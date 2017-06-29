@@ -33,7 +33,8 @@ import quasar.precog.common.security.{
 
 import quasar.yggdrasil.PathMetadata
 import quasar.yggdrasil.table.VFSColumnarTableModule
-import quasar.yggdrasil.vfs.ResourceError
+
+import quasar.yggdrasil.vfs.{SerialVFS, ResourceError}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.routing.{
@@ -45,7 +46,13 @@ import akka.routing.{
   Router
 }
 
+import delorean._
+
+import fs2.async
+import fs2.interop.scalaz._
+
 import scalaz.{EitherT, Monad, StreamT}
+import scalaz.concurrent.Task
 import scalaz.std.scalaFuture.futureInstance
 
 import java.io.File
@@ -57,7 +64,7 @@ import scala.concurrent.Future
 import scala.collection.immutable.IndexedSeq
 
 // calling this constructor is a side-effect; you must always shutdown allocated instances
-class Precog(dataDir0: File) extends VFSColumnarTableModule {
+final class Precog private (dataDir0: File) extends VFSColumnarTableModule {
 
   object Config {
     val howManyChefsInTheKitchen: Int = 4
@@ -66,6 +73,20 @@ class Precog(dataDir0: File) extends VFSColumnarTableModule {
     val quiescenceTimeout: FiniteDuration = new FiniteDuration(300, SECONDS)
     val maxOpenPaths: Int = 500
     val dataDir: File = dataDir0
+  }
+
+  private var _vfs: SerialVFS = _
+  def vfs = _vfs
+
+  private val vfsShutdownSignal =
+    async.signalOf[Task, Option[Unit]](Some(())).unsafePerformSync
+
+  {
+    // setup VFS stuff as a side-effect (and a race condition!)
+    val vfsStr = SerialVFS(dataDir0).evalMap(v => Task.delay(_vfs = v))
+    val gated = vfsStr.mergeHaltBoth(vfsShutdownSignal.discrete.noneTerminate.drain)
+
+    gated.run.unsafePerformAsync(_ => ())
   }
 
   // for the time being, do everything with this key
@@ -120,5 +141,15 @@ class Precog(dataDir0: File) extends VFSColumnarTableModule {
   // TODO this could be trivially rewritten with fs2.Stream
   def ingest(path: Path, chunks: StreamT[Future, Vector[JValue]]): Future[Unit] = ???   // TODO
 
-  def shutdown: Future[Unit] = actorSystem.terminate.map(_ => ())
+  def shutdown: Future[Unit] = {
+    for {
+      _ <- vfsShutdownSignal.set(None).unsafeToFuture
+      _ <- actorSystem.terminate.map(_ => ())
+    } yield ()
+  }
+}
+
+object Precog {
+  def apply(dataDir: File): Task[Precog] =
+    Task.delay(new Precog(dataDir))
 }

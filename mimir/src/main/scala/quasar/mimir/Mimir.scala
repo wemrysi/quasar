@@ -136,7 +136,7 @@ object Mimir extends BackendModule with Logging {
 
   def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])] = {
     val t = for {
-      cake <- Task.delay(new Precog(cfg.dataDir))
+      cake <- Precog(cfg.dataDir)
     } yield (λ[M ~> Task](_.run(cake)), cake.shutdown.toTask)
 
     t.liftM[FileSystemDef.DefErrT]

@@ -34,6 +34,8 @@ import org.slf4s.Logging
 
 trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with Logging {
 
+  def vfs: SerialVFS
+
   trait VFSColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
     def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[Future, ResourceError, Table] = ???   // TODO
   }
