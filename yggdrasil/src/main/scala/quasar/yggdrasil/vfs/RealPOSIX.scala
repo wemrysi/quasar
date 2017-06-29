@@ -124,7 +124,10 @@ object RealPOSIX {
           Path.refineType(target) match {
             case -\/(dir) =>
               Task delay {
-                IOUtils.recursiveDelete(ftarget).unsafePerformIO()
+                if (Files.isSymbolicLink(ftarget.toPath()))
+                  Files.delete(ftarget.toPath())
+                else
+                  IOUtils.recursiveDelete(ftarget).unsafePerformIO()
               }
 
             case \/-(file) => Task.delay(ftarget.delete()).void

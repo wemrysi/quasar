@@ -273,6 +273,28 @@ object RealPOSIXSpecs extends Specification {
 
       ftarget.exists() mustEqual false
     }
+
+    "delete a non-empty dir symlink" in setupDir { base =>
+      val target = "foo"
+      val ftarget = new File(base, target)
+
+      ftarget.mkdir()
+
+      Files.createFile(new File(ftarget, "test").toPath())
+
+      val test = for {
+        interp <- RealPOSIX(base)
+        _ <- interp(LinkDir(Path.rootDir </> Path.dir("foo"), Path.rootDir </> Path.dir("bar")))
+        _ <- interp(Delete(Path.rootDir </> Path.dir("bar")))
+      } yield ()
+
+      test.unsafePerformSync
+
+      ftarget.exists() mustEqual true
+      new File(ftarget, "test").exists() mustEqual true
+
+      new File(base, "bar").exists() mustEqual false
+    }
   }
 
   def translate[A](str: Stream[POSIXWithTask, A], interp: POSIXOp ~> Task): Stream[Task, A] = {
