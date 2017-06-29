@@ -137,9 +137,6 @@ trait StructuralPlanner[F[_], FMT] { self =>
   def typeOf(item: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
     typeOfFn.apply(item)
 
-  def typeOfQ(item: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
-    typeOfQFn.apply(item)
-
   /** Converts a sequence of items into an array. */
   def seqToArray(seq: XQuery)(implicit F0: Bind[F], F1: PrologW[F]): F[XQuery] =
     seqToArrayFn.apply(seq)
@@ -206,22 +203,6 @@ trait StructuralPlanner[F[_], FMT] { self =>
         })
     })
 
-  // ejson:type-of-q($item as item()*) as xs:string?
-  def typeOfQFn(implicit F0: Bind[F], F1: PrologW[F]): F[FunctionDecl1] =
-    ejs.declare[F]("type-of-q") flatMap (_(
-      $("item") as ST.Top
-    ).as(ST("xs:string?")) { item: XQuery =>
-      val (lookup, mapped) = ($("lookup"), $("mapped"))
-      typeOf(item) map ( tpe =>
-        let_(
-          lookup := map.new_(mkSeq_(
-            map.entry("object".xs, "map".xs),
-            map.entry("string".xs, "array".xs),
-            map.entry("na".xs, emptySeq)
-          )),
-          mapped := map.get(~lookup, tpe))
-        .return_(if_(fn.empty(~mapped) and tpe =/= "na".xs).then_(tpe).else_(~mapped)))
-    })
 
   // ejson:type-of($item as item()*) as xs:string?
   private def typeOfFn(implicit F0: Bind[F], F1: PrologW[F]): F[FunctionDecl1] =
