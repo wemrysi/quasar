@@ -216,11 +216,11 @@ trait StructuralPlanner[F[_], FMT] { self =>
         let_(
           lookup := map.new_(mkSeq_(
             map.entry("object".xs, "map".xs),
-            map.entry("string".xs, "array".xs)
+            map.entry("string".xs, "array".xs),
+            map.entry("na".xs, emptySeq)
           )),
-          mapped := map.get(~lookup, tpe)
-        )
-        .return_(if_(fn.empty(~mapped)).then_(tpe).else_(~mapped)))
+          mapped := map.get(~lookup, tpe))
+        .return_(if_(fn.empty(~mapped) and tpe =/= "na".xs).then_(tpe).else_(~mapped)))
     })
 
   // ejson:type-of($item as item()*) as xs:string?
