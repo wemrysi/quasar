@@ -796,6 +796,21 @@ object FreeVFSSpecs extends Specification {
             to mustEqual (baseDir </> Path.file("versions.json"))
           }
       }
+
+      _ <- H.pattern[Unit] {
+        case CPL(Delete(target)) =>
+          Task delay {
+            target mustEqual (baseDir </> Path.dir("CURRENT"))
+          }
+      }
+
+      _ <- H.pattern[Unit] {
+        case CPL(LinkDir(from, to)) =>
+          Task delay {
+            from mustEqual (baseDir </> Path.dir(uuid.toString))
+            to mustEqual (baseDir </> Path.dir("CURRENT"))
+          }
+      }
     } yield ()
   }
 

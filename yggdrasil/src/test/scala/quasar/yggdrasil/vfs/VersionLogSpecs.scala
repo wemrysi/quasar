@@ -269,6 +269,21 @@ object VersionLogSpecs extends Specification {
               to mustEqual (BaseDir </> Path.file("versions.json"))
             }
         }
+
+        _ <- HWT.pattern[Unit] {
+          case CPL(Delete(target)) =>
+            Task delay {
+              target mustEqual (BaseDir </> Path.dir("CURRENT"))
+            }
+        }
+
+        _ <- HWT.pattern[Unit] {
+          case CPL(LinkDir(from, to)) =>
+            Task delay {
+              from mustEqual (BaseDir </> Path.dir(v.value.toString))
+              to mustEqual (BaseDir </> Path.dir("CURRENT"))
+            }
+        }
       } yield ()
 
       val state =

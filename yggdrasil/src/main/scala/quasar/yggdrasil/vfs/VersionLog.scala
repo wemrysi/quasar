@@ -135,7 +135,12 @@ object VersionLog {
           writer = Stream.emit(ByteVector(json.getBytes)).to(vnew).run
           _ <- POSIXWithTask.generalize(writer).liftM[ST]
 
-          _ <- POSIX.move(log.baseDir </> VersionsJsonNew, log.baseDir </> VersionsJson).liftM[ST]
+          _ <- POSIX.move[S](log.baseDir </> VersionsJsonNew, log.baseDir </> VersionsJson).liftM[ST]
+
+          _ <- POSIX.delete[S](log.baseDir </> Path.dir("CURRENT")).liftM[ST]
+          _ <- POSIX.linkDir[S](
+            log.baseDir </> Path.dir(v.value.toString),
+            log.baseDir </> Path.dir("CURRENT")).liftM[ST]
         } yield ()
       } else {
         ().point[StateT[Free[S, ?], VersionLog, ?]]
