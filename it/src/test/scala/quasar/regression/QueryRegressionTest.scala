@@ -42,7 +42,7 @@ import scala.util.matching.Regex
 import argonaut._, Argonaut._
 import matryoshka._
 import matryoshka.data.Fix
-import org.specs2.execute._
+import org.specs2.execute
 import org.specs2.specification.core.Fragment
 import pathy.Path, Path._
 import scalaz._, Scalaz._
@@ -128,7 +128,7 @@ abstract class QueryRegressionTest[S[_]](
     setup: Run,
     run: Run
   ): Fragment = {
-    def runTest: Result = {
+    def runTest: execute.Result = {
       val data = testQuery(
         test.data.nonEmpty.fold(DataDir </> fileParent(loc), rootDir),
         test.query,
@@ -144,10 +144,15 @@ abstract class QueryRegressionTest[S[_]](
       test.backends.get(backendName) match {
         case Some(TestDirective.Skip)    => skipped
         case Some(TestDirective.SkipCI)  =>
-          BuildInfo.isCIBuild.fold(Skipped("(skipped during CI build)"), runTest)
+          BuildInfo.isCIBuild.fold(execute.Skipped("(skipped during CI build)"), runTest)
+        case Some(TestDirective.Timeout)  =>
+          // NB: To locally skip tests that time out, make `Skipped` unconditional.
+          BuildInfo.isCIBuild.fold(
+            execute.Skipped("(skipped because it times out)"),
+            runTest)
         case Some(TestDirective.Pending) =>
           if (BuildInfo.coverageEnabled)
-            Skipped("(pending example skipped during coverage run)")
+            execute.Skipped("(pending example skipped during coverage run)")
           else
             runTest.pendingUntilFixed
         case _                           => runTest
@@ -199,7 +204,7 @@ abstract class QueryRegressionTest[S[_]](
     act: Process[CompExecM, Data],
     run: Run,
     backendName: BackendName
-  ): Task[Result] = {
+  ): Task[execute.Result] = {
 
     type H1[A] = PhaseResultT[Task, A]
     type H2[A] = SemanticErrsT[H1, A]
@@ -222,24 +227,42 @@ abstract class QueryRegressionTest[S[_]](
     def deleteFields: Json => Json =
       _.withObject(exp.ignoredFields.foldLeft(_)(_ - _))
 
-    exp.predicate(
-      exp.rows.toVector,
-      act.map(d => normalizeJson(d.asJson) ∘ deleteFields).unite.translate[Task](liftRun),
-      // TODO: Error if a backend ignores field order when the query already does.
-      if (exp.ignoreFieldOrder) OrderIgnored
-      else exp.backends.get(backendName) match {
-        case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder) =>
-          OrderIgnored
-        case _ =>
-          OrderPreserved
-      },
-      if (exp.ignoreResultOrder) OrderIgnored
-      else exp.backends.get(backendName) match {
-        case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreResultOrder) =>
-          OrderIgnored
-        case _ =>
-          OrderPreserved
-      })
+    val result =
+      exp.predicate(
+        exp.rows.toVector,
+        act.map(d => normalizeJson(d.asJson) ∘ deleteFields).unite.translate[Task](liftRun),
+        // TODO: Error if a backend ignores field order when the query already does.
+        if (exp.ignoreFieldOrder) OrderIgnored
+        else exp.backends.get(backendName) match {
+          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder) =>
+            OrderIgnored
+          case _ =>
+            OrderPreserved
+        },
+        if (exp.ignoreResultOrder) OrderIgnored
+        else exp.backends.get(backendName) match {
+          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreResultOrder) =>
+            OrderIgnored
+          case _ =>
+            OrderPreserved
+        })
+
+    exp.backends.get(backendName) match {
+        case Some(TestDirective.Timeout) => result.map {
+          case execute.Success(_, _) =>
+            execute.Failure(s"Fixed now, you should remove the “timeout” status.")
+          case execute.Failure(m, _, _, _) =>
+            execute.Failure(s"Failed with “$m”, you should change the “timeout” status.")
+          case x => x
+        }.handle {
+          case e: java.util.concurrent.TimeoutException => execute.Pending(s"times out: ${e.getMessage}")
+          case e => execute.Failure(s"Errored with “${e.getMessage}”, you should change the “timeout” status to “pending”.") 
+        }
+      case _ => result.handle {
+        case e: java.util.concurrent.TimeoutException =>
+          execute.Failure(s"Times out (${e.getMessage}), you should use the “timeout” status.")
+      }
+    }
   }
 
   /** Parse and execute the given query, returning a stream of results. */

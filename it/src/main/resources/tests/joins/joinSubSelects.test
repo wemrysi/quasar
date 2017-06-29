@@ -2,15 +2,14 @@
     "name": "join the results of a pair of sub-queries",
 
     "backends": {
-        "couchbase":         "skip",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
+        "couchbase":      "timeout",
+        "marklogic_json": "timeout",
+        "marklogic_xml":  "timeout",
         "mimir": "skip",
-        "postgresql":        "pending"
+        "postgresql":     "pending"
     },
 
-    "NB": "#2120: Disabled in marklogic due to slow performance.
-           #1587: Disabled in couchbase due to lack of general join.",
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
 
     "data": ["../zips.data", "../largeZips.data"],
 

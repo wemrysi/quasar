@@ -176,14 +176,16 @@ sealed abstract class TypeStatInstances {
         def optEntry[B: EncodeEJson](k: String, b: Option[B]): List[(String, J)] =
           b.map(x => (k, x.asEJson[J])).toList
 
-        def minmax[B: EncodeEJson](c: A, mn: B, mx: B): J =
+        def minmax[B: EncodeEJson](kind: String, c: A, mn: B, mx: B): J =
           emap(
+            "kind"   -> kind.asEJson[J],
             "count" -> c.asEJson[J],
             "min"   -> mn.asEJson[J],
             "max"   -> mx.asEJson[J])
 
-        def dist[B: EncodeEJson](ss: SampleStats[A], mn: B, mx: B): J =
+        def dist[B: EncodeEJson](kind: String, ss: SampleStats[A], mn: B, mx: B): J =
           emap(
+            "kind"          -> kind.asEJson[J],
             "count"        -> ss.size.asEJson[J],
             "distribution" -> emap(
                       ("mean"   -> ss.mean.asEJson[J])    ::
@@ -194,22 +196,31 @@ sealed abstract class TypeStatInstances {
             "max"          -> mx.asEJson[J])
 
         ts match {
-          case Bool(t, f)               => emap("true" -> t.asEJson[J], "false" -> f.asEJson[J])
-          case Byte(c, mn, mx)          => minmax(c, mn, mx)
-          case Char(c, mn, mx)          => minmax(c, mn, mx)
-          case Int(s, mn, mx)           => dist(s, mn, mx)
-          case Dec(s, mn, mx)           => dist(s, mn, mx)
-          case Count(c)                 => emap("count" -> c.asEJson[J])
+          case Bool(t, f)               =>
+            emap(
+              "kind" -> "boolean".asEJson[J],
+              "true" -> t.asEJson[J],
+              "false" -> f.asEJson[J])
+          case Byte(c, mn, mx)          => minmax("byte", c, mn, mx)
+          case Char(c, mn, mx)          => minmax("char", c, mn, mx)
+          case Int(s, mn, mx)           => dist("integer", s, mn, mx)
+          case Dec(s, mn, mx)           => dist("decimal", s, mn, mx)
+          case Count(c)                 =>
+            emap(
+              "kind"   -> "count".asEJson[J],
+              "count" -> c.asEJson[J])
 
           case Coll(c, mnl, mxl)        =>
             emap(
-              ("count" -> c.asEJson[J])  ::
-              optEntry("minLength", mnl) :::
-              optEntry("maxLength", mxl) : _*)
+              ("kind"   -> "collection".asEJson[J]) ::
+              ("count" -> c.asEJson[J])            ::
+              optEntry("minLength", mnl)           :::
+              optEntry("maxLength", mxl)           : _*)
 
 
           case Str(c, mnl, mxl, mn, mx) =>
             emap(
+              "kind"       -> "string".asEJson[J],
               "count"     -> c.asEJson[J],
               "minLength" -> mnl.asEJson[J],
               "maxLength" -> mxl.asEJson[J],

@@ -2,16 +2,17 @@
     "name": "perform inner equi-join",
 
     "backends": {
-        "couchbase":         "skip",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "mimir": "skip",
+        "couchbase":         "pending",
+        "marklogic_json":    "timeout",
+        "marklogic_xml":     "timeout",
+        "mimir":             "skip",
+        "mongodb_3_2":       "timeout",
+        "mongodb_3_4":       "timeout",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },
 
-    "NB": "#2120: Disabled in marklogic due to slow performance.
-           #1587: Disabled in couchbase due to lack of general join.",
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
 
     "data": ["../smallZips.data", "../zips.data"],
 

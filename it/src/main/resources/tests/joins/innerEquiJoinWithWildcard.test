@@ -2,14 +2,16 @@
     "name": "perform inner equi-join with wildcard",
 
     "backends": {
-        "couchbase":      "pending",
-        "marklogic_json": "skip",
-        "marklogic_xml":  "skip",
+        "couchbase":         "pending",
+        "marklogic_json":    "timeout",
+        "marklogic_xml":     "timeout",
         "mimir":          "skip",
-        "postgresql":     "pending"
+        "mongodb_3_2":       "timeout",
+        "mongodb_3_4":       "timeout",
+        "postgresql":        "pending"
     },
 
-    "NB": "#2120: Disabled in marklogic due to slow performance.",
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
 
     "data": ["../smallZips.data", "../zips.data"],
 
