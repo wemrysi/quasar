@@ -41,6 +41,7 @@ import scalaz.syntax.monoid._
 
 import scodec.bits.ByteVector
 
+import java.io.File
 import java.util.UUID
 
 final case class VFS(
@@ -355,6 +356,7 @@ object FreeVFS {
  * serialization is imposed without thread locking.
  */
 final class SerialVFS private (
+    root: File,
     @volatile private var current: VFS,
     worker: mutable.Queue[Task, Task[Unit]],    // this exists solely for #serialize
     interp: POSIXWithTask ~> Task) {
@@ -382,14 +384,17 @@ final class SerialVFS private (
   def readPath(path: AFile): Task[Option[Blob]] =
     runST(FreeVFS.readPath[POSIXWithTask](path))
 
-  def underlyingDir(blob: Blob, version: Version): Task[Option[ADir]] =
-    runST(FreeVFS.underlyingDir[S](blob, version))
+  def underlyingDir(blob: Blob, version: Version): Task[File] = {
+    runST(FreeVFS.underlyingDir[S](blob, version)).map(_.get) map { adir =>
+      new File(root, Path.posixCodec.printPath(adir))
+    }
+  }
 
   def headOfBlob(blob: Blob): Task[Option[Version]] =
     runST(FreeVFS.headOfBlob[S](blob))
 
-  def fresh(blob: Blob): Task[Option[Version]] =
-    runST(FreeVFS.fresh[S](blob))
+  def fresh(blob: Blob): Task[Version] =
+    runST(FreeVFS.fresh[S](blob)).map(_.get)
 
   def commit(blob: Blob, version: Version): Task[Unit] =
     runST(FreeVFS.commit[S](blob, version))
@@ -416,8 +421,6 @@ final class SerialVFS private (
 }
 
 object SerialVFS {
-  import java.io.File
-
   private[SerialVFS] type S[A] = Coproduct[POSIXOp, Task, A]
 
   /**
@@ -432,7 +435,7 @@ object SerialVFS {
       vfs <- Stream.eval(FreeVFS.init[S](Path.rootDir).foldMap(interp))
       worker <- Stream.eval(async.boundedQueue[Task, Task[Unit]](10))
 
-      svfs = new SerialVFS(vfs, worker, λ[POSIXWithTask ~> Task](_.foldMap(interp)))
+      svfs = new SerialVFS(root, vfs, worker, λ[POSIXWithTask ~> Task](_.foldMap(interp)))
       back <- Stream.emit(svfs).merge(worker.dequeue.evalMap(t => t).drain)
     } yield back
   }
