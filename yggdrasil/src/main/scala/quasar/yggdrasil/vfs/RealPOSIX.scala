@@ -90,7 +90,7 @@ object RealPOSIX {
           val ptarget = canonicalize(target).toPath()
 
           Task delay {
-            Files.createSymbolicLink(psrc, ptarget)
+            Files.createSymbolicLink(ptarget, psrc)
 
             ()
           }
@@ -100,7 +100,7 @@ object RealPOSIX {
           val ptarget = canonicalize(target).toPath()
 
           Task delay {
-            Files.createSymbolicLink(psrc, ptarget)
+            Files.createSymbolicLink(ptarget, psrc)
 
             ()
           }
