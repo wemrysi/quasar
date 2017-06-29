@@ -195,7 +195,11 @@ object Mimir extends BackendModule with Logging {
     lazy val doPlanMapFuncDerived: AlgebraM[(Option ∘ Backend)#λ, MapFuncDerived[T, ?], Repr] = _ => None
 
     lazy val planMapFuncDerived: AlgebraM[Backend, MapFuncDerived[T, ?], Repr] = { f =>
-      doPlanMapFuncDerived(f).getOrElse(???)
+      doPlanMapFuncDerived(f).getOrElse(
+        Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(
+          interpretM(implicitly[Monad[Backend]].point[Repr](_), planMapFuncCore)
+        )
+      )
     }
 
     lazy val planMapFunc: AlgebraM[Backend, MapFunc[T, ?], Repr] = {

@@ -220,6 +220,7 @@ final class Compiler[M[_], T: Equal]
       CIName("squash")                  -> identity.Squash,
       CIName("oid")                     -> identity.ToId,
       CIName("type_of")                 -> identity.TypeOf,
+      CIName("abs")                     -> math.Abs,
       CIName("between")                 -> relations.Between,
       CIName("where")                   -> set.Filter,
       CIName("distinct")                -> set.Distinct,

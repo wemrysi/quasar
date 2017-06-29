@@ -928,7 +928,7 @@ class QScriptPruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScr
           UnreferencedRT.embed,
           HoleF,
           ExcludeId,
-          Free.roll(Constant(ejsonArr())))).embed
+          Free.roll(MFC(Constant(ejsonArr()))))).embed
 
       val expected: Fix[QST] =
         QCT.inj(LeftShift(

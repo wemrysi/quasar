@@ -16,7 +16,7 @@
 
 package quasar.qscript
 
-import quasar.ejson
+//import quasar.ejson
 import quasar.qscript.{MapFuncsDerived => D}, MapFuncsCore._
 
 import matryoshka._
@@ -45,12 +45,15 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
 
       val expand: MapFuncDerived[T, ?] ~> ((OUT ∘ Free[OUT, ?])#λ) =
         λ[MapFuncDerived[T, ?] ~> (OUT ∘ Free[OUT, ?])#λ] {
-          case D.Abs(a) =>
-            MFC(Cond(
-              Free.roll(MFC(Lt(a.point[Free[OUT,?]], Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(0)))))))),
-              Free.roll(MFC(Negate(a.point[Free[OUT, ?]]))),
-              a.point[Free[OUT, ?]]
-            ))
+          //TODO just a simple (and wrong) expansion for now to show the idea works
+          //the commented out version returns
+          // java.lang.RuntimeException: The function 'Abs' is recognized but not supported by this back-end. (in workflow planner) (rethrow.scala:33)
+          case D.Abs(a) => MFC(Add(a.point[Free[OUT, ?]], a.point[Free[OUT, ?]]))
+            // MFC(Cond(
+            //   Free.roll(MFC(Lt(a.point[Free[OUT,?]], Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(0)))))))),
+            //   Free.roll(MFC(Negate(a.point[Free[OUT, ?]]))),
+            //   a.point[Free[OUT, ?]]
+            // ))
         }
     }
 

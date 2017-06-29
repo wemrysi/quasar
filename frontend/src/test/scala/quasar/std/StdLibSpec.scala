@@ -930,6 +930,20 @@ abstract class StdLibSpec extends Qspec {
         // TODO: Interval
       }
 
+      "Abs" >> {
+        "any Int" >> prop { (x: BigInt) =>
+          unary(Abs(_).embed, Data.Int(x), if (x >= 0) Data.Int(x) else Data.Int(-x))
+        }
+
+        "any Dec" >> prop { (x: BigDecimal) =>
+          unary(Abs(_).embed, Data.Dec(x), if (x >= 0) Data.Dec(x) else Data.Dec(-x))
+        }
+
+        "any Interval" >> prop { (x: Duration) =>
+          unary(Abs(_).embed, Data.Interval(x), if (x.isNegative) Data.Interval(x.negated) else Data.Interval(x))
+        }
+      }
+
       "Modulo" >> {
         "any int by 1" >> prop { (x: Int) =>
             binary(Modulo(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(0))
