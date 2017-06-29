@@ -531,6 +531,7 @@ lazy val yggdrasil = project.setup
       "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2",
 
       "co.fs2" %% "fs2-core"   % "0.9.6",
+      "co.fs2" %% "fs2-io"     % "0.9.6",
       "co.fs2" %% "fs2-scalaz" % "0.2.0",
 
       "com.codecommit" %% "smock" % "0.3-specs2-3.8.4" % "test"))
