@@ -55,7 +55,8 @@ object data {
     case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) =>
       respond_((offsetOrInvalid(offsetParam) |@| limitOrInvalid(limitParam)) { (offset, limit) =>
         val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
-        download[S](requestedFormat, path, offset, limit)
+        val zipped = req.headers.get(Accept).map(_.values.exists(_.mediaRange == MediaType.`application/zip`)).getOrElse(false)
+        download[S](requestedFormat, path, offset, limit, zipped)
       })
 
     case req @ POST -> AsFilePath(path) =>
@@ -84,7 +85,8 @@ object data {
     format: MessageFormat,
     path: APath,
     offset: Natural,
-    limit: Option[Positive]
+    limit: Option[Positive],
+    zipped: Boolean
   )(implicit
     R: ReadFile.Ops[S],
     Q: QueryFile.Ops[S],
@@ -99,7 +101,18 @@ object data {
             (format.disposition.toList: List[Header])
         QResponse.headers.modify(_ ++ headers)(QResponse.streaming(p))
       },
-      filePath => formattedDataResponse(format, R.scan(filePath, offset, limit)))
+      filePath => {
+        if (zipped) {
+          val headers: List[Header] = `Content-Type`(MediaType.`application/zip`) :: (format.disposition.toList: List[Header])
+          val p: Process[R.M, ByteVector] = format.encode(R.scan(filePath, offset, limit)).map(str => ByteVector.view(str.getBytes(StandardCharsets.UTF_8)))
+          val f: RelFile[Sandboxed] = currentDir[Sandboxed] </> file1[Sandboxed](fileName(filePath))
+          val z: Process[R.M, ByteVector] = Zip.zipFiles(Map(f -> p))
+          QResponse.headers.modify(_ ++ headers)(QResponse.streaming(z))
+        }
+        else {
+          formattedDataResponse(format, R.scan(filePath, offset, limit))
+        }
+      })
 
   private def parseDestination(dstString: String): ApiError \/ APath = {
     def absPathRequired(rf: pathy.Path[Rel, _, _]) = ApiError.fromMsg(
