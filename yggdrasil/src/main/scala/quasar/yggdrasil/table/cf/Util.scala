@@ -283,6 +283,20 @@ object util {
     case c: NullColumn        => new EmptyColumn[NullColumn] with NullColumn
   }
 
+  val Undefined = CF1P("builtin::ct::undefined") {
+    case c: BoolColumn   => UndefinedColumn.raw
+    case c: LongColumn   => UndefinedColumn.raw
+    case c: DoubleColumn => UndefinedColumn.raw
+    case c: NumColumn    => UndefinedColumn.raw
+    case c: StrColumn    => UndefinedColumn.raw
+    case c: DateColumn   => UndefinedColumn.raw
+    case c: PeriodColumn => UndefinedColumn.raw
+    case c: HomogeneousArrayColumn[_] => UndefinedColumn.raw
+    case c: EmptyArrayColumn  => UndefinedColumn.raw
+    case c: EmptyObjectColumn => UndefinedColumn.raw
+    case c: NullColumn        => UndefinedColumn.raw
+  }
+
   def Remap(f: Int => Int) = CF1P("builtin::ct::remap") {
     case c: BoolColumn   => new RemapColumn(c, f) with BoolColumn { def apply(row: Int)   = c(f(row)) }
     case c: LongColumn   => new RemapColumn(c, f) with LongColumn { def apply(row: Int)   = c(f(row)) }

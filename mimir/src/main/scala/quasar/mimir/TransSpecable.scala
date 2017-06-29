@@ -108,7 +108,7 @@ trait TransSpecableModule[M[+ _]] extends TransSpecModule with TableModule[M] wi
 
         def EqualLiteral(node: Join)(parent: N[S], value: RValue, invert: Boolean) =
           parent.flatMap(leftMap(_) { target =>
-            val inner = trans.Equal(target, transRValue(value, target))
+            val inner = trans.Equal(target, trans.transRValue(value, target))
             if (invert) op1ForUnOp(Comp).spec(MorphContext(ctx, node))(inner) else inner
           })
 
