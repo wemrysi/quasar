@@ -41,12 +41,13 @@ object compression {
     * group of keys having the same primary type to the unknown key field
     * and their values to the unknown value field.
     */
-  def coalesceKeys[J: Order, A: Order: Field: ConvertableTo](
+  def coalesceKeys[F[_], J: Order, A: Order: Field: ConvertableTo](
     maxSize: Positive
   )(implicit
+    I : TypeF[J, ?] :<: F,
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
+  ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
     case EnvT((ts, Map(kn, unk))) if kn.size > maxSize.value =>
       val grouped =
         kn.foldlWithKey(IMap.empty[PrimaryType, J ==>> Unit])((m, j, _) =>
@@ -65,11 +66,12 @@ object compression {
   /** Compress unions by combining any constants with their primary type if it
     * also appears in the union.
     */
-  def coalescePrimary[J: Order, A: Order: Field: ConvertableTo](
+  def coalescePrimary[F[_], J: Order, A: Order: Field: ConvertableTo](
     implicit
+    I : TypeF[J, ?] :<: F,
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
+  ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
     case sstf @ EnvT((ts, Unioned(xs))) if xs.any(sstConst[J, A].isEmpty) =>
       val grouped = xs.list groupBy { sst =>
         sstConst[J, A].isEmpty(sst).fold(
@@ -91,11 +93,12 @@ object compression {
     * when the unknown contains any values having the same primary type as the
     * known key.
     */
-  def coalesceWithUnknown[J: Order, A: Order: Field: ConvertableTo](
+  def coalesceWithUnknown[F[_], J: Order, A: Order: Field: ConvertableTo](
     implicit
+    I : TypeF[J, ?] :<: F,
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
+  ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
     case EnvT((ts, Map(xs, Some((k, v))))) =>
       val unkPrimaries = k.toType[Fix[TypeF[J, ?]]].project match {
         case Unioned(ts) => ISet.fromFoldable(ts.map(t => primary(t.project)).list.unite)
@@ -112,22 +115,24 @@ object compression {
   /** Replace statically known arrays longer than the given limit with an array
     * of unknown size.
     */
-  def limitArrays[J: Order, A: Order](maxLength: Positive)(
+  def limitArrays[F[_], J: Order, A: Order](maxLength: Positive)(
     implicit
+    I : TypeF[J, ?] :<: F,
     A : Field[A],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
+  ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
     case EnvT((ts, Arr(-\/(elts)))) if elts.length > maxLength.value =>
       val (cnt, len) = (size1(ts), A fromInt elts.length)
       envT(some(TS.coll(cnt, some(len), some(len))), arr(\/-(elts.suml)))
   }
 
   /** Replace literal string types longer than the given limit with `char[]`. */
-  def limitStrings[J, A](maxLength: Positive)(
+  def limitStrings[F[_], J, A](maxLength: Positive)(
     implicit
+    I : TypeF[J, ?] :<: F,
     A : Ring[A],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
+  ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
     case EnvT((ts, Const(Embed(C(Str(s)))))) if s.length > maxLength.value =>
       val (cnt, len) = (size1(ts), A fromInt s.length)
       envT(some(TS.coll(cnt, some(len), some(len))), charArr(cnt))
@@ -136,12 +141,13 @@ object compression {
   /** Compress a union larger than `maxSize` by reducing the largest group of
     * values sharing a primary type to their shared type.
     */
-  def narrowUnion[J: Order, A: Order: Field: ConvertableTo](
+  def narrowUnion[F[_], J: Order, A: Order: Field: ConvertableTo](
     maxSize: Positive
   )(implicit
+    I : TypeF[J, ?] :<: F,
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
+  ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
     case sstf @ EnvT((ts, Unioned(xs))) if xs.length > maxSize.value =>
       val grouped   = xs.list.groupBy(sst => TypeF.primary[J](sst.project.lower))
       val primaries = grouped.toList.map(_.bitraverse(ι, some)).unite
@@ -159,11 +165,12 @@ object compression {
   }
 
   /** Replace encoded binary strings with `byte[]`. */
-  def z85EncodedBinary[J, A](
+  def z85EncodedBinary[F[_], J, A](
     implicit
+    I : TypeF[J, ?] :<: F,
     A : Field[A],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
+  ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
     case EnvT((ts, Const(Embed(EncodedBinary(size))))) =>
       // NB: Z85 uses 5 chars for every 4 bytes.
       val (cnt, len) = (size1(ts), some(A.fromBigInt(size)))
@@ -208,6 +215,23 @@ object compression {
     case SimpleEJson(s)   => envT(some(TS.fromEJson(cnt, j)), simple[J, SST[J, A]](s)).embed
     case Embed(C(Str(_))) => envT(some(TS.fromEJson(cnt, j)), charArr[J, A](cnt)).embed
     case _                => SST.fromEJson(cnt, j)
+  }
+
+  private object partialTransform {
+    def apply[F[_], G[_]] = new PartiallyApplied[F, G]
+
+    final class PartiallyApplied[F[_], G[_]] {
+      def apply[A, B](
+        pf: PartialFunction[SSTF2[F, A, B], SSTF2[F, A, B]]
+      )(
+        implicit I: F :<: G
+      ): SSTF2[G, A, B] => SSTF2[G, A, B] =
+        orOriginal((sstf: SSTF2[G, A, B]) =>
+            sstf.run.traverse(I.prj)
+              .map(EnvT(_))
+              .collect(pf)
+              .map(EnvT.hmap(I)(_)))
+    }
   }
 
   private def size1[A](ots: Option[TypeStat[A]])(implicit R: Ring[A]): A =

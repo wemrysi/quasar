@@ -77,13 +77,13 @@ object analysis {
     JR: Recursive.Aux[J, EJson]
   ): Process1[Data, SST[J, A]] = {
     val structuralTrans =
-      compression.coalesceWithUnknown[J, A]                    >>>
-      compression.coalesceKeys[J, A](settings.mapMaxSize)      >>>
-      compression.z85EncodedBinary[J, A]                       >>>
-      compression.limitStrings[J, A](settings.stringMaxLength) >>>
-      compression.limitArrays[J, A](settings.arrayMaxLength)   >>>
-      compression.coalescePrimary[J, A]                        >>>
-      compression.narrowUnion[J, A](settings.unionMaxSize)
+      compression.coalesceWithUnknown[TypeS[J, ?], J, A]                    >>>
+      compression.coalesceKeys[TypeS[J, ?], J, A](settings.mapMaxSize)      >>>
+      compression.z85EncodedBinary[TypeS[J, ?], J, A]                       >>>
+      compression.limitStrings[TypeS[J, ?], J, A](settings.stringMaxLength) >>>
+      compression.limitArrays[TypeS[J, ?], J, A](settings.arrayMaxLength)   >>>
+      compression.coalescePrimary[TypeS[J, ?], J, A]                        >>>
+      compression.narrowUnion[TypeS[J, ?], J, A](settings.unionMaxSize)
 
     val compress = (sst: SST[J, A]) => {
       val compSST = sst.transCata[SST[J, A]](structuralTrans)
