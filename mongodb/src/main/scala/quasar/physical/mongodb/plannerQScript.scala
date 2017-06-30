@@ -171,10 +171,6 @@ object MongoDbQScriptPlanner {
       funcHandler(mf).map(t => unpack(t.mapSuspension(inj)))
 
     val handleSpecialCore: MapFuncCore[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
-      case Constant(v1) =>
-        v1.cataM(BsonCodec.fromEJson).fold(
-          κ(merr.raiseError(qscriptPlanningFailed(NonRepresentableEJson(v1.shows)))),
-          $literal(_).point[M])
       case Now() => unimplemented[M, Fix[ExprOp]]("Now expression")
 
       // FIXME: Will only work for Arrays, not Strings

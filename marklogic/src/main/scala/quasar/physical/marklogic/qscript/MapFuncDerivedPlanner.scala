@@ -27,7 +27,7 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-import scalaz._//, Scalaz._
+import scalaz._
 
 private[qscript] final class MapFuncDerivedPlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: BirecursiveT](
   implicit
