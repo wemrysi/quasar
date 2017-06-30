@@ -32,8 +32,6 @@ import quasar.qscript._
 
 import quasar.blueeyes.json.{JNum, JValue}
 import quasar.precog.common.{Path, RValue}
-import quasar.precog.util.IOUtils
-import quasar.yggdrasil.PathMetadata
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
 
@@ -290,27 +288,6 @@ object Mimir extends BackendModule with Logging {
   private def dirToPath(dir: ADir): Path = Path(pathy.Path.posixCodec.printPath(dir))
   private def fileToPath(file: AFile): Path = Path(pathy.Path.posixCodec.printPath(file))
 
-  private def toSegment: PathMetadata => PathSegment = {
-    // ShiftedRead[ADir]
-    case PathMetadata(path, PathMetadata.DataDir(_)) =>
-      DirName(path.components.mkString("/")).left[FileName]
-
-    // ShiftedRead[AFile]
-    case PathMetadata(path, PathMetadata.DataOnly(_)) =>
-      FileName(path.components.mkString("/")).right[DirName]
-
-    case PathMetadata(path, PathMetadata.PathOnly) =>
-      DirName(path.components.mkString("/")).left[FileName]
-  }
-
-  private def children(dir: ADir): EitherT[M, ResourceError, Set[PathSegment]] = {
-    log.debug(s"children of $dir")
-
-    cake[M].liftM[EitherT[?[_], ResourceError, ?]] flatMap { P =>
-      P.showContents(dirToPath(dir)).map(_.map(toSegment)).mapT(_.toTask.liftM[MT])
-    }
-  }
-
   private def toFSError: ResourceError => FileSystemError = {
     case ResourceError.Corrupt(msg) => ???
     case ResourceError.IOError(ex) => ???
@@ -352,27 +329,11 @@ object Mimir extends BackendModule with Logging {
 
     def explain(repr: Repr): Backend[String] = ???
 
-    def listContents(dir: ADir): Backend[Set[PathSegment]] = {
-      val segments: FileSystemErrT[M, Set[PathSegment]] =
-        children(dir).leftMap(toFSError)
+    def listContents(dir: ADir): Backend[Set[PathSegment]] =
+      cake[M].liftB.flatMap(_.fs.listContents(dir).liftM[MT].liftB)
 
-      val result: FileSystemErrT[M, ?] ~> Backend =
-        Hoist[FileSystemErrT].hoist[M, PhaseResultT[Configured, ?]](
-          λ[Configured ~> PhaseResultT[Configured, ?]](_.liftM[PhaseResultT])
-            compose λ[M ~> Configured](_.liftM[ConfiguredT]))
-
-      result(segments)
-    }
-
-    def fileExists(file: AFile): Configured[Boolean] = {
-      val dir: ADir = pathy.Path.fileParent(file)
-
-      val res: M[Boolean] = for {
-        back <- children(dir).fold(_ => false, _.contains(pathy.Path.fileName(file).right))
-      } yield back
-
-      res.liftM[ConfiguredT]
-    }
+    def fileExists(file: AFile): Configured[Boolean] =
+      cake[M].flatMap(_.fs.fileExists(file).liftM[MT]).liftM[ConfiguredT]
   }
 
   object ReadFileModule extends ReadFileModule {
@@ -451,59 +412,37 @@ object Mimir extends BackendModule with Logging {
         _ <- queue.enqueue1(Vector.empty).liftM[MT]
         // wait until queue actually stops; task async completes when signal completes
         _ <- signal.discrete.takeWhile(!_).run.liftM[MT]
-        precog <- cake[M]
       } yield ()
 
       t.liftM[ConfiguredT]
     }
   }
 
-  // move and delete assume nihdb semantics
   object ManageFileModule extends ManageFileModule {
-    import java.io.File
-
     import ManageFile._
 
+    // TODO directory moving and varying semantics
     def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = {
-      def inner(fpath: APath, dpath: APath): M[Unit] = for {
-        precog <- cake[M]
-
-        from = new File(precog.Config.dataDir, pathy.Path.posixCodec.printPath(fpath))
-        dest = new File(precog.Config.dataDir, pathy.Path.posixCodec.printPath(dpath))
-
-        _ <- Task.delay(from.renameTo(dest)).liftM[MT]
-      } yield ()
-
-      inner(scenario.src, scenario.dst).liftB
+      scenario.fold(
+        d2d = { (from, to) => ??? },
+        f2f = { (from, to) =>
+          cake[M].flatMap(_.fs.move(from, to).void.liftM[MT]).liftB
+        })
     }
 
     def delete(path: APath): Backend[Unit] = {
-      val t = for {
-        precog <- cake[M]
-        target = new File(precog.Config.dataDir, pathy.Path.posixCodec.printPath(path))
+      refineType(path) match {
+        case -\/(adir) => ???
 
-        _ <- Task.delay(IOUtils.recursiveDelete(target).unsafePerformIO()).liftM[MT]
-      } yield ()
-
-      t.liftB
-      //().point[Backend]
+        case \/-(afile) =>
+          cake[M].flatMap(_.fs.delete(afile).void.liftM[MT]).liftB
+      }
     }
 
     def tempFile(near: APath): Backend[AFile] = {
       for {
         seed <- Task.delay(Random.nextLong.toString).liftM[MT].liftB
-
-        precog <- cake[M].liftB
-        newDir <- Task.delay(new File(precog.Config.dataDir, pathy.Path.posixCodec.printPath(parentDir(near).get))).liftM[MT].liftB
-        _ <- Task.delay(newDir.mkdirs()).liftM[MT].liftB
-
-        // yolo
-        target = parentDir(near).get </> file(seed)
-
-        h <- WriteFileModule.open(target)
-        _ <- WriteFileModule.write(h, Vector(Data.Obj())).liftM[PhaseResultT].liftM[FileSystemErrT]
-        _ <- WriteFileModule.close(h).liftM[PhaseResultT].liftM[FileSystemErrT]
-      } yield target
+      } yield parentDir(near).get </> file(seed)
     }
   }
 }

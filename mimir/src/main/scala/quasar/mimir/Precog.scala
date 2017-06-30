@@ -18,7 +18,6 @@ package quasar.mimir
 
 import quasar.blueeyes.util.Clock
 import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedSegmentFormat, VersionedCookedBlockFormat}
-import quasar.precog.common.Path
 import quasar.precog.common.accounts.AccountFinder
 
 import quasar.precog.common.security.{
@@ -30,10 +29,8 @@ import quasar.precog.common.security.{
   PermissionsFinder
 }
 
-import quasar.yggdrasil.PathMetadata
 import quasar.yggdrasil.table.VFSColumnarTableModule
-
-import quasar.yggdrasil.vfs.{SerialVFS, ResourceError}
+import quasar.yggdrasil.vfs.SerialVFS
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.routing.{
@@ -50,7 +47,7 @@ import delorean._
 import fs2.async
 import fs2.interop.scalaz._
 
-import scalaz.{EitherT, Monad}
+import scalaz.Monad
 import scalaz.concurrent.Task
 import scalaz.std.scalaFuture.futureInstance
 
@@ -133,8 +130,6 @@ final class Precog private (dataDir0: File) extends VFSColumnarTableModule {
   // Members declared in quasar.yggdrasil.TableModule
   sealed trait TableCompanion extends VFSColumnarTableCompanion
   object Table extends TableCompanion
-
-  def showContents(path: Path): EitherT[Future, ResourceError, Set[PathMetadata]] = ???   // TODO
 
   def shutdown: Future[Unit] = {
     for {

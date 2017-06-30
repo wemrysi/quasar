@@ -17,7 +17,7 @@
 package quasar.yggdrasil.table
 
 import quasar.blueeyes.json.JValue
-import quasar.contrib.pathy.AFile
+import quasar.contrib.pathy.{firstSegmentName, ADir, AFile, PathSegment}
 import quasar.niflheim.NIHDB
 import quasar.precog.common.{Path => PrecogPath}
 import quasar.precog.common.accounts.AccountFinder
@@ -179,6 +179,21 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
       _ <- EitherT.right[Task, ResourceError, Unit](driver.run)
     } yield ()
+  }
+
+  object fs {
+    def listContents(dir: ADir): Task[Set[PathSegment]] = {
+      vfs.ls(dir) map { paths =>
+        paths.map(firstSegmentName).flatMap(_.toList).toSet
+      }
+    }
+
+    def fileExists(file: AFile): Task[Boolean] = vfs.exists(file)
+
+    def move(from: AFile, to: AFile): Task[Boolean] = vfs.move(from, to)
+
+    // TODO shut down NIHDB
+    def delete(target: AFile): Task[Boolean] = vfs.delete(target)
   }
 
   private def pathToAFile(path: PrecogPath): Option[AFile] = {
