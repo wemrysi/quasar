@@ -136,8 +136,6 @@ final class Precog private (dataDir0: File) extends VFSColumnarTableModule {
 
   def showContents(path: Path): EitherT[Future, ResourceError, Set[PathMetadata]] = ???   // TODO
 
-  def stopPath(path: Path): Unit = ???
-
   def shutdown: Future[Unit] = {
     for {
       _ <- vfsShutdownSignal.set(None).unsafeToFuture

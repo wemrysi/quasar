@@ -452,7 +452,6 @@ object Mimir extends BackendModule with Logging {
         // wait until queue actually stops; task async completes when signal completes
         _ <- signal.discrete.takeWhile(!_).run.liftM[MT]
         precog <- cake[M]
-        _ <- Task.delay(precog.stopPath(fileToPath(h.file))).liftM[MT]
       } yield ()
 
       t.liftM[ConfiguredT]
