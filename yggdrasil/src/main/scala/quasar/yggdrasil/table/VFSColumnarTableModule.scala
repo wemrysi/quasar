@@ -153,14 +153,29 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
   }
 
   def commitDB(blob: Blob, version: Version, db: NIHDB): Task[Unit] = {
-    for {
+    // last-wins semantics
+    lazy val replaceM: OptionT[Task, Unit] = for {
+      oldHead <- OptionT(vfs.headOfBlob(blob))
+      oldDB <- OptionT(Task.delay(Option(dbs.get((blob, oldHead)))))
+
+      check <- Task.delay(dbs.replace((blob, oldHead), oldDB, db)).liftM[OptionT]
+
+      _ <- if (check)
+        oldDB.close.toTask.liftM[OptionT]
+      else
+        replaceM
+    } yield ()
+
+    val insert = for {
       check <- Task.delay(dbs.putIfAbsent((blob, version), db))
 
       _ <- if (check == null)
         vfs.commit(blob, version)
       else
-        Task.delay(log.warn(s"orphaned blob/version pair: $blob/$version"))
+        commitDB(blob, version, db)
     } yield ()
+
+    replaceM.getOrElseF(insert)
   }
 
   def ingest(path: PrecogPath, ingestion: Stream[Task, JValue]): EitherT[Task, ResourceError, Unit] = {
@@ -192,8 +207,28 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
     def move(from: AFile, to: AFile): Task[Boolean] = vfs.move(from, to)
 
-    // TODO shut down NIHDB
-    def delete(target: AFile): Task[Boolean] = vfs.delete(target)
+    def delete(target: AFile): Task[Boolean] = {
+      for {
+        _ <- {
+          val ot = for {
+            blob <- OptionT(vfs.readPath(target))
+            version <- OptionT(vfs.headOfBlob(blob))
+            nihdb <- OptionT(Task.delay(Option(dbs.get((blob, version)))))
+
+            removed <- Task.delay(dbs.remove((blob, version), nihdb)).liftM[OptionT]
+
+            _ <- if (removed)
+              nihdb.close.toTask.liftM[OptionT]
+            else
+              ().point[OptionT[Task, ?]]
+          } yield ()
+
+          ot.run
+        }
+
+        back <- vfs.delete(target)
+      } yield back
+    }
   }
 
   private def pathToAFile(path: PrecogPath): Option[AFile] = {
