@@ -16,27 +16,203 @@
 
 package quasar.yggdrasil.table
 
-import quasar.yggdrasil._
-import quasar.yggdrasil.bytecode.JType
+import quasar.contrib.pathy.AFile
+import quasar.niflheim.NIHDB
+import quasar.precog.common.{Path => PrecogPath}
+import quasar.precog.common.accounts.AccountFinder
 import quasar.precog.common.security._
+import quasar.yggdrasil.{ExactSize, Schema}
+import quasar.yggdrasil.bytecode.JType
+import quasar.yggdrasil.nihdb.NIHDBProjection
 import quasar.yggdrasil.vfs._
 
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global // FIXME what is this thing
+import akka.actor.{ActorRef, ActorSystem}
 
-import akka.pattern.AskSupport
-
-import scalaz._
-import scalaz.std.list._
-import scalaz.syntax.traverse._
+import delorean._
 
 import org.slf4s.Logging
 
+import pathy.Path
+
+import scalaz.{-\/, \/, EitherT, OptionT, StreamT}
+import scalaz.concurrent.Task
+import scalaz.std.list._
+import scalaz.syntax.either._
+import scalaz.syntax.monad._
+import scalaz.syntax.traverse._
+
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global // FIXME what is this thing
+import scala.concurrent.duration._
+
+import java.util.concurrent.{ConcurrentHashMap, ScheduledThreadPoolExecutor, ThreadFactory}
+import java.util.concurrent.atomic.AtomicInteger
+
 trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with Logging {
+  private val dbs = new ConcurrentHashMap[(Blob, Version), NIHDB]
+
+  // TODO 20 is the old default size; need to actually tune this
+  private val TxLogScheduler = new ScheduledThreadPoolExecutor(20,
+    new ThreadFactory {
+      private val counter = new AtomicInteger(0)
+
+      def newThread(r: Runnable): Thread = {
+        val t = new Thread(r)
+        t.setName("HOWL-sched-%03d".format(counter.getAndIncrement()))
+
+        t
+      }
+    })
+
+  def CookThreshold: Int
+  def StorageTimeout: FiniteDuration
+
+  def actorSystem: ActorSystem
+  private[this] implicit def _actorSystem = actorSystem
 
   def vfs: SerialVFS
 
+  def masterChef: ActorRef
+
+  def openDB(path: AFile): OptionT[Task, ResourceError \/ NIHDB] = {
+    val failure = ResourceError.fromExtractorError(s"failed to open NIHDB in path $path")
+
+    for {
+      blob <- OptionT(vfs.readPath(path))
+      version <- OptionT(vfs.headOfBlob(blob))
+
+      cached <- Task.delay(Option(dbs.get((blob, version)))).liftM[OptionT]
+
+      nihdb <- cached match {
+        case Some(nihdb) =>
+          nihdb.right[ResourceError].point[OptionT[Task, ?]]
+
+        case None =>
+          for {
+            dir <- vfs.underlyingDir(blob, version).liftM[OptionT]
+
+            tndb = Task delay {
+              NIHDB.open(
+                masterChef,
+                dir,
+                CookThreshold,
+                StorageTimeout,
+                TxLogScheduler).unsafePerformIO()
+            }
+
+            validation <- OptionT(tndb)
+
+            back <- validation.disjunction.leftMap(failure) traverse { nihdb: NIHDB =>
+              for {
+                check <- Task.delay(dbs.putIfAbsent((blob, version), nihdb)).liftM[OptionT]
+
+                back <- if (check == null)
+                  nihdb.right[ResourceError].point[OptionT[Task, ?]]
+                else
+                  nihdb.close.toTask.liftM[OptionT] >> openDB(path)
+              } yield back
+            }
+          } yield back.flatMap(x => x)
+      }
+    } yield nihdb
+  }
+
+  def createDB(path: AFile): Task[ResourceError \/ (Blob, Version, NIHDB)] = {
+    val failure = ResourceError.fromExtractorError(s"Failed to create NIHDB in $path")
+
+    val createBlob: Task[Blob] = for {
+      blob <- vfs.scratch
+      _ <- vfs.link(blob, path)   // should be `true` because we already looked for path
+    } yield blob
+
+    for {
+      maybeBlob <- vfs.readPath(path)
+      blob <- maybeBlob.map(Task.now(_)).getOrElse(createBlob)
+
+      version <- vfs.fresh(blob)    // overwrite any previously-existing HEAD
+      dir <- vfs.underlyingDir(blob, version)
+
+      validation <- Task delay {
+        NIHDB.create(
+          masterChef,
+          Authorities(AccountFinder.DefaultId),
+          dir,
+          CookThreshold,
+          StorageTimeout,
+          TxLogScheduler).unsafePerformIO()
+      }
+
+      disj = validation.disjunction.leftMap(failure)
+    } yield disj.map(n => (blob, version, n))
+  }
+
+  def commitDB(blob: Blob, version: Version, db: NIHDB): Task[Unit] = {
+    for {
+      check <- Task.delay(dbs.putIfAbsent((blob, version), db))
+
+      _ <- if (check == null)
+        vfs.commit(blob, version)
+      else
+        Task.delay(log.warn(s"orphaned blob/version pair: $blob/$version"))
+    } yield ()
+  }
+
   trait VFSColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
-    def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[Future, ResourceError, Table] = ???   // TODO
+
+    def load(table: Table, tpe: JType): EitherT[Future, ResourceError, Table] = {
+      def pathToAFile(path: PrecogPath): Option[AFile] = {
+        val parent = path.elements.dropRight(1).foldLeft(Path.rootDir)(_ </> Path.dir(_))
+
+        path.elements.lastOption.map(parent </> Path.file(_))
+      }
+
+      for {
+        _ <- EitherT.right(table.toJson.map(json => log.trace("Starting load from " + json.toList.map(_.renderCompact))))
+        paths <- EitherT.right(pathsM(table))
+
+        projections <- paths.toList traverse { path =>
+          val etask = for {
+            _ <- Task.delay(log.debug("Loading path: " + path)).liftM[EitherT[?[_], ResourceError, ?]]
+
+            optAFile = pathToAFile(path)
+
+            afile <- optAFile match {
+              case Some(afile) =>
+                EitherT.right[Task, ResourceError, AFile](Task.now(afile))
+
+              case None =>
+                EitherT.left[Task, ResourceError, AFile](
+                  Task.now(
+                    ResourceError.notFound(
+                      s"invalid path does not contain file element: $path")))
+            }
+
+            nihdb <- EitherT.eitherT[Task, ResourceError, NIHDB](openDB(afile).run map { opt =>
+              opt.getOrElse(-\/(ResourceError.notFound(s"unable to locate dataset at path $path")))
+            })
+
+            projection <- NIHDBProjection.wrap(nihdb).toTask.liftM[EitherT[?[_], ResourceError, ?]]
+          } yield projection
+
+          etask.mapT(_.unsafeToFuture)
+        }
+      } yield {
+        val length = projections.map(_.length).sum
+        val stream = projections.foldLeft(StreamT.empty[Future, Slice]) { (acc, proj) =>
+          // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
+          val constraints = proj.structure.map { struct =>
+            Some(Schema.flatten(tpe, struct.toList))
+          }
+
+          log.debug("Appending from projection: " + proj)
+          acc ++ StreamT.wrapEffect(constraints map { c => proj.getBlockStream(c) })
+        }
+
+        Table(stream, ExactSize(length))
+      }
+    }
+
+    def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[Future, ResourceError, Table] =
+      load(table, tpe)
   }
 }

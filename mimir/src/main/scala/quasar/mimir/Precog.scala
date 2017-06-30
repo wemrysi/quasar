@@ -58,9 +58,9 @@ import scalaz.std.scalaFuture.futureInstance
 import java.io.File
 import java.time.Instant
 
-import scala.concurrent.duration.{FiniteDuration, SECONDS}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.collection.immutable.IndexedSeq
 
 // calling this constructor is a side-effect; you must always shutdown allocated instances
@@ -68,12 +68,13 @@ final class Precog private (dataDir0: File) extends VFSColumnarTableModule {
 
   object Config {
     val howManyChefsInTheKitchen: Int = 4
-    val cookThreshold: Int = 20000
-    val storageTimeout: FiniteDuration = new FiniteDuration(300, SECONDS)
     val quiescenceTimeout: FiniteDuration = new FiniteDuration(300, SECONDS)
     val maxOpenPaths: Int = 500
     val dataDir: File = dataDir0
   }
+
+  val CookThreshold: Int = 20000
+  val StorageTimeout: FiniteDuration = 300.seconds
 
   private var _vfs: SerialVFS = _
   def vfs = _vfs
@@ -104,7 +105,7 @@ final class Precog private (dataDir0: File) extends VFSColumnarTableModule {
   def permissionsFinder: PermissionsFinder[Future] =
     new PermissionsFinder(apiKeyFinder, accountFinder, Instant.EPOCH)
 
-  private val actorSystem: ActorSystem =
+  val actorSystem: ActorSystem =
     ActorSystem("nihdbExecutorActorSystem")
 
   private val props: Props = Props(Chef(
@@ -122,7 +123,7 @@ final class Precog private (dataDir0: File) extends VFSColumnarTableModule {
   }
 
   // needed for nihdb
-  private val masterChef: ActorRef =
+  val masterChef: ActorRef =
     actorSystem.actorOf(props.withRouter(routerConfig))
 
   private val clock: Clock = Clock.System
