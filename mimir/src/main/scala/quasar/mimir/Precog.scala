@@ -16,7 +16,6 @@
 
 package quasar.mimir
 
-import quasar.blueeyes.json.JValue
 import quasar.blueeyes.util.Clock
 import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedSegmentFormat, VersionedCookedBlockFormat}
 import quasar.precog.common.Path
@@ -51,7 +50,7 @@ import delorean._
 import fs2.async
 import fs2.interop.scalaz._
 
-import scalaz.{EitherT, Monad, StreamT}
+import scalaz.{EitherT, Monad}
 import scalaz.concurrent.Task
 import scalaz.std.scalaFuture.futureInstance
 
@@ -138,9 +137,6 @@ final class Precog private (dataDir0: File) extends VFSColumnarTableModule {
   def showContents(path: Path): EitherT[Future, ResourceError, Set[PathMetadata]] = ???   // TODO
 
   def stopPath(path: Path): Unit = ???
-
-  // TODO this could be trivially rewritten with fs2.Stream
-  def ingest(path: Path, chunks: StreamT[Future, Vector[JValue]]): Future[Unit] = ???   // TODO
 
   def shutdown: Future[Unit] = {
     for {

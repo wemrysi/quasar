@@ -37,10 +37,10 @@ import quasar.yggdrasil.PathMetadata
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
 
+import fs2.Stream
 import fs2.async.mutable.{Queue, Signal}
 import fs2.interop.scalaz._
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
+
 import matryoshka._
 import matryoshka.implicits._
 import matryoshka.data._
@@ -58,6 +58,9 @@ import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Random
+
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 object Mimir extends BackendModule with Logging {
 
@@ -402,12 +405,12 @@ object Mimir extends BackendModule with Logging {
           signal <- fs2.async.signalOf[Task, Boolean](false).liftM[MT]
 
           path = fileToPath(file)
-          jvs = dequeueStreamT(queue)(_.isEmpty).map(_.map(JValue.fromData))
+          jvs = queue.dequeueAvailable.flatMap(Stream.emits).map(JValue.fromData)
 
           precog <- cake[M]
 
           ingestion = for {
-            _ <- precog.ingest(path, jvs.trans(λ[Task ~> Future](_.unsafeToFuture))).toTask
+            _ <- precog.ingest(path, jvs).run   // TODO log resource errors?
             _ <- signal.set(true)
           } yield ()
 

@@ -16,6 +16,7 @@
 
 package quasar.yggdrasil.table
 
+import quasar.blueeyes.json.JValue
 import quasar.contrib.pathy.AFile
 import quasar.niflheim.NIHDB
 import quasar.precog.common.{Path => PrecogPath}
@@ -30,11 +31,14 @@ import akka.actor.{ActorRef, ActorSystem}
 
 import delorean._
 
+import fs2.Stream
+import fs2.interop.scalaz._
+
 import org.slf4s.Logging
 
 import pathy.Path
 
-import scalaz.{-\/, \/, EitherT, OptionT, StreamT}
+import scalaz.{-\/, \/, EitherT, Monad, OptionT, StreamT}
 import scalaz.concurrent.Task
 import scalaz.std.list._
 import scalaz.syntax.either._
@@ -49,6 +53,8 @@ import java.util.concurrent.{ConcurrentHashMap, ScheduledThreadPoolExecutor, Thr
 import java.util.concurrent.atomic.AtomicInteger
 
 trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with Logging {
+  private type ET[F[_], A] = EitherT[F, ResourceError, A]
+
   private val dbs = new ConcurrentHashMap[(Blob, Version), NIHDB]
 
   // TODO 20 is the old default size; need to actually tune this
@@ -157,41 +163,62 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
     } yield ()
   }
 
+  def ingest(path: PrecogPath, ingestion: Stream[Task, JValue]): EitherT[Task, ResourceError, Unit] = {
+    for {
+      afile <- pathToAFileET[Task](path)
+      triple <- EitherT.eitherT(createDB(afile))
+      (blob, version, nihdb) = triple
+
+      actions = ingestion.chunks.zipWithIndex evalMap {
+        case (jvs, offset) =>
+          // insertVerified forces sequential behavior and backpressure
+          nihdb.insertVerified(NIHDB.Batch(offset, jvs.toList) :: Nil).toTask
+      }
+
+      driver = actions.drain ++ Stream.eval(commitDB(blob, version, nihdb))
+
+      _ <- EitherT.right[Task, ResourceError, Unit](driver.run)
+    } yield ()
+  }
+
+  private def pathToAFile(path: PrecogPath): Option[AFile] = {
+    val parent = path.elements.dropRight(1).foldLeft(Path.rootDir)(_ </> Path.dir(_))
+    path.elements.lastOption.map(parent </> Path.file(_))
+  }
+
+  private def pathToAFileET[F[_]: Monad](path: PrecogPath): EitherT[F, ResourceError, AFile] = {
+    pathToAFile(path) match {
+      case Some(afile) =>
+        EitherT.right[F, ResourceError, AFile](afile.point[F])
+
+      case None =>
+        EitherT.left[F, ResourceError, AFile] {
+          val err: ResourceError = ResourceError.notFound(
+            s"invalid path does not contain file element: $path")
+
+          err.point[F]
+        }
+    }
+  }
+
   trait VFSColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
 
     def load(table: Table, tpe: JType): EitherT[Future, ResourceError, Table] = {
-      def pathToAFile(path: PrecogPath): Option[AFile] = {
-        val parent = path.elements.dropRight(1).foldLeft(Path.rootDir)(_ </> Path.dir(_))
-
-        path.elements.lastOption.map(parent </> Path.file(_))
-      }
-
       for {
         _ <- EitherT.right(table.toJson.map(json => log.trace("Starting load from " + json.toList.map(_.renderCompact))))
         paths <- EitherT.right(pathsM(table))
 
         projections <- paths.toList traverse { path =>
           val etask = for {
-            _ <- Task.delay(log.debug("Loading path: " + path)).liftM[EitherT[?[_], ResourceError, ?]]
+            _ <- Task.delay(log.debug("Loading path: " + path)).liftM[ET]
 
-            optAFile = pathToAFile(path)
-
-            afile <- optAFile match {
-              case Some(afile) =>
-                EitherT.right[Task, ResourceError, AFile](Task.now(afile))
-
-              case None =>
-                EitherT.left[Task, ResourceError, AFile](
-                  Task.now(
-                    ResourceError.notFound(
-                      s"invalid path does not contain file element: $path")))
-            }
+            afile <- pathToAFileET[Task](path)
 
             nihdb <- EitherT.eitherT[Task, ResourceError, NIHDB](openDB(afile).run map { opt =>
               opt.getOrElse(-\/(ResourceError.notFound(s"unable to locate dataset at path $path")))
             })
 
-            projection <- NIHDBProjection.wrap(nihdb).toTask.liftM[EitherT[?[_], ResourceError, ?]]
+            projection <- NIHDBProjection.wrap(nihdb).toTask.liftM[ET]
           } yield projection
 
           etask.mapT(_.unsafeToFuture)
