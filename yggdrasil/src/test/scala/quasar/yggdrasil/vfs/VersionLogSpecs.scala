@@ -273,7 +273,7 @@ object VersionLogSpecs extends Specification {
         _ <- HWT.pattern[Unit] {
           case CPL(Delete(target)) =>
             Task delay {
-              target mustEqual (BaseDir </> Path.dir("CURRENT"))
+              target mustEqual (BaseDir </> Path.dir("HEAD"))
             }
         }
 
@@ -281,7 +281,7 @@ object VersionLogSpecs extends Specification {
           case CPL(LinkDir(from, to)) =>
             Task delay {
               from mustEqual (BaseDir </> Path.dir(v.value.toString))
-              to mustEqual (BaseDir </> Path.dir("CURRENT"))
+              to mustEqual (BaseDir </> Path.dir("HEAD"))
             }
         }
       } yield ()

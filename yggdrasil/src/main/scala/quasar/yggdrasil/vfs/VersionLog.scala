@@ -16,7 +16,7 @@
 
 package quasar.yggdrasil.vfs
 
-import quasar.contrib.pathy.{ADir, RFile}
+import quasar.contrib.pathy.{ADir, RDir, RFile}
 import quasar.contrib.scalaz.stateT, stateT._
 
 import argonaut.{Argonaut, Parse}
@@ -48,6 +48,7 @@ object VersionLog {
 
   private type ST[F[_], A] = StateT[F, VersionLog, A]
 
+  private val Head: RDir = Path.dir("HEAD")
   private val VersionsJson: RFile = Path.file("versions.json")
   private val VersionsJsonNew: RFile = Path.file("versions.json.new")
 
@@ -137,10 +138,10 @@ object VersionLog {
 
           _ <- POSIX.move[S](log.baseDir </> VersionsJsonNew, log.baseDir </> VersionsJson).liftM[ST]
 
-          _ <- POSIX.delete[S](log.baseDir </> Path.dir("CURRENT")).liftM[ST]
+          _ <- POSIX.delete[S](log.baseDir </> Head).liftM[ST]
           _ <- POSIX.linkDir[S](
             log.baseDir </> Path.dir(v.value.toString),
-            log.baseDir </> Path.dir("CURRENT")).liftM[ST]
+            log.baseDir </> Head).liftM[ST]
         } yield ()
       } else {
         ().point[StateT[Free[S, ?], VersionLog, ?]]

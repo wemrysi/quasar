@@ -800,7 +800,7 @@ object FreeVFSSpecs extends Specification {
       _ <- H.pattern[Unit] {
         case CPL(Delete(target)) =>
           Task delay {
-            target mustEqual (baseDir </> Path.dir("CURRENT"))
+            target mustEqual (baseDir </> Path.dir("HEAD"))
           }
       }
 
@@ -808,7 +808,7 @@ object FreeVFSSpecs extends Specification {
         case CPL(LinkDir(from, to)) =>
           Task delay {
             from mustEqual (baseDir </> Path.dir(uuid.toString))
-            to mustEqual (baseDir </> Path.dir("CURRENT"))
+            to mustEqual (baseDir </> Path.dir("HEAD"))
           }
       }
     } yield ()
