@@ -85,7 +85,7 @@ object MountConfig {
     case FileSystemConfig(typ, uri) =>
       typ.value -> uri.value
     case ModuleConfig(statements) =>
-      "module" -> statements.pprint[Fix[Sql]]
+      "module" -> statements.pprint
   }
 
   val fromConfigPair: (String, String) => String \/ MountConfig = {
@@ -102,7 +102,7 @@ object MountConfig {
   implicit val mountConfigCodecJson: CodecJson[MountConfig] =
     CodecJson({
       case ModuleConfig(statements)   =>
-        Json("module" := statements.pprint[Fix[Sql]])
+        Json("module" := statements.pprint)
       case ViewConfig(query, vars)    =>
         Json("view" := Json("connectionUri" := ConnectionUri(viewCfgAsUri(query, vars)).value))
       case FileSystemConfig(typ, uri) =>

@@ -681,14 +681,14 @@ class SQLParserSpec extends quasar.Qspec {
     }.set(minTestsOk = 1000) // one cannot test a parser too much
 
     "round-trip module" >> prop { module: List[Statement[Fix[Sql]]] =>
-      val back = fixParser.parseModule(module.pprint[Fix[Sql]])
+      val back = fixParser.parseModule(module.pprint)
 
       back must beRightDisjOrDiff(module)
     }
 
     "pprint an import statement should escpae backticks" >> {
       val `import` = Import[Fix[Sql]](currentDir </> dir("di") </> dir("k`~ireW.5u1+fOh") </> dir("j"))
-      val string = List(`import`).pprint[Fix[Sql]]
+      val string = List(`import`).pprint
       string must_== raw"import `./di/k\`~ireW.5u1+fOh/j/`"
       fixParser.parseModule(string) must_=== List(`import`).right
     }

@@ -208,8 +208,8 @@ package object sql {
     def imports: List[Import[A]] =
       a.collect { case i: Import[_] => i }
 
-    def pprint[T](implicit T: Recursive.Aux[T, Sql], ev: A <~< T): String =
-      a.map(st => st.map(b => sql.pprint(ev(b))).pprint).mkString(";\n")
+    def pprint(implicit T: Recursive.Aux[A, Sql]): String =
+      a.map(st => st.map(b => sql.pprint(b)).pprint).mkString(";\n")
   }
 
   def pprint[T](sql: T)(implicit T: Recursive.Aux[T, Sql]) = sql.para(pprintƒ)

@@ -34,11 +34,11 @@ trait ExprArbitrary {
   implicit val exprArbitrary: Arbitrary[Fix[Sql]] = Arbitrary(selectGen(4))
 
   implicit val exprShrink: Shrink[Fix[Sql]] = Shrink (expr => (expr.project match {
-    case s @ Select(distinct, proj, relation, filter, groupBy, orderBy) =>
-      shrink(distinct).map(d => s.copy(isDistinct = d)) append
-      relation.map(κ(s.copy(relation = None))).toStream    append
-      filter.map(κ(s.copy(filter = None))).toStream        append
-      groupBy.map(κ(s.copy(groupBy = None))).toStream      append
+    case s @ Select(_, projections, relation, filter, groupBy, orderBy) =>
+      shrink(projections).map(p => s.copy(projections = p)) append
+      relation.map(κ(s.copy(relation = None))).toStream     append
+      filter.map(κ(s.copy(filter = None))).toStream         append
+      groupBy.map(κ(s.copy(groupBy = None))).toStream       append
       orderBy.map(κ(s.copy(orderBy = None))).toStream
     case ArrayLiteral(elems) => shrink(elems).map(ArrayLiteral(_))
     case SetLiteral(elems)  => shrink(elems).map(SetLiteral(_))

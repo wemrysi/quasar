@@ -22,7 +22,6 @@ import quasar._, RenderTree.ops._
 import matryoshka.Recursive
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
-import scalaz.Liskov._
 
 @Lenses final case class ScopedExpr[T](expr: T, scope: List[Statement[T]]) {
   def mapExpressionM[M[_]:Functor](f: T => M[T]): M[ScopedExpr[T]] =
@@ -31,9 +30,9 @@ import scalaz.Liskov._
     scope.collect { case i: Import[_] => i }
   def defs: List[FunctionDecl[T]] =
     scope.collect { case d: FunctionDecl[_] => d }
-  def pprint[T1](implicit ev: T <~< T1, T1: Recursive.Aux[T1, Sql]): String = {
+  def pprint(implicit T: Recursive.Aux[T, Sql]): String = {
     val scopeString = if (scope.isEmpty) "" else scope.pprint + ";\n"
-    scopeString + sql.pprint(ev(expr))
+    scopeString + sql.pprint(expr)
   }
 }
 
