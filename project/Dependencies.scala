@@ -135,9 +135,9 @@ object Dependencies {
     "com.fasterxml.jackson.core" %  "jackson-databind"     % jacksonVersion,
     "com.marklogic"              %  "marklogic-xcc"        % "8.0.5",
     "com.slamdata"               %% "xml-names-core"       % "0.0.1",
+    "org.scala-lang.modules"     %% "scala-xml"            % "1.0.6",
     "eu.timepit"                 %% "refined-scalaz"       % refinedVersion,
     "eu.timepit"                 %% "refined-scalacheck"   % refinedVersion % Test,
-    "org.scala-lang.modules"     %% "scala-xml"            % "1.0.6",
     "com.slamdata"               %% "xml-names-scalacheck" % "0.0.1"        % Test
   )
   val couchbase = Seq(
