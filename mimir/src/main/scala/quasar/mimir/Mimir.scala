@@ -366,7 +366,7 @@ object Mimir extends BackendModule with Logging {
           signal <- fs2.async.signalOf[Task, Boolean](false).liftM[MT]
 
           path = fileToPath(file)
-          jvs = queue.dequeueAvailable.flatMap(Stream.emits).map(JValue.fromData)
+          jvs = queue.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits).map(JValue.fromData)
 
           precog <- cake[M]
 

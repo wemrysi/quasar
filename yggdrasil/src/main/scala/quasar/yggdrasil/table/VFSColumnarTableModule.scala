@@ -175,7 +175,10 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
         commitDB(blob, version, db)
     } yield ()
 
-    replaceM.getOrElseF(insert)
+    for {
+      _ <- Task.delay(log.trace(s"attempting to commit blob/version: $blob/$version"))
+      _ <- replaceM.getOrElseF(insert)
+    } yield ()
   }
 
   def ingest(path: PrecogPath, ingestion: Stream[Task, JValue]): EitherT[Task, ResourceError, Unit] = {
