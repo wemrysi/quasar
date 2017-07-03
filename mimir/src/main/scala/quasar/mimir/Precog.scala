@@ -53,6 +53,7 @@ import scalaz.std.scalaFuture.futureInstance
 
 import java.io.File
 import java.time.Instant
+import java.util.concurrent.CountDownLatch
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -75,15 +76,23 @@ final class Precog private (dataDir0: File) extends VFSColumnarTableModule {
   private var _vfs: SerialVFS = _
   def vfs = _vfs
 
+  private val vfsLatch = new CountDownLatch(1)
+
   private val vfsShutdownSignal =
     async.signalOf[Task, Option[Unit]](Some(())).unsafePerformSync
 
   {
     // setup VFS stuff as a side-effect (and a race condition!)
-    val vfsStr = SerialVFS(dataDir0).evalMap(v => Task.delay(_vfs = v))
+    val vfsStr = SerialVFS(dataDir0).evalMap { v =>
+      Task delay {
+        _vfs = v
+        vfsLatch.countDown()
+      }
+    }
     val gated = vfsStr.mergeHaltBoth(vfsShutdownSignal.discrete.noneTerminate.drain)
 
     gated.run.unsafePerformAsync(_ => ())
+    vfsLatch.await()      // sigh....
   }
 
   // for the time being, do everything with this key
