@@ -27,6 +27,7 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.physical.marklogic.cts.Query
 import quasar.physical.marklogic.xquery.{cts => ctsfn, _}
 import quasar.physical.marklogic.xquery.syntax._
+import quasar.physical.marklogic.xquery.expr.emptySeq
 import quasar.physical.marklogic.xcc._
 import quasar.qscript._
 import quasar.qscript.MapFuncsCore.{Eq, Neq, TypeOf, Constant}
@@ -138,8 +139,9 @@ package object qscript {
     implicit Q: Recursive.Aux[Q, Query[V, ?]]
   ): F[Boolean] = {
     val err = axes.descendant.elementNamed("error:error")
-    val xqy = fn.empty(xdmp.plan(query.cata(Query.toXQuery[V])) `//` err)
-    Xcc[F].queryResults(xqy) map booleanResult
+    val xqy = query.cataM(Query.toXQuery[V, F](κ(emptySeq.point[F]))) map (q => fn.empty(xdmp.plan(q) `//` err))
+
+    xqy >>= (Xcc[F].queryResults(_) map booleanResult)
   }
 
   def rebaseXQuery[T[_[_]], F[_]: Monad, FMT, Q, V](
