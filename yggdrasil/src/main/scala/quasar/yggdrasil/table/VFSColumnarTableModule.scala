@@ -17,7 +17,7 @@
 package quasar.yggdrasil.table
 
 import quasar.blueeyes.json.JValue
-import quasar.contrib.pathy.{firstSegmentName, ADir, AFile, PathSegment}
+import quasar.contrib.pathy.{firstSegmentName, ADir, AFile, APath, PathSegment}
 import quasar.niflheim.NIHDB
 import quasar.precog.common.{Path => PrecogPath}
 import quasar.precog.common.accounts.AccountFinder
@@ -208,29 +208,45 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
     def fileExists(file: AFile): Task[Boolean] = vfs.exists(file)
 
-    def move(from: AFile, to: AFile): Task[Boolean] = vfs.move(from, to)
+    def moveFile(from: AFile, to: AFile): Task[Boolean] = vfs.moveFile(from, to)
 
-    def delete(target: AFile): Task[Boolean] = {
-      for {
-        _ <- {
-          val ot = for {
-            blob <- OptionT(vfs.readPath(target))
-            version <- OptionT(vfs.headOfBlob(blob))
-            nihdb <- OptionT(Task.delay(Option(dbs.get((blob, version)))))
+    def moveDir(from: ADir, to: ADir): Task[Boolean] = vfs.moveDir(from, to)
 
-            removed <- Task.delay(dbs.remove((blob, version), nihdb)).liftM[OptionT]
+    def delete(target: APath): Task[Boolean] = {
+      def deleteFile(target: AFile) = {
+        for {
+          _ <- {
+            val ot = for {
+              blob <- OptionT(vfs.readPath(target))
+              version <- OptionT(vfs.headOfBlob(blob))
+              nihdb <- OptionT(Task.delay(Option(dbs.get((blob, version)))))
 
-            _ <- if (removed)
-              nihdb.close.toTask.liftM[OptionT]
-            else
-              ().point[OptionT[Task, ?]]
-          } yield ()
+              removed <- Task.delay(dbs.remove((blob, version), nihdb)).liftM[OptionT]
 
-          ot.run
-        }
+              _ <- if (removed)
+                nihdb.close.toTask.liftM[OptionT]
+              else
+                ().point[OptionT[Task, ?]]
+            } yield ()
 
-        back <- vfs.delete(target)
-      } yield back
+            ot.run
+          }
+
+          back <- vfs.delete(target)
+        } yield back
+      }
+
+      def deleteDir(target: ADir): Task[Boolean] = {
+        for {
+          paths <- vfs.ls(target)
+
+          results <- paths traverse { path =>
+            delete(target </> path)
+          }
+        } yield results.forall(_ == true)
+      }
+
+      Path.refineType(target).fold(deleteDir, deleteFile)
     }
   }
 

@@ -497,18 +497,18 @@ object FreeVFSSpecs extends Specification {
         (vfs2.index(Path.rootDir) mustEqual Vector(Path.file("bar"), Path.file("foo")))
     }
 
-    "move fails with non-existent source" in {
+    "moveFile fails with non-existent source" in {
       val from = Path.rootDir </> Path.file("foo")
       val to = Path.rootDir </> Path.file("bar")
 
       val interp = ().point[Harness[S, Task, ?]]
 
-      val result = interp(FreeVFS.move[S](from, to).eval(BlankVFS)).unsafePerformSync
+      val result = interp(FreeVFS.moveFile[S](from, to).eval(BlankVFS)).unsafePerformSync
 
       result mustEqual false
     }
 
-    "move fails with extant target" in {
+    "moveFile fails with extant target" in {
       val blob = Blob(UUID.randomUUID())
       val from = Path.rootDir </> Path.file("foo")
       val to = Path.rootDir </> Path.file("bar")
@@ -517,12 +517,12 @@ object FreeVFSSpecs extends Specification {
 
       val interp = ().point[Harness[S, Task, ?]]
 
-      val result = interp(FreeVFS.move[S](from, to).eval(vfs)).unsafePerformSync
+      val result = interp(FreeVFS.moveFile[S](from, to).eval(vfs)).unsafePerformSync
 
       result mustEqual false
     }
 
-    "move updates paths and index" in {
+    "moveFile updates paths and index" in {
       val blob = Blob(UUID.randomUUID())
       val from = Path.rootDir </> Path.file("foo")
       val to = Path.rootDir </> Path.file("bar")
@@ -540,7 +540,7 @@ object FreeVFSSpecs extends Specification {
           _ mustEqual s"""{"/bar":$blobJson}""",
           _ mustEqual """{"/":["./bar"]}""")
 
-      val (vfs2, result) = interp(FreeVFS.move[S](from, to).apply(vfs)).unsafePerformSync
+      val (vfs2, result) = interp(FreeVFS.moveFile[S](from, to).apply(vfs)).unsafePerformSync
 
       result mustEqual true
 
@@ -549,6 +549,44 @@ object FreeVFSSpecs extends Specification {
       vfs2.paths must not(haveKey(from))
 
       vfs2.index(Path.rootDir) mustEqual Vector(Path.file("bar"))
+    }
+
+    "moveDir moves a directory with a single element" in {
+      val blob = Blob(UUID.randomUUID())
+
+      val source = Path.rootDir </> Path.dir("source")
+      val from = source </> Path.file("foo")
+
+      val target = Path.rootDir </> Path.dir("target")
+      val to = target </> Path.file("foo")
+
+      val blobJson = s""""${blob.value}""""
+
+      val vfs =
+        BlankVFS.copy(
+          paths = Map(from -> blob),
+          index = Map(
+            Path.rootDir -> Vector(Path.file("source")),
+            source -> Vector(Path.file("foo"))))
+
+      val interp =
+        persistMeta(
+          BaseDir </> Path.dir("META"),
+          _ mustEqual s"""{"/target/foo":$blobJson}""",
+          { json =>
+            (json mustEqual """{"/":["./target/"],"/target/":["./foo"]}""") or
+              (json mustEqual """{"/target/":["./foo"],"/":["./target/"]}""")
+          })
+
+      val (vfs2, result) = interp(FreeVFS.moveDir[S](source, target).apply(vfs)).unsafePerformSync
+
+      result mustEqual true
+
+      vfs2.paths must haveKey(to)
+      vfs2.paths(to) mustEqual blob
+      vfs2.paths must not(haveKey(from))
+
+      vfs2.index(target) mustEqual Vector(Path.file("foo"))
     }
 
     "delete fails with non-existent target" in {
@@ -561,7 +599,7 @@ object FreeVFSSpecs extends Specification {
       result mustEqual false
     }
 
-    "delete updates paths and index" in {
+    "delete updates paths and index for file" in {
       val blob = Blob(UUID.randomUUID())
       val target = Path.rootDir </> Path.file("foo")
 
@@ -578,6 +616,36 @@ object FreeVFSSpecs extends Specification {
           _ mustEqual "{}")
 
       val (vfs2, result) = interp(FreeVFS.delete[S](target).apply(vfs)).unsafePerformSync
+
+      result mustEqual true
+
+      vfs2.paths must beEmpty
+      vfs2.index must beEmpty
+      vfs2.blobs mustEqual Set(blob)
+    }
+
+    "delete updates paths and index for directory" in {
+      val blob = Blob(UUID.randomUUID())
+
+      val target = Path.rootDir </> Path.dir("target")
+      val foo = target </> Path.file("foo")
+
+      val vfs =
+        BlankVFS.copy(
+          paths = Map(foo -> blob),
+          index = Map(
+            Path.rootDir -> Vector(Path.dir("target")),
+            target -> Vector(Path.file("foo"))),
+          blobs = Set(blob))
+
+      val interp =
+        persistMeta(
+          BaseDir </> Path.dir("META"),
+          _ mustEqual "{}",
+          _ mustEqual "{}")
+
+      val (vfs2, result) =
+        interp(FreeVFS.delete[S](target).apply(vfs)).unsafePerformSync
 
       result mustEqual true
 

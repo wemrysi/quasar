@@ -424,19 +424,16 @@ object Mimir extends BackendModule with Logging {
     // TODO directory moving and varying semantics
     def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = {
       scenario.fold(
-        d2d = { (from, to) => ??? },
+        d2d = { (from, to) =>
+          cake[M].flatMap(_.fs.moveDir(from, to).void.liftM[MT]).liftB
+        },
         f2f = { (from, to) =>
-          cake[M].flatMap(_.fs.move(from, to).void.liftM[MT]).liftB
+          cake[M].flatMap(_.fs.moveFile(from, to).void.liftM[MT]).liftB
         })
     }
 
     def delete(path: APath): Backend[Unit] = {
-      refineType(path) match {
-        case -\/(adir) => ???
-
-        case \/-(afile) =>
-          cake[M].flatMap(_.fs.delete(afile).void.liftM[MT]).liftB
-      }
+      cake[M].flatMap(_.fs.delete(path).void.liftM[MT]).liftB
     }
 
     def tempFile(near: APath): Backend[AFile] = {
