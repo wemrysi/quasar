@@ -52,7 +52,7 @@ private[qscript] final class MapFuncCorePlanner[F[_]: Monad: QNameGenerator: Pro
     case TemporalTrunc(part, src)     => lib.temporalTrunc[F](part) apply src
     case TimeOfDay(dt)                => asDateTime(dt) map xs.time
     case ToTimestamp(millis)          => SP.castIfNode(millis) >>= (lib.timestampToDateTime[F] apply _)
-    case TypeOf(x)                    => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unimplemented("TypeOf"))
+    case TypeOf(x)                    => lib.typeOf[F, FMT] apply x
     case Now()                        => fn.currentDateTime.point[F]
 
     case ExtractCentury(time)         => asDateTime(time) map (dt =>

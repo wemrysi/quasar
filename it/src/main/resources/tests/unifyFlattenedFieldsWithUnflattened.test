@@ -3,12 +3,11 @@
     "backends": {
         "mimir": "skip",
         "couchbase":  "pending",
-        "mongodb_q_3_2": "pending",
         "postgresql": "pending"
     },
     "data": "zips.data",
     "query": "select `_id` as zip, loc[*] from zips order by loc[*] limit 10",
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "expected": [{ "zip": "99742", "loc": -171.701685},
                  { "zip": "99769", "loc": -170.470908},
                  { "zip": "99660", "loc": -170.293408},

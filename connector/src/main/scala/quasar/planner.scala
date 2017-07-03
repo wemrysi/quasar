@@ -88,6 +88,10 @@ object Planner {
       }
   }
 
+  final case class CompilationFailed(semErrs: NonEmptyList[SemanticError]) extends PlannerError {
+    def message = "Compilation failed: " + semErrs.list.toList.mkString(", ")
+  }
+
   final case class InternalError(msg: String, cause: Option[Exception]) extends PlannerError {
     def message = msg + ~cause.map(ex => s" (caused by: $ex)")
   }

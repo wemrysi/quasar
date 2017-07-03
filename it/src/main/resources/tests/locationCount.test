@@ -4,7 +4,7 @@
         "mimir": "skip",
         "couchbase":         "pending",
         "marklogic_json":    "pending",
-        "marklogic_xml":     "skip",
+        "marklogic_xml":     "timeout",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending",
@@ -23,7 +23,7 @@
               group by location
               order by counter desc
               limit 10",
-    "predicate": "equalsInitial",
+    "predicate": "initial",
     "expected": [{ "counter": 3, "location": "Boston"  },
                  { "counter": 2, "location": "Denver"  },
                  { "counter": 1, "location": "Boulder" }]

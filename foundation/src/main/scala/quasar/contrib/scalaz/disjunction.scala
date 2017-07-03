@@ -14,24 +14,18 @@
  * limitations under the License.
  */
 
-package quasar.sql
+package quasar.contrib.scalaz
 
-import slamdata.Predef._
-import quasar.sql.StatementArbitrary._
-import quasar.sql.ExprArbitrary._
+import scalaz._
 
-import scala.Predef._
-
-import org.scalacheck.Arbitrary
-import matryoshka.data.Fix
-
-trait BlobArbitrary {
-
-  implicit val blobArbitrary: Arbitrary[Blob[Fix[Sql]]] =
-    Arbitrary(for {
-      expr <- Arbitrary.arbitrary[Fix[Sql]]
-      scope <- Arbitrary.arbitrary[List[Statement[Fix[Sql]]]]
-    } yield Blob(expr, scope))
+final class DisjunctionOps[A, B] private[scalaz] (val self: A \/ B) extends scala.AnyVal {
+  final def liftT[F[_]: Applicative]: EitherT[F, A, B] =
+    EitherT.fromDisjunction[F](self)
 }
 
-object BlobArbitrary extends BlobArbitrary
+trait ToDisjunctionOps {
+  implicit def toDisjunctionOps[A, B](self: A \/ B): DisjunctionOps[A, B] =
+    new DisjunctionOps(self)
+}
+
+object disjunction extends ToDisjunctionOps

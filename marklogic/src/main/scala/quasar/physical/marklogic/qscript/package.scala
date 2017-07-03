@@ -21,11 +21,13 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.ejson.{EJson, Str}
 import quasar.fp.coproductShow
 import quasar.fp.ski.κ
+import quasar.contrib.matryoshka.totally
 import quasar.contrib.pathy.{AFile, UriPathCodec}
 import quasar.contrib.scalaz.MonadError_
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
+import quasar.qscript.MapFuncsCore.{Eq, Neq, TypeOf, Constant}
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
@@ -106,7 +108,7 @@ package object qscript {
       case other => planMapFunc[T, F, FMT, Hole](other.embed)(κ(src))
     }
 
-  def mergeXQuery[T[_[_]]: RecursiveT, F[_]: Monad, FMT](
+  def mergeXQuery[T[_[_]]: BirecursiveT, F[_]: Monad, FMT](
     jf: JoinFunc[T],
     l: XQuery,
     r: XQuery
@@ -118,13 +120,13 @@ package object qscript {
       case RightSide => r
     }
 
-  def planMapFunc[T[_[_]]: RecursiveT, F[_]: Monad, FMT, A](
+  def planMapFunc[T[_[_]]: BirecursiveT, F[_]: Monad, FMT, A](
     freeMap: FreeMapA[T, A])(
     recover: A => XQuery
   )(implicit
     MFP: Planner[F, FMT, MapFunc[T, ?]]
   ): F[XQuery] =
-    freeMap.cataM(interpretM(recover(_).point[F], MFP.plan))
+    freeMap.transCata[FreeMapA[T, A]](rewriteNullCheck[T, FreeMapA[T, A], A]).cataM(interpretM(recover(_).point[F], MFP.plan))
 
   def rebaseXQuery[T[_[_]], F[_]: Monad, FMT](
     fqs: FreeQS[T],
@@ -133,6 +135,31 @@ package object qscript {
     QTP: Planner[F, FMT, QScriptTotal[T, ?]]
   ): F[XQuery] =
     fqs.cataM(interpretM(κ(src.point[F]), QTP.plan))
+
+  def rewriteNullCheck[T[_[_]]: BirecursiveT, U, E](
+    implicit UR: Recursive.Aux[U, CoEnv[E, MapFunc[T, ?], ?]],
+             UC: Corecursive.Aux[U, CoEnv[E, MapFunc[T, ?], ?]]
+  ): CoEnv[E, MapFunc[T, ?], U] => CoEnv[E, MapFunc[T, ?], U] = {
+    val MFC = quasar.qscript.MFC[T]
+
+    object NullLit {
+      def unapply[A](mfc: CoEnv[E, MapFunc[T, ?], A]): Boolean =
+        mfc.run.exists[MapFunc[T, A]] {
+          case MFC(Constant(ej)) => EJson.isNull(ej)
+          case _                 => false
+        }
+    }
+
+    val nullString: U =
+      UC.embed(CoEnv(MFC(Constant[T, U](EJson.fromCommon(Str[T[EJson]]("null")))).right))
+
+    fa => CoEnv(fa.run.map (totally {
+      case MFC(Eq(lhs, Embed(NullLit())))  => MFC(Eq(UC.embed(CoEnv(\/-(MFC(TypeOf(lhs))))), nullString))
+      case MFC(Eq(Embed(NullLit()), rhs))  => MFC(Eq(UC.embed(CoEnv(MFC(TypeOf(rhs)).right)), nullString))
+      case MFC(Neq(lhs, Embed(NullLit()))) => MFC(Neq(UC.embed(CoEnv(MFC(TypeOf(lhs)).right)), nullString))
+      case MFC(Neq(Embed(NullLit()), rhs)) => MFC(Neq(UC.embed(CoEnv(MFC(TypeOf(rhs)).right)), nullString))
+    }))
+  }
 
   ////
 

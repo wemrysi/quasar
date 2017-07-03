@@ -276,8 +276,8 @@ object PruneArrays {
               }.getOrElse((ScalaMap.empty, in.rBranch))
 
             ThetaJoin(in.src,
-              lBranch.pruneArraysBranch,
-              rBranch.pruneArraysBranch,
+              lBranch.pruneArraysBranch(Ignore),
+              rBranch.pruneArraysBranch(Ignore),
               remapIndicesInJoinFunc(in.on, lrepl, rrepl),
               in.f,
               remapIndicesInJoinFunc(in.combine, lrepl, rrepl))
@@ -316,8 +316,8 @@ object PruneArrays {
               }.getOrElse((ScalaMap.empty, in.rBranch))
 
             EquiJoin(in.src,
-              lBranch.pruneArraysBranch,
-              rBranch.pruneArraysBranch,
+              lBranch.pruneArraysBranch(Ignore),
+              rBranch.pruneArraysBranch(Ignore),
               remapIndicesInFunc(in.lKey, lrepl),
               remapIndicesInFunc(in.rKey, rrepl),
               in.f,
@@ -387,7 +387,7 @@ object PruneArrays {
             M.put(bucketIndices |+| reducersIndices).as(Ignore)
 
           case Union(_, _, _)     => default.find(in)
-          case Subset(_, _, _, _) => default.find(in)
+          case Subset(_, _, _, _) => M.modify(ι).as(Ignore)
 
           case Map(_, func)    => M.put(liftHole(findIndicesInFunc[Hole](func))).as(Ignore)
           case Filter(_, func) => M.modify(liftHole(findIndicesInFunc[Hole](func)) |+| _).as(Ignore)
@@ -399,7 +399,7 @@ object PruneArrays {
             }
             M.modify(bucketState |+| orderState |+| _).as(Ignore)
 
-          case Unreferenced() => default.find(in)
+          case Unreferenced() => M.modify(ι).as(Ignore)
         }
 
       def remap[M[_], A](env: RewriteState, in: QScriptCore[A])(implicit M: MonadState[M, RewriteState]) =
@@ -446,10 +446,12 @@ object PruneArrays {
             M.get >>= (st => haltRemap(remapState(st, in, indexMapping >>> replacement)))
 
           case Union(src, lBranch, rBranch) =>
-            M.put(Ignore).as(Union(src, lBranch.pruneArraysBranch, rBranch.pruneArraysBranch))
+            M.put(Ignore).as(Union(src, lBranch.pruneArraysBranch(Ignore), rBranch.pruneArraysBranch(Ignore)))
 
           case Subset(src, from, op, count) =>
-            M.put(Ignore).as(Subset(src, from.pruneArraysBranch, op, count.pruneArraysBranch))
+            def replacement(state: RewriteState) =
+              Subset(src, from.pruneArraysBranch(state), op, count.pruneArraysBranch(Ignore))
+            M.get ∘ (state => remapState(state, replacement(Ignore), _ => replacement(state)))
 
           case Map(src, func) =>
             def replacement(repl: IndexMapping): QScriptCore[A] =
@@ -469,7 +471,7 @@ object PruneArrays {
                 order0.map(_.leftMap(remapIndicesInFunc(_, repl))))
             M.get ∘ (remapState(_, in, indexMapping >>> replacement))
 
-          case Unreferenced() => default.remap(env, in)
+          case Unreferenced() => M.modify(ι).as(in)
         }
     }
 }

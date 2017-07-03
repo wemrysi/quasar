@@ -11,7 +11,8 @@
 
   "query": "select city as `12`, pop as `42` from smallZips",
 
-  "predicate": "containsAtLeast",
+  "predicate": "atLeast",
+  "ignoreResultOrder": true,
 
   "expected": [
     { "12": "NEW SALEM", "42": 14077 }

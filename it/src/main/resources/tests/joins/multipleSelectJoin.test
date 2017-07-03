@@ -22,7 +22,8 @@
               ON smallZips.pop = extraSmallZips.pop
               WHERE extraSmallZips.state = \"MA\"",
 
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
 
     "expected": [{ "CitySmall": "AGAWAM", "StateSmall": "MA", "City": "AGAWAM", "State": "MA", "Pop": 15338 },
                  { "CitySmall": "WARE",   "StateSmall": "MA", "City": "WARE",   "State": "MA", "Pop": 9808  }]

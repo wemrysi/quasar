@@ -3,9 +3,9 @@
 
     "backends": {
         "mimir": "skip",
-        "couchbase":         "skip",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
+        "couchbase":         "timeout",
+        "marklogic_json":    "timeout",
+        "marklogic_xml":     "timeout",
         "mongodb_2_6": "ignoreFieldOrder",
         "mongodb_3_0": "ignoreFieldOrder",
         "mongodb_3_2": "ignoreFieldOrder",
@@ -26,7 +26,8 @@
               ON p.sha = c.sha
               GROUP BY p.author.login",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": [{ "login": "mossprescott", "count": 15 },
                  { "login": "sellout"     , "count":  9 },

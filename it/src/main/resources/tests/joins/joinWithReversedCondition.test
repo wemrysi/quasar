@@ -2,7 +2,7 @@
     "name": "join with reversed condition and complex condition expression",
 
     "backends": {
-        "couchbase":         "skip",
+        "couchbase":         "pending",
         "marklogic_json": "ignoreFieldOrder",
         "mimir": "skip",
         "mongodb_q_3_2":     "pending",
@@ -17,7 +17,8 @@
               from `../slamengine_commits` as l join `../slamengine_commits_dup` as r
               on r.sha = l.parents[0].sha",
 
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
 
     "expected": [
         { "child": "b29d8f254e5df2c4d1792f077625924cd1fde2db", "c_auth": "mossprescott",

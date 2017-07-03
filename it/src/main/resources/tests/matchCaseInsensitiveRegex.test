@@ -6,7 +6,8 @@
     },
     "data": "zips.data",
     "query": "select * from zips where city ~* \"^bOu\"",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "ignoredFields": ["_id"],
     "ignoreFieldOrder": true,
     "expected": [

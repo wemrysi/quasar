@@ -6,7 +6,7 @@
     },
     "data": "zips.data",
     "query": "select * from zips order by pop, city limit 10",
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
     "ignoredFields": ["_id"],
     "ignoreFieldOrder": true,
     "expected": [

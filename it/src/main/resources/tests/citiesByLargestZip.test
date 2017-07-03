@@ -21,7 +21,7 @@
 
     "query": "select distinct city from zips order by pop desc limit 5",
 
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
 
     "expected": [{ "city" : "CHICAGO" },
                  { "city" : "BROOKLYN" },

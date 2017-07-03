@@ -6,6 +6,7 @@
     },
     "data": "nested.data",
     "query": "select topObj{*}.botObj{*} from nested",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": ["m", "n", "o"]
 }

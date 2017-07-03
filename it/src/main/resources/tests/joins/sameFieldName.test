@@ -2,7 +2,7 @@
     "name": "select over fields with same name",
 
     "backends": {
-        "couchbase":         "skip",
+        "couchbase":         "pending",
         "marklogic_json": "ignoreFieldOrder",
         "mimir": "skip",
         "mongodb_q_3_2": "pending",
@@ -17,7 +17,8 @@
               from `../owners` as owner join `../cars` as car
               on car.`_id` = owner.carId",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": [{ "name": "emma",  "name0": "RangeRover-Evoque" },
                  { "name": "scott", "name0": "Honda-civic" },

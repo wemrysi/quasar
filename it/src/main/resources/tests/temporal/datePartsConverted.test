@@ -29,7 +29,8 @@
               to_string(author.id) as id
               from `../slamengine_commits`",
 
-  "predicate": "containsAtLeast",
+  "predicate": "atLeast",
+  "ignoreResultOrder": true,
 
   "expected": [
     {

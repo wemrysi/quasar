@@ -2,7 +2,7 @@
     "name": "cross join with conditions that must be pushed ahead of the join (or else the join explodes, taking several minutes to complete)",
 
     "backends": {
-        "couchbase":         "skip",
+        "couchbase":         "pending",
         "marklogic_json":    "ignoreFieldOrder",
         "mimir":             "skip",
         "mongodb_q_3_2":     "pending",
@@ -17,7 +17,8 @@
             from `../zips` as a, `../largeZips` as b
             where a.`_id` like \"80301\" and b.`_id` like \"95928\"",
 
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": [{ "a": "BOULDER", "b": "CHICO", "diff": 9278 }]
 }
