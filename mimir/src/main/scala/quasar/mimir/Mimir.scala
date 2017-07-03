@@ -309,7 +309,7 @@ object Mimir extends BackendModule with Logging {
       val t = for {
         handle <- Task.delay(ResultHandle(cur.getAndIncrement()))
 
-        killSwitch = new AtomicBoolean(false)
+        killSwitch <- Task.delay(new AtomicBoolean(false))
         q <- async.boundedQueue[Task, Vector[Data]](1)    // only "run ahead" by 1 chunk
 
         _ <- Task.delay(map.put(handle, (q, killSwitch)))
@@ -317,7 +317,7 @@ object Mimir extends BackendModule with Logging {
         fchunks = repr.table.slices.map(_.toJsonElements)
         chunks = fchunks.trans(λ[Future ~> Task](_.toTask))
 
-        enqueueing = chunks foreachRec { chunk =>
+        driver = chunks foreachRec { chunk =>
           for {
             killed <- Task.delay(killSwitch.get())
 
@@ -329,7 +329,9 @@ object Mimir extends BackendModule with Logging {
           } yield ()
         }
 
-        _ <- Task.delay(enqueueing.unsafePerformAsync(_ => ()))
+        driverWithTerm = driver >> q.enqueue1(Vector.empty)
+
+        _ <- Task.delay(driverWithTerm.unsafePerformAsync(_ => ()))
       } yield handle
 
       t.liftM[MT].liftB
@@ -349,8 +351,8 @@ object Mimir extends BackendModule with Logging {
       val t = for {
         pair <- Task.delay(map.get(h))
         (_, killSwitch) = pair
-        _ <- Task.delay(killSwitch.set(true))
         _ <- Task.delay(map.remove(h, pair))
+        _ <- Task.delay(killSwitch.set(true))
       } yield ()
 
       t.liftM[MT].liftM[ConfiguredT]
