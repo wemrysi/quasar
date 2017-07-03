@@ -35,7 +35,7 @@ import quasar.precog.common.{Path, RValue}
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
 
-import fs2.Stream
+import fs2.{async, Stream}
 import fs2.async.mutable.{Queue, Signal}
 import fs2.interop.scalaz._
 
@@ -58,7 +58,7 @@ import scala.concurrent.Future
 import scala.util.Random
 
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
 object Mimir extends BackendModule with Logging {
 
@@ -300,16 +300,36 @@ object Mimir extends BackendModule with Logging {
   object QueryFileModule extends QueryFileModule {
     import QueryFile._
 
-    def executePlan(repr: Repr, out: AFile): Backend[AFile] = sys.error("woodle")
-
-    private val map = new ConcurrentHashMap[ResultHandle, Vector[Data]]
+    private val map = new ConcurrentHashMap[ResultHandle, (Queue[Task, Vector[Data]], AtomicBoolean)]
     private val cur = new AtomicLong(0L)
+
+    def executePlan(repr: Repr, out: AFile): Backend[AFile] = sys.error("woodle")
 
     def evaluatePlan(repr: Repr): Backend[ResultHandle] = {
       val t = for {
-        results <- repr.table.toJson.toTask     // dear god delete me please!!! halp alissa halp
         handle <- Task.delay(ResultHandle(cur.getAndIncrement()))
-        _ <- Task.delay(map.put(handle, results.toVector.map(JValue.toData)))
+
+        killSwitch = new AtomicBoolean(false)
+        q <- async.boundedQueue[Task, Vector[Data]](1)    // only "run ahead" by 1 chunk
+
+        _ <- Task.delay(map.put(handle, (q, killSwitch)))
+
+        fchunks = repr.table.slices.map(_.toJsonElements)
+        chunks = fchunks.trans(λ[Future ~> Task](_.toTask))
+
+        enqueueing = chunks foreachRec { chunk =>
+          for {
+            killed <- Task.delay(killSwitch.get())
+
+            // once we're killed, run the whole thing out since we don't have early termination semantics
+            _ <- if (killed)
+              Task.now(())
+            else
+              q.enqueue1(chunk.map(JValue.toData))
+          } yield ()
+        }
+
+        _ <- Task.delay(enqueueing.unsafePerformAsync(_ => ()))
       } yield handle
 
       t.liftM[MT].liftB
@@ -317,15 +337,24 @@ object Mimir extends BackendModule with Logging {
 
     def more(h: ResultHandle): Backend[Vector[Data]] = {
       val t = for {
-        back <- Task.delay(map.get(h))
-        _ <- Task.delay(map.put(h, Vector.empty))
+        pair <- Task.delay(map.get(h))
+        (q, _) = pair
+        back <- q.dequeue1
       } yield back
 
       t.liftM[MT].liftB
     }
 
-    def close(h: ResultHandle): Configured[Unit] =
-      (Task delay { map.remove(h); () }).liftM[MT].liftM[ConfiguredT]
+    def close(h: ResultHandle): Configured[Unit] = {
+      val t = for {
+        pair <- Task.delay(map.get(h))
+        (_, killSwitch) = pair
+        _ <- Task.delay(killSwitch.set(true))
+        _ <- Task.delay(map.remove(h, pair))
+      } yield ()
+
+      t.liftM[MT].liftM[ConfiguredT]
+    }
 
     def explain(repr: Repr): Backend[String] = ???
 
