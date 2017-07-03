@@ -356,7 +356,7 @@ object Mimir extends BackendModule with Logging {
       t.liftM[MT].liftM[ConfiguredT]
     }
 
-    def explain(repr: Repr): Backend[String] = ???
+    def explain(repr: Repr): Backend[String] = "🤹".point[Backend]
 
     def listContents(dir: ADir): Backend[Set[PathSegment]] =
       cake[M].liftB.flatMap(_.fs.listContents(dir).liftM[MT].liftB)
