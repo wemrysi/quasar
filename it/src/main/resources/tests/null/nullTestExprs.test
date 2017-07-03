@@ -2,7 +2,7 @@
     "name": "expressions with `= null` and `is null`",
     "backends": {
         "couchbase": "ignoreFieldOrder",
-        "mimir": "skip",
+        "mimir":"pending",
         "marklogic_json": "pending",
         "marklogic_xml": "pending",
         "postgresql": "pending"
