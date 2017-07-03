@@ -1,0 +1,19 @@
+{
+    "name": "flatten array",
+    "backends": {
+        "mimir": "skip",
+        "postgresql": "pending"
+    },
+    "data": "zips.data",
+    "query": "SELECT loc[*] AS loc FROM zips",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+    "expected": [
+      { "loc" : -72.622739 },
+      { "loc" :  34.933613 },
+      { "loc" : -78.504109 },
+      { "loc" :  34.994081 },
+      { "loc" : -79.261843 },
+      { "loc" :  34.588664 }
+    ]
+}

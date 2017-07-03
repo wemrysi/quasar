@@ -1,0 +1,1 @@
+- traverse QScript branches when converting to Read

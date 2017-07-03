@@ -1,0 +1,2 @@
+- Introduces a Unreferenced structure to replace unreferenced Root.
+- Enables simplifyQC for FreeQS structures.

@@ -1,0 +1,83 @@
+language: scala
+scala: 2.11.8
+jdk: oraclejdk8
+dist: trusty
+sudo: required
+
+services:
+  - docker
+
+# travis installs postgres by default this will stop and free up the psql port
+# needed by the  postgreql container
+before_install:
+  - sudo /etc/init.d/postgresql stop
+ 
+# create all the docker containers we need for IT testing
+install:
+  - docker/scripts/initContainer quasar_metastore
+  - docker/scripts/initContainer quasar_$CONNECTOR
+  - docker ps
+
+# run db config scripts and populate the it/testing.conf file
+before_script:
+  - docker/scripts/setupContainers -c quasar_metastore
+  - docker/scripts/setupContainers -c quasar_$CONNECTOR
+  - docker/scripts/assembleTestingConf -c quasar_metastore
+  - docker/scripts/assembleTestingConf -i quasar_$CONNECTOR
+  - cat it/testing.conf
+
+# export some needed env vars, build, then publish and tag resources
+script:
+  - cd $TRAVIS_BUILD_DIR
+  - export ANSI_RED ANSI_GREEN ANSI_RESET ANSI_CLEAR
+  - export -f travis_wait travis_jigger
+  - ./scripts/build
+  - ./scripts/quasarPublishAndTag
+
+after_success:
+  - ./scripts/afterSuccess
+
+notifications:
+  irc:
+    template:
+      - "%{result}: %{repository_slug}#%{build_number} (%{branch}@%{commit}: %{author})
+        %{build_url}"
+  slack:
+    secure: k7tat0w0CSokOD1K0nfPhFY9Z3xkYHXboNlW1WgNAjqtq56hQsfQWhN8z6cXRAs/CgT8ME0K//wDN/HgdG91/aVh1smv/hxMa6P/o70GclhvUkB4iTis3kv9la3Kf2w3K5pbWJ6fFLdAZqc5i9XpQ8q+d7UTgwAxj1ZcYwaCSVo=
+
+branches:
+  except:
+    - /^v\d+\.\d+\.\d+$/ # don't redundantly build tags
+    - mimir
+
+cache:
+  directories:
+    - $HOME/.cache/quasar/marklogic
+    - $HOME/.coursier/cache
+    - $HOME/.ivy2/cache
+    - $HOME/.sbt
+    - target
+    - .targets
+    - project/project/target
+    - project/target
+
+before_cache:
+  - find "$HOME/.sbt/" -name '*.lock' -print0 | xargs -0 rm
+  - find "$HOME/.ivy2/" -name 'ivydata-*.properties' -print0 | xargs -0 rm
+
+env:
+  matrix:
+    - CONNECTOR=mongodb_2_6
+    - CONNECTOR=mimir
+    - CONNECTOR=marklogic_xml
+    - CONNECTOR=marklogic_json
+    - CONNECTOR=couchbase
+    - CONNECTOR=mongodb_3_0
+    - CONNECTOR=mongodb_read_only
+    - CONNECTOR=mongodb_3_2
+    - CONNECTOR=mongodb_3_4
+    - CONNECTOR=postgresql
+    - CONNECTOR=spark_local_test
+
+  global:
+    - COURSIER_PROGRESS=0

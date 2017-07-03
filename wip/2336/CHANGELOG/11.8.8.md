@@ -1,0 +1,1 @@
+- [#1238]: implement conversion to JS for several of the date operators

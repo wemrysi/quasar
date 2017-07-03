@@ -1,0 +1,11 @@
+{
+    "name": "double flatten with intervening field",
+    "backends": {
+        "mimir": "skip",
+        "postgresql": "pending"
+    },
+    "data": "nested.data",
+    "query": "select topObj{*}.botObj{*} from nested",
+    "predicate": "containsExactly",
+    "expected": ["m", "n", "o"]
+}

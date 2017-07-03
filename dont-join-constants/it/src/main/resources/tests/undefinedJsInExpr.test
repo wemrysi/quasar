@@ -1,0 +1,15 @@
+{
+    "name": "propagate undefined and null in JS",
+    "backends": {
+        "mimir": "skip",
+        "couchbase":         "pending",
+        "mongodb_q_3_2":     "pending",
+        "postgresql":        "pending"
+    },
+    "data": "zips.data",
+    "query": "select distinct length(meh) as meh_len, meh.mep, length(meh.mep) as mep_len from zips",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "FIXME": "There should be a `{ }`, but it is rewritten away",
+    "expected": []
+}

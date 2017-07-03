@@ -1,0 +1,21 @@
+{
+    "name": "project from non-static concatted array",
+    "backends": {
+        "mimir": "skip",
+        "mongodb_q_3_2": "pending",
+        "postgresql":        "pending"
+    },
+    "data": "largeZips.data",
+    "query": "select (loc || [1, 2])[1] from largeZips",
+    "predicate": "containsAtLeast",
+    "expected": [42.377017,
+                 42.176443,
+                 42.202007,
+                 42.324662,
+                 42.129484,
+                 42.115066,
+                 42.085314,
+                 42.114455,
+                 42.453086,
+                 42.579563]
+}

@@ -1,0 +1,13 @@
+{
+    "name": "count distinct *",
+    "backends": {
+        "mimir": "skip",
+        "mongodb_q_3_2":     "pending",
+        "postgresql":        "pending"
+    },
+    "data": "olympics.data",
+    "query": "select count(distinct *) as cnt from olympics",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [{ "cnt": 2304 }]
+}

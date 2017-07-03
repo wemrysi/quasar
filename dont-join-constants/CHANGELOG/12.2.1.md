@@ -1,0 +1,3 @@
+- Finish MarkLogic planning of MapFunc
+  - Includes support for all terms except 'Undefined', 'IfUndefined' and 'Guard'.
+  - Also fixes the plan for 'QScriptCore.Unreferenced' to have the correct cardinality (1).

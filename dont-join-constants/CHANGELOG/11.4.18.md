@@ -1,0 +1,1 @@
+- [#1371] two fixes related to joining sub-selects

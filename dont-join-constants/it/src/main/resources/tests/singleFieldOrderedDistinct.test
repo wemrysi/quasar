@@ -1,0 +1,39 @@
+{
+    "name": "distinct of one ordered field",
+    "backends": {
+        "mimir": "skip",
+        "couchbase":      "pending",
+        "marklogic_json": "pending",
+        "marklogic_xml":  "pending",
+        "mongodb_q_3_2":  "pending",
+        "postgresql":     "pending",
+	"spark_hdfs": "pending",
+        "spark_local": "pending"
+    },
+    "data": "olympics.data",
+
+    "NB": "Skipped for all connectors due to reduce/sort ordering bug.
+           Bug is fixed on @sellout's new mongo branch, but the fix breaks old mongo.
+
+           The lack of alias on this field is important, as it triggers the
+           `select value` semantics of returning a value directly, not wrapped
+           in a map.",
+
+    "query": "select distinct discipline from olympics order by discipline",
+    "predicate": "exactly",
+    "expected": ["Alpine Skiing",
+                 "Biathlon",
+                 "Bobsleigh",
+                 "Cross Country S",
+                 "Curling",
+                 "Figure skating",
+                 "Freestyle Ski.",
+                 "Ice Hockey",
+                 "Luge",
+                 "Nordic Combined",
+                 "Short Track S.",
+                 "Skeleton",
+                 "Ski Jumping",
+                 "Snowboard",
+                 "Speed skating"]
+}

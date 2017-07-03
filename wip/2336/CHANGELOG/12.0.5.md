@@ -1,0 +1,2 @@
+- Add `shiftRead` convenience function
+- Add optimization for `ShiftedRead` and apply in new `shiftRead` function

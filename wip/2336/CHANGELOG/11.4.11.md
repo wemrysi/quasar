@@ -1,0 +1,1 @@
+- [#1374] fixed error when collection size doesn't fit in 32-bits

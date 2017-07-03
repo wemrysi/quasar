@@ -1,0 +1,1 @@
+- pass specs test arguments to specs.
