@@ -63,10 +63,10 @@ object queryfile {
     val rootFolder: String => String = _.split(separator).head
 
     val segments = if(adir === rootDir)
-      E.listIndeces.map(_.map(rootFolder).toSet.map(toDirName))
+      E.listIndices.map(_.map(rootFolder).toSet.map(toDirName))
     else {
       val prefix = dir2Index(adir)
-      val folders = E.listIndeces.map(indices =>
+      val folders = E.listIndices.map(indices =>
         indices
           .filter(_.startsWith(prefix))
           .map(s => s.substring(s.indexOf(prefix) + prefix.length))

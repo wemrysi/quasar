@@ -99,6 +99,20 @@ class ElasticCallSpec extends quasar.Qspec
     }
   }
 
+  "ListIndices" should {
+    "list all existing indices" in {
+      val program = for {
+        _ <- elastic.createIndex("bar")
+        _ <- elastic.createIndex("baz")
+        indices <- elastic.listIndices
+      } yield indices
+
+      val indices = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      indices must contain("bar")
+      indices must contain("baz")
+    }
+  }
+
   "TypeExists" should {
     "return true if type exists" in {
       val program = for {
@@ -128,6 +142,50 @@ class ElasticCallSpec extends quasar.Qspec
 
       val exists = program.foldMap(ElasticCall.interpreter).unsafePerformSync
       exists must_== false
+    }
+  }
+
+  "ListTypes" should {
+    "list all types for given index" in {
+      val program = for {
+        _ <- elastic.createIndex("foo")
+        _ <- elastic.indexInto(IndexType("foo", "bar"), List(("key" -> "value")))
+        _ <- elastic.indexInto(IndexType("foo", "baz"), List(("key" -> "value")))
+        types <- elastic.listTypes("foo")
+      } yield types
+
+      val types = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      types must contain("bar")
+      types must contain("baz")
+    }
+
+    "return empty List if index has no types" in {
+      val program = for {
+        _ <- elastic.createIndex("foo")
+        types <- elastic.listTypes("foo")
+      } yield types
+
+      val types = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      types must_== List.empty[String]
+    }
+
+    "return empty List if index has no types" in {
+      val program = for {
+        _ <- elastic.createIndex("foo")
+        types <- elastic.listTypes("foo")
+      } yield types
+
+      val types = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      types must_== List.empty[String]
+    }
+
+    "return empty List if index does not exist" in {
+      val program = for {
+        types <- elastic.listTypes("foo")
+      } yield types
+
+      val types = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      types must_== List.empty[String]
     }
   }
 }

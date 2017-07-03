@@ -58,7 +58,7 @@ object managefile {
     elastic: ElasticCall.Ops[S]
     ): Free[S, Boolean] = 
     refineType(path).fold(
-      d => elastic.listIndeces.map(_.contains(dir2Index(d))),
+      d => elastic.listIndices.map(_.contains(dir2Index(d))),
       f => elastic.typeExists(file2ES(f))
     )
 
@@ -98,7 +98,7 @@ object managefile {
 
     for {
       src      <- dir2Index(sd).point[Free[S, ?]]
-      toMove   <- elastic.listIndeces.map(_.filter(i => i.startsWith(src)))
+      toMove   <- elastic.listIndices.map(_.filter(i => i.startsWith(src)))
       _        <- toMove.map(i => copyIndex(i, calculateDestinationIndex(i))).sequence
       _        <- toMove.map(elastic.deleteIndex(_)).sequence
     } yield ()
@@ -120,7 +120,7 @@ object managefile {
   private def deleteDir[S[_]](dir: ADir)(implicit
     elastic: ElasticCall.Ops[S]
   ): Free[S, FileSystemError \/ Unit] = for {
-    indices <- elastic.listIndeces
+    indices <- elastic.listIndices
     index = dir2Index(dir)
     result <- if(indices.isEmpty) pathErr(pathNotFound(dir)).left[Unit].point[Free[S, ?]] else {
       indices.filter(_.startsWith(index)).map(elastic.deleteIndex(_)).sequence.as(().right[FileSystemError])

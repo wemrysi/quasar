@@ -36,7 +36,7 @@ class ListContentsSpec extends quasar.Qspec with DisjunctionMatchers {
       case Copy(_, _) => ()
       case TypeExists(indexType) => true
       case ListTypes(index) => indices.get(index).getOrElse(List.empty[String])
-      case ListIndeces() => indices.keys.toList
+      case ListIndices() => indices.keys.toList
       case DeleteIndex(index: String) => ()
       case DeleteType(_) => ()
     }
