@@ -62,7 +62,6 @@ class ElasticCallSpec extends quasar.Qspec
       val created = program.foldMap(ElasticCall.interpreter).unsafePerformSync
       created must_== true
     }
-
   }
 
   "DeleteIndex" should {
@@ -73,8 +72,8 @@ class ElasticCallSpec extends quasar.Qspec
         exists <- elastic.indexExists("hello")
       } yield exists
 
-      val created = program.foldMap(ElasticCall.interpreter).unsafePerformSync
-      created must_== false
+      val exists = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      exists must_== false
     }
 
     "not fail if index does not exists" in {
@@ -83,8 +82,52 @@ class ElasticCallSpec extends quasar.Qspec
         exists <- elastic.indexExists("hello")
       } yield exists
 
-      val created = program.foldMap(ElasticCall.interpreter).unsafePerformSync
-      created must_== false
+      val exists = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      exists must_== false
+    }
+
+    "not fail if index contains types with documents" in {
+      val program = for {
+        _ <- elastic.createIndex("foo")
+        _ <- elastic.indexInto(IndexType("foo", "bar"), List(("key" -> "value")))
+        _      <- elastic.deleteIndex("hello")
+        exists <- elastic.indexExists("hello")
+      } yield exists
+
+      val exists = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      exists must_== false
+    }
+  }
+
+  "TypeExists" should {
+    "return true if type exists" in {
+      val program = for {
+        _ <- elastic.createIndex("foo")
+        _ <- elastic.indexInto(IndexType("foo", "bar"), List(("key" -> "value")))
+        exists <- elastic.typeExists(IndexType("foo", "bar"))
+      } yield exists
+
+      val exists = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      exists must_== true
+    }
+
+    "return false if type does not exist" in {
+      val program = for {
+        _ <- elastic.createIndex("foo")
+        exists <- elastic.typeExists(IndexType("foo", "bar"))
+      } yield exists
+
+      val exists = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      exists must_== false
+    }
+
+    "return false if even indec does not exist" in {
+      val program = for {
+        exists <- elastic.typeExists(IndexType("foo", "bar"))
+      } yield exists
+
+      val exists = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      exists must_== false
     }
   }
 }

@@ -32,6 +32,7 @@ class ListContentsSpec extends quasar.Qspec with DisjunctionMatchers {
   def elasticInterpreter(indices: Map[String, List[String]]): ElasticCall ~> Id = new (ElasticCall ~> Id) {
     def apply[A](from: ElasticCall[A]) = from match {
       case CreateIndex(_) => ()
+      case IndexInto(_, _) => ()
       case Copy(_, _) => ()
       case TypeExists(indexType) => true
       case ListTypes(index) => indices.get(index).getOrElse(List.empty[String])

@@ -42,6 +42,7 @@ final case class ListTypes(index: String) extends ElasticCall[List[String]]
 final case class ListIndeces() extends ElasticCall[List[String]]
 final case class DeleteIndex(index: String) extends ElasticCall[Unit]
 final case class DeleteType(indexType: IndexType) extends ElasticCall[Unit]
+final case class IndexInto(indexType: IndexType, data: List[(String, String)]) extends ElasticCall[Unit]
 
 object ElasticCall {
 
@@ -53,6 +54,7 @@ object ElasticCall {
     def listIndeces: Free[S, List[String]] = lift(ListIndeces()).into[S]
     def deleteIndex(index: String): Free[S, Unit] = lift(DeleteIndex(index)).into[S]
     def deleteType(indexType: IndexType): Free[S, Unit] = lift(DeleteType(indexType)).into[S]
+    def indexInto(indexType: IndexType, data: List[(String, String)]): Free[S, Unit] = lift(IndexInto(indexType, data)).into[S]
 
     def indexExists(index: String): Free[S, Boolean] = listIndeces.map(_.contains(index))
   }
@@ -65,7 +67,7 @@ object ElasticCall {
   //TODO_ES reuse single client per interpreter, close when unmounted
   implicit def interpreter: ElasticCall ~> Task = new (ElasticCall ~> Task) {
 
-    def listIndices: Task[List[String]] = for {
+    def _listIndices: Task[List[String]] = for {
       httpClient <- Task.delay {
         PooledHttp1Client()
       }
@@ -79,8 +81,8 @@ object ElasticCall {
       result
     }
 
-    def create(index: String): Task[Unit] = for {
-      indices <- listIndices
+    def _create(index: String): Task[Unit] = for {
+      indices <- _listIndices
       _       <- if(indices.contains(index)) ().point[Task] else Task.delay {
         val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
         val result = client.execute { createIndex(index) }.await
@@ -89,8 +91,8 @@ object ElasticCall {
       }
     } yield ()
 
-    def delete(index: String): Task[Unit] = for {
-      indices <- listIndices
+    def _delete(index: String): Task[Unit] = for {
+      indices <- _listIndices
       _       <- if(!indices.contains(index)) ().point[Task] else Task.delay {
         val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
         val result = client.execute { deleteIndex(index) }.await
@@ -99,19 +101,27 @@ object ElasticCall {
       }
     } yield ()
 
+    def _indexInto(indexType: IndexType, data: List[(String, String)]): Task[Unit] = Task.delay {
+        val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
+        val result = client.execute { indexInto(indexType.index / indexType.typ) fields (data:_*) }.await
+        client.close()
+        ()
+    }
+
+    def _typeExists(index: String, typ: String): Task[Boolean] = Task.delay {
+        val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
+        val result = client.execute { typesExist(typ) in index }.await.exists
+        client.close()
+        result
+      }
+
     def apply[A](from: ElasticCall[A]) = from match {
-      case CreateIndex(index) => create(index)
+      case CreateIndex(index) => _create(index)
+      case IndexInto(indexType: IndexType, data: List[(String, String)]) => _indexInto(indexType, data)
       case Copy(src, dst) => Task.delay {
         // TODO_ES
       }
-
-      case TypeExists(IndexType(index, typ)) =>
-        Task.delay {
-          val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
-          val result = client.execute { typesExist(typ) in index }.await.exists
-          client.close()
-          result
-        }
+      case TypeExists(IndexType(index, typ)) => _typeExists(index, typ)
       case ListTypes(index) => for {
         httpClient <- Task.delay {
           PooledHttp1Client()
@@ -131,8 +141,8 @@ object ElasticCall {
         httpClient.shutdownNow() // TODO_ES handling resources
         result
       }
-      case ListIndeces() => listIndices
-      case DeleteIndex(index) => delete(index)
+      case ListIndeces() => _listIndices
+      case DeleteIndex(index) => _delete(index)
       case DeleteType(IndexType(index, typ)) => Task.delay {
         // TODO_ES
         ()
