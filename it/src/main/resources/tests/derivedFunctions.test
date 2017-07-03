@@ -4,7 +4,7 @@
     },
     "data": "divide.data",
     "query": "select nr, -val1 as neg1, abs(val1) as abs1 from divide",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
     "expected": [
         { "nr":  1, "neg1": -3.0, "abs1": 3.0 },
         { "nr":  2, "neg1": -2, "abs1": 2 },
