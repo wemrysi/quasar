@@ -1277,7 +1277,7 @@ abstract class StdLibSpec extends Qspec {
 
       "Meta" >> {
         // FIXME: Implement once we've switched to EJson in LogicalPlan.
-        "returns metadata associated with a value" >> skipped("Requires EJson.")
+        "returns metadata associated with a value" >> pending("Requires EJson.")
       }
     }
   }
