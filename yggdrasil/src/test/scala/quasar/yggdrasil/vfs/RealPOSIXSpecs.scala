@@ -102,7 +102,7 @@ object RealPOSIXSpecs extends Specification {
         files <- interp(Ls(Path.rootDir))
       } yield files
 
-      test.unsafePerformSync mustEqual targets.map(Path.file)
+      test.unsafePerformSync must containTheSameElementsAs(targets.map(Path.file))
     }
 
     "make a subdirectory" in setupDir { base =>
