@@ -49,7 +49,6 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case (string.ToString, Data.Interval(_) :: Nil) =>
       Pending("Interval prints numeric representation").left
 
-    case (math.Abs, List(Data.Interval(_))) => notHandled.left
     case (math.Power, Data.Number(x) :: Data.Number(y) :: Nil)
         if x == 0 && y < 0 =>
       Pending("Infinity is not translated properly?").left
