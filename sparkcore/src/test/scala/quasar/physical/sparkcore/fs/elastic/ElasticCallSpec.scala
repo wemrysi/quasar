@@ -41,6 +41,7 @@ class ElasticCallSpec extends quasar.Qspec
     node = None
   }
 
+
   "CreateIndex" should {
     "create new index" in {
       val program = for {
@@ -110,6 +111,15 @@ class ElasticCallSpec extends quasar.Qspec
       val indices = program.foldMap(ElasticCall.interpreter).unsafePerformSync
       indices must contain("bar")
       indices must contain("baz")
+    }
+
+    "return empty list if there are no indices in the system" in {
+      val program = for {
+        indices <- elastic.listIndices
+      } yield indices
+
+      val indices = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      indices must_== List.empty[String]
     }
   }
 
@@ -186,6 +196,46 @@ class ElasticCallSpec extends quasar.Qspec
 
       val types = program.foldMap(ElasticCall.interpreter).unsafePerformSync
       types must_== List.empty[String]
+    }
+  }
+
+  "Copy" should {
+    "copy content of existing type to non-existing type" in {
+      val program = for {
+        _ <- elastic.createIndex("foo")
+        _ <- elastic.indexInto(IndexType("foo", "bar"), List(("key" -> "value")))
+        _ <- elastic.indexInto(IndexType("foo", "baz"), List(("key" -> "value")))
+        _ <- elastic.createIndex("foo2")
+        _ <- elastic.copy(IndexType("foo", "bar"), IndexType("foo2", "bar2"))
+      } yield ()
+
+      val checkProgram = for {
+        bar2Exists <- elastic.typeExists(IndexType("foo2", "bar2"))
+        bazExists <- elastic.typeExists(IndexType("foo2", "baz"))
+      } yield (bar2Exists, bazExists)
+
+      program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      java.lang.Thread.sleep(2000) // test needs to wait for the views to be updated
+      val (bar2Exists, bazExists) = checkProgram.foldMap(ElasticCall.interpreter).unsafePerformSync
+      bar2Exists must_== true
+      bazExists must_== false
+    }
+  }
+
+  "DeleteType" should {
+    "foo delete existing type from existsing index" in {
+/*      
+      val program = for {
+        _ <- elastic.createIndex("foo")
+        _ <- elastic.indexInto(IndexType("foo", "bar"), List(("key" -> "value")))
+        _ <- elastic.deleteType(IndexType("foo", "bar"))
+        exists <- elastic.typeExists(IndexType("foo", "bar"))
+      } yield exists
+
+      val exists = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      exists must_== false
+ */
+      pending
     }
   }
 }
