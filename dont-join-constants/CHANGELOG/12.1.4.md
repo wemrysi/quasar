@@ -1,0 +1,1 @@
+- work around scala separate compilation bug

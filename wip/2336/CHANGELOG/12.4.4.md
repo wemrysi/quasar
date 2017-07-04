@@ -1,0 +1,2 @@
+- delete dead code from free package object
+- more polymorphic lambdas

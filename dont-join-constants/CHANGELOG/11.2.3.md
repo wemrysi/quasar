@@ -1,0 +1,1 @@
+- Create effect and js projects, making core a bit smaller.

@@ -1,0 +1,20 @@
+{
+    "name": "filter with pipeline using variables in query",
+
+    "backends": {
+        "mimir": "skip",
+        "postgresql": "pending"
+    },
+
+    "data": "smallZips.data",
+
+    "variables": {
+        "cutoff": "1000"
+    },
+
+    "query": "select count(*) as cnt from smallZips where pop < :cutoff",
+
+    "predicate": "equalsExactly",
+
+    "expected": [{ "cnt": 19 }]
+}

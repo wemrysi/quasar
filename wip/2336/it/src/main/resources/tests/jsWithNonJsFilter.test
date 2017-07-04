@@ -1,0 +1,20 @@
+{
+    "name": "filter on JS with non-JS",
+    "backends": {
+        "mimir": "skip",
+        "postgresql":        "pending"
+    },
+    "data": "largeZips.data",
+    "query": "select city, pop from largeZips where length(city) < 5 and pop < 30000",
+    "predicate": "containsAtLeast",
+    "expected": [{"city": "EDEN" , "pop": 26675},
+                 {"city": "ABAC" , "pop": 27906},
+                 {"city": "TICE" , "pop": 25029},
+                 {"city": "TAFT" , "pop": 26113},
+                 {"city": "TROY" , "pop": 29422},
+                 {"city": "LIMA" , "pop": 27344},
+                 {"city": "AVON" , "pop": 29182},
+                 {"city": "NORA" , "pop": 29718},
+                 {"city": "BOND" , "pop":   149},
+                 {"city": "PINE" , "pop":  2827}]
+}

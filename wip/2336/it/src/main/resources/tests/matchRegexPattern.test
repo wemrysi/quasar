@@ -1,0 +1,11 @@
+{
+    "name": "match regex pattern",
+    "backends": {
+        "mimir": "skip",
+        "postgresql": "pending"
+    },
+    "data": "zips.data",
+    "query": "select city from zips where city ~ \"OULD.{0,2} CIT\"",
+    "predicate": "containsExactly",
+    "expected": ["GOULD CITY", "BOULDER CITY"]
+}

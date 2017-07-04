@@ -1,0 +1,1 @@
+- Fix a bug that caused `ShiftRead` to not eliminate `Read` nodes.

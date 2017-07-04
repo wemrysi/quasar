@@ -1,0 +1,2 @@
+- Add ability to ignore field order in query regression tests
+- Enable trivial.test against Couchbase

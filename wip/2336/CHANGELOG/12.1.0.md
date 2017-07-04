@@ -1,0 +1,1 @@
+- support `union` in the Mongo connector.

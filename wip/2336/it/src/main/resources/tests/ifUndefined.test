@@ -1,0 +1,22 @@
+{
+    "name": "handle undefined values",
+    "backends": {
+        "couchbase": "ignoreFieldOrder",
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir": "skip",
+        "postgresql":        "pending"
+    },
+    "data": "zips.data",
+    "query": "select foo ?? pop as p, city ?? false as c from zips",
+    "predicate": "containsAtLeast",
+    "expected": [{ "p": 15338.0, "c": "AGAWAM"       },
+                 { "p": 36963.0, "c": "CUSHMAN"      },
+                 { "p":  4546.0, "c": "BARRE"        },
+                 { "p": 10579.0, "c": "BELCHERTOWN"  },
+                 { "p":  1240.0, "c": "BLANDFORD"    },
+                 { "p":  3706.0, "c": "BRIMFIELD"    },
+                 { "p":  1688.0, "c": "CHESTER"      },
+                 { "p":   177.0, "c": "CHESTERFIELD" },
+                 { "p": 23396.0, "c": "CHICOPEE"     },
+                 { "p": 31495.0, "c": "CHICOPEE"     }]
+}

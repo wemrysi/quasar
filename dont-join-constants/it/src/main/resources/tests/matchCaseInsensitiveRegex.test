@@ -1,0 +1,24 @@
+{
+    "name": "match on case-insensitive string",
+    "backends": {
+        "mimir": "skip",
+        "postgresql": "pending"
+    },
+    "data": "zips.data",
+    "query": "select * from zips where city ~* \"^bOu\"",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+    "ignoredFields": ["_id"],
+    "ignoreFieldOrder": true,
+    "expected": [
+        { "city": "BOUCKVILLE",       "loc": [ -75.567841,  42.894024], "pop":   650, "state": "NY" },
+        { "city": "BOUTON",           "loc": [ -93.996286,  41.828432], "pop":   552, "state": "IA" },
+        { "city": "BOULDER JUNCTION", "loc": [ -89.632454,  46.111183], "pop":   563, "state": "WI" },
+        { "city": "BOULDER",          "loc": [-112.113757,  46.230647], "pop":  1737, "state": "MT" },
+        { "city": "BOURBONNAIS",      "loc": [ -87.879023,  41.166119], "pop": 18311, "state": "IL" },
+        { "city": "BOURBON",          "loc": [ -91.22254,   38.172039], "pop":  4456, "state": "MO" },
+        { "city": "BOUTTE",           "loc": [ -90.393396,  29.897319], "pop":  2432, "state": "LA" },
+        { "city": "BOUNTIFUL",        "loc": [ -111.872658, 40.877513], "pop": 41077, "state": "UT" },
+        { "city": "BOULDER CITY",     "loc": [ -114.834413, 35.972711], "pop": 12920, "state": "NV" },
+        { "city": "BOURG",            "loc": [ -90.60866,   29.548489], "pop":  5310, "state": "LA" }]
+}

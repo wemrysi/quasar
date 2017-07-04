@@ -1,0 +1,17 @@
+{
+    "name": "count distinct",
+
+    "backends": {
+        "mimir": "skip",
+        "postgresql": "pending"
+    },
+
+    "data": "olympics.data",
+
+    "query": "select count(distinct sport) as cnt from olympics",
+
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+
+    "expected": [{ "cnt": 7 }]
+}

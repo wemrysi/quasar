@@ -1,0 +1,27 @@
+{
+    "name": "filter, sort, and limit",
+
+    "backends": {
+        "mimir": "skip",
+        "postgresql": "pending"
+    },
+
+    "data": "zips.data",
+
+    "query": "select * from zips where city like \"BOU%\" order by pop limit 10",
+
+    "predicate": "exactly",
+    "ignoredFields": ["_id"],
+    "ignoreFieldOrder": true,
+    "expected": [
+        { "city": "BOULDER",         "loc": [-109.540105, 42.688146], "pop":  112, "state": "WY"  },
+        { "city": "BOULDER",         "loc": [-111.426646, 37.916606], "pop":  131, "state": "UT"  },
+        { "city": "BOUTON",          "loc": [ -93.996286, 41.828432], "pop":  552, "state": "IA"  },
+        { "city": "BOULDER JUNCTION","loc": [ -89.632454, 46.111183], "pop":  563, "state": "WI"  },
+        { "city": "BOUCKVILLE",      "loc": [ -75.567841, 42.894024], "pop":  650, "state": "NY"  },
+        { "city": "BOULEVARD",       "loc": [-116.319982, 32.671934], "pop": 1163, "state": "CA"  },
+        { "city": "BOULDER",         "loc": [-112.113757, 46.230647], "pop": 1737, "state": "MT"  },
+        { "city": "BOUTTE",          "loc": [ -90.393396, 29.897319], "pop": 2432, "state": "LA"  },
+        { "city": "BOURBON",         "loc": [ -86.117438, 41.309785], "pop": 2976, "state": "IN"  },
+        { "city": "BOURBON",         "loc": [ -91.22254,  38.172039], "pop": 4456, "state": "MO"  }]
+}
