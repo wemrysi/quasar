@@ -19,6 +19,7 @@ package quasar.physical.couchbase.planner
 import slamdata.Predef._
 import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
+import quasar.ejson
 import quasar.fp.ski.κ
 import quasar.NameGenerator
 import quasar.physical.couchbase._,
@@ -26,7 +27,7 @@ import quasar.physical.couchbase._,
   N1QL.{Eq, Unreferenced, _},
   Select.{Filter, Value, _}
 import quasar.Planner.PlannerErrorME
-import quasar.qscript, qscript.{MapFuncsCore => mfs, _}
+import quasar.qscript, qscript.{MapFuncsCore => mfs, _}, MapFuncCore.StaticArray
 
 import matryoshka._
 import matryoshka.data._
@@ -75,9 +76,15 @@ final class EquiJoinPlanner[
   }
 
   object KeyMetaId {
-    def unapply(mf: FreeMap[T]): Boolean = mf.resume match {
-      case -\/(MFC(mfs.ProjectField(Embed(CoEnv(\/-(MFC(mfs.Meta(_))))), mfs.StrLit("id")))) => true
-      case _                                                                                 => false
+    def unapply(mf: FreeMap[T]): Boolean = mf match {
+      case Embed(StaticArray(v :: Nil)) => v.resume match {
+        case -\/(MFC(mfs.ProjectField(src, field))) => (src.resume, field.resume) match {
+          case (-\/(MFC(mfs.Meta(_))), -\/(MFC(mfs.Constant(Embed(MapFuncCore.EC(ejson.Str(v2))))))) => true
+          case _                                                                       => false
+        }
+        case v => false
+      }
+      case _ => false
     }
   }
 
