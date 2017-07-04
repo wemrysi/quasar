@@ -117,10 +117,10 @@ object Dependencies {
     "org.http4s"             %% "http4s-core"            % http4sVersion,
     "org.http4s"             %% "http4s-blaze-client"    % http4sVersion,
     "org.elasticsearch"      %% "elasticsearch-spark-20" % "5.4.1",
-    ("com.sksamuel.elastic4s" %% "elastic4s-http"         % "5.4.5")
+    ("com.sksamuel.elastic4s" %% "elastic4s-http"         % "5.4.6")
       .exclude("commons-logging", "commons-logging"),
-    "com.sksamuel.elastic4s" %% "elastic4s-jackson"      % "5.4.5",
-    "com.sksamuel.elastic4s" %% "elastic4s-testkit"      % "5.4.5" % Test,
+    "com.sksamuel.elastic4s" %% "elastic4s-jackson"      % "5.4.6",
+    "com.sksamuel.elastic4s" %% "elastic4s-testkit"      % "5.4.6" % Test,
     "org.apache.logging.log4j"              % "log4j-core"                % "2.6.2"
   )
 
