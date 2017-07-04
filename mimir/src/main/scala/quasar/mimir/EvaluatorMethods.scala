@@ -19,7 +19,6 @@ package quasar.mimir
 import quasar.precog.common._
 import quasar.yggdrasil._
 import quasar.yggdrasil.TableModule.paths
-import quasar.yggdrasil.execution.EvaluationContext
 
 trait EvaluatorMethodsModule[M[+ _]] extends DAG with TableModule[M] with TableLibModule[M] with OpFinderModule[M] {
   import dag._
@@ -27,11 +26,10 @@ trait EvaluatorMethodsModule[M[+ _]] extends DAG with TableModule[M] with TableL
   import trans._
 
   trait EvaluatorMethods extends OpFinder {
-    def MorphContext(ctx: EvaluationContext, node: DepGraph): MorphContext
 
-    def transFromBinOp[A <: SourceType](op: BinaryOperation, ctx: MorphContext)(left: TransSpec[A], right: TransSpec[A]): TransSpec[A] = op match {
+    def transFromBinOp[A <: SourceType](op: BinaryOperation)(left: TransSpec[A], right: TransSpec[A]): TransSpec[A] = op match {
       case Eq                      => trans.Equal[A](left, right)
-      case NotEq                   => op1ForUnOp(Comp).spec(ctx)(trans.Equal[A](left, right))
+      case NotEq                   => op1ForUnOp(Comp).spec(trans.Equal[A](left, right))
       case instructions.WrapObject => WrapObjectDynamic(left, right)
       case JoinObject              => InnerObjectConcat(left, right)
       case JoinArray               => InnerArrayConcat(left, right)
@@ -39,7 +37,7 @@ trait EvaluatorMethodsModule[M[+ _]] extends DAG with TableModule[M] with TableL
       case DerefObject             => DerefObjectDynamic(left, right)
       case DerefMetadata           => sys.error("cannot do a dynamic metadata deref")
       case DerefArray              => DerefArrayDynamic(left, right)
-      case _                       => op2ForBinOp(op).get.spec(ctx)(left, right)
+      case _                       => op2ForBinOp(op).get.spec(left, right)
     }
 
     def combineTransSpecs(specs: List[TransSpec1]): TransSpec1 =

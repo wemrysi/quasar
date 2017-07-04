@@ -20,7 +20,6 @@ import quasar.precog.common._
 import quasar.precog.util.IdGen
 import quasar.yggdrasil._
 import quasar.yggdrasil.bytecode.JType.JUniverseT
-import quasar.yggdrasil.execution.EvaluationContext
 
 import scalaz._
 
@@ -36,9 +35,7 @@ trait JoinOptimizerSpecs[M[+_]] extends EvaluatorSpecification[M]
 
   val ctx = defaultEvaluationContext
 
-  object joins extends JoinOptimizer with StdLibOpFinder {
-    def MorphContext(ctx: EvaluationContext, node: DepGraph): MorphContext = new MorphContext(ctx, null)
-  }
+  object joins extends JoinOptimizer with StdLibOpFinder
 
   import joins._
 

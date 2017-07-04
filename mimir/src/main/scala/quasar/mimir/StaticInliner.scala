@@ -52,7 +52,7 @@ trait StdLibStaticInlinerModule[M[+ _]] extends StaticInlinerModule[M] with StdL
                         val result = for {
                           // No Op1F1 that can be applied to a complex RValues
                           cvalue <- RValue.toCValue(value)
-                          col <- newOp1.f1(MorphContext(ctx, graph)).apply(cvalue)
+                          col <- newOp1.f1.apply(cvalue)
                           if col isDefinedAt 0
                         } yield col cValue 0
 
@@ -181,7 +181,7 @@ trait StdLibStaticInlinerModule[M[+ _]] extends StaticInlinerModule[M] with StdL
                              // No Op1F1 that can be applied to a complex RValues
                              leftCValue <- RValue.toCValue(leftValue)
                              rightCValue <- RValue.toCValue(rightValue)
-                             col <- op2F2.f2(MorphContext(ctx, graph)).partialLeft(leftCValue).apply(rightCValue)
+                             col <- op2F2.f2.partialLeft(leftCValue).apply(rightCValue)
                              if col isDefinedAt 0
                            } yield col cValue 0
 

@@ -38,7 +38,7 @@ trait StdLibEvaluatorStack[M[+ _]]
 
     val Exists = library.Exists
     val Forall = library.Forall
-    def concatString(ctx: MorphContext)   = library.Infix.concatString.f2(ctx)
-    def coerceToDouble(ctx: MorphContext) = cf.util.CoerceToDouble
+    def concatString = library.Infix.concatString.f2
+    def coerceToDouble = cf.util.CoerceToDouble
   }
 }

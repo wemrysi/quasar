@@ -50,18 +50,18 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
     object Median extends Morphism1(EmptyNamespace, "median") {
       val tpe = UnaryOperationType(JNumberT, JNumberT)
 
-      def apply(table: Table, ctx: MorphContext) = { //TODO write tests for the empty table case
+      def apply(table: Table) = { //TODO write tests for the empty table case
         val compactedTable = table.compact(WrapObject(Typed(DerefObjectStatic(Leaf(Source), paths.Value), JNumberT), paths.Value.name))
 
         val sortKey = DerefObjectStatic(Leaf(Source), paths.Value)
 
         for {
           sortedTable <- compactedTable.sort(sortKey, SortAscending)
-          count <- sortedTable.reduce(Count.reducer(ctx))
+          count <- sortedTable.reduce(Count.reducer)
           median <- if (count % 2 == 0) {
                      val middleValues     = sortedTable.takeRange((count.toLong / 2) - 1, 2)
                      val transformedTable = middleValues.transform(trans.DerefObjectStatic(Leaf(Source), paths.Value)) //todo make function for this
-                     Mean(transformedTable, ctx)
+                     Mean(transformedTable)
                    } else {
                      val middleValue = M.point(sortedTable.takeRange((count.toLong / 2), 1))
                      middleValue map { _.transform(trans.DerefObjectStatic(Leaf(Source), paths.Value)) }
@@ -91,7 +91,7 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
         def append(left: Set[A], right: => Set[A]) = left ++ right
       }
 
-      def reducer(ctx: MorphContext): Reducer[Result] =
+      def reducer: Reducer[Result] =
         new Reducer[Result] { //TODO add cases for other column types; get information necessary for dealing with slice boundaries and unsoretd slices in the Iterable[Slice] that's used in table.reduce
           def reduce(schema: CSchema, range: Range): Result = {
             schema.columns(JNumberT) flatMap {
@@ -133,11 +133,11 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
 
       def extract(res: Result): Table = Table.constDecimal(res)
 
-      def apply(table: Table, ctx: MorphContext) = {
+      def apply(table: Table) = {
         val sortKey               = DerefObjectStatic(Leaf(Source), paths.Value)
         val sortedTable: M[Table] = table.sort(sortKey, SortAscending)
 
-        sortedTable.flatMap(_.reduce(reducer(ctx)).map(extract))
+        sortedTable.flatMap(_.reduce(reducer).map(extract))
       }
     }
 
@@ -181,7 +181,7 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
       def spec = InnerObjectConcat(WrapObject(keySpec, paths.Key.name), WrapObject(smoothSpec, paths.Value.name))
 
       private val morph1 = new Morph1Apply {
-        def apply(table: Table, ctx: MorphContext): M[Table] =
+        def apply(table: Table): M[Table] =
           for {
             sorted <- table.sort(sortSpec)
             smoothed <- sorted.transform(spec).sort(keySpec)
@@ -355,7 +355,7 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
 
       implicit def monoid = implicitly[Monoid[Result]]
 
-      def reducer(ctx: MorphContext): Reducer[Result] = new Reducer[Result] {
+      def reducer: Reducer[Result] = new Reducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
           val left  = schema.columns(JArrayFixedT(Map(0 -> JNumberT)))
           val right = schema.columns(JArrayFixedT(Map(1 -> JNumberT)))
@@ -538,9 +538,9 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
       }
 
       private val morph1 = new Morph1Apply {
-        def apply(table: Table, ctx: MorphContext) = {
+        def apply(table: Table) = {
           val valueSpec = DerefObjectStatic(TransSpec1.Id, paths.Value)
-          table.transform(valueSpec).reduce(reducer(ctx)) map extract
+          table.transform(valueSpec).reduce(reducer) map extract
         }
       }
     }
@@ -555,7 +555,7 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
 
       implicit def monoid = implicitly[Monoid[Result]]
 
-      def reducer(ctx: MorphContext): Reducer[Result] = new Reducer[Result] {
+      def reducer: Reducer[Result] = new Reducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
 
           val left  = schema.columns(JArrayFixedT(Map(0 -> JNumberT)))
@@ -709,9 +709,9 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
       }
 
       private val morph1 = new Morph1Apply {
-        def apply(table: Table, ctx: MorphContext) = {
+        def apply(table: Table) = {
           val valueSpec = DerefObjectStatic(TransSpec1.Id, paths.Value)
-          table.transform(valueSpec).reduce(reducer(ctx)) map extract
+          table.transform(valueSpec).reduce(reducer) map extract
         }
       }
     }
@@ -726,7 +726,7 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
 
       implicit def monoid = implicitly[Monoid[Result]]
 
-      def reducer(ctx: MorphContext): Reducer[Result] = new Reducer[Result] {
+      def reducer: Reducer[Result] = new Reducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
 
           val left  = schema.columns(JArrayFixedT(Map(0 -> JNumberT)))
@@ -890,9 +890,9 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
       }
 
       private val morph1 = new Morph1Apply {
-        def apply(table: Table, ctx: MorphContext) = {
+        def apply(table: Table) = {
           val valueSpec = DerefObjectStatic(TransSpec1.Id, paths.Value)
-          table.transform(valueSpec).reduce(reducer(ctx)) map extract
+          table.transform(valueSpec).reduce(reducer) map extract
         }
       }
     }
@@ -907,7 +907,7 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
 
       implicit def monoid = implicitly[Monoid[Result]]
 
-      def reducer(ctx: MorphContext): Reducer[Result] = new Reducer[Result] {
+      def reducer: Reducer[Result] = new Reducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
 
           val left  = schema.columns(JArrayFixedT(Map(0 -> JNumberT)))
@@ -1152,9 +1152,9 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
       }
 
       private val morph1 = new Morph1Apply {
-        def apply(table: Table, ctx: MorphContext) = {
+        def apply(table: Table) = {
           val valueSpec = DerefObjectStatic(TransSpec1.Id, paths.Value)
-          table.transform(valueSpec).reduce(reducer(ctx)) map extract
+          table.transform(valueSpec).reduce(reducer) map extract
         }
       }
     }
@@ -1552,10 +1552,10 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
       // it would be better to let our consumers worry about whether the table is
       // sorted on paths.SortKey.
 
-      def apply(table: Table, ctx: MorphContext): M[Table] = {
+      def apply(table: Table): M[Table] = {
         def count(tbl: Table): M[Long] = tbl.size match {
           case ExactSize(n) => M.point(n)
-          case _            => table.reduce(Count.reducer(ctx))
+          case _            => table.reduce(Count.reducer)
         }
 
         for {
