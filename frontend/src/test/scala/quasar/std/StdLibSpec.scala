@@ -932,11 +932,11 @@ abstract class StdLibSpec extends Qspec {
 
       "Abs" >> {
         "any Int" >> prop { (x: BigInt) =>
-          unary(Abs(_).embed, Data.Int(x), if (x >= 0) Data.Int(x) else Data.Int(-x))
+          unary(Abs(_).embed, Data.Int(x), Data.Int(x.abs))
         }
 
         "any Dec" >> prop { (x: BigDecimal) =>
-          unary(Abs(_).embed, Data.Dec(x), if (x >= 0) Data.Dec(x) else Data.Dec(-x))
+          unary(Abs(_).embed, Data.Dec(x), Data.Dec(x.abs))
         }
 
         "any Interval" >> prop { (x: Duration) =>

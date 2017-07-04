@@ -17,6 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
+import quasar.Data
 import quasar.javascript.Js
 import quasar.jscore, jscore.{Name, JsCoreF}
 import quasar.std.StdLib._
@@ -37,7 +38,8 @@ trait JsFuncHandler[IN[_]] {
 
 object JsFuncHandler {
 
-  implicit def mapFuncCore[T[_[_]]]: JsFuncHandler[MapFuncCore[T, ?]] =
+  implicit def mapFuncCore[T[_[_]]: BirecursiveT, J, E]
+      : JsFuncHandler[MapFuncCore[T, ?]] =
     new JsFuncHandler[MapFuncCore[T, ?]] {
       def handle: MapFuncCore[T, ?] ~> OptionFree[JsCoreF, ?] =
         new (MapFuncCore[T, ?] ~> OptionFree[JsCoreF, ?]) {
@@ -142,39 +144,41 @@ object JsFuncHandler {
                       BinOp(jscore.Add, litStr("0"), ident("x")),
                       ident("x")))))
 
-            mfc.some collect {
-              case Add(a1, a2)      => BinOp(jscore.Add, a1, a2)
-              case Multiply(a1, a2) => BinOp(jscore.Mult, a1, a2)
+            mfc match {
+              case Constant(v1)     =>
+                v1.cata(Data.fromEJson).toJs.map(_.transCata[Free[JsCoreF, A]](js => CoEnv(js.right[A])))
+              case Add(a1, a2)      => BinOp(jscore.Add, a1, a2).some
+              case Multiply(a1, a2) => BinOp(jscore.Mult, a1, a2).some
               case Power(a1, a2) =>
-                Call(select(ident("Math"), "pow"), List(a1, a2))
-              case Subtract(a1, a2) => BinOp(jscore.Sub, a1, a2)
-              case Divide(a1, a2)   => BinOp(jscore.Div, a1, a2)
-              case Modulo(a1, a2)   => BinOp(jscore.Mod, a1, a2)
-              case Negate(a1)       => UnOp(jscore.Neg, a1)
+                Call(select(ident("Math"), "pow"), List(a1, a2)).some
+              case Subtract(a1, a2) => BinOp(jscore.Sub, a1, a2).some
+              case Divide(a1, a2)   => BinOp(jscore.Div, a1, a2).some
+              case Modulo(a1, a2)   => BinOp(jscore.Mod, a1, a2).some
+              case Negate(a1)       => UnOp(jscore.Neg, a1).some
 
-              case MapFuncsCore.Eq(a1, a2)  => BinOp(jscore.Eq, a1, a2)
-              case Neq(a1, a2) => BinOp(jscore.Neq, a1, a2)
-              case Lt(a1, a2)  => BinOp(jscore.Lt, a1, a2)
-              case Lte(a1, a2) => BinOp(jscore.Lte, a1, a2)
-              case Gt(a1, a2)  => BinOp(jscore.Gt, a1, a2)
-              case Gte(a1, a2) => BinOp(jscore.Gte, a1, a2)
-              case Not(a1)     => UnOp(jscore.Not, a1)
-              case And(a1, a2) => BinOp(jscore.And, a1, a2)
-              case Or(a1, a2)  => BinOp(jscore.Or, a1, a2)
+              case MapFuncsCore.Eq(a1, a2)  => BinOp(jscore.Eq, a1, a2).some
+              case Neq(a1, a2) => BinOp(jscore.Neq, a1, a2).some
+              case Lt(a1, a2)  => BinOp(jscore.Lt, a1, a2).some
+              case Lte(a1, a2) => BinOp(jscore.Lte, a1, a2).some
+              case Gt(a1, a2)  => BinOp(jscore.Gt, a1, a2).some
+              case Gte(a1, a2) => BinOp(jscore.Gte, a1, a2).some
+              case Not(a1)     => UnOp(jscore.Not, a1).some
+              case And(a1, a2) => BinOp(jscore.And, a1, a2).some
+              case Or(a1, a2)  => BinOp(jscore.Or, a1, a2).some
               case Between(value, min, max) =>
                   BinOp(jscore.And,
                     BinOp(jscore.Lte, min, value),
-                    BinOp(jscore.Lte, value, max))
+                    BinOp(jscore.Lte, value, max)).some
 
-              case MakeArray(a1) => Arr(List(a1))
+              case MakeArray(a1) => Arr(List(a1)).some
               case Length(str) =>
-                Call(ident("NumberLong"), List(select(hole(str), "length")))
+                Call(ident("NumberLong"), List(select(hole(str), "length"))).some
               case Substring(field, start, len) =>
                 If(BinOp(jscore.Lt, start, litNum(0)),
                   litStr(""),
                   If(BinOp(jscore.Lt, len, litNum(0)),
                     Call(select(field, "substr"), List(start, select(field, "length"))),
-                    Call(select(field, "substr"), List(start, len))))
+                    Call(select(field, "substr"), List(start, len)))).some
               case Search(field, pattern, insen) =>
                   Call(
                     select(
@@ -182,12 +186,12 @@ object JsFuncHandler {
                         pattern,
                         If(insen, litStr("im"), litStr("m")))),
                       "test"),
-                    List(field))
+                    List(field)).some
               case Null(str) =>
                 If(
                   BinOp(jscore.Eq, str, litStr("null")),
                   Literal(Js.Null),
-                  ident("undefined"))
+                  ident("undefined")).some
               case Bool(str) =>
                 If(
                   BinOp(jscore.Eq, str, litStr("true")),
@@ -195,27 +199,27 @@ object JsFuncHandler {
                   If(
                     BinOp(jscore.Eq, str, litStr("false")),
                     Literal(Js.Bool(false)),
-                    ident("undefined")))
+                    ident("undefined"))).some
               case Integer(str) =>
                 If(Call(select(Call(ident("RegExp"), List(litStr("^" + string.intRegex + "$"))), "test"), List(str)),
                   Call(ident("NumberLong"), List(str)),
-                  ident("undefined"))
+                  ident("undefined")).some
               case Decimal(str) =>
                   If(Call(select(Call(ident("RegExp"), List(litStr("^" + string.floatRegex + "$"))), "test"), List(str)),
                     Call(ident("parseFloat"), List(str)),
-                    ident("undefined"))
+                    ident("undefined")).some
               case Date(str) =>
                 If(Call(select(Call(ident("RegExp"), List(litStr("^" + string.dateRegex + "$"))), "test"), List(str)),
                   Call(ident("ISODate"), List(str)),
-                  ident("undefined"))
+                  ident("undefined")).some
               case Time(str) =>
                 If(Call(select(Call(ident("RegExp"), List(litStr("^" + string.timeRegex + "$"))), "test"), List(str)),
                   str,
-                  ident("undefined"))
+                  ident("undefined")).some
               case Timestamp(str) =>
                 If(Call(select(Call(ident("RegExp"), List(litStr("^" + string.timestampRegex + "$"))), "test"), List(str)),
                   Call(ident("ISODate"), List(str)),
-                  ident("undefined"))
+                  ident("undefined")).some
               // TODO: case Interval(str) =>
               case ToString(value) =>
                 If(isInt(value),
@@ -229,7 +233,7 @@ object JsFuncHandler {
                     litStr(""))),
                   If(BinOp(jscore.Or, isTimestamp(value), isDate(value)),
                     Call(select(value, "toISOString"), Nil),
-                    Call(ident("String"), List(value))))
+                    Call(ident("String"), List(value)))).some
               // TODO: case ToTimestamp(str) =>
 
               case TimeOfDay(date) =>
@@ -241,24 +245,24 @@ object JsFuncHandler {
                     litStr(":"),
                     pad2(second(ident("t"))),
                     litStr("."),
-                    pad3(millisecond(ident("t")))))
+                    pad3(millisecond(ident("t"))))).some
 
-              case ExtractCentury(date) => century(date)
-              case ExtractDayOfMonth(date) => day(date)
-              case ExtractDecade(date) => decade(date)
-              case ExtractDayOfWeek(date) => dayOfWeek(date)
+              case ExtractCentury(date) => century(date).some
+              case ExtractDayOfMonth(date) => day(date).some
+              case ExtractDecade(date) => decade(date).some
+              case ExtractDayOfWeek(date) => dayOfWeek(date).some
               // TODO: case ExtractDayOfYear(date) =>
               case ExtractEpoch(date) =>
                 BinOp(jscore.Div,
                   Call(select(date, "valueOf"), Nil),
-                  litNum(1000))
-              case ExtractHour(date) => hour(date)
+                  litNum(1000)).some
+              case ExtractHour(date) => hour(date).some
               case ExtractIsoDayOfWeek(date) =>
                 Let(Name("x"), dayOfWeek(date),
                   If(
                     BinOp(jscore.Eq, ident("x"), litNum(0)),
                     litNum(7),
-                    ident("x")))
+                    ident("x"))).some
               // TODO: case ExtractIsoYear(date) =>
               case ExtractMicroseconds(date) =>
                 BinOp(jscore.Mult,
@@ -267,56 +271,56 @@ object JsFuncHandler {
                     BinOp(jscore.Mult,
                       second(date),
                       litNum(1000))),
-                  litNum(1000))
-              case ExtractMillennium(date) => millennium(date)
+                  litNum(1000)).some
+              case ExtractMillennium(date) => millennium(date).some
               case ExtractMilliseconds(date) =>
                 BinOp(jscore.Add,
                   millisecond(date),
                   BinOp(jscore.Mult,
                     second(date),
-                    litNum(1000)))
-              case ExtractMinute(date) => minute(date)
-              case ExtractMonth(date) => month(date)
-              case ExtractQuarter(date) => quarter(date)
+                    litNum(1000))).some
+              case ExtractMinute(date) => minute(date).some
+              case ExtractMonth(date) => month(date).some
+              case ExtractQuarter(date) => quarter(date).some
               case ExtractSecond(date) =>
                 BinOp(jscore.Add,
                   second(date),
-                  BinOp(jscore.Div, millisecond(date), litNum(1000)))
+                  BinOp(jscore.Div, millisecond(date), litNum(1000))).some
               // TODO: case ExtractWeek(date) =>
-              case ExtractYear(date) => year(date)
+              case ExtractYear(date) => year(date).some
 
               case StartOfDay(date) =>
-                dateZ(year(date), month(date), day(date), litNum(0), litNum(0), litNum(0), litNum(0))
+                dateZ(year(date), month(date), day(date), litNum(0), litNum(0), litNum(0), litNum(0)).some
 
               case TemporalTrunc(Century, date) =>
                 val yr =
                   Call(select(ident("Math"), "floor"), List(BinOp(jscore.Div, year(date), litNum(100))))
                 dateZ(
                   BinOp(jscore.Mult, yr, litNum(100)),
-                  litNum(1), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0))
+                  litNum(1), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0)).some
               case TemporalTrunc(Day, date) =>
-                dateZ(year(date), month(date), day(date), litNum(0), litNum(0), litNum(0), litNum(0))
+                dateZ(year(date), month(date), day(date), litNum(0), litNum(0), litNum(0), litNum(0)).some
               case TemporalTrunc(Decade, date) =>
                 dateZ(
                   BinOp(jscore.Mult, decade(date), litNum(10)),
-                  litNum(1), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0))
+                  litNum(1), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0)).some
               case TemporalTrunc(Hour, date) =>
-                dateZ(year(date), month(date), day(date), hour(date), litNum(0), litNum(0), litNum(0))
+                dateZ(year(date), month(date), day(date), hour(date), litNum(0), litNum(0), litNum(0)).some
               case TemporalTrunc(Millennium, date) =>
                 dateZ(
                   BinOp(jscore.Mult,
                     Call(select(ident("Math"), "floor"), List(
                       BinOp(jscore.Div, year(date), litNum(1000)))),
                     litNum(1000)),
-                  litNum(1), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0))
+                  litNum(1), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0)).some
               case TemporalTrunc(Microsecond | Millisecond, date) =>
                 dateZ(
                   year(date), month(date), day(date),
-                  hour(date), minute(date), second(date), millisecond(date))
+                  hour(date), minute(date), second(date), millisecond(date)).some
               case TemporalTrunc(Minute, date) =>
-                dateZ(year(date), month(date), day(date), hour(date), minute(date), litNum(0), litNum(0))
+                dateZ(year(date), month(date), day(date), hour(date), minute(date), litNum(0), litNum(0)).some
               case TemporalTrunc(Month, date) =>
-                dateZ(year(date), month(date), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0))
+                dateZ(year(date), month(date), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0)).some
               case TemporalTrunc(Quarter, date) =>
                 dateZ(
                   year(date),
@@ -325,9 +329,9 @@ object JsFuncHandler {
                       BinOp(jscore.Sub, quarter(date), litNum(1)),
                       litNum(3)),
                     litNum(1)),
-                  litNum(1), litNum(0), litNum(0), litNum(0), litNum(0))
+                  litNum(1), litNum(0), litNum(0), litNum(0), litNum(0)).some
               case TemporalTrunc(Second, date) =>
-                dateZ(year(date), month(date), day(date), hour(date), minute(date), second(date), litNum(0))
+                dateZ(year(date), month(date), day(date), hour(date), minute(date), second(date), litNum(0)).some
               case TemporalTrunc(Week, date) =>
                 val d =
                   New(Name("Date"), List(
@@ -340,14 +344,17 @@ object JsFuncHandler {
                           litNum(7))
                     ))))
                 Let(Name("d"), d,
-                  dateZ(year(d), month(d), day(d), litNum(0), litNum(0), litNum(0), litNum(0)))
+                  dateZ(year(d), month(d), day(d), litNum(0), litNum(0), litNum(0), litNum(0))).some
               case TemporalTrunc(Year, date) =>
-                dateZ(year(date), litNum(1), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0))
+                dateZ(year(date), litNum(1), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0)).some
 
-              case Now() => Call(ident("ISODate"), Nil)
+              case Now() => Call(ident("ISODate"), Nil).some
 
-              case ProjectField(obj, field) => Access(obj, field)
-              case ProjectIndex(arr, index) => Access(arr, index)
+              case ProjectField(obj, field) => Access(obj, field).some
+              case ProjectIndex(arr, index) => Access(arr, index).some
+
+              case Cond(i, t, e) => If(i, t, e).some
+              case _ => None
             }
           }
         }
