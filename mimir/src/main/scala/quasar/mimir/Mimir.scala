@@ -188,7 +188,42 @@ object Mimir extends BackendModule with Logging {
         val rvalue: RValue = RValue.fromJValue(jvalue)
         cake.trans.transRValue(rvalue, cake.trans.TransSpec1.Id).point[Backend]
 
+      case MapFuncsCore.JoinSideName(_) => ??? // should never be received
+
       case MapFuncsCore.Length(a1) => ???
+
+      case MapFuncsCore.ExtractCentury(a1) => ???
+      case MapFuncsCore.ExtractDayOfMonth(a1) => ???
+      case MapFuncsCore.ExtractDecade(a1) => ???
+      case MapFuncsCore.ExtractDayOfWeek(a1) => ???
+      case MapFuncsCore.ExtractDayOfYear(a1) => ???
+      case MapFuncsCore.ExtractEpoch(a1) => ???
+      case MapFuncsCore.ExtractHour(a1) => ???
+      case MapFuncsCore.ExtractIsoDayOfWeek(a1) => ???
+      case MapFuncsCore.ExtractIsoYear(a1) => ???
+      case MapFuncsCore.ExtractMicroseconds(a1) => ???
+      case MapFuncsCore.ExtractMillennium(a1) => ???
+      case MapFuncsCore.ExtractMilliseconds(a1) => ???
+      case MapFuncsCore.ExtractMinute(a1) => ???
+      case MapFuncsCore.ExtractMonth(a1) => ???
+      case MapFuncsCore.ExtractQuarter(a1) => ???
+      case MapFuncsCore.ExtractSecond(a1) => ???
+      case MapFuncsCore.ExtractTimezone(a1) => ???
+      case MapFuncsCore.ExtractTimezoneHour(a1) => ???
+      case MapFuncsCore.ExtractTimezoneMinute(a1) => ???
+      case MapFuncsCore.ExtractWeek(a1) => ???
+      case MapFuncsCore.ExtractYear(a1) => ???
+      case MapFuncsCore.Date(a1) => ???
+      case MapFuncsCore.Time(a1) => ???
+      case MapFuncsCore.Timestamp(a1) => ???
+      case MapFuncsCore.Interval(a1) => ???
+      case MapFuncsCore.StartOfDay(a1) => ???
+      case MapFuncsCore.TemporalTrunc(part, a1) => ???
+      case MapFuncsCore.TimeOfDay(a1) => ???
+      case MapFuncsCore.ToTimestamp(a1) => ???
+      case MapFuncsCore.Now() => ???
+
+      case MapFuncsCore.TypeOf(a1) => ???
 
       case MapFuncsCore.Negate(a1) =>
         (cake.trans.Map1[cake.trans.Source1](a1, math.Negate): cake.trans.TransSpec1).point[M].liftB
@@ -218,6 +253,7 @@ object Mimir extends BackendModule with Logging {
       case MapFuncsCore.Gte(a1, a2) =>
         (cake.trans.Map2[cake.trans.Source1](a1, a2, cake.Library.Infix.GtEq.f2): cake.trans.TransSpec1).point[M].liftB
 
+      case MapFuncsCore.IfUndefined(a1, a2) => ???
       case MapFuncsCore.And(a1, a2) =>
         (cake.trans.Map2[cake.trans.Source1](a1, a2, cake.Library.Infix.And.f2): cake.trans.TransSpec1).point[M].liftB
       case MapFuncsCore.Or(a1, a2) =>
@@ -225,7 +261,19 @@ object Mimir extends BackendModule with Logging {
       case MapFuncsCore.Between(a1, a2, a3) => ???
       case MapFuncsCore.Cond(a1, a2, a3) => ???
 
-      // TODO detect constant cases so we don't have to always use the dynamic variants
+      case MapFuncsCore.Within(a1, a2) => ???
+
+      case MapFuncsCore.Lower(a1) => ???
+      case MapFuncsCore.Upper(a1) => ???
+      case MapFuncsCore.Bool(a1) => ???
+      case MapFuncsCore.Integer(a1) => ???
+      case MapFuncsCore.Decimal(a1) => ???
+      case MapFuncsCore.Null(a1) => ???
+      case MapFuncsCore.ToString(a1) => ???
+      case MapFuncsCore.Search(a1, a2, a3) => ???
+      case MapFuncsCore.Substring(string, from, count) => ???
+
+      // FIXME detect constant cases so we don't have to always use the dynamic variants
       case MapFuncsCore.MakeArray(a1) =>
         (cake.trans.WrapArray[cake.trans.Source1](a1): cake.trans.TransSpec1).point[M].liftB
       case MapFuncsCore.MakeMap(key, value) =>
@@ -240,10 +288,12 @@ object Mimir extends BackendModule with Logging {
         (cake.trans.DerefObjectDynamic[cake.trans.Source1](src, field): cake.trans.TransSpec1).point[M].liftB
       case MapFuncsCore.DeleteField(src, field) => ???
 
-      // TODO if fallback is not undefined don't throw this away
-      case MapFuncsCore.Guard(_, _, a2, _) => a2.point[Backend]
+      case MapFuncsCore.Meta(a1) => ???
 
-      case _ => ???
+      case MapFuncsCore.Range(from, to) => ???
+
+      // FIXME if fallback is not undefined don't throw this away
+      case MapFuncsCore.Guard(_, _, a2, _) => a2.point[Backend]
     }
 
     lazy val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = {
