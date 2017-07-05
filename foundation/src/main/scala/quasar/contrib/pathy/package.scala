@@ -37,6 +37,7 @@ package object pathy {
   type APath = AbsPath[scala.Any]
   type RPath = RelPath[scala.Any]
   type FPath = Path[scala.Any,File,Sandboxed]
+  type DPath = Path[scala.Any,Dir, Sandboxed]
 
   type PathSegment = DirName \/ FileName
 
@@ -58,10 +59,25 @@ package object pathy {
       pathEncodeJson
   }
 
+  object RPath {
+    import PosixCodecJson._
+
+    // this will be sound so long as we're round-tripping
+    @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+    private def resandbox[R, T](path: Path[R, T, Unsandboxed]): Path[Rel, T, Sandboxed] =
+      Path.sandbox(Path.currentDir, path).get
+
+    implicit val rPathDecodeJson: DecodeJson[RPath] =
+      (relDirDecodeJson.map(resandbox(_)).widen[RPath] ||| relFileDecodeJson.map(resandbox(_))).setName("RPath")
+
+    implicit val rPathEncodeJson: EncodeJson[RPath] =
+      pathEncodeJson
+  }
+
   /** PathCodec with URI-encoded segments. */
   val UriPathCodec: PathCodec = {
     /** This encoder translates spaces into pluses, but we want the
-      *  more rigorous %20 encoding.
+      * more rigorous %20 encoding.
       */
     val uriEncodeUtf8: String => String = URLEncoder.encode(_, "UTF-8").replace("+", "%20")
     val uriDecodeUtf8: String => String = URLDecoder.decode(_, "UTF-8")

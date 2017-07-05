@@ -18,7 +18,7 @@ package quasar.sql
 
 trait Arbitraries extends
   ExprArbitrary with
-  BlobArbitrary with
+  ScopedExprArbitrary with
   StatementArbitrary with
   CINameArbitrary
 
