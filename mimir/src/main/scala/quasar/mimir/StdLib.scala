@@ -251,7 +251,7 @@ trait StdLibModule[M[+ _]]
     with MathLibModule[M]
     with TypeLibModule[M]
     with StringLibModule[M]
-    with SummaryLibModule[M]
+    with ReductionLibModule[M]
     with RandomLibModule[M] {
   type Lib <: StdLib
 
@@ -262,7 +262,7 @@ trait StdLibModule[M[+ _]]
       with MathLib
       with TypeLib
       with StringLib
-      with SummaryLib
+      with ReductionLib
       with RandomLib
 }
 
