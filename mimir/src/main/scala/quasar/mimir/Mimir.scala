@@ -193,25 +193,35 @@ object Mimir extends BackendModule with Logging {
       case MapFuncsCore.Negate(a1) =>
         (cake.trans.Map1[cake.trans.Source1](a1, math.Negate): cake.trans.TransSpec1).point[M].liftB
       case MapFuncsCore.Add(a1, a2) =>
-        (cake.trans.Map2[cake.trans.Source1](a1, a2, math.Add): cake.trans.TransSpec1).point[M].liftB
-      case MapFuncsCore.Multiply(a1, a2) => ???
-      case MapFuncsCore.Subtract(a1, a2) => ???
-      case MapFuncsCore.Divide(a1, a2) => ???
+        (cake.trans.Map2[cake.trans.Source1](a1, a2, cake.Library.Infix.Add.f2): cake.trans.TransSpec1).point[M].liftB
+      case MapFuncsCore.Multiply(a1, a2) =>
+        (cake.trans.Map2[cake.trans.Source1](a1, a2, cake.Library.Infix.Mul.f2): cake.trans.TransSpec1).point[M].liftB
+      case MapFuncsCore.Subtract(a1, a2) =>
+        (cake.trans.Map2[cake.trans.Source1](a1, a2, cake.Library.Infix.Sub.f2): cake.trans.TransSpec1).point[M].liftB
+      case MapFuncsCore.Divide(a1, a2) =>
+        (cake.trans.Map2[cake.trans.Source1](a1, a2, cake.Library.Infix.Div.f2): cake.trans.TransSpec1).point[M].liftB
       case MapFuncsCore.Modulo(a1, a2) =>
-        (cake.trans.Map2[cake.trans.Source1](a1, a2, math.Mod): cake.trans.TransSpec1).point[M].liftB
-      case MapFuncsCore.Power(a1, a2) => ???
+        (cake.trans.Map2[cake.trans.Source1](a1, a2, cake.Library.Infix.Mod.f2): cake.trans.TransSpec1).point[M].liftB
+      case MapFuncsCore.Power(a1, a2) =>
+        (cake.trans.Map2[cake.trans.Source1](a1, a2, cake.Library.Infix.Pow.f2): cake.trans.TransSpec1).point[M].liftB
 
       case MapFuncsCore.Not(a1) => ???
       case MapFuncsCore.Eq(a1, a2) =>
         (cake.trans.Equal[cake.trans.Source1](a1, a2): cake.trans.TransSpec1).point[M].liftB
       case MapFuncsCore.Neq(a1, a2) => ???
-      case MapFuncsCore.Lt(a1, a2) => ???
-      case MapFuncsCore.Lte(a1, a2) => ???
-      case MapFuncsCore.Gt(a1, a2) => ???
-      case MapFuncsCore.Gte(a1, a2) => ???
+      case MapFuncsCore.Lt(a1, a2) =>
+        (cake.trans.Map2[cake.trans.Source1](a1, a2, cake.Library.Infix.Lt.f2): cake.trans.TransSpec1).point[M].liftB
+      case MapFuncsCore.Lte(a1, a2) =>
+        (cake.trans.Map2[cake.trans.Source1](a1, a2, cake.Library.Infix.LtEq.f2): cake.trans.TransSpec1).point[M].liftB
+      case MapFuncsCore.Gt(a1, a2) =>
+        (cake.trans.Map2[cake.trans.Source1](a1, a2, cake.Library.Infix.Gt.f2): cake.trans.TransSpec1).point[M].liftB
+      case MapFuncsCore.Gte(a1, a2) =>
+        (cake.trans.Map2[cake.trans.Source1](a1, a2, cake.Library.Infix.GtEq.f2): cake.trans.TransSpec1).point[M].liftB
 
-      case MapFuncsCore.And(a1, a2) => ???
-      case MapFuncsCore.Or(a1, a2) => ???
+      case MapFuncsCore.And(a1, a2) =>
+        (cake.trans.Map2[cake.trans.Source1](a1, a2, cake.Library.Infix.And.f2): cake.trans.TransSpec1).point[M].liftB
+      case MapFuncsCore.Or(a1, a2) =>
+        (cake.trans.Map2[cake.trans.Source1](a1, a2, cake.Library.Infix.Or.f2): cake.trans.TransSpec1).point[M].liftB
       case MapFuncsCore.Between(a1, a2, a3) => ???
       case MapFuncsCore.Cond(a1, a2, a3) => ???
 
@@ -221,9 +231,9 @@ object Mimir extends BackendModule with Logging {
       case MapFuncsCore.MakeMap(key, value) =>
         (cake.trans.WrapObjectDynamic[cake.trans.Source1](key, value): cake.trans.TransSpec1).point[M].liftB
       case MapFuncsCore.ConcatArrays(a1, a2) =>
-        (cake.trans.InnerArrayConcat[cake.trans.Source1](a1, a2): cake.trans.TransSpec1).point[M].liftB
+        (cake.trans.OuterArrayConcat[cake.trans.Source1](a1, a2): cake.trans.TransSpec1).point[M].liftB
       case MapFuncsCore.ConcatMaps(a1, a2) =>
-        (cake.trans.InnerObjectConcat[cake.trans.Source1](a1, a2): cake.trans.TransSpec1).point[M].liftB
+        (cake.trans.OuterObjectConcat[cake.trans.Source1](a1, a2): cake.trans.TransSpec1).point[M].liftB
       case MapFuncsCore.ProjectIndex(src, index) =>
         (cake.trans.DerefArrayDynamic[cake.trans.Source1](src, index): cake.trans.TransSpec1).point[M].liftB
       case MapFuncsCore.ProjectField(src, field) =>
