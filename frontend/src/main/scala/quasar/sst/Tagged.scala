@@ -17,12 +17,12 @@
 package quasar.sst
 
 import slamdata.Predef._
+import quasar.ejson.TypeTag
 
 import matryoshka._
 import scalaz._, Scalaz._
 
-// TODO: More appropriate name than `Tagged`?
-final case class Tagged[A](tag: String, value: A)
+final case class Tagged[A](tag: TypeTag, value: A)
 
 object Tagged {
   implicit val traverse1: Traverse1[Tagged] =
@@ -46,7 +46,7 @@ object Tagged {
     new Delay[Show, Tagged] {
       def apply[A](shw: Show[A]) = {
         implicit val shwA: Show[A] = shw
-        Show.shows(t => s"${t.value.shows} @ ${t.tag}")
+        Show.shows(t => s"${t.value.shows} @ ${t.tag.value}")
       }
     }
 }

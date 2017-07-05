@@ -293,7 +293,7 @@ final class CompressionSpec extends quasar.Qspec
       val encoded = z85.encode(bytes)
       val ejs     = E(ejson.meta[J](
                       C(ejson.str[J](encoded)).embed,
-                      ejson.SizedTypeTag[J](ejson.BinaryTag, BigInt(bytes.size))
+                      ejson.SizedType[J](ejson.TypeTag.Binary, BigInt(bytes.size))
                     )).embed
       val sst     = SST.fromEJson(Real(1), ejs)
 

@@ -53,6 +53,9 @@ trait EJsonArbitrary {
         )
       )
     }
+
+  implicit val arbitraryTypeTag: Arbitrary[TypeTag] =
+    Arbitrary(Gen.alphaNumStr map (TypeTag(_)))
 }
 
 object EJsonArbitrary extends EJsonArbitrary

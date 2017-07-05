@@ -18,7 +18,7 @@ package quasar
 
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
-import quasar.ejson.{BinaryTag, EJson, CommonEJson => C, ExtEJson => E, EncodeEJson, Meta, Null, SizedTypeTag, Str}
+import quasar.ejson.{EJson, CommonEJson => C, ExtEJson => E, EncodeEJson, Meta, Null, SizedType, Str, TypeTag}
 import quasar.fp.ski.κ
 import quasar.tpe._
 
@@ -30,6 +30,7 @@ import spire.algebra.{AdditiveMonoid, Field, NRoot}
 import spire.math.ConvertableTo
 
 package object sst {
+  type PrimaryTag = PrimaryType \/ TypeTag
   /** Statistical Structural Type */
   type TypeS[J, A]         = TypeF[J, A]
   type SSTF2[F[_], A, B]   = EnvT[Option[TypeStat[A]], F, B]
@@ -84,8 +85,8 @@ package object sst {
   object EncodedBinary {
     def unapply[J](ejs: EJson[J])(implicit J: Recursive.Aux[J, EJson]): Option[BigInt] =
       ejs match {
-        case E(Meta(Embed(C(Str(_))), Embed(SizedTypeTag(BinaryTag, size)))) => some(size)
-        case _                                                               => none
+        case E(Meta(Embed(C(Str(_))), Embed(SizedType(TypeTag.Binary, size)))) => some(size)
+        case _                                                                 => none
       }
   }
 
