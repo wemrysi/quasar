@@ -184,6 +184,7 @@ package object sql {
 
     def absImport(i: Import[T[Sql]], from: ADir): ADir = refineTypeAbs(i.path).fold(ι, from </> _)
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def scopeFromHere(imports: List[Import[T[Sql]]], funcsHere: List[FunctionDecl[T[Sql]]], here: ADir): (CIName, Int) => EitherT[M, SemanticError, List[(FunctionDecl[T[Sql]], ADir)]] = {
       case (name, arity) =>
         // All functions coming from `imports` along with their respective import statements that were made absolute and where they are defined
