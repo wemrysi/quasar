@@ -117,8 +117,10 @@ final class MapFuncPlanner[T[_[_]]: RecursiveT, M[_], F[_]: Applicative] {
 
     case MapFuncsCore.Within(a1, a2) => ???
 
-    case MapFuncsCore.Lower(a1) => ???
-    case MapFuncsCore.Upper(a1) => ???
+    case MapFuncsCore.Lower(a1) =>
+      (cake.trans.Map1[cake.trans.Source1](a1, cake.Library.toLowerCase.f1): cake.trans.TransSpec1).point[F]
+    case MapFuncsCore.Upper(a1) =>
+      (cake.trans.Map1[cake.trans.Source1](a1, cake.Library.toUpperCase.f1): cake.trans.TransSpec1).point[F]
     case MapFuncsCore.Bool(a1) => ???
     case MapFuncsCore.Integer(a1) => ???
     case MapFuncsCore.Decimal(a1) => ???
