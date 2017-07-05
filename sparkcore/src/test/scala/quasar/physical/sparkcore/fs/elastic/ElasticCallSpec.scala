@@ -41,7 +41,7 @@ class ElasticCallSpec extends quasar.Qspec
     node = None
   }
 
-
+/*
   "CreateIndex" should {
     "create new index" in {
       val program = for {
@@ -198,15 +198,15 @@ class ElasticCallSpec extends quasar.Qspec
       types must_== List.empty[String]
     }
   }
-
-  "Copy" should {
+*/
+  "CopyType" should {
     "copy content of existing type to non-existing type" in {
       val program = for {
         _ <- elastic.createIndex("foo")
         _ <- elastic.indexInto(IndexType("foo", "bar"), List(("key" -> "value")))
         _ <- elastic.indexInto(IndexType("foo", "baz"), List(("key" -> "value")))
         _ <- elastic.createIndex("foo2")
-        _ <- elastic.copy(IndexType("foo", "bar"), IndexType("foo2", "bar2"))
+        _ <- elastic.copyType(IndexType("foo", "bar"), IndexType("foo2", "bar2"))
       } yield ()
 
       val checkProgram = for {
@@ -224,7 +224,6 @@ class ElasticCallSpec extends quasar.Qspec
 
   "DeleteType" should {
     "foo delete existing type from existsing index" in {
-/*      
       val program = for {
         _ <- elastic.createIndex("foo")
         _ <- elastic.indexInto(IndexType("foo", "bar"), List(("key" -> "value")))
@@ -234,8 +233,6 @@ class ElasticCallSpec extends quasar.Qspec
 
       val exists = program.foldMap(ElasticCall.interpreter).unsafePerformSync
       exists must_== false
- */
-      pending
     }
   }
 }

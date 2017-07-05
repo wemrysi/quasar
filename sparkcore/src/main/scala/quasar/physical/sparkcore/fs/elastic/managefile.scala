@@ -72,7 +72,7 @@ object managefile {
     _                            <- if(dstTypeExists) elastic.deleteType(dst)
                                     else if(!dstIndexExists) elastic.createIndex(dst.index)
                                     else ().point[Free[S, ?]]
-    _                            <- elastic.copy(src, dst)
+    _                            <- elastic.copyType(src, dst)
     _                            <- elastic.deleteType(src)
   } yield ()
 

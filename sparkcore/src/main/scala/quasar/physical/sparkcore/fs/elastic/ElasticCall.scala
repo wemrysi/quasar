@@ -39,7 +39,8 @@ object IndexType {
 
 sealed trait ElasticCall[A]
 final case class CreateIndex(index: String) extends ElasticCall[Unit]
-final case class Copy(src: IndexType, dst: IndexType) extends ElasticCall[Unit]
+final case class CopyType(src: IndexType, dst: IndexType) extends ElasticCall[Unit]
+final case class CopyIndex(src: String, dst: String) extends ElasticCall[Unit]
 final case class TypeExists(indexType: IndexType) extends ElasticCall[Boolean]
 final case class ListTypes(index: String) extends ElasticCall[List[String]]
 final case class ListIndices() extends ElasticCall[List[String]]
@@ -51,7 +52,8 @@ object ElasticCall {
 
   class Ops[S[_]](implicit S: ElasticCall :<: S) {
     def createIndex(index: String): Free[S, Unit] = lift(CreateIndex(index)).into[S]
-    def copy(src: IndexType, dst: IndexType): Free[S, Unit] = lift(Copy(src, dst)).into[S]
+    def copyType(src: IndexType, dst: IndexType): Free[S, Unit] = lift(CopyType(src, dst)).into[S]
+    def copyIndex(src: String, dst: String): Free[S, Unit] = lift(CopyIndex(src, dst)).into[S]
     def typeExists(indexType: IndexType): Free[S, Boolean] = lift(TypeExists(indexType)).into[S]
     def listTypes(index: String): Free[S, List[String]] = lift(ListTypes(index)).into[S]
     def listIndices: Free[S, List[String]] = lift(ListIndices()).into[S]
@@ -76,7 +78,7 @@ object ElasticCall {
       result.map(_.index).toList
     }
 
-    def _create(index: String): Task[Unit] = for {
+    def _createIndex(index: String): Task[Unit] = for {
       indices <- _listIndices
       _       <- if(indices.contains(index)) ().point[Task] else Task.delay {
         val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
@@ -86,7 +88,7 @@ object ElasticCall {
       }
     } yield ()
 
-    def _delete(index: String): Task[Unit] = for {
+    def _deleteIndex(index: String): Task[Unit] = for {
       indices <- _listIndices
       _       <- if(!indices.contains(index)) ().point[Task] else Task.delay {
         val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
@@ -121,16 +123,15 @@ object ElasticCall {
     } yield types
 
     def _deleteType(index: String, typ: String): Task[Unit] = for {
-        httpClient <- Task.delay(PooledHttp1Client())
-        result          <- httpClient.expect[String](
-          Request(method = POST, uri = Uri.unsafeFromString(s"http://localhost:9200/$index/$typ/_delete_by_query?refresh=true&wait_for_completion=true"))
-            .withBody(s"""{ "query": {"match_all": {}}}""")
-        )
-    } yield {
-      println(s"result: $result")
-    }
+      types <- _listTypes(index)
+      temp  <- Task.delay(s"prefix${index}")
+      _     <- _copyIndex(index, temp)
+      _     <- _deleteIndex(index)
+      _     <- _createIndex(index)
+      _     <- types.filter(_ =/= typ).map(t => _copyType(IndexType(temp, t), IndexType(index, t))).sequence
+    } yield ()
 
-    def _copy(src: IndexType, dst: IndexType): Task[Unit] = for {
+    def _copyType(src: IndexType, dst: IndexType): Task[Unit] = for {
         httpClient <- Task.delay(PooledHttp1Client())
         result          <- httpClient.expect[String](
           Request(method = POST, uri = Uri.unsafeFromString("http://localhost:9200/_reindex?refresh=true"))
@@ -139,16 +140,29 @@ object ElasticCall {
                            "dest": { "index": "${dst.index}", "type": "${dst.typ}" }
                        }""")
         )
-      } yield ()
+    } yield ()
+
+    def _copyIndex(src: String, dst: String): Task[Unit] = for {
+      httpClient <- Task.delay(PooledHttp1Client())
+      result          <- httpClient.expect[String](
+        Request(method = POST, uri = Uri.unsafeFromString("http://localhost:9200/_reindex?refresh=true"))
+          .withBody(s"""{
+                           "source": { "index": "${src}" }, 
+                           "dest": { "index": "${dst}" }
+                       }""")
+      )
+    } yield ()
+
 
     def apply[A](from: ElasticCall[A]) = from match {
-      case CreateIndex(index) => _create(index)
+      case CreateIndex(index) => _createIndex(index)
       case IndexInto(indexType: IndexType, data: List[(String, String)]) => _indexInto(indexType, data)
-      case Copy(src, dst) => _copy(src, dst)
+      case CopyType(src, dst) => _copyType(src, dst)
+      case CopyIndex(src, dst) => _copyIndex(src, dst)
       case TypeExists(IndexType(index, typ)) => _typeExists(index, typ)
       case ListTypes(index) => _listTypes(index)
       case ListIndices() => _listIndices
-      case DeleteIndex(index) => _delete(index)
+      case DeleteIndex(index) => _deleteIndex(index)
       case DeleteType(IndexType(index, typ)) => _deleteType(index, typ)
     }
   }
