@@ -27,7 +27,6 @@ import TableModule.SortAscending
 import scala.collection.mutable
 
 trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLibModule[M] {
-  //import library._
   import trans._
 
   trait StatsLib extends ColumnarTableLib with ReductionLib {

@@ -254,8 +254,6 @@ trait StdLibModule[M[+ _]]
     with StatsLibModule[M]
     with SummaryLibModule[M]
     with NormalizationLibModule[M]
-    with ClusteringLibModule[M]
-    with RandomForestLibModule[M]
     with RandomLibModule[M] {
   type Lib <: StdLib
 
@@ -269,8 +267,6 @@ trait StdLibModule[M[+ _]]
       with StatsLib
       with SummaryLib
       with NormalizationLib
-      with ClusteringLib
-      with RandomForestLib
       with RandomLib
 }
 
