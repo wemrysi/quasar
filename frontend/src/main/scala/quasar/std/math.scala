@@ -294,6 +294,23 @@ trait MathLib extends Library {
       case t             => success(Func.Input1(t))
     })
 
+    val Trunc = UnaryFunc(
+      Mapping,
+      "Truncates a numeric value towards zero",
+      Type.Numeric,
+      Func.Input1(Type.Numeric),
+      noSimplification,
+      partialTyperV[nat._1] {
+        case Sized(Type.Const(Data.Int(v)))      => success(Type.Const(Data.Int(v.abs)))
+        case Sized(Type.Const(Data.Dec(v)))      => success(Type.Const(Data.Int(v.toBigInt)))
+
+        case Sized(t) if Type.Numeric contains t => success(t)
+      },
+      untyper[nat._1] {
+        case Type.Const(d) => success(Func.Input1(d.dataType))
+        case t             => success(Func.Input1(t))
+      })
+
   val Modulo = BinaryFunc(
     Mapping,
     "Finds the remainder of one number divided by another",

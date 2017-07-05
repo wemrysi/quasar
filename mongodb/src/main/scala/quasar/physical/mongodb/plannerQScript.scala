@@ -251,6 +251,7 @@ object MongoDbQScriptPlanner {
 
     val handleSpecialDerived: MapFuncDerived[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
       case Abs(a1) => unimplemented[M, Fix[ExprOp]]("Abs expression")
+      case Trunc(a1) => unimplemented[M, Fix[ExprOp]]("Trunc expression")
     }
 
     val handleSpecial: MapFunc[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
@@ -526,7 +527,8 @@ object MongoDbQScriptPlanner {
     }
 
     val handleSpecialDerived: MapFuncDerived[T, JsCore] => M[JsCore] = {
-      case Abs(a1)       => Call(Select(ident("Math"), "abs"), List(a1)).point[M]
+      case Abs(a1)       => unimplemented[M, JsCore]("Abs JS")
+      case Trunc(a1)     => unimplemented[M, JsCore]("Trunc JS")
     }
 
     val handleSpecial: MapFunc[T, JsCore] => M[JsCore] = {

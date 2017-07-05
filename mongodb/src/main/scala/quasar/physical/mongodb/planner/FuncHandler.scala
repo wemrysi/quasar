@@ -278,6 +278,7 @@ object FuncHandler {
 
             fa.some collect {
               case D.Abs(a1)       => $abs(a1)
+              case D.Trunc(a1)     => $trunc(a1)
             }
           }
         }

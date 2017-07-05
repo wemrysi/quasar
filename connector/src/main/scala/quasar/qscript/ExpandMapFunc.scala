@@ -51,6 +51,11 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
               Free.roll(MFC(Negate(a.point[Free[OUT, ?]]))),
               a.point[Free[OUT, ?]]
             ))
+          case D.Trunc(a) =>
+            MFC(Subtract(
+              a.point[Free[OUT, ?]],
+              Free.roll(MFC(Modulo(a.point[Free[OUT,?]], Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(1))))))))
+            ))
         }
     }
 

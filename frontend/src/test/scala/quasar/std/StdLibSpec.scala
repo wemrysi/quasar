@@ -16,7 +16,7 @@
 
 package quasar.std
 
-import slamdata.Predef._
+import slamdata.Predef._, BigDecimal.RoundingMode
 import quasar.{Data, DataCodec, Qspec, Type}
 import quasar.DateArbitrary._
 import quasar.frontend.logicalplan._
@@ -943,6 +943,16 @@ abstract class StdLibSpec extends Qspec {
         // "any Interval" >> prop { (x: Duration) =>
         //   unary(Abs(_).embed, Data.Interval(x), if (x.isNegative) Data.Interval(x.negated) else Data.Interval(x))
         // }
+      }
+
+      "Trunc" >> {
+        "any Int" >> prop { (x: BigInt) =>
+          unary(Abs(_).embed, Data.Int(x), Data.Int(x))
+        }
+
+        "any Dec" >> prop { (x: BigDecimal) =>
+          unary(Trunc(_).embed, Data.Dec(x), Data.Dec(x.setScale(0, RoundingMode.DOWN)))
+        }
       }
 
       "Modulo" >> {

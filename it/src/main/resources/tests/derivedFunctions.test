@@ -1,29 +1,22 @@
 {
     "name": "derived functions",
     "backends": {
-        "marklogic_xml": "skip",
-        "couchbase": "pending",
-        "marklogic_json": "pending",
-        "mimir": "pending",
-        "mongodb_3_2": "timeout",
-        "spark_local": "pending",
-        "spark_hdfs": "pending"
     },
     "data": "divide.data",
-    "query": "select nr, -val1 as neg1, abs(val1) as abs1 from divide",
+    "query": "select nr, trunc(val3) as trunc1 from divide",
     "predicate": "exactly",
     "expected": [
-        { "nr":  1, "neg1": -3.0, "abs1": 3.0 },
-        { "nr":  2, "neg1": -2, "abs1": 2 },
-        { "nr":  3, "neg1": -1, "abs1": 1 },
-        { "nr":  4, "neg1": -1.0, "abs1": 1.0 },
-        { "nr":  5, "neg1": -3.0, "abs1": 3.0 },
-        { "nr":  6, "neg1": -2.0, "abs1": 2.0 },
-        { "nr":  7, "neg1": 4, "abs1": 4 },
-        { "nr":  8, "neg1": -1, "abs1": 1 },
-        { "nr":  9, "neg1": 1.0, "abs1": 1.0 },
-        { "nr": 10, "neg1": -1.0, "abs1": 1.0 },
-        { "nr": 11, "neg1": 1.0, "abs1": 1.0 },
-        { "nr": 12, "neg1": 0, "abs1": 0 }
+        { "nr":  1, "trunc1": 1.0 },
+        { "nr":  2, "trunc1": 1 },
+        { "nr":  3, "trunc1": 2 },
+        { "nr":  4, "trunc1": 4 },
+        { "nr":  5, "trunc1": -1 },
+        { "nr":  6, "trunc1": -1 },
+        { "nr":  7, "trunc1": -1 },
+        { "nr":  8, "trunc1": -2 },
+        { "nr":  9, "trunc1": 4 },
+        { "nr": 10, "trunc1": 0 },
+        { "nr": 11, "trunc1": -1 },
+        { "nr": 12, "trunc1": -9 }
     ]
 }
