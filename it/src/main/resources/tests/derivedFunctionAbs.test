@@ -1,11 +1,11 @@
 {
-    "name": "derived functions",
+    "name": "derived function abs",
     "backends": {
         "marklogic_xml": "skip",
+        "mongodb_q_3_2": "timeout",
         "couchbase": "pending",
         "marklogic_json": "pending",
         "mimir": "pending",
-        "mongodb_3_2": "timeout",
         "spark_local": "pending",
         "spark_hdfs": "pending"
     },
