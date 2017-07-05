@@ -41,7 +41,6 @@ class ElasticCallSpec extends quasar.Qspec
     node = None
   }
 
-/*
   "CreateIndex" should {
     "create new index" in {
       val program = for {
@@ -198,7 +197,7 @@ class ElasticCallSpec extends quasar.Qspec
       types must_== List.empty[String]
     }
   }
-*/
+
   "CopyType" should {
     "copy content of existing type to non-existing type" in {
       val program = for {
