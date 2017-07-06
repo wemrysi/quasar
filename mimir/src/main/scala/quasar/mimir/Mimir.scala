@@ -31,7 +31,7 @@ import quasar.fs.mount._
 import quasar.qscript._
 
 import quasar.blueeyes.json.{JNum, JValue}
-import quasar.precog.common.{Path, RValue}
+import quasar.precog.common.Path
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
 
@@ -156,6 +156,8 @@ object Mimir extends BackendModule with Logging {
 //def interpretM[M[_], F[_], A, B](f: A => M[B], φ: AlgebraM[M, F, B]): AlgebraM[M, CoEnv[A, F, ?], B]
 // f.cataM(interpretM)
 
+    val mapFuncPlanner = new MapFuncPlanner[T, M, Backend]
+
     lazy val planQST: AlgebraM[Backend, QScriptTotal[T, ?], Repr] =
       _.run.fold(
         planQScriptCore,
@@ -175,28 +177,34 @@ object Mimir extends BackendModule with Logging {
                       _ => ???,   // Read[AFile]
                       _ => ???))))))))    // DeadEnd
 
-    lazy val planMapFunc: AlgebraM[Backend, MapFuncCore[T, ?], Repr] = {
-      // EJson => Data => JValue => RValue => Table
-      case MapFuncsCore.Constant(ejson) =>
-        val data: Data = ejson.cata(Data.fromEJson)
-        val jvalue: JValue = JValue.fromData(data)
-        val rvalue: RValue = RValue.fromJValue(jvalue)
-
-        Repr.meld[M](new DepFn1[Cake, λ[`P <: Cake` => M[P#Table]]] {
-          def apply(P: Cake): M[P.Table] =
-            P.Table.fromRValues(scala.Stream(rvalue)).point[M]
-        }).liftB
-
-      case _ => ???
-    }
-
     lazy val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = {
-      case qscript.Map(src, f) => f.cataM(interpretM(κ(src.point[Backend]), planMapFunc))
+      case qscript.Map(src, f) =>
+        for {
+          trans <- f.cataM[Backend, src.P.trans.TransSpec1](
+            interpretM(
+              κ(src.P.trans.TransSpec1.Id.point[Backend]),
+              mapFuncPlanner.plan(src.P)))
+        } yield Repr(src.P)(src.table.transform(trans))
+
       case qscript.LeftShift(src, struct, id, repair) => ???
       case qscript.Reduce(src, bucket, reducers, repair) => ???
       case qscript.Sort(src, bucket, order) => ???
-      case qscript.Filter(src, f) => ???
+
+      case qscript.Filter(src, f) =>
+        for {
+          trans <- f.cataM[Backend, src.P.trans.TransSpec1](
+            interpretM(
+              κ(src.P.trans.TransSpec1.Id.point[Backend]),
+              mapFuncPlanner.plan(src.P)))
+        } yield Repr(src.P)(src.table.transform(src.P.trans.Filter(src.P.trans.TransSpec1.Id, trans)))
+
       case qscript.Union(src, lBranch, rBranch) => ???
+        //for {
+        //  leftRepr <- lBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
+        //  rightRepr <- rBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
+        //  rightCoerced <- leftRepr.unsafeCoerce[Lambda[`P <: Cake` => P#Table]](rightRepr.table).liftM[MT].liftB
+        //} yield Repr(leftRepr.P)(leftRepr.table.concat(rightCoerced))
+
       case qscript.Subset(src, from, op, count) =>
         for {
           fromRepr <- from.cataM(interpretM(κ(src.point[Backend]), planQST))
@@ -206,15 +214,16 @@ object Mimir extends BackendModule with Logging {
               vals <- countRepr.table.toJson
               nums = vals collect { case n: JNum => n.toLong.toInt } // TODO error if we get something strange
               number = nums.head
+              compacted = fromRepr.table.compact(fromRepr.P.trans.TransSpec1.Id)
               back <- op match {
                 case Take =>
-                  Future.successful(fromRepr.table.takeRange(0, number))
+                  Future.successful(compacted.takeRange(0, number))
 
                 case Drop =>
-                  Future.successful(fromRepr.table.takeRange(number, slamdata.Predef.Int.MaxValue.toLong)) // blame precog
+                  Future.successful(compacted.takeRange(number, slamdata.Predef.Int.MaxValue.toLong)) // blame precog
 
                 case Sample =>
-                  fromRepr.table.sample(number, List(fromRepr.P.trans.TransSpec1.Id)).map(_.head) // the number of Reprs returned equals the number of transspecs
+                  compacted.sample(number, List(fromRepr.P.trans.TransSpec1.Id)).map(_.head) // the number of Reprs returned equals the number of transspecs
               }
             } yield Repr(fromRepr.P)(back)
 
@@ -222,10 +231,11 @@ object Mimir extends BackendModule with Logging {
           }
         } yield back
 
+      // FIXME look for Map(Unreferenced, Constant) and return constant table
       case qscript.Unreferenced() =>
         Repr.meld[M](new DepFn1[Cake, λ[`P <: Cake` => M[P#Table]]] {
           def apply(P: Cake): M[P.Table] =
-            P.Table.empty.point[M]
+            P.Table.constLong(Set(0)).point[M]
         }).liftB
     }
 
@@ -258,7 +268,6 @@ object Mimir extends BackendModule with Logging {
             }
           }
 
-        // TODO duplicated in listContents
         val result: FileSystemErrT[M, ?] ~> Backend =
           Hoist[FileSystemErrT].hoist[M, PhaseResultT[Configured, ?]](
             λ[Configured ~> PhaseResultT[Configured, ?]](_.liftM[PhaseResultT])

@@ -108,8 +108,8 @@ trait TransSpecableModule[M[+ _]] extends TransSpecModule with TableModule[M] wi
 
         def EqualLiteral(node: Join)(parent: N[S], value: RValue, invert: Boolean) =
           parent.flatMap(leftMap(_) { target =>
-            val inner = trans.Equal(target, transRValue(value, target))
-            if (invert) op1ForUnOp(Comp).spec(MorphContext(ctx, node))(inner) else inner
+            val inner = trans.Equal(target, trans.transRValue(value, target))
+            if (invert) op1ForUnOp(Comp).spec(inner) else inner
           })
 
         def WrapObject(node: Join)(parent: N[S], field: String) =
@@ -138,7 +138,7 @@ trait TransSpecableModule[M[+ _]] extends TransSpecModule with TableModule[M] wi
           parent.flatMap(leftMap(_) { target =>
             value match {
               case cv: CValue =>
-                trans.Map1(target, op.f2(MorphContext(ctx, node)).applyr(cv))
+                trans.Map1(target, op.f2.applyr(cv))
 
               case _ =>
                 trans.Typed(trans.Typed(target, JNullT), JTextT) // nuke all the things
@@ -149,7 +149,7 @@ trait TransSpecableModule[M[+ _]] extends TransSpecModule with TableModule[M] wi
           parent.flatMap(leftMap(_) { target =>
             value match {
               case cv: CValue =>
-                trans.Map1(target, op.f2(MorphContext(ctx, node)).applyl(cv))
+                trans.Map1(target, op.f2.applyl(cv))
 
               case _ =>
                 trans.Typed(trans.Typed(target, JNullT), JTextT) // nuke all the things
@@ -163,7 +163,7 @@ trait TransSpecableModule[M[+ _]] extends TransSpecModule with TableModule[M] wi
             pr <- rightParent
             (r, ar) = get(pr)
             result <- if (al == ar) {
-                       set(pl, (transFromBinOp(op, MorphContext(ctx, node))(l, r), al))
+                       set(pl, (transFromBinOp(op)(l, r), al))
                      } else {
                        init(Leaf(Source), node)
                      }
@@ -183,7 +183,7 @@ trait TransSpecableModule[M[+ _]] extends TransSpecModule with TableModule[M] wi
           parent.flatMap(leftMap(_)(trans.WrapArray(_)))
 
         def Op1(node: Operate)(parent: N[S], op: UnaryOperation) =
-          parent.flatMap(leftMap(_)(parent => op1ForUnOp(op).spec(MorphContext(ctx, node))(parent)))
+          parent.flatMap(leftMap(_)(parent => op1ForUnOp(op).spec(parent)))
 
         def Cond(node: dag.Cond)(pred: N[S], left: N[S], right: N[S]) = {
           for {

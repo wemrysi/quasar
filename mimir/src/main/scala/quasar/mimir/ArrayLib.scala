@@ -35,7 +35,7 @@ trait ArrayLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
       override val idPolicy = IdentityPolicy.Product(IdentityPolicy.Retain.Merge, IdentityPolicy.Synthesize)
 
-      def apply(table: Table, ctx: MorphContext) = M point {
+      def apply(table: Table) = M point {
         val derefed = table transform trans.DerefObjectStatic(Leaf(Source), paths.Value)
         val keys    = table transform trans.DerefObjectStatic(Leaf(Source), paths.Key)
 

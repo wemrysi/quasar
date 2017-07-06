@@ -45,7 +45,7 @@ trait SummaryLibModule[M[+ _]] extends ReductionLibModule[M] {
       type Result = coalesced.Result
       val monoid: Monoid[Result] = coalesced.monoid
 
-      def reducer(ctx: MorphContext): CReducer[Result] = coalesced.reducer(ctx)
+      def reducer: CReducer[Result] = coalesced.reducer
 
       def extract(res: Result): Table = {
         val arrayTable = coalesced.extract(res)
@@ -84,12 +84,12 @@ trait SummaryLibModule[M[+ _]] extends ReductionLibModule[M] {
         coalesce(functions map { SingleSummary -> _ })
       }
 
-      def reduceTable(table: Table, jtype: JType, ctx: MorphContext): M[Table] = {
+      def reduceTable(table: Table, jtype: JType): M[Table] = {
         val reduction = makeReduction(jtype)
 
         implicit def monoid = reduction.monoid
 
-        val values = table.reduce(reduction.reducer(ctx))
+        val values = table.reduce(reduction.reducer)
 
         def extract(result: reduction.Result, jtype: JType): Table = {
           val paths = Schema.cpath(jtype)
@@ -103,7 +103,7 @@ trait SummaryLibModule[M[+ _]] extends ReductionLibModule[M] {
         values map { extract(_, jtype) }
       }
 
-      def apply(table: Table, ctx: MorphContext) = {
+      def apply(table: Table) = {
         val jtypes0: M[Seq[Option[JType]]] = for {
           schemas <- table.schemas
         } yield {
@@ -143,7 +143,7 @@ trait SummaryLibModule[M[+ _]] extends ReductionLibModule[M] {
         val resultTables: M[Seq[Table]] = tablesWithType flatMap {
           _.map {
             case (table, jtype) =>
-              reduceTable(table, jtype, ctx)
+              reduceTable(table, jtype)
           }.toStream.sequence map (_.toSeq)
         }
 
