@@ -19,7 +19,6 @@ package quasar.mimir
 import quasar.precog.common._
 import quasar.precog.util.Identifier
 import quasar.yggdrasil._
-import quasar.yggdrasil.execution.EvaluationContext
 
 import scalaz._
 
@@ -31,11 +30,9 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
   import TableModule.CrossOrder._
 
   val evalCtx = defaultEvaluationContext
-  val morphCtx = defaultMorphContext
 
-  object reductions extends ReductionFinder with StdLibOpFinder {
-    def MorphContext(ctx: EvaluationContext, node: DepGraph): MorphContext = new MorphContext(ctx, null)
-  }
+  object reductions extends ReductionFinder with StdLibOpFinder
+
   import reductions._
 
   "mega reduce" should {
@@ -103,9 +100,9 @@ trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
           Const(CNum(12))(line))(line))(line)
 
       val fooDerefTrans = trans.DerefObjectStatic(trans.Leaf(trans.Source), CPathField("foo"))
-      val nonEqTrans = trans.Map1(trans.Equal(fooDerefTrans, trans.ConstLiteral(CNum(5), fooDerefTrans)), Unary.Comp.f1(morphCtx))
+      val nonEqTrans = trans.Map1(trans.Equal(fooDerefTrans, trans.ConstLiteral(CNum(5), fooDerefTrans)), Unary.Comp.f1)
       val objTrans = trans.WrapObject(trans.Leaf(trans.Source), "bar")
-      val opTrans = op1ForUnOp(Neg).spec(morphCtx)(trans.DerefArrayStatic(trans.Leaf(trans.Source), CPathIndex(1)))
+      val opTrans = op1ForUnOp(Neg).spec(trans.DerefArrayStatic(trans.Leaf(trans.Source), CPathIndex(1)))
       val bazDerefTrans = trans.DerefObjectStatic(trans.Leaf(trans.Source), CPathField("baz"))
       val filterTrans = trans.Filter(trans.Leaf(trans.Source), trans.Equal(bazDerefTrans, trans.ConstLiteral(CNum(12), bazDerefTrans)))
 
