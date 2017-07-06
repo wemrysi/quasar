@@ -35,7 +35,7 @@ import quasar.precog.common.{Path, RValue}
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
 
-import fs2.Stream
+import fs2.{async, Stream}
 import fs2.async.mutable.{Queue, Signal}
 import fs2.interop.scalaz._
 
@@ -300,7 +300,36 @@ object Mimir extends BackendModule with Logging {
     private val map = new ConcurrentHashMap[ResultHandle, Precog#TablePager]
     private val cur = new AtomicLong(0L)
 
-    def executePlan(repr: Repr, out: AFile): Backend[AFile] = sys.error("woodle")
+    // this is an awful function. there's literally no backpressure
+    def executePlan(repr: Repr, out: AFile): Backend[AFile] = {
+      val path = fileToPath(out)
+
+      // TODO it's kind of ugly that we have to page through JValue to get back into NIHDB
+      val driver = for {
+        q <- async.boundedQueue[Task, Vector[JValue]](1)
+
+        populator = repr.table.slices.trans(λ[Future ~> Task](_.toTask)) foreachRec { slice =>
+          if (!slice.isEmpty) {
+            val json = slice.toJsonElements
+            if (!json.isEmpty)
+              q.enqueue1(json)
+            else
+              Task.now(())
+          } else {
+            Task.now(())
+          }
+        }
+
+        populatorWithTermination = populator >> q.enqueue1(Vector.empty)
+
+        ingestor = repr.P.ingest(path, q.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits)).run
+
+        // generally this function is bad news
+        _ <- Task.gatherUnordered(Seq(populatorWithTermination, ingestor))
+      } yield ()
+
+      Task.delay(driver.unsafePerformAsync(_ => ())).map(_ => out).liftM[MT].liftB
+    }
 
     def evaluatePlan(repr: Repr): Backend[ResultHandle] = {
       val t = for {
