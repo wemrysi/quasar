@@ -74,13 +74,11 @@ object NIHDB {
 
   final val projectionIdGen = new AtomicInteger()
 
-  final def create(chef: ActorRef, authorities: Authorities, baseDir: File, cookThreshold: Int, timeout: FiniteDuration, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem): IO[Validation[Error, NIHDB]] = {
+  final def create(chef: ActorRef, authorities: Authorities, baseDir: File, cookThreshold: Int, timeout: FiniteDuration, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem): IO[Validation[Error, NIHDB]] =
     NIHDBActor.create(chef, authorities, baseDir, cookThreshold, timeout, txLogScheduler) map { _ map { actor => new NIHDBImpl(actor, timeout, authorities) } }
-  }
 
-  final def open(chef: ActorRef, baseDir: File, cookThreshold: Int, timeout: FiniteDuration, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem) = {
+  final def open(chef: ActorRef, baseDir: File, cookThreshold: Int, timeout: FiniteDuration, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem) =
     NIHDBActor.open(chef, baseDir, cookThreshold, timeout, txLogScheduler) map { _ map { _ map { case (authorities, actor) => new NIHDBImpl(actor, timeout, authorities) } } }
-  }
 
   final def hasProjection(dir: File) = NIHDBActor.hasProjection(dir)
 }
@@ -114,7 +112,7 @@ trait NIHDB {
    */
   def count(paths0: Option[Set[CPath]]): Future[Long]
 
-  def quiesce: IO[Unit]
+  def quiesce: Future[Unit]
 
   def close(implicit actorSystem: ActorSystem): Future[Unit]
 }
@@ -151,8 +149,8 @@ private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: T
   def count(paths0: Option[Set[CPath]]): Future[Long] =
     getSnapshot().map(_.count(paths0))
 
-  def quiesce: IO[Unit] =
-    IO(actor ! Quiesce)
+  def quiesce: Future[Unit] =
+    (actor ? Quiesce).mapTo[Unit]
 
   def close(implicit actorSystem: ActorSystem): Future[Unit] =
     gracefulStop(actor, timeout.duration).map(_ => ())
@@ -400,6 +398,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
 
     case Quiesce =>
       quiesce.unsafePerformIO
+      sender ! (())
   }
 }
 
