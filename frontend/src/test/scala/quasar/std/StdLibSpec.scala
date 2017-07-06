@@ -947,7 +947,7 @@ abstract class StdLibSpec extends Qspec {
 
       "Trunc" >> {
         "any Int" >> prop { (x: BigInt) =>
-          unary(Abs(_).embed, Data.Int(x), Data.Int(x))
+          unary(Trunc(_).embed, Data.Int(x), Data.Int(x))
         }
 
         "any Dec" >> prop { (x: BigDecimal) =>
