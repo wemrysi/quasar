@@ -73,14 +73,14 @@ class ReadFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.
       // Load read-only data
       step((deleteForReading(fs.setupInterpM).run.void *> loadForReading(fs.setupInterpM).run.void).unsafePerformSync)
 
-      "read unopened file handle returns UnknownReadHandle" >> pendingForF(fs)(Set("mimir")) {
+      "read unopened file handle returns UnknownReadHandle" >>* {
         val h = ReadHandle(rootDir </> file("f1"), 42)
         read.unsafe.read(h).run map { r =>
           r must_= unknownReadHandle(h).left
         }
       }
 
-      "read closed file handle returns UnknownReadHandle" >> pendingForF(fs)(Set("mimir")) {
+      "read closed file handle returns UnknownReadHandle" >>* {
         val r = for {
           h  <- read.unsafe.open(smallFile.file, 0L, None)
           _  <- read.unsafe.close(h).liftM[FileSystemErrT]
