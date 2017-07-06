@@ -20,7 +20,6 @@ import quasar.precog.common._
 import quasar.yggdrasil._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
-import quasar.yggdrasil.execution.EvaluationContext
 
 import scalaz._, Scalaz._
 
