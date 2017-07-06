@@ -371,7 +371,7 @@ trait JoinOptimizerSpecs[M[+_]] extends EvaluatorSpecification[M]
         | a := //users
         | b := //heightWeight
         | a ~ b
-        |   std::stats::indexedRank({ name: a.name, height: b.height }.height) where a.userId = b.userId
+        |   flatten({ name: a.name, height: b.height }.height) where a.userId = b.userId
         """.stripMargin
 
       val line = Line(1, 1, "")
@@ -385,7 +385,7 @@ trait JoinOptimizerSpecs[M[+_]] extends EvaluatorSpecification[M]
 
       val input =
         Filter(IdentitySort,
-          dag.Morph1(IndexedRank,
+          dag.Morph1(Flatten,
             Join(DerefObject, Cross(None),
               Join(JoinObject, Cross(None),
                 Join(WrapObject, Cross(None),
