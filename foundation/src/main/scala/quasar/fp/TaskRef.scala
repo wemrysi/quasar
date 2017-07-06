@@ -28,13 +28,33 @@ import scalaz.concurrent.Task
   * project: https://github.com/oncue/remotely
   *
   */
-sealed abstract class TaskRef[A] {
+sealed abstract class TaskRef[A] { self =>
   def read: Task[A]
   def write(a: A): Task[Unit]
   def compareAndSet(oldA: A, newA: A): Task[Boolean]
   def modifyS[B](f: A => (A, B)): Task[B]
   def modify(f: A => A): Task[A] =
     modifyS(a => f(a).squared)
+
+  /** Be notified of any change to the underlying value
+    * @param notif Will be called with the old and new value
+    *              respectively whenever the value within the
+    *              `TaskRef` is changed.
+    */
+  def onChange(notif: (A, A) => Task[Unit]): TaskRef[A] =
+    new TaskRef[A] {
+      def read = self.read
+      def write(a: A) = for {
+        oldValue <- read
+        _        <- self.write(a)
+        _        <- notif(oldValue, a)
+      } yield ()
+      def compareAndSet(oldA: A, newA: A) = for {
+        changed <- self.compareAndSet(oldA, newA)
+        _       <- if (changed) notif(oldA, newA) else Task.now(())
+      } yield changed
+      def modifyS[B](f: A => (A, B)) = self.modifyS(f)
+    }
 }
 
 object TaskRef {

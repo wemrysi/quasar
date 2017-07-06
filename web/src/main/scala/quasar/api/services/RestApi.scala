@@ -24,6 +24,7 @@ import quasar.fp.free.foldMapNT
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.module.Module
+import quasar.main.MetaStoreRef
 
 import scala.concurrent.duration._
 import scala.collection.immutable.ListMap
@@ -50,17 +51,19 @@ object RestApi {
         S8: PathMismatchFailure :<: S,
         S9: Module :<: S,
         S10: Module.Failure :<: S,
-        S11: Analyze :<: S
+        S11: Analyze :<: S,
+        S12: MetaStoreRef :<: S
       ): Map[String, QHttpService[S]] =
     ListMap(
-      "/compile/fs"  -> query.compile.service[S],
+      "/compile/fs"   -> query.compile.service[S],
       "/estimate/fs"  -> query.analysis.service[S],
-      "/data/fs"     -> data.service[S],
-      "/metadata/fs" -> metadata.service[S],
-      "/mount/fs"    -> mount.service[S],
-      "/query/fs"    -> query.execute.service[S],
-      "/invoke/fs"   -> invoke.service[S],
-      "/schema/fs"   -> analyze.schema.service[S]
+      "/data/fs"      -> data.service[S],
+      "/metadata/fs"  -> metadata.service[S],
+      "/mount/fs"     -> mount.service[S],
+      "/query/fs"     -> query.execute.service[S],
+      "/invoke/fs"    -> invoke.service[S],
+      "/schema/fs"    -> analyze.schema.service[S],
+      "/metastore"    -> metastore.service[S]
     )
 
   val additionalServices: Map[String, HttpService] =

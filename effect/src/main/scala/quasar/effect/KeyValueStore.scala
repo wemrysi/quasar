@@ -111,8 +111,17 @@ object KeyValueStore {
 
   object impl {
 
-    def empty[K, V]: Task[KeyValueStore[K,V, ?] ~> Task] = Task.delay {
-      val state = scala.collection.concurrent.TrieMap.empty[K, V]
+    /** The default implementation of an in-memory KeyValueStore.
+      * Uses a `scala.collection.concurrent.TrieMap` as the underlying implementation
+      */
+    def default[K, V]: Task[KeyValueStore[K, V, ?] ~> Task] = defaultWith(Map.empty)
+
+    /** The default implementation of an in-memory KeyValueStore.
+      * Uses a `scala.collection.concurrent.TrieMap` as the underlying implementation
+      * @param initialState The initial state of the key value store to begin with
+      */
+    def defaultWith[K, V](initialState: Map[K, V]) : Task[KeyValueStore[K,V, ?] ~> Task] = Task.delay {
+      val state = scala.collection.concurrent.TrieMap(initialState.toList: _*)
       new (KeyValueStore[K, V, ?] ~> Task) {
         def apply[A](fa: KeyValueStore[K, V, A]): Task[A] = fa match {
           case Keys() => Task.delay(state.keys.toVector)

@@ -24,13 +24,15 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-sealed trait DbConnectionConfig
+sealed trait DbConnectionConfig {
+  def isInMemory: Boolean
+}
 
 object DbConnectionConfig {
-  // TODO: constrain to allowable names? (no ";", >= 3 chars)
-  // NB: FsFile is preferable to String, but parsing and printing is effectful
-  //     and leads to effectful Json codecs.
-  final case class H2(file: String) extends DbConnectionConfig
+
+  final case class H2(url: String) extends DbConnectionConfig {
+    def isInMemory: Boolean = url.startsWith("mem:")
+  }
 
   final case class HostInfo(name: String, port: Option[Int])
 
@@ -39,7 +41,9 @@ object DbConnectionConfig {
     database: Option[String],
     userName: String,
     password: String,
-    parameters: Map[String, String]) extends DbConnectionConfig
+    parameters: Map[String, String]) extends DbConnectionConfig {
+    def isInMemory: Boolean = false
+  }
 
   implicit val encodeJson: EncodeJson[DbConnectionConfig] =
     EncodeJson {
@@ -92,10 +96,10 @@ object DbConnectionConfig {
   }
 
   def connectionInfo(config: DbConnectionConfig): ConnectionInfo = config match {
-    case H2(file) =>
+    case H2(url) =>
       ConnectionInfo(
         "org.h2.Driver",
-        "jdbc:h2:file:" + file,
+        "jdbc:h2:" + url,
         "sa",
         "")
     case cfg @ PostgreSql(_, _, _, _, _) =>

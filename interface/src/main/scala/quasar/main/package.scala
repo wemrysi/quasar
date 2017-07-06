@@ -17,10 +17,13 @@
 package quasar
 
 import slamdata.Predef._
-import quasar.config.{ConfigOps, FsFile, ConfigError}
+import quasar.cli.Cmd
+import quasar.config.{ConfigOps, FsFile, ConfigError, CoreConfig, MetaStoreConfig}
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.catchable._
+import quasar.contrib.scalaz.eitherT._
 import quasar.effect._
-import quasar.db.Schema
+import quasar.db.{DbConnectionConfig, Schema}
 import quasar.fp._, ski._
 import quasar.fp.free._
 import quasar.fs._
@@ -28,10 +31,14 @@ import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
 import quasar.fs.mount.module.Module
 import quasar.physical._, couchbase.Couchbase
+import quasar.main.config.loadConfigFile
+import quasar.main.metastore._
+import quasar.metastore._
 
 import scala.util.control.NonFatal
 
-import doobie.imports.Transactor
+import doobie.imports.{ConnectionIO, Transactor}
+import doobie.syntax.connectionio._
 import eu.timepit.refined.auto._
 import monocle.Lens
 import pathy.Path.posixCodec
@@ -69,7 +76,8 @@ package object main {
     * we may want to interpret using more than one implementation.
     */
   type QEffIO[A]  = Coproduct[Task, QEff, A]
-  type QEff[A]    = Coproduct[Mounting, QErrs, A]
+  type QEff[A]     = Coproduct[MetaStoreRef, QEff0, A]
+  type QEff0[A]    = Coproduct[Mounting, QErrs, A]
 
   /** All possible types of failure in the system (apis + physical). */
   type QErrs[A]    = Coproduct[PhysErr, CoreErrs, A]
@@ -83,9 +91,11 @@ package object main {
       Failure.toRuntimeError[F, FileSystemError]
   }
 
+  type MetaStoreRef[A] = AtomicRef[quasar.metastore.MetaStore, A]
+
   /** Effect comprising the core Quasar apis. */
   type CoreEffIO[A] = Coproduct[Task, CoreEff, A]
-  type CoreEff[A]   = (Module :\: Mounting :\: Analyze :\: QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :/: CoreErrs)#M[A]
+  type CoreEff[A]   = (MetaStoreRef :\: Module :\: Mounting :\: Analyze :\: QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :/: CoreErrs)#M[A]
 
   object CoreEff {
     def runFs[S[_]](
@@ -98,13 +108,15 @@ package object main {
       S3: MountingFailure :<: S,
       S4: PathMismatchFailure :<: S,
       S5: FileSystemFailure :<: S,
-      S6: Module.Failure    :<: S
+      S6: Module.Failure    :<: S,
+      S7: MetaStoreRef      :<: S
     ): Task[CoreEff ~> Free[S, ?]] = {
       def moduleInter(fs: AnalyticalFileSystem ~> Free[S,?]): Module ~> Free[S, ?] = {
         val wtv: Coproduct[Mounting, AnalyticalFileSystem, ?] ~> Free[S,?] = injectFT[Mounting, S] :+: fs
         flatMapSNT(wtv) compose Module.impl.default[Coproduct[Mounting, AnalyticalFileSystem, ?]]
       }
       CompositeFileSystem.interpreter[S](hfsRef) map { compFs =>
+        injectFT[MetaStoreRef, S]                       :+:
         moduleInter(compFs)                             :+:
         injectFT[Mounting, S]                           :+:
         (compFs compose Inject[Analyze, AnalyticalFileSystem])  :+:
@@ -360,6 +372,152 @@ package object main {
     case (path, err) => console.stderr(
       s"Warning: Failed to mount '${posixCodec.printPath(path)}' because '$err'."
     )
+  }
+
+  private def closeFileSystem(dr: DefinitionResult[PhysFsEffM]): Task[Unit] = {
+    val transform: PhysFsEffM ~> Task =
+      foldMapNT(reflNT[Task] :+: (Failure.toCatchable[Task, Exception] compose Failure.mapError[PhysicalError, Exception](_.cause)))
+
+    dr.translate(transform).close
+  }
+
+  private def closeAllFsMounts(mnts: Mounts[DefinitionResult[PhysFsEffM]]): Task[Unit] =
+    mnts.traverse_(closeFileSystem(_).attemptNonFatal.void)
+
+  type QErrs_Task[A] = Coproduct[Task, QErrs, A]
+  type QErrs_TaskM[A] = Free[QErrs_Task, A]
+
+  object QErrs_Task {
+    def toMainTask: QErrs_TaskM ~> MainTask = {
+      foldMapNT(liftMT[Task, MainErrT] :+: QErrs.toCatchable[MainTask])
+    }
+  }
+
+  type QErrsCnxIO[A]  = Coproduct[ConnectionIO, QErrs, A]
+  type QErrsTCnxIO[A] = Coproduct[Task, QErrsCnxIO, A]
+  type QErrs_CnxIO_Task_MetaStoreRef[A] = Coproduct[MetaStoreRef, QErrsTCnxIO, A]
+  type QErrs_CnxIO_Task_MetaStoreRefM[A] = Free[QErrs_CnxIO_Task_MetaStoreRef, A]
+
+  object QErrsCnxIO {
+    def qErrsToMainErrT[F[_]: Catchable: Monad]: QErrs ~> MainErrT[F, ?] =
+      liftMT[F, MainErrT].compose(QErrs.toCatchable[F])
+
+    def toMainTask(transactor: Transactor[Task]): QErrsCnxIOM ~> MainTask = {
+      val f: QErrsCnxIOM ~> MainErrT[ConnectionIO, ?] =
+        foldMapNT(liftMT[ConnectionIO, MainErrT] :+: qErrsToMainErrT[ConnectionIO])
+
+      Hoist[MainErrT].hoist(transactor.trans) compose f
+    }
+  }
+
+  type QErrsCnxIOM[A]  = Free[QErrsCnxIO, A]
+  type QErrsTCnxIOM[A] = Free[QErrsTCnxIO, A]
+
+  object QErrsTCnxIO {
+    def toMainTask(transactor: Transactor[Task]): QErrsTCnxIOM ~> MainTask = {
+      val f: QErrsTCnxIOM ~> MainErrT[ConnectionIO, ?] =
+        foldMapNT(
+          (liftMT[ConnectionIO, MainErrT] compose taskToConnectionIO) :+:
+            liftMT[ConnectionIO, MainErrT]                              :+:
+            QErrsCnxIO.qErrsToMainErrT[ConnectionIO])
+
+      Hoist[MainErrT].hoist(transactor.trans) compose f
+    }
+  }
+
+  /** Initialize the Quasar FileSystem assuming all defaults */
+  val initializeFS: MainTask[QuasarFS] = initializeFS_(None)
+
+  /** Initialize the Quasar FileSytem using the configuration
+    * found in `configPath` if it's a `Some`
+    */
+  def initializeFS_(configPath: Option[FsFile]): MainTask[QuasarFS] =
+    for {
+      cfgFile      <- loadConfigFile[CoreConfig](configPath).liftM[MainErrT]
+      metastoreCfg <- cfgFile.metastore.cata(Task.now, MetaStoreConfig.configOps.default).liftM[MainErrT]
+      quasarFS     <- initializeFSWith(metastoreCfg.database)
+    } yield quasarFS
+
+  def initializeFSWith(db: DbConnectionConfig): MainTask[QuasarFS] =
+    for {
+      metastore <- metastoreTransactor(db)
+      metaRef   <- TaskRef(MetaStore(db, metastore)).liftM[MainErrT]
+      quasarFS  <- initializeFSImpl(metaRef, db.isInMemory)
+    } yield quasarFS
+
+  def initializeFSImpl(metaRef0: TaskRef[MetaStore], initialize: Boolean): MainTask[QuasarFS] = {
+    def shutdownOld(old: MetaStore, current: MetaStore) = old.trans.shutdown
+    for {
+      metastore  <- metaRef0.read.liftM[MainErrT]
+      _          <- if (initialize)
+                      initUpdateMigrate(quasar.metastore.Schema.schema, metastore.trans.transactor, None)
+                    else Task.now(()).liftM[MainErrT]
+      _          <- verifySchema(quasar.metastore.Schema.schema, metastore.trans.transactor).leftMap(_.message)
+      metaRef    =  metaRef0.onChange(shutdownOld)
+      hfsRef     <- TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM]).liftM[MainErrT]
+      mntdRef    <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
+
+      ephmralMnt =  KvsMounter.interpreter[Task, QErrsTCnxIO](
+        KvsMounter.ephemeralMountConfigs[Task], hfsRef, mntdRef) andThen
+        mapSNT(absorbTask)                                       andThen
+        QErrsCnxIO.toMainTask(metastore.trans.transactor)
+
+      mountsCfg  <- MetaStoreAccess.fsMounts
+        .map(MountingsConfig(_))
+        .transact(metastore.trans.transactor)
+        .liftM[MainErrT]
+
+      // TODO: Still need to expose these in the HTTP API, see SD-1131
+      failedMnts <- attemptMountAll[Mounting](mountsCfg) foldMap ephmralMnt
+      _          <- failedMnts.toList.traverse_(logFailedMount).liftM[MainErrT]
+
+      runCore    <- CoreEff.runFs[QEffIO](hfsRef).liftM[MainErrT]
+    } yield {
+      val f: QEffIO ~> QErrs_CnxIO_Task_MetaStoreRefM =
+        injectFT[Task, QErrs_CnxIO_Task_MetaStoreRef]               :+:
+          injectFT[MetaStoreRef, QErrs_CnxIO_Task_MetaStoreRef]       :+:
+          jdbcMounter[QErrs_CnxIO_Task_MetaStoreRef](hfsRef, mntdRef) :+:
+          injectFT[QErrs, QErrs_CnxIO_Task_MetaStoreRef]
+
+      val connectionIOToTask: ConnectionIO ~> Task =
+        λ[ConnectionIO ~> Task](io => metaRef.read.flatMap(t => t.trans.transactor.trans(io)))
+      val g: QErrs_CnxIO_Task_MetaStoreRef ~> QErrs_TaskM =
+        (injectFT[Task, QErrs_Task] compose AtomicRef.fromTaskRef(metaRef)) :+:
+         injectFT[Task, QErrs_Task]                                         :+:
+        (injectFT[Task, QErrs_Task] compose connectionIOToTask)             :+:
+         injectFT[QErrs, QErrs_Task]
+
+      QuasarFS(
+        foldMapNT(g) compose foldMapNT(f) compose runCore,
+        (mntdRef.read >>= closeAllFsMounts _) *> metaRef.read.flatMap(_.trans.shutdown))
+    }
+  }
+
+  final case class CmdLineConfig(configPath: Option[FsFile], cmd: Cmd)
+
+  /** Either initialize the metastore or execute the start depending
+    * on what command is provided by the user in the command line arguments
+    */
+  def initMetaStoreOrStart[C: argonaut.DecodeJson](config: CmdLineConfig, start: (C, CoreEff ~> QErrs_TaskM) => MainTask[Unit])(implicit
+    configOps: ConfigOps[C]
+  ): MainTask[Unit] = {
+    for {
+      cfg  <- loadConfigFile[C](config.configPath).liftM[MainErrT]
+      _     <- config.cmd match {
+        case Cmd.Start =>
+          for {
+            quasarFs <- initializeFS_(config.configPath)
+            _        <- start(cfg, quasarFs.interp).onFinish(κ(quasarFs.shutdown))
+          } yield ()
+
+        case Cmd.InitUpdateMetaStore =>
+          for {
+            msCfg <- configOps.metaStoreConfig(cfg).cata(Task.now, MetaStoreConfig.configOps.default).liftM[MainErrT]
+            trans <- metastoreTransactor(msCfg.database)
+            _     <- initUpdateMigrate(quasar.metastore.Schema.schema, trans.transactor, config.configPath).onFinish(κ(trans.shutdown))
+          } yield ()
+      }
+    } yield ()
   }
 
   /** Initialize or update MetaStore Schema and migrate mounts from config file

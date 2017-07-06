@@ -27,7 +27,7 @@ import pathy.Path, Path._
 /** Raw query and update terms, which may be `checked` against a DB schema
   * without requiring or affecting any data.
   */
-class Queries {
+object Queries {
   val fsMounts: Query0[(APath, FileSystemConfig)] =
     sql"SELECT path, type, connectionUri FROM Mounts WHERE type != 'view'".query[(APath, FileSystemConfig)]
 
@@ -55,5 +55,3 @@ class Queries {
   def deleteMount(path: APath): Update0 =
     sql"DELETE FROM Mounts where path = ${refineType(path)}".update
 }
-
-object Queries extends Queries

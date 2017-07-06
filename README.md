@@ -202,11 +202,13 @@ An example H2 configuration would look something like
 }
 ```
 
+Where <path/to/database/file> can really be any h2 url as described [here](http://www.h2database.com/html/features.html#database_url).
+
 A PostgreSQL configuration looks something like
 ```json
 "postgresql": {
-  "host": "<hostname>",
-  "port": "<port>",
+  "host": localhost,
+  "port": 8087,
   "database": "<database name>",
   "userName": "<database user>",
   "password": "<password for database user>",
@@ -815,6 +817,16 @@ Deletes an existing mount point, if any exists at the given path. If no such mou
 
 Moves a mount from one path to another. The new path must be provided in the `Destination` request header. This will return a 409 Conflict if a database mount is being moved above or below the path of an existing database mount. Mounts that are nested within the mount being moved (i.e. views) are moved along with it.
 
+### GET /server/info
+
+Returns information about this server. Name and app version.
+
+Example response:
+
+```json
+{"name":"Quasar","version":"19.1.2"}
+```
+
 ### PUT /server/port
 
 Takes a port number in the body, and attempts to restart the server on that port, shutting down the current instance which is running on the port used to make this http request.
@@ -823,6 +835,44 @@ Takes a port number in the body, and attempts to restart the server on that port
 
 Removes any configured port, reverting to the default (20223) and restarting, as with `PUT`.
 
+### GET /metastore
+
+Retrieve the connection information of the current metastore in use
+
+An example response:
+
+```json
+{
+    "h2": {
+        "file": "mem"
+    }
+}
+
+```
+
+### PUT /metastore
+
+Attempts to change the metastore using the supplied connection information
+
+An optional `initialize` query parameter can be supplied so that Quasar automatically initializes the new
+metastore after a successful connection if it has not already been initialized. If this parameter is omitted
+and the new metastore has not been initialized, the request will fail with a message to the effect that the
+new metastore has not been initialized.
+
+An example request body:
+
+```json
+{
+    "postgresql": {
+        "host": "localhost",
+        "port": 9876,
+        "database": "bob",
+        "password": "123456"
+    }
+}
+```
+
+Returns `200 OK` if the change was performed successfully otherwise returns a `400` with a message body explaining what went wrong.
 
 ## Error Responses
 

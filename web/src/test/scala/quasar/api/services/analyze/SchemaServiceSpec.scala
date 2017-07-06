@@ -202,7 +202,7 @@ object SchemaServiceSpec {
     }
 
   val runMounting: Task[Mounting ~> ResponseOr] =
-    KeyValueStore.impl.empty[APath, MountConfig] map { eval =>
+    KeyValueStore.impl.default[APath, MountConfig] map { eval =>
       liftMT[Task, ResponseT] compose foldMapNT(eval) compose Mounter.trivial[MountConfigs]
     }
 

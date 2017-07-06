@@ -128,10 +128,10 @@ package object fs {
       })
 
     val runFs = (
-      KeyValueStore.impl.empty[WriteHandle, AFile]          |@|
-      KeyValueStore.impl.empty[ReadHandle, XccDataStream]   |@|
-      KeyValueStore.impl.empty[ResultHandle, XccDataStream] |@|
-      MonotonicSeq.fromZero                                 |@|
+      KeyValueStore.impl.default[WriteHandle, AFile]          |@|
+      KeyValueStore.impl.default[ReadHandle, XccDataStream]   |@|
+      KeyValueStore.impl.default[ResultHandle, XccDataStream] |@|
+      MonotonicSeq.fromZero                                   |@|
       GenUUID.type4[Task]
     ).tupled.map { case (whandles, rhandles, qhandles, seq, genUUID) =>
       contentSource flatMapF { cs =>

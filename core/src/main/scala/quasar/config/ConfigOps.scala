@@ -37,6 +37,8 @@ import simulacrum.typeclass
 
   def name: String
 
+  def metaStoreConfig(c: C): Option[MetaStoreConfig]
+
   def default: Task[C]
 
   def fromFile(path: FsFile)(implicit D: DecodeJson[C]): CfgTask[C] =

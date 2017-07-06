@@ -16,9 +16,10 @@
 
 package quasar.contrib.scalaz
 
-import slamdata.Predef.Throwable
+import slamdata.Predef._
 
 import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 
 trait EitherTInstances extends EitherTInstances0 {
   implicit def eitherTCatchable[F[_]: Catchable : Functor, E]: Catchable[EitherT[F, E, ?]] =
@@ -79,5 +80,14 @@ object eitherT extends EitherTInstances {
   implicit class NestedEitherT[E,F[_]: Monad, A](a: EitherT[EitherT[F, E, ?], E, A]) {
     def flattenLeft: EitherT[F, E, A] =
       a.run.flatMapF(_.point[F])
+  }
+  implicit class TaskEitherT[E, A](a: EitherT[Task, E, A]) {
+    def onFinish(f: Option[Throwable] => Task[Unit]) =
+      EitherT(a.run.onFinish(f))
+    def foldLeftIntoFail(implicit show: Show[E]): Task[A] =
+      a.run.flatMap {
+        case -\/(e) => Task.fail(new scala.Exception(e.shows))
+        case \/-(a) => Task.now(a)
+      }
   }
 }

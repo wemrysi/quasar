@@ -27,7 +27,7 @@ import scalaz._, Scalaz._
 object MetaStoreConfig {
   implicit val configOps: ConfigOps[MetaStoreConfig] = new ConfigOps[MetaStoreConfig] {
     val name = "metastore"
-
+    def metaStoreConfig(mCfg: MetaStoreConfig) = mCfg.some
     val default = DbConnectionConfig.defaultConnectionConfig ∘ (MetaStoreConfig(_))
   }
 

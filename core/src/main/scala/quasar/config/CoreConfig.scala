@@ -27,7 +27,7 @@ import scalaz._, Scalaz._
 object CoreConfig {
   implicit val configOps: ConfigOps[CoreConfig] = new ConfigOps[CoreConfig] {
     val name = "core"
-
+    def metaStoreConfig(c: CoreConfig) = c.metastore
     val default = MetaStoreConfig.configOps.default ∘ (ms => CoreConfig(ms.some))
   }
 
