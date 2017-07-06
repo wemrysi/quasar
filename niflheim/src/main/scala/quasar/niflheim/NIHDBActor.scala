@@ -309,7 +309,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
     } yield state
   }
 
-  private def cook = IO {
+  private def cook(responseRequested: Boolean) = IO {
     state.blockState.rawLog.close
     val toCook = state.blockState.rawLog
     val newRaw = RawHandler.empty(toCook.id + 1, rawFileFor(toCook.id + 1))
@@ -318,7 +318,12 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
     state.txLog.startCook(toCook.id)
 
     val target = sender
-    chef ! Prepare(toCook.id, cookSequence.getAndIncrement, cookedDir, toCook, () => target ! (()))
+    val onComplete = if (responseRequested)
+      () => target ! (())
+    else
+      () => ()
+
+    chef ! Prepare(toCook.id, cookSequence.getAndIncrement, cookedDir, toCook, onComplete)
   }
 
   private def quiesce = IO {
@@ -408,7 +413,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
 
           if (state.blockState.rawLog.length >= cookThreshold) {
             log.debug("Starting cook on %s after threshold exceeded".format(baseDir.getCanonicalPath))
-            cook.unsafePerformIO
+            cook(false).unsafePerformIO
           }
 
           log.debug("Insert complete on %d rows at offset %d for %s".format(values.length, offset, baseDir.getCanonicalPath))
@@ -417,7 +422,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
       }
 
     case Cook =>
-      cook.unsafePerformIO
+      cook(true).unsafePerformIO
 
     case GetStatus =>
       sender ! Status(state.blockState.cooked.length, state.blockState.pending.size, state.blockState.rawLog.length)
