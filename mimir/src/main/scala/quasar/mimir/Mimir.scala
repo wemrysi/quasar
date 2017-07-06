@@ -61,6 +61,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 object Mimir extends BackendModule with Logging {
+  import FileSystemError._
 
   // pessimistically equal to couchbase's
   type QS[T[_[_]]] =
@@ -393,12 +394,19 @@ object Mimir extends BackendModule with Logging {
     }
 
     def read(h: ReadHandle): Backend[Vector[Data]] = {
-      val t = for {
-        pager <- Task.delay(Option(map.get(h)).get)
-        chunk <- pager.more
-      } yield chunk
+      for {
+        maybePager <- Task.delay(Option(map.get(h))).liftM[MT].liftB
 
-      t.liftM[MT].liftB
+        pager <- maybePager match {
+          case Some(pager) =>
+            pager.point[Backend]
+
+          case None =>
+            MonadError_[Backend, FileSystemError].raiseError(unknownReadHandle(h))
+        }
+
+        chunk <- pager.more.liftM[MT].liftB
+      } yield chunk
     }
 
     def close(h: ReadHandle): Configured[Unit] = {
@@ -457,17 +465,24 @@ object Mimir extends BackendModule with Logging {
     def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] = {
       log.debug(s"write to $h and $chunk")
 
-      if (chunk.isEmpty) {
-        Vector.empty[FileSystemError].point[Configured]
-      } else {
-        val t = for {
-          pair <- Task.delay(Option(map.get(h)).get)
-          (queue, _) = pair
-          _ <- queue.enqueue1(chunk)
-        } yield Vector.empty[FileSystemError]
+      val t = for {
+        maybePair <- Task.delay(Option(map.get(h)))
 
-        t.liftM[MT].liftM[ConfiguredT]
-      }
+        back <- maybePair match {
+          case Some(pair) =>
+            if (chunk.isEmpty) {
+              Task.now(Vector.empty[FileSystemError])
+            } else {
+              val (queue, _) = pair
+              queue.enqueue1(chunk).map(_ => Vector.empty[FileSystemError])
+            }
+
+          case _ =>
+            Task.now(Vector(unknownWriteHandle(h)))
+        }
+      } yield back
+
+      t.liftM[MT].liftM[ConfiguredT]
     }
 
     def close(h: WriteHandle): Configured[Unit] = {
@@ -476,6 +491,7 @@ object Mimir extends BackendModule with Logging {
         pair <- Task.delay(Option(map.get(h)).get).liftM[MT]
         (queue, signal) = pair
 
+        _ <- Task.delay(map.remove(h)).liftM[MT]
         _ <- Task.delay(log.debug(s"close $h")).liftM[MT]
         // ask queue to stop
         _ <- queue.enqueue1(Vector.empty).liftM[MT]
