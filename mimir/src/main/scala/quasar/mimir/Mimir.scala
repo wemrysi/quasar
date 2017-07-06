@@ -35,7 +35,7 @@ import quasar.precog.common.{Path, RValue}
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
 
-import fs2.{async, Stream}
+import fs2.Stream
 import fs2.async.mutable.{Queue, Signal}
 import fs2.interop.scalaz._
 
@@ -58,7 +58,7 @@ import scala.concurrent.Future
 import scala.util.Random
 
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
+import java.util.concurrent.atomic.AtomicLong
 
 object Mimir extends BackendModule with Logging {
 
@@ -300,7 +300,7 @@ object Mimir extends BackendModule with Logging {
   object QueryFileModule extends QueryFileModule {
     import QueryFile._
 
-    private val map = new ConcurrentHashMap[ResultHandle, (Queue[Task, Vector[Data]], AtomicBoolean)]
+    private val map = new ConcurrentHashMap[ResultHandle, Precog#TablePager]
     private val cur = new AtomicLong(0L)
 
     def executePlan(repr: Repr, out: AFile): Backend[AFile] = sys.error("woodle")
@@ -308,30 +308,8 @@ object Mimir extends BackendModule with Logging {
     def evaluatePlan(repr: Repr): Backend[ResultHandle] = {
       val t = for {
         handle <- Task.delay(ResultHandle(cur.getAndIncrement()))
-
-        killSwitch <- Task.delay(new AtomicBoolean(false))
-        q <- async.boundedQueue[Task, Vector[Data]](1)    // only "run ahead" by 1 chunk
-
-        _ <- Task.delay(map.put(handle, (q, killSwitch)))
-
-        fchunks = repr.table.slices.map(_.toJsonElements)
-        chunks = fchunks.trans(λ[Future ~> Task](_.toTask))
-
-        driver = chunks foreachRec { chunk =>
-          for {
-            killed <- Task.delay(killSwitch.get())
-
-            // once we're killed, run the whole thing out since we don't have early termination semantics
-            _ <- if (killed)
-              Task.now(())
-            else
-              q.enqueue1(chunk.map(JValue.toData))
-          } yield ()
-        }
-
-        driverWithTerm = driver >> q.enqueue1(Vector.empty)
-
-        _ <- Task.delay(driverWithTerm.unsafePerformAsync(_ => ()))
+        pager <- repr.P.TablePager(repr.table)
+        _ <- Task.delay(map.put(handle, pager))
       } yield handle
 
       t.liftM[MT].liftB
@@ -339,20 +317,18 @@ object Mimir extends BackendModule with Logging {
 
     def more(h: ResultHandle): Backend[Vector[Data]] = {
       val t = for {
-        pair <- Task.delay(map.get(h))
-        (q, _) = pair
-        back <- q.dequeue1
-      } yield back
+        pager <- Task.delay(Option(map.get(h)).get)
+        chunk <- pager.more
+      } yield chunk
 
       t.liftM[MT].liftB
     }
 
     def close(h: ResultHandle): Configured[Unit] = {
       val t = for {
-        pair <- Task.delay(map.get(h))
-        (_, killSwitch) = pair
-        _ <- Task.delay(map.remove(h, pair))
-        _ <- Task.delay(killSwitch.set(true))
+        pager <- Task.delay(Option(map.get(h)).get)
+        check <- Task.delay(map.remove(h, pager))
+        _ <- if (check) pager.close else Task.now(())
       } yield ()
 
       t.liftM[MT].liftM[ConfiguredT]
@@ -370,15 +346,50 @@ object Mimir extends BackendModule with Logging {
   object ReadFileModule extends ReadFileModule {
     import ReadFile._
 
-    def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = ???
-    def read(h: ReadHandle): Backend[Vector[Data]] = ???
-    def close(h: ReadHandle): Configured[Unit] = ???
+    private val map = new ConcurrentHashMap[ReadHandle, Precog#TablePager]
+    private val cur = new AtomicLong(0L)
+
+    def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
+      for {
+        precog <- cake[Backend]
+        handle <- Task.delay(ReadHandle(file, cur.getAndIncrement())).liftM[MT].liftB
+
+        target = precog.Table.constString(Set(posixCodec.printPath(file)))
+        loader = precog.Table.load(target, JType.JUniverseT).mapT(_.toTask.liftM[MT]).leftMap(toFSError)
+        table <- loader.mapT(_.liftM[ConfiguredT].liftM[PhaseResultT]): Backend[precog.Table]
+
+        limited = table.takeRange(offset.value, limit.fold(slamdata.Predef.Int.MaxValue.toLong)(_.value))
+        projected = limited.transform(precog.trans.constants.SourceValue.Single)
+
+        pager <- precog.TablePager(projected).liftM[MT].liftB
+        _ <- Task.delay(map.put(handle, pager)).liftM[MT].liftB
+      } yield handle
+    }
+
+    def read(h: ReadHandle): Backend[Vector[Data]] = {
+      val t = for {
+        pager <- Task.delay(Option(map.get(h)).get)
+        chunk <- pager.more
+      } yield chunk
+
+      t.liftM[MT].liftB
+    }
+
+    def close(h: ReadHandle): Configured[Unit] = {
+      val t = for {
+        pager <- Task.delay(Option(map.get(h)).get)
+        check <- Task.delay(map.remove(h, pager))
+        _ <- if (check) pager.close else Task.now(())
+      } yield ()
+
+      t.liftM[MT].liftM[ConfiguredT]
+    }
   }
 
   object WriteFileModule extends WriteFileModule {
     import WriteFile._
 
-    private val QueueLimit = 100
+    private val QueueLimit = 1
 
     private val map: ConcurrentHashMap[WriteHandle, (Queue[Task, Vector[Data]], Signal[Task, Boolean])] =
       new ConcurrentHashMap
@@ -438,6 +449,7 @@ object Mimir extends BackendModule with Logging {
         // yolo we crash because quasar
         pair <- Task.delay(Option(map.get(h)).get).liftM[MT]
         (queue, signal) = pair
+
         _ <- Task.delay(log.debug(s"close $h")).liftM[MT]
         // ask queue to stop
         _ <- queue.enqueue1(Vector.empty).liftM[MT]

@@ -199,6 +199,18 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
     } yield ()
   }
 
+  // note: this function should almost always be unnecessary, since nihdb includes the append log in snapshots
+  def flush(path: AFile): Task[Unit] = {
+    val ot = for {
+      blob <- OptionT(vfs.readPath(path))
+      head <- OptionT(vfs.headOfBlob(blob))
+      db <- OptionT(Task.delay(Option(dbs.get((blob, head)))))
+      _ <- db.cook.toTask.liftM[OptionT]
+    } yield ()
+
+    ot.getOrElse(Task.now(()))
+  }
+
   object fs {
     def listContents(dir: ADir): Task[Set[PathSegment]] = {
       vfs.ls(dir) map { paths =>
