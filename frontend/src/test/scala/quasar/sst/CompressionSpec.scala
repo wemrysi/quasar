@@ -88,9 +88,9 @@ final class CompressionSpec extends quasar.Qspec
       val unk  = unk0.map(_.umap(_.toSST))
       val msst = envT(cnt1, TypeF.map[J, S](m0, unk)).embed
       val uval = SST.fromEJson(Real(cs.size), C(ejson.nul[J]()).embed)
-      val ukey = chars.foldMap(c => SST.fromEJson(Real(1), c))
+      val ukey = chars.foldMap1Opt(c => SST.fromEJson(Real(1), c))
       val m1   = IMap.fromFoldable(IList(byte, int) strengthR nul)
-      val unk1 = (ukey, uval).some |+| unk
+      val unk1 = ukey.strengthR(uval) |+| unk
       val exp  = envT(cnt1, TypeF.map[J, S](m1, unk1)).embed
 
       msst.transCata[S](compression.coalesceKeys(2L)) must_= exp
@@ -117,11 +117,11 @@ final class CompressionSpec extends quasar.Qspec
       val ssts = sjs.toIList.map(_.toSST)
       val (matching, nonmatching) = ssts.partition(sstConst.exist(j => simpleTypeOf(j) exists (_ ≟ st)))
       val simplified = matching.map(x => envTType.set(TypeF.simple(st))(x.project).embed)
-      val coalesced = (simpleSst :: simplified).suml
+      val coalesced = NonEmptyList.nel(simpleSst, simplified).suml1
 
-      val compressed = (simpleSst :: ssts).suml.transCata[S](compression.coalescePrimary)
+      val compressed = NonEmptyList.nel(simpleSst, ssts).suml1.transCata[S](compression.coalescePrimary)
 
-      compressed must_= (coalesced :: nonmatching).suml
+      compressed must_= NonEmptyList.nel(coalesced, nonmatching).suml1
     }
 
     "combines multiple instances of a primary type in unions" >> prop {
@@ -132,13 +132,13 @@ final class CompressionSpec extends quasar.Qspec
       val cnt = TypeStat.count(Real(xs.length + 2)).some
 
       val union = envT(cnt, TypeF.union[J, S](as1, as2, xs)).embed
-      val sum   = (as1 :: as2 :: xs).suml
+      val sum   = NonEmptyList.nel(as1, as2 :: xs).suml1
 
       union.transCata[S](compression.coalescePrimary) must_= sum
     }
 
-    "no effect when a const's primary type not in the union" >> prop { ljs: IList[LeafEjs] =>
-      val sum = ljs.foldMap(_.toSST)
+    "no effect when a const's primary type not in the union" >> prop { ljs: NonEmptyList[LeafEjs] =>
+      val sum = ljs.foldMap1(_.toSST)
       sum.transCata[S](compression.coalescePrimary) must_= sum
     }
   }
@@ -161,10 +161,10 @@ final class CompressionSpec extends quasar.Qspec
       val sst1 = envT(cnt1, TypeF.map(m, u1.some)).embed
       val sst2 = envT(cnt1, TypeF.map(m, u2.some)).embed
 
-      val a = cs.foldMap { case (j, s) => (SST.fromEJson(Real(1), j), s) }
+      val a = cs.foldMap1Opt { case (j, s) => (SST.fromEJson(Real(1), j), s) }
       val b = IMap.singleton(kv1._1, kv1._2)
-      val exp1 = envT(cnt1, TypeF.map(b, (a |+| u1).some)).embed
-      val exp2 = envT(cnt1, TypeF.map(b, (a |+| u2).some)).embed
+      val exp1 = envT(cnt1, TypeF.map(b, a map (_ |+| u1))).embed
+      val exp2 = envT(cnt1, TypeF.map(b, a map (_ |+| u2))).embed
 
       (sst1.transCata[S](compression.coalesceWithUnknown) must_= exp1) and
       (sst2.transCata[S](compression.coalesceWithUnknown) must_= exp2)
@@ -191,10 +191,10 @@ final class CompressionSpec extends quasar.Qspec
       val sst1 = envT(cnt1, TypeF.map(m, u1u.some)).embed
       val sst2 = envT(cnt1, TypeF.map(m, u2u.some)).embed
 
-      val a = cs.foldMap { case (j, s) => (SST.fromEJson(Real(1), j), s) }
+      val a = cs.foldMap1Opt { case (j, s) => (SST.fromEJson(Real(1), j), s) }
       val b = IMap.singleton(kv1._1, kv1._2)
-      val exp1 = envT(cnt1, TypeF.map(b, (a |+| u1u).some)).embed
-      val exp2 = envT(cnt1, TypeF.map(b, (a |+| u2u).some)).embed
+      val exp1 = envT(cnt1, TypeF.map(b, a map (_ |+| u1u))).embed
+      val exp2 = envT(cnt1, TypeF.map(b, a map (_ |+| u2u))).embed
 
       (sst1.transCata[S](compression.coalesceWithUnknown) must_= exp1) and
       (sst2.transCata[S](compression.coalesceWithUnknown) must_= exp2)
@@ -218,15 +218,15 @@ final class CompressionSpec extends quasar.Qspec
 
   "limitArrays" >> {
     "compresses arrays longer than maxLen to the union of the members" >> prop {
-      xs: List[BigInt] => (xs.length > 1) ==> {
+      xs: NonEmptyList[BigInt] => (xs.length > 1) ==> {
 
       val alen: Positive = Positive(xs.length.toLong) getOrElse 1L
       val lt: Positive = Positive((xs.length - 1).toLong) getOrElse 1L
       val rlen = Real(xs.length).some
       val ints = xs.map(i => E(ejson.int[J](i)).embed)
-      val xsst = SST.fromEJson(Real(1), C(ejson.arr[J](ints)).embed)
+      val xsst = SST.fromEJson(Real(1), C(ejson.arr[J](ints.toList)).embed)
 
-      val sum = ints.foldMap(x => SST.fromEJson(Real(1), x))
+      val sum = ints.foldMap1(x => SST.fromEJson(Real(1), x))
       val coll = TypeStat.coll(Real(1), rlen, rlen).some
       val lubarr = envT(coll, TypeF.arr[J, S](sum.right)).embed
 
@@ -269,7 +269,7 @@ final class CompressionSpec extends quasar.Qspec
         TypeF.simple[J, S](SimpleType.Byte)
       ).embed
 
-      val union0 = (dec :: chars ::: bytes).suml
+      val union0 = NonEmptyList.nel(dec, chars ::: bytes).suml1
       val union1 = envT(union0.copoint, TypeF.union[J, S](compByte, dec, chars)).embed
 
       union0.transCata[S](compression.narrowUnion(3L)) must_= union1

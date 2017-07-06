@@ -102,23 +102,29 @@ object StructuralType extends StructuralTypeInstances {
   }
 
   /** Unfold a pair of structural types into their deep structural merge. */
-  def mergeƒ[L, V: Monoid, F[_]: Functor, T](
+  def mergeƒ[L, V: Semigroup, F[_]: Functor, T](
     implicit
     I: TypeF[L, ?] :<: F,
     F: StructuralMerge[F],
     TC: Corecursive.Aux[T, EnvT[V, F, ?]],
     TR: Recursive.Aux[T, EnvT[V, F, ?]]
-  ): ElgotCoalgebra[T \/ ?, EnvT[V, F, ?], (T, T)] =
+  ): GCoalgebra[T \/ ?, EnvT[V, F, ?], (T, T)] =
     tt => {
       val pp = tt.umap(_.project)
       F.merge[V, T](pp) getOrElse (pp match {
+        case (EnvT((v, I(TypeF.Unioned(xs)))), y @ EnvT((w, _))) =>
+          envT(v |+| w, I(TypeF.union[L, T](y.embed, xs.head, xs.tail)) map (_.left))
+
+        case (x @ EnvT((v, _)), EnvT((w, I(TypeF.Unioned(ys))))) =>
+          envT(v |+| w, I(TypeF.union[L, T](x.embed, ys.head, ys.tail)) map (_.left))
+
         case (EnvT((v, _)), EnvT((w, _))) =>
-          envT(v |+| w, I(TypeF.coproduct[L, T](tt))).embed.left
+          envT(v |+| w, I(TypeF.coproduct[L, T](tt) map (_.left)))
       })
     }
 
   /** A transform ensuring unions are disjoint by merging their members. */
-  def disjoinUnionsƒ[L, V: Monoid, F[_]: Functor, T](
+  def disjoinUnionsƒ[L, V: Semigroup, F[_]: Functor, T](
     implicit
     I: TypeF[L, ?] :<: F,
     F: StructuralMerge[F],
@@ -126,7 +132,7 @@ object StructuralType extends StructuralTypeInstances {
     TR: Recursive.Aux[T, EnvT[V, F, ?]]
   ): EnvT[V, F, T] => EnvT[V, F, T] = {
     def strictMerge(x: T, y: T): Option[T] =
-      some((x, y).elgotApo[T](mergeƒ[L, V, F, T])) filter { t =>
+      some((x, y).apo[T](mergeƒ[L, V, F, T])) filter { t =>
         I.prj(t.project.lower) all TypeF.union[L, T].isEmpty
       }
 
@@ -169,15 +175,14 @@ sealed abstract class StructuralTypeInstances extends StructuralTypeInstances0 {
         st.toCofree.project map (StructuralType(_))
     }
 
-  implicit def monoid[L: Order, V: Monoid]: Monoid[StructuralType[L, V]] =
-    new Monoid[StructuralType[L, V]] {
+  implicit def semigroup[L: Order, V: Semigroup]: Semigroup[StructuralType[L, V]] =
+    new Semigroup[StructuralType[L, V]] {
       type F[A] = TypeF[L, A]
       type T    = Cofree[F, V]
-      val norm = (_: T).transAna[T](StructuralType.disjoinUnionsƒ[L, V, F, T])
-      val zero = StructuralType(Cofree(∅[V], TypeF.bottom[L, T]()))
       def append(x: StructuralType[L, V], y: => StructuralType[L, V]) =
-        StructuralType((x.toCofree, y.toCofree).elgotApo[T](
-          StructuralType.mergeƒ[L, V, F, T] >>> (_ leftMap norm)))
+        StructuralType((x.toCofree, y.toCofree)
+          .apo[T](StructuralType.mergeƒ[L, V, F, T])
+          .transAna[T](StructuralType.disjoinUnionsƒ[L, V, F, T]))
     }
 
   implicit def comonad[L]: Comonad[StructuralType[L, ?]] =

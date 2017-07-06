@@ -47,8 +47,8 @@ final class ExtractSchemaSpec extends quasar.Qspec {
       .pipe(analysis.extractSchema[J, Double](cs))
       .toVector.headOption must beSome(equal(expected))
 
-  def ints(ns: SInt*): IList[S] =
-    IList(ns: _*) map (n =>
+  def ints(n: SInt, ns: SInt*): NonEmptyList[S] =
+    NonEmptyList(n, ns: _*) map (n =>
       envT(
         TypeStat.int(SampleStats.one(n.toDouble), BigInt(n), BigInt(n)).some,
         TypeF.const[J, S](E(e.int[J](BigInt(n))).embed)).embed)
@@ -64,11 +64,11 @@ final class ExtractSchemaSpec extends quasar.Qspec {
       TypeF.map[J, S](IMap(
         C(e.str[J]("foo")).embed -> envT(
           TypeStat.coll(1.0, 2.0.some, 2.0.some).some,
-          TypeF.arr[J, S](ints(1, 2).left)).embed,
+          TypeF.arr[J, S](ints(1, 2).list.left)).embed,
 
         C(e.str[J]("bar")).embed -> envT(
           TypeStat.coll(1.0, 3.0.some, 3.0.some).some,
-          TypeF.arr[J, S](ints(1, 2, 3).suml.right)).embed
+          TypeF.arr[J, S](ints(1, 2, 3).suml1.right)).embed
       ), None)).embed
 
     verify(settings.copy(arrayMaxLength = 2L), input, expected)

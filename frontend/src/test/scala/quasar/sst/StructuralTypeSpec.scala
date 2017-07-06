@@ -50,16 +50,16 @@ final class StructuralTypeSpec extends Spec
   def mkST(j: J): S = StructuralType.fromEJsonK[J](1, j)
 
   checkAll(propz.equal.laws[S])
-  checkAll(propz.monoid.laws[S])
+  checkAll(propz.semigroup.laws[S])
   checkAll(propz.traverse1.laws[StructuralType[J, ?]])
   // FIXME: Need Cogen
   //checkAll(propz.comonad.laws[StructuralType[J, ?]])
 
-  "structural monoid" >> {
+  "structural semigroup" >> {
     "accumulates measure for identical structure" >> prop { (ejs: J, k0: Int) =>
       val k = scala.math.abs(k0 % 100) + 1
       val st = mkST(ejs)
-      st.multiply(k) must equal(st as k)
+      Semigroup[S].multiply1(st, k) must equal(st as (k + 1))
     }
 
     "unmergeable values accumulate via union" >> prop { (x: J, y: J) =>

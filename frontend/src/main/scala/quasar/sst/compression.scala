@@ -57,7 +57,7 @@ object compression {
 
       val (kn1, unk1) = grouped.maximumBy(_.size).fold((kn, unk)) { m =>
         val toCompress = kn intersection m
-        (kn \\ toCompress, some(compressMap(toCompress)) |+| unk)
+        (kn \\ toCompress, compressMap(toCompress) |+| unk)
       }
 
       envT(ts, map[J, SST[J, A]](kn1, unk1))
@@ -109,7 +109,7 @@ object compression {
         unkPrimaries member primaryTypeOf(j)
       }
 
-      envT(ts, TypeF.map(unchanged, some(compressMap(toCompress) |+| ((k, v)))))
+      envT(ts, TypeF.map(unchanged, compressMap(toCompress) |+| some((k, v))))
   }
 
   /** Replace statically known arrays longer than the given limit with an array
@@ -121,9 +121,9 @@ object compression {
     A : Field[A],
     JR: Recursive.Aux[J, EJson]
   ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
-    case EnvT((ts, Arr(-\/(elts)))) if elts.length > maxLength.value =>
+    case EnvT((ts, Arr(-\/(elts @ ICons(h, t))))) if elts.length > maxLength.value =>
       val (cnt, len) = (size1(ts), A fromInt elts.length)
-      envT(some(TS.coll(cnt, some(len), some(len))), arr(\/-(elts.suml)))
+      envT(some(TS.coll(cnt, some(len), some(len))), arr(\/-(NonEmptyList.nel(h, t).suml1)))
   }
 
   /** Replace literal string types longer than the given limit with `char[]`. */
@@ -154,7 +154,7 @@ object compression {
 
       val compressed = primaries.maximumBy(_._2.length).fold(grouped) {
         case (pt, ssts) =>
-          grouped.insert(some(pt), ssts.foldMap(widenConst[J, A]).wrapNel)
+          grouped.insert(some(pt), ssts.foldMap1(widenConst[J, A]).wrapNel)
       }
 
       compressed.foldMap(_.list) match {
@@ -198,8 +198,8 @@ object compression {
   )(implicit
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
-  ): (SST[J, A], SST[J, A]) =
-    m.toList foldMap { case (j, sst) =>
+  ): Option[(SST[J, A], SST[J, A])] =
+    m.toList foldMap1Opt { case (j, sst) =>
       (SST.fromEJson(size1(sst.copoint), j), sst)
     }
 
