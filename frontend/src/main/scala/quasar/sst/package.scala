@@ -26,17 +26,17 @@ import matryoshka._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
-import spire.algebra.{AdditiveMonoid, Field, NRoot}
+import spire.algebra.{AdditiveSemigroup, Field, NRoot}
 import spire.math.ConvertableTo
 
 package object sst {
   type PrimaryTag = PrimaryType \/ TypeTag
   /** Statistical Structural Type */
   type TypeS[J, A]         = TypeF[J, A]
-  type SSTF2[F[_], A, B]   = EnvT[Option[TypeStat[A]], F, B]
-  type SSTF[J, A, B]       = EnvT[Option[TypeStat[A]], TypeF[J, ?], B]
-  type SST[J, A]           = StructuralType[J, Option[TypeStat[A]]]
-  type PopulationSST[J, A] = StructuralType[J, Option[TypeStat[A] @@ Population]]
+  type SSTF2[F[_], A, B]   = EnvT[TypeStat[A], F, B]
+  type SSTF[J, A, B]       = EnvT[TypeStat[A], TypeF[J, ?], B]
+  type SST[J, A]           = StructuralType[J, TypeStat[A]]
+  type PopulationSST[J, A] = StructuralType[J, TypeStat[A] @@ Population]
 
   /** Type tag indicating the tagged value represents an entire population
     * as opposed to a sample of a population.
@@ -69,8 +69,8 @@ package object sst {
         TypeStat.fromTypeFƒ(count),
         ejson.transCata[J](elideNonBinaryMetadata[J]))
 
-    def size[J, A: AdditiveMonoid](sst: SST[J, A]): A =
-      sst.copoint.fold(AdditiveMonoid[A].zero)(_.size)
+    def size[J, A: AdditiveSemigroup](sst: SST[J, A]): A =
+      sst.copoint.size
 
     ////
 

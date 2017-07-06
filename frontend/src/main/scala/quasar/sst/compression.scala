@@ -122,8 +122,8 @@ object compression {
     JR: Recursive.Aux[J, EJson]
   ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
     case EnvT((ts, Arr(-\/(elts @ ICons(h, t))))) if elts.length > maxLength.value =>
-      val (cnt, len) = (size1(ts), A fromInt elts.length)
-      envT(some(TS.coll(cnt, some(len), some(len))), arr(\/-(NonEmptyList.nel(h, t).suml1)))
+      val (cnt, len) = (ts.size, A fromInt elts.length)
+      envT(TS.coll(cnt, some(len), some(len)), arr(\/-(NonEmptyList.nel(h, t).suml1)))
   }
 
   /** Replace literal string types longer than the given limit with `char[]`. */
@@ -134,8 +134,8 @@ object compression {
     JR: Recursive.Aux[J, EJson]
   ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
     case EnvT((ts, Const(Embed(C(Str(s)))))) if s.length > maxLength.value =>
-      val (cnt, len) = (size1(ts), A fromInt s.length)
-      envT(some(TS.coll(cnt, some(len), some(len))), charArr(cnt))
+      val (cnt, len) = (ts.size, A fromInt s.length)
+      envT(TS.coll(cnt, some(len), some(len)), charArr(cnt))
   }
 
   /** Compress a union larger than `maxSize` by reducing the largest group of
@@ -173,13 +173,13 @@ object compression {
   ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
     case EnvT((ts, Const(Embed(EncodedBinary(size))))) =>
       // NB: Z85 uses 5 chars for every 4 bytes.
-      val (cnt, len) = (size1(ts), some(A.fromBigInt(size)))
-      envT(some(TS.coll(cnt, len, len)), byteArr(cnt))
+      val (cnt, len) = (ts.size, some(A.fromBigInt(size)))
+      envT(TS.coll(cnt, len, len), byteArr(cnt))
   }
 
   ////
 
-  private def sstMeasure[J, A] = StructuralType.measure[J, Option[TypeStat[A]]]
+  private def sstMeasure[J, A] = StructuralType.measure[J, TypeStat[A]]
 
   private def sstConst[J, A]: Fold[SST[J, A], J] =
     project[SST[J, A], SSTF[J, A, ?]] composeIso envTIso composeLens _2 composePrism const
@@ -191,7 +191,7 @@ object compression {
     simpleArr(cnt, SimpleType.Char)
 
   private def simpleArr[J, A](cnt: A, st: SimpleType): TypeF[J, SST[J, A]] =
-    arr[J, SST[J, A]](envT(some(TS.count(cnt)), simple[J, SST[J, A]](st)).embed.right)
+    arr[J, SST[J, A]](envT(TS.count(cnt), simple[J, SST[J, A]](st)).embed.right)
 
   private def compressMap[J: Order, A: Order: Field: ConvertableTo](
     m: J ==>> SST[J, A]
@@ -200,7 +200,7 @@ object compression {
     JR: Recursive.Aux[J, EJson]
   ): Option[(SST[J, A], SST[J, A])] =
     m.toList foldMap1Opt { case (j, sst) =>
-      (SST.fromEJson(size1(sst.copoint), j), sst)
+      (SST.fromEJson(SST.size(sst), j), sst)
     }
 
   /** Returns the SST of the primary type of the given EJson value.
@@ -212,8 +212,8 @@ object compression {
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
   ): SST[J, A] = j match {
-    case SimpleEJson(s)   => envT(some(TS.fromEJson(cnt, j)), simple[J, SST[J, A]](s)).embed
-    case Embed(C(Str(_))) => envT(some(TS.fromEJson(cnt, j)), charArr[J, A](cnt)).embed
+    case SimpleEJson(s)   => envT(TS.fromEJson(cnt, j), simple[J, SST[J, A]](s)).embed
+    case Embed(C(Str(_))) => envT(TS.fromEJson(cnt, j), charArr[J, A](cnt)).embed
     case _                => SST.fromEJson(cnt, j)
   }
 
@@ -234,9 +234,6 @@ object compression {
     }
   }
 
-  private def size1[A](ots: Option[TypeStat[A]])(implicit R: Ring[A]): A =
-    ots.cata(_.size, R.one)
-
   /** Returns the primary SST if the argument is a constant, otherwise returns
     * the argument itself.
     */
@@ -248,6 +245,6 @@ object compression {
   ): SST[J, A] =
     sstConst[J, A].headOption(sst).fold(sst) { j =>
       val ts = sstMeasure[J, A].get(sst)
-      sstMeasure[J, A].set(ts)(primarySST(size1(ts), j))
+      sstMeasure[J, A].set(ts)(primarySST(ts.size, j))
     }
 }

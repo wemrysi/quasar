@@ -25,7 +25,7 @@ import quasar.tpe.TypeF
 import matryoshka._
 import matryoshka.implicits._
 import monocle.Prism
-import scalaz._, Scalaz._, NonEmptyList.nel, Tags.Max
+import scalaz._, Scalaz._, NonEmptyList.nel
 import scalaz.std.anyVal.{char => charInst}
 import spire.algebra.{AdditiveMonoid, AdditiveSemigroup, Field, NRoot}
 import spire.math.ConvertableTo
@@ -142,26 +142,26 @@ object TypeStat extends TypeStatInstances {
     implicit
     J: Recursive.Aux[J, EJson],
     F: Field[A]
-  ): Algebra[TypeF[J, ?], Option[TypeStat[A]]] = {
-    case TypeF.Bottom()              => none
-    case TypeF.Top()                 => some(count(cnt))
-    case TypeF.Simple(_)             => some(count(cnt))
-    case TypeF.Const(j)              => some(fromEJson(cnt, j))
-    case TypeF.Arr(-\/(xs))          => some(fromFoldable(maxOr(cnt, xs), xs))
-    case TypeF.Arr(\/-(x))           => some(coll(x.cata(_.size, cnt), none, none))
-    case TypeF.Map(xs, None)         => some(fromFoldable(maxOr(cnt, xs), xs))
+  ): Algebra[TypeF[J, ?], TypeStat[A]] = {
+    case TypeF.Bottom()              => count(F.zero)
+    case TypeF.Top()                 => count(cnt)
+    case TypeF.Simple(_)             => count(cnt)
+    case TypeF.Const(j)              => fromEJson(cnt, j)
+    case TypeF.Arr(-\/(xs))          => fromFoldable(maxOr(cnt, xs), xs)
+    case TypeF.Arr(\/-(x))           => coll(x.size, none, none)
+    case TypeF.Map(xs, None)         => fromFoldable(maxOr(cnt, xs), xs)
 
     case TypeF.Map(xs, Some((a, b))) =>
-      val ys = xs.toIList
-      some(coll(maxOr(cnt, a :: b :: ys), some(F fromInt xs.size), none))
+      val n = OneAnd(a, OneAnd(b, xs)).maximumOf1(_.size)
+      coll(n, some(F fromInt xs.size), none)
 
     case TypeF.Union(a, b, cs)       => nel(a, b :: cs).suml1
   }
 
   ////
 
-  private def maxOr[F[_]: Foldable, A: Order: AdditiveSemigroup](a: A, fa: F[Option[TypeStat[A]]]): A =
-    Tag.unwrap(fa.foldMap(s => Max(s map (_.size)))) | a
+  private def maxOr[F[_]: Foldable, A: Order: AdditiveSemigroup](a: A, fa: F[TypeStat[A]]): A =
+    fa.maximumOf(_.size) | a
 }
 
 sealed abstract class TypeStatInstances {

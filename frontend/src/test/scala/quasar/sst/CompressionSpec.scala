@@ -71,8 +71,8 @@ final class CompressionSpec extends quasar.Qspec
 
   implicit val realShow: Show[Real] = Show.showFromToString
 
-  val cnt1 = TypeStat.count(Real(1)).some
-  val envTType = envTIso[Option[TypeStat[Real]], TypeF[J, ?], S] composeLens _2
+  val cnt1 = TypeStat.count(Real(1))
+  val envTType = envTIso[TypeStat[Real], TypeF[J, ?], S] composeLens _2
   val sstConst = project[S, SSTF[J, Real, ?]] composeLens envTType composePrism TypeF.const
 
   "coalesceKeys" >> {
@@ -129,7 +129,7 @@ final class CompressionSpec extends quasar.Qspec
       val as1 = SST.fromEJson(Real(1), C(ejson.arr[J](a1.toList)).embed)
       val as2 = SST.fromEJson(Real(1), C(ejson.arr[J](a2.toList)).embed)
       val xs  = sts.list.map(st => envT(cnt1, TypeF.simple[J, S](st)).embed)
-      val cnt = TypeStat.count(Real(xs.length + 2)).some
+      val cnt = TypeStat.count(Real(xs.length + 2))
 
       val union = envT(cnt, TypeF.union[J, S](as1, as2, xs)).embed
       val sum   = NonEmptyList.nel(as1, as2 :: xs).suml1
@@ -152,7 +152,7 @@ final class CompressionSpec extends quasar.Qspec
       val u1 = head.leftAs(SST.fromEJson(Real(1), E(ejson.char[J]('x')).embed)).map(_.toSST)
       val u2 = head.bimap(c =>
         envT(
-          TypeStat.fromEJson(Real(1), E(ejson.char[J](c)).embed).some,
+          TypeStat.fromEJson(Real(1), E(ejson.char[J](c)).embed),
           TypeF.simple[J, S](SimpleType.Char)).embed,
         _.toSST)
       val kv1 = kv.bimap(i => E(ejson.int[J](i)).embed, _.toSST)
@@ -178,7 +178,7 @@ final class CompressionSpec extends quasar.Qspec
       val u1 = head.leftAs(SST.fromEJson(Real(1), E(ejson.char[J]('x')).embed)).map(_.toSST)
       val u2 = head.bimap(c =>
         envT(
-          TypeStat.fromEJson(Real(1), E(ejson.char[J](c)).embed).some,
+          TypeStat.fromEJson(Real(1), E(ejson.char[J](c)).embed),
           TypeF.simple[J, S](SimpleType.Char)).embed,
         _.toSST)
       val st = envT(cnt1, TypeF.simple[J, S](SimpleType.Dec)).embed
@@ -227,7 +227,7 @@ final class CompressionSpec extends quasar.Qspec
       val xsst = SST.fromEJson(Real(1), C(ejson.arr[J](ints.toList)).embed)
 
       val sum = ints.foldMap1(x => SST.fromEJson(Real(1), x))
-      val coll = TypeStat.coll(Real(1), rlen, rlen).some
+      val coll = TypeStat.coll(Real(1), rlen, rlen)
       val lubarr = envT(coll, TypeF.arr[J, S](sum.right)).embed
 
       val req = xsst.transCata[S](compression.limitArrays(alen))
@@ -245,7 +245,7 @@ final class CompressionSpec extends quasar.Qspec
       val str  = SST.fromEJson(Real(1), C(ejson.str[J](s)).embed)
 
       val char = envT(cnt1, TypeF.simple[J, S](SimpleType.Char)).embed
-      val coll = TypeStat.coll(Real(1), rlen, rlen).some
+      val coll = TypeStat.coll(Real(1), rlen, rlen)
       val arr  = envT(coll, TypeF.arr[J, S](char.right)).embed
 
       val req = str.transCata[S](compression.limitStrings(plen))
@@ -265,7 +265,7 @@ final class CompressionSpec extends quasar.Qspec
       val dec = SST.fromEJson(Real(1), C(ejson.dec[J](d1)).embed)
 
       val compByte = envT(
-        bytes.foldMap(_.copoint),
+        bytes.foldMap1Opt(_.copoint) | TypeStat.count(Real(0)),
         TypeF.simple[J, S](SimpleType.Byte)
       ).embed
 
@@ -299,7 +299,7 @@ final class CompressionSpec extends quasar.Qspec
 
       val byte    = envT(cnt1, TypeF.simple[J, S](SimpleType.Byte)).embed
       val rsize   = Real(bytes.size).some
-      val coll    = TypeStat.coll(Real(1), rsize, rsize).some
+      val coll    = TypeStat.coll(Real(1), rsize, rsize)
       val barr    = envT(coll, TypeF.arr[J, S](byte.right)).embed
 
       sst.transCata[S](compression.z85EncodedBinary) must_= barr
