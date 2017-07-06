@@ -110,7 +110,7 @@ package object qscript {
       case other => planMapFunc[T, F, FMT, Hole](other.embed)(κ(src))
     }
 
-  def mergeXQuery[T[_[_]]: RecursiveT, F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT](
+  def mergeXQuery[T[_[_]]: BirecursiveT, F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT](
     jf: JoinFunc[T],
     l: XQuery,
     r: XQuery
@@ -122,7 +122,7 @@ package object qscript {
       case RightSide => r
     }
 
-  def planMapFunc[T[_[_]]: BirecursiveT, F[_]: Monad, FMT, A](
+  def planMapFunc[T[_[_]]: BirecursiveT, F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, A](
     freeMap: FreeMapA[T, A])(
     recover: A => XQuery
   )(implicit
