@@ -148,9 +148,6 @@ object Mimir extends BackendModule with Logging {
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       cp: T[QSM[T, ?]]): Backend[Repr] = {
 
-    val MFC = quasar.qscript.MFC[T]
-    val MFD = quasar.qscript.MFD[T]
-
 // M = Backend
 // F[_] = MapFuncCore[T, ?]
 // B = Repr

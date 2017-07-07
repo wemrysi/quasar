@@ -20,23 +20,12 @@ import quasar.fp.ski._
 import quasar.qscript.{ExpandMapFunc, MapFuncCore, MapFuncDerived}
 
 import matryoshka._
-import matryoshka.data._
-import matryoshka.implicits._
-import matryoshka.patterns._
-
-import scalaz.{Free, Monad}
+import scalaz.Monad
 
 final class MapFuncDerivedPlanner[T[_[_]]: BirecursiveT, F[_]: Monad]
   (core: Planner[T, F, MapFuncCore[T, ?]])
   extends Planner[T, F, MapFuncDerived[T, ?]] {
 
-  private def planDerived(cake: Precog): AlgebraM[(Option ∘ F)#λ, MapFuncDerived[T, ?], cake.trans.TransSpec1] = κ(None)
-
-  def plan(cake: Precog): AlgebraM[F, MapFuncDerived[T, ?], cake.trans.TransSpec1] = { f =>
-    planDerived(cake)(f).getOrElse(
-      Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(
-        interpretM(implicitly[Monad[F]].point[cake.trans.TransSpec1](_), core.plan(cake))
-      )
-    )
-  }
+  def plan(cake: Precog): AlgebraM[F, MapFuncDerived[T, ?], cake.trans.TransSpec1] =
+    ExpandMapFunc.expand(core.plan(cake), κ(None))
 }

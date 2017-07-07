@@ -27,7 +27,6 @@ import quasar.std.TemporalPart
 
 import java.time._, ZoneOffset.UTC
 import scala.math
-import scala.Predef.implicitly
 
 import matryoshka._
 import matryoshka.data.free._
@@ -63,16 +62,8 @@ object CoreMap extends Serializable {
     _.run.fold(changeCore, changeDerived)
 
   def changeDerived[T[_[_]]: BirecursiveT, A]
-      : AlgebraM[PlannerError \/ ?, MapFuncDerived[T, ?], A => Data] = {
-    val doChange: AlgebraM[(Option ∘ (PlannerError \/ ?))#λ[?], MapFuncDerived[T, ?], A => Data] =
-      { _ => None }
-
-    { f => doChange(f).getOrElse(
-        Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(
-          interpretM(implicitly[Monad[PlannerError \/ ?]].point[A => Data](_), changeCore)
-        )
-    )}
-  }
+      : AlgebraM[PlannerError \/ ?, MapFuncDerived[T, ?], A => Data] =
+    ExpandMapFunc.expand(changeCore, κ(None))
 
   def changeCore[T[_[_]]: RecursiveT, A]
       : AlgebraM[PlannerError \/ ?, MapFuncCore[T, ?], A => Data] = {
