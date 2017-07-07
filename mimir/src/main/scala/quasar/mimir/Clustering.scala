@@ -634,7 +634,7 @@ trait ClusteringLibModule[M[+ _]] extends ColumnarTableModule[M] with AssignClus
       }
 
       def morph1Apply(ks: List[Int]): Morph1Apply = new Morph1Apply {
-        def apply(table0: Table, ctx: MorphContext): M[Table] = {
+        def apply(table0: Table): M[Table] = {
           val table = table0.transform(DerefObjectStatic(trans.DeepMap1(TransSpec1.Id, cf.util.CoerceToDouble), paths.Value))
 
           val defaultNumber = new java.util.concurrent.atomic.AtomicInteger(1)

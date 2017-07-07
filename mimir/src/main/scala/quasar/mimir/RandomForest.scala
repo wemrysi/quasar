@@ -621,7 +621,7 @@ trait RandomForestLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       def morph1Apply(forests: Seq[(JType, F)]) = new Morph1Apply {
         import TransSpecModule._
 
-        def apply(table: Table, ctx: MorphContext): M[Table] = {
+        def apply(table: Table): M[Table] = {
 
           lazy val models: Map[String, (JType, F)] = forests.zipWithIndex.map({
             case (elem, i) =>

@@ -62,6 +62,13 @@ sealed trait RValue { self =>
 }
 
 object RValue {
+  def toCValue(rvalue: RValue): Option[CValue] = rvalue match {
+    case cvalue: CValue => Some(cvalue)
+    case RArray.empty   => Some(CEmptyArray)
+    case RObject.empty  => Some(CEmptyObject)
+    case _              => None
+  }
+
   def fromJValue(jv: JValue): RValue = jv match {
     case JObject(fields)  => RObject(fields mapValues fromJValue toMap)
     case JArray(elements) => RArray(elements map fromJValue)

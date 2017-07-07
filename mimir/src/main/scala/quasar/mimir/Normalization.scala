@@ -130,7 +130,7 @@ trait NormalizationHelperModule[M[+ _]] extends ColumnarTableLibModule[M] with R
         }
       }
 
-      def applyMapper(summary: Result, mapper: Summary => CMapper[M], table: Table, ctx: MorphContext): M[Table] = {
+      def applyMapper(summary: Result, mapper: Summary => CMapper[M], table: Table): M[Table] = {
         val resultTables = summary map {
           case singleSummary =>
             val spec = liftToValues(trans.MapWith(trans.TransSpec1.Id, mapper(singleSummary)))
@@ -232,11 +232,11 @@ trait NormalizationLibModule[M[+ _]] extends NormalizationHelperModule[M] {
 
       def morph1Apply(summary: Result) = new Morph1Apply {
 
-        def apply(table: Table, ctx: MorphContext): M[Table] = {
+        def apply(table: Table): M[Table] = {
           def makeValue(info: RowValueWithStats): BigDecimal =
             (info.rowValue - info.stats.mean) / info.stats.stdDev
 
-          applyMapper(summary, normMapper(makeValue), table, ctx)
+          applyMapper(summary, normMapper(makeValue), table)
         }
       }
     }
@@ -246,11 +246,11 @@ trait NormalizationLibModule[M[+ _]] extends NormalizationHelperModule[M] {
 
       def morph1Apply(summary: Result) = new Morph1Apply {
 
-        def apply(table: Table, ctx: MorphContext): M[Table] = {
+        def apply(table: Table): M[Table] = {
           def makeValue(info: RowValueWithStats): BigDecimal =
             (info.rowValue * info.stats.stdDev) + info.stats.mean
 
-          applyMapper(summary, normMapper(makeValue), table, ctx)
+          applyMapper(summary, normMapper(makeValue), table)
         }
       }
     }
