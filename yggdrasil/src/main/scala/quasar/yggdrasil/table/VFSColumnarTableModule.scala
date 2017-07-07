@@ -218,7 +218,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
       }
     }
 
-    def fileExists(file: AFile): Task[Boolean] = vfs.exists(file)
+    def exists(path: APath): Task[Boolean] = vfs.exists(path)
 
     def moveFile(from: AFile, to: AFile, semantics: MoveSemantics): Task[Boolean] =
       vfs.moveFile(from, to, semantics)

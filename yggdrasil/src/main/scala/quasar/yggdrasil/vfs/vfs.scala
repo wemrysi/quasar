@@ -28,7 +28,7 @@ import fs2.util.Async
 
 import pathy.Path
 
-import scalaz.{~>, :<:, Coproduct, Free, Monad, NaturalTransformation, StateT}
+import scalaz.{-\/, \/-, ~>, :<:, Coproduct, Free, Monad, NaturalTransformation, StateT}
 import scalaz.concurrent.Task
 import scalaz.std.list._
 import scalaz.std.map._
@@ -211,8 +211,15 @@ object FreeVFS {
     } yield back
   }
 
-  def exists[F[_]: Monad](path: AFile): StateT[F, VFS, Boolean] =
-    StateTContrib.get[F, VFS].map(_.paths.contains(path))
+  def exists[F[_]: Monad](path: APath): StateT[F, VFS, Boolean] = {
+    Path.refineType(path) match {
+      case -\/(dir) =>
+        StateTContrib.get[F, VFS].map(_.index.contains(dir))
+
+      case \/-(file) =>
+        StateTContrib.get[F, VFS].map(_.paths.contains(file))
+    }
+  }
 
   def ls[F[_]: Monad](parent: ADir): StateT[F, VFS, List[RPath]] = {
     StateTContrib.get[F, VFS] map { vfs =>
@@ -452,7 +459,7 @@ final class SerialVFS private (
   def scratch: Task[Blob] =
     runST(FreeVFS.scratch[S])
 
-  def exists(path: AFile): Task[Boolean] =
+  def exists(path: APath): Task[Boolean] =
     runST(FreeVFS.exists[POSIXWithTask](path))
 
   def ls(parent: ADir): Task[List[RPath]] =

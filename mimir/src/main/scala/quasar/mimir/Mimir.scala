@@ -62,6 +62,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 object Mimir extends BackendModule with Logging {
   import FileSystemError._
+  import PathError._
 
   // pessimistically equal to couchbase's
   type QS[T[_[_]]] =
@@ -363,11 +364,23 @@ object Mimir extends BackendModule with Logging {
 
     def explain(repr: Repr): Backend[String] = "🤹".point[Backend]
 
-    def listContents(dir: ADir): Backend[Set[PathSegment]] =
-      cake[M].liftB.flatMap(_.fs.listContents(dir).liftM[MT].liftB)
+    def listContents(dir: ADir): Backend[Set[PathSegment]] = {
+      for {
+        precog <- cake[Backend]
+
+        exists <- precog.fs.exists(dir).liftM[MT].liftB
+
+        _ <- if (exists)
+          ().point[Backend]
+        else
+          MonadError_[Backend, FileSystemError].raiseError(pathErr(pathNotFound(dir)))
+
+        back <- precog.fs.listContents(dir).liftM[MT].liftB
+      } yield back
+    }
 
     def fileExists(file: AFile): Configured[Boolean] =
-      cake[M].flatMap(_.fs.fileExists(file).liftM[MT]).liftM[ConfiguredT]
+      cake[M].flatMap(_.fs.exists(file).liftM[MT]).liftM[ConfiguredT]
   }
 
   object ReadFileModule extends ReadFileModule {
@@ -508,17 +521,84 @@ object Mimir extends BackendModule with Logging {
 
     // TODO directory moving and varying semantics
     def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = {
+      val semantics2 =
+        semantics match {
+          case MoveSemantics.Overwrite =>
+            quasar.yggdrasil.vfs.MoveSemantics.Overwrite
+
+          case MoveSemantics.FailIfExists =>
+            quasar.yggdrasil.vfs.MoveSemantics.FailIfExists
+
+          case MoveSemantics.FailIfMissing =>
+            quasar.yggdrasil.vfs.MoveSemantics.FailIfMissing
+        }
+
       scenario.fold(
         d2d = { (from, to) =>
-          cake[M].flatMap(_.fs.moveDir(from, to).void.liftM[MT]).liftB
+          for {
+            precog <- cake[Backend]
+
+            exists <- precog.fs.exists(from).liftM[MT].liftB
+
+            _ <- if (exists)
+              ().point[Backend]
+            else
+              MonadError_[Backend, FileSystemError].raiseError(pathErr(pathNotFound(from)))
+
+            result <- precog.fs.moveDir(from, to, semantics2).liftM[MT].liftB
+
+            _ <- if (result) {
+              ().point[Backend]
+            } else {
+              val error = semantics match {
+                case MoveSemantics.FailIfMissing => pathNotFound(to)
+                case _ => pathExists(to)
+              }
+
+              MonadError_[Backend, FileSystemError].raiseError(pathErr(error))
+            }
+          } yield ()
         },
         f2f = { (from, to) =>
-          cake[M].flatMap(_.fs.moveFile(from, to).void.liftM[MT]).liftB
+          for {
+            precog <- cake[Backend]
+
+            exists <- precog.fs.exists(from).liftM[MT].liftB
+
+            _ <- if (exists)
+              ().point[Backend]
+            else
+              MonadError_[Backend, FileSystemError].raiseError(pathErr(pathNotFound(from)))
+
+            result <- precog.fs.moveFile(from, to, semantics2).liftM[MT].liftB
+
+            _ <- if (result) {
+              ().point[Backend]
+            } else {
+              val error = semantics match {
+                case MoveSemantics.FailIfMissing => pathNotFound(to)
+                case _ => pathExists(to)
+              }
+
+              MonadError_[Backend, FileSystemError].raiseError(pathErr(error))
+            }
+          } yield ()
         })
     }
 
     def delete(path: APath): Backend[Unit] = {
-      cake[M].flatMap(_.fs.delete(path).void.liftM[MT]).liftB
+      for {
+        precog <- cake[Backend]
+
+        exists <- precog.fs.exists(path).liftM[MT].liftB
+
+        _ <- if (exists)
+          ().point[Backend]
+        else
+          MonadError_[Backend, FileSystemError].raiseError(pathErr(pathNotFound(path)))
+
+        _ <- precog.fs.delete(path).liftM[MT].liftB
+      } yield ()
     }
 
     def tempFile(near: APath): Backend[AFile] = {
