@@ -108,9 +108,9 @@ object data {
       "dstPath" := posixCodec.unsafePrintPath(rf)).left
     UriPathCodec.parsePath(
       absPathRequired,
-      sandboxAbs(_).right,
+      unsafeSandboxAbs(_).right,
       absPathRequired,
-      sandboxAbs(_).right
+      unsafeSandboxAbs(_).right
     )(dstString)
   }
 

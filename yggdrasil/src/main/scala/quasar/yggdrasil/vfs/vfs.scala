@@ -16,7 +16,7 @@
 
 package quasar.yggdrasil.vfs
 
-import quasar.contrib.pathy.{sandboxAbs, ADir, AFile, APath, RPath}
+import quasar.contrib.pathy.{unsafeSandboxAbs, ADir, AFile, APath, RPath}
 import quasar.contrib.scalaz.stateT, stateT._
 
 import argonaut.{Argonaut, Parse}
@@ -165,7 +165,7 @@ object FreeVFS {
 
             paths = pathsFromStrings flatMap {
               case (k, v) =>
-                val maybe = Path.posixCodec.parseAbsFile(k).map(sandboxAbs)
+                val maybe = Path.posixCodec.parseAbsFile(k).map(unsafeSandboxAbs)
                 maybe.fold(Map[AFile, Blob]())(k => Map(k -> v))
             }
 
@@ -178,7 +178,7 @@ object FreeVFS {
 
             index = indexFromStrings flatMap {
               case (k, v) =>
-                val maybe = Path.posixCodec.parseAbsDir(k).map(sandboxAbs)
+                val maybe = Path.posixCodec.parseAbsDir(k).map(unsafeSandboxAbs)
 
                 maybe.fold(Map[ADir, Vector[RPath]]())(k => Map(k -> v))
             }
