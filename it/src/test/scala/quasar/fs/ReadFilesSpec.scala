@@ -117,7 +117,8 @@ class ReadFilesSpec extends FileSystemTest[AnalyticalFileSystem](FileSystemTest.
         r.run_\/ must_= Vector.empty.right
       }
 
-      "scan with offset k > 0 and no limit skips first k data" >> {
+      // disabled for mimir, not because it doesn't work, but because it's absurdly slow
+      "scan with offset k > 0 and no limit skips first k data" >> pendingFor(fs)(Set("mimir")) {
         prop { k: Int Refined RPositive =>
           val rFull = runLogT(run, read.scan(smallFile.file, 0L, None)).run_\/
           val r     = runLogT(run, read.scan(smallFile.file, widenPositive(k), None)).run_\/
