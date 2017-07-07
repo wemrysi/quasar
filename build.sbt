@@ -55,9 +55,11 @@ lazy val buildSettings = commonBuildSettings ++ Seq(
     Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
     Wart.Nothing),              // - see wartremover/wartremover#263
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
-  testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive")),
+  testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive", "showtimes")),
   // Exclusive tests include only those tagged with 'exclusive'.
-  testOptions in ExclusiveTests := Seq(Tests.Argument(Specs2, "include", "exclusive")),
+  testOptions in ExclusiveTests := Seq(Tests.Argument(Specs2, "include", "exclusive", "showtimes")),
+
+  logBuffered in Test := false,
 
   console := { (console in Test).value }) // console alias test:console
 
