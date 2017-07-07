@@ -59,7 +59,7 @@ lazy val buildSettings = commonBuildSettings ++ Seq(
   // Exclusive tests include only those tagged with 'exclusive'.
   testOptions in ExclusiveTests := Seq(Tests.Argument(Specs2, "include", "exclusive", "showtimes")),
 
-  logBuffered in Test := false,
+  logBuffered in Test := isTravisBuild.value,
 
   console := { (console in Test).value }) // console alias test:console
 
