@@ -295,7 +295,6 @@ object Mimir extends BackendModule with Logging {
     private val map = new ConcurrentHashMap[ResultHandle, Precog#TablePager]
     private val cur = new AtomicLong(0L)
 
-    // this is an awful function. there's literally no backpressure
     def executePlan(repr: Repr, out: AFile): Backend[AFile] = {
       val path = fileToPath(out)
 
@@ -319,11 +318,11 @@ object Mimir extends BackendModule with Logging {
 
         ingestor = repr.P.ingest(path, q.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits)).run
 
-        // generally this function is bad news
+        // generally this function is bad news (TODO provide a way to ingest as a Stream)
         _ <- Task.gatherUnordered(Seq(populatorWithTermination, ingestor))
       } yield ()
 
-      Task.delay(driver.unsafePerformAsync(_ => ())).map(_ => out).liftM[MT].liftB
+      driver.map(_ => out).liftM[MT].liftB
     }
 
     def evaluatePlan(repr: Repr): Backend[ResultHandle] = {
