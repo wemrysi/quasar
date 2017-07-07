@@ -17,7 +17,6 @@
 package quasar.mimir
 
 import quasar.precog.common._
-import quasar.yggdrasil.execution.EvaluationContext
 
 import scalaz.Need
 
@@ -26,9 +25,8 @@ trait StaticInlinerSpecs[M[+_]] extends EvaluatorSpecification[M] {
   import dag._
   import instructions._
 
-  object inliner extends StdLibStaticInliner with StdLibOpFinder {
-    def MorphContext(ctx: EvaluationContext, node: DepGraph): MorphContext = new MorphContext(ctx, null)
-  }
+  object inliner extends StdLibStaticInliner with StdLibOpFinder
+
   import inliner._
 
   "static inlining of Root computation" should {
