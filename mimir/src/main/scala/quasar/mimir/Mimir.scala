@@ -55,8 +55,8 @@ import delorean._
 import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.Random
 
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -603,7 +603,7 @@ object Mimir extends BackendModule with Logging {
 
     def tempFile(near: APath): Backend[AFile] = {
       for {
-        seed <- Task.delay(Random.nextLong.toString).liftM[MT].liftB
+        seed <- Task.delay(UUID.randomUUID().toString).liftM[MT].liftB
       } yield refineType(near).fold(p => p, fileParent) </> file(seed)
     }
   }
