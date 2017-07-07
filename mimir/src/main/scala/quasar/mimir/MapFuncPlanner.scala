@@ -21,28 +21,28 @@ import quasar.qscript.{MapFuncCore, MapFuncDerived}
 import matryoshka.{AlgebraM, BirecursiveT, RecursiveT}
 import scalaz.{Applicative, Coproduct, Monad}
 
-abstract class Planner[T[_[_]], F[_]: Applicative, QS[_]] {
+abstract class MapFuncPlanner[T[_[_]], F[_]: Applicative, QS[_]] {
   def plan(cake: Precog): AlgebraM[F, QS, cake.trans.TransSpec1]
 }
 
-object Planner {
+object MapFuncPlanner {
   def apply[T[_[_]], F[_], QS[_]]
-    (implicit ev: Planner[T, F, QS]): Planner[T, F, QS] =
+    (implicit ev: MapFuncPlanner[T, F, QS]): MapFuncPlanner[T, F, QS] =
     ev
 
   implicit def coproduct[T[_[_]], F[_]: Applicative, G[_], H[_]]
-    (implicit G: Planner[T, F, G], H: Planner[T, F, H])
-      : Planner[T, F, Coproduct[G, H, ?]] =
-    new Planner[T, F, Coproduct[G, H, ?]] {
+    (implicit G: MapFuncPlanner[T, F, G], H: MapFuncPlanner[T, F, H])
+      : MapFuncPlanner[T, F, Coproduct[G, H, ?]] =
+    new MapFuncPlanner[T, F, Coproduct[G, H, ?]] {
       def plan(cake: Precog): AlgebraM[F, Coproduct[G, H, ?], cake.trans.TransSpec1] =
         _.run.fold(G.plan(cake), H.plan(cake))
     }
 
   implicit def mapFuncCore[T[_[_]]: RecursiveT, F[_]: Applicative]
-    : Planner[T, F, MapFuncCore[T, ?]] =
+    : MapFuncPlanner[T, F, MapFuncCore[T, ?]] =
     new MapFuncCorePlanner[T, F]
 
   implicit def mapFuncDerived[T[_[_]]: BirecursiveT, F[_]: Monad]
-    : Planner[T, F, MapFuncDerived[T, ?]] =
+    : MapFuncPlanner[T, F, MapFuncDerived[T, ?]] =
     new MapFuncDerivedPlanner[T, F](mapFuncCore)
 }

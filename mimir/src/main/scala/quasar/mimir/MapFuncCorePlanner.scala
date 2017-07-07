@@ -31,7 +31,7 @@ import scalaz.Applicative
 import scalaz.syntax.applicative._
 
 final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
-  extends Planner[T, F, MapFuncCore[T, ?]] {
+  extends MapFuncPlanner[T, F, MapFuncCore[T, ?]] {
   def plan(cake: Precog): AlgebraM[F, MapFuncCore[T, ?], cake.trans.TransSpec1] = {
     import cake.trans._
     {

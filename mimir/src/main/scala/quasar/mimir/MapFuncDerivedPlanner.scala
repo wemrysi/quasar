@@ -23,8 +23,8 @@ import matryoshka._
 import scalaz.Monad
 
 final class MapFuncDerivedPlanner[T[_[_]]: BirecursiveT, F[_]: Monad]
-  (core: Planner[T, F, MapFuncCore[T, ?]])
-  extends Planner[T, F, MapFuncDerived[T, ?]] {
+  (core: MapFuncPlanner[T, F, MapFuncCore[T, ?]])
+  extends MapFuncPlanner[T, F, MapFuncDerived[T, ?]] {
 
   def plan(cake: Precog): AlgebraM[F, MapFuncDerived[T, ?], cake.trans.TransSpec1] =
     ExpandMapFunc.expand(core.plan(cake), κ(None))
