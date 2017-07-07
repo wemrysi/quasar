@@ -604,7 +604,7 @@ object Mimir extends BackendModule with Logging {
     def tempFile(near: APath): Backend[AFile] = {
       for {
         seed <- Task.delay(Random.nextLong.toString).liftM[MT].liftB
-      } yield parentDir(near).get </> file(seed)
+      } yield refineType(near).fold(p => p, fileParent) </> file(seed)
     }
   }
 }
