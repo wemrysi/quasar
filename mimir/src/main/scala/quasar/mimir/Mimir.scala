@@ -32,7 +32,6 @@ import quasar.qscript._
 
 import quasar.blueeyes.json.{JNum, JValue}
 import quasar.precog.common.{Path, RValue}
-import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
 
 import fs2.{async, Stream}
@@ -246,7 +245,10 @@ object Mimir extends BackendModule with Logging {
                     val et =
                       P.Table.constString(Set(pathStr)).load(apiKey, JType.JUniverseT).mapT(_.toTask)
 
-                    et.mapT(_.liftM[MT]).leftMap(toFSError)
+                    et.mapT(_.liftM[MT]) leftMap { err =>
+                      val msg = err.messages.toList.reduce(_ + ";" + _)
+                      readFailed(posixCodec.printPath(path), msg)
+                    }
                   }
                 })
           } yield {
@@ -286,15 +288,6 @@ object Mimir extends BackendModule with Logging {
 
   private def dirToPath(dir: ADir): Path = Path(pathy.Path.posixCodec.printPath(dir))
   private def fileToPath(file: AFile): Path = Path(pathy.Path.posixCodec.printPath(file))
-
-  private def toFSError: ResourceError => FileSystemError = {
-    case ResourceError.Corrupt(msg) => ???
-    case ResourceError.IOError(ex) => ???
-    case ResourceError.IllegalWriteRequestError(msg) => ???
-    case ResourceError.PermissionsError(msg) => ???
-    case ResourceError.NotFound(msg) => ???
-    case ResourceError.ResourceErrors(errs) => ???
-  }
 
   object QueryFileModule extends QueryFileModule {
     import QueryFile._
@@ -395,10 +388,16 @@ object Mimir extends BackendModule with Logging {
         handle <- Task.delay(ReadHandle(file, cur.getAndIncrement())).liftM[MT].liftB
 
         target = precog.Table.constString(Set(posixCodec.printPath(file)))
-        loader = precog.Table.load(target, JType.JUniverseT).mapT(_.toTask.liftM[MT]).leftMap(toFSError)
-        table <- loader.mapT(_.liftM[ConfiguredT].liftM[PhaseResultT]): Backend[precog.Table]
 
-        limited = table.takeRange(offset.value, limit.fold(slamdata.Predef.Int.MaxValue.toLong)(_.value))
+        // apparently read on a non-existent file is equivalent to reading the empty file??!!
+        eitherTable <- precog.Table.load(target, JType.JUniverseT).mapT(_.toTask).run.liftM[MT].liftB
+        table = eitherTable.fold(_ => precog.Table.empty, table => table)
+
+        limited = if (offset.value == 0L && !limit.isDefined)
+          table
+        else
+          table.takeRange(offset.value, limit.fold(slamdata.Predef.Int.MaxValue.toLong)(_.value))
+
         projected = limited.transform(precog.trans.constants.SourceValue.Single)
 
         pager <- precog.TablePager(projected).liftM[MT].liftB
