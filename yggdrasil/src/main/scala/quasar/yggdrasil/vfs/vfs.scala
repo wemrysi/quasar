@@ -239,11 +239,11 @@ object FreeVFS {
     } yield success
   }
 
-  def moveFile[S[_]](from: AFile, to: AFile)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
+  def moveFile[S[_]](from: AFile, to: AFile, semantics: MoveSemantics)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
     for {
       vfs <- StateTContrib.get[Free[S, ?], VFS]
 
-      success <- if (vfs.paths.contains(from) && !vfs.paths.contains(to)) {
+      success <- if (vfs.paths.contains(from) && semantics(vfs.paths.contains(to))) {
         // we could delegate to delete >> link, but that would persist metadata twice
         val blob = vfs.paths(from)
         val paths2 = vfs.paths - from + (to -> blob)
@@ -260,18 +260,33 @@ object FreeVFS {
     } yield success
   }
 
-  def moveDir[S[_]](from: ADir, to: ADir)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
+  def moveDir[S[_]](from: ADir, to: ADir, semantics: MoveSemantics)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
     for {
-      leaves <- reparentLeaves[Free[S, ?]](from, to)
-
       vfs <- StateTContrib.get[Free[S, ?], VFS]
-      index2 = computeIndex(vfs.paths.keys.toList)
 
-      metaLog2 <- persistMeta[S](vfs.paths, index2).exec(vfs.metaLog).liftM[ST]
+      // TODO overwrite file with dir
+      success <- if (vfs.index.contains(from) && semantics(vfs.index.contains(to))) {
+        for {
+          // remove all pre-existing directories
+          _ <- if (vfs.index.contains(to))
+            deleteDir[S](to, false)
+          else
+            ().point[ST[Free[S, ?], ?]]
 
-      _ <- StateTContrib.put[Free[S, ?], VFS](
-        vfs.copy(index = index2, metaLog = metaLog2))
-    } yield true
+          leaves <- reparentLeaves[Free[S, ?]](from, to)
+          vfs2 <- StateTContrib.get[Free[S, ?], VFS]
+
+          index2 = computeIndex(vfs2.paths.keys.toList)
+
+          metaLog2 <- persistMeta[S](vfs2.paths, index2).exec(vfs2.metaLog).liftM[ST]
+
+          _ <- StateTContrib.put[Free[S, ?], VFS](
+            vfs2.copy(index = index2, metaLog = metaLog2))
+        } yield true
+      } else {
+        false.point[ST[Free[S, ?], ?]]
+      }
+    } yield success
   }
 
   def reparentLeaves[F[_]: Monad](from: ADir, to: ADir): StateT[F, VFS, Unit] = {
@@ -296,53 +311,58 @@ object FreeVFS {
     } yield ()
   }
 
-  def delete[S[_]](target: APath)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
-    def deleteFile(target: AFile) = {
-      for {
-        vfs <- StateTContrib.get[Free[S, ?], VFS]
+  def delete[S[_]](target: APath)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] =
+    Path.refineType(target).fold(deleteDir[S](_), deleteFile[S](_))
 
-        success <- if (vfs.paths.contains(target)) {
-          val paths2 = vfs.paths - target
-          val index2 = computeIndex(paths2.keys.toList)
+  private def deleteFile[S[_]](target: AFile)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
+    for {
+      vfs <- StateTContrib.get[Free[S, ?], VFS]
 
-          for {
-            metaLog2 <- persistMeta[S](paths2, index2).exec(vfs.metaLog).liftM[ST]
-            vfs2 = vfs.copy(metaLog = metaLog2, paths = paths2, index = index2)
-            _ <- StateTContrib.put[Free[S, ?], VFS](vfs2)
-          } yield true
-        } else {
-          false.point[ST[Free[S, ?], ?]]
-        }
-      } yield success
-    }
+      success <- if (vfs.paths.contains(target)) {
+        val paths2 = vfs.paths - target
+        val index2 = computeIndex(paths2.keys.toList)
 
-    def deleteDir(dir: ADir): StateT[Free[S, ?], VFS, Boolean] = {
-      for {
-        vfs <- StateTContrib.get[Free[S, ?], VFS]
+        for {
+          metaLog2 <- persistMeta[S](paths2, index2).exec(vfs.metaLog).liftM[ST]
+          vfs2 = vfs.copy(metaLog = metaLog2, paths = paths2, index = index2)
+          _ <- StateTContrib.put[Free[S, ?], VFS](vfs2)
+        } yield true
+      } else {
+        false.point[ST[Free[S, ?], ?]]
+      }
+    } yield success
+  }
 
-        _ <- vfs.index.getOrElse(dir, Vector.empty) traverse { child =>
-          Path.refineType(child).fold[StateT[Free[S, ?], VFS, Boolean]](
-            d => deleteDir(dir </> d),
-            { f =>
-              for {
-                vfs <- StateTContrib.get[Free[S, ?], VFS]
-                paths2 = vfs.paths - (dir </> f)
-                _ <- StateTContrib.put[Free[S, ?], VFS](vfs.copy(paths = paths2))
-              } yield true
-            })
-        }
+  private def deleteDir[S[_]](dir: ADir, persist: Boolean = true)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VFS, Boolean] = {
+    for {
+      vfs <- StateTContrib.get[Free[S, ?], VFS]
 
-        // get the new one
-        vfs2 <- StateTContrib.get[Free[S, ?], VFS]
+      _ <- vfs.index.getOrElse(dir, Vector.empty) traverse { child =>
+        Path.refineType(child).fold[StateT[Free[S, ?], VFS, Boolean]](
+          d => deleteDir(dir </> d),
+          { f =>
+            for {
+              vfs <- StateTContrib.get[Free[S, ?], VFS]
+              paths2 = vfs.paths - (dir </> f)
+              _ <- StateTContrib.put[Free[S, ?], VFS](vfs.copy(paths = paths2))
+            } yield true
+          })
+      }
 
-        index2 = computeIndex(vfs2.paths.keys.toList)
+      _ <- if (persist) {
+        for {
+          // get the new one
+          vfs2 <- StateTContrib.get[Free[S, ?], VFS]
 
-        metaLog2 <- persistMeta[S](vfs2.paths, index2).exec(vfs2.metaLog).liftM[ST]
-        _ <- StateTContrib.put[Free[S, ?], VFS](vfs2.copy(metaLog = metaLog2, index = index2))
-      } yield true    // TODO failure modes
-    }
+          index2 = computeIndex(vfs2.paths.keys.toList)
 
-    Path.refineType(target).fold(deleteDir, deleteFile)
+          metaLog2 <- persistMeta[S](vfs2.paths, index2).exec(vfs2.metaLog).liftM[ST]
+          _ <- StateTContrib.put[Free[S, ?], VFS](vfs2.copy(metaLog = metaLog2, index = index2))
+        } yield ()
+      } else {
+        ().point[ST[Free[S, ?], ?]]
+      }
+    } yield true    // TODO failure modes
   }
 
   def readPath[F[_]: Monad](path: AFile): StateT[F, VFS, Option[Blob]] =
@@ -441,11 +461,11 @@ final class SerialVFS private (
   def link(from: Blob, to: AFile): Task[Boolean] =
     runST(FreeVFS.link[S](from, to))
 
-  def moveFile(from: AFile, to: AFile): Task[Boolean] =
-    runST(FreeVFS.moveFile[S](from, to))
+  def moveFile(from: AFile, to: AFile, semantics: MoveSemantics): Task[Boolean] =
+    runST(FreeVFS.moveFile[S](from, to, semantics))
 
-  def moveDir(from: ADir, to: ADir): Task[Boolean] =
-    runST(FreeVFS.moveDir[S](from, to))
+  def moveDir(from: ADir, to: ADir, semantics: MoveSemantics): Task[Boolean] =
+    runST(FreeVFS.moveDir[S](from, to, semantics))
 
   def delete(target: APath): Task[Boolean] =
     runST(FreeVFS.delete[S](target))
