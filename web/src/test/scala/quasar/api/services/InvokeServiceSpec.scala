@@ -160,6 +160,16 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
             isExpectedResponse(sampleData, response, MessageFormat.Default)
           }}
       }
+      "if query in function is constant even if not supported by connector" >>
+        prop { (functionFile: PathOf[Abs, File, Sandboxed, AlphaCharacters]) =>
+          val constant = sqlE"select (1,2)"
+          val statements = List(FunctionDecl(CIName(fileName(functionFile.path).value), Nil, constant))
+          val mounts = Map((fileParent(functionFile.path):APath) -> MountConfig.moduleConfig(statements))
+          val state = InMemState.empty
+          val request = Request(uri = pathUri(functionFile.path))
+          val response = service(state, mounts)(request).unsafePerformSync
+          isExpectedResponse(Vector(Data.Int(1), Data.Int(2)), response, MessageFormat.Default)
+        }
       "support offset and limit" >> {
         prop { (functionFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
                 dataFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
