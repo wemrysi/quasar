@@ -443,6 +443,8 @@ object Mimir extends BackendModule with Logging {
   object WriteFileModule extends WriteFileModule {
     import WriteFile._
 
+    // we set this to 1 because we don't want the table evaluation "running ahead" of
+    // quasar's paging logic.  See also: TablePager.apply
     private val QueueLimit = 1
 
     private val map: ConcurrentHashMap[WriteHandle, (Queue[Task, Vector[Data]], Signal[Task, Boolean])] =
