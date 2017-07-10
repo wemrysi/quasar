@@ -189,7 +189,6 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
           val request = Request(
             uri = pathUri(functionFile.path).copy(query = Query.fromPairs("bar" -> arg)),
             headers = Headers(Accept(jsonReadableLine.mediaType.withExtensions(Map("disposition" -> disposition.value)))))
-          println(request.queryString)
           val response = service(state, mounts)(request).unsafePerformSync
           isExpectedResponse(sampleData, response, MessageFormat.Default)
           response.headers.get(`Content-Disposition`) must_=== Some(disposition)
