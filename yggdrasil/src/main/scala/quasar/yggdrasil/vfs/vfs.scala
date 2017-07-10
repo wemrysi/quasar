@@ -28,7 +28,7 @@ import fs2.util.Async
 
 import pathy.Path
 
-import scalaz.{-\/, \/-, ~>, :<:, Coproduct, Free, Monad, NaturalTransformation, StateT}
+import scalaz.{~>, :<:, Coproduct, Free, Monad, NaturalTransformation, StateT}
 import scalaz.concurrent.Task
 import scalaz.std.list._
 import scalaz.std.map._
@@ -212,13 +212,9 @@ object FreeVFS {
   }
 
   def exists[F[_]: Monad](path: APath): StateT[F, VFS, Boolean] = {
-    Path.refineType(path) match {
-      case -\/(dir) =>
-        StateTContrib.get[F, VFS].map(_.index.contains(dir))
-
-      case \/-(file) =>
-        StateTContrib.get[F, VFS].map(_.paths.contains(file))
-    }
+    Path.refineType(path).fold(
+      dir => StateTContrib.get[F, VFS].map(_.index.contains(dir)),
+      file => StateTContrib.get[F, VFS].map(_.paths.contains(file)))
   }
 
   def ls[F[_]: Monad](parent: ADir): StateT[F, VFS, List[RPath]] = {
