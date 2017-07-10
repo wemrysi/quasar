@@ -401,7 +401,7 @@ object Mimir extends BackendModule with Logging {
         eitherTable <- precog.Table.load(target, JType.JUniverseT).mapT(_.toTask).run.liftM[MT].liftB
         table = eitherTable.fold(_ => precog.Table.empty, table => table)
 
-        limited = if (offset.value == 0L && !limit.isDefined)
+        limited = if (offset.value === 0L && !limit.isDefined)
           table
         else
           table.takeRange(offset.value, limit.fold(slamdata.Predef.Int.MaxValue.toLong)(_.value))
