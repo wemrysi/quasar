@@ -301,9 +301,8 @@ trait MathLib extends Library {
       Func.Input1(Type.Numeric),
       noSimplification,
       partialTyperV[nat._1] {
-        case Sized(Type.Const(Data.Int(v)))      => success(Type.Const(Data.Int(v.abs)))
+        case Sized(Type.Const(Data.Int(v)))      => success(Type.Const(Data.Int(v)))
         case Sized(Type.Const(Data.Dec(v)))      => success(Type.Const(Data.Int(v.toBigInt)))
-
         case Sized(t) if Type.Numeric contains t => success(t)
       },
       untyper[nat._1] {
