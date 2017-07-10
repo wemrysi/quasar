@@ -35,15 +35,17 @@ object writefile {
   def chrooted[S[_]](prefix: ADir)(implicit
     s0: KeyValueStore.Ops[WriteHandle, AFile, S],
     s1: MonotonicSeq :<: S,
-    s2: Read.Ops[SparkContext, S]
+    s2: Read.Ops[SparkContext, S],
+    s3: CassandraDDL.Ops[S]
   ) : WriteFile ~> Free[S, ?] =
     flatMapSNT(interpret) compose chroot.writeFile[WriteFile](prefix)
 
-  def interpret[S[_]](implicit 
+  def interpret[S[_]](implicit
     s0: KeyValueStore.Ops[WriteHandle, AFile, S],
     s1: MonotonicSeq :<: S,
-    s2: Read.Ops[SparkContext, S]
-    ): WriteFile ~> Free[S, ?] = {
+    s2: Read.Ops[SparkContext, S],
+    s3: CassandraDDL.Ops[S]
+  ): WriteFile ~> Free[S, ?] = {
     new (WriteFile ~> Free[S, ?]) {
       def apply[A](wr: WriteFile[A]): Free[S, A] = wr match {
         case Open(f) => open(f)
@@ -53,11 +55,12 @@ object writefile {
     }
   }
 
-  def open[S[_]](file: AFile)(implicit 
+  def open[S[_]](file: AFile)(implicit
     writers: KeyValueStore.Ops[WriteHandle, AFile, S],
     gen: MonotonicSeq.Ops[S],
-    s1: Read.Ops[SparkContext, S]
-    ): Free[S, FileSystemError \/ WriteHandle] = 
+    s0: Read.Ops[SparkContext, S],
+    s1: CassandraDDL.Ops[S]
+  ): Free[S, FileSystemError \/ WriteHandle] =
     for {
       id <- gen.next
       _ <- create(file)
@@ -66,56 +69,46 @@ object writefile {
     } yield (wh.right)
 
   def create[S[_]](file: AFile)(implicit
-    read: Read.Ops[SparkContext, S]
-    ): Free[S, Unit] = 
-    read.asks { sc =>
-      val connector = CassandraConnector(sc.getConf)
-      connector.withSessionDo { implicit session =>
-        val k = if(!keyspaceExists(keyspace(fileParent(file)))) {
-          createKeyspace(keyspace(fileParent(file)))
-        }
+    cass: CassandraDDL.Ops[S]
+  ): Free[S, Unit] = {
+    val ks = keyspace(fileParent(file))
+    val tb = tableName(file)
 
-        val t = if(!tableExists(keyspace(fileParent(file)), tableName(file)))
-          createTable(keyspace(fileParent(file)), tableName(file))
-      }
-    }
+    for {
+      keyspaceExists <- cass.keyspaceExists(ks)
+      _              <- if(keyspaceExists) ().point[Free[S, ?]] else cass.createKeyspace(ks)
+      tableExists    <- cass.tableExists(ks, tb)
+      _              <- if(tableExists) ().point[Free[S, ?]] else cass.createTable(ks, tb)
+    } yield ()
+  }
+
+  implicit val codec: DataCodec = DataCodec.Precise
 
   def write[S[_]](handle: WriteHandle, chunks: Vector[Data])(implicit
     writers: KeyValueStore.Ops[WriteHandle, AFile, S],
-    read: Read.Ops[SparkContext, S]
-  ): Free[S, Vector[FileSystemError]] = for {
-    maybeAFile <- writers.get(handle).run
-    vectors <- read.asks {
-      sc =>
+    read: Read.Ops[SparkContext, S],
+    cass: CassandraDDL.Ops[S]
+  ): Free[S, Vector[FileSystemError]] =
+    for{
+      maybeAFile <- writers.get(handle).run
+      errors     <- 
+        maybeAFile.cata(
+          f => {
+            implicit val codec: DataCodec = DataCodec.Precise
 
-      implicit val codec: DataCodec = DataCodec.Precise
+            val textChunk: Vector[(String, Data)] =
+              chunks.map(d => DataCodec.render(d) strengthR d).unite
 
-      def _write(file: AFile) : Vector[FileSystemError] = {
-        val textChunk: Vector[(String, Data)] =
-          chunks.map(d => DataCodec.render(d) strengthR d).unite
-      
-        CassandraConnector(sc.getConf).withSessionDo {implicit session =>
-          if(!tableExists(keyspace(fileParent(file)), tableName(file))) {
-            Vector(unknownWriteHandle(handle))
-          } else {
-            textChunk.flatMap {
-              case (text,data) => 
-                \/.fromTryCatchNonFatal{
-                  insertData(keyspace(fileParent(handle.file)), tableName(handle.file), text)
-                }.fold(
-                  ex => Vector(writeFailed(data, ex.getMessage)),
-                  u => Vector.empty[FileSystemError]
-                )
-            }
-          }
-        }
-      }
+            val ks = keyspace(fileParent(f))
+            val tn = tableName(f)
 
-      maybeAFile.map(_write).getOrElse(
-        Vector[FileSystemError](unknownWriteHandle(handle))
-      )
-    }
-  } yield vectors
+            textChunk.map {
+              case (text, data) => cass.insertData(ks, tn, text)
+            }.sequence.as(Vector.empty[FileSystemError])
+          },
+          Vector[FileSystemError](unknownWriteHandle(handle)).point[Free[S, ?]]
+        )
+    } yield errors
 
   def close[S[_]](handle: WriteHandle)(implicit
     writers: KeyValueStore.Ops[WriteHandle, AFile, S]

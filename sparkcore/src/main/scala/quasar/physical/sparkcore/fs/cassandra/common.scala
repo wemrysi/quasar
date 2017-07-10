@@ -44,6 +44,7 @@ final case class ListTables(keyspace: String) extends CassandraDDL[Set[String]]
 final case class ListKeyspaces(startWith: String) extends CassandraDDL[Set[String]]
 
 final case class ReadTable(keyspace: String, table: String) extends CassandraDDL[RDD[Data]]
+final case class InsertData(keyspace: String, table: String, data: String) extends CassandraDDL[Unit]
 
 object CassandraDDL {
 
@@ -59,6 +60,7 @@ object CassandraDDL {
     def listTables(keyspace: String): Free[S, Set[String]] = Free.liftF(s0.inj(ListTables(keyspace)))
     def listKeyspaces(startWith: String): Free[S, Set[String]] = Free.liftF(s0.inj(ListKeyspaces(startWith)))
     def readTable(keyspace: String, table: String): Free[S, RDD[Data]] = Free.liftF(s0.inj(ReadTable(keyspace, table)))
+    def insertData(keyspace: String, table: String, data: String): Free[S, Unit] = Free.liftF(s0.inj(InsertData(keyspace, table, data)))
   }
 
   object Ops {
@@ -68,9 +70,9 @@ object CassandraDDL {
   }
 
   def interpreter[S[_]](implicit sc: SparkContext) = new (CassandraDDL ~> Task) {
-    def apply[A](from: CassandraDDL[A]) = 
+    def apply[A](from: CassandraDDL[A]) =
       from match {
-        case KeyspaceExists(keyspace) => 
+        case KeyspaceExists(keyspace) =>
           keyspaceExists(keyspace)
         case TableExists(keyspace, table) =>
           tableExists(keyspace, table)
@@ -90,6 +92,8 @@ object CassandraDDL {
           listKeyspaces(nameStartWith)
         case ReadTable(keyspace, table) =>
           readTable(keyspace, table)
+        case InsertData(keyspace, table, data) =>
+          insertData(keyspace, table, data)
       }
   }
 
@@ -153,6 +157,12 @@ object CassandraDDL {
       .map { raw =>
         DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
       }
+  }
+
+  def insertData[S[_]](keyspace: String, table: String, data: String)(implicit sc: SparkContext) = Task.delay {
+    CassandraConnector(sc.getConf).withSessionDo { implicit session =>
+      val _ = common.insertData(keyspace, table, data)
+    }
   }
 
 }
