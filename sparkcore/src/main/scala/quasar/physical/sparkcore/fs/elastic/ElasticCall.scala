@@ -18,7 +18,6 @@ package quasar.physical.sparkcore.fs.elastic
 
 import slamdata.Predef._
 import quasar.fp.free._
-// import quasar.{Data, DataCodec}
 
 import org.http4s.client.blaze._
 import org.http4s.Request
