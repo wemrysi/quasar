@@ -29,10 +29,13 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._
 
-private[qscript] final class MapFuncDerivedPlanner[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: BirecursiveT](
-  implicit
-  CP: Planner[F, FMT, MapFuncCore[T, ?]]
-) extends Planner[F, FMT, MapFuncDerived[T, ?]] {
+private[qscript] final class MapFuncDerivedPlanner[
+  F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
+  FMT,
+  T[_[_]]: BirecursiveT
+](implicit
+  CP: MapFuncPlanner[F, MapFuncCore[T, ?], T]
+) extends MapFuncPlanner[F, MapFuncDerived[T, ?], T] {
 
   private val planDerived: AlgebraM[(Option ∘ F)#λ, MapFuncDerived[T, ?], XQuery] = { _ => None }
 
