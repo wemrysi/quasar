@@ -17,16 +17,11 @@
 package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
+import quasar.fp.ski._
 import quasar.physical.marklogic.xquery._
 import quasar.qscript.{ExpandMapFunc, MapFuncCore, MapFuncDerived}
 
-import scala.Predef.implicitly
-
-import eu.timepit.refined.auto._
 import matryoshka._
-import matryoshka.data._
-import matryoshka.implicits._
-import matryoshka.patterns._
 import scalaz._
 
 private[qscript] final class MapFuncDerivedPlanner[
@@ -37,13 +32,6 @@ private[qscript] final class MapFuncDerivedPlanner[
   CP: MapFuncPlanner[F, MapFuncCore[T, ?], T]
 ) extends MapFuncPlanner[F, MapFuncDerived[T, ?], T] {
 
-  private val planDerived: AlgebraM[(Option ∘ F)#λ, MapFuncDerived[T, ?], XQuery] = { _ => None }
+  val plan: AlgebraM[F, MapFuncDerived[T, ?], XQuery] = ExpandMapFunc.expand(CP.plan, κ(None))
 
-  val plan: AlgebraM[F, MapFuncDerived[T, ?], XQuery] = { f =>
-    planDerived(f).getOrElse(
-      Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(
-        interpretM(implicitly[Monad[F]].point[XQuery](_), CP.plan)
-      )
-    )
-  }
 }
