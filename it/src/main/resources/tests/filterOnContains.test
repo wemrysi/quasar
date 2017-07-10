@@ -1,12 +1,12 @@
 {
     "name": "filter on contains",
     "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
         "postgresql":        "pending"
     },
     "data": "zips.data",
     "query": "select * from zips where 43.058514 in loc[_]",
-    "predicate": "equalsExactly",
-    "ignoreFieldOrder": [ "*" ],
+    "predicate": "exactly",
+    "ignoreFieldOrder": true,
     "expected": [{ "city": "CANDIA", "state": "NH", "pop": 3557, "_id":"03034", "loc": [-71.304857, 43.058514] }]
 }

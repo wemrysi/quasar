@@ -180,7 +180,7 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
       val line = Line(1, 1, "")
 
       val input =
-        Morph1(Median,
+        Morph1(toUpperCase,
           Join(DerefObject, Cross(None),
             AbsoluteLoad(Const(CString("/file"))(line))(line),
             Const(CString("column"))(line))(line))(line)
@@ -188,8 +188,7 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
       val result = extractLoads(inferTypes(JType.JPrimitiveUnfixedT)(input))
 
       val expected = Map(
-        "/file" -> Map(JPath("column") -> Set(CLong, CDouble, CNum))
-      )
+        "/file" -> Map(JPath("column") -> Set(CString, CDate)))
 
       result must_== expected
     }
@@ -198,7 +197,7 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
       val line = Line(1, 1, "")
 
       val input =
-        Morph2(Covariance,
+        Morph2(concat,
           Join(DerefObject, Cross(None),
             AbsoluteLoad(Const(CString("/file0"))(line))(line),
             Const(CString("column0"))(line))(line),
@@ -209,9 +208,8 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
       val result = extractLoads(inferTypes(JType.JPrimitiveUnfixedT)(input))
 
       val expected = Map(
-        "/file0" -> Map(JPath("column0") -> Set(CLong, CDouble, CNum)),
-        "/file1" -> Map(JPath("column1") -> Set(CLong, CDouble, CNum))
-      )
+        "/file0" -> Map(JPath("column0") -> Set(CString, CDate)),
+        "/file1" -> Map(JPath("column1") -> Set(CString, CDate)))
 
       result must_== expected
     }

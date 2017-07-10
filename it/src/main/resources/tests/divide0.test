@@ -4,13 +4,14 @@
         "couchbase": "pending",
         "marklogic_json": "pending",
         "marklogic_xml": "pending",
-        "mimir": "skip",
+        "mimir":"pending",
         "spark_local": "pending",
         "spark_hdfs": "pending"
     },
     "data": "divide.data",
     "query": "select nr, val1 / 0 as d from divide",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [
         { "nr":  1 },
         { "nr":  2 },

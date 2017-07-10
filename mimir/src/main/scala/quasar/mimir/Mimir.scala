@@ -31,16 +31,14 @@ import quasar.fs.mount._
 import quasar.qscript._
 
 import quasar.blueeyes.json.{JNum, JValue}
-import quasar.precog.common.{Path, RValue}
-import quasar.precog.util.IOUtils
-import quasar.yggdrasil.PathMetadata
+import quasar.precog.common.Path
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
 
+import fs2.Stream
 import fs2.async.mutable.{Queue, Signal}
 import fs2.interop.scalaz._
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
+
 import matryoshka._
 import matryoshka.implicits._
 import matryoshka.data._
@@ -58,6 +56,9 @@ import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Random
+
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 object Mimir extends BackendModule with Logging {
 
@@ -136,7 +137,7 @@ object Mimir extends BackendModule with Logging {
 
   def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])] = {
     val t = for {
-      cake <- Task.delay(new Precog(cfg.dataDir))
+      cake <- Precog(cfg.dataDir)
     } yield (λ[M ~> Task](_.run(cake)), cake.shutdown.toTask)
 
     t.liftM[FileSystemDef.DefErrT]
@@ -148,12 +149,14 @@ object Mimir extends BackendModule with Logging {
       cp: T[QSM[T, ?]]): Backend[Repr] = {
 
 // M = Backend
-// F[_] = MapFunc[T, ?]
+// F[_] = MapFuncCore[T, ?]
 // B = Repr
 // A = SrcHole
-// AlgebraM[M, CoEnv[A, F, ?], B] = AlgebraM[Backend, CoEnv[Hole, MapFunc[T, ?], ?], Repr]
+// AlgebraM[M, CoEnv[A, F, ?], B] = AlgebraM[Backend, CoEnv[Hole, MapFuncCore[T, ?], ?], Repr]
 //def interpretM[M[_], F[_], A, B](f: A => M[B], φ: AlgebraM[M, F, B]): AlgebraM[M, CoEnv[A, F, ?], B]
 // f.cataM(interpretM)
+
+    val mapFuncPlanner = new MapFuncPlanner[T, M, Backend]
 
     lazy val planQST: AlgebraM[Backend, QScriptTotal[T, ?], Repr] =
       _.run.fold(
@@ -174,28 +177,34 @@ object Mimir extends BackendModule with Logging {
                       _ => ???,   // Read[AFile]
                       _ => ???))))))))    // DeadEnd
 
-    lazy val planMapFunc: AlgebraM[Backend, MapFunc[T, ?], Repr] = {
-      // EJson => Data => JValue => RValue => Table
-      case MapFuncs.Constant(ejson) =>
-        val data: Data = ejson.cata(Data.fromEJson)
-        val jvalue: JValue = JValue.fromData(data)
-        val rvalue: RValue = RValue.fromJValue(jvalue)
-
-        Repr.meld[M](new DepFn1[Cake, λ[`P <: Cake` => M[P#Table]]] {
-          def apply(P: Cake): M[P.Table] =
-            P.Table.fromRValues(scala.Stream(rvalue)).point[M]
-        }).liftB
-
-      case _ => ???
-    }
-
     lazy val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = {
-      case qscript.Map(src, f) => f.cataM(interpretM(κ(src.point[Backend]), planMapFunc))
+      case qscript.Map(src, f) =>
+        for {
+          trans <- f.cataM[Backend, src.P.trans.TransSpec1](
+            interpretM(
+              κ(src.P.trans.TransSpec1.Id.point[Backend]),
+              mapFuncPlanner.plan(src.P)))
+        } yield Repr(src.P)(src.table.transform(trans))
+
       case qscript.LeftShift(src, struct, id, repair) => ???
       case qscript.Reduce(src, bucket, reducers, repair) => ???
       case qscript.Sort(src, bucket, order) => ???
-      case qscript.Filter(src, f) => ???
+
+      case qscript.Filter(src, f) =>
+        for {
+          trans <- f.cataM[Backend, src.P.trans.TransSpec1](
+            interpretM(
+              κ(src.P.trans.TransSpec1.Id.point[Backend]),
+              mapFuncPlanner.plan(src.P)))
+        } yield Repr(src.P)(src.table.transform(src.P.trans.Filter(src.P.trans.TransSpec1.Id, trans)))
+
       case qscript.Union(src, lBranch, rBranch) => ???
+        //for {
+        //  leftRepr <- lBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
+        //  rightRepr <- rBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
+        //  rightCoerced <- leftRepr.unsafeCoerce[Lambda[`P <: Cake` => P#Table]](rightRepr.table).liftM[MT].liftB
+        //} yield Repr(leftRepr.P)(leftRepr.table.concat(rightCoerced))
+
       case qscript.Subset(src, from, op, count) =>
         for {
           fromRepr <- from.cataM(interpretM(κ(src.point[Backend]), planQST))
@@ -205,15 +214,16 @@ object Mimir extends BackendModule with Logging {
               vals <- countRepr.table.toJson
               nums = vals collect { case n: JNum => n.toLong.toInt } // TODO error if we get something strange
               number = nums.head
+              compacted = fromRepr.table.compact(fromRepr.P.trans.TransSpec1.Id)
               back <- op match {
                 case Take =>
-                  Future.successful(fromRepr.table.takeRange(0, number))
+                  Future.successful(compacted.takeRange(0, number))
 
                 case Drop =>
-                  Future.successful(fromRepr.table.takeRange(number, slamdata.Predef.Int.MaxValue.toLong)) // blame precog
+                  Future.successful(compacted.takeRange(number, slamdata.Predef.Int.MaxValue.toLong)) // blame precog
 
                 case Sample =>
-                  fromRepr.table.sample(number, List(fromRepr.P.trans.TransSpec1.Id)).map(_.head) // the number of Reprs returned equals the number of transspecs
+                  compacted.sample(number, List(fromRepr.P.trans.TransSpec1.Id)).map(_.head) // the number of Reprs returned equals the number of transspecs
               }
             } yield Repr(fromRepr.P)(back)
 
@@ -221,10 +231,11 @@ object Mimir extends BackendModule with Logging {
           }
         } yield back
 
+      // FIXME look for Map(Unreferenced, Constant) and return constant table
       case qscript.Unreferenced() =>
         Repr.meld[M](new DepFn1[Cake, λ[`P <: Cake` => M[P#Table]]] {
           def apply(P: Cake): M[P.Table] =
-            P.Table.empty.point[M]
+            P.Table.constLong(Set(0)).point[M]
         }).liftB
     }
 
@@ -257,7 +268,6 @@ object Mimir extends BackendModule with Logging {
             }
           }
 
-        // TODO duplicated in listContents
         val result: FileSystemErrT[M, ?] ~> Backend =
           Hoist[FileSystemErrT].hoist[M, PhaseResultT[Configured, ?]](
             λ[Configured ~> PhaseResultT[Configured, ?]](_.liftM[PhaseResultT])
@@ -286,27 +296,6 @@ object Mimir extends BackendModule with Logging {
 
   private def dirToPath(dir: ADir): Path = Path(pathy.Path.posixCodec.printPath(dir))
   private def fileToPath(file: AFile): Path = Path(pathy.Path.posixCodec.printPath(file))
-
-  private def toSegment: PathMetadata => PathSegment = {
-    // ShiftedRead[ADir]
-    case PathMetadata(path, PathMetadata.DataDir(_)) =>
-      DirName(path.components.mkString("/")).left[FileName]
-
-    // ShiftedRead[AFile]
-    case PathMetadata(path, PathMetadata.DataOnly(_)) =>
-      FileName(path.components.mkString("/")).right[DirName]
-
-    case PathMetadata(path, PathMetadata.PathOnly) =>
-      DirName(path.components.mkString("/")).left[FileName]
-  }
-
-  private def children(dir: ADir): EitherT[M, ResourceError, Set[PathSegment]] = {
-    log.debug(s"children of $dir")
-
-    cake[M].liftM[EitherT[?[_], ResourceError, ?]] flatMap { P =>
-      P.showContents(dirToPath(dir)).map(_.map(toSegment)).mapT(_.toTask.liftM[MT])
-    }
-  }
 
   private def toFSError: ResourceError => FileSystemError = {
     case ResourceError.Corrupt(msg) => ???
@@ -349,27 +338,11 @@ object Mimir extends BackendModule with Logging {
 
     def explain(repr: Repr): Backend[String] = ???
 
-    def listContents(dir: ADir): Backend[Set[PathSegment]] = {
-      val segments: FileSystemErrT[M, Set[PathSegment]] =
-        children(dir).leftMap(toFSError)
+    def listContents(dir: ADir): Backend[Set[PathSegment]] =
+      cake[M].liftB.flatMap(_.fs.listContents(dir).liftM[MT].liftB)
 
-      val result: FileSystemErrT[M, ?] ~> Backend =
-        Hoist[FileSystemErrT].hoist[M, PhaseResultT[Configured, ?]](
-          λ[Configured ~> PhaseResultT[Configured, ?]](_.liftM[PhaseResultT])
-            compose λ[M ~> Configured](_.liftM[ConfiguredT]))
-
-      result(segments)
-    }
-
-    def fileExists(file: AFile): Configured[Boolean] = {
-      val dir: ADir = pathy.Path.fileParent(file)
-
-      val res: M[Boolean] = for {
-        back <- children(dir).fold(_ => false, _.contains(pathy.Path.fileName(file).right))
-      } yield back
-
-      res.liftM[ConfiguredT]
-    }
+    def fileExists(file: AFile): Configured[Boolean] =
+      cake[M].flatMap(_.fs.fileExists(file).liftM[MT]).liftM[ConfiguredT]
   }
 
   object ReadFileModule extends ReadFileModule {
@@ -402,12 +375,12 @@ object Mimir extends BackendModule with Logging {
           signal <- fs2.async.signalOf[Task, Boolean](false).liftM[MT]
 
           path = fileToPath(file)
-          jvs = dequeueStreamT(queue)(_.isEmpty).map(_.map(JValue.fromData))
+          jvs = queue.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits).map(JValue.fromData)
 
           precog <- cake[M]
 
           ingestion = for {
-            _ <- precog.ingest(path, jvs.trans(λ[Task ~> Future](_.unsafeToFuture))).toTask
+            _ <- precog.ingest(path, jvs).run   // TODO log resource errors?
             _ <- signal.set(true)
           } yield ()
 
@@ -448,60 +421,34 @@ object Mimir extends BackendModule with Logging {
         _ <- queue.enqueue1(Vector.empty).liftM[MT]
         // wait until queue actually stops; task async completes when signal completes
         _ <- signal.discrete.takeWhile(!_).run.liftM[MT]
-        precog <- cake[M]
-        _ <- Task.delay(precog.stopPath(fileToPath(h.file))).liftM[MT]
       } yield ()
 
       t.liftM[ConfiguredT]
     }
   }
 
-  // move and delete assume nihdb semantics
   object ManageFileModule extends ManageFileModule {
-    import java.io.File
-
     import ManageFile._
 
+    // TODO directory moving and varying semantics
     def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = {
-      def inner(fpath: APath, dpath: APath): M[Unit] = for {
-        precog <- cake[M]
-
-        from = new File(precog.Config.dataDir, pathy.Path.posixCodec.printPath(fpath))
-        dest = new File(precog.Config.dataDir, pathy.Path.posixCodec.printPath(dpath))
-
-        _ <- Task.delay(from.renameTo(dest)).liftM[MT]
-      } yield ()
-
-      inner(scenario.src, scenario.dst).liftB
+      scenario.fold(
+        d2d = { (from, to) =>
+          cake[M].flatMap(_.fs.moveDir(from, to).void.liftM[MT]).liftB
+        },
+        f2f = { (from, to) =>
+          cake[M].flatMap(_.fs.moveFile(from, to).void.liftM[MT]).liftB
+        })
     }
 
     def delete(path: APath): Backend[Unit] = {
-      val t = for {
-        precog <- cake[M]
-        target = new File(precog.Config.dataDir, pathy.Path.posixCodec.printPath(path))
-
-        _ <- Task.delay(IOUtils.recursiveDelete(target).unsafePerformIO()).liftM[MT]
-      } yield ()
-
-      t.liftB
-      //().point[Backend]
+      cake[M].flatMap(_.fs.delete(path).void.liftM[MT]).liftB
     }
 
     def tempFile(near: APath): Backend[AFile] = {
       for {
         seed <- Task.delay(Random.nextLong.toString).liftM[MT].liftB
-
-        precog <- cake[M].liftB
-        newDir <- Task.delay(new File(precog.Config.dataDir, pathy.Path.posixCodec.printPath(parentDir(near).get))).liftM[MT].liftB
-        _ <- Task.delay(newDir.mkdirs()).liftM[MT].liftB
-
-        // yolo
-        target = parentDir(near).get </> file(seed)
-
-        h <- WriteFileModule.open(target)
-        _ <- WriteFileModule.write(h, Vector(Data.Obj())).liftM[PhaseResultT].liftM[FileSystemErrT]
-        _ <- WriteFileModule.close(h).liftM[PhaseResultT].liftM[FileSystemErrT]
-      } yield target
+      } yield parentDir(near).get </> file(seed)
     }
   }
 }

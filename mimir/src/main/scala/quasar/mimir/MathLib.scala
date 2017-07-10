@@ -63,7 +63,7 @@ trait MathLibModule[M[+ _]] extends ColumnarTableLibModule[M] with InfixLibModul
 
     abstract class Op1DD(name: String, defined: Double => Boolean, f: Double => Double) extends Op1F1(MathNamespace, name) {
       val tpe = UnaryOperationType(JNumberT, JNumberT)
-      def f1(ctx: MorphContext): F1 = CF1P("builtin::math::op1dd::" + name) {
+      def f1: F1 = CF1P("builtin::math::op1dd::" + name) {
         case c: DoubleColumn => new DoubleFrom.D(c, defined, f)
         case c: LongColumn   => new DoubleFrom.L(c, defined, f)
         case c: NumColumn    => new DoubleFrom.N(c, defined, f)
@@ -127,7 +127,7 @@ trait MathLibModule[M[+ _]] extends ColumnarTableLibModule[M] with InfixLibModul
 
     abstract class Op2DDD(name: String, defined: (Double, Double) => Boolean, f: (Double, Double) => Double) extends Op2F2(MathNamespace, name) {
       val tpe = BinaryOperationType(JNumberT, JNumberT, JNumberT)
-      def f2(ctx: MorphContext): F2 = CF2P("builtin::math::op2dd::" + name) {
+      def f2: F2 = CF2P("builtin::math::op2dd::" + name) {
         case (c1: DoubleColumn, c2: DoubleColumn) =>
           new DoubleFrom.DD(c1, c2, defined, f)
 

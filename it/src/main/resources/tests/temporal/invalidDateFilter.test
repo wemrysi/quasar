@@ -2,7 +2,7 @@
     "name": "filter on date part, where the field isn't a timestamp",
 
     "backends": {
-        "mimir": "skip",
+        "mimir":"pending",
         "mongodb_q_3_2": "pending",
         "postgresql":    "pending"
     },
@@ -11,7 +11,8 @@
 
     "query": "select day from `../days` where date_part(\"dow\", epoch) >= 3",
 
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": []
 }
