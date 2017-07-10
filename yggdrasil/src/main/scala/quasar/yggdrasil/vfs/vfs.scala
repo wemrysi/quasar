@@ -18,6 +18,7 @@ package quasar.yggdrasil.vfs
 
 import quasar.contrib.pathy.{sandboxAbs, ADir, AFile, APath, RPath}
 import quasar.contrib.scalaz.stateT, stateT._
+import quasar.fs.MoveSemantics
 
 import argonaut.{Argonaut, Parse}
 

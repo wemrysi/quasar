@@ -530,18 +530,6 @@ object Mimir extends BackendModule with Logging {
 
     // TODO directory moving and varying semantics
     def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = {
-      val semantics2 =
-        semantics match {
-          case MoveSemantics.Overwrite =>
-            quasar.yggdrasil.vfs.MoveSemantics.Overwrite
-
-          case MoveSemantics.FailIfExists =>
-            quasar.yggdrasil.vfs.MoveSemantics.FailIfExists
-
-          case MoveSemantics.FailIfMissing =>
-            quasar.yggdrasil.vfs.MoveSemantics.FailIfMissing
-        }
-
       scenario.fold(
         d2d = { (from, to) =>
           for {
@@ -554,7 +542,7 @@ object Mimir extends BackendModule with Logging {
             else
               MonadError_[Backend, FileSystemError].raiseError(pathErr(pathNotFound(from)))
 
-            result <- precog.fs.moveDir(from, to, semantics2).liftM[MT].liftB
+            result <- precog.fs.moveDir(from, to, semantics).liftM[MT].liftB
 
             _ <- if (result) {
               ().point[Backend]
@@ -579,7 +567,7 @@ object Mimir extends BackendModule with Logging {
             else
               MonadError_[Backend, FileSystemError].raiseError(pathErr(pathNotFound(from)))
 
-            result <- precog.fs.moveFile(from, to, semantics2).liftM[MT].liftB
+            result <- precog.fs.moveFile(from, to, semantics).liftM[MT].liftB
 
             _ <- if (result) {
               ().point[Backend]

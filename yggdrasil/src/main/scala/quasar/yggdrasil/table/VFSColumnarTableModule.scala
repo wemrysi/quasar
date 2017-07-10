@@ -18,6 +18,7 @@ package quasar.yggdrasil.table
 
 import quasar.blueeyes.json.JValue
 import quasar.contrib.pathy.{firstSegmentName, ADir, AFile, APath, PathSegment}
+import quasar.fs.MoveSemantics
 import quasar.niflheim.NIHDB
 import quasar.precog.common.{Path => PrecogPath}
 import quasar.precog.common.accounts.AccountFinder
