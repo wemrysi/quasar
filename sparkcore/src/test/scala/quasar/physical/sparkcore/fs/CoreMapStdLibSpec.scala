@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.Planner.PlannerError
 import quasar.fp.ski._
 import quasar.fp.tree._
-import quasar.qscript.{MapFunc, MapFuncsCore, MapFuncStdLibTestRunner, FreeMapA}, MapFuncsCore._
+import quasar.qscript._, MapFuncsCore._, MapFuncsDerived._
 import quasar.std._
 
 import matryoshka._
@@ -33,16 +33,18 @@ import org.specs2.execute._
 import scalaz._, Scalaz._
 
 class CoreMapStdLibSpec extends StdLibSpec {
-  val TODO: Result \/ Unit = Skipped("TODO").left
+  val TODO: Result \/ Unit = Pending("TODO").left
 
   val MFC = quasar.qscript.MFC[Fix]
-  
+  val MFD = quasar.qscript.MFD[Fix]
+
   /** Identify constructs that are expected not to be implemented. */
   val shortCircuit: AlgebraM[Result \/ ?, MapFunc[Fix, ?], Unit] = {
     case MFC(ExtractIsoYear(_))  => TODO
     case MFC(ExtractWeek(_))     => TODO
-    case MFC(Power(_, _))        => Skipped("TODO: handle large value").left
-    case MFC(ConcatArrays(_, _)) => Skipped("TODO: handle mixed string/array").left
+    case MFD(Trunc(_))           => TODO
+    case MFC(Power(_, _))        => Pending("TODO: handle large value").left
+    case MFC(ConcatArrays(_, _)) => Pending("TODO: handle mixed string/array").left
     case _                       => ().right
   }
 
