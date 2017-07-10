@@ -20,7 +20,6 @@ import quasar.precog.common._
 import quasar.yggdrasil._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
-import quasar.yggdrasil.execution.EvaluationContext
 
 import scalaz._, Scalaz._
 
@@ -249,11 +248,7 @@ trait StdLibModule[M[+ _]]
     with MathLibModule[M]
     with TypeLibModule[M]
     with StringLibModule[M]
-    with StatsLibModule[M]
-    with SummaryLibModule[M]
-    with NormalizationLibModule[M]
-    with ClusteringLibModule[M]
-    with RandomForestLibModule[M]
+    with ReductionLibModule[M]
     with RandomLibModule[M] {
   type Lib <: StdLib
 
@@ -264,11 +259,7 @@ trait StdLibModule[M[+ _]]
       with MathLib
       with TypeLib
       with StringLib
-      with StatsLib
-      with SummaryLib
-      with NormalizationLib
-      with ClusteringLib
-      with RandomForestLib
+      with ReductionLib
       with RandomLib
 }
 
