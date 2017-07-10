@@ -246,29 +246,29 @@ object MapFuncCore {
 
   // NB: This _could_ be combined with `rewrite`, but it causes rewriting to
   //     take way too long, so instead we apply it separately afterward.
+  /** Pulls conditional `Undefined`s as far up an expression as possible. */
   def extractGuards[T[_[_]]: BirecursiveT, A]
       : CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
     _.run.toOption >>= {
       // NB: The last case pulls guards into a wider scope, and we want to avoid
       //     doing that for certain MapFuncs, so we add explicit `none`s.
-      case ConcatArrays(_, _) | ConcatMaps(_, _)
-         | Guard(_, _, _, _)
+      case Guard(_, _, _, _)
          | IfUndefined(_, _)
-         | MakeArray(_) | MakeMap(_, _)          => none
+         | MakeArray(_) | MakeMap(_, _) => none
       // TODO: This should be able to extract a guard where _either_ side is
       //       `Undefined`, and should also extract `Cond` with `Undefined` on a
       //       branch.
       case func =>
-        val meh =
+        val writer =
           func.traverse[Writer[List[(FreeMapA[T, A], Type)], ?], FreeMapA[T, A]] {
             case Embed(CoEnv(\/-(Guard(e, t, s, Embed(CoEnv(\/-(Undefined()))))))) =>
               Writer(List((e, t)), s)
             case arg => Writer(Nil, arg)
           }
-        meh.written match {
+        writer.written match {
           case Nil    => none
           case guards =>
-            rollMF(guards.distinct.foldRight(meh.value) {
+            rollMF(guards.distinct.foldRight(writer.value) {
               case ((e, t), s) =>
                 Guard(e, t, Free.roll(s), Free.roll(Undefined[T, FreeMapA[T, A]]()))
             }).some
