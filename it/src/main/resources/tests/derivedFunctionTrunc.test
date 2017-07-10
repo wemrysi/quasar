@@ -1,6 +1,14 @@
 {
     "name": "derived function trunc",
-    "backends": {},
+    "backends": {
+      "couchbase": "timeout",
+      "marklogic_json": "timeout",
+      "marklogic_xml": "timeout",
+      "mimir": "timeout",
+      "mongodb_q_3_2": "timeout",
+      "spark_local": "timeout",
+      "spark_hdfs": "timeout"
+    },
     "data": "divide.data",
     "query": "select nr, trunc(val3) as trunc1 from divide",
     "predicate": "exactly",
