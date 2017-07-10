@@ -127,8 +127,8 @@ object Module {
     /** Returns mounts located at a path having the given prefix. */
     def invokeFunction(path: AFile, args: Map[String, String], offset: Natural, limit: Option[Positive]): Process[M, Data] = {
       // TODO: use DataCursor.process for the appropriate cursor type
-      def closeHandle(h: ResultHandle): Process[M, Nothing] =
-        Process.eval_[M, Unit](unsafe.close(h).liftM[ErrorT])
+      def closeHandle(dataOrHandle: List[Data] \/ ResultHandle): Process[M, Nothing] =
+        dataOrHandle.fold(_ => Process.empty, h => Process.eval_[M, Unit](unsafe.close(h).liftM[ErrorT]))
 
       def readUntilEmpty(h: ResultHandle): Process[M, Data] =
         Process.await(unsafe.more(h).leftMap(Error.fsError(_))) { data =>
@@ -138,10 +138,10 @@ object Module {
             Process.emitAll(data) ++ readUntilEmpty(h)
         }
 
-      Process.await(unsafe.invokeFunction(path, args, offset, limit)) { dataOrHandle =>
+      Process.bracket(unsafe.invokeFunction(path, args, offset, limit))(closeHandle) { dataOrHandle =>
         dataOrHandle.fold(
           data => Process.emitAll(data),
-          handle => Process.bracket(handle.point[M])(closeHandle)(readUntilEmpty))
+          handle => readUntilEmpty(handle))
       }
     }
   }
