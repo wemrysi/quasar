@@ -34,6 +34,7 @@ import java.io.File
 import java.nio.CharBuffer
 import java.time.ZonedDateTime
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 trait ColumnarTableTypes[M[+ _]] {

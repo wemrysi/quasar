@@ -28,15 +28,10 @@ import java.nio.charset.Charset
 import java.util.UUID
 
 package object blueeyes extends precog.PackageTime {
-  type spec    = scala.specialized
-  type switch  = scala.annotation.switch
-  type tailrec = scala.annotation.tailrec
-
   type MimeType = quasar.precog.MimeType
   val MimeType  = quasar.precog.MimeType
   val MimeTypes = quasar.precog.MimeTypes
 
-  // Temporary
   type BitSet             = quasar.precog.BitSet
   type RawBitSet          = Array[Int]
   val RawBitSet           = quasar.precog.util.RawBitSet

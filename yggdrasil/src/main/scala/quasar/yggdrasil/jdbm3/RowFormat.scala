@@ -26,6 +26,7 @@ import quasar.precog.util.{ ByteBufferMonad, ByteBufferPool, NumericComparisons 
 import java.nio.ByteBuffer
 import java.time.ZonedDateTime
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 trait ColumnEncoder {

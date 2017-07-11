@@ -34,6 +34,7 @@ import scalaz._, Scalaz._, Ordering._
 import scala.collection.mutable
 import TableModule._
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 trait BlockStoreColumnarTableModuleConfig {

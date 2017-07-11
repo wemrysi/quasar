@@ -32,7 +32,9 @@ import scalaz._, Scalaz._, Ordering._
 import java.nio.CharBuffer
 import java.time.ZonedDateTime
 
+import scala.annotation.{switch, tailrec}
 import scala.collection.mutable
+import scala.specialized
 
 trait Slice { source =>
   import Slice._
@@ -104,7 +106,7 @@ trait Slice { source =>
     val cols0 = (source.columns).toList sortBy { case (ref, _) => ref.selector }
     val cols  = cols0 map { case (_, col)                      => col }
 
-    def inflate[@spec A: CTag](cols: Array[Int => A], row: Int) = {
+    def inflate[@specialized A: CTag](cols: Array[Int => A], row: Int) = {
       val as = new Array[A](cols.length)
       var i = 0
       while (i < cols.length) {

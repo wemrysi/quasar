@@ -29,6 +29,7 @@ import scalaz._
 import scalaz.effect.IO
 import scalaz.Ordering.{LT, EQ, GT}
 
+import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable.Builder
@@ -384,7 +385,7 @@ object NumericComparisons {
 }
 
 object RawBitSet {
-  final def create(size: Int): RawBitSet = new Array[Int]((size >>> 5) + 1)
+  final def create(size: Int): Array[Int] = new Array[Int]((size >>> 5) + 1)
 
   final def get(bits: Array[Int], i: Int): Boolean = {
     val pos = i >>> 5

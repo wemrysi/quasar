@@ -17,13 +17,15 @@
 package quasar.yggdrasil
 package util
 
-import java.time.ZonedDateTime
-
-import quasar.precog._
 import quasar.blueeyes._
+import quasar.precog._
 import quasar.precog.common._
 import quasar.yggdrasil.table._
+
 import scalaz._, Scalaz._
+
+import java.time.ZonedDateTime
+import scala.specialized
 
 /**
   * Represents the result of an ordering, but with the possibility that no
@@ -65,7 +67,7 @@ object CPathComparator {
     def compare(a: ZonedDateTime, b: ZonedDateTime) = a compareTo b
   }
 
-  def apply[@spec(Boolean, Long, Double, AnyRef) A, @spec(Boolean, Long, Double, AnyRef) B](lCol: Int => A, rCol: Int => B)(implicit order: HetOrder[A, B]) = {
+  def apply[@specialized(Boolean, Long, Double, AnyRef) A, @specialized(Boolean, Long, Double, AnyRef) B](lCol: Int => A, rCol: Int => B)(implicit order: HetOrder[A, B]) = {
     new CPathComparator {
       def compare(r1: Int, r2: Int, i: Array[Int]) =
         MaybeOrdering.fromInt(order.compare(lCol(r1), rCol(r2)))
@@ -186,7 +188,7 @@ private[yggdrasil] trait ArrayCPathComparatorSupport {
   * A non-boxing CPathComparator where the left-side is a homogeneous array and
   * the right side is not.
   */
-private[yggdrasil] final class HalfArrayCPathComparator[@spec(Boolean, Long, Double) A, @spec(Boolean, Long, Double) B](
+private[yggdrasil] final class HalfArrayCPathComparator[@specialized(Boolean, Long, Double) A, @specialized(Boolean, Long, Double) B](
     lPath: CPath,
     lCol: HomogeneousArrayColumn[_],
     rCol: Int => B)(implicit ma: CTag[A], ho: HetOrder[A, B])
@@ -217,7 +219,7 @@ private[yggdrasil] final class HalfArrayCPathComparator[@spec(Boolean, Long, Dou
 /**
   * A non-boxing CPathComparator for homogeneous arrays.
   */
-private[yggdrasil] final class ArrayCPathComparator[@spec(Boolean, Long, Double) A, @spec(Boolean, Long, Double) B](
+private[yggdrasil] final class ArrayCPathComparator[@specialized(Boolean, Long, Double) A, @specialized(Boolean, Long, Double) B](
     lPath: CPath,
     lCol: HomogeneousArrayColumn[_],
     rPath: CPath,
@@ -225,7 +227,7 @@ private[yggdrasil] final class ArrayCPathComparator[@spec(Boolean, Long, Double)
     extends CPathComparator
     with ArrayCPathComparatorSupport {
 
-  // FIXME: These are lazy to get around a bug in @spec. We can probably remove
+  // FIXME: These are lazy to get around a bug in @specialized. We can probably remove
   // this in 2.10.
 
   final lazy val lMask: Array[Boolean] = makeMask(lPath)
@@ -264,7 +266,7 @@ private[yggdrasil] final class ArrayCPathComparator[@spec(Boolean, Long, Double)
   * ArraySelector provides a non-boxing way of accessing the leaf elements in a
   * bunch of nested arrays.
   */
-private[yggdrasil] final class ArraySelector[@spec(Boolean, Long, Double) A](implicit m: CTag[A]) {
+private[yggdrasil] final class ArraySelector[@specialized(Boolean, Long, Double) A](implicit m: CTag[A]) {
   private val am = m.wrap
 
   def canPluck(a: Array[_], indices: Array[Int], mask: Array[Boolean]): Boolean = {

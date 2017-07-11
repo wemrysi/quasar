@@ -17,11 +17,13 @@
 package quasar.yggdrasil
 package jdbm3
 
-import quasar.blueeyes._
 import quasar.precog.common._
-import quasar.yggdrasil.table._
-import org.scalacheck.Shrink
 import quasar.precog.TestSupport._
+import quasar.yggdrasil.table._
+
+import org.scalacheck.Shrink
+
+import scala.annotation.tailrec
 
 class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators {
   import Arbitrary._

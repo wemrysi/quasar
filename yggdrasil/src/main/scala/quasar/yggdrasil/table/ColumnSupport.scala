@@ -22,6 +22,8 @@ import quasar.precog.common._
 
 import java.time.ZonedDateTime
 
+import scala.annotation.tailrec
+
 class BitsetColumn(definedAt: BitSet) {
   this: Column =>
   def isDefinedAt(row: Int): Boolean = definedAt(row)

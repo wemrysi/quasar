@@ -25,7 +25,9 @@ import scalaz.Semigroup
 
 import java.time.ZonedDateTime
 
+import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.specialized
 
 sealed trait Column {
   def isDefinedAt(row: Int): Boolean
@@ -48,7 +50,7 @@ sealed trait Column {
 
 private[yggdrasil] trait ExtensibleColumn extends Column // TODO: or should we just unseal Column?
 
-trait HomogeneousArrayColumn[@spec(Boolean, Long, Double) A] extends Column with (Int => Array[A]) { self =>
+trait HomogeneousArrayColumn[@specialized(Boolean, Long, Double) A] extends Column with (Int => Array[A]) { self =>
   val tpe: CArrayType[A]
   def apply(row: Int): Array[A]
   def isDefinedAt(row: Int): Boolean
@@ -432,7 +434,7 @@ object Column {
     def apply(row: Int) = v
   }
 
-  @inline def const[@spec(Boolean, Long, Double) A: CValueType](v: Array[A]) = new InfiniteColumn with HomogeneousArrayColumn[A] {
+  @inline def const[@specialized(Boolean, Long, Double) A: CValueType](v: Array[A]) = new InfiniteColumn with HomogeneousArrayColumn[A] {
     val tpe = CArrayType(CValueType[A])
     def apply(row: Int) = v
   }
