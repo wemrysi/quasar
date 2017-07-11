@@ -29,10 +29,6 @@ import java.nio.charset.Charset
 import java.util.UUID
 
 package object blueeyes extends precog.PackageTime {
-  type MimeType = quasar.precog.MimeType
-  val MimeType  = quasar.precog.MimeType
-  val MimeTypes = quasar.precog.MimeTypes
-
   type ByteBufferPoolS[A] = State[(ByteBufferPool, List[ByteBuffer]), A]
 
   def Utf8Charset: Charset                                               = Charset forName "UTF-8"
