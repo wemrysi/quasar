@@ -25,6 +25,7 @@ import quasar.api.ApiError._
 import quasar.api.ApiErrorEntityDecoder._
 import quasar.api.matchers._
 import quasar.api.PathUtils._
+import quasar.api.services.Fixture._
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fp._
 import quasar.fp.free._
@@ -42,7 +43,7 @@ import eu.timepit.refined.scalacheck.numeric._
 import shapeless.tag.@@
 import org.http4s.{Query, _}
 import org.http4s.dsl._
-import org.http4s.headers.`Content-Type`
+import org.http4s.headers._
 import pathy.scalacheck.PathyArbitrary._
 import pathy.scalacheck.{AlphaCharacters, PathOf}
 import pathy.scalacheck.PathOf.{absFileOfArbitrary, relFileOfArbitrary}
@@ -78,9 +79,9 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
 
   def isExpectedResponse(data: Vector[Data], response: Response, format: MessageFormat) = {
     val expectedBody: Process[Task, String] = format.encode(Process.emitAll(data))
-    response.as[String].unsafePerformSync must_== expectedBody.runLog.unsafePerformSync.mkString("")
-    response.status must_== Status.Ok
-    response.contentType must_== Some(`Content-Type`(format.mediaType, Charset.`UTF-8`))
+    response.as[String].unsafePerformSync must_=== expectedBody.runLog.unsafePerformSync.mkString("")
+    response.status must_=== Status.Ok
+    response.contentType must_=== Some(`Content-Type`(format.mediaType, Charset.`UTF-8`))
   }
 
   "Invoke Service" should {
@@ -175,6 +176,22 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
           val response = service(state, mounts)(request).unsafePerformSync
           isExpectedResponse(sampleData.drop(offset).take(limit), response, MessageFormat.Default)
         }
+      }
+      "support disposition" >>
+        prop { (functionFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
+                dataFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
+                sampleData: Vector[Data]) =>
+          val disposition = `Content-Disposition`("attachement", Map("filename" -> "data.json"))
+          val statements = List(sampleStatement(fileName(functionFile.path).value))
+          val mounts = Map((fileParent(functionFile.path):APath) -> MountConfig.moduleConfig(statements))
+          val state = InMemState.fromFiles(Map(dataFile.path -> sampleData))
+          val arg = "`" + posixCodec.printPath(dataFile.path) + "`"
+          val request = Request(
+            uri = pathUri(functionFile.path).copy(query = Query.fromPairs("bar" -> arg)),
+            headers = Headers(Accept(jsonReadableLine.mediaType.withExtensions(Map("disposition" -> disposition.value)))))
+          val response = service(state, mounts)(request).unsafePerformSync
+          isExpectedResponse(sampleData, response, MessageFormat.Default)
+          response.headers.get(`Content-Disposition`) must_=== Some(disposition)
       }
     }
   }

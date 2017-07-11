@@ -1,7 +1,6 @@
 {
     "name": "filter field in single-element set",
     "backends": {
-        "mimir":"pending",
         "postgresql": "pending"
     },
     "data": "zips.data",
