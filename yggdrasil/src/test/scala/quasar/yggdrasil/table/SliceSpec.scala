@@ -21,6 +21,7 @@ import quasar.blueeyes._
 import quasar.precog.util._
 import quasar.precog.common._
 
+import java.time.{Instant, ZoneOffset, ZonedDateTime}
 import scala.util.Random
 import org.scalacheck.{ Arbitrary, Gen }
 import Gen.listOfN
@@ -186,6 +187,7 @@ class SliceSpec extends Specification with ScalaCheck {
 object ArbitrarySlice {
   private def genBitSet(size: Int): Gen[BitSet] = listOfN(size, genBool) ^^ (BitsetColumn bitset _)
 
+  // TODO remove duplication with `SegmentFormatSupport#genForCType`
   def genColumn(col: ColumnRef, size: Int): Gen[Column] = {
     def bs = BitSetUtil.range(0, size)
     col.ctype match {
@@ -193,7 +195,7 @@ object ArbitrarySlice {
       case CBoolean      => arrayOfN(size, genBool) ^^ (ArrayBoolColumn(bs, _))
       case CLong         => arrayOfN(size, genLong) ^^ (ArrayLongColumn(bs, _))
       case CDouble       => arrayOfN(size, genDouble) ^^ (ArrayDoubleColumn(bs, _))
-      case CDate         => arrayOfN(size, genLong) ^^ (ns => ArrayDateColumn(bs, ns map dateTime.fromMillis))
+      case CDate         => arrayOfN(size, genLong) ^^ (ns => ArrayDateColumn(bs, ns.map(n => ZonedDateTime.ofInstant(Instant.ofEpochSecond(n % Instant.MAX.getEpochSecond), ZoneOffset.UTC))))
       case CPeriod       => arrayOfN(size, genLong) ^^ (ns => ArrayPeriodColumn(bs, ns map period.fromMillis))
       case CNum          => arrayOfN(size, genDouble) ^^ (ns => ArrayNumColumn(bs, ns map (v => BigDecimal(v))))
       case CNull         => genBitSet(size) ^^ (s => new BitsetColumn(s) with NullColumn)

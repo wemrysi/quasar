@@ -32,7 +32,7 @@ import scalaz._, Scalaz._, Ordering._
 
 import java.io.File
 import java.nio.CharBuffer
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 import scala.collection.mutable
 
@@ -386,7 +386,7 @@ trait ColumnarTableModule[M[+ _]]
       Table(Slice(Map(ColumnRef(CPath.Identity, CString) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
-    def constDate(v: collection.Set[LocalDateTime]): Table = {
+    def constDate(v: collection.Set[ZonedDateTime]): Table = {
       val column = ArrayDateColumn(v.toArray)
       Table(Slice(Map(ColumnRef(CPath.Identity, CDate) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }

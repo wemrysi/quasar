@@ -22,7 +22,7 @@ import quasar.yggdrasil.table._
 import quasar.precog.util._
 import quasar.precog._, TestSupport._
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 class CPathTraversalSpec extends Specification {
   import CPathTraversal._
@@ -43,7 +43,7 @@ class CPathTraversalSpec extends Specification {
     implicit val BoolColBuilder   = builder[Boolean](ArrayBoolColumn(_, _))
     implicit val DoubleColBuilder = builder[Double](ArrayDoubleColumn(_, _))
     implicit val NumColBuilder    = builder[BigDecimal](ArrayNumColumn(_, _))
-    implicit val DateColBuilder   = builder[LocalDateTime](ArrayDateColumn(_, _))
+    implicit val DateColBuilder   = builder[ZonedDateTime](ArrayDateColumn(_, _))
     implicit def HomogeneousArrayColBuilder[@spec(Boolean, Long, Double) A: CValueType] =
       builder[Array[A]](ArrayHomogeneousArrayColumn(_, _))
   }

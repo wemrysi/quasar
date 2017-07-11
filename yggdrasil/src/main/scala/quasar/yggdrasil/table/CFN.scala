@@ -21,7 +21,7 @@ import quasar.yggdrasil.bytecode.JType
 import quasar.blueeyes._
 import quasar.precog.common._
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 sealed trait CFId
 case class LeafCFId(identity: String)            extends CFId
@@ -276,7 +276,7 @@ trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
 
       case (tpe @ CDate, (cols0, defined)) => {
         val max  = maxIds(cols0, defined)
-        val cols = cols0.asInstanceOf[Array[Array[LocalDateTime]]]
+        val cols = cols0.asInstanceOf[Array[Array[ZonedDateTime]]]
 
         val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
           ColumnRef(CPath(CPathIndex(i)), tpe) -> new DateColumn {

@@ -21,7 +21,7 @@ import quasar.precog._
 import quasar.precog.common._
 import quasar.precog.util._
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 trait DefinedAtIndex {
   private[table] val defined: BitSet
@@ -151,22 +151,22 @@ object ArrayStrColumn {
     new ArrayStrColumn(new BitSet, new Array[String](size))
 }
 
-class ArrayDateColumn(val defined: BitSet, values: Array[LocalDateTime]) extends ArrayColumn[LocalDateTime] with DateColumn {
+class ArrayDateColumn(val defined: BitSet, values: Array[ZonedDateTime]) extends ArrayColumn[ZonedDateTime] with DateColumn {
   def apply(row: Int) = values(row)
 
-  def update(row: Int, value: LocalDateTime) = {
+  def update(row: Int, value: ZonedDateTime) = {
     defined.set(row)
     values(row) = value
   }
 }
 
 object ArrayDateColumn {
-  def apply(values: Array[LocalDateTime]) =
+  def apply(values: Array[ZonedDateTime]) =
     new ArrayDateColumn(BitSetUtil.range(0, values.length), values)
-  def apply(defined: BitSet, values: Array[LocalDateTime]) =
+  def apply(defined: BitSet, values: Array[ZonedDateTime]) =
     new ArrayDateColumn(defined.copy, values)
   def empty(size: Int): ArrayDateColumn =
-    new ArrayDateColumn(new BitSet, new Array[LocalDateTime](size))
+    new ArrayDateColumn(new BitSet, new Array[ZonedDateTime](size))
 }
 
 class ArrayPeriodColumn(val defined: BitSet, values: Array[Period]) extends ArrayColumn[Period] with PeriodColumn {

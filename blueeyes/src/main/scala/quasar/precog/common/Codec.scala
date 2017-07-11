@@ -23,7 +23,11 @@ import quasar.precog.util.{ BitSetUtil, ByteBufferMonad, ByteBufferPool }
 import java.nio.{ByteBuffer, CharBuffer}
 import java.nio.charset.{ CharsetEncoder, CoderResult }
 import java.math.{ BigDecimal => BigDec }
-import java.time.LocalDateTime
+import java.time.{LocalDateTime, ZonedDateTime}
+import java.time.format.DateTimeFormatter
+
+import scala.annotation.tailrec
+import scala.specialized
 
 import scalaz._
 
@@ -34,7 +38,7 @@ import scalaz._
   * given to a `writeMore` method so it can finish the writing. It may take
   * several calls to `writeMore` before it all is finally written.
   */
-trait Codec[@spec(Boolean, Long, Double) A] { self =>
+trait Codec[@specialized(Boolean, Long, Double) A] { self =>
   type S
 
   /** Returns the exact encoded size of `a`. */
@@ -153,7 +157,7 @@ object Codec {
 
   implicit def IndexedSeqCodec[A](implicit elemCodec: Codec[A]) = new IndexedSeqCodec(elemCodec)
 
-  implicit def arrayCodec[@spec(Boolean, Long, Double) A: Codec: CTag]: Codec[Array[A]] = ArrayCodec(Codec[A])
+  implicit def arrayCodec[@specialized(Boolean, Long, Double) A: Codec: CTag]: Codec[Array[A]] = ArrayCodec(Codec[A])
 
   /**
     * A utility method for getting the encoded version of `a` as an array of
@@ -236,7 +240,7 @@ object Codec {
     }
   }
 
-  trait FixedWidthCodec[@spec(Boolean, Long, Double) A] extends Codec[A] {
+  trait FixedWidthCodec[@specialized(Boolean, Long, Double) A] extends Codec[A] {
     type S = A
 
     def size: Int
@@ -361,8 +365,16 @@ object Codec {
     }
   }
 
-  implicit val DateCodec   = Codec[Long].as[LocalDateTime](_.getMillis, dateTime.fromMillis)
-  implicit val PeriodCodec = Codec[Long].as[Period](_.getMillis, period.fromMillis)
+  implicit val LocalDateTimeCodec =
+    Codec[Long].as[LocalDateTime](_.getMillis, dateTime.fromMillis)
+
+  implicit val ZonedDateTimeCodec = {
+    val formatter = DateTimeFormatter.ISO_ZONED_DATE_TIME
+    Utf8Codec.as[ZonedDateTime](_.format(formatter), ZonedDateTime.parse(_, formatter))
+  }
+
+  implicit val PeriodCodec =
+    Codec[Long].as[Period](_.getMillis, period.fromMillis)
 
   implicit case object DoubleCodec extends FixedWidthCodec[Double] {
     val size = 8
@@ -530,7 +542,7 @@ object Codec {
       }
     }
   }
-  case class ArrayCodec[@spec(Boolean, Long, Double) A: CTag](elemCodec: Codec[A]) extends Codec[Array[A]] {
+  case class ArrayCodec[@specialized(Boolean, Long, Double) A: CTag](elemCodec: Codec[A]) extends Codec[Array[A]] {
     type S = Either[Array[A], (elemCodec.S, Array[A], Int)]
 
     override def minSize(as: Array[A]): Int = 5

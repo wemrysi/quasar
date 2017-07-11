@@ -137,8 +137,6 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
         implicit val arbRows: Arbitrary[List[List[CValue]]] =
           Arbitrary(Gen.listOfN(10, genCValuesForColumnRefs(refs)))
 
-
-
         prop { (vals: List[List[CValue]]) =>
           val valueEncoded = vals map (valueRowFormat.encode(_))
           val sortEncoded = vals map (sortingKeyRowFormat.encode(_))
@@ -168,6 +166,7 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
         }
       }
     }
+
     "survive rountrip from CValue -> Array[Byte] -> Column -> Array[Byte] -> CValue" in {
       val size = 10
 
@@ -196,5 +195,3 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
     }
   }
 }
-
-

@@ -24,7 +24,7 @@ import scalaz._, Scalaz._
 import quasar.precog.util.{ ByteBufferMonad, ByteBufferPool, NumericComparisons }, ByteBufferPool._
 
 import java.nio.ByteBuffer
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 import scala.collection.mutable
 
@@ -178,8 +178,8 @@ trait RowFormatSupport { self: StdCodecs =>
       }
 
     case (CDate, col: DateColumn) =>
-      new SimpleColumnValueEncoder[LocalDateTime] {
-        val codec = Codec[LocalDateTime]
+      new SimpleColumnValueEncoder[ZonedDateTime] {
+        val codec = Codec[ZonedDateTime]
 
         def encode(row: Int, buffer: ByteBuffer, pool: ByteBufferPool): Option[List[ByteBuffer]] = {
           codec.writeInit(col(row), buffer) match {
@@ -246,7 +246,7 @@ trait RowFormatSupport { self: StdCodecs =>
       }
     case (CDate, col: ArrayDateColumn) =>
       new ColumnValueDecoder {
-        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[LocalDateTime].read(buf))
+        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[ZonedDateTime].read(buf))
       }
     case (CPeriod, col: ArrayPeriodColumn) =>
       new ColumnValueDecoder {
@@ -429,7 +429,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
         (x match {
           case CBoolean(x)      => wrappedWriteInit[Boolean](x, sink)
           case CString(x)       => wrappedWriteInit[String](x, sink)
-          case CDate(x)         => wrappedWriteInit[LocalDateTime](x, sink)
+          case CDate(x)         => wrappedWriteInit[ZonedDateTime](x, sink)
           case CPeriod(x)       => wrappedWriteInit[Period](x, sink)
           case CLong(x)         => wrappedWriteInit[Long](x, sink)
           case CDouble(x)       => wrappedWriteInit[Double](x, sink)

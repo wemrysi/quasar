@@ -38,7 +38,7 @@ import java.io.{File, FileReader, IOException}
 import java.io.RandomAccessFile
 import java.nio.channels.{ FileChannel, FileLock => JFileLock }
 import java.nio.file.Files
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 import java.util.Arrays.fill
 import java.util.Properties
 
@@ -335,7 +335,7 @@ object NumericComparisons {
 
   @inline def compare(a: BigDecimal, b: BigDecimal): Int = a compare b
 
-  @inline def compare(a: LocalDateTime, b: LocalDateTime): Int = {
+  @inline def compare(a: ZonedDateTime, b: ZonedDateTime): Int = {
     val res: Int = a compareTo b
     if (res < 0) -1
     else if (res > 0) 1
@@ -379,7 +379,7 @@ object NumericComparisons {
   @inline def order(a: BigDecimal, b: BigDecimal): scalaz.Ordering =
     scalaz.Ordering.fromInt(compare(a, b))
 
-  @inline def order(a: LocalDateTime, b: LocalDateTime): scalaz.Ordering =
+  @inline def order(a: ZonedDateTime, b: ZonedDateTime): scalaz.Ordering =
     scalaz.Ordering.fromInt(compare(a, b))
 }
 
