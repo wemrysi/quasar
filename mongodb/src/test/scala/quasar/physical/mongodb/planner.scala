@@ -28,6 +28,7 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
+import quasar.qscript.DiscoverPath
 import quasar.sql , sql.{fixpoint => sqlF, _}
 import quasar.std._
 
@@ -43,7 +44,6 @@ import org.specs2.execute.Result
 import org.specs2.matcher.{Matcher, Expectable}
 import pathy.Path._
 import scalaz._, Scalaz._
-import quasar.specs2.QuasarMatchers._
 
 class PlannerSpec extends
     org.specs2.mutable.Specification with
@@ -289,7 +289,7 @@ class PlannerSpec extends
     }
 
     "plan concat (3.2+)" in {
-      plan3_2("select concat(bar, baz) from foo", defaultStats, defaultIndexes) must
+      plan3_2(sqlE"select concat(bar, baz) from foo", defaultStats, defaultIndexes) must
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $project(
@@ -537,7 +537,7 @@ class PlannerSpec extends
     }.pendingUntilFixed(notOnPar)
 
     "plan select array element (3.0-)" in {
-      plan3_0("select loc[0] from zips") must
+      plan3_0(sqlE"select loc[0] from zips") must
       beWorkflow(chain[Workflow](
         $read(collection("db", "zips")),
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
@@ -1973,7 +1973,7 @@ class PlannerSpec extends
     }
 
     "plan array project with concat (3.2+)" in {
-      plan3_2("select city, loc[0] from zips", defaultStats, defaultIndexes) must
+      plan3_2(sqlE"select city, loc[0] from zips", defaultStats, defaultIndexes) must
         beWorkflow {
           chain[Workflow](
             $read(collection("db", "zips")),

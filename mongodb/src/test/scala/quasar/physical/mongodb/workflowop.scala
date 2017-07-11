@@ -54,14 +54,18 @@ class WorkflowFSpec extends org.specs2.scalaz.Spec {
     new (Cogen ~> λ[α => Cogen[CardinalExpr[α]]]) {
       def apply[α](cg: Cogen[α]): Cogen[CardinalExpr[α]] =
         Cogen { (seed: Seed, ce: CardinalExpr[α]) =>
-          cg.perturb(seed, ce.copoint)
+          ce match {
+            case MapExpr(fn)        => cg.perturb(seed, fn)
+            case SubExpr(place, fn) => cg.perturb(cg.perturb(seed, place), fn)
+            case FlatExpr(fn)       => cg.perturb(seed, fn)
+          }
         }
     }
 
   implicit val cogenIntCardinalExpr = cogenCardinalExpr(Cogen.cogenInt)
 
   checkAll("CardinalExpr", traverse.laws[CardinalExpr])
-  checkAll("CardinalExpr", comonad.laws[CardinalExpr])
+  // checkAll("CardinalExpr", comonad.laws[CardinalExpr])
 }
 
 class WorkflowSpec extends quasar.Qspec with TreeMatchers {
