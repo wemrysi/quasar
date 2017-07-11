@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.algebra._
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
-import quasar.ejson, ejson.{CommonEJson => C, EJson, EJsonArbitrary, ExtEJson => E, z85}
+import quasar.ejson, ejson.{CommonEJson => C, EJsonArbitrary, ExtEJson => E, z85}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.numeric.Positive
@@ -48,9 +48,9 @@ final class CompressionSpec extends quasar.Qspec
 
   implicit val params = Parameters(maxSize = 10)
 
-  import StructuralType.{ConstST, TypeST}
+  import StructuralType.{ConstST, TagST, TypeST}
 
-  type J = Fix[EJson]
+  type J = TypedEJson[Fix]
   type S = SST[J, Real]
 
   case class LeafEjs(ejs: J) {
@@ -78,31 +78,39 @@ final class CompressionSpec extends quasar.Qspec
   def sstConst(s: S) = ConstST unapply (s.project) map (_._3)
 
   "coalesceKeys" >> {
-    "compresses largest group of keys having same primary type" >> prop {
-      (cs: ISet[Char], n: BigInt, b: Byte, unk0: Option[(LeafEjs, LeafEjs)]) => (cs.size > 1) ==> {
+    def test(kind: String, f: Char => J) =
+      s"compresses largest group of keys having same primary ${kind}" >> prop {
+        (cs: ISet[Char], n: BigInt, b: Byte, unk0: Option[(LeafEjs, LeafEjs)]) => (cs.size > 1) ==> {
 
-      val chars = cs.toIList.map(c => E(ejson.char[J](c)).embed)
-      val int = E(ejson.int[J](n)).embed
-      val byte = E(ejson.byte[J](b)).embed
-      val nul = SST.fromEJson(Real(1), C(ejson.nul[J]()).embed)
-      val m0 = IMap.fromFoldable((int :: byte :: chars) strengthR nul)
+        val chars = cs.toIList map f
+        val int = E(ejson.int[J](n)).embed
+        val byte = E(ejson.byte[J](b)).embed
+        val nul = SST.fromEJson(Real(1), C(ejson.nul[J]()).embed)
+        val m0 = IMap.fromFoldable((int :: byte :: chars) strengthR nul)
+        val unk  = unk0.map(_.umap(_.toSST))
+        val msst = envT(cnt1, TypeST(TypeF.map[J, S](m0, unk))).embed
 
-      val unk  = unk0.map(_.umap(_.toSST))
-      val msst = envT(cnt1, TypeST(TypeF.map[J, S](m0, unk))).embed
-      val uval = SST.fromEJson(Real(cs.size), C(ejson.nul[J]()).embed)
-      val ukey = chars.foldMap1Opt(c => SST.fromEJson(Real(1), c))
-      val m1   = IMap.fromFoldable(IList(byte, int) strengthR nul)
-      val unk1 = ukey.strengthR(uval) |+| unk
-      val exp  = envT(cnt1, TypeST(TypeF.map[J, S](m1, unk1))).embed
+        val uval = SST.fromEJson(Real(cs.size), C(ejson.nul[J]()).embed)
+        val ukey = chars.foldMap1Opt(c => SST.fromEJson(Real(1), c))
+        val m1   = IMap.fromFoldable(IList(byte, int) strengthR nul)
+        val unk1 = ukey.strengthR(uval) |+| unk
+        val exp  = envT(cnt1, TypeST(TypeF.map[J, S](m1, unk1))).embed
 
-      msst.transCata[S](compression.coalesceKeys(2L)) must_= exp
-    }}
+        msst.transCata[S](compression.coalesceKeys(2L)) must_= exp
+      }}
+
+    test("type", c => E(ejson.char[J](c)).embed)
+
+    test("tag", c => E(ejson.Meta(
+      E(ejson.char[J](c)).embed,
+      ejson.Type[J](ejson.TypeTag("cp"))
+    )).embed)
 
     "ignores map where size of keys does not exceed maxSize" >> prop {
       (xs: IList[(LeafEjs, LeafEjs)], unk0: Option[(LeafEjs, LeafEjs)]) =>
 
       val m   = IMap.fromFoldable(xs.map(_.bimap(_.ejs, _.toSST)))
-      val unk = unk0.map(_.umap(l => SST.fromEJson(Real(1), l.ejs)))
+      val unk = unk0.map(_.umap(_.toSST))
       val sst = envT(cnt1, TypeST(TypeF.map[J, S](m, unk))).embed
 
       Positive(m.size.toLong).cata(
@@ -146,61 +154,76 @@ final class CompressionSpec extends quasar.Qspec
   }
 
   "coalesceWithUnknown" >> {
-    "merges known map entry with unknown entry when same primary type appears in unknown" >> prop {
-      (head: (Char, LeafEjs), xs0: NonEmptyList[(Char, LeafEjs)], kv: (BigInt, LeafEjs)) =>
+    def testUnk(kind: String, f: Char => J, g: (TypeStat[Real], SimpleType) => SSTF[J, Real, S]) =
+      s"merges known map entry with unknown entry when same primary $kind appears in unknown" >> prop {
+        (head: (Char, LeafEjs), xs0: NonEmptyList[(Char, LeafEjs)], kv: (BigInt, LeafEjs)) =>
 
-      val xs: IMap[Char, LeafEjs] = IMap.fromFoldable(xs0) + head
+        val xs: IMap[Char, LeafEjs] = IMap.fromFoldable(xs0) + head
 
-      val u1 = head.leftAs(SST.fromEJson(Real(1), E(ejson.char[J]('x')).embed)).map(_.toSST)
-      val u2 = head.bimap(c =>
-        envT(
-          TypeStat.fromEJson(Real(1), E(ejson.char[J](c)).embed),
-          TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
-        _.toSST)
-      val kv1 = kv.bimap(i => E(ejson.int[J](i)).embed, _.toSST)
-      val cs = xs.toList.map(_.bimap(c => E(ejson.char[J](c)).embed, _.toSST))
-      val m = IMap.fromFoldable(kv1 :: cs)
-      val sst1 = envT(cnt1, TypeST(TypeF.map(m, u1.some))).embed
-      val sst2 = envT(cnt1, TypeST(TypeF.map(m, u2.some))).embed
+        val u1 = head.bimap(_ => SST.fromEJson(Real(1), f('x')), _.toSST)
+        val u2 = head.bimap(
+          c => g(TypeStat.fromEJson(Real(1), E(ejson.char[J](c)).embed), SimpleType.Char).embed,
+          _.toSST)
+        val kv1 = kv.bimap(i => E(ejson.int[J](i)).embed, _.toSST)
+        val cs = xs.toList.map(_.bimap(f, _.toSST))
+        val m = IMap.fromFoldable(kv1 :: cs)
+        val sst1 = envT(cnt1, TypeST(TypeF.map(m, u1.some))).embed
+        val sst2 = envT(cnt1, TypeST(TypeF.map(m, u2.some))).embed
 
-      val a = cs.foldMap1Opt { case (j, s) => (SST.fromEJson(Real(1), j), s) }
-      val b = IMap.singleton(kv1._1, kv1._2)
-      val exp1 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u1)))).embed
-      val exp2 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u2)))).embed
+        val a = cs.foldMap1Opt { case (j, s) => (SST.fromEJson(Real(1), j), s) }
+        val b = IMap.singleton(kv1._1, kv1._2)
+        val exp1 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u1)))).embed
+        val exp2 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u2)))).embed
 
-      (sst1.transCata[S](compression.coalesceWithUnknown) must_= exp1) and
-      (sst2.transCata[S](compression.coalesceWithUnknown) must_= exp2)
+        (sst1.transCata[S](compression.coalesceWithUnknown) must_= exp1) and
+        (sst2.transCata[S](compression.coalesceWithUnknown) must_= exp2)
+      }
+
+    def testUnkUnion(kind: String, f: Char => J, g: (TypeStat[Real], SimpleType) => SSTF[J, Real, S]) =
+      s"merges known map entry with unknown when primary $kind appears in unknown union" >> prop {
+        (head: (Char, LeafEjs), xs0: NonEmptyList[(Char, LeafEjs)], kv: (BigInt, LeafEjs)) =>
+
+        val xs: IMap[Char, LeafEjs] = IMap.fromFoldable(xs0) + head
+
+        val u1 = head.bimap(_ => SST.fromEJson(Real(1), f('x')), _.toSST)
+        val u2 = head.bimap(
+          c => g(TypeStat.fromEJson(Real(1), E(ejson.char[J](c)).embed), SimpleType.Char).embed,
+          _.toSST)
+        val st = envT(cnt1, TypeST(TypeF.simple[J, S](SimpleType.Dec))).embed
+        val tp = envT(cnt1, TypeST(TypeF.top[J, S]())).embed
+        val u1u = u1.leftMap(s => envT(cnt1, TypeST(TypeF.union[J, S](tp, s, IList(st)))).embed)
+        val u2u = u2.leftMap(s => envT(cnt1, TypeST(TypeF.union[J, S](s, st, IList(tp)))).embed)
+        val kv1 = kv.bimap(i => E(ejson.int[J](i)).embed, _.toSST)
+        val cs = xs.toList.map(_.bimap(f, _.toSST))
+        val m = IMap.fromFoldable(kv1 :: cs)
+        val sst1 = envT(cnt1, TypeST(TypeF.map(m, u1u.some))).embed
+        val sst2 = envT(cnt1, TypeST(TypeF.map(m, u2u.some))).embed
+
+        val a = cs.foldMap1Opt { case (j, s) => (SST.fromEJson(Real(1), j), s) }
+        val b = IMap.singleton(kv1._1, kv1._2)
+        val exp1 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u1u)))).embed
+        val exp2 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u2u)))).embed
+
+        (sst1.transCata[S](compression.coalesceWithUnknown) must_= exp1) and
+        (sst2.transCata[S](compression.coalesceWithUnknown) must_= exp2)
+      }
+
+    def test(kind: String, f: Char => J, g: (TypeStat[Real], SimpleType) => SSTF[J, Real, S]) = {
+      testUnk(kind, f, g)
+      testUnkUnion(kind, f, g)
     }
 
-    "merges known map entry with unknown when primary type appears in unknown union" >> prop {
-      (head: (Char, LeafEjs), xs0: NonEmptyList[(Char, LeafEjs)], kv: (BigInt, LeafEjs)) =>
+    test("type",
+      c => E(ejson.char[J](c)).embed,
+      (ts, st) => envT(ts, TypeST(TypeF.simple[J, S](st))))
 
-      val xs: IMap[Char, LeafEjs] = IMap.fromFoldable(xs0) + head
-
-      val u1 = head.leftAs(SST.fromEJson(Real(1), E(ejson.char[J]('x')).embed)).map(_.toSST)
-      val u2 = head.bimap(c =>
-        envT(
-          TypeStat.fromEJson(Real(1), E(ejson.char[J](c)).embed),
-          TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
-        _.toSST)
-      val st = envT(cnt1, TypeST(TypeF.simple[J, S](SimpleType.Dec))).embed
-      val tp = envT(cnt1, TypeST(TypeF.top[J, S]())).embed
-      val u1u = u1.leftMap(s => envT(cnt1, TypeST(TypeF.union[J, S](tp, s, IList(st)))).embed)
-      val u2u = u2.leftMap(s => envT(cnt1, TypeST(TypeF.union[J, S](s, st, IList(tp)))).embed)
-      val kv1 = kv.bimap(i => E(ejson.int[J](i)).embed, _.toSST)
-      val cs = xs.toList.map(_.bimap(c => E(ejson.char[J](c)).embed, _.toSST))
-      val m = IMap.fromFoldable(kv1 :: cs)
-      val sst1 = envT(cnt1, TypeST(TypeF.map(m, u1u.some))).embed
-      val sst2 = envT(cnt1, TypeST(TypeF.map(m, u2u.some))).embed
-
-      val a = cs.foldMap1Opt { case (j, s) => (SST.fromEJson(Real(1), j), s) }
-      val b = IMap.singleton(kv1._1, kv1._2)
-      val exp1 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u1u)))).embed
-      val exp2 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u2u)))).embed
-
-      (sst1.transCata[S](compression.coalesceWithUnknown) must_= exp1) and
-      (sst2.transCata[S](compression.coalesceWithUnknown) must_= exp2)
-    }
+    test("tag",
+      c => E(ejson.Meta(
+        E(ejson.char[J](c)).embed,
+        ejson.Type[J](ejson.TypeTag("codepoint")))).embed,
+      (ts, st) => envT(TypeStat.count(ts.size), TagST[J](Tagged(
+        ejson.TypeTag("codepoint"),
+        envT(ts, TypeST(TypeF.simple[J, S](st))).embed))))
 
     "has no effect on maps when all keys are known" >> prop { xs: IList[(LeafEjs, LeafEjs)] =>
       val m   = IMap.fromFoldable(xs.map(_.bimap(_.ejs, _.toSST)))
@@ -212,6 +235,18 @@ final class CompressionSpec extends quasar.Qspec
     "has no effect on maps when primary type not in unknown" >> prop { xs: IList[(LeafEjs, LeafEjs)] =>
       val m   = IMap.fromFoldable(xs.map(_.bimap(_.ejs, _.toSST)))
       val T   = envT(cnt1, TypeST(TypeF.top[J, S]())).embed
+      val sst = envT(cnt1, TypeST(TypeF.map[J, S](m, Some((T, T))))).embed
+
+      sst.transCata[S](compression.coalesceWithUnknown) must_= sst
+    }
+
+    "has no effect on maps when primary tag not in unknown" >> prop { xs: IList[(LeafEjs, LeafEjs)] =>
+      val foo = ejson.TypeTag("foo")
+      val bar = ejson.TypeTag("bar")
+      val m = IMap.fromFoldable(xs.map(_.bimap(
+        l => E(ejson.Meta(l.ejs, ejson.Type[J](foo))).embed,
+        _.toSST)))
+      val T = envT(cnt1, TagST[J](Tagged(bar, envT(cnt1, TypeST(TypeF.top[J, S]())).embed))).embed
       val sst = envT(cnt1, TypeST(TypeF.map[J, S](m, Some((T, T))))).embed
 
       sst.transCata[S](compression.coalesceWithUnknown) must_= sst

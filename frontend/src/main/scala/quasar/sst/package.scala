@@ -101,7 +101,7 @@ package object sst {
           unfoldStructural))
     }
 
-    // Allows us to use the size metadata during compression.
+    // Allows use of the size metadata during compression.
     private def preserveConstBinary[J, A](
       implicit J: Recursive.Aux[J, EJson]
     ): PartialFunction[TypeF[J, A], StructuralType.ST[J, A]] = {
