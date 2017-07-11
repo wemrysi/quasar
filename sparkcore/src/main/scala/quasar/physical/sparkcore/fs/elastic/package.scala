@@ -131,7 +131,7 @@ package object elastic {
       corequeryfile.interpreter[Eff](queryfile.input[Eff], FsType),
       corereadfile.interpret[Eff](readfile.input[Eff]),
       writefile.interpreter[Eff],
-      Empty.manageFile[FreeEff])
+      managefile.interpreter[Eff])
   }
 
   def definition[S[_]](implicit

@@ -24,8 +24,6 @@ import quasar.fs._,
   MoveScenario._,
   FileSystemError._,
   PathError._
-// import quasar.effect._
-import quasar.fp.free._
 import quasar.fs.impl.ensureMoveSemantics
 
 import pathy._, Path._
@@ -33,12 +31,7 @@ import scalaz._, Scalaz._
 
 object managefile {
 
-  def chrooted[S[_]](prefix: ADir)(implicit
-    s1: ElasticCall.Ops[S]
-  ): ManageFile ~> Free[S, ?] =
-    flatMapSNT(interpret) compose chroot.manageFile[ManageFile](prefix)
-
-  def interpret[S[_]](implicit
+  def interpreter[S[_]](implicit
     s0: ElasticCall.Ops[S]
   ): ManageFile ~> Free[S, ?] =
     new (ManageFile ~> Free[S, ?]) {
