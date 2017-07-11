@@ -35,9 +35,6 @@ package object blueeyes extends precog.PackageTime {
 
   type ByteBufferPoolS[A] = State[(ByteBufferPool, List[ByteBuffer]), A]
 
-  val HNil = shapeless.HNil
-  val Iso  = shapeless.Generic
-
   def Utf8Charset: Charset                                               = Charset forName "UTF-8"
   def utf8Bytes(s: String): Array[Byte]                                  = s getBytes Utf8Charset
   def uuid(s: String): UUID                                              = UUID fromString s
