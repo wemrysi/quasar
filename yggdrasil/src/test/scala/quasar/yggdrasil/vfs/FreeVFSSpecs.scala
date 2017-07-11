@@ -17,6 +17,7 @@
 package quasar.yggdrasil.vfs
 
 import quasar.contrib.pathy.{ADir, RPath}
+import quasar.fs.MoveSemantics
 
 import fs2.{Stream, Sink}
 

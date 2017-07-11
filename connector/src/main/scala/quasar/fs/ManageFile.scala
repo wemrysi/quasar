@@ -30,9 +30,6 @@ import scalaz._, Scalaz._
 sealed abstract class ManageFile[A]
 
 object ManageFile {
-  type MoveSemantics = quasar.fs.MoveSemantics
-  val MoveSemantics = quasar.fs.MoveSemantics
-
   sealed abstract class MoveScenario {
     import MoveScenario._
 

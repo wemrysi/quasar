@@ -40,7 +40,7 @@ import scalaz.stream.Process
 import scodec.bits.ByteVector
 
 object data {
-  import ManageFile.{MoveSemantics, MoveScenario}
+  import ManageFile.MoveScenario
 
   def service[S[_]](
     implicit
