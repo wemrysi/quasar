@@ -19,6 +19,7 @@ package quasar.physical.sparkcore.fs.elastic
 import slamdata.Predef._
 import quasar.fp.free._
 
+import delorean._
 import org.http4s.client.blaze._
 import org.http4s.Request
 import org.http4s.Method._
@@ -67,61 +68,37 @@ object ElasticCall {
     implicit def apply[S[_]](implicit S: ElasticCall :<: S): Ops[S] = new Ops[S]
   }
 
-  //TODO_ES reuse single client per interpreter, close when unmounted
+  //TODO_ES use Kleisly[Task, ElasticClientUr]
   implicit def interpreter: ElasticCall ~> Task = new (ElasticCall ~> Task) {
 
-    def _listIndices: Task[List[String]] = Task.delay {
-      val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
-      val result = client.execute { catIndices() }.await
-      client.close()
-      result.map(_.index).toList
-    }
+    import scala.concurrent.ExecutionContext.Implicits.global
 
-    def _createIndex(index: String): Task[Unit] = for {
+    def _listIndices(implicit client: HttpClient): Task[List[String]] =
+       client.execute { catIndices() }.toTask.map(_.map(_.index).toList)
+
+    def _createIndex(index: String)(implicit client: HttpClient): Task[Unit] = for {
       indices <- _listIndices
-      _       <- if(indices.contains(index)) ().point[Task] else Task.delay {
-        val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
-        val result = client.execute { createIndex(index) }.await
-        client.close()
-        ()
-      }
+      _       <- if(indices.contains(index)) ().point[Task] else client.execute { createIndex(index) }.toTask
     } yield ()
 
-    def _deleteIndex(index: String): Task[Unit] = for {
+    def _deleteIndex(index: String)(implicit client: HttpClient): Task[Unit] = for {
       indices <- _listIndices
-      _       <- if(!indices.contains(index)) ().point[Task] else Task.delay {
-        val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
-        val result = client.execute { deleteIndex(index) }.await
-        client.close()
-        ()
-      }
+      _       <- if(!indices.contains(index)) ().point[Task] else client.execute { deleteIndex(index) }.toTask
     } yield ()
 
-    def _indexInto(indexType: IndexType, data: List[(String, String)]): Task[Unit] = Task.delay {
-      val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
-      val result = client.execute { indexInto(indexType.index / indexType.typ) fields (data:_*) }.await
-      client.close()
-      ()
-    }
+    def _indexInto(indexType: IndexType, data: List[(String, String)])(implicit
+      client: HttpClient
+    ): Task[Unit] = client.execute { indexInto(indexType.index / indexType.typ) fields (data:_*) }.toTask.as(())
 
-    def _typeExists(index: String, typ: String): Task[Boolean] = Task.delay {
-      val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
-      val result = client.execute { typesExist(typ) in index }.await.exists
-      client.close()
-      result
-    }
+    def _typeExists(index: String, typ: String)(implicit client: HttpClient): Task[Boolean] = 
+       client.execute { typesExist(typ) in index }.toTask.map(_.exists)
 
-    def _listTypes(index: String): Task[List[String]] = for {
+    def _listTypes(index: String)(implicit client: HttpClient): Task[List[String]] = for {
       indices <- _listIndices
-      types   <- if(!indices.contains(index)) List.empty.point[Task] else Task.delay {
-        val client = HttpClient(ElasticsearchClientUri("localhost", 9200))
-        val result = client.execute { getMapping(index) }.await
-        client.close()
-        result.toList.flatMap(_.mappings.keys.toList)
-      }
+      types   <- if(!indices.contains(index)) List.empty.point[Task] else client.execute { getMapping(index) }.toTask.map(_.toList.flatMap(_.mappings.keys.toList))
     } yield types
 
-    def _deleteType(index: String, typ: String): Task[Unit] = for {
+    def _deleteType(index: String, typ: String)(implicit client: HttpClient): Task[Unit] = for {
       types <- _listTypes(index)
       temp  <- Task.delay(s"prefix${index}")
       _     <- _copyIndex(index, temp)
@@ -152,19 +129,32 @@ object ElasticCall {
       )
     } yield ()
 
+    def newHttpClient: Task[HttpClient] = Task.delay {
+      HttpClient(ElasticsearchClientUri("localhost", 9200))
+    }
+
+    def closeHttpClient(client: HttpClient): Task[Unit] = Task.delay {
+      client.close()
+    }
+
+    def run[A](t: HttpClient => Task[A]): Task[A] = for {
+        client <- newHttpClient
+        result <- t(client)
+        _    <- closeHttpClient(client)
+      } yield result
 
     def apply[A](from: ElasticCall[A]) = from match {
-      case CreateIndex(index) => _createIndex(index)
-      case IndexInto(indexType: IndexType, data: List[(String, String)]) => _indexInto(indexType, data)
+      case CreateIndex(index) => run(c => _createIndex(index)(c))
+      case IndexInto(indexType: IndexType, data: List[(String, String)]) => run(c => _indexInto(indexType, data)(c))
       case CopyType(src, dst) => _copyType(src, dst)
-      case CopyIndex(src, dst) => _copyIndex(src, dst)
-      case TypeExists(IndexType(index, typ)) => _typeExists(index, typ)
-      case ListTypes(index) => _listTypes(index)
-      case ListIndices() => _listIndices
-      case DeleteIndex(index) => _deleteIndex(index)
-      case DeleteType(IndexType(index, typ)) => _deleteType(index, typ)
+      case CopyIndex(src, dst) =>_copyIndex(src, dst)
+      case TypeExists(IndexType(index, typ)) => run(c => _typeExists(index, typ)(c))
+      case ListTypes(index) => run(c => _listTypes(index)(c))
+      case ListIndices() => run(c => _listIndices(c))
+      case DeleteIndex(index) => run(c => _deleteIndex(index)(c))
+      case DeleteType(IndexType(index, typ)) => run(c => _deleteType(index, typ)(c))
     }
   }
 
-
 }
+
