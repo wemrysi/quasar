@@ -20,7 +20,6 @@ package jdbm3
 import quasar.precog._
 import quasar.blueeyes._
 import quasar.precog.common._
-import quasar.precog.util._
 
 import java.time.ZonedDateTime
 
@@ -36,7 +35,7 @@ trait StdCodecs {
   implicit def DateTimeCodec: Codec[ZonedDateTime]
   implicit def PeriodCodec: Codec[Period]
   implicit def BitSetCodec: Codec[BitSet]
-  implicit def RawBitSetCodec: Codec[RawBitSet]
+  implicit def RawBitSetCodec: Codec[Array[Int]]
   implicit def IndexedSeqCodec[A](implicit elemCodec: Codec[A]): Codec[IndexedSeq[A]]
   implicit def ArrayCodec[A](implicit elemCodec: Codec[A], m: CTag[A]): Codec[Array[A]]
 
@@ -63,7 +62,7 @@ trait RowFormatCodecs extends StdCodecs { self: RowFormat =>
   // implicit def BitSetCodec: Codec[BitSet] = Codec.BitSetCodec
   //@transient implicit lazy val BitSetCodec: Codec[BitSet] = Codec.SparseBitSetCodec(columnRefs.size)
   @transient implicit lazy val BitSetCodec: Codec[BitSet]       = Codec.SparseBitSetCodec(columnRefs.size)
-  @transient implicit lazy val RawBitSetCodec: Codec[RawBitSet] = Codec.SparseRawBitSetCodec(columnRefs.size)
+  @transient implicit lazy val RawBitSetCodec: Codec[Array[Int]] = Codec.SparseRawBitSetCodec(columnRefs.size)
   implicit def IndexedSeqCodec[A](implicit elemCodec: Codec[A]): Codec[IndexedSeq[A]]       = Codec.IndexedSeqCodec(elemCodec)
   implicit def ArrayCodec[A](implicit elemCodec: Codec[A], m: CTag[A]): Codec[Array[A]] = Codec.ArrayCodec(elemCodec)(m)
 }

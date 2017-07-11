@@ -16,8 +16,8 @@
 
 package quasar.niflheim
 
-import quasar.blueeyes._
 import quasar.blueeyes.json._
+import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.precog.util._
 

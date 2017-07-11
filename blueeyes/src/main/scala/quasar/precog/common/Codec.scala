@@ -16,13 +16,13 @@
 
 package quasar.precog.common
 
-import quasar.precog._
 import quasar.blueeyes._
-import quasar.precog.util.{ BitSetUtil, ByteBufferMonad, ByteBufferPool }
+import quasar.precog._
+import quasar.precog.util.{BitSetUtil, ByteBufferMonad, ByteBufferPool, RawBitSet}
 
 import java.nio.{ByteBuffer, CharBuffer}
-import java.nio.charset.{ CharsetEncoder, CoderResult }
-import java.math.{ BigDecimal => BigDec }
+import java.nio.charset.{CharsetEncoder, CoderResult}
+import java.math.{BigDecimal => BigDec}
 import java.time.{LocalDateTime, ZonedDateTime}
 import java.time.format.DateTimeFormatter
 
@@ -768,21 +768,21 @@ object Codec {
     }
   }
 
-  case class SparseRawBitSetCodec(size: Int) extends Codec[RawBitSet] {
+  case class SparseRawBitSetCodec(size: Int) extends Codec[Array[Int]] {
 
     // The maxBytes is max. bits / 8 = (highestOneBit(size) << 3) / 8
     private val maxBytes = java.lang.Integer.highestOneBit(size) max 1
 
     type S = (Array[Byte], Int)
 
-    def encodedSize(bs: RawBitSet)      = writeBitSet(bs).size
-    override def maxSize(bs: RawBitSet) = maxBytes
+    def encodedSize(bs: Array[Int])      = writeBitSet(bs).size
+    override def maxSize(bs: Array[Int]) = maxBytes
 
-    def writeUnsafe(bs: RawBitSet, sink: ByteBuffer) {
+    def writeUnsafe(bs: Array[Int], sink: ByteBuffer) {
       sink.put(writeBitSet(bs))
     }
 
-    def writeInit(bs: RawBitSet, sink: ByteBuffer): Option[S] = {
+    def writeInit(bs: Array[Int], sink: ByteBuffer): Option[S] = {
       val spaceLeft = sink.remaining()
       val bytes     = writeBitSet(bs)
 
@@ -809,7 +809,7 @@ object Codec {
       }
     }
 
-    def read(src: ByteBuffer): RawBitSet = readBitSet(src)
+    def read(src: ByteBuffer): Array[Int] = readBitSet(src)
 
     override def skip(buf: ByteBuffer) {
       var b = buf.get()
@@ -818,7 +818,7 @@ object Codec {
       }
     }
 
-    def writeBitSet(bs: RawBitSet): Array[Byte] = {
+    def writeBitSet(bs: Array[Int]): Array[Byte] = {
       val bytes = new Array[Byte](maxBytes)
 
       def set(offset: Int) {
@@ -893,7 +893,7 @@ object Codec {
       java.util.Arrays.copyOf(bytes, (len >>> 3) + 1) // The +1 covers the extra 2 '0' bits.
     }
 
-    def readBitSet(src: ByteBuffer): RawBitSet = {
+    def readBitSet(src: ByteBuffer): Array[Int] = {
       val pos = src.position()
       @inline def get(offset: Int): Boolean =
         (src.get(pos + (offset >>> 3)) & (1 << (offset & 7))) != 0

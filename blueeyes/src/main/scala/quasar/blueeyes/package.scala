@@ -16,6 +16,7 @@
 
 package quasar
 
+import quasar.precog.BitSet
 import quasar.precog.util._
 
 import scalaz._
@@ -32,9 +33,6 @@ package object blueeyes extends precog.PackageTime {
   val MimeType  = quasar.precog.MimeType
   val MimeTypes = quasar.precog.MimeTypes
 
-  type BitSet             = quasar.precog.BitSet
-  type RawBitSet          = Array[Int]
-  val RawBitSet           = quasar.precog.util.RawBitSet
   type ByteBufferPoolS[A] = State[(ByteBufferPool, List[ByteBuffer]), A]
 
   val HNil = shapeless.HNil

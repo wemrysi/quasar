@@ -17,9 +17,10 @@
 package quasar.yggdrasil
 package table
 
-import quasar.yggdrasil.bytecode.JType
 import quasar.blueeyes._
+import quasar.precog.BitSet
 import quasar.precog.common._
+import quasar.yggdrasil.bytecode.JType
 
 import java.time.ZonedDateTime
 

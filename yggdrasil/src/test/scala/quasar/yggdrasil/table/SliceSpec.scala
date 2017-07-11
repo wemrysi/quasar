@@ -16,10 +16,11 @@
 
 package quasar.yggdrasil.table
 
-import quasar.precog.TestSupport._
 import quasar.blueeyes._
-import quasar.precog.util._
+import quasar.precog.BitSet
+import quasar.precog.TestSupport._
 import quasar.precog.common._
+import quasar.precog.util._
 
 import java.time.{Instant, ZoneOffset, ZonedDateTime}
 import scala.util.Random
