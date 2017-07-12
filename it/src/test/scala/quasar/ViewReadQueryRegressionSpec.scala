@@ -24,7 +24,7 @@ import quasar.fs.{Empty, PhysicalError, ReadFile}
 import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.main._
 import quasar.regression._
-import quasar.sql.{Blob, Sql}
+import quasar.sql.{ScopedExpr, Sql}
 
 import matryoshka.data.Fix
 import pathy.Path._
@@ -33,15 +33,15 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 
 class ViewReadQueryRegressionSpec
-  extends QueryRegressionTest[FileSystemIO](QueryRegressionTest.externalFS.map(_.take(1))) {
+  extends QueryRegressionTest[AnalyticalFileSystemIO](QueryRegressionTest.externalFS.map(_.take(1))) {
 
   val suiteName = "View Reads"
-  type ViewFS[A] = (Mounting :\: ViewState :\: MonotonicSeq :/: FileSystemIO)#M[A]
+  type ViewFS[A] = (Mounting :\: ViewState :\: MonotonicSeq :/: AnalyticalFileSystemIO)#M[A]
 
   def mounts(path: APath, expr: Fix[Sql], vars: Variables): Task[Mounting ~> Task] =
     (
-      TaskRef(Map[APath, MountConfig](path -> MountConfig.viewConfig(expr, vars))) |@|
-      TaskRef(Empty.fileSystem[HierarchicalFsEffM]) |@|
+      TaskRef(Map[APath, MountConfig](path -> MountConfig.viewConfig(ScopedExpr(expr, Nil), vars))) |@|
+      TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM]) |@|
       TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
     ) { (cfgsRef, hfsRef, mntdRef) =>
       val mnt =
@@ -56,15 +56,15 @@ class ViewReadQueryRegressionSpec
 
   val RF = ReadFile.Ops[ReadFile]
 
-  def queryResults(blob: Blob[Fix[Sql]], vars: Variables, basePath: ADir) = {
+  def queryResults(query: Fix[Sql], vars: Variables, basePath: ADir) = {
     val path = basePath </> file("view")
     val prg: Process[RF.unsafe.M, Data] = RF.scanAll(path)
-    val interp = mounts(path, blob.expr, vars).flatMap(interpViews).unsafePerformSync
+    val interp = mounts(path, query, vars).flatMap(interpViews).unsafePerformSync
 
     def t: RF.unsafe.M ~> qfTransforms.CompExecM =
       new (RF.unsafe.M ~> qfTransforms.CompExecM) {
         def apply[A](fa: RF.unsafe.M[A]): qfTransforms.CompExecM[A] = {
-          val u: ReadFile ~> Free[FileSystemIO, ?] =
+          val u: ReadFile ~> Free[AnalyticalFileSystemIO, ?] =
             mapSNT(interp) compose view.readFile[ViewFS]
 
           EitherT(EitherT.right(WriterT.put(fa.run.flatMapSuspension(u))(Vector.empty)))
@@ -74,10 +74,10 @@ class ViewReadQueryRegressionSpec
     prg.translate(t)
   }
 
-  def interpViews(mnts: Mounting ~> Task): Task[ViewFS ~> FileSystemIO] =
+  def interpViews(mnts: Mounting ~> Task): Task[ViewFS ~> AnalyticalFileSystemIO] =
     (ViewState.toTask(Map()) |@| seq)((v, s) =>
-      (injectNT[Task, FileSystemIO] compose mnts) :+:
-      (injectNT[Task, FileSystemIO] compose v) :+:
-      (injectNT[Task, FileSystemIO] compose s) :+:
-      reflNT[FileSystemIO])
+      (injectNT[Task, AnalyticalFileSystemIO] compose mnts) :+:
+      (injectNT[Task, AnalyticalFileSystemIO] compose v) :+:
+      (injectNT[Task, AnalyticalFileSystemIO] compose s) :+:
+      reflNT[AnalyticalFileSystemIO])
 }

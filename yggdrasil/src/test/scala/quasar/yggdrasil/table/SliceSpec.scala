@@ -16,7 +16,6 @@
 
 package quasar.yggdrasil.table
 
-import quasar.yggdrasil._
 import quasar.precog.TestSupport._
 import quasar.blueeyes._
 import quasar.precog.util._
@@ -24,7 +23,7 @@ import quasar.precog.common._
 
 import scala.util.Random
 import org.scalacheck.{ Arbitrary, Gen }
-import Gen.{ listOfN, containerOfN }, Arbitrary.arbitrary
+import Gen.listOfN
 import ArbitrarySlice._
 
 class SliceSpec extends Specification with ScalaCheck {
@@ -206,7 +205,7 @@ object ArbitrarySlice {
   }
 
   def genSlice(refs: Seq[ColumnRef], sz: Int): Gen[Slice] = {
-    val zero    = Nil: Gen[List[ColumnRef -> Column]]
+    val zero    = Nil: Gen[List[(ColumnRef, Column)]]
     val gs      = refs map (cr => genColumn(cr, sz) ^^ (cr -> _))
     val genData = gs.foldLeft(zero)((res, g) => res >> (r => g ^^ (_ :: r)))
 

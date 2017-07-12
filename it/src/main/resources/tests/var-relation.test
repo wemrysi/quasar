@@ -2,6 +2,7 @@
     "name": "select from a table named by a variable",
 
     "backends": {
+        "mimir":"pending",
         "postgresql": "pending"
     },
 
@@ -13,7 +14,8 @@
 
     "query": "select count(*) as cnt from :table where pop < 1000",
 
-    "predicate": "equalsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
 
     "expected": [{ "cnt": 19 }]
 }

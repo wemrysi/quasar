@@ -45,6 +45,9 @@ object fn {
   def concat(x: XQuery, xs: XQuery*): XQuery =
     XQuery(s"fn:concat${mkSeq_(x, xs: _*)}")
 
+  def contains(s: XQuery, q: XQuery): XQuery =
+    XQuery(s"fn:contains($s, $q)")
+
   def count(xs: XQuery, max: Option[XQuery] = None): XQuery =
     XQuery(s"fn:count(${xs}${asArg(max)})")
 
@@ -141,6 +144,9 @@ object fn {
 
   def nodeName(node: XQuery): XQuery =
     XQuery(s"fn:node-name($node)")
+
+  def name(): XQuery =
+    XQuery("fn:name()")
 
   def not(bool: XQuery): XQuery =
     XQuery(s"fn:not($bool)")

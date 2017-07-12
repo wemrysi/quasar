@@ -1,10 +1,12 @@
 {
     "name": "population of Boulder",
     "backends": {
+        "mimir":"pending",
         "postgresql": "pending"
     },
     "data": "zips.data",
     "query": "select sum(pop) as Population from zips where city=\"BOULDER\" and state=\"CO\"",
-    "predicate": "containsExactly",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [{ "Population": 108968 }]
 }

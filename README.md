@@ -1,4 +1,4 @@
-[![Build status](https://travis-ci.org/quasar-analytics/quasar.svg?branch=master)](https://travis-ci.org/quasar-analytics/quasar)
+Ï[![Build status](https://travis-ci.org/quasar-analytics/quasar.svg?branch=master)](https://travis-ci.org/quasar-analytics/quasar)
 [![Coverage Status](https://coveralls.io/repos/quasar-analytics/quasar/badge.svg)](https://coveralls.io/r/quasar-analytics/quasar)
 [![Latest version](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web/latest.svg)](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web)
 [![Join the chat at https://gitter.im/quasar-analytics/quasar](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/quasar-analytics/quasar?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
@@ -15,7 +15,7 @@ Quasar is an open source NoSQL analytics engine that can be used as a library or
 
 SQL² is the dialect of SQL that Quasar understands.
 
-SQL² is a superset of standard SQL. Therefore, in the following documentation SQL² will be used interchangeably with SQL.
+In the following documentation SQL² will be used interchangeably with SQL.
 
 See the [SQL² tutorial](http://quasar-analytics.org/docs/sqltutorial/) for more info on SQL².
 
@@ -123,13 +123,31 @@ To run the JAR, execute the following command:
 java -jar [<path to jar>] [-c <config file>]
 ```
 
-As a command-line REPL user, to work with a fully functioning REPL you will need the metadata store and a mount point. See [here](#full-testing-prerequisite-docker-and-docker-compose) for instructions on creating the metadata store backend using docker. To add a mount you can start the web server mentioned [below](#web-jar) and issue a `curl` command like:
+As a command-line REPL user, to work with a fully functioning REPL you will need the metadata store and a mount point. See [here](#full-testing-prerequisite-docker-and-docker-compose) for instructions on creating the metadata store backend using docker.
+
+Once you have a running metastore you can start the web api service with [these](#web-jar) instructions and issue curl commands 
+of the following format to create new mount points.
+
+```bash
+curl -v -X PUT http://localhost:8080/mount/fs/<mountPath>/ -d '{ "<mountKey>": { "connectionUri":"<protocol><uri>" } }'
+```
+The `<mountPath>` specifies the path of your mount point and the remaining parameters are listed below:
+
+| mountKey        | protocol         | uri                                    |
+|-----------------|------------------|----------------------------------------|
+| `couchbase`     | `couchbase://`   | [Couchbase](#couchbase)                |
+| `marklogic`     | `xcc://`         | [MarkLogic](#marklogic)                |
+| `mongodb`       | `mongodb://`     | [MongoDB](#database-mounts)            |
+| `spark-hdfs`    | `spark://`       | [Spark HDFS](#apache-spark) |
+| `spark-local`   | `spark_local=`   | [Spark](#apache-spark)      |
+
+See [here](#get-mountfspath) for more details on the mount web api service.
+
+For example, to create a couchbase mount point, issue a `curl` command like:
 
 ```bash
 curl -v -X PUT http://localhost:8080/mount/fs/cb/ -d '{ "couchbase": { "connectionUri":"couchbase://192.168.99.100/beer-sample?password=&docTypeKey=type" } }'
 ```
-
-You can find examples of `connectionUri` values [here](#database-mounts).
 
 #### Web JAR
 
@@ -247,13 +265,19 @@ Known Limitations
 - Join unimplemented — future support planned
 - [Open issues](https://github.com/quasar-analytics/quasar/issues?q=is%3Aissue+is%3Aopen+label%3ACouchbase)
 
-#### HDFS using Apache Spark
+#### Apache Spark
 
-To connect to HDFS using Apache Spark use the following `connectionUri` format:
+To connect to Apache Spark and use either local files or HDFS to query data use the following `connectionUri`:
 
-`spark://<spark_host>:<spark_port>|hdfs://<hdfs_host>:<hdfs_port>|<root_path>`
+with local files:
 
-e.g "spark://spark_master:7077|hdfs://primary_node:9000|/hadoop/users/"
+`spark_local=\"/path/to/data/my.data\"`
+
+with HDFS:
+
+`spark://<host>:<port>?rootPath=<rootPath>&hdfsUri=<hdfsUri>[&spark_configuration=spark_configuration_value]`
+
+For example: "spark://10.0.0.4:7077?hdfsUri=hdfs%3A%2F%2F10.0.0.3%3A9000&rootPath=/data&spark.executor.memory=4g&spark.eventLog.enabled=true"
 
 #### MarkLogic
 
@@ -267,13 +291,11 @@ If a root directory path is specified, all operations and queries within the mou
 
 Prerequisites
 - MarkLogic 8.0+
-- Documents must to be organized under directories to be found by Quasar.
+- The URI lexicon must be enabled.
 - Namespaces used in queries must be defined on the server.
 - Loading schema definitions into the server, while not required, will improve sorting and other operations on types other than `xs:string`. Otherwise, non-string fields may require casting in queries using [SQL² conversion functions](http://docs.slamdata.com/en/v4.0/sql-squared-reference.html#section-11-data-type-conversion).
 
-[Known Limitations](https://github.com/quasar-analytics/quasar/issues?utf8=%E2%9C%93&q=is%3Aissue%20is%3Aopen%20label%3AMarkLogic)
-- Field aliases when working with XML must currently be valid [XML QNames](https://www.w3.org/TR/xml-names/#NT-QName) ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
-- "Default" numeric field names are prefixed with an underscore ("_") when working with XML in order to make them valid QNames. For example, `select count((1, 2, 3, 4))` will result in `{"_1": 4}` ([#1642](https://github.com/quasar-analytics/quasar/issues/1642)).
+[Known Limitations](https://github.com/quasar-analytics/quasar/issues?q=is%3Aissue+is%3Aopen+marklogic+label%3A%22topic%3A+MarkLogic%22)
 - It is not possible to query both JSON and XML documents from a single mount, a separate mount with the appropriate `format` value must be created for each type of document.
 - Index usage is currently poor, so performance may degrade on large directories and/or complex queries and joins. This should improve as optimizations are applied both to the MarkLogic connector and the `QScript` compiler.
 
@@ -283,8 +305,15 @@ Quasar's data model is JSON-ish and thus there is a bit of translation required 
 - XML document results are currently serialized to JSON with an emphasis on producting idiomatic JSON:
   - An element is serialized to a singleton object with the element name as the only key and an object representing the children as its value. The child object will contain an entry for each child element with repeated elements collected into an array.
   - An element without attributes containing only text content will be serialized as a singleton object with the element name as the only key and the text content as its value.
-  - Element attributes are serialized to an object at the `_attributes` key.
-  - Text content of elements containing mixed text and element children or attributes will be available at the `_text` key.
+  - Element attributes are serialized to an object at the `_xml.attributes` key.
+  - Text content of elements containing mixed text and element children or attributes will be available at the `_xml.text` key.
+- Fields that are not valid [XML QNames](https://www.w3.org/TR/xml-names/#NT-QName) are encoded as `<ejson:key>` elements with a `ejson:key-id` attribute including the field's original name. For instance, the query `SELECT TO_STRING(city), TO_STRING(state) FROM zips` yields elements with numeric field names. Numeric names are not valid QNames and will be encoded as follows:
+
+  ```xml
+  <ejson:key ejson:key-id="0" ejson:type="string">GILMAN CITY</ejson:key>
+  <ejson:key ejson:key-id="1" ejson:type="string">MO</ejson:key>
+  ```
+
 
 ### View mounts
 
@@ -293,6 +322,24 @@ If the mount's key is "view" then the mount represents a "virtual" file, defined
 For example, given the above MongoDB mount, an additional view could be defined with a `connectionUri` of `sql2:///?q=select%20_id%20as%20zip%2C%20city%2C%20state%20from%20%60%2Flocal%2Ftest%2Fzips%60%20where%20pop%20%3C%20%3Acutoff&var.cutoff=1000`
 
 A view can be mounted at any file path. If a view's path is nested inside the path of a database mount, it will appear alongside the other files in the database. A view will "shadow" any actual file that would otherwise be mapped to the same path. Any attempt to write data to a view will result in an error.
+
+### Module mounts
+
+If the mount's key is "module" then the mount represents a "virtual" directory which contains a collection of SQL Statements. The Quasar Filesystem surfaces each SQL function definition as a file despite the fact that it is not possible to read from that file. Instead one needs to use the `invoke` endpoint in order to pass arguments to a particular function and get the result.
+
+A module function can be thought of as a parameterized view, i.e. a view with "holes" that can be filled dynamically.
+
+The value of a module mount is simply the SQL string which will be parsed into a list of SQL Statements.
+
+To create a new module one would send a json blob similar to this one to the mount endpoint:
+
+```json
+{ "module": "CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END; CREATE FUNCTION USER_DATA(:user_id) BEGIN SELECT * FROM `/root/path/data/` WHERE user_id = :user_id END" }
+```
+
+See [SQL² reference](http://quasar-analytics.org/docs/sqlreference/) for more info on SQL².
+
+Similar to views, modules can be mounted at any directory path. If a module's path is nested inside the path of a database mount, it will appear alongside the other directory and files in the database. A module will "shadow" any actual directory that would otherwise be mapped to the same path. Any attempt to write data to a module will result in an error.
 
 #### Build Quasar for Apache Spark
 
@@ -494,6 +541,7 @@ Returns a Json object with the following shape:
   "inputs": [<filePath>, ...],
   "physicalPlan": "Description of physical plan"
 }
+```
 
 where `inputs` is a field containing a list of files that are referenced by the query.
 where `physicalPlan` is a string description of the physical plan that would be executed by this query. `null` if no physical plan is required in order to execute this query. A query may not need a physical plan in order to be executed if the query is "constant", that is that no data needs to be read from a backend.
@@ -579,11 +627,11 @@ be provided in the `Destination` request header. Single files are moved atomical
 
 Where `path` is a file path. Invokes the function represented by the file path with the parameters supplied in the query string.
 
-### GET /schema/fs/[path]?arrayMaxLength=[size]&mapMaxSize=[size]&stringMaxLength=[size]&unionMaxSize=[size]
+### GET /schema/fs/[path]?q=[query]&var.[foo]=[value]&arrayMaxLength=[size]&mapMaxSize=[size]&stringMaxLength=[size]&unionMaxSize=[size]
 
-Where `path` is a file path and `size` is a positive integer. Returns a schema document, summarizing the dataset at the specified path.
+Where `path` is a directory path, `query` is a SQL² query and `size` is a positive integer. Returns a schema document, summarizing the results of the query. Free variables in the query may be bound using parameters like `var.foo=value` where `foo` is the variable to be bound and `value` is what it should be bound to.
 
-For example, given a dataset having documents like:
+For example, given query results like:
 
 ```json
 {"_id":"01001","city":"AGAWAM","loc":[-72.622739,42.070206],"pop":15338,"state":"MA"}

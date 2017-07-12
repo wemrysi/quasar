@@ -6,7 +6,17 @@ import scala._, Predef._
 object Build {
   val BothScopes = "compile->compile;test->test"
 
-  def warningOpts = Seq("-g:vars", "-deprecation", "-unchecked", "-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-numeric-widen")
+  val warningOpts = Seq(
+    //"-g:vars",
+    //"-deprecation",
+    //"-unchecked",
+    //"-Ywarn-value-discard",
+    //"-Ywarn-numeric-widen",
+    //"-Ywarn-unused",
+    "-Ywarn-unused-import")
+
+  val defaultArgSet = Seq(
+    "-Ypartial-unification")
 
   /** Watch out Jonesy! It's the ol' double-cross!
    *  Why, you...
@@ -57,9 +67,8 @@ object Build {
     def scalacPlugins(ms: ModuleID*): Project         = also(ms.toList map (m => addCompilerPlugin(m)))
 
     def setup: Project = (
-      serialTests scalacPlugins (kindProjector) also(
-        organization := "quasar",
-        version := "0.1",
+      serialTests scalacPlugins (kindProjector) scalacArgs (defaultArgSet: _*) also(
+        organization := "org.quasar-analytics",
         scalaVersion := "2.11.8",
         scalaOrganization := "org.typelevel",
         logBuffered in Test := false,

@@ -16,7 +16,6 @@
 
 package quasar.yggdrasil
 
-import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.yggdrasil.bytecode.JType
 
@@ -54,66 +53,66 @@ trait TransSpecModule extends FNModule {
     case object SourceLeft  extends Source2
     case object SourceRight extends Source2
 
-    case class Leaf[+A <: SourceType](source: A) extends TransSpec[A] //done
+    case class Leaf[+A <: SourceType](source: A) extends TransSpec[A]
 
-    case class Filter[+A <: SourceType](source: TransSpec[A], predicate: TransSpec[A]) extends TransSpec[A] //done
+    case class Filter[+A <: SourceType](source: TransSpec[A], predicate: TransSpec[A]) extends TransSpec[A]
 
     // Adds a column to the output in the manner of scanLeft
-    case class Scan[+A <: SourceType](source: TransSpec[A], scanner: Scanner) extends TransSpec[A] //done
+    case class Scan[+A <: SourceType](source: TransSpec[A], scanner: Scanner) extends TransSpec[A]
 
     case class MapWith[+A <: SourceType](source: TransSpec[A], mapper: Mapper) extends TransSpec[A]
 
-    case class Map1[+A <: SourceType](source: TransSpec[A], f: F1) extends TransSpec[A] //done
+    case class Map1[+A <: SourceType](source: TransSpec[A], f: F1) extends TransSpec[A]
 
-    case class DeepMap1[+A <: SourceType](source: TransSpec[A], f: F1) extends TransSpec[A] //done
+    case class DeepMap1[+A <: SourceType](source: TransSpec[A], f: F1) extends TransSpec[A]
 
     // apply a function to the cartesian product of the transformed left and right subsets of columns
-    case class Map2[+A <: SourceType](left: TransSpec[A], right: TransSpec[A], f: F2) extends TransSpec[A] //done
+    case class Map2[+A <: SourceType](left: TransSpec[A], right: TransSpec[A], f: F2) extends TransSpec[A]
 
     // Perform the specified transformation on the all sources, and then create a new set of columns
     // containing all the resulting columns.
-    case class InnerObjectConcat[+A <: SourceType](objects: TransSpec[A]*) extends ObjectSpec[A] //done
+    case class InnerObjectConcat[+A <: SourceType](objects: TransSpec[A]*) extends ObjectSpec[A]
 
-    case class OuterObjectConcat[+A <: SourceType](objects: TransSpec[A]*) extends ObjectSpec[A] //done
+    case class OuterObjectConcat[+A <: SourceType](objects: TransSpec[A]*) extends ObjectSpec[A]
 
     case class ObjectDelete[+A <: SourceType](source: TransSpec[A], fields: Set[CPathField]) extends TransSpec[A]
 
-    case class InnerArrayConcat[+A <: SourceType](arrays: TransSpec[A]*) extends ArraySpec[A] //done
+    case class InnerArrayConcat[+A <: SourceType](arrays: TransSpec[A]*) extends ArraySpec[A]
 
-    case class OuterArrayConcat[+A <: SourceType](arrays: TransSpec[A]*) extends ArraySpec[A] //done
+    case class OuterArrayConcat[+A <: SourceType](arrays: TransSpec[A]*) extends ArraySpec[A]
 
     // Take the output of the specified TransSpec and prefix all of the resulting selectors with the
     // specified field.
-    case class WrapObject[+A <: SourceType](source: TransSpec[A], field: String) extends ObjectSpec[A] //done
+    case class WrapObject[+A <: SourceType](source: TransSpec[A], field: String) extends ObjectSpec[A]
 
     case class WrapObjectDynamic[+A <: SourceType](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A]
 
-    case class WrapArray[+A <: SourceType](source: TransSpec[A]) extends ArraySpec[A] //done
+    case class WrapArray[+A <: SourceType](source: TransSpec[A]) extends ArraySpec[A]
 
-    case class DerefObjectStatic[+A <: SourceType](source: TransSpec[A], field: CPathField) extends TransSpec[A] //done
+    case class DerefObjectStatic[+A <: SourceType](source: TransSpec[A], field: CPathField) extends TransSpec[A]
 
     case class DerefMetadataStatic[+A <: SourceType](source: TransSpec[A], field: CPathMeta) extends TransSpec[A]
 
-    case class DerefObjectDynamic[+A <: SourceType](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A] //done
+    case class DerefObjectDynamic[+A <: SourceType](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A]
 
-    case class DerefArrayStatic[+A <: SourceType](source: TransSpec[A], element: CPathIndex) extends TransSpec[A] //done
+    case class DerefArrayStatic[+A <: SourceType](source: TransSpec[A], element: CPathIndex) extends TransSpec[A]
 
-    case class DerefArrayDynamic[+A <: SourceType](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A] //done
+    case class DerefArrayDynamic[+A <: SourceType](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A]
 
     case class ArraySwap[+A <: SourceType](source: TransSpec[A], index: Int) extends TransSpec[A]
 
     // Filter out all the source columns whose selector and CType are not specified by the supplied JType
-    case class Typed[+A <: SourceType](source: TransSpec[A], tpe: JType) extends TransSpec[A] // done
+    case class Typed[+A <: SourceType](source: TransSpec[A], tpe: JType) extends TransSpec[A]
 
     // Filter out all the source columns whose selector and CType are not specified by the supplied JType
     // if the set of columns does not cover the JType specified, this will return the empty slice.
-    case class TypedSubsumes[+A <: SourceType](source: TransSpec[A], tpe: JType) extends TransSpec[A] // done
+    case class TypedSubsumes[+A <: SourceType](source: TransSpec[A], tpe: JType) extends TransSpec[A]
 
     // return a Boolean column
     // returns true for a given row when all of the columns specified by the supplied JType are defined
-    case class IsType[+A <: SourceType](source: TransSpec[A], tpe: JType) extends TransSpec[A] // done
+    case class IsType[+A <: SourceType](source: TransSpec[A], tpe: JType) extends TransSpec[A]
 
-    case class Equal[+A <: SourceType](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A] //done
+    case class Equal[+A <: SourceType](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A]
 
     case class EqualLiteral[+A <: SourceType](left: TransSpec[A], right: CValue, invert: Boolean) extends TransSpec[A]
 
@@ -255,7 +254,7 @@ trait TransSpecModule extends FNModule {
     object TransSpec1 {
       import constants._
 
-      val Id = Leaf(Source)
+      val Id: TransSpec1 = Leaf(Source)
 
       val DerefArray0 = DerefArrayStatic(Leaf(Source), CPathIndex(0))
       val DerefArray1 = DerefArrayStatic(Leaf(Source), CPathIndex(1))
@@ -342,6 +341,26 @@ trait TransSpecModule extends FNModule {
         val Right = DerefObjectStatic(Leaf(SourceRight), Value)
       }
     }
+
+    def transRValue[A <: SourceType](rvalue: RValue, target: TransSpec[A]): TransSpec[A] = {
+      RValue.toCValue(rvalue) map { cvalue =>
+        trans.ConstLiteral(cvalue, target)
+      } getOrElse {
+        rvalue match {
+          case RArray(elements) =>
+            InnerArrayConcat(elements map { element =>
+              trans.WrapArray(transRValue(element, target))
+            }: _*)
+          case RObject(fields) =>
+            InnerObjectConcat(fields.toSeq map {
+              case (key, value) => trans.WrapObject(transRValue(value, target), key)
+            }: _*)
+          case _ =>
+            sys.error("Can't handle RValue")
+        }
+      }
+    }
+
   }
 
   import trans._

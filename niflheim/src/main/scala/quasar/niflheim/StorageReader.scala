@@ -17,7 +17,6 @@
 package quasar.niflheim
 
 import quasar.precog.common._
-import quasar.precog.util._
 
 trait StorageReader {
   def snapshot(pathConstraints: Option[Set[CPath]]): Block

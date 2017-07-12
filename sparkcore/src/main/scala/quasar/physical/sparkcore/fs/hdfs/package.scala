@@ -96,8 +96,9 @@ package object hdfs {
     }
 
     val hdfsUrlOrErr: DefinitionError \/ String = uriOrErr.flatMap(uri =>
-      uri.params.get("hdfsUrl").fold(liftErr("'hdfsUrl' parameter not provided").left[String])(_.right[DefinitionError])
-    ) 
+      uri.params.get("hdfsUrl").map(url => URLDecoder.decode(url, "UTF-8")).fold(liftErr("'hdfsUrl' parameter not provided").left[String])(_.right[DefinitionError])
+    )
+
     val rootPathOrErr: DefinitionError \/ ADir =
       uriOrErr
         .flatMap(uri =>
@@ -105,7 +106,7 @@ package object hdfs {
         )
         .flatMap(pathStr =>
           posixCodec.parseAbsDir(pathStr)
-            .map(sandboxAbs)
+            .map(unsafeSandboxAbs)
             .fold(liftErr("'rootPath' is not a valid path").left[ADir])(_.right[DefinitionError])
         )
 
@@ -121,7 +122,7 @@ package object hdfs {
     /* Points to quasar-web.jar or target/classes if run from sbt repl/run */
     val fetchProjectRootPath = Task.delay {
       val pathStr = URLDecoder.decode(this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath, "UTF-8")
-      posixCodec.parsePath[Option[APath]](_ => None, Some(_).map(sandboxAbs), _ => None, Some(_).map(sandboxAbs))(pathStr)
+      posixCodec.parsePath[Option[APath]](_ => None, Some(_).map(unsafeSandboxAbs), _ => None, Some(_).map(unsafeSandboxAbs))(pathStr)
     }
     val jar: Task[Option[APath]] =
       fetchProjectRootPath.map(_.flatMap(s => parentDir(s).map(_ </> file("sparkcore.jar"))))
@@ -170,7 +171,7 @@ package object hdfs {
     fs <- Task.delay {
       val conf = new Configuration()
       conf.setBoolean("fs.hdfs.impl.disable.cache", true)
-      HdfsFileSystem.get(new URI(URLDecoder.decode(sfsConf.hdfsUriStr, "UTF-8")), conf)
+      HdfsFileSystem.get(new URI(sfsConf.hdfsUriStr), conf)
     }
     uriStr = fs.getUri().toASCIIString()
     _ <- if(uriStr.startsWith("file:///")) Task.fail(new RuntimeException("Provided URL is not valid HDFS URL")) else ().point[Task]

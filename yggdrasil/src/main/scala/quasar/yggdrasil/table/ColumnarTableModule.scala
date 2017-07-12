@@ -30,8 +30,11 @@ import org.slf4s.Logging
 import quasar.precog.util.IOUtils
 import scalaz._, Scalaz._, Ordering._
 
+import java.io.File
 import java.nio.CharBuffer
 import java.time.LocalDateTime
+
+import scala.collection.mutable
 
 trait ColumnarTableTypes[M[+ _]] {
   type F1         = CF1
@@ -128,7 +131,7 @@ object ColumnarTableModule extends Logging {
       def getPaths: Array[String]     = a
       def columnForPath(path: String) = m(path)
       def combine(that: Indices): Indices = {
-        val buf = new ArrayBuffer[String](a.length)
+        val buf = new mutable.ArrayBuffer[String](a.length)
         buf ++= a
         that.getPaths.foreach(p => if (!m.contains(p)) buf.append(p))
         Indices.fromPaths(buf.toArray)
@@ -162,7 +165,7 @@ object ColumnarTableModule extends Logging {
 
       def fromPaths(ps: Array[String]): Indices = {
         val paths = ps.sorted
-        val m     = scmMap[String, Int]()
+        val m = mutable.Map[String, Int]()
         var i = 0
         val len = paths.length
         while (i < len) { m(paths(i)) = i; i += 1 }
@@ -302,20 +305,6 @@ object ColumnarTableModule extends Logging {
       case other                         =>
         log.warn("Unrecognized output type requested for conversion of slice stream to char buffers: %s".format(output))
         StreamT.empty[N, CharBuffer]
-    }
-  }
-
-  def byteStream[M[+ _]](blockStream: StreamT[M, Slice], mimeType: Option[MimeType])(implicit M: Monad[M]): Option[StreamT[M, Array[Byte]]] = {
-    import vfs.VFSModule.bufferOutput
-    import FileContent._
-
-    mimeType match {
-      case Some(ApplicationJson) | None => Some(bufferOutput(toCharBuffers(ApplicationJson, blockStream)))
-      case Some(XJsonStream)            => Some(bufferOutput(toCharBuffers(XJsonStream, blockStream)))
-      case Some(TextCSV)                => Some(bufferOutput(toCharBuffers(TextCSV, blockStream)))
-      case Some(other) =>
-        log.warn("NIHDB resource cannot be rendered to a byte stream of type %s".format(other.value))
-        None
     }
   }
 }

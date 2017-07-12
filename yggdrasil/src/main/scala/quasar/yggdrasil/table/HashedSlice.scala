@@ -20,6 +20,7 @@ package table
 import quasar.precog.util._
 import quasar.blueeyes._
 import quasar.precog.common._
+
 import scala.collection.mutable
 
 /**
@@ -47,7 +48,7 @@ final class HashedSlice private (slice0: Slice, rowMap: scala.collection.Map[Int
 object HashedSlice {
   def apply(slice: Slice): HashedSlice = {
     val hasher = new SliceHasher(slice)
-    val rowMap = scmMap[Int, IntList]()
+    val rowMap = mutable.Map[Int, IntList]()
 
     Loop.range(0, slice.size) { row =>
       val hash = hasher.hash(row)

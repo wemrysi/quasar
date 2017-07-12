@@ -14,15 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.blueeyes
-package json
+package quasar.blueeyes.json
 
+import quasar.blueeyes._
 import quasar.precog._, JsonTestSupport._
 
 import scalaz._
 
-import scala.util.control.Exception._
+import scala.collection.mutable
 import scala.math.min
+import scala.util.control.Exception._
 import scala.util.Random.nextInt
 
 import java.net.URLDecoder
@@ -30,7 +31,6 @@ import java.nio.ByteBuffer
 
 class JsonParserSpec extends Specification with ScalaCheck {
   import JParser._
-  import AsyncParser._
 
   "Any valid json can be parsed" in {
     val parsing = (json: JValue) => { parseUnsafe(json.renderPretty); true }
@@ -102,7 +102,7 @@ object AsyncParserSpec extends Specification {
   }
 
   private def chunkAll(async: AsyncParser, data: Array[Byte], f: () => Int) = {
-    var vs = ArrayBuffer.empty[JValue]
+    var vs = mutable.ArrayBuffer.empty[JValue]
     val n = data.length
     var i                   = 0
     var parser: AsyncParser = async
@@ -287,7 +287,6 @@ xyz
 }
 
 object ArrayUnwrappingSpec extends Specification {
-  import JParser._
   import AsyncParser._
 
   def bb(s: String)        = More(ByteBufferWrap(s.getBytes("UTF-8")))
@@ -335,9 +334,6 @@ object ArrayUnwrappingSpec extends Specification {
   }
 
   "Unwrapping array parser performs adequately" in {
-    import scala.math.min
-    import java.nio._
-
     val num = 100 * 1000
     //val num = 1 * 1000 * 1000
     //val num = 2 * 1000 * 1000

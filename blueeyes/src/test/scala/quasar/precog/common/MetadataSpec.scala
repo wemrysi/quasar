@@ -16,10 +16,11 @@
 
 package quasar.precog.common
 
-import quasar.blueeyes._, json._
+import quasar.blueeyes._
 import quasar.blueeyes.json.serialization.DefaultSerialization._
-import scalaz._, Scalaz._
 import quasar.precog._, JsonTestSupport._, Gen._
+
+import scalaz._, Scalaz._
 
 class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck {
   val sampleSize = 100
@@ -58,8 +59,8 @@ class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck
         }
         case (StringValueStats(c1, mn1, mx1), StringValueStats(c2, mn2, mx2), Some(StringValueStats(c3, mn3, mx3))) => {
           c3 must_== c1 + c2
-          mn3 must_== ScalazOrder[String].min(mn1, mn2)
-          mx3 must_== ScalazOrder[String].max(mx1, mx2)
+          mn3 must_== scalaz.Order[String].min(mn1, mn2)
+          mx3 must_== scalaz.Order[String].max(mx1, mx2)
         }
         case (e1, e2, r) => r must beNone
       }
@@ -108,5 +109,5 @@ trait MetadataGenerators  {
   def genLongMetadata: Gen[LongValueStats]             = for(count <- choose(0, 1000); a <- genLong; b <- genLong) yield LongValueStats(count, a min b,a max b)
   def genDoubleMetadata: Gen[DoubleValueStats]         = for(count <- choose(0, 1000); a <- genDouble; b <- genDouble) yield DoubleValueStats(count, a min b,a max b)
   def genBigDecimalMetadata: Gen[BigDecimalValueStats] = for(count <- choose(0, 1000); a <- genBigDecimal; b <- genBigDecimal) yield BigDecimalValueStats(count, a min b, a max b)
-  def genStringMetadata: Gen[StringValueStats]         = for(count <- choose(0, 1000); a <- genString; b <- genString) yield StringValueStats(count, ScalazOrder[String].min(a,b), ScalazOrder[String].max(a,b))
+  def genStringMetadata: Gen[StringValueStats]         = for(count <- choose(0, 1000); a <- genString; b <- genString) yield StringValueStats(count, scalaz.Order[String].min(a,b), scalaz.Order[String].max(a,b))
 }

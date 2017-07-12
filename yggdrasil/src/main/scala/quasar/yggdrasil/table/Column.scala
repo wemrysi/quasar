@@ -16,14 +16,16 @@
 
 package quasar.yggdrasil.table
 
-import quasar.precog.util._
-import quasar.yggdrasil._
 import quasar.blueeyes._, json._
-import quasar.precog.common._
-import scalaz.Semigroup
 import quasar.precog._
+import quasar.precog.common._
+import quasar.precog.util._
+
+import scalaz.Semigroup
 
 import java.time.LocalDateTime
+
+import scala.collection.mutable
 
 sealed trait Column {
   def isDefinedAt(row: Int): Boolean
@@ -350,7 +352,7 @@ case class MmixPrng(_seed: Long) {
 }
 
 object Column {
-  def rowOrder(col: Column): SpireOrder[Int] = new SpireOrder[Int] {
+  def rowOrder(col: Column): spire.algebra.Order[Int] = new spire.algebra.Order[Int] {
     def compare(i: Int, j: Int): Int = {
       if (col.isDefinedAt(i)) {
         if (col.isDefinedAt(j)) {
@@ -378,7 +380,7 @@ object Column {
 
   @inline def uniformDistribution(init: MmixPrng): (Column, MmixPrng) = {
     val col = new InfiniteColumn with DoubleColumn {
-      var memo = ArrayBuffer.empty[Double]
+      var memo = mutable.ArrayBuffer.empty[Double]
 
       def apply(row: Int) = {
         val maxRowComputed = memo.length

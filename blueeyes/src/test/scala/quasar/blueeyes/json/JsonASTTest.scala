@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 
-package quasar.blueeyes
-package json
+package quasar.blueeyes.json
 
-import org.scalacheck._
 import scalaz._, Scalaz._, Ordering._
 import quasar.precog.JsonTestSupport._
 
@@ -160,7 +158,7 @@ object JsonASTSpec extends quasar.Qspec {
     prop(inverse)
   }.flakyTest
 
-  "Set and retrieve an arbitrary jvalue at an arbitrary path" in {
+  "Set and retrieve an arbitrary jvalue at an arbitrary path" in skipped { // FIXME skipped per #2185
     runArbitraryPathSpec
   }
 

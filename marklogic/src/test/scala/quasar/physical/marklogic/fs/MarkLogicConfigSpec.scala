@@ -25,7 +25,7 @@ import pathy.Path._
 import scalaz._
 import scalaz.std.option._
 
-final class MarkLogicConfigSpec extends quasar.Qspec {
+final class MarkLogicConfigSpec extends quasar.Qspec with MarkLogicConfigArbitrary {
   "fromUriString" >> {
     val validUri = "xcc://user:pass@ml.example.com:8007/somedb/foo/bar?format=json"
 
@@ -80,5 +80,9 @@ final class MarkLogicConfigSpec extends quasar.Qspec {
         ) must beLeftDisjunction(NonEmptyList("Missing port"))
       }
     }
+  }
+
+  "roundtrip from/asUriString" >> prop { cfg: MarkLogicConfig =>
+    MarkLogicConfig.fromUriString[ErrorMessages \/ ?](cfg.asUriString).toOption must_= Some(cfg)
   }
 }

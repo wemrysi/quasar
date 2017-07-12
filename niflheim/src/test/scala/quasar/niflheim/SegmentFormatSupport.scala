@@ -30,6 +30,7 @@ import scalaz._
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels._
 import java.time.{LocalDateTime, ZoneOffset}
@@ -162,8 +163,8 @@ final class StubSegmentFormat extends SegmentFormat {
   }
 
   object writer extends SegmentWriter {
-    def writeSegment(channel: WritableByteChannel, segment: Segment): Validation[IOException, PrecogUnit] =
-      Success(PrecogUnit)
+    def writeSegment(channel: WritableByteChannel, segment: Segment): Validation[IOException, Unit] =
+      Success(())
   }
 }
 

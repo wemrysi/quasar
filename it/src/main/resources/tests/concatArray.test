@@ -1,12 +1,13 @@
 {
     "name": "concat known array structure",
     "backends": {
-        "mongodb_read_only": "pending",
+        "mimir":"pending",
         "postgresql":        "pending"
     },
     "data": "largeZips.data",
     "query": "select [ city, pop ] as cp from largeZips",
-    "predicate": "containsAtLeast",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
     "expected": [{ "cp": ["CUSHMAN",          36963] },
                  { "cp": ["CHICOPEE",         31495] },
                  { "cp": ["HOLYOKE",          43704] },

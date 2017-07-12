@@ -18,7 +18,7 @@ package quasar
 
 import quasar.contrib.pathy.ADir
 import quasar.regression._
-import quasar.sql.{Blob, Sql}
+import quasar.sql.Sql
 
 import scala.None
 
@@ -26,12 +26,12 @@ import eu.timepit.refined.auto._
 import matryoshka.data.Fix
 
 class StreamingQueryRegressionSpec
-  extends QueryRegressionTest[FileSystemIO](
+  extends QueryRegressionTest[AnalyticalFileSystemIO](
     QueryRegressionTest.externalFS.map(_.filter(
       _.ref.supports(BackendCapability.query())))) {
 
   val suiteName = "Streaming Queries"
 
-  def queryResults(expr: Blob[Fix[Sql]], vars: Variables, basePath: ADir) =
+  def queryResults(expr: Fix[Sql], vars: Variables, basePath: ADir) =
     fsQ.evaluateQuery(expr, vars, basePath, 0L, None)
 }

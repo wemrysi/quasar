@@ -16,10 +16,8 @@
 
 package quasar.mimir
 
-import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.precog.util.Identifier
-import quasar.yggdrasil.execution.EvaluationContext
 
 import scalaz._
 
@@ -28,9 +26,8 @@ trait PredicatePullupSpecs[M[+_]] extends EvaluatorSpecification[M] {
 
   val ctx = defaultEvaluationContext
 
-  object pullups extends PredicatePullups with StdLibOpFinder {
-    def MorphContext(ctx: EvaluationContext, node: DepGraph): MorphContext = new MorphContext(ctx, null)
-  }
+  object pullups extends PredicatePullups with StdLibOpFinder
+
   import pullups._
 
   "Predicate pullups optimization" should {

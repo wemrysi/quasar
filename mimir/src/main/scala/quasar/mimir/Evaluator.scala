@@ -17,7 +17,7 @@
 package quasar.mimir
 
 import quasar.blueeyes._
-import quasar.precog.common._, accounts._
+import quasar.precog.common._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil._
 import quasar.yggdrasil.TableModule._
@@ -68,22 +68,12 @@ trait EvaluatorModule[M[+ _]]
 
     def report: QueryLogger[N, instructions.Line]
 
-    private def MorphLogger(loc: instructions.Line): MorphLogger = new MorphLogger {
-      def info(msg: String): M[Unit]  = nm(report.info(loc, msg))
-      def warn(msg: String): M[Unit]  = nm(report.warn(loc, msg))
-      def error(msg: String): M[Unit] = nm(report.error(loc, msg))
-      def die(): M[Unit]              = nm(report.die())
-    }
-
-    def MorphContext(ctx: EvaluationContext, node: DepGraph): MorphContext =
-      new MorphContext(ctx, MorphLogger(node.loc))
-
     def freshIdScanner: Scanner
 
     def Forall: Reduction { type Result = Option[Boolean] }
     def Exists: Reduction { type Result = Option[Boolean] }
-    def concatString(ctx: MorphContext): F2
-    def coerceToDouble(ctx: MorphContext): F1
+    def concatString: F2
+    def coerceToDouble: F1
 
     def composeOptimizations(optimize: Boolean, funcs: List[DepGraph => DepGraph]): DepGraph => DepGraph =
       if (optimize) funcs.reverse.map(Endo[DepGraph]).suml.run else identity
@@ -448,7 +438,7 @@ trait EvaluatorModule[M[+ _]]
             }
 
           case Join(op, joinSort @ (IdentitySort | ValueSort(_)), left, right) =>
-            join(graph, left, right, joinSort)(transFromBinOp(op, MorphContext(ctx, graph)))
+            join(graph, left, right, joinSort)(transFromBinOp(op))
 
           case dag.Filter(joinSort @ (IdentitySort | ValueSort(_)), target, boolean) =>
             join(graph, target, boolean, joinSort)(trans.Filter(_, _))
@@ -504,7 +494,7 @@ trait EvaluatorModule[M[+ _]]
             for {
               pendingTable <- prepareEval(parent, splits)
               Path(prefixStr) = ctx.basePath
-              f1 = concatString(MorphContext(ctx, graph)).applyl(CString(prefixStr.replaceAll("([^/])$", "$1/")))
+              f1 = concatString.applyl(CString(prefixStr.replaceAll("([^/])$", "$1/")))
               trans2 = trans.Map1(trans.DerefObjectStatic(pendingTable.trans, paths.Value), f1)
               loaded = pendingTable.table
                 .transform(trans2)
@@ -528,7 +518,7 @@ trait EvaluatorModule[M[+ _]]
               Path(midStr) = ctx.scriptPath
               fullPrefix = prefixStr.replaceAll("([^/])$", "$1/") + midStr.replaceAll("([^/])$", "$1/")
 
-              f1 = concatString(MorphContext(ctx, graph)).applyl(CString(fullPrefix))
+              f1 = concatString.applyl(CString(fullPrefix))
               trans2 = trans.Map1(trans.DerefObjectStatic(pendingTable.trans, paths.Value), f1)
               loaded = pendingTable.table
                 .transform(trans2)
@@ -547,7 +537,7 @@ trait EvaluatorModule[M[+ _]]
           case dag.Morph1(mor, parent) =>
             for {
               pendingTable <- prepareEval(parent, splits)
-              back <- transState liftM mn(mor(pendingTable.table.transform(liftToValues(pendingTable.trans)), MorphContext(ctx, graph)))
+              back <- transState liftM mn(mor(pendingTable.table.transform(liftToValues(pendingTable.trans))))
             } yield {
               PendingTable(back, graph, TransSpec1.Id, findMorphOrder(mor.idPolicy, pendingTable.sort))
             }
@@ -599,7 +589,7 @@ trait EvaluatorModule[M[+ _]]
 
             joined flatMap {
               case (morph1, PendingTable(joinedTable, _, _, sort)) =>
-                transState liftM mn(morph1(joinedTable, MorphContext(ctx, graph))) map { table =>
+                transState liftM mn(morph1(joinedTable)) map { table =>
                   PendingTable(table, graph, TransSpec1.Id, findMorphOrder(mor.idPolicy, sort))
                 }
             }
@@ -645,7 +635,7 @@ trait EvaluatorModule[M[+ _]]
                   .transform(liftedTrans)
                   .transform(DerefObjectStatic(Leaf(Source), paths.Value))
                   .transform(spec)
-                  .reduce(reduction.reducer(MorphContext(ctx, graph)))(reduction.monoid))
+                  .reduce(reduction.reducer)(reduction.monoid))
 
               table = result.map(reduction.extract)
 
@@ -670,7 +660,7 @@ trait EvaluatorModule[M[+ _]]
             for {
               pendingTable <- prepareEval(parent, splits)
               liftedTrans = liftToValues(pendingTable.trans)
-              result <- transState liftM mn(red(pendingTable.table.transform(DerefObjectStatic(liftedTrans, paths.Value)), MorphContext(ctx, graph)))
+              result <- transState liftM mn(red(pendingTable.table.transform(DerefObjectStatic(liftedTrans, paths.Value))))
               wrapped = result transform buildConstantWrapSpec(Leaf(Source))
             } yield PendingTable(wrapped, graph, TransSpec1.Id, IdentityOrder(graph))
 
@@ -710,7 +700,7 @@ trait EvaluatorModule[M[+ _]]
               liftedTrans = liftToValues(predPending.trans)
               predTable = predPending.table transform DerefObjectStatic(liftedTrans, paths.Value)
 
-              truthiness <- transState liftM mn(predTable.reduce(Forall reducer MorphContext(ctx, graph))(Forall.monoid))
+              truthiness <- transState liftM mn(predTable.reduce(Forall.reducer)(Forall.monoid))
 
               assertion = if (truthiness getOrElse false) {
                 N.point(())
@@ -778,7 +768,7 @@ trait EvaluatorModule[M[+ _]]
             }
 
           case j @ Join(op, Cross(hint), left, right) =>
-            cross(graph, left, right, hint)(transFromBinOp(op, MorphContext(ctx, graph)))
+            cross(graph, left, right, hint)(transFromBinOp(op))
 
           case f @ dag.Filter(Cross(hint), target, boolean) =>
             cross(graph, target, boolean, hint)(trans.Filter(_, _))
