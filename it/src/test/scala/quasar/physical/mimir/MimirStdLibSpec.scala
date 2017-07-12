@@ -19,16 +19,19 @@ package quasar.physical.mimir
 import slamdata.Predef._
 
 import quasar.Data
+import quasar.contrib.scalacheck.gen
 import quasar.fp.tree.{BinaryArg, TernaryArg, UnaryArg}
 import quasar.qscript._
 import quasar.std.StdLibSpec
 
 import matryoshka.data.Fix
 
-import org.scalacheck.Gen
+import org.scalacheck.{Arbitrary, Gen}
 import org.specs2.execute.Result
 
 import java.time.LocalDate
+
+import scalaz.syntax.functor._
 
 class MimirStdLibSpec extends StdLibSpec {
   val runner = new MapFuncStdLibTestRunner {
@@ -37,10 +40,15 @@ class MimirStdLibSpec extends StdLibSpec {
     def binaryMapFunc(prg: FreeMapA[Fix, BinaryArg], arg1: Data,arg2: Data, expected: Data): Result = ???
     def ternaryMapFunc(prg: FreeMapA[Fix, TernaryArg], arg1: Data,arg2: Data, arg3: Data, expected: Data): Result = ???
     
-    def dateDomain: Gen[LocalDate] = ???
-    def decDomain: Gen[BigDecimal] = ???
-    def intDomain: Gen[BigInt] = ???
-    def stringDomain: Gen[String] = ???
+    def decDomain: Gen[BigDecimal] = Arbitrary.arbitrary[Long].map(BigDecimal(_))
+    def intDomain: Gen[BigInt] = Arbitrary.arbitrary[Long].map(BigInt(_))
+    def stringDomain: Gen[String] = gen.printableAsciiString
+
+    def dateDomain: Gen[LocalDate] =
+      Gen.choose(
+        LocalDate.of(1, 1, 1).toEpochDay,
+        LocalDate.of(9999, 12, 31).toEpochDay
+      ) ∘ (LocalDate.ofEpochDay(_))
   }
 
   tests(runner)
