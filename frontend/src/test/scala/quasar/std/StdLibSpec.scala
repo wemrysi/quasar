@@ -994,6 +994,9 @@ abstract class StdLibSpec extends Qspec {
             binary(Eq(_, _).embed, x, y, Data.Bool(false))
         }
 
+        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
+          binary(Eq(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        }
         // TODO: the rest of the types
       }
 
@@ -1062,6 +1065,9 @@ abstract class StdLibSpec extends Qspec {
           binary(Lt(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x < y))
         }
 
+        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
+          binary(Lt(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        }
         // TODO: Timestamp, Interval, cross-type comparison
       }
 
