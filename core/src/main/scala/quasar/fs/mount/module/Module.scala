@@ -130,6 +130,7 @@ object Module {
       def closeHandle(dataOrHandle: List[Data] \/ ResultHandle): Process[M, Nothing] =
         dataOrHandle.fold(_ => Process.empty, h => Process.eval_[M, Unit](unsafe.close(h).liftM[ErrorT]))
 
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def readUntilEmpty(h: ResultHandle): Process[M, Data] =
         Process.await(unsafe.more(h).leftMap(Error.fsError(_))) { data =>
           if (data.isEmpty)
