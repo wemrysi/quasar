@@ -960,22 +960,22 @@ abstract class StdLibSpec extends Qspec {
             binary(Modulo(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(0))
         }
 
-        "any positive ints" >> prop { (x0: Int, y0: Int) =>
-          val x = abs(x0)
-          val y = abs(y0)
-          (x > 0 && y > 1) ==>
+        "any ints" >> prop { (x: Int, y: Int) =>
+          y != 0 ==>
             binary(Modulo(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(BigInt(x) % BigInt(y)))
         }
 
-        // TODO: figure out what domain can be tested here
-        // "any doubles" >> prop { (x: Double, y: Double) =>
-        //   binary(Modulo(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x % y))
-        // }
+        "any doubles" >> prop { (x: Double, y: Double) =>
+          y != 0 ==>
+            binary(Modulo(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x % y))
+        }
 
-        // TODO: figure out what domain can be tested here
-        // "mixed int/double" >> prop { (x: Int, y: Double) =>
-        //   commute(Modulo(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x % y))
-        // }
+        "mixed int/double" >> prop { (x: Int, y: Double) =>
+          y != 0 ==>
+            binary(Modulo(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x % y))
+          x != 0 ==>
+            binary(Modulo(_, _).embed, Data.Dec(y), Data.Int(x), Data.Dec(y % x))
+        }
       }
     }
 
