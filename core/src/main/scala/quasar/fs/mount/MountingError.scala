@@ -71,5 +71,12 @@ object MountingError {
         s"Invalid ${t.shows}, because: $e"
     }
 
-  implicit val equal: Equal[MountingError] = Equal.equalA
+  implicit val equal: Equal[MountingError] = Equal.equal {
+    case (PError(a), PError(b))                     => a ≟ b
+    case (EError(a), EError(b))                     => a ≟ b
+    case (InvalidConfig(a, b), InvalidConfig(c, d)) => a ≟ c && b ≟ d
+    case (InvalidMount(a, b), InvalidMount(c, d))   => a ≟ c && b ≟ d
+    case _                                          => false
+  }
+
 }
