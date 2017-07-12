@@ -154,7 +154,7 @@ object Mimir extends BackendModule with Logging {
 //def interpretM[M[_], F[_], A, B](f: A => M[B], φ: AlgebraM[M, F, B]): AlgebraM[M, CoEnv[A, F, ?], B]
 // f.cataM(interpretM)
 
-    val mapFuncPlanner = new MapFuncPlanner[T, M, Backend]
+    val mapFuncPlanner = new MapFuncPlanner[T, Backend]
 
     lazy val planQST: AlgebraM[Backend, QScriptTotal[T, ?], Repr] =
       _.run.fold(

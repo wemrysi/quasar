@@ -47,7 +47,7 @@ import delorean._
 import fs2.async
 import fs2.interop.scalaz._
 
-import scalaz.Monad
+import scalaz.{-\/, \/-, Monad}
 import scalaz.concurrent.Task
 import scalaz.std.scalaFuture.futureInstance
 
@@ -94,9 +94,14 @@ final class Precog private (dataDir0: File)
         vfsLatch.countDown()
       }
     }
+
     val gated = vfsStr.mergeHaltBoth(vfsShutdownSignal.discrete.noneTerminate.drain)
 
-    gated.run.unsafePerformAsync(_ => ())
+    gated.run.unsafePerformAsync {
+      case -\/(_) => vfsLatch.countDown()
+      case \/-(_) => ()
+    }
+
     vfsLatch.await()      // sigh....
   }
 
