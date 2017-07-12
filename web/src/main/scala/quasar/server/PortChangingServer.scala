@@ -62,6 +62,7 @@ object PortChangingServer {
     produceService: (Int => Task[Unit]) => HttpService
   ): Task[PortChangingServer] = {
     val configQ = async.boundedQueue[ServerBlueprint](1)
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def startNew(port: Int): Task[Unit] = {
       val conf = ServerBlueprint(port, idleTimeout = Duration.Inf, produceService(startNew))
       configQ.enqueueOne(conf)

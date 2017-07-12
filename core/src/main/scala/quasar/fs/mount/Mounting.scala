@@ -199,6 +199,20 @@ object Mounting {
     )(implicit S0: MountingFailure :<: S): FreeS[Unit] =
       MountingFailure.Ops[S].unattempt(lift(Remount(src, dst)))
 
+    def mountOrReplace(
+      path: APath,
+      mountConfig: MountConfig,
+      replaceIfExists: Boolean
+    )(implicit
+      S0: MountingFailure :<: S,
+      S1: PathMismatchFailure :<: S
+    ): Free[S, Unit] =
+      for {
+        exists <- lookupType(path).isDefined
+        _      <- if (replaceIfExists && exists) replace(path, mountConfig)
+                  else mount(path, mountConfig)
+      } yield ()
+
     ////
 
     private val notFound: Prism[MountingError, APath] =

@@ -19,11 +19,8 @@ package quasar.api.services
 import slamdata.Predef.StringContext
 import quasar.api._
 import quasar.db.DbConnectionConfig
-import quasar.effect.AtomicRef
 import quasar.fp.free._
-import quasar.main.api.MetaStoreApi
-import quasar.main.MainErrT
-import quasar.metastore.MetaStore
+import quasar.main.{MainErrT, MetaStoreLocation}
 
 import org.http4s.dsl._
 import org.http4s.argonaut._
@@ -34,17 +31,17 @@ import scalaz.concurrent.Task
 
 object metastore {
 
-  def service[S[_]](implicit M: AtomicRef.Ops[MetaStore, S], S0: Task :<: S): QHttpService[S] = {
+  def service[S[_]](implicit meta: MetaStoreLocation.Ops[S], S0: Task :<: S): QHttpService[S] = {
 
     QHttpService {
       case GET -> Root =>
-        respond(MetaStoreApi.getCurrentMetastore.map(_.asJson))
+        respond(meta.get.map(_.asJson))
       case req @ PUT -> Root =>
         val initialize = req.params.keys.toList.contains("initialize")
         respondT((for {
           connConfigJson <- lift(req.as[Json]).into[S].liftM[MainErrT]
           connConfig     <- EitherT.fromEither(connConfigJson.as[DbConnectionConfig].result.leftMap(_._1).point[Free[S, ?]])
-          _              <- EitherT(MetaStoreApi.attemptChangeMetastore(connConfig, initialize))
+          _              <- EitherT(meta.set(connConfig, initialize))
           newUrl         =  DbConnectionConfig.connectionInfo(connConfig).url
           initializedStr =  if (initialize) "newly initialized " else ""
         } yield s"Now using ${initializedStr}metastore located at $newUrl").leftMap(msg => ApiError.fromMsg(BadRequest, msg)))

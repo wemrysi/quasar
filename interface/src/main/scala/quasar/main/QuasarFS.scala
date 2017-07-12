@@ -17,15 +17,22 @@
 package quasar.main
 
 import slamdata.Predef._
-import quasar.contrib.pathy.APath
+import quasar._
+import quasar.contrib.pathy._
 import quasar.db.DbConnectionConfig
 import quasar.fp.free._
-import quasar.fs.mount.MountConfig
-import quasar.main.api.{MetaStoreApi, MountApi}
+import quasar.fp.numeric._
+import quasar.fs._
+import quasar.fs.mount._
+import quasar.fs.mount.module.Module
+import quasar.sql._
 
+import matryoshka.data.Fix
 import pathy.Path
 import pathy.Path._
-import scalaz._, concurrent.Task
+import scalaz._
+import scalaz.concurrent.Task
+import scalaz.stream.Process
 
 /**
   * The Quasar Filesystem. Contains the `CoreEff` that can be used to interpret most
@@ -38,23 +45,34 @@ final case class QuasarFS(interp: CoreEff ~> QErrs_TaskM, shutdown: Task[Unit]) 
   private val taskInter: CoreEff ~> Task =
     foldMapNT(NaturalTransformation.refl[Task] :+: QErrs.toCatchable[Task]) compose interp
 
-  type CoreEff_Task[A] = Coproduct[Task, CoreEff, A]
-
-  private val taskInter0: CoreEff_Task ~> Task =
-    NaturalTransformation.refl[Task] :+: taskInter
-
   def getCurrentMetastore: Task[DbConnectionConfig] =
-    MetaStoreApi.getCurrentMetastore[CoreEff].foldMap(taskInter)
+    MetaStoreLocation.Ops[CoreEff].get.foldMap(taskInter)
 
   def attemptChangeMetastore(newConnection: DbConnectionConfig, initialize: Boolean): Task[String \/ Unit] =
-    MetaStoreApi.attemptChangeMetastore[CoreEff_Task](newConnection, initialize).foldMap(taskInter0)
+    MetaStoreLocation.Ops[CoreEff].set(newConnection, initialize).foldMap(taskInter)
 
   def getMount(path: APath): Task[Option[MountConfig]] =
-    MountApi.getMount[CoreEff](path).run.foldMap(taskInter)
+    Mounting.Ops[CoreEff].lookupConfig(path).run.foldMap(taskInter)
 
   def moveMount[T](src: Path[Abs,T,Sandboxed], dst: Path[Abs,T,Sandboxed]): Task[Unit] =
-    MountApi.moveMount[CoreEff, T](src, dst).foldMap(taskInter)
+     Mounting.Ops[CoreEff].remount[T](src, dst).foldMap(taskInter)
 
   def mount(path: APath, mountConfig: MountConfig, replaceIfExists: Boolean): Task[Unit] =
-    MountApi.mount[CoreEff](path, mountConfig, replaceIfExists).foldMap(taskInter)
+    Mounting.Ops[CoreEff].mountOrReplace(path, mountConfig, replaceIfExists).foldMap(taskInter)
+
+  def mountView(file: AFile, scopedExpr: ScopedExpr[Fix[Sql]], vars: Variables): Task[Unit] =
+    Mounting.Ops[CoreEff].mountView(file, scopedExpr, vars).foldMap(taskInter)
+
+  def mountModule(dir: ADir, statements: List[Statement[Fix[Sql]]]): Task[Unit] =
+    Mounting.Ops[CoreEff].mountModule(dir, statements).foldMap(taskInter)
+
+  def mountFileSystem(
+    loc: ADir,
+    typ: FileSystemType,
+    uri: ConnectionUri
+  ): Task[Unit] =
+    Mounting.Ops[CoreEff].mountFileSystem(loc, typ, uri).foldMap(taskInter)
+
+  def invoke(func: AFile, args: Map[String, String], offset: Natural, limit: Option[Positive]): Process[Task, Data] =
+    Module.Ops[CoreEff].invokeFunction_(func, args, offset, limit).translate(foldMapNT(taskInter))
 }

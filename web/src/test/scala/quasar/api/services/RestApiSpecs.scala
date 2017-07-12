@@ -18,12 +18,12 @@ package quasar.api.services
 
 import slamdata.Predef._
 import quasar.api._
-import quasar.effect.{AtomicRef, Failure}
+import quasar.effect.Failure
 import quasar.fp._, free._
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.module.Module
-import quasar.main.MetaStoreRef
+import quasar.main.MetaStoreLocation
 import quasar.metastore.MetaStoreFixture.createNewTestMetastore
 
 import org.http4s._, Method.MOVE
@@ -36,7 +36,7 @@ import org.specs2.matcher.TraversableMatchers._
 class RestApiSpecs extends quasar.Qspec {
   import InMemory._, Mounting.PathTypeMismatch
 
-  type Eff[A] = (Task :\: PathMismatchFailure :\: MountingFailure :\: FileSystemFailure :\: Module.Failure :\: MetaStoreRef :\: Module :\: Mounting :\: Analyze :/: FileSystem)#M[A]
+  type Eff[A] = (Task :\: PathMismatchFailure :\: MountingFailure :\: FileSystemFailure :\: Module.Failure :\: MetaStoreLocation :\: Module :\: Mounting :\: Analyze :/: FileSystem)#M[A]
 
   "OPTIONS" should {
     val mount = λ[Mounting ~> Task](_ => Task.fail(new RuntimeException("unimplemented")))
@@ -51,7 +51,7 @@ class RestApiSpecs extends quasar.Qspec {
       Failure.toRuntimeError[Task, MountingError]        :+:
       Failure.toRuntimeError[Task, FileSystemError]      :+:
       Failure.toRuntimeError[Task, Module.Error]         :+:
-      AtomicRef.fromTaskRef(metaRef)                     :+:
+      MetaStoreLocation.impl.default[Task](metaRef)      :+:
       (foldMapNT(mount :+: fs) compose Module.impl.default[MountingFileSystem]) :+:
       mount :+:
       analyze :+:

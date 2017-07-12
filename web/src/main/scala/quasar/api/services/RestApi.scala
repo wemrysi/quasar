@@ -24,7 +24,7 @@ import quasar.fp.free.foldMapNT
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.module.Module
-import quasar.main.MetaStoreRef
+import quasar.main.MetaStoreLocation
 
 import scala.concurrent.duration._
 import scala.collection.immutable.ListMap
@@ -52,7 +52,7 @@ object RestApi {
         S9: Module :<: S,
         S10: Module.Failure :<: S,
         S11: Analyze :<: S,
-        S12: MetaStoreRef :<: S
+        S12: MetaStoreLocation :<: S
       ): Map[String, QHttpService[S]] =
     ListMap(
       "/compile/fs"   -> query.compile.service[S],

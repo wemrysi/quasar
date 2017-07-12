@@ -19,10 +19,9 @@ package quasar.api.services
 import slamdata.Predef._
 import quasar.api._
 import quasar.db.DbConnectionConfig
-import quasar.effect.AtomicRef
 import quasar.fp._
 import quasar.fp.free._
-import quasar.main.MetaStoreRef
+import quasar.main.MetaStoreLocation
 import quasar.metastore.MetaStoreFixture
 
 import argonaut._, Argonaut._
@@ -33,12 +32,12 @@ import scalaz._, concurrent.Task
 
 class MetastoreServiceSpec extends quasar.Qspec {
 
-  type Eff[A] = Coproduct[Task, MetaStoreRef, A]
+  type Eff[A] = Coproduct[Task, MetaStoreLocation, A]
 
   val metastore = MetaStoreFixture.createNewTestMetastore.unsafePerformSync
   val metaRef   = TaskRef(metastore).unsafePerformSync
 
-  val inter: Eff ~> ResponseOr = liftMT[Task, ResponseT] :+: (liftMT[Task, ResponseT] compose AtomicRef.fromTaskRef(metaRef))
+  val inter: Eff ~> ResponseOr = liftMT[Task, ResponseT] :+: (liftMT[Task, ResponseT] compose MetaStoreLocation.impl.default[Task](metaRef))
 
   val service = quasar.api.services.metastore.service[Eff].toHttpService(inter)
 

@@ -76,7 +76,7 @@ package object main {
     * we may want to interpret using more than one implementation.
     */
   type QEffIO[A]  = Coproduct[Task, QEff, A]
-  type QEff[A]     = Coproduct[MetaStoreRef, QEff0, A]
+  type QEff[A]     = Coproduct[MetaStoreLocation, QEff0, A]
   type QEff0[A]    = Coproduct[Mounting, QErrs, A]
 
   /** All possible types of failure in the system (apis + physical). */
@@ -95,7 +95,7 @@ package object main {
 
   /** Effect comprising the core Quasar apis. */
   type CoreEffIO[A] = Coproduct[Task, CoreEff, A]
-  type CoreEff[A]   = (MetaStoreRef :\: Module :\: Mounting :\: Analyze :\: QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :/: CoreErrs)#M[A]
+  type CoreEff[A]   = (MetaStoreLocation :\: Module :\: Mounting :\: Analyze :\: QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :/: CoreErrs)#M[A]
 
   object CoreEff {
     def runFs[S[_]](
@@ -109,14 +109,14 @@ package object main {
       S4: PathMismatchFailure :<: S,
       S5: FileSystemFailure :<: S,
       S6: Module.Failure    :<: S,
-      S7: MetaStoreRef      :<: S
+      S7: MetaStoreLocation :<: S
     ): Task[CoreEff ~> Free[S, ?]] = {
       def moduleInter(fs: AnalyticalFileSystem ~> Free[S,?]): Module ~> Free[S, ?] = {
         val wtv: Coproduct[Mounting, AnalyticalFileSystem, ?] ~> Free[S,?] = injectFT[Mounting, S] :+: fs
         flatMapSNT(wtv) compose Module.impl.default[Coproduct[Mounting, AnalyticalFileSystem, ?]]
       }
       CompositeFileSystem.interpreter[S](hfsRef) map { compFs =>
-        injectFT[MetaStoreRef, S]                       :+:
+        injectFT[MetaStoreLocation, S]                       :+:
         moduleInter(compFs)                             :+:
         injectFT[Mounting, S]                           :+:
         (compFs compose Inject[Analyze, AnalyticalFileSystem])  :+:
@@ -395,8 +395,8 @@ package object main {
 
   type QErrsCnxIO[A]  = Coproduct[ConnectionIO, QErrs, A]
   type QErrsTCnxIO[A] = Coproduct[Task, QErrsCnxIO, A]
-  type QErrs_CnxIO_Task_MetaStoreRef[A] = Coproduct[MetaStoreRef, QErrsTCnxIO, A]
-  type QErrs_CnxIO_Task_MetaStoreRefM[A] = Free[QErrs_CnxIO_Task_MetaStoreRef, A]
+  type QErrs_CnxIO_Task_MetaStoreLoc[A] = Coproduct[MetaStoreLocation, QErrsTCnxIO, A]
+  type QErrs_CnxIO_Task_MetaStoreLocM[A] = Free[QErrs_CnxIO_Task_MetaStoreLoc, A]
 
   object QErrsCnxIO {
     def qErrsToMainErrT[F[_]: Catchable: Monad]: QErrs ~> MainErrT[F, ?] =
@@ -473,18 +473,18 @@ package object main {
 
       runCore    <- CoreEff.runFs[QEffIO](hfsRef).liftM[MainErrT]
     } yield {
-      val f: QEffIO ~> QErrs_CnxIO_Task_MetaStoreRefM =
-        injectFT[Task, QErrs_CnxIO_Task_MetaStoreRef]               :+:
-          injectFT[MetaStoreRef, QErrs_CnxIO_Task_MetaStoreRef]       :+:
-          jdbcMounter[QErrs_CnxIO_Task_MetaStoreRef](hfsRef, mntdRef) :+:
-          injectFT[QErrs, QErrs_CnxIO_Task_MetaStoreRef]
+      val f: QEffIO ~> QErrs_CnxIO_Task_MetaStoreLocM =
+        injectFT[Task, QErrs_CnxIO_Task_MetaStoreLoc]               :+:
+        injectFT[MetaStoreLocation, QErrs_CnxIO_Task_MetaStoreLoc]  :+:
+        jdbcMounter[QErrs_CnxIO_Task_MetaStoreLoc](hfsRef, mntdRef) :+:
+        injectFT[QErrs, QErrs_CnxIO_Task_MetaStoreLoc]
 
       val connectionIOToTask: ConnectionIO ~> Task =
         λ[ConnectionIO ~> Task](io => metaRef.read.flatMap(t => t.trans.transactor.trans(io)))
-      val g: QErrs_CnxIO_Task_MetaStoreRef ~> QErrs_TaskM =
-        (injectFT[Task, QErrs_Task] compose AtomicRef.fromTaskRef(metaRef)) :+:
-         injectFT[Task, QErrs_Task]                                         :+:
-        (injectFT[Task, QErrs_Task] compose connectionIOToTask)             :+:
+      val g: QErrs_CnxIO_Task_MetaStoreLoc ~> QErrs_TaskM =
+        (injectFT[Task, QErrs_Task] compose MetaStoreLocation.impl.default[QErrs_Task](metaRef)) :+:
+         injectFT[Task, QErrs_Task]                                                              :+:
+        (injectFT[Task, QErrs_Task] compose connectionIOToTask)                                  :+:
          injectFT[QErrs, QErrs_Task]
 
       QuasarFS(
