@@ -55,7 +55,7 @@ object data {
     case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) =>
       respond_((offsetOrInvalid(offsetParam) |@| limitOrInvalid(limitParam)) { (offset, limit) =>
         val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
-        val zipped = req.headers.get(Accept).map(_.values.exists(_.mediaRange == MediaType.`application/zip`)).getOrElse(false)
+        val zipped = req.headers.get(Accept).exists(_.values.exists(_.mediaRange == MediaType.`application/zip`))
         download[S](requestedFormat, path, offset, limit, zipped)
       })
 
@@ -103,11 +103,7 @@ object data {
       },
       filePath => {
         if (zipped) {
-          val headers: List[Header] = `Content-Type`(MediaType.`application/zip`) :: (format.disposition.toList: List[Header])
-          val p: Process[R.M, ByteVector] = format.encode(R.scan(filePath, offset, limit)).map(str => ByteVector.view(str.getBytes(StandardCharsets.UTF_8)))
-          val f: RelFile[Sandboxed] = currentDir[Sandboxed] </> file1[Sandboxed](fileName(filePath))
-          val z: Process[R.M, ByteVector] = Zip.zipFiles(Map(f -> p))
-          QResponse.headers.modify(_ ++ headers)(QResponse.streaming(z))
+          formattedZipDataResponse(format, filePath, R.scan(filePath, offset, limit))
         }
         else {
           formattedDataResponse(format, R.scan(filePath, offset, limit))
