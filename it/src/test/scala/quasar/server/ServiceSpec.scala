@@ -298,12 +298,18 @@ class ServiceSpec extends quasar.Qspec {
           --\ "children"
           -\ (c => (c.hcursor --\ "name").as[String].toOption ≟ "f2".some)
           --\ "mount"
-          --\ "error" := jEmptyString
-        ).up.up.up.focus >>= (_.array ∘ (_.toSet))
+          --\ "detail"
+          --\ "message" := jEmptyString
+        ).up.up.up.up.focus >>= (_.array ∘ (_.toSet))
       ) must beRightDisjunction(
         Set(
           Json("name" := "f1", "type" := "file", "mount" := "view"),
-          Json("name" := "f2", "type" := "view", "mount" := Json("error" := ""))).some)
+          Json(
+            "name" := "f2",
+            "type" := "view",
+            "mount" := Json(
+              "status" := "Internal Server Error",
+              "detail" := Json("message" := "")))).some)
     }
   }
 
