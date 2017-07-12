@@ -80,7 +80,7 @@ package object elastic {
     /* Points to quasar-web.jar or target/classes if run from sbt repl/run */
     val fetchProjectRootPath = Task.delay {
       val pathStr = URLDecoder.decode(this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath, "UTF-8")
-      posixCodec.parsePath[Option[APath]](_ => None, Some(_).map(sandboxAbs), _ => None, Some(_).map(sandboxAbs))(pathStr)
+      posixCodec.parsePath[Option[APath]](_ => None, Some(_).map(unsafeSandboxAbs), _ => None, Some(_).map(unsafeSandboxAbs))(pathStr)
     }
     val jar: Task[Option[APath]] =
       fetchProjectRootPath.map(_.flatMap(s => parentDir(s).map(_ </> file("sparkcore.jar"))))
