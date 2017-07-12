@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.physical.sparkcore.fs
+package quasar.physical.sparkcore
 
 import quasar._
 import slamdata.Predef._
 import quasar.Planner.PlannerError
 import quasar.fp.ski._
 import quasar.fp.tree._
+import quasar.physical.sparkcore.fs.CoreMap
 import quasar.qscript.{MapFuncCore, MapFuncsCore, MapFuncStdLibTestRunner, FreeMapA}, MapFuncsCore._
 import quasar.std._
 
@@ -32,7 +33,7 @@ import org.scalacheck.Arbitrary.arbitrary
 import org.specs2.execute._
 import scalaz._, Scalaz._
 
-class CoreMapStdLibSpec extends StdLibSpec {
+class SparkStdLibSpec extends StdLibSpec {
   val TODO: Result \/ Unit = Skipped("TODO").left
 
   def ignoreSome(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data)(run: => Result): Result =
