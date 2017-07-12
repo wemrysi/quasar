@@ -467,8 +467,7 @@ class PlannerSpec
           def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
           def combine: JoinFunc = Free.roll(MFC(ConcatMaps(
             Free.roll(MFC(MakeMap(StrLit(JoinDir.Left.name), LeftSideF))),
-            Free.roll(MFC(MakeMap(StrLit(JoinDir.Right.name), RightSideF)))
-          )))
+            Free.roll(MFC(MakeMap(StrLit(JoinDir.Right.name), RightSideF))))))
 
           val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.Inner, combine)
 
@@ -478,9 +477,7 @@ class PlannerSpec
               rdd.collect.toList must_= List(
                 Data.Obj(ListMap(
                   JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
-                  JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
-                )
-                ))
+                  JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US")))))))
           })
         }
       }
@@ -500,8 +497,7 @@ class PlannerSpec
           def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
           def combine: JoinFunc = Free.roll(MFC(ConcatMaps(
             Free.roll(MFC(MakeMap(StrLit(JoinDir.Left.name), LeftSideF))),
-            Free.roll(MFC(MakeMap(StrLit(JoinDir.Right.name), RightSideF)))
-          )))
+            Free.roll(MFC(MakeMap(StrLit(JoinDir.Right.name), RightSideF))))))
 
           val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.LeftOuter, combine)
 
@@ -537,8 +533,7 @@ class PlannerSpec
           def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
           def combine: JoinFunc = Free.roll(MFC(ConcatMaps(
             Free.roll(MFC(MakeMap(StrLit(JoinDir.Left.name), LeftSideF))),
-            Free.roll(MFC(MakeMap(StrLit(JoinDir.Right.name), RightSideF)))
-          )))
+            Free.roll(MFC(MakeMap(StrLit(JoinDir.Right.name), RightSideF))))))
 
           val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.RightOuter, combine)
 
@@ -572,8 +567,7 @@ class PlannerSpec
           def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
           def combine: JoinFunc = Free.roll(MFC(ConcatMaps(
             Free.roll(MFC(MakeMap(StrLit(JoinDir.Left.name), LeftSideF))),
-            Free.roll(MFC(MakeMap(StrLit(JoinDir.Right.name), RightSideF)))
-          )))
+            Free.roll(MFC(MakeMap(StrLit(JoinDir.Right.name), RightSideF))))))
 
           val equiJoin = quasar.qscript.EquiJoin(src, left, right, key, key, JoinType.FullOuter, combine)
 

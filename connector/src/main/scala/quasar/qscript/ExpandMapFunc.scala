@@ -45,9 +45,7 @@ object ExpandMapFunc extends ExpandMapFuncInstances {
       : AlgebraM[F, MapFuncDerived[T, ?], A] = { f =>
     derived(f).getOrElse(
       Free.roll(mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(
-        interpretM(scala.Predef.implicitly[Monad[F]].point[A](_), core)
-      )
-    )
+        interpretM(scala.Predef.implicitly[Monad[F]].point[A](_), core)))
   }
 }
 
@@ -65,13 +63,11 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
             MFC(Cond(
               Free.roll(MFC(Lt(a.point[Free[OUT,?]], Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(0)))))))),
               Free.roll(MFC(Negate(a.point[Free[OUT, ?]]))),
-              a.point[Free[OUT, ?]]
-            ))
+              a.point[Free[OUT, ?]]))
           case D.Trunc(a) =>
             MFC(Subtract(
               a.point[Free[OUT, ?]],
-              Free.roll(MFC(Modulo(a.point[Free[OUT,?]], Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(1))))))))
-            ))
+              Free.roll(MFC(Modulo(a.point[Free[OUT,?]], Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(1))))))))))
         }
     }
 
