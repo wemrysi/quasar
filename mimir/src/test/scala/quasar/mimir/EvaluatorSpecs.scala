@@ -60,13 +60,6 @@ trait EvaluatorTestSupport[M[+_]] extends StdLibEvaluatorStack[M]
 
   val defaultEvaluationContext = EvaluationContext("testAPIKey", testAccount, Path.Root, Path.Root, dateTime.now)
 
-  val defaultMorphContext = MorphContext(defaultEvaluationContext, new MorphLogger {
-    def info(msg: String): M[Unit] = M.point(())
-    def warn(msg: String): M[Unit] = M.point(())
-    def error(msg: String): M[Unit] = M.point(())
-    def die(): M[Unit] = M.point(sys.error("MorphContext#die()"))
-  })
-
   val projections = Map.empty[Path, Projection]
   def vfs = sys.error("VFS metadata not supported in test.")
 
