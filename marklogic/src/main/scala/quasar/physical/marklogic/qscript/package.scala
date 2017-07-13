@@ -129,7 +129,7 @@ package object qscript {
     SP: StructuralPlanner[F, FMT]
   ): F[XQuery] =
     freeMap.transCata[FreeMapA[T, A]](rewriteNullCheck[T, FreeMapA[T, A], A])
-      .cataM(interpretM(recover(_).point[F], MapFuncPlanner[F, MapFunc[T, ?], T].plan))
+      .cataM(interpretM(recover(_).point[F], MapFuncPlanner[F, FMT, MapFunc[T, ?]].plan))
 
   /** Returns whether the query is valid and can be executed.
     *

@@ -43,6 +43,7 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT]
   type Count = Long
 
   // TODO consider moving to data.scala (conflicts with existing code)
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def dataOrder: Order[Data] = new Order[Data] with Serializable {
     def order(d1: Data, d2: Data) = (d1, d2) match {
       case Data.Null -> Data.Null                 => Ordering.EQ
