@@ -134,7 +134,8 @@ object Dependencies {
       .exclude("commons-logging", "commons-logging"),
     "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2",
     "com.sksamuel.elastic4s" %% "elastic4s-jackson"      % "5.4.6",
-    "com.sksamuel.elastic4s" %% "elastic4s-testkit"      % "5.4.6" % Test,
+    ("com.sksamuel.elastic4s" %% "elastic4s-testkit"      % "5.4.6" % Test)
+      .exlude("org.scalatest","scalatest")
     "org.apache.logging.log4j"              % "log4j-core"                % "2.6.2"
   )
 
