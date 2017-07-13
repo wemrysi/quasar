@@ -310,6 +310,12 @@ trait MathLib extends Library {
         case t             => success(Func.Input1(t))
       })
 
+  // Note: there are 2 interpretations of `%` which return different values for negative numbers.
+  // Depending on the interpretation `-5.5 % 1` can either be `-0.5` or `0.5`.
+  // Generally, the first interpretation seems to be referred to as "remainder" and the 2nd as "modulo".
+  // Java/scala and PostgreSQL all use the remainder interpretation, so we use it here too.
+  // However, since PostgreSQL uses the function name `mod` as an alias for `%` while using the term
+  // remainder in its description we keep the term `Modulo` around.
   val Modulo = BinaryFunc(
     Mapping,
     "Finds the remainder of one number divided by another",
