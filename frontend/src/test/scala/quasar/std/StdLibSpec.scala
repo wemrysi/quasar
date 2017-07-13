@@ -941,7 +941,6 @@ abstract class StdLibSpec extends Qspec {
           (x > 0 && y > 1) ==>
             binary(Modulo(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(BigInt(x) % BigInt(y)))
         }
-
         // TODO: figure out what domain can be tested here
         // "any doubles" >> prop { (x: Double, y: Double) =>
         //   binary(Modulo(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x % y))
