@@ -82,7 +82,8 @@ package object services {
     S0: Failure[E, ?] :<: S,
     S1: Task :<: S
   ): QResponse[S] = {
-    val headers: List[Header] = `Content-Type`(MediaType.`application/zip`) :: Header("Content-Transfer-Encoding","binary") :: (format.disposition.toList: List[Header])
+    val headers: List[Header] = `Content-Type`(MediaType.`application/zip`) :: 
+      (format.disposition.toList: List[Header])
     val p = format.encode(data).map(str => ByteVector.view(str.getBytes(StandardCharsets.UTF_8))) 
     val f = currentDir[Sandboxed] </> file1[Sandboxed](fileName(filePath)) 
     val z = Zip.zipFiles(Map(f -> p))

@@ -276,7 +276,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           }
           "zipped json" >> {
             val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.json.zip"))
-            val encoding = Header("Content-Transfer-Encoding", "binary")
             val sampleFile = rootDir[Sandboxed] </> file("foo")
             val data = Vector(Data.Obj("a" -> Data.Str("bar"), "b" -> Data.Bool(true)))
             val request = Request(
@@ -287,13 +286,11 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             val zipMagicByte: ByteVector = hex"504b" // zip file magic byte
             zipfile.take(2) must_=== zipMagicByte
             response.headers.get(`Content-Disposition`.name) must_=== Some(disposition)
-            response.headers.get(`Content-Transfer-Encoding`.name) must_=== Some(encoding)
             response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
             response.status must_=== Status.Ok
           }
           "zipped csv" >> {
             val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.csv.zip"))
-            val encoding = Header("Content-Transfer-Encoding", "binary")
             val sampleFile = rootDir[Sandboxed] </> file("foo")
             val data = Vector(Data.Str("a,b\n1,2"))
             val request = Request(
@@ -305,13 +302,11 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             val zipMagicByte: ByteVector = hex"504b" // zip file magic byte
             zipfile.take(2) must_=== zipMagicByte
             response.headers.get(`Content-Disposition`.name) must_=== Some(disposition)
-            response.headers.get(`Content-Transfer-Encoding`.name) must_=== Some(encoding)
             response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
             response.status must_=== Status.Ok
           }
           "zipped via request headers" >> {
             val sampleFile = rootDir[Sandboxed] </> file("foo")
-            val encoding = Header("Content-Transfer-Encoding", "binary")
             val data = Vector(Data.Obj("a" -> Data.Str("bar"), "b" -> Data.Bool(true)))
             val request = Request(uri = pathUri(sampleFile).+?("request-headers", s"""{"Accept-Encoding":"gzip","Accept":"application/zip,application/json"}"""))
             val response = HeaderParam(service(fileSystemWithSampleFile(data)))(request).unsafePerformSync
@@ -319,7 +314,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             val zipMagicByte: ByteVector = hex"504b" // zip file magic byte
             zipfile.take(2) must_=== zipMagicByte
             response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
-            response.headers.get(`Content-Transfer-Encoding`.name) must_=== Some(encoding)
             response.status must_=== Status.Ok
           }
         }
