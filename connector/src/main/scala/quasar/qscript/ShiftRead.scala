@@ -64,7 +64,6 @@ object ShiftRead {
       : ShiftRead.Aux[T, Const[Read[A], ?], F] =
     new ShiftRead[Const[Read[A], ?]] {
       type G[A] = F[A]
-      val MFC = quasar.qscript.MFC[T]
       def shiftRead[H[_]](GtoH: G ~> H) = λ[Const[Read[A], ?] ~> FixFreeH[H, ?]](read =>
         GtoH(QC.inj(Reduce(
           Free.liftF(GtoH(SR.inj(Const(ShiftedRead(

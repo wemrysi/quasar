@@ -42,8 +42,6 @@ final class EquiJoinPlanner[
     F[_]: Monad: ContextReader: NameGenerator: PlannerErrorME]
   extends Planner[T, F, EquiJoin[T, ?]] {
 
-  val MFC = quasar.qscript.MFC[T]
-
   object CShiftedRead {
     def unapply[F[_], A](
       fa: F[A]

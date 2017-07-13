@@ -104,8 +104,22 @@ package object qscript {
     ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[ShiftedRead[AFile], ?]]))
 
   type MapFunc[T[_[_]], A] = (MapFuncCore[T, ?] :/: MapFuncDerived[T, ?])#M[A]
-  def MFC[T[_[_]]] = Inject[MapFuncCore[T, ?], MapFunc[T, ?]]
-  def MFD[T[_[_]]] = Inject[MapFuncDerived[T, ?], MapFunc[T, ?]]
+
+  object MFC {
+    def apply[T[_[_]], A](mfc: MapFuncCore[T, A]): MapFunc[T, A] =
+      Inject[MapFuncCore[T, ?], MapFunc[T, ?]].inj(mfc)
+
+    def unapply[T[_[_]], A](mf: MapFunc[T, A]): Option[MapFuncCore[T, A]] =
+      Inject[MapFuncCore[T, ?], MapFunc[T, ?]].prj(mf)
+  }
+
+  object MFD {
+    def apply[T[_[_]], A](mfc: MapFuncDerived[T, A]): MapFunc[T, A] =
+      Inject[MapFuncDerived[T, ?], MapFunc[T, ?]].inj(mfc)
+
+    def unapply[T[_[_]], A](mf: MapFunc[T, A]): Option[MapFuncDerived[T, A]] =
+      Inject[MapFuncDerived[T, ?], MapFunc[T, ?]].prj(mf)
+  }
 
   type FreeQS[T[_[_]]]      = Free[QScriptTotal[T, ?], Hole]
   type FreeMapA[T[_[_]], A] = Free[MapFunc[T, ?], A]
@@ -148,7 +162,6 @@ package object qscript {
   def concat[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
     (l: FreeMapA[T, A], r: FreeMapA[T, A])
       : (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
-    val MFC = quasar.qscript.MFC[T]
     val rewrite = new Rewrite[T]
     val norm = Normalizable.normalizable[T]
 

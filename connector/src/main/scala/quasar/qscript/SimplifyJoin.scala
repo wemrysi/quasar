@@ -67,8 +67,6 @@ object SimplifyJoin {
       type IT[F[_]] = T[F]
       type G[A] = F[A]
 
-      val MFC = quasar.qscript.MFC[T]
-
       def simplifyJoin[H[_]: Functor](GtoH: G ~> H): ThetaJoin[T, T[H]] => H[T[H]] =
         tj => {
           // TODO: This can potentially rewrite conditions to try to get left

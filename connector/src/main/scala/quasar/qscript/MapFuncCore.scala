@@ -68,8 +68,7 @@ object MapFuncCore {
   object StaticArray {
     def unapply[T[_[_]]: BirecursiveT, A]
         (mf: CoMapFuncR[T, A])
-        : Option[List[FreeMapA[T, A]]] = {
-      val MFC = quasar.qscript.MFC[T]
+        : Option[List[FreeMapA[T, A]]] =
       mf match {
         case ConcatArraysN(as) =>
           as.foldRightM[Option, List[FreeMapA[T, A]]](
@@ -81,7 +80,6 @@ object MapFuncCore {
             }))
         case _ => None
       }
-    }
   }
 
   /** Like `StaticArray`, but returns as much of the array as can be statically
@@ -90,8 +88,7 @@ object MapFuncCore {
     */
   object StaticArrayPrefix {
     def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A]):
-        Option[List[FreeMapA[T, A]]] = {
-      val MFC = quasar.qscript.MFC[T]
+        Option[List[FreeMapA[T, A]]] =
       mf match {
         case ConcatArraysN(as) =>
           as.foldLeftM[List[FreeMapA[T, A]] \/ ?, List[FreeMapA[T, A]]](
@@ -106,13 +103,11 @@ object MapFuncCore {
               })).merge.some
         case _ => None
       }
-    }
   }
 
   object StaticMap {
     def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A]):
-        Option[List[(T[EJson], FreeMapA[T, A])]] = {
-      val MFC = quasar.qscript.MFC[T]
+        Option[List[(T[EJson], FreeMapA[T, A])]] =
       mf match {
         case ConcatMapsN(as) =>
           as.foldRightM[Option, List[(T[EJson], FreeMapA[T, A])]](
@@ -126,7 +121,6 @@ object MapFuncCore {
               }))
         case _ => None
       }
-    }
   }
 
   object EmptyArray {
@@ -150,8 +144,7 @@ object MapFuncCore {
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def unapply[T[_[_]]: BirecursiveT, A](mf: CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]]):
-        Option[List[FreeMapA[T, A]]] = {
-      val MFC = quasar.qscript.MFC[T]
+        Option[List[FreeMapA[T, A]]] =
       mf.run.fold(
         κ(None),
         {
@@ -162,7 +155,6 @@ object MapFuncCore {
               unapply(t.project).getOrElse(List(t))).some
           case _ => None
         })
-    }
   }
 
   // TODO subtyping is preventing embedding of MapFuncsCore
@@ -176,8 +168,7 @@ object MapFuncCore {
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def unapply[T[_[_]]: BirecursiveT, A](mf: CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]]):
-        Option[List[FreeMapA[T, A]]] = {
-      val MFC = quasar.qscript.MFC[T]
+        Option[List[FreeMapA[T, A]]] =
       mf.run.fold(
         κ(None),
         {
@@ -188,14 +179,12 @@ object MapFuncCore {
               unapply(t.project).getOrElse(List(t))).some
           case _ => None
         })
-    }
   }
 
   // Transform effectively constant `MapFunc` into a `Constant` value.
   // This is a mini-evaluator for constant qscript values.
   def foldConstant[T[_[_]]: BirecursiveT, A]
       : CoMapFuncR[T, A] => Option[T[EJson]] = {
-    val MFC = quasar.qscript.MFC[T]
     object ConstEC {
       def unapply[B](tco: FreeMapA[T, B]): Option[ejson.Common[T[EJson]]] = {
         tco.project.run match {
@@ -239,21 +228,18 @@ object MapFuncCore {
       orOriginal(foldConstant[T, A].apply(_) ∘ (const => rollMF[T, A](MFC(Constant(const)))))
 
   def replaceJoinSides[T[_[_]]: BirecursiveT](left: Symbol, right: Symbol)
-      : CoMapFuncR[T, JoinSide] => CoMapFuncR[T, JoinSide] = {
-    val MFC = quasar.qscript.MFC[T]
+      : CoMapFuncR[T, JoinSide] => CoMapFuncR[T, JoinSide] =
     _.run match {
       case \/-(MFC(JoinSideName(`left`))) => CoEnv(-\/(LeftSide))
       case \/-(MFC(JoinSideName(`right`))) => CoEnv(-\/(RightSide))
       case x => CoEnv(x)
     }
-  }
 
   // TODO: This could be split up as it is in LP, with each function containing
   //       its own normalization.
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   private def rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Show]:
-      CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
-    val MFC = quasar.qscript.MFC[T]
+      CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
     _.run.fold(
       κ(None),
       {
@@ -304,7 +290,6 @@ object MapFuncCore {
 
         case _ => None
       })
-  }
 
   implicit def traverse[T[_[_]]]: Traverse[MapFuncCore[T, ?]] =
     new Traverse[MapFuncCore[T, ?]] {
@@ -833,21 +818,18 @@ object MapFuncsCore {
     def apply[T[_[_]]: CorecursiveT, A](): FreeMapA[T, A] =
       Free.roll(MFC(Constant[T, FreeMapA[T, A]](EJson.fromCommon(ejson.Null[T[EJson]]()))))
 
-    def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]): Boolean = {
-      val MFC = quasar.qscript.MFC[T]
+    def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]): Boolean =
       mf.resume.fold ({
         case MFC(Constant(ej)) => EJson.isNull(ej)
         case _ => false
       }, _ => false)
-    }
   }
 
   object BoolLit {
     def apply[T[_[_]]: CorecursiveT, A](b: Boolean): FreeMapA[T, A] =
       Free.roll(MFC(Constant[T, FreeMapA[T, A]](EJson.fromCommon(ejson.Bool[T[EJson]](b)))))
 
-    def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]): Option[Boolean] = {
-      val MFC = quasar.qscript.MFC[T]
+    def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]): Option[Boolean] =
       mf.resume.fold ({
         case MFC(Constant(ej)) => CommonEJson.prj(ej.project).flatMap {
           case ejson.Bool(b) => b.some
@@ -855,7 +837,6 @@ object MapFuncsCore {
         }
         case _ => None
       }, _ => None)
-    }
   }
 
   object DecLit {
@@ -872,8 +853,7 @@ object MapFuncsCore {
   }
 
   object IntLitMapFunc {
-    def unapply[T[_[_]]: RecursiveT, A](mf: MapFunc[T, A]): Option[BigInt] = {
-      val MFC = quasar.qscript.MFC[T]
+    def unapply[T[_[_]]: RecursiveT, A](mf: MapFunc[T, A]): Option[BigInt] =
       mf match {
         case MFC(Constant(ej)) => ExtEJson.prj(ej.project).flatMap {
           case ejson.Int(i) => i.some
@@ -881,7 +861,6 @@ object MapFuncsCore {
         }
         case _ => None
       }
-    }
   }
 
   object StrLit {
@@ -889,8 +868,7 @@ object MapFuncsCore {
       Free.roll(MFC(Constant[T, FreeMapA[T, A]](EJson.fromCommon(ejson.Str[T[EJson]](str)))))
 
     def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]):
-        Option[String] = {
-      val MFC = quasar.qscript.MFC[T]
+        Option[String] =
       mf.resume.fold({
         case MFC(Constant(ej)) => CommonEJson.prj(ej.project).flatMap {
           case ejson.Str(str) => str.some
@@ -900,6 +878,5 @@ object MapFuncsCore {
       }, {
         _ => None
       })
-    }
   }
 }

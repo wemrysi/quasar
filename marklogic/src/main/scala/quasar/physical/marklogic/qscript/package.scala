@@ -157,7 +157,6 @@ package object qscript {
     implicit UR: Recursive.Aux[U, CoEnv[E, MapFunc[T, ?], ?]],
              UC: Corecursive.Aux[U, CoEnv[E, MapFunc[T, ?], ?]]
   ): CoEnv[E, MapFunc[T, ?], U] => CoEnv[E, MapFunc[T, ?], U] = {
-    val MFC = quasar.qscript.MFC[T]
 
     object NullLit {
       def unapply[A](mfc: CoEnv[E, MapFunc[T, ?], A]): Boolean =
@@ -172,9 +171,9 @@ package object qscript {
 
     fa => CoEnv(fa.run.map (totally {
       case MFC(Eq(lhs, Embed(NullLit())))  => MFC(Eq(UC.embed(CoEnv(\/-(MFC(TypeOf(lhs))))), nullString))
-      case MFC(Eq(Embed(NullLit()), rhs))  => MFC(Eq(UC.embed(CoEnv(MFC(TypeOf(rhs)).right)), nullString))
-      case MFC(Neq(lhs, Embed(NullLit()))) => MFC(Neq(UC.embed(CoEnv(MFC(TypeOf(lhs)).right)), nullString))
-      case MFC(Neq(Embed(NullLit()), rhs)) => MFC(Neq(UC.embed(CoEnv(MFC(TypeOf(rhs)).right)), nullString))
+      case MFC(Eq(Embed(NullLit()), rhs))  => MFC(Eq(UC.embed(CoEnv(MFC[T, U](TypeOf(rhs)).right)), nullString))
+      case MFC(Neq(lhs, Embed(NullLit()))) => MFC(Neq(UC.embed(CoEnv(MFC[T, U](TypeOf(lhs)).right)), nullString))
+      case MFC(Neq(Embed(NullLit()), rhs)) => MFC(Neq(UC.embed(CoEnv(MFC[T, U](TypeOf(rhs)).right)), nullString))
     }))
   }
 

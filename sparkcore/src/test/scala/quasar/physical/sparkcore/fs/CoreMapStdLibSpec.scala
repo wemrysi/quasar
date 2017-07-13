@@ -35,9 +35,6 @@ import scalaz._, Scalaz._
 class CoreMapStdLibSpec extends StdLibSpec {
   val TODO: Result \/ Unit = Pending("TODO").left
 
-  val MFC = quasar.qscript.MFC[Fix]
-  val MFD = quasar.qscript.MFD[Fix]
-
   /** Identify constructs that are expected not to be implemented. */
   val shortCircuit: AlgebraM[Result \/ ?, MapFunc[Fix, ?], Unit] = {
     case MFC(ExtractIsoYear(_))  => TODO

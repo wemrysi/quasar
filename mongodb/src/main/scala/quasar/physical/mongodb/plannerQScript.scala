@@ -165,9 +165,6 @@ object MongoDbQScriptPlanner {
     import MapFuncsCore._
     import MapFuncsDerived._
 
-    val MFC = quasar.qscript.MFC[T]
-    val MFD = quasar.qscript.MFD[T]
-
     def handleCommon(mf: MapFunc[T, Fix[ExprOp]]): Option[Fix[ExprOp]] =
       funcHandler(mf).map(t => unpack(t.mapSuspension(inj)))
 
@@ -275,8 +272,6 @@ object MongoDbQScriptPlanner {
 
     import MapFuncsCore._
     import MapFuncsDerived._
-    val MFC = quasar.qscript.MFC[T]
-    val MFD = quasar.qscript.MFD[T]
 
     val mjs = quasar.physical.mongodb.javascript[JsCore](_.embed)
     import mjs._
@@ -575,8 +570,6 @@ object MongoDbQScriptPlanner {
     import MapFuncsCore._
 
     type Output = OutputM[PartialSelector[T]]
-
-    val MFC = quasar.qscript.MFC[T]
 
     object IsBson {
       def unapply(v: (T[MapFunc[T, ?]], Output)): Option[Bson] =
@@ -1180,7 +1173,6 @@ object MongoDbQScriptPlanner {
     (subType: Type)
     (implicit merr: MonadError_[M, FileSystemError])
       : CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {
-    val MFC = quasar.qscript.MFC[T]
     def f: CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {
       case free @ CoEnv(\/-(MFC(MapFuncsCore.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, fb)))) =>
         if (typ.contains(subType)) cont.project.point[M]
