@@ -388,12 +388,12 @@ object CoreMap extends Serializable {
     case _ => undefined
   }
 
-  // TODO other cases?
+  // TODO interval cases?
   private def modulo(d1: Data, d2: Data) = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Int(a % b)
-    case (Data.Int(a), Data.Dec(b)) => ???
-    case (Data.Dec(a), Data.Int(b)) => ???
-    case (Data.Dec(a), Data.Dec(b)) => ???
+    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a).remainder(b))
+    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a.remainder(BigDecimal(b)))
+    case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a.remainder(b))
     case (Data.Interval(a), Data.Int(b)) => ???
     case (Data.Interval(a), Data.Dec(b)) => ???
     case _ => undefined
