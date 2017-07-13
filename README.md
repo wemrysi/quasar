@@ -627,11 +627,11 @@ be provided in the `Destination` request header. Single files are moved atomical
 
 Where `path` is a file path. Invokes the function represented by the file path with the parameters supplied in the query string.
 
-### GET /schema/fs/[path]?arrayMaxLength=[size]&mapMaxSize=[size]&stringMaxLength=[size]&unionMaxSize=[size]
+### GET /schema/fs/[path]?q=[query]&var.[foo]=[value]&arrayMaxLength=[size]&mapMaxSize=[size]&stringMaxLength=[size]&unionMaxSize=[size]
 
-Where `path` is a file path and `size` is a positive integer. Returns a schema document, summarizing the dataset at the specified path.
+Where `path` is a directory path, `query` is a SQL² query and `size` is a positive integer. Returns a schema document, summarizing the results of the query. Free variables in the query may be bound using parameters like `var.foo=value` where `foo` is the variable to be bound and `value` is what it should be bound to.
 
-For example, given a dataset having documents like:
+For example, given query results like:
 
 ```json
 {"_id":"01001","city":"AGAWAM","loc":[-72.622739,42.070206],"pop":15338,"state":"MA"}

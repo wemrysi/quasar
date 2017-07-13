@@ -2,8 +2,7 @@
     "name": "splice a wildcard with multiple constants",
 
     "backends": {
-        "mimir": "skip",
-        "postgresql":        "pending"
+        "postgresql": "pending"
     },
 
     "data": "largeZips.data",

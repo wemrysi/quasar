@@ -20,7 +20,10 @@ import slamdata.Predef._
 import quasar.fp._
 import quasar.RenderTree.ops._
 import quasar.specs2.QuasarMatchers._
+import quasar.sql.StatementArbitrary._
 import quasar.sql.fixpoint._
+
+import scala.Predef.$conforms
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -34,7 +37,7 @@ class SQLParserSpec extends quasar.Qspec {
   implicit def stringToQuery(s: String): Query = Query(s)
 
   def parse(query: Query): ParsingError \/ Fix[Sql] =
-    fixParser.parseExpr(query).map(_.makeTables(Nil))
+    fixParser.parseExpr(query)
 
   "SQLParser" should {
     "parse query1" in {
@@ -592,23 +595,30 @@ class SQLParserSpec extends quasar.Qspec {
     "parse import statement" in {
       val importString = "import `/foo/bar/baz/`"
       fixParser.parseWithParser(importString, fixParser.import_) must beRightDisjunction(
-        Import("/foo/bar/baz/"))
+        Import(rootDir </> dir("foo") </> dir("bar") </> dir("baz")))
     }
 
-    "parse module" in {
-      val moduleString =
-        """
-          |CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END;
-          |CREATE FUNCTION USER_DATA(:user_id) BEGIN SELECT * FROM `/root/path/data/` WHERE user_id = :user_id END;
-          |import `/other/stuff/in/filesystem/`
-        """.stripMargin
-      fixParser.parseWithParser(moduleString, fixParser.statements) must beLike {
-        case \/-(List(FunctionDecl(_,_,_),FunctionDecl(_,_,_),Import(_))) => ok
+    "parse module" >> {
+      "typical case" in {
+        val moduleString =
+          """
+            |CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END;
+            |CREATE FUNCTION USER_DATA(:user_id) BEGIN SELECT * FROM `/root/path/data/` WHERE user_id = :user_id END;
+            |import `/other/stuff/in/filesystem/`
+          """.stripMargin
+        fixParser.parseModule(moduleString) must beLike {
+          case \/-(List(FunctionDecl(_, _, _), FunctionDecl(_, _, _), Import(_))) => ok
+        }
+      }
+      "does not complain about a trailing semicolon" in {
+        val moduleString = "CREATE FUNCTION FOO(:foo) BEGIN :foo END;"
+        fixParser.parseModule(moduleString) must_===
+          \/-(List(FunctionDecl(CIName("foo"), List(CIName("foo")), sqlE":foo")))
       }
     }
 
-    "parse blob" in {
-      val blobString =
+    "parse scopedExpr" in {
+      val scopedExprString =
         """
           |CREATE FUNCTION USER_DATA(:user_id)
           |  BEGIN
@@ -617,8 +627,8 @@ class SQLParserSpec extends quasar.Qspec {
           |USER_DATA("bob")
         """.stripMargin
       val invokeAST: Fix[Sql] = Fix(invokeFunction[Fix[Sql]](CIName("USER_DATA"),List(Fix(stringLiteral[Fix[Sql]]("bob")))))
-      fixParser.parse(blobString) must beLike {
-        case \/-(Blob(`invokeAST`, List(FunctionDecl(_,_,_)))) => ok
+      fixParser.parse(scopedExprString) must beLike {
+        case \/-(ScopedExpr(`invokeAST`, List(FunctionDecl(_,_,_)))) => ok
       }
     }
 
@@ -660,7 +670,7 @@ class SQLParserSpec extends quasar.Qspec {
       }.pendingUntilFixed("SD-1536")
     }
 
-    "round-trip to SQL and back" >> prop { (node: Fix[Sql]) =>
+    "round-trip to SQL and back" >> prop { node: Fix[Sql] =>
       val parsed = parse(pprint(node))
 
       parsed.fold(
@@ -669,6 +679,19 @@ class SQLParserSpec extends quasar.Qspec {
 
       parsed must beRightDisjOrDiff(node)
     }.set(minTestsOk = 1000) // one cannot test a parser too much
+
+    "round-trip module" >> prop { module: List[Statement[Fix[Sql]]] =>
+      val back = fixParser.parseModule(module.pprint)
+
+      back must beRightDisjOrDiff(module)
+    }
+
+    "pprint an import statement should escpae backticks" >> {
+      val `import` = Import[Fix[Sql]](currentDir </> dir("di") </> dir("k`~ireW.5u1+fOh") </> dir("j"))
+      val string = List(`import`).pprint
+      string must_== raw"import `./di/k\`~ireW.5u1+fOh/j/`"
+      fixParser.parseModule(string) must_=== List(`import`).right
+    }
 
     "round-trip through the pretty-printer" >> {
       def roundTrip(q: String) = {

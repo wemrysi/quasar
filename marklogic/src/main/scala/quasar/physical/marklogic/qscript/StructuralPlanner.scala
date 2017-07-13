@@ -16,6 +16,7 @@
 
 package quasar.physical.marklogic.qscript
 
+import slamdata.Predef._
 import quasar.fp.liftMT
 import quasar.fp.ski.κ
 import quasar.physical.marklogic.DocType
@@ -180,6 +181,7 @@ trait StructuralPlanner[F[_], FMT] { self =>
       }
     })
 
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   private def toStringFn(implicit F0: Bind[F], F1: PrologW[F]): F[FunctionDecl1] =
     ejs.declare[F]("to-string") flatMap (_(
       $("item") as ST("item()?")
@@ -202,6 +204,7 @@ trait StructuralPlanner[F[_], FMT] { self =>
           ) default fn.string(item))))))
         })
     })
+
 
   // ejson:type-of($item as item()*) as xs:string?
   private def typeOfFn(implicit F0: Bind[F], F1: PrologW[F]): F[FunctionDecl1] =

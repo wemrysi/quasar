@@ -2,9 +2,9 @@
     "name": "expressions with `= null` and `is null`",
     "backends": {
         "couchbase": "ignoreFieldOrder",
-        "mimir": "skip",
-        "marklogic_json": "pending",
-        "marklogic_xml": "pending",
+        "mimir":"pending",
+        "marklogic_json": "ignoreFieldOrder",
+        "marklogic_xml":  "ignoreFieldOrder",
         "postgresql": "pending"
     },
     "data": "nulls.data",

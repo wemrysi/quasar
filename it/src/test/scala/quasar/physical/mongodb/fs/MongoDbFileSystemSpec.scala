@@ -30,7 +30,7 @@ import quasar.main.FilesystemQueries
 import quasar.physical.mongodb.Collection
 import quasar.physical.mongodb.fs.MongoDbFileSystemSpec.mongoFsUT
 import quasar.regression._
-import quasar.sql, sql.Sql, sql.Blob
+import quasar.sql, sql.Sql
 
 import scala.Predef.$conforms
 
@@ -242,14 +242,14 @@ class MongoDbFileSystemSpec
 
             val out = renameFile(file, κ(FileName("out")))
 
-            def check0(expr: Blob[Fix[Sql]]) =
+            def check0(expr: Fix[Sql]) =
               (run(query.fileExists(file)).unsafePerformSync ==== false) and
               (errP.getOption(
                 runExec(fsQ.executeQuery(expr, Variables.empty, rootDir, out))
                   .run.value.unsafePerformSync
               ) must beSome(file))
 
-            sql.fixParser.parse(sql.Query(f(posixCodec.printPath(file)))) fold (
+            sql.fixParser.parseExpr(sql.Query(f(posixCodec.printPath(file)))) fold (
               err => ko(s"Parsing failed: ${err.shows}"),
               check0)
           }
@@ -311,7 +311,7 @@ class MongoDbFileSystemSpec
           def check(src: ADir, dst: ADir)(implicit X: Apply[X]) = {
             val f1 = src </> file("movdb1")
             val f2 = src </> file("movdb2")
-            val ovr = ManageFile.MoveSemantics.Overwrite
+            val ovr = MoveSemantics.Overwrite
 
             (
               write.save(f1, oneDoc.toProcess).terminated |@|

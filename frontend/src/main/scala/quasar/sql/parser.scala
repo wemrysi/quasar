@@ -28,6 +28,8 @@ import scala.util.parsing.input.CharArrayReader.EofCh
 
 import matryoshka._
 import matryoshka.implicits._
+import pathy.Path
+import pathy.Path._
 import scalaz._, Scalaz._
 
 sealed abstract class DerefType[T[_[_]]] extends Product with Serializable
@@ -108,6 +110,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
       '-' ~ '-' ~ rep(chrExcept(EofCh, '\n')) |
       '/' ~ '*' ~ failure("unclosed comment"))
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     override protected def comment: Parser[scala.Any] = (
       '*' ~ '/'  ^^ κ(' ') |
       chrExcept(EofCh) ~ comment)
@@ -156,19 +159,26 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     }
 
   def import_ : Parser[Import[T[Sql]]] =
-    keyword("import") ~> ident ^^ {
-      case i => Import(i)
+    keyword("import") ~> ident >> {
+      case i => posixCodec.parsePath[Option[Path[Any, Dir, Unsandboxed]]](κ(none), κ(none), Some(_), Some(_))(i).cata(
+        path => success(Import(path)),
+        failure("Import must identify a directory"))
     }
 
   @SuppressWarnings(Array(
     "org.wartremover.warts.Product",
     "org.wartremover.warts.Serializable"))
   def statements: Parser[List[Statement[T[Sql]]]] =
-    repsep(func_def | import_, op(";"))
+    repsep(func_def | import_, op(";")) <~ opt(op(";"))
 
-  def blob: Parser[Blob[T[Sql]]] =
-    opt(statements <~ op(";")) ~ expr ^^ {
-      case stats ~ expr => Blob(expr, stats.getOrElse(Nil))
+  def scopedExpr: Parser[ScopedExpr[T[Sql]]] =
+    statements ~ expr ^^ {
+      case stats ~ expr => ScopedExpr(expr, stats)
+    }
+
+  def block: Parser[Block[T[Sql]]] =
+    opt(repsep(func_def, op(";")) <~ op(";")) ~ expr ^^ {
+      case defs ~ expr => Block(expr, defs.getOrElse(Nil))
     }
 
   def select_expr: Parser[T[Sql]] =
@@ -364,6 +374,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
   def function_expr: Parser[T[Sql]] =
     ident ~ paren_list ^^ { case a ~ xs => invokeFunction(CIName(a), xs).embed }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def primary_expr: Parser[T[Sql]] =
     case_expr |
     unshift_expr |
@@ -481,14 +492,17 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
       case Failure(msg, input)  => \/.left(GenericParsingError(s"$msg; but found `${input.first.chars}'"))
     }
 
-  val parse: Query => ParsingError \/ Blob[T[Sql]] = query =>
-    parseBlob(query.value)
+  val parse: Query => ParsingError \/ ScopedExpr[T[Sql]] = query =>
+    parseScopedExpr(query.value)
 
-  def parseBlob(blobString: String): ParsingError \/ Blob[T[Sql]] =
-    parseWithParser(blobString, blob).map(_.map(normalize))
+  def parseScopedExpr(scopedExprString: String): ParsingError \/ ScopedExpr[T[Sql]] =
+    parseWithParser(scopedExprString, scopedExpr).map(_.map(normalize))
 
   def parseModule(moduleString: String): ParsingError \/ List[Statement[T[Sql]]] =
     parseWithParser(moduleString, statements).map(_.map(_.map(normalize)))
+
+  def parseBlock(blockString: String): ParsingError \/ Block[T[Sql]] =
+    parseWithParser(blockString, block).map(_.map(normalize))
 
   val parseExpr: Query => ParsingError \/ T[Sql] = query =>
     parseWithParser(query.value, expr).map(normalize)

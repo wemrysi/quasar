@@ -127,6 +127,21 @@ object lib {
       }
     })
 
+  // qscript:type-of($item as item()*) as xs:string?
+  def typeOf[F[_]: Bind: PrologW, T](implicit SP: StructuralPlanner[F, T]): F[FunctionDecl1] =
+    qs.declare[F]("type-of-q") flatMap (_(
+      $("item") as ST.Top
+    ).as(ST("xs:string?")) { item: XQuery =>
+      val (lookup, mapped) = ($("lookup"), $("mapped"))
+      SP.typeOf(item) map ( tpe =>
+        if_(tpe === "object".xs)
+        .then_("map".xs)
+        .else_(if_(tpe === "string".xs)
+        .then_("array".xs)
+        .else_(if_(tpe === "na".xs)
+        .then_(emptySeq).else_(tpe))))
+    })
+
   // qscript:concat($x as item()?, $y as item()?) as item()?
   def concat[F[_]: Bind: PrologW, T](implicit SP: StructuralPlanner[F, T]): F[FunctionDecl2] =
     qs.declare("concat") flatMap (_(
@@ -158,6 +173,7 @@ object lib {
     })
 
   // qscript:delete-field($src as element()?, $field as xs:string) as element()?
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   def deleteField[F[_]: Functor: PrologW]: F[FunctionDecl2] =
     qs.declare("delete-field") map (_(
       $("src")   as ST("element()?"),
@@ -176,6 +192,7 @@ object lib {
     })
 
   // qscript:isoyear-from-dateTime($dt as xs:dateTime?) as xs:integer
+  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   def isoyearFromDateTime[F[_]: Functor: PrologW]: F[FunctionDecl1] =
     qs.declare("isoyear-from-dateTime") map (_(
       $("dt") as ST("xs:dateTime?")

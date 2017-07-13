@@ -69,4 +69,4 @@ quasar_couchbase:
   ports:
     - "8091-8094:8091-8094"
     - "11210:11210"
-  mem_limit: 2048m
+  mem_limit: 2560m
