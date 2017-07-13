@@ -61,8 +61,8 @@ object MapFuncDerived {
     new Delay[Equal, MapFuncDerived[T, ?]] {
       def apply[A](in: Equal[A]): Equal[MapFuncDerived[T, A]] = Equal.equal {
         // unary
-        case (Abs(a1), Abs(a2)) => a1.equals(a2)
-        case (Trunc(a1), Trunc(a2)) => a1.equals(a2)
+        case (Abs(a1), Abs(a2)) => in.equal(a1, a2)
+        case (Trunc(a1), Trunc(a2)) => in.equal(a1, a2)
 
         case (_, _) => false
       }
