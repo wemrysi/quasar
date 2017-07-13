@@ -18,7 +18,7 @@ package quasar.main
 
 import slamdata.Predef._
 import quasar.console.stdout
-import quasar.db, db.{DbConnectionConfig, StatefulTransactor}
+import quasar.db, db.DbConnectionConfig
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
@@ -39,14 +39,14 @@ object metastore {
   val absorbTask: QErrsTCnxIO ~> QErrsCnxIO =
     Inject[ConnectionIO, QErrsCnxIO].compose(taskToConnectionIO) :+: reflNT[QErrsCnxIO]
 
-  def metastoreTransactor(dbCfg: DbConnectionConfig): MainTask[StatefulTransactor] = {
+  def metastoreTransactor(dbCfg: DbConnectionConfig): MainTask[MetaStore] = {
     val connInfo = DbConnectionConfig.connectionInfo(dbCfg)
 
     val statefulTransactor =
       stdout(s"Using metastore: ${connInfo.url}") *>
-      db.poolingTransactor(connInfo, db.DefaultConfig)
+      MetaStore.connect(dbCfg)
 
-    EitherT(statefulTransactor.attempt)
+    EitherT(statefulTransactor)
       .leftMap(t => {t.printStackTrace ; s"While initializing the MetaStore: ${t.getMessage}"})
   }
 

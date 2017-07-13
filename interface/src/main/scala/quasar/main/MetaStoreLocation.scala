@@ -55,13 +55,14 @@ object MetaStoreLocation {
       λ[MetaStoreLocation ~> Task] {
         case Get => ref.read.map(_.connectionInfo)
         case Set(conn, initialize) =>
-          val tryNewMetaStore = metastoreTransactor(conn).flatMap(trans =>
+          val tryNewMetaStore = metastoreTransactor(conn).flatMap(m =>
             if (initialize)
-              initUpdateMigrate(quasar.metastore.Schema.schema, trans.transactor, None).as(trans)
-            else trans.point[MainTask])
+              initUpdateMigrate(quasar.metastore.Schema.schema, m.transactor, None).as(m)
+            else m.point[MainTask])
           (for {
-            trans  <- tryNewMetaStore
-            result <- ref.write(MetaStore(conn, trans)).liftM[MainErrT]
+            m      <- tryNewMetaStore
+            _      <- ref.read.flatMap(_.shutdown).liftM[MainErrT]
+            result <- ref.write(m).liftM[MainErrT]
           } yield result).run
       }
   }

@@ -198,16 +198,16 @@ If no metastore configuration is specified, the default configuration will use a
 An example H2 configuration would look something like
 ```json
 "h2": {
-  "file": "<path/to/database/file>"
+  "location": "`database_url`"
 }
 ```
 
-Where <path/to/database/file> can really be any h2 url as described [here](http://www.h2database.com/html/features.html#database_url).
+Where `database_url` can be any h2 url as described [here](http://www.h2database.com/html/features.html#database_url).
 
 A PostgreSQL configuration looks something like
 ```json
 "postgresql": {
-  "host": localhost,
+  "host": "localhost",
   "port": 8087,
   "database": "<database name>",
   "userName": "<database user>",

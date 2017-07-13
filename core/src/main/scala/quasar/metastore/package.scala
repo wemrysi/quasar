@@ -18,7 +18,7 @@ package quasar
 
 import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile, APath, unsafeSandboxAbs}
-import quasar.db.{DbConnectionConfig, Schema, StatefulTransactor}
+import quasar.db.Schema
 import quasar.fs.FileSystemType
 import quasar.fs.mount.{MountConfig, MountType}
 
@@ -42,8 +42,6 @@ import scalaz._, Scalaz._
   the database.
   */
 package object metastore {
-
-  final case class MetaStore(connectionInfo: DbConnectionConfig, trans: StatefulTransactor)
 
   sealed trait MetastoreInitializationFailure {
     def message: String

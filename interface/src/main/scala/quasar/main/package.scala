@@ -441,19 +441,17 @@ package object main {
   def initializeFSWith(db: DbConnectionConfig): MainTask[QuasarFS] =
     for {
       metastore <- metastoreTransactor(db)
-      metaRef   <- TaskRef(MetaStore(db, metastore)).liftM[MainErrT]
+      metaRef   <- TaskRef(metastore).liftM[MainErrT]
       quasarFS  <- initializeFSImpl(metaRef, db.isInMemory)
     } yield quasarFS
 
-  def initializeFSImpl(metaRef0: TaskRef[MetaStore], initialize: Boolean): MainTask[QuasarFS] = {
-    def shutdownOld(old: MetaStore, current: MetaStore) = old.trans.shutdown
+  def initializeFSImpl(metaRef: TaskRef[MetaStore], initialize: Boolean): MainTask[QuasarFS] =
     for {
-      metastore  <- metaRef0.read.liftM[MainErrT]
+      metastore  <- metaRef.read.liftM[MainErrT]
       _          <- if (initialize)
                       initUpdateMigrate(quasar.metastore.Schema.schema, metastore.trans.transactor, None)
                     else Task.now(()).liftM[MainErrT]
       _          <- verifySchema(quasar.metastore.Schema.schema, metastore.trans.transactor).leftMap(_.message)
-      metaRef    =  metaRef0.onChange(shutdownOld)
       hfsRef     <- TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM]).liftM[MainErrT]
       mntdRef    <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
 
@@ -491,7 +489,6 @@ package object main {
         foldMapNT(g) compose foldMapNT(f) compose runCore,
         (mntdRef.read >>= closeAllFsMounts _) *> metaRef.read.flatMap(_.trans.shutdown))
     }
-  }
 
   final case class CmdLineConfig(configPath: Option[FsFile], cmd: Cmd)
 
@@ -507,14 +504,14 @@ package object main {
         case Cmd.Start =>
           for {
             quasarFs <- initializeFS_(config.configPath)
-            _        <- start(cfg, quasarFs.interp).onFinish(κ(quasarFs.shutdown))
+            _        <- start(cfg, quasarFs.interp).ensuring(κ(quasarFs.shutdown.liftM[MainErrT]))
           } yield ()
 
         case Cmd.InitUpdateMetaStore =>
           for {
             msCfg <- configOps.metaStoreConfig(cfg).cata(Task.now, MetaStoreConfig.configOps.default).liftM[MainErrT]
             trans <- metastoreTransactor(msCfg.database)
-            _     <- initUpdateMigrate(quasar.metastore.Schema.schema, trans.transactor, config.configPath).onFinish(κ(trans.shutdown))
+            _     <- initUpdateMigrate(quasar.metastore.Schema.schema, trans.transactor, config.configPath).ensuring(κ(trans.shutdown.liftM[MainErrT]))
           } yield ()
       }
     } yield ()

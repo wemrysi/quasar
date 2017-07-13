@@ -69,7 +69,9 @@ object DbConnectionConfig {
 
     DecodeJson(cur =>
       cur.fields match {
-        case Some("h2" :: Nil) => (cur --\ "h2" --\ "file").as[String].map(H2(_))
+        case Some("h2" :: Nil) =>
+          // "file" field is for backwards compatibility for older config files
+          ((cur --\ "h2" --\ "location").as[String] ||| (cur --\ "h2" --\ "file").as[String]).map(H2(_))
         case Some("postgresql" :: Nil) =>
           val pg = cur --\ "postgresql"
           for {

@@ -27,7 +27,7 @@ import scalaz._, Scalaz._
 
 /** Operations that access the meta-store via doobie, all wrapped in ConnectionIO
   */
-object MetaStoreAccess {
+trait MetaStoreAccess {
 
   //--- Mounts ---
   val fsMounts: ConnectionIO[Map[APath, FileSystemConfig]] =
@@ -68,3 +68,5 @@ object MetaStoreAccess {
       case _ => connFail("found multiple matching rows")
     })
 }
+
+object MetaStoreAccess extends MetaStoreAccess

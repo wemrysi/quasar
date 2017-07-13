@@ -3,7 +3,7 @@
     "metastore": {
         "database": {
             "h2": {
-                "file": "mem"
+                "location": "mem"
             }
         }
     }
