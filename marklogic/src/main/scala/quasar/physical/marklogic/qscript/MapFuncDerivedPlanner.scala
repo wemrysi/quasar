@@ -25,9 +25,8 @@ import matryoshka._
 import scalaz._
 
 private[qscript] final class MapFuncDerivedPlanner[
-  F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
-  FMT,
-  T[_[_]]: BirecursiveT
+  F[_]: Monad,
+  T[_[_]]: CorecursiveT
 ](implicit
   CP: MapFuncPlanner[F, MapFuncCore[T, ?], T]
 ) extends MapFuncPlanner[F, MapFuncDerived[T, ?], T] {

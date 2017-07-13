@@ -44,10 +44,10 @@ object MapFuncPlanner {
   ): MapFuncPlanner[M, MapFuncCore[T, ?], T] =
     new MapFuncCorePlanner[M, FMT, T]
 
-  implicit def mapFuncDerived[M[_]: Monad: QNameGenerator: PrologW: MonadPlanErr, FMT, T[_[_]]: BirecursiveT](
+  implicit def mapFuncDerived[M[_]: Monad, T[_[_]]: CorecursiveT](
     implicit
     CP: MapFuncPlanner[M, MapFuncCore[T, ?], T]
   ): MapFuncPlanner[M, MapFuncDerived[T, ?], T] =
-    new MapFuncDerivedPlanner[M, FMT, T]
+    new MapFuncDerivedPlanner[M, T]
 
 }
