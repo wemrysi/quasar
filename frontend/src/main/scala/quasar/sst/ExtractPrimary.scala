@@ -21,6 +21,7 @@ import quasar.ejson.EJson
 import quasar.tpe._
 
 import matryoshka._
+import matryoshka.patterns.EnvT
 import scalaz._, Scalaz._
 import simulacrum._
 
@@ -31,10 +32,11 @@ trait ExtractPrimary[F[_]] {
 }
 
 object ExtractPrimary {
+  import ops._
+
   implicit def coproductExtractPrimary[F[_]: ExtractPrimary, G[_]: ExtractPrimary]
     : ExtractPrimary[Coproduct[F, G, ?]] =
     new ExtractPrimary[Coproduct[F, G, ?]] {
-      import ExtractPrimary.ops._
       def primaryTag[A](fa: Coproduct[F, G, A]) =
         fa.run.fold(_.primaryTag, _.primaryTag)
     }
@@ -49,5 +51,11 @@ object ExtractPrimary {
   ): ExtractPrimary[TypeF[L, ?]] =
     new ExtractPrimary[TypeF[L, ?]] {
       def primaryTag[A](fa: TypeF[L, A]) = TypeF.primary(fa) map (_.left)
+    }
+
+  implicit def envTExtractPrimary[E, F[_]: ExtractPrimary]
+    : ExtractPrimary[EnvT[E, F, ?]] =
+    new ExtractPrimary[EnvT[E, F, ?]] {
+      def primaryTag[A](fa: EnvT[E, F, A]) = fa.lower.primaryTag
     }
 }

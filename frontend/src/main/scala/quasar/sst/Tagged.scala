@@ -17,9 +17,12 @@
 package quasar.sst
 
 import slamdata.Predef._
-import quasar.ejson.TypeTag
+import quasar.{ejson => ejs}
+import quasar.ejson.{EJson, EncodeEJsonK, ExtEJson => E, TypeTag}
+import quasar.ejson.implicits._
 
 import matryoshka._
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 final case class Tagged[A](tag: TypeTag, value: A)
@@ -32,6 +35,13 @@ object Tagged {
 
       def traverse1Impl[G[_]: Apply, A, B](fa: Tagged[A])(f: A => G[B]): G[Tagged[B]] =
         f(fa.value) map (b => fa.copy(value = b))
+    }
+
+  implicit val encodeEJsonK: EncodeEJsonK[Tagged] =
+    new EncodeEJsonK[Tagged] {
+      def encodeK[J](implicit J: Corecursive.Aux[J, EJson]): Algebra[Tagged, J] = {
+        case Tagged(t, j) => E(ejs.Meta(j, ejs.Type(t))).embed
+      }
     }
 
   implicit val equal: Delay[Equal, Tagged] =

@@ -20,39 +20,33 @@ import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.ejson.{EJson, CommonEJson => C, Str}
 import quasar.fp.numeric._
-import quasar.fp.ski.ι
 import quasar.tpe._
 
 import matryoshka.{project => _, _}
-import matryoshka.data.Fix
 import matryoshka.patterns.EnvT
 import matryoshka.implicits._
-import monocle.Fold
-import monocle.syntax.fields._
 import scalaz._, Scalaz._
 import spire.algebra.{Field, Ring}
 import spire.math.ConvertableTo
 
 object compression {
-  import TypeF._
-  private val TS = TypeStat
+  import StructuralType.{ConstST, TypeST, TagST, isConst, typeTransform}, ExtractPrimary.ops._
 
   /** Compress a map having greater than `maxSize` keys by moving the largest
-    * group of keys having the same primary type to the unknown key field
+    * group of keys having the same `PrimaryTag` to the unknown key field
     * and their values to the unknown value field.
     */
-  def coalesceKeys[F[_], J: Order, A: Order: Field: ConvertableTo](
+  def coalesceKeys[J: Order, A: Order: Field: ConvertableTo](
     maxSize: Positive
   )(implicit
-    I : TypeF[J, ?] :<: F,
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
-    case EnvT((ts, Map(kn, unk))) if kn.size > maxSize.value =>
+  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = typeTransform[J] {
+    case EnvT((ts, TypeF.Map(kn, unk))) if kn.size > maxSize.value =>
       val grouped =
-        kn.foldlWithKey(IMap.empty[PrimaryType, J ==>> Unit])((m, j, _) =>
+        kn.foldlWithKey(IMap.empty[PrimaryTag, J ==>> Unit])((m, j, _) =>
           m.alter(
-            primaryTypeOf(j),
+            primaryTagOf(j),
             _ map (_ insert (j, ())) orElse some(IMap.singleton(j, ()))))
 
       val (kn1, unk1) = grouped.maximumBy(_.size).fold((kn, unk)) { m =>
@@ -60,28 +54,25 @@ object compression {
         (kn \\ toCompress, compressMap(toCompress) |+| unk)
       }
 
-      envT(ts, map[J, SST[J, A]](kn1, unk1))
+      envT(ts, TypeF.map[J, SST[J, A]](kn1, unk1))
   }
 
   /** Compress unions by combining any constants with their primary type if it
     * also appears in the union.
     */
-  def coalescePrimary[F[_], J: Order, A: Order: Field: ConvertableTo](
+  def coalescePrimary[J: Order, A: Order: Field: ConvertableTo](
     implicit
-    I : TypeF[J, ?] :<: F,
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
-    case sstf @ EnvT((ts, Unioned(xs))) if xs.any(sstConst[J, A].isEmpty) =>
+  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
+    case sstf @ EnvT((ts, TypeST(TypeF.Unioned(xs)))) if xs.any(x => !isConst(x)) =>
       val grouped = xs.list groupBy { sst =>
-        sstConst[J, A].isEmpty(sst).fold(
-          TypeF.primary[J](sst.project.lower),
-          none)
+        isConst(sst).fold(none, sst.project.primaryTag)
       }
 
       grouped.minView flatMap { case (nonPrimary, m0) =>
         val coalesced = nonPrimary.foldLeft(m0 map (_.suml1)) { (m, sst) =>
-          TypeF.primary[J](sst.project.lower) flatMap { pt =>
+          sst.project.primaryTag flatMap { pt =>
             m.member(some(pt)) option m.adjust(some(pt), _ |+| widenConst(sst))
           } getOrElse m.updateAppend(none, sst)
         }
@@ -90,23 +81,25 @@ object compression {
   }
 
   /** Compress maps having unknown keys by coalescing known keys with unknown
-    * when the unknown contains any values having the same primary type as the
+    * when the unknown contains any values having the same `PrimaryTag` as the
     * known key.
     */
-  def coalesceWithUnknown[F[_], J: Order, A: Order: Field: ConvertableTo](
+  def coalesceWithUnknown[J: Order, A: Order: Field: ConvertableTo](
     implicit
-    I : TypeF[J, ?] :<: F,
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
-    case EnvT((ts, Map(xs, Some((k, v))))) =>
-      val unkPrimaries = k.toType[Fix[TypeF[J, ?]]].project match {
-        case Unioned(ts) => ISet.fromFoldable(ts.map(t => primary(t.project)).list.unite)
-        case other       => ISet.fromFoldable(primary(other))
+  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = typeTransform[J] {
+    case EnvT((ts, TypeF.Map(xs, Some((k, v))))) =>
+      val unkPrimaries = k.project.lower match {
+        case TypeST(TypeF.Unioned(ts)) =>
+          ISet.fromFoldable[NelOpt, PrimaryTag](ts map (_.project.primaryTag))
+
+        case tpe =>
+          ISet.fromFoldable(tpe.primaryTag)
       }
 
       val (toCompress, unchanged) = xs partitionWithKey { (j, _) =>
-        unkPrimaries member primaryTypeOf(j)
+        unkPrimaries member primaryTagOf(j)
       }
 
       envT(ts, TypeF.map(unchanged, compressMap(toCompress) |+| some((k, v))))
@@ -115,74 +108,65 @@ object compression {
   /** Replace statically known arrays longer than the given limit with an array
     * of unknown size.
     */
-  def limitArrays[F[_], J: Order, A: Order](maxLength: Positive)(
+  def limitArrays[J: Order, A: Order](maxLength: Positive)(
     implicit
-    I : TypeF[J, ?] :<: F,
     A : Field[A],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
-    case EnvT((ts, Arr(-\/(elts @ ICons(h, t))))) if elts.length > maxLength.value =>
+  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = typeTransform[J] {
+    case EnvT((ts, TypeF.Arr(-\/(elts @ ICons(h, t))))) if elts.length > maxLength.value =>
       val (cnt, len) = (ts.size, A fromInt elts.length)
-      envT(TS.coll(cnt, some(len), some(len)), arr(\/-(NonEmptyList.nel(h, t).suml1)))
+      envT(TypeStat.coll(cnt, some(len), some(len)), TypeF.arr(\/-(NonEmptyList.nel(h, t).suml1)))
   }
 
   /** Replace literal string types longer than the given limit with `char[]`. */
-  def limitStrings[F[_], J, A](maxLength: Positive)(
+  def limitStrings[J, A](maxLength: Positive)(
     implicit
-    I : TypeF[J, ?] :<: F,
     A : Ring[A],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
-    case EnvT((ts, Const(Embed(C(Str(s)))))) if s.length > maxLength.value =>
+  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = typeTransform[J] {
+    case EnvT((ts, TypeF.Const(Embed(C(Str(s)))))) if s.length > maxLength.value =>
       val (cnt, len) = (ts.size, A fromInt s.length)
-      envT(TS.coll(cnt, some(len), some(len)), charArr(cnt))
+      envT(TypeStat.coll(cnt, some(len), some(len)), charArr(cnt))
   }
 
   /** Compress a union larger than `maxSize` by reducing the largest group of
     * values sharing a primary type to their shared type.
     */
-  def narrowUnion[F[_], J: Order, A: Order: Field: ConvertableTo](
+  def narrowUnion[J: Order, A: Order: Field: ConvertableTo](
     maxSize: Positive
   )(implicit
-    I : TypeF[J, ?] :<: F,
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
-    case sstf @ EnvT((ts, Unioned(xs))) if xs.length > maxSize.value =>
-      val grouped   = xs.list.groupBy(sst => TypeF.primary[J](sst.project.lower))
-      val primaries = grouped.toList.map(_.bitraverse(ι, some)).unite
+  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
+    case sstf @ EnvT((ts, TypeST(TypeF.Unioned(xs)))) if xs.length > maxSize.value =>
+      val grouped = xs.list groupBy (_.project.primaryTag)
 
-      val compressed = primaries.maximumBy(_._2.length).fold(grouped) {
-        case (pt, ssts) =>
-          grouped.insert(some(pt), ssts.foldMap1(widenConst[J, A]).wrapNel)
+      val compressed = (grouped - none).toList.maximumBy(_._2.length).fold(grouped) {
+        case (pt, ssts) => grouped.insert(pt, ssts.foldMap1(widenConst[J, A]).wrapNel)
       }
 
       compressed.foldMap(_.list) match {
-        case ICons(x, ICons(y, zs)) => envT(ts, union[J, SST[J, A]](x, y, zs))
+        case ICons(x, ICons(y, zs)) => envT(ts, TypeST(TypeF.union[J, SST[J, A]](x, y, zs)))
         case ICons(x, INil())       => envT(ts, x.project.lower)
         case INil()                 => sstf
       }
   }
 
   /** Replace encoded binary strings with `byte[]`. */
-  def z85EncodedBinary[F[_], J, A](
+  def z85EncodedBinary[J, A](
     implicit
-    I : TypeF[J, ?] :<: F,
     A : Field[A],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF2[F, A, SST[J, A]] => SSTF2[F, A, SST[J, A]] = partialTransform[TypeF[J, ?], F] {
-    case EnvT((ts, Const(Embed(EncodedBinary(size))))) =>
-      // NB: Z85 uses 5 chars for every 4 bytes.
-      val (cnt, len) = (ts.size, some(A.fromBigInt(size)))
-      envT(TS.coll(cnt, len, len), byteArr(cnt))
+  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = typeTransform[J] {
+    case EnvT((ts, TypeF.Const(Embed(EncodedBinarySize(n))))) =>
+      val (cnt, len) = (ts.size, some(A.fromBigInt(n)))
+      envT(TypeStat.coll(cnt, len, len), byteArr(cnt))
   }
 
   ////
 
-  private def sstMeasure[J, A] = StructuralType.measure[J, TypeStat[A]]
-
-  private def sstConst[J, A]: Fold[SST[J, A], J] =
-    project[SST[J, A], SSTF[J, A, ?]] composeIso envTIso composeLens _2 composePrism const
+  private type NelOpt[A] = NonEmptyList[Option[A]]
+  private implicit val foldableNelOpt: Foldable[NelOpt] = Foldable[NonEmptyList].compose[Option]
 
   private def byteArr[J, A](cnt: A): TypeF[J, SST[J, A]] =
     simpleArr(cnt, SimpleType.Byte)
@@ -191,7 +175,10 @@ object compression {
     simpleArr(cnt, SimpleType.Char)
 
   private def simpleArr[J, A](cnt: A, st: SimpleType): TypeF[J, SST[J, A]] =
-    arr[J, SST[J, A]](envT(TS.count(cnt), simple[J, SST[J, A]](st)).embed.right)
+    TypeF.arr[J, SST[J, A]](envT(
+      TypeStat.count(cnt),
+      TypeST(TypeF.simple[J, SST[J, A]](st))
+    ).embed.right)
 
   private def compressMap[J: Order, A: Order: Field: ConvertableTo](
     m: J ==>> SST[J, A]
@@ -199,39 +186,23 @@ object compression {
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
   ): Option[(SST[J, A], SST[J, A])] =
-    m.toList foldMap1Opt { case (j, sst) =>
-      (SST.fromEJson(SST.size(sst), j), sst)
+    m.foldlWithKey(none[(SST[J, A], SST[J, A])]) { (r, j, sst) =>
+      r |+| some((SST.fromEJson(SST.size(sst), j), sst))
     }
 
-  /** Returns the SST of the primary type of the given EJson value.
-    *
-    * ∀ a j. Const(j).embed <: primarySST(a, j).toType[T]
-    */
+  /** Returns the SST of the primary type of the given EJson value. */
   private def primarySST[J: Order, A: ConvertableTo: Field: Order](cnt: A, j: J)(
     implicit
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
   ): SST[J, A] = j match {
-    case SimpleEJson(s)   => envT(TS.fromEJson(cnt, j), simple[J, SST[J, A]](s)).embed
-    case Embed(C(Str(_))) => envT(TS.fromEJson(cnt, j), charArr[J, A](cnt)).embed
-    case _                => SST.fromEJson(cnt, j)
-  }
+    case SimpleEJson(s) =>
+      envT(TypeStat.fromEJson(cnt, j), TypeST(TypeF.simple[J, SST[J, A]](s))).embed
 
-  private object partialTransform {
-    def apply[F[_], G[_]] = new PartiallyApplied[F, G]
+    case Embed(C(Str(_))) =>
+      envT(TypeStat.fromEJson(cnt, j), TypeST(charArr[J, A](cnt))).embed
 
-    final class PartiallyApplied[F[_], G[_]] {
-      def apply[A, B](
-        pf: PartialFunction[SSTF2[F, A, B], SSTF2[F, A, B]]
-      )(
-        implicit I: F :<: G
-      ): SSTF2[G, A, B] => SSTF2[G, A, B] =
-        orOriginal((sstf: SSTF2[G, A, B]) =>
-            sstf.run.traverse(I.prj)
-              .map(EnvT(_))
-              .collect(pf)
-              .map(EnvT.hmap(I)(_)))
-    }
+    case _ => SST.fromEJson(cnt, j)
   }
 
   /** Returns the primary SST if the argument is a constant, otherwise returns
@@ -242,9 +213,18 @@ object compression {
   )(implicit
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
-  ): SST[J, A] =
-    sstConst[J, A].headOption(sst).fold(sst) { j =>
-      val ts = sstMeasure[J, A].get(sst)
-      sstMeasure[J, A].set(ts)(primarySST(ts.size, j))
+  ): SST[J, A] = {
+    def psst(ts: TypeStat[A], j: J): SST[J, A] =
+      StructuralType.measure[J, TypeStat[A]].set(ts)(primarySST(ts.size, j))
+
+    sst.project match {
+      case ConstST(None, ts, j) =>
+        psst(ts, j)
+
+      case ConstST(Some((ts0, t)), ts, j) =>
+        envT(ts0, TagST[J](Tagged(t, psst(ts, j)))).embed
+
+      case _ => sst
     }
+  }
 }
