@@ -110,6 +110,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
       '-' ~ '-' ~ rep(chrExcept(EofCh, '\n')) |
       '/' ~ '*' ~ failure("unclosed comment"))
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     override protected def comment: Parser[scala.Any] = (
       '*' ~ '/'  ^^ κ(' ') |
       chrExcept(EofCh) ~ comment)
@@ -373,6 +374,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
   def function_expr: Parser[T[Sql]] =
     ident ~ paren_list ^^ { case a ~ xs => invokeFunction(CIName(a), xs).embed }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def primary_expr: Parser[T[Sql]] =
     case_expr |
     unshift_expr |

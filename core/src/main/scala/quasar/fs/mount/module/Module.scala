@@ -130,6 +130,7 @@ object Module {
       def closeHandle(dataOrHandle: List[Data] \/ ResultHandle): Process[M, Nothing] =
         dataOrHandle.fold(_ => Process.empty, h => Process.eval_[M, Unit](unsafe.close(h).liftM[ErrorT]))
 
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def readUntilEmpty(h: ResultHandle): Process[M, Data] =
         Process.await(unsafe.more(h).leftMap(Error.fsError(_))) { data =>
           if (data.isEmpty)
@@ -165,7 +166,9 @@ object Module {
           val iArgs = args.map{ case (key, value) => (CIName(key), value)}
           val currentDir = fileParent(file)
           (for {
-            moduleConfig <- mount.lookupModuleConfig(currentDir).toRight(notFoundError)
+            moduleConfig <- EitherT(mount.lookupModuleConfig(currentDir)
+                              .leftMap(e => semErrors(SemanticError.genericError(e.shows).wrapNel))
+                              .run.toRight(notFoundError).run.map(_.join))
             name         =  fileName(file).value
             funcDec      <- EitherT(moduleConfig.declarations.find(_.name.value ≟ name)
                               .toRightDisjunction(notFoundError).point[Free[S, ?]])
