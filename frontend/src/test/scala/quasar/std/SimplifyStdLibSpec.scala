@@ -41,6 +41,12 @@ class SimplifyStdLibSpec extends StdLibSpec {
   def shortCircuit[N <: Nat](func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     case (relations.Between, _) => notHandled
 
+    case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => notHandled
+    case (relations.Lt, List(Data.Date(_), Data.Timestamp(_))) => notHandled
+    case (relations.Lte, List(Data.Date(_), Data.Timestamp(_))) => notHandled
+    case (relations.Gt, List(Data.Date(_), Data.Timestamp(_))) => notHandled
+    case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => notHandled
+
     case (date.ExtractCentury, _) => notHandled
     case (date.ExtractDayOfMonth, _) => notHandled
     case (date.ExtractDecade, _) => notHandled
@@ -70,16 +76,6 @@ class SimplifyStdLibSpec extends StdLibSpec {
     case _                   => ().right
   }
 
-  def ignoreSome(prg: FreeMapA[Fix, BinaryArg], arg1: QData, arg2: QData)(run: => Result): Result =
-    (prg, arg1, arg2) match {
-      case (Embed(CoEnv(\/-(MapFuncsCore.Eq(_,_)))), QData.Date(_), QData.Timestamp(_)) => pending
-      case (Embed(CoEnv(\/-(MapFuncsCore.Lt(_,_)))), QData.Date(_), QData.Timestamp(_)) => pending
-      case (Embed(CoEnv(\/-(MapFuncsCore.Lte(_,_)))), QData.Date(_), QData.Timestamp(_)) => pending
-      case (Embed(CoEnv(\/-(MapFuncsCore.Gt(_,_)))), QData.Date(_), QData.Timestamp(_)) => pending
-      case (Embed(CoEnv(\/-(MapFuncsCore.Gte(_,_)))), QData.Date(_), QData.Timestamp(_)) => pending
-      case _ => run
-    }
-
   def check(args: List[Data], prg: List[Fix[LP]] => Fix[LP]): Option[Result] =
     prg((0 until args.length).toList.map(idx => lpf.free(Symbol("arg" + idx))))
       .cataM[Result \/ ?, Unit](shortCircuitLP(args)).swap.toOption
@@ -101,8 +97,8 @@ class SimplifyStdLibSpec extends StdLibSpec {
         run(prg(lpf.constant(arg)), expected)
 
     def binary(prg: (Fix[LP], Fix[LP]) => Fix[LP], arg1: Data, arg2: Data, expected: Data) =
-      ignoreSome(prg, arg1, arg2)(check(List(arg1, arg2), { case List(arg1, arg2) => prg(arg1, arg2) }) getOrElse
-        run(prg(lpf.constant(arg1), lpf.constant(arg2)), expected))
+      check(List(arg1, arg2), { case List(arg1, arg2) => prg(arg1, arg2) }) getOrElse
+        run(prg(lpf.constant(arg1), lpf.constant(arg2)), expected)
 
     def ternary(prg: (Fix[LP], Fix[LP], Fix[LP]) => Fix[LP], arg1: Data, arg2: Data, arg3: Data, expected: Data) =
       check(List(arg1, arg2, arg3), { case List(arg1, arg2, arg3) => prg(arg1, arg2, arg3) }) getOrElse
