@@ -96,6 +96,9 @@ object Mimir extends BackendModule with Logging {
     def unsafeCoerce[F[_ <: Cake]](term: F[Cake]): Task[F[P]] =
       Task.delay(term.asInstanceOf[F[P]])
 
+    def unsafeMerge(other: Repr): Task[Repr { type P = Repr.this.P.type }] =
+      Task.delay(other.asInstanceOf[Repr { type P = Repr.this.P.type }])
+
     def map(f: P.Table => P.Table): Repr { type P = Repr.this.P.type } =
       Repr(P)(f(table))
   }
@@ -177,11 +180,13 @@ object Mimir extends BackendModule with Logging {
 
     lazy val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = {
       case qscript.Map(src, f) =>
+        import src.P.trans._
+
         for {
           trans <- f.cataM[Backend, src.P.trans.TransSpec1](
             interpretM(
-              κ(src.P.trans.TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)))
+              κ(TransSpec1.Id.point[Backend]),
+              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
         } yield Repr(src.P)(src.table.transform(trans))
 
       case qscript.LeftShift(src, struct, id, repair) => ???
@@ -189,12 +194,14 @@ object Mimir extends BackendModule with Logging {
       case qscript.Sort(src, bucket, order) => ???
 
       case qscript.Filter(src, f) =>
+        import src.P.trans._
+
         for {
           trans <- f.cataM[Backend, src.P.trans.TransSpec1](
             interpretM(
-              κ(src.P.trans.TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)))
-        } yield Repr(src.P)(src.table.transform(src.P.trans.Filter(src.P.trans.TransSpec1.Id, trans)))
+              κ(TransSpec1.Id.point[Backend]),
+              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+        } yield Repr(src.P)(src.table.transform(Filter(TransSpec1.Id, trans)))
 
       case qscript.Union(src, lBranch, rBranch) => ???
         //for {
@@ -237,7 +244,74 @@ object Mimir extends BackendModule with Logging {
         }).liftB
     }
 
-    lazy val planEquiJoin: AlgebraM[Backend, EquiJoin[T, ?], Repr] = _ => ???
+    lazy val planEquiJoin: AlgebraM[Backend, EquiJoin[T, ?], Repr] = {
+      case qscript.EquiJoin(src, lbranch, rbranch, lkey, rkey, tpe, combine) =>
+        import src.P.trans._
+
+        for {
+          leftRepr <- lbranch.cataM(interpretM(κ(src.point[Backend]), planQST))
+          rightRepr <- rbranch.cataM(interpretM(κ(src.point[Backend]), planQST))
+
+          lmerged <- src.unsafeMerge(leftRepr).liftM[MT].liftB
+          ltable = lmerged.table
+
+          rmerged <- src.unsafeMerge(rightRepr).liftM[MT].liftB
+          rtable = rmerged.table
+
+          transLKey <- lkey.cataM[Backend, src.P.trans.TransSpec1](
+            interpretM(
+              κ(TransSpec1.Id.point[Backend]),
+              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+
+          transRKey <- rkey.cataM[Backend, src.P.trans.TransSpec1](
+            interpretM(
+              κ(TransSpec1.Id.point[Backend]),
+              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+
+          lsorted <- ltable.sort(transLKey).toTask.liftM[MT].liftB
+          rsorted <- rtable.sort(transRKey).toTask.liftM[MT].liftB
+
+          transLeft <- combine.cataM[Backend, src.P.trans.TransSpec1](
+            interpretM(
+              {
+                case qscript.LeftSide =>
+                  TransSpec1.Id.point[Backend]
+
+                case qscript.RightSide =>
+                  tpe match {
+                    case JoinType.Inner | JoinType.RightOuter => TransSpec1.Undef.point[Backend]
+                    case JoinType.FullOuter | JoinType.LeftOuter => TransSpec1.Id.point[Backend]
+                  }
+              },
+              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+
+          transRight <- combine.cataM[Backend, src.P.trans.TransSpec1](
+            interpretM(
+              {
+                case qscript.LeftSide =>
+                  tpe match {
+                    case JoinType.Inner | JoinType.LeftOuter => TransSpec1.Undef.point[Backend]
+                    case JoinType.FullOuter | JoinType.RightOuter => TransSpec1.Id.point[Backend]
+                  }
+
+                case qscript.RightSide =>
+                  TransSpec1.Id.point[Backend]
+              },
+              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+
+          transMiddle <- combine.cataM[Backend, TransSpec2](
+            interpretM(
+              {
+                case qscript.LeftSide => TransSpec2.LeftId.point[Backend]
+                case qscript.RightSide => TransSpec2.RightId.point[Backend]
+              },
+              mapFuncPlanner.plan(src.P)[Source2](TransSpec2.LeftId)))    // TODO weirdly left-biases things like constants
+        } yield {
+          val table = lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle)
+
+          Repr(src.P)(table)
+        }
+    }
 
     lazy val planShiftedRead: AlgebraM[Backend, Const[ShiftedRead[AFile], ?], Repr] = {
       case Const(ShiftedRead(path, status)) => {
