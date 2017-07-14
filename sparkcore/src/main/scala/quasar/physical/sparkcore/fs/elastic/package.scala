@@ -102,7 +102,11 @@ package object elastic {
     }).run).into[S]
 
     val definition: SparkContext => Free[S, SparkFSDef[Eff, S]] =
-      (sc: SparkContext) => lift((TaskRef(0L) |@| TaskRef(Map.empty[ResultHandle, RddState]) |@| TaskRef(Map.empty[ReadHandle, SparkCursor]) |@| TaskRef(Map.empty[WriteHandle, writefile.WriteCursor])) {
+      (sc: SparkContext) => lift(
+        ( TaskRef(0L)                                 |@|
+          TaskRef(Map.empty[ResultHandle, RddState])  |@|
+          TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
+          TaskRef(Map.empty[WriteHandle, writefile.WriteCursor])) {
         (genState, rddStates, readCursors, writeCursors) => {
           val interpreter: Eff ~> S =
             (KeyValueStore.impl.fromTaskRef[WriteHandle, writefile.WriteCursor](writeCursors) andThen injectNT[Task, S])  :+:
