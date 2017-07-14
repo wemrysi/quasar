@@ -41,6 +41,9 @@ class ElasticCallSpec extends quasar.Qspec
     node = None
   }
 
+  def execute[A](program: Free[ElasticCall, A]): A =
+    program.foldMap(ElasticCall.interpreter("localhost", 9200)).unsafePerformSync
+    
   "CreateIndex" should {
     "create new index" in {
       val program = for {
@@ -48,7 +51,7 @@ class ElasticCallSpec extends quasar.Qspec
         exists <- elastic.indexExists("hello")
       } yield exists
 
-      val created = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      val created = execute(program)
       created must_== true
     }
 
@@ -59,7 +62,7 @@ class ElasticCallSpec extends quasar.Qspec
         exists <- elastic.indexExists("hello")
       } yield exists
 
-      val created = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      val created = execute(program)
       created must_== true
     }
   }
@@ -72,7 +75,7 @@ class ElasticCallSpec extends quasar.Qspec
         exists <- elastic.indexExists("hello")
       } yield exists
 
-      val exists = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      val exists = execute(program)
       exists must_== false
     }
 
@@ -82,7 +85,7 @@ class ElasticCallSpec extends quasar.Qspec
         exists <- elastic.indexExists("hello")
       } yield exists
 
-      val exists = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      val exists = execute(program)
       exists must_== false
     }
 
@@ -94,7 +97,7 @@ class ElasticCallSpec extends quasar.Qspec
         exists <- elastic.indexExists("hello")
       } yield exists
 
-      val exists = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      val exists = execute(program)
       exists must_== false
     }
   }
@@ -107,7 +110,7 @@ class ElasticCallSpec extends quasar.Qspec
         indices <- elastic.listIndices
       } yield indices
 
-      val indices = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      val indices = execute(program)
       indices must contain("bar")
       indices must contain("baz")
     }
@@ -117,7 +120,7 @@ class ElasticCallSpec extends quasar.Qspec
         indices <- elastic.listIndices
       } yield indices
 
-      val indices = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      val indices = execute(program)
       indices must_== List.empty[String]
     }
   }
@@ -130,7 +133,7 @@ class ElasticCallSpec extends quasar.Qspec
         exists <- elastic.typeExists(IndexType("foo", "bar"))
       } yield exists
 
-      val exists = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      val exists = execute(program)
       exists must_== true
     }
 
@@ -140,7 +143,7 @@ class ElasticCallSpec extends quasar.Qspec
         exists <- elastic.typeExists(IndexType("foo", "bar"))
       } yield exists
 
-      val exists = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      val exists = execute(program)
       exists must_== false
     }
 
@@ -149,7 +152,7 @@ class ElasticCallSpec extends quasar.Qspec
         exists <- elastic.typeExists(IndexType("foo", "bar"))
       } yield exists
 
-      val exists = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      val exists = execute(program)
       exists must_== false
     }
   }
@@ -163,7 +166,7 @@ class ElasticCallSpec extends quasar.Qspec
         types <- elastic.listTypes("foo")
       } yield types
 
-      val types = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      val types = execute(program)
       types must contain("bar")
       types must contain("baz")
     }
@@ -174,7 +177,7 @@ class ElasticCallSpec extends quasar.Qspec
         types <- elastic.listTypes("foo")
       } yield types
 
-      val types = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      val types = execute(program)
       types must_== List.empty[String]
     }
 
@@ -184,7 +187,7 @@ class ElasticCallSpec extends quasar.Qspec
         types <- elastic.listTypes("foo")
       } yield types
 
-      val types = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      val types = execute(program)
       types must_== List.empty[String]
     }
 
@@ -193,7 +196,7 @@ class ElasticCallSpec extends quasar.Qspec
         types <- elastic.listTypes("foo")
       } yield types
 
-      val types = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      val types = execute(program)
       types must_== List.empty[String]
     }
   }
@@ -213,9 +216,9 @@ class ElasticCallSpec extends quasar.Qspec
         bazExists <- elastic.typeExists(IndexType("foo2", "baz"))
       } yield (bar2Exists, bazExists)
 
-      program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      execute(program)
       java.lang.Thread.sleep(2000) // test needs to wait for the views to be updated
-      val (bar2Exists, bazExists) = checkProgram.foldMap(ElasticCall.interpreter).unsafePerformSync
+      val (bar2Exists, bazExists) = execute(checkProgram)
       bar2Exists must_== true
       bazExists must_== false
     }
@@ -230,7 +233,7 @@ class ElasticCallSpec extends quasar.Qspec
         exists <- elastic.typeExists(IndexType("foo", "bar"))
       } yield exists
 
-      val exists = program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      val exists = execute(program)
       exists must_== false
     }
   }

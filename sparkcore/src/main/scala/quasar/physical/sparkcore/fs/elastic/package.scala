@@ -49,7 +49,7 @@ package object elastic {
   type Eff5[A]  = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Eff4, A]
   type Eff[A]  = Coproduct[KeyValueStore[WriteHandle, writefile.WriteCursor, ?], Eff5, A]
 
-  final case class SparkFSConf(sparkConf: SparkConf)
+  final case class SparkFSConf(sparkConf: SparkConf, host: String, port: Int)
 
   val parseUri: ConnectionUri => DefinitionError \/ (SparkConf, SparkFSConf) = (connUri: ConnectionUri) => {
 
@@ -93,8 +93,16 @@ package object elastic {
       ).exec(new SparkConf())
     }
 
-    // TODO_ES missng ES nodes and port
-    sparkConfOrErr.map(sparkConf => (sparkConf, SparkFSConf(sparkConf)))
+
+    def fetchParameter(name: String): DefinitionError \/ String = uriOrErr.flatMap(uri =>
+      uri.params.get(name).fold(liftErr(s"'$name' parameter not provided").left[String])(_.right[DefinitionError])
+    )
+
+    for {
+      sparkConf   <- sparkConfOrErr
+      elasticHost <- fetchParameter("elasticHost")
+      elasticPort <- fetchParameter("elasticPort")
+    } yield (sparkConf, SparkFSConf(sparkConf, elasticHost, elasticPort.toInt))
   }
 
   private def sparkCoreJar: EitherT[Task, String, APath] = {
@@ -112,18 +120,18 @@ package object elastic {
     S0: Task :<: S,
     S1: PhysErr :<: S,
     FailOps: Failure.Ops[PhysicalError, S]
-  ): SparkConf => Free[S, SparkFSDef[Eff, S]] = (sparkConf: SparkConf) => {
+  ): SparkFSConf => Free[S, SparkFSDef[Eff, S]] = (sfsc: SparkFSConf) => {
 
     val genScWithJar: Free[S, String \/ SparkContext] = lift((for {
-      sc <- coreGenSc(sparkConf)
+      sc <- coreGenSc(sfsc.sparkConf)
       jar <- sparkCoreJar
     } yield {
       sc.addJar(posixCodec.printPath(jar))
       sc
     }).run).into[S]
-
-    val definition: SparkContext => Free[S, SparkFSDef[Eff, S]] =
-      (sc: SparkContext) => lift(
+  
+    val definition: (SparkContext, String, Int) => Free[S, SparkFSDef[Eff, S]] =
+      (sc: SparkContext, host: String, port: Int) => lift(
         ( TaskRef(0L)                                 |@|
           TaskRef(Map.empty[ResultHandle, RddState])  |@|
           TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
@@ -134,18 +142,18 @@ package object elastic {
             (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](readCursors) andThen injectNT[Task, S]) :+:
             (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
           (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
-          (ElasticCall.interpreter andThen injectNT[Task, S]) :+:
+          (ElasticCall.interpreter(host, port) andThen injectNT[Task, S]) :+:
           (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S]) :+:
           injectNT[Task, S] :+:
           injectNT[PhysErr, S]
 
           SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
         }
-      }).into[S]
+        }).into[S]
 
     genScWithJar >>= (_.fold(
       msg => FailOps.fail[SparkFSDef[Eff, S]](UnhandledFSError(new RuntimeException(msg))),
-      definition(_)
+      sc => definition(sc, sfsc.host, sfsc.port)
     ))
   }
 
