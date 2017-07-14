@@ -117,7 +117,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
   override def interpreter(cfg: Config): DefErrT[Task, (BackendEffect ~> Task, Task[Unit])] = {
     val xformPaths =
       if (cfg.cfg.rootDir === rootDir) liftFT[BackendEffect]
-      else chroot.analyticalFileSystem[BackendEffect](cfg.cfg.rootDir)
+      else chroot.backendEffect[BackendEffect](cfg.cfg.rootDir)
 
     super.interpreter(cfg) map {
       case (f, c) => (foldMapNT(f) compose xformPaths, c)

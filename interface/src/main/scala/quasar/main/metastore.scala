@@ -168,7 +168,7 @@ object metastore {
 
   def metastoreCtx[A](metastore: StatefulTransactor): MainTask[MetaStoreCtx] = {
     for {
-      hfsRef       <- TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM]).liftM[MainErrT]
+      hfsRef       <- TaskRef(Empty.backendEffect[HierarchicalFsEffM]).liftM[MainErrT]
       mntdRef      <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
 
       ephmralMnt   =  KvsMounter.interpreter[Task, QErrsTCnxIO](

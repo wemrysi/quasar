@@ -304,7 +304,7 @@ object hierarchical {
     qf :+: rf :+: wf :+: mf
   }
 
-  def analyticalFileSystem[F[_], S[_]](
+  def backendEffect[F[_], S[_]](
     mounts: Mounts[BackendEffect ~> F]
   )(implicit
     S1: F :<: S,

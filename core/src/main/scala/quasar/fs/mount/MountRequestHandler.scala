@@ -106,7 +106,7 @@ final class MountRequestHandler[F[_], S[_]](
   ): Free[T, Unit] =
     for {
       mnted <- fsm.MountedFsRef.Ops[T].get ∘
-                 (mnts => hierarchical.analyticalFileSystem[F, S](mnts.map(_.run)))
+                 (mnts => hierarchical.backendEffect[F, S](mnts.map(_.run)))
       _     <- HierarchicalFsRef.Ops[T].set(mnted)
     } yield ()
 }

@@ -143,7 +143,7 @@ object FileSystemTest {
 
   def allFsUT: Task[IList[SupportedFs[BackendEffect]]] =
     (localFsUT |@| externalFsUT) { (loc, ext) =>
-      (loc ::: ext) map (sf => sf.copy(impl = sf.impl.map(ut => ut.contramapF(chroot.analyticalFileSystem[BackendEffect](ut.testDir)))))
+      (loc ::: ext) map (sf => sf.copy(impl = sf.impl.map(ut => ut.contramapF(chroot.backendEffect[BackendEffect](ut.testDir)))))
     }
 
   def fsTestConfig(fsType: FileSystemType, fsDef: FileSystemDef[Free[filesystems.Eff, ?]])
@@ -183,7 +183,7 @@ object FileSystemTest {
       TaskRef(0L)                                         |@|
       ViewState.toTask(Map())                             |@|
       TaskRef(Map[APath, MountConfig]())                  |@|
-      TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM])       |@|
+      TaskRef(Empty.backendEffect[HierarchicalFsEffM])       |@|
       TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
     ) {
       (mem, seqRef, viewState, cfgsRef, hfsRef, mntdRef) =>
@@ -212,7 +212,7 @@ object FileSystemTest {
       MonotonicSeq.fromTaskRef(seqRef) :+:
       mem.testInterp
 
-      val fs = foldMapNT(memPlus) compose view.analyticalFileSystem[ViewBackendEffect]
+      val fs = foldMapNT(memPlus) compose view.backendEffect[ViewBackendEffect]
       val ref = BackendRef.name.set(BackendName("No-view"))(mem.ref)
 
       FileSystemUT(ref, fs, fs, mem.testDir, mem.close)
@@ -223,7 +223,7 @@ object FileSystemTest {
 
     def fs(f: HfsIO ~> Task, r: BackendEffect ~> Task) =
       foldMapNT[HfsIO, Task](f) compose
-        hierarchical.analyticalFileSystem[Task, HfsIO](Mounts.singleton(mntDir, r))
+        hierarchical.backendEffect[Task, HfsIO](Mounts.singleton(mntDir, r))
 
     (interpretHfsIO |@| inMemUT)((f, mem) =>
       FileSystemUT(

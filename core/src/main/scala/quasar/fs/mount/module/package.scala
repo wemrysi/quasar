@@ -140,7 +140,7 @@ package object module {
     interpretFileSystem[Free[S, ?]](queryFile, readFile, writeFile, manageFile)
   }
   // FIX-ME
-  def analyticalFileSystem[S[_]](
+  def backendEffect[S[_]](
                         implicit
                         S0: ReadFile :<: S,
                         S1: WriteFile :<: S,

@@ -389,8 +389,8 @@ object QueryRegressionTest {
       val interpFS = f compose injectNT[BackendEffect, BackendEffectIO]
 
       val g: BackendEffect ~> Free[HfsIO, ?] =
-        flatMapSNT(hierarchical.analyticalFileSystem[Task, HfsIO](Mounts.singleton(mnt, interpFS)))
-          .compose(chroot.analyticalFileSystem[BackendEffect](mnt))
+        flatMapSNT(hierarchical.backendEffect[Task, HfsIO](Mounts.singleton(mnt, interpFS)))
+          .compose(chroot.backendEffect[BackendEffect](mnt))
 
       NaturalTransformation.refl[Task] :+: (free.foldMapNT(hfs) compose g)
     }

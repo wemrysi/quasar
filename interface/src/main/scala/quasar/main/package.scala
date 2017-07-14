@@ -181,7 +181,7 @@ package object main {
           injectFT[PathMismatchFailure, S]                                    :+:
           hierarchicalFs
 
-        flatMapSNT(compFs) compose flatMapSNT(transformIn[BackendEffect, V, Free[V, ?]](module.analyticalFileSystem[V], liftFT)) compose view.analyticalFileSystem[V]
+        flatMapSNT(compFs) compose flatMapSNT(transformIn[BackendEffect, V, Free[V, ?]](module.backendEffect[V], liftFT)) compose view.backendEffect[V]
       }
   }
 
