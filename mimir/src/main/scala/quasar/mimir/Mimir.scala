@@ -262,10 +262,20 @@ object Mimir extends BackendModule with Logging {
                   }
                 })
           } yield {
+            import repr.P.trans._
+
             status match {
-              case IdOnly => repr.map(_.transform(repr.P.trans.constants.SourceKey.Single))
-              case IncludeId => repr
-              case ExcludeId => repr.map(_.transform(repr.P.trans.constants.SourceValue.Single))
+              case IdOnly =>
+                repr.map(_.transform(constants.SourceKey.Single))
+
+              case IncludeId =>
+                val ids = constants.SourceKey.Single
+                val values = constants.SourceValue.Single
+
+                repr.map(_.transform(InnerArrayConcat(WrapArray(ids), WrapArray(values))))
+
+              case ExcludeId =>
+                repr.map(_.transform(constants.SourceValue.Single))
             }
           }
 
