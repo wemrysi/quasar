@@ -33,6 +33,7 @@ import scalaz._, Scalaz._
 
 @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
 object metadata {
+  import ToApiError.ops._
 
   final case class FsNode(name: String, typ: String, mount: Option[String], args: Option[List[String]])
 
@@ -64,18 +65,19 @@ object metadata {
       jdecode4L(FsNode.apply)("name", "type", "mount", "args")
   }
 
-  final case class InvalidMountNode(name: String, `type`: Option[String], error: String)
+  final case class InvalidMountNode(name: String, `type`: Option[String], error: MountingError)
 
   object InvalidMountNode {
+    import MountingError._
+
     implicit val invalidMountNodeOrder: Order[InvalidMountNode] =
-      Order.orderBy(n => (n.name, n.`type`, n.error))
+      Order.orderBy(n => (n.name, n.`type`, n.error.toApiError.status, n.error.shows))
 
     implicit val invalidMountNodeEncodeJson: EncodeJson[InvalidMountNode] =
       EncodeJson { case InvalidMountNode(name, tpe, error) =>
-        ("name" := name)                                             ->:
-        ("type" :=? tpe)                                             ->?:
-        ("mount" := Json(
-          "error" := ApiError.fromMsg_(InternalServerError, error))) ->:
+        ("name" := name)                               ->:
+        ("type" :=? tpe)                               ->?:
+        ("mount" := Json("error" := error.toApiError)) ->:
         jEmptyObject
       }
   }
@@ -113,7 +115,7 @@ object metadata {
                   e => InvalidMountNode(
                     name.fold(_.value, _.value),
                     MountingError.invalidMount.getOption(e) ∘ (_._1.fold(_.value, "view", "module")),
-                    e.shows),
+                    e),
                   t => FsNode(name, t.fold(_.value, "view", "module").some, none)),
                 FsNode(name, none, none).right)
             }
