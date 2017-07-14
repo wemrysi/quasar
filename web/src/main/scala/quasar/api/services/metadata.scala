@@ -72,9 +72,10 @@ object metadata {
 
     implicit val invalidMountNodeEncodeJson: EncodeJson[InvalidMountNode] =
       EncodeJson { case InvalidMountNode(name, tpe, error) =>
-        ("name" := name)                                           ->:
-        ("type" :=? tpe)                                           ->?:
-        ("mount" := ApiError.fromMsg_(InternalServerError, error)) ->:
+        ("name" := name)                                             ->:
+        ("type" :=? tpe)                                             ->?:
+        ("mount" := Json(
+          "error" := ApiError.fromMsg_(InternalServerError, error))) ->:
         jEmptyObject
       }
   }
