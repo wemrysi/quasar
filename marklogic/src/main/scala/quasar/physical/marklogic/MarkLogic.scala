@@ -96,7 +96,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import Kleisli.kleisliMonadReader
   import WriterT.writerTMonadListen
-  import FileSystemDef.DefErrT
+  import BackendDef.DefErrT
 
   final implicit class LiftMLFSQ[A](mlfsq: MLFSQ[A]) {
     val liftQB: Backend[A] =

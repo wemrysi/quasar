@@ -34,7 +34,7 @@ import scalaz.concurrent.Task
 import scalaz.stream.{Writer => _, _}
 
 package object fs {
-  import FileSystemDef.{DefinitionError, DefErrT}
+  import BackendDef.{DefinitionError, DefErrT}
 
   val FsType = FileSystemType("mongodb")
 
@@ -76,7 +76,7 @@ package object fs {
   def definition[S[_]](implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
-  ): FileSystemDef[Free[S, ?]] = FileSystemDef.fromPF[Free[S, ?]] {
+  ): BackendDef[Free[S, ?]] = BackendDef.fromPF[Free[S, ?]] {
     case (FsType, uri) =>
       type M[A] = Free[S, A]
       for {
@@ -88,7 +88,7 @@ package object fs {
                       .run
                   ).into[S])
         close  =  free.lift(Task.delay(client.close()).attempt.void).into[S]
-      } yield FileSystemDef.DefinitionResult[M](fs, close)
+      } yield BackendDef.DefinitionResult[M](fs, close)
   }
 
   val QScriptFsType = FileSystemType("mongodbq")
@@ -125,7 +125,7 @@ package object fs {
   def qscriptDefinition[S[_]](implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
-  ): FileSystemDef[Free[S, ?]] = FileSystemDef.fromPF[Free[S, ?]] {
+  ): BackendDef[Free[S, ?]] = BackendDef.fromPF[Free[S, ?]] {
     case (QScriptFsType, uri) =>
       type M[A] = Free[S, A]
       for {
@@ -137,7 +137,7 @@ package object fs {
                       .run
                   ).into[S])
         close  =  free.lift(Task.delay(client.close()).attempt.void).into[S]
-      } yield FileSystemDef.DefinitionResult[M](fs, close)
+      } yield BackendDef.DefinitionResult[M](fs, close)
   }
 
   val listContents: ADir => EitherT[MongoDbIO, FileSystemError, Set[PathSegment]] =

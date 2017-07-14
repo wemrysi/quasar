@@ -130,15 +130,15 @@ object Mimir extends BackendModule with Logging {
 
   final case class Config(dataDir: java.io.File)
 
-  def parseConfig(uri: ConnectionUri): FileSystemDef.DefErrT[Task, Config] =
-    Config(new java.io.File("/tmp/precog")).point[FileSystemDef.DefErrT[Task, ?]]
+  def parseConfig(uri: ConnectionUri): BackendDef.DefErrT[Task, Config] =
+    Config(new java.io.File("/tmp/precog")).point[BackendDef.DefErrT[Task, ?]]
 
-  def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])] = {
+  def compile(cfg: Config): BackendDef.DefErrT[Task, (M ~> Task, Task[Unit])] = {
     val t = for {
       cake <- Precog(cfg.dataDir)
     } yield (λ[M ~> Task](_.run(cake)), cake.shutdown.toTask)
 
-    t.liftM[FileSystemDef.DefErrT]
+    t.liftM[BackendDef.DefErrT]
   }
 
   val Type = FileSystemType("mimir")

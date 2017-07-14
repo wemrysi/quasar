@@ -25,7 +25,7 @@ import quasar.effect._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
-import quasar.fs.mount._, FileSystemDef.DefinitionResult
+import quasar.fs.mount._, BackendDef.DefinitionResult
 import quasar.metastore._
 
 import argonaut._, Argonaut._

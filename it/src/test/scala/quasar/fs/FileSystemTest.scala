@@ -22,7 +22,7 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.fp._
 import quasar.fp.free._
-import quasar.fs.mount._, FileSystemDef.DefinitionResult
+import quasar.fs.mount._, BackendDef.DefinitionResult
 import quasar.effect._
 import quasar.main.{KvsMounter, HierarchicalFsEffM, PhysFsEff, PhysFsEffM}
 import quasar.mimir
@@ -146,7 +146,7 @@ object FileSystemTest {
       (loc ::: ext) map (sf => sf.copy(impl = sf.impl.map(ut => ut.contramapF(chroot.backendEffect[BackendEffect](ut.testDir)))))
     }
 
-  def fsTestConfig(fsType: FileSystemType, fsDef: FileSystemDef[Free[filesystems.Eff, ?]])
+  def fsTestConfig(fsType: FileSystemType, fsDef: BackendDef[Free[filesystems.Eff, ?]])
     : PartialFunction[(MountConfig, ADir), Task[(BackendEffect ~> Task, Task[Unit])]] = {
     case (MountConfig.FileSystemConfig(FileSystemType(fsType.value), uri), dir) =>
       filesystems.testFileSystem(uri, dir, fsDef.apply(fsType, uri).run)

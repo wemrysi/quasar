@@ -42,7 +42,7 @@ import scalaz.concurrent.Task
   * functionality.
   */
 package object main {
-  import FileSystemDef.DefinitionResult
+  import BackendDef.DefinitionResult
   import QueryFile.ResultHandle
 
   type MainErrT[F[_], A] = EitherT[F, String, A]
@@ -50,7 +50,7 @@ package object main {
   val MainTask           = MonadError[EitherT[Task, String, ?], String]
 
   /** The physical filesystems currently supported. */
-  val physicalFileSystems: FileSystemDef[PhysFsEffM] = IList(
+  val physicalFileSystems: BackendDef[PhysFsEffM] = IList(
     Couchbase.definition translate injectFT[Task, PhysFsEff],
     marklogic.MarkLogic(
       readChunkSize  = 10000L,

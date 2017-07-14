@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp._, free._
 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle
-import quasar.fs.mount._, FileSystemDef.DefErrT
+import quasar.fs.mount._, BackendDef.DefErrT
 
 import doobie.imports._
 import scalaz._, Scalaz._
@@ -66,11 +66,11 @@ package object fs {
     implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
-  ): FileSystemDef[Free[S, ?]] =
-    FileSystemDef.fromPF {
+  ): BackendDef[Free[S, ?]] =
+    BackendDef.fromPF {
       case (FsType, uri) =>
         interp(uri).map { run =>
-          FileSystemDef.DefinitionResult[Free[S, ?]](
+          BackendDef.DefinitionResult[Free[S, ?]](
             run compose interpretBackendEffect(
               Empty.analyze[Free[Eff, ?]],
               queryfile.interpret,

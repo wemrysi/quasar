@@ -32,7 +32,7 @@ import scalaz._, Scalaz._
   * @tparam S the composite effect, supporting the base and hierarchical effects
   */
 final class MountRequestHandler[F[_], S[_]](
-  fsDef: FileSystemDef[F]
+  fsDef: BackendDef[F]
 )(implicit
   S0: F :<: S,
   S1: MountedResultH :<: S,
@@ -113,7 +113,7 @@ final class MountRequestHandler[F[_], S[_]](
 
 object MountRequestHandler {
   def apply[F[_], S[_]](
-    fsDef: FileSystemDef[F]
+    fsDef: BackendDef[F]
   )(implicit
     S0: F :<: S,
     S1: MountedResultH :<: S,

@@ -36,7 +36,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 trait BackendModule {
-  import FileSystemDef.{DefErrT, DefinitionResult}
+  import BackendDef.{DefErrT, DefinitionResult}
 
   type QSM[T[_[_]], A] = QS[T]#M[A]
 
@@ -57,8 +57,8 @@ trait BackendModule {
     val liftB: Backend[A] = m.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
   }
 
-  final val definition: FileSystemDef[Task] =
-    FileSystemDef fromPF {
+  final val definition: BackendDef[Task] =
+    BackendDef fromPF {
       case (Type, uri) =>
         (parseConfig(uri) >>= interpreter) map { case (f, c) => DefinitionResult(f, c) }
     }
