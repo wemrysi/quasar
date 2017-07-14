@@ -57,11 +57,10 @@ package object elastic {
 
     def master(host: String, port: Int): State[SparkConf, Unit] =
       State.modify(_.setMaster(s"spark://$host:$port"))
-
     def appName: State[SparkConf, Unit] = State.modify(_.setAppName("quasar"))
-
     def indexAuto: State[SparkConf, Unit] = State.modify(_.set("es.index.auto.create", "true"))
-
+    def config(name: String, uri: Uri): State[SparkConf, Unit] =
+      State.modify(c => uri.params.get(name).fold(c)(c.set(name, _)))
     val uriOrErr: DefinitionError \/ Uri = Uri.fromString(connUri.value).leftMap((pf: ParseFailure) => liftErr(pf.toString))
 
     val sparkConfOrErr: DefinitionError \/ SparkConf = for {
@@ -69,10 +68,32 @@ package object elastic {
       host <- uri.host.fold(NonEmptyList("host not provided").left[EnvironmentError].left[Uri.Host])(_.right[DefinitionError])
       port <- uri.port.fold(NonEmptyList("port not provided").left[EnvironmentError].left[Int])(_.right[DefinitionError])
     } yield {
-      // TODO_ES missng ES nodes and port
-      (master(host.value, port) *> appName *> indexAuto).exec(new SparkConf())
+
+      ( master(host.value, port)                       *>
+        appName                                        *>
+        indexAuto                                      *>
+        config("spark.executor.memory", uri)           *>
+        config("spark.executor.cores", uri)            *>
+        config("spark.executor.extraJavaOptions", uri) *>
+        config("spark.default.parallelism", uri)       *>
+        config("spark.files.maxPartitionBytes", uri)   *>
+        config("spark.driver.cores", uri)              *>
+        config("spark.driver.maxResultSize", uri)      *>
+        config("spark.driver.memory", uri)             *>
+        config("spark.local.dir", uri)                 *>
+        config("spark.reducer.maxSizeInFlight", uri)   *>
+        config("spark.reducer.maxReqsInFlight", uri)   *>
+        config("spark.shuffle.file.buffer", uri)       *>
+        config("spark.shuffle.io.retryWait", uri)      *>
+        config("spark.memory.fraction", uri)           *>
+        config("spark.memory.storageFraction", uri)    *>
+        config("spark.cores.max", uri)                 *>
+        config("spark.speculation", uri)               *>
+        config("spark.task.cpus", uri)
+      ).exec(new SparkConf())
     }
 
+    // TODO_ES missng ES nodes and port
     sparkConfOrErr.map(sparkConf => (sparkConf, SparkFSConf(sparkConf)))
   }
 
