@@ -159,6 +159,7 @@ object MapFuncCore {
       }
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def unapply[T[_[_]]: BirecursiveT, A](mf: CoEnv[A, MapFuncCore[T, ?], FreeMapA[T, A]]):
         Option[List[FreeMapA[T, A]]] =
       mf.run.fold(
@@ -184,6 +185,7 @@ object MapFuncCore {
       }
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def unapply[T[_[_]]: BirecursiveT, A](mf: CoEnv[A, MapFuncCore[T, ?], FreeMapA[T, A]]):
         Option[List[FreeMapA[T, A]]] =
       mf.run.fold(
@@ -238,6 +240,7 @@ object MapFuncCore {
       }) ∘ (_.embed)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def flattenAnd[T[_[_]], A](fm: FreeMapA[T, A]): NonEmptyList[FreeMapA[T, A]] =
     fm.resume match {
       case -\/(And(a, b)) => flattenAnd(a) append flattenAnd(b)
@@ -456,6 +459,7 @@ object MapFuncCore {
 
   implicit def equal[T[_[_]]: BirecursiveT: EqualT, A]: Delay[Equal, MapFuncCore[T, ?]] =
     new Delay[Equal, MapFuncCore[T, ?]] {
+      @SuppressWarnings(Array("org.wartremover.warts.Equals"))
       def apply[A](in: Equal[A]): Equal[MapFuncCore[T, A]] = Equal.equal {
         // nullary
         case (Constant(v1), Constant(v2)) =>
@@ -464,7 +468,6 @@ object MapFuncCore {
         case (JoinSideName(n1), JoinSideName(n2)) => n1 ≟ n2
         case (Undefined(), Undefined()) => true
         case (Now(), Now()) => true
-
         // unary
         case (ExtractCentury(a1), ExtractCentury(a2)) => in.equal(a1, a2)
         case (ExtractDayOfMonth(a1), ExtractDayOfMonth(a2)) => in.equal(a1, a2)

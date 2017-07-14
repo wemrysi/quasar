@@ -20,11 +20,10 @@ import quasar.precog.common._
 import quasar.yggdrasil._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
-import quasar.yggdrasil.execution.EvaluationContext
 
 import scalaz._, Scalaz._
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
   type Lib <: TableLib
@@ -41,8 +40,6 @@ trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
     def error(msg: String): M[Unit]
     def die(): M[Unit]
   }
-
-  case class MorphContext(evalContext: EvaluationContext, logger: MorphLogger)
 
   trait TableLib extends Library {
     import TableLib._
@@ -61,7 +58,7 @@ trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
     def _libReduction: Set[Reduction] = Set()
 
     trait Morph1Apply {
-      def apply(input: Table, ctx: MorphContext): M[Table]
+      def apply(input: Table): M[Table]
     }
 
     sealed trait MorphismAlignment
@@ -90,17 +87,17 @@ trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
     }
 
     abstract class Op1(namespace: Vector[String], name: String) extends Morphism1(namespace, name) with Op1Like {
-      def spec[A <: SourceType](ctx: MorphContext)(source: TransSpec[A]): TransSpec[A]
+      def spec[A <: SourceType](source: TransSpec[A]): TransSpec[A]
 
       def fold[A](op1: Op1 => A, op1F1: Op1F1 => A): A = op1(this)
-      def apply(table: Table, ctx: MorphContext)       = sys.error("morphism application of an op1 is wrong")
+      def apply(table: Table)       = sys.error("morphism application of an op1 is wrong")
     }
 
     abstract class Op1F1(namespace: Vector[String], name: String) extends Op1(namespace, name) {
-      def spec[A <: SourceType](ctx: MorphContext)(source: TransSpec[A]): TransSpec[A] =
-        trans.Map1(source, f1(ctx))
+      def spec[A <: SourceType](source: TransSpec[A]): TransSpec[A] =
+        trans.Map1(source, f1)
 
-      def f1(ctx: MorphContext): F1
+      def f1: F1
 
       override val rowLevel: Boolean = true
 
@@ -110,17 +107,17 @@ trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
     abstract class Op2(namespace: Vector[String], name: String) extends Morphism2(namespace, name) with Op2Like {
       val alignment = MorphismAlignment.Match(M.point {
         new Morph1Apply {
-          def apply(input: Table, ctx: MorphContext) = sys.error("morphism application of an op2 is wrong")
+          def apply(input: Table) = sys.error("morphism application of an op2 is wrong")
         }
       })
 
-      def spec[A <: SourceType](ctx: MorphContext)(left: TransSpec[A], right: TransSpec[A]): TransSpec[A]
+      def spec[A <: SourceType](left: TransSpec[A], right: TransSpec[A]): TransSpec[A]
 
       def fold[A](op2: Op2 => A, op2F2: Op2F2 => A): A = op2(this)
     }
 
     trait Op2Array extends Op2 {
-      def spec[A <: SourceType](ctx: MorphContext)(left: TransSpec[A], right: TransSpec[A]): TransSpec[A] = {
+      def spec[A <: SourceType](left: TransSpec[A], right: TransSpec[A]): TransSpec[A] = {
         trans.MapWith(trans.InnerArrayConcat(trans.WrapArray(trans.Map1(left, prepare)), trans.WrapArray(trans.Map1(right, prepare))), mapper)
       }
 
@@ -130,10 +127,10 @@ trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
     }
 
     abstract class Op2F2(namespace: Vector[String], name: String) extends Op2(namespace, name) {
-      def spec[A <: SourceType](ctx: MorphContext)(left: TransSpec[A], right: TransSpec[A]): TransSpec[A] =
-        trans.Map2(left, right, f2(ctx))
+      def spec[A <: SourceType](left: TransSpec[A], right: TransSpec[A]): TransSpec[A] =
+        trans.Map2(left, right, f2)
 
-      def f2(ctx: MorphContext): F2
+      def f2: F2
 
       override val rowLevel: Boolean = true
 
@@ -147,11 +144,11 @@ trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
       type Result
 
       def monoid: Monoid[Result]
-      def reducer(ctx: MorphContext): Reducer[Result]
+      def reducer: Reducer[Result]
       def extract(res: Result): Table
       def extractValue(res: Result): Option[RValue]
 
-      def apply(table: Table, ctx: MorphContext) = table.reduce(reducer(ctx))(monoid) map extract
+      def apply(table: Table) = table.reduce(reducer)(monoid) map extract
     }
 
     def coalesce(reductions: List[(Reduction, Option[JType => JType])]): Reduction
@@ -165,7 +162,7 @@ trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTabl
       val tpe = r.tpe
 
       def monoid = r.monoid
-      def reducer(ctx: MorphContext) = new CReducer[Result] {
+      def reducer = new CReducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
           jtypef match {
             case Some(f) =>
@@ -173,9 +170,9 @@ trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTabl
                 def columnRefs          = schema.columnRefs
                 def columns(tpe: JType) = schema.columns(f(tpe))
               }
-              r.reducer(ctx).reduce(cols0, range)
+              r.reducer.reduce(cols0, range)
             case None =>
-              r.reducer(ctx).reduce(schema, range)
+              r.reducer.reduce(schema, range)
           }
         }
       }
@@ -193,7 +190,7 @@ trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTabl
             val impl = new Reduction(Vector(), "") {
               type Result = (x.Result, acc.Result)
 
-              def reducer(ctx: MorphContext) = new CReducer[Result] {
+              def reducer = new CReducer[Result] {
                 def reduce(schema: CSchema, range: Range): Result = {
                   jtypef match {
                     case Some(f) =>
@@ -201,9 +198,9 @@ trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTabl
                         def columnRefs          = schema.columnRefs
                         def columns(tpe: JType) = schema.columns(f(tpe))
                       }
-                      (x.reducer(ctx).reduce(cols0, range), acc.reducer(ctx).reduce(schema, range))
+                      (x.reducer.reduce(cols0, range), acc.reducer.reduce(schema, range))
                     case None =>
-                      (x.reducer(ctx).reduce(schema, range), acc.reducer(ctx).reduce(schema, range))
+                      (x.reducer.reduce(schema, range), acc.reducer.reduce(schema, range))
                   }
                 }
               }
@@ -251,12 +248,7 @@ trait StdLibModule[M[+ _]]
     with MathLibModule[M]
     with TypeLibModule[M]
     with StringLibModule[M]
-    with StatsLibModule[M]
-    with SummaryLibModule[M]
-    with NormalizationLibModule[M]
-    with ClusteringLibModule[M]
-    with RandomForestLibModule[M]
-    with FSLibModule[M]
+    with ReductionLibModule[M]
     with RandomLibModule[M] {
   type Lib <: StdLib
 
@@ -267,12 +259,7 @@ trait StdLibModule[M[+ _]]
       with MathLib
       with TypeLib
       with StringLib
-      with StatsLib
-      with SummaryLib
-      with NormalizationLib
-      with ClusteringLib
-      with RandomForestLib
-      with FSLib
+      with ReductionLib
       with RandomLib
 }
 
@@ -314,7 +301,7 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
-    class Dt(c: DateColumn, defined: LocalDateTime => Boolean, f: LocalDateTime => String) extends Map1Column(c) with StrColumn {
+    class Dt(c: DateColumn, defined: ZonedDateTime => Boolean, f: ZonedDateTime => String) extends Map1Column(c) with StrColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
@@ -375,7 +362,7 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
-    class Dt(c: DateColumn, defined: LocalDateTime => Boolean, f: LocalDateTime => Long) extends Map1Column(c) with LongColumn {
+    class Dt(c: DateColumn, defined: ZonedDateTime => Boolean, f: ZonedDateTime => Long) extends Map1Column(c) with LongColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
@@ -751,7 +738,7 @@ object StdLib {
       def apply(row: Int) = f(c1(row), c2(row))
     }
 
-    class Dt(c: DateColumn, defined: LocalDateTime => Boolean, f: LocalDateTime => Boolean) extends Map1Column(c) with BoolColumn {
+    class Dt(c: DateColumn, defined: ZonedDateTime => Boolean, f: ZonedDateTime => Boolean) extends Map1Column(c) with BoolColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
@@ -759,7 +746,7 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
-    class DtDt(c1: DateColumn, c2: DateColumn, defined: (LocalDateTime, LocalDateTime) => Boolean, f: (LocalDateTime, LocalDateTime) => Boolean)
+    class DtDt(c1: DateColumn, c2: DateColumn, defined: (ZonedDateTime, ZonedDateTime) => Boolean, f: (ZonedDateTime, ZonedDateTime) => Boolean)
         extends Map2Column(c1, c2)
         with BoolColumn {
 

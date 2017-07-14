@@ -42,7 +42,7 @@ trait RandomLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       val tpe = UnaryOperationType(JNumberT, JNumberT)
       type Result = Option[Long]
 
-      def reducer(ctx: MorphContext) = new Reducer[Result] {
+      def reducer = new Reducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
           val cols = schema.columns(JObjectFixedT(Map(paths.Value.name -> JNumberT)))
 
@@ -65,8 +65,8 @@ trait RandomLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         } getOrElse Table.empty
       }
 
-      def apply(table: Table, ctx: MorphContext): M[Table] =
-        table.reduce(reducer(ctx)) map extract
+      def apply(table: Table): M[Table] =
+        table.reduce(reducer) map extract
     }
   }
 }

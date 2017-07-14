@@ -285,8 +285,8 @@ object ExprOpCoreF {
 
     def rebase[T](base: T)(implicit T: Recursive.Aux[T, OUT]) = {
       case $varF(DocVar.ROOT(None)) => base.project.some
-      case $includeF()          => none
-      case in                   => I(in).some
+      case $includeF()              => none
+      case in                       => I(in).some
     }
 
     def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) = {

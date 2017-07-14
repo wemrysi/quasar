@@ -372,9 +372,10 @@ object WorkflowBuilder {
 
   }
 
+  // TODO: See if we can extract `WB => Base` from this.
   // FIXME: There are a few recursive references to this function. We need to
   //        eliminate those.
-  // TODO: See if we can extract `WB => Base` from this.
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def toWorkflow[M[_]: Monad, WF[_]: Coalesce]
     (implicit M: MonadError_[M, PlannerError], ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], exprOps: ExprOpOps.Uni[ExprOp])
       : AlgebraM[M, WorkflowBuilderF[WF, ?], (Fix[WF], Base)] = {

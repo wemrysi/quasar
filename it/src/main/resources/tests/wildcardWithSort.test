@@ -1,8 +1,8 @@
 {
     "name": "wildcard with sort",
     "backends": {
-        "mimir": "skip",
-        "postgresql":        "pending"
+        "mimir": "pending",
+        "postgresql": "pending"
     },
     "data": "zips.data",
     "query": "select * from zips order by pop, city limit 10",

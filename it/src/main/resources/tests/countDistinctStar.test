@@ -1,8 +1,8 @@
 {
     "name": "count distinct *",
     "backends": {
-        "mimir": "skip",
-        "postgresql":        "pending"
+        "mimir":      "pending",
+        "postgresql": "pending"
     },
     "data": "olympics.data",
     "query": "select count(distinct *) as cnt from olympics",

@@ -5,7 +5,6 @@ import java.lang.{String, System}
 import scala.collection.Seq
 
 import sbt._, Keys._
-import slamdata.CommonDependencies
 
 object Dependencies {
   private val algebraVersion      = "0.7.0"
@@ -22,13 +21,11 @@ object Dependencies {
   private val monocleVersion      = "1.4.0"
   private val pathyVersion        = "0.2.11"
   private val raptureVersion      = "2.0.0-M9"
-  // Staying on 0.8.0 version of refined due to latest version using scala 2.11.11 which
-  // causes duplicate libjansi libraries for linux, mac, and windows that in turn make assembly sbt task fail.
-  private val refinedVersion      = "0.8.0"
+  private val refinedVersion      = "0.8.2"
   private val scodecBitsVersion   = "1.1.0"
   private val http4sVersion       = "0.15.13a"
   private val scalacheckVersion   = "1.13.4"
-  private val scalazVersion       = "7.2.13"
+  private val scalazVersion       = "7.2.14"
   private val scalazStreamVersion = "0.8.6a"
   private val shapelessVersion    = "2.3.2"
   private val simulacrumVersion   = "0.10.0"
@@ -136,6 +133,7 @@ object Dependencies {
     "com.marklogic"              %  "marklogic-xcc"        % "8.0.5",
     "com.slamdata"               %% "xml-names-core"       % "0.0.1",
     "org.scala-lang.modules"     %% "scala-xml"            % "1.0.6",
+    "eu.timepit"                 %% "refined-scalaz"       % refinedVersion,
     "eu.timepit"                 %% "refined-scalacheck"   % refinedVersion % Test,
     "com.slamdata"               %% "xml-names-scalacheck" % "0.0.1"        % Test
   )
@@ -166,7 +164,8 @@ object Dependencies {
     "org.apache.jdbm"      %  "jdbm"            % "3.0-alpha5",
     "com.typesafe.akka"    %  "akka-actor_2.11" % "2.5.1",
     "org.quartz-scheduler" %  "quartz"          % "2.3.0",
-    "commons-io"           %  "commons-io"      % "2.5"
+    "commons-io"           %  "commons-io"      % "2.5",
+    "org.scodec"           %% "scodec-bits"     % scodecBitsVersion
   )
   def it = Seq(
     "io.argonaut"      %% "argonaut-monocle"    % argonautVersion     % Test,

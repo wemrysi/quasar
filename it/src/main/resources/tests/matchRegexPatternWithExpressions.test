@@ -4,8 +4,8 @@
   "backends": {
         "couchbase": "ignoreFieldOrder",
         "marklogic_json": "ignoreFieldOrder",
-        "mimir": "skip",
-        "postgresql":        "pending"
+        "mimir": "pending",
+        "postgresql": "pending"
   },
 
   "data": "largeZips.data",

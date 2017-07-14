@@ -3,8 +3,8 @@
     "backends": {
         "couchbase": "ignoreFieldOrder",
         "marklogic_json": "ignoreFieldOrder",
-        "mimir": "skip",
-        "postgresql":        "pending"
+        "mimir": "pending",
+        "postgresql": "pending"
     },
     "data": "slamengine_commits.data",
     "query": "select parents[0].sha, count(*) as count from slamengine_commits where parents[0].sha like \"5%\" group by parents[0].sha",

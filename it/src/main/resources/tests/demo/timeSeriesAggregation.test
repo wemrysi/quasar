@@ -1,11 +1,9 @@
 {
     "name": "time series aggregation",
     "backends": {
-        "couchbase":   "pending",
-        "mimir":       "skip",
-        "postgresql":  "pending",
-        "spark_hdfs":  "pending",
-        "spark_local": "pending"
+        "couchbase":  "ignoreFieldOrder",
+        "mimir":      "pending",
+        "postgresql": "pending"
     },
     "data": "smalltimeseries.data",
     "query": "

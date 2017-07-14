@@ -2,8 +2,8 @@
     "name": "self-ordered distinct",
 
     "backends": {
-        "mimir": "skip",
-        "postgresql":     "pending"
+        "mimir": "pending",
+        "postgresql": "pending"
     },
 
     "data": "zips.data",

@@ -57,6 +57,7 @@ object Grouped {
 final case class Reshape[EX[_]](value: ListMap[BsonField.Name, Reshape.Shape[EX]]) {
   import Reshape.Shape
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def bson(implicit ops: ExprOpOps.Uni[EX], ev: Functor[EX]): Bson.Doc = Bson.Doc(value.map {
     case (field, either) => field.asText -> either.fold(_.bson, _.cata(ops.bson))
   })
@@ -70,6 +71,7 @@ final case class Reshape[EX[_]](value: ListMap[BsonField.Name, Reshape.Shape[EX]
         },
         κ(None)))
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def rewriteRefs(applyVar: PartialFunction[DocVar, DocVar])(implicit
       ops: ExprOpOps.Uni[EX],
       ev0: ExprOpCoreF :<: EX,
@@ -88,6 +90,7 @@ final case class Reshape[EX[_]](value: ListMap[BsonField.Name, Reshape.Shape[EX]
       -\/(this))(
       (rez, elem) => rez.fold(_.value.get(elem), κ(None)))
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def find(expr: Fix[EX]): Option[BsonField] =
     value.foldLeft[Option[BsonField]](
       None) {
@@ -103,7 +106,7 @@ final case class Reshape[EX[_]](value: ListMap[BsonField.Name, Reshape.Shape[EX]
         _.fold(ι, κ(Reshape.emptyDoc[EX])),
         Reshape.emptyDoc[EX])
 
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements", "org.wartremover.warts.Recursion"))
     def set0(cur: Reshape[EX], els: List[BsonField.Name]): Reshape[EX] = els match {
       case Nil => ??? // TODO: Refactor els to be NonEmptyList
       case (x @ BsonField.Name(_)) :: Nil => Reshape(cur.value + (x -> newv))
@@ -123,6 +126,7 @@ object Reshape {
 
   def emptyDoc[EX[_]] = Reshape[EX](ListMap())
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def getAll[EX[_]](r: Reshape[EX]): List[(BsonField, Fix[EX])] = {
     def getAll0(f0: BsonField, e: Shape[EX]) = e.fold(
       r => getAll(r).map { case (f, e) => (f0 \ f) -> e },
@@ -154,6 +158,7 @@ object Reshape {
 
   private val ProjectNodeType = List("Project")
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private[mongodb] def renderReshape[EX[_]: Functor](shape: Reshape[EX])(implicit ops: ExprOpOps.Uni[EX]): List[RenderedTree] = {
     def renderField(field: BsonField, value: Shape[EX]) = {
       val (label, typ) = field.bson.toJs.pprint(0) -> "Name"

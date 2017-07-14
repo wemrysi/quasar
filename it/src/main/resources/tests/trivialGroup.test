@@ -2,8 +2,8 @@
     "name": "trivial group by",
     "backends": {
         "couchbase": "ignoreFieldOrder",
-        "mimir": "skip",
-        "postgresql":    "pending",
+        "mimir": "pending",
+        "postgresql": "pending",
         "spark_hdfs": "ignoreFieldOrder",
         "spark_local": "ignoreFieldOrder"
     },

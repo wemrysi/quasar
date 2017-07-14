@@ -1,8 +1,8 @@
 {
     "name": "select count and another field",
     "backends": {
-        "couchbase":  "pending",
-        "mimir":      "skip",
+        "couchbase": "pending",
+        "mimir": "pending",
         "postgresql": "pending"
     },
     "data": "slamengine_commits.data",

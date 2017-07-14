@@ -79,6 +79,7 @@ object SimplifyJoin {
               EquiJoinKey(r.as[Hole](SrcHole), l.as[Hole](SrcHole)).some
             else None
 
+          @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
           def separateConditions(fm: JoinFunc[T]): SimplifiedJoinCondition[T] =
             fm.resume match {
               // TODO: Use `MapFunc.flattenAnd` instead of this case.

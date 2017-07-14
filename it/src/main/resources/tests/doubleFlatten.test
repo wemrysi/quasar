@@ -1,9 +1,9 @@
 {
     "name": "flatten a flattened field",
     "backends": {
-        "mimir": "skip",
-        "mongodb_2_6": "pending",
-        "mongodb_3_0": "pending",
+        "mimir":             "pending",
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
         "mongodb_read_only": "pending",
         "postgresql":        "pending"
     },

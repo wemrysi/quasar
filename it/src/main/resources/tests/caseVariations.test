@@ -2,12 +2,9 @@
     "name": "four different kinds of CASE expressions (switch/match, with and without ELSE)",
 
     "backends": {
-        "couchbase":         "skip",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "mimir": "skip",
         "couchbase":  "pending",
         "marklogic_json": "pending",
+        "mimir": "pending",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_3_2":       "pending",

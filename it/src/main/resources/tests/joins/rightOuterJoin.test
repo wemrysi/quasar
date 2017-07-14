@@ -2,12 +2,11 @@
     "name": "right outer join",
 
     "backends": {
+        "couchbase": "pending",
+        "marklogic_json": "timeout",
+        "marklogic_xml": "timeout",
         "mimir": "skip",
-        "couchbase":         "pending",
-        "marklogic_json":    "timeout",
-        "marklogic_xml":     "timeout",
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "postgresql": "pending"
     },
 
     "NB": "#1587: Disabled in couchbase due to lack of general join.",

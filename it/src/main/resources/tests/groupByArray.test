@@ -1,8 +1,8 @@
 {
     "name": "group by array",
     "backends": {
-        "mimir": "skip",
-        "postgresql":  "pending"
+        "mimir": "pending",
+        "postgresql": "pending"
     },
     "data": "slamengine_commits.data",
     "query": "select distinct count(*) as cnt from slamengine_commits group by parents",

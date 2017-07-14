@@ -18,10 +18,10 @@ package quasar.sql
 
 import slamdata.Predef._
 import quasar._, RenderTree.ops._
-import quasar.contrib.pathy.DPath
 import quasar.contrib.std._
 
-import pathy.Path.posixCodec
+import pathy.Path
+import pathy.Path._
 import matryoshka._
 import matryoshka.implicits._
 import matryoshka.data.Fix
@@ -45,7 +45,7 @@ object Statement {
     new RenderTree[Statement[BODY]] {
       def render(statement: Statement[BODY]) = statement match {
         case func: FunctionDecl[_] => func.render
-        case Import(path) => NonTerminal("Import" :: Nil, Some(posixCodec.printPath(path)), Nil)
+        case Import(path) => NonTerminal("Import" :: Nil, Some(posixCodec.unsafePrintPath(path)), Nil)
       }
     }
   implicit def equal[BODY:Equal]: Equal[Statement[BODY]] =
@@ -55,7 +55,7 @@ object Statement {
     case FunctionDecl(name, args, body) => (name, args, body)
   } ((FunctionDecl[BODY](_,_,_)).tupled)
 
-  def import_[BODY] = Prism.partial[Statement[BODY], DPath] {
+  def import_[BODY] = Prism.partial[Statement[BODY], Path[Any, Dir, Unsandboxed]] {
     case Import(path) => path
   } (Import(_))
 }
@@ -66,7 +66,7 @@ object Statement {
   def transformBodyM[M[_]: Functor, B](f: BODY => M[B]) =
     f(body).map(FunctionDecl(name, args, _))
   override def pprint(implicit ev: BODY <~< String) =
-    s"CREATE FUNCTION ${name.shows}(${args.map(":" + _.shows).mkString(",")})\n  BEGIN\n    ${ev(body)}\n  END"
+    s"CREATE FUNCTION ${name.shows}(${args.map(":" + _.shows).mkString(", ")})\n  BEGIN\n    ${ev(body)}\n  END"
   def applyArgs[T[_[_]]: BirecursiveT](argsProvided: List[T[Sql]])(implicit ev: BODY <~< T[Sql]): SemanticError \/ T[Sql] = {
     val expected = args.size
     val actual   = argsProvided.size
@@ -100,7 +100,10 @@ object FunctionDecl {
   }
 }
 
-@Lenses final case class Import[BODY](path: DPath) extends Statement[BODY] {
+@Lenses final case class Import[BODY](path: Path[Any, Dir, Unsandboxed]) extends Statement[BODY] {
   override def pprint(implicit ev: BODY <~< String) =
-    s"import `$path`"
+    // We need to escape any backticks in the resulting String as pathy is
+    // indiferent but since this is a SQL string they yield invalid SQL
+    // if not escaped
+    s"import `${posixCodec.unsafePrintPath(path).replace("`", "\\`")}`"
 }

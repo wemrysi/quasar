@@ -16,10 +16,10 @@
 
 package quasar.mimir
 
+import quasar.precog.BitSet
+import quasar.precog.common._
 import quasar.precog.util._
 import quasar.yggdrasil._, table._
-import quasar.blueeyes._
-import quasar.precog.common._
 
 import scalaz._, Scalaz._
 import spire.implicits._
@@ -247,7 +247,7 @@ trait AssignClusterModule[M[+ _]] extends ColumnarTableLibModule[M] with ModelLi
           }
         }
 
-        def apply(table: Table, ctx: MorphContext): M[Table] = {
+        def apply(table: Table): M[Table] = {
           val scanners: Seq[TransSpec1] = models map { model =>
             WrapArray(Scan(TransSpec1.Id, scanner(model)))
           }

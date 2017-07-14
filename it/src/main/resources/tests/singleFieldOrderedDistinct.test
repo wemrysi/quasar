@@ -1,8 +1,8 @@
 {
     "name": "distinct of one ordered field",
     "backends": {
-        "mimir": "skip",
-        "postgresql":     "pending"
+        "mimir": "pending",
+        "postgresql": "pending"
     },
     "data": "olympics.data",
 

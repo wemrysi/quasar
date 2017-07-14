@@ -1,8 +1,8 @@
 {
     "name": "filtered distinct of one field",
     "backends": {
-        "mimir": "skip",
-        "postgresql":  "pending"
+        "mimir": "pending",
+        "postgresql": "pending"
     },
     "data": "olympics.data",
     "query": "select distinct discipline from olympics where event like \"%pursuit\"",
