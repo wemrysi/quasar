@@ -58,7 +58,7 @@ object BackendDef {
   ): BackendDef[F] =
     BackendDef(pf.lift)
 
-  implicit def fileSystemDefMonoid[F[_]]: Monoid[BackendDef[F]] =
+  implicit def backendDefMonoid[F[_]]: Monoid[BackendDef[F]] =
     new Monoid[BackendDef[F]] {
       def zero = BackendDef(κ(None))
       def append(d1: BackendDef[F], d2: => BackendDef[F]) = d1 orElse d2
