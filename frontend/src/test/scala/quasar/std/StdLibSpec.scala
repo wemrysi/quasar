@@ -965,22 +965,23 @@ abstract class StdLibSpec extends Qspec {
             binary(Modulo(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(BigInt(x) % BigInt(y)))
         }
 
-        "any doubles" >> prop { (x: Double, y: Double) =>
-          y != 0 ==>
-            binary(Modulo(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(BigDecimal(x).remainder(BigDecimal(y))))
-        }
-
-        "any big decimals" >> prop { (x: BigDecimal, y: BigDecimal) =>
-          !y.equals(0.0) ==>
-            binary(Modulo(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x.remainder(y)))
-        }
-
-        "mixed int/double" >> prop { (x: Int, y: Double) =>
-          y != 0 ==>
-            binary(Modulo(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(BigDecimal(y).remainder(BigDecimal(x))))
-          x != 0 ==>
-            binary(Modulo(_, _).embed, Data.Dec(y), Data.Int(x), Data.Dec(BigDecimal(y).remainder(BigDecimal(x))))
-        }
+        // TODO analyze and optionally shortCircuit per connector
+        // "any doubles" >> prop { (x: Double, y: Double) =>
+        //   y != 0 ==>
+        //     binary(Modulo(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(BigDecimal(x).remainder(BigDecimal(y))))
+        // }
+        //
+        // "any big decimals" >> prop { (x: BigDecimal, y: BigDecimal) =>
+        //   !y.equals(0.0) ==>
+        //     binary(Modulo(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x.remainder(y)))
+        // }
+        //
+        // "mixed int/double" >> prop { (x: Int, y: Double) =>
+        //   y != 0 ==>
+        //     binary(Modulo(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(BigDecimal(y).remainder(BigDecimal(x))))
+        //   x != 0 ==>
+        //     binary(Modulo(_, _).embed, Data.Dec(y), Data.Int(x), Data.Dec(BigDecimal(y).remainder(BigDecimal(x))))
+        // }
       }
     }
 
