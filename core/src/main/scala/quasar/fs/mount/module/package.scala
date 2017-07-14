@@ -152,7 +152,7 @@ package object module {
                         S7: MountingFailure :<: S,
                         S8: PathMismatchFailure :<: S,
                         S9: Analyze :<: S
-                      ): AnalyticalFileSystem ~> Free[S, ?] = {
+                      ): BackendEffect ~> Free[S, ?] = {
     (injectFT[Analyze, S]) :+: fileSystem[S]
   }
 }

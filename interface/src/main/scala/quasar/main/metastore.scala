@@ -92,7 +92,7 @@ object metastore {
   }
 
   def jdbcMounter[S[_]](
-    hfsRef: TaskRef[AnalyticalFileSystem~> HierarchicalFsEffM],
+    hfsRef: TaskRef[BackendEffect~> HierarchicalFsEffM],
     mntdRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
   )(implicit
     S0: ConnectionIO :<: S,

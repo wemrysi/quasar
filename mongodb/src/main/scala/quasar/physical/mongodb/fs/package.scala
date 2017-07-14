@@ -53,7 +53,7 @@ package object fs {
   )(implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
-  ): EnvErrT[Task, AnalyticalFileSystem ~> Free[S, ?]] = {
+  ): EnvErrT[Task, BackendEffect ~> Free[S, ?]] = {
     val runM = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
 
     (
@@ -64,7 +64,7 @@ package object fs {
       writefile.run[S](client).liftM[EnvErrT]       |@|
       managefile.run[S](client).liftM[EnvErrT]
     )((execMongo, qfile, rfile, wfile, mfile) => {
-      interpretAnalyticalFileSystem[Free[S, ?]](
+      interpretBackendEffect[Free[S, ?]](
         Empty.analyze[Free[S, ?]], // old mongo, will be removed
         qfile compose queryfile.interpret(execMongo),
         rfile compose readfile.interpret,
@@ -82,7 +82,7 @@ package object fs {
       for {
         client <- asyncClientDef[S](uri)
         defDb  <- free.lift(findDefaultDb.run(client)).into[S].liftM[DefErrT]
-        fs     <- EitherT[M, DefinitionError, AnalyticalFileSystem ~> M](free.lift(
+        fs     <- EitherT[M, DefinitionError, BackendEffect ~> M](free.lift(
                     fileSystem[S](client, defDb)
                       .leftMap(_.right[NonEmptyList[String]])
                       .run
@@ -99,7 +99,7 @@ package object fs {
   )(implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
-  ): EnvErrT[Task, AnalyticalFileSystem ~> Free[S, ?]] = {
+  ): EnvErrT[Task, BackendEffect ~> Free[S, ?]] = {
     val runM = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
 
     (
@@ -131,7 +131,7 @@ package object fs {
       for {
         client <- asyncClientDef[S](uri)
         defDb  <- free.lift(findDefaultDb.run(client)).into[S].liftM[DefErrT]
-        fs     <- EitherT[M, DefinitionError, AnalyticalFileSystem ~> M](free.lift(
+        fs     <- EitherT[M, DefinitionError, BackendEffect ~> M](free.lift(
                     qscriptFileSystem[S](client, defDb)
                       .leftMap(_.right[NonEmptyList[String]])
                       .run

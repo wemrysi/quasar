@@ -305,14 +305,14 @@ object hierarchical {
   }
 
   def analyticalFileSystem[F[_], S[_]](
-    mounts: Mounts[AnalyticalFileSystem ~> F]
+    mounts: Mounts[BackendEffect ~> F]
   )(implicit
     S1: F :<: S,
     S2: MountedResultH :<: S,
     S3: MonotonicSeq :<: S
-  ): AnalyticalFileSystem ~> Free[S, ?] = {
-    analyze[F, S](mounts map (_ compose Inject[Analyze, AnalyticalFileSystem])) :+:
-    fileSystem[F,S](mounts.map(_  compose Inject[FileSystem, AnalyticalFileSystem]))
+  ): BackendEffect ~> Free[S, ?] = {
+    analyze[F, S](mounts map (_ compose Inject[Analyze, BackendEffect])) :+:
+    fileSystem[F,S](mounts.map(_  compose Inject[FileSystem, BackendEffect]))
   }
 
   ////

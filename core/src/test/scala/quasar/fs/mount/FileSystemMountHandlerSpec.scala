@@ -21,7 +21,7 @@ import quasar.contrib.pathy.{ADir}
 import quasar.effect._
 import quasar.fp.liftMT
 import quasar.fp.free, free._
-import quasar.fs.{AnalyticalFileSystem, FileSystemType, PathError}
+import quasar.fs.{BackendEffect, FileSystemType, PathError}
 
 import monocle.function.Field1
 import pathy.Path._
@@ -68,9 +68,9 @@ class FileSystemMountHandlerSpec extends quasar.Qspec {
     }
 
 
-  val abortFs: AnalyticalFileSystem ~> AbortM =
-    new (AnalyticalFileSystem ~> AbortM) {
-      def apply[A](fs: AnalyticalFileSystem[A]) =
+  val abortFs: BackendEffect ~> AbortM =
+    new (BackendEffect ~> AbortM) {
+      def apply[A](fs: BackendEffect[A]) =
         abort.fail("FileSystem")
     }
 

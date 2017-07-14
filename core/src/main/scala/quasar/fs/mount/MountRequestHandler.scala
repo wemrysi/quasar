@@ -18,7 +18,7 @@ package quasar.fs.mount
 
 import slamdata.Predef._
 import quasar.effect._
-import quasar.fs.AnalyticalFileSystem
+import quasar.fs.BackendEffect
 import hierarchical.MountedResultH
 
 import eu.timepit.refined.auto._
@@ -40,11 +40,11 @@ final class MountRequestHandler[F[_], S[_]](
 ) {
   import MountRequest._
 
-  type HierarchicalFsRef[A] = AtomicRef[AnalyticalFileSystem ~> Free[S, ?], A]
+  type HierarchicalFsRef[A] = AtomicRef[BackendEffect ~> Free[S, ?], A]
 
   object HierarchicalFsRef {
     def Ops[G[_]](implicit G: HierarchicalFsRef :<: G) =
-      AtomicRef.Ops[AnalyticalFileSystem ~> Free[S, ?], G]
+      AtomicRef.Ops[BackendEffect ~> Free[S, ?], G]
   }
 
   def mount[T[_]](
