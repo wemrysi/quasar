@@ -129,6 +129,9 @@ package object ejson {
     val stringIso: Iso[TypeTag, String] =
       Iso[TypeTag, String](_.value)(TypeTag(_))
 
+    implicit val encodeEJson: EncodeEJson[TypeTag] =
+      EncodeEJson[String].contramap(_.value)
+
     implicit val order: Order[TypeTag] =
       Order.orderBy(_.value)
 

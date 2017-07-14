@@ -62,4 +62,14 @@ sealed abstract class EncodeEJsonKInstances {
       def encodeK[J](implicit J: Corecursive.Aux[J, EJson]): Algebra[EJson, J] =
         _.embed
     }
+
+  implicit def coproductEncodeEJsonK[F[_], G[_]](
+    implicit
+    F: EncodeEJsonK[F],
+    G: EncodeEJsonK[G]
+  ): EncodeEJsonK[Coproduct[F, G, ?]] =
+    new EncodeEJsonK[Coproduct[F, G, ?]] {
+      def encodeK[J](implicit J: Corecursive.Aux[J, EJson]): Algebra[Coproduct[F, G, ?], J] =
+        _.run.fold(F.encodeK[J], G.encodeK[J])
+    }
 }
