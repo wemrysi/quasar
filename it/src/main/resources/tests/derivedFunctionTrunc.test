@@ -1,6 +1,8 @@
 {
     "name": "derived function trunc",
-    "backends": {},
+    "backends": {
+      "mimir": "pending"
+    },
     "data": "divide.data",
     "query": "select nr, trunc(val3) as trunc1 from divide",
     "predicate": "exactly",
