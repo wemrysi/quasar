@@ -310,7 +310,7 @@ class ServiceSpec extends quasar.Qspec {
             "type" := "view",
             "mount" := Json(
               "error" := Json(
-                "status" := "Internal Server Error",
+                "status" := "Invalid mount.",
                 "detail" := Json("message" := ""))))).some)
     }
   }
