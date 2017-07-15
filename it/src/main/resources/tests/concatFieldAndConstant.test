@@ -1,7 +1,6 @@
 {
     "name": "concat field with constant array",
     "backends": {
-        "mimir":"pending",
         "postgresql":        "pending"
     },
     "data": "largeZips.data",

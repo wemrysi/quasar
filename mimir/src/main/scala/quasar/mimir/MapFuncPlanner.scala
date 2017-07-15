@@ -20,7 +20,7 @@ import quasar.Data
 import quasar.qscript.{MapFuncCore, MapFuncsCore}
 
 import quasar.blueeyes.json.JValue
-import quasar.precog.common.RValue
+import quasar.precog.common.{CLong, CPathField, CPathIndex, CString, RValue}
 import quasar.yggdrasil.table.cf.math
 import quasar.yggdrasil.table.cf.util.Undefined
 
@@ -38,7 +38,7 @@ final class MapFuncPlanner[T[_[_]]: RecursiveT, M[_], F[_]: Applicative] {
   final class PlanApplicator[P <: Precog](val cake: P) {
     import cake.trans._
 
-    def apply[A <: SourceType](id: cake.trans.TransSpec[A]): AlgebraM[F, MapFuncCore[T, ?], cake.trans.TransSpec[A]] = {
+    def apply[A <: SourceType](id: cake.trans.TransSpec[A]): AlgebraM[F, MapFuncCore[T, ?], TransSpec[A]] = {
       case MapFuncsCore.Undefined() =>
         (Map1[A](id, Undefined): TransSpec[A]).point[F]
 
@@ -139,14 +139,20 @@ final class MapFuncPlanner[T[_[_]]: RecursiveT, M[_], F[_]: Applicative] {
       // FIXME detect constant cases so we don't have to always use the dynamic variants
       case MapFuncsCore.MakeArray(a1) =>
         (WrapArray[A](a1): TransSpec[A]).point[F]
+      case MapFuncsCore.MakeMap(ConstLiteral(CString(key), _), value) =>
+        (WrapObject[A](value, key): TransSpec[A]).point[F]
       case MapFuncsCore.MakeMap(key, value) =>
         (WrapObjectDynamic[A](key, value): TransSpec[A]).point[F]
       case MapFuncsCore.ConcatArrays(a1, a2) =>
         (OuterArrayConcat[A](a1, a2): TransSpec[A]).point[F]
       case MapFuncsCore.ConcatMaps(a1, a2) =>
         (OuterObjectConcat[A](a1, a2): TransSpec[A]).point[F]
+      case MapFuncsCore.ProjectIndex(src, ConstLiteral(CLong(index), _)) =>
+        (DerefArrayStatic[A](src, CPathIndex(index.toInt)): TransSpec[A]).point[F]
       case MapFuncsCore.ProjectIndex(src, index) =>
         (DerefArrayDynamic[A](src, index): TransSpec[A]).point[F]
+      case MapFuncsCore.ProjectField(src, ConstLiteral(CString(field), _)) =>
+        (DerefObjectStatic[A](src, CPathField(field)): TransSpec[A]).point[F]
       case MapFuncsCore.ProjectField(src, field) =>
         (DerefObjectDynamic[A](src, field): TransSpec[A]).point[F]
       case MapFuncsCore.DeleteField(src, field) => ???

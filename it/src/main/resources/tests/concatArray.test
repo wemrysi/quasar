@@ -1,7 +1,6 @@
 {
     "name": "concat known array structure",
     "backends": {
-        "mimir":"pending",
         "postgresql":        "pending"
     },
     "data": "largeZips.data",
