@@ -36,6 +36,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.atomic.AtomicBoolean
 
 trait TablePagerModule extends ColumnarTableModule[Future] {
+  import Precog.startTask
 
   final class TablePager private (
       slices: StreamT[Task, Slice],

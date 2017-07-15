@@ -31,7 +31,7 @@ import quasar.fs.mount._
 import quasar.qscript._
 
 import quasar.blueeyes.json.{JNum, JValue}
-import quasar.precog.common.Path
+import quasar.precog.common.{CEmptyArray, Path}
 import quasar.yggdrasil.bytecode.JType
 
 import fs2.{async, Stream}
@@ -259,45 +259,14 @@ object Mimir extends BackendModule with Logging {
           rmerged <- src.unsafeMerge(rightRepr).liftM[MT].liftB
           rtable = rmerged.table
 
-          transLKey <- lkey.cataM[Backend, src.P.trans.TransSpec1](
+          transLKey <- lkey.cataM[Backend, TransSpec1](
             interpretM(
               κ(TransSpec1.Id.point[Backend]),
               mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
 
-          transRKey <- rkey.cataM[Backend, src.P.trans.TransSpec1](
+          transRKey <- rkey.cataM[Backend, TransSpec1](
             interpretM(
               κ(TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
-
-          lsorted <- ltable.sort(transLKey).toTask.liftM[MT].liftB
-          rsorted <- rtable.sort(transRKey).toTask.liftM[MT].liftB
-
-          transLeft <- combine.cataM[Backend, src.P.trans.TransSpec1](
-            interpretM(
-              {
-                case qscript.LeftSide =>
-                  TransSpec1.Id.point[Backend]
-
-                case qscript.RightSide =>
-                  tpe match {
-                    case JoinType.Inner | JoinType.RightOuter => TransSpec1.Undef.point[Backend]
-                    case JoinType.FullOuter | JoinType.LeftOuter => TransSpec1.Id.point[Backend]
-                  }
-              },
-              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
-
-          transRight <- combine.cataM[Backend, src.P.trans.TransSpec1](
-            interpretM(
-              {
-                case qscript.LeftSide =>
-                  tpe match {
-                    case JoinType.Inner | JoinType.LeftOuter => TransSpec1.Undef.point[Backend]
-                    case JoinType.FullOuter | JoinType.RightOuter => TransSpec1.Id.point[Backend]
-                  }
-
-                case qscript.RightSide =>
-                  TransSpec1.Id.point[Backend]
-              },
               mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
 
           transMiddle <- combine.cataM[Backend, TransSpec2](
@@ -307,11 +276,49 @@ object Mimir extends BackendModule with Logging {
                 case qscript.RightSide => TransSpec2.RightId.point[Backend]
               },
               mapFuncPlanner.plan(src.P)[Source2](TransSpec2.LeftId)))    // TODO weirdly left-biases things like constants
-        } yield {
-          val table = lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle)
 
-          Repr(src.P)(table)
-        }
+          // identify full-cross and avoid cogroup
+          result <- if (transLKey == transRKey && transLKey == ConstLiteral(CEmptyArray, TransSpec1.Id)) {
+            log.trace("EQUIJOIN: full-cross detected!")
+
+            rtable.cross(ltable)(transMiddle).point[Backend]
+          } else {
+            log.trace("EQUIJOIN: not a full-cross; sorting and cogrouping")
+
+            for {
+              lsorted <- ltable.sort(transLKey).toTask.liftM[MT].liftB
+              rsorted <- rtable.sort(transRKey).toTask.liftM[MT].liftB
+
+              transLeft <- combine.cataM[Backend, TransSpec1](
+                interpretM(
+                  {
+                    case qscript.LeftSide =>
+                      TransSpec1.Id.point[Backend]
+
+                    case qscript.RightSide =>
+                      tpe match {
+                        case JoinType.Inner | JoinType.RightOuter => TransSpec1.Undef.point[Backend]
+                        case JoinType.FullOuter | JoinType.LeftOuter => TransSpec1.Id.point[Backend]
+                      }
+                  },
+                  mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+
+              transRight <- combine.cataM[Backend, src.P.trans.TransSpec1](
+                interpretM(
+                  {
+                    case qscript.LeftSide =>
+                      tpe match {
+                        case JoinType.Inner | JoinType.LeftOuter => TransSpec1.Undef.point[Backend]
+                        case JoinType.FullOuter | JoinType.RightOuter => TransSpec1.Id.point[Backend]
+                      }
+
+                    case qscript.RightSide =>
+                      TransSpec1.Id.point[Backend]
+                  },
+                  mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+            } yield lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle)
+          }
+        } yield Repr(src.P)(result)
     }
 
     lazy val planShiftedRead: AlgebraM[Backend, Const[ShiftedRead[AFile], ?], Repr] = {
@@ -367,17 +374,6 @@ object Mimir extends BackendModule with Logging {
       in.run.fold(planQScriptCore, _.run.fold(planEquiJoin, planShiftedRead))
 
     cp.cataM(planQSM _)
-  }
-
-  private def dequeueStreamT[F[_]: Functor, A](q: Queue[F, A])(until: A => Boolean): StreamT[F, A] = {
-    StreamT.unfoldM[F, A, Queue[F, A]](q) { q =>
-      q.dequeue1 map { a =>
-        if (until(a))
-          None
-        else
-          Some((a, q))
-      }
-    }
   }
 
   private def dirToPath(dir: ADir): Path = Path(pathy.Path.posixCodec.printPath(dir))
