@@ -46,4 +46,14 @@ object implicits {
     ): J =
       A.encode[J](self)
   }
+
+  implicit final class EncodeEJsonKOps[F[_], J](val self: F[J]) extends scala.AnyVal {
+    def asEJsonK(
+      implicit
+      F : EncodeEJsonK[F],
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson]
+    ): J =
+      F.encodeK[J].apply(self)
+  }
 }

@@ -19,7 +19,9 @@ package quasar.sst
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz.zipper._
-import quasar.ejson.{EJson, EncodeEJson, EncodeEJsonK, ExtEJson => E, Meta, Type => EType, TypeTag}
+import quasar.ejson
+import quasar.ejson.{CommonEJson => C, EJson, EncodeEJson, EncodeEJsonK, ExtEJson => E, Type => EType, TypeTag}
+import quasar.ejson.implicits._
 import quasar.fp.{coproductEqual, coproductShow}
 import quasar.fp.ski.κ
 import quasar.tpe._
@@ -199,7 +201,7 @@ object StructuralType extends StructuralTypeInstances {
     JR: Recursive.Aux[J, EJson]
   ): Coalgebra[ST[J, ?], T] =
     _.project match {
-      case TypeF.Const(Embed(E(Meta(j, Embed(EType(t)))))) =>
+      case TypeF.Const(Embed(E(ejson.Meta(j, Embed(EType(t)))))) =>
         TagST[J](Tagged(t, TypeF.const[J, T](j).embed))
 
       case other =>
@@ -226,26 +228,74 @@ object StructuralType extends StructuralTypeInstances {
 }
 
 sealed abstract class StructuralTypeInstances extends StructuralTypeInstances0 {
-  import StructuralType.ST
+  import StructuralType.{ST, STF, TypeST, TagST}
 
-  implicit def encodeEJson[L: EncodeEJson, V: EncodeEJson]: EncodeEJson[StructuralType[L, V]] = {
-    implicit val encodeEnvT = EncodeEJsonK.envT[V, ST[L, ?]]("measure", "structure")
-    EncodeEJson.encodeEJsonR[StructuralType[L, V], EnvT[V, ST[L, ?], ?]]
+  private final case class TTags[L, A](tags: List[TypeTag], tpe: TypeF[L, A])
+
+  private object TTags {
+    def collectTags[V, L]: Transform[Cofree[TTags[L, ?], V], STF[L, V, ?], EnvT[V, TTags[L, ?], ?]] = {
+      case EnvT((v, TypeST(tpe))) =>
+        envT(v, TTags(Nil, tpe))
+
+      case EnvT((_, TagST(Tagged(t, Embed(EnvT((v, TTags(ts, tpe)))))))) =>
+        envT(v, TTags(t :: ts, tpe))
+    }
+
+    implicit def functor[L]: Functor[TTags[L, ?]] =
+      new Functor[TTags[L, ?]] {
+        def map[A, B](fa: TTags[L, A])(f: A => B) = fa.copy(tpe = fa.tpe.map(f))
+      }
+
+    // TODO{ejson}: Lift tags back to metadata once we're using EJson everywhere.
+    implicit def encodeEJsonK[L: EncodeEJson]: EncodeEJsonK[TTags[L, ?]] =
+      new EncodeEJsonK[TTags[L, ?]] {
+        def encodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]) = {
+          case TTags(     Nil, j) => j.asEJsonK
+          case TTags(t :: Nil, j) => tagEjs(t.asEJson[J], j.asEJsonK)
+          case TTags(     ts , j) => tagEjs(C(ejson.arr(ts map (_.asEJson[J]))).embed, j.asEJsonK)
+        }
+
+        val encType = EncodeEJsonK[TypeF[L, ?]]
+
+        def tagEjs[J](tejs: J, v: J)(
+          implicit
+          JC: Corecursive.Aux[J, EJson],
+          JR: Recursive.Aux[J, EJson]
+        ): J = v.project match {
+          case E(ejson.Map(xs)) =>
+            E(ejson.map((C(ejson.str[J]("tag")).embed, tejs) :: xs)).embed
+
+          case other =>
+            C(ejson.arr[J](List(tejs, v))).embed
+        }
+      }
   }
 
-  implicit def corecursive[L, V]: Corecursive.Aux[StructuralType[L, V], EnvT[V, ST[L, ?], ?]] =
-    new Corecursive[StructuralType[L, V]] {
-      type Base[B] = EnvT[V, ST[L, ?], B]
+  implicit def encodeEJson[L: EncodeEJson, V: EncodeEJson]: EncodeEJson[StructuralType[L, V]] =
+    new EncodeEJson[StructuralType[L, V]] {
+      implicit val encodeEnvT = EncodeEJsonK.envT[V, TTags[L, ?]]("measure", "structure")
 
-      def embed(st: EnvT[V, ST[L, ?], StructuralType[L, V]])(implicit BF: Functor[EnvT[V, ST[L, ?], ?]]) =
+      def encode[J](st: StructuralType[L, V])(
+        implicit
+        JC: Corecursive.Aux[J, EJson],
+        JR: Recursive.Aux[J, EJson]
+      ): J =
+        st.transCata[Cofree[TTags[L, ?], V]](TTags.collectTags).cata[J](encodeEnvT.encodeK)
+    }
+
+  implicit def corecursive[L, V]: Corecursive.Aux[StructuralType[L, V], STF[L, V, ?]] =
+    new Corecursive[StructuralType[L, V]] {
+      type Base[B] = STF[L, V, B]
+
+      def embed(st: STF[L, V, StructuralType[L, V]])(implicit BF: Functor[STF[L, V, ?]]) =
         StructuralType(st.map(_.toCofree).embed)
     }
 
-  implicit def recursive[L, V]: Recursive.Aux[StructuralType[L, V], EnvT[V, ST[L, ?], ?]] =
+  implicit def recursive[L, V]: Recursive.Aux[StructuralType[L, V], STF[L, V, ?]] =
     new Recursive[StructuralType[L, V]] {
-      type Base[B] = EnvT[V, ST[L, ?], B]
+      type Base[B] = STF[L, V, B]
 
-      def project(st: StructuralType[L, V])(implicit BF: Functor[EnvT[V, ST[L, ?], ?]]) =
+      def project(st: StructuralType[L, V])(implicit BF: Functor[STF[L, V, ?]]) =
         st.toCofree.project map (StructuralType(_))
     }
 
