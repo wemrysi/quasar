@@ -127,7 +127,11 @@ package object sst {
   // NB: Defined here as adding the tag causes the compiler not to consider the TypeStat companion.
   implicit def populationTypeStatEncodeEJson[A: EncodeEJson: Equal: Field: NRoot]: EncodeEJson[TypeStat[A] @@ Population] =
     new EncodeEJson[TypeStat[A] @@ Population] {
-      def encode[J](ts: TypeStat[A] @@ Population)(implicit J: Corecursive.Aux[J, EJson]): J =
+      def encode[J](ts: TypeStat[A] @@ Population)(
+        implicit
+        JC: Corecursive.Aux[J, EJson],
+        JR: Recursive.Aux[J, EJson]
+      ): J =
         TypeStat.encodeEJson0(Population.unwrap(ts), isPopulation = true)
     }
 }

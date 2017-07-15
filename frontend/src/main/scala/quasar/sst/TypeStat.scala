@@ -169,7 +169,7 @@ sealed abstract class TypeStatInstances {
 
   implicit def encodeEJson[A: EncodeEJson: Equal: Field: NRoot]: EncodeEJson[TypeStat[A]] =
     new EncodeEJson[TypeStat[A]] {
-      def encode[J](ts: TypeStat[A])(implicit J: Corecursive.Aux[J, EJson]): J =
+      def encode[J](ts: TypeStat[A])(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
         encodeEJson0(ts, isPopulation = false)
     }
 
@@ -210,7 +210,8 @@ sealed abstract class TypeStatInstances {
     ts: TypeStat[A],
     isPopulation: Boolean
   )(implicit
-    J: Corecursive.Aux[J, EJson]
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
   ): J = {
     def emap(xs: (String, J)*): J =
       E(ejs.map(xs.toList.map(_.leftMap(_.asEJson[J])))).embed
