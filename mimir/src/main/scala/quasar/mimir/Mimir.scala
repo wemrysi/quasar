@@ -62,6 +62,7 @@ import java.util.concurrent.atomic.AtomicLong
 object Mimir extends BackendModule with Logging {
   import FileSystemError._
   import PathError._
+  import Precog.startTask
 
   // pessimistically equal to couchbase's
   type QS[T[_[_]]] =
@@ -558,7 +559,7 @@ object Mimir extends BackendModule with Logging {
           } yield ()
 
           // run asynchronously forever
-          _ <- Task.delay(ingestion.unsafePerformAsync(_ => ())).liftM[MT]
+          _ <- startTask(ingestion).liftM[MT]
           _ <- Task.delay(log.debug(s"Started ingest.")).liftM[MT]
 
           _ <- Task.delay(map.put(handle, (queue, signal))).liftM[MT]

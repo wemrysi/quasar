@@ -62,9 +62,7 @@ trait TablePagerModule extends ColumnarTableModule[Future] {
         } yield ()
       }
 
-      val withCompletion = driver >> queue.enqueue1(Vector.empty)
-
-      withCompletion.unsafePerformAsync(_ => ())
+      startTask(driver >> queue.enqueue1(Vector.empty)).unsafePerformSync
     }
 
     def more: Task[Vector[Data]] = queue.dequeue1
