@@ -38,6 +38,7 @@ private[qscript] final class MapFuncCorePlanner[
 ) extends MapFuncPlanner[F, FMT, MapFuncCore[T, ?]] {
   import expr.{emptySeq, if_, let_, some, try_}, XQuery.flwor
 
+  // wart: uses `eq` (3x) and `ne`
   @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   val plan: AlgebraM[F, MapFuncCore[T, ?], XQuery] = {
     case Constant(ejson)              => DataPlanner[F, FMT](ejson.cata(Data.fromEJson))
