@@ -204,12 +204,12 @@ object Mimir extends BackendModule with Logging {
               mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
         } yield Repr(src.P)(src.table.transform(Filter(TransSpec1.Id, trans)))
 
-      case qscript.Union(src, lBranch, rBranch) => ???
-        //for {
-        //  leftRepr <- lBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
-        //  rightRepr <- rBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
-        //  rightCoerced <- leftRepr.unsafeCoerce[Lambda[`P <: Cake` => P#Table]](rightRepr.table).liftM[MT].liftB
-        //} yield Repr(leftRepr.P)(leftRepr.table.concat(rightCoerced))
+      case qscript.Union(src, lBranch, rBranch) =>
+        for {
+         leftRepr <- lBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
+         rightRepr <- rBranch.cataM(interpretM(κ(src.point[Backend]), planQST))
+         rightCoerced <- leftRepr.unsafeMerge(rightRepr).liftM[MT].liftB
+        } yield Repr(leftRepr.P)(leftRepr.table.concat(rightCoerced.table))
 
       case qscript.Subset(src, from, op, count) =>
         for {
