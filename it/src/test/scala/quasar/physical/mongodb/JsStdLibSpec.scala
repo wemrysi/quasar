@@ -55,8 +55,13 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
 
     case (relations.Cond, _)           => Skipped("TODO").left
 
+    case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => Skipped("TODO").left
+    case (relations.Lt, List(Data.Date(_), Data.Timestamp(_))) => Skipped("TODO").left
+    case (relations.Lte, List(Data.Date(_), Data.Timestamp(_))) => Skipped("TODO").left
+    case (relations.Gt, List(Data.Date(_), Data.Timestamp(_))) => Skipped("TODO").left
+    case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => Skipped("TODO").left
+
     case (date.ExtractDayOfYear, _)    => Skipped("TODO").left
-    // case (date.ExtractIsoDayOfWeek, _) => Skipped("TODO").left
     case (date.ExtractIsoYear, _)      => Skipped("TODO").left
     case (date.ExtractWeek, _)         => Skipped("TODO").left
     case (date.ExtractQuarter, _)      => Skipped("TODO").left
