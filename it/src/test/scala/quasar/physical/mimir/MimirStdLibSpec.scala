@@ -38,7 +38,7 @@ import java.time.LocalDate
 import matryoshka.implicits._
 import matryoshka.patterns._
 
-import scalaz.{Id, Monad}
+import scalaz.Id
 import scalaz.syntax.applicative._
 
 import java.nio.file.Files
@@ -49,28 +49,50 @@ import scala.concurrent.duration._
 class MimirStdLibSpec extends StdLibSpec with PrecogCake {
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  private def run[A, F[_]: Monad](cake: Precog)(
+  private def run[A](cake: Precog)(
     freeMap: FreeMapA[Fix, A],
-    hole: A => F[cake.trans.TransSpec1])
-      : F[cake.trans.TransSpec1] =
-    freeMap.cataM[F, cake.trans.TransSpec1](
-      interpretM(hole, new MapFuncPlanner[Fix, F].plan(cake)))
+    hole: A => cake.trans.TransSpec1)
+      : cake.trans.TransSpec1 =
+    freeMap.cataM[Id.Id, cake.trans.TransSpec1](
+      interpretM(hole(_).point[Id.Id], new MapFuncPlanner[Fix, Id.Id].plan(cake)))
 
   private def evaluate(cake: Precog)(transSpec: cake.trans.TransSpec1): cake.Table =
     cake.Table.constString(Set("")).transform(transSpec)
 
+  private def dataToTransSpec(cake: Precog)(data: Data): cake.trans.TransSpec1 = {
+    val jvalue: JValue = JValue.fromData(data)
+    val rvalue: RValue = RValue.fromJValue(jvalue)
+    cake.trans.transRValue(rvalue, cake.trans.TransSpec1.Id)
+  }
+
   def runner(cake: Precog) = new MapFuncStdLibTestRunner {
     def nullaryMapFunc(prg: FreeMapA[Fix, Nothing], expected: Data): Result = ???
+
     def unaryMapFunc(prg: FreeMapA[Fix, UnaryArg], arg: Data, expected: Data): Result = {
-      val jvalue: JValue = JValue.fromData(arg)
-      val rvalue: RValue = RValue.fromJValue(jvalue)
-      val trans: cake.trans.TransSpec1 = cake.trans.transRValue(rvalue, cake.trans.TransSpec1.Id)
-      val table: cake.Table = evaluate(cake)(run[UnaryArg, Id.Id](cake)(prg, _.fold(trans.point[Id.Id])))
-      val result = Await.result(table.toJson.map(_.toList.map(JValue.toData)), Duration.Inf) must_== List(expected)
-      result.toResult
+      val table: cake.Table = evaluate(cake)(
+        run[UnaryArg](cake)(prg, _.fold(dataToTransSpec(cake)(arg))))
+      val actual = Await.result(table.toJson.map(_.toList.map(JValue.toData)), Duration.Inf)
+      (actual must_== List(expected)).toResult
     }
-    def binaryMapFunc(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data, expected: Data): Result = ???
-    def ternaryMapFunc(prg: FreeMapA[Fix, TernaryArg], arg1: Data, arg2: Data, arg3: Data, expected: Data): Result = ???
+
+    def binaryMapFunc(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data, expected: Data): Result = {
+      val table: cake.Table =
+        evaluate(cake)(run[BinaryArg](cake)(prg, _.fold(
+	  dataToTransSpec(cake)(arg1),
+	  dataToTransSpec(cake)(arg2))))
+      val actual = Await.result(table.toJson.map(_.toList.map(JValue.toData)), Duration.Inf)
+      (actual must_== List(expected)).toResult
+    }
+
+    def ternaryMapFunc(prg: FreeMapA[Fix, TernaryArg], arg1: Data, arg2: Data, arg3: Data, expected: Data): Result = {
+      val table: cake.Table =
+        evaluate(cake)(run[TernaryArg](cake)(prg, _.fold(
+	  dataToTransSpec(cake)(arg1),
+	  dataToTransSpec(cake)(arg2),
+	  dataToTransSpec(cake)(arg3))))
+      val actual = Await.result(table.toJson.map(_.toList.map(JValue.toData)), Duration.Inf)
+      (actual must_== List(expected)).toResult
+    }
     
     def decDomain: Gen[BigDecimal] = Arbitrary.arbitrary[Long].map(BigDecimal(_))
     def intDomain: Gen[BigInt] = Arbitrary.arbitrary[Long].map(BigInt(_))
