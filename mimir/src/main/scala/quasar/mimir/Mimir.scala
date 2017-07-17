@@ -354,7 +354,8 @@ object Mimir extends BackendModule with Logging {
                 val ids = constants.SourceKey.Single
                 val values = constants.SourceValue.Single
 
-                repr.map(_.transform(InnerArrayConcat(WrapArray(ids), WrapArray(values))))
+                // note that ids are already an array
+                repr.map(_.transform(InnerArrayConcat(ids, WrapArray(values))))
 
               case ExcludeId =>
                 repr.map(_.transform(constants.SourceValue.Single))
