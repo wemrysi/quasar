@@ -1,9 +1,7 @@
 {
     "name": "handle let as project of select",
 
-    "backends": {
-        "postgresql": "pending"
-    },
+    "backends": {},
 
     "data": ["cars.data", "smallZips.data"],
 
