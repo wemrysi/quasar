@@ -2,6 +2,7 @@
     "name": "join with multiple fields selected",
 
     "backends": {
+        "mimir":          "ignoreFieldOrder",
         "couchbase":         "pending",
         "marklogic_json": "ignoreFieldOrder",
         "mongodb_q_3_2":     "pending"
@@ -22,7 +23,6 @@
 
     "predicate": "atLeast",
     "ignoreResultOrder": true,
-    "ignoreFieldOrder": true,
 
     "expected": [{ "CitySmall": "AGAWAM", "StateSmall": "MA", "City": "AGAWAM", "State": "MA", "Pop": 15338 },
                  { "CitySmall": "WARE",   "StateSmall": "MA", "City": "WARE",   "State": "MA", "Pop": 9808  }]
