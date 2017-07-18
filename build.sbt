@@ -188,7 +188,7 @@ lazy val root = project.in(file("."))
     sql, connector,                                                        yggdrasil,
 //   |   /  | | \ \______ __________________________________________________  |
 //   |  /   | |  \                                                          \ |
-    core, couchbase, marklogic, mongodb, postgresql, skeleton, sparkcore,   mimir,
+    core, couchbase, marklogic, mongodb, skeleton, sparkcore,   mimir,
 //      \ \ | / /                                                           /
         interface,
 //        /   \
@@ -356,16 +356,6 @@ lazy val mongodb = project
       Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
-/** Implementation of the Postgresql connector.
-  */
-lazy val postgresql = project
-  .settings(name := "quasar-postgresql-internal")
-  .dependsOn(connector % BothScopes)
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(libraryDependencies ++= Dependencies.postgresql)
-  .enablePlugins(AutomateHeaderPlugin)
-
 /** A connector outline, meant to be copied and incrementally filled in while
   * implementing a new connector.
   */
@@ -404,7 +394,6 @@ lazy val interface = project
     couchbase,
     marklogic % BothScopes,
     mongodb,
-    postgresql,
     sparkcore,
     skeleton,
     mimir)

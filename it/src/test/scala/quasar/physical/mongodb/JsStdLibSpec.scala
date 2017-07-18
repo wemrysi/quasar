@@ -48,6 +48,21 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
 
     case (date.ExtractIsoYear, _)      => Skipped("Returns incorrect year at beginning and end.").left
 
+/** FIXME: Determine which of these are needed
+    case (relations.Cond, _)           => Skipped("TODO").left
+
+    case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => Skipped("TODO").left
+    case (relations.Lt, List(Data.Date(_), Data.Timestamp(_))) => Skipped("TODO").left
+    case (relations.Lte, List(Data.Date(_), Data.Timestamp(_))) => Skipped("TODO").left
+    case (relations.Gt, List(Data.Date(_), Data.Timestamp(_))) => Skipped("TODO").left
+    case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => Skipped("TODO").left
+
+    case (date.ExtractDayOfYear, _)    => Skipped("TODO").left
+    case (date.ExtractIsoYear, _)      => Skipped("TODO").left
+    case (date.ExtractWeek, _)         => Skipped("TODO").left
+    case (date.ExtractQuarter, _)      => Skipped("TODO").left
+*/
+
     case (structural.ConcatOp, _)      => Skipped("TODO").left
 
     case _                             => ().right

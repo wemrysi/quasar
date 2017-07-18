@@ -7,8 +7,7 @@
         "mongodb_3_0":       "pending",
         "mongodb_3_2":       "ignoreFieldOrder",
         "mongodb_3_4":       "ignoreFieldOrder",
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "mongodb_read_only": "pending"
     },
     "data": "largeZips.data",
     "query": "select loc || [1, 2] as arr, city from largeZips",

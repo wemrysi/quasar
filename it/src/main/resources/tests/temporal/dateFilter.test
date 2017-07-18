@@ -2,8 +2,7 @@
     "name": "filter on date part",
 
     "backends": {
-        "mimir": "pending",
-        "postgresql": "pending"
+        "mimir": "skip"
     },
 
     "data": "../days.data",

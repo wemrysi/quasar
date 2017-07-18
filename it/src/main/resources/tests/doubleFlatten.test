@@ -4,8 +4,7 @@
         "mimir":             "pending",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "mongodb_read_only": "pending"
     },
     "data": "slamengine_commits.data",
     "query": "select parents[*]{*} from slamengine_commits",

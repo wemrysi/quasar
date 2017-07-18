@@ -3,8 +3,7 @@
     "backends": {
         "mimir": "pending",
         "marklogic_json": "pending",
-        "marklogic_xml": "pending",
-        "postgresql": "pending"
+        "marklogic_xml": "pending"
     },
     "data": "../days.data",
     "query": "select day from `../days`

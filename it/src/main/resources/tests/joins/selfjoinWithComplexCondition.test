@@ -5,8 +5,7 @@
         "couchbase": "pending",
         "marklogic_json": "timeout",
         "marklogic_xml": "timeout",
-        "mimir": "pending",
-        "postgresql": "pending"
+        "mimir": "pending"
     },
 
     "NB": "#1587: Disabled in couchbase due to lack of general join.",

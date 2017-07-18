@@ -5,8 +5,7 @@
         "couchbase": "pending",
         "mongodb_2_6": "ignoreResultOrder",
         "mongodb_3_0": "ignoreResultOrder",
-        "mongodb_read_only": "ignoreResultOrder",
-        "postgresql": "pending"
+        "mongodb_read_only": "ignoreResultOrder"
     },
     "description": "combines an aggregate function (min) with a function implemented in JS (length)",
     "data": "zips.data",

@@ -29,6 +29,7 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import org.specs2.execute.{Failure, Result}
 import org.specs2.matcher.{Expectable, Matcher}
+import org.specs2.specification.core.Fragment
 import org.scalacheck.{Arbitrary, Gen}
 import scalaz._, Scalaz._
 
@@ -55,7 +56,7 @@ abstract class StdLibSpec extends Qspec {
     }
   }
 
-  def tests(runner: StdLibTestRunner) = {
+  def tests(runner: StdLibTestRunner): Fragment = {
     import runner._
 
     implicit val arbBigInt = Arbitrary[BigInt] { runner.intDomain }
@@ -941,7 +942,6 @@ abstract class StdLibSpec extends Qspec {
           (x > 0 && y > 1) ==>
             binary(Modulo(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(BigInt(x) % BigInt(y)))
         }
-
         // TODO: figure out what domain can be tested here
         // "any doubles" >> prop { (x: Double, y: Double) =>
         //   binary(Modulo(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x % y))
@@ -994,6 +994,9 @@ abstract class StdLibSpec extends Qspec {
             binary(Eq(_, _).embed, x, y, Data.Bool(false))
         }
 
+        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
+          binary(Eq(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        }
         // TODO: the rest of the types
       }
 
@@ -1062,6 +1065,9 @@ abstract class StdLibSpec extends Qspec {
           binary(Lt(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x < y))
         }
 
+        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
+          binary(Lt(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        }
         // TODO: Timestamp, Interval, cross-type comparison
       }
 
@@ -1090,7 +1096,9 @@ abstract class StdLibSpec extends Qspec {
           binary(Lte(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x <= y))
         }
 
-        // TODO: Timestamp, Interval, cross-type comparison
+        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
+          binary(Lte(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        }
       }
 
       "Gt" >> {
@@ -1117,8 +1125,9 @@ abstract class StdLibSpec extends Qspec {
         "any two Strs" >> prop { (x: String, y: String) =>
           binary(Gt(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x > y))
         }
-
-        // TODO: Timestamp, Interval, cross-type comparison
+        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
+          binary(Gt(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        }
       }
 
       "Gte" >> {
@@ -1146,7 +1155,9 @@ abstract class StdLibSpec extends Qspec {
           binary(Gte(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x >= y))
         }
 
-        // TODO: Timestamp, Interval, cross-type comparison
+        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
+          binary(Gte(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        }
       }
 
       "Between" >> {

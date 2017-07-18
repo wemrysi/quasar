@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.physical.sparkcore.fs
+package quasar.physical.sparkcore
 
 import quasar._
 import slamdata.Predef._
 import quasar.Planner.PlannerError
 import quasar.fp.ski._
 import quasar.fp.tree._
+import quasar.physical.sparkcore.fs.CoreMap
 import quasar.qscript.{MapFuncCore, MapFuncsCore, MapFuncStdLibTestRunner, FreeMapA}, MapFuncsCore._
 import quasar.std._
 
@@ -32,8 +33,14 @@ import org.scalacheck.Arbitrary.arbitrary
 import org.specs2.execute._
 import scalaz._, Scalaz._
 
-class CoreMapStdLibSpec extends StdLibSpec {
+class SparkStdLibSpec extends StdLibSpec {
   val TODO: Result \/ Unit = Skipped("TODO").left
+
+  def ignoreSome(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data)(run: => Result): Result =
+    (prg, arg1, arg2) match {
+      case (Embed(CoEnv(\/-(MapFuncsCore.Eq(_,_)))), Data.Date(_), Data.Timestamp(_)) => Skipped("TODO")
+      case _ => run
+    }
 
   /** Identify constructs that are expected not to be implemented. */
   val shortCircuit: AlgebraM[Result \/ ?, MapFuncCore[Fix, ?], Unit] = {
@@ -76,8 +83,8 @@ class CoreMapStdLibSpec extends StdLibSpec {
       arg1: Data, arg2: Data,
       expected: Data
     ): Result =
-      check(prg, List(arg1, arg2)) getOrElse
-       run[BinaryArg](prg, _.fold(arg1, arg2), expected)
+      ignoreSome(prg, arg1, arg2)(check(prg, List(arg1, arg2)) getOrElse
+       run[BinaryArg](prg, _.fold(arg1, arg2), expected))
 
     def ternaryMapFunc(
       prg: FreeMapA[Fix, TernaryArg],
