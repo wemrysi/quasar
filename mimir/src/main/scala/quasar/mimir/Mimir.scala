@@ -556,7 +556,7 @@ object Mimir extends BackendModule with Logging {
           } yield ()
 
           // run asynchronously forever
-          _ <- startTask(ingestion).liftM[MT]
+          _ <- startTask(ingestion, ()).liftM[MT]
           _ <- Task.delay(log.debug(s"Started ingest.")).liftM[MT]
 
           _ <- Task.delay(map.put(handle, (queue, signal))).liftM[MT]
