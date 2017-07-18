@@ -195,12 +195,11 @@ object Mimir extends BackendModule with Logging {
 
       // reduce with a single bucket and a single reducer
       case qscript.Reduce(src, MapFuncsCore.NullLit(), List(reducer), repair) =>
-        def toTransSpec(f: FreeMap[T]): Backend[src.P.trans.TransSpec1] = for {
-          trans <- f.cataM[Backend, src.P.trans.TransSpec1](
+        def toTransSpec(f: FreeMap[T]): Backend[src.P.trans.TransSpec1] =
+          f.cataM[Backend, src.P.trans.TransSpec1](
             interpretM(
               κ(src.P.trans.TransSpec1.Id.point[Backend]),
               mapFuncPlanner.plan(src.P)[src.P.trans.Source1](src.P.trans.TransSpec1.Id)))
-        } yield trans
 
         def extractReduction(red: ReduceFunc[FreeMap[T]])
             : (src.P.Library.Reduction, FreeMap[T]) = red match {
