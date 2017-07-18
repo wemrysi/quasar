@@ -25,7 +25,7 @@ object Dependencies {
   private val scodecBitsVersion   = "1.1.0"
   private val http4sVersion       = "0.15.13a"
   private val scalacheckVersion   = "1.13.4"
-  private val scalazVersion       = "7.2.13"
+  private val scalazVersion       = "7.2.14"
   private val scalazStreamVersion = "0.8.6a"
   private val shapelessVersion    = "2.3.2"
   private val simulacrumVersion   = "0.10.0"
@@ -105,11 +105,6 @@ object Dependencies {
       "io.netty"    % "netty-handler"        % nettyVersion
     )
   }
-
-  val postgresql = Seq(
-    "org.tpolecat" %% "doobie-core"               % doobieVersion % "compile, test",
-    "org.tpolecat" %% "doobie-contrib-postgresql" % doobieVersion % "compile, test"
-  )
 
   def sparkcore(sparkProvided: Boolean) = Seq(
     ("org.apache.spark" %% "spark-core" % "2.1.1" % (if(sparkProvided) "provided" else "compile"))
