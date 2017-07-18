@@ -20,7 +20,7 @@ import quasar.Data
 import quasar.qscript.{MapFuncCore, MapFuncsCore}
 
 import quasar.blueeyes.json.JValue
-import quasar.precog.common.RValue
+import quasar.precog.common.{CLong, CPathField, CPathIndex, CString, RValue}
 import quasar.yggdrasil.table.cf.math
 import quasar.yggdrasil.table.cf.util.Undefined
 
@@ -32,18 +32,24 @@ import scalaz.syntax.applicative._
 
 final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
   extends MapFuncPlanner[T, F, MapFuncCore[T, ?]] {
-  def plan(cake: Precog): AlgebraM[F, MapFuncCore[T, ?], cake.trans.TransSpec1] = {
+
+  def plan(cake: Precog): PlanApplicator[cake.type] =
+    new PlanApplicatorCore(cake)
+
+  final class PlanApplicatorCore[P <: Precog](override val cake: P)
+    extends PlanApplicator[P](cake) {
     import cake.trans._
-    {
+
+    def apply[A <: SourceType](id: cake.trans.TransSpec[A]): AlgebraM[F, MapFuncCore[T, ?], TransSpec[A]] = {
       case MapFuncsCore.Undefined() =>
-        (Map1[Source1](TransSpec1.Id, Undefined): TransSpec1).point[F]
+        (Map1[A](id, Undefined): TransSpec[A]).point[F]
 
       case MapFuncsCore.Constant(ejson) =>
         // EJson => Data => JValue => RValue => Table
         val data: Data = ejson.cata(Data.fromEJson)
         val jvalue: JValue = JValue.fromData(data)
         val rvalue: RValue = RValue.fromJValue(jvalue)
-        transRValue(rvalue, TransSpec1.Id).point[F]
+        transRValue(rvalue, id).point[F]
 
       case MapFuncsCore.JoinSideName(_) => ??? // should never be received
 
@@ -83,47 +89,47 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.TypeOf(a1) => ???
 
       case MapFuncsCore.Negate(a1) =>
-        (Map1[Source1](a1, math.Negate): TransSpec1).point[F]
+        (Map1[A](a1, math.Negate): TransSpec[A]).point[F]
       case MapFuncsCore.Add(a1, a2) =>
-        (Map2[Source1](a1, a2, cake.Library.Infix.Add.f2): TransSpec1).point[F]
+        (Map2[A](a1, a2, cake.Library.Infix.Add.f2): TransSpec[A]).point[F]
       case MapFuncsCore.Multiply(a1, a2) =>
-        (Map2[Source1](a1, a2, cake.Library.Infix.Mul.f2): TransSpec1).point[F]
+        (Map2[A](a1, a2, cake.Library.Infix.Mul.f2): TransSpec[A]).point[F]
       case MapFuncsCore.Subtract(a1, a2) =>
-        (Map2[Source1](a1, a2, cake.Library.Infix.Sub.f2): TransSpec1).point[F]
+        (Map2[A](a1, a2, cake.Library.Infix.Sub.f2): TransSpec[A]).point[F]
       case MapFuncsCore.Divide(a1, a2) =>
-        (Map2[Source1](a1, a2, cake.Library.Infix.Div.f2): TransSpec1).point[F]
+        (Map2[A](a1, a2, cake.Library.Infix.Div.f2): TransSpec[A]).point[F]
       case MapFuncsCore.Modulo(a1, a2) =>
-        (Map2[Source1](a1, a2, cake.Library.Infix.Mod.f2): TransSpec1).point[F]
+        (Map2[A](a1, a2, cake.Library.Infix.Mod.f2): TransSpec[A]).point[F]
       case MapFuncsCore.Power(a1, a2) =>
-        (Map2[Source1](a1, a2, cake.Library.Infix.Pow.f2): TransSpec1).point[F]
+        (Map2[A](a1, a2, cake.Library.Infix.Pow.f2): TransSpec[A]).point[F]
 
       case MapFuncsCore.Not(a1) => ???
       case MapFuncsCore.Eq(a1, a2) =>
-        (Equal[Source1](a1, a2): TransSpec1).point[F]
+        (Equal[A](a1, a2): TransSpec[A]).point[F]
       case MapFuncsCore.Neq(a1, a2) => ???
       case MapFuncsCore.Lt(a1, a2) =>
-        (Map2[Source1](a1, a2, cake.Library.Infix.Lt.f2): TransSpec1).point[F]
+        (Map2[A](a1, a2, cake.Library.Infix.Lt.f2): TransSpec[A]).point[F]
       case MapFuncsCore.Lte(a1, a2) =>
-        (Map2[Source1](a1, a2, cake.Library.Infix.LtEq.f2): TransSpec1).point[F]
+        (Map2[A](a1, a2, cake.Library.Infix.LtEq.f2): TransSpec[A]).point[F]
       case MapFuncsCore.Gt(a1, a2) =>
-        (Map2[Source1](a1, a2, cake.Library.Infix.Gt.f2): TransSpec1).point[F]
+        (Map2[A](a1, a2, cake.Library.Infix.Gt.f2): TransSpec[A]).point[F]
       case MapFuncsCore.Gte(a1, a2) =>
-        (Map2[Source1](a1, a2, cake.Library.Infix.GtEq.f2): TransSpec1).point[F]
+        (Map2[A](a1, a2, cake.Library.Infix.GtEq.f2): TransSpec[A]).point[F]
 
       case MapFuncsCore.IfUndefined(a1, a2) => ???
       case MapFuncsCore.And(a1, a2) =>
-        (Map2[Source1](a1, a2, cake.Library.Infix.And.f2): TransSpec1).point[F]
+        (Map2[A](a1, a2, cake.Library.Infix.And.f2): TransSpec[A]).point[F]
       case MapFuncsCore.Or(a1, a2) =>
-        (Map2[Source1](a1, a2, cake.Library.Infix.Or.f2): TransSpec1).point[F]
+        (Map2[A](a1, a2, cake.Library.Infix.Or.f2): TransSpec[A]).point[F]
       case MapFuncsCore.Between(a1, a2, a3) => ???
       case MapFuncsCore.Cond(a1, a2, a3) => ???
 
       case MapFuncsCore.Within(a1, a2) => ???
 
       case MapFuncsCore.Lower(a1) =>
-        (Map1[Source1](a1, cake.Library.toLowerCase.f1): TransSpec1).point[F]
+        (Map1[A](a1, cake.Library.toLowerCase.f1): TransSpec[A]).point[F]
       case MapFuncsCore.Upper(a1) =>
-        (Map1[Source1](a1, cake.Library.toUpperCase.f1): TransSpec1).point[F]
+        (Map1[A](a1, cake.Library.toUpperCase.f1): TransSpec[A]).point[F]
       case MapFuncsCore.Bool(a1) => ???
       case MapFuncsCore.Integer(a1) => ???
       case MapFuncsCore.Decimal(a1) => ???
@@ -134,17 +140,23 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
 
       // FIXME detect constant cases so we don't have to always use the dynamic variants
       case MapFuncsCore.MakeArray(a1) =>
-        (WrapArray[Source1](a1): TransSpec1).point[F]
+        (WrapArray[A](a1): TransSpec[A]).point[F]
+      case MapFuncsCore.MakeMap(ConstLiteral(CString(key), _), value) =>
+        (WrapObject[A](value, key): TransSpec[A]).point[F]
       case MapFuncsCore.MakeMap(key, value) =>
-        (WrapObjectDynamic[Source1](key, value): TransSpec1).point[F]
+        (WrapObjectDynamic[A](key, value): TransSpec[A]).point[F]
       case MapFuncsCore.ConcatArrays(a1, a2) =>
-        (OuterArrayConcat[Source1](a1, a2): TransSpec1).point[F]
+        (OuterArrayConcat[A](a1, a2): TransSpec[A]).point[F]
       case MapFuncsCore.ConcatMaps(a1, a2) =>
-        (OuterObjectConcat[Source1](a1, a2): TransSpec1).point[F]
+        (OuterObjectConcat[A](a1, a2): TransSpec[A]).point[F]
+      case MapFuncsCore.ProjectIndex(src, ConstLiteral(CLong(index), _)) =>
+        (DerefArrayStatic[A](src, CPathIndex(index.toInt)): TransSpec[A]).point[F]
       case MapFuncsCore.ProjectIndex(src, index) =>
-        (DerefArrayDynamic[Source1](src, index): TransSpec1).point[F]
+        (DerefArrayDynamic[A](src, index): TransSpec[A]).point[F]
+      case MapFuncsCore.ProjectField(src, ConstLiteral(CString(field), _)) =>
+        (DerefObjectStatic[A](src, CPathField(field)): TransSpec[A]).point[F]
       case MapFuncsCore.ProjectField(src, field) =>
-        (DerefObjectDynamic[Source1](src, field): TransSpec1).point[F]
+        (DerefObjectDynamic[A](src, field): TransSpec[A]).point[F]
       case MapFuncsCore.DeleteField(src, field) => ???
 
       case MapFuncsCore.Meta(a1) => ???

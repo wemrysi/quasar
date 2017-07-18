@@ -26,6 +26,14 @@ final class MapFuncDerivedPlanner[T[_[_]]: BirecursiveT, F[_]: Monad]
   (core: MapFuncPlanner[T, F, MapFuncCore[T, ?]])
   extends MapFuncPlanner[T, F, MapFuncDerived[T, ?]] {
 
-  def plan(cake: Precog): AlgebraM[F, MapFuncDerived[T, ?], cake.trans.TransSpec1] =
-    ExpandMapFunc.expand(core.plan(cake), κ(None))
+  def plan(cake: Precog): PlanApplicator[cake.type] =
+    new PlanApplicatorDerived(cake)
+
+  final class PlanApplicatorDerived[P <: Precog](override val cake: P)
+    extends PlanApplicator[P](cake) {
+    import cake.trans._
+
+    def apply[A <: SourceType](id: cake.trans.TransSpec[A]): AlgebraM[F, MapFuncDerived[T, ?], TransSpec[A]] =
+      ExpandMapFunc.expand(core.plan(cake).apply(id), κ(None))
+  }
 }
