@@ -63,7 +63,7 @@ trait TablePagerModule extends ColumnarTableModule[Future] {
         } yield ()
       }
 
-      startTask(driver >> queue.enqueue1(Vector.empty)).unsafePerformSync
+      startTask(driver >> queue.enqueue1(Vector.empty), ()).unsafePerformSync
     }
 
     def more: Task[Vector[Data]] = queue.dequeue1

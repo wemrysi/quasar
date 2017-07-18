@@ -96,9 +96,10 @@ final class Precog private (dataDir0: File)
         vfsLatch.countDown()
       }
     }
+
     val gated = vfsStr.mergeHaltBoth(vfsShutdownSignal.discrete.noneTerminate.drain)
 
-    Precog.startTask(gated.run).unsafePerformSync
+    Precog.startTask(gated.run, vfsLatch.countDown()).unsafePerformSync
     vfsLatch.await()      // sigh....
   }
 
@@ -161,6 +162,11 @@ object Precog extends Logging {
     Task.delay(new Precog(dataDir))
 
   // utility function for running a Task in the background
-  def startTask(ta: Task[_]): Task[Unit] =
-    Task.delay(ta.unsafePerformAsync(_.fold(log.error(s"exception in background task", _), _ => ())))
+  def startTask(ta: Task[_], cb: => Unit): Task[Unit] =
+    Task.delay(ta.unsafePerformAsync(_.fold(
+      ex => {
+        log.error(s"exception in background task", ex)
+        cb
+      },
+      _ => ())))
 }

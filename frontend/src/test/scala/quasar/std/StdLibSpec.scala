@@ -29,6 +29,7 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import org.specs2.execute.{Failure, Result}
 import org.specs2.matcher.{Expectable, Matcher}
+import org.specs2.specification.core.Fragment
 import org.scalacheck.{Arbitrary, Gen}
 import scalaz._, Scalaz._
 
@@ -55,7 +56,7 @@ abstract class StdLibSpec extends Qspec {
     }
   }
 
-  def tests(runner: StdLibTestRunner) = {
+  def tests(runner: StdLibTestRunner): Fragment = {
     import runner._
 
     implicit val arbBigInt = Arbitrary[BigInt] { runner.intDomain }

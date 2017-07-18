@@ -30,7 +30,7 @@ import matryoshka.implicits._
 import scalaz.Applicative
 import scalaz.syntax.applicative._
 
-final class MapFuncPlanner[T[_[_]]: RecursiveT, M[_], F[_]: Applicative] {
+final class MapFuncPlanner[T[_[_]]: RecursiveT, F[_]: Applicative] {
 
   def plan(cake: Precog): PlanApplicator[cake.type] = new PlanApplicator(cake)
 
