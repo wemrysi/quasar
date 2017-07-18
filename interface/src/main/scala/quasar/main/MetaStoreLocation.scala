@@ -61,7 +61,7 @@ object MetaStoreLocation {
             else m.point[MainTask])
           (for {
             m      <- tryNewMetaStore
-            _      <- ref.read.flatMap(_.shutdown).liftM[MainErrT]
+            _      <- ref.read.flatMap(_.shutdown.attempt).liftM[MainErrT]
             result <- ref.write(m).liftM[MainErrT]
           } yield result).run
       }

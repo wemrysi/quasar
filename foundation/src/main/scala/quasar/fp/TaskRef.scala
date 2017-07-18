@@ -28,7 +28,7 @@ import scalaz.concurrent.Task
   * project: https://github.com/oncue/remotely
   *
   */
-sealed abstract class TaskRef[A] { self =>
+sealed abstract class TaskRef[A] {
   def read: Task[A]
   def write(a: A): Task[Unit]
   def compareAndSet(oldA: A, newA: A): Task[Boolean]

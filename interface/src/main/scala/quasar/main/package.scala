@@ -18,12 +18,12 @@ package quasar
 
 import slamdata.Predef._
 import quasar.cli.Cmd
-import quasar.config.{ConfigOps, FsFile, ConfigError, CoreConfig, MetaStoreConfig}
+import quasar.config.{ConfigOps, FsFile, ConfigError, MetaStoreConfig}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect._
-import quasar.db.{DbConnectionConfig, Schema}
+import quasar.db.Schema
 import quasar.fp._, ski._
 import quasar.fp.free._
 import quasar.fs._
@@ -37,8 +37,7 @@ import quasar.metastore._
 
 import scala.util.control.NonFatal
 
-import doobie.imports.{ConnectionIO, Transactor}
-import doobie.syntax.connectionio._
+import doobie.imports.Transactor
 import eu.timepit.refined.auto._
 import monocle.Lens
 import pathy.Path.posixCodec
@@ -89,8 +88,6 @@ package object main {
       Failure.toRuntimeError[F, MountingError]             :+:
       Failure.toRuntimeError[F, FileSystemError]
   }
-
-  type MetaStoreRef[A] = AtomicRef[quasar.metastore.MetaStore, A]
 
   /** Effect comprising the core Quasar apis. */
   type CoreEffIO[A] = Coproduct[Task, CoreEff, A]
@@ -373,16 +370,6 @@ package object main {
     )
   }
 
-  private def closeFileSystem(dr: DefinitionResult[PhysFsEffM]): Task[Unit] = {
-    val transform: PhysFsEffM ~> Task =
-      foldMapNT(reflNT[Task] :+: (Failure.toCatchable[Task, Exception] compose Failure.mapError[PhysicalError, Exception](_.cause)))
-
-    dr.translate(transform).close
-  }
-
-  private def closeAllFsMounts(mnts: Mounts[DefinitionResult[PhysFsEffM]]): Task[Unit] =
-    mnts.traverse_(closeFileSystem(_).attemptNonFatal.void)
-
   type QErrs_Task[A] = Coproduct[Task, QErrs, A]
   type QErrs_TaskM[A] = Free[QErrs_Task, A]
 
@@ -391,103 +378,6 @@ package object main {
       foldMapNT(liftMT[Task, MainErrT] :+: QErrs.toCatchable[MainTask])
     }
   }
-
-  type QErrsCnxIO[A]  = Coproduct[ConnectionIO, QErrs, A]
-  type QErrsTCnxIO[A] = Coproduct[Task, QErrsCnxIO, A]
-  type QErrs_CnxIO_Task_MetaStoreLoc[A] = Coproduct[MetaStoreLocation, QErrsTCnxIO, A]
-  type QErrs_CnxIO_Task_MetaStoreLocM[A] = Free[QErrs_CnxIO_Task_MetaStoreLoc, A]
-
-  object QErrsCnxIO {
-    def qErrsToMainErrT[F[_]: Catchable: Monad]: QErrs ~> MainErrT[F, ?] =
-      liftMT[F, MainErrT].compose(QErrs.toCatchable[F])
-
-    def toMainTask(transactor: Transactor[Task]): QErrsCnxIOM ~> MainTask = {
-      val f: QErrsCnxIOM ~> MainErrT[ConnectionIO, ?] =
-        foldMapNT(liftMT[ConnectionIO, MainErrT] :+: qErrsToMainErrT[ConnectionIO])
-
-      Hoist[MainErrT].hoist(transactor.trans) compose f
-    }
-  }
-
-  type QErrsCnxIOM[A]  = Free[QErrsCnxIO, A]
-  type QErrsTCnxIOM[A] = Free[QErrsTCnxIO, A]
-
-  object QErrsTCnxIO {
-    def toMainTask(transactor: Transactor[Task]): QErrsTCnxIOM ~> MainTask = {
-      val f: QErrsTCnxIOM ~> MainErrT[ConnectionIO, ?] =
-        foldMapNT(
-          (liftMT[ConnectionIO, MainErrT] compose taskToConnectionIO) :+:
-            liftMT[ConnectionIO, MainErrT]                              :+:
-            QErrsCnxIO.qErrsToMainErrT[ConnectionIO])
-
-      Hoist[MainErrT].hoist(transactor.trans) compose f
-    }
-  }
-
-  /** Initialize the Quasar FileSystem assuming all defaults */
-  val initializeFS: MainTask[QuasarFS] = initializeFS_(None)
-
-  /** Initialize the Quasar FileSytem using the configuration
-    * found in `configPath` if it's a `Some`
-    */
-  def initializeFS_(configPath: Option[FsFile]): MainTask[QuasarFS] =
-    for {
-      cfgFile      <- loadConfigFile[CoreConfig](configPath).liftM[MainErrT]
-      metastoreCfg <- cfgFile.metastore.cata(Task.now, MetaStoreConfig.configOps.default).liftM[MainErrT]
-      quasarFS     <- initializeFSWith(metastoreCfg.database)
-    } yield quasarFS
-
-  def initializeFSWith(db: DbConnectionConfig): MainTask[QuasarFS] =
-    for {
-      metastore <- metastoreTransactor(db)
-      metaRef   <- TaskRef(metastore).liftM[MainErrT]
-      quasarFS  <- initializeFSImpl(metaRef, db.isInMemory)
-    } yield quasarFS
-
-  def initializeFSImpl(metaRef: TaskRef[MetaStore], initialize: Boolean): MainTask[QuasarFS] =
-    for {
-      metastore  <- metaRef.read.liftM[MainErrT]
-      _          <- if (initialize)
-                      initUpdateMigrate(quasar.metastore.Schema.schema, metastore.trans.transactor, None)
-                    else Task.now(()).liftM[MainErrT]
-      _          <- verifySchema(quasar.metastore.Schema.schema, metastore.trans.transactor).leftMap(_.message)
-      hfsRef     <- TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM]).liftM[MainErrT]
-      mntdRef    <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
-
-      ephmralMnt =  KvsMounter.interpreter[Task, QErrsTCnxIO](
-        KvsMounter.ephemeralMountConfigs[Task], hfsRef, mntdRef) andThen
-        mapSNT(absorbTask)                                       andThen
-        QErrsCnxIO.toMainTask(metastore.trans.transactor)
-
-      mountsCfg  <- MetaStoreAccess.fsMounts
-        .map(MountingsConfig(_))
-        .transact(metastore.trans.transactor)
-        .liftM[MainErrT]
-
-      // TODO: Still need to expose these in the HTTP API, see SD-1131
-      failedMnts <- attemptMountAll[Mounting](mountsCfg) foldMap ephmralMnt
-      _          <- failedMnts.toList.traverse_(logFailedMount).liftM[MainErrT]
-
-      runCore    <- CoreEff.runFs[QEffIO](hfsRef).liftM[MainErrT]
-    } yield {
-      val f: QEffIO ~> QErrs_CnxIO_Task_MetaStoreLocM =
-        injectFT[Task, QErrs_CnxIO_Task_MetaStoreLoc]               :+:
-        injectFT[MetaStoreLocation, QErrs_CnxIO_Task_MetaStoreLoc]  :+:
-        jdbcMounter[QErrs_CnxIO_Task_MetaStoreLoc](hfsRef, mntdRef) :+:
-        injectFT[QErrs, QErrs_CnxIO_Task_MetaStoreLoc]
-
-      val connectionIOToTask: ConnectionIO ~> Task =
-        λ[ConnectionIO ~> Task](io => metaRef.read.flatMap(t => t.trans.transactor.trans(io)))
-      val g: QErrs_CnxIO_Task_MetaStoreLoc ~> QErrs_TaskM =
-        (injectFT[Task, QErrs_Task] compose MetaStoreLocation.impl.default[QErrs_Task](metaRef)) :+:
-         injectFT[Task, QErrs_Task]                                                              :+:
-        (injectFT[Task, QErrs_Task] compose connectionIOToTask)                                  :+:
-         injectFT[QErrs, QErrs_Task]
-
-      QuasarFS(
-        foldMapNT(g) compose foldMapNT(f) compose runCore,
-        (mntdRef.read >>= closeAllFsMounts _) *> metaRef.read.flatMap(_.trans.shutdown))
-    }
 
   final case class CmdLineConfig(configPath: Option[FsFile], cmd: Cmd)
 
@@ -502,7 +392,7 @@ package object main {
       _     <- config.cmd match {
         case Cmd.Start =>
           for {
-            quasarFs <- initializeFS_(config.configPath)
+            quasarFs <- Quasar.initFromConfig(config.configPath)
             _        <- start(cfg, quasarFs.interp).ensuring(κ(quasarFs.shutdown.liftM[MainErrT]))
           } yield ()
 

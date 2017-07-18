@@ -103,10 +103,11 @@ object Server {
   /**
     * Start the Quasar server and shutdown once the command line user presses "Enter"
     */
-  def startServerUntilUserInput(quasarInter: CoreEff ~> QErrs_TaskM,
-                            port: Int,
-                  staticContent: List[StaticContent],
-                  redirect: Option[String]
+  def startServerUntilUserInput(
+    quasarInter: CoreEff ~> QErrs_TaskM,
+    port: Int,
+    staticContent: List[StaticContent],
+    redirect: Option[String]
   ): Task[Unit] = {
     val starter = serviceStarter(defaultPort = port, staticContent, redirect, quasarInter)
     PortChangingServer.start(initialPort = port, starter).flatMap(_.shutdownOnUserInput)
@@ -116,10 +117,11 @@ object Server {
     * Start Quasar server
     * @return A `Task` that can be used to shutdown the server
     */
-  def startServer(quasarInter: CoreEff ~> QErrs_TaskM,
-                  port: Int,
-                  staticContent: List[StaticContent],
-                  redirect: Option[String]
+  def startServer(
+    quasarInter: CoreEff ~> QErrs_TaskM,
+    port: Int,
+    staticContent: List[StaticContent],
+    redirect: Option[String]
   ): Task[Task[Unit]] = {
     val starter = serviceStarter(defaultPort = port, staticContent, redirect, quasarInter)
     PortChangingServer.start(initialPort = port, starter).map(_.shutdown)

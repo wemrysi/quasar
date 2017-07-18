@@ -211,7 +211,7 @@ object Mounting {
       S1: PathMismatchFailure :<: S
     ): Free[S, Unit] =
       for {
-        exists <- lookupType(path).isDefined
+        exists <- lookupType(path).run.isDefined
         _      <- if (replaceIfExists && exists) replace(path, mountConfig)
                   else mount(path, mountConfig)
       } yield ()

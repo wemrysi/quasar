@@ -120,7 +120,4 @@ final class MonadError_Ops[F[_], E, A] private[scalaz] (self: F[A])(implicit F0:
 
   def unattempt[B](implicit ev: A <~< (E \/ B), M: Monad[F]): F[B] =
     F0.unattempt(self.map(ev(_)))
-
-  def unattemptShow[B, E1: Show](implicit ev0: A <~< (E1 \/ B), ev1: E >~> Throwable, M: Monad[F]): F[B] =
-    self.map(a => ev0(a).leftMap(e => ev1(new Exception(e.shows)))).unattempt
 }

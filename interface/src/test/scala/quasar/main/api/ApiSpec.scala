@@ -16,7 +16,6 @@
 
 package quasar.main.api
 
-import slamdata.Predef.String
 import quasar.contrib.scalaz._
 import quasar.fs.mount.MountConfig
 import quasar.main._
@@ -35,7 +34,7 @@ class ApiSpec extends quasar.Qspec {
       val sampleMount = MountConfig.viewConfig0(sqlB"select * from zips")
       (for {
         firstMetaConf <- MetaStoreFixture.createNewTestMetaStoreConfig
-        quasarFS      <- initializeFSWith(firstMetaConf).run.unattemptShow[QuasarFS, String]
+        quasarFS      <- Quasar.initWithDbConfig(firstMetaConf).run.map(a => a.leftMap(e => new scala.Exception(e.shows))).unattempt
         _             <- quasarFS.mount(sampleMountPath, sampleMount, false)
         mountIsThere  <- quasarFS.getMount(sampleMountPath).map(_.isDefined)
         otherMetaConf <- MetaStoreFixture.createNewTestMetaStoreConfig

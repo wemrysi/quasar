@@ -36,9 +36,6 @@ object metastore {
   val taskToConnectionIO: Task ~> ConnectionIO =
     λ[Task ~> ConnectionIO](t => HC.delay(t.unsafePerformSync))
 
-  val absorbTask: QErrsTCnxIO ~> QErrsCnxIO =
-    Inject[ConnectionIO, QErrsCnxIO].compose(taskToConnectionIO) :+: reflNT[QErrsCnxIO]
-
   def metastoreTransactor(dbCfg: DbConnectionConfig): MainTask[MetaStore] = {
     val connInfo = DbConnectionConfig.connectionInfo(dbCfg)
 

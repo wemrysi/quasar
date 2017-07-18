@@ -842,7 +842,7 @@ An example response:
 ```json
 {
     "h2": {
-        "file": "mem"
+        "location": "mem"
     }
 }
 
