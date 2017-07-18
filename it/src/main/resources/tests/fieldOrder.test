@@ -1,10 +1,6 @@
 {
     "name": "reduced expressions which trigger bad field ordering in MongoDB (#598)",
 
-    "backends": {
-        "mimir":"pending"
-    },
-
     "data": "zips.data",
 
     "query": "select count(*)/1000, 0 from zips limit 5",

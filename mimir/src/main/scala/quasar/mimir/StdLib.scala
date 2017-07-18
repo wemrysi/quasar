@@ -148,7 +148,7 @@ trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
       def extract(res: Result): Table
       def extractValue(res: Result): Option[RValue]
 
-      def apply(table: Table) = table.reduce(reducer)(monoid) map extract
+      def apply(table: Table): M[Table] = table.reduce(reducer)(monoid) map extract
     }
 
     def coalesce(reductions: List[(Reduction, Option[JType => JType])]): Reduction

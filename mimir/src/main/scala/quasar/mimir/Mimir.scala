@@ -53,7 +53,8 @@ import delorean._
 
 import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration.Duration
 
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -184,14 +185,59 @@ object Mimir extends BackendModule with Logging {
         import src.P.trans._
 
         for {
-          trans <- f.cataM[Backend, src.P.trans.TransSpec1](
+          trans <- f.cataM[Backend, TransSpec1](
             interpretM(
               κ(TransSpec1.Id.point[Backend]),
               mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
         } yield Repr(src.P)(src.table.transform(trans))
 
       case qscript.LeftShift(src, struct, id, repair) => ???
+
+      // reduce with a single bucket and a single reducer
+      case qscript.Reduce(src, MapFuncsCore.NullLit(), List(reducer), repair) =>
+        def toTransSpec(f: FreeMap[T]): Backend[src.P.trans.TransSpec1] = for {
+          trans <- f.cataM[Backend, src.P.trans.TransSpec1](
+            interpretM(
+              κ(src.P.trans.TransSpec1.Id.point[Backend]),
+              mapFuncPlanner.plan(src.P)[src.P.trans.Source1](src.P.trans.TransSpec1.Id)))
+        } yield trans
+
+        def extractReduction(red: ReduceFunc[FreeMap[T]])
+            : (src.P.Library.Reduction, FreeMap[T]) = red match {
+          case ReduceFuncs.Count(f) => (src.P.Library.Count, f)
+          case ReduceFuncs.Sum(f) => (src.P.Library.Sum, f)
+          case ReduceFuncs.Min(f) => (src.P.Library.Min, f)
+          case ReduceFuncs.Max(f) => (src.P.Library.Max, f)
+          case ReduceFuncs.Avg(f) => (src.P.Library.Mean, f)
+          case ReduceFuncs.Arbitrary(f) => ???
+          case ReduceFuncs.First(f) => ???
+          case ReduceFuncs.Last(f) => ???
+          case ReduceFuncs.UnshiftArray(f) => ???
+          case ReduceFuncs.UnshiftMap(f1, f2) => ???
+        }
+
+        val (reduction, fm) = extractReduction(reducer)
+
+        val reduced: Backend[Repr] =
+          toTransSpec(fm).map(x =>
+            // FIXME do something better with the future
+            Await.result(
+              reduction.apply(src.table.transform(x)).map(r => Repr(src.P)(r)),
+              Duration.Inf))
+
+        for {
+          red <- reduced
+          trans <- repair.cataM[Backend, red.P.trans.TransSpec1](
+            interpretM(
+              {
+                case ReduceIndex(Some(0)) => red.P.trans.TransSpec1.Id.point[Backend]
+                case _ => ??? // FIXME handle None case and generalize so we index into reducers
+              },
+              mapFuncPlanner.plan(red.P)[red.P.trans.Source1](red.P.trans.TransSpec1.Id)))
+        } yield Repr(red.P)(red.table.transform(trans))
+
       case qscript.Reduce(src, bucket, reducers, repair) => ???
+
       case qscript.Sort(src, bucket, order) => ???
 
       case qscript.Filter(src, f) =>
