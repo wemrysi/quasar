@@ -151,8 +151,9 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
     freeMap: FreeMapA[Fix, A],
     hole: A => cake.trans.TransSpec1)
       : cake.trans.TransSpec1 =
-    freeMap.cataM[Id.Id, cake.trans.TransSpec1](
-      interpretM(hole(_).point[Id.Id], new MapFuncPlanner[Fix, Id.Id].plan(cake)))
+    freeMap.cataM[Id.Id, cake.trans.TransSpec1](interpretM[Id.Id, MapFuncCore[Fix, ?], A, cake.trans.TransSpec1](
+      hole(_).point[Id.Id],
+      new MapFuncPlanner[Fix, Id.Id].plan(cake)[cake.trans.Source1](cake.trans.TransSpec1.Id)))
 
   private def evaluate(transSpec: cake.trans.TransSpec1): cake.Table =
     cake.Table.constString(Set("")).transform(transSpec)
