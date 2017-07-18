@@ -289,33 +289,33 @@ object Mimir extends BackendModule with Logging {
               lsorted <- ltable.sort(transLKey).toTask.liftM[MT].liftB
               rsorted <- rtable.sort(transRKey).toTask.liftM[MT].liftB
 
-              transLeft <- combine.cataM[Backend, TransSpec1](
-                interpretM(
-                  {
-                    case qscript.LeftSide =>
-                      TransSpec1.Id.point[Backend]
+              transLeft <- tpe match {
+                case JoinType.LeftOuter | JoinType.FullOuter =>
+                  combine.cataM[Backend, TransSpec1](
+                    interpretM(
+                      {
+                        case qscript.LeftSide => TransSpec1.Id.point[Backend]
+                        case qscript.RightSide => TransSpec1.Undef.point[Backend]
+                      },
+                      mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
 
-                    case qscript.RightSide =>
-                      tpe match {
-                        case JoinType.Inner | JoinType.RightOuter => TransSpec1.Undef.point[Backend]
-                        case JoinType.FullOuter | JoinType.LeftOuter => TransSpec1.Id.point[Backend]
-                      }
-                  },
-                  mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+                case JoinType.Inner | JoinType.RightOuter =>
+                  TransSpec1.Undef.point[Backend]
+              }
 
-              transRight <- combine.cataM[Backend, src.P.trans.TransSpec1](
-                interpretM(
-                  {
-                    case qscript.LeftSide =>
-                      tpe match {
-                        case JoinType.Inner | JoinType.LeftOuter => TransSpec1.Undef.point[Backend]
-                        case JoinType.FullOuter | JoinType.RightOuter => TransSpec1.Id.point[Backend]
-                      }
+              transRight <- tpe match {
+                case JoinType.RightOuter | JoinType.FullOuter =>
+                  combine.cataM[Backend, TransSpec1](
+                    interpretM(
+                      {
+                        case qscript.LeftSide => TransSpec1.Undef.point[Backend]
+                        case qscript.RightSide => TransSpec1.Id.point[Backend]
+                      },
+                      mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
 
-                    case qscript.RightSide =>
-                      TransSpec1.Id.point[Backend]
-                  },
-                  mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+                case JoinType.Inner | JoinType.LeftOuter =>
+                  TransSpec1.Undef.point[Backend]
+              }
             } yield lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle)
           }
         } yield Repr(src.P)(result)
