@@ -53,8 +53,7 @@ import delorean._
 
 import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Await, Future}
-import scala.concurrent.duration.Duration
+import scala.concurrent.Future
 
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -217,12 +216,10 @@ object Mimir extends BackendModule with Logging {
 
         val (reduction, fm) = extractReduction(reducer)
 
-        val reduced: Backend[Repr] =
-          toTransSpec(fm).map(x =>
-            // FIXME do something better with the future
-            Await.result(
-              reduction.apply(src.table.transform(x)).map(r => Repr(src.P)(r)),
-              Duration.Inf))
+        val reduced: Backend[Repr { type P = src.P.type }] = for {
+          spec <- toTransSpec(fm)
+          table <- reduction.apply(src.table.transform(spec)).toTask.liftM[MT].liftB
+        } yield Repr(src.P)(table)
 
         for {
           red <- reduced
