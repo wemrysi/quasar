@@ -219,6 +219,7 @@ final class Compiler[M[_], T: Equal]
       CIName("oid")                     -> identity.ToId,
       CIName("type_of")                 -> identity.TypeOf,
       CIName("abs")                     -> math.Abs,
+      CIName("floor")                   -> math.Floor,
       CIName("trunc")                   -> math.Trunc,
       CIName("between")                 -> relations.Between,
       CIName("where")                   -> set.Filter,

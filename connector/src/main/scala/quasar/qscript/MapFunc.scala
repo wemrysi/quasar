@@ -62,6 +62,7 @@ object MapFunc {
     case date.ToTimestamp => a => MFC(C.ToTimestamp(a))
     case identity.TypeOf => a => MFC(C.TypeOf(a))
     case math.Abs => a => MFD(D.Abs(a))
+    case math.Floor => a => MFD(D.Floor(a))
     case math.Negate => a => MFC(C.Negate(a))
     case math.Trunc => a => MFD(D.Trunc(a))
     case relations.Not => a => MFC(C.Not(a))

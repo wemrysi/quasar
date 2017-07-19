@@ -956,9 +956,19 @@ abstract class StdLibSpec extends Qspec {
         }
       }
 
+      "Floor" >> {
+        "any Int" >> prop { (x: BigInt) =>
+          unary(Floor(_).embed, Data.Int(x), Data.Int(x))
+        }
+
+        "any Dec" >> prop { (x: BigDecimal) =>
+          unary(Floor(_).embed, Data.Dec(x), Data.Dec(x.setScale(0, RoundingMode.FLOOR)))
+        }
+      }
+
       "Modulo" >> {
         "any int by 1" >> prop { (x: Int) =>
-            binary(Modulo(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(0))
+          binary(Modulo(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(0))
         }
 
         "any ints" >> prop { (x: Int, y: Int) =>
