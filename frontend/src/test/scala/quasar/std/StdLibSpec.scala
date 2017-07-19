@@ -956,6 +956,16 @@ abstract class StdLibSpec extends Qspec {
         }
       }
 
+      "Ceil" >> {
+        "any Int" >> prop { (x: BigInt) =>
+          unary(Ceil(_).embed, Data.Int(x), Data.Int(x))
+        }
+
+        "any Dec" >> prop { (x: BigDecimal) =>
+          unary(Ceil(_).embed, Data.Dec(x), Data.Dec(x.setScale(0, RoundingMode.CEILING)))
+        }
+      }
+
       "Floor" >> {
         "any Int" >> prop { (x: BigInt) =>
           unary(Floor(_).embed, Data.Int(x), Data.Int(x))

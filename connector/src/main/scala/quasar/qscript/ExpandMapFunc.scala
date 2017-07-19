@@ -69,6 +69,9 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
           a,
           moduloR(a, intR(1))))
 
+      def addR[A](a1: Free[OUT, A], a2: Free[OUT, A]): Free[OUT, A] =
+        Free.roll(MFC(Add(a1, a2)))
+
       def subtractR[A](a1: Free[OUT, A], a2: Free[OUT, A]): Free[OUT, A] =
         Free.roll(MFC(Subtract(a1, a2)))
 
@@ -94,6 +97,14 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
               ltR(a.point[Free[OUT, ?]], intR(0)),
               negateR(a.point[Free[OUT, ?]]),
               a.point[Free[OUT, ?]]))
+          case D.Ceil(a) =>
+            MFC(Cond(
+              eqR(moduloR(a.point[Free[OUT, ?]], intR(1)), intR(0)),
+              a.point[Free[OUT, ?]],
+              condR(
+                ltR(a.point[Free[OUT, ?]], intR(0)),
+                truncR(a.point[Free[OUT, ?]]),
+                addR(truncR(a.point[Free[OUT, ?]]), intR(1)))))
           case D.Floor(a) =>
             MFC(Cond(
               eqR(moduloR(a.point[Free[OUT, ?]], intR(1)), intR(0)),

@@ -189,6 +189,7 @@ trait GenericFuncInstances {
       case math.Divide                    => "Divide"
       case math.Negate                    => "Negate"
       case math.Modulo                    => "Modulo"
+      case math.Ceil                      => "Ceil"
       case math.Floor                     => "Floor"
       case math.Trunc                     => "Trunc"
       case relations.Eq                   => "Eq"

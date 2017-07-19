@@ -250,6 +250,7 @@ object MongoDbQScriptPlanner {
 
     val handleSpecialDerived: MapFuncDerived[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
       case Abs(a1) => unimplemented[M, Fix[ExprOp]]("Abs expression")
+      case Ceil(a1) => unimplemented[M, Fix[ExprOp]]("Ceil expression")
       case Floor(a1) => unimplemented[M, Fix[ExprOp]]("Floor expression")
       case Trunc(a1) => unimplemented[M, Fix[ExprOp]]("Trunc expression")
     }
@@ -526,6 +527,7 @@ object MongoDbQScriptPlanner {
 
     val handleSpecialDerived: MapFuncDerived[T, JsCore] => M[JsCore] = {
       case Abs(a1)       => unimplemented[M, JsCore]("Abs JS")
+      case Ceil(a1)      => unimplemented[M, JsCore]("Ceil JS")
       case Floor(a1)     => unimplemented[M, JsCore]("Floor JS")
       case Trunc(a1)     => unimplemented[M, JsCore]("Trunc JS")
     }
