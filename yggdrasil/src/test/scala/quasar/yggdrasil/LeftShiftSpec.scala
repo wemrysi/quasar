@@ -105,6 +105,19 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     toJson(table.leftShift(CPath.Identity \ 1)).copoint mustEqual expected
   }
 
+  def testTrivialArrayLeftShiftWithInnerObject = {
+    val rec = toRecord(Array(0), JArray(JNum(12) :: JNum(13) :: JObject(JField("a", JNum(42))) :: Nil))
+    val table = fromSample(SampleData(Stream(rec)))
+
+    val expected =
+      Vector(
+        toRecord(Array(0), JArray(JNum(0), JNum(12))),
+        toRecord(Array(0), JArray(JNum(1), JNum(13))),
+        toRecord(Array(0), JArray(JNum(2), JObject(JField("a", JNum(42))))))
+
+    toJson(table.leftShift(CPath.Identity \ 1)).copoint mustEqual expected
+  }
+
   // replaces SampleData.toRecord to avoid ordering issues
   def toRecord(indices: Array[Int], jv: JValue): JValue =
     JArray(JArray(indices.map(JNum(_)).toList) :: jv :: Nil)

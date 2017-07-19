@@ -1527,7 +1527,7 @@ trait ColumnarTableModule[M[+ _]]
             case (ref, col) => ref -> expansion(col).get
           }
 
-          val remapped = focused.toList map {
+          val remapped: List[(ColumnRef, Column)] = focused.toList map {
             case (ColumnRef(CPath.Identity, CArrayType(tpe)), col: HomogeneousArrayColumn[a]) =>
               ???
 
@@ -1543,13 +1543,10 @@ trait ColumnarTableModule[M[+ _]]
               ColumnRef(path.dropPrefix(head).get, tpe) -> expanded
           }
 
-          // put together all the same-type columns which now are mapped to the same path
-          val merged: Map[ColumnRef, Column] = remapped.groupBy(_._1.ctype).map({
-            // the key here is the type; the value is the list of same-type pairs
-            case (_, toMerge) =>
-              // group buckets are guaranted to be non-empty
-              val ref = toMerge.head._1
-
+          // put together all the same-ref columns which now are mapped to the same path
+          val merged: Map[ColumnRef, Column] = remapped.groupBy(_._1).map({
+            // the key here is the column ref; the value is the list of same-type pairs
+            case (ref, toMerge) =>
               ref -> toMerge.map(_._2).reduce(cf.util.UnionRight(_, _).get)
           })(collection.breakOut)
 

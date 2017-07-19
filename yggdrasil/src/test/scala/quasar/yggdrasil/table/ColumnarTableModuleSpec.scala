@@ -320,6 +320,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       "shift a mixture of objects and arrays" in testTrivialObjectArrayLeftShift
       "shift a set of arrays" in testSetArrayLeftShift
       "shift a heterogeneous array" in testHeteroArrayLeftShift
+      "shift a simple array with an inner object" in testTrivialArrayLeftShiftWithInnerObject
     }
 
     "in transform" >> {
