@@ -31,8 +31,8 @@ import quasar.fs.mount._
 import quasar.qscript._
 
 import quasar.blueeyes.json.{JNum, JValue}
-import quasar.precog.common.{CEmptyArray, Path}
-import quasar.yggdrasil.bytecode.JType
+import quasar.precog.common.{CEmptyArray, CPathIndex, Path}
+import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
 import fs2.{async, Stream}
 import fs2.async.mutable.{Queue, Signal}
@@ -192,8 +192,8 @@ object Mimir extends BackendModule with Logging {
 
       case qscript.LeftShift(src, struct, id, repair) => ???
 
-      // reduce with a single bucket and a single reducer
-      case qscript.Reduce(src, MapFuncsCore.NullLit(), List(reducer), repair) =>
+      // reduce with a single bucket
+      case qscript.Reduce(src, MapFuncsCore.NullLit(), reducers, repair) =>
         def toTransSpec(f: FreeMap[T]): Backend[src.P.trans.TransSpec1] =
           f.cataM[Backend, src.P.trans.TransSpec1](
             interpretM(
@@ -214,19 +214,47 @@ object Mimir extends BackendModule with Logging {
           case ReduceFuncs.UnshiftMap(f1, f2) => ???
         }
 
-        val (reduction, fm) = extractReduction(reducer)
+        def combineTransSpecs(specs: List[src.P.trans.TransSpec1]): src.P.trans.TransSpec1 =
+          specs.map(src.P.trans.WrapArray(_): src.P.trans.TransSpec1)
+            .reduceLeftOption(src.P.trans.OuterArrayConcat(_, _))
+            .getOrElse(src.P.trans.TransSpec1.Id)
+
+        val pairs: List[(src.P.Library.Reduction, FreeMap[T])] =
+          reducers.map(extractReduction)
+
+        val reductions: List[src.P.Library.Reduction] = pairs.map(_._1)
+        val funcs: List[FreeMap[T]] = pairs.map(_._2)
+
+        def makeJArray(idx: Int)(tpe: JType): JType =
+          JArrayFixedT(scala.collection.immutable.Map(idx -> tpe))
+
+        val megaReduction: src.P.Library.Reduction =
+          src.P.Library.coalesce(reductions.zipWithIndex.map {
+            case (r, i) => (r, Some(makeJArray(i)(_)))
+          })
+
+        val megaSpec: Backend[src.P.trans.TransSpec1] = for {
+          specs <- funcs.traverse(toTransSpec)
+        } yield combineTransSpecs(specs)
 
         val reduced: Backend[Repr { type P = src.P.type }] = for {
-          spec <- toTransSpec(fm)
-          table <- reduction.apply(src.table.transform(spec)).toTask.liftM[MT].liftB
+          spec <- megaSpec
+          table <- megaReduction.apply(src.table.transform(spec)).toTask.liftM[MT].liftB
         } yield Repr(src.P)(table)
+
+        // mimir reverses the order of the returned results
+        def remapIndex: scala.collection.immutable.Map[Int, Int] =
+          (0 until reducers.length).reverse.zipWithIndex.toMap
 
         for {
           red <- reduced
           trans <- repair.cataM[Backend, red.P.trans.TransSpec1](
             interpretM(
               {
-                case ReduceIndex(Some(0)) => red.P.trans.TransSpec1.Id.point[Backend]
+                case ReduceIndex(Some(idx)) =>
+                  (red.P.trans.DerefArrayStatic(
+                    red.P.trans.TransSpec1.Id,
+                    CPathIndex(remapIndex(idx))): red.P.trans.TransSpec1).point[Backend]
                 case _ => ??? // FIXME handle None case and generalize so we index into reducers
               },
               mapFuncPlanner.plan(red.P)[red.P.trans.Source1](red.P.trans.TransSpec1.Id)))
