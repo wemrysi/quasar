@@ -23,6 +23,8 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
+import scala.math.BigDecimal.RoundingMode
+
 import matryoshka._
 import scalaz._, Scalaz._, Validation.{success, failure}
 import shapeless._
@@ -293,6 +295,38 @@ trait MathLib extends Library {
       case Type.Const(d) => success(Func.Input1(d.dataType))
       case t             => success(Func.Input1(t))
     })
+
+    val Ceil = UnaryFunc(
+      Mapping,
+      "Returns the nearest integer greater than or equal to a numeric value",
+      Type.Numeric,
+      Func.Input1(Type.Numeric),
+      noSimplification,
+      partialTyperV[nat._1] {
+        case Sized(Type.Const(Data.Int(v)))      => success(Type.Const(Data.Int(v)))
+        case Sized(Type.Const(Data.Dec(v)))      => success(Type.Const(Data.Dec(v.setScale(0, RoundingMode.CEILING))))
+        case Sized(t) if Type.Numeric contains t => success(t)
+      },
+      untyper[nat._1] {
+        case Type.Const(d) => success(Func.Input1(d.dataType))
+        case t             => success(Func.Input1(t))
+      })
+
+    val Floor = UnaryFunc(
+      Mapping,
+      "Returns the nearest integer less than or equal to a numeric value",
+      Type.Numeric,
+      Func.Input1(Type.Numeric),
+      noSimplification,
+      partialTyperV[nat._1] {
+        case Sized(Type.Const(Data.Int(v)))      => success(Type.Const(Data.Int(v)))
+        case Sized(Type.Const(Data.Dec(v)))      => success(Type.Const(Data.Dec(v.setScale(0, RoundingMode.FLOOR))))
+        case Sized(t) if Type.Numeric contains t => success(t)
+      },
+      untyper[nat._1] {
+        case Type.Const(d) => success(Func.Input1(d.dataType))
+        case t             => success(Func.Input1(t))
+      })
 
     val Trunc = UnaryFunc(
       Mapping,

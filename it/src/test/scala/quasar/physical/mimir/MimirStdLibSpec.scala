@@ -90,6 +90,8 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
   // If we create a `AlgebraM[Result \/ ?, MapFunc[Fix, ?], Unit]` scalac errors
   // because it cannot check the match for unreachability.
   private val shortCircuitDerived: AlgebraM[Result \/ ?, MapFuncDerived[Fix, ?], Unit] = {
+    case MapFuncsDerived.Ceil(_) => notImplemented.left
+    case MapFuncsDerived.Floor(_) => notImplemented.left
     case MapFuncsDerived.Trunc(_) => notImplemented.left
     case MapFuncsDerived.Abs(_) => notImplemented.left
   }
@@ -220,7 +222,7 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
         ((actual(table) must haveSize(1)) and
 	  (actual(table).head must beCloseTo(expected))).toResult
       }
-    
+
     def decDomain: Gen[BigDecimal] = Arbitrary.arbitrary[Long].map(BigDecimal(_))
     def intDomain: Gen[BigInt] = Arbitrary.arbitrary[Long].map(BigInt(_))
     def stringDomain: Gen[String] = gen.printableAsciiString
