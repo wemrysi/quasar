@@ -1470,8 +1470,16 @@ trait ColumnarTableModule[M[+ _]]
       val slices2 = slices.map(_.materialized) flatMap { slice =>
         val (focused, unfocused) = lens(slice.columns)
 
-        val innerHeads = focused.keys.toVector flatMap {
-          case ColumnRef(path, _) => path.head.toVector
+        val innerHeads = {
+          val unsorted = focused.keys.toVector flatMap {
+            case ColumnRef(path, _) => path.head.toVector
+          }
+
+          // sort the index lexicographically except in the case of indices
+          unsorted sortWith {
+            case (CPathIndex(i1), CPathIndex(i2)) => i1 < i2
+            case (p1, p2) => p1.toString < p2.toString
+          }
         }
 
         val innerIndex = Map(innerHeads.zipWithIndex: _*)
@@ -1569,8 +1577,6 @@ trait ColumnarTableModule[M[+ _]]
             val loci = refinedHeads.zipWithIndex collect {
               case (-\/(_), i) => i
             } toSet
-
-            // TODO we need to manually apply inner-concat semantics to all of these columns
 
             val col = new StrColumn {
               def apply(row: Int) = {
