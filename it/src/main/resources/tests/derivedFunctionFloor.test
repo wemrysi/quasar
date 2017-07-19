@@ -1,6 +1,7 @@
 {
     "name": "derived function floor",
     "backends": {
+      "couchbase": "ignoreFieldOrder",
       "mimir": "pending"
     },
     "data": "divide.data",
