@@ -1500,12 +1500,12 @@ trait ColumnarTableModule[M[+ _]]
           val numSplits =
             math.ceil((slice.size * highWaterMark).toDouble / yggConfig.maxSliceSize).toInt
 
-          // this has accumulating rounding error which can cause slices to exceed max by a small amount in rare cases
+          // this has accumulating rounding errors which can cause slices to exceed max by a small amount in rare cases
           val targetIdx = slice.size / numSplits
 
           val (acc, last) = (0 until numSplits).foldLeft((Vector.empty[Slice], slice)) {
             case ((acc, cur), _) =>
-              val (left, right) = slice.split(targetIdx)
+              val (left, right) = cur.split(targetIdx)
               (acc :+ left, right)
           }
 

@@ -61,6 +61,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
     with TableModuleSpec[M]
     with CogroupSpec[M]
     with CrossSpec[M]
+    with LeftShiftSpec[M]
     with TransformSpec[M]
     with CompactSpec[M]
     with TakeRangeSpec[M]
@@ -311,6 +312,14 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       "survive scalacheck" in {
         prop { cogroupData: (SampleData, SampleData) => testCross(cogroupData._1, cogroupData._2) }
       }
+    }
+
+    "in leftShift" >> {
+      "shift a simple array" in testTrivialArrayLeftShift
+      "shift a simple object" in testTrivialObjectLeftShift
+      "shift a mixture of objects and arrays" in testTrivialObjectArrayLeftShift
+      "shift a set of arrays" in testSetArrayLeftShift
+      "shift a heterogeneous array" in testHeteroArrayLeftShift
     }
 
     "in transform" >> {
