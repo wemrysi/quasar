@@ -32,9 +32,9 @@ object arbitrary extends CorecursiveArbitrary {
   implicit def coproductDelayArbitrary[F[_], G[_]](
     implicit
     FA: Delay[Arbitrary, F],
-    FW: UWidth[F],
+    FW: UnionWidth[F],
     GA: Delay[Arbitrary, G],
-    GW: UWidth[G]
+    GW: UnionWidth[G]
   ): Delay[Arbitrary, Coproduct[F, G, ?]] =
     new Delay[Arbitrary, Coproduct[F, G, ?]] {
       def apply[A](arb: Arbitrary[A]): Arbitrary[Coproduct[F, G, A]] =

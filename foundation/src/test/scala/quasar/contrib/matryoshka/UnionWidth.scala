@@ -20,24 +20,25 @@ import slamdata.Predef._
 
 import scalaz._
 
-sealed abstract class UWidth[F[_]] {
+/** Calculates the width of a typelevel union (coproduct). */
+sealed abstract class UnionWidth[F[_]] {
   val width: Int
 }
 
-object UWidth extends UWidthInstances
+object UnionWidth extends UWidthInstances
 
 sealed abstract class UWidthInstances extends UWidthInstances0 {
   implicit def coproductUWidth[F[_], G[_]](
     implicit
-    F: UWidth[F],
-    G: UWidth[G]
-  ): UWidth[Coproduct[F, G, ?]] =
-    new UWidth[Coproduct[F, G, ?]] {
+    F: UnionWidth[F],
+    G: UnionWidth[G]
+  ): UnionWidth[Coproduct[F, G, ?]] =
+    new UnionWidth[Coproduct[F, G, ?]] {
       val width = F.width + G.width
     }
 }
 
 sealed abstract class UWidthInstances0 {
-  implicit def defaultUWidth[F[_]]: UWidth[F] =
-    new UWidth[F] { val width = 1 }
+  implicit def defaultUWidth[F[_]]: UnionWidth[F] =
+    new UnionWidth[F] { val width = 1 }
 }
