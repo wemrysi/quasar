@@ -65,7 +65,7 @@ trait TablePagerModule extends ColumnarTableModule[Future] {
       val ta = driver >> queue.enqueue1(\/-(Vector.empty))
 
       ta unsafePerformAsync {
-        case -\/(t) => queue.enqueue1(-\/(t)).unsafePerformSync
+        case -\/(t) => queue.enqueue1(-\/(t)).unsafePerformAsync(_ => ())
         case \/-(_) => ()
       }
     }
