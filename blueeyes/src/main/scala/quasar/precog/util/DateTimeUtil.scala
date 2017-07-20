@@ -18,36 +18,20 @@ package quasar.precog.util
 
 import java.time._
 import java.time.format._
-import java.time.temporal.{TemporalAccessor, TemporalQuery}
 
 import java.util.regex.Pattern
 
 object DateTimeUtil {
-  // from http://stackoverflow.com/a/30072486/9815
-  private val fullParser = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss[xxx]")
 
-  // from joda-time javadoc
-  private val basicParser = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss.SSSZ")
-
-  //2013-02-04T18:07:39.608835
-  private val dateTimeRegex = Pattern.compile("^[0-9]{4}-?[0-9]{2}-?[0-9]{2}.*$")
+  // mimics ISO_INSTANT
+  private val dateTimeRegex =
+    Pattern.compile("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 
   def looksLikeIso8601(s: String): Boolean = dateTimeRegex.matcher(s).matches
 
-  def parseDateTime(value0: String): ZonedDateTime = {
-    val value = value0.trim.replace(" ", "T")
-
-    val parser = if (value.contains("-") || value.contains(":")) {
-      fullParser
-    } else {
-      basicParser
-    }
-
-    parser.parse(value, new TemporalQuery[ZonedDateTime] {
-      def queryFrom(temporal: TemporalAccessor) =
-        ZonedDateTime.from(temporal)
-    })
-  }
+  // FIXME ok this really sucks.  Instant ≠ ZonedDateTime
+  def parseDateTime(value: String): ZonedDateTime =
+    Instant.parse(value).atZone(ZoneId.of("UTC"))
 
   def isValidISO(str: String): Boolean = try {
     parseDateTime(str); true
