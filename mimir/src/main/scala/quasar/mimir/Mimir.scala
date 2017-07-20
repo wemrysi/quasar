@@ -32,6 +32,7 @@ import quasar.qscript._
 
 import quasar.blueeyes.json.{JNum, JValue}
 import quasar.precog.common.{CEmptyArray, Path, CPath, CPathIndex}
+import quasar.yggdrasil.TableModule
 import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
 import fs2.{async, Stream}
@@ -291,7 +292,33 @@ object Mimir extends BackendModule with Logging {
           repaired = shifted.transform(repairTrans)
         } yield Repr(src.P)(repaired)
 
-      case qscript.Sort(src, bucket, order) => ???
+      case qscript.Sort(src, MapFuncsCore.NullLit(), orders) =>
+        for {
+          transDirs <- orders.toList traverse {
+            case (fm, dir) => interpretMapFunc(src.P)(fm).map(ts => (ts, dir))
+          }
+
+          (transes, dirs) = transDirs.unzip(x => x)
+
+          // stable sort by the whole key
+          sortKey = src.P.trans.OuterArrayConcat(transes: _*)
+
+          dir = dirs.head   // it's a NEL coming in, so this is safe
+
+          _ <- if (dirs.exists(_ =/= dir))
+            Task.fail(new NotImplementedError(s"cannot sort non-uniform directions: $dirs")).liftM[MT].liftB
+          else
+            Task.now(()).liftM[MT].liftB
+
+          sortOrder = dir match {
+            case SortDir.Ascending => TableModule.SortAscending
+            case SortDir.Descending => TableModule.SortDescending
+          }
+
+          table <- src.table.sort(sortKey, sortOrder).toTask.liftM[MT].liftB
+        } yield Repr(src.P)(table)
+
+      case qscript.Sort(src, bucket, orders) => ???
 
       case qscript.Filter(src, f) =>
         import src.P.trans._
