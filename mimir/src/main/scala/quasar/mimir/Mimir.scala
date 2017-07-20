@@ -292,7 +292,7 @@ object Mimir extends BackendModule with Logging {
           repaired = shifted.transform(repairTrans)
         } yield Repr(src.P)(repaired)
 
-      case qscript.Sort(src, MapFuncsCore.NullLit(), orders) =>
+      case qscript.Sort(src, bucket, orders) =>
         import src.P.trans._
         import TableModule.DesiredSortOrder
 
@@ -319,17 +319,30 @@ object Mimir extends BackendModule with Logging {
               (acc :+ ((Vector(ts), ord2)), Some(ord2))
           }
 
-          (bucketed, _) = pair
+          (sorts, _) = pair
 
-          table <- bucketed.foldRightM(src.table) {
-            case ((transes, sortOrder), table) =>
-              val sortKey = OuterArrayConcat(transes: _*)
+          table <- {
+            def sortAll(table: src.P.Table): Future[src.P.Table] = {
+              sorts.foldRightM(table) {
+                case ((transes, sortOrder), table) =>
+                  val sortKey = OuterArrayConcat(transes: _*)
 
-              table.sort(sortKey, sortOrder).toTask.liftM[MT].liftB
+                  table.sort(sortKey, sortOrder)
+              }
+            }
+
+            if (bucket === MapFuncsCore.NullLit()) {
+              sortAll(src.table).toTask.liftM[MT].liftB
+            } else {
+              for {
+                bucketTrans <- interpretMapFunc(src.P)(bucket)
+
+                prepared <- src.table.sort(bucketTrans).toTask.liftM[MT].liftB
+                table <- prepared.partitionMerge(bucketTrans)(sortAll).toTask.liftM[MT].liftB
+              } yield table
+            }
           }
         } yield Repr(src.P)(table)
-
-      case qscript.Sort(src, bucket, orders) => ???
 
       case qscript.Filter(src, f) =>
         import src.P.trans._
