@@ -21,7 +21,6 @@ import quasar.qscript.{MapFuncCore, MapFuncsCore}
 
 import quasar.blueeyes.json.JValue
 import quasar.precog.common.{CLong, CPathField, CPathIndex, CString, RValue}
-import quasar.yggdrasil.table.cf.math
 import quasar.yggdrasil.table.cf.util.Undefined
 
 import matryoshka.{AlgebraM, RecursiveT}
@@ -38,7 +37,9 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
 
   final class PlanApplicatorCore[P <: Precog](override val cake: P)
     extends PlanApplicator[P](cake) {
+
     import cake.trans._
+    import cake.Library._
 
     def apply[A <: SourceType](id: cake.trans.TransSpec[A]): AlgebraM[F, MapFuncCore[T, ?], TransSpec[A]] = {
       case MapFuncsCore.Undefined() =>
@@ -89,47 +90,48 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.TypeOf(a1) => ???
 
       case MapFuncsCore.Negate(a1) =>
-        (Map1[A](a1, math.Negate): TransSpec[A]).point[F]
+        Unary.Neg.spec(a1).point[F]   // NB: don't use math.Negate here; it does weird things to booleans
       case MapFuncsCore.Add(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Add.f2): TransSpec[A]).point[F]
+        Infix.Add.spec(a1, a2).point[F]
       case MapFuncsCore.Multiply(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Mul.f2): TransSpec[A]).point[F]
+        Infix.Mul.spec(a1, a2).point[F]
       case MapFuncsCore.Subtract(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Sub.f2): TransSpec[A]).point[F]
+        Infix.Sub.spec(a1, a2).point[F]
       case MapFuncsCore.Divide(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Div.f2): TransSpec[A]).point[F]
+        Infix.Div.spec(a1, a2).point[F]
       case MapFuncsCore.Modulo(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Mod.f2): TransSpec[A]).point[F]
+        Infix.Mod.spec(a1, a2).point[F]
       case MapFuncsCore.Power(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Pow.f2): TransSpec[A]).point[F]
+        Infix.Pow.spec(a1, a2).point[F]
 
-      case MapFuncsCore.Not(a1) => ???
+      case MapFuncsCore.Not(a1) =>
+        Unary.Comp.spec(a1).point[F]
       case MapFuncsCore.Eq(a1, a2) =>
         (Equal[A](a1, a2): TransSpec[A]).point[F]
       case MapFuncsCore.Neq(a1, a2) => ???
       case MapFuncsCore.Lt(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Lt.f2): TransSpec[A]).point[F]
+        Infix.Lt.spec(a1, a2).point[F]
       case MapFuncsCore.Lte(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.LtEq.f2): TransSpec[A]).point[F]
+        Infix.LtEq.spec(a1, a2).point[F]
       case MapFuncsCore.Gt(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Gt.f2): TransSpec[A]).point[F]
+        Infix.Gt.spec(a1, a2).point[F]
       case MapFuncsCore.Gte(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.GtEq.f2): TransSpec[A]).point[F]
+        Infix.GtEq.spec(a1, a2).point[F]
 
       case MapFuncsCore.IfUndefined(a1, a2) => ???
       case MapFuncsCore.And(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.And.f2): TransSpec[A]).point[F]
+        Infix.And.spec(a1, a2).point[F]
       case MapFuncsCore.Or(a1, a2) =>
-        (Map2[A](a1, a2, cake.Library.Infix.Or.f2): TransSpec[A]).point[F]
+        Infix.Or.spec(a1, a2).point[F]
       case MapFuncsCore.Between(a1, a2, a3) => ???
       case MapFuncsCore.Cond(a1, a2, a3) => ???
 
       case MapFuncsCore.Within(a1, a2) => ???
 
       case MapFuncsCore.Lower(a1) =>
-        (Map1[A](a1, cake.Library.toLowerCase.f1): TransSpec[A]).point[F]
+        toLowerCase.spec(a1).point[F]
       case MapFuncsCore.Upper(a1) =>
-        (Map1[A](a1, cake.Library.toUpperCase.f1): TransSpec[A]).point[F]
+        toUpperCase.spec(a1).point[F]
       case MapFuncsCore.Bool(a1) => ???
       case MapFuncsCore.Integer(a1) => ???
       case MapFuncsCore.Decimal(a1) => ???
@@ -138,7 +140,6 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.Search(a1, a2, a3) => ???
       case MapFuncsCore.Substring(string, from, count) => ???
 
-      // FIXME detect constant cases so we don't have to always use the dynamic variants
       case MapFuncsCore.MakeArray(a1) =>
         (WrapArray[A](a1): TransSpec[A]).point[F]
       case MapFuncsCore.MakeMap(ConstLiteral(CString(key), _), value) =>
