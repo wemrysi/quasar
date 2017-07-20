@@ -2,7 +2,7 @@
     "name": "concat unknown with literal array",
     "backends": {
         "marklogic_json":    "ignoreFieldOrder",
-        "mimir":             "pendingIgnoreFieldOrder",
+        "mimir":             "ignoreFieldOrder",
         "mongodb_q_3_2":     "ignoreFieldOrder"
     },
     "data": "largeZips.data",
