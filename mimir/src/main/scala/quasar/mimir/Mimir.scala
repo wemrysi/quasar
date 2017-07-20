@@ -31,7 +31,7 @@ import quasar.fs.mount._
 import quasar.qscript._
 
 import quasar.blueeyes.json.{JNum, JValue}
-import quasar.precog.common.{CEmptyArray, CPathIndex, Path}
+import quasar.precog.common.{CEmptyArray, Path, CPath, CPathIndex}
 import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
 import fs2.{async, Stream}
@@ -134,15 +134,15 @@ object Mimir extends BackendModule with Logging {
 
   final case class Config(dataDir: java.io.File)
 
-  def parseConfig(uri: ConnectionUri): FileSystemDef.DefErrT[Task, Config] =
-    Config(new java.io.File(uri.value)).point[FileSystemDef.DefErrT[Task, ?]]
+  def parseConfig(uri: ConnectionUri): BackendDef.DefErrT[Task, Config] =
+    Config(new java.io.File(uri.value)).point[BackendDef.DefErrT[Task, ?]]
 
-  def compile(cfg: Config): FileSystemDef.DefErrT[Task, (M ~> Task, Task[Unit])] = {
+  def compile(cfg: Config): BackendDef.DefErrT[Task, (M ~> Task, Task[Unit])] = {
     val t = for {
       cake <- Precog(cfg.dataDir)
     } yield (λ[M ~> Task](_.run(cake)), cake.shutdown.toTask)
 
-    t.liftM[FileSystemDef.DefErrT]
+    t.liftM[BackendDef.DefErrT]
   }
 
   val Type = FileSystemType("mimir")
@@ -189,8 +189,6 @@ object Mimir extends BackendModule with Logging {
               κ(TransSpec1.Id.point[Backend]),
               mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
         } yield Repr(src.P)(src.table.transform(trans))
-
-      case qscript.LeftShift(src, struct, id, repair) => ???
 
       // reduce with a single bucket
       case qscript.Reduce(src, MapFuncsCore.NullLit(), reducers, repair) =>
@@ -261,6 +259,40 @@ object Mimir extends BackendModule with Logging {
         } yield Repr(red.P)(red.table.transform(trans))
 
       case qscript.Reduce(src, bucket, reducers, repair) => ???
+
+      case qscript.LeftShift(src, struct, idStatus, repair) =>
+        import src.P.trans._
+
+        for {
+          structTrans <- struct.cataM[Backend, TransSpec1](
+            interpretM(
+              κ(TransSpec1.Id.point[Backend]),
+              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+
+          wrappedStructTrans = InnerArrayConcat(WrapArray(TransSpec1.Id), WrapArray(structTrans))
+
+          repairTrans <- repair.cataM[Backend, TransSpec1](
+            interpretM(
+              {
+                case qscript.LeftSide =>
+                  (DerefArrayStatic(TransSpec1.Id, CPathIndex(0)): TransSpec1).point[Backend]
+
+                case qscript.RightSide =>
+                  val target = DerefArrayStatic(TransSpec1.Id, CPathIndex(1))
+
+                  val back: TransSpec1 = idStatus match {
+                    case IdOnly => DerefArrayStatic(target, CPathIndex(0))
+                    case IncludeId => target
+                    case ExcludeId => DerefArrayStatic(target, CPathIndex(1))
+                  }
+
+                  back.point[Backend]
+              },
+              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+
+          shifted = src.table.transform(wrappedStructTrans).leftShift(CPath.Identity \ 1)
+          repaired = shifted.transform(repairTrans)
+        } yield Repr(src.P)(repaired)
 
       case qscript.Sort(src, bucket, order) => ???
 

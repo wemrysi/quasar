@@ -56,18 +56,64 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
       : ExpandMapFunc.Aux[MapFuncDerived[T, ?], OUTʹ] =
     new ExpandMapFunc[MapFuncDerived[T, ?]] {
       type OUT[A] = OUTʹ[A]
+      type OutFree[A] = (OUT ∘ Free[OUT, ?])#λ[A]
+
+      def intR[A](i: Int): Free[OUT, A] =
+        Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(i)))))
+
+      def truncR[A](a: Free[OUT, A]): Free[OUT, A] =
+        Free.roll[OUT, A](trunc(a))
+
+      def trunc[A](a: Free[OUT, A]): (OUT ∘ Free[OUT, ?])#λ[A] =
+        MFC(Subtract(
+          a,
+          moduloR(a, intR(1))))
+
+      def addR[A](a1: Free[OUT, A], a2: Free[OUT, A]): Free[OUT, A] =
+        Free.roll(MFC(Add(a1, a2)))
+
+      def subtractR[A](a1: Free[OUT, A], a2: Free[OUT, A]): Free[OUT, A] =
+        Free.roll(MFC(Subtract(a1, a2)))
+
+      def moduloR[A](a1: Free[OUT, A], a2: Free[OUT, A]): Free[OUT, A] =
+        Free.roll(MFC(Modulo(a1, a2)))
+
+      def eqR[A](a1: Free[OUT, A], a2: Free[OUT, A]): Free[OUT, A] =
+        Free.roll(MFC(MapFuncsCore.Eq(a1, a2)))
+
+      def ltR[A](a1: Free[OUT, A], a2: Free[OUT, A]): Free[OUT, A] =
+        Free.roll(MFC(Lt(a1, a2)))
+
+      def negateR[A](a: Free[OUT, A]): Free[OUT, A] =
+        Free.roll(MFC(Negate(a)))
+
+      def condR[A](a1: Free[OUT, A], a2: Free[OUT, A], a3: Free[OUT, A]): Free[OUT, A] =
+        Free.roll(MFC(Cond(a1, a2, a3)))
 
       val expand: MapFuncDerived[T, ?] ~> ((OUT ∘ Free[OUT, ?])#λ) =
         λ[MapFuncDerived[T, ?] ~> (OUT ∘ Free[OUT, ?])#λ] {
           case D.Abs(a) =>
             MFC(Cond(
-              Free.roll(MFC(Lt(a.point[Free[OUT,?]], Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(0)))))))),
-              Free.roll(MFC(Negate(a.point[Free[OUT, ?]]))),
+              ltR(a.point[Free[OUT, ?]], intR(0)),
+              negateR(a.point[Free[OUT, ?]]),
               a.point[Free[OUT, ?]]))
-          case D.Trunc(a) =>
-            MFC(Subtract(
+          case D.Ceil(a) =>
+            MFC(Cond(
+              eqR(moduloR(a.point[Free[OUT, ?]], intR(1)), intR(0)),
               a.point[Free[OUT, ?]],
-              Free.roll(MFC(Modulo(a.point[Free[OUT,?]], Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(1))))))))))
+              condR(
+                ltR(a.point[Free[OUT, ?]], intR(0)),
+                truncR(a.point[Free[OUT, ?]]),
+                addR(truncR(a.point[Free[OUT, ?]]), intR(1)))))
+          case D.Floor(a) =>
+            MFC(Cond(
+              eqR(moduloR(a.point[Free[OUT, ?]], intR(1)), intR(0)),
+              a.point[Free[OUT, ?]],
+              condR(
+                ltR(a.point[Free[OUT, ?]], intR(0)),
+                subtractR(truncR(a.point[Free[OUT, ?]]), intR(1)),
+                truncR(a.point[Free[OUT, ?]]))))
+          case D.Trunc(a) => trunc(a.point[Free[OUT, ?]])
         }
     }
 
