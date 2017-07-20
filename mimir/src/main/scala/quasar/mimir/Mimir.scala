@@ -253,11 +253,12 @@ object Mimir extends BackendModule with Logging {
                   (red.P.trans.DerefArrayStatic(
                     red.P.trans.TransSpec1.Id,
                     CPathIndex(remapIndex(idx))): red.P.trans.TransSpec1).point[Backend]
-                case _ => ??? // FIXME handle None case and generalize so we index into reducers
+                case _ => ??? // FIXME handle None case
               },
               mapFuncPlanner.plan(red.P)[red.P.trans.Source1](red.P.trans.TransSpec1.Id)))
         } yield Repr(red.P)(red.table.transform(trans))
 
+      // TODO #1990 grouped reduction
       case qscript.Reduce(src, bucket, reducers, repair) => ???
 
       case qscript.LeftShift(src, struct, idStatus, repair) =>
