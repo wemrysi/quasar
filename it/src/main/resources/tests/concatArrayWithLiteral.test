@@ -2,8 +2,8 @@
     "name": "concat unknown with literal array",
     "backends": {
         "marklogic_json":    "ignoreFieldOrder",
-        "mimir":             "pending",
-        "mongodb_q_3_2":     "pending"
+        "mimir":             "ignoreFieldOrder",
+        "mongodb_q_3_2":     "ignoreFieldOrder"
     },
     "data": "largeZips.data",
     "query": "select loc || [1, 2] as arr, city from largeZips",
