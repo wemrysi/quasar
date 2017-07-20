@@ -191,7 +191,7 @@ object Mimir extends BackendModule with Logging {
         } yield Repr(src.P)(src.table.transform(trans))
 
       // reduce with a single bucket
-      case qscript.Reduce(src, MapFuncsCore.NullLit(), reducers, repair) =>
+      case qscript.Reduce(src, bucket @ MapFuncsCore.NullLit(), reducers, repair) =>
         def toTransSpec(f: FreeMap[T]): Backend[src.P.trans.TransSpec1] =
           f.cataM[Backend, src.P.trans.TransSpec1](
             interpretM(
@@ -253,7 +253,7 @@ object Mimir extends BackendModule with Logging {
                   (red.P.trans.DerefArrayStatic(
                     red.P.trans.TransSpec1.Id,
                     CPathIndex(remapIndex(idx))): red.P.trans.TransSpec1).point[Backend]
-                case _ => ??? // FIXME handle None case
+                case ReduceIndex(None) => toTransSpec(bucket)
               },
               mapFuncPlanner.plan(red.P)[red.P.trans.Source1](red.P.trans.TransSpec1.Id)))
         } yield Repr(red.P)(red.table.transform(trans))
