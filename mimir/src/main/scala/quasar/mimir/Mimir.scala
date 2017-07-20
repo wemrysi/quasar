@@ -52,6 +52,7 @@ import pathy.Path._
 import delorean._
 
 import scala.Predef.implicitly
+import scala.collection.immutable.{Map => ScalaMap}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -192,19 +193,22 @@ object Mimir extends BackendModule with Logging {
 
       // reduce with a single bucket
       case qscript.Reduce(src, bucket @ MapFuncsCore.NullLit(), reducers, repair) =>
-        def toTransSpec(f: FreeMap[T]): Backend[src.P.trans.TransSpec1] =
-          f.cataM[Backend, src.P.trans.TransSpec1](
+        import src.P.trans._
+        import src.P.Library
+
+        def toTransSpec(f: FreeMap[T]): Backend[TransSpec1] =
+          f.cataM[Backend, TransSpec1](
             interpretM(
-              κ(src.P.trans.TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)[src.P.trans.Source1](src.P.trans.TransSpec1.Id)))
+              κ(TransSpec1.Id.point[Backend]),
+              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
 
         def extractReduction(red: ReduceFunc[FreeMap[T]])
-            : (src.P.Library.Reduction, FreeMap[T]) = red match {
-          case ReduceFuncs.Count(f) => (src.P.Library.Count, f)
-          case ReduceFuncs.Sum(f) => (src.P.Library.Sum, f)
-          case ReduceFuncs.Min(f) => (src.P.Library.Min, f)
-          case ReduceFuncs.Max(f) => (src.P.Library.Max, f)
-          case ReduceFuncs.Avg(f) => (src.P.Library.Mean, f)
+            : (Library.Reduction, FreeMap[T]) = red match {
+          case ReduceFuncs.Count(f) => (Library.Count, f)
+          case ReduceFuncs.Sum(f) => (Library.Sum, f)
+          case ReduceFuncs.Min(f) => (Library.Min, f)
+          case ReduceFuncs.Max(f) => (Library.Max, f)
+          case ReduceFuncs.Avg(f) => (Library.Mean, f)
           case ReduceFuncs.Arbitrary(f) => ???
           case ReduceFuncs.First(f) => ???
           case ReduceFuncs.Last(f) => ???
@@ -212,26 +216,26 @@ object Mimir extends BackendModule with Logging {
           case ReduceFuncs.UnshiftMap(f1, f2) => ???
         }
 
-        def combineTransSpecs(specs: List[src.P.trans.TransSpec1]): src.P.trans.TransSpec1 =
-          specs.map(src.P.trans.WrapArray(_): src.P.trans.TransSpec1)
-            .reduceLeftOption(src.P.trans.OuterArrayConcat(_, _))
-            .getOrElse(src.P.trans.TransSpec1.Id)
+        def combineTransSpecs(specs: List[TransSpec1]): TransSpec1 =
+          specs.map(WrapArray(_): TransSpec1)
+            .reduceLeftOption(OuterArrayConcat(_, _))
+            .getOrElse(TransSpec1.Id)
 
-        val pairs: List[(src.P.Library.Reduction, FreeMap[T])] =
+        val pairs: List[(Library.Reduction, FreeMap[T])] =
           reducers.map(extractReduction)
 
-        val reductions: List[src.P.Library.Reduction] = pairs.map(_._1)
+        val reductions: List[Library.Reduction] = pairs.map(_._1)
         val funcs: List[FreeMap[T]] = pairs.map(_._2)
 
         def makeJArray(idx: Int)(tpe: JType): JType =
-          JArrayFixedT(scala.collection.immutable.Map(idx -> tpe))
+          JArrayFixedT(ScalaMap(idx -> tpe))
 
-        val megaReduction: src.P.Library.Reduction =
-          src.P.Library.coalesce(reductions.zipWithIndex.map {
+        val megaReduction: Library.Reduction =
+          Library.coalesce(reductions.zipWithIndex.map {
             case (r, i) => (r, Some(makeJArray(i)(_)))
           })
 
-        val megaSpec: Backend[src.P.trans.TransSpec1] = for {
+        val megaSpec: Backend[TransSpec1] = for {
           specs <- funcs.traverse(toTransSpec)
         } yield combineTransSpecs(specs)
 
@@ -241,21 +245,21 @@ object Mimir extends BackendModule with Logging {
         } yield Repr(src.P)(table)
 
         // mimir reverses the order of the returned results
-        def remapIndex: scala.collection.immutable.Map[Int, Int] =
+        def remapIndex: ScalaMap[Int, Int] =
           (0 until reducers.length).reverse.zipWithIndex.toMap
 
         for {
           red <- reduced
-          trans <- repair.cataM[Backend, red.P.trans.TransSpec1](
+          trans <- repair.cataM[Backend, TransSpec1](
             interpretM(
               {
                 case ReduceIndex(Some(idx)) =>
-                  (red.P.trans.DerefArrayStatic(
-                    red.P.trans.TransSpec1.Id,
-                    CPathIndex(remapIndex(idx))): red.P.trans.TransSpec1).point[Backend]
+                  (DerefArrayStatic(
+                    TransSpec1.Id,
+                    CPathIndex(remapIndex(idx))): TransSpec1).point[Backend]
                 case ReduceIndex(None) => toTransSpec(bucket)
               },
-              mapFuncPlanner.plan(red.P)[red.P.trans.Source1](red.P.trans.TransSpec1.Id)))
+              mapFuncPlanner.plan(red.P)[Source1](TransSpec1.Id)))
         } yield Repr(red.P)(red.table.transform(trans))
 
       // TODO #1990 grouped reduction
