@@ -321,8 +321,8 @@ object Mimir extends BackendModule with Logging {
 
           (bucketed, _) = pair
 
-          table <- bucketed.foldLeftM(src.table) {
-            case (table, (transes, sortOrder)) =>
+          table <- bucketed.foldRightM(src.table) {
+            case ((transes, sortOrder), table) =>
               val sortKey = OuterArrayConcat(transes: _*)
 
               table.sort(sortKey, sortOrder).toTask.liftM[MT].liftB
