@@ -180,27 +180,22 @@ object Mimir extends BackendModule with Logging {
                       _ => ???,   // Read[AFile]
                       _ => ???))))))))    // DeadEnd
 
+    def interpretMapFunc(P: Precog)(fm: FreeMap[T]): Backend[P.trans.TransSpec1] =
+      fm.cataM[Backend, P.trans.TransSpec1](
+        interpretM(
+          κ(P.trans.TransSpec1.Id.point[Backend]),
+          mapFuncPlanner.plan(P)[P.trans.Source1](P.trans.TransSpec1.Id)))
+
     lazy val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = {
       case qscript.Map(src, f) =>
-        import src.P.trans._
-
         for {
-          trans <- f.cataM[Backend, TransSpec1](
-            interpretM(
-              κ(TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+          trans <- interpretMapFunc(src.P)(f)
         } yield Repr(src.P)(src.table.transform(trans))
 
       // reduce with a single bucket
       case qscript.Reduce(src, bucket @ MapFuncsCore.NullLit(), reducers, repair) =>
         import src.P.trans._
         import src.P.Library
-
-        def toTransSpec(f: FreeMap[T]): Backend[TransSpec1] =
-          f.cataM[Backend, TransSpec1](
-            interpretM(
-              κ(TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
 
         def extractReduction(red: ReduceFunc[FreeMap[T]])
             : (Library.Reduction, FreeMap[T]) = red match {
@@ -236,7 +231,7 @@ object Mimir extends BackendModule with Logging {
           })
 
         val megaSpec: Backend[TransSpec1] = for {
-          specs <- funcs.traverse(toTransSpec)
+          specs <- funcs.traverse(interpretMapFunc(src.P)(_))
         } yield combineTransSpecs(specs)
 
         val reduced: Backend[Repr { type P = src.P.type }] = for {
@@ -258,7 +253,7 @@ object Mimir extends BackendModule with Logging {
                     (DerefArrayStatic(TransSpec1.Id, CPathIndex(i)): TransSpec1).point[Backend]
                   case None => ???
                 }
-                case ReduceIndex(None) => toTransSpec(bucket)
+                case ReduceIndex(None) => interpretMapFunc(src.P)(bucket)
               },
               mapFuncPlanner.plan(red.P)[Source1](TransSpec1.Id)))
         } yield Repr(red.P)(red.table.transform(trans))
@@ -270,11 +265,7 @@ object Mimir extends BackendModule with Logging {
         import src.P.trans._
 
         for {
-          structTrans <- struct.cataM[Backend, TransSpec1](
-            interpretM(
-              κ(TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
-
+          structTrans <- interpretMapFunc(src.P)(struct)
           wrappedStructTrans = InnerArrayConcat(WrapArray(TransSpec1.Id), WrapArray(structTrans))
 
           repairTrans <- repair.cataM[Backend, TransSpec1](
@@ -306,10 +297,7 @@ object Mimir extends BackendModule with Logging {
         import src.P.trans._
 
         for {
-          trans <- f.cataM[Backend, src.P.trans.TransSpec1](
-            interpretM(
-              κ(TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+          trans <- interpretMapFunc(src.P)(f)
         } yield Repr(src.P)(src.table.transform(Filter(TransSpec1.Id, trans)))
 
       case qscript.Union(src, lBranch, rBranch) =>
@@ -367,15 +355,8 @@ object Mimir extends BackendModule with Logging {
           rmerged <- src.unsafeMerge(rightRepr).liftM[MT].liftB
           rtable = rmerged.table
 
-          transLKey <- lkey.cataM[Backend, TransSpec1](
-            interpretM(
-              κ(TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
-
-          transRKey <- rkey.cataM[Backend, TransSpec1](
-            interpretM(
-              κ(TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+          transLKey <- interpretMapFunc(src.P)(lkey)
+          transRKey <- interpretMapFunc(src.P)(rkey)
 
           transMiddle <- combine.cataM[Backend, TransSpec2](
             interpretM(
