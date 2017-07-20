@@ -293,29 +293,40 @@ object Mimir extends BackendModule with Logging {
         } yield Repr(src.P)(repaired)
 
       case qscript.Sort(src, MapFuncsCore.NullLit(), orders) =>
+        import src.P.trans._
+        import TableModule.DesiredSortOrder
+
         for {
           transDirs <- orders.toList traverse {
-            case (fm, dir) => interpretMapFunc(src.P)(fm).map(ts => (ts, dir))
+            case (fm, dir) =>
+              val order = dir match {
+                case SortDir.Ascending => TableModule.SortAscending
+                case SortDir.Descending => TableModule.SortDescending
+              }
+
+              interpretMapFunc(src.P)(fm).map(ts => (ts, order))
           }
 
-          (transes, dirs) = transDirs.unzip(x => x)
+          pair = transDirs.foldLeft((Vector.empty[(Vector[TransSpec1], DesiredSortOrder)], None: Option[DesiredSortOrder])) {
+            case ((acc, None), (ts, order)) =>
+              (acc :+ ((Vector(ts), order)), Some(order))
 
-          // stable sort by the whole key
-          sortKey = src.P.trans.OuterArrayConcat(transes: _*)
+            case ((acc, Some(ord1)), (ts, ord2)) if ord1 == ord2 =>
+              val idx = acc.length - 1
+              (acc.updated(idx, (acc(idx)._1 :+ ts, ord1)), Some(ord1))
 
-          dir = dirs.head   // it's a NEL coming in, so this is safe
-
-          _ <- if (dirs.exists(_ =/= dir))
-            Task.fail(new NotImplementedError(s"cannot sort non-uniform directions: $dirs")).liftM[MT].liftB
-          else
-            Task.now(()).liftM[MT].liftB
-
-          sortOrder = dir match {
-            case SortDir.Ascending => TableModule.SortAscending
-            case SortDir.Descending => TableModule.SortDescending
+            case ((acc, Some(ord1)), (ts, ord2)) =>
+              (acc :+ ((Vector(ts), ord2)), Some(ord2))
           }
 
-          table <- src.table.sort(sortKey, sortOrder).toTask.liftM[MT].liftB
+          (bucketed, _) = pair
+
+          table <- bucketed.foldLeftM(src.table) {
+            case (table, (transes, sortOrder)) =>
+              val sortKey = OuterArrayConcat(transes: _*)
+
+              table.sort(sortKey, sortOrder).toTask.liftM[MT].liftB
+          }
         } yield Repr(src.P)(table)
 
       case qscript.Sort(src, bucket, orders) => ???
