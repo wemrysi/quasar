@@ -2,7 +2,8 @@
     "name": "implicitly grouped, with filtering",
 
     "backends": {
-        "marklogic_json": "ignoreFieldOrder"
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir":"ignoreFieldOrder"
     },
 
     "data": "zips.data",

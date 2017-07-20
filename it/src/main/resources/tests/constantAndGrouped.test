@@ -3,7 +3,8 @@
 
     "backends": {
         "couchbase":      "ignoreFieldOrder",
-        "marklogic_json": "ignoreFieldOrder"
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir":          "ignoreFieldOrder"
     },
 
     "data": "zips.data",
