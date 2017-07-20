@@ -253,10 +253,11 @@ object Mimir extends BackendModule with Logging {
           trans <- repair.cataM[Backend, TransSpec1](
             interpretM(
               {
-                case ReduceIndex(Some(idx)) =>
-                  (DerefArrayStatic(
-                    TransSpec1.Id,
-                    CPathIndex(remapIndex(idx))): TransSpec1).point[Backend]
+                case ReduceIndex(Some(idx)) => remapIndex.get(idx) match {
+                  case Some(i) =>
+                    (DerefArrayStatic(TransSpec1.Id, CPathIndex(i)): TransSpec1).point[Backend]
+                  case None => ???
+                }
                 case ReduceIndex(None) => toTransSpec(bucket)
               },
               mapFuncPlanner.plan(red.P)[Source1](TransSpec1.Id)))
