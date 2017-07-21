@@ -130,10 +130,6 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
     case MapFuncsCore.IfUndefined(_, _) => notImplemented.left
     case MapFuncsCore.Between(_, _, _) => notImplemented.left
     case MapFuncsCore.Within(_, _) => notImplemented.left
-    case MapFuncsCore.Bool(_) => notImplemented.left
-    case MapFuncsCore.Integer(_) => notImplemented.left
-    case MapFuncsCore.Decimal(_) => notImplemented.left
-    case MapFuncsCore.Null(_) => notImplemented.left
     case MapFuncsCore.ToString(_) => notImplemented.left
     case MapFuncsCore.Meta(_) => notImplemented.left
     case MapFuncsCore.Range(_, _) => notImplemented.left

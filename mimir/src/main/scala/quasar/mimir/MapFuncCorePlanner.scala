@@ -136,10 +136,14 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         toLowerCase.spec(a1).point[F]
       case MapFuncsCore.Upper(a1) =>
         toUpperCase.spec(a1).point[F]
-      case MapFuncsCore.Bool(a1) => ???
-      case MapFuncsCore.Integer(a1) => ???
-      case MapFuncsCore.Decimal(a1) => ???
-      case MapFuncsCore.Null(a1) => ???
+      case MapFuncsCore.Bool(a1) =>
+        readBoolean.spec[A](a1).point[F]
+      case MapFuncsCore.Integer(a1) =>
+        readInteger.spec[A](a1).point[F]
+      case MapFuncsCore.Decimal(a1) =>
+        readDecimal.spec[A](a1).point[F]
+      case MapFuncsCore.Null(a1) =>
+        readNull.spec[A](a1).point[F]
       case MapFuncsCore.ToString(a1) => ???
 
       case MapFuncsCore.Search(src, pattern, ConstLiteral(CBoolean(flag), _)) =>

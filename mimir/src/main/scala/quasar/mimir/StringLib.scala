@@ -92,6 +92,47 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
     object intern extends Op1SS("intern", _.intern)
 
+    object readBoolean extends Op1F1(StringNamespace, "readBoolean") {
+      val tpe = UnaryOperationType(StrAndDateT, JBooleanT)
+      def f1: F1 = CF1P("builtin::str::readBoolean") {
+        case c: StrColumn => new BoolFrom.S(c, s => s == "true" || s == "false", _.toBoolean)
+        case c: DateColumn => new BoolFrom.S(dateToStrCol(c), s => s == "true" || s == "false", _.toBoolean)
+      }
+    }
+
+    object readInteger extends Op1F1(StringNamespace, "readInteger") {
+      val tpe = UnaryOperationType(StrAndDateT, JNumberT)
+      def f1: F1 = CF1P("builtin::str::readInteger") {
+        case c: StrColumn => new LongFrom.S(c, s => try { s.toLong; true } catch { case _: Exception => false }, _.toLong)
+        case c: DateColumn => new LongFrom.S(dateToStrCol(c), s => try { s.toLong; true } catch { case _: Exception => false }, _.toLong)
+      }
+    }
+
+    object readDecimal extends Op1F1(StringNamespace, "readDecimal") {
+      val tpe = UnaryOperationType(StrAndDateT, JNumberT)
+      def f1: F1 = CF1P("builtin::str::readDecimal") {
+        case c: StrColumn => new NumFrom.S(c, s => try { BigDecimal(s); true } catch { case _: Exception => false }, BigDecimal(_))
+        case c: DateColumn => new NumFrom.S(dateToStrCol(c), s => try { BigDecimal(s); true } catch { case _: Exception => false }, BigDecimal(_))
+      }
+    }
+
+    object readNull extends Op1F1(StringNamespace, "readNull") {
+      val tpe = UnaryOperationType(StrAndDateT, JNullT)
+      def f1: F1 = CF1P("builtin::str::readNull") {
+        case c: StrColumn =>
+          new NullColumn {
+            def isDefinedAt(row: Int) = c.isDefinedAt(row) && c(row) == "null"
+          }
+
+        case dc: DateColumn =>
+          val c = dateToStrCol(dc)
+
+          new NullColumn {
+            def isDefinedAt(row: Int) = c.isDefinedAt(row) && c(row) == "null"
+          }
+      }
+    }
+
     object isEmpty extends Op1F1(StringNamespace, "isEmpty") {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = UnaryOperationType(StrAndDateT, JBooleanT)

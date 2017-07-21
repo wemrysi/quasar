@@ -572,6 +572,14 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
+    class S(c: StrColumn, defined: String => Boolean, f: String => BigDecimal) extends Map1Column(c) with NumColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
     class DD(c1: DoubleColumn, c2: DoubleColumn, defined: (BigDecimal, BigDecimal) => Boolean, f: (BigDecimal, BigDecimal) => BigDecimal)
         extends Map2Column(c1, c2)
         with NumColumn {
