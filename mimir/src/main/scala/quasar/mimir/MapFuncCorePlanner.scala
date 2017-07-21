@@ -144,7 +144,8 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         readDecimal.spec[A](a1).point[F]
       case MapFuncsCore.Null(a1) =>
         readNull.spec[A](a1).point[F]
-      case MapFuncsCore.ToString(a1) => ???
+      case MapFuncsCore.ToString(a1) =>
+        convertToString.spec[A](a1).point[F]
 
       case MapFuncsCore.Search(src, pattern, ConstLiteral(CBoolean(flag), _)) =>
         val op = if (flag)

@@ -133,6 +133,47 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       }
     }
 
+    object convertToString extends Op1F1(StringNamespace, "toString") {
+      val tpe = UnaryOperationType(JType.JPrimitiveUnfixedT, JTextT)
+      def f1: F1 = CF1P("builtin::str::toString") {
+        case c: BoolColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: LongColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: DoubleColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: NumColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: PeriodColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: DateColumn =>
+          new StrColumn {
+            def apply(row: Int) = c(row).toString
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+        case c: NullColumn =>
+          new StrColumn {
+            def apply(row: Int) = "null"
+            def isDefinedAt(row: Int) = c.isDefinedAt(row)
+          }
+      }
+    }
+
     object isEmpty extends Op1F1(StringNamespace, "isEmpty") {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = UnaryOperationType(StrAndDateT, JBooleanT)
