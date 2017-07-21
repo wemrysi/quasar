@@ -59,28 +59,41 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.Length(a1) => length.spec(a1).point[F]
 
       case MapFuncsCore.ExtractCentury(a1) => ???
-      case MapFuncsCore.ExtractDayOfMonth(a1) => ???
+      case MapFuncsCore.ExtractDayOfMonth(a1) =>
+        (Map1[A](a1, cake.Library.DayOfMonth.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractDecade(a1) => ???
-      case MapFuncsCore.ExtractDayOfWeek(a1) => ???
-      case MapFuncsCore.ExtractDayOfYear(a1) => ???
+      case MapFuncsCore.ExtractDayOfWeek(a1) =>
+        (Map1[A](a1, cake.Library.DayOfWeek.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractDayOfYear(a1) =>
+        (Map1[A](a1, cake.Library.DayOfYear.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractEpoch(a1) => ???
-      case MapFuncsCore.ExtractHour(a1) => ???
-      case MapFuncsCore.ExtractIsoDayOfWeek(a1) => ???
-      case MapFuncsCore.ExtractIsoYear(a1) => ???
+      case MapFuncsCore.ExtractHour(a1) =>
+        (Map1[A](a1, cake.Library.HourOfDay.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractIsoDayOfWeek(a1) =>
+        (Map1[A](a1, cake.Library.DayOfWeek.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractIsoYear(a1) =>
+        (Map1[A](a1, cake.Library.Year.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractMicroseconds(a1) => ???
       case MapFuncsCore.ExtractMillennium(a1) => ???
       case MapFuncsCore.ExtractMilliseconds(a1) => ???
-      case MapFuncsCore.ExtractMinute(a1) => ???
-      case MapFuncsCore.ExtractMonth(a1) => ???
-      case MapFuncsCore.ExtractQuarter(a1) => ???
-      case MapFuncsCore.ExtractSecond(a1) => ???
-      case MapFuncsCore.ExtractTimezone(a1) => ???
+      case MapFuncsCore.ExtractMinute(a1) =>
+        (Map1[A](a1, cake.Library.MinuteOfHour.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractMonth(a1) =>
+        (Map1[A](a1, cake.Library.MonthOfYear.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractQuarter(a1) =>
+        (Map1[A](a1, cake.Library.QuarterOfYear.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractSecond(a1) => ??? // expects a decimal like 32.12383
+      case MapFuncsCore.ExtractTimezone(a1) =>
+        (Map1[A](a1, cake.Library.TimeZone.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractTimezoneHour(a1) => ???
       case MapFuncsCore.ExtractTimezoneMinute(a1) => ???
-      case MapFuncsCore.ExtractWeek(a1) => ???
-      case MapFuncsCore.ExtractYear(a1) => ???
-      case MapFuncsCore.Date(a1) => ???
-      case MapFuncsCore.Time(a1) => ???
+      case MapFuncsCore.ExtractWeek(a1) => ??? // week of year
+      case MapFuncsCore.ExtractYear(a1) =>
+        (Map1[A](a1, cake.Library.Year.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.Date(a1) =>
+        (Map1[A](a1, cake.Library.Date.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.Time(a1) =>
+        (Map1[A](a1, cake.Library.Time.f1): TransSpec[A]).point[F]
       case MapFuncsCore.Timestamp(a1) => ???
       case MapFuncsCore.Interval(a1) => ???
       case MapFuncsCore.StartOfDay(a1) => ???
