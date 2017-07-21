@@ -76,10 +76,6 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
       case (ExtractBin(MapFuncsCore.Add(_,_)), Data.Int(_), Data.Dec(_)) => notImplemented // FIXME implemented: should be working
       case (ExtractBin(MapFuncsCore.Add(_,_)), Data.Dec(_), Data.Int(_)) => notImplemented // FIXME implemented: should be working
 
-      case (ExtractBin(MapFuncsCore.Subtract(_,_)), Data.Dec(_), Data.Dec(_)) => notImplemented // FIXME implemented: should be working
-      case (ExtractBin(MapFuncsCore.Subtract(_,_)), Data.Int(_), Data.Dec(_)) => notImplemented // FIXME implemented: should be working
-      case (ExtractBin(MapFuncsCore.Subtract(_,_)), Data.Dec(_), Data.Int(_)) => notImplemented // FIXME implemented: should be working
-
       case (ExtractBin(MapFuncsCore.Power(_,_)), Data.Int(_), Data.Int(one)) if one.toInt == 1 => notImplemented // FIXME implemented: should be working
       case (ExtractBin(MapFuncsCore.Power(_,_)), Data.Dec(_), Data.Int(one)) if one.toInt == 1 => notImplemented // FIXME implemented: should be working
       case (ExtractBin(MapFuncsCore.Power(_,_)), Data.Int(_), Data.Int(two)) if two.toInt == 2 => notImplemented // FIXME implemented: should be working
@@ -127,7 +123,6 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
     case MapFuncsCore.Now() => notImplemented.left
     case MapFuncsCore.TypeOf(_) => notImplemented.left
     case MapFuncsCore.Negate(_) => notImplemented.left // TODO this isn't passing because -Long.MinValue == Long.MinValue, so basically a limitation in ColumnarTable
-    case MapFuncsCore.Neq(_, _) => notImplemented.left
     case MapFuncsCore.IfUndefined(_, _) => notImplemented.left
     case MapFuncsCore.Between(_, _, _) => notImplemented.left
     case MapFuncsCore.Within(_, _) => notImplemented.left

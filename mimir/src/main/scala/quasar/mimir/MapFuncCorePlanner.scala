@@ -108,7 +108,8 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         Unary.Comp.spec(a1).point[F]
       case MapFuncsCore.Eq(a1, a2) =>
         (Equal[A](a1, a2): TransSpec[A]).point[F]
-      case MapFuncsCore.Neq(a1, a2) => ???
+      case MapFuncsCore.Neq(a1, a2) =>
+        Unary.Comp.spec(Equal[A](a1, a2)).point[F]
       case MapFuncsCore.Lt(a1, a2) =>
         Infix.Lt.spec(a1, a2).point[F]
       case MapFuncsCore.Lte(a1, a2) =>
