@@ -3,7 +3,7 @@
 
     "backends": {
         "marklogic_json": "ignoreFieldOrder",
-        "mimir":"pendingIgnoreFieldOrder"
+        "mimir":"ignoreFieldOrder"
     },
 
     "data": "zips.data",
