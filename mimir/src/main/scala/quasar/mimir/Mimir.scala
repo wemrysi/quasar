@@ -32,6 +32,7 @@ import quasar.qscript._
 
 import quasar.blueeyes.json.{JNum, JValue}
 import quasar.precog.common.{CEmptyArray, Path, CPath, CPathIndex}
+import quasar.yggdrasil.TableModule
 import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
 import fs2.{async, Stream}
@@ -291,7 +292,44 @@ object Mimir extends BackendModule with Logging {
           repaired = shifted.transform(repairTrans)
         } yield Repr(src.P)(repaired)
 
-      case qscript.Sort(src, bucket, order) => ???
+      case qscript.Sort(src, MapFuncsCore.NullLit(), orders) =>
+        import src.P.trans._
+        import TableModule.DesiredSortOrder
+
+        for {
+          transDirs <- orders.toList traverse {
+            case (fm, dir) =>
+              val order = dir match {
+                case SortDir.Ascending => TableModule.SortAscending
+                case SortDir.Descending => TableModule.SortDescending
+              }
+
+              interpretMapFunc(src.P)(fm).map(ts => (ts, order))
+          }
+
+          pair = transDirs.foldLeft((Vector.empty[(Vector[TransSpec1], DesiredSortOrder)], None: Option[DesiredSortOrder])) {
+            case ((acc, None), (ts, order)) =>
+              (acc :+ ((Vector(ts), order)), Some(order))
+
+            case ((acc, Some(ord1)), (ts, ord2)) if ord1 == ord2 =>
+              val idx = acc.length - 1
+              (acc.updated(idx, (acc(idx)._1 :+ ts, ord1)), Some(ord1))
+
+            case ((acc, Some(ord1)), (ts, ord2)) =>
+              (acc :+ ((Vector(ts), ord2)), Some(ord2))
+          }
+
+          (bucketed, _) = pair
+
+          table <- bucketed.foldRightM(src.table) {
+            case ((transes, sortOrder), table) =>
+              val sortKey = OuterArrayConcat(transes: _*)
+
+              table.sort(sortKey, sortOrder).toTask.liftM[MT].liftB
+          }
+        } yield Repr(src.P)(table)
+
+      case qscript.Sort(src, bucket, orders) => ???
 
       case qscript.Filter(src, f) =>
         import src.P.trans._
