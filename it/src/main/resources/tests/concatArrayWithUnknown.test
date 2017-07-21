@@ -3,7 +3,7 @@
     "backends": {
         "couchbase":         "ignoreFieldOrder",
         "marklogic_json":    "ignoreFieldOrder",
-        "mimir":             "skip"
+        "mimir":             "ignoreFieldOrder"
     },
     "data": "largeZips.data",
     "query": "select city, state, loc || [ pop ] as lp from largeZips",

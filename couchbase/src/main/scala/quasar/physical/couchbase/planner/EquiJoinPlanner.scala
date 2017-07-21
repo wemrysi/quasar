@@ -52,12 +52,12 @@ final class EquiJoinPlanner[
 
   object MetaGuard {
     def unapply[A](mf: FreeMapA[T, A]): Boolean = (
-      mf.resume.swap.toOption >>= { case mfs.Guard(Meta(), _, _, _) => ().some; case _ => none }
+      mf.resume.swap.toOption >>= { case MFC(mfs.Guard(Meta(), _, _, _)) => ().some; case _ => none }
     ).isDefined
 
     object Meta {
       def unapply[A](mf: FreeMapA[T, A]): Boolean =
-        (mf.resume.swap.toOption >>= { case mfs.Meta(_) => ().some; case _ => none }).isDefined
+        (mf.resume.swap.toOption >>= { case MFC(mfs.Meta(_)) => ().some; case _ => none }).isDefined
     }
   }
 
@@ -74,15 +74,15 @@ final class EquiJoinPlanner[
 
   object KeyMetaId {
     def unapply(mf: FreeMap[T]): Boolean = mf.resume match {
-      case -\/(mfs.ProjectField(Embed(CoEnv(\/-(mfs.Meta(_)))), mfs.StrLit("id"))) => true
-      case _                                                                       => false
+      case -\/(MFC(mfs.ProjectField(Embed(CoEnv(\/-(MFC(mfs.Meta(_))))), mfs.StrLit("id")))) => true
+      case _                                                                                 => false
     }
   }
 
   lazy val tPlan: AlgebraM[F, QScriptTotal[T, ?], T[N1QL]] =
     Planner[T, F, QScriptTotal[T, ?]].plan
 
-  lazy val mfPlan: AlgebraM[F, MapFuncCore[T, ?], T[N1QL]] =
+  lazy val mfPlan: AlgebraM[F, MapFunc[T, ?], T[N1QL]] =
     Planner.mapFuncPlanner[T, F].plan
 
   def unimpl[A] =

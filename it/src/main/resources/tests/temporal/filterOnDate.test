@@ -1,9 +1,9 @@
 {
     "name": "filter with date literals",
     "backends": {
-        "mimir": "pending",
-        "marklogic_json": "pending",
-        "marklogic_xml": "pending"
+        "marklogic_json":    "pending",
+        "marklogic_xml":     "pending",
+        "mimir":             "pending"
     },
     "data": "../days.data",
     "query": "select day from `../days`

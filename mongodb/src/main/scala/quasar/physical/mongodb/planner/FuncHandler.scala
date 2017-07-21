@@ -86,12 +86,13 @@ import simulacrum.typeclass
 
 object FuncHandler {
 
-  implicit def mapFuncCore[T[_[_]]: CorecursiveT]: FuncHandler[MapFuncCore[T, ?]] =
+  implicit def mapFuncCore[T[_[_]]: BirecursiveT]: FuncHandler[MapFuncCore[T, ?]] =
     new FuncHandler[MapFuncCore[T, ?]] {
 
       def handleOpsCore[EX[_]: Functor](trunc: Free[EX, ?] ~> Free[EX, ?])(implicit e26: ExprOpCoreF :<: EX)
           : MapFuncCore[T, ?] ~> OptionFree[EX, ?] =
         new (MapFuncCore[T, ?] ~> OptionFree[EX, ?]) {
+
           implicit def hole[D](d: D): Free[EX, D] = Free.pure(d)
 
           def apply[A](mfc: MapFuncCore[T, A]): OptionFree[EX, A] = {
@@ -297,14 +298,16 @@ object FuncHandler {
 
             fa.some collect {
               case D.Abs(a1)       => $abs(a1)
+              case D.Ceil(a1)      => $ceil(a1)
+              case D.Floor(a1)     => $floor(a1)
+              case D.Trunc(a1)     => $trunc(a1)
             }
           }
         }
     }
 
-  // TODO generalize this and make available for other connectors
   implicit def mapFuncDerivedUnhandled[T[_[_]]: CorecursiveT]
-      (implicit core: FuncHandler[MapFuncCore[T, ?]])
+    (implicit core: FuncHandler[MapFuncCore[T, ?]])
       : FuncHandler[MapFuncDerived[T, ?]] =
     new FuncHandler[MapFuncDerived[T, ?]] {
       val derived = mapFuncDerived

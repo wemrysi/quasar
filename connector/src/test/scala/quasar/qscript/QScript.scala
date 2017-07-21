@@ -93,13 +93,13 @@ class QScriptSpec
         QC.inj(LeftShift((),
           HoleF,
           ExcludeId,
-          Free.roll(MakeMap(
+          Free.roll(MFC(MakeMap(
             StrLit("foo"),
-            Free.roll(Guard(
+            Free.roll(MFC(Guard(
               RightSideF,
               Type.Obj(ScalaMap(),Some(Type.Top)),
               ProjectFieldR(RightSideF, StrLit("foo")),
-              Free.roll(Undefined()))))))))))
+              Free.roll(MFC(Undefined())))))))))))))
     }
 
     // TODO: This would benefit from better normalization around Sort (#1545)
@@ -111,21 +111,21 @@ class QScriptSpec
         QC.inj(LeftShift((),
           HoleF,
           IncludeId,
-          Free.roll(ConcatArrays(
-            Free.roll(MakeArray(
-              Free.roll(Guard(
+          Free.roll(MFC(ConcatArrays(
+            Free.roll(MFC(MakeArray(
+              Free.roll(MFC(Guard(
                 ProjectIndexR(RightSideF, IntLit(1)),
                 Type.Obj(scala.Predef.Map(), Type.Top.some),
                 ProjectIndexR(RightSideF, IntLit(1)),
-                Free.roll(Undefined()))))),
-            Free.roll(MakeArray(
-              Free.roll(Guard(
+                Free.roll(MFC(Undefined())))))))),
+            Free.roll(MFC(MakeArray(
+              Free.roll(MFC(Guard(
                 ProjectIndexR(RightSideF, IntLit(1)),
                 Type.Obj(scala.Predef.Map(), Type.Top.some),
                 ProjectFieldR(
                   ProjectIndexR(RightSideF, IntLit(1)),
                   StrLit("city")),
-                Free.roll(Undefined()))))))))),
+                Free.roll(MFC(Undefined()))))))))))))),
         QC.inj(Sort((),
           Nil,
           (ProjectIndexR(HoleF, IntLit(1)), SortDir.asc).wrapNel)),
@@ -142,15 +142,15 @@ class QScriptSpec
         QC.inj(Reduce((),
           Nil,
           List(ReduceFuncs.Sum(
-            Free.roll(Guard(
+            Free.roll(MFC(Guard(
               HoleF, Type.Obj(ScalaMap(), Type.Top.some),
-              Free.roll(Guard(
+              Free.roll(MFC(Guard(
                 ProjectFieldR(HoleF, StrLit("pop")),
                 Type.Coproduct(Type.Coproduct(Type.Int, Type.Dec), Type.Interval),
                 ProjectFieldR(HoleF, StrLit("pop")),
-                Free.roll(Undefined()))),
-              Free.roll(Undefined()))))),
-          Free.roll(MakeMap(StrLit("pop"), ReduceIndexF(0.right))))))(
+                Free.roll(MFC(Undefined()))))),
+              Free.roll(MFC(Undefined()))))))),
+          Free.roll(MFC(MakeMap(StrLit("pop"), ReduceIndexF(0.right)))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -182,21 +182,21 @@ class QScriptSpec
         QC.inj(LeftShift((),
           HoleF,
           ExcludeId,
-          Free.roll(ConcatMaps(
-            Free.roll(MakeMap(
+          Free.roll(MFC(ConcatMaps(
+            Free.roll(MFC(MakeMap(
               StrLit("city"),
-              Free.roll(Guard(
+              Free.roll(MFC(Guard(
                 RightSideF,
                 Type.Obj(ScalaMap(),Some(Type.Top)),
                 ProjectFieldR(RightSideF, StrLit("city")),
-                Free.roll(Undefined()))))),
-            Free.roll(MakeMap(
+                Free.roll(MFC(Undefined())))))))),
+            Free.roll(MFC(MakeMap(
               StrLit("state"),
-              Free.roll(Guard(
+              Free.roll(MFC(Guard(
                 RightSideF,
                 Type.Obj(ScalaMap(),Some(Type.Top)),
                 ProjectFieldR(RightSideF, StrLit("state")),
-                Free.roll(Undefined()))))))))))))
+                Free.roll(MFC(Undefined()))))))))))))))))
     }
 
     "convert a simple read with path projects" in {
@@ -220,19 +220,19 @@ class QScriptSpec
               ProjectFieldR(HoleF, StrLit("foo"))))),
             HoleF,
             IncludeId,
-            Free.roll(MakeArray(RightSideF))))),
+            Free.roll(MFC(MakeArray(RightSideF)))))),
           Free.roll(QCT.inj(LeftShift(
             Free.roll(QCT.inj(Map(
               Free.point(SrcHole),
               ProjectFieldR(HoleF, StrLit("bar"))))),
             HoleF,
             IncludeId,
-            Free.roll(MakeArray(RightSideF))))),
+            Free.roll(MFC(MakeArray(RightSideF)))))),
           BoolLit(true),
           JoinType.Inner,
-          Free.roll(Add(
+          Free.roll(MFC(Add(
             ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(1)),
-            ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(1)))))))))
+            ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(1))))))))))
     }
 
     "convert project object and make object" in {
@@ -248,9 +248,9 @@ class QScriptSpec
         QC.inj(LeftShift((),
           ProjectFieldR(HoleF, StrLit("city")),
           ExcludeId,
-          Free.roll(MakeMap[Fix, JoinFunc](
+          Free.roll(MFC(MakeMap[Fix, JoinFunc](
             StrLit[Fix, JoinSide]("name"),
-            ProjectFieldR(RightSideF, StrLit("name")))))))))
+            ProjectFieldR(RightSideF, StrLit("name"))))))))))
     }
 
     "convert a basic reduction" in {
@@ -283,7 +283,7 @@ class QScriptSpec
         QC.inj(Reduce((),
           Nil,
           List(ReduceFuncs.Sum[FreeMap](ProjectFieldR(HoleF, StrLit("height")))),
-          Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0.right)))))))(
+          Free.roll(MFC(MakeMap(StrLit("0"), Free.point(ReduceIndex(0.right))))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -304,7 +304,7 @@ class QScriptSpec
         QC.inj(LeftShift((),
           HoleF,
           ExcludeId,
-          Free.roll(MakeMap(StrLit("loc"), RightSideF)))))(
+          Free.roll(MFC(MakeMap(StrLit("loc"), RightSideF))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -319,7 +319,7 @@ class QScriptSpec
       beSome(beTreeEqual(chain(
         UnreferencedR,
         QC.inj(LeftShift((),
-          Free.roll(Constant(ejsonArr(ejsonInt(7)))),
+          Free.roll(MFC(Constant(ejsonArr(ejsonInt(7))))),
           ExcludeId,
           RightSideF)))))
     }
@@ -338,7 +338,7 @@ class QScriptSpec
         QC.inj(Unreferenced[Fix, Fix[QS]]()),
         QC.inj(LeftShift(
           (),
-          Free.roll(Constant(ejsonArr(ejsonInt(7), ejsonInt(8)))),
+          Free.roll(MFC(Constant(ejsonArr(ejsonInt(7), ejsonInt(8))))),
           ExcludeId,
           RightSideF)))))
     }
@@ -358,7 +358,7 @@ class QScriptSpec
       beSome(beTreeEqual(chain(
         QC.inj(Unreferenced[Fix, Fix[QS]]()),
         QC.inj(LeftShift((),
-          Free.roll(Constant(ejsonArr(ejsonInt(7), ejsonInt(8), ejsonInt(9)))),
+          Free.roll(MFC(Constant(ejsonArr(ejsonInt(7), ejsonInt(8), ejsonInt(9))))),
           ExcludeId,
           RightSideF)))))
     }
@@ -379,11 +379,11 @@ class QScriptSpec
         QC.inj(LeftShift((),
           ProjectFieldR(ProjectFieldR(HoleF, StrLit("foo")), StrLit("bar")),
           ExcludeId,
-          Free.roll(ConcatArrays[Fix, JoinFunc](
-            Free.roll(ConcatArrays[Fix, JoinFunc](
+          Free.roll(MFC(ConcatArrays[Fix, JoinFunc](
+            Free.roll(MFC(ConcatArrays[Fix, JoinFunc](
               ProjectFieldR(RightSideF, StrLit("baz")),
-              ProjectFieldR(RightSideF, StrLit("quux")))),
-            ProjectFieldR(RightSideF, StrLit("ducks")))))),
+              ProjectFieldR(RightSideF, StrLit("quux"))))),
+            ProjectFieldR(RightSideF, StrLit("ducks"))))))),
         QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
@@ -404,17 +404,17 @@ class QScriptSpec
         QC.inj(LeftShift((),
           HoleF,
           IncludeId,
-          Free.roll(ConcatArrays(
-            Free.roll(MakeArray(LeftSideF)),
-            Free.roll(MakeArray(RightSideF)))))),
+          Free.roll(MFC(ConcatArrays(
+            Free.roll(MFC(MakeArray(LeftSideF))),
+            Free.roll(MFC(MakeArray(RightSideF)))))))),
         QC.inj(LeftShift((),
           ProjectFieldR(
             ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)),
             StrLit("loc")),
           IdOnly,
-          Free.roll(ConcatArrays(
-            Free.roll(MakeArray(LeftSideF)),
-            Free.roll(MakeArray(RightSideF)))))),
+          Free.roll(MFC(ConcatArrays(
+            Free.roll(MFC(MakeArray(LeftSideF))),
+            Free.roll(MFC(MakeArray(RightSideF)))))))),
         QC.inj(Reduce((),
           List(
             ProjectIndexR(
@@ -422,12 +422,12 @@ class QScriptSpec
               IntLit(0))),
           List(
             ReduceFuncs.UnshiftArray(
-              Free.roll(Multiply(
+              Free.roll(MFC(Multiply(
                 ProjectIndexR(HoleF, IntLit(1)),
-                IntLit(10))))),
-          Free.roll(MakeMap[Fix, FreeMapA[ReduceIndex]](
+                IntLit(10)))))),
+          Free.roll(MFC(MakeMap[Fix, FreeMapA[ReduceIndex]](
             StrLit[Fix, ReduceIndex]("0"),
-            ReduceIndexF(0.right))))))(
+            ReduceIndexF(0.right)))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -446,15 +446,15 @@ class QScriptSpec
         QC.inj(LeftShift((),
           HoleF,
           IncludeId,
-          Free.roll(ConcatArrays(
-            Free.roll(MakeArray(ProjectIndexR(RightSideF, IntLit(1)))),
-            Free.roll(MakeArray(
-              Free.roll(Between(
+          Free.roll(MFC(ConcatArrays(
+            Free.roll(MFC(MakeArray(ProjectIndexR(RightSideF, IntLit(1))))),
+            Free.roll(MFC(MakeArray(
+              Free.roll(MFC(Between(
                 ProjectFieldR(
                   ProjectIndexR(RightSideF, IntLit(1)),
                   StrLit("baz")),
                 IntLit(1),
-                IntLit(10))))))))),
+                IntLit(10)))))))))))),
         QC.inj(Filter((), ProjectIndexR(HoleF, IntLit(1)))),
         QC.inj(Map((), ProjectIndexR(HoleF, IntLit(0)))))(
         implicitly, Corecursive[Fix[QS], QS])))
@@ -482,17 +482,17 @@ class QScriptSpec
             Free.roll(RTF.inj(Const(Read(rootDir </> file("person"))))),
             HoleF,
             IncludeId,
-            Free.roll(MakeArray(RightSideF))))),
+            Free.roll(MFC(MakeArray(RightSideF)))))),
           Free.roll(QCT.inj(LeftShift(
             Free.roll(RTF.inj(Const(Read(rootDir </> file("car"))))),
             HoleF,
             IncludeId,
-            Free.roll(MakeArray(RightSideF))))),
+            Free.roll(MFC(MakeArray(RightSideF)))))),
           BoolLit(true),
           JoinType.Inner,
-          Free.roll(ConcatMaps(
+          Free.roll(MFC(ConcatMaps(
             ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(1)),
-            ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(1)))))))))
+            ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(1))))))))))
     }
 
     "convert basic join with explicit join condition" in {
@@ -532,7 +532,7 @@ class QScriptSpec
               HoleF,
               IncludeId,
               MakeArrayR(RightSideF)))),
-            Free.roll(Eq(
+            Free.roll(MFC(Eq(
               ProjectFieldR(
                 ProjectIndexR(
                   ProjectIndexR(LeftSideF, IntLit(0)),
@@ -542,7 +542,7 @@ class QScriptSpec
                 ProjectIndexR(
                   ProjectIndexR(RightSideF, IntLit(0)),
                   IntLit(1)),
-                StrLit("foo_id")))),
+                StrLit("foo_id"))))),
             JoinType.Inner,
             ConcatMapsR(
               MakeMapR(
@@ -571,20 +571,20 @@ class QScriptSpec
             Free.roll(RTF.inj(Const(Read(rootDir </> file("city"))))),
             HoleF,
             ExcludeId,
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(
-                Free.roll(MakeArray(
-                  ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0)))))),
-              Free.roll(MakeArray(RightSideF))))))),
+            Free.roll(MFC(ConcatArrays(
+              Free.roll(MFC(MakeArray(
+                Free.roll(MFC(MakeArray(
+                  ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0)))))))),
+              Free.roll(MFC(MakeArray(RightSideF))))))))),
           Free.roll(QCT.inj(LeftShift(
             Free.roll(RTF.inj(Const(Read(rootDir </> file("person"))))),
             HoleF,
             ExcludeId,
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(
-                Free.roll(MakeArray(
-                  ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0)))))),
-              Free.roll(MakeArray(RightSideF))))))))),
+            Free.roll(MFC(ConcatArrays(
+              Free.roll(MFC(MakeArray(
+                Free.roll(MFC(MakeArray(
+                  ProjectIndexR(ProjectIndexR(RightSideF, IntLit(1)), IntLit(0)))))))),
+              Free.roll(MFC(MakeArray(RightSideF))))))))))),
         QC.inj(Reduce((),
           List(ProjectIndexR(HoleF, IntLit(1))),
           // FIXME: This should be fetched from the bucket
@@ -601,58 +601,58 @@ class QScriptSpec
         QC.inj(LeftShift((),
           HoleF,
           IncludeId,
-          Free.roll(ConcatArrays(
-            Free.roll(MakeArray(
-              Free.roll(ConcatMaps(
-                Free.roll(MakeMap(
+          Free.roll(MFC(ConcatArrays(
+            Free.roll(MFC(MakeArray(
+              Free.roll(MFC(ConcatMaps(
+                Free.roll(MFC(MakeMap(
                   StrLit("city"),
-                  Free.roll(Guard(
+                  Free.roll(MFC(Guard(
                     ProjectIndexR(RightSideF, IntLit(1)),
                     Type.Obj(ScalaMap(),Some(Type.Top)),
                     ProjectFieldR(
                       ProjectIndexR(RightSideF, IntLit(1)),
                       StrLit("city")),
-                    Free.roll(Undefined()))))),
-                Free.roll(MakeMap(
+                    Free.roll(MFC(Undefined())))))))),
+                Free.roll(MFC(MakeMap(
                   StrLit("__sd__0"),
-                  Free.roll(Guard(
+                  Free.roll(MFC(Guard(
                     ProjectIndexR(RightSideF, IntLit(1)),
                     Type.Obj(ScalaMap(),Some(Type.Top)),
                     ProjectFieldR(
                       ProjectIndexR(RightSideF, IntLit(1)),
                       StrLit("pop")),
-                    Free.roll(Undefined()))))))))),
-            Free.roll(MakeArray(
-              Free.roll(Guard(
+                    Free.roll(MFC(Undefined())))))))))))))),
+            Free.roll(MFC(MakeArray(
+              Free.roll(MFC(Guard(
                 ProjectIndexR(RightSideF, IntLit(1)),
                 Type.Obj(ScalaMap(),Some(Type.Top)),
                 ProjectFieldR(
                   ProjectIndexR(RightSideF, IntLit(1)),
                   StrLit("pop")),
-                Free.roll(Undefined()))))))))),
+                Free.roll(MFC(Undefined()))))))))))))),
         // FIXME #2034
         // this `Sort` should sort by the representation of the synthetic field "__sd0__"
         QC.inj(Sort((),
           Nil,
           (ProjectIndexR(HoleF, IntLit(1)) -> SortDir.asc).wrapNel)),
         QC.inj(Reduce((),
-          List(Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(0)), StrLit("__sd__0")))),
+          List(Free.roll(MFC(DeleteField(ProjectIndexR(HoleF, IntLit(0)), StrLit("__sd__0"))))),
           List(ReduceFuncs.First(ProjectIndexR(HoleF, IntLit(0)))),
-          Free.roll(ConcatArrays(
-            Free.roll(ConcatArrays(
-              Free.roll(ConcatArrays(
-                Free.roll(MakeArray(
-                  Free.roll(MakeArray(ReduceIndexF(0.left))))),
-                Free.roll(MakeArray(
-                  Free.roll(MakeArray(ReduceIndexF(0.left))))))),
-              Free.roll(MakeArray(ReduceIndexF(0.right))))),
-            Free.roll(MakeArray(
-              ProjectFieldR(ReduceIndexF(0.right), StrLit("__sd__0")))))))),
+          Free.roll(MFC(ConcatArrays(
+            Free.roll(MFC(ConcatArrays(
+              Free.roll(MFC(ConcatArrays(
+                Free.roll(MFC(MakeArray(
+                  Free.roll(MFC(MakeArray(ReduceIndexF(0.left))))))),
+                Free.roll(MFC(MakeArray(
+                  Free.roll(MFC(MakeArray(ReduceIndexF(0.left)))))))))),
+              Free.roll(MFC(MakeArray(ReduceIndexF(0.right))))))),
+            Free.roll(MFC(MakeArray(
+              ProjectFieldR(ReduceIndexF(0.right), StrLit("__sd__0")))))))))),
         QC.inj(Sort((),
           Nil,
           (ProjectIndexR(HoleF, IntLit(3)) -> SortDir.asc).wrapNel)),
         QC.inj(Map((),
-          Free.roll(DeleteField(ProjectIndexR(HoleF, IntLit(2)), StrLit("__sd__0"))))))(
+          Free.roll(MFC(DeleteField(ProjectIndexR(HoleF, IntLit(2)), StrLit("__sd__0")))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -666,36 +666,36 @@ class QScriptSpec
           Nil,
           List(
             ReduceFuncs.Max(
-              Free.roll(Guard(
-                Free.roll(Guard(
+              Free.roll(MFC(Guard(
+                Free.roll(MFC(Guard(
                   HoleF,
                   Type.Obj(ScalaMap(),Some(Type.Top)),
                   ProjectFieldR(HoleF, StrLit("pop")),
-                  Free.roll(Undefined()))),
+                  Free.roll(MFC(Undefined()))))),
                 Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
-                Free.roll(Guard(
+                Free.roll(MFC(Guard(
                   HoleF,
                   Type.Obj(ScalaMap(),Some(Type.Top)),
                   ProjectFieldR(HoleF, StrLit("pop")),
-                  Free.roll(Undefined()))),
-                Free.roll(Undefined())))),
+                  Free.roll(MFC(Undefined()))))),
+                Free.roll(MFC(Undefined())))))),
             ReduceFuncs.Min(
-              Free.roll(Guard(
-                Free.roll(Guard(
+              Free.roll(MFC(Guard(
+                Free.roll(MFC(Guard(
                   HoleF,
                   Type.Obj(ScalaMap(),Some(Type.Top)),
                   ProjectFieldR(HoleF, StrLit("city")),
-                  Free.roll(Undefined()))),
+                  Free.roll(MFC(Undefined()))))),
                 Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
-                Free.roll(Guard(
+                Free.roll(MFC(Guard(
                   HoleF,
                   Type.Obj(ScalaMap(),Some(Type.Top)),
                   ProjectFieldR(HoleF, StrLit("city")),
-                  Free.roll(Undefined()))),
-                Free.roll(Undefined()))))),
-          Free.roll(ConcatMaps(
-            Free.roll(MakeMap(StrLit("0"), ReduceIndexF(0.right))),
-            Free.roll(MakeMap(StrLit("1"), ReduceIndexF(1.right))))))))(
+                  Free.roll(MFC(Undefined()))))),
+                Free.roll(MFC(Undefined()))))))),
+          Free.roll(MFC(ConcatMaps(
+            Free.roll(MFC(MakeMap(StrLit("0"), ReduceIndexF(0.right)))),
+            Free.roll(MFC(MakeMap(StrLit("1"), ReduceIndexF(1.right))))))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -708,35 +708,35 @@ class QScriptSpec
         QC.inj(LeftShift((),
           HoleF,
           IncludeId,
-           Free.roll(ConcatArrays(
-             Free.roll(MakeArray(
-               Free.roll(Guard(
+           Free.roll(MFC(ConcatArrays(
+             Free.roll(MFC(MakeArray(
+               Free.roll(MFC(Guard(
                  ProjectIndexR(RightSideF, IntLit(1)),
                  Type.Obj(ScalaMap(),Some(Type.Top)),
                  ProjectIndexR(RightSideF, IntLit(1)),
-                 Free.roll(Undefined()))))),
-             Free.roll(MakeArray(
-               Free.roll(Guard(
-                 Free.roll(Guard(
+                 Free.roll(MFC(Undefined())))))))),
+             Free.roll(MFC(MakeArray(
+               Free.roll(MFC(Guard(
+                 Free.roll(MFC(Guard(
                    ProjectIndexR(RightSideF, IntLit(1)),
                    Type.Obj(ScalaMap(),Some(Type.Top)),
-                   Free.roll(ProjectField(
+                   Free.roll(MFC(ProjectField(
                      ProjectIndexR(RightSideF, IntLit(1)),
-                     StrLit("pop"))),
-                   Free.roll(Undefined()))),
+                     StrLit("pop")))),
+                   Free.roll(MFC(Undefined()))))),
                  Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
-                 Free.roll(Guard(
+                 Free.roll(MFC(Guard(
                    ProjectIndexR(RightSideF, IntLit(1)),
                    Type.Obj(ScalaMap(),Some(Type.Top)),
-                   Free.roll(Gt(
-                     Free.roll(ProjectField(
+                   Free.roll(MFC(Gt(
+                     Free.roll(MFC(ProjectField(
                        ProjectIndexR(RightSideF, IntLit(1)),
-                       StrLit("pop"))),
-                     IntLit(1000))),
-                   Free.roll(Undefined()))),
-                 Free.roll(Undefined()))))))))),
+                       StrLit("pop")))),
+                     IntLit(1000)))),
+                   Free.roll(MFC(Undefined()))))),
+                 Free.roll(MFC(Undefined()))))))))))))),
         QC.inj(Filter((),
-          Free.roll(ProjectIndex(HoleF, IntLit(1))))),
+          Free.roll(MFC(ProjectIndex(HoleF, IntLit(1)))))),
         QC.inj(Reduce((),
           Nil,
           List(ReduceFuncs.Count[FreeMap](ProjectIndexR(HoleF, IntLit(0)))),
@@ -753,19 +753,19 @@ class QScriptSpec
         QC.inj(LeftShift((),
           HoleF,
           ExcludeId,
-          Free.roll(Guard(
+          Free.roll(MFC(Guard(
             RightSideF,
             Type.Obj(ScalaMap(),Some(Type.Top)),
-            Free.roll(Guard(
+            Free.roll(MFC(Guard(
               ProjectFieldR(RightSideF, StrLit("loc")),
               Type.FlexArr(0, None, Type.Top),
               ProjectIndexR(
                 ConcatArraysR(
                   ProjectFieldR(RightSideF, StrLit("loc")),
-                  Free.roll(Constant(ejsonArr(ejsonInt(7), ejsonInt(8))))),
+                  Free.roll(MFC(Constant(ejsonArr(ejsonInt(7), ejsonInt(8)))))),
                 IntLit(0)),
-              Free.roll(Undefined()))),
-            Free.roll(Undefined()))))))))
+              Free.roll(MFC(Undefined()))))),
+            Free.roll(MFC(Undefined()))))))))))
     }
 
     "convert a static array projection prefix" in {
@@ -777,15 +777,15 @@ class QScriptSpec
         QC.inj(LeftShift((),
           HoleF,
           ExcludeId,
-          Free.roll(Guard(
+          Free.roll(MFC(Guard(
             RightSideF,
             Type.Obj(ScalaMap(),Some(Type.Top)),
-            Free.roll(Guard(
+            Free.roll(MFC(Guard(
               ProjectFieldR(RightSideF, StrLit("loc")),
               Type.FlexArr(0, None, Type.Top),
               IntLit(8),
-              Free.roll(Undefined()))),
-            Free.roll(Undefined()))))))))
+              Free.roll(MFC(Undefined()))))),
+            Free.roll(MFC(Undefined()))))))))))
     }
 
     "convert a group by with reduction" in {
@@ -793,45 +793,45 @@ class QScriptSpec
       val qs = convert(lc.some, lp)
 
       val inner: FreeMap =
-        Free.roll(Guard(
-          Free.roll(Guard(
+        Free.roll(MFC(Guard(
+          Free.roll(MFC(Guard(
             HoleF,
             Type.Obj(ScalaMap(),Some(Type.Top)),
             ProjectFieldR(HoleF, StrLit("loc")),
-            Free.roll(Undefined()))),
+            Free.roll(MFC(Undefined()))))),
           Type.FlexArr(0, None, Type.Top),
-          Free.roll(Guard(
-            Free.roll(Guard(
+          Free.roll(MFC(Guard(
+            Free.roll(MFC(Guard(
               HoleF,
               Type.Obj(ScalaMap(),Some(Type.Top)),
               ProjectIndexR(ProjectFieldR(HoleF, StrLit("loc")), IntLit(0)),
-              Free.roll(Undefined()))),
+              Free.roll(MFC(Undefined()))))),
             Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
-            Free.roll(Guard(
+            Free.roll(MFC(Guard(
               HoleF,
               Type.Obj(ScalaMap(),Some(Type.Top)),
-              Free.roll(Gt(
+              Free.roll(MFC(Gt(
                 ProjectIndexR(ProjectFieldR(HoleF, StrLit("loc")), IntLit(0)),
-                DecLit(-78.0))),
-              Free.roll(Undefined()))),
-            Free.roll(Undefined()))),
-          Free.roll(Undefined())))
+                DecLit(-78.0)))),
+              Free.roll(MFC(Undefined()))))),
+            Free.roll(MFC(Undefined()))))),
+          Free.roll(MFC(Undefined())))))
 
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("zips")),
         QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)),
         QC.inj(Reduce((),
-          List(Free.roll(MakeArray(inner))),
+          List(Free.roll(MFC(MakeArray(inner)))),
           List(
             ReduceFuncs.Arbitrary[FreeMap](inner),
-            ReduceFuncs.Count[FreeMap](Free.roll(Guard(
+            ReduceFuncs.Count[FreeMap](Free.roll(MFC(Guard(
               HoleF,
               Type.Obj(ScalaMap(),Some(Type.Top)),
               HoleF,
-              Free.roll(Undefined()))))),
-          Free.roll(ConcatMaps(
-            Free.roll(MakeMap(StrLit("l"), ReduceIndexF(0.right))),
-            Free.roll(MakeMap(StrLit("c"), ReduceIndexF(1.right))))))))(
+              Free.roll(MFC(Undefined()))))))),
+          Free.roll(MFC(ConcatMaps(
+            Free.roll(MFC(MakeMap(StrLit("l"), ReduceIndexF(0.right)))),
+            Free.roll(MFC(MakeMap(StrLit("c"), ReduceIndexF(1.right))))))))))(
         implicitly, Corecursive[Fix[QS], QS])))
 
     }
@@ -841,11 +841,11 @@ class QScriptSpec
       val qs = convert(lc.some, lp)
 
       def guard(jf: JoinFunc => JoinFunc): JoinFunc =
-        Free.roll(Guard(
+        Free.roll(MFC(Guard(
           ProjectIndexR(RightSideF, IntLit(1)),
           Type.Obj(ScalaMap(), Some(Type.Top)),
           jf(ProjectIndexR(RightSideF, IntLit(1))),
-          Free.roll(Undefined())))
+          Free.roll(MFC(Undefined())))))
 
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("zips")),
@@ -854,11 +854,11 @@ class QScriptSpec
           IncludeId,
           ConcatArraysR(
             MakeArrayR(guard(ι)),
-            MakeArrayR(Free.roll(Guard(
+            MakeArrayR(Free.roll(MFC(Guard(
               guard(ProjectFieldR(_, StrLit("pop"))),
               Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
-              guard(jf => Free.roll(Lte(ProjectFieldR(jf, StrLit("pop")), IntLit(10)))),
-              Free.roll(Undefined()))))))),
+              guard(jf => Free.roll(MFC(Lte(ProjectFieldR(jf, StrLit("pop")), IntLit(10))))),
+              Free.roll(MFC(Undefined()))))))))),
         QC.inj(Filter((),
           ProjectIndexR(HoleF, IntLit(1)))),
         // FIXME #2034
@@ -896,17 +896,17 @@ class QScriptSpec
       val qs = convert(lc.some, lp)
 
       def guard(jf: JoinFunc => JoinFunc): JoinFunc =
-        Free.roll(Guard(
+        Free.roll(MFC(Guard(
           ProjectIndexR(RightSideF, IntLit(1)),
           Type.Obj(ScalaMap(), Some(Type.Top)),
           jf(ProjectIndexR(RightSideF, IntLit(1))),
-          Free.roll(Undefined())))
+          Free.roll(MFC(Undefined())))))
 
       val cond: FreeMap =
-        Free.roll(Cond(
-          Free.roll(Eq(ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("state")), StrLit("MA"))),
+        Free.roll(MFC(Cond(
+          Free.roll(MFC(Eq(ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("state")), StrLit("MA")))),
           StrLit("Massachusetts"),
-          StrLit("unknown")))
+          StrLit("unknown"))))
 
       qs must beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("zips")),
@@ -915,11 +915,11 @@ class QScriptSpec
           IncludeId,
           ConcatArraysR(
             MakeArrayR(guard(ι)),
-            MakeArrayR(Free.roll(Guard(
+            MakeArrayR(Free.roll(MFC(Guard(
               guard(ProjectFieldR(_, StrLit("pop"))),
               Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
-              guard(jf => Free.roll(Lte(ProjectFieldR(jf, StrLit("pop")), IntLit(10)))),
-              Free.roll(Undefined()))))))),
+              guard(jf => Free.roll(MFC(Lte(ProjectFieldR(jf, StrLit("pop")), IntLit(10))))),
+              Free.roll(MFC(Undefined()))))))))),
         QC.inj(Filter((),
           ProjectIndexR(HoleF, IntLit(1)))),
         // FIXME #2034
@@ -973,38 +973,38 @@ class QScriptSpec
                   MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0)))),
                   MakeArrayR(MakeArrayR(ProjectIndexR(RightSideF, IntLit(0))))),
                 MakeArrayR(
-                  Free.roll(Guard(
+                  Free.roll(MFC(Guard(
                     ProjectIndexR(RightSideF, IntLit(1)),
                     Type.Obj(ScalaMap(), Some(Type.Top)),
                     ProjectFieldR(
                       ProjectIndexR(RightSideF, IntLit(1)),
                       StrLit("loc")),
-                    Free.roll(Undefined()))))),
+                    Free.roll(MFC(Undefined()))))))),
               MakeArrayR(
-                Free.roll(Guard(
+                Free.roll(MFC(Guard(
                   ProjectIndexR(RightSideF, IntLit(1)),
                   Type.Obj(ScalaMap(), Some(Type.Top)),
                   ProjectFieldR(
                     ProjectIndexR(RightSideF, IntLit(1)),
                     StrLit("loc")),
-                  Free.roll(Undefined()))))))))),
+                  Free.roll(MFC(Undefined()))))))))))),
         QC.inj(LeftShift((),
-          Free.roll(Guard(
+          Free.roll(MFC(Guard(
             ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(2)),
             Type.FlexArr(0, None, Type.Top),
             ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(3)),
-            Free.roll(Undefined()))),
+            Free.roll(MFC(Undefined()))))),
           ExcludeId,
           ConcatMapsR(
             MakeMapR(
               StrLit("city"),
-              Free.roll(Guard(
+              Free.roll(MFC(Guard(
                 ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(2)),
                 Type.Obj(ScalaMap(), Some(Type.Top)),
                 ProjectFieldR(
                   ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(3)),
                   StrLit("city")),
-                Free.roll(Undefined())))),
+                Free.roll(MFC(Undefined())))))),
             MakeMapR(StrLit("loc"), RightSideF)))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
