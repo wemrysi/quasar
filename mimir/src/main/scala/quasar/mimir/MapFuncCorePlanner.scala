@@ -124,7 +124,8 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.Or(a1, a2) =>
         Infix.Or.spec(a1, a2).point[F]
       case MapFuncsCore.Between(a1, a2, a3) => ???
-      case MapFuncsCore.Cond(a1, a2, a3) => ???
+      case MapFuncsCore.Cond(a1, a2, a3) =>
+        (Cond(a1, a2, a3): TransSpec[A]).point[F]
 
       case MapFuncsCore.Within(a1, a2) => ???
 
