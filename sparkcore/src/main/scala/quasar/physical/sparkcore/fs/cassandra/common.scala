@@ -22,7 +22,6 @@ import quasar.fp.ski._
 import quasar.{Data, DataCodec}
 
 import pathy.Path._
-import com.datastax.driver.core.Session
 import com.datastax.spark.connector.cql.CassandraConnector
 import com.datastax.spark.connector._
 import scalaz._, Scalaz._
@@ -98,38 +97,50 @@ object CassandraDDL {
   }
 
   def keyspaceExists[S[_]](keyspace: String)(implicit sc: SparkContext) = Task.delay {
-    CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-      common.keyspaceExists(keyspace)
-    }
+    if (keyspace.length > 0) {
+      CassandraConnector(sc.getConf).withSessionDo { implicit session =>
+        val stmt = session.prepare("SELECT * FROM system_schema.keyspaces WHERE keyspace_name = ?;")
+        session.execute(stmt.bind(keyspace)).all().size() > 0
+      }
+    } else false
   }
 
   def tableExists[S[_]](keyspace: String, table: String)(implicit sc: SparkContext) = Task.delay {
     CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-      common.tableExists(keyspace, table)
+      val stmt = session.prepare("SELECT * FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?;")
+      session.execute(stmt.bind(keyspace, table)).all().size() > 0
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def dropKeyspace[S[_]](keyspace: String)(implicit sc: SparkContext) = Task.delay {
     CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-      val _ = common.dropKeyspace(keyspace)
+      session.execute(s"DROP KEYSPACE IF EXISTS $keyspace;")
+      ()
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def dropTable[S[_]](keyspace: String, table: String)(implicit sc: SparkContext) = Task.delay {
     CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-      val _ = common.dropTable(keyspace, table)
+      session.execute(s"DROP TABLE $keyspace.$table;")
+      ()
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def createTable[S[_]](keyspace: String, table: String)(implicit sc: SparkContext) = Task.delay {
     CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-      val _ = common.createTable(keyspace, table)
+      session.execute(s"CREATE TABLE $keyspace.$table (id timeuuid PRIMARY KEY, data text);")
+      ()
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def createKeyspace[S[_]](keyspace: String)(implicit sc: SparkContext) = Task.delay {
     CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-      val _ = common.createKeyspace(keyspace)
+      session.execute(s"CREATE KEYSPACE $keyspace WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
+      ()
     }
   }
 
@@ -146,7 +157,8 @@ object CassandraDDL {
   }
 
   def listKeyspaces[S[_]](nameStartWith: String)(implicit sc: SparkContext) = Task.delay {
-    sc.cassandraTable[String]("system_schema","keyspaces").select("keyspace_name")
+    sc.cassandraTable[String]("system_schema","keyspaces")
+      .select("keyspace_name")
       .filter(_.startsWith(nameStartWith))
       .collect.toSet
   }
@@ -159,17 +171,17 @@ object CassandraDDL {
       }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def insertData[S[_]](keyspace: String, table: String, data: String)(implicit sc: SparkContext) = Task.delay {
     CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-      val _ = common.insertData(keyspace, table, data)
+      val stmt = session.prepare(s"INSERT INTO $keyspace.$table (id, data) VALUES (now(),  ?);")
+      session.execute(stmt.bind(data))
+      ()
     }
   }
 
 }
 
-/*
- *  TODO it should be represented as algebra (e.g CassandraDDL[A]) so that it can be later used and interpreted as Free[CassandraDDL, A]
- */
 object common {
 
   def keyspace(dir: ADir) =
@@ -177,35 +189,5 @@ object common {
 
   def tableName(file: AFile) =
     posixCodec.printPath(file).split("/").reverse(0).toLowerCase
-
-  def keyspaceExists(keyspace: String)(implicit session: Session) = {
-    val stmt = session.prepare("SELECT * FROM system_schema.keyspaces WHERE keyspace_name = ?;")
-    session.execute(stmt.bind(keyspace)).all().size() > 0
-  }
-
-  def tableExists(keyspace: String, table: String)(implicit session: Session) = {
-    val stmt = session.prepare("SELECT * FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?;")
-    session.execute(stmt.bind(keyspace, table)).all().size() > 0
-  }
-
-  def dropKeyspace(keyspace: String)(implicit session: Session) = {
-    session.execute(s"DROP KEYSPACE IF EXISTS $keyspace;")
-  }
-
-  def dropTable(keyspace: String, table: String)(implicit session: Session) = {
-    session.execute(s"DROP TABLE $keyspace.$table;")
-  }
-
-  def createKeyspace(keyspace: String)(implicit session: Session) =
-    session.execute(s"CREATE KEYSPACE $keyspace WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
-
-  def createTable(keyspace: String, table: String)(implicit session: Session) = {
-    session.execute(s"CREATE TABLE $keyspace.$table (id timeuuid PRIMARY KEY, data text);")
-  }
-
-  def insertData(keyspace: String, table: String, data: String)(implicit session: Session) = {
-    val stmt = session.prepare(s"INSERT INTO $keyspace.$table (id, data) VALUES (now(),  ?);")
-    session.execute(stmt.bind(data))
-  }
 
 }

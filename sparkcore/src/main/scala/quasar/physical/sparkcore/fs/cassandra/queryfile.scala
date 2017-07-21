@@ -18,6 +18,7 @@ package quasar.physical.sparkcore.fs.cassandra
 
 import slamdata.Predef._
 import quasar.effect._
+import quasar.fp.free._
 import quasar.fp.ski._
 import quasar.contrib.pathy._
 import quasar.{Data, DataCodec}
@@ -29,7 +30,6 @@ import quasar.fs._,
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
 import com.datastax.spark.connector._
-import com.datastax.spark.connector.cql.CassandraConnector
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import pathy.Path._
@@ -47,83 +47,65 @@ object queryfile {
       }
   }
 
-  def store[S[_]](rdd: RDD[Data], out: AFile)(implicit 
-    read: Read.Ops[SparkContext, S]
-  ): Free[S, Unit] = read.asks { sc =>
-      val ks = keyspace(fileParent(out))
-      val tb = tableName(out)
+  def store[S[_]](rdd: RDD[Data], out: AFile)(implicit
+     cass: CassandraDDL.Ops[S],
+     S0: Task :<: S
+  ): Free[S, Unit] = {
+    val ks = keyspace(fileParent(out))
+    val tb = tableName(out)
 
-      CassandraConnector(sc.getConf).withSessionDo { implicit session =>
-        val k = if(!keyspaceExists(ks)) {
-          createKeyspace(ks)
-        }
-
-        val u = if(tableExists(ks, tb)){
-          val d = dropTable(ks, tb)
-          createTable(ks, tb)
-        } else {
-          createTable(ks, tb)
-        }
-        rdd.flatMap(data =>
-          DataCodec.render(data)(DataCodec.Precise).toList).collect().foreach (v => insertData(ks, tb, v)
-        )
-      }
-    }
-
-  def fileExists[S[_]](f: AFile)(implicit
-    read: Read.Ops[SparkContext, S]
-  ): Free[S, Boolean] = read.asks { sc =>
-    CassandraConnector(sc.getConf).withSessionDo{ implicit session =>
-      tableExists(keyspace(fileParent(f)), tableName(f))
-    }
+    for {
+      keyspaceExists <- cass.keyspaceExists(ks)
+      _ <- if(keyspaceExists) ().point[Free[S,?]] else cass.createKeyspace(ks)
+      tableExists <- cass.tableExists(ks, tb)
+      _ <- if(tableExists) {
+        cass.dropTable(ks, tb) *> cass.createTable(ks, tb)
+      } else cass.createTable(ks, tb)
+      _ <- lift(Task.delay{
+              rdd.flatMap(data =>
+                DataCodec.render(data)(DataCodec.Precise).toList).collect().map(v => cass.insertData(ks, tb, v)
+              )
+      }).into[S]
+    } yield ()
   }
 
-  def listContents[S[_]](d: ADir)(implicit
+  def fileExists[S[_]](f: AFile)(implicit
+    cass: CassandraDDL.Ops[S],
     read: Read.Ops[SparkContext, S]
-  ): Free[S, FileSystemError \/ Set[PathSegment]] = 
-    read.asks { sc =>
-      CassandraConnector(sc.getConf).withSessionDo{ implicit session =>
+  ): Free[S, Boolean] =
+    for {
+      tableExists <- cass.tableExists(keyspace(fileParent(f)), tableName(f))
+    } yield tableExists
 
-        val k = keyspace(d)
-        val dirsRDD = sc.cassandraTable[String]("system_schema", "keyspaces")
-            .select("keyspace_name")
-            .filter(!_.startsWith("system"))
-            .filter(_.startsWith(k))
-            .map { kspc =>
-              val dir = kspc.replace(k, "").split("_")(0)
-              DirName(dir)
-            }
-
-        if(dirsRDD.count() > 0) {
-          val files = if(k.length > 0 && keyspaceExists(k)) {
-            sc.cassandraTable[String]("system_schema", "tables")
-              .select("table_name")
-              .where("keyspace_name = ?", keyspace(d))
-              .map { table =>
-                FileName(table).right[DirName]
-              }.collect.toSet
-
-          } else {
-            Set[PathSegment]()
-          } 
-
-          val dirs = dirsRDD.filter(_.value.length > 0)
-              .map(_.left[FileName])
-              .collect.toSet
-
-          (files ++ dirs).right[FileSystemError]
-        } else {
-          pathErr(pathNotFound(d)).left[Set[PathSegment]] 
-        }
-
-      }
+  def listContents[S[_]](d: ADir)(implicit
+    read: Read.Ops[SparkContext, S],
+    cass: CassandraDDL.Ops[S]
+  ): Free[S, FileSystemError \/ Set[PathSegment]] = {
+    val ks = keyspace(d)
+    for {
+      dirs <- cass.listKeyspaces(ks)
+      isKeyspaceExists <- cass.keyspaceExists(ks)
+      files <- if(ks.length > 0 && isKeyspaceExists) cass.listTables(ks) else Set.empty[String].point[Free[S,?]]
+    } yield {
+      if(dirs.length > 0)
+        (
+          files.map{f => FileName(f).right[DirName]} ++
+            dirs.map{d => d.replace(ks, "").split("_")(0)}
+            .filter(_.length > 0)
+            .map(d => DirName(d).left[FileName])
+        ).right[FileSystemError]
+      else
+        pathErr(pathNotFound(d)).left[Set[PathSegment]]
     }
+  }
 
   def readChunkSize: Int = 5000
 
   def input[S[_]](implicit
-    read: Read.Ops[SparkContext, S]
-  ): Input[S] = 
+    cass: CassandraDDL.Ops[S],
+    read: Read.Ops[SparkContext, S],
+    S0: Task :<: S
+  ): Input[S] =
     Input(fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
 
 }

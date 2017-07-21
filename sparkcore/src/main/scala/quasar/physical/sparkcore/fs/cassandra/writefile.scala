@@ -24,7 +24,6 @@ import quasar.fs._, WriteFile._, FileSystemError._
 import quasar.fp.free._
 
 import org.apache.spark.SparkContext
-import com.datastax.spark.connector.cql.CassandraConnector
 import pathy.Path.fileParent
 import scalaz._, Scalaz._
 
