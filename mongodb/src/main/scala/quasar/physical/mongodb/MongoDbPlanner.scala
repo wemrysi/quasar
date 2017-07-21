@@ -1398,6 +1398,13 @@ object MongoDbPlanner {
     import MongoQueryModel._
 
     queryContext.model match {
+      case `3.4` =>
+        val joinHandler =
+          JoinHandler.fallback[Workflow3_2F, WBM](
+            JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
+            JoinHandler.mapReduce)
+        plan0[T, M, Workflow3_2F, Expr3_4](queryContext.listContents, joinHandler, FuncHandler.handle3_4[MapFuncCore[T, ?]])(logical)
+
       case `3.2` =>
         val joinHandler =
           JoinHandler.fallback[Workflow3_2F, WBM](

@@ -36,7 +36,12 @@ import simulacrum.typeclass
   def handleOps3_0[EX[_]: Functor](implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX)
       : IN ~> OptionFree[EX, ?]
 
-  def handleOps3_2[EX[_]: Functor](implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX, e32: ExprOp3_2F :<: EX)
+  def handleOps3_2[EX[_]: Functor]
+    (implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX, e32: ExprOp3_2F :<: EX)
+      : IN ~> OptionFree[EX, ?]
+
+  def handleOps3_4[EX[_]: Functor]
+    (implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX, e32: ExprOp3_2F :<: EX, e34: ExprOp3_4F :<: EX)
       : IN ~> OptionFree[EX, ?]
 
   def trunc2_6[EX[_]: Functor](implicit inj: ExprOpCoreF :<: EX): Free[EX, ?] ~> Free[EX, ?] =
@@ -82,6 +87,16 @@ import simulacrum.typeclass
       val h = handleOpsCore[Expr3_2](trunc3_2)
       h32(f) orElse h30(f) orElse h(f)
     }
+
+    def handle3_4
+       : IN ~> OptionFree[Expr3_4, ?] =
+      λ[IN ~> OptionFree[Expr3_4, ?]]{f =>
+        val h34 = handleOps3_4[Expr3_4]
+        val h32 = handleOps3_2[Expr3_4]
+        val h30 = handleOps3_0[Expr3_4]
+        val h = handleOpsCore[Expr3_4](trunc3_2)
+        h34(f) orElse h32(f) orElse h30(f) orElse h(f)
+      }
 }
 
 object FuncHandler {
@@ -269,6 +284,22 @@ object FuncHandler {
                                       $literal(Bson.Text("_bson.regularexpression"))))))))))))}
             }
           }
+
+          def handleOps3_4[EX[_]: Functor]
+            (implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX, e32: ExprOp3_2F :<: EX, e34: ExprOp3_4F :<: EX)
+              : MapFuncCore[T, ?] ~> OptionFree[EX, ?] =
+            new (MapFuncCore[T, ?] ~> OptionFree[EX, ?]){
+              implicit def hole[D](d: D): Free[EX, D] = Free.pure(d)
+
+              def apply[A](mfc: MapFuncCore[T, A]): OptionFree[EX, A] = {
+                val fp = new ExprOp3_4F.fixpoint[Free[EX, A], EX](Free.roll)
+                import fp._
+
+                mfc.some collect {
+                 case Substring(a1, a2, a3) => $substrCP(a1, a2, a3)
+                }
+              }
+            }
     }
 
   def mapFuncDerived[T[_[_]]: CorecursiveT]
@@ -300,6 +331,11 @@ object FuncHandler {
             }
           }
         }
+
+      def handleOps3_4[EX[_]: Functor]
+        (implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX, e32: ExprOp3_2F :<: EX, e34: ExprOp3_4F :<: EX)
+          : MapFuncDerived[T, ?] ~> OptionFree[EX, ?] =
+        emptyDerived
     }
 
   // TODO generalize this and make available for other connectors
@@ -330,9 +366,14 @@ object FuncHandler {
         handleUnhandled(derived.handleOps3_0, core.handleOps3_0)
 
       def handleOps3_2[EX[_]: Functor]
-          (implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX, e32: ExprOp3_2F :<: EX)
+        (implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX, e32: ExprOp3_2F :<: EX)
           : MapFuncDerived[T, ?] ~> OptionFree[EX, ?] =
         handleUnhandled(derived.handleOps3_2, core.handleOps3_2)
+
+      def handleOps3_4[EX[_]: Functor]
+        (implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX, e32: ExprOp3_2F :<: EX, e34: ExprOp3_4F :<: EX)
+          : MapFuncDerived[T, ?] ~> OptionFree[EX, ?] =
+        handleUnhandled(derived.handleOps3_4, core.handleOps3_4)
     }
 
   implicit def mapFuncCoproduct[F[_], G[_]]
@@ -354,12 +395,21 @@ object FuncHandler {
         ))
 
       def handleOps3_2[EX[_]: Functor]
-          (implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX, e32: ExprOp3_2F :<: EX)
+        (implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX, e32: ExprOp3_2F :<: EX)
           : Coproduct[F, G, ?] ~> OptionFree[EX, ?] =
         λ[Coproduct[F, G, ?] ~> OptionFree[EX, ?]](_.run.fold(
           F.handleOps3_2[EX].apply _,
           G.handleOps3_2[EX].apply _
         ))
+
+      def handleOps3_4[EX[_]: Functor]
+        (implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX, e32: ExprOp3_2F :<: EX, e34: ExprOp3_4F :<: EX)
+          : Coproduct[F, G, ?] ~> OptionFree[EX, ?] =
+        λ[Coproduct[F, G, ?] ~> OptionFree[EX, ?]](_.run.fold(
+          F.handleOps3_4[EX].apply _,
+          G.handleOps3_4[EX].apply _
+        ))
+
     }
 
   def handle2_6[F[_]: FuncHandler]: F ~> OptionFree[Expr2_6, ?] =
@@ -371,4 +421,6 @@ object FuncHandler {
   def handle3_2[F[_]: FuncHandler]: F ~> OptionFree[Expr3_2, ?] =
     FuncHandler[F].handle3_2
 
+  def handle3_4[F[_]: FuncHandler]: F ~> OptionFree[Expr3_4, ?] =
+    FuncHandler[F].handle3_4
 }
