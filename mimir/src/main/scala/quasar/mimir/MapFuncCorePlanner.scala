@@ -54,7 +54,7 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
 
       case MapFuncsCore.JoinSideName(_) => ??? // should never be received
 
-      case MapFuncsCore.Length(a1) => ???
+      case MapFuncsCore.Length(a1) => length.spec(a1).point[F]
 
       case MapFuncsCore.ExtractCentury(a1) => ???
       case MapFuncsCore.ExtractDayOfMonth(a1) => ???

@@ -95,7 +95,6 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
   }
 
   private val shortCircuitCore: AlgebraM[Result \/ ?, MapFuncCore[Fix, ?], Unit] = {
-    case MapFuncsCore.Length(_) => notImplemented.left
     case MapFuncsCore.ExtractCentury(_) => notImplemented.left
     case MapFuncsCore.ExtractDayOfMonth(_) => notImplemented.left
     case MapFuncsCore.ExtractDecade(_) => notImplemented.left
