@@ -139,7 +139,10 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.Null(a1) => ???
       case MapFuncsCore.ToString(a1) => ???
       case MapFuncsCore.Search(a1, a2, a3) => ???
-      case MapFuncsCore.Substring(string, from, count) => ???
+
+      case MapFuncsCore.Substring(string, from, count) =>
+        val args = OuterArrayConcat(WrapArray(string), WrapArray(from), WrapArray(count))
+        (MapN(args, substring): TransSpec[A]).point[F]
 
       case MapFuncsCore.MakeArray(a1) =>
         (WrapArray[A](a1): TransSpec[A]).point[F]

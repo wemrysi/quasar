@@ -18,6 +18,7 @@ package quasar.mimir
 
 import quasar.precog.BitSet
 import quasar.precog.common._
+import quasar.std.StringLib
 import quasar.yggdrasil.bytecode._
 
 import quasar.yggdrasil.table._
@@ -134,6 +135,136 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     object endsWith extends Op2SSB("endsWith", _ endsWith _)
 
     object matches extends Op2SSB("matches", _ matches _)
+
+    // starting to follow a different pattern  since we don't do evaluator lookups anymore
+    // note that this different pattern means we can't test in StringLibSpecs
+    lazy val substring = CFNP("builtin::str::substring") {
+      case List(s: StrColumn, f: LongColumn, c: LongColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(s: StrColumn, f: LongColumn, c: DoubleColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(s: StrColumn, f: LongColumn, c: NumColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(s: StrColumn, f: DoubleColumn, c: LongColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(s: StrColumn, f: DoubleColumn, c: DoubleColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(s: StrColumn, f: DoubleColumn, c: NumColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(s: StrColumn, f: NumColumn, c: LongColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(s: StrColumn, f: NumColumn, c: DoubleColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(s: StrColumn, f: NumColumn, c: NumColumn) =>
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: LongColumn, c: LongColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: LongColumn, c: DoubleColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: LongColumn, c: NumColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: DoubleColumn, c: LongColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: DoubleColumn, c: DoubleColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: DoubleColumn, c: NumColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: NumColumn, c: LongColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: NumColumn, c: DoubleColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+
+      case List(sd: DateColumn, f: NumColumn, c: NumColumn) =>
+        val s = dateToStrCol(sd)
+
+        new StrColumn {
+          def apply(row: Int) = StringLib.safeSubstring(s(row), f(row).toInt, c(row).toInt)
+          def isDefinedAt(row: Int) = s.isDefinedAt(row) && f.isDefinedAt(row) && c.isDefinedAt(row)
+        }
+    }
 
     object regexMatch extends Op2(StringNamespace, "regexMatch") with Op2Array {
 

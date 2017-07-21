@@ -135,7 +135,6 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
     case MapFuncsCore.Neq(_, _) => notImplemented.left
     case MapFuncsCore.IfUndefined(_, _) => notImplemented.left
     case MapFuncsCore.Between(_, _, _) => notImplemented.left
-    case MapFuncsCore.Cond(_, _, _) => notImplemented.left
     case MapFuncsCore.Within(_, _) => notImplemented.left
     case MapFuncsCore.Bool(_) => notImplemented.left
     case MapFuncsCore.Integer(_) => notImplemented.left
@@ -143,7 +142,6 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
     case MapFuncsCore.Null(_) => notImplemented.left
     case MapFuncsCore.ToString(_) => notImplemented.left
     case MapFuncsCore.Search(_, _, _) => notImplemented.left
-    case MapFuncsCore.Substring(_, _, _) => notImplemented.left
     case MapFuncsCore.DeleteField(_, _) => notImplemented.left
     case MapFuncsCore.Meta(_) => notImplemented.left
     case MapFuncsCore.Range(_, _) => notImplemented.left
@@ -180,48 +178,61 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
       notImplemented
 
     def unaryMapFunc(
-      prg: FreeMapA[Fix, UnaryArg],
-      arg: Data,
-      expected: Data)
-        : Result =
+        prg: FreeMapA[Fix, UnaryArg],
+        arg: Data,
+        expected: Data): Result = {
+
       check(prg) getOrElse {
-        val table: cake.Table = evaluate(
-          run[UnaryArg](prg, _.fold(dataToTransSpec(arg))))
+        val table: cake.Table =
+          evaluate(
+            run[UnaryArg](
+              prg,
+              _.fold(dataToTransSpec(arg))))
+
         ((actual(table) must haveSize(1)) and
-	  (actual(table).head must beCloseTo(expected))).toResult
+          (actual(table).head must beCloseTo(expected))).toResult
       }
+    }
 
     def binaryMapFunc(
-      prg: FreeMapA[Fix, BinaryArg],
-      arg1: Data,
-      arg2: Data,
-      expected: Data)
-        : Result =
+        prg: FreeMapA[Fix, BinaryArg],
+        arg1: Data,
+        arg2: Data,
+        expected: Data): Result = {
+
       skipBinary(prg, arg1, arg2)(check(prg) getOrElse {
         val table: cake.Table =
-          evaluate(run[BinaryArg](prg, _.fold(
-            dataToTransSpec(arg1),
-            dataToTransSpec(arg2))))
+          evaluate(run[BinaryArg](
+            prg,
+            _.fold(
+              dataToTransSpec(arg1),
+              dataToTransSpec(arg2))))
+
         ((actual(table) must haveSize(1)) and
-	  (actual(table).head must beCloseTo(expected))).toResult
+          (actual(table).head must beCloseTo(expected))).toResult
       })
+    }
 
     def ternaryMapFunc(
-      prg: FreeMapA[Fix, TernaryArg],
-      arg1: Data,
-      arg2: Data,
-      arg3: Data,
-      expected: Data)
-        : Result =
+        prg: FreeMapA[Fix, TernaryArg],
+        arg1: Data,
+        arg2: Data,
+        arg3: Data,
+        expected: Data): Result = {
+
       check(prg) getOrElse {
         val table: cake.Table =
-          evaluate(run[TernaryArg](prg, _.fold(
-            dataToTransSpec(arg1),
-            dataToTransSpec(arg2),
-            dataToTransSpec(arg3))))
+          evaluate(run[TernaryArg](
+            prg,
+            _.fold(
+              dataToTransSpec(arg1),
+              dataToTransSpec(arg2),
+              dataToTransSpec(arg3))))
+
         ((actual(table) must haveSize(1)) and
-	  (actual(table).head must beCloseTo(expected))).toResult
+          (actual(table).head must beCloseTo(expected))).toResult
       }
+    }
 
     def decDomain: Gen[BigDecimal] = Arbitrary.arbitrary[Long].map(BigDecimal(_))
     def intDomain: Gen[BigInt] = Arbitrary.arbitrary[Long].map(BigInt(_))
