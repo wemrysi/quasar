@@ -162,10 +162,16 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         (DerefObjectStatic[A](src, CPathField(field)): TransSpec[A]).point[F]
       case MapFuncsCore.ProjectField(src, field) =>
         (DerefObjectDynamic[A](src, field): TransSpec[A]).point[F]
+
+      case MapFuncsCore.DeleteField(src, ConstLiteral(CString(key), _)) =>
+        (ObjectDelete[A](src, Set(CPathField(key))): TransSpec[A]).point[F]
+
+      // mimir doesn't have a way to implement this
       case MapFuncsCore.DeleteField(src, field) => ???
 
       case MapFuncsCore.Meta(a1) => ???
 
+      // this returns rows, rather than array; literally cannot be implemented in mimir at present
       case MapFuncsCore.Range(from, to) => ???
 
       // FIXME if fallback is not undefined don't throw this away
