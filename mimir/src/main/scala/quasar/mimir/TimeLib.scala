@@ -34,6 +34,8 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
 
     override def _lib1 = super._lib1 ++ Set(
       GetMillis,
+      Date,
+      Time,
       TimeZone,
       Season,
 
@@ -48,11 +50,6 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       MinuteOfHour,
       SecondOfMinute,
       NanoOfSecond,
-
-      Date,
-      YearMonth,
-      YearDayOfYear,
-      MonthDay,
 
       ParsePeriod)
 
@@ -455,7 +452,7 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
     }
 
     object DayOfWeek extends Op1F1(TimeNamespace, "dayOfWeek") with TimeFraction {
-      def fraction(d: ZonedDateTime) = d.getDayOfWeek().getValue()
+      def fraction(d: ZonedDateTime) = d.getDayOfWeek().getValue() % 7 // java indexes 1-7 while quasar expects 0-6
     }
 
     object HourOfDay extends Op1F1(TimeNamespace, "hourOfDay") with TimeFraction {
@@ -495,16 +492,8 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       val fmt = DateTimeFormatter.ISO_DATE
     }
 
-    object YearMonth extends Op1F1(TimeNamespace, "yearMonth") with TimeTruncation {
-      val fmt = DateTimeFormatter.ofPattern("yyyy-MM")
-    }
-
-    object YearDayOfYear extends Op1F1(TimeNamespace, "yearDayOfYear") with TimeTruncation {
-      val fmt = DateTimeFormatter.ISO_ORDINAL_DATE
-    }
-
-    object MonthDay extends Op1F1(TimeNamespace, "monthDay") with TimeTruncation {
-      val fmt = DateTimeFormatter.ofPattern("MM-dd")
+    object Time extends Op1F1(TimeNamespace, "time") with TimeTruncation {
+      val fmt = DateTimeFormatter.ISO_LOCAL_TIME
     }
   }
 }

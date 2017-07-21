@@ -30,8 +30,26 @@ object DateTimeUtil {
   def looksLikeIso8601(s: String): Boolean = dateTimeRegex.matcher(s).matches
 
   // FIXME ok this really sucks.  Instant ≠ ZonedDateTime
-  def parseDateTime(value: String): ZonedDateTime =
-    Instant.parse(value).atZone(ZoneId.of("UTC"))
+  def parseDateTime(value: String): ZonedDateTime = {
+    val utc = ZoneId.of("UTC")
+
+    try {
+      Instant.parse(value).atZone(utc)
+    } catch {
+      case _: Throwable => try {
+        ZonedDateTime.of(
+          LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE),
+          LocalTime.of(0, 0, 0, 0),
+          utc)
+      } catch {
+        case _: Throwable =>
+          ZonedDateTime.of(
+            LocalDate.now(utc), // FIXME what is the expected default?
+            LocalTime.parse(value, DateTimeFormatter.ISO_TIME),
+            utc)
+      }
+    }
+  }
 
   def isValidISO(str: String): Boolean = try {
     parseDateTime(str); true
