@@ -20,7 +20,9 @@ import quasar.Data
 import quasar.qscript.{MapFuncCore, MapFuncsCore}
 
 import quasar.blueeyes.json.JValue
-import quasar.precog.common.{CLong, CPathField, CPathIndex, CString, RValue}
+import quasar.precog.common.{CBoolean, CLong, CPathField, CPathIndex, CString, RValue}
+import quasar.yggdrasil.TransSpecModule
+import quasar.yggdrasil.bytecode.JType
 import quasar.yggdrasil.table.cf.util.Undefined
 
 import matryoshka.{AlgebraM, RecursiveT}
@@ -139,7 +141,17 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.Decimal(a1) => ???
       case MapFuncsCore.Null(a1) => ???
       case MapFuncsCore.ToString(a1) => ???
-      case MapFuncsCore.Search(a1, a2, a3) => ???
+
+      case MapFuncsCore.Search(src, pattern, ConstLiteral(CBoolean(flag), _)) =>
+        val op = if (flag)
+          matches
+        else
+          matchesInsensitive
+
+        op.spec[A](src, pattern).point[F]
+
+      // can't do it
+      case MapFuncsCore.Search(_, _, _) => ???
 
       case MapFuncsCore.Substring(string, from, count) =>
         val args = OuterArrayConcat(WrapArray(string), WrapArray(from), WrapArray(count))
@@ -175,8 +187,11 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       // this returns rows, rather than array; literally cannot be implemented in mimir at present
       case MapFuncsCore.Range(from, to) => ???
 
-      // FIXME if fallback is not undefined don't throw this away
-      case MapFuncsCore.Guard(_, _, a2, _) => a2.point[F]
+      case MapFuncsCore.Guard(src, tpe, a2, Map1(_, Undefined)) =>
+        (FilterDefined(a2, Typed(src, JType.fromType(tpe)), TransSpecModule.AllDefined): TransSpec[A]).point[F]
+
+      // FIXME not sure exactly how to implement this...
+      case MapFuncsCore.Guard(_, _, _, _) => ???
     }
   }
 }

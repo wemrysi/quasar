@@ -136,6 +136,11 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
     object matches extends Op2SSB("matches", _ matches _)
 
+    object matchesInsensitive extends Op2SSB("matchesInsensitive", { (target, pattern) =>
+      val compiled = Pattern.compile(pattern, Pattern.CASE_INSENSITIVE)
+      compiled.matcher(pattern).matches()
+    })
+
     // starting to follow a different pattern  since we don't do evaluator lookups anymore
     // note that this different pattern means we can't test in StringLibSpecs
     lazy val substring = CFNP("builtin::str::substring") {
