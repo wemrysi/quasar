@@ -129,8 +129,7 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
     case MapFuncsCore.ToTimestamp(_) => notImplemented.left
     case MapFuncsCore.Now() => notImplemented.left
     case MapFuncsCore.TypeOf(_) => notImplemented.left
-    case MapFuncsCore.Negate(_) => notImplemented.left // FIXME implemented: should be working
-    case MapFuncsCore.Modulo(_, _) => notImplemented.left // FIXME implemented: should be working
+    case MapFuncsCore.Negate(_) => notImplemented.left // TODO this isn't passing because -Long.MinValue == Long.MinValue, so basically a limitation in ColumnarTable
     case MapFuncsCore.Not(_) => notImplemented.left
     case MapFuncsCore.Neq(_, _) => notImplemented.left
     case MapFuncsCore.IfUndefined(_, _) => notImplemented.left
