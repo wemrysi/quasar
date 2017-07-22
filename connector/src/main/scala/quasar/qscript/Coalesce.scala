@@ -223,7 +223,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
     }
 
   private def eliminateRightSideProj(elem: FreeMap): Option[FreeMap] = {
-    val oneRef = Free.roll[MapFuncCore, Hole](ProjectIndex(HoleF, IntLit(1)))
+    val oneRef = Free.roll[MapFunc, Hole](MFC(ProjectIndex(HoleF, IntLit(1))))
     val rightCount: Int = elem.elgotPara(count(HoleF))
 
     // all `RightSide` access is through `oneRef`
@@ -327,11 +327,13 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
                   mf >> mfInner).some
               case _ => None
             }
+/* FIXME: Investigate why this causes the 'convert union' test to fail.
             case Union(innerSrc, lBranch, rBranch) =>
               Union(
                 innerSrc,
                 Free.roll(Inject[QScriptCore, QScriptTotal].inj(Map(lBranch, mf))),
                 Free.roll(Inject[QScriptCore, QScriptTotal].inj(Map(rBranch, mf)))).some
+*/
             case _ => None
           })
         case LeftShift(Embed(src), struct, id, shiftRepair) =>
@@ -404,7 +406,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
           }
         case Filter(Embed(src), cond) => FToOut.get(src) >>= QC.prj >>= {
           case Filter(srcInner, condInner) =>
-            Filter(srcInner, Free.roll[MapFuncCore, Hole](And(condInner, cond))).some
+            Filter(srcInner, Free.roll[MapFunc, Hole](MFC(And(condInner, cond)))).some
           case _ => None
         }
         case Subset(src, from, sel, count) =>
@@ -492,7 +494,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
             tj => TJ.inj(ThetaJoin.combine.modify(mf >> (_: JoinFunc))(tj)))
         case Filter(Embed(src), cond) =>
           (FToOut(src) >>= TJ.prj).map(
-            tj => TJ.inj(ThetaJoin.on[IT, IT[F]].modify(on => Free.roll(And(on, cond >> tj.combine)))(tj)))
+            tj => TJ.inj(ThetaJoin.on[IT, IT[F]].modify(on => Free.roll(MFC(And(on, cond >> tj.combine))))(tj)))
         case Subset(src, from, sel, count) =>
           makeBranched(from, count)(ifNeq(freeTJ))((l, r) => QC.inj(Subset(src, l, sel, r)))
         case Union(src, from, count) =>

@@ -1,8 +1,7 @@
 {
     "name": "match LIKE with multiple lines",
     "backends": {
-        "mimir": "pending",
-        "postgresql":     "pending",
+        "mimir":"pending",
         "spark_hdfs":     "pending",
         "spark_local":    "pending"
     },

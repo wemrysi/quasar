@@ -1,8 +1,6 @@
 {
     "name": "project from non-static concatted array",
     "backends": {
-        "mimir": "skip",
-        "postgresql":        "pending"
     },
     "data": "largeZips.data",
     "query": "select (loc || [1, 2])[1] from largeZips",

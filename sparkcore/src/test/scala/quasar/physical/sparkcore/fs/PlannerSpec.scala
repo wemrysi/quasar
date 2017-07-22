@@ -169,7 +169,7 @@ class PlannerSpec
 
             def bucket = List(ProjectFieldR(HoleF, StrLit("country")))
             def reducers: List[ReduceFunc[FreeMap]] = List(Count(ProjectFieldR(HoleF, StrLit("country"))))
-            def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.right))
+            def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.right))
             val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[RDD[Data]] = compile(reduce)
@@ -188,7 +188,7 @@ class PlannerSpec
 
             def bucket = List(ProjectFieldR(HoleF, StrLit("country")))
             def reducers: List[ReduceFunc[FreeMap]] = List(Sum(ProjectFieldR(HoleF, StrLit("age"))))
-            def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.right))
+            def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.right))
             val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[RDD[Data]] = compile(reduce)
@@ -207,7 +207,7 @@ class PlannerSpec
 
             def bucket = List(ProjectFieldR(HoleF, StrLit("country")))
             def reducers: List[ReduceFunc[FreeMap]] = Nil
-            def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.left))
+            def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.left))
             val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[RDD[Data]] = compile(reduce)
@@ -247,7 +247,7 @@ class PlannerSpec
 
             def bucket = List(ProjectFieldR(HoleF, StrLit("country")))
             def reducers: List[ReduceFunc[FreeMap]] = List(Max(ProjectFieldR(HoleF, StrLit("age"))))
-            def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.right))
+            def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.right))
             val reduce = Reduce(src, bucket, reducers, repair)
 
             val program: SparkState[RDD[Data]] = compile(reduce)
@@ -273,7 +273,7 @@ class PlannerSpec
 
               def bucket = List(ProjectFieldR(HoleF, StrLit("country")))
               def reducers: List[ReduceFunc[FreeMap]] = List(Avg(ProjectFieldR(HoleF, StrLit("age"))))
-              def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.right))
+              def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.right))
               val reduce = Reduce(src, bucket, reducers, repair)
 
               val program: SparkState[RDD[Data]] = compile(reduce)
@@ -297,7 +297,7 @@ class PlannerSpec
 
               def bucket = List(ProjectFieldR(HoleF, StrLit("country")))
               def reducers: List[ReduceFunc[FreeMap]] = List(Avg(ProjectFieldR(HoleF, StrLit("height"))))
-              def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.right))
+              def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.right))
               val reduce = Reduce(src, bucket, reducers, repair)
 
               val program: SparkState[RDD[Data]] = compile(reduce)
@@ -321,7 +321,7 @@ class PlannerSpec
               // when avg is calcualted
               def bucket = List(ProjectFieldR(HoleF, StrLit("country")))
               def reducers: List[ReduceFunc[FreeMap]] = List(Avg(ProjectFieldR(HoleF, StrLit("height"))))
-              def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0.right))
+              def repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.right))
               val reduce = Reduce(src, bucket, reducers, repair)
               val program: SparkState[RDD[Data]] = compile(reduce)
               program.eval(sc).run
@@ -337,7 +337,7 @@ class PlannerSpec
           val compile: AlgebraM[SparkState, QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
           val src: RDD[Data] = sc.parallelize(data)
 
-          def func: FreeMap = Free.roll(Lt(ProjectFieldR(HoleF, StrLit("age")), IntLit(24)))
+          def func: FreeMap = Free.roll(MFC(Lt(ProjectFieldR(HoleF, StrLit("age")), IntLit(24))))
           val filter = quasar.qscript.Filter(src, func)
 
           val program: SparkState[RDD[Data]] = compile(filter)
@@ -408,7 +408,7 @@ class PlannerSpec
           val src: RDD[Data] = sc.parallelize(data)
 
           def func(country: String): FreeMap =
-            Free.roll(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+            Free.roll(MFC(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country))))
 
           def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
           def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
@@ -461,15 +461,14 @@ class PlannerSpec
           val src: RDD[Data] = sc.parallelize(data3)
 
           def func(country: String): FreeMap =
-            Free.roll(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+            Free.roll(MFC(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country))))
 
           def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
           def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
           def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
-          def combine: JoinFunc = Free.roll(ConcatMaps(
-            Free.roll(MakeMap(StrLit(JoinDir.Left.name), LeftSideF)),
-            Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
-          ))
+          def combine: JoinFunc = Free.roll(MFC(ConcatMaps(
+            Free.roll(MFC(MakeMap(StrLit(JoinDir.Left.name), LeftSideF))),
+            Free.roll(MFC(MakeMap(StrLit(JoinDir.Right.name), RightSideF))))))
 
           val equiJoin = quasar.qscript.EquiJoin(src, left, right, List((key, key)), JoinType.Inner, combine)
 
@@ -479,9 +478,7 @@ class PlannerSpec
               rdd.collect.toList must_= List(
                 Data.Obj(ListMap(
                   JoinDir.Left.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("Poland")))),
-                  JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US"))))
-                )
-                ))
+                  JoinDir.Right.name -> Data.Obj(ListMap(("age" -> Data.Int(24)), ("country" -> Data.Str("US")))))))
           })
         }
       }
@@ -494,15 +491,14 @@ class PlannerSpec
           val src: RDD[Data] = sc.parallelize(data3)
 
           def func(country: String): FreeMap =
-            Free.roll(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+            Free.roll(MFC(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country))))
 
           def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
           def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
           def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
-          def combine: JoinFunc = Free.roll(ConcatMaps(
-            Free.roll(MakeMap(StrLit(JoinDir.Left.name), LeftSideF)),
-            Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
-          ))
+          def combine: JoinFunc = Free.roll(MFC(ConcatMaps(
+            Free.roll(MFC(MakeMap(StrLit(JoinDir.Left.name), LeftSideF))),
+            Free.roll(MFC(MakeMap(StrLit(JoinDir.Right.name), RightSideF))))))
 
           val equiJoin = quasar.qscript.EquiJoin(src, left, right, List((key, key)), JoinType.LeftOuter, combine)
 
@@ -531,15 +527,14 @@ class PlannerSpec
           val src: RDD[Data] = sc.parallelize(data4)
 
           def func(country: String): FreeMap =
-            Free.roll(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+            Free.roll(MFC(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country))))
 
           def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
           def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
           def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
-          def combine: JoinFunc = Free.roll(ConcatMaps(
-            Free.roll(MakeMap(StrLit(JoinDir.Left.name), LeftSideF)),
-            Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
-          ))
+          def combine: JoinFunc = Free.roll(MFC(ConcatMaps(
+            Free.roll(MFC(MakeMap(StrLit(JoinDir.Left.name), LeftSideF))),
+            Free.roll(MFC(MakeMap(StrLit(JoinDir.Right.name), RightSideF))))))
 
           val equiJoin = quasar.qscript.EquiJoin(src, left, right, List((key, key)), JoinType.RightOuter, combine)
 
@@ -566,15 +561,14 @@ class PlannerSpec
           val src: RDD[Data] = sc.parallelize(data5)
 
           def func(country: String): FreeMap =
-            Free.roll(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country)))
+            Free.roll(MFC(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country))))
 
           def left: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("Poland"))))
           def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
           def key: FreeMap = ProjectFieldR(HoleF, StrLit("age"))
-          def combine: JoinFunc = Free.roll(ConcatMaps(
-            Free.roll(MakeMap(StrLit(JoinDir.Left.name), LeftSideF)),
-            Free.roll(MakeMap(StrLit(JoinDir.Right.name), RightSideF))
-          ))
+          def combine: JoinFunc = Free.roll(MFC(ConcatMaps(
+            Free.roll(MFC(MakeMap(StrLit(JoinDir.Left.name), LeftSideF))),
+            Free.roll(MFC(MakeMap(StrLit(JoinDir.Right.name), RightSideF))))))
 
           val equiJoin = quasar.qscript.EquiJoin(src, left, right, List((key, key)), JoinType.FullOuter, combine)
 

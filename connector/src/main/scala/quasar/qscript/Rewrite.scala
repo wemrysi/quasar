@@ -37,18 +37,18 @@ import scalaz.{:+: => _, Divide => _, _},
 
 class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   def rebuildArray[A](funcs: List[FreeMapA[A]]): FreeMapA[A] = funcs match {
-    case Nil    => Free.roll(EmptyArray[T, FreeMapA[A]])
+    case Nil    => Free.roll(MFC(EmptyArray[T, FreeMapA[A]]))
     case h :: t =>
       t.foldLeft(
-        Free.roll(MakeArray[T, FreeMapA[A]](h)))(
-        (acc, e) => Free.roll(ConcatArrays(acc, Free.roll(MakeArray(e)))))
+        Free.roll(MFC(MakeArray[T, FreeMapA[A]](h))))(
+        (acc, e) => Free.roll(MFC(ConcatArrays(acc, Free.roll(MFC(MakeArray(e)))))))
   }
 
   def rewriteShift(idStatus: IdStatus, repair: JoinFunc)
       : Option[(IdStatus, JoinFunc)] =
     (idStatus ≟ IncludeId).option[Option[(IdStatus, JoinFunc)]] {
       def makeRef(idx: Int): JoinFunc =
-        Free.roll[MapFuncCore, JoinSide](ProjectIndex(RightSideF, IntLit(idx)))
+        Free.roll[MapFunc, JoinSide](MFC(ProjectIndex(RightSideF, IntLit(idx))))
 
       val zeroRef: JoinFunc = makeRef(0)
       val oneRef: JoinFunc = makeRef(1)
@@ -278,7 +278,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
         // LeftShift(Map(_, MakeArray(_)), Hole, ExcludeId, _)
         case (Some(Map(innerSrc, fm)), \/-(SrcHole)) =>
           fm.resume match {
-            case -\/(MakeArray(value)) =>
+            case -\/(MFC(MakeArray(value))) =>
               QC.inj(Map(innerSrc, joinFunc >>= {
                 case LeftSide => fm
                 case RightSide => value
@@ -286,7 +286,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
             case _ => None
           }
         // LeftShift(_, MakeArray(_), ExcludeId, _)
-        case (_, -\/(MakeArray(value))) =>
+        case (_, -\/(MFC(MakeArray(value)))) =>
           QC.inj(Map(src.embed, joinFunc >>= {
             case LeftSide => HoleF
             case RightSide => value

@@ -4,8 +4,7 @@
     "backends": {
         "couchbase":         "pending",
         "marklogic_json":    "ignoreFieldOrder",
-        "mimir":             "skip",
-        "postgresql":        "pending"
+        "mimir":             "skip"
     },
 
     "NB": "#1587: Disabled in couchbase due to lack of general join.",

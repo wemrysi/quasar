@@ -2,13 +2,12 @@
     "name": "select map keys",
     "backends": {
         "marklogic_xml":     "pending",
-        "mimir":             "skip",
+        "mimir":             "pending",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "mongodb_read_only": "pending"
     },
     "data": "newTests.data",
     "query": "select distinct backends{_:} from newTests",

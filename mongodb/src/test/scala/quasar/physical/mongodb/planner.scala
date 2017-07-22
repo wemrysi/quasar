@@ -103,6 +103,7 @@ class PlannerSpec extends
           FileName("foo").right[DirName],
           FileName("zips").right,
           FileName("zips2").right,
+          FileName("largeZips").right,
           FileName("a").right,
           FileName("slamengine_commits").right,
           FileName("person").right,

@@ -103,24 +103,42 @@ package object qscript {
   implicit def qScriptShiftReadToQScriptTotal[T[_[_]]]: Injectable.Aux[QScriptShiftRead[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[ShiftedRead[AFile], ?]]))
 
+  type MapFunc[T[_[_]], A] = (MapFuncCore[T, ?] :/: MapFuncDerived[T, ?])#M[A]
+
+  object MFC {
+    def apply[T[_[_]], A](mfc: MapFuncCore[T, A]): MapFunc[T, A] =
+      Inject[MapFuncCore[T, ?], MapFunc[T, ?]].inj(mfc)
+
+    def unapply[T[_[_]], A](mf: MapFunc[T, A]): Option[MapFuncCore[T, A]] =
+      Inject[MapFuncCore[T, ?], MapFunc[T, ?]].prj(mf)
+  }
+
+  object MFD {
+    def apply[T[_[_]], A](mfc: MapFuncDerived[T, A]): MapFunc[T, A] =
+      Inject[MapFuncDerived[T, ?], MapFunc[T, ?]].inj(mfc)
+
+    def unapply[T[_[_]], A](mf: MapFunc[T, A]): Option[MapFuncDerived[T, A]] =
+      Inject[MapFuncDerived[T, ?], MapFunc[T, ?]].prj(mf)
+  }
+
   type FreeQS[T[_[_]]]      = Free[QScriptTotal[T, ?], Hole]
-  type FreeMapA[T[_[_]], A] = Free[MapFuncCore[T, ?], A]
+  type FreeMapA[T[_[_]], A] = Free[MapFunc[T, ?], A]
   type FreeMap[T[_[_]]]     = FreeMapA[T, Hole]
   type JoinFunc[T[_[_]]]    = FreeMapA[T, JoinSide]
 
   type CoEnvQS[T[_[_]], A]      = CoEnv[Hole, QScriptTotal[T, ?], A]
-  type CoEnvMapA[T[_[_]], A, B] = CoEnv[A, MapFuncCore[T, ?], B]
+  type CoEnvMapA[T[_[_]], A, B] = CoEnv[A, MapFunc[T, ?], B]
   type CoEnvMap[T[_[_]], A]     = CoEnvMapA[T, Hole, A]
   type CoEnvJoin[T[_[_]], A]    = CoEnvMapA[T, JoinSide, A]
 
-  def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFuncCore[T, ?], Hole](SrcHole)
+  def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFunc[T, ?], Hole](SrcHole)
   def HoleQS[T[_[_]]]: FreeQS[T] = Free.point[QScriptTotal[T, ?], Hole](SrcHole)
   def LeftSideF[T[_[_]]]: JoinFunc[T] =
-    Free.point[MapFuncCore[T, ?], JoinSide](LeftSide)
+    Free.point[MapFunc[T, ?], JoinSide](LeftSide)
   def RightSideF[T[_[_]]]: JoinFunc[T] =
-    Free.point[MapFuncCore[T, ?], JoinSide](RightSide)
+    Free.point[MapFunc[T, ?], JoinSide](RightSide)
   def ReduceIndexF[T[_[_]]](i: Int \/ Int): FreeMapA[T, ReduceIndex] =
-    Free.point[MapFuncCore[T, ?], ReduceIndex](ReduceIndex(i))
+    Free.point[MapFunc[T, ?], ReduceIndex](ReduceIndex(i))
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
 
@@ -131,14 +149,14 @@ package object qscript {
 
     (norm.freeMF(l), norm.freeMF(r)) match {
       case (newL, newR) if newL ≟ newR => (newL, HoleF[T], HoleF[T])
-      case (newL @ Embed(CoEnv(-\/(Constant(_)))), newR) =>
+      case (newL @ Embed(CoEnv(\/-(MFC(Constant(_))))), newR) =>
         (newR, newL >> HoleF, HoleF[T])
-      case (newL, newR @ Embed(CoEnv(-\/(Constant(_))))) =>
+      case (newL, newR @ Embed(CoEnv(\/-(MFC(Constant(_)))))) =>
         (newL, HoleF[T], newR >> HoleF)
       case (newL, newR) =>
         (StaticArray(List(newL, newR)),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))))
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
     }
   }
 
@@ -161,10 +179,10 @@ package object qscript {
     }
 
     def projectIndex(idx: Int): FreeMap[T] =
-      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](idx)))
+      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](idx))))
 
     def indexOf(elems: List[FreeMapA[T ,A]], value: FreeMapA[T, A]): Option[Int] =
-      IList.fromList(elems).indexOf(Free.roll(MakeArray(value)))
+      IList.fromList(elems).indexOf(Free.roll(MFC(MakeArray(value))))
 
     indexOf(leftElems, normr).cata(
       idx => (norml, HoleF[T], projectIndex(idx)),
@@ -182,41 +200,48 @@ package object qscript {
     (norm.freeMF(l), norm.freeMF(c), norm.freeMF(r)) match {
       case (newL, newC, newR) if newL ≟ newC && newL ≟ newR =>
         (newL, HoleF[T], HoleF[T], HoleF[T])
-      case (newL @ Embed(CoEnv(-\/(Constant(_)))), newC @ Embed(CoEnv(-\/(Constant(_)))), newR) =>
+
+      case (newL @ Embed(CoEnv(\/-(MFC(Constant(_))))), newC @ Embed(CoEnv(\/-(MFC(Constant(_))))), newR) =>
         (newR, newL >> HoleF[T], newC >> HoleF[T], HoleF[T])
-      case (newL @ Embed(CoEnv(-\/(Constant(_)))), newC, newR @ Embed(CoEnv(-\/(Constant(_))))) =>
+
+      case (newL @ Embed(CoEnv(\/-(MFC(Constant(_))))), newC, newR @ Embed(CoEnv(\/-(MFC(Constant(_)))))) =>
         (newC, newL >> HoleF[T], HoleF[T], newR >> HoleF[T])
-      case (newL, newC @ Embed(CoEnv(-\/(Constant(_)))), newR @ Embed(CoEnv(-\/(Constant(_))))) =>
+
+      case (newL, newC @ Embed(CoEnv(\/-(MFC(Constant(_))))), newR @ Embed(CoEnv(\/-(MFC(Constant(_)))))) =>
         (newL, HoleF[T], newC >> HoleF[T], newR >> HoleF[T])
-      case (newL @ Embed(CoEnv(-\/(Constant(_)))), newC, newR) =>
+
+      case (newL @ Embed(CoEnv(\/-(MFC(Constant(_))))), newC, newR) =>
         if (newC ≟ newR)
           (newC, newL >> HoleF, HoleF[T], HoleF[T])
         else
           (StaticArray(List(newC, newR)),
             newL >> HoleF,
-            Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-            Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))))
-      case (newL, newC @ Embed(CoEnv(-\/(Constant(_)))), newR) =>
+            Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+            Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
+
+      case (newL, newC @ Embed(CoEnv(\/-(MFC(Constant(_))))), newR) =>
         if (newL ≟ newR)
           (newL, HoleF[T], newC >> HoleF, HoleF[T])
         else
           (StaticArray(List(newL, newR)),
-            Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+            Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
             newC >> HoleF,
-            Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))))
-      case (newL, newC, newR @ Embed(CoEnv(-\/(Constant(_))))) =>
+            Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
+
+      case (newL, newC, newR @ Embed(CoEnv(\/-(MFC(Constant(_)))))) =>
         if (newL ≟ newC)
           (newL, HoleF[T], HoleF[T], newR >> HoleF)
         else
           (StaticArray(List(newL, newC)),
-            Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-            Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
+            Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+            Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
             newR >> HoleF)
+
       case (newL, newC, newR) =>
         (StaticArray(List(newL, newC, newR)),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](2)))))
     }
   }
 
@@ -228,36 +253,40 @@ package object qscript {
 
     (norm.freeMF(l), norm.freeMF(c), norm.freeMF(r), norm.freeMF(r2)) match {
       // TODO: Handle cases with more than one constant.
-      case (newL @ Embed(CoEnv(-\/(Constant(_)))), newC, newR, newR2) =>
+      case (newL @ Embed(CoEnv(\/-(MFC(Constant(_))))), newC, newR, newR2) =>
         (StaticArray(List(newC, newR, newR2)),
           newL >> HoleF,
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
-      case (newL, newC @ Embed(CoEnv(-\/(Constant(_)))), newR, newR2) =>
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](2)))))
+
+      case (newL, newC @ Embed(CoEnv(\/-(MFC(Constant(_))))), newR, newR2) =>
         (StaticArray(List(newL, newR, newR2)),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
           newC >> HoleF,
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
-      case (newL, newC, newR @ Embed(CoEnv(-\/(Constant(_)))), newR2) =>
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](2)))))
+
+      case (newL, newC, newR @ Embed(CoEnv(\/-(MFC(Constant(_))))), newR2) =>
         (StaticArray(List(newL, newC, newR2)),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
           newR >> HoleF,
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
-      case (newL, newC, newR, newR2 @ Embed(CoEnv(-\/(Constant(_))))) =>
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](2)))))
+
+      case (newL, newC, newR, newR2 @ Embed(CoEnv(\/-(MFC(Constant(_)))))) =>
         (StaticArray(List(newL, newC, newR)),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](2)))),
           newR2 >> HoleF)
+
       case (newL, newC, newR, newR2) =>
         (StaticArray(List(newL, newC, newR, newR2)),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](3))))
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](2)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](3)))))
     }
   }
 
