@@ -228,19 +228,36 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
     object matches extends Op2SSB("matches", _ matches _)
 
-    // like matches, except for quasar
-    def search(flag: Boolean) =
-      new Op2SSB("search", { (target, pattern) =>
-        val compiled = if (flag)
-          Pattern.compile(pattern)
-        else
-          Pattern.compile(pattern, Pattern.CASE_INSENSITIVE)
+    // like matches, except for quasar, and hilariously less efficient
+    lazy val searchDynamic: CFN = CFNP("builtin::str::searchDynamic") {
+      case List(target: StrColumn, pattern: StrColumn, flag: BoolColumn) =>
+        new BoolColumn {
+          def apply(row: Int) = {
+            // we're literally recompiling this on a row-by-row basis
+            val compiled = if (flag(row))
+              Pattern.compile(pattern(row))
+            else
+              Pattern.compile(pattern(row), Pattern.CASE_INSENSITIVE)
 
+            compiled.matcher(target(row)).matches()
+          }
 
-        compiled.matcher(target).matches()
-      })
+          def isDefinedAt(row: Int) =
+            target.isDefinedAt(row) && pattern.isDefinedAt(row) && flag.isDefinedAt(row)
+        }
 
-    def searchStatic(pattern: String, flag: Boolean) = {
+      case List(target: DateColumn, pattern: StrColumn, flag: BoolColumn) =>
+        searchDynamic(List(dateToStrCol(target), pattern, flag)).get
+
+      case List(target: StrColumn, pattern: DateColumn, flag: BoolColumn) =>
+        searchDynamic(List(target, dateToStrCol(pattern), flag)).get
+
+      case List(target: DateColumn, pattern: DateColumn, flag: BoolColumn) =>
+        searchDynamic(List(dateToStrCol(target), dateToStrCol(pattern), flag)).get
+    }
+
+    // please use this one as much as possible. it is orders of magnitude faster than search
+    def search(pattern: String, flag: Boolean) = {
       val compiled = if (flag)
         Pattern.compile(pattern)
       else

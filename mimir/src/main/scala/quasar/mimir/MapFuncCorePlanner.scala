@@ -162,13 +162,11 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
 
       // significantly faster fast path
       case MapFuncsCore.Search(src, ConstLiteral(CString(pattern), _), ConstLiteral(CBoolean(flag), _)) =>
-        searchStatic(pattern, flag).spec[A](src).point[F]
+        search(pattern, flag).spec[A](src).point[F]
 
-      case MapFuncsCore.Search(src, pattern, ConstLiteral(CBoolean(flag), _)) =>
-        search(flag).spec[A](src, pattern).point[F]
-
-      // we could do this, but... dear god
-      case MapFuncsCore.Search(_, _, _) => ???
+      // this case is hideously slow; hopefully we don't see it too often
+      case MapFuncsCore.Search(src, pattern, flag) =>
+        (MapN((OuterArrayConcat(WrapArray(src), WrapArray(pattern), WrapArray(flag))), searchDynamic): TransSpec[A]).point[F]
 
       case MapFuncsCore.Substring(string, from, count) =>
         val args = OuterArrayConcat(WrapArray(string), WrapArray(from), WrapArray(count))
