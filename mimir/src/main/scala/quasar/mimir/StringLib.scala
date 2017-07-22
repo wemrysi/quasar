@@ -84,6 +84,16 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       }
     }
 
+    class Op1SB(name: String, f: String => Boolean) extends Op1F1(StringNamespace, name) {
+      //@deprecated, see the DEPRECATED comment in StringLib
+      val tpe = UnaryOperationType(StrAndDateT, JNumberT)
+      private def build(c: StrColumn) = new BoolFrom.S(c, _ != null, f)
+      def f1: F1 = CF1P("builtin::str::op1sb::" + name) {
+        case c: StrColumn  => build(c)
+        case c: DateColumn => build(dateToStrCol(c))
+      }
+    }
+
     object trim extends Op1SS("trim", _.trim)
 
     object toUpperCase extends Op1SS("toUpperCase", _.toUpperCase)
@@ -218,10 +228,28 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
     object matches extends Op2SSB("matches", _ matches _)
 
-    object matchesInsensitive extends Op2SSB("matchesInsensitive", { (target, pattern) =>
-      val compiled = Pattern.compile(pattern, Pattern.CASE_INSENSITIVE)
-      compiled.matcher(pattern).matches()
-    })
+    // like matches, except for quasar
+    def search(flag: Boolean) =
+      new Op2SSB("search", { (target, pattern) =>
+        val compiled = if (flag)
+          Pattern.compile(pattern)
+        else
+          Pattern.compile(pattern, Pattern.CASE_INSENSITIVE)
+
+
+        compiled.matcher(pattern).matches()
+      })
+
+    def searchStatic(pattern: String, flag: Boolean) = {
+      val compiled = if (flag)
+        Pattern.compile(pattern)
+      else
+        Pattern.compile(pattern, Pattern.CASE_INSENSITIVE)
+
+      new Op1SB("search", { target =>
+        compiled.matcher(pattern).matches()
+      })
+    }
 
     // starting to follow a different pattern  since we don't do evaluator lookups anymore
     // note that this different pattern means we can't test in StringLibSpecs

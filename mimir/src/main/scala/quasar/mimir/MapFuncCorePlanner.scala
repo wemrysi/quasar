@@ -21,8 +21,8 @@ import quasar.qscript.{MapFuncCore, MapFuncsCore}
 
 import quasar.blueeyes.json.JValue
 import quasar.precog.common.{CBoolean, CLong, CPathField, CPathIndex, CString, RValue}
-import quasar.yggdrasil.TransSpecModule
-import quasar.yggdrasil.bytecode.JType
+// import quasar.yggdrasil.TransSpecModule
+// import quasar.yggdrasil.bytecode.JType
 import quasar.yggdrasil.table.cf.util.Undefined
 
 import matryoshka.{AlgebraM, RecursiveT}
@@ -160,15 +160,14 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.ToString(a1) =>
         convertToString.spec[A](a1).point[F]
 
+      // significantly faster fast path
+      case MapFuncsCore.Search(src, ConstLiteral(CString(pattern), _), ConstLiteral(CBoolean(flag), _)) =>
+        searchStatic(pattern, flag).spec[A](src).point[F]
+
       case MapFuncsCore.Search(src, pattern, ConstLiteral(CBoolean(flag), _)) =>
-        val op = if (flag)
-          matches
-        else
-          matchesInsensitive
+        search(flag).spec[A](src, pattern).point[F]
 
-        op.spec[A](src, pattern).point[F]
-
-      // can't do it
+      // we could do this, but... dear god
       case MapFuncsCore.Search(_, _, _) => ???
 
       case MapFuncsCore.Substring(string, from, count) =>
@@ -205,8 +204,12 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       // this returns rows, rather than array; literally cannot be implemented in mimir at present
       case MapFuncsCore.Range(from, to) => ???
 
-      case MapFuncsCore.Guard(src, tpe, a2, Map1(_, Undefined)) =>
-        (FilterDefined(a2, Typed(src, JType.fromType(tpe)), TransSpecModule.AllDefined): TransSpec[A]).point[F]
+      // rely on implicit guard
+      case MapFuncsCore.Guard(_, _, a2, Map1(_, Undefined)) =>
+        a2.point[F]
+
+      /*case MapFuncsCore.Guard(src, tpe, a2, Map1(_, Undefined)) =>
+        (FilterDefined(a2, Typed(src, JType.fromType(tpe)), TransSpecModule.AllDefined): TransSpec[A]).point[F]*/
 
       // FIXME not sure exactly how to implement this...
       case MapFuncsCore.Guard(_, _, _, _) => ???
