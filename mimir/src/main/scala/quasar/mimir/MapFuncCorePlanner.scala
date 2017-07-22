@@ -134,7 +134,14 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.Gte(a1, a2) =>
         Infix.GtEq.spec(a1, a2).point[F]
 
-      case MapFuncsCore.IfUndefined(a1, a2) => ???
+      // this function is completely unspecified; I'm guessing on semantics here
+      case MapFuncsCore.IfUndefined(a1, a2) =>
+        (DerefObjectStatic(
+          OuterObjectConcat(    // this operation is left-biased, so we default to a1
+            WrapObject(a1, "foo"),
+            WrapObject(a2, "foo")),
+          CPathField("foo")): TransSpec[A]).point[F]
+
       case MapFuncsCore.And(a1, a2) =>
         Infix.And.spec(a1, a2).point[F]
       case MapFuncsCore.Or(a1, a2) =>
