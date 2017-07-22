@@ -521,7 +521,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
     }
   }
 
-  /*"partitionMerge" should {
+  "partitionMerge" should {
     "concatenate reductions of subsequences" in testPartitionMerge
   }
 
@@ -654,7 +654,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
       testRenderCsv(input, Some(2)) must_== expected2
     }
-  }*/
+  }
 }
 
 object ColumnarTableModuleSpec extends ColumnarTableModuleSpec[Need] {
