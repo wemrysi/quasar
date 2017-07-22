@@ -139,7 +139,8 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         Infix.And.spec(a1, a2).point[F]
       case MapFuncsCore.Or(a1, a2) =>
         Infix.Or.spec(a1, a2).point[F]
-      case MapFuncsCore.Between(a1, a2, a3) => ???
+      case MapFuncsCore.Between(a1, a2, a3) =>
+        (MapN(OuterArrayConcat(WrapArray(a1), WrapArray(a2), WrapArray(a3)), between): TransSpec[A]).point[F]
       case MapFuncsCore.Cond(a1, a2, a3) =>
         (Cond(a1, a2, a3): TransSpec[A]).point[F]
 
