@@ -247,6 +247,7 @@ trait StdLibModule[M[+ _]]
     with ArrayLibModule[M]
     with MathLibModule[M]
     with TypeLibModule[M]
+    with TimeLibModule[M]
     with StringLibModule[M]
     with ReductionLibModule[M]
     with RandomLibModule[M] {
@@ -258,6 +259,7 @@ trait StdLibModule[M[+ _]]
       with ArrayLib
       with MathLib
       with TypeLib
+      with TimeLib
       with StringLib
       with ReductionLib
       with RandomLib
@@ -572,7 +574,7 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
-    class S(c: StrColumn, defined: String => Boolean, f: BigDecimal => BigDecimal) extends Map1Column(c) with NumColumn {
+    class S(c: StrColumn, defined: String => Boolean, f: String => BigDecimal) extends Map1Column(c) with NumColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
