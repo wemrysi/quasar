@@ -247,8 +247,8 @@ trait StdLibModule[M[+ _]]
     with ArrayLibModule[M]
     with MathLibModule[M]
     with TypeLibModule[M]
-    with StringLibModule[M]
     with TimeLibModule[M]
+    with StringLibModule[M]
     with ReductionLibModule[M]
     with RandomLibModule[M] {
   type Lib <: StdLib
@@ -259,8 +259,8 @@ trait StdLibModule[M[+ _]]
       with ArrayLib
       with MathLib
       with TypeLib
-      with StringLib
       with TimeLib
+      with StringLib
       with ReductionLib
       with RandomLib
 }
@@ -348,12 +348,29 @@ object StdLib {
   }
 
   object LongFrom {
+
+    class D(c: DoubleColumn, defined: Long => Boolean, f: Long => Long) extends Map1Column(c) with LongColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row).toLong) && c(row).ceil == c(row)
+
+      def apply(row: Int) = f(c(row).toLong)
+    }
+
     class L(c: LongColumn, defined: Long => Boolean, f: Long => Long) extends Map1Column(c) with LongColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
 
       def apply(row: Int) = f(c(row))
+    }
+
+    class N(c: NumColumn, defined: Long => Boolean, f: Long => Long) extends Map1Column(c) with LongColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row).toLong)
+
+      def apply(row: Int) = f(c(row).toLong)
     }
 
     class S(c: StrColumn, defined: String => Boolean, f: String => Long) extends Map1Column(c) with LongColumn {
@@ -530,7 +547,34 @@ object StdLib {
   }
 
   object NumFrom {
+
+    // unsafe!  use only if you know what you're doing
+    class D(c: DoubleColumn, defined: BigDecimal => Boolean, f: BigDecimal => BigDecimal) extends Map1Column(c) with NumColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(BigDecimal(c(row)))
+
+      def apply(row: Int) = f(BigDecimal(c(row)))
+    }
+
+    // unsafe!  use only if you know what you're doing
+    class L(c: LongColumn, defined: BigDecimal => Boolean, f: BigDecimal => BigDecimal) extends Map1Column(c) with NumColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(BigDecimal(c(row)))
+
+      def apply(row: Int) = f(BigDecimal(c(row)))
+    }
+
     class N(c: NumColumn, defined: BigDecimal => Boolean, f: BigDecimal => BigDecimal) extends Map1Column(c) with NumColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class S(c: StrColumn, defined: String => Boolean, f: String => BigDecimal) extends Map1Column(c) with NumColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
