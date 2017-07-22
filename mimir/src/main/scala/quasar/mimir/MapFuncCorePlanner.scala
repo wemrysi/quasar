@@ -205,14 +205,15 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.Range(from, to) => ???
 
       // rely on implicit guard
-      case MapFuncsCore.Guard(_, _, a2, Map1(_, Undefined)) =>
+      // this really should be restricted to undefined only, but that breaks some join/ integration tests
+      case MapFuncsCore.Guard(_, _, a2, _ /*Map1(_, Undefined)*/) =>
         a2.point[F]
 
       /*case MapFuncsCore.Guard(src, tpe, a2, Map1(_, Undefined)) =>
         (FilterDefined(a2, Typed(src, JType.fromType(tpe)), TransSpecModule.AllDefined): TransSpec[A]).point[F]*/
 
       // FIXME not sure exactly how to implement this...
-      case MapFuncsCore.Guard(_, _, _, _) => ???
+      // case MapFuncsCore.Guard(_, _, _, _) => ???
     }
   }
 }
