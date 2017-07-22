@@ -237,7 +237,7 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
           Pattern.compile(pattern, Pattern.CASE_INSENSITIVE)
 
 
-        compiled.matcher(pattern).matches()
+        compiled.matcher(target).matches()
       })
 
     def searchStatic(pattern: String, flag: Boolean) = {
@@ -247,7 +247,7 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         Pattern.compile(pattern, Pattern.CASE_INSENSITIVE)
 
       new Op1SB("search", { target =>
-        compiled.matcher(pattern).matches()
+        compiled.matcher(target).matches()
       })
     }
 
