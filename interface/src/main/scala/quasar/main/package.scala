@@ -48,7 +48,7 @@ import scalaz.concurrent.Task
   * functionality.
   */
 package object main {
-  import FileSystemDef.DefinitionResult
+  import BackendDef.DefinitionResult
   import QueryFile.ResultHandle
 
   type MainErrT[F[_], A] = EitherT[F, String, A]
@@ -56,7 +56,7 @@ package object main {
   val MainTask           = MonadError[EitherT[Task, String, ?], String]
 
   /** The physical filesystems currently supported. */
-  val physicalFileSystems: FileSystemDef[PhysFsEffM] = IList(
+  val physicalFileSystems: BackendDef[PhysFsEffM] = IList(
     Couchbase.definition translate injectFT[Task, PhysFsEff],
     marklogic.MarkLogic(
       readChunkSize  = 10000L,
@@ -95,7 +95,7 @@ package object main {
 
   object CoreEff {
     def runFs[S[_]](
-      hfsRef: TaskRef[AnalyticalFileSystem ~> HierarchicalFsEffM]
+      hfsRef: TaskRef[BackendEffect ~> HierarchicalFsEffM]
     )(
       implicit
       S0: Task :<: S,
@@ -107,19 +107,19 @@ package object main {
       S6: Module.Failure    :<: S,
       S7: MetaStoreLocation :<: S
     ): Task[CoreEff ~> Free[S, ?]] = {
-      def moduleInter(fs: AnalyticalFileSystem ~> Free[S,?]): Module ~> Free[S, ?] = {
-        val wtv: Coproduct[Mounting, AnalyticalFileSystem, ?] ~> Free[S,?] = injectFT[Mounting, S] :+: fs
-        flatMapSNT(wtv) compose Module.impl.default[Coproduct[Mounting, AnalyticalFileSystem, ?]]
+      def moduleInter(fs: BackendEffect ~> Free[S,?]): Module ~> Free[S, ?] = {
+        val wtv: Coproduct[Mounting, BackendEffect, ?] ~> Free[S,?] = injectFT[Mounting, S] :+: fs
+        flatMapSNT(wtv) compose Module.impl.default[Coproduct[Mounting, BackendEffect, ?]]
       }
       CompositeFileSystem.interpreter[S](hfsRef) map { compFs =>
         injectFT[MetaStoreLocation, S]                       :+:
         moduleInter(compFs)                             :+:
         injectFT[Mounting, S]                           :+:
-        (compFs compose Inject[Analyze, AnalyticalFileSystem])  :+:
-        (compFs compose Inject[QueryFile, AnalyticalFileSystem])  :+:
-        (compFs compose Inject[ReadFile, AnalyticalFileSystem])   :+:
-        (compFs compose Inject[WriteFile, AnalyticalFileSystem])  :+:
-        (compFs compose Inject[ManageFile, AnalyticalFileSystem]) :+:
+        (compFs compose Inject[Analyze, BackendEffect])  :+:
+        (compFs compose Inject[QueryFile, BackendEffect])  :+:
+        (compFs compose Inject[ReadFile, BackendEffect])   :+:
+        (compFs compose Inject[WriteFile, BackendEffect])  :+:
+        (compFs compose Inject[ManageFile, BackendEffect]) :+:
         injectFT[Module.Failure, S]                     :+:
         injectFT[PathMismatchFailure, S]                :+:
         injectFT[MountingFailure, S]                    :+:
@@ -153,21 +153,21 @@ package object main {
       *       for more flexible production of interpreters.
       */
     def interpreter[S[_]](
-      hfsRef: TaskRef[AnalyticalFileSystem ~> HierarchicalFsEffM]
+      hfsRef: TaskRef[BackendEffect ~> HierarchicalFsEffM]
     )(implicit
       S0: Task :<: S,
       S1: PhysErr :<: S,
       S2: Mounting :<: S,
       S3: MountingFailure :<: S,
       S4: PathMismatchFailure :<: S
-    ): Task[AnalyticalFileSystem ~> Free[S, ?]] =
+    ): Task[BackendEffect ~> Free[S, ?]] =
       for {
         startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
         seqRef     <- TaskRef(startSeq)
         viewHRef   <- TaskRef[ViewState.ViewHandles](Map())
         mntedRHRef <- TaskRef(Map[ResultHandle, (ADir, ResultHandle)]())
       } yield {
-        val hierarchicalFs: AnalyticalFileSystem ~> Free[S, ?] =
+        val hierarchicalFs: BackendEffect ~> Free[S, ?] =
           HierarchicalFsEff.dynamicFileSystem(
             hfsRef,
             HierarchicalFsEff.interpreter[S](seqRef, mntedRHRef))
@@ -178,7 +178,7 @@ package object main {
           :\: Mounting
           :\: MountingFailure
           :\: PathMismatchFailure
-          :/: AnalyticalFileSystem
+          :/: BackendEffect
         )#M[A]
 
         val compFs: V ~> Free[S, ?] =
@@ -189,7 +189,7 @@ package object main {
           injectFT[PathMismatchFailure, S]                                    :+:
           hierarchicalFs
 
-        flatMapSNT(compFs) compose flatMapSNT(transformIn[AnalyticalFileSystem, V, Free[V, ?]](module.analyticalFileSystem[V], liftFT)) compose view.analyticalFileSystem[V]
+        flatMapSNT(compFs) compose flatMapSNT(transformIn[BackendEffect, V, Free[V, ?]](module.backendEffect[V], liftFT)) compose view.backendEffect[V]
       }
   }
 
@@ -218,13 +218,13 @@ package object main {
       * time as the ref is updated.
       */
     def dynamicFileSystem[S[_]](
-      ref: TaskRef[AnalyticalFileSystem ~> HierarchicalFsEffM],
+      ref: TaskRef[BackendEffect ~> HierarchicalFsEffM],
       hfs: HierarchicalFsEff ~> Free[S, ?]
     )(implicit
       S: Task :<: S
-    ): AnalyticalFileSystem ~> Free[S, ?] =
-      new (AnalyticalFileSystem ~> Free[S, ?]) {
-        def apply[A](fs: AnalyticalFileSystem[A]) =
+    ): BackendEffect ~> Free[S, ?] =
+      new (BackendEffect ~> Free[S, ?]) {
+        def apply[A](fs: BackendEffect[A]) =
           lift(ref.read.map(free.foldMapNT(hfs) compose _))
             .into[S]
             .flatMap(_ apply fs)
@@ -267,7 +267,7 @@ package object main {
 
   object MountEff {
     def interpreter[S[_]](
-      hrchRef: TaskRef[AnalyticalFileSystem ~> HierarchicalFsEffM],
+      hrchRef: TaskRef[BackendEffect ~> HierarchicalFsEffM],
       mntsRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
     )(implicit
       S0: Task :<: S,
@@ -301,7 +301,7 @@ package object main {
       */
     def interpreter[F[_], S[_]](
       cfgsImpl: MountConfigs ~> F,
-      hrchFsRef: TaskRef[AnalyticalFileSystem ~> HierarchicalFsEffM],
+      hrchFsRef: TaskRef[BackendEffect ~> HierarchicalFsEffM],
       mntdFsRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
     )(implicit
       S0: F :<: S,
