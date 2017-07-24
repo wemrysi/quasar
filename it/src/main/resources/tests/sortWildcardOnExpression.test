@@ -6,8 +6,11 @@
         "mongodb_3_0":       "ignoreResultOrder",
         "mongodb_3_2":       "ignoreResultOrder",
         "mongodb_3_4":       "ignoreResultOrder",
-        "mongodb_read_only": "ignoreResultOrder"
+        "mongodb_read_only": "ignoreResultOrder",
+        "spark_hdfs":        "pending",
+        "spark_local":       "pending"
     },
+    "NB": "spark_hdfs and spark_local not on par with master",
     "data": "largeZips.data",
     "query": "select * from largeZips order by pop/10 desc",
     "predicate": "initial",

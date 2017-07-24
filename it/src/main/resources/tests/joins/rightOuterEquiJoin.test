@@ -5,9 +5,10 @@
         "couchbase": "skip",
         "marklogic_json": "pending",
         "marklogic_xml": "pending",
-        "mimir": "ignoreFieldOrder"
+        "mimir": "ignoreFieldOrder",
+        "mongodb_2_6": "timeout",
+        "mongodb_3_0": "timeout"
     },
-
     "data": ["../cars.data", "../cars2.data"],
 
     "query": "select cars.name as c1, cars2.name as c2

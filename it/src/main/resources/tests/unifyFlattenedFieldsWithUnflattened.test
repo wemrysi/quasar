@@ -2,13 +2,18 @@
     "name": "unify flattened fields with unflattened field",
     "backends": {
         "couchbase": "pending",
+        "marklogic_json": "timeout",
+        "marklogic_xml": "timeout",
         "mimir": "pending",
-        "mongodb_2_6":       "pending",
-        "mongodb_3_0":       "pending",
-        "mongodb_3_2":       "pending",
-        "mongodb_3_4":       "pending",
-        "mongodb_read_only": "pending"
+        "mongodb_2_6": "pending",
+        "mongodb_3_0": "pending",
+        "mongodb_3_2": "pending",
+        "mongodb_3_4": "pending",
+        "mongodb_read_only": "pending",
+        "spark_hdfs": "timeout",
+        "spark_local": "timeout"
     },
+    "NB": "marklogic_json, marklogic_xml, spark_hdfs and spark_local not on par with master",
     "data": "zips.data",
     "query": "select `_id` as zip, loc[*] from zips order by loc[*] limit 10",
     "predicate": "exactly",

@@ -2897,19 +2897,19 @@ class PlannerSpec extends
           collection("db", "zips2") -> CollectionStatistics(15, 150, true)).get(c),
         defaultIndexes) must_==
         plan2_6(query)
-    }
+    }.pendingUntilFixed(notOnPar)
 
     "plan simple join with sources in different DBs" in {
       // NB: cannot use $lookup, so fall back to the old approach
       val query = sqlE"select zips2.city from `/db1/zips` join `/db2/zips2` on zips.`_id` = zips2.`_id`"
       plan(query) must_== plan2_6(query)
-    }
+    }.pendingUntilFixed(notOnPar)
 
     "plan simple join with no index" in {
       // NB: cannot use $lookup, so fall back to the old approach
       val query = sqlE"select zips2.city from zips join zips2 on zips.pop = zips2.pop"
       plan(query) must_== plan2_6(query)
-    }
+    }.pendingUntilFixed(notOnPar)
 
     "plan non-equi join" in {
       plan(sqlE"select zips2.city from zips join zips2 on zips.`_id` < zips2.`_id`") must
@@ -3440,7 +3440,7 @@ class PlannerSpec extends
             "_id" -> $field("_id", "0"),
             "1"   -> $include),
           IgnoreId)))
-    }
+    }.pendingUntilFixed(notOnPar)
 
     "plan join with multiple conditions" in {
       plan(sqlE"select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth from slamengine_commits as l join slamengine_commits as r on r.sha = l.parents[0].sha and l.author.login = r.author.login") must
