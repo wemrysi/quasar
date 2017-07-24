@@ -235,9 +235,9 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
           def apply(row: Int) = {
             // we're literally recompiling this on a row-by-row basis
             val compiled = if (flag(row))
-              Pattern.compile(pattern(row))
-            else
               Pattern.compile(pattern(row), Pattern.CASE_INSENSITIVE)
+            else
+              Pattern.compile(pattern(row))
 
             compiled.matcher(target(row)).matches()
           }
@@ -256,12 +256,12 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         searchDynamic(List(dateToStrCol(target), dateToStrCol(pattern), flag)).get
     }
 
-    // please use this one as much as possible. it is orders of magnitude faster than search
+    // please use this one as much as possible. it is orders of magnitude faster than searchDynamic
     def search(pattern: String, flag: Boolean) = {
       val compiled = if (flag)
-        Pattern.compile(pattern)
-      else
         Pattern.compile(pattern, Pattern.CASE_INSENSITIVE)
+      else
+        Pattern.compile(pattern)
 
       new Op1SB("search", { target =>
         compiled.matcher(target).matches()
