@@ -239,7 +239,7 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
             else
               Pattern.compile(pattern(row))
 
-            compiled.matcher(target(row)).matches()
+            compiled.matcher(target(row)).find()
           }
 
           def isDefinedAt(row: Int) =
@@ -264,7 +264,7 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         Pattern.compile(pattern)
 
       new Op1SB("search", { target =>
-        compiled.matcher(target).matches()
+        compiled.matcher(target).find()
       })
     }
 
