@@ -29,7 +29,7 @@ import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount._
-import quasar.fs.mount.FileSystemDef.DefinitionResult
+import quasar.fs.mount.BackendDef.DefinitionResult
 import quasar.fs.mount.module.Module
 import quasar.main.config.loadConfigFile
 import quasar.main.metastore._
@@ -152,7 +152,7 @@ object Quasar {
         initUpdateMigrate(quasar.metastore.Schema.schema, metastore.trans.transactor, None)
       else Task.now(()).liftM[MainErrT]
       _          <- verifySchema(quasar.metastore.Schema.schema, metastore.trans.transactor).leftMap(_.message)
-      hfsRef     <- TaskRef(Empty.analyticalFileSystem[HierarchicalFsEffM]).liftM[MainErrT]
+      hfsRef     <- TaskRef(Empty.backendEffect[HierarchicalFsEffM]).liftM[MainErrT]
       mntdRef    <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
 
       ephmralMnt =  KvsMounter.interpreter[Task, QErrsTCnxIO](
