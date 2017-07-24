@@ -372,6 +372,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       "wrap the results of a transform in an object as the specified field" in checkWrapObject
       "give the identity transform for self-object concatenation" in checkObjectConcatSelf
       "use a right-biased overwrite strategy in object concat conflicts" in checkObjectConcatOverwrite
+      "use a right-biased overwrite strategy in object concat conflicts (with differing types)" in checkObjectConcatOverwriteDifferingTypes
       "test inner object concat with a single boolean" in testObjectConcatSingletonNonObject
       "test inner object concat with a boolean and an empty object" in testObjectConcatTrivial
       "concatenate dissimilar objects" in checkObjectConcat
