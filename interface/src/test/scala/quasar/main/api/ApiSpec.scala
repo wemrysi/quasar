@@ -17,7 +17,7 @@
 package quasar.main.api
 
 import quasar.contrib.scalaz._
-import quasar.fs.mount.MountConfig
+import quasar.fs.mount._
 import quasar.main._
 import quasar.metastore.MetaStoreFixture
 import quasar.sql._
@@ -32,16 +32,18 @@ class ApiSpec extends quasar.Qspec {
     "change metastore at runtime" >> {
       val sampleMountPath = rootDir </> file("foo")
       val sampleMount = MountConfig.viewConfig0(sqlB"select * from zips")
+      val mount = Mounting.Ops[CoreEff]
       (for {
         firstMetaConf <- MetaStoreFixture.createNewTestMetaStoreConfig
         quasarFS      <- Quasar.initWithDbConfig(firstMetaConf).run.map(a => a.leftMap(e => new scala.Exception(e.shows))).unattempt
-        _             <- quasarFS.mount(sampleMountPath, sampleMount, false)
-        mountIsThere  <- quasarFS.getMount(sampleMountPath).map(_.isDefined)
+        run0          =  quasarFS.taskInter
+        _             <- mount.mountOrReplace(sampleMountPath, sampleMount, false).foldMap(run0)
+        mountIsThere  <- mount.lookupConfig(sampleMountPath).run.run.map(_.isDefined).foldMap(run0)
         otherMetaConf <- MetaStoreFixture.createNewTestMetaStoreConfig
-        _             <- quasarFS.attemptChangeMetastore(otherMetaConf, initialize = true)
-        noLongerThere <- quasarFS.getMount(sampleMountPath).map(_.empty)
-        _             <- quasarFS.attemptChangeMetastore(firstMetaConf, initialize = true)
-        thereAgain    <- quasarFS.getMount(sampleMountPath).map(_.isDefined)
+        _             <- MetaStoreLocation.Ops[CoreEff].set(otherMetaConf, initialize = true).foldMap(run0)
+        noLongerThere <- mount.lookupConfig(sampleMountPath).run.run.map(_.empty).foldMap(run0)
+        _             <- MetaStoreLocation.Ops[CoreEff].set(firstMetaConf, initialize = true).foldMap(run0)
+        thereAgain    <- mount.lookupConfig(sampleMountPath).run.run.map(_.isDefined).foldMap(run0)
       } yield {
         mountIsThere  must_=== true
         noLongerThere must_=== true
