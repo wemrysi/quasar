@@ -76,10 +76,9 @@ object Command {
       case SavePattern(XFile(f), value)  => Save(f, value)
       case AppendPattern(XFile(f), value) => Append(f, value)
       case DeletePattern(XFile(f))       => Delete(f)
-      case DebugPattern(code)            =>
-        Debug(DebugLevel.fromInt(code.toInt).getOrElse(DebugLevel.Normal))
+      case DebugPattern(code)            => Debug(DebugLevel.int.unapply(code.toInt) | DebugLevel.Normal)
       case SummaryCountPattern(rows)     => SummaryCount(rows.toInt)
-      case FormatPattern(format)         => Format(OutputFormat.fromString(format).getOrElse(OutputFormat.Table))
+      case FormatPattern(format)         => Format(OutputFormat.fromString(format) | OutputFormat.Table)
       case HelpPattern()                 => Help
       case SetVarPattern(name, value)    => SetVar(name, value)
       case UnsetVarPattern(name)         => UnsetVar(name)

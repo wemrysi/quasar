@@ -261,11 +261,12 @@ object Repl {
           expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
           vars  =  Variables.fromMap(state.variables)
           block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
-          (log, result) = compileQuery(block, vars, state.cwd)
-          // TODO: This is brittle, relying on particular phase positions in the
-          //       log, we should add more structure to be able to project out
-          //       particular sections directly.
-          _     <- printLog(DebugLevel.Verbose, log.drop(6))
+          (log0, result) = compileQuery(block, vars, state.cwd)
+          // TODO: This is a bit brittle, it'd be nice if we had a way to refer
+          //       to logical sections directly.
+          log   = if (state.debugLevel === DebugLevel.Verbose) log0
+                  else log0.dropWhile(_.name =/= "Logical Plan")
+          _     <- printLog(DebugLevel.Verbose, log)
           _     <- result.fold(
                     serr => DF.fail(serr.shows),
                     _.fold(
