@@ -25,17 +25,25 @@ import matryoshka._
 import matryoshka.data.Fix
 import scalaz._, Scalaz._
 
-/** "Pipeline" operators added in MongoDB version 3.2. */
+/** "Pipeline" operators added in MongoDB version 3.4. */
 trait ExprOp3_4F[A]
 object ExprOp3_4F {
-  final case class $substrBytesF[A](string: A, start: A, count: A)  extends ExprOp3_4F[A]
-  final case class $substrCPF[A](string: A, start: A, count: A)  extends ExprOp3_4F[A]
+  final case class $indexOfBytesF[A](string: A, substring: A, start: Option[A], end: Option[A]) extends ExprOp3_4F[A]
+  final case class $indexOfCPF[A](string: A, substring: A, start: Option[A], end: Option[A]) extends ExprOp3_4F[A]
+  final case class $strLenBytesF[A](string: A) extends ExprOp3_4F[A]
+  final case class $strLenCPF[A](string: A) extends ExprOp3_4F[A]
+  final case class $substrBytesF[A](string: A, start: A, count: A) extends ExprOp3_4F[A]
+  final case class $substrCPF[A](string: A, start: A, count: A) extends ExprOp3_4F[A]
 
   implicit val equal: Delay[Equal, ExprOp3_4F] =
     new Delay[Equal, ExprOp3_4F] {
       def apply[A](eq: Equal[A]) = {
         implicit val EQ: Equal[A] = eq
         Equal.equal {
+          case ($indexOfBytesF(s1, t1, u1, v1), $indexOfBytesF(s2, t2, u2, v2)) => s1 ≟ s2 && t1 ≟ t2 && u1 ≟ u2 && v1 ≟ v2
+          case ($indexOfCPF(s1, t1, u1, v1), $indexOfCPF(s2, t2, u2, v2)) => s1 ≟ s2 && t1 ≟ t2 && u1 ≟ u2 && v1 ≟ v2
+          case ($strLenBytesF(s1), $strLenBytesF(s2)) => s1 ≟ s2
+          case ($strLenCPF(s1), $strLenCPF(s2)) => s1 ≟ s2
           case ($substrBytesF(s1, i1, c1), $substrBytesF(s2, i2, c2)) => s1 ≟ s2 && i1 ≟ i2 && c1 ≟ c2
           case ($substrCPF(s1, i1, c1), $substrCPF(s2, i2, c2)) => s1 ≟ s2 && i1 ≟ i2 && c1 ≟ c2
           case _ => false
@@ -47,6 +55,10 @@ object ExprOp3_4F {
     def traverseImpl[G[_], A, B](fa: ExprOp3_4F[A])(f: A => G[B])(implicit G: Applicative[G]):
         G[ExprOp3_4F[B]] =
       fa match {
+        case $indexOfBytesF(s, t, u, v) => (f(s) |@| f(t) |@| u.traverse(f) |@| v.traverse(f))($indexOfBytesF(_, _, _, _))
+        case $indexOfCPF(s, t, u, v) => (f(s) |@| f(t) |@| u.traverse(f) |@| v.traverse(f))($indexOfCPF(_, _, _, _))
+        case $strLenBytesF(s) => G.map(f(s))($strLenBytesF(_))
+        case $strLenCPF(s) => G.map(f(s))($strLenCPF(_))
         case $substrBytesF(s, i, c) => (f(s) |@| f(i) |@| f(c))($substrBytesF(_, _, _))
         case $substrCPF(s, i, c) => (f(s) |@| f(i) |@| f(c))($substrCPF(_, _, _))
       }
@@ -58,6 +70,10 @@ object ExprOp3_4F {
     val simplify: AlgebraM[Option, ExprOp3_4F, Fix[F]] = κ(None)
 
     def bson: Algebra[ExprOp3_4F, Bson] = {
+      case $indexOfBytesF(s, t, u, v) => Bson.Doc("$indexOfBytes" -> Bson.Arr(List(List(s, t), u.toList, v.toList).flatMap(x => x)))
+      case $indexOfCPF(s, t, u, v) => Bson.Doc("$indexOfCP" -> Bson.Arr(List(List(s, t), u.toList, v.toList).flatMap(x => x)))
+      case $strLenBytesF(s) => Bson.Doc("$strLenBytes" -> s)
+      case $strLenCPF(s) => Bson.Doc("$strLenCP" -> s)
       case $substrBytesF(s, i, c) => Bson.Doc("$substrBytes" -> Bson.Arr(s, i, c))
       case $substrCPF(s, i, c) => Bson.Doc("$substrCP" -> Bson.Arr(s, i, c))
     }
@@ -72,9 +88,35 @@ object ExprOp3_4F {
     (implicit I: ExprOp3_4F :<: EX) {
     @inline private def convert(expr: ExprOp3_4F[T]): T = embed(I.inj(expr))
 
+    def $indexOfBytes(string: T, substring: T, start: Option[T], end: Option[T]) =
+      convert($indexOfBytesF(string, substring, start, end))
+    def $indexOfCP(string: T, substring: T, start: Option[T], end: Option[T]) =
+      convert($indexOfCPF(string, substring, start, end))
+    def $strLenBytes(string: T): T = convert($strLenBytesF(string))
+    def $strLenCP(string: T): T = convert($strLenCPF(string))
     def $substrBytes(string: T, start: T, index: T): T = convert($substrBytesF(string, start, index))
     def $substrCP(string: T, start: T, index: T): T = convert($substrCPF(string, start, index))
   }
+}
+
+object $indexOfBytes {
+  def apply[EX[_], A](string: A, substring: A, start: Option[A], end: Option[A])(implicit I: ExprOp3_4F :<: EX): EX[A] =
+    I.inj(ExprOp3_4F.$indexOfBytesF(string, substring, start, end))
+}
+
+object $indexOfCP {
+  def apply[EX[_], A](string: A, substring: A, start: Option[A], end: Option[A])(implicit I: ExprOp3_4F :<: EX): EX[A] =
+    I.inj(ExprOp3_4F.$indexOfCPF(string, substring, start, end))
+}
+
+object $strLenBytes {
+  def apply[EX[_], A](string: A)(implicit I: ExprOp3_4F :<: EX): EX[A] =
+    I.inj(ExprOp3_4F.$strLenBytesF(string))
+}
+
+object $strLenCP {
+  def apply[EX[_], A](string: A)(implicit I: ExprOp3_4F :<: EX): EX[A] =
+    I.inj(ExprOp3_4F.$strLenCPF(string))
 }
 
 object $substrBytes {
