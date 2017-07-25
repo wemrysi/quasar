@@ -30,6 +30,7 @@ object Command {
   private val CdPattern           = "(?i)cd(?: +(.+))?".r
   private val NamedExprPattern    = "(?i)([^ :]+) *<- *(.+)".r
   private val ExplainPattern      = "(?i)explain +(.+)".r
+  private val CompilePattern      = "(?i)compile +(.+)".r
   private val SchemaPattern       = "(?i)schema +(.+)".r
   private val LsPattern           = "(?i)ls(?: +(.+))?".r
   private val SavePattern         = "(?i)save +([\\S]+) (.+)".r
@@ -48,6 +49,7 @@ object Command {
   final case class Cd(dir: XDir) extends Command
   final case class Select(name: Option[String], query: Query) extends Command
   final case class Explain(query: Query) extends Command
+  final case class Compile(query: Query) extends Command
   final case class Schema(query: Query) extends Command
   final case class Ls(dir: Option[XDir]) extends Command
   final case class Save(path: XFile, value: String) extends Command
@@ -67,6 +69,7 @@ object Command {
       case CdPattern(_)                  => Cd(rootDir.right)
       case NamedExprPattern(name, query) => Select(Some(name), Query(query))
       case ExplainPattern(query)         => Explain(Query(query))
+      case CompilePattern(query)         => Compile(Query(query))
       case SchemaPattern(query)          => Schema(Query(query))
       case LsPattern(XDir(d))            => Ls(d.some)
       case LsPattern(_)                  => Ls(none)

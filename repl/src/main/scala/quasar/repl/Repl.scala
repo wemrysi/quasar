@@ -18,18 +18,23 @@ package quasar.repl
 
 import slamdata.Predef._
 
-import quasar.{Data, DataCodec, Variables, resolveImports}
+import quasar.{Data, DataCodec, Variables, resolveImports, queryPlan}
 import quasar.common.PhaseResults
+import quasar.connector.CompileM
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.csv.CsvWriter
 import quasar.effect._
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
+import quasar.frontend.SemanticErrors
+import quasar.frontend.logicalplan.{LogicalPlanR, LogicalPlan}
 import quasar.fp._, ski._, numeric._
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.main.{analysis, FilesystemQueries, Prettify}
+import quasar.qscript.{DiscoverPath, QScriptRead, qScriptReadToQscriptTotal}
+import quasar.sql.Sql
 import quasar.sql
 
 import argonaut._, Argonaut._
@@ -56,6 +61,7 @@ object Repl {
       |  [query]
       |  [id] <- [query]
       |  explain [query]
+      |  compile [query]
       |  schema [query]
       |  ls [path]
       |  save [path] [value]
@@ -143,6 +149,22 @@ object Repl {
         }
       } yield ()
 
+    def compileQuery(expr: Fix[Sql], vars: Variables, basePath: ADir): (PhaseResults, SemanticErrors \/ (FileSystemError \/ Unit)) = {
+      type M[A] = FileSystemErrT[CompileM, A]
+      val lpr = new LogicalPlanR[Fix[LogicalPlan]]
+
+      def absFiles(lp: Fix[LogicalPlan]): List[AFile] =
+        lpr.paths(lp).foldMap(f => refineTypeAbs(f).swap.toList)
+
+      queryPlan(expr, vars, basePath, 0L, None).liftM[FileSystemErrT]
+        .flatMap(_.fold(
+          _  => ().point[M],
+          lp => QueryFile.convertToQScriptRead[Fix, M, QScriptRead[Fix, ?]](
+                  DiscoverPath.ListContents.static[List, M](absFiles(lp)))(
+                  lp).void))
+        .run.run.run
+    }
+
     cmd match {
       case Help =>
         P.println(HelpMessage)
@@ -226,6 +248,24 @@ object Repl {
           t     <- fsQ.explainQuery(block, vars, state.cwd).run.run.run
           (log, result) = t
           _     <- printLog(state.debugLevel, log)
+          _     <- result.fold(
+                    serr => DF.fail(serr.shows),
+                    _.fold(
+                      perr => DF.fail(perr.shows),
+                      κ(().point[Free[S, ?]])))
+        } yield ()
+
+      case Compile(q) =>
+        for {
+          state <- RS.get
+          expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
+          vars  =  Variables.fromMap(state.variables)
+          block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
+          (log, result) = compileQuery(block, vars, state.cwd)
+          // TODO: This is brittle, relying on particular phase positions in the
+          //       log, we should add more structure to be able to project out
+          //       particular sections directly.
+          _     <- printLog(DebugLevel.Verbose, log.drop(6))
           _     <- result.fold(
                     serr => DF.fail(serr.shows),
                     _.fold(
