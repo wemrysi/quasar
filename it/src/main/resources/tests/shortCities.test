@@ -2,13 +2,12 @@
     "name": "shortest city names",
     "backends": {
         "couchbase":         "pending",
-        "mimir": "pending",
+        "mimir":             "pending",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",
-        "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "mongodb_read_only": "pending"
     },
     "data": "largeZips.data",
     "query": "select distinct city from largeZips order by length(city), city limit 5",

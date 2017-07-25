@@ -1,9 +1,10 @@
 {
     "name": "time series aggregation",
     "backends": {
-        "couchbase":  "ignoreFieldOrder",
-        "mimir":      "pending",
-        "postgresql": "pending"
+        "couchbase": "pending",
+        "mimir":"pending",
+        "spark_hdfs": "pending",
+        "spark_local": "pending"
     },
     "data": "smalltimeseries.data",
     "query": "
@@ -11,7 +12,8 @@
         FROM smalltimeseries
         GROUP BY sensor, dt
         ORDER BY sensor ASC, dt ASC",
-    "NB": "The query is ordered, but not uniquely, so we have to use containsExactly instead of equalsExactly.",
+    "NB": "The query is ordered, but not uniquely, so we have to use containsExactly instead of equalsExactly.
+           Couchbase, spark_hdfs and spark_local not on par with master",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

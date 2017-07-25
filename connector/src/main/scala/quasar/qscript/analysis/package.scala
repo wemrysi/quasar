@@ -82,7 +82,6 @@ package object analysis {
 
     implicit def qscriptCore[T[_[_]]: RecursiveT: ShowT]: Cardinality[QScriptCore[T, ?]] =
       new Cardinality[QScriptCore[T, ?]] {
-
         val I = Inject[QScriptCore[T, ?], QScriptTotal[T, ?]]
 
         @SuppressWarnings(Array("org.wartremover.warts.Recursion"))

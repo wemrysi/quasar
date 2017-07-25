@@ -2,8 +2,7 @@
     "name": "filter on is null",
 
     "backends": {
-        "mimir": "pending",
-        "postgresql": "pending"
+        "mimir":"pending"
     },
 
     "description": "expression with `is null` should be true whenever the same filter is satisfied",

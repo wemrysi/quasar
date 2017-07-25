@@ -99,13 +99,13 @@ object MongoDbPlanner {
 
   def processMapFuncExpr
     [T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse, A]
-    (funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (fm: FreeMapA[T, A])
     (recovery: A => Fix[ExprOp])
     (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp)
       : M[Fix[ExprOp]] =
     fm.cataM(
-      interpretM[M, MapFuncCore[T, ?], A, Fix[ExprOp]](
+      interpretM[M, MapFunc[T, ?], A, Fix[ExprOp]](
         recovery(_).point[M],
         expression(funcHandler)))
 
@@ -115,19 +115,20 @@ object MongoDbPlanner {
     (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp)
       : OutputM[PartialSelector[T]] =
     fm.zygo(
-      interpret[MapFuncCore[T, ?], Hole, T[MapFuncCore[T, ?]]](
-        κ(MapFuncsCore.Undefined[T, T[MapFuncCore[T, ?]]]().embed),
+      interpret[MapFunc[T, ?], Hole, T[MapFunc[T, ?]]](
+        κ(MFC(MapFuncsCore.Undefined[T, T[MapFunc[T, ?]]]()).embed),
         _.embed),
-      ginterpret[(T[MapFuncCore[T, ?]], ?), MapFuncCore[T, ?], Hole, OutputM[PartialSelector[T]]](
+      ginterpret[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], Hole, OutputM[PartialSelector[T]]](
         κ(defaultSelector[T].point[OutputM]),
         selector[T]))
 
-  def processMapFunc[T[_[_]]: RecursiveT: ShowT, M[_]: Monad, A]
+
+  def processMapFunc[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, A]
     (fm: FreeMapA[T, A])
     (recovery: A => JsCore)
     (implicit merr: MonadError_[M, FileSystemError])
       : M[JsCore] =
-    fm.cataM(interpretM[M, MapFuncCore[T, ?], A, JsCore](recovery(_).point[M], javascript))
+    fm.cataM(interpretM[M, MapFunc[T, ?], A, JsCore](recovery(_).point[M], javascript))
 
   // FIXME: This is temporary. Should go away when the connector is complete.
   def unimplemented[M[_], A](label: String)(implicit merr: MonadError_[M, FileSystemError]): M[A] =
@@ -180,15 +181,16 @@ object MongoDbPlanner {
     exprOrJs(ej)(ejsonToExpression[M, EJ], ejsonToJs[M, EJ](_) ∘ JsFn.const)
 
   def expression[T[_[_]]: RecursiveT: ShowT, M[_]: Applicative, EX[_]: Traverse]
-    (funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
-    (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp):
-      AlgebraM[M, MapFuncCore[T, ?], Fix[ExprOp]] = {
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
+    (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp)
+      : AlgebraM[M, MapFunc[T, ?], Fix[ExprOp]] = {
     import MapFuncsCore._
+    import MapFuncsDerived._
 
-    def handleCommon(mf: MapFuncCore[T, Fix[ExprOp]]): Option[Fix[ExprOp]] =
+    def handleCommon(mf: MapFunc[T, Fix[ExprOp]]): Option[Fix[ExprOp]] =
       funcHandler(mf).map(t => unpack(t.mapSuspension(inj)))
 
-    val handleSpecial: MapFuncCore[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
+    val handleSpecialCore: MapFuncCore[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
       case Constant(v1) => ejsonToExpression[M, T[EJson]](v1)
       case Now() => unimplemented[M, Fix[ExprOp]]("Now expression")
 
@@ -269,12 +271,24 @@ object MongoDbPlanner {
       case Search(_, _, _)    => unimplemented[M, Fix[ExprOp]]("Search expression")
     }
 
+    val handleSpecialDerived: MapFuncDerived[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
+      case Abs(a1) => unimplemented[M, Fix[ExprOp]]("Abs expression")
+      case Ceil(a1) => unimplemented[M, Fix[ExprOp]]("Ceil expression")
+      case Floor(a1) => unimplemented[M, Fix[ExprOp]]("Floor expression")
+      case Trunc(a1) => unimplemented[M, Fix[ExprOp]]("Trunc expression")
+    }
+
+    val handleSpecial: MapFunc[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
+      case MFC(mfc) => handleSpecialCore(mfc)
+      case MFD(mfd) => handleSpecialDerived(mfd)
+    }
+
     mf => handleCommon(mf).cata(_.point[M], handleSpecial(mf))
   }
 
-  def javascript[T[_[_]]: RecursiveT: ShowT, M[_]: Applicative]
+  def javascript[T[_[_]]: BirecursiveT: ShowT, M[_]: Applicative]
     (implicit merr: MonadError_[M, FileSystemError])
-      : AlgebraM[M, MapFuncCore[T, ?], JsCore] = {
+      : AlgebraM[M, MapFunc[T, ?], JsCore] = {
     import jscore.{
       Add => _, In => _,
       Lt => _, Lte => _, Gt => _, Gte => _, Eq => _, Neq => _,
@@ -282,6 +296,7 @@ object MongoDbPlanner {
       _}
 
     import MapFuncsCore._
+    import MapFuncsDerived._
 
     val mjs = quasar.physical.mongodb.javascript[JsCore](_.embed)
     import mjs._
@@ -293,10 +308,10 @@ object MongoDbPlanner {
           ident("x"),
           BinOp(jscore.Mod, ident("x"), Literal(Js.Num(1, false)))))
 
-    def handleCommon(mf: MapFuncCore[T, JsCore]): Option[JsCore] =
-      JsFuncHandler(mf).map(unpack[Fix, JsCoreF])
+    def handleCommon(mf: MapFunc[T, JsCore]): Option[JsCore] =
+      JsFuncHandler.handle[MapFunc[T, ?]].apply(mf).map(unpack[Fix, JsCoreF])
 
-    val handleSpecial: MapFuncCore[T, JsCore] => M[JsCore] = {
+    val handleSpecialCore: MapFuncCore[T, JsCore] => M[JsCore] = {
       case Constant(v1) => ejsonToJs[M, T[EJson]](v1)
       case Undefined() => ident("undefined").point[M]
       case JoinSideName(n) =>
@@ -579,6 +594,18 @@ object MongoDbPlanner {
               BinOp(jscore.Add, ident("index"), start)))).point[M]
     }
 
+    val handleSpecialDerived: MapFuncDerived[T, JsCore] => M[JsCore] = {
+      case Abs(a1)       => unimplemented[M, JsCore]("Abs JS")
+      case Ceil(a1)      => unimplemented[M, JsCore]("Ceil JS")
+      case Floor(a1)     => unimplemented[M, JsCore]("Floor JS")
+      case Trunc(a1)     => unimplemented[M, JsCore]("Trunc JS")
+    }
+
+    val handleSpecial: MapFunc[T, JsCore] => M[JsCore] = {
+      case MFC(mfc) => handleSpecialCore(mfc)
+      case MFD(mfd) => handleSpecialDerived(mfd)
+    }
+
     mf => handleCommon(mf).cata(_.point[M], handleSpecial(mf))
   }
 
@@ -610,21 +637,21 @@ object MongoDbPlanner {
     * leftovers for conversion using \$where.
     */
   def selector[T[_[_]]: RecursiveT: ShowT]:
-      GAlgebra[(T[MapFuncCore[T, ?]], ?), MapFuncCore[T, ?], OutputM[PartialSelector[T]]] = { node =>
+      GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = { node =>
     import MapFuncsCore._
 
     type Output = OutputM[PartialSelector[T]]
 
     object IsBson {
-      def unapply(v: (T[MapFuncCore[T, ?]], Output)): Option[Bson] =
+      def unapply(v: (T[MapFunc[T, ?]], Output)): Option[Bson] =
         v._1.project match {
-          case Constant(b) => b.cataM(BsonCodec.fromEJson).toOption
+          case MFC(Constant(b)) => b.cataM(BsonCodec.fromEJson).toOption
           case _ => None
         }
     }
 
     object IsBool {
-      def unapply(v: (T[MapFuncCore[T, ?]], Output)): Option[Boolean] =
+      def unapply(v: (T[MapFunc[T, ?]], Output)): Option[Boolean] =
         v match {
           case IsBson(Bson.Bool(b)) => b.some
           case _                    => None
@@ -632,7 +659,7 @@ object MongoDbPlanner {
     }
 
     object IsText {
-      def unapply(v: (T[MapFuncCore[T, ?]], Output)): Option[String] =
+      def unapply(v: (T[MapFunc[T, ?]], Output)): Option[String] =
         v match {
           case IsBson(Bson.Text(str)) => Some(str)
           case _                      => None
@@ -640,26 +667,26 @@ object MongoDbPlanner {
     }
 
     object IsDate {
-      def unapply(v: (T[MapFuncCore[T, ?]], Output)): Option[Data.Date] =
+      def unapply(v: (T[MapFunc[T, ?]], Output)): Option[Data.Date] =
         v._1.project match {
-          case Constant(d @ Data.Date(_)) => Some(d)
-          case _                          => None
+          case MFC(Constant(d @ Data.Date(_))) => Some(d)
+          case _                               => None
         }
     }
 
-    val relFunc: MapFuncCore[T, _] => Option[Bson => Selector.Condition] = {
-      case Eq(_, _)  => Some(Selector.Eq)
-      case Neq(_, _) => Some(Selector.Neq)
-      case Lt(_, _)  => Some(Selector.Lt)
-      case Lte(_, _) => Some(Selector.Lte)
-      case Gt(_, _)  => Some(Selector.Gt)
-      case Gte(_, _) => Some(Selector.Gte)
-      case _         => None
+    val relFunc: MapFunc[T, _] => Option[Bson => Selector.Condition] = {
+      case MFC(Eq(_, _))  => Some(Selector.Eq)
+      case MFC(Neq(_, _)) => Some(Selector.Neq)
+      case MFC(Lt(_, _))  => Some(Selector.Lt)
+      case MFC(Lte(_, _)) => Some(Selector.Lte)
+      case MFC(Gt(_, _))  => Some(Selector.Gt)
+      case MFC(Gte(_, _)) => Some(Selector.Gte)
+      case _              => None
     }
 
     val default: PartialSelector[T] = defaultSelector[T]
 
-    def invoke(func: MapFuncCore[T, (T[MapFuncCore[T, ?]], Output)]): Output = {
+    def invoke(func: MapFunc[T, (T[MapFunc[T, ?]], Output)]): Output = {
       /**
         * All the relational operators require a field as one parameter, and
         * BSON literal value as the other parameter. So we have to try to
@@ -671,7 +698,7 @@ object MongoDbPlanner {
         * Javascript using the "$where" operator.
         */
       def relop
-        (x: (T[MapFuncCore[T, ?]], Output), y: (T[MapFuncCore[T, ?]], Output))
+        (x: (T[MapFunc[T, ?]], Output), y: (T[MapFunc[T, ?]], Output))
         (f: Bson => Selector.Condition, r: Bson => Selector.Condition):
           Output =
         (x, y) match {
@@ -710,7 +737,7 @@ object MongoDbPlanner {
             p1.map(There(0, _)) ++ p2.map(There(1, _)))
         }
 
-      val flip: MapFuncCore[T, _] => Option[MapFuncCore[T, _]] = {
+      val flipCore: MapFuncCore[T, _] => Option[MapFuncCore[T, _]] = {
         case Eq(a, b)  => Some(Eq(a, b))
         case Neq(a, b) => Some(Neq(a, b))
         case Lt(a, b)  => Some(Gt(a, b))
@@ -722,60 +749,65 @@ object MongoDbPlanner {
         case _         => None
       }
 
-      def reversibleRelop(x: (T[MapFuncCore[T, ?]], Output), y: (T[MapFuncCore[T, ?]], Output))(f: MapFuncCore[T, _]): Output =
+      val flip: MapFunc[T, _] => Option[MapFunc[T, _]] = {
+        case MFC(mfc) => flipCore(mfc).map(MFC(_))
+        case _ => None
+      }
+
+      def reversibleRelop(x: (T[MapFunc[T, ?]], Output), y: (T[MapFunc[T, ?]], Output))(f: MapFunc[T, _]): Output =
         (relFunc(f) ⊛ flip(f).flatMap(relFunc))(relop(x, y)(_, _)).getOrElse(-\/(InternalError fromMsg "couldn’t decipher operation"))
 
       func match {
-        case Constant(_)        => \/-(default)
+        case MFC(Constant(_))        => \/-(default)
 
-        case Gt(_, IsDate(d2))  => relDateOp1(Selector.Gte, d2, date.startOfNextDay, 0)
-        case Lt(IsDate(d1), _)  => relDateOp1(Selector.Gte, d1, date.startOfNextDay, 1)
+        case MFC(Gt(_, IsDate(d2)))  => relDateOp1(Selector.Gte, d2, date.startOfNextDay, 0)
+        case MFC(Lt(IsDate(d1), _))  => relDateOp1(Selector.Gte, d1, date.startOfNextDay, 1)
 
-        case Lt(_, IsDate(d2))  => relDateOp1(Selector.Lt,  d2, date.startOfDay, 0)
-        case Gt(IsDate(d1), _)  => relDateOp1(Selector.Lt,  d1, date.startOfDay, 1)
+        case MFC(Lt(_, IsDate(d2)))  => relDateOp1(Selector.Lt,  d2, date.startOfDay, 0)
+        case MFC(Gt(IsDate(d1), _))  => relDateOp1(Selector.Lt,  d1, date.startOfDay, 1)
 
-        case Gte(_, IsDate(d2)) => relDateOp1(Selector.Gte, d2, date.startOfDay, 0)
-        case Lte(IsDate(d1), _) => relDateOp1(Selector.Gte, d1, date.startOfDay, 1)
+        case MFC(Gte(_, IsDate(d2))) => relDateOp1(Selector.Gte, d2, date.startOfDay, 0)
+        case MFC(Lte(IsDate(d1), _)) => relDateOp1(Selector.Gte, d1, date.startOfDay, 1)
 
-        case Lte(_, IsDate(d2)) => relDateOp1(Selector.Lt,  d2, date.startOfNextDay, 0)
-        case Gte(IsDate(d1), _) => relDateOp1(Selector.Lt,  d1, date.startOfNextDay, 1)
+        case MFC(Lte(_, IsDate(d2))) => relDateOp1(Selector.Lt,  d2, date.startOfNextDay, 0)
+        case MFC(Gte(IsDate(d1), _)) => relDateOp1(Selector.Lt,  d1, date.startOfNextDay, 1)
 
-        case Eq(_, IsDate(d2)) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d2, date.startOfDay, date.startOfNextDay, 0)
-        case Eq(IsDate(d1), _) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d1, date.startOfDay, date.startOfNextDay, 1)
+        case MFC(Eq(_, IsDate(d2))) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d2, date.startOfDay, date.startOfNextDay, 0)
+        case MFC(Eq(IsDate(d1), _)) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d1, date.startOfDay, date.startOfNextDay, 1)
 
-        case Neq(_, IsDate(d2)) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d2, date.startOfDay, date.startOfNextDay, 0)
-        case Neq(IsDate(d1), _) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d1, date.startOfDay, date.startOfNextDay, 1)
+        case MFC(Neq(_, IsDate(d2))) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d2, date.startOfDay, date.startOfNextDay, 0)
+        case MFC(Neq(IsDate(d1), _)) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d1, date.startOfDay, date.startOfNextDay, 1)
 
-        case Eq(a, b)  => reversibleRelop(a, b)(func)
-        case Neq(a, b) => reversibleRelop(a, b)(func)
-        case Lt(a, b)  => reversibleRelop(a, b)(func)
-        case Lte(a, b) => reversibleRelop(a, b)(func)
-        case Gt(a, b)  => reversibleRelop(a, b)(func)
-        case Gte(a, b) => reversibleRelop(a, b)(func)
+        case MFC(Eq(a, b))  => reversibleRelop(a, b)(func)
+        case MFC(Neq(a, b)) => reversibleRelop(a, b)(func)
+        case MFC(Lt(a, b))  => reversibleRelop(a, b)(func)
+        case MFC(Lte(a, b)) => reversibleRelop(a, b)(func)
+        case MFC(Gt(a, b))  => reversibleRelop(a, b)(func)
+        case MFC(Gte(a, b)) => reversibleRelop(a, b)(func)
 
-        case Within(a, b) =>
+        case MFC(Within(a, b)) =>
           relop(a, b)(
             Selector.In.apply _,
             x => Selector.ElemMatch(\/-(Selector.In(Bson.Arr(List(x))))))
 
-        case Search(_, IsText(patt), IsBool(b)) =>
+        case MFC(Search(_, IsText(patt), IsBool(b))) =>
           \/-(({ case List(f1) =>
             Selector.Doc(ListMap(f1 -> Selector.Expr(Selector.Regex(patt, b, true, false, false)))) },
             List(There(0, Here[T]()))))
 
-        case Between(_, IsBson(lower), IsBson(upper)) =>
+        case MFC(Between(_, IsBson(lower), IsBson(upper))) =>
           \/-(({ case List(f) => Selector.And(
             Selector.Doc(f -> Selector.Gte(lower)),
             Selector.Doc(f -> Selector.Lte(upper)))
           },
             List(There(0, Here[T]()))))
 
-        case And(a, b) => invoke2Nel(a._2, b._2)(Selector.And.apply _)
-        case Or(a, b) => invoke2Nel(a._2, b._2)(Selector.Or.apply _)
-        case Not((_, v)) =>
+        case MFC(And(a, b)) => invoke2Nel(a._2, b._2)(Selector.And.apply _)
+        case MFC(Or(a, b)) => invoke2Nel(a._2, b._2)(Selector.Or.apply _)
+        case MFC(Not((_, v))) =>
           v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
 
-        case Guard(_, typ, cont, _) =>
+        case MFC(Guard(_, typ, cont, _)) =>
           def selCheck: Type => Option[BsonField => Selector] =
             generateTypeCheck[BsonField, Selector](Selector.Or(_, _)) {
               case Type.Null => ((f: BsonField) =>  Selector.Doc(f -> Selector.Type(BsonType.Null)))
@@ -838,7 +870,7 @@ object MongoDbPlanner {
     def plan
       [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
       (joinHandler: JoinHandler[WF, WBM],
-        funcHandler: MapFuncCore[IT, ?] ~> OptionFree[EX, ?])
+        funcHandler: MapFunc[IT, ?] ~> OptionFree[EX, ?])
       (implicit
         merr: MonadError_[M, FileSystemError],
         ev0: WorkflowOpCoreF :<: WF,
@@ -859,7 +891,7 @@ object MongoDbPlanner {
         def plan
           [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
           (joinHandler: JoinHandler[WF, WBM],
-            funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
+            funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
           (implicit
             merr: MonadError_[M, FileSystemError],
             ev0: WorkflowOpCoreF :<: WF,
@@ -878,13 +910,13 @@ object MongoDbPlanner {
                     getExprBuilder[T, M, WF, EX](
                       funcHandler)(
                       dataset,
-                        Free.roll(MapFuncsCore.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id"))))
+                        Free.roll(MFC(MapFuncsCore.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))))
                   case IncludeId =>
                     getExprBuilder[T, M, WF, EX](
                       funcHandler)(
                       dataset,
                         MapFuncCore.StaticArray(List(
-                          Free.roll(MapFuncsCore.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id"))),
+                          Free.roll(MFC(MapFuncsCore.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))),
                           HoleF)))
                   case ExcludeId => dataset.point[M]
                 }
@@ -902,7 +934,7 @@ object MongoDbPlanner {
             WF[_]: Functor: Coalesce: Crush: Crystallize,
             EX[_]: Traverse]
           (joinHandler: JoinHandler[WF, WBM],
-            funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
+            funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
           (implicit
             merr: MonadError_[M, FileSystemError],
             ev0: WorkflowOpCoreF :<: WF,
@@ -1005,7 +1037,7 @@ object MongoDbPlanner {
         def plan
           [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
           (joinHandler: JoinHandler[WF, WBM],
-            funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
+            funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
           (implicit
             merr: MonadError_[M, FileSystemError],
             ev0: WorkflowOpCoreF :<: WF,
@@ -1026,8 +1058,8 @@ object MongoDbPlanner {
                 JoinSource(lb, lk),
                 JoinSource(rb, rk))) >>=
                 (getExprBuilder[T, M, WF, EX](funcHandler)(_, qs.combine >>= {
-                  case LeftSide => Free.roll(MapFuncsCore.ProjectField(HoleF, MapFuncsCore.StrLit("left")))
-                  case RightSide => Free.roll(MapFuncsCore.ProjectField(HoleF, MapFuncsCore.StrLit("right")))
+                  case LeftSide => Free.roll(MFC(MapFuncsCore.ProjectField(HoleF, MapFuncsCore.StrLit("left"))))
+                  case RightSide => Free.roll(MFC(MapFuncsCore.ProjectField(HoleF, MapFuncsCore.StrLit("right"))))
                 }))).join
           }).join
       }
@@ -1040,7 +1072,7 @@ object MongoDbPlanner {
         def plan
           [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
           (joinHandler: JoinHandler[WF, WBM],
-            funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
+            funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
           (implicit
             merr: MonadError_[M, FileSystemError],
             ev0: WorkflowOpCoreF :<: WF,
@@ -1062,7 +1094,7 @@ object MongoDbPlanner {
         def plan
           [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
           (joinHandler: JoinHandler[WF, WBM],
-            funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
+            funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
           (implicit
             merr: MonadError_[M, FileSystemError],
             ev0: WorkflowOpCoreF :<: WF,
@@ -1088,14 +1120,14 @@ object MongoDbPlanner {
       default("ProjectBucket")
   }
 
-  def getExpr[T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
-    (funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
+  def getExpr[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Fix[ExprOp]] =
     processMapFuncExpr[T, M, EX, Hole](funcHandler)(fm)(κ($$ROOT))
 
-  def getJsFn[T[_[_]]: RecursiveT: ShowT, M[_]: Monad]
+  def getJsFn[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad]
     (fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError])
       : M[JsFn] =
@@ -1121,7 +1153,7 @@ object MongoDbPlanner {
 
   def getExprBuilder
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse]
-    (funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (src: WorkflowBuilder[WF], fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[WorkflowBuilder[WF]] =
@@ -1129,7 +1161,7 @@ object MongoDbPlanner {
 
   def getReduceBuilder
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse]
-    (funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[WorkflowBuilder[WF]] =
@@ -1158,20 +1190,20 @@ object MongoDbPlanner {
       _ => merr.handleError[Expr](js.map(-\&/))(_ => expr.map(\&/-)))
   }
 
-  def handleFreeMap[T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
-    (funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?], fm: FreeMap[T])
+  def handleFreeMap[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Expr] =
     exprOrJs(fm)(getExpr[T, M, EX](funcHandler)(_), getJsFn[T, M])
 
   def handleRedRepair[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
-    (funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?], jr: FreeMapA[T, ReduceIndex])
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], jr: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Expr] =
     exprOrJs(jr)(getExprRed[T, M, EX](funcHandler)(_), getJsRed[T, M])
 
-  def getExprRed[T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
-    (funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
+  def getExprRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (jr: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[Fix[ExprOp]] =
@@ -1179,8 +1211,8 @@ object MongoDbPlanner {
       i => $field("_id", i.toString),
       i => $field(createFieldName("f", i))))
 
-  def getJsRed[T[_[_]]: RecursiveT: ShowT, M[_]: Monad]
-    (jr: Free[MapFuncCore[T, ?], ReduceIndex])
+  def getJsRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad]
+    (jr: Free[MapFunc[T, ?], ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError])
       : M[JsFn] =
     processMapFunc[T, M, ReduceIndex](jr)(_.idx.fold(
@@ -1191,7 +1223,7 @@ object MongoDbPlanner {
   def rebaseWB
     [T[_[_]]: EqualT, M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
     (joinHandler: JoinHandler[WF, WBM],
-      funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?],
+      funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?],
       free: FreeQS[T],
       src: WorkflowBuilder[WF])
     (implicit
@@ -1236,16 +1268,21 @@ object MongoDbPlanner {
     (subType: Type)
     (implicit merr: MonadError_[M, FileSystemError])
       : CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {
-    case free @ CoEnv(\/-(MapFuncsCore.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, fb))) =>
-      if (typ.contains(subType)) cont.project.point[M]
-      // TODO: Error if there is no overlap between the types.
-      else {
-        val union = subType ⨯ typ
-        if (union ≟ Type.Bottom)
-          merr.raiseError(qscriptPlanningFailed(InternalError.fromMsg(s"can only contain ${subType.shows}, but a(n) ${typ.shows} is expected")))
-        else CoEnv[Hole, MapFuncCore[T, ?], FreeMap[T]](MapFuncsCore.Guard[T, FreeMap[T]](HoleF[T], union, cont, fb).right).point[M]
-      }
-    case x => x.point[M]
+    def f: CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {
+      case free @ CoEnv(\/-(MFC(MapFuncsCore.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, fb)))) =>
+        if (typ.contains(subType)) cont.project.point[M]
+        // TODO: Error if there is no overlap between the types.
+        else {
+          val union = subType ⨯ typ
+          if (union ≟ Type.Bottom)
+            merr.raiseError(qscriptPlanningFailed(InternalError.fromMsg(s"can only contain ${subType.shows}, but a(n) ${typ.shows} is expected")))
+          else {
+            CoEnv[Hole, MapFunc[T, ?], FreeMap[T]](MFC(MapFuncsCore.Guard[T, FreeMap[T]](HoleF[T], union, cont, fb)).right).point[M]
+          }
+        }
+      case x => x.point[M]
+    }
+    f
   }
 
   // TODO: Allow backends to provide a “Read” type to the typechecker, which
@@ -1274,7 +1311,7 @@ object MongoDbPlanner {
               case _                      => true
             } match {
               case Nil    => src.project
-              case h :: t => QC(Filter(src, t.foldLeft[FreeMap[T]](h)((acc, e) => Free.roll(MapFuncsCore.And(acc, e)))))
+              case h :: t => QC(Filter(src, t.foldLeft[FreeMap[T]](h)((acc, e) => Free.roll(MFC(MapFuncsCore.And(acc, e))))))
             })
         case _ => QC.inj(f).point[M]
       }
@@ -1357,7 +1394,7 @@ object MongoDbPlanner {
       EX[_]: Traverse]
     (listContents: DiscoverPath.ListContents[M],
       joinHandler: JoinHandler[WF, WBM],
-      funcHandler: MapFuncCore[T, ?] ~> OptionFree[EX, ?])
+      funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (lp: T[LogicalPlan])
     (implicit
       merr: MonadError_[M, FileSystemError],
@@ -1410,15 +1447,15 @@ object MongoDbPlanner {
           JoinHandler.fallback[Workflow3_2F, WBM](
             JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
             JoinHandler.mapReduce)
-        plan0[T, M, Workflow3_2F, Expr3_2](queryContext.listContents, joinHandler, FuncHandler.handle3_2[MapFuncCore[T, ?]])(logical)
+        plan0[T, M, Workflow3_2F, Expr3_2](queryContext.listContents, joinHandler, FuncHandler.handle3_2[MapFunc[T, ?]])(logical)
 
       case `3.0`     =>
         val joinHandler = JoinHandler.mapReduce[WBM, Workflow2_6F]
-        plan0[T, M, Workflow2_6F, Expr3_0](queryContext.listContents, joinHandler, FuncHandler.handle3_0[MapFuncCore[T, ?]])(logical).map(_.inject[WorkflowF])
+        plan0[T, M, Workflow2_6F, Expr3_0](queryContext.listContents, joinHandler, FuncHandler.handle3_0[MapFunc[T, ?]])(logical).map(_.inject[WorkflowF])
 
       case _     =>
         val joinHandler = JoinHandler.mapReduce[WBM, Workflow2_6F]
-        plan0[T, M, Workflow2_6F, Expr2_6](queryContext.listContents, joinHandler, FuncHandler.handle2_6[MapFuncCore[T, ?]])(logical).map(_.inject[WorkflowF])
+        plan0[T, M, Workflow2_6F, Expr2_6](queryContext.listContents, joinHandler, FuncHandler.handle2_6[MapFunc[T, ?]])(logical).map(_.inject[WorkflowF])
     }
   }
 }

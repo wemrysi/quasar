@@ -10,10 +10,10 @@
         "mongodb_3_0": "pending",
         "mongodb_3_2": "pending",
         "mongodb_3_4": "pending",
-        "postgresql": "pending",
-        "spark_hdfs":     "pending",
-        "spark_local":    "pending"
+        "spark_hdfs": "pending",
+        "spark_local": "pending"
     },
+    "NB": "spark_hdfs and spark_local not on par with master",
     "data": "patients.data",
     "query": "SELECT AVG(cnt) as measure, state as category FROM
                 (SELECT COUNT(*) as cnt, state, gender FROM patients

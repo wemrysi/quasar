@@ -1,9 +1,8 @@
 {
   "name": "regex on non-string field",
   "backends": {
-        "mimir": "pending",
-      "marklogic_json":    "pending",
-      "postgresql":        "pending"
+        "mimir":"pending",
+      "marklogic_json":    "pending"
   },
   "data": "zips.data",
   "query": "select distinct * from zips where pop ~* \"foo\"",

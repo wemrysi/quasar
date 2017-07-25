@@ -9,8 +9,7 @@
         "mongodb_3_0": "ignoreFieldOrder",
         "mongodb_3_2": "ignoreFieldOrder",
         "mongodb_3_4": "ignoreFieldOrder",
-        "mongodb_read_only": "ignoreFieldOrder",
-        "postgresql": "pending"
+        "mongodb_read_only": "ignoreFieldOrder"
     },
     "data": "zips.data",
     "query": "select state, city, [pop ...] as pop from zips group by state, city",
