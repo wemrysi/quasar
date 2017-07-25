@@ -134,12 +134,20 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.Gte(a1, a2) =>
         Infix.GtEq.spec(a1, a2).point[F]
 
-      case MapFuncsCore.IfUndefined(a1, a2) => ???
+      // this function is completely unspecified; I'm guessing on semantics here
+      case MapFuncsCore.IfUndefined(a1, a2) =>
+        (DerefObjectStatic(
+          OuterObjectConcat(    // this operation is left-biased, so we default to a1
+            WrapObject(a1, "foo"),
+            WrapObject(a2, "foo")),
+          CPathField("foo")): TransSpec[A]).point[F]
+
       case MapFuncsCore.And(a1, a2) =>
         Infix.And.spec(a1, a2).point[F]
       case MapFuncsCore.Or(a1, a2) =>
         Infix.Or.spec(a1, a2).point[F]
-      case MapFuncsCore.Between(a1, a2, a3) => ???
+      case MapFuncsCore.Between(a1, a2, a3) =>
+        (MapN(OuterArrayConcat(WrapArray(a1), WrapArray(a2), WrapArray(a3)), between): TransSpec[A]).point[F]
       case MapFuncsCore.Cond(a1, a2, a3) =>
         (Cond(a1, a2, a3): TransSpec[A]).point[F]
 
@@ -162,13 +170,11 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
 
       // significantly faster fast path
       case MapFuncsCore.Search(src, ConstLiteral(CString(pattern), _), ConstLiteral(CBoolean(flag), _)) =>
-        searchStatic(pattern, flag).spec[A](src).point[F]
+        search(pattern, flag).spec[A](src).point[F]
 
-      case MapFuncsCore.Search(src, pattern, ConstLiteral(CBoolean(flag), _)) =>
-        search(flag).spec[A](src, pattern).point[F]
-
-      // we could do this, but... dear god
-      case MapFuncsCore.Search(_, _, _) => ???
+      // this case is hideously slow; hopefully we don't see it too often
+      case MapFuncsCore.Search(src, pattern, flag) =>
+        (MapN((OuterArrayConcat(WrapArray(src), WrapArray(pattern), WrapArray(flag))), searchDynamic): TransSpec[A]).point[F]
 
       case MapFuncsCore.Substring(string, from, count) =>
         val args = OuterArrayConcat(WrapArray(string), WrapArray(from), WrapArray(count))
