@@ -33,7 +33,8 @@ import quasar.qscript._
 
 import quasar.blueeyes.json.{JNum, JValue}
 import quasar.precog.common.{CEmptyArray, Path, CPath, CPathIndex}
-import quasar.yggdrasil.bytecode.JType
+import quasar.yggdrasil.TableModule
+import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
 import fs2.{async, Stream}
 import fs2.async.mutable.{Queue, Signal}
@@ -53,6 +54,7 @@ import pathy.Path._
 import delorean._
 
 import scala.Predef.implicitly
+import scala.collection.immutable.{Map => ScalaMap}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -159,7 +161,7 @@ object Mimir extends BackendModule with Logging {
 //def interpretM[M[_], F[_], A, B](f: A => M[B], φ: AlgebraM[M, F, B]): AlgebraM[M, CoEnv[A, F, ?], B]
 // f.cataM(interpretM)
 
-    val mapFuncPlanner = MapFuncPlanner[T, Backend, MapFunc[T, ?]]
+    def mapFuncPlanner[F[_]: Monad] = MapFuncPlanner[T, F, MapFunc[T, ?]]
 
     lazy val planQST: AlgebraM[Backend, QScriptTotal[T, ?], Repr] =
       _.run.fold(
@@ -180,26 +182,99 @@ object Mimir extends BackendModule with Logging {
                       _ => ???,   // Read[AFile]
                       _ => ???))))))))    // DeadEnd
 
+    def interpretMapFunc[F[_]: Monad](P: Precog)(fm: FreeMap[T]): F[P.trans.TransSpec1] =
+      fm.cataM[F, P.trans.TransSpec1](
+        interpretM(
+          κ(P.trans.TransSpec1.Id.point[F]),
+          mapFuncPlanner[F].plan(P)[P.trans.Source1](P.trans.TransSpec1.Id)))
+
     lazy val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = {
       case qscript.Map(src, f) =>
+        for {
+          trans <- interpretMapFunc[Backend](src.P)(f)
+        } yield Repr(src.P)(src.table.transform(trans))
+
+      case qscript.Reduce(src, bucket, reducers, repair) =>
         import src.P.trans._
+        import src.P.Library
+
+        def extractReduction(red: ReduceFunc[FreeMap[T]])
+            : (Library.Reduction, FreeMap[T]) = red match {
+          case ReduceFuncs.Count(f) => (Library.Count, f)
+          case ReduceFuncs.Sum(f) => (Library.Sum, f)
+          case ReduceFuncs.Min(f) => (Library.Min, f)
+          case ReduceFuncs.Max(f) => (Library.Max, f)
+          case ReduceFuncs.Avg(f) => (Library.Mean, f)
+          case ReduceFuncs.Arbitrary(f) => ???
+          case ReduceFuncs.First(f) => ???
+          case ReduceFuncs.Last(f) => ???
+          case ReduceFuncs.UnshiftArray(f) => ???
+          case ReduceFuncs.UnshiftMap(f1, f2) => ???
+        }
+
+        def combineTransSpecs(specs: List[TransSpec1]): TransSpec1 =
+          specs.map(WrapArray(_): TransSpec1)
+            .reduceLeftOption(OuterArrayConcat(_, _))
+            .getOrElse(TransSpec1.Id)
+
+        val pairs: List[(Library.Reduction, FreeMap[T])] =
+          reducers.map(extractReduction)
+
+        val reductions: List[Library.Reduction] = pairs.map(_._1)
+        val funcs: List[FreeMap[T]] = pairs.map(_._2)
+
+        def makeJArray(idx: Int)(tpe: JType): JType =
+          JArrayFixedT(ScalaMap(idx -> tpe))
+
+        val megaReduction: Library.Reduction =
+          Library.coalesce(reductions.zipWithIndex.map {
+            case (r, i) => (r, Some(makeJArray(i)(_)))
+          })
+
+        // mimir reverses the order of the returned results
+        def remapIndex: ScalaMap[Int, Int] =
+          (0 until reducers.length).reverse.zipWithIndex.toMap
 
         for {
-          trans <- f.cataM[Backend, src.P.trans.TransSpec1](
-            interpretM(
-              κ(TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
-        } yield Repr(src.P)(src.table.transform(trans))
+          specs <- funcs.traverse(interpretMapFunc[Backend](src.P)(_))
+          megaSpec = combineTransSpecs(specs)
+
+          table <- {
+            def reduceAll(table: src.P.Table): Future[src.P.Table] = {
+              for {
+                red <- megaReduction(table.transform(megaSpec))
+                trans <- repair.cataM[Future, TransSpec1](
+                  interpretM(
+                    {
+                      case ReduceIndex(Some(idx)) => remapIndex.get(idx) match {
+                        case Some(i) =>
+                          (DerefArrayStatic(TransSpec1.Id, CPathIndex(i)): TransSpec1).point[Future]
+                        case None => ???
+                      }
+                      case ReduceIndex(None) => interpretMapFunc[Future](src.P)(bucket)
+                    },
+                    mapFuncPlanner[Future].plan(src.P)[Source1](TransSpec1.Id)))
+              } yield red.transform(trans)
+            }
+
+            if (bucket === MapFuncsCore.NullLit()) {
+              reduceAll(src.table).toTask.liftM[MT].liftB
+            } else {
+              for {
+                bucketTrans <- interpretMapFunc[Backend](src.P)(bucket)
+
+                prepared <- src.table.sort(bucketTrans).toTask.liftM[MT].liftB
+                table <- prepared.partitionMerge(bucketTrans)(reduceAll).toTask.liftM[MT].liftB
+              } yield table
+            }
+          }
+        } yield Repr(src.P)(table)
 
       case qscript.LeftShift(src, struct, idStatus, repair) =>
         import src.P.trans._
 
         for {
-          structTrans <- struct.cataM[Backend, TransSpec1](
-            interpretM(
-              κ(TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
-
+          structTrans <- interpretMapFunc[Backend](src.P)(struct)
           wrappedStructTrans = InnerArrayConcat(WrapArray(TransSpec1.Id), WrapArray(structTrans))
 
           repairTrans <- repair.cataM[Backend, TransSpec1](
@@ -219,23 +294,69 @@ object Mimir extends BackendModule with Logging {
 
                   back.point[Backend]
               },
-              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+              mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)))
 
           shifted = src.table.transform(wrappedStructTrans).leftShift(CPath.Identity \ 1)
           repaired = shifted.transform(repairTrans)
         } yield Repr(src.P)(repaired)
 
-      case qscript.Reduce(src, bucket, reducers, repair) => ???
-      case qscript.Sort(src, bucket, order) => ???
+      case qscript.Sort(src, bucket, orders) =>
+        import src.P.trans._
+        import TableModule.DesiredSortOrder
+
+        for {
+          transDirs <- orders.toList traverse {
+            case (fm, dir) =>
+              val order = dir match {
+                case SortDir.Ascending => TableModule.SortAscending
+                case SortDir.Descending => TableModule.SortDescending
+              }
+
+              interpretMapFunc[Backend](src.P)(fm).map(ts => (ts, order))
+          }
+
+          pair = transDirs.foldLeft((Vector.empty[(Vector[TransSpec1], DesiredSortOrder)], None: Option[DesiredSortOrder])) {
+            case ((acc, None), (ts, order)) =>
+              (acc :+ ((Vector(ts), order)), Some(order))
+
+            case ((acc, Some(ord1)), (ts, ord2)) if ord1 == ord2 =>
+              val idx = acc.length - 1
+              (acc.updated(idx, (acc(idx)._1 :+ ts, ord1)), Some(ord1))
+
+            case ((acc, Some(ord1)), (ts, ord2)) =>
+              (acc :+ ((Vector(ts), ord2)), Some(ord2))
+          }
+
+          (sorts, _) = pair
+
+          table <- {
+            def sortAll(table: src.P.Table): Future[src.P.Table] = {
+              sorts.foldRightM(table) {
+                case ((transes, sortOrder), table) =>
+                  val sortKey = OuterArrayConcat(transes: _*)
+
+                  table.sort(sortKey, sortOrder)
+              }
+            }
+
+            if (bucket === MapFuncsCore.NullLit()) {
+              sortAll(src.table).toTask.liftM[MT].liftB
+            } else {
+              for {
+                bucketTrans <- interpretMapFunc[Backend](src.P)(bucket)
+
+                prepared <- src.table.sort(bucketTrans).toTask.liftM[MT].liftB
+                table <- prepared.partitionMerge(bucketTrans)(sortAll).toTask.liftM[MT].liftB
+              } yield table
+            }
+          }
+        } yield Repr(src.P)(table)
 
       case qscript.Filter(src, f) =>
         import src.P.trans._
 
         for {
-          trans <- f.cataM[Backend, src.P.trans.TransSpec1](
-            interpretM(
-              κ(TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+          trans <- interpretMapFunc[Backend](src.P)(f)
         } yield Repr(src.P)(src.table.transform(Filter(TransSpec1.Id, trans)))
 
       case qscript.Union(src, lBranch, rBranch) =>
@@ -293,15 +414,8 @@ object Mimir extends BackendModule with Logging {
           rmerged <- src.unsafeMerge(rightRepr).liftM[MT].liftB
           rtable = rmerged.table
 
-          transLKey <- lkey.cataM[Backend, TransSpec1](
-            interpretM(
-              κ(TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
-
-          transRKey <- rkey.cataM[Backend, TransSpec1](
-            interpretM(
-              κ(TransSpec1.Id.point[Backend]),
-              mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+          transLKey <- interpretMapFunc[Backend](src.P)(lkey)
+          transRKey <- interpretMapFunc[Backend](src.P)(rkey)
 
           transMiddle <- combine.cataM[Backend, TransSpec2](
             interpretM(
@@ -309,7 +423,7 @@ object Mimir extends BackendModule with Logging {
                 case qscript.LeftSide => TransSpec2.LeftId.point[Backend]
                 case qscript.RightSide => TransSpec2.RightId.point[Backend]
               },
-              mapFuncPlanner.plan(src.P)[Source2](TransSpec2.LeftId)))    // TODO weirdly left-biases things like constants
+              mapFuncPlanner[Backend].plan(src.P)[Source2](TransSpec2.LeftId)))    // TODO weirdly left-biases things like constants
 
           // identify full-cross and avoid cogroup
           result <- if (transLKey == transRKey && transLKey == ConstLiteral(CEmptyArray, TransSpec1.Id)) {
@@ -331,7 +445,7 @@ object Mimir extends BackendModule with Logging {
                         case qscript.LeftSide => TransSpec1.Id.point[Backend]
                         case qscript.RightSide => TransSpec1.Undef.point[Backend]
                       },
-                      mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+                      mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)))
 
                 case JoinType.Inner | JoinType.RightOuter =>
                   TransSpec1.Undef.point[Backend]
@@ -345,7 +459,7 @@ object Mimir extends BackendModule with Logging {
                         case qscript.LeftSide => TransSpec1.Undef.point[Backend]
                         case qscript.RightSide => TransSpec1.Id.point[Backend]
                       },
-                      mapFuncPlanner.plan(src.P)[Source1](TransSpec1.Id)))
+                      mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)))
 
                 case JoinType.Inner | JoinType.LeftOuter =>
                   TransSpec1.Undef.point[Backend]

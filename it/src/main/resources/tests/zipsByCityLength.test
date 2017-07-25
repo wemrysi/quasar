@@ -3,7 +3,7 @@
     "backends": {
         "couchbase": "ignoreFieldOrder",
         "marklogic_json": "ignoreFieldOrder",
-        "mimir": "pending"
+        "mimir":"pendingIgnoreFieldOrder"
     },
     "data": "largeZips.data",
     "query": "select length(city) as len, count(*) as cnt

@@ -2,7 +2,7 @@
     "name": "derived function floor",
     "backends": {
       "couchbase": "ignoreFieldOrder",
-      "mimir": "pending",
+      "mimir": "pendingIgnoreFieldOrder",
       "mongodb_2_6": "pending",
       "mongodb_3_0": "pending",
       "mongodb_read_only": "pending"

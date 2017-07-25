@@ -2,9 +2,9 @@
     "name": "four different kinds of CASE expressions (switch/match, with and without ELSE)",
 
     "backends": {
+        "mimir":"pendingIgnoreFieldOrder",
         "couchbase":  "pending",
         "marklogic_json": "pending",
-        "mimir": "pending",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_3_2":       "pending",

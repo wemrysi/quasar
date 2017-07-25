@@ -2,7 +2,7 @@
     "name": "select count and another field",
     "backends": {
         "couchbase": "pending",
-        "mimir": "pending"
+        "mimir":"pendingIgnoreFieldOrder"
     },
     "data": "slamengine_commits.data",
     "query": "select committer.login, count(*) from slamengine_commits",
