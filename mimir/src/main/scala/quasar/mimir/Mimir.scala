@@ -197,6 +197,7 @@ object Mimir extends BackendModule with Logging {
         import src.P.trans._
         import src.P.Library
 
+        // empty reduction is distinct
         if (reducers.isEmpty) {
           for {
             trans <- repair.cataM[Backend, TransSpec1](
@@ -206,9 +207,12 @@ object Mimir extends BackendModule with Logging {
                   case ReduceIndex(None) => interpretMapFunc[Backend](src.P)(bucket)
                 },
                 mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)))
-          } yield Repr(src.P)(src.table.transform(trans))
-        } else {
 
+            transformed = src.table.transform(trans)
+
+            sorted <- transformed.sort(TransSpec1.Id, unique = true).toTask.liftM[MT].liftB
+          } yield Repr(src.P)(sorted)
+        } else {
           def extractReduction(red: ReduceFunc[FreeMap[T]])
               : (Library.Reduction, FreeMap[T]) = red match {
             case ReduceFuncs.Count(f) => (Library.Count, f)
