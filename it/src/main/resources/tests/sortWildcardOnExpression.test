@@ -1,8 +1,5 @@
 {
     "name": "sort wildcard on expression",
-    "backends": {
-        "mimir":"pending"
-    },
     "data": "largeZips.data",
     "query": "select * from largeZips order by pop/10 desc",
     "predicate": "initial",

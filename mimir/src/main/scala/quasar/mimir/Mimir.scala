@@ -349,7 +349,7 @@ object Mimir extends BackendModule with Logging {
             def sortAll(table: src.P.Table): Future[src.P.Table] = {
               sorts.foldRightM(table) {
                 case ((transes, sortOrder), table) =>
-                  val sortKey = OuterArrayConcat(transes: _*)
+                  val sortKey = OuterArrayConcat(transes.map(WrapArray(_)): _*)
 
                   table.sort(sortKey, sortOrder)
               }

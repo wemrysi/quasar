@@ -2,7 +2,7 @@
     "name": "sort, project, and limit",
 
     "backends": {
-        "mimir":"pendingIgnoreFieldOrder"
+        "mimir":"ignoreFieldOrder"
     },
 
     "data": "zips.data",
