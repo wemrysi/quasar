@@ -475,10 +475,10 @@ object PruneArrays {
     }
 }
 
-class PAFindRemap[T[_[_]]: BirecursiveT, F[_]: Functor] {
+class PAFindRemap[T, F[_]: Functor](implicit P: PruneArrays[F]) {
   import PATypes._
 
-  type ArrayEnv[G[_], A] = EnvT[RewriteState, G, A]
+  type ArrayEnv[A] = EnvT[RewriteState, F, A]
 
   /** Given an input, we accumulate state and annotate the focus.
     *
@@ -489,14 +489,13 @@ class PAFindRemap[T[_[_]]: BirecursiveT, F[_]: Functor] {
     * If the focus is an array that can be pruned, the annotatation is set to
     * the state. Else the annotation is set to `None`.
     */
-  def findIndices[S[_[_]], M[_], F[_], G[_]: Functor](
+  def findIndices[M[_]](
     implicit
-      R: Recursive.Aux[S[F], G],
-      M: MonadState[M, RewriteState],
-      P: PruneArrays[G])
-      : CoalgebraM[M, ArrayEnv[G, ?], S[F]] = sf => {
-    val gsf: G[S[F]] = sf.project
-    P.find(gsf) ∘ (newEnv => EnvT((newEnv, gsf)))
+      R: Recursive.Aux[T, F],
+      M: MonadState[M, RewriteState])
+      : CoalgebraM[M, ArrayEnv, T] = t => {
+    val ft: F[T] = t.project
+    P.find(ft) ∘ (newEnv => EnvT((newEnv, ft)))
   }
 
   /** Given an annotated input, we produce an output with state.
@@ -506,13 +505,12 @@ class PAFindRemap[T[_[_]]: BirecursiveT, F[_]: Functor] {
     * If an array has an associated environment, we update the state
     * to be the environment and prune the array.
     */
-  def remapIndices[S[_[_]], M[_], F[_], G[_]: Functor](
+  def remapIndices[M[_]](
     implicit
-      C: Corecursive.Aux[S[F], G],
-      M: MonadState[M, RewriteState],
-      P: PruneArrays[G])
-      : AlgebraM[M, ArrayEnv[G, ?], S[F]] = arrenv => {
-    val (env, gsf): (RewriteState, G[S[F]]) = arrenv.run
-    P.remap(env, gsf) ∘ (_.embed)
+      C: Corecursive.Aux[T, F],
+      M: MonadState[M, RewriteState])
+      : AlgebraM[M, ArrayEnv, T] = arrenv => {
+    val (env, ft): (RewriteState, F[T]) = arrenv.run
+    P.remap(env, ft) ∘ (_.embed)
   }
 }
