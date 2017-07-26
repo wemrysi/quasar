@@ -53,32 +53,14 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
       val input = dag.Reduce(First,
         dag.AbsoluteLoad(Const(CString("/hom/numbers"))(line))(line))(line)
 
-      val result = testEval(input)
-
-      result must haveSize(1)
-
-      val result2 = result collect {
-        case (ids, SArray(Vector(SDecimal(d)))) if ids.length == 0 =>
-          d.toDouble
-      }
-
-      result2.toSet must_== Set(42)
+      determineResult(input, 42)
     }
 
     "last" >> {
       val input = dag.Reduce(Last,
         dag.AbsoluteLoad(Const(CString("/hom/numbers"))(line))(line))(line)
 
-      val result = testEval(input)
-
-      result must haveSize(1)
-
-      val result2 = result collect {
-        case (ids, SArray(Vector(SDecimal(d)))) if ids.length == 0 =>
-          d.toDouble
-      }
-
-      result2.toSet must_== Set(13)
+      determineResult(input, 13)
     }
 
     "singleton count" >> {
