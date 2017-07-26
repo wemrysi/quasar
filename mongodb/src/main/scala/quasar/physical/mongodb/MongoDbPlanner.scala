@@ -269,6 +269,7 @@ object MongoDbPlanner {
 
       case Range(_, _)        => unimplemented[M, Fix[ExprOp]]("Range expression")
       case Search(_, _, _)    => unimplemented[M, Fix[ExprOp]]("Search expression")
+      case Split(_, _)        => unimplemented[M, Fix[ExprOp]]("Split expression")
     }
 
     val handleSpecialDerived: MapFuncDerived[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
@@ -540,6 +541,8 @@ object MongoDbPlanner {
           List(a1)).point[M]
       case Substring(a1, a2, a3) =>
         Call(Select(a1, "substr"), List(a2, a3)).point[M]
+      case Split(a1, a2) =>
+        Call(Select(a1, "split"), List(a2)).point[M]
 
       case MakeMap(Embed(LiteralF(Js.Str(str))), a2) => Obj(ListMap(Name(str) -> a2)).point[M]
       // TODO: pull out the literal, and handle this case in other situations

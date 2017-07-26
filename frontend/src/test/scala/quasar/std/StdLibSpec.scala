@@ -24,6 +24,7 @@ import quasar.frontend.logicalplan._
 import java.time._, ZoneOffset.UTC
 import scala.collection.Traversable
 import scala.math.abs
+import scala.util.matching.Regex
 
 import matryoshka.data.Fix
 import matryoshka.implicits._
@@ -141,6 +142,20 @@ abstract class StdLibSpec extends Qspec {
           // NB: this is the MongoDB behavior, for lack of a better idea
           val expected = StringLib.safeSubstring(str, start, length)
           ternary(Substring(_, _, _).embed, Data.Str(str), Data.Int(start), Data.Int(length), Data.Str(expected))
+        }
+      }
+
+      "Split" >> {
+        "some string" >> {
+          binary(Split(_, _).embed, Data.Str("some string"), Data.Str(" "), Data.Arr(List("some", "string").map(Data.Str(_))))
+        }
+        "any string not containing delimiter" >> prop { (s: String, d: String) =>
+          (!d.isEmpty && !s.contains(d)) ==>
+            binary(Split(_, _).embed, Data.Str(s), Data.Str(d), Data.Arr(List(Data.Str(s))))
+        }
+        "any string with non-empty delimiter" >> prop { (s: String, d: String) =>
+          !d.isEmpty ==>
+            binary(Split(_, _).embed, Data.Str(s), Data.Str(d), Data.Arr(s.split(Regex.quote(d)).toList.map(Data.Str(_))))
         }
       }
 

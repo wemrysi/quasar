@@ -1,0 +1,19 @@
+{
+  "name": "split",
+
+  "backends": {
+    "marklogic_xml": "pending",
+    "mimir": "pending"
+  },
+
+  "data": "cars.data",
+
+  "query": "select split(name, \"-\") from cars",
+
+  "predicate": "exactly",
+  "expected": [
+    [ "RangeRover", "Evoque" ],
+    [ "Honda", "civic" ],
+    [ "BMW", "X5" ]
+  ]
+}

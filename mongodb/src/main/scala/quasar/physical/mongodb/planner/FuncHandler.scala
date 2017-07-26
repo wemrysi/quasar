@@ -25,7 +25,7 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-import scalaz.{Divide => _, _}, Scalaz._
+import scalaz.{Divide => _, Split => _, _}, Scalaz._
 import simulacrum.typeclass
 
 @typeclass trait FuncHandler[IN[_]] {
@@ -298,6 +298,7 @@ object FuncHandler {
 
                 mfc.some collect {
                   case Length(a1) => $strLenBytes(a1)
+                  case Split(a1, a2) => $split(a1, a2)
                   case Substring(a1, a2, a3) =>  $substrBytes(a1, a2, a3)
                 }
               }

@@ -227,6 +227,7 @@ trait GenericFuncInstances {
       case string.Lower                   => "Lower"
       case string.Upper                   => "Upper"
       case string.Substring               => "Substring"
+      case string.Split                   => "Split"
       case string.Boolean                 => "Boolean"
       case string.Integer                 => "Integer"
       case string.Decimal                 => "Decimal"

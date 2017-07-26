@@ -59,6 +59,8 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
       case (Embed(CoEnv(\/-(MFC(MapFuncsCore.ConcatArrays(_,_))))), Data.Str(_), Data.Arr(_)) => notImplemented
       case (Embed(CoEnv(\/-(MFC(MapFuncsCore.ConcatArrays(_,_))))), Data.Str(_), Data.Str(_)) => notImplemented
 
+      case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Split(_,_))))), Data.Str(_), Data.Str(_)) => notImplemented
+
       case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Eq(_,_))))), Data.Date(_), Data.Timestamp(_)) => notImplemented
 
       case (Embed(CoEnv(\/-(MFC(MapFuncsCore.Lt(_,_))))), Data.Str(_), Data.Str(_)) => notImplemented

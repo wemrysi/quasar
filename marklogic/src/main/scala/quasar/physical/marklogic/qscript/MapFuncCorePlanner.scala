@@ -121,6 +121,7 @@ private[qscript] final class MapFuncCorePlanner[
     case ToString(x)                  => SP.asString(x)
     case QSearch(in, ptn, ci)         => fn.matches(in, ptn, Some(if_ (ci) then_ "im".xs else_ "m".xs)).point[F]
     case Substring(s, loc, len)       => lib.safeSubstring[F] apply (s, loc + 1.xqy, len)
+    case Split(s, d)                  => SP.mkArray(fn.tokenize(s, d))
 
     // structural
     case MakeArray(x)                 => SP.singletonArray(x)

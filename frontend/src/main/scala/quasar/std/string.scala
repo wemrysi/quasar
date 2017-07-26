@@ -23,6 +23,7 @@ import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import java.time.ZoneOffset.UTC
+import scala.util.matching.Regex
 
 import matryoshka._
 import matryoshka.implicits._
@@ -238,6 +239,21 @@ trait StringLib extends Library {
       case Sized(Type.Str, _,                       _)                       =>
         failureNel(GenericError("expected integer arguments for SUBSTRING"))
       case Sized(t, _, _) => failureNel(TypeError(Type.Str, t, None))
+    },
+    basicUntyper)
+
+  val Split = BinaryFunc(
+    Mapping,
+    "Splits a string into an array of substrings based on a delimiter.",
+    Type.Str,
+    Func.Input2(Type.Str, Type.Str),
+    noSimplification,
+    partialTyperV[nat._2] {
+      case Sized(Type.Const(Data.Str(str)), Type.Const(Data.Str(delimiter))) =>
+        success(Type.Const(Data.Arr(str.split(Regex.quote(delimiter)).toList.map(Data.Str(_)))))
+      case Sized(strT, delimiterT) =>
+        (Type.typecheck(Type.Str, strT).leftMap(nel => nel.map(ι[SemanticError])) |@|
+         Type.typecheck(Type.Str, delimiterT).leftMap(nel => nel.map(ι[SemanticError])))((_, _) => Type.FlexArr(0, None, Type.Str))
     },
     basicUntyper)
 
