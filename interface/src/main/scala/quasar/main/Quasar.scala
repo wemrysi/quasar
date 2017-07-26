@@ -17,7 +17,7 @@
 package quasar.main
 
 import slamdata.Predef._
-import quasar.config.{FsFile, CoreConfig, MetaStoreConfig}
+import quasar.config.MetaStoreConfig
 import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
 import quasar.db.DbConnectionConfig
@@ -28,7 +28,6 @@ import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.BackendDef.DefinitionResult
-import quasar.main.config.loadConfigFile
 import quasar.main.metastore._
 import quasar.metastore._
 
@@ -86,27 +85,28 @@ object Quasar {
   val absorbTask: QErrsTCnxIO ~> QErrsCnxIO =
     Inject[ConnectionIO, QErrsCnxIO].compose(taskToConnectionIO) :+: reflNT[QErrsCnxIO]
 
-  /** Initialize the Quasar FileSystem assuming all defaults */
-  val init: MainTask[Quasar] = initFromConfig(None)
-
-  /** Initialize the Quasar FileSytem using the configuration
-    * found in `configPath` if it's a `Some`
+  /** Initialize the Quasar FileSystem assuming all defaults
+    * The metastore can be changed but it will not be persisted to the config file.
     */
-  def initFromConfig(configPath: Option[FsFile]): MainTask[Quasar] =
+  val init: MainTask[Quasar] = initFromMetaConfig(None, _ => ().point[MainTask])
+
+  /** Initialize the Quasar FileSytem using the specified metastore configuration
+    * or with the default if not provided.
+    */
+  def initFromMetaConfig(metaCfg: Option[MetaStoreConfig], persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
     for {
-      cfgFile      <- loadConfigFile[CoreConfig](configPath).liftM[MainErrT]
-      metastoreCfg <- cfgFile.metastore.cata(Task.now, MetaStoreConfig.configOps.default).liftM[MainErrT]
-      quasarFS     <- initWithDbConfig(metastoreCfg.database)
+      metastoreCfg <- metaCfg.cata(Task.now, MetaStoreConfig.default).liftM[MainErrT]
+      quasarFS     <- initWithDbConfig(metastoreCfg.database, persist)
     } yield quasarFS
 
-  def initWithDbConfig(db: DbConnectionConfig): MainTask[Quasar] =
+  def initWithDbConfig(db: DbConnectionConfig, persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
     for {
       metastore <- metastoreTransactor(db)
       metaRef   <- TaskRef(metastore).liftM[MainErrT]
-      quasarFS  <- initWithMeta(metaRef, db.isInMemory)
+      quasarFS  <- initWithMeta(metaRef, persist, db.isInMemory)
     } yield quasarFS
 
-  def initWithMeta(metaRef: TaskRef[MetaStore], initialize: Boolean): MainTask[Quasar] =
+  def initWithMeta(metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit], initialize: Boolean): MainTask[Quasar] =
     for {
       metastore  <- metaRef.read.liftM[MainErrT]
       _          <- if (initialize)
@@ -141,10 +141,10 @@ object Quasar {
       val connectionIOToTask: ConnectionIO ~> Task =
         λ[ConnectionIO ~> Task](io => metaRef.read.flatMap(t => t.trans.transactor.trans(io)))
       val g: QErrs_CnxIO_Task_MetaStoreLoc ~> QErrs_TaskM =
-        (injectFT[Task, QErrs_Task] compose MetaStoreLocation.impl.default[QErrs_Task](metaRef)) :+:
-          injectFT[Task, QErrs_Task]                                                              :+:
-          (injectFT[Task, QErrs_Task] compose connectionIOToTask)                                  :+:
-          injectFT[QErrs, QErrs_Task]
+        (injectFT[Task, QErrs_Task] compose MetaStoreLocation.impl.default(metaRef, persist)) :+:
+         injectFT[Task, QErrs_Task]                                                           :+:
+        (injectFT[Task, QErrs_Task] compose connectionIOToTask)                               :+:
+         injectFT[QErrs, QErrs_Task]
 
       Quasar(
         foldMapNT(g) compose foldMapNT(f) compose runCore,

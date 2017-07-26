@@ -23,7 +23,7 @@ import quasar.fp._, free._
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.module.Module
-import quasar.main.MetaStoreLocation
+import quasar.main._
 import quasar.metastore.MetaStoreFixture.createNewTestMetastore
 
 import org.http4s._, Method.MOVE
@@ -51,7 +51,7 @@ class RestApiSpecs extends quasar.Qspec {
       Failure.toRuntimeError[Task, MountingError]        :+:
       Failure.toRuntimeError[Task, FileSystemError]      :+:
       Failure.toRuntimeError[Task, Module.Error]         :+:
-      MetaStoreLocation.impl.default[Task](metaRef)      :+:
+      MetaStoreLocation.impl.default(metaRef, _ => ().point[MainTask])    :+:
       (foldMapNT(mount :+: fs) compose Module.impl.default[MountingFileSystem]) :+:
       mount :+:
       analyze :+:

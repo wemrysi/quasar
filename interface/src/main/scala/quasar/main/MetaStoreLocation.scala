@@ -51,7 +51,7 @@ object MetaStoreLocation {
 
   object impl {
 
-    def default[S[_]](ref: TaskRef[MetaStore]): MetaStoreLocation ~> Task =
+    def default(ref: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): MetaStoreLocation ~> Task =
       λ[MetaStoreLocation ~> Task] {
         case Get => ref.read.map(_.connectionInfo)
         case Set(conn, initialize) =>
@@ -60,10 +60,16 @@ object MetaStoreLocation {
               initUpdateMigrate(quasar.metastore.Schema.schema, m.transactor, None).as(m)
             else m.point[MainTask])
           (for {
-            m      <- tryNewMetaStore
-            _      <- ref.read.flatMap(_.shutdown.attempt).liftM[MainErrT]
-            result <- ref.write(m).liftM[MainErrT]
-          } yield result).run
+            // Try connecting to the new metastore location
+            m <- tryNewMetaStore
+            // Persist the change, if persisting fails, shutdown the new metastore connection and fail the change
+            _ <- EitherT(persist(m.connectionInfo).foldM(persistFailure => m.shutdown.as(persistFailure.left), _ => ().right.point[Task]))
+            // We successfully connected to the new metastore and persisted the change to the config file
+            // so we shutdown the old one and
+            _ <- ref.read.flatMap(_.shutdown.attempt).liftM[MainErrT]
+            // change the value of the reference
+            _ <- ref.write(m).liftM[MainErrT]
+          } yield ()).run
       }
   }
 }

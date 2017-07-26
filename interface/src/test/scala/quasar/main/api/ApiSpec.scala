@@ -35,7 +35,7 @@ class ApiSpec extends quasar.Qspec {
       val mount = Mounting.Ops[CoreEff]
       (for {
         firstMetaConf <- MetaStoreFixture.createNewTestMetaStoreConfig
-        quasarFS      <- Quasar.initWithDbConfig(firstMetaConf).run.map(a => a.leftMap(e => new scala.Exception(e.shows))).unattempt
+        quasarFS      <- Quasar.initWithDbConfig(firstMetaConf, _ => ().point[MainTask]).run.map(a => a.leftMap(e => new scala.Exception(e.shows))).unattempt
         run0          =  quasarFS.taskInter
         _             <- mount.mountOrReplace(sampleMountPath, sampleMount, false).foldMap(run0)
         mountIsThere  <- mount.lookupConfig(sampleMountPath).run.run.map(_.isDefined).foldMap(run0)

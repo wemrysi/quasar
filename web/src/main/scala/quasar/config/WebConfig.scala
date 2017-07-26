@@ -27,8 +27,8 @@ import scalaz._, Scalaz._
 object WebConfig {
   implicit val configOps: ConfigOps[WebConfig] = new ConfigOps[WebConfig] {
     val name = "web"
-    def metaStoreConfig(c: WebConfig) = c.metastore
-    val default = MetaStoreConfig.configOps.default ∘ (ms => WebConfig(ServerConfig(ServerConfig.DefaultPort), ms.some))
+    def metaStoreConfig = WebConfig.metastore
+    val default = MetaStoreConfig.default ∘ (ms => WebConfig(ServerConfig(ServerConfig.DefaultPort), ms.some))
   }
 
   implicit val codecJson: CodecJson[WebConfig] =

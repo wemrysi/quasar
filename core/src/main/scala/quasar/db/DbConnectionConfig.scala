@@ -47,7 +47,7 @@ object DbConnectionConfig {
 
   implicit val encodeJson: EncodeJson[DbConnectionConfig] =
     EncodeJson {
-      case H2(file) => Json("h2" -> Json("file" := file))
+      case H2(file) => Json("h2" -> Json("location" := file))
       case PostgreSql(host, database, userName, password, parameters) =>
         Json("postgresql" -> (
           ("host"       :=? host.map(_.name)) ->?:

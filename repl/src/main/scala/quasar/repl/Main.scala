@@ -149,7 +149,10 @@ object Main {
           .map(some))
       _ <- initMetaStoreOrStart[CoreConfig](
         CmdLineConfig(cfgPath, opts.cmd),
-        (_, quasarInter) => startRepl(quasarInter).liftM[MainErrT])
+        (_, quasarInter) => startRepl(quasarInter).liftM[MainErrT],
+        // The REPL does not allow you to change metastore
+        // so no need to supply a function to persist the metastore
+        _ => ().point[MainTask])
     } yield ())
 
   def main(args: Array[String]): Unit =

@@ -24,6 +24,7 @@ import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect._
 import quasar.db.Schema
+import quasar.db.DbConnectionConfig
 import quasar.fp._, ski._
 import quasar.fp.free._
 import quasar.fs._
@@ -384,7 +385,11 @@ package object main {
   /** Either initialize the metastore or execute the start depending
     * on what command is provided by the user in the command line arguments
     */
-  def initMetaStoreOrStart[C: argonaut.DecodeJson](config: CmdLineConfig, start: (C, CoreEff ~> QErrs_TaskM) => MainTask[Unit])(implicit
+  def initMetaStoreOrStart[C: argonaut.DecodeJson](
+    config: CmdLineConfig,
+    start: (C, CoreEff ~> QErrs_TaskM) => MainTask[Unit],
+    persist: DbConnectionConfig => MainTask[Unit]
+  )(implicit
     configOps: ConfigOps[C]
   ): MainTask[Unit] = {
     for {
@@ -392,13 +397,13 @@ package object main {
       _     <- config.cmd match {
         case Cmd.Start =>
           for {
-            quasarFs <- Quasar.initFromConfig(config.configPath)
+            quasarFs <- Quasar.initFromMetaConfig(configOps.metaStoreConfig.get(cfg), persist)
             _        <- start(cfg, quasarFs.interp).ensuring(κ(quasarFs.shutdown.liftM[MainErrT]))
           } yield ()
 
         case Cmd.InitUpdateMetaStore =>
           for {
-            msCfg <- configOps.metaStoreConfig(cfg).cata(Task.now, MetaStoreConfig.configOps.default).liftM[MainErrT]
+            msCfg <- configOps.metaStoreConfig.get(cfg).cata(Task.now, MetaStoreConfig.default).liftM[MainErrT]
             trans <- metastoreTransactor(msCfg.database)
             _     <- initUpdateMigrate(quasar.metastore.Schema.schema, trans.transactor, config.configPath).ensuring(κ(trans.shutdown.liftM[MainErrT]))
           } yield ()

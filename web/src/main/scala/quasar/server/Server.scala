@@ -23,6 +23,7 @@ import quasar.cli.Cmd
 import quasar.config._
 import quasar.console.logErrors
 import quasar.contrib.scopt._
+import quasar.db.DbConnectionConfig
 import quasar.fp._
 import quasar.fp.free._
 import quasar.main._
@@ -85,7 +86,8 @@ object Server {
     defaultPort: Int,
     staticContent: List[StaticContent],
     redirect: Option[String],
-    eval: CoreEff ~> QErrs_TaskM
+    eval: CoreEff ~> QErrs_TaskM,
+    persistPortChange: Int => Task[Unit]
   ): ServiceStarter = {
     import RestApi._
 
@@ -97,7 +99,7 @@ object Server {
       finalizeServices(
         toHttpServices(liftMT[Task, ResponseT] :+: (foldMapNT(f) compose eval), coreServices[CoreEffIO]) ++
         additionalServices
-      ) orElse nonApiService(defaultPort, reload, staticContent, redirect)
+      ) orElse nonApiService(defaultPort, Kleisli(persistPortChange) >> Kleisli(reload), staticContent, redirect)
   }
 
   /**
@@ -107,9 +109,10 @@ object Server {
     quasarInter: CoreEff ~> QErrs_TaskM,
     port: Int,
     staticContent: List[StaticContent],
-    redirect: Option[String]
+    redirect: Option[String],
+    persistPortChange: Int => Task[Unit]
   ): Task[Unit] = {
-    val starter = serviceStarter(defaultPort = port, staticContent, redirect, quasarInter)
+    val starter = serviceStarter(defaultPort = port, staticContent, redirect, quasarInter, persistPortChange)
     PortChangingServer.start(initialPort = port, starter).flatMap(_.shutdownOnUserInput)
   }
 
@@ -121,23 +124,50 @@ object Server {
     quasarInter: CoreEff ~> QErrs_TaskM,
     port: Int,
     staticContent: List[StaticContent],
-    redirect: Option[String]
+    redirect: Option[String],
+    persistPortChange: Int => Task[Unit]
   ): Task[Task[Unit]] = {
-    val starter = serviceStarter(defaultPort = port, staticContent, redirect, quasarInter)
+    val starter = serviceStarter(defaultPort = port, staticContent, redirect, quasarInter, persistPortChange)
     PortChangingServer.start(initialPort = port, starter).map(_.shutdown)
   }
 
-  def safeMain(args: Vector[String]): Task[Unit] =
+  def persistMetaStore(configPath: Option[FsFile]): DbConnectionConfig => MainTask[Unit] =
+    persistWebConfig(configPath, conn => _.copy(metastore = MetaStoreConfig(conn).some))
+
+  def persistPortChange(configPath: Option[FsFile]): Int => MainTask[Unit] =
+    persistWebConfig(configPath, port => _.copy(server = ServerConfig(port)))
+
+  def persistWebConfig[A](configPath: Option[FsFile], modify: A => (WebConfig => WebConfig)): A => MainTask[Unit] = { a =>
+    for {
+      diskConfig <- EitherT(ConfigOps[WebConfig].fromOptionalFile(configPath).run.flatMap {
+                      // Great, we were able to load the config file from disk
+                      case \/-(config) => config.right.point[Task]
+                      // The config file is malformed, let's warn the user and not make any changes
+                      case -\/(configErr@ConfigError.MalformedConfig(_,_)) =>
+                        (configErr: ConfigError).shows.left.point[Task]
+                      // There is no config file, so let's create a new one with the default configuration
+                      // to which we will apply this change
+                      case -\/(ConfigError.FileNotFound(_)) => WebConfig.configOps.default.map(_.right)
+                    })
+      newConfig  =  modify(a)(diskConfig)
+      _          <- EitherT(ConfigOps[WebConfig].toFile(newConfig, configPath).attempt).leftMap(_.getMessage)
+    } yield ()
+  }
+
+  def safeMain(args: Vector[String]): Task[Unit] = {
     logErrors(for {
       webCmdLineCfg <- WebCmdLineConfig.fromArgs(args)
       _ <- initMetaStoreOrStart[WebConfig](
              webCmdLineCfg.toCmdLineConfig,
              (wCfg, quasarInter) => {
                val port = webCmdLineCfg.port | wCfg.server.port
-               (startServerUntilUserInput(quasarInter, port, webCmdLineCfg.staticContent, webCmdLineCfg.redirect) <*
+               val persistPort = persistPortChange(webCmdLineCfg.configPath) andThen (_.foldM(s => Task.fail(new Exception(s)), Task.now))
+               (startServerUntilUserInput(quasarInter, port, webCmdLineCfg.staticContent, webCmdLineCfg.redirect, persistPort) <*
                 openBrowser(port).whenM(webCmdLineCfg.openClient)).liftM[MainErrT]
-             })
+             },
+             persistMetaStore(webCmdLineCfg.configPath))
     } yield ())
+  }
 
   def main(args: Array[String]): Unit =
     safeMain(args.toVector).unsafePerformSync
