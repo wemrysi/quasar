@@ -51,6 +51,15 @@ object DiscoverPath extends DiscoverPathInstances {
 
   type ListContents[M[_]] = ADir => M[Set[PathSegment]]
 
+  object ListContents {
+    def static[F[_]: Foldable, M[_]: Applicative](paths: F[APath]): ListContents[M] = {
+      def segment(d: ADir): APath => Set[PathSegment] =
+        _.relativeTo(d).flatMap(firstSegmentName).toSet
+
+      dir => paths.foldMap(segment(dir)).point[M]
+    }
+  }
+
   def apply[T[_[_]], IN[_], OUT[_]](implicit ev: DiscoverPath.Aux[T, IN, OUT]) =
     ev
 
