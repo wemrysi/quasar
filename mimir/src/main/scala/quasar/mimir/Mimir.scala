@@ -397,10 +397,10 @@ object Mimir extends BackendModule with Logging {
               compacted = fromRepr.table.compact(fromRepr.P.trans.TransSpec1.Id)
               back <- op match {
                 case Take =>
-                  Future.successful(compacted.takeRange(0, number))
+                  Future.successful(compacted.take(number))
 
                 case Drop =>
-                  Future.successful(compacted.takeRange(number, slamdata.Predef.Int.MaxValue.toLong)) // blame precog
+                  Future.successful(compacted.drop(number))
 
                 case Sample =>
                   compacted.sample(number, List(fromRepr.P.trans.TransSpec1.Id)).map(_.head) // the number of Reprs returned equals the number of transspecs
