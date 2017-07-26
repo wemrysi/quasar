@@ -775,7 +775,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       def extractValue(res: Result) = res
     }
 
-    object Last extends Reduction(ReductionNamespace, "first") {
+    object Last extends Reduction(ReductionNamespace, "last") {
       type Result = Option[() => RValue]
 
       implicit val monoid = new Monoid[Option[() => RValue]] {
