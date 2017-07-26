@@ -151,13 +151,13 @@ trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
       def apply(table: Table): M[Table] = table.reduce(reducer)(monoid) map extract
     }
 
-    def coalesce(reductions: List[(Reduction, Option[JType => JType])]): Reduction
+    def coalesce(reductions: List[(Reduction, Option[(JType => JType, ColumnRef => Option[ColumnRef])])]): Reduction
   }
 }
 
 trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTableModule[M] {
   trait ColumnarTableLib extends TableLib {
-    class WrapArrayTableReduction(val r: Reduction, val jtypef: Option[JType => JType]) extends Reduction(r.namespace, r.name) {
+    class WrapArrayTableReduction(val r: Reduction, val jtypef: Option[(JType => JType, ColumnRef => Option[ColumnRef])]) extends Reduction(r.namespace, r.name) {
       type Result = r.Result
       val tpe = r.tpe
 
@@ -165,10 +165,13 @@ trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTabl
       def reducer = new CReducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
           jtypef match {
-            case Some(f) =>
+            case Some((ft, fr)) =>
               val cols0 = new CSchema {
-                def slice = schema.slice
-                def columns(tpe: JType) = schema.columns(f(tpe))
+                def columnRefs = schema.columnRefs
+                def columnMap(tpe: JType) =
+                  schema.columnMap(ft(tpe)) flatMap {
+                    case (ref, col) => fr(ref).map(_ -> col).toList
+                  }
               }
               r.reducer.reduce(cols0, range)
             case None =>
@@ -183,8 +186,8 @@ trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTabl
       def extractValue(res: Result) = r.extractValue(res)
     }
 
-    def coalesce(reductions: List[(Reduction, Option[JType => JType])]): Reduction = {
-      def rec(reductions: List[(Reduction, Option[JType => JType])], acc: Reduction): Reduction = {
+    def coalesce(reductions: List[(Reduction, Option[(JType => JType, ColumnRef => Option[ColumnRef])])]): Reduction = {
+      def rec(reductions: List[(Reduction, Option[(JType => JType, ColumnRef => Option[ColumnRef])])], acc: Reduction): Reduction = {
         reductions match {
           case (x, jtypef) :: xs => {
             val impl = new Reduction(Vector(), "") {
@@ -193,10 +196,13 @@ trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTabl
               def reducer = new CReducer[Result] {
                 def reduce(schema: CSchema, range: Range): Result = {
                   jtypef match {
-                    case Some(f) =>
+                    case Some((ft, fr)) =>
                       val cols0 = new CSchema {
-                        def slice = schema.slice
-                        def columns(tpe: JType) = schema.columns(f(tpe))
+                        def columnRefs = schema.columnRefs
+                        def columnMap(tpe: JType) =
+                          schema.columnMap(ft(tpe)) flatMap {
+                            case (ref, col) => fr(ref).map(_ -> col).toList
+                          }
                       }
                       (x.reducer.reduce(cols0, range), acc.reducer.reduce(schema, range))
                     case None =>

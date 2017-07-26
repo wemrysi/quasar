@@ -31,7 +31,7 @@ import quasar.fs.mount._
 import quasar.qscript._
 
 import quasar.blueeyes.json.{JNum, JValue}
-import quasar.precog.common.{CEmptyArray, Path, CPath, CPathIndex}
+import quasar.precog.common.{CEmptyArray, ColumnRef, CPath, CPathIndex, Path}
 import quasar.yggdrasil.TableModule
 import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
@@ -241,9 +241,12 @@ object Mimir extends BackendModule with Logging {
           def makeJArray(idx: Int)(tpe: JType): JType =
             JArrayFixedT(ScalaMap(idx -> tpe))
 
+          def derefArray(idx: Int)(ref: ColumnRef): Option[ColumnRef] =
+            ref.selector.dropPrefix(CPath.Identity \ idx).map(ColumnRef(_, ref.ctype))
+
           val megaReduction: Library.Reduction =
             Library.coalesce(reductions.zipWithIndex.map {
-              case (r, i) => (r, Some(makeJArray(i)(_)))
+              case (r, i) => (r, Some((makeJArray(i)(_), derefArray(i)(_))))
             })
 
           // mimir reverses the order of the returned results

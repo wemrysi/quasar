@@ -653,8 +653,12 @@ trait ColumnarTableModule[M[+ _]]
       rec(
         slices map { s =>
           val schema = new CSchema {
-            val slice = s
-            def columns(jtype: JType) = s.logicalColumns(jtype)
+            def columnRefs = s.columns.keySet
+            def columnMap(jtpe: JType) =
+              s.columns collect {
+                case (ref @ ColumnRef(cpath, ctype), col) if Schema.includes(jtpe, cpath, ctype) =>
+                  ref -> col
+              }
           }
 
           reducer.reduce(schema, 0 until s.size)
