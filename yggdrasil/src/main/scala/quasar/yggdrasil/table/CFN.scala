@@ -175,7 +175,8 @@ trait CMapperM[M[+ _]] extends CMapper[M] {
 }
 
 trait CSchema {
-  def columnRefs: Set[ColumnRef]
+  def columnRefs: Set[ColumnRef] = slice.columns.keySet
+  def slice: Slice    // this is kind of a kludge, but really, CSchema is too restrictive
   def columns(jtype: JType): Set[Column]
 }
 

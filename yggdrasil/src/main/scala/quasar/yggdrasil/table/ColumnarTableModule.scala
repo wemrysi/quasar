@@ -653,7 +653,7 @@ trait ColumnarTableModule[M[+ _]]
       rec(
         slices map { s =>
           val schema = new CSchema {
-            val columnRefs = s.columns.keySet
+            val slice = s
             def columns(jtype: JType) = s.logicalColumns(jtype)
           }
 

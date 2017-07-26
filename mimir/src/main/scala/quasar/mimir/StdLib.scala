@@ -167,7 +167,7 @@ trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTabl
           jtypef match {
             case Some(f) =>
               val cols0 = new CSchema {
-                def columnRefs          = schema.columnRefs
+                def slice = schema.slice
                 def columns(tpe: JType) = schema.columns(f(tpe))
               }
               r.reducer.reduce(cols0, range)
@@ -195,7 +195,7 @@ trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTabl
                   jtypef match {
                     case Some(f) =>
                       val cols0 = new CSchema {
-                        def columnRefs          = schema.columnRefs
+                        def slice = schema.slice
                         def columns(tpe: JType) = schema.columns(f(tpe))
                       }
                       (x.reducer.reduce(cols0, range), acc.reducer.reduce(schema, range))

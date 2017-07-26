@@ -220,9 +220,9 @@ object Mimir extends BackendModule with Logging {
             case ReduceFuncs.Min(f) => (Library.Min, f)
             case ReduceFuncs.Max(f) => (Library.Max, f)
             case ReduceFuncs.Avg(f) => (Library.Mean, f)
-            case ReduceFuncs.Arbitrary(f) => ???
-            case ReduceFuncs.First(f) => ???
-            case ReduceFuncs.Last(f) => ???
+            case ReduceFuncs.Arbitrary(f) => (Library.First, f)   // first is the most efficient for Table
+            case ReduceFuncs.First(f) => (Library.First, f)
+            case ReduceFuncs.Last(f) => (Library.Last, f)
             case ReduceFuncs.UnshiftArray(f) => ???
             case ReduceFuncs.UnshiftMap(f1, f2) => ???
           }

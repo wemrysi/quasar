@@ -735,5 +735,79 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
       def extractValue(res: Result) = Some(CBoolean(perform(res)))
     }
+
+    object First extends Reduction(ReductionNamespace, "first") {
+      import scala.util.control.Breaks._
+
+      type Result = Option[RValue]
+
+      implicit val monoid = new Monoid[Option[RValue]] {
+        def zero = None
+
+        def append(left: Option[RValue], right: => Option[RValue]) =
+          left orElse right
+      }
+
+      val tpe = UnaryOperationType(JType.JUniverseT, JType.JUniverseT)
+
+      def reducer: Reducer[Result] = new CReducer[Result] {
+        def reduce(schema: CSchema, range: Range) = {
+          val slice = schema.slice
+          var result: Option[RValue] = None
+          breakable {
+            RangeUtil.loop(range) { i =>
+              if (slice.isDefinedAt(i)) {
+                result = Some(slice.toRValue(i))
+                break()
+              }
+            }
+          }
+          result
+        }
+      }
+
+      def extract(res: Result): Table =
+        Table.fromRValues(res.toStream, None)
+
+      def extractValue(res: Result) = res
+    }
+
+    object Last extends Reduction(ReductionNamespace, "first") {
+      type Result = Option[() => RValue]
+
+      implicit val monoid = new Monoid[Option[() => RValue]] {
+        def zero = None
+
+        def append(left: Option[() => RValue], right: => Option[() => RValue]) =
+          right orElse left
+      }
+
+      val tpe = UnaryOperationType(JType.JUniverseT, JType.JUniverseT)
+
+      def reducer: Reducer[Result] = new CReducer[Result] {
+        def reduce(schema: CSchema, range: Range) = {
+          val slice = schema.slice
+          var result = -1
+          RangeUtil.loop(range) { i =>
+            if (slice.isDefinedAt(i)) {
+              result = i
+            }
+          }
+
+          // this allows unboxed lambda lifting
+          val finalResult = result
+
+          if (result >= 0)
+            Some(() => slice.toRValue(finalResult))
+          else
+            None
+        }
+      }
+
+      def extract(res: Result): Table =
+        Table.fromRValues(res.toStream.map(_()), None)
+
+      def extractValue(res: Result) = res.map(_())
+    }
   }
 }
