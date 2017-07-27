@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.config.{ConfigOps, WebConfig}
 import quasar.contrib.pathy._
 import quasar.fp.TaskRef
+import quasar.fp.ski._
 import quasar.fs.mount._
 import quasar.main._
 import quasar.metastore._, MetaStoreAccess._
@@ -61,7 +62,7 @@ class ServiceSpec extends quasar.Qspec {
       quasarFs   <- Quasar.initWithMeta(metaRef, _ => ().point[MainTask], initialize = false)
       shutdown   <- Server.startServer(quasarFs.interp, port, Nil, None, _ => ().point[Task]).liftM[MainErrT]
       r          <- f(uri)
-                      .onFinish(_ => shutdown)
+                      .onFinish(κ(shutdown.onFinish(κ(quasarFs.shutdown))))
                       .liftM[MainErrT]
     } yield r).run.unsafePerformSync
   }
