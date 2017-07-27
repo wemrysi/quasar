@@ -3,7 +3,7 @@
     "metastore": {
         "database": {
             "h2": {
-                "location": "mem"
+                "location": "~/quasar-metastore.db"
             }
         }
     }
