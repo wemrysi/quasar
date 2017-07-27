@@ -220,19 +220,19 @@ class QScriptSpec
               ProjectFieldR(HoleF, StrLit("foo"))))),
             HoleF,
             IncludeId,
-            Free.roll(MFC(MakeArray(RightSideF)))))),
+            RightSideF))),
           Free.roll(QCT.inj(LeftShift(
             Free.roll(QCT.inj(Map(
               Free.point(SrcHole),
               ProjectFieldR(HoleF, StrLit("bar"))))),
             HoleF,
             IncludeId,
-            Free.roll(MFC(MakeArray(RightSideF)))))),
+            RightSideF))),
           BoolLit(true),
           JoinType.Inner,
           Free.roll(MFC(Add(
-            ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(1)),
-            ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(1))))))))))
+            ProjectIndexR(LeftSideF, IntLit(1)),
+            ProjectIndexR(RightSideF, IntLit(1))))))))))
     }
 
     "convert project object and make object" in {
@@ -482,17 +482,17 @@ class QScriptSpec
             Free.roll(RTF.inj(Const(Read(rootDir </> file("person"))))),
             HoleF,
             IncludeId,
-            Free.roll(MFC(MakeArray(RightSideF)))))),
+            RightSideF))),
           Free.roll(QCT.inj(LeftShift(
             Free.roll(RTF.inj(Const(Read(rootDir </> file("car"))))),
             HoleF,
             IncludeId,
-            Free.roll(MFC(MakeArray(RightSideF)))))),
+            RightSideF))),
           BoolLit(true),
           JoinType.Inner,
           Free.roll(MFC(ConcatMaps(
-            ProjectIndexR(ProjectIndexR(LeftSideF, IntLit(0)), IntLit(1)),
-            ProjectIndexR(ProjectIndexR(RightSideF, IntLit(0)), IntLit(1))))))))))
+            ProjectIndexR(LeftSideF, IntLit(1)),
+            ProjectIndexR(RightSideF, IntLit(1))))))))))
     }
 
     "convert basic join with explicit join condition" in {
@@ -526,38 +526,30 @@ class QScriptSpec
               Free.roll(QCT.inj(Map(HoleQS, ProjectFieldR(HoleF, StrLit("foo"))))),
               HoleF,
               IncludeId,
-              MakeArrayR(RightSideF)))),
+              RightSideF))),
             Free.roll(QCT.inj(LeftShift(
               Free.roll(QCT.inj(Map(HoleQS, ProjectFieldR(HoleF, StrLit("bar"))))),
               HoleF,
               IncludeId,
-              MakeArrayR(RightSideF)))),
+              RightSideF))),
             Free.roll(MFC(Eq(
               ProjectFieldR(
-                ProjectIndexR(
-                  ProjectIndexR(LeftSideF, IntLit(0)),
-                  IntLit(1)),
+                ProjectIndexR(LeftSideF, IntLit(1)),
                 StrLit("id")),
               ProjectFieldR(
-                ProjectIndexR(
-                  ProjectIndexR(RightSideF, IntLit(0)),
-                  IntLit(1)),
+                ProjectIndexR(RightSideF, IntLit(1)),
                 StrLit("foo_id"))))),
             JoinType.Inner,
             ConcatMapsR(
               MakeMapR(
                 StrLit("name"),
                 ProjectFieldR(
-                  ProjectIndexR(
-                    ProjectIndexR(LeftSideF, IntLit(0)),
-                    IntLit(1)),
+                  ProjectIndexR(LeftSideF, IntLit(1)),
                   StrLit("name"))),
               MakeMapR(
                 StrLit("address"),
                 ProjectFieldR(
-                  ProjectIndexR(
-                    ProjectIndexR(RightSideF, IntLit(0)),
-                    IntLit(1)),
+                  ProjectIndexR(RightSideF, IntLit(1)),
                   StrLit("address")))))))))
     }
 
