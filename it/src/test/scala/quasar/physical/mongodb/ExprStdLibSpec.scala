@@ -42,6 +42,8 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     case (string.Integer | string.Decimal | string.ToString, _)   => notHandled.left
     case (string.Length, _) if !is3_4(backend) => Skipped("not implemented in aggregation on MongoDB < 3.4").left
+    case (string.Substring, List(Data.Str(s), _, _)) if (!is3_4(backend) && !isPrintableAscii(s)) =>
+      Skipped("only printable ascii supported on MongoDB < 3.4").left
 
     case (date.ExtractIsoYear, _) => notHandled.left
     case (date.ExtractWeek, _)    => Skipped("Implemented, but not ISO compliant").left
