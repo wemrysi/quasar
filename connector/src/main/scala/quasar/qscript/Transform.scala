@@ -112,7 +112,7 @@ class Transform
             l <- uni.remap(lval)
             r <- uni.remap(rval)
             (c, lacc, racc) <- concat(l, r).some
-            res <- uni.combine(c.some)
+            res <- uni.combine(c)
           } yield (res, lacc, racc)
 
         def c3[A: Equal: Show](
@@ -124,7 +124,7 @@ class Transform
             r <- uni.remap(rval)
             b <- uni.remap(bucket)
             (c, bacc, lacc, racc) <- concat3(b, l, r).some
-            res <- uni.combine(c.some)
+            res <- uni.combine(c)
           } yield (res, bacc, lacc, racc)
 
         def c4[A: Equal: Show](
@@ -138,7 +138,7 @@ class Transform
             lb <- uni.remap(lBucket)
             rb <- uni.remap(rBucket)
             (c, lbacc, rbacc, lacc, racc) <- concat4(lb, rb, l, r).some
-            res <- uni.combine(c.some)
+            res <- uni.combine(c)
           } yield (res, lbacc, rbacc, lacc, racc)
 
         def theta(combine: JoinFunc, newLprov: List[prov.Provenance], newRprov: List[prov.Provenance]): F[T[F]] =

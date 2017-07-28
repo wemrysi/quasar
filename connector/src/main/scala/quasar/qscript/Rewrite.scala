@@ -130,7 +130,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   }
 
   type Remap[A] = JoinFunc => Option[FreeMapA[A]]
-  type Combine[F[_], A, B] = Option[FreeMapA[A]] => Option[F[B]]
+  type Combine[F[_], A, B] = FreeMapA[A] => Option[F[B]]
 
   case class BranchUnification[F[_], A, B](remap: Remap[A], combine: Combine[F, A, B])
 
@@ -160,8 +160,8 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
                     case RightSide => RightSideF
                   }
                 }).some
-                def combine(jf: Option[JoinFunc]): Option[F[A]] =
-                  jf.map(func => QC.inj(LeftShift(src, struct >> mf2, status, func)))
+                def combine(func: JoinFunc): Option[F[A]] =
+                  QC.inj(LeftShift(src, struct >> mf2, status, func)).some
                 BranchUnification(remap(_), combine(_))
               case _ => NoneBranch
             }
@@ -176,8 +176,8 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
                   }
                   case RightSide => mf2 >> LeftSideF  // references `src`
                 }).some
-                def combine(jf: Option[JoinFunc]): Option[F[A]] =
-                  jf.map(func => QC.inj(LeftShift(src,struct >> mf1, status, func)))
+                def combine(func: JoinFunc): Option[F[A]] =
+                  QC.inj(LeftShift(src,struct >> mf1, status, func)).some
                 BranchUnification(remap(_), combine(_))
               case _ => NoneBranch
             }
@@ -206,8 +206,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
               case LeftSide  => mf1
               case RightSide => mf2
             }).some
-            def combine(fm: Option[FreeMap]): Option[F[A]] =
-              fm.map(func => QC.inj(Map(src, func)))
+            def combine(func: FreeMap): Option[F[A]] = QC.inj(Map(src, func)).some
             BranchUnification(remap(_), combine(_))
           // neither side references the src
           case (Some(Map(-\/(src1), mf1)), Some(Map(-\/(src2), mf2)))
@@ -216,8 +215,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
               case LeftSide  => mf1
               case RightSide => mf2
             }).some
-            def combine(fm: Option[FreeMap]): Option[F[A]] =
-              fm.map(func => QC.inj(Map(src, func)))
+            def combine(func: FreeMap): Option[F[A]] = QC.inj(Map(src, func)).some
             BranchUnification(remap(_), combine(_))
           // only the right side references the source
           case (Some(Map(-\/(src1), mf1)), _) if src1 ≟ UnrefedSrc =>
@@ -225,8 +223,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
               case LeftSide  => mf1
               case RightSide => HoleF
             }).some
-            def combine(fm: Option[FreeMap]): Option[F[A]] = for {
-              func <- fm
+            def combine(func: FreeMap): Option[F[A]] = for {
               tf <- rebase(right)(src)
             } yield QC.inj(Map(tf, func))
             BranchUnification(remap(_), combine(_))
@@ -235,8 +232,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
               case LeftSide  => None
               case RightSide => HoleF.some
             }
-            def combine(fm: Option[FreeMap]): Option[F[A]] = for {
-              func <- fm
+            def combine(func: FreeMap): Option[F[A]] = for {
               tf <- rebase(right)(src)
             } yield QC.inj(Map(tf, func))
             BranchUnification(remap(_), combine(_))
@@ -246,8 +242,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
               case LeftSide  => HoleF
               case RightSide => mf2
             }).some
-            def combine(fm: Option[FreeMap]): Option[F[A]] = for {
-              func <- fm
+            def combine(func: FreeMap): Option[F[A]] = for {
               tf <- rebase(left)(src)
             } yield QC.inj(Map(tf, func))
             BranchUnification(remap(_), combine(_))
@@ -256,8 +251,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
               case LeftSide  => HoleF.some
               case RightSide => None
             }
-            def combine(fm: Option[FreeMap]): Option[F[A]] = for {
-              func <- fm
+            def combine(func: FreeMap): Option[F[A]] = for {
               tf <- rebase(left)(src)
             } yield QC.inj(Map(tf, func))
             BranchUnification(remap(_), combine(_))
@@ -270,16 +264,14 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
             case LeftSide  => mf1
             case RightSide => HoleF
           }).some
-          def combine(fm: Option[FreeMap]): Option[F[A]] =
-            fm.map(func => QC.inj(Map(src, func)))
+          def combine(func: FreeMap): Option[F[A]] = QC.inj(Map(src, func)).some
           BranchUnification(remap(_), combine(_))
         case Some(Unreferenced()) =>
           def remap(jf: JoinFunc): Option[FreeMap] = jf.traverseM[Option, Hole] {
             case LeftSide  => None
             case RightSide => HoleF.some
           }
-          def combine(fm: Option[FreeMap]): Option[F[A]] =
-            fm.map(func => QC.inj(Map(src, func)))
+          def combine(func: FreeMap): Option[F[A]] = QC.inj(Map(src, func)).some
           BranchUnification(remap(_), combine(_))
         case _ => NoneBranch
       }
@@ -290,24 +282,21 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
             case LeftSide  => HoleF
             case RightSide => mf2
           }).some
-          def combine(fm: Option[FreeMap]): Option[F[A]] =
-            fm.map(func => QC.inj(Map(src, func)))
+          def combine(func: FreeMap): Option[F[A]] = QC.inj(Map(src, func)).some
           BranchUnification(remap(_), combine(_))
         case Some(Unreferenced()) =>
           def remap(jf: JoinFunc): Option[FreeMap] = jf.traverseM[Option, Hole] {
             case LeftSide  => HoleF.some
             case RightSide => None
           }
-          def combine(fm: Option[FreeMap]): Option[F[A]] =
-            fm.map(func => QC.inj(Map(src, func)))
+          def combine(func: FreeMap): Option[F[A]] = QC.inj(Map(src, func)).some
           BranchUnification(remap(_), combine(_))
         case _ => NoneBranch
       }
       // both sides are the src
       case (\/-(SrcHole), \/-(SrcHole)) =>
         def remap(jf: JoinFunc): Option[FreeMap] = (jf.as(SrcHole): FreeMap).some
-        def combine(fm: Option[FreeMap]): Option[F[A]] =
-          fm.map(func => QC.inj(Map(src, func)))
+        def combine(func: FreeMap): Option[F[A]] = QC.inj(Map(src, func)).some
         BranchUnification(remap(_), combine(_))
       case (_, _) => NoneBranch
     }
@@ -325,8 +314,8 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     val branchSide: BranchUnification[F, JoinSide, A] =
       unifySimpleBranchesJoinSide(src, left, right)(rebase)(QC, FI)
 
-    branchHole.combine(branchHole.remap(func)).orElse(
-      branchSide.combine(branchSide.remap(func)))
+    branchHole.remap(func).flatMap(branchHole.combine) orElse
+      branchSide.remap(func).flatMap(branchSide.combine)
   }
 
   def unifySimpleBranchesCoEnv[F[_], A]
