@@ -28,8 +28,24 @@ import scalaz._, Scalaz._
 /** "Pipeline" operators added in MongoDB version 3.4. */
 trait ExprOp3_4F[A]
 object ExprOp3_4F {
-  final case class $indexOfBytesF[A](string: A, substring: A, start: Option[A], end: Option[A]) extends ExprOp3_4F[A]
-  final case class $indexOfCPF[A](string: A, substring: A, start: Option[A], end: Option[A]) extends ExprOp3_4F[A]
+  type BoundsF[A] = Option[(A, Option[A])]
+
+  private def toList[A](bounds: BoundsF[A]) = bounds.fold(nil[A])(p => p._1 :: p._2.toList)
+
+  implicit val traverseBounds: Traverse[BoundsF] = new Traverse[BoundsF] {
+    private def unlist[A](l: List[A]): BoundsF[A] = l match {
+      case Nil => none
+      case a :: Nil => ((a, none)).some
+      case a :: b :: _ => ((a, b.some)).some
+    }
+
+    def traverseImpl[G[_], A, B](fa: BoundsF[A])(f: A => G[B])(implicit G: Applicative[G]):
+        G[BoundsF[B]] =
+      G.map(toList(fa).traverse(f))(unlist)
+  }
+
+  final case class $indexOfBytesF[A](string: A, substring: A, bounds: BoundsF[A]) extends ExprOp3_4F[A]
+  final case class $indexOfCPF[A](string: A, substring: A, bounds: BoundsF[A]) extends ExprOp3_4F[A]
   final case class $splitF[A](string: A, delimiter: A) extends ExprOp3_4F[A]
   final case class $strLenBytesF[A](string: A) extends ExprOp3_4F[A]
   final case class $strLenCPF[A](string: A) extends ExprOp3_4F[A]
@@ -41,8 +57,8 @@ object ExprOp3_4F {
       def apply[A](eq: Equal[A]) = {
         implicit val EQ: Equal[A] = eq
         Equal.equal {
-          case ($indexOfBytesF(s1, t1, u1, v1), $indexOfBytesF(s2, t2, u2, v2)) => s1 ≟ s2 && t1 ≟ t2 && u1 ≟ u2 && v1 ≟ v2
-          case ($indexOfCPF(s1, t1, u1, v1), $indexOfCPF(s2, t2, u2, v2)) => s1 ≟ s2 && t1 ≟ t2 && u1 ≟ u2 && v1 ≟ v2
+          case ($indexOfBytesF(s1, t1, b1), $indexOfBytesF(s2, t2, b2)) => s1 ≟ s2 && t1 ≟ t2 && b1 ≟ b2
+          case ($indexOfCPF(s1, t1, b1), $indexOfCPF(s2, t2, b2)) => s1 ≟ s2 && t1 ≟ t2 && b1 ≟ b2
           case ($splitF(s1, d1), $splitF(s2, d2)) => s1 ≟ s2 && d1 ≟ d2
           case ($strLenBytesF(s1), $strLenBytesF(s2)) => s1 ≟ s2
           case ($strLenCPF(s1), $strLenCPF(s2)) => s1 ≟ s2
@@ -57,8 +73,8 @@ object ExprOp3_4F {
     def traverseImpl[G[_], A, B](fa: ExprOp3_4F[A])(f: A => G[B])(implicit G: Applicative[G]):
         G[ExprOp3_4F[B]] =
       fa match {
-        case $indexOfBytesF(s, t, u, v) => (f(s) |@| f(t) |@| u.traverse(f) |@| v.traverse(f))($indexOfBytesF(_, _, _, _))
-        case $indexOfCPF(s, t, u, v) => (f(s) |@| f(t) |@| u.traverse(f) |@| v.traverse(f))($indexOfCPF(_, _, _, _))
+        case $indexOfBytesF(s, t, b) => (f(s) |@| f(t) |@| Traverse[BoundsF].traverse(b)(f))($indexOfBytesF(_, _, _))
+        case $indexOfCPF(s, t, b) => (f(s) |@| f(t) |@| Traverse[BoundsF].traverse(b)(f))($indexOfCPF(_, _, _))
         case $splitF(s, d) => (f(s) |@| f(d))($splitF(_, _))
         case $strLenBytesF(s) => G.map(f(s))($strLenBytesF(_))
         case $strLenCPF(s) => G.map(f(s))($strLenCPF(_))
@@ -73,8 +89,8 @@ object ExprOp3_4F {
     val simplify: AlgebraM[Option, ExprOp3_4F, Fix[F]] = κ(None)
 
     def bson: Algebra[ExprOp3_4F, Bson] = {
-      case $indexOfBytesF(s, t, u, v) => Bson.Doc("$indexOfBytes" -> Bson.Arr(List(List(s, t), u.toList, v.toList).flatMap(x => x)))
-      case $indexOfCPF(s, t, u, v) => Bson.Doc("$indexOfCP" -> Bson.Arr(List(List(s, t), u.toList, v.toList).flatMap(x => x)))
+      case $indexOfBytesF(s, t, b) => Bson.Doc("$indexOfBytes" -> Bson.Arr(List(List(s, t), toList(b)).join))
+      case $indexOfCPF(s, t, b) => Bson.Doc("$indexOfCP" -> Bson.Arr(List(List(s, t), toList(b)).join))
       case $splitF(s, d) => Bson.Doc("$split" -> Bson.Arr(s, d))
       case $strLenBytesF(s) => Bson.Doc("$strLenBytes" -> s)
       case $strLenCPF(s) => Bson.Doc("$strLenCP" -> s)
@@ -92,10 +108,10 @@ object ExprOp3_4F {
     (implicit I: ExprOp3_4F :<: EX) {
     @inline private def convert(expr: ExprOp3_4F[T]): T = embed(I.inj(expr))
 
-    def $indexOfBytes(string: T, substring: T, start: Option[T], end: Option[T]) =
-      convert($indexOfBytesF(string, substring, start, end))
-    def $indexOfCP(string: T, substring: T, start: Option[T], end: Option[T]) =
-      convert($indexOfCPF(string, substring, start, end))
+    def $indexOfBytes(string: T, substring: T, bounds: Option[(T, Option[T])]) =
+      convert($indexOfBytesF(string, substring, bounds))
+    def $indexOfCP(string: T, substring: T, bounds: Option[(T, Option[T])]) =
+      convert($indexOfCPF(string, substring, bounds))
     def $split(string: T, delimiter: T): T = convert($splitF(string, delimiter))
     def $strLenBytes(string: T): T = convert($strLenBytesF(string))
     def $strLenCP(string: T): T = convert($strLenCPF(string))
@@ -105,13 +121,13 @@ object ExprOp3_4F {
 }
 
 object $indexOfBytes {
-  def apply[EX[_], A](string: A, substring: A, start: Option[A], end: Option[A])(implicit I: ExprOp3_4F :<: EX): EX[A] =
-    I.inj(ExprOp3_4F.$indexOfBytesF(string, substring, start, end))
+  def apply[EX[_], A](string: A, substring: A, bounds: Option[(A, Option[A])])(implicit I: ExprOp3_4F :<: EX): EX[A] =
+    I.inj(ExprOp3_4F.$indexOfBytesF(string, substring, bounds))
 }
 
 object $indexOfCP {
-  def apply[EX[_], A](string: A, substring: A, start: Option[A], end: Option[A])(implicit I: ExprOp3_4F :<: EX): EX[A] =
-    I.inj(ExprOp3_4F.$indexOfCPF(string, substring, start, end))
+  def apply[EX[_], A](string: A, substring: A, bounds: Option[(A, Option[A])])(implicit I: ExprOp3_4F :<: EX): EX[A] =
+    I.inj(ExprOp3_4F.$indexOfCPF(string, substring, bounds))
 }
 
 object $split {
