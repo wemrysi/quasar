@@ -176,7 +176,8 @@ trait CMapperM[M[+ _]] extends CMapper[M] {
 
 trait CSchema {
   def columnRefs: Set[ColumnRef]
-  def columns(jtype: JType): Set[Column]
+  def columnMap(jtype: JType): Map[ColumnRef, Column]
+  final def columns(jtype: JType): Set[Column] = columnMap(jtype).values.toSet
 }
 
 trait CReducer[A] {

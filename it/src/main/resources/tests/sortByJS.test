@@ -2,10 +2,8 @@
   "name": "sort by JS expression with filter",
 
   "backends": {
-        "mimir":"pending"
+        "mimir":"ignoreFieldOrder"
   },
-
-  "NB": "pendingIgnoreFieldOrder doesn't work here",
 
   "data": "zips.data",
 

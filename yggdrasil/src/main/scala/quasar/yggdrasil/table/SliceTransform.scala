@@ -1234,26 +1234,44 @@ trait ObjectConcatHelpers extends ConcatHelpers {
 
     val innerPaths = Set(leftInner.keys map { _.selector } toSeq: _*)
 
+    // for all columns which have an identical path
     val mergedPairs: Set[(ColumnRef, Column)] = innerPaths flatMap { path =>
+      // find the right columns with the path
       val rightSelection = rightInner filter {
         case (ColumnRef(path2, _), _) => path == path2
       }
 
+      // find the left columns with the path that will NOT be merged
       val leftSelection = leftInner filter {
         case (ref @ ColumnRef(path2, _), _) =>
           path == path2 && !rightSelection.contains(ref)
       }
 
+      // merge the right and left columns of the same types
       val rightMerged = rightSelection map {
-        case (ref, col) => {
-          if (leftInner contains ref)
+        case (ref, col) =>
+          if (leftInner.contains(ref))
             ref -> cf.util.UnionRight(leftInner(ref), col).get
           else
             ref -> col
-        }
       }
 
-      rightMerged ++ leftSelection
+      // a predicate which indicates where all right columns are defined
+      val rightFilter: Int => Boolean = {
+        val cols = rightMerged.toList map { case (_, col) => col }
+
+        // we use forall rather than exists since we optimize for homogeneity
+        row => cols.forall(!_.isDefinedAt(row))
+      }
+
+      // poke holes in the left (of differing types) where the right is defined
+      val leftFiltered = leftSelection map {
+        case (ref, col) =>
+          ref -> cf.util.filterBy(rightFilter)(col).get
+      }
+
+      // glue it all back together
+      rightMerged ++ leftFiltered
     }
 
     leftOuter ++ rightOuter ++ mergedPairs
