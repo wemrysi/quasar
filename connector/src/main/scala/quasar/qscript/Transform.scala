@@ -141,7 +141,11 @@ class Transform
             res <- uni.combine(c)
           } yield (res, lbacc, rbacc, lacc, racc)
 
-        def theta(combine: JoinFunc, newLprov: List[prov.Provenance], newRprov: List[prov.Provenance]): F[T[F]] =
+        def theta(
+          combine: JoinFunc,
+          newLprov: List[prov.Provenance],
+          newRprov: List[prov.Provenance])
+            : F[T[F]] =
           TJ.inj(ThetaJoin(src, lBranch, rBranch, prov.genComparisons(newLprov, newRprov), JoinType.Inner, combine))
 
         val (res, newLprov, newRprov, lacc, racc) =
