@@ -298,14 +298,21 @@ object FuncHandler {
                 val fp34 = new ExprOp3_4F.fixpoint[Free[EX, A], EX](Free.roll)
                 import fp26._, fp34._
 
-                def nonNeg(a: Free[EX, A]) =
-                  $cond($lt(a, $literal(Bson.Int32(0))),
-                    $literal(Bson.Int32(0)),
-                    a)
-
                 mfc.some collect {
                   case Length(a1) => $strLenCP(a1)
-                  case Substring(a1, a2, a3) => $substrCP(a1, nonNeg(a2), nonNeg(a3))
+                  case Substring(a1, a2, a3) =>
+                    $cond(
+                      $or(
+                        $lt(a2, $literal(Bson.Int32(0))),
+                        $gt(a2, $strLenCP(a1))
+                      ),
+                      $literal(Bson.Text("")),
+                      $cond(
+                        $lt(a3, $literal(Bson.Int32(0))),
+                        $substrCP(a1, a2, $strLenCP(a1)),
+                        $substrCP(a1, a2, a3)
+                      )
+                    )
                 }
               }
             }
