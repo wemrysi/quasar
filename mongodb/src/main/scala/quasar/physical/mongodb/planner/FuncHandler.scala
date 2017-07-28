@@ -292,13 +292,20 @@ object FuncHandler {
             new (MapFuncCore[T, ?] ~> OptionFree[EX, ?]){
               implicit def hole[D](d: D): Free[EX, D] = Free.pure(d)
 
+
               def apply[A](mfc: MapFuncCore[T, A]): OptionFree[EX, A] = {
-                val fp = new ExprOp3_4F.fixpoint[Free[EX, A], EX](Free.roll)
-                import fp._
+                val fp26 = new ExprOpCoreF.fixpoint[Free[EX, A], EX](Free.roll)
+                val fp34 = new ExprOp3_4F.fixpoint[Free[EX, A], EX](Free.roll)
+                import fp26._, fp34._
+
+                def nonNeg(a: Free[EX, A]) =
+                  $cond($lt(a, $literal(Bson.Int32(0))),
+                    $literal(Bson.Int32(0)),
+                    a)
 
                 mfc.some collect {
                   case Length(a1) => $strLenCP(a1)
-                  case Substring(a1, a2, a3) => $substrCP(a1, a2, a3)
+                  case Substring(a1, a2, a3) => $substrCP(a1, nonNeg(a2), nonNeg(a3))
                 }
               }
             }
