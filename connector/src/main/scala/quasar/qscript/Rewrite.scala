@@ -325,8 +325,8 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     val branchSide: BranchUnification[F, JoinSide, A] =
       unifySimpleBranchesJoinSide(src, left, right)(rebase)(QC, FI)
 
-    branchHole.combine(branchHole.remap(func)).cata(
-      _.some, branchSide.combine(branchSide.remap(func)))
+    branchHole.combine(branchHole.remap(func)).orElse(
+      branchSide.combine(branchSide.remap(func)))
   }
 
   def unifySimpleBranchesCoEnv[F[_], A]

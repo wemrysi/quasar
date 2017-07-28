@@ -148,31 +148,31 @@ class Transform
           (lprovs, rprovs) match {
             case (None, None) =>
               val (combine, lacc, racc) =
-                c2(uniHole).getOrElse(c2(uniSide).getOrElse {
+                c2(uniHole) orElse c2(uniSide) getOrElse {
                   val (c, lacc, racc) = concat(lval, rval)
                   (theta(c, lann.provenance, rann.provenance), lacc, racc)
-                })
+                }
               (combine, lann.provenance, rann.provenance, lacc, racc)
             case (None, Some((rProvs, rBuck))) =>
               val (combine, bacc, lacc, racc) =
-                c3(uniHole, rBuck).getOrElse(c3(uniSide, rBuck).getOrElse {
+                c3(uniHole, rBuck) orElse c3(uniSide, rBuck) getOrElse {
                   val (c, bacc, lacc, racc) = concat3(rBuck, lval, rval)
                   (theta(c, lann.provenance, prov.rebase(bacc, rProvs)), bacc, lacc, racc)
-                })
+                }
               (combine, lann.provenance, prov.rebase(bacc, rProvs), lacc, racc)
             case (Some((lProvs, lBuck)), None) =>
               val (combine, bacc, lacc, racc) =
-                c3(uniHole, lBuck).getOrElse(c3(uniSide, lBuck).getOrElse {
+                c3(uniHole, lBuck) orElse c3(uniSide, lBuck) getOrElse {
                   val (c, bacc, lacc, racc) = concat3(lBuck, lval, rval)
                   (theta(c, prov.rebase(bacc, lProvs), rann.provenance), bacc, lacc, racc)
-                })
+                }
               (combine, prov.rebase(bacc, lProvs), rann.provenance, lacc, racc)
             case (Some((lProvs, lBuck)), Some((rProvs, rBuck))) =>
               val (combine, lbacc, rbacc, lacc, racc) =
-                c4(uniHole, lBuck, rBuck).getOrElse(c4(uniSide, lBuck, rBuck).getOrElse {
+                c4(uniHole, lBuck, rBuck) orElse c4(uniSide, lBuck, rBuck) getOrElse {
                   val (c, lbacc, rbacc, lacc, racc) = concat4(lBuck, rBuck, lval, rval)
                   (theta(c, prov.rebase(lbacc, lProvs), prov.rebase(rbacc, rProvs)), lbacc, rbacc, lacc, racc)
-                })
+                }
               (combine, prov.rebase(lbacc, lProvs), prov.rebase(rbacc, rProvs), lacc, racc)
           }
 
