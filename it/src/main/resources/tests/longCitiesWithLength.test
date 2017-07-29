@@ -2,7 +2,7 @@
     "name": "long city names in Colorado",
     "backends": {
         "couchbase": "ignoreFieldOrder",
-        "mimir":"pendingIgnoreFieldOrder"
+        "mimir":"ignoreFieldOrder"
     },
     "data": "largeZips.data",
     "query": "select distinct city, length(city) as len from largeZips where state=\"CO\" and length(city) >= 10",

@@ -2,7 +2,7 @@
     "name": "trivial group by",
     "backends": {
         "couchbase": "ignoreFieldOrder",
-        "mimir":"pendingIgnoreFieldOrder",
+        "mimir":"ignoreFieldOrder",
         "spark_hdfs": "ignoreFieldOrder",
         "spark_local": "ignoreFieldOrder"
     },

@@ -1,7 +1,6 @@
 {
     "name": "wildcard with projection and synthetic field",
     "backends": {
-        "mimir": "pending",
         "mongodb_2_6":       "ignoreResultOrder",
         "mongodb_3_0":       "ignoreResultOrder",
         "mongodb_3_2":       "ignoreResultOrder",

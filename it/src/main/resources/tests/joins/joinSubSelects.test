@@ -5,7 +5,7 @@
         "couchbase":      "timeout",
         "marklogic_json": "timeout",
         "marklogic_xml":  "timeout",
-        "mimir":          "pendingIgnoreFieldOrder"
+        "mimir":          "ignoreFieldOrder"
     },
 
     "NB": "#1587: Disabled in couchbase due to lack of general join.",
