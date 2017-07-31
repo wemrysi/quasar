@@ -68,6 +68,7 @@ package object main {
     mongodb.fs.qscriptDefinition[PhysFsEff],
     skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff],
     sparkcore.fs.hdfs.definition[PhysFsEff],
+    sparkcore.fs.elastic.definition[PhysFsEff],
     sparkcore.fs.local.definition[PhysFsEff]
   ).fold
 
