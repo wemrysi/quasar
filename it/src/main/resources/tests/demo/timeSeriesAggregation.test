@@ -1,7 +1,7 @@
 {
     "name": "time series aggregation",
     "backends": {
-        "couchbase": "ignoreFieldOrder",
+        "couchbase": "pending",
         "mimir":"pendingIgnoreFieldOrder",
         "spark_hdfs": "pending",
         "spark_local": "pending"
