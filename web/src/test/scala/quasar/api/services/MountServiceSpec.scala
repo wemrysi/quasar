@@ -16,10 +16,10 @@
 
 package quasar.api.services
 
-import scala.Predef.$conforms
 import slamdata.Predef._
 import quasar._
 import quasar.api._, ApiErrorEntityDecoder._
+import quasar.api.PathUtils._
 import quasar.api.matchers._
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.effect.{Failure, KeyValueStore}
@@ -28,6 +28,8 @@ import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount.{MountRequest => MR, _}
 import quasar.sql._
+
+import scala.Predef.$conforms
 
 import argonaut._, Argonaut._
 import org.http4s._, Status._
@@ -39,7 +41,6 @@ import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
-import quasar.api.PathUtils._
 
 class MountServiceSpec extends quasar.Qspec with Http4s {
   import posixCodec.printPath

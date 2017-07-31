@@ -14,23 +14,22 @@
  * limitations under the License.
  */
 
-package quasar.config
+package quasar.metastore
 
 import slamdata.Predef._
+import quasar.db._
 
-import argonaut._, Argonaut._
-import monocle._, macros.Lenses
-import scalaz._, Scalaz._
+import doobie.imports.Transactor
+import scalaz._
+import scalaz.concurrent.Task
 
-@Lenses final case class WebConfig(server: ServerConfig, metastore: Option[MetaStoreConfig])
+final case class MetaStore private (connectionInfo: DbConnectionConfig, trans: StatefulTransactor) {
+  def shutdown: Task[Unit] = trans.shutdown
+  def transactor: Transactor[Task] = trans.transactor
+}
 
-object WebConfig {
-  implicit val configOps: ConfigOps[WebConfig] = new ConfigOps[WebConfig] {
-    val name = "web"
-    def metaStoreConfig = WebConfig.metastore
-    val default = MetaStoreConfig.default ∘ (ms => WebConfig(ServerConfig(ServerConfig.DefaultPort), ms.some))
-  }
+object MetaStore {
+  def connect(dbConfig: DbConnectionConfig): Task[Throwable \/ MetaStore] =
+      poolingTransactor(DbConnectionConfig.connectionInfo(dbConfig), DefaultConfig).map(MetaStore(dbConfig, _)).attempt
 
-  implicit val codecJson: CodecJson[WebConfig] =
-    casecodec2(WebConfig.apply, WebConfig.unapply)("server", "metastore")
 }
