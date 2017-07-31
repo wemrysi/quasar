@@ -48,8 +48,8 @@ object queryfile {
   }
 
   def store[S[_]](rdd: RDD[Data], out: AFile)(implicit
-     cass: CassandraDDL.Ops[S],
-     S0: Task :<: S
+    cass: CassandraDDL.Ops[S],
+    S0: Task :<: S
   ): Free[S, Unit] = {
     val ks = keyspace(fileParent(out))
     val tb = tableName(out)
@@ -61,11 +61,12 @@ object queryfile {
       _ <- if(tableExists) {
         cass.dropTable(ks, tb) *> cass.createTable(ks, tb)
       } else cass.createTable(ks, tb)
-      _ <- lift(Task.delay{
-              rdd.flatMap(data =>
-                DataCodec.render(data)(DataCodec.Precise).toList).collect().map(v => cass.insertData(ks, tb, v)
-              )
-      }).into[S]
+      jsons <- {
+        lift(Task.delay(rdd.flatMap(DataCodec.render(_)(DataCodec.Precise).toList)
+                          .collect().toList)
+        ).into[S]
+      }
+      _ <- jsons.map(cass.insertData(ks, tb, _)).sequence
     } yield ()
   }
 
