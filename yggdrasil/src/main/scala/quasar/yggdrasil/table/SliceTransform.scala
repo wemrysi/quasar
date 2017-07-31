@@ -18,9 +18,10 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._
+import quasar.precog.BitSet
 import quasar.precog.common._
-import quasar.yggdrasil.bytecode.{ JBooleanT, JObjectUnfixedT, JArrayUnfixedT }
 import quasar.precog.util._
+import quasar.yggdrasil.bytecode.{ JBooleanT, JObjectUnfixedT, JArrayUnfixedT }
 
 import scalaz._
 import scalaz.std.tuple._
@@ -91,6 +92,51 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
                     }
                     (ColumnRef(CPath.Identity, tpe), col)
                 }
+              }
+            }
+          }
+
+        case MapN(contents, f) =>
+          composeSliceTransform2(contents) map { slice =>
+            new Slice {
+
+              val size = slice.size
+
+              val columns: Map[ColumnRef, Column] = {
+                // find all of the scalar array values at root
+                val cols = slice.columns.toList collect {
+                  case (ref @ ColumnRef(CPath(CPathIndex(_)), _), col) => ref -> col
+                }
+
+                // group them up (note this may be sparse! that's why it must be a Map not a Vector)
+                val grouped = cols groupBy {
+                  case (ColumnRef(CPath(CPathIndex(i)), _), _) => i
+                } map { case (i, bucket) => i -> bucket.map(_._2) }
+
+                // to mirror the semantics of the concrete cardinalities, we do the cross-product of possible index columns
+                val processed = grouped.keys.reduceOption(_ max _) map { maxIndex =>
+                  def permuteFrom(i: Int): Stream[List[Column]] = {
+                    if (i > maxIndex) {   // it's maxIndex, not length, so we don't want >=
+                      Stream(Nil)
+                    } else {
+                      val potentials: Stream[Column] =
+                        grouped.get(i).getOrElse(List(UndefinedColumn.raw)).toStream
+
+                      potentials flatMap { col =>
+                        permuteFrom(i + 1).map(col :: _)
+                      }
+                    }
+                  }
+
+                  val back: Map[ColumnRef, Column] =
+                    permuteFrom(0).flatMap(f(_).toList).map({ col =>
+                      ColumnRef(CPath.Identity, col.tpe) -> col
+                    })(collection.breakOut)
+
+                  back
+                }
+
+                processed.getOrElse(Map())
               }
             }
           }
@@ -1188,26 +1234,44 @@ trait ObjectConcatHelpers extends ConcatHelpers {
 
     val innerPaths = Set(leftInner.keys map { _.selector } toSeq: _*)
 
+    // for all columns which have an identical path
     val mergedPairs: Set[(ColumnRef, Column)] = innerPaths flatMap { path =>
+      // find the right columns with the path
       val rightSelection = rightInner filter {
         case (ColumnRef(path2, _), _) => path == path2
       }
 
+      // find the left columns with the path that will NOT be merged
       val leftSelection = leftInner filter {
         case (ref @ ColumnRef(path2, _), _) =>
           path == path2 && !rightSelection.contains(ref)
       }
 
+      // merge the right and left columns of the same types
       val rightMerged = rightSelection map {
-        case (ref, col) => {
-          if (leftInner contains ref)
+        case (ref, col) =>
+          if (leftInner.contains(ref))
             ref -> cf.util.UnionRight(leftInner(ref), col).get
           else
             ref -> col
-        }
       }
 
-      rightMerged ++ leftSelection
+      // a predicate which indicates where all right columns are defined
+      val rightFilter: Int => Boolean = {
+        val cols = rightMerged.toList map { case (_, col) => col }
+
+        // we use forall rather than exists since we optimize for homogeneity
+        row => cols.forall(!_.isDefinedAt(row))
+      }
+
+      // poke holes in the left (of differing types) where the right is defined
+      val leftFiltered = leftSelection map {
+        case (ref, col) =>
+          ref -> cf.util.filterBy(rightFilter)(col).get
+      }
+
+      // glue it all back together
+      rightMerged ++ leftFiltered
     }
 
     leftOuter ++ rightOuter ++ mergedPairs

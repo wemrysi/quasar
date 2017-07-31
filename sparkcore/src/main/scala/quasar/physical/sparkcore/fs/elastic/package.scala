@@ -23,7 +23,7 @@ import quasar.effect._
 import quasar.fp.free._
 import quasar.fp.TaskRef
 import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
-import quasar.fs.mount._, FileSystemDef._
+import quasar.fs.mount._, BackendDef._
 import quasar.physical.sparkcore.fs.{readfile => corereadfile, queryfile => corequeryfile, genSc => coreGenSc}
 
 import java.net.URLDecoder

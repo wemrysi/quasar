@@ -26,8 +26,11 @@ import quasar.yggdrasil.vfs._
 import quasar.precog.util._
 
 import org.slf4j.LoggerFactory
-import scala.collection.immutable.Queue
+
 import scalaz._, Scalaz._, StateT._
+
+import scala.annotation.tailrec
+import scala.collection.immutable.Queue
 
 trait EvaluatorModule[M[+ _]]
     extends CrossOrdering
@@ -618,9 +621,12 @@ trait EvaluatorModule[M[+ _]]
 
             def makeJArray(idx: Int)(tpe: JType): JType = JArrayFixedT(Map(idx -> tpe))
 
+            def derefArray(idx: Int)(ref: ColumnRef): Option[ColumnRef] =
+              ref.selector.dropPrefix(CPath.Identity \ idx).map(ColumnRef(_, ref.ctype))
+
             val original = firstCoalesce.zipWithIndex map {
               case (red, idx) =>
-                (red, Some(makeJArray(idx) _))
+                (red, Some((makeJArray(idx) _, derefArray(idx) _)))
             }
             val reduction = coalesce(original)
 

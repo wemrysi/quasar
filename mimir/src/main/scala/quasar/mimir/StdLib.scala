@@ -23,7 +23,7 @@ import quasar.yggdrasil.table._
 
 import scalaz._, Scalaz._
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
   type Lib <: TableLib
@@ -148,16 +148,16 @@ trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
       def extract(res: Result): Table
       def extractValue(res: Result): Option[RValue]
 
-      def apply(table: Table) = table.reduce(reducer)(monoid) map extract
+      def apply(table: Table): M[Table] = table.reduce(reducer)(monoid) map extract
     }
 
-    def coalesce(reductions: List[(Reduction, Option[JType => JType])]): Reduction
+    def coalesce(reductions: List[(Reduction, Option[(JType => JType, ColumnRef => Option[ColumnRef])])]): Reduction
   }
 }
 
 trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTableModule[M] {
   trait ColumnarTableLib extends TableLib {
-    class WrapArrayTableReduction(val r: Reduction, val jtypef: Option[JType => JType]) extends Reduction(r.namespace, r.name) {
+    class WrapArrayTableReduction(val r: Reduction, val jtypef: Option[(JType => JType, ColumnRef => Option[ColumnRef])]) extends Reduction(r.namespace, r.name) {
       type Result = r.Result
       val tpe = r.tpe
 
@@ -165,10 +165,13 @@ trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTabl
       def reducer = new CReducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
           jtypef match {
-            case Some(f) =>
+            case Some((ft, fr)) =>
               val cols0 = new CSchema {
-                def columnRefs          = schema.columnRefs
-                def columns(tpe: JType) = schema.columns(f(tpe))
+                def columnRefs = schema.columnRefs
+                def columnMap(tpe: JType) =
+                  schema.columnMap(ft(tpe)) flatMap {
+                    case (ref, col) => fr(ref).map(_ -> col).toList
+                  }
               }
               r.reducer.reduce(cols0, range)
             case None =>
@@ -183,8 +186,8 @@ trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTabl
       def extractValue(res: Result) = r.extractValue(res)
     }
 
-    def coalesce(reductions: List[(Reduction, Option[JType => JType])]): Reduction = {
-      def rec(reductions: List[(Reduction, Option[JType => JType])], acc: Reduction): Reduction = {
+    def coalesce(reductions: List[(Reduction, Option[(JType => JType, ColumnRef => Option[ColumnRef])])]): Reduction = {
+      def rec(reductions: List[(Reduction, Option[(JType => JType, ColumnRef => Option[ColumnRef])])], acc: Reduction): Reduction = {
         reductions match {
           case (x, jtypef) :: xs => {
             val impl = new Reduction(Vector(), "") {
@@ -193,10 +196,13 @@ trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTabl
               def reducer = new CReducer[Result] {
                 def reduce(schema: CSchema, range: Range): Result = {
                   jtypef match {
-                    case Some(f) =>
+                    case Some((ft, fr)) =>
                       val cols0 = new CSchema {
-                        def columnRefs          = schema.columnRefs
-                        def columns(tpe: JType) = schema.columns(f(tpe))
+                        def columnRefs = schema.columnRefs
+                        def columnMap(tpe: JType) =
+                          schema.columnMap(ft(tpe)) flatMap {
+                            case (ref, col) => fr(ref).map(_ -> col).toList
+                          }
                       }
                       (x.reducer.reduce(cols0, range), acc.reducer.reduce(schema, range))
                     case None =>
@@ -247,6 +253,7 @@ trait StdLibModule[M[+ _]]
     with ArrayLibModule[M]
     with MathLibModule[M]
     with TypeLibModule[M]
+    with TimeLibModule[M]
     with StringLibModule[M]
     with ReductionLibModule[M]
     with RandomLibModule[M] {
@@ -258,6 +265,7 @@ trait StdLibModule[M[+ _]]
       with ArrayLib
       with MathLib
       with TypeLib
+      with TimeLib
       with StringLib
       with ReductionLib
       with RandomLib
@@ -301,7 +309,7 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
-    class Dt(c: DateColumn, defined: LocalDateTime => Boolean, f: LocalDateTime => String) extends Map1Column(c) with StrColumn {
+    class Dt(c: DateColumn, defined: ZonedDateTime => Boolean, f: ZonedDateTime => String) extends Map1Column(c) with StrColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
@@ -346,12 +354,29 @@ object StdLib {
   }
 
   object LongFrom {
+
+    class D(c: DoubleColumn, defined: Long => Boolean, f: Long => Long) extends Map1Column(c) with LongColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row).toLong) && c(row).ceil == c(row)
+
+      def apply(row: Int) = f(c(row).toLong)
+    }
+
     class L(c: LongColumn, defined: Long => Boolean, f: Long => Long) extends Map1Column(c) with LongColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
 
       def apply(row: Int) = f(c(row))
+    }
+
+    class N(c: NumColumn, defined: Long => Boolean, f: Long => Long) extends Map1Column(c) with LongColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row).toLong)
+
+      def apply(row: Int) = f(c(row).toLong)
     }
 
     class S(c: StrColumn, defined: String => Boolean, f: String => Long) extends Map1Column(c) with LongColumn {
@@ -362,7 +387,7 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
-    class Dt(c: DateColumn, defined: LocalDateTime => Boolean, f: LocalDateTime => Long) extends Map1Column(c) with LongColumn {
+    class Dt(c: DateColumn, defined: ZonedDateTime => Boolean, f: ZonedDateTime => Long) extends Map1Column(c) with LongColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
@@ -528,7 +553,34 @@ object StdLib {
   }
 
   object NumFrom {
+
+    // unsafe!  use only if you know what you're doing
+    class D(c: DoubleColumn, defined: BigDecimal => Boolean, f: BigDecimal => BigDecimal) extends Map1Column(c) with NumColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(BigDecimal(c(row)))
+
+      def apply(row: Int) = f(BigDecimal(c(row)))
+    }
+
+    // unsafe!  use only if you know what you're doing
+    class L(c: LongColumn, defined: BigDecimal => Boolean, f: BigDecimal => BigDecimal) extends Map1Column(c) with NumColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(BigDecimal(c(row)))
+
+      def apply(row: Int) = f(BigDecimal(c(row)))
+    }
+
     class N(c: NumColumn, defined: BigDecimal => Boolean, f: BigDecimal => BigDecimal) extends Map1Column(c) with NumColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class S(c: StrColumn, defined: String => Boolean, f: String => BigDecimal) extends Map1Column(c) with NumColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
@@ -738,7 +790,7 @@ object StdLib {
       def apply(row: Int) = f(c1(row), c2(row))
     }
 
-    class Dt(c: DateColumn, defined: LocalDateTime => Boolean, f: LocalDateTime => Boolean) extends Map1Column(c) with BoolColumn {
+    class Dt(c: DateColumn, defined: ZonedDateTime => Boolean, f: ZonedDateTime => Boolean) extends Map1Column(c) with BoolColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
@@ -746,7 +798,7 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
-    class DtDt(c1: DateColumn, c2: DateColumn, defined: (LocalDateTime, LocalDateTime) => Boolean, f: (LocalDateTime, LocalDateTime) => Boolean)
+    class DtDt(c1: DateColumn, c2: DateColumn, defined: (ZonedDateTime, ZonedDateTime) => Boolean, f: (ZonedDateTime, ZonedDateTime) => Boolean)
         extends Map2Column(c1, c2)
         with BoolColumn {
 

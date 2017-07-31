@@ -1,9 +1,5 @@
 {
     "name": "flatten a flattened field",
-    "backends": {
-        "mimir":"pending",
-        "postgresql":        "pending"
-    },
     "data": "slamengine_commits.data",
     "query": "select parents[*]{*} from slamengine_commits",
     "predicate": "atLeast",

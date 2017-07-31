@@ -183,13 +183,13 @@ final class Compiler[M[_], T: Equal]
   type CoExpr = Cofree[Sql, SA.Annotations]
 
   // CORE COMPILER
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def compile0
     (node: CoExpr)
     (implicit
       MErr: MonadError_[M, SemanticError],
       MState: MonadState[M, CompilerState[T]])
       : M[T] = {
-
     // NB: When there are multiple names for the same function, we may mark one
     //     with an `*` to indicate that it’s the “preferred” name, and others
     //     are for compatibility with other SQL dialects.
@@ -218,6 +218,10 @@ final class Compiler[M[_], T: Equal]
       CIName("squash")                  -> identity.Squash,
       CIName("oid")                     -> identity.ToId,
       CIName("type_of")                 -> identity.TypeOf,
+      CIName("abs")                     -> math.Abs,
+      CIName("ceil")                    -> math.Ceil,
+      CIName("floor")                   -> math.Floor,
+      CIName("trunc")                   -> math.Trunc,
       CIName("between")                 -> relations.Between,
       CIName("where")                   -> set.Filter,
       CIName("distinct")                -> set.Distinct,
@@ -254,6 +258,7 @@ final class Compiler[M[_], T: Equal]
           relations.Cond(cond, expr, default).embed
       })
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def flattenJoins(term: T, relations: SqlRelation[CoExpr]):
         T = relations match {
       case _: NamedRelation[_]             => term
@@ -265,6 +270,7 @@ final class Compiler[M[_], T: Equal]
 
     def buildJoinDirectionMap(relations: SqlRelation[CoExpr]):
         Map[String, List[JoinDir]] = {
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def loop(rel: SqlRelation[CoExpr], acc: List[JoinDir]):
           Map[String, List[JoinDir]] = rel match {
         case t: NamedRelation[_] => Map(t.aliasName -> acc)
@@ -341,6 +347,7 @@ final class Compiler[M[_], T: Equal]
         .getOrElse(lpr.constant(Data.Obj()))
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def compileRelation(r: SqlRelation[CoExpr]): M[T] =
       r match {
         case IdentRelationAST(name, _) =>
@@ -727,6 +734,7 @@ object Compiler {
     def keysƒ(t: LP[(T, List[T])]):
         (T, List[T]) =
     {
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def groupedKeys(t: LP[T], newSrc: T): Option[List[T]] = {
         t match {
           case InvokeUnapply(set.GroupBy, Sized(src, structural.MakeArrayN(keys))) =>

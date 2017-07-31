@@ -16,15 +16,14 @@
 
 package quasar.mimir
 
-import quasar.blueeyes._
-import quasar.precog.util._
 import quasar.precog.common._
+import quasar.precog.util.NumericComparisons
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
 
 import scalaz._, Scalaz._
 
-import java.time.LocalDateTime
+import java.time.{LocalDateTime, ZonedDateTime, ZoneId}
 
 import scala.collection.mutable
 
@@ -88,7 +87,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     }
 
     object MaxTime extends Reduction(ReductionNamespace, "maxTime") {
-      type Result = Option[LocalDateTime]
+      type Result = Option[ZonedDateTime]
 
       implicit val monoid = new Monoid[Result] {
         def zero = None
@@ -110,12 +109,13 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         def reduce(schema: CSchema, range: Range): Result = {
           val maxs = schema.columns(JDateT) map {
             case col: DateColumn =>
-              var zmax: LocalDateTime = dateTime.minimum
+	      // FIXME `ZonedDateTime` doesn't actually have a minimum value
+              var zmin: ZonedDateTime = ZonedDateTime.of(LocalDateTime.MIN, ZoneId.of("UTC"))
               val seen = RangeUtil.loopDefined(range, col) { i =>
                 val z = col(i)
-                if (NumericComparisons.compare(z, zmax) > 0) zmax = z
+                if (NumericComparisons.compare(z, zmin) > 0) zmin = z
               }
-              if (seen) Some(zmax) else None
+              if (seen) Some(zmin) else None
 
             case _ => None
           }
@@ -133,7 +133,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     }
 
     object MinTime extends Reduction(ReductionNamespace, "minTime") {
-      type Result = Option[LocalDateTime]
+      type Result = Option[ZonedDateTime]
 
       implicit val monoid = new Monoid[Result] {
         def zero = None
@@ -155,7 +155,8 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         def reduce(schema: CSchema, range: Range): Result = {
           val maxs = schema.columns(JDateT) map {
             case col: DateColumn =>
-              var zmax: LocalDateTime = dateTime.maximum
+	      // FIXME `ZonedDateTime` doesn't actually have a maximum value
+              var zmax: ZonedDateTime = ZonedDateTime.of(LocalDateTime.MAX, ZoneId.of("UTC"))
               val seen = RangeUtil.loopDefined(range, col) { i =>
                 val z = col(i)
                 if (NumericComparisons.compare(z, zmax) < 0) zmax = z
@@ -239,6 +240,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     }
 
     val MinMonoid = implicitly[Monoid[Min.Result]]
+
     object Min extends Reduction(ReductionNamespace, "min") {
       type Result = Option[BigDecimal]
 
@@ -732,6 +734,86 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       def extract(res: Result): Table = Table.constBoolean(Set(perform(res)))
 
       def extractValue(res: Result) = Some(CBoolean(perform(res)))
+    }
+
+    object First extends Reduction(ReductionNamespace, "first") {
+      import scala.util.control.Breaks._
+
+      type Result = Option[RValue]
+
+      implicit val monoid = new Monoid[Option[RValue]] {
+        def zero = None
+
+        def append(left: Option[RValue], right: => Option[RValue]) =
+          left orElse right
+      }
+
+      val tpe = UnaryOperationType(JType.JUniverseT, JType.JUniverseT)
+
+      def reducer: Reducer[Result] = new CReducer[Result] {
+        def reduce(schema: CSchema, range: Range) = {
+          val slice = new Slice {
+            val size = range.end
+            val columns = schema.columnMap(JType.JUniverseT)
+          }
+          var result: Option[RValue] = None
+          breakable {
+            RangeUtil.loop(range) { i =>
+              if (slice.isDefinedAt(i)) {
+                result = Some(slice.toRValue(i))
+                break()
+              }
+            }
+          }
+          result
+        }
+      }
+
+      def extract(res: Result): Table =
+        Table.fromRValues(res.toStream, None)
+
+      def extractValue(res: Result) = res
+    }
+
+    object Last extends Reduction(ReductionNamespace, "last") {
+      type Result = Option[() => RValue]
+
+      implicit val monoid = new Monoid[Option[() => RValue]] {
+        def zero = None
+
+        def append(left: Option[() => RValue], right: => Option[() => RValue]) =
+          right orElse left
+      }
+
+      val tpe = UnaryOperationType(JType.JUniverseT, JType.JUniverseT)
+
+      def reducer: Reducer[Result] = new CReducer[Result] {
+        def reduce(schema: CSchema, range: Range) = {
+          val slice = new Slice {
+            val size = range.end
+            val columns = schema.columnMap(JType.JUniverseT)
+          }
+          var result = -1
+          RangeUtil.loop(range) { i =>
+            if (slice.isDefinedAt(i)) {
+              result = i
+            }
+          }
+
+          // this allows unboxed lambda lifting
+          val finalResult = result
+
+          if (result >= 0)
+            Some(() => slice.toRValue(finalResult))
+          else
+            None
+        }
+      }
+
+      def extract(res: Result): Table =
+        Table.fromRValues(res.toStream.map(_()), None)
+
+      def extractValue(res: Result) = res.map(_())
     }
   }
 }

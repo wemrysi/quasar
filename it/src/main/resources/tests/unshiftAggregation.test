@@ -4,14 +4,13 @@
     "backends": {
         "couchbase":  "pending",
         "marklogic_json": "ignoreFieldOrder",
-        "mimir":"pending",
+        "mimir":"pendingIgnoreFieldOrder",
         "mongodb_2_6": "ignoreFieldOrder",
         "mongodb_3_0": "ignoreFieldOrder",
         "mongodb_3_2": "ignoreFieldOrder",
         "mongodb_3_4": "ignoreFieldOrder",
         "mongodb_read_only": "ignoreFieldOrder",
-        "mongodb_q_3_2": "ignoreFieldOrder",
-        "postgresql": "pending"
+        "mongodb_q_3_2": "ignoreFieldOrder"
     },
     "data": "zips.data",
     "query": "select state, city, [pop ...] as pop from zips group by state, city",

@@ -2,14 +2,13 @@
     "name": "show tests that likely have a bug prior to the connector",
     "backends": {
         "couchbase":         "pending",
-        "mimir":             "skip",
+        "mimir":             "pending",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",
         "mongodb_read_only": "pending",
         "mongodb_q_3_2":     "pending",
-        "postgresql":        "pending",
         "spark_hdfs":        "pending",
         "spark_local":       "pending"
     },

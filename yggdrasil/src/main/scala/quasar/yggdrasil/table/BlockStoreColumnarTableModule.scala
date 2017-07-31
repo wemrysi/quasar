@@ -18,6 +18,7 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._
+import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.precog.common.security._
 import quasar.yggdrasil.bytecode._
@@ -34,6 +35,7 @@ import scalaz._, Scalaz._, Ordering._
 import scala.collection.mutable
 import TableModule._
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 trait BlockStoreColumnarTableModuleConfig {
@@ -293,6 +295,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
       def opened(): (File, DB, JDBMState) = fdb match {
         case Some((f, db)) => (f, db, this)
         case None          =>
+          log.trace(s"opening a new JDBM database and things")
           // Open a JDBM3 DB for use in sorting under a temp directory
           val dbFile = new File(newScratchDir(), prefix)
           val db     = DBMaker.openFile(dbFile.getCanonicalPath).make()
@@ -777,6 +780,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
                                  vEncoder: ColumnEncoder,
                                  indexNamePrefix: String,
                                  jdbmState: JDBMState): M[JDBMState] = M.point {
+
       // Iterate over the slice, storing each row
       // FIXME: Determine whether undefined sort keys are valid
       def storeRows(kslice: Slice, vslice: Slice, keyRowFormat: RowFormat, vEncoder: ColumnEncoder, storage: IndexStore, insertCount: Long): Long = {
@@ -787,6 +791,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
         @tailrec def storeRow(row: Int, insertCount: Long): Long = {
           if (row < vslice.size) {
             if (vslice.isDefinedAt(row) && kslice.isDefinedAt(row)) {
+
               storage.put(kEncoder.encodeFromRow(row), vEncoder.encodeFromRow(row))
 
               if (insertCount % jdbmCommitInterval == 0 && insertCount > 0) jdbmState.commit()
