@@ -1713,8 +1713,8 @@ trait ColumnarTableModule[M[+ _]]
         case Some((slices, taken)) =>
           slices.uncons map {
             case Some((slice, tail)) =>
-              if (slice.size > count - taken)
-                Some((slice :: StreamT.empty[M, Slice], Some(tail, taken + slice.size)))
+              if (slice.size <= count - taken)
+                Some((slice :: StreamT.empty[M, Slice], Some((tail, taken + slice.size))))
               else
                 Some((slice.take((count - taken).toInt) :: StreamT.empty[M, Slice], None))
 
