@@ -30,6 +30,7 @@ import quasar.qscript._
 import quasar.std._
 
 import java.time.LocalDate
+import scala.math.{abs, round}
 
 import com.marklogic.xcc.ContentSource
 import matryoshka._
@@ -101,8 +102,18 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
       run(xqyPlan, expected)
     }
 
+    private def distinguishable(d: Double) = {
+      val a = abs(d - round(d))
+      //NB the proper value of distinguishable is somewhere between 1E-308 and 1E-306
+      (a == 0) || (a >= 1E-306)
+    }
+
     def intDomain    = arbitrary[Long]   map (BigInt(_))
-    def decDomain    = arbitrary[Double] map (BigDecimal(_))
+
+    // MarkLogic cannot handle doubles that are very close, but not equal to a whole number.
+    // If not distinguishable then ceil/floor returns a result that is 1 off.
+    def decDomain    = arbitrary[Double].filter(distinguishable).map(BigDecimal(_))
+
     def stringDomain = gen.printableAsciiString
 
     // Years 0-999 omitted for year zero disagreement involving millennium extract and trunc.
