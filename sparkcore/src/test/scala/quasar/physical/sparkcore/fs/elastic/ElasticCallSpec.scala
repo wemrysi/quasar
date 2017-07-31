@@ -17,8 +17,8 @@
 package quasar.physical.sparkcore.fs.elastic
 
 import slamdata.Predef._
-import com.sksamuel.elastic4s.testkit._
-import com.sksamuel.elastic4s.embedded._
+import com.sksamuel.elastic4s.testkit.AlwaysNewLocalNodeProvider
+import com.sksamuel.elastic4s.embedded.LocalNode
 import scalaz._, Scalaz._
 import org.specs2.specification.BeforeAfterEach
 
@@ -27,6 +27,8 @@ class ElasticCallSpec extends quasar.Qspec
     with BeforeAfterEach  {
 
   sequential
+
+  java.lang.System.setProperty("es.set.netty.runtime.available.processors", "false")
 
   val elastic = new ElasticCall.Ops[ElasticCall]
 
@@ -39,6 +41,32 @@ class ElasticCallSpec extends quasar.Qspec
   def after = {
     node.map(_.stop(removeData = true))
     node = None
+  }
+
+  "CopyType" should {
+    "copy content of existing type to non-existing type" in {
+      val fromIndex = "from"
+      val toIndex = "to"
+
+      val program = for {
+        _ <- elastic.createIndex(fromIndex)
+        _ <- elastic.indexInto(IndexType(fromIndex, "bar"), List(("key" -> "value")))
+        _ <- elastic.indexInto(IndexType(fromIndex, "baz"), List(("key" -> "value")))
+        _ <- elastic.createIndex(toIndex)
+        _ <- elastic.copyType(IndexType(fromIndex, "bar"), IndexType(toIndex, "bar2"))
+      } yield ()
+
+      val checkProgram = for {
+        bar2Exists <- elastic.typeExists(IndexType(toIndex, "bar2"))
+        bazExists <- elastic.typeExists(IndexType(toIndex, "baz"))
+      } yield (bar2Exists, bazExists)
+
+      program.foldMap(ElasticCall.interpreter).unsafePerformSync
+      java.lang.Thread.sleep(2000) // test needs to wait for the views to be updated
+      val (bar2Exists, bazExists) = checkProgram.foldMap(ElasticCall.interpreter).unsafePerformSync
+      bar2Exists must_== true
+      bazExists must_== false
+    }
   }
 
   "CreateIndex" should {
@@ -198,31 +226,8 @@ class ElasticCallSpec extends quasar.Qspec
     }
   }
 
-  "CopyType" should {
-    "copy content of existing type to non-existing type" in {
-      val program = for {
-        _ <- elastic.createIndex("foo")
-        _ <- elastic.indexInto(IndexType("foo", "bar"), List(("key" -> "value")))
-        _ <- elastic.indexInto(IndexType("foo", "baz"), List(("key" -> "value")))
-        _ <- elastic.createIndex("foo2")
-        _ <- elastic.copyType(IndexType("foo", "bar"), IndexType("foo2", "bar2"))
-      } yield ()
-
-      val checkProgram = for {
-        bar2Exists <- elastic.typeExists(IndexType("foo2", "bar2"))
-        bazExists <- elastic.typeExists(IndexType("foo2", "baz"))
-      } yield (bar2Exists, bazExists)
-
-      program.foldMap(ElasticCall.interpreter).unsafePerformSync
-      java.lang.Thread.sleep(2000) // test needs to wait for the views to be updated
-      val (bar2Exists, bazExists) = checkProgram.foldMap(ElasticCall.interpreter).unsafePerformSync
-      bar2Exists must_== true
-      bazExists must_== false
-    }
-  }
-
   "DeleteType" should {
-    "foo delete existing type from existsing index" in {
+    "delete existing type from existsing index" in {
       val program = for {
         _ <- elastic.createIndex("foo")
         _ <- elastic.indexInto(IndexType("foo", "bar"), List(("key" -> "value")))
