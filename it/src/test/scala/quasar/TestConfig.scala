@@ -56,6 +56,7 @@ object TestConfig {
   val MONGO_Q_3_4     = ExternalBackendRef(BackendRef(BackendName("mongodb_q_3_4")    , BackendCapability.All), mongodb.fs.QScriptFsType)
   val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), sparkcore.fs.hdfs.FsType)
   val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), sparkcore.fs.local.FsType)
+  val SPARK_ELASTIC     = ExternalBackendRef(BackendRef(BackendName("spark_elastic")      , BackendCapability.All), sparkcore.fs.elastic.FsType)
 
   lazy val backendRefs: List[ExternalBackendRef] = List(
     COUCHBASE,
@@ -63,7 +64,7 @@ object TestConfig {
     MIMIR,
     MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_3_4, MONGO_READ_ONLY,
     MONGO_Q_2_6, MONGO_Q_3_0, MONGO_Q_3_2, MONGO_Q_3_4,
-    SPARK_HDFS, SPARK_LOCAL)
+    SPARK_HDFS, SPARK_LOCAL, SPARK_ELASTIC)
 
   final case class UnsupportedFileSystemConfig(c: MountConfig)
     extends RuntimeException(s"Unsupported filesystem config: $c")
