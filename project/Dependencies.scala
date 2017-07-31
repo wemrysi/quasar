@@ -127,7 +127,7 @@ object Dependencies {
     "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2",
     "com.sksamuel.elastic4s" %% "elastic4s-jackson"      % "5.4.6",
     ("com.sksamuel.elastic4s" %% "elastic4s-testkit"      % "5.4.6" % Test)
-      .exclude("org.scalatest","scalatest"),
+      .exclude("org.scalatest", "scalatest_2.11"),
     "org.apache.logging.log4j"              % "log4j-core"                % "2.6.2"
   )
 
