@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.physical.mongodb.Bson
+import quasar.physical.mongodb.{Bson, BsonCodec}
 import quasar.physical.mongodb.expression._
 import quasar.qscript.{Coalesce => _, MapFuncsDerived => D,  _}, MapFuncsCore._
 
@@ -100,7 +100,7 @@ object FuncHandler {
             val fp = new ExprOpCoreF.fixpoint[Free[EX, A], EX](Free.roll)
             import fp._
 
-            mfc.some collect {
+            def partial(mfc: MapFuncCore[T, A]): OptionFree[EX, A] = mfc.some collect {
               case Undefined()           => $literal(Bson.Undefined)
               case Add(a1, a2)           => $add(a1, a2)
               case Multiply(a1, a2)      => $multiply(a1, a2)
@@ -215,6 +215,11 @@ object FuncHandler {
                                  $cond($lt(a1, $literal(Check.minRegex)),      $literal(Bson.Text("_bson.timestamp")),
                                                                                $literal(Bson.Text("_bson.regularexpression"))))))))))))
             }
+
+            partial(mfc) orElse (mfc match {
+              case Constant(v1)  => v1.cataM(BsonCodec.fromEJson).toOption.map($literal(_))
+              case _             => None
+            })
           }
         }
 
