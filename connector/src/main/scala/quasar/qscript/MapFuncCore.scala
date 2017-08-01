@@ -248,7 +248,7 @@ object MapFuncCore {
   // NB: This _could_ be combined with `rewrite`, but it causes rewriting to
   //     take way too long, so instead we apply it separately afterward.
   /** Pulls conditional `Undefined`s as far up an expression as possible. */
-  def extractGuards[T[_[_]]: BirecursiveT, A]
+  def extractGuards[T[_[_]]: BirecursiveT: EqualT, A: Equal]
       : CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
     _.run.toOption >>= (MFC.unapply) >>= {
       // NB: The last case pulls guards into a wider scope, and we want to avoid
@@ -269,7 +269,7 @@ object MapFuncCore {
         writer.written match {
           case Nil    => none
           case guards =>
-            rollMF[T, A](guards.distinct.foldRight(MFC(writer.value)) {
+            rollMF[T, A](guards.distinctE.foldRight(MFC(writer.value)) {
               case ((e, t), s) =>
                 MFC(Guard(e, t, Free.roll(s), Free.roll(MFC(Undefined[T, FreeMapA[T, A]]()))))
             }).some
