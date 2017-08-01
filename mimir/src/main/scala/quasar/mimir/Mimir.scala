@@ -199,105 +199,91 @@ object Mimir extends BackendModule with Logging {
           trans <- interpretMapFunc[Backend](src.P)(f)
         } yield Repr(src.P)(src.table.transform(trans))
 
-      case qscript.Reduce(src, bucket, reducers, repair) =>
+      // Single bucket and single Arbitrary reducer of the same bucket is distinct.
+      case qscript.Reduce(src, bucket :: Nil, ReduceFuncs.Arbitrary(arb) :: Nil, Embed(CoEnv(-\/(ReduceIndex(\/-(0)))))) if bucket ≟ arb =>
+        import src.P.trans._
+        for {
+          trans <- interpretMapFunc[Backend](src.P)(bucket)
+          transformed = src.table.transform(trans)
+          sorted <- transformed.sort(TransSpec1.Id, unique = true).toTask.liftM[MT].liftB
+        } yield Repr(src.P)(sorted)
+
+      case qscript.Reduce(src, buckets, reducers, repair) =>
         import src.P.trans._
         import src.P.Library
 
-        // empty reduction is distinct
-        if (reducers.isEmpty) {
-          for {
-            trans <- repair.cataM[Backend, TransSpec1](
-              interpretM(
-                {
-                  case ReduceIndex(\/-(_)) => ???    // this should be impossible
-                  // FIXME: Handle the bucket index
-                  case ReduceIndex(-\/(_)) =>
-                    bucket
-                      .traverse(interpretMapFunc[Backend](src.P))
-                      .map(combineTransSpecs(src.P))
-                },
-                mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)))
-
-            transformed = src.table.transform(trans)
-
-            sorted <- transformed.sort(TransSpec1.Id, unique = true).toTask.liftM[MT].liftB
-          } yield Repr(src.P)(sorted)
-        } else {
-          def extractReduction(red: ReduceFunc[FreeMap[T]])
-              : (Library.Reduction, FreeMap[T]) = red match {
-            case ReduceFuncs.Count(f) => (Library.Count, f)
-            case ReduceFuncs.Sum(f) => (Library.Sum, f)
-            case ReduceFuncs.Min(f) => (Library.Min, f)
-            case ReduceFuncs.Max(f) => (Library.Max, f)
-            case ReduceFuncs.Avg(f) => (Library.Mean, f)
-            case ReduceFuncs.Arbitrary(f) => (Library.First, f)   // first is the most efficient for Table
-            case ReduceFuncs.First(f) => (Library.First, f)
-            case ReduceFuncs.Last(f) => (Library.Last, f)
-            case ReduceFuncs.UnshiftArray(f) => ???
-            case ReduceFuncs.UnshiftMap(f1, f2) => ???
-          }
-
-          val pairs: List[(Library.Reduction, FreeMap[T])] =
-            reducers.map(extractReduction)
-
-          val reductions: List[Library.Reduction] = pairs.map(_._1)
-          val funcs: List[FreeMap[T]] = pairs.map(_._2)
-
-          def makeJArray(idx: Int)(tpe: JType): JType =
-            JArrayFixedT(ScalaMap(idx -> tpe))
-
-          def derefArray(idx: Int)(ref: ColumnRef): Option[ColumnRef] =
-            ref.selector.dropPrefix(CPath.Identity \ idx).map(ColumnRef(_, ref.ctype))
-
-          val megaReduction: Library.Reduction =
-            Library.coalesce(reductions.zipWithIndex.map {
-              case (r, i) => (r, Some((makeJArray(i)(_), derefArray(i)(_))))
-            })
-
-          // mimir reverses the order of the returned results
-          def remapIndex: ScalaMap[Int, Int] =
-            (0 until reducers.length).reverse.zipWithIndex.toMap
-
-          for {
-            specs <- funcs.traverse(interpretMapFunc[Backend](src.P)(_))
-            megaSpec = combineTransSpecs(src.P)(specs)
-
-            table <- {
-              def reduceAll(table: src.P.Table): Future[src.P.Table] = {
-                for {
-                  red <- megaReduction(table.transform(megaSpec))
-                  trans <- repair.cataM[Future, TransSpec1](
-                    interpretM(
-                      {
-                        case ReduceIndex(\/-(idx)) => remapIndex.get(idx) match {
-                          case Some(i) =>
-                            (DerefArrayStatic(TransSpec1.Id, CPathIndex(i)): TransSpec1).point[Future]
-                          case None => ???
-                        }
-                        // FIXME: Handle the bucket index
-                        case ReduceIndex(-\/(_)) =>
-                          bucket
-                            .traverse(interpretMapFunc[Future](src.P))
-                            .map(combineTransSpecs(src.P))
-                      },
-                      mapFuncPlanner[Future].plan(src.P)[Source1](TransSpec1.Id)))
-                } yield red.transform(trans)
-              }
-
-              if (bucket.isEmpty) {
-                reduceAll(src.table).toTask.liftM[MT].liftB
-              } else {
-                for {
-                  bucketTranses <- bucket traverse interpretMapFunc[Backend](src.P)
-                  bucketTrans = combineTransSpecs(src.P)(bucketTranses)
-
-                  prepared <- src.table.sort(bucketTrans).toTask.liftM[MT].liftB
-                  table <- prepared.partitionMerge(bucketTrans)(reduceAll).toTask.liftM[MT].liftB
-                } yield table
-              }
-            }
-          } yield Repr(src.P)(table)
+        def extractReduction(red: ReduceFunc[FreeMap[T]])
+            : (Library.Reduction, FreeMap[T]) = red match {
+          case ReduceFuncs.Count(f) => (Library.Count, f)
+          case ReduceFuncs.Sum(f) => (Library.Sum, f)
+          case ReduceFuncs.Min(f) => (Library.Min, f)
+          case ReduceFuncs.Max(f) => (Library.Max, f)
+          case ReduceFuncs.Avg(f) => (Library.Mean, f)
+          case ReduceFuncs.Arbitrary(f) => (Library.First, f)   // first is the most efficient for Table
+          case ReduceFuncs.First(f) => (Library.First, f)
+          case ReduceFuncs.Last(f) => (Library.Last, f)
+          case ReduceFuncs.UnshiftArray(f) => ???
+          case ReduceFuncs.UnshiftMap(f1, f2) => ???
         }
+
+        val pairs: List[(Library.Reduction, FreeMap[T])] =
+          reducers.map(extractReduction)
+
+        val reductions: List[Library.Reduction] = pairs.map(_._1)
+        val funcs: List[FreeMap[T]] = pairs.map(_._2)
+
+        def makeJArray(idx: Int)(tpe: JType): JType =
+          JArrayFixedT(ScalaMap(idx -> tpe))
+
+        def derefArray(idx: Int)(ref: ColumnRef): Option[ColumnRef] =
+          ref.selector.dropPrefix(CPath.Identity \ idx).map(ColumnRef(_, ref.ctype))
+
+        val megaReduction: Library.Reduction =
+          Library.coalesce(reductions.zipWithIndex.map {
+            case (r, i) => (r, Some((makeJArray(i)(_), derefArray(i)(_))))
+          })
+
+        // mimir reverses the order of the returned results
+        def remapIndex: ScalaMap[Int, Int] =
+          (0 until reducers.length).reverse.zipWithIndex.toMap
+
+        for {
+          specs <- funcs.traverse(interpretMapFunc[Backend](src.P)(_))
+          megaSpec = combineTransSpecs(src.P)(specs)
+
+          table <- {
+            def reduceAll(table: src.P.Table): Future[src.P.Table] = {
+              for {
+                red <- megaReduction(table.transform(megaSpec))
+                trans <- repair.cataM[Future, TransSpec1](
+                  interpretM(
+                    {
+                      case ReduceIndex(\/-(idx)) => remapIndex.get(idx) match {
+                        case Some(i) =>
+                          (DerefArrayStatic(TransSpec1.Id, CPathIndex(i)): TransSpec1).point[Future]
+                        case None => ???
+                      }
+                      // FIXME: Handle the bucket index
+                      case ReduceIndex(-\/(_)) =>
+                        (TransSpec1.Id: TransSpec1).point[Future]
+                    },
+                    mapFuncPlanner[Future].plan(src.P)[Source1](TransSpec1.Id)))
+              } yield red.transform(trans)
+            }
+
+            if (buckets.isEmpty) {
+              reduceAll(src.table).toTask.liftM[MT].liftB
+            } else {
+              for {
+                bucketTranses <- buckets traverse interpretMapFunc[Backend](src.P)
+                bucketTrans = combineTransSpecs(src.P)(bucketTranses)
+
+                prepared <- src.table.sort(bucketTrans).toTask.liftM[MT].liftB
+                table <- prepared.partitionMerge(bucketTrans)(reduceAll).toTask.liftM[MT].liftB
+              } yield table
+            }
+          }
+        } yield Repr(src.P)(table)
 
       case qscript.LeftShift(src, struct, idStatus, repair) =>
         import src.P.trans._
