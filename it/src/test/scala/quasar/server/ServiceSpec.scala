@@ -17,19 +17,16 @@
 package quasar.server
 
 import slamdata.Predef._
-import quasar.cli.Cmd.Start
-import quasar.config.{ConfigOps, FsPath, WebConfig}
+import quasar.config.{ConfigOps, WebConfig}
 import quasar.contrib.pathy._
-import quasar.db.{DbUtil, StatefulTransactor}
+import quasar.fp.TaskRef
+import quasar.fp.ski._
 import quasar.fs.mount._
-import quasar.main._, metastore._
+import quasar.main._
 import quasar.metastore._, MetaStoreAccess._
-import quasar.server.Server.QuasarConfig
+import quasar.metastore.MetaStoreFixture.createNewTestMetastore
 import quasar.sql._
 import quasar.TestConfig
-
-import java.io.File
-import scala.util.Random.nextInt
 
 import argonaut._, Argonaut._
 import doobie.imports._
@@ -57,29 +54,16 @@ class ServiceSpec extends quasar.Qspec {
     val uri = Uri(authority = Some(Authority(port = Some(port))))
 
     (for {
-      cfgPath       <- FsPath.parseSystemFile(
-                         File.createTempFile("quasar", ".json").toString
-                       ).run.liftM[MainErrT]
-      qCfg          =  QuasarConfig(
-                         cmd = Start,
-                         staticContent = Nil,
-                         redirect = None,
-                         port = None,
-                         configPath = cfgPath,
-                         openClient = false)
-      transactor    <- Task.delay(DbUtil.simpleTransactor(
-                         DbUtil.inMemoryConnectionInfo(s"test_mem_service_spec_$nextInt")
-                       )).liftM[MainErrT]
-      _             <- schema.updateToLatest.transact(transactor).liftM[MainErrT]
-      _             <- metastoreInit.transact(transactor).liftM[MainErrT]
-      msCtx         <- metastoreCtx(StatefulTransactor(transactor, Task.now(())))
-      (svc, close)  =  Server.durableService(qCfg, port, msCtx)
-      (p, shutdown) <- Http4sUtils.startServers(port, svc).liftM[MainErrT]
-      r             <- f(uri)
-                          .onFinish(_ => shutdown)
-                          .onFinish(_ => p.run)
-                          .onFinish(_ => close)
-                          .liftM[MainErrT]
+      metastore  <- createNewTestMetastore.liftM[MainErrT]
+      transactor = metastore.trans.transactor
+      _          <- schema.updateToLatest.transact(transactor).liftM[MainErrT]
+      _          <- metastoreInit.transact(transactor).liftM[MainErrT]
+      metaRef    <- TaskRef(metastore).liftM[MainErrT]
+      quasarFs   <- Quasar.initWithMeta(metaRef, _ => ().point[MainTask], initialize = false)
+      shutdown   <- Server.startServer(quasarFs.interp, port, Nil, None, _ => ().point[Task]).liftM[MainErrT]
+      r          <- f(uri)
+                      .onFinish(κ(shutdown.onFinish(κ(quasarFs.shutdown))))
+                      .liftM[MainErrT]
     } yield r).run.unsafePerformSync
   }
 
@@ -257,6 +241,61 @@ class ServiceSpec extends quasar.Qspec {
       }
 
       r.map(_.status) must beRightDisjunction(Ok)
+    }
+
+    "GET invalid view" in {
+      val port = Http4sUtils.anyAvailablePort.unsafePerformSync
+
+      val insertMnt =
+        MetaStoreMounterSpec.insertMount(rootDir </> file("f1"), MountType.ViewMount, "bogus")
+
+      val r = withServer(port, insertMnt) { baseUri: Uri =>
+        client.fetch(
+          Request(
+            uri = baseUri / "data" / "fs" / "f1",
+            method = Method.GET)
+        )(Task.now)
+      }
+
+      r.map(_.status) must beRightDisjunction(BadRequest withReason "Compilation failed")
+    }
+  }
+
+  "/metadata/fs" should {
+    "GET directory with invalid view" in {
+      import Json._
+
+      val port = Http4sUtils.anyAvailablePort.unsafePerformSync
+
+      val viewConfig = MountConfig.viewConfig0(sqlB"select 42")
+
+      val insertMnts =
+        insertMount(rootDir </> file("f1"), viewConfig) *>
+        MetaStoreMounterSpec.insertMount(rootDir </> file("f2"), MountType.ViewMount, "bogus")
+
+      val r = withServer(port, insertMnts) { baseUri: Uri =>
+        client.expect[Json](baseUri / "metadata" / "fs")
+      }
+
+      r.map(json =>
+        (json.hcursor
+          --\ "children"
+          -\ (c => (c.hcursor --\ "name").as[String].toOption ≟ "f2".some)
+          --\ "mount"
+          --\ "error"
+          --\ "detail"
+          --\ "message" := jEmptyString
+        ).up.up.up.up.up.focus >>= (_.array ∘ (_.toSet))
+      ) must beRightDisjunction(
+        Set(
+          Json("name" := "f1", "type" := "file", "mount" := "view"),
+          Json(
+            "name" := "f2",
+            "type" := "view",
+            "mount" := Json(
+              "error" := Json(
+                "status" := "Invalid mount.",
+                "detail" := Json("message" := ""))))).some)
     }
   }
 

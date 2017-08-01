@@ -67,17 +67,16 @@ quasar_mongodb_read_only
 quasar_mongodb_3_2
 quasar_mongodb_3_4
 quasar_metastore
-quasar_postgresql
 quasar_marklogic_xml
 quasar_marklogic_json
 quasar_couchbase
 ```
 
 Knowing which backend datastores are supported you can create and configure docker containers using `setupContainers`. For example
-if you wanted to run integration tests with mongo, postgresql, marklogic, and couchbase you would use:
+if you wanted to run integration tests with mongo, marklogic, and couchbase you would use:
 
 ```
-./setupContainers -u quasar_metastore,quasar_mongodb_3_0,quasar_postgresql,quasar_marklogic_xml,quasar_couchbase
+./setupContainers -u quasar_metastore,quasar_mongodb_3_0,quasar_marklogic_xml,quasar_couchbase
 ```
 
 Note: `quasar_metastore` is always needed to run integration tests.
@@ -99,7 +98,6 @@ After running this command your `testing.conf` file should look similar to this:
 postgresql_metastore="{\"host\":\"192.168.99.101\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"
 couchbase="couchbase://192.168.99.101/beer-sample?password=&docTypeKey=type&socketConnectTimeoutSeconds=15"
 marklogic_xml="xcc://marklogic:marklogic@192.168.99.101:8000/Documents?format=xml"
-postgresql="jdbc:postgresql://192.168.99.101:5433/quasar-test?user=postgres&password=postgres"
 mongodb_3_0="mongodb://192.168.99.101:27019"
 ```
 
@@ -198,15 +196,17 @@ If no metastore configuration is specified, the default configuration will use a
 An example H2 configuration would look something like
 ```json
 "h2": {
-  "file": "<path/to/database/file>"
+  "location": "`database_url`"
 }
 ```
+
+Where `database_url` can be any h2 url as described [here](http://www.h2database.com/html/features.html#database_url).
 
 A PostgreSQL configuration looks something like
 ```json
 "postgresql": {
-  "host": "<hostname>",
-  "port": "<port>",
+  "host": "localhost",
+  "port": 8087,
   "database": "<database name>",
   "userName": "<database user>",
   "password": "<password for database user>",
@@ -815,6 +815,16 @@ Deletes an existing mount point, if any exists at the given path. If no such mou
 
 Moves a mount from one path to another. The new path must be provided in the `Destination` request header. This will return a 409 Conflict if a database mount is being moved above or below the path of an existing database mount. Mounts that are nested within the mount being moved (i.e. views) are moved along with it.
 
+### GET /server/info
+
+Returns information about this server. Name and app version.
+
+Example response:
+
+```json
+{"name":"Quasar","version":"19.1.2"}
+```
+
 ### PUT /server/port
 
 Takes a port number in the body, and attempts to restart the server on that port, shutting down the current instance which is running on the port used to make this http request.
@@ -823,6 +833,44 @@ Takes a port number in the body, and attempts to restart the server on that port
 
 Removes any configured port, reverting to the default (20223) and restarting, as with `PUT`.
 
+### GET /metastore
+
+Retrieve the connection information of the current metastore in use
+
+An example response:
+
+```json
+{
+    "h2": {
+        "location": "mem"
+    }
+}
+
+```
+
+### PUT /metastore
+
+Attempts to change the metastore using the supplied connection information
+
+An optional `initialize` query parameter can be supplied so that Quasar automatically initializes the new
+metastore after a successful connection if it has not already been initialized. If this parameter is omitted
+and the new metastore has not been initialized, the request will fail with a message to the effect that the
+new metastore has not been initialized.
+
+An example request body:
+
+```json
+{
+    "postgresql": {
+        "host": "localhost",
+        "port": 9876,
+        "database": "bob",
+        "password": "123456"
+    }
+}
+```
+
+Returns `200 OK` if the change was performed successfully otherwise returns a `400` with a message body explaining what went wrong.
 
 ## Error Responses
 

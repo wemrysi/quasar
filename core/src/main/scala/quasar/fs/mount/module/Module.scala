@@ -21,7 +21,7 @@ import quasar._
 import quasar.fp.numeric._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
-import quasar.effect.LiftedOps
+import quasar.effect.{Failure, LiftedOps}
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.sql._
@@ -130,6 +130,7 @@ object Module {
       def closeHandle(dataOrHandle: List[Data] \/ ResultHandle): Process[M, Nothing] =
         dataOrHandle.fold(_ => Process.empty, h => Process.eval_[M, Unit](unsafe.close(h).liftM[ErrorT]))
 
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def readUntilEmpty(h: ResultHandle): Process[M, Data] =
         Process.await(unsafe.more(h).leftMap(Error.fsError(_))) { data =>
           if (data.isEmpty)
@@ -144,6 +145,14 @@ object Module {
           handle => readUntilEmpty(handle))
       }
     }
+
+    def invokeFunction_(path: AFile, args: Map[String, String], offset: Natural, limit: Option[Positive])(implicit
+      SO: Failure :<: S
+    ): Process[Free[S, ?], Data] = {
+      val nat: M ~> Free[S, ?] = λ[M ~> Free[S, ?]] { x => Failure.Ops[Error, S].unattempt(x.run) }
+      invokeFunction(path, args, offset, limit).translate(nat)
+    }
+
   }
 
   object Ops {
@@ -165,7 +174,9 @@ object Module {
           val iArgs = args.map{ case (key, value) => (CIName(key), value)}
           val currentDir = fileParent(file)
           (for {
-            moduleConfig <- mount.lookupModuleConfig(currentDir).toRight(notFoundError)
+            moduleConfig <- EitherT(mount.lookupModuleConfig(currentDir)
+                              .leftMap(e => semErrors(SemanticError.genericError(e.shows).wrapNel))
+                              .run.toRight(notFoundError).run.map(_.join))
             name         =  fileName(file).value
             funcDec      <- EitherT(moduleConfig.declarations.find(_.name.value ≟ name)
                               .toRightDisjunction(notFoundError).point[Free[S, ?]])

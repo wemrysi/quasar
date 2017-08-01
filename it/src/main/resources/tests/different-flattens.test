@@ -1,11 +1,10 @@
 {
     "name": "merge differently-nested flattens",
     "backends": {
-        "mimir":"pending",
+        "mimir":"pendingIgnoreFieldOrder",
         "couchbase": "pending",
         "marklogic_json": "pending",
-        "mongodb_q_3_2":  "pending",
-        "postgresql":     "pending"
+        "mongodb_q_3_2":  "pending"
     },
     "data": "user_comments.data",
     "query": "select profile from user_comments where (

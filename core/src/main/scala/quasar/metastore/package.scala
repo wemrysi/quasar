@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile, APath, unsafeSandboxAbs}
 import quasar.db.Schema
 import quasar.fs.FileSystemType
-import quasar.fs.mount.{MountConfig, MountType}
+import quasar.fs.mount.MountType
 
 import doobie.imports._
 import pathy.Path, Path._
@@ -43,12 +43,26 @@ import scalaz._, Scalaz._
   */
 package object metastore {
 
-  def verifyMetaStoreSchema[A](schema: Schema[A]): EitherT[ConnectionIO, String, Unit] =
+  sealed trait MetastoreInitializationFailure {
+    def message: String
+  }
+  final case object MetastoreRequiresInitialization extends MetastoreInitializationFailure {
+    def message: String = "MetaStore requires initialization, try running the 'initUpdateMetaStore' command."
+  }
+  final case class MetastoreRequiresMigration(current: String, latest: String) extends MetastoreInitializationFailure {
+    def message: String = "MetaStore schema requires migrating, current version is '$cur' latest version is '$nxt'."
+  }
+  final case class UnknownInitializationError(causedBy: scala.Throwable) extends MetastoreInitializationFailure {
+    private val metastorePrompt: String = "Is the metastore database running?"
+    def message: String = s"While verifying MetaStore schema: ${causedBy.getMessage}. $metastorePrompt"
+  }
+
+  def verifyMetaStoreSchema[A: Show](schema: Schema[A]): EitherT[ConnectionIO, MetastoreInitializationFailure, Unit] =
     EitherT(schema.updateRequired map {
       case Some((None, _)) =>
-        "MetaStore requires initialization, try running the 'initUpdateMetaStore' command.".left
+        MetastoreRequiresInitialization.left
       case Some((Some(cur), nxt)) =>
-        s"MetaStore schema requires migrating, current version is '$cur' latest version is '$nxt'.".left
+        MetastoreRequiresMigration(cur.shows, nxt.shows).left
       case None =>
         ().right
     })
@@ -83,18 +97,9 @@ package object metastore {
   implicit val mountTypeMeta: Meta[MountType] = {
     import MountType._
     Meta[String].xmap[MountType](
-      str => (str === "view") ? viewMount() | fileSystemMount(FileSystemType(str)),
-      mt  => fileSystemMount.getOption(mt).fold("view")(_.value))
+      { case "view" => viewMount(); case "module" => moduleMount(); case fsType => fileSystemMount(FileSystemType(fsType)) },
+      _.fold(_.value, "view", "module"))
   }
-
-  implicit val mountConfigComposite: Composite[MountConfig] =
-    Composite[(String, String)].xmap(
-      { case (typ, uri) =>
-        MountConfig.fromConfigPair(typ, uri)
-          .leftMap(unexpectedValue(_))
-          .merge
-      },
-      MountConfig.toConfigPair)
 
   // See comment above.
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))

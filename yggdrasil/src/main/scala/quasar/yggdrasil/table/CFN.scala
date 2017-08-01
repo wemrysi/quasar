@@ -17,11 +17,12 @@
 package quasar.yggdrasil
 package table
 
-import quasar.yggdrasil.bytecode.JType
 import quasar.blueeyes._
+import quasar.precog.BitSet
 import quasar.precog.common._
+import quasar.yggdrasil.bytecode.JType
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 sealed trait CFId
 case class LeafCFId(identity: String)            extends CFId
@@ -35,6 +36,7 @@ object CFId {
 
 trait CF {
   def identity: CFId
+
   override final def equals(other: Any): Boolean = other match {
     case cf: CF => identity == cf.identity
     case _      => false
@@ -114,6 +116,27 @@ object CF2P {
   }
 }
 
+trait CFN extends CF {
+  def apply(columns: List[Column]): Option[Column]
+}
+
+object CFN {
+  def apply(id: String)(f: List[Column] => Option[Column]): CFN = apply(CFId(id))(f)
+  def apply(id: CFId)(f: List[Column] => Option[Column]): CFN = new CFN {
+    def apply(columns: List[Column]): Option[Column] = f(columns)
+    val identity = id
+  }
+}
+
+object CFNP {
+  def apply(id: String)(f: PartialFunction[List[Column], Column]): CFN = apply(CFId(id))(f)
+  def apply(id: CFId)(f: PartialFunction[List[Column], Column]): CFN = new CFN {
+    private val lifted: List[Column] => Option[Column] = f.lift
+    def apply(columns: List[Column]): Option[Column] = lifted(columns)
+    val identity = id
+  }
+}
+
 object CF2Array {
   def apply[A, M[+ _]](name: String)(pf: PartialFunction[(Column, Column, Range), (CType, Array[Array[A]], BitSet)]): CMapper[M] = new ArrayMapperS[M] {
     def apply(columns0: Map[ColumnRef, Column], range: Range) = {
@@ -153,7 +176,8 @@ trait CMapperM[M[+ _]] extends CMapper[M] {
 
 trait CSchema {
   def columnRefs: Set[ColumnRef]
-  def columns(jtype: JType): Set[Column]
+  def columnMap(jtype: JType): Map[ColumnRef, Column]
+  final def columns(jtype: JType): Set[Column] = columnMap(jtype).values.toSet
 }
 
 trait CReducer[A] {
@@ -276,7 +300,7 @@ trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
 
       case (tpe @ CDate, (cols0, defined)) => {
         val max  = maxIds(cols0, defined)
-        val cols = cols0.asInstanceOf[Array[Array[LocalDateTime]]]
+        val cols = cols0.asInstanceOf[Array[Array[ZonedDateTime]]]
 
         val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
           ColumnRef(CPath(CPathIndex(i)), tpe) -> new DateColumn {

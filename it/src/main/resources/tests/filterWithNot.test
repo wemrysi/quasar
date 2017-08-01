@@ -2,8 +2,7 @@
   "name": "filter with negated regex selector",
 
   "backends": {
-        "mimir":"pending",
-    "postgresql": "pending"
+        "mimir":"ignoreFieldOrder"
   },
 
   "data": "zips.data",

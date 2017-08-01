@@ -31,7 +31,7 @@ import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, _}
 import quasar.namegen._
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript.MapFuncCore
+import quasar.qscript.MapFunc
 import quasar.std.StdLib._
 
 import matryoshka._
@@ -72,6 +72,7 @@ object MongoDbPlanner {
       ifs.map(f => RenderTree.fromShow("InputFinder")(Show.showFromToString[InputFinder]).render(f)))
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
       Type => Option[In => Out] =
         typ => f.lift(typ).fold(
@@ -164,14 +165,14 @@ object MongoDbPlanner {
         case (ArrayConcat, _) => None
 
         case (func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
-          val mf = MapFuncCore.translateUnaryMapping[Fix, UnaryArg](func)(UnaryArg._1)
-          JsFuncHandler(mf).map(exp => Arity1(exp.eval))
+          val mf = (MapFunc.translateUnaryMapping[Fix, MapFunc[Fix, ?], UnaryArg].apply _)(func)(UnaryArg._1)
+          JsFuncHandler.handle[MapFunc[Fix, ?]].apply(mf).map(exp => Arity1(exp.eval))
         case (func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2)) if func.effect ≟ Mapping =>
-          val mf = MapFuncCore.translateBinaryMapping[Fix, BinaryArg](func)(BinaryArg._1, BinaryArg._2)
-          JsFuncHandler(mf).map(exp => Arity2(exp.eval))
+          val mf = (MapFunc.translateBinaryMapping[Fix, MapFunc[Fix, ?], BinaryArg] _)(func)(BinaryArg._1, BinaryArg._2)
+          JsFuncHandler.handle[MapFunc[Fix, ?]].apply(mf).map(exp => Arity2(exp.eval))
         case (func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) if func.effect ≟ Mapping =>
-          val mf = MapFuncCore.translateTernaryMapping[Fix, TernaryArg](func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
-          JsFuncHandler(mf).map(exp => Arity3(exp.eval))
+          val mf = (MapFunc.translateTernaryMapping[Fix, MapFunc[Fix, ?], TernaryArg] _)(func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
+          JsFuncHandler.handle[MapFunc[Fix, ?]].apply(mf).map(exp => Arity3(exp.eval))
         case _ => None
       }).getOrElse(func match {
         case Constantly => Arity1(ι)  // FIXME: this cannot possibly be right
@@ -496,7 +497,7 @@ object MongoDbPlanner {
   import quasar.physical.mongodb.accumulator._
 
   def workflowƒ[F[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-    (joinHandler: JoinHandler[F, WorkflowBuilder.M], funcHandler: MapFuncCore[Fix, ?] ~> OptionFree[EX, ?])
+    (joinHandler: JoinHandler[F, WorkflowBuilder.M], funcHandler: MapFunc[Fix, ?] ~> OptionFree[EX, ?])
     (implicit
       ev0: WorkflowOpCoreF :<: F,
       ev1: RenderTree[WorkflowBuilder[F]],
@@ -570,6 +571,7 @@ object MongoDbPlanner {
       }
 
       def groupExpr0(f: AccumOp[Fix[ExprOp]]): Output = {
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def reduce0(wb: WorkflowBuilder[F])(fʹ: AccumOp[Fix[ExprOp]])
             : WorkflowBuilder[F] =
           wb.unFix match {
@@ -630,14 +632,14 @@ object MongoDbPlanner {
         case (ArrayConcat, _) => None
 
         case (func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
-          val mf: MapFuncCore[Fix, UnaryArg] = MapFuncCore.translateUnaryMapping[Fix, UnaryArg](func)(UnaryArg._1)
+          val mf: MapFunc[Fix, UnaryArg] = (MapFunc.translateUnaryMapping[Fix, MapFunc[Fix, ?], UnaryArg].apply _)(func)(UnaryArg._1)
           (HasWorkflow(a1).toOption |@|
             funcHandler(mf)) { (wb1, f) =>
             val exp: Unary[ExprOp] = createOp[UnaryArg](f)
             WB.expr1(wb1)(exp.eval)
           }
         case (func @ BinaryFunc(_, _, _, _, _, _, _), Sized(a1, a2)) if func.effect ≟ Mapping =>
-          val mf = MapFuncCore.translateBinaryMapping[Fix, BinaryArg](func)(BinaryArg._1, BinaryArg._2)
+          val mf = (MapFunc.translateBinaryMapping[Fix, MapFunc[Fix, ?], BinaryArg] _)(func)(BinaryArg._1, BinaryArg._2)
           (HasWorkflow(a1).toOption |@|
             HasWorkflow(a2).toOption |@|
             funcHandler(mf)) { (wb1, wb2, f) =>
@@ -645,7 +647,7 @@ object MongoDbPlanner {
             WB.expr2(wb1, wb2)(exp.eval)
           }
         case (func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) if func.effect ≟ Mapping =>
-          val mf = MapFuncCore.translateTernaryMapping[Fix, TernaryArg](func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
+          val mf = (MapFunc.translateTernaryMapping[Fix, MapFunc[Fix, ?], TernaryArg] _)(func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
           (HasWorkflow(a1).toOption |@|
             HasWorkflow(a2).toOption |@|
             HasWorkflow(a3).toOption |@|
@@ -764,6 +766,7 @@ object MongoDbPlanner {
       })
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def splitConditions: Ann => Option[List[(Ann, Ann)]] = _.tail match {
       case InvokeUnapply(relations.And, terms) =>
         terms.unsized.traverse(splitConditions).map(_.concatenate)
@@ -824,6 +827,7 @@ object MongoDbPlanner {
         // NB: Even if certain checks aren’t needed by ExprOps, we have to
         //     maintain them because we may convert ExprOps to JS.
         //     Hopefully BlackShield will eliminate the need for this.
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def exprCheck: Type => Option[Fix[ExprOp] => Fix[ExprOp]] =
           generateTypeCheck[Fix[ExprOp], Fix[ExprOp]]($or(_, _)) {
             case Type.Null => check.isNull//((expr: Fix[ExprOp]) => $eq($literal(Bson.Null), expr))
@@ -900,6 +904,7 @@ object MongoDbPlanner {
       condA.contains(tableA) && condB.contains(tableB) &&
         condA.all(_ ≠ tableB) && condB.all(_ ≠ tableA)
 
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def alignCondition(lt: Fix[LP], rt: Fix[LP]):
         Fix[LP] => OutputM[Fix[LP]] =
       _.unFix match {
@@ -967,7 +972,7 @@ object MongoDbPlanner {
   }
 
   def plan0[WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-    (joinHandler: JoinHandler[WF, WorkflowBuilder.M], funcHandler: MapFuncCore[Fix, ?] ~> OptionFree[EX, ?])
+    (joinHandler: JoinHandler[WF, WorkflowBuilder.M], funcHandler: MapFunc[Fix, ?] ~> OptionFree[EX, ?])
     (logical: Fix[LP])
     (implicit
       ev0: WorkflowOpCoreF :<: WF,
@@ -1027,15 +1032,15 @@ object MongoDbPlanner {
         val joinHandler = JoinHandler.fallback(
           JoinHandler.pipeline[Workflow3_2F](queryContext.statistics, queryContext.indexes),
           JoinHandler.mapReduce[Workflow3_2F])
-        plan0[Workflow3_2F, Expr3_2](joinHandler, FuncHandler.handle3_2[MapFuncCore[Fix, ?]])(logical)
+        plan0[Workflow3_2F, Expr3_2](joinHandler, FuncHandler.handle3_2[MapFunc[Fix, ?]])(logical)
 
       case `3.0` =>
         val joinHandler = JoinHandler.mapReduce[Workflow2_6F]
-        plan0[Workflow2_6F, Expr3_0](joinHandler, FuncHandler.handle3_0[MapFuncCore[Fix, ?]])(logical).map(_.inject[WorkflowF])
+        plan0[Workflow2_6F, Expr3_0](joinHandler, FuncHandler.handle3_0[MapFunc[Fix, ?]])(logical).map(_.inject[WorkflowF])
 
       case _     =>
         val joinHandler = JoinHandler.mapReduce[Workflow2_6F]
-        plan0[Workflow2_6F, Expr2_6](joinHandler, FuncHandler.handle2_6[MapFuncCore[Fix, ?]])(logical).map(_.inject[WorkflowF])
+        plan0[Workflow2_6F, Expr2_6](joinHandler, FuncHandler.handle2_6[MapFunc[Fix, ?]])(logical).map(_.inject[WorkflowF])
     }
   }
 }

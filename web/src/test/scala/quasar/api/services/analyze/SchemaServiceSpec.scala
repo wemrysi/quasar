@@ -78,7 +78,7 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
     if (i > 0) -i else i
 
   def sstResponse(dataset: Vector[Data], cfg: analysis.CompressionSettings): Json = {
-    type P[X] = StructuralType[J, Option[X]]
+    type P[X] = StructuralType[J, X]
 
     Process.emitAll(dataset)
       .pipe(analysis.extractSchema[J, Double](cfg))
@@ -202,7 +202,7 @@ object SchemaServiceSpec {
     }
 
   val runMounting: Task[Mounting ~> ResponseOr] =
-    KeyValueStore.impl.empty[APath, MountConfig] map { eval =>
+    KeyValueStore.impl.default[APath, MountConfig] map { eval =>
       liftMT[Task, ResponseT] compose foldMapNT(eval) compose Mounter.trivial[MountConfigs]
     }
 

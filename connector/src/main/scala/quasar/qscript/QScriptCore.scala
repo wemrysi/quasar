@@ -149,6 +149,7 @@ object ReduceIndex {
 object QScriptCore {
   implicit def equal[T[_[_]]: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
     new Delay[Equal, QScriptCore[T, ?]] {
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](eq: Equal[A]) =
         Equal.equal {
           case (Map(a1, f1), Map(a2, f2)) => f1 ≟ f2 && eq.equal(a1, a2)
@@ -186,6 +187,7 @@ object QScriptCore {
 
   implicit def show[T[_[_]]: ShowT]: Delay[Show, QScriptCore[T, ?]] =
     new Delay[Show, QScriptCore[T, ?]] {
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](s: Show[A]): Show[QScriptCore[T, A]] =
         Show.show {
           case Map(src, mf) => Cord("Map(") ++
@@ -228,9 +230,10 @@ object QScriptCore {
         new RenderTree[QScriptCore[T, A]] {
           val nt = List("QScriptCore")
 
+          @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
           def nested[A: RenderTree](label: String, a: A) =
             NonTerminal(label :: nt, None, a.render :: Nil)
-
+          @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
           def render(v: QScriptCore[T, A]) =
             v match {
               case Map(src, f) =>
@@ -335,13 +338,13 @@ object QScriptCore {
 
             val idAccess: IdStatus => JoinFunc[IT] = {
               case ExcludeId =>
-                Free.roll(MapFuncsCore.ProjectIndex[IT, JoinFunc[IT]](
+                Free.roll(MFC(MapFuncsCore.ProjectIndex[IT, JoinFunc[IT]](
                   RightSideF[IT],
-                  MapFuncsCore.IntLit[IT, JoinSide](1)))
+                  MapFuncsCore.IntLit[IT, JoinSide](1))))
               case IdOnly =>
-                Free.roll(MapFuncsCore.ProjectIndex[IT, JoinFunc[IT]](
+                Free.roll(MFC(MapFuncsCore.ProjectIndex[IT, JoinFunc[IT]](
                   RightSideF[IT],
-                  MapFuncsCore.IntLit[IT, JoinSide](0)))
+                  MapFuncsCore.IntLit[IT, JoinSide](0))))
               case IncludeId => RightSideF
             }
 

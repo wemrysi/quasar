@@ -2,12 +2,11 @@
     "name": "filter on time_of_day (MongoDB)",
 
     "backends": {
-        "mimir":"pending",
+        "mimir":"skip",
         "couchbase":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
         "mongodb_q_3_2":     "pending",
-        "postgresql":        "skip",
         "spark_local":       "skip",
         "spark_hdfs":        "skip"
     },

@@ -29,7 +29,7 @@ import scalaz._
 import scalaz.syntax.monad._
 
 import java.nio.CharBuffer
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
 // TODO: define better upper/lower bound methods, better comparisons,
 // better names, better everything!
@@ -140,7 +140,7 @@ trait TableModule[M[+ _]] extends TransSpecModule {
     def constLong(v: Set[Long]): Table
     def constDouble(v: Set[Double]): Table
     def constDecimal(v: Set[BigDecimal]): Table
-    def constDate(v: Set[LocalDateTime]): Table
+    def constDate(v: Set[ZonedDateTime]): Table
     def constBoolean(v: Set[Boolean]): Table
     def constNull: Table
 
@@ -217,6 +217,17 @@ trait TableModule[M[+ _]] extends TransSpecModule {
       * a single table.
       */
     def cross(that: Table)(spec: TransSpec2): Table
+
+    /**
+      * Performs a dimensional pivot on any array or object values at the given
+      * focus.  We can view the focus as a form of lens: the structure at the
+      * focus is pivoted, while everything *around* the focus is left untouched.
+      * Usually, this results in data being duplicated, since the resulting
+      * number of rows will be greater-than or equal-to the input number of rows,
+      * provided that the focus does indeed refer to arrays/objects and those
+      * structures are non-empty.
+      */
+    def leftShift(focus: CPath): Table
 
     /**
       * Force the table to a backing store, and provice a restartable table

@@ -27,7 +27,7 @@ import quasar.fp._, free._
 import quasar.frontend.logicalplan
 import quasar.fs._
 import quasar.fs.impl.DataStream
-import quasar.fs.mount._, FileSystemDef.{DefinitionError, DefErrT}
+import quasar.fs.mount._, BackendDef.{DefinitionError, DefErrT}
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc.{AsContent, provideSession}
 import quasar.physical.marklogic.xquery.PrologT
@@ -129,10 +129,10 @@ package object fs {
       })
 
     val runFs = (
-      KeyValueStore.impl.empty[WriteHandle, AFile]          |@|
-      KeyValueStore.impl.empty[ReadHandle, XccDataStream]   |@|
-      KeyValueStore.impl.empty[ResultHandle, XccDataStream] |@|
-      MonotonicSeq.fromZero                                 |@|
+      KeyValueStore.impl.default[WriteHandle, AFile]          |@|
+      KeyValueStore.impl.default[ReadHandle, XccDataStream]   |@|
+      KeyValueStore.impl.default[ResultHandle, XccDataStream] |@|
+      MonotonicSeq.fromZero                                   |@|
       GenUUID.type4[Task]
     ).tupled.map { case (whandles, rhandles, qhandles, seq, genUUID) =>
       contentSource flatMapF { cs =>
