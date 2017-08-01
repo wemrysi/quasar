@@ -81,6 +81,10 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   import PATypes._
 
   type IndexMapping = ScalaMap[BigInt, BigInt]
+  type EitherMap[A] = FreeMapA[A \/ A]
+
+  // NB: Neded due to how the type parameters of CoEnv are ordered.
+  private val cbf = Bifunctor[CoEnv[?, MapFunc, ?]]
 
   /** Returns `None` if a non-static non-integer index was found.
     * Else returns all indices of the form `ProjectIndex(SrcHole, IntLit(_))`.
@@ -110,50 +114,74 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     func.para(findIndices)
   }
 
-  private def remapResult[A](hole: FreeMapA[A], mapping: IndexMapping, idx: BigInt):
-      CoEnvMapA[A, FreeMapA[A]] = {
-    val x = MFC(ProjectIndex[T, FreeMapA[A]](
-      hole,
-      IntLit(mapping.get(idx).getOrElse(idx))))
+  /** NB: The lhs of the disjunction allows us to ensure we only remove a single
+    *     layer of a nested projection of the same index, like
+    *
+    *     ProjectIndex(
+    *       ProjectIndex(
+    *         Hole,
+    *         Int(1))
+    *       Int(1))
+    *
+    *     without this extra bit of state, rewriting the inner project to just `Hole` would
+    *     also end up rewriting the outer project during the next step of the fold as
+    *     it would then match the ProjectIndex(Hole, Int(i)) pattern we look for.
+    */
+  private def remapResult[A](hole: A, mapping: IndexMapping, idx: BigInt):
+      CoEnvMapA[A \/ A, EitherMap[A]] = {
 
-    CoEnv[A, MapFunc, FreeMapA[A]](x.right[A])
+    def mkPrj(i: BigInt) =
+      CoEnv(MFC(ProjectIndex[T, EitherMap[A]](
+        CoEnv(hole.right[A].left[MapFunc[EitherMap[A]]]).embed,
+        IntLit(i))).right[A \/ A])
+
+    mapping.get(idx).fold(mkPrj(idx)) { i =>
+      if (i === 0 && mapping.size === 1)
+        CoEnv(hole.left[A].left)
+      else
+        mkPrj(i)
+    }
   }
 
   /** Remap all indices in `func` in structures like
     * `ProjectIndex(SrcHole, IntLit(_))` according to the provided `mapping`.
     */
   def remapIndicesInFunc(func: FreeMap, mapping: IndexMapping): FreeMap =
-    func.transCata[FreeMap] {
-      case CoEnv(\/-(MFC(ProjectIndex(hole @ Embed(CoEnv(-\/(SrcHole))), IntLit(idx))))) =>
-        remapResult[Hole](hole, mapping, idx)
-      case co => co
-    }
+    func.transCata[EitherMap[Hole]] {
+      case CoEnv(\/-(MFC(ProjectIndex(Embed(CoEnv(-\/(\/-(SrcHole)))), IntLit(idx))))) =>
+        remapResult[Hole](SrcHole, mapping, idx)
+      case co => cbf.leftMap(co)(_.right[Hole])
+    } map (_.merge)
 
   def remapIndicesInJoinFunc(func: JoinFunc, lMapping: IndexMapping, rMapping: IndexMapping): JoinFunc =
-    func.transCata[JoinFunc] {
-      case CoEnv(\/-(MFC(ProjectIndex(side @ Embed(CoEnv(-\/(LeftSide))), IntLit(idx))))) =>
-        remapResult[JoinSide](side, lMapping, idx)
-      case CoEnv(\/-(MFC(ProjectIndex(side @ Embed(CoEnv(-\/(RightSide))), IntLit(idx))))) =>
-        remapResult[JoinSide](side, rMapping, idx)
-      case co => co
-    }
+    func.transCata[EitherMap[JoinSide]] {
+      case CoEnv(\/-(MFC(ProjectIndex(Embed(CoEnv(-\/(\/-(LeftSide)))), IntLit(idx))))) =>
+        remapResult[JoinSide](LeftSide, lMapping, idx)
+      case CoEnv(\/-(MFC(ProjectIndex(Embed(CoEnv(-\/(\/-(RightSide)))), IntLit(idx))))) =>
+        remapResult[JoinSide](RightSide, rMapping, idx)
+      case co => cbf.leftMap(co)(_.right[JoinSide])
+    } map (_.merge)
 
   def remapIndicesInLeftShift[A](struct: FreeMap, repair: JoinFunc, mapping: IndexMapping): JoinFunc =
-    repair.transCata[JoinFunc] {
-      case CoEnv(\/-(MFC(ProjectIndex(hole @ Embed(CoEnv(-\/(LeftSide))), IntLit(idx))))) =>
-        remapResult[JoinSide](hole, mapping, idx)
-      case CoEnv(\/-(MFC(ProjectIndex(hole @ Embed(CoEnv(-\/(RightSide))), IntLit(idx))))) if struct ≟ HoleF =>
-        remapResult[JoinSide](hole, mapping, idx)
-      case co => co
-    }
+    repair.transCata[EitherMap[JoinSide]] {
+      case CoEnv(\/-(MFC(ProjectIndex(Embed(CoEnv(-\/(\/-(LeftSide)))), IntLit(idx))))) =>
+        remapResult[JoinSide](LeftSide, mapping, idx)
+      case CoEnv(\/-(MFC(ProjectIndex(Embed(CoEnv(-\/(\/-(RightSide)))), IntLit(idx))))) if struct ≟ HoleF =>
+        remapResult[JoinSide](RightSide, mapping, idx)
+      case co => cbf.leftMap(co)(_.right[JoinSide])
+    } map (_.merge)
 
-  /** Prune the provided `array` keeping only the indices in `indicesToKeep`. */
+  /** Prune the provided `array` keeping only the indices in `indicesToKeep`,
+    * eliding it alltogether if only a single element is retained.
+    */
   def rewriteRepair[A](repair: FreeMapA[A], seen: SeenIndices): Option[FreeMapA[A]] =
-    repair.project match {
+    repair.project.some collect {
       case StaticArray(array) =>
         val rewrite = new quasar.qscript.Rewrite[T]
-        rewrite.rebuildArray[A](seen.map(_.toInt).toList.sorted ∘ array).some
-      case _ => none
+        rewrite.rebuildArray[A](seen.map(_.toInt).toList.sorted ∘ array) match {
+          case Embed(CoEnv(\/-(MFC(MakeArray(a))))) => a
+          case other                                => other
+        }
     }
 
   // TODO currently we only rewrite the branch if it is precisely a LeftShift
@@ -475,10 +503,10 @@ object PruneArrays {
     }
 }
 
-class PAFindRemap[T[_[_]]: BirecursiveT, F[_]: Functor] {
+class PAFindRemap[T, F[_]: Functor](implicit P: PruneArrays[F]) {
   import PATypes._
 
-  type ArrayEnv[G[_], A] = EnvT[RewriteState, G, A]
+  type ArrayEnv[A] = EnvT[RewriteState, F, A]
 
   /** Given an input, we accumulate state and annotate the focus.
     *
@@ -489,14 +517,13 @@ class PAFindRemap[T[_[_]]: BirecursiveT, F[_]: Functor] {
     * If the focus is an array that can be pruned, the annotatation is set to
     * the state. Else the annotation is set to `None`.
     */
-  def findIndices[S[_[_]], M[_], F[_], G[_]: Functor](
+  def findIndices[M[_]](
     implicit
-      R: Recursive.Aux[S[F], G],
-      M: MonadState[M, RewriteState],
-      P: PruneArrays[G])
-      : CoalgebraM[M, ArrayEnv[G, ?], S[F]] = sf => {
-    val gsf: G[S[F]] = sf.project
-    P.find(gsf) ∘ (newEnv => EnvT((newEnv, gsf)))
+      R: Recursive.Aux[T, F],
+      M: MonadState[M, RewriteState])
+      : CoalgebraM[M, ArrayEnv, T] = t => {
+    val ft: F[T] = t.project
+    P.find(ft) ∘ (newEnv => EnvT((newEnv, ft)))
   }
 
   /** Given an annotated input, we produce an output with state.
@@ -506,13 +533,12 @@ class PAFindRemap[T[_[_]]: BirecursiveT, F[_]: Functor] {
     * If an array has an associated environment, we update the state
     * to be the environment and prune the array.
     */
-  def remapIndices[S[_[_]], M[_], F[_], G[_]: Functor](
+  def remapIndices[M[_]](
     implicit
-      C: Corecursive.Aux[S[F], G],
-      M: MonadState[M, RewriteState],
-      P: PruneArrays[G])
-      : AlgebraM[M, ArrayEnv[G, ?], S[F]] = arrenv => {
-    val (env, gsf): (RewriteState, G[S[F]]) = arrenv.run
-    P.remap(env, gsf) ∘ (_.embed)
+      C: Corecursive.Aux[T, F],
+      M: MonadState[M, RewriteState])
+      : AlgebraM[M, ArrayEnv, T] = arrenv => {
+    val (env, ft): (RewriteState, F[T]) = arrenv.run
+    P.remap(env, ft) ∘ (_.embed)
   }
 }

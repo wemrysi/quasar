@@ -350,35 +350,36 @@ package object qscript {
       Injectable.inject[F, QScriptTotal[T, ?]],
       Injectable.inject[G, QScriptTotal[T, ?]])
 
-  private def pruneArrays0[T[_[_]]: BirecursiveT, S[_[_]], F[_], G[_]: Traverse](
+  private def pruneArrays0[T, F[_]: Traverse](
     state: PATypes.RewriteState)(
     implicit
-      R: Recursive.Aux[S[F], G],
-      C: Corecursive.Aux[S[F], G],
-      P: PruneArrays[G])
-      : S[F] => S[F] = {
-    val pa = new PAFindRemap[T, G]
-    _.hyloM[State[PATypes.RewriteState, ?], pa.ArrayEnv[G, ?], S[F]](
-      pa.remapIndices[S, State[PATypes.RewriteState, ?], F, G],
-      pa.findIndices[S, State[PATypes.RewriteState, ?], F, G]).run(state)._2
+      R: Recursive.Aux[T, F],
+      C: Corecursive.Aux[T, F],
+      P: PruneArrays[F])
+      : T => T = {
+    val pa = new PAFindRemap[T, F]
+    _.hyloM[State[PATypes.RewriteState, ?], pa.ArrayEnv, T](
+      pa.remapIndices[State[PATypes.RewriteState, ?]],
+      pa.findIndices[State[PATypes.RewriteState, ?]]
+    ).eval(state)
   }
 
-  private def pruneArrays[T[_[_]]: BirecursiveT, S[_[_]], F[_], G[_]: Traverse](
+  private def pruneArrays[T, F[_]: Traverse](
     implicit
-      R: Recursive.Aux[S[F], G],
-      C: Corecursive.Aux[S[F], G],
-      P: PruneArrays[G])
-      : S[F] => S[F] =
-    pruneArrays0[T, S, F, G](PATypes.Ignore)
+      R: Recursive.Aux[T, F],
+      C: Corecursive.Aux[T, F],
+      P: PruneArrays[F])
+      : T => T =
+    pruneArrays0[T, F](PATypes.Ignore)
 
   implicit final class BirecursiveOps[T[_[_]], F[_]](val self: T[F]) extends scala.AnyVal {
     final def pruneArraysF(
       implicit
         T: BirecursiveT[T],
-        PA: PruneArrays[F],
-        TF: Traverse[F])
+        P: PruneArrays[F],
+        F: Traverse[F])
         : T[F] =
-      pruneArrays[T, T, F, F].apply(self)
+      pruneArrays[T[F], F].apply(self)
   }
 
   implicit final class FreeQSOps[T[_[_]]](val self: FreeQS[T]) extends scala.AnyVal {
@@ -386,10 +387,9 @@ package object qscript {
       state: PATypes.RewriteState)(
       implicit
         T: BirecursiveT[T],
-        PA: PruneArrays[CoEnvQS[T, ?]],
-        TF: Traverse[CoEnvQS[T, ?]])
+        P: PruneArrays[CoEnvQS[T, ?]])
         : FreeQS[T] =
-      pruneArrays0[T, Free[?[_], Hole], QScriptTotal[T, ?], CoEnvQS[T, ?]](state).apply(self)
+      pruneArrays0[FreeQS[T], CoEnvQS[T, ?]](state).apply(self)
   }
 }
 

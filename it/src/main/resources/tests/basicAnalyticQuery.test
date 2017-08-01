@@ -4,8 +4,8 @@
         "couchbase":         "ignoreFieldOrder",
         "marklogic_json":    "ignoreFieldOrder",
         "mimir":             "pending",
-        "mongodb_2_6":       "pending",
-        "mongodb_3_0":       "pending",
+        "mongodb_2_6":       "ignoreResultOrder",
+        "mongodb_3_0":       "ignoreResultOrder",
         "mongodb_read_only": "ignoreResultOrder"
     },
     "data": "zips.data",
