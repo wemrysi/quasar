@@ -87,12 +87,12 @@ private[qscript] final class FilterPlanner[
   private def anyDocument[T[_[_]]: BirecursiveT, Q](q: Q)(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
   ): Boolean = {
-    val f: Algebra[Query[T[EJson], ?], Boolean] = {
-      case Query.Document(_) => true
-      case other             => false
+    val f: AlgebraM[Option, Query[T[EJson], ?], Q] = {
+      case Query.Document(_) => none
+      case other             => Q.embed(other).some
     }
 
-    Q.cata(q)(f)
+    Q.cataM(q)(f).isDefined
   }
 
   private object PathProjection {

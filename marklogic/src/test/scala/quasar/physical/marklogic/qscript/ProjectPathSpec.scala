@@ -30,44 +30,44 @@ import pathy._, Path._
 import scalaz._, Scalaz._
 
 final class ProjectPathSpec extends quasar.Qspec {
-  def projectField0[T[_[_]]: BirecursiveT, S[_]: Functor](src: Free[MapFunc[T, ?], Hole], str: String)(
-    implicit I: MapFunc[T, ?] :<: S
+  def projectField[S[_]: Functor](src: Free[MapFunc[Fix, ?], Hole], str: String)(
+    implicit I: MapFunc[Fix, ?] :<: S
   ): Free[S, Hole] =
-    Free.roll[MapFunc[T, ?], Hole](MFC(ProjectField(src, StrLit(str)))).mapSuspension(injectNT[MapFunc[T, ?], S])
+    Free.roll[MapFunc[Fix, ?], Hole](MFC(ProjectField(src, StrLit(str)))).mapSuspension(injectNT[MapFunc[Fix, ?], S])
 
-  def makeMap[T[_[_]]: BirecursiveT, S[_]: Functor](key: String, values: Free[MapFunc[T, ?], Hole])(
-    implicit I: MapFunc[T, ?] :<: S
+  def makeMap[S[_]: Functor](key: String, values: Free[MapFunc[Fix, ?], Hole])(
+    implicit I: MapFunc[Fix, ?] :<: S
   ) : Free[S, Hole] =
-    Free.roll[MapFunc[T, ?], Hole](MFC(MakeMap(StrLit(key), values))).mapSuspension(injectNT[MapFunc[T, ?], S])
+    Free.roll[MapFunc[Fix, ?], Hole](MFC(MakeMap(StrLit(key), values))).mapSuspension(injectNT[MapFunc[Fix, ?], S])
 
-  def holeS[T[_[_]]: BirecursiveT, S[_]: Functor](implicit I: MapFunc[T, ?] :<: S): Free[S, Hole] =
-    Free.point[MapFunc[T, ?], Hole](SrcHole).mapSuspension(injectNT[MapFunc[T, ?], S])
+  def hole[S[_]: Functor](
+    implicit I: MapFunc[Fix, ?] :<: S
+  ): Free[S, Hole] =
+    Free.point[MapFunc[Fix, ?], Hole](SrcHole).mapSuspension(injectNT[MapFunc[Fix, ?], S])
 
-  def projectPath[T[_[_]]: BirecursiveT](src: FreePathMap[T], path: ADir): FreePathMap[T] =
-    Free.roll(Inject[ProjectPath, PathMapFunc[T, ?]].inj(ProjectPath(src, path)))
+  def projectPath(src: FreePathMap[Fix], path: ADir): FreePathMap[Fix] =
+    Free.roll(Inject[ProjectPath, PathMapFunc[Fix, ?]].inj(ProjectPath(src, path)))
 
-  def projectField(src: FreeMap[Fix], str: String): FreeMap[Fix] =
-    projectField0[Fix, MapFunc[Fix, ?]](src, str)
-
-  def makeMapPath(key: String, values: Free[MapFunc[Fix, ?], Hole]): FreePathMap[Fix] =
-    makeMap[Fix, PathMapFunc[Fix, ?]](key, values)
-
-  def holeM = holeS[Fix, MapFunc[Fix, ?]]
-  def holeP = holeS[Fix, PathMapFunc[Fix, ?]]
+  val root = rootDir[Sandboxed]
 
   "foldProjectField" should {
     "squash nested ProjectField of strings into a single ProjectPath" in {
-      val nestedProjects = projectField(projectField(holeM, "info"), "location")
+      val nestedProjects = projectField[MapFunc[Fix, ?]](projectField(hole, "info"), "location")
 
       ProjectPath.foldProjectField(nestedProjects) must
-        equal(projectPath[Fix](holeP, rootDir[Sandboxed] </> dir("info") </> dir("location")))
+        equal(projectPath(hole, root </> dir("info") </> dir("location")))
+    }
+
+    "fold a single ProjectField into a single ProjectPath" in {
+      ProjectPath.foldProjectField(projectField[MapFunc[Fix, ?]](hole, "location")) must
+        equal(projectPath(hole, root </> dir("location")))
     }
 
     "preserve an unrelated node inside a nesting of ProjectField" in {
-      val inclUnrelatedNode = projectField(makeMap("k", projectField(holeM, "info")), "location")
+      val inclUnrelatedNode = projectField[MapFunc[Fix, ?]](makeMap("k", projectField(hole, "info")), "location")
 
       ProjectPath.foldProjectField(inclUnrelatedNode) must
-        equal(projectPath[Fix](makeMapPath("k", projectField0(holeM, "info")), rootDir[Sandboxed] </> dir("location")))
+        equal(projectPath(makeMap("k", projectField(hole, "info")), root </> dir("location")))
     }
   }
 }
