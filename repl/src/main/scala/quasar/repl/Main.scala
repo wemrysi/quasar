@@ -50,18 +50,14 @@ object Main {
   type DriverEffM[A] = Free[DriverEff, A]
 
   private def driver(f: Command => Free[DriverEff, Unit]): Task[Unit] = {
-    def shutdownConsole(c: Console): Task[Unit] =
-      Task.delay(c.getShell.out.println("Exiting...")) >>
-      Task.delay(c.stop)
-
-    Task delay {
+    val runConsole = Task.async[Console] { callback =>
       val console =
         new Console(new SettingsBuilder()
           .parseOperators(false)
           .enableExport(false)
           .interruptHook(new InterruptHook {
             def handleInterrupt(console: Console, action: Action) =
-              shutdownConsole(console).unsafePerformSync
+              callback(console.right)
           })
           .create())
 
@@ -76,7 +72,7 @@ object Main {
         override def execute(input: ConsoleOperation): Int = {
           Command.parse(input.getBuffer.trim) match {
             case Command.Exit =>
-              shutdownConsole(console).unsafePerformSync
+              callback(console.right)
 
             case command      =>
               f(command).foldMap(i).run.unsafePerformSync.valueOr(
@@ -90,6 +86,8 @@ object Main {
 
       ()
     }
+
+    runConsole.flatMap(c => Task.delay(c.getShell.out.println("Exiting...")).onFinish(_ => Task.delay(c.stop)))
   }
 
   type ReplEff[S[_], A] = (
