@@ -20,8 +20,9 @@ import slamdata.Predef._
 
 import quasar.contrib.pathy._
 import quasar.fp.ski._
+import quasar.physical.marklogic.cts.ComparisonOp
 import quasar.qscript._
-import quasar.qscript.MapFuncsCore._
+import quasar.qscript.{MapFuncsCore => MFCore}
 
 import matryoshka.data.Fix
 import org.scalacheck.{Arbitrary, Gen}, Arbitrary.arbitrary
@@ -31,17 +32,45 @@ import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 
 final class FilterPlannerSpec extends quasar.Qspec {
+  val comparisons = List(ComparisonOp.EQ , ComparisonOp.NE , ComparisonOp.LT , ComparisonOp.LE , ComparisonOp.GT , ComparisonOp.GE)
 
   def projectField(src: FreeMap[Fix], str: String): FreeMap[Fix] =
-    Free.roll(MFC(ProjectField(src, StrLit(str))))
+    Free.roll(MFC(MFCore.ProjectField(src, MFCore.StrLit(str))))
 
-  implicit val arbNestedProject: Gen[(ADir, FreeMap[Fix])] =
+  def makeComp(op: ComparisonOp, src: FreeMap[Fix], str: String): FreeMap[Fix] = {
+    val searchExpr = MFCore.StrLit[Fix, Hole](str)
+
+    Free.roll(MFC(op match {
+      case ComparisonOp.EQ => MFCore.Eq(src, searchExpr)
+      case ComparisonOp.NE => MFCore.Neq(src,searchExpr)
+      case ComparisonOp.LT => MFCore.Lt(src, searchExpr)
+      case ComparisonOp.LE => MFCore.Lte(src,searchExpr)
+      case ComparisonOp.GT => MFCore.Gt(src, searchExpr)
+      case ComparisonOp.GE => MFCore.Gte(src,searchExpr)
+    }))
+  }
+
+  case class ProjectTestCase(fm: FreeMap[Fix], path: ADir, op: ComparisonOp)
+
+  val genNestedProject: Gen[(FreeMap[Fix], ADir)] =
     for {
-      dir0 <- arbitrary[ADir]
-      nested = flatten("/", ".", "..", ι, ι, dir0)
-        .foldLeft(projectField(HoleF, "/"))((prj: FreeMap[Fix], nxt: String) => projectField(prj, nxt))
-    } yield (dir0, nested)
+      dir0  <- arbitrary[ADir]
+      first <- Gen.alphaStr
+      path = rebaseA(rootDir[Sandboxed] </> dir(first))(dir0)
+      nested = flatten(first, ".", "..", ι, ι, dir0).tail.foldLeft(
+        projectField(HoleF, first))((prj: FreeMap[Fix], nxt: String) => projectField(prj, nxt))
+    } yield (nested, path)
 
+  val genProjectTestCase: Gen[ProjectTestCase] =
+    for {
+      projection <- genNestedProject
+      searchExpr <- Gen.alphaStr
+      (nested, dir0) = projection
+      op <- Gen.oneOf(comparisons)
+    } yield ProjectTestCase(makeComp(op, nested, searchExpr), dir0, op)
+
+  implicit val arbProjectTestCase: Arbitrary[ProjectTestCase] =
+    Arbitrary(genProjectTestCase)
 
   "plan" >> {
     "fallback to non-indexed search when search expression is XQuery" >> {
@@ -53,21 +82,28 @@ final class FilterPlannerSpec extends quasar.Qspec {
   }
 
   "StarIndexPlanner" >> {
-    "search expression includes * and projection path" >> prop { prj: (ADir, FreeMap[Fix]) =>
+    "search expression includes * and projection path" >> prop { prj: ProjectTestCase =>
+      import scala.Predef.implicitly
+      import quasar.RenderTree
+
+      val rt = implicitly[RenderTree[FreeMap[Fix]]]
+      println(prettyPrint(prj.path))
+      println(rt.render(prj.fm).shows)
+
       1 must_== 1
     }
   }
   "PathIndexPlanner" >> {
-    "plan with path indexes using any comparison operator" >> prop { prj: (ADir, FreeMap[Fix]) =>
+    "plan with path indexes using any comparison operator" >> prop { prj: ProjectTestCase =>
       1 must_== 1
     }
   }
   "ElementIndexPlanner" >> {
-    "add a predicate to search expression when there's none" >> prop { prj: (ADir, FreeMap[Fix]) =>
+    "add a predicate to search expression when there's none" >> prop { prj: ProjectTestCase =>
       1 must_== 1
     }
 
-    "fallback to non-indexed search when there's already a predicate on the search expression" >> prop { prj: (ADir, FreeMap[Fix]) =>
+    "fallback to non-indexed search when there's already a predicate on the search expression" >> prop { prj: ProjectTestCase =>
       1 must_== 1
     }
   }
