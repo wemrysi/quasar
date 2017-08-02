@@ -45,12 +45,13 @@ package object hdfs {
 
   val FsType = FileSystemType("spark-hdfs")
 
-  type EffM1[A] = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
-  type Eff0[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], EffM1, A]
-  type Eff1[A] = Coproduct[KeyValueStore[WriteHandle, HdfsWriteCursor, ?], Eff0, A]
-  type Eff2[A] = Coproduct[Task, Eff1, A]
-  type Eff3[A] = Coproduct[PhysErr, Eff2, A]
-  type Eff[A]  = Coproduct[MonotonicSeq, Eff3, A]
+  type Eff1[A]  = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
+  type Eff2[A]  = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Eff1, A]
+  type Eff3[A]  = Coproduct[KeyValueStore[WriteHandle, HdfsWriteCursor, ?], Eff2, A]
+  type Eff4[A]  = Coproduct[Task, Eff3, A]
+  type Eff5[A]  = Coproduct[PhysErr, Eff4, A]
+  type Eff6[A]  = Coproduct[MonotonicSeq, Eff5, A]
+  type Eff[A]   = Coproduct[SparkConnectorDetails, Eff6, A]
 
   final case class SparkFSConf(sparkConf: SparkConf, hdfsUriStr: String, prefix: ADir)
 
@@ -150,13 +151,19 @@ package object hdfs {
       ) {
       // TODO better names!
       (genState, rddStates, sparkCursors, writeCursors) =>
-      val interpreter: Eff ~> S = (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
+
+      def detailsInterpreter: SparkConnectorDetails ~> Task = ???
+
+      val interpreter: Eff ~> S =
+        (detailsInterpreter andThen injectNT[Task, S]) :+:
+        (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:
       (KeyValueStore.impl.fromTaskRef[WriteHandle, HdfsWriteCursor](writeCursors) andThen injectNT[Task, S])  :+:
       (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[Task, S]) :+:
       (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
       (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
+
 
       SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
     }).into[S]

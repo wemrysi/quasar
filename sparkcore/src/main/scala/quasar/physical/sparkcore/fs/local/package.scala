@@ -39,12 +39,13 @@ package object local {
 
   val FsType = FileSystemType("spark-local")
 
-  type EffM1[A] = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
-  type Eff0[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], EffM1, A]
-  type Eff1[A] = Coproduct[KeyValueStore[WriteHandle, PrintWriter, ?], Eff0, A]
-  type Eff2[A] = Coproduct[Task, Eff1, A]
-  type Eff3[A] = Coproduct[PhysErr, Eff2, A]
-  type Eff[A]  = Coproduct[MonotonicSeq, Eff3, A]
+  type Eff1[A]  = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
+  type Eff2[A]  = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Eff1, A]
+  type Eff3[A]  = Coproduct[KeyValueStore[WriteHandle, PrintWriter, ?], Eff2, A]
+  type Eff4[A]  = Coproduct[Task, Eff3, A]
+  type Eff5[A]  = Coproduct[PhysErr, Eff4, A]
+  type Eff6[A]  = Coproduct[MonotonicSeq, Eff5, A]
+  type Eff[A]   = Coproduct[SparkConnectorDetails, Eff6, A]
 
   final case class SparkFSConf(sparkConf: SparkConf, prefix: ADir)
 
@@ -76,7 +77,12 @@ package object local {
       TaskRef(Map.empty[WriteHandle, PrintWriter])
       ) {
       (genState, rddStates, sparkCursors, printWriters) =>
-      val interpreter: Eff ~> S = (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
+
+      def detailsInterpreter: SparkConnectorDetails ~> Task = ???
+
+      val interpreter: Eff ~> S =
+        (detailsInterpreter andThen injectNT[Task, S]) :+:
+      (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:
       (KeyValueStore.impl.fromTaskRef[WriteHandle, PrintWriter](printWriters) andThen injectNT[Task, S])  :+:
