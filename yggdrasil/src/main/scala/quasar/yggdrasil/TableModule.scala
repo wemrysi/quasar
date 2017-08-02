@@ -272,7 +272,21 @@ trait TableModule[M[+ _]] extends TransSpecModule {
 
     def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table]
 
-    def takeRange(startIndex: Long, numberToTake: Long): Table
+    @deprecated("use drop/take directly")
+    def takeRange(startIndex: Long, numberToTake: Long): Table = {
+      if (startIndex < 0 || numberToTake < 0)   // it's defined this way, for... reasons
+        Table.empty
+      else if (startIndex == 0)
+        take(numberToTake)
+      else if (numberToTake == Long.MaxValue)
+        drop(startIndex)
+      else
+        drop(startIndex).take(numberToTake)
+    }
+
+    def drop(count: Long): Table
+
+    def take(count: Long): Table
 
     def canonicalize(length: Int, maxLength0: Option[Int] = None): Table
 
