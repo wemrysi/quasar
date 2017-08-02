@@ -80,10 +80,10 @@ package object cassandra {
   private def sparkFsDef[S[_]](implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
-  ): SparkConf => Free[S, SparkFSDef[Eff, S]] = (sparkConf: SparkConf) => {
+  ): SparkFSConf => Free[S, SparkFSDef[Eff, S]] = (sfsc: SparkFSConf) => {
 
     val genSc = fetchSparkCoreJar.map { jar => 
-      val sc = new SparkContext(sparkConf)
+      val sc = new SparkContext(sfsc.sparkConf)
       sc.addJar(jar)
       sc
     }
