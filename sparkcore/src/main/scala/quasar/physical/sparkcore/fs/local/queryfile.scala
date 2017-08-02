@@ -25,6 +25,7 @@ import quasar.fs.FileSystemError._
 import quasar.contrib.pathy._
 import quasar.fp.ski._
 import quasar.fp.free._
+import quasar.physical.sparkcore.fs.{SparkConnectorDetails, FileExists}
 
 import java.io.{File, PrintWriter, FileOutputStream}
 import java.nio.file._
@@ -79,4 +80,14 @@ object queryfile {
   def input[S[_]](implicit
     S: Task :<: S
   ): Input[S] = Input[S](fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
+
+  def detailsInterpreter[S[_], G[_] : Monad](int: S ~> G)(implicit
+    S: Task :<: S
+  ): SparkConnectorDetails ~> G =
+    new (SparkConnectorDetails ~> G) {
+      def apply[A](from: SparkConnectorDetails[A]) = from match {
+        case FileExists(f) => fileExists[S](f).foldMap(int)
+      }
+    }
+
 }

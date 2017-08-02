@@ -78,10 +78,8 @@ package object local {
       ) {
       (genState, rddStates, sparkCursors, printWriters) =>
 
-      def detailsInterpreter: SparkConnectorDetails ~> Task = ???
-
       val interpreter: Eff ~> S =
-        (detailsInterpreter andThen injectNT[Task, S]) :+:
+        (queryfile.detailsInterpreter(injectNT[Task, Task]) andThen injectNT[Task, S]) :+:
       (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:
