@@ -39,7 +39,7 @@ private[qscript] final class ShiftedReadDirPlanner[F[_]: Applicative: MonadPlanE
         Search(
           Q.embed(Query.Directory[J, Q](IList(uri), MatchDepth.Children)),
           idStatus,
-          none
+          IList()
         ).left[XQuery].point[F],
         MonadPlanErr[F].raiseError(invalidUri(dirUri)))
   }

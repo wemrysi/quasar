@@ -95,15 +95,16 @@ final class FilterPlannerSpec extends quasar.Qspec {
   }
   "PathIndexPlanner" >> {
     "plan with path indexes using any comparison operator" >> prop { prj: ProjectTestCase =>
+
       1 must_== 1
     }
   }
   "ElementIndexPlanner" >> {
-    "add a predicate to search expression when there's none" >> prop { prj: ProjectTestCase =>
+    "add a predicate to search expression" >> prop { prj: ProjectTestCase =>
       1 must_== 1
     }
 
-    "fallback to non-indexed search when there's already a predicate on the search expression" >> prop { prj: ProjectTestCase =>
+    "concatenate predicates if there's already one" >> prop { prj: ProjectTestCase =>
       1 must_== 1
     }
   }

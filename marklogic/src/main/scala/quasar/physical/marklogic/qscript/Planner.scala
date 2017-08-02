@@ -85,7 +85,7 @@ sealed abstract class PlannerInstances0 extends PlannerInstances1 {
   ): Planner[F, FMT, Const[ShiftedRead[ADir], ?], J] =
     new ShiftedReadDirPlanner[F, FMT, J]
 
-  implicit def qScriptCore[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc, FMT: SearchOptions: FormatFilterPlanner, T[_[_]]: BirecursiveT: ShowT](
+  implicit def qScriptCore[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc, FMT: SearchOptions: FormatFilterPlanner, T[_[_]]: BirecursiveT](
     implicit
     SP : StructuralPlanner[F, FMT],
     QTP: Lazy[Planner[F, FMT, QScriptTotal[T, ?], T[EJson]]]
@@ -115,11 +115,11 @@ sealed abstract class PlannerInstances0 extends PlannerInstances1 {
   implicit def constShiftedReadFile[F[_]: MonadPlanErr, FMT, J]: Planner[F, FMT, Const[ShiftedRead[AFile], ?], J] =
     new UnreachablePlanner[F, FMT, Const[ShiftedRead[AFile], ?], J]("ShiftedRead[AFile]")
 
-  implicit def equiJoin[F[_]: MonadPlanErr, FMT, T[_[_]]]: Planner[F, FMT, EquiJoin[T, ?], T[EJson]] =
-    new UnreachablePlanner[F, FMT, EquiJoin[T, ?], T[EJson]]("EquiJoin")
+  implicit def equiJoin[F[_]: MonadPlanErr, FMT, T[_[_]], J]: Planner[F, FMT, EquiJoin[T, ?], J] =
+    new UnreachablePlanner[F, FMT, EquiJoin[T, ?], J]("EquiJoin")
 
-  implicit def projectBucket[F[_]: MonadPlanErr, FMT, T[_[_]]]: Planner[F, FMT, ProjectBucket[T, ?], T[EJson]] =
-    new UnreachablePlanner[F, FMT, ProjectBucket[T, ?], T[EJson]]("ProjectBucket")
+  implicit def projectBucket[F[_]: MonadPlanErr, FMT, T[_[_]], J]: Planner[F, FMT, ProjectBucket[T, ?], J] =
+    new UnreachablePlanner[F, FMT, ProjectBucket[T, ?], J]("ProjectBucket")
 }
 
 sealed abstract class PlannerInstances1 {

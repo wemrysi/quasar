@@ -39,7 +39,7 @@ import scalaz._, Scalaz._
 private[qscript] final class QScriptCorePlanner[
   F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
   FMT: SearchOptions: FormatFilterPlanner,
-  T[_[_]]: BirecursiveT: ShowT
+  T[_[_]]: BirecursiveT
 ](implicit
   QTP: Planner[F, FMT, QScriptTotal[T, ?], T[EJson]],
   SP : StructuralPlanner[F, FMT]
