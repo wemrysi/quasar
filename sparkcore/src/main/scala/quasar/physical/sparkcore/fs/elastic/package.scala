@@ -92,10 +92,10 @@ package object elastic {
     S0: Task :<: S,
     S1: PhysErr :<: S,
     FailOps: Failure.Ops[PhysicalError, S]
-  ): SparkConf => Free[S, SparkFSDef[Eff, S]] = (sparkConf: SparkConf) => {
+  ): SparkFSConf => Free[S, SparkFSDef[Eff, S]] = (sfsc: SparkFSConf) => {
 
     val genScWithJar: Free[S, String \/ SparkContext] = lift((for {
-      sc <- coreGenSc(sparkConf)
+      sc <- coreGenSc(sfsc.sparkConf)
       jar <- sparkCoreJar
     } yield {
       sc.addJar(posixCodec.printPath(jar))
