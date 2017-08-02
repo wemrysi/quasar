@@ -152,10 +152,8 @@ package object hdfs {
       // TODO better names!
       (genState, rddStates, sparkCursors, writeCursors) =>
 
-      def detailsInterpreter: SparkConnectorDetails ~> Task = ???
-
       val interpreter: Eff ~> S =
-        (detailsInterpreter andThen injectNT[Task, S]) :+:
+        (queryfile.detailsInterpreter(generateHdfsFS(sfsc), injectNT[Task, Task]) andThen injectNT[Task, S]) :+:
         (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:
@@ -163,7 +161,6 @@ package object hdfs {
       (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[Task, S]) :+:
       (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
       (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
-
 
       SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
     }).into[S]
