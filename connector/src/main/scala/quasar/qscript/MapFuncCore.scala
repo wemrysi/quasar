@@ -278,19 +278,53 @@ object MapFuncCore {
 
   /** Converts conditional `Undefined`s into conditions that can be used in a
     * `Filter`.
+    *
+    * Returns the extracted predicate, the defined expression extracted from the
+    * original condition and a function to extract the defined branch from other
+    * expressions containing the same conditional test as the original.
     */
-  def extractFilter[T[_[_]]: CorecursiveT, A](mf: FreeMapA[T, A])(test: A => Option[Hole])
-      : Option[(FreeMap[T], FreeMapA[T, A])] =
+  def extractFilter[T[_[_]]: BirecursiveT: EqualT, A: Equal](mf: FreeMapA[T, A])(test: A => Option[Hole])
+    : Option[(FreeMap[T], FreeMapA[T, A], FreeMapA[T, A] => Option[FreeMapA[T, A]])] =
     mf.resume.swap.toOption >>= {
       case MFC(Cond(c, e, Embed(CoEnv(\/-(MFC(Undefined())))))) =>
-        c.traverse(test) strengthR e
+        c.traverse(test) ∘ ((_, e, {
+          case Embed(CoEnv(\/-(MFC(Cond(c1, e1, Embed(CoEnv(\/-(MFC(Undefined()))))))))) =>
+            (c1 ≟ c) option e1
+
+          case _ => none
+        }))
+
       case MFC(Cond(c, Embed(CoEnv(\/-(MFC(Undefined())))), f)) =>
-        c.traverse(test) ∘ (h => (Free.roll(MFC(Not[T, FreeMap[T]](h))), f))
+        c.traverse(test) ∘ (h => (Free.roll(MFC(Not[T, FreeMap[T]](h))), f, {
+          case Embed(CoEnv(\/-(MFC(Cond(c1, Embed(CoEnv(\/-(MFC(Undefined())))), f1))))) =>
+            (c1 ≟ c) option f1
+
+          case _ => none
+        }))
+
       case MFC(Guard(c, t, e, Embed(CoEnv(\/-(MFC(Undefined())))))) =>
-        c.traverse(test) ∘
-          (h => (Free.roll(MFC(Guard(h, t, BoolLit[T, Hole](true), BoolLit[T, Hole](false)))), e))
+        c.traverse(test) ∘ (h => (
+          Free.roll(MFC(Guard(h, t, BoolLit[T, Hole](true), BoolLit[T, Hole](false)))),
+          e,
+          {
+            case Embed(CoEnv(\/-(MFC(Guard(c1, t1, e1, Embed(CoEnv(\/-(MFC(Undefined()))))))))) =>
+              (c1 ≟ c && t1 ≟ t) option e1
+
+            case _ => none
+          }
+        ))
+
       case MFC(Guard(c, t, Embed(CoEnv(\/-(MFC(Undefined())))), f)) =>
-        c.traverse(test) ∘ (h => (Free.roll(MFC(Guard(h, t, BoolLit[T, Hole](false), BoolLit[T, Hole](true)))), f))
+        c.traverse(test) ∘ (h => (
+          Free.roll(MFC(Guard(h, t, BoolLit[T, Hole](false), BoolLit[T, Hole](true)))),
+          f,
+          {
+            case Embed(CoEnv(\/-(MFC(Guard(c1, t1, Embed(CoEnv(\/-(MFC(Undefined())))), f1))))) =>
+              (c1 ≟ c && t1 ≟ t) option f1
+
+            case _ => none
+          }
+        ))
       case _ => none
     }
 

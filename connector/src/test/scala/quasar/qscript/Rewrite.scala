@@ -432,5 +432,163 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
 
       compactLeftShiftExpr(original) must equal(expected)
     }
+
+    "extract filter from join condition" >> {
+      "when guard is undefined in true branch" >> {
+        val original =
+          TJ.inj(ThetaJoin(
+            QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
+            Free.roll(MFC(Guard(
+              LeftSideF,
+              Type.AnyObject,
+              UndefinedR,
+              EqR(
+                ProjectFieldR(RightSideF, StrLit("r_id")),
+                ProjectFieldR(LeftSideF, StrLit("l_id")))))),
+            JoinType.Inner,
+            ConcatMapsR(
+              Free.roll(MFC(Guard(
+                LeftSideF,
+                Type.AnyObject,
+                UndefinedR,
+                LeftSideF))),
+              RightSideF))).embed
+
+        val expected =
+          TJ.inj(ThetaJoin(
+            QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
+            Free.roll(QCT(Filter(
+              Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
+              Free.roll(MFC(Guard(
+                HoleF[Fix],
+                Type.AnyObject,
+                BoolLit(false),
+                BoolLit(true))))))),
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
+            EqR(
+              ProjectFieldR(RightSideF, StrLit("r_id")),
+              ProjectFieldR(LeftSideF, StrLit("l_id"))),
+            JoinType.Inner,
+            ConcatMapsR(LeftSideF, RightSideF))).embed
+
+        normalizeExpr(original) must equal(expected)
+      }
+
+      "when guard is undefined in false branch" >> {
+        val original =
+          TJ.inj(ThetaJoin(
+            QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
+            Free.roll(MFC(Guard(
+              LeftSideF,
+              Type.AnyObject,
+              EqR(
+                ProjectFieldR(RightSideF, StrLit("r_id")),
+                ProjectFieldR(LeftSideF, StrLit("l_id"))),
+              UndefinedR))),
+            JoinType.Inner,
+            ConcatMapsR(
+              Free.roll(MFC(Guard(
+                LeftSideF,
+                Type.AnyObject,
+                LeftSideF,
+                UndefinedR))),
+              RightSideF))).embed
+
+        val expected =
+          TJ.inj(ThetaJoin(
+            QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
+            Free.roll(QCT(Filter(
+              Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
+              Free.roll(MFC(Guard(
+                HoleF[Fix],
+                Type.AnyObject,
+                BoolLit(true),
+                BoolLit(false))))))),
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
+            EqR(
+              ProjectFieldR(RightSideF, StrLit("r_id")),
+              ProjectFieldR(LeftSideF, StrLit("l_id"))),
+            JoinType.Inner,
+            ConcatMapsR(LeftSideF, RightSideF))).embed
+
+        normalizeExpr(original) must equal(expected)
+      }
+
+      "when cond is undefined in true branch" >> {
+        val original =
+          TJ.inj(ThetaJoin(
+            QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
+            Free.roll(MFC(Cond(
+              LtR(ProjectFieldR(LeftSideF, StrLit("x")), IntLit(7)),
+              UndefinedR,
+              EqR(
+                ProjectFieldR(RightSideF, StrLit("r_id")),
+                ProjectFieldR(LeftSideF, StrLit("l_id")))))),
+            JoinType.Inner,
+            ConcatMapsR(
+              Free.roll(MFC(Cond(
+                LtR(ProjectFieldR(LeftSideF, StrLit("x")), IntLit(7)),
+                UndefinedR,
+                LeftSideF))),
+              RightSideF))).embed
+
+        val expected =
+          TJ.inj(ThetaJoin(
+            QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
+            Free.roll(QCT(Filter(
+              Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
+              NotR(LtR(ProjectFieldR(HoleF, StrLit("x")), IntLit(7)))))),
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
+            EqR(
+              ProjectFieldR(RightSideF, StrLit("r_id")),
+              ProjectFieldR(LeftSideF, StrLit("l_id"))),
+            JoinType.Inner,
+            ConcatMapsR(LeftSideF, RightSideF))).embed
+
+        normalizeExpr(original) must equal(expected)
+      }
+
+      "when cond is undefined in false branch" >> {
+        val original =
+          TJ.inj(ThetaJoin(
+            QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
+            Free.roll(MFC(Cond(
+              LtR(ProjectFieldR(LeftSideF, StrLit("x")), IntLit(7)),
+              EqR(
+                ProjectFieldR(RightSideF, StrLit("r_id")),
+                ProjectFieldR(LeftSideF, StrLit("l_id"))),
+              UndefinedR))),
+            JoinType.Inner,
+            ConcatMapsR(
+              Free.roll(MFC(Cond(
+                LtR(ProjectFieldR(LeftSideF, StrLit("x")), IntLit(7)),
+                LeftSideF,
+                UndefinedR))),
+              RightSideF))).embed
+
+        val expected =
+          TJ.inj(ThetaJoin(
+            QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
+            Free.roll(QCT(Filter(
+              Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
+              LtR(ProjectFieldR(HoleF, StrLit("x")), IntLit(7))))),
+            Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
+            EqR(
+              ProjectFieldR(RightSideF, StrLit("r_id")),
+              ProjectFieldR(LeftSideF, StrLit("l_id"))),
+            JoinType.Inner,
+            ConcatMapsR(LeftSideF, RightSideF))).embed
+
+        normalizeExpr(original) must equal(expected)
+      }
+    }
   }
 }

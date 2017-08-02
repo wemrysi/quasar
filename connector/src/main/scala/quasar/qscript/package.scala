@@ -75,6 +75,14 @@ package object qscript {
   type QScriptTotal5[T[_[_]], A] = Coproduct[Const[Read[ADir], ?]        , QScriptTotal6[T, ?], A]
   type QScriptTotal6[T[_[_]], A] = Coproduct[Const[Read[AFile], ?]       , Const[DeadEnd, ?]  , A]
 
+  object QCT {
+    def apply[T[_[_]], A](qc: QScriptCore[T, A]): QScriptTotal[T, A] =
+      Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(qc)
+
+    def unapply[T[_[_]], A](qt: QScriptTotal[T, A]): Option[QScriptCore[T, A]] =
+      Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].prj(qt)
+  }
+
   /** QScript that has not gone through Read conversion. */
   type QScript[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[DeadEnd, ?])#M[A]
@@ -250,6 +258,9 @@ package object qscript {
     val norm = Normalizable.normalizable[T]
 
     (norm.freeMF(l), norm.freeMF(c), norm.freeMF(r), norm.freeMF(r2)) match {
+      case (newL, newC, newR, newR2) if newL ≟ newC && newC ≟ newR && newR ≟ newR2 =>
+        (newL, HoleF, HoleF, HoleF, HoleF)
+
       case (newL, newC, newR, newR2) if newL ≟ newC && newR ≟ newR2 =>
         (StaticArray(List(newL, newR)),
           Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
