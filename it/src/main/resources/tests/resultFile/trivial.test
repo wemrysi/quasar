@@ -4,9 +4,9 @@
   "backends": {
   },
 
-  "data": "smallZips.data",
+  "data": "../smallZips.data",
 
-  "query": "select * from smallZips",
+  "query": "select * from `../smallZips`",
 
   "predicate": "atLeast",
   "ignoreResultOrder": true,
