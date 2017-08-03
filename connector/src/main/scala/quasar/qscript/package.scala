@@ -190,7 +190,7 @@ package object qscript {
       Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](idx))))
 
     def indexOf(elems: List[FreeMapA[T ,A]], value: FreeMapA[T, A]): Option[Int] =
-      IList.fromList(elems).indexOf(Free.roll(MFC(MakeArray(value))))
+      IList.fromList(elems) indexOf value
 
     indexOf(leftElems, normr).cata(
       idx => (norml, HoleF[T], projectIndex(idx)),
