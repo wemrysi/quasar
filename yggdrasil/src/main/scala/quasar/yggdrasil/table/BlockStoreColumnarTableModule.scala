@@ -780,6 +780,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
                                  vEncoder: ColumnEncoder,
                                  indexNamePrefix: String,
                                  jdbmState: JDBMState): M[JDBMState] = M.point {
+
       // Iterate over the slice, storing each row
       // FIXME: Determine whether undefined sort keys are valid
       def storeRows(kslice: Slice, vslice: Slice, keyRowFormat: RowFormat, vEncoder: ColumnEncoder, storage: IndexStore, insertCount: Long): Long = {
@@ -790,6 +791,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
         @tailrec def storeRow(row: Int, insertCount: Long): Long = {
           if (row < vslice.size) {
             if (vslice.isDefinedAt(row) && kslice.isDefinedAt(row)) {
+
               storage.put(kEncoder.encodeFromRow(row), vEncoder.encodeFromRow(row))
 
               if (insertCount % jdbmCommitInterval == 0 && insertCount > 0) jdbmState.commit()

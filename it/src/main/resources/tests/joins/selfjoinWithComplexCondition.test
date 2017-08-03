@@ -5,7 +5,7 @@
         "couchbase": "pending",
         "marklogic_json": "timeout",
         "marklogic_xml": "timeout",
-        "mimir": "pending",
+        "mimir":       "pendingIgnoreFieldOrder",
         "mongodb_2_6": "timeout",
         "mongodb_3_0": "timeout",
         "mongodb_3_2": "timeout",
@@ -13,7 +13,7 @@
     },
 
     "NB": "#1587: Disabled in couchbase due to lack of general join.
-           Mongo backends not on par with master",
+           Mongo backends succeed, but timeout sporadically on travis.",
 
     "data": "../slamengine_commits.data",
 
