@@ -25,11 +25,8 @@ import scalaz._, Scalaz._
 @Lenses final case class MetaStoreConfig(database: DbConnectionConfig)
 
 object MetaStoreConfig {
-  implicit val configOps: ConfigOps[MetaStoreConfig] = new ConfigOps[MetaStoreConfig] {
-    val name = "metastore"
 
-    val default = DbConnectionConfig.defaultConnectionConfig ∘ (MetaStoreConfig(_))
-  }
+  val default = DbConnectionConfig.defaultConnectionConfig ∘ (MetaStoreConfig(_))
 
   implicit val codecJson: CodecJson[MetaStoreConfig] =
     casecodec1(MetaStoreConfig.apply, MetaStoreConfig.unapply)("database")

@@ -32,7 +32,7 @@ class CoreConfigSpec extends ConfigSpec[CoreConfig] {
        |  "metastore": {
        |    "database": {
        |      "h2": {
-       |        "file": "/h2"
+       |        "location": "/h2"
        |      }
        |    }
        |  }
