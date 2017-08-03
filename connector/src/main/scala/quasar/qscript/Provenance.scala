@@ -46,19 +46,30 @@ object Provenance {
   // TODO: This might not be the proper notion of equality – this just tells us
   //       which things align properly for autojoins.
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  implicit def equal[T[_[_]]: EqualT](implicit J: Equal[T[EJson]]): Equal[Provenance[T]] =
+  implicit def equal[T[_[_]]](implicit J: Equal[T[EJson]]): Equal[Provenance[T]] = {
+    val P = new ProvenanceT[T]
+    import P.{flattenBoth, nubNadas}
+
+    def equalAsSets(xs: List[Provenance[T]], ys: List[Provenance[T]]): Boolean =
+      xs.all(ys element _) && ys.all(xs element _)
+
+    def bothEq(x: Provenance[T], y: Provenance[T]): Boolean =
+      equalAsSets((nubNadas <<< flattenBoth)(x), (nubNadas <<< flattenBoth)(y))
+
     Equal.equal {
       case (Nada(),        Nada())        => true
       case (Value(_),      Value(_))      => true
       case (Value(_),      Proj(_))       => true
       case (Proj(_),       Value(_))      => true
       case (Proj(d1),      Proj(d2))      => d1 ≟ d2
-      case (Both(l1, r1),  Both(l2, r2))  => l1 ≟ l2 && r1 ≟ r2
+      case (l @ Both(_, _),            r) => bothEq(l, r)
+      case (l           , r @ Both(_, _)) => bothEq(l, r)
       case (OneOf(l1, r1), OneOf(l2, r2)) =>
         l1 ≟ l2 && r1 ≟ r2 || l1 ≟ r2 && r1 ≟ l2
       case (Then(l1, r1),  Then(l2, r2))  => l1 ≟ l2 && r1 ≟ r2
       case (_,             _)             => false
     }
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def show[T[_[_]]: ShowT]: Show[Provenance[T]] = Show.show {
@@ -71,10 +82,18 @@ object Provenance {
   }
 }
 
-class ProvenanceT[T[_[_]]: CorecursiveT: EqualT](implicit J: Equal[T[EJson]]) extends TTypes[T] {
+class ProvenanceT[T[_[_]]](implicit J: Equal[T[EJson]]) extends TTypes[T] {
   type Provenance = quasar.qscript.provenance.Provenance[T]
 
-  def genComparisons(lps: List[Provenance], rps: List[Provenance]): JoinFunc =
+  val flattenBoth: Provenance => List[Provenance] = {
+    case Both(l, r) => flattenBoth(l) ++ flattenBoth(r)
+    case other      => List(other)
+  }
+
+  val  nubNadas: List[Provenance] => List[Provenance] =
+    _.filter(_ =/= Nada())
+
+  def genComparisons(lps: List[Provenance], rps: List[Provenance])(implicit T: CorecursiveT[T]): JoinFunc =
     lps.reverse.zip(rps.reverse).takeWhile { case (l, r) => l ≟ r }.reverse.map((genComparison(_, _)).tupled(_).toList).join match {
       case Nil    => BoolLit(true)
       case h :: t => t.foldLeft(h)((a, e) => Free.roll(MFC(And(a, e))))
@@ -130,7 +149,7 @@ class ProvenanceT[T[_[_]]: CorecursiveT: EqualT](implicit J: Equal[T[EJson]]) ex
 
   /** Reifies the part of the provenance that must exist in the plan.
     */
-  def genBuckets(ps: List[Provenance]): Option[(List[Provenance], FreeMap)] =
+  def genBuckets(ps: List[Provenance])(implicit T: CorecursiveT[T]): Option[(List[Provenance], FreeMap)] =
     ps.traverse(genBucket).eval(0).unzip.traverse(_.join match {
       case Nil      => None
       case h :: t   =>
@@ -139,27 +158,29 @@ class ProvenanceT[T[_[_]]: CorecursiveT: EqualT](implicit J: Equal[T[EJson]]) ex
           (a, e) => Free.roll(MFC(ConcatArrays(a, Free.roll(MFC(MakeArray(e))))))).some
     })
 
-  def genBucketList(ps: List[Provenance]): Option[(List[Provenance], List[FreeMap])] =
+  def genBucketList(ps: List[Provenance])(implicit T: CorecursiveT[T]): Option[(List[Provenance], List[FreeMap])] =
     ps.traverse(genBucket).eval(0).unzip.traverse(_.join match {
       case Nil => None
       case l   => l.some
     })
 
-  val genBucket: Provenance => State[Int, (Provenance, List[FreeMap])] = {
-    case Nada()      => (Nada[T](): Provenance, Nil: List[FreeMap]).point[State[Int, ?]]
-    case Value(expr) =>
-      State(i => (i + 1, (Value(Free.roll(MFC(ProjectIndex(HoleF, IntLit(i))))), List(expr))))
-    case Proj(d)     => (Proj(d): Provenance, Nil: List[FreeMap]).point[State[Int, ?]]
-    case Both(l, r)  => (genBucket(l) ⊛ genBucket(r)) {
-      case ((lp, lf), (rp, rf)) => (Both(lp, rp), lf ++ rf)
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def genBucket(p: Provenance)(implicit T: CorecursiveT[T]): State[Int, (Provenance, List[FreeMap])] =
+    p match {
+      case Nada()      => (Nada[T](): Provenance, Nil: List[FreeMap]).point[State[Int, ?]]
+      case Value(expr) =>
+        State(i => (i + 1, (Value(Free.roll(MFC(ProjectIndex(HoleF, IntLit(i))))), List(expr))))
+      case Proj(d)     => (Proj(d): Provenance, Nil: List[FreeMap]).point[State[Int, ?]]
+      case Both(l, r)  => (genBucket(l) ⊛ genBucket(r)) {
+        case ((lp, lf), (rp, rf)) => (Both(lp, rp), lf ++ rf)
+      }
+      case OneOf(l, r)  => (genBucket(l) ⊛ genBucket(r)) {
+        case ((lp, lf), (rp, rf)) => (OneOf(lp, rp), lf ++ rf)
+      }
+      case Then(l, r)  => (genBucket(l) ⊛ genBucket(r)) {
+        case ((lp, lf), (rp, rf)) => (Then(lp, rp), lf ++ rf)
+      }
     }
-    case OneOf(l, r)  => (genBucket(l) ⊛ genBucket(r)) {
-      case ((lp, lf), (rp, rf)) => (OneOf(lp, rp), lf ++ rf)
-    }
-    case Then(l, r)  => (genBucket(l) ⊛ genBucket(r)) {
-      case ((lp, lf), (rp, rf)) => (Then(lp, rp), lf ++ rf)
-    }
-  }
 
   def joinProvenances(leftBuckets: List[Provenance], rightBuckets: List[Provenance]):
       List[Provenance] =
