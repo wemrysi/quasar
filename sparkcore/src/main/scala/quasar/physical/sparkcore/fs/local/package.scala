@@ -48,10 +48,10 @@ package object local {
 
   final case class SparkFSConf(sparkConf: SparkConf, prefix: ADir)
 
-  def parseUri: ConnectionUri => DefinitionError \/ (SparkConf, SparkFSConf) =
-    (uri: ConnectionUri) => {
+  def parseUri: ConnectionUri => Task[DefinitionError \/ (SparkConf, SparkFSConf)] =
+    (uri: ConnectionUri) => Task.delay {
 
-     def error(msg: String): DefinitionError \/ (SparkConf, SparkFSConf) =
+      def error(msg: String): DefinitionError \/ (SparkConf, SparkFSConf) =
         NonEmptyList(msg).left[EnvironmentError].left[(SparkConf, SparkFSConf)]
 
       def forge(master: String, rootPath: String): DefinitionError \/ (SparkConf, SparkFSConf) =

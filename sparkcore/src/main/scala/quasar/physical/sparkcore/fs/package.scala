@@ -80,7 +80,7 @@ package object fs {
 
   def definition[HS[_],S[_], T](
     fsType: FileSystemType,
-    parseUri: ConnectionUri => DefinitionError \/ (SparkConf, T),
+    parseUri: ConnectionUri => Task[DefinitionError \/ (SparkConf, T)],
     sparkFsDef: T => Free[S, SparkFSDef[HS, S]],
     fsInterpret: T => (FileSystem ~> Free[HS, ?])
   )(implicit
@@ -90,7 +90,7 @@ package object fs {
     BackendDef.fromPF {
       case (`fsType`, uri) =>
         for {
-          config <- EitherT(parseUri(uri).point[Free[S, ?]])
+          config <- EitherT(lift(parseUri(uri)).into[S])
           (sparkConf, t) = config
           res <- {
             sparkFsDef(t).map {

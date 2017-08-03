@@ -54,7 +54,7 @@ package object hdfs {
 
   final case class SparkFSConf(sparkConf: SparkConf, hdfsUriStr: String, prefix: ADir)
 
-  val parseUri: ConnectionUri => DefinitionError \/ (SparkConf, SparkFSConf) = (connUri: ConnectionUri) => {
+  val parseUri: ConnectionUri => Task[DefinitionError \/ (SparkConf, SparkFSConf)] = (connUri: ConnectionUri) => Task.delay {
 
     def liftErr(msg: String): DefinitionError = NonEmptyList(msg).left[EnvironmentError]
 
@@ -116,7 +116,6 @@ package object hdfs {
       rootPath <- rootPathOrErr
     } yield (sparkConf, SparkFSConf(sparkConf, hdfsUrl, rootPath))
   }
-
 
   private def sparkCoreJar: EitherT[Task, String, APath] = {
     /* Points to quasar-web.jar or target/classes if run from sbt repl/run */
