@@ -1,10 +1,6 @@
 {
     "name": "filter, sort, and limit",
 
-    "backends": {
-        "mimir":"pending"
-    },
-
     "data": "zips.data",
 
     "query": "select * from zips where city like \"BOU%\" order by pop limit 10",

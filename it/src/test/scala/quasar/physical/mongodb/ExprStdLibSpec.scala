@@ -40,8 +40,11 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
-    case (string.Integer | string.Decimal | string.ToString, _)   => notHandled.left
     case (string.Length, _) if !is3_4(backend) => Skipped("not implemented in aggregation on MongoDB < 3.4").left
+    case (string.Integer, _)  => notHandled.left
+    case (string.Decimal, _)  => notHandled.left
+    case (string.ToString, _) => notHandled.left
+    case (string.Search, _) => Skipped("compiles to a map/reduce, so can't be run in tests").left
     case (string.Substring, List(Data.Str(s), _, _)) if (!is3_4(backend) && !isPrintableAscii(s)) =>
       Skipped("only printable ascii supported on MongoDB < 3.4").left
 

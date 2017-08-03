@@ -2,7 +2,6 @@
     "name": "self-ordered distinct",
 
     "backends": {
-        "mimir": "pending"
     },
 
     "data": "zips.data",

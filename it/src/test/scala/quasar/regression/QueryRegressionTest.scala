@@ -150,7 +150,7 @@ abstract class QueryRegressionTest[S[_]](
           BuildInfo.isCIBuild.fold(
             execute.Skipped("(skipped because it times out)"),
             runTest)
-        case Some(TestDirective.Pending) =>
+        case Some(TestDirective.Pending | TestDirective.PendingIgnoreFieldOrder) =>
           if (BuildInfo.coverageEnabled)
             execute.Skipped("(pending example skipped during coverage run)")
           else
@@ -234,14 +234,14 @@ abstract class QueryRegressionTest[S[_]](
         // TODO: Error if a backend ignores field order when the query already does.
         if (exp.ignoreFieldOrder) OrderIgnored
         else exp.backends.get(backendName) match {
-          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder) =>
+          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder | TestDirective.PendingIgnoreFieldOrder) =>
             OrderIgnored
           case _ =>
             OrderPreserved
         },
         if (exp.ignoreResultOrder) OrderIgnored
         else exp.backends.get(backendName) match {
-          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreResultOrder) =>
+          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreResultOrder | TestDirective.PendingIgnoreFieldOrder) =>
             OrderIgnored
           case _ =>
             OrderPreserved
@@ -256,7 +256,7 @@ abstract class QueryRegressionTest[S[_]](
           case x => x
         }.handle {
           case e: java.util.concurrent.TimeoutException => execute.Pending(s"times out: ${e.getMessage}")
-          case e => execute.Failure(s"Errored with “${e.getMessage}”, you should change the “timeout” status to “pending”.") 
+          case e => execute.Failure(s"Errored with “${e.getMessage}”, you should change the “timeout” status to “pending”.")
         }
       case _ => result.handle {
         case e: java.util.concurrent.TimeoutException =>
