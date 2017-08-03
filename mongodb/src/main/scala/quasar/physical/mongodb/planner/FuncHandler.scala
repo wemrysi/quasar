@@ -149,7 +149,17 @@ object FuncHandler {
               case Lower(a1)             => $toLower(a1)
               case Upper(a1)             => $toUpper(a1)
               case Substring(a1, a2, a3) => $substr(a1, a2, a3)
-              case ToString(a1)          => $substr(a1, $literal(Bson.Int32(0)), $literal(Bson.Int32(-1)))
+              case ToString(a1)          =>
+                $cond(
+                  $eq(a1, $literal(Bson.Null)),
+                  $literal(Bson.Text("null")),
+                  $cond(
+                    $eq(a1, $literal(Bson.Bool(false))),
+                    $literal(Bson.Text("false")),
+                    $cond(
+                      $eq(a1, $literal(Bson.Bool(true))),
+                      $literal(Bson.Text("true")),
+                      $substr(a1, $literal(Bson.Int32(0)), $literal(Bson.Int32(-1))))))
               case Cond(a1, a2, a3)      => $cond(a1, a2, a3)
 
               case Or(a1, a2)            => $or(a1, a2)
@@ -320,7 +330,17 @@ object FuncHandler {
                       )
                     )
                   case ToString(a1) =>
-                    $substrBytes(a1, $literal(Bson.Int32(0)), $literal(Bson.Int32(-1)))
+                    // NB: Identical to the one in Core, but uses $substrBytes
+                    $cond(
+                      $eq(a1, $literal(Bson.Null)),
+                      $literal(Bson.Text("null")),
+                      $cond(
+                        $eq(a1, $literal(Bson.Bool(false))),
+                        $literal(Bson.Text("false")),
+                        $cond(
+                          $eq(a1, $literal(Bson.Bool(true))),
+                          $literal(Bson.Text("true")),
+                          $substrBytes(a1, $literal(Bson.Int32(0)), $literal(Bson.Int32(-1))))))
                 }
               }
             }

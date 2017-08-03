@@ -44,7 +44,6 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (string.Length, _) if !is3_4(backend) => Skipped("not implemented in aggregation on MongoDB < 3.4").left
     case (string.Substring, List(Data.Str(s), _, _)) if (!is3_4(backend) && !isPrintableAscii(s)) =>
       Skipped("only printable ascii supported on MongoDB < 3.4").left
-    case (string.ToString, List(Data.Null | Data.Bool(_))) => notHandled.left
     case (string.ToString, List(Data.Timestamp(_) | Data.Date(_))) => Skipped("Implemented, but formatted incorrectly").left
 
     case (date.ExtractIsoYear, _) => notHandled.left
