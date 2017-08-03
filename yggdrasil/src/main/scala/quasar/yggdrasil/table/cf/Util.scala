@@ -14,12 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil
-package table
-package cf
+package quasar.yggdrasil.table.cf
+
+import quasar.blueeyes._
 
 import quasar.precog._
-import quasar.blueeyes._
+import quasar.precog.util.DateTimeUtil
+
+import quasar.yggdrasil._
+import quasar.yggdrasil.table._
 
 object util {
 
@@ -198,6 +201,15 @@ object util {
       new Map1Column(c) with DoubleColumn {
         def apply(row: Int) = c(row).toDouble
       }
+  }
+
+  def CoerceToDate = CF1P("builtin:ct:coerceToDate") {
+    case (c: DateColumn) => c
+
+    case (c: StrColumn) => new DateColumn {
+      def isDefinedAt(row: Int) = c.isDefinedAt(row) && DateTimeUtil.isValidISO(c(row))
+      def apply(row: Int) = DateTimeUtil.parseDateTime(c(row))
+    }
   }
 
   def Shift(by: Int) = CF1P("builtin::ct::shift") {
