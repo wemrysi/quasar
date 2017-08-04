@@ -26,7 +26,7 @@ import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.Write
 import quasar.fs.mount.{ConnectionUri, BackendDef}, BackendDef._
 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile, genSc => coreGenSc}
 
-import java.io.PrintWriter
+import java.io.{File, PrintWriter}
 
 import org.apache.spark._
 import pathy.Path._
@@ -49,19 +49,21 @@ package object local {
   final case class SparkFSConf(sparkConf: SparkConf, prefix: ADir)
 
   def parseUri: ConnectionUri => Task[DefinitionError \/ (SparkConf, SparkFSConf)] =
-    (uri: ConnectionUri) => Task.delay {
+    (uri: ConnectionUri) => {
+        def error(msg: String): DefinitionError \/ (SparkConf, SparkFSConf) =
+          NonEmptyList(msg).left[EnvironmentError].left[(SparkConf, SparkFSConf)]
 
-      def error(msg: String): DefinitionError \/ (SparkConf, SparkFSConf) =
-        NonEmptyList(msg).left[EnvironmentError].left[(SparkConf, SparkFSConf)]
+        def forge(master: String, rootPath: String): DefinitionError \/ (SparkConf, SparkFSConf) =
+          posixCodec.parseAbsDir(rootPath)
+            .map { prefix =>
+              val sc = new SparkConf().setMaster(master).setAppName("quasar")
+              (sc, SparkFSConf(sc, unsafeSandboxAbs(prefix)))
+            }.fold(error(s"Could not extract a path from $rootPath"))(_.right[DefinitionError])
 
-      def forge(master: String, rootPath: String): DefinitionError \/ (SparkConf, SparkFSConf) =
-        posixCodec.parseAbsDir(rootPath)
-          .map { prefix =>
-          val sc = new SparkConf().setMaster(master).setAppName("quasar")
-          (sc, SparkFSConf(sc, unsafeSandboxAbs(prefix)))
-        }.fold(error(s"Could not extract a path from $rootPath"))(_.right[DefinitionError])
-
-      forge("local[*]", uri.value)
+      for {
+        exists  <- Task.delay(new File(uri.value).exists())
+        result <- Task.delay(if(exists) forge("local[*]", uri.value) else error(s"Path ${uri.value} does not exist on local file system"))
+      } yield result
     }
 
   def sparkFsDef[S[_]](implicit
