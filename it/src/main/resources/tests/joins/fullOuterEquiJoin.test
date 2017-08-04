@@ -6,10 +6,7 @@
         "marklogic_json": "pending",
         "marklogic_xml": "pending",
         "mimir": "ignoreFieldOrder",
-        "mongodb_2_6": "timeout",
-        "mongodb_3_0": "timeout",
-        "mongodb_3_2": "timeout",
-        "mongodb_3_4": "timeout"
+        "mongodb_2_6": "timeout"
     },
 
     "NB": "This passes for mongo locally, but can timeout on travis sporadically.",
