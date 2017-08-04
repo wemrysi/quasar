@@ -36,64 +36,7 @@ import xml.name._
 
 import scalaz._, Scalaz._
 
-private[qscript] final class FilterPlanner[
-  F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
-  FMT: SearchOptions,
-  T[_[_]]: BirecursiveT
-](implicit SP: StructuralPlanner[F, FMT]) {
-  def plan[Q](src0: Search[Q] \/ XQuery, f: FreeMap[T])(
-    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]],
-             P: FormatFilterPlanner[FMT]
-  ): F[Search[Q] \/ XQuery] = {
-    src0 match {
-      case (\/-(src)) =>
-        xqueryFilter(src, f) map (_.right[Search[Q]])
-      case (-\/(src)) if anyDocument(src.query) =>
-        fallbackFilter(src, f) map (_.right[Search[Q]])
-      case (-\/(src)) =>
-        P.plan[F, FMT, T, Q](src, f) >>= {
-          case Some(search) => search.left[XQuery].point[F]
-          case None         => fallbackFilter(src, f).map(_.right[Search[Q]])
-        }
-    }
-  }
-
-  private def fallbackFilter[Q](src: Search[Q], f: FreeMap[T])(
-    implicit Q: Recursive.Aux[Q, Query[T[EJson], ?]]
-  ): F[XQuery] = {
-    def interpretSearch(s: Search[Q]): F[XQuery] =
-      Search.plan[F, Q, T[EJson], FMT](s, EJsonPlanner.plan[T[EJson], F, FMT])
-
-    interpretSearch(src) >>= (xqueryFilter(_: XQuery, f))
-  }
-
-  private def xqueryFilter(src: XQuery, fm: FreeMap[T]): F[XQuery] =
-    for {
-      x   <- freshName[F]
-      p   <- mapFuncXQuery[T, F, FMT](fm, ~x) map (xs.boolean)
-    } yield src match {
-      case IterativeFlwor(bindings, filter, order, isStable, result) =>
-        XQuery.Flwor(
-          bindings :::> IList(BindingClause.let_(x := result)),
-          Some(filter.fold(p)(_ and p)),
-          order,
-          isStable,
-          ~x)
-
-      case _ =>
-        for_(x in src) where_ p return_ ~x
-    }
-
-  private def anyDocument[T[_[_]]: BirecursiveT, Q](q: Q)(
-    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-  ): Boolean = {
-    val f: AlgebraM[Option, Query[T[EJson], ?], Q] = {
-      case Query.Document(_) => none
-      case other             => Q.embed(other).some
-    }
-
-    !(Q.cataM(q)(f).isDefined)
-  }
+private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
 
   private object PathProjection {
     object MFComp {
@@ -153,9 +96,14 @@ private[qscript] final class FilterPlanner[
   object ElementIndexPlanner {
     import axes.child
 
-    private object QNamePath {
+    private object QNameSegment {
       def unapply(path: ADir): Option[QName] =
         dirName(path).map(_.value) >>= (QName.string.getOption(_))
+    }
+
+    private object FinalSegment {
+      def unapply(path: ADir): Option[DirName] =
+        dirName(path)
     }
 
     private def projections(path: ADir): IList[String] =
@@ -175,7 +123,7 @@ private[qscript] final class FilterPlanner[
     private def elementRange[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
     ): Option[(Search[Q], ADir)] = rewrite(fm) match {
-      case PathProjection(op, dir0 @ QNamePath(qname), const) => {
+      case PathProjection(op, dir0 @ QNameSegment(qname), const) => {
         val q = Query.ElementRange[T[EJson], Q](IList(qname), op, IList(const)).embed
 
         Search.query.modify((qr: Q) =>
@@ -187,8 +135,8 @@ private[qscript] final class FilterPlanner[
     private def jsonPropertyRange[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
     ): Option[(Search[Q], ADir)] = rewrite(fm) match {
-      case PathProjection(op, dir0 @ QNamePath(qname), const) => {
-        val q = Query.JsonPropertyRange[T[EJson], Q](IList(qname.shows), op, IList(const)).embed
+      case PathProjection(op, dir0 @ FinalSegment(seg), const) => {
+        val q = Query.JsonPropertyRange[T[EJson], Q](IList(seg.value), op, IList(const)).embed
 
         Search.query.modify((qr: Q) =>
           Q.embed(Query.And(IList(qr, q))))(src).some strengthR dir0
@@ -213,8 +161,57 @@ private[qscript] final class FilterPlanner[
     }
   }
 
+}
 
-  def validSearch[Q](src: Option[Search[Q]])(
+object FilterPlanner {
+
+  def fallbackFilter[T[_[_]]: BirecursiveT,
+    F[_]: Monad: PrologW: QNameGenerator: MonadPlanErr,
+    FMT: StructuralPlanner[F, ?]: SearchOptions,
+    Q](src: Search[Q], f: FreeMap[T])(
+    implicit Q: Recursive.Aux[Q, Query[T[EJson], ?]]
+  ): F[XQuery] = {
+    def interpretSearch(s: Search[Q]): F[XQuery] =
+      Search.plan[F, Q, T[EJson], FMT](s, EJsonPlanner.plan[T[EJson], F, FMT])
+
+    interpretSearch(src) >>= (xqueryFilter[T, F, FMT, Q](_: XQuery, f))
+  }
+
+  def anyDocument[T[_[_]], Q](q: Q)(
+    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+  ): Boolean = {
+    val f: AlgebraM[Option, Query[T[EJson], ?], Q] = {
+      case Query.Document(_) => none
+      case other             => Q.embed(other).some
+    }
+
+    !(Q.cataM(q)(f).isDefined)
+  }
+
+  def xqueryFilter[T[_[_]]: BirecursiveT,
+    F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
+    FMT: StructuralPlanner[F, ?], Q](src: XQuery, fm: FreeMap[T]
+  ): F[XQuery] =
+    for {
+      x   <- freshName[F]
+      p   <- mapFuncXQuery[T, F, FMT](fm, ~x) map (xs.boolean)
+    } yield src match {
+      case IterativeFlwor(bindings, filter, order, isStable, result) =>
+        XQuery.Flwor(
+          bindings :::> IList(BindingClause.let_(x := result)),
+          Some(filter.fold(p)(_ and p)),
+          order,
+          isStable,
+          ~x)
+
+      case _ =>
+        for_(x in src) where_ p return_ ~x
+    }
+
+  def validSearch[T[_[_]]: RecursiveT,
+    F[_]: Monad: Xcc,
+    FMT: StructuralPlanner[F, ?],
+    Q](src: Option[Search[Q]])(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
   ): OptionT[F, Search[Q]] = src match {
     case Some(search) =>
@@ -223,4 +220,24 @@ private[qscript] final class FilterPlanner[
     case None =>
       OptionT(none.point[F])
   }
+
+  def plan[T[_[_]]: BirecursiveT,
+    F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
+    FMT: SearchOptions: StructuralPlanner[F, ?], Q](src0: Search[Q] \/ XQuery, f: FreeMap[T])(
+    implicit Q:  Birecursive.Aux[Q, Query[T[EJson], ?]],
+             P:  FormatFilterPlanner[FMT]
+  ): F[Search[Q] \/ XQuery] = {
+    src0 match {
+      case (\/-(src)) =>
+        xqueryFilter[T, F, FMT, Q](src, f) map (_.right[Search[Q]])
+      case (-\/(src)) if anyDocument(src.query) =>
+        fallbackFilter[T, F, FMT, Q](src, f) map (_.right[Search[Q]])
+      case (-\/(src)) =>
+        P.plan[F, FMT, T, Q](src, f) >>= {
+          case Some(search) => search.left[XQuery].point[F]
+          case None         => fallbackFilter[T, F, FMT, Q](src, f).map(_.right[Search[Q]])
+        }
+    }
+  }
+
 }

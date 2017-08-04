@@ -32,26 +32,24 @@ import scalaz._
 trait FormatFilterPlanner[A] {
   def plan[
     F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
-    FMT: SearchOptions,
+    FMT: SearchOptions: StructuralPlanner[F, ?],
     T[_[_]]: BirecursiveT, Q](src: Search[Q], f: FreeMap[T])(
-    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]],
-             SP: StructuralPlanner[F, FMT]
+    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
   ): F[Option[Search[Q]]]
 }
 
 object FormatFilterPlanner {
   implicit val xmlFilterPlanner: FormatFilterPlanner[DocType.Xml] = new FormatFilterPlanner[DocType.Xml] {
     def plan[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
-      FMT: SearchOptions,
+      FMT: SearchOptions: StructuralPlanner[F, ?],
       T[_[_]]: BirecursiveT, Q](src: Search[Q], f: FreeMap[T])(
-      implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]],
-               SP: StructuralPlanner[F, FMT]
+      implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
     ): F[Option[Search[Q]]] = {
-      val planner = new FilterPlanner[F, FMT, T]
+      val planner = new FilterPlanner[T]
 
-      lazy val pathQuery    = planner.validSearch(planner.PathIndexPlanner(src, f))
-      lazy val starQuery    = planner.validSearch(planner.StarIndexPlanner(src, f))
-      lazy val elementQuery = planner.validSearch(planner.ElementIndexPlanner.planXml(src, f))
+      lazy val pathQuery    = FilterPlanner.validSearch[T, F, FMT, Q](planner.PathIndexPlanner(src, f))
+      lazy val starQuery    = FilterPlanner.validSearch[T, F, FMT, Q](planner.StarIndexPlanner(src, f))
+      lazy val elementQuery = FilterPlanner.validSearch[T, F, FMT, Q](planner.ElementIndexPlanner.planXml(src, f))
 
       (pathQuery ||| starQuery ||| elementQuery).run
     }
@@ -59,18 +57,16 @@ object FormatFilterPlanner {
 
   implicit val jsonFilterPlanner: FormatFilterPlanner[DocType.Json] = new FormatFilterPlanner[DocType.Json] {
     def plan[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
-      FMT: SearchOptions,
+      FMT: SearchOptions: StructuralPlanner[F, ?],
       T[_[_]]: BirecursiveT, Q](src: Search[Q], f: FreeMap[T])(
-      implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]],
-               SP: StructuralPlanner[F, FMT]
+      implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
     ): F[Option[Search[Q]]] = {
-      val planner = new FilterPlanner[F, FMT, T]
+      val planner = new FilterPlanner[T]
 
-      lazy val pathQuery    = planner.validSearch(planner.PathIndexPlanner(src, f))
-      lazy val elementQuery = planner.validSearch(planner.ElementIndexPlanner.planJson(src, f))
+      lazy val pathQuery    = FilterPlanner.validSearch[T, F, FMT, Q](planner.PathIndexPlanner(src, f))
+      lazy val elementQuery = FilterPlanner.validSearch[T, F, FMT, Q](planner.ElementIndexPlanner.planJson(src, f))
 
       (pathQuery ||| elementQuery).run
     }
   }
-
 }

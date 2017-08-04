@@ -19,7 +19,6 @@ package quasar.physical.marklogic.qscript
 import slamdata.Predef._
 
 import quasar.contrib.pathy._
-import quasar.fp.ski._
 import quasar.physical.marklogic.cts.ComparisonOp
 import quasar.qscript._
 import quasar.qscript.{MapFuncsCore => MFCore}
@@ -57,7 +56,7 @@ final class FilterPlannerSpec extends quasar.Qspec {
       dir0  <- arbitrary[ADir]
       first <- Gen.alphaStr
       path = rebaseA(rootDir[Sandboxed] </> dir(first))(dir0)
-      nested = flatten(first, ".", "..", ι, ι, dir0).tail.foldLeft(
+      nested = flatten(None, None, None, Some(_), Some(_), dir0).tail.unite.foldLeft(
         projectField(HoleF, first))((prj: FreeMap[Fix], nxt: String) => projectField(prj, nxt))
     } yield (nested, path)
 
@@ -71,15 +70,6 @@ final class FilterPlannerSpec extends quasar.Qspec {
 
   implicit val arbProjectTestCase: Arbitrary[ProjectTestCase] =
     Arbitrary(genProjectTestCase)
-
-  "plan" >> {
-    "fallback to non-indexed search when search expression is XQuery" >> {
-      1 must_== 1
-    }
-    "fallback to non-indexed search when search expression contains cts.Document" >> {
-      1 must_== 1
-    }
-  }
 
   "StarIndexPlanner" >> {
     "search expression includes * and projection path" >> prop { prj: ProjectTestCase =>
