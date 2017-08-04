@@ -51,7 +51,7 @@ object FormatFilterPlanner {
 
       lazy val pathQuery    = planner.validSearch(planner.PathIndexPlanner(src, f))
       lazy val starQuery    = planner.validSearch(planner.StarIndexPlanner(src, f))
-      lazy val elementQuery = planner.validSearch(planner.ElementIndexPlanner(src, f))
+      lazy val elementQuery = planner.validSearch(planner.ElementIndexPlanner.planXml(src, f))
 
       (pathQuery ||| starQuery ||| elementQuery).run
     }
@@ -67,7 +67,7 @@ object FormatFilterPlanner {
       val planner = new FilterPlanner[F, FMT, T]
 
       lazy val pathQuery    = planner.validSearch(planner.PathIndexPlanner(src, f))
-      lazy val elementQuery = planner.validSearch(planner.ElementIndexPlanner(src, f))
+      lazy val elementQuery = planner.validSearch(planner.ElementIndexPlanner.planJson(src, f))
 
       (pathQuery ||| elementQuery).run
     }

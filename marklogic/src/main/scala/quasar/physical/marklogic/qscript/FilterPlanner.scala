@@ -155,26 +155,51 @@ private[qscript] final class FilterPlanner[
 
     private object QNamePath {
       def unapply(path: ADir): Option[QName] =
-        (dirName(path).map(_.value) >>= (QName.string.getOption(_)))
+        dirName(path).map(_.value) >>= (QName.string.getOption(_))
     }
 
     private def projections(path: ADir): IList[XQuery] =
       flatten(none, none, none, Some(_), Some(_), path)
-        .toIList.unite.map(child.* `/` child.elementNamed(_))
+        .toIList.unite
+        .map(child.elementNamed(_))
 
-    def apply[Q](src: Search[Q], fm: FreeMap[T])(
+    private def xmlProjections(path: ADir): Option[XQuery] =
+      if(depth(path) >= 1)
+        projections(path).foldLeft(child.*)((path, segment) => path `/` segment).some
+      else none
+
+    private def jsonProjections(path: ADir): Option[XQuery] =
+      projections(path).foldLeft1Opt((path, segment) => path `/` segment)
+
+    private def plan[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-    ): Option[Search[Q]] = rewrite(fm) match {
+    ): Option[(Search[Q], ADir)] = rewrite(fm) match {
       case PathProjection(op, dir0 @ QNamePath(qname), const) => {
         val q = Query.ElementRange[T[EJson], Q](IList(qname), op, IList(const)).embed
-        val preds = projections(dir0)
-        val src0 = Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src)
 
-        Search.pred.modify(pred0 => pred0 ++ preds)(src0).some
+        Search.query.modify((qr: Q) =>
+          Q.embed(Query.And(IList(qr, q))))(src).some strengthR dir0
       }
       case _ => none
     }
+
+    def planXml[Q](src: Search[Q], fm: FreeMap[T])(
+      implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
+    ): Option[Search[Q]] = plan(src, fm) >>= {
+      case (src0, dir0) =>
+        Search.pred.modify(pred0 => pred0 ++ xmlProjections(dir0).map(IList(_))
+          .getOrElse(IList()))(src0).some
+    }
+
+    def planJson[Q](src: Search[Q], fm: FreeMap[T])(
+      implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
+    ): Option[Search[Q]] = plan(src, fm) >>= {
+      case (src0, dir0) =>
+        Search.pred.modify(pred0 => pred0 ++ jsonProjections(dir0).map(IList(_))
+          .getOrElse(IList()))(src0).some
+    }
   }
+
 
   def validSearch[Q](src: Option[Search[Q]])(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
