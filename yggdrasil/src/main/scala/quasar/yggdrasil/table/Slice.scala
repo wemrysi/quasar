@@ -782,9 +782,10 @@ trait Slice { source =>
     (take(idx), drop(idx))
   }
 
-  def take(sz: Int): Slice =
-    if (sz >= source.size) source
-    else {
+  def take(sz: Int): Slice = {
+    if (sz >= source.size) {
+      source
+    } else {
       new Slice {
         val size = sz
         val columns = source.columns lazyMapValues { col =>
@@ -792,10 +793,12 @@ trait Slice { source =>
         }
       }
     }
+  }
 
-  def drop(sz: Int): Slice =
-    if (sz <= 0) source
-    else {
+  def drop(sz: Int): Slice = {
+    if (sz <= 0) {
+      source
+    } else {
       new Slice {
         val size = source.size - sz
         val columns = source.columns lazyMapValues { col =>
@@ -803,6 +806,7 @@ trait Slice { source =>
         }
       }
     }
+  }
 
   def takeRange(startIndex: Int, numberToTake: Int): Slice = {
     val take2 = math.min(this.size, startIndex + numberToTake) - startIndex

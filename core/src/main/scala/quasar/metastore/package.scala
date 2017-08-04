@@ -43,12 +43,26 @@ import scalaz._, Scalaz._
   */
 package object metastore {
 
-  def verifyMetaStoreSchema[A](schema: Schema[A]): EitherT[ConnectionIO, String, Unit] =
+  sealed trait MetastoreInitializationFailure {
+    def message: String
+  }
+  final case object MetastoreRequiresInitialization extends MetastoreInitializationFailure {
+    def message: String = "MetaStore requires initialization, try running the 'initUpdateMetaStore' command."
+  }
+  final case class MetastoreRequiresMigration(current: String, latest: String) extends MetastoreInitializationFailure {
+    def message: String = "MetaStore schema requires migrating, current version is '$cur' latest version is '$nxt'."
+  }
+  final case class UnknownInitializationError(causedBy: scala.Throwable) extends MetastoreInitializationFailure {
+    private val metastorePrompt: String = "Is the metastore database running?"
+    def message: String = s"While verifying MetaStore schema: ${causedBy.getMessage}. $metastorePrompt"
+  }
+
+  def verifyMetaStoreSchema[A: Show](schema: Schema[A]): EitherT[ConnectionIO, MetastoreInitializationFailure, Unit] =
     EitherT(schema.updateRequired map {
       case Some((None, _)) =>
-        "MetaStore requires initialization, try running the 'initUpdateMetaStore' command.".left
+        MetastoreRequiresInitialization.left
       case Some((Some(cur), nxt)) =>
-        s"MetaStore schema requires migrating, current version is '$cur' latest version is '$nxt'.".left
+        MetastoreRequiresMigration(cur.shows, nxt.shows).left
       case None =>
         ().right
     })
