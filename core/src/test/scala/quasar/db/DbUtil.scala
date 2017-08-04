@@ -23,20 +23,17 @@ import scalaz.{:+: => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 object DbUtil {
-  /** Connection info for an in-memory DB that persists only as long
+  /** Configuration for an in-memory DB that persists only as long
     * as the process is running. The same db can be accessed by connecting
     * multiple times with the same name.
     * @param name Should not contain `;`.
     */
-  def inMemoryConnectionInfo(name: String): ConnectionInfo =
-    ConnectionInfo(
-      "org.h2.Driver",
-      s"jdbc:h2:mem:$name;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000", // some tests were hitting the default time limit
-                                                                 // of 1 second, 10 seconds seems like a reasonable
-                                                                 // value even if this is eventually used for an
-                                                                 // ephemeral production database.
-      "sa",
-      "")
+  def inMemoryConfig(name: String): DbConnectionConfig =
+    // LOCK_TIMEOUT: Some tests were hitting the default time limit
+    //               of 1 second, 10 seconds seems like a reasonable
+    //               value even if this is eventually used for an
+    //               ephemeral production database.
+    DbConnectionConfig.H2(s"mem:$name;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000")
 
   /** Transactor that does not use a connection pool, so doesn't require any cleanup. */
   def simpleTransactor(cxn: ConnectionInfo): Transactor[Task] =

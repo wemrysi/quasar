@@ -1,12 +1,6 @@
 {
     "name": "skip and count",
 
-    "backends": {
-        "mimir":"skip"
-    },
-
-    "NB": "Skipped in mimir due to #2506 offset is slow. Sometimes it passes and sometimes it times out.",
-
     "data": "zips.data",
 
     "query": "select count(*) from (select * from zips offset 10) as x",

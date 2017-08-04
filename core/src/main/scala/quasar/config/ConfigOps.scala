@@ -26,6 +26,7 @@ import java.nio.charset._
 import scala.util.Properties._
 
 import argonaut._
+import monocle.Lens
 import monocle.syntax.fields._
 import pathy._, Path._
 import scalaz.{Lens => _, _}, Scalaz._
@@ -37,7 +38,13 @@ import simulacrum.typeclass
 
   def name: String
 
+  def metaStoreConfig: Lens[C, Option[MetaStoreConfig]]
+
   def default: Task[C]
+
+  def fromOptionalFile(configFile: Option[FsFile])(implicit d: DecodeJson[C]): CfgTask[C] = {
+    configFile.fold(fromDefaultPath)(fromFile)
+  }
 
   def fromFile(path: FsFile)(implicit D: DecodeJson[C]): CfgTask[C] =
     for {
@@ -51,7 +58,7 @@ import simulacrum.typeclass
     } yield config
 
   /** Loads configuration from one of the OS-specific default paths. */
-  def fromDefaultPaths(implicit D: DecodeJson[C]): CfgTask[C] = {
+  def fromDefaultPath(implicit D: DecodeJson[C]): CfgTask[C] = {
     def load(path: Task[FsFile]): CfgTask[C] =
       path.liftM[CfgErrT] flatMap fromFile
 

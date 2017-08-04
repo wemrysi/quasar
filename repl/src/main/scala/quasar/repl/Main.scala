@@ -17,19 +17,16 @@
 package quasar.repl
 
 import slamdata.Predef._
-import quasar.cli.Cmd, Cmd._
 import quasar.config._
 import quasar.console._
-import quasar.db.StatefulTransactor
+import quasar.contrib.scopt._
 import quasar.effect._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
-import quasar.main._, config._, metastore._
-import quasar.metastore.{MetaStoreAccess, Schema}
+import quasar.main._
 
-import doobie.syntax.connectionio._
 import org.jboss.aesh.console.{AeshConsoleCallback, Console, ConsoleOperation, Prompt}
 import org.jboss.aesh.console.helper.InterruptHook
 import org.jboss.aesh.console.settings.SettingsBuilder
@@ -52,20 +49,15 @@ object Main {
   type DriverEff[A]  = Coproduct[ReplFail, DriverEff0, A]
   type DriverEffM[A] = Free[DriverEff, A]
 
-  private def driver(f: Command => Free[DriverEff, Unit], e: Task[Unit]): Task[Unit] = {
-    def shutdownConsole(c: Console): Task[Unit] =
-      Task.delay(c.getShell.out.println("Exiting...")) >>
-      e.attempt                                        >>
-      Task.delay(c.stop)
-
-    Task delay {
+  private def driver(f: Command => Free[DriverEff, Unit]): Task[Unit] = {
+    val runConsole = Task.async[Console] { callback =>
       val console =
         new Console(new SettingsBuilder()
           .parseOperators(false)
           .enableExport(false)
           .interruptHook(new InterruptHook {
             def handleInterrupt(console: Console, action: Action) =
-              shutdownConsole(console).unsafePerformSync
+              callback(console.right)
           })
           .create())
 
@@ -80,7 +72,7 @@ object Main {
         override def execute(input: ConsoleOperation): Int = {
           Command.parse(input.getBuffer.trim) match {
             case Command.Exit =>
-              shutdownConsole(console).unsafePerformSync
+              callback(console.right)
 
             case command      =>
               f(command).foldMap(i).run.unsafePerformSync.valueOr(
@@ -94,6 +86,8 @@ object Main {
 
       ()
     }
+
+    runConsole.flatMap(c => Task.delay(c.getShell.out.println("Exiting...")).onFinish(_ => Task.delay(c.stop)))
   }
 
   type ReplEff[S[_], A] = (
@@ -138,47 +132,27 @@ object Main {
           _.point[DriverEffM]))
     }
 
-  def main(args: Array[String]): Unit = {
-    val cfgOpsCore = ConfigOps[CoreConfig]
-
-    def start(tx: StatefulTransactor) =
-      for {
-        _       <- verifySchema(Schema.schema, tx.transactor)
-        ctx     <- metastoreCtx(tx)
-        // NB: for now, there's no way to add mounts through the REPL, so no point
-        // in starting if you can't do anything and can't correct the situation.
-        _       <- MetaStoreAccess.fsMounts
-                     .map(_.isEmpty)
-                     .transact(ctx.metastore.transactor)
-                     .liftM[MainErrT]
-                     .ifM(
-                       MainTask.raiseError("No mounts configured."),
-                       ().point[MainTask])
-
-        coreApi =  QErrsTCnxIO.toMainTask(ctx.metastore.transactor) compose ctx.interp
-        runCmd  <- repl[CoreEff](mt compose coreApi).liftM[MainErrT]
-        _       <- driver(runCmd, ctx.closeMnts).liftM[MainErrT]
-      } yield ()
-
-    val main0: MainTask[Unit] = for {
-      opts    <- CliOptions.parser.parse(args.toSeq, CliOptions.default)
-                      .cata(_.point[MainTask], MainTask.raiseError("Couldn't parse options."))
-      cfgPath <- opts.config.fold(none[FsFile].point[MainTask])(cfg =>
-                   FsPath.parseSystemFile(cfg)
-                     .toRight(s"Invalid path to config file: $cfg.")
-                     .map(some))
-      cfg     <- loadConfigFile[CoreConfig](cfgPath).liftM[MainErrT]
-      msCfg   <- cfg.metastore.cata(
-                   Task.now, MetaStoreConfig.configOps.default
-                 ).liftM[MainErrT]
-      tx      <- metastoreTransactor(msCfg)
-      _       <- opts.cmd match {
-                   case Start               => start(tx)
-                   case InitUpdateMetaStore => initUpdateMigrate(Schema.schema, tx.transactor, cfgPath)
-                 }
+  def startRepl(quasarInter: CoreEff ~> QErrs_TaskM): Task[Unit] =
+    for {
+      runCmd  <- repl[CoreEff](mt compose QErrs_Task.toMainTask compose quasarInter)
+      _       <- driver(runCmd)
     } yield ()
 
-    logErrors(main0).unsafePerformSync
-  }
+  def safeMain(args: Vector[String]): Task[Unit] =
+    logErrors(for {
+      opts    <- CliOptions.parser.safeParse(args, CliOptions.default)
+      cfgPath <- opts.config.fold(none[FsFile].point[MainTask])(cfg =>
+        FsPath.parseSystemFile(cfg)
+          .toRight(s"Invalid path to config file: $cfg.")
+          .map(some))
+      _ <- initMetaStoreOrStart[CoreConfig](
+        CmdLineConfig(cfgPath, opts.cmd),
+        (_, quasarInter) => startRepl(quasarInter).liftM[MainErrT],
+        // The REPL does not allow you to change metastore
+        // so no need to supply a function to persist the metastore
+        _ => ().point[MainTask])
+    } yield ())
 
+  def main(args: Array[String]): Unit =
+    safeMain(args.toVector).unsafePerformSync
 }

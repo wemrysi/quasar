@@ -36,7 +36,7 @@ class WebConfigSpec extends ConfigSpec[WebConfig] {
       |  "metastore": {
       |    "database": {
       |      "h2": {
-      |        "file": "/h2"
+      |        "location": "/h2"
       |      }
       |    }
       |  }

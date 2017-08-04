@@ -17,19 +17,16 @@
 package quasar.server
 
 import slamdata.Predef._
-import quasar.cli.Cmd.Start
-import quasar.config.{ConfigOps, FsPath, WebConfig}
+import quasar.config.{ConfigOps, WebConfig}
 import quasar.contrib.pathy._
-import quasar.db.{DbUtil, StatefulTransactor}
+import quasar.fp.TaskRef
+import quasar.fp.ski._
 import quasar.fs.mount._
-import quasar.main._, metastore._
+import quasar.main._
 import quasar.metastore._, MetaStoreAccess._
-import quasar.server.Server.QuasarConfig
+import quasar.metastore.MetaStoreFixture.createNewTestMetastore
 import quasar.sql._
 import quasar.TestConfig
-
-import java.io.File
-import scala.util.Random.nextInt
 
 import argonaut._, Argonaut._
 import doobie.imports._
@@ -57,29 +54,16 @@ class ServiceSpec extends quasar.Qspec {
     val uri = Uri(authority = Some(Authority(port = Some(port))))
 
     (for {
-      cfgPath       <- FsPath.parseSystemFile(
-                         File.createTempFile("quasar", ".json").toString
-                       ).run.liftM[MainErrT]
-      qCfg          =  QuasarConfig(
-                         cmd = Start,
-                         staticContent = Nil,
-                         redirect = None,
-                         port = None,
-                         configPath = cfgPath,
-                         openClient = false)
-      transactor    <- Task.delay(DbUtil.simpleTransactor(
-                         DbUtil.inMemoryConnectionInfo(s"test_mem_service_spec_$nextInt")
-                       )).liftM[MainErrT]
-      _             <- schema.updateToLatest.transact(transactor).liftM[MainErrT]
-      _             <- metastoreInit.transact(transactor).liftM[MainErrT]
-      msCtx         <- metastoreCtx(StatefulTransactor(transactor, Task.now(())))
-      (svc, close)  =  Server.durableService(qCfg, port, msCtx)
-      (p, shutdown) <- Http4sUtils.startServers(port, svc).liftM[MainErrT]
-      r             <- f(uri)
-                          .onFinish(_ => shutdown)
-                          .onFinish(_ => p.run)
-                          .onFinish(_ => close)
-                          .liftM[MainErrT]
+      metastore  <- createNewTestMetastore.liftM[MainErrT]
+      transactor = metastore.trans.transactor
+      _          <- schema.updateToLatest.transact(transactor).liftM[MainErrT]
+      _          <- metastoreInit.transact(transactor).liftM[MainErrT]
+      metaRef    <- TaskRef(metastore).liftM[MainErrT]
+      quasarFs   <- Quasar.initWithMeta(metaRef, _ => ().point[MainTask], initialize = false)
+      shutdown   <- Server.startServer(quasarFs.interp, port, Nil, None, _ => ().point[Task]).liftM[MainErrT]
+      r          <- f(uri)
+                      .onFinish(κ(shutdown.onFinish(κ(quasarFs.shutdown))))
+                      .liftM[MainErrT]
     } yield r).run.unsafePerformSync
   }
 
