@@ -158,20 +158,21 @@ private[qscript] final class FilterPlanner[
         dirName(path).map(_.value) >>= (QName.string.getOption(_))
     }
 
-    private def projections(path: ADir): IList[XQuery] =
+    private def projections(path: ADir): IList[String] =
       flatten(none, none, none, Some(_), Some(_), path)
         .toIList.unite
-        .map(child.elementNamed(_))
 
     private def xmlProjections(path: ADir): Option[XQuery] =
       if(depth(path) >= 1)
-        projections(path).foldLeft(child.*)((path, segment) => path `/` segment).some
+        projections(path).map(child.elementNamed(_))
+          .foldLeft(child.*)((path, segment) => path `/` segment).some
       else none
 
     private def jsonProjections(path: ADir): Option[XQuery] =
-      projections(path).foldLeft1Opt((path, segment) => path `/` segment)
+      projections(path).map(child.nodeNamed(_))
+        .foldLeft1Opt((path, segment) => path `/` segment)
 
-    private def plan[Q](src: Search[Q], fm: FreeMap[T])(
+    private def elementRange[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
     ): Option[(Search[Q], ADir)] = rewrite(fm) match {
       case PathProjection(op, dir0 @ QNamePath(qname), const) => {
@@ -183,9 +184,21 @@ private[qscript] final class FilterPlanner[
       case _ => none
     }
 
+    private def jsonPropertyRange[Q](src: Search[Q], fm: FreeMap[T])(
+      implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
+    ): Option[(Search[Q], ADir)] = rewrite(fm) match {
+      case PathProjection(op, dir0 @ QNamePath(qname), const) => {
+        val q = Query.JsonPropertyRange[T[EJson], Q](IList(qname.shows), op, IList(const)).embed
+
+        Search.query.modify((qr: Q) =>
+          Q.embed(Query.And(IList(qr, q))))(src).some strengthR dir0
+      }
+      case _ => none
+    }
+
     def planXml[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-    ): Option[Search[Q]] = plan(src, fm) >>= {
+    ): Option[Search[Q]] = elementRange(src, fm) >>= {
       case (src0, dir0) =>
         Search.pred.modify(pred0 => pred0 ++ xmlProjections(dir0).map(IList(_))
           .getOrElse(IList()))(src0).some
@@ -193,7 +206,7 @@ private[qscript] final class FilterPlanner[
 
     def planJson[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-    ): Option[Search[Q]] = plan(src, fm) >>= {
+    ): Option[Search[Q]] = jsonPropertyRange(src, fm) >>= {
       case (src0, dir0) =>
         Search.pred.modify(pred0 => pred0 ++ jsonProjections(dir0).map(IList(_))
           .getOrElse(IList()))(src0).some
