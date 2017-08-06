@@ -147,7 +147,7 @@ private final class QueryFileInterpreter[C](
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import WriterT.writerTMonadListen
- 
+
   private val execJs = WorkflowExecutor.javaScript
 
   def apply[A](qf: QueryFile[A]) = qf match {

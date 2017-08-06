@@ -70,6 +70,8 @@ package object api {
           _.right[Response].point[Task])))
     }
 
+  // https://tools.ietf.org/html/rfc7234#section-4.2.4
+  val StaleResponse = Status(110)(reason = "Response is Stale")
 
   object Destination extends HeaderKey.Singleton {
     type HeaderT = Header

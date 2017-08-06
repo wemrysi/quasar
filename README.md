@@ -323,6 +323,14 @@ For example, given the above MongoDB mount, an additional view could be defined 
 
 A view can be mounted at any file path. If a view's path is nested inside the path of a database mount, it will appear alongside the other files in the database. A view will "shadow" any actual file that would otherwise be mapped to the same path. Any attempt to write data to a view will result in an error.
 
+#### Caching
+
+View mounts can optionally be cached. When cached a view is refreshed periodically in the background with respect to its associated `max-age`.
+
+A cached view is created by adding the `Cache-Control: max-age=<seconds>`  header to a `/mount/fs/` request.
+
+Cached views are retrieved via `/data/fs` and include a `Expires: <http-date>` header informed by `max-age`. A resonablly provisioned server will keep cached views fresh. If it does fall behind it will serve the stale cache with a `110` HTTP status. The `Expires` header is absent from non-cached views.
+
 ### Module mounts
 
 If the mount's key is "module" then the mount represents a "virtual" directory which contains a collection of SQL Statements. The Quasar Filesystem surfaces each SQL function definition as a file despite the fact that it is not possible to read from that file. Instead one needs to use the `invoke` endpoint in order to pass arguments to a particular function and get the result.

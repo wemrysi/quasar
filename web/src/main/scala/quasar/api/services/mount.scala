@@ -17,14 +17,19 @@
 package quasar.api.services
 
 import slamdata.Predef.{ -> => _, _ }
-import quasar.api._, ToApiError._
+import quasar.api._, ToApiError.ops._
 import quasar.contrib.pathy._
-import quasar.fp._
+import quasar.effect.{KeyValueStore, Timing}
+import quasar.fp._, ski._
+import quasar.fs.cache.{VCache, ViewCache}
 import quasar.fs.mount._
+import quasar.fs.ManageFile
 
 import argonaut._, Argonaut._
 import org.http4s._, Method.MOVE
 import org.http4s.dsl._
+import org.http4s.CacheDirective.`max-age`
+import org.http4s.headers.`Cache-Control`
 import pathy.Path, Path._
 import pathy.argonaut.PosixCodecJson._
 import scalaz._, Scalaz._
@@ -37,8 +42,11 @@ object mount {
     implicit
     M: Mounting.Ops[S],
     S0: Task :<: S,
-    S1: MountingFailure :<: S,
-    S2: PathMismatchFailure :<: S
+    S1: ManageFile :<: S,
+    S2: MountingFailure :<: S,
+    S3: PathMismatchFailure :<: S,
+    S4: VCache :<: S,
+    S5: Timing :<: S
   ): QHttpService[S] =
     QHttpService {
       case GET -> AsPath(path) =>
@@ -54,7 +62,7 @@ object mount {
         respondT(requiredHeader(Destination, req).map(_.value).fold(
           _.raiseError[ApiErrT[M.FreeS, ?], String],
           dst => refineType(src).fold(
-            srcDir  => move[S, Dir](srcDir,  dst, UriPathCodec.parseAbsDir,  "directory"),
+            srcDir  => move[S, Dir](srcDir, dst, UriPathCodec.parseAbsDir,  "directory"),
             srcFile => move[S, File](srcFile, dst, UriPathCodec.parseAbsFile, "file"))))
 
       case req @ POST -> AsDirPath(parent) =>
@@ -77,10 +85,17 @@ object mount {
         })
 
       case DELETE -> AsPath(p) =>
-        respond(M.unmount(p).as(s"deleted ${printPath(p)}"))
+        val deleteViewIfExists: OptionT[Free[S, ?], Unit] =
+          OptionT(refineType(p).toOption.η[Free[S, ?]]) >>= (f =>
+            vcache.get(f) >> (vcache.delete(f).liftM[OptionT]))
+
+        respond(
+          deleteViewIfExists.getOrElseF(M.unmount(p)).as(s"deleted ${printPath(p)}"))
     }
 
   ////
+
+  private def vcache[S[_]](implicit S0: VCache :<: S) = KeyValueStore.Ops[AFile, ViewCache, S]
 
   private def move[S[_], T](
     src: AbsPath[T],
@@ -90,9 +105,13 @@ object mount {
   )(implicit
     M: Mounting.Ops[S],
     S0: MountingFailure :<: S,
-    S1: PathMismatchFailure :<: S
+    S1: PathMismatchFailure :<: S,
+    S2: VCache :<: S
   ): EitherT[Free[S, ?], ApiError, String] =
     parse(dstStr).map(unsafeSandboxAbs).cata(dst =>
+      ((refineType(src) ⊛ refineType(dst))((s, d) =>
+        vcache.get(s) >>= (vc => (vcache.put(d, vc) >> vcache.delete(s)).liftM[OptionT])
+      ) | ().η[OptionT[Free[S, ?], ?]]).run.liftM[ApiErrT] >>
       M.remount[T](src, dst)
         .as(s"moved ${printPath(src)} to ${printPath(dst)}")
         .liftM[ApiErrT],
@@ -106,10 +125,13 @@ object mount {
     req: Request,
     replaceIfExists: Boolean
   )(implicit
-    M: Mounting.Ops[S],
+    M:  Mounting.Ops[S],
+    MF: ManageFile.Ops[S],
+    T:  Timing.Ops[S],
     S0: Task :<: S,
     S1: MountingFailure :<: S,
-    S2: PathMismatchFailure :<: S
+    S2: PathMismatchFailure :<: S,
+    S3: VCache :<: S
   ): EitherT[Free[S, ?], ApiError, Boolean] =
     for {
       body  <- free.lift(EntityDecoder.decodeString(req))
@@ -123,8 +145,36 @@ object mount {
                  (msg, _) => ApiError.fromMsg_(
                    BadRequest, msg).left))
       exists <- M.lookupType(path).run.isDefined.liftM[ApiErrT]
-      mnt    =  if (replaceIfExists && exists) M.replace(path, bConf)
-                else M.mount(path, bConf)
-      _      <- mnt.liftM[ApiErrT]
+      cc     =  req.headers.get(`Cache-Control`)
+      maxAge =  cc >>= (_.values.list.collectFirst(_ match {
+                  case `max-age`(s) => s
+                }))
+      tf     <- MF.tempFile(path).leftMap(_.toApiError)
+      ts     <- T.timestamp.liftM[ApiErrT]
+      rAfter <- free.lift(maxAge.traverse(ViewCache.expireAt(ts, _))).into.liftM[ApiErrT]
+      _      <- (refineType(path).toOption ⊛ MountConfig.viewConfig.getOption(bConf) ⊛ maxAge ⊛ rAfter) { (p, c, a, r) =>
+                  val nvc = ViewCache(
+                    query = MountConfig.viewConfigUri(c),
+                    lastUpdate = none,
+                    executionMillis = none,
+                    cacheReads = 0,
+                    assignee = none,
+                    assigneeStart = none,
+                    maxAgeSeconds = a.toSeconds,
+                    refreshAfter = r,
+                    status = ViewCache.Status.Pending,
+                    errorMsg = none,
+                    dataFile = tf,
+                    tmpDataFile = none)
+                  vcache.get(p).fold(
+                    κ(vcache.modify(p, _.copy(
+                      query = nvc.query,
+                      maxAgeSeconds = nvc.maxAgeSeconds,
+                      refreshAfter = nvc.refreshAfter,
+                      status = nvc.status,
+                      dataFile = nvc.dataFile))),
+                    vcache.put(p, nvc )).join
+                }.orZero.liftM[ApiErrT]
+      _      <- (replaceIfExists && exists).fold(M.replace(path, bConf), M.mount(path, bConf)).liftM[ApiErrT]
     } yield exists
 }

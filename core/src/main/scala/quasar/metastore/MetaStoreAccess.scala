@@ -17,10 +17,10 @@
 package quasar.metastore
 
 import slamdata.Predef._
-
-import quasar.contrib.pathy.{ADir, APath}
-import quasar.fs.mount.{MountConfig, MountType, MountingError}, MountConfig.FileSystemConfig
+import quasar.contrib.pathy._
 import quasar.db._
+import quasar.fs.cache.ViewCache
+import quasar.fs.mount.{MountConfig, MountType, MountingError}, MountConfig.FileSystemConfig
 
 import doobie.imports._
 import scalaz._, Scalaz._
@@ -47,6 +47,19 @@ trait MetaStoreAccess {
 
   def deleteMount(path: APath): NotFoundErrT[ConnectionIO, Unit] =
     runOneRowUpdateOpt(Queries.deleteMount(path)) toRight NotFound
+
+  //--- View Cache ---
+  val staleCachedViews: ConnectionIO[List[PathedViewCache]] = Queries.staleCachedViews.list
+
+  def lookupViewCache(path: AFile): ConnectionIO[Option[ViewCache]] =
+    Queries.lookupViewCache(path).option ∘ (_ ∘ (_.vc))
+
+  def updateInsertViewCache(path: AFile, viewCache: ViewCache): ConnectionIO[Unit] =
+    runOneRowUpdateOpt(Queries.updateViewCache(path, viewCache)).isEmpty >>= (_.whenM(
+      runOneRowUpdate(Queries.insertViewCache(path, viewCache))))
+
+  def updateViewCacheErrorMsg(path: AFile, errorMsg: String): ConnectionIO[Unit] =
+    runOneRowUpdate(Queries.updateViewCacheErrorMsg(path, errorMsg))
 
   // NB: H2 stores everything in upper, PosgreSQL in lower, so need to ignore
   // case here.

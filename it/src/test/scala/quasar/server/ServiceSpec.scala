@@ -67,6 +67,23 @@ class ServiceSpec extends quasar.Qspec {
     } yield r).run.unsafePerformSync
   }
 
+  val fileSystemConfigs =
+    TestConfig.backendRefs
+      .traverse { ref =>
+        val connectionUri = TestConfig.loadConnectionUri(ref.ref)
+        connectionUri.map(MountConfig.fileSystemConfig(ref.fsType, _)).run
+      }.map(_
+        .unite
+        .zipWithIndex
+        .map { case (c, i) => (rootDir </> dir("data") </> dir(i.toString)) -> c }
+        .toMap[APath, MountConfig])
+      .unsafePerformSync
+
+  def withFileSystemConfigs[A](result: => MatchResult[A]): Result =
+    fileSystemConfigs.isEmpty.fold(
+      skipped("Warning: no test backends enabled"),
+      AsResult(result))
+
   "/mount/fs" should {
 
     "POST view" in {
@@ -110,14 +127,17 @@ class ServiceSpec extends quasar.Qspec {
       r.map(_.status) must beRightDisjunction(Ok)
     }
 
-    "[SD-1833] replace view" in {
+    "[SD-1833] replace view" in withFileSystemConfigs {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync
       val sel1 = "sql2:///?q=%28select%201%29"
       val sel2 = "sql2:///?q=%28select%202%29"
 
       val finalCfg = MountConfig.viewConfig0(sqlB"select 2")
 
-      val r = withServer(port) { baseUri: Uri =>
+      val mnts =
+        fileSystemConfigs.headOption.traverse { case (_, m) => insertMount(rootDir, m) }.void
+
+      val r = withServer(port, mnts) { baseUri: Uri =>
         client.fetch(
           Request(
               uri = baseUri / "mount" / "fs" / "viewA",
@@ -164,24 +184,6 @@ class ServiceSpec extends quasar.Qspec {
   }
 
   "/data/fs" should {
-    val fileSystemConfigs =
-      TestConfig.backendRefs
-        .traverse { ref =>
-          val connectionUri = TestConfig.loadConnectionUri(ref.ref)
-          connectionUri.map(MountConfig.fileSystemConfig(ref.fsType, _)).run
-        }.map(_
-          .unite
-          .zipWithIndex
-          .map { case (c, i) => (rootDir </> dir("data") </> dir(i.toString)) -> c }
-          .toMap[APath, MountConfig])
-        .unsafePerformSync
-
-    val testName = "MOVE view"
-
-    def withFileSystemConfigs[A](result: MatchResult[A]): Result =
-      fileSystemConfigs.isEmpty.fold(
-        skipped("Warning: no test backends enabled"),
-        AsResult(result))
 
     "MOVE view" in withFileSystemConfigs {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync

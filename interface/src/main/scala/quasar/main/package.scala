@@ -27,6 +27,7 @@ import quasar.db._
 import quasar.fp._, ski._
 import quasar.fp.free._
 import quasar.fs._
+import quasar.fs.cache.VCache
 import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
 import quasar.fs.mount.module.Module
@@ -74,9 +75,11 @@ package object main {
   /** A "terminal" effect, encompassing failures and other effects which
     * we may want to interpret using more than one implementation.
     */
-  type QEffIO[A]  = Coproduct[Task, QEff, A]
-  type QEff[A]     = Coproduct[MetaStoreLocation, QEff0, A]
-  type QEff0[A]    = Coproduct[Mounting, QErrs, A]
+  type QEffIO[A] = Coproduct[Task, QEff, A]
+  type QEff[A]   = Coproduct[Timing, QEff0, A]
+  type QEff0[A]  = Coproduct[VCache, QEff1, A]
+  type QEff1[A]  = Coproduct[MetaStoreLocation, QEff2, A]
+  type QEff2[A]  = Coproduct[Mounting, QErrs, A]
 
   /** All possible types of failure in the system (apis + physical). */
   type QErrs[A]    = Coproduct[PhysErr, CoreErrs, A]
@@ -92,7 +95,12 @@ package object main {
 
   /** Effect comprising the core Quasar apis. */
   type CoreEffIO[A] = Coproduct[Task, CoreEff, A]
-  type CoreEff[A]   = (MetaStoreLocation :\: Module :\: Mounting :\: Analyze :\: QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :/: CoreErrs)#M[A]
+  type CoreEff[A]   =
+    (
+      MetaStoreLocation :\: Module :\: Mounting :\: Analyze :\:
+      QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :\:
+      VCache :\: Timing :/: CoreErrs
+    )#M[A]
 
   object CoreEff {
     def runFs[S[_]](
@@ -106,24 +114,28 @@ package object main {
       S4: PathMismatchFailure :<: S,
       S5: FileSystemFailure :<: S,
       S6: Module.Failure    :<: S,
-      S7: MetaStoreLocation :<: S
+      S7: MetaStoreLocation :<: S,
+      S8: VCache :<: S,
+      S9: Timing :<: S
     ): Task[CoreEff ~> Free[S, ?]] = {
       def moduleInter(fs: BackendEffect ~> Free[S,?]): Module ~> Free[S, ?] = {
         val wtv: Coproduct[Mounting, BackendEffect, ?] ~> Free[S,?] = injectFT[Mounting, S] :+: fs
         flatMapSNT(wtv) compose Module.impl.default[Coproduct[Mounting, BackendEffect, ?]]
       }
       CompositeFileSystem.interpreter[S](hfsRef) map { compFs =>
-        injectFT[MetaStoreLocation, S]                       :+:
-        moduleInter(compFs)                             :+:
-        injectFT[Mounting, S]                           :+:
-        (compFs compose Inject[Analyze, BackendEffect])  :+:
+        injectFT[MetaStoreLocation, S]                     :+:
+        moduleInter(compFs)                                :+:
+        injectFT[Mounting, S]                              :+:
+        (compFs compose Inject[Analyze, BackendEffect])    :+:
         (compFs compose Inject[QueryFile, BackendEffect])  :+:
         (compFs compose Inject[ReadFile, BackendEffect])   :+:
         (compFs compose Inject[WriteFile, BackendEffect])  :+:
         (compFs compose Inject[ManageFile, BackendEffect]) :+:
-        injectFT[Module.Failure, S]                     :+:
-        injectFT[PathMismatchFailure, S]                :+:
-        injectFT[MountingFailure, S]                    :+:
+        injectFT[VCache, S]                                :+:
+        injectFT[Timing, S]                                :+:
+        injectFT[Module.Failure, S]                        :+:
+        injectFT[PathMismatchFailure, S]                   :+:
+        injectFT[MountingFailure, S]                       :+:
         injectFT[FileSystemFailure, S]
       }
     }

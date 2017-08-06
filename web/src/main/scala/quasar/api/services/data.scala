@@ -20,10 +20,14 @@ import slamdata.Predef.{ -> => _, _ }
 import quasar.Data
 import quasar.api._, ToQResponse.ops._, ToApiError.ops._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.disjunction._
+import quasar.effect.{KeyValueStore, Timing}
 import quasar.fp._, numeric._
 import quasar.fs._
+import quasar.fs.cache.{VCache, ViewCache}
 
 import java.nio.charset.StandardCharsets
+import java.time.Duration
 
 import argonaut.Parse
 import argonaut.Argonaut._
@@ -31,7 +35,8 @@ import argonaut.ArgonautScalaz._
 import eu.timepit.refined.auto._
 import org.http4s._
 import org.http4s.dsl._
-import org.http4s.headers.{`Content-Type`, Accept}
+import org.http4s.headers.{`Content-Type`, Accept, Expires}
+import org.http4s.util.Renderer
 import pathy.Path._
 import pathy.argonaut.PosixCodecJson._
 import scalaz.{Zip => _, _}, Scalaz._
@@ -49,15 +54,22 @@ object data {
     M: ManageFile.Ops[S],
     Q: QueryFile.Ops[S],
     S0: Task :<: S,
-    S1: FileSystemFailure :<: S
+    S1: FileSystemFailure :<: S,
+    S2: VCache :<: S,
+    S3: Timing :<: S
   ): QHttpService[S] = QHttpService {
 
     case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) =>
-      respond_((offsetOrInvalid(offsetParam) |@| limitOrInvalid(limitParam)) { (offset, limit) =>
+      respondT {
+        val offsetLimit: ApiErrT[Free[S, ?], (Natural, Option[Positive])] =
+          (offsetOrInvalid(offsetParam) |@| limitOrInvalid(limitParam)).tupled.liftT[Free[S, ?]]
         val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
         val zipped = req.headers.get(Accept).exists(_.values.exists(_.mediaRange == MediaType.`application/zip`))
-        download[S](requestedFormat, path, offset, limit, zipped)
-      })
+
+        offsetLimit >>= { case (offset, limit) =>
+          download[S](requestedFormat, path, offset, limit, zipped).liftM[ApiErrT]
+        }
+      }
 
     case req @ POST -> AsFilePath(path) =>
       upload(req, path, W.appendThese(_, _))
@@ -90,25 +102,46 @@ object data {
   )(implicit
     R: ReadFile.Ops[S],
     Q: QueryFile.Ops[S],
+    T: Timing.Ops[S],
     S0: FileSystemFailure :<: S,
-    S1: Task :<: S
-  ): QResponse[S] =
+    S1: Task :<: S,
+    S2: VCache :<: S
+  ): Free[S, QResponse[S]] = {
+    val vcache = KeyValueStore.Ops[AFile, ViewCache, S]
+
     refineType(path).fold(
       dirPath => {
         val p = zippedContents[S](dirPath, format, offset, limit)
         val headers =
           `Content-Type`(MediaType.`application/zip`) ::
             (format.disposition.toList: List[Header])
-        QResponse.headers.modify(_ ++ headers)(QResponse.streaming(p))
+        QResponse.headers.modify(_ ++ headers)(QResponse.streaming(p)).η[Free[S, ?]]
       },
       filePath => {
-        if (zipped) {
-          formattedZipDataResponse(format, filePath, R.scan(filePath, offset, limit))
-        }
-        else {
-          formattedDataResponse(format, R.scan(filePath, offset, limit))
+        val statusFile: Free[S, (Status, Headers, AFile)] =
+          (for {
+            vc <- vcache.get(filePath)
+            cr <- (T.timestamp.liftM[OptionT] ⊛ OptionT(vc.lastUpdate.η[Free[S, ?]])) { (ts, lu) =>
+                    val expiration = lu.plus(Duration.ofSeconds(vc.maxAgeSeconds))
+
+                    (
+                      ts.isAfter(expiration).fold(StaleResponse, Status.Ok),
+                      Headers(Header(Expires.name.value, Renderer.renderString(expiration))),
+                      vc.dataFile
+                    )
+                  }
+            _  <- vcache.modify(filePath, vc => vc.copy(cacheReads = vc.cacheReads + 1)).liftM[OptionT]
+          } yield cr) | ((Status.Ok, Headers.empty, filePath))
+
+        statusFile ∘ { case (s, h, f) =>
+          val d = R.scan(f, offset, limit)
+          zipped.fold(
+            formattedZipDataResponse(format, f, d),
+            formattedDataResponse(format, d)
+          ).withStatus(s).modifyHeaders(_ ++ h )
         }
       })
+  }
 
   private def parseDestination(dstString: String): ApiError \/ APath = {
     def absPathRequired(rf: pathy.Path[Rel, _, _]) = ApiError.fromMsg(

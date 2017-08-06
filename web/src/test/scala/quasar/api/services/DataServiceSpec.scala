@@ -20,24 +20,36 @@ import scala.Predef.$conforms
 import slamdata.Predef._
 import quasar.{Data, RepresentableData}
 import quasar.DataArbitrary._
+import quasar.DateArbitrary._
 import quasar.RepresentableDataArbitrary._
 import quasar.api._,
-  ApiErrorEntityDecoder._, MessageFormat.JsonContentType, MessageFormatGen._
+  ApiErrorEntityDecoder._, PathUtils._, MessageFormat.JsonContentType, MessageFormatGen._
 import quasar.api.matchers._
 import quasar.api.MessageFormatGen._
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.csv.CsvParser
+import quasar.effect.{Failure, KeyValueStore, Timing}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._
+import quasar.fs.cache.{VCache, ViewCache}
+import quasar.fs.mount.MountConfig
+import quasar.sql._
+import quasar.Variables
+
+import java.time.{Duration, Instant}
 
 import argonaut.{Json, EncodeJson}
 import argonaut.Argonaut._
+import eu.timepit.refined.numeric.{NonNegative, Negative, Positive => RPositive}
+import eu.timepit.refined.auto._
+import eu.timepit.refined.scalacheck.numeric._
 import org.http4s._
 import org.http4s.argonaut._
 import org.http4s.headers._
 import org.http4s.server.middleware.GZip
+import org.http4s.util.Renderer
 import org.specs2.specification.core.Fragment
 import org.specs2.execute.AsResult
 import org.specs2.matcher.MatchResult
@@ -54,32 +66,59 @@ import eu.timepit.refined.numeric.{NonNegative, Negative, Positive => RPositive}
 import eu.timepit.refined.auto._
 import eu.timepit.refined.scalacheck.numeric._
 import shapeless.tag.@@
-import quasar.api.PathUtils._
 
 class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import Fixture._, InMemory._, JsonPrecision._, JsonFormat._
   import FileSystemFixture.{ReadWriteT, ReadWrites, amendWrites}
   import PathError.{pathExists, pathNotFound}
 
-  type Eff0[A] = Coproduct[FileSystemFailure, FileSystem, A]
+  type Eff2[A] = Coproduct[FileSystemFailure, FileSystem, A]
+  type Eff1[A] = Coproduct[VCache, Eff2, A]
+  type Eff0[A] = Coproduct[Timing, Eff1, A]
   type Eff[A]  = Coproduct[Task, Eff0, A]
   type EffM[A] = Free[Eff, A]
 
-  def effRespOr(fs: FileSystem ~> Task): Eff ~> ResponseOr =
-    liftMT[Task, ResponseT]              :+:
-    failureResponseOr[FileSystemError]   :+:
+  def timingInterp(i: Instant) = λ[Timing ~> Task] {
+    case Timing.Timestamp => Task.now(i)
+    case Timing.Nanos     => Task.now(0)
+  }
+
+  val vcacheInterp: Task[VCache ~> Task] = KeyValueStore.impl.default[AFile, ViewCache]
+
+  val vcache = KeyValueStore.Ops[AFile, ViewCache, Eff]
+
+  def effRespOr(fs: FileSystem ~> Task): Task[Eff ~> ResponseOr] =
+    vcacheInterp ∘ (vci =>
+      liftMT[Task, ResponseT]                                                  :+:
+      (liftMT[Task, ResponseT] compose timingInterp(Instant.ofEpochSecond(0))) :+:
+      (liftMT[Task, ResponseT] compose vci)                                    :+:
+      failureResponseOr[FileSystemError]                                       :+:
+      (liftMT[Task, ResponseT] compose fs))
+
+  def effTaskInterp(fs: FileSystem ~> Task, i: Instant, vci: VCache ~> Task): Eff ~> Task =
+    reflNT[Task]                                  :+:
+    timingInterp(i)                               :+:
+    vci                                           :+:
+    Failure.toRuntimeError[Task, FileSystemError] :+:
+    fs
+
+  def effRespOrInterp(fs: FileSystem ~> Task, i: Instant, vci: VCache ~> Task): Eff ~> ResponseOr =
+    liftMT[Task, ResponseT]                           :+:
+    (liftMT[Task, ResponseT] compose timingInterp(i)) :+:
+    (liftMT[Task, ResponseT] compose vci)             :+:
+    failureResponseOr[FileSystemError]                :+:
     (liftMT[Task, ResponseT] compose fs)
 
   def service(mem: InMemState): HttpService =
-    HttpService.lift(req => runFs(mem) flatMap (fs =>
-      data.service[Eff].toHttpService(effRespOr(fs)).apply(req)))
+    HttpService.lift(req => runFs(mem) >>= (fs => effRespOr(fs) >>= (r =>
+      data.service[Eff].toHttpService(r).apply(req))))
 
   def serviceRef(mem: InMemState): (HttpService, Task[InMemState]) = {
     val (inter, ref) = runInspect(mem).unsafePerformSync
-    val svc = HttpService.lift(req =>
-      data.service[Eff]
-        .toHttpService(effRespOr(inter compose fileSystem))
-        .apply(req))
+    val svc =
+      HttpService.lift(req =>
+        effRespOr(inter compose fileSystem) >>= (r =>
+          data.service[Eff].toHttpService(r).apply(req)))
 
     (svc, ref)
   }
@@ -90,14 +129,14 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   def serviceErrs(mem: InMemState, writeErrors: FileSystemError*): HttpService = {
     type RW[A] = ReadWriteT[ResponseOr, A]
     HttpService.lift(req => runFs(mem) flatMap { fs =>
-      val fs0: Eff ~> ResponseOr = effRespOr(fs)
-      val g: WriteFile ~> RW = amendWrites(restrict[ResponseOr, WriteFile, Eff](fs0))
-      val f: Eff ~> RW = liftMT[ResponseOr, ReadWriteT] compose fs0
+      val fs0: Task[Eff ~> ResponseOr] = effRespOr(fs)
+      val g: Task[WriteFile ~> RW] = fs0 ∘ (i => amendWrites(restrict[ResponseOr, WriteFile, Eff](i)))
+      val f: Task[Eff ~> RW] = fs0 ∘ (liftMT[ResponseOr, ReadWriteT] compose _)
+      val fsErrs: Task[Eff ~> ResponseOr] =
+        (f ⊛ g)((fʹ, gʹ) =>
+          evalNT[ResponseOr, ReadWrites]((Nil, List(writeErrors.toVector))) compose free.transformIn(gʹ, fʹ))
 
-      val fsErrs: Eff ~> ResponseOr =
-        evalNT[ResponseOr, ReadWrites]((Nil, List(writeErrors.toVector))) compose free.transformIn(g, f)
-
-      data.service[Eff].toHttpService(fsErrs).apply(req)
+      fsErrs >>= (i => data.service[Eff].toHttpService(i).apply(req))
     })
   }
 
@@ -320,6 +359,87 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           }
         }
       }
+
+      "respond with view cache data" >> {
+        "fresh" >> prop {
+            (f: AFile, g: AFile, d: Vector[Data], now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
+            val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
+            lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isBefore(lastUpdate.plus(maxAge))
+          } ==> {
+            val expr = sqlB"α"
+            val viewCache = ViewCache(
+              MountConfig.viewConfigUri(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
+              maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
+
+            val memState = InMemState.fromFiles(Map(g -> d))
+
+            val (respA, respB, vc) =
+              (runFs(memState) ⊛ vcacheInterp)((fs, vci) => {
+                val it: Eff ~> Task       = effTaskInterp(fs, now, vci)
+                val ir: Eff ~> ResponseOr = effRespOrInterp(fs, now, vci)
+
+                val p: Free[Eff, (QResponse[Eff], QResponse[Eff], Option[ViewCache])] =
+                  for {
+                    _ <- vcache.put(f, viewCache)
+                    a <- data.service[Eff].apply(Request(uri = pathUri(f)))
+                    b <- data.service[Eff].apply(Request(uri = pathUri(g)))
+                    c <- vcache.get(f).run
+                  } yield (a, b, c)
+
+                p.foldMap(it) >>= { case (a, b, c) =>
+                  (a.toHttpResponse(ir) ⊛ b.toHttpResponse(ir) ⊛ c.η[Task]).tupled
+                }
+              }).join.unsafePerformSync
+
+            respA.status must_= Status.Ok
+            respB.status must_= Status.Ok
+            respA.headers.get(Expires.name) ∘ (_.value) must_=
+              Some(Renderer.renderString(lastUpdate.plus(Duration.ofSeconds(maxAgeSecs.toLong))))
+            respA.as[String].unsafePerformSync must_= respB.as[String].unsafePerformSync
+            vc ∘ (_.cacheReads) must_= (viewCache.cacheReads ⊹ 1).some
+          }
+        }
+
+        "stale" >> prop {
+            (f: AFile, g: AFile, d: Vector[Data], now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
+            val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
+              lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isAfter(lastUpdate.plus(maxAge))
+          } ==> {
+            val expr = sqlB"α"
+            val viewCache = ViewCache(
+              MountConfig.viewConfigUri(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
+              maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
+
+            val memState = InMemState.fromFiles(Map(g -> d))
+
+            val (respA, respB, vc) =
+              (runFs(memState) ⊛ vcacheInterp)((fs, vci) => {
+                val it: Eff ~> Task       = effTaskInterp(fs, now, vci)
+                val ir: Eff ~> ResponseOr = effRespOrInterp(fs, now, vci)
+
+                val p: Free[Eff, (QResponse[Eff], QResponse[Eff], Option[ViewCache])] =
+                  for {
+                    _ <- vcache.put(f, viewCache)
+                    a <- data.service[Eff].apply(Request(uri = pathUri(f)))
+                    b <- data.service[Eff].apply(Request(uri = pathUri(g)))
+                    c <- vcache.get(f).run
+                  } yield (a, b, c)
+
+                p.foldMap(it) >>= { case (a, b, c) =>
+                  (a.toHttpResponse(ir) ⊛ b.toHttpResponse(ir) ⊛ c.η[Task]).tupled
+                }
+              }).join.unsafePerformSync
+
+            respA.status must_= StaleResponse
+            respB.status must_= Status.Ok
+            respA.headers.get(Expires) ∘ (_.value) must_=
+              Some(Renderer.renderString(lastUpdate.plus(Duration.ofSeconds(maxAgeSecs.toLong))))
+            respA.as[String].unsafePerformSync must_= respB.as[String].unsafePerformSync
+            vc ∘ (_.cacheReads) must_= (viewCache.cacheReads ⊹ 1).some
+           }
+        }
+      }
+
       "download as zipped directory" >> prop { filesystem: NonEmptyDir =>
         val disposition = `Content-Disposition`("attachment", Map("filename" -> "foo.zip"))
         val requestMediaType = MediaType.`text/csv`.withExtensions(Map("disposition" -> disposition.value))

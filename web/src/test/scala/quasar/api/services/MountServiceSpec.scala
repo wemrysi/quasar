@@ -22,17 +22,20 @@ import quasar.api._, ApiErrorEntityDecoder._
 import quasar.api.PathUtils._
 import quasar.api.matchers._
 import quasar.contrib.pathy._, PathArbitrary._
-import quasar.effect.{Failure, KeyValueStore}
+import quasar.effect.{Failure, KeyValueStore, Timing}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
+import quasar.fs.cache.{VCache, ViewCache}
 import quasar.fs.mount.{MountRequest => MR, _}
 import quasar.sql._
 
+import java.time.Instant
+import scala.concurrent.duration._
 import scala.Predef.$conforms
 
 import argonaut._, Argonaut._
-import org.http4s._, Status._
+import org.http4s._, headers._, Status._
 import org.http4s.argonaut._
 import org.specs2.specification.core.Fragment
 import matryoshka.data.Fix
@@ -46,7 +49,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
   import posixCodec.printPath
   import PathError._, Mounting.PathTypeMismatch
 
-  type Eff[A] = (Task :\: Mounting :\: MountingFailure :/: PathMismatchFailure)#M[A]
+  type Eff[A] = (Task :\: Timing :\: VCache :\: ManageFile :\: Mounting :\: MountingFailure :/: PathMismatchFailure)#M[A]
 
   type Mounted = Set[MR]
   type TestSvc = Request => Free[Eff, (Response, Mounted)]
@@ -58,6 +61,17 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
   val sampleStatements: List[Statement[Fix[Sql]]] = List(FunctionDecl(CIName("FOO"), List(CIName("Bar")), Fix(boolLiteral(true))))
 
   val M = Mounting.Ops[Eff]
+
+  val nineteenEighty = Instant.parse("1980-01-01T00:00:00.00Z")
+
+  val timingInterp = λ[Timing ~> Task] {
+    case Timing.Timestamp => Task.now(nineteenEighty)
+    case Timing.Nanos     => Task.now(0)
+  }
+
+  val vcacheInterp: Task[VCache ~> Task] = KeyValueStore.impl.default[AFile, ViewCache]
+
+  val vcache = KeyValueStore.Ops[AFile, ViewCache, Eff]
 
   def runTest[A](f: TestSvc => Free[Eff, A]): A = {
     type MEff[A] = Coproduct[Task, MountConfigs, A]
@@ -76,31 +90,37 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
           case mntReq =>
             mountedRef.modify(_ + mntReq).void map \/.right
         },
-        mntReq => mountedRef.modify(_ - mntReq).void
-      )
+        mntReq => mountedRef.modify(_ - mntReq).void)
 
       val meff: MEff ~> Task =
         reflNT[Task] :+: KeyValueStore.impl.fromTaskRef(configsRef)
 
-      val effR: Eff ~> ResponseOr =
-        liftMT[Task, ResponseT]              :+:
-        (liftMT[Task, ResponseT] compose
-          (foldMapNT(meff) compose mounter)) :+:
-        failureResponseOr[MountingError]     :+:
-        failureResponseOr[PathTypeMismatch]
+      (vcacheInterp ⊛ InMemory.runFs(InMemory.InMemState.empty)) { (vci, fsi) =>
+        val effR: Eff ~> ResponseOr =
+          liftMT[Task, ResponseT]                                                        :+:
+          (liftMT[Task, ResponseT] compose timingInterp)                                 :+:
+          (liftMT[Task, ResponseT] compose vci)                                          :+:
+          (liftMT[Task, ResponseT] compose fsi compose injectNT[ManageFile, FileSystem]) :+:
+          (liftMT[Task, ResponseT] compose (foldMapNT(meff) compose mounter))            :+:
+          failureResponseOr[MountingError]                                               :+:
+          failureResponseOr[PathTypeMismatch]
 
-      val effT: Eff ~> Task =
-        reflNT[Task]                                   :+:
-        (foldMapNT(meff) compose mounter)              :+:
-        Failure.toRuntimeError[Task, MountingError]    :+:
-        Failure.toRuntimeError[Task, PathTypeMismatch]
+        val effT: Eff ~> Task =
+          reflNT[Task]                                   :+:
+          timingInterp                                   :+:
+          vci                                            :+:
+          (fsi compose injectNT[ManageFile, FileSystem]) :+:
+          (foldMapNT(meff) compose mounter)              :+:
+          Failure.toRuntimeError[Task, MountingError]    :+:
+          Failure.toRuntimeError[Task, PathTypeMismatch]
 
-      val service = mount.service[Eff].toHttpService(effR)
+        val service = mount.service[Eff].toHttpService(effR)
 
-      val testSvc: TestSvc =
-        req => injectFT[Task, Eff] apply (service(req) flatMap (mountedRef.read strengthL _))
+        val testSvc: TestSvc =
+          req => injectFT[Task, Eff] apply (service(req) flatMap (mountedRef.read strengthL _))
 
-      f(testSvc) foldMap effT
+        f(testSvc) foldMap effT
+      }.join
     }.unsafePerformSync
   }
 
@@ -209,7 +229,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
     }
 
     "MOVE" should {
-      import org.http4s.Method.MOVE
+      import org.http4s.Method.{MOVE, PUT}
 
       def destination(p: pathy.Path[_, _, Sandboxed]) = Header(Destination.name.value, UriPathCodec.printPath(p))
 
@@ -276,9 +296,53 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             } yield {
               (body must_== s"moved ${printPath(src)} to ${printPath(dst)}") and
               (res.status must_== Ok)                                        and
-              (mntd must_== Set(MR.mountView(dst, scopedExpr, vars)))              and
+              (mntd must_== Set(MR.mountView(dst, scopedExpr, vars)))        and
               (srcAfter must beNone)                                         and
               (dstAfter must beSome(MountConfig.viewConfig(scopedExpr, vars).right[MountingError]))
+            }
+          }
+        }
+      }
+
+      "succeed with a cached view mount" >> prop { (src: AFile, dst: AFile) =>
+        val expr = sqlB"α"
+        val vars = Variables.empty
+        val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
+        val maxAge = 7.seconds
+        val viewCache =
+          lift(ViewCache.expireAt(nineteenEighty, maxAge) ∘ (ra =>
+            ViewCache(
+              MountConfig.viewConfigUri(expr, vars), None, None, 0, None, None,
+              maxAge.toSeconds, ra, ViewCache.Status.Pending, None, src, None))).into[Eff]
+
+        (src ≠ dst) ==> {
+          runTest { service =>
+            for {
+              vc       <- viewCache
+              put      <- lift(Request(
+                              method = PUT,
+                              uri = pathUri(src),
+                              headers = Headers(`Cache-Control`(CacheDirective.`max-age`(maxAge))))
+                            .withBody(cfgStr)).into[Eff]
+              _        <- service(put)
+              r        <- service(Request(
+                            method = MOVE,
+                            uri = pathUri(src),
+                            headers = Headers(destination(dst))))
+              (res, mntd) = r
+              body     <- lift(res.as[String]).into[Eff]
+              vcSrc    <- vcache.get(src).run
+              vcDst    <- vcache.get(dst).run
+              srcAfter <- M.lookupConfig(src).run.run
+              dstAfter <- M.lookupConfig(dst).run.run
+            } yield {
+              (body must_== s"moved ${printPath(src)} to ${printPath(dst)}")             and
+              (res.status must_== Ok)                                                    and
+              (vcSrc must beNone)                                                        and
+              (vcDst ∘ (_.copy(dataFile = src)) must beSome(vc)) and
+              (mntd must_== Set(MR.mountView(dst, expr, vars)))                          and
+              (srcAfter must beNone)                                                     and
+              (dstAfter must beSome(MountConfig.viewConfig(expr, vars).right[MountingError]))
             }
           }
         }
@@ -396,27 +460,28 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
       import org.http4s.Method.PUT
 
       trait RequestBuilder {
-        def apply[B](parent: ADir, mount: RPath, body: B)(implicit B: EntityEncoder[B]): Free[Eff, Request]
+        def apply[B](parent: ADir, mount: RPath, body: B, headers: Header*)(implicit B: EntityEncoder[B]): Free[Eff, Request]
       }
 
       def testBoth(test: RequestBuilder => Fragment) = {
         "POST" should {
           test(new RequestBuilder {
-            def apply[B](parent: ADir, mount: RPath, body: B)(implicit B: EntityEncoder[B]) =
+            def apply[B](parent: ADir, mount: RPath, body: B, headers: Header*)(implicit B: EntityEncoder[B]) =
               lift(Request(
                 method = POST,
                 uri = pathUri(parent),
-                headers = Headers(xFileName(mount)))
+                headers = Headers(xFileName(mount) :: headers.toList))
               .withBody(body)).into[Eff]
             })
         }
 
         "PUT" should {
           test(new RequestBuilder {
-            def apply[B](parent: ADir, mount: RPath, body: B)(implicit B: EntityEncoder[B]) =
+            def apply[B](parent: ADir, mount: RPath, body: B, headers: Header*)(implicit B: EntityEncoder[B]) =
               lift(Request(
                 method = PUT,
-                uri = pathUri(parent </> mount))
+                uri = pathUri(parent </> mount),
+                headers = Headers(headers.toList))
               .withBody(body)).into[Eff]
           })
         }
@@ -545,6 +610,69 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
                 (res.status must_== Ok)                                   and
                 (mntd must_== Set(MR.mountModule(dst, sampleStatements))) and
                 (after must beSome(MountConfig.moduleConfig(sampleStatements).right[MountingError]))
+            }
+          }
+        }
+
+        "create view cache if non-existant" >> prop { (d: ADir, f: RFile) =>
+          runTest { service =>
+            val expr = sqlB"α"
+            val vars = Variables.empty
+            val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
+            val df = d </> f
+            val maxAge = 7.seconds
+            val viewCache =
+              lift(ViewCache.expireAt(nineteenEighty, maxAge) ∘ (ra =>
+                ViewCache(
+                  MountConfig.viewConfigUri(expr, vars), None, None, 0, None, None,
+                  maxAge.toSeconds, ra, ViewCache.Status.Pending, None, df, None))).into[Eff]
+
+            for {
+              vc    <- viewCache
+              req   <- reqBuilder(d, f, cfgStr, `Cache-Control`(CacheDirective.`max-age`(7.seconds)))
+              r     <- service(req)
+              (res, mntd) = r
+              body  <- lift(res.as[String]).into[Eff]
+              vcg   <- vcache.get(df).run
+              after <- M.lookupConfig(df).run.run
+            } yield {
+              (body must_= s"added ${printPath(df)}")           and
+              (res.status must_= Ok)                            and
+              (vcg ∘ (_.copy(dataFile = df)) must beSome(vc))   and
+              (mntd must_=== Set(MR.mountView(df, expr, vars))) and
+              (after must beSome(MountConfig.viewConfig(expr, vars).right[MountingError]))
+            }
+          }
+        }
+
+        "update existing view" >> prop { (d: ADir, f: RFile) =>
+          runTest { service =>
+            val expr = sqlB"α"
+            val vars = Variables.empty
+            val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
+            val df = d </> f
+            val maxAge = 7.seconds
+            val viewCache =
+              lift(ViewCache.expireAt(nineteenEighty, maxAge) ∘ (ra =>
+                ViewCache(
+                  MountConfig.viewConfigUri(expr, vars), None, None, 0, None, None,
+                  maxAge.toSeconds, ra, ViewCache.Status.Pending, None, df, None))).into[Eff]
+
+            for {
+              vc    <- viewCache
+              vcg   <- vcache.put(df, vc.copy(status = ViewCache.Status.Successful))
+              req   <- reqBuilder(d, f, cfgStr, `Cache-Control`(CacheDirective.`max-age`(7.seconds)))
+              r     <- service(req)
+              (res, mntd) = r
+              body  <- lift(res.as[String]).into[Eff]
+              vcg   <- vcache.get(df).run
+              after <- M.lookupConfig(df).run.run
+            } yield {
+              (body must_= s"added ${printPath(df)}")           and
+              (res.status must_= Ok)                            and
+              (vcg ∘ (_.copy(dataFile = df)) must beSome(vc))   and
+              (mntd must_=== Set(MR.mountView(df, expr, vars))) and
+              (after must beSome(MountConfig.viewConfig(expr, vars).right[MountingError]))
             }
           }
         }
@@ -818,6 +946,29 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
               (res.status must_== Ok)                 and
               (mntd must beEmpty)                     and
               (after must beNone)
+          }
+        }
+      }
+
+      "remove view cache" >> prop { f: AFile =>
+        runTest { service =>
+          val viewCache = ViewCache(
+            ConnectionUri("α"), None, None, 0, None, None,
+            0, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, f, None)
+
+          for {
+            _   <- vcache.put(f, viewCache)
+            r   <- service(Request(method = DELETE, uri = pathUri(f)))
+            (res, mntd) = r
+            body  <- lift(res.as[String]).into[Eff]
+            vcg   <- vcache.get(f).run
+            after <- M.lookupConfig(f).run.run
+          } yield {
+            (body must_= s"deleted ${printPath(f)}") and
+            (res.status must_= Ok)                   and
+            (vcg must beNone)                        and
+            (mntd must beEmpty)                      and
+            (after must beNone)
           }
         }
       }

@@ -17,9 +17,11 @@
 package quasar.metastore
 
 import slamdata.Predef._
-
-import quasar.contrib.pathy.{ADir, APath}
+import quasar.contrib.pathy.{ADir, AFile, APath}
+import quasar.fs.cache.ViewCache
 import quasar.fs.mount.{MountConfig, MountType}, MountConfig.FileSystemConfig
+
+import java.time.Instant
 
 import doobie.imports._
 import pathy.Path, Path._
@@ -54,6 +56,74 @@ trait Queries {
 
   def deleteMount(path: APath): Update0 =
     sql"DELETE FROM Mounts where path = ${refineType(path)}".update
+
+  val viewCachePaths: Query0[AFile] =
+    sql"SELECT path FROM view_cache".query[AFile]
+
+  def lookupViewCache(path: AFile): Query0[PathedViewCache] =
+    sql"SELECT * FROM view_cache WHERE path = $path".query[PathedViewCache]
+
+  def insertViewCache(path: AFile, viewCache: ViewCache): Update0 =
+    sql"""INSERT INTO view_cache values (
+            $path,
+            ${viewCache.query},
+            ${viewCache.lastUpdate},
+            ${viewCache.executionMillis},
+            ${viewCache.cacheReads},
+            ${viewCache.assignee},
+            ${viewCache.assigneeStart},
+            ${viewCache.maxAgeSeconds},
+            ${viewCache.refreshAfter},
+            ${viewCache.status},
+            ${viewCache.errorMsg},
+            ${viewCache.dataFile},
+            ${viewCache.tmpDataFile})""".update
+
+  def updateViewCache(path: AFile, viewCache: ViewCache): Update0 =
+    sql"""UPDATE view_cache
+          SET
+            path = $path,
+            query = ${viewCache.query},
+            last_update = ${viewCache.lastUpdate},
+            execution_millis = ${viewCache.executionMillis},
+            cache_reads = ${viewCache.cacheReads},
+            assignee = ${viewCache.assignee},
+            assignee_start = ${viewCache.assigneeStart},
+            max_age_seconds = ${viewCache.maxAgeSeconds},
+            refresh_after = ${viewCache.refreshAfter},
+            status = ${viewCache.status},
+            error_msg = ${viewCache.errorMsg},
+            data_file = ${viewCache.dataFile},
+            tmp_data_file = ${viewCache.tmpDataFile}
+          WHERE PATH = $path""".update
+
+  def updateViewCacheErrorMsg(path: AFile, errorMsg: String): Update0 =
+    sql"""UPDATE view_cache
+          SET
+            status = ${ViewCache.Status.Failed: ViewCache.Status},
+            error_msg = $errorMsg
+          WHERE PATH = $path""".update
+
+  def deleteViewCache(path: AFile): Update0 =
+    sql"""DELETE FROM view_cache WHERE path = $path""".update
+
+  val staleCachedViews: Query0[PathedViewCache] =
+    sql"""SELECT *
+          FROM view_cache
+          WHERE last_update IS NULL OR (last_update > refresh_after)""".query[PathedViewCache]
+
+  def cacheRefreshAssigneStart(path: AFile, assigneeId: String, start: Instant, tmpDataPath: AFile): Update0 =
+    sql"""UPDATE view_cache
+          SET assignee = $assigneeId, assignee_start = $start, tmp_data_file = $tmpDataPath
+          WHERE path = $path""".update
+
+  def updatePerSuccesfulCacheRefresh(path: AFile, lastUpdate: Instant): Update0 =
+    sql"""UPDATE view_cache
+          SET
+            assignee = null, last_update = $lastUpdate,
+            status = 'successful',
+            tmp_data_file = null
+          WHERE path = $path""".update
 }
 
 object Queries extends Queries
