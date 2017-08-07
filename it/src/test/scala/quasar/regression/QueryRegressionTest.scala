@@ -69,7 +69,12 @@ abstract class QueryRegressionTest[S[_]](
   val injectTask: Task ~> F =
     liftFT[S].compose(injectNT[Task, S])
 
-  val TestsRoot = currentDir[Sandboxed] </> dir("it") </> dir("src") </> dir("main") </> dir("resources") </> dir("tests")
+  val TestDataRoot: RDir =
+    currentDir[Sandboxed] </> dir("it") </> dir("src") </> dir("main") </> dir("resources") </> dir("tests")
+
+  lazy val TestsRoot: RDir =
+    TestsDir.fold(TestDataRoot)(TestDataRoot </> _)
+
   val DataDir: ADir = rootDir </> dir("regression")
 
   /** Location on the (host) file system of the data file referred to from a
@@ -87,6 +92,9 @@ abstract class QueryRegressionTest[S[_]](
   val manage = ManageFile.Ops[S]
   val fsQ    = new FilesystemQueries[S]
 
+  /** The location of the test files. */
+  def TestsDir: Option[Path[Rel, Dir, Sandboxed]]
+
   /** A name to identify the suite in test output. */
   def suiteName: String
 
@@ -95,7 +103,7 @@ abstract class QueryRegressionTest[S[_]](
 
   ////
 
-  lazy val tests = regressionTests(TestsRoot, knownFileSystems).unsafePerformSync
+  lazy val tests = regressionTests(TestDataRoot, TestsRoot, knownFileSystems).unsafePerformSync
 
   // NB: The printing is just to indicate progress (especially for travis-ci) as
   //     these tests have the potential to be slow for a backend.
@@ -305,7 +313,8 @@ abstract class QueryRegressionTest[S[_]](
                )),
         Process.emit(_))
 
-    val jf = jFile(TestsRoot </> file)
+    val jf = jFile(TestDataRoot </> file)
+
     Task.delay(jf.exists).liftM[Process].ifM(
       io.linesR(new FileInputStream(jf)) flatMap parse,
       Process.fail(new java.io.FileNotFoundException(jf.getPath)))
@@ -315,13 +324,14 @@ abstract class QueryRegressionTest[S[_]](
     * file path.
     */
   def regressionTests(
+    dataDir: RDir,
     testDir: RDir,
     knownBackends: Set[BackendName]
   ): Task[Map[RFile, RegressionTest]] =
     descendantsMatching(testDir, """^([^.].*)\.test""".r) // don't match file names with a leading .
       .map(f =>
         (loadRegressionTest(f) >>= verifyBackends(knownBackends)) strengthL
-          (f relativeTo testDir).get)
+          (f relativeTo dataDir).get)
       .gather(4)
       .runLog
       .map(_.toMap)
