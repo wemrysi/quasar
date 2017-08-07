@@ -99,9 +99,9 @@ package object elastic {
     )
 
     for {
-      sparkConf   <- sparkConfOrErr
-      elasticHost <- fetchParameter("elasticHost")
-      elasticPort <- fetchParameter("elasticPort")
+      sparkConf                  <- sparkConfOrErr
+      elasticHostAndPort         <- fetchParameter("elasticHost").tuple(fetchParameter("elasticPort"))
+      (elasticHost, elasticPort) = elasticHostAndPort
     } yield (sparkConf, SparkFSConf(sparkConf, elasticHost, elasticPort.toInt))
   }
 
