@@ -19,8 +19,9 @@ package quasar.physical.marklogic.qscript
 import slamdata.Predef._
 
 import quasar.contrib.pathy._
-import quasar.ejson.EJson
+import quasar.ejson._
 import quasar.physical.marklogic.cts._
+import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 import quasar.qscript.{MapFuncsCore => MFCore}
 
@@ -30,6 +31,7 @@ import matryoshka.{Hole => _, _}
 import org.scalacheck.{Arbitrary, Gen}, Arbitrary.arbitrary
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
+import xml.name._
 
 import scalaz._, Scalaz._
 
@@ -55,7 +57,7 @@ final class FilterPlannerSpec extends quasar.Qspec {
     }))
   }
 
-  case class ProjectTestCase(fm: FreeMap[Fix], path: ADir, op: ComparisonOp)
+  case class ProjectTestCase(fm: FreeMap[Fix], path: ADir, op: ComparisonOp, expr: String)
 
   val genNestedProject: Gen[(FreeMap[Fix], ADir)] =
     for {
@@ -72,7 +74,7 @@ final class FilterPlannerSpec extends quasar.Qspec {
       searchExpr <- Gen.alphaStr
       (nested, dir0) = projection
       op <- Gen.oneOf(comparisons)
-    } yield ProjectTestCase(makeComp(op, nested, searchExpr), dir0, op)
+    } yield ProjectTestCase(makeComp(op, nested, searchExpr), dir0, op, searchExpr)
 
   implicit val arbProjectTestCase: Arbitrary[ProjectTestCase] =
     Arbitrary(genProjectTestCase)
@@ -80,37 +82,79 @@ final class FilterPlannerSpec extends quasar.Qspec {
   val rt = implicitly[RenderTree[FreeMap[Fix]]]
   val rtp = implicitly[RenderTree[FreePathMap[Fix]]]
 
+  type U = Fix[Query[Fix[EJson], ?]]
+
+  def directoryQuery[Q](implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]
+  ): Q = Q.embed(Query.Directory[Fix[EJson], Q](IList("/some/ml/location"), MatchDepth.Children))
+
+  def andQuery[Q](l: Q, r: Q)(implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]
+  ): Q = Q.embed(Query.And[Fix[EJson], Q](IList(l, r)))
+
+  def pathRange[Q](path: String, op: ComparisonOp, value: Fix[EJson])(
+    implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]
+  ): Q = Q.embed(Query.PathRange(IList(path), op, IList(value)))
+
+  def elementRange[Q](element: QName, op: ComparisonOp, value: Fix[EJson])(
+    implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]
+  ): Q = Q.embed(Query.ElementRange(IList(element), op, IList(value)))
+
+  def jsonPropertyRange[Q](property: String, op: ComparisonOp, value: Fix[EJson])(
+    implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]
+  ): Q = Q.embed(Query.JsonPropertyRange(IList(property), op, IList(value)))
+
   def src0[Q](implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]): Search[Q] =
-    Search(
-      Q.embed(Query.Directory[Fix[EJson], Q](IList("/some/ml/location"), MatchDepth.Children)),
-      IncludeId,
-      IList())
+    Search(directoryQuery, IncludeId, IList())
 
-  def andQuery[Q](l: Q, r: Q)(implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]): Q =
-    Q.embed(Query.And[Fix[EJson], Q](IList(l, r)))
-
-  val src = src0[Fix[Query[Fix[EJson], ?]]]
+  def str(value: String): Fix[EJson] = EJson.fromCommon(Str[Fix[EJson]](value))
 
   "StarIndexPlanner" >> {
     "search expression includes * and projection path" >> prop { prj: ProjectTestCase =>
       val planner = new FilterPlanner[Fix]
+      val path = prettyPrint(rebaseA(rootDir[Sandboxed] </> dir("*"))(prj.path)).dropRight(1)
 
-      planner.StarIndexPlanner(src, prj.fm) must beSome
+      val expectedSearch = Search[U](
+        andQuery[U](directoryQuery[U], pathRange[U](path, prj.op, str(prj.expr))), IncludeId, IList())
+
+      planner.StarIndexPlanner(src0[U], prj.fm) must beSome(expectedSearch)
     }
   }
   "PathIndexPlanner" >> {
-    "plan with path indexes using any comparison operator" >> prop { prj: ProjectTestCase =>
+    "plan includes the projection path" >> prop { prj: ProjectTestCase =>
+      val planner = new FilterPlanner[Fix]
+      val path = prettyPrint(prj.path).dropRight(1)
 
-      1 must_== 1
+      val expectedSearch = Search[U](
+        andQuery[U](directoryQuery[U], pathRange[U](path, prj.op, str(prj.expr))), IncludeId, IList())
+
+      planner.PathIndexPlanner(src0[U], prj.fm) must beSome(expectedSearch)
     }
   }
   "ElementIndexPlanner" >> {
-    "add a predicate to search expression" >> prop { prj: ProjectTestCase =>
-      1 must_== 1
+    "planXml" >> {
+      "plan with a star predicate and path" >> prop { prj: ProjectTestCase =>
+        import axes.child
+
+        val planner = new FilterPlanner[Fix]
+        val predPath = flatten(None, None, None, Some(_), Some(_), prj.path)
+          .toIList.unite.map(child.elementNamed(_)).foldLeft(child.*)((path, segment) => path `/` segment)
+
+        val name: Option[QName] = dirName(prj.path) >>= ((dr: DirName) => QName.string.getOption(dr.value))
+
+        val expectedSearch: Option[Search[U]] = name map ((elName: QName) => Search[U](
+          andQuery[U](directoryQuery[U], elementRange[U](elName, prj.op, str(prj.expr))), IncludeId, IList(predPath)))
+
+        planner.ElementIndexPlanner.planXml(src0[U], prj.fm) must beEqualTo(expectedSearch)
+      }
+
+      "concatenate predicates if there's already one" >> prop { prj: ProjectTestCase =>
+        1 must_== 1
+      }
     }
 
-    "concatenate predicates if there's already one" >> prop { prj: ProjectTestCase =>
-      1 must_== 1
+    "planJson" >> {
+      "add the path as a predicate to the search expression" >> prop { prj: ProjectTestCase =>
+        1 must_== 1
+      }
     }
   }
 }
