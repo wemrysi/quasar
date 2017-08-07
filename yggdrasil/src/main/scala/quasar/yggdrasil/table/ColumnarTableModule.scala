@@ -653,8 +653,12 @@ trait ColumnarTableModule[M[+ _]]
       rec(
         slices map { s =>
           val schema = new CSchema {
-            val columnRefs = s.columns.keySet
-            def columns(jtype: JType) = s.logicalColumns(jtype)
+            def columnRefs = s.columns.keySet
+            def columnMap(jtpe: JType) =
+              s.columns collect {
+                case (ref @ ColumnRef(cpath, ctype), col) if Schema.includes(jtpe, cpath, ctype) =>
+                  ref -> col
+              }
           }
 
           reducer.reduce(schema, 0 until s.size)
@@ -1685,36 +1689,43 @@ trait ColumnarTableModule[M[+ _]]
       distinct0(SliceTransform.identity(None: Option[Slice]), composeSliceTransform(spec))
     }
 
-    def takeRange(startIndex: Long, numberToTake: Long): Table = {
-      def loop(stream: StreamT[M, Slice], readSoFar: Long): M[StreamT[M, Slice]] = stream.uncons flatMap {
-        // Prior to first needed slice, so skip
-        case Some((head, tail)) if (readSoFar + head.size) < (startIndex + 1) => loop(tail, readSoFar + head.size)
-        // Somewhere in between, need to transition to splitting/reading
-        case Some(_) if readSoFar < (startIndex + 1) => inner(stream, 0, (startIndex - readSoFar).toInt)
-        // Read off the end (we took nothing)
-        case _ => M.point(StreamT.empty[M, Slice])
+    def drop(count: Long): Table = {
+      val slices2 = StreamT.unfoldM[M, StreamT[M, Slice], Option[(StreamT[M, Slice], Long)]](Some((slices, 0L))) {
+        case Some((slices, dropped)) =>
+          slices.uncons map {
+            case Some((slice, tail)) =>
+              if (slice.size <= count - dropped)
+                Some((StreamT.empty[M, Slice], Some((tail, dropped + slice.size))))
+              else
+                Some((slice.drop((count - dropped).toInt) :: tail, None))
+
+            case None => None
+          }
+
+        case None => M.point(None)
       }
 
-      def inner(stream: StreamT[M, Slice], takenSoFar: Long, sliceStartIndex: Int): M[StreamT[M, Slice]] = stream.uncons flatMap {
-        case Some((head, tail)) if takenSoFar < numberToTake => {
-          val needed = head.takeRange(sliceStartIndex, (numberToTake - takenSoFar).toInt)
-          inner(tail, takenSoFar + (head.size - (sliceStartIndex)), 0).map(needed :: _)
-        }
-        case _ => M.point(StreamT.empty[M, Slice])
-      }
-
-      def calcNewSize(current: Long): Long = ((current - startIndex) max 0) min numberToTake
-
-      val newSize = size match {
-        case ExactSize(sz)            => ExactSize(calcNewSize(sz))
-        case EstimateSize(sMin, sMax) => TableSize(calcNewSize(sMin), calcNewSize(sMax))
-        case UnknownSize              => UnknownSize
-        case InfiniteSize             => InfiniteSize
-      }
-
-      Table(StreamT.wrapEffect(loop(slices, 0)), newSize)
+      Table(slices2.flatMap(x => x), size + ExactSize(-count))
     }
 
+    def take(count: Long): Table = {
+      val slices2 = StreamT.unfoldM[M, StreamT[M, Slice], Option[(StreamT[M, Slice], Long)]](Some((slices, 0L))) {
+        case Some((slices, taken)) =>
+          slices.uncons map {
+            case Some((slice, tail)) =>
+              if (slice.size <= count - taken)
+                Some((slice :: StreamT.empty[M, Slice], Some((tail, taken + slice.size))))
+              else
+                Some((slice.take((count - taken).toInt) :: StreamT.empty[M, Slice], None))
+
+            case None => None
+          }
+
+        case None => M.point(None)
+      }
+
+      Table(slices2.flatMap(x => x), EstimateSize(0, count))
+    }
     /**
       * In order to call partitionMerge, the table must be sorted according to
       * the values specified by the partitionBy transspec.

@@ -20,6 +20,8 @@ import slamdata.Predef._
 import quasar.fp.free.foldMapNT
 import quasar.db._
 
+import scala.util.Random.nextInt
+
 import doobie.imports._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -49,9 +51,19 @@ trait MetaStoreFixture {
     interpretIO compose foldMapNT(f)
 }
 
+object MetaStoreFixture {
+  def createNewTestMetaStoreConfig: Task[DbConnectionConfig] =
+      Task.delay { DbUtil.inMemoryConfig(s"test_mem_$nextInt") }
+  def createNewTestTransactor: Task[Transactor[Task]] =
+    createNewTestMetastore.map(_.trans.transactor)
+  def createNewTestMetastore: Task[MetaStore] =
+    createNewTestMetaStoreConfig.map(testConfig =>
+      MetaStore(testConfig, StatefulTransactor(DbUtil.simpleTransactor(DbConnectionConfig.connectionInfo(testConfig)), Task.now(()))))
+}
+
 trait H2MetaStoreFixture extends MetaStoreFixture {
   def rawTransactor = DbUtil.simpleTransactor(
-    DbUtil.inMemoryConnectionInfo(s"test_mem_${this.getClass.getSimpleName}"))
+    DbConnectionConfig.connectionInfo(DbUtil.inMemoryConfig(s"test_mem_${this.getClass.getSimpleName}")))
 }
 
 trait PostgreSqlMetaStoreFixture

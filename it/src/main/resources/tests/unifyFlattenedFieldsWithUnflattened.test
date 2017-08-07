@@ -1,7 +1,7 @@
 {
     "name": "unify flattened fields with unflattened field",
     "backends": {
-        "mimir":"pendingIgnoreFieldOrder",
+        "mimir":"ignoreFieldOrder",
         "couchbase":  "pending"
     },
     "data": "zips.data",

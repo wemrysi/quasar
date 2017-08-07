@@ -2,7 +2,6 @@
   "name": "filter on date part",
 
   "backends": {
-        "mimir":"pending",
     "mongodb_q_3_2":  "pending"
   },
 

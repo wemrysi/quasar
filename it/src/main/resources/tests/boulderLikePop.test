@@ -2,7 +2,7 @@
   "name": "population of Boulder-like towns",
 
   "backends": {
-        "mimir":"pendingIgnoreFieldOrder"
+        "mimir":"ignoreFieldOrder"
   },
 
   "data": "zips.data",

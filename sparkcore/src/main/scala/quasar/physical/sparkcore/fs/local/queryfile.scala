@@ -25,6 +25,8 @@ import quasar.fs.FileSystemError._
 import quasar.contrib.pathy._
 import quasar.fp.ski._
 import quasar.fp.free._
+import quasar.effect.Capture
+import quasar.physical.sparkcore.fs.{SparkConnectorDetails, FileExists}
 
 import java.io.{File, PrintWriter, FileOutputStream}
 import java.nio.file._
@@ -50,11 +52,9 @@ object queryfile {
     pw.close()
   }).into[S]
 
-  def fileExists[S[_]](f: AFile)(implicit
-    S: Task :<: S
-  ): Free[S, Boolean] = lift(Task.delay {
-    Files.exists(Paths.get(posixCodec.unsafePrintPath(f)))
-  }).into[S]
+  def fileExists[F[_]:Capture](f: AFile): F[Boolean] = Capture[F].capture {
+      Files.exists(Paths.get(posixCodec.unsafePrintPath(f)))
+  }
 
   def listContents[S[_]](d: ADir)(implicit
     S: Task :<: S
@@ -78,5 +78,14 @@ object queryfile {
 
   def input[S[_]](implicit
     S: Task :<: S
-  ): Input[S] = Input[S](fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
+  ): Input[S] = Input[S](fromFile _, store[S] _, fileExists[Free[S, ?]] _, listContents[S] _, readChunkSize _)
+
+  def detailsInterpreter[F[_] : Capture]: SparkConnectorDetails ~> F =
+    new (SparkConnectorDetails ~> F) {
+      def apply[A](from: SparkConnectorDetails[A]) = from match {
+        case FileExists(f) => fileExists[F](f)
+      }
+    }
+
+
 }

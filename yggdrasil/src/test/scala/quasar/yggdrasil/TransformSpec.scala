@@ -1069,8 +1069,36 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
           JObject(JField("value1", v \ "value2") :: Nil)
       })
 
-    isOk(resultsOuter)
-    isOk(resultsInner)
+      isOk(resultsOuter)
+      isOk(resultsInner)
+    }
+  }
+
+  def checkObjectConcatOverwriteDifferingTypes = {
+    implicit val gen = sample(_ => Seq(JPath("value1") -> CString, JPath("value2") -> CLong))
+    prop { (sample: SampleData) =>
+      val table = fromSample(sample)
+      val resultsInner = toJson(table.transform {
+        InnerObjectConcat(
+          WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathField("value1")), "value1"),
+          WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathField("value2")), "value1")
+        )
+      })
+
+      val resultsOuter = toJson(table.transform {
+        OuterObjectConcat(
+          WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathField("value1")), "value1"),
+          WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathField("value2")), "value1")
+        )
+      })
+
+      def isOk(results: M[Stream[JValue]]) = results.copoint must_== (sample.data map { _ \ "value" } collect {
+        case v if (v \ "value1") != JUndefined && (v \ "value2") != JUndefined =>
+          JObject(JField("value1", v \ "value2") :: Nil)
+      })
+
+      isOk(resultsOuter)
+      isOk(resultsInner)
     }
   }
 

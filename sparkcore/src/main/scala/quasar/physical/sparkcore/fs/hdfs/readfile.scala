@@ -25,6 +25,7 @@ import quasar.fp.ski._
 import quasar.physical.sparkcore.fs.readfile.{Offset, Limit}
 import quasar.physical.sparkcore.fs.readfile.Input
 import quasar.physical.sparkcore.fs.hdfs.parquet.ParquetRDD
+import quasar.effect.Capture
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -37,7 +38,7 @@ object readfile {
 
   import ParquetRDD._
 
-  def fetchRdd(sc: SparkContext, pathStr: String): Task[RDD[Data]] = Task.delay {
+  def fetchRdd[F[_]:Capture](sc: SparkContext, pathStr: String): F[RDD[Data]] = Capture[F].capture {
     // TODO add magic number support to distinguish
     if(pathStr.endsWith(".parquet"))
       sc.parquet(pathStr)
@@ -53,7 +54,7 @@ object readfile {
     for {
       pathStr <- lift(hdfsPathStr(f)).into[S]
       sc <- read.asks(ι)
-      rdd <- lift(fetchRdd(sc, pathStr)).into[S]
+      rdd <- lift(fetchRdd[Task](sc, pathStr)).into[S]
     } yield {
       rdd
         .zipWithIndex()
