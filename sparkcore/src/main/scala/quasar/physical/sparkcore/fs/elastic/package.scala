@@ -105,9 +105,8 @@ package object elastic {
     val definition: SparkContext => Free[S, SparkFSDef[Eff, S]] =
       (sc: SparkContext) => lift((TaskRef(0L) |@| TaskRef(Map.empty[ResultHandle, RddState]) |@| TaskRef(Map.empty[ReadHandle, SparkCursor]) |@| TaskRef(Map.empty[WriteHandle, writefile.WriteCursor])) {
         (genState, rddStates, readCursors, writeCursors) => {
-
           val interpreter: Eff ~> S =
-            (queryfile.detailsInterpreter[ElasticCall, Task](ElasticCall.interpreter) andThen injectNT[Task, S]) :+:
+            (queryfile.detailsInterpreter[ElasticCall] andThen foldMapNT(ElasticCall.interpreter) andThen injectNT[Task, S]) :+:
             (KeyValueStore.impl.fromTaskRef[WriteHandle, writefile.WriteCursor](writeCursors) andThen injectNT[Task, S])  :+:
             (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](readCursors) andThen injectNT[Task, S]) :+:
             (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:

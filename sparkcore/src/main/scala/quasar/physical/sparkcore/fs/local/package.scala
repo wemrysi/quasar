@@ -79,7 +79,7 @@ package object local {
       (genState, rddStates, sparkCursors, printWriters) =>
 
       val interpreter: Eff ~> S =
-        (queryfile.detailsInterpreter(injectNT[Task, Task]) andThen injectNT[Task, S]) :+:
+      (queryfile.detailsInterpreter[Task] andThen injectNT[Task, S]) :+:
       (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:

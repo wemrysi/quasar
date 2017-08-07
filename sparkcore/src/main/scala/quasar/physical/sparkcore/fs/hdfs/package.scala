@@ -153,7 +153,7 @@ package object hdfs {
       (genState, rddStates, sparkCursors, writeCursors) =>
 
       val interpreter: Eff ~> S =
-        (queryfile.detailsInterpreter(generateHdfsFS(sfsc), injectNT[Task, Task]) andThen injectNT[Task, S]) :+:
+        (queryfile.detailsInterpreter(generateHdfsFS(sfsc)) andThen injectNT[Task, S]) :+:
         (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:

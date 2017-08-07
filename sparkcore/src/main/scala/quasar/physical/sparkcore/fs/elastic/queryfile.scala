@@ -92,13 +92,12 @@ object queryfile {
   ): Input[S] =
     Input[S](fromFile _, store[S] _, (f: AFile) => false.point[Free[S, ?]], listContents[S] _, readChunkSize _)
 
-  def detailsInterpreter[S[_], G[_] : Monad](int: S ~> G)(implicit
+  def detailsInterpreter[S[_]](implicit
     E: ElasticCall.Ops[S]
-  ): SparkConnectorDetails ~> G =
-    new (SparkConnectorDetails ~> G) {
-      def apply[A](from: SparkConnectorDetails[A]) = from match {
-        case FileExists(f) => E.typeExists(file2ES(f)).foldMap(int)
-      }
+  ): SparkConnectorDetails ~> Free[S, ?] = new (SparkConnectorDetails ~> Free[S, ?]) {
+    def apply[A](from: SparkConnectorDetails[A]) = from match {
+      case FileExists(f) => E.typeExists(file2ES(f))
     }
+  }
 
 }
