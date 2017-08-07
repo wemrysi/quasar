@@ -39,7 +39,7 @@ import scalaz._, Scalaz._
 private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
 
   private object PathProjection {
-    object MFComp {
+    private object MFComp {
       def unapply[T[_[_]], A](mfc: MapFuncCore[T, A]): Option[(ComparisonOp, A, A)] = mfc match {
         case MFCore.Eq(a1, a2)  => (ComparisonOp.EQ, a1, a2).some
         case MFCore.Neq(a1, a2) => (ComparisonOp.NE, a1, a2).some
@@ -96,12 +96,12 @@ private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
   object ElementIndexPlanner {
     import axes.child
 
-    private object QNameSegment {
+    private object QNameDirName {
       def unapply(path: ADir): Option[QName] =
         dirName(path).map(_.value) >>= (QName.string.getOption(_))
     }
 
-    private object FinalSegment {
+    private object DirName {
       def unapply(path: ADir): Option[DirName] =
         dirName(path)
     }
@@ -123,7 +123,7 @@ private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
     private def elementRange[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
     ): Option[(Search[Q], ADir)] = rewrite(fm) match {
-      case PathProjection(op, dir0 @ QNameSegment(qname), const) => {
+      case PathProjection(op, dir0 @ QNameDirName(qname), const) => {
         val q = Query.ElementRange[T[EJson], Q](IList(qname), op, IList(const)).embed
 
         Search.query.modify((qr: Q) =>
@@ -135,7 +135,7 @@ private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
     private def jsonPropertyRange[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
     ): Option[(Search[Q], ADir)] = rewrite(fm) match {
-      case PathProjection(op, dir0 @ FinalSegment(seg), const) => {
+      case PathProjection(op, dir0 @ DirName(seg), const) => {
         val q = Query.JsonPropertyRange[T[EJson], Q](IList(seg.value), op, IList(const)).embed
 
         Search.query.modify((qr: Q) =>

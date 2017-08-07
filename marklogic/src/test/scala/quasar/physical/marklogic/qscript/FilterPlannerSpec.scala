@@ -19,16 +19,22 @@ package quasar.physical.marklogic.qscript
 import slamdata.Predef._
 
 import quasar.contrib.pathy._
-import quasar.physical.marklogic.cts.ComparisonOp
+import quasar.ejson.EJson
+import quasar.physical.marklogic.cts._
 import quasar.qscript._
 import quasar.qscript.{MapFuncsCore => MFCore}
 
+import eu.timepit.refined.auto._
 import matryoshka.data.Fix
+import matryoshka.{Hole => _, _}
 import org.scalacheck.{Arbitrary, Gen}, Arbitrary.arbitrary
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 
 import scalaz._, Scalaz._
+
+import scala.Predef.implicitly
+import quasar.RenderTree
 
 final class FilterPlannerSpec extends quasar.Qspec {
   val comparisons = List(ComparisonOp.EQ , ComparisonOp.NE , ComparisonOp.LT , ComparisonOp.LE , ComparisonOp.GT , ComparisonOp.GE)
@@ -71,16 +77,25 @@ final class FilterPlannerSpec extends quasar.Qspec {
   implicit val arbProjectTestCase: Arbitrary[ProjectTestCase] =
     Arbitrary(genProjectTestCase)
 
+  val rt = implicitly[RenderTree[FreeMap[Fix]]]
+  val rtp = implicitly[RenderTree[FreePathMap[Fix]]]
+
+  def src0[Q](implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]): Search[Q] =
+    Search(
+      Q.embed(Query.Directory[Fix[EJson], Q](IList("/some/ml/location"), MatchDepth.Children)),
+      IncludeId,
+      IList())
+
+  def andQuery[Q](l: Q, r: Q)(implicit Q: Birecursive.Aux[Q, Query[Fix[EJson], ?]]): Q =
+    Q.embed(Query.And[Fix[EJson], Q](IList(l, r)))
+
+  val src = src0[Fix[Query[Fix[EJson], ?]]]
+
   "StarIndexPlanner" >> {
     "search expression includes * and projection path" >> prop { prj: ProjectTestCase =>
-      import scala.Predef.implicitly
-      import quasar.RenderTree
+      val planner = new FilterPlanner[Fix]
 
-      val rt = implicitly[RenderTree[FreeMap[Fix]]]
-      println(prettyPrint(prj.path))
-      println(rt.render(prj.fm).shows)
-
-      1 must_== 1
+      planner.StarIndexPlanner(src, prj.fm) must beSome
     }
   }
   "PathIndexPlanner" >> {
