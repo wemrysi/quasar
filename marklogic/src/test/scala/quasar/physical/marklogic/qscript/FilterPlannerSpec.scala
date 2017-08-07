@@ -130,9 +130,10 @@ final class FilterPlannerSpec extends quasar.Qspec {
     }
   }
   "ElementIndexPlanner" >> {
+    import axes.child
+
     "planXml" >> {
-      "plan with a star predicate and path" >> prop { prj: ProjectTestCase =>
-        import axes.child
+      "plan with a star predicate and path predicate" >> prop { prj: ProjectTestCase =>
 
         val planner = new FilterPlanner[Fix]
         val predPath = flatten(None, None, None, Some(_), Some(_), prj.path)
@@ -147,13 +148,33 @@ final class FilterPlannerSpec extends quasar.Qspec {
       }
 
       "concatenate predicates if there's already one" >> prop { prj: ProjectTestCase =>
-        1 must_== 1
+        val planner = new FilterPlanner[Fix]
+
+        val existingPredPath = (child.elementNamed("aa") `/` child.elementNamed("bb")).point[IList]
+        val predPath = flatten(None, None, None, Some(_), Some(_), prj.path)
+          .toIList.unite.map(child.elementNamed(_)).foldLeft(child.*)((path, segment) => path `/` segment).point[IList]
+
+        val name: Option[QName] = dirName(prj.path) >>= (dr => QName.string.getOption(dr.value))
+        val src1 = Search.pred.set(existingPredPath)(src0[U])
+        val expectedSearch: Option[Search[U]] = name map ((elName: QName) => Search[U](
+          andQuery[U](directoryQuery[U], elementRange[U](elName, prj.op, str(prj.expr))), IncludeId, existingPredPath ++ predPath))
+
+        planner.ElementIndexPlanner.planXml(src1, prj.fm) must beEqualTo(expectedSearch)
       }
     }
 
     "planJson" >> {
       "add the path as a predicate to the search expression" >> prop { prj: ProjectTestCase =>
-        1 must_== 1
+        val planner = new FilterPlanner[Fix]
+        val path = flatten(None, None, None, Some(_), Some(_), prj.path)
+          .toIList.unite.map(child.nodeNamed(_)).foldLeft1Opt((path, segment) => path `/` segment)
+
+        val expectedSearch = (path |@| dirName(prj.path))((pth, prop) =>
+          Search[U](
+            andQuery[U](directoryQuery[U], jsonPropertyRange[U](prop.value, prj.op, str(prj.expr))),
+            IncludeId, IList(pth)).some).join
+
+        planner.ElementIndexPlanner.planJson(src0[U], prj.fm) must beEqualTo(expectedSearch)
       }
     }
   }
