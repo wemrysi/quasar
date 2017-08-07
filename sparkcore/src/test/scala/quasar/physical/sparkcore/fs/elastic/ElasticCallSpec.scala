@@ -19,7 +19,7 @@ package quasar.physical.sparkcore.fs.elastic
 import slamdata.Predef._
 import com.sksamuel.elastic4s.testkit.AlwaysNewLocalNodeProvider
 import com.sksamuel.elastic4s.embedded.LocalNode
-import scalaz._, Scalaz._
+import scalaz._, Scalaz._, concurrent.Task
 import org.specs2.specification.BeforeAfterEach
 
 class ElasticCallSpec extends quasar.Qspec
@@ -34,8 +34,20 @@ class ElasticCallSpec extends quasar.Qspec
 
   var node: Option[LocalNode] = None
 
+  def healthCheck(tried: Int): Task[Boolean] = 
+    if(tried > 5)
+      false.point[Task]
+    else {
+      val attemptedConnection = elastic.listIndices.foldMap(ElasticCall.interpreter).void.attempt
+      attemptedConnection >>= (_.fold(
+        _ => Task.delay(java.lang.Thread.sleep(200)) *> healthCheck(tried + 1),
+        _ => true.point[Task]
+      ))
+    }
+
   def before = {
     node = getNode.some
+    healthCheck(0).unsafePerformSync
   }
 
   def after = {
