@@ -26,6 +26,8 @@ import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
 import quasar.fp.free._
 import quasar.contrib.pathy._
+import quasar.physical.sparkcore.fs.{SparkConnectorDetails, FileExists}
+import quasar.effect.Capture
 
 import java.io.BufferedWriter
 import java.io.OutputStreamWriter
@@ -40,15 +42,15 @@ import scalaz.concurrent.Task
 import org.apache.spark._
 import org.apache.spark.rdd._
 
-class queryfile(fileSystem: Task[FileSystem]) {
+class queryfile[F[_]:Capture:Bind](fileSystem: F[FileSystem]) {
 
-  private def toPath(apath: APath): Task[Path] = Task.delay {
+  private def toPath(apath: APath): F[Path] = Capture[F].capture {
     new Path(posixCodec.unsafePrintPath(apath))
   }
 
-  def fromFile(sc: SparkContext, file: AFile): Task[RDD[Data]] = for {
+  def fromFile(sc: SparkContext, file: AFile): F[RDD[Data]] = for {
     hdfs <- fileSystem
-    pathStr <- Task.delay {
+    pathStr <- Capture[F].capture {
       val pathStr = posixCodec.unsafePrintPath(file)
       val host = hdfs.getUri().getHost()
       val port = hdfs.getUri().getPort()
@@ -57,9 +59,7 @@ class queryfile(fileSystem: Task[FileSystem]) {
     rdd <- readfile.fetchRdd(sc, pathStr)
   } yield rdd
 
-  def store[S[_]](rdd: RDD[Data], out: AFile)(implicit
-    S: Task :<: S
-  ): Free[S, Unit] = lift(for {
+  def store(rdd: RDD[Data], out: AFile): F[Unit] = for {
     path <- toPath(out)
     hdfs <- fileSystem
   } yield {
@@ -74,22 +74,18 @@ class queryfile(fileSystem: Task[FileSystem]) {
     })
     bw.close()
     hdfs.close()
-  }).into[S]
+  }
 
-  def fileExists[S[_]](f: AFile)(implicit
-    S: Task :<: S
-  ): Free[S, Boolean] = lift(for {
+  def fileExists(f: AFile): F[Boolean] = for {
     path <- toPath(f)
     hdfs <- fileSystem
   } yield {
     val exists = hdfs.exists(path)
     hdfs.close()
     exists
-  }).into[S]
+  }
 
-  def listContents[S[_]](d: ADir)(implicit
-    S: Task :<: S
-  ): FileSystemErrT[Free[S, ?], Set[PathSegment]] = EitherT(lift(for {
+  def listContents(d: ADir): FileSystemErrT[F, Set[PathSegment]] = EitherT(for {
     path <- toPath(d)
     hdfs <- fileSystem
   } yield {
@@ -101,14 +97,31 @@ class queryfile(fileSystem: Task[FileSystem]) {
     } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
     hdfs.close
     result
-  }).into[S])
+  })
 
   def readChunkSize: Int = 5000
 
-  def input[S[_]](implicit s0: Task :<: S): Input[S] =
-    Input[S](fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
 }
 
 object queryfile {
-  def input[S[_]](fileSystem: Task[FileSystem])(implicit s0: Task :<: S): Input[S] = new queryfile(fileSystem).input
+
+  def detailsInterpreter[F[_]:Capture:Bind](fileSystem: F[FileSystem]): SparkConnectorDetails ~> F =
+    new (SparkConnectorDetails ~> F) {
+      val qf = new queryfile[F](fileSystem)
+
+      def apply[A](from: SparkConnectorDetails[A]) = from match {
+        case FileExists(f) => qf.fileExists(f)
+      }
+    }
+
+  def input[S[_]](fileSystem: Task[FileSystem])(implicit s0: Task :<: S): Input[S] = {
+    val qf = new queryfile[Task](fileSystem)
+    Input[S](
+      qf.fromFile _,
+      (rdd, out) => lift(qf.store(rdd, out)).into[S],
+      f => lift(qf.fileExists(f)).into[S],
+      d => EitherT(lift(qf.listContents(d).run).into[S]),
+      qf.readChunkSize _
+    )
+  }
 }
