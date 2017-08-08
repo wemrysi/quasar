@@ -80,11 +80,11 @@ object Zip {
 
   def zipFiles[F[_]: Monad](files: Map[RelFile[Sandboxed], Process[F, ByteVector]]): Process[F, ByteVector] = {
     val ops: Process[F, Op] = {
-      def fileOps(file: RelFile[Sandboxed], bytes: Process[F, ByteVector]) =
-        Process.emit(Op.StartEntry(new jzip.ZipEntry(posixCodec.printPath(file)))) ++
+      def fileOps(file: RelFile[Sandboxed], bytes: Process[F, ByteVector]) = {
+        Process.emit(Op.StartEntry(new jzip.ZipEntry(posixCodec.printPath(file).drop(2)))) ++ // do not include the "./" of a path when zipping
           bytes.map(Op.Chunk(_)) ++
           Process.emit(Op.EndEntry)
-
+      }
       Process.emit(Op.Start) ++
         Process.emitAll(files.toList).flatMap((fileOps _).tupled) ++
         Process.emit(Op.End)
