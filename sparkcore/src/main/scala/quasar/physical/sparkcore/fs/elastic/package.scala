@@ -41,13 +41,14 @@ package object elastic {
 
   val FsType = FileSystemType("spark-elastic")
 
-  type Eff0[A] = Coproduct[Task, PhysErr, A]
-  type Eff1[A] = Coproduct[Read[SparkContext, ?], Eff0, A]
-  type Eff2[A] = Coproduct[ElasticCall, Eff1, A]
-  type Eff3[A] = Coproduct[MonotonicSeq, Eff2, A]
+  type Eff0[A]  = Coproduct[Task, PhysErr, A]
+  type Eff1[A]  = Coproduct[Read[SparkContext, ?], Eff0, A]
+  type Eff2[A]  = Coproduct[ElasticCall, Eff1, A]
+  type Eff3[A]  = Coproduct[MonotonicSeq, Eff2, A]
   type Eff4[A]  = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Eff3, A]
   type Eff5[A]  = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Eff4, A]
-  type Eff[A]  = Coproduct[KeyValueStore[WriteHandle, writefile.WriteCursor, ?], Eff5, A]
+  type Eff6[A]  = Coproduct[KeyValueStore[WriteHandle, writefile.WriteCursor, ?], Eff5, A]
+  type Eff[A]   = Coproduct[SparkConnectorDetails, Eff6, A]
 
   final case class SparkFSConf(sparkConf: SparkConf, host: String, port: Int)
 
@@ -138,6 +139,7 @@ package object elastic {
           TaskRef(Map.empty[WriteHandle, writefile.WriteCursor])) {
         (genState, rddStates, readCursors, writeCursors) => {
           val interpreter: Eff ~> S =
+            (queryfile.detailsInterpreter[ElasticCall] andThen foldMapNT(ElasticCall.interpreter(host, port)) andThen injectNT[Task, S]) :+:
             (KeyValueStore.impl.fromTaskRef[WriteHandle, writefile.WriteCursor](writeCursors) andThen injectNT[Task, S])  :+:
             (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](readCursors) andThen injectNT[Task, S]) :+:
             (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
