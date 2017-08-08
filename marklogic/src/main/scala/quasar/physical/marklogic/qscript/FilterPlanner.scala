@@ -37,6 +37,7 @@ import xml.name._
 import scalaz._, Scalaz._
 
 private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
+  import FilterPlanner._
 
   private object PathProjection {
     private object MFComp {
@@ -70,7 +71,7 @@ private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
       case PathProjection(op, path, const) => {
         val starPath = rebaseA(rootDir[Sandboxed] </> dir("*"))(path)
         val q = Query.PathRange[T[EJson], Q](
-          IList(prettyPrint(starPath).dropRight(1)), op, IList(const)).embed
+          IList(strPath(starPath)), op, IList(const)).embed
 
         Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src).some
       }
@@ -83,9 +84,7 @@ private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
     ): Option[Search[Q]] = rewrite(fm) match {
       case PathProjection(op, path, const) => {
-        val q = Query.PathRange[T[EJson], Q](
-          IList(prettyPrint(path).dropRight(1)),
-          op, IList(const)).embed
+        val q = Query.PathRange[T[EJson], Q](IList(strPath(path)), op, IList(const)).embed
 
         Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src).some
       }
@@ -106,18 +105,14 @@ private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
         dirName(path)
     }
 
-    private def projections(path: ADir): IList[String] =
-      flatten(none, none, none, Some(_), Some(_), path)
-        .toIList.unite
-
     private def xmlProjections(path: ADir): Option[XQuery] =
       if(depth(path) >= 1)
-        projections(path).map(child.elementNamed(_))
+        FilterPlanner.flattenDir(path).map(child.elementNamed(_))
           .foldLeft(child.*)((path, segment) => path `/` segment).some
       else none
 
     private def jsonProjections(path: ADir): Option[XQuery] =
-      projections(path).map(child.nodeNamed(_))
+      FilterPlanner.flattenDir(path).map(child.nodeNamed(_))
         .foldLeft1Opt((path, segment) => path `/` segment)
 
     private def elementRange[Q](src: Search[Q], fm: FreeMap[T])(
@@ -164,6 +159,22 @@ private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
 }
 
 object FilterPlanner {
+  def flattenDir(dir0: ADir): IList[String] =
+    flatten(None, None, None, Some(_), Some(_), dir0).toIList.unite
+
+  def strPath(dir0: ADir): String =
+    "/" ++ flattenDir(dir0).map(PathCodec.placeholder('/').escape(_)).intercalate("/")
+
+  def anyDocument[T[_[_]], Q](q: Q)(
+    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+  ): Boolean = {
+    val f: AlgebraM[Option, Query[T[EJson], ?], Q] = {
+      case Query.Document(_) => none
+      case other             => Q.embed(other).some
+    }
+
+    !(Q.cataM(q)(f).isDefined)
+  }
 
   def fallbackFilter[T[_[_]]: BirecursiveT,
     F[_]: Monad: PrologW: QNameGenerator: MonadPlanErr,
@@ -175,17 +186,6 @@ object FilterPlanner {
       Search.plan[F, Q, T[EJson], FMT](s, EJsonPlanner.plan[T[EJson], F, FMT])
 
     interpretSearch(src) >>= (xqueryFilter[T, F, FMT, Q](_: XQuery, f))
-  }
-
-  def anyDocument[T[_[_]], Q](q: Q)(
-    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-  ): Boolean = {
-    val f: AlgebraM[Option, Query[T[EJson], ?], Q] = {
-      case Query.Document(_) => none
-      case other             => Q.embed(other).some
-    }
-
-    !(Q.cataM(q)(f).isDefined)
   }
 
   def xqueryFilter[T[_[_]]: BirecursiveT,
