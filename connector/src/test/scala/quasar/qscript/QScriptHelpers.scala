@@ -141,6 +141,9 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
       FreeMapA[A] =
     Free.roll(MFC(MapFuncsCore.Not(value)))
 
+  def UndefinedR[A]: FreeMapA[A] =
+    Free.roll(MFC(MapFuncsCore.Undefined[Fix, FreeMapA[A]]()))
+
   def lpRead(path: String): Fix[LP] =
     lpf.read(unsafeSandboxAbs(posixCodec.parseAbsFile(path).get))
 
