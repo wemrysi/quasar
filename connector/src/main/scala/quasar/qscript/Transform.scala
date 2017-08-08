@@ -90,9 +90,11 @@ class Transform
       case (Embed(QC(Unreferenced())), r) =>
         val buckets = prov.joinProvenances(lann.provenance, rann.provenance)
         AutoJoinResult(AutoJoinBase(r, buckets), lann.values, rann.values)
+
       case (l, Embed(QC(Unreferenced()))) =>
         val buckets = prov.joinProvenances(lann.provenance, rann.provenance)
         AutoJoinResult(AutoJoinBase(l, buckets), lann.values, rann.values)
+
       case (l, r) =>
         val SrcMerge(src, lBranch, rBranch) = merge.mergeT(l, r)
 
@@ -141,12 +143,8 @@ class Transform
             res <- uni.combine(c)
           } yield (res, lbacc, rbacc, lacc, racc)
 
-        def theta(
-          combine: JoinFunc,
-          newLprov: List[prov.Provenance],
-          newRprov: List[prov.Provenance])
-            : F[T[F]] =
-          TJ.inj(ThetaJoin(src, lBranch, rBranch, prov.genComparisons(newLprov, newRprov), JoinType.Inner, combine))
+        def theta(combine: JoinFunc): F[T[F]] =
+          TJ.inj(ThetaJoin(src, lBranch, rBranch, prov.genComparisons(lann.provenance, rann.provenance), JoinType.Inner, combine))
 
         val (res, newLprov, newRprov, lacc, racc) =
           (lprovs, rprovs) match {
@@ -154,28 +152,31 @@ class Transform
               val (combine, lacc, racc) =
                 c2(uniHole) orElse c2(uniSide) getOrElse {
                   val (c, lacc, racc) = concat(lval, rval)
-                  (theta(c, lann.provenance, rann.provenance), lacc, racc)
+                  (theta(c), lacc, racc)
                 }
               (combine, lann.provenance, rann.provenance, lacc, racc)
+
             case (None, Some((rProvs, rBuck))) =>
               val (combine, bacc, lacc, racc) =
                 c3(uniHole, rBuck) orElse c3(uniSide, rBuck) getOrElse {
                   val (c, bacc, lacc, racc) = concat3(rBuck, lval, rval)
-                  (theta(c, lann.provenance, prov.rebase(bacc, rProvs)), bacc, lacc, racc)
+                  (theta(c), bacc, lacc, racc)
                 }
               (combine, lann.provenance, prov.rebase(bacc, rProvs), lacc, racc)
+
             case (Some((lProvs, lBuck)), None) =>
               val (combine, bacc, lacc, racc) =
                 c3(uniHole, lBuck) orElse c3(uniSide, lBuck) getOrElse {
                   val (c, bacc, lacc, racc) = concat3(lBuck, lval, rval)
-                  (theta(c, prov.rebase(bacc, lProvs), rann.provenance), bacc, lacc, racc)
+                  (theta(c), bacc, lacc, racc)
                 }
               (combine, prov.rebase(bacc, lProvs), rann.provenance, lacc, racc)
+
             case (Some((lProvs, lBuck)), Some((rProvs, rBuck))) =>
               val (combine, lbacc, rbacc, lacc, racc) =
                 c4(uniHole, lBuck, rBuck) orElse c4(uniSide, lBuck, rBuck) getOrElse {
                   val (c, lbacc, rbacc, lacc, racc) = concat4(lBuck, rBuck, lval, rval)
-                  (theta(c, prov.rebase(lbacc, lProvs), prov.rebase(rbacc, rProvs)), lbacc, rbacc, lacc, racc)
+                  (theta(c), lbacc, rbacc, lacc, racc)
                 }
               (combine, prov.rebase(lbacc, lProvs), prov.rebase(rbacc, rProvs), lacc, racc)
           }
