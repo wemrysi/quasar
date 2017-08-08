@@ -91,12 +91,12 @@ object Dependencies {
   )
 
   def mongodb = {
-    val nettyVersion = "4.0.42.Final" // This version is set to be the same as Spark
+    val nettyVersion = "4.1.14.Final" // This version is set to be the same as Spark
                                       // to avoid problems in web and it where their classpaths get merged
                                       // In any case, it should be binary compatible with version 4.0.26 that this
                                       // mongo release is expecting
     Seq(
-      "org.mongodb" % "mongodb-driver-async" %   "3.3.0", // Intentionnally not upgrading to the latest 3.4.1 in order
+      "org.mongodb" % "mongodb-driver-async" %   "3.5.0", // Intentionnally not upgrading to the latest 3.4.1 in order
                                                           // to make integration easier with Spark as the latest version
                                                           // depends on netty 4.1.x
       // These are optional dependencies of the mongo asynchronous driver.
@@ -115,7 +115,8 @@ object Dependencies {
       .exclude("commons-logging", "commons-logging")          // create an assembly jar without conflicts
       .exclude("commons-logging", "commons-logging")          // It would seem though that things work without them...
       .exclude("com.esotericsoftware.minlog", "minlog")       // It's likely this list will need to be updated
-      .exclude("org.spark-project.spark", "unused")           // anytime the Spark dependency itselft is updated
+      .exclude("org.spark-project.spark", "unused")           // anytime the Spark dependency itself is updated
+      .exclude("io.netty", "netty-all")
       .exclude("org.scalatest", "scalatest_2.11"),
     "org.apache.parquet"     % "parquet-format"          % "2.3.1",
     "org.apache.parquet"     % "parquet-hadoop"          % "1.9.0",

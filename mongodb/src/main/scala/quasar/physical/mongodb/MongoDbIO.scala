@@ -81,7 +81,6 @@ object MongoDbIO {
     allowDiskUse: Boolean
   ): Process[MongoDbIO, BsonDocument] =
     aggregateIterable(src, pipeline, allowDiskUse)
-      .map(_.useCursor(new JBoolean(true)))
       .liftM[Process]
       .flatMap(iterableToProcess)
 
