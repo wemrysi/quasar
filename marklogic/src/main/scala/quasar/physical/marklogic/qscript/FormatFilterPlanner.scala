@@ -35,22 +35,22 @@ trait FormatFilterPlanner[A] {
     FMT: SearchOptions: StructuralPlanner[F, ?],
     T[_[_]]: BirecursiveT, Q](src: Search[Q], f: FreeMap[T])(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-  ): F[Option[Search[Q]]]
+  ): F[Option[IndexPlan[Q]]]
 }
 
 object FormatFilterPlanner {
-  import FilterPlanner.validSearch
+  import FilterPlanner.validIndexPlan
 
   implicit val xmlFilterPlanner: FormatFilterPlanner[DocType.Xml] = new FormatFilterPlanner[DocType.Xml] {
     def plan[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
       FMT: SearchOptions: StructuralPlanner[F, ?],
       T[_[_]]: BirecursiveT, Q](src: Search[Q], f: FreeMap[T])(
       implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-    ): F[Option[Search[Q]]] = {
+    ): F[Option[IndexPlan[Q]]] = {
       val planner = new FilterPlanner[T]
 
-      lazy val starQuery    = validSearch[T, F, FMT, Q](planner.StarIndexPlanner(src, f))
-      lazy val elementQuery = validSearch[T, F, FMT, Q](planner.ElementIndexPlanner.planXml(src, f))
+      lazy val starQuery    = validIndexPlan[T, F, FMT, Q](planner.StarIndexPlanner(src, f))
+      lazy val elementQuery = validIndexPlan[T, F, FMT, Q](planner.ElementIndexPlanner.planXml(src, f))
 
       (starQuery ||| elementQuery).run
     }
@@ -61,11 +61,11 @@ object FormatFilterPlanner {
       FMT: SearchOptions: StructuralPlanner[F, ?],
       T[_[_]]: BirecursiveT, Q](src: Search[Q], f: FreeMap[T])(
       implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-    ): F[Option[Search[Q]]] = {
+    ): F[Option[IndexPlan[Q]]] = {
       val planner = new FilterPlanner[T]
 
-      lazy val pathQuery    = validSearch[T, F, FMT, Q](planner.PathIndexPlanner(src, f))
-      lazy val elementQuery = validSearch[T, F, FMT, Q](planner.ElementIndexPlanner.planJson(src, f))
+      lazy val pathQuery    = validIndexPlan[T, F, FMT, Q](planner.PathIndexPlanner(src, f))
+      lazy val elementQuery = validIndexPlan[T, F, FMT, Q](planner.ElementIndexPlanner.planJson(src, f))
 
       (pathQuery ||| elementQuery).run
     }

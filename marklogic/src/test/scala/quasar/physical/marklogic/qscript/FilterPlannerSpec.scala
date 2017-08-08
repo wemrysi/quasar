@@ -112,12 +112,13 @@ final class FilterPlannerSpec extends quasar.Qspec {
       val planner = new FilterPlanner[Fix]
       val path = prettyPrint(rebaseA(rootDir[Sandboxed] </> dir("*"))(prj.path)).dropRight(1)
 
-      val expectedSearch = Search[U](
-        andQuery[U](
-          directoryQuery[U],
-          pathRange[U](path, prj.op, str(prj.expr))),
-        IncludeId,
-        IList())
+      val expectedSearch = IndexPlan(
+        Search[U](
+          andQuery[U](
+            directoryQuery[U],
+            pathRange[U](path, prj.op, str(prj.expr))),
+          IncludeId,
+          IList()), false)
 
       planner.StarIndexPlanner(src0[U], prj.fm) must beSome(expectedSearch)
     }
@@ -128,12 +129,13 @@ final class FilterPlannerSpec extends quasar.Qspec {
       val planner = new FilterPlanner[Fix]
       val path = prettyPrint(prj.path).dropRight(1)
 
-      val expectedSearch = Search[U](
-        andQuery[U](
-          directoryQuery[U],
-          pathRange[U](path, prj.op, str(prj.expr))),
-        IncludeId,
-        IList())
+      val expectedSearch = IndexPlan(
+        Search[U](
+          andQuery[U](
+            directoryQuery[U],
+            pathRange[U](path, prj.op, str(prj.expr))),
+          IncludeId,
+          IList()), false)
 
       planner.PathIndexPlanner(src0[U], prj.fm) must beSome(expectedSearch)
     }
@@ -151,13 +153,14 @@ final class FilterPlannerSpec extends quasar.Qspec {
         val planner = new FilterPlanner[Fix]
         val name: Option[QName] = qnameDirName(prj.path)
 
-        val expectedSearch: Option[Search[U]] = name map ((elName: QName) =>
-          Search[U](
-            andQuery[U](
-              directoryQuery[U],
-              elementRange[U](elName, prj.op, str(prj.expr))),
-            IncludeId,
-            IList(predPath(prj.path))))
+        val expectedSearch: Option[IndexPlan[U]] = name map ((elName: QName) =>
+          IndexPlan(
+            Search[U](
+              andQuery[U](
+                directoryQuery[U],
+                elementRange[U](elName, prj.op, str(prj.expr))),
+              IncludeId,
+              IList(predPath(prj.path))), true))
 
         planner.ElementIndexPlanner.planXml(src0[U], prj.fm) must beEqualTo(expectedSearch)
       }
@@ -169,13 +172,14 @@ final class FilterPlannerSpec extends quasar.Qspec {
         val name: Option[QName] = qnameDirName(prj.path)
         val src1 = Search.pred.set(IList(existingPredPath))(src0[U])
 
-        val expectedSearch: Option[Search[U]] = name map ((elName: QName) =>
-          Search[U](
-            andQuery[U](
-              directoryQuery[U],
-              elementRange[U](elName, prj.op, str(prj.expr))),
-            IncludeId,
-            IList(existingPredPath, predPath(prj.path))))
+        val expectedSearch: Option[IndexPlan[U]] = name map ((elName: QName) =>
+          IndexPlan(
+            Search[U](
+              andQuery[U](
+                directoryQuery[U],
+                elementRange[U](elName, prj.op, str(prj.expr))),
+              IncludeId,
+              IList(existingPredPath, predPath(prj.path))), true))
 
         planner.ElementIndexPlanner.planXml(src1, prj.fm) must beEqualTo(expectedSearch)
       }
@@ -186,13 +190,13 @@ final class FilterPlannerSpec extends quasar.Qspec {
         val planner = new FilterPlanner[Fix]
         val path = flattenDir(prj.path).map(child.nodeNamed(_)).foldLeft1Opt((path, segment) => path `/` segment)
 
-        val expectedSearch: Option[Search[U]] = (path |@| dirName(prj.path))((pth, prop) =>
-          Search[U](
+        val expectedSearch: Option[IndexPlan[U]] = (path |@| dirName(prj.path))((pth, prop) =>
+          IndexPlan(Search[U](
             andQuery[U](
               directoryQuery[U],
               jsonPropertyRange[U](prop.value, prj.op, str(prj.expr))),
             IncludeId,
-            IList(pth)).some).join
+            IList(pth)), true).some).join
 
         planner.ElementIndexPlanner.planJson(src0[U], prj.fm) must beEqualTo(expectedSearch)
       }

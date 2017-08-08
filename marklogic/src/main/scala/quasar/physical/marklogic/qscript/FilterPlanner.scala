@@ -70,13 +70,14 @@ private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
   object StarIndexPlanner {
     def apply[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-    ): Option[Search[Q]] = rewrite(fm) match {
+    ): Option[IndexPlan[Q]] = rewrite(fm) match {
       case PathProjection(op, path, const) => {
         val starPath = rebaseA(rootDir[Sandboxed] </> dir("*"))(path)
         val q = Query.PathRange[T[EJson], Q](
           IList(strPath(starPath)), op, IList(const)).embed
+        val src0 = Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src)
 
-        Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src).some
+        IndexPlan(src0, false).some
       }
       case _ => none
     }
@@ -85,11 +86,12 @@ private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
   object PathIndexPlanner {
     def apply[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-    ): Option[Search[Q]] = rewrite(fm) match {
+    ): Option[IndexPlan[Q]] = rewrite(fm) match {
       case PathProjection(op, path, const) => {
         val q = Query.PathRange[T[EJson], Q](IList(strPath(path)), op, IList(const)).embed
+        val src0 = Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src)
 
-        Search.query.modify((qr: Q) => Q.embed(Query.And(IList(qr, q))))(src).some
+        IndexPlan(src0, false).some
       }
       case _ => none
     }
@@ -144,18 +146,24 @@ private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
 
     def planXml[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-    ): Option[Search[Q]] = elementRange(src, fm) >>= {
-      case (src0, dir0) =>
-        Search.pred.modify(pred0 => pred0 ++ xmlProjections(dir0).map(IList(_))
-          .getOrElse(IList()))(src0).some
+    ): Option[IndexPlan[Q]] = elementRange(src, fm) >>= {
+      case (src0, dir0) => {
+        val src1 = Search.pred.modify(pred0 => pred0 ++ xmlProjections(dir0).map(IList(_))
+          .getOrElse(IList()))(src0)
+
+        IndexPlan(src1, true).some
+      }
     }
 
     def planJson[Q](src: Search[Q], fm: FreeMap[T])(
       implicit Q: Corecursive.Aux[Q, Query[T[EJson], ?]]
-    ): Option[Search[Q]] = jsonPropertyRange(src, fm) >>= {
-      case (src0, dir0) =>
-        Search.pred.modify(pred0 => pred0 ++ jsonProjections(dir0).map(IList(_))
-          .getOrElse(IList()))(src0).some
+    ): Option[IndexPlan[Q]] = jsonPropertyRange(src, fm) >>= {
+      case (src0, dir0) => {
+        val src1 = Search.pred.modify(pred0 => pred0 ++ jsonProjections(dir0).map(IList(_))
+          .getOrElse(IList()))(src0)
+
+        IndexPlan(src1, true).some
+      }
     }
   }
 
@@ -208,14 +216,14 @@ object FilterPlanner {
         for_(x in src) where_ p return_ ~x
     }
 
-  def validSearch[T[_[_]]: RecursiveT,
+  def validIndexPlan[T[_[_]]: RecursiveT,
     F[_]: Monad: Xcc,
     FMT: StructuralPlanner[F, ?],
-    Q](src: Option[Search[Q]])(
+    Q](src: Option[IndexPlan[Q]])(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-  ): OptionT[F, Search[Q]] = src match {
-    case Some(search) =>
-      OptionT(queryIsValid[F, Q, T[EJson], FMT](search.query)
+  ): OptionT[F, IndexPlan[Q]] = src match {
+    case Some(indexPlan) =>
+      OptionT(queryIsValid[F, Q, T[EJson], FMT](indexPlan.src.query)
         .ifM(src.point[F], none.point[F]))
     case None =>
       OptionT(none.point[F])
@@ -234,8 +242,9 @@ object FilterPlanner {
         fallbackFilter[T, F, FMT, Q](src, f) map (_.right[Search[Q]])
       case (-\/(src)) =>
         P.plan[F, FMT, T, Q](src, f) >>= {
-          case Some(search) => search.left[XQuery].point[F]
-          case None         => fallbackFilter[T, F, FMT, Q](src, f).map(_.right[Search[Q]])
+          case Some(IndexPlan(search, true))  => fallbackFilter[T, F, FMT, Q](search, f) map (_.right[Search[Q]])
+          case Some(IndexPlan(search, false)) => search.left[XQuery].point[F]
+          case None => fallbackFilter[T, F, FMT, Q](src, f).map(_.right[Search[Q]])
         }
     }
   }
