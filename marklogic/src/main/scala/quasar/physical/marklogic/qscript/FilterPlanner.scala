@@ -37,7 +37,10 @@ import xml.name._
 import scalaz._, Scalaz._
 
 private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
-  import FilterPlanner._
+  import FilterPlanner.flattenDir
+
+  private def strPath(dir0: ADir): String =
+    "/" ++ flattenDir(dir0).map(PathCodec.placeholder('/').escape(_)).intercalate("/")
 
   private object PathProjection {
     private object MFComp {
@@ -107,12 +110,12 @@ private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
 
     private def xmlProjections(path: ADir): Option[XQuery] =
       if(depth(path) >= 1)
-        FilterPlanner.flattenDir(path).map(child.elementNamed(_))
+        flattenDir(path).map(child.elementNamed(_))
           .foldLeft(child.*)((path, segment) => path `/` segment).some
       else none
 
     private def jsonProjections(path: ADir): Option[XQuery] =
-      FilterPlanner.flattenDir(path).map(child.nodeNamed(_))
+      flattenDir(path).map(child.nodeNamed(_))
         .foldLeft1Opt((path, segment) => path `/` segment)
 
     private def elementRange[Q](src: Search[Q], fm: FreeMap[T])(
@@ -161,9 +164,6 @@ private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
 object FilterPlanner {
   def flattenDir(dir0: ADir): IList[String] =
     flatten(None, None, None, Some(_), Some(_), dir0).toIList.unite
-
-  def strPath(dir0: ADir): String =
-    "/" ++ flattenDir(dir0).map(PathCodec.placeholder('/').escape(_)).intercalate("/")
 
   def anyDocument[T[_[_]], Q](q: Q)(
     implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]

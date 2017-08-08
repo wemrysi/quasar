@@ -39,6 +39,8 @@ trait FormatFilterPlanner[A] {
 }
 
 object FormatFilterPlanner {
+  import FilterPlanner.validSearch
+
   implicit val xmlFilterPlanner: FormatFilterPlanner[DocType.Xml] = new FormatFilterPlanner[DocType.Xml] {
     def plan[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
       FMT: SearchOptions: StructuralPlanner[F, ?],
@@ -47,11 +49,10 @@ object FormatFilterPlanner {
     ): F[Option[Search[Q]]] = {
       val planner = new FilterPlanner[T]
 
-      lazy val pathQuery    = FilterPlanner.validSearch[T, F, FMT, Q](planner.PathIndexPlanner(src, f))
-      lazy val starQuery    = FilterPlanner.validSearch[T, F, FMT, Q](planner.StarIndexPlanner(src, f))
-      lazy val elementQuery = FilterPlanner.validSearch[T, F, FMT, Q](planner.ElementIndexPlanner.planXml(src, f))
+      lazy val starQuery    = validSearch[T, F, FMT, Q](planner.StarIndexPlanner(src, f))
+      lazy val elementQuery = validSearch[T, F, FMT, Q](planner.ElementIndexPlanner.planXml(src, f))
 
-      (pathQuery ||| starQuery ||| elementQuery).run
+      (starQuery ||| elementQuery).run
     }
   }
 
@@ -63,8 +64,8 @@ object FormatFilterPlanner {
     ): F[Option[Search[Q]]] = {
       val planner = new FilterPlanner[T]
 
-      lazy val pathQuery    = FilterPlanner.validSearch[T, F, FMT, Q](planner.PathIndexPlanner(src, f))
-      lazy val elementQuery = FilterPlanner.validSearch[T, F, FMT, Q](planner.ElementIndexPlanner.planJson(src, f))
+      lazy val pathQuery    = validSearch[T, F, FMT, Q](planner.PathIndexPlanner(src, f))
+      lazy val elementQuery = validSearch[T, F, FMT, Q](planner.ElementIndexPlanner.planJson(src, f))
 
       (pathQuery ||| elementQuery).run
     }
