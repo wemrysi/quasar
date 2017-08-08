@@ -32,13 +32,15 @@ class ElasticCallSpec extends quasar.Qspec
 
   val elastic = new ElasticCall.Ops[ElasticCall]
 
+  val interpreter = ElasticCall.interpreter("localhost", 9200)
+
   var node: Option[LocalNode] = None
 
   def healthCheck(tried: Int): Task[Boolean] = 
     if(tried > 5)
       false.point[Task]
     else {
-      val attemptedConnection = elastic.listIndices.foldMap(ElasticCall.interpreter).void.attempt
+      val attemptedConnection = elastic.listIndices.foldMap(interpreter).void.attempt
       attemptedConnection >>= (_.fold(
         _ => Task.delay(java.lang.Thread.sleep(200)) *> healthCheck(tried + 1),
         _ => true.point[Task]
@@ -56,7 +58,7 @@ class ElasticCallSpec extends quasar.Qspec
   }
 
   def execute[A](program: Free[ElasticCall, A]): A =
-    program.foldMap(ElasticCall.interpreter("localhost", 9200)).unsafePerformSync
+    program.foldMap(interpreter).unsafePerformSync
 
   "CopyType" should {
     "copy content of existing type to non-existing type" in {
