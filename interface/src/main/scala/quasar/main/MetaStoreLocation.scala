@@ -28,7 +28,6 @@ import scalaz.concurrent.Task
 sealed abstract class MetaStoreLocation[A]
 
 object MetaStoreLocation {
-  import metastore.metastoreTransactor
 
   final case object Get extends MetaStoreLocation[DbConnectionConfig]
 
@@ -55,13 +54,10 @@ object MetaStoreLocation {
       λ[MetaStoreLocation ~> Task] {
         case Get => ref.read.map(_.connectionInfo)
         case Set(conn, initialize) =>
-          val tryNewMetaStore = metastoreTransactor(conn).flatMap(m =>
-            if (initialize)
-              initUpdateMigrate(quasar.metastore.Schema.schema, m.transactor, None).as(m)
-            else m.point[MainTask])
           (for {
+            currentSchema <- ref.read.map(_.schema).liftM[MainErrT]
             // Try connecting to the new metastore location
-            m <- tryNewMetaStore
+            m <- MetaStore.connect(conn, initialize || conn.isInMemory, currentSchema).leftMap(_.message)
             // Persist the change, if persisting fails, shutdown the new metastore connection and fail the change
             _ <- EitherT(persist(m.connectionInfo).foldM(persistFailure => m.shutdown.as(persistFailure.left), _ => ().right.point[Task]))
             // We successfully connected to the new metastore and persisted the change to the config file

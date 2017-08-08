@@ -32,11 +32,20 @@ package object db {
   def connFail[A](message: String): ConnectionIO[A] =
     Catchable[ConnectionIO].fail(new RuntimeException(message))
 
-  def poolingTransactor(cxn: ConnectionInfo, config: HikariConfig => Task[Unit]): Task[StatefulTransactor] =
-    for {
+  /** Transactor that makes use of a connection pool for performance. Requires cleanup. */
+  def poolingTransactor(cxn: ConnectionInfo, config: HikariConfig => Task[Unit]): Task[Throwable \/ StatefulTransactor] =
+    (for {
       xa <- HikariTransactor[Task](cxn.driverClassName, cxn.url, cxn.userName, cxn.password)
       _  <- xa.configure(config)
-    } yield StatefulTransactor(xa, xa.shutdown)
+    } yield StatefulTransactor(xa, xa.shutdown)).attempt
+
+  /** Transactor that does not use a connection pool, so doesn't require any cleanup. */
+  def simpleTransactor(cxn: ConnectionInfo): Transactor[Task] =
+    DriverManagerTransactor[Task](
+      cxn.driverClassName,
+      cxn.url,
+      cxn.userName,
+      cxn.password)
 
   val DefaultConfig: HikariConfig => Task[Unit] = _ => Task.now(())
 }

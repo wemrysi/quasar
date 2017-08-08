@@ -17,6 +17,7 @@
 package quasar.db
 
 import slamdata.Predef._
+import quasar.contrib.scalaz.catchable._
 
 import argonaut._
 import doobie.imports._
@@ -49,7 +50,7 @@ trait PostgresTxFixture {
 
         // Connect to the fresh test DB:
         testCfg =  mainCfg.asInstanceOf[DbConnectionConfig.PostgreSql].copy(database = dbName.some)
-        tr      <- poolingTransactor(DbConnectionConfig.connectionInfo(testCfg), DefaultConfig)
+        tr      <- poolingTransactor(DbConnectionConfig.connectionInfo(testCfg), DefaultConfig).unattempt
       } yield tr)
   }
 }

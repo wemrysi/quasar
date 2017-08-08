@@ -25,6 +25,7 @@ import quasar.fs.mount.MountType
 import doobie.imports._
 import pathy.Path, Path._
 import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 
 /* NB: the `Meta` and `Composite` instances defined here handle errors by
   throwing exceptions. This departs from the convention established for _all_
@@ -43,21 +44,24 @@ import scalaz._, Scalaz._
   */
 package object metastore {
 
-  sealed trait MetastoreInitializationFailure {
+  sealed trait MetastoreFailure {
     def message: String
   }
-  final case object MetastoreRequiresInitialization extends MetastoreInitializationFailure {
+  final case object MetastoreRequiresInitialization extends MetastoreFailure {
     def message: String = "MetaStore requires initialization, try running the 'initUpdateMetaStore' command."
   }
-  final case class MetastoreRequiresMigration(current: String, latest: String) extends MetastoreInitializationFailure {
+  final case class MetastoreRequiresMigration(current: String, latest: String) extends MetastoreFailure {
     def message: String = "MetaStore schema requires migrating, current version is '$cur' latest version is '$nxt'."
   }
-  final case class UnknownInitializationError(causedBy: scala.Throwable) extends MetastoreInitializationFailure {
+  final case class UnknownError(causedBy: scala.Throwable, `while`: String) extends MetastoreFailure {
     private val metastorePrompt: String = "Is the metastore database running?"
-    def message: String = s"While verifying MetaStore schema: ${causedBy.getMessage}. $metastorePrompt"
+    def message: String = s"${`while`}: ${causedBy.getMessage}. $metastorePrompt"
   }
 
-  def verifyMetaStoreSchema[A: Show](schema: Schema[A]): EitherT[ConnectionIO, MetastoreInitializationFailure, Unit] =
+  val taskToConnectionIO: Task ~> ConnectionIO =
+    λ[Task ~> ConnectionIO](t => HC.delay(t.unsafePerformSync))
+
+  def verifyMetaStoreSchema[A: Show](schema: Schema[A]): EitherT[ConnectionIO, MetastoreFailure, Unit] =
     EitherT(schema.updateRequired map {
       case Some((None, _)) =>
         MetastoreRequiresInitialization.left

@@ -58,11 +58,14 @@ object MetaStoreFixture {
     createNewTestMetastore.map(_.trans.transactor)
   def createNewTestMetastore: Task[MetaStore] =
     createNewTestMetaStoreConfig.map(testConfig =>
-      MetaStore(testConfig, StatefulTransactor(DbUtil.simpleTransactor(DbConnectionConfig.connectionInfo(testConfig)), Task.now(()))))
+      MetaStore(
+        testConfig,
+        StatefulTransactor(simpleTransactor(DbConnectionConfig.connectionInfo(testConfig)), Task.now(())),
+        quasar.metastore.Schema.schema))
 }
 
 trait H2MetaStoreFixture extends MetaStoreFixture {
-  def rawTransactor = DbUtil.simpleTransactor(
+  def rawTransactor = simpleTransactor(
     DbConnectionConfig.connectionInfo(DbUtil.inMemoryConfig(s"test_mem_${this.getClass.getSimpleName}")))
 }
 

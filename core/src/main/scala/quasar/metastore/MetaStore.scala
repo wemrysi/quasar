@@ -17,19 +17,86 @@
 package quasar.metastore
 
 import slamdata.Predef._
+import quasar.console.stdout
 import quasar.db._
+import quasar.fs.mount.MountingsConfig
 
-import doobie.imports.Transactor
-import scalaz._
+import argonaut._
+import doobie.imports._
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-final case class MetaStore private (connectionInfo: DbConnectionConfig, trans: StatefulTransactor) {
+final case class MetaStore private (connectionInfo: DbConnectionConfig, trans: StatefulTransactor, schema: Schema[Int]) {
   def shutdown: Task[Unit] = trans.shutdown
   def transactor: Transactor[Task] = trans.transactor
 }
 
 object MetaStore {
-  def connect(dbConfig: DbConnectionConfig): Task[Throwable \/ MetaStore] =
-      poolingTransactor(DbConnectionConfig.connectionInfo(dbConfig), DefaultConfig).map(MetaStore(dbConfig, _)).attempt
+  /**
+    * Attempts to connect to a Quasar MetaStore. Will make sure the schema matches the expected Schema and print
+    * a line to the console to inform the user that we just connected to a given MetaStore location once the
+    * connection is established.
+    * @param dbConfig The configuration specifying the location of the database backing the MetaStore
+    * @param initializeOrUpdate Whether or not to immediately initialize or update the MetaStore upon connecting
+    *                           to the underlying database. If the database has not been initialized and this value
+    *                           is set to false, this call will fail to connect to the database with a
+    *                           `MetastoreFailure` detailing the reason for the failure (requires initialization or an update).
+    * @param schema The Schema that the underlying database is expected to have. You probably want to pass in
+    *               `quasar.metastore.Schema.schema`, but a different Schema may be desirable if the application
+    *               needs to store additional information in the MetaStore
+    * @return A `MetaStore` object containing the `transactor` to use to perform operation on the MetaStore as
+    *         well as it's location and expected Schema
+    */
+  def connect(dbConfig: DbConnectionConfig, initializeOrUpdate: Boolean, schema: Schema[Int]): EitherT[Task, MetastoreFailure, MetaStore] = {
+    for {
+      tx <- EitherT(poolingTransactor(DbConnectionConfig.connectionInfo(dbConfig), DefaultConfig))
+              .leftMap(t => UnknownError(t, "While connecting to MetaStore"):MetastoreFailure)
+      _  <-
+        if (initializeOrUpdate)
+          this.initializeOrUpdate(schema, tx.transactor, None).void
+        else ().point[EitherT[Task, MetastoreFailure, ?]]
+      _  <- verifySchema(schema, tx.transactor)
+      _  <- stdout(s"Using metastore: ${DbConnectionConfig.connectionInfo(dbConfig).url}").liftM[EitherT[?[_], MetastoreFailure, ?]]
+    } yield MetaStore(dbConfig, tx, schema)
+
+  }
+
+  def initializeOrUpdate[A](
+    schema: Schema[A], transactor: Transactor[Task], jCfg: Option[Json]
+  ): EitherT[Task, MetastoreFailure, Option[Json]] = {
+    val mntsFieldName = "mountings"
+
+    val mountingsConfigDecodeJson: DecodeJson[Option[MountingsConfig]] =
+      DecodeJson(cur => (cur --\ mntsFieldName).as[Option[MountingsConfig]])
+
+    val mountingsConfig: ConnectionIO[Option[MountingsConfig]] =
+      taskToConnectionIO(jCfg.traverse(
+        mountingsConfigDecodeJson.decodeJson(_).fold({
+          case (e, _) => Task.fail(new RuntimeException(
+            s"malformed config, fix before attempting initUpdateMetaStore, ${e.shows}"))},
+          Task.now)
+      ) ∘ (_.unite))
+
+    def migrateMounts(cfg: Option[MountingsConfig]): ConnectionIO[Unit] =
+      cfg.traverse_(_.toMap.toList.traverse_((MetaStoreAccess.insertMount _).tupled))
+
+    val op: ConnectionIO[Option[Json]] =
+      for {
+        cfg <- mountingsConfig
+        ver <- schema.readVersion
+        _   <- schema.updateToLatest
+        _   <- ver.isEmpty.whenM(migrateMounts(cfg))
+      } yield ver.isEmpty.fold(
+        jCfg ∘ (_.withObject(_ - mntsFieldName)),
+        jCfg)
+
+    EitherT(transactor.trans(op).attempt ∘ (
+      _.leftMap(t => UnknownError(t, "While initializing or updating"))))
+  }
+
+  def verifySchema[A: Show](schema: Schema[A], transactor: Transactor[Task]): EitherT[Task, MetastoreFailure, Unit] = {
+    EitherT(verifyMetaStoreSchema(schema).run.transact(transactor).attempt.map(_.valueOr(t =>
+      UnknownError(t, "while verifying schema").left)))
+  }
 
 }

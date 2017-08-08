@@ -23,8 +23,7 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect._
-import quasar.db.Schema
-import quasar.db.DbConnectionConfig
+import quasar.db._
 import quasar.fp._, ski._
 import quasar.fp.free._
 import quasar.fs._
@@ -33,12 +32,11 @@ import quasar.fs.mount.hierarchical._
 import quasar.fs.mount.module.Module
 import quasar.physical._, couchbase.Couchbase
 import quasar.main.config.loadConfigFile
-import quasar.main.metastore._
 import quasar.metastore._
 
 import scala.util.control.NonFatal
 
-import doobie.imports.Transactor
+import doobie.imports._
 import eu.timepit.refined.auto._
 import monocle.Lens
 import pathy.Path.posixCodec
@@ -405,8 +403,8 @@ package object main {
         case Cmd.InitUpdateMetaStore =>
           for {
             msCfg <- configOps.metaStoreConfig.get(cfg).cata(Task.now, MetaStoreConfig.default).liftM[MainErrT]
-            trans <- metastoreTransactor(msCfg.database)
-            _     <- initUpdateMigrate(quasar.metastore.Schema.schema, trans.transactor, config.configPath).ensuring(κ(trans.shutdown.liftM[MainErrT]))
+            trans =  simpleTransactor(DbConnectionConfig.connectionInfo(msCfg.database))
+            _     <- initUpdateMigrate(quasar.metastore.Schema.schema, trans, config.configPath)
           } yield ()
       }
     } yield ()
@@ -421,7 +419,7 @@ package object main {
       j  <- EitherT(ConfigOps.jsonFromFile(cfgFile).fold(
               e => ConfigError.fileNotFound.getOption(e).cata(κ(none.right), e.shows.left),
               _.some.right))
-      jʹ <- metastore.initUpdateMetaStore(schema, tx, j)
+      jʹ <- MetaStore.initializeOrUpdate(schema, tx, j).leftMap(_.message)
       _  <- EitherT.right(jʹ.traverse_(ConfigOps.jsonToFile(_, cfgFile)))
     } yield ()
 }

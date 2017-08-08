@@ -101,18 +101,14 @@ object Quasar {
 
   def initWithDbConfig(db: DbConnectionConfig, persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
     for {
-      metastore <- metastoreTransactor(db)
+      metastore <- MetaStore.connect(db, db.isInMemory, quasar.metastore.Schema.schema).leftMap(_.message)
       metaRef   <- TaskRef(metastore).liftM[MainErrT]
-      quasarFS  <- initWithMeta(metaRef, persist, db.isInMemory)
+      quasarFS  <- initWithMeta(metaRef, persist)
     } yield quasarFS
 
-  def initWithMeta(metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit], initialize: Boolean): MainTask[Quasar] =
+  def initWithMeta(metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
     for {
       metastore  <- metaRef.read.liftM[MainErrT]
-      _          <- if (initialize)
-        initUpdateMigrate(quasar.metastore.Schema.schema, metastore.trans.transactor, None)
-      else Task.now(()).liftM[MainErrT]
-      _          <- verifySchema(quasar.metastore.Schema.schema, metastore.trans.transactor).leftMap(_.message)
       hfsRef     <- TaskRef(Empty.backendEffect[HierarchicalFsEffM]).liftM[MainErrT]
       mntdRef    <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
 
