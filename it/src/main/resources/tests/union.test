@@ -2,13 +2,14 @@
     "name": "union",
     "backends": {
         "couchbase":         "pending",
-        "mimir":             "ignoreFieldOrder",
+        "mimir":             "pending",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",
         "mongodb_read_only": "pending"
     },
+    "NB": "The qscript for this query contains some nonsensical structures and the fact that it passes on any connector is based purely on how nonsense-tolerant that connector is, this isn't expected to work in general.",
     "data": "zips.data",
     "query": "select `_id` as zip from zips union select city, state from zips",
     "predicate": "atLeast",
