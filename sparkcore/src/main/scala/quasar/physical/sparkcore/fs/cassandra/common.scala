@@ -112,37 +112,29 @@ object CassandraDDL {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def dropKeyspace[S[_]](keyspace: String)(implicit sc: SparkContext) = Task.delay {
     CassandraConnector(sc.getConf).withSessionDo { implicit session =>
       session.execute(s"DROP KEYSPACE IF EXISTS $keyspace;")
-      ()
     }
-  }
+  }.void
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def dropTable[S[_]](keyspace: String, table: String)(implicit sc: SparkContext) = Task.delay {
     CassandraConnector(sc.getConf).withSessionDo { implicit session =>
       session.execute(s"DROP TABLE $keyspace.$table;")
-      ()
     }
-  }
+  }.void
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def createTable[S[_]](keyspace: String, table: String)(implicit sc: SparkContext) = Task.delay {
     CassandraConnector(sc.getConf).withSessionDo { implicit session =>
       session.execute(s"CREATE TABLE $keyspace.$table (id timeuuid PRIMARY KEY, data text);")
-      ()
     }
-  }
+  }.void
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def createKeyspace[S[_]](keyspace: String)(implicit sc: SparkContext) = Task.delay {
     CassandraConnector(sc.getConf).withSessionDo { implicit session =>
       session.execute(s"CREATE KEYSPACE $keyspace WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
-      ()
     }
-  }
+  }.void
 
   def moveTable[S[_]](fromK: String, fromT: String, toK: String, toT: String)(implicit sc: SparkContext) = Task.delay {
     val rdd = sc.cassandraTable(fromK, fromT)
@@ -171,14 +163,12 @@ object CassandraDDL {
       }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def insertData[S[_]](keyspace: String, table: String, data: String)(implicit sc: SparkContext) = Task.delay {
     CassandraConnector(sc.getConf).withSessionDo { implicit session =>
       val stmt = session.prepare(s"INSERT INTO $keyspace.$table (id, data) VALUES (now(),  ?);")
       session.execute(stmt.bind(data))
-      ()
     }
-  }
+  }.void
 
 }
 
