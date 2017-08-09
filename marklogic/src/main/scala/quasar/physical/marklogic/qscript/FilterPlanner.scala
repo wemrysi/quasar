@@ -18,6 +18,7 @@ package quasar.physical.marklogic.qscript
 
 import quasar.contrib.pathy._
 import quasar.ejson.EJson
+import quasar.physical.marklogic.DocType
 import quasar.physical.marklogic.cts._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery._
@@ -36,8 +37,14 @@ import xml.name._
 
 import scalaz._, Scalaz._
 
-private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
+private[qscript] abstract class FilterPlanner[T[_[_]]: RecursiveT, FMT] {
   import FilterPlanner.flattenDir
+
+  def plan[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
+    FMT: SearchOptions: StructuralPlanner[F, ?],
+    Q](src: Search[Q], f: FreeMap[T])(
+    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+  ): F[Option[IndexPlan[Q]]]
 
   private def strPath(dir0: ADir): String =
     "/" ++ flattenDir(dir0).map(PathCodec.placeholder('/').escape(_)).intercalate("/")
@@ -170,6 +177,33 @@ private[qscript] final class FilterPlanner[T[_[_]]: RecursiveT] {
 }
 
 object FilterPlanner {
+  implicit def xmlFilterPlanner[T[_[_]]: BirecursiveT]: FilterPlanner[T, DocType.Xml] = new FilterPlanner[T, DocType.Xml] {
+    def plan[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
+      FMT: SearchOptions: StructuralPlanner[F, ?],
+      Q](src: Search[Q], f: FreeMap[T])(
+      implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+    ): F[Option[IndexPlan[Q]]] = {
+      lazy val starQuery    = validIndexPlan[T, F, FMT, Q](StarIndexPlanner(src, f))
+      lazy val elementQuery = validIndexPlan[T, F, FMT, Q](ElementIndexPlanner.planXml(src, f))
+
+      (starQuery ||| elementQuery).run
+    }
+  }
+
+  implicit def jsonFilterPlanner[T[_[_]]: BirecursiveT]: FilterPlanner[T, DocType.Json] = new FilterPlanner[T, DocType.Json] {
+    def plan[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
+      FMT: SearchOptions: StructuralPlanner[F, ?],
+      Q](src: Search[Q], f: FreeMap[T])(
+      implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+    ): F[Option[IndexPlan[Q]]] = {
+      lazy val pathQuery    = validIndexPlan[T, F, FMT, Q](PathIndexPlanner(src, f))
+      lazy val elementQuery = validIndexPlan[T, F, FMT, Q](ElementIndexPlanner.planJson(src, f))
+
+      (pathQuery ||| elementQuery).run
+    }
+  }
+
+
   def flattenDir(dir0: ADir): IList[String] =
     flatten(None, None, None, Some(_), Some(_), dir0).toIList.unite
 
@@ -232,8 +266,8 @@ object FilterPlanner {
   def plan[T[_[_]]: BirecursiveT,
     F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
     FMT: SearchOptions: StructuralPlanner[F, ?], Q](src0: Search[Q] \/ XQuery, f: FreeMap[T])(
-    implicit Q:  Birecursive.Aux[Q, Query[T[EJson], ?]],
-             P:  FormatFilterPlanner[FMT]
+    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]],
+             P: FilterPlanner[T, FMT]
   ): F[Search[Q] \/ XQuery] = {
     src0 match {
       case (\/-(src)) =>
@@ -241,7 +275,7 @@ object FilterPlanner {
       case (-\/(src)) if anyDocument(src.query) =>
         fallbackFilter[T, F, FMT, Q](src, f) map (_.right[Search[Q]])
       case (-\/(src)) =>
-        P.plan[F, FMT, T, Q](src, f) >>= {
+        P.plan[F, FMT, Q](src, f) >>= {
           case Some(IndexPlan(search, true))  => fallbackFilter[T, F, FMT, Q](search, f) map (_.right[Search[Q]])
           case Some(IndexPlan(search, false)) => search.left[XQuery].point[F]
           case None => fallbackFilter[T, F, FMT, Q](src, f).map(_.right[Search[Q]])

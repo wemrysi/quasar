@@ -20,6 +20,7 @@ import slamdata.Predef._
 
 import quasar.contrib.pathy._
 import quasar.ejson._
+import quasar.physical.marklogic.DocType
 import quasar.physical.marklogic.cts._
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
@@ -107,9 +108,12 @@ final class FilterPlannerSpec extends quasar.Qspec {
   def qnameDirName(dir0: ADir): Option[QName] =
     dirName(dir0) >>= (d => QName.string.getOption(d.value))
 
+  // The FMT type index is not relevant for these tests
+  def planner(implicit ev: FilterPlanner[Fix, DocType.Json]
+  ): FilterPlanner[Fix, DocType.Json] = ev
+
   "StarIndexPlanner" >> {
     "search expression includes * and projection path" >> prop { prj: ProjectTestCase =>
-      val planner = new FilterPlanner[Fix]
       val path = prettyPrint(rebaseA(rootDir[Sandboxed] </> dir("*"))(prj.path)).dropRight(1)
 
       val expectedSearch = IndexPlan(
@@ -126,7 +130,6 @@ final class FilterPlannerSpec extends quasar.Qspec {
 
   "PathIndexPlanner" >> {
     "plan includes the projection path" >> prop { prj: ProjectTestCase =>
-      val planner = new FilterPlanner[Fix]
       val path = prettyPrint(prj.path).dropRight(1)
 
       val expectedSearch = IndexPlan(
@@ -150,7 +153,6 @@ final class FilterPlannerSpec extends quasar.Qspec {
         flattenDir(path0).map(child.elementNamed(_)).foldLeft(child.*)((path, segment) => path `/` segment)
 
       "plan with a star path and path predicate" >> prop { prj: ProjectTestCase =>
-        val planner = new FilterPlanner[Fix]
         val name: Option[QName] = qnameDirName(prj.path)
 
         val expectedSearch: Option[IndexPlan[U]] = name map ((elName: QName) =>
@@ -166,7 +168,6 @@ final class FilterPlannerSpec extends quasar.Qspec {
       }
 
       "concatenate predicates if there's already one" >> prop { prj: ProjectTestCase =>
-        val planner = new FilterPlanner[Fix]
         val existingPredPath: XQuery = (child.elementNamed("aa") `/` child.elementNamed("bb"))
 
         val name: Option[QName] = qnameDirName(prj.path)
@@ -187,7 +188,6 @@ final class FilterPlannerSpec extends quasar.Qspec {
 
     "planJson" >> {
       "add the path as a predicate to the search expression" >> prop { prj: ProjectTestCase =>
-        val planner = new FilterPlanner[Fix]
         val path = flattenDir(prj.path).map(child.nodeNamed(_)).foldLeft1Opt((path, segment) => path `/` segment)
 
         val expectedSearch: Option[IndexPlan[U]] = (path |@| dirName(prj.path))((pth, prop) =>
