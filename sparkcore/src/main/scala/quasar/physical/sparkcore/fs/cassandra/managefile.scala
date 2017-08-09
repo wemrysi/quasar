@@ -105,10 +105,9 @@ object managefile {
     val table = common.tableName(file)
 
     (for {
-      keyspaceExists <- cass.keyspaceExists(keyspace).liftM[FileSystemErrT]
       tableExists    <- cass.tableExists(keyspace, table).liftM[FileSystemErrT]
       _              <- EitherT((
-                                  if(keyspaceExists && tableExists)
+                                  if(tableExists)
                                     ().right
                                   else
                                     pathErr(pathNotFound(file)).left[Unit]
