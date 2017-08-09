@@ -41,9 +41,8 @@ init_marklogic() {
 }
 
 init_spark_local() {
-    echo $HOME
     mkdir ${HOME}/spark_local_test
-    ls ${HOME}/spark_local_test
+    ls ${HOME}
 }
 
 ##########################################
