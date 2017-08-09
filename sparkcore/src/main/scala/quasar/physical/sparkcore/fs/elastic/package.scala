@@ -52,7 +52,7 @@ package object elastic {
 
   final case class SparkFSConf(sparkConf: SparkConf, host: String, port: Int)
 
-  val parseUri: ConnectionUri => DefinitionError \/ (SparkConf, SparkFSConf) = (connUri: ConnectionUri) => {
+  val parseUri: ConnectionUri => Task[DefinitionError \/ (SparkConf, SparkFSConf)] = (connUri: ConnectionUri) => Task.delay {
 
     def liftErr(msg: String): DefinitionError = NonEmptyList(msg).left[EnvironmentError]
 
