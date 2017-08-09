@@ -57,7 +57,7 @@ apply_configuration() {
   if [[ $CONTAINER == "quasar_marklogic_xml"     ]]; then init_marklogic $DOCKERIP 8001 8002 enabled;  fi
   if [[ $CONTAINER == "quasar_marklogic_json"    ]]; then init_marklogic $DOCKERIP 9001 9002 disabled; fi
   if [[ $CONTAINER == "quasar_metastore"         ]]; then init_metastore;                              fi
-  if [[ $CONTAINER == "quasar_spark_local"       ]]; then init_spark_local;                            fi
+  if [[ $CONTAINER == "quasar_spark_local_test"  ]]; then init_spark_local;                            fi
 }
 
 configure_containers() {
