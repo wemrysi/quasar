@@ -40,6 +40,10 @@ init_marklogic() {
   $SCRIPTS_DIR/initMarklogic $1 $2 $3 $4
 }
 
+init_spark_local() {
+    mkdir ${HOME}/spark_local_test
+}
+
 ##########################################
 # parse arguments and run various
 # database configuration scripts
@@ -51,6 +55,7 @@ apply_configuration() {
   if [[ $CONTAINER == "quasar_marklogic_xml"     ]]; then init_marklogic $DOCKERIP 8001 8002 enabled;  fi
   if [[ $CONTAINER == "quasar_marklogic_json"    ]]; then init_marklogic $DOCKERIP 9001 9002 disabled; fi
   if [[ $CONTAINER == "quasar_metastore"         ]]; then init_metastore;                              fi
+  if [[ $CONTAINER == "quasar_spark_local"       ]]; then init_spark_local;                            fi
 }
 
 configure_containers() {
@@ -135,12 +140,7 @@ while getopts ":hac:u:" opt; do
     c)
       echo "$OPTARG is being configured..." >&2
       enable_docker_env
-      if [[ $OPTARG =~ "spark" ]]
-      then
-        echo "Will not make a container for spark*: $OPTARG"
-      else
-        apply_configuration $OPTARG
-      fi
+      apply_configuration $OPTARG
       ;;
     u)
       echo "bringing up the following containers: $OPTARG" >&2
