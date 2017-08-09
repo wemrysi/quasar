@@ -33,8 +33,6 @@ import scalaz._, Scalaz._
 
 object managefile {
 
-  import common._
-
   def chrooted[S[_]](prefix: ADir)(implicit
     s0: Read.Ops[SparkContext, S],
     s1: CassandraDDL.Ops[S]
@@ -62,34 +60,36 @@ object managefile {
     cass: CassandraDDL.Ops[S]
     ): Free[S, Boolean] = 
     refineType(path).fold(
-      d => cass.keyspaceExists(keyspace(d)),
-      f => cass.tableExists(keyspace(fileParent(f)), tableName(f))
+      d => cass.keyspaceExists(common.keyspace(d)),
+      f => cass.tableExists(common.keyspace(fileParent(f)), common.tableName(f))
     )
 
-  def moveFile[S[_]](sf: AFile, df: AFile)(implicit
+  def moveFile[S[_]](source: AFile, destination: AFile)(implicit
     cass: CassandraDDL.Ops[S]
     ): Free[S, Unit] = {
-    val dks = keyspace(fileParent(df))
-    val dft = tableName(df)
+    val destinationKeyspace = common.keyspace(fileParent(destination))
+    val destinationTable = common.tableName(destination)
+    val sourceKeyspace = common.keyspace(fileParent(source))
+    val sourceTable = common.tableName(source)
     for {
-      keyspaceExists <- cass.keyspaceExists(dks)
-      _              <- if (!keyspaceExists) cass.createKeyspace(dks) else Free.pure[S, Unit](())
-      tableExists    <- cass.tableExists(dks, dft)
-      _              <- if(tableExists) cass.dropTable(dks, dft) else Free.pure[S, Unit](())
-      _              <- cass.moveTable(keyspace(fileParent(sf)), tableName(sf), dks, dft)
-      _              <- cass.dropTable(keyspace(fileParent(sf)), tableName(sf))
+      keyspaceExists <- cass.keyspaceExists(destinationKeyspace)
+      _              <- if (!keyspaceExists) cass.createKeyspace(destinationKeyspace) else Free.pure[S, Unit](())
+      tableExists    <- cass.tableExists(destinationKeyspace, destinationTable)
+      _              <- if(tableExists) cass.dropTable(destinationKeyspace, destinationTable) else Free.pure[S, Unit](())
+      _              <- cass.moveTable(sourceKeyspace, sourceTable, destinationKeyspace, destinationTable)
+      _              <- cass.dropTable(sourceKeyspace, sourceTable)
     } yield ()
   }
 
-  def moveDir[S[_]](sd: ADir, dd: ADir)(implicit
+  def moveDir[S[_]](source: ADir, destination: ADir)(implicit
     cass: CassandraDDL.Ops[S]
   ): Free[S, Unit] = {
     for {
-      tables <- cass.listTables(keyspace(sd))
+      tables <- cass.listTables(common.keyspace(source))
       _      <- tables.map { tn =>
-                  moveFile(sd </> file(tn), dd </> file(tn))
+                  moveFile(source </> file(tn), destination </> file(tn))
                 }.toList.sequence
-      _      <- cass.dropKeyspace(keyspace(sd))
+      _      <- cass.dropKeyspace(common.keyspace(source))
     } yield ()
   }
 
@@ -101,19 +101,19 @@ object managefile {
   private def deleteFile[S[_]](file: AFile)(implicit
     cass: CassandraDDL.Ops[S]
   ): Free[S, FileSystemError \/ Unit] = {
-    val ks = keyspace(fileParent(file))
-    val tb = tableName(file)
+    val keyspace = common.keyspace(fileParent(file))
+    val table = common.tableName(file)
 
     (for {
-      keyspaceExists <- cass.keyspaceExists(ks).liftM[FileSystemErrT]
-      tableExists    <- cass.tableExists(ks, tb).liftM[FileSystemErrT]
+      keyspaceExists <- cass.keyspaceExists(keyspace).liftM[FileSystemErrT]
+      tableExists    <- cass.tableExists(keyspace, table).liftM[FileSystemErrT]
       _              <- EitherT((
                                   if(keyspaceExists && tableExists)
                                     ().right
                                   else
                                     pathErr(pathNotFound(file)).left[Unit]
                                 ).point[Free[S, ?]])
-      _              <- cass.dropTable(ks, tb).liftM[FileSystemErrT]
+      _              <- cass.dropTable(keyspace, table).liftM[FileSystemErrT]
     } yield ()).run
   }
 
@@ -121,10 +121,10 @@ object managefile {
     cass: CassandraDDL.Ops[S]
   ): Free[S, FileSystemError \/ Unit] = {
     val aDir: ADir = refineType(dir).fold(d => d, fileParent(_))
-    val ks = keyspace(aDir)
+    val keyspace = common.keyspace(aDir)
 
     (for {
-      keyspaces <- cass.listKeyspaces(ks).liftM[FileSystemErrT]
+      keyspaces <- cass.listKeyspaces(keyspace).liftM[FileSystemErrT]
       _         <- EitherT((
                              if(keyspaces.isEmpty)
                                pathErr(pathNotFound(dir)).left[Unit]
