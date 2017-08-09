@@ -150,41 +150,13 @@ package object qscript {
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
 
-  private def concatNaive[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
-    (l: FreeMapA[T, A], r: FreeMapA[T, A])
-      : (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
-    val norm = Normalizable.normalizable[T]
-
-    (norm.freeMF(l), norm.freeMF(r)) match {
-      case (newL, newR) if newL ≟ newR => (newL, HoleF[T], HoleF[T])
-      case (newL @ Embed(CoEnv(\/-(MFC(Constant(_))))), newR) =>
-        (newR, newL >> HoleF, HoleF[T])
-      case (newL, newR @ Embed(CoEnv(\/-(MFC(Constant(_)))))) =>
-        (newL, HoleF[T], newR >> HoleF)
-      case (newL, newR) =>
-        (StaticArray(List(newL, newR)),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
-    }
-  }
-
   def concat[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
     (l: FreeMapA[T, A], r: FreeMapA[T, A])
       : (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
-    val norm = Normalizable.normalizable[T]
 
+    val norm = Normalizable.normalizable[T]
     val norml = norm.freeMF(l)
     val normr = norm.freeMF(r)
-
-    val leftElems: List[FreeMapA[T, A]] = norml.project match {
-      case StaticArray(array) => array
-      case _                  => Nil
-    }
-
-    val rightElems: List[FreeMapA[T, A]] = normr.project  match {
-      case StaticArray(array) => array
-      case _                  => Nil
-    }
 
     def projectIndex(idx: Int): FreeMap[T] =
       Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](idx))))
@@ -192,118 +164,55 @@ package object qscript {
     def indexOf(elems: List[FreeMapA[T ,A]], value: FreeMapA[T, A]): Option[Int] =
       IList.fromList(elems) indexOf value
 
-    indexOf(leftElems, normr).cata(
-      idx => (norml, HoleF[T], projectIndex(idx)),
-      indexOf(rightElems, norml).cata(
-        idx => (normr, projectIndex(idx), HoleF[T]),
-        concatNaive(norml, normr)))
+    def foundR =
+      StaticArray.unapply(norml.project)
+        .flatMap(indexOf(_, normr))
+        .map(idx => (norml, HoleF[T], projectIndex(idx)))
+
+    def foundL =
+      StaticArray.unapply(normr.project)
+        .flatMap(indexOf(_, norml))
+        .map(idx => (normr, projectIndex(idx), HoleF[T]))
+
+    def concat0 = (norml, normr) match {
+      case _ if norml ≟ normr =>
+        (norml, HoleF[T], HoleF[T])
+
+      case (Embed(CoEnv(\/-(MFC(Constant(_))))), _) =>
+        (normr, norml >> HoleF, HoleF[T])
+
+      case (_, Embed(CoEnv(\/-(MFC(Constant(_)))))) =>
+        (norml, HoleF[T], normr >> HoleF)
+
+      case (Embed(StaticArray(ls)), _) =>
+        (StaticArray(ls ::: List(normr)), HoleF[T], projectIndex(ls.length))
+
+      case (_, Embed(StaticArray(rs))) =>
+        (StaticArray(rs ::: List(norml)), projectIndex(rs.length), HoleF[T])
+
+      case _ =>
+        (StaticArray(List(norml, normr)), projectIndex(0), projectIndex(1))
+    }
+
+    foundR orElse foundL getOrElse concat0
   }
 
   def concat3[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T]) = {
-    val norm = Normalizable.normalizable[T]
 
-    (norm.freeMF(l), norm.freeMF(c), norm.freeMF(r)) match {
-      case (newL, newC, newR) if newL ≟ newC && newL ≟ newR =>
-        (newL, HoleF[T], HoleF[T], HoleF[T])
-
-      case (newL @ Embed(CoEnv(\/-(MFC(Constant(_))))), newC @ Embed(CoEnv(\/-(MFC(Constant(_))))), newR) =>
-        (newR, newL >> HoleF[T], newC >> HoleF[T], HoleF[T])
-
-      case (newL @ Embed(CoEnv(\/-(MFC(Constant(_))))), newC, newR @ Embed(CoEnv(\/-(MFC(Constant(_)))))) =>
-        (newC, newL >> HoleF[T], HoleF[T], newR >> HoleF[T])
-
-      case (newL, newC @ Embed(CoEnv(\/-(MFC(Constant(_))))), newR @ Embed(CoEnv(\/-(MFC(Constant(_)))))) =>
-        (newL, HoleF[T], newC >> HoleF[T], newR >> HoleF[T])
-
-      case (newL @ Embed(CoEnv(\/-(MFC(Constant(_))))), newC, newR) =>
-        if (newC ≟ newR)
-          (newC, newL >> HoleF, HoleF[T], HoleF[T])
-        else
-          (StaticArray(List(newC, newR)),
-            newL >> HoleF,
-            Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
-            Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
-
-      case (newL, newC @ Embed(CoEnv(\/-(MFC(Constant(_))))), newR) =>
-        if (newL ≟ newR)
-          (newL, HoleF[T], newC >> HoleF, HoleF[T])
-        else
-          (StaticArray(List(newL, newR)),
-            Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
-            newC >> HoleF,
-            Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
-
-      case (newL, newC, newR @ Embed(CoEnv(\/-(MFC(Constant(_)))))) =>
-        if (newL ≟ newC)
-          (newL, HoleF[T], HoleF[T], newR >> HoleF)
-        else
-          (StaticArray(List(newL, newC)),
-            Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
-            Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
-            newR >> HoleF)
-
-      case (newL, newC, newR) =>
-        (StaticArray(List(newL, newC, newR)),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](2)))))
-    }
+    val (lc, getL, getC) = concat(l, c)
+    val (lcr, getLC, getR) = concat(lc, r)
+    (lcr, getL >> getLC, getC >> getLC, getR)
   }
 
   def concat4[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A], r2: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T], FreeMap[T]) = {
-    val norm = Normalizable.normalizable[T]
 
-    (norm.freeMF(l), norm.freeMF(c), norm.freeMF(r), norm.freeMF(r2)) match {
-      case (newL, newC, newR, newR2) if newL ≟ newC && newC ≟ newR && newR ≟ newR2 =>
-        (newL, HoleF, HoleF, HoleF, HoleF)
-
-      case (newL, newC, newR, newR2) if newL ≟ newC && newR ≟ newR2 =>
-        (StaticArray(List(newL, newR)),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
-
-      // TODO: Handle cases with more than one constant.
-      case (newL @ Embed(CoEnv(\/-(MFC(Constant(_))))), newC, newR, newR2) =>
-        (StaticArray(List(newC, newR, newR2)),
-          newL >> HoleF,
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](2)))))
-
-      case (newL, newC @ Embed(CoEnv(\/-(MFC(Constant(_))))), newR, newR2) =>
-        (StaticArray(List(newL, newR, newR2)),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
-          newC >> HoleF,
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](2)))))
-
-      case (newL, newC, newR @ Embed(CoEnv(\/-(MFC(Constant(_))))), newR2) =>
-        (StaticArray(List(newL, newC, newR2)),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
-          newR >> HoleF,
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](2)))))
-
-      case (newL, newC, newR, newR2 @ Embed(CoEnv(\/-(MFC(Constant(_)))))) =>
-        (StaticArray(List(newL, newC, newR)),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](2)))),
-          newR2 >> HoleF)
-
-      case (newL, newC, newR, newR2) =>
-        (StaticArray(List(newL, newC, newR, newR2)),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](2)))),
-          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](3)))))
-    }
+    val (lcr, getL, getC, getR) = concat3(l, c, r)
+    val (lcr2, getLCR, getR2) = concat(lcr, r2)
+    (lcr2, getL >> getLCR, getC >> getLCR, getR >> getLCR, getR2)
   }
 
   def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
