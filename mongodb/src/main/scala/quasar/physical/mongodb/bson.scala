@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.fp._
 import quasar.javascript._
 import quasar.jscore, jscore.JsFn
+import MongoQueryModel._
 
 import java.time.Instant
 import scala.Any
@@ -39,32 +40,45 @@ sealed abstract class Bson extends Product with Serializable {
   //       BsonF[BsonValue] => BsonValue
   def repr: BsonValue
   def toJs: Js.Expr
+  def isSupported(v: MongoQueryModel): Boolean = true
 }
 
 object Bson {
+
+  def isSupported(v: MongoQueryModel, bv: BsonValue) = bv match {
+    case _: BsonDecimal128 => v gte `3.4`
+    case _ => true
+  }
+
   // TODO: Once Bson is fixpoint, this should be a coalgebra:
   //       BsonValue => BsonF[BsonValue]
-  val fromRepr: BsonValue => Bson = {
-    case arr:  BsonArray             => Arr(arr.getValues.asScala.toList ∘ fromRepr)
-    case bin:  BsonBinary            => Binary.fromArray(bin.getData)
-    case bool: BsonBoolean           => Bool(bool.getValue)
-    case dt:   BsonDateTime          => Date(dt.getValue)
-    case doc:  BsonDocument          => Doc(doc.asScala.toList.toListMap ∘ fromRepr)
-    case dub:  BsonDouble            => Dec(dub.doubleValue)
-    case i32:  BsonInt32             => Int32(i32.intValue)
-    case i64:  BsonInt64             => Int64(i64.longValue)
-    case _:    BsonMaxKey            => MaxKey
-    case _:    BsonMinKey            => MinKey
-    case _:    BsonNull              => Null
-    case oid:  BsonObjectId          => ObjectId.fromArray(oid.getValue.toByteArray)
-    case rex:  BsonRegularExpression => Regex(rex.getPattern, rex.getOptions)
-    case str:  BsonString            => Text(str.getValue)
-    case sym:  BsonSymbol            => Symbol(sym.getSymbol)
-    case tms:  BsonTimestamp         => Timestamp(tms.getTime, tms.getInc)
-    case _:    BsonUndefined         => Undefined
+  val fromRepr: BsonValue => Bson = b => fromReprV (`3.4`, b)
+
+  val fromReprV: (MongoQueryModel, BsonValue) => Bson = {
+    case (v, bv) if !isSupported(v, bv)   => Undefined
+    case (v, arr:  BsonArray)             => Arr(arr.getValues.asScala.toList ∘ (fromReprV(v, _)))
+    case (_, bin:  BsonBinary)            => Binary.fromArray(bin.getData)
+    case (_, bool: BsonBoolean)           => Bool(bool.getValue)
+    case (_, dt:   BsonDateTime)          => Date(dt.getValue)
+    case (_, dec: BsonDecimal128) if (dec.getValue.isNaN || dec.getValue.isInfinite)
+                                          => Undefined
+    case (_, dec:  BsonDecimal128)        => Dec128(dec.getValue.bigDecimalValue)
+    case (v, doc:  BsonDocument)          => Doc(doc.asScala.toList.toListMap ∘ (fromReprV(v, _)))
+    case (_, dub:  BsonDouble)            => Dec(dub.doubleValue)
+    case (_, i32:  BsonInt32)             => Int32(i32.intValue)
+    case (_, i64:  BsonInt64)             => Int64(i64.longValue)
+    case (_, _:    BsonMaxKey)            => MaxKey
+    case (_, _:    BsonMinKey)            => MinKey
+    case (_, _:    BsonNull)              => Null
+    case (_, oid:  BsonObjectId)          => ObjectId.fromArray(oid.getValue.toByteArray)
+    case (_, rex:  BsonRegularExpression) => Regex(rex.getPattern, rex.getOptions)
+    case (_, str:  BsonString)            => Text(str.getValue)
+    case (_, sym:  BsonSymbol)            => Symbol(sym.getSymbol)
+    case (_, tms:  BsonTimestamp)         => Timestamp(tms.getTime, tms.getInc)
+    case (_, _:    BsonUndefined)         => Undefined
       // NB: These types we can’t currently translate back to Bson, but we don’t
       //     expect them to appear.
-    case _: BsonDbPointer | _: BsonJavaScript | _: BsonJavaScriptWithScope => Undefined
+    case (_, _: BsonDbPointer | _: BsonJavaScript | _: BsonJavaScriptWithScope) => Undefined
   }
 
   final case class Dec(value: Double) extends Bson {
@@ -220,6 +234,21 @@ object Bson {
     def repr = new BsonInt64(value)
     def toJs = Js.Call(Js.Ident("NumberLong"), List(Js.Str(value.shows)))
   }
+
+  val _dec128 =
+    Prism.partial[Bson, BigDecimal] { case Bson.Dec128(v) => v } (Bson.Dec128(_))
+
+  final case class Dec128(value: BigDecimal) extends Bson {
+    private val mc =
+      if (value.mc == java.math.MathContext.UNLIMITED) java.math.MathContext.DECIMAL128
+      else value.mc
+
+    private val decimal128 = new types.Decimal128(value(mc).bigDecimal)
+    def repr = new BsonDecimal128(decimal128)
+    def toJs = Js.Call(Js.Ident("NumberDecimal"), List(Js.Str(decimal128.toString)))
+    override def isSupported(v: MongoQueryModel) = v gte `3.4`
+  }
+
   final case class Timestamp private (epochSecond: Int, ordinal: Int) extends Bson {
     def repr = new BsonTimestamp(epochSecond, ordinal)
     def toJs = Js.Call(Js.Ident("Timestamp"),
@@ -260,6 +289,7 @@ object BsonType {
   final case object Int32 extends BsonType(16)
   final case object Int64 extends BsonType(18)
   final case object Timestamp extends BsonType(17)
+  final case object Dec128 extends BsonType(19)
   final case object MinKey extends BsonType(255)
   final case object MaxKey extends BsonType(127)
 }

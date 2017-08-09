@@ -82,6 +82,9 @@ class BsonSpecs extends quasar.Qspec {
             // NB: encoding int as Data loses size info
             (bson.toJs must_== jscore.Call(jscore.ident("NumberInt"), List(jscore.Literal(Js.Str(x.shows)))).toJs) or
             (bson.toJs must_== jscore.Call(jscore.ident("NumberLong"), List(jscore.Literal(Js.Str(x.shows)))).toJs)
+          case Data.Dec(x) =>
+            (bson.toJs must_== jscore.Call(jscore.ident("NumberDecimal"), List(jscore.Literal(Js.Str(x.shows)))).toJs) or
+            (bson.toJs.some must_== data.toJs.map(_.toJs))
           case _ =>
             BsonCodec.fromData(data).fold(
               _ => scala.sys.error("failed to convert data to BSON: " + data.shows),
@@ -112,6 +115,7 @@ object BsonGen {
     arbitrary[Int].map(Int32.apply),
     arbitrary[Long].map(Int64.apply),
     arbitrary[Double].map(Dec.apply),
+    arbitrary[BigDecimal].filter(_.mc != java.math.MathContext.UNLIMITED).map(Dec128.apply),
     listOf(arbitrary[Byte]).map(bytes => Binary.fromArray(bytes.toArray)),
     listOfN(12, arbitrary[Byte]).map(bytes => ObjectId.fromArray(bytes.toArray)),
     const(Date(0)),
