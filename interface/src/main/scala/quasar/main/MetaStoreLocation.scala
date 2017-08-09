@@ -67,5 +67,11 @@ object MetaStoreLocation {
             _ <- ref.write(m).liftM[MainErrT]
           } yield ()).run
       }
+
+    def constant(config: DbConnectionConfig): MetaStoreLocation ~> Task =
+      λ[MetaStoreLocation ~> Task] {
+        case Get => config.point[Task]
+        case Set(conn, initialize) => Task.fail(new Exception("This implementation does not allow changing MetaStore"))
+      }
   }
 }

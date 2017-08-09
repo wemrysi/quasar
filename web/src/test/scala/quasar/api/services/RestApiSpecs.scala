@@ -24,7 +24,7 @@ import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.module.Module
 import quasar.main._
-import quasar.metastore.MetaStoreFixture.createNewTestMetastore
+import quasar.metastore.MetaStoreFixture.createNewTestMetaStoreConfig
 
 import org.http4s._, Method.MOVE
 import org.http4s.dsl._
@@ -45,13 +45,13 @@ class RestApiSpecs extends quasar.Qspec {
 
     type MountingFileSystem[A] = Coproduct[Mounting, FileSystem, A]
 
-    val eff: Task[Eff ~> Task] = (runFs(InMemState.empty) |@| createNewTestMetastore.flatMap(TaskRef(_))){ (fs, metaRef) =>
+    val eff: Task[Eff ~> Task] = (runFs(InMemState.empty) |@| createNewTestMetaStoreConfig){ (fs, metaConf) =>
       NaturalTransformation.refl[Task]                   :+:
       Failure.toRuntimeError[Task, PathTypeMismatch]     :+:
       Failure.toRuntimeError[Task, MountingError]        :+:
       Failure.toRuntimeError[Task, FileSystemError]      :+:
       Failure.toRuntimeError[Task, Module.Error]         :+:
-      MetaStoreLocation.impl.default(metaRef, _ => ().point[MainTask])    :+:
+      MetaStoreLocation.impl.constant(metaConf)          :+:
       (foldMapNT(mount :+: fs) compose Module.impl.default[MountingFileSystem]) :+:
       mount :+:
       analyze :+:
