@@ -75,7 +75,7 @@ object QueryFile {
   }
 
   def simplifyAndNormalize
-    [T[_[_]]: BirecursiveT: EqualT: ShowT,
+    [T[_[_]]: BirecursiveT: RenderTreeT: EqualT: ShowT,
       IQS[_]: Functor,
       QS[_]: Traverse: Normalizable]
     (implicit
@@ -85,6 +85,7 @@ object QueryFile {
       PA: PruneArrays[QS],
       QC: QScriptCore[T, ?] :<: QS,
       TJ:   ThetaJoin[T, ?] :<: QS,
+      render: Delay[RenderTree, QS],
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]])
       : T[IQS] => T[QS] = {
     val rewrite = new Rewrite[T]
