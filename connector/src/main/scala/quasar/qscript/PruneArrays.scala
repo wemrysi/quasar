@@ -166,8 +166,8 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     repair.transCata[EitherMap[JoinSide]] {
       case CoEnv(\/-(MFC(ProjectIndex(Embed(CoEnv(-\/(\/-(LeftSide)))), IntLit(idx))))) =>
         remapResult[JoinSide](LeftSide, mapping, idx)
-      case CoEnv(\/-(MFC(ProjectIndex(Embed(CoEnv(-\/(\/-(RightSide)))), IntLit(idx))))) if struct ≟ HoleF =>
-        remapResult[JoinSide](RightSide, mapping, idx)
+      case CoEnv(\/-(MFC(ProjectIndex(value @ Embed(CoEnv(\/-(MFC(ProjectIndex(Embed(CoEnv(-\/(\/-(RightSide)))), IntLit(ridx)))))), IntLit(idx))))) if ridx ≟ 1 =>
+        remapResult[EitherMap[JoinSide]](value map (_.swap), mapping, idx).embed.flatMap(_.merge).project
       case co => cbf.leftMap(co)(_.right[JoinSide])
     } map (_.merge)
 
