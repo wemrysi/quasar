@@ -33,11 +33,11 @@ package object db {
     Catchable[ConnectionIO].fail(new RuntimeException(message))
 
   /** Transactor that makes use of a connection pool for performance. Requires cleanup. */
-  def poolingTransactor(cxn: ConnectionInfo, config: HikariConfig => Task[Unit]): Task[Throwable \/ StatefulTransactor] =
-    (for {
+  def poolingTransactor(cxn: ConnectionInfo, config: HikariConfig => Task[Unit]): EitherT[Task, metastore.UnknownError, StatefulTransactor] =
+    EitherT((for {
       xa <- HikariTransactor[Task](cxn.driverClassName, cxn.url, cxn.userName, cxn.password)
       _  <- xa.configure(config)
-    } yield StatefulTransactor(xa, xa.shutdown)).attempt
+    } yield StatefulTransactor(xa, xa.shutdown)).attempt.map(_.leftMap(e => metastore.UnknownError(e, "While connecting to MetaStore"))))
 
   /** Transactor that does not use a connection pool, so doesn't require any cleanup. */
   def simpleTransactor(cxn: ConnectionInfo): Transactor[Task] =

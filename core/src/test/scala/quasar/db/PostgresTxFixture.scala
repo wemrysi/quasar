@@ -50,7 +50,7 @@ trait PostgresTxFixture {
 
         // Connect to the fresh test DB:
         testCfg =  mainCfg.asInstanceOf[DbConnectionConfig.PostgreSql].copy(database = dbName.some)
-        tr      <- poolingTransactor(DbConnectionConfig.connectionInfo(testCfg), DefaultConfig).unattempt
+        tr      <- poolingTransactor(DbConnectionConfig.connectionInfo(testCfg), DefaultConfig).leftMap(_.causedBy).run.unattempt
       } yield tr)
   }
 }

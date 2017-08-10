@@ -49,12 +49,8 @@ object MetaStore {
     */
   def connect(dbConfig: DbConnectionConfig, initializeOrUpdate: Boolean, schemas: List[Schema[Int]]): EitherT[Task, MetastoreFailure, MetaStore] = {
     for {
-      tx <- EitherT(poolingTransactor(DbConnectionConfig.connectionInfo(dbConfig), DefaultConfig))
-              .leftMap(t => UnknownError(t, "While connecting to MetaStore"):MetastoreFailure)
-      _  <-
-        if (initializeOrUpdate)
-          schemas.traverse(this.initializeOrUpdate(_, tx.transactor, None)).void
-        else ().point[EitherT[Task, MetastoreFailure, ?]]
+      tx <- poolingTransactor(DbConnectionConfig.connectionInfo(dbConfig), DefaultConfig).leftMap(f => f:MetastoreFailure)
+      _  <- initializeOrUpdate.whenM(schemas.traverse(this.initializeOrUpdate(_, tx.transactor, None)))
       _  <- schemas.traverse(verifySchema(_, tx.transactor))
       _  <- stdout(s"Using metastore: ${DbConnectionConfig.connectionInfo(dbConfig).url}").liftM[EitherT[?[_], MetastoreFailure, ?]]
     } yield MetaStore(dbConfig, tx, schemas)
