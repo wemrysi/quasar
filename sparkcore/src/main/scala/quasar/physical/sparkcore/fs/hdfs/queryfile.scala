@@ -24,7 +24,6 @@ import quasar.fs.FileSystemError
 import quasar.fs.FileSystemErrT
 import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
-import quasar.fp.free._
 import quasar.contrib.pathy._
 import quasar.physical.sparkcore.fs.SparkConnectorDetails, SparkConnectorDetails._
 import quasar.effect.Capture
@@ -110,14 +109,12 @@ object queryfile {
         case FileExists(f)       => qf.fileExists(f)
         case ReadChunkSize       => 5000.point[F]
         case StoreData(rdd, out) => qf.store(rdd, out)
+        case ListContents(d)     => qf.listContents(d).run
       }
     }
 
   def input[S[_]](fileSystem: Task[FileSystem])(implicit s0: Task :<: S): Input[S] = {
     val qf = new queryfile[Task](fileSystem)
-    Input[S](
-      qf.fromFile _,
-      d => EitherT(lift(qf.listContents(d).run).into[S])
-    )
+    Input[S](qf.fromFile _)
   }
 }

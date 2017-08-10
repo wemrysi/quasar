@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.pathy._
 import quasar.fp.free._
+import quasar.fs._
 
 import org.apache.spark.rdd.RDD
 import scalaz._
@@ -30,7 +31,8 @@ object SparkConnectorDetails {
 
   final case class FileExists(afile: AFile) extends SparkConnectorDetails[Boolean]
   final case object ReadChunkSize extends SparkConnectorDetails[Int]
-  final case class StoreData(rdd: RDD[Data], out: AFile) extends SparkConnectorDetails[Unit] 
+  final case class StoreData(rdd: RDD[Data], out: AFile) extends SparkConnectorDetails[Unit]
+  final case class ListContents(dir: ADir) extends SparkConnectorDetails[FileSystemError \/ Set[PathSegment]]
 
   class Ops[S[_]](implicit S: SparkConnectorDetails :<: S) {
     def fileExists(afile: AFile): Free[S, Boolean] =
@@ -39,6 +41,8 @@ object SparkConnectorDetails {
       lift(ReadChunkSize).into[S]
     def storeData(rdd: RDD[Data], out: AFile): Free[S, Unit] =
       lift(StoreData(rdd, out)).into[S]
+    def listContents(dir: ADir): EitherT[Free[S, ?], FileSystemError, Set[PathSegment]] =
+      EitherT(lift(ListContents(dir)).into[S])
   }
 
   object Ops {

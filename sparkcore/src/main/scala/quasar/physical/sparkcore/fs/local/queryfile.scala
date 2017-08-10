@@ -24,7 +24,6 @@ import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.fs.FileSystemError._
 import quasar.contrib.pathy._
 import quasar.fp.ski._
-import quasar.fp.free._
 import quasar.effect.Capture
 import quasar.physical.sparkcore.fs.SparkConnectorDetails, SparkConnectorDetails._
 
@@ -54,9 +53,8 @@ object queryfile {
       Files.exists(Paths.get(posixCodec.unsafePrintPath(f)))
   }
 
-  def listContents[S[_]](d: ADir)(implicit
-    S: Task :<: S
-  ): EitherT[Free[S, ?], FileSystemError, Set[PathSegment]] = EitherT(lift(Task.delay {
+  def listContents[F[_]:Capture](d: ADir): EitherT[F, FileSystemError, Set[PathSegment]] =
+    EitherT(Capture[F].capture {
     val directory = new File(posixCodec.unsafePrintPath(d))
     if(directory.exists()) {
       \/.fromTryCatchNonFatal{
@@ -70,18 +68,19 @@ object queryfile {
           pathErr(invalidPath(d, e.getMessage()))
       }
     } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
-  }).into[S])
+  })
 
   def input[S[_]](implicit
     S: Task :<: S
-  ): Input[S] = Input[S](fromFile _, listContents[S] _)
+  ): Input[S] = Input[S](fromFile _)
 
   def detailsInterpreter[F[_]:Capture:Applicative]: SparkConnectorDetails ~> F =
     new (SparkConnectorDetails ~> F) {
       def apply[A](from: SparkConnectorDetails[A]) = from match {
-        case FileExists(f)   => fileExists[F](f)
-        case ReadChunkSize   => 5000.point[F]
+        case FileExists(f)       => fileExists[F](f)
+        case ReadChunkSize       => 5000.point[F]
         case StoreData(rdd, out) => store(rdd, out)
+        case ListContents(d)   => listContents(d).run
       }
     }
 

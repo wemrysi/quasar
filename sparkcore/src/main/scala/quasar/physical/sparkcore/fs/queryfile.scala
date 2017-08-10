@@ -43,8 +43,7 @@ import scalaz.concurrent.Task
 object queryfile {
 
   final case class Input[S[_]](
-    fromFile: (SparkContext, AFile) => Task[RDD[Data]],
-    listContents: ADir => EitherT[Free[S, ?], FileSystemError, Set[PathSegment]]
+    fromFile: (SparkContext, AFile) => Task[RDD[Data]]
   )
 
   type SparkContextRead[A] = effect.Read[SparkContext, A]
@@ -70,14 +69,14 @@ object queryfile {
       exec: (Fix[SparkQScript]) => Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, T]],
       lp: Fix[LogicalPlan]
     ): Free[S, (PhaseResults, FileSystemError \/ T)] = {
-          val qs = toQScript[Free[S, ?]](listContents(input, _))(lp) >>= (qs => EitherT(WriterT(exec(qs).map(_.run.run))))
+          val qs = toQScript[Free[S, ?]](listContents(_))(lp) >>= (qs => EitherT(WriterT(exec(qs).map(_.run.run))))
           qs.run.run
         }
 
     new (QueryFile ~> Free[S, ?]) {
       def apply[A](qf: QueryFile[A]) = qf match {
         case QueryFile.FileExists(f) => fileExists[S](f)
-        case QueryFile.ListContents(dir) => listContents(input, dir)
+        case QueryFile.ListContents(dir) => listContents(dir)
         case QueryFile.ExecutePlan(lp: Fix[LogicalPlan], out: AFile) =>
           qsToProgram(qs => executePlan(input, qs, out, lp), lp)
         case QueryFile.EvaluatePlan(lp: Fix[LogicalPlan]) =>
@@ -205,7 +204,8 @@ object queryfile {
     details: SparkConnectorDetails.Ops[S]
   ): Free[S, Boolean] = details.fileExists(f)
 
-  private def listContents[S[_]](input: Input[S], d: ADir)(implicit
-    s0: Task :<: S): Free[S, FileSystemError \/ Set[PathSegment]] =
-    input.listContents(d).run
+  private def listContents[S[_]](d: ADir)(implicit
+    details: SparkConnectorDetails.Ops[S]
+  ): Free[S, FileSystemError \/ Set[PathSegment]] =
+    details.listContents(d).run
 }

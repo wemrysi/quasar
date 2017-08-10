@@ -90,7 +90,7 @@ object queryfile {
     s0: Task :<: S,
     elastic: ElasticCall :<: S
   ): Input[S] =
-    Input[S](fromFile _, listContents[S] _)
+    Input[S](fromFile _)
 
   def detailsInterpreter[S[_]](implicit
     E: ElasticCall.Ops[S],
@@ -103,6 +103,7 @@ object queryfile {
         rdd.flatMap(DataCodec.render(_)(DataCodec.Precise).toList)
            .saveJsonToEs(file2ES(out).shows)
       }).into[S]
+      case ListContents(d)     => listContents[S](d).run
     }
   }
 
