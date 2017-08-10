@@ -25,6 +25,7 @@ import quasar.fs.FileSystemError
 import quasar.fs.FileSystemErrT
 import quasar.{Data, DataCodec}
 import quasar.physical.sparkcore.fs.queryfile.Input
+import quasar.physical.sparkcore.fs.{SparkConnectorDetails, FileExists}
 import quasar.fs._,
   FileSystemError._, 
   PathError._
@@ -73,8 +74,7 @@ object queryfile {
   }
 
   def fileExists[S[_]](f: AFile)(implicit
-    cass: CassandraDDL.Ops[S],
-    read: Read.Ops[SparkContext, S]
+    cass: CassandraDDL.Ops[S]
   ): Free[S, Boolean] =
     for {
       tableExists <- cass.tableExists(keyspace(fileParent(f)), tableName(f))
@@ -111,4 +111,11 @@ object queryfile {
   ): Input[S] =
     Input(fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
 
+  def detailsInterpreter[S[_]](implicit
+    cass: CassandraDDL.Ops[S]
+  ): SparkConnectorDetails ~> Free[S, ?] = new (SparkConnectorDetails ~> Free[S, ?]) {
+    def apply[A](from: SparkConnectorDetails[A]) = from match {
+      case FileExists(f) => fileExists(f)
+    }
+  }
 }
