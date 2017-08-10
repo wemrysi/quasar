@@ -61,7 +61,7 @@ object MetaStoreFixture {
       MetaStore(
         testConfig,
         StatefulTransactor(simpleTransactor(DbConnectionConfig.connectionInfo(testConfig)), Task.now(())),
-        quasar.metastore.Schema.schema))
+        List(quasar.metastore.Schema.schema)))
 }
 
 trait H2MetaStoreFixture extends MetaStoreFixture {

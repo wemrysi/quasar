@@ -26,7 +26,7 @@ import doobie.imports._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-final case class MetaStore private (connectionInfo: DbConnectionConfig, trans: StatefulTransactor, schema: Schema[Int]) {
+final case class MetaStore private (connectionInfo: DbConnectionConfig, trans: StatefulTransactor, schemas: List[Schema[Int]]) {
   def shutdown: Task[Unit] = trans.shutdown
   def transactor: Transactor[Task] = trans.transactor
 }
@@ -41,23 +41,23 @@ object MetaStore {
     *                           to the underlying database. If the database has not been initialized and this value
     *                           is set to false, this call will fail to connect to the database with a
     *                           `MetastoreFailure` detailing the reason for the failure (requires initialization or an update).
-    * @param schema The Schema that the underlying database is expected to have. You probably want to pass in
-    *               `quasar.metastore.Schema.schema`, but a different Schema may be desirable if the application
+    * @param schemas The Schemas that the underlying database is expected to have. You probably want to pass in
+    *               `quasar.metastore.Schema.schema`, but additional Schemas may be desirable if the application
     *               needs to store additional information in the MetaStore
     * @return A `MetaStore` object containing the `transactor` to use to perform operation on the MetaStore as
     *         well as it's location and expected Schema
     */
-  def connect(dbConfig: DbConnectionConfig, initializeOrUpdate: Boolean, schema: Schema[Int]): EitherT[Task, MetastoreFailure, MetaStore] = {
+  def connect(dbConfig: DbConnectionConfig, initializeOrUpdate: Boolean, schemas: List[Schema[Int]]): EitherT[Task, MetastoreFailure, MetaStore] = {
     for {
       tx <- EitherT(poolingTransactor(DbConnectionConfig.connectionInfo(dbConfig), DefaultConfig))
               .leftMap(t => UnknownError(t, "While connecting to MetaStore"):MetastoreFailure)
       _  <-
         if (initializeOrUpdate)
-          this.initializeOrUpdate(schema, tx.transactor, None).void
+          schemas.traverse(this.initializeOrUpdate(_, tx.transactor, None)).void
         else ().point[EitherT[Task, MetastoreFailure, ?]]
-      _  <- verifySchema(schema, tx.transactor)
+      _  <- schemas.traverse(verifySchema(_, tx.transactor))
       _  <- stdout(s"Using metastore: ${DbConnectionConfig.connectionInfo(dbConfig).url}").liftM[EitherT[?[_], MetastoreFailure, ?]]
-    } yield MetaStore(dbConfig, tx, schema)
+    } yield MetaStore(dbConfig, tx, schemas)
 
   }
 

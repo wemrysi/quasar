@@ -55,9 +55,9 @@ object MetaStoreLocation {
         case Get => ref.read.map(_.connectionInfo)
         case Set(conn, initialize) =>
           (for {
-            currentSchema <- ref.read.map(_.schema).liftM[MainErrT]
+            currentSchemas <- ref.read.map(_.schemas).liftM[MainErrT]
             // Try connecting to the new metastore location
-            m <- MetaStore.connect(conn, initialize || conn.isInMemory, currentSchema).leftMap(_.message)
+            m <- MetaStore.connect(conn, initialize || conn.isInMemory, currentSchemas).leftMap(_.message)
             // Persist the change, if persisting fails, shutdown the new metastore connection and fail the change
             _ <- EitherT(persist(m.connectionInfo).foldM(persistFailure => m.shutdown.as(persistFailure.left), _ => ().right.point[Task]))
             // We successfully connected to the new metastore and persisted the change to the config file

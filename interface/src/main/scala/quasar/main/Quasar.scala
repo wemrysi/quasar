@@ -101,7 +101,7 @@ object Quasar {
 
   def initWithDbConfig(db: DbConnectionConfig, persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
     for {
-      metastore <- MetaStore.connect(db, db.isInMemory, quasar.metastore.Schema.schema).leftMap(_.message)
+      metastore <- MetaStore.connect(db, db.isInMemory, List(quasar.metastore.Schema.schema)).leftMap(_.message)
       metaRef   <- TaskRef(metastore).liftM[MainErrT]
       quasarFS  <- initWithMeta(metaRef, persist)
     } yield quasarFS
