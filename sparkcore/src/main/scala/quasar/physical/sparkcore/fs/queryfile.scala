@@ -44,7 +44,6 @@ object queryfile {
 
   final case class Input[S[_]](
     fromFile: (SparkContext, AFile) => Task[RDD[Data]],
-    store: (RDD[Data], AFile) => Free[S, Unit],
     listContents: ADir => EitherT[Free[S, ?], FileSystemError, Set[PathSegment]]
   )
 
@@ -125,7 +124,8 @@ object queryfile {
 
   private def executePlan[S[_]](input: Input[S], qs: Fix[SparkQScript], out: AFile, lp: Fix[LogicalPlan]) (implicit
     s0: Task :<: S,
-    read: effect.Read.Ops[SparkContext, S]
+    read: effect.Read.Ops[SparkContext, S],
+    details: SparkConnectorDetails.Ops[S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, AFile]] = {
 
     val total = scala.Predef.implicitly[Planner[SparkQScript]]
@@ -136,7 +136,7 @@ object queryfile {
 
       sparkStuff >>= (mrdd => mrdd.bitraverse[(Free[S, ?] ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](
         planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Free[S, ?]],
-        rdd => input.store(rdd, out).as (Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), out))).map(EitherT(_)))
+        rdd => details.storeData(rdd, out).as (Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), out))).map(EitherT(_)))
 
     }.join
   }

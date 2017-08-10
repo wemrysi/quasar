@@ -43,14 +43,12 @@ object queryfile {
       .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
   }
 
-  def store[S[_]](rdd: RDD[Data], out: AFile)(implicit
-    S: Task :<: S
-  ): Free[S, Unit] = lift(Task.delay {
+  def store[F[_]:Capture](rdd: RDD[Data], out: AFile): F[Unit] = Capture[F].capture {
     val ioFile = new File(posixCodec.printPath(out))
     val pw = new PrintWriter(new FileOutputStream(ioFile, false))
     rdd.flatMap(DataCodec.render(_)(DataCodec.Precise).toList).collect().foreach(v => pw.write(s"$v\n"))
     pw.close()
-  }).into[S]
+  }
 
   def fileExists[F[_]:Capture](f: AFile): F[Boolean] = Capture[F].capture {
       Files.exists(Paths.get(posixCodec.unsafePrintPath(f)))
@@ -76,13 +74,14 @@ object queryfile {
 
   def input[S[_]](implicit
     S: Task :<: S
-  ): Input[S] = Input[S](fromFile _, store[S] _, listContents[S] _)
+  ): Input[S] = Input[S](fromFile _, listContents[S] _)
 
   def detailsInterpreter[F[_]:Capture:Applicative]: SparkConnectorDetails ~> F =
     new (SparkConnectorDetails ~> F) {
       def apply[A](from: SparkConnectorDetails[A]) = from match {
-        case FileExists(f) => fileExists[F](f)
-        case ReadChunkSize => 5000.point[F]
+        case FileExists(f)   => fileExists[F](f)
+        case ReadChunkSize   => 5000.point[F]
+        case StoreData(rdd, out) => store(rdd, out)
       }
     }
 

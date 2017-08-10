@@ -90,14 +90,19 @@ object queryfile {
     s0: Task :<: S,
     elastic: ElasticCall :<: S
   ): Input[S] =
-    Input[S](fromFile _, store[S] _, listContents[S] _)
+    Input[S](fromFile _, listContents[S] _)
 
   def detailsInterpreter[S[_]](implicit
-    E: ElasticCall.Ops[S]
+    E: ElasticCall.Ops[S],
+    S: Task :<: S
   ): SparkConnectorDetails ~> Free[S, ?] = new (SparkConnectorDetails ~> Free[S, ?]) {
     def apply[A](from: SparkConnectorDetails[A]) = from match {
-      case FileExists(f) => E.typeExists(file2ES(f))
-      case ReadChunkSize => 5000.point[Free[S, ?]]
+      case FileExists(f)       => E.typeExists(file2ES(f))
+      case ReadChunkSize       => 5000.point[Free[S, ?]]
+      case StoreData(rdd, out) => lift(Task.delay {
+        rdd.flatMap(DataCodec.render(_)(DataCodec.Precise).toList)
+           .saveJsonToEs(file2ES(out).shows)
+      }).into[S]
     }
   }
 

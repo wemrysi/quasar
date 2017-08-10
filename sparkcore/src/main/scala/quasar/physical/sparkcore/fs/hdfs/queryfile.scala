@@ -107,8 +107,9 @@ object queryfile {
       val qf = new queryfile[F](fileSystem)
 
       def apply[A](from: SparkConnectorDetails[A]) = from match {
-        case FileExists(f) => qf.fileExists(f)
-        case ReadChunkSize => 5000.point[F]
+        case FileExists(f)       => qf.fileExists(f)
+        case ReadChunkSize       => 5000.point[F]
+        case StoreData(rdd, out) => qf.store(rdd, out)
       }
     }
 
@@ -116,7 +117,6 @@ object queryfile {
     val qf = new queryfile[Task](fileSystem)
     Input[S](
       qf.fromFile _,
-      (rdd, out) => lift(qf.store(rdd, out)).into[S],
       d => EitherT(lift(qf.listContents(d).run).into[S])
     )
   }
