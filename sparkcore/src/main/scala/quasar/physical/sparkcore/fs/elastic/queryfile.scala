@@ -90,7 +90,7 @@ object queryfile {
     s0: Task :<: S,
     elastic: ElasticCall :<: S
   ): Input[S] =
-    Input[S](fromFile _, store[S] _, (f: AFile) => false.point[Free[S, ?]], listContents[S] _, readChunkSize _)
+    Input[S](fromFile _, store[S] _, listContents[S] _, readChunkSize _)
 
   def detailsInterpreter[S[_]](implicit
     E: ElasticCall.Ops[S]

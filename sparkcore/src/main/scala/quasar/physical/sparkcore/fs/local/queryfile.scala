@@ -78,7 +78,7 @@ object queryfile {
 
   def input[S[_]](implicit
     S: Task :<: S
-  ): Input[S] = Input[S](fromFile _, store[S] _, fileExists[Free[S, ?]] _, listContents[S] _, readChunkSize _)
+  ): Input[S] = Input[S](fromFile _, store[S] _, listContents[S] _, readChunkSize _)
 
   def detailsInterpreter[F[_] : Capture]: SparkConnectorDetails ~> F =
     new (SparkConnectorDetails ~> F) {

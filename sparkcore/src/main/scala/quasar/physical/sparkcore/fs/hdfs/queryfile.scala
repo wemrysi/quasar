@@ -119,7 +119,6 @@ object queryfile {
     Input[S](
       qf.fromFile _,
       (rdd, out) => lift(qf.store(rdd, out)).into[S],
-      f => lift(qf.fileExists(f)).into[S],
       d => EitherT(lift(qf.listContents(d).run).into[S]),
       qf.readChunkSize _
     )

@@ -45,7 +45,6 @@ object queryfile {
   final case class Input[S[_]](
     fromFile: (SparkContext, AFile) => Task[RDD[Data]],
     store: (RDD[Data], AFile) => Free[S, Unit],
-    fileExists: AFile => Free[S, Boolean],
     listContents: ADir => EitherT[Free[S, ?], FileSystemError, Set[PathSegment]],
     readChunkSize: () => Int
   )
