@@ -118,7 +118,9 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](qs: T[QSM[T, ?]]): Backend[Repr] = {
     def doPlan(cfg: Config): Backend[MainModule] = {
       import cfg.{searchOptions, structuralPlannerM}
-      val ejsPlanner = EJsonPlanner.plan[T[EJson], cfg.M, cfg.FMT](implicitly, structuralPlannerM, implicitly)
+      val ejsPlanner: T[EJson] => cfg.M[XQuery] =
+        EJsonPlanner.plan[T[EJson], cfg.M, cfg.FMT](_)(implicitly, structuralPlannerM, implicitly)
+
       MainModule.fromWritten(
         qs.cataM(cfg.planner[T].plan[Q[T]])
           .flatMap(_.fold(s =>
