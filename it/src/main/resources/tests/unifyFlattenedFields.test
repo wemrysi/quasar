@@ -1,12 +1,7 @@
 {
     "name": "unify flattened fields",
     "backends": {
-        "couchbase":  "pending",
-        "mongodb_2_6":       "skip",
-        "mongodb_3_0":       "skip",
-        "mongodb_3_2":       "skip",
-        "mongodb_3_4":       "skip",
-        "mongodb_read_only": "skip"
+        "couchbase":  "pending"
     },
     "NB": "this doesn't actually timeout for mimir, but it takes a long time and possibly causing overall build on next-major to timeout.",
     "data": "zips.data",
