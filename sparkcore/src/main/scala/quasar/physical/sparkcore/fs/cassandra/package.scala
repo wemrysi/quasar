@@ -39,17 +39,18 @@ package object cassandra {
 
   val FsType = FileSystemType("spark-cassandra")
 
-  type EffM1[A] = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
-  type Eff0[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], EffM1, A]
-  type Eff1[A] = Coproduct[KeyValueStore[WriteHandle, AFile, ?], Eff0, A]
-  type Eff2[A] = Coproduct[Task, Eff1, A]
-  type Eff3[A] = Coproduct[PhysErr, Eff2, A]
-  type Eff4[A] = Coproduct[CassandraDDL, Eff3, A]
-  type Eff[A]  = Coproduct[MonotonicSeq, Eff4, A]
+  type Eff7[A] = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
+  type Eff6[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Eff7, A]
+  type Eff5[A] = Coproduct[KeyValueStore[WriteHandle, AFile, ?], Eff6, A]
+  type Eff4[A] = Coproduct[Task, Eff5, A]
+  type Eff3[A] = Coproduct[PhysErr, Eff4, A]
+  type Eff2[A] = Coproduct[CassandraDDL, Eff3, A]
+  type Eff1[A] = Coproduct[MonotonicSeq, Eff2, A]
+  type Eff[A]  = Coproduct[SparkConnectorDetails, Eff1, A]
 
   final case class SparkFSConf(sparkConf: SparkConf, prefix: ADir)
 
-  def parseUri: ConnectionUri => DefinitionError \/ (SparkConf, SparkFSConf) = (uri: ConnectionUri) => {
+  def parseUri: ConnectionUri => Task[DefinitionError \/ (SparkConf, SparkFSConf)] = (uri: ConnectionUri) => Task.delay {
 
     def error(msg: String): DefinitionError \/ (SparkConf, SparkFSConf) =
       NonEmptyList(msg).left[EnvironmentError].left[(SparkConf, SparkFSConf)]
@@ -95,7 +96,9 @@ package object cassandra {
       genSc) {
       // TODO better names!
       (genState, rddStates, sparkCursors, writehandlers, sc) =>
-      val interpreter: Eff ~> S = (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
+      val interpreter: Eff ~> S =
+        (queryfile.detailsInterpreter[CassandraDDL] andThen foldMapNT(CassandraDDL.interpreter[S](sc)) andThen injectNT[Task, S]) :+:
+      (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       (CassandraDDL.interpreter[S](sc) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:
