@@ -23,13 +23,17 @@ import quasar.fp.free._
 import scalaz._
 
 trait SparkConnectorDetails[A]
-final case class FileExists(afile: AFile) extends SparkConnectorDetails[Boolean]
 
 object SparkConnectorDetails {
+
+  final case class FileExists(afile: AFile) extends SparkConnectorDetails[Boolean]
+  final case object ReadChunkSize extends SparkConnectorDetails[Int]
 
   class Ops[S[_]](implicit S: SparkConnectorDetails :<: S) {
     def fileExists(afile: AFile): Free[S, Boolean] =
       lift(FileExists(afile)).into[S]
+    def readChunkSize: Free[S, Int] =
+      lift(ReadChunkSize).into[S]
   }
 
   object Ops {

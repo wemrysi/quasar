@@ -26,7 +26,7 @@ import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
 import quasar.fp.free._
 import quasar.contrib.pathy._
-import quasar.physical.sparkcore.fs.{SparkConnectorDetails, FileExists}
+import quasar.physical.sparkcore.fs.SparkConnectorDetails, SparkConnectorDetails._
 import quasar.effect.Capture
 
 import java.io.BufferedWriter
@@ -98,19 +98,17 @@ class queryfile[F[_]:Capture:Bind](fileSystem: F[FileSystem]) {
     hdfs.close
     result
   })
-
-  def readChunkSize: Int = 5000
-
 }
 
 object queryfile {
 
-  def detailsInterpreter[F[_]:Capture:Bind](fileSystem: F[FileSystem]): SparkConnectorDetails ~> F =
+  def detailsInterpreter[F[_]:Capture:Monad](fileSystem: F[FileSystem]): SparkConnectorDetails ~> F =
     new (SparkConnectorDetails ~> F) {
       val qf = new queryfile[F](fileSystem)
 
       def apply[A](from: SparkConnectorDetails[A]) = from match {
         case FileExists(f) => qf.fileExists(f)
+        case ReadChunkSize => 5000.point[F]
       }
     }
 
@@ -119,8 +117,7 @@ object queryfile {
     Input[S](
       qf.fromFile _,
       (rdd, out) => lift(qf.store(rdd, out)).into[S],
-      d => EitherT(lift(qf.listContents(d).run).into[S]),
-      qf.readChunkSize _
+      d => EitherT(lift(qf.listContents(d).run).into[S])
     )
   }
 }

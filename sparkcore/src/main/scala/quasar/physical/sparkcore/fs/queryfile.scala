@@ -45,8 +45,7 @@ object queryfile {
   final case class Input[S[_]](
     fromFile: (SparkContext, AFile) => Task[RDD[Data]],
     store: (RDD[Data], AFile) => Free[S, Unit],
-    listContents: ADir => EitherT[Free[S, ?], FileSystemError, Set[PathSegment]],
-    readChunkSize: () => Int
+    listContents: ADir => EitherT[Free[S, ?], FileSystemError, Set[PathSegment]]
   )
 
   type SparkContextRead[A] = effect.Read[SparkContext, A]
@@ -84,7 +83,7 @@ object queryfile {
           qsToProgram(qs => executePlan(input, qs, out, lp), lp)
         case QueryFile.EvaluatePlan(lp: Fix[LogicalPlan]) =>
           qsToProgram(qs => evaluatePlan(input, qs, lp), lp)
-        case QueryFile.More(h) => more(h, input.readChunkSize())
+        case QueryFile.More(h) => more(h)
         case QueryFile.Close(h) => close(h)
         case QueryFile.Explain(lp: Fix[LogicalPlan]) =>
           qsToProgram(qs => explainPlan(input, fsType, qs, lp), lp)
@@ -171,12 +170,13 @@ object queryfile {
     }
   }
 
-  private def more[S[_]](h: QueryFile.ResultHandle, step: Int)(implicit
-      s0: Task :<: S,
-      kvs: KeyValueStore.Ops[QueryFile.ResultHandle, RddState, S]
-  ): Free[S, FileSystemError \/ Vector[Data]] = {
-
-    kvs.get(h).toRight(unknownResultHandle(h)).flatMap {
+  private def more[S[_]](h: QueryFile.ResultHandle)(implicit
+    s0: Task :<: S,
+    kvs: KeyValueStore.Ops[QueryFile.ResultHandle, RddState, S],
+    details: SparkConnectorDetails.Ops[S]
+  ): Free[S, FileSystemError \/ Vector[Data]] = for {
+    step <- details.readChunkSize
+    res  <- (kvs.get(h).toRight(unknownResultHandle(h)).flatMap {
       case RddState(None, _) =>
         Vector.empty[Data].pure[EitherT[Free[S, ?], FileSystemError, ?]]
       case RddState(Some(rdd), p) =>
@@ -194,8 +194,8 @@ object queryfile {
           }).into[S].liftM[FileSystemErrT]
           _ <- kvs.put(h, rddState).liftM[FileSystemErrT]
         } yield collected
-    }.run
-  }
+    }).run
+  } yield res
 
   private def close[S[_]](h: QueryFile.ResultHandle)(implicit
       kvs: KeyValueStore.Ops[QueryFile.ResultHandle, RddState, S]

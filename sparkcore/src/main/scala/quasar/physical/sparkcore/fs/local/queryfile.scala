@@ -26,7 +26,7 @@ import quasar.contrib.pathy._
 import quasar.fp.ski._
 import quasar.fp.free._
 import quasar.effect.Capture
-import quasar.physical.sparkcore.fs.{SparkConnectorDetails, FileExists}
+import quasar.physical.sparkcore.fs.SparkConnectorDetails, SparkConnectorDetails._
 
 import java.io.{File, PrintWriter, FileOutputStream}
 import java.nio.file._
@@ -74,16 +74,15 @@ object queryfile {
     } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
   }).into[S])
 
-  def readChunkSize: Int = 5000
-
   def input[S[_]](implicit
     S: Task :<: S
-  ): Input[S] = Input[S](fromFile _, store[S] _, listContents[S] _, readChunkSize _)
+  ): Input[S] = Input[S](fromFile _, store[S] _, listContents[S] _)
 
-  def detailsInterpreter[F[_] : Capture]: SparkConnectorDetails ~> F =
+  def detailsInterpreter[F[_]:Capture:Applicative]: SparkConnectorDetails ~> F =
     new (SparkConnectorDetails ~> F) {
       def apply[A](from: SparkConnectorDetails[A]) = from match {
         case FileExists(f) => fileExists[F](f)
+        case ReadChunkSize => 5000.point[F]
       }
     }
 

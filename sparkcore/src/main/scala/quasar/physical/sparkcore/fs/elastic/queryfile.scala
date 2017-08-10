@@ -25,7 +25,7 @@ import quasar.fs.FileSystemErrT
 import quasar.fp.free._
 import quasar.fp.ski._
 import quasar.contrib.pathy._
-import quasar.physical.sparkcore.fs.{SparkConnectorDetails, FileExists}
+import quasar.physical.sparkcore.fs.SparkConnectorDetails, SparkConnectorDetails._
 
 import org.elasticsearch.spark._
 import org.apache.spark._
@@ -90,13 +90,14 @@ object queryfile {
     s0: Task :<: S,
     elastic: ElasticCall :<: S
   ): Input[S] =
-    Input[S](fromFile _, store[S] _, listContents[S] _, readChunkSize _)
+    Input[S](fromFile _, store[S] _, listContents[S] _)
 
   def detailsInterpreter[S[_]](implicit
     E: ElasticCall.Ops[S]
   ): SparkConnectorDetails ~> Free[S, ?] = new (SparkConnectorDetails ~> Free[S, ?]) {
     def apply[A](from: SparkConnectorDetails[A]) = from match {
       case FileExists(f) => E.typeExists(file2ES(f))
+      case ReadChunkSize => 5000.point[Free[S, ?]]
     }
   }
 
