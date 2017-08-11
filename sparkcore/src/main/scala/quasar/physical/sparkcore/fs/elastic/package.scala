@@ -139,9 +139,13 @@ package object elastic {
           TaskRef(Map.empty[WriteHandle, writefile.WriteCursor])) {
           (genState, rddStates, readCursors, writeCursors) => {
 
-            type Temp[A] = Coproduct[ElasticCall, Task, A]
+            val read = Read.constant[Task, SparkContext](sc)
+
+            type Temp1[A] = Coproduct[Task, Read[SparkContext, ?], A]
+            type Temp[A] = Coproduct[ElasticCall, Temp1, A]
+
             def temp: Free[Temp, ?] ~> Task =
-              foldMapNT(ElasticCall.interpreter(host, port) :+: injectNT[Task, Task])
+              foldMapNT(ElasticCall.interpreter(host, port) :+: injectNT[Task, Task] :+: read)
 
             val interpreter: Eff ~> S =
               (queryfile.detailsInterpreter[Temp] andThen temp andThen injectNT[Task, S]) :+:
@@ -150,7 +154,7 @@ package object elastic {
             (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
             (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
             (ElasticCall.interpreter(host, port) andThen injectNT[Task, S]) :+:
-            (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S]) :+:
+            (read andThen injectNT[Task, S]) :+:
             injectNT[Task, S] :+:
             injectNT[PhysErr, S]
 
@@ -169,7 +173,7 @@ package object elastic {
     type FreeEff[A]  = Free[Eff, A]
     interpretFileSystem(
       corequeryfile.interpreter[Eff](queryfile.input[Eff], FsType),
-      corereadfile.interpret[Eff](readfile.input[Eff]),
+      corereadfile.interpret[Eff],
       writefile.interpreter[Eff],
       managefile.interpreter[Eff])
   }

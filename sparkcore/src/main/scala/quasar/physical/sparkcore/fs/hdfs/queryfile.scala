@@ -20,13 +20,16 @@ import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.contrib.pathy._
+import quasar.contrib.pathy._
+import quasar.effect.{Read, Capture}
+import quasar.fp.ski._
+import quasar.fp.free._
 import quasar.fs.FileSystemError
 import quasar.fs.FileSystemError._
 import quasar.fs.FileSystemErrT
 import quasar.fs.PathError._
-import quasar.contrib.pathy._
 import quasar.physical.sparkcore.fs.SparkConnectorDetails, SparkConnectorDetails._
-import quasar.effect.Capture
+import quasar.physical.sparkcore.fs.hdfs.parquet.ParquetRDD
 
 import java.io.BufferedWriter
 import java.io.OutputStreamWriter
@@ -55,7 +58,26 @@ class queryfile[F[_]:Capture:Bind](fileSystem: F[FileSystem]) {
       val port = hdfs.getUri().getPort()
       s"hdfs://$host:$port$pathStr"
     }
-    rdd <- readfile.fetchRdd(sc, pathStr)
+    rdd <- fetchRdd(sc, pathStr)
+  } yield rdd
+
+  def fetchRdd[F[_]:Capture](sc: SparkContext, pathStr: String): F[RDD[Data]] = Capture[F].capture {
+    import ParquetRDD._
+    // TODO add magic number support to distinguish
+    if(pathStr.endsWith(".parquet"))
+      sc.parquet(pathStr)
+    else
+      sc.textFile(pathStr)
+        .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
+  }
+
+  def rddFrom[S[_]](f: AFile)(hdfsPathStr: AFile => Task[String])(implicit
+    read: Read.Ops[SparkContext, S],
+    s1: Task :<: S
+  ): Free[S, RDD[Data]] = for {
+    pathStr <- lift(hdfsPathStr(f)).into[S]
+    sc <- read.asks(ι)
+    rdd <- lift(fetchRdd[Task](sc, pathStr)).into[S]
   } yield rdd
 
   def store(rdd: RDD[Data], out: AFile): F[Unit] = for {
@@ -110,6 +132,7 @@ object queryfile {
         case ReadChunkSize       => 5000.point[F]
         case StoreData(rdd, out) => qf.store(rdd, out)
         case ListContents(d)     => qf.listContents(d).run
+        // case RDDFrom(f)          => qf.rddFrom(f)
       }
     }
 

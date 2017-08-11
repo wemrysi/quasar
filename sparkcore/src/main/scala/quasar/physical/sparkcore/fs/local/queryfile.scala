@@ -42,6 +42,13 @@ object queryfile {
       .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
   }
 
+  def rddFrom[F[_]](f: AFile) (implicit
+    reader: MonadReader[F, SparkContext]): F[RDD[Data]] =
+    reader.asks { sc =>
+      sc.textFile(posixCodec.unsafePrintPath(f))
+        .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
+      }
+
   def store[F[_]:Capture](rdd: RDD[Data], out: AFile): F[Unit] = Capture[F].capture {
     val ioFile = new File(posixCodec.printPath(out))
     val pw = new PrintWriter(new FileOutputStream(ioFile, false))
@@ -74,15 +81,14 @@ object queryfile {
     S: Task :<: S
   ): Input[S] = Input[S](fromFile _)
 
-  def detailsInterpreter[F[_]:Capture:Applicative]: SparkConnectorDetails ~> F =
+  def detailsInterpreter[F[_]:Capture:MonadReader[?[_], SparkContext]]: SparkConnectorDetails ~> F =
     new (SparkConnectorDetails ~> F) {
       def apply[A](from: SparkConnectorDetails[A]) = from match {
         case FileExists(f)       => fileExists[F](f)
         case ReadChunkSize       => 5000.point[F]
         case StoreData(rdd, out) => store(rdd, out)
-        case ListContents(d)   => listContents(d).run
+        case ListContents(d)     => listContents(d).run
+        case RDDFrom(f)          => rddFrom[F](f)
       }
     }
-
-
 }

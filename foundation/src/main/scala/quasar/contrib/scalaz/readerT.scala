@@ -14,27 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.physical.sparkcore.fs.cassandra
+package quasar.contrib.scalaz
 
-import quasar.Data
-import quasar.contrib.pathy._
-import quasar.physical.sparkcore.fs.readfile.Input
-
-import org.apache.spark.rdd._
 import scalaz._
-import scalaz.concurrent.Task
-import pathy.Path.fileParent
 
-object readfile {
-
-  import common._
-
-  def rddFrom[S[_]](f: AFile)(implicit
-    cass: CassandraDDL.Ops[S]
-  ): Free[S, RDD[Data]] =
-    cass.readTable(keyspace(fileParent(f)), tableName(f))
-
-  def input[S[_]](implicit cass: CassandraDDL.Ops[S], s0: Task :<: S) =
-    Input(f => rddFrom(f))
-
+object readerT {
+  def runReaderNT[F[_], S](s: S): ReaderT[F, S, ?] ~> F =
+    λ[ReaderT[F, S, ?] ~> F](_.run(s))
 }

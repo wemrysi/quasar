@@ -120,7 +120,7 @@ package object cassandra {
   private def fsInterpret: SparkFSConf => (FileSystem ~> Free[Eff, ?]) =
     (sparkFsConf: SparkFSConf) => interpretFileSystem(
       corequeryfile.chrooted[Eff](queryfile.input, FsType, sparkFsConf.prefix),
-      corereadfile.chrooted(readfile.input[Eff], sparkFsConf.prefix),
+      corereadfile.chrooted(sparkFsConf.prefix),
       writefile.chrooted[Eff](sparkFsConf.prefix),
       managefile.chrooted[Eff](sparkFsConf.prefix))
 

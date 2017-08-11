@@ -15,55 +15,33 @@
  */
 
 package quasar.physical.sparkcore.fs.hdfs
-
+/*
 import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
 import quasar.effect.Read
-import quasar.fp.free._
-import quasar.fp.ski._
+
+
 import quasar.physical.sparkcore.fs.readfile.Input
 import quasar.physical.sparkcore.fs.hdfs.parquet.ParquetRDD
 import quasar.effect.Capture
 
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
 import scalaz._
 import scalaz.concurrent.Task
-
+*/
 object readfile {
 
-  import ParquetRDD._
-
-  def fetchRdd[F[_]:Capture](sc: SparkContext, pathStr: String): F[RDD[Data]] = Capture[F].capture {
-    // TODO add magic number support to distinguish
-    if(pathStr.endsWith(".parquet"))
-      sc.parquet(pathStr)
-    else
-      sc.textFile(pathStr)
-        .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
-  }
-
-  def rddFrom[S[_]](f: AFile)(hdfsPathStr: AFile => Task[String])(implicit
-    read: Read.Ops[SparkContext, S],
-    s1: Task :<: S
-  ): Free[S, RDD[Data]] = for {
-    pathStr <- lift(hdfsPathStr(f)).into[S]
-    sc <- read.asks(ι)
-    rdd <- lift(fetchRdd[Task](sc, pathStr)).into[S]
-  } yield rdd
 
 
-  def fileExists[S[_]](f: AFile)(hdfsPathStr: AFile => Task[String], fileSystem: Task[FileSystem])(
-    implicit s0: Task :<: S): Free[S, Boolean] =
-    lift(hdfsPathStr(f).flatMap { pathStr =>
-      fileSystem.map(fs => fs.exists(new Path(pathStr)))
-    }).into[S]
 
-  def input[S[_]](hdfsPathStr: AFile => Task[String], fileSystem: Task[FileSystem])(implicit
-    read: Read.Ops[SparkContext, S], s0: Task :<: S) =
-    Input(f => rddFrom(f)(hdfsPathStr))
+  // def input[S[_]](hdfsPathStr: AFile => Task[String], fileSystem: Task[FileSystem])(implicit
+    // read: Read.Ops[SparkContext, S], s0: Task :<: S) =
+    // Input(f => rddFrom(f)(hdfsPathStr))
+
+
+
 
 }

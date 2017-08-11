@@ -36,22 +36,18 @@ object readfile {
   type Offset = Natural
   type Limit = Option[Positive]
 
-  final case class Input[S[_]](
-    rddFrom: AFile => Free[S, RDD[Data]]
-  )
-
   import ReadFile.ReadHandle
 
-  def chrooted[S[_]](input: Input[S], prefix: ADir)(implicit
+  def chrooted[S[_]](prefix: ADir)(implicit
     s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
     s1: Read[SparkContext, ?] :<: S,
     s2: MonotonicSeq :<: S,
     s3: Task :<: S,
     s4: SparkConnectorDetails :<: S
   ): ReadFile ~> Free[S, ?] =
-    flatMapSNT(interpret(input)) compose chroot.readFile[ReadFile](prefix)
+    flatMapSNT(interpret) compose chroot.readFile[ReadFile](prefix)
 
-  def interpret[S[_]](input: Input[S])(implicit
+  def interpret[S[_]](implicit
     s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
     s1: Read[SparkContext, ?] :<: S,
     s2: MonotonicSeq :<: S,
@@ -60,13 +56,13 @@ object readfile {
   ): ReadFile ~> Free[S, ?] =
     new (ReadFile ~> Free[S, ?]) {
       def apply[A](rf: ReadFile[A]) = rf match {
-        case ReadFile.Open(f, offset, limit) => open[S](f, offset, limit, input)
+        case ReadFile.Open(f, offset, limit) => open[S](f, offset, limit)
         case ReadFile.Read(h) => details.readChunkSize >>= (step => read[S](h, step))
         case ReadFile.Close(h) => close[S](h)
       }
   }
 
-  private def open[S[_]](f: AFile, offset: Offset, limit: Limit, input: Input[S])(implicit
+  private def open[S[_]](f: AFile, offset: Offset, limit: Limit)(implicit
     kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
     s1: Read[SparkContext, ?] :<: S,
     gen: MonotonicSeq.Ops[S],
@@ -77,7 +73,7 @@ object readfile {
       gen.next map (ReadHandle(f, _))
 
     def _open: Free[S, ReadHandle] = for {
-      rdd <- input.rddFrom(f)
+      rdd <- details.rddFrom(f)
       limitedRdd = rdd.zipWithIndex().filter {
         case (value, index) =>
           limit.fold(

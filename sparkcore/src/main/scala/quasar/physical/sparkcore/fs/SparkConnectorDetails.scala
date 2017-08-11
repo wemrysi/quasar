@@ -33,6 +33,7 @@ object SparkConnectorDetails {
   final case object ReadChunkSize extends SparkConnectorDetails[Int]
   final case class StoreData(rdd: RDD[Data], out: AFile) extends SparkConnectorDetails[Unit]
   final case class ListContents(dir: ADir) extends SparkConnectorDetails[FileSystemError \/ Set[PathSegment]]
+  final case class RDDFrom(afile: AFile) extends SparkConnectorDetails[RDD[Data]]
 
   class Ops[S[_]](implicit S: SparkConnectorDetails :<: S) {
     def fileExists(afile: AFile): Free[S, Boolean] =
@@ -43,6 +44,8 @@ object SparkConnectorDetails {
       lift(StoreData(rdd, out)).into[S]
     def listContents(dir: ADir): EitherT[Free[S, ?], FileSystemError, Set[PathSegment]] =
       EitherT(lift(ListContents(dir)).into[S])
+    def rddFrom(afile: AFile): Free[S, RDD[Data]] =
+      lift(RDDFrom(afile)).into[S]
   }
 
   object Ops {

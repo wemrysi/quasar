@@ -50,6 +50,11 @@ object queryfile {
       }
   }
 
+  def rddFrom[S[_]](f: AFile)(implicit
+    cass: CassandraDDL.Ops[S]
+  ): Free[S, RDD[Data]] =
+    cass.readTable(keyspace(fileParent(f)), tableName(f))
+
   def store[S[_]](rdd: RDD[Data], out: AFile)(implicit
     cass: CassandraDDL.Ops[S],
     S0: Task :<: S
@@ -118,7 +123,8 @@ object queryfile {
       case FileExists(f)       => fileExists(f)
       case ReadChunkSize       => 5000.point[Free[S, ?]]
       case StoreData(rdd, out) => store(rdd, out)
-      case ListContents(d)   => listContents(d).run
+      case ListContents(d)     => listContents(d).run
+      case RDDFrom(f)          => rddFrom(f)
     }
   }
 }
