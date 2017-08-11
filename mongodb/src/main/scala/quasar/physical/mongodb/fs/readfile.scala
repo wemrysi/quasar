@@ -22,7 +22,6 @@ import quasar.fp.TaskRef
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._
 import quasar.physical.mongodb._
-import quasar.physical.mongodb.fs.bsoncursor._
 
 import com.mongodb.async.client.MongoClient
 import scalaz._, Scalaz._
@@ -36,8 +35,8 @@ object readfile {
   type MongoRead[A]        = ReadStateT[MongoDbIO, A]
 
   /** Interpret the `ReadFile` algebra using MongoDB */
-  val interpret: ReadFile ~> MongoRead = new (ReadFile ~> MongoRead) {
-    val DC = DataCursor[MongoDbIO, BsonCursor]
+  def interpret(implicit DC: DataCursor[MongoDbIO, BsonCursor])
+      : ReadFile ~> MongoRead = new (ReadFile ~> MongoRead) {
 
     def apply[A](rf: ReadFile[A]) = rf match {
       case Open(file, offset, limit) =>

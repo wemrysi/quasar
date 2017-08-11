@@ -40,7 +40,11 @@ object MongoQueryModel {
     else if (version >= ServerVersion.MongoDb3_0) MongoQueryModel.`3.0`
     else                                          MongoQueryModel.`2.6`
 
-  implicit val showsMongoQueryModel: Show[MongoQueryModel] = new Show[MongoQueryModel] {
+  def toBsonVersion(v: MongoQueryModel): BsonVersion =
+    if (v lt `3.4`) BsonVersion.`1.0`
+    else BsonVersion.`1.1`
+
+  implicit val showMongoQueryModel: Show[MongoQueryModel] = new Show[MongoQueryModel] {
     override def shows(v: MongoQueryModel) = v.s
   }
 

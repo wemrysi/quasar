@@ -77,22 +77,23 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
   def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix])
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
+    val bsonVersion = MongoQueryModel.toBsonVersion(queryModel)
     queryModel match {
       case MongoQueryModel.`3.4` =>
-        (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_4](FuncHandler.handle3_4)(mf) >>=
+        (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_4](FuncHandler.handle3_4(bsonVersion))(mf) >>=
           (expr => WorkflowBuilder.build[PlannerError \/ ?, Workflow3_2F](WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow3_2F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).leftMap(qscriptPlanningFailed.reverseGet)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
       case MongoQueryModel.`3.2` =>
-        (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_2](FuncHandler.handle3_2)(mf) >>=
+        (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_2](FuncHandler.handle3_2(bsonVersion))(mf) >>=
           (expr => WorkflowBuilder.build[PlannerError \/ ?, Workflow3_2F](WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow3_2F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).leftMap(qscriptPlanningFailed.reverseGet)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
       case MongoQueryModel.`3.0` =>
-        (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_0](FuncHandler.handle3_0)(mf) >>=
+        (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr3_0](FuncHandler.handle3_0(bsonVersion))(mf) >>=
           (expr => WorkflowBuilder.build[PlannerError \/ ?, Workflow2_6F](WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow2_6F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).leftMap(qscriptPlanningFailed.reverseGet)))
           .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 
       case _                     =>
-        (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr2_6](FuncHandler.handle2_6)(mf) >>=
+        (MongoDbPlanner.getExpr[Fix, FileSystemError \/ ?, Expr2_6](FuncHandler.handle2_6(bsonVersion))(mf) >>=
           (expr => WorkflowBuilder.build[PlannerError \/ ?, Workflow2_6F](WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[Workflow2_6F].read(coll), ListMap(BsonField.Name("value") -> \&/-(expr)))).leftMap(qscriptPlanningFailed.reverseGet)))
           .map(wf => (Crystallize[Workflow2_6F].crystallize(wf).inject[WorkflowF], BsonField.Name("value")))
 

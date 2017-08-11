@@ -44,19 +44,23 @@ object writefile {
                  recordCollection(file, col) map \/.right)
 
       case Write(h, data) =>
-        val (errs, docs) = data foldMap { d =>
-          dataToDocument(d).fold(
-            e => (Vector(e), Vector()),
-            d => (Vector(), Vector(d)))
-        }
+        lookupServerVersion.flatMap { serverVersion =>
+          val v = MongoQueryModel.toBsonVersion(MongoQueryModel(serverVersion))
 
-        lookupCollection(h) flatMap (_ cata (
-          c => insertAny(c, docs.map(_.repr))
-                 .filter(_ < docs.size)
-                 .map(n => partialWrite(docs.size - n))
-                 .run.map(errs ++ _.toList)
-                 .liftM[WriteStateT],
-          (errs :+ unknownWriteHandle(h)).point[MongoWrite]))
+          val (errs, docs) = data foldMap { d =>
+            dataToDocument(v, d).fold(
+              e => (Vector(e), Vector()),
+              d => (Vector(), Vector(d)))
+          }
+
+          lookupCollection(h) flatMap (_ cata (
+            c => insertAny(c, docs.map(_.repr))
+                   .filter(_ < docs.size)
+                   .map(n => partialWrite(docs.size - n))
+                   .run.map(errs ++ _.toList)
+                   .liftM[WriteStateT],
+            (errs :+ unknownWriteHandle(h)).point[MongoWrite]))
+        }
 
       case Close(h) =>
         MongoWrite(collectionL(h) := None).void
@@ -105,8 +109,11 @@ object writefile {
   private def lookupCollection(h: WriteHandle): MongoWrite[Option[Collection]] =
     writeState map (collectionL(h).get)
 
-  private def dataToDocument(d: Data): FileSystemError \/ Bson.Doc =
-    BsonCodec.fromData(d)
+  private def lookupServerVersion: MongoWrite[ServerVersion] =
+    MongoDbIO.serverVersion.liftM[WriteStateT]
+
+  private def dataToDocument(v: BsonVersion, d: Data): FileSystemError \/ Bson.Doc =
+    BsonCodec.fromData(v, d)
       .leftMap(err => writeFailed(d, err.shows))
       .flatMap {
         case doc @ Bson.Doc(_) => doc.right
