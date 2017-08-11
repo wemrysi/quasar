@@ -17,6 +17,7 @@
 package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
+import quasar.{BackendName, TestConfig}
 import quasar.contrib.pathy.ADir
 import quasar.contrib.scalaz.catchable._
 import quasar.effect._
@@ -31,10 +32,12 @@ import quasar.physical.marklogic.xquery._
 import quasar.qscript.{Read => _, _}
 import quasar.qscript.{MapFuncsCore => MFCore}
 
+import com.marklogic.xcc.{ContentSource, Session}
+import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import matryoshka._
-import com.marklogic.xcc.{ContentSource, Session}
+import org.specs2.specification.core.Fragment
+import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent._
 
@@ -47,7 +50,14 @@ final class FilterPlannerSpec extends quasar.Qspec {
 
   type M[A] = MarkLogicPlanErrT[PrologT[StateT[Free[XccEvalEff, ?], Long, ?], ?], A]
 
-  def filterExpr(adir: ADir, field: String): Fix[QSR] = {
+  xccSpec(_ => "Filter Planner") { eval =>
+    "does not plan with indexes if not available" >> {
+
+      1 must_== 1
+    }
+  }
+
+  def filterExpr(idxName: String): Fix[QSR] = {
     def eq(lhs: FreeMap[Fix], rhs: String): FreeMap[Fix] =
       Free.roll(MFC(MFCore.Eq(lhs, MFCore.StrLit(rhs))))
 
@@ -60,23 +70,28 @@ final class FilterPlannerSpec extends quasar.Qspec {
     def filter(src: Fix[QSR], f: FreeMap[Fix]): Fix[QSR] =
       Fix(Inject[QScriptCore[Fix, ?], QSR].inj(Filter(src, f)))
 
-    filter(shiftedRead(adir), eq(projectField(field), "foobar"))
+    filter(shiftedRead(rootDir[Sandboxed] </> dir("some")), eq(projectField(idxName), "foobar"))
   }
 
-  def runJson(qs: Fix[QSR]): Free[XccEvalEff, (Prologs, MarkLogicPlannerError \/ (Search[U] \/ XQuery))] = {
-    def runJ[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc](qs: Fix[QSR]
-    ): F[Search[U] \/ XQuery] =
-      qs.cataM(Planner[F, DocType.Json, QSR, Fix[EJson]].plan[U])
+  def xccSpec(desc: BackendName => String)(tests: (Fix[QSR] => Option[Search[U]]) => Fragment): Unit =
+    TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
+      contentSourceConnection[Task](uri).map(cs => desc(backend.name) >> tests(runJson(cs, _))).void
+    }).unsafePerformSync
 
-    runJ[M](qs).run.run.eval(1)
-  }
-
-  def runXcc[A](f: Free[XccEvalEff, A], sess: Session, cs: ContentSource): Task[A] =
+  def runXcc[A](f: Free[XccEvalEff, A], sess: Session, cs: ContentSource): A =
     (MonotonicSeq.fromZero map { (monoSeq: MonotonicSeq ~> Task) =>
       val xccToTask: XccEvalEff ~> Task =
         reflNT[Task] :+: monoSeq :+: Read.constant[Task, Session](sess) :+: Read.constant[Task, ContentSource](cs)
       val eval: Free[XccEvalEff, ?] ~> Task = foldMapNT(xccToTask)
 
       eval(f)
-    }).join
+    }).join.unsafePerformSync
+
+  def runJson(cs: ContentSource, qs: Fix[QSR]): Option[Search[U]] = {
+    def runJ[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc](qs: Fix[QSR]
+    ): F[Search[U] \/ XQuery] =
+      qs.cataM(Planner[F, DocType.Json, QSR, Fix[EJson]].plan[U])
+
+    runXcc(runJ[M](qs).run.run.eval(1), cs.newSession, cs)._2.toOption.map(_.swap.toOption).join
+  }
 }
