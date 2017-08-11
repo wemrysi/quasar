@@ -3,8 +3,13 @@
     "backends": {
         "couchbase": "ignoreFieldOrder",
         "marklogic_json": "ignoreFieldOrder",
-        "mimir":"ignoreFieldOrder"
+        "mimir":"ignoreFieldOrder",
+        "spark_hdfs": "pending",
+        "spark_local": "pending"
     },
+    "NB": "Spark broken because of Netty conflict of Spark with new Mongo.
+           This should be resolved once both Spark and new Mongo are on BackendModule (#2216 resp #2094)
+           and we have dynamic backend loading in place (#2105)",
     "data": "zips.data",
     "query": "select integer(`_id`) as intId, decimal(`_id`) as decId, to_string(pop) as popStr, to_string(loc[0]) as locStr, to_string(length(city) < 9) as boolStr from zips",
     "predicate": "atLeast",
