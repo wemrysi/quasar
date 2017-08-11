@@ -46,29 +46,29 @@ object Bson {
   // TODO: Once Bson is fixpoint, this should be a coalgebra:
   //       BsonValue => BsonF[BsonValue]
   val fromRepr: BsonValue => Bson = {
-    case (arr:  BsonArray)             => Arr(arr.getValues.asScala.toList ∘ fromRepr)
-    case (bin:  BsonBinary)            => Binary.fromArray(bin.getData)
-    case (bool: BsonBoolean)           => Bool(bool.getValue)
-    case (dt:   BsonDateTime)          => Date(dt.getValue)
-    case (dec: BsonDecimal128) if (dec.getValue.isNaN || dec.getValue.isInfinite)
-                                       => Undefined
-    case (dec:  BsonDecimal128)        => Dec128(dec.getValue.bigDecimalValue)
-    case (doc:  BsonDocument)          => Doc(doc.asScala.toList.toListMap ∘ fromRepr)
-    case (dub:  BsonDouble)            => Dec(dub.doubleValue)
-    case (i32:  BsonInt32)             => Int32(i32.intValue)
-    case (i64:  BsonInt64)             => Int64(i64.longValue)
-    case (_:    BsonMaxKey)            => MaxKey
-    case (_:    BsonMinKey)            => MinKey
-    case (_:    BsonNull)              => Null
-    case (oid:  BsonObjectId)          => ObjectId.fromArray(oid.getValue.toByteArray)
-    case (rex:  BsonRegularExpression) => Regex(rex.getPattern, rex.getOptions)
-    case (str:  BsonString)            => Text(str.getValue)
-    case (sym:  BsonSymbol)            => Symbol(sym.getSymbol)
-    case (tms:  BsonTimestamp)         => Timestamp(tms.getTime, tms.getInc)
-    case (_:    BsonUndefined)         => Undefined
+    case arr:  BsonArray             => Arr(arr.getValues.asScala.toList ∘ fromRepr)
+    case bin:  BsonBinary            => Binary.fromArray(bin.getData)
+    case bool: BsonBoolean           => Bool(bool.getValue)
+    case dt:   BsonDateTime          => Date(dt.getValue)
+    case dec:  BsonDecimal128 if (dec.getValue.isNaN || dec.getValue.isInfinite)
+                                     => Undefined
+    case dec:  BsonDecimal128        => Dec128(dec.getValue.bigDecimalValue)
+    case doc:  BsonDocument          => Doc(doc.asScala.toList.toListMap ∘ fromRepr)
+    case dub:  BsonDouble            => Dec(dub.doubleValue)
+    case i32:  BsonInt32             => Int32(i32.intValue)
+    case i64:  BsonInt64             => Int64(i64.longValue)
+    case _:    BsonMaxKey            => MaxKey
+    case _:    BsonMinKey            => MinKey
+    case _:    BsonNull              => Null
+    case oid:  BsonObjectId          => ObjectId.fromArray(oid.getValue.toByteArray)
+    case rex:  BsonRegularExpression => Regex(rex.getPattern, rex.getOptions)
+    case str:  BsonString            => Text(str.getValue)
+    case sym:  BsonSymbol            => Symbol(sym.getSymbol)
+    case tms:  BsonTimestamp         => Timestamp(tms.getTime, tms.getInc)
+    case _:    BsonUndefined         => Undefined
       // NB: These types we can’t currently translate back to Bson, but we don’t
       //     expect them to appear.
-    case (_: BsonDbPointer | _: BsonJavaScript | _: BsonJavaScriptWithScope) => Undefined
+    case _: BsonDbPointer | _: BsonJavaScript | _: BsonJavaScriptWithScope => Undefined
   }
 
   final case class Dec(value: Double) extends Bson {
