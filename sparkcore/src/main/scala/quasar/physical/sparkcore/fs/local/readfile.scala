@@ -16,12 +16,10 @@
 
 package quasar.physical.sparkcore.fs.local
 
-import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
 import quasar.effect.Read
 import quasar.fp.ski._
-import quasar.physical.sparkcore.fs.readfile.{Offset, Limit}
 import quasar.physical.sparkcore.fs.readfile.Input
 
 import org.apache.spark.SparkContext
@@ -32,23 +30,14 @@ import scalaz.concurrent.Task
 
 object readfile {
 
-  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)
-    (implicit read: Read.Ops[SparkContext, S]): Free[S, RDD[(Data, Long)]] =
+  def rddFrom[S[_]](f: AFile)
+    (implicit read: Read.Ops[SparkContext, S]): Free[S, RDD[Data]] =
     read.asks { sc =>
       sc.textFile(posixCodec.unsafePrintPath(f))
         .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
-        .zipWithIndex()
-        .filter {
-        case (value, index) =>
-          maybeLimit.fold(
-            index >= offset.value
-          ) (
-            limit => index >= offset.value && index < limit.value + offset.value
-          )
       }
-    }
 
   def input[S[_]](implicit read: Read.Ops[SparkContext, S], s0: Task :<: S) =
-    Input((f,off, lim) => rddFrom(f, off, lim))
+    Input(f => rddFrom(f))
 
 }

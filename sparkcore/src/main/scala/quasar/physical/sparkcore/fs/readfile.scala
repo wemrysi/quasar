@@ -37,7 +37,7 @@ object readfile {
   type Limit = Option[Positive]
 
   final case class Input[S[_]](
-    rddFrom: (AFile, Offset, Limit)  => Free[S, RDD[(Data, Long)]]
+    rddFrom: AFile => Free[S, RDD[Data]]
   )
 
   import ReadFile.ReadHandle
@@ -77,8 +77,16 @@ object readfile {
       gen.next map (ReadHandle(f, _))
 
     def _open: Free[S, ReadHandle] = for {
-      rdd <- input.rddFrom(f, offset, limit)
-      cur = SparkCursor(rdd.some, 0)
+      rdd <- input.rddFrom(f)
+      limitedRdd = rdd.zipWithIndex().filter {
+        case (value, index) =>
+          limit.fold(
+            index >= offset.value
+          ) (
+            limit => index >= offset.value && index < limit.value + offset.value
+          )
+      }
+      cur = SparkCursor(limitedRdd.some, 0)
       h <- freshHandle
       _ <- kvs.put(h, cur)
     } yield h

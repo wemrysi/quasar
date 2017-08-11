@@ -22,7 +22,6 @@ import quasar.contrib.pathy._
 import quasar.effect.Read
 import quasar.fp.free._
 import quasar.fp.ski._
-import quasar.physical.sparkcore.fs.readfile.{Offset, Limit}
 import quasar.physical.sparkcore.fs.readfile.Input
 import quasar.physical.sparkcore.fs.hdfs.parquet.ParquetRDD
 import quasar.effect.Capture
@@ -47,27 +46,15 @@ object readfile {
         .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
   }
 
-  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)(hdfsPathStr: AFile => Task[String])(implicit
+  def rddFrom[S[_]](f: AFile)(hdfsPathStr: AFile => Task[String])(implicit
     read: Read.Ops[SparkContext, S],
     s1: Task :<: S
-  ): Free[S, RDD[(Data, Long)]] = {
-    for {
-      pathStr <- lift(hdfsPathStr(f)).into[S]
-      sc <- read.asks(ι)
-      rdd <- lift(fetchRdd[Task](sc, pathStr)).into[S]
-    } yield {
-      rdd
-        .zipWithIndex()
-        .filter {
-        case (value, index) =>
-          maybeLimit.fold(
-            index >= offset.value
-          ) (
-            limit => index >= offset.value && index < limit.value + offset.value
-          )
-      }
-    }
-  }
+  ): Free[S, RDD[Data]] = for {
+    pathStr <- lift(hdfsPathStr(f)).into[S]
+    sc <- read.asks(ι)
+    rdd <- lift(fetchRdd[Task](sc, pathStr)).into[S]
+  } yield rdd
+
 
   def fileExists[S[_]](f: AFile)(hdfsPathStr: AFile => Task[String], fileSystem: Task[FileSystem])(
     implicit s0: Task :<: S): Free[S, Boolean] =
@@ -77,6 +64,6 @@ object readfile {
 
   def input[S[_]](hdfsPathStr: AFile => Task[String], fileSystem: Task[FileSystem])(implicit
     read: Read.Ops[SparkContext, S], s0: Task :<: S) =
-    Input((f,off, lim) => rddFrom(f, off, lim)(hdfsPathStr))
+    Input(f => rddFrom(f)(hdfsPathStr))
 
 }

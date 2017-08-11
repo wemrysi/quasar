@@ -16,14 +16,12 @@
 
 package quasar.physical.sparkcore.fs.elastic
 
-import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.pathy._
 import quasar.effect.Read
 import quasar.fp.free._
 import quasar.fp.ski.ι
 import quasar.physical.sparkcore.fs.readfile.Input
-import quasar.physical.sparkcore.fs.readfile.{Offset, Limit}
 
 import org.apache.spark._
 import org.apache.spark.rdd._
@@ -31,32 +29,19 @@ import scalaz._, concurrent.Task
 
 object readfile {
 
-  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)(implicit
+  def rddFrom[S[_]](f: AFile)(implicit
     read: Read.Ops[SparkContext, S],
     E: ElasticCall :<: S,
     S: Task :<: S
-  ): Free[S, (RDD[(Data, Long)])] = {
-    for {
-      sc <- read.asks(ι)
-      rdd <- lift(queryfile.fromFile(sc, f)).into[S]
-    } yield {
-      rdd
-        .zipWithIndex()
-        .filter {
-        case (value, index) =>
-          maybeLimit.fold(
-            index >= offset.value
-          ) (
-            limit => index >= offset.value && index < limit.value + offset.value
-          )
-      }
-    }
-  }
+  ): Free[S, (RDD[Data])] = for {
+    sc <- read.asks(ι)
+    rdd <- lift(queryfile.fromFile(sc, f)).into[S]
+  } yield rdd
 
   def input[S[_]](implicit
     read: Read.Ops[SparkContext, S],
     E: ElasticCall :<: S,
     S: Task :<: S
-  ): Input[S] = Input(rddFrom[S] _)
+  ): Input[S] = Input(f => rddFrom(f))
 
 }

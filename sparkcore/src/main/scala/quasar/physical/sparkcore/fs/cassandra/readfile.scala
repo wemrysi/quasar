@@ -16,10 +16,8 @@
 
 package quasar.physical.sparkcore.fs.cassandra
 
-import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.pathy._
-import quasar.physical.sparkcore.fs.readfile.{ Offset, Limit }
 import quasar.physical.sparkcore.fs.readfile.Input
 
 import org.apache.spark.rdd._
@@ -31,23 +29,12 @@ object readfile {
 
   import common._
 
-  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)(implicit
+  def rddFrom[S[_]](f: AFile)(implicit
     cass: CassandraDDL.Ops[S]
-  ): Free[S, RDD[(Data, Long)]] =
-    cass.readTable(keyspace(fileParent(f)), tableName(f)).map{ rdd =>
-      rdd
-        .zipWithIndex()
-        .filter {
-          case (value, index) =>
-            maybeLimit.fold(
-              index >= offset.value
-            )(
-              limit => index >= offset.value && index < limit.value + offset.value
-            )
-        }
-    }
+  ): Free[S, RDD[Data]] =
+    cass.readTable(keyspace(fileParent(f)), tableName(f))
 
   def input[S[_]](implicit cass: CassandraDDL.Ops[S], s0: Task :<: S) =
-    Input(rddFrom(_, _, _))
+    Input(f => rddFrom(f))
 
 }
