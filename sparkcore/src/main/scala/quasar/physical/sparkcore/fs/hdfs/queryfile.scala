@@ -21,9 +21,8 @@ import quasar.{Data, DataCodec}
 import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.contrib.pathy._
 import quasar.contrib.pathy._
-import quasar.effect.{Read, Capture}
+import quasar.effect.Capture
 import quasar.fp.ski._
-import quasar.fp.free._
 import quasar.fs.FileSystemError
 import quasar.fs.FileSystemError._
 import quasar.fs.FileSystemErrT
@@ -71,13 +70,12 @@ class queryfile[F[_]:Capture:Bind](fileSystem: F[FileSystem]) {
         .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
   }
 
-  def rddFrom[S[_]](f: AFile)(hdfsPathStr: AFile => Task[String])(implicit
-    read: Read.Ops[SparkContext, S],
-    s1: Task :<: S
-  ): Free[S, RDD[Data]] = for {
-    pathStr <- lift(hdfsPathStr(f)).into[S]
-    sc <- read.asks(ι)
-    rdd <- lift(fetchRdd[Task](sc, pathStr)).into[S]
+  def rddFrom[F[_]:Capture](f: AFile)(hdfsPathStr: AFile => F[String])(implicit
+    reader: MonadReader[F, SparkContext]
+  ): F[RDD[Data]] = for {
+    pathStr <- hdfsPathStr(f)
+    sc <- reader.asks(ι)
+    rdd <- fetchRdd[F](sc, pathStr)
   } yield rdd
 
   def store(rdd: RDD[Data], out: AFile): F[Unit] = for {
@@ -123,7 +121,12 @@ class queryfile[F[_]:Capture:Bind](fileSystem: F[FileSystem]) {
 
 object queryfile {
 
-  def detailsInterpreter[F[_]:Capture:Monad](fileSystem: F[FileSystem]): SparkConnectorDetails ~> F =
+  def detailsInterpreter[F[_]:Capture](
+    fileSystem: F[FileSystem],
+    hdfsPathStr: AFile => F[String]
+  )(implicit
+    reader: MonadReader[F, SparkContext]
+  ): SparkConnectorDetails ~> F =
     new (SparkConnectorDetails ~> F) {
       val qf = new queryfile[F](fileSystem)
 
@@ -132,7 +135,7 @@ object queryfile {
         case ReadChunkSize       => 5000.point[F]
         case StoreData(rdd, out) => qf.store(rdd, out)
         case ListContents(d)     => qf.listContents(d).run
-        // case RDDFrom(f)          => qf.rddFrom(f)
+        case RDDFrom(f)          => qf.rddFrom(f)(hdfsPathStr)
       }
     }
 
