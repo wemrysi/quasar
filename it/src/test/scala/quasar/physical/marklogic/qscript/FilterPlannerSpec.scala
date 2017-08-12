@@ -29,6 +29,7 @@ import quasar.physical.marklogic.cts._
 import quasar.physical.marklogic.fs._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{Read => _, _}
 import quasar.qscript.{MapFuncsCore => MFCore}
 
@@ -49,11 +50,11 @@ final class FilterPlannerSpec extends quasar.Qspec {
   type QSR[A] = Coproduct[QScriptCore[Fix, ?], SR, A]
 
   type M[A] = MarkLogicPlanErrT[PrologT[StateT[Free[XccEvalEff, ?], Long, ?], ?], A]
+  type G[A] = WriterT[Id, Prologs, A]
 
-  xccSpec(_ => "Filter Planner") { eval =>
+  xccSpec(_ => "Filter Planner") { (evalPlan, evalXQuery) =>
     "does not plan with indexes if not available" >> {
-
-      1 must_== 1
+      evalPlan(filterExpr("does_not_exist")) must beSome((_: Search[U] \/ XQuery).isRight)
     }
   }
 
@@ -73,25 +74,41 @@ final class FilterPlannerSpec extends quasar.Qspec {
     filter(shiftedRead(rootDir[Sandboxed] </> dir("some")), eq(projectField(idxName), "foobar"))
   }
 
-  def xccSpec(desc: BackendName => String)(tests: (Fix[QSR] => Option[Search[U]]) => Fragment): Unit =
+  def xccSpec(desc: BackendName => String)(tests: (Fix[QSR] => Option[Search[U] \/ XQuery], G[XQuery] => Unit) => Fragment): Unit =
     TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
-      contentSourceConnection[Task](uri).map(cs => desc(backend.name) >> tests(runJson(cs, _))).void
+      contentSourceConnection[Task](uri).map { cs =>
+        val evalPlan: Fix[QSR] => Option[Search[U] \/ XQuery] = runPlan(cs, _)
+        val evalXQuery:  G[XQuery] => Unit = runXQuery(cs, _)
+
+        desc(backend.name) >> tests(evalPlan, evalXQuery)
+      }.void
     }).unsafePerformSync
 
+  def createElementIndex[F[_]: Monad: PrologW](idxName0: String): F[XQuery] =
+    (admin.getConfiguration[F] |@| admin.databaseRangeElementIndex[F](idxName0.xs))((config, idx) =>
+      admin.databaseAddRangeElementIndex[F](config, xdmp.database, idx)).join
+
+  def runXQuery(cs: ContentSource, fx: G[XQuery]): Unit = {
+    val (prologs, body) = fx.run
+    val mainModule = MainModule(Version.`1.0-ml`, prologs, body)
+
+    testing.moduleResults[ReaderT[Task, ContentSource, ?]](mainModule).run(cs).void.unsafePerformSync
+  }
+
   def runXcc[A](f: Free[XccEvalEff, A], sess: Session, cs: ContentSource): A =
-    (MonotonicSeq.fromZero map { (monoSeq: MonotonicSeq ~> Task) =>
+    (MonotonicSeq.fromZero >>= { (monoSeq: MonotonicSeq ~> Task) =>
       val xccToTask: XccEvalEff ~> Task =
         reflNT[Task] :+: monoSeq :+: Read.constant[Task, Session](sess) :+: Read.constant[Task, ContentSource](cs)
       val eval: Free[XccEvalEff, ?] ~> Task = foldMapNT(xccToTask)
 
       eval(f)
-    }).join.unsafePerformSync
+    }).unsafePerformSync
 
-  def runJson(cs: ContentSource, qs: Fix[QSR]): Option[Search[U]] = {
-    def runJ[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc](qs: Fix[QSR]
+  def runPlan(cs: ContentSource, qs: Fix[QSR]): Option[Search[U] \/ XQuery] = {
+    def runP[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc](qs: Fix[QSR]
     ): F[Search[U] \/ XQuery] =
       qs.cataM(Planner[F, DocType.Json, QSR, Fix[EJson]].plan[U])
 
-    runXcc(runJ[M](qs).run.run.eval(1), cs.newSession, cs)._2.toOption.map(_.swap.toOption).join
+    runXcc(runP[M](qs).run.run.eval(1), cs.newSession, cs)._2.toOption
   }
 }

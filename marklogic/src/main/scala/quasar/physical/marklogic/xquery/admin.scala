@@ -24,6 +24,12 @@ import scalaz.Functor
 object admin {
   val m = module("admin", "http://marklogic.com/xdmp/admin", "/MarkLogic/admin.xqy")
 
+  def databaseAddRangeElementIndex[F[_]: Functor: PrologW](config: XQuery, databaseId: XQuery, rangeIndexes: XQuery): F[XQuery] =
+    m("database-add-range-element-index") apply (config, databaseId, rangeIndexes)
+
+  def databaseRangeElementIndex[F[_]: Functor: PrologW](localName: XQuery): F[XQuery] =
+    m("database-range-element-index") apply ("string".xs, "".xs, localName, "http://marklogic.com/collation/".xqy, "false".xqy)
+
   def getConfiguration[F[_]: Functor: PrologW]: F[XQuery] =
     m("get-configuration").apply()
 
