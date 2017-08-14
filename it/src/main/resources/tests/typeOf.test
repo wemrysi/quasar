@@ -1,8 +1,8 @@
 {
     "name": "use type_of function",
     "backends": {
-        "mimir": "pending",
         "couchbase":      "pending",
+        "mimir":"pendingIgnoreFieldOrder",
         "spark_hdfs":     "pending",
         "spark_local":    "pending"
     },

@@ -172,7 +172,7 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     } map (_.merge)
 
   /** Prune the provided `array` keeping only the indices in `indicesToKeep`,
-    * eliding it alltogether if only a single element is retained.
+    * eliding it altogether if only a single element is retained.
     */
   def rewriteRepair[A](repair: FreeMapA[A], seen: SeenIndices): Option[FreeMapA[A]] =
     repair.project.some collect {

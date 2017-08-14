@@ -21,7 +21,6 @@ import quasar.contrib.pathy.{ADir, APath}
 import quasar.effect.Failure
 import quasar.fs.mount._, Mounting.PathTypeMismatch
 import quasar.fp._, free._, ski._
-import quasar.db._
 
 import doobie.imports._
 import org.specs2.ScalaCheck
@@ -37,8 +36,7 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
   isolated  // NB: each test needs a fresh DB, or else need to get cleanup working in between
 
   val xa = {
-    val rand = scala.util.Random.nextInt
-    val tr = DbUtil.simpleTransactor(DbUtil.inMemoryConnectionInfo(s"test_mem_$rand"))
+    val tr = MetaStoreFixture.createNewTestTransactor.unsafePerformSync
 
     Schema.schema.updateToLatest.transact(tr).unsafePerformSync
 

@@ -1,8 +1,10 @@
 {
     "name": "unify flattened fields",
     "backends": {
-        "couchbase":  "pending"
+        "couchbase":  "pending",
+        "mimir": "timeout"
     },
+    "NB": "this doesn't actually timeout for mimir, but it takes a long time and possibly causing overall build on next-major to timeout.",
     "data": "zips.data",
     "query": "select loc[*] from zips where loc[*] < 0",
     "predicate": "atLeast",

@@ -75,6 +75,14 @@ package object qscript {
   type QScriptTotal5[T[_[_]], A] = Coproduct[Const[Read[ADir], ?]        , QScriptTotal6[T, ?], A]
   type QScriptTotal6[T[_[_]], A] = Coproduct[Const[Read[AFile], ?]       , Const[DeadEnd, ?]  , A]
 
+  object QCT {
+    def apply[T[_[_]], A](qc: QScriptCore[T, A]): QScriptTotal[T, A] =
+      Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(qc)
+
+    def unapply[T[_[_]], A](qt: QScriptTotal[T, A]): Option[QScriptCore[T, A]] =
+      Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].prj(qt)
+  }
+
   /** QScript that has not gone through Read conversion. */
   type QScript[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[DeadEnd, ?])#M[A]
@@ -182,7 +190,7 @@ package object qscript {
       Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](idx))))
 
     def indexOf(elems: List[FreeMapA[T ,A]], value: FreeMapA[T, A]): Option[Int] =
-      IList.fromList(elems).indexOf(Free.roll(MFC(MakeArray(value))))
+      IList.fromList(elems) indexOf value
 
     indexOf(leftElems, normr).cata(
       idx => (norml, HoleF[T], projectIndex(idx)),
@@ -191,8 +199,7 @@ package object qscript {
         concatNaive(norml, normr)))
   }
 
-  // FIXME naive - use `concat`
-  def naiveConcat3[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
+  def concat3[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T]) = {
     val norm = Normalizable.normalizable[T]
@@ -245,13 +252,22 @@ package object qscript {
     }
   }
 
-  // FIXME naive - use `concat`
-  def naiveConcat4[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
+  def concat4[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A], r2: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T], FreeMap[T]) = {
     val norm = Normalizable.normalizable[T]
 
     (norm.freeMF(l), norm.freeMF(c), norm.freeMF(r), norm.freeMF(r2)) match {
+      case (newL, newC, newR, newR2) if newL ≟ newC && newC ≟ newR && newR ≟ newR2 =>
+        (newL, HoleF, HoleF, HoleF, HoleF)
+
+      case (newL, newC, newR, newR2) if newL ≟ newC && newR ≟ newR2 =>
+        (StaticArray(List(newL, newR)),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
+          Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))))
+
       // TODO: Handle cases with more than one constant.
       case (newL @ Embed(CoEnv(\/-(MFC(Constant(_))))), newC, newR, newR2) =>
         (StaticArray(List(newC, newR, newR2)),

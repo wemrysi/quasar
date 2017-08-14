@@ -21,7 +21,7 @@ import quasar._
 import quasar.fp.numeric._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
-import quasar.effect.LiftedOps
+import quasar.effect.{Failure, LiftedOps}
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.sql._
@@ -145,6 +145,14 @@ object Module {
           handle => readUntilEmpty(handle))
       }
     }
+
+    def invokeFunction_(path: AFile, args: Map[String, String], offset: Natural, limit: Option[Positive])(implicit
+      SO: Failure :<: S
+    ): Process[Free[S, ?], Data] = {
+      val nat: M ~> Free[S, ?] = λ[M ~> Free[S, ?]] { x => Failure.Ops[Error, S].unattempt(x.run) }
+      invokeFunction(path, args, offset, limit).translate(nat)
+    }
+
   }
 
   object Ops {

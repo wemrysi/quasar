@@ -1,7 +1,6 @@
 {
     "name": "propagate undefined and null in JS",
     "backends": {
-        "mimir": "pending",
         "couchbase":         "pending",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",

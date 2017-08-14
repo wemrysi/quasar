@@ -1,10 +1,6 @@
 {
     "name": "skip and count",
 
-    "backends": {
-        "mimir":"pending"
-    },
-
     "data": "zips.data",
 
     "query": "select count(*) from (select * from zips offset 10) as x",

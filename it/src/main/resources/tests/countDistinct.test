@@ -1,10 +1,6 @@
 {
     "name": "count distinct",
 
-    "backends": {
-        "mimir":"pending"
-    },
-
     "data": "olympics.data",
 
     "query": "select count(distinct sport) as cnt from olympics",

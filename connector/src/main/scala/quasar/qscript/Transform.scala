@@ -99,28 +99,89 @@ class Transform
         val lprovs = prov.genBuckets(lann.provenance) ∘ (_ ∘ (_.as[JoinSide](LeftSide)))
         val rprovs = prov.genBuckets(rann.provenance) ∘ (_ ∘ (_.as[JoinSide](RightSide)))
 
-        val (combine, newLprov, newRprov, lacc, racc) =
+        val uniHole: rewrite.BranchUnification[F, Hole, T[F]] =
+          rewrite.unifySimpleBranchesHole(src, lBranch, rBranch)(rebaseT[T, F])
+
+        val uniSide: rewrite.BranchUnification[F, JoinSide, T[F]] =
+          rewrite.unifySimpleBranchesJoinSide(src, lBranch, rBranch)(rebaseT[T, F])
+
+        def c2[A: Equal: Show](
+          uni: rewrite.BranchUnification[F, A, T[F]])
+            : Option[(F[T[F]], FreeMap, FreeMap)] =
+          for {
+            l <- uni.remap(lval)
+            r <- uni.remap(rval)
+            (c, lacc, racc) <- concat(l, r).some
+            res <- uni.combine(c)
+          } yield (res, lacc, racc)
+
+        def c3[A: Equal: Show](
+          uni: rewrite.BranchUnification[F, A, T[F]],
+          bucket: JoinFunc)
+            : Option[(F[T[F]], FreeMap, FreeMap, FreeMap)] =
+          for {
+            l <- uni.remap(lval)
+            r <- uni.remap(rval)
+            b <- uni.remap(bucket)
+            (c, bacc, lacc, racc) <- concat3(b, l, r).some
+            res <- uni.combine(c)
+          } yield (res, bacc, lacc, racc)
+
+        def c4[A: Equal: Show](
+          uni: rewrite.BranchUnification[F, A, T[F]],
+          lBucket: JoinFunc,
+          rBucket: JoinFunc)
+            : Option[(F[T[F]], FreeMap, FreeMap, FreeMap, FreeMap)] =
+          for {
+            l <- uni.remap(lval)
+            r <- uni.remap(rval)
+            lb <- uni.remap(lBucket)
+            rb <- uni.remap(rBucket)
+            (c, lbacc, rbacc, lacc, racc) <- concat4(lb, rb, l, r).some
+            res <- uni.combine(c)
+          } yield (res, lbacc, rbacc, lacc, racc)
+
+        def theta(
+          combine: JoinFunc,
+          newLprov: List[prov.Provenance],
+          newRprov: List[prov.Provenance])
+            : F[T[F]] =
+          TJ.inj(ThetaJoin(src, lBranch, rBranch, prov.genComparisons(newLprov, newRprov), JoinType.Inner, combine))
+
+        val (res, newLprov, newRprov, lacc, racc) =
           (lprovs, rprovs) match {
             case (None, None) =>
-              val (combine, lacc, racc) = concat(lval, rval)
+              val (combine, lacc, racc) =
+                c2(uniHole) orElse c2(uniSide) getOrElse {
+                  val (c, lacc, racc) = concat(lval, rval)
+                  (theta(c, lann.provenance, rann.provenance), lacc, racc)
+                }
               (combine, lann.provenance, rann.provenance, lacc, racc)
             case (None, Some((rProvs, rBuck))) =>
-              val (combine, bacc, lacc, racc) = naiveConcat3(rBuck, lval, rval)
+              val (combine, bacc, lacc, racc) =
+                c3(uniHole, rBuck) orElse c3(uniSide, rBuck) getOrElse {
+                  val (c, bacc, lacc, racc) = concat3(rBuck, lval, rval)
+                  (theta(c, lann.provenance, prov.rebase(bacc, rProvs)), bacc, lacc, racc)
+                }
               (combine, lann.provenance, prov.rebase(bacc, rProvs), lacc, racc)
             case (Some((lProvs, lBuck)), None) =>
-              val (combine, bacc, lacc, racc) = naiveConcat3(lBuck, lval, rval)
+              val (combine, bacc, lacc, racc) =
+                c3(uniHole, lBuck) orElse c3(uniSide, lBuck) getOrElse {
+                  val (c, bacc, lacc, racc) = concat3(lBuck, lval, rval)
+                  (theta(c, prov.rebase(bacc, lProvs), rann.provenance), bacc, lacc, racc)
+                }
               (combine, prov.rebase(bacc, lProvs), rann.provenance, lacc, racc)
             case (Some((lProvs, lBuck)), Some((rProvs, rBuck))) =>
               val (combine, lbacc, rbacc, lacc, racc) =
-                naiveConcat4(lBuck, rBuck, lval, rval)
+                c4(uniHole, lBuck, rBuck) orElse c4(uniSide, lBuck, rBuck) getOrElse {
+                  val (c, lbacc, rbacc, lacc, racc) = concat4(lBuck, rBuck, lval, rval)
+                  (theta(c, prov.rebase(lbacc, lProvs), prov.rebase(rbacc, rProvs)), lbacc, rbacc, lacc, racc)
+                }
               (combine, prov.rebase(lbacc, lProvs), prov.rebase(rbacc, rProvs), lacc, racc)
           }
 
         AutoJoinResult(
-          AutoJoinBase(
-            rewrite.unifySimpleBranches[F, T[F]](src, lBranch, rBranch, combine)(rebaseT).getOrElse(
-              TJ.inj(ThetaJoin(src, lBranch, rBranch, prov.genComparisons(newLprov, newRprov), JoinType.Inner, combine))).embed,
-            prov.joinProvenances(newLprov, newRprov)),
+          AutoJoinBase(res.embed, prov.joinProvenances(newLprov, newRprov)),
           lacc,
           racc)
     }
@@ -197,8 +258,8 @@ class Transform
       // id(p, y) - {foo: 1, bar: 2}
       //   id(p, x:foo) - 12
       //   id(p, x:bar) - 18
-      //   id(p, x:foo) - 1
-      //   id(p, x:bar) - 2
+      //   id(p, y:foo) - 1
+      //   id(p, y:bar) - 2
       // (one bucket)
       case  structural.FlattenArray | structural.FlattenMap =>
         flatten(shiftValues(values(0)))
@@ -567,26 +628,82 @@ class Transform
         QC.inj(reifyResult(func.ann, func.value)).embed
           .transCata[T[F]](rewrite.normalize).project
 
-      val result: PlannerError \/ JoinFunc =
-        QC.prj(reifiedCondition) match {
-          case Some(Map(_, mf)) if mf.count ≟ 0 =>
-            mf.as[JoinSide](LeftSide)
-              .transCata[JoinFunc](replaceJoinSides[T](lName, rName))
-              .right[PlannerError]
-          case _ =>
-            InternalError.fromMsg(s"non-mapping join condition found").left[JoinFunc]
-        }
+      reifiedCondition match {
+        case QC(Map(_, mf)) if mf.count ≟ 0 =>
+          val cond: JoinFunc = mf.as[JoinSide](LeftSide)
+            .transCata[JoinFunc](replaceJoinSides[T](lName, rName))
 
-      result.map(cond =>
-        Target(Ann(prov.joinProvenances(leftBuckets, rightBuckets), HoleF),
-          TJ.inj(ThetaJoin(src,
-            lBranch,
-            rBranch,
-            cond >>= {
-              case LeftSide => leftValue >> LeftSideF
-              case RightSide => rightValue >> RightSideF
-            },
-            joinType,
-            magicJoinStructure(leftValue, rightValue))).embed))
+          Target(Ann(prov.joinProvenances(leftBuckets, rightBuckets), HoleF),
+            TJ.inj(ThetaJoin(src,
+              lBranch,
+              rBranch,
+              cond >>= {
+                case LeftSide => leftValue >> LeftSideF
+                case RightSide => rightValue >> RightSideF
+              },
+              joinType,
+              magicJoinStructure(leftValue, rightValue))).embed).right[PlannerError]
+
+        // FIXME we can only ignore the join condition if this `ThetaJoin` is an autojoin
+        // consider creating a AutoJoin type that is internal to QScript compilation so we
+        // can detect joins that we have created
+        case TJ(ThetaJoin(Embed(QC(Unreferenced())), lTheta, rTheta, _, JoinType.Inner, combine)) =>
+          def replaceLeft(branch: FreeQS): Option[FreeQS] =
+            ReplaceMapFunc.applyToBranch[T](lName, branch, leftValue)
+
+          def replaceRight(branch: FreeQS): Option[FreeQS] =
+            ReplaceMapFunc.applyToBranch[T](rName, branch, rightValue)
+
+          val replace: Option[(FreeQS, FreeQS)] = for {
+            l <- replaceLeft(lTheta)
+            r <- replaceRight(rTheta)
+          } yield (l, r)
+
+          val replaceSwap: Option[(FreeQS, FreeQS)] = for {
+            l <- replaceLeft(rTheta)
+            r <- replaceRight(lTheta)
+          } yield (l, r)
+
+          val result: PlannerError \/ (FreeQS, FreeQS) =
+            replace.orElse(replaceSwap).toRightDisjunction(
+            InternalError.fromMsg(s"Non-supported join condition found: branches don't each contain a single join side."))
+
+          result.flatMap {
+            case (l, r) =>
+              (l.resume, r.resume) match {
+                case (-\/(QCT(LeftShift(_, structL, idL, repairL))), -\/(QCT(LeftShift(_, structR, idR, repairR)))) =>
+
+                  val newCondition: JoinFunc =
+                    Free.roll(MFC(And(
+                      // identites line up
+                      prov.genComparisons(leftBuckets, rightBuckets) >>= {
+                        case LeftSide => Free.roll(MFC(ProjectIndex(LeftSideF, IntLit(1))))
+                        case RightSide => Free.roll(MFC(ProjectIndex(RightSideF, IntLit(1))))
+                      },
+                      // values line up
+                      combine >>= {
+                        case LeftSide => Free.roll(MFC(ProjectIndex(LeftSideF, IntLit(1))))
+                        case RightSide => Free.roll(MFC(ProjectIndex(RightSideF, IntLit(1))))
+                      })))
+
+                  Target(Ann(prov.joinProvenances(leftBuckets, rightBuckets), HoleF),
+                    TJ.inj(ThetaJoin(
+                      src,
+                      Free.roll(QCT(LeftShift(lBranch, structL, idL, StaticArray(List(LeftSideF, repairL))))),
+                      Free.roll(QCT(LeftShift(rBranch, structR, idR, StaticArray(List(LeftSideF, repairR))))),
+                      newCondition,
+                      JoinType.Inner,
+                      magicJoinStructure(
+                        leftValue >> Free.roll(MFC(ProjectIndex(HoleF, IntLit(0)))),
+                        rightValue >> Free.roll(MFC(ProjectIndex(HoleF, IntLit(0))))))).embed).right[PlannerError]
+
+                case (_, _) =>
+                  InternalError.fromMsg(s"Non-supported join condition found: branches are not a supported shape.").left[Target[F]]
+              }
+          }
+
+        case _ =>
+          InternalError.fromMsg(s"Non-supported join condition found: join condition is not a supported shape.").left[Target[F]]
+      }
   }
 }

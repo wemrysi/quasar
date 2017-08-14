@@ -27,8 +27,8 @@ import scalaz._, Scalaz._
 object CoreConfig {
   implicit val configOps: ConfigOps[CoreConfig] = new ConfigOps[CoreConfig] {
     val name = "core"
-
-    val default = MetaStoreConfig.configOps.default ∘ (ms => CoreConfig(ms.some))
+    def metaStoreConfig = CoreConfig.metastore
+    val default = MetaStoreConfig.default ∘ (ms => CoreConfig(ms.some))
   }
 
   implicit val codec: CodecJson[CoreConfig] =

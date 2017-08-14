@@ -41,11 +41,20 @@ class DbConnectionConfigSpec extends mutable.Specification with ScalaCheck with 
     "decode" >> prop { (f: AFile) =>
       val cfg =
         Json("h2" ->
-          Json("file" := f))
+          Json("location" := f))
       decode(cfg) must beRight.which { info =>
           (info.driverClassName must_== "org.h2.Driver") and
-            (info.url must_== "jdbc:h2:file:" + posixCodec.printPath(f))
+            (info.url must_== "jdbc:h2:" + posixCodec.printPath(f))
         }
+    }
+    "decode old format" >> prop { (f: AFile) =>
+      val cfg =
+        Json("h2" ->
+          Json("file" := f))
+      decode(cfg) must beRight.which { info =>
+        (info.driverClassName must_== "org.h2.Driver") and
+          (info.url must_== "jdbc:h2:" + posixCodec.printPath(f))
+      }
     }
   }
 

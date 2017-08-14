@@ -81,7 +81,7 @@ package object fs {
   def definition[HS[_],S[_], T](
     fsType: FileSystemType,
     parseUri: ConnectionUri => DefinitionError \/ (SparkConf, T),
-    sparkFsDef: SparkConf => Free[S, SparkFSDef[HS, S]],
+    sparkFsDef: T => Free[S, SparkFSDef[HS, S]],
     fsInterpret: T => (FileSystem ~> Free[HS, ?])
   )(implicit
     S0: Task :<: S, S1: PhysErr :<: S
@@ -93,7 +93,7 @@ package object fs {
           config <- EitherT(parseUri(uri).point[Free[S, ?]])
           (sparkConf, t) = config
           res <- {
-            sparkFsDef(sparkConf).map {
+            sparkFsDef(t).map {
               case SparkFSDef(run, close) =>
                 val fileSystemInterpreter = fsInterpret(t)
                 val queryFileIntereter   = fileSystemInterpreter compose Inject[QueryFile, FileSystem]

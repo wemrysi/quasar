@@ -29,6 +29,8 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
   import SampleData._
   import trans._
 
+  def addThree: FN
+
   def checkTransformLeaf = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
@@ -339,6 +341,31 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       lookupF2(Nil, "add"))
     })
     val expected = Stream(JNum(80))
+
+    results.copoint mustEqual expected
+  }
+
+  def testMapNAddThree = {
+    val parsed = JParser.parseUnsafe("""[
+      { "values": [1, 2, 3] },
+      { "not-values": false },
+      { "values": [1, "hi", 3] },
+      { "values": [1, { "a": 42 }, 3] }
+    ]""")
+
+    val data: Stream[JValue] = parsed match {
+      case JArray(ls) => ls.toStream
+      case _ => sys.error("derp")
+    }
+
+    val sample = SampleData(data)
+    val table = fromSample(sample)
+
+    val results = toJson(table transform {
+      MapN(DerefObjectStatic(Leaf(Source), CPathField("values")), addThree)
+    })
+
+    val expected = Stream(JNum(6))
 
     results.copoint mustEqual expected
   }
@@ -1042,8 +1069,36 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
           JObject(JField("value1", v \ "value2") :: Nil)
       })
 
-    isOk(resultsOuter)
-    isOk(resultsInner)
+      isOk(resultsOuter)
+      isOk(resultsInner)
+    }
+  }
+
+  def checkObjectConcatOverwriteDifferingTypes = {
+    implicit val gen = sample(_ => Seq(JPath("value1") -> CString, JPath("value2") -> CLong))
+    prop { (sample: SampleData) =>
+      val table = fromSample(sample)
+      val resultsInner = toJson(table.transform {
+        InnerObjectConcat(
+          WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathField("value1")), "value1"),
+          WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathField("value2")), "value1")
+        )
+      })
+
+      val resultsOuter = toJson(table.transform {
+        OuterObjectConcat(
+          WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathField("value1")), "value1"),
+          WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathField("value2")), "value1")
+        )
+      })
+
+      def isOk(results: M[Stream[JValue]]) = results.copoint must_== (sample.data map { _ \ "value" } collect {
+        case v if (v \ "value1") != JUndefined && (v \ "value2") != JUndefined =>
+          JObject(JField("value1", v \ "value2") :: Nil)
+      })
+
+      isOk(resultsOuter)
+      isOk(resultsInner)
     }
   }
 

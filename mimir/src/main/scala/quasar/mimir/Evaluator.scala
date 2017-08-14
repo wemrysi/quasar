@@ -621,9 +621,12 @@ trait EvaluatorModule[M[+ _]]
 
             def makeJArray(idx: Int)(tpe: JType): JType = JArrayFixedT(Map(idx -> tpe))
 
+            def derefArray(idx: Int)(ref: ColumnRef): Option[ColumnRef] =
+              ref.selector.dropPrefix(CPath.Identity \ idx).map(ColumnRef(_, ref.ctype))
+
             val original = firstCoalesce.zipWithIndex map {
               case (red, idx) =>
-                (red, Some(makeJArray(idx) _))
+                (red, Some((makeJArray(idx) _, derefArray(idx) _)))
             }
             val reduction = coalesce(original)
 

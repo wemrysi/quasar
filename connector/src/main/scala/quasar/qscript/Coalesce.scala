@@ -278,11 +278,11 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
         (implicit QC: QScriptCore :<: OUT)
           : QScriptCore[IT[F]] => Option[QScriptCore[IT[F]]] = {
         case LeftShift(src, struct, id, repair) =>
-          MapFuncCore.extractFilter(struct)(_.some) ∘ { case (f, m) =>
+          MapFuncCore.extractFilter(struct)(_.some) ∘ { case (f, m, _) =>
             LeftShift(FToOut(QC.inj(Filter(src, f))).embed, m, id, repair)
           }
         case Map(src, mf) =>
-          MapFuncCore.extractFilter(mf)(_.some) ∘ { case (f, m) =>
+          MapFuncCore.extractFilter(mf)(_.some) ∘ { case (f, m, _) =>
             Map(FToOut(QC.inj(Filter(src, f))).embed, m)
           }
         case _ => none

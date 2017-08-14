@@ -2,7 +2,7 @@
     "name": "largest cities",
 
     "backends": {
-        "mimir": "pending",
+        "mimir":"ignoreFieldOrder",
         "mongodb_2_6": "ignoreResultOrder",
         "mongodb_3_0": "ignoreResultOrder",
         "mongodb_read_only": "ignoreResultOrder"

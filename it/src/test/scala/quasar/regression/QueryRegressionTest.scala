@@ -69,7 +69,12 @@ abstract class QueryRegressionTest[S[_]](
   val injectTask: Task ~> F =
     liftFT[S].compose(injectNT[Task, S])
 
-  val TestsRoot = currentDir[Sandboxed] </> dir("it") </> dir("src") </> dir("main") </> dir("resources") </> dir("tests")
+  val TestDataRoot: RDir =
+    currentDir[Sandboxed] </> dir("it") </> dir("src") </> dir("main") </> dir("resources") </> dir("tests")
+
+  lazy val TestsRoot: RDir =
+    TestsDir.fold(TestDataRoot)(TestDataRoot </> _)
+
   val DataDir: ADir = rootDir </> dir("regression")
 
   /** Location on the (host) file system of the data file referred to from a
@@ -87,6 +92,9 @@ abstract class QueryRegressionTest[S[_]](
   val manage = ManageFile.Ops[S]
   val fsQ    = new FilesystemQueries[S]
 
+  /** The location of the test files. */
+  def TestsDir: Option[Path[Rel, Dir, Sandboxed]]
+
   /** A name to identify the suite in test output. */
   def suiteName: String
 
@@ -95,7 +103,7 @@ abstract class QueryRegressionTest[S[_]](
 
   ////
 
-  lazy val tests = regressionTests(TestsRoot, knownFileSystems).unsafePerformSync
+  lazy val tests = regressionTests(TestDataRoot, TestsRoot, knownFileSystems).unsafePerformSync
 
   // NB: The printing is just to indicate progress (especially for travis-ci) as
   //     these tests have the potential to be slow for a backend.
@@ -150,7 +158,7 @@ abstract class QueryRegressionTest[S[_]](
           BuildInfo.isCIBuild.fold(
             execute.Skipped("(skipped because it times out)"),
             runTest)
-        case Some(TestDirective.Pending) =>
+        case Some(TestDirective.Pending | TestDirective.PendingIgnoreFieldOrder) =>
           if (BuildInfo.coverageEnabled)
             execute.Skipped("(pending example skipped during coverage run)")
           else
@@ -234,14 +242,14 @@ abstract class QueryRegressionTest[S[_]](
         // TODO: Error if a backend ignores field order when the query already does.
         if (exp.ignoreFieldOrder) OrderIgnored
         else exp.backends.get(backendName) match {
-          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder) =>
+          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreFieldOrder | TestDirective.PendingIgnoreFieldOrder) =>
             OrderIgnored
           case _ =>
             OrderPreserved
         },
         if (exp.ignoreResultOrder) OrderIgnored
         else exp.backends.get(backendName) match {
-          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreResultOrder) =>
+          case Some(TestDirective.IgnoreAllOrder | TestDirective.IgnoreResultOrder | TestDirective.PendingIgnoreFieldOrder) =>
             OrderIgnored
           case _ =>
             OrderPreserved
@@ -256,7 +264,7 @@ abstract class QueryRegressionTest[S[_]](
           case x => x
         }.handle {
           case e: java.util.concurrent.TimeoutException => execute.Pending(s"times out: ${e.getMessage}")
-          case e => execute.Failure(s"Errored with “${e.getMessage}”, you should change the “timeout” status to “pending”.") 
+          case e => execute.Failure(s"Errored with “${e.getMessage}”, you should change the “timeout” status to “pending”.")
         }
       case _ => result.handle {
         case e: java.util.concurrent.TimeoutException =>
@@ -311,7 +319,8 @@ abstract class QueryRegressionTest[S[_]](
                )),
         Process.emit(_))
 
-    val jf = jFile(TestsRoot </> file)
+    val jf = jFile(TestDataRoot </> file)
+
     Task.delay(jf.exists).liftM[Process].ifM(
       io.linesR(new FileInputStream(jf)) flatMap parse,
       Process.fail(new java.io.FileNotFoundException(jf.getPath)))
@@ -321,13 +330,14 @@ abstract class QueryRegressionTest[S[_]](
     * file path.
     */
   def regressionTests(
+    dataDir: RDir,
     testDir: RDir,
     knownBackends: Set[BackendName]
   ): Task[Map[RFile, RegressionTest]] =
     descendantsMatching(testDir, """^([^.].*)\.test""".r) // don't match file names with a leading .
       .map(f =>
         (loadRegressionTest(f) >>= verifyBackends(knownBackends)) strengthL
-          (f relativeTo testDir).get)
+          (f relativeTo dataDir).get)
       .gather(4)
       .runLog
       .map(_.toMap)

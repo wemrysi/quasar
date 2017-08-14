@@ -38,6 +38,16 @@ trait TestColumnarTableModule[M[+_]] extends ColumnarTableModuleTestSupport[M] {
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
   def newGroupId = groupId.getAndIncrement
 
+  def addThree: CFN = CFNP("addThree") {
+    case List(x: LongColumn, y: LongColumn, z: LongColumn) =>
+      new LongColumn {
+        def apply(row: Int) = x(row) + y(row) + z(row)
+
+        def isDefinedAt(row: Int) =
+          x.isDefinedAt(row) && y.isDefinedAt(row) && z.isDefinedAt(row)
+      }
+  }
+
   class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
     def load(apiKey: APIKey, jtpe: JType) = sys.error("todo")
@@ -345,6 +355,8 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       "perform a trivial map2 eq" in checkMap2Eq
       "perform a map2 add over but not into arrays and objects" in testMap2ArrayObject
 
+      "perform a mapN add over arrays and objects" in testMapNAddThree
+
       "perform a trivial equality check" in checkEqualSelf
       "perform a trivial equality check on an array" in checkEqualSelfArray
       "perform a slightly less trivial equality check" in checkEqual
@@ -360,6 +372,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       "wrap the results of a transform in an object as the specified field" in checkWrapObject
       "give the identity transform for self-object concatenation" in checkObjectConcatSelf
       "use a right-biased overwrite strategy in object concat conflicts" in checkObjectConcatOverwrite
+      "use a right-biased overwrite strategy in object concat conflicts (with differing types)" in checkObjectConcatOverwriteDifferingTypes
       "test inner object concat with a single boolean" in testObjectConcatSingletonNonObject
       "test inner object concat with a boolean and an empty object" in testObjectConcatTrivial
       "concatenate dissimilar objects" in checkObjectConcat

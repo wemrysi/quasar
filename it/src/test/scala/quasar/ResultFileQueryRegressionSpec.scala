@@ -24,6 +24,7 @@ import quasar.regression._
 import quasar.sql.Sql
 
 import matryoshka.data.Fix
+import pathy.Path.dir
 import scalaz._, Scalaz._
 import scalaz.stream.Process
 
@@ -37,6 +38,8 @@ class ResultFileQueryRegressionSpec
   ) {
 
   val read = ReadFile.Ops[BackendEffectIO]
+
+  val TestsDir = dir("resultFile").some
 
   val suiteName = "ResultFile Queries"
 

@@ -35,7 +35,10 @@ import scalaz.stream.Process
 class ViewReadQueryRegressionSpec
   extends QueryRegressionTest[BackendEffectIO](QueryRegressionTest.externalFS.map(_.take(1))) {
 
+  val TestsDir = dir("resultFile").some
+
   val suiteName = "View Reads"
+
   type ViewFS[A] = (Mounting :\: ViewState :\: MonotonicSeq :/: BackendEffectIO)#M[A]
 
   def mounts(path: APath, expr: Fix[Sql], vars: Variables): Task[Mounting ~> Task] =

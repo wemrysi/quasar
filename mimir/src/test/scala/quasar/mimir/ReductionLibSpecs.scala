@@ -49,6 +49,20 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
   val line = Line(1, 1, "")
 
   "reduce homogeneous sets" >> {
+    "first" >> {
+      val input = dag.Reduce(First,
+        dag.AbsoluteLoad(Const(CString("/hom/numbers"))(line))(line))(line)
+
+      determineResult(input, 42)
+    }
+
+    "last" >> {
+      val input = dag.Reduce(Last,
+        dag.AbsoluteLoad(Const(CString("/hom/numbers"))(line))(line))(line)
+
+      determineResult(input, 13)
+    }
+
     "singleton count" >> {
       val input = dag.Reduce(Count, Const(CString("alpha"))(line))(line)
 

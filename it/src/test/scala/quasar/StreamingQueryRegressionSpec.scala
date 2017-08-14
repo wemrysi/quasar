@@ -30,6 +30,8 @@ class StreamingQueryRegressionSpec
     QueryRegressionTest.externalFS.map(_.filter(
       _.ref.supports(BackendCapability.query())))) {
 
+  val TestsDir = None
+
   val suiteName = "Streaming Queries"
 
   def queryResults(expr: Fix[Sql], vars: Variables, basePath: ADir) =

@@ -31,7 +31,7 @@ object config {
     */
   def loadConfigFile[C: DecodeJson](configFile: Option[FsFile])(implicit cfgOps: ConfigOps[C]): Task[C] = {
     import ConfigError._
-    configFile.fold(cfgOps.fromDefaultPaths)(cfgOps.fromFile).run flatMap {
+    cfgOps.fromOptionalFile(configFile).run flatMap {
       case \/-(c) => c.point[Task]
 
       case -\/(FileNotFound(f)) => for {

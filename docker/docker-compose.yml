@@ -1,7 +1,7 @@
 quasar_mongodb_2_6:
   container_name: quasar_mongodb_2_6
   image: tutum/mongodb:2.6
-  command: mongod --smallfiles
+  command: mongod --smallfiles --noprealloc
   ports:
     - "27018:27017"
 
