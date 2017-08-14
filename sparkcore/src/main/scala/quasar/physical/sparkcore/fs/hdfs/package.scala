@@ -22,6 +22,8 @@ import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp.TaskRef
 import quasar.fp.free._
+import quasar.fp.ski.κ
+import quasar.contrib.scalaz.readerT._
 import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.fs.mount._, BackendDef._
 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile, genSc => coreGenSc}
@@ -152,7 +154,7 @@ package object hdfs {
       (genState, rddStates, sparkCursors, writeCursors) =>
 
       val interpreter: Eff ~> S =
-        (queryfile.detailsInterpreter(generateHdfsFS(sfsc)) andThen injectNT[Task, S]) :+:
+        (queryfile.detailsInterpreter[ReaderT[Task, SparkContext, ?]](ReaderT(κ(generateHdfsFS(sfsc))), hdfsPathStr(sfsc)) andThen  runReaderNT(sc) andThen injectNT[Task, S]) :+:
         (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:
@@ -170,27 +172,27 @@ package object hdfs {
     ))
   }
 
-  def generateHdfsFS(sfsConf: SparkFSConf): Task[HdfsFileSystem] = for {
-    fs <- Task.delay {
-      val conf = new Configuration()
-      conf.setBoolean("fs.hdfs.impl.disable.cache", true)
-      HdfsFileSystem.get(new URI(sfsConf.hdfsUriStr), conf)
-    }
-    uriStr = fs.getUri().toASCIIString()
-    _ <- if(uriStr.startsWith("file:///")) Task.fail(new RuntimeException("Provided URL is not valid HDFS URL")) else ().point[Task]
-  } yield fs
+  def generateHdfsFS(sfsConf: SparkFSConf): Task[HdfsFileSystem] =
+    for {
+      fs <- Task.delay {
+        val conf = new Configuration()
+        conf.setBoolean("fs.hdfs.impl.disable.cache", true)
+        HdfsFileSystem.get(new URI(sfsConf.hdfsUriStr), conf)
+      }
+      uriStr = fs.getUri().toASCIIString()
+      _ <- if(uriStr.startsWith("file:///")) Task.fail(new RuntimeException("Provided URL is not valid HDFS URL")) else ().point[Task]
+    } yield fs
+
+  def hdfsPathStr(sfsConf: SparkFSConf): AFile => ReaderT[Task, SparkContext, String] = (afile: AFile) => ReaderT(κ(Task.delay {
+    sfsConf.hdfsUriStr + posixCodec.unsafePrintPath(afile)
+  }))
 
   val fsInterpret: SparkFSConf => (FileSystem ~> Free[Eff, ?]) = (sparkFsConf: SparkFSConf) => {
-
-    def hdfsPathStr: AFile => Task[String] = (afile: AFile) => Task.delay {
-      sparkFsConf.hdfsUriStr + posixCodec.unsafePrintPath(afile)
-    }
-
     val fileSystem = generateHdfsFS(sparkFsConf)
 
     interpretFileSystem(
       corequeryfile.chrooted[Eff](queryfile.input(fileSystem), FsType, sparkFsConf.prefix),
-      corereadfile.chrooted(readfile.input[Eff](hdfsPathStr, fileSystem), sparkFsConf.prefix),
+      corereadfile.chrooted(sparkFsConf.prefix),
       writefile.chrooted[Eff](sparkFsConf.prefix, fileSystem),
       managefile.chrooted[Eff](sparkFsConf.prefix, fileSystem))
   }
