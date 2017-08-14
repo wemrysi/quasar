@@ -18,6 +18,7 @@ package quasar.physical.sparkcore.fs
 
 import slamdata.Predef._
 import quasar.connector.EnvironmentError
+import quasar.contrib.scalaz.readerT._
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp.TaskRef
@@ -81,7 +82,7 @@ package object local {
       (genState, rddStates, sparkCursors, printWriters) =>
 
       val interpreter: Eff ~> S =
-      (queryfile.detailsInterpreter[Task] andThen injectNT[Task, S]) :+:
+      (queryfile.detailsInterpreter[ReaderT[Task, SparkContext, ?]] andThen runReaderNT(sc) andThen injectNT[Task, S]) :+:
       (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:
@@ -102,7 +103,7 @@ package object local {
   def fsInterpret: SparkFSConf => (FileSystem ~> Free[Eff, ?]) =
     (fsConf: SparkFSConf) => interpretFileSystem(
       corequeryfile.chrooted[Eff](queryfile.input, FsType, fsConf.prefix),
-      corereadfile.chrooted(readfile.input[Eff], fsConf.prefix),
+      corereadfile.chrooted(fsConf.prefix),
       writefile.chrooted[Eff](fsConf.prefix),
       managefile.chrooted[Eff](fsConf.prefix))
 

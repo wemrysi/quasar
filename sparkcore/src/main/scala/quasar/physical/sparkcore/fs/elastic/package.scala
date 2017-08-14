@@ -137,19 +137,28 @@ package object elastic {
           TaskRef(Map.empty[ResultHandle, RddState])  |@|
           TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
           TaskRef(Map.empty[WriteHandle, writefile.WriteCursor])) {
-        (genState, rddStates, readCursors, writeCursors) => {
-          val interpreter: Eff ~> S =
-            (queryfile.detailsInterpreter[ElasticCall] andThen foldMapNT(ElasticCall.interpreter(host, port)) andThen injectNT[Task, S]) :+:
+          (genState, rddStates, readCursors, writeCursors) => {
+
+            val read = Read.constant[Task, SparkContext](sc)
+
+            type Temp1[A] = Coproduct[Task, Read[SparkContext, ?], A]
+            type Temp[A] = Coproduct[ElasticCall, Temp1, A]
+
+            def temp: Free[Temp, ?] ~> Task =
+              foldMapNT(ElasticCall.interpreter(host, port) :+: injectNT[Task, Task] :+: read)
+
+            val interpreter: Eff ~> S =
+              (queryfile.detailsInterpreter[Temp] andThen temp andThen injectNT[Task, S]) :+:
             (KeyValueStore.impl.fromTaskRef[WriteHandle, writefile.WriteCursor](writeCursors) andThen injectNT[Task, S])  :+:
             (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](readCursors) andThen injectNT[Task, S]) :+:
             (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
-          (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
-          (ElasticCall.interpreter(host, port) andThen injectNT[Task, S]) :+:
-          (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S]) :+:
-          injectNT[Task, S] :+:
-          injectNT[PhysErr, S]
+            (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
+            (ElasticCall.interpreter(host, port) andThen injectNT[Task, S]) :+:
+            (read andThen injectNT[Task, S]) :+:
+            injectNT[Task, S] :+:
+            injectNT[PhysErr, S]
 
-          SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
+            SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
         }
         }).into[S]
 
@@ -164,7 +173,7 @@ package object elastic {
     type FreeEff[A]  = Free[Eff, A]
     interpretFileSystem(
       corequeryfile.interpreter[Eff](queryfile.input[Eff], FsType),
-      corereadfile.interpret[Eff](readfile.input[Eff]),
+      corereadfile.interpret[Eff],
       writefile.interpreter[Eff],
       managefile.interpreter[Eff])
   }
