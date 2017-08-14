@@ -23,7 +23,6 @@ import quasar.blueeyes.json.JValue
 import quasar.precog.common.{CBoolean, CLong, CPathField, CPathIndex, CString, RValue}
 // import quasar.yggdrasil.TransSpecModule
 import quasar.yggdrasil.bytecode.JType
-import quasar.yggdrasil.table.cf.util.Undefined
 
 import matryoshka.{AlgebraM, RecursiveT}
 import matryoshka.implicits._
