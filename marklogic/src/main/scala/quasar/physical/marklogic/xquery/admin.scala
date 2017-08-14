@@ -27,6 +27,9 @@ object admin {
   def databaseAddRangePathIndex[F[_]: Functor: PrologW](config: XQuery, databaseId: XQuery, rangeIndexes: XQuery): F[XQuery] =
     m("database-add-range-path-index") apply (config, databaseId, rangeIndexes)
 
+  def databaseDeleteRangePathIndex[F[_]: Functor: PrologW](config: XQuery, databaseId: XQuery, rangeIndexes: XQuery): F[XQuery] =
+    m("database-delete-range-path-index") apply (config, databaseId, rangeIndexes)
+
   def databaseRangePathIndex[F[_]: Functor: PrologW](
     databaseId: XQuery,
     tpe: XQuery,
