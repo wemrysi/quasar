@@ -42,7 +42,8 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent._
 
-final class FilterPlannerSpec extends quasar.Qspec {
+final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
+  // Workaround for monadMTAB issue
   import EitherT.eitherTMonad
 
   type U      = Fix[Query[Fix[EJson], ?]]
