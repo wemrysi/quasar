@@ -278,7 +278,7 @@ object FuncHandler {
                 import fp26._, fp34._
 
                 mfc.some collect {
-                  case Length(a1) => $strLenBytes(a1)
+                  case Length(a1) => $strLenCP(a1)
                   case Split(a1, a2) => $split(a1, a2)
                   case Substring(a1, a2, a3) =>
                     $cond(
