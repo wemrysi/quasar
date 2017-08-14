@@ -51,7 +51,7 @@ object queryfile {
     E: ElasticCall :<: S,
     S: Task :<: S
   ): Free[S, RDD[Data]] = for {
-    sc <- read.asks(ι)
+    sc <- read.ask
     rdd <- lift(fromFile(sc, f)).into[S]
   } yield rdd
 
