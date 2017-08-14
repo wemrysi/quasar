@@ -24,14 +24,24 @@ import scalaz.Functor
 object admin {
   val m = module("admin", "http://marklogic.com/xdmp/admin", "/MarkLogic/admin.xqy")
 
-  def databaseAddRangeElementIndex[F[_]: Functor: PrologW](config: XQuery, databaseId: XQuery, rangeIndexes: XQuery): F[XQuery] =
-    m("database-add-range-element-index") apply (config, databaseId, rangeIndexes)
+  def databaseAddRangePathIndex[F[_]: Functor: PrologW](config: XQuery, databaseId: XQuery, rangeIndexes: XQuery): F[XQuery] =
+    m("database-add-range-path-index") apply (config, databaseId, rangeIndexes)
 
-  def databaseRangeElementIndex[F[_]: Functor: PrologW](localName: XQuery): F[XQuery] =
-    m("database-range-element-index") apply ("string".xs, "".xs, localName, "http://marklogic.com/collation/".xqy, "false".xqy)
+  def databaseRangePathIndex[F[_]: Functor: PrologW](
+    databaseId: XQuery,
+    tpe: XQuery,
+    path: XQuery,
+    collation: XQuery,
+    indexPositions: XQuery,
+    invalidValues: XQuery
+  ): F[XQuery] =
+    m("database-range-path-index") apply (databaseId, tpe, path, collation, indexPositions, invalidValues)
 
   def getConfiguration[F[_]: Functor: PrologW]: F[XQuery] =
     m("get-configuration").apply()
+
+  def saveConfiguration[F[_]: Functor: PrologW](config: XQuery): F[XQuery] =
+    m("save-configuration") apply (config)
 
   def databaseGetDirectoryCreation[F[_]: Functor: PrologW](config: XQuery, databaseId: XQuery): F[XQuery] =
     m("database-get-directory-creation") apply (config, databaseId)

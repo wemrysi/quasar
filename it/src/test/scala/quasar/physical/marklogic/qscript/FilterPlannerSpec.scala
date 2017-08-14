@@ -56,6 +56,12 @@ final class FilterPlannerSpec extends quasar.Qspec {
     "does not plan with indexes if not available" >> {
       evalPlan(filterExpr("does_not_exist")) must beSome((_: Search[U] \/ XQuery).isRight)
     }
+
+    "uses an element range index when it exists" >> {
+      evalXQuery(createPathRangeIndex[G]("year"))
+
+      evalPlan(filterExpr("year")) must beSome((_: Search[U] \/ XQuery).isLeft)
+    }
   }
 
   def filterExpr(idxName: String): Fix[QSR] = {
@@ -74,19 +80,32 @@ final class FilterPlannerSpec extends quasar.Qspec {
     filter(shiftedRead(rootDir[Sandboxed] </> dir("some")), eq(projectField(idxName), "foobar"))
   }
 
-  def xccSpec(desc: BackendName => String)(tests: (Fix[QSR] => Option[Search[U] \/ XQuery], G[XQuery] => Unit) => Fragment): Unit =
+  def xccSpec(desc: BackendName => String)(
+   tests: (Fix[QSR] => Option[Search[U] \/ XQuery], G[XQuery] => Unit) => Fragment
+  ): Unit =
     TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
       contentSourceConnection[Task](uri).map { cs =>
-        val evalPlan: Fix[QSR] => Option[Search[U] \/ XQuery] = runPlan(cs, _)
+        val evalPlan: Fix[QSR] => Option[Search[U] \/ XQuery] = planQs(cs, _)
         val evalXQuery:  G[XQuery] => Unit = runXQuery(cs, _)
 
         desc(backend.name) >> tests(evalPlan, evalXQuery)
       }.void
     }).unsafePerformSync
 
-  def createElementIndex[F[_]: Monad: PrologW](idxName0: String): F[XQuery] =
-    (admin.getConfiguration[F] |@| admin.databaseRangeElementIndex[F](idxName0.xs))((config, idx) =>
-      admin.databaseAddRangeElementIndex[F](config, xdmp.database, idx)).join
+  def createPathRangeIndex[F[_]: Monad: PrologW](idxName: String): F[XQuery] = {
+    val pathIdx = admin.databaseRangePathIndex[F](
+      xdmp.database,
+      "string".xs,
+      (s"/${idxName}").xs,
+      XQuery.StringLit("http://marklogic.com/collation/"),
+      fn.False,
+      "ignore".xs)
+
+    val addIdxConfig = (admin.getConfiguration[F] |@| pathIdx)((config, idx) =>
+      admin.databaseAddRangePathIndex[F](config, xdmp.database, idx)).join
+
+    addIdxConfig >>= (admin.saveConfiguration[F](_))
+  }
 
   def runXQuery(cs: ContentSource, fx: G[XQuery]): Unit = {
     val (prologs, body) = fx.run
@@ -104,11 +123,11 @@ final class FilterPlannerSpec extends quasar.Qspec {
       eval(f)
     }).unsafePerformSync
 
-  def runPlan(cs: ContentSource, qs: Fix[QSR]): Option[Search[U] \/ XQuery] = {
-    def runP[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc](qs: Fix[QSR]
+  def planQs(cs: ContentSource, qs: Fix[QSR]): Option[Search[U] \/ XQuery] = {
+    def planQ[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc](qs: Fix[QSR]
     ): F[Search[U] \/ XQuery] =
       qs.cataM(Planner[F, DocType.Json, QSR, Fix[EJson]].plan[U])
 
-    runXcc(runP[M](qs).run.run.eval(1), cs.newSession, cs)._2.toOption
+    runXcc(planQ[M](qs).run.run.eval(1), cs.newSession, cs)._2.toOption
   }
 }
