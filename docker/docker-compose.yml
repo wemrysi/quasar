@@ -118,7 +118,7 @@ services:
   
   quasar_spark_hdfs:
     container_name: quasar_spark_hdfs
-    image: harisekhon/hadoop
+    image: harisekhon/hadoop:2.7
     ports:
       - 8042:8042
       - 8088:8088
