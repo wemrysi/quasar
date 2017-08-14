@@ -59,7 +59,6 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
       case (ExtractBin(MapFuncsCore.ConcatArrays(_,_)), Data.Str(_), Data.Arr(_)) => notImplemented
       case (ExtractBin(MapFuncsCore.ConcatArrays(_,_)), Data.Str(_), Data.Str(_)) => notImplemented
 
-      case (ExtractBin(MapFuncsCore.Split(_,_)), Data.Str(_), Data.Str(_)) => notImplemented
       case (ExtractBin(MapFuncsCore.Eq(_,_)), Data.Date(_), Data.Timestamp(_)) => notImplemented
 
       case (ExtractBin(MapFuncsCore.Lt(_,_)), Data.Str(_), Data.Str(_)) => notImplemented
