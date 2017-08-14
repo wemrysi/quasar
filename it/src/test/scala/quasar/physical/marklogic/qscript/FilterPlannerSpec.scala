@@ -55,26 +55,25 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
 
   xccSpec(backendName => s"Filter Planner for ${backendName.name}") { (evalPlan, evalXQuery) =>
     "does not plan with indexes if not available" >> {
-      evalPlan(filterExpr("doesNotExist")) must beSome((_: Search[U] \/ XQuery).isRight)
+      evalPlan(filterExpr("doesNotExist")).unsafePerformSync must beSome((_: Search[U] \/ XQuery).isRight)
     }
 
-    "uses an element range index when it exists" >> {
-      val idxName = "someIndex"
-
+    "uses a path range index when it exists" >> {
+      val idxName = "someIndex-2839472ksjdfh"
       val pathRangeIndex = mkPathRangeIndex[G](idxName)
-      evalXQuery(pathRangeIndex >>= (createPathRangeIndex[G](_)))
-      val ev = evalPlan(filterExpr(idxName)) must beSome.which(includesPathRange(idxName, _))
+      val cleanup = evalXQuery(pathRangeIndex >>= (deletePathRangeIndex[G](_)))
 
-      evalXQuery(pathRangeIndex >>= (deletePathRangeIndex[G](_)))
-      ev
+      val test0 = evalXQuery(pathRangeIndex >>= (createPathRangeIndex[G](_))) >> evalPlan(filterExpr(idxName))
+      val test  = test0.onFinish(_ => cleanup)
+
+      test.unsafePerformSync must beSome.which(includesPathRange(idxName, _))
     }
   }
 
   private def includesPathRange(idxName: String, q: Search[U] \/ XQuery): Boolean = {
     val alg: AlgebraM[Option, Query[Fix[EJson], ?], U] = {
-      case node @ Query.PathRange(_, _, _) =>
-        Fix(node).some
-      case _ => None
+      case node @ Query.PathRange(_, _, _) => None
+      case other => other.embed.some
     }
 
     q.fold(src => !(src.query.cataM(alg).isDefined), _ => false)
@@ -97,12 +96,12 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
   }
 
   private def xccSpec(desc: BackendName => String)(
-   tests: (Fix[QSR] => Option[Search[U] \/ XQuery], G[XQuery] => Unit) => Fragment
+   tests: (Fix[QSR] => Task[Option[Search[U] \/ XQuery]], G[XQuery] => Task[Unit]) => Fragment
   ): Unit =
     TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
       contentSourceConnection[Task](uri).map { cs =>
-        val evalPlan: Fix[QSR] => Option[Search[U] \/ XQuery] = planQs(cs, _)
-        val evalXQuery:  G[XQuery] => Unit = runXQuery(cs, _)
+        val evalPlan: Fix[QSR] => Task[Option[Search[U] \/ XQuery]] = planQs(cs, _)
+        val evalXQuery:  G[XQuery] => Task[Unit] = runXQuery(cs, _)
 
         desc(backend.name) >> tests(evalPlan, evalXQuery)
       }.void
@@ -130,27 +129,27 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
   private def deletePathRangeIndex[F[_]: Monad: PrologW](pathIdx: XQuery): F[XQuery] =
     bracketConfig(admin.databaseDeleteRangePathIndex[F](_, xdmp.database, pathIdx))
 
-  private def runXQuery(cs: ContentSource, fx: G[XQuery]): Unit = {
+  private def runXQuery(cs: ContentSource, fx: G[XQuery]): Task[Unit] = {
     val (prologs, body) = fx.run
     val mainModule = MainModule(Version.`1.0-ml`, prologs, body)
 
-    testing.moduleResults[ReaderT[Task, ContentSource, ?]](mainModule).run(cs).void.unsafePerformSync
+    testing.moduleResults[ReaderT[Task, ContentSource, ?]](mainModule).run(cs).void
   }
 
-  private def runXcc[A](f: Free[XccEvalEff, A], sess: Session, cs: ContentSource): A =
-    (MonotonicSeq.fromZero >>= { (monoSeq: MonotonicSeq ~> Task) =>
+  private def runXcc[A](f: Free[XccEvalEff, A], sess: Session, cs: ContentSource): Task[A] =
+    MonotonicSeq.fromZero >>= { (monoSeq: MonotonicSeq ~> Task) =>
       val xccToTask: XccEvalEff ~> Task =
         reflNT[Task] :+: monoSeq :+: Read.constant[Task, Session](sess) :+: Read.constant[Task, ContentSource](cs)
       val eval: Free[XccEvalEff, ?] ~> Task = foldMapNT(xccToTask)
 
       eval(f)
-    }).unsafePerformSync
+    }
 
-  private def planQs(cs: ContentSource, qs: Fix[QSR]): Option[Search[U] \/ XQuery] = {
+  private def planQs(cs: ContentSource, qs: Fix[QSR]): Task[Option[Search[U] \/ XQuery]] = {
     def planQ[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc](qs: Fix[QSR]
     ): F[Search[U] \/ XQuery] =
       qs.cataM(Planner[F, DocType.Json, QSR, Fix[EJson]].plan[U])
 
-    runXcc(planQ[M](qs).run.run.eval(1), cs.newSession, cs)._2.toOption
+    runXcc(planQ[M](qs).run.run.eval(1), cs.newSession, cs).map(_._2.toOption)
   }
 }
