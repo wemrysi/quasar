@@ -1,7 +1,6 @@
 {
     "name": "triple flatten with mixed content",
     "backends": {
-        "mimir":"pending",
         "marklogic_json":    "pending",
         "marklogic_xml":     "pending",
         "spark_hdfs":        "pending",
