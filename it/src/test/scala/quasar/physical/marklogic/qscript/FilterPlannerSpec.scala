@@ -62,9 +62,10 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
       val idxName = "someIndex-2839472ksjdfh"
       val pathRangeIndex = mkPathRangeIndex[G](idxName)
       val cleanup = evalXQuery(pathRangeIndex >>= (deletePathRangeIndex[G](_)))
+      val createIndex = evalXQuery(pathRangeIndex >>= (createPathRangeIndex[G](_)))
+      val planFilter = evalPlan(filterExpr(idxName))
 
-      val test0 = evalXQuery(pathRangeIndex >>= (createPathRangeIndex[G](_))) >> evalPlan(filterExpr(idxName))
-      val test  = test0.onFinish(_ => cleanup)
+      val test = (createIndex >> planFilter).onFinish(_ => cleanup)
 
       test.unsafePerformSync must beSome.which(includesPathRange(idxName, _))
     }
