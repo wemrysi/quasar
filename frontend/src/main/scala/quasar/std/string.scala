@@ -250,7 +250,7 @@ trait StringLib extends Library {
     noSimplification,
     partialTyperV[nat._2] {
       case Sized(Type.Const(Data.Str(str)), Type.Const(Data.Str(delimiter))) =>
-        success(Type.Const(Data.Arr(str.split(Regex.quote(delimiter)).toList.map(Data.Str(_)))))
+        success(Type.Const(Data.Arr(str.split(Regex.quote(delimiter), -1).toList.map(Data.Str(_)))))
       case Sized(strT, delimiterT) =>
         (Type.typecheck(Type.Str, strT).leftMap(nel => nel.map(ι[SemanticError])) |@|
          Type.typecheck(Type.Str, delimiterT).leftMap(nel => nel.map(ι[SemanticError])))((_, _) => Type.FlexArr(0, None, Type.Str))

@@ -182,13 +182,16 @@ abstract class StdLibSpec extends Qspec {
         "some string" >> {
           binary(Split(_, _).embed, Data.Str("some string"), Data.Str(" "), Data.Arr(List("some", "string").map(Data.Str(_))))
         }
+        "some string by itself" >> {
+          binary(Split(_, _).embed, Data.Str("some string"), Data.Str("some string"), Data.Arr(List("", "").map(Data.Str(_))))
+        }
         "any string not containing delimiter" >> prop { (s: String, d: String) =>
           (!d.isEmpty && !s.contains(d)) ==>
             binary(Split(_, _).embed, Data.Str(s), Data.Str(d), Data.Arr(List(Data.Str(s))))
         }
         "any string with non-empty delimiter" >> prop { (s: String, d: String) =>
           !d.isEmpty ==>
-            binary(Split(_, _).embed, Data.Str(s), Data.Str(d), Data.Arr(s.split(Regex.quote(d)).toList.map(Data.Str(_))))
+            binary(Split(_, _).embed, Data.Str(s), Data.Str(d), Data.Arr(s.split(Regex.quote(d), -1).toList.map(Data.Str(_))))
         }
       }
 

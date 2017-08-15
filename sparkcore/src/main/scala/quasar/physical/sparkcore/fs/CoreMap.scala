@@ -548,7 +548,7 @@ object CoreMap extends Serializable {
   private def split(dStr: Data, dDelim: Data): Data =
     (dStr, dDelim) match {
       case (Data.Str(str), Data.Str(delim)) =>
-        \/.fromTryCatchNonFatal(Data.Arr(str.split(Regex.quote(delim)).toList.map(Data.Str(_)))).fold(κ(Data.NA), ι)
+        \/.fromTryCatchNonFatal(Data.Arr(str.split(Regex.quote(delim), -1).toList.map(Data.Str(_)))).fold(κ(Data.NA), ι)
       case _ => undefined
     }
 
