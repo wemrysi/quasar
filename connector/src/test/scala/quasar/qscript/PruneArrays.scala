@@ -861,7 +861,7 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
       initial.pruneArraysF must equal(expected)
     }
 
-    "rewrite left shift when struct references a pruned index" in {
+    "rewrite left shift when struct projects an index pruned from repair" in {
       val initial: Fix[QST] =
         QCT.inj(Map(
           QCT.inj(Filter(
