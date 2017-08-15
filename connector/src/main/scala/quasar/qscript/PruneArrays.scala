@@ -162,12 +162,14 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
       case co => cbf.leftMap(co)(_.right[JoinSide])
     } map (_.merge)
 
+  // NB: We only remap `LeftSide` references as a) we only reported indices
+  //     from `LeftSide` references in `find` and b) except under very
+  //     contrived circumstances, we don't know anything about the shape of
+  //     the values resulting from a left shift.
   def remapIndicesInLeftShift[A](repair: JoinFunc, mapping: IndexMapping): JoinFunc =
     repair.transCata[EitherMap[JoinSide]] {
       case CoEnv(\/-(MFC(ProjectIndex(Embed(CoEnv(-\/(\/-(LeftSide)))), IntLit(idx))))) =>
         remapResult[JoinSide](LeftSide, mapping, idx)
-      case CoEnv(\/-(MFC(ProjectIndex(value @ Embed(CoEnv(\/-(MFC(ProjectIndex(Embed(CoEnv(-\/(\/-(RightSide)))), IntLit(ridx)))))), IntLit(idx))))) if ridx ≟ 1 =>
-        remapResult[EitherMap[JoinSide]](value map (_.swap), mapping, idx).embed.flatMap(_.merge).project
       case co => cbf.leftMap(co)(_.right[JoinSide])
     } map (_.merge)
 
