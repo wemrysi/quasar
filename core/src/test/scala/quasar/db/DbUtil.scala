@@ -35,14 +35,6 @@ object DbUtil {
     //               ephemeral production database.
     DbConnectionConfig.H2(s"mem:$name;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000")
 
-  /** Transactor that does not use a connection pool, so doesn't require any cleanup. */
-  def simpleTransactor(cxn: ConnectionInfo): Transactor[Task] =
-    DriverManagerTransactor[Task](
-      cxn.driverClassName,
-      cxn.url,
-      cxn.userName,
-      cxn.password)
-
   /** Interpreter that runs a doobie program outside of any transaction. */
   def noTxInterp(info: ConnectionInfo): ConnectionIO ~> Task = {
     // NB: When not using one of the provided Transactors, we have to make sure
