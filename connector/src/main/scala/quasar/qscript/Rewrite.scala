@@ -19,6 +19,7 @@ package quasar.qscript
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
+import quasar.contrib.scalaz.bitraverse._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.MonadFsErr
@@ -149,45 +150,109 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
       QC: QScriptCore :<: F,
       FI: Injectable.Aux[F, QScriptTotal])
       : BranchUnification[F, JoinSide, A] = {
-    val UnrefedSrc: QScriptTotal[FreeQS] =
-      Inject[QScriptCore, QScriptTotal] inj Unreferenced[T, FreeQS]()
+
+    // Unify (Map, LeftShift)
+    def unifyMapRightSideShift(
+      struct: FreeMap,
+      status: IdStatus,
+      repair: JoinFunc,
+      shiftSrc: FreeMap,
+      mapFn: FreeMap
+    ): BranchUnification[F, JoinSide, A] =
+      BranchUnification { jf =>
+        (jf >>= {
+          case LeftSide => mapFn >> LeftSideF  // references `src`
+          case RightSide  => repair >>= {
+            case LeftSide  => shiftSrc >> LeftSideF
+            case RightSide => RightSideF
+          }
+        }).some
+      } (func => QC.inj(LeftShift(src, struct >> shiftSrc, status, func)).some)
+
+    // Unify (LeftShift, Map)
+    def unifyMapLeftSideShift(
+      struct: FreeMap,
+      status: IdStatus,
+      repair: JoinFunc,
+      shiftSrc: FreeMap,
+      mapFn: FreeMap
+    ): BranchUnification[F, JoinSide, A] =
+      BranchUnification { jf =>
+        (jf >>= {
+          case LeftSide  => repair >>= {
+            case LeftSide  => shiftSrc >> LeftSideF
+            case RightSide => RightSideF
+          }
+          case RightSide => mapFn >> LeftSideF  // references `src`
+        }).some
+      } (func => QC.inj(LeftShift(src, struct >> shiftSrc, status, func)).some)
 
     (left.resumeTwice, right.resumeTwice) match {
-      case (-\/(m1), -\/(m2)) =>
-        (FI.project(m1) >>= QC.prj, FI.project(m2) >>= QC.prj) match {
-          // left side maps over the data while the right side shifts the same data
-          case (Some(Map(\/-(SrcHole), mf1)), Some(LeftShift(-\/(values), struct, status, repair))) =>
-            FI.project(values) >>= QC.prj match {
-              case Some(Map(src2, mf2)) if src2 ≟ HoleQS =>
-                BranchUnification { jf =>
-                  (jf >>= {
-                    case LeftSide  => mf1 >> LeftSideF  // references `src`
-                    case RightSide => repair >>= {
-                      case LeftSide  => mf2 >> LeftSideF
-                      case RightSide => RightSideF
-                    }
-                  }).some
-                } (func => QC.inj(LeftShift(src, struct >> mf2, status, func)).some)
-              case _ => NoneBranch
+      // left side is the data while the right side shifts the same data
+      case (\/-(SrcHole), -\/(r)) => FI.project(r) >>= QC.prj match {
+        case Some(LeftShift(lshiftSrc, struct, status, repair)) =>
+          lshiftSrc match {
+            case \/-(SrcHole) =>
+              unifyMapRightSideShift(struct, status, repair, HoleF, HoleF)
+
+            case -\/(values) => FI.project(values) >>= QC.prj match {
+              case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
+                unifyMapRightSideShift(struct, status, repair, srcFn, HoleF)
+
+              case _ => NoneBranch[F, JoinSide, A]
             }
-          // right side maps over the data while the left side shifts the same data
-          case (Some(LeftShift(-\/(values), struct, status, repair)), Some(Map(\/-(SrcHole), mf2))) =>
-            FI.project(values) >>= QC.prj match {
-              case Some(Map(src1, mf1)) if src1 ≟ HoleQS =>
-                BranchUnification { jf =>
-                  (jf >>= {
-                    case LeftSide  => repair >>= {
-                      case LeftSide  => mf1 >> LeftSideF
-                      case RightSide => RightSideF
-                    }
-                    case RightSide => mf2 >> LeftSideF  // references `src`
-                  }).some
-                } (func => QC.inj(LeftShift(src,struct >> mf1, status, func)).some)
-              case _ => NoneBranch
+          }
+        case _ => NoneBranch
+      }
+
+      // right side is the data while the left side shifts the same data
+      case (-\/(l), \/-(SrcHole)) => FI.project(l) >>= QC.prj match {
+        case Some(LeftShift(lshiftSrc, struct, status, repair)) =>
+          lshiftSrc match {
+            case \/-(SrcHole) =>
+              unifyMapLeftSideShift(struct, status, repair, HoleF, HoleF)
+
+            case -\/(values) => FI.project(values) >>= QC.prj match {
+              case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
+                unifyMapLeftSideShift(struct, status, repair, srcFn, HoleF)
+
+              case _ => NoneBranch[F, JoinSide, A]
             }
-          case (_, _) => NoneBranch
-        }
-      case (_, _) => NoneBranch
+          }
+        case _ => NoneBranch
+      }
+
+      case (-\/(l), -\/(r)) => (l, r).uTraverse(m => FI.project(m) >>= QC.prj) collect {
+        // left side maps over the data while the right side shifts the same data
+        case (Map(\/-(SrcHole), mapFn), LeftShift(lshiftSrc, struct, status, repair)) =>
+          lshiftSrc match {
+            case \/-(SrcHole) =>
+              unifyMapRightSideShift(struct, status, repair, HoleF, mapFn)
+
+            case -\/(values) => FI.project(values) >>= QC.prj match {
+              case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
+                unifyMapRightSideShift(struct, status, repair, srcFn, mapFn)
+
+              case _ => NoneBranch[F, JoinSide, A]
+            }
+          }
+
+        // right side maps over the data while the left side shifts the same data
+        case (LeftShift(lshiftSrc, struct, status, repair), Map(\/-(SrcHole), mapFn)) =>
+          lshiftSrc match {
+            case \/-(SrcHole) =>
+              unifyMapLeftSideShift(struct, status, repair, HoleF, mapFn)
+
+            case -\/(values) => FI.project(values) >>= QC.prj match {
+              case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
+                unifyMapLeftSideShift(struct, status, repair, srcFn, mapFn)
+
+              case _ => NoneBranch[F, JoinSide, A]
+            }
+          }
+      } getOrElse NoneBranch
+
+      case _ => NoneBranch
     }
   }
 
