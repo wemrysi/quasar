@@ -48,8 +48,6 @@ object MongoQueryModel {
     override def shows(v: MongoQueryModel) = v.s
   }
 
-  implicit val equalMongoQueryModel: Equal[MongoQueryModel] = Equal.equalA
-
   implicit val orderMongoQueryModel: Order[MongoQueryModel] = new Order[MongoQueryModel] {
     def order(x: MongoQueryModel, y: MongoQueryModel): Ordering = (x, y) match {
       case (`2.6`, `2.6`) => EQ
