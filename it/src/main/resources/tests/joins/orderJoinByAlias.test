@@ -6,15 +6,14 @@
         "marklogic_json":    "timeout",
         "marklogic_xml":     "timeout",
         "mimir":             "ignoreFieldOrder",
-        "mongodb_2_6":       "pending",
-        "mongodb_3_0":       "pending",
-        "mongodb_3_2":       "pending",
-        "mongodb_3_4":       "pending",
-        "mongodb_read_only": "pending"
+        "mongodb_2_6":       "ignoreResultOrder",
+        "mongodb_3_0":       "ignoreResultOrder",
+        "mongodb_3_2":       "ignoreResultOrder",
+        "mongodb_3_4":       "ignoreResultOrder",
+        "mongodb_read_only": "ignoreResultOrder"
     },
 
     "NB": "#1587: Disabled in couchbase due to lack of general join.",
-    "NB": "Technically, mimir should be pendingIgnoreFieldOrder, but that oddly doesn't work",
 
     "data": ["../smallZips.data", "../zips.data"],
 
