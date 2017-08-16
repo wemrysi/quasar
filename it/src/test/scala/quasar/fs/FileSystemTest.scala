@@ -160,7 +160,7 @@ object FileSystemTest {
   def externalFsUT = {
     TestConfig.externalFileSystems {
       fsTestConfig0(couchbase.fs.FsType, Couchbase.definition) orElse
-      fsTestConfig0(marklogic.fs.FsType, MarkLogic(10000L, 10000L).definition) orElse
+      fsTestConfig0(marklogic.fs.FsType, MarkLogic.definition) orElse
       fsTestConfig0(mimir.Mimir.Type, mimir.Mimir.definition) orElse
       fsTestConfig0(mongodb.MongoDb.Type, mongodb.MongoDb.definition) orElse
       fsTestConfig0(sparkcore.fs.hdfs.SparkHdfsBackendModule.Type, sparkcore.fs.hdfs.SparkHdfsBackendModule.definition)  orElse
