@@ -58,17 +58,18 @@ package object fs {
 
     (
       runM(WorkflowExecutor.mongoDb)                |@|
+      runM(MongoDbIO.serverVersion.liftM[EnvErrT])  |@|
       queryfile.run[BsonCursor, S](client, defDb)
         .liftM[EnvErrT]                             |@|
       readfile.run[S](client).liftM[EnvErrT]        |@|
       writefile.run[S](client).liftM[EnvErrT]       |@|
       managefile.run[S](client).liftM[EnvErrT]
-    )((execMongo, qfile, rfile, wfile, mfile) => {
+    )((execMongo, serverVersion, qfile, rfile, wfile, mfile) => {
       interpretBackendEffect[Free[S, ?]](
         Empty.analyze[Free[S, ?]], // old mongo, will be removed
         qfile compose queryfile.interpret(execMongo),
         rfile compose readfile.interpret,
-        wfile compose writefile.interpret,
+        wfile compose writefile.interpret(serverVersion),
         mfile compose managefile.interpret)
     })
   }

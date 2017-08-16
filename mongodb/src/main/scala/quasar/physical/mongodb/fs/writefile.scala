@@ -35,7 +35,7 @@ object writefile {
   type MongoWrite[A]        = WriteStateT[MongoDbIO, A]
 
   /** Interpret the `WriteFile` algebra using MongoDB. */
-  val interpret: WriteFile ~> MongoWrite = new (WriteFile ~> MongoWrite) {
+  def interpret(serverVersion: ServerVersion): WriteFile ~> MongoWrite = new (WriteFile ~> MongoWrite) {
     def apply[A](wf: WriteFile[A]) = wf match {
       case Open(file) =>
         Collection.fromFile(file) fold (
@@ -44,23 +44,21 @@ object writefile {
                  recordCollection(file, col) map \/.right)
 
       case Write(h, data) =>
-        lookupServerVersion.flatMap { serverVersion =>
-          val v = MongoQueryModel.toBsonVersion(MongoQueryModel(serverVersion))
+        val v = MongoQueryModel.toBsonVersion(MongoQueryModel(serverVersion))
 
-          val (errs, docs) = data foldMap { d =>
-            dataToDocument(v, d).fold(
-              e => (Vector(e), Vector()),
-              d => (Vector(), Vector(d)))
-          }
-
-          lookupCollection(h) flatMap (_ cata (
-            c => insertAny(c, docs.map(_.repr))
-                   .filter(_ < docs.size)
-                   .map(n => partialWrite(docs.size - n))
-                   .run.map(errs ++ _.toList)
-                   .liftM[WriteStateT],
-            (errs :+ unknownWriteHandle(h)).point[MongoWrite]))
+        val (errs, docs) = data foldMap { d =>
+          dataToDocument(v, d).fold(
+            e => (Vector(e), Vector()),
+            d => (Vector(), Vector(d)))
         }
+
+        lookupCollection(h) flatMap (_ cata (
+          c => insertAny(c, docs.map(_.repr))
+                 .filter(_ < docs.size)
+                 .map(n => partialWrite(docs.size - n))
+                 .run.map(errs ++ _.toList)
+                 .liftM[WriteStateT],
+          (errs :+ unknownWriteHandle(h)).point[MongoWrite]))
 
       case Close(h) =>
         MongoWrite(collectionL(h) := None).void
@@ -108,9 +106,6 @@ object writefile {
 
   private def lookupCollection(h: WriteHandle): MongoWrite[Option[Collection]] =
     writeState map (collectionL(h).get)
-
-  private def lookupServerVersion: MongoWrite[ServerVersion] =
-    MongoDbIO.serverVersion.liftM[WriteStateT]
 
   private def dataToDocument(v: BsonVersion, d: Data): FileSystemError \/ Bson.Doc =
     BsonCodec.fromData(v, d)
