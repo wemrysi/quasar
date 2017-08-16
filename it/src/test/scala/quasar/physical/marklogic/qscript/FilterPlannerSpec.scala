@@ -18,7 +18,7 @@ package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
 import quasar.{BackendName, TestConfig}
-import quasar.contrib.pathy.ADir
+import quasar.contrib.pathy._
 import quasar.contrib.scalaz.catchable._
 import quasar.effect._
 import quasar.ejson.EJson
@@ -27,7 +27,6 @@ import quasar.fp.free._
 import quasar.physical.marklogic._
 import quasar.physical.marklogic.cts._
 import quasar.physical.marklogic.fs._
-import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{Read => _, _}
@@ -39,11 +38,12 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import org.specs2.specification.core.Fragment
 import pathy.Path._
+import scala.util.Random
 import scalaz._, Scalaz._
 import scalaz.concurrent._
 
 final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
-  // Workaround for monadMTAB issue
+  // Shadow the monadMTMAB instance
   import EitherT.eitherTMonad
 
   type U      = Fix[Query[Fix[EJson], ?]]
@@ -53,31 +53,42 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
   type M[A] = MarkLogicPlanErrT[PrologT[StateT[Free[XccEvalEff, ?], Long, ?], ?], A]
   type G[A] = WriterT[Id, Prologs, A]
 
-  xccSpec(backendName => s"Filter Planner for ${backendName.name}") { (evalPlan, evalXQuery) =>
-    "does not plan with indexes if not available" >> {
-      evalPlan(filterExpr("doesNotExist")).unsafePerformSync must beSome((_: Search[U] \/ XQuery).isRight)
-    }
-
+  xccSpec[DocType.Json](bn => s"Filter Planner for ${bn.name}") { (evalPlan, evalXQuery) =>
     "uses a path range index when it exists" >> {
-      val idxName = "someIndex-2839472ksjdfh"
-      val pathRangeIndex = mkPathRangeIndex[G](idxName)
-      val cleanup = evalXQuery(pathRangeIndex >>= (deletePathRangeIndex[G](_)))
-      val createIndex = evalXQuery(pathRangeIndex >>= (createPathRangeIndex[G](_)))
-      val planFilter = evalPlan(filterExpr(idxName))
+      val field            = randomIndexName
+      val idxName          = prettyPrint(rootDir[Sandboxed] </> file(field))
+      val (create, delete) = mkPathRangeIndex[G](idxName)
+      val planFilter       = evalPlan(filterExpr(field))
 
-      val test = (createIndex >> planFilter).onFinish(_ => cleanup)
+      val test = (evalXQuery(create) >> planFilter).onFinish(_ => evalXQuery(delete))
 
       test.unsafePerformSync must beSome.which(includesPathRange(idxName, _))
     }
   }
 
+  xccSpec[DocType.Xml](bn => s"Filter Planner for ${bn.name}") { (evalPlan, evalXQuery) =>
+    "uses a path range index when it exists" >> {
+      val field            = randomIndexName
+      val idxName          = prettyPrint(rootDir[Sandboxed] </> dir("*") </> file(field))
+      val (create, delete) = mkPathRangeIndex[G](idxName)
+      val planFilter       = evalPlan(filterExpr(field))
+
+      val test = (evalXQuery(create) >> planFilter).onFinish(_ => evalXQuery(delete))
+
+      test.unsafePerformSync must beSome.which(includesPathRange(idxName, _))
+    }
+  }
+
+  // prefixed with an underscore to avoid problems with leading numbers causing invalid QNames
+  private def randomIndexName: String = s"_${Random.alphanumeric.take(15).mkString}"
+
   private def includesPathRange(idxName: String, q: Search[U] \/ XQuery): Boolean = {
     val alg: AlgebraM[Option, Query[Fix[EJson], ?], U] = {
-      case node @ Query.PathRange(_, _, _) => None
+      case Query.PathRange(paths, _, _) if paths === IList(idxName) => None
       case other => other.embed.some
     }
 
-    q.fold(src => !(src.query.cataM(alg).isDefined), _ => false)
+    q.fold(src => src.query.cataM(alg).isEmpty, _ => false)
   }
 
   private def filterExpr(idxName: String): Fix[QSR] = {
@@ -96,26 +107,29 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
     filter(shiftedRead(rootDir[Sandboxed] </> dir("some")), eq(projectField(idxName), "foobar"))
   }
 
-  private def xccSpec(desc: BackendName => String)(
+  private def xccSpec[FMT: StructuralPlanner[M, ?]: FilterPlanner[Fix, ?]: SearchOptions](desc: BackendName => String)(
    tests: (Fix[QSR] => Task[Option[Search[U] \/ XQuery]], G[XQuery] => Task[Unit]) => Fragment
   ): Unit =
     TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>
       contentSourceConnection[Task](uri).map { cs =>
-        val evalPlan: Fix[QSR] => Task[Option[Search[U] \/ XQuery]] = planQs(cs, _)
-        val evalXQuery:  G[XQuery] => Task[Unit] = runXQuery(cs, _)
+        val evalPlan: Fix[QSR] => Task[Option[Search[U] \/ XQuery]] = plan[FMT](cs, _)
+        val evalXQuery: G[XQuery] => Task[Unit] = runXQuery(cs, _)
 
         desc(backend.name) >> tests(evalPlan, evalXQuery)
       }.void
     }).unsafePerformSync
 
-  private def mkPathRangeIndex[F[_]: Monad: PrologW](idxName: String): F[XQuery] =
-    admin.databaseRangePathIndex[F](
+  private def mkPathRangeIndex[F[_]: Monad: PrologW](idxName: String): (F[XQuery], F[XQuery]) = {
+    val idx = admin.databaseRangePathIndex[F](
       xdmp.database,
       "string".xs,
-      (s"/${idxName}").xs,
+      idxName.xs,
       XQuery.StringLit("http://marklogic.com/collation/"),
       fn.False,
       "ignore".xs)
+
+    (idx >>= (createPathRangeIndex[F](_)), idx >>= (deletePathRangeIndex[F](_)))
+  }
 
   private def bracketConfig[F[_]: Monad: PrologW](fx: XQuery => F[XQuery]) =
     for {
@@ -146,11 +160,11 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
       eval(f)
     }
 
-  private def planQs(cs: ContentSource, qs: Fix[QSR]): Task[Option[Search[U] \/ XQuery]] = {
-    def planQ[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc](qs: Fix[QSR]
-    ): F[Search[U] \/ XQuery] =
-      qs.cataM(Planner[F, DocType.Json, QSR, Fix[EJson]].plan[U])
+  private def plan[FMT: StructuralPlanner[M, ?]: FilterPlanner[Fix, ?]: SearchOptions](
+    cs: ContentSource, qs: Fix[QSR]
+  ): Task[Option[Search[U] \/ XQuery]] = {
+    val plan = qs.cataM(Planner[M, FMT, QSR, Fix[EJson]].plan[U])
 
-    runXcc(planQ[M](qs).run.run.eval(1), cs.newSession, cs).map(_._2.toOption)
+    runXcc(plan.run.run.eval(1), cs.newSession, cs).map(_._2.toOption)
   }
 }

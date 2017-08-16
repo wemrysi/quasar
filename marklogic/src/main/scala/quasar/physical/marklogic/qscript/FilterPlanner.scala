@@ -177,6 +177,40 @@ private[qscript] abstract class FilterPlanner[T[_[_]]: RecursiveT, FMT] {
 }
 
 object FilterPlanner {
+  def plan[T[_[_]]: BirecursiveT,
+    F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
+    FMT: SearchOptions: StructuralPlanner[F, ?], Q](src0: Search[Q] \/ XQuery, f: FreeMap[T])(
+    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]],
+             P: FilterPlanner[T, FMT]
+  ): F[Search[Q] \/ XQuery] = {
+    src0 match {
+      case (\/-(src)) =>
+        xqueryFilter[T, F, FMT, Q](src, f) map (_.right[Search[Q]])
+      case (-\/(src)) if anyDocument(src.query) =>
+        fallbackFilter[T, F, FMT, Q](src, f) map (_.right[Search[Q]])
+      case (-\/(src)) =>
+        P.plan[F, FMT, Q](src, f) >>= {
+          case Some(IndexPlan(search, true))  => fallbackFilter[T, F, FMT, Q](search, f) map (_.right[Search[Q]])
+          case Some(IndexPlan(search, false)) => search.left[XQuery].point[F]
+          case None => fallbackFilter[T, F, FMT, Q](src, f).map(_.right[Search[Q]])
+        }
+    }
+  }
+
+  def flattenDir(dir0: ADir): IList[String] =
+    flatten(None, None, None, Some(_), Some(_), dir0).toIList.unite
+
+  def anyDocument[T[_[_]], Q](q: Q)(
+    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
+  ): Boolean = {
+    val f: AlgebraM[Option, Query[T[EJson], ?], Q] = {
+      case Query.Document(_) => none
+      case other             => Q.embed(other).some
+    }
+
+    Q.cataM(q)(f).isEmpty
+  }
+
   implicit def xmlFilterPlanner[T[_[_]]: BirecursiveT]: FilterPlanner[T, DocType.Xml] = new FilterPlanner[T, DocType.Xml] {
     def plan[F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
       FMT: SearchOptions: StructuralPlanner[F, ?],
@@ -203,22 +237,9 @@ object FilterPlanner {
     }
   }
 
+  //
 
-  def flattenDir(dir0: ADir): IList[String] =
-    flatten(None, None, None, Some(_), Some(_), dir0).toIList.unite
-
-  def anyDocument[T[_[_]], Q](q: Q)(
-    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]]
-  ): Boolean = {
-    val f: AlgebraM[Option, Query[T[EJson], ?], Q] = {
-      case Query.Document(_) => none
-      case other             => Q.embed(other).some
-    }
-
-    !(Q.cataM(q)(f).isDefined)
-  }
-
-  def fallbackFilter[T[_[_]]: BirecursiveT,
+  private def fallbackFilter[T[_[_]]: BirecursiveT,
     F[_]: Monad: PrologW: QNameGenerator: MonadPlanErr,
     FMT: StructuralPlanner[F, ?]: SearchOptions,
     Q](src: Search[Q], f: FreeMap[T])(
@@ -230,7 +251,7 @@ object FilterPlanner {
     interpretSearch(src) >>= (xqueryFilter[T, F, FMT, Q](_: XQuery, f))
   }
 
-  def xqueryFilter[T[_[_]]: BirecursiveT,
+  private def xqueryFilter[T[_[_]]: BirecursiveT,
     F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr,
     FMT: StructuralPlanner[F, ?], Q](src: XQuery, fm: FreeMap[T]
   ): F[XQuery] =
@@ -250,7 +271,7 @@ object FilterPlanner {
         for_(x in src) where_ p return_ ~x
     }
 
-  def validIndexPlan[T[_[_]]: RecursiveT,
+  private def validIndexPlan[T[_[_]]: RecursiveT,
     F[_]: Monad: Xcc,
     FMT: StructuralPlanner[F, ?],
     Q](src: Option[IndexPlan[Q]])(
@@ -261,26 +282,6 @@ object FilterPlanner {
         .ifM(src.point[F], none.point[F]))
     case None =>
       OptionT(none.point[F])
-  }
-
-  def plan[T[_[_]]: BirecursiveT,
-    F[_]: Monad: QNameGenerator: PrologW: MonadPlanErr: Xcc,
-    FMT: SearchOptions: StructuralPlanner[F, ?], Q](src0: Search[Q] \/ XQuery, f: FreeMap[T])(
-    implicit Q: Birecursive.Aux[Q, Query[T[EJson], ?]],
-             P: FilterPlanner[T, FMT]
-  ): F[Search[Q] \/ XQuery] = {
-    src0 match {
-      case (\/-(src)) =>
-        xqueryFilter[T, F, FMT, Q](src, f) map (_.right[Search[Q]])
-      case (-\/(src)) if anyDocument(src.query) =>
-        fallbackFilter[T, F, FMT, Q](src, f) map (_.right[Search[Q]])
-      case (-\/(src)) =>
-        P.plan[F, FMT, Q](src, f) >>= {
-          case Some(IndexPlan(search, true))  => fallbackFilter[T, F, FMT, Q](search, f) map (_.right[Search[Q]])
-          case Some(IndexPlan(search, false)) => search.left[XQuery].point[F]
-          case None => fallbackFilter[T, F, FMT, Q](src, f).map(_.right[Search[Q]])
-        }
-    }
   }
 
 }
