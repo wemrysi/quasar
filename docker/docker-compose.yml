@@ -73,6 +73,9 @@ services:
     build:
       context: ./Dockerfiles/Spark
       dockerfile: Spark-Dockerfile
+      args:
+        SPARK_VERSION: "2.2.0"
+    network_mode: "bridge"
     ports:
       - "8081:8080"
       - "7077:7077"
@@ -118,13 +121,40 @@ services:
   
   quasar_spark_hdfs:
     container_name: quasar_spark_hdfs
-    image: harisekhon/hadoop:2.7
+    build:
+      context: ./Dockerfiles/Hadoop
+      dockerfile: Hadoop-Dockerfile
+      args:
+        HADOOP_VERSION: "2.7.3"
+    network_mode: "bridge"
     ports:
-      - 8042:8042
+      - 8030:8030
+      - 8031:8031
+      - 8082:8032
+      - 8033:8033
       - 8088:8088
+      - 9000:9000
+      - 10020:10020
       - 19888:19888
       - 50010:50010
       - 50020:50020
       - 50070:50070
       - 50075:50075
       - 50090:50090
+
+#  quasar_spark_hdfs:
+#    container_name: quasar_spark_hdfs
+#    image: harisekhon/hadoop:2.7
+#    network_mode: "host"
+#    ports:
+#      - 8020:8020
+#      - 8042:8042
+#      - 8088:8088
+#      - 9000:9000
+#      - 10020:10020
+#      - 19888:19888
+#      - 50010:50010
+#      - 50020:50020
+#      - 50070:50070
+#      - 50075:50075
+#      - 50090:50090
