@@ -162,12 +162,14 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
       case co => cbf.leftMap(co)(_.right[JoinSide])
     } map (_.merge)
 
-  def remapIndicesInLeftShift[A](struct: FreeMap, repair: JoinFunc, mapping: IndexMapping): JoinFunc =
+  // NB: We only remap `LeftSide` references as a) we only reported indices
+  //     from `LeftSide` references in `find` and b) except under very
+  //     contrived circumstances, we don't know anything about the shape of
+  //     the values resulting from a left shift.
+  def remapIndicesInLeftShift[A](repair: JoinFunc, mapping: IndexMapping): JoinFunc =
     repair.transCata[EitherMap[JoinSide]] {
       case CoEnv(\/-(MFC(ProjectIndex(Embed(CoEnv(-\/(\/-(LeftSide)))), IntLit(idx))))) =>
         remapResult[JoinSide](LeftSide, mapping, idx)
-      case CoEnv(\/-(MFC(ProjectIndex(Embed(CoEnv(-\/(\/-(RightSide)))), IntLit(idx))))) if struct ≟ HoleF =>
-        remapResult[JoinSide](RightSide, mapping, idx)
       case co => cbf.leftMap(co)(_.right[JoinSide])
     } map (_.merge)
 
@@ -223,7 +225,8 @@ object PruneArrays {
       : PruneArrays[IN] =
     new PruneArrays[IN] {
       def find[M[_], A](in: IN[A])(implicit M: MonadState[M, RewriteState]) =
-        M.put(Ignore).as(Ignore)
+        haltRemap(Ignore)
+
       def remap[M[_], A](env: RewriteState, in: IN[A])(implicit M: MonadState[M, RewriteState]) =
         haltRemap(in)
     }
@@ -434,7 +437,7 @@ object PruneArrays {
             }
             M.modify(bucketState |+| orderState |+| _).as(Ignore)
 
-          case Unreferenced() => M.modify(ι).as(Ignore)
+          case Unreferenced() => (Ignore: RewriteState).point[M]
         }
 
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -443,24 +446,20 @@ object PruneArrays {
         in match {
           case LeftShift(src, struct, id, repair) =>
             def replacement(repair: JoinFunc, repl: IndexMapping): QScriptCore[A] =
-              LeftShift(src,
-                remapIndicesInFunc(struct, repl),
-                id,
-                remapIndicesInLeftShift(struct, repair, repl))
+              LeftShift(src, remapIndicesInFunc(struct, repl), id, remapIndicesInLeftShift(repair, repl))
 
-            def notSeen: M[QScriptCore[A]] =
+            def notPruned: M[QScriptCore[A]] =
               M.get >>= (st => haltRemap(remapState(st, in, indexMapping >>> (replacement(repair, _)))))
 
+            def pruned(prunedRepair: JoinFunc): M[QScriptCore[A]] = {
+              val unchanged = LeftShift(src, struct, id, prunedRepair)
+              (M.get <* M.put(env)) ∘ (remapState(_, unchanged, indexMapping >>> (replacement(prunedRepair, _))))
+            }
+
             env match {
-              case Ignore => notSeen
+              case Ignore => notPruned
               case Rewrite(indices) =>
-                (getIndices(SrcHole.left, indices) >>= (seen =>
-                  rewriteRepair(repair, seen) ∘ (rep => {
-                    M.put(env).as(
-                      getIndices(SrcHole.left, indices).fold[QScriptCore[A]](
-                        LeftShift(src, struct, id, rep))(
-                        indexMapping >>> (replacement(rep, _))))
-                  }))).getOrElse(notSeen)
+                ((getIndices(SrcHole.left, indices) >>= (rewriteRepair(repair, _))) ∘ pruned) | notPruned
             }
 
           case Reduce(src, bucket0, reducers0, repair) =>
@@ -498,7 +497,7 @@ object PruneArrays {
                 order0.map(_.leftMap(remapIndicesInFunc(_, repl))))
             M.get ∘ (remapState(_, in, indexMapping >>> replacement))
 
-          case Unreferenced() => M.modify(ι).as(in)
+          case Unreferenced() => in.point[M]
         }
     }
 }

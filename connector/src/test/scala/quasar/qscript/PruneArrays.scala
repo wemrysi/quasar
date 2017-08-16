@@ -861,6 +861,38 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
       initial.pruneArraysF must equal(expected)
     }
 
+    "rewrite left shift when struct projects an index pruned from repair" in {
+      val initial: Fix[QST] =
+        QCT.inj(Map(
+          QCT.inj(Filter(
+            QCT.inj(LeftShift(
+              ReadRT(rootDir </> file("data")).embed,
+              ProjectIndexR(ProjectIndexR(HoleF, IntLit(2)), IntLit(1)),
+              ExcludeId,
+              ConcatArraysR(
+                ConcatArraysR(
+                  MakeArrayR(IntLit(3)),
+                  MakeArrayR(IntLit(6))),
+                MakeArrayR(BoolLit(true))))).embed,
+            ProjectIndexR(HoleF, IntLit(2)))).embed,
+        ProjectIndexR(HoleF, IntLit(1)))).embed
+
+      val expected: Fix[QST] =
+        QCT.inj(Map(
+          QCT.inj(Filter(
+            QCT.inj(LeftShift(
+              ReadRT(rootDir </> file("data")).embed,
+              ProjectIndexR(ProjectIndexR(HoleF, IntLit(2)), IntLit(1)),
+              ExcludeId,
+              ConcatArraysR(
+                MakeArrayR(IntLit(6)),
+                MakeArrayR(BoolLit(true))))).embed,
+            ProjectIndexR(HoleF, IntLit(1)))).embed,
+        ProjectIndexR(HoleF, IntLit(0)))).embed
+
+      initial.pruneArraysF must equal(expected)
+    }
+
     "not rewrite left shift with entire array referenced through left side" in {
       val initial: Fix[QST] =
         QCT.inj(LeftShift(
