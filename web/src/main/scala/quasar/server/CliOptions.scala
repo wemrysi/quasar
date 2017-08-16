@@ -61,11 +61,11 @@ object CliOptions {
 
     opt[String]('L', "content-location") action { (x, c) =>
       (l composeLens contentLoc).set(Some(x))(c)
-    } text("location where static content is hosted")
+    } text("location where static content will be hosted on the Quasar server. Must begin with a /")
 
     opt[String]('C', "content-path") action { (x, c) =>
       (l composeLens contentPath).set(Some(x))(c)
-    } text("path where static content lives")
+    } text("path where static content lives on the file system")
 
     opt[Unit]('r', "content-path-relative") action { (_, c) =>
       (l composeLens contentPathRelative).set(true)(c)
