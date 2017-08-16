@@ -20,46 +20,45 @@ import slamdata.Predef._
 import quasar._, quasar.Planner._
 import quasar.contrib.pathy.{AFile, ADir}
 import quasar.qscript._
+import quasar.effect.Capture
 
 import org.apache.spark._
 import org.apache.spark.rdd._
 import matryoshka.{Hole => _, _}
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
-trait Planner[F[_]] extends Serializable {
-  def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[Planner.SparkState, F, RDD[Data]]
+trait Planner[F[_], M[_]] extends Serializable {
+  def plan(fromFile: (SparkContext, AFile) => M[RDD[Data]]): AlgebraM[Planner.SparkState[M, ?], F, RDD[Data]]
 }
 
 object Planner {
 
-  def apply[F[_]](implicit P: Planner[F]): Planner[F] = P
+  def apply[F[_],M[_]:Capture](implicit P: Planner[F, M]): Planner[F, M] = P
 
-  type SparkState[A] = StateT[EitherT[Task, PlannerError, ?], SparkContext, A]
+  type SparkState[M[_], A] = StateT[EitherT[M, PlannerError, ?], SparkContext, A]
   type SparkStateT[F[_], A] = StateT[F, SparkContext, A]
 
+  implicit def deadEnd[M[_]:Capture:Monad]: Planner[Const[DeadEnd, ?], M] = unreachable("deadEnd")
+  implicit def read[A, M[_]:Capture:Monad]: Planner[Const[Read[A], ?], M] = unreachable("read")
+  implicit def shiftedReadPath[M[_]:Capture:Monad]: Planner[Const[ShiftedRead[ADir], ?], M] = unreachable("shifted read of a dir")
+  implicit def projectBucket[T[_[_]], M[_]:Capture:Monad]: Planner[ProjectBucket[T, ?], M] = unreachable("projectBucket")
+  implicit def thetaJoin[T[_[_]], M[_]:Capture:Monad]: Planner[ThetaJoin[T, ?], M] = unreachable("thetajoin")
+  implicit def shiftedread[M[_]:Capture:Monad]: Planner[Const[ShiftedRead[AFile], ?], M] = new ShiftedReadPlanner[M]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT: ShowT, M[_]:Capture:Monad]: Planner[QScriptCore[T, ?], M] = new QScriptCorePlanner[T, M]
+  implicit def equiJoin[T[_[_]]: BirecursiveT: ShowT, M[_]:Capture:Monad]: Planner[EquiJoin[T, ?], M] = new EquiJoinPlanner[T, M]
 
-  implicit def deadEnd: Planner[Const[DeadEnd, ?]] = unreachable("deadEnd")
-  implicit def read[A]: Planner[Const[Read[A], ?]] = unreachable("read")
-  implicit def shiftedReadPath: Planner[Const[ShiftedRead[ADir], ?]] = unreachable("shifted read of a dir")
-  implicit def projectBucket[T[_[_]]]: Planner[ProjectBucket[T, ?]] = unreachable("projectBucket")
-  implicit def thetaJoin[T[_[_]]]: Planner[ThetaJoin[T, ?]] = unreachable("thetajoin")
-  implicit def shiftedread: Planner[Const[ShiftedRead[AFile], ?]] = ShiftedReadPlanner
-  implicit def qscriptCore[T[_[_]]: BirecursiveT: ShowT]: Planner[QScriptCore[T, ?]] = new QScriptCorePlanner
-  implicit def equiJoin[T[_[_]]: BirecursiveT: ShowT]: Planner[EquiJoin[T, ?]] = new EquiJoinPlanner
-
-  implicit def coproduct[F[_], G[_]](
-    implicit F: Planner[F], G: Planner[G]):
-      Planner[Coproduct[F, G, ?]] =
-    new Planner[Coproduct[F, G, ?]] {
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[SparkState, Coproduct[F, G, ?], RDD[Data]] = _.run.fold(F.plan(fromFile), G.plan(fromFile))
+  implicit def coproduct[F[_], G[_], M[_]:Capture](
+    implicit F: Planner[F, M], G: Planner[G, M]):
+      Planner[Coproduct[F, G, ?], M] =
+    new Planner[Coproduct[F, G, ?], M] {
+      def plan(fromFile: (SparkContext, AFile) => M[RDD[Data]]): AlgebraM[SparkState[M, ?], Coproduct[F, G, ?], RDD[Data]] = _.run.fold(F.plan(fromFile), G.plan(fromFile))
     }
 
-  private def unreachable[F[_]](what: String): Planner[F] =
-    new Planner[F] {
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[SparkState, F, RDD[Data]] =
+  private def unreachable[F[_], M[_]:Capture:Monad](what: String): Planner[F, M] =
+    new Planner[F, M] {
+      def plan(fromFile: (SparkContext, AFile) => M[RDD[Data]]): AlgebraM[SparkState[M, ?], F, RDD[Data]] =
         _ =>  StateT((sc: SparkContext) => {
-          EitherT(InternalError.fromMsg(s"unreachable $what").left[(SparkContext, RDD[Data])].point[Task])
+          EitherT(InternalError.fromMsg(s"unreachable $what").left[(SparkContext, RDD[Data])].point[M])
         })
     }
 

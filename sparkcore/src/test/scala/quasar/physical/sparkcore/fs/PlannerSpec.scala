@@ -49,9 +49,9 @@ class PlannerSpec
 
   sequential
 
-  val equi = Planner.equiJoin[Fix]
-  val sr = Planner.shiftedread
-  val qscore = Planner.qscriptCore[Fix]
+  val equi = Planner.equiJoin[Fix, Task]
+  val sr = Planner.shiftedread[Task]
+  val qscore = Planner.qscriptCore[Fix, Task]
 
   val data = List(
     Data.Obj(ListMap(("age" -> Data.Int(24)), "height" -> Data.Dec(1.56), "country" -> Data.Str("Poland"))),

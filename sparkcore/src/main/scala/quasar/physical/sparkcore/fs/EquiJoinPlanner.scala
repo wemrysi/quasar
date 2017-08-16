@@ -21,6 +21,7 @@ import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
 import quasar.fp._, ski._
 import quasar.qscript._
+import quasar.effect.Capture
 
 import scala.math.{Ordering => SOrdering}, SOrdering.Implicits._
 
@@ -33,14 +34,13 @@ import matryoshka.patterns._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-
-class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT]  extends Planner[EquiJoin[T, ?]] {
+class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, M[_]:Capture] extends Planner[EquiJoin[T, ?], M] {
 
   import Planner.{SparkState, SparkStateT}
 
   def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[SparkState, EquiJoin[T, ?], RDD[Data]] = {
     case EquiJoin(src, lBranch, rBranch, lKey, rKey, jt, combine) =>
-      val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
+      val algebraM = Planner[QScriptTotal[T, ?], M].plan(fromFile)
       val srcState = src.point[SparkState]
 
       def genKey(kf: FreeMap[T]): SparkState[Data => Data] =

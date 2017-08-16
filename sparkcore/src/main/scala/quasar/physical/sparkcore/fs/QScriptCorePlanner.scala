@@ -22,6 +22,7 @@ import quasar.common.SortDir
 import quasar.contrib.pathy.AFile
 import quasar.fp._, ski._
 import quasar.qscript._, ReduceFuncs._, SortDir._
+import quasar.effect.Capture
 
 import scala.math.{Ordering => SOrdering}, SOrdering.Implicits._
 
@@ -34,8 +35,8 @@ import matryoshka.patterns._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT]
-    extends Planner[QScriptCore[T, ?]] {
+class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, M[_]:Capture]
+    extends Planner[QScriptCore[T, ?], M] {
 
   import Planner.{SparkState, SparkStateT}
 
@@ -81,7 +82,7 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT]
     predicate: (Index, Count) => Boolean ):
       StateT[EitherT[Task, PlannerError, ?], SparkContext, RDD[Data]] = {
 
-    val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
+    val algebraM = Planner[QScriptTotal[T, ?], M].plan(fromFile)
     val srcState = src.point[SparkState]
 
     val fromState: SparkState[RDD[Data]] = from.cataM(interpretM(κ(srcState), algebraM))
@@ -278,7 +279,7 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT]
           })).map((sc, _)).point[Task]))
 
     case Union(src, lBranch, rBranch) =>
-      val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
+      val algebraM = Planner[QScriptTotal[T, ?], M].plan(fromFile)
       val srcState = src.point[SparkState]
 
       (lBranch.cataM(interpretM(κ(srcState), algebraM)) ⊛

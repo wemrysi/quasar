@@ -20,13 +20,14 @@ import slamdata.Predef._
 import quasar._, quasar.Planner._
 import quasar.contrib.pathy.AFile
 import quasar.qscript._
+import quasar.effect.Capture
 
 import org.apache.spark._
 import org.apache.spark.rdd._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-object ShiftedReadPlanner extends Planner[Const[ShiftedRead[AFile], ?]] {
+class ShiftedReadPlanner[M[_]:Capture] extends Planner[Const[ShiftedRead[AFile], ?], M] {
 
   def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]) =
     (qs: Const[ShiftedRead[AFile], RDD[Data]]) => {
