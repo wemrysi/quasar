@@ -60,8 +60,9 @@ init_spark_connector() {
 }
 
 init_spark_cluster() {
-  # this is being run to create "uberjar" that is needed to be available on every executor on spark cluster
-  "$SBT" 'set every sparkDependencyProvided := true' sparkcore/assembly
+  echo "running sbt command for sparkcore assembly..."
+  source ${TRAVIS_BUILD_DIR}/scripts/constants
+  $SBT 'set every sparkDependencyProvided := true' sparkcore/assembly
 }
 
 ##########################################
