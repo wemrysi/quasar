@@ -25,11 +25,10 @@ import quasar.effect.Capture
 import org.apache.spark._
 import org.apache.spark.rdd._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
-class ShiftedReadPlanner[M[_]:Capture] extends Planner[Const[ShiftedRead[AFile], ?], M] {
+class ShiftedReadPlanner[M[_]:Capture:Monad] extends Planner[Const[ShiftedRead[AFile], ?], M] {
 
-  def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]) =
+  def plan(fromFile: (SparkContext, AFile) => M[RDD[Data]]) =
     (qs: Const[ShiftedRead[AFile], RDD[Data]]) => {
       StateT((sc: SparkContext) => {
         val filePath = qs.getConst.path
