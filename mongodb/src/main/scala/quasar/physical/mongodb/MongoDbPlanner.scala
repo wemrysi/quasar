@@ -905,12 +905,12 @@ object MongoDbPlanner {
                 qs.getConst.idStatus match {
                   case IdOnly    =>
                     getExprBuilder[T, M, WF, EX](
-                      v, funcHandler)(
+                      funcHandler)(
                       dataset,
                         Free.roll(MFC(MapFuncsCore.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))))
                   case IncludeId =>
                     getExprBuilder[T, M, WF, EX](
-                      v, funcHandler)(
+                      funcHandler)(
                       dataset,
                         MapFuncCore.StaticArray(List(
                           Free.roll(MFC(MapFuncsCore.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))),
@@ -939,10 +939,10 @@ object MongoDbPlanner {
             ev1: RenderTree[WorkflowBuilder[WF]],
             WB: WorkflowBuilder.Ops[WF],
             ev3: EX :<: ExprOp) = {
-          case qscript.Map(src, f) => getExprBuilder[T, M, WF, EX](v, funcHandler)(src, f)
+          case qscript.Map(src, f) => getExprBuilder[T, M, WF, EX](funcHandler)(src, f)
           case LeftShift(src, struct, id, repair) =>
             if (repair.contains(LeftSideF))
-              (handleFreeMap[T, M, EX](v, funcHandler, struct) ⊛
+              (handleFreeMap[T, M, EX](funcHandler, struct) ⊛
                 getJsMerge[T, M](
                   repair,
                   jscore.Select(jscore.Ident(JsFn.defaultName), "s"),
@@ -958,18 +958,18 @@ object MongoDbPlanner {
                   Set(StructureType.Object(DocField(BsonField.Name("f")), id))),
                 -\&/(j)))
             else
-              getExprBuilder[T, M, WF, EX](v, funcHandler)(src, struct) >>= (builder =>
+              getExprBuilder[T, M, WF, EX](funcHandler)(src, struct) >>= (builder =>
                 getExprBuilder[T, M, WF, EX](
-                  v, funcHandler)(
+                  funcHandler)(
                   FlatteningBuilder(
                     builder,
                     Set(StructureType.Object(DocVar.ROOT(), id))),
                     repair.as(SrcHole)))
           case Reduce(src, bucket, reducers, repair) =>
-            (bucket.traverse(handleFreeMap[T, M, EX](v, funcHandler, _)) ⊛
-              reducers.traverse(_.traverse(handleFreeMap[T, M, EX](v, funcHandler, _))))((b, red) => {
+            (bucket.traverse(handleFreeMap[T, M, EX](funcHandler, _)) ⊛
+              reducers.traverse(_.traverse(handleFreeMap[T, M, EX](funcHandler, _))))((b, red) => {
                 getReduceBuilder[T, M, WF, EX](
-                  v, funcHandler)(
+                  funcHandler)(
                   // TODO: This work should probably be done in `toWorkflow`.
                   semiAlignExpr[λ[α => List[ReduceFunc[α]]]](red)(Traverse[List].compose).fold(
                     WB.groupBy(
@@ -991,11 +991,11 @@ object MongoDbPlanner {
               }).join
           case Sort(src, bucket, order) =>
             val (keys, dirs) = (bucket.toIList.map((_, SortDir.asc)) <::: order).unzip
-            keys.traverse(handleFreeMap[T, M, EX](v, funcHandler, _))
+            keys.traverse(handleFreeMap[T, M, EX](funcHandler, _))
               .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
           case Filter(src, cond) =>
             getSelector[T, M, EX](v)(cond).fold(
-              _ => handleFreeMap[T, M, EX](v, funcHandler, cond).map {
+              _ => handleFreeMap[T, M, EX](funcHandler, cond).map {
                 // TODO: Postpone decision until we know whether we are going to
                 //       need mapReduce anyway.
                 case cond @ HasThat(_) => WB.filter(src, List(cond), {
@@ -1007,7 +1007,7 @@ object MongoDbPlanner {
               },
               {
                 case (sel, inputs) =>
-                  inputs.traverse(f => handleFreeMap[T, M, EX](v, funcHandler, f(cond))).map(WB.filter(src, _, sel))
+                  inputs.traverse(f => handleFreeMap[T, M, EX](funcHandler, f(cond))).map(WB.filter(src, _, sel))
               })
           case Union(src, lBranch, rBranch) =>
             (rebaseWB[T, M, WF, EX](joinHandler, funcHandler, v, lBranch, src) ⊛
@@ -1049,14 +1049,14 @@ object MongoDbPlanner {
           (lb, rb) => {
             val (lKey, rKey) = Unzip[List].unzip(qs.key)
 
-            (lKey.traverse(handleFreeMap[T, M, EX](v, funcHandler, _)) ⊛
-              rKey.traverse(handleFreeMap[T, M, EX](v, funcHandler, _)))(
+            (lKey.traverse(handleFreeMap[T, M, EX](funcHandler, _)) ⊛
+              rKey.traverse(handleFreeMap[T, M, EX](funcHandler, _)))(
               (lk, rk) =>
               liftM[M, WorkflowBuilder[WF]](joinHandler.run(
                 qs.f,
                 JoinSource(lb, lk),
                 JoinSource(rb, rk))) >>=
-                (getExprBuilder[T, M, WF, EX](v, funcHandler)(_, qs.combine >>= {
+                (getExprBuilder[T, M, WF, EX](funcHandler)(_, qs.combine >>= {
                   case LeftSide => Free.roll(MFC(MapFuncsCore.ProjectField(HoleF, MapFuncsCore.StrLit("left"))))
                   case RightSide => Free.roll(MFC(MapFuncsCore.ProjectField(HoleF, MapFuncsCore.StrLit("right"))))
                 }))).join
@@ -1154,19 +1154,19 @@ object MongoDbPlanner {
 
   def getExprBuilder
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse]
-    (v: BsonVersion, funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (src: WorkflowBuilder[WF], fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[WorkflowBuilder[WF]] =
-    getBuilder[T, M, WF, EX, Hole](handleFreeMap[T, M, EX](v, funcHandler, _))(src, fm)
+    getBuilder[T, M, WF, EX, Hole](handleFreeMap[T, M, EX](funcHandler, _))(src, fm)
 
   def getReduceBuilder
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse]
-    (v: BsonVersion, funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
       : M[WorkflowBuilder[WF]] =
-    getBuilder[T, M, WF, EX, ReduceIndex](handleRedRepair[T, M, EX](v, funcHandler, _))(src, fm)
+    getBuilder[T, M, WF, EX, ReduceIndex](handleRedRepair[T, M, EX](funcHandler, _))(src, fm)
 
   def getJsMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad]
     (jf: JoinFunc[T], a1: JsCore, a2: JsCore)
@@ -1178,34 +1178,30 @@ object MongoDbPlanner {
       case RightSide => a2
     } ∘ (JsFn(JsFn.defaultName, _))
 
-  def exprOrJs[M[_]: Applicative, A, B]
-    (a: A)(b: B)
-    (exf: A => B => M[Fix[ExprOp]], jsf: B => M[JsFn])
+  def exprOrJs[M[_]: Applicative, A]
+    (a: A)
+    (exf: A => M[Fix[ExprOp]], jsf: A => M[JsFn])
     (implicit merr: MonadError_[M, FileSystemError])
       : M[Expr] = {
     // TODO: Return _both_ errors
-    val js = jsf(b)
-    val expr = exf(a)(b)
+    val js = jsf(a)
+    val expr = exf(a)
     merr.handleError[Expr](
       (js ⊛ expr)(\&/.Both(_, _)))(
       _ => merr.handleError[Expr](js.map(-\&/))(_ => expr.map(\&/-)))
   }
 
   def handleFreeMap[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
-    (v: BsonVersion, funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], fm: FreeMap[T])
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], fm: FreeMap[T])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
-      : M[Expr] = {
-    val f: FreeMap[T] => M[Fix[ExprOp]] = getExpr[T, M, EX](funcHandler)
-    exprOrJs(v)(fm)((_ => f), getJsFn[T, M])
-  }
+      : M[Expr] =
+    exprOrJs(fm)(getExpr[T, M, EX](funcHandler)(_), getJsFn[T, M])
 
   def handleRedRepair[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
-    (v: BsonVersion, funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], jr: FreeMapA[T, ReduceIndex])
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], jr: FreeMapA[T, ReduceIndex])
     (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
-      : M[Expr] = {
-    val f: FreeMapA[T, ReduceIndex] => M[Fix[ExprOp]] = getExprRed[T, M, EX](funcHandler)
-    exprOrJs(v)(jr)(_ => f, getJsRed[T, M])
-  }
+      : M[Expr] =
+    exprOrJs(jr)(getExprRed[T, M, EX](funcHandler)(_), getJsRed[T, M])
 
   def getExprRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
