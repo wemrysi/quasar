@@ -240,6 +240,8 @@ public class BitSet {
     public void flip(int fromIndex, int toIndex) {
         if ((fromIndex < 0) || (toIndex < fromIndex))
             throw new IndexOutOfBoundsException();
+        if (toIndex == 0)
+            return;
         int i = fromIndex >>> 6;
         int j = toIndex >>> 6;
         setLength(j + 1);

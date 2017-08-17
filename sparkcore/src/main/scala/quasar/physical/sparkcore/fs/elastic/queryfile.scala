@@ -23,8 +23,10 @@ import quasar.contrib.pathy._
 import quasar.fs.FileSystemError
 import quasar.fs.FileSystemErrT
 import quasar.fp.free._
+import quasar.effect.Read
 import quasar.fp.ski._
 import quasar.contrib.pathy._
+import quasar.physical.sparkcore.fs.SparkConnectorDetails, SparkConnectorDetails._
 
 import org.elasticsearch.spark._
 import org.apache.spark._
@@ -43,6 +45,15 @@ object queryfile {
       .map(_._2)
       .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
   }
+
+  def rddFrom[S[_]](f: AFile)(implicit
+    read: Read.Ops[SparkContext, S],
+    E: ElasticCall :<: S,
+    S: Task :<: S
+  ): Free[S, RDD[Data]] = for {
+    sc <- read.ask
+    rdd <- lift(fromFile(sc, f)).into[S]
+  } yield rdd
 
   def store[S[_]](rdd: RDD[Data], out: AFile)(implicit
     S: Task :<: S
@@ -89,5 +100,23 @@ object queryfile {
     s0: Task :<: S,
     elastic: ElasticCall :<: S
   ): Input[S] =
-    Input[S](fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
+    Input[S](fromFile _)
+
+  def detailsInterpreter[S[_]](implicit
+    read: Read.Ops[SparkContext, S],
+    E: ElasticCall :<: S,
+    S: Task :<: S
+  ): SparkConnectorDetails ~> Free[S, ?] = new (SparkConnectorDetails ~> Free[S, ?]) {
+    def apply[A](from: SparkConnectorDetails[A]) = from match {
+      case FileExists(f)       => ElasticCall.Ops[S].typeExists(file2ES(f))
+      case ReadChunkSize       => 5000.point[Free[S, ?]]
+      case StoreData(rdd, out) => lift(Task.delay {
+        rdd.flatMap(DataCodec.render(_)(DataCodec.Precise).toList)
+           .saveJsonToEs(file2ES(out).shows)
+      }).into[S]
+      case ListContents(d)     => listContents[S](d).run
+      case RDDFrom(f)          => rddFrom(f)
+    }
+  }
+
 }

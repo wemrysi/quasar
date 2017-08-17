@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.fs.mount
+package quasar.contrib.scalaz
 
-trait Arbitraries extends
-  MountConfigArbitrary with
-  ConnectionUriArbitrary with
-  MountsArbitrary with
-  MountingsConfigArbitrary
+import scalaz._
 
-object Arbitraries extends Arbitraries
+object readerT {
+  def runReaderNT[F[_], S](s: S): ReaderT[F, S, ?] ~> F =
+    λ[ReaderT[F, S, ?] ~> F](_.run(s))
+}

@@ -22,8 +22,7 @@ import quasar.qscript.{MapFuncCore, MapFuncsCore}
 import quasar.blueeyes.json.JValue
 import quasar.precog.common.{CBoolean, CLong, CPathField, CPathIndex, CString, RValue}
 // import quasar.yggdrasil.TransSpecModule
-// import quasar.yggdrasil.bytecode.JType
-import quasar.yggdrasil.table.cf.util.Undefined
+import quasar.yggdrasil.bytecode.JType
 
 import matryoshka.{AlgebraM, RecursiveT}
 import matryoshka.implicits._
@@ -45,7 +44,7 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
 
     def apply[A <: SourceType](id: cake.trans.TransSpec[A]): AlgebraM[F, MapFuncCore[T, ?], TransSpec[A]] = {
       case MapFuncsCore.Undefined() =>
-        (Map1[A](id, Undefined): TransSpec[A]).point[F]
+        (DerefArrayStatic[A](OuterArrayConcat[A](WrapArray(id)), CPathIndex(1)): TransSpec[A]).point[F]
 
       case MapFuncsCore.Constant(ejson) =>
         // EJson => Data => JValue => RValue => Table
@@ -209,16 +208,8 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       // this returns rows, rather than array; literally cannot be implemented in mimir at present
       case MapFuncsCore.Range(from, to) => ???
 
-      // rely on implicit guard
-      // this really should be restricted to undefined only, but that breaks some join/ integration tests
-      case MapFuncsCore.Guard(_, _, a2, _ /*Map1(_, Undefined)*/) =>
-        a2.point[F]
-
-      /*case MapFuncsCore.Guard(src, tpe, a2, Map1(_, Undefined)) =>
-        (FilterDefined(a2, Typed(src, JType.fromType(tpe)), TransSpecModule.AllDefined): TransSpec[A]).point[F]*/
-
-      // FIXME not sure exactly how to implement this...
-      // case MapFuncsCore.Guard(_, _, _, _) => ???
+      case MapFuncsCore.Guard(src, tpe, a2, a3) =>
+        (Cond(IsType(src, JType.fromType(tpe)), a2, a3): TransSpec[A]).point[F]
     }
   }
 }
