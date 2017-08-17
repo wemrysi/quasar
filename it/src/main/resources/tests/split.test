@@ -1,9 +1,7 @@
 {
   "name": "split",
 
-  "backends": {
-    "marklogic_xml": "pending"
-  },
+  "backends": {},
 
   "data": "cars.data",
 
