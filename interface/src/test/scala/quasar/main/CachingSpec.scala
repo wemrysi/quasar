@@ -17,11 +17,10 @@
 package quasar.main
 
 import slamdata.Predef._
-import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
 import quasar.Data
-import quasar.effect.{Failure, KeyValueStore, Timing}
+import quasar.effect.{Failure, Timing}
 import quasar.fp._, free._
 import quasar.fs.cache.{VCache, ViewCache}
 import quasar.fs._, InMemory._
@@ -92,7 +91,7 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
 
       def eval: Task[Free[Eff, ?] ~> Task] = eff(i) ∘ (foldMapNT(_))
 
-      val vcache = KeyValueStore.Ops[AFile, ViewCache, Eff]
+      val vcache = VCache.Ops[Eff]
 
       val r: (Option[ViewCache], FileSystemError \/ Vector[Data]) =
         (eval >>= { e =>

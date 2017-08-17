@@ -21,10 +21,10 @@ import quasar.Data
 import quasar.api._, ToQResponse.ops._, ToApiError.ops._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.disjunction._
-import quasar.effect.{KeyValueStore, Timing}
+import quasar.effect.Timing
 import quasar.fp._, numeric._
 import quasar.fs._
-import quasar.fs.cache.{VCache, ViewCache}
+import quasar.fs.cache.VCache
 
 import java.nio.charset.StandardCharsets
 import java.time.Duration
@@ -83,15 +83,23 @@ object data {
                     requiredHeader(Destination, req) map (_.value))
         dst    <- EitherT.fromDisjunction[M.FreeS](parseDestination(dstStr))
         scn    <- EitherT.fromDisjunction[M.FreeS](moveScenario(path, dst))
-        _      <- M.move(scn, MoveSemantics.FailIfExists)
-                    .leftMap(_.toApiError)
+        _      <- EitherT(vcacheGet(path).fold(sf =>
+                    refineType(scn.dst)
+                      .leftMap(p => PathError.invalidPath(p, "view mount destination must be a file").toApiError)
+                      .traverse(d => VCache.Ops[S].move(sf, d)),
+                    M.move(scn, MoveSemantics.FailIfExists).leftMap(_.toApiError).run).join)
       } yield Created).run)
 
     case DELETE -> AsPath(path) =>
-      respond(M.delete(path).run)
+      respond(
+        vcacheGet(path).fold(
+          VCache.Ops[S].delete(_) ∘ (_.right[FileSystemError]), M.delete(path).run).join)
   }
 
   ////
+
+  private def vcacheGet[S[_]](p: APath)(implicit VC: VCache.Ops[S]): OptionT[Free[S, ?], AFile] =
+    OptionT(maybeFile(p).η[Free[S, ?]]) >>= (f => VC.get(f).as(f))
 
   private def download[S[_]](
     format: MessageFormat,
@@ -103,12 +111,10 @@ object data {
     R: ReadFile.Ops[S],
     Q: QueryFile.Ops[S],
     T: Timing.Ops[S],
+    VC: VCache.Ops[S],
     S0: FileSystemFailure :<: S,
-    S1: Task :<: S,
-    S2: VCache :<: S
-  ): Free[S, QResponse[S]] = {
-    val vcache = KeyValueStore.Ops[AFile, ViewCache, S]
-
+    S1: Task :<: S
+  ): Free[S, QResponse[S]] =
     refineType(path).fold(
       dirPath => {
         val p = zippedContents[S](dirPath, format, offset, limit)
@@ -120,7 +126,7 @@ object data {
       filePath => {
         val statusFile: Free[S, (Status, Headers, AFile)] =
           (for {
-            vc <- vcache.get(filePath)
+            vc <- VC.get(filePath)
             cr <- (T.timestamp.liftM[OptionT] ⊛ OptionT(vc.lastUpdate.η[Free[S, ?]])) { (ts, lu) =>
                     val expiration = lu.plus(Duration.ofSeconds(vc.maxAgeSeconds))
 
@@ -130,7 +136,7 @@ object data {
                       vc.dataFile
                     )
                   }
-            _  <- vcache.modify(filePath, vc => vc.copy(cacheReads = vc.cacheReads + 1)).liftM[OptionT]
+            _  <- VC.modify(filePath, vc => vc.copy(cacheReads = vc.cacheReads + 1)).liftM[OptionT]
           } yield cr) | ((Status.Ok, Headers.empty, filePath))
 
         statusFile ∘ { case (s, h, f) =>
@@ -141,7 +147,6 @@ object data {
           ).withStatus(s).modifyHeaders(_ ++ h )
         }
       })
-  }
 
   private def parseDestination(dstString: String): ApiError \/ APath = {
     def absPathRequired(rf: pathy.Path[Rel, _, _]) = ApiError.fromMsg(

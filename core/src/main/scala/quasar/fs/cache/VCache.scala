@@ -16,6 +16,7 @@
 
 package quasar.fs.cache
 
+import quasar.contrib.pathy.AFile
 import quasar.effect.KeyValueStore
 import quasar.metastore._, KeyValueStore._, MetaStoreAccess._
 
@@ -23,6 +24,10 @@ import doobie.imports.ConnectionIO
 import scalaz._, Scalaz._
 
 object VCache {
+  type Ops[S[_]] = KeyValueStore.Ops[AFile, ViewCache, S]
+
+  implicit def Ops[S[_]](implicit S0: VCache :<: S): Ops[S] = KeyValueStore.Ops[AFile, ViewCache, S]
+
   val interp: VCache ~> ConnectionIO = λ[VCache ~> ConnectionIO] {
     case Keys()                      => Queries.viewCachePaths.list ∘ (_.toVector)
     case Get(k)                      => lookupViewCache(k)

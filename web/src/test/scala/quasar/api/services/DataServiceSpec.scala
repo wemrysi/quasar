@@ -85,7 +85,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
 
   val vcacheInterp: Task[VCache ~> Task] = KeyValueStore.impl.default[AFile, ViewCache]
 
-  val vcache = KeyValueStore.Ops[AFile, ViewCache, Eff]
+  val vcache = VCache.Ops[Eff]
 
   def effRespOr(fs: FileSystem ~> Task): Task[Eff ~> ResponseOr] =
     vcacheInterp ∘ (vci =>
@@ -139,6 +139,14 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
       fsErrs >>= (i => data.service[Eff].toHttpService(i).apply(req))
     })
   }
+
+  def evalViewTest[A](now: Instant)(p: (Eff ~> Task, Eff ~> ResponseOr) => Task[A]): Task[A] =
+    (runFs(InMemState.empty) ⊛ vcacheInterp)((fs, vci) => {
+      val it: Eff ~> Task       = effTaskInterp(fs, now, vci)
+      val ir: Eff ~> ResponseOr = effRespOrInterp(fs, now, vci)
+
+      p(it, ir)
+    }).join
 
   val csv = MediaType.`text/csv`
 
@@ -373,23 +381,16 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
 
             val memState = InMemState.fromFiles(Map(g -> d))
 
-            val (respA, respB, vc) =
-              (runFs(memState) ⊛ vcacheInterp)((fs, vci) => {
-                val it: Eff ~> Task       = effTaskInterp(fs, now, vci)
-                val ir: Eff ~> ResponseOr = effRespOrInterp(fs, now, vci)
-
-                val p: Free[Eff, (QResponse[Eff], QResponse[Eff], Option[ViewCache])] =
-                  for {
-                    _ <- vcache.put(f, viewCache)
-                    a <- data.service[Eff].apply(Request(uri = pathUri(f)))
-                    b <- data.service[Eff].apply(Request(uri = pathUri(g)))
-                    c <- vcache.get(f).run
-                  } yield (a, b, c)
-
-                p.foldMap(it) >>= { case (a, b, c) =>
-                  (a.toHttpResponse(ir) ⊛ b.toHttpResponse(ir) ⊛ c.η[Task]).tupled
-                }
-              }).join.unsafePerformSync
+            val (respA, respB, vc) = evalViewTest(now) { (it, ir) =>
+              (for {
+                _ <- vcache.put(f, viewCache)
+                a <- data.service[Eff].apply(Request(uri = pathUri(f)))
+                b <- data.service[Eff].apply(Request(uri = pathUri(g)))
+                c <- vcache.get(f).run
+              } yield (a, b, c)).foldMap(it) >>= {
+                case (a, b, c) => (a.toHttpResponse(ir) ⊛ b.toHttpResponse(ir) ⊛ c.η[Task]).tupled
+              }
+            }.unsafePerformSync
 
             respA.status must_= Status.Ok
             respB.status must_= Status.Ok
@@ -412,23 +413,16 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
 
             val memState = InMemState.fromFiles(Map(g -> d))
 
-            val (respA, respB, vc) =
-              (runFs(memState) ⊛ vcacheInterp)((fs, vci) => {
-                val it: Eff ~> Task       = effTaskInterp(fs, now, vci)
-                val ir: Eff ~> ResponseOr = effRespOrInterp(fs, now, vci)
-
-                val p: Free[Eff, (QResponse[Eff], QResponse[Eff], Option[ViewCache])] =
-                  for {
-                    _ <- vcache.put(f, viewCache)
-                    a <- data.service[Eff].apply(Request(uri = pathUri(f)))
-                    b <- data.service[Eff].apply(Request(uri = pathUri(g)))
-                    c <- vcache.get(f).run
-                  } yield (a, b, c)
-
-                p.foldMap(it) >>= { case (a, b, c) =>
-                  (a.toHttpResponse(ir) ⊛ b.toHttpResponse(ir) ⊛ c.η[Task]).tupled
-                }
-              }).join.unsafePerformSync
+            val (respA, respB, vc) = evalViewTest(now) { (it, ir) =>
+              (for {
+                _ <- vcache.put(f, viewCache)
+                a <- data.service[Eff].apply(Request(uri = pathUri(f)))
+                b <- data.service[Eff].apply(Request(uri = pathUri(g)))
+                c <- vcache.get(f).run
+              } yield (a, b, c)).foldMap(it) >>= {
+                case (a, b, c) => (a.toHttpResponse(ir) ⊛ b.toHttpResponse(ir) ⊛ c.η[Task]).tupled
+              }
+            }.unsafePerformSync
 
             respA.status must_= StaleResponse
             respB.status must_= Status.Ok
@@ -811,6 +805,32 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             body = (str: String) => str must_=== "",
             newState = Changed(fs.filesInDir.map{ case (relFile,data) => (dir </> relFile, data)}.list.toList.toMap))
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
+
+      "move view cache" >> prop {(f1: AFile, f2: AFile, g: AFile, now: Instant) =>
+        val expr = sqlB"α"
+        val viewCache = ViewCache(
+          MountConfig.viewConfigUri(expr, Variables.empty), None, None, 0, None, None,
+          600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
+
+        val (resp, vc1, vc2) = evalViewTest(now) { (it, ir) =>
+          (for {
+            _  <- vcache.put(f1, viewCache)
+            a  <- data.service[Eff].apply(Request(
+                    uri = pathUri(f1),
+                    headers = Headers(Header("Destination", UriPathCodec.printPath(f2))),
+                    method = Method.MOVE))
+            c1 <- vcache.get(f1).run
+            c2 <- vcache.get(f2).run
+          } yield (a, c1, c2)).foldMap(it) >>= {
+            case (a, c1, c2) => a.toHttpResponse(ir) ∘ (r => (r, c1, c2))
+          }
+        }.unsafePerformSync
+
+        resp.status must_= Status.Created
+        vc1 must beEmpty
+        vc2 must beSome(viewCache)
+      }
+
       "be 409 with file to same location" >> prop {(fs: SingleFileMemState) =>
         testMove(
           from = fs.file,
@@ -850,6 +870,29 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
         ref.unsafePerformSync.contents must_=== Map() // The filesystem no longer contains that folder
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
        .flakyTest("scalacheck: 'Gave up after only 1 passed tests. 11 tests were discarded.'")
+
+      "delete view cache" >> prop {(f: AFile, g: AFile, now: Instant) =>
+        val expr = sqlB"α"
+        val viewCache = ViewCache(
+          MountConfig.viewConfigUri(expr, Variables.empty), None, None, 0, None, None,
+          600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
+
+        val (resp, vc) = evalViewTest(now) { (it, ir) =>
+          (for {
+            _ <- vcache.put(f, viewCache)
+            a <- data.service[Eff].apply(Request(
+                   uri = pathUri(f),
+                   method = Method.DELETE))
+            c <- vcache.get(f).run
+          } yield (a, c)).foldMap(it) >>= {
+            case (a, c) => a.toHttpResponse(ir) ∘ (r => (r, c))
+          }
+        }.unsafePerformSync
+
+        resp.status must_= Status.NoContent
+        vc must beEmpty
+      }
+
 
       "be 404 with missing file" >> prop { file: AbsFile[Sandboxed] =>
         val request = Request(uri = pathUri(file), method = Method.DELETE)

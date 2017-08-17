@@ -71,7 +71,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
 
   val vcacheInterp: Task[VCache ~> Task] = KeyValueStore.impl.default[AFile, ViewCache]
 
-  val vcache = KeyValueStore.Ops[AFile, ViewCache, Eff]
+  val vcache = VCache.Ops[Eff]
 
   def runTest[A](f: TestSvc => Free[Eff, A]): A = {
     type MEff[A] = Coproduct[Task, MountConfigs, A]
