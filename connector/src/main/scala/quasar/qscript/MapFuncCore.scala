@@ -480,6 +480,7 @@ object MapFuncCore {
         case DeleteField(a1, a2) => (f(a1) ⊛ f(a2))(DeleteField(_, _))
         case ConcatArrays(a1, a2) => (f(a1) ⊛ f(a2))(ConcatArrays(_, _))
         case Range(a1, a2) => (f(a1) ⊛ f(a2))(Range(_, _))
+        case Split(a1, a2) => (f(a1) ⊛ f(a2))(Split(_, _))
 
         //  ternary
         case Between(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Between(_, _, _))
@@ -569,6 +570,7 @@ object MapFuncCore {
         case (DeleteField(a1, a2), DeleteField(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (ConcatArrays(a1, a2), ConcatArrays(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Range(a1, a2), Range(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Split(a1, a2), Split(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
 
         //  ternary
         case (Between(a1, a2, a3), Between(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
@@ -662,6 +664,7 @@ object MapFuncCore {
           case DeleteField(a1, a2) => shz("DeleteField", a1, a2)
           case ConcatArrays(a1, a2) => shz("ConcatArrays", a1, a2)
           case Range(a1, a2) => shz("Range", a1, a2)
+          case Split(a1, a2) => shz("Split", a1, a2)
 
           //  ternary
           case Between(a1, a2, a3) => shz("Between", a1, a2, a3)
@@ -764,6 +767,7 @@ object MapFuncCore {
           case DeleteField(a1, a2) => nAry("DeleteField", a1, a2)
           case ConcatArrays(a1, a2) => nAry("ConcatArrays", a1, a2)
           case Range(a1, a2) => nAry("Range", a1, a2)
+          case Split(a1, a2) => nAry("Split", a1, a2)
 
           //  ternary
           case Between(a1, a2, a3) => nAry("Between", a1, a2, a3)
@@ -880,6 +884,7 @@ object MapFuncsCore {
   @Lenses final case class Decimal[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Null[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ToString[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Split[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Search[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
   @Lenses final case class Substring[T[_[_]], A](string: A, from: A, count: A) extends Ternary[T, A] {
     def a1 = string

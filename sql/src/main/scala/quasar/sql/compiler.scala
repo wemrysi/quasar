@@ -233,6 +233,7 @@ final class Compiler[M[_], T: Equal]
       CIName("lower")                   -> string.Lower,
       CIName("upper")                   -> string.Upper,
       CIName("substring")               -> string.Substring,
+      CIName("split")                   -> string.Split,
       CIName("boolean")                 -> string.Boolean,
       CIName("integer")                 -> string.Integer,
       CIName("decimal")                 -> string.Decimal,

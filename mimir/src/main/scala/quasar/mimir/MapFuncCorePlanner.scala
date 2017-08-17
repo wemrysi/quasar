@@ -165,6 +165,8 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         readNull.spec[A](a1).point[F]
       case MapFuncsCore.ToString(a1) =>
         convertToString.spec[A](a1).point[F]
+      case MapFuncsCore.Split(a1, a2) =>
+        split.spec[A](a1, a2).point[F]
 
       // significantly faster fast path
       case MapFuncsCore.Search(src, ConstLiteral(CString(pattern), _), ConstLiteral(CBoolean(flag), _)) =>
