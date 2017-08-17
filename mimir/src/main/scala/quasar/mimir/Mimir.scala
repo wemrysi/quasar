@@ -448,7 +448,7 @@ object Mimir extends BackendModule with Logging {
           result <- if (transLKey == transRKey && transLKey == ConstLiteral(CEmptyArray, TransSpec1.Id)) {
             log.trace("EQUIJOIN: full-cross detected!")
 
-            rtable.cross(ltable)(transMiddle).point[Backend]
+            ltable.cross(rtable)(transMiddle).point[Backend]
           } else {
             log.trace("EQUIJOIN: not a full-cross; sorting and cogrouping")
 
