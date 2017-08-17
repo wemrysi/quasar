@@ -25,7 +25,6 @@ import quasar.effect.Capture
 
 import scala.math.{Ordering => SOrdering}, SOrdering.Implicits._
 
-import org.apache.spark._
 import org.apache.spark.rdd._
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
@@ -37,7 +36,7 @@ class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, M[_]:Capture:Monad] extends 
 
   import Planner.{SparkState, SparkStateT}
 
-  def plan(fromFile: (SparkContext, AFile) => M[RDD[Data]]): AlgebraM[SparkState[M, ?], EquiJoin[T, ?], RDD[Data]] = {
+  def plan(fromFile: AFile => M[RDD[Data]]): AlgebraM[SparkState[M, ?], EquiJoin[T, ?], RDD[Data]] = {
     case EquiJoin(src, lBranch, rBranch, lKey, rKey, jt, combine) =>
       val algebraM = Planner[QScriptTotal[T, ?], M].plan(fromFile)
       val srcState = src.point[SparkState[M, ?]]

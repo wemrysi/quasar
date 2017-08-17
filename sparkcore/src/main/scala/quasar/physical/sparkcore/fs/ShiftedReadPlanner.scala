@@ -28,13 +28,13 @@ import scalaz._, Scalaz._
 
 class ShiftedReadPlanner[M[_]:Capture:Monad] extends Planner[Const[ShiftedRead[AFile], ?], M] {
 
-  def plan(fromFile: (SparkContext, AFile) => M[RDD[Data]]) =
+  def plan(fromFile: AFile => M[RDD[Data]]) =
     (qs: Const[ShiftedRead[AFile], RDD[Data]]) => {
       StateT((sc: SparkContext) => {
         val filePath = qs.getConst.path
         val idStatus = qs.getConst.idStatus
 
-        EitherT(fromFile(sc, filePath).map { rdd =>
+        EitherT(fromFile(filePath).map { rdd =>
           (sc,
             idStatus match {
               case IdOnly => rdd.zipWithIndex.map[Data](p => Data.Int(p._2))

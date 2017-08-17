@@ -74,7 +74,7 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, M[_]:Capture:Monad]
 
 
   private def filterOut(
-    fromFile: (SparkContext, AFile) => M[RDD[Data]],
+    fromFile: AFile => M[RDD[Data]],
     src: RDD[Data],
     from: FreeQS[T],
     count: FreeQS[T],
@@ -136,7 +136,7 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, M[_]:Capture:Monad]
 
   }
 
-  def plan(fromFile: (SparkContext, AFile) => M[RDD[Data]]): AlgebraM[SparkState[M, ?], QScriptCore[T, ?], RDD[Data]] = {
+  def plan(fromFile: AFile => M[RDD[Data]]): AlgebraM[SparkState[M, ?], QScriptCore[T, ?], RDD[Data]] = {
     case qscript.Map(src, f) =>
       StateT((sc: SparkContext) =>
         EitherT(CoreMap.changeFreeMap(f).map(df => (sc, src.map(df))).point[M]))

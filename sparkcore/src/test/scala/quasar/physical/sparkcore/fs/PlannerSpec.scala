@@ -96,8 +96,8 @@ class PlannerSpec
               "name" -> Data.Str("tom"),
               "age" -> Data.Int(28)
             )
-        val fromFile: (SparkContext, AFile) => Task[RDD[Data]] =
-          (sc: SparkContext, file: AFile) => Task.delay {
+        val fromFile: AFile => Task[RDD[Data]] =
+          (file: AFile) => Task.delay {
             sc.parallelize(List(Data.Obj(input)))
           }
         val compile: AlgebraM[SparkState[Task, ?], Const[ShiftedRead[AFile], ?], RDD[Data]] = sr.plan(fromFile)
@@ -116,7 +116,7 @@ class PlannerSpec
     "core" should {
       "map" in {
         withSpark { sc =>
-          val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+          val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF(sc))
           val src: RDD[Data] = sc.parallelize(data)
 
           def func: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
@@ -138,7 +138,7 @@ class PlannerSpec
 
       "sort" in {
         withSpark { sc =>
-          val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+          val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF(sc))
           val src: RDD[Data] = sc.parallelize(data)
 
           def bucket = ProjectFieldR(HoleF, StrLit("country"))
@@ -163,7 +163,7 @@ class PlannerSpec
       "reduce" should {
         "calculate count" in {
           withSpark( sc => {
-            val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+            val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF(sc))
             val src: RDD[Data] = sc.parallelize(data)
 
             def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
@@ -182,7 +182,7 @@ class PlannerSpec
 
         "calculate sum" in {
           withSpark { sc =>
-            val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+            val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF(sc))
             val src: RDD[Data] = sc.parallelize(data)
 
             def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
@@ -201,7 +201,7 @@ class PlannerSpec
 
         "extract bucket" in {
           withSpark { sc =>
-            val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+            val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF(sc))
             val src: RDD[Data] = sc.parallelize(data)
 
             def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
@@ -222,7 +222,7 @@ class PlannerSpec
         //        not sure how to check the result
         // "calculate arbitrary" in {
         //   withSpark { sc =>
-        //     val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+        //     val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF(sc))
         //     val src: RDD[Data] = sc.parallelize(data)
 
         //     def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
@@ -241,7 +241,7 @@ class PlannerSpec
 
         "calculate max" in {
           withSpark { sc =>
-            val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+            val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF(sc))
             val src: RDD[Data] = sc.parallelize(data)
 
             def bucket: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
@@ -261,7 +261,7 @@ class PlannerSpec
         "for avg" should {
           "calculate int values" in {
             withSpark { sc =>
-              val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+              val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF(sc))
 
               val src: RDD[Data] = sc.parallelize(List(
                 Data.Obj(ListMap() + ("age" -> Data.Int(24)) + ("country" -> Data.Str("Poland"))),
@@ -286,7 +286,7 @@ class PlannerSpec
 
           "calculate dec values" in {
             withSpark { sc =>
-              val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+              val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF(sc))
 
               val src: RDD[Data] = sc.parallelize(List(
                 Data.Obj(ListMap(("height" -> Data.Dec(1.56)),("country" -> Data.Str("Poland")))),
@@ -311,7 +311,7 @@ class PlannerSpec
           "bugfix: calculate even if Data.Dec has BigDecimal with precision 0" in {
             withSpark { sc =>
               // given avg height is 10.(3)
-              val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+              val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF(sc))
               val src: RDD[Data] = sc.parallelize(List(
                 Data.Obj(ListMap(("height" -> Data.Dec(BigDecimal(3,MathContext.UNLIMITED))),("country" -> Data.Str("Poland")))),
                 Data.Obj(ListMap(("height" -> Data.Dec(BigDecimal(4,MathContext.UNLIMITED))),("country" -> Data.Str("Poland")))),
@@ -333,7 +333,7 @@ class PlannerSpec
 
       "filter" in {
         withSpark { sc =>
-          val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+          val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF(sc))
           val src: RDD[Data] = sc.parallelize(data)
 
           def func: FreeMap = Free.roll(MFC(Lt(ProjectFieldR(HoleF, StrLit("age")), IntLit(24))))
@@ -355,7 +355,7 @@ class PlannerSpec
 
       "take" in {
         withSpark { sc =>
-          val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+          val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF(sc))
           val src: RDD[Data] = sc.parallelize(data)
 
           def from: FreeQS = Free.point(SrcHole)
@@ -379,7 +379,7 @@ class PlannerSpec
 
       "drop" in {
         withSpark { sc =>
-          val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+          val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF(sc))
           val src: RDD[Data] = sc.parallelize(data)
 
           def from: FreeQS = Free.point(SrcHole)
@@ -403,7 +403,7 @@ class PlannerSpec
 
       "union" in {
         withSpark { sc =>
-          val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+          val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF(sc))
           val src: RDD[Data] = sc.parallelize(data)
 
           def func(country: String): FreeMap =
@@ -429,7 +429,7 @@ class PlannerSpec
 
       "leftshift" in {
         withSpark { sc =>
-          val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF)
+          val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF(sc))
           val src: RDD[Data] = sc.parallelize(data2)
 
           def struct: FreeMap = ProjectFieldR(HoleF, StrLit("countries"))
@@ -456,7 +456,7 @@ class PlannerSpec
       "inner" in {
 
         withSpark { sc =>
-          val compile: AlgebraM[SparkState[Task, ?], EquiJoin, RDD[Data]] = equi.plan(emptyFF)
+          val compile: AlgebraM[SparkState[Task, ?], EquiJoin, RDD[Data]] = equi.plan(emptyFF(sc))
           val src: RDD[Data] = sc.parallelize(data3)
 
           def func(country: String): FreeMap =
@@ -486,7 +486,7 @@ class PlannerSpec
       "leftOuter" in {
 
         withSpark { sc =>
-          val compile: AlgebraM[SparkState[Task, ?], EquiJoin, RDD[Data]] = equi.plan(emptyFF)
+          val compile: AlgebraM[SparkState[Task, ?], EquiJoin, RDD[Data]] = equi.plan(emptyFF(sc))
           val src: RDD[Data] = sc.parallelize(data3)
 
           def func(country: String): FreeMap =
@@ -521,7 +521,7 @@ class PlannerSpec
       "rightOuter" in {
 
         withSpark { sc =>
-          val compile: AlgebraM[SparkState[Task, ?], EquiJoin, RDD[Data]] = equi.plan(emptyFF)
+          val compile: AlgebraM[SparkState[Task, ?], EquiJoin, RDD[Data]] = equi.plan(emptyFF(sc))
 
           val src: RDD[Data] = sc.parallelize(data4)
 
@@ -556,7 +556,7 @@ class PlannerSpec
 
       "fullOuter" in {
         withSpark { sc =>
-          val compile: AlgebraM[SparkState[Task, ?], EquiJoin, RDD[Data]] = equi.plan(emptyFF)
+          val compile: AlgebraM[SparkState[Task, ?], EquiJoin, RDD[Data]] = equi.plan(emptyFF(sc))
           val src: RDD[Data] = sc.parallelize(data5)
 
           def func(country: String): FreeMap =
@@ -605,8 +605,8 @@ class PlannerSpec
   private def constFreeQS(v: Int): FreeQS =
     Free.roll(QCT.inj(quasar.qscript.Map(Free.roll(QCT.inj(Unreferenced())), IntLit(v))))
 
-  private val emptyFF: (SparkContext, AFile) => Task[RDD[Data]] =
-    (sc: SparkContext, file: AFile) => Task.delay {
+  private def emptyFF(sc: SparkContext): AFile => Task[RDD[Data]] =
+    (file: AFile) => Task.delay {
       sc.parallelize(List())
     }
 }

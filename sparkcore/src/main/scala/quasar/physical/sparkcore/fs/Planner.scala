@@ -28,7 +28,7 @@ import matryoshka.{Hole => _, _}
 import scalaz._, Scalaz._
 
 trait Planner[F[_], M[_]] extends Serializable {
-  def plan(fromFile: (SparkContext, AFile) => M[RDD[Data]]): AlgebraM[Planner.SparkState[M, ?], F, RDD[Data]]
+  def plan(fromFile: AFile => M[RDD[Data]]): AlgebraM[Planner.SparkState[M, ?], F, RDD[Data]]
 }
 
 object Planner {
@@ -51,12 +51,12 @@ object Planner {
     implicit F: Planner[F, M], G: Planner[G, M]):
       Planner[Coproduct[F, G, ?], M] =
     new Planner[Coproduct[F, G, ?], M] {
-      def plan(fromFile: (SparkContext, AFile) => M[RDD[Data]]): AlgebraM[SparkState[M, ?], Coproduct[F, G, ?], RDD[Data]] = _.run.fold(F.plan(fromFile), G.plan(fromFile))
+      def plan(fromFile: AFile => M[RDD[Data]]): AlgebraM[SparkState[M, ?], Coproduct[F, G, ?], RDD[Data]] = _.run.fold(F.plan(fromFile), G.plan(fromFile))
     }
 
   private def unreachable[F[_], M[_]:Capture:Monad](what: String): Planner[F, M] =
     new Planner[F, M] {
-      def plan(fromFile: (SparkContext, AFile) => M[RDD[Data]]): AlgebraM[SparkState[M, ?], F, RDD[Data]] =
+      def plan(fromFile: AFile => M[RDD[Data]]): AlgebraM[SparkState[M, ?], F, RDD[Data]] =
         _ =>  StateT((sc: SparkContext) => {
           EitherT(InternalError.fromMsg(s"unreachable $what").left[(SparkContext, RDD[Data])].point[M])
         })

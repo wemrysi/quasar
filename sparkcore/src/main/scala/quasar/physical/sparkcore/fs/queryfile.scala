@@ -90,6 +90,10 @@ object queryfile {
       def map[A, B](fa: F[G[A]])(f: A => B) = fa ∘ (_ ∘ f)
     }
 
+  def temp[S[_]](implicit
+    details: SparkConnectorDetails.Ops[S]
+  ) = (afile: AFile) => details.rddFrom(afile)
+
   // TODO unify explainPlan, executePlan & evaluatePlan
   // This might be more complicated then it looks at first glance
   private def explainPlan[S[_]](fsType: FileSystemType, qs: Fix[SparkQScript], lp: Fix[LogicalPlan]) (implicit
@@ -99,8 +103,6 @@ object queryfile {
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, ExecutionPlan]] = {
 
     val total = scala.Predef.implicitly[Planner[SparkQScript, Free[S, ?]]]
-
-    val temp = (sc: SparkContext, afile: AFile) => details.rddFrom(afile)
 
     read.asks { sc =>
       val sparkStuff: Free[S, PlannerError \/ RDD[Data]] =
@@ -126,8 +128,6 @@ object queryfile {
 
     val total = scala.Predef.implicitly[Planner[SparkQScript, Free[S, ?]]]
 
-    val temp = (sc: SparkContext, afile: AFile) => details.rddFrom(afile)
-
     read.asks { sc =>
       val sparkStuff: Free[S, PlannerError \/ RDD[Data]] =
         qs.cataM(total.plan(temp)).eval(sc).run
@@ -151,8 +151,6 @@ object queryfile {
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, QueryFile.ResultHandle]] = {
 
     val total = scala.Predef.implicitly[Planner[SparkQScript, Free[S, ?]]]
-
-    val temp = (sc: SparkContext, afile: AFile) => details.rddFrom(afile)
 
     val open: Free[S, PlannerError \/ (QueryFile.ResultHandle, RDD[Data])] = (for {
       h <- EitherT(ms.next map (QueryFile.ResultHandle(_).right[PlannerError]))
