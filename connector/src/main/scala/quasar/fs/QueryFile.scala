@@ -49,7 +49,7 @@ object QueryFile {
   }
 
   def convertAndNormalize
-    [T[_[_]]: BirecursiveT: EqualT: ShowT, QS[_]: Traverse: Normalizable]
+    [T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, QS[_]: Traverse: Normalizable]
     (lp: T[LogicalPlan])
     (eval: QS[T[QS]] => QS[T[QS]])
     (implicit
@@ -69,7 +69,10 @@ object QueryFile {
 
     // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
     //       so we don’t duplicate work.
-    lp.transCata[T[LogicalPlan]](orOriginal(optimizer.elideLets))
+    //
+    // NB: `pullUpGroupBy` is necessary to correct LogicalPlan, but must be
+    //      applied after eliding let-bindings.
+    optimizer.pullUpGroupBy(lp.transCata[T[LogicalPlan]](orOriginal(optimizer.elideLets)))
       .cataM[PlannerError \/ ?, Target[T, QS]](newLP => transform.lpToQScript(newLP.map(Target.value.modify(_.transAna[T[QS]](eval)))))
       .map(target => QC.inj((transform.reifyResult(target.ann, target.value))).embed.transCata[T[QS]](eval))
   }
