@@ -168,69 +168,55 @@ trait DateLib extends Library with Serializable {
       constTyper[nat._1](Type.Numeric),
       basicUntyper)
 
-  /** 
-    * Please note that all vals are lazy in this companion object. There is a reason for that, yet not completely 
-    * understood yet - it's like quantum theory.
-    * 
-    * It is still not completely clear for me why this is needed. In essence we had an error, that
-    * manifasted itself as ClassNotFoundError on spark's executors. This normally means that sparkcore.jar (uberjar) is
-    * not send to the cluster or the given class (DateLib$) is not in that jar. 
-    * After verifying that is not the case, I kept on googling and I found this 
-    * https://stackoverflow.com/questions/7262799/why-does-scala-fail-to-instantiate-a-companion-object Seemed odd but it was
-    * worth a try. And it solved the issue. This is something worth investigating further and I'm actually planning 
-    * to do so (recreate the issue on a sandboxed project), but for now I need working spark connectors and this
-    * thing solves it (even though it runs on magic at the moment)
-    */
-
-  lazy val ExtractCentury      = extract(
+  val ExtractCentury      = extract(
     "Pulls out the century subfield from a date/time value (currently year/100).")
-  lazy val ExtractDayOfMonth   = extract(
+  val ExtractDayOfMonth   = extract(
     "Pulls out the day of month (`day`) subfield from a date/time value (1-31).")
-  lazy val ExtractDecade       = extract(
+  val ExtractDecade       = extract(
     "Pulls out the decade subfield from a date/time value (year/10).")
-  lazy val ExtractDayOfWeek    = extract(
+  val ExtractDayOfWeek    = extract(
     "Pulls out the day of week (`dow`) subfield from a date/time value " +
     "(Sunday: 0 to Saturday: 7).")
-  lazy val ExtractDayOfYear    = extract(
+  val ExtractDayOfYear    = extract(
     "Pulls out the day of year (`doy`) subfield from a date/time value (1-365 or -366).")
-  lazy val ExtractEpoch        = extract(
+  val ExtractEpoch        = extract(
     "Pulls out the epoch subfield from a date/time value. For dates and " +
     "timestamps, this is the number of seconds since midnight, 1970-01-01. " +
     "For intervals, the number of seconds in the interval.")
-  lazy val ExtractHour         = extract(
+  val ExtractHour         = extract(
     "Pulls out the hour subfield from a date/time value (0-23).")
-  lazy val ExtractIsoDayOfWeek       = extract(
+  val ExtractIsoDayOfWeek       = extract(
     "Pulls out the ISO day of week (`isodow`) subfield from a date/time value " +
     "(Monday: 1 to Sunday: 7).")
-  lazy val ExtractIsoYear      = extract(
+  val ExtractIsoYear      = extract(
     "Pulls out the ISO year (`isoyear`) subfield from a date/time value (based " +
     "on the first week containing Jan. 4).")
-  lazy val ExtractMicroseconds = extract(
+  val ExtractMicroseconds = extract(
     "Pulls out the microseconds subfield from a date/time value (including seconds).")
-  lazy val ExtractMillennium    = extract(
+  val ExtractMillennium    = extract(
     "Pulls out the millennium subfield from a date/time value (currently year/1000).")
-  lazy val ExtractMilliseconds = extract(
+  val ExtractMilliseconds = extract(
     "Pulls out the milliseconds subfield from a date/time value (including seconds).")
-  lazy val ExtractMinute       = extract(
+  val ExtractMinute       = extract(
     "Pulls out the minute subfield from a date/time value (0-59).")
-  lazy val ExtractMonth        = extract(
+  val ExtractMonth        = extract(
     "Pulls out the month subfield from a date/time value (1-12).")
-  lazy val ExtractQuarter      = extract(
+  val ExtractQuarter      = extract(
     "Pulls out the quarter subfield from a date/time value (1-4).")
-  lazy val ExtractSecond = extract(
+  val ExtractSecond = extract(
     "Pulls out the second subfield from a date/time value (0-59, with fractional parts).")
-  lazy val ExtractTimezone = extract(
+  val ExtractTimezone = extract(
     "Pulls out the timezone subfield from a date/time value (in seconds east of UTC).")
-  lazy val ExtractTimezoneHour = extract(
+  val ExtractTimezoneHour = extract(
     "Pulls out the hour component of the timezone subfield from a date/time value.")
-  lazy val ExtractTimezoneMinute = extract(
+  val ExtractTimezoneMinute = extract(
     "Pulls out the minute component of the timezone subfield from a date/time value.")
-  lazy val ExtractWeek = extract(
+  val ExtractWeek = extract(
     "Pulls out the week subfield from a date/time value (1-53).")
-  lazy val ExtractYear = extract(
+  val ExtractYear = extract(
     "Pulls out the year subfield from a date/time value.")
 
-  lazy val Date = UnaryFunc(
+  val Date = UnaryFunc(
     Mapping,
     "Converts a string in the format (YYYY-MM-DD) to a date value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Date,
@@ -242,13 +228,13 @@ trait DateLib extends Library with Serializable {
     },
     basicUntyper)
 
-  lazy val Now = NullaryFunc(
+  val Now = NullaryFunc(
     Mapping,
     "Returns the current timestamp – this must always return the same value within the same execution of a query.",
     Type.Timestamp,
     noSimplification)
 
-  lazy val Time = UnaryFunc(
+  val Time = UnaryFunc(
     Mapping,
     "Converts a string in the format (HH:MM:SS[.SSS]) to a time value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Time,
@@ -260,7 +246,7 @@ trait DateLib extends Library with Serializable {
     },
     basicUntyper)
 
-  lazy val Timestamp = UnaryFunc(
+  val Timestamp = UnaryFunc(
     Mapping,
     "Converts a string in the format (ISO 8601, UTC, e.g. 2015-05-12T12:22:00Z) to a timestamp value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Timestamp,
@@ -272,7 +258,7 @@ trait DateLib extends Library with Serializable {
     },
     basicUntyper)
 
-  lazy val Interval = UnaryFunc(
+  val Interval = UnaryFunc(
     Mapping,
     "Converts a string in the format (ISO 8601, e.g. P3DT12H30M15.0S) to an interval value. Note: year/month not currently supported. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Interval,
@@ -284,7 +270,7 @@ trait DateLib extends Library with Serializable {
     },
     basicUntyper)
 
-  lazy val StartOfDay = UnaryFunc(
+  val StartOfDay = UnaryFunc(
     Mapping,
     "Converts a Date or Timestamp to a Timestamp at the start of that day.",
     Type.Timestamp,
@@ -307,7 +293,7 @@ trait DateLib extends Library with Serializable {
       case t                              => success(Func.Input1(t))
     })
 
-  lazy val TimeOfDay = UnaryFunc(
+  val TimeOfDay = UnaryFunc(
     Mapping,
     "Extracts the time of day from a (UTC) timestamp value.",
     Type.Time,
@@ -319,7 +305,7 @@ trait DateLib extends Library with Serializable {
     },
     basicUntyper)
 
-  lazy val ToTimestamp = UnaryFunc(
+  val ToTimestamp = UnaryFunc(
     Mapping,
     "Converts an integer epoch time value (i.e. milliseconds since 1 Jan. 1970, UTC) to a timestamp constant.",
     Type.Timestamp,
