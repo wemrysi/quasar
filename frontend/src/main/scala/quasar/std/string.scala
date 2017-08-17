@@ -245,7 +245,7 @@ trait StringLib extends Library {
   val Split = BinaryFunc(
     Mapping,
     "Splits a string into an array of substrings based on a delimiter.",
-    Type.Str,
+    Type.FlexArr(0, None, Type.Str),
     Func.Input2(Type.Str, Type.Str),
     noSimplification,
     partialTyperV[nat._2] {
