@@ -168,6 +168,20 @@ trait DateLib extends Library with Serializable {
       constTyper[nat._1](Type.Numeric),
       basicUntyper)
 
+  /** 
+    * Please note that all vals are lazy in this companion object. There is a reason for that, yet not completely 
+    * understood yet - it's like quantum theory.
+    * 
+    * It is still not completely clear for me why this is needed. In essence we had an error, that
+    * manifasted itself as ClassNotFoundError on spark's executors. This normally means that sparkcore.jar (uberjar) is
+    * not send to the cluster or the given class (DateLib$) is not in that jar. 
+    * After verifying that is not the case, I kept on googling and I found this 
+    * https://stackoverflow.com/questions/7262799/why-does-scala-fail-to-instantiate-a-companion-object Seemed odd but it was
+    * worth a try. And it solved the issue. This is something worth investigating further and I'm actually planning 
+    * to do so (recreate the issue on a sandboxed project), but for now I need working spark connectors and this
+    * thing solves it (even though it runs on magic at the moment)
+    */
+
   lazy val ExtractCentury      = extract(
     "Pulls out the century subfield from a date/time value (currently year/100).")
   lazy val ExtractDayOfMonth   = extract(
