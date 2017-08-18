@@ -78,11 +78,11 @@ private[effect] class TaskCapture extends Capture[Task] with Serializable {
 }
 
 private[effect] class TransCapture[F[_]: Monad: Capture, T[_[_], _]: MonadTrans]
-  extends Capture[T[F, ?]] {
+  extends Capture[T[F, ?]] with Serializable{
   def capture[A](a: => A) = Capture[F].capture(a).liftM[T]
 }
 
 private[effect] class FreeCapture[F[_], S[_]](implicit F: Capture[F], I: F :<: S)
-  extends Capture[Free[S, ?]] {
+  extends Capture[Free[S, ?]] with Serializable {
   def capture[A](a: => A) = Free.liftF(I(F.capture(a)))
 }
