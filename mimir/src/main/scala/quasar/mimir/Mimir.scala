@@ -518,7 +518,7 @@ object Mimir extends BackendModule with Logging {
 
     lazy val planEquiJoin: AlgebraM[Backend, EquiJoin[T, ?], Repr] = {
       case qscript.EquiJoin(src, lbranch, rbranch, lkey, rkey, tpe, combine) =>
-        import src.P.trans._, scalaz.syntax.std.option._, scalaz.std.option._, scalaz.syntax.show._
+        import src.P.trans._, scalaz.syntax.std.option._
         def rephrase2(projection: TransSpec2, rootL: TransSpec1, rootR: TransSpec1): Option[SortOrdering[TransSpec1]] = {
           val leftRephrase = TransSpec.rephrase(projection, SourceLeft, rootL).fold(Set.empty[TransSpec1])(Set(_))
           val rightRephrase = TransSpec.rephrase(projection, SourceRight, rootR).fold(Set.empty[TransSpec1])(Set(_))
