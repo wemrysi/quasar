@@ -84,8 +84,11 @@ object Mimir extends BackendModule with Logging {
   // EquiJoin results are sorted by both keys at the same time, so we need to keep track of both
   final case class SortOrdering[TS1](sortKeys: Set[TS1], sortOrder: DesiredSortOrder, unique: Boolean) {
     def sort(src: Cake)(table: src.Table)(implicit ev: TS1 === src.trans.TransSpec1): Future[src.Table] =
-      if (sortKeys.isEmpty) Future.successful(table)
-      else table.sort(ev(sortKeys.head), sortOrder, unique)
+      if (sortKeys.isEmpty) {
+        Future.successful(table)
+      } else {
+        table.sort(ev(sortKeys.head), sortOrder, unique)
+      }
   }
 
   final case class SortState[TS1](bucket: Option[TS1], orderings: List[SortOrdering[TS1]])
@@ -253,7 +256,7 @@ object Mimir extends BackendModule with Logging {
           newSort = for {
             lastSort <- src.lastSort
             newBucket = lastSort.bucket.flatMap(TransSpec.rephrase(_, Source, trans))
-            newOrderings <- lastSort.orderings.traverse{ord =>
+            newOrderings <- lastSort.orderings.traverse { ord =>
               val rephrasedSortKeys = ord.sortKeys.flatMap(TransSpec.rephrase(_, Source, trans))
               // can't guarantee uniqueness is preserved by all functions,
               // but maybe it's worth keeping track of that
@@ -276,7 +279,9 @@ object Mimir extends BackendModule with Logging {
                   case ReduceIndex(Some(_)) => ???    // this should be impossible
                   case ReduceIndex(None) => interpretMapFunc[Backend](src.P)(bucket)
                 },
-                mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)))
+                mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)
+              )
+            )
 
             transformed = src.table.transform(trans)
 
@@ -440,7 +445,9 @@ object Mimir extends BackendModule with Logging {
                 .filterNot(_ === MapFuncsCore.NullLit())
                 .traverse(interpretMapFunc[Backend](src.P))
               newSort = SortState(bucketNotNullTrans, sortOrderings)
-              sortedTable <- if (src.lastSort.fold(true)(last => needToSort(Repr.single[src.P](src).P)(last, newSort))) {
+              sortNeeded = src.lastSort.fold(true)(last => needToSort(Repr.single[src.P](src).P)(last, newSort))
+              sortedTable <-
+              if (sortNeeded) {
                 bucketNotNullTrans.fold(sortAll(src.table).toTask.liftM[MT].liftB) { bucketTrans =>
                   for {
                     prepared <- sortT[src.P.type](Repr.single[src.P](src))(src.table, bucketTrans)
@@ -491,9 +498,11 @@ object Mimir extends BackendModule with Logging {
                 case Sample =>
                   compacted.sample(number, List(fromRepr.P.trans.TransSpec1.Id)).map(_.head) // the number of Reprs returned equals the number of transspecs
               }
-            } yield
-              if (retainsOrder) Repr.withSort(fromRepr.P)(back)(fromRepr.lastSort)
-              else Repr(fromRepr.P)(back)
+            } yield if (retainsOrder) {
+              Repr.withSort(fromRepr.P)(back)(fromRepr.lastSort)
+            } else {
+              Repr(fromRepr.P)(back)
+            }
 
             result.toTask.liftM[MT].liftB
           }
@@ -514,8 +523,11 @@ object Mimir extends BackendModule with Logging {
           val leftRephrase = TransSpec.rephrase(projection, SourceLeft, rootL).fold(Set.empty[TransSpec1])(Set(_))
           val rightRephrase = TransSpec.rephrase(projection, SourceRight, rootR).fold(Set.empty[TransSpec1])(Set(_))
           val bothRephrased = leftRephrase ++ rightRephrase
-          if (bothRephrased.isEmpty) None
-          else SortOrdering(bothRephrased, SortAscending, unique = false).some
+          if (bothRephrased.isEmpty) {
+            None
+          } else {
+            SortOrdering(bothRephrased, SortAscending, unique = false).some
+          }
         }
 
         for {
@@ -537,13 +549,15 @@ object Mimir extends BackendModule with Logging {
                 case qscript.LeftSide => TransSpec2.LeftId.point[Backend]
                 case qscript.RightSide => TransSpec2.RightId.point[Backend]
               },
-              mapFuncPlanner[Backend].plan(src.P)[Source2](TransSpec2.LeftId)))    // TODO weirdly left-biases things like constants
+              mapFuncPlanner[Backend].plan(src.P)[Source2](TransSpec2.LeftId)
+            )
+          ) // TODO weirdly left-biases things like constants
 
           // identify full-cross and avoid cogroup
-          resultAndSort <- if (transLKey == transRKey && transLKey == ConstLiteral(CEmptyArray, TransSpec1.Id)) {
+          resultAndSort <-
+          if (transLKey == transRKey && transLKey == ConstLiteral(CEmptyArray, TransSpec1.Id)) {
             log.trace("EQUIJOIN: full-cross detected!")
-            val crossWithSort = (rtable.cross(ltable)(transMiddle), src.unsafeMerge(leftRepr).lastSort)
-            crossWithSort.point[Backend]
+            (rtable.cross(ltable)(transMiddle), src.unsafeMerge(leftRepr).lastSort).point[Backend]
           } else {
             log.trace("EQUIJOIN: not a full-cross; sorting and cogrouping")
 
@@ -561,7 +575,9 @@ object Mimir extends BackendModule with Logging {
                         case qscript.LeftSide => TransSpec1.Id.point[Backend]
                         case qscript.RightSide => TransSpec1.Undef.point[Backend]
                       },
-                      mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)))
+                      mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)
+                    )
+                  )
 
                 case JoinType.Inner | JoinType.RightOuter =>
                   TransSpec1.Undef.point[Backend]
@@ -575,14 +591,15 @@ object Mimir extends BackendModule with Logging {
                         case qscript.LeftSide => TransSpec1.Undef.point[Backend]
                         case qscript.RightSide => TransSpec1.Id.point[Backend]
                       },
-                      mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)))
+                      mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)
+                    )
+                  )
 
                 case JoinType.Inner | JoinType.LeftOuter =>
                   TransSpec1.Undef.point[Backend]
               }
               newSortOrder = rephrase2(transMiddle, transLKey, transRKey)
-            } yield
-              (lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle),
+            } yield (lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle),
                 newSortOrder.map(order => SortState(None, order :: Nil)))
           }
           (result, newSort) = resultAndSort
