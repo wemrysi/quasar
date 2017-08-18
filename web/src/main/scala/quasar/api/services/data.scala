@@ -124,27 +124,28 @@ object data {
         QResponse.headers.modify(_ ++ headers)(QResponse.streaming(p)).η[Free[S, ?]]
       },
       filePath => {
-        val statusFile: Free[S, (Status, Headers, AFile)] =
+        val statusFile: Free[S, (Headers, AFile)] =
           (for {
             vc <- VC.get(filePath)
             cr <- (T.timestamp.liftM[OptionT] ⊛ OptionT(vc.lastUpdate.η[Free[S, ?]])) { (ts, lu) =>
                     val expiration = lu.plus(Duration.ofSeconds(vc.maxAgeSeconds))
 
                     (
-                      ts.isAfter(expiration).fold(StaleResponse, Status.Ok),
-                      Headers(Header(Expires.name.value, Renderer.renderString(expiration))),
+                      Headers(
+                        Header(Expires.name.value, Renderer.renderString(expiration)) ::
+                        ts.isAfter(expiration).fold(List(StaleHeader), Nil)),
                       vc.dataFile
                     )
                   }
             _  <- VC.modify(filePath, vc => vc.copy(cacheReads = vc.cacheReads + 1)).liftM[OptionT]
-          } yield cr) | ((Status.Ok, Headers.empty, filePath))
+          } yield cr) | ((Headers.empty, filePath))
 
-        statusFile ∘ { case (s, h, f) =>
+        statusFile ∘ { case (h, f) =>
           val d = R.scan(f, offset, limit)
           zipped.fold(
             formattedZipDataResponse(format, f, d),
             formattedDataResponse(format, d)
-          ).withStatus(s).modifyHeaders(_ ++ h )
+          ).modifyHeaders(_ ++ h)
         }
       })
 

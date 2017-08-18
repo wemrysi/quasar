@@ -25,7 +25,7 @@ import argonaut.{DecodeResult => _, _}, Argonaut._
 import org.http4s._
 import org.http4s.argonaut._
 import org.http4s.dsl.{Path => HPath, _}
-import org.http4s.headers.`Content-Disposition`
+import org.http4s.headers.{`Content-Disposition`, Warning}
 import org.http4s.server._
 import org.http4s.server.staticcontent._
 import org.http4s.util._
@@ -71,7 +71,7 @@ package object api {
     }
 
   // https://tools.ietf.org/html/rfc7234#section-4.2.4
-  val StaleResponse = Status(110)(reason = "Response is Stale")
+  val StaleHeader = Header(Warning.name.value, """110 - "Response is Stale"""")
 
   object Destination extends HeaderKey.Singleton {
     type HeaderT = Header

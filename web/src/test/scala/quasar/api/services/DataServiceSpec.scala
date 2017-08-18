@@ -395,7 +395,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             respA.status must_= Status.Ok
             respB.status must_= Status.Ok
             respA.headers.get(Expires.name) ∘ (_.value) must_=
-              Some(Renderer.renderString(lastUpdate.plus(Duration.ofSeconds(maxAgeSecs.toLong))))
+              Renderer.renderString(lastUpdate.plus(Duration.ofSeconds(maxAgeSecs.toLong))).some
             respA.as[String].unsafePerformSync must_= respB.as[String].unsafePerformSync
             vc ∘ (_.cacheReads) must_= (viewCache.cacheReads ⊹ 1).some
           }
@@ -424,10 +424,11 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
               }
             }.unsafePerformSync
 
-            respA.status must_= StaleResponse
+            respA.status must_= Status.Ok
             respB.status must_= Status.Ok
+            respA.headers.get(Warning) ∘ (_.value) must_= StaleHeader.value.some
             respA.headers.get(Expires) ∘ (_.value) must_=
-              Some(Renderer.renderString(lastUpdate.plus(Duration.ofSeconds(maxAgeSecs.toLong))))
+              Renderer.renderString(lastUpdate.plus(Duration.ofSeconds(maxAgeSecs.toLong))).some
             respA.as[String].unsafePerformSync must_= respB.as[String].unsafePerformSync
             vc ∘ (_.cacheReads) must_= (viewCache.cacheReads ⊹ 1).some
            }
