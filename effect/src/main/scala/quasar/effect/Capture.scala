@@ -73,7 +73,7 @@ sealed abstract class CaptureInstances0 {
     new TransCapture[F, WriterT[?[_], W, ?]]
 }
 
-private[effect] class TaskCapture extends Capture[Task] {
+private[effect] class TaskCapture extends Capture[Task] with Serializable {
   def capture[A](a: => A) = Task.delay(a)
 }
 
