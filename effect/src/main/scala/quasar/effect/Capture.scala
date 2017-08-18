@@ -25,7 +25,7 @@ import scalaz.syntax.monad._
   *
   * Cribbed from [doobie](http://github.com/tpolecat/doobie)
   */
-trait Capture[F[_]] {
+trait Capture[F[_]] extends Serializable {
   /** Captures the effect of producing `A`, including any exceptions that may
     * be thrown.
     */
