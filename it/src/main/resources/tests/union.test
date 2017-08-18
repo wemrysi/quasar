@@ -3,7 +3,8 @@
     "backends": {
         "mimir":"ignoreFieldOrder",
         "couchbase":         "pending",
-        "mongodb_q_3_2":     "pending"
+        "mongodb_q_3_2":     "pending",
+	"marklogic_xml":     "skip"
     },
     "data": "zips.data",
     "query": "select `_id` as zip from zips union select city, state from zips",

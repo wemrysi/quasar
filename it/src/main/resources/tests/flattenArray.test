@@ -1,5 +1,8 @@
 {
     "name": "flatten array",
+    "backends": {
+    	"marklogic_xml":     "skip"
+    },
     "data": "zips.data",
     "query": "SELECT loc[*] AS loc FROM zips",
     "predicate": "atLeast",
