@@ -88,7 +88,7 @@ object Mimir extends BackendModule with Logging {
       else table.sort(ev(sortKeys.head), sortOrder, unique)
   }
 
-  final case class SortRepr[TS1](bucket: Option[TS1], orderings: List[SortOrdering[TS1]])
+  final case class SortState[TS1](bucket: Option[TS1], orderings: List[SortOrdering[TS1]])
 
   trait Repr {
     type P <: Cake
@@ -99,7 +99,7 @@ object Mimir extends BackendModule with Logging {
 
     val P: P
     val table: P.Table
-    val lastSort: Option[SortRepr[P.trans.TransSpec1]]
+    val lastSort: Option[SortState[P.trans.TransSpec1]]
 
     // these casts can't crash, because `Precog` is final.
     // however they're unsafe because they could lead to sharing cakes
@@ -129,10 +129,10 @@ object Mimir extends BackendModule with Logging {
 
         val P: P0.type = P0
         val table: P.Table = table0
-        val lastSort: Option[SortRepr[P0.trans.TransSpec1]] = None
+        val lastSort: Option[SortState[P0.trans.TransSpec1]] = None
       }
 
-    def withSort(P0: Precog)(table0: P0.Table)(lastSort0: Option[SortRepr[P0.trans.TransSpec1]]): Repr.Aux[P0.type] =
+    def withSort(P0: Precog)(table0: P0.Table)(lastSort0: Option[SortState[P0.trans.TransSpec1]]): Repr.Aux[P0.type] =
       new Repr {
         type P = P0.type
 
@@ -140,7 +140,7 @@ object Mimir extends BackendModule with Logging {
 
         val P: P0.type = P0
         val table: P.Table = table0
-        val lastSort: Option[SortRepr[P0.trans.TransSpec1]] = lastSort0
+        val lastSort: Option[SortState[P0.trans.TransSpec1]] = lastSort0
       }
 
     def meld[F[_]: Monad](fn: DepFn1[Cake, λ[`P <: Cake` => F[P#Table]]])(
@@ -179,7 +179,7 @@ object Mimir extends BackendModule with Logging {
     t.liftM[BackendDef.DefErrT]
   }
 
-  def needToSort(p: Precog)(oldSort: SortRepr[p.trans.TransSpec1], newSort: SortRepr[p.trans.TransSpec1]): Boolean = {
+  def needToSort(p: Precog)(oldSort: SortState[p.trans.TransSpec1], newSort: SortState[p.trans.TransSpec1]): Boolean = {
     (oldSort.orderings.length != newSort.orderings.length || oldSort.bucket != newSort.bucket) || {
       def requiresSort(oldOrdering: SortOrdering[p.trans.TransSpec1], newOrdering: SortOrdering[p.trans.TransSpec1]) =
         (oldOrdering.sortKeys & newOrdering.sortKeys).nonEmpty ||
@@ -196,7 +196,7 @@ object Mimir extends BackendModule with Logging {
   def sortT[P0 <: Cake](c: Repr.Aux[P0])(table: c.P.Table, sortKey: c.P.trans.TransSpec1,
                                                  sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): Task[Repr.Aux[c.P.type]] = {
     val newRepr =
-      SortRepr[c.P.trans.TransSpec1](bucket = None, orderings = SortOrdering(Set(sortKey), sortOrder, unique) :: Nil)
+      SortState[c.P.trans.TransSpec1](bucket = None, orderings = SortOrdering(Set(sortKey), sortOrder, unique) :: Nil)
     if (c.lastSort.fold(true)(needToSort(c.P)(_, newSort = newRepr)))
       table.sort(sortKey, sortOrder, unique).toTask.map(sorted =>
         Repr.withSort(c.P)(sorted)(Some(newRepr))
@@ -260,7 +260,7 @@ object Mimir extends BackendModule with Logging {
               if (rephrasedSortKeys.isEmpty) None
               else Some(SortOrdering(rephrasedSortKeys, ord.sortOrder, unique = false))
             }
-          } yield SortRepr(newBucket, newOrderings)
+          } yield SortState(newBucket, newOrderings)
         } yield Repr.withSort(src.P)(src.table.transform(trans))(newSort)
 
       case qscript.Reduce(src, bucket, reducers, repair) =>
@@ -439,7 +439,7 @@ object Mimir extends BackendModule with Logging {
               bucketNotNullTrans <- Some(bucket)
                 .filterNot(_ === MapFuncsCore.NullLit())
                 .traverse(interpretMapFunc[Backend](src.P))
-              newSort = SortRepr(bucketNotNullTrans, sortOrderings)
+              newSort = SortState(bucketNotNullTrans, sortOrderings)
               sortedTable <- if (src.lastSort.fold(true)(last => needToSort(Repr.single[src.P](src).P)(last, newSort))) {
                 bucketNotNullTrans.fold(sortAll(src.table).toTask.liftM[MT].liftB) { bucketTrans =>
                   for {
@@ -583,7 +583,7 @@ object Mimir extends BackendModule with Logging {
               newSortOrder = rephrase2(transMiddle, transLKey, transRKey)
             } yield
               (lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle),
-                newSortOrder.map(order => SortRepr(None, order :: Nil)))
+                newSortOrder.map(order => SortState(None, order :: Nil)))
           }
           (result, newSort) = resultAndSort
         } yield Repr.withSort(src.P)(result)(newSort)
