@@ -1,12 +1,10 @@
 {
-    "name": "reads timestamps with map reduce",
+    "name": "reads timestamps with flatten",
     "backends": {
-        "mimir":          "skip",
-        "marklogic_json": "skip",
-        "marklogic_xml":  "skip",
-        "couchbase":      "skip",
-        "spark_local":    "skip",
-        "spark_hdfs":     "skip"
+        "mimir":          "pending",
+        "couchbase":      "pending",
+        "spark_local":    "pending",
+        "spark_hdfs":     "pending"
     },
     "data": "../../daysWithArray.data",
 
