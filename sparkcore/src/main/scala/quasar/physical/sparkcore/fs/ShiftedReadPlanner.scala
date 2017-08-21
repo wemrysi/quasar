@@ -20,15 +20,20 @@ import slamdata.Predef._
 import quasar._, quasar.Planner._
 import quasar.contrib.pathy.AFile
 import quasar.qscript._
-import quasar.effect.Capture
 
+import matryoshka.{Hole => _, _}
 import org.apache.spark._
 import org.apache.spark.rdd._
 import scalaz._, Scalaz._
 
-class ShiftedReadPlanner[M[_]:Capture:Monad] extends Planner[Const[ShiftedRead[AFile], ?], M] {
+class ShiftedReadPlanner[M[_]:Monad] extends Planner[Const[ShiftedRead[AFile], ?], M] {
 
-  def plan(fromFile: AFile => M[RDD[Data]]) =
+  import Planner.SparkState
+
+  def plan(
+    fromFile: AFile => M[RDD[Data]],
+    first: RDD[Data] => M[Data]
+  ): AlgebraM[SparkState[M, ?], Const[ShiftedRead[AFile], ?], RDD[Data]] =
     (qs: Const[ShiftedRead[AFile], RDD[Data]]) => {
       StateT((sc: SparkContext) => {
         val filePath = qs.getConst.path
