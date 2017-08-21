@@ -27,38 +27,41 @@ import matryoshka.{Hole => _, _}
 import scalaz._, Scalaz._
 
 
-trait Planner[F[_], M[_]] extends Serializable {
-  def plan(fromFile: AFile => M[RDD[Data]], first: RDD[Data] => M[Data]): AlgebraM[Planner.SparkState[M, ?], F, RDD[Data]]
+trait Planner[F[_], S[_]] extends Serializable {
+  def plan(
+    fromFile: AFile => Free[S, RDD[Data]],
+    first: RDD[Data] => Free[S, Data]
+  ): AlgebraM[Planner.SparkState[S, ?], F, RDD[Data]]
 }
 
 object Planner {
 
-  def apply[F[_],M[_]:Monad](implicit P: Planner[F, M]): Planner[F, M] = P
+  def apply[F[_],S[_]](implicit P: Planner[F, S]): Planner[F, S] = P
 
-  type SparkState[M[_], A] = StateT[EitherT[M, PlannerError, ?], SparkContext, A]
+  type SparkState[S[_], A] = StateT[EitherT[Free[S, ?], PlannerError, ?], SparkContext, A]
   type SparkStateT[F[_], A] = StateT[F, SparkContext, A]
 
-  implicit def deadEnd[M[_]:Monad]: Planner[Const[DeadEnd, ?], M] = unreachable("deadEnd")
-  implicit def read[A, M[_]:Monad]: Planner[Const[Read[A], ?], M] = unreachable("read")
-  implicit def shiftedReadPath[M[_]:Monad]: Planner[Const[ShiftedRead[ADir], ?], M] = unreachable("shifted read of a dir")
-  implicit def projectBucket[T[_[_]], M[_]:Monad]: Planner[ProjectBucket[T, ?], M] = unreachable("projectBucket")
-  implicit def thetaJoin[T[_[_]], M[_]:Monad]: Planner[ThetaJoin[T, ?], M] = unreachable("thetajoin")
-  implicit def shiftedread[M[_]:Monad]: Planner[Const[ShiftedRead[AFile], ?], M] = new ShiftedReadPlanner[M]
-  implicit def qscriptCore[T[_[_]]: BirecursiveT: ShowT, M[_]:Monad]: Planner[QScriptCore[T, ?], M] = new QScriptCorePlanner[T, M]
-  implicit def equiJoin[T[_[_]]: BirecursiveT: ShowT, M[_]:Monad]: Planner[EquiJoin[T, ?], M] = new EquiJoinPlanner[T, M]
+  implicit def deadEnd[S[_]]: Planner[Const[DeadEnd, ?], S] = unreachable("deadEnd")
+  implicit def read[A, S[_]]: Planner[Const[Read[A], ?], S] = unreachable("read")
+  implicit def shiftedReadPath[S[_]]: Planner[Const[ShiftedRead[ADir], ?], S] = unreachable("shifted read of a dir")
+  implicit def projectBucket[T[_[_]], S[_]]: Planner[ProjectBucket[T, ?], S] = unreachable("projectBucket")
+  implicit def thetaJoin[T[_[_]], S[_]]: Planner[ThetaJoin[T, ?], S] = unreachable("thetajoin")
+  implicit def shiftedread[S[_]]: Planner[Const[ShiftedRead[AFile], ?], S] = new ShiftedReadPlanner[S]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT: ShowT, S[_]]: Planner[QScriptCore[T, ?], S] = new QScriptCorePlanner[T, S]
+  implicit def equiJoin[T[_[_]]: BirecursiveT: ShowT, S[_]]: Planner[EquiJoin[T, ?], S] = new EquiJoinPlanner[T, S]
 
-  implicit def coproduct[F[_], G[_], M[_]:Monad](
-    implicit F: Planner[F, M], G: Planner[G, M]):
-      Planner[Coproduct[F, G, ?], M] =
-    new Planner[Coproduct[F, G, ?], M] {
-      def plan(fromFile: AFile => M[RDD[Data]], first: RDD[Data] => M[Data]): AlgebraM[SparkState[M, ?], Coproduct[F, G, ?], RDD[Data]] = _.run.fold(F.plan(fromFile, first), G.plan(fromFile, first))
+  implicit def coproduct[F[_], G[_], S[_]](
+    implicit F: Planner[F, S], G: Planner[G, S]):
+      Planner[Coproduct[F, G, ?], S] =
+    new Planner[Coproduct[F, G, ?], S] {
+      def plan(fromFile: AFile => Free[S, RDD[Data]], first: RDD[Data] => Free[S, Data]): AlgebraM[SparkState[S, ?], Coproduct[F, G, ?], RDD[Data]] = _.run.fold(F.plan(fromFile, first), G.plan(fromFile, first))
     }
 
-  private def unreachable[F[_], M[_]:Monad](what: String): Planner[F, M] =
-    new Planner[F, M] {
-      def plan(fromFile: AFile => M[RDD[Data]], first: RDD[Data] => M[Data]): AlgebraM[SparkState[M, ?], F, RDD[Data]] =
+  private def unreachable[F[_], S[_]](what: String): Planner[F, S] =
+    new Planner[F, S] {
+      def plan(fromFile: AFile => Free[S, RDD[Data]], first: RDD[Data] => Free[S,Data]): AlgebraM[SparkState[S, ?], F, RDD[Data]] =
         _ =>  StateT((sc: SparkContext) => {
-          EitherT(InternalError.fromMsg(s"unreachable $what").left[(SparkContext, RDD[Data])].point[M])
+          EitherT(InternalError.fromMsg(s"unreachable $what").left[(SparkContext, RDD[Data])].point[Free[S, ?]])
         })
     }
 

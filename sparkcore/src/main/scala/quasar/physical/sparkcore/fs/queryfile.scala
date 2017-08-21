@@ -108,7 +108,7 @@ object queryfile {
     details: SparkConnectorDetails.Ops[S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, ExecutionPlan]] = {
 
-    val total = scala.Predef.implicitly[Planner[SparkQScript, Free[S, ?]]]
+    val total = scala.Predef.implicitly[Planner[SparkQScript, S]]
 
     read.asks { sc =>
       val sparkStuff: Free[S, PlannerError \/ RDD[Data]] =
@@ -132,7 +132,7 @@ object queryfile {
     details: SparkConnectorDetails.Ops[S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, AFile]] = {
 
-    val total = scala.Predef.implicitly[Planner[SparkQScript, Free[S, ?]]]
+    val total = scala.Predef.implicitly[Planner[SparkQScript, S]]
 
     read.asks { sc =>
       val sparkStuff: Free[S, PlannerError \/ RDD[Data]] =
@@ -156,7 +156,7 @@ object queryfile {
     details: SparkConnectorDetails.Ops[S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, QueryFile.ResultHandle]] = {
 
-    val total = scala.Predef.implicitly[Planner[SparkQScript, Free[S, ?]]]
+    val total = scala.Predef.implicitly[Planner[SparkQScript, S]]
 
     val open: Free[S, PlannerError \/ (QueryFile.ResultHandle, RDD[Data])] = (for {
       h <- EitherT(ms.next map (QueryFile.ResultHandle(_).right[PlannerError]))

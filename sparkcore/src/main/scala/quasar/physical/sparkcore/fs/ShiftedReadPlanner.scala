@@ -26,14 +26,14 @@ import org.apache.spark._
 import org.apache.spark.rdd._
 import scalaz._, Scalaz._
 
-class ShiftedReadPlanner[M[_]:Monad] extends Planner[Const[ShiftedRead[AFile], ?], M] {
+class ShiftedReadPlanner[S[_]] extends Planner[Const[ShiftedRead[AFile], ?], S] {
 
   import Planner.SparkState
 
   def plan(
-    fromFile: AFile => M[RDD[Data]],
-    first: RDD[Data] => M[Data]
-  ): AlgebraM[SparkState[M, ?], Const[ShiftedRead[AFile], ?], RDD[Data]] =
+    fromFile: AFile => Free[S, RDD[Data]],
+    first: RDD[Data] => Free[S, Data]
+  ): AlgebraM[SparkState[S, ?], Const[ShiftedRead[AFile], ?], RDD[Data]] =
     (qs: Const[ShiftedRead[AFile], RDD[Data]]) => {
       StateT((sc: SparkContext) => {
         val filePath = qs.getConst.path

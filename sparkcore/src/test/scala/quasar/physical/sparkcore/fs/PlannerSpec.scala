@@ -26,7 +26,7 @@ import quasar.contrib.pathy._
 import quasar.Data
 import quasar.qscript._
 import quasar.sql.JoinDir
-
+import quasar.fp.free._
 
 import java.math.MathContext
 
@@ -96,10 +96,10 @@ class PlannerSpec
               "name" -> Data.Str("tom"),
               "age" -> Data.Int(28)
             )
-        val fromFile: AFile => Task[RDD[Data]] =
-          (file: AFile) => Task.delay {
-            sc.parallelize(List(Data.Obj(input)))
-          }
+        val fromFile: AFile => Free[Task, RDD[Data]] =
+          (file: AFile) => lift(Task.delay {
+            sc.parallelize(List(Data.Obj(input):Data))
+          }).into[Task]
         val compile: AlgebraM[SparkState[Task, ?], Const[ShiftedRead[AFile], ?], RDD[Data]] =
           sr.plan(fromFile, first)
         val afile: AFile = rootDir </> dir("Users") </> dir("rabbit") </> file("test.json")
@@ -117,7 +117,8 @@ class PlannerSpec
     "core" should {
       "map" in {
         withSpark { sc =>
-          val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] = qscore.plan(emptyFF(sc), first)
+          val compile: AlgebraM[SparkState[Task, ?], QScriptCore, RDD[Data]] =
+            qscore.plan(emptyFF[Task](sc), first[Task])
           val src: RDD[Data] = sc.parallelize(data)
 
           def func: FreeMap = ProjectFieldR(HoleF, StrLit("country"))
@@ -231,7 +232,7 @@ class PlannerSpec
         //     def repair: Free[MapFuncCore, ReduceIndex] = Free.point(ReduceIndex(0))
         //     val reduce = Reduce(src, bucket, reducers, repair)
 
-        //     val state: SparkState[Task, RDD[Data]] = compile(reduce)
+        //     val state: SparkState[Free[S,?], RDD[Data]] = compile(reduce)
         //     state.eval(sc).run.map(result => result must beRightDisjunction.like{
         //       case rdd =>
         //         val results = rdd.collect
@@ -449,8 +450,8 @@ class PlannerSpec
           })
         }
       }
-    }
 
+    }
 
     "equiJoin" should {
 
@@ -557,7 +558,8 @@ class PlannerSpec
 
       "fullOuter" in {
         withSpark { sc =>
-          val compile: AlgebraM[SparkState[Task, ?], EquiJoin, RDD[Data]] = equi.plan(emptyFF(sc), first)
+          val compile: AlgebraM[SparkState[Task, ?], EquiJoin, RDD[Data]] =
+            equi.plan(emptyFF[Task](sc), first[Task])
           val src: RDD[Data] = sc.parallelize(data5)
 
           def func(country: String): FreeMap =
@@ -593,25 +595,32 @@ class PlannerSpec
         }
       }
     }
+
   }
 
-  private def withSpark[A](f: SparkContext => Task[A]): A = {
+  private def withSpark[A, S[_]](f: SparkContext => Free[S, A])(implicit
+    S: S :<: Task
+  ): A = {
     val config = new SparkConf().setMaster("local[*]").setAppName("PlannerSpec")
     (for {
       sc     <- Task.delay(new SparkContext(config))
-      result <- f(sc).onFinish(_ => Task.delay(sc.stop))
+      result <- f(sc).foldMap(injectNT[S, Task]).onFinish(_ => Task.delay(sc.stop))
     } yield result).unsafePerformSync
   }
 
   private def constFreeQS(v: Int): FreeQS =
     Free.roll(QCT.inj(quasar.qscript.Map(Free.roll(QCT.inj(Unreferenced())), IntLit(v))))
 
-  private def emptyFF(sc: SparkContext): AFile => Task[RDD[Data]] =
-    (file: AFile) => Task.delay {
-      sc.parallelize(List())
-    }
+  private def emptyFF[S[_]](sc: SparkContext)(implicit
+    S: Task :<: S
+  ): AFile => Free[S, RDD[Data]] =
+    (file: AFile) => lift(Task.delay {
+      sc.parallelize(List.empty[Data])
+    }).into[S]
 
-  private def first: RDD[Data] => Task[Data] = (rdd: RDD[Data]) => Task.delay {
+  private def first[S[_]](implicit
+    S: Task :<: S
+  ): RDD[Data] => Free[S, Data] = (rdd: RDD[Data]) => lift(Task.delay {
     rdd.first
-  }
+  }).into[S]
 }

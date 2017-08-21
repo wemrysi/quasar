@@ -31,20 +31,20 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 
-class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, M[_]:Monad] extends Planner[EquiJoin[T, ?], M] {
+class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, S[_]] extends Planner[EquiJoin[T, ?], S] {
 
   import Planner.{SparkState, SparkStateT}
 
-  def plan(fromFile: AFile => M[RDD[Data]], first: RDD[Data] => M[Data]): AlgebraM[SparkState[M, ?], EquiJoin[T, ?], RDD[Data]] = {
+  def plan(fromFile: AFile => Free[S, RDD[Data]], first: RDD[Data] => Free[S, Data]): AlgebraM[SparkState[S, ?], EquiJoin[T, ?], RDD[Data]] = {
     case EquiJoin(src, lBranch, rBranch, lKey, rKey, jt, combine) =>
-      val algebraM = Planner[QScriptTotal[T, ?], M].plan(fromFile, first)
-      val srcState = src.point[SparkState[M, ?]]
+      val algebraM = Planner[QScriptTotal[T, ?], S].plan(fromFile, first)
+      val srcState = src.point[SparkState[S, ?]]
 
-      def genKey(kf: FreeMap[T]): SparkState[M, Data => Data] =
-        EitherT(CoreMap.changeFreeMap(kf).point[M]).liftM[SparkStateT]
+      def genKey(kf: FreeMap[T]): SparkState[S, Data => Data] =
+        EitherT(CoreMap.changeFreeMap(kf).point[Free[S, ?]]).liftM[SparkStateT]
 
-      val merger: SparkState[M, (Data, Data) => Data] =
-        EitherT(CoreMap.changeJoinFunc(combine).point[M]).liftM[SparkStateT]
+      val merger: SparkState[S, (Data, Data) => Data] =
+        EitherT(CoreMap.changeJoinFunc(combine).point[Free[S, ?]]).liftM[SparkStateT]
 
       for {
         lk <- genKey(lKey)

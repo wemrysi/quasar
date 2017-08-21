@@ -33,8 +33,8 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 
-class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, M[_]:Monad]
-    extends Planner[QScriptCore[T, ?], M] {
+class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
+    extends Planner[QScriptCore[T, ?], S] {
 
   import Planner.{SparkState, SparkStateT}
 
@@ -73,21 +73,21 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, M[_]:Monad]
 
 
   private def filterOut(
-    fromFile: AFile => M[RDD[Data]],
-    first: RDD[Data] => M[Data],
+    fromFile: AFile => Free[S, RDD[Data]],
+    first: RDD[Data] => Free[S, Data],
     src: RDD[Data],
     from: FreeQS[T],
     count: FreeQS[T],
     predicate: (Index, Count) => Boolean ):
-      StateT[EitherT[M, PlannerError, ?], SparkContext, RDD[Data]] = {
+      StateT[EitherT[Free[S, ?], PlannerError, ?], SparkContext, RDD[Data]] = {
 
-    val algebraM = Planner[QScriptTotal[T, ?], M].plan(fromFile, first)
-    val srcState = src.point[SparkState[M, ?]]
+    val algebraM = Planner[QScriptTotal[T, ?], S].plan(fromFile, first)
+    val srcState = src.point[SparkState[S, ?]]
 
-    val fromState: SparkState[M, RDD[Data]] = from.cataM(interpretM(κ(srcState), algebraM))
-    val countState: SparkState[M, RDD[Data]] = count.cataM(interpretM(κ(srcState), algebraM))
+    val fromState: SparkState[S, RDD[Data]] = from.cataM(interpretM(κ(srcState), algebraM))
+    val countState: SparkState[S, RDD[Data]] = count.cataM(interpretM(κ(srcState), algebraM))
 
-    val countEval: SparkState[M, Long] = countState >>= (rdd => EitherT(first(rdd).map {
+    val countEval: SparkState[S, Long] = countState >>= (rdd => EitherT(first(rdd).map {
       case Data.Int(v) if v.isValidLong => v.toLong.right[PlannerError]
       case Data.Int(v) => InternalError.fromMsg(s"Provided Integer $v is not a Long").left[Long]
       case a => InternalError.fromMsg(s"$a is not a Long number").left[Long]
@@ -137,12 +137,12 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, M[_]:Monad]
   }
 
   def plan(
-    fromFile: AFile => M[RDD[Data]],
-    first: RDD[Data] => M[Data]
-  ): AlgebraM[SparkState[M, ?], QScriptCore[T, ?], RDD[Data]] = {
+    fromFile: AFile => Free[S, RDD[Data]],
+    first: RDD[Data] => Free[S, Data]
+  ): AlgebraM[SparkState[S, ?], QScriptCore[T, ?], RDD[Data]] = {
     case qscript.Map(src, f) =>
       StateT((sc: SparkContext) =>
-        EitherT(CoreMap.changeFreeMap(f).map(df => (sc, src.map(df))).point[M]))
+        EitherT(CoreMap.changeFreeMap(f).map(df => (sc, src.map(df))).point[Free[S, ?]]))
     case Reduce(src, bucket, reducers, repair) =>
       val maybePartitioner: PlannerError \/ (Data => Data) =
         CoreMap.changeFreeMap(bucket)
@@ -203,7 +203,7 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, M[_]:Monad]
                   }
                   repair(k, v)
               }
-        }).map((sc, _)).point[M])
+        }).map((sc, _)).point[Free[S, ?]])
       )
     case Sort(src, bucket, orders) =>
 
@@ -236,7 +236,7 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, M[_]:Monad]
           val main = sortBys.head._2
           val keys = (bucket, main) :: sortBys.toList
           src.sortBy(d => KO(keys.map(p => p.leftMap(_(d))), main), main === SortDir.Ascending)
-      }.point[M]).liftM[SparkStateT]
+      }.point[Free[S, ?]]).liftM[SparkStateT]
 
     case Filter(src, f) =>
       StateT((sc: SparkContext) =>
@@ -245,7 +245,7 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, M[_]:Monad]
             df >>> {
               case Data.Bool(b) => b
               case _            => false
-            }))).point[M]
+            }))).point[Free[S, ?]]
         })
     case Subset(src, from, sel, count) =>
       filterOut(fromFile, first, src, from, count,
@@ -278,17 +278,17 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, M[_]:Monad]
               case IdOnly => m.keys.map(k => rf(input, Data.Str(k)))
             }
             case _ => List.empty[Data]
-          })).map((sc, _)).point[M]))
+          })).map((sc, _)).point[Free[S, ?]]))
 
     case Union(src, lBranch, rBranch) =>
-      val algebraM = Planner[QScriptTotal[T, ?], M].plan(fromFile, first)
-      val srcState = src.point[SparkState[M, ?]]
+      val algebraM = Planner[QScriptTotal[T, ?], S].plan(fromFile, first)
+      val srcState = src.point[SparkState[S, ?]]
 
       (lBranch.cataM(interpretM(κ(srcState), algebraM)) ⊛
         rBranch.cataM(interpretM(κ(srcState), algebraM)))(_ ++ _)
     case Unreferenced() =>
       StateT((sc: SparkContext) => {
-        EitherT((sc, sc.parallelize(List(Data.Null: Data))).right[PlannerError].point[M])
+        EitherT((sc, sc.parallelize(List(Data.Null: Data))).right[PlannerError].point[Free[S, ?]])
       })
   }
 }
