@@ -89,8 +89,7 @@ object mount {
           OptionT(refineType(p).toOption.η[Free[S, ?]]) >>= (f =>
             vcache.get(f) >> (vcache.delete(f).liftM[OptionT]))
 
-        respond(
-          deleteViewIfExists.getOrElseF(M.unmount(p)).as(s"deleted ${printPath(p)}"))
+        respond((M.unmount(p) *> deleteViewIfExists.run).as(s"deleted ${printPath(p)}"))
     }
 
   ////
@@ -152,6 +151,7 @@ object mount {
       tf     <- MF.tempFile(path).leftMap(_.toApiError)
       ts     <- T.timestamp.liftM[ApiErrT]
       rAfter <- free.lift(maxAge.traverse(ViewCache.expireAt(ts, _))).into.liftM[ApiErrT]
+      _      <- (replaceIfExists && exists).fold(M.replace(path, bConf), M.mount(path, bConf)).liftM[ApiErrT]
       _      <- (refineType(path).toOption ⊛ MountConfig.viewConfig.getOption(bConf) ⊛ maxAge ⊛ rAfter) { (p, c, a, r) =>
                   val nvc = ViewCache(
                     query = MountConfig.viewConfigUri(c),
@@ -175,6 +175,5 @@ object mount {
                       dataFile = nvc.dataFile))),
                     vcache.put(p, nvc )).join
                 }.orZero.liftM[ApiErrT]
-      _      <- (replaceIfExists && exists).fold(M.replace(path, bConf), M.mount(path, bConf)).liftM[ApiErrT]
     } yield exists
 }

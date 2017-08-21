@@ -645,38 +645,6 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
           }
         }
 
-        "update existing view" >> prop { (d: ADir, f: RFile) =>
-          runTest { service =>
-            val expr = sqlB"α"
-            val vars = Variables.empty
-            val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
-            val df = d </> f
-            val maxAge = 7.seconds
-            val viewCache =
-              lift(ViewCache.expireAt(nineteenEighty, maxAge) ∘ (ra =>
-                ViewCache(
-                  MountConfig.viewConfigUri(expr, vars), None, None, 0, None, None,
-                  maxAge.toSeconds, ra, ViewCache.Status.Pending, None, df, None))).into[Eff]
-
-            for {
-              vc    <- viewCache
-              vcg   <- vcache.put(df, vc.copy(status = ViewCache.Status.Successful))
-              req   <- reqBuilder(d, f, cfgStr, `Cache-Control`(CacheDirective.`max-age`(7.seconds)))
-              r     <- service(req)
-              (res, mntd) = r
-              body  <- lift(res.as[String]).into[Eff]
-              vcg   <- vcache.get(df).run
-              after <- M.lookupConfig(df).run.run
-            } yield {
-              (body must_= s"added ${printPath(df)}")           and
-              (res.status must_= Ok)                            and
-              (vcg ∘ (_.copy(dataFile = df)) must beSome(vc))   and
-              (mntd must_=== Set(MR.mountView(df, expr, vars))) and
-              (after must beSome(MountConfig.viewConfig(expr, vars).right[MountingError]))
-            }
-          }
-        }
-
         "be 409 with fs above existing fs path" >> prop { (d: ADir, fs: RDir, fsSuffix: RDir) =>
           (!identicalPath(fsSuffix, currentDir)) ==> {
             runTest { service =>
@@ -810,6 +778,81 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
         }
       }
 
+      "be 409 for view cache in place of existing view" >> prop { (d: ADir, f: RFile) =>
+        runTest { service =>
+          val expr = sqlB"α"
+          val vars = Variables.empty
+          val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
+          val df = d </> f
+          val maxAge = 7.seconds
+
+          for {
+            _     <- lift(Request(
+                       method = Method.PUT,
+                       uri = pathUri(df))
+                       .withBody(cfgStr)).into[Eff] >>= (service)
+            put   <- lift(Request(
+                       method = Method.POST,
+                       uri = pathUri(d),
+                       headers = Headers(xFileName(f), `Cache-Control`(CacheDirective.`max-age`(maxAge))))
+                       .withBody(cfgStr)).into[Eff]
+            r     <- service(put)
+            (res, mntd) = r
+            err   <- lift(res.as[ApiError]).into[Eff]
+            vcg   <- vcache.get(df).run
+            after <- M.lookupConfig(df).run.run
+          } yield {
+            (res.status must_= Conflict)                      and
+            (err must beApiErrorLike(pathExists(df)))         and
+            (vcg must beEmpty)                                and
+            (mntd must_=== Set(MR.mountView(df, expr, vars))) and
+            (after must beSome(MountConfig.viewConfig(expr, vars).right[MountingError]))
+          }
+        }
+      }
+
+      "be 409 for view cache in place of existing view cache" >> prop { (d: ADir, f: RFile) =>
+        runTest { service =>
+          val expr1 = sqlB"α"
+          val expr2 = sqlB"β"
+          val vars = Variables.empty
+          val cfgStr1 = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr1, vars))
+          val cfgStr2 = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr2, vars))
+          val df = d </> f
+          val maxAge = 7.seconds
+          val viewCache =
+            lift(ViewCache.expireAt(nineteenEighty, maxAge) ∘ (ra =>
+              ViewCache(
+                MountConfig.viewConfigUri(expr1, vars), None, None, 0, None, None,
+                maxAge.toSeconds, ra, ViewCache.Status.Pending, None, df, None))).into[Eff]
+
+          for {
+            vc    <- viewCache
+            _     <- lift(Request(
+                       method = Method.PUT,
+                       uri = pathUri(df))
+                       .withBody(cfgStr1)).into[Eff] >>= (service)
+            vcg   <- vcache.put(df, vc)
+            put   <- lift(Request(
+                       method = Method.POST,
+                       uri = pathUri(d),
+                       headers = Headers(xFileName(f), `Cache-Control`(CacheDirective.`max-age`(maxAge))))
+                       .withBody(cfgStr2)).into[Eff]
+            r     <- service(put)
+            (res, mntd) = r
+            err   <- lift(res.as[ApiError]).into[Eff]
+            vcg   <- vcache.get(df).run
+            after <- M.lookupConfig(df).run.run
+          } yield {
+            (res.status must_= Conflict)                       and
+            (err must beApiErrorLike(pathExists(df)))          and
+            (vcg ∘ (_.copy(dataFile = df)) must beSome(vc))    and
+            (mntd must_=== Set(MR.mountView(df, expr1, vars))) and
+            (after must beSome(MountConfig.viewConfig(expr1, vars).right[MountingError]))
+          }
+        }
+      }
+
       "be 400 with missing X-File-Name header" >> prop { (parent: ADir) =>
         runTest { service =>
           for {
@@ -851,6 +894,85 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             (res.status must_== Ok)                                       and
             (mntd must_== Set(MR.mountFileSystem(fsDir, StubFs, fooUri))) and
             (after must beSome(MountConfig.fileSystemConfig(StubFs, fooUri).right[MountingError]))
+          }
+        }
+      }
+
+      "succeed for view cache in place of existing view" >> prop { (d: ADir, f: RFile) =>
+        runTest { service =>
+          val expr = sqlB"α"
+          val vars = Variables.empty
+          val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
+          val df = d </> f
+          val maxAge = 7.seconds
+          val viewCache =
+            lift(ViewCache.expireAt(nineteenEighty, maxAge) ∘ (ra =>
+              ViewCache(
+                MountConfig.viewConfigUri(expr, vars), None, None, 0, None, None,
+                maxAge.toSeconds, ra, ViewCache.Status.Pending, None, df, None))).into[Eff]
+
+          for {
+            vc    <- viewCache
+            _     <- lift(Request(
+                       method = Method.PUT,
+                       uri = pathUri(df))
+                       .withBody(cfgStr)).into[Eff] >>= (service)
+            put   <- lift(Request(
+                       method = Method.PUT,
+                       uri = pathUri(df),
+                       headers = Headers(`Cache-Control`(CacheDirective.`max-age`(maxAge))))
+                       .withBody(cfgStr)).into[Eff]
+            r     <- service(put)
+            (res, mntd) = r
+            body  <- lift(res.as[String]).into[Eff]
+            vcg   <- vcache.get(df).run
+            after <- M.lookupConfig(df).run.run
+          } yield {
+            (body must_= s"updated ${printPath(df)}")         and
+            (res.status must_= Ok)                            and
+            (vcg ∘ (_.copy(dataFile = df)) must beSome(vc))   and
+            (mntd must_=== Set(MR.mountView(df, expr, vars))) and
+            (after must beSome(MountConfig.viewConfig(expr, vars).right[MountingError]))
+          }
+        }
+      }
+
+      "succeed for view cache in place of existing view cache" >> prop { (d: ADir, f: RFile) =>
+        runTest { service =>
+          val expr = sqlB"α"
+          val vars = Variables.empty
+          val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
+          val df = d </> f
+          val maxAge = 7.seconds
+          val viewCache =
+            lift(ViewCache.expireAt(nineteenEighty, maxAge) ∘ (ra =>
+              ViewCache(
+                MountConfig.viewConfigUri(expr, vars), None, None, 0, None, None,
+                maxAge.toSeconds, ra, ViewCache.Status.Pending, None, df, None))).into[Eff]
+
+          for {
+            vc    <- viewCache
+            _     <- lift(Request(
+                       method = Method.PUT,
+                       uri = pathUri(df),
+                       headers = Headers(`Cache-Control`(CacheDirective.`max-age`(maxAge))))
+                       .withBody(cfgStr)).into[Eff] >>= (service)
+            put   <- lift(Request(
+                       method = Method.PUT,
+                       uri = pathUri(df),
+                       headers = Headers(`Cache-Control`(CacheDirective.`max-age`(maxAge))))
+                       .withBody(cfgStr)).into[Eff]
+            r     <- service(put)
+            (res, mntd) = r
+            body  <- lift(res.as[String]).into[Eff]
+            vcg   <- vcache.get(df).run
+            after <- M.lookupConfig(df).run.run
+          } yield {
+            (body must_= s"updated ${printPath(df)}")         and
+            (res.status must_= Ok)                            and
+            (vcg ∘ (_.copy(dataFile = df)) must beSome(vc))   and
+            (mntd must_=== Set(MR.mountView(df, expr, vars))) and
+            (after must beSome(MountConfig.viewConfig(expr, vars).right[MountingError]))
           }
         }
       }
@@ -950,15 +1072,17 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
         }
       }
 
-      "remove view cache" >> prop { f: AFile =>
+      "succeed with view cache path" >> prop { f: AFile =>
         runTest { service =>
-          val viewCache = ViewCache(
-            ConnectionUri("α"), None, None, 0, None, None,
-            0, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, f, None)
+          val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(sqlB"α", Variables.empty))
 
           for {
-            _   <- vcache.put(f, viewCache)
-            r   <- service(Request(method = DELETE, uri = pathUri(f)))
+            _     <- lift(Request(
+                       method = Method.PUT,
+                       uri = pathUri(f),
+                       headers = Headers(`Cache-Control`(CacheDirective.`max-age`(7.seconds))))
+                       .withBody(cfgStr)).into[Eff] >>= (service)
+            r     <- service(Request(method = DELETE, uri = pathUri(f)))
             (res, mntd) = r
             body  <- lift(res.as[String]).into[Eff]
             vcg   <- vcache.get(f).run
