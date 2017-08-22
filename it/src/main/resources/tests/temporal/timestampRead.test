@@ -1,0 +1,16 @@
+{
+    "name": "reads timestamps with flatten",
+    "backends": {
+        "mimir":          "pending",
+        "couchbase":      "pending",
+        "spark_hdfs":     "pending"
+    },
+    "data": "../daysWithArray.data",
+
+    "query": "select cc[*], ts from `../daysWithArray`",
+    "predicate": "exactly",
+
+    "expected": [{"cc": "a", "ts":{ "$timestamp": "2014-08-17T06:00:00.000Z" }},
+                 {"cc": "b", "ts":{ "$timestamp": "2014-08-17T06:00:00.000Z" }},
+                 {"cc": "c", "ts":{ "$timestamp": "2014-08-17T06:00:00.000Z" }}]
+}
