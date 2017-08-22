@@ -21,7 +21,7 @@ import quasar._
 import quasar.connector.BackendModule
 import quasar.contrib.pathy._
 import quasar.fp._, free._
-import quasar.fs._
+import quasar.fs._, FileSystemError._
 import quasar.fs.mount._, BackendDef.DefErrT
 import quasar.effect.Failure
 import quasar.qscript._
@@ -31,6 +31,7 @@ import scala.Predef.implicitly
 import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
 import matryoshka._
+import matryoshka.implicits._
 import scalaz.{Failure => _, _}
 import scalaz.concurrent.Task
 
@@ -40,6 +41,7 @@ trait SparkCoreBackendModule extends BackendModule {
   type Eff[A]
   def toLowerLevel[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S): M ~> Free[S, ?]
   def generateSC: Config => DefErrT[M, SparkContext]
+  def askSc: M[SparkContext]
 
   // common for all spark based connecotrs
   type M[A] = Free[Eff, A]
@@ -67,4 +69,15 @@ trait SparkCoreBackendModule extends BackendModule {
   def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] =
     EitherT(toTask(generateSC(cfg).run)).map(sc => (toTask, Task.delay(sc.stop())))
 
+  def rddFrom: AFile => M[RDD[Data]]
+  def first: RDD[Data] => M[Data]
+  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](cp: T[QSM[T, ?]]): Backend[Repr] =
+    includeError((askSc >>= { sc =>
+      val total = implicitly[Planner[QSM[T, ?], Eff]]
+      cp.cataM(total.plan(rddFrom, first)).eval(sc).run.map(_.leftMap(pe => qscriptPlanningFailed(pe)))
+    }).liftB)
+
+  // util functions because 4 levels of monad transformes is like o_O
+  // this will disapper
+  def includeError[A](b: Backend[FileSystemError \/ A]): Backend[A]
 }
