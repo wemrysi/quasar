@@ -31,7 +31,7 @@ import quasar.fs.mount._
 import quasar.qscript._
 
 import quasar.blueeyes.json.{JNum, JValue}
-import quasar.precog.common.{CEmptyArray, ColumnRef, CPath, CPathIndex, Path}
+import quasar.precog.common.{CEmptyArray, ColumnRef, CPath, CPathField, CPathIndex, Path}
 import quasar.yggdrasil.TableModule
 import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
@@ -312,7 +312,15 @@ object Mimir extends BackendModule with Logging {
           val pairs: List[(Library.Reduction, FreeMap[T])] =
             reducers.map(extractReduction)
 
-          val reductions: List[Library.Reduction] = pairs.map(_._1)
+          // we add First so we can pull out the group key
+          def reductions(bucketed: Boolean): List[Library.Reduction] = {
+            if (bucketed)
+              Library.First :: pairs.map(_._1)
+            else
+              pairs.map(_._1)
+          }
+
+          // note that this means that funcs will NOT align with reductions!
           val funcs: List[FreeMap[T]] = pairs.map(_._2)
 
           def makeJArray(idx: Int)(tpe: JType): JType =
@@ -321,46 +329,76 @@ object Mimir extends BackendModule with Logging {
           def derefArray(idx: Int)(ref: ColumnRef): Option[ColumnRef] =
             ref.selector.dropPrefix(CPath.Identity \ idx).map(ColumnRef(_, ref.ctype))
 
-          val megaReduction: Library.Reduction =
-            Library.coalesce(reductions.zipWithIndex.map {
+          def megaReduction(bucketed: Boolean): Library.Reduction = {
+            Library.coalesce(reductions(bucketed).zipWithIndex map {
               case (r, i) => (r, Some((makeJArray(i)(_), derefArray(i)(_))))
             })
+          }
 
           // mimir reverses the order of the returned results
-          def remapIndex: ScalaMap[Int, Int] =
-            (0 until reducers.length).reverse.zipWithIndex.toMap
+          def remapIndex(bucketed: Boolean): ScalaMap[Int, Int] =
+            (0 until (reducers.length + (if (bucketed) 1 else 0))).reverse.zipWithIndex.toMap
 
           for {
             specs <- funcs.traverse(interpretMapFunc[Backend](src.P)(_))
-            megaSpec = combineTransSpecs(specs)
+
+            adjustedSpecs = { bucketed: Boolean =>
+              if (bucketed) {
+                specs map { spec =>
+                  TransSpec.deepMap(spec) {
+                    case Leaf(source) =>
+                      DerefObjectStatic(Leaf(source), CPathField("1"))
+                  }
+                }
+              } else {
+                specs
+              }
+            }
+
+            // add back in the group key reduction (corresponds with the First we add above)
+            megaSpec = { bucketed: Boolean =>
+              combineTransSpecs(DerefObjectStatic(Leaf(Source), CPathField("0")) :: adjustedSpecs(bucketed))
+            }
 
             table <- {
-              def reduceAll(table: src.P.Table): Future[src.P.Table] = {
+              def reduceAll(bucketed: Boolean)(table: src.P.Table): Future[src.P.Table] = {
                 for {
-                  red <- megaReduction(table.transform(megaSpec))
+                  // ok this isn't working right now because we throw away the key when we reduce; need to fold in a First reducer to carry along the key
+                  red <- megaReduction(bucketed)(table.transform(megaSpec(bucketed)))
                   trans <- repair.cataM[Future, TransSpec1](
+                    // note that .0 is the partition key
+                    // and .1 is the value (if bucketed)
+                    // if we aren't bucketed, everything is unwrapped
+                    // these are effectively implementation details of partitionMerge
                     interpretM(
                       {
-                        case ReduceIndex(Some(idx)) => remapIndex.get(idx) match {
-                          case Some(i) =>
-                            (DerefArrayStatic(TransSpec1.Id, CPathIndex(i)): TransSpec1).point[Future]
-                          case None => ???
-                        }
-                        case ReduceIndex(None) => interpretMapFunc[Future](src.P)(bucket)
+                        case ReduceIndex(Some(idx)) =>
+                          // we don't add First if we aren't bucketed
+                          remapIndex(bucketed).get(idx + (if (bucketed) 1 else 0)) match {
+                            case Some(i) =>
+                              (DerefArrayStatic(Leaf(Source), CPathIndex(i)): TransSpec1).point[Future]
+
+                            case None => ???
+                          }
+
+                        case ReduceIndex(None) =>
+                          Future(scala.Predef.assert(bucketed, "bucketed was false in a ReduceIndex(None)")) >>
+                            (DerefArrayStatic(Leaf(Source), CPathIndex(remapIndex(bucketed)(0))): TransSpec1).point[Future]
                       },
                       mapFuncPlanner[Future].plan(src.P)[Source1](TransSpec1.Id)))
                 } yield red.transform(trans)
               }
 
               if (bucket === MapFuncsCore.NullLit()) {
-                reduceAll(src.table).toTask.liftM[MT].liftB
+                reduceAll(false)(src.table).toTask.liftM[MT].liftB
               } else {
                 for {
                   bucketTrans <- interpretMapFunc[Backend](src.P)(bucket)
 
                   prepared <- sortT[src.P.type](Repr.single[src.P](src))(src.table, bucketTrans)
                     .liftM[MT].liftB.map(r => src.unsafeMergeTable(r.table))
-                  table <- prepared.partitionMerge(bucketTrans)(reduceAll).toTask.liftM[MT].liftB
+
+                  table <- prepared.partitionMerge(bucketTrans, keepKey = true)(reduceAll(true)).toTask.liftM[MT].liftB
                 } yield table
               }
             }
