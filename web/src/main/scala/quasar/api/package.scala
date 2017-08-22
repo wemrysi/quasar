@@ -231,51 +231,18 @@ package object api {
     from.parsePath(to.unsafePrintPath, to.unsafePrintPath, to.unsafePrintPath, to.unsafePrintPath)
 
   def staticFileService(basePath: String): HttpService = {
-    /// This is cribbed from http4s (server/src/main/scala/org/http4s/server/staticcontent/FileService.scala)
-    /// The only change is the `file.isDirectory` case statement in the `pathCollector` method which was
-    /// changed so that index.html is chosen when the client requests a directory.
-    /// The default implementation returns an Unauthorized response.
-    /// The implementation is copy pasted because http4s does not currently make it easy to customize this
-    /// implementation without copying over the whole thing which is quite unfortunate.
-    import org.http4s.headers._
+    val fsConfig = FileService.Config(systemPath = basePath)
 
-    val AcceptRangeHeader = `Accept-Ranges`(RangeUnit.Bytes)
-
-    def validRange(start: Long, end: Option[Long], fileLength: Long): Boolean = {
-      start < fileLength && (end match {
-        case Some(end) => start >= 0 && start <= end
-        case None      => start >= 0 || fileLength + start - 1 >= 0
-      })
-    }
-
-    // Attempt to find a Range header and collect only the subrange of content requested
-    def getPartialContentFile(file: jFile, config: FileService.Config, req: Request): Option[Response] = req.headers.get(Range).flatMap {
-      case Range(RangeUnit.Bytes, org.http4s.util.NonEmptyList(Range.SubRange(s, e))) if validRange(s, e, file.length) =>
-        val size = file.length()
-        val start = if (s >= 0) s else scala.math.max(0, size + s)
-        val end = scala.math.min(size - 1, e getOrElse (size - 1))  // end is inclusive
-
-        StaticFile .fromFile(file, start, end + 1, config.bufferSize, Some(req))(config.executor)
-          .map { resp =>
-            val hs = resp.headers.put(AcceptRangeHeader, `Content-Range`(Range.SubRange(start, end), Some(size)))
-            resp.copy(status = Status.PartialContent, headers = hs)
-          }
-
-      case _ => None
-    }
-
-    def pathCollector(file: jFile, config: FileService.Config, req: Request): Task[Option[Response]] = Task.delay {
-      if (file.isDirectory) StaticFile.fromFile(new jFile(file, "index.html"), Some(req))
-      else if (!file.isFile) None
-      else getPartialContentFile(file, config, req) orElse
-        StaticFile.fromFile(file, config.bufferSize, Some(req))(config.executor)
-          .map(_.putHeaders(AcceptRangeHeader))
-    }
-    /// End cribbing from http4s
-
-    fileService(FileService.Config(
-      systemPath = basePath,
-      pathCollector = pathCollector))
+    // This can be changed to simply `fileService(fsConfig)` once we upgrade to
+    // http4s 0.16.0 or higher as this will become the new default behavior in http4s
+    // This is because the behavior prior to 0.16.0 is to serve a `Unauthorized` response
+    // if the path is a directory
+    fileService(fsConfig.copy(
+      pathCollector = (file, config, req) =>
+        // If the path is a directory serve the index.html file if present
+        if (file.isDirectory) Task.delay(StaticFile.fromFile(new jFile(file, "index.html"), Some(req)))
+        // otherwise delegate to the default implementation
+        else fsConfig.pathCollector(file, config, req)))
   }
 
   def redirectService(basePath: String) = HttpService {
