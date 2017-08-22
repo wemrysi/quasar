@@ -90,11 +90,11 @@ object queryfile {
       def map[A, B](fa: F[G[A]])(f: A => B) = fa ∘ (_ ∘ f)
     }
 
-  def temp[S[_]](implicit
+  def rddFrom[S[_]](implicit
     details: SparkConnectorDetails.Ops[S]
   ) = (afile: AFile) => details.rddFrom(afile)
 
-  def temp2[S[_]](implicit
+  def first[S[_]](implicit
     S: Task :<: S
   ) = (rdd: RDD[Data]) => lift(Task.delay {
     rdd.first
@@ -112,7 +112,7 @@ object queryfile {
 
     read.asks { sc =>
       val sparkStuff: Free[S, PlannerError \/ RDD[Data]] =
-        qs.cataM(total.plan(temp, temp2)).eval(sc).run
+        qs.cataM(total.plan(rddFrom, first)).eval(sc).run
 
         sparkStuff.flatMap(mrdd => mrdd.bitraverse[(Free[S, ?] ∘ Writer[PhaseResults, ?])#λ, FileSystemError, ExecutionPlan](
           planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Free[S, ?]],
@@ -136,7 +136,7 @@ object queryfile {
 
     read.asks { sc =>
       val sparkStuff: Free[S, PlannerError \/ RDD[Data]] =
-        qs.cataM(total.plan(temp, temp2)).eval(sc).run
+        qs.cataM(total.plan(rddFrom, first)).eval(sc).run
 
       sparkStuff >>= (mrdd => mrdd.bitraverse[(Free[S, ?] ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](
         planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Free[S, ?]],
@@ -161,7 +161,7 @@ object queryfile {
     val open: Free[S, PlannerError \/ (QueryFile.ResultHandle, RDD[Data])] = (for {
       h <- EitherT(ms.next map (QueryFile.ResultHandle(_).right[PlannerError]))
       rdd <- EitherT(read.asks { sc =>
-        qs.cataM(total.plan(temp, temp2)).eval(sc).run
+        qs.cataM(total.plan(rddFrom, first)).eval(sc).run
       }.join)
       _ <- kvs.put(h, RddState(rdd.zipWithIndex.persist.some, 0)).liftM[PlannerErrT]
     } yield (h, rdd)).run
