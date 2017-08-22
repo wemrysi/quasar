@@ -122,7 +122,7 @@ package object api {
     def apply(service: HttpService): HttpService =
       Service.lift { req =>
         (req.params.get("request-headers").fold[String \/ Request](\/-(req)) { v =>
-          parse(v).map(hv => req.copy(headers = rewrite(req.headers, hv)))
+          parse(v).map(hv => req.withHeaders(rewrite(req.headers, hv)))
         }).fold(
           err => BadRequest(Json("error" := "invalid request-headers: " + err)),
           service.run)
@@ -149,19 +149,26 @@ package object api {
     }
 
     def apply(service: HttpService): HttpService =
-      service ∘ (resp => resp.headers.get(`Content-Disposition`).cata(
-        i => resp.copy(headers = resp.headers
-          .filter(_.name ≠ `Content-Disposition`.name)
-          .put(ContentDisposition(i.dispositionType, i.parameters))),
-        resp))
+      service.map {
+        case resp: Response =>
+          resp.headers.get(`Content-Disposition`).cata(
+            i => resp.copy(headers = resp.headers
+              .filter(_.name ≠ `Content-Disposition`.name)
+              .put(ContentDisposition(i.dispositionType, i.parameters))),
+            resp)
+        case pass => pass
+      }
   }
 
   object Prefix {
     def apply(prefix: String)(service: HttpService): HttpService = {
+      import monocle.Lens
       import monocle.macros.GenLens
       import scalaz.std.option._
 
-      val _uri_path = GenLens[Request](_.uri) composeLens GenLens[Uri](_.path)
+      val uriLens = Lens[Request, Uri](_.uri)(uri => req => req.withUri(uri))
+
+      val _uri_path = uriLens composeLens GenLens[Uri](_.path)
 
       val stripChars = prefix match {
         case "/"                    => 0
@@ -176,7 +183,7 @@ package object api {
       Service.lift { req: Request =>
         _uri_path.modifyF(rewrite)(req) match {
           case Some(req1) => service(req1)
-          case None       => Response.fallthrough
+          case None       => Pass.now
         }
       }
     }

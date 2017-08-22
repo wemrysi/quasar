@@ -23,7 +23,7 @@ object Dependencies {
   private val raptureVersion      = "2.0.0-M9"
   private val refinedVersion      = "0.8.2"
   private val scodecBitsVersion   = "1.1.0"
-  private val http4sVersion       = "0.15.13a"
+  private val http4sVersion       = "0.16.0a-RC1"
   private val scalacheckVersion   = "1.13.4"
   private val scalazVersion       = "7.2.14"
   private val scalazStreamVersion = "0.8.6a"
