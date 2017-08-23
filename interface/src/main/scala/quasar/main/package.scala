@@ -171,8 +171,9 @@ package object main {
       S0: Task :<: S,
       S1: PhysErr :<: S,
       S2: Mounting :<: S,
-      S3: MountingFailure :<: S,
-      S4: PathMismatchFailure :<: S
+      S3: VCache :<: S,
+      S4: MountingFailure :<: S,
+      S5: PathMismatchFailure :<: S
     ): Task[BackendEffect ~> Free[S, ?]] =
       for {
         startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
@@ -189,6 +190,7 @@ package object main {
               ViewState
           :\: MonotonicSeq
           :\: Mounting
+          :\: VCache
           :\: MountingFailure
           :\: PathMismatchFailure
           :/: BackendEffect
@@ -198,6 +200,7 @@ package object main {
           injectFT[Task, S].compose(KeyValueStore.impl.fromTaskRef(viewHRef)) :+:
           injectFT[Task, S].compose(MonotonicSeq.fromTaskRef(seqRef))         :+:
           injectFT[Mounting, S]                                               :+:
+          injectFT[VCache, S]                                                 :+:
           injectFT[MountingFailure, S]                                        :+:
           injectFT[PathMismatchFailure, S]                                    :+:
           hierarchicalFs

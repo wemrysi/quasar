@@ -20,6 +20,7 @@ import slamdata.Predef.{Map, Vector}
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._, free._
+import quasar.fs.cache.VCache
 
 import monocle.Lens
 import scalaz.{Lens => _, Failure => _, _}
@@ -82,6 +83,7 @@ package object mount {
     :\: PathMismatchFailure
     :\: MountingFailure
     :\: ViewState
+    :\: VCache
     :\: MonotonicSeq
     :/: FileSystem
   )#M[A]
@@ -92,9 +94,10 @@ package object mount {
       mismatchFailure: PathMismatchFailure ~> F,
       mountingFailure: MountingFailure ~> F,
       viewState: ViewState ~> F,
+      vcache: VCache ~> F,
       monotonicSeq: MonotonicSeq ~> F,
       fileSystem: FileSystem ~> F
     ): ViewFileSystem ~> F =
-      mounting :+: mismatchFailure :+: mountingFailure :+: viewState :+: monotonicSeq :+: fileSystem
+      mounting :+: mismatchFailure :+: mountingFailure :+: viewState :+: vcache :+: monotonicSeq :+: fileSystem
   }
 }

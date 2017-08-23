@@ -17,29 +17,28 @@
 package quasar.fs.mount
 
 import slamdata.Predef._
-
 import quasar._
 import quasar.common.JoinType
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
-import quasar.fp._
+import quasar.fp._, free._
 import quasar.fs._, InMemory.InMemState
+import quasar.fs.cache.{VCache, ViewCache}
 import quasar.frontend.logicalplan.{Free => _, free => _, _}
 import quasar.sql._, ExprArbitrary._
 import quasar.std._, IdentityLib.Squash, StdLib._, set._
 
-import eu.timepit.refined.auto._
+import java.time.Instant
+import scala.concurrent.duration._
 
+import eu.timepit.refined.auto._
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-
 import monocle.macros.Lenses
-
 import pathy.{Path => PPath}, PPath._
 import pathy.scalacheck.PathyArbitrary._
-
 import scalaz.{Failure => _, _}, Scalaz._
 
 class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
@@ -56,10 +55,12 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   val mounting = Mounting.Ops[ViewFileSystem]
 
   @Lenses
-  case class VS(seq: Long, handles: ViewState.ViewHandles, mountConfigs: Map[APath, MountConfig], fs: InMemState)
+  case class VS(
+    seq: Long, handles: ViewState.ViewHandles, vcache: Map[AFile, ViewCache],
+    mountConfigs: Map[APath, MountConfig], fs: InMemState)
 
   object VS {
-    def empty = VS(0, Map.empty, Map.empty, InMemState.empty)
+    def empty = VS(0, Map.empty, Map.empty, Map.empty, InMemState.empty)
 
     def emptyWithViews(views: Map[AFile, Fix[Sql]]) =
       mountConfigs.set(views.map { case (p, expr) =>
@@ -83,6 +84,9 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   def runMounting[F[_]](implicit F: MonadState[F, VS]): Mounting ~> F =
     free.foldMapNT(KeyValueStore.impl.toState[F](VS.mountConfigs)) compose Mounter.trivial[MountConfigs]
 
+  def runVCache[F[_]](implicit F: MonadState[F, VS]): VCache ~> F =
+    KeyValueStore.impl.toState[F](VS.vcache)
+
   def runViewFileSystem[F[_]](
     runFileSystem: FileSystem ~> F
   )(implicit
@@ -94,6 +98,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       Failure.toError[F, Errs] compose Failure.mapError[PathTypeMismatch, Errs](_.right),
       Failure.toError[F, Errs] compose Failure.mapError[MountingError, Errs](_.left),
       KeyValueStore.impl.toState[F](VS.handles),
+      KeyValueStore.impl.toState[F](VS.vcache),
       MonotonicSeq.toState[F](VS.seq),
       runFileSystem)
 
@@ -122,7 +127,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
     val (renderedTrees, (vs, r)) =
       toBeTraced.foldMap(traceViewFs(paths))
-        .run.run(VS(0, Map.empty, Map.empty, InMemState.empty)).run
+        .run.run(VS(0, Map.empty, Map.empty, Map.empty, InMemState.empty)).run
 
     ViewInterpResultTrace(renderedTrees, vs, r)
   }
@@ -570,10 +575,19 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     def unsafeParse(sqlQry: String): Fix[Sql] =
       sql.fixParser.parseExpr(sql.Query(sqlQry)).toOption.get
 
+    type Eff[A] = Coproduct[Mounting, VCache, A]
+
+    def resolvedRefsVC[A](
+      views: Map[AFile, Fix[Sql]], vcache: Map[AFile, ViewCache], lp: Fix[LogicalPlan]
+    ): FileSystemError \/ Fix[LogicalPlan] =
+      view.resolveViewRefs[Eff](lp).run
+        .foldMap(runMounting[State[VS, ?]] :+: runVCache[State[VS, ?]])
+        .eval(VS.emptyWithViews(views).copy(vcache = vcache))
+
     def resolvedRefs[A](views: Map[AFile, Fix[Sql]], lp: Fix[LogicalPlan]): FileSystemError \/ Fix[LogicalPlan] =
-      view.resolveViewRefs[Mounting](lp).run
-        .foldMap(runMounting[State[VS, ?]])
-        .eval(VS.emptyWithViews(views))
+      resolvedRefsVC(views, Map.empty, lp)
+
+    val nineteenSixty = Instant.parse("1960-01-01T00:00:00.00Z")
 
     "no match" >> {
       resolvedRefs(Map(), lpf.read(rootDir </> file("zips"))) must
@@ -588,6 +602,20 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         case r => r must beTreeEqual(
           Fix(Squash(lpf.read(rootDir </> file("zips"))))
         )
+      }
+    }
+
+    "trivial view cache read" >> {
+      val fa = rootDir </> file("a")
+      val fb = rootDir </> file("b")
+      val viewCache =
+        ViewCache(
+          MountConfig.viewConfigUri(sqlB"α", Variables.empty), None, None, 0, None, None,
+          4.seconds.toSeconds, nineteenSixty, ViewCache.Status.Successful, None, fb, None)
+
+      resolvedRefsVC(Map.empty, Map(fa -> viewCache), lpf.read(fa)) must beRightDisjunction.like {
+        case r => r must beTreeEqual(
+          lpf.read(rootDir </> file("b")))
       }
     }
 
@@ -643,6 +671,23 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         }
     }
 
+    "multi-level with view cache" >> {
+      val vs = Map[AFile, Fix[Sql]](
+        (rootDir </> file("view")) ->
+          unsafeParse("select * from vcache"))
+
+      val dest = rootDir </> file("dest")
+
+      val vcache = Map[AFile, ViewCache](
+        (rootDir </> file("vcache")) -> ViewCache(
+          MountConfig.viewConfigUri(sqlB"α", Variables.empty), None, None, 0, None, None,
+          4.seconds.toSeconds, nineteenSixty, ViewCache.Status.Successful, None, dest, None))
+
+      resolvedRefsVC(vs, vcache, lpf.read(rootDir </> file("view"))) must beRightDisjunction.like {
+        case r => r must beTreeEqual(
+          Squash(lpf.read(dest)).embed)
+      }
+    }
 
     // Several tests for edge cases with view references:
 

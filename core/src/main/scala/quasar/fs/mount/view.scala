@@ -26,6 +26,7 @@ import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.frontend.{SemanticErrors, SemanticErrsT}
 import quasar.fs._, FileSystemError._, PathError._
+import quasar.fs.cache.{VCache, ViewCache}
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, Optimizer}
 
 import matryoshka._
@@ -45,7 +46,8 @@ object view {
     S1: QueryFile :<: S,
     S2: MonotonicSeq :<: S,
     S3: ViewState :<: S,
-    S4: Mounting :<: S
+    S4: VCache :<: S,
+    S5: Mounting :<: S
   ): ReadFile ~> Free[S, ?] = {
     import ReadFile._
 
@@ -130,7 +132,8 @@ object view {
   def queryFile[S[_]](
     implicit
     S0: QueryFile :<: S,
-    S1: Mounting :<: S
+    S1: VCache :<: S,
+    S2: Mounting :<: S
   ): QueryFile ~> Free[S, ?] = {
     import QueryFile._
 
@@ -183,6 +186,7 @@ object view {
   }
 
   def analyze[S[_]](implicit
+    S0: VCache :<: S,
     M: Mounting.Ops[S],
     A: Analyze.Ops[S]
   ): Analyze ~> Free[S, ?] = new (Analyze ~> Free[S, ?]) {
@@ -206,9 +210,10 @@ object view {
     S3: QueryFile :<: S,
     S4: MonotonicSeq :<: S,
     S5: ViewState :<: S,
-    S6: Mounting :<: S,
-    S7: MountingFailure :<: S,
-    S8: PathMismatchFailure :<: S
+    S6: VCache :<: S,
+    S7: Mounting :<: S,
+    S8: MountingFailure :<: S,
+    S9: PathMismatchFailure :<: S
   ): FileSystem ~> Free[S, ?] = {
     val mount = Mounting.Ops[S]
     val manageFile = nonFsMounts.manageFile(dir => mount.viewsHavingPrefix_(dir).map(paths => paths.map(p => (p:RPath))))
@@ -223,14 +228,15 @@ object view {
     S3: QueryFile :<: S,
     S4: MonotonicSeq :<: S,
     S5: ViewState :<: S,
-    S6: Mounting :<: S,
-    S7: MountingFailure :<: S,
-    S8: PathMismatchFailure :<: S,
-    S9: Analyze :<: S
+    S6: VCache :<: S,
+    S7: Mounting :<: S,
+    S8: MountingFailure :<: S,
+    S9: PathMismatchFailure :<: S,
+    S10: Analyze :<: S
   ): BackendEffect ~> Free[S, ?] = analyze :+: fileSystem[S]
 
   /** Resolve view references in the given `LP`. */
-  def resolveViewRefs[S[_]](plan: Fix[LP])(implicit M: Mounting.Ops[S])
+  def resolveViewRefs[S[_]](plan: Fix[LP])(implicit S0: VCache :<: S, M: Mounting.Ops[S])
     : FileSystemErrT[Free[S, ?], Fix[LP]] = {
 
     def lift(e: Set[FPath], plan: Fix[LP]) =
@@ -251,6 +257,12 @@ object view {
                             .run.value.right[FileSystemError].η[Free[S, ?]].liftM[OptionT]))
       } yield r).run.run
 
+    def vcacheRead(loc: AFile): OptionT[Free[S, ?], FileSystemError \/ (SemanticErrors \/ Fix[LP])] =
+      VCache.Ops[S].get(loc) >>= (vc =>
+        OptionT(
+          ((vc.status ≟ ViewCache.Status.Successful).option(lp.Read[Fix[LP]](vc.dataFile).embed) ∘ (
+            _.right[SemanticErrors].right[FileSystemError])).η[Free[S, ?]]))
+
     // NB: simplify incoming queries to the raw, idealized LP which is simpler
     //     to manage.
     val cleaned = plan.cata(optimizer.elideTypeCheckƒ)
@@ -259,7 +271,7 @@ object view {
       (Set[FPath](), cleaned).anaM[Fix[LP]] {
         case (e, i @ Embed(lp.Read(p))) if !(e contains p) =>
           refineTypeAbs(p).swap.map(f =>
-            EitherT(EitherT(compiledView(f) getOrElse i.right.right)).map(_.project.map((e + f, _)))
+            EitherT(EitherT(vcacheRead(f) orElse compiledView(f) getOrElse i.right.right)).map(_.project.map((e + f, _)))
           ).getOrElse(lift(e, i))
 
         case (e, i) => lift(e, i)
