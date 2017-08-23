@@ -20,9 +20,10 @@ import slamdata.Predef._
 import quasar._
 import quasar.connector.BackendModule
 import quasar.contrib.pathy._
+import quasar.common._
 import quasar.fp._, free._
 import quasar.fs._, FileSystemError._
-import quasar.fs.mount._, BackendDef.DefErrT
+import quasar.fs.mount._, BackendDef._
 import quasar.effect._
 import quasar.qscript.{Read => _, _}
 
@@ -43,10 +44,11 @@ trait SparkCoreBackendModule extends BackendModule {
   def generateSC: Config => DefErrT[M, SparkContext]
 
   def ReadSparkContextInj: Inject[Read[SparkContext, ?], Eff]
-  def KeyValueStoreInj: Inject[KeyValueStore[ReadFile.ReadHandle, SparkCursor, ?], Eff]
+  def RFKeyValueStoreInj: Inject[KeyValueStore[ReadFile.ReadHandle, SparkCursor, ?], Eff]
   def MonotonicSeqInj: Inject[MonotonicSeq, Eff]
   def TaskInj: Inject[Task, Eff]
   def SparkConnectorDetailsInj: Inject[SparkConnectorDetails, Eff]
+  def QFKeyValueStoreInj: Inject[KeyValueStore[QueryFile.ResultHandle, queryfile.RddState, ?], Eff]
 
   // common for all spark based connecotrs
 
@@ -54,11 +56,24 @@ trait SparkCoreBackendModule extends BackendModule {
   type QS[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
   type Repr = RDD[Data]
 
-  private final implicit def _ReadSparkContextInj: Inject[Read[SparkContext, ?], Eff] = ReadSparkContextInj
-  private final implicit def _KeyValueStoreInj: Inject[KeyValueStore[ReadFile.ReadHandle, SparkCursor, ?], Eff] = KeyValueStoreInj
-  private final implicit def _MonotonicSeqInj: Inject[MonotonicSeq, Eff] = MonotonicSeqInj
-  private final implicit def _TaskInj: Inject[Task, Eff] = TaskInj
-  private final implicit def _SparkConnectorDetailsInj: Inject[SparkConnectorDetails, Eff] = SparkConnectorDetailsInj
+  private final implicit def _ReadSparkContextInj: Inject[Read[SparkContext, ?], Eff] =
+    ReadSparkContextInj
+  private final implicit def _RFKeyValueStoreInj: Inject[KeyValueStore[ReadFile.ReadHandle, SparkCursor, ?], Eff] =
+    RFKeyValueStoreInj
+  private final implicit def _MonotonicSeqInj: Inject[MonotonicSeq, Eff] =
+    MonotonicSeqInj
+  private final implicit def _TaskInj: Inject[Task, Eff] =
+    TaskInj
+  private final implicit def _SparkConnectorDetailsInj: Inject[SparkConnectorDetails, Eff] =
+    SparkConnectorDetailsInj
+  private final implicit def _QFKeyValueStoreInj: Inject[KeyValueStore[QueryFile.ResultHandle, queryfile.RddState, ?], Eff] =
+    QFKeyValueStoreInj
+
+  def detailsOps: SparkConnectorDetails.Ops[Eff] = SparkConnectorDetails.Ops[Eff]
+  def readScOps: Read.Ops[SparkContext, Eff] = Read.Ops[SparkContext, Eff]
+  def msOps: MonotonicSeq.Ops[Eff] = MonotonicSeq.Ops[Eff]
+  def qfKvsOps: KeyValueStore.Ops[QueryFile.ResultHandle, queryfile.RddState, Eff] =
+    KeyValueStore.Ops[QueryFile.ResultHandle, queryfile.RddState, Eff]
 
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
@@ -68,8 +83,6 @@ trait SparkCoreBackendModule extends BackendModule {
   def MonadM = Monad[M]
   def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Unirewrite[T, QS[T]]]
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
-
-  def askSc(implicit read: Read.Ops[SparkContext, Eff]): M[SparkContext] = read.ask
 
   type LowerLevel[A] = Coproduct[Task, PhysErr, A]
   def lowerToTask: LowerLevel ~> Task = λ[LowerLevel ~> Task](_.fold(
@@ -81,16 +94,17 @@ trait SparkCoreBackendModule extends BackendModule {
   def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] =
     EitherT(toTask(generateSC(cfg).run)).map(sc => (toTask, Task.delay(sc.stop())))
 
-  def rddFrom: AFile => M[RDD[Data]]
-  def first: RDD[Data] => M[Data]
+  def rddFrom: AFile => M[RDD[Data]] = (f: AFile) => detailsOps.rddFrom(f)
+  def first: RDD[Data] => M[Data] = (rdd: RDD[Data]) => lift(Task.delay {rdd.first}).into[Eff]
+
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](cp: T[QSM[T, ?]]): Backend[Repr] =
-    includeError((askSc >>= { sc =>
+    includeError((readScOps.ask >>= { sc =>
       val total = implicitly[Planner[QSM[T, ?], Eff]]
       cp.cataM(total.plan(rddFrom, first)).eval(sc).run.map(_.leftMap(pe => qscriptPlanningFailed(pe)))
     }).liftB)
 
   object SparkReadFileModule extends ReadFileModule {
-    import ReadFile._
+    import ReadFile._p
     import quasar.fp.numeric.{Natural, Positive}
 
     def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] =
@@ -101,8 +115,40 @@ trait SparkCoreBackendModule extends BackendModule {
       readfile.close[Eff](h).liftM[ConfiguredT]
   }
   def ReadFileModule = SparkReadFileModule
-  
+
+  object SparkQueryFileModule extends QueryFileModule {
+    import QueryFile._
+    import queryfile.RddState
+
+    def executePlan(rdd: RDD[Data], out: AFile): Backend[AFile] = {
+      val execute = detailsOps.storeData(rdd, out).as(out)
+      val log     = PhaseResult.detail("RDD", rdd.toDebugString)
+      withLog[AFile](execute, log)
+    }
+
+    def evaluatePlan(rdd: Repr): Backend[ResultHandle] = withLog(for {
+      h <- msOps.next.map(ResultHandle(_))
+      _ <- qfKvsOps.put(h, RddState(rdd.zipWithIndex.persist.some, 0))
+    } yield h, PhaseResult.detail("RDD", rdd.toDebugString))
+
+    def more(h: ResultHandle): Backend[Vector[Data]] = includeError(queryfile.more[Eff](h).liftB)
+
+    def close(h: ResultHandle): Configured[Unit] = queryfile.close[Eff](h).liftM[ConfiguredT]
+
+    def explain(rdd: RDD[Data]): Backend[String] =
+      rdd.toDebugString.point[Backend]
+
+    def listContents(dir: ADir): Backend[Set[PathSegment]] =
+      includeError(detailsOps.listContents(dir).run.liftB)
+
+    def fileExists(file: AFile): Configured[Boolean] =
+      detailsOps.fileExists(file).liftM[ConfiguredT]
+  }
+
+  def QueryFileModule: QueryFileModule = SparkQueryFileModule
+
   // util functions because 4 levels of monad transformes is like o_O
   // this will disapper
   def includeError[A](b: Backend[FileSystemError \/ A]): Backend[A]
+  def withLog[A](m: M[A], pr: PhaseResult): Backend[A]
 }
