@@ -23,7 +23,7 @@ import quasar.contrib.pathy._
 import quasar.fp._, free._
 import quasar.fs._, FileSystemError._
 import quasar.fs.mount._, BackendDef.DefErrT
-import quasar.effect.Failure
+import quasar.effect.{Read, Failure}
 import quasar.qscript._
 
 import scala.Predef.implicitly
@@ -41,12 +41,15 @@ trait SparkCoreBackendModule extends BackendModule {
   type Eff[A]
   def toLowerLevel[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S): M ~> Free[S, ?]
   def generateSC: Config => DefErrT[M, SparkContext]
-  def askSc: M[SparkContext]
+
+  def ReadSparkContext: Inject[Read[SparkContext, ?], Eff]
 
   // common for all spark based connecotrs
   type M[A] = Free[Eff, A]
   type QS[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
   type Repr = RDD[Data]
+
+  private final implicit def _ReadSparkContext: Inject[Read[SparkContext, ?], Eff] = ReadSparkContext
 
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
@@ -57,13 +60,13 @@ trait SparkCoreBackendModule extends BackendModule {
   def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Unirewrite[T, QS[T]]]
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
 
-  type LowerLevel[A] = Coproduct[Task, PhysErr, A]
+  def askSc(implicit read: Read.Ops[SparkContext, Eff]): M[SparkContext] = read.ask
 
+  type LowerLevel[A] = Coproduct[Task, PhysErr, A]
   def lowerToTask: LowerLevel ~> Task = λ[LowerLevel ~> Task](_.fold(
     injectNT[Task, Task],
     Failure.mapError[PhysicalError, Exception](_.cause) andThen Failure.toCatchable[Task, Exception]
   ))
-
   def toTask: M ~> Task = toLowerLevel[LowerLevel] andThen foldMapNT(lowerToTask)
 
   def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] =
