@@ -24,8 +24,8 @@ import quasar.effect.Failure
 import quasar.contrib.pathy._
 import quasar.fp._, free._
 import quasar.fs._, mount._
-import quasar.physical.mongodb.fs.bsoncursor._
 import quasar.physical.mongodb.fs.fsops._
+import quasar.physical.mongodb.MongoDb._
 
 import com.mongodb.async.client.MongoClient
 import pathy.Path.{depth, dirName}
@@ -34,9 +34,7 @@ import scalaz.concurrent.Task
 import scalaz.stream.{Writer => _, _}
 
 package object fs {
-  import BackendDef.{DefinitionError, DefErrT}
-
-  val FsType = FileSystemType("mongodb")
+  import BackendDef.DefErrT
 
   final case class DefaultDb(run: DatabaseName)
 
@@ -47,49 +45,20 @@ package object fs {
 
   final case class TmpPrefix(run: String) extends scala.AnyVal
 
-  def fileSystem[S[_]](
-    client: MongoClient,
-    defDb: Option[DefaultDb]
-  )(implicit
-    S0: Task :<: S,
-    S1: PhysErr :<: S
-  ): EnvErrT[Task, BackendEffect ~> Free[S, ?]] = {
-    val runM = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
+  type PhysFsEff[A]  = Coproduct[Task, PhysErr, A]
 
-    (
-      runM(WorkflowExecutor.mongoDb)                |@|
-      queryfile.run[BsonCursor, S](client, defDb)
-        .liftM[EnvErrT]                             |@|
-      readfile.run[S](client).liftM[EnvErrT]        |@|
-      writefile.run[S](client).liftM[EnvErrT]       |@|
-      managefile.run[S](client).liftM[EnvErrT]
-    )((execMongo, qfile, rfile, wfile, mfile) => {
-      interpretBackendEffect[Free[S, ?]](
-        Empty.analyze[Free[S, ?]], // old mongo, will be removed
-        qfile compose queryfile.interpret(execMongo),
-        rfile compose readfile.interpret,
-        wfile compose writefile.interpret,
-        mfile compose managefile.interpret)
-    })
-  }
+  def parseConfig(uri: ConnectionUri)
+      : DefErrT[Task, Config] =
+    (for {
+      client <- asyncClientDef[Task](uri)
+      defDb <- free.lift(findDefaultDb.run(client)).into[Task].liftM[DefErrT]
+      wfExec <- wfExec(client)
+    } yield Config(client, defDb, wfExec)).mapT(freeTaskToTask.apply)
 
-  def definition[S[_]](implicit
-    S0: Task :<: S,
-    S1: PhysErr :<: S
-  ): BackendDef[Free[S, ?]] = BackendDef.fromPF[Free[S, ?]] {
-    case (FsType, uri) =>
-      type M[A] = Free[S, A]
-      for {
-        client <- asyncClientDef[S](uri)
-        defDb  <- free.lift(findDefaultDb.run(client)).into[S].liftM[DefErrT]
-        fs     <- EitherT[M, DefinitionError, BackendEffect ~> M](free.lift(
-                    fileSystem[S](client, defDb)
-                      .leftMap(_.right[NonEmptyList[String]])
-                      .run
-                  ).into[S])
-        close  =  free.lift(Task.delay(client.close()).attempt.void).into[S]
-      } yield BackendDef.DefinitionResult[M](fs, close)
-  }
+  def compile(cfg: Config): BackendDef.DefErrT[Task, (M ~> Task, Task[Unit])] =
+    (effToTask(cfg) map (i => (
+      foldMapNT[Eff, Task](i),
+      Task.delay(cfg.client.close).void))).liftM[DefErrT]
 
   val listContents: ADir => EitherT[MongoDbIO, FileSystemError, Set[PathSegment]] =
     dir => EitherT(dirName(dir) match {
@@ -111,7 +80,35 @@ package object fs {
 
   ////
 
-  private type Eff[A] = (Task :\: EnvErr :/: CfgErr)#M[A]
+  private val freeTaskToTask: Free[Task, ?] ~> Task =
+    new Interpreter(NaturalTransformation.refl[Task]).interpret
+
+  private def wfExec(client: MongoClient): DefErrT[Free[Task, ?], WorkflowExecutor[MongoDbIO, BsonCursor]] = {
+    val run: EnvErrT[MongoDbIO, ?] ~> EnvErrT[Task, ?] = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
+    val runWf: EnvErrT[Task, WorkflowExecutor[MongoDbIO, BsonCursor]] = run(WorkflowExecutor.mongoDb)
+    val envErrToDefErr: EnvErrT[Task, ?] ~> DefErrT[Task, ?] =
+      quasar.convertError[Task]((_: EnvironmentError).right[NonEmptyList[String]])
+    val runWfx: DefErrT[Task, WorkflowExecutor[MongoDbIO, BsonCursor]] = envErrToDefErr(runWf)
+    runWfx.mapT(Free.liftF(_))
+  }
+
+  private def effToTask(cfg: Config): Task[Eff ~> Task] = {
+    (
+      queryfile.run[BsonCursor, PhysFsEff](cfg.client, cfg.defaultDb) |@|
+      managefile.run[PhysFsEff](cfg.client) |@|
+      readfile.run[PhysFsEff](cfg.client) |@|
+      writefile.run[PhysFsEff](cfg.client)
+    )((qfile, mfile, rfile, wfile) => {
+      (freeFsEffToTask compose (qfile :+: mfile :+: rfile :+: wfile))
+    })
+  }
+
+  private def freeFsEffToTask: Free[PhysFsEff, ?] ~> Task = foldMapNT[PhysFsEff, Task](fsEffToTask)
+
+  private def fsEffToTask: PhysFsEff ~> Task = λ[PhysFsEff ~> Task](_.run.fold(
+    NaturalTransformation.refl[Task],
+    Failure.toRuntimeError[Task, PhysicalError]
+  ))
 
   private def findDefaultDb: MongoDbIO[Option[DefaultDb]] =
     (for {
@@ -128,6 +125,7 @@ package object fs {
     S0: Task :<: S
   ): DefErrT[Free[S, ?], MongoClient] = {
     import quasar.convertError
+    type Eff[A] = (Task :\: EnvErr :/: CfgErr)#M[A]
     type M[A] = Free[S, A]
     type ME[A, B] = EitherT[M, A, B]
     type MEEnvErr[A] = ME[EnvironmentError,A]

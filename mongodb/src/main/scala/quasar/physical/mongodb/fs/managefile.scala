@@ -22,7 +22,7 @@ import quasar.fp.ski.κ
 import quasar.contrib.pathy._
 import quasar.fp.TaskRef
 import quasar.fs._
-import quasar.physical.mongodb._
+import quasar.physical.mongodb._, MongoDb._
 
 import com.mongodb.{MongoException, MongoCommandException, MongoServerException}
 import com.mongodb.async.client.MongoClient
@@ -30,7 +30,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-object managefile {
+object managefile extends ManageFileModule {
   import ManageFile._, FileSystemError._, PathError._, MongoDbIO._, fsops._
 
   type ManageIn           = (TmpPrefix, TaskRef[Long])
@@ -45,33 +45,34 @@ object managefile {
     *      dir succeeds, this should probably be changed to fail.
     */
 
-  /** Interpret `ManageFile` using MongoDB. */
-  val interpret: ManageFile ~> MongoManage = new (ManageFile ~> MongoManage) {
-    def apply[A](fs: ManageFile[A]) = fs match {
-      case Move(scenario, semantics) =>
-        scenario.fold(moveDir(_, _, semantics), moveFile(_, _, semantics))
-          .run.liftM[ManageInT]
+  def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = {
+    val mm: MongoManage[FileSystemError \/ Unit] =
+      scenario.fold(moveDir(_, _, semantics), moveFile(_, _, semantics))
+        .run.liftM[ManageInT]
+    toBackend(mm)
+  }
 
-      case Delete(path) =>
-        refineType(path).fold(deleteDir, deleteFile)
-          .run.liftM[ManageInT]
+  def delete(path: APath): Backend[Unit] = {
+    val mm: MongoManage[FileSystemError \/ Unit] =
+      refineType(path).fold(deleteDir, deleteFile)
+        .run.liftM[ManageInT]
+    toBackend(mm)
+  }
 
-      // TODO: For some reason, compiler is having trouble finding Functor/Apply
-      //       instances within this block.
-      case TempFile(path) =>
-        val checkPath =
-          EitherT.fromDisjunction[MongoManage](Collection.dbNameFromPath(path))
-            .bimap(pathErr(_), κ(()))
+  def tempFile(near: APath): Backend[AFile] = {
+    val checkPath =
+      EitherT.fromDisjunction[MongoManage](Collection.dbNameFromPath(near))
+        .bimap(pathErr(_), κ(()))
 
-        val mkTemp =
-          freshName.liftM[FileSystemErrT] map { n =>
-            refineType(path).fold(
-              _ </> file(n),
-              f => fileParent(f) </> file(n))
-          }
+    val mkTemp =
+      freshName.liftM[FileSystemErrT] map { n =>
+        refineType(near).fold(
+          _ </> file(n),
+          f => fileParent(f) </> file(n))
+      }
 
-        checkPath.flatMap(κ(mkTemp)).run
-    }
+    val mm: MongoManage[FileSystemError \/ AFile] = checkPath.flatMap(κ(mkTemp)).run
+    toBackend(mm)
   }
 
   /** Run [[MongoManage]] with the given `MongoClient`. */

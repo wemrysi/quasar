@@ -25,7 +25,7 @@ import scalaz._, Scalaz._
 class MongoDbIOSpec extends Qspec {
   import MongoDbSpec._
 
-  clientShould(FsType) { (backend, prefix, setupClient, testClient) =>
+  clientShould(MongoDb.Type) { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._
 
     backend.name should {

@@ -18,42 +18,40 @@ package quasar.physical.mongodb.fs
 
 import slamdata.Predef._
 import quasar.contrib.pathy._
+import quasar.Data
 import quasar.fp.TaskRef
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._
-import quasar.physical.mongodb._
+import quasar.physical.mongodb._, MongoDb._
 import quasar.physical.mongodb.fs.bsoncursor._
 
 import com.mongodb.async.client.MongoClient
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-object readfile {
-  import ReadFile._, FileSystemError._, MongoDbIO._
+object readfile extends ReadFileModule {
+  import ReadFile._, FileSystemError._, MongoDbIO._, MongoDb._
 
   type ReadState           = (Long, Map[ReadHandle, BsonCursor])
   type ReadStateT[F[_], A] = ReaderT[F, TaskRef[ReadState], A]
   type MongoRead[A]        = ReadStateT[MongoDbIO, A]
 
-  /** Interpret the `ReadFile` algebra using MongoDB */
-  val interpret: ReadFile ~> MongoRead = new (ReadFile ~> MongoRead) {
-    val DC = DataCursor[MongoDbIO, BsonCursor]
+  val DC = DataCursor[MongoDbIO, BsonCursor]
 
-    def apply[A](rf: ReadFile[A]) = rf match {
-      case Open(file, offset, limit) =>
-        openCursor(file, offset, limit)
+  def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] =
+    toBackend(openCursor(file, offset, limit))
 
-      case Read(h) =>
-        lookupCursor(h)
-          .flatMapF(c => DC.nextChunk(c).liftM[ReadStateT])
-          .toRight(unknownReadHandle(h))
-          .run
+  def read(h: ReadHandle): Backend[Vector[Data]] = {
+    val rm = lookupCursor(h)
+      .flatMapF(c => DC.nextChunk(c).liftM[ReadStateT])
+      .toRight(unknownReadHandle(h)).run
+    toBackend(rm)
+  }
 
-      case Close(h) =>
-        OptionT[MongoRead, BsonCursor](MongoRead(cursorL(h) <:= None))
-          .flatMapF(c => DC.close(c).liftM[ReadStateT])
-          .run.void
-    }
+  def close(h: ReadHandle): Configured[Unit] = {
+    val x: OptionT[MongoRead, Unit] = OptionT[MongoRead, BsonCursor](MongoRead(cursorL(h) <:= None))
+      .flatMapF(c => DC.close(c).liftM[ReadStateT])
+    toConfigured(x.run.void)
   }
 
   /** Run [[MongoRead]], using the given `MongoClient`. */
@@ -116,4 +114,5 @@ object readfile {
       err  => freshHandle(f).map(_.right[FileSystemError]),
       coll => openCursor0(coll) map(_.right[FileSystemError]))
   }
+
 }

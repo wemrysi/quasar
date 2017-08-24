@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.kleisli._
 import quasar.fp._
@@ -27,7 +28,7 @@ import quasar.fp.ski._
 import quasar.fs._
 import quasar.javascript._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
-import quasar.physical.mongodb._, WorkflowExecutor.WorkflowCursor
+import quasar.physical.mongodb._, MongoDb._, WorkflowExecutor.WorkflowCursor
 
 import argonaut.JsonObject, JsonObject.{single => jSingle}
 import argonaut.JsonIdentity._
@@ -47,8 +48,35 @@ object queryfileTypes {
   type MongoQuery[C, A]    = QueryRT[MongoDbIO, C, A]
 }
 
-object queryfile {
+object queryfile extends QueryFileModule {
   import queryfileTypes._
+  import QueryFile._
+  import bsoncursor._
+
+  def inConfigured[A](qf: QueryFile[A]): Configured[A] =
+    MonadReader_[Configured, Config].asks(_.wfExec).map(interpret[BsonCursor]) >>=
+      (i => toConfigured(i(qf)))
+
+  def inBackend[A](qf: QueryFile[FileSystemError \/ A]): Backend[A] =
+    MonadReader_[Backend, Config].asks(_.wfExec).map(interpret[BsonCursor]) >>=
+      (i => toBackend(i(qf)))
+
+  def executePlan(repr: Repr, out: AFile): Backend[AFile] = ???
+
+  def evaluatePlan(repr: Repr): Backend[ResultHandle] = ???
+
+  def more(h: ResultHandle): Backend[Vector[Data]] =
+    inBackend(More(h))
+
+  def close(h: ResultHandle): Configured[Unit] = inConfigured(Close(h))
+
+  def explain(repr: Repr): Backend[String] = ???
+
+  def listContents(dir: ADir): Backend[Set[PathSegment]] =
+    inBackend(ListContents(dir))
+
+  def fileExists(file: AFile): Configured[Boolean] =
+    inConfigured(FileExists(file))
 
   def interpret[C]
     (execMongo: WorkflowExecutor[MongoDbIO, C])
@@ -138,7 +166,7 @@ private final class QueryFileInterpreter[C](
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import WriterT.writerTMonadListen
- 
+
   private val execJs = WorkflowExecutor.javaScript
 
   def apply[A](qf: QueryFile[A]) = qf match {
@@ -184,7 +212,7 @@ private final class QueryFileInterpreter[C](
       // TODO: Extract from QScript once legacy planner goes away.
       ipt =  lpr.absolutePaths(lp)
       ep  <- EitherT.fromDisjunction[MongoLogWF[C, ?]](
-               r.as(ExecutionPlan(FsType, out, ipt)))
+               r.as(ExecutionPlan(MongoDb.Type, out, ipt)))
       _   <- logProgram(stmts).liftM[FileSystemErrT]
     } yield ep).run.run
 

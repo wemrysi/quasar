@@ -64,7 +64,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
   def lt3_2(backend: BackendName): Boolean = !(is3_2(backend) || is3_4(backend))
 
-  MongoDbSpec.clientShould(FsType) { (backend, prefix, setupClient, testClient) =>
+  MongoDbSpec.clientShould(MongoDb.Type) { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._
 
     /** Intercept and transform expected values into the form that's actually

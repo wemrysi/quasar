@@ -21,46 +21,48 @@ import quasar.Data
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fs._
-import quasar.physical.mongodb._
+import quasar.physical.mongodb._, MongoDb._
 
 import com.mongodb.async.client.MongoClient
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-object writefile {
-  import WriteFile._, FileSystemError._, MongoDbIO._
+object writefile extends WriteFileModule {
+  import WriteFile._, FileSystemError._, MongoDbIO._, MongoDb._
 
   type WriteState           = (Long, Map[WriteHandle, Collection])
   type WriteStateT[F[_], A] = ReaderT[F, TaskRef[WriteState], A]
   type MongoWrite[A]        = WriteStateT[MongoDbIO, A]
 
-  /** Interpret the `WriteFile` algebra using MongoDB. */
-  val interpret: WriteFile ~> MongoWrite = new (WriteFile ~> MongoWrite) {
-    def apply[A](wf: WriteFile[A]) = wf match {
-      case Open(file) =>
-        Collection.fromFile(file) fold (
-          err => pathErr(err).left.point[MongoWrite],
-          col => ensureCollection(col).liftM[WriteStateT] *>
-                 recordCollection(file, col) map \/.right)
+  def open(file: AFile): Backend[WriteHandle] = {
+    val mw: MongoWrite[FileSystemError \/ WriteHandle] = Collection.fromFile(file) fold (
+      err => pathErr(err).left.point[MongoWrite],
+      col => ensureCollection(col).liftM[WriteStateT] *>
+             recordCollection(file, col) map \/.right)
+    toBackend(mw)
+  }
 
-      case Write(h, data) =>
-        val (errs, docs) = data foldMap { d =>
-          dataToDocument(d).fold(
-            e => (Vector(e), Vector()),
-            d => (Vector(), Vector(d)))
-        }
-
-        lookupCollection(h) flatMap (_ cata (
-          c => insertAny(c, docs.map(_.repr))
-                 .filter(_ < docs.size)
-                 .map(n => partialWrite(docs.size - n))
-                 .run.map(errs ++ _.toList)
-                 .liftM[WriteStateT],
-          (errs :+ unknownWriteHandle(h)).point[MongoWrite]))
-
-      case Close(h) =>
-        MongoWrite(collectionL(h) := None).void
+  def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] = {
+    val (errs, docs) = chunk foldMap { d =>
+      dataToDocument(d).fold(
+        e => (Vector(e), Vector()),
+        d => (Vector(), Vector(d)))
     }
+
+    val mw = lookupCollection(h) flatMap (_ cata (
+      c => insertAny(c, docs.map(_.repr))
+             .filter(_ < docs.size)
+             .map(n => partialWrite(docs.size - n))
+             .run.map(errs ++ _.toList)
+             .liftM[WriteStateT],
+      (errs :+ unknownWriteHandle(h)).point[MongoWrite]))
+
+    toConfigured(mw)
+  }
+
+  def close(h: WriteHandle): Configured[Unit] = {
+    val mw = MongoWrite(collectionL(h) := None).void
+    toConfigured(mw)
   }
 
   /** Run [[MongoWrite]] using the given `MongoClient`. */

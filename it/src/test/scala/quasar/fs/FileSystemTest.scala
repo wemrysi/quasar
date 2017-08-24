@@ -69,7 +69,7 @@ abstract class FileSystemTest[S[_]](
             Fragments(examples(f0, f1), step(f0.close.unsafePerformSync))
         } getOrElse {
           val confParamName = TestConfig.backendConfName(fs.ref.name)
-          Fragments(s"${fs.ref.name.shows} FileSystem" >> 
+          Fragments(s"${fs.ref.name.shows} FileSystem" >>
             skipped(s"No connection uri found to test this FileSystem, set config parameter $confParamName in '${TestConfig.confFile}' in order to do so"))
         })
     }.unsafePerformSync
@@ -152,16 +152,17 @@ object FileSystemTest {
       filesystems.testFileSystem(uri, dir, fsDef.apply(fsType, uri).run)
   }
 
-  def externalFsUT = {
-    val marklogicDef =
-      MarkLogic(10000L, 10000L).definition translate injectFT[Task, filesystems.Eff]
+  def fsTestConfig0(fsType: FileSystemType, fsDef: BackendDef[Task])
+      : PartialFunction[(MountConfig, ADir), Task[(BackendEffect ~> Task, Task[Unit])]] =
+    fsTestConfig(fsType, fsDef translate injectFT[Task, filesystems.Eff])
 
+  def externalFsUT = {
     TestConfig.externalFileSystems {
-      fsTestConfig(couchbase.fs.FsType,       Couchbase.definition translate injectFT[Task, filesystems.Eff]) orElse
-      fsTestConfig(marklogic.fs.FsType,       marklogicDef)                  orElse
-      fsTestConfig(mimir.Mimir.Type,          mimir.Mimir.definition translate injectFT[Task, filesystems.Eff]) orElse
-      fsTestConfig(mongodb.fs.FsType,         mongodb.fs.definition)         orElse
-      fsTestConfig(sparkcore.fs.hdfs.FsType,  sparkcore.fs.hdfs.definition)  orElse
+      fsTestConfig0(couchbase.fs.FsType, Couchbase.definition) orElse
+      fsTestConfig0(marklogic.fs.FsType, MarkLogic(10000L, 10000L).definition) orElse
+      fsTestConfig0(mimir.Mimir.Type, mimir.Mimir.definition) orElse
+      fsTestConfig0(mongodb.MongoDb.Type, mongodb.MongoDb.definition) orElse
+      fsTestConfig(sparkcore.fs.hdfs.FsType, sparkcore.fs.hdfs.definition)  orElse
       fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition) orElse
       fsTestConfig(sparkcore.fs.elastic.FsType, sparkcore.fs.elastic.definition)
     }
