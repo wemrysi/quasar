@@ -104,7 +104,7 @@ trait SparkCoreBackendModule extends BackendModule {
     }).liftB)
 
   object SparkReadFileModule extends ReadFileModule {
-    import ReadFile._p
+    import ReadFile._
     import quasar.fp.numeric.{Natural, Positive}
 
     def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] =
@@ -147,8 +147,8 @@ trait SparkCoreBackendModule extends BackendModule {
 
   def QueryFileModule: QueryFileModule = SparkQueryFileModule
 
-  // util functions because 4 levels of monad transformes is like o_O
-  // this will disapper
-  def includeError[A](b: Backend[FileSystemError \/ A]): Backend[A]
-  def withLog[A](m: M[A], pr: PhaseResult): Backend[A]
+  // utility functions
+  def includeError[A](b: Backend[FileSystemError \/ A]): Backend[A] = EitherT(b.run.map(_.join))
+  def withLog[A](m: M[A], pr: PhaseResult): Backend[A] =
+    WriterT(m.liftM[ConfiguredT].map((Vector(pr), _))).liftM[FileSystemErrT]
 }
