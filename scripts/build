@@ -104,8 +104,6 @@ else
   if [[ $CONNECTOR =~ "spark" ]]; then
     echo "Building sparkcore.jar"
     $SBT 'set every sparkDependencyProvided := true' sparkcore/assembly
-    echo "check sparkcore.jar is in place:"
-    ls -al ${TRAVIS_BUILD_DIR}/.targets/sparkcore/scala-2.11/sparkcore.jar
   fi
 
   # Not the first job in Travis; run only integration tests (no sense

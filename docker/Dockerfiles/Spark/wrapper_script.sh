@@ -1,9 +1,15 @@
 #!/bin/bash
 
 # start spark master
-/opt/spark/bin/spark-class org.apache.spark.deploy.master.Master -h $(hostname) &
+/opt/spark/sbin/start-master.sh -i $(hostname -i)
 
-sleep 2
+sleep 5
 
 # start spark worker
-/opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://$(hostname):7077
+/opt/spark/sbin/start-slave.sh spark://$(hostname -i):7077
+
+sleep 5
+
+tail -f /opt/spark/logs/*
+
+

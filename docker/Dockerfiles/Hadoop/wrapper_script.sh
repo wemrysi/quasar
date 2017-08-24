@@ -1,17 +1,11 @@
 #!/bin/bash
 
-sed -i "s/localhost/$(hostname -f)/" /opt/hadoop/etc/hadoop/core-site.xml
-
-sleep 2
-
 service ssh restart
 
-slee 2
+slee 5
 
 # start hadoop namenode
 /opt/hadoop/sbin/hadoop-daemon.sh --config /opt/hadoop/etc/hadoop/ --script hdfs start namenode
-
-#/opt/hadoop/sbin/start-all.sh
 
 sleep 5
 

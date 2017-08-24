@@ -50,7 +50,6 @@ init_hdfs() {
   CONTAINER=$1
   HADOOP_HOME="/opt/hadoop"
   echo "configuring hdfs..."
-  sleep 10
   if [[ ${TRAVIS:-} ]]
   then
     docker cp $TRAVIS_BUILD_DIR/docker/Dockerfiles/Hadoop/hdfs-site.xml $CONTAINER:${HADOOP_HOME}/etc/hadoop/hdfs-site.xml
@@ -63,8 +62,6 @@ init_hdfs() {
   fi
   sleep 5
   docker restart $CONTAINER
-  sleep 5
-  docker exec $CONTAINER /bin/bash -c "${HADOOP_HOME}/sbin/hadoop-daemon.sh start datanode; sleep 5; ${HADOOP_HOME}/sbin/yarn-daemon.sh start nodemanager "
 }
 
 init_spark_connector() {
