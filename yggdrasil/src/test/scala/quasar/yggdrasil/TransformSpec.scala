@@ -810,6 +810,10 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
           "a":42
         },
         "in":[[]]
+      },
+      {
+        "item":0,
+        "in":[]
       }
     ]""")
 
@@ -825,6 +829,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val JArray(expected) = JParser.parseUnsafe("""[
       true,
+      false,
       false,
       false
     ]""")

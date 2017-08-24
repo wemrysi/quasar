@@ -342,6 +342,10 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
 
         case Within(item, in) =>
           composeSliceTransform2(item).zip(composeSliceTransform2(in)) { (itemS, inS) =>
+            val emptyArrayDefined = inS.columns.get(ColumnRef(CPath.Identity, CEmptyArray)) map { col =>
+              col.definedAt(0, inS.size)
+            } getOrElse (new BitSet)
+
             val indices: Set[Int] = inS.columns.keySet collect {
               case ColumnRef(CPath(CPathIndex(i), _*), _) => i
             }
@@ -374,6 +378,10 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
 
             val defined = definedM.getOrElse(new BitSet)
             val values = valuesM.getOrElse(new BitSet)
+
+            // we bring in empty array definedness after the fact
+            // note that the value will always be false
+            defined.or(emptyArrayDefined)
 
             val results = new ArrayBoolColumn(defined, values)
 
