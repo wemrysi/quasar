@@ -225,22 +225,22 @@ lazy val root = project.in(file("."))
                       niflheim,
 //   |         |         |
     sql, connector,   yggdrasil,
-//   |   /  | | \ \______|__________________________________
-//   |  /   | |  \      /     \         \         \         \
-    core, skeleton, mimir, marklogic, mongodb, couchbase, sparkcore,
-//      \     |     /         |          |         |         |
-          interface,   //     |          |         |         |
-//          /  \              |          |         |         |
-         repl, web,   //      |          |         |         |
-//              |             |          |         |         |
-                it,   //      |          |         |         |
-//   ___________|_____________/          |         |         |
-//  /           |      __________________/         |         |
-//  |          /|\    /          __________________/         |
-//  |         / | \  /          /             _______________/
-//  |        /  |  \/__________/______       /
-//  |       /   |  /    \     /        \    /
-  marklogicIt, mongoIt, couchbaseIt, sparkcoreIt
+//   |   /  | | \ \______|____________________________________________
+//   |  /   | |  \      /     \         \         \         \         \
+    core, skeleton, mimir, marklogic, mongodb, couchbase, sparkcore, rdbms,
+//      \     |     /         |          |         |         |         |
+          interface,   //     |          |         |         |         |
+//          /  \              |          |         |         |         |
+         repl, web,   //      |          |         |         |         |
+//              |             |          |         |         |         |
+                it,   //      |          |         |         |         |
+//   ___________|_____________/          |         |         |         |
+//  /           |      __________________/         |         |         |
+//  |          /|\    /          __________________/         |         |
+//  |         / | \  /          /             _______________/         /
+//  |        /  |  \/__________/______       /            ____________/
+//  |       /   |  /    \     /        \    /            /
+  marklogicIt, mongoIt, couchbaseIt, sparkcoreIt, rdbmsIt
 //
 // NB: the *It projects are temporary until we polyrepo
   ).enablePlugins(AutomateHeaderPlugin)
@@ -420,10 +420,23 @@ lazy val skeleton = project
   .settings(targetSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val rdbms = project
+  .settings(name := "quasar-rdbms-internal")
+  .dependsOn(
+    connector % BothScopes
+  )
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(githubReleaseSettings)
+  .settings(assemblyJarName in assembly := "rdbms.jar")
+  .settings(
+    libraryDependencies ++= Dependencies.rdbmscore)
+  .enablePlugins(AutomateHeaderPlugin)
+
 /** Implementation of the Spark connector.
   */
 lazy val sparkcore = project
-  .settings(name := "quasar-sparkcore-internal")
+  .settings(name := "quasar-4-internal")
   .dependsOn(
     connector % BothScopes
     )
@@ -570,6 +583,18 @@ lazy val couchbaseIt = project
 lazy val sparkcoreIt = project
   .configs(ExclusiveTests)
   .dependsOn(it % BothScopes, sparkcore)
+  .settings(commonSettings)
+  .settings(noPublishSettings)
+  .settings(targetSettings)
+  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
+  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
+  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
+  .settings(parallelExecution in Test := false)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val rdbmsIt = project
+  .configs(ExclusiveTests)
+  .dependsOn(it % BothScopes, rdbms)
   .settings(commonSettings)
   .settings(noPublishSettings)
   .settings(targetSettings)
