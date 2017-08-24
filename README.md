@@ -864,7 +864,8 @@ An example request body:
     "postgresql": {
         "host": "localhost",
         "port": 9876,
-        "database": "bob",
+        "database": "meta",
+        "userName": "bob",
         "password": "123456"
     }
 }
