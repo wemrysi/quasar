@@ -48,9 +48,20 @@ init_hdfs() {
   # Need to start datanode and nodemanager
   # within hadoop container
   CONTAINER=$1
+  HADOOP_HOME="/opt/hadoop"
   echo "configuring hdfs..."
+  if [[ ${TRAVIS:-} ]]
+  then
+    docker cp $TRAVIS_BUILD_DIR/docker/Dockerfiles/Hadoop/hdfs-site.xml $CONTAINER:${HADOOP_HOME}/etc/hadoop/hdfs-site.xml
+    docker cp $TRAVIS_BUILD_DIR/docker/Dockerfiles/Hadoop/core-site.xml $CONTAINER:${HADOOP_HOME}/etc/hadoop/core-site.xml
+    docker cp $TRAVIS_BUILD_DIR/docker/Dockerfiles/Hadoop/slaves $CONTAINER:${HADOOP_HOME}/etc/hadoop/slaves
+  else
+    docker cp $SCRIPTS_DIR/../Dockerfiles/Hadoop/hdfs-site.xml $CONTAINER:${HADOOP_HOME}/etc/hadoop/hdfs-site.xml
+    docker cp $SCRIPTS_DIR/../Dockerfiles/Hadoop/core-site.xml $CONTAINER:${HADOOP_HOME}/etc/hadoop/core-site.xml
+    docker cp $SCRIPTS_DIR/../Dockerfiles/Hadoop/slaves $CONTAINER:${HADOOP_HOME}/etc/hadoop/slaves
+  fi
   sleep 5
-  docker exec $CONTAINER /bin/bash -c "/hadoop-2.7.3/sbin/hadoop-daemon.sh start datanode; sleep 5; /hadoop-2.7.3/sbin/yarn-daemon.sh start nodemanager "
+  docker restart $CONTAINER
 }
 
 init_spark_connector() {
