@@ -184,10 +184,12 @@ object Mimir extends BackendModule with Logging {
 
   def needToSort(p: Precog)(oldSort: SortState[p.trans.TransSpec1], newSort: SortState[p.trans.TransSpec1]): Boolean = {
     (oldSort.orderings.length != newSort.orderings.length || oldSort.bucket != newSort.bucket) || {
-      def requiresSort(oldOrdering: SortOrdering[p.trans.TransSpec1], newOrdering: SortOrdering[p.trans.TransSpec1]) =
-        (oldOrdering.sortKeys & newOrdering.sortKeys).nonEmpty ||
+      def requiresSort(oldOrdering: SortOrdering[p.trans.TransSpec1], newOrdering: SortOrdering[p.trans.TransSpec1]) = {
+        (oldOrdering.sortKeys & newOrdering.sortKeys).isEmpty ||
           (oldOrdering.sortOrder != newOrdering.sortOrder) ||
           (oldOrdering.unique && !newOrdering.unique)
+      }
+
       (oldSort.bucket != newSort.bucket) || {
         val allOrderings = oldSort.orderings.zip(newSort.orderings)
         allOrderings.exists { case (o, n) => requiresSort(o, n) }
@@ -196,16 +198,24 @@ object Mimir extends BackendModule with Logging {
   }
 
   // sort by one dimension
-  def sortT[P0 <: Cake](c: Repr.Aux[P0])(table: c.P.Table, sortKey: c.P.trans.TransSpec1,
-                                                 sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): Task[Repr.Aux[c.P.type]] = {
+  def sortT[P0 <: Cake](c: Repr.Aux[P0])(
+      table: c.P.Table,
+      sortKey: c.P.trans.TransSpec1,
+      sortOrder: DesiredSortOrder = SortAscending,
+      unique: Boolean = false): Task[Repr.Aux[c.P.type]] = {
+
     val newRepr =
-      SortState[c.P.trans.TransSpec1](bucket = None, orderings = SortOrdering(Set(sortKey), sortOrder, unique) :: Nil)
-    if (c.lastSort.fold(true)(needToSort(c.P)(_, newSort = newRepr)))
-      table.sort(sortKey, sortOrder, unique).toTask.map(sorted =>
+      SortState[c.P.trans.TransSpec1](
+        bucket = None,
+        orderings = SortOrdering(Set(sortKey), sortOrder, unique) :: Nil)
+
+    if (c.lastSort.fold(true)(needToSort(c.P)(_, newSort = newRepr))) {
+      table.sort(sortKey, sortOrder, unique).toTask map { sorted =>
         Repr.withSort(c.P)(sorted)(Some(newRepr))
-      )
-    else
+      }
+    } else {
       Task.now(Repr.withSort(c.P)(table)(Some(newRepr)))
+    }
   }
 
   val Type = FileSystemType("mimir")
@@ -253,6 +263,8 @@ object Mimir extends BackendModule with Logging {
 
       if (specs.isEmpty)
         TransSpec1.Id
+      else if (specs.lengthCompare(1) == 0)
+        specs.head
       else
         OuterArrayConcat(specs.map(WrapArray(_): TransSpec1) : _*)
     }
