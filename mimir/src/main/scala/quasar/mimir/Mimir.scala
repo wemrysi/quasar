@@ -383,7 +383,9 @@ object Mimir extends BackendModule with Logging {
                         // we don't add First if we aren't bucketed
                         remapIndex(bucketed).get(idx + (if (bucketed) 1 else 0)) match {
                           case Some(i) =>
-                            (DerefArrayStatic(Leaf(Source), CPathIndex(i)): TransSpec1).point[Future]
+                            (DerefArrayStatic(
+                              Leaf(Source),
+                              CPathIndex(i)): TransSpec1).point[Future]
 
                           case None => ???
                         }
@@ -391,7 +393,11 @@ object Mimir extends BackendModule with Logging {
                       case ReduceIndex(-\/(idx)) =>
                         // note that an undefined bucket will still retain indexing as long as we don't compact the slice
                         Future(scala.Predef.assert(bucketed, s"bucketed was false in a ReduceIndex(-\\/($idx))")) >>
-                          (DerefArrayStatic(DerefArrayStatic(Leaf(Source), CPathIndex(remapIndex(bucketed)(0))), CPathIndex(idx)): TransSpec1).point[Future]
+                          (DerefArrayStatic(
+                            DerefArrayStatic(
+                              Leaf(Source),
+                              CPathIndex(remapIndex(bucketed)(0))),
+                            CPathIndex(idx)): TransSpec1).point[Future]
                     },
                     mapFuncPlanner[Future].plan(src.P)[Source1](TransSpec1.Id)))
               } yield red.transform(trans)
