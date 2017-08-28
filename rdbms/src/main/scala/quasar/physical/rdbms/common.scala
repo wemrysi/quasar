@@ -15,11 +15,14 @@
  */
 
 package quasar.physical.rdbms
-import slamdata.Predef._
 import doobie.imports.IOLite
+import slamdata.Predef._
 import doobie.util.transactor.Transactor
 import pathy.Path
 import quasar.contrib.pathy.AFile
+
+import scalaz.Show
+
 
 object common {
 
@@ -28,6 +31,9 @@ object common {
   final case class SchemaName(name: String) extends AnyVal
   final case class TableName(name: String) extends AnyVal
   final case class TablePath(schema: Option[SchemaName], table: TableName)
+
+  implicit val showPath: Show[TablePath] =
+    Show.shows(path => path.schema.map(s => s"${s.name}.").getOrElse("") + path.table.name)
 
   object TablePath {
     def create(file: AFile): TablePath = {
