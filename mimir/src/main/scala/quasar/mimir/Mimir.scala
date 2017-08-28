@@ -288,16 +288,29 @@ object Mimir extends BackendModule with Logging {
         } yield Repr.withSort(src.P)(src.table.transform(trans))(newSort)
 
       // special-case for distinct (TODO this should be a new node in qscript)
-      case qscript.Reduce(src, bucket :: Nil, ReduceFuncs.Arbitrary(arb) :: Nil, Embed(CoEnv(-\/(ReduceIndex(\/-(0)))))) if bucket === arb =>
-        for {
-          trans <- interpretMapFunc[Backend](src.P)(bucket)
-          transformed = src.table.transform(trans)
+      case qscript.Reduce(src, bucket :: Nil, ReduceFuncs.Arbitrary(arb) :: Nil, repair) if bucket === arb =>
+        import src.P.trans._
 
-          back <- sortT[src.P.type](Repr.single[src.P](src))(
-            transformed,
-            src.P.trans.TransSpec1.Id,
-            unique = true).liftM[MT].liftB.asInstanceOf[Backend[Repr]]    // TODO remove this cast; it's safe, but annoying
-        } yield back
+        for {
+          bucketTrans <- interpretMapFunc[Backend](src.P)(bucket)
+
+          distinctedUnforced <- sortT[src.P.type](Repr.single[src.P](src))(
+            src.table,
+            bucketTrans,
+            unique = true).liftM[MT].liftB
+
+          distincted = src.unsafeMerge(distinctedUnforced)
+
+          repairTrans <- repair.cataM[Backend, TransSpec1](
+            interpretM(
+              {
+                case ReduceIndex(-\/(0) | \/-(0)) => bucketTrans.point[Backend]
+                case _ => sys.error("should be impossible")
+              },
+              mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)))
+
+          repaired = distincted.table.transform(repairTrans)
+        } yield Repr(src.P)(repaired)
 
       case qscript.Reduce(src, buckets, reducers, repair) =>
         import src.P.trans._
