@@ -53,9 +53,17 @@ trait BackendModule {
   private final implicit def _UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnirewriteT[T]
   private final implicit def _UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnicoalesceCap[T]
 
-  implicit class LiftBackend[A](m: M[A]) {
+  implicit class LiftBackendM[A](m: M[A]) {
     val liftB: Backend[A] = m.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
   }
+
+  implicit class LiftBackendConfigured[A](c: Configured[A]) {
+    val liftB: Backend[A] = c.liftM[PhaseResultT].liftM[FileSystemErrT]
+  }
+
+  def includeError[A](b: Backend[FileSystemError \/ A]): Backend[A] = EitherT(b.run.map(_.join))
+  def withLog[A](m: M[A], pr: PhaseResult): Backend[A] =
+    WriterT(m.liftM[ConfiguredT].map((Vector(pr), _))).liftM[FileSystemErrT]
 
   final val definition: BackendDef[Task] =
     BackendDef fromPF {

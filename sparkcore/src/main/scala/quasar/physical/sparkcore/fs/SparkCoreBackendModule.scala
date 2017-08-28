@@ -31,6 +31,7 @@ import scala.Predef.implicitly
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
+import pathy.Path._
 import matryoshka._
 import matryoshka.implicits._
 import scalaz.{Failure => _, _}, Scalaz._
@@ -40,8 +41,14 @@ trait SparkCoreBackendModule extends BackendModule {
 
   // conntector specificc
   type Eff[A]
-  def toLowerLevel[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S): M ~> Free[S, ?]
-  def generateSC: Config => DefErrT[M, SparkContext]
+  def toLowerLevel[S[_]](sc: SparkContext)(implicit
+    S0: Task :<: S, S1: PhysErr :<: S
+  ): Task[M ~> Free[S, ?]]
+  def generateSC: Config => DefErrT[Task, SparkContext]
+  def rebaseAFile(f: AFile): Configured[AFile]
+  def stripPrefixAFile(f: AFile): Configured[AFile]
+  def rebaseADir(f: ADir): Configured[ADir]
+  def stripPrefixADir(f: ADir): Configured[ADir]
 
   def ReadSparkContextInj: Inject[Read[SparkContext, ?], Eff]
   def RFKeyValueStoreInj: Inject[KeyValueStore[ReadFile.ReadHandle, SparkCursor, ?], Eff]
@@ -89,10 +96,12 @@ trait SparkCoreBackendModule extends BackendModule {
     injectNT[Task, Task],
     Failure.mapError[PhysicalError, Exception](_.cause) andThen Failure.toCatchable[Task, Exception]
   ))
-  def toTask: M ~> Task = toLowerLevel[LowerLevel] andThen foldMapNT(lowerToTask)
+  def toTask(sc: SparkContext): Task[M ~> Task] = toLowerLevel[LowerLevel](sc).map(_ andThen foldMapNT(lowerToTask))
 
-  def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] =
-    EitherT(toTask(generateSC(cfg).run)).map(sc => (toTask, Task.delay(sc.stop())))
+  def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] = for {
+    sc <- generateSC(cfg)
+    tt <- toTask(sc).liftM[DefErrT]
+  } yield (tt, Task.delay(sc.stop()))
 
   def rddFrom: AFile => M[RDD[Data]] = (f: AFile) => detailsOps.rddFrom(f)
   def first: RDD[Data] => M[Data] = (rdd: RDD[Data]) => lift(Task.delay {rdd.first}).into[Eff]
@@ -108,7 +117,7 @@ trait SparkCoreBackendModule extends BackendModule {
     import quasar.fp.numeric.{Natural, Positive}
 
     def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] =
-      includeError(readfile.open[Eff](file, offset, limit).liftB)
+      rebaseAFile(file).liftB >>= (f => includeError(readfile.open[Eff](f, offset, limit).liftB))
     def read(h: ReadHandle): Backend[Vector[Data]] =
       includeError(readfile.read[Eff](h).liftB)
     def close(h: ReadHandle): Configured[Unit] =
@@ -120,8 +129,8 @@ trait SparkCoreBackendModule extends BackendModule {
     import QueryFile._
     import queryfile.RddState
 
-    def executePlan(rdd: RDD[Data], out: AFile): Backend[AFile] = {
-      val execute = detailsOps.storeData(rdd, out).as(out)
+    def executePlan(rdd: RDD[Data], out: AFile): Backend[AFile] = stripPrefixAFile(out).liftB >>= { o =>
+      val execute =  detailsOps.storeData(rdd, o).as(out)
       val log     = PhaseResult.detail("RDD", rdd.toDebugString)
       withLog[AFile](execute, log)
     }
@@ -139,16 +148,63 @@ trait SparkCoreBackendModule extends BackendModule {
       rdd.toDebugString.point[Backend]
 
     def listContents(dir: ADir): Backend[Set[PathSegment]] =
-      includeError(detailsOps.listContents(dir).run.liftB)
+      rebaseADir(dir).liftB >>= (d => includeError(detailsOps.listContents(dir).run.liftB))
 
     def fileExists(file: AFile): Configured[Boolean] =
-      detailsOps.fileExists(file).liftM[ConfiguredT]
+      rebaseAFile(file) >>= (f => detailsOps.fileExists(f).liftM[ConfiguredT])
   }
 
   def QueryFileModule: QueryFileModule = SparkQueryFileModule
 
-  // utility functions
-  def includeError[A](b: Backend[FileSystemError \/ A]): Backend[A] = EitherT(b.run.map(_.join))
-  def withLog[A](m: M[A], pr: PhaseResult): Backend[A] =
-    WriterT(m.liftM[ConfiguredT].map((Vector(pr), _))).liftM[FileSystemErrT]
+  abstract class SparkCoreWriteFileModule extends WriteFileModule {
+    import WriteFile._
+
+    def rebasedOpen(file: AFile): Backend[WriteHandle]
+
+    def open(file: AFile): Backend[WriteHandle] =
+      rebaseAFile(file).liftB >>= (rebasedOpen _)
+  }
+
+  abstract class SparkCoreManageFileModule extends ManageFileModule {
+    import ManageFile._, ManageFile.MoveScenario._
+    import quasar.fs.impl.ensureMoveSemantics
+
+    def moveFile(src: AFile, dst: AFile): M[Unit]
+    def moveDir(src: ADir, dst: ADir): M[Unit]
+    def doesPathExist: APath => M[Boolean]
+    def deleteFile(f: AFile): Backend[Unit]
+    def deleteDir(d: ADir): Backend[Unit]
+    def tempFileNearFile(f: AFile): Backend[AFile]
+    def tempFileNearDir(d: ADir): Backend[AFile]
+
+    def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = (scenario, semantics) match {
+      case (FileToFile(srcFile, destFile), semantics) => for {
+        sf <- rebaseAFile(srcFile).liftB
+        df <- rebaseAFile(destFile).liftB
+        _  <- includeError(((ensureMoveSemantics(sf, df, doesPathExist, semantics).toLeft(()) *>
+          moveFile(sf, df).liftM[FileSystemErrT]).run).liftB)
+      } yield ()
+
+      case (DirToDir(srcDir, destDir), semantics) => for {
+        sd <- rebaseADir(srcDir).liftB
+        dd <- rebaseADir(destDir).liftB
+        _  <- includeError(((ensureMoveSemantics(sd, dd, doesPathExist, semantics).toLeft(()) *>
+          moveDir(sd, dd).liftM[FileSystemErrT]).run).liftB)
+      } yield ()
+        
+    }
+
+    def delete(path: APath): Backend[Unit] =
+      refineType(path).fold(
+        dir  => rebaseADir(dir).liftB   >>= (deleteDir _),
+        file => rebaseAFile(file).liftB >>= (deleteFile _) 
+      )
+
+    def tempFile(near: APath): Backend[AFile] = {
+      refineType(near).fold(
+        dir  => rebaseADir(dir).liftB   >>= (tempFileNearDir _)  >>= (f => stripPrefixAFile(f).liftB),
+        file => rebaseAFile(file).liftB >>= (tempFileNearFile _) >>= (f => stripPrefixAFile(f).liftB)
+      )
+    }
+  }
 }
