@@ -45,7 +45,7 @@ object DbUtil {
       info.password
     )
 
-    xa.trans
+    xa.rawTrans
   }
 
 }
