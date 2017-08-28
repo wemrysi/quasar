@@ -2,12 +2,15 @@
     "name": "cities with largest individual zip codes",
     "backends": {
         "couchbase":      "pending",
+        "mimir":          "pending",
         "mongodb_2_6":    "pending",
         "mongodb_3_0":    "pending",
         "mongodb_3_2":    "pending",
         "mongodb_3_4":    "pending",
         "mongodb_read_only": "pending"
     },
+
+    "NB": "I had to turn mimir back off because this query seems to be affected by the array undefinedness issue pretty severely."
 
     "data": "zips.data",
 
