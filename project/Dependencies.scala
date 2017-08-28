@@ -105,7 +105,6 @@ object Dependencies {
   }
 
   def rdbmscore = {
-    val doobieVersion = "0.4.4"
     Seq(
       "org.tpolecat" %% "doobie-core"       % doobieVersion,
       "org.tpolecat" %% "doobie-postgres"   % doobieVersion,
