@@ -59,11 +59,11 @@ object Quasar {
     def qErrsToMainErrT[F[_]: Catchable: Monad]: QErrs ~> MainErrT[F, ?] =
       liftMT[F, MainErrT].compose(QErrs.toCatchable[F])
 
-    def toMainTask(transactor: Transactor[Task]): QErrsCnxIOM ~> MainTask = {
+    def toMainTask(transactor: Transactor[Task])(implicit tm: Monad[Task]): QErrsCnxIOM ~> MainTask = {
       val f: QErrsCnxIOM ~> MainErrT[ConnectionIO, ?] =
         foldMapNT(liftMT[ConnectionIO, MainErrT] :+: qErrsToMainErrT[ConnectionIO])
 
-      Hoist[MainErrT].hoist(transactor.trans) compose f
+      Hoist[MainErrT].hoist(transactor.trans(tm)) compose f
     }
   }
 
@@ -127,6 +127,7 @@ object Quasar {
       _          <- failedMnts.toList.traverse_(logFailedMount).liftM[MainErrT]
 
       runCore    <- CoreEff.runFs[QEffIO](hfsRef).liftM[MainErrT]
+
     } yield {
       val f: QEffIO ~> QErrs_CnxIO_Task_MetaStoreLocM =
         injectFT[Task, QErrs_CnxIO_Task_MetaStoreLoc]               :+:
@@ -135,7 +136,7 @@ object Quasar {
           injectFT[QErrs, QErrs_CnxIO_Task_MetaStoreLoc]
 
       val connectionIOToTask: ConnectionIO ~> Task =
-        λ[ConnectionIO ~> Task](io => metaRef.read.flatMap(t => t.trans.transactor.trans(io)))
+        λ[ConnectionIO ~> Task](io => metaRef.read.flatMap(t => t.trans.transactor.trans.apply(io)))
       val g: QErrs_CnxIO_Task_MetaStoreLoc ~> QErrs_TaskM =
         (injectFT[Task, QErrs_Task] compose MetaStoreLocation.impl.default(metaRef, persist)) :+:
          injectFT[Task, QErrs_Task]                                                           :+:

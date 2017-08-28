@@ -86,7 +86,7 @@ object MetaStore {
         jCfg ∘ (_.withObject(_ - mntsFieldName)),
         jCfg)
 
-    EitherT(transactor.trans(op).attempt ∘ (
+    EitherT(transactor.trans.apply(op).attempt ∘ (
       _.leftMap(t => UnknownError(t, "While initializing or updating"))))
   }
 
