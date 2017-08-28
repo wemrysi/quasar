@@ -17,10 +17,11 @@
 package quasar.db
 
 import slamdata.Predef._
-import doobie.imports._
 
-import scalaz.concurrent.Task
+import doobie.free.connection.ConnectionIO
+import doobie.imports.DriverManagerTransactor
 import scalaz.~>
+import scalaz.concurrent.Task
 
 object DbUtil {
   /** Configuration for an in-memory DB that persists only as long

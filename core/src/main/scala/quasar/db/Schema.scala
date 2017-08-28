@@ -18,7 +18,8 @@ package quasar.db
 
 import slamdata.Predef._
 
-import doobie.imports._
+import doobie.free.connection.ConnectionIO
+import doobie.imports.HC
 import scala.collection.immutable.SortedMap
 import scalaz._, Scalaz._
 

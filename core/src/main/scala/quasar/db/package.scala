@@ -17,10 +17,12 @@
 package quasar
 
 import slamdata.Predef._
-import com.zaxxer.hikari.HikariConfig
-import doobie.imports._
-import doobie.hikari.hikaritransactor.HikariTransactor
 
+import com.zaxxer.hikari.HikariConfig
+import doobie.free.connection.ConnectionIO
+import doobie.hikari.hikaritransactor.HikariTransactor
+import doobie.imports.DriverManagerTransactor
+import doobie.util.transactor.Transactor
 import scalaz._
 import scalaz.concurrent.Task
 

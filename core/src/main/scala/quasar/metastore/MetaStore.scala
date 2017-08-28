@@ -22,8 +22,11 @@ import quasar.db._
 import quasar.fs.mount.MountingsConfig
 
 import argonaut._
-import doobie.imports._
-import scalaz._, Scalaz._
+import doobie.util.transactor.Transactor
+import doobie.free.connection.ConnectionIO
+import doobie.syntax.connectionio._
+import scalaz._
+import Scalaz._
 import scalaz.concurrent.Task
 
 final case class MetaStore private (connectionInfo: DbConnectionConfig, trans: StatefulTransactor, schemas: List[Schema[Int]]) {
