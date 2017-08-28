@@ -41,6 +41,8 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     case (string.Lower, _)   => Pending("TODO").left
     case (string.Upper, _)   => Pending("TODO").left
+    //case (set.Within, _)     => Pending("TODO").left
+
 
     case (string.ToString, Data.Dec(_) :: Nil) =>
       Pending("Dec printing doesn't match precisely").left
