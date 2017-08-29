@@ -123,20 +123,20 @@ class PlannerSpec extends
 
   def queryPlanner(expr: Fix[Sql], model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
-    indexes: Collection => Option[Set[Index]]) =
-    queryPlan(expr, Variables.empty, basePath, 0L, None)
-      .leftMap(es => scala.sys.error("errors while planning: ${es}"))
-      // TODO: Would be nice to error on Constant plans here, but property
-      // tests currently run into that.
-      .flatMap(_.fold(
-        _ => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
-        MongoDbPlanner.plan(_, fs.QueryContext(model, stats, indexes, listContents))))
+    indexes: Collection => Option[Set[Index]]): EitherT[PhaseResultW, Nothing, FileSystemError \/ Crystallized[WorkflowF]] = ???
+    // queryPlan(expr, Variables.empty, basePath, 0L, None)
+    //   .leftMap(es => scala.sys.error("errors while planning: ${es}"))
+    //   // TODO: Would be nice to error on Constant plans here, but property
+    //   // tests currently run into that.
+    //   .flatMap(_.fold(
+    //     _ => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
+    //     MongoDbPlanner.plan(_, fs.QueryContext(model, stats, indexes, listContents))))
 
   def plan0(query: Fix[Sql], model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]]
-  ): Either[FileSystemError, Crystallized[WorkflowF]] =
-    queryPlanner(query, model, stats, indexes).run.value.toEither
+  ): Either[FileSystemError, Crystallized[WorkflowF]] = ???
+    //queryPlanner(query, model, stats, indexes).run.value.toEither
 
   def plan2_6(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`2.6`, κ(None), κ(None))
@@ -163,11 +163,12 @@ class PlannerSpec extends
     plan0(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes)
 
   def planLP(logical: Fix[LP]): Either[FileSystemError, Crystallized[WorkflowF]] = {
-    (for {
-      _          <- emit("Input",      logical)
-      simplified <- emit("Simplified", optimizer.simplify(logical))
-      phys       <- MongoDbPlanner.plan[Fix, EitherWriter](simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents))
-    } yield phys).run.value.toEither
+    // (for {
+    //   _          <- emit("Input",      logical)
+    //   simplified <- emit("Simplified", optimizer.simplify(logical))
+    //   phys       <- MongoDbPlanner.plan[Fix, EitherWriter](simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents))
+    // } yield phys).run.value.toEither
+    ???
   }
 
   def planLog(query: Fix[Sql]): Vector[PhaseResult] =

@@ -17,10 +17,8 @@
 package quasar.physical.mongodb.fs
 
 import slamdata.Predef._
-import quasar._
-import quasar.common.PhaseResultT
+import quasar.{config => _, _}
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.kleisli._
 import quasar.fp._
@@ -28,7 +26,6 @@ import quasar.fs._
 import quasar.physical.mongodb._, MongoDb._, WorkflowExecutor.WorkflowCursor
 
 import com.mongodb.async.client.MongoClient
-import matryoshka.data.Fix
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -40,45 +37,61 @@ object queryfileTypes {
   type EvalState[C]        = (Long, ResultMap[C])
   type QueryRT[F[_], C, A] = ReaderT[F, (Option[DefaultDb], TaskRef[EvalState[C]]), A]
   type MongoQuery[C, A]    = QueryRT[MongoDbIO, C, A]
+
+  type QRT[F[_], A]        = QueryRT[F, BsonCursor, A]
+  type MQ[A]               = QRT[MongoDbIO, A]
 }
 
 object queryfile extends QueryFileModule {
   import queryfileTypes._
   import QueryFile._
-  import bsoncursor._
 
-  def inConfigured[A](qf: QueryFile[A]): Configured[A] =
-    MonadReader_[Configured, Config].asks(_.wfExec).map(interpret[BsonCursor]) >>=
-      (i => toConfigured(i(qf)))
+  private def mkInterp(cfg: Config): QueryFileInterpreter =
+    new QueryFileInterpreter(cfg.wfExec)
 
-  def inBackend[A](qf: QueryFile[FileSystemError \/ A]): Backend[A] =
-    MonadReader_[Backend, Config].asks(_.wfExec).map(interpret[BsonCursor]) >>=
-      (i => toBackend(i(qf)))
+  def executePlan(repr: Repr, out: AFile): Backend[AFile] =
+    for {
+      i <- config[Backend].map(mkInterp)
+      dst <- i.execPlan(repr, out)
+    } yield dst
 
-  def executePlan(repr: Repr, out: AFile): Backend[AFile] = ???
+  def evaluatePlan(repr: Repr): Backend[ResultHandle] =
+    for {
+      dbName <- config[Backend].map(_.defaultDb.map(_.run))
+      i <- config[Backend].map(mkInterp)
+      handle <- i.evalPlan(repr, dbName)
+    } yield handle
 
-  def evaluatePlan(repr: Repr): Backend[ResultHandle] = ???
+  def explain(repr: Repr): Backend[String] =
+    for {
+      dbName <- config[Backend].map(_.defaultDb.map(_.run))
+      i <- config[Backend].map(mkInterp)
+      s <- i.explain(repr, dbName)
+    } yield s
 
   def more(h: ResultHandle): Backend[Vector[Data]] =
-    inBackend(More(h))
+    for {
+      i <- config[Backend].map(mkInterp)
+      d <- i.more(h)
+    } yield d
 
-  def close(h: ResultHandle): Configured[Unit] = inConfigured(Close(h))
-
-  def explain(repr: Repr): Backend[String] = ???
+  def close(h: ResultHandle): Configured[Unit] =
+    for {
+      i <- config[Configured].map(mkInterp)
+      u <- i.close(h)
+    } yield u
 
   def listContents(dir: ADir): Backend[Set[PathSegment]] =
-    inBackend(ListContents(dir))
+    for {
+      i <- config[Backend].map(mkInterp)
+      c <- i.listContents0(dir)
+    } yield c
 
   def fileExists(file: AFile): Configured[Boolean] =
-    inConfigured(FileExists(file))
-
-  def interpret[C]
-    (execMongo: WorkflowExecutor[MongoDbIO, C])
-    (implicit C: DataCursor[MongoDbIO, C])
-      : QueryFile ~> MongoQuery[C, ?] =
-    new QueryFileInterpreter(
-      execMongo,
-      MongoDbPlanner.plan[Fix, FileSystemErrT[PhaseResultT[MongoDbIO, ?], ?]])
+    for {
+      i <- config[Configured].map(mkInterp)
+      c <- i.fileExists(file)
+    } yield c
 
   def run[C, S[_]](
     client: MongoClient,

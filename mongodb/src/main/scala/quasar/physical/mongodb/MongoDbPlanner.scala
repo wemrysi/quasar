@@ -26,10 +26,9 @@ import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.{FileSystemError, QueryFile}, FileSystemError.qscriptPlanningFailed
+import quasar.fs.FileSystemError, FileSystemError.qscriptPlanningFailed
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
-import quasar.frontend.logicalplan.LogicalPlan
 import quasar.namegen._
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.accumulator._
@@ -1361,31 +1360,13 @@ object MongoDbPlanner {
   type MongoQScript[T[_[_]], A] = MongoQScriptCP[T]#M[A]
 
   def toMongoQScript[T[_[_]] : BirecursiveT: EqualT: RenderTreeT: ShowT, M[_] : Monad](
-    lp: T[LogicalPlan],
+    qs: T[MongoDb.QSM[T, ?]],
     listContents: DiscoverPath.ListContents[M])(implicit
     merr: MonadError_[M, FileSystemError],
     mtell: MonadTell_[M, PhaseResults]
-  ): M[T[MongoQScript[T, ?]]] = {
-    val rewrite = new Rewrite[T]
-    val optimize = new Optimize[T]
-
-    implicit val mongoQScripToQScriptTotal: Injectable.Aux[MongoQScript[T, ?], QScriptTotal[T, ?]] =
-      ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
-
-    for {
-      qs  <- QueryFile.convertToQScriptRead[T, M, QScriptRead[T, ?]](listContents)(lp)
-      // TODO: also need to prefer projections over deletions
-      // NB: right now this only outputs one phase, but it’d be cool if we could
-      //     interleave phase building in the composed recursion scheme
-      opt <- log(
-        "QScript (Mongo-specific)",
-        Unirewrite[T, MongoQScriptCP[T], M](rewrite, listContents).apply(qs)
-          .map(_.transHylo(
-            optimize.optimize(reflNT[MongoQScript[T, ?]]),
-            Unicoalesce[T, MongoQScriptCP[T]]))
-          .flatMap(_.transCataM(liftFGM(assumeReadType[M, T, MongoQScript[T, ?]](Type.AnyObject)))))
-    } yield opt
-  }
+  ): M[T[MongoQScript[T, ?]]] =
+    //TODO re-implement the Mongo specific QScript phase
+    qs.point[M]
 
   def plan0
     [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
@@ -1395,7 +1376,7 @@ object MongoDbPlanner {
     (listContents: DiscoverPath.ListContents[M],
       joinHandler: JoinHandler[WF, WBM],
       funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
-    (lp: T[LogicalPlan])
+    (qs: T[MongoDb.QSM[T, ?]])
     (implicit
       merr: MonadError_[M, FileSystemError],
       mtell: MonadTell_[M, PhaseResults],
@@ -1406,7 +1387,7 @@ object MongoDbPlanner {
       : M[Crystallized[WF]] = {
 
     for {
-      opt <- toMongoQScript(lp, listContents)
+      opt <- toMongoQScript(qs, listContents)
       wb  <- log(
         "Workflow Builder",
         opt.cataM[M, WorkflowBuilder[WF]](
@@ -1427,7 +1408,7 @@ object MongoDbPlanner {
     * callers don't need to worry about it.
     */
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, M[_]: Monad]
-    (logical: T[LogicalPlan], queryContext: fs.QueryContext[M])
+    (qs: T[MongoDb.QSM[T, ?]], queryContext: fs.QueryContext[M])
     (implicit
       merr: MonadError_[M, FileSystemError],
       mtell: MonadTell_[M, PhaseResults])
@@ -1440,22 +1421,22 @@ object MongoDbPlanner {
           JoinHandler.fallback[Workflow3_2F, WBM](
             JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
             JoinHandler.mapReduce)
-        plan0[T, M, Workflow3_2F, Expr3_4](queryContext.listContents, joinHandler, FuncHandler.handle3_4[MapFunc[T, ?]])(logical)
+        plan0[T, M, Workflow3_2F, Expr3_4](queryContext.listContents, joinHandler, FuncHandler.handle3_4[MapFunc[T, ?]])(qs)
 
       case `3.2` =>
         val joinHandler =
           JoinHandler.fallback[Workflow3_2F, WBM](
             JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
             JoinHandler.mapReduce)
-        plan0[T, M, Workflow3_2F, Expr3_2](queryContext.listContents, joinHandler, FuncHandler.handle3_2[MapFunc[T, ?]])(logical)
+        plan0[T, M, Workflow3_2F, Expr3_2](queryContext.listContents, joinHandler, FuncHandler.handle3_2[MapFunc[T, ?]])(qs)
 
       case `3.0`     =>
         val joinHandler = JoinHandler.mapReduce[WBM, Workflow2_6F]
-        plan0[T, M, Workflow2_6F, Expr3_0](queryContext.listContents, joinHandler, FuncHandler.handle3_0[MapFunc[T, ?]])(logical).map(_.inject[WorkflowF])
+        plan0[T, M, Workflow2_6F, Expr3_0](queryContext.listContents, joinHandler, FuncHandler.handle3_0[MapFunc[T, ?]])(qs).map(_.inject[WorkflowF])
 
       case _     =>
         val joinHandler = JoinHandler.mapReduce[WBM, Workflow2_6F]
-        plan0[T, M, Workflow2_6F, Expr2_6](queryContext.listContents, joinHandler, FuncHandler.handle2_6[MapFunc[T, ?]])(logical).map(_.inject[WorkflowF])
+        plan0[T, M, Workflow2_6F, Expr2_6](queryContext.listContents, joinHandler, FuncHandler.handle2_6[MapFunc[T, ?]])(qs).map(_.inject[WorkflowF])
     }
   }
 }

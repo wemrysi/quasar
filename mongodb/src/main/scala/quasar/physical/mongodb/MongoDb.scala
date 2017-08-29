@@ -21,10 +21,12 @@ import slamdata.Predef._
 import quasar.common._
 import quasar.connector._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz._
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount._
+import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 
 import com.mongodb.async.client.MongoClient
@@ -41,7 +43,7 @@ object MongoDb extends BackendModule {
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
-  type Repr = Unit
+  type Repr = Crystallized[WorkflowF]
 
   type Eff[A] = (
     fs.queryfileTypes.MongoQuery[BsonCursor, ?] :\:
@@ -72,8 +74,24 @@ object MongoDb extends BackendModule {
 
   val Type = FileSystemType("mongodb")
 
+  private def doPlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, N[_]: Monad]
+    (qs: T[QSM[T, ?]], ctx: fs.QueryContext[N])
+    (implicit
+      merr: MonadError_[N, FileSystemError],
+      mtell: MonadTell_[N, PhaseResults]): N[Repr] =
+    MongoDbPlanner.plan[T, N](qs, ctx)
+
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import EitherT.eitherTMonad
+
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
-      cp: T[QSM[T, ?]]): Backend[Repr] = ???
+      qs: T[QSM[T, ?]]): Backend[Repr] =
+    for {
+      ctx <- fs.QueryContext.queryContext[T](qs)
+      _ <- fs.QueryContext.checkPathsExist(qs)
+      p <- doPlan[T, Backend](qs, ctx)
+    } yield p
 
   private type PhaseRes[A] = PhaseResultT[ConfiguredT[M, ?], A]
 
@@ -88,14 +106,17 @@ object MongoDb extends BackendModule {
   def toBackend[C[_], A](c: C[FileSystemError \/ A])(implicit inj: C :<: Eff): Backend[A] =
     EitherT(c).mapT(x => effToPhaseRes(toEff(x)))
 
+  def toBackendP[C[_], A](c: C[(PhaseResults, FileSystemError \/ A)])(implicit inj: C :<: Eff): Backend[A] =
+    EitherT(WriterT(effToConfigured(toEff(c))))
+
   def toConfigured[C[_], A](c: C[A])(implicit inj: C :<: Eff): Configured[A] =
-    effToConfigured.apply(toEff(c))
+    effToConfigured(toEff(c))
 
-  override def QueryFileModule = fs.queryfile
+  override val QueryFileModule = fs.queryfile
 
-  override def ReadFileModule = fs.readfile
+  override val ReadFileModule = fs.readfile
 
-  override def WriteFileModule = fs.writefile
+  override val WriteFileModule = fs.writefile
 
-  override def ManageFileModule = fs.managefile
+  override val ManageFileModule = fs.managefile
 }

@@ -18,15 +18,15 @@ package quasar.physical.mongodb.fs
 
 import slamdata.Predef._
 import quasar._
-import quasar.common.{PhaseResult, PhaseResultT}
+import quasar.common.PhaseResultT
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.kleisli._
 import quasar.fs._
-import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
-import quasar.physical.mongodb._
+import quasar.physical.mongodb._, MongoDb._
 
-import matryoshka.data.Fix
+import matryoshka._
+import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 
@@ -44,34 +44,57 @@ object QueryContext {
   type MongoLogWF[C, A]  = PhaseResultT[QueryRT[MongoDbIO, C, ?], A]
   type MongoLogWFR[C, A] = FileSystemErrT[MongoLogWF[C, ?], A]
 
-  val lpr = new LogicalPlanR[Fix[LogicalPlan]]
+  def paths[T[_[_]]: BirecursiveT](qs: T[MongoDb.QSM[T, ?]]): ISet[APath] =
+    ISet.fromFoldable(
+      qs.cata(qscript.ExtractPath[MongoDb.QSM[T, ?], APath].extractPath[DList]))
 
-  def collections(lp: Fix[LogicalPlan]): PathError \/ Set[Collection] =
+  def collections[T[_[_]]: BirecursiveT](qs: T[MongoDb.QSM[T, ?]]): PathError \/ Set[Collection] =
     // NB: documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
-    lpr.paths(lp).toList
+    paths(qs).toList
+      .flatMap(f => maybeFile(f).toList)
       .traverse(file => Collection.fromFile(mkAbsolute(rootDir, file)))
       .map(_.toSet)
 
-  def queryContext[C](lp: Fix[LogicalPlan]):
-      MongoLogWFR[C, QueryContext[FileSystemErrT[PhaseResultT[MongoDbIO, ?], ?]]] = {
-    def lift[A](fa: FileSystemErrT[MongoDbIO, A]): MongoLogWFR[C, A] =
-      EitherT[MongoLogWF[C, ?], FileSystemError, A](
-        fa.run.liftM[QueryRT[?[_], C, ?]].liftM[PhaseResultT])
+  def lookup[T[_[_]]: BirecursiveT, A](qs: T[MongoDb.QSM[T, ?]], f: Collection => MongoDbIO[A])
+      : EitherT[MongoDbIO, FileSystemError, Map[Collection, A]] =
+    for {
+      colls <- EitherT.fromDisjunction[MongoDbIO](collections(qs).leftMap(pathErr(_)))
+      a     <- colls.toList.traverse(c => f(c).strengthL(c)).map(Map(_: _*)).liftM[FileSystemErrT]
+    } yield a
 
-    def lookup[A](f: Collection => MongoDbIO[A]): EitherT[MongoDbIO, FileSystemError, Map[Collection, A]] =
-      for {
-        colls <- EitherT.fromDisjunction[MongoDbIO](collections(lp).leftMap(pathErr(_)))
-        a     <- colls.toList.traverse(c => f(c).strengthL(c)).map(Map(_: _*)).liftM[FileSystemErrT]
-      } yield a
+  def queryContext[
+    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
+    (qs: T[MongoDb.QSM[T, ?]])
+      : Backend[QueryContext[Backend]] = {
 
-    lift(
+    def lift[A](fa: FileSystemErrT[MongoDbIO, A]): MongoLogWFR[BsonCursor, A] =
+      EitherT[MongoLogWF[BsonCursor, ?], FileSystemError, A](
+        fa.run.liftM[QueryRT[?[_], BsonCursor, ?]].liftM[PhaseResultT])
+
+    val x: FileSystemErrT[MongoDbIO, QueryContext[quasar.physical.mongodb.MongoDb.Backend]] =
       (MongoDbIO.serverVersion.liftM[FileSystemErrT] |@|
-        lookup(MongoDbIO.collectionStatistics) |@|
-        lookup(MongoDbIO.indexes))((vers, stats, idxs) =>
+       lookup(qs, MongoDbIO.collectionStatistics) |@|
+       lookup(qs, MongoDbIO.indexes))((vers, stats, idxs) =>
         QueryContext(
           MongoQueryModel(vers),
           stats.get(_),
           idxs.get(_),
-          dir => EitherT(WriterT(listContents(dir).run.map((Vector[PhaseResult](), _)))))))
+          dir => queryfile.listContents(dir)))
+
+    toBackendP(lift(x).run.run)
   }
+
+  def checkPathsExist[T[_[_]]: BirecursiveT](qs: T[MongoDb.QSM[T, ?]]): Backend[Unit] = {
+    val rez = for {
+      colls <- EitherT.fromDisjunction[MongoDbIO](collections(qs).leftMap(pathErr(_)))
+      _     <- colls.traverse_(c => EitherT(MongoDbIO.collectionExists(c)
+                .map(_ either (()) or pathErr(PathError.pathNotFound(c.asFile)))))
+    } yield ()
+    val e: MongoLogWFR[BsonCursor, Unit] = EitherT[MongoLogWF[BsonCursor, ?], FileSystemError, Unit](
+      rez.run.liftM[QRT].liftM[PhaseResultT])
+
+    toBackendP(e.run.run)
+  }
+
+
 }
