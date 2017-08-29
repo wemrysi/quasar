@@ -96,12 +96,27 @@ trait SparkCoreBackendModule extends BackendModule {
     injectNT[Task, Task],
     Failure.mapError[PhysicalError, Exception](_.cause) andThen Failure.toCatchable[Task, Exception]
   ))
+
   def toTask(sc: SparkContext): Task[M ~> Task] = toLowerLevel[LowerLevel](sc).map(_ andThen foldMapNT(lowerToTask))
 
   def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] = for {
     sc <- generateSC(cfg)
     tt <- toTask(sc).liftM[DefErrT]
   } yield (tt, Task.delay(sc.stop()))
+
+  implicit class BackendRebase[A](b: Backend[A]) {
+
+    import ReadFile._
+
+    type ConfiguredAndLoged[A] = PhaseResultT[ConfiguredT[M, ?], A]
+
+    def stripError: Backend[A] = 
+      EitherT(b.run >>= {
+        case -\/(UnknownReadHandle(h)) =>
+          stripPrefixAFile(h.file).map(f => (UnknownReadHandle(ReadHandle(f, h.id)):FileSystemError).left[A]).liftM[PhaseResultT]
+        case o       => o.point[ConfiguredAndLoged]
+      })
+  }
 
   def rddFrom: AFile => M[RDD[Data]] = (f: AFile) => detailsOps.rddFrom(f)
   def first: RDD[Data] => M[Data] = (rdd: RDD[Data]) => lift(Task.delay {rdd.first}).into[Eff]
@@ -116,12 +131,16 @@ trait SparkCoreBackendModule extends BackendModule {
     import ReadFile._
     import quasar.fp.numeric.{Natural, Positive}
 
-    def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] =
-      rebaseAFile(file).liftB >>= (f => includeError(readfile.open[Eff](f, offset, limit).liftB))
+    def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = for {
+      f <- rebaseAFile(file).liftB.stripError
+      h <- includeError(readfile.open[Eff](f, offset, limit).liftB)
+    } yield ReadHandle(file, h.id)
+    
     def read(h: ReadHandle): Backend[Vector[Data]] =
-      includeError(readfile.read[Eff](h).liftB)
+      rebaseAFile(h.file).liftB >>= (f => includeError(readfile.read[Eff](ReadHandle(f, h.id)).liftB).stripError)
+
     def close(h: ReadHandle): Configured[Unit] =
-      readfile.close[Eff](h).liftM[ConfiguredT]
+      rebaseAFile(h.file) >>= (f => readfile.close[Eff](ReadHandle(f, h.id)).liftM[ConfiguredT])
   }
   def ReadFileModule = SparkReadFileModule
 
@@ -160,9 +179,19 @@ trait SparkCoreBackendModule extends BackendModule {
     import WriteFile._
 
     def rebasedOpen(file: AFile): Backend[WriteHandle]
+    def rebasedWrite(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]]
+    def rebasedClose(h: WriteHandle): Configured[Unit]
 
-    def open(file: AFile): Backend[WriteHandle] =
-      rebaseAFile(file).liftB >>= (rebasedOpen _)
+    def open(file: AFile): Backend[WriteHandle] = for {
+      f <- rebaseAFile(file).liftB
+      h <- rebasedOpen(f)
+    } yield WriteHandle(file, h.id)
+
+    def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] =
+      rebaseAFile(h.file) >>= (f => rebasedWrite(WriteHandle(f, h.id), chunk))
+
+    def close(h: WriteHandle): Configured[Unit] =
+      rebaseAFile(h.file) >>= (f => rebasedClose(WriteHandle(f, h.id)))
   }
 
   abstract class SparkCoreManageFileModule extends ManageFileModule {

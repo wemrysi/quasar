@@ -66,8 +66,8 @@ object SparkLocalBackendModule extends SparkCoreBackendModule {
   def TaskInj = Inject[Task, Eff]
   def SparkConnectorDetailsInj = Inject[SparkConnectorDetails, Eff]
   def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, corequeryfile.RddState, ?], Eff]
-
   def wrKvsOps = KeyValueStore.Ops[WriteHandle, PrintWriter, Eff]
+
 
   def toLowerLevel[S[_]](sc: SparkContext)(implicit S0: Task :<: S, S1: PhysErr :<: S): Task[Free[Eff, ?] ~> Free[S, ?]] = 
     (TaskRef(0L) |@|
@@ -160,7 +160,7 @@ object SparkLocalBackendModule extends SparkCoreBackendModule {
       _  <- wrKvsOps.put(h, pw).liftB
     } yield h
 
-    def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] = {
+    def rebasedWrite(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] = {
 
       implicit val codec: DataCodec = DataCodec.Precise
 
@@ -182,7 +182,7 @@ object SparkLocalBackendModule extends SparkCoreBackendModule {
       _write.fold(errs => errs, Vector[FileSystemError](unknownWriteHandle(h))).liftM[ConfiguredT]
     }
 
-    def close(h: WriteHandle): Configured[Unit] =
+    def rebasedClose(h: WriteHandle): Configured[Unit] =
       (((wrKvsOps.get(h) <* wrKvsOps.delete(h).liftM[OptionT]) ∘ (_.close)).run.void).liftM[ConfiguredT]
   }
 
