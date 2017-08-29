@@ -15,7 +15,7 @@
  */
 
 package quasar.physical.rdbms
-import doobie.util.iolite.IOLite
+
 import matryoshka.{BirecursiveT, Delay, EqualT, RecursiveT, ShowT}
 import quasar.{RenderTree, RenderTreeT}
 import slamdata.Predef._
@@ -46,7 +46,7 @@ trait Rdbms extends BackendModule with RdbmsReadFile {
   implicit val monadMInstance: Monad[M] = MonadM
 
   type Eff[A] = (
-    IOLite :\:
+    Task :\:
       MonotonicSeq :\:
       GenUUID :/:
       KeyValueStore[ReadHandle, SqlReadCursor, ?]

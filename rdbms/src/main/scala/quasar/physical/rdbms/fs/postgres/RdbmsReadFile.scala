@@ -16,21 +16,27 @@
 
 package quasar.physical.rdbms.fs.postgres
 
-import slamdata.Predef._
+
 import quasar.contrib.pathy.AFile
-import quasar.contrib.scalaz._
-import eitherT._
+import quasar.contrib.scalaz.eitherT._
 import quasar.Data
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp.free.lift
-import quasar.fs._
-import quasar.physical.rdbms.Rdbms
-import quasar.physical.rdbms.common.TablePath
 import quasar.fp.numeric.{Natural, Positive}
+import quasar.fs._
+import quasar.physical.rdbms.common.TablePath
+import quasar.physical.rdbms.mapping._
+import quasar.physical.rdbms.Rdbms
+import slamdata.Predef._
+import eu.timepit.refined.api.RefType.ops._
+import doobie.util.transactor.Transactor
+import doobie.syntax.connectionio._
+import doobie.syntax.process._
+import doobie.syntax.string._
+
 import scalaz._
 import Scalaz._
-import doobie.imports._
-import eu.timepit.refined.api.RefType.ops._
+import scalaz.concurrent.Task
 
 final case class SqlReadCursor(data: Vector[Data])
 
@@ -45,9 +51,6 @@ trait RdbmsReadFile {
 
   override def ReadFileModule: ReadFileModule = new ReadFileModule {
 
-    private def strToData(string: String): Data =
-      ??? // TODO
-
     private def readAll[F[_]: Monad](
         dbPath: TablePath,
         offset: Int,
@@ -56,20 +59,20 @@ trait RdbmsReadFile {
     ): F[Vector[Data]] = {
 
       val streamWithOffset = sql"select * from ${dbPath.shows}"
-        .query[String]
+        .query[Data]
         .process
         .drop(offset)
-      //
+
       val streamWithLimit = limit match {
         case Some(l) => streamWithOffset.take(l)
         case None    => streamWithOffset
       }
-      streamWithLimit.map(strToData).vector.transact(xa)
+      streamWithLimit.vector.transact(xa)
     }
 
     private def toInt(long: Long, varName: String): Backend[\/[FileSystemError, Int]] =
       lift(
-        IOLite.pure(
+        Task.delay(
           \/.fromTryCatchNonFatal(long.toInt)
             .leftMap(
               _ => FileSystemError.readFailed(long.toString, s"$varName not convertible to Int.")
