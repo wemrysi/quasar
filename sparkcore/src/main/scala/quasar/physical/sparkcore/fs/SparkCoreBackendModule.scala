@@ -22,7 +22,7 @@ import quasar.connector.BackendModule
 import quasar.contrib.pathy._
 import quasar.common._
 import quasar.fp._, free._
-import quasar.fs._, FileSystemError._
+import quasar.fs._, FileSystemError._, PathError._
 import quasar.fs.mount._, BackendDef._
 import quasar.effect._
 import quasar.qscript.{Read => _, _}
@@ -114,18 +114,37 @@ trait SparkCoreBackendModule extends BackendModule {
       EitherT(b.run >>= {
         case -\/(UnknownReadHandle(h)) =>
           stripPrefixAFile(h.file).map(f => (UnknownReadHandle(ReadHandle(f, h.id)):FileSystemError).left[A]).liftM[PhaseResultT]
+        case -\/(PathErr(PathNotFound(path))) =>
+          refineType(path).fold(
+            dir  => stripPrefixADir(dir).map(d => (PathErr(PathNotFound(d)):FileSystemError).left[A]).liftM[PhaseResultT],
+            file => stripPrefixAFile(file).map(f => (PathErr(PathNotFound(f)):FileSystemError).left[A]).liftM[PhaseResultT]
+          )
+        case -\/(PathErr(PathExists(path))) =>
+          refineType(path).fold(
+            dir  => stripPrefixADir(dir).map(d => (PathErr(PathExists(d)):FileSystemError).left[A]).liftM[PhaseResultT],
+            file => stripPrefixAFile(file).map(f => (PathErr(PathExists(f)):FileSystemError).left[A]).liftM[PhaseResultT]
+          )
+        case -\/(PathErr(InvalidPath(path, reason))) =>
+          refineType(path).fold(
+            dir  => stripPrefixADir(dir).map(d => (PathErr(InvalidPath(d, reason)):FileSystemError).left[A]).liftM[PhaseResultT],
+            file => stripPrefixAFile(file).map(f => (PathErr(InvalidPath(f, reason)):FileSystemError).left[A]).liftM[PhaseResultT]
+          )
         case o       => o.point[ConfiguredAndLoged]
       })
   }
 
-  def rddFrom: AFile => M[RDD[Data]] = (f: AFile) => detailsOps.rddFrom(f)
+  def rddFrom: AFile => Configured[RDD[Data]] =
+    (file: AFile) => (rebaseAFile(file) >>= (f => detailsOps.rddFrom(f).liftM[ConfiguredT]))
   def first: RDD[Data] => M[Data] = (rdd: RDD[Data]) => lift(Task.delay {rdd.first}).into[Eff]
 
-  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](cp: T[QSM[T, ?]]): Backend[Repr] =
-    includeError((readScOps.ask >>= { sc =>
+  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](cp: T[QSM[T, ?]]): Backend[Repr] = for {
+    config <- Kleisli.ask[M, Config].liftB
+    repr   <- includeError((readScOps.ask >>= { sc =>
       val total = implicitly[Planner[QSM[T, ?], Eff]]
-      cp.cataM(total.plan(rddFrom, first)).eval(sc).run.map(_.leftMap(pe => qscriptPlanningFailed(pe)))
+      cp.cataM(total.plan(f => rddFrom(f).run.apply(config), first)).eval(sc).run.map(_.leftMap(pe => qscriptPlanningFailed(pe)))
     }).liftB)
+  } yield repr
+
 
   object SparkReadFileModule extends ReadFileModule {
     import ReadFile._
@@ -148,7 +167,7 @@ trait SparkCoreBackendModule extends BackendModule {
     import QueryFile._
     import queryfile.RddState
 
-    def executePlan(rdd: RDD[Data], out: AFile): Backend[AFile] = stripPrefixAFile(out).liftB >>= { o =>
+    def executePlan(rdd: RDD[Data], out: AFile): Backend[AFile] = rebaseAFile(out).liftB >>= { o =>
       val execute =  detailsOps.storeData(rdd, o).as(out)
       val log     = PhaseResult.detail("RDD", rdd.toDebugString)
       withLog[AFile](execute, log)
@@ -167,7 +186,7 @@ trait SparkCoreBackendModule extends BackendModule {
       rdd.toDebugString.point[Backend]
 
     def listContents(dir: ADir): Backend[Set[PathSegment]] =
-      rebaseADir(dir).liftB >>= (d => includeError(detailsOps.listContents(dir).run.liftB))
+      (rebaseADir(dir).liftB >>= (d => includeError(detailsOps.listContents(d).run.liftB))).stripError
 
     def fileExists(file: AFile): Configured[Boolean] =
       rebaseAFile(file) >>= (f => detailsOps.fileExists(f).liftM[ConfiguredT])
@@ -183,7 +202,7 @@ trait SparkCoreBackendModule extends BackendModule {
     def rebasedClose(h: WriteHandle): Configured[Unit]
 
     def open(file: AFile): Backend[WriteHandle] = for {
-      f <- rebaseAFile(file).liftB
+       f <- rebaseAFile(file).liftB
       h <- rebasedOpen(f)
     } yield WriteHandle(file, h.id)
 
@@ -206,7 +225,7 @@ trait SparkCoreBackendModule extends BackendModule {
     def tempFileNearFile(f: AFile): Backend[AFile]
     def tempFileNearDir(d: ADir): Backend[AFile]
 
-    def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = (scenario, semantics) match {
+    def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = ((scenario, semantics) match {
       case (FileToFile(srcFile, destFile), semantics) => for {
         sf <- rebaseAFile(srcFile).liftB
         df <- rebaseAFile(destFile).liftB
@@ -221,19 +240,19 @@ trait SparkCoreBackendModule extends BackendModule {
           moveDir(sd, dd).liftM[FileSystemErrT]).run).liftB)
       } yield ()
         
-    }
+    }).stripError
 
     def delete(path: APath): Backend[Unit] =
       refineType(path).fold(
         dir  => rebaseADir(dir).liftB   >>= (deleteDir _),
         file => rebaseAFile(file).liftB >>= (deleteFile _) 
-      )
+      ).stripError
 
     def tempFile(near: APath): Backend[AFile] = {
       refineType(near).fold(
         dir  => rebaseADir(dir).liftB   >>= (tempFileNearDir _)  >>= (f => stripPrefixAFile(f).liftB),
         file => rebaseAFile(file).liftB >>= (tempFileNearFile _) >>= (f => stripPrefixAFile(f).liftB)
-      )
+      ).stripError
     }
   }
 }
