@@ -49,7 +49,6 @@ trait SparkCoreBackendModule extends BackendModule {
   def stripPrefixAFile(f: AFile): Configured[AFile]
   def rebaseADir(f: ADir): Configured[ADir]
   def stripPrefixADir(f: ADir): Configured[ADir]
-
   def ReadSparkContextInj: Inject[Read[SparkContext, ?], Eff]
   def RFKeyValueStoreInj: Inject[KeyValueStore[ReadFile.ReadHandle, SparkCursor, ?], Eff]
   def MonotonicSeqInj: Inject[MonotonicSeq, Eff]
@@ -104,33 +103,22 @@ trait SparkCoreBackendModule extends BackendModule {
     tt <- toTask(sc).liftM[DefErrT]
   } yield (tt, Task.delay(sc.stop()))
 
+  private def stripErr(input: FileSystemError): Configured[FileSystemError] = input match {
+    case UnknownReadHandle(h) =>
+      stripPrefixAFile(h.file).map(f => (UnknownReadHandle(ReadFile.ReadHandle(f, h.id)):FileSystemError))
+    case UnknownWriteHandle(h) =>
+      stripPrefixAFile(h.file).map(f => (UnknownWriteHandle(WriteFile.WriteHandle(f, h.id)):FileSystemError))
+    case PathErr(perr) =>
+      refineType(errorPath.get(perr)).fold(
+        dir  => stripPrefixADir(dir).map(d => (PathErr(errorPath.set(d)(perr)):FileSystemError)),
+        file => stripPrefixAFile(file).map(f => (PathErr(errorPath.set(f)(perr)):FileSystemError))
+      )
+    case o       => o.point[Configured]
+  }
+
   implicit class BackendRebase[A](b: Backend[A]) {
-
-    import ReadFile._
-
-    type ConfiguredAndLoged[A] = PhaseResultT[ConfiguredT[M, ?], A]
-
     def stripError: Backend[A] = 
-      EitherT(b.run >>= {
-        case -\/(UnknownReadHandle(h)) =>
-          stripPrefixAFile(h.file).map(f => (UnknownReadHandle(ReadHandle(f, h.id)):FileSystemError).left[A]).liftM[PhaseResultT]
-        case -\/(PathErr(PathNotFound(path))) =>
-          refineType(path).fold(
-            dir  => stripPrefixADir(dir).map(d => (PathErr(PathNotFound(d)):FileSystemError).left[A]).liftM[PhaseResultT],
-            file => stripPrefixAFile(file).map(f => (PathErr(PathNotFound(f)):FileSystemError).left[A]).liftM[PhaseResultT]
-          )
-        case -\/(PathErr(PathExists(path))) =>
-          refineType(path).fold(
-            dir  => stripPrefixADir(dir).map(d => (PathErr(PathExists(d)):FileSystemError).left[A]).liftM[PhaseResultT],
-            file => stripPrefixAFile(file).map(f => (PathErr(PathExists(f)):FileSystemError).left[A]).liftM[PhaseResultT]
-          )
-        case -\/(PathErr(InvalidPath(path, reason))) =>
-          refineType(path).fold(
-            dir  => stripPrefixADir(dir).map(d => (PathErr(InvalidPath(d, reason)):FileSystemError).left[A]).liftM[PhaseResultT],
-            file => stripPrefixAFile(file).map(f => (PathErr(InvalidPath(f, reason)):FileSystemError).left[A]).liftM[PhaseResultT]
-          )
-        case o       => o.point[ConfiguredAndLoged]
-      })
+      EitherT(b.run >>= (i => i.bitraverse(stripErr, _.point[Configured]).liftM[PhaseResultT]))
   }
 
   def rddFrom: AFile => Configured[RDD[Data]] =
@@ -144,7 +132,6 @@ trait SparkCoreBackendModule extends BackendModule {
       cp.cataM(total.plan(f => rddFrom(f).run.apply(config), first)).eval(sc).run.map(_.leftMap(pe => qscriptPlanningFailed(pe)))
     }).liftB)
   } yield repr
-
 
   object SparkReadFileModule extends ReadFileModule {
     import ReadFile._
@@ -206,8 +193,8 @@ trait SparkCoreBackendModule extends BackendModule {
       h <- rebasedOpen(f)
     } yield WriteHandle(file, h.id)
 
-    def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] =
-      rebaseAFile(h.file) >>= (f => rebasedWrite(WriteHandle(f, h.id), chunk))
+    def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] = 
+      rebaseAFile(h.file) >>= (f => rebasedWrite(WriteHandle(f, h.id), chunk)) >>= (_.traverse(stripErr))
 
     def close(h: WriteHandle): Configured[Unit] =
       rebaseAFile(h.file) >>= (f => rebasedClose(WriteHandle(f, h.id)))
