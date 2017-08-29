@@ -173,7 +173,8 @@ object Dependencies {
     "org.scodec"           %% "scodec-scalaz"   % "1.3.0a",
     "org.apache.jdbm"      %  "jdbm"            % "3.0-alpha5",
     "com.typesafe.akka"    %  "akka-actor_2.11" % "2.5.1",
-    "org.quartz-scheduler" %  "quartz"          % "2.3.0",
+    ("org.quartz-scheduler" %  "quartz"          % "2.3.0")
+      .exclude("com.zaxxer", "HikariCP-java6"), // conflict with Doobie
     "commons-io"           %  "commons-io"      % "2.5",
     "org.scodec"           %% "scodec-bits"     % scodecBitsVersion
   )
