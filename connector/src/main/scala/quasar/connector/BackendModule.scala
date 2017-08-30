@@ -53,7 +53,7 @@ trait BackendModule {
   private final implicit def _UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnirewriteT[T]
   private final implicit def _UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = UnicoalesceCap[T]
 
-  implicit class LiftBackendM[A](m: M[A]) {
+  implicit class LiftBackend[A](m: M[A]) {
     val liftB: Backend[A] = m.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
     def withLog(pr: PhaseResult): Backend[A] =
       WriterT(m.liftM[ConfiguredT].map((Vector(pr), _))).liftM[FileSystemErrT]
