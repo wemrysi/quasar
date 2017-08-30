@@ -55,6 +55,8 @@ trait BackendModule {
 
   implicit class LiftBackendM[A](m: M[A]) {
     val liftB: Backend[A] = m.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
+    def withLog(pr: PhaseResult): Backend[A] =
+      WriterT(m.liftM[ConfiguredT].map((Vector(pr), _))).liftM[FileSystemErrT]
   }
 
   implicit class LiftBackendConfigured[A](c: Configured[A]) {
@@ -62,8 +64,6 @@ trait BackendModule {
   }
 
   def includeError[A](b: Backend[FileSystemError \/ A]): Backend[A] = EitherT(b.run.map(_.join))
-  def withLog[A](m: M[A], pr: PhaseResult): Backend[A] =
-    WriterT(m.liftM[ConfiguredT].map((Vector(pr), _))).liftM[FileSystemErrT]
 
   final val definition: BackendDef[Task] =
     BackendDef fromPF {
