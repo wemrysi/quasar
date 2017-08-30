@@ -19,6 +19,7 @@ package quasar.physical.mongodb.fs
 import slamdata.Predef._
 import quasar.{config => _, _}
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.kleisli._
 import quasar.fp._
@@ -46,52 +47,37 @@ object queryfile extends QueryFileModule {
   import queryfileTypes._
   import QueryFile._
 
-  private def mkInterp(cfg: Config): QueryFileInterpreter =
-    new QueryFileInterpreter(cfg.wfExec)
+  private def mkInterp[F[_] : Functor](implicit C: MonadReader_[F, Config]): F[QueryFileInterpreter] =
+    config[F].map(cfg => new QueryFileInterpreter(cfg.wfExec))
 
   def executePlan(repr: Repr, out: AFile): Backend[AFile] =
-    for {
-      i <- config[Backend].map(mkInterp)
-      dst <- i.execPlan(repr, out)
-    } yield dst
+    mkInterp[Backend] >>= (_.execPlan(repr, out))
 
   def evaluatePlan(repr: Repr): Backend[ResultHandle] =
     for {
       dbName <- config[Backend].map(_.defaultDb.map(_.run))
-      i <- config[Backend].map(mkInterp)
+      i <- mkInterp[Backend]
       handle <- i.evalPlan(repr, dbName)
     } yield handle
 
   def explain(repr: Repr): Backend[String] =
     for {
       dbName <- config[Backend].map(_.defaultDb.map(_.run))
-      i <- config[Backend].map(mkInterp)
+      i <- mkInterp[Backend]
       s <- i.explain(repr, dbName)
     } yield s
 
   def more(h: ResultHandle): Backend[Vector[Data]] =
-    for {
-      i <- config[Backend].map(mkInterp)
-      d <- i.more(h)
-    } yield d
+    mkInterp[Backend] >>= (_.more(h))
 
   def close(h: ResultHandle): Configured[Unit] =
-    for {
-      i <- config[Configured].map(mkInterp)
-      u <- i.close(h)
-    } yield u
+    mkInterp[Configured] >>= (_.close(h))
 
   def listContents(dir: ADir): Backend[Set[PathSegment]] =
-    for {
-      i <- config[Backend].map(mkInterp)
-      c <- i.listContents0(dir)
-    } yield c
+    mkInterp[Backend] >>= (_.listContents0(dir))
 
   def fileExists(file: AFile): Configured[Boolean] =
-    for {
-      i <- config[Configured].map(mkInterp)
-      c <- i.fileExists(file)
-    } yield c
+    mkInterp[Configured] >>= (_.fileExists(file))
 
   def run[C, S[_]](
     client: MongoClient,
