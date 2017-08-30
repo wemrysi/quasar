@@ -4,6 +4,7 @@
         "mimir":"pendingIgnoreFieldOrder",
         "couchbase": "ignoreFieldOrder"
     },
+    "NB": "Pending for mimir due to Q#2692.",
     "data": "patients.data",
     "query": "SELECT
                 COUNT(*) as cnt,
