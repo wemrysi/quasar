@@ -37,6 +37,7 @@ import java.io.BufferedWriter
 // import java.io.OutputStreamWriter
 import java.net.{URLDecoder, URI}
 
+import org.http4s.{ParseFailure, Uri}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem => HdfsFileSystem}
 import org.apache.spark._
@@ -114,15 +115,25 @@ abstract class SparkHdfsBackendModule extends SparkCoreBackendModule {
     }
 
   type Config = HdfsConfig
-  // def parseConfig(uri: ConnectionUri): DefErrT[Task, HdfsConfig]
+  def parseConfig(connUri: ConnectionUri): DefErrT[Task, HdfsConfig] = {
 
-/**
-  {
+    def liftErr(msg: String): DefinitionError = NonEmptyList(msg).left[EnvironmentError]
+
+    def master(host: String, port: Int): State[SparkConf, Unit] =
+      State.modify(_.setMaster(s"spark://$host:$port"))
+
+    def appName: State[SparkConf, Unit] = State.modify(_.setAppName("quasar"))
+
+    def config(name: String, uri: Uri): State[SparkConf, Unit] =
+      State.modify(c => uri.params.get(name).fold(c)(c.set(name, _)))
+
+    val uriOrErr: DefErrT[Task, Uri] =
+      EitherT(Uri.fromString(connUri.value).leftMap((pf: ParseFailure) => liftErr(pf.toString)).point[Task])
 
     val sparkConfOrErr: DefErrT[Task, SparkConf] = for {
       uri <- uriOrErr
-      host <- uri.host.fold(NonEmptyList("host not provided").left[EnvironmentError].left[Uri.Host])(_.right[DefinitionError])
-      port <- uri.port.fold(NonEmptyList("port not provided").left[EnvironmentError].left[Int])(_.right[DefinitionError])
+      host <- EitherT(uri.host.fold(liftErr("host not provided").left[Uri.Host])(_.right[DefinitionError]).point[Task])
+      port <- EitherT(uri.port.fold(liftErr("port not provided").left[Int])(_.right[DefinitionError]).point[Task])
     } yield {
       (master(host.value, port) *> appName *>
         config("spark.executor.memory", uri) *>
@@ -146,13 +157,28 @@ abstract class SparkHdfsBackendModule extends SparkCoreBackendModule {
       ).exec(new SparkConf())
     }
 
+    val hdfsUrlOrErr: DefErrT[Task, String] = uriOrErr.flatMap(uri =>
+      EitherT(uri.params.get("hdfsUrl").map(url => URLDecoder.decode(url, "UTF-8")).fold(liftErr("'hdfsUrl' parameter not provided").left[String])(_.right[DefinitionError]).point[Task])
+    )
+
+    val rootPathOrErr: DefErrT[Task, ADir] =
+      uriOrErr
+        .flatMap(uri =>
+          EitherT(uri.params.get("rootPath").fold(liftErr("'rootPath' parameter not provided").left[String])(_.right[DefinitionError]).point[Task])
+        )
+        .flatMap(pathStr =>
+          EitherT(posixCodec.parseAbsDir(pathStr)
+            .map(unsafeSandboxAbs)
+            .fold(liftErr("'rootPath' is not a valid path").left[ADir])(_.right[DefinitionError]).point[Task])
+        )
+
     for {
       sparkConf <- sparkConfOrErr
       hdfsUrl <- hdfsUrlOrErr
       rootPath <- rootPathOrErr
-    } yield (sparkConf, SparkFSConf(sparkConf, hdfsUrl, rootPath))
+    } yield HdfsConfig(sparkConf, hdfsUrl, rootPath)
   }
-  */
+
   private def sparkCoreJar: DefErrT[Task, APath] = {
     /* Points to quasar-web.jar or target/classes if run from sbt repl/run */
     val fetchProjectRootPath = Task.delay {
