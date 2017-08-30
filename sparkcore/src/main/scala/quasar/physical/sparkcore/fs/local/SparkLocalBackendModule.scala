@@ -32,11 +32,11 @@ import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, _}
 import quasar.physical.sparkcore.fs.SparkCoreBackendModule
 import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
 
-import java.io.{File, PrintWriter}
-import java.io.FileNotFoundException
+import java.io.{FileNotFoundException, File, PrintWriter}
 import java.lang.Exception
 
 import org.apache.spark._
+import org.apache.spark.rdd._
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -78,7 +78,7 @@ object SparkLocalBackendModule extends SparkCoreBackendModule {
       (genState, rddStates, sparkCursors, printWriters) =>
 
       val interpreter: Eff ~> S =
-        (queryfile.detailsInterpreter[ReaderT[Task, SparkContext, ?]] andThen runReaderNT(sc) andThen injectNT[Task, S]) :+:
+        (details.interpreter[ReaderT[Task, SparkContext, ?]] andThen runReaderNT(sc) andThen injectNT[Task, S]) :+:
       (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:
@@ -129,6 +129,60 @@ object SparkLocalBackendModule extends SparkCoreBackendModule {
 
   def stripPrefixADir(d: ADir): Configured[ADir] =
     Kleisli((config: LocalConfig) => stripPrefixA(config.prefix).apply(d).point[Free[Eff, ?]])
+
+  object details {
+
+    import quasar.physical.sparkcore.fs.SparkConnectorDetails, SparkConnectorDetails._
+    import quasar.fp.ski._
+    import java.nio.file._
+
+    def rddFrom[F[_]](f: AFile) (implicit
+      reader: MonadReader[F, SparkContext]): F[RDD[Data]] =
+      reader.asks { sc =>
+        sc.textFile(posixCodec.unsafePrintPath(f))
+          .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
+      }
+
+    def store[F[_]:Capture](rdd: RDD[Data], out: AFile): F[Unit] = Capture[F].capture {
+      val ioFile = new File(posixCodec.printPath(out))
+      val pw = new PrintWriter(new FileOutputStream(ioFile, false))
+      rdd.flatMap(DataCodec.render(_)(DataCodec.Precise).toList).collect().foreach(v => pw.write(s"$v\n"))
+      pw.close()
+    }
+
+    def fileExists[F[_]:Capture](f: AFile): F[Boolean] = Capture[F].capture {
+      Files.exists(Paths.get(posixCodec.unsafePrintPath(f)))
+    }
+
+    def listContents[F[_]:Capture](d: ADir): EitherT[F, FileSystemError, Set[PathSegment]] =
+      EitherT(Capture[F].capture {
+        val directory = new File(posixCodec.unsafePrintPath(d))
+        if(directory.exists()) {
+          \/.fromTryCatchNonFatal{
+            directory.listFiles.toSet[File].map {
+              case file if file.isFile() => FileName(file.getName()).right[DirName]
+              case directory => DirName(directory.getName()).left[FileName]
+            }
+          }
+            .leftMap {
+              case e =>
+                pathErr(invalidPath(d, e.getMessage()))
+            }
+        } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
+      })
+
+    def interpreter[F[_]:Capture:MonadReader[?[_], SparkContext]]: SparkConnectorDetails ~> F =
+      new (SparkConnectorDetails ~> F) {
+        def apply[A](from: SparkConnectorDetails[A]) = from match {
+          case FileExists(f)       => fileExists[F](f)
+          case ReadChunkSize       => 5000.point[F]
+          case StoreData(rdd, out) => store(rdd, out)
+          case ListContents(d)     => listContents(d).run
+          case RDDFrom(f)          => rddFrom[F](f)
+        }
+      }
+  }
+
 
   object LocalWriteFileModule extends SparkCoreWriteFileModule {
     import WriteFile._
