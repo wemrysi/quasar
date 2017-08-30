@@ -43,8 +43,9 @@ final case class PortChangingServer(servers: Process[Task, (http4s.server.Server
   def shutdownOnUserInput: Task[Unit] = for {
     _ <- stdout("Press Enter to stop.")
     // TODO this ignores errors all over the place
-    _ <- Task.delay(Task.fork(waitForInput)(PortChangingServer.AwaitingPool).unsafePerformAsync(_ => shutdownImpl.unsafePerformAsync(_ => ())))
     _ <- servers.run
+    _ <- Task.fork(waitForInput)(PortChangingServer.AwaitingPool)
+    _ <- shutdownImpl
   } yield ()
 
   def shutdown: Task[Unit] =
