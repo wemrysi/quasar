@@ -17,7 +17,7 @@
 package quasar.physical.sparkcore.fs.hdfs
 
 import slamdata.Predef._
-// import quasar.{Data, DataCodec}
+import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.readerT._
 import quasar.connector.EnvironmentError
@@ -25,7 +25,7 @@ import quasar.effect._
 import quasar.fp, fp.ski.κ, fp.TaskRef,  fp.free._
 import quasar.fs._,
   mount._,
-//  FileSystemError._, //PathError._, WriteFile._,
+  FileSystemError._, PathError._, WriteFile._,
   BackendDef.{DefinitionError, DefErrT},
   QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, _}
@@ -39,7 +39,8 @@ import java.net.{URLDecoder, URI}
 
 import org.http4s.{ParseFailure, Uri}
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem => HdfsFileSystem}
+import org.apache.hadoop.fs.{FileSystem => HdfsFileSystem, Path}
+import org.apache.hadoop.util.Progressable;
 import org.apache.spark._
 // import org.apache.spark.rdd._
 import pathy.Path._
@@ -50,7 +51,7 @@ final case class HdfsWriteCursor(hdfs: HdfsFileSystem, bw: BufferedWriter)
 
 final case class HdfsConfig(sparkConf: SparkConf, hdfsUriStr: String, prefix: ADir)
 
-abstract class SparkHdfsBackendModule extends SparkCoreBackendModule {
+object SparkHdfsBackendModule extends SparkCoreBackendModule {
 
   import corequeryfile.RddState
 
@@ -62,7 +63,8 @@ abstract class SparkHdfsBackendModule extends SparkCoreBackendModule {
   type Eff4[A]  = Coproduct[Task, Eff3, A]
   type Eff5[A]  = Coproduct[PhysErr, Eff4, A]
   type Eff6[A]  = Coproduct[MonotonicSeq, Eff5, A]
-  type Eff[A]   = Coproduct[SparkConnectorDetails, Eff6, A]
+  type Eff7[A]  = Coproduct[SparkConnectorDetails, Eff6, A]
+  type Eff[A]   = Coproduct[Read[HdfsFileSystem, ?], Eff7, A]
 
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
         ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
@@ -74,7 +76,9 @@ abstract class SparkHdfsBackendModule extends SparkCoreBackendModule {
   def SparkConnectorDetailsInj = Inject[SparkConnectorDetails, Eff]
   def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, corequeryfile.RddState, ?], Eff]
 
-  def wrKvsOps = KeyValueStore.Ops[WriteHandle, HdfsWriteCursor, Eff]
+  def writersOps = KeyValueStore.Ops[WriteHandle, HdfsWriteCursor, Eff]
+  def sequenceOps = MonotonicSeq.Ops[Eff]
+  def hdfsFSOps = Read.Ops[HdfsFileSystem, Eff]
 
   def generateHdfsFS(sfsConf: HdfsConfig): Task[HdfsFileSystem] =
     for {
@@ -97,12 +101,14 @@ abstract class SparkHdfsBackendModule extends SparkCoreBackendModule {
     (TaskRef(0L) |@|
       TaskRef(Map.empty[ResultHandle, RddState]) |@|
       TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
-      TaskRef(Map.empty[WriteHandle, HdfsWriteCursor])
+      TaskRef(Map.empty[WriteHandle, HdfsWriteCursor]) |@|
+      generateHdfsFS(config)
     ) {
-      (genState, rddStates, sparkCursors, writeCursors) =>
+      (genState, rddStates, sparkCursors, writeCursors, hdfsFS) =>
 
       val interpreter: Eff ~> S =
-        (queryfile.detailsInterpreter[ReaderT[Task, SparkContext, ?]](ReaderT(κ(generateHdfsFS(config))), hdfsPathStr(config)) andThen  runReaderNT(sc) andThen injectNT[Task, S]) :+:
+        (Read.constant[Task, HdfsFileSystem](hdfsFS) andThen injectNT[Task, S]) :+:
+        (queryfile.detailsInterpreter[ReaderT[Task, SparkContext, ?]](ReaderT(κ(hdfsFS.point[Task])), hdfsPathStr(config)) andThen  runReaderNT(sc) andThen injectNT[Task, S]) :+:
       (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:
@@ -205,5 +211,157 @@ abstract class SparkHdfsBackendModule extends SparkCoreBackendModule {
     sc.addJar(posixCodec.printPath(jar))
     sc
   }
+
+  def rebaseAFile(f: AFile): Configured[AFile] =
+    Kleisli((config: HdfsConfig) => rebaseA(config.prefix).apply(f).point[Free[Eff, ?]])
+
+  def stripPrefixAFile(f: AFile): Configured[AFile] =
+    Kleisli((config: HdfsConfig) => stripPrefixA(config.prefix).apply(f).point[Free[Eff, ?]])
+
+  def rebaseADir(d: ADir): Configured[ADir] =
+    Kleisli((config: HdfsConfig) => rebaseA(config.prefix).apply(d).point[Free[Eff, ?]])
+
+  def stripPrefixADir(d: ADir): Configured[ADir] =
+    Kleisli((config: HdfsConfig) => stripPrefixA(config.prefix).apply(d).point[Free[Eff, ?]])
+
+  private def toPath(apath: APath): Free[Eff, Path] = lift(Task.delay {
+    new Path(posixCodec.unsafePrintPath(apath))
+  }).into[Eff]
+
+  object HdfsWriteFileModule extends SparkCoreWriteFileModule {
+    import WriteFile._
+
+    def rebasedOpen(file: AFile): Backend[WriteHandle] = {
+      def createCursor: Free[Eff, HdfsWriteCursor] = for {
+        path <- toPath(file)
+        hdfs <- hdfsFSOps.ask
+      } yield {
+        val os: OutputStream = hdfs.create(path, new Progressable() {
+          override def progress(): Unit = {}
+        })
+        val bw = new BufferedWriter( new OutputStreamWriter( os, "UTF-8" ) )
+        HdfsWriteCursor(hdfs, bw)
+      }
+
+      (for {
+        hwc <- createCursor
+        id <- sequenceOps.next
+        h = WriteHandle(file, id)
+        _ <- writersOps.put(h, hwc)
+      } yield h).liftB
+    }
+
+    def rebasedWrite(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] = {
+
+      implicit val codec: DataCodec = DataCodec.Precise
+
+      def _write(bw: BufferedWriter): Free[Eff, Vector[FileSystemError]] = {
+
+        val lines: Vector[(String, Data)] =
+          chunk.map(data => DataCodec.render(data) strengthR data).unite
+
+        lift(Task.delay(lines.flatMap {
+          case (line, data) =>
+            \/.fromTryCatchNonFatal{
+              bw.write(line)
+              bw.newLine()
+            }.fold(
+              ex => Vector(writeFailed(data, ex.getMessage)),
+              u => Vector.empty[FileSystemError]
+            )
+        })).into[Eff]
+      }
+
+      val findAndWrite: OptionT[Free[Eff, ?], Vector[FileSystemError]] = for {
+        HdfsWriteCursor(_, bw) <- writersOps.get(h)
+        errors                 <- _write(bw).liftM[OptionT]
+      } yield errors
+
+      findAndWrite.fold (
+        errs => errs,
+        Vector[FileSystemError](unknownWriteHandle(h))
+      ).liftM[ConfiguredT]
+    }
+
+    def rebasedClose(h: WriteHandle): Configured[Unit] = (for {
+      HdfsWriteCursor(hdfs, br) <- writersOps.get(h)
+      _                         <- writersOps.delete(h).liftM[OptionT]
+    } yield {
+      br.close()
+      hdfs.close()
+    }).run.void.liftM[ConfiguredT]
+
+  }
+
+  def WriteFileModule = HdfsWriteFileModule
+
+  object HdfsManageFileModule extends SparkCoreManageFileModule {
+
+    def moveFile(src: AFile, dst: AFile): Free[Eff, Unit] = {
+      val move: Free[Eff, PhysicalError \/ Unit] = (for {
+        hdfs <- hdfsFSOps.ask
+        srcPath <- toPath(src)
+        dstPath <- toPath(dst)
+        dstParent <- toPath(fileParent(dst))
+      } yield {
+        val deleted = hdfs.delete(dstPath, true)
+        val _ = hdfs.mkdirs(dstParent)
+        hdfs.rename(srcPath, dstPath)
+      }).as(().right[PhysicalError])
+      Failure.Ops[PhysicalError, Eff].unattempt(move)
+    }
+
+    def moveDir(src: ADir, dst: ADir): Free[Eff, Unit] = {
+      val move: Free[Eff, PhysicalError \/ Unit] = (for {
+        hdfs <- hdfsFSOps.ask
+        srcPath <- toPath(src)
+        dstPath <- toPath(dst)
+      } yield {
+        val deleted = hdfs.delete(dstPath, true)
+        hdfs.rename(srcPath, dstPath)
+      }).as(().right[PhysicalError])
+
+      Failure.Ops[PhysicalError, Eff].unattempt(move)
+    }
+
+    def doesPathExist: APath => Free[Eff, Boolean] = (ap) => for {
+      path <- toPath(ap)
+      hdfs <- hdfsFSOps.ask
+    } yield hdfs.exists(path)
+
+    private def deletePath(p: APath): Backend[Unit] = {
+
+      val delete: Free[Eff, FileSystemError \/ Unit] = for {
+        path <- toPath(p)
+        hdfs <- hdfsFSOps.ask
+      } yield (if(hdfs.exists(path)) {
+        hdfs.delete(path, true).right[FileSystemError]
+      }
+      else {
+        pathErr(pathNotFound(p)).left[Unit]
+      }).as(())
+
+      val deleteHandled: Free[Eff, PhysicalError \/ (FileSystemError \/ Unit)] =
+        delete.map(_.right[PhysicalError])
+
+      includeError(Failure.Ops[PhysicalError, Eff].unattempt(deleteHandled).liftB)
+    }
+
+    def deleteFile(f: AFile): Backend[Unit] = deletePath(f)
+    def deleteDir(d: ADir): Backend[Unit]  = deletePath(d)
+
+    private def tempFileNearPath(near: APath): Free[Eff, FileSystemError \/ AFile] = lift(Task.delay {
+      val parent: ADir = refineType(near).fold(d => d, fileParent(_))
+      val random = scala.util.Random.nextInt().toString
+        (parent </> file(s"quasar-$random.tmp")).right[FileSystemError]
+    }
+    ).into[Eff]
+
+    def tempFileNearFile(f: AFile): Backend[AFile] = includeError(tempFileNearPath(f).liftB)
+    def tempFileNearDir(d: ADir): Backend[AFile]  = includeError(tempFileNearPath(d).liftB)
+  }
+
+  def ManageFileModule: ManageFileModule = HdfsManageFileModule
+
 
 }
