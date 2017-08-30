@@ -288,9 +288,7 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule {
       _                         <- writersOps.delete(h).liftM[OptionT]
     } yield {
       br.close()
-      hdfs.close()
     }).run.void.liftM[ConfiguredT]
-
   }
 
   def WriteFileModule = HdfsWriteFileModule
