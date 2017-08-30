@@ -41,7 +41,7 @@ trait SparkCoreBackendModule extends BackendModule {
 
   // conntector specificc
   type Eff[A]
-  def toLowerLevel[S[_]](sc: SparkContext)(implicit
+  def toLowerLevel[S[_]](sc: SparkContext, config: Config)(implicit
     S0: Task :<: S, S1: PhysErr :<: S
   ): Task[M ~> Free[S, ?]]
   def generateSC: Config => DefErrT[Task, SparkContext]
@@ -96,11 +96,12 @@ trait SparkCoreBackendModule extends BackendModule {
     Failure.mapError[PhysicalError, Exception](_.cause) andThen Failure.toCatchable[Task, Exception]
   ))
 
-  def toTask(sc: SparkContext): Task[M ~> Task] = toLowerLevel[LowerLevel](sc).map(_ andThen foldMapNT(lowerToTask))
+  def toTask(sc: SparkContext, config: Config): Task[M ~> Task] =
+    toLowerLevel[LowerLevel](sc, config).map(_ andThen foldMapNT(lowerToTask))
 
   def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] = for {
     sc <- generateSC(cfg)
-    tt <- toTask(sc).liftM[DefErrT]
+    tt <- toTask(sc, cfg).liftM[DefErrT]
   } yield (tt, Task.delay(sc.stop()))
 
   private def stripErr(input: FileSystemError): Configured[FileSystemError] = input match {

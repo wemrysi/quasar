@@ -66,10 +66,12 @@ object SparkLocalBackendModule extends SparkCoreBackendModule {
   def TaskInj = Inject[Task, Eff]
   def SparkConnectorDetailsInj = Inject[SparkConnectorDetails, Eff]
   def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, corequeryfile.RddState, ?], Eff]
+
   def wrKvsOps = KeyValueStore.Ops[WriteHandle, PrintWriter, Eff]
 
-
-  def toLowerLevel[S[_]](sc: SparkContext)(implicit S0: Task :<: S, S1: PhysErr :<: S): Task[Free[Eff, ?] ~> Free[S, ?]] = 
+  def toLowerLevel[S[_]](sc: SparkContext, config: LocalConfig)(implicit
+    S0: Task :<: S, S1: PhysErr :<: S
+  ): Task[Free[Eff, ?] ~> Free[S, ?]] =
     (TaskRef(0L) |@|
       TaskRef(Map.empty[ResultHandle, RddState]) |@|
       TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
