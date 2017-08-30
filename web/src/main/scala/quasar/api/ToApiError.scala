@@ -87,8 +87,8 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
         fromMsg(
           InternalServerError withReason "Failed to execute SQL^2 query.",
           reason,
-          det.toList : _*)            :+
-        ("logicalplan" :=  lp.render) :?+
+          det.toList : _*) :?+
+        ("logicalplan" :?= lp.map(_.render)) :?+
         ("cause"       :?= cause.map(_.shows))
       case PathErr(e) =>
         e.toApiError

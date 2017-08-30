@@ -176,7 +176,7 @@ final class QueryFileInterpreter(execMongo: WorkflowExecutor[MongoDbIO, BsonCurs
     EitherT[MongoLogWF[C, ?], FileSystemError, A](
                 wf.leftMap(wfErrToFsErr(repr))
                   .run.mapK(_.attemptMongo.leftMap(err =>
-                    execFailed(repr,
+                    executionFailed0(
                       s"MongoDB Error: ${err.cause.getMessage}",
                       JsonObject.empty,
                       some(err)).left[A]
@@ -224,27 +224,21 @@ final class QueryFileInterpreter(execMongo: WorkflowExecutor[MongoDbIO, BsonCurs
 
   import WorkflowExecutionError.{InvalidTask, InsertFailed, NoDatabase}
 
-  private def execFailed(repr: Repr, s: String, detail: JsonObject, cause: Option[PhysicalError])
-      : FileSystemError =
-    ReadFailed("todo", "todo")
-
-  private def execFailed_(repr: Repr, s: String): FileSystemError = ReadFailed("todo", "todo")
-
   private def wfErrToFsErr(repr: Repr): WorkflowExecutionError => FileSystemError = {
     case InvalidTask(task, reason) =>
-      execFailed(repr,
+      executionFailed0(
         s"Invalid MongoDB workflow task: $reason",
         jSingle("workflowTask", task.render.asJson),
         none)
 
     case InsertFailed(bson, reason) =>
-      execFailed(repr,
+      executionFailed0(
         s"Unable to insert data into MongoDB: $reason",
         jSingle("data", bson.shows.asJson),
         none)
 
     case NoDatabase =>
-      execFailed_(repr,
+      executionFailed0_(
         "Executing this plan on MongoDB requires temporary collections, but a database in which to store them could not be determined.")
   }
 }
