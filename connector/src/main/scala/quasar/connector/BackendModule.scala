@@ -120,13 +120,13 @@ trait BackendModule {
     qfInter :+: rfInter :+: wfInter :+: mfInter
   }
 
+  final def logPhase[M[_]: Monad: PhaseResultTell](pr: PhaseResult): M[Unit] =
+    PhaseResultTell[M].tell(Vector(pr))
+
   final def lpToRepr[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       lp: T[LogicalPlan]): Backend[PhysicalPlan[Repr]] = {
 
     type QSR[A] = QScriptRead[T, A]
-
-    def logPhase(pr: PhaseResult): Backend[Unit] =
-      MonadTell_[Backend, PhaseResults].tell(Vector(pr))
 
     val lc: DiscoverPath.ListContents[Backend] =
       QueryFileModule.listContents(_)
@@ -138,12 +138,12 @@ trait BackendModule {
       qs <- QueryFile.convertToQScriptRead[T, Backend, QSR](lc)(lp)
       shifted <- Unirewrite[T, QS[T], Backend](R, lc).apply(qs)
 
-      _ <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
+      _ <- logPhase[Backend](PhaseResult.tree("QScript (ShiftRead)", shifted))
 
       optimized =
         shifted.transHylo(O.optimize(reflNT[QSM[T, ?]]), Unicoalesce.Capture[T, QS[T]].run)
 
-      _ <- logPhase(PhaseResult.tree("QScript (Optimized)", optimized))
+      _ <- logPhase[Backend](PhaseResult.tree("QScript (Optimized)", optimized))
 
       main <- plan(optimized)
       inputs = optimized.cata(ExtractPath[QSM[T, ?], APath].extractPath[DList])

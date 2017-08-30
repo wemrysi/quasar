@@ -1365,8 +1365,10 @@ object MongoDbPlanner {
     merr: MonadError_[M, FileSystemError],
     mtell: MonadTell_[M, PhaseResults]
   ): M[T[MongoQScript[T, ?]]] =
-    //TODO re-implement the Mongo specific QScript phase
-    qs.point[M]
+    for {
+      mongoQs <- qs.transCataM(liftFGM(assumeReadType[M, T, MongoQScript[T, ?]](Type.AnyObject)))
+      _ <- MongoDb.logPhase[M](PhaseResult.tree("QScript (Mongo-specific)", mongoQs))
+    } yield mongoQs
 
   def plan0
     [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
