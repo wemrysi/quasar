@@ -25,21 +25,22 @@ import quasar.contrib.scalaz.{MonadError_, MonadReader_}
 import quasar.effect.uuid.GenUUID
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp.{:/:, :\:}
+import quasar.fp.free._
 import quasar.fs.{FileSystemError, FileSystemType}
 import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.mount.BackendDef.DefErrT
 import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.fs.postgres.{RdbmsReadFile, SqlReadCursor}
-import quasar.qscript.{EquiJoin, ExtractPath, QScriptCore, ShiftedRead, Unicoalesce, Unirewrite}
+import quasar.qscript.{::\::, ::/::, EquiJoin, ExtractPath, Injectable, QScriptCore, QScriptTotal, ShiftedRead, Unicoalesce, Unirewrite}
+import config._
 
 import scalaz._
 import Scalaz._
 import scala.Predef.implicitly
 import scalaz.concurrent.Task
 
-trait Rdbms extends BackendModule with RdbmsReadFile {
+trait Rdbms extends BackendModule with RdbmsReadFile with Interpreter {
 
-  val Type: FileSystemType = FileSystemType("rdbms")
   val MR                   = MonadReader_[Backend, Config]
   val ME                   = MonadError_[Backend, FileSystemError]
 
@@ -67,11 +68,18 @@ trait Rdbms extends BackendModule with RdbmsReadFile {
   def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]    = implicitly[Unirewrite[T, QS[T]]]
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
 
-  def parseConfig(uri: ConnectionUri): DefErrT[Task, Config] = Task.now(common.Config(???)).liftM[DefErrT] // TODO
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[
+    QSM[T, ?],
+    QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
-  def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] = ??? // TODO
+  def parseConfig(uri: ConnectionUri): DefErrT[Task, Config] = parseUri(uri)
 
-  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](cp: T[QSM[T, ?]]): Backend[Repr] = ??? // TODO
+  def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] =
+    (interp ∘ (i => (foldMapNT[Eff, Task](i), Task.delay(())))).liftM[DefErrT]
+
+  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
+      cp: T[QSM[T, ?]]): Backend[Repr] = ??? // TODO
 
   def QueryFileModule: QueryFileModule = ??? // TODO
 
@@ -79,5 +87,10 @@ trait Rdbms extends BackendModule with RdbmsReadFile {
 
   def ManageFileModule: ManageFileModule = ??? // TODO
 
-  def includeError[A](b: Backend[FileSystemError \/ A]): Backend[A] = EitherT(b.run.map(_.join))
+  def includeError[A](b: Backend[FileSystemError \/ A]): Backend[A] =
+    EitherT(b.run.map(_.join))
+}
+
+object Postgres extends Rdbms {
+  override val Type = FileSystemType("postgres")
 }
