@@ -422,15 +422,12 @@ lazy val skeleton = project
 
 lazy val rdbms = project
   .settings(name := "quasar-rdbms-internal")
-  .dependsOn(
-    connector % BothScopes
-  )
+  .dependsOn(connector % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(githubReleaseSettings)
-  .settings(assemblyJarName in assembly := "rdbms.jar")
-  .settings(
-    libraryDependencies ++= Dependencies.rdbmscore)
+  .settings(libraryDependencies ++= Dependencies.rdbmscore)
+  .settings(isolatedBackendSettings("quasar.physical.rdbms.Postgres$"))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the Spark connector.
