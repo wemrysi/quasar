@@ -336,6 +336,7 @@ object CoreMap extends Serializable {
     }).right
     case DeleteField(fSrc, fField) =>  ((x: A) => (fSrc(x), fField(x)) match {
       case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => Data.Obj(m - field)
+      case (obj @ Data.Obj(_), _) => obj
       case _ => undefined
     }).right
     case Range(fFrom, fTo) => ((x: A) => (fFrom(x), fTo(x)) match {
