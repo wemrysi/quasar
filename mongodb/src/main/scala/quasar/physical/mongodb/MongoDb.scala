@@ -29,7 +29,6 @@ import quasar.fs.mount._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 
-import com.mongodb.async.client.MongoClient
 import matryoshka._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -61,10 +60,7 @@ object MongoDb extends BackendModule {
   def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Unirewrite[T, QS[T]]]
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
 
-  final case class Config(
-    client: MongoClient,
-    defaultDb: Option[fs.DefaultDb],
-    wfExec: WorkflowExecutor[MongoDbIO, BsonCursor])
+  type Config = fs.MongoConfig
 
   def parseConfig(uri: ConnectionUri): BackendDef.DefErrT[Task, Config] =
     fs.parseConfig(uri)

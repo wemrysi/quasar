@@ -36,6 +36,11 @@ import scalaz.stream.{Writer => _, _}
 package object fs {
   import BackendDef.DefErrT
 
+  final case class MongoConfig(
+    client: MongoClient,
+    defaultDb: Option[fs.DefaultDb],
+    wfExec: WorkflowExecutor[MongoDbIO, BsonCursor])
+
   final case class DefaultDb(run: DatabaseName)
 
   object DefaultDb {
@@ -48,14 +53,14 @@ package object fs {
   type PhysFsEff[A]  = Coproduct[Task, PhysErr, A]
 
   def parseConfig(uri: ConnectionUri)
-      : DefErrT[Task, Config] =
+      : DefErrT[Task, MongoConfig] =
     (for {
       client <- asyncClientDef[Task](uri)
       defDb <- free.lift(findDefaultDb.run(client)).into[Task].liftM[DefErrT]
       wfExec <- wfExec(client)
-    } yield Config(client, defDb, wfExec)).mapT(freeTaskToTask.apply)
+    } yield MongoConfig(client, defDb, wfExec)).mapT(freeTaskToTask.apply)
 
-  def compile(cfg: Config): BackendDef.DefErrT[Task, (M ~> Task, Task[Unit])] =
+  def compile(cfg: MongoConfig): BackendDef.DefErrT[Task, (M ~> Task, Task[Unit])] =
     (effToTask(cfg) map (i => (
       foldMapNT[Eff, Task](i),
       Task.delay(cfg.client.close).void))).liftM[DefErrT]
@@ -83,7 +88,7 @@ package object fs {
   private val freeTaskToTask: Free[Task, ?] ~> Task =
     new Interpreter(NaturalTransformation.refl[Task]).interpret
 
-  private def wfExec(client: MongoClient): DefErrT[Free[Task, ?], WorkflowExecutor[MongoDbIO, BsonCursor]] = {
+  def wfExec(client: MongoClient): DefErrT[Free[Task, ?], WorkflowExecutor[MongoDbIO, BsonCursor]] = {
     val run: EnvErrT[MongoDbIO, ?] ~> EnvErrT[Task, ?] = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
     val runWf: EnvErrT[Task, WorkflowExecutor[MongoDbIO, BsonCursor]] = run(WorkflowExecutor.mongoDb)
     val envErrToDefErr: EnvErrT[Task, ?] ~> DefErrT[Task, ?] =
@@ -92,7 +97,7 @@ package object fs {
     runWfx.mapT(Free.liftF(_))
   }
 
-  private def effToTask(cfg: Config): Task[Eff ~> Task] = {
+  private def effToTask(cfg: MongoConfig): Task[Eff ~> Task] = {
     (
       queryfile.run[BsonCursor, PhysFsEff](cfg.client, cfg.defaultDb) |@|
       managefile.run[PhysFsEff](cfg.client) |@|
