@@ -26,6 +26,8 @@ import quasar.fs.MonadFsErr
 import quasar.qscript.MapFuncCore._
 import quasar.qscript.MapFuncsCore._
 
+import scala.collection.immutable.{Map => ScalaMap}
+
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
@@ -458,20 +460,25 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
   val compactReductions = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
     case Reduce(src, bucket, reducers, repair) =>
-      val (mapping, newReducers) =
-        reducers.zipWithIndex.foldLeft[(scala.collection.immutable.Map[Int, Int], List[ReduceFunc[FreeMap]])](
-          (scala.collection.immutable.Map[Int, Int](), Nil)) {
-          case ((map, lrf), (rf, origIndex)) =>
+      val (_, mapping, newReducers) =
+        // (shift as duplicate reducers are found, new mapping of reducers, resulting reducers)
+        reducers.zipWithIndex.foldLeft[(Int, ScalaMap[Int, Int], List[ReduceFunc[FreeMap]])](
+          (0, scala.collection.immutable.Map[Int, Int](), Nil)) {
+          case ((shift, mapping, lrf), (rf, origIndex)) =>
             val i = lrf.indexWhere(_ ≟ rf)
-            (i ≟ -1).fold((map, lrf :+ rf), (map + ((origIndex, i)), lrf))
+            (i ≟ -1).fold(
+              // when the reducer is new, we apply the shift
+              (shift, mapping + ((origIndex, origIndex - shift)), lrf :+ rf),
+              // when the reducer already exists, we record a shift
+              (shift + 1, mapping + ((origIndex, i)), lrf))
         }
-
       (newReducers ≠ reducers).option(
         Reduce(
           src,
           bucket,
           newReducers,
           repair.map(ri => ReduceIndex(ri.idx.map(i => mapping.applyOrElse(i, κ(i)))))))
+
     case _ => None
   }
 
