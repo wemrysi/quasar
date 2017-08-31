@@ -28,6 +28,7 @@ import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => cor
 
 import scala.sys
 
+import org.http4s.{ParseFailure, Uri}
 import org.apache.spark._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -50,27 +51,70 @@ package object cassandra {
 
   final case class SparkFSConf(sparkConf: SparkConf, prefix: ADir)
 
-  def parseUri: ConnectionUri => Task[DefinitionError \/ (SparkConf, SparkFSConf)] = (uri: ConnectionUri) => Task.delay {
+  val parseUri: ConnectionUri => Task[DefinitionError \/ (SparkConf, SparkFSConf)] = (connUri: ConnectionUri) => Task.delay {
 
-    def error(msg: String): DefinitionError \/ (SparkConf, SparkFSConf) =
-      NonEmptyList(msg).left[EnvironmentError].left[(SparkConf, SparkFSConf)]
+    def liftErr(msg: String): DefinitionError = NonEmptyList(msg).left[EnvironmentError]
 
-    def forge(
-      master: String,
-      cassandraHost: String,
-      rootPath: String
-    ): DefinitionError \/ (SparkConf, SparkFSConf) =
-      posixCodec.parseAbsDir(rootPath)
-        .map { prefix =>
-          val sparkConf = new SparkConf().setMaster(master).setAppName("quasar").set("spark.cassandra.connection.host", cassandraHost)
-          (sparkConf, SparkFSConf(sparkConf, unsafeSandboxAbs(prefix)))
-      }.fold(error(s"Could not extrat a path from $rootPath"))(_.right[DefinitionError])
+    def master(host: String, port: Int): State[SparkConf, Unit] =
+      State.modify(_.setMaster(s"spark://$host:$port"))
+    def appName: State[SparkConf, Unit] = State.modify(_.setAppName("quasar"))
+       def config(name: String, uri: Uri): State[SparkConf, Unit] =
+      State.modify(c => uri.params.get(name).fold(c)(c.set(name, _)))
+    val uriOrErr: DefinitionError \/ Uri = Uri.fromString(connUri.value).leftMap((pf: ParseFailure) => liftErr(pf.toString))
 
-    uri.value.split('|').toList match {
-      case master :: cassandraHost :: prefixPath :: Nil => forge(master, cassandraHost, prefixPath)
-      case _ =>
-        error("Missing master and prefixPath (seperated by |)" +
-          " e.g spark://spark_host:port|cassandra://cassandra_host:port|/user/")
+    val sparkConfOrErr: DefinitionError \/ SparkConf = for {
+      uri <- uriOrErr
+      host <- uri.host.fold(NonEmptyList("host not provided").left[EnvironmentError].left[Uri.Host])(_.right[DefinitionError])
+      port <- uri.port.fold(NonEmptyList("port not provided").left[EnvironmentError].left[Int])(_.right[DefinitionError])
+    } yield {
+
+      ( master(host.value, port)                       *>
+        appName                                        *>
+        config("spark.executor.memory", uri)           *>
+        config("spark.executor.cores", uri)            *>
+        config("spark.executor.extraJavaOptions", uri) *>
+        config("spark.default.parallelism", uri)       *>
+        config("spark.files.maxPartitionBytes", uri)   *>
+        config("spark.driver.cores", uri)              *>
+        config("spark.driver.maxResultSize", uri)      *>
+        config("spark.driver.memory", uri)             *>
+        config("spark.local.dir", uri)                 *>
+        config("spark.reducer.maxSizeInFlight", uri)   *>
+        config("spark.reducer.maxReqsInFlight", uri)   *>
+        config("spark.shuffle.file.buffer", uri)       *>
+        config("spark.shuffle.io.retryWait", uri)      *>
+        config("spark.memory.fraction", uri)           *>
+        config("spark.memory.storageFraction", uri)    *>
+        config("spark.cores.max", uri)                 *>
+        config("spark.speculation", uri)               *>
+        config("spark.task.cpus", uri)
+      ).exec(new SparkConf())
+    }
+
+    val rootPathOrErr: DefinitionError \/ ADir =
+      uriOrErr
+        .flatMap(uri =>
+          uri.params.get("rootPath").fold(liftErr("'rootPath' parameter not provided").left[String])(_.right[DefinitionError])
+        )
+        .flatMap(pathStr =>
+          posixCodec.parseAbsDir(pathStr)
+            .map(unsafeSandboxAbs)
+            .fold(liftErr("'rootPath' is not a valid path").left[ADir])(_.right[DefinitionError])
+        )
+
+    def fetchParameter(name: String): DefinitionError \/ String = uriOrErr.flatMap(uri =>
+      uri.params.get(name).fold(liftErr(s"'$name' parameter not provided").left[String])(_.right[DefinitionError])
+    )
+
+    for {
+      initSparkConf          <- sparkConfOrErr
+      host                  <- fetchParameter("cassandraHost")
+      port                  <- fetchParameter("cassandraPort")
+      rootPath              <- rootPathOrErr
+    } yield {
+      val sparkConf = initSparkConf.set("spark.cassandra.connection.host", host)
+        .set("spark.cassandra.connection.port", port)
+      (sparkConf, SparkFSConf(sparkConf, rootPath))
     }
   }
 
