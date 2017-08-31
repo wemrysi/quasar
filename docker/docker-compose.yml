@@ -96,7 +96,7 @@ services:
   
   quasar_spark_cassandra:
     container_name: quasar_spark_cassandra
-    image: cassandra:3.11
+    image: cassandra
     #command: /bin/bash -c "sleep 30 && echo ' -- Pausing to let system catch up ... -->' && /docker-entrypoint.sh cassandra -f"
     network_mode: "bridge"
     ports:
