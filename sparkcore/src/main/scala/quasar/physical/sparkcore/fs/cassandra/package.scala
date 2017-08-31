@@ -24,14 +24,14 @@ import quasar.fp.free._
 import quasar.fp.TaskRef
 import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.fs.mount._, BackendDef._
-import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile}
+import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile, genSc => coreGenSc}
 
-import scala.sys
+import java.net.URLDecoder
 
 import org.http4s.{ParseFailure, Uri}
 import org.apache.spark._
 import pathy.Path._
-import scalaz._, Scalaz._
+import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 package object cassandra {
@@ -118,28 +118,38 @@ package object cassandra {
     }
   }
 
-  private def fetchSparkCoreJar: Task[String] = Task.delay {
-    sys.env("QUASAR_HOME") + "/sparkcore.jar"
+  private def sparkCoreJar: EitherT[Task, String, APath] = {
+    /* Points to quasar-web.jar or target/classes if run from sbt repl/run */
+    val fetchProjectRootPath = Task.delay {
+      val pathStr = URLDecoder.decode(this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath, "UTF-8")
+      posixCodec.parsePath[Option[APath]](_ => None, Some(_).map(unsafeSandboxAbs), _ => None, Some(_).map(unsafeSandboxAbs))(pathStr)
+    }
+    val jar: Task[Option[APath]] =
+      fetchProjectRootPath.map(_.flatMap(s => parentDir(s).map(_ </> file("sparkcore.jar"))))
+    OptionT(jar).toRight("Could not fetch sparkcore.jar")
   }
+
 
   private def sparkFsDef[S[_]](implicit
     S0: Task :<: S,
-    S1: PhysErr :<: S
+    S1: PhysErr :<: S,
+    FailOps: Failure.Ops[PhysicalError, S]
   ): SparkFSConf => Free[S, SparkFSDef[Eff, S]] = (sfsc: SparkFSConf) => {
 
-    val genSc = fetchSparkCoreJar.map { jar => 
-      val sc = new SparkContext(sfsc.sparkConf)
-      sc.addJar(jar)
+    val genScWithJar: Free[S, String \/ SparkContext] = lift((for {
+      sc <- coreGenSc(sfsc.sparkConf)
+      jar <- sparkCoreJar
+    } yield {
+      sc.addJar(posixCodec.printPath(jar))
       sc
-    }
+    }).run).into[S]
 
-    lift((TaskRef(0L) |@|
+    val definition: SparkContext => Free[S, SparkFSDef[Eff, S]] = (sc: SparkContext) => lift((TaskRef(0L) |@|
       TaskRef(Map.empty[ResultHandle, RddState]) |@|
       TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
-      TaskRef(Map.empty[WriteHandle, AFile]) |@|
-      genSc) {
+      TaskRef(Map.empty[WriteHandle, AFile])) {
       // TODO better names!
-      (genState, rddStates, sparkCursors, writehandlers, sc) => {
+      (genState, rddStates, sparkCursors, writehandlers) => {
 
         type Temp[A] = Coproduct[CassandraDDL, Task, A]
         def temp: Free[Temp, ?] ~> Task =
@@ -159,6 +169,11 @@ package object cassandra {
         SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
       }
     }).into[S]
+    
+    genScWithJar >>= (_.fold(
+      msg => FailOps.fail[SparkFSDef[Eff, S]](UnhandledFSError(new RuntimeException(msg))),
+      definition(_)
+    ))
   }
 
   private def fsInterpret: SparkFSConf => (FileSystem ~> Free[Eff, ?]) =
