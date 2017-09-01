@@ -6,6 +6,7 @@
     "data": "divide.data",
     "query": "select nr, trunc(val3) as trunc1 from divide",
     "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": [
         { "nr":  1, "trunc1": 1.0 },
         { "nr":  2, "trunc1": 1 },
