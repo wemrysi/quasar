@@ -26,13 +26,15 @@ import quasar.effect.uuid.GenUUID
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp.{:/:, :\:}
 import quasar.fp.free._
-import quasar.fs.{FileSystemError, FileSystemType}
+import quasar.fs.FileSystemError
 import quasar.fs.ReadFile.ReadHandle
-import quasar.fs.mount.BackendDef.DefErrT
+import quasar.fs.mount.BackendDef.{DefErrT, DefinitionError}
 import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.fs.postgres.{RdbmsReadFile, SqlReadCursor}
-import quasar.qscript.{::\::, ::/::, EquiJoin, ExtractPath, Injectable, QScriptCore, QScriptTotal, ShiftedRead, Unicoalesce, Unirewrite}
-import config._
+import quasar.qscript.{::/::, ::\::, EquiJoin, ExtractPath, Injectable, QScriptCore, QScriptTotal, ShiftedRead, Unicoalesce, Unirewrite}
+import doobie.hikari.hikaritransactor.HikariTransactor
+import quasar.physical.rdbms.common.Config
+import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 
 import scalaz._
 import Scalaz._
@@ -73,7 +75,17 @@ trait Rdbms extends BackendModule with RdbmsReadFile with Interpreter {
     QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
-  def parseConfig(uri: ConnectionUri): DefErrT[Task, Config] = parseUri(uri)
+  def parseConfig(uri: ConnectionUri): DefErrT[Task, Config] = {
+    EitherT(parseConnectionUri(uri).traverse { connectionInfo =>
+      val xa = HikariTransactor[Task](
+        connectionInfo.driverClassName,
+        connectionInfo.url,
+        connectionInfo.userName,
+        connectionInfo.password.getOrElse("")
+      )
+      xa.map(Config.apply)
+    })
+  }
 
   def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] =
     (interp ∘ (i => (foldMapNT[Eff, Task](i), Task.delay(())))).liftM[DefErrT]
@@ -87,10 +99,8 @@ trait Rdbms extends BackendModule with RdbmsReadFile with Interpreter {
 
   def ManageFileModule: ManageFileModule = ??? // TODO
 
+  def parseConnectionUri(uri: ConnectionUri): \/[DefinitionError, JdbcConnectionInfo]
+
   def includeError[A](b: Backend[FileSystemError \/ A]): Backend[A] =
     EitherT(b.run.map(_.join))
-}
-
-object Postgres extends Rdbms {
-  override val Type = FileSystemType("postgres")
 }
