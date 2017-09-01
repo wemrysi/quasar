@@ -45,6 +45,16 @@ final case class LocalConfig(sparkConf: SparkConf, prefix: ADir)
 
 object SparkLocalBackendModule extends SparkCoreBackendModule {
 
+  override def interpreter(cfg: Config): DefErrT[Task, (BackendEffect ~> Task, Task[Unit])] = {
+    val xformPaths =
+      if (cfg.prefix === rootDir) liftFT[BackendEffect]
+      else chroot.backendEffect[BackendEffect](cfg.prefix)
+
+    super.interpreter(cfg) map {
+      case (f, c) => (foldMapNT(f) compose xformPaths, c)
+    }
+  }
+
   import corequeryfile.RddState
 
   val Type = FileSystemType("spark-local")
@@ -120,18 +130,6 @@ object SparkLocalBackendModule extends SparkCoreBackendModule {
         "Please unmount existing one first.").left[EnvironmentError].left[SparkContext].point[Task]
   })
 
-  def rebaseAFile(f: AFile): Configured[AFile] =
-    Kleisli((config: LocalConfig) => rebaseA(config.prefix).apply(f).point[Free[Eff, ?]])
-
-  def stripPrefixAFile(f: AFile): Configured[AFile] =
-    Kleisli((config: LocalConfig) => stripPrefixA(config.prefix).apply(f).point[Free[Eff, ?]])
-
-  def rebaseADir(d: ADir): Configured[ADir] =
-    Kleisli((config: LocalConfig) => rebaseA(config.prefix).apply(d).point[Free[Eff, ?]])
-
-  def stripPrefixADir(d: ADir): Configured[ADir] =
-    Kleisli((config: LocalConfig) => stripPrefixA(config.prefix).apply(d).point[Free[Eff, ?]])
-
   object details {
 
     import quasar.physical.sparkcore.fs.SparkConnectorDetails, SparkConnectorDetails._
@@ -186,7 +184,7 @@ object SparkLocalBackendModule extends SparkCoreBackendModule {
   }
 
 
-  object LocalWriteFileModule extends SparkCoreWriteFileModule {
+  object LocalWriteFileModule extends WriteFileModule {
     import WriteFile._
 
     private def mkParents(f: AFile): Backend[Unit] = includeError(lift(Task.delay {
@@ -209,14 +207,14 @@ object SparkLocalBackendModule extends SparkCoreBackendModule {
 
     private def openPrintWriter(f: AFile): Backend[PrintWriter] = mkParents(f) *> printWriter(f)
 
-    def rebasedOpen(file: AFile): Backend[WriteHandle] = for {
+    def open(file: AFile): Backend[WriteHandle] = for {
       pw <- openPrintWriter(file)
       id <- msOps.next.liftB
       h  = WriteHandle(file, id)
       _  <- wrKvsOps.put(h, pw).liftB
     } yield h
 
-    def rebasedWrite(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] = {
+    def write(h: WriteHandle, chunk: Vector[Data]): Configured[Vector[FileSystemError]] = {
 
       implicit val codec: DataCodec = DataCodec.Precise
 
@@ -238,7 +236,7 @@ object SparkLocalBackendModule extends SparkCoreBackendModule {
       _write.fold(errs => errs, Vector[FileSystemError](unknownWriteHandle(h))).liftM[ConfiguredT]
     }
 
-    def rebasedClose(h: WriteHandle): Configured[Unit] =
+    def close(h: WriteHandle): Configured[Unit] =
       (((wrKvsOps.get(h) <* wrKvsOps.delete(h).liftM[OptionT]) ∘ (_.close)).run.void).liftM[ConfiguredT]
   }
 
@@ -277,7 +275,7 @@ object SparkLocalBackendModule extends SparkCoreBackendModule {
     }).into[Eff]
 
 
-    private def deletePath(path: APath): Backend[Unit] = {
+    def delete(path: APath): Backend[Unit] = {
       val del: Task[PhysicalError \/ (FileSystemError \/ Unit)] = Task.delay {
         FileUtils.forceDelete(toNioPath(path).toFile())
       }.as(().right[FileSystemError].right[PhysicalError]).handle {
@@ -286,17 +284,6 @@ object SparkLocalBackendModule extends SparkCoreBackendModule {
       }
       includeError(Failure.Ops[PhysicalError, Eff].unattempt(lift(del).into[Eff]).liftB)
     }
-
-    def deleteFile(f: AFile): Backend[Unit] = deletePath(f)
-    def deleteDir(d: ADir): Backend[Unit]   = deletePath(d)
-
-    private def temp(near: ADir): Backend[AFile] = lift(Task.delay {
-      val random = scala.util.Random.nextInt().toString
-      near </> file(s"quasar-$random.tmp")
-    }).into[Eff].liftB
-
-    def tempFileNearFile(f: AFile) = temp(fileParent(f))
-    def tempFileNearDir(d: ADir)   = temp(d)
   }
 
   def ManageFileModule: ManageFileModule = LocalManageFileModule
