@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.readerT._
-import quasar.connector.EnvironmentError
+import quasar.connector.{ChrootedInterpreter, EnvironmentError}
 import quasar.effect._
 import quasar.fp, fp.ski.κ, fp.TaskRef,  fp.free._
 import quasar.fs._,
@@ -32,9 +32,7 @@ import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, _}
 import quasar.physical.sparkcore.fs.SparkCoreBackendModule
 import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
 
-// import java.io.OutputStream
 import java.io.BufferedWriter
-// import java.io.OutputStreamWriter
 import java.net.{URLDecoder, URI}
 
 import org.http4s.{ParseFailure, Uri}
@@ -42,7 +40,6 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem => HdfsFileSystem, Path}
 import org.apache.hadoop.util.Progressable;
 import org.apache.spark._
-// import org.apache.spark.rdd._
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -51,17 +48,9 @@ final case class HdfsWriteCursor(hdfs: HdfsFileSystem, bw: BufferedWriter)
 
 final case class HdfsConfig(sparkConf: SparkConf, hdfsUriStr: String, prefix: ADir)
 
-object SparkHdfsBackendModule extends SparkCoreBackendModule {
+object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterpreter {
 
-  override def interpreter(cfg: Config): DefErrT[Task, (BackendEffect ~> Task, Task[Unit])] = {
-    val xformPaths =
-      if (cfg.prefix === rootDir) liftFT[BackendEffect]
-      else chroot.backendEffect[BackendEffect](cfg.prefix)
-
-    super.interpreter(cfg) map {
-      case (f, c) => (foldMapNT(f) compose xformPaths, c)
-    }
-  }
+  def prefix(cfg: HdfsConfig): ADir = cfg.prefix
 
   import corequeryfile.RddState
 
