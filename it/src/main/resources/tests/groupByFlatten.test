@@ -7,7 +7,8 @@
         "marklogic_xml": "pending",
         "mongodb_q_3_2": "pending",
 	"spark_local": "pending",
-        "spark_hdfs": "pending"
+        "spark_hdfs": "pending",
+        "spark_cassandra": "pending"
     },
     "data": "slamengine_commits.data",
     "query": "select substring(parents[*].sha, 0, 1), count(*) from slamengine_commits group by substring(parents[*].sha, 0, 1)",

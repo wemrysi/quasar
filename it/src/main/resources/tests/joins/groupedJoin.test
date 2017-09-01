@@ -13,7 +13,8 @@
         "mongodb_read_only": "pending",
         "mongodb_q_3_2":     "pending",
         "spark_local":       "pending",
-        "spark_hdfs":        "pending"
+        "spark_hdfs":        "pending",
+        "spark_cassandra":   "pending"
     },
 
     "NB": "#2121: Disabled in all qscript-based connectors due to possible qscript bug.",
