@@ -6,8 +6,9 @@
         "marklogic_json": "pending",
         "marklogic_xml":  "pending",
         "mongodb_q_3_2": "pending",
+        "spark_hdfs": "pending",
         "spark_local": "pending",
-        "spark_hdfs": "pending"
+        "spark_cassandra": "pending"
     },
     "NB": "Skipped for all connectors due to reduce/sort ordering bug.
            Bug is fixed on @sellout's new mongo branch, but the fix breaks old mongo.

@@ -7,8 +7,9 @@
         "marklogic_json": "pending",
         "marklogic_xml":  "pending",
         "mongodb_q_3_2": "pending",
+        "spark_hdfs": "pending",
         "spark_local": "pending",
-        "spark_hdfs": "pending"
+        "spark_cassandra": "pending"
     },
 
     "NB": "this actually works on mimir locally, it just doesn't work on Travis for... reasons",
