@@ -10,7 +10,8 @@
         "mongodb_read_only": "pending",
         "mongodb_q_3_2":     "pending",
         "spark_hdfs":        "pending",
-        "spark_local":       "pending"
+        "spark_local":       "pending",
+        "spark_cassandra":       "pending"
     },
     "data": "newTests.data",
     "query": "select backends{_:} as backend, backends{:_} as status, name from newTests",

@@ -12,7 +12,8 @@
         "mongodb_3_4":       "pending",
         "mongodb_q_3_2":     "pending",
         "spark_hdfs":        "pending",
-        "spark_local":       "pending"
+        "spark_local":       "pending",
+        "spark_cassandra":       "pending"
     },
     "NB": "Skipped for marklogic_xml because it times out.",
     "data": "jobs_jobinfo.data",
