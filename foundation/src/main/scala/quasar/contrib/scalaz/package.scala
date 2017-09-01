@@ -16,7 +16,10 @@
 
 package quasar.contrib
 
+import slamdata.Predef._
+
 import _root_.scalaz._, \&/._
+import _root_.scalaz.concurrent.Task
 
 package object scalaz {
   def -\&/[A, B](a: A): These[A, B] = This(a)
@@ -27,4 +30,14 @@ package object scalaz {
 
   implicit def toMonadError_Ops[F[_], E, A](fa: F[A])(implicit F: MonadError_[F, E]): MonadError_Ops[F, E, A] =
     new MonadError_Ops[F, E, A](fa)
+
+  implicit class NewThreadTask(t: Task[Unit]) {
+    def runAsyncOnNewThread(threadName: String, daemon: Boolean): Task[Unit] = Task.delay {
+      val thread = new java.lang.Thread(new java.lang.Runnable {
+        override def run(): Unit = t.unsafePerformSync
+      }, threadName)
+      thread.setDaemon(daemon)
+      thread.start()
+    }
+  }
 }

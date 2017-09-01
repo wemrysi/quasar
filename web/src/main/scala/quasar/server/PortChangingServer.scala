@@ -18,13 +18,12 @@ package quasar.server
 
 import slamdata.Predef._
 import quasar.console.stdout
+import quasar.contrib.scalaz.NewThreadTask
 import quasar.fp._
 import quasar.server.Http4sUtils._
 
 import scala.concurrent.duration._
 
-import java.lang.{Runnable, Thread}
-import java.util.concurrent.{Executors, ThreadFactory}
 import org.http4s
 import org.http4s.HttpService
 import scalaz._, Scalaz._
@@ -33,61 +32,32 @@ import scalaz.stream.{async, Process}
 
 /**
   * A server that can change ports on which it is serving clients when requested to do so.
-  * @param servers An infinite stream of http4s servers. Every time a port changed is requested, a new server will
-  *                appear at the end of this stream
-  * @param shutdownImpl Should be called to cleanly shutdown this server
   */
-final case class PortChangingServer(servers: Process[Task, (http4s.server.Server,Int)], shutdownImpl: Task[Unit]) {
-
-  /** Wait for the command line user to press enter before shutting down the server */
-  def shutdownOnUserInput: Task[Unit] = for {
-    _ <- stdout("Press Enter to stop.")
-    // TODO this ignores errors all over the place
-    _ <- servers.run
-    _ <- Task.fork(waitForInput)(PortChangingServer.AwaitingPool)
-    _ <- shutdownImpl
-  } yield ()
-
-  def shutdown: Task[Unit] =
-    shutdownImpl >> servers.run // We need to run the servers in order to make sure everything is cleaned up properly
-}
-
 object PortChangingServer {
+  type ServiceStarter = (Int => Task[String \/ Unit]) => HttpService
 
-  private val AwaitingPool = Executors.newFixedThreadPool(1, new ThreadFactory {
-    def newThread(r: Runnable): Thread = {
-      val back = new Thread(r)
-      back.setName("AWAITING_INPUT_THREAD")
-      back.setPriority(Thread.MIN_PRIORITY)
-      back
-    }
-  })
-
-  /** Produce a stream of servers that can be restarted on a supplied port
+  /** Start this server
     * @param initialPort The port on which to start the initial server
     * @param produceService A function that given a function to restart a server
     *                       on a new port, returns an `HttpService`
-    * @return The `Task` will start the first server and provide a function to
-    *         shutdown the active server. It will also return a process of
-    *         servers and ports. This `Process` must be run in order for
-    *         servers to actually be started and stopped. The `Process` must be
-    *         run to completion in order for appropriate clean up to occur.
+    * @return A function to shutdown the active server
     */
-  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   def start(
     initialPort: Int,
-    produceService: (Int => Task[Unit]) => HttpService
-  ): Task[PortChangingServer] = {
+    produceService: ServiceStarter
+  ): Task[Task[Unit]] = {
     val configQ = async.boundedQueue[ServerBlueprint](1)
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def startNew(port: Int): Task[Unit] = {
-      val conf = ServerBlueprint(port, idleTimeout = Duration.Inf, produceService(startNew))
-      configQ.enqueueOne(conf)
+    def startNew(port: Int): Task[String \/ Unit] = {
+      Http4sUtils.unavailableReason(port).run.flatMap {
+        case Some(reason) => Task.now(reason.left)
+        case None =>
+          val conf = ServerBlueprint(port, idleTimeout = Duration.Inf, produceService(startNew))
+          configQ.enqueueOne(conf).map(_.right)
+      }
     }
-    startNew(initialPort) >> (servers(configQ.dequeue, false).unconsOption.map {
-      case None => throw new java.lang.AssertionError("should never happen")
-      case Some((head, rest)) => PortChangingServer(Process.emit(head) ++ rest, configQ.close)
-    })
+    startNew(initialPort) >>
+    servers(configQ.dequeue, false).run.runAsyncOnNewThread("port-changing-thread", daemon = false).as(configQ.close)
   }
 
   /** Given a `Process` of [[ServerBlueprint]], returns a `Process` of `Server`.

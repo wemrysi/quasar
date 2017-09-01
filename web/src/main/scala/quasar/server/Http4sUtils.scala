@@ -34,7 +34,18 @@ object Http4sUtils {
 
   final case class ServerBlueprint(port: Int, idleTimeout: Duration, svc: HttpService)
 
-  def waitForInput: Task[Unit] = Task.delay(scala.io.StdIn.readLine).void
+  /**
+    * Wait for the user to press enter before returning. This is a blocking operation,
+    * so the thread will be suspended until it is notified of the user pressing Enter following which
+    * the `Task` will complete. If the standard input stream is ended, which would usually
+    * indicate that this application was launched from a script, then this Task will
+    * immediately complete with a return value of `false`
+    * @return `true` if we waited on user input before returning, false if returning
+    *        immediately for lack of any possibility or receiving user input
+    */
+  def waitForUserEnter: Task[Boolean] = Task.delay {
+    Option(scala.io.StdIn.readLine).isDefined
+  }
 
   def openBrowser(port: Int): Task[Unit] = {
     val url = s"http://localhost:$port/"

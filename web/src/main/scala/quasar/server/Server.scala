@@ -21,13 +21,13 @@ import quasar.api.services._
 import quasar.api.{redirectService, staticFileService, ResponseOr, ResponseT}
 import quasar.cli.Cmd
 import quasar.config._
-import quasar.console.logErrors
+import quasar.console.{logErrors, stdout}
 import quasar.contrib.scopt._
 import quasar.db.DbConnectionConfig
 import quasar.fp._
 import quasar.fp.free._
 import quasar.main._
-import quasar.server.Http4sUtils.openBrowser
+import quasar.server.Http4sUtils.{openBrowser, waitForUserEnter}
 
 import org.http4s.HttpService
 import org.http4s.server._
@@ -37,7 +37,6 @@ import Scalaz._
 import scalaz.concurrent.Task
 
 object Server {
-  type ServiceStarter = (Int => Task[Unit]) => HttpService
 
   final case class WebCmdLineConfig(
     cmd: Cmd,
@@ -66,7 +65,7 @@ object Server {
 
   def nonApiService(
     defaultPort: Int,
-    reload: Int => Task[Unit],
+    reload: Int => Task[String \/ Unit],
     staticContent: List[StaticContent],
     redirect: Option[String]
   ): HttpService = {
@@ -87,33 +86,19 @@ object Server {
     staticContent: List[StaticContent],
     redirect: Option[String],
     eval: CoreEff ~> QErrs_TaskM,
-    persistPortChange: Int => Task[Unit]
-  ): ServiceStarter = {
+    persistPortChange: Int => MainTask[Unit]
+  ): PortChangingServer.ServiceStarter = {
     import RestApi._
 
     val f: QErrs_Task ~> ResponseOr =
       liftMT[Task, ResponseT] :+:
         qErrsToResponseOr
 
-    (reload: Int => Task[Unit]) =>
+    (reload: Int => Task[String \/ Unit]) =>
       finalizeServices(
         toHttpServices(liftMT[Task, ResponseT] :+: (foldMapNT(f) compose eval), coreServices[CoreEffIO]) ++
         additionalServices
-      ) orElse nonApiService(defaultPort, Kleisli(persistPortChange) >> Kleisli(reload), staticContent, redirect)
-  }
-
-  /**
-    * Start the Quasar server and shutdown once the command line user presses "Enter"
-    */
-  def startServerUntilUserInput(
-    quasarInter: CoreEff ~> QErrs_TaskM,
-    port: Int,
-    staticContent: List[StaticContent],
-    redirect: Option[String],
-    persistPortChange: Int => Task[Unit]
-  ): Task[Unit] = {
-    val starter = serviceStarter(defaultPort = port, staticContent, redirect, quasarInter, persistPortChange)
-    PortChangingServer.start(initialPort = port, starter).flatMap(_.shutdownOnUserInput)
+      ) orElse nonApiService(defaultPort, Kleisli(persistPortChange andThen (a => a.run)) >> Kleisli(reload), staticContent, redirect)
   }
 
   /**
@@ -125,10 +110,10 @@ object Server {
     port: Int,
     staticContent: List[StaticContent],
     redirect: Option[String],
-    persistPortChange: Int => Task[Unit]
+    persistPortChange: Int => MainTask[Unit]
   ): Task[Task[Unit]] = {
     val starter = serviceStarter(defaultPort = port, staticContent, redirect, quasarInter, persistPortChange)
-    PortChangingServer.start(initialPort = port, starter).map(_.shutdown)
+    PortChangingServer.start(initialPort = port, starter)
   }
 
   def persistMetaStore(configPath: Option[FsFile]): DbConnectionConfig => MainTask[Unit] =
@@ -161,9 +146,17 @@ object Server {
              webCmdLineCfg.toCmdLineConfig,
              (wCfg, quasarInter) => {
                val port = webCmdLineCfg.port | wCfg.server.port
-               val persistPort = persistPortChange(webCmdLineCfg.configPath) andThen (_.foldM(s => Task.fail(new Exception(s)), Task.now))
-               (startServerUntilUserInput(quasarInter, port, webCmdLineCfg.staticContent, webCmdLineCfg.redirect, persistPort) <*
-                openBrowser(port).whenM(webCmdLineCfg.openClient)).liftM[MainErrT]
+               val persistPort = persistPortChange(webCmdLineCfg.configPath)
+               (for {
+                 shutdown <- startServer(quasarInter, port, webCmdLineCfg.staticContent, webCmdLineCfg.redirect, persistPort)
+                 _        <- openBrowser(port).whenM(webCmdLineCfg.openClient)
+                 _        <- stdout("Press Enter to stop.")
+                 // If user pressed enter (after this main thread has been blocked on it),
+                 // then we shutdown, otherwise we just run indefinitely until the JVM is killed
+                 // If we don't call shutdown and this main thread completes, the application will
+                 // continue to run indefinitely as `startServer` spanned a new non-daemon thread
+                 _        <- waitForUserEnter.ifM(shutdown, Task.now(()))
+               } yield ()).liftM[MainErrT]
              },
              persistMetaStore(webCmdLineCfg.configPath))
     } yield ())
