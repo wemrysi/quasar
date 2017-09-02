@@ -32,6 +32,8 @@ import quasar.fs.mount.BackendDef.DefinitionResult
 import quasar.main.metastore._
 import quasar.metastore._
 
+import scala.Predef.implicitly
+
 import doobie.imports.{ConnectionIO, Transactor}
 import doobie.syntax.connectionio._
 import scalaz._, Scalaz._
@@ -64,7 +66,7 @@ object Quasar {
       val f: QErrsCnxIOM ~> MainErrT[ConnectionIO, ?] =
         foldMapNT(liftMT[ConnectionIO, MainErrT] :+: qErrsToMainErrT[ConnectionIO])
 
-      Hoist[MainErrT].hoist(transactor.trans) compose f
+      Hoist[MainErrT].hoist(transactor.trans(implicitly[Monad[Task]])) compose f
     }
   }
 
@@ -133,7 +135,7 @@ object Quasar {
         injectFT[QErrs, QErrs_CnxIO_Task_MetaStoreLoc]
 
       val connectionIOToTask: ConnectionIO ~> Task =
-        λ[ConnectionIO ~> Task](io => metaRef.read.flatMap(t => t.trans.transactor.trans(io)))
+        λ[ConnectionIO ~> Task](io => metaRef.read.flatMap(t => t.trans.transactor.trans.apply(io)))
 
       val g: QErrs_CnxIO_Task_MetaStoreLoc ~> QErrs_TaskM =
         (injectFT[Task, QErrs_Task] compose MetaStoreLocation.impl.default(metaRef, persist)) :+:

@@ -108,7 +108,7 @@ package object metastore {
         posixCodec.parseAbsDir(str).getOrElse(unexpectedValue("not an absolute dir path: " + str))),
       posixCodec.printPath(_))
 
-  implicit val instantMeta: Meta[Instant] = Meta[Timestamp].nxmap(_.toInstant, Timestamp.from)
+  implicit val instantMeta: Meta[Instant] = Meta[Timestamp].xmap(_.toInstant, Timestamp.from)
 
   implicit val viewCacheStatusMeta: Meta[ViewCache.Status] = Meta[String].xmap(
     {
