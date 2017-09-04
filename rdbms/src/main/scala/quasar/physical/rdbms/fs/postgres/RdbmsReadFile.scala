@@ -45,7 +45,7 @@ trait RdbmsReadFile {
 
   import ReadFile._
 
-  val kvs = KeyValueStore.Ops[ReadHandle, SqlReadCursor, Eff]
+  private val kvs = KeyValueStore.Ops[ReadHandle, SqlReadCursor, Eff]
 
   implicit def monadMInstance: Monad[M]
 
@@ -93,12 +93,13 @@ trait RdbmsReadFile {
 
       } yield handle
 
-    override def read(h: ReadHandle): Backend[Vector[Data]] =
+    override def read(h: ReadHandle): Backend[Vector[Data]] = {
       for {
         c <- ME.unattempt(kvs.get(h).toRight(FileSystemError.unknownReadHandle(h)).run.liftB)
         data = c.data
         _ <- kvs.put(h, SqlReadCursor(Vector.empty)).liftB
       } yield data
+    }
 
     override def close(h: ReadHandle): Configured[Unit] =
       kvs.delete(h).liftM[ConfiguredT]

@@ -21,19 +21,20 @@ import quasar.{RenderTree, RenderTreeT}
 import slamdata.Predef._
 import quasar.connector.BackendModule
 import quasar.contrib.pathy.{AFile, APath}
-import quasar.contrib.scalaz.{MonadError_, MonadReader_}
+import quasar.contrib.scalaz.MonadReader_
 import quasar.effect.uuid.GenUUID
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp.{:/:, :\:}
 import quasar.fp.free._
-import quasar.fs.FileSystemError
+import quasar.fs.{FileSystemError, MonadFsErr}
 import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.mount.BackendDef.{DefErrT, DefinitionError}
 import quasar.fs.mount.ConnectionUri
-import quasar.physical.rdbms.fs.postgres.{RdbmsReadFile, SqlReadCursor}
+import quasar.physical.rdbms.fs.postgres.{RdbmsReadFile, RdbmsWriteFile, SqlReadCursor}
 import quasar.qscript.{::/::, ::\::, EquiJoin, ExtractPath, Injectable, QScriptCore, QScriptTotal, ShiftedRead, Unicoalesce, Unirewrite}
 import doobie.hikari.hikaritransactor.HikariTransactor
-import quasar.physical.rdbms.common.Config
+import quasar.fs.WriteFile.WriteHandle
+import quasar.physical.rdbms.common.{Config, TablePath}
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 
 import scalaz._
@@ -41,18 +42,19 @@ import Scalaz._
 import scala.Predef.implicitly
 import scalaz.concurrent.Task
 
-trait Rdbms extends BackendModule with RdbmsReadFile with Interpreter {
-
-  val MR                   = MonadReader_[Backend, Config]
-  val ME                   = MonadError_[Backend, FileSystemError]
+trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Interpreter {
 
   implicit val monadMInstance: Monad[M] = MonadM
+
+  val MR                   = MonadReader_[Backend, Config]
+  val ME                   = MonadFsErr[Backend]
 
   type Eff[A] = (
     Task :\:
       MonotonicSeq :\:
-      GenUUID :/:
-      KeyValueStore[ReadHandle, SqlReadCursor, ?]
+      GenUUID :\:
+      KeyValueStore[ReadHandle, SqlReadCursor, ?] :/:
+      KeyValueStore[WriteHandle, TablePath, ?]
   )#M[A]
 
   type QS[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
@@ -94,8 +96,6 @@ trait Rdbms extends BackendModule with RdbmsReadFile with Interpreter {
       cp: T[QSM[T, ?]]): Backend[Repr] = ??? // TODO
 
   def QueryFileModule: QueryFileModule = ??? // TODO
-
-  def WriteFileModule: WriteFileModule = ??? // TODO
 
   def ManageFileModule: ManageFileModule = ??? // TODO
 

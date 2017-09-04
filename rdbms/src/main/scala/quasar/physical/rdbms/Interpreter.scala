@@ -18,9 +18,11 @@ package quasar.physical.rdbms
 
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.effect.uuid.GenUUID
-import quasar.fp.{reflNT, TaskRef}
+import quasar.fp.{TaskRef, reflNT}
 import quasar.fp.free._
 import quasar.fs.ReadFile.ReadHandle
+import quasar.fs.WriteFile.WriteHandle
+import quasar.physical.rdbms.common.TablePath
 import quasar.physical.rdbms.fs.postgres.SqlReadCursor
 import slamdata.Predef.Map
 
@@ -34,12 +36,14 @@ trait Interpreter {
   def interp: Task[Eff ~> Task] =
     (
       TaskRef(Map.empty[ReadHandle, SqlReadCursor]) |@|
+      TaskRef(Map.empty[WriteHandle, TablePath]) |@|
         TaskRef(0L) |@|
         GenUUID.type1[Task]
     )(
-      (kvR, i, genUUID) =>
+      (kvR, kvW, i, genUUID) =>
         reflNT[Task] :+:
           MonotonicSeq.fromTaskRef(i) :+:
           genUUID :+:
-          KeyValueStore.impl.fromTaskRef(kvR))
+          KeyValueStore.impl.fromTaskRef(kvR) :+:
+          KeyValueStore.impl.fromTaskRef(kvW))
 }

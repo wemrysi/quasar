@@ -18,6 +18,7 @@ package quasar.physical.rdbms
 
 import java.sql.{PreparedStatement, ResultSet}
 
+import doobie.enum.jdbctype
 import doobie.enum.jdbctype.JdbcType
 import doobie.util.composite.Composite
 import doobie.util.kernel.Kernel
@@ -42,15 +43,44 @@ package object mapping {
             val colValue = rs.getString(index)
             if (colValue == null)
               Data.Null
-            else Data.Str(colValue)
+            else colType match {
+              case jdbctype.Integer =>
+                Data.Int(colValue.toInt)
+              case jdbctype.VarChar =>
+                Data.Str(colValue)
+              case _ =>
+                Data.Null // unsupported
+            }
           })
         }:_*)
         Data.Obj(cols)
       }
-      val set     = (_: PreparedStatement, _: Int, _: I) => ()
+      val set = (p: PreparedStatement, _: Int, d: I) => {
+        d match {
+          case Data.Obj(fields) =>
+            val rsMeta = p.getParameterMetaData
+            fields.zipWithIndex.foreach {
+              case ((_, value), shiftedIndex) =>
+                val index = shiftedIndex + 1
+                val colType = JdbcType.fromInt(rsMeta.getParameterType(index))
+                value match {
+                  // TODO map colType
+                  case Data.Int(num) => p.setInt(index, num.intValue())
+                  case Data.Str(str) => p.setString(index, str)
+                  case Data.Null => p.setNull(index, colType.toInt)
+                  case _ =>
+                    println("TODO handle unsupported operation. ")
+                }
+
+            }
+          case other =>
+            println("TODO handle unsupported operation. ")
+        }
+        ()
+      }
       val setNull = (_: PreparedStatement, _: Int) => ()
       val update  = (_: ResultSet, _: Int, _: I) => ()
-      val width   = 0
+      val width   = 1
     }
     val meta   = Nil
     val toList = (d: Data) => List(d)

@@ -29,7 +29,7 @@ object Postgres extends Rdbms {
 
   override val Type = FsType
 
-  val driverClass = "org.postgres.Driver"
+  val driverClass = "org.postgresql.Driver"
 
   val formatHint =
     "jdbc:postgres://host:port/db_name?user=username(&password=pw)"
@@ -40,9 +40,6 @@ object Postgres extends Rdbms {
   private def parsingErr(uri: ConnectionUri) =
     -\/(NonEmptyList(
       s"Cannot extract credentials from URI [${uri.value}]. Expected format: $formatHint"))
-
-  def toDefErr[T](errs: \/[NonEmptyList[String], T]): \/[DefinitionError, T] =
-    errs.leftMap(_.left[EnvironmentError])
 
   override def parseConnectionUri(
       uri: ConnectionUri): \/[DefinitionError, JdbcConnectionInfo] = {
