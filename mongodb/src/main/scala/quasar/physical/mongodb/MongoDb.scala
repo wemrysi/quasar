@@ -70,7 +70,7 @@ object MongoDb extends BackendModule {
 
   val Type = FileSystemType("mongodb")
 
-  private def doPlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, N[_]: Monad]
+  def doPlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, N[_]: Monad]
     (qs: T[QSM[T, ?]], ctx: fs.QueryContext[N])
     (implicit
       merr: MonadError_[N, FileSystemError],

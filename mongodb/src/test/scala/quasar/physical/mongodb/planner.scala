@@ -21,7 +21,7 @@ import quasar._, RenderTree.ops._
 import quasar.common.{Map => _, _}
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.FileSystemError
+import quasar.fs._
 import quasar.javascript._
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.physical.mongodb.accumulator._
@@ -121,22 +121,33 @@ class PlannerSpec extends
     EitherT.monadListen[WriterT[Id, Vector[PhaseResult], ?], PhaseResults, FileSystemError](
       WriterT.writerTMonadListen[Id, Vector[PhaseResult]])
 
-  def queryPlanner(expr: Fix[Sql], model: MongoQueryModel,
-    stats: Collection => Option[CollectionStatistics],
-    indexes: Collection => Option[Set[Index]]): EitherT[PhaseResultW, Nothing, FileSystemError \/ Crystallized[WorkflowF]] = ???
-    // queryPlan(expr, Variables.empty, basePath, 0L, None)
-    //   .leftMap(es => scala.sys.error("errors while planning: ${es}"))
-    //   // TODO: Would be nice to error on Constant plans here, but property
-    //   // tests currently run into that.
-    //   .flatMap(_.fold(
-    //     _ => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
-    //     MongoDbPlanner.plan(_, fs.QueryContext(model, stats, indexes, listContents))))
+  def compileSqlToLP[M[_]: Monad: MonadFsErr: PhaseResultTell](sql: Fix[Sql]): M[Fix[LP]] = {
+    val (log, s) = queryPlan(sql, Variables.empty, basePath, 0L, None).run.run
+    val lp = s.fold(
+      e => scala.sys.error(e.shows),
+      d => d.fold(e => scala.sys.error(e.shows), ι)
+    )
+    for {
+      _ <- scala.Predef.implicitly[PhaseResultTell[M]].tell(log)
+    } yield lp
+  }
+
+  def queryPlanner[M[_]: Monad: MonadFsErr: PhaseResultTell]
+    (sql: Fix[Sql], model: MongoQueryModel, stats: Collection => Option[CollectionStatistics],
+    indexes: Collection => Option[Set[Index]], lc: DiscoverPath.ListContents[M])
+      : M[Crystallized[WorkflowF]] = {
+    for {
+      lp <- compileSqlToLP[M](sql)
+      qs <- MongoDb.lpToQScript(lp, lc)
+      repr <- MongoDb.doPlan(qs, fs.QueryContext(model, stats, indexes, lc))
+    } yield repr
+  }
 
   def plan0(query: Fix[Sql], model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]]
-  ): Either[FileSystemError, Crystallized[WorkflowF]] = ???
-    //queryPlanner(query, model, stats, indexes).run.value.toEither
+  ): Either[FileSystemError, Crystallized[WorkflowF]] =
+    queryPlanner(query, model, stats, indexes, listContents).run.value.toEither
 
   def plan2_6(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`2.6`, κ(None), κ(None))
@@ -163,16 +174,16 @@ class PlannerSpec extends
     plan0(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes)
 
   def planLP(logical: Fix[LP]): Either[FileSystemError, Crystallized[WorkflowF]] = {
-    // (for {
-    //   _          <- emit("Input",      logical)
-    //   simplified <- emit("Simplified", optimizer.simplify(logical))
-    //   phys       <- MongoDbPlanner.plan[Fix, EitherWriter](simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents))
-    // } yield phys).run.value.toEither
-    ???
+    (for {
+     _  <- emit("Input", logical)
+     simplified <- emit("Simplified", optimizer.simplify(logical))
+     qs <- MongoDb.lpToQScript(simplified, listContents)
+     phys <- MongoDb.doPlan(qs, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents))
+    } yield phys).run.value.toEither
   }
 
   def planLog(query: Fix[Sql]): Vector[PhaseResult] =
-    queryPlanner(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes).run.written
+    queryPlanner(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents).run.written
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf))
 
@@ -4063,7 +4074,7 @@ class PlannerSpec extends
           "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
           "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
-          "QScript", "QScript (Mongo-specific)",
+          "QScript", "QScript (ShiftRead)", "QScript (Optimized)", "QScript (Mongo-specific)",
           "Workflow Builder", "Workflow (raw)", "Workflow (crystallized)")
     }
 
@@ -4079,7 +4090,7 @@ class PlannerSpec extends
           "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
           "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
-          "QScript", "QScript (Mongo-specific)")
+          "QScript", "QScript (ShiftRead)", "QScript (Optimized)", "QScript (Mongo-specific)")
     }
   }
 }
