@@ -22,6 +22,7 @@ import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 import slamdata.Predef._
+
 import scalaz.{-\/, NonEmptyList, \/, \/-}
 import scalaz.syntax.either._
 

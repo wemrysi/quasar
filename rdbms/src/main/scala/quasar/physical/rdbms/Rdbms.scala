@@ -44,11 +44,6 @@ import scalaz.concurrent.Task
 
 trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Interpreter {
 
-  implicit val monadMInstance: Monad[M] = MonadM
-
-  val MR                   = MonadReader_[Backend, Config]
-  val ME                   = MonadFsErr[Backend]
-
   type Eff[A] = (
     Task :\:
       MonotonicSeq :\:
@@ -58,7 +53,7 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with In
   )#M[A]
 
   type QS[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
-  type Repr        = String // TODO define best Repr for a SQL query
+  type Repr        = String // TODO define best Repr for a SQL query (Doobie Fragment?)
   type M[A]        = Free[Eff, A]
 
   type Config = common.Config
@@ -92,8 +87,13 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with In
   def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] =
     (interp ∘ (i => (foldMapNT[Eff, Task](i), Task.delay(())))).liftM[DefErrT]
 
+  lazy val MR                   = MonadReader_[Backend, Config]
+  lazy val ME                   = MonadFsErr[Backend]
+
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
-      cp: T[QSM[T, ?]]): Backend[Repr] = ??? // TODO
+      cp: T[QSM[T, ?]]): Backend[Repr] = {
+    ???
+  } // TODO
 
   def QueryFileModule: QueryFileModule = ??? // TODO
 

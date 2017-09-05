@@ -18,7 +18,6 @@ package quasar.physical.rdbms.fs.postgres
 
 import doobie.imports.Update
 import doobie.syntax.connectionio._
-
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
 import quasar.Data
@@ -33,6 +32,7 @@ import quasar.effect._
 import quasar.fp.free._
 import slamdata.Predef._
 import quasar.physical.rdbms.mapping._
+
 import scalaz._
 import Scalaz._
 import scalaz.concurrent.Task
@@ -44,14 +44,15 @@ trait RdbmsWriteFile {
 
   val writeKvs = KeyValueStore.Ops[WriteHandle, TablePath, Eff]
 
-  implicit def monadMInstance: Monad[M]
+  implicit private val monadMInstance: Monad[M] = MonadM
 
   override def WriteFileModule: WriteFileModule = new WriteFileModule {
 
     def batchInsert(
         dbPath: TablePath,
         chunk: Vector[Data],
-        xa: Transactor[Task]): Task[Vector[FileSystemError]] = {
+        xa: Transactor[Task]
+        ): Task[Vector[FileSystemError]] = {
       chunk.headOption match {
         case Some(Data.Obj(lm)) =>
           val fQuery = fr"insert into ${dbPath.shows}" ++ fr"values(" ++ lm.toList
@@ -88,7 +89,6 @@ trait RdbmsWriteFile {
 
     override def open(file: AFile): Backend[WriteHandle] =
       for {
-        xa <- MR.asks(_.transactor)
         i <- MonotonicSeq.Ops[Eff].next.liftB
         dbPath = TablePath.create(file)
         handle = WriteHandle(file, i)

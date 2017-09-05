@@ -20,11 +20,12 @@ package quasar.physical.rdbms.fs.postgres
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
 import quasar.Data
-import quasar.effect.{KeyValueStore, MonotonicSeq}
+import quasar.effect.KeyValueStore
 import quasar.fp.free.lift
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._
 import quasar.physical.rdbms.common.TablePath
+import quasar.effect.MonotonicSeq
 import quasar.physical.rdbms.mapping._
 import quasar.physical.rdbms.Rdbms
 import slamdata.Predef._
@@ -47,9 +48,9 @@ trait RdbmsReadFile {
 
   private val kvs = KeyValueStore.Ops[ReadHandle, SqlReadCursor, Eff]
 
-  implicit def monadMInstance: Monad[M]
+  implicit private val monadMInstance: Monad[M] = MonadM
 
-  override def ReadFileModule: ReadFileModule = new ReadFileModule {
+  val ReadFileModule: ReadFileModule = new ReadFileModule {
 
     private def readAll[F[_]: Monad](
         dbPath: TablePath,
@@ -80,18 +81,18 @@ trait RdbmsReadFile {
         )
       ).into[Eff].liftB
 
-    override def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] =
+    override def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
       for {
-        xa        <- MR.asks(_.transactor)
+        xa <- MR.asks(config => { println(">>>>>>>>>>>>>>> asks"); config.transactor })
         offsetInt <- includeError(toInt(offset.unwrap, "offset"))
-        limitInt  <- limit.traverse(l => includeError(toInt(l.unwrap, "limit")))
-        i         <- MonotonicSeq.Ops[Eff].next.liftB
+        limitInt <- limit.traverse(l => includeError(toInt(l.unwrap, "limit")))
+        i <- MonotonicSeq.Ops[Eff].next.liftB
         dbPath = TablePath.create(file)
         sqlResult <- lift(readAll(dbPath, offsetInt, limitInt, xa)).into[Eff].liftB
         handle = ReadHandle(file, i)
         _ <- kvs.put(handle, SqlReadCursor(sqlResult)).liftB
-
       } yield handle
+    }
 
     override def read(h: ReadHandle): Backend[Vector[Data]] = {
       for {
