@@ -60,7 +60,6 @@ class PlannerSpec extends
 
   type EitherWriter[A] =
     EitherT[Writer[Vector[PhaseResult], ?], FileSystemError, A]
-  //type PlanTestT[A] = ReaderT[EitherT[Writer[Vector[PhaseResult], ?], FileSystemError, ?], Instant, A]
 
   val notOnPar = "Not on par with old (LP-based) connector."
 

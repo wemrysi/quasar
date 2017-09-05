@@ -21,8 +21,6 @@ import slamdata.Predef._
 import quasar.common._
 import quasar.connector._
 import quasar.contrib.pathy._
-// import quasar.contrib.scalaz._
-// import quasar.effect.Read
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs._
@@ -38,7 +36,6 @@ import scala.Predef.implicitly
 
 object MongoDb extends BackendModule {
 
-  // default QS subset; change if you're cool/weird/unique!
   type QS[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
 
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
@@ -47,18 +44,12 @@ object MongoDb extends BackendModule {
   type Repr = Crystallized[WorkflowF]
 
   type Eff[A] = (
-    //Read[Instant, ?] :\:
     fs.queryfileTypes.MongoQuery[BsonCursor, ?] :\:
     fs.managefile.MongoManage :\:
     fs.readfile.MongoRead :/:
     fs.writefile.MongoWrite)#M[A]
 
   type M[A] = Free[Eff, A]
-
-  // type InstantR[A] = Read[Instant, A]
-  // implicit def rd[A]: Read[Instant, A] = ???
-  //implicit val ops: Read.Ops[Instant, Eff] = ??? //Read.Ops(rd[MQ])
-  //implicit val effInstantR: MonadReader_[M, Instant] = Read.monadReader_[Instant, Eff]
 
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
@@ -82,12 +73,6 @@ object MongoDb extends BackendModule {
       N[_]: Monad: MonadFsErr: PhaseResultTell]
       (qs: T[QSM[T, ?]], ctx: fs.QueryContext[N], execTime: Instant): N[Repr] =
       MongoDbPlanner.planExecTime[T, N](qs, ctx, execTime)
-  // def doPlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, N[_]: Monad]
-  //   (qs: T[QSM[T, ?]], ctx: fs.QueryContext[N])
-  //   (implicit
-  //     merr: MonadError_[N, FileSystemError],
-  //     mtell: MonadTell_[N, PhaseResults]): N[Repr] =
-  //   MongoDbPlanner.plan[T, N](qs, ctx)
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
