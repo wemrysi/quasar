@@ -1135,6 +1135,21 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             (lpf.free('__tmp0), SortDir.asc).wrapNel)))
     }
 
+    "compile order by reusing selected flattened field" in {
+      testLogicalPlanCompile(
+        sqlE"select quux[*] from foo order by quux[*]",
+        lpf.let('__tmp0,
+          lpf.invoke1(Squash,
+            lpf.invoke1(
+              FlattenArray,
+              lpf.invoke2(ObjectProject,
+                read("foo"),
+                lpf.constant(Data.Str("quux"))))),
+          lpf.sort(
+            lpf.free('__tmp0),
+            (lpf.free('__tmp0), SortDir.asc).wrapNel)))
+    }
+
     "compile simple order by with filter" in {
       testLogicalPlanCompile(
         sqlE"""select name from person where gender = "male" order by name, height""",
