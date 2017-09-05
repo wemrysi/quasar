@@ -88,6 +88,13 @@ object Quasar {
   val absorbTask: QErrsTCnxIO ~> QErrsCnxIO =
     Inject[ConnectionIO, QErrsCnxIO].compose(taskToConnectionIO) :+: reflNT[QErrsCnxIO]
 
+  /** Initialize the Quasar FileSystem assuming all defaults
+    * The metastore can be changed but it will not be persisted to the config file.
+    *
+    * Not used in the codebase, but useful for manual testing at the console.
+    */
+  val init: MainTask[Quasar] = initFromMetaConfig(None, _ => ().point[MainTask])
+
   /** Initialize the Quasar FileSytem using the specified metastore configuration
     * or with the default if not provided.
     */
