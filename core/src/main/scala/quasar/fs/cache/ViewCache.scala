@@ -24,7 +24,6 @@ import java.time.{Duration => JDuration, Instant}
 import scala.concurrent.duration._
 
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
 final case class ViewCache(
   query: ConnectionUri,
@@ -51,8 +50,8 @@ object ViewCache {
   }
 
   // Hard coded to 80% of maxAge for now
-  def expireAt(ts: Instant, maxAge: Duration): Task[Instant] =
-    Task.delay(ts.plus(JDuration.ofMillis((maxAge.toMillis.toDouble * 0.8).toLong)))
+  def expireAt(ts: Instant, maxAge: Duration): Throwable \/ Instant =
+    \/.fromTryCatchNonFatal(ts.plus(JDuration.ofMillis((maxAge.toMillis.toDouble * 0.8).toLong)))
 
   implicit val equal: Equal[ViewCache] = {
     implicit val equalInstant: Equal[Instant] = Equal.equalA

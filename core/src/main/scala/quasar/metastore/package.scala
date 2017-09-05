@@ -21,7 +21,7 @@ import quasar.contrib.pathy.{ADir, AFile, APath, unsafeSandboxAbs}
 import quasar.db.Schema
 import quasar.fs.FileSystemType
 import quasar.fs.cache.ViewCache
-import quasar.fs.mount.{ConnectionUri, MountConfig, MountType}
+import quasar.fs.mount.{ConnectionUri, MountType}
 
 import java.sql.Timestamp
 import java.time.Instant
@@ -128,15 +128,6 @@ package object metastore {
       { case "view" => viewMount(); case "module" => moduleMount(); case fsType => fileSystemMount(FileSystemType(fsType)) },
       _.fold(_.value, "view", "module"))
   }
-
-  implicit val mountConfigComposite: Composite[MountConfig] =
-    Composite[(String, String)].xmap(
-      { case (typ, uri) =>
-        MountConfig.fromConfigPair(typ, uri)
-          .leftMap(unexpectedValue(_))
-          .merge
-      },
-      MountConfig.toConfigPair)
 
   implicit val pathedViewCacheComposite: Composite[PathedViewCache] =
     Composite[(

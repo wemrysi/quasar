@@ -66,10 +66,8 @@ object Caching {
   def refresh(
     f: Free[Eff, ?] ~> Task,
     assigneeId: String
-  ): Process[Task, Unit] = {
-    val taskToProcess = λ[Task ~> Process[Task, ?]](Process.await(_)(Process.emit))
-
-    taskToProcess(
+  ): Process[Task, Unit] =
+    Process.eval(
       f(compExecMToFree(ViewCacheRefresh.selectCacheForRefresh[Eff])) >>= (_.cata(
         pvc => f(compExecMToFree(ViewCacheRefresh.updateCache(pvc.path, assigneeId))).void.handleWith {
           case ex: Throwable =>
@@ -77,7 +75,6 @@ object Caching {
               pvc.path, ex.getMessage ⊹ ex.getStackTrace.map("  " ⊹ _.toString).mkString("\n"))).into[Eff])
         },
         ().η[Task])))
-  }
 
   def periodicRefresh(
     f: Free[Eff, ?] ~> Task,

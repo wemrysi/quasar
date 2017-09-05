@@ -107,21 +107,25 @@ trait Queries {
   def deleteViewCache(path: AFile): Update0 =
     sql"""DELETE FROM view_cache WHERE path = $path""".update
 
-  val staleCachedViews: Query0[PathedViewCache] =
+  def staleCachedViews(now: Instant): Query0[PathedViewCache] =
     sql"""SELECT *
           FROM view_cache
-          WHERE last_update IS NULL OR (last_update > refresh_after)""".query[PathedViewCache]
+          WHERE last_update IS NULL OR ($now > refresh_after)""".query[PathedViewCache]
 
   def cacheRefreshAssigneStart(path: AFile, assigneeId: String, start: Instant, tmpDataPath: AFile): Update0 =
     sql"""UPDATE view_cache
           SET assignee = $assigneeId, assignee_start = $start, tmp_data_file = $tmpDataPath
           WHERE path = $path""".update
 
-  def updatePerSuccesfulCacheRefresh(path: AFile, lastUpdate: Instant): Update0 =
+  def updatePerSuccesfulCacheRefresh(path: AFile, lastUpdate: Instant, executionMillis: Long, refreshAfter: Instant): Update0 =
     sql"""UPDATE view_cache
           SET
-            assignee = null, last_update = $lastUpdate,
+            assignee = null,
+            last_update = $lastUpdate,
+            execution_millis = $executionMillis,
+            refresh_after = $refreshAfter,
             status = 'successful',
+            error_msg = null,
             tmp_data_file = null
           WHERE path = $path""".update
 }

@@ -63,9 +63,9 @@ abstract class MetaStoreAccessSpec extends Specification with TaskChecker {
     check(Queries.updateViewCache(f, viewCache))
     check(Queries.updateViewCacheErrorMsg(f, "err"))
     check(Queries.deleteViewCache(f))
-    check(Queries.staleCachedViews)
+    check(Queries.staleCachedViews(instant))
     check(Queries.cacheRefreshAssigneStart(f, "α", instant, f))
-    check(Queries.updatePerSuccesfulCacheRefresh(f, instant))
+    check(Queries.updatePerSuccesfulCacheRefresh(f, instant, 0, instant))
   }
 }
 

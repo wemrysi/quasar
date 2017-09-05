@@ -333,9 +333,9 @@ View mounts can optionally be cached. When cached a view is refreshed periodical
 
 A cached view is created by adding the `Cache-Control: max-age=<seconds>`  header to a `/mount/fs/` request.
 
-Cached views are retrieved via `/data/fs/` and include a `Expires: <http-date>` header informed by `max-age`. A reasonably provisioned server will keep cached views fresh. If it does fall behind the response will include the `Warning: 110 - "Response is Stale"` header. The `Expires` header is absent from non-cached views.
+Like ordinary views, cached views appear as a file in the filesystem.
 
-The `/query/fs/` and `/invoke/fs/` endpoints also utilize view caches.
+When serving a cached view the `/data/fs/` endpoint includes a `Expires: <http-date>` header informed by `max-age`. A reasonably provisioned server will keep cached views fresh. If it does fall behind the response will include the `Warning: 110 - "Response is Stale"` header. The `Expires` header is absent from non-cached views.
 
 ### Module mounts
 

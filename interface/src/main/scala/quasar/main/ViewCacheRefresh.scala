@@ -24,6 +24,7 @@ import quasar.contrib.scalaz.disjunction._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.Timing
 import quasar.frontend.SemanticErrsT
+import quasar.fp.free
 import quasar.fs.FileSystemError, FileSystemError._
 import quasar.fs.mount.{ConnectionUri, MountConfig, Mounting}
 import quasar.fs.MoveSemantics.Overwrite
@@ -32,11 +33,13 @@ import quasar.fs.{ManageFile, QueryFile, WriteFile}
 import quasar.main.FilesystemQueries
 import quasar.metastore.{MetaStoreAccess, PathedViewCache, Queries}
 
-import java.time.Instant
+import java.time.{Duration => JDuration, Instant}
+import scala.concurrent.duration._
 
 import doobie.free.connection.ConnectionIO
 import pathy.Path._
 import scalaz._, Scalaz._, NonEmptyList.nels
+import scalaz.concurrent.Task
 
 @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
 object ViewCacheRefresh {
@@ -50,7 +53,8 @@ object ViewCacheRefresh {
     S0: WriteFile :<: S,
     S1: ManageFile :<: S,
     S2: Mounting :<: S,
-    S3: ConnectionIO :<: S
+    S3: ConnectionIO :<: S,
+    S4: Task :<: S
   ): Q.transforms.CompExecM[Unit] = {
     import Q.transforms._
 
@@ -59,8 +63,11 @@ object ViewCacheRefresh {
     val getCachedView: CompExecM[ViewCache] =
       lift(MetaStoreAccess.lookupViewCache(viewPath) ∘ (_ \/> pathErr(pathNotFound(viewPath))))
 
-    def updatePerSuccessfulCacheRefresh(viewPath: AFile, instant: Instant): CompExecM[Unit] =
-      lift(Queries.updatePerSuccesfulCacheRefresh(viewPath, instant).run.void ∘ (_.right[FileSystemError]))
+    def updatePerSuccessfulCacheRefresh(
+      viewPath: AFile, lastUpdate: Instant, executionMillis: Long, refreshAfter: Instant
+    ): CompExecM[Unit] =
+      lift(Queries.updatePerSuccesfulCacheRefresh(viewPath, lastUpdate, executionMillis, refreshAfter).run.void ∘ (
+        _.right[FileSystemError]))
 
     for {
       vc  <- getCachedView
@@ -70,16 +77,23 @@ object ViewCacheRefresh {
       _   <- writeViewCache[S](rootDir, tf, vc.query)
       _   <- lift(M.moveFile(tf, vc.dataFile, Overwrite).run)
       ts2 <- lift(T.timestamp ∘ (_.right[FileSystemError]))
-      _   <- updatePerSuccessfulCacheRefresh(viewPath, ts2)
+      em  <- lift(free.lift(Task.delay(JDuration.between(ts1, ts2).toMillis)).into[S] ∘ (_.right[FileSystemError]))
+      e   <- lift(free.lift(
+               Task.fromDisjunction(ViewCache.expireAt(ts2, vc.maxAgeSeconds.seconds))
+             ).into[S] ∘ (_.right[FileSystemError]))
+      _   <- updatePerSuccessfulCacheRefresh(viewPath, ts2, em, e)
     } yield ()
   }
 
   // Naïve stale cache selection for the moment
   def selectCacheForRefresh[S[_]](implicit
     Q: QueryFile.Ops[S],
+    T: Timing.Ops[S],
     S0: ConnectionIO :<: S
   ): Q.transforms.CompExecM[Option[PathedViewCache]] =
-    lift(MetaStoreAccess.staleCachedViews ∘ (_.right[FileSystemError])) ∘ (_.headOption)
+    lift(T.timestamp ∘ (_.right[FileSystemError])) >>= {(ts: Instant) =>
+      println(s"ts: $ts")
+    (lift(MetaStoreAccess.staleCachedViews(ts) ∘ (_.right[FileSystemError])) ∘ (_.headOption))}
 
   def assigneeStart(path: AFile, assigneeId: String, start: Instant, tmpDataPath: AFile): ConnectionIO[Int] =
     Queries.cacheRefreshAssigneStart(path, assigneeId, start, tmpDataPath).run

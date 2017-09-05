@@ -32,8 +32,8 @@ import quasar.sql._
 import quasar.Variables
 
 import java.time.Instant
+import scala.concurrent.duration._
 
-import doobie.imports._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -48,19 +48,17 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
 
   val mount = λ[Mounting ~> Task](_ => Task.fail(new RuntimeException("unimplemented")))
 
-  val transact: ConnectionIO ~> Task = λ[ConnectionIO ~> Task](_.transact(transactor))
-
   def timingInterp(i: Instant) = λ[Timing ~> Task] {
     case Timing.Timestamp => Task.now(i)
     case Timing.Nanos     => Task.now(0)
   }
 
-  val vcacheInterp: VCache ~> Task = VCache.interp andThen transact
+  val vcacheInterp: VCache ~> Task = VCache.interp andThen transactor.trans
 
   def eff(i: Instant): Task[Eff ~> Task] =
     (runFs(InMemState.empty) ⊛ createNewTestMetaStoreConfig)((fs, metaConf) =>
       NaturalTransformation.refl[Task]                                          :+:
-      transact                                                                  :+:
+      transactor.trans                                                          :+:
       MetaStoreLocation.impl.constant(metaConf)                                 :+:
       (foldMapNT(mount :+: fs) compose Module.impl.default[MountingFileSystem]) :+:
       mount                                                                     :+:
@@ -111,7 +109,9 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
       r must_= ((
         viewCache.copy(
           lastUpdate = i.some,
+          executionMillis = 0L.some,
           assigneeStart = i.some,
+          refreshAfter = ViewCache.expireAt(i, viewCache.maxAgeSeconds.seconds) | i,
           status = ViewCache.Status.Successful).some,
         Vector(Data.Obj(ListMap("α" -> Data.Int(42)))).right[FileSystemError]
       ))
