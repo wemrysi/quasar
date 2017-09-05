@@ -91,9 +91,8 @@ object ViewCacheRefresh {
     T: Timing.Ops[S],
     S0: ConnectionIO :<: S
   ): Q.transforms.CompExecM[Option[PathedViewCache]] =
-    lift(T.timestamp ∘ (_.right[FileSystemError])) >>= {(ts: Instant) =>
-      println(s"ts: $ts")
-    (lift(MetaStoreAccess.staleCachedViews(ts) ∘ (_.right[FileSystemError])) ∘ (_.headOption))}
+    lift(T.timestamp ∘ (_.right[FileSystemError])) >>= (ts =>
+      lift(MetaStoreAccess.staleCachedViews(ts) ∘ (_.right[FileSystemError])) ∘ (_.headOption))
 
   def assigneeStart(path: AFile, assigneeId: String, start: Instant, tmpDataPath: AFile): ConnectionIO[Int] =
     Queries.cacheRefreshAssigneStart(path, assigneeId, start, tmpDataPath).run

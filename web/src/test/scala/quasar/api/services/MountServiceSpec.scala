@@ -310,7 +310,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
         val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
         val maxAge = 7.seconds
         val viewCache =
-          lift(ViewCache.expireAt(nineteenEighty, maxAge) ∘ (ra =>
+          lift(Task.fromDisjunction(ViewCache.expireAt(nineteenEighty, maxAge)) ∘ (ra =>
             ViewCache(
               MountConfig.viewConfigUri(expr, vars), None, None, 0, None, None,
               maxAge.toSeconds, ra, ViewCache.Status.Pending, None, src, None))).into[Eff]
@@ -622,7 +622,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             val df = d </> f
             val maxAge = 7.seconds
             val viewCache =
-              lift(ViewCache.expireAt(nineteenEighty, maxAge) ∘ (ra =>
+              lift(Task.fromDisjunction(ViewCache.expireAt(nineteenEighty, maxAge)) ∘ (ra =>
                 ViewCache(
                   MountConfig.viewConfigUri(expr, vars), None, None, 0, None, None,
                   maxAge.toSeconds, ra, ViewCache.Status.Pending, None, df, None))).into[Eff]
@@ -821,7 +821,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
           val df = d </> f
           val maxAge = 7.seconds
           val viewCache =
-            lift(ViewCache.expireAt(nineteenEighty, maxAge) ∘ (ra =>
+            lift(Task.fromDisjunction(ViewCache.expireAt(nineteenEighty, maxAge)) ∘ (ra =>
               ViewCache(
                 MountConfig.viewConfigUri(expr1, vars), None, None, 0, None, None,
                 maxAge.toSeconds, ra, ViewCache.Status.Pending, None, df, None))).into[Eff]
@@ -906,7 +906,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
           val df = d </> f
           val maxAge = 7.seconds
           val viewCache =
-            lift(ViewCache.expireAt(nineteenEighty, maxAge) ∘ (ra =>
+            lift(Task.fromDisjunction(ViewCache.expireAt(nineteenEighty, maxAge)) ∘ (ra =>
               ViewCache(
                 MountConfig.viewConfigUri(expr, vars), None, None, 0, None, None,
                 maxAge.toSeconds, ra, ViewCache.Status.Pending, None, df, None))).into[Eff]
@@ -945,7 +945,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
           val df = d </> f
           val maxAge = 7.seconds
           val viewCache =
-            lift(ViewCache.expireAt(nineteenEighty, maxAge) ∘ (ra =>
+            lift(Task.fromDisjunction(ViewCache.expireAt(nineteenEighty, maxAge)) ∘ (ra =>
               ViewCache(
                 MountConfig.viewConfigUri(expr, vars), None, None, 0, None, None,
                 maxAge.toSeconds, ra, ViewCache.Status.Pending, None, df, None))).into[Eff]

@@ -150,7 +150,7 @@ object mount {
                 }))
       tf     <- MF.tempFile(path).leftMap(_.toApiError)
       ts     <- T.timestamp.liftM[ApiErrT]
-      rAfter <- free.lift(maxAge.traverse(ViewCache.expireAt(ts, _))).into.liftM[ApiErrT]
+      rAfter <- free.lift(Task.fromDisjunction(maxAge.traverse(ViewCache.expireAt(ts, _)))).into.liftM[ApiErrT]
       _      <- (replaceIfExists && exists).fold(M.replace(path, bConf), M.mount(path, bConf)).liftM[ApiErrT]
       _      <- (refineType(path).toOption ⊛ MountConfig.viewConfig.getOption(bConf) ⊛ maxAge ⊛ rAfter) { (p, c, a, r) =>
                   val nvc = ViewCache(
