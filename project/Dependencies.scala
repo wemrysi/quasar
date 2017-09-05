@@ -83,8 +83,7 @@ object Dependencies {
   )
   def interface = Seq(
     "com.github.scopt" %% "scopt" % "3.5.0",
-    "org.jboss.aesh"    % "aesh"  % "0.66.17",
-    "com.h2database"    % "h2"    % "1.4.195"
+    "org.jboss.aesh"    % "aesh"  % "0.66.17"
   )
 
   def mongodb = {
