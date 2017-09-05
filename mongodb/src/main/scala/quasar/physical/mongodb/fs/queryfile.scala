@@ -27,6 +27,7 @@ import quasar.fs._
 import quasar.physical.mongodb._, MongoDb._, WorkflowExecutor.WorkflowCursor
 
 import com.mongodb.async.client.MongoClient
+import java.time.Instant
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -78,6 +79,8 @@ object queryfile extends QueryFileModule {
 
   def fileExists(file: AFile): Configured[Boolean] =
     mkInterp[Configured] >>= (_.fileExists(file))
+
+  def queryTime: Backend[Instant] = mkInterp[Backend] >>= (_.queryTime)
 
   def run[C, S[_]](
     client: MongoClient,

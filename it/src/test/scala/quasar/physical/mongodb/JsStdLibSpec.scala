@@ -23,6 +23,7 @@ import quasar.std.StdLib._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 
+import java.time.Instant
 import matryoshka._
 import matryoshka.data.Fix
 import org.specs2.execute._
@@ -35,6 +36,10 @@ import shapeless.Nat
 class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
   /** Identify constructs that are expected not to be implemented in JS. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
+    case (string.Lower, _)              => Pending("TODO").left
+    case (string.Upper, _)              => Pending("TODO").left
+    case (quasar.std.SetLib.Within, _)  => Pending("TODO").left
+
     case (string.ToString, Data.Dec(_) :: Nil) =>
       Pending("Dec printing doesn't match precisely").left
     case (string.ToString, Data.Date(_) :: Nil) =>
@@ -47,6 +52,7 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
       Pending("Infinity is not translated properly?").left
 
     case (date.ExtractIsoYear, _)      => Skipped("Returns incorrect year at beginning and end.").left
+    case (date.Now, _)                 => Skipped("Returns correct result, but wrapped into Data.Dec instead of Data.Interval").left
 
     case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => Pending("TODO").left
     case (relations.Lt, List(Data.Date(_), Data.Timestamp(_))) => Pending("TODO").left
@@ -70,7 +76,7 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
 
   def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix])
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
-    MongoDbPlanner.getJsFn[Fix, FileSystemError \/ ?](mf) ∘
+    MongoDbPlanner.getJsFn[Fix, ReaderT[FileSystemError \/ ?, Instant, ?]](mf).run(runAt) ∘
       (js =>
         (Crystallize[WorkflowF].crystallize(
           chain[Fix[WorkflowF]](

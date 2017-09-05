@@ -30,6 +30,7 @@ import quasar.physical.mongodb._, MongoDb._, WorkflowExecutor.WorkflowCursor
 
 import argonaut.JsonObject, JsonObject.{single => jSingle}
 import argonaut.JsonIdentity._
+import java.time.Instant
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -109,6 +110,11 @@ final class QueryFileInterpreter(execMongo: WorkflowExecutor[MongoDbIO, BsonCurs
       coll => MongoDbIO.collectionExists(coll).liftM[QRT])
 
     toConfigured(e)
+  }
+
+  def queryTime: Backend[Instant] = {
+    val n = MongoDbIO.liftTask(Task.delay { Instant.now }).liftM[QRT]
+    toBackendP(liftMQ(n).run.run)
   }
 
   ////

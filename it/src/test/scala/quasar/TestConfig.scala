@@ -32,7 +32,7 @@ object TestConfig {
   /** The directory under which test data may be found as well as where tests
     * can write test data/output.
     */
-  val DefaultTestPrefix: ADir = rootDir </> dir("quasar-test")
+  val DefaultTestPrefix: ADir = rootDir </> dir("t")
 
   /** The environment variable used to externally specify the test path prefix.
     *
@@ -53,13 +53,15 @@ object TestConfig {
   val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), sparkcore.fs.hdfs.FsType)
   val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), sparkcore.fs.local.FsType)
   val SPARK_ELASTIC     = ExternalBackendRef(BackendRef(BackendName("spark_elastic")      , BackendCapability.All), sparkcore.fs.elastic.FsType)
+  val SPARK_CASSANDRA = ExternalBackendRef(BackendRef(BackendName("spark_cassandra")  , BackendCapability.All), sparkcore.fs.cassandra.FsType)
+
 
   lazy val backendRefs: List[ExternalBackendRef] = List(
     COUCHBASE,
     MARKLOGIC_JSON, MARKLOGIC_XML,
     MIMIR,
     MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_3_4, MONGO_READ_ONLY,
-    SPARK_HDFS, SPARK_LOCAL, SPARK_ELASTIC)
+    SPARK_HDFS, SPARK_LOCAL, SPARK_ELASTIC, SPARK_CASSANDRA)
 
   final case class UnsupportedFileSystemConfig(c: MountConfig)
     extends RuntimeException(s"Unsupported filesystem config: $c")
@@ -117,7 +119,7 @@ object TestConfig {
       } yield FileSystemUT(r.ref,
           embed(testRef.get.map(_._1)),
           embed(setupRef.get.map(_._1)),
-          p </> dir("run_" + s),
+          p </> dir("run" + s),
           testRef.release *> setupRef.release)
     }
 

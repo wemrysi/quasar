@@ -31,6 +31,8 @@ import quasar.fs.mount.BackendDef.DefinitionResult
 import quasar.main.metastore._
 import quasar.metastore._
 
+import scala.Predef.implicitly
+
 import doobie.imports.{ConnectionIO, Transactor}
 import doobie.syntax.connectionio._
 import scalaz._, Scalaz._
@@ -63,7 +65,7 @@ object Quasar {
       val f: QErrsCnxIOM ~> MainErrT[ConnectionIO, ?] =
         foldMapNT(liftMT[ConnectionIO, MainErrT] :+: qErrsToMainErrT[ConnectionIO])
 
-      Hoist[MainErrT].hoist(transactor.trans) compose f
+      Hoist[MainErrT].hoist(transactor.trans(implicitly[Monad[Task]])) compose f
     }
   }
 
@@ -101,18 +103,14 @@ object Quasar {
 
   def initWithDbConfig(db: DbConnectionConfig, persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
     for {
-      metastore <- metastoreTransactor(db)
+      metastore <- MetaStore.connect(db, db.isInMemory, List(quasar.metastore.Schema.schema)).leftMap(_.message)
       metaRef   <- TaskRef(metastore).liftM[MainErrT]
-      quasarFS  <- initWithMeta(metaRef, persist, db.isInMemory)
+      quasarFS  <- initWithMeta(metaRef, persist)
     } yield quasarFS
 
-  def initWithMeta(metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit], initialize: Boolean): MainTask[Quasar] =
+  def initWithMeta(metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
     for {
       metastore  <- metaRef.read.liftM[MainErrT]
-      _          <- if (initialize)
-        initUpdateMigrate(quasar.metastore.Schema.schema, metastore.trans.transactor, None)
-      else Task.now(()).liftM[MainErrT]
-      _          <- verifySchema(quasar.metastore.Schema.schema, metastore.trans.transactor).leftMap(_.message)
       hfsRef     <- TaskRef(Empty.backendEffect[HierarchicalFsEffM]).liftM[MainErrT]
       mntdRef    <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
 
@@ -139,7 +137,7 @@ object Quasar {
           injectFT[QErrs, QErrs_CnxIO_Task_MetaStoreLoc]
 
       val connectionIOToTask: ConnectionIO ~> Task =
-        λ[ConnectionIO ~> Task](io => metaRef.read.flatMap(t => t.trans.transactor.trans(io)))
+        λ[ConnectionIO ~> Task](io => metaRef.read.flatMap(t => t.trans.transactor.trans.apply(io)))
       val g: QErrs_CnxIO_Task_MetaStoreLoc ~> QErrs_TaskM =
         (injectFT[Task, QErrs_Task] compose MetaStoreLocation.impl.default(metaRef, persist)) :+:
          injectFT[Task, QErrs_Task]                                                           :+:

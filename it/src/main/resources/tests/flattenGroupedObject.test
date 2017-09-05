@@ -1,17 +1,20 @@
 {
     "name": "flatten a grouped object with filter",
     "backends": {
+        "mimir":             "ignoreFieldOrder",
         "couchbase":         "pending",
         "marklogic_json":    "pending",
-        "mimir":             "pendingIgnoreFieldOrder",
-        "mongodb_2_6":       "pending",
-        "mongodb_3_0":       "pending",
-        "mongodb_3_2":       "pending",
-        "mongodb_3_4":       "pending",
-        "mongodb_read_only": "pending",
+        "mongodb_2_6":       "ignoreFieldOrder",
+        "mongodb_3_0":       "ignoreFieldOrder",
+        "mongodb_3_2":       "ignoreFieldOrder",
+        "mongodb_3_4":       "ignoreFieldOrder",
+        "mongodb_read_only": "ignoreFieldOrder",
         "spark_hdfs":        "pending",
         "spark_local":       "pending"
     },
+
+    "NB": "Legacy MongoDB did not have to ignore field order.",
+
     "data": "slamengine_commits.data",
     "query": "select distinct commit{*}, count(*) from slamengine_commits where commit{*} like \"http%\" group by committer.login",
     "predicate": "atLeast",

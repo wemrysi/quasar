@@ -17,7 +17,7 @@
 package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
-import quasar.Data
+import quasar.ejson.EJson
 import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.physical.marklogic.xquery._
@@ -25,7 +25,7 @@ import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFuncCore, MapFuncsCore}, MapFuncsCore.{Search => QSearch, _}
 
 import eu.timepit.refined.auto._
-import matryoshka._, Recursive.ops._
+import matryoshka._
 import scalaz.{Monad, Show}
 import scalaz.syntax.monad._
 
@@ -41,7 +41,7 @@ private[qscript] final class MapFuncCorePlanner[
   // wart: uses `eq` (3x) and `ne`
   @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   val plan: AlgebraM[F, MapFuncCore[T, ?], XQuery] = {
-    case Constant(ejson)              => DataPlanner[F, FMT](ejson.cata(Data.fromEJson))
+    case Constant(ejson)              => EJsonPlanner.plan[T[EJson], F, FMT](ejson)
     case Undefined()                  => emptySeq.point[F]
     case JoinSideName(n)              => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unreachable(s"JoinSideName(${Show[Symbol].shows(n)})"))
 
@@ -121,6 +121,7 @@ private[qscript] final class MapFuncCorePlanner[
     case ToString(x)                  => SP.asString(x)
     case QSearch(in, ptn, ci)         => fn.matches(in, ptn, Some(if_ (ci) then_ "im".xs else_ "m".xs)).point[F]
     case Substring(s, loc, len)       => lib.safeSubstring[F] apply (s, loc + 1.xqy, len)
+    case Split(s, d)                  => SP.seqToArray(fn.tokenize(s, d))
 
     // structural
     case MakeArray(x)                 => SP.singletonArray(x)

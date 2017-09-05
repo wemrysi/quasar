@@ -10,11 +10,7 @@ object Dependencies {
   private val algebraVersion      = "0.7.0"
   private val argonautVersion     = "6.2"
   private val disciplineVersion   = "0.5"
-  // Upgrading to doobie `0.4.1` is not trivial for a relatively minor annoyance that
-  // will be addressed in `0.4.2` in which case the only thing I think needed to upgrade will be
-  // changing `AnalysisSpec` to `TaskChecker`. Also, the "contrib" dependencies no longer have
-  // contrib in their name, so they need to be updated. As well as `postgresql` having been changed to `postgres`
-  private val doobieVersion       = "0.3.0"
+  private val doobieVersion       = "0.4.4"
   private val jawnVersion         = "0.10.4"
   private val jacksonVersion      = "2.4.4"
   private val matryoshkaVersion   = "0.18.3"
@@ -75,14 +71,15 @@ object Dependencies {
   )
   def core = Seq(
     "org.tpolecat"               %% "doobie-core"               % doobieVersion,
-    "org.tpolecat"               %% "doobie-contrib-hikari"     % doobieVersion,
-    "org.tpolecat"               %% "doobie-contrib-postgresql" % doobieVersion,
+    "org.tpolecat"               %% "doobie-hikari"             % doobieVersion,
+    "org.tpolecat"               %% "doobie-postgres"           % doobieVersion,
     "org.http4s"                 %% "http4s-core"               % http4sVersion,
     "com.github.julien-truffaut" %% "monocle-macro"             % monocleVersion,
     "com.github.tototoshi"       %% "scala-csv"                 % "1.3.4",
     "com.slamdata"               %% "pathy-argonaut"            % pathyVersion,
-    "org.tpolecat"               %% "doobie-contrib-specs2"     % doobieVersion % Test,
-    "org.tpolecat"               %% "doobie-contrib-h2"         % doobieVersion % Test
+    ("org.tpolecat"               %% "doobie-specs2"             % doobieVersion % Test)
+      .exclude("org.specs2", "specs2-core_2.11"), // conflicting version
+    "org.tpolecat"               %% "doobie-h2"                 % doobieVersion % Test
   )
   def interface = Seq(
     "com.github.scopt" %% "scopt" % "3.5.0",
@@ -91,7 +88,7 @@ object Dependencies {
   )
 
   def mongodb = {
-    val nettyVersion = "4.0.42.Final" // This version is set to be the same as Spark
+    val nettyVersion = "4.0.43.Final" // This version is set to be the same as Spark
                                       // to avoid problems in web and it where their classpaths get merged
                                       // In any case, it should be binary compatible with version 4.0.26 that this
                                       // mongo release is expecting
@@ -107,7 +104,7 @@ object Dependencies {
   }
 
   def sparkcore(sparkProvided: Boolean) = Seq(
-    ("org.apache.spark" %% "spark-core" % "2.1.1" % (if(sparkProvided) "provided" else "compile"))
+    ("org.apache.spark" %% "spark-core" % "2.2.0" % (if(sparkProvided) "provided" else "compile"))
       .exclude("aopalliance", "aopalliance")                  // It seems crazy that we need to do this,
       .exclude("javax.inject", "javax.inject")                // but it looks like Spark had some dependency conflicts
       .exclude("commons-collections", "commons-collections")  // among its transitive dependencies which means
@@ -115,10 +112,19 @@ object Dependencies {
       .exclude("commons-logging", "commons-logging")          // create an assembly jar without conflicts
       .exclude("commons-logging", "commons-logging")          // It would seem though that things work without them...
       .exclude("com.esotericsoftware.minlog", "minlog")       // It's likely this list will need to be updated
-      .exclude("org.spark-project.spark", "unused")           // anytime the Spark dependency itselft is updated
-      .exclude("org.scalatest", "scalatest_2.11"),
+      .exclude("org.spark-project.spark", "unused"),          // anytime the Spark dependency itselft is updated
+    ("org.apache.spark" %% "spark-sql" % "2.2.0" % (if(sparkProvided) "provided" else "compile"))
+      .exclude("aopalliance", "aopalliance")                  // Same limitation
+      .exclude("javax.inject", "javax.inject")                // as above for
+      .exclude("commons-collections", "commons-collections")  // spark-sql dependency.
+      .exclude("commons-beanutils", "commons-beanutils-core") // This hopefully will go away
+      .exclude("commons-logging", "commons-logging")          // in near future with
+      .exclude("commons-logging", "commons-logging")          // classloaders magic
+      .exclude("com.esotericsoftware.minlog", "minlog")       // Keep calm and
+      .exclude("org.spark-project.spark", "unused"),          // ignore Spark.
     "org.apache.parquet"     % "parquet-format"          % "2.3.1",
     "org.apache.parquet"     % "parquet-hadoop"          % "1.9.0",
+    "com.datastax.spark" %% "spark-cassandra-connector" % "2.0.3",
     "org.http4s"             %% "http4s-core"            % http4sVersion,
     "org.http4s"             %% "http4s-blaze-client"    % http4sVersion,
     "org.elasticsearch"      %% "elasticsearch-spark-20" % "5.4.1",
@@ -167,7 +173,8 @@ object Dependencies {
     "org.scodec"           %% "scodec-scalaz"   % "1.3.0a",
     "org.apache.jdbm"      %  "jdbm"            % "3.0-alpha5",
     "com.typesafe.akka"    %  "akka-actor_2.11" % "2.5.1",
-    "org.quartz-scheduler" %  "quartz"          % "2.3.0",
+    ("org.quartz-scheduler" %  "quartz"          % "2.3.0")
+      .exclude("com.zaxxer", "HikariCP-java6"), // conflict with Doobie
     "commons-io"           %  "commons-io"      % "2.5",
     "org.scodec"           %% "scodec-bits"     % scodecBitsVersion
   )

@@ -60,11 +60,11 @@ class PlannerSpec extends
 
   type EitherWriter[A] =
     EitherT[Writer[Vector[PhaseResult], ?], FileSystemError, A]
+  //type PlanTestT[A] = ReaderT[EitherT[Writer[Vector[PhaseResult], ?], FileSystemError, ?], Instant, A]
 
   val notOnPar = "Not on par with old (LP-based) connector."
 
-  def emit[A: RenderTree](label: String, v: A)
-      : EitherWriter[A] =
+  def emit[A: RenderTree](label: String, v: A): EitherWriter[A] =
     EitherT[Writer[PhaseResults, ?], FileSystemError, A](Writer(Vector(PhaseResult.tree(label, v)), v.right))
 
   case class equalToWorkflow(expected: Workflow)
@@ -134,12 +134,13 @@ class PlannerSpec extends
 
   def queryPlanner[M[_]: Monad: MonadFsErr: PhaseResultTell]
     (sql: Fix[Sql], model: MongoQueryModel, stats: Collection => Option[CollectionStatistics],
-    indexes: Collection => Option[Set[Index]], lc: DiscoverPath.ListContents[M])
+    indexes: Collection => Option[Set[Index]], lc: DiscoverPath.ListContents[M],
+    execTime: Instant)
       : M[Crystallized[WorkflowF]] = {
     for {
       lp <- compileSqlToLP[M](sql)
       qs <- MongoDb.lpToQScript(lp, lc)
-      repr <- MongoDb.doPlan(qs, fs.QueryContext(model, stats, indexes, lc))
+      repr <- MongoDb.doPlan(qs, fs.QueryContext(model, stats, indexes, lc), execTime)
     } yield repr
   }
 
@@ -147,7 +148,7 @@ class PlannerSpec extends
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]]
   ): Either[FileSystemError, Crystallized[WorkflowF]] =
-    queryPlanner(query, model, stats, indexes, listContents).run.value.toEither
+    queryPlanner(query, model, stats, indexes, listContents, Instant.now).run.value.toEither
 
   def plan2_6(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`2.6`, κ(None), κ(None))
@@ -157,7 +158,8 @@ class PlannerSpec extends
 
   def plan3_2(query: Fix[Sql],
     stats: Collection => Option[CollectionStatistics],
-    indexes: Collection => Option[Set[Index]]) =
+    indexes: Collection => Option[Set[Index]]
+  ): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`3.2`, stats, indexes)
 
   val defaultStats: Collection => Option[CollectionStatistics] =
@@ -173,17 +175,20 @@ class PlannerSpec extends
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan0(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes)
 
+  def planAt(time: Instant, query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
+    queryPlanner(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents, time).run.value.toEither
+
   def planLP(logical: Fix[LP]): Either[FileSystemError, Crystallized[WorkflowF]] = {
     (for {
      _  <- emit("Input", logical)
      simplified <- emit("Simplified", optimizer.simplify(logical))
      qs <- MongoDb.lpToQScript(simplified, listContents)
-     phys <- MongoDb.doPlan(qs, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents))
+     phys <- MongoDb.doPlan(qs, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents), Instant.now)
     } yield phys).run.value.toEither
   }
 
   def planLog(query: Fix[Sql]): Vector[PhaseResult] =
-    queryPlanner(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents).run.written
+    queryPlanner(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents, Instant.now).run.written
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf))
 
@@ -428,6 +433,17 @@ class PlannerSpec extends
                $field("baz"),
                $field("bar"))),
            ExcludeId)))
+    }
+
+    "plan now() with a literal timestamp" in {
+      val time = Instant.parse("2016-08-25T00:00:00.000Z")
+      val bsTime = Bson.Date.fromInstant(time).get
+
+      planAt(time, sqlE"""select NOW(), bar from foo""") must
+       beWorkflow(chain[Workflow](
+         $read(collection("db", "foo")),
+         $project(
+           reshape("0" -> $literal(bsTime), "bar" -> $field("bar")))))
     }
 
     "plan date field extraction" in {

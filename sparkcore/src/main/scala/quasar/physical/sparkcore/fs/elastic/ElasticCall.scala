@@ -69,7 +69,7 @@ object ElasticCall {
   }
 
   //TODO_ES use Kleisly[Task, ElasticClientUr]
-  implicit def interpreter: ElasticCall ~> Task = new (ElasticCall ~> Task) {
+  implicit def interpreter(host: String, port: Int): ElasticCall ~> Task = new (ElasticCall ~> Task) {
 
     import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -110,7 +110,7 @@ object ElasticCall {
     def _copyType(src: IndexType, dst: IndexType): Task[Unit] = for {
         httpClient <- Task.delay(PooledHttp1Client())
         result          <- httpClient.expect[String](
-          Request(method = POST, uri = Uri.unsafeFromString("http://localhost:9200/_reindex?refresh=true"))
+          Request(method = POST, uri = Uri.unsafeFromString(s"http://${host}:${port}/_reindex?refresh=true"))
             .withBody(s"""{
                            "source": { "index": "${src.index}", "type": "${src.typ}" }, 
                            "dest": { "index": "${dst.index}", "type": "${dst.typ}" }
@@ -121,7 +121,7 @@ object ElasticCall {
     def _copyIndex(src: String, dst: String): Task[Unit] = for {
       httpClient <- Task.delay(PooledHttp1Client())
       result          <- httpClient.expect[String](
-        Request(method = POST, uri = Uri.unsafeFromString("http://localhost:9200/_reindex?refresh=true"))
+        Request(method = POST, uri = Uri.unsafeFromString(s"http://${host}:${port}/_reindex?refresh=true"))
           .withBody(s"""{
                            "source": { "index": "${src}" }, 
                            "dest": { "index": "${dst}" }
@@ -130,7 +130,7 @@ object ElasticCall {
     } yield ()
 
     def newHttpClient: Task[HttpClient] = Task.delay {
-      HttpClient(ElasticsearchClientUri("localhost", 9200))
+      HttpClient(ElasticsearchClientUri(host, port))
     }
 
     def closeHttpClient(client: HttpClient): Task[Unit] = Task.delay {
