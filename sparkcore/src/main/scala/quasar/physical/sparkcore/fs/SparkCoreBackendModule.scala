@@ -22,7 +22,7 @@ import quasar.connector.BackendModule
 import quasar.contrib.pathy._
 import quasar.common._
 import quasar.fp._, free._
-import quasar.fs._, FileSystemError._//, PathError._
+import quasar.fs._, FileSystemError._
 import quasar.fs.mount._, BackendDef._
 import quasar.effect._
 import quasar.qscript.{Read => _, _}
@@ -39,7 +39,7 @@ import scalaz.concurrent.Task
 
 trait SparkCoreBackendModule extends BackendModule {
 
-  // conntector specificc
+  // conntector specific
   type Eff[A]
   def toLowerLevel[S[_]](sc: SparkContext, config: Config)(implicit
     S0: Task :<: S, S1: PhysErr :<: S

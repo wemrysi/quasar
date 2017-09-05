@@ -26,12 +26,12 @@ import scalaz._, Scalaz._, concurrent.Task
 
 trait ChrootedInterpreter extends BackendModule {
 
-  def prefix(cfg: Config): ADir
+  def rootPrefix(cfg: Config): ADir
 
   override def interpreter(cfg: Config): DefErrT[Task, (BackendEffect ~> Task, Task[Unit])] = {
     val xformPaths =
-      if (prefix(cfg) === rootDir) liftFT[BackendEffect]
-      else chroot.backendEffect[BackendEffect](prefix(cfg))
+      if (rootPrefix(cfg) === rootDir) liftFT[BackendEffect]
+      else chroot.backendEffect[BackendEffect](rootPrefix(cfg))
 
     super.interpreter(cfg) map {
       case (f, c) => (foldMapNT(f) compose xformPaths, c)

@@ -105,7 +105,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
     runMarkLogicFs(cfg.cfg.xccUri) map { case (f, c) => (f compose dropWritten, c) }
   }
 
-  def prefix(cfg: Config): ADir = cfg.cfg.rootDir
+  def rootPrefix(cfg: Config): ADir = cfg.cfg.rootDir
 
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](qs: T[QSM[T, ?]]): Backend[Repr] = {
     def doPlan(cfg: Config): Backend[MainModule] = {

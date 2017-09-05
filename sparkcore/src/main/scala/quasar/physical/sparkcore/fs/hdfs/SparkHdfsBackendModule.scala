@@ -50,7 +50,7 @@ final case class HdfsConfig(sparkConf: SparkConf, hdfsUriStr: String, prefix: AD
 
 object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterpreter {
 
-  def prefix(cfg: HdfsConfig): ADir = cfg.prefix
+  def rootPrefix(cfg: HdfsConfig): ADir = cfg.prefix
 
   import corequeryfile.RddState
 

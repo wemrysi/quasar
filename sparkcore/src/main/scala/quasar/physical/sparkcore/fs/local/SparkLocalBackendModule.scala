@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.readerT._
-import quasar.connector.EnvironmentError
+import quasar.connector.{ChrootedInterpreter, EnvironmentError}
 import quasar.effect._
 import quasar.fp, fp.TaskRef,  fp.free._
 import quasar.fs._,
@@ -43,17 +43,9 @@ import scalaz.concurrent.Task
 
 final case class LocalConfig(sparkConf: SparkConf, prefix: ADir)
 
-object SparkLocalBackendModule extends SparkCoreBackendModule {
+object SparkLocalBackendModule extends SparkCoreBackendModule with ChrootedInterpreter {
 
-  override def interpreter(cfg: Config): DefErrT[Task, (BackendEffect ~> Task, Task[Unit])] = {
-    val xformPaths =
-      if (cfg.prefix === rootDir) liftFT[BackendEffect]
-      else chroot.backendEffect[BackendEffect](cfg.prefix)
-
-    super.interpreter(cfg) map {
-      case (f, c) => (foldMapNT(f) compose xformPaths, c)
-    }
-  }
+  def rootPrefix(cfg: LocalConfig): ADir = cfg.prefix
 
   import corequeryfile.RddState
 
