@@ -155,10 +155,10 @@ object Server {
                  // then we shutdown, otherwise we just run indefinitely until the JVM is killed
                  // If we don't call shutdown and this main thread completes, the application will
                  // continue to run indefinitely as `startServer` uses a non-daemon `ExecutorService`
-                 // TODO: Figure out why it's necessary to `sleep` to keep the main thread from completing
-                 // instead of simply relying on the fact that the server is using a pool of non-daemon threads
-                 // to ensure the application doesn't shutdown
-                 _        <- waitForUserEnter.ifM(shutdown, Task.delay(java.lang.Thread.sleep(Long.MaxValue)))
+                 // TODO: Figure out why it's necessary to use a `Task` that never completes to keep the main thread
+                 // from completing instead of simply relying on the fact that the server is using a pool of
+                 // non-daemon threads to ensure the application doesn't shutdown
+                 _        <- waitForUserEnter.ifM(shutdown, Task.async[Unit](_ => ()))
                } yield ()).liftM[MainErrT]
              },
              persistMetaStore(webCmdLineCfg.configPath))
