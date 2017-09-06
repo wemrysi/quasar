@@ -107,9 +107,10 @@ package object cassandra {
     )
 
     for {
-      initSparkConf          <- sparkConfOrErr
-      host                  <- fetchParameter("cassandraHost")
-      port                  <- fetchParameter("cassandraPort")
+      initSparkConf         <- sparkConfOrErr
+      hostAndPort           <- fetchParameter("cassandraHost").tuple(fetchParameter("cassandraPort"))
+      host                  = hostAndPort._1
+      port                  = hostAndPort._2
       rootPath              <- rootPathOrErr
     } yield {
       val sparkConf = initSparkConf.set("spark.cassandra.connection.host", host)
