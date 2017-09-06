@@ -39,9 +39,7 @@ class ControlServiceSpec extends quasar.Qspec {
 
     (for {
       shutdown <- PortChangingServer.start(initialPort, reload => control.service(defaultPort, reload) orElse info.service)
-      // Give the server a little time to startup before issuing a request
-      _        <- Task.delay(java.lang.Thread.sleep(500))
-      b <- (causeRestart(uri) >> Task.delay(java.lang.Thread.sleep(500)) >> afterRestart).onFinish(_ => shutdown)
+      b <- (causeRestart(uri) >> afterRestart).onFinish(_ => shutdown)
     } yield b).unsafePerformSyncFor(timeoutMillis)
   }
 

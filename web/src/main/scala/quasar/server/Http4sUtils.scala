@@ -41,7 +41,7 @@ object Http4sUtils {
     * indicate that this application was launched from a script, then this Task will
     * immediately complete with a return value of `false`
     * @return `true` if we waited on user input before returning, false if returning
-    *        immediately for lack of any possibility or receiving user input
+    *        immediately for lack of any possibility of receiving user input
     */
   def waitForUserEnter: Task[Boolean] = Task.delay {
     Option(scala.io.StdIn.readLine).isDefined
@@ -79,13 +79,32 @@ object Http4sUtils {
       .getOrElse(requested)
 
   /** Start `Server` with supplied [[ServerBlueprint]]
-    * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
     * @return Server that has been started along with the port on which it was started
     */
-  def startServer(blueprint: ServerBlueprint, flexibleOnPort: Boolean): Task[(Http4sServer, Int)] = {
+  def startServerOnAnyPort(blueprint: ServerBlueprint): Task[(Http4sServer, Int)] = {
     for {
-      actualPort <- if (flexibleOnPort) choosePort(blueprint.port) else Task.now(blueprint.port)
-      server     <- BlazeBuilder.withIdleTimeout(blueprint.idleTimeout).bindHttp(actualPort, "0.0.0.0").mountService(blueprint.svc).start
+      actualPort <- choosePort(blueprint.port)
+      server     <- startServer(blueprint.copy(port = actualPort))
     } yield (server, actualPort)
+  }
+
+  def startServer(blueprint: ServerBlueprint): Task[Http4sServer] = {
+    // Extracted from http4s in order to make Server run on non-daemon threads
+    def newPool(name: String, min: Int, cpuFactor: Double, timeout: Boolean) = {
+      val cpus = java.lang.Runtime.getRuntime.availableProcessors
+      val exec = new java.util.concurrent.ThreadPoolExecutor(
+        scala.math.max(min, cpus), scala.math.max(min, (cpus * cpuFactor).ceil.toInt),
+        10L, java.util.concurrent.TimeUnit.SECONDS,
+        new java.util.concurrent.LinkedBlockingQueue[java.lang.Runnable],
+        org.http4s.util.threads.threadFactory(i => s"${name}-$i", daemon = false))
+      exec.allowCoreThreadTimeOut(timeout)
+      exec
+    }
+    BlazeBuilder
+      .withIdleTimeout(blueprint.idleTimeout)
+      .bindHttp(blueprint.port, "0.0.0.0")
+      .mountService(blueprint.svc)
+      .withServiceExecutor(newPool("http4s-pool", 4, 3.0, false))
+      .start
   }
 }

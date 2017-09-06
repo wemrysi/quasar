@@ -18,7 +18,6 @@ package quasar.server
 
 import slamdata.Predef._
 import quasar.console.stdout
-import quasar.contrib.scalaz.NewThreadTask
 import quasar.fp._
 import quasar.server.Http4sUtils._
 
@@ -28,10 +27,11 @@ import org.http4s
 import org.http4s.HttpService
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.stream.{async, Process}
 
 /**
   * A server that can change ports on which it is serving clients when requested to do so.
+  * A known limitation is that this server will always fail to send a response to a request
+  * makes use of restart function.
   */
 object PortChangingServer {
   type ServiceStarter = (Int => Task[String \/ Unit]) => HttpService
@@ -45,46 +45,26 @@ object PortChangingServer {
   def start(
     initialPort: Int,
     produceService: ServiceStarter
-  ): Task[Task[Unit]] = {
-    val configQ = async.boundedQueue[ServerBlueprint](1)
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def startNew(port: Int): Task[String \/ Unit] = {
-      Http4sUtils.unavailableReason(port).run.flatMap {
-        case Some(reason) => Task.now(reason.left)
-        case None =>
-          val conf = ServerBlueprint(port, idleTimeout = Duration.Inf, produceService(startNew))
-          configQ.enqueueOne(conf).map(_.right)
+  ): Task[Task[Unit]] =
+    TaskRef[Option[(http4s.server.Server, Int)]](None).flatMap { serverRef =>
+      def shutdown(s: Option[(http4s.server.Server, Int)]): Task[Unit] =
+        s.fold(Task.now(())){ case (server, port) =>
+          server.shutdown >> stdout(s"Stopped server listening on port $port")
+        }
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+      def startNew(port: Int): Task[String \/ Unit] = {
+        for {
+          oldServer <- serverRef.read
+          newServer <- startServer(ServerBlueprint(port, idleTimeout = Duration.Inf, produceService(startNew)))
+          succeeded <- serverRef.compareAndSet(oldServer, (newServer, port).some)
+          result    <- if (succeeded)
+                        for {
+                          _ <- shutdown(oldServer)
+                          _ <- stdout(s"Server started listening on port $port")
+                        } yield ().right
+                       else newServer.shutdown.as("Concurrent attempt to restart server. Try again later".left)
+        } yield result
       }
+      startNew(initialPort).as(serverRef.read.flatMap(shutdown))
     }
-    startNew(initialPort) >>
-    servers(configQ.dequeue, false).run.runAsyncOnNewThread("port-changing-thread", daemon = false).as(configQ.close)
-  }
-
-  /** Given a `Process` of [[ServerBlueprint]], returns a `Process` of `Server`.
-    *
-    * The returned process will emit each time a new server configuration is provided and ensures only
-    * one server is running at a time, i.e. providing a new Configuration ensures
-    * the previous server has been stopped.
-    *
-    * When the process of configurations terminates for any reason, the last server is shutdown and the
-    * process of servers will terminate.
-    * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
-    */
-  def servers(configurations: Process[Task, ServerBlueprint], flexibleOnPort: Boolean): Process[Task, (http4s.server.Server,Int)] = {
-
-    val serversAndPort = configurations.evalMap(conf =>
-      startServer(conf, flexibleOnPort).onSuccess { case (_, port) =>
-        stdout(s"Server started listening on port $port") })
-
-    serversAndPort.evalScan1 { case ((oldServer, oldPort), newServerAndPort) =>
-      oldServer.shutdown.flatMap(_ => stdout(s"Stopped server listening on port $oldPort")) *>
-        Task.now(newServerAndPort)
-    }.cleanUpWithA{ server =>
-      server.map { case (lastServer, lastPort) =>
-        lastServer.shutdown.flatMap(_ => stdout(s"Stopped last server listening on port $lastPort"))
-      }.getOrElse(Task.now(()))
-    }
-  }
 }
-
-
