@@ -36,7 +36,7 @@ class ApiSpec extends quasar.Qspec {
       val mount = Mounting.Ops[CoreEff]
       (for {
         firstMetaConf <- MetaStoreFixture.createNewTestMetaStoreConfig
-        quasarFS <- Quasar.initWithDbConfig(firstMetaConf, _ => ().point[MainTask]).run.map(a => a.leftMap(e => new scala.Exception(e.shows))).unattempt
+        quasarFS <- Quasar.initWithDbConfig(firstMetaConf, _ => ().point[MainTask]).leftMap(e => new scala.Exception(e.shows)).run.unattempt
         run0 = quasarFS.taskInter
         result <- (for {
           _             <- mount.mountOrReplace(sampleMountPath, sampleMount, false).foldMap(run0)
@@ -50,6 +50,18 @@ class ApiSpec extends quasar.Qspec {
           mountIsThere must_=== true
           noLongerThere must_=== true
           thereAgain must_=== true
+        }).onFinish(κ(quasarFS.shutdown))
+      } yield result).unsafePerformSync
+    }
+    "attempting to change the metastore to the same one succeeds without doing anything" >> {
+      (for {
+        metaConf <- MetaStoreFixture.createNewTestMetaStoreConfig
+        quasarFS <- Quasar.initWithDbConfig(metaConf, _ => ().point[MainTask]).leftMap(e => new scala.Exception(e.shows)).run.unattempt
+        run0 = quasarFS.taskInter
+        result <- (for {
+          result  <- MetaStoreLocation.Ops[CoreEff].set(metaConf, initialize = true).foldMap(run0)
+        } yield {
+          result must_=== ().right
         }).onFinish(κ(quasarFS.shutdown))
       } yield result).unsafePerformSync
     }
