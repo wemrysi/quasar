@@ -37,6 +37,7 @@ import scalaz.concurrent.Task
 
 trait BackendModule {
   import BackendDef.{DefErrT, DefinitionResult}
+  import BackendModule._
 
   type QSM[T[_[_]], A] = QS[T]#M[A]
 
@@ -119,9 +120,6 @@ trait BackendModule {
 
     qfInter :+: rfInter :+: wfInter :+: mfInter
   }
-
-  final def logPhase[M[_]: Monad: PhaseResultTell](pr: PhaseResult): M[Unit] =
-    PhaseResultTell[M].tell(Vector(pr))
 
   final def lpToQScript
     [T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
@@ -232,4 +230,9 @@ trait BackendModule {
   }
 
   def ManageFileModule: ManageFileModule
+}
+
+object BackendModule {
+  final def logPhase[M[_]: Monad: PhaseResultTell](pr: PhaseResult): M[Unit] =
+    PhaseResultTell[M].tell(Vector(pr))
 }

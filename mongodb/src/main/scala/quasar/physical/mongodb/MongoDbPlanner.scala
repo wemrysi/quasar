@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultTell, SortDir}
+import quasar.connector.BackendModule
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile, PathSegment}
 import quasar.contrib.scalaz._, eitherT._
@@ -1368,7 +1369,7 @@ object MongoDbPlanner {
   ): M[T[MongoQScript[T, ?]]] =
     for {
       mongoQs <- qs.transCataM(liftFGM(assumeReadType[M, T, MongoQScript[T, ?]](Type.AnyObject)))
-      _ <- MongoDb.logPhase[M](PhaseResult.tree("QScript (Mongo-specific)", mongoQs))
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript (Mongo-specific)", mongoQs))
     } yield mongoQs
 
   def plan0
