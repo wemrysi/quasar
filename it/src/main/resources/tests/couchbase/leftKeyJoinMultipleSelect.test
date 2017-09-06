@@ -13,7 +13,7 @@
         "mongodb_q_3_2":     "skip",
         "spark_hdfs":        "skip",
         "spark_local":       "skip",
-        "spark_cassandra":       "skip"
+        "spark_cassandra":   "skip"
     },
     "data": [],
     "query": "SELECT META(brewery).id AS brewery_meta_id,
