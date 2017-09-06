@@ -37,6 +37,16 @@ class ResolveImportSpec extends quasar.Qspec {
       }
       resolveImportsImpl[Id, Fix](scopedExpr, rootDir, retrieve).run must_=== sqlE"select * from `/foo`".right
     }
+    "relative paths in function bodies should resolve relative to the module location" >> {
+      val scopedExpr = sqlB"import `/mymodule/a/b/c/`; TRIVIAL(`/foo`)"
+      val trivial = FunctionDecl(CIName("Trivial"), List(CIName("from")), sqlE"select * FROM `./data`")
+      val mymodule = rootDir </> dir("mymodule") </> dir("a") </> dir("b") </> dir("c")
+      val retrieve: ADir => List[FunctionDecl[Fix[Sql]]] = {
+        case `mymodule` => List(trivial)
+        case _          => Nil
+      }
+      resolveImportsImpl[Id, Fix](scopedExpr, rootDir, retrieve).run must_=== sqlE"select * from `/mymodule/a/b/c/data`".right
+    }
     "multiple imports" >> {
       val scopedExpr = sqlB"import `/mymodule/`; import `/othermodule/`; FOO(1) + Bar(2)"
       val foo = FunctionDecl(CIName("foo"), List(CIName("a")), sqlE":a + 1")
