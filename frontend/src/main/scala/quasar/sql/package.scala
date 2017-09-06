@@ -81,19 +81,31 @@ package object sql {
     (implicit T: Corecursive.Aux[T, Sql])=
     JoinRelation(left, right, JoinType.Inner, boolLiteral[T](true).embed)
 
+  /** Returns the name of the expression when viewed as a projection
+    * (of the optional relation), if available.
+    */
+  def projectionName[T](
+    expr: T,
+    relationName: Option[String]
+  )(implicit
+    T: Recursive.Aux[T, Sql]
+  ): Option[String] = {
+    val loop: T => (Option[String] \/ (Option[String] \/ T)) =
+      _.project match {
+        case Ident(name) if !relationName.element(name)    => some(name).left
+        case Binop(_, Embed(StringLiteral(v)), FieldDeref) => some(v).left
+        case Unop(arg, FlattenMapValues)                   => arg.right.right
+        case Unop(arg, FlattenArrayValues)                 => arg.right.right
+        case _                                             => None.left
+      }
+
+    \/.loopRight(expr.right, ι[Option[String]], loop)
+  }
+
   def projectionNames[T]
     (projections: List[Proj[T]], relName: Option[String])
     (implicit T: Recursive.Aux[T, Sql])
       : SemanticError \/ List[(String, T)] = {
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def extractName(expr: T): Option[String] = expr.project match {
-      case Ident(name) if name.some ≠ relName            => name.some
-      case Binop(_, Embed(StringLiteral(v)), FieldDeref) => v.some
-      case Unop(expr, FlattenMapValues)                  => extractName(expr)
-      case Unop(expr, FlattenArrayValues)                => extractName(expr)
-      case _                                             => None
-    }
-
     val aliases = projections.flatMap(_.alias.toList)
 
     (aliases diff aliases.distinct).headOption.cata[SemanticError \/ List[(String, T)]](
@@ -102,7 +114,7 @@ package object sql {
         alias.cata(
           a => (used, a -> expr).right,
           {
-            val tentativeName = extractName(expr) getOrElse index.toString
+            val tentativeName = projectionName(expr, relName) getOrElse index.toString
             val alternatives = Stream.from(0).map(suffix => tentativeName + suffix.toString)
             (tentativeName #:: alternatives).dropWhile(used.contains).headOption.map { name =>
               // WartRemover seems to be confused by the `+` method on `Set`

@@ -144,8 +144,8 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
       StateT((sc: SparkContext) =>
         EitherT(CoreMap.changeFreeMap(f).map(df => (sc, src.map(df))).point[Free[S, ?]]))
     case Reduce(src, bucket, reducers, repair) =>
-      val maybePartitioner: PlannerError \/ (Data => Data) =
-        CoreMap.changeFreeMap(bucket)
+      val maybePartitioner: PlannerError \/ List[Data => Data] =
+        bucket.traverse(CoreMap.changeFreeMap[T])
 
       val extractFunc: ReduceFunc[Data => Data] => (Data => Data) = {
         case Count(a) => a >>> {
@@ -177,7 +177,7 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
       val reducersFuncs: List[(Data,Data) => Data] =
         reducers.map(reduceData)
 
-      val maybeRepair: PlannerError \/ ((Data, List[Data]) => Data) =
+      val maybeRepair: PlannerError \/ ((List[Data], List[Data]) => Data) =
         CoreMap.changeReduceFunc(repair)
 
       def merge
@@ -191,9 +191,9 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
       }
 
       StateT((sc: SparkContext) =>
-        EitherT(((maybePartitioner |@| maybeTransformers |@| maybeRepair) {
-          case (partitioner, trans, repair) =>
-            src.map(d => (partitioner(d), trans.map(_(d))))
+        EitherT(((maybePartitioner |@| maybeTransformers |@| maybeRepair)(
+          (partitioner, trans, repair) =>
+            src.map(d => (partitioner.map(_(d)), trans.map(_(d))))
               .reduceByKey(merge(_,_, reducersFuncs))
               .map {
                 case (k, vs) =>
@@ -203,7 +203,7 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
                   }
                   repair(k, v)
               }
-        }).map((sc, _)).point[Free[S, ?]])
+        )).map((sc, _)).point[Free[S, ?]])
       )
     case Sort(src, bucket, orders) =>
 
@@ -212,7 +212,7 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
           case (freemap, sdir) => CoreMap.changeFreeMap(freemap).map((_, sdir))
         }
 
-      val maybeBucket = CoreMap.changeFreeMap(bucket)
+      val maybeBucket = bucket.traverse(CoreMap.changeFreeMap[T])
 
       case class KO(keys: List[(Data, SortDir)], main: SortDir)
 
@@ -234,7 +234,7 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
       EitherT((maybeBucket |@| maybeSortBys) {
         case (bucket, sortBys) =>
           val main = sortBys.head._2
-          val keys = (bucket, main) :: sortBys.toList
+          val keys = bucket.map((_, main)) ++ sortBys.toList
           src.sortBy(d => KO(keys.map(p => p.leftMap(_(d))), main), main === SortDir.Ascending)
       }.point[Free[S, ?]]).liftM[SparkStateT]
 

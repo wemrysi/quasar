@@ -24,6 +24,7 @@ import quasar.frontend.logicalplan._
 import java.time._, ZoneOffset.UTC
 import scala.collection.Traversable
 import scala.math.abs
+import scala.util.matching.Regex
 
 import matryoshka.data.Fix
 import matryoshka.implicits._
@@ -37,6 +38,9 @@ import scalaz._, Scalaz._
   * library implementation, of which there are one or more per backend.
   */
 abstract class StdLibSpec extends Qspec {
+  def isPrintableAscii(c: Char): Boolean = c >= '\u0020' && c <= '\u007e'
+  def isPrintableAscii(s: String): Boolean = s.forall(isPrintableAscii)
+
   def beCloseTo(expected: Data): Matcher[Data] = new Matcher[Data] {
     def isClose(x: BigDecimal, y: BigDecimal, err: Double): Boolean =
       x == y || ((x - y).abs/(y.abs max err)).toDouble < err
@@ -116,6 +120,9 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "Length" >> {
+        "multibyte chars" >> {
+          unary(Length(_).embed, Data.Str("€1"), Data.Int(2))
+        }
         "any string" >> prop { (str: String) =>
           unary(Length(_).embed, Data.Str(str), Data.Int(str.length))
         }
@@ -137,6 +144,10 @@ abstract class StdLibSpec extends Qspec {
         "simple" >> {
           // NB: not consistent with PostgreSQL, which is 1-based for `start`
           ternary(Substring(_, _, _).embed, Data.Str("Thomas"), Data.Int(1), Data.Int(3), Data.Str("hom"))
+        }
+
+        "multibyte chars" >> {
+          ternary(Substring(_, _, _).embed, Data.Str("cafétéria"), Data.Int(3), Data.Int(1), Data.Str("é"))
         }
 
         "empty string and any offsets" >> prop { (start0: Int, length0: Int) =>
@@ -164,6 +175,23 @@ abstract class StdLibSpec extends Qspec {
           // NB: this is the MongoDB behavior, for lack of a better idea
           val expected = StringLib.safeSubstring(str, start, length)
           ternary(Substring(_, _, _).embed, Data.Str(str), Data.Int(start), Data.Int(length), Data.Str(expected))
+        }
+      }
+
+      "Split" >> {
+        "some string" >> {
+          binary(Split(_, _).embed, Data.Str("some string"), Data.Str(" "), Data.Arr(List("some", "string").map(Data.Str(_))))
+        }
+        "some string by itself" >> {
+          binary(Split(_, _).embed, Data.Str("some string"), Data.Str("some string"), Data.Arr(List("", "").map(Data.Str(_))))
+        }
+        "any string not containing delimiter" >> prop { (s: String, d: String) =>
+          (!d.isEmpty && !s.contains(d)) ==>
+            binary(Split(_, _).embed, Data.Str(s), Data.Str(d), Data.Arr(List(Data.Str(s))))
+        }
+        "any string with non-empty delimiter" >> prop { (s: String, d: String) =>
+          !d.isEmpty ==>
+            binary(Split(_, _).embed, Data.Str(s), Data.Str(d), Data.Arr(s.split(Regex.quote(d), -1).toList.map(Data.Str(_))))
         }
       }
 
@@ -625,6 +653,16 @@ abstract class StdLibSpec extends Qspec {
             StartOfDay(_).embed,
             Data.Date(x),
             Data.Timestamp(x.atStartOfDay(UTC).toInstant))
+        }
+      }
+
+      "Now" >> {
+        import MathLib.Subtract
+
+        "now" >> prop { (_: Int) =>
+          val now = Now[Fix[LogicalPlan]]
+
+          nullary(Subtract(now.embed, now.embed).embed, Data.Interval(Duration.ZERO))
         }
       }
 
@@ -1344,6 +1382,32 @@ abstract class StdLibSpec extends Qspec {
 
         "string || string" >> prop { (x: String, y: String) =>
           binary(ConcatOp(_, _).embed, Data._str(x), Data._str(y), Data._str(x + y))
+        }
+      }
+
+      "DeleteField" >> {
+        "{a:1, b:2} delete .a" >> {
+          binary(
+            DeleteField(_, _).embed,
+            Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2))),
+            Data.Str("a"),
+            Data.Obj(ListMap("b" -> Data.Int(2))))
+        }
+
+        "{a:1, b:2} delete .b" >> {
+          binary(
+            DeleteField(_, _).embed,
+            Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2))),
+            Data.Str("b"),
+            Data.Obj(ListMap("a" -> Data.Int(1))))
+        }
+
+        "{a:1, b:2} delete .c" >> {
+          binary(
+            DeleteField(_, _).embed,
+            Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2))),
+            Data.Str("c"),
+            Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2))))
         }
       }
 
