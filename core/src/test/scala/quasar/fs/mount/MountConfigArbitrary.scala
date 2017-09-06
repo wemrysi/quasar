@@ -30,13 +30,13 @@ trait MountConfigArbitrary {
   implicit val mountConfigArbitrary: Arbitrary[MountConfig] =
     Arbitrary(Gen.oneOf(genFileSystemConfig, genViewConfig))
 
-  private def genFileSystemConfig: Gen[MountConfig] =
+  private[mount] def genFileSystemConfig: Gen[MountConfig] =
     for {
       typ <- Arbitrary.arbitrary[FileSystemType]
       uri <- Arbitrary.arbitrary[ConnectionUri]
     } yield fileSystemConfig(typ, uri)
 
-  private def genViewConfig: Gen[MountConfig] =
+  private[mount] def genViewConfig: Gen[MountConfig] =
     for {
       scopedExpr <- Arbitrary.arbitrary[ScopedExpr[Fix[Sql]]]
       vars <- Arbitrary.arbitrary[Variables]

@@ -70,18 +70,22 @@ object SemanticAnalysis {
     * projection with Synthetic.SortKey. The compiler will generate a step to
     * remove these fields after the sort operation.
     */
-  def projectSortKeysƒ[T](implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql])
+  def projectSortKeysƒ[T: Equal](implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql])
       : Sql[T] => Option[Sql[T]] = {
     case Select(d, projections, r, f, g, Some(OrderBy(keys))) => {
-      def matches(key: T): PartialFunction[Proj[T], T] =
+      def matches(key: T): Proj[T] => Id[Option[T]] =
         key.project match {
-          case Ident(keyName) => {
-            case Proj(_, Some(alias))               if keyName == alias    => key
-            case Proj(Embed(Ident(projName)), None) if keyName == projName => key
-            case Proj(Embed(Splice(_)), _)                                 => key
+          case Ident(keyName) => prj => some(prj) collect {
+            case Proj(_, Some(alias))               if keyName === alias    => key
+            case Proj(Embed(Ident(projName)), None) if keyName === projName => key
+            case Proj(Embed(Splice(_)), _)                                  => key
           }
-          case _ => {
-            case Proj(expr2, Some(alias)) if key == expr2 => ident[T](alias).embed
+
+          case _ => prj => {
+            (prj.expr === key)
+              .option(prj.alias orElse projectionName(key, None))
+              .join
+              .map(ident[T](_).embed)
           }
         }
 
@@ -91,7 +95,7 @@ object SemanticAnalysis {
 
       val (projs2, keys2, _) = keys.foldRight[Target]((Nil, Nil, 0)) {
         case ((orderType, expr), (projs, keys, index)) =>
-          projections.collectFirst(matches(expr)).fold {
+          projections.findMapM(matches(expr)).fold {
             val name  = syntheticPrefix + index.toString()
             val proj2 = Proj(expr, Some(name))
             val key2  = (orderType, ident[T](name).embed)
@@ -372,8 +376,8 @@ object SemanticAnalysis {
   def normalizeProjections[T](expr: T)(implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql]): T =
     expr.anaM[T](normalizeProjectionsƒ[T]).run(None)._2
 
-  def projectSortKeys[T](expr: T)(implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql]): T =
-    expr.transCata[T](orOriginal(projectSortKeysƒ))
+  def projectSortKeys[T: Equal](expr: T)(implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql]): T =
+    expr.transCata[T](orOriginal(projectSortKeysƒ[T]))
 
   // NB: identifySynthetics &&& (scopeTables >>> inferProvenance)
   def annotate[T](expr: T)(implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql])

@@ -36,48 +36,53 @@ object readfile {
   type Offset = Natural
   type Limit = Option[Positive]
 
-  final case class Input[S[_]](
-    rddFrom: (AFile, Offset, Limit)  => Free[S, RDD[(Data, Long)]],
-    fileExists: AFile => Free[S, Boolean],
-    readChunkSize: () => Int
-  )
-
   import ReadFile.ReadHandle
 
-  def chrooted[S[_]](input: Input[S], prefix: ADir)(implicit
+  def chrooted[S[_]](prefix: ADir)(implicit
     s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
     s1: Read[SparkContext, ?] :<: S,
     s2: MonotonicSeq :<: S,
-    s3: Task :<: S
+    s3: Task :<: S,
+    s4: SparkConnectorDetails :<: S
   ): ReadFile ~> Free[S, ?] =
-    flatMapSNT(interpret(input)) compose chroot.readFile[ReadFile](prefix)
+    flatMapSNT(interpret) compose chroot.readFile[ReadFile](prefix)
 
-  def interpret[S[_]](input: Input[S])(implicit
+  def interpret[S[_]](implicit
     s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
     s1: Read[SparkContext, ?] :<: S,
     s2: MonotonicSeq :<: S,
-    s3: Task :<: S
+    s3: Task :<: S,
+    details: SparkConnectorDetails.Ops[S]
   ): ReadFile ~> Free[S, ?] =
     new (ReadFile ~> Free[S, ?]) {
       def apply[A](rf: ReadFile[A]) = rf match {
-        case ReadFile.Open(f, offset, limit) => open[S](f, offset, limit, input)
-        case ReadFile.Read(h) => read[S](h, input.readChunkSize())
+        case ReadFile.Open(f, offset, limit) => open[S](f, offset, limit)
+        case ReadFile.Read(h) => details.readChunkSize >>= (step => read[S](h, step))
         case ReadFile.Close(h) => close[S](h)
       }
   }
 
-  private def open[S[_]](f: AFile, offset: Offset, limit: Limit, input: Input[S])(implicit
+  private def open[S[_]](f: AFile, offset: Offset, limit: Limit)(implicit
     kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
     s1: Read[SparkContext, ?] :<: S,
-    gen: MonotonicSeq.Ops[S]
+    gen: MonotonicSeq.Ops[S],
+    details: SparkConnectorDetails.Ops[S]
   ): Free[S, FileSystemError \/ ReadHandle] = {
 
     def freshHandle: Free[S, ReadHandle] =
       gen.next map (ReadHandle(f, _))
 
     def _open: Free[S, ReadHandle] = for {
-      rdd <- input.rddFrom(f, offset, limit)
-      cur = SparkCursor(rdd.some, 0)
+      rdd <- details.rddFrom(f)
+      limitedRdd = rdd.zipWithIndex().filter {
+        case (value, index) =>
+          limit.fold(
+            index >= offset.value
+          ) (
+            limit => index >= offset.value && index < limit.value + offset.value
+          )
+      }
+      cur = SparkCursor(limitedRdd.some, 0)
       h <- freshHandle
       _ <- kvs.put(h, cur)
     } yield h
@@ -88,7 +93,7 @@ object readfile {
       _ <- kvs.put(h, cur)
     } yield h
 
-    input.fileExists(f).ifM(
+    details.fileExists(f).ifM(
       _open map (_.right[FileSystemError]),
      _empty map (_.right[FileSystemError])
     )

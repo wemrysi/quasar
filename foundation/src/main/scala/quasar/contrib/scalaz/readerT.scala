@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil
+package quasar.contrib.scalaz
 
-case class EnormousCartesianException(left: TableSize, right: TableSize) extends RuntimeException {
-  override def getMessage =
-    "cannot evaluate cartesian of sets with size %s and %s".format(left, right)
+import scalaz._
+
+object readerT {
+  def runReaderNT[F[_], S](s: S): ReaderT[F, S, ?] ~> F =
+    λ[ReaderT[F, S, ?] ~> F](_.run(s))
 }

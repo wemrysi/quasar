@@ -29,7 +29,7 @@ import quasar.ejson.implicits._
 import quasar.fp.free._
 import quasar.fp.ignore
 import quasar.frontend.logicalplan.LogicalPlan
-import quasar.fs._, FileSystemError._, QueryFile._
+import quasar.fs._, FileSystemError._
 import quasar.qscript._
 
 import matryoshka._
@@ -42,51 +42,45 @@ import scalaz.concurrent.Task
 
 object queryfile {
 
-  final case class Input[S[_]](
-    fromFile: (SparkContext, AFile) => Task[RDD[Data]],
-    store: (RDD[Data], AFile) => Free[S, Unit],
-    fileExists: AFile => Free[S, Boolean],
-    listContents: ADir => EitherT[Free[S, ?], FileSystemError, Set[PathSegment]],
-    readChunkSize: () => Int
-  )
-
   type SparkContextRead[A] = effect.Read[SparkContext, A]
 
-  def chrooted[S[_]](input: Input[S], fsType: FileSystemType, prefix: ADir)(implicit
+  def chrooted[S[_]](fsType: FileSystemType, prefix: ADir)(implicit
     s0: Task :<: S,
     s1: SparkContextRead :<: S,
     s2: MonotonicSeq :<: S,
-    s3: KeyValueStore[ResultHandle, RddState, ?] :<: S
+    s3: KeyValueStore[QueryFile.ResultHandle, RddState, ?] :<: S,
+    s4: SparkConnectorDetails :<: S
   ): QueryFile ~> Free[S, ?] =
-    flatMapSNT(interpreter(input, fsType)) compose chroot.queryFile[QueryFile](prefix)
+    flatMapSNT(interpreter(fsType)) compose chroot.queryFile[QueryFile](prefix)
 
-  def interpreter[S[_]](input: Input[S], fsType: FileSystemType)(implicit
+  def interpreter[S[_]](fsType: FileSystemType)(implicit
     s0: Task :<: S,
     s1: SparkContextRead :<: S,
     s2: MonotonicSeq :<: S,
-    s3: KeyValueStore[ResultHandle, RddState, ?] :<: S
+    s3: KeyValueStore[QueryFile.ResultHandle, RddState, ?] :<: S,
+    details: SparkConnectorDetails.Ops[S]
   ): QueryFile ~> Free[S, ?] = {
 
     def qsToProgram[T](
       exec: (Fix[SparkQScript]) => Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, T]],
       lp: Fix[LogicalPlan]
     ): Free[S, (PhaseResults, FileSystemError \/ T)] = {
-          val qs = toQScript[Free[S, ?]](listContents(input, _))(lp) >>= (qs => EitherT(WriterT(exec(qs).map(_.run.run))))
+          val qs = toQScript[Free[S, ?]](details.listContents(_).run)(lp) >>= (qs => EitherT(WriterT(exec(qs).map(_.run.run))))
           qs.run.run
         }
 
     new (QueryFile ~> Free[S, ?]) {
       def apply[A](qf: QueryFile[A]) = qf match {
-        case FileExists(f) => fileExists(input, f)
-        case ListContents(dir) => listContents(input, dir)
+        case QueryFile.FileExists(f) => details.fileExists(f)
+        case QueryFile.ListContents(dir) => details.listContents(dir).run
         case QueryFile.ExecutePlan(lp: Fix[LogicalPlan], out: AFile) =>
-          qsToProgram(qs => executePlan(input, qs, out, lp), lp)
+          qsToProgram(qs => executePlan(qs, out, lp), lp)
         case QueryFile.EvaluatePlan(lp: Fix[LogicalPlan]) =>
-          qsToProgram(qs => evaluatePlan(input, qs, lp), lp)
-        case QueryFile.More(h) => more(h, input.readChunkSize())
+          qsToProgram(qs => evaluatePlan(qs, lp), lp)
+        case QueryFile.More(h) => more(h)
         case QueryFile.Close(h) => close(h)
         case QueryFile.Explain(lp: Fix[LogicalPlan]) =>
-          qsToProgram(qs => explainPlan(input, fsType, qs, lp), lp)
+          qsToProgram(qs => explainPlan(fsType, qs, lp), lp)
       }
     }}
 
@@ -96,47 +90,57 @@ object queryfile {
       def map[A, B](fa: F[G[A]])(f: A => B) = fa ∘ (_ ∘ f)
     }
 
+  def rddFrom[S[_]](implicit
+    details: SparkConnectorDetails.Ops[S]
+  ) = (afile: AFile) => details.rddFrom(afile)
+
+  def first[S[_]](implicit
+    S: Task :<: S
+  ) = (rdd: RDD[Data]) => lift(Task.delay {
+    rdd.first
+  }).into[S]
+
   // TODO unify explainPlan, executePlan & evaluatePlan
   // This might be more complicated then it looks at first glance
-  private def explainPlan[S[_]](input: Input[S], fsType: FileSystemType, qs: Fix[SparkQScript], lp: Fix[LogicalPlan]) (implicit
+  private def explainPlan[S[_]](fsType: FileSystemType, qs: Fix[SparkQScript], lp: Fix[LogicalPlan]) (implicit
     s0: Task :<: S,
-    read: Read.Ops[SparkContext, S]
+    read: Read.Ops[SparkContext, S],
+    details: SparkConnectorDetails.Ops[S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, ExecutionPlan]] = {
 
-    val total = scala.Predef.implicitly[Planner[SparkQScript]]
-
-    read.asks { sc =>
-      val sparkStuff: Task[PlannerError \/ RDD[Data]] =
-        qs.cataM(total.plan(input.fromFile)).eval(sc).run
-
-      injectFT.apply {
-        sparkStuff.flatMap(mrdd => mrdd.bitraverse[(Task ∘ Writer[PhaseResults, ?])#λ, FileSystemError, ExecutionPlan](
-          planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Task],
-          rdd => {
-            val rddDebug = rdd.toDebugString
-            val inputs   = qs.cata(ExtractPath[SparkQScript, APath].extractPath[DList])
-            Task.delay(Writer(
-              Vector(PhaseResult.detail("RDD", rddDebug)),
-              ExecutionPlan(fsType, rddDebug, ISet fromFoldable inputs)))
-          })).map(EitherT(_))
-      }
-    }.join
-  }
-
-  private def executePlan[S[_]](input: Input[S], qs: Fix[SparkQScript], out: AFile, lp: Fix[LogicalPlan]) (implicit
-    s0: Task :<: S,
-    read: effect.Read.Ops[SparkContext, S]
-  ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, AFile]] = {
-
-    val total = scala.Predef.implicitly[Planner[SparkQScript]]
+    val total = scala.Predef.implicitly[Planner[SparkQScript, S]]
 
     read.asks { sc =>
       val sparkStuff: Free[S, PlannerError \/ RDD[Data]] =
-        lift(qs.cataM(total.plan(input.fromFile)).eval(sc).run).into[S]
+        qs.cataM(total.plan(rddFrom, first)).eval(sc).run
+
+        sparkStuff.flatMap(mrdd => mrdd.bitraverse[(Free[S, ?] ∘ Writer[PhaseResults, ?])#λ, FileSystemError, ExecutionPlan](
+          planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Free[S, ?]],
+          rdd => {
+            val rddDebug = rdd.toDebugString
+            val inputs   = qs.cata(ExtractPath[SparkQScript, APath].extractPath[DList])
+            lift(Task.delay(Writer(
+              Vector(PhaseResult.detail("RDD", rddDebug)),
+              ExecutionPlan(fsType, rddDebug, ISet fromFoldable inputs)))).into[S]
+          })).map(EitherT(_))
+    }.join
+  }
+
+  private def executePlan[S[_]](qs: Fix[SparkQScript], out: AFile, lp: Fix[LogicalPlan]) (implicit
+    s0: Task :<: S,
+    read: effect.Read.Ops[SparkContext, S],
+    details: SparkConnectorDetails.Ops[S]
+  ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, AFile]] = {
+
+    val total = scala.Predef.implicitly[Planner[SparkQScript, S]]
+
+    read.asks { sc =>
+      val sparkStuff: Free[S, PlannerError \/ RDD[Data]] =
+        qs.cataM(total.plan(rddFrom, first)).eval(sc).run
 
       sparkStuff >>= (mrdd => mrdd.bitraverse[(Free[S, ?] ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](
         planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Free[S, ?]],
-        rdd => input.store(rdd, out).as (Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), out))).map(EitherT(_)))
+        rdd => details.storeData(rdd, out).as (Writer(Vector(PhaseResult.detail("RDD", rdd.toDebugString)), out))).map(EitherT(_)))
 
     }.join
   }
@@ -144,19 +148,20 @@ object queryfile {
   // TODO for Q4.2016  - unify it with ReadFile
   final case class RddState(maybeRDD: Option[RDD[(Data, Long)]], pointer: Int)
 
-  private def evaluatePlan[S[_]](input: Input[S], qs: Fix[SparkQScript], lp: Fix[LogicalPlan])(implicit
-      s0: Task :<: S,
-      kvs: KeyValueStore.Ops[ResultHandle, RddState, S],
-      read: Read.Ops[SparkContext, S],
-      ms: MonotonicSeq.Ops[S]
-  ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, ResultHandle]] = {
+  private def evaluatePlan[S[_]](qs: Fix[SparkQScript], lp: Fix[LogicalPlan])(implicit
+    s0: Task :<: S,
+    kvs: KeyValueStore.Ops[QueryFile.ResultHandle, RddState, S],
+    read: Read.Ops[SparkContext, S],
+    ms: MonotonicSeq.Ops[S],
+    details: SparkConnectorDetails.Ops[S]
+  ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, QueryFile.ResultHandle]] = {
 
-    val total = scala.Predef.implicitly[Planner[SparkQScript]]
+    val total = scala.Predef.implicitly[Planner[SparkQScript, S]]
 
-    val open: Free[S, PlannerError \/ (ResultHandle, RDD[Data])] = (for {
-      h <- EitherT(ms.next map (ResultHandle(_).right[PlannerError]))
+    val open: Free[S, PlannerError \/ (QueryFile.ResultHandle, RDD[Data])] = (for {
+      h <- EitherT(ms.next map (QueryFile.ResultHandle(_).right[PlannerError]))
       rdd <- EitherT(read.asks { sc =>
-        lift(qs.cataM(total.plan(input.fromFile)).eval(sc).run).into[S]
+        qs.cataM(total.plan(rddFrom, first)).eval(sc).run
       }.join)
       _ <- kvs.put(h, RddState(rdd.zipWithIndex.persist.some, 0)).liftM[PlannerErrT]
     } yield (h, rdd)).run
@@ -170,12 +175,13 @@ object queryfile {
     }
   }
 
-  private def more[S[_]](h: ResultHandle, step: Int)(implicit
-      s0: Task :<: S,
-      kvs: KeyValueStore.Ops[ResultHandle, RddState, S]
-  ): Free[S, FileSystemError \/ Vector[Data]] = {
-
-    kvs.get(h).toRight(unknownResultHandle(h)).flatMap {
+  private def more[S[_]](h: QueryFile.ResultHandle)(implicit
+    s0: Task :<: S,
+    kvs: KeyValueStore.Ops[QueryFile.ResultHandle, RddState, S],
+    details: SparkConnectorDetails.Ops[S]
+  ): Free[S, FileSystemError \/ Vector[Data]] = for {
+    step <- details.readChunkSize
+    res  <- (kvs.get(h).toRight(unknownResultHandle(h)).flatMap {
       case RddState(None, _) =>
         Vector.empty[Data].pure[EitherT[Free[S, ?], FileSystemError, ?]]
       case RddState(Some(rdd), p) =>
@@ -193,17 +199,10 @@ object queryfile {
           }).into[S].liftM[FileSystemErrT]
           _ <- kvs.put(h, rddState).liftM[FileSystemErrT]
         } yield collected
-    }.run
-  }
+    }).run
+  } yield res
 
-  private def close[S[_]](h: ResultHandle)(implicit
-      kvs: KeyValueStore.Ops[ResultHandle, RddState, S]
+  private def close[S[_]](h: QueryFile.ResultHandle)(implicit
+      kvs: KeyValueStore.Ops[QueryFile.ResultHandle, RddState, S]
   ): Free[S, Unit] = kvs.delete(h)
-
-  private def fileExists[S[_]](input: Input[S], f: AFile)(implicit
-    s0: Task :<: S): Free[S, Boolean] = input.fileExists(f)
-
-  private def listContents[S[_]](input: Input[S], d: ADir)(implicit
-    s0: Task :<: S): Free[S, FileSystemError \/ Set[PathSegment]] =
-    input.listContents(d).run
 }

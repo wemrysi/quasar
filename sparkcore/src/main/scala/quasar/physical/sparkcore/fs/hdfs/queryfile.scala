@@ -18,14 +18,16 @@ package quasar.physical.sparkcore.fs.hdfs
 
 import slamdata.Predef._
 import quasar.{Data, DataCodec}
-import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.contrib.pathy._
+import quasar.contrib.pathy._
+import quasar.effect.Capture
+import quasar.fp.ski._
 import quasar.fs.FileSystemError
-import quasar.fs.FileSystemErrT
 import quasar.fs.FileSystemError._
+import quasar.fs.FileSystemErrT
 import quasar.fs.PathError._
-import quasar.fp.free._
-import quasar.contrib.pathy._
+import quasar.physical.sparkcore.fs.SparkConnectorDetails, SparkConnectorDetails._
+import quasar.physical.sparkcore.fs.hdfs.parquet.ParquetRDD
 
 import java.io.BufferedWriter
 import java.io.OutputStreamWriter
@@ -36,30 +38,34 @@ import org.apache.hadoop.fs.FileSystem
 import org.apache.hadoop.util.Progressable
 import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 import org.apache.spark._
 import org.apache.spark.rdd._
 
-class queryfile(fileSystem: Task[FileSystem]) {
+class queryfile[F[_]:Capture:Bind](fileSystem: F[FileSystem]) {
 
-  private def toPath(apath: APath): Task[Path] = Task.delay {
+  private def toPath(apath: APath): F[Path] = Capture[F].capture {
     new Path(posixCodec.unsafePrintPath(apath))
   }
 
-  def fromFile(sc: SparkContext, file: AFile): Task[RDD[Data]] = for {
-    hdfs <- fileSystem
-    pathStr <- Task.delay {
-      val pathStr = posixCodec.unsafePrintPath(file)
-      val host = hdfs.getUri().getHost()
-      val port = hdfs.getUri().getPort()
-      s"hdfs://$host:$port$pathStr"
-    }
-    rdd <- readfile.fetchRdd(sc, pathStr)
+  private def fetchRdd[F[_]:Capture](sc: SparkContext, pathStr: String): F[RDD[Data]] = Capture[F].capture {
+    import ParquetRDD._
+    // TODO add magic number support to distinguish
+    if(pathStr.endsWith(".parquet"))
+      sc.parquet(pathStr)
+    else
+      sc.textFile(pathStr)
+        .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
+  }
+
+  def rddFrom[F[_]:Capture](f: AFile)(hdfsPathStr: AFile => F[String])(implicit
+    reader: MonadReader[F, SparkContext]
+  ): F[RDD[Data]] = for {
+    pathStr <- hdfsPathStr(f)
+    sc <- reader.asks(ι)
+    rdd <- fetchRdd[F](sc, pathStr)
   } yield rdd
 
-  def store[S[_]](rdd: RDD[Data], out: AFile)(implicit
-    S: Task :<: S
-  ): Free[S, Unit] = lift(for {
+  def store(rdd: RDD[Data], out: AFile): F[Unit] = for {
     path <- toPath(out)
     hdfs <- fileSystem
   } yield {
@@ -74,22 +80,18 @@ class queryfile(fileSystem: Task[FileSystem]) {
     })
     bw.close()
     hdfs.close()
-  }).into[S]
+  }
 
-  def fileExists[S[_]](f: AFile)(implicit
-    S: Task :<: S
-  ): Free[S, Boolean] = lift(for {
+  def fileExists(f: AFile): F[Boolean] = for {
     path <- toPath(f)
     hdfs <- fileSystem
   } yield {
     val exists = hdfs.exists(path)
     hdfs.close()
     exists
-  }).into[S]
+  }
 
-  def listContents[S[_]](d: ADir)(implicit
-    S: Task :<: S
-  ): FileSystemErrT[Free[S, ?], Set[PathSegment]] = EitherT(lift(for {
+  def listContents(d: ADir): FileSystemErrT[F, Set[PathSegment]] = EitherT(for {
     path <- toPath(d)
     hdfs <- fileSystem
   } yield {
@@ -101,14 +103,26 @@ class queryfile(fileSystem: Task[FileSystem]) {
     } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
     hdfs.close
     result
-  }).into[S])
-
-  def readChunkSize: Int = 5000
-
-  def input[S[_]](implicit s0: Task :<: S): Input[S] =
-    Input[S](fromFile _, store[S] _, fileExists[S] _, listContents[S] _, readChunkSize _)
+  })
 }
 
 object queryfile {
-  def input[S[_]](fileSystem: Task[FileSystem])(implicit s0: Task :<: S): Input[S] = new queryfile(fileSystem).input
+
+  def detailsInterpreter[F[_]:Capture](
+    fileSystem: F[FileSystem],
+    hdfsPathStr: AFile => F[String]
+  )(implicit
+    reader: MonadReader[F, SparkContext]
+  ): SparkConnectorDetails ~> F =
+    new (SparkConnectorDetails ~> F) {
+      val qf = new queryfile[F](fileSystem)
+
+      def apply[A](from: SparkConnectorDetails[A]) = from match {
+        case FileExists(f)       => qf.fileExists(f)
+        case ReadChunkSize       => 5000.point[F]
+        case StoreData(rdd, out) => qf.store(rdd, out)
+        case ListContents(d)     => qf.listContents(d).run
+        case RDDFrom(f)          => qf.rddFrom(f)(hdfsPathStr)
+      }
+    }
 }

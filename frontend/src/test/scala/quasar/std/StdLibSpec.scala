@@ -24,6 +24,7 @@ import quasar.frontend.logicalplan._
 import java.time._, ZoneOffset.UTC
 import scala.collection.Traversable
 import scala.math.abs
+import scala.util.matching.Regex
 
 import matryoshka.data.Fix
 import matryoshka.implicits._
@@ -174,6 +175,23 @@ abstract class StdLibSpec extends Qspec {
           // NB: this is the MongoDB behavior, for lack of a better idea
           val expected = StringLib.safeSubstring(str, start, length)
           ternary(Substring(_, _, _).embed, Data.Str(str), Data.Int(start), Data.Int(length), Data.Str(expected))
+        }
+      }
+
+      "Split" >> {
+        "some string" >> {
+          binary(Split(_, _).embed, Data.Str("some string"), Data.Str(" "), Data.Arr(List("some", "string").map(Data.Str(_))))
+        }
+        "some string by itself" >> {
+          binary(Split(_, _).embed, Data.Str("some string"), Data.Str("some string"), Data.Arr(List("", "").map(Data.Str(_))))
+        }
+        "any string not containing delimiter" >> prop { (s: String, d: String) =>
+          (!d.isEmpty && !s.contains(d)) ==>
+            binary(Split(_, _).embed, Data.Str(s), Data.Str(d), Data.Arr(List(Data.Str(s))))
+        }
+        "any string with non-empty delimiter" >> prop { (s: String, d: String) =>
+          !d.isEmpty ==>
+            binary(Split(_, _).embed, Data.Str(s), Data.Str(d), Data.Arr(s.split(Regex.quote(d), -1).toList.map(Data.Str(_))))
         }
       }
 
@@ -635,6 +653,16 @@ abstract class StdLibSpec extends Qspec {
             StartOfDay(_).embed,
             Data.Date(x),
             Data.Timestamp(x.atStartOfDay(UTC).toInstant))
+        }
+      }
+
+      "Now" >> {
+        import MathLib.Subtract
+
+        "now" >> prop { (_: Int) =>
+          val now = Now[Fix[LogicalPlan]]
+
+          nullary(Subtract(now.embed, now.embed).embed, Data.Interval(Duration.ZERO))
         }
       }
 
@@ -1357,9 +1385,79 @@ abstract class StdLibSpec extends Qspec {
         }
       }
 
+      "DeleteField" >> {
+        "{a:1, b:2} delete .a" >> {
+          binary(
+            DeleteField(_, _).embed,
+            Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2))),
+            Data.Str("a"),
+            Data.Obj(ListMap("b" -> Data.Int(2))))
+        }
+
+        "{a:1, b:2} delete .b" >> {
+          binary(
+            DeleteField(_, _).embed,
+            Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2))),
+            Data.Str("b"),
+            Data.Obj(ListMap("a" -> Data.Int(1))))
+        }
+
+        "{a:1, b:2} delete .c" >> {
+          binary(
+            DeleteField(_, _).embed,
+            Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2))),
+            Data.Str("c"),
+            Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2))))
+        }
+      }
+
       "Meta" >> {
         // FIXME: Implement once we've switched to EJson in LogicalPlan.
         "returns metadata associated with a value" >> pending("Requires EJson.")
+      }
+    }
+
+    "SetLib" >> {
+      import SetLib._
+
+      "Within" >> {
+        "0 in [1, 2, 3]" >> {
+          binary(Within(_, _).embed, Data.Int(0), Data.Arr(List(Data.Int(1), Data.Int(2), Data.Int(3))), Data.False)
+        }
+
+        "1 in [1, 2, 3]" >> {
+          binary(Within(_, _).embed, Data.Int(1), Data.Arr(List(Data.Int(1), Data.Int(2), Data.Int(3))), Data.True)
+        }
+
+        "0 in []" >> {
+          binary(Within(_, _).embed, Data.Int(0), Data.Arr(Nil), Data.False)
+        }
+
+        "[0] in [[1], 2, {a:3}, [0]]" >> {
+          binary(
+            Within(_, _).embed,
+            Data.Arr(List(Data.Int(0))),
+            Data.Arr(
+              List(
+                Data.Arr(List(Data.Int(1))),
+                Data.Int(2),
+                Data.Obj(ListMap("a" -> Data.Int(3))),
+                Data.Arr(List(Data.Int(0))))),
+            Data.True)
+        }
+
+        "[0, 1] in [[1], 2, {a:3}, [0, 1]]" >> {
+          binary(
+            Within(_, _).embed,
+            Data.Arr(List(Data.Int(0), Data.Int(1))),
+            Data.Arr(
+              List(
+                Data.Arr(List(Data.Int(1))),
+                Data.Int(2),
+                Data.Obj(ListMap("a" -> Data.Int(3))),
+                Data.Arr(List(Data.Int(0), Data.Int(1))))),
+            Data.True)
+        }
       }
     }
   }

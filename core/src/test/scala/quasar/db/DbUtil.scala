@@ -18,8 +18,9 @@ package quasar.db
 
 import slamdata.Predef._
 
-import doobie.imports._
-import scalaz.{:+: => _, _}, Scalaz._
+import doobie.free.connection.ConnectionIO
+import doobie.imports.DriverManagerTransactor
+import scalaz.~>
 import scalaz.concurrent.Task
 
 object DbUtil {
@@ -35,26 +36,16 @@ object DbUtil {
     //               ephemeral production database.
     DbConnectionConfig.H2(s"mem:$name;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000")
 
-  /** Transactor that does not use a connection pool, so doesn't require any cleanup. */
-  def simpleTransactor(cxn: ConnectionInfo): Transactor[Task] =
-    DriverManagerTransactor[Task](
-      cxn.driverClassName,
-      cxn.url,
-      cxn.userName,
-      cxn.password)
-
   /** Interpreter that runs a doobie program outside of any transaction. */
   def noTxInterp(info: ConnectionInfo): ConnectionIO ~> Task = {
-    // NB: When not using one of the provided Transactors, we have to make sure
-    // the JDBC driver is loaded. Believe it or not, this is the standard way
-    // to load a driver for JDBC.
-    val loadDriver = HDM.delay(java.lang.Class.forName(info.driverClassName))
+    val xa = DriverManagerTransactor[Task](
+      info.driverClassName,
+      info.url,
+      info.userName,
+      info.password
+    )
 
-    def interp[A](fa: ConnectionIO[A]) =
-      HDM.getConnection(info.url, info.userName, info.password)(fa)
-
-    λ[ConnectionIO ~> Task] { fa =>
-      (loadDriver *> interp(fa)).trans[Task]
-    }
+    xa.rawTrans
   }
+
 }
