@@ -19,6 +19,7 @@ package quasar.physical.sparkcore.fs
 import slamdata.Predef._
 import quasar._
 import quasar.connector.BackendModule
+import quasar.contrib.scalaz._
 import quasar.contrib.pathy._
 import quasar.common._
 import quasar.fp._, free._
@@ -38,6 +39,9 @@ import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 trait SparkCoreBackendModule extends BackendModule {
+
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import EitherT.eitherTMonad
 
   // conntector specific
   type Eff[A]
@@ -106,10 +110,10 @@ trait SparkCoreBackendModule extends BackendModule {
 
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](cp: T[QSM[T, ?]]): Backend[Repr] = for {
     config <- Kleisli.ask[M, Config].liftB
-    repr   <- includeError((readScOps.ask >>= { sc =>
+    repr   <- (readScOps.ask >>= { sc =>
       val total = implicitly[Planner[QSM[T, ?], Eff]]
       cp.cataM(total.plan(f => rddFrom(f).run.apply(config), first)).eval(sc).run.map(_.leftMap(pe => qscriptPlanningFailed(pe)))
-    }).liftB)
+    }).liftB.unattempt
   } yield repr
 
   object SparkReadFileModule extends ReadFileModule {
@@ -117,11 +121,11 @@ trait SparkCoreBackendModule extends BackendModule {
     import quasar.fp.numeric.{Natural, Positive}
 
     def open(f: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = for {
-      h <- includeError(readfile.open[Eff](f, offset, limit).liftB)
+      h <- readfile.open[Eff](f, offset, limit).liftB.unattempt
     } yield ReadHandle(f, h.id)
     
     def read(h: ReadHandle): Backend[Vector[Data]] =
-      includeError(readfile.read[Eff](h).liftB)
+      readfile.read[Eff](h).liftB.unattempt
 
     def close(h: ReadHandle): Configured[Unit] =
       readfile.close[Eff](h).liftM[ConfiguredT]
@@ -143,7 +147,7 @@ trait SparkCoreBackendModule extends BackendModule {
       _ <- qfKvsOps.put(h, RddState(rdd.zipWithIndex.persist.some, 0))
     } yield h).withLog(PhaseResult.detail("RDD", rdd.toDebugString))
 
-    def more(h: ResultHandle): Backend[Vector[Data]] = includeError(queryfile.more[Eff](h).liftB)
+    def more(h: ResultHandle): Backend[Vector[Data]] = queryfile.more[Eff](h).liftB.unattempt
 
     def close(h: ResultHandle): Configured[Unit] = queryfile.close[Eff](h).liftM[ConfiguredT]
 
@@ -151,7 +155,7 @@ trait SparkCoreBackendModule extends BackendModule {
       rdd.toDebugString.point[Backend]
 
     def listContents(dir: ADir): Backend[Set[PathSegment]] =
-      includeError(detailsOps.listContents(dir).run.liftB)
+      detailsOps.listContents(dir).run.liftB.unattempt
 
     def fileExists(file: AFile): Configured[Boolean] =
       detailsOps.fileExists(file).liftM[ConfiguredT]
@@ -169,21 +173,21 @@ trait SparkCoreBackendModule extends BackendModule {
 
     def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = ((scenario, semantics) match {
       case (FileToFile(sf, df), semantics) => for {
-        _  <- includeError(((ensureMoveSemantics(sf, df, doesPathExist, semantics).toLeft(()) *>
-          moveFile(sf, df).liftM[FileSystemErrT]).run).liftB)
+        _  <- (((ensureMoveSemantics(sf, df, doesPathExist, semantics).toLeft(()) *>
+          moveFile(sf, df).liftM[FileSystemErrT]).run).liftB).unattempt
       } yield ()
 
       case (DirToDir(sd, dd), semantics) => for {
-        _  <- includeError(((ensureMoveSemantics(sd, dd, doesPathExist, semantics).toLeft(()) *>
-          moveDir(sd, dd).liftM[FileSystemErrT]).run).liftB)
+        _  <- (((ensureMoveSemantics(sd, dd, doesPathExist, semantics).toLeft(()) *>
+          moveDir(sd, dd).liftM[FileSystemErrT]).run).liftB).unattempt
       } yield ()
     })
 
-    def tempFile(near: APath): Backend[AFile] = includeError(lift(Task.delay {
+    def tempFile(near: APath): Backend[AFile] = lift(Task.delay {
       val parent: ADir = refineType(near).fold(d => d, fileParent(_))
       val random = scala.util.Random.nextInt().toString
         (parent </> file(s"quasar-$random.tmp")).right[FileSystemError]
     }
-    ).into[Eff].liftB)
+    ).into[Eff].liftB.unattempt
   }
 }

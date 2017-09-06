@@ -63,8 +63,6 @@ trait BackendModule {
     val liftB: Backend[A] = c.liftM[PhaseResultT].liftM[FileSystemErrT]
   }
 
-  def includeError[A](b: Backend[FileSystemError \/ A]): Backend[A] = EitherT(b.run.map(_.join))
-
   final val definition: BackendDef[Task] =
     BackendDef fromPF {
       case (Type, uri) =>

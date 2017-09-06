@@ -19,7 +19,7 @@ package quasar.physical.sparkcore.fs.hdfs
 import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.readerT._
+import quasar.contrib.scalaz._, readerT._
 import quasar.connector.{ChrootedInterpreter, EnvironmentError}
 import quasar.effect._
 import quasar.fp, fp.ski.κ, fp.TaskRef,  fp.free._
@@ -49,6 +49,9 @@ final case class HdfsWriteCursor(hdfs: HdfsFileSystem, bw: BufferedWriter)
 final case class HdfsConfig(sparkConf: SparkConf, hdfsUriStr: String, prefix: ADir)
 
 object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterpreter {
+
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import EitherT.eitherTMonad
 
   def rootPrefix(cfg: HdfsConfig): ADir = cfg.prefix
 
@@ -326,14 +329,9 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
         pathErr(pathNotFound(p)).left[Unit]
       }).as(())
 
-      val deleteHandled: Free[Eff, PhysicalError \/ (FileSystemError \/ Unit)] =
-        delete.map(_.right[PhysicalError])
-
-      includeError(Failure.Ops[PhysicalError, Eff].unattempt(deleteHandled).liftB)
+      delete.liftB.unattempt
     }
   }
 
   def ManageFileModule: ManageFileModule = HdfsManageFileModule
-
-
 }

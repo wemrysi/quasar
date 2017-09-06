@@ -19,7 +19,7 @@ package quasar.physical.sparkcore.fs.local
 import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.readerT._
+import quasar.contrib.scalaz._, readerT._
 import quasar.connector.{ChrootedInterpreter, EnvironmentError}
 import quasar.effect._
 import quasar.fp, fp.TaskRef,  fp.free._
@@ -44,6 +44,9 @@ import scalaz.concurrent.Task
 final case class LocalConfig(sparkConf: SparkConf, prefix: ADir)
 
 object SparkLocalBackendModule extends SparkCoreBackendModule with ChrootedInterpreter {
+
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import EitherT.eitherTMonad
 
   def rootPrefix(cfg: LocalConfig): ADir = cfg.prefix
 
@@ -179,7 +182,7 @@ object SparkLocalBackendModule extends SparkCoreBackendModule with ChrootedInter
   object LocalWriteFileModule extends WriteFileModule {
     import WriteFile._
 
-    private def mkParents(f: AFile): Backend[Unit] = includeError(lift(Task.delay {
+    private def mkParents(f: AFile): Backend[Unit] = lift(Task.delay {
       val parent = fileParent(f)
         val dir = new File(posixCodec.unsafePrintPath(parent))
         if(!dir.exists()) {
@@ -189,13 +192,13 @@ object SparkLocalBackendModule extends SparkCoreBackendModule with ChrootedInter
           }.void
         }
         else ().right[FileSystemError]
-    }).into[Eff].liftB)
+    }).into[Eff].liftB.unattempt
 
-    private def printWriter(f: AFile): Backend[PrintWriter] = includeError(lift(Task.delay {
+    private def printWriter(f: AFile): Backend[PrintWriter] = lift(Task.delay {
         val file = new File(posixCodec.unsafePrintPath(f))
           \/.fromTryCatchNonFatal(new PrintWriter(new FileOutputStream(file, true)))
             .leftMap(e => pathErr(pathNotFound(f)))
-      }).into[Eff].liftB)
+      }).into[Eff].liftB.unattempt
 
     private def openPrintWriter(f: AFile): Backend[PrintWriter] = mkParents(f) *> printWriter(f)
 
@@ -274,7 +277,7 @@ object SparkLocalBackendModule extends SparkCoreBackendModule with ChrootedInter
         case e: FileNotFoundException => pathErr(pathNotFound(path)).left[Unit].right[PhysicalError]
         case NonFatal(e : Exception) => UnhandledFSError(e).left[FileSystemError \/ Unit]
       }
-      includeError(Failure.Ops[PhysicalError, Eff].unattempt(lift(del).into[Eff]).liftB)
+      Failure.Ops[PhysicalError, Eff].unattempt(lift(del).into[Eff]).liftB.unattempt
     }
   }
 
