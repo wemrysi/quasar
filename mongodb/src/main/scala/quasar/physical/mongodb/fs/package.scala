@@ -26,7 +26,7 @@ import quasar.contrib.pathy._
 import quasar.fp._, free._
 import quasar.fs._, mount._
 import quasar.physical.mongodb.fs.fsops._
-import quasar.physical.mongodb.MongoDb._
+import quasar.{qscript => qs}
 
 import com.mongodb.async.client.MongoClient
 import java.time.Instant
@@ -38,6 +38,17 @@ import scalaz.stream.{Writer => _, _}
 package object fs {
   import BackendDef.DefErrT
   type PlanT[F[_], A] = ReaderT[FileSystemErrT[PhaseResultT[F, ?], ?], Instant, A]
+
+  type Eff[A] = (
+    fs.queryfileTypes.MongoQuery[BsonCursor, ?] :\:
+    fs.managefile.MongoManage :\:
+    fs.readfile.MongoRead :/:
+    fs.writefile.MongoWrite)#M[A]
+
+  type MongoM[A] = Free[Eff, A]
+
+  type MongoQScriptCP[T[_[_]]] = qs.QScriptCore[T, ?] :\: qs.EquiJoin[T, ?] :/: Const[qs.ShiftedRead[AFile], ?]
+  type MongoQScript[T[_[_]], A] = MongoQScriptCP[T]#M[A]
 
   final case class MongoConfig(
     client: MongoClient,
@@ -63,7 +74,7 @@ package object fs {
       wfExec <- wfExec(client)
     } yield MongoConfig(client, defDb, wfExec)).mapT(freeTaskToTask.apply)
 
-  def compile(cfg: MongoConfig): BackendDef.DefErrT[Task, (M ~> Task, Task[Unit])] =
+  def compile(cfg: MongoConfig): BackendDef.DefErrT[Task, (MongoM ~> Task, Task[Unit])] =
     (effToTask(cfg) map (i => (
       foldMapNT[Eff, Task](i),
       Task.delay(cfg.client.close).void))).liftM[DefErrT]

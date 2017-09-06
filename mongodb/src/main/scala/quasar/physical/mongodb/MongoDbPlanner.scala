@@ -1360,15 +1360,12 @@ object MongoDbPlanner {
       : M[A] =
     ma.mproduct(a => mtell.tell(Vector(PhaseResult.tree(label, a)))) ∘ (_._1)
 
-  type MongoQScriptCP[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
-  type MongoQScript[T[_[_]], A] = MongoQScriptCP[T]#M[A]
-
   def toMongoQScript[T[_[_]] : BirecursiveT: EqualT: RenderTreeT: ShowT, M[_]: Monad: MonadFsErr: PhaseResultTell](
-    qs: T[MongoDb.QSM[T, ?]],
+    qs: T[fs.MongoQScript[T, ?]],
     listContents: DiscoverPath.ListContents[M]
-  ): M[T[MongoQScript[T, ?]]] =
+  ): M[T[fs.MongoQScript[T, ?]]] =
     for {
-      mongoQs <- qs.transCataM(liftFGM(assumeReadType[M, T, MongoQScript[T, ?]](Type.AnyObject)))
+      mongoQs <- qs.transCataM(liftFGM(assumeReadType[M, T, fs.MongoQScript[T, ?]](Type.AnyObject)))
       _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript (Mongo-specific)", mongoQs))
     } yield mongoQs
 
@@ -1380,7 +1377,7 @@ object MongoDbPlanner {
     (listContents: DiscoverPath.ListContents[M],
       joinHandler: JoinHandler[WF, WBM],
       funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
-    (qs: T[MongoDb.QSM[T, ?]])
+    (qs: T[fs.MongoQScript[T, ?]])
     (implicit
       ev0: WorkflowOpCoreF :<: WF,
       ev1: WorkflowBuilder.Ops[WF],
@@ -1393,7 +1390,7 @@ object MongoDbPlanner {
       wb  <- log(
         "Workflow Builder",
         opt.cataM[M, WorkflowBuilder[WF]](
-          Planner[T, MongoQScript[T, ?]].plan[M, WF, EX](joinHandler, funcHandler).apply(_) ∘
+          Planner[T, fs.MongoQScript[T, ?]].plan[M, WF, EX](joinHandler, funcHandler).apply(_) ∘
             (_.transCata[Fix[WorkflowBuilderF[WF, ?]]](repeatedly(WorkflowBuilder.normalize[WF, Fix[WorkflowBuilderF[WF, ?]]])))))
       wf1 <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb)))
       wf2 <- log(
@@ -1405,7 +1402,7 @@ object MongoDbPlanner {
   def planExecTime[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     M[_]: Monad: PhaseResultTell: MonadFsErr]
-    (qs: T[MongoDb.QSM[T, ?]], queryContext: fs.QueryContext[M], execTime: Instant
+    (qs: T[fs.MongoQScript[T, ?]], queryContext: fs.QueryContext[M], execTime: Instant
     ): M[Crystallized[WorkflowF]] = {
 
     val lc: qscript.DiscoverPath.ListContents[ReaderT[M, Instant, ?]] =
@@ -1424,7 +1421,7 @@ object MongoDbPlanner {
   def plan[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     M[_]: Monad: PhaseResultTell: MonadFsErr: ExecTimeR]
-    (qs: T[MongoDb.QSM[T, ?]], queryContext: fs.QueryContext[M]
+    (qs: T[fs.MongoQScript[T, ?]], queryContext: fs.QueryContext[M]
     ): M[Crystallized[WorkflowF]] = {
     import MongoQueryModel._
 

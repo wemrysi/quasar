@@ -21,7 +21,6 @@ import slamdata.Predef._
 import quasar.common._
 import quasar.connector._
 import quasar.contrib.pathy._
-import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount._
@@ -36,20 +35,14 @@ import scala.Predef.implicitly
 
 object MongoDb extends BackendModule {
 
-  type QS[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
+  type QS[T[_[_]]] = fs.MongoQScriptCP[T]
 
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
   type Repr = Crystallized[WorkflowF]
 
-  type Eff[A] = (
-    fs.queryfileTypes.MongoQuery[BsonCursor, ?] :\:
-    fs.managefile.MongoManage :\:
-    fs.readfile.MongoRead :/:
-    fs.writefile.MongoWrite)#M[A]
-
-  type M[A] = Free[Eff, A]
+  type M[A] = fs.MongoM[A]
 
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
@@ -89,21 +82,21 @@ object MongoDb extends BackendModule {
 
   private type PhaseRes[A] = PhaseResultT[ConfiguredT[M, ?], A]
 
-  private val effToConfigured: Eff ~> Configured =
-    λ[Eff ~> Configured](eff => Free.liftF(eff).liftM[ConfiguredT])
+  private val effToConfigured: fs.Eff ~> Configured =
+    λ[fs.Eff ~> Configured](eff => Free.liftF(eff).liftM[ConfiguredT])
 
-  private val effToPhaseRes: Eff ~> PhaseRes =
+  private val effToPhaseRes: fs.Eff ~> PhaseRes =
     λ[Configured ~> PhaseRes](_.liftM[PhaseResultT]) compose effToConfigured
 
-  private def toEff[C[_], A](c: C[A])(implicit inj: C :<: Eff): Eff[A] = inj(c)
+  private def toEff[C[_], A](c: C[A])(implicit inj: C :<: fs.Eff): fs.Eff[A] = inj(c)
 
-  def toBackend[C[_], A](c: C[FileSystemError \/ A])(implicit inj: C :<: Eff): Backend[A] =
+  def toBackend[C[_], A](c: C[FileSystemError \/ A])(implicit inj: C :<: fs.Eff): Backend[A] =
     EitherT(c).mapT(x => effToPhaseRes(toEff(x)))
 
-  def toBackendP[C[_], A](c: C[(PhaseResults, FileSystemError \/ A)])(implicit inj: C :<: Eff): Backend[A] =
+  def toBackendP[C[_], A](c: C[(PhaseResults, FileSystemError \/ A)])(implicit inj: C :<: fs.Eff): Backend[A] =
     EitherT(WriterT(effToConfigured(toEff(c))))
 
-  def toConfigured[C[_], A](c: C[A])(implicit inj: C :<: Eff): Configured[A] =
+  def toConfigured[C[_], A](c: C[A])(implicit inj: C :<: fs.Eff): Configured[A] =
     effToConfigured(toEff(c))
 
   override val QueryFileModule = fs.queryfile
