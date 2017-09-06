@@ -58,7 +58,7 @@ package object cassandra {
     def master(host: String, port: Int): State[SparkConf, Unit] =
       State.modify(_.setMaster(s"spark://$host:$port"))
     def appName: State[SparkConf, Unit] = State.modify(_.setAppName("quasar"))
-       def config(name: String, uri: Uri): State[SparkConf, Unit] =
+    def config(name: String, uri: Uri): State[SparkConf, Unit] =
       State.modify(c => uri.params.get(name).fold(c)(c.set(name, _)))
     val uriOrErr: DefinitionError \/ Uri = Uri.fromString(connUri.value).leftMap((pf: ParseFailure) => liftErr(pf.toString))
 
