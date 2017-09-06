@@ -76,7 +76,7 @@ object MongoDb extends BackendModule {
     for {
       ctx <- fs.QueryContext.queryContext[T](qs)
       _ <- fs.QueryContext.checkPathsExist(qs)
-      execTime <- fs.queryfile.queryTime
+      execTime <- fs.queryfile.queryTime.liftM[PhaseResultT].liftM[FileSystemErrT]
       p <- doPlan[T, Backend](qs, ctx, execTime)
     } yield p
 

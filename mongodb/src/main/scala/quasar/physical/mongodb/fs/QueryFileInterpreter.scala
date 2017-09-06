@@ -26,7 +26,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.javascript._
-import quasar.physical.mongodb._, MongoDb._, WorkflowExecutor.WorkflowCursor
+import quasar.physical.mongodb._, WorkflowExecutor.WorkflowCursor
 
 import argonaut.JsonObject, JsonObject.{single => jSingle}
 import argonaut.JsonIdentity._
@@ -44,78 +44,57 @@ final class QueryFileInterpreter(execMongo: WorkflowExecutor[MongoDbIO, BsonCurs
 
   private val execJs = WorkflowExecutor.javaScript
 
-  def execPlan(repr: Repr, out: AFile): Backend[AFile] = {
-    val x: MongoLogWFR[C, AFile] = for {
+  def execPlan(wf: Crystallized[WorkflowF], out: AFile): MQPhErr[AFile] =
+    (for {
       dst <- EitherT(Collection.fromFile(out)
                 .leftMap(pathErr(_))
                 .point[MongoLogWF[C, ?]])
-      coll <- handlePlan(repr, execJs.execute(_, dst), execWorkflow(_, dst, _))
-    } yield coll.asFile
+      coll <- handlePlan(wf, execJs.execute(_, dst), execWorkflow(_, dst, _))
+    } yield coll.asFile).run.run
 
-    toBackendP(x.run.run)
-  }
 
-  def evalPlan(repr: Repr, dbName: Option[DatabaseName]): Backend[ResultHandle] = {
-    val x: MongoLogWFR[C, ResultHandle] = for {
-      rcursor <- handlePlan(repr, execJs.evaluate(_, dbName), evalWorkflow(_, dbName, _))
+  def evalPlan(wf: Crystallized[WorkflowF], dbName: Option[DatabaseName]): MQPhErr[ResultHandle] =
+    (for {
+      rcursor <- handlePlan(wf, execJs.evaluate(_, dbName), evalWorkflow(_, dbName, _))
       handle <- liftMQ(recordCursor(rcursor))
-    } yield handle
+    } yield handle).run.run
 
-    toBackendP(x.run.run)
-  }
-
-  def explain(repr: Repr, dbName: Option[DatabaseName]): Backend[String] = {
-    val (stmts, r) = execJs.evaluate(repr, dbName)
-                       .leftMap(wfErrToFsErr(repr))
+  def explain(wf: Crystallized[WorkflowF], dbName: Option[DatabaseName]): MQPhErr[String] = {
+    val (stmts, r) = execJs.evaluate(wf, dbName)
+                       .leftMap(wfErrToFsErr(wf))
                        .run.run(CollectionName("tmp.gen_"))
                        .eval(0).run
     val out = Js.Stmts(stmts.toList).pprint(0)
 
-    val x: MongoLogWFR[C, String] = for {
+    (for {
       exp <- EitherT.fromDisjunction[MongoLogWF[C, ?]](r.as(out))
       _   <- logProgram(stmts).liftM[FileSystemErrT]
-    } yield exp
-
-    toBackendP(x.run.run)
+    } yield exp).run.run
   }
 
-  def more(h: ResultHandle): Backend[Vector[Data]] = {
-    val m = moreResults(h)
+  def more(h: ResultHandle): MQErr[Vector[Data]] =
+    moreResults(h)
       .toRight(unknownResultHandle(h))
       .run
 
-    toBackend(m)
-  }
-
-  def close(h: ResultHandle): Configured[Unit] = {
-    val c = OptionT[MQ, ResultCursor[C]](MongoQuery(resultsL(h) <:= none))
+  def close(h: ResultHandle): MQ[Unit] =
+    OptionT[MQ, ResultCursor[C]](MongoQuery(resultsL(h) <:= none))
       .flatMapF(_.fold(κ(().point[MQ]), wc =>
         DataCursor[MongoDbIO, WorkflowCursor[C]]
           .close(wc)
           .liftM[QRT]))
       .run.void
 
-    toConfigured(c)
-  }
+  def listContents0(dir: ADir): MQErr[Set[PathSegment]] =
+    listContents(dir).run.liftM[QRT]
 
-  def listContents0(dir: ADir): Backend[Set[PathSegment]] = {
-    val c = listContents(dir).run.liftM[QRT]
-
-    toBackend(c)
-  }
-
-  def fileExists(file: AFile): Configured[Boolean] = {
-    val e = Collection.fromFile(file).fold(
+  def fileExists(file: AFile): MQ[Boolean] =
+    Collection.fromFile(file).fold(
       κ(false.point[MQ]),
       coll => MongoDbIO.collectionExists(coll).liftM[QRT])
 
-    toConfigured(e)
-  }
-
-  def queryTime: Backend[Instant] = {
-    val n = MongoDbIO.liftTask(Task.delay { Instant.now }).liftM[QRT]
-    toBackendP(liftMQ(n).run.run)
-  }
+  def queryTime: MQ[Instant] =
+    MongoDbIO.liftTask(Task.delay { Instant.now }).liftM[QRT]
 
   ////
 
@@ -168,29 +147,29 @@ final class QueryFileInterpreter(execMongo: WorkflowExecutor[MongoDbIO, BsonCurs
     liftMT[MongoLogWF[C, ?], FileSystemErrT] compose liftMT[MQ, PhaseResultT]
 
   def handlePlan[A](
-    repr: Repr,
-    log: Repr => JsR[_],
-    handle: (Repr, CollectionName) => WorkflowExecErrT[MQ, A]
+    wf: Crystallized[WorkflowF],
+    log: Crystallized[WorkflowF] => JsR[_],
+    handle: (Crystallized[WorkflowF], CollectionName) => WorkflowExecErrT[MQ, A]
   ): MongoLogWFR[C, A] =
     for {
       prefix <- liftMQ(genPrefix)
-      _ <- writeJsLog(repr, log(repr), prefix)
-      a <- toMongoLogWFR(repr, handle(repr, prefix))
+      _ <- writeJsLog(wf, log(wf), prefix)
+      a <- toMongoLogWFR(wf, handle(wf, prefix))
     } yield a
 
-  private def toMongoLogWFR[A](repr: Repr, wf: WorkflowExecErrT[MQ, A]): MongoLogWFR[C, A] =
+  private def toMongoLogWFR[A](wf: Crystallized[WorkflowF], wfErrMq: WorkflowExecErrT[MQ, A]): MongoLogWFR[C, A] =
     EitherT[MongoLogWF[C, ?], FileSystemError, A](
-                wf.leftMap(wfErrToFsErr(repr))
-                  .run.mapK(_.attemptMongo.leftMap(err =>
-                    executionFailed0(
-                      s"MongoDB Error: ${err.cause.getMessage}",
-                      JsonObject.empty,
-                      some(err)).left[A]
-                    ).merge)
-                  .liftM[PhaseResultT])
+      wfErrMq.leftMap(wfErrToFsErr(wf))
+        .run.mapK(_.attemptMongo.leftMap(err =>
+          executionFailed0(
+            s"MongoDB Error: ${err.cause.getMessage}",
+            JsonObject.empty,
+            some(err)).left[A]
+          ).merge)
+        .liftM[PhaseResultT])
 
   def execWorkflow(
-    wf: Repr,
+    wf: Crystallized[WorkflowF],
     dst: Collection,
     tmpPrefix: CollectionName
   ): WorkflowExecErrT[MQ, Collection] =
@@ -198,16 +177,16 @@ final class QueryFileInterpreter(execMongo: WorkflowExecutor[MongoDbIO, BsonCurs
       execMongo.execute(wf, dst).run.run(tmpPrefix).eval(0).liftM[QRT])
 
   def evalWorkflow(
-    wf: Repr,
+    wf: Crystallized[WorkflowF],
     defDb: Option[DatabaseName],
     tmpPrefix: CollectionName
   ): WorkflowExecErrT[MQ, ResultCursor[C]] =
     EitherT[MQ, WorkflowExecutionError, ResultCursor[C]](
       execMongo.evaluate(wf, defDb).run.run(tmpPrefix).eval(0).liftM[QRT])
 
-  private def writeJsLog(repr: Repr, jsr: JsR[_], tmpPrefix: CollectionName): MongoLogWFR[C, Unit] = {
+  private def writeJsLog(wf: Crystallized[WorkflowF], jsr: JsR[_], tmpPrefix: CollectionName): MongoLogWFR[C, Unit] = {
     val (stmts, r) = jsr.run.run(tmpPrefix).eval(0).run
-    EitherT(logProgram(stmts) as r.leftMap(wfErrToFsErr(repr))).void
+    EitherT(logProgram(stmts) as r.leftMap(wfErrToFsErr(wf))).void
   }
 
   private def logProgram(prog: JavaScriptPrg): MongoLogWF[C, Unit] =
@@ -230,7 +209,7 @@ final class QueryFileInterpreter(execMongo: WorkflowExecutor[MongoDbIO, BsonCurs
 
   import WorkflowExecutionError.{InvalidTask, InsertFailed, NoDatabase}
 
-  private def wfErrToFsErr(repr: Repr): WorkflowExecutionError => FileSystemError = {
+  private def wfErrToFsErr(wf: Crystallized[WorkflowF]): WorkflowExecutionError => FileSystemError = {
     case InvalidTask(task, reason) =>
       executionFailed0(
         s"Invalid MongoDB workflow task: $reason",

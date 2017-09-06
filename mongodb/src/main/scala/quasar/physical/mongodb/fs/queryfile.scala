@@ -17,6 +17,7 @@
 package quasar.physical.mongodb.fs
 
 import slamdata.Predef._
+import quasar.common.PhaseResults
 import quasar.{config => _, _}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
@@ -42,6 +43,8 @@ object queryfileTypes {
 
   type QRT[F[_], A]        = QueryRT[F, BsonCursor, A]
   type MQ[A]               = QRT[MongoDbIO, A]
+  type MQErr[A]            = MQ[FileSystemError \/ A]
+  type MQPhErr[A]          = MQ[(PhaseResults, FileSystemError \/ A)]
 }
 
 object queryfile extends QueryFileModule {
@@ -52,35 +55,36 @@ object queryfile extends QueryFileModule {
     config[F].map(cfg => new QueryFileInterpreter(cfg.wfExec))
 
   def executePlan(repr: Repr, out: AFile): Backend[AFile] =
-    mkInterp[Backend] >>= (_.execPlan(repr, out))
+    mkInterp[Backend] >>= (i => toBackendP(i.execPlan(repr, out)))
 
   def evaluatePlan(repr: Repr): Backend[ResultHandle] =
     for {
       dbName <- config[Backend].map(_.defaultDb.map(_.run))
       i <- mkInterp[Backend]
-      handle <- i.evalPlan(repr, dbName)
+      handle <- toBackendP(i.evalPlan(repr, dbName))
     } yield handle
 
   def explain(repr: Repr): Backend[String] =
     for {
       dbName <- config[Backend].map(_.defaultDb.map(_.run))
       i <- mkInterp[Backend]
-      s <- i.explain(repr, dbName)
+      s <- toBackendP(i.explain(repr, dbName))
     } yield s
 
   def more(h: ResultHandle): Backend[Vector[Data]] =
-    mkInterp[Backend] >>= (_.more(h))
+    mkInterp[Backend] >>= (i => toBackend(i.more(h)))
 
   def close(h: ResultHandle): Configured[Unit] =
-    mkInterp[Configured] >>= (_.close(h))
+    mkInterp[Configured] >>= (i => toConfigured(i.close(h)))
 
   def listContents(dir: ADir): Backend[Set[PathSegment]] =
-    mkInterp[Backend] >>= (_.listContents0(dir))
+    mkInterp[Backend] >>= (i => toBackend(i.listContents0(dir)))
 
   def fileExists(file: AFile): Configured[Boolean] =
-    mkInterp[Configured] >>= (_.fileExists(file))
+    mkInterp[Configured] >>= (i => toConfigured(i.fileExists(file)))
 
-  def queryTime: Backend[Instant] = mkInterp[Backend] >>= (_.queryTime)
+  def queryTime: Configured[Instant] =
+    mkInterp[Configured] >>= (i => toConfigured(i.queryTime))
 
   def run[C, S[_]](
     client: MongoClient,
