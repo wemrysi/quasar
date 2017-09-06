@@ -45,7 +45,8 @@ class ServiceSpec extends quasar.Qspec {
 
   val client = org.http4s.client.blaze.defaultClient
 
-  sequential
+  sequential // These tests spin up a server and there is potential for port conflicts if
+             // they don't run sequentially
 
   def withServer[A]
     (port: Int = 8888, metastoreInit: ConnectionIO[Unit] = ().η[ConnectionIO])
@@ -60,10 +61,8 @@ class ServiceSpec extends quasar.Qspec {
       _          <- metastoreInit.transact(transactor).liftM[MainErrT]
       metaRef    <- TaskRef(metastore).liftM[MainErrT]
       quasarFs   <- Quasar.initWithMeta(metaRef, _ => ().point[MainTask])
-      shutdown   <- Server.startServer(quasarFs.interp, port, Nil, None, _ => ().point[Task]).liftM[MainErrT]
-      r          <- f(uri)
-                      .onFinish(κ(shutdown.onFinish(κ(quasarFs.shutdown))))
-                      .liftM[MainErrT]
+      shutdown   <- Server.startServer(quasarFs.interp, port, Nil, None, _ => ().point[MainTask]).liftM[MainErrT]
+      r          <- f(uri).onFinish(κ(shutdown.onFinish(κ(quasarFs.shutdown)))).liftM[MainErrT]
     } yield r).run.unsafePerformSync
   }
 
