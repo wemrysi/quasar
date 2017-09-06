@@ -137,15 +137,15 @@ trait SparkCoreBackendModule extends BackendModule {
     import queryfile.RddState
 
     def executePlan(rdd: RDD[Data], out: AFile): Backend[AFile] = {
-      val execute =  detailsOps.storeData(rdd, out).as(out)
-      val log     = PhaseResult.detail("RDD", rdd.toDebugString)
-      execute.withLog(log)
+      val execute =  detailsOps.storeData(rdd, out).as(out).liftB
+      val log     = Vector(PhaseResult.detail("RDD", rdd.toDebugString))
+      execute :++> log
     }
 
     def evaluatePlan(rdd: Repr): Backend[ResultHandle] = (for {
       h <- msOps.next.map(ResultHandle(_))
       _ <- qfKvsOps.put(h, RddState(rdd.zipWithIndex.persist.some, 0))
-    } yield h).withLog(PhaseResult.detail("RDD", rdd.toDebugString))
+    } yield h).liftB :++> Vector(PhaseResult.detail("RDD", rdd.toDebugString))
 
     def more(h: ResultHandle): Backend[Vector[Data]] = queryfile.more[Eff](h).liftB.unattempt
 

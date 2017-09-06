@@ -55,8 +55,6 @@ trait BackendModule {
 
   implicit class LiftBackend[A](m: M[A]) {
     val liftB: Backend[A] = m.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
-    def withLog(pr: PhaseResult): Backend[A] =
-      WriterT(m.liftM[ConfiguredT].map((Vector(pr), _))).liftM[FileSystemErrT]
   }
 
   implicit class LiftBackendConfigured[A](c: Configured[A]) {
