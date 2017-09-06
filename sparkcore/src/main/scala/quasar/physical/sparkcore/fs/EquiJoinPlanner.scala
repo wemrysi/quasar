@@ -16,6 +16,7 @@
 
 package quasar.physical.sparkcore.fs
 
+import slamdata.Predef._
 import quasar._
 import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
@@ -36,7 +37,7 @@ class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, S[_]] extends Planner[EquiJo
   import Planner.{SparkState, SparkStateT}
 
   def plan(fromFile: AFile => Free[S, RDD[Data]], first: RDD[Data] => Free[S, Data]): AlgebraM[SparkState[S, ?], EquiJoin[T, ?], RDD[Data]] = {
-    case EquiJoin(src, lBranch, rBranch, lKey, rKey, jt, combine) =>
+    case EquiJoin(src, lBranch, rBranch, key, jt, combine) =>
       val algebraM = Planner[QScriptTotal[T, ?], S].plan(fromFile, first)
       val srcState = src.point[SparkState[S, ?]]
 
@@ -47,14 +48,15 @@ class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, S[_]] extends Planner[EquiJo
         EitherT(CoreMap.changeJoinFunc(combine).point[Free[S, ?]]).liftM[SparkStateT]
 
       for {
-        lk <- genKey(lKey)
-        rk <- genKey(rKey)
+        k <- key.traverse(_.bitraverse(genKey, genKey))
         lRdd <- lBranch.cataM(interpretM(κ(srcState), algebraM))
         rRdd <- rBranch.cataM(interpretM(κ(srcState), algebraM))
         merge <- merger
       } yield {
-        val klRdd = lRdd.map(d => (lk(d), d))
-        val krRdd = rRdd.map(d => (rk(d), d))
+        val (klRdd, krRdd) =
+          Unzip[List].unzip(k).bimap(
+            lk => lRdd.map(d => (lk.map(_(d)), d)),
+            rk => rRdd.map(d => (rk.map(_(d)), d)))
 
         jt match {
           case JoinType.Inner => klRdd.join(krRdd).map {

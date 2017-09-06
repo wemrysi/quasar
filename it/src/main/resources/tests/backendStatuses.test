@@ -3,12 +3,11 @@
     "backends": {
         "couchbase":         "pending",
         "marklogic_xml":     "pending",
-        "mongodb_2_6":       "pending",
-        "mongodb_3_0":       "pending",
-        "mongodb_3_2":       "pending",
-        "mongodb_3_4":       "pending",
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2":     "pending",
+        "mongodb_2_6":       "pendingIgnoreFieldOrder",
+        "mongodb_3_0":       "pendingIgnoreFieldOrder",
+        "mongodb_3_2":       "pendingIgnoreFieldOrder",
+        "mongodb_3_4":       "pendingIgnoreFieldOrder",
+        "mongodb_read_only": "pendingIgnoreFieldOrder",
         "spark_hdfs":        "pending",
         "spark_local":       "pending"
     },

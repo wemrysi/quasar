@@ -18,14 +18,15 @@ package quasar.physical.mongodb
 
 import slamdata.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
-import quasar.common.{PhaseResult, PhaseResults, SortDir}
+import quasar.common.{PhaseResult, PhaseResults, PhaseResultTell, SortDir}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz._, eitherT._
+import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.{FileSystemError, QueryFile}, FileSystemError.qscriptPlanningFailed
+import quasar.fs.{FileSystemError, QueryFile, MonadFsErr}, FileSystemError.qscriptPlanningFailed
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.frontend.logicalplan.LogicalPlan
@@ -38,11 +39,12 @@ import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
 import quasar.qscript.{Coalesce => _, _}
 import quasar.std.StdLib._ // TODO: remove this
 
+import java.time.Instant
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-import scalaz._, Scalaz._
+import scalaz._, Scalaz.{ToIdOps => _, _}
 
 // TODO: This is generalizable to an arbitrary `Recursive` type, I think.
 sealed abstract class InputFinder[T[_[_]]] {
@@ -59,7 +61,7 @@ final case class There[T[_[_]]](index: Int, next: InputFinder[T])
     a.resume.fold(fa => next(fa.toList.apply(index)), κ(a))
 }
 
-object MongoDbQScriptPlanner {
+object MongoDbPlanner {
   import fixExprOp._
 
   // FIXME: Move to Matryoshka.
@@ -69,7 +71,16 @@ object MongoDbQScriptPlanner {
 
   type Partial[T[_[_]], In, Out] = (PartialFunction[List[In], Out], List[InputFinder[T]])
 
-  type OutputM[A] = PlannerError \/ A
+  type OutputM[A]      = PlannerError \/ A
+  type ExecTimeR[F[_]] = MonadReader_[F, Instant]
+
+  private def raiseErr[M[_], A](err: FileSystemError)(
+    implicit ev: MonadFsErr[M]
+  ): M[A] = ev.raiseError(err)
+
+  private def handleErr[M[_], A](ma: M[A])(f: FileSystemError => M[A])(
+    implicit ev: MonadFsErr[M]
+  ): M[A] = ev.handleError(ma)(f)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
@@ -97,11 +108,11 @@ object MongoDbQScriptPlanner {
           Some(_))
 
   def processMapFuncExpr
-    [T[_[_]]: RecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse, A]
+    [T[_[_]]: RecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, EX[_]: Traverse, A]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (fm: FreeMapA[T, A])
     (recovery: A => Fix[ExprOp])
-    (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp)
+    (implicit inj: EX :<: ExprOp)
       : M[Fix[ExprOp]] =
     fm.cataM(
       interpretM[M, MapFunc[T, ?], A, Fix[ExprOp]](
@@ -109,9 +120,9 @@ object MongoDbQScriptPlanner {
         expression(funcHandler)))
 
   def getSelector
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, EX[_]: Traverse]
     (fm: FreeMap[T])
-    (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp)
+    (implicit inj: EX :<: ExprOp)
       : OutputM[PartialSelector[T]] =
     fm.zygo(
       interpret[MapFunc[T, ?], Hole, T[MapFunc[T, ?]]](
@@ -122,16 +133,14 @@ object MongoDbQScriptPlanner {
         selector[T]))
 
 
-  def processMapFunc[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, A]
-    (fm: FreeMapA[T, A])
-    (recovery: A => JsCore)
-    (implicit merr: MonadError_[M, FileSystemError])
+  def processMapFunc[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR, A]
+    (fm: FreeMapA[T, A])(recovery: A => JsCore)
       : M[JsCore] =
     fm.cataM(interpretM[M, MapFunc[T, ?], A, JsCore](recovery(_).point[M], javascript))
 
   // FIXME: This is temporary. Should go away when the connector is complete.
-  def unimplemented[M[_], A](label: String)(implicit merr: MonadError_[M, FileSystemError]): M[A] =
-    merr.raiseError(qscriptPlanningFailed(InternalError.fromMsg(s"unimplemented $label")))
+  def unimplemented[M[_]: MonadFsErr, A](label: String): M[A] =
+    raiseErr(qscriptPlanningFailed(InternalError.fromMsg(s"unimplemented $label")))
 
   // TODO: Should have a JsFn version of this for $reduce nodes.
   val accumulator: ReduceFunc[Fix[ExprOp]] => AccumOp[Fix[ExprOp]] = {
@@ -158,18 +167,46 @@ object MongoDbQScriptPlanner {
   // largest type in WorkflowOp, so they're immediately injected into ExprOp.
   val check = new Check[Fix[ExprOp], ExprOp]
 
-  def expression[T[_[_]]: RecursiveT: ShowT, M[_]: Applicative, EX[_]: Traverse]
-    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
-    (implicit merr: MonadError_[M, FileSystemError], inj: EX :<: ExprOp)
-      : AlgebraM[M, MapFunc[T, ?], Fix[ExprOp]] = {
+  def ejsonToExpression[M[_]: Applicative: MonadFsErr, EJ]
+    (ej: EJ)(implicit EJ: Recursive.Aux[EJ, EJson])
+      : M[Fix[ExprOp]] =
+    ej.cataM(BsonCodec.fromEJson).fold(pe => raiseErr(qscriptPlanningFailed(pe)), $literal(_).point[M])
+
+  // TODO: Use `JsonCodec.encode` and avoid failing.
+  def ejsonToJs[M[_]: Applicative: MonadFsErr, EJ: Show]
+    (ej: EJ)(implicit EJ: Recursive.Aux[EJ, EJson])
+      : M[JsCore] =
+    ej.cata(Data.fromEJson).toJs.fold(
+      raiseErr[M, JsCore](qscriptPlanningFailed(NonRepresentableEJson(ej.shows))))(
+      _.point[M])
+
+  def ejsonToExpr[M[_]: Applicative: MonadFsErr, EJ: Show]
+    (ej: EJ)(implicit EJ: Recursive.Aux[EJ, EJson])
+      : M[Expr] =
+    exprOrJs(ej)(ejsonToExpression[M, EJ], ejsonToJs[M, EJ](_) ∘ JsFn.const)
+
+  def expression[
+    T[_[_]]: RecursiveT: ShowT,
+    M[_]: Monad: ExecTimeR: MonadFsErr,
+    EX[_]: Traverse](funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])(
+    implicit inj: EX :<: ExprOp
+  ): AlgebraM[M, MapFunc[T, ?], Fix[ExprOp]] = {
+
     import MapFuncsCore._
     import MapFuncsDerived._
 
     def handleCommon(mf: MapFunc[T, Fix[ExprOp]]): Option[Fix[ExprOp]] =
       funcHandler(mf).map(t => unpack(t.mapSuspension(inj)))
 
+    def execTime(implicit ev: ExecTimeR[M]): M[Bson.Date] =
+      OptionT[M, Bson.Date](ev.ask.map(Bson.Date.fromInstant(_)))
+        .getOrElseF(raiseErr(
+          qscriptPlanningFailed(InternalError.fromMsg("Could not get the current timestamp"))))
+
+
     val handleSpecialCore: MapFuncCore[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
-      case Now() => unimplemented[M, Fix[ExprOp]]("Now expression")
+      case Constant(v1) => ejsonToExpression[M, T[EJson]](v1)
+      case Now() => execTime map ($literal(_))
 
       // FIXME: Will only work for Arrays, not Strings
       // case Length(a1) => $size(a1).point[M]
@@ -246,6 +283,7 @@ object MongoDbQScriptPlanner {
 
       case Range(_, _)        => unimplemented[M, Fix[ExprOp]]("Range expression")
       case Search(_, _, _)    => unimplemented[M, Fix[ExprOp]]("Search expression")
+      case Split(_, _)        => unimplemented[M, Fix[ExprOp]]("Split expression")
     }
 
     val handleSpecialDerived: MapFuncDerived[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
@@ -263,8 +301,7 @@ object MongoDbQScriptPlanner {
     mf => handleCommon(mf).cata(_.point[M], handleSpecial(mf))
   }
 
-  def javascript[T[_[_]]: BirecursiveT: ShowT, M[_]: Applicative]
-    (implicit merr: MonadError_[M, FileSystemError])
+  def javascript[T[_[_]]: BirecursiveT: ShowT, M[_]: Applicative: MonadFsErr: ExecTimeR]
       : AlgebraM[M, MapFunc[T, ?], JsCore] = {
     import jscore.{
       Add => _, In => _,
@@ -285,19 +322,18 @@ object MongoDbQScriptPlanner {
           ident("x"),
           BinOp(jscore.Mod, ident("x"), Literal(Js.Num(1, false)))))
 
+    def execTime(implicit ev: ExecTimeR[M]): M[JsCore] =
+      ev.ask map (ts => Literal(Js.Str(ts.toString)))
+
     def handleCommon(mf: MapFunc[T, JsCore]): Option[JsCore] =
       JsFuncHandler.handle[MapFunc[T, ?]].apply(mf).map(unpack[Fix, JsCoreF])
 
     val handleSpecialCore: MapFuncCore[T, JsCore] => M[JsCore] = {
-      case Constant(v1) =>
-        v1.cata(Data.fromEJson).toJs.fold(
-          merr.raiseError[JsCore](qscriptPlanningFailed(NonRepresentableEJson(v1.shows))))(
-          _.point[M])
-      // FIXME: Not correct
+      case Constant(v1) => ejsonToJs[M, T[EJson]](v1)
       case Undefined() => ident("undefined").point[M]
       case JoinSideName(n) =>
-        merr.raiseError[JsCore](qscriptPlanningFailed(UnexpectedJoinSide(n)))
-      case Now() => New(Name("Date"), Nil).point[M]
+        raiseErr[M, JsCore](qscriptPlanningFailed(UnexpectedJoinSide(n)))
+      case Now() => execTime map (ts => New(Name("ISODate"), List(ts)))
       case Length(a1) =>
         Call(ident("NumberLong"), List(Select(a1, "length"))).point[M]
       case Date(a1) =>
@@ -339,27 +375,41 @@ object MongoDbQScriptPlanner {
             Literal(Js.Str(".")),
             pad3(Call(Select(ident("t"), "getUTCMilliseconds"), Nil)))).point[M]
       }
-      case ToTimestamp(a1) =>
-        New(Name("Date"), List(Select(a1, "epoch"))).point[M]
+      case ToTimestamp(a1) => New(Name("Date"), List(a1)).point[M]
 
       case ExtractCentury(date) =>
-        Call(Select(ident("Math"), "ceil"), List(
-          BinOp(jscore.Div,
-            Call(Select(date, "getUTCFullYear"), Nil),
-            Literal(Js.Num(100, false))))).point[M]
+        Call(ident("NumberLong"), List(
+          Call(Select(ident("Math"), "ceil"), List(
+            BinOp(jscore.Div,
+              Call(Select(date, "getUTCFullYear"), Nil),
+              Literal(Js.Num(100, false))))))).point[M]
       case ExtractDayOfMonth(date) => Call(Select(date, "getUTCDate"), Nil).point[M]
       case ExtractDecade(date) =>
-        trunc(
-          BinOp(jscore.Div,
-            Call(Select(date, "getUTCFullYear"), Nil),
-            Literal(Js.Num(10, false)))).point[M]
+        Call(ident("NumberLong"), List(
+          trunc(
+            BinOp(jscore.Div,
+              Call(Select(date, "getUTCFullYear"), Nil),
+              Literal(Js.Num(10, false)))))).point[M]
       case ExtractDayOfWeek(date) =>
         Call(Select(date, "getUTCDay"), Nil).point[M]
-      case ExtractDayOfYear(date) => unimplemented[M, JsCore]("ExtractDayOfYear JS")
+      case ExtractDayOfYear(date) =>
+        Call(ident("NumberInt"), List(
+          Call(Select(ident("Math"), "floor"), List(
+            BinOp(jscore.Add,
+              BinOp(jscore.Div,
+                BinOp(Sub,
+                  date,
+                  New(Name("Date"), List(
+                    Call(Select(date, "getFullYear"), Nil),
+                    Literal(Js.Num(0, false)),
+                    Literal(Js.Num(0, false))))),
+                Literal(Js.Num(86400000, false))),
+              Literal(Js.Num(1, false))))))).point[M]
       case ExtractEpoch(date) =>
-        BinOp(jscore.Div,
-          Call(Select(date, "valueOf"), Nil),
-          Literal(Js.Num(1000, false))).point[M]
+        Call(ident("NumberLong"), List(
+          BinOp(jscore.Div,
+            Call(Select(date, "valueOf"), Nil),
+            Literal(Js.Num(1000, false))))).point[M]
       case ExtractHour(date) => Call(Select(date, "getUTCHours"), Nil).point[M]
       case ExtractIsoDayOfWeek(date) =>
         Let(Name("x"), Call(Select(date, "getUTCDay"), Nil),
@@ -367,7 +417,8 @@ object MongoDbQScriptPlanner {
             BinOp(jscore.Eq, ident("x"), Literal(Js.Num(0, false))),
             Literal(Js.Num(7, false)),
             ident("x"))).point[M]
-      case ExtractIsoYear(date) => unimplemented[M, JsCore]("ExtractIsoYear JS")
+      case ExtractIsoYear(date) =>
+        Call(Select(date, "getUTCFullYear"), Nil).point[M]
       case ExtractMicroseconds(date) =>
         BinOp(jscore.Mult,
           BinOp(jscore.Add,
@@ -377,10 +428,11 @@ object MongoDbQScriptPlanner {
               Literal(Js.Num(1000, false)))),
           Literal(Js.Num(1000, false))).point[M]
       case ExtractMillennium(date) =>
-        Call(Select(ident("Math"), "ceil"), List(
-          BinOp(jscore.Div,
-            Call(Select(date, "getUTCFullYear"), Nil),
-            Literal(Js.Num(1000, false))))).point[M]
+        Call(ident("NumberLong"), List(
+          Call(Select(ident("Math"), "ceil"), List(
+            BinOp(jscore.Div,
+              Call(Select(date, "getUTCFullYear"), Nil),
+              Literal(Js.Num(1000, false))))))).point[M]
       case ExtractMilliseconds(date) =>
         BinOp(jscore.Add,
           Call(Select(date, "getUTCMilliseconds"), Nil),
@@ -394,20 +446,40 @@ object MongoDbQScriptPlanner {
           Call(Select(date, "getUTCMonth"), Nil),
           Literal(Js.Num(1, false))).point[M]
       case ExtractQuarter(date) =>
-        BinOp(jscore.Add,
-          BinOp(jscore.BitOr,
-            BinOp(jscore.Div,
-              Call(Select(date, "getUTCMonth"), Nil),
-              Literal(Js.Num(3, false))),
-            Literal(Js.Num(0, false))),
-          Literal(Js.Num(1, false))).point[M]
+        Call(ident("NumberInt"), List(
+          BinOp(jscore.Add,
+            BinOp(jscore.BitOr,
+              BinOp(jscore.Div,
+                Call(Select(date, "getUTCMonth"), Nil),
+                Literal(Js.Num(3, false))),
+              Literal(Js.Num(0, false))),
+            Literal(Js.Num(1, false))))).point[M]
       case ExtractSecond(date) =>
         BinOp(jscore.Add,
           Call(Select(date, "getUTCSeconds"), Nil),
           BinOp(jscore.Div,
             Call(Select(date, "getUTCMilliseconds"), Nil),
             Literal(Js.Num(1000, false)))).point[M]
-      case ExtractWeek(date) => unimplemented[M, JsCore]("ExtractWeek JS")
+      case ExtractWeek(date) =>
+        Call(ident("NumberInt"), List(
+          Call(Select(ident("Math"), "floor"), List(
+            BinOp(jscore.Add,
+              BinOp(jscore.Div,
+                Let(Name("startOfYear"),
+                  New(Name("Date"), List(
+                    Call(Select(date, "getFullYear"), Nil),
+                    Literal(Js.Num(0, false)),
+                    Literal(Js.Num(1, false)))),
+                  BinOp(jscore.Add,
+                    BinOp(Div,
+                      BinOp(Sub, date, ident("startOfYear")),
+                      Literal(Js.Num(86400000, false))),
+                    BinOp(jscore.Add,
+                      Call(Select(ident("startOfYear"), "getDay"), Nil),
+                      Literal(Js.Num(1, false))))),
+                Literal(Js.Num(7, false))),
+              Literal(Js.Num(1, false))))))).point[M]
+
       case ExtractYear(date) => Call(Select(date, "getUTCFullYear"), Nil).point[M]
 
       case Negate(a1)       => UnOp(Neg, a1).point[M]
@@ -466,7 +538,7 @@ object MongoDbQScriptPlanner {
         If(isInt(a1),
           // NB: This is a terrible way to turn an int into a string, but the
           //     only one that doesn’t involve converting to a decimal and
-          //     losing pre222222cision.
+          //     losing precision.
           Call(Select(Call(ident("String"), List(a1)), "replace"), List(
             Call(ident("RegExp"), List(
               Literal(Js.Str("[^-0-9]+")),
@@ -485,7 +557,8 @@ object MongoDbQScriptPlanner {
           List(a1)).point[M]
       case Substring(a1, a2, a3) =>
         Call(Select(a1, "substr"), List(a2, a3)).point[M]
-      // case ToId(a1) => Call(ident("ObjectId"), List(a1)).point[M]
+      case Split(a1, a2) =>
+        Call(Select(a1, "split"), List(a2)).point[M]
 
       case MakeMap(Embed(LiteralF(Js.Str(str))), a2) => Obj(ListMap(Name(str) -> a2)).point[M]
       // TODO: pull out the literal, and handle this case in other situations
@@ -493,7 +566,12 @@ object MongoDbQScriptPlanner {
        Arr(List(Arr(List(a1, a2)))))).point[M]
       case ConcatArrays(Embed(ArrF(a1)), Embed(ArrF(a2))) =>
         Arr(a1 |+| a2).point[M]
-      case ConcatArrays(a1, a2) => BinOp(jscore.Add, a1, a2).point[M]
+      case ConcatArrays(a1, a2) =>
+        If(BinOp(jscore.Or, isArray(a1), isArray(a2)),
+          Call(Select(a1, "concat"), List(a2)),
+          BinOp(jscore.Add, a1, a2)).point[M]
+      case ConcatMaps(Embed(ObjF(o1)), Embed(ObjF(o2))) =>
+        Obj(o1 ++ o2).point[M]
       case ConcatMaps(a1, a2) => SpliceObjects(List(a1, a2)).point[M]
       case ProjectField(a1, a2) => Access(a1, a2).point[M]
       case ProjectIndex(a1, a2) => Access(a1, a2).point[M]
@@ -519,10 +597,20 @@ object MongoDbQScriptPlanner {
             case Type.Date             => isDate
           }
         jsCheck(typ).fold[M[JsCore]](
-          merr.raiseError(qscriptPlanningFailed(InternalError.fromMsg("uncheckable type"))))(
+          raiseErr(qscriptPlanningFailed(InternalError.fromMsg("uncheckable type"))))(
           f => If(f(expr), cont, fallback).point[M])
 
-      case Range(_, _)        => unimplemented[M, JsCore]("Range JS")
+      // FIXME: Doesn't work for Char.
+      case Range(start, end)        =>
+        Call(
+          Select(
+            Call(Select(ident("Array"), "apply"), List(
+              Literal(Js.Null),
+              Call(ident("Array"), List(BinOp(Sub, end, start))))),
+            "map"),
+          List(
+            Fun(List(Name("element"), Name("index")),
+              BinOp(jscore.Add, ident("index"), start)))).point[M]
     }
 
     val handleSpecialDerived: MapFuncDerived[T, JsCore] => M[JsCore] = {
@@ -540,10 +628,9 @@ object MongoDbQScriptPlanner {
     mf => handleCommon(mf).cata(_.point[M], handleSpecial(mf))
   }
 
-  /** Need this until the old connector goes away and we can redefine `Selector`
-    * as `Selector[A, B]`, where `A` is the field type (naturally `BsonField`),
-    * and `B` is the recursive parameter.
-    */
+  // TODO: Need this until the old connector goes away and we can redefine
+  //       `Selector` as `Selector[A, B]`, where `A` is the field type
+  //       (naturally `BsonField`), and `B` is the recursive parameter.
   type PartialSelector[T[_[_]]] = Partial[T, BsonField, Selector]
 
   def defaultSelector[T[_[_]]]: PartialSelector[T] = (
@@ -553,22 +640,21 @@ object MongoDbQScriptPlanner {
     },
     List(Here[T]()))
 
-  /**
-   * The selector phase tries to turn expressions into MongoDB selectors -- i.e.
-   * Mongo query expressions. Selectors are only used for the filtering pipeline
-   * op, so it's quite possible we build more stuff than is needed (but it
-   * doesn’t matter, unneeded annotations will be ignored by the pipeline
-   * phase).
-   *
-   * Like the expression op phase, this one requires bson field annotations.
-   *
-   * Most expressions cannot be turned into selector expressions without using
-   * the "\$where" operator, which allows embedding JavaScript
-   * code. Unfortunately, using this operator turns filtering into a full table
-   * scan. We should do a pass over the tree to identify partial boolean
-   * expressions which can be turned into selectors, factoring out the leftovers
-   * for conversion using \$where.
-   */
+  /** The selector phase tries to turn expressions into MongoDB selectors – i.e.
+    * Mongo query expressions. Selectors are only used for the filtering
+    * pipeline op, so it's quite possible we build more stuff than is needed
+    * (but it doesn’t matter, unneeded annotations will be ignored by the
+    * pipeline phase).
+    *
+    * Like the expression op phase, this one requires bson field annotations.
+    *
+    * Most expressions cannot be turned into selector expressions without using
+    * the "\$where" operator, which allows embedding JavaScript
+    * code. Unfortunately, using this operator turns filtering into a full table
+    * scan. We should do a pass over the tree to identify partial boolean
+    * expressions which can be turned into selectors, factoring out the
+    * leftovers for conversion using \$where.
+    */
   def selector[T[_[_]]: RecursiveT: ShowT]:
       GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = { node =>
     import MapFuncsCore._
@@ -783,35 +869,25 @@ object MongoDbQScriptPlanner {
     invoke(node) <+> \/-(default)
   }
 
-  /** Brings a [[WorkflowBuilder.EitherE]] into our `M`.
-    */
-  def liftErr[M[_]: Applicative, A]
-    (meh: WorkflowBuilder.EitherE[A])
-    (implicit merr: MonadError_[M, FileSystemError])
-      : M[A] =
+  // TODO: Remove this type.
+  type WBM[X] = PlannerError \/ X
+
+  /** Brings a [[WBM]] into our `M`. */
+  def liftM[M[_]: Monad: MonadFsErr, A](meh: WBM[A]): M[A] =
     meh.fold(
-      e => merr.raiseError(qscriptPlanningFailed(e)),
+      e => raiseErr(qscriptPlanningFailed(e)),
       _.point[M])
 
-  /** Brings a [[WorkflowBuilder.M]] into our `M`. */
-  def liftM[M[_]: Monad, A]
-    (meh: WorkflowBuilder.M[A])
-    (implicit merr: MonadError_[M, FileSystemError], mst: MonadState_[M, NameGen])
-      : M[A] =
-    mst.gets(meh.eval) >>= (liftErr[M, A](_))
-
-  def createFieldName(i: Int): String = "f" + i.toString
+  def createFieldName(prefix: String, i: Int): String = prefix + i.toString
 
   trait Planner[F[_]] {
     type IT[G[_]]
 
     def plan
-      [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-      (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
+      [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+      (joinHandler: JoinHandler[WF, WBM],
         funcHandler: MapFunc[IT, ?] ~> OptionFree[EX, ?])
       (implicit
-        merr: MonadError_[M, FileSystemError],
-        mst:  MonadState_[M, NameGen],
         ev0: WorkflowOpCoreF :<: WF,
         ev1: RenderTree[WorkflowBuilder[WF]],
         ev2: WorkflowBuilder.Ops[WF],
@@ -824,16 +900,14 @@ object MongoDbQScriptPlanner {
 
     def apply[T[_[_]], F[_]](implicit ev: Planner.Aux[T, F]) = ev
 
-    implicit def shiftedReadFile[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead[AFile], ?]] =
+    implicit def shiftedReadFile[T[_[_]]: BirecursiveT: ShowT]: Planner.Aux[T, Const[ShiftedRead[AFile], ?]] =
       new Planner[Const[ShiftedRead[AFile], ?]] {
         type IT[G[_]] = T[G]
         def plan
-          [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-          (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
+          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+          (joinHandler: JoinHandler[WF, WBM],
             funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
           (implicit
-            merr: MonadError_[M, FileSystemError],
-            mst:  MonadState_[M, NameGen],
             ev0: WorkflowOpCoreF :<: WF,
             ev1: RenderTree[WorkflowBuilder[WF]],
             WB: WorkflowBuilder.Ops[WF],
@@ -841,16 +915,25 @@ object MongoDbQScriptPlanner {
           qs => Collection
             .fromFile(qs.getConst.path)
             .fold(
-              e => merr.raiseError(qscriptPlanningFailed(PlanPathError(e))),
+              e => raiseErr(qscriptPlanningFailed(PlanPathError(e))),
               coll => {
                 val dataset = WB.read(coll)
                 // TODO: exclude `_id` from the value here?
-                (qs.getConst.idStatus match {
-                  case IdOnly => ExprBuilder(dataset, $field("_id").right)
+                qs.getConst.idStatus match {
+                  case IdOnly    =>
+                    getExprBuilder[T, M, WF, EX](
+                      funcHandler)(
+                      dataset,
+                        Free.roll(MFC(MapFuncsCore.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))))
                   case IncludeId =>
-                    ArrayBuilder(dataset, List($field("_id").right, $$ROOT.right))
-                  case ExcludeId => dataset
-                }).point[M]
+                    getExprBuilder[T, M, WF, EX](
+                      funcHandler)(
+                      dataset,
+                        MapFuncCore.StaticArray(List(
+                          Free.roll(MFC(MapFuncsCore.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))),
+                          HoleF)))
+                  case ExcludeId => dataset.point[M]
+                }
               })
       }
 
@@ -861,74 +944,90 @@ object MongoDbQScriptPlanner {
 
         @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def plan
-          [M[_]: Monad,
+          [M[_]: Monad: ExecTimeR: MonadFsErr,
             WF[_]: Functor: Coalesce: Crush: Crystallize,
             EX[_]: Traverse]
-          (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
+          (joinHandler: JoinHandler[WF, WBM],
             funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
           (implicit
-            merr: MonadError_[M, FileSystemError],
-            mst:  MonadState_[M, NameGen],
             ev0: WorkflowOpCoreF :<: WF,
             ev1: RenderTree[WorkflowBuilder[WF]],
             WB: WorkflowBuilder.Ops[WF],
             ev3: EX :<: ExprOp) = {
           case qscript.Map(src, f) => getExprBuilder[T, M, WF, EX](funcHandler)(src, f)
           case LeftShift(src, struct, id, repair) =>
-            (getExprBuilder[T, M, WF, EX](funcHandler)(src, struct) ⊛
-              (if (repair.contains(LeftSideF))
-                 getJsMerge[T, M](
-                   repair,
-                   jscore.Access(jscore.Ident(JsFn.defaultName), jscore.Literal(Js.Num(0, false))),
-                   jscore.Access(jscore.Ident(JsFn.defaultName), jscore.Literal(Js.Num(1, false)))).map(_.left)
-               else
-                 getJsFn[T, M](repair.as(SrcHole)).map(_.right)))(
-              (expr, jm) => jm.fold(WB.jsArrayExpr(List(src, WB.flattenMap(expr)), _), WB.jsExpr1(WB.flattenMap(expr), _).point[WorkflowBuilder.M])).map(liftM[M, WorkflowBuilder[WF]]).join
+            if (repair.contains(LeftSideF))
+              (handleFreeMap[T, M, EX](funcHandler, struct) ⊛
+                getJsMerge[T, M](
+                  repair,
+                  jscore.Select(jscore.Ident(JsFn.defaultName), "s"),
+                  jscore.Select(jscore.Ident(JsFn.defaultName), "f")))((expr, j) =>
+              ExprBuilder(
+                FlatteningBuilder(
+                  DocBuilder(
+                    src,
+                    ListMap(
+                      BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                      BsonField.Name("f") -> expr)),
+                  // TODO: Handle arrays properly
+                  Set(StructureType.Object(DocField(BsonField.Name("f")), id))),
+                -\&/(j)))
+            else
+              getExprBuilder[T, M, WF, EX](funcHandler)(src, struct) >>= (builder =>
+                getExprBuilder[T, M, WF, EX](
+                  funcHandler)(
+                  FlatteningBuilder(
+                    builder,
+                    Set(StructureType.Object(DocVar.ROOT(), id))),
+                    repair.as(SrcHole)))
           case Reduce(src, bucket, reducers, repair) =>
-            (getExprBuilder[T, M, WF, EX](funcHandler)(src, bucket) ⊛
-              reducers.traverse(_.traverse(fm => handleFreeMap[T, M, EX](funcHandler, fm))))((b, red) => {
-                val newB = b.unFix match {
-                  case ArrayBuilderF(src, elems) => DocBuilder(src, elems.zipWithIndex.map(_.map(i => BsonField.Name(i.toString)).swap).toListMap)
-                  case _ => b
-                }
+            (bucket.traverse(handleFreeMap[T, M, EX](funcHandler, _)) ⊛
+              reducers.traverse(_.traverse(handleFreeMap[T, M, EX](funcHandler, _))))((b, red) => {
                 getReduceBuilder[T, M, WF, EX](
                   funcHandler)(
-                  red.map(_.sequence).sequence.fold(
-                    κ(GroupBuilder(DocBuilder(src, red.unite.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName(i))).swap).toListMap), // FIXME: Doesn’t work with UnshiftMap
-                      List(newB),
-                      Contents.Doc(red.zipWithIndex.map(ai =>
-                        (BsonField.Name(createFieldName(ai._2)),
-                          accumulator(ai._1.as($field(createFieldName(ai._2)))).left[Fix[ExprOp]])).toListMap))),
-                    exprs => GroupBuilder(src,
-                      List(newB),
-                      Contents.Doc(exprs.zipWithIndex.map(ai =>
-                        (BsonField.Name(createFieldName(ai._2)),
-                          accumulator(ai._1).left[Fix[ExprOp]])).toListMap))),
+                  // TODO: This work should probably be done in `toWorkflow`.
+                  semiAlignExpr[λ[α => List[ReduceFunc[α]]]](red)(Traverse[List].compose).fold(
+                    WB.groupBy(
+                      DocBuilder(
+                        src,
+                        // FIXME: Doesn’t work with UnshiftMap
+                        red.unite.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName("f", i))).swap).toListMap ++
+                          b.zipWithIndex.map(_.map(i => BsonField.Name(createFieldName("b", i))).swap).toListMap),
+                      b.zipWithIndex.map(p => docVarToExpr(DocField(BsonField.Name(createFieldName("b", p._2))))),
+                      red.zipWithIndex.map(ai =>
+                        (BsonField.Name(createFieldName("f", ai._2)),
+                          accumulator(ai._1.as($field(createFieldName("f", ai._2)))))).toListMap))(
+                    exprs => WB.groupBy(src,
+                      b,
+                      exprs.zipWithIndex.map(ai =>
+                        (BsonField.Name(createFieldName("f", ai._2)),
+                          accumulator(ai._1))).toListMap)),
                     repair)
               }).join
           case Sort(src, bucket, order) =>
-            val (keys, dirs) = (bucket match {
-              case MapFuncsCore.NullLit() => order
-              case _                  => (bucket, SortDir.Ascending) <:: order
-            }).unzip
-            keys.traverse(getExprBuilder[T, M, WF, EX](funcHandler)(src, _))
+            val (keys, dirs) = (bucket.toIList.map((_, SortDir.asc)) <::: order).unzip
+            keys.traverse(handleFreeMap[T, M, EX](funcHandler, _))
               .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
           case Filter(src, cond) =>
             getSelector[T, M, EX](cond).fold(
-              // FIXME: If this is an ExprOp, then do this, but if it’s JS, we
-              //        should use a `Where` selector instead.
-              _ => getExprBuilder[T, M, WF, EX](funcHandler)(src, cond).map(cond =>
-                WB.filter(src, List(cond), {
+              _ => handleFreeMap[T, M, EX](funcHandler, cond).map {
+                // TODO: Postpone decision until we know whether we are going to
+                //       need mapReduce anyway.
+                case cond @ HasThat(_) => WB.filter(src, List(cond), {
                   case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
-                })),
+                })
+                case \&/.This(js) => WB.filter(src, Nil, {
+                  case Nil => Selector.Where(js(jscore.ident("this")).toJs)
+                })
+              },
               {
                 case (sel, inputs) =>
-                  inputs.traverse(f => getExprBuilder[T, M, WF, EX](funcHandler)(src, f(cond))).map(WB.filter(src, _, sel))
+                  inputs.traverse(f => handleFreeMap[T, M, EX](funcHandler, f(cond))).map(WB.filter(src, _, sel))
               })
           case Union(src, lBranch, rBranch) =>
             (rebaseWB[T, M, WF, EX](joinHandler, funcHandler, lBranch, src) ⊛
               rebaseWB[T, M, WF, EX](joinHandler, funcHandler, rBranch, src))(
-              WB.unionAll).map(liftM[M, WorkflowBuilder[WF]]).join
+              UnionBuilder(_, _))
           case Subset(src, from, sel, count) =>
             (rebaseWB[T, M, WF, EX](joinHandler, funcHandler, from, src) ⊛
               (rebaseWB[T, M, WF, EX](joinHandler, funcHandler, count, src) >>= (HasInt[M, WF](_))))(
@@ -938,7 +1037,8 @@ object MongoDbQScriptPlanner {
                 // TODO: Better sampling
                 case Sample => WB.limit
               })
-          case Unreferenced() => ValueBuilder(Bson.Null).point[M]
+          case Unreferenced() =>
+            CollectionBuilder($pure(Bson.Null), WorkflowBuilder.Root(), none).point[M]
         }
       }
 
@@ -948,30 +1048,32 @@ object MongoDbQScriptPlanner {
       new Planner[EquiJoin[T, ?]] {
         type IT[G[_]] = T[G]
         def plan
-          [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-          (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
+          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+          (joinHandler: JoinHandler[WF, WBM],
             funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
           (implicit
-            merr: MonadError_[M, FileSystemError],
-            mst:  MonadState_[M, NameGen],
             ev0: WorkflowOpCoreF :<: WF,
             ev1: RenderTree[WorkflowBuilder[WF]],
             ev2: WorkflowBuilder.Ops[WF],
             ev3: EX :<: ExprOp) =
           qs =>
-        // FIXME: we should take advantage of the already merged srcs
         (rebaseWB[T, M, WF, EX](joinHandler, funcHandler, qs.lBranch, qs.src) ⊛
-          rebaseWB[T, M, WF, EX](joinHandler, funcHandler, qs.rBranch, qs.src) ⊛
-          getExprBuilder[T, M, WF, EX](funcHandler)(qs.src, qs.lKey) ⊛
-          getExprBuilder[T, M, WF, EX](funcHandler)(qs.src, qs.rKey) ⊛
-          getJsFn[T, M](qs.lKey).map(_.some).handleError(κ(none.point[M])) ⊛
-          getJsFn[T, M](qs.rKey).map(_.some).handleError(κ(none.point[M])))(
-          (lb, rb, lk, rk, lj, rj) =>
-          liftM[M, WorkflowBuilder[WF]](joinHandler.run(
-            // FIXME: `LogicalPlan` join functions are deprecated in favor of `logicalplan.Join`
-            LogicalPlan.funcFromJoinType(qs.f),
-            JoinSource(lb, List(lk), lj.map(List(_))),
-            JoinSource(rb, List(rk), rj.map(List(_)))))).join
+          rebaseWB[T, M, WF, EX](joinHandler, funcHandler, qs.rBranch, qs.src))(
+          (lb, rb) => {
+            val (lKey, rKey) = Unzip[List].unzip(qs.key)
+
+            (lKey.traverse(handleFreeMap[T, M, EX](funcHandler, _)) ⊛
+              rKey.traverse(handleFreeMap[T, M, EX](funcHandler, _)))(
+              (lk, rk) =>
+              liftM[M, WorkflowBuilder[WF]](joinHandler.run(
+                qs.f,
+                JoinSource(lb, lk),
+                JoinSource(rb, rk))) >>=
+                (getExprBuilder[T, M, WF, EX](funcHandler)(_, qs.combine >>= {
+                  case LeftSide => Free.roll(MFC(MapFuncsCore.ProjectField(HoleF, MapFuncsCore.StrLit("left"))))
+                  case RightSide => Free.roll(MFC(MapFuncsCore.ProjectField(HoleF, MapFuncsCore.StrLit("right"))))
+                }))).join
+          }).join
       }
 
     implicit def coproduct[T[_[_]], F[_], G[_]](
@@ -980,12 +1082,10 @@ object MongoDbQScriptPlanner {
       new Planner[Coproduct[F, G, ?]] {
         type IT[G[_]] = T[G]
         def plan
-          [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-          (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
+          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+          (joinHandler: JoinHandler[WF, WBM],
             funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
           (implicit
-            merr: MonadError_[M, FileSystemError],
-            mst:  MonadState_[M, NameGen],
             ev0: WorkflowOpCoreF :<: WF,
             ev1: RenderTree[WorkflowBuilder[WF]],
             ev2: WorkflowBuilder.Ops[WF],
@@ -995,7 +1095,6 @@ object MongoDbQScriptPlanner {
             G.plan[M, WF, EX](joinHandler, funcHandler))
       }
 
-
     // TODO: All instances below here only need to exist because of `FreeQS`,
     //       but can’t actually be called.
 
@@ -1004,17 +1103,15 @@ object MongoDbQScriptPlanner {
         type IT[G[_]] = T[G]
 
         def plan
-          [M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-          (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
+          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+          (joinHandler: JoinHandler[WF, WBM],
             funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
           (implicit
-            merr: MonadError_[M, FileSystemError],
-            mst:  MonadState_[M, NameGen],
             ev0: WorkflowOpCoreF :<: WF,
             ev1: RenderTree[WorkflowBuilder[WF]],
             ev2: WorkflowBuilder.Ops[WF],
             ev3: EX :<: ExprOp) =
-          κ(merr.raiseError(qscriptPlanningFailed(InternalError.fromMsg(s"should not be reached: $label"))))
+          κ(raiseErr(qscriptPlanningFailed(InternalError.fromMsg(s"should not be reached: $label"))))
       }
 
     implicit def deadEnd[T[_[_]]]: Planner.Aux[T, Const[DeadEnd, ?]] =
@@ -1033,59 +1130,54 @@ object MongoDbQScriptPlanner {
       default("ProjectBucket")
   }
 
-  def getExpr[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
-    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
-    (fm: FreeMap[T])
-    (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
-      : M[Fix[ExprOp]] =
+  def getExpr[
+    T[_[_]]: BirecursiveT: ShowT,
+    M[_]: Monad: ExecTimeR: MonadFsErr, EX[_]: Traverse: Inject[?[_], ExprOp]]
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])(fm: FreeMap[T]
+  ) : M[Fix[ExprOp]] =
     processMapFuncExpr[T, M, EX, Hole](funcHandler)(fm)(κ($$ROOT))
 
-  def getJsFn[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad]
+  def getJsFn[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
     (fm: FreeMap[T])
-    (implicit merr: MonadError_[M, FileSystemError])
       : M[JsFn] =
     processMapFunc[T, M, Hole](fm)(κ(jscore.Ident(JsFn.defaultName))) ∘
       (JsFn(JsFn.defaultName, _))
 
   def getBuilder
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse, A]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_], EX[_]: Traverse, A]
     (handler: FreeMapA[T, A] => M[Expr])
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, A])
-    (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
+    (implicit ev: EX :<: ExprOp)
       : M[WorkflowBuilder[WF]] =
     fm.project match {
-      // TODO: identify cases for SpliceBuilder.
-      case MapFuncCore.StaticArray(elems) =>
-        elems.traverse(handler) ∘ (ArrayBuilder(src, _))
       case MapFuncCore.StaticMap(elems) =>
         elems.traverse(_.bitraverse({
           case Embed(MapFuncCore.EC(ejson.Str(key))) => BsonField.Name(key).point[M]
-          case key => merr.raiseError[BsonField.Name](qscriptPlanningFailed(InternalError.fromMsg(s"Unsupported object key: ${key.shows}")))
+          case key => raiseErr[M, BsonField.Name](qscriptPlanningFailed(InternalError.fromMsg(s"Unsupported object key: ${key.shows}")))
         },
           handler)) ∘
         (es => DocBuilder(src, es.toListMap))
-      case co => handler(co.embed) ∘ (ExprBuilder(src, _))
+      case _ => handler(fm) ∘ (ExprBuilder(src, _))
     }
 
   def getExprBuilder
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, WF[_], EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (src: WorkflowBuilder[WF], fm: FreeMap[T])
-    (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
+    (implicit ev: EX :<: ExprOp)
       : M[WorkflowBuilder[WF]] =
     getBuilder[T, M, WF, EX, Hole](handleFreeMap[T, M, EX](funcHandler, _))(src, fm)
 
   def getReduceBuilder
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, WF[_], EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, ReduceIndex])
-    (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
+    (implicit ev: EX :<: ExprOp)
       : M[WorkflowBuilder[WF]] =
     getBuilder[T, M, WF, EX, ReduceIndex](handleRedRepair[T, M, EX](funcHandler, _))(src, fm)
 
-  def getJsMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad]
+  def getJsMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
     (jf: JoinFunc[T], a1: JsCore, a2: JsCore)
-    (implicit merr: MonadError_[M, FileSystemError])
       : M[JsFn] =
     processMapFunc[T, M, JoinSide](
       jf) {
@@ -1093,50 +1185,54 @@ object MongoDbQScriptPlanner {
       case RightSide => a2
     } ∘ (JsFn(JsFn.defaultName, _))
 
-  def exprOrJs[M[_]: Functor, A]
+  def exprOrJs[M[_]: Applicative: MonadFsErr, A]
     (a: A)
     (exf: A => M[Fix[ExprOp]], jsf: A => M[JsFn])
-    (implicit merr: MonadError_[M, FileSystemError])
-      : M[Expr] =
-    merr.handleError(
-      exf(a).map(_.right[JsFn]))(
-      _ => jsf(a).map(_.left[Fix[ExprOp]]))
+      : M[Expr] = {
+    // TODO: Return _both_ errors
+    val js = jsf(a)
+    val expr = exf(a)
+    handleErr[M, Expr](
+      (js ⊛ expr)(\&/.Both(_, _)))(
+      _ => handleErr[M, Expr](js.map(-\&/))(_ => expr.map(\&/-)))
+  }
 
-  def handleFreeMap[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+  def handleFreeMap[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], fm: FreeMap[T])
-    (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
+    (implicit ev: EX :<: ExprOp)
       : M[Expr] =
     exprOrJs(fm)(getExpr[T, M, EX](funcHandler)(_), getJsFn[T, M])
 
-  def handleRedRepair[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+  def handleRedRepair[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], jr: FreeMapA[T, ReduceIndex])
-    (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
+    (implicit ev: EX :<: ExprOp)
       : M[Expr] =
     exprOrJs(jr)(getExprRed[T, M, EX](funcHandler)(_), getJsRed[T, M])
 
-  def getExprRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
+  def getExprRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (jr: FreeMapA[T, ReduceIndex])
-    (implicit merr: MonadError_[M, FileSystemError], ev: EX :<: ExprOp)
+    (implicit ev: EX :<: ExprOp)
       : M[Fix[ExprOp]] =
-    processMapFuncExpr[T, M, EX, ReduceIndex](funcHandler)(jr)(ri => $field(ri.idx.fold("_id")(createFieldName)))
+    processMapFuncExpr[T, M, EX, ReduceIndex](funcHandler)(jr)(_.idx.fold(
+      i => $field("_id", i.toString),
+      i => $field(createFieldName("f", i))))
 
-  def getJsRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad]
+  def getJsRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
     (jr: Free[MapFunc[T, ?], ReduceIndex])
-    (implicit merr: MonadError_[M, FileSystemError])
       : M[JsFn] =
-    processMapFunc[T, M, ReduceIndex](jr)(ri => jscore.Access(jscore.Ident(JsFn.defaultName), jscore.Literal(Js.Str(ri.idx.fold("_id")(createFieldName))))) ∘
+    processMapFunc[T, M, ReduceIndex](jr)(_.idx.fold(
+      i => jscore.Select(jscore.Select(jscore.Ident(JsFn.defaultName), "_id"), i.toString),
+      i => jscore.Select(jscore.Ident(JsFn.defaultName), createFieldName("f", i)))) ∘
       (JsFn(JsFn.defaultName, _))
 
   def rebaseWB
-    [T[_[_]]: EqualT, M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
-    (joinHandler: JoinHandler[WF, WorkflowBuilder.M],
+    [T[_[_]]: EqualT, M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+    (joinHandler: JoinHandler[WF, WBM],
       funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?],
       free: FreeQS[T],
       src: WorkflowBuilder[WF])
     (implicit
-      merr: MonadError_[M, FileSystemError],
-      mst:  MonadState_[M, NameGen],
       F: Planner.Aux[T, QScriptTotal[T, ?]],
       ev0: WorkflowOpCoreF :<: WF,
       ev1: RenderTree[WorkflowBuilder[WF]],
@@ -1148,23 +1244,23 @@ object MongoDbQScriptPlanner {
 
   // TODO: Need `Delay[Show, WorkflowBuilder]`
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def HasLiteral[M[_]: Applicative, WF[_]]
+  def HasLiteral[M[_]: Applicative: MonadFsErr, WF[_]]
     (wb: WorkflowBuilder[WF])
-    (implicit merr: MonadError_[M, FileSystemError])
+    (implicit ev0: WorkflowOpCoreF :<: WF)
       : M[Bson] =
     asLiteral(wb).fold(
-      merr.raiseError[Bson](qscriptPlanningFailed(NonRepresentableEJson(wb.toString))))(
+      raiseErr[M, Bson](qscriptPlanningFailed(NonRepresentableEJson(wb.toString))))(
       _.point[M])
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def HasInt[M[_]: Monad, WF[_]]
+  def HasInt[M[_]: Monad: MonadFsErr, WF[_]]
     (wb: WorkflowBuilder[WF])
-    (implicit merr: MonadError_[M, FileSystemError])
+    (implicit ev0: WorkflowOpCoreF :<: WF)
       : M[Long] =
     HasLiteral[M, WF](wb) >>= {
       case Bson.Int32(v) => v.toLong.point[M]
       case Bson.Int64(v) => v.point[M]
-      case x => merr.raiseError(qscriptPlanningFailed(NonRepresentableEJson(x.toString)))
+      case x => raiseErr(qscriptPlanningFailed(NonRepresentableEJson(x.toString)))
     }
 
   // This is maybe worth putting in Matryoshka?
@@ -1173,9 +1269,8 @@ object MongoDbQScriptPlanner {
       CoalgebraM[A \/ ?, F, T[F]] =
     tf => (f.lift(tf) \/> tf.project).swap
 
-  def elideMoreGeneralGuards[M[_]: Applicative, T[_[_]]: RecursiveT]
+  def elideMoreGeneralGuards[M[_]: Applicative: MonadFsErr, T[_[_]]: RecursiveT]
     (subType: Type)
-    (implicit merr: MonadError_[M, FileSystemError])
       : CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {
     def f: CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {
       case free @ CoEnv(\/-(MFC(MapFuncsCore.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, fb)))) =>
@@ -1184,7 +1279,7 @@ object MongoDbQScriptPlanner {
         else {
           val union = subType ⨯ typ
           if (union ≟ Type.Bottom)
-            merr.raiseError(qscriptPlanningFailed(InternalError.fromMsg(s"can only contain ${subType.shows}, but a(n) ${typ.shows} is expected")))
+            raiseErr(qscriptPlanningFailed(InternalError.fromMsg(s"can only contain ${subType.shows}, but a(n) ${typ.shows} is expected")))
           else {
             CoEnv[Hole, MapFunc[T, ?], FreeMap[T]](MFC(MapFuncsCore.Guard[T, FreeMap[T]](HoleF[T], union, cont, fb)).right).point[M]
           }
@@ -1200,38 +1295,56 @@ object MongoDbQScriptPlanner {
   //       generate more correct PatternGuards in the first place, rather than
   //       trying to strip out unnecessary ones after the fact
   // FIXME: This doesn’t yet traverse branches, so it leaves in some checks.
-  def assumeReadType[M[_]: Monad, T[_[_]]: BirecursiveT, F[_]: Functor]
+  def assumeReadType[M[_]: Monad: MonadFsErr, T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Functor]
     (typ: Type)
     (implicit
-      merr: MonadError_[M, FileSystemError],
       QC: QScriptCore[T, ?] :<: F,
       SR: Const[ShiftedRead[AFile], ?] :<: F)
       : QScriptCore[T, T[F]] => M[F[T[F]]] = {
     case f @ Filter(src, cond) =>
-      SR.prj(src.project) match {
-        case Some(Const(ShiftedRead(_, ExcludeId))) =>
-          cond.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
-            (c => QC.inj(Filter(src, c)))
+      src.project match {
+        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
+           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
+           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
+           | SR(Const(ShiftedRead(_, ExcludeId))) =>
+          ((MapFuncCore.flattenAnd(cond))
+            .traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))))
+            .map(_.toList.filter {
+              case MapFuncsCore.BoolLit(true) => false
+              case _                      => true
+            } match {
+              case Nil    => src.project
+              case h :: t => QC(Filter(src, t.foldLeft[FreeMap[T]](h)((acc, e) => Free.roll(MFC(MapFuncsCore.And(acc, e))))))
+            })
         case _ => QC.inj(f).point[M]
       }
     case ls @ LeftShift(src, struct, id, repair) =>
-      SR.prj(src.project) match {
-        case Some(Const(ShiftedRead(_, ExcludeId))) =>
+      src.project match {
+        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
+           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
+           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
+           | SR(Const(ShiftedRead(_, ExcludeId))) =>
           struct.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
           (struct => QC.inj(LeftShift(src, struct, id, repair)))
         case _ => QC.inj(ls).point[M]
       }
     case m @ qscript.Map(src, mf) =>
-      SR.prj(src.project) match {
-        case Some(Const(ShiftedRead(_, ExcludeId))) =>
+      src.project match {
+        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
+           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
+           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
+           | SR(Const(ShiftedRead(_, ExcludeId))) =>
           mf.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
           (mf => QC.inj(qscript.Map(src, mf)))
         case _ => QC.inj(m).point[M]
       }
     case r @ Reduce(src, b, red, rep) =>
-      SR.prj(src.project) match {
-        case Some(Const(ShiftedRead(_, ExcludeId))) =>
-          (b.transCataM(elideMoreGeneralGuards[M, T](typ)) ⊛
+      src.project match {
+        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
+           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
+           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
+           | SR(Const(ShiftedRead(_, ExcludeId))) =>
+          (b.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))) ⊛
             red.traverse(_.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ)))))(
             (b, red) => QC.inj(Reduce(src, b, red, rep)))
         case _ => QC.inj(r).point[M]
@@ -1239,8 +1352,6 @@ object MongoDbQScriptPlanner {
     case qc =>
       QC.inj(qc).point[M]
   }
-
-  type GenT[X[_], A]  = StateT[X, NameGen, A]
 
   // TODO: This should perhaps be _in_ PhaseResults or something
   def log[M[_]: Monad, A: RenderTree]
@@ -1252,11 +1363,9 @@ object MongoDbQScriptPlanner {
   type MongoQScriptCP[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
   type MongoQScript[T[_[_]], A] = MongoQScriptCP[T]#M[A]
 
-  def toMongoQScript[T[_[_]] : BirecursiveT: EqualT: RenderTreeT: ShowT, M[_] : Monad](
+  def toMongoQScript[T[_[_]] : BirecursiveT: EqualT: RenderTreeT: ShowT, M[_]: Monad: MonadFsErr: PhaseResultTell](
     lp: T[LogicalPlan],
-    listContents: DiscoverPath.ListContents[M])(implicit
-    merr: MonadError_[M, FileSystemError],
-    mtell: MonadTell_[M, PhaseResults]
+    listContents: DiscoverPath.ListContents[M]
   ): M[T[MongoQScript[T, ?]]] = {
     val rewrite = new Rewrite[T]
     val optimize = new Optimize[T]
@@ -1281,32 +1390,32 @@ object MongoDbQScriptPlanner {
 
   def plan0
     [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
-      M[_]: Monad,
+      M[_]: Monad: PhaseResultTell: MonadFsErr: ExecTimeR,
       WF[_]: Functor: Coalesce: Crush: Crystallize,
       EX[_]: Traverse]
     (listContents: DiscoverPath.ListContents[M],
-      joinHandler: JoinHandler[WF, WorkflowBuilder.M],
+      joinHandler: JoinHandler[WF, WBM],
       funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?])
     (lp: T[LogicalPlan])
     (implicit
-      merr: MonadError_[M, FileSystemError],
-      mtell: MonadTell_[M, PhaseResults],
       ev0: WorkflowOpCoreF :<: WF,
       ev1: WorkflowBuilder.Ops[WF],
       ev2: EX :<: ExprOp,
       ev3: RenderTree[Fix[WF]])
       : M[Crystallized[WF]] = {
 
-    (for {
-      opt <- toMongoQScript(lp, listContents).liftM[GenT]
+    for {
+      opt <- toMongoQScript(lp, listContents)
       wb  <- log(
         "Workflow Builder",
-        opt.cataM[GenT[M, ?], WorkflowBuilder[WF]](Planner[T, MongoQScript[T, ?]].plan[GenT[M, ?], WF, EX](joinHandler, funcHandler) ∘ (_ ∘ (_.mapR(normalize)))))
-      wf1 <- log("Workflow (raw)", liftM[GenT[M, ?], Fix[WF]](WorkflowBuilder.build(wb)))
+        opt.cataM[M, WorkflowBuilder[WF]](
+          Planner[T, MongoQScript[T, ?]].plan[M, WF, EX](joinHandler, funcHandler).apply(_) ∘
+            (_.transCata[Fix[WorkflowBuilderF[WF, ?]]](repeatedly(WorkflowBuilder.normalize[WF, Fix[WorkflowBuilderF[WF, ?]]])))))
+      wf1 <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb)))
       wf2 <- log(
         "Workflow (crystallized)",
-        Crystallize[WF].crystallize(wf1).point[GenT[M, ?]])
-    } yield wf2).evalZero
+        Crystallize[WF].crystallize(wf1).point[M])
+    } yield wf2
   }
 
   /** Translate the QScript plan to an executable MongoDB "physical"
@@ -1316,28 +1425,34 @@ object MongoDbQScriptPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, M[_]: Monad]
-    (logical: T[LogicalPlan], queryContext: fs.QueryContext[M])
-    (implicit
-      merr: MonadError_[M, FileSystemError],
-      mtell: MonadTell_[M, PhaseResults])
-      : M[Crystallized[WorkflowF]] = {
+  def plan[
+    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+    M[_]: Monad: PhaseResultTell: MonadFsErr: ExecTimeR]
+    (logical: T[LogicalPlan], queryContext: fs.QueryContext[M]
+    ): M[Crystallized[WorkflowF]] = {
     import MongoQueryModel._
 
     queryContext.model match {
+      case `3.4` =>
+        val joinHandler =
+          JoinHandler.fallback[Workflow3_2F, WBM](
+            JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
+            JoinHandler.mapReduce)
+        plan0[T, M, Workflow3_2F, Expr3_4](queryContext.listContents, joinHandler, FuncHandler.handle3_4[MapFunc[T, ?]])(logical)
+
       case `3.2` =>
         val joinHandler =
-          JoinHandler.fallback(
-            JoinHandler.pipeline[Workflow3_2F](queryContext.statistics, queryContext.indexes),
-            JoinHandler.mapReduce[Workflow3_2F])
+          JoinHandler.fallback[Workflow3_2F, WBM](
+            JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
+            JoinHandler.mapReduce)
         plan0[T, M, Workflow3_2F, Expr3_2](queryContext.listContents, joinHandler, FuncHandler.handle3_2[MapFunc[T, ?]])(logical)
 
       case `3.0`     =>
-        val joinHandler = JoinHandler.mapReduce[Workflow2_6F]
+        val joinHandler = JoinHandler.mapReduce[WBM, Workflow2_6F]
         plan0[T, M, Workflow2_6F, Expr3_0](queryContext.listContents, joinHandler, FuncHandler.handle3_0[MapFunc[T, ?]])(logical).map(_.inject[WorkflowF])
 
       case _     =>
-        val joinHandler = JoinHandler.mapReduce[Workflow2_6F]
+        val joinHandler = JoinHandler.mapReduce[WBM, Workflow2_6F]
         plan0[T, M, Workflow2_6F, Expr2_6](queryContext.listContents, joinHandler, FuncHandler.handle2_6[MapFunc[T, ?]])(logical).map(_.inject[WorkflowF])
     }
   }

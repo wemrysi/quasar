@@ -529,6 +529,11 @@ final case class $SimpleMapF[A](src: A, exprs: NonEmptyList[CardinalExpr[JsFn]],
               Js.Block(List(
                 Js.VarDef(List(n -> m(b).toJs)),
                 inner(ident(n))))
+            case ((SubExpr(p, m), n), inner) => b =>
+              Js.Block(List(
+                Js.VarDef(List(n -> b.toJs)),
+                unsafeAssign(p(ident(n)), m(b)),
+                inner(ident(n))))
             case ((FlatExpr(m), n), inner) => b =>
               Js.ForIn(Js.Ident("elem"), m(b).toJs,
                 Js.Block(List(
@@ -556,7 +561,7 @@ final case class $SimpleMapF[A](src: A, exprs: NonEmptyList[CardinalExpr[JsFn]],
   def raw = {
     import quasar.jscore._
 
-    val funcs = (exprs).map(_.copoint(ident("_")).para(findFunctionsƒ)).foldLeft(Set[String]())(_ ++ _)
+    val funcs = (exprs).foldRight(Set[String]())(_.foldLeft(_)(_ ++ _(ident("_")).para(findFunctionsƒ)))
 
     exprs match {
       case NonEmptyList(MapExpr(expr), INil()) =>
@@ -606,7 +611,10 @@ object $SimpleMapF {
             Js.BinOp("==", Js.Ident("src"), Js.Null)),
           Js.Return(Js.Ident("src")),
           None),
-        Js.VarDef(List("dest" -> Js.New(Js.Select(Js.Ident("src"), "constructor")))),
+        Js.VarDef(List("dest" ->
+          Js.Ternary(Js.BinOp("instanceof", Js.Ident("src"), Js.Ident("Date")),
+            Js.New(Js.Call(Js.Ident("Date"), List(Js.Ident("src")))),
+            Js.New(Js.Select(Js.Ident("src"), "constructor"))))),
         Js.ForIn(Js.Ident("i"), Js.Ident("src"),
           Js.BinOp ("=",
             Js.Access(Js.Ident("dest"), Js.Ident("i")),
@@ -897,7 +905,8 @@ object WorkflowOpCoreF {
           NonTerminal(nt, None,
             exprs.toList.map {
               case MapExpr(e)  => NonTerminal("Map" :: nt, None, List(e.render))
-        case FlatExpr(e) => NonTerminal("Flatten" :: nt, None, List(e.render))
+              case SubExpr(p, e) => NonTerminal("SubMap" :: nt, None, List(p.render, e.render))
+              case FlatExpr(e) => NonTerminal("Flatten" :: nt, None, List(e.render))
             } :+
               Terminal("Scope" :: nt, Some((scope ∘ (_.toJs.pprint(2))).toString)))
         case $ReduceF(_, fn, scope) =>

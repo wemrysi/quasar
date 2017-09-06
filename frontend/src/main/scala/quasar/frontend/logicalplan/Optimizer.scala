@@ -30,8 +30,10 @@ import quasar.sql.JoinDir
 import scala.Predef.$conforms
 
 import matryoshka._
+import matryoshka.data._
 import matryoshka.implicits._
-import scalaz._, Scalaz.{ToIdOps => _, _}
+import matryoshka.patterns._
+import scalaz.{Free => Freez, _}, Scalaz.{ToIdOps => _, _}
 import shapeless.{Data => _, :: => _, _}
 
 sealed abstract class Component[T, A] {
@@ -183,8 +185,6 @@ final class Optimizer[T: Equal]
     case Join(_, _, _, _) =>
       Some(List(JoinDir.Left.const, JoinDir.Right.const))
     case InvokeUnapply(GroupBy, Sized(src, _)) => src._2
-    case InvokeUnapply(Distinct, Sized(src, _)) => src._2
-    case InvokeUnapply(DistinctBy, Sized(src, _)) => src._2
     case InvokeUnapply(identity.Squash, Sized(src)) => src._2
     case _ => None
   }
@@ -428,4 +428,52 @@ final class Optimizer[T: Equal]
       lpr.normalizeTempNames
 
     ).foldLeft1(_ >>> _)
+
+  /** Pulls a nested GroupBy up to the immediate child of the nearest Arbitrary,
+    * applying any intermediate expressions to the source of the GroupBy.
+    */
+  def pullUpGroupBy
+    (tree: T)
+    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
+      : T = {
+
+    val paritionArbitraryƒ: T => Option[CoEnv[(T, T), LP, T]] = _.project match {
+      case InvokeUnapply(agg.Arbitrary, Sized(_)) => none
+      case InvokeUnapply(set.GroupBy, Sized(src, keys)) => some(CoEnv(-\/((src, keys))))
+      case other => some(CoEnv(\/-(other)))
+    }
+
+    val partitionArbitrary: T => Option[Freez[LP, (T, T)]] =
+      _.anaM[Freez[LP, (T, T)]](paritionArbitraryƒ)
+
+    def unfold: LP[T] => LP[T] = {
+      case InvokeUnapply(agg.Arbitrary, Sized(arg)) =>
+        val partitioned = partitionArbitrary(arg)
+
+        val existsNonMapping =
+          partitioned.exists(ftt =>
+            Recursive[Freez[LP, (T, T)], CoEnv[(T, T), LP, ?]].any(ftt)(_.project match {
+              case CoEnv(\/-(InvokeUnapply(fn, _))) =>
+                fn.effect =/= Mapping
+              case _ => false
+            }))
+
+        val arbArg = if (existsNonMapping) {
+          partitioned.flatMap(part => part.findLeft(_ => true) map {
+            case (src, keys) =>
+              Invoke(set.GroupBy, Func.Input2(
+                part.cata(interpret(_ => src, (_: LP[T]).embed)),
+                keys))
+          }).fold(arg)(_.embed)
+        } else {
+          arg
+        }
+
+        Invoke(agg.Arbitrary, Func.Input1(arbArg))
+
+      case other => other
+    }
+
+    tree.transAna[T](unfold)
+  }
 }
