@@ -2,16 +2,10 @@
     "name": "count grouped joined tables",
 
     "backends": {
-        "mimir":"pendingIgnoreFieldOrder",
-        "couchbase":         "timeout",
-        "marklogic_json":    "timeout",
-        "marklogic_xml":     "timeout",
-        "mongodb_2_6": "ignoreFieldOrder",
-        "mongodb_3_0": "ignoreFieldOrder",
-        "mongodb_3_2": "ignoreFieldOrder",
-        "mongodb_3_4": "ignoreFieldOrder",
-        "mongodb_read_only": "pending",
-        "mongodb_q_3_2":     "pending",
+        "couchbase":         "skip",
+        "marklogic_json":    "skip",
+        "marklogic_xml":     "skip",
+        "mimir":             "pendingIgnoreFieldOrder",
         "spark_local":       "pending",
         "spark_hdfs":        "pending",
         "spark_cassandra":   "pending"

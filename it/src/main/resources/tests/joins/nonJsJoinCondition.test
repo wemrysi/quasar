@@ -5,8 +5,7 @@
         "couchbase":      "pending",
         "marklogic_json": "timeout",
         "marklogic_xml":  "timeout",
-        "mimir":          "pendingIgnoreFieldOrder",
-        "mongodb_q_3_2":  "pending",
+        "mimir":          "ignoreFieldOrder",
         "spark_local":    "pending",
         "spark_hdfs":     "pending",
         "spark_cassandra":"pending"
@@ -16,9 +15,7 @@
 
     "data": "../zips.data",
 
-    "query": "select z1.city as city1, z1.loc, z2.city as city2, z2.pop
-              from `../zips` as z1 join `../zips` as z2
-              on z1.loc[*] = z2.pop",
+    "query": "select z1.city as city1, z1.loc, z2.city as city2, z2.pop from `../zips` as z1 join `../zips` as z2 on z1.loc[*] = z2.pop",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

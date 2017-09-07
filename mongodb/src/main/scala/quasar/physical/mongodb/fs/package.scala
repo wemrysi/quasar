@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 import quasar.{NameGenerator => NG}
 import quasar.connector.{EnvironmentError, EnvErrT, EnvErr}
+import quasar.common.PhaseResultT
 import quasar.config._
 import quasar.effect.Failure
 import quasar.contrib.pathy._
@@ -28,6 +29,7 @@ import quasar.physical.mongodb.fs.bsoncursor._
 import quasar.physical.mongodb.fs.fsops._
 
 import com.mongodb.async.client.MongoClient
+import java.time.Instant
 import pathy.Path.{depth, dirName}
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -35,6 +37,7 @@ import scalaz.stream.{Writer => _, _}
 
 package object fs {
   import BackendDef.{DefinitionError, DefErrT}
+  type PlanT[F[_], A] = ReaderT[FileSystemErrT[PhaseResultT[F, ?], ?], Instant, A]
 
   val FsType = FileSystemType("mongodb")
 
@@ -57,11 +60,10 @@ package object fs {
     val runM = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
 
     (
-      runM(WorkflowExecutor.mongoDb)                |@|
-      queryfile.run[BsonCursor, S](client, defDb)
-        .liftM[EnvErrT]                             |@|
-      readfile.run[S](client).liftM[EnvErrT]        |@|
-      writefile.run[S](client).liftM[EnvErrT]       |@|
+      runM(WorkflowExecutor.mongoDb)                             |@|
+      queryfile.run[BsonCursor, S](client, defDb).liftM[EnvErrT] |@|
+      readfile.run[S](client).liftM[EnvErrT]                     |@|
+      writefile.run[S](client).liftM[EnvErrT]                    |@|
       managefile.run[S](client).liftM[EnvErrT]
     )((execMongo, qfile, rfile, wfile, mfile) => {
       interpretBackendEffect[Free[S, ?]](
@@ -84,55 +86,6 @@ package object fs {
         defDb  <- free.lift(findDefaultDb.run(client)).into[S].liftM[DefErrT]
         fs     <- EitherT[M, DefinitionError, BackendEffect ~> M](free.lift(
                     fileSystem[S](client, defDb)
-                      .leftMap(_.right[NonEmptyList[String]])
-                      .run
-                  ).into[S])
-        close  =  free.lift(Task.delay(client.close()).attempt.void).into[S]
-      } yield BackendDef.DefinitionResult[M](fs, close)
-  }
-
-  val QScriptFsType = FileSystemType("mongodbq")
-
-  def qscriptFileSystem[S[_]](
-    client: MongoClient,
-    defDb: Option[DefaultDb]
-  )(implicit
-    S0: Task :<: S,
-    S1: PhysErr :<: S
-  ): EnvErrT[Task, BackendEffect ~> Free[S, ?]] = {
-    val runM = Hoist[EnvErrT].hoist(MongoDbIO.runNT(client))
-
-    (
-      runM(WorkflowExecutor.mongoDb)                |@|
-      queryfile.run[BsonCursor, S](client, defDb)
-        .liftM[EnvErrT]                             |@|
-      readfile.run[S](client).liftM[EnvErrT]        |@|
-      writefile.run[S](client).liftM[EnvErrT]       |@|
-      managefile.run[S](client).liftM[EnvErrT]
-    )((execMongo, qfile, rfile, wfile, mfile) => {
-      val fileSystemInterpreter = interpretFileSystem[Free[S, ?]](
-        qfile compose queryfile.interpretQ(execMongo),
-        rfile compose readfile.interpret,
-        wfile compose writefile.interpret,
-        mfile compose managefile.interpret)
-
-      val analyzeInterpreter = Empty.analyze[Free[S, ?]]
-
-      analyzeInterpreter :+: fileSystemInterpreter
-    })
-  }
-
-  def qscriptDefinition[S[_]](implicit
-    S0: Task :<: S,
-    S1: PhysErr :<: S
-  ): BackendDef[Free[S, ?]] = BackendDef.fromPF[Free[S, ?]] {
-    case (QScriptFsType, uri) =>
-      type M[A] = Free[S, A]
-      for {
-        client <- asyncClientDef[S](uri)
-        defDb  <- free.lift(findDefaultDb.run(client)).into[S].liftM[DefErrT]
-        fs     <- EitherT[M, DefinitionError, BackendEffect ~> M](free.lift(
-                    qscriptFileSystem[S](client, defDb)
                       .leftMap(_.right[NonEmptyList[String]])
                       .run
                   ).into[S])

@@ -101,6 +101,7 @@ object MapFunc {
     case relations.And => (a1, a2) => MFC(C.And(a1, a2))
     case relations.Or => (a1, a2) => MFC(C.Or(a1, a2))
     case set.Within => (a1, a2) => MFC(C.Within(a1, a2))
+    case string.Split => (a1, a2) => MFC(C.Split(a1, a2))
     case structural.MakeObject => (a1, a2) => MFC(C.MakeMap(a1, a2))
     case structural.ObjectConcat => (a1, a2) => MFC(C.ConcatMaps(a1, a2))
     case structural.ArrayProject => (a1, a2) => MFC(C.ProjectIndex(a1, a2))
