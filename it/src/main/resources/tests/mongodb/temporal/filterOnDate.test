@@ -1,20 +1,17 @@
 {
     "name": "filter with date literals",
     "backends": {
-        "mimir":             "skip",
-        "couchbase":         "skip",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "spark_local":       "skip",
-        "spark_hdfs":        "skip",
-        "spark_cassandra":   "skip"
+        "marklogic_json":    "pending",
+        "marklogic_xml":     "pending",
+        "mimir":             "pending"
     },
-    "data": "../../days.data",
-    "query": "select day from `../../days`
+    "data": "../days.data",
+    "query": "select day from `../days`
               where
-                ((ts > date(\"2014-08-17\") and ts <= date(\"2014-08-20\"))
-                  and ts != date(\"2014-08-19\"))
-                or ts = date(\"2014-08-22\")",
+                ((date_trunc(\"day\", ts) > start_of_day(date(\"2014-08-17\"))
+                    and date_trunc(\"day\", ts) <= start_of_day(date(\"2014-08-20\")))
+                  and date_trunc(\"day\", ts) != start_of_day(date(\"2014-08-19\")))
+                or date_trunc(\"day\", ts) = start_of_day(date(\"2014-08-22\"))",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": ["Monday", "Wednesday", "Friday"]
