@@ -254,6 +254,17 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
       ).some
     )
 
+    "remove deleted keys" in rephraseTest(
+    // rephrase({key: .[0]} ++ delete({key: .[1]}, key), .[0]) --> .key
+      projection = OuterObjectConcat(
+        WrapObject(DerefArrayStatic(Leaf(Source), CPathIndex(0)), "key"),
+        ObjectDelete(WrapObject(DerefArrayStatic(Leaf(Source), CPathIndex(1)), "key"), Set(CPathField("key")))
+      ),
+      root = DerefArrayStatic(Leaf(Source), CPathIndex(0)),
+      rootSource = Source,
+      expected = DerefObjectStatic(Leaf(Source), CPathField("key")).some
+    )
+
     "duplicate subtrees of root in projection" in rephraseTest(
       // rephrase(.x, [.x.y] ++ [.x]) --> [.y] ++ [.]
       projection = DerefObjectStatic(Leaf(Source), CPathField("x")),

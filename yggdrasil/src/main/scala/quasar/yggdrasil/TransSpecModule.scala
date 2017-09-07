@@ -511,6 +511,9 @@ trait TransSpecModule extends FNModule {
                   peelInvert(s, currentIndex = 0, Set.empty, inverseLayers andThen (DerefObjectStatic(_, CPathField(k))))
                 PeelState(0.some, Set(k).some, nestedSubstitutions)
               }
+            case ObjectDelete(s, k) =>
+              val PeelState(_, nestedKeys, nestedSubstitutions) = peelInvert(s, currentIndex = 0, keys, inverseLayers)
+              PeelState(0.some, nestedKeys.map(_ -- k.map(_.name)), nestedSubstitutions)
             // encountering a WrapArray inside a *ArrayConcat requires shifting the index by 1.
             // however inside the WrapArray, the index is reset to 0.
             case WrapArray(s) =>
