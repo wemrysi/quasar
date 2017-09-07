@@ -21,7 +21,7 @@ import quasar.{NameGenerator => NG}
 import quasar.connector.{EnvironmentError, EnvErrT, EnvErr}
 import quasar.common.PhaseResultT
 import quasar.config._
-import quasar.effect.Failure
+import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
 import quasar.contrib.pathy._
 import quasar.fp._, free._
 import quasar.fs._, mount._
@@ -39,10 +39,14 @@ package object fs {
   import BackendDef.DefErrT
   type PlanT[F[_], A] = ReaderT[FileSystemErrT[PhaseResultT[F, ?], ?], Instant, A]
 
+  type MongoReadHandles[A] = KeyValueStore[ReadFile.ReadHandle, BsonCursor, A]
+
   type Eff[A] = (
+    MonotonicSeq :\:
+    MongoDbIO :\:
     fs.queryfileTypes.MongoQuery[BsonCursor, ?] :\:
     fs.managefile.MongoManage :\:
-    fs.readfile.MongoRead :/:
+    MongoReadHandles :/:
     fs.writefile.MongoWrite)#M[A]
 
   type MongoM[A] = Free[Eff, A]
@@ -113,12 +117,18 @@ package object fs {
 
   private def effToTask(cfg: MongoConfig): Task[Eff ~> Task] = {
     (
+      MonotonicSeq.fromZero |@|
+      Task.delay(MongoDbIO.runNT(cfg.client)) |@|
       queryfile.run[BsonCursor, PhysFsEff](cfg.client, cfg.defaultDb) |@|
       managefile.run[PhysFsEff](cfg.client) |@|
-      readfile.run[PhysFsEff](cfg.client) |@|
+      KeyValueStore.impl.default[ReadFile.ReadHandle, BsonCursor] |@|
       writefile.run[PhysFsEff](cfg.client)
-    )((qfile, mfile, rfile, wfile) => {
-      (freeFsEffToTask compose (qfile :+: mfile :+: rfile :+: wfile))
+    )((seq, io, qfile, mfile, rfile, wfile) => {
+      (seq :+: io :+:
+        (freeFsEffToTask compose qfile) :+:
+        (freeFsEffToTask compose mfile) :+:
+        rfile :+:
+        (freeFsEffToTask compose wfile))
     })
   }
 

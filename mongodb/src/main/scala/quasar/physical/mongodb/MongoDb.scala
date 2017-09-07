@@ -21,9 +21,11 @@ import slamdata.Predef._
 import quasar.common._
 import quasar.connector._
 import quasar.contrib.pathy._
+import quasar.effect.{Kvs, MonoSeq}
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount._
+import quasar.physical.mongodb.fs.bsoncursor._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 
@@ -33,7 +35,9 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scala.Predef.implicitly
 
-object MongoDb extends BackendModule {
+object MongoDb
+    extends BackendModule
+    with ManagedReadFile[BsonCursor] {
 
   type QS[T[_[_]]] = fs.MongoQScriptCP[T]
 
@@ -53,6 +57,10 @@ object MongoDb extends BackendModule {
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
 
   type Config = fs.MongoConfig
+
+  // Managed
+  def MonoSeqM = MonoSeq[M]
+  def ReadKvsM = Kvs[M, ReadFile.ReadHandle, BsonCursor]
 
   def parseConfig(uri: ConnectionUri): BackendDef.DefErrT[Task, Config] =
     fs.parseConfig(uri)
@@ -99,9 +107,34 @@ object MongoDb extends BackendModule {
   def toConfigured[C[_], A](c: C[A])(implicit inj: C :<: fs.Eff): Configured[A] =
     effToConfigured(toEff(c))
 
+  val DC = DataCursor[MongoDbIO, BsonCursor]
+
   override val QueryFileModule = fs.queryfile
 
-  override val ReadFileModule = fs.readfile
+  object ManagedReadFileModule extends ManagedReadFileModule {
+
+    private def cursor(coll: Collection, offset: Natural, limit: Option[Positive]): MongoDbIO[BsonCursor] =
+      for {
+        iter <- MongoDbIO.find(coll)
+        iter2 =  iter.skip(offset.value.toInt)
+        iter3 = limit.map(l => iter2.limit(l.value.toInt)).getOrElse(iter2)
+        cur  <- MongoDbIO.async(iter3.batchCursor)
+      } yield cur
+
+    def readCursor(f: AFile, offset: Natural, limit: Option[Positive])
+        : Backend[BsonCursor] = {
+      val c = Collection.fromFile(f).fold(
+        err  => ???, //TODO what needs to be done in this case?
+        coll => cursor(coll, offset, limit))
+      Free.liftF(toEff(c)).liftB
+    }
+
+    def nextChunk(c: BsonCursor): Backend[(BsonCursor, Vector[Data])] =
+      Free.liftF(toEff(DC.nextChunk(c).map((c, _)))).liftB
+
+    def closeCursor(c: BsonCursor): Configured[Unit] =
+      toConfigured(DC.close(c))
+  }
 
   override val WriteFileModule = fs.writefile
 
