@@ -24,6 +24,7 @@ import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.kleisli._
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.frontend.logicalplan.{constant, LogicalPlan}
 import quasar.fs._
 import quasar.javascript._
 import quasar.physical.mongodb._, WorkflowExecutor.WorkflowCursor
@@ -31,6 +32,9 @@ import quasar.physical.mongodb._, WorkflowExecutor.WorkflowCursor
 import argonaut.JsonObject, JsonObject.{single => jSingle}
 import argonaut.JsonIdentity._
 import java.time.Instant
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -161,7 +165,8 @@ final class QueryFileInterpreter(execMongo: WorkflowExecutor[MongoDbIO, BsonCurs
     EitherT[MongoLogWF[C, ?], FileSystemError, A](
       wfErrMq.leftMap(wfErrToFsErr(wf))
         .run.mapK(_.attemptMongo.leftMap(err =>
-          executionFailed0(
+          execFailed(
+            wf,
             s"MongoDB Error: ${err.cause.getMessage}",
             JsonObject.empty,
             some(err)).left[A]
@@ -209,21 +214,34 @@ final class QueryFileInterpreter(execMongo: WorkflowExecutor[MongoDbIO, BsonCurs
 
   import WorkflowExecutionError.{InvalidTask, InsertFailed, NoDatabase}
 
+  private def execFailed(wf: Crystallized[WorkflowF], s: String, detail: JsonObject, cause: Option[PhysicalError])
+      : FileSystemError =
+    //FIXME executionFailed expects a LogicalPlan but this is not available anymore at this stage
+    //so just supplying an empty LogicalPlan for now.
+    //We can fix this properly after executionFailed has been refactored
+    executionFailed(constant[Fix[LogicalPlan]](quasar.Data.NA).embed, s, detail, cause)
+
+  private def execFailed_(wf: Crystallized[WorkflowF], s: String): FileSystemError =
+    //FIXME executionFailed expects a LogicalPlan but this is not available anymore at this stage
+    //so just supplying an empty LogicalPlan for now.
+    //We can fix this properly after executionFailed has been refactored
+    executionFailed_(constant[Fix[LogicalPlan]](quasar.Data.NA).embed, s)
+
   private def wfErrToFsErr(wf: Crystallized[WorkflowF]): WorkflowExecutionError => FileSystemError = {
     case InvalidTask(task, reason) =>
-      executionFailed0(
+      execFailed(wf,
         s"Invalid MongoDB workflow task: $reason",
         jSingle("workflowTask", task.render.asJson),
         none)
 
     case InsertFailed(bson, reason) =>
-      executionFailed0(
+      execFailed(wf,
         s"Unable to insert data into MongoDB: $reason",
         jSingle("data", bson.shows.asJson),
         none)
 
     case NoDatabase =>
-      executionFailed0_(
+      execFailed_(wf,
         "Executing this plan on MongoDB requires temporary collections, but a database in which to store them could not be determined.")
   }
 }

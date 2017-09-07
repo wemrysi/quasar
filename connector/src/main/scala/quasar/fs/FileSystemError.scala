@@ -38,7 +38,7 @@ object FileSystemError {
   import WriteFile.WriteHandle
 
   final case class ExecutionFailed private (
-    lp: Option[Fix[LogicalPlan]],
+    lp: Fix[LogicalPlan],
     reason: String,
     detail: JsonObject,
     cause: Option[PhysicalError]
@@ -64,18 +64,12 @@ object FileSystemError {
   final case class WriteFailed private (data: Data, reason: String)
     extends FileSystemError
 
-  val executionFailed = Prism.partial[FileSystemError, (Option[Fix[LogicalPlan]], String, JsonObject, Option[PhysicalError])] {
+  val executionFailed = Prism.partial[FileSystemError, (Fix[LogicalPlan], String, JsonObject, Option[PhysicalError])] {
     case ExecutionFailed(lp, rsn, det, cs) => (lp, rsn, det, cs)
   } (ExecutionFailed.tupled)
 
   def executionFailed_(lp: Fix[LogicalPlan], reason: String): FileSystemError =
-    executionFailed(Some(lp), reason, JsonObject.empty, None)
-
-  def executionFailed0(reason: String, detail: JsonObject, cause: Option[PhysicalError]) =
-    executionFailed(None, reason, detail, cause)
-
-  def executionFailed0_(reason: String): FileSystemError =
-    executionFailed0(reason, JsonObject.empty, None)
+    executionFailed(lp, reason, JsonObject.empty, None)
 
   val pathErr = Prism.partial[FileSystemError, PathError] {
     case PathErr(err) => err
