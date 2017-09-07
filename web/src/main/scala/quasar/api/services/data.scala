@@ -83,23 +83,14 @@ object data {
                     requiredHeader(Destination, req) map (_.value))
         dst    <- EitherT.fromDisjunction[M.FreeS](parseDestination(dstStr))
         scn    <- EitherT.fromDisjunction[M.FreeS](moveScenario(path, dst))
-        _      <- EitherT(vcacheGet(path).fold(sf =>
-                    refineType(scn.dst)
-                      .leftMap(p => PathError.invalidPath(p, "view mount destination must be a file").toApiError)
-                      .traverse(d => VCache.Ops[S].move(sf, d)),
-                    M.move(scn, MoveSemantics.FailIfExists).leftMap(_.toApiError).run).join)
+        _      <- M.move(scn, MoveSemantics.FailIfExists).leftMap(_.toApiError)
       } yield Created).run)
 
     case DELETE -> AsPath(path) =>
-      respond(
-        vcacheGet(path).fold(
-          VCache.Ops[S].delete(_) ∘ (_.right[FileSystemError]), M.delete(path).run).join)
+      respond(M.delete(path).run)
   }
 
   ////
-
-  private def vcacheGet[S[_]](p: APath)(implicit VC: VCache.Ops[S]): OptionT[Free[S, ?], AFile] =
-    OptionT(maybeFile(p).η[Free[S, ?]]) >>= (f => VC.get(f).as(f))
 
   private def download[S[_]](
     format: MessageFormat,

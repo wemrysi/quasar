@@ -110,20 +110,26 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   case class ViewInterpResultTrace[A](renderedTrees: Vector[RenderedTree], vs: VS, result: Errs \/ A)
 
-
   def viewInterpTrace[A](views: Map[AFile, Fix[Sql]], paths: Map[ADir, Set[PathSegment]], t: Free[FileSystem, A])
     : ViewInterpResultTrace[A] =
-    viewInterpTrace(views, List.empty[AFile], paths, t)
+    viewInterpTrace(views, Map.empty[AFile, ViewCache], List.empty[AFile], paths, t)
+
+  def viewInterpTrace[A](vcache: Map[AFile, ViewCache], t: Free[FileSystem, A])
+      : ViewInterpResultTrace[A] =
+    viewInterpTrace(Map.empty[AFile, Fix[Sql]], vcache, List.empty[AFile], Map.empty[ADir, Set[PathSegment]], t)
 
   def viewInterpTrace[A](
-    views: Map[AFile, Fix[Sql]], files: List[AFile], paths: Map[ADir, Set[PathSegment]], t: Free[FileSystem, A])
+    views: Map[AFile, Fix[Sql]], vcache: Map[AFile, ViewCache], files: List[AFile], paths: Map[ADir, Set[PathSegment]], t: Free[FileSystem, A])
     : ViewInterpResultTrace[A] = {
 
     val mountViews: Free[ViewFileSystem, Unit] =
       views.toList.traverse_ { case (loc, expr) => mounting.mountView(loc, ScopedExpr(expr, Nil), Variables.empty) }
 
+    val initVCache: Free[ViewFileSystem, Unit] =
+      vcache.toList.traverse_ { case (f, vc) => VCache.Ops[ViewFileSystem].put(f, vc) }
+
     val toBeTraced: Free[ViewFileSystem, A] =
-      mountViews *> t.flatMapSuspension(view.fileSystem[ViewFileSystem])
+      mountViews *> initVCache *> t.flatMapSuspension(view.fileSystem[ViewFileSystem])
 
     val (renderedTrees, (vs, r)) =
       toBeTraced.foldMap(traceViewFs(paths))
@@ -380,6 +386,22 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           .copy(fs = InMemState.fromFiles(List(destDir </> dataFile).map(_ -> Vector[Data]()).toMap)),
         \/.right(\/.right(())))
     }
+
+    "move view cache" >> prop { (f1: AFile, f2: AFile) =>
+      val expr = sqlB"α"
+      val viewCache = ViewCache(
+        MountConfig.viewConfigUri(expr, Variables.empty), None, None, 0, None, None,
+        600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, f1, None)
+
+      val vc = Map(f1 -> viewCache)
+
+      val f = manage.move(fileToFile(f1, f2), MoveSemantics.FailIfExists).run
+
+      viewInterpTrace(vc, f) must_=== ViewInterpResultTrace(
+        Vector.empty,
+        VS.empty.copy(vcache = Map(f2 -> viewCache)),
+        \/.right(\/.right(())))
+    }
   }
 
   "ManageFile.delete" should {
@@ -409,6 +431,21 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         \/.right(\/.right(())))
     }
 
+    "delete with view cache" >> prop { (p: AFile) =>
+      val expr = sqlB"α"
+      val viewCache = ViewCache(
+        MountConfig.viewConfigUri(expr, Variables.empty), None, None, 0, None, None,
+        600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, p, None)
+
+      val vc = Map(p -> viewCache)
+
+      val f = manage.delete(p).run
+
+      viewInterpTrace(vc, f) must_=== ViewInterpResultTrace(
+        Vector.empty,
+        VS.empty,
+        \/.right(\/.right(())))
+    }
   }
 
   "QueryFile.exec" should {
