@@ -5,10 +5,7 @@
         "couchbase":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
-        "mimir":             "pendingIgnoreFieldOrder",
-        "spark_local":       "pending",
-        "spark_hdfs":        "pending",
-        "spark_cassandra":   "pending"
+        "mimir":             "pendingIgnoreFieldOrder"
     },
 
     "NB": "#2121: Disabled in all qscript-based connectors due to possible qscript bug.",

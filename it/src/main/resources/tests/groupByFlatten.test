@@ -7,10 +7,7 @@
         "mongodb_3_0": "ignoreFieldOrder",
         "mongodb_3_2": "ignoreFieldOrder",
         "mongodb_3_4": "ignoreFieldOrder",
-        "mongodb_read_only": "ignoreFieldOrder",
-        "spark_local": "pending",
-        "spark_hdfs": "pending",
-        "spark_cassandra": "pending"
+        "mongodb_read_only": "ignoreFieldOrder"
     },
     "data": "slamengine_commits.data",
     "query": "select substring(parents[*].sha, 0, 1), count(*) from slamengine_commits group by substring(parents[*].sha, 0, 1)",
