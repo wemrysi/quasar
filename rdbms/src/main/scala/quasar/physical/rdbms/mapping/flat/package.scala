@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.physical.rdbms
+package quasar.physical.rdbms.mapping
 
 import java.sql.{PreparedStatement, ResultSet}
 
@@ -25,9 +25,9 @@ import doobie.util.kernel.Kernel
 import quasar.Data
 import slamdata.Predef._
 
-package object mapping {
+package object flat {
 
-  implicit val dataComposite: Composite[Data] =  new Composite[Data] {
+  implicit val FlatDataComposite: Composite[Data] =  new Composite[Data] {
     val kernel = new Kernel[Data] {
       type I      = Data
       val ia      = (i: I) => i

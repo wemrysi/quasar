@@ -24,5 +24,5 @@ import slamdata.Predef.Unit
 
 trait RdbmsCreateTable {
 
-  def run(tablePath: TablePath, firstRow: Data): FileSystemErrT[ConnectionIO, Unit]
+  def run(tablePath: TablePath): FileSystemErrT[ConnectionIO, Unit]
 }

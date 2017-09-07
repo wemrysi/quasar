@@ -24,20 +24,28 @@ import slamdata.Predef._
 import quasar.fs._
 import doobie.imports._
 import scalaz.EitherT
+import scalaz.syntax.monad._
 import scalaz.syntax.show._
 
-class PostgresCreateJsonTable extends RdbmsCreateTable {
+object PostgresCreateJsonTable extends RdbmsCreateTable {
 
-  override def run(
-      tablePath: TablePath,
-      firstRow: Data): FileSystemErrT[ConnectionIO, Unit] =
-    EitherT(sql"CREATE TABLE IF NOT EXISTS ${tablePath.shows} (ID serial NOT NULL PRIMARY KEY, data json NOT NULL)".update.run
+  override def run(tablePath: TablePath): FileSystemErrT[ConnectionIO, Unit] = {
+
+    val createSchema: ConnectionIO[Unit] = tablePath.schema.map { s =>
+      (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(s.name)).update.run.map(_ => ())
+    }.getOrElse(().point[ConnectionIO])
+
+    EitherT(createSchema
+      .flatMap(_ =>
+        (fr"CREATE TABLE IF NOT EXISTS"
+          ++ Fragment.const(tablePath.shows)
+          ++ fr" (ID VARCHAR NOT NULL PRIMARY KEY, data json NOT NULL)").update.run)
       .map(_ => ())
-      .attemptSomeSqlState {
-        case errorCode =>
+      .attemptSome {
+        case throwable =>
           FileSystemError.writeFailed(
-            firstRow,
-            s"Failed to create table ${tablePath.shows}. SQL error $errorCode")
+            Data.Str("No data"),
+            s"Failed to create table ${tablePath.shows}. SQL error ${throwable.getMessage}")
       })
-
+  }
 }

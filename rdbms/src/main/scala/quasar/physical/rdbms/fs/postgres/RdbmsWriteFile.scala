@@ -16,17 +16,21 @@
 
 package quasar.physical.rdbms.fs.postgres
 
+import java.util.UUID
+
 import doobie.free.connection.ConnectionIO
 import doobie.imports.Update
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
-import quasar.Data
+import quasar.{Data, DataCodec}
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fs._
 import quasar.physical.rdbms.common.TablePath
+import quasar.physical.rdbms.mapping.json._
 import quasar.physical.rdbms.Rdbms
 import slamdata.Predef._
 import doobie.syntax.string._
+import doobie.util.fragment.Fragment
 import quasar.effect._
 import quasar.fp.free._
 import slamdata.Predef._
@@ -48,38 +52,33 @@ trait RdbmsWriteFile {
 
     def batchInsert(
         dbPath: TablePath,
-        chunk: Vector[Data]
+        chunk: Vector[Data],
+        isJson: Boolean
         ): ConnectionIO[Vector[FileSystemError]] = {
-      chunk.headOption match {
-        case Some(Data.Obj(lm)) =>
-          val fQuery = fr"insert into ${dbPath.shows}" ++ fr"values(" ++ lm.toList
-            .map(_ => fr"""?""")
-            .intercalate(fr",") ++ fr")"
 
-          Update[Data](fQuery.update.sql)
+      // TODO this is postgres-specific (?::JSON)
+      val fQuery = fr"insert into " ++ Fragment.const(dbPath.shows) ++ fr"(id, data) values(?, ?::JSON)"
+
+          Update[Data](fQuery.update.sql)(JsonDataComposite)
             .updateMany(chunk.toList)
-            .map (_ => Vector())
-        case Some(unsupportedObj) =>
-
-            Vector(
-              FileSystemError.writeFailed(
-                (unsupportedObj, "Cannot translate to a RDBMS row."))).point[ConnectionIO]
-        case None =>
-          Vector[FileSystemError]().point[ConnectionIO]
+            .map(_ => Vector.empty[FileSystemError])
       }
-    }
+
+    private def getDbPath(h: WriteHandle) = ME.unattempt(
+      writeKvs
+        .get(h)
+        .toRight(FileSystemError.unknownWriteHandle(h))
+        .run
+        .liftB)
 
     override def write(
         h: WriteHandle,
         chunk: Vector[Data]): Configured[Vector[FileSystemError]] = {
       (for {
-        dbPath <- ME.unattempt(
-          writeKvs
-            .get(h)
-            .toRight(FileSystemError.unknownWriteHandle(h))
-            .run
-            .liftB)
-        _ <- lift(batchInsert(dbPath, chunk)).into[Eff].liftB
+        _ <- ME.unattempt(writeKvs.get(h).toRight(FileSystemError.unknownWriteHandle(h)).run.liftB)
+        dbPath <- getDbPath(h)
+       isJson <- ME.unattempt(lift(describeTable.isJson(dbPath).run).into[Eff].liftB)
+        _ <- lift(batchInsert(dbPath, chunk, isJson)).into[Eff].liftB
       } yield Vector()).run.value.map(_.valueOr(Vector(_)))
     }
 
@@ -87,6 +86,7 @@ trait RdbmsWriteFile {
       for {
         i <- MonotonicSeq.Ops[Eff].next.liftB
         dbPath = TablePath.create(file)
+        _ <- ME.unattempt(lift(createTable.run(dbPath).run).into[Eff].liftB)
         handle = WriteHandle(file, i)
         _ <- writeKvs.put(handle, dbPath).liftB
       } yield handle

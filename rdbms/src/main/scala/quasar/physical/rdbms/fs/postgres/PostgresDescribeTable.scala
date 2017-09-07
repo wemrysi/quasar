@@ -28,16 +28,23 @@ import scalaz.syntax.show._
 
 object PostgresDescribeTable extends RdbmsDescribeTable {
 
-  override def isJson(tablePath: TablePath): FileSystemErrT[ConnectionIO, Boolean] = {
-    EitherT(sql"SELECT COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_NAME = ${tablePath.table.name}"
+  override def isJson(
+      tablePath: TablePath): FileSystemErrT[ConnectionIO, Boolean] = {
+
+    val schemaName = tablePath.schema.map(_.name).getOrElse("public")
+
+    EitherT((fr"SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = " ++
+      Fragment.const("'" + schemaName + "'") ++
+      fr"AND TABLE_NAME =" ++
+      Fragment.const("'" + tablePath.table.name + "'"))
       .query[(String, String)]
       .list
-      .map(_.equals(List(("id", "serial"), ("data", "json"))))
-      .attemptSomeSqlState {
-        case errorCode =>
+      .map(_.contains(("data", "json")))
+      .attemptSome {
+        case throwable =>
           FileSystemError.readFailed(
             tablePath.shows,
-            s"Failed to load table description from information_schema $errorCode")
+            s"Failed to load table description from information_schema, error: ${throwable.getMessage}")
       })
   }
 }

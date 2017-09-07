@@ -36,7 +36,7 @@ import doobie.hikari.hikaritransactor.HikariTransactor
 import doobie.imports.ConnectionIO
 import quasar.fs.WriteFile.WriteHandle
 import quasar.physical.rdbms.common.{Config, TablePath}
-import quasar.physical.rdbms.fs.RdbmsDescribeTable
+import quasar.physical.rdbms.fs.{RdbmsCreateTable, RdbmsDescribeTable}
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 
 import scalaz._
@@ -106,6 +106,8 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with In
 
   // Below DB-specific functions
   def describeTable: RdbmsDescribeTable
+
+  def createTable: RdbmsCreateTable
 
   def parseConnectionUri(uri: ConnectionUri): \/[DefinitionError, JdbcConnectionInfo]
 

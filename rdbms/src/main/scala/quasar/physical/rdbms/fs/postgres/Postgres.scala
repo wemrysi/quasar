@@ -61,4 +61,5 @@ object Postgres extends Rdbms {
   }
 
   override lazy val describeTable = PostgresDescribeTable
+  override lazy val createTable = PostgresCreateJsonTable
 }

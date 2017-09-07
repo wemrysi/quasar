@@ -17,7 +17,6 @@
 package quasar.physical.rdbms.fs.postgres
 
 
-import doobie.free.connection.ConnectionIO
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
 import quasar.Data
@@ -31,9 +30,7 @@ import quasar.physical.rdbms.mapping._
 import quasar.physical.rdbms.Rdbms
 import slamdata.Predef._
 import eu.timepit.refined.api.RefType.ops._
-import doobie.syntax.process._
-import doobie.syntax.string._
-
+import doobie.imports._
 import scalaz._
 import Scalaz._
 
@@ -55,10 +52,15 @@ trait RdbmsReadFile {
         offset: Int,
         limit: Option[Int],
         isJson: Boolean
-    ): ConnectionIO[Vector[Data]] = {
+    ): ConnectionIO[\/[FileSystemError, Vector[Data]]] = {
+
+      val codec = if (isJson)
+        json.JsonDataComposite
+      else
+        flat.FlatDataComposite
 
       val streamWithOffset = sql"select * from ${dbPath.shows}"
-        .query[Data]
+        .query[Data](codec)
         .process
         .drop(offset)
 
@@ -66,7 +68,15 @@ trait RdbmsReadFile {
         case Some(l) => streamWithOffset.take(l)
         case None    => streamWithOffset
       }
-      streamWithLimit.vector
+      streamWithLimit
+        .vector
+        .attemptSome {
+          case throwable =>
+            FileSystemError.readFailed(
+              throwable.getMessage,
+              s"Failed to read data from table ${dbPath.shows}")
+        }
+
     }
 
     private def toInt(long: Long, varName: String): Backend[\/[FileSystemError, Int]] =
@@ -85,7 +95,7 @@ trait RdbmsReadFile {
         i <- MonotonicSeq.Ops[Eff].next.liftB
         dbPath = TablePath.create(file)
         isJson <- ME.unattempt(lift(describeTable.isJson(dbPath).run).into[Eff].liftB)
-        sqlResult <- lift(readAll(dbPath, offsetInt, limitInt, isJson)).into[Eff].liftB
+        sqlResult <- ME.unattempt(lift(readAll(dbPath, offsetInt, limitInt, isJson)).into[Eff].liftB)
         handle = ReadHandle(file, i)
         _ <- kvs.put(handle, SqlReadCursor(sqlResult)).liftB
       } yield handle
