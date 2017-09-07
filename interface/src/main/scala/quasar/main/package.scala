@@ -64,12 +64,11 @@ package object main {
     ).definition translate injectFT[Task, PhysFsEff],
     mimir.Mimir.definition translate injectFT[Task, PhysFsEff],
     mongodb.fs.definition[PhysFsEff],
-    mongodb.fs.qscriptDefinition[PhysFsEff],
     skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff],
     sparkcore.fs.hdfs.definition[PhysFsEff],
     sparkcore.fs.elastic.definition[PhysFsEff],
     sparkcore.fs.cassandra.definition[PhysFsEff],
-    sparkcore.fs.local.definition[PhysFsEff]
+    sparkcore.fs.local.SparkLocalBackendModule.definition translate injectFT[Task, PhysFsEff]
   ).fold
 
   /** A "terminal" effect, encompassing failures and other effects which

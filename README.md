@@ -841,11 +841,11 @@ Example response:
 
 ### PUT /server/port
 
-Takes a port number in the body, and attempts to restart the server on that port, shutting down the current instance which is running on the port used to make this http request.
+Takes a port number in the body, and attempts to restart the server on that port, shutting down the current instance which is running on the port used to make this http request. If this request succeeds, the client will not receive a response as the server is killed by the request. However, any subsequent request to the new port should succeed.
 
 ### DELETE /server/port
 
-Removes any configured port, reverting to the default (20223) and restarting, as with `PUT`.
+Removes any configured port, reverting to the default (the one the server was started on) and restarting. As with `PUT`, if this request succeeds, the client will not receive a response as the server is killed by the request. However, any subsequent request to the new port should succeed.
 
 ### GET /metastore
 

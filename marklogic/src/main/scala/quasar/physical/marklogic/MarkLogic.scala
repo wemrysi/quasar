@@ -29,7 +29,6 @@ import quasar.contrib.scalaz.writerT._
 import quasar.effect._
 import quasar.effect.uuid.UuidReader
 import quasar.ejson.EJson
-import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
 import quasar.fs.impl.{dataStreamRead, dataStreamClose}
@@ -55,7 +54,8 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
     extends BackendModule
     with ManagedQueryFile[XccDataStream]
     with ManagedWriteFile[AFile]
-    with ManagedReadFile[XccDataStream] {
+    with ManagedReadFile[XccDataStream]
+    with ChrootedInterpreter {
 
   type QS[T[_[_]]] = MLQScriptCP[T]
   type Repr        = MainModule
@@ -105,15 +105,7 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
     runMarkLogicFs(cfg.cfg.xccUri) map { case (f, c) => (f compose dropWritten, c) }
   }
 
-  override def interpreter(cfg: Config): DefErrT[Task, (BackendEffect ~> Task, Task[Unit])] = {
-    val xformPaths =
-      if (cfg.cfg.rootDir === rootDir) liftFT[BackendEffect]
-      else chroot.backendEffect[BackendEffect](cfg.cfg.rootDir)
-
-    super.interpreter(cfg) map {
-      case (f, c) => (foldMapNT(f) compose xformPaths, c)
-    }
-  }
+  def rootPrefix(cfg: Config): ADir = cfg.cfg.rootDir
 
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](qs: T[QSM[T, ?]]): Backend[Repr] = {
     def doPlan(cfg: Config): Backend[MainModule] = {

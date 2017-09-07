@@ -18,7 +18,6 @@ package quasar.physical.mongodb.expression
 
 import scala.Predef.$conforms
 import slamdata.Predef._
-import quasar.fp._
 import quasar.physical.mongodb.{Bson, BsonField}
 
 import matryoshka._
@@ -86,6 +85,12 @@ object ArbitraryExprOp {
           $pow(x, y))
       } yield expr)
   }
+
+  lazy val genExpr3_4: Gen[Fix[Expr3_4]] = {
+    def inj3_2(expr: Fix[Expr3_2]) = expr.transCata[Fix[Expr3_4]](Inject[Expr3_2, Expr3_4])
+    genExpr3_2.map(inj3_2)
+  }
+
 }
 
 class ExpressionSpec extends quasar.Qspec {
@@ -147,17 +152,6 @@ class ExpressionSpec extends quasar.Qspec {
 
     "render $foo.bar under $$CURRENT" in {
       DocVar.CURRENT(BsonField.Name("foo") \ BsonField.Name("bar")).bson must_== Bson.Text("$$CURRENT.foo.bar")
-    }
-  }
-
-  "toJs" should {
-    import quasar.jscore._
-
-    "handle addition with epoch date literal" in {
-      $add(
-        $literal(Bson.Date(0)),
-        $var(DocField(BsonField.Name("epoch")))).para(toJs[Fix[ExprOp], ExprOp]) must beRightDisjunction(
-        JsFn(JsFn.defaultName, New(Name("Date"), List(Select(Ident(JsFn.defaultName), "epoch")))))
     }
   }
 

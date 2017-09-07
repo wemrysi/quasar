@@ -449,6 +449,8 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
       )(
         Else(RegexContains(a1, ConcatStr(str("(?s)"), a2).embed).embed)
       ).embed.η[F]
+    case MF.Split(a1, a2) =>
+      Split(a1, a2).embed.η[F]
     case MF.Substring(a1, a2, a3) =>
       Case(
         WhenThen(

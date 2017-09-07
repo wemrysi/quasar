@@ -27,12 +27,13 @@ import quasar.std.TemporalPart
 
 import java.time._, ZoneOffset.UTC
 import scala.math
+import scala.util.matching.Regex
 
 import matryoshka._
 import matryoshka.data.free._
 import matryoshka.implicits._
 import matryoshka.patterns._
-import scalaz.{Divide => _, _}, Scalaz._
+import scalaz.{Divide => _,Split => _, _}, Scalaz._
 
 object CoreMap extends Serializable {
 
@@ -52,10 +53,10 @@ object CoreMap extends Serializable {
       change[T, (Data, Data)])).map(f => (l: Data, r: Data) => f((l, r)))
 
   def changeReduceFunc[T[_[_]]: BirecursiveT](f: Free[MapFunc[T, ?], ReduceIndex])
-      : PlannerError \/ ((Data, List[Data]) => Data) =
+      : PlannerError \/ ((List[Data], List[Data]) => Data) =
     f.cataM(interpretM(
-      _.idx.fold((_: (Data, List[Data]))._1)(i => _._2(i)).right,
-      change[T, (Data, List[Data])])).map(f => (l: Data, r: List[Data]) => f((l, r)))
+      _.idx.fold[((List[Data], List[Data])) => Data](i => _._1(i), i => _._2(i)).right,
+      change[T, (List[Data], List[Data])])).map(f => (l: List[Data], r: List[Data]) => f((l, r)))
 
   def change[T[_[_]]: BirecursiveT, A]
       : AlgebraM[PlannerError \/ ?, MapFunc[T, ?], A => Data] =
@@ -308,6 +309,8 @@ object CoreMap extends Serializable {
       ((x: A) => search(fStr(x), fPattern(x), fInsen(x))).right
     case Substring(fStr, fFrom, fCount) =>
       ((x: A) => substring(fStr(x), fFrom(x), fCount(x))).right
+     case Split(fStr, fDelim) =>
+       ((x: A) => split(fStr(x), fDelim(x))).right
     case MakeArray(f) => (f >>> ((x: Data) => Data.Arr(List(x)))).right
     case MakeMap(fK, fV) => ((x: A) => (fK(x), fV(x)) match {
       case (Data.Str(k), v) => Data.Obj(ListMap(k -> v))
@@ -333,6 +336,7 @@ object CoreMap extends Serializable {
     }).right
     case DeleteField(fSrc, fField) =>  ((x: A) => (fSrc(x), fField(x)) match {
       case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => Data.Obj(m - field)
+      case (obj @ Data.Obj(_), _) => obj
       case _ => undefined
     }).right
     case Range(fFrom, fTo) => ((x: A) => (fFrom(x), fTo(x)) match {
@@ -539,6 +543,13 @@ object CoreMap extends Serializable {
     (dStr, dFrom, dCount) match {
       case (Data.Str(str), Data.Int(from), Data.Int(count)) =>
         \/.fromTryCatchNonFatal(Data.Str(StringLib.safeSubstring(str, from.toInt, count.toInt))).fold(κ(Data.NA), ι)
+      case _ => undefined
+    }
+
+  private def split(dStr: Data, dDelim: Data): Data =
+    (dStr, dDelim) match {
+      case (Data.Str(str), Data.Str(delim)) =>
+        \/.fromTryCatchNonFatal(Data.Arr(str.split(Regex.quote(delim), -1).toList.map(Data.Str(_)))).fold(κ(Data.NA), ι)
       case _ => undefined
     }
 
