@@ -42,6 +42,7 @@ object Caching {
   def viewCacheRefreshCtx(eval: Free[Eff, ?] ~> Task): Task[ViewCacheRefreshCtx] = Task.delay {
     val executor: ScheduledExecutorService =
       Executors.newScheduledThreadPool(
+        // A minimum of 8 threads is just a starting point until we learn more on workload characteristics
         scala.math.max(8, java.lang.Runtime.getRuntime.availableProcessors * 2),
         NamedDaemonThreadFactory("quasar-cache-refresh"))
 
