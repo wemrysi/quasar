@@ -16,8 +16,8 @@
 
 package quasar.physical.rdbms.fs.postgres
 
+import doobie.free.connection.ConnectionIO
 import doobie.imports.Update
-import doobie.syntax.connectionio._
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
 import quasar.Data
@@ -26,7 +26,6 @@ import quasar.fs._
 import quasar.physical.rdbms.common.TablePath
 import quasar.physical.rdbms.Rdbms
 import slamdata.Predef._
-import doobie.util.transactor.Transactor
 import doobie.syntax.string._
 import quasar.effect._
 import quasar.fp.free._
@@ -35,7 +34,6 @@ import quasar.physical.rdbms.mapping._
 
 import scalaz._
 import Scalaz._
-import scalaz.concurrent.Task
 
 trait RdbmsWriteFile {
   this: Rdbms =>
@@ -50,9 +48,8 @@ trait RdbmsWriteFile {
 
     def batchInsert(
         dbPath: TablePath,
-        chunk: Vector[Data],
-        xa: Transactor[Task]
-        ): Task[Vector[FileSystemError]] = {
+        chunk: Vector[Data]
+        ): ConnectionIO[Vector[FileSystemError]] = {
       chunk.headOption match {
         case Some(Data.Obj(lm)) =>
           val fQuery = fr"insert into ${dbPath.shows}" ++ fr"values(" ++ lm.toList
@@ -61,14 +58,14 @@ trait RdbmsWriteFile {
 
           Update[Data](fQuery.update.sql)
             .updateMany(chunk.toList)
-            .transact(xa) map (_ => Vector())
+            .map (_ => Vector())
         case Some(unsupportedObj) =>
-          Task.delay(
+
             Vector(
               FileSystemError.writeFailed(
-                (unsupportedObj, "Cannot translate to a RDBMS row."))))
+                (unsupportedObj, "Cannot translate to a RDBMS row."))).point[ConnectionIO]
         case None =>
-          Task.delay(Vector())
+          Vector[FileSystemError]().point[ConnectionIO]
       }
     }
 
@@ -76,14 +73,13 @@ trait RdbmsWriteFile {
         h: WriteHandle,
         chunk: Vector[Data]): Configured[Vector[FileSystemError]] = {
       (for {
-        xa <- MR.asks(_.transactor)
         dbPath <- ME.unattempt(
           writeKvs
             .get(h)
             .toRight(FileSystemError.unknownWriteHandle(h))
             .run
             .liftB)
-        _ <- lift(batchInsert(dbPath, chunk, xa)).into[Eff].liftB
+        _ <- lift(batchInsert(dbPath, chunk)).into[Eff].liftB
       } yield Vector()).run.value.map(_.valueOr(Vector(_)))
     }
 

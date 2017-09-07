@@ -16,9 +16,10 @@
 
 package quasar.physical.rdbms
 
+import doobie.imports.Transactor
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.effect.uuid.GenUUID
-import quasar.fp.{TaskRef, reflNT}
+import quasar.fp.TaskRef
 import quasar.fp.free._
 import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.WriteFile.WriteHandle
@@ -33,15 +34,17 @@ import scalaz.~>
 trait Interpreter {
   this: Rdbms =>
 
-  def interp: Task[Eff ~> Task] =
+  def interp(xa: Task[Transactor[Task]]): Task[Eff ~> Task] =
     (
       TaskRef(Map.empty[ReadHandle, SqlReadCursor]) |@|
       TaskRef(Map.empty[WriteHandle, TablePath]) |@|
+        xa.map(_.trans) |@|
         TaskRef(0L) |@|
         GenUUID.type1[Task]
     )(
-      (kvR, kvW, i, genUUID) =>
-        reflNT[Task] :+:
+      (kvR, kvW, x, i, genUUID) =>
+
+          x :+:
           MonotonicSeq.fromTaskRef(i) :+:
           genUUID :+:
           KeyValueStore.impl.fromTaskRef(kvR) :+:

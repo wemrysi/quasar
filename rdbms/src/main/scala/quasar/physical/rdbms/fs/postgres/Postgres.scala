@@ -59,4 +59,6 @@ object Postgres extends Rdbms {
 
     connectionInfo.leftMap(_.left[EnvironmentError])
   }
+
+  override lazy val describeTable = PostgresDescribeTable
 }

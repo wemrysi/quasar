@@ -17,6 +17,7 @@
 package quasar.physical.rdbms.fs.postgres
 
 
+import doobie.free.connection.ConnectionIO
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
 import quasar.Data
@@ -30,14 +31,11 @@ import quasar.physical.rdbms.mapping._
 import quasar.physical.rdbms.Rdbms
 import slamdata.Predef._
 import eu.timepit.refined.api.RefType.ops._
-import doobie.util.transactor.Transactor
-import doobie.syntax.connectionio._
 import doobie.syntax.process._
 import doobie.syntax.string._
 
 import scalaz._
 import Scalaz._
-import scalaz.concurrent.Task
 
 final case class SqlReadCursor(data: Vector[Data])
 
@@ -52,12 +50,12 @@ trait RdbmsReadFile {
 
   val ReadFileModule: ReadFileModule = new ReadFileModule {
 
-    private def readAll[F[_]: Monad](
+    private def readAll(
         dbPath: TablePath,
         offset: Int,
         limit: Option[Int],
-        xa: Transactor[F]
-    ): F[Vector[Data]] = {
+        isJson: Boolean
+    ): ConnectionIO[Vector[Data]] = {
 
       val streamWithOffset = sql"select * from ${dbPath.shows}"
         .query[Data]
@@ -68,27 +66,26 @@ trait RdbmsReadFile {
         case Some(l) => streamWithOffset.take(l)
         case None    => streamWithOffset
       }
-      streamWithLimit.vector.transact(xa)
+      streamWithLimit.vector
     }
 
     private def toInt(long: Long, varName: String): Backend[\/[FileSystemError, Int]] =
       lift(
-        Task.delay(
+
           \/.fromTryCatchNonFatal(long.toInt)
             .leftMap(
               _ => FileSystemError.readFailed(long.toString, s"$varName not convertible to Int.")
-            )
-        )
-      ).into[Eff].liftB
+            ).point[ConnectionIO]
+        ).into[Eff].liftB
 
     override def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
       for {
-        xa <- MR.asks(config => { println(">>>>>>>>>>>>>>> asks"); config.transactor })
         offsetInt <- includeError(toInt(offset.unwrap, "offset"))
         limitInt <- limit.traverse(l => includeError(toInt(l.unwrap, "limit")))
         i <- MonotonicSeq.Ops[Eff].next.liftB
         dbPath = TablePath.create(file)
-        sqlResult <- lift(readAll(dbPath, offsetInt, limitInt, xa)).into[Eff].liftB
+        isJson <- ME.unattempt(lift(describeTable.isJson(dbPath).run).into[Eff].liftB)
+        sqlResult <- lift(readAll(dbPath, offsetInt, limitInt, isJson)).into[Eff].liftB
         handle = ReadHandle(file, i)
         _ <- kvs.put(handle, SqlReadCursor(sqlResult)).liftB
       } yield handle

@@ -17,17 +17,15 @@
 package quasar.physical.rdbms
 
 import slamdata.Predef._
-import doobie.util.transactor.Transactor
 import pathy.Path
 import quasar.contrib.pathy.AFile
-
+import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 import scalaz.Show
-import scalaz.concurrent.Task
 
 
 object common {
 
-  final case class Config(transactor: Transactor[Task])
+  final case class Config(connInfo: JdbcConnectionInfo)
 
   final case class SchemaName(name: String) extends AnyVal
   final case class TableName(name: String) extends AnyVal

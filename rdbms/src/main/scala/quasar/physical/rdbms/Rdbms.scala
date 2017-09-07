@@ -33,8 +33,10 @@ import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.fs.postgres.{RdbmsReadFile, RdbmsWriteFile, SqlReadCursor}
 import quasar.qscript.{::/::, ::\::, EquiJoin, ExtractPath, Injectable, QScriptCore, QScriptTotal, ShiftedRead, Unicoalesce, Unirewrite}
 import doobie.hikari.hikaritransactor.HikariTransactor
+import doobie.imports.ConnectionIO
 import quasar.fs.WriteFile.WriteHandle
 import quasar.physical.rdbms.common.{Config, TablePath}
+import quasar.physical.rdbms.fs.RdbmsDescribeTable
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 
 import scalaz._
@@ -45,7 +47,7 @@ import scalaz.concurrent.Task
 trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Interpreter {
 
   type Eff[A] = (
-    Task :\:
+      ConnectionIO :\:
       MonotonicSeq :\:
       GenUUID :\:
       KeyValueStore[ReadHandle, SqlReadCursor, ?] :/:
@@ -72,20 +74,20 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with In
     QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
-  def parseConfig(uri: ConnectionUri): DefErrT[Task, Config] = {
-    EitherT(parseConnectionUri(uri).traverse { connectionInfo =>
-      val xa = HikariTransactor[Task](
-        connectionInfo.driverClassName,
-        connectionInfo.url,
-        connectionInfo.userName,
-        connectionInfo.password.getOrElse("")
-      )
-      xa.map(Config.apply)
-    })
-  }
+  def parseConfig(uri: ConnectionUri): DefErrT[Task, Config] =
+    EitherT(Task.delay(parseConnectionUri(uri).map(Config.apply)))
 
-  def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] =
-    (interp ∘ (i => (foldMapNT[Eff, Task](i), Task.delay(())))).liftM[DefErrT]
+
+  def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] = {
+    val xa = HikariTransactor[Task](
+      cfg.connInfo.driverClassName,
+      cfg.connInfo.url,
+      cfg.connInfo.userName,
+      cfg.connInfo.password.getOrElse("")
+    )
+    val close = xa.flatMap(_.configure(_.close()))
+    (interp(xa) ∘ (i => (foldMapNT[Eff, Task](i), close))).liftM[DefErrT]
+  }
 
   lazy val MR                   = MonadReader_[Backend, Config]
   lazy val ME                   = MonadFsErr[Backend]
@@ -99,8 +101,12 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with In
 
   def ManageFileModule: ManageFileModule = ??? // TODO
 
-  def parseConnectionUri(uri: ConnectionUri): \/[DefinitionError, JdbcConnectionInfo]
-
   def includeError[A](b: Backend[FileSystemError \/ A]): Backend[A] =
     EitherT(b.run.map(_.join))
+
+  // Below DB-specific functions
+  def describeTable: RdbmsDescribeTable
+
+  def parseConnectionUri(uri: ConnectionUri): \/[DefinitionError, JdbcConnectionInfo]
+
 }
