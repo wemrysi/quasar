@@ -26,7 +26,6 @@ import doobie.imports._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import org.specs2.mutable.SpecificationLike
-import org.specs2.specification.AfterAll
 
 trait MetaStoreFixture {
   def schema: Schema[Int]
@@ -72,8 +71,7 @@ trait H2MetaStoreFixture extends MetaStoreFixture {
 trait PostgreSqlMetaStoreFixture
     extends MetaStoreFixture
     with    PostgresTxFixture
-    with    SpecificationLike
-    with    AfterAll {
+    with    SpecificationLike {
   // The `toLowerCase` is important here to make sure `doobie` can connect to the database properly
   lazy val transactorOption =
     postgreSqlTransactor(this.getClass.getSimpleName.toLowerCase).run.unsafePerformSync
@@ -87,7 +85,5 @@ trait PostgreSqlMetaStoreFixture
                         "provides us with some fixtures that are inheritance based"
 
   override def rawTransactor =
-    transactorOption.getOrElse(throw new Exception(failMessage)).transactor
-
-  override def afterAll = transactorOption.get.shutdown.unsafePerformSync
+    transactorOption.getOrElse(throw new Exception(failMessage))
 }

@@ -21,7 +21,8 @@ import quasar.contrib.pathy.{ADir, APath}
 import quasar.effect._
 import quasar.fp._ , free._
 import quasar.fs.{Empty, PhysicalError, ReadFile}
-import quasar.fs.mount._, BackendDef.DefinitionResult
+import quasar.fs.cache.VCache
+import quasar.fs.mount._, BackendDef.DefinitionResult, Fixture._
 import quasar.main._
 import quasar.regression._
 import quasar.sql.{ScopedExpr, Sql}
@@ -39,7 +40,7 @@ class ViewReadQueryRegressionSpec
 
   val suiteName = "View Reads"
 
-  type ViewFS[A] = (Mounting :\: ViewState :\: MonotonicSeq :/: BackendEffectIO)#M[A]
+  type ViewFS[A] = (Mounting :\: ViewState :\: VCache :\: MonotonicSeq :/: BackendEffectIO)#M[A]
 
   def mounts(path: APath, expr: Fix[Sql], vars: Variables): Task[Mounting ~> Task] =
     (
@@ -79,8 +80,9 @@ class ViewReadQueryRegressionSpec
 
   def interpViews(mnts: Mounting ~> Task): Task[ViewFS ~> BackendEffectIO] =
     (ViewState.toTask(Map()) |@| seq)((v, s) =>
-      (injectNT[Task, BackendEffectIO] compose mnts) :+:
-      (injectNT[Task, BackendEffectIO] compose v) :+:
-      (injectNT[Task, BackendEffectIO] compose s) :+:
+      (injectNT[Task, BackendEffectIO] compose mnts)                               :+:
+      (injectNT[Task, BackendEffectIO] compose v)                                  :+:
+      (injectNT[Task, BackendEffectIO] compose runConstantVCache[Task](Map.empty)) :+:
+      (injectNT[Task, BackendEffectIO] compose s)                                  :+:
       reflNT[BackendEffectIO])
 }
