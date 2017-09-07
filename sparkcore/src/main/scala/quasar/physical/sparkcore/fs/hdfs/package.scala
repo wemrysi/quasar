@@ -27,8 +27,6 @@ import quasar.contrib.scalaz.readerT._
 import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.fs.mount._, BackendDef._
 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile, genSc => coreGenSc}
-import quasar.physical.sparkcore.fs.hdfs.writefile.HdfsWriteCursor
-
 
 import java.net.{URLDecoder, URI}
 

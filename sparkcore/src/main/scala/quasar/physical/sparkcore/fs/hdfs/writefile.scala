@@ -36,8 +36,6 @@ import scalaz.concurrent.Task
 
 object writefile {
 
-  final case class HdfsWriteCursor(hdfs: FileSystem, bw: BufferedWriter)
-
   private def toPath(apath: APath): Task[Path] = Task.delay {
     new Path(posixCodec.unsafePrintPath(apath))
   }

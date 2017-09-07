@@ -58,6 +58,10 @@ trait BackendModule {
     val liftB: Backend[A] = m.liftM[ConfiguredT].liftM[PhaseResultT].liftM[FileSystemErrT]
   }
 
+  implicit class LiftBackendConfigured[A](c: Configured[A]) {
+    val liftB: Backend[A] = c.liftM[PhaseResultT].liftM[FileSystemErrT]
+  }
+
   final val definition: BackendDef[Task] =
     BackendDef fromPF {
       case (Type, uri) =>

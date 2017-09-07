@@ -162,8 +162,8 @@ object FileSystemTest {
       fsTestConfig0(marklogic.fs.FsType, MarkLogic(10000L, 10000L).definition) orElse
       fsTestConfig0(mimir.Mimir.Type, mimir.Mimir.definition) orElse
       fsTestConfig0(mongodb.MongoDb.Type, mongodb.MongoDb.definition) orElse
-      fsTestConfig(sparkcore.fs.hdfs.FsType, sparkcore.fs.hdfs.definition)  orElse
-      fsTestConfig(sparkcore.fs.local.FsType, sparkcore.fs.local.definition) orElse
+      fsTestConfig0(sparkcore.fs.hdfs.SparkHdfsBackendModule.Type, sparkcore.fs.hdfs.SparkHdfsBackendModule.definition)  orElse
+      fsTestConfig0(sparkcore.fs.local.SparkLocalBackendModule.Type, sparkcore.fs.local.SparkLocalBackendModule.definition) orElse
       fsTestConfig(sparkcore.fs.elastic.FsType, sparkcore.fs.elastic.definition) orElse
       fsTestConfig(sparkcore.fs.cassandra.FsType,  sparkcore.fs.cassandra.definition)
     }

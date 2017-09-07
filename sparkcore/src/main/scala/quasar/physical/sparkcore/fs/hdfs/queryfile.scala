@@ -79,7 +79,6 @@ class queryfile[F[_]:Capture:Bind](fileSystem: F[FileSystem]) {
         bw.newLine()
     })
     bw.close()
-    hdfs.close()
   }
 
   def fileExists(f: AFile): F[Boolean] = for {
@@ -87,7 +86,6 @@ class queryfile[F[_]:Capture:Bind](fileSystem: F[FileSystem]) {
     hdfs <- fileSystem
   } yield {
     val exists = hdfs.exists(path)
-    hdfs.close()
     exists
   }
 
@@ -101,7 +99,6 @@ class queryfile[F[_]:Capture:Bind](fileSystem: F[FileSystem]) {
         case directory => DirName(directory.getPath().getName()).left[FileName]
       }.right[FileSystemError]
     } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
-    hdfs.close
     result
   })
 }
