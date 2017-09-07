@@ -5,7 +5,7 @@
         "marklogic_xml":     "pending",
         "mimir":             "pending"
     },
-    "data": "../days.data",
+    "data":  "../days.data",
     "query": "select day from `../days`
               where
                 ((date_trunc(\"day\", ts) > start_of_day(date(\"2014-08-17\"))
