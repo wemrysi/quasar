@@ -22,7 +22,7 @@ import quasar.qscript.{MapFuncCore, MapFuncsCore}
 import quasar.blueeyes.json.JValue
 import quasar.precog.common.{CBoolean, CLong, CPathField, CPathIndex, CString, RValue}
 // import quasar.yggdrasil.TransSpecModule
-import quasar.yggdrasil.bytecode.JType
+import quasar.yggdrasil.bytecode.{JDateT, JTextT, JType, JUnionT}
 
 import matryoshka.{AlgebraM, RecursiveT}
 import matryoshka.implicits._
@@ -42,9 +42,14 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
     import cake.trans._
     import cake.Library._
 
-    def apply[A <: SourceType](id: cake.trans.TransSpec[A]): AlgebraM[F, MapFuncCore[T, ?], TransSpec[A]] = {
+    private val StrAndDateT = JUnionT(JTextT, JDateT)
+
+    private def undefined[A <: SourceType](id: TransSpec[A]): TransSpec[A] =
+      DerefArrayStatic[A](OuterArrayConcat[A](WrapArray(id)), CPathIndex(1))
+
+    def apply[A <: SourceType](id: TransSpec[A]): AlgebraM[F, MapFuncCore[T, ?], TransSpec[A]] = {
       case MapFuncsCore.Undefined() =>
-        (DerefArrayStatic[A](OuterArrayConcat[A](WrapArray(id)), CPathIndex(1)): TransSpec[A]).point[F]
+        undefined(id).point[F]
 
       case MapFuncsCore.Constant(ejson) =>
         // EJson => Data => JValue => RValue => Table
@@ -187,8 +192,13 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         (WrapObject[A](value, key): TransSpec[A]).point[F]
       case MapFuncsCore.MakeMap(key, value) =>
         (WrapObjectDynamic[A](key, value): TransSpec[A]).point[F]
+
       case MapFuncsCore.ConcatArrays(a1, a2) =>
-        (OuterArrayConcat[A](a1, a2): TransSpec[A]).point[F]
+        (Cond(
+          Infix.And.spec[A](IsType(a1, StrAndDateT), IsType(a2, StrAndDateT)),
+          concat.spec[A](a1, a2),
+          OuterArrayConcat[A](a1, a2)): TransSpec[A]).point[F]
+
       case MapFuncsCore.ConcatMaps(a1, a2) =>
         (OuterObjectConcat[A](a1, a2): TransSpec[A]).point[F]
       case MapFuncsCore.ProjectIndex(src, ConstLiteral(CLong(index), _)) =>
