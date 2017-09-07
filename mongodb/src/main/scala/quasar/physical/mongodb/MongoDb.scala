@@ -122,12 +122,10 @@ object MongoDb
       } yield cur
 
     def readCursor(f: AFile, offset: Natural, limit: Option[Positive])
-        : Backend[BsonCursor] = {
-      val c = Collection.fromFile(f).fold(
-        err  => ???, //TODO what needs to be done in this case?
-        coll => cursor(coll, offset, limit))
-      Free.liftF(toEff(c)).liftB
-    }
+        : Backend[BsonCursor] =
+      Collection.fromFile(f).fold(
+        err  => MonadFsErr[Backend].raiseError[BsonCursor](FileSystemError.pathErr(err)),
+        coll => Free.liftF(toEff(cursor(coll, offset, limit))).liftB)
 
     def nextChunk(c: BsonCursor): Backend[(BsonCursor, Vector[Data])] =
       Free.liftF(toEff(DC.nextChunk(c).map((c, _)))).liftB
