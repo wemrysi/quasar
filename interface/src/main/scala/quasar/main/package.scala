@@ -63,7 +63,7 @@ package object main {
       writeChunkSize = 10000L
     ).definition translate injectFT[Task, PhysFsEff],
     mimir.Mimir.definition translate injectFT[Task, PhysFsEff],
-    mongodb.fs.definition[PhysFsEff],
+    mongodb.MongoDb.definition translate injectFT[Task, PhysFsEff],
     skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff],
     sparkcore.fs.hdfs.definition[PhysFsEff],
     sparkcore.fs.elastic.definition[PhysFsEff],
