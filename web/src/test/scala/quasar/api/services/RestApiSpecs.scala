@@ -18,9 +18,11 @@ package quasar.api.services
 
 import slamdata.Predef._
 import quasar.api._
-import quasar.effect.Failure
+import quasar.contrib.pathy._
+import quasar.effect.{Failure, KeyValueStore, Timing}
 import quasar.fp._, free._
 import quasar.fs._
+import quasar.fs.cache.{VCache, ViewCache}
 import quasar.fs.mount._
 import quasar.fs.mount.module.Module
 import quasar.main._
@@ -29,34 +31,43 @@ import quasar.metastore.MetaStoreFixture.createNewTestMetaStoreConfig
 import org.http4s._, Method.MOVE
 import org.http4s.dsl._
 import org.http4s.headers._
+import org.specs2.matcher.TraversableMatchers._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
-import org.specs2.matcher.TraversableMatchers._
 
 class RestApiSpecs extends quasar.Qspec {
   import InMemory._, Mounting.PathTypeMismatch
 
-  type Eff[A] = (Task :\: PathMismatchFailure :\: MountingFailure :\: FileSystemFailure :\: Module.Failure :\: MetaStoreLocation :\: Module :\: Mounting :\: Analyze :/: FileSystem)#M[A]
+  type Eff[A] = (
+    Task :\: Timing :\: VCache :\: PathMismatchFailure :\: MountingFailure :\: FileSystemFailure :\:
+    Module.Failure :\: MetaStoreLocation :\: Module :\: Mounting :\: Analyze :/: FileSystem
+  )#M[A]
+
+  type MountingFileSystem[A] = Coproduct[Mounting, FileSystem, A]
 
   "OPTIONS" should {
     val mount = λ[Mounting ~> Task](_ => Task.fail(new RuntimeException("unimplemented")))
 
     val analyze = Empty.analyze[Task]
 
-    type MountingFileSystem[A] = Coproduct[Mounting, FileSystem, A]
+    val fsInterp: Task[FileSystem ~> Task] = runFs(InMemState.empty)
 
-    val eff: Task[Eff ~> Task] = (runFs(InMemState.empty) |@| createNewTestMetaStoreConfig){ (fs, metaConf) =>
-      NaturalTransformation.refl[Task]                   :+:
-      Failure.toRuntimeError[Task, PathTypeMismatch]     :+:
-      Failure.toRuntimeError[Task, MountingError]        :+:
-      Failure.toRuntimeError[Task, FileSystemError]      :+:
-      Failure.toRuntimeError[Task, Module.Error]         :+:
-      MetaStoreLocation.impl.constant(metaConf)          :+:
-      (foldMapNT(mount :+: fs) compose Module.impl.default[MountingFileSystem]) :+:
-      mount :+:
-      analyze :+:
-      fs
-    }
+    val vcacheInterp: Task[VCache ~> Task] = KeyValueStore.impl.default[AFile, ViewCache]
+
+    val eff: Task[Eff ~> Task] =
+      (fsInterp ⊛ createNewTestMetaStoreConfig ⊛ vcacheInterp)((fs, metaConf, vci) =>
+        NaturalTransformation.refl[Task]                                          :+:
+        Timing.toTask                                                             :+:
+        vci                                                                       :+:
+        Failure.toRuntimeError[Task, PathTypeMismatch]                            :+:
+        Failure.toRuntimeError[Task, MountingError]                               :+:
+        Failure.toRuntimeError[Task, FileSystemError]                             :+:
+        Failure.toRuntimeError[Task, Module.Error]                                :+:
+        MetaStoreLocation.impl.constant(metaConf)                                 :+:
+        (foldMapNT(mount :+: fs) compose Module.impl.default[MountingFileSystem]) :+:
+        mount                                                                     :+:
+        analyze                                                                   :+:
+        fs)
 
     val service = eff map { runEff =>
       RestApi.finalizeServices(RestApi.toHttpServices(

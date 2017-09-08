@@ -22,7 +22,8 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.fp._
 import quasar.fp.free._
-import quasar.fs.mount._, BackendDef.DefinitionResult
+import quasar.fs.cache.VCache
+import quasar.fs.mount._, BackendDef.DefinitionResult, Fixture._
 import quasar.effect._
 import quasar.main.{KvsMounter, HierarchicalFsEffM, PhysFsEff, PhysFsEffM}
 import quasar.mimir
@@ -201,6 +202,7 @@ object FileSystemTest {
           :\: PathMismatchFailure
           :\: MountingFailure
           :\: ViewState
+          :\: VCache
           :\: MonotonicSeq
           :/: BackendEffect
       )#M[A]
@@ -209,6 +211,7 @@ object FileSystemTest {
       Failure.toRuntimeError[Task, Mounting.PathTypeMismatch] :+:
       Failure.toRuntimeError[Task, MountingError] :+:
       viewState :+:
+      runConstantVCache[Task](Map.empty) :+:
       MonotonicSeq.fromTaskRef(seqRef) :+:
       mem.testInterp
 

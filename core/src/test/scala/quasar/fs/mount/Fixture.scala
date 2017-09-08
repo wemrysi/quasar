@@ -20,6 +20,7 @@ import slamdata.Predef._
 
 import quasar.contrib.pathy._
 import quasar.effect.KeyValueStore
+import quasar.fs.cache.{VCache, ViewCache}
 import quasar.fp._
 import quasar.fp.free._
 
@@ -28,13 +29,13 @@ import scalaz._, Id._
 
 object Fixture {
 
-  def constant: Mounting ~> State[Map[APath, MountConfig], ?] = {
-    type F[A] = State[Map[APath, MountConfig], A]
-    val mntr = Mounter.trivial[MountConfigs]
-    val kvf = KeyValueStore.impl.toState[F](Lens.id[Map[APath, MountConfig]])
-    mntr andThen foldMapNT(kvf)
-  }
+  def constant[F[_]: Applicative, K, V](m: Map[K, V]): KeyValueStore[K, V, ?] ~> F =
+    KeyValueStore.impl.toState[State[Map[K, V], ?]](Lens.id[Map[K, V]]) andThen
+    evalNT[Id, Map[K, V]](m) andThen pointNT[F]
 
-  def runConstantMount[F[_]: Applicative](mnts: Map[APath, MountConfig]): Mounting ~> F =
-    constant andThen evalNT[Id, Map[APath, MountConfig]](mnts) andThen pointNT[F]
+  def runConstantMount[F[_]: Monad](mnts: Map[APath, MountConfig]): Mounting ~> F =
+    Mounter.trivial[MountConfigs] andThen foldMapNT[MountConfigs, F](constant[F, APath, MountConfig](mnts))
+
+  def runConstantVCache[F[_]: Applicative](vcache: Map[AFile, ViewCache]): VCache ~> F =
+    constant[F, AFile, ViewCache](vcache)
 }
