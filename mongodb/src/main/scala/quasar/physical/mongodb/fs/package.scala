@@ -40,6 +40,7 @@ package object fs {
   type PlanT[F[_], A] = ReaderT[FileSystemErrT[PhaseResultT[F, ?], ?], Instant, A]
 
   type MongoReadHandles[A] = KeyValueStore[ReadFile.ReadHandle, BsonCursor, A]
+  type MongoWriteHandles[A] = KeyValueStore[WriteFile.WriteHandle, Collection, A]
 
   type Eff[A] = (
     MonotonicSeq :\:
@@ -47,7 +48,7 @@ package object fs {
     fs.queryfileTypes.MongoQuery[BsonCursor, ?] :\:
     fs.managefile.MongoManage :\:
     MongoReadHandles :/:
-    fs.writefile.MongoWrite)#M[A]
+    MongoWriteHandles)#M[A]
 
   type MongoM[A] = Free[Eff, A]
 
@@ -122,13 +123,13 @@ package object fs {
       queryfile.run[BsonCursor, PhysFsEff](cfg.client, cfg.defaultDb) |@|
       managefile.run[PhysFsEff](cfg.client) |@|
       KeyValueStore.impl.default[ReadFile.ReadHandle, BsonCursor] |@|
-      writefile.run[PhysFsEff](cfg.client)
-    )((seq, io, qfile, mfile, rfile, wfile) => {
+      KeyValueStore.impl.default[WriteFile.WriteHandle, Collection]
+    )((seq, io, qfile, mfile, rh, wh) => {
       (seq :+: io :+:
         (freeFsEffToTask compose qfile) :+:
         (freeFsEffToTask compose mfile) :+:
-        rfile :+:
-        (freeFsEffToTask compose wfile))
+        rh :+:
+        wh)
     })
   }
 

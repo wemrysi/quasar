@@ -37,7 +37,8 @@ import scala.Predef.implicitly
 
 object MongoDb
     extends BackendModule
-    with ManagedReadFile[BsonCursor] {
+    with ManagedReadFile[BsonCursor]
+    with ManagedWriteFile[Collection] {
 
   type QS[T[_[_]]] = fs.MongoQScriptCP[T]
 
@@ -61,6 +62,7 @@ object MongoDb
   // Managed
   def MonoSeqM = MonoSeq[M]
   def ReadKvsM = Kvs[M, ReadFile.ReadHandle, BsonCursor]
+  def WriteKvsM = Kvs[M, WriteFile.WriteHandle, Collection]
 
   def parseConfig(uri: ConnectionUri): BackendDef.DefErrT[Task, Config] =
     fs.parseConfig(uri)
@@ -98,6 +100,8 @@ object MongoDb
 
   private def toEff[C[_], A](c: C[A])(implicit inj: C :<: fs.Eff): fs.Eff[A] = inj(c)
 
+  def toM[C[_], A](c: C[A])(implicit inj: C :<: fs.Eff): M[A] = Free.liftF(toEff(c))
+
   def toBackend[C[_], A](c: C[FileSystemError \/ A])(implicit inj: C :<: fs.Eff): Backend[A] =
     EitherT(c).mapT(x => effToPhaseRes(toEff(x)))
 
@@ -125,16 +129,46 @@ object MongoDb
         : Backend[BsonCursor] =
       Collection.fromFile(f).fold(
         err  => MonadFsErr[Backend].raiseError[BsonCursor](FileSystemError.pathErr(err)),
-        coll => Free.liftF(toEff(cursor(coll, offset, limit))).liftB)
+        coll => toM(cursor(coll, offset, limit)).liftB)
 
     def nextChunk(c: BsonCursor): Backend[(BsonCursor, Vector[Data])] =
-      Free.liftF(toEff(DC.nextChunk(c).map((c, _)))).liftB
+      toM(DC.nextChunk(c).map((c, _))).liftB
 
     def closeCursor(c: BsonCursor): Configured[Unit] =
       toConfigured(DC.close(c))
   }
 
-  override val WriteFileModule = fs.writefile
+  object ManagedWriteFileModule extends ManagedWriteFileModule {
+    private def dataToDocument(d: Data): FileSystemError \/ Bson.Doc =
+      BsonCodec.fromData(d)
+        .leftMap(err => FileSystemError.writeFailed(d, err.shows))
+        .flatMap {
+          case doc @ Bson.Doc(_) => doc.right
+          case otherwise => FileSystemError.writeFailed(d, "MongoDB is only able to store documents").left
+        }
+
+    def writeCursor(file: AFile): Backend[Collection] =
+      Collection.fromFile(file).fold(
+        err => MonadFsErr[Backend].raiseError[Collection](FileSystemError.pathErr(err)),
+        coll => toM(MongoDbIO.ensureCollection(coll) *> coll.point[MongoDbIO]).liftB)
+
+    def writeChunk(c: Collection, chunk: Vector[Data])
+        : Configured[Vector[FileSystemError]] = {
+      val (errs, docs) = chunk foldMap { d =>
+        dataToDocument(d).fold(
+          e => (Vector(e), Vector()),
+          d => (Vector(), Vector(d)))
+      }
+      val io = MongoDbIO.insertAny(c, docs.map(_.repr))
+        .filter(_ < docs.size)
+        .map(n => FileSystemError.partialWrite(docs.size - n))
+        .run.map(errs ++ _.toList)
+      toConfigured(io)
+    }
+
+    def closeCursor(c: Collection): Configured[Unit] =
+      ().point[Configured]
+  }
 
   override val ManageFileModule = fs.managefile
 }
