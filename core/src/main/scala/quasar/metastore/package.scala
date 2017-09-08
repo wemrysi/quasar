@@ -20,7 +20,11 @@ import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile, APath, unsafeSandboxAbs}
 import quasar.db.Schema
 import quasar.fs.FileSystemType
-import quasar.fs.mount.MountType
+import quasar.fs.cache.ViewCache
+import quasar.fs.mount.{ConnectionUri, MountType}
+
+import java.sql.Timestamp
+import java.time.Instant
 
 import doobie.imports._
 import pathy.Path, Path._
@@ -92,11 +96,31 @@ package object metastore {
       )(str),
       p => posixCodec.printPath(p.merge[APath]))
 
+  implicit val aFileMeta: Meta[AFile] =
+    Meta[String].xmap[AFile](
+      str => unsafeSandboxAbs(
+        posixCodec.parseAbsFile(str).getOrElse(unexpectedValue("not an absolute file path: " + str))),
+      posixCodec.printPath(_))
+
   implicit val aDirMeta: Meta[ADir] =
     Meta[String].xmap[ADir](
       str => unsafeSandboxAbs(
         posixCodec.parseAbsDir(str).getOrElse(unexpectedValue("not an absolute dir path: " + str))),
       posixCodec.printPath(_))
+
+  implicit val instantMeta: Meta[Instant] = Meta[Timestamp].xmap(_.toInstant, Timestamp.from)
+
+  implicit val viewCacheStatusMeta: Meta[ViewCache.Status] = Meta[String].xmap(
+    {
+      case "pending"    => ViewCache.Status.Pending
+      case "successful" => ViewCache.Status.Successful
+      case "failed"     => ViewCache.Status.Failed
+    },
+    {
+      case ViewCache.Status.Pending    => "pending"
+      case ViewCache.Status.Successful => "successful"
+      case ViewCache.Status.Failed     => "failed"
+    })
 
   implicit val mountTypeMeta: Meta[MountType] = {
     import MountType._
@@ -104,6 +128,26 @@ package object metastore {
       { case "view" => viewMount(); case "module" => moduleMount(); case fsType => fileSystemMount(FileSystemType(fsType)) },
       _.fold(_.value, "view", "module"))
   }
+
+  implicit val pathedViewCacheComposite: Composite[PathedViewCache] =
+    Composite[(
+      AFile, ConnectionUri, Option[Instant], Option[Long], Int, Option[String],
+      Option[Instant], Long, Instant, ViewCache.Status, Option[String], AFile, Option[String]
+    )].xmap(
+      { case (path, query, lastUpdate, executionMillis, cacheReads, assignee,
+              assigneeStart, maxAge, refreshAfter, status, errorMsg, dataFile, tmpDataFile) =>
+          PathedViewCache(
+            path,
+            ViewCache(
+              query, lastUpdate, executionMillis, cacheReads, assignee,
+              assigneeStart, maxAge, refreshAfter, status, errorMsg, dataFile,
+              tmpDataFile ∘ (tf => unsafeSandboxAbs(
+                posixCodec.parseAbsFile(tf)
+                  .getOrElse(unexpectedValue("not an absolute file path: " + tf))))))
+      },
+      c => (c.path, c.vc.query, c.vc.lastUpdate, c.vc.executionMillis, c.vc.cacheReads, c.vc.assignee,
+             c.vc.assigneeStart, c.vc.maxAgeSeconds, c.vc.refreshAfter, c.vc.status, c.vc.errorMsg, c.vc.dataFile,
+             c.vc.tmpDataFile ∘ (posixCodec.printPath(_))))
 
   // See comment above.
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))

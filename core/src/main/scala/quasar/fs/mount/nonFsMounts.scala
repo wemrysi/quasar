@@ -23,6 +23,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
+import quasar.fs.cache.VCache
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, Optimizer}
 
 import matryoshka._
@@ -37,6 +38,7 @@ object nonFsMounts {
   /** Intercept and handle moves and deletes involving view path(s); all others are passed untouched. */
   def manageFile[S[_]](mountsIn: ADir => Free[S, Set[RPath]])(
                         implicit
+                        VC: VCache.Ops[S],
                         S0: ManageFile :<: S,
                         S1: QueryFile :<: S,
                         S2: Mounting :<: S,
@@ -112,7 +114,13 @@ object nonFsMounts {
         case MoveScenario.FileToFile(_, dst) => query.fileExists(dst)
         case MoveScenario.DirToDir(_, dst)   => query.ls(dst).run.map(_.toOption.map(_.nonEmpty).getOrElse(false))
       }
-      EitherT((mount.exists(scenario.src) |@| mount.exists(scenario.dst) |@| destinationNonEmpty).tupled.flatMap {
+
+      def cacheMove(s: AFile) =
+        refineType(scenario.dst)
+          .leftMap(p => pathErr(PathError.invalidPath(p, "view mount destination must be a file")))
+          .traverse(d => VC.move(s, d))
+
+      val move = (mount.exists(scenario.src) |@| mount.exists(scenario.dst) |@| destinationNonEmpty).tupled.flatMap {
         case (srcMountExists, dstMountExists, dstNonEmpty) => (semantics match {
           case FailIfExists if dstMountExists || dstNonEmpty =>
             pathErr(pathExists(scenario.dst)).raiseError[manage.M, Unit]
@@ -131,16 +139,19 @@ object nonFsMounts {
           case _ =>
             manage.move(scenario, semantics)
         }).run
-      })
+      }
+
+      EitherT(
+        vcacheGet(scenario.src).fold(
+          cacheMove,
+          move).join)
     }
 
-    λ[ManageFile ~> Free[S, ?]] {
-      case Move(scenario, semantics) =>
-        scenario.fold(
-          (src, dst) => dirToDirMove(src, dst, semantics),
-          (src, dst) => mountMove(MoveScenario.FileToFile(src, dst), semantics).run)
+    def mountDelete(path: APath): Free[S, FileSystemError \/ Unit] = {
+      def cacheDelete(f: AFile): Free[S, FileSystemError \/ Unit] =
+        VC.delete(f) ∘ (_.right[FileSystemError])
 
-      case Delete(path) =>
+      val delete: Free[S, FileSystemError \/ Unit] =
         refineType(path).fold(
           d => mountsIn(d).map(paths => paths.map(d </> _))
             .flatMap(_.traverse_(deleteMount))
@@ -150,6 +161,18 @@ object nonFsMounts {
             deleteMount(f).liftM[FileSystemErrT],
             manage.delete(f))
         ).run
+
+      vcacheGet(path).fold(cacheDelete, delete).join
+    }
+
+    λ[ManageFile ~> Free[S, ?]] {
+      case Move(scenario, semantics) =>
+        scenario.fold(
+          (src, dst) => dirToDirMove(src, dst, semantics),
+          (src, dst) => mountMove(MoveScenario.FileToFile(src, dst), semantics).run)
+
+      case Delete(path) =>
+        mountDelete(path)
 
       case TempFile(nearTo) =>
         manage.tempFile(nearTo).run
@@ -176,4 +199,10 @@ object nonFsMounts {
       case Close(h) => writeUnsafe.close(h)
     }
   }
+
+  ////
+
+  private def vcacheGet[S[_]](p: APath)(implicit VC: VCache.Ops[S]): OptionT[Free[S, ?], AFile] =
+    OptionT(maybeFile(p).η[Free[S, ?]]) >>= (f => VC.get(f).as(f))
+
 }
