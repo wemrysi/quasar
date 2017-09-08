@@ -235,19 +235,17 @@ class MongoDbFileSystemSpec
           }
 
           def check(file: AFile) = {
-            val errP: Prism[FileSystemError \/ AFile, APath] =
-              D.left                    composePrism
-              FileSystemError.pathErr composePrism
-              PathError.pathNotFound
+            val errP: Prism[FileSystemError \/ AFile, Planner.PlannerError] =
+              D.left composePrism FileSystemError.qscriptPlanningFailed
 
             val out = renameFile(file, κ(FileName("out")))
 
             def check0(expr: Fix[Sql]) =
-              (run(query.fileExists(file)).unsafePerformSync ==== false) and
-              (errP.getOption(
-                runExec(fsQ.executeQuery(expr, Variables.empty, rootDir, out))
-                  .run.value.unsafePerformSync
-              ) must beSome(file))
+              ((run(query.fileExists(file)).unsafePerformSync ==== false) and
+
+              (errP.getOption(runExec(fsQ.executeQuery(expr, Variables.empty, rootDir, out))
+                  .run.value.unsafePerformSync)
+               must beSome(Planner.NoFilesFound(List.empty[ADir]))))
 
             sql.fixParser.parseExpr(sql.Query(f(posixCodec.printPath(file)))) fold (
               err => ko(s"Parsing failed: ${err.shows}"),
@@ -261,13 +259,13 @@ class MongoDbFileSystemSpec
           shouldFailWithPathNotFound { path =>
             s"""SELECT name FROM `$path` WHERE LENGTH(name) > 10"""
           }
-        }.pendingUntilFixed("""error does not include file: -\/(QScriptPlanningFailed(NoFilesFound(List())))""")
+        }
 
         "aggregation query should fail when file DNE" >> {
           shouldFailWithPathNotFound { path =>
             s"""SELECT name FROM `$path` WHERE name.field1 > 10"""
           }
-        }.pendingUntilFixed("""error does not include file: -\/(QScriptPlanningFailed(NoFilesFound(List())))""")
+        }
       }
 
       "List dirs" >> {
