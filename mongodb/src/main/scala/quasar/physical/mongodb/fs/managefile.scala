@@ -18,11 +18,10 @@ package quasar.physical.mongodb.fs
 
 import slamdata.Predef._
 import quasar.NameGenerator
-import quasar.fp.ski.κ
 import quasar.contrib.pathy._
 import quasar.fp.TaskRef
 import quasar.fs._
-import quasar.physical.mongodb._, MongoDb._
+import quasar.physical.mongodb._
 
 import com.mongodb.{MongoException, MongoCommandException, MongoServerException}
 import com.mongodb.async.client.MongoClient
@@ -30,50 +29,12 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-object managefile extends ManageFileModule {
-  import ManageFile._, FileSystemError._, PathError._, MongoDbIO._, fsops._
+object managefile {
+  import FileSystemError._, PathError._, MongoDbIO._, fsops._
 
   type ManageIn           = (TmpPrefix, TaskRef[Long])
   type ManageInT[F[_], A] = ReaderT[F, ManageIn, A]
   type MongoManage[A]     = ManageInT[MongoDbIO, A]
-
-  /** TODO: There are still some questions regarding Path
-    *   1) We should assume all paths will be canonicalized and can do so
-    *      with a ManageFile ~> ManageFile that canonicalizes everything.
-    *
-    *   2) Currently, parsing a directory like "/../foo/bar/" as an absolute
-    *      dir succeeds, this should probably be changed to fail.
-    */
-
-  def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = {
-    val mm: MongoManage[FileSystemError \/ Unit] =
-      scenario.fold(moveDir(_, _, semantics), moveFile(_, _, semantics))
-        .run.liftM[ManageInT]
-    toBackend(mm)
-  }
-
-  def delete(path: APath): Backend[Unit] = {
-    val mm: MongoManage[FileSystemError \/ Unit] =
-      refineType(path).fold(deleteDir, deleteFile)
-        .run.liftM[ManageInT]
-    toBackend(mm)
-  }
-
-  def tempFile(near: APath): Backend[AFile] = {
-    val checkPath =
-      EitherT.fromDisjunction[MongoManage](Collection.dbNameFromPath(near))
-        .bimap(pathErr(_), κ(()))
-
-    val mkTemp =
-      freshName.liftM[FileSystemErrT] map { n =>
-        refineType(near).fold(
-          _ </> file(n),
-          f => fileParent(f) </> file(n))
-      }
-
-    val mm: MongoManage[FileSystemError \/ AFile] = checkPath.flatMap(κ(mkTemp)).run
-    toBackend(mm)
-  }
 
   /** Run [[MongoManage]] with the given `MongoClient`. */
   def run[S[_]](
@@ -89,15 +50,13 @@ object managefile extends ManageFileModule {
       }
     }
 
-  ////
-
-  private val moveToRename: MoveSemantics => RenameSemantics = {
+  val moveToRename: MoveSemantics => RenameSemantics = {
     case MoveSemantics.Overwrite     => RenameSemantics.Overwrite
     case MoveSemantics.FailIfExists  => RenameSemantics.FailIfExists
     case MoveSemantics.FailIfMissing => RenameSemantics.Overwrite
   }
 
-  private def moveDir(src: ADir, dst: ADir, sem: MoveSemantics): MongoFsM[Unit] = {
+  def moveDir(src: ADir, dst: ADir, sem: MoveSemantics): MongoFsM[Unit] = {
     // TODO: Need our own error type instead of reusing the one from the driver.
     def filesMismatchError(srcs: Vector[AFile], dsts: Vector[AFile]): MongoException = {
       val pp = posixCodec.printPath _
@@ -124,8 +83,7 @@ object managefile extends ManageFileModule {
       moveAllUserCollections
   }
 
-  private def moveFile(src: AFile, dst: AFile, sem: MoveSemantics)
-                      : MongoFsM[Unit] = {
+  def moveFile(src: AFile, dst: AFile, sem: MoveSemantics): MongoFsM[Unit] = {
 
     // TODO: Is there a more structured indicator for these errors, the code
     //       appears to be '-1', which is suspect.
@@ -186,7 +144,7 @@ object managefile extends ManageFileModule {
 
   // TODO: Really need a Path#fold[A] method, which will be much more reliable
   //       than this process of deduction.
-  private def deleteDir(dir: ADir): MongoFsM[Unit] =
+  def deleteDir(dir: ADir): MongoFsM[Unit] =
     Collection.dbNameFromPath(dir).toOption match {
       case Some(n) if depth(dir) == 1 =>
         dropDatabase(n).liftM[FileSystemErrT]
@@ -202,19 +160,19 @@ object managefile extends ManageFileModule {
         nonExistentParent(dir)
     }
 
-  private def deleteFile(file: AFile): MongoFsM[Unit] =
+  def deleteFile(file: AFile): MongoFsM[Unit] =
     collFromFileM(file) flatMap (c =>
       collectionExists(c).liftM[FileSystemErrT].ifM(
         dropCollection(c).liftM[FileSystemErrT],
         pathErr(pathNotFound(file)).raiseError[MongoFsM, Unit]))
 
-  private def freshName: MongoManage[String] =
+  def freshName: MongoManage[String] =
     for {
       in <- MonadReader[MongoManage, ManageIn].ask
       (prefix, ref) = in
       n  <- liftTask(ref.modifyS(i => (i + 1, i))).liftM[ManageInT]
     } yield prefix.run + n.toString
 
-  private def tmpPrefix: Task[TmpPrefix] =
+  def tmpPrefix: Task[TmpPrefix] =
     NameGenerator.salt map (s => TmpPrefix(s"__quasar.tmp_${s}_"))
 }

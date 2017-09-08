@@ -23,6 +23,7 @@ import quasar.connector._
 import quasar.contrib.pathy._
 import quasar.effect.{Kvs, MonoSeq}
 import quasar.fp.numeric._
+import quasar.fp.ski.κ
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.physical.mongodb.fs.bsoncursor._
@@ -170,5 +171,44 @@ object MongoDb
       ().point[Configured]
   }
 
-  override val ManageFileModule = fs.managefile
+  object ManageFileModule extends ManageFileModule {
+    import fs.managefile._, ManageFile._
+
+    /** TODO: There are still some questions regarding Path
+      *   1) We should assume all paths will be canonicalized and can do so
+      *      with a ManageFile ~> ManageFile that canonicalizes everything.
+      *
+      *   2) Currently, parsing a directory like "/../foo/bar/" as an absolute
+      *      dir succeeds, this should probably be changed to fail.
+      */
+    def move(scenario: MoveScenario, semantics: MoveSemantics): Backend[Unit] = {
+      val mm: MongoManage[FileSystemError \/ Unit] =
+        scenario.fold(moveDir(_, _, semantics), moveFile(_, _, semantics))
+          .run.liftM[ManageInT]
+      toBackend(mm)
+    }
+
+    def delete(path: APath): Backend[Unit] = {
+      val mm: MongoManage[FileSystemError \/ Unit] =
+        pathy.Path.refineType(path).fold(deleteDir, deleteFile)
+          .run.liftM[ManageInT]
+      toBackend(mm)
+    }
+
+    def tempFile(near: APath): Backend[AFile] = {
+      val checkPath =
+        EitherT.fromDisjunction[MongoManage](Collection.dbNameFromPath(near))
+          .bimap(FileSystemError.pathErr(_), κ(()))
+
+      val mkTemp =
+        freshName.liftM[FileSystemErrT] map { n =>
+          pathy.Path.refineType(near).fold(
+            _ </> pathy.Path.file(n),
+            f => pathy.Path.fileParent(f) </> pathy.Path.file(n))
+        }
+
+      val mm: MongoManage[FileSystemError \/ AFile] = checkPath.flatMap(κ(mkTemp)).run
+      toBackend(mm)
+    }
+  }
 }
