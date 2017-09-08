@@ -49,6 +49,14 @@ package object matryoshka {
   def envTIso[E, W[_], A]: Iso[EnvT[E, W, A], (E, W[A])] =
     Iso((_: EnvT[E, W, A]).runEnvT)(EnvT(_))
 
+  def ginterpret[W[_], F[_], A, B](f: A => B, φ: GAlgebra[W, F, B])
+      : GAlgebra[W, CoEnv[A, F, ?], B] =
+    ginterpretM[W, Id, F, A, B](f, φ)
+
+  def einterpret[W[_]: Traverse, F[_], A, B](f: A => B, φ: ElgotAlgebra[W, F, B])
+      : ElgotAlgebra[W, CoEnv[A, F, ?], B] =
+    _.traverse(_.run).fold(f, φ)
+
   def project[T, F[_]: Functor](implicit T: Recursive.Aux[T, F]): Getter[T, F[T]] =
     Getter(T.project(_))
 

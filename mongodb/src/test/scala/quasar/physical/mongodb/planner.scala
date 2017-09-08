@@ -4089,7 +4089,7 @@ class PlannerSpec extends
           "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
           "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
-          "QScript", "QScript (ShiftRead)", "QScript (Optimized)", "QScript (Mongo-specific)",
+          "QScript", "QScript (ShiftRead)", "QScript (Optimized)", "QScript (Mongo-specific)", "QScript (Prefer Projection)",
           "Workflow Builder", "Workflow (raw)", "Workflow (crystallized)")
     }
 
@@ -4105,7 +4105,7 @@ class PlannerSpec extends
           "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
           "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
-          "QScript", "QScript (ShiftRead)", "QScript (Optimized)", "QScript (Mongo-specific)")
+          "QScript", "QScript (ShiftRead)", "QScript (Optimized)", "QScript (Mongo-specific)", "QScript (Prefer Projection)")
     }
   }
 }
