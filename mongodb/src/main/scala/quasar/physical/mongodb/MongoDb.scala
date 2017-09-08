@@ -73,6 +73,20 @@ object MongoDb
 
   val Type = FileSystemType("mongodb")
 
+  private def checkPathsExist[T[_[_]]: BirecursiveT](qs: T[MongoDb.QSM[T, ?]]): Backend[Unit] = {
+    import fs.QueryContext._, fs.queryfileTypes.QRT
+    val rez = for {
+      colls <- EitherT.fromDisjunction[MongoDbIO](
+                 fs.QueryContext.collections(qs).leftMap(FileSystemError.pathErr(_)))
+      _     <- colls.traverse_(c => EitherT(MongoDbIO.collectionExists(c)
+                .map(_ either (()) or FileSystemError.pathErr(PathError.pathNotFound(c.asFile)))))
+    } yield ()
+    val e: MongoLogWFR[BsonCursor, Unit] = EitherT[MongoLogWF[BsonCursor, ?], FileSystemError, Unit](
+      rez.run.liftM[QRT].liftM[PhaseResultT])
+
+    toBackendP(e.run.run)
+  }
+
   def doPlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       N[_]: Monad: MonadFsErr: PhaseResultTell]
       (qs: T[QSM[T, ?]], ctx: fs.QueryContext[N], execTime: Instant): N[Repr] =
@@ -85,8 +99,8 @@ object MongoDb
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       qs: T[QSM[T, ?]]): Backend[Repr] =
     for {
-      ctx <- fs.QueryContext.queryContext[T](qs)
-      _ <- fs.QueryContext.checkPathsExist(qs)
+      ctx <- toBackendP(fs.QueryContext.queryContext[T, Backend](qs, fs.queryfile.listContents))
+      _ <- checkPathsExist(qs)
       execTime <- fs.queryfile.queryTime.liftM[PhaseResultT].liftM[FileSystemErrT]
       p <- doPlan[T, Backend](qs, ctx, execTime)
     } yield p

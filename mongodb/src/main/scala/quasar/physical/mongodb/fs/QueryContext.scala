@@ -23,7 +23,7 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.kleisli._
 import quasar.fs._
-import quasar.physical.mongodb._, MongoDb._
+import quasar.physical.mongodb._
 
 import matryoshka._
 import matryoshka.implicits._
@@ -63,15 +63,15 @@ object QueryContext {
     } yield a
 
   def queryContext[
-    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
-    (qs: T[MongoDb.QSM[T, ?]])
-      : Backend[QueryContext[Backend]] = {
+    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, M[_]]
+    (qs: T[MongoDb.QSM[T, ?]], lc: qscript.DiscoverPath.ListContents[M])
+      : MQPhErr[QueryContext[M]] = {
 
     def lift[A](fa: FileSystemErrT[MongoDbIO, A]): MongoLogWFR[BsonCursor, A] =
       EitherT[MongoLogWF[BsonCursor, ?], FileSystemError, A](
         fa.run.liftM[QueryRT[?[_], BsonCursor, ?]].liftM[PhaseResultT])
 
-    val x: FileSystemErrT[MongoDbIO, QueryContext[quasar.physical.mongodb.MongoDb.Backend]] =
+    val x: FileSystemErrT[MongoDbIO, QueryContext[M]] =
       (MongoDbIO.serverVersion.liftM[FileSystemErrT] |@|
        lookup(qs, MongoDbIO.collectionStatistics) |@|
        lookup(qs, MongoDbIO.indexes))((vers, stats, idxs) =>
@@ -79,22 +79,8 @@ object QueryContext {
           MongoQueryModel(vers),
           stats.get(_),
           idxs.get(_),
-          dir => queryfile.listContents(dir)))
+          lc))
 
-    toBackendP(lift(x).run.run)
+    lift(x).run.run
   }
-
-  def checkPathsExist[T[_[_]]: BirecursiveT](qs: T[MongoDb.QSM[T, ?]]): Backend[Unit] = {
-    val rez = for {
-      colls <- EitherT.fromDisjunction[MongoDbIO](collections(qs).leftMap(pathErr(_)))
-      _     <- colls.traverse_(c => EitherT(MongoDbIO.collectionExists(c)
-                .map(_ either (()) or pathErr(PathError.pathNotFound(c.asFile)))))
-    } yield ()
-    val e: MongoLogWFR[BsonCursor, Unit] = EitherT[MongoLogWF[BsonCursor, ?], FileSystemError, Unit](
-      rez.run.liftM[QRT].liftM[PhaseResultT])
-
-    toBackendP(e.run.run)
-  }
-
-
 }
