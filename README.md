@@ -849,9 +849,9 @@ Removes any configured port, reverting to the default (the one the server was st
 
 ### GET /metastore
 
-Retrieve the connection information of the current metastore in use
+Retrieve the connection information of the current metastore in use. In the case where the current metastore is a postgres database, the password will be obscured for security reasons.
 
-An example response:
+A few example responses:
 
 ```json
 {
@@ -860,6 +860,18 @@ An example response:
     }
 }
 
+```
+
+```json
+{
+    "postgresql": {
+      "host": "localhost",
+      "port": 8087,
+      "database": "slamdata_db",
+      "userName": "slamdata",
+      "password": "****"
+    }
+}
 ```
 
 ### PUT /metastore
