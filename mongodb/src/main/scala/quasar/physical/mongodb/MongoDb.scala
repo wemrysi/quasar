@@ -20,6 +20,7 @@ package physical.mongodb
 import slamdata.Predef._
 import quasar.common._
 import quasar.connector._
+import quasar.contrib.scalaz.MonadReader_
 import quasar.contrib.pathy._
 import quasar.effect.{Kvs, MonoSeq}
 import quasar.fp.numeric._
@@ -99,9 +100,9 @@ object MongoDb
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       qs: T[QSM[T, ?]]): Backend[Repr] =
     for {
-      ctx <- toBackendP(fs.QueryContext.queryContext[T, Backend](qs, fs.queryfile.listContents))
+      ctx <- toBackendP(fs.QueryContext.queryContext[T, Backend](qs, QueryFileModule.listContents))
       _ <- checkPathsExist(qs)
-      execTime <- fs.queryfile.queryTime.liftM[PhaseResultT].liftM[FileSystemErrT]
+      execTime <- QueryFileModule.queryTime.liftM[PhaseResultT].liftM[FileSystemErrT]
       p <- doPlan[T, Backend](qs, ctx, execTime)
     } yield p
 
@@ -128,7 +129,45 @@ object MongoDb
 
   val DC = DataCursor[MongoDbIO, BsonCursor]
 
-  override val QueryFileModule = fs.queryfile
+  object QueryFileModule extends QueryFileModule {
+    import QueryFile._
+
+    private def mkInterp[F[_] : Functor](implicit C: MonadReader_[F, Config]): F[fs.QueryFileInterpreter] =
+      config[F].map(cfg => new fs.QueryFileInterpreter(cfg.wfExec))
+
+    def executePlan(repr: Repr, out: AFile): Backend[AFile] =
+      mkInterp[Backend] >>= (i => toBackendP(i.execPlan(repr, out)))
+
+    def evaluatePlan(repr: Repr): Backend[ResultHandle] =
+      for {
+        dbName <- config[Backend].map(_.defaultDb.map(_.run))
+        i <- mkInterp[Backend]
+        handle <- toBackendP(i.evalPlan(repr, dbName))
+      } yield handle
+
+    def explain(repr: Repr): Backend[String] =
+      for {
+        dbName <- config[Backend].map(_.defaultDb.map(_.run))
+        i <- mkInterp[Backend]
+        s <- toBackendP(i.explain(repr, dbName))
+      } yield s
+
+    def more(h: ResultHandle): Backend[Vector[Data]] =
+      mkInterp[Backend] >>= (i => toBackend(i.more(h)))
+
+    def close(h: ResultHandle): Configured[Unit] =
+      mkInterp[Configured] >>= (i => toConfigured(i.close(h)))
+
+    def listContents(dir: ADir): Backend[Set[PathSegment]] =
+      mkInterp[Backend] >>= (i => toBackend(i.listContents0(dir)))
+
+    def fileExists(file: AFile): Configured[Boolean] =
+      mkInterp[Configured] >>= (i => toConfigured(i.fileExists(file)))
+
+    def queryTime: Configured[Instant] =
+      mkInterp[Configured] >>= (i => toConfigured(i.queryTime))
+
+  }
 
   object ManagedReadFileModule extends ManagedReadFileModule {
 
