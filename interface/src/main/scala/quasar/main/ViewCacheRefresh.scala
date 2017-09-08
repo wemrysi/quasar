@@ -17,16 +17,14 @@
 package quasar.fs.cache
 
 import slamdata.Predef._
-import quasar.Planner.InternalError
 import quasar.common.PhaseResultT
 import quasar.contrib.pathy.{ADir, AFile}
-import quasar.contrib.scalaz.disjunction._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.Timing
 import quasar.frontend.SemanticErrsT
 import quasar.fp.free
 import quasar.fs.FileSystemError, FileSystemError._
-import quasar.fs.mount.{ConnectionUri, MountConfig, Mounting}
+import quasar.fs.mount.{MountConfig, Mounting}
 import quasar.fs.MoveSemantics.Overwrite
 import quasar.fs.PathError._
 import quasar.fs.{ManageFile, QueryFile, WriteFile}
@@ -74,7 +72,7 @@ object ViewCacheRefresh {
       tf  <- lift(M.tempFile(viewPath).run)
       ts1 <- lift(T.timestamp ∘ (_.right[FileSystemError]))
       _   <- lift(assigneeStart(viewPath, assigneeId, ts1, tf) ∘ (_.right[FileSystemError]))
-      _   <- writeViewCache[S](rootDir, tf, vc.query)
+      _   <- writeViewCache[S](rootDir, tf, vc.viewConfig)
       _   <- lift(M.moveFile(tf, vc.dataFile, Overwrite).run)
       ts2 <- lift(T.timestamp ∘ (_.right[FileSystemError]))
       em  <- lift(free.lift(Task.delay(JDuration.between(ts1, ts2).toMillis)).into[S] ∘ (_.right[FileSystemError]))
@@ -98,7 +96,7 @@ object ViewCacheRefresh {
     Queries.cacheRefreshAssigneStart(path, assigneeId, start, tmpDataPath).run
 
   def writeViewCache[S[_]](
-    basePath: ADir, tmpDataPath: AFile, view: ConnectionUri
+    basePath: ADir, tmpDataPath: AFile, view: MountConfig.ViewConfig
   )(implicit
     Q: QueryFile.Ops[S],
     S0: WriteFile :<: S,
@@ -108,15 +106,10 @@ object ViewCacheRefresh {
     val fsQ = new FilesystemQueries[S]
 
     for {
-      vc      <- MountConfig.viewCfgFromUri(view)
-                   .leftMap(e =>
-                      qscriptPlanningFailed(InternalError("Unable to obtain view config from $view, $e", none)))
-                   .liftT[fsQ.Q.transforms.H]
-      (se, v) =  vc
       q       <- EitherT(EitherT(
-                   (quasar.resolveImports_[S](se, basePath).leftMap(nels(_)).run.run ∘ (_.sequence))
+                   (quasar.resolveImports_[S](view.query, basePath).leftMap(nels(_)).run.run ∘ (_.sequence))
                      .liftM[PhaseResultT]))
-      r       <- fsQ.executeQuery(q, v, basePath, tmpDataPath)
+      r       <- fsQ.executeQuery(q, view.vars, basePath, tmpDataPath)
     } yield r
   }
 

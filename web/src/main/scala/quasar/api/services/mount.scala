@@ -144,36 +144,45 @@ object mount {
                  (msg, _) => ApiError.fromMsg_(
                    BadRequest, msg).left))
       exists <- M.lookupType(path).run.isDefined.liftM[ApiErrT]
-      cc     =  req.headers.get(`Cache-Control`)
-      maxAge =  cc >>= (_.values.list.collectFirst(_ match {
-                  case `max-age`(s) => s
-                }))
-      tf     <- MF.tempFile(path).leftMap(_.toApiError)
-      ts     <- T.timestamp.liftM[ApiErrT]
-      rAfter <- free.lift(Task.fromDisjunction(maxAge.traverse(ViewCache.expireAt(ts, _)))).into.liftM[ApiErrT]
       _      <- (replaceIfExists && exists).fold(M.replace(path, bConf), M.mount(path, bConf)).liftM[ApiErrT]
-      _      <- (refineType(path).toOption ⊛ MountConfig.viewConfig.getOption(bConf) ⊛ maxAge ⊛ rAfter) { (p, c, a, r) =>
-                  val nvc = ViewCache(
-                    query = MountConfig.viewConfigUri(c),
-                    lastUpdate = none,
-                    executionMillis = none,
-                    cacheReads = 0,
-                    assignee = none,
-                    assigneeStart = none,
-                    maxAgeSeconds = a.toSeconds,
-                    refreshAfter = r,
-                    status = ViewCache.Status.Pending,
-                    errorMsg = none,
-                    dataFile = tf,
-                    tmpDataFile = none)
-                  vcache.get(p).fold(
-                    κ(vcache.modify(p, _.copy(
-                      query = nvc.query,
-                      maxAgeSeconds = nvc.maxAgeSeconds,
-                      refreshAfter = nvc.refreshAfter,
-                      status = nvc.status,
-                      dataFile = nvc.dataFile))),
-                    vcache.put(p, nvc )).join
-                }.orZero.liftM[ApiErrT]
+      cc     =  req.headers.get(`Cache-Control`)
+      _      <- (refineType(path).toOption ⊛ MountConfig.viewConfig.getOption(bConf).map(MountConfig.ViewConfig.tupled) ⊛ cc)(createNewViewCache[S]).orZero.liftM[ApiErrT]
     } yield exists
+
+  private def createNewViewCache[S[_]](viewPath: AFile, viewConfig: MountConfig.ViewConfig, cacheControl: `Cache-Control`)
+  (implicit
+    MF: ManageFile.Ops[S],
+    T:  Timing.Ops[S],
+    S0: Task :<: S,
+    S3: VCache :<: S
+  ): EitherT[Free[S, ?], ApiError, Unit] =
+    for {
+      tempFile      <- MF.tempFile(viewPath).leftMap(_.toApiError)
+      timeStamp     <- T.timestamp.liftM[ApiErrT]
+      maxAge        =  cacheControl.values.list.collectFirst(_ match {
+                        case `max-age`(s) => s
+                      })
+      refreshAfter  <- free.lift(Task.fromDisjunction(maxAge.traverse(ViewCache.expireAt(timeStamp, _)))).into.liftM[ApiErrT]
+      newViewCache  = ViewCache(
+                       viewConfig = viewConfig,
+                       lastUpdate = none,
+                       executionMillis = none,
+                       cacheReads = 0,
+                       assignee = none,
+                       assigneeStart = none,
+                       maxAgeSeconds = maxAge.toSeconds,
+                       refreshAfter = refreshAfter,
+                       status = ViewCache.Status.Pending,
+                       errorMsg = none,
+                       dataFile = tempFile,
+                       tmpDataFile = none)
+      _             <- vcache.get(viewPath).fold(
+                          κ(vcache.modify(viewPath, _.copy(
+                            viewConfig = newViewCache.viewConfig,
+                            maxAgeSeconds = newViewCache.maxAgeSeconds,
+                            refreshAfter = newViewCache.refreshAfter,
+                            status = newViewCache.status,
+                            dataFile = newViewCache.dataFile))),
+                          vcache.put(viewPath, newViewCache)).join.liftM[ApiErrT]
+    } yield ()
 }

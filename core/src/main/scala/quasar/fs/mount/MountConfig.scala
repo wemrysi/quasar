@@ -41,7 +41,9 @@ object MountConfig {
   }
 
   final case class ViewConfig private[mount] (query: ScopedExpr[Fix[Sql]], vars: Variables)
-    extends MountConfig
+    extends MountConfig {
+      def asUri = viewCfgAsUri(query,vars)
+    }
 
   final case class FileSystemConfig private[mount] (typ: FileSystemType, uri: ConnectionUri)
     extends MountConfig
