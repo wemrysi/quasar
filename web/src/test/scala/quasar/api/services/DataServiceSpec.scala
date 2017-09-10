@@ -372,7 +372,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
         "fresh" >> prop {
             (f: AFile, g: AFile, d: Vector[Data], now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
             val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
-            lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isBefore(lastUpdate.plus(maxAge))
+            lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isBefore(lastUpdate.plus(maxAge)) && f ≠ g
           } ==> {
             val expr = sqlB"α"
             val viewCache = ViewCache(
