@@ -27,8 +27,6 @@ import quasar.contrib.scalaz.readerT._
 import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.fs.mount._, BackendDef._
 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile, genSc => coreGenSc}
-import quasar.physical.sparkcore.fs.hdfs.writefile.HdfsWriteCursor
-
 
 import java.net.{URLDecoder, URI}
 
@@ -191,7 +189,7 @@ package object hdfs {
     val fileSystem = generateHdfsFS(sparkFsConf)
 
     interpretFileSystem(
-      corequeryfile.chrooted[Eff](queryfile.input(fileSystem), FsType, sparkFsConf.prefix),
+      corequeryfile.chrooted[Eff](FsType, sparkFsConf.prefix),
       corereadfile.chrooted(sparkFsConf.prefix),
       writefile.chrooted[Eff](sparkFsConf.prefix, fileSystem),
       managefile.chrooted[Eff](sparkFsConf.prefix, fileSystem))

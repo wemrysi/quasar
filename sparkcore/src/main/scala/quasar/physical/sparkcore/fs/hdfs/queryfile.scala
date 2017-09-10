@@ -18,7 +18,6 @@ package quasar.physical.sparkcore.fs.hdfs
 
 import slamdata.Predef._
 import quasar.{Data, DataCodec}
-import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.contrib.pathy._
 import quasar.contrib.pathy._
 import quasar.effect.Capture
@@ -39,7 +38,6 @@ import org.apache.hadoop.fs.FileSystem
 import org.apache.hadoop.util.Progressable
 import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 import org.apache.spark._
 import org.apache.spark.rdd._
 
@@ -49,18 +47,7 @@ class queryfile[F[_]:Capture:Bind](fileSystem: F[FileSystem]) {
     new Path(posixCodec.unsafePrintPath(apath))
   }
 
-  def fromFile(sc: SparkContext, file: AFile): F[RDD[Data]] = for {
-    hdfs <- fileSystem
-    pathStr <- Capture[F].capture {
-      val pathStr = posixCodec.unsafePrintPath(file)
-      val host = hdfs.getUri().getHost()
-      val port = hdfs.getUri().getPort()
-      s"hdfs://$host:$port$pathStr"
-    }
-    rdd <- fetchRdd(sc, pathStr)
-  } yield rdd
-
-  def fetchRdd[F[_]:Capture](sc: SparkContext, pathStr: String): F[RDD[Data]] = Capture[F].capture {
+  private def fetchRdd[F[_]:Capture](sc: SparkContext, pathStr: String): F[RDD[Data]] = Capture[F].capture {
     import ParquetRDD._
     // TODO add magic number support to distinguish
     if(pathStr.endsWith(".parquet"))
@@ -92,7 +79,6 @@ class queryfile[F[_]:Capture:Bind](fileSystem: F[FileSystem]) {
         bw.newLine()
     })
     bw.close()
-    hdfs.close()
   }
 
   def fileExists(f: AFile): F[Boolean] = for {
@@ -100,7 +86,6 @@ class queryfile[F[_]:Capture:Bind](fileSystem: F[FileSystem]) {
     hdfs <- fileSystem
   } yield {
     val exists = hdfs.exists(path)
-    hdfs.close()
     exists
   }
 
@@ -114,7 +99,6 @@ class queryfile[F[_]:Capture:Bind](fileSystem: F[FileSystem]) {
         case directory => DirName(directory.getPath().getName()).left[FileName]
       }.right[FileSystemError]
     } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
-    hdfs.close
     result
   })
 }
@@ -138,9 +122,4 @@ object queryfile {
         case RDDFrom(f)          => qf.rddFrom(f)(hdfsPathStr)
       }
     }
-
-  def input[S[_]](fileSystem: Task[FileSystem])(implicit s0: Task :<: S): Input[S] = {
-    val qf = new queryfile[Task](fileSystem)
-    Input[S](qf.fromFile _)
-  }
 }

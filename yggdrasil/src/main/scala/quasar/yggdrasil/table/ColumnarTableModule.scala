@@ -1718,7 +1718,7 @@ trait ColumnarTableModule[M[+ _]]
       * In order to call partitionMerge, the table must be sorted according to
       * the values specified by the partitionBy transspec.
       */
-    def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table] = {
+    def partitionMerge(partitionBy: TransSpec1, keepKey: Boolean = false)(f: Table => M[Table]): M[Table] = {
       // Find the first element that compares LT
       @tailrec def findEnd(compare: Int => Ordering, imin: Int, imax: Int): Int = {
         val minOrd = compare(imin)
@@ -1794,8 +1794,13 @@ trait ColumnarTableModule[M[+ _]]
             rowComparator.compare(spanStart, i)
         }
 
-        val groupTable                       = subTable(comparatorGen, head.drop(spanStart) :: tail)
-        val groupedM                         = groupTable.map(_.transform(DerefObjectStatic(Leaf(Source), CPathField("1")))).flatMap(f)
+        val groupTable = subTable(comparatorGen, head.drop(spanStart) :: tail)
+
+        val groupedM = (if (keepKey)
+          groupTable
+        else
+          groupTable.map(_.transform(DerefObjectStatic(Leaf(Source), CPathField("1"))))).flatMap(f)
+
         val groupedStream: StreamT[M, Slice] = StreamT.wrapEffect(groupedM.map(_.slices))
 
         groupedStream ++ dropAndSplit(comparatorGen, head :: tail, spanStart)

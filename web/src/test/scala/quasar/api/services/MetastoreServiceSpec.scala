@@ -45,10 +45,22 @@ class MetastoreServiceSpec extends quasar.Qspec {
     quasar.api.services.metastore.service[Eff].toHttpService(inter(persist))
 
   "Metastore service" should {
-    "return current metastore" in {
-      val req = Request()
-      val resp = service()(req).unsafePerformSync
-      resp.as[Json].unsafePerformSync must_=== metastore.connectionInfo.asJson
+    "return current metastore with password obscured" in {
+      val dbConfig = DbConnectionConfig.PostgreSql(
+        host = None,
+        database = None,
+        userName = "bob",
+        password = "bobIsAwesome",
+        parameters = Map.empty)
+      val inter = liftMT[Task, ResponseT] compose (reflNT[Task] :+: MetaStoreLocation.impl.constant(dbConfig))
+      val service = quasar.api.services.metastore.service[Eff].toHttpService(inter)
+      val get = Request()
+      val resp = service(get).unsafePerformSync
+      resp.as[Json].unsafePerformSync must_===
+        Json(
+          "postgresql" := Json(
+            "userName" := "bob",
+            "password" := "****"))
     }
     "succeed in changing metastore" in {
       val newConn = MetaStoreFixture.createNewTestMetaStoreConfig.unsafePerformSync

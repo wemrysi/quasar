@@ -35,7 +35,7 @@ object metastore {
 
     QHttpService {
       case GET -> Root =>
-        respond(meta.get.map(_.asJson))
+        respond(meta.get.map(_.asJson(DbConnectionConfig.secureEncodeJson)))
       case req @ PUT -> Root =>
         val initialize = req.params.keys.toList.contains("initialize")
         respondT((for {

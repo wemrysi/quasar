@@ -21,15 +21,18 @@ import quasar.config.MetaStoreConfig
 import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
 import quasar.db.DbConnectionConfig
-import quasar.effect.Failure
+import quasar.effect.{Timing, Failure}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._
+import quasar.fs.cache.VCache
 import quasar.fs.mount._
 import quasar.fs.mount.BackendDef.DefinitionResult
 import quasar.main.metastore._
 import quasar.metastore._
+
+import scala.Predef.implicitly
 
 import doobie.imports.{ConnectionIO, Transactor}
 import doobie.syntax.connectionio._
@@ -63,7 +66,7 @@ object Quasar {
       val f: QErrsCnxIOM ~> MainErrT[ConnectionIO, ?] =
         foldMapNT(liftMT[ConnectionIO, MainErrT] :+: qErrsToMainErrT[ConnectionIO])
 
-      Hoist[MainErrT].hoist(transactor.trans) compose f
+      Hoist[MainErrT].hoist(transactor.trans(implicitly[Monad[Task]])) compose f
     }
   }
 
@@ -87,6 +90,8 @@ object Quasar {
 
   /** Initialize the Quasar FileSystem assuming all defaults
     * The metastore can be changed but it will not be persisted to the config file.
+    *
+    * Not used in the codebase, but useful for manual testing at the console.
     */
   val init: MainTask[Quasar] = initFromMetaConfig(None, _ => ().point[MainTask])
 
@@ -107,7 +112,7 @@ object Quasar {
     } yield quasarFS
 
   def initWithMeta(metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
-    for {
+    (for {
       metastore  <- metaRef.read.liftM[MainErrT]
       hfsRef     <- TaskRef(Empty.backendEffect[HierarchicalFsEffM]).liftM[MainErrT]
       mntdRef    <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
@@ -129,23 +134,39 @@ object Quasar {
       runCore    <- CoreEff.runFs[QEffIO](hfsRef).liftM[MainErrT]
     } yield {
       val f: QEffIO ~> QErrs_CnxIO_Task_MetaStoreLocM =
-        injectFT[Task, QErrs_CnxIO_Task_MetaStoreLoc]               :+:
-          injectFT[MetaStoreLocation, QErrs_CnxIO_Task_MetaStoreLoc]  :+:
-          jdbcMounter[QErrs_CnxIO_Task_MetaStoreLoc](hfsRef, mntdRef) :+:
-          injectFT[QErrs, QErrs_CnxIO_Task_MetaStoreLoc]
+        injectFT[Task, QErrs_CnxIO_Task_MetaStoreLoc]                                 :+:
+        (injectFT[Task, QErrs_CnxIO_Task_MetaStoreLoc] compose Timing.toTask)         :+:
+        (injectFT[ConnectionIO, QErrs_CnxIO_Task_MetaStoreLoc] compose VCache.interp) :+:
+        injectFT[MetaStoreLocation, QErrs_CnxIO_Task_MetaStoreLoc]                    :+:
+        jdbcMounter[QErrs_CnxIO_Task_MetaStoreLoc](hfsRef, mntdRef)                   :+:
+        injectFT[QErrs, QErrs_CnxIO_Task_MetaStoreLoc]
 
       val connectionIOToTask: ConnectionIO ~> Task =
-        λ[ConnectionIO ~> Task](io => metaRef.read.flatMap(t => t.trans.transactor.trans(io)))
+        λ[ConnectionIO ~> Task](io => metaRef.read.flatMap(t => t.trans.transactor.trans.apply(io)))
+
       val g: QErrs_CnxIO_Task_MetaStoreLoc ~> QErrs_TaskM =
         (injectFT[Task, QErrs_Task] compose MetaStoreLocation.impl.default(metaRef, persist)) :+:
          injectFT[Task, QErrs_Task]                                                           :+:
         (injectFT[Task, QErrs_Task] compose connectionIOToTask)                               :+:
          injectFT[QErrs, QErrs_Task]
 
-      Quasar(
-        foldMapNT(g) compose foldMapNT(f) compose runCore,
-        (mntdRef.read >>= closeAllFsMounts _) *> metaRef.read.flatMap(_.trans.shutdown))
-    }
+      val h: CoreEff ~> QErrs_TaskM =  foldMapNT(g) compose foldMapNT(f) compose runCore
+
+      val mainTaskToTask =
+        λ[MainTask ~> Task](_.foldM(e => Task.fail(new RuntimeException(e)), Task.delay(_)))
+
+      val cacheCtx =
+        Caching.viewCacheRefreshCtx(foldMapNT(
+          reflNT[Task]       :+:
+          connectionIOToTask :+:
+          (h andThen QErrs_Task.toMainTask andThen mainTaskToTask)))
+
+      (cacheCtx >>= (ctx => ctx.start.as(
+        Quasar(
+          h,
+          ctx.shutdown *> (mntdRef.read >>= closeAllFsMounts _) *> metaRef.read.flatMap(_.trans.shutdown))))
+      ).liftM[MainErrT]
+    }).join
 
   private def closeFileSystem(dr: DefinitionResult[PhysFsEffM]): Task[Unit] = {
     val transform: PhysFsEffM ~> Task =

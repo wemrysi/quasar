@@ -24,13 +24,14 @@ import quasar.fp.free._
 import quasar.fp.TaskRef
 import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.fs.mount._, BackendDef._
-import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile}
+import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, readfile => corereadfile, genSc => coreGenSc}
 
-import scala.sys
+import java.net.URLDecoder
 
+import org.http4s.{ParseFailure, Uri}
 import org.apache.spark._
 import pathy.Path._
-import scalaz._, Scalaz._
+import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 package object cassandra {
@@ -50,52 +51,106 @@ package object cassandra {
 
   final case class SparkFSConf(sparkConf: SparkConf, prefix: ADir)
 
-  def parseUri: ConnectionUri => Task[DefinitionError \/ (SparkConf, SparkFSConf)] = (uri: ConnectionUri) => Task.delay {
+  val parseUri: ConnectionUri => Task[DefinitionError \/ (SparkConf, SparkFSConf)] = (connUri: ConnectionUri) => Task.delay {
 
-    def error(msg: String): DefinitionError \/ (SparkConf, SparkFSConf) =
-      NonEmptyList(msg).left[EnvironmentError].left[(SparkConf, SparkFSConf)]
+    def liftErr(msg: String): DefinitionError = NonEmptyList(msg).left[EnvironmentError]
 
-    def forge(
-      master: String,
-      cassandraHost: String,
-      rootPath: String
-    ): DefinitionError \/ (SparkConf, SparkFSConf) =
-      posixCodec.parseAbsDir(rootPath)
-        .map { prefix =>
-          val sparkConf = new SparkConf().setMaster(master).setAppName("quasar").set("spark.cassandra.connection.host", cassandraHost)
-          (sparkConf, SparkFSConf(sparkConf, unsafeSandboxAbs(prefix)))
-      }.fold(error(s"Could not extrat a path from $rootPath"))(_.right[DefinitionError])
+    def master(host: String, port: Int): State[SparkConf, Unit] =
+      State.modify(_.setMaster(s"spark://$host:$port"))
+    def appName: State[SparkConf, Unit] = State.modify(_.setAppName("quasar"))
+    def config(name: String, uri: Uri): State[SparkConf, Unit] =
+      State.modify(c => uri.params.get(name).fold(c)(c.set(name, _)))
+    val uriOrErr: DefinitionError \/ Uri = Uri.fromString(connUri.value).leftMap((pf: ParseFailure) => liftErr(pf.toString))
 
-    uri.value.split('|').toList match {
-      case master :: cassandraHost :: prefixPath :: Nil => forge(master, cassandraHost, prefixPath)
-      case _ =>
-        error("Missing master and prefixPath (seperated by |)" +
-          " e.g spark://spark_host:port|cassandra://cassandra_host:port|/user/")
+    val sparkConfOrErr: DefinitionError \/ SparkConf = for {
+      uri <- uriOrErr
+      host <- uri.host.fold(NonEmptyList("host not provided").left[EnvironmentError].left[Uri.Host])(_.right[DefinitionError])
+      port <- uri.port.fold(NonEmptyList("port not provided").left[EnvironmentError].left[Int])(_.right[DefinitionError])
+    } yield {
+
+      ( master(host.value, port)                       *>
+        appName                                        *>
+        config("spark.executor.memory", uri)           *>
+        config("spark.executor.cores", uri)            *>
+        config("spark.executor.extraJavaOptions", uri) *>
+        config("spark.default.parallelism", uri)       *>
+        config("spark.files.maxPartitionBytes", uri)   *>
+        config("spark.driver.cores", uri)              *>
+        config("spark.driver.maxResultSize", uri)      *>
+        config("spark.driver.memory", uri)             *>
+        config("spark.local.dir", uri)                 *>
+        config("spark.reducer.maxSizeInFlight", uri)   *>
+        config("spark.reducer.maxReqsInFlight", uri)   *>
+        config("spark.shuffle.file.buffer", uri)       *>
+        config("spark.shuffle.io.retryWait", uri)      *>
+        config("spark.memory.fraction", uri)           *>
+        config("spark.memory.storageFraction", uri)    *>
+        config("spark.cores.max", uri)                 *>
+        config("spark.speculation", uri)               *>
+        config("spark.task.cpus", uri)
+      ).exec(new SparkConf())
+    }
+
+    val rootPathOrErr: DefinitionError \/ ADir =
+      uriOrErr
+        .flatMap(uri =>
+          uri.params.get("rootPath").fold(liftErr("'rootPath' parameter not provided").left[String])(_.right[DefinitionError])
+        )
+        .flatMap(pathStr =>
+          posixCodec.parseAbsDir(pathStr)
+            .map(unsafeSandboxAbs)
+            .fold(liftErr("'rootPath' is not a valid path").left[ADir])(_.right[DefinitionError])
+        )
+
+    def fetchParameter(name: String): DefinitionError \/ String = uriOrErr.flatMap(uri =>
+      uri.params.get(name).fold(liftErr(s"'$name' parameter not provided").left[String])(_.right[DefinitionError])
+    )
+
+    for {
+      initSparkConf         <- sparkConfOrErr
+      hostAndPort           <- fetchParameter("cassandraHost").tuple(fetchParameter("cassandraPort"))
+      host                  = hostAndPort._1
+      port                  = hostAndPort._2
+      rootPath              <- rootPathOrErr
+    } yield {
+      val sparkConf = initSparkConf.set("spark.cassandra.connection.host", host)
+        .set("spark.cassandra.connection.port", port)
+      (sparkConf, SparkFSConf(sparkConf, rootPath))
     }
   }
 
-  private def fetchSparkCoreJar: Task[String] = Task.delay {
-    sys.env("QUASAR_HOME") + "/sparkcore.jar"
+  private def sparkCoreJar: EitherT[Task, String, APath] = {
+    /* Points to quasar-web.jar or target/classes if run from sbt repl/run */
+    val fetchProjectRootPath = Task.delay {
+      val pathStr = URLDecoder.decode(this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath, "UTF-8")
+      posixCodec.parsePath[Option[APath]](_ => None, Some(_).map(unsafeSandboxAbs), _ => None, Some(_).map(unsafeSandboxAbs))(pathStr)
+    }
+    val jar: Task[Option[APath]] =
+      fetchProjectRootPath.map(_.flatMap(s => parentDir(s).map(_ </> file("sparkcore.jar"))))
+    OptionT(jar).toRight("Could not fetch sparkcore.jar")
   }
+
 
   private def sparkFsDef[S[_]](implicit
     S0: Task :<: S,
-    S1: PhysErr :<: S
+    S1: PhysErr :<: S,
+    FailOps: Failure.Ops[PhysicalError, S]
   ): SparkFSConf => Free[S, SparkFSDef[Eff, S]] = (sfsc: SparkFSConf) => {
 
-    val genSc = fetchSparkCoreJar.map { jar => 
-      val sc = new SparkContext(sfsc.sparkConf)
-      sc.addJar(jar)
+    val genScWithJar: Free[S, String \/ SparkContext] = lift((for {
+      sc <- coreGenSc(sfsc.sparkConf)
+      jar <- sparkCoreJar
+    } yield {
+      sc.addJar(posixCodec.printPath(jar))
       sc
-    }
+    }).run).into[S]
 
-    lift((TaskRef(0L) |@|
+    val definition: SparkContext => Free[S, SparkFSDef[Eff, S]] = (sc: SparkContext) => lift((TaskRef(0L) |@|
       TaskRef(Map.empty[ResultHandle, RddState]) |@|
       TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
-      TaskRef(Map.empty[WriteHandle, AFile]) |@|
-      genSc) {
+      TaskRef(Map.empty[WriteHandle, AFile])) {
       // TODO better names!
-      (genState, rddStates, sparkCursors, writehandlers, sc) => {
+      (genState, rddStates, sparkCursors, writehandlers) => {
 
         type Temp[A] = Coproduct[CassandraDDL, Task, A]
         def temp: Free[Temp, ?] ~> Task =
@@ -115,11 +170,16 @@ package object cassandra {
         SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
       }
     }).into[S]
+    
+    genScWithJar >>= (_.fold(
+      msg => FailOps.fail[SparkFSDef[Eff, S]](UnhandledFSError(new RuntimeException(msg))),
+      definition(_)
+    ))
   }
 
   private def fsInterpret: SparkFSConf => (FileSystem ~> Free[Eff, ?]) =
     (sparkFsConf: SparkFSConf) => interpretFileSystem(
-      corequeryfile.chrooted[Eff](queryfile.input, FsType, sparkFsConf.prefix),
+      corequeryfile.chrooted[Eff](FsType, sparkFsConf.prefix),
       corereadfile.chrooted(sparkFsConf.prefix),
       writefile.chrooted[Eff](sparkFsConf.prefix),
       managefile.chrooted[Eff](sparkFsConf.prefix))

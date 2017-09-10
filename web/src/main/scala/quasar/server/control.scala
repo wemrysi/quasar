@@ -30,7 +30,7 @@ object control {
     *                    if the `DELETE` http method is used.
     * @param restart A function that will restart the server on the specified port
     */
-  def service(defaultPort: Int, restart: Int => Task[Unit]): HttpService = {
+  def service(defaultPort: Int, restart: Int => Task[String \/ Unit]): HttpService = {
     def safeRestart(port: Int, default: Boolean, currentPort: Int) =
       if (currentPort ≟ port)
         Ok(s"Server is already running on port $port")
@@ -40,7 +40,10 @@ object control {
             PreconditionFailed(s"Could not restart on new port because $reason")
           } getOrElse {
             val defaultString = if(default) " default " else ""
-            (restart(port) *> Accepted(s"Restarting on $defaultString port $port")) handleWith {
+            restart(port).flatMap {
+              case -\/(reason) => BadRequest(s"Cannot restart server on port $port because $reason")
+              case _           => Accepted(s"Restarting on $defaultString port $port")
+            } handleWith {
               case e: Exception => InternalServerError(s"Failed to restart on port $port because ${e.getMessage}")
               case _            => InternalServerError(s"Failed to restart on port $port for unknown reason")
             }

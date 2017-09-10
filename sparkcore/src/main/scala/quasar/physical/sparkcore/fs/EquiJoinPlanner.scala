@@ -16,6 +16,7 @@
 
 package quasar.physical.sparkcore.fs
 
+import slamdata.Predef._
 import quasar._
 import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
@@ -24,40 +25,38 @@ import quasar.qscript._
 
 import scala.math.{Ordering => SOrdering}, SOrdering.Implicits._
 
-import org.apache.spark._
 import org.apache.spark.rdd._
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
-
-class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT]  extends Planner[EquiJoin[T, ?]] {
+class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT, S[_]] extends Planner[EquiJoin[T, ?], S] {
 
   import Planner.{SparkState, SparkStateT}
 
-  def plan(fromFile: (SparkContext, AFile) => Task[RDD[Data]]): AlgebraM[SparkState, EquiJoin[T, ?], RDD[Data]] = {
-    case EquiJoin(src, lBranch, rBranch, lKey, rKey, jt, combine) =>
-      val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
-      val srcState = src.point[SparkState]
+  def plan(fromFile: AFile => Free[S, RDD[Data]], first: RDD[Data] => Free[S, Data]): AlgebraM[SparkState[S, ?], EquiJoin[T, ?], RDD[Data]] = {
+    case EquiJoin(src, lBranch, rBranch, key, jt, combine) =>
+      val algebraM = Planner[QScriptTotal[T, ?], S].plan(fromFile, first)
+      val srcState = src.point[SparkState[S, ?]]
 
-      def genKey(kf: FreeMap[T]): SparkState[Data => Data] =
-        EitherT(CoreMap.changeFreeMap(kf).point[Task]).liftM[SparkStateT]
+      def genKey(kf: FreeMap[T]): SparkState[S, Data => Data] =
+        EitherT(CoreMap.changeFreeMap(kf).point[Free[S, ?]]).liftM[SparkStateT]
 
-      val merger: SparkState[(Data, Data) => Data] =
-        EitherT(CoreMap.changeJoinFunc(combine).point[Task]).liftM[SparkStateT]
+      val merger: SparkState[S, (Data, Data) => Data] =
+        EitherT(CoreMap.changeJoinFunc(combine).point[Free[S, ?]]).liftM[SparkStateT]
 
       for {
-        lk <- genKey(lKey)
-        rk <- genKey(rKey)
+        k <- key.traverse(_.bitraverse(genKey, genKey))
         lRdd <- lBranch.cataM(interpretM(κ(srcState), algebraM))
         rRdd <- rBranch.cataM(interpretM(κ(srcState), algebraM))
         merge <- merger
       } yield {
-        val klRdd = lRdd.map(d => (lk(d), d))
-        val krRdd = rRdd.map(d => (rk(d), d))
+        val (klRdd, krRdd) =
+          Unzip[List].unzip(k).bimap(
+            lk => lRdd.map(d => (lk.map(_(d)), d)),
+            rk => rRdd.map(d => (rk.map(_(d)), d)))
 
         jt match {
           case JoinType.Inner => klRdd.join(krRdd).map {

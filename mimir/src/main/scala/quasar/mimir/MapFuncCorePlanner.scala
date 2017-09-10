@@ -149,7 +149,8 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.Cond(a1, a2, a3) =>
         (Cond(a1, a2, a3): TransSpec[A]).point[F]
 
-      case MapFuncsCore.Within(a1, a2) => ???
+      case MapFuncsCore.Within(a1, a2) =>
+        (Within(a1, a2): TransSpec[A]).point[F]
 
       case MapFuncsCore.Lower(a1) =>
         toLowerCase.spec(a1).point[F]
@@ -165,6 +166,8 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         readNull.spec[A](a1).point[F]
       case MapFuncsCore.ToString(a1) =>
         convertToString.spec[A](a1).point[F]
+      case MapFuncsCore.Split(a1, a2) =>
+        split.spec[A](a1, a2).point[F]
 
       // significantly faster fast path
       case MapFuncsCore.Search(src, ConstLiteral(CString(pattern), _), ConstLiteral(CBoolean(flag), _)) =>

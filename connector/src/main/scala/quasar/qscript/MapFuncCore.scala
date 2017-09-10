@@ -66,9 +66,14 @@ object MapFuncCore {
     * can’t statically determine _all_ of the elements, it doesn’t match.
     */
   object StaticArray {
-    def unapply[T[_[_]]: BirecursiveT, A]
-        (mf: CoMapFuncR[T, A])
-        : Option[List[FreeMapA[T, A]]] =
+    def apply[T[_[_]]: CorecursiveT, A](elems: List[FreeMapA[T, A]]): FreeMapA[T, A] =
+      elems.map(e => Free.roll(MFC(MakeArray[T, FreeMapA[T, A]](e)))) match {
+        case Nil    => Free.roll(MFC(EmptyArray[T, FreeMapA[T, A]]))
+        case h :: t => t.foldLeft(h)((a, e) => Free.roll(MFC(ConcatArrays(a, e))))
+      }
+
+    def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A]):
+        Option[List[FreeMapA[T, A]]] =
       mf match {
         case ConcatArraysN(as) =>
           as.foldRightM[Option, List[FreeMapA[T, A]]](
@@ -106,6 +111,12 @@ object MapFuncCore {
   }
 
   object StaticMap {
+    def apply[T[_[_]]: CorecursiveT, A](elems: List[(T[EJson], FreeMapA[T, A])]): FreeMapA[T, A] =
+      elems.map(e => Free.roll(MFC(MakeMap[T, FreeMapA[T, A]](Free.roll(MFC(Constant(e._1))), e._2)))) match {
+        case Nil    => Free.roll(MFC(EmptyMap[T, FreeMapA[T, A]]))
+        case h :: t => t.foldLeft(h)((a, e) => Free.roll(MFC(ConcatMaps(a, e))))
+      }
+
     def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A]):
         Option[List[(T[EJson], FreeMapA[T, A])]] =
       mf match {
@@ -114,7 +125,7 @@ object MapFuncCore {
             Nil)(
             (mf, acc) => (mf.project.run.toOption >>=
               {
-                case MFC(MakeMap(Embed(CoEnv(\/-(MFC(Constant(k))))), v)) => ((k, v) :: acc).some
+                case MFC(MakeMap(ExtractFunc(Constant(k)), v)) => ((k, v) :: acc).some
                 case MFC(Constant(Embed(EX(ejson.Map(kvs))))) =>
                   (kvs.map(_.map(v => rollMF[T, A](MFC(Constant(v))).embed)) ++ acc).some
                 case _ => None
@@ -124,8 +135,13 @@ object MapFuncCore {
   }
 
   object EmptyArray {
-    def apply[T[_[_]]: CorecursiveT, A]: Constant[T, A] =
+    def apply[T[_[_]]: CorecursiveT, A]: MapFuncCore[T, A] =
       Constant[T, A](EJson.fromCommon(ejson.Arr[T[EJson]](Nil)))
+  }
+
+  object EmptyMap {
+    def apply[T[_[_]]: CorecursiveT, A]: MapFuncCore[T, A] =
+      Constant[T, A](EJson.fromExt(ejson.Map[T[EJson]](Nil)))
   }
 
   // TODO: subtyping is preventing embedding of MapFuncsCore
@@ -212,9 +228,9 @@ object MapFuncCore {
           EC.inj(ejson.Str(v1.toUpperCase)).some
 
         // structural
-        case MFC(MakeArray(Embed(CoEnv(\/-(MFC(Constant(v1))))))) =>
+        case MFC(MakeArray(ExtractFunc(Constant(v1)))) =>
           EC.inj(ejson.Arr(List(v1))).some
-        case MFC(MakeMap(ConstEC(ejson.Str(v1)), Embed(CoEnv(\/-(MFC(Constant(v2))))))) =>
+        case MFC(MakeMap(ConstEC(ejson.Str(v1)), ExtractFunc(Constant(v2)))) =>
           EX.inj(ejson.Map(List(EC.inj(ejson.Str[T[ejson.EJson]](v1)).embed -> v2))).some
         case MFC(ConcatArrays(ConstEC(ejson.Arr(v1)), ConstEC(ejson.Arr(v2)))) =>
           EC.inj(ejson.Arr(v1 ++ v2)).some
@@ -222,10 +238,101 @@ object MapFuncCore {
       }) ∘ (_.embed)
   }
 
-  def normalize[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Show]
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def flattenAnd[T[_[_]], A](fm: FreeMapA[T, A]): NonEmptyList[FreeMapA[T, A]] =
+    fm.resume match {
+      case -\/(MFC(And(a, b))) => flattenAnd(a) append flattenAnd(b)
+      case _                   => NonEmptyList(fm)
+    }
+
+  // NB: This _could_ be combined with `rewrite`, but it causes rewriting to
+  //     take way too long, so instead we apply it separately afterward.
+  /** Pulls conditional `Undefined`s as far up an expression as possible. */
+  def extractGuards[T[_[_]]: BirecursiveT: EqualT, A: Equal]
+      : CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
+    _.run.toOption >>= (MFC.unapply) >>= {
+      // NB: The last case pulls guards into a wider scope, and we want to avoid
+      //     doing that for certain MapFuncs, so we add explicit `none`s.
+      case Guard(_, _, _, _)
+         | IfUndefined(_, _)
+         | MakeArray(_) | MakeMap(_, _) => none
+      // TODO: This should be able to extract a guard where _either_ side is
+      //       `Undefined`, and should also extract `Cond` with `Undefined` on a
+      //       branch.
+      case func =>
+        val writer =
+          func.traverse[Writer[List[(FreeMapA[T, A], Type)], ?], FreeMapA[T, A]] {
+            case Embed(CoEnv(\/-(MFC(Guard(e, t, s, ExtractFunc(Undefined())))))) =>
+              Writer(List((e, t)), s)
+            case arg => Writer(Nil, arg)
+          }
+        writer.written match {
+          case Nil    => none
+          case guards =>
+            rollMF[T, A](guards.distinctE.foldRight(MFC(writer.value)) {
+              case ((e, t), s) =>
+                MFC(Guard(e, t, Free.roll(s), Free.roll(MFC(Undefined[T, FreeMapA[T, A]]()))))
+            }).some
+        }
+    }
+
+  /** Converts conditional `Undefined`s into conditions that can be used in a
+    * `Filter`.
+    *
+    * Returns the extracted predicate, the defined expression extracted from the
+    * original condition and a function to extract the defined branch from other
+    * expressions containing the same conditional test as the original.
+    */
+  def extractFilter[T[_[_]]: BirecursiveT: EqualT, A: Equal](mf: FreeMapA[T, A])(test: A => Option[Hole])
+    : Option[(FreeMap[T], FreeMapA[T, A], FreeMapA[T, A] => Option[FreeMapA[T, A]])] =
+    mf.resume.swap.toOption >>= {
+      case MFC(Cond(c, e, ExtractFunc(Undefined()))) =>
+        c.traverse(test) ∘ ((_, e, {
+          case Embed(CoEnv(\/-(MFC(Cond(c1, e1, ExtractFunc(Undefined())))))) =>
+            (c1 ≟ c) option e1
+
+          case _ => none
+        }))
+
+      case MFC(Cond(c, ExtractFunc(Undefined()), f)) =>
+        c.traverse(test) ∘ (h => (Free.roll(MFC(Not[T, FreeMap[T]](h))), f, {
+          case Embed(CoEnv(\/-(MFC(Cond(c1, ExtractFunc(Undefined()), f1))))) =>
+            (c1 ≟ c) option f1
+
+          case _ => none
+        }))
+
+      case MFC(Guard(c, t, e, ExtractFunc(Undefined()))) =>
+        c.traverse(test) ∘ (h => (
+          Free.roll(MFC(Guard(h, t, BoolLit[T, Hole](true), BoolLit[T, Hole](false)))),
+          e,
+          {
+            case Embed(CoEnv(\/-(MFC(Guard(c1, t1, e1, ExtractFunc(Undefined())))))) =>
+              (c1 ≟ c && t1 ≟ t) option e1
+
+            case _ => none
+          }
+        ))
+
+      case MFC(Guard(c, t, ExtractFunc(Undefined()), f)) =>
+        c.traverse(test) ∘ (h => (
+          Free.roll(MFC(Guard(h, t, BoolLit[T, Hole](false), BoolLit[T, Hole](true)))),
+          f,
+          {
+            case Embed(CoEnv(\/-(MFC(Guard(c1, t1, ExtractFunc(Undefined()), f1))))) =>
+              (c1 ≟ c && t1 ≟ t) option f1
+
+            case _ => none
+          }
+        ))
+      case _ => none
+    }
+
+  def normalize[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]
       : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
-    (repeatedly(rewrite[T, A]) _) ⋘
-      orOriginal(foldConstant[T, A].apply(_) ∘ (const => rollMF[T, A](MFC(Constant(const)))))
+    repeatedly(applyTransforms(
+      foldConstant[T, A].apply(_) ∘ (const => rollMF[T, A](MFC(Constant(const)))),
+      rewrite[T, A]))
 
   def replaceJoinSides[T[_[_]]: BirecursiveT](left: Symbol, right: Symbol)
       : CoMapFuncR[T, JoinSide] => CoMapFuncR[T, JoinSide] =
@@ -237,59 +344,60 @@ object MapFuncCore {
 
   // TODO: This could be split up as it is in LP, with each function containing
   //       its own normalization.
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private def rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Show]:
+  private def rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT, A: Equal: Show]:
       CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
-    _.run.fold(
-      κ(None),
-      {
-        case MFC(Eq(Embed(CoEnv(\/-(MFC(Constant(v1))))), Embed(CoEnv(\/-(MFC(Constant(v2))))))) =>
-          rollMF[T, A](
-            MFC(Constant(EJson.fromCommon(ejson.Bool[T[EJson]](v1 ≟ v2))))).some
+    _.run.toOption >>= (MFC.unapply _) >>= {
+      case Eq(v1, v2) if v1 ≟ v2 =>
+        rollMF[T, A](
+          MFC(Constant(EJson.fromCommon(ejson.Bool[T[EJson]](true))))).some
 
-        case MFC(ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(MFC(Constant(Embed(EX(ejson.Int(index)))))))))) =>
-          if (index.isValidInt)
-            as.lift(index.intValue).map(_.project)
-          else None
+      case Eq(ExtractFunc(Constant(v1)), ExtractFunc(Constant(v2))) =>
+        rollMF[T, A](
+          MFC(Constant(EJson.fromCommon(ejson.Bool[T[EJson]](v1 ≟ v2))))).some
 
-        case MFC(ProjectField(Embed(ConcatMapsN(as)), Embed(CoEnv(\/-(MFC(Constant(field))))))) =>
-          as.collectFirst {
-            // TODO: Perhaps we could have an extractor so these could be
-            //       handled by the same case
-            case Embed(CoEnv(\/-(MFC(MakeMap(Embed(CoEnv(\/-(MFC(Constant(src))))), Embed(value)))))) if field ≟ src =>
-              value.some
-            case Embed(CoEnv(\/-(MFC(Constant(Embed(EX(ejson.Map(m)))))))) =>
-              m.collectFirst {
-                case (k, v) if k ≟ field => rollMF[T, A](MFC(Constant(v)))
-              }
-          }.flatten
+      case DeleteField(
+        Embed(StaticMap(map)),
+        ExtractFunc(Constant(field))) =>
+        StaticMap(map.filter(_._1 ≠ field)).project.some
 
-        // elide Nil array on the left
-        case MFC(ConcatArrays(
-          Embed(CoEnv(\/-(MFC(Constant(Embed(EC(ejson.Arr(Nil)))))))),
-          Embed(CoEnv(\/-(rhs))))) =>
-            rollMF[T, A](rhs).some
+      // TODO: Generalize this to `StaticMapSuffix`.
+      case DeleteField(
+        Embed(CoEnv(\/-(MFC(ConcatMaps(m, Embed(CoEnv(\/-(MFC(MakeMap(k, _)))))))))),
+        f)
+          if k ≟ f =>
+        rollMF[T, A](MFC(DeleteField(m, f))).some
 
-        // elide Nil array on the right
-        case MFC(ConcatArrays(
-          Embed(CoEnv(\/-(lhs))),
-          Embed(CoEnv(\/-(MFC(Constant(Embed(EC(ejson.Arr(Nil)))))))))) =>
-            rollMF[T, A](lhs).some
+      case ProjectIndex(
+        Embed(StaticArrayPrefix(as)),
+        ExtractFunc(Constant(Embed(EX(ejson.Int(index))))))
+          if index.isValidInt =>
+        as.lift(index.intValue).map(_.project)
 
-        // elide Nil map on the left
-        case MFC(ConcatMaps(
-          Embed(CoEnv(\/-(MFC(Constant(Embed(EX(ejson.Map(Nil)))))))),
-          Embed(CoEnv(\/-(rhs))))) =>
-            rollMF[T, A](rhs).some
+      case ProjectField(
+        Embed(StaticMap(map)),
+        ExtractFunc(Constant(field))) =>
+        map.reverse.find(_._1 ≟ field) ∘ (_._2.project)
 
-        // elide Nil map on the right
-        case MFC(ConcatMaps(
-          Embed(CoEnv(\/-(lhs))),
-          Embed(CoEnv(\/-(MFC(Constant(Embed(EX(ejson.Map(Nil)))))))))) =>
-            rollMF[T, A](lhs).some
+      // TODO: Generalize these to `StaticMapSuffix`
+      case ProjectField(Embed(CoEnv(\/-(MFC(MakeMap(k, Embed(v)))))), f) if k ≟ f =>
+        v.some
 
-        case _ => None
-      })
+      case ProjectField(
+        Embed(CoEnv(\/-(MFC(ConcatMaps(_, Embed(CoEnv(\/-(MFC(MakeMap(k, Embed(v))))))))))),
+        f)
+          if k ≟ f =>
+        v.some
+
+      case ConcatArrays(Embed(StaticArray(Nil)), Embed(rhs)) => rhs.some
+
+      case ConcatArrays(Embed(lhs), Embed(StaticArray(Nil))) => lhs.some
+
+      case ConcatMaps(Embed(StaticMap(Nil)), Embed(rhs)) => rhs.some
+
+      case ConcatMaps(Embed(lhs), Embed(StaticMap(Nil))) => lhs.some
+
+      case _ => none
+    }
 
   implicit def traverse[T[_[_]]]: Traverse[MapFuncCore[T, ?]] =
     new Traverse[MapFuncCore[T, ?]] {
@@ -372,6 +480,7 @@ object MapFuncCore {
         case DeleteField(a1, a2) => (f(a1) ⊛ f(a2))(DeleteField(_, _))
         case ConcatArrays(a1, a2) => (f(a1) ⊛ f(a2))(ConcatArrays(_, _))
         case Range(a1, a2) => (f(a1) ⊛ f(a2))(Range(_, _))
+        case Split(a1, a2) => (f(a1) ⊛ f(a2))(Split(_, _))
 
         //  ternary
         case Between(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Between(_, _, _))
@@ -382,13 +491,15 @@ object MapFuncCore {
       }
   }
 
-  implicit def equal[T[_[_]]: EqualT, A]: Delay[Equal, MapFuncCore[T, ?]] =
+  implicit def equal[T[_[_]]: BirecursiveT: EqualT, A]: Delay[Equal, MapFuncCore[T, ?]] =
     new Delay[Equal, MapFuncCore[T, ?]] {
       @SuppressWarnings(Array("org.wartremover.warts.Equals"))
       def apply[A](in: Equal[A]): Equal[MapFuncCore[T, A]] = Equal.equal {
         // nullary
-        case (Constant(v1), Constant(v2)) => v1.equals(v2)
-        case (JoinSideName(n1), JoinSideName(n2)) => n1.equals(n2)
+        case (Constant(v1), Constant(v2)) =>
+          // FIXME: Ensure we’re using _structural_ equality here.
+          v1 ≟ v2
+        case (JoinSideName(n1), JoinSideName(n2)) => n1 ≟ n2
         case (Undefined(), Undefined()) => true
         case (Now(), Now()) => true
         // unary
@@ -459,6 +570,7 @@ object MapFuncCore {
         case (DeleteField(a1, a2), DeleteField(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (ConcatArrays(a1, a2), ConcatArrays(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Range(a1, a2), Range(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Split(a1, a2), Split(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
 
         //  ternary
         case (Between(a1, a2, a3), Between(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
@@ -552,6 +664,7 @@ object MapFuncCore {
           case DeleteField(a1, a2) => shz("DeleteField", a1, a2)
           case ConcatArrays(a1, a2) => shz("ConcatArrays", a1, a2)
           case Range(a1, a2) => shz("Range", a1, a2)
+          case Split(a1, a2) => shz("Split", a1, a2)
 
           //  ternary
           case Between(a1, a2, a3) => shz("Between", a1, a2, a3)
@@ -654,6 +767,7 @@ object MapFuncCore {
           case DeleteField(a1, a2) => nAry("DeleteField", a1, a2)
           case ConcatArrays(a1, a2) => nAry("ConcatArrays", a1, a2)
           case Range(a1, a2) => nAry("Range", a1, a2)
+          case Split(a1, a2) => nAry("Split", a1, a2)
 
           //  ternary
           case Between(a1, a2, a3) => nAry("Between", a1, a2, a3)
@@ -770,6 +884,7 @@ object MapFuncsCore {
   @Lenses final case class Decimal[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Null[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ToString[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Split[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Search[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
   @Lenses final case class Substring[T[_[_]], A](string: A, from: A, count: A) extends Ternary[T, A] {
     def a1 = string

@@ -31,7 +31,7 @@ import quasar.fs.mount._
 import quasar.qscript._
 
 import quasar.blueeyes.json.{JNum, JValue}
-import quasar.precog.common.{CEmptyArray, ColumnRef, CPath, CPathIndex, Path}
+import quasar.precog.common.{ColumnRef, CPath, CPathField, CPathIndex, Path}
 import quasar.yggdrasil.TableModule
 import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
@@ -184,10 +184,12 @@ object Mimir extends BackendModule with Logging {
 
   def needToSort(p: Precog)(oldSort: SortState[p.trans.TransSpec1], newSort: SortState[p.trans.TransSpec1]): Boolean = {
     (oldSort.orderings.length != newSort.orderings.length || oldSort.bucket != newSort.bucket) || {
-      def requiresSort(oldOrdering: SortOrdering[p.trans.TransSpec1], newOrdering: SortOrdering[p.trans.TransSpec1]) =
-        (oldOrdering.sortKeys & newOrdering.sortKeys).nonEmpty ||
+      def requiresSort(oldOrdering: SortOrdering[p.trans.TransSpec1], newOrdering: SortOrdering[p.trans.TransSpec1]) = {
+        (oldOrdering.sortKeys & newOrdering.sortKeys).isEmpty ||
           (oldOrdering.sortOrder != newOrdering.sortOrder) ||
           (oldOrdering.unique && !newOrdering.unique)
+      }
+
       (oldSort.bucket != newSort.bucket) || {
         val allOrderings = oldSort.orderings.zip(newSort.orderings)
         allOrderings.exists { case (o, n) => requiresSort(o, n) }
@@ -196,16 +198,24 @@ object Mimir extends BackendModule with Logging {
   }
 
   // sort by one dimension
-  def sortT[P0 <: Cake](c: Repr.Aux[P0])(table: c.P.Table, sortKey: c.P.trans.TransSpec1,
-                                                 sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): Task[Repr.Aux[c.P.type]] = {
+  def sortT[P0 <: Cake](c: Repr.Aux[P0])(
+      table: c.P.Table,
+      sortKey: c.P.trans.TransSpec1,
+      sortOrder: DesiredSortOrder = SortAscending,
+      unique: Boolean = false): Task[Repr.Aux[c.P.type]] = {
+
     val newRepr =
-      SortState[c.P.trans.TransSpec1](bucket = None, orderings = SortOrdering(Set(sortKey), sortOrder, unique) :: Nil)
-    if (c.lastSort.fold(true)(needToSort(c.P)(_, newSort = newRepr)))
-      table.sort(sortKey, sortOrder, unique).toTask.map(sorted =>
+      SortState[c.P.trans.TransSpec1](
+        bucket = None,
+        orderings = SortOrdering(Set(sortKey), sortOrder, unique) :: Nil)
+
+    if (c.lastSort.fold(true)(needToSort(c.P)(_, newSort = newRepr))) {
+      table.sort(sortKey, sortOrder, unique).toTask map { sorted =>
         Repr.withSort(c.P)(sorted)(Some(newRepr))
-      )
-    else
+      }
+    } else {
       Task.now(Repr.withSort(c.P)(table)(Some(newRepr)))
+    }
   }
 
   val Type = FileSystemType("mimir")
@@ -248,6 +258,17 @@ object Mimir extends BackendModule with Logging {
           κ(P.trans.TransSpec1.Id.point[F]),
           mapFuncPlanner[F].plan(P)[P.trans.Source1](P.trans.TransSpec1.Id)))
 
+    def combineTransSpecs(P: Precog)(specs: Seq[P.trans.TransSpec1]): P.trans.TransSpec1 = {
+      import P.trans._
+
+      if (specs.isEmpty)
+        TransSpec1.Id
+      else if (specs.lengthCompare(1) == 0)
+        specs.head
+      else
+        OuterArrayConcat(specs.map(WrapArray(_): TransSpec1) : _*)
+    }
+
     lazy val planQScriptCore: AlgebraM[Backend, QScriptCore[T, ?], Repr] = {
       case qscript.Map(src, f) =>
         import src.P.trans._
@@ -266,106 +287,150 @@ object Mimir extends BackendModule with Logging {
           } yield SortState(newBucket, newOrderings)
         } yield Repr.withSort(src.P)(src.table.transform(trans))(newSort)
 
-      case qscript.Reduce(src, bucket, reducers, repair) =>
+      // special-case for distinct (TODO this should be a new node in qscript)
+      case qscript.Reduce(src, bucket :: Nil, ReduceFuncs.Arbitrary(arb) :: Nil, repair) if bucket === arb =>
+        import src.P.trans._
+
+        for {
+          bucketTrans <- interpretMapFunc[Backend](src.P)(bucket)
+
+          distinctedUnforced <- sortT[src.P.type](Repr.single[src.P](src))(
+            src.table,
+            bucketTrans,
+            unique = true).liftM[MT].liftB
+
+          distincted = src.unsafeMerge(distinctedUnforced)
+
+          repairTrans <- repair.cataM[Backend, TransSpec1](
+            interpretM(
+              {
+                case ReduceIndex(-\/(0) | \/-(0)) => bucketTrans.point[Backend]
+                case _ => sys.error("should be impossible")
+              },
+              mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)))
+
+          repaired = distincted.table.transform(repairTrans)
+        } yield Repr(src.P)(repaired)
+
+      case qscript.Reduce(src, buckets, reducers, repair) =>
         import src.P.trans._
         import src.P.Library
 
-        // empty reduction is distinct
-        if (reducers.isEmpty) {
-          for {
-            trans <- repair.cataM[Backend, TransSpec1](
-              interpretM(
-                {
-                  case ReduceIndex(Some(_)) => ???    // this should be impossible
-                  case ReduceIndex(None) => interpretMapFunc[Backend](src.P)(bucket)
-                },
-                mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)
-              )
-            )
+        def extractReduction(red: ReduceFunc[FreeMap[T]]): (Library.Reduction, FreeMap[T]) = red match {
+          case ReduceFuncs.Count(f) => (Library.Count, f)
+          case ReduceFuncs.Sum(f) => (Library.Sum, f)
+          case ReduceFuncs.Min(f) => (Library.Min, f)
+          case ReduceFuncs.Max(f) => (Library.Max, f)
+          case ReduceFuncs.Avg(f) => (Library.Mean, f)
+          case ReduceFuncs.Arbitrary(f) => (Library.First, f)   // first is the most efficient for Table
+          case ReduceFuncs.First(f) => (Library.First, f)
+          case ReduceFuncs.Last(f) => (Library.Last, f)
+          case ReduceFuncs.UnshiftArray(f) => ???
+          case ReduceFuncs.UnshiftMap(f1, f2) => ???
+        }
 
-            transformed = src.table.transform(trans)
+        val pairs: List[(Library.Reduction, FreeMap[T])] =
+          reducers.map(extractReduction)
 
-            sorted <- sortT[src.P.type](Repr.single[src.P](src))(transformed,
-              TransSpec1.Id,
-              unique = true).liftM[MT].liftB
-          } yield sorted
-        } else {
-          def extractReduction(red: ReduceFunc[FreeMap[T]])
-              : (Library.Reduction, FreeMap[T]) = red match {
-            case ReduceFuncs.Count(f) => (Library.Count, f)
-            case ReduceFuncs.Sum(f) => (Library.Sum, f)
-            case ReduceFuncs.Min(f) => (Library.Min, f)
-            case ReduceFuncs.Max(f) => (Library.Max, f)
-            case ReduceFuncs.Avg(f) => (Library.Mean, f)
-            case ReduceFuncs.Arbitrary(f) => (Library.First, f)   // first is the most efficient for Table
-            case ReduceFuncs.First(f) => (Library.First, f)
-            case ReduceFuncs.Last(f) => (Library.Last, f)
-            case ReduceFuncs.UnshiftArray(f) => ???
-            case ReduceFuncs.UnshiftMap(f1, f2) => ???
+        // we add First so we can pull out the group key
+        def reductions(bucketed: Boolean): List[Library.Reduction] = {
+          if (bucketed)
+            Library.First :: pairs.map(_._1)
+          else
+            pairs.map(_._1)
+        }
+
+        // note that this means that funcs will NOT align with reductions!
+        val funcs: List[FreeMap[T]] = pairs.map(_._2)
+
+        def makeJArray(idx: Int)(tpe: JType): JType =
+          JArrayFixedT(ScalaMap(idx -> tpe))
+
+        def derefArray(idx: Int)(ref: ColumnRef): Option[ColumnRef] =
+          ref.selector.dropPrefix(CPath.Identity \ idx).map(ColumnRef(_, ref.ctype))
+
+        def megaReduction(bucketed: Boolean): Library.Reduction = {
+          Library.coalesce(reductions(bucketed).zipWithIndex map {
+            case (r, i) => (r, Some((makeJArray(i)(_), derefArray(i)(_))))
+          })
+        }
+
+        // mimir reverses the order of the returned results
+        def remapIndex(bucketed: Boolean): ScalaMap[Int, Int] =
+          (0 until (reducers.length + (if (bucketed) 1 else 0))).reverse.zipWithIndex.toMap
+
+        for {
+          specs <- funcs.traverse(interpretMapFunc[Backend](src.P)(_))
+
+          adjustedSpecs = { bucketed: Boolean =>
+            if (bucketed) {
+              specs map { spec =>
+                TransSpec.deepMap(spec) {
+                  case Leaf(source) =>
+                    DerefObjectStatic(Leaf(source), CPathField("1"))
+                }
+              }
+            } else {
+              specs
+            }
           }
 
-          def combineTransSpecs(specs: List[TransSpec1]): TransSpec1 =
-            specs.map(WrapArray(_): TransSpec1)
-              .reduceLeftOption(OuterArrayConcat(_, _))
-              .getOrElse(TransSpec1.Id)
+          // add back in the group key reduction (corresponds with the First we add above)
+          megaSpec = { bucketed: Boolean =>
+            combineTransSpecs(src.P)(DerefObjectStatic(Leaf(Source), CPathField("0")) :: adjustedSpecs(bucketed))
+          }
 
-          val pairs: List[(Library.Reduction, FreeMap[T])] =
-            reducers.map(extractReduction)
-
-          val reductions: List[Library.Reduction] = pairs.map(_._1)
-          val funcs: List[FreeMap[T]] = pairs.map(_._2)
-
-          def makeJArray(idx: Int)(tpe: JType): JType =
-            JArrayFixedT(ScalaMap(idx -> tpe))
-
-          def derefArray(idx: Int)(ref: ColumnRef): Option[ColumnRef] =
-            ref.selector.dropPrefix(CPath.Identity \ idx).map(ColumnRef(_, ref.ctype))
-
-          val megaReduction: Library.Reduction =
-            Library.coalesce(reductions.zipWithIndex.map {
-              case (r, i) => (r, Some((makeJArray(i)(_), derefArray(i)(_))))
-            })
-
-          // mimir reverses the order of the returned results
-          def remapIndex: ScalaMap[Int, Int] =
-            (0 until reducers.length).reverse.zipWithIndex.toMap
-
-          for {
-            specs <- funcs.traverse(interpretMapFunc[Backend](src.P)(_))
-            megaSpec = combineTransSpecs(specs)
-
-            table <- {
-              def reduceAll(table: src.P.Table): Future[src.P.Table] = {
-                for {
-                  red <- megaReduction(table.transform(megaSpec))
-                  trans <- repair.cataM[Future, TransSpec1](
-                    interpretM(
-                      {
-                        case ReduceIndex(Some(idx)) => remapIndex.get(idx) match {
+          table <- {
+            def reduceAll(bucketed: Boolean)(table: src.P.Table): Future[src.P.Table] = {
+              for {
+                // ok this isn't working right now because we throw away the key when we reduce; need to fold in a First reducer to carry along the key
+                red <- megaReduction(bucketed)(table.transform(megaSpec(bucketed)))
+                trans <- repair.cataM[Future, TransSpec1](
+                  // note that .0 is the partition key
+                  // and .1 is the value (if bucketed)
+                  // if we aren't bucketed, everything is unwrapped
+                  // these are effectively implementation details of partitionMerge
+                  interpretM(
+                    {
+                      case ReduceIndex(\/-(idx)) =>
+                        // we don't add First if we aren't bucketed
+                        remapIndex(bucketed).get(idx + (if (bucketed) 1 else 0)) match {
                           case Some(i) =>
-                            (DerefArrayStatic(TransSpec1.Id, CPathIndex(i)): TransSpec1).point[Future]
+                            (DerefArrayStatic(
+                              Leaf(Source),
+                              CPathIndex(i)): TransSpec1).point[Future]
+
                           case None => ???
                         }
-                        case ReduceIndex(None) => interpretMapFunc[Future](src.P)(bucket)
-                      },
-                      mapFuncPlanner[Future].plan(src.P)[Source1](TransSpec1.Id)))
-                } yield red.transform(trans)
-              }
 
-              if (bucket === MapFuncsCore.NullLit()) {
-                reduceAll(src.table).toTask.liftM[MT].liftB
-              } else {
-                for {
-                  bucketTrans <- interpretMapFunc[Backend](src.P)(bucket)
-
-                  prepared <- sortT[src.P.type](Repr.single[src.P](src))(src.table, bucketTrans)
-                    .liftM[MT].liftB.map(r => src.unsafeMergeTable(r.table))
-                  table <- prepared.partitionMerge(bucketTrans)(reduceAll).toTask.liftM[MT].liftB
-                } yield table
-              }
+                      case ReduceIndex(-\/(idx)) =>
+                        // note that an undefined bucket will still retain indexing as long as we don't compact the slice
+                        Future(scala.Predef.assert(bucketed, s"bucketed was false in a ReduceIndex(-\\/($idx))")) >>
+                          (DerefArrayStatic(
+                            DerefArrayStatic(
+                              Leaf(Source),
+                              CPathIndex(remapIndex(bucketed)(0))),
+                            CPathIndex(idx)): TransSpec1).point[Future]
+                    },
+                    mapFuncPlanner[Future].plan(src.P)[Source1](TransSpec1.Id)))
+              } yield red.transform(trans)
             }
-          } yield Repr(src.P)(table)
-        }
+
+            if (buckets.isEmpty) {
+              reduceAll(false)(src.table).toTask.liftM[MT].liftB
+            } else {
+              for {
+                bucketTranses <- buckets.traverse(interpretMapFunc[Backend](src.P))
+                bucketTrans = combineTransSpecs(src.P)(bucketTranses)
+
+                prepared <- sortT[src.P.type](Repr.single[src.P](src))(src.table, bucketTrans)
+                  .liftM[MT].liftB.map(r => src.unsafeMergeTable(r.table))
+
+                table <- prepared.partitionMerge(bucketTrans, keepKey = true)(reduceAll(true)).toTask.liftM[MT].liftB
+              } yield table
+            }
+          }
+        } yield Repr(src.P)(table)
 
       case qscript.LeftShift(src, struct, idStatus, repair) =>
         import src.P.trans._
@@ -397,7 +462,7 @@ object Mimir extends BackendModule with Logging {
           repaired = shifted.transform(repairTrans)
         } yield Repr(src.P)(repaired)
 
-      case qscript.Sort(src, bucket, orders) =>
+      case qscript.Sort(src, buckets, orders) =>
         import src.P.trans._
         import TableModule.DesiredSortOrder
 
@@ -441,22 +506,31 @@ object Mimir extends BackendModule with Logging {
             }
 
             for {
-              bucketNotNullTrans <- Some(bucket)
-                .filterNot(_ === MapFuncsCore.NullLit())
-                .traverse(interpretMapFunc[Backend](src.P))
-              newSort = SortState(bucketNotNullTrans, sortOrderings)
+              bucketTranses <-
+                buckets.traverse(interpretMapFunc[Backend](src.P))
+
+              bucketTrans = combineTransSpecs(src.P)(bucketTranses)
+
+              newSort = SortState(
+                Some(bucketTrans).filterNot(_ => buckets.isEmpty),
+                sortOrderings)
+
               sortNeeded = src.lastSort.fold(true)(last => needToSort(Repr.single[src.P](src).P)(last, newSort))
-              sortedTable <-
-              if (sortNeeded) {
-                bucketNotNullTrans.fold(sortAll(src.table).toTask.liftM[MT].liftB) { bucketTrans =>
-                  for {
-                    prepared <- sortT[src.P.type](Repr.single[src.P](src))(src.table, bucketTrans)
-                      .liftM[MT].liftB.map(r => src.unsafeMergeTable(r.table))
-                    table <- prepared.partitionMerge(bucketTrans)(sortAll).toTask.liftM[MT].liftB
-                  } yield table
+
+              sortedTable <- {
+                if (sortNeeded) {
+                  if (buckets.isEmpty) {
+                    sortAll(src.table).toTask.liftM[MT].liftB
+                  } else {
+                    for {
+                      prepared <- sortT[src.P.type](Repr.single[src.P](src))(src.table, bucketTrans)
+                        .liftM[MT].liftB.map(r => src.unsafeMergeTable(r.table))
+                      table <- prepared.partitionMerge(bucketTrans)(sortAll).toTask.liftM[MT].liftB
+                    } yield table
+                  }
+                } else {
+                  src.table.point[Backend]
                 }
-              } else {
-                src.table.point[Backend]
               }
             } yield (sortedTable, newSort)
           }
@@ -517,18 +591,21 @@ object Mimir extends BackendModule with Logging {
     }
 
     lazy val planEquiJoin: AlgebraM[Backend, EquiJoin[T, ?], Repr] = {
-      case qscript.EquiJoin(src, lbranch, rbranch, lkey, rkey, tpe, combine) =>
-        import src.P.trans._, scalaz.syntax.std.option._, scalaz.std.option._, scalaz.syntax.show._
+      case qscript.EquiJoin(src, lbranch, rbranch, keys, tpe, combine) =>
+        import src.P.trans._, scalaz.syntax.std.option._
+
         def rephrase2(projection: TransSpec2, rootL: TransSpec1, rootR: TransSpec1): Option[SortOrdering[TransSpec1]] = {
           val leftRephrase = TransSpec.rephrase(projection, SourceLeft, rootL).fold(Set.empty[TransSpec1])(Set(_))
           val rightRephrase = TransSpec.rephrase(projection, SourceRight, rootR).fold(Set.empty[TransSpec1])(Set(_))
           val bothRephrased = leftRephrase ++ rightRephrase
-          if (bothRephrased.isEmpty) {
+
+          if (bothRephrased.isEmpty)
             None
-          } else {
+          else
             SortOrdering(bothRephrased, SortAscending, unique = false).some
-          }
         }
+
+        val (lkeys, rkeys) = keys.unfzip
 
         for {
           leftRepr <- lbranch.cataM(interpretM(κ(src.point[Backend]), planQST))
@@ -540,8 +617,10 @@ object Mimir extends BackendModule with Logging {
           rmerged = src.unsafeMerge(rightRepr)
           rtable = rmerged.table
 
-          transLKey <- interpretMapFunc[Backend](src.P)(lkey)
-          transRKey <- interpretMapFunc[Backend](src.P)(rkey)
+          transLKeys <- lkeys traverse interpretMapFunc[Backend](src.P)
+          transLKey = combineTransSpecs(src.P)(transLKeys)
+          transRKeys <- rkeys traverse interpretMapFunc[Backend](src.P)
+          transRKey = combineTransSpecs(src.P)(transRKeys)
 
           transMiddle <- combine.cataM[Backend, TransSpec2](
             interpretM(
@@ -554,54 +633,57 @@ object Mimir extends BackendModule with Logging {
           ) // TODO weirdly left-biases things like constants
 
           // identify full-cross and avoid cogroup
-          resultAndSort <-
-          if (transLKey == transRKey && transLKey == ConstLiteral(CEmptyArray, TransSpec1.Id)) {
-            log.trace("EQUIJOIN: full-cross detected!")
-            (rtable.cross(ltable)(transMiddle), src.unsafeMerge(leftRepr).lastSort).point[Backend]
-          } else {
-            log.trace("EQUIJOIN: not a full-cross; sorting and cogrouping")
+          resultAndSort <- {
+            if (keys.isEmpty) {
+              log.trace("EQUIJOIN: full-cross detected!")
 
-            for {
-              lsorted <- sortT[leftRepr.P.type](Repr.single[leftRepr.P](leftRepr))(leftRepr.table, leftRepr.mergeTS1(transLKey))
-                .liftM[MT].liftB.map(r => src.unsafeMergeTable(r.table))
-              rsorted <- sortT[rightRepr.P.type](Repr.single[rightRepr.P](rightRepr))(rightRepr.table, rightRepr.mergeTS1(transRKey))
-                .liftM[MT].liftB.map(r => src.unsafeMergeTable(r.table))
+              (ltable.cross(rtable)(transMiddle), src.unsafeMerge(leftRepr).lastSort).point[Backend]
+            } else {
+              log.trace("EQUIJOIN: not a full-cross; sorting and cogrouping")
 
-              transLeft <- tpe match {
-                case JoinType.LeftOuter | JoinType.FullOuter =>
-                  combine.cataM[Backend, TransSpec1](
-                    interpretM(
-                      {
-                        case qscript.LeftSide => TransSpec1.Id.point[Backend]
-                        case qscript.RightSide => TransSpec1.Undef.point[Backend]
-                      },
-                      mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)
+              for {
+                lsorted <- sortT[leftRepr.P.type](Repr.single[leftRepr.P](leftRepr))(leftRepr.table, leftRepr.mergeTS1(transLKey))
+                  .liftM[MT].liftB.map(r => src.unsafeMergeTable(r.table))
+                rsorted <- sortT[rightRepr.P.type](Repr.single[rightRepr.P](rightRepr))(rightRepr.table, rightRepr.mergeTS1(transRKey))
+                  .liftM[MT].liftB.map(r => src.unsafeMergeTable(r.table))
+
+                transLeft <- tpe match {
+                  case JoinType.LeftOuter | JoinType.FullOuter =>
+                    combine.cataM[Backend, TransSpec1](
+                      interpretM(
+                        {
+                          case qscript.LeftSide => TransSpec1.Id.point[Backend]
+                          case qscript.RightSide => TransSpec1.Undef.point[Backend]
+                        },
+                        mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)
+                      )
                     )
-                  )
 
-                case JoinType.Inner | JoinType.RightOuter =>
-                  TransSpec1.Undef.point[Backend]
-              }
+                  case JoinType.Inner | JoinType.RightOuter =>
+                    TransSpec1.Undef.point[Backend]
+                }
 
-              transRight <- tpe match {
-                case JoinType.RightOuter | JoinType.FullOuter =>
-                  combine.cataM[Backend, TransSpec1](
-                    interpretM(
-                      {
-                        case qscript.LeftSide => TransSpec1.Undef.point[Backend]
-                        case qscript.RightSide => TransSpec1.Id.point[Backend]
-                      },
-                      mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)
+                transRight <- tpe match {
+                  case JoinType.RightOuter | JoinType.FullOuter =>
+                    combine.cataM[Backend, TransSpec1](
+                      interpretM(
+                        {
+                          case qscript.LeftSide => TransSpec1.Undef.point[Backend]
+                          case qscript.RightSide => TransSpec1.Id.point[Backend]
+                        },
+                        mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)
+                      )
                     )
-                  )
 
-                case JoinType.Inner | JoinType.LeftOuter =>
-                  TransSpec1.Undef.point[Backend]
-              }
-              newSortOrder = rephrase2(transMiddle, transLKey, transRKey)
-            } yield (lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle),
-                newSortOrder.map(order => SortState(None, order :: Nil)))
+                  case JoinType.Inner | JoinType.LeftOuter =>
+                    TransSpec1.Undef.point[Backend]
+                }
+                newSortOrder = rephrase2(transMiddle, transLKey, transRKey)
+              } yield (lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle),
+                  newSortOrder.map(order => SortState(None, order :: Nil)))
+            }
           }
+
           (result, newSort) = resultAndSort
         } yield Repr.withSort(src.P)(result)(newSort)
     }

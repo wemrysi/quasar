@@ -4,11 +4,7 @@
     "backends": {
         "couchbase": "skip",
         "marklogic_json": "pending",
-        "mimir": "ignoreFieldOrder",
-        "mongodb_q_2_6": "pending",
-        "mongodb_q_3_0": "pending",
-        "mongodb_q_3_2": "pending",
-        "mongodb_q_3_4": "pending"
+        "mimir": "ignoreFieldOrder"
     },
 
     "data": ["../cars.data", "../cars2.data"],

@@ -60,8 +60,8 @@ object MountConfig {
     case ViewConfig(query, vars) => (query, vars)
   } ((ViewConfig(_, _)).tupled)
 
-  val viewConfigUri: Prism[String, (ScopedExpr[Fix[Sql]], Variables)] =
-    Prism((viewCfgFromUriStr _) andThen (_.toOption))((viewCfgAsUriStr _).tupled)
+  val viewConfigUri: Prism[ConnectionUri, (ScopedExpr[Fix[Sql]], Variables)] =
+    Prism((viewCfgFromUri _) >>> (_.toOption))((viewCfgAsUri _).tupled)
 
   val fileSystemConfig =
     Prism.partial[MountConfig, (FileSystemType, ConnectionUri)] {
@@ -73,13 +73,33 @@ object MountConfig {
       case ModuleConfig(statements) =>
         "Module Config"  // TODO: Perhaps make this more descriptive
       case ViewConfig(expr, vars) =>
-        viewConfigUri.reverseGet((expr, vars))
+        viewConfigUri.reverseGet((expr, vars)).value
       case FileSystemConfig(typ, uri) =>
         s"[${typ.value}] ${uri.value}"
     }
 
   implicit def equal: Equal[MountConfig] =
     Equal.equalBy(m => (viewConfig.getOption(m), fileSystemConfig.getOption(m), moduleConfig.getOption(m)))
+
+  val toConfigPair: MountConfig => (String, String) = {
+    case ViewConfig(query, vars) =>
+      "view" -> viewCfgAsUri(query, vars).value
+    case FileSystemConfig(typ, uri) =>
+      typ.value -> uri.value
+    case ModuleConfig(statements) =>
+      "module" -> stmtsAsSqlStr(statements)
+  }
+
+  val fromConfigPair: (String, String) => String \/ MountConfig = {
+    case ("view", uri) =>
+      viewCfgFromUri(ConnectionUri(uri)).map(i => viewConfig(i))
+    case ("module", stmts) =>
+      sql.fixParser.parseWithParser(stmts, sql.fixParser.statements).bimap(
+        _.message,
+        moduleConfig(_))
+    case (typ, uri) =>
+      fileSystemConfig(FileSystemType(typ), ConnectionUri(uri)).right
+  }
 
   implicit val mountConfigCodecJson: CodecJson[MountConfig] =
     CodecJson({

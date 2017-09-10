@@ -81,6 +81,10 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   import PATypes._
 
   type IndexMapping = ScalaMap[BigInt, BigInt]
+  type EitherMap[A] = FreeMapA[A \/ A]
+
+  // NB: Neded due to how the type parameters of CoEnv are ordered.
+  private val cbf = Bifunctor[CoEnv[?, MapFunc, ?]]
 
   /** Returns `None` if a non-static non-integer index was found.
     * Else returns all indices of the form `ProjectIndex(SrcHole, IntLit(_))`.
@@ -110,56 +114,77 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
     func.para(findIndices)
   }
 
-  private def remapResult[A](hole: FreeMapA[A], mapping: IndexMapping, idx: BigInt):
-      CoEnvMapA[A, FreeMapA[A]] = {
-    val x = MFC(ProjectIndex[T, FreeMapA[A]](
-      hole,
-      IntLit(mapping.get(idx).getOrElse(idx))))
+  /** NB: The lhs of the disjunction allows us to ensure we only remove a single
+    *     layer of a nested projection of the same index, like
+    *
+    *     ProjectIndex(
+    *       ProjectIndex(
+    *         Hole,
+    *         Int(1))
+    *       Int(1))
+    *
+    *     without this extra bit of state, rewriting the inner project to just `Hole` would
+    *     also end up rewriting the outer project during the next step of the fold as
+    *     it would then match the ProjectIndex(Hole, Int(i)) pattern we look for.
+    */
+  private def remapResult[A](hole: A, mapping: IndexMapping, idx: BigInt):
+      CoEnvMapA[A \/ A, EitherMap[A]] = {
 
-    CoEnv[A, MapFunc, FreeMapA[A]](x.right[A])
+    def mkPrj(i: BigInt) =
+      CoEnv(MFC(ProjectIndex[T, EitherMap[A]](
+        CoEnv(hole.right[A].left[MapFunc[EitherMap[A]]]).embed,
+        IntLit(i))).right[A \/ A])
+
+    mapping.get(idx).fold(mkPrj(idx)) { i =>
+      if (i === 0 && mapping.size === 1)
+        CoEnv(hole.left[A].left)
+      else
+        mkPrj(i)
+    }
   }
 
   /** Remap all indices in `func` in structures like
     * `ProjectIndex(SrcHole, IntLit(_))` according to the provided `mapping`.
     */
   def remapIndicesInFunc(func: FreeMap, mapping: IndexMapping): FreeMap =
-    func.transCata[FreeMap] {
-      case CoEnv(\/-(MFC(ProjectIndex(hole @ Embed(CoEnv(-\/(SrcHole))), IntLit(idx))))) =>
-        remapResult[Hole](hole, mapping, idx)
-      case co => co
-    }
+    func.transCata[EitherMap[Hole]] {
+      case CoEnv(\/-(MFC(ProjectIndex(Embed(CoEnv(-\/(\/-(SrcHole)))), IntLit(idx))))) =>
+        remapResult[Hole](SrcHole, mapping, idx)
+      case co => cbf.leftMap(co)(_.right[Hole])
+    } map (_.merge)
 
   def remapIndicesInJoinFunc(func: JoinFunc, lMapping: IndexMapping, rMapping: IndexMapping): JoinFunc =
-    func.transCata[JoinFunc] {
-      case CoEnv(\/-(MFC(ProjectIndex(side @ Embed(CoEnv(-\/(LeftSide))), IntLit(idx))))) =>
-        remapResult[JoinSide](side, lMapping, idx)
-      case CoEnv(\/-(MFC(ProjectIndex(side @ Embed(CoEnv(-\/(RightSide))), IntLit(idx))))) =>
-        remapResult[JoinSide](side, rMapping, idx)
-      case co => co
+    func.transCata[EitherMap[JoinSide]] {
+      case CoEnv(\/-(MFC(ProjectIndex(Embed(CoEnv(-\/(\/-(LeftSide)))), IntLit(idx))))) =>
+        remapResult[JoinSide](LeftSide, lMapping, idx)
+      case CoEnv(\/-(MFC(ProjectIndex(Embed(CoEnv(-\/(\/-(RightSide)))), IntLit(idx))))) =>
+        remapResult[JoinSide](RightSide, rMapping, idx)
+      case co => cbf.leftMap(co)(_.right[JoinSide])
+    } map (_.merge)
+
+  // NB: We only remap `LeftSide` references as a) we only reported indices
+  //     from `LeftSide` references in `find` and b) except under very
+  //     contrived circumstances, we don't know anything about the shape of
+  //     the values resulting from a left shift.
+  def remapIndicesInLeftShift[A](repair: JoinFunc, mapping: IndexMapping): JoinFunc =
+    repair.transCata[EitherMap[JoinSide]] {
+      case CoEnv(\/-(MFC(ProjectIndex(Embed(CoEnv(-\/(\/-(LeftSide)))), IntLit(idx))))) =>
+        remapResult[JoinSide](LeftSide, mapping, idx)
+      case co => cbf.leftMap(co)(_.right[JoinSide])
+    } map (_.merge)
+
+  /** Prune the provided `array` keeping only the indices in `indicesToKeep`,
+    * eliding it altogether if only a single element is retained.
+    */
+  def rewriteRepair[A](repair: FreeMapA[A], seen: SeenIndices): Option[FreeMapA[A]] =
+    repair.project.some collect {
+      case StaticArray(array) =>
+        val rewrite = new quasar.qscript.Rewrite[T]
+        rewrite.rebuildArray[A](seen.map(_.toInt).toList.sorted ∘ array) match {
+          case Embed(CoEnv(\/-(MFC(MakeArray(a))))) => a
+          case other                                => other
+        }
     }
-
-  def remapIndicesInLeftShift[A](struct: FreeMap, repair: JoinFunc, mapping: IndexMapping): JoinFunc =
-    repair.transCata[JoinFunc] {
-      case CoEnv(\/-(MFC(ProjectIndex(hole @ Embed(CoEnv(-\/(LeftSide))), IntLit(idx))))) =>
-        remapResult[JoinSide](hole, mapping, idx)
-      case CoEnv(\/-(MFC(ProjectIndex(hole @ Embed(CoEnv(-\/(RightSide))), IntLit(idx))))) if struct ≟ HoleF =>
-        remapResult[JoinSide](hole, mapping, idx)
-      case co => co
-    }
-
-  /** Prune the provided `array` keeping only the indices in `indicesToKeep`. */
-  private def arrayRewrite(array: ConcatArrays[T, JoinFunc], indicesToKeep: Set[Int]): JoinFunc = {
-    val rewrite = new quasar.qscript.Rewrite[T]
-
-    def removeUnusedIndices[A](array: List[A], indicesToKeep: Set[Int]): List[A] =
-      indicesToKeep.toList.sorted map array
-
-    rewrite.rebuildArray[JoinSide](
-      removeUnusedIndices[JoinFunc](rewrite.flattenArray[JoinSide](array), indicesToKeep))
-  }
-
-  def rewriteRepair(array: ConcatArrays[T, JoinFunc], seen: SeenIndices): JoinFunc  =
-    arrayRewrite(array, seen.map(_.toInt).toSet)
 
   // TODO currently we only rewrite the branch if it is precisely a LeftShift
   // we need to generalize this so we can rewrite all rewritable branches
@@ -167,14 +192,16 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   def rewriteBranch(branch: FreeQS, seen: SeenIndices): Option[FreeQS] =
     branch.resume match {
       case -\/(qs) =>
-        Inject[QScriptCore, QScriptTotal].prj(qs) match {
-          case Some(LeftShift(src, struct, id, repair)) =>
-            repair.resume match {
-              case -\/(MFC(array @ ConcatArrays(_, _))) =>
-                Free.roll(Inject[QScriptCore, QScriptTotal].inj(
-                  LeftShift(src, struct, id, rewriteRepair(array, seen)))).some
-              case _ => none
-            }
+        Inject[QScriptCore, QScriptTotal].prj(qs) >>= {
+          case LeftShift(src, struct, id, repair) =>
+            rewriteRepair(repair, seen) ∘ (rep =>
+              Free.roll(Inject[QScriptCore, QScriptTotal].inj(
+                LeftShift(src, struct, id, rep))))
+
+          case Reduce(src, bucket, reducers, repair) =>
+            rewriteRepair(repair, seen) ∘ (rep =>
+              Free.roll(Inject[QScriptCore, QScriptTotal].inj(
+                Reduce(src, bucket, reducers, rep))))
           case _ => none
         }
       case _ => none
@@ -198,7 +225,8 @@ object PruneArrays {
       : PruneArrays[IN] =
     new PruneArrays[IN] {
       def find[M[_], A](in: IN[A])(implicit M: MonadState[M, RewriteState]) =
-        M.put(Ignore).as(Ignore)
+        haltRemap(Ignore)
+
       def remap[M[_], A](env: RewriteState, in: IN[A])(implicit M: MonadState[M, RewriteState]) =
         haltRemap(in)
     }
@@ -293,8 +321,8 @@ object PruneArrays {
 
       def find[M[_], A](in: EquiJoin[A])(implicit M: MonadState[M, RewriteState]) = {
         val state: RewriteState =
-          liftJoinSide(findIndicesInFunc[Hole](in.lKey).collect { case (SrcHole, v) => (LeftSide, v) }) |+|
-            liftJoinSide(findIndicesInFunc[Hole](in.rKey).collect { case (SrcHole, v) => (RightSide, v) }) |+|
+          liftJoinSide((in.key ∘ (_._1)).foldRight(ScalaMap.empty[Hole, KnownIndices])(findIndicesInFunc[Hole](_) |++| _).collect { case (SrcHole, v) => (LeftSide, v) }) |+|
+            liftJoinSide((in.key ∘ (_._2)).foldRight(ScalaMap.empty[Hole, KnownIndices])(findIndicesInFunc[Hole](_) |++| _).collect { case (SrcHole, v) => (RightSide, v) }) |+|
             liftJoinSide(findIndicesInFunc[JoinSide](in.combine))
         M.put(Ignore).as(state) // annotate computed state as environment
       }
@@ -320,8 +348,9 @@ object PruneArrays {
             EquiJoin(in.src,
               lBranch.pruneArraysBranch(Ignore),
               rBranch.pruneArraysBranch(Ignore),
-              remapIndicesInFunc(in.lKey, lrepl),
-              remapIndicesInFunc(in.rKey, rrepl),
+              in.key ∘ (_.bimap(
+                remapIndicesInFunc(_, lrepl),
+                remapIndicesInFunc(_, rrepl))),
               in.f,
               remapIndicesInJoinFunc(in.combine, lrepl, rrepl))
           }
@@ -382,7 +411,10 @@ object PruneArrays {
 
           case Reduce(src, bucket, reducers, _) =>
             val bucketIndices: RewriteState =
-              liftHole(findIndicesInFunc[Hole](bucket))
+              liftHole(
+                ScalaMap(
+                  SrcHole ->
+                    bucket.traverse(findIndicesInFunc(_).get(SrcHole).join).map(_.unite.toSet)))
             val reducersIndices: RewriteState =
               reducers.foldMap(_.foldMap[RewriteState](f => liftHole(findIndicesInFunc[Hole](f))))
 
@@ -395,13 +427,17 @@ object PruneArrays {
           case Filter(_, func) => M.modify(liftHole(findIndicesInFunc[Hole](func)) |+| _).as(Ignore)
 
           case Sort(_, bucket, order) =>
-            val bucketState: RewriteState = liftHole(findIndicesInFunc[Hole](bucket))
+            val bucketState: RewriteState =
+              liftHole(
+                ScalaMap(
+                  SrcHole ->
+                    bucket.traverse(findIndicesInFunc(_).get(SrcHole).join).map(_.unite.toSet)))
             val orderState: RewriteState = order.foldMap {
               case (f, _) => liftHole(findIndicesInFunc(f))
             }
             M.modify(bucketState |+| orderState |+| _).as(Ignore)
 
-          case Unreferenced() => M.modify(ι).as(Ignore)
+          case Unreferenced() => (Ignore: RewriteState).point[M]
         }
 
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -409,41 +445,28 @@ object PruneArrays {
         // ignore `env` everywhere except for `LeftShift`
         in match {
           case LeftShift(src, struct, id, repair) =>
-            def replacementRemap(repl: IndexMapping): QScriptCore[A] =
-              LeftShift(src,
-                remapIndicesInFunc(struct, repl),
-                id,
-                remapIndicesInLeftShift(struct, repair, repl))
+            def replacement(repair: JoinFunc, repl: IndexMapping): QScriptCore[A] =
+              LeftShift(src, remapIndicesInFunc(struct, repl), id, remapIndicesInLeftShift(repair, repl))
 
-            def notSeen: M[QScriptCore[A]] =
-              M.get >>= (st => haltRemap(remapState(st, in, indexMapping >>> replacementRemap)))
+            def notPruned: M[QScriptCore[A]] =
+              M.get >>= (st => haltRemap(remapState(st, in, indexMapping >>> (replacement(repair, _)))))
 
-            repair.resume match {
-              case -\/(MFC(array @ ConcatArrays(_, _))) =>
-                env match {
-                  case Ignore => notSeen
-                  case Rewrite(indices) =>
-                    getIndices(SrcHole.left, indices).cata(
-                      seen => {
-                        def replacement(repl: IndexMapping): QScriptCore[A] =
-                          LeftShift(src,
-                            remapIndicesInFunc(struct, repl),
-                            id,
-                            remapIndicesInLeftShift(struct, rewriteRepair(array, seen), repl))
-                        M.put(env).as(
-                          getIndices(SrcHole.left, indices).fold[QScriptCore[A]](
-                            LeftShift(src, struct, id, rewriteRepair(array, seen)))(
-                            indexMapping >>> replacement))
-                      }, notSeen)
-                }
-              case _ => notSeen
+            def pruned(prunedRepair: JoinFunc): M[QScriptCore[A]] = {
+              val unchanged = LeftShift(src, struct, id, prunedRepair)
+              (M.get <* M.put(env)) ∘ (remapState(_, unchanged, indexMapping >>> (replacement(prunedRepair, _))))
+            }
+
+            env match {
+              case Ignore => notPruned
+              case Rewrite(indices) =>
+                ((getIndices(SrcHole.left, indices) >>= (rewriteRepair(repair, _))) ∘ pruned) | notPruned
             }
 
           case Reduce(src, bucket0, reducers0, repair) =>
             def replacement(repl: IndexMapping): QScriptCore[A] =
               Reduce(
                 src,
-                remapIndicesInFunc(bucket0, repl),
+                bucket0 ∘ (remapIndicesInFunc(_, repl)),
                 reducers0.map(_.map(remapIndicesInFunc(_, repl))),
                 repair)
             M.get >>= (st => haltRemap(remapState(st, in, indexMapping >>> replacement)))
@@ -470,19 +493,19 @@ object PruneArrays {
             def replacement(repl: IndexMapping): QScriptCore[A] =
               Sort(
                 src,
-                remapIndicesInFunc(bucket0, repl),
+                bucket0 ∘ (remapIndicesInFunc(_, repl)),
                 order0.map(_.leftMap(remapIndicesInFunc(_, repl))))
             M.get ∘ (remapState(_, in, indexMapping >>> replacement))
 
-          case Unreferenced() => M.modify(ι).as(in)
+          case Unreferenced() => in.point[M]
         }
     }
 }
 
-class PAFindRemap[T[_[_]]: BirecursiveT, F[_]: Functor] {
+class PAFindRemap[T, F[_]: Functor](implicit P: PruneArrays[F]) {
   import PATypes._
 
-  type ArrayEnv[G[_], A] = EnvT[RewriteState, G, A]
+  type ArrayEnv[A] = EnvT[RewriteState, F, A]
 
   /** Given an input, we accumulate state and annotate the focus.
     *
@@ -493,14 +516,13 @@ class PAFindRemap[T[_[_]]: BirecursiveT, F[_]: Functor] {
     * If the focus is an array that can be pruned, the annotatation is set to
     * the state. Else the annotation is set to `None`.
     */
-  def findIndices[S[_[_]], M[_], F[_], G[_]: Functor](
+  def findIndices[M[_]](
     implicit
-      R: Recursive.Aux[S[F], G],
-      M: MonadState[M, RewriteState],
-      P: PruneArrays[G])
-      : CoalgebraM[M, ArrayEnv[G, ?], S[F]] = sf => {
-    val gsf: G[S[F]] = sf.project
-    P.find(gsf) ∘ (newEnv => EnvT((newEnv, gsf)))
+      R: Recursive.Aux[T, F],
+      M: MonadState[M, RewriteState])
+      : CoalgebraM[M, ArrayEnv, T] = t => {
+    val ft: F[T] = t.project
+    P.find(ft) ∘ (newEnv => EnvT((newEnv, ft)))
   }
 
   /** Given an annotated input, we produce an output with state.
@@ -510,13 +532,12 @@ class PAFindRemap[T[_[_]]: BirecursiveT, F[_]: Functor] {
     * If an array has an associated environment, we update the state
     * to be the environment and prune the array.
     */
-  def remapIndices[S[_[_]], M[_], F[_], G[_]: Functor](
+  def remapIndices[M[_]](
     implicit
-      C: Corecursive.Aux[S[F], G],
-      M: MonadState[M, RewriteState],
-      P: PruneArrays[G])
-      : AlgebraM[M, ArrayEnv[G, ?], S[F]] = arrenv => {
-    val (env, gsf): (RewriteState, G[S[F]]) = arrenv.run
-    P.remap(env, gsf) ∘ (_.embed)
+      C: Corecursive.Aux[T, F],
+      M: MonadState[M, RewriteState])
+      : AlgebraM[M, ArrayEnv, T] = arrenv => {
+    val (env, ft): (RewriteState, F[T]) = arrenv.run
+    P.remap(env, ft) ∘ (_.embed)
   }
 }

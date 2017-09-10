@@ -70,6 +70,8 @@ quasar_metastore
 quasar_marklogic_xml
 quasar_marklogic_json
 quasar_couchbase
+quasar_spark_hdfs
+quasar_saprk_cluster
 ```
 
 Knowing which backend datastores are supported you can create and configure docker containers using `setupContainers`. For example
@@ -131,13 +133,15 @@ curl -v -X PUT http://localhost:8080/mount/fs/<mountPath>/ -d '{ "<mountKey>": {
 ```
 The `<mountPath>` specifies the path of your mount point and the remaining parameters are listed below:
 
-| mountKey        | protocol         | uri                                    |
-|-----------------|------------------|----------------------------------------|
-| `couchbase`     | `couchbase://`   | [Couchbase](#couchbase)                |
-| `marklogic`     | `xcc://`         | [MarkLogic](#marklogic)                |
-| `mongodb`       | `mongodb://`     | [MongoDB](#database-mounts)            |
-| `spark-hdfs`    | `spark://`       | [Spark HDFS](#apache-spark) |
-| `spark-local`   | `spark_local=`   | [Spark](#apache-spark)      |
+| mountKey        | protocol         | uri                          |
+|-----------------|------------------|------------------------------|
+| `couchbase`     | `couchbase://`   | [Couchbase](#couchbase)      |
+| `marklogic`     | `xcc://`         | [MarkLogic](#marklogic)      |
+| `mimir`         | `mimir=`         | "\<path-to-directory\>"      |
+| `mongodb`       | `mongodb://`     | [MongoDB](#database-mounts)  |
+| `spark-hdfs`    | `spark://`       | [Spark HDFS](#apache-spark)  |
+| `spark-local`   | `spark_local=`   | [Spark](#apache-spark)       |
+
 
 See [here](#get-mountfspath) for more details on the mount web api service.
 
@@ -322,6 +326,16 @@ If the mount's key is "view" then the mount represents a "virtual" file, defined
 For example, given the above MongoDB mount, an additional view could be defined with a `connectionUri` of `sql2:///?q=select%20_id%20as%20zip%2C%20city%2C%20state%20from%20%60%2Flocal%2Ftest%2Fzips%60%20where%20pop%20%3C%20%3Acutoff&var.cutoff=1000`
 
 A view can be mounted at any file path. If a view's path is nested inside the path of a database mount, it will appear alongside the other files in the database. A view will "shadow" any actual file that would otherwise be mapped to the same path. Any attempt to write data to a view will result in an error.
+
+#### Caching
+
+View mounts can optionally be cached. When cached a view is refreshed periodically in the background with respect to its associated `max-age`.
+
+A cached view is created by adding the `Cache-Control: max-age=<seconds>`  header to a `/mount/fs/` request.
+
+Like ordinary views, cached views appear as a file in the filesystem.
+
+When serving a cached view the `/data/fs/` endpoint includes a `Expires: <http-date>` header informed by `max-age`. A reasonably provisioned server will keep cached views fresh. If it does fall behind the response will include the `Warning: 110 - "Response is Stale"` header. The `Expires` header is absent from non-cached views.
 
 ### Module mounts
 
@@ -827,17 +841,17 @@ Example response:
 
 ### PUT /server/port
 
-Takes a port number in the body, and attempts to restart the server on that port, shutting down the current instance which is running on the port used to make this http request.
+Takes a port number in the body, and attempts to restart the server on that port, shutting down the current instance which is running on the port used to make this http request. If this request succeeds, the client will not receive a response as the server is killed by the request. However, any subsequent request to the new port should succeed.
 
 ### DELETE /server/port
 
-Removes any configured port, reverting to the default (20223) and restarting, as with `PUT`.
+Removes any configured port, reverting to the default (the one the server was started on) and restarting. As with `PUT`, if this request succeeds, the client will not receive a response as the server is killed by the request. However, any subsequent request to the new port should succeed.
 
 ### GET /metastore
 
-Retrieve the connection information of the current metastore in use
+Retrieve the connection information of the current metastore in use. In the case where the current metastore is a postgres database, the password will be obscured for security reasons.
 
-An example response:
+A few example responses:
 
 ```json
 {
@@ -846,6 +860,18 @@ An example response:
     }
 }
 
+```
+
+```json
+{
+    "postgresql": {
+      "host": "localhost",
+      "port": 8087,
+      "database": "slamdata_db",
+      "userName": "slamdata",
+      "password": "****"
+    }
+}
 ```
 
 ### PUT /metastore
@@ -864,7 +890,8 @@ An example request body:
     "postgresql": {
         "host": "localhost",
         "port": 9876,
-        "database": "bob",
+        "database": "meta",
+        "userName": "bob",
         "password": "123456"
     }
 }

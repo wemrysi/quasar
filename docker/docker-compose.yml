@@ -3,7 +3,7 @@ services:
   quasar_mongodb_2_6:
     container_name: quasar_mongodb_2_6
     image: tutum/mongodb:2.6
-    command: mongod --smallfiles
+    command: mongod --smallfiles --noprealloc
     ports:
       - "27018:27017"
 
@@ -70,9 +70,8 @@ services:
 
   quasar_spark_cluster:
     container_name: quasar_spark_cluster
-    build:
-      context: ./Dockerfiles/Spark
-      dockerfile: Spark-Dockerfile
+    image: slamdata/spark-standalone-cluster:2.2.0
+    network_mode: "bridge"
     ports:
       - "8081:8080"
       - "7077:7077"
@@ -97,8 +96,9 @@ services:
   
   quasar_spark_cassandra:
     container_name: quasar_spark_cassandra
-    image: cassandra:3.11
+    image: cassandra:3
     #command: /bin/bash -c "sleep 30 && echo ' -- Pausing to let system catch up ... -->' && /docker-entrypoint.sh cassandra -f"
+    network_mode: "bridge"
     ports:
       - 7199:7199
       - 9042:9042
@@ -118,10 +118,16 @@ services:
   
   quasar_spark_hdfs:
     container_name: quasar_spark_hdfs
-    image: harisekhon/hadoop:2.7
+    image: slamdata/hadoop-singlenode-cluster:2.7.3
+    network_mode: "bridge"
     ports:
-      - 8042:8042
+      - 8030:8030
+      - 8031:8031
+      - 8082:8032
+      - 8033:8033
       - 8088:8088
+      - 9000:9000
+      - 10020:10020
       - 19888:19888
       - 50010:50010
       - 50020:50020

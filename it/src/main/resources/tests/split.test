@@ -1,0 +1,16 @@
+{
+  "name": "split",
+
+  "backends": {},
+
+  "data": "cars.data",
+
+  "query": "select split(name, \"-\") from cars",
+
+  "predicate": "exactly",
+  "expected": [
+    [ "RangeRover", "Evoque" ],
+    [ "Honda", "civic" ],
+    [ "BMW", "X5" ]
+  ]
+}
