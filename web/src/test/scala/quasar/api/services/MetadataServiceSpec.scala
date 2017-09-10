@@ -35,6 +35,7 @@ import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
 import eu.timepit.refined.scalacheck.numeric._
 import matryoshka.data.Fix
 import org.http4s._
+import org.http4s.dsl._
 import org.http4s.argonaut._
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
@@ -57,9 +58,9 @@ object MetadataFixture {
     addViews andThen addModules andThen foldMapNT(run)
   }
 
-  def service(mem: InMemState, mnts: Map[APath, MountConfig]): HttpService = {
+  def service(mem: InMemState, mnts: Map[APath, MountConfig]): Service[Request, Response] = {
     metadata.service[Eff].toHttpService(
-      liftMT[Task, ResponseT] compose (runQueryWithMounts(mem, mnts) :+: runConstantMount[Task](mnts) :+: runConstantVCache[Task](Map.empty)))
+      liftMT[Task, ResponseT] compose (runQueryWithMounts(mem, mnts) :+: runConstantMount[Task](mnts) :+: runConstantVCache[Task](Map.empty))).orNotFound
   }
 }
 
