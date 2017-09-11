@@ -240,7 +240,7 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
       reader: MonadReader[F, SparkContext]
     ): F[RDD[Data]] = for {
       pathStr <- hdfsPathStr(f)
-      sc <- reader.asks(ι)
+      sc <- reader.ask
       rdd <- fetchRdd(sc, pathStr)
     } yield rdd
 
