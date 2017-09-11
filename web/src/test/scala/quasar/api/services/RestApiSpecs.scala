@@ -72,7 +72,7 @@ class RestApiSpecs extends quasar.Qspec {
     val service = eff map { runEff =>
       RestApi.finalizeServices(RestApi.toHttpServices(
         liftMT[Task, ResponseT] compose runEff,
-        RestApi.coreServices[Eff]))
+        RestApi.coreServices[Eff])).orNotFound
     }
 
     def testAdvertise(

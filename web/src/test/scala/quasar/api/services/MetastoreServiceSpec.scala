@@ -27,6 +27,7 @@ import quasar.metastore.MetaStoreFixture
 import argonaut._, Argonaut._
 import org.http4s._, Status._
 import org.http4s.Method.PUT
+import org.http4s.syntax.service._
 import org.http4s.argonaut._
 import scalaz._, Scalaz._, concurrent.Task
 
@@ -41,8 +42,8 @@ class MetastoreServiceSpec extends quasar.Qspec {
     liftMT[Task, ResponseT] :+:
     (liftMT[Task, ResponseT] compose MetaStoreLocation.impl.default(metaRef, persist))
 
-  def service(persist: DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]) =
-    quasar.api.services.metastore.service[Eff].toHttpService(inter(persist))
+  def service(persist: DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]): Service[Request, Response] =
+    quasar.api.services.metastore.service[Eff].toHttpService(inter(persist)).orNotFound
 
   "Metastore service" should {
     "return current metastore with password obscured" in {
@@ -53,7 +54,7 @@ class MetastoreServiceSpec extends quasar.Qspec {
         password = "bobIsAwesome",
         parameters = Map.empty)
       val inter = liftMT[Task, ResponseT] compose (reflNT[Task] :+: MetaStoreLocation.impl.constant(dbConfig))
-      val service = quasar.api.services.metastore.service[Eff].toHttpService(inter)
+      val service = quasar.api.services.metastore.service[Eff].toHttpService(inter).orNotFound
       val get = Request()
       val resp = service(get).unsafePerformSync
       resp.as[Json].unsafePerformSync must_===

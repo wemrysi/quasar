@@ -25,6 +25,7 @@ import argonaut._, Argonaut._
 import matryoshka.data.Fix
 import monocle.Prism
 import org.http4s.Uri
+import org.http4s.syntax.string._
 import scalaz._, Scalaz._
 
 /** Configuration for a mount, currently either a view or a filesystem. */
@@ -138,7 +139,7 @@ object MountConfig {
   // FIXME
   @SuppressWarnings(Array("org.wartremover.warts.Equals"))
   private def viewCfgFromUriStr(uri: String): String \/ (ScopedExpr[Fix[Sql]], Variables) = {
-    import org.http4s.{parser => _, _}, util._, CaseInsensitiveString._
+    import org.http4s.{parser => _, _}
 
     for {
       parsed   <- Uri.fromString(uri).leftMap(_.sanitized)
@@ -156,7 +157,7 @@ object MountConfig {
   }
 
   private def viewCfgAsUriStr(scopedExpr: ScopedExpr[Fix[Sql]], vars: Variables): String = {
-    import org.http4s._, util._, CaseInsensitiveString._
+    import org.http4s._
 
     val qryMap = vars.value.foldLeft(Map("q" -> List(scopedExpr.pprint))) {
       case (qm, (n, v)) => qm + ((VarPrefix + n.value, List(v.value)))
