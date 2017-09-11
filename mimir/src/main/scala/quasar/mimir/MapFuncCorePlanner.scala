@@ -120,10 +120,25 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
 
       case MapFuncsCore.Not(a1) =>
         Unary.Comp.spec(a1).point[F]
+
+      case MapFuncsCore.Eq(a1, ConstLiteral(literal, _)) =>
+        (EqualLiteral[A](a1, literal, false): TransSpec[A]).point[F]
+
+      case MapFuncsCore.Eq(ConstLiteral(literal, _), a2) =>
+        (EqualLiteral[A](a2, literal, false): TransSpec[A]).point[F]
+
       case MapFuncsCore.Eq(a1, a2) =>
         (Equal[A](a1, a2): TransSpec[A]).point[F]
+
+      case MapFuncsCore.Neq(a1, ConstLiteral(literal, _)) =>
+        (EqualLiteral[A](a1, literal, true): TransSpec[A]).point[F]
+
+      case MapFuncsCore.Neq(ConstLiteral(literal, _), a2) =>
+        (EqualLiteral[A](a2, literal, true): TransSpec[A]).point[F]
+
       case MapFuncsCore.Neq(a1, a2) =>
         Unary.Comp.spec(Equal[A](a1, a2)).point[F]
+
       case MapFuncsCore.Lt(a1, a2) =>
         Infix.Lt.spec(a1, a2).point[F]
       case MapFuncsCore.Lte(a1, a2) =>
