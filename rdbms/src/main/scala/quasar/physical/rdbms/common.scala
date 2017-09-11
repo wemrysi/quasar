@@ -18,10 +18,11 @@ package quasar.physical.rdbms
 
 import slamdata.Predef._
 import pathy.Path
-import quasar.contrib.pathy.AFile
+import pathy.Path.PathCodec
+import quasar.contrib.pathy.{ADir, AFile}
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
-import scalaz.Show
 
+import scalaz._, Scalaz._
 
 object common {
 
@@ -31,14 +32,28 @@ object common {
   final case class TableName(name: String) extends AnyVal
   final case class TablePath(schema: Option[SchemaName], table: TableName)
 
+
   implicit val showPath: Show[TablePath] =
     Show.shows(path => path.schema.map(s => s"${s.name}.").getOrElse("") + path.table.name)
 
   object TablePath {
+
+    val Separator = "_$child_"
+
+    def dirToSchemaName(dir: ADir): Option[SchemaName] = {
+      Some(Path.flatten(None, None, None, Some(_), Some(_), dir)
+        .toIList
+        .unite
+        .intercalate(Separator))
+        .filter(_.nonEmpty).map(SchemaName.apply)
+    }
+
+
     def create(file: AFile): TablePath = {
       val filename = Path.fileName(file).value
-      val dirname = Path.parentDir(file).flatMap(Path.dirName).map(_.value)
-      new TablePath(dirname.map(SchemaName.apply), TableName(filename))
+      val parentDir = Path.parentDir(file)
+      val dirname = parentDir.flatMap(dirToSchemaName)
+      new TablePath(dirname, TableName(filename))
     }
   }
 }

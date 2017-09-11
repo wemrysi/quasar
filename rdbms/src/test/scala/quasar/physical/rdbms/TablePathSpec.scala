@@ -18,6 +18,7 @@ package quasar.physical.rdbms
 
 import pathy.Path
 import Path.{FileName, dir1, _}
+import org.scalacheck.{Arbitrary, Gen}
 import quasar.physical.rdbms.common.{SchemaName, TableName, TablePath}
 import quasar.Qspec
 import quasar.contrib.pathy.AFile
@@ -26,39 +27,67 @@ import pathy.scalacheck.PathyArbitrary._
 
 class TablePathSpec extends Qspec {
 
-  "TablePath" should {
+  import TablePath._
 
+  def alphaNumDirGen =
+    Gen.alphaNumStr.map(DirName.apply).suchThat(!_.value.isEmpty)
+
+  def alphaNumFileGen =
+    Gen.alphaNumStr.map(FileName.apply).suchThat(!_.value.isEmpty)
+
+  "TablePath" should {
     "extract table name" in {
-      prop {
-        (file: AFile) =>
-          TablePath.create(file).table must_=== TableName(Path.fileName(file).value)
+      prop { (file: AFile) =>
+        TablePath.create(file).table must_=== TableName(
+          Path.fileName(file).value)
       }
     }
 
     "extract empty schema name" in {
-      prop {
-        (fileName: FileName) => {
-          TablePath.create(rootDir </> file1(fileName)).schema must beNone
+      prop { (fileName: FileName) =>
+        {
+          create(rootDir </> file1(fileName)).schema must beNone
         }
       }
     }
 
     "extract some schema name" in {
-      prop {
-        (parentDirName: DirName, fileName: FileName) => {
+      prop { (parentDirName: DirName, fileName: FileName) =>
+        {
           val file = rootDir </> dir1(parentDirName) </> file1(fileName)
-          TablePath.create(file).schema must beSome(SchemaName(parentDirName.value))
+          create(file).schema must beSome(
+            SchemaName(parentDirName.value))
         }
-      }
+      }.setGens(alphaNumDirGen, alphaNumFileGen)
     }
 
-    "extract some schema name for multiple levels of depth" in {
-      prop {
-        (dirName1: DirName, dirName2: DirName, fileName: FileName) => {
-          val file = rootDir </> dir1(dirName1) </> dir1(dirName2) </> file1(fileName)
-          TablePath.create(file).schema must beSome(SchemaName(dirName2.value))
+    "extract some schema name for 2 levels of depth" in {
+      prop { (dirName1: DirName, dirName2: DirName, fileName: FileName) =>
+        {
+          val file = rootDir </> dir1(dirName1) </> dir1(dirName2) </> file1(
+            fileName)
+          create(file).schema must beSome(
+            SchemaName(dirName1.value + Separator + dirName2.value))
         }
-      }
+      }.setGens(alphaNumDirGen, alphaNumDirGen, alphaNumFileGen)
+    }
+
+    "extract some schema name for 3 levels of depth" in {
+
+      prop {
+        (
+            dirName1: DirName,
+            dirName2: DirName,
+            dirName3: DirName,
+            fileName: FileName) =>
+          {
+            val path = rootDir </> dir1(dirName1) </> dir1(dirName2) </> dir1(
+              dirName3) </> file1(fileName)
+            create(path).schema must beSome(
+              SchemaName(
+                dirName1.value + Separator + dirName2.value + Separator + dirName3.value))
+          }
+      }.setGens(alphaNumDirGen, alphaNumDirGen, alphaNumDirGen, alphaNumFileGen)
     }
   }
 
