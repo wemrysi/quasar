@@ -116,4 +116,10 @@ object Failure {
       def raiseError[A](e: E) = O.fail(e)
       def handleError[A](fa: Free[S, A])(f: E => Free[S, A]) = O.recover(fa, f)
     }
+
+  implicit def functor[E]: Functor[Failure[E, ?]] = new Functor[Failure[E, ?]] {
+    def map[A, B](fa: Failure[E, A])(f: A => B): Failure[E, B] = fa match {
+      case Fail(e) => Fail(e)
+    }
+  }
 }

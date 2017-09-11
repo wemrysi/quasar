@@ -53,7 +53,8 @@ final case class Quasar(interp: CoreEff ~> QErrs_TaskM, shutdown: Task[Unit]) {
 
 object Quasar {
 
-  type QErrsCnxIO[A]  = Coproduct[ConnectionIO, QErrs, A]
+  type QErrsFsAsk[A]  = Coproduct[FsAsk, QErrs, A]
+  type QErrsCnxIO[A]  = Coproduct[ConnectionIO, QErrsFsAsk, A]
   type QErrsTCnxIO[A] = Coproduct[Task, QErrsCnxIO, A]
   type QErrs_CnxIO_Task_MetaStoreLoc[A] = Coproduct[MetaStoreLocation, QErrsTCnxIO, A]
   type QErrs_CnxIO_Task_MetaStoreLocM[A] = Free[QErrs_CnxIO_Task_MetaStoreLoc, A]
@@ -62,9 +63,12 @@ object Quasar {
     def qErrsToMainErrT[F[_]: Catchable: Monad]: QErrs ~> MainErrT[F, ?] =
       liftMT[F, MainErrT].compose(QErrs.toCatchable[F])
 
-    def toMainTask(transactor: Transactor[Task]): QErrsCnxIOM ~> MainTask = {
+    def toMainTask(mounts: BackendDef[PhysFsEffM], transactor: Transactor[Task]): QErrsCnxIOM ~> MainTask = {
       val f: QErrsCnxIOM ~> MainErrT[ConnectionIO, ?] =
-        foldMapNT(liftMT[ConnectionIO, MainErrT] :+: qErrsToMainErrT[ConnectionIO])
+        foldMapNT(
+          liftMT[ConnectionIO, MainErrT] :+:
+          FsAsk.runToF[MainErrT[ConnectionIO, ?]](mounts) :+:
+          qErrsToMainErrT[ConnectionIO])
 
       Hoist[MainErrT].hoist(transactor.trans(implicitly[Monad[Task]])) compose f
     }
@@ -74,11 +78,12 @@ object Quasar {
   type QErrsTCnxIOM[A] = Free[QErrsTCnxIO, A]
 
   object QErrsTCnxIO {
-    def toMainTask(transactor: Transactor[Task]): QErrsTCnxIOM ~> MainTask = {
+    def toMainTask(mounts: BackendDef[PhysFsEffM], transactor: Transactor[Task]): QErrsTCnxIOM ~> MainTask = {
       val f: QErrsTCnxIOM ~> MainErrT[ConnectionIO, ?] =
         foldMapNT(
           (liftMT[ConnectionIO, MainErrT] compose taskToConnectionIO) :+:
-            liftMT[ConnectionIO, MainErrT]                              :+:
+            liftMT[ConnectionIO, MainErrT] :+:
+            FsAsk.runToF[MainErrT[ConnectionIO, ?]](mounts) :+:
             QErrsCnxIO.qErrsToMainErrT[ConnectionIO])
 
       Hoist[MainErrT].hoist(transactor.trans) compose f
@@ -117,10 +122,13 @@ object Quasar {
       hfsRef     <- TaskRef(Empty.backendEffect[HierarchicalFsEffM]).liftM[MainErrT]
       mntdRef    <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
 
+      // TODO
+      mounts <- physicalFileSystems(()).liftM[MainErrT]
+
       ephmralMnt =  KvsMounter.interpreter[Task, QErrsTCnxIO](
         KvsMounter.ephemeralMountConfigs[Task], hfsRef, mntdRef) andThen
         mapSNT(absorbTask)                                       andThen
-        QErrsCnxIO.toMainTask(metastore.trans.transactor)
+        QErrsCnxIO.toMainTask(mounts, metastore.trans.transactor)
 
       mountsCfg  <- MetaStoreAccess.fsMounts
         .map(MountingsConfig(_))
@@ -146,9 +154,10 @@ object Quasar {
 
       val g: QErrs_CnxIO_Task_MetaStoreLoc ~> QErrs_TaskM =
         (injectFT[Task, QErrs_Task] compose MetaStoreLocation.impl.default(metaRef, persist)) :+:
-         injectFT[Task, QErrs_Task]                                                           :+:
-        (injectFT[Task, QErrs_Task] compose connectionIOToTask)                               :+:
-         injectFT[QErrs, QErrs_Task]
+        injectFT[Task, QErrs_Task] :+:
+        (injectFT[Task, QErrs_Task] compose connectionIOToTask) :+:
+        FsAsk.runToF[QErrs_TaskM](mounts) :+:
+        injectFT[QErrs, QErrs_Task]
 
       val h: CoreEff ~> QErrs_TaskM =  foldMapNT(g) compose foldMapNT(f) compose runCore
 

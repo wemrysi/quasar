@@ -19,7 +19,7 @@ package quasar
 import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.fs._
-import quasar.fs.mount.{ConnectionUri, MountConfig}
+import quasar.fs.mount.{BackendDef, ConnectionUri, MountConfig}
 import quasar.physical.{couchbase, marklogic, mongodb, sparkcore}
 
 import pathy.Path._
@@ -86,18 +86,16 @@ object TestConfig {
     * to select an interpreter for a given config.
     */
   def externalFileSystems[S[_]](
-    pf: PartialFunction[(MountConfig, ADir), Task[(S ~> Task, Task[Unit])]]
+    pf: PartialFunction[BackendDef.FsCfg, Task[(S ~> Task, Task[Unit])]]
   ): Task[IList[SupportedFs[S]]] = {
     def fs(
       envName: String,
-      p: ADir,
       typ: FileSystemType
     ): OptionT[Task, Task[(S ~> Task, Task[Unit])]] =
       TestConfig.loadConnectionUri(envName) flatMapF { uri =>
-        val config = MountConfig.fileSystemConfig(typ, uri)
-        pf.lift((config, p)).cata(
+        pf.lift((typ, uri)).cata(
           Task.delay(_),
-          Task.fail(new UnsupportedFileSystemConfig(config)))
+          Task.fail(new UnsupportedFileSystemConfig(MountConfig.fileSystemConfig(typ, uri))))
       }
 
     def lookupFileSystem(r: ExternalBackendRef, p: ADir): OptionT[Task, FileSystemUT[S]] = {
@@ -111,8 +109,8 @@ object TestConfig {
       }
 
       for {
-        test     <- fs(backendConfName(r.ref.name), p, r.fsType)
-        setup    <- fs(insertConfName(r.ref.name), p, r.fsType).run.liftM[OptionT]
+        test     <- fs(backendConfName(r.ref.name), r.fsType)
+        setup    <- fs(insertConfName(r.ref.name), r.fsType).run.liftM[OptionT]
         s        <- NameGenerator.salt.liftM[OptionT]
         testRef  <- rsrc(test).liftM[OptionT]
         setupRef <- setup.cata(rsrc, Task.now(testRef)).liftM[OptionT]

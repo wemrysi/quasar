@@ -55,8 +55,17 @@ package object main {
   type MainTask[A]       = MainErrT[Task, A]
   val MainTask           = MonadError[EitherT[Task, String, ?], String]
 
-  /** The physical filesystems currently supported. */
-  val physicalFileSystems: BackendDef[PhysFsEffM] = IList(
+  // TODO
+  type FsConfig = Unit
+
+  /**
+   * The physical filesystems currently supported.  Please note that it
+   * is really best if you only sequence this task ''once'' per runtime.
+   * It won't misbehave, but it will waste resources if you run it multiple
+   * times.  Thus, all uses of the value from this Task should be handled
+   * by `FsAsk` (or an analogous `Kleisli`).
+   */
+  def physicalFileSystems(config: FsConfig): Task[BackendDef[PhysFsEffM]] = IList(
     Couchbase.definition translate injectFT[Task, PhysFsEff],
     marklogic.MarkLogic.definition translate injectFT[Task, PhysFsEff],
     mimir.Mimir.definition translate injectFT[Task, PhysFsEff],
@@ -66,7 +75,19 @@ package object main {
     sparkcore.fs.elastic.SparkElasticBackendModule.definition translate injectFT[Task, PhysFsEff],
     sparkcore.fs.cassandra.definition[PhysFsEff],
     sparkcore.fs.local.SparkLocalBackendModule.definition translate injectFT[Task, PhysFsEff]
-  ).fold
+  ).fold.point[Task]    // TODO
+
+  sealed trait FsAsk[A]
+
+  object FsAsk {
+    private case object Singleton extends FsAsk[BackendDef[PhysFsEffM]]
+
+    def runToF[F[_]: Applicative](mounts: BackendDef[PhysFsEffM]): FsAsk ~> F =
+      λ[FsAsk ~> F] { case Singleton => mounts.point[F] }
+
+    def apply[S[_]](implicit S: FsAsk :<: S): Free[S, BackendDef[PhysFsEffM]] =
+      Free.liftF[S, BackendDef[PhysFsEffM]](S.inj(Singleton))
+  }
 
   /** A "terminal" effect, encompassing failures and other effects which
     * we may want to interpret using more than one implementation.
@@ -264,12 +285,16 @@ package object main {
   /** Provides the mount handlers to update the hierarchical
     * filesystem whenever a mount is added or removed.
     */
-  val mountHandler = MountRequestHandler[PhysFsEffM, HierarchicalFsEff](
-    physicalFileSystems translate flatMapSNT(
-      PhysFsEff.reifyNonFatalErrors[PhysFsEff] :+: injectFT[PhysErr, PhysFsEff]))
+  def mountHandler[S[_]](implicit S: FsAsk :<: S): Free[S, MountRequestHandler[PhysFsEffM, HierarchicalFsEff]] = {
+    FsAsk[S] map { physicalFileSystems =>
+      MountRequestHandler[PhysFsEffM, HierarchicalFsEff](
+        physicalFileSystems translate flatMapSNT(
+          PhysFsEff.reifyNonFatalErrors[PhysFsEff] :+: injectFT[PhysErr, PhysFsEff]))
+    }
+  }
 
-  import mountHandler.HierarchicalFsRef
-
+  // copied out of MountRequestHandler to avoid dependent typing
+  type HierarchicalFsRef[A] = AtomicRef[BackendEffect ~> Free[HierarchicalFsEff, ?], A]
   type MountedFsRef[A] = AtomicRef[Mounts[DefinitionResult[PhysFsEffM]], A]
 
   /** Effects required for mounting. */
@@ -318,7 +343,8 @@ package object main {
     )(implicit
       S0: F :<: S,
       S1: Task :<: S,
-      S2: PhysErr :<: S
+      S2: PhysErr :<: S,
+      S3: FsAsk :<: S
     ): Mounting ~> Free[S, ?] = {
       type G[A] = Coproduct[MountConfigs, MountEffM, A]
 
@@ -326,12 +352,16 @@ package object main {
         injectFT[F, S].compose(cfgsImpl) :+:
         free.foldMapNT(MountEff.interpreter[S](hrchFsRef, mntdFsRef))
 
-      val mounter: Mounting ~> Free[G, ?] =
-        quasar.fs.mount.Mounter.kvs[MountEffM, G](
-          mountHandler.mount[MountEff](_),
-          mountHandler.unmount[MountEff](_))
+      val mounter: Free[S, Mounting ~> Free[G, ?]] =
+        mountHandler map { handler =>
+          quasar.fs.mount.Mounter.kvs[MountEffM, G](
+            handler.mount[MountEff](_),
+            handler.unmount[MountEff](_))
+        }
 
-      free.foldMapNT(f) compose mounter
+      λ[Mounting ~> Free[S, ?]] { mounting =>
+        mounter.flatMap(nt => (free.foldMapNT(f) compose nt)(mounting))
+      }
     }
 
     def ephemeralMountConfigs[F[_]: Monad]: MountConfigs ~> F = {

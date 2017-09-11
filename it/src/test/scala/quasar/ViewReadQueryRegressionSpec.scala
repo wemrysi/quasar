@@ -42,17 +42,20 @@ class ViewReadQueryRegressionSpec
 
   type ViewFS[A] = (Mounting :\: ViewState :\: VCache :\: MonotonicSeq :/: BackendEffectIO)#M[A]
 
+  type FsAskPhysFsEff[A] = Coproduct[FsAsk, PhysFsEff, A]
+
   def mounts(path: APath, expr: Fix[Sql], vars: Variables): Task[Mounting ~> Task] =
     (
       TaskRef(Map[APath, MountConfig](path -> MountConfig.viewConfig(ScopedExpr(expr, Nil), vars))) |@|
       TaskRef(Empty.backendEffect[HierarchicalFsEffM]) |@|
-      TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
-    ) { (cfgsRef, hfsRef, mntdRef) =>
+      TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]) |@|
+      physicalFileSystems(())   // TODO
+    ) { (cfgsRef, hfsRef, mntdRef, mounts) =>
       val mnt =
-        KvsMounter.interpreter[Task, PhysFsEff](
+        KvsMounter.interpreter[Task, FsAskPhysFsEff](
           KeyValueStore.impl.fromTaskRef(cfgsRef), hfsRef, mntdRef)
 
-      foldMapNT(reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
+      foldMapNT(FsAsk.runToF[Task](mounts) :+: reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
         .compose(mnt)
     }
 
