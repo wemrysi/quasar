@@ -233,7 +233,7 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
         sc.parquet(pathStr)
       else
         sc.textFile(pathStr)
-          .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
+          .map(raw => DataCodec.parse(raw)(DataCodec.Precise) | Data.NA)
     }
 
     def rddFrom(f: AFile)(hdfsPathStr: AFile => F[String])(implicit
