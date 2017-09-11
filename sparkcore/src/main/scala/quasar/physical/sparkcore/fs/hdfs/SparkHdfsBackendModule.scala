@@ -110,9 +110,12 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
     ) {
       (genState, rddStates, sparkCursors, writeCursors, hdfsFS) =>
 
+      val detailsInterpreter =
+        details.interpreter[ReaderT[Task, SparkContext, ?]](readChunkSize = 5000, ReaderT(κ(hdfsFS.point[Task])), hdfsPathStr(config))
+
       val interpreter: Eff ~> S =
         (Read.constant[Task, HdfsFileSystem](hdfsFS) andThen injectNT[Task, S]) :+:
-        (details.interpreter[ReaderT[Task, SparkContext, ?]](ReaderT(κ(hdfsFS.point[Task])), hdfsPathStr(config)) andThen  runReaderNT(sc) andThen injectNT[Task, S]) :+:
+        (detailsInterpreter andThen  runReaderNT(sc) andThen injectNT[Task, S]) :+:
       (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:
@@ -279,6 +282,7 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
   object details {
 
     def interpreter[F[_]:Capture](
+      readChunkSize: Int,
       fileSystem: F[HdfsFileSystem],
       hdfsPathStr: AFile => F[String]
     )(implicit
@@ -289,7 +293,7 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
 
         def apply[A](from: SparkConnectorDetails[A]) = from match {
           case FileExists(f)       => qf.fileExists(f)
-          case ReadChunkSize       => 5000.point[F]
+          case ReadChunkSize       => readChunkSize.point[F]
           case StoreData(rdd, out) => qf.store(rdd, out)
           case ListContents(d)     => qf.listContents(d).run
           case RDDFrom(f)          => qf.rddFrom(f)(hdfsPathStr)
