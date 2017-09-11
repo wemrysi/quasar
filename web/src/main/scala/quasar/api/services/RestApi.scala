@@ -19,9 +19,11 @@ package quasar.api.services
 import slamdata.Predef._
 import quasar.api._, ToApiError.ops._, ToQResponse.ops._
 import quasar.api.{Destination, HeaderParam}
+import quasar.effect.Timing
 import quasar.fp.liftMT
 import quasar.fp.free.foldMapNT
 import quasar.fs._
+import quasar.fs.cache.VCache
 import quasar.fs.mount._
 import quasar.fs.mount.module.Module
 import quasar.main.MetaStoreLocation
@@ -52,7 +54,9 @@ object RestApi {
         S9: Module :<: S,
         S10: Module.Failure :<: S,
         S11: Analyze :<: S,
-        S12: MetaStoreLocation :<: S
+        S12: MetaStoreLocation :<: S,
+        S13: VCache :<: S,
+        S14: Timing :<: S
       ): Map[String, QHttpService[S]] =
     ListMap(
       "/compile/fs"   -> query.compile.service[S],

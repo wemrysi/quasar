@@ -178,6 +178,6 @@ object common {
     posixCodec.printPath(dir).substring(1).replace("/", "_").toLowerCase
 
   def tableName(file: AFile) =
-    posixCodec.printPath(file).split("/").reverse(0).toLowerCase
+    posixCodec.printPath(file).split("/").reverse(0)
 
 }

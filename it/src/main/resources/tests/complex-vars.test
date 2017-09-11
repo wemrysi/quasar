@@ -15,5 +15,6 @@
     "query": "select day from days where ts >= start_of_day(:start) and ts <= :end",
 
     "predicate": "exactly",
+    "ignoreResultOrder": true,
     "expected": ["Wednesday", "Thursday"]
 }

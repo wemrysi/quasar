@@ -5,7 +5,7 @@
         "couchbase":         "skip",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
-        "mimir":"pendingIgnoreFieldOrder"
+        "mimir":             "pendingIgnoreFieldOrder"
     },
 
     "NB": "#2121: Disabled in all qscript-based connectors due to possible qscript bug.",

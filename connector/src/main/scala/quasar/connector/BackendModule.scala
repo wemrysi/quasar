@@ -37,6 +37,7 @@ import scalaz.concurrent.Task
 
 trait BackendModule {
   import BackendDef.{DefErrT, DefinitionResult}
+  import BackendModule._
 
   type QSM[T[_[_]], A] = QS[T]#M[A]
 
@@ -124,31 +125,38 @@ trait BackendModule {
     qfInter :+: rfInter :+: wfInter :+: mfInter
   }
 
-  final def lpToRepr[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
-      lp: T[LogicalPlan]): Backend[PhysicalPlan[Repr]] = {
+  final def lpToQScript
+    [T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+      M[_]: Monad: MonadFsErr: PhaseResultTell]
+    (lp: T[LogicalPlan], lc: DiscoverPath.ListContents[M])
+      : M[T[QSM[T, ?]]] = {
 
     type QSR[A] = QScriptRead[T, A]
-
-    def logPhase(pr: PhaseResult): Backend[Unit] =
-      MonadTell_[Backend, PhaseResults].tell(Vector(pr))
-
-    val lc: DiscoverPath.ListContents[Backend] =
-      QueryFileModule.listContents(_)
 
     val R = new Rewrite[T]
     val O = new Optimize[T]
 
     for {
-      qs <- QueryFile.convertToQScriptRead[T, Backend, QSR](lc)(lp)
-      shifted <- Unirewrite[T, QS[T], Backend](R, lc).apply(qs)
+      qs <- QueryFile.convertToQScriptRead[T, M, QSR](lc)(lp)
+      shifted <- Unirewrite[T, QS[T], M](R, lc).apply(qs)
 
-      _ <- logPhase(PhaseResult.tree("QScript (ShiftRead)", shifted))
+      _ <- logPhase[M](PhaseResult.tree("QScript (ShiftRead)", shifted))
 
       optimized =
         shifted.transHylo(O.optimize(reflNT[QSM[T, ?]]), Unicoalesce.Capture[T, QS[T]].run)
 
-      _ <- logPhase(PhaseResult.tree("QScript (Optimized)", optimized))
+      _ <- logPhase[M](PhaseResult.tree("QScript (Optimized)", optimized))
+    } yield optimized
+  }
 
+  final def lpToRepr[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
+      lp: T[LogicalPlan]): Backend[PhysicalPlan[Repr]] = {
+
+    val lc: DiscoverPath.ListContents[Backend] =
+      QueryFileModule.listContents(_)
+
+    for {
+      optimized <- lpToQScript[T, Backend](lp, lc)
       main <- plan(optimized)
       inputs = optimized.cata(ExtractPath[QSM[T, ?], APath].extractPath[DList])
     } yield PhysicalPlan(main, ISet.fromFoldable(inputs))
@@ -226,4 +234,9 @@ trait BackendModule {
   }
 
   def ManageFileModule: ManageFileModule
+}
+
+object BackendModule {
+  final def logPhase[M[_]: Monad: PhaseResultTell](pr: PhaseResult): M[Unit] =
+    PhaseResultTell[M].tell(Vector(pr))
 }

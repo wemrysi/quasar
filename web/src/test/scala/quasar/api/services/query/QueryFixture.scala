@@ -29,6 +29,7 @@ import quasar.sql._
 import quasar.sql.fixpoint._
 
 import org.http4s._
+import org.http4s.syntax.service._
 import org.specs2.matcher._, MustMatchers._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -45,7 +46,7 @@ object queryFixture {
     limit: Option[Positive] = None,
     varNameAndValue: Option[(String, String)] = None)
 
-  def get[A:EntityDecoder](service: (InMemState, Map[APath, MountConfig]) => HttpService)(path: ADir,
+  def get[A:EntityDecoder](service: (InMemState, Map[APath, MountConfig]) => Service[Request, Response])(path: ADir,
             query: Option[Query],
             state: InMemState,
             mounts: Map[APath, MountConfig] = Map.empty,
@@ -69,15 +70,15 @@ object queryFixture {
   def serviceInter(state: InMemState, mounts: Map[APath, MountConfig]): Task[Eff ~> ResponseOr] =
     (runFs(state) |@| mountingInter(mounts))(effRespOr)
 
-  def compileService(state: InMemState, mounts: Map[APath, MountConfig] = Map.empty): HttpService =
+  def compileService(state: InMemState, mounts: Map[APath, MountConfig] = Map.empty): Service[Request, Response] =
     HttpService.lift(req => serviceInter(state, mounts).flatMap { inter =>
       compile.service[Eff].toHttpService(inter).apply(req)
-    })
+    }).orNotFound
 
-  def executeService(state: InMemState, mounts: Map[APath, MountConfig] = Map.empty): HttpService =
+  def executeService(state: InMemState, mounts: Map[APath, MountConfig] = Map.empty): Service[Request, Response] =
     HttpService.lift(req => serviceInter(state, mounts).flatMap { inter =>
       execute.service[Eff].toHttpService(inter).apply(req)
-    })
+    }).orNotFound
 
   def selectAll(from: FPath) = {
     val ast = SelectR(

@@ -43,7 +43,23 @@ object Schema {
               type          VARCHAR  NOT NULL,
               connectionUri VARCHAR  NOT NULL
               )""".update.run.void                                                         *>
-        sql"""CREATE INDEX IF NOT EXISTS mounts_type ON mounts (type)""".update.run.void
+        sql"""CREATE INDEX IF NOT EXISTS mounts_type ON mounts (type)""".update.run.void,
+      1 ->
+        sql"""CREATE TABLE IF NOT EXISTS view_cache (
+              path             VARCHAR   NOT NULL PRIMARY KEY,
+              query            VARCHAR   NOT NULL,
+              last_update      TIMESTAMP,
+              execution_millis BIGINT,
+              cache_reads      INTEGER   NOT NULL,
+              assignee         VARCHAR,
+              assignee_start   TIMESTAMP,
+              max_age_seconds  BIGINT    NOT NULL,
+              refresh_after    TIMESTAMP NOT NULL,
+              status           VARCHAR   NOT NULL,
+              error_msg        VARCHAR,
+              data_file        VARCHAR   NOT NULL,
+              tmp_data_file    VARCHAR
+              )""".update.run.void
 
         /*
         Important! Once a new schema version is added to this sequence and

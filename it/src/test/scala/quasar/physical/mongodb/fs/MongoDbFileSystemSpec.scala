@@ -27,7 +27,7 @@ import quasar.fp.ski._
 import quasar.frontend._
 import quasar.fs._, FileSystemError._, FileSystemTest._
 import quasar.main.FilesystemQueries
-import quasar.physical.mongodb.Collection
+import quasar.physical.mongodb._
 import quasar.physical.mongodb.fs.MongoDbFileSystemSpec.mongoFsUT
 import quasar.regression._
 import quasar.sql, sql.Sql
@@ -235,19 +235,17 @@ class MongoDbFileSystemSpec
           }
 
           def check(file: AFile) = {
-            val errP: Prism[FileSystemError \/ AFile, APath] =
-              D.left                    composePrism
-              FileSystemError.pathErr composePrism
-              PathError.pathNotFound
+            val errP: Prism[FileSystemError \/ AFile, Planner.PlannerError] =
+              D.left composePrism FileSystemError.qscriptPlanningFailed
 
             val out = renameFile(file, κ(FileName("out")))
 
             def check0(expr: Fix[Sql]) =
-              (run(query.fileExists(file)).unsafePerformSync ==== false) and
-              (errP.getOption(
-                runExec(fsQ.executeQuery(expr, Variables.empty, rootDir, out))
-                  .run.value.unsafePerformSync
-              ) must beSome(file))
+              ((run(query.fileExists(file)).unsafePerformSync ==== false) and
+
+              (errP.getOption(runExec(fsQ.executeQuery(expr, Variables.empty, rootDir, out))
+                  .run.value.unsafePerformSync)
+               must beSome(Planner.NoFilesFound(List.empty[ADir]))))
 
             sql.fixParser.parseExpr(sql.Query(f(posixCodec.printPath(file)))) fold (
               err => ko(s"Parsing failed: ${err.shows}"),
@@ -373,7 +371,7 @@ object MongoDbFileSystemSpec {
     (Functor[Task] compose Functor[IList])
       .map(
         TestConfig.externalFileSystems(
-          FileSystemTest.fsTestConfig(FsType, definition)
+          FileSystemTest.fsTestConfig0(MongoDb.Type, MongoDb.definition)
         ).handleWith[IList[SupportedFs[BackendEffect]]] {
           case _: TestConfig.UnsupportedFileSystemConfig => Task.now(IList.empty)
         }
