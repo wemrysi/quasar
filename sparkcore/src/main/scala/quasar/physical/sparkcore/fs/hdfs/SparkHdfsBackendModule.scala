@@ -226,7 +226,7 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
       new Path(posixCodec.unsafePrintPath(apath))
     }
 
-    private def fetchRdd[F[_]:Capture](sc: SparkContext, pathStr: String): F[RDD[Data]] = Capture[F].capture {
+    private def fetchRdd(sc: SparkContext, pathStr: String): F[RDD[Data]] = Capture[F].capture {
       import ParquetRDD._
       // TODO add magic number support to distinguish
       if(pathStr.endsWith(".parquet"))
@@ -236,12 +236,12 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
           .map(raw => DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι))
     }
 
-    def rddFrom[F[_]:Capture](f: AFile)(hdfsPathStr: AFile => F[String])(implicit
+    def rddFrom(f: AFile)(hdfsPathStr: AFile => F[String])(implicit
       reader: MonadReader[F, SparkContext]
     ): F[RDD[Data]] = for {
       pathStr <- hdfsPathStr(f)
       sc <- reader.asks(ι)
-      rdd <- fetchRdd[F](sc, pathStr)
+      rdd <- fetchRdd(sc, pathStr)
     } yield rdd
 
     def store(rdd: RDD[Data], out: AFile): F[Unit] = for {
