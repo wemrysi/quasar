@@ -263,24 +263,18 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
     def fileExists(f: AFile): F[Boolean] = for {
       path <- toPath(f)
       hdfs <- fileSystem
-    } yield {
-      val exists = hdfs.exists(path)
-      exists
-    }
+    } yield hdfs.exists(path)
 
     def listContents(d: ADir): FileSystemErrT[F, Set[PathSegment]] = EitherT(for {
       path <- toPath(d)
       hdfs <- fileSystem
-    } yield {
-      val result = if(hdfs.exists(path)) {
+    } yield if(hdfs.exists(path)) {
         hdfs.listStatus(path).toSet.map {
           case file if file.isFile() => FileName(file.getPath().getName()).right[DirName]
           case directory => DirName(directory.getPath().getName()).left[FileName]
         }.right[FileSystemError]
       } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
-      result
-    })
-  }
+    )}
 
   object details {
 
