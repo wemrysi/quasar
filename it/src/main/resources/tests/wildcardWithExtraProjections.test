@@ -1,9 +1,5 @@
 {
   "name": "wildcard with additional projections and filtering",
-
-  "backends": {
-        "mimir":"pendingIgnoreFieldOrder"
-  },
   "data": "zips.data",
   "query": "select *, concat(city, concat(\", \", state)) as city_state, city = \"BOULDER\" as boulderish from zips where city like \"BOULDER%\"",
   "predicate": "exactly",
