@@ -14,53 +14,51 @@
  * limitations under the License.
  */
 
-package quasar.physical.rdbms.fs.postgres
+package quasar.physical.rdbms.fs
 
 
+import quasar.Data
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
-import quasar.Data
-import quasar.effect.KeyValueStore
+import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp.free.lift
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._
-import quasar.physical.rdbms.common.TablePath
-import quasar.effect.MonotonicSeq
-import quasar.physical.rdbms.mapping._
 import quasar.physical.rdbms.Rdbms
+import quasar.physical.rdbms.common.TablePath
 import slamdata.Predef._
 import eu.timepit.refined.api.RefType.ops._
-import doobie.imports._
+
+import doobie.free.connection.ConnectionIO
+import doobie.syntax.string._
+import doobie.syntax.process._
+import doobie.util.fragment.Fragment
+import doobie.util.meta.Meta
+
 import scalaz._
 import Scalaz._
 
 final case class SqlReadCursor(data: Vector[Data])
 
-trait RdbmsReadFile {
+trait RdbmsReadFile extends RdbmsDescribeTable {
   this: Rdbms =>
 
   import ReadFile._
 
   private val kvs = KeyValueStore.Ops[ReadHandle, SqlReadCursor, Eff]
 
-  implicit private val monadMInstance: Monad[M] = MonadM
+  implicit def MonadM: Monad[M]
+  implicit def dataMeta: Meta[Data]
 
   val ReadFileModule: ReadFileModule = new ReadFileModule {
 
     private def readAll(
         dbPath: TablePath,
         offset: Int,
-        limit: Option[Int],
-        isJson: Boolean
-    ): ConnectionIO[\/[FileSystemError, Vector[Data]]] = {
-
-      val codec = if (isJson)
-        json.JsonDataComposite
-      else
-        flat.FlatDataComposite
-
-      val streamWithOffset = sql"select * from ${dbPath.shows}"
-        .query[Data](codec)
+        limit: Option[Int]
+    ): ConnectionIO[Vector[Data]] = {
+      val streamWithOffset = (fr"select * from" ++ Fragment.const(dbPath.shows))
+        .query[Data]
         .process
         .drop(offset)
 
@@ -70,34 +68,41 @@ trait RdbmsReadFile {
       }
       streamWithLimit
         .vector
-        .attemptSome {
-          case throwable =>
-            FileSystemError.readFailed(
-              throwable.getMessage,
-              s"Failed to read data from table ${dbPath.shows}")
-        }
-
     }
 
     private def toInt(long: Long, varName: String): Backend[\/[FileSystemError, Int]] =
       lift(
-
           \/.fromTryCatchNonFatal(long.toInt)
             .leftMap(
               _ => FileSystemError.readFailed(long.toString, s"$varName not convertible to Int.")
             ).point[ConnectionIO]
         ).into[Eff].liftB
 
-    override def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
+    def openExisting(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
       for {
-        offsetInt <- includeError(toInt(offset.unwrap, "offset"))
-        limitInt <- limit.traverse(l => includeError(toInt(l.unwrap, "limit")))
         i <- MonotonicSeq.Ops[Eff].next.liftB
         dbPath = TablePath.create(file)
-        isJson <- ME.unattempt(lift(describeTable.isJson(dbPath).run).into[Eff].liftB)
-        sqlResult <- ME.unattempt(lift(readAll(dbPath, offsetInt, limitInt, isJson)).into[Eff].liftB)
         handle = ReadHandle(file, i)
+        limitInt <- limit.traverse(l => ME.unattempt(toInt(l.unwrap, "limit")))
+        offsetInt <- ME.unattempt(toInt(offset.unwrap, "offset"))
+        sqlResult <- lift(readAll(dbPath, offsetInt, limitInt)).into[Eff].liftB
         _ <- kvs.put(handle, SqlReadCursor(sqlResult)).liftB
+      } yield handle
+    }
+
+    def openMissing(file: AFile): Backend[ReadHandle] = {
+      for {
+        i <- MonotonicSeq.Ops[Eff].next.liftB
+        handle = ReadHandle(file, i)
+        _ <- kvs.put(handle, SqlReadCursor(Vector.empty)).liftB
+      } yield handle
+    }
+
+    override def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
+      val dbPath = TablePath.create(file)
+      for {
+        exists <- lift(tableExists(dbPath)).into[Eff].liftB
+        handle <- if (exists) openExisting(file, offset, limit) else openMissing(file)
       } yield handle
     }
 
@@ -111,6 +116,5 @@ trait RdbmsReadFile {
 
     override def close(h: ReadHandle): Configured[Unit] =
       kvs.delete(h).liftM[ConfiguredT]
-
   }
 }

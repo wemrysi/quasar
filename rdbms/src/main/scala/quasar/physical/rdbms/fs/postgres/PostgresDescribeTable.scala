@@ -16,35 +16,50 @@
 
 package quasar.physical.rdbms.fs.postgres
 
-import quasar.fs.FileSystemErrT
 import quasar.physical.rdbms.common._
-import slamdata.Predef._
-import quasar.fs._
-import doobie.imports._
 import quasar.physical.rdbms.fs.RdbmsDescribeTable
+import slamdata.Predef._
 
-import scalaz.EitherT
-import scalaz.syntax.show._
+import doobie.imports._
 
-object PostgresDescribeTable extends RdbmsDescribeTable {
+trait PostgresDescribeTable extends RdbmsDescribeTable {
 
-  override def isJson(
-      tablePath: TablePath): FileSystemErrT[ConnectionIO, Boolean] = {
-
-    val schemaName = tablePath.schema.map(_.name).getOrElse("public")
-
-    EitherT((fr"SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = " ++
-      Fragment.const("'" + schemaName + "'") ++
-      fr"AND TABLE_NAME =" ++
-      Fragment.const("'" + tablePath.table.name + "'"))
+  private def descQuery[F[_], T](
+      whereClause: Fragment,
+      mapResult: List[(String, String)] => T): ConnectionIO[T] = {
+    (fr"SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.COLUMNS"
+      ++ whereClause)
       .query[(String, String)]
       .list
-      .map(_.contains(("data", "json")))
-      .attemptSome {
-        case throwable =>
-          FileSystemError.readFailed(
-            tablePath.shows,
-            s"Failed to load table description from information_schema, error: ${throwable.getMessage}")
-      })
+      .map(mapResult)
   }
+
+  private def whereSchemaAndTable(tablePath: TablePath): Fragment = {
+    val schemaName = tablePath.schema.map(_.name).getOrElse("public")
+    fr"WHERE TABLE_SCHEMA=" ++
+  Fragment.const("'" + schemaName + "'") ++
+    fr"AND TABLE_NAME =" ++
+    Fragment.const("'" + tablePath.table.name + "'")
+  }
+
+  private def whereSchema(schemaName: SchemaName): Fragment =
+    fr"WHERE TABLE_SCHEMA=" ++
+      Fragment.const("'" + schemaName.name + "'")
+
+
+  def findChildSchemas(parentSchema: SchemaName): ConnectionIO[Vector[SchemaName]] = {
+    val prefixParam = parentSchema.name + TablePath.Separator
+    sql"SELECT SCHEMA_NAME FROM information_schema.schemata WHERE SCHEMA_NAME LIKE $prefixParam"
+      .query[String]
+      .vector
+      .map(_.map(SchemaName.apply))
+  }
+
+  override def schemaExists(schemaName: SchemaName): ConnectionIO[Boolean] =
+    descQuery(whereSchema(schemaName), _.nonEmpty)
+
+  override def tableExists(
+      tablePath: TablePath): ConnectionIO[Boolean] =
+    descQuery(whereSchemaAndTable(tablePath), _.nonEmpty)
+
 }

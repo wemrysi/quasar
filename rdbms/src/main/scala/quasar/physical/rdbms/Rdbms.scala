@@ -16,9 +16,8 @@
 
 package quasar.physical.rdbms
 
+import scala.Predef.implicitly
 import matryoshka.{BirecursiveT, Delay, EqualT, RecursiveT, ShowT}
-import quasar.{RenderTree, RenderTreeT}
-import slamdata.Predef._
 import quasar.connector.BackendModule
 import quasar.contrib.pathy.{AFile, APath}
 import quasar.contrib.scalaz.MonadReader_
@@ -26,25 +25,26 @@ import quasar.effect.uuid.GenUUID
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp.{:/:, :\:}
 import quasar.fp.free._
-import quasar.fs.{FileSystemError, MonadFsErr}
+import quasar.fs.MonadFsErr
 import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.mount.BackendDef.{DefErrT, DefinitionError}
 import quasar.fs.mount.ConnectionUri
-import quasar.physical.rdbms.fs.postgres.{RdbmsReadFile, RdbmsWriteFile, SqlReadCursor}
+import quasar.physical.rdbms.fs.{RdbmsReadFile, RdbmsWriteFile, SqlReadCursor}
 import quasar.qscript.{::/::, ::\::, EquiJoin, ExtractPath, Injectable, QScriptCore, QScriptTotal, ShiftedRead, Unicoalesce, Unirewrite}
-import doobie.hikari.hikaritransactor.HikariTransactor
-import doobie.imports.ConnectionIO
 import quasar.fs.WriteFile.WriteHandle
 import quasar.physical.rdbms.common.{Config, TablePath}
-import quasar.physical.rdbms.fs.{RdbmsCreateTable, RdbmsDescribeTable}
+import quasar.physical.rdbms.fs.RdbmsManageFile
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
+import quasar.{RenderTree, RenderTreeT}
+import slamdata.Predef._
 
+import doobie.hikari.hikaritransactor.HikariTransactor
+import doobie.imports.ConnectionIO
 import scalaz._
 import Scalaz._
-import scala.Predef.implicitly
 import scalaz.concurrent.Task
 
-trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Interpreter {
+trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with RdbmsManageFile with Interpreter {
 
   type Eff[A] = (
       ConnectionIO :\:
@@ -99,16 +99,5 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with In
 
   def QueryFileModule: QueryFileModule = ??? // TODO
 
-  def ManageFileModule: ManageFileModule = ??? // TODO
-
-  def includeError[A](b: Backend[FileSystemError \/ A]): Backend[A] =
-    EitherT(b.run.map(_.join))
-
-  // Below DB-specific functions
-  def describeTable: RdbmsDescribeTable
-
-  def createTable: RdbmsCreateTable
-
   def parseConnectionUri(uri: ConnectionUri): \/[DefinitionError, JdbcConnectionInfo]
-
 }

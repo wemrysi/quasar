@@ -16,7 +16,6 @@
 
 package quasar.physical.rdbms
 
-import doobie.imports.Transactor
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.effect.uuid.GenUUID
 import quasar.fp.TaskRef
@@ -24,9 +23,10 @@ import quasar.fp.free._
 import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.WriteFile.WriteHandle
 import quasar.physical.rdbms.common.TablePath
-import quasar.physical.rdbms.fs.postgres.SqlReadCursor
+import quasar.physical.rdbms.fs.SqlReadCursor
 import slamdata.Predef.Map
 
+import doobie.imports.Transactor
 import scalaz.concurrent.Task
 import scalaz.syntax.applicative._
 import scalaz.~>

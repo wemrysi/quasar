@@ -16,29 +16,34 @@
 
 package quasar.physical.rdbms.fs.postgres
 
-import quasar.physical.rdbms.fs.RdbmsCreateTable
-import quasar.physical.rdbms.common._
+import quasar.Data
+import quasar.fs.FileSystemError
+import quasar.physical.rdbms.common.TablePath
+import quasar.physical.rdbms.fs.RdbmsInsert
 import slamdata.Predef._
-
-import doobie.syntax.string._
 import doobie.free.connection.ConnectionIO
+
+import doobie.imports.{Meta, Update}
+import doobie.syntax.string._
 import doobie.util.fragment.Fragment
-import scalaz.syntax.monad._
+import scalaz.std.vector._
 import scalaz.syntax.show._
 
-trait PostgresCreateJsonTable extends RdbmsCreateTable {
+trait PostgresInsert extends RdbmsInsert {
 
-  override def createTable(tablePath: TablePath): ConnectionIO[Unit] = {
+  implicit def dataMeta: Meta[Data]
 
-    val createSchema: ConnectionIO[Unit] = tablePath.schema.map { s =>
-      (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(s.name)).update.run.map(_ => ())
-    }.getOrElse(().point[ConnectionIO])
+  def batchInsert(
+      dbPath: TablePath,
+      chunk: Vector[Data]
+  ): ConnectionIO[Vector[FileSystemError]] = {
 
-    createSchema
-      .flatMap(_ =>
-        (fr"CREATE TABLE IF NOT EXISTS"
-          ++ Fragment.const(tablePath.shows)
-          ++ fr"(data json NOT NULL)").update.run)
-      .map(_ => ())
+    val fQuery = fr"insert into " ++ Fragment.const(dbPath.shows) ++ fr"(data) values(?::JSON)"
+
+    Update[Data](fQuery.update.sql)
+      .updateMany(chunk)
+      .map(_ => Vector.empty[FileSystemError])
+
   }
+
 }

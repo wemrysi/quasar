@@ -16,13 +16,12 @@
 
 package quasar.physical.rdbms.fs
 
-import doobie.imports.ConnectionIO
-import quasar.Data
-import quasar.fs.FileSystemErrT
 import quasar.physical.rdbms.common.TablePath
 import slamdata.Predef.Unit
 
+import doobie.imports.ConnectionIO
+
 trait RdbmsCreateTable {
 
-  def run(tablePath: TablePath): FileSystemErrT[ConnectionIO, Unit]
+  def createTable(tablePath: TablePath): ConnectionIO[Unit]
 }

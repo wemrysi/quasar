@@ -20,13 +20,14 @@ import quasar.connector.EnvironmentError
 import quasar.fs.mount.BackendDef.DefinitionError
 import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.Rdbms
+import quasar.physical.rdbms.fs._
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 import slamdata.Predef._
 
 import scalaz.{-\/, NonEmptyList, \/, \/-}
 import scalaz.syntax.either._
 
-object Postgres extends Rdbms {
+object Postgres extends Rdbms with PostgresInsert with PostgresDescribeTable with PostgresCreateJsonTable {
 
   override val Type = FsType
 
@@ -60,6 +61,5 @@ object Postgres extends Rdbms {
     connectionInfo.leftMap(_.left[EnvironmentError])
   }
 
-  override lazy val describeTable = PostgresDescribeTable
-  override lazy val createTable = PostgresCreateJsonTable
+  override lazy val dataMeta = postgres.mapping.JsonDataMeta
 }

@@ -14,55 +14,34 @@
  * limitations under the License.
  */
 
-package quasar.physical.rdbms.fs.postgres
+package quasar.physical.rdbms.fs
 
-import java.util.UUID
-
-import doobie.free.connection.ConnectionIO
-import doobie.imports.Update
+import quasar.Data
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
-import quasar.{Data, DataCodec}
 import quasar.effect.{KeyValueStore, MonotonicSeq}
-import quasar.fs._
-import quasar.physical.rdbms.common.TablePath
-import quasar.physical.rdbms.mapping.json._
-import quasar.physical.rdbms.Rdbms
-import slamdata.Predef._
-import doobie.syntax.string._
-import doobie.util.fragment.Fragment
-import quasar.effect._
 import quasar.fp.free._
+import quasar.fs._
+import quasar.physical.rdbms.Rdbms
+import quasar.physical.rdbms.common.TablePath
 import slamdata.Predef._
-import quasar.physical.rdbms.mapping._
 
-import scalaz._
-import Scalaz._
+import doobie.imports.Meta
+import scalaz.Monad
+import scalaz.syntax.monad._
+import scalaz.std.vector._
 
-trait RdbmsWriteFile {
+trait RdbmsWriteFile extends RdbmsInsert with RdbmsDescribeTable with RdbmsCreateTable {
   this: Rdbms =>
 
   import WriteFile._
 
   val writeKvs = KeyValueStore.Ops[WriteHandle, TablePath, Eff]
 
-  implicit private val monadMInstance: Monad[M] = MonadM
+  implicit def MonadM: Monad[M]
+  implicit def dataMeta: Meta[Data]
 
   override def WriteFileModule: WriteFileModule = new WriteFileModule {
-
-    def batchInsert(
-        dbPath: TablePath,
-        chunk: Vector[Data],
-        isJson: Boolean
-        ): ConnectionIO[Vector[FileSystemError]] = {
-
-      // TODO this is postgres-specific (?::JSON)
-      val fQuery = fr"insert into " ++ Fragment.const(dbPath.shows) ++ fr"(id, data) values(?, ?::JSON)"
-
-          Update[Data](fQuery.update.sql)(JsonDataComposite)
-            .updateMany(chunk.toList)
-            .map(_ => Vector.empty[FileSystemError])
-      }
 
     private def getDbPath(h: WriteHandle) = ME.unattempt(
       writeKvs
@@ -77,8 +56,7 @@ trait RdbmsWriteFile {
       (for {
         _ <- ME.unattempt(writeKvs.get(h).toRight(FileSystemError.unknownWriteHandle(h)).run.liftB)
         dbPath <- getDbPath(h)
-       isJson <- ME.unattempt(lift(describeTable.isJson(dbPath).run).into[Eff].liftB)
-        _ <- lift(batchInsert(dbPath, chunk, isJson)).into[Eff].liftB
+        _ <- lift(batchInsert(dbPath, chunk)).into[Eff].liftB
       } yield Vector()).run.value.map(_.valueOr(Vector(_)))
     }
 
@@ -86,7 +64,7 @@ trait RdbmsWriteFile {
       for {
         i <- MonotonicSeq.Ops[Eff].next.liftB
         dbPath = TablePath.create(file)
-        _ <- ME.unattempt(lift(createTable.run(dbPath).run).into[Eff].liftB)
+        _ <- lift(createTable(dbPath)).into[Eff].liftB
         handle = WriteHandle(file, i)
         _ <- writeKvs.put(handle, dbPath).liftB
       } yield handle

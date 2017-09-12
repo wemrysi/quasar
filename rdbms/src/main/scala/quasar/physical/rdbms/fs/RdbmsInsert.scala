@@ -16,15 +16,16 @@
 
 package quasar.physical.rdbms.fs
 
-import quasar.physical.rdbms.common.{SchemaName, TablePath}
-import slamdata.Predef._
+import doobie.free.connection.ConnectionIO
+import quasar.Data
+import quasar.fs.FileSystemError
+import quasar.physical.rdbms.common.TablePath
+import slamdata.Predef.Vector
 
-import doobie.imports.ConnectionIO
+trait RdbmsInsert {
 
-trait RdbmsDescribeTable {
-
-  def findChildSchemas(
-      schemaPrefix: SchemaName): ConnectionIO[Vector[SchemaName]]
-  def schemaExists(schemaName: SchemaName): ConnectionIO[Boolean]
-  def tableExists(tablePath: TablePath): ConnectionIO[Boolean]
+  def batchInsert(
+      dbPath: TablePath,
+      chunk: Vector[Data]
+  ): ConnectionIO[Vector[FileSystemError]]
 }
