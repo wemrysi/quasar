@@ -16,8 +16,14 @@
 
 package quasar.fs.mount.cache
 
+import slamdata.Predef._
 import quasar.contrib.pathy.AFile
-import quasar.effect.KeyValueStore
+import quasar.effect.{Failure, KeyValueStore}
+import quasar.fp.free.injectFT
+import quasar.fp.ski.κ
+import quasar.fs.{FileSystemError, FileSystemFailure, ManageFile}
+import quasar.fs.FileSystemError.PathErr
+import quasar.fs.PathError.PathNotFound
 import quasar.metastore._, KeyValueStore._, MetaStoreAccess._
 
 import doobie.imports.ConnectionIO
@@ -28,12 +34,40 @@ object VCache {
 
   implicit def Ops[S[_]](implicit S0: VCache :<: S): Ops[S] = KeyValueStore.Ops[AFile, ViewCache, S]
 
-  val interp: VCache ~> ConnectionIO = λ[VCache ~> ConnectionIO] {
-    case Keys()                      => Queries.viewCachePaths.list ∘ (_.toVector)
-    case Get(k)                      => lookupViewCache(k)
-    case Put(k, v)                   => updateInsertViewCache(k, v)
+  def deleteThen[S[_], A](
+    k: AFile, op: Option[ViewCache] => ConnectionIO[A]
+  )(implicit
+    M: ManageFile.Ops[S],
+    E: Failure.Ops[FileSystemError, S],
+    S0: ConnectionIO :<: S
+  ): Free[S, A] =
+    for {
+      vc <- injectFT[ConnectionIO, S].apply(lookupViewCache(k))
+      _  <- vc.foldMap(vc => E.unattempt(
+              (M.delete(vc.dataFile) >> (vc.tmpDataFile.traverse_(M.delete(_)))).run ∘ (_.bimap(
+                {
+                  case PathErr(PathNotFound(_)) => ().right[FileSystemError]
+                  case e => e.left
+                },
+                _.right
+              ).merge)))
+      r  <- injectFT[ConnectionIO, S].apply(op(vc))
+    } yield r
+
+  def interp[S[_]](implicit
+    S0: ManageFile :<: S,
+    S1: FileSystemFailure :<: S,
+    S2: ConnectionIO :<: S
+  ): VCache ~> Free[S, ?] = λ[VCache ~> Free[S, ?]] {
+    case Keys() =>
+      injectFT[ConnectionIO, S].apply(Queries.viewCachePaths.list ∘ (_.toVector))
+    case Get(k) =>
+      injectFT[ConnectionIO, S].apply(lookupViewCache(k))
+    case Put(k, v) =>
+      deleteThen(k, κ(updateInsertViewCache(k, v)))
     case CompareAndPut(k, expect, v) =>
-      lookupViewCache(k) >>= (vc => (vc ≟ expect).fold(updateInsertViewCache(k, v).as(true), false.η[ConnectionIO]))
-    case Delete(k)                   => runOneRowUpdate(Queries.deleteViewCache(k))
+      deleteThen(k, vc => (vc ≟ expect).fold(updateInsertViewCache(k, v).as(true), false.η[ConnectionIO]))
+    case Delete(k) =>
+      deleteThen(k, κ(runOneRowUpdate(Queries.deleteViewCache(k))))
   }
 }
