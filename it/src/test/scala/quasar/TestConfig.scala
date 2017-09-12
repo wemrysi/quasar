@@ -52,7 +52,7 @@ object TestConfig {
   val MONGO_READ_ONLY = ExternalBackendRef(BackendRef(BackendName("mongodb_read_only"), ISet singleton BackendCapability.query()), mongodb.MongoDb.Type)
   val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), sparkcore.fs.hdfs.SparkHdfsBackendModule.Type)
   val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), sparkcore.fs.local.SparkLocalBackendModule.Type)
-  val SPARK_ELASTIC   = ExternalBackendRef(BackendRef(BackendName("spark_elastic")    , BackendCapability.All), sparkcore.fs.elastic.FsType)
+  val SPARK_ELASTIC   = ExternalBackendRef(BackendRef(BackendName("spark_elastic")    , BackendCapability.All), sparkcore.fs.elastic.SparkElasticBackendModule.Type)
   val SPARK_CASSANDRA = ExternalBackendRef(BackendRef(BackendName("spark_cassandra")  , BackendCapability.All), sparkcore.fs.cassandra.FsType)
 
 

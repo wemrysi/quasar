@@ -26,6 +26,10 @@ import org.specs2.scalaz.DisjunctionMatchers
 
 class ListContentsSpec extends quasar.Qspec with DisjunctionMatchers {
 
+  import SparkElasticBackendModule.separator
+
+  val lc = SparkElasticBackendModule.details
+
   def elasticInterpreter(indices: List[String]): ElasticCall ~> Id =
     elasticInterpreter(Map[String, List[String]](indices.map(idx => (idx -> List.empty[String])): _*))
 
@@ -44,10 +48,10 @@ class ListContentsSpec extends quasar.Qspec with DisjunctionMatchers {
   }
 
   def exec(adir: ADir, indices: List[String]): FileSystemError \/ Set[PathSegment] =
-    queryfile.listContents[ElasticCall](adir).run.foldMap(elasticInterpreter(indices))
+    lc.listContents[ElasticCall](adir).run.foldMap(elasticInterpreter(indices))
 
   def exec(adir: ADir, indices: Map[String, List[String]]): FileSystemError \/ Set[PathSegment] =
-    queryfile.listContents[ElasticCall](adir).run.foldMap(elasticInterpreter(indices))
+    lc.listContents[ElasticCall](adir).run.foldMap(elasticInterpreter(indices))
 
   "ListContents" should {
     "for a /" should {
