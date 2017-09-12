@@ -20,7 +20,9 @@ import slamdata.Predef._
 
 import _root_.monocle.{Getter, Iso}
 import _root_.matryoshka._
-import _root_.matryoshka.patterns.EnvT
+import _root_.matryoshka.data.free._
+import _root_.matryoshka.implicits._
+import _root_.matryoshka.patterns._
 import _root_.scalaz._, Scalaz._
 
 package object matryoshka {
@@ -32,6 +34,14 @@ package object matryoshka {
     rest.foldLeft(
       first)(
       (prev, next) => x => prev(x).fold(next(x))(orOriginal(next)(_).some))
+
+  object convertToFree {
+    def apply[F[_], A] = new PartiallyApplied[F, A]
+    final class PartiallyApplied[F[_], A] {
+      def apply[T](t: T)(implicit T: Recursive.Aux[T, F], F: Functor[F]): Free[F, A] =
+        t.ana[Free[F, A]](x => CoEnv(x.project.right[A]))
+    }
+  }
 
   def envT[E, W[_], A](e: E, wa: W[A]): EnvT[E, W, A] =
     EnvT((e, wa))
