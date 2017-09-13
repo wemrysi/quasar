@@ -20,7 +20,6 @@ import quasar.Data
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
-import quasar.fp.free._
 import quasar.fs._
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.common.TablePath
@@ -56,7 +55,7 @@ trait RdbmsWriteFile extends RdbmsInsert with RdbmsDescribeTable with RdbmsCreat
       (for {
         _ <- ME.unattempt(writeKvs.get(h).toRight(FileSystemError.unknownWriteHandle(h)).run.liftB)
         dbPath <- getDbPath(h)
-        _ <- lift(batchInsert(dbPath, chunk)).into[Eff].liftB
+        _ <- batchInsert(dbPath, chunk).liftB
       } yield Vector()).run.value.map(_.valueOr(Vector(_)))
     }
 
@@ -64,7 +63,7 @@ trait RdbmsWriteFile extends RdbmsInsert with RdbmsDescribeTable with RdbmsCreat
       for {
         i <- MonotonicSeq.Ops[Eff].next.liftB
         dbPath = TablePath.create(file)
-        _ <- lift(createTable(dbPath)).into[Eff].liftB
+        _ <- createTable(dbPath).liftB
         handle = WriteHandle(file, i)
         _ <- writeKvs.put(handle, dbPath).liftB
       } yield handle

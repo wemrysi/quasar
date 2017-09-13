@@ -21,7 +21,6 @@ import quasar.Data
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
-import quasar.fp.free.lift
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._
 import quasar.physical.rdbms.Rdbms
@@ -71,12 +70,12 @@ trait RdbmsReadFile extends RdbmsDescribeTable {
     }
 
     private def toInt(long: Long, varName: String): Backend[\/[FileSystemError, Int]] =
-      lift(
+        (
           \/.fromTryCatchNonFatal(long.toInt)
             .leftMap(
               _ => FileSystemError.readFailed(long.toString, s"$varName not convertible to Int.")
             ).point[ConnectionIO]
-        ).into[Eff].liftB
+        ).liftB
 
     def openExisting(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
       for {
@@ -85,7 +84,7 @@ trait RdbmsReadFile extends RdbmsDescribeTable {
         handle = ReadHandle(file, i)
         limitInt <- limit.traverse(l => ME.unattempt(toInt(l.unwrap, "limit")))
         offsetInt <- ME.unattempt(toInt(offset.unwrap, "offset"))
-        sqlResult <- lift(readAll(dbPath, offsetInt, limitInt)).into[Eff].liftB
+        sqlResult <- readAll(dbPath, offsetInt, limitInt).liftB
         _ <- kvs.put(handle, SqlReadCursor(sqlResult)).liftB
       } yield handle
     }
@@ -101,7 +100,7 @@ trait RdbmsReadFile extends RdbmsDescribeTable {
     override def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
       val dbPath = TablePath.create(file)
       for {
-        exists <- lift(tableExists(dbPath)).into[Eff].liftB
+        exists <- tableExists(dbPath).liftB
         handle <- if (exists) openExisting(file, offset, limit) else openMissing(file)
       } yield handle
     }

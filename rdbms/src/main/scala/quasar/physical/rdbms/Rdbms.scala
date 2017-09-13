@@ -29,22 +29,21 @@ import quasar.fs.MonadFsErr
 import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.mount.BackendDef.{DefErrT, DefinitionError}
 import quasar.fs.mount.ConnectionUri
-import quasar.physical.rdbms.fs.{RdbmsReadFile, RdbmsWriteFile, SqlReadCursor}
+import quasar.physical.rdbms.fs._
 import quasar.qscript.{::/::, ::\::, EquiJoin, ExtractPath, Injectable, QScriptCore, QScriptTotal, ShiftedRead, Unicoalesce, Unirewrite}
 import quasar.fs.WriteFile.WriteHandle
 import quasar.physical.rdbms.common.{Config, TablePath}
-import quasar.physical.rdbms.fs.RdbmsManageFile
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 import quasar.{RenderTree, RenderTreeT}
 import slamdata.Predef._
-
 import doobie.hikari.hikaritransactor.HikariTransactor
 import doobie.imports.ConnectionIO
+
 import scalaz._
 import Scalaz._
 import scalaz.concurrent.Task
 
-trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with RdbmsManageFile with Interpreter {
+trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with RdbmsManageFile with RdbmsQueryFile with Interpreter {
 
   type Eff[A] = (
       ConnectionIO :\:
@@ -59,6 +58,10 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
   type M[A]        = Free[Eff, A]
 
   type Config = common.Config
+
+  implicit class LiftEffBackend[F[_], A](m: F[A])(implicit I: F :<: Eff) {
+    val liftB: Backend[A] = lift(m).into[Eff].liftB
+  }
 
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
@@ -96,8 +99,6 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
       cp: T[QSM[T, ?]]): Backend[Repr] = {
     ???
   } // TODO
-
-  def QueryFileModule: QueryFileModule = ??? // TODO
 
   def parseConnectionUri(uri: ConnectionUri): \/[DefinitionError, JdbcConnectionInfo]
 }

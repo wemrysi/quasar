@@ -22,7 +22,6 @@ import pathy.Path._
 import quasar.contrib.pathy.{ADir, AFile, APath}
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.MonotonicSeq
-import quasar.fp.free.lift
 import quasar.fs._
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.common._
@@ -40,9 +39,7 @@ trait RdbmsManageFile extends RdbmsDescribeTable with RdbmsCreateTable {
       .map(_ => ())
 
   def dropSchemaWithChildren(parent: Schema): Backend[Unit] =
-    lift(findChildSchemas(parent).flatMap(cs => (cs :+ parent).foldMap(dropSchema)))
-      .into[Eff]
-      .liftB
+    findChildSchemas(parent).flatMap(cs => (cs :+ parent).foldMap(dropSchema)).liftB
 
   override def ManageFileModule = new ManageFileModule {
 
@@ -54,21 +51,18 @@ trait RdbmsManageFile extends RdbmsDescribeTable with RdbmsCreateTable {
 
     def deleteTable(aFile: AFile): Backend[Unit] = {
       val dbTablePath = TablePath.create(aFile)
-      (for {
-        exists <- lift(tableExists(dbTablePath)).into[Eff].liftB
+      for {
+        exists <- tableExists(dbTablePath).liftB
         _ <- exists.unlessM(
           ME.raiseError(FileSystemError.pathErr(PathError.pathNotFound(aFile))))
-        _ <- lift(
-          (fr"DROP TABLE" ++ Fragment.const(dbTablePath.shows)).update.run)
-          .into[Eff]
-          .liftB
-      } yield ())
+        _ <- (fr"DROP TABLE" ++ Fragment.const(dbTablePath.shows)).update.run.liftB
+      } yield ()
     }
 
     def deleteSchema(aDir: ADir): Backend[Unit] = {
       val schema = TablePath.dirToSchema(aDir)
           for {
-            exists <- lift(schemaExists(schema)).into[Eff].liftB
+            exists <- schemaExists(schema).liftB
             _ <- exists.unlessM(ME.raiseError(
               FileSystemError.pathErr(PathError.pathNotFound(aDir))))
             _ <- dropSchemaWithChildren(schema)
@@ -99,7 +93,7 @@ trait RdbmsManageFile extends RdbmsDescribeTable with RdbmsCreateTable {
 
       for {
         path <- tempFilePath(near)
-        _ <- lift(createTable(TablePath.create(path))).into[Eff].liftB
+        _ <- createTable(TablePath.create(path)).liftB
       }
         yield path
     }
