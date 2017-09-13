@@ -144,6 +144,38 @@ object Extension extends ExtensionInstances {
 }
 
 sealed abstract class ExtensionInstances {
+  /** Structural ordering, which _does_ consider metadata and thus needs to
+    * be elided before using for proper semantics.
+    */
+  val structuralOrder: Delay[Order, Extension] =
+    new Delay[Order, Extension] {
+      def apply[α](ord: Order[α]) = {
+        implicit val ordA: Order[α] = ord
+        // TODO: Not sure why this isn't found?
+        implicit val ordC: Order[SChar] = scalaz.std.anyVal.char
+        Order.orderBy { e =>
+          val g = generic(e)
+          g.copy(_4 = g._4 map (IMap.fromFoldable(_)))
+        }
+      }
+    }
+
+  /** Structural equality, which _does_ consider metadata and thus needs to
+    * be elided before using for proper semantics.
+    */
+  val structuralEqual: Delay[Equal, Extension] =
+    new Delay[Equal, Extension] {
+      def apply[α](eql: Equal[α]) = {
+        implicit val eqlA: Equal[α] = eql
+        // TODO: Not sure why this isn't found?
+        implicit val eqlC: Equal[SChar] = scalaz.std.anyVal.char
+        Equal.equalBy { e =>
+          val g = generic(e)
+          g.copy(_4 = g._4 map (EqMap.fromFoldable(_)))
+        }
+      }
+    }
+
   implicit val traverse: Traverse[Extension] = new Traverse[Extension] {
     def traverseImpl[G[_], A, B](
       fa: Extension[A])(
@@ -170,24 +202,14 @@ sealed abstract class ExtensionInstances {
       })
     }
 
-  // NB: Private as we don't consider metadata for purposes of EJson equality
-  //     and we need to elide it before using this to compare.
-  //
-  //     This _does_ consider metadata so we can use it in tests of other
-  //     Extension properties.
-  private[ejson] val order: Delay[Order, Extension] =
-    new Delay[Order, Extension] {
-      def apply[α](ord: Order[α]) = {
-        implicit val ordA: Order[α] = ord
-        // TODO: Not sure why this isn't found?
-        implicit val ordC: Order[SChar] = scalaz.std.anyVal.char
-        Order.orderBy(e => (
-          byte.getOption(e)                          ,
-          char.getOption(e)                          ,
-          int.getOption(e)                           ,
-          map.getOption(e) map (IMap fromFoldable _) ,
-          meta.getOption(e)
-        ))
-      }
-    }
+  ////
+
+  private def generic[A](e: Extension[A]) =
+    (
+      byte.getOption(e),
+      char.getOption(e),
+      int.getOption(e) ,
+      map.getOption(e) ,
+      meta.getOption(e)
+    )
 }
