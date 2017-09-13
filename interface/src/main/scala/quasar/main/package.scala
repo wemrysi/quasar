@@ -95,7 +95,7 @@ package object main {
     // marklogic.MarkLogic.definition translate injectFT[Task, PhysFsEff],
     mimir.Mimir.definition translate injectFT[Task, PhysFsEff],
     // mongodb.MongoDb.definition translate injectFT[Task, PhysFsEff],
-    skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff],
+    skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff]// ,
     // sparkcore.fs.hdfs.SparkHdfsBackendModule.definition translate injectFT[Task, PhysFsEff],
     // sparkcore.fs.elastic.SparkElasticBackendModule.definition translate injectFT[Task, PhysFsEff],
     // sparkcore.fs.cassandra.definition[PhysFsEff],

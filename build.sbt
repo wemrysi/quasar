@@ -203,30 +203,38 @@ lazy val root = project.in(file("."))
 //  └──────────┼───────────┴─────────┴──────┘
 //         interface
 
-        foundation,
-//     / / | | \ \
-//
+       foundation,
+//       /   \
       ejson, js,
 //       \  /
-        common,    // <------------------------------------------------------
-//        |    \                                                             \
-    effect, frontend,                                                       precog,
-//   |       |  |  \________________________________________________________  |
-                                                                           blueeyes,
-//                                                                            |
-                                                                           niflheim,
-//   |    |   |                                                               |
-    sql, connector,                                                        yggdrasil,
-//   |   /  | | \ \______ __________________________________________________  |
-//   |  /   | |  \                                                          \ |
-    core, couchbase, marklogic, mongodb, skeleton, sparkcore,   mimir,
-//      \ \ | / /                                                           /
-        interface,
-//        /   \
-       repl,  web,
-//             |
-              it)
-  .enablePlugins(AutomateHeaderPlugin)
+        common,   // <--
+//     /       \        \
+    effect, frontend,  precog,
+//   |         |    \    |
+                      blueeyes,
+//   |         |         |
+                      niflheim,
+//   |         |         |
+    sql, connector,   yggdrasil,
+//   |   /  | | \ \______|__________________________________
+//   |  /   | |  \      /     \         \         \         \
+    core, skeleton, mimir, marklogic, mongodb, couchbase, sparkcore,
+//      \     |     /         |          |         |         |
+          interface,   //     |          |         |         |
+//          /  \              |          |         |         |
+         repl, web,   //      |          |         |         |
+//              |             |          |         |         |
+                it,   //      |          |         |         |
+//   ___________|_____________/          |         |         |
+//  /           |      __________________/         |         |
+//  |          /|\    /          __________________/         |
+//  |         / | \  /          /             _______________/
+//  |        /  |  \/__________/______       /
+//  |       /   |  /    \     /        \    /
+  marklogicIt, mongoIt, couchbaseIt, sparkcoreIt
+//
+// NB: the *It projects are temporary until we polyrepo
+  ).enablePlugins(AutomateHeaderPlugin)
 
 // common components
 
@@ -429,10 +437,6 @@ lazy val interface = project
   .settings(name := "quasar-interface-internal")
   .dependsOn(
     core % BothScopes,
-    couchbase,
-    marklogic % BothScopes,
-    mongodb,
-    sparkcore,
     skeleton,
     mimir)
   .settings(commonSettings)
@@ -510,6 +514,53 @@ lazy val it = project
     }.value)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val marklogicIt = project
+  .configs(ExclusiveTests)
+  .dependsOn(it % BothScopes, marklogic % BothScopes)
+  .settings(commonSettings)
+  .settings(noPublishSettings)
+  .settings(targetSettings)
+  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
+  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
+  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
+  .settings(parallelExecution in Test := false)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val mongoIt = project
+  .configs(ExclusiveTests)
+  .dependsOn(it % BothScopes, mongodb)
+  .settings(commonSettings)
+  .settings(noPublishSettings)
+  .settings(targetSettings)
+  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
+  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
+  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
+  .settings(parallelExecution in Test := false)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val couchbaseIt = project
+  .configs(ExclusiveTests)
+  .dependsOn(it % BothScopes, couchbase)
+  .settings(commonSettings)
+  .settings(noPublishSettings)
+  .settings(targetSettings)
+  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
+  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
+  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
+  .settings(parallelExecution in Test := false)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val sparkcoreIt = project
+  .configs(ExclusiveTests)
+  .dependsOn(it % BothScopes, sparkcore)
+  .settings(commonSettings)
+  .settings(noPublishSettings)
+  .settings(targetSettings)
+  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
+  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
+  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
+  .settings(parallelExecution in Test := false)
+  .enablePlugins(AutomateHeaderPlugin)
 
 /***** PRECOG *****/
 

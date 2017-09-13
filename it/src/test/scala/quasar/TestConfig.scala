@@ -21,7 +21,6 @@ import quasar.contrib.pathy._
 import quasar.fs._
 import quasar.fs.mount.{BackendDef, ConnectionUri, MountConfig}
 import quasar.main.{ClassName, ClassPath, FsLoadCfg}
-import quasar.physical.{couchbase, marklogic, mongodb, sparkcore}
 
 import pathy.Path._
 import knobs.{Required, Optional, FileResource}
@@ -41,20 +40,26 @@ object TestConfig {
     */
   val TestPathPrefixEnvName = "QUASAR_TEST_PATH_PREFIX"
 
-  /** External Backends. */
-  val COUCHBASE       = ExternalBackendRef(BackendRef(BackendName("couchbase")        , BackendCapability.All), couchbase.fs.FsType)
-  val MARKLOGIC_JSON  = ExternalBackendRef(BackendRef(BackendName("marklogic_json")   , BackendCapability.All), marklogic.fs.FsType)
-  val MARKLOGIC_XML   = ExternalBackendRef(BackendRef(BackendName("marklogic_xml")    , BackendCapability.All), marklogic.fs.FsType)
+  /**
+   * External Backends.
+   *
+   * This is an artifact of the fact that we haven't inverted the dependency between
+   * `it` and the connectors.  Hence, the redundant hard-coding of constants.  We
+   * should get rid of this abomination as soon as possible.
+   */
+  val COUCHBASE       = ExternalBackendRef(BackendRef(BackendName("couchbase")        , BackendCapability.All), FileSystemType("couchbase"))
+  val MARKLOGIC_JSON  = ExternalBackendRef(BackendRef(BackendName("marklogic_json")   , BackendCapability.All), FileSystemType("marklogic"))
+  val MARKLOGIC_XML   = ExternalBackendRef(BackendRef(BackendName("marklogic_xml")    , BackendCapability.All), FileSystemType("marklogic"))
   val MIMIR           = ExternalBackendRef(BackendRef(BackendName("mimir")            , BackendCapability.All), mimir.Mimir.Type)
-  val MONGO_2_6       = ExternalBackendRef(BackendRef(BackendName("mongodb_2_6")      , BackendCapability.All), mongodb.MongoDb.Type)
-  val MONGO_3_0       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_0")      , BackendCapability.All), mongodb.MongoDb.Type)
-  val MONGO_3_2       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_2")      , BackendCapability.All), mongodb.MongoDb.Type)
-  val MONGO_3_4       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_4")      , BackendCapability.All), mongodb.MongoDb.Type)
-  val MONGO_READ_ONLY = ExternalBackendRef(BackendRef(BackendName("mongodb_read_only"), ISet singleton BackendCapability.query()), mongodb.MongoDb.Type)
-  val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), sparkcore.fs.hdfs.SparkHdfsBackendModule.Type)
-  val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), sparkcore.fs.local.SparkLocalBackendModule.Type)
-  val SPARK_ELASTIC   = ExternalBackendRef(BackendRef(BackendName("spark_elastic")    , BackendCapability.All), sparkcore.fs.elastic.SparkElasticBackendModule.Type)
-  val SPARK_CASSANDRA = ExternalBackendRef(BackendRef(BackendName("spark_cassandra")  , BackendCapability.All), sparkcore.fs.cassandra.FsType)
+  val MONGO_2_6       = ExternalBackendRef(BackendRef(BackendName("mongodb_2_6")      , BackendCapability.All), FileSystemType("mongodb"))
+  val MONGO_3_0       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_0")      , BackendCapability.All), FileSystemType("mongodb"))
+  val MONGO_3_2       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_2")      , BackendCapability.All), FileSystemType("mongodb"))
+  val MONGO_3_4       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_4")      , BackendCapability.All), FileSystemType("mongodb"))
+  val MONGO_READ_ONLY = ExternalBackendRef(BackendRef(BackendName("mongodb_read_only"), ISet singleton BackendCapability.query()), FileSystemType("mongodb"))
+  val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), FileSystemType("spark-hdfs"))
+  val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), FileSystemType("spark-local"))
+  val SPARK_ELASTIC   = ExternalBackendRef(BackendRef(BackendName("spark_elastic")    , BackendCapability.All), FileSystemType("spark-elastic"))
+  val SPARK_CASSANDRA = ExternalBackendRef(BackendRef(BackendName("spark_cassandra")  , BackendCapability.All), FileSystemType("spark-cassandra"))
 
 
   lazy val backendRefs: List[ExternalBackendRef] = List(
