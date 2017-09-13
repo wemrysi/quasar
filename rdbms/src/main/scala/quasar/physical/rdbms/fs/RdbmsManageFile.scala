@@ -25,8 +25,9 @@ import quasar.effect.MonotonicSeq
 import quasar.fp.free.lift
 import quasar.fs._
 import quasar.physical.rdbms.Rdbms
-import quasar.physical.rdbms.common.{SchemaName, TablePath}
+import quasar.physical.rdbms.common._
 import slamdata.Predef._
+
 import scalaz.Scalaz._
 import scalaz._
 
@@ -34,11 +35,11 @@ trait RdbmsManageFile extends RdbmsDescribeTable with RdbmsCreateTable {
   this: Rdbms =>
   implicit def MonadM: Monad[M]
 
-  def dropSchema(schemaName: SchemaName): ConnectionIO[Unit] =
-    (fr"DROP SCHEMA" ++ Fragment.const(schemaName.name) ++ fr"CASCADE").update.run
+  def dropSchema(schema: Schema): ConnectionIO[Unit] =
+    (fr"DROP SCHEMA" ++ Fragment.const(schema.shows) ++ fr"CASCADE").update.run
       .map(_ => ())
 
-  def dropSchemaWithChildren(parent: SchemaName): Backend[Unit] =
+  def dropSchemaWithChildren(parent: Schema): Backend[Unit] =
     lift(findChildSchemas(parent).flatMap(cs => (cs :+ parent).foldMap(dropSchema)))
       .into[Eff]
       .liftB
@@ -65,17 +66,13 @@ trait RdbmsManageFile extends RdbmsDescribeTable with RdbmsCreateTable {
     }
 
     def deleteSchema(aDir: ADir): Backend[Unit] = {
-      TablePath
-        .dirToSchemaName(aDir)
-        .map { schemaName =>
-          (for {
-            exists <- lift(schemaExists(schemaName)).into[Eff].liftB
+      val schema = TablePath.dirToSchema(aDir)
+          for {
+            exists <- lift(schemaExists(schema)).into[Eff].liftB
             _ <- exists.unlessM(ME.raiseError(
               FileSystemError.pathErr(PathError.pathNotFound(aDir))))
-            _ <- dropSchemaWithChildren(schemaName)
-          } yield ())
-        }
-        .getOrElse(().point[Backend])
+            _ <- dropSchemaWithChildren(schema)
+          } yield ()
     }
 
     override def delete(path: APath): Backend[Unit] = {

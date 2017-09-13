@@ -18,22 +18,16 @@ package quasar.physical.rdbms
 
 import pathy.Path
 import Path.{FileName, dir1, _}
-import org.scalacheck.{Arbitrary, Gen}
-import quasar.physical.rdbms.common.{SchemaName, TableName, TablePath}
+import quasar.physical.rdbms.common.{CustomSchema, DefaultSchema, TableName, TablePath}
 import quasar.Qspec
 import quasar.contrib.pathy.AFile
 import quasar.contrib.pathy._
 import pathy.scalacheck.PathyArbitrary._
+import quasar.physical.rdbms.testutils.RdbmsPathyArbitrary.Generators._
 
 class TablePathSpec extends Qspec {
 
   import TablePath._
-
-  def alphaNumDirGen =
-    Gen.alphaNumStr.map(DirName.apply).suchThat(!_.value.isEmpty)
-
-  def alphaNumFileGen =
-    Gen.alphaNumStr.map(FileName.apply).suchThat(!_.value.isEmpty)
 
   "TablePath" should {
     "extract table name" in {
@@ -46,7 +40,7 @@ class TablePathSpec extends Qspec {
     "extract empty schema name" in {
       prop { (fileName: FileName) =>
         {
-          create(rootDir </> file1(fileName)).schema must beNone
+          create(rootDir </> file1(fileName)).schema must_=== DefaultSchema
         }
       }
     }
@@ -55,8 +49,7 @@ class TablePathSpec extends Qspec {
       prop { (parentDirName: DirName, fileName: FileName) =>
         {
           val file = rootDir </> dir1(parentDirName) </> file1(fileName)
-          create(file).schema must beSome(
-            SchemaName(parentDirName.value))
+          create(file).schema must_=== CustomSchema(parentDirName.value)
         }
       }.setGens(alphaNumDirGen, alphaNumFileGen)
     }
@@ -66,8 +59,7 @@ class TablePathSpec extends Qspec {
         {
           val file = rootDir </> dir1(dirName1) </> dir1(dirName2) </> file1(
             fileName)
-          create(file).schema must beSome(
-            SchemaName(dirName1.value + Separator + dirName2.value))
+          create(file).schema must_=== CustomSchema(dirName1.value + Separator + dirName2.value)
         }
       }.setGens(alphaNumDirGen, alphaNumDirGen, alphaNumFileGen)
     }
@@ -83,9 +75,9 @@ class TablePathSpec extends Qspec {
           {
             val path = rootDir </> dir1(dirName1) </> dir1(dirName2) </> dir1(
               dirName3) </> file1(fileName)
-            create(path).schema must beSome(
-              SchemaName(
-                dirName1.value + Separator + dirName2.value + Separator + dirName3.value))
+            create(path).schema must_===
+              CustomSchema(
+                dirName1.value + Separator + dirName2.value + Separator + dirName3.value)
           }
       }.setGens(alphaNumDirGen, alphaNumDirGen, alphaNumDirGen, alphaNumFileGen)
     }

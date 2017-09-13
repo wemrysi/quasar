@@ -43,7 +43,5 @@ trait PostgresInsert extends RdbmsInsert {
     Update[Data](fQuery.update.sql)
       .updateMany(chunk)
       .map(_ => Vector.empty[FileSystemError])
-
   }
-
 }

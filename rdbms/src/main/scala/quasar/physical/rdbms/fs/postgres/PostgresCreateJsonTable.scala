@@ -30,9 +30,10 @@ trait PostgresCreateJsonTable extends RdbmsCreateTable {
 
   override def createTable(tablePath: TablePath): ConnectionIO[Unit] = {
 
-    val createSchema: ConnectionIO[Unit] = tablePath.schema.map { s =>
-      (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(s.name)).update.run.map(_ => ())
-    }.getOrElse(().point[ConnectionIO])
+    val createSchema: ConnectionIO[Unit] = tablePath.schema match {
+      case DefaultSchema => ().point[ConnectionIO]
+      case CustomSchema(name) => (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(name)).update.run.map(_ => ())
+    }
 
     createSchema
       .flatMap(_ =>

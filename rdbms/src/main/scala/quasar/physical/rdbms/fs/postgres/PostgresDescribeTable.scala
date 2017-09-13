@@ -16,11 +16,14 @@
 
 package quasar.physical.rdbms.fs.postgres
 
-import quasar.physical.rdbms.common._
+import quasar.physical.rdbms.common.{Schema, _}
 import quasar.physical.rdbms.fs.RdbmsDescribeTable
 import slamdata.Predef._
-
 import doobie.imports._
+import quasar.physical.rdbms.common.TablePath.Separator
+
+import scalaz.syntax.show._
+import scalaz.syntax.applicative._
 
 trait PostgresDescribeTable extends RdbmsDescribeTable {
 
@@ -35,28 +38,50 @@ trait PostgresDescribeTable extends RdbmsDescribeTable {
   }
 
   private def whereSchemaAndTable(tablePath: TablePath): Fragment = {
-    val schemaName = tablePath.schema.map(_.name).getOrElse("public")
+    val schemaName = tablePath.schema match {
+      case DefaultSchema => "public"
+      case CustomSchema(name) => name
+    }
     fr"WHERE TABLE_SCHEMA=" ++
   Fragment.const("'" + schemaName + "'") ++
     fr"AND TABLE_NAME =" ++
-    Fragment.const("'" + tablePath.table.name + "'")
+    Fragment.const("'" + tablePath.table.shows + "'")
   }
 
-  private def whereSchema(schemaName: SchemaName): Fragment =
+  private def whereSchema(schemaName: String): Fragment =
     fr"WHERE TABLE_SCHEMA=" ++
-      Fragment.const("'" + schemaName.name + "'")
+      Fragment.const("'" + schemaName + "'")
 
 
-  def findChildSchemas(parentSchema: SchemaName): ConnectionIO[Vector[SchemaName]] = {
-    val prefixParam = parentSchema.name + TablePath.Separator
-    sql"SELECT SCHEMA_NAME FROM information_schema.schemata WHERE SCHEMA_NAME LIKE $prefixParam"
+  override def findChildTables(schema: Schema): ConnectionIO[Vector[TableName]] = {
+    val whereClause = schema match {
+      case DefaultSchema => fr""
+      case CustomSchema(name) => fr"WHERE TABLE_SCHEMA = $name"
+    }
+
+    (fr"select TABLE_NAME from information_schema.tables" ++ whereClause)
       .query[String]
       .vector
-      .map(_.map(SchemaName.apply))
+      .map(_.map(TableName.apply))
   }
 
-  override def schemaExists(schemaName: SchemaName): ConnectionIO[Boolean] =
-    descQuery(whereSchema(schemaName), _.nonEmpty)
+  override def findChildSchemas(parent: Schema): ConnectionIO[Vector[CustomSchema]] = {
+    val whereClause = parent match {
+      case DefaultSchema => fr""
+      case CustomSchema(name) => fr"WHERE SCHEMA_NAME LIKE ${name + Separator}"
+    }
+    (fr"SELECT SCHEMA_NAME FROM information_schema.schemata" ++ whereClause)
+      .query[String]
+      .vector
+      .map(_.map(CustomSchema.apply))
+  }
+
+  override def schemaExists(schema: Schema): ConnectionIO[Boolean] =
+    schema match {
+      case DefaultSchema => true.point[ConnectionIO]
+      case CustomSchema(name) =>
+        descQuery(whereSchema(name), _.nonEmpty)
+    }
 
   override def tableExists(
       tablePath: TablePath): ConnectionIO[Boolean] =

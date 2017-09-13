@@ -18,42 +18,74 @@ package quasar.physical.rdbms
 
 import slamdata.Predef._
 import pathy.Path
-import pathy.Path.PathCodec
+import pathy.Path.DirName
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 
-import scalaz._, Scalaz._
+import scalaz._
+import Scalaz._
 
 object common {
 
   final case class Config(connInfo: JdbcConnectionInfo)
 
-  final case class SchemaName(name: String) extends AnyVal
+  sealed trait Schema
+
+  final case object DefaultSchema extends Schema
+
+  final case class CustomSchema(name: String) extends Schema
+
+
+  object Schema {
+    def lastDirName(schema: Schema): DirName = {
+      schema match {
+        case DefaultSchema => DirName("")
+        case CustomSchema(name) =>
+          val lastSeparatorIndex = name.lastIndexOf(TablePath.Separator)
+          val startIndex = if (lastSeparatorIndex > 0) lastSeparatorIndex + TablePath.Separator.length else 0
+          DirName(name.substring(startIndex))
+      }
+    }
+  }
+
   final case class TableName(name: String) extends AnyVal
-  final case class TablePath(schema: Option[SchemaName], table: TableName)
+  final case class TablePath(schema: Schema, table: TableName)
 
+  implicit val showSchema: Show[Schema] = Show.shows {
+    case DefaultSchema => ""
+    case CustomSchema(name) => s"$name"
+  }
 
-  implicit val showPath: Show[TablePath] =
-    Show.shows(path => path.schema.map(s => s"${s.name}.").getOrElse("") + path.table.name)
+  implicit val showTableName: Show[TableName] =
+    Show.shows(_.name)
+
+  implicit val showPath: Show[TablePath] = Show.shows { tp =>
+    tp.schema match {
+      case DefaultSchema => tp.table.shows
+      case CustomSchema(name) => s"$name.${tp.table.shows}"
+    }
+  }
 
   object TablePath {
 
-    val Separator = "_$child_"
+    val Separator = "__child_"
+    val SeparatorRegex = "__child_"
 
-    def dirToSchemaName(dir: ADir): Option[SchemaName] = {
-      Some(Path.flatten(None, None, None, Some(_), Some(_), dir)
+    def dirToSchema(dir: ADir): Schema = {
+      Path.flatten(None, None, None, Some(_), Some(_), dir)
         .toIList
         .unite
-        .intercalate(Separator))
-        .filter(_.nonEmpty).map(SchemaName.apply)
-    }
+        .intercalate(Separator) match {
+        case "" => DefaultSchema
+        case pathStr => CustomSchema(pathStr)
+      }
 
+    }
 
     def create(file: AFile): TablePath = {
       val filename = Path.fileName(file).value
-      val parentDir = Path.parentDir(file)
-      val dirname = parentDir.flatMap(dirToSchemaName)
-      new TablePath(dirname, TableName(filename))
+      val schema = Path.parentDir(file).map(dirToSchema).getOrElse(DefaultSchema)
+      new TablePath(schema, TableName(filename))
     }
   }
 }
