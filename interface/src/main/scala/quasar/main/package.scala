@@ -22,6 +22,7 @@ import quasar.config.{ConfigOps, FsFile, ConfigError, MetaStoreConfig}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
+import quasar.connector.BackendModule
 import quasar.effect._
 import quasar.db._
 import quasar.fp._, ski._
@@ -31,7 +32,7 @@ import quasar.fs.cache.VCache
 import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
 import quasar.fs.mount.module.Module
-import quasar.physical._, couchbase.Couchbase
+import quasar.physical._ // , couchbase.Couchbase
 import quasar.main.config.loadConfigFile
 import quasar.metastore._
 
@@ -40,7 +41,7 @@ import scala.util.control.NonFatal
 import doobie.imports._
 import eu.timepit.refined.auto._
 import monocle.Lens
-import pathy.Path.posixCodec
+import pathy.Path, Path.posixCodec
 import scalaz.{Failure => _, Lens => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
@@ -88,6 +89,19 @@ package object main {
     final case class ExplodedDirs(backends: IList[(ClassName, ClassPath)]) extends FsLoadCfg
   }
 
+  // all of the backends which are included in the core distribution
+  private val CoreFS = IList(
+    // Couchbase.definition translate injectFT[Task, PhysFsEff],
+    // marklogic.MarkLogic.definition translate injectFT[Task, PhysFsEff],
+    mimir.Mimir.definition translate injectFT[Task, PhysFsEff],
+    // mongodb.MongoDb.definition translate injectFT[Task, PhysFsEff],
+    skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff],
+    // sparkcore.fs.hdfs.SparkHdfsBackendModule.definition translate injectFT[Task, PhysFsEff],
+    // sparkcore.fs.elastic.SparkElasticBackendModule.definition translate injectFT[Task, PhysFsEff],
+    // sparkcore.fs.cassandra.definition[PhysFsEff],
+    // sparkcore.fs.local.SparkLocalBackendModule.definition translate injectFT[Task, PhysFsEff]
+  ).fold
+
   /**
    * The physical filesystems currently supported.  Please note that it
    * is really best if you only sequence this task ''once'' per runtime.
@@ -95,17 +109,81 @@ package object main {
    * times.  Thus, all uses of the value from this Task should be handled
    * by `FsAsk` (or an analogous `Kleisli`).
    */
-  def physicalFileSystems(config: FsLoadCfg): Task[BackendDef[PhysFsEffM]] = IList(
-    Couchbase.definition translate injectFT[Task, PhysFsEff],
-    marklogic.MarkLogic.definition translate injectFT[Task, PhysFsEff],
-    mimir.Mimir.definition translate injectFT[Task, PhysFsEff],
-    mongodb.MongoDb.definition translate injectFT[Task, PhysFsEff],
-    skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff],
-    sparkcore.fs.hdfs.SparkHdfsBackendModule.definition translate injectFT[Task, PhysFsEff],
-    sparkcore.fs.elastic.SparkElasticBackendModule.definition translate injectFT[Task, PhysFsEff],
-    sparkcore.fs.cassandra.definition[PhysFsEff],
-    sparkcore.fs.local.SparkLocalBackendModule.definition translate injectFT[Task, PhysFsEff]
-  ).fold.point[Task]    // TODO
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf", "org.wartremover.warts.Null"))
+  def physicalFileSystems(config: FsLoadCfg): Task[BackendDef[PhysFsEffM]] = {
+    import java.io.File
+    import java.lang.{
+      ClassCastException,
+      ClassNotFoundException,
+      ExceptionInInitializerError,
+      IllegalAccessException,
+      IllegalArgumentException,
+      NoSuchFieldException,
+      NullPointerException
+    }
+    import java.net.URLClassLoader
+
+    import FsLoadCfg._
+
+    // this is a side-effect in the same way that `new` is a side-effect
+    val ParentCL = this.getClass.getClassLoader
+
+    val isolatedFS: Task[BackendDef[Task]] = config match {
+      case JarDirectory(dir) => ???
+
+      case ExplodedDirs(backends) =>
+        val maybeDefinitionsM: Task[IList[Option[BackendDef[Task]]]] = backends traverse {
+          case (ClassName(cn), ClassPath(paths)) =>
+            val back = for {
+              urls <- (paths traverse { path =>
+                for {
+                  file <- Task.delay(new File(posixCodec.unsafePrintPath(path)))
+                  url <- Task.delay(file.toURI.toURL)
+                } yield url
+              }).liftM[OptionT]
+
+              urlsArr = urls.toList.toArray
+
+              cl <- Task.delay(new URLClassLoader(urlsArr, ParentCL)).liftM[OptionT]
+
+              clazz <- OptionT(Task delay {
+                try {
+                  Some(cl.loadClass(cn))
+                } catch {
+                  case cnf: ClassNotFoundException =>
+                    // TODO log the non-existence of the class!
+                    None
+                }
+              })
+
+              module <- OptionT(Task delay {
+                try {
+                  Some(clazz.getDeclaredField("MODULE$").get(null).asInstanceOf[BackendModule])
+                } catch {
+                  case _: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException =>
+                    // TODO log the fact that the BackendModule is not an object
+                    None
+
+                  case _: ExceptionInInitializerError =>
+                    // TODO log the fact that the backend module failed to load
+                    None
+
+                  case _: ClassCastException =>
+                    // TODO log the fact that the backend module isn't a BackendModule
+                    None
+                }
+              })
+            } yield module.definition
+
+            back.run
+        }
+
+        maybeDefinitionsM.map(_.flatMap(opt => IList.fromList(opt.toList)).fold)
+    }
+
+    // merge the isolated filesystems with the core filesystems
+    isolatedFS.map(_.translate(injectFT[Task, PhysFsEff])).map(IList(_, CoreFS).fold)
+  }
 
   sealed trait FsAsk[A]
 
