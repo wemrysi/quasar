@@ -30,6 +30,7 @@ import quasar.qscript.{Read => _, _}
 
 import scala.Predef.implicitly
 
+import java.lang.Thread
 import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
 import pathy.Path._
@@ -91,10 +92,23 @@ trait SparkCoreBackendModule extends BackendModule {
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
 
   type LowerLevel[A] = Coproduct[Task, PhysErr, A]
+
+  @SuppressWarnings(Array("org.wartremover.warts.Equals", "org.wartremover.warts.Null"))
+  private val overrideContextCL = {
+    for {
+      thread <- Task.delay(Thread.currentThread())
+      ccl <- Task.delay(thread.getContextClassLoader())
+      _ <- if (ccl eq null)
+        Task.now(())
+      else
+        Task.delay(thread.setContextClassLoader(null))    // force spark to use its own classloader
+    } yield ()
+  }
+
   def lowerToTask: LowerLevel ~> Task = λ[LowerLevel ~> Task](_.fold(
     injectNT[Task, Task],
     Failure.mapError[PhysicalError, Exception](_.cause) andThen Failure.toCatchable[Task, Exception]
-  ))
+  )).andThen(λ[Task ~> Task](overrideContextCL >> _))
 
   def toTask(sc: SparkContext, config: Config): Task[M ~> Task] =
     toLowerLevel[LowerLevel](sc, config).map(_ andThen foldMapNT(lowerToTask))
@@ -123,7 +137,7 @@ trait SparkCoreBackendModule extends BackendModule {
     def open(f: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = for {
       h <- readfile.open[Eff](f, offset, limit).liftB.unattempt
     } yield ReadHandle(f, h.id)
-    
+
     def read(h: ReadHandle): Backend[Vector[Data]] =
       readfile.read[Eff](h).liftB.unattempt
 
@@ -162,7 +176,7 @@ trait SparkCoreBackendModule extends BackendModule {
   }
 
   def QueryFileModule: QueryFileModule = SparkQueryFileModule
-  
+
   abstract class SparkCoreManageFileModule extends ManageFileModule {
     import ManageFile._, ManageFile.MoveScenario._
     import quasar.fs.impl.ensureMoveSemantics
