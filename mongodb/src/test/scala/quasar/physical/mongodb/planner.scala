@@ -615,15 +615,15 @@ class PlannerSpec extends
           ExcludeId)))
     }
 
-    "plan array length -3.2" in {
+    "plan array length 3.2" in {
       plan3_2(sqlE"select array_length(bar, 1) from zips") must
        beWorkflow(chain[Workflow](
          $read(collection("db", "zips")),
          $simpleMap(
            NonEmptyList(MapExpr(JsFn(Name("x"),
              If(
-               Call(Select(ident("Array"), "isArray"), List(Select(ident("_"), "bar"))),
-               Call(ident("NumberLong"), List(Select(Select(ident("_"), "bar"), "length"))),
+               Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "bar"))),
+               Call(ident("NumberLong"), List(Select(Select(ident("x"), "bar"), "length"))),
                ident(Js.Undefined.ident))))),
              ListMap())))
     }
