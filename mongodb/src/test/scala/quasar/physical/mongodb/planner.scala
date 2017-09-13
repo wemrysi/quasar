@@ -1921,13 +1921,8 @@ class PlannerSpec extends
             grouped(
               "len" -> $first($field("f0")),
               "cnt" -> $sum($literal(Bson.Int32(1)))),
-            -\/(reshape("0" -> $field("__tmp6")))),
-          $project(
-            reshape(
-              "len" -> $field("_id", "0"),
-              "cnt" -> $include()),
-            IgnoreId)))
-    }.pendingUntilFixed(notOnPar)
+            -\/(reshape("0" -> $field("b0"))))))
+    }
 
     "plan simple JS inside expression" in {
       plan3_2(sqlE"select length(city) + 1 from zips") must
