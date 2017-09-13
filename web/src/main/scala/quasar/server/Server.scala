@@ -59,13 +59,12 @@ object Server {
     def fromCliOptions(opts: CliOptions): MainTask[WebCmdLineConfig] = {
       import scala.sys
 
-      // the following throws exceptions because the CLI validation should have already caught it
       val loadConfig = opts.loadConfig.fold(
         plugins => FsLoadCfg.JarDirectory(ADir.fromFile(plugins).getOrElse(sys.error("plugin directory does not exist (or is a file)"))),
         { backends =>
           val entries = backends.toList map {
             case (name, paths) =>
-              val apaths = paths.toList.map(path => ADir.fromFile(path).orElse(AFile.fromFile(path)).getOrElse(sys.error(s"backend classpath entry '$path' does not exist")))
+              val apaths = paths.toList.flatMap(path => ADir.fromFile(path).orElse(AFile.fromFile(path)).toList)
 
               val cn = ClassName(name)
               val cp = ClassPath(IList.fromList(apaths))

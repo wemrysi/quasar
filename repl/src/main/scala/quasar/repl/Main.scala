@@ -139,7 +139,6 @@ object Main {
       _       <- driver(runCmd)
     } yield ()
 
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def safeMain(args: Vector[String]): Task[Unit] =
     logErrors(for {
       opts    <- CliOptions.parser.safeParse(args, CliOptions.default)
@@ -151,9 +150,8 @@ object Main {
 
       backends = opts.backends map {
         case (name, paths) =>
-          // this .get is safe because the options are already validated
           val apaths =
-            paths.toList.map(file => ADir.fromFile(file).orElse(AFile.fromFile(file)).get)
+            paths.toList.flatMap(file => ADir.fromFile(file).orElse(AFile.fromFile(file)).toList)
 
           val cn = ClassName(name)
           val cp = ClassPath(IList.fromList(apaths))

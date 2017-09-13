@@ -72,6 +72,26 @@ val targetSettings = Seq(
   }
 )
 
+lazy val backendRewrittenRunSettings = Seq(
+  run := Def.inputTaskDyn {
+    val log = streams.value.log
+    val args = complete.DefaultParsers.spaceDelimited("<arg>").parsed
+
+    log.info("Computing classpaths of dependent backends...")
+
+    val parentCp = (fullClasspath in connector in Compile).value.files
+    val backends = isolatedBackends.value map {
+      case (name, childCp) =>
+        val cpStr = createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(",")
+        "--backend:" + name + "=" + cpStr
+    }
+
+    // the leading string is significant here!  #sbtwtfbarbecue
+    val argStr = (backends ++ args).mkString(" ", " ", "")
+
+    (run in Compile).toTask(argStr)
+  }.evaluated)
+
 // In Travis, the processor count is reported as 32, but only ~2 cores are
 // actually available to run.
 concurrentRestrictions in Global := {
@@ -105,10 +125,10 @@ lazy val assemblySettings = Seq(
     case PathList("org", "apache", "hadoop", "yarn", xs @ _*) => MergeStrategy.last
     case PathList("com", "google", "common", "base", xs @ _*) => MergeStrategy.last
     case "log4j.properties"                                   => MergeStrategy.discard
-    // After recent library version upgrades there seems to be a library pulling 
+    // After recent library version upgrades there seems to be a library pulling
     // in the scala-lang scala-compiler 2.11.11 jar. It comes bundled with jansi OS libraries
-    // which conflict with similar jansi libraries brought in by fusesource.jansi.jansi-1.11 
-    // So the merge needed the following lines to avoid the "deduplicate: different file contents found" 
+    // which conflict with similar jansi libraries brought in by fusesource.jansi.jansi-1.11
+    // So the merge needed the following lines to avoid the "deduplicate: different file contents found"
     // produced by web/assembly. Look into removing this once we move to scala v2.11.11.
     case s if s.endsWith("libjansi.jnilib")                   => MergeStrategy.last
     case s if s.endsWith("jansi.dll")                         => MergeStrategy.last
@@ -159,6 +179,14 @@ lazy val isCIBuild               = settingKey[Boolean]("True when building in an
 lazy val isIsolatedEnv           = settingKey[Boolean]("True if running in an isolated environment")
 lazy val exclusiveTestTag        = settingKey[String]("Tag for exclusive execution tests")
 lazy val sparkDependencyProvided = settingKey[Boolean]("Whether or not the spark dependency should be marked as provided. If building for use in a Spark cluster, one would set this to true otherwise setting it to false will allow you to run the assembly jar on it's own")
+
+lazy val isolatedBackends =
+  taskKey[Seq[(String, Seq[File])]]("Global-only setting which contains all of the classpath-isolated backends")
+
+isolatedBackends in Global := Seq()
+
+def createBackendEntry(childPath: Seq[File], parentPath: Seq[File]): Seq[File] =
+  (childPath.toSet -- parentPath.toSet).toSeq
 
 lazy val root = project.in(file("."))
   .settings(commonSettings)
@@ -326,6 +354,7 @@ lazy val couchbase = project
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.couchbase)
+  .settings(isolatedBackends in Global += "quasar.physical.couchbase.Couchbase$" -> (fullClasspath in Compile).value.files)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the MarkLogic connector.
@@ -337,6 +366,7 @@ lazy val marklogic = project
   .settings(targetSettings)
   .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
   .settings(libraryDependencies ++= Dependencies.marklogic)
+  .settings(isolatedBackends in Global += "quasar.physical.marklogic.MarkLogic$" -> (fullClasspath in Compile).value.files)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the MongoDB connector.
@@ -355,6 +385,7 @@ lazy val mongodb = project
       Wart.AsInstanceOf,
       Wart.Equals,
       Wart.Overloading))
+  .settings(isolatedBackends in Global += "quasar.physical.mongodb.MongoDb$" -> (fullClasspath in Compile).value.files)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** A connector outline, meant to be copied and incrementally filled in while
@@ -382,6 +413,10 @@ lazy val sparkcore = project
   .settings(
     sparkDependencyProvided := false,
     libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value))
+  .settings(
+    isolatedBackends in Global ++= Seq(
+      // TODO the rest of them
+      "quasar.physical.sparkcore.fs.local.SparkLocalBackendModule$" -> (fullClasspath in Compile).value.files))
   .enablePlugins(AutomateHeaderPlugin)
 
 // interfaces
@@ -412,6 +447,7 @@ lazy val repl = project
   .settings(noPublishSettings)
   .settings(githubReleaseSettings)
   .settings(targetSettings)
+  .settings(backendRewrittenRunSettings)
   .settings(
     fork in run := true,
     connectInput in run := true,
@@ -427,6 +463,7 @@ lazy val web = project
   .settings(publishTestsSettings)
   .settings(githubReleaseSettings)
   .settings(targetSettings)
+  .settings(backendRewrittenRunSettings)
   .settings(
     mainClass in Compile := Some("quasar.server.Server"),
     libraryDependencies ++= Dependencies.web)
@@ -445,6 +482,28 @@ lazy val it = project
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
+  .settings(
+    test := Def.taskDyn {
+      val LoadCfgProp = "slamdata.internal.fs-load-cfg"
+
+      if (java.lang.System.getProperty(LoadCfgProp, "").isEmpty) {
+        val log = streams.value.log
+
+        log.info("Computing classpaths of dependent backends...")
+
+        val parentCp = (fullClasspath in connector in Compile).value.files
+        val backends = isolatedBackends.value map {
+          case (name, childCp) =>
+            val cpStr = createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(",")
+            name + "=" + cpStr
+        }
+
+        // we aren't forking tests, so we just set the property in the current JVM
+        java.lang.System.setProperty(LoadCfgProp, backends.mkString(";"))
+      }
+
+      test in Test
+    }.value)
   .enablePlugins(AutomateHeaderPlugin)
 
 

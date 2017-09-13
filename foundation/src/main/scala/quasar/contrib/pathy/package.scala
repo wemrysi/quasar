@@ -55,7 +55,8 @@ package object pathy {
     // performs some effects; I'm probably going to regret this...
     def fromFile(file: JFile): Option[ADir] = {
       val check = file.exists() && file.isDirectory()
-      posixCodec.parseAbsDir(file.getAbsolutePath).map(unsafeSandboxAbs).filter(_ => check)
+      // trailing '/' is significant!  yay, pathy...
+      posixCodec.parseAbsDir(file.getAbsolutePath + "/").map(unsafeSandboxAbs).filter(_ => check)
     }
   }
 
