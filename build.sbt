@@ -87,7 +87,7 @@ lazy val backendRewrittenRunSettings = Seq(
     }
 
     // the leading string is significant here!  #sbtwtfbarbecue
-    val argStr = (backends ++ args).mkString(" ", " ", "")
+    val argStr = (args ++ backends).mkString(" ", " ", "")
 
     (run in Compile).toTask(argStr)
   }.evaluated)
