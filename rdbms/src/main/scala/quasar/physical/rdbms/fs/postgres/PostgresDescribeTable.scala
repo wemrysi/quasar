@@ -68,7 +68,8 @@ trait PostgresDescribeTable extends RdbmsDescribeTable {
   override def findChildSchemas(parent: Schema): ConnectionIO[Vector[CustomSchema]] = {
     val whereClause = parent match {
       case DefaultSchema => fr""
-      case CustomSchema(name) => fr"WHERE SCHEMA_NAME LIKE ${name + Separator}"
+      case CustomSchema(name) =>
+        fr"WHERE SCHEMA_NAME LIKE" ++ Fragment.const("'" + name + Separator + "%'")
     }
     (fr"SELECT SCHEMA_NAME FROM information_schema.schemata" ++ whereClause)
       .query[String]
