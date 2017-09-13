@@ -66,7 +66,7 @@ package object main {
     mongodb.MongoDb.definition translate injectFT[Task, PhysFsEff],
     skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff],
     sparkcore.fs.hdfs.SparkHdfsBackendModule.definition translate injectFT[Task, PhysFsEff],
-    sparkcore.fs.elastic.definition[PhysFsEff],
+    sparkcore.fs.elastic.SparkElasticBackendModule.definition translate injectFT[Task, PhysFsEff],
     sparkcore.fs.cassandra.definition[PhysFsEff],
     sparkcore.fs.local.SparkLocalBackendModule.definition translate injectFT[Task, PhysFsEff]
   ).fold
