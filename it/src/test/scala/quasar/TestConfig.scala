@@ -24,7 +24,7 @@ import quasar.main.{ClassName, ClassPath, FsLoadCfg}
 import quasar.physical.{couchbase, marklogic, mongodb, sparkcore}
 
 import pathy.Path._
-import knobs.{Required, Optional, FileResource, SysPropsResource, Prefix}
+import knobs.{Required, Optional, FileResource}
 import scalaz._, Scalaz._
 import scalaz.concurrent._
 
@@ -139,7 +139,6 @@ object TestConfig {
 
   def confValue(name: String): OptionT[Task, String] = {
     val config = knobs.loadImmutable(
-      Optional(SysPropsResource(Prefix("")))                    ::
       Optional(FileResource(new java.io.File(confFile)))        ::
       Required(FileResource(new java.io.File(defaultConfFile))) ::
       Nil)

@@ -185,6 +185,8 @@ lazy val isolatedBackends =
 
 isolatedBackends in Global := Seq()
 
+lazy val sideEffectTestFSConfig = taskKey[Unit]("Rewrite the JVM environment to contain the filesystem classpath information for integration tests")
+
 def createBackendEntry(childPath: Seq[File], parentPath: Seq[File]): Seq[File] =
   (childPath.toSet -- parentPath.toSet).toSeq
 
@@ -483,24 +485,26 @@ lazy val it = project
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
   .settings(
-    test := Def.taskDyn {
+    sideEffectTestFSConfig := {
       val LoadCfgProp = "slamdata.internal.fs-load-cfg"
 
       if (java.lang.System.getProperty(LoadCfgProp, "").isEmpty) {
-        val log = streams.value.log
-
-        log.info("Computing classpaths of dependent backends...")
-
         val parentCp = (fullClasspath in connector in Compile).value.files
         val backends = isolatedBackends.value map {
           case (name, childCp) =>
-            val cpStr = createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(",")
+            val cpStr = createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(":")
             name + "=" + cpStr
         }
 
         // we aren't forking tests, so we just set the property in the current JVM
         java.lang.System.setProperty(LoadCfgProp, backends.mkString(";"))
       }
+
+      ()
+    },
+
+    test := Def.taskDyn {
+      val _ = sideEffectTestFSConfig.value
 
       test in Test
     }.value)
