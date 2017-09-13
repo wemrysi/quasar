@@ -41,6 +41,7 @@ import scala.util.control.NonFatal
 import doobie.imports._
 import eu.timepit.refined.auto._
 import monocle.Lens
+import org.slf4s.Logging
 import pathy.Path, Path.posixCodec
 import scalaz.{Failure => _, Lens => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -48,7 +49,7 @@ import scalaz.concurrent.Task
 /** Concrete effect types and their interpreters that implement the quasar
   * functionality.
   */
-package object main {
+package object main extends Logging {
   import BackendDef.DefinitionResult
   import QueryFile.ResultHandle
 
@@ -151,7 +152,8 @@ package object main {
                   Some(cl.loadClass(cn))
                 } catch {
                   case cnf: ClassNotFoundException =>
-                    // TODO log the non-existence of the class!
+                    log.warn(s"could not locate class for backend module '$cn'", cnf)
+
                     None
                 }
               })
@@ -160,16 +162,19 @@ package object main {
                 try {
                   Some(clazz.getDeclaredField("MODULE$").get(null).asInstanceOf[BackendModule])
                 } catch {
-                  case _: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException =>
-                    // TODO log the fact that the BackendModule is not an object
+                  case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
+                    log.warn(s"backend module '$cn' does not appear to be a singleton object", e)
+
                     None
 
-                  case _: ExceptionInInitializerError =>
-                    // TODO log the fact that the backend module failed to load
+                  case e: ExceptionInInitializerError =>
+                    log.warn(s"backend module '$cn' failed to load with exception", e)
+
                     None
 
                   case _: ClassCastException =>
-                    // TODO log the fact that the backend module isn't a BackendModule
+                    log.warn(s"backend module '$cn' is not actually a subtype of BackendModule")
+
                     None
                 }
               })
