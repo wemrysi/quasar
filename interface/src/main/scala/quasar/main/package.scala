@@ -129,8 +129,74 @@ package object main extends Logging {
     // this is a side-effect in the same way that `new` is a side-effect
     val ParentCL = this.getClass.getClassLoader
 
+    def loadBackend(cn: String, cl: ClassLoader): OptionT[Task, BackendDef[Task]] = {
+      for {
+        clazz <- OptionT(Task delay {
+          try {
+            Some(cl.loadClass(cn))
+          } catch {
+            case cnf: ClassNotFoundException =>
+              log.warn(s"could not locate class for backend module '$cn'", cnf)
+
+              None
+          }
+        })
+
+        module <- OptionT(Task delay {
+          try {
+            Some(clazz.getDeclaredField("MODULE$").get(null).asInstanceOf[BackendModule])
+          } catch {
+            case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
+              log.warn(s"backend module '$cn' does not appear to be a singleton object", e)
+
+              None
+
+            case e: ExceptionInInitializerError =>
+              log.warn(s"backend module '$cn' failed to load with exception", e)
+
+              None
+
+            case _: ClassCastException =>
+              log.warn(s"backend module '$cn' is not actually a subtype of BackendModule")
+
+              None
+          }
+        })
+      } yield module.definition
+    }
+
     val isolatedFS: Task[BackendDef[Task]] = config match {
-      case JarDirectory(dir) => ???
+      case JarDirectory(dir) =>
+        import java.util.jar.Manifest
+
+        for {
+          file <- Task.delay(new File(posixCodec.unsafePrintPath(dir)))
+          children <- Task.delay(file.listFiles().toList)
+          jars = IList.fromList(children.filter(_.getName.endsWith(".jar")).toList)
+
+          loaded <- jars traverse { jar =>
+            val back = for {
+              cl <- Task.delay(new URLClassLoader(Array(jar.toURI.toURL), ParentCL)).liftM[OptionT]
+              manifestIS <- OptionT(Task.delay(Option(cl.getResourceAsStream("META-INF/MANIFEST.MF"))))
+              manifest <- Task.delay(new Manifest(manifestIS)).liftM[OptionT]
+              attrs <- Task.delay(manifest.getMainAttributes()).liftM[OptionT]
+
+              moduleAttrValue <- OptionT(Task.delay(Option(attrs.getValue("Backend-Module"))))
+              modules = IList.fromList(moduleAttrValue.split(" ").toList)
+
+              defs <- modules.traverse(loadBackend(_, cl))
+            } yield defs.fold
+
+            for {
+              result <- back.run
+
+              _ <- if (result.isEmpty)
+                Task.delay(log.warn(s"unable to load any backends from $jar; perhaps the 'Backend-Module' attribute is not defined"))
+              else
+                Task.now(())
+            } yield result
+          }
+        } yield loaded.flatMap(r => IList.fromList(r.toList)).fold
 
       case ExplodedDirs(backends) =>
         val maybeDefinitionsM: Task[IList[Option[BackendDef[Task]]]] = backends traverse {
@@ -143,42 +209,9 @@ package object main extends Logging {
                 } yield url
               }).liftM[OptionT]
 
-              urlsArr = urls.toList.toArray
-
-              cl <- Task.delay(new URLClassLoader(urlsArr, ParentCL)).liftM[OptionT]
-
-              clazz <- OptionT(Task delay {
-                try {
-                  Some(cl.loadClass(cn))
-                } catch {
-                  case cnf: ClassNotFoundException =>
-                    log.warn(s"could not locate class for backend module '$cn'", cnf)
-
-                    None
-                }
-              })
-
-              module <- OptionT(Task delay {
-                try {
-                  Some(clazz.getDeclaredField("MODULE$").get(null).asInstanceOf[BackendModule])
-                } catch {
-                  case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
-                    log.warn(s"backend module '$cn' does not appear to be a singleton object", e)
-
-                    None
-
-                  case e: ExceptionInInitializerError =>
-                    log.warn(s"backend module '$cn' failed to load with exception", e)
-
-                    None
-
-                  case _: ClassCastException =>
-                    log.warn(s"backend module '$cn' is not actually a subtype of BackendModule")
-
-                    None
-                }
-              })
-            } yield module.definition
+              cl <- Task.delay(new URLClassLoader(urls.toList.toArray, ParentCL)).liftM[OptionT]
+              back <- loadBackend(cn, cl)
+            } yield back
 
             back.run
         }
