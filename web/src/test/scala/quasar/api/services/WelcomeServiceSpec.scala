@@ -20,17 +20,18 @@ import slamdata.Predef._
 import quasar.build
 
 import org.http4s.Request
+import org.http4s.syntax.service._
 
 class WelcomeServiceSpec extends quasar.Qspec {
   "Welcome service" should {
     "show a welcome message" in {
       val req = Request()
-      val resp = welcome.service(req).unsafePerformSync
+      val resp = welcome.service.orNotFound(req).unsafePerformSync
       resp.as[String].unsafePerformSync must contain("quasar-logo-vector.png")
     }
     "show the current version" in {
       val req = Request()
-      val resp = welcome.service(req).unsafePerformSync
+      val resp = welcome.service.orNotFound(req).unsafePerformSync
       resp.as[String].unsafePerformSync must contain("Quasar " + build.BuildInfo.version)
     }
   }

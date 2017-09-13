@@ -65,12 +65,12 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
     failureResponseOr[Module.Error]      :+:
     (liftMT[Task, ResponseT] compose inter)
 
-  def service(mem: InMemState, mounts: Map[APath, MountConfig] = Map.empty): HttpService =
+  def service(mem: InMemState, mounts: Map[APath, MountConfig] = Map.empty): Service[Request, Response] =
     HttpService.lift(req => runFs(mem).flatMap { fs =>
       val module = Module.impl.default[Coproduct[Mounting, FileSystem, ?]]
       val runModule = foldMapNT(runConstantMount[Task](mounts) :+: fs) compose module
       invoke.service[Eff].toHttpService(effRespOr(runModule)).apply(req)
-    })
+    }).orNotFound
 
   def sampleStatement(name: String): Statement[Fix[Sql]] = {
     val selectAll = sqlE"select * from :Bar"

@@ -165,7 +165,7 @@ object FileSystemTest {
       fsTestConfig0(mongodb.MongoDb.Type, mongodb.MongoDb.definition) orElse
       fsTestConfig0(sparkcore.fs.hdfs.SparkHdfsBackendModule.Type, sparkcore.fs.hdfs.SparkHdfsBackendModule.definition)  orElse
       fsTestConfig0(sparkcore.fs.local.SparkLocalBackendModule.Type, sparkcore.fs.local.SparkLocalBackendModule.definition) orElse
-      fsTestConfig(sparkcore.fs.elastic.FsType, sparkcore.fs.elastic.definition) orElse
+      fsTestConfig0(sparkcore.fs.elastic.SparkElasticBackendModule.Type, sparkcore.fs.elastic.SparkElasticBackendModule.definition) orElse
       fsTestConfig(sparkcore.fs.cassandra.FsType,  sparkcore.fs.cassandra.definition)
     }
   }

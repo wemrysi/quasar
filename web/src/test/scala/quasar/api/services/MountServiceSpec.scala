@@ -114,7 +114,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
           Failure.toRuntimeError[Task, MountingError]    :+:
           Failure.toRuntimeError[Task, PathTypeMismatch]
 
-        val service = mount.service[Eff].toHttpService(effR)
+        val service = mount.service[Eff].toHttpService(effR).orNotFound
 
         val testSvc: TestSvc =
           req => injectFT[Task, Eff] apply (service(req) flatMap (mountedRef.read strengthL _))

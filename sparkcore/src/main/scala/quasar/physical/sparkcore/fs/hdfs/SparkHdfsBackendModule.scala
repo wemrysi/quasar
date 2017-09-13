@@ -22,14 +22,15 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, readerT._
 import quasar.connector.{ChrootedInterpreter, EnvironmentError}
 import quasar.effect._
-import quasar.fp, fp.ski.κ, fp.TaskRef,  fp.free._
+import quasar.fp, fp.ski._, fp.TaskRef,  fp.free._
 import quasar.fs._,
   mount._,
   FileSystemError._, PathError._, WriteFile._,
   BackendDef.{DefinitionError, DefErrT},
   QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, _}
-import quasar.physical.sparkcore.fs.SparkCoreBackendModule
+import quasar.physical.sparkcore.fs.{SparkCoreBackendModule, SparkConnectorDetails}, SparkConnectorDetails._
+import quasar.physical.sparkcore.fs.hdfs.parquet.ParquetRDD
 import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
 
 import java.io.BufferedWriter
@@ -40,6 +41,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem => HdfsFileSystem, Path}
 import org.apache.hadoop.util.Progressable;
 import org.apache.spark._
+import org.apache.spark.rdd._
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -108,9 +110,12 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
     ) {
       (genState, rddStates, sparkCursors, writeCursors, hdfsFS) =>
 
+      val detailsInterpreter =
+        details.interpreter[ReaderT[Task, SparkContext, ?]](readChunkSize = 5000, ReaderT(κ(hdfsFS.point[Task])), hdfsPathStr(config))
+
       val interpreter: Eff ~> S =
         (Read.constant[Task, HdfsFileSystem](hdfsFS) andThen injectNT[Task, S]) :+:
-        (queryfile.detailsInterpreter[ReaderT[Task, SparkContext, ?]](ReaderT(κ(hdfsFS.point[Task])), hdfsPathStr(config)) andThen  runReaderNT(sc) andThen injectNT[Task, S]) :+:
+        (detailsInterpreter andThen  runReaderNT(sc) andThen injectNT[Task, S]) :+:
       (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
       injectNT[PhysErr, S] :+:
       injectNT[Task, S]  :+:
@@ -217,6 +222,84 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
   private def toPath(apath: APath): Free[Eff, Path] = lift(Task.delay {
     new Path(posixCodec.unsafePrintPath(apath))
   }).into[Eff]
+
+  class details[F[_]:Capture:Bind](fileSystem: F[HdfsFileSystem]) {
+
+    private def toPath(apath: APath): F[Path] = Capture[F].capture {
+      new Path(posixCodec.unsafePrintPath(apath))
+    }
+
+    private def fetchRdd(sc: SparkContext, pathStr: String): F[RDD[Data]] = Capture[F].capture {
+      import ParquetRDD._
+      // TODO add magic number support to distinguish
+      if(pathStr.endsWith(".parquet"))
+        sc.parquet(pathStr)
+      else
+        sc.textFile(pathStr)
+          .map(raw => DataCodec.parse(raw)(DataCodec.Precise) | Data.NA)
+    }
+
+    def rddFrom(f: AFile)(hdfsPathStr: AFile => F[String])(implicit
+      reader: MonadReader[F, SparkContext]
+    ): F[RDD[Data]] = for {
+      pathStr <- hdfsPathStr(f)
+      sc <- reader.ask
+      rdd <- fetchRdd(sc, pathStr)
+    } yield rdd
+
+    def store(rdd: RDD[Data], out: AFile): F[Unit] = for {
+      path <- toPath(out)
+      hdfs <- fileSystem
+    } yield {
+      val os: OutputStream = hdfs.create(path, new Progressable() {
+        override def progress(): Unit = {}
+      })
+      val bw = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"))
+
+      rdd.flatMap(DataCodec.render(_)(DataCodec.Precise).toList).collect().foreach(v => {
+        bw.write(v)
+        bw.newLine()
+      })
+      bw.close()
+    }
+
+    def fileExists(f: AFile): F[Boolean] = for {
+      path <- toPath(f)
+      hdfs <- fileSystem
+    } yield hdfs.exists(path)
+
+    def listContents(d: ADir): FileSystemErrT[F, Set[PathSegment]] = EitherT(for {
+      path <- toPath(d)
+      hdfs <- fileSystem
+    } yield if(hdfs.exists(path)) {
+        hdfs.listStatus(path).toSet.map {
+          case file if file.isFile() => FileName(file.getPath().getName()).right[DirName]
+          case directory => DirName(directory.getPath().getName()).left[FileName]
+        }.right[FileSystemError]
+      } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
+    )}
+
+  object details {
+
+    def interpreter[F[_]:Capture](
+      readChunkSize: Int,
+      fileSystem: F[HdfsFileSystem],
+      hdfsPathStr: AFile => F[String]
+    )(implicit
+      reader: MonadReader[F, SparkContext]
+    ): SparkConnectorDetails ~> F =
+      new (SparkConnectorDetails ~> F) {
+        val qf = new details[F](fileSystem)
+
+        def apply[A](from: SparkConnectorDetails[A]) = from match {
+          case FileExists(f)       => qf.fileExists(f)
+          case ReadChunkSize       => readChunkSize.point[F]
+          case StoreData(rdd, out) => qf.store(rdd, out)
+          case ListContents(d)     => qf.listContents(d).run
+          case RDDFrom(f)          => qf.rddFrom(f)(hdfsPathStr)
+        }
+      }
+  }
 
   object HdfsWriteFileModule extends WriteFileModule {
     import WriteFile._

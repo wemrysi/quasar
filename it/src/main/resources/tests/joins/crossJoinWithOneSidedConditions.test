@@ -4,10 +4,10 @@
     "backends": {
         "couchbase":         "pending",
         "marklogic_json":    "ignoreFieldOrder",
-        "mimir":             "pendingIgnoreFieldOrder"
+        "mimir":             "skip"
     },
 
-    "NB": "#1587: Disabled in couchbase due to lack of general join.",
+    "NB": "#1587: Disabled in couchbase due to lack of general join; disabled in mimir because it takes forever",
 
     "data": ["../largeZips.data", "../zips.data"],
 

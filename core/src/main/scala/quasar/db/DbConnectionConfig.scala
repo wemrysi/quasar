@@ -46,16 +46,22 @@ object DbConnectionConfig {
   }
 
   implicit val encodeJson: EncodeJson[DbConnectionConfig] =
+    encodeJsonImpl(false)
+
+  val secureEncodeJson: EncodeJson[DbConnectionConfig] =
+    encodeJsonImpl(true)
+
+  def encodeJsonImpl(secure: Boolean): EncodeJson[DbConnectionConfig] =
     EncodeJson {
       case H2(file) => Json("h2" -> Json("location" := file))
       case PostgreSql(host, database, userName, password, parameters) =>
         Json("postgresql" -> (
           ("host"       :=? host.map(_.name)) ->?:
-          ("port"       :=? host.flatMap(_.port)) ->?:
-          ("database"   :=? database) ->?:
-          ("userName"   :=  userName) ->:
-          ("password"   :=  password) ->:
-          ("parameters" :=? parameters.nonEmpty.option(parameters)) ->?:
+            ("port"       :=? host.flatMap(_.port)) ->?:
+            ("database"   :=? database) ->?:
+            ("userName"   :=  userName) ->:
+            ("password"   :=  (if (secure) "****" else password))   ->:
+            ("parameters" :=? parameters.nonEmpty.option(parameters)) ->?:
             jEmptyObject))
     }
 

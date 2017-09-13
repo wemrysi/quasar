@@ -38,7 +38,7 @@ class QueryServiceSpec extends quasar.Qspec with FileSystemFixture {
   import queryFixture._
 
   "Execute and Compile Services" should {
-    def testBoth[A](test: ((InMemState, Map[APath, MountConfig]) => HttpService) => Fragment) = {
+    def testBoth[A](test: ((InMemState, Map[APath, MountConfig]) => Service[Request, Response]) => Fragment) = {
       "Compile" should {
         test(compileService)
       }
