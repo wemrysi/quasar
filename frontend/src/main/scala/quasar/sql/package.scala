@@ -208,7 +208,7 @@ package object sql {
         imports.traverse(absImport(_, here)).fold(
           err => EitherT(err.left.point[M]),
           absImportPaths => {
-            // All functions coming from `imports` along with their respective import statements that were made absolute and where they are defined
+            // All functions coming from `imports` along with their respective import statements and where they are defined
             val funcsFromImports = absImportPaths.traverse(d => retrieve(d).map(stats => (stats.decls, stats.imports, d)))
             // All functions in "this" scope along with their own imports
             val allFuncs = funcsFromImports.map((funcsHere, imports, here) :: _)
@@ -216,8 +216,8 @@ package object sql {
               def matchesSignature(func: FunctionDecl[T[Sql]]) = func.name === name && arity === func.args.size
               funcs.filter(matchesSignature).traverse { decl =>
                 val others = funcs.filterNot(matchesSignature) // No recursice calls in SQL^2 so we don't include ourselves
-              val currentScope = scopeFromHere(imports, others, from)
-                decl.traverse(_.inlineInvokes(currentScope)).flattenLeft.strengthR(from)
+                val currentScope = scopeFromHere(imports, others, from)
+                decl.traverse(_.mkPathsAbsolute(from).inlineInvokes(currentScope)).flattenLeft.strengthR(from)
               }
             }).map(_.join)
           }
