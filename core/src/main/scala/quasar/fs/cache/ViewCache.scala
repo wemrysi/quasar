@@ -18,7 +18,6 @@ package quasar.fs.cache
 
 import slamdata.Predef._
 import quasar.contrib.pathy.AFile
-//import quasar.fs.mount.ConnectionUri
 import quasar.fs.mount.MountConfig
 
 import java.time.{Duration => JDuration, Instant}

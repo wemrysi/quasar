@@ -153,8 +153,11 @@ object mount {
                   .cata(ι,().point[EitherT[Free[S, ?], ApiError, ?]])
     } yield exists
 
-  private def createNewViewCache[S[_]](viewPath: AFile, viewConfig: MountConfig.ViewConfig, maxAge: scala.concurrent.duration.Duration)
-  (implicit
+  private def createNewViewCache[S[_]](
+    viewPath: AFile, 
+    viewConfig: MountConfig.ViewConfig, 
+    maxAge: scala.concurrent.duration.Duration
+  )(implicit
     MF: ManageFile.Ops[S],
     T:  Timing.Ops[S],
     S0: Task :<: S,
