@@ -175,6 +175,13 @@ lazy val githubReleaseSettings =
       pushChanges)
   )
 
+def isolatedBackendSettings(classnames: String*) = Seq(
+  isolatedBackends in Global ++=
+    classnames.map(_ -> (fullClasspath in Compile).value.files),
+
+  packageOptions in assembly +=
+    Package.ManifestAttributes(new java.util.jar.Attributes.Name("Backend-Module") -> classnames.mkString(" ")))
+
 lazy val isCIBuild               = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
 lazy val isIsolatedEnv           = settingKey[Boolean]("True if running in an isolated environment")
 lazy val exclusiveTestTag        = settingKey[String]("Tag for exclusive execution tests")
@@ -364,7 +371,8 @@ lazy val couchbase = project
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.couchbase)
-  .settings(isolatedBackends in Global += "quasar.physical.couchbase.Couchbase$" -> (fullClasspath in Compile).value.files)
+  .settings(githubReleaseSettings)
+  .settings(isolatedBackendSettings("quasar.physical.couchbase.Couchbase$"))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the MarkLogic connector.
@@ -376,7 +384,8 @@ lazy val marklogic = project
   .settings(targetSettings)
   .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
   .settings(libraryDependencies ++= Dependencies.marklogic)
-  .settings(isolatedBackends in Global += "quasar.physical.marklogic.MarkLogic$" -> (fullClasspath in Compile).value.files)
+  .settings(githubReleaseSettings)
+  .settings(isolatedBackendSettings("quasar.physical.marklogic.MarkLogic$"))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the MongoDB connector.
@@ -395,7 +404,8 @@ lazy val mongodb = project
       Wart.AsInstanceOf,
       Wart.Equals,
       Wart.Overloading))
-  .settings(isolatedBackends in Global += "quasar.physical.mongodb.MongoDb$" -> (fullClasspath in Compile).value.files)
+  .settings(githubReleaseSettings)
+  .settings(isolatedBackendSettings("quasar.physical.mongodb.MongoDb$"))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** A connector outline, meant to be copied and incrementally filled in while
@@ -424,10 +434,9 @@ lazy val sparkcore = project
     sparkDependencyProvided := false,
     libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value))
   .settings(
-    isolatedBackends in Global ++= Seq(
-      // TODO the rest of them
-      "quasar.physical.sparkcore.fs.hdfs.SparkHdfsBackendModule$" -> (fullClasspath in Compile).value.files,
-      "quasar.physical.sparkcore.fs.local.SparkLocalBackendModule$" -> (fullClasspath in Compile).value.files))
+    isolatedBackendSettings(
+      "quasar.physical.sparkcore.fs.hdfs.SparkHdfsBackendModule$",
+      "quasar.physical.sparkcore.fs.local.SparkLocalBackendModule$"))
   .enablePlugins(AutomateHeaderPlugin)
 
 // interfaces
