@@ -25,6 +25,7 @@ import quasar.fs.cache.{VCache, ViewCache}
 import quasar.fs.mount._
 import quasar.fs.ManageFile
 
+
 import argonaut._, Argonaut._
 import org.http4s._, Method.MOVE
 import org.http4s.dsl._
@@ -145,24 +146,25 @@ object mount {
                    BadRequest, msg).left))
       exists <- M.lookupType(path).run.isDefined.liftM[ApiErrT]
       _      <- (replaceIfExists && exists).fold(M.replace(path, bConf), M.mount(path, bConf)).liftM[ApiErrT]
-      cc     =  req.headers.get(`Cache-Control`)
-      _      <- (refineType(path).toOption ⊛ MountConfig.viewConfig.getOption(bConf).map(MountConfig.ViewConfig.tupled) ⊛ cc)(createNewViewCache[S]).orZero.liftM[ApiErrT]
+      maxAge =  req.headers.get(`Cache-Control`).flatMap(_.values.list.collectFirst(_ match {
+                  case `max-age`(s) => s
+                }))
+      _      <- (refineType(path).toOption ⊛ MountConfig.viewConfig.getOption(bConf).map(MountConfig.ViewConfig.tupled) ⊛ maxAge)(createNewViewCache[S])
+                  .cata(ι,().point[EitherT[Free[S, ?], ApiError, ?]])
     } yield exists
 
-  private def createNewViewCache[S[_]](viewPath: AFile, viewConfig: MountConfig.ViewConfig, cacheControl: `Cache-Control`)
+  private def createNewViewCache[S[_]](viewPath: AFile, viewConfig: MountConfig.ViewConfig, maxAge: scala.concurrent.duration.Duration)
   (implicit
     MF: ManageFile.Ops[S],
     T:  Timing.Ops[S],
     S0: Task :<: S,
-    S3: VCache :<: S
+    S1: VCache :<: S
   ): EitherT[Free[S, ?], ApiError, Unit] =
     for {
       tempFile      <- MF.tempFile(viewPath).leftMap(_.toApiError)
       timeStamp     <- T.timestamp.liftM[ApiErrT]
-      maxAge        =  cacheControl.values.list.collectFirst(_ match {
-                        case `max-age`(s) => s
-                      })
-      refreshAfter  <- free.lift(Task.fromDisjunction(maxAge.traverse(ViewCache.expireAt(timeStamp, _)))).into.liftM[ApiErrT]
+     
+      refreshAfter  <- free.lift(Task.fromDisjunction(ViewCache.expireAt(timeStamp, maxAge))).into.liftM[ApiErrT]
       newViewCache  = ViewCache(
                        viewConfig = viewConfig,
                        lastUpdate = none,
