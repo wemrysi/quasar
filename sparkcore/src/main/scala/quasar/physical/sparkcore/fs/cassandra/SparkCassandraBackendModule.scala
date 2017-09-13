@@ -32,7 +32,7 @@ import quasar.fs._,
   FileSystemError._,
   PathError._
 import quasar.fs.mount._, BackendDef._
-import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, _}
+import quasar.physical.sparkcore.fs._
 import quasar.physical.sparkcore.fs.SparkCoreBackendModule
 import quasar.physical.sparkcore.fs.{SparkCoreBackendModule, SparkConnectorDetails}, SparkConnectorDetails._
 import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
@@ -56,7 +56,7 @@ object SparkCassandraBackendModule extends SparkCoreBackendModule with ManagedWr
 
   def rootPrefix(cfg: Config): ADir = cfg.prefix
 
-  import corequeryfile.RddState
+  
 
   val Type = FileSystemType("spark-cassandra")
 
@@ -77,7 +77,7 @@ object SparkCassandraBackendModule extends SparkCoreBackendModule with ManagedWr
   def MonotonicSeqInj = Inject[MonotonicSeq, Eff]
   def TaskInj = Inject[Task, Eff]
   def SparkConnectorDetailsInj = Inject[SparkConnectorDetails, Eff]
-  def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, corequeryfile.RddState, ?], Eff]
+  def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, RddState, ?], Eff]
 
   val cass = CassandraDDL.Ops[Eff]
   def MonoSeqM = MonoSeq[M]

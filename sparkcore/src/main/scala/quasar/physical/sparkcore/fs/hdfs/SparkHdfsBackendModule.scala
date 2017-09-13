@@ -28,7 +28,7 @@ import quasar.fs._,
   FileSystemError._, PathError._, WriteFile._,
   BackendDef.{DefinitionError, DefErrT},
   QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
-import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, _}
+import quasar.physical.sparkcore.fs._
 import quasar.physical.sparkcore.fs.{SparkCoreBackendModule, SparkConnectorDetails}, SparkConnectorDetails._
 import quasar.physical.sparkcore.fs.hdfs.parquet.ParquetRDD
 import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
@@ -57,7 +57,7 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
 
   def rootPrefix(cfg: HdfsConfig): ADir = cfg.prefix
 
-  import corequeryfile.RddState
+  
 
   val Type = FileSystemType("spark-hdfs")
 
@@ -78,7 +78,7 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
   def MonotonicSeqInj = Inject[MonotonicSeq, Eff]
   def TaskInj = Inject[Task, Eff]
   def SparkConnectorDetailsInj = Inject[SparkConnectorDetails, Eff]
-  def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, corequeryfile.RddState, ?], Eff]
+  def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, RddState, ?], Eff]
 
   def writersOps = KeyValueStore.Ops[WriteHandle, HdfsWriteCursor, Eff]
   def sequenceOps = MonotonicSeq.Ops[Eff]

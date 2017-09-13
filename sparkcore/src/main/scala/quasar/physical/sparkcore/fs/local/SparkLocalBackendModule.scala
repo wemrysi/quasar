@@ -28,7 +28,7 @@ import quasar.fs._,
   FileSystemError._, PathError._, WriteFile._,
   BackendDef.{DefinitionError, DefErrT},
   QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
-import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, _}
+import quasar.physical.sparkcore.fs._
 import quasar.physical.sparkcore.fs.SparkCoreBackendModule
 import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
 
@@ -50,8 +50,6 @@ object SparkLocalBackendModule extends SparkCoreBackendModule with ChrootedInter
 
   def rootPrefix(cfg: LocalConfig): ADir = cfg.prefix
 
-  import corequeryfile.RddState
-
   val Type = FileSystemType("spark-local")
 
   type Eff1[A]  = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
@@ -70,7 +68,7 @@ object SparkLocalBackendModule extends SparkCoreBackendModule with ChrootedInter
   def MonotonicSeqInj = Inject[MonotonicSeq, Eff]
   def TaskInj = Inject[Task, Eff]
   def SparkConnectorDetailsInj = Inject[SparkConnectorDetails, Eff]
-  def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, corequeryfile.RddState, ?], Eff]
+  def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, RddState, ?], Eff]
 
   def wrKvsOps = KeyValueStore.Ops[WriteHandle, PrintWriter, Eff]
 

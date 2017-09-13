@@ -32,7 +32,7 @@ import quasar.fs._,
   FileSystemError._,
   PathError._
 import quasar.fs.mount._, BackendDef._
-import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, _}
+import quasar.physical.sparkcore.fs._
 import quasar.physical.sparkcore.fs.SparkCoreBackendModule
 import quasar.physical.sparkcore.fs.{SparkCoreBackendModule, SparkConnectorDetails}, SparkConnectorDetails._
 import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
@@ -55,7 +55,7 @@ object SparkElasticBackendModule extends SparkCoreBackendModule with ManagedWrit
 
   def rootPrefix(cfg: ElasticConfig): ADir = rootDir
 
-  import corequeryfile.RddState
+  
 
   val Type = FileSystemType("spark-elastic")
 
@@ -76,7 +76,7 @@ object SparkElasticBackendModule extends SparkCoreBackendModule with ManagedWrit
   def MonotonicSeqInj = Inject[MonotonicSeq, Eff]
   def TaskInj = Inject[Task, Eff]
   def SparkConnectorDetailsInj = Inject[SparkConnectorDetails, Eff]
-  def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, corequeryfile.RddState, ?], Eff]
+  def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, RddState, ?], Eff]
 
   def MonoSeqM = MonoSeq[M]
   def WriteKvsM = Kvs[M, WriteFile.WriteHandle, AFile]
