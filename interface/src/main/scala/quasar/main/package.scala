@@ -65,7 +65,7 @@ package object main {
     mimir.Mimir.definition translate injectFT[Task, PhysFsEff],
     mongodb.MongoDb.definition translate injectFT[Task, PhysFsEff],
     skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff],
-    sparkcore.fs.hdfs.definition[PhysFsEff],
+    sparkcore.fs.hdfs.SparkHdfsBackendModule.definition translate injectFT[Task, PhysFsEff],
     sparkcore.fs.elastic.SparkElasticBackendModule.definition translate injectFT[Task, PhysFsEff],
     sparkcore.fs.cassandra.definition[PhysFsEff],
     sparkcore.fs.local.SparkLocalBackendModule.definition translate injectFT[Task, PhysFsEff]
