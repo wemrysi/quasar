@@ -426,6 +426,7 @@ lazy val sparkcore = project
   .settings(
     isolatedBackends in Global ++= Seq(
       // TODO the rest of them
+      "quasar.physical.sparkcore.fs.hdfs.SparkHdfsBackendModule$" -> (fullClasspath in Compile).value.files,
       "quasar.physical.sparkcore.fs.local.SparkLocalBackendModule$" -> (fullClasspath in Compile).value.files))
   .enablePlugins(AutomateHeaderPlugin)
 
