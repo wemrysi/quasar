@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.fs._
 import quasar.fs.mount.{BackendDef, ConnectionUri, MountConfig}
+import quasar.main.{ClassName, ClassPath, FsLoadCfg}
 import quasar.physical.{couchbase, marklogic, mongodb, sparkcore}
 
 import pathy.Path._
@@ -178,6 +179,28 @@ object TestConfig {
         d => OptionT(sandbox(rootDir, d).map(rootDir </> _).point[Task]),
         fail[ADir](s"Test data dir must be an absolute dir, got: $s").liftM[OptionT])
     } getOrElse DefaultTestPrefix
+
+  val testFsLoadCfg: Task[FsLoadCfg] = {
+    val confStrM =
+      Task.delay(java.lang.System.getProperty("slamdata.internal.fs-load-cfg", ""))
+
+    confStrM map { confStr =>
+      import java.io.File
+
+      val backends = confStr.split(";").toList map { backend =>
+        val List(name, classpath) = backend.split("=").toList
+
+        val apaths = classpath.split(":").toList flatMap { path =>
+          val file = new File(path)
+          ADir.fromFile(file).orElse(AFile.fromFile(file)).toList
+        }
+
+        ClassName(name) -> ClassPath(IList.fromList(apaths))
+      }
+
+      FsLoadCfg.ExplodedDirs(IList.fromList(backends))
+    }
+  }
 
   ////
 

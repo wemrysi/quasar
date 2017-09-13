@@ -55,8 +55,38 @@ package object main {
   type MainTask[A]       = MainErrT[Task, A]
   val MainTask           = MonadError[EitherT[Task, String, ?], String]
 
-  // TODO
-  type FsConfig = Unit
+  final case class ClassName(value: String) extends AnyVal
+  final case class ClassPath(value: IList[APath]) extends AnyVal
+
+  sealed trait FsLoadCfg extends Product with Serializable
+
+  /**
+   * APaths relative to real filesystem root
+   */
+  object FsLoadCfg {
+
+    /**
+     * This should only be used for testing purposes.  It represents a
+     * configuration in which no backends will be loaded at all.
+     */
+    val Empty: FsLoadCfg = ExplodedDirs(IList.empty)
+
+    /**
+     * A single directory containing jars, each of which will be
+     * loaded as a backend.  With each jar, the `BackendModule` class
+     * name will be determined from the `Manifest.mf` file.
+     */
+    final case class JarDirectory(dir: ADir) extends FsLoadCfg
+
+    /**
+     * Any files in the classpath will be loaded as jars; any directories
+     * will be assumed to contain class files (e.g. the target output of
+     * SBT compile).  The class name should be the fully qualified Java
+     * class name of the `BackendModule` implemented as a Scala object.
+     * In most cases, this means the class name here will end with a `$`
+     */
+    final case class ExplodedDirs(backends: IList[(ClassName, ClassPath)]) extends FsLoadCfg
+  }
 
   /**
    * The physical filesystems currently supported.  Please note that it
@@ -65,7 +95,7 @@ package object main {
    * times.  Thus, all uses of the value from this Task should be handled
    * by `FsAsk` (or an analogous `Kleisli`).
    */
-  def physicalFileSystems(config: FsConfig): Task[BackendDef[PhysFsEffM]] = IList(
+  def physicalFileSystems(config: FsLoadCfg): Task[BackendDef[PhysFsEffM]] = IList(
     Couchbase.definition translate injectFT[Task, PhysFsEff],
     marklogic.MarkLogic.definition translate injectFT[Task, PhysFsEff],
     mimir.Mimir.definition translate injectFT[Task, PhysFsEff],
@@ -421,7 +451,7 @@ package object main {
     }
   }
 
-  final case class CmdLineConfig(configPath: Option[FsFile], cmd: Cmd)
+  final case class CmdLineConfig(configPath: Option[FsFile], loadConfig: FsLoadCfg, cmd: Cmd)
 
   /** Either initialize the metastore or execute the start depending
     * on what command is provided by the user in the command line arguments
@@ -438,8 +468,12 @@ package object main {
       _     <- config.cmd match {
         case Cmd.Start =>
           for {
-            quasarFs <- Quasar.initFromMetaConfig(configOps.metaStoreConfig.get(cfg), persist)
-            _        <- start(cfg, quasarFs.interp).ensuring(κ(quasarFs.shutdown.liftM[MainErrT]))
+            quasarFs <- Quasar.initFromMetaConfig(
+              config.loadConfig,
+              configOps.metaStoreConfig.get(cfg),
+              persist)
+
+            _ <- start(cfg, quasarFs.interp).ensuring(κ(quasarFs.shutdown.liftM[MainErrT]))
           } yield ()
 
         case Cmd.InitUpdateMetaStore =>

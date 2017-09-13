@@ -98,32 +98,33 @@ object Quasar {
     *
     * Not used in the codebase, but useful for manual testing at the console.
     */
-  val init: MainTask[Quasar] = initFromMetaConfig(None, _ => ().point[MainTask])
+  def init(loadConfig: FsLoadCfg): MainTask[Quasar] =
+    initFromMetaConfig(loadConfig, None, _ => ().point[MainTask])
 
   /** Initialize the Quasar FileSytem using the specified metastore configuration
     * or with the default if not provided.
     */
-  def initFromMetaConfig(metaCfg: Option[MetaStoreConfig], persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
+  def initFromMetaConfig(loadConfig: FsLoadCfg, metaCfg: Option[MetaStoreConfig], persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
     for {
       metastoreCfg <- metaCfg.cata(Task.now, MetaStoreConfig.default).liftM[MainErrT]
-      quasarFS     <- initWithDbConfig(metastoreCfg.database, persist)
+      quasarFS     <- initWithDbConfig(loadConfig, metastoreCfg.database, persist)
     } yield quasarFS
 
-  def initWithDbConfig(db: DbConnectionConfig, persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
+  def initWithDbConfig(loadConfig: FsLoadCfg, db: DbConnectionConfig, persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
     for {
       metastore <- MetaStore.connect(db, db.isInMemory, List(quasar.metastore.Schema.schema)).leftMap(_.message)
       metaRef   <- TaskRef(metastore).liftM[MainErrT]
-      quasarFS  <- initWithMeta(metaRef, persist)
+      quasarFS  <- initWithMeta(loadConfig, metaRef, persist)
     } yield quasarFS
 
-  def initWithMeta(metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
+  def initWithMeta(loadConfig: FsLoadCfg, metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
     (for {
       metastore  <- metaRef.read.liftM[MainErrT]
       hfsRef     <- TaskRef(Empty.backendEffect[HierarchicalFsEffM]).liftM[MainErrT]
       mntdRef    <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
 
       // TODO
-      mounts <- physicalFileSystems(()).liftM[MainErrT]
+      mounts <- physicalFileSystems(loadConfig).liftM[MainErrT]
 
       ephmralMnt =  KvsMounter.interpreter[Task, QErrsTCnxIO](
         KvsMounter.ephemeralMountConfigs[Task], hfsRef, mntdRef) andThen

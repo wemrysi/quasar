@@ -60,7 +60,7 @@ class ServiceSpec extends quasar.Qspec {
       _          <- schema.updateToLatest.transact(transactor).liftM[MainErrT]
       _          <- metastoreInit.transact(transactor).liftM[MainErrT]
       metaRef    <- TaskRef(metastore).liftM[MainErrT]
-      quasarFs   <- Quasar.initWithMeta(metaRef, _ => ().point[MainTask])
+      quasarFs   <- Quasar.initWithMeta(FsLoadCfg.Empty, metaRef, _ => ().point[MainTask])
       shutdown   <- Server.startServer(quasarFs.interp, port, Nil, None, _ => ().point[MainTask]).liftM[MainErrT]
       r          <- f(uri).onFinish(κ(shutdown.onFinish(κ(quasarFs.shutdown)))).liftM[MainErrT]
     } yield r).run.unsafePerformSync

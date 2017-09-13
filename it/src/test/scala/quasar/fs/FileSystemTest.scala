@@ -140,12 +140,14 @@ object FileSystemTest {
   //--- FileSystems to Test ---
 
   def allFsUT: Task[IList[SupportedFs[BackendEffect]]] = {
-    // TODO config
-    physicalFileSystems(()) flatMap { mounts =>
-      (localFsUT(mounts) |@| externalFsUT(mounts)) { (loc, ext) =>
-        (loc ::: ext) map { sf =>
-          sf.copy(impl = sf.impl.map(ut => ut.contramapF(chroot.backendEffect[BackendEffect](ut.testDir))))
-        }
+    for {
+      loadConfig <- TestConfig.testFsLoadCfg
+      mounts <- physicalFileSystems(loadConfig)
+      loc <- localFsUT(mounts)
+      ext <- externalFsUT(mounts)
+    } yield {
+      (loc ::: ext) map { sf =>
+        sf.copy(impl = sf.impl.map(ut => ut.contramapF(chroot.backendEffect[BackendEffect](ut.testDir))))
       }
     }
   }

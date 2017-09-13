@@ -22,6 +22,7 @@ import quasar.api.{redirectService, staticFileService, ResponseOr, ResponseT}
 import quasar.cli.Cmd
 import quasar.config._
 import quasar.console.{logErrors, stdout}
+import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scopt._
 import quasar.db.DbConnectionConfig
 import quasar.fp._
@@ -39,13 +40,15 @@ import scalaz.concurrent.Task
 object Server {
 
   final case class WebCmdLineConfig(
-    cmd: Cmd,
-    staticContent: List[StaticContent],
-    redirect: Option[String],
-    port: Option[Int],
-    configPath: Option[FsFile],
-    openClient: Boolean) {
-    def toCmdLineConfig: CmdLineConfig = CmdLineConfig(configPath, cmd)
+      cmd: Cmd,
+      staticContent: List[StaticContent],
+      redirect: Option[String],
+      port: Option[Int],
+      configPath: Option[FsFile],
+      loadConfig: FsLoadCfg,
+      openClient: Boolean) {
+
+    def toCmdLineConfig: CmdLineConfig = CmdLineConfig(configPath, loadConfig, cmd)
   }
 
   object WebCmdLineConfig {
@@ -53,14 +56,34 @@ object Server {
       CliOptions.parser.safeParse(args, CliOptions.default)
         .flatMap(fromCliOptions(_))
 
-    def fromCliOptions(opts: CliOptions): MainTask[WebCmdLineConfig] =
+    def fromCliOptions(opts: CliOptions): MainTask[WebCmdLineConfig] = {
+      import scala.sys
+
+      // the following throws exceptions because the CLI validation should have already caught it
+      val loadConfig = opts.loadConfig.fold(
+        plugins => FsLoadCfg.JarDirectory(ADir.fromFile(plugins).getOrElse(sys.error("plugin directory does not exist (or is a file)"))),
+        { backends =>
+          val entries = backends.toList map {
+            case (name, paths) =>
+              val apaths = paths.toList.map(path => ADir.fromFile(path).orElse(AFile.fromFile(path)).getOrElse(sys.error(s"backend classpath entry '$path' does not exist")))
+
+              val cn = ClassName(name)
+              val cp = ClassPath(IList.fromList(apaths))
+
+              cn -> cp
+          }
+
+          FsLoadCfg.ExplodedDirs(IList.fromList(entries))
+        })
+
       (StaticContent.fromCliOptions("/files", opts) ⊛
         opts.config.fold(none[FsFile].point[MainTask])(cfg =>
           FsPath.parseSystemFile(cfg)
             .toRight(s"Invalid path to config file: $cfg")
             .map(some))) ((content, cfgPath) =>
         WebCmdLineConfig(
-          opts.cmd, content.toList, content.map(_.loc), opts.port, cfgPath, opts.openClient))
+          opts.cmd, content.toList, content.map(_.loc), opts.port, cfgPath, loadConfig, opts.openClient))
+    }
   }
 
   def nonApiService(
