@@ -166,7 +166,7 @@ object FileSystemTest {
       fsTestConfig0(sparkcore.fs.hdfs.SparkHdfsBackendModule.Type, sparkcore.fs.hdfs.SparkHdfsBackendModule.definition)  orElse
       fsTestConfig0(sparkcore.fs.local.SparkLocalBackendModule.Type, sparkcore.fs.local.SparkLocalBackendModule.definition) orElse
       fsTestConfig0(sparkcore.fs.elastic.SparkElasticBackendModule.Type, sparkcore.fs.elastic.SparkElasticBackendModule.definition) orElse
-      fsTestConfig(sparkcore.fs.cassandra.FsType,  sparkcore.fs.cassandra.definition)
+      fsTestConfig0(sparkcore.fs.cassandra.SparkCassandraBackendModule.Type, sparkcore.fs.cassandra.SparkCassandraBackendModule.definition)
     }
   }
 
