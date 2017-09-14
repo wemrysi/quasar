@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.contrib.pathy._
 import quasar.effect.KeyValueStore
-import quasar.fs.cache.{VCache, ViewCache}
+import quasar.fs.mount.cache.{VCache, ViewCache}
 import quasar.fp._
 import quasar.fp.free._
 

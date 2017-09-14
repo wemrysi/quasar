@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.fs.cache
+package quasar.fs.mount.cache
 
 import quasar.contrib.pathy._
 import quasar.DateArbitrary._
-import quasar.fs.mount._, ConnectionUriArbitrary._
+import quasar.fs.mount._ //ConnectionUriArbitrary._
 import slamdata.Predef._
 
 import java.time.Instant
@@ -38,7 +38,7 @@ trait ViewCacheArbitrary {
 
   implicit val arbViewCache: Arbitrary[ViewCache] =
     Arbitrary(
-      (arb[ConnectionUri] ⊛ arb[Option[Instant]] ⊛ arb[Option[Long]] ⊛
+      (MountConfigArbitrary.genViewConfig ⊛ arb[Option[Instant]] ⊛ arb[Option[Long]] ⊛
        arb[Int] ⊛ arb[Option[String]] ⊛ arb[Option[Instant]] ⊛ arb[Long] ⊛ arb[Instant] ⊛
        arb[ViewCache.Status] ⊛ arb[Option[String]] ⊛ arb[AFile] ⊛ arb[Option[AFile]])(
         ViewCache.apply))

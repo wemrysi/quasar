@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.fs.cache
+package quasar.fs.mount.cache
 
 import slamdata.Predef._
 import quasar.contrib.pathy.AFile

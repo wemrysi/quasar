@@ -33,8 +33,8 @@ import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._
-import quasar.fs.cache.{VCache, ViewCache}
 import quasar.fs.mount.MountConfig
+import quasar.fs.mount.cache.{VCache, ViewCache}
 import quasar.sql._
 import quasar.Variables
 
@@ -376,7 +376,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           } ==> {
             val expr = sqlB"α"
             val viewCache = ViewCache(
-              MountConfig.viewConfigUri(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
+              MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
               maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
 
             val memState = InMemState.fromFiles(Map(g -> d))
@@ -408,7 +408,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           } ==> {
             val expr = sqlB"α"
             val viewCache = ViewCache(
-              MountConfig.viewConfigUri(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
+              MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
               maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
 
             val memState = InMemState.fromFiles(Map(g -> d))

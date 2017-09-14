@@ -21,10 +21,9 @@ import quasar.api._, ToApiError.ops._
 import quasar.contrib.pathy._
 import quasar.effect.{KeyValueStore, Timing}
 import quasar.fp._, ski._
-import quasar.fs.cache.{VCache, ViewCache}
 import quasar.fs.mount._
+import quasar.fs.mount.cache.{VCache, ViewCache}
 import quasar.fs.ManageFile
-
 
 import argonaut._, Argonaut._
 import org.http4s._, Method.MOVE
@@ -150,7 +149,7 @@ object mount {
                   case `max-age`(s) => s
                 }))
       _      <- (refineType(path).toOption ⊛ MountConfig.viewConfig.getOption(bConf).map(MountConfig.ViewConfig.tupled) ⊛ maxAge)(createNewViewCache[S])
-                  .cata(ι,().point[EitherT[Free[S, ?], ApiError, ?]])
+                  .getOrElse(().point[EitherT[Free[S, ?], ApiError, ?]])
     } yield exists
 
   private def createNewViewCache[S[_]](

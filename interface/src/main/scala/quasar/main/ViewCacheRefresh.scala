@@ -25,6 +25,7 @@ import quasar.frontend.SemanticErrsT
 import quasar.fp.free
 import quasar.fs.FileSystemError, FileSystemError._
 import quasar.fs.mount.{MountConfig, Mounting}
+import quasar.fs.mount.cache.ViewCache
 import quasar.fs.MoveSemantics.Overwrite
 import quasar.fs.PathError._
 import quasar.fs.{ManageFile, QueryFile, WriteFile}

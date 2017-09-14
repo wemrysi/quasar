@@ -26,7 +26,7 @@ import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.frontend.{SemanticErrors, SemanticErrsT}
 import quasar.fs._, FileSystemError._, PathError._
-import quasar.fs.cache.{VCache, ViewCache}
+import quasar.fs.mount.cache.{VCache, ViewCache}
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, Optimizer}
 
 import matryoshka._

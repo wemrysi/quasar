@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.fs.cache
+package quasar.fs.mount.cache
 
 import org.specs2.scalaz.Spec
 import scalaz.scalacheck.ScalazProperties

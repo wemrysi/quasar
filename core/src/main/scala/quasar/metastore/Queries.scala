@@ -18,7 +18,7 @@ package quasar.metastore
 
 import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile, APath}
-import quasar.fs.cache.ViewCache
+import quasar.fs.mount.cache.ViewCache
 import quasar.fs.mount.{MountConfig, MountType}, MountConfig.FileSystemConfig
 
 import java.time.Instant

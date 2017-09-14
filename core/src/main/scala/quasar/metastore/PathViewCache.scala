@@ -17,6 +17,6 @@
 package quasar.metastore
 
 import quasar.contrib.pathy.AFile
-import quasar.fs.cache.ViewCache
+import quasar.fs.mount.cache.ViewCache
 
 final case class PathedViewCache(path: AFile, vc: ViewCache)

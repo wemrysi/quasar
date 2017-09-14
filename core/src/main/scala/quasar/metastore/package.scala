@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile, APath, unsafeSandboxAbs}
 import quasar.db.Schema
 import quasar.fs.FileSystemType
-import quasar.fs.cache.ViewCache
+import quasar.fs.mount.cache.ViewCache
 import quasar.fs.mount.{ConnectionUri, MountType, MountConfig}
 
 import java.sql.Timestamp

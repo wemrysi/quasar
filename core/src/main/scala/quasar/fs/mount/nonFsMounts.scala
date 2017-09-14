@@ -23,7 +23,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
-import quasar.fs.cache.VCache
+import quasar.fs.mount.cache.VCache
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, Optimizer}
 
 import matryoshka._

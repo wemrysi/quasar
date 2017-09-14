@@ -22,8 +22,8 @@ import quasar.contrib.pathy._
 import quasar.effect.{Failure, KeyValueStore, Timing}
 import quasar.fp._, free._
 import quasar.fs._
-import quasar.fs.cache.{VCache, ViewCache}
 import quasar.fs.mount._
+import quasar.fs.mount.cache.{VCache, ViewCache}
 import quasar.fs.mount.module.Module
 import quasar.main._
 import quasar.metastore.MetaStoreFixture.createNewTestMetaStoreConfig
