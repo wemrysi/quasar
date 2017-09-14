@@ -427,7 +427,7 @@ lazy val sparkcore = project
     )
   .settings(commonSettings)
   .settings(targetSettings)
-  .settings(githubReleaseSettings)
+  // .settings(githubReleaseSettings)
   .settings(assemblyJarName in assembly := "sparkcore.jar")
   .settings(parallelExecution in Test := false)
   .settings(
