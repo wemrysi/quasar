@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => _, _}
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultTell, SortDir}
 import quasar.connector.BackendModule
@@ -37,6 +37,7 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.{FuncHandler, JsFuncHandler, JoinHandler, JoinSource, OptionFree}
 import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
 import quasar.qscript.{Coalesce => _, _}
+import quasar.qscript.{MapFuncsCore => MF}
 import quasar.std.StdLib._ // TODO: remove this
 
 import java.time.Instant
@@ -1289,6 +1290,60 @@ object MongoDbPlanner {
     f
   }
 
+  def mapBeforeSort[T[_[_]]: BirecursiveT, F[_], G[_]: Functor]
+    (GtoF: PrismNT[G, F])
+    (implicit QC: QScriptCore[T, ?] :<: F)
+      : QScriptCore[T, T[G]] => F[T[G]] = {
+    case qs @ Map(Embed(src), fm) =>
+      GtoF.get(src) >>= QC.prj match {
+        case Some(Sort(innerSrc, bucket, order)) =>
+          val innerMap = GtoF.reverseGet(QC.inj(Map(innerSrc,
+	    // qscript <3 arrays
+            Free.roll(MFC(MF.ConcatArrays(
+              Free.roll(MFC(MF.MakeArray(fm))),
+              Free.roll(MFC(MF.MakeArray(HoleF[T]))))))))).embed
+          QC.inj(Map(
+            GtoF.reverseGet(QC.inj(Sort(innerMap,
+              bucket.map(_ >> Free.roll[MapFunc[T, ?], Hole](MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(1))))),
+              order.map {
+                case (fm, dir) =>
+                  (fm >> Free.roll[MapFunc[T, ?], Hole](MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(1)))), dir)
+              }))).embed,
+            Free.roll(MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(0))))))
+        case _ => QC.inj(qs)
+      }
+    case x => QC.inj(x)
+  }
+
+  def intermediate[T[_[_]]: BirecursiveT, F[_], G[_]: Functor]
+    (GtoF: PrismNT[G, F])
+    (implicit QC: QScriptCore[T, ?] :<: F)
+      : F[T[G]] => G[T[G]] =
+    ftg => GtoF.reverseGet(
+      liftFG[QScriptCore[T, ?], F, T[G]](mapBeforeSort[T, F, G](GtoF)).apply(ftg))
+
+  // qs.transCata[T[QScriptTotal]](mapBeforeSortF[QScriptTotal])
+  def mapBeforeSortF[T[_[_]]: BirecursiveT, F[_]: Functor]
+    (implicit QC: QScriptCore[T, ?] :<: F)
+      : F[T[F]] => F[T[F]] =
+    intermediate[T, F, F](idPrism)
+
+  type CoEnvF[F[_]] = CoEnv[Hole, F, Free[F, Hole]]
+
+  // free.transCata[FreeQS](mapBeforeSortCoEnv[QScriptTotal])
+  def mapBeforeSortCoEnv[T[_[_]]: BirecursiveT, F[_]: Functor]
+    (implicit QC: QScriptCore[T, ?] :<: F)
+      : CoEnvF[F] => CoEnvF[F] = {
+    val bij = coenvBijection[T, F, Hole]
+
+    val partial: F[Free[F, Hole]] => CoEnvF[F] = fa => {
+      intermediate[T, F, CoEnv[Hole, F, ?]](coenvPrism[F, Hole])
+        .apply(fa ∘ bij.toK.run) ∘ bij.fromK.run
+    }
+
+    liftCo[T, F, Hole, Free[F, Hole]](partial)
+  }
+
   // TODO: Allow backends to provide a “Read” type to the typechecker, which
   //       represents the type of values that can be stored in a collection.
   //       E.g., for MongoDB, it would be `Map(String, Top)`. This will help us
@@ -1362,10 +1417,17 @@ object MongoDbPlanner {
 
   def toMongoQScript[T[_[_]] : BirecursiveT: EqualT: RenderTreeT: ShowT, M[_]: Monad: MonadFsErr: PhaseResultTell](
     qs: T[fs.MongoQScript[T, ?]],
-    listContents: DiscoverPath.ListContents[M]
-  ): M[T[fs.MongoQScript[T, ?]]] =
+    listContents: DiscoverPath.ListContents[M])(
+    implicit rewrite: ApplyToCoEnv.Aux[T, fs.MongoQScript[T, ?]])
+      : M[T[fs.MongoQScript[T, ?]]] =
     for {
-      mongoQs <- qs.transCataM(liftFGM(assumeReadType[M, T, fs.MongoQScript[T, ?]](Type.AnyObject)))
+      rewriteSortF <- qs.transCata[T[fs.MongoQScript[T, ?]]](mapBeforeSortF[T, fs.MongoQScript[T, ?]]).point[M]
+      rewriteSortFree <- rewrite
+        .run[T[fs.MongoQScript[T, ?]]](mapBeforeSortCoEnv[T, QScriptTotal[T, ?]])
+        .apply(rewriteSortF.project)
+        .embed
+        .point[M]
+      mongoQs <- rewriteSortFree.transCataM(liftFGM(assumeReadType[M, T, fs.MongoQScript[T, ?]](Type.AnyObject)))
       _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript (Mongo-specific)", mongoQs))
     } yield mongoQs
 
