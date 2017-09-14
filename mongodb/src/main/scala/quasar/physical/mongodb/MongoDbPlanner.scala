@@ -1405,14 +1405,15 @@ object MongoDbPlanner {
 
   def planExecTime[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    M[_]: Monad: PhaseResultTell: MonadFsErr]
-    (qs: T[fs.MongoQScript[T, ?]], queryContext: fs.QueryContext[M], execTime: Instant
+    M[_]: Monad: PhaseResultTell: MonadFsErr](
+    qs: T[fs.MongoQScript[T, ?]], queryContext: fs.QueryContext[M],
+    queryModel: MongoQueryModel, execTime: Instant
     ): M[Crystallized[WorkflowF]] = {
 
     val lc: qscript.DiscoverPath.ListContents[ReaderT[M, Instant, ?]] =
       queryContext.listContents.map(f => Kleisli[M, Instant, Set[PathSegment]](_ => f))
     val ctx: fs.QueryContext[ReaderT[M, Instant, ?]] = queryContext.copy(listContents = lc)
-    plan[T, ReaderT[M, Instant, ?]](qs, ctx).run(execTime)
+    plan[T, ReaderT[M, Instant, ?]](qs, ctx, queryModel).run(execTime)
   }
 
   /** Translate the QScript plan to an executable MongoDB "physical"
@@ -1425,13 +1426,13 @@ object MongoDbPlanner {
   def plan[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     M[_]: Monad: PhaseResultTell: MonadFsErr: ExecTimeR]
-    (qs: T[fs.MongoQScript[T, ?]], queryContext: fs.QueryContext[M]
+    (qs: T[fs.MongoQScript[T, ?]], queryContext: fs.QueryContext[M], queryModel: MongoQueryModel
     ): M[Crystallized[WorkflowF]] = {
     import MongoQueryModel._
 
-    val bsonVersion = toBsonVersion(queryContext.model)
+    val bsonVersion = toBsonVersion(queryModel)
 
-    queryContext.model match {
+    queryModel match {
       case `3.4` =>
         val joinHandler =
           JoinHandler.fallback[Workflow3_2F, WBM](

@@ -139,7 +139,7 @@ class PlannerSpec extends
     for {
       lp <- compileSqlToLP[M](sql)
       qs <- MongoDb.lpToQScript(lp, lc)
-      repr <- MongoDb.doPlan(qs, fs.QueryContext(model, stats, indexes, lc), execTime)
+      repr <- MongoDb.doPlan(qs, fs.QueryContext(stats, indexes, lc), model, execTime)
     } yield repr
   }
 
@@ -182,7 +182,7 @@ class PlannerSpec extends
      _  <- emit("Input", logical)
      simplified <- emit("Simplified", optimizer.simplify(logical))
      qs <- MongoDb.lpToQScript(simplified, listContents)
-     phys <- MongoDb.doPlan(qs, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents), Instant.now)
+     phys <- MongoDb.doPlan(qs, fs.QueryContext(defaultStats, defaultIndexes, listContents), MongoQueryModel.`3.2`, Instant.now)
     } yield phys).run.value.toEither
   }
 
