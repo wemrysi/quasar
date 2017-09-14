@@ -28,8 +28,8 @@ import quasar.fs._,
   FileSystemError._, PathError._, WriteFile._,
   BackendDef.{DefinitionError, DefErrT},
   QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
-import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, _}
-import quasar.physical.sparkcore.fs.SparkCoreBackendModule
+import quasar.physical.sparkcore.fs._
+import quasar.physical.sparkcore.fs.SparkCore
 import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
 
 import java.io.{FileNotFoundException, File, PrintWriter}
@@ -43,18 +43,16 @@ import scalaz.concurrent.Task
 
 final case class LocalConfig(sparkConf: SparkConf, prefix: ADir)
 
-object SparkLocalBackendModule extends SparkCoreBackendModule with ChrootedInterpreter {
+object SparkLocal extends SparkCore with ChrootedInterpreter {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
 
   def rootPrefix(cfg: LocalConfig): ADir = cfg.prefix
 
-  import corequeryfile.RddState
-
   val Type = FileSystemType("spark-local")
 
-  type Eff1[A]  = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
+  type Eff1[A]  = Coproduct[KeyValueStore[ResultHandle, SparkCursor, ?], Read[SparkContext, ?], A]
   type Eff2[A]  = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Eff1, A]
   type Eff3[A]  = Coproduct[KeyValueStore[WriteHandle, PrintWriter, ?], Eff2, A]
   type Eff4[A]  = Coproduct[Task, Eff3, A]
@@ -70,7 +68,7 @@ object SparkLocalBackendModule extends SparkCoreBackendModule with ChrootedInter
   def MonotonicSeqInj = Inject[MonotonicSeq, Eff]
   def TaskInj = Inject[Task, Eff]
   def SparkConnectorDetailsInj = Inject[SparkConnectorDetails, Eff]
-  def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, corequeryfile.RddState, ?], Eff]
+  def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, SparkCursor, ?], Eff]
 
   def wrKvsOps = KeyValueStore.Ops[WriteHandle, PrintWriter, Eff]
 
@@ -78,7 +76,7 @@ object SparkLocalBackendModule extends SparkCoreBackendModule with ChrootedInter
     S0: Task :<: S, S1: PhysErr :<: S
   ): Task[Free[Eff, ?] ~> Free[S, ?]] =
     (TaskRef(0L) |@|
-      TaskRef(Map.empty[ResultHandle, RddState]) |@|
+      TaskRef(Map.empty[ResultHandle, SparkCursor]) |@|
       TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
       TaskRef(Map.empty[WriteHandle, PrintWriter])
     ) {
@@ -91,7 +89,7 @@ object SparkLocalBackendModule extends SparkCoreBackendModule with ChrootedInter
       injectNT[Task, S]  :+:
       (KeyValueStore.impl.fromTaskRef[WriteHandle, PrintWriter](printWriters) andThen injectNT[Task, S])  :+:
       (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[Task, S]) :+:
-      (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
+      (KeyValueStore.impl.fromTaskRef[ResultHandle, SparkCursor](rddStates) andThen injectNT[Task, S]) :+:
       (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
       mapSNT(interpreter)
     }
