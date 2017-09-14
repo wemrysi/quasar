@@ -39,6 +39,6 @@ class HdfsPackageSpec extends quasar.Qspec {
   }
 
   private def hdfsUri(url: String): Task[URI] =
-    SparkHdfsBackendModule.generateHdfsFS(HdfsConfig(new SparkConf(), url, rootDir)).map(_.getUri())
+    SparkHdfs.generateHdfsFS(HdfsConfig(new SparkConf(), url, rootDir)).map(_.getUri())
 
 }

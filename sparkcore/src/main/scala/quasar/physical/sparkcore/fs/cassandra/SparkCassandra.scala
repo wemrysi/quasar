@@ -32,9 +32,9 @@ import quasar.fs._,
   FileSystemError._,
   PathError._
 import quasar.fs.mount._, BackendDef._
-import quasar.physical.sparkcore.fs.{queryfile => corequeryfile, _}
-import quasar.physical.sparkcore.fs.SparkCoreBackendModule
-import quasar.physical.sparkcore.fs.{SparkCoreBackendModule, SparkConnectorDetails}, SparkConnectorDetails._
+import quasar.physical.sparkcore.fs._
+import quasar.physical.sparkcore.fs.SparkCore
+import quasar.physical.sparkcore.fs.{SparkCore, SparkConnectorDetails}, SparkConnectorDetails._
 import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
 
 import java.net.URLDecoder
@@ -48,7 +48,7 @@ import scalaz.concurrent.Task
 
 final case class CassandraConfig(sparkConf: SparkConf, prefix: ADir)
 
-object SparkCassandraBackendModule extends SparkCoreBackendModule with ManagedWriteFile[AFile] with ChrootedInterpreter {
+object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with ChrootedInterpreter {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
@@ -56,11 +56,11 @@ object SparkCassandraBackendModule extends SparkCoreBackendModule with ManagedWr
 
   def rootPrefix(cfg: Config): ADir = cfg.prefix
 
-  import corequeryfile.RddState
+  
 
   val Type = FileSystemType("spark-cassandra")
 
-  type Eff7[A] = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
+  type Eff7[A] = Coproduct[KeyValueStore[ResultHandle, SparkCursor, ?], Read[SparkContext, ?], A]
   type Eff6[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Eff7, A]
   type Eff5[A] = Coproduct[KeyValueStore[WriteHandle, AFile, ?], Eff6, A]
   type Eff4[A] = Coproduct[Task, Eff5, A]
@@ -77,7 +77,7 @@ object SparkCassandraBackendModule extends SparkCoreBackendModule with ManagedWr
   def MonotonicSeqInj = Inject[MonotonicSeq, Eff]
   def TaskInj = Inject[Task, Eff]
   def SparkConnectorDetailsInj = Inject[SparkConnectorDetails, Eff]
-  def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, corequeryfile.RddState, ?], Eff]
+  def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, SparkCursor, ?], Eff]
 
   val cass = CassandraDDL.Ops[Eff]
   def MonoSeqM = MonoSeq[M]
@@ -86,7 +86,7 @@ object SparkCassandraBackendModule extends SparkCoreBackendModule with ManagedWr
   def toLowerLevel[S[_]](sc: SparkContext, config: CassandraConfig)(implicit
     S0: Task :<: S, S1: PhysErr :<: S
   ): Task[Free[Eff, ?] ~> Free[S, ?]] = (TaskRef(0L) |@|
-    TaskRef(Map.empty[ResultHandle, RddState]) |@|
+    TaskRef(Map.empty[ResultHandle, SparkCursor]) |@|
     TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
     TaskRef(Map.empty[WriteHandle, AFile])) {
     // TODO better names!
@@ -104,7 +104,7 @@ object SparkCassandraBackendModule extends SparkCoreBackendModule with ManagedWr
     injectNT[Task, S]  :+:
     (KeyValueStore.impl.fromTaskRef[WriteHandle, AFile](writehandlers) andThen injectNT[Task, S]) :+:
     (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[Task, S]) :+:
-    (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
+    (KeyValueStore.impl.fromTaskRef[ResultHandle, SparkCursor](rddStates) andThen injectNT[Task, S]) :+:
     (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
 
     mapSNT[Eff, S](interpreter)
