@@ -67,7 +67,7 @@ package object main {
     skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff],
     sparkcore.fs.hdfs.SparkHdfsBackendModule.definition translate injectFT[Task, PhysFsEff],
     sparkcore.fs.elastic.SparkElasticBackendModule.definition translate injectFT[Task, PhysFsEff],
-    sparkcore.fs.cassandra.definition[PhysFsEff],
+    sparkcore.fs.cassandra.SparkCassandraBackendModule.definition translate injectFT[Task, PhysFsEff],
     sparkcore.fs.local.SparkLocalBackendModule.definition translate injectFT[Task, PhysFsEff]
   ).fold
 
