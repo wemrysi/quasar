@@ -49,7 +49,7 @@ final case class HdfsWriteCursor(hdfs: HdfsFileSystem, bw: BufferedWriter)
 
 final case class HdfsConfig(sparkConf: SparkConf, hdfsUriStr: String, prefix: ADir)
 
-object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterpreter {
+object SparkHdfs extends SparkCore with ChrootedInterpreter {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad

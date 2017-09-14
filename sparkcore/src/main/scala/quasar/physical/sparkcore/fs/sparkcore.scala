@@ -40,7 +40,7 @@ import scalaz.concurrent.Task
 
 final case class SparkCursor(rdd: Option[RDD[(Data, Long)]], pointer: Int)
 
-trait SparkCoreBackendModule extends BackendModule {
+trait SparkCore extends BackendModule {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad

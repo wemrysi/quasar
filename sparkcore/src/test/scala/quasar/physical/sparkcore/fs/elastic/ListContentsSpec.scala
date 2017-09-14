@@ -26,9 +26,9 @@ import org.specs2.scalaz.DisjunctionMatchers
 
 class ListContentsSpec extends quasar.Qspec with DisjunctionMatchers {
 
-  import SparkElasticBackendModule.separator
+  import SparkElastic.separator
 
-  val lc = SparkElasticBackendModule.details
+  val lc = SparkElastic.details
 
   def elasticInterpreter(indices: List[String]): ElasticCall ~> Id =
     elasticInterpreter(Map[String, List[String]](indices.map(idx => (idx -> List.empty[String])): _*))

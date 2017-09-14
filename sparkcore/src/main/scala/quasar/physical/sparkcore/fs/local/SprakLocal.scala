@@ -29,7 +29,7 @@ import quasar.fs._,
   BackendDef.{DefinitionError, DefErrT},
   QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.physical.sparkcore.fs._
-import quasar.physical.sparkcore.fs.SparkCoreBackendModule
+import quasar.physical.sparkcore.fs.SparkCore
 import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
 
 import java.io.{FileNotFoundException, File, PrintWriter}
@@ -43,7 +43,7 @@ import scalaz.concurrent.Task
 
 final case class LocalConfig(sparkConf: SparkConf, prefix: ADir)
 
-object SparkLocalBackendModule extends SparkCoreBackendModule with ChrootedInterpreter {
+object SparkLocal extends SparkCore with ChrootedInterpreter {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad

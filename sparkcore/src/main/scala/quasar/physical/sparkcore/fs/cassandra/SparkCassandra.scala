@@ -33,8 +33,8 @@ import quasar.fs._,
   PathError._
 import quasar.fs.mount._, BackendDef._
 import quasar.physical.sparkcore.fs._
-import quasar.physical.sparkcore.fs.SparkCoreBackendModule
-import quasar.physical.sparkcore.fs.{SparkCoreBackendModule, SparkConnectorDetails}, SparkConnectorDetails._
+import quasar.physical.sparkcore.fs.SparkCore
+import quasar.physical.sparkcore.fs.{SparkCore, SparkConnectorDetails}, SparkConnectorDetails._
 import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
 
 import java.net.URLDecoder
@@ -48,7 +48,7 @@ import scalaz.concurrent.Task
 
 final case class CassandraConfig(sparkConf: SparkConf, prefix: ADir)
 
-object SparkCassandraBackendModule extends SparkCoreBackendModule with ManagedWriteFile[AFile] with ChrootedInterpreter {
+object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with ChrootedInterpreter {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
