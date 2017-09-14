@@ -61,7 +61,6 @@ object TestConfig {
   val SPARK_ELASTIC   = ExternalBackendRef(BackendRef(BackendName("spark_elastic")    , BackendCapability.All), FileSystemType("spark-elastic"))
   val SPARK_CASSANDRA = ExternalBackendRef(BackendRef(BackendName("spark_cassandra")  , BackendCapability.All), FileSystemType("spark-cassandra"))
 
-
   lazy val backendRefs: List[ExternalBackendRef] = List(
     COUCHBASE,
     MARKLOGIC_JSON, MARKLOGIC_XML,

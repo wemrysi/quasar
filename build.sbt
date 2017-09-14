@@ -435,6 +435,7 @@ lazy val sparkcore = project
     libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value))
   .settings(
     isolatedBackendSettings(
+      "quasar.physical.sparkcore.fs.cassandra.SparkCassandraBackendModule$",
       "quasar.physical.sparkcore.fs.elastic.SparkElasticBackendModule$",
       "quasar.physical.sparkcore.fs.hdfs.SparkHdfsBackendModule$",
       "quasar.physical.sparkcore.fs.local.SparkLocalBackendModule$"))
