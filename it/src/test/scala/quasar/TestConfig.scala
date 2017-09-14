@@ -19,11 +19,11 @@ package quasar
 import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.fs._
-import quasar.fs.mount.{ConnectionUri, MountConfig}
-import quasar.physical.{couchbase, marklogic, mongodb, sparkcore}
+import quasar.fs.mount.{BackendDef, ConnectionUri, MountConfig}
+import quasar.main.{ClassName, ClassPath, FsLoadCfg}
 
 import pathy.Path._
-import knobs.{Required, Optional, FileResource, SysPropsResource, Prefix}
+import knobs.{Required, Optional, FileResource}
 import scalaz._, Scalaz._
 import scalaz.concurrent._
 
@@ -40,20 +40,26 @@ object TestConfig {
     */
   val TestPathPrefixEnvName = "QUASAR_TEST_PATH_PREFIX"
 
-  /** External Backends. */
-  val COUCHBASE       = ExternalBackendRef(BackendRef(BackendName("couchbase")        , BackendCapability.All), couchbase.fs.FsType)
-  val MARKLOGIC_JSON  = ExternalBackendRef(BackendRef(BackendName("marklogic_json")   , BackendCapability.All), marklogic.fs.FsType)
-  val MARKLOGIC_XML   = ExternalBackendRef(BackendRef(BackendName("marklogic_xml")    , BackendCapability.All), marklogic.fs.FsType)
+  /**
+   * External Backends.
+   *
+   * This is an artifact of the fact that we haven't inverted the dependency between
+   * `it` and the connectors.  Hence, the redundant hard-coding of constants.  We
+   * should get rid of this abomination as soon as possible.
+   */
+  val COUCHBASE       = ExternalBackendRef(BackendRef(BackendName("couchbase")        , BackendCapability.All), FileSystemType("couchbase"))
+  val MARKLOGIC_JSON  = ExternalBackendRef(BackendRef(BackendName("marklogic_json")   , BackendCapability.All), FileSystemType("marklogic"))
+  val MARKLOGIC_XML   = ExternalBackendRef(BackendRef(BackendName("marklogic_xml")    , BackendCapability.All), FileSystemType("marklogic"))
   val MIMIR           = ExternalBackendRef(BackendRef(BackendName("mimir")            , BackendCapability.All), mimir.Mimir.Type)
-  val MONGO_2_6       = ExternalBackendRef(BackendRef(BackendName("mongodb_2_6")      , BackendCapability.All), mongodb.fs.FsType)
-  val MONGO_3_0       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_0")      , BackendCapability.All), mongodb.fs.FsType)
-  val MONGO_3_2       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_2")      , BackendCapability.All), mongodb.fs.FsType)
-  val MONGO_3_4       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_4")      , BackendCapability.All), mongodb.fs.FsType)
-  val MONGO_READ_ONLY = ExternalBackendRef(BackendRef(BackendName("mongodb_read_only"), ISet singleton BackendCapability.query()), mongodb.fs.FsType)
-  val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), sparkcore.fs.hdfs.SparkHdfsBackendModule.Type)
-  val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), sparkcore.fs.local.SparkLocalBackendModule.Type)
-  val SPARK_ELASTIC   = ExternalBackendRef(BackendRef(BackendName("spark_elastic")    , BackendCapability.All), sparkcore.fs.elastic.FsType)
-  val SPARK_CASSANDRA = ExternalBackendRef(BackendRef(BackendName("spark_cassandra")  , BackendCapability.All), sparkcore.fs.cassandra.FsType)
+  val MONGO_2_6       = ExternalBackendRef(BackendRef(BackendName("mongodb_2_6")      , BackendCapability.All), FileSystemType("mongodb"))
+  val MONGO_3_0       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_0")      , BackendCapability.All), FileSystemType("mongodb"))
+  val MONGO_3_2       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_2")      , BackendCapability.All), FileSystemType("mongodb"))
+  val MONGO_3_4       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_4")      , BackendCapability.All), FileSystemType("mongodb"))
+  val MONGO_READ_ONLY = ExternalBackendRef(BackendRef(BackendName("mongodb_read_only"), ISet singleton BackendCapability.query()), FileSystemType("mongodb"))
+  val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), FileSystemType("spark-hdfs"))
+  val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), FileSystemType("spark-local"))
+  val SPARK_ELASTIC   = ExternalBackendRef(BackendRef(BackendName("spark_elastic")    , BackendCapability.All), FileSystemType("spark-elastic"))
+  val SPARK_CASSANDRA = ExternalBackendRef(BackendRef(BackendName("spark_cassandra")  , BackendCapability.All), FileSystemType("spark-cassandra"))
 
 
   lazy val backendRefs: List[ExternalBackendRef] = List(
@@ -86,18 +92,16 @@ object TestConfig {
     * to select an interpreter for a given config.
     */
   def externalFileSystems[S[_]](
-    pf: PartialFunction[(MountConfig, ADir), Task[(S ~> Task, Task[Unit])]]
+    pf: PartialFunction[BackendDef.FsCfg, Task[(S ~> Task, Task[Unit])]]
   ): Task[IList[SupportedFs[S]]] = {
     def fs(
       envName: String,
-      p: ADir,
       typ: FileSystemType
     ): OptionT[Task, Task[(S ~> Task, Task[Unit])]] =
       TestConfig.loadConnectionUri(envName) flatMapF { uri =>
-        val config = MountConfig.fileSystemConfig(typ, uri)
-        pf.lift((config, p)).cata(
+        pf.lift((typ, uri)).cata(
           Task.delay(_),
-          Task.fail(new UnsupportedFileSystemConfig(config)))
+          Task.fail(new UnsupportedFileSystemConfig(MountConfig.fileSystemConfig(typ, uri))))
       }
 
     def lookupFileSystem(r: ExternalBackendRef, p: ADir): OptionT[Task, FileSystemUT[S]] = {
@@ -111,8 +115,8 @@ object TestConfig {
       }
 
       for {
-        test     <- fs(backendConfName(r.ref.name), p, r.fsType)
-        setup    <- fs(insertConfName(r.ref.name), p, r.fsType).run.liftM[OptionT]
+        test     <- fs(backendConfName(r.ref.name), r.fsType)
+        setup    <- fs(insertConfName(r.ref.name), r.fsType).run.liftM[OptionT]
         s        <- NameGenerator.salt.liftM[OptionT]
         testRef  <- rsrc(test).liftM[OptionT]
         setupRef <- setup.cata(rsrc, Task.now(testRef)).liftM[OptionT]
@@ -140,7 +144,6 @@ object TestConfig {
 
   def confValue(name: String): OptionT[Task, String] = {
     val config = knobs.loadImmutable(
-      Optional(SysPropsResource(Prefix("")))                    ::
       Optional(FileResource(new java.io.File(confFile)))        ::
       Required(FileResource(new java.io.File(defaultConfFile))) ::
       Nil)
@@ -180,6 +183,28 @@ object TestConfig {
         d => OptionT(sandbox(rootDir, d).map(rootDir </> _).point[Task]),
         fail[ADir](s"Test data dir must be an absolute dir, got: $s").liftM[OptionT])
     } getOrElse DefaultTestPrefix
+
+  val testFsLoadCfg: Task[FsLoadCfg] = {
+    val confStrM =
+      Task.delay(java.lang.System.getProperty("slamdata.internal.fs-load-cfg", ""))
+
+    confStrM map { confStr =>
+      import java.io.File
+
+      val backends = confStr.split(";").toList map { backend =>
+        val List(name, classpath) = backend.split("=").toList
+
+        val apaths = classpath.split(":").toList flatMap { path =>
+          val file = new File(path)
+          ADir.fromFile(file).orElse(AFile.fromFile(file)).toList
+        }
+
+        ClassName(name) -> ClassPath(IList.fromList(apaths))
+      }
+
+      FsLoadCfg.ExplodedDirs(IList.fromList(backends))
+    }
+  }
 
   ////
 

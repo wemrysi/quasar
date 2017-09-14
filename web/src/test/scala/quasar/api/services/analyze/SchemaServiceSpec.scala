@@ -206,8 +206,8 @@ object SchemaServiceSpec {
       liftMT[Task, ResponseT] compose foldMapNT(eval) compose Mounter.trivial[MountConfigs]
     }
 
-  def service(mem: InMemState): HttpService =
-    Kleisli(req => runQueryFile(mem).tuple(runMounting) flatMap {
+  def service(mem: InMemState): Service[Request, Response] =
+    HttpService.lift(req => runQueryFile(mem).tuple(runMounting) flatMap {
       case (runQF, runM) =>
         schema.service[SchemaEff].toHttpService(
           runM                               :+:
@@ -215,5 +215,5 @@ object SchemaServiceSpec {
           failureResponseOr[FileSystemError] :+:
           liftMT[Task, ResponseT]
         )(req)
-    })
+    }).orNotFound
 }

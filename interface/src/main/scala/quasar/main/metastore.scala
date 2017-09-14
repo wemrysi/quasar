@@ -34,7 +34,8 @@ object metastore {
     mntdRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
   )(implicit
     S0: ConnectionIO :<: S,
-    S1: PhysErr :<: S
+    S1: PhysErr :<: S,
+    S2: FsAsk :<: S
   ): Mounting ~> Free[S, ?] = {
     type M[A] = Free[MountEff, A]
     type G[A] = Coproduct[ConnectionIO, M, A]
@@ -47,10 +48,14 @@ object metastore {
       injectFT[ConnectionIO, S] :+:
       foldMapNT(mapSNT(t) compose MountEff.interpreter[T](hfsRef, mntdRef))
 
-    val mounter = MetaStoreMounter[M, G](
-      mountHandler.mount[MountEff](_),
-      mountHandler.unmount[MountEff](_))
+    def mounter(handler: MountRequestHandler[PhysFsEffM, HierarchicalFsEff]) = {
+      MetaStoreMounter[M, G](
+        handler.mount[MountEff](_),
+        handler.unmount[MountEff](_))
+    }
 
-    foldMapNT(g) compose mounter
+    λ[Mounting ~> Free[S, ?]] { mounting =>
+      mountHandler[S].flatMap(handler => (foldMapNT(g) compose mounter(handler))(mounting))
+    }
   }
 }

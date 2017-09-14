@@ -19,17 +19,17 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultTell, SortDir}
+import quasar.connector.BackendModule
 import quasar.contrib.matryoshka._
-import quasar.contrib.pathy.{ADir, AFile}
+import quasar.contrib.pathy.{ADir, AFile, PathSegment}
 import quasar.contrib.scalaz._, eitherT._
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.{FileSystemError, QueryFile, MonadFsErr}, FileSystemError.qscriptPlanningFailed
+import quasar.fs.{FileSystemError, MonadFsErr}, FileSystemError.qscriptPlanningFailed
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
-import quasar.frontend.logicalplan.LogicalPlan
 import quasar.namegen._
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.accumulator._
@@ -1363,33 +1363,14 @@ object MongoDbPlanner {
       : M[A] =
     ma.mproduct(a => mtell.tell(Vector(PhaseResult.tree(label, a)))) ∘ (_._1)
 
-  type MongoQScriptCP[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
-  type MongoQScript[T[_[_]], A] = MongoQScriptCP[T]#M[A]
-
   def toMongoQScript[T[_[_]] : BirecursiveT: EqualT: RenderTreeT: ShowT, M[_]: Monad: MonadFsErr: PhaseResultTell](
-    lp: T[LogicalPlan],
+    qs: T[fs.MongoQScript[T, ?]],
     listContents: DiscoverPath.ListContents[M]
-  ): M[T[MongoQScript[T, ?]]] = {
-    val rewrite = new Rewrite[T]
-    val optimize = new Optimize[T]
-
-    implicit val mongoQScripToQScriptTotal: Injectable.Aux[MongoQScript[T, ?], QScriptTotal[T, ?]] =
-      ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
-
+  ): M[T[fs.MongoQScript[T, ?]]] =
     for {
-      qs  <- QueryFile.convertToQScriptRead[T, M, QScriptRead[T, ?]](listContents)(lp)
-      // TODO: also need to prefer projections over deletions
-      // NB: right now this only outputs one phase, but it’d be cool if we could
-      //     interleave phase building in the composed recursion scheme
-      opt <- log(
-        "QScript (Mongo-specific)",
-        Unirewrite[T, MongoQScriptCP[T], M](rewrite, listContents).apply(qs)
-          .map(_.transHylo(
-            optimize.optimize(reflNT[MongoQScript[T, ?]]),
-            Unicoalesce[T, MongoQScriptCP[T]]))
-          .flatMap(_.transCataM(liftFGM(assumeReadType[M, T, MongoQScript[T, ?]](Type.AnyObject)))))
-    } yield opt
-  }
+      mongoQs <- qs.transCataM(liftFGM(assumeReadType[M, T, fs.MongoQScript[T, ?]](Type.AnyObject)))
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript (Mongo-specific)", mongoQs))
+    } yield mongoQs
 
   def plan0
     [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
@@ -1400,7 +1381,7 @@ object MongoDbPlanner {
       joinHandler: JoinHandler[WF, WBM],
       funcHandler: BsonVersion => MapFunc[T, ?] ~> OptionFree[EX, ?],
       v: BsonVersion)
-    (lp: T[LogicalPlan])
+      (qs: T[fs.MongoQScript[T, ?]])
     (implicit
       ev0: WorkflowOpCoreF :<: WF,
       ev1: WorkflowBuilder.Ops[WF],
@@ -1409,17 +1390,29 @@ object MongoDbPlanner {
       : M[Crystallized[WF]] = {
 
     for {
-      opt <- toMongoQScript(lp, listContents)
+      opt <- toMongoQScript(qs, listContents)
       wb  <- log(
         "Workflow Builder",
         opt.cataM[M, WorkflowBuilder[WF]](
-          Planner[T, MongoQScript[T, ?]].plan[M, WF, EX](joinHandler, funcHandler(v), v).apply(_) ∘
+          Planner[T, fs.MongoQScript[T, ?]].plan[M, WF, EX](joinHandler, funcHandler(v), v).apply(_) ∘
             (_.transCata[Fix[WorkflowBuilderF[WF, ?]]](repeatedly(WorkflowBuilder.normalize[WF, Fix[WorkflowBuilderF[WF, ?]]])))))
       wf1 <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb)))
       wf2 <- log(
         "Workflow (crystallized)",
         Crystallize[WF].crystallize(wf1).point[M])
     } yield wf2
+  }
+
+  def planExecTime[
+    T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+    M[_]: Monad: PhaseResultTell: MonadFsErr]
+    (qs: T[fs.MongoQScript[T, ?]], queryContext: fs.QueryContext[M], execTime: Instant
+    ): M[Crystallized[WorkflowF]] = {
+
+    val lc: qscript.DiscoverPath.ListContents[ReaderT[M, Instant, ?]] =
+      queryContext.listContents.map(f => Kleisli[M, Instant, Set[PathSegment]](_ => f))
+    val ctx: fs.QueryContext[ReaderT[M, Instant, ?]] = queryContext.copy(listContents = lc)
+    plan[T, ReaderT[M, Instant, ?]](qs, ctx).run(execTime)
   }
 
   /** Translate the QScript plan to an executable MongoDB "physical"
@@ -1432,7 +1425,7 @@ object MongoDbPlanner {
   def plan[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     M[_]: Monad: PhaseResultTell: MonadFsErr: ExecTimeR]
-    (logical: T[LogicalPlan], queryContext: fs.QueryContext[M]
+    (qs: T[fs.MongoQScript[T, ?]], queryContext: fs.QueryContext[M]
     ): M[Crystallized[WorkflowF]] = {
     import MongoQueryModel._
 
@@ -1444,22 +1437,22 @@ object MongoDbPlanner {
           JoinHandler.fallback[Workflow3_2F, WBM](
             JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
             JoinHandler.mapReduce)
-        plan0[T, M, Workflow3_2F, Expr3_4](queryContext.listContents, joinHandler, FuncHandler.handle3_4[MapFunc[T, ?]], bsonVersion)(logical)
+        plan0[T, M, Workflow3_2F, Expr3_4](queryContext.listContents, joinHandler, FuncHandler.handle3_4[MapFunc[T, ?]], bsonVersion)(qs)
 
       case `3.2` =>
         val joinHandler =
           JoinHandler.fallback[Workflow3_2F, WBM](
             JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
             JoinHandler.mapReduce)
-        plan0[T, M, Workflow3_2F, Expr3_2](queryContext.listContents, joinHandler, FuncHandler.handle3_2[MapFunc[T, ?]], bsonVersion)(logical)
+        plan0[T, M, Workflow3_2F, Expr3_2](queryContext.listContents, joinHandler, FuncHandler.handle3_2[MapFunc[T, ?]], bsonVersion)(qs)
 
       case `3.0`     =>
         val joinHandler = JoinHandler.mapReduce[WBM, Workflow2_6F]
-        plan0[T, M, Workflow2_6F, Expr3_0](queryContext.listContents, joinHandler, FuncHandler.handle3_0[MapFunc[T, ?]], bsonVersion)(logical).map(_.inject[WorkflowF])
+        plan0[T, M, Workflow2_6F, Expr3_0](queryContext.listContents, joinHandler, FuncHandler.handle3_0[MapFunc[T, ?]], bsonVersion)(qs).map(_.inject[WorkflowF])
 
       case _     =>
         val joinHandler = JoinHandler.mapReduce[WBM, Workflow2_6F]
-        plan0[T, M, Workflow2_6F, Expr2_6](queryContext.listContents, joinHandler, FuncHandler.handle2_6[MapFunc[T, ?]], bsonVersion)(logical).map(_.inject[WorkflowF])
+        plan0[T, M, Workflow2_6F, Expr2_6](queryContext.listContents, joinHandler, FuncHandler.handle2_6[MapFunc[T, ?]], bsonVersion)(qs).map(_.inject[WorkflowF])
     }
   }
 }

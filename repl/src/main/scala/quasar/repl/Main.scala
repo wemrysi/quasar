@@ -19,6 +19,7 @@ package quasar.repl
 import slamdata.Predef._
 import quasar.config._
 import quasar.console._
+import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scopt._
 import quasar.effect._
 import quasar.fp._
@@ -141,12 +142,25 @@ object Main {
   def safeMain(args: Vector[String]): Task[Unit] =
     logErrors(for {
       opts    <- CliOptions.parser.safeParse(args, CliOptions.default)
+
       cfgPath <- opts.config.fold(none[FsFile].point[MainTask])(cfg =>
         FsPath.parseSystemFile(cfg)
           .toRight(s"Invalid path to config file: $cfg.")
           .map(some))
+
+      backends = opts.backends map {
+        case (name, paths) =>
+          val apaths =
+            paths.toList.flatMap(file => ADir.fromFile(file).orElse(AFile.fromFile(file)).toList)
+
+          val cn = ClassName(name)
+          val cp = ClassPath(IList.fromList(apaths))
+
+          cn -> cp
+      }
+
       _ <- initMetaStoreOrStart[CoreConfig](
-        CmdLineConfig(cfgPath, opts.cmd),
+        CmdLineConfig(cfgPath, FsLoadCfg.ExplodedDirs(IList.fromList(backends)), opts.cmd),
         (_, quasarInter) => startRepl(quasarInter).liftM[MainErrT],
         // The REPL does not allow you to change metastore
         // so no need to supply a function to persist the metastore

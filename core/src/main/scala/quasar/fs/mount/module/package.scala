@@ -23,6 +23,7 @@ import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fp.free._
 import quasar.fs._, FileSystemError._, PathError._, MountType._
+import quasar.fs.cache.VCache
 import quasar.sql.FunctionDecl
 
 import pathy.Path._
@@ -132,9 +133,10 @@ package object module {
                         S3: QueryFile :<: S,
                         S4: MonotonicSeq :<: S,
                         S5: ViewState :<: S,
-                        S6: Mounting :<: S,
-                        S7: MountingFailure :<: S,
-                        S8: PathMismatchFailure :<: S
+                        S6: VCache :<: S,
+                        S7: Mounting :<: S,
+                        S8: MountingFailure :<: S,
+                        S9: PathMismatchFailure :<: S
                       ): FileSystem ~> Free[S, ?] = {
     val mount = Mounting.Ops[S]
     val manageFile = nonFsMounts.manageFile(dir => mount.modulesHavingPrefix_(dir).map(paths => paths.map(p => (p:RPath))))
@@ -149,10 +151,11 @@ package object module {
                         S3: QueryFile :<: S,
                         S4: MonotonicSeq :<: S,
                         S5: ViewState :<: S,
-                        S6: Mounting :<: S,
-                        S7: MountingFailure :<: S,
-                        S8: PathMismatchFailure :<: S,
-                        S9: Analyze :<: S
+                        S6: VCache :<: S,
+                        S7: Mounting :<: S,
+                        S8: MountingFailure :<: S,
+                        S9: PathMismatchFailure :<: S,
+                        S10: Analyze :<: S
                       ): BackendEffect ~> Free[S, ?] = {
     (injectFT[Analyze, S]) :+: fileSystem[S]
   }

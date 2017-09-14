@@ -16,16 +16,16 @@
 
 package quasar.server
 
+import argonaut.Json
 import org.http4s.{Status, Method, Request}
 import org.http4s.argonaut._
-
-import argonaut.Json
+import org.http4s.syntax.service._
 
 class InfoServiceSpec extends quasar.Qspec {
 
   "Info Service" should {
     "be capable of providing it's name and version" in {
-      val response = info.service(Request(method = Method.GET)).unsafePerformSync
+      val response = info.service.orNotFound(Request(method = Method.GET)).unsafePerformSync
       response.status must_== Status.Ok
       response.as[Json].unsafePerformSync must_== info.nameAndVersionInfo
     }

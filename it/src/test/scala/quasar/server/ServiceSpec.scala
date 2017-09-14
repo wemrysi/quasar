@@ -60,11 +60,28 @@ class ServiceSpec extends quasar.Qspec {
       _          <- schema.updateToLatest.transact(transactor).liftM[MainErrT]
       _          <- metastoreInit.transact(transactor).liftM[MainErrT]
       metaRef    <- TaskRef(metastore).liftM[MainErrT]
-      quasarFs   <- Quasar.initWithMeta(metaRef, _ => ().point[MainTask])
+      quasarFs   <- Quasar.initWithMeta(FsLoadCfg.Empty, metaRef, _ => ().point[MainTask])
       shutdown   <- Server.startServer(quasarFs.interp, port, Nil, None, _ => ().point[MainTask]).liftM[MainErrT]
       r          <- f(uri).onFinish(κ(shutdown.onFinish(κ(quasarFs.shutdown)))).liftM[MainErrT]
     } yield r).run.unsafePerformSync
   }
+
+  val fileSystemConfigs =
+    TestConfig.backendRefs
+      .traverse { ref =>
+        val connectionUri = TestConfig.loadConnectionUri(ref.ref)
+        connectionUri.map(MountConfig.fileSystemConfig(ref.fsType, _)).run
+      }.map(_
+        .unite
+        .zipWithIndex
+        .map { case (c, i) => (rootDir </> dir("data") </> dir(i.toString)) -> c }
+        .toMap[APath, MountConfig])
+      .unsafePerformSync
+
+  def withFileSystemConfigs[A](result: => MatchResult[A]): Result =
+    fileSystemConfigs.isEmpty.fold(
+      skipped("Warning: no test backends enabled"),
+      AsResult(result))
 
   "/mount/fs" should {
 
@@ -109,14 +126,17 @@ class ServiceSpec extends quasar.Qspec {
       r.map(_.status) must beRightDisjunction(Ok)
     }
 
-    "[SD-1833] replace view" in {
+    "[SD-1833] replace view" in withFileSystemConfigs {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync
       val sel1 = "sql2:///?q=%28select%201%29"
       val sel2 = "sql2:///?q=%28select%202%29"
 
       val finalCfg = MountConfig.viewConfig0(sqlB"select 2")
 
-      val r = withServer(port) { baseUri: Uri =>
+      val mnts =
+        fileSystemConfigs.headOption.traverse { case (_, m) => insertMount(rootDir, m) }.void
+
+      val r = withServer(port, mnts) { baseUri: Uri =>
         client.fetch(
           Request(
               uri = baseUri / "mount" / "fs" / "viewA",
@@ -133,7 +153,7 @@ class ServiceSpec extends quasar.Qspec {
       }
 
       r ==== finalCfg.asJson.right
-    }
+    }.flakyTest   // FIXME this test is actually non-deterministic depending on server scheduling
 
     "MOVE view" in {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync
@@ -163,24 +183,6 @@ class ServiceSpec extends quasar.Qspec {
   }
 
   "/data/fs" should {
-    val fileSystemConfigs =
-      TestConfig.backendRefs
-        .traverse { ref =>
-          val connectionUri = TestConfig.loadConnectionUri(ref.ref)
-          connectionUri.map(MountConfig.fileSystemConfig(ref.fsType, _)).run
-        }.map(_
-          .unite
-          .zipWithIndex
-          .map { case (c, i) => (rootDir </> dir("data") </> dir(i.toString)) -> c }
-          .toMap[APath, MountConfig])
-        .unsafePerformSync
-
-    val testName = "MOVE view"
-
-    def withFileSystemConfigs[A](result: MatchResult[A]): Result =
-      fileSystemConfigs.isEmpty.fold(
-        skipped("Warning: no test backends enabled"),
-        AsResult(result))
 
     "MOVE view" in withFileSystemConfigs {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync

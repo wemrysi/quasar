@@ -11,7 +11,8 @@
         "mongodb_3_4":       "skip",
         "mongodb_read_only": "skip",
         "spark_hdfs":        "skip",
-        "spark_local":       "skip"
+        "spark_local":       "skip",
+        "spark_cassandra":   "skip"	
     },
     "data": "nested_foo.data",
     "query": "select * from nested_foo where (

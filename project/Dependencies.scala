@@ -18,10 +18,10 @@ object Dependencies {
   private val pathyVersion        = "0.2.11"
   private val raptureVersion      = "2.0.0-M9"
   private val refinedVersion      = "0.8.2"
-  private val scodecBitsVersion   = "1.1.0"
-  private val http4sVersion       = "0.15.13a"
+  private val scodecBitsVersion   = "1.1.2"
+  private val http4sVersion       = "0.16.0a"
   private val scalacheckVersion   = "1.13.4"
-  private val scalazVersion       = "7.2.14"
+  private val scalazVersion       = "7.2.15"
   private val scalazStreamVersion = "0.8.6a"
   private val shapelessVersion    = "2.3.2"
   private val simulacrumVersion   = "0.10.0"
@@ -77,14 +77,15 @@ object Dependencies {
     "com.github.julien-truffaut" %% "monocle-macro"             % monocleVersion,
     "com.github.tototoshi"       %% "scala-csv"                 % "1.3.4",
     "com.slamdata"               %% "pathy-argonaut"            % pathyVersion,
+    // Removing this will not cause any compile time errors, but will cause a runtime error once
+    // Quasar attempts to connect to an h2 database to use as a metastore
+    "com.h2database"              % "h2"                        % "1.4.196",
     ("org.tpolecat"               %% "doobie-specs2"             % doobieVersion % Test)
-      .exclude("org.specs2", "specs2-core_2.11"), // conflicting version
-    "org.tpolecat"               %% "doobie-h2"                 % doobieVersion % Test
+      .exclude("org.specs2", "specs2-core_2.11") // conflicting version
   )
   def interface = Seq(
     "com.github.scopt" %% "scopt" % "3.5.0",
-    "org.jboss.aesh"    % "aesh"  % "0.66.17",
-    "com.h2database"    % "h2"    % "1.4.195"
+    "org.jboss.aesh"    % "aesh"  % "0.66.17"
   )
 
   def mongodb = {

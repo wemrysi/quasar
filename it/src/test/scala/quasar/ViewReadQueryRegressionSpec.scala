@@ -21,7 +21,8 @@ import quasar.contrib.pathy.{ADir, APath}
 import quasar.effect._
 import quasar.fp._ , free._
 import quasar.fs.{Empty, PhysicalError, ReadFile}
-import quasar.fs.mount._, BackendDef.DefinitionResult
+import quasar.fs.cache.VCache
+import quasar.fs.mount._, BackendDef.DefinitionResult, Fixture._
 import quasar.main._
 import quasar.regression._
 import quasar.sql.{ScopedExpr, Sql}
@@ -39,19 +40,22 @@ class ViewReadQueryRegressionSpec
 
   val suiteName = "View Reads"
 
-  type ViewFS[A] = (Mounting :\: ViewState :\: MonotonicSeq :/: BackendEffectIO)#M[A]
+  type ViewFS[A] = (Mounting :\: ViewState :\: VCache :\: MonotonicSeq :/: BackendEffectIO)#M[A]
+
+  type FsAskPhysFsEff[A] = Coproduct[FsAsk, PhysFsEff, A]
 
   def mounts(path: APath, expr: Fix[Sql], vars: Variables): Task[Mounting ~> Task] =
     (
       TaskRef(Map[APath, MountConfig](path -> MountConfig.viewConfig(ScopedExpr(expr, Nil), vars))) |@|
       TaskRef(Empty.backendEffect[HierarchicalFsEffM]) |@|
-      TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
-    ) { (cfgsRef, hfsRef, mntdRef) =>
+      TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]) |@|
+      physicalFileSystems(FsLoadCfg.Empty)   // test views just against mimir
+    ) { (cfgsRef, hfsRef, mntdRef, mounts) =>
       val mnt =
-        KvsMounter.interpreter[Task, PhysFsEff](
+        KvsMounter.interpreter[Task, FsAskPhysFsEff](
           KeyValueStore.impl.fromTaskRef(cfgsRef), hfsRef, mntdRef)
 
-      foldMapNT(reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
+      foldMapNT(FsAsk.runToF[Task](mounts) :+: reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
         .compose(mnt)
     }
 
@@ -79,8 +83,9 @@ class ViewReadQueryRegressionSpec
 
   def interpViews(mnts: Mounting ~> Task): Task[ViewFS ~> BackendEffectIO] =
     (ViewState.toTask(Map()) |@| seq)((v, s) =>
-      (injectNT[Task, BackendEffectIO] compose mnts) :+:
-      (injectNT[Task, BackendEffectIO] compose v) :+:
-      (injectNT[Task, BackendEffectIO] compose s) :+:
+      (injectNT[Task, BackendEffectIO] compose mnts)                               :+:
+      (injectNT[Task, BackendEffectIO] compose v)                                  :+:
+      (injectNT[Task, BackendEffectIO] compose runConstantVCache[Task](Map.empty)) :+:
+      (injectNT[Task, BackendEffectIO] compose s)                                  :+:
       reflNT[BackendEffectIO])
 }

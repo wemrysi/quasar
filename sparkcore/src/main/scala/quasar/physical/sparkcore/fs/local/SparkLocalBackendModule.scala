@@ -117,7 +117,11 @@ object SparkLocalBackendModule extends SparkCoreBackendModule with ChrootedInter
     })
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def generateSC: LocalConfig => DefErrT[Task, SparkContext] = (config: LocalConfig) => EitherT(Task.delay {
+    // look, I didn't make Spark the way it is...
+    java.lang.Thread.currentThread().setContextClassLoader(null)
+
     new SparkContext(config.sparkConf).right[DefinitionError]
   }.handleWith {
     case ex : SparkException if ex.getMessage.contains("SPARK-2243") =>

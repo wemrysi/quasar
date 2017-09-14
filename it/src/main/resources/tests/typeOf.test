@@ -4,7 +4,8 @@
         "couchbase":      "pending",
         "mimir":"pendingIgnoreFieldOrder",
         "spark_hdfs":     "pending",
-        "spark_local":    "pending"
+        "spark_local":    "pending",
+	"spark_cassandra": "pending"
     },
     "data": "nested_foo.data",
     "query": "select foo, type_of(foo) as type from nested_foo",

@@ -37,6 +37,7 @@ import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
 import eu.timepit.refined.scalacheck.numeric._
 import matryoshka.data.Fix
 import org.http4s._
+import org.http4s.syntax.service._
 import org.http4s.argonaut._
 import org.specs2.matcher.MatchResult
 import pathy.Path._
@@ -60,12 +61,12 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
     mem: InMemState,
     f: FileSystem ~> InMemoryFs,
     mounts: Map[APath, MountConfig] = Map.empty
-  ): (HttpService, Task[InMemState]) = {
+  ): (Service[Request, Response], Task[InMemState]) = {
     val (inter, ref) = runInspect(mem).unsafePerformSync
     val svc = HttpService.lift(req =>
       execute.service[Eff]
         .toHttpService(effRespOr(inter compose f, mountingInter(mounts).unsafePerformSync))
-        .apply(req))
+        .apply(req)).orNotFound
 
     (svc, ref)
   }
@@ -104,10 +105,10 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
     val req = query.map { query =>
       val uri = baseURI.+??("offset", query.offset.map(_.shows)).+??("limit", query.limit.map(_.shows))
       val uri1 = query.varNameAndValue.map{ case (name, value) => uri.+?("var."+name,value)}.getOrElse(uri)
-      baseReq.copy(uri = uri1).withBody(query.q).unsafePerformSync
+      baseReq.withUri(uri1).withBody(query.q).unsafePerformSync
     }.getOrElse(baseReq)
     val req1 = destination.map(destination =>
-      req.copy(headers = Headers(Header("Destination", UriPathCodec.printPath(destination))))
+      req.withHeaders(Headers(Header("Destination", UriPathCodec.printPath(destination))))
     ).getOrElse(req)
     val (service, ref) = executeServiceRef(state, eval)
     val actualResponse = service(req1).unsafePerformSync

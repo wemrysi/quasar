@@ -22,15 +22,17 @@ import quasar.config.{ConfigOps, FsFile, ConfigError, MetaStoreConfig}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
+import quasar.connector.BackendModule
 import quasar.effect._
 import quasar.db._
 import quasar.fp._, ski._
 import quasar.fp.free._
 import quasar.fs._
+import quasar.fs.cache.VCache
 import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
 import quasar.fs.mount.module.Module
-import quasar.physical._, couchbase.Couchbase
+import quasar.physical._ // , couchbase.Couchbase
 import quasar.main.config.loadConfigFile
 import quasar.metastore._
 
@@ -39,14 +41,15 @@ import scala.util.control.NonFatal
 import doobie.imports._
 import eu.timepit.refined.auto._
 import monocle.Lens
-import pathy.Path.posixCodec
+import org.slf4s.Logging
+import pathy.Path, Path.posixCodec
 import scalaz.{Failure => _, Lens => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 /** Concrete effect types and their interpreters that implement the quasar
   * functionality.
   */
-package object main {
+package object main extends Logging {
   import BackendDef.DefinitionResult
   import QueryFile.ResultHandle
 
@@ -54,28 +57,192 @@ package object main {
   type MainTask[A]       = MainErrT[Task, A]
   val MainTask           = MonadError[EitherT[Task, String, ?], String]
 
-  /** The physical filesystems currently supported. */
-  val physicalFileSystems: BackendDef[PhysFsEffM] = IList(
-    Couchbase.definition translate injectFT[Task, PhysFsEff],
-    marklogic.MarkLogic(
-      readChunkSize  = 10000L,
-      writeChunkSize = 10000L
-    ).definition translate injectFT[Task, PhysFsEff],
+  final case class ClassName(value: String) extends AnyVal
+  final case class ClassPath(value: IList[APath]) extends AnyVal
+
+  sealed trait FsLoadCfg extends Product with Serializable
+
+  /**
+   * APaths relative to real filesystem root
+   */
+  object FsLoadCfg {
+
+    /**
+     * This should only be used for testing purposes.  It represents a
+     * configuration in which no backends will be loaded at all.
+     */
+    val Empty: FsLoadCfg = ExplodedDirs(IList.empty)
+
+    /**
+     * A single directory containing jars, each of which will be
+     * loaded as a backend.  With each jar, the `BackendModule` class
+     * name will be determined from the `Manifest.mf` file.
+     */
+    final case class JarDirectory(dir: ADir) extends FsLoadCfg
+
+    /**
+     * Any files in the classpath will be loaded as jars; any directories
+     * will be assumed to contain class files (e.g. the target output of
+     * SBT compile).  The class name should be the fully qualified Java
+     * class name of the `BackendModule` implemented as a Scala object.
+     * In most cases, this means the class name here will end with a `$`
+     */
+    final case class ExplodedDirs(backends: IList[(ClassName, ClassPath)]) extends FsLoadCfg
+  }
+
+  // all of the backends which are included in the core distribution
+  private val CoreFS = IList(
+    // Couchbase.definition translate injectFT[Task, PhysFsEff],
+    // marklogic.MarkLogic.definition translate injectFT[Task, PhysFsEff],
     mimir.Mimir.definition translate injectFT[Task, PhysFsEff],
-    mongodb.fs.definition[PhysFsEff],
-    skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff],
-    sparkcore.fs.hdfs.definition[PhysFsEff],
-    sparkcore.fs.elastic.definition[PhysFsEff],
-    sparkcore.fs.cassandra.definition[PhysFsEff],
-    sparkcore.fs.local.SparkLocalBackendModule.definition translate injectFT[Task, PhysFsEff]
+    // mongodb.MongoDb.definition translate injectFT[Task, PhysFsEff],
+    skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff]// ,
+    // sparkcore.fs.hdfs.SparkHdfsBackendModule.definition translate injectFT[Task, PhysFsEff],
+    // sparkcore.fs.elastic.SparkElasticBackendModule.definition translate injectFT[Task, PhysFsEff],
+    // sparkcore.fs.cassandra.definition[PhysFsEff],
+    // sparkcore.fs.local.SparkLocalBackendModule.definition translate injectFT[Task, PhysFsEff]
   ).fold
+
+  /**
+   * The physical filesystems currently supported.  Please note that it
+   * is really best if you only sequence this task ''once'' per runtime.
+   * It won't misbehave, but it will waste resources if you run it multiple
+   * times.  Thus, all uses of the value from this Task should be handled
+   * by `FsAsk` (or an analogous `Kleisli`).
+   */
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf", "org.wartremover.warts.Null"))
+  def physicalFileSystems(config: FsLoadCfg): Task[BackendDef[PhysFsEffM]] = {
+    import java.io.File
+    import java.lang.{
+      ClassCastException,
+      ClassNotFoundException,
+      ExceptionInInitializerError,
+      IllegalAccessException,
+      IllegalArgumentException,
+      NoSuchFieldException,
+      NullPointerException
+    }
+    import java.net.URLClassLoader
+
+    import FsLoadCfg._
+
+    // this is a side-effect in the same way that `new` is a side-effect
+    val ParentCL = this.getClass.getClassLoader
+
+    def loadBackend(cn: String, cl: ClassLoader): OptionT[Task, BackendDef[Task]] = {
+      for {
+        clazz <- OptionT(Task delay {
+          try {
+            Some(cl.loadClass(cn))
+          } catch {
+            case cnf: ClassNotFoundException =>
+              log.warn(s"could not locate class for backend module '$cn'", cnf)
+
+              None
+          }
+        })
+
+        module <- OptionT(Task delay {
+          try {
+            Some(clazz.getDeclaredField("MODULE$").get(null).asInstanceOf[BackendModule])
+          } catch {
+            case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
+              log.warn(s"backend module '$cn' does not appear to be a singleton object", e)
+
+              None
+
+            case e: ExceptionInInitializerError =>
+              log.warn(s"backend module '$cn' failed to load with exception", e)
+
+              None
+
+            case _: ClassCastException =>
+              log.warn(s"backend module '$cn' is not actually a subtype of BackendModule")
+
+              None
+          }
+        })
+      } yield module.definition
+    }
+
+    val isolatedFS: Task[BackendDef[Task]] = config match {
+      case JarDirectory(dir) =>
+        import java.util.jar.Manifest
+
+        for {
+          file <- Task.delay(new File(posixCodec.unsafePrintPath(dir)))
+          children <- Task.delay(file.listFiles().toList)
+          jars = IList.fromList(children.filter(_.getName.endsWith(".jar")).toList)
+
+          loaded <- jars traverse { jar =>
+            val back = for {
+              cl <- Task.delay(new URLClassLoader(Array(jar.toURI.toURL), ParentCL)).liftM[OptionT]
+              manifestIS <- OptionT(Task.delay(Option(cl.getResourceAsStream("META-INF/MANIFEST.MF"))))
+              manifest <- Task.delay(new Manifest(manifestIS)).liftM[OptionT]
+              attrs <- Task.delay(manifest.getMainAttributes()).liftM[OptionT]
+
+              moduleAttrValue <- OptionT(Task.delay(Option(attrs.getValue("Backend-Module"))))
+              modules = IList.fromList(moduleAttrValue.split(" ").toList)
+
+              defs <- modules.traverse(loadBackend(_, cl))
+            } yield defs.fold
+
+            for {
+              result <- back.run
+
+              _ <- if (result.isEmpty)
+                Task.delay(log.warn(s"unable to load any backends from $jar; perhaps the 'Backend-Module' attribute is not defined"))
+              else
+                Task.now(())
+            } yield result
+          }
+        } yield loaded.flatMap(r => IList.fromList(r.toList)).fold
+
+      case ExplodedDirs(backends) =>
+        val maybeDefinitionsM: Task[IList[Option[BackendDef[Task]]]] = backends traverse {
+          case (ClassName(cn), ClassPath(paths)) =>
+            val back = for {
+              urls <- (paths traverse { path =>
+                for {
+                  file <- Task.delay(new File(posixCodec.unsafePrintPath(path)))
+                  url <- Task.delay(file.toURI.toURL)
+                } yield url
+              }).liftM[OptionT]
+
+              cl <- Task.delay(new URLClassLoader(urls.toList.toArray, ParentCL)).liftM[OptionT]
+              back <- loadBackend(cn, cl)
+            } yield back
+
+            back.run
+        }
+
+        maybeDefinitionsM.map(_.flatMap(opt => IList.fromList(opt.toList)).fold)
+    }
+
+    // merge the isolated filesystems with the core filesystems
+    isolatedFS.map(_.translate(injectFT[Task, PhysFsEff])).map(IList(_, CoreFS).fold)
+  }
+
+  sealed trait FsAsk[A]
+
+  object FsAsk {
+    private case object Singleton extends FsAsk[BackendDef[PhysFsEffM]]
+
+    def runToF[F[_]: Applicative](mounts: BackendDef[PhysFsEffM]): FsAsk ~> F =
+      λ[FsAsk ~> F] { case Singleton => mounts.point[F] }
+
+    def apply[S[_]](implicit S: FsAsk :<: S): Free[S, BackendDef[PhysFsEffM]] =
+      Free.liftF[S, BackendDef[PhysFsEffM]](S.inj(Singleton))
+  }
 
   /** A "terminal" effect, encompassing failures and other effects which
     * we may want to interpret using more than one implementation.
     */
-  type QEffIO[A]  = Coproduct[Task, QEff, A]
-  type QEff[A]     = Coproduct[MetaStoreLocation, QEff0, A]
-  type QEff0[A]    = Coproduct[Mounting, QErrs, A]
+  type QEffIO[A] = Coproduct[Task, QEff, A]
+  type QEff[A]   = Coproduct[Timing, QEff0, A]
+  type QEff0[A]  = Coproduct[VCache, QEff1, A]
+  type QEff1[A]  = Coproduct[MetaStoreLocation, QEff2, A]
+  type QEff2[A]  = Coproduct[Mounting, QErrs, A]
 
   /** All possible types of failure in the system (apis + physical). */
   type QErrs[A]    = Coproduct[PhysErr, CoreErrs, A]
@@ -91,7 +258,12 @@ package object main {
 
   /** Effect comprising the core Quasar apis. */
   type CoreEffIO[A] = Coproduct[Task, CoreEff, A]
-  type CoreEff[A]   = (MetaStoreLocation :\: Module :\: Mounting :\: Analyze :\: QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :/: CoreErrs)#M[A]
+  type CoreEff[A]   =
+    (
+      MetaStoreLocation :\: Module :\: Mounting :\: Analyze :\:
+      QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :\:
+      VCache :\: Timing :/: CoreErrs
+    )#M[A]
 
   object CoreEff {
     def runFs[S[_]](
@@ -105,24 +277,28 @@ package object main {
       S4: PathMismatchFailure :<: S,
       S5: FileSystemFailure :<: S,
       S6: Module.Failure    :<: S,
-      S7: MetaStoreLocation :<: S
+      S7: MetaStoreLocation :<: S,
+      S8: VCache :<: S,
+      S9: Timing :<: S
     ): Task[CoreEff ~> Free[S, ?]] = {
       def moduleInter(fs: BackendEffect ~> Free[S,?]): Module ~> Free[S, ?] = {
         val wtv: Coproduct[Mounting, BackendEffect, ?] ~> Free[S,?] = injectFT[Mounting, S] :+: fs
         flatMapSNT(wtv) compose Module.impl.default[Coproduct[Mounting, BackendEffect, ?]]
       }
       CompositeFileSystem.interpreter[S](hfsRef) map { compFs =>
-        injectFT[MetaStoreLocation, S]                       :+:
-        moduleInter(compFs)                             :+:
-        injectFT[Mounting, S]                           :+:
-        (compFs compose Inject[Analyze, BackendEffect])  :+:
+        injectFT[MetaStoreLocation, S]                     :+:
+        moduleInter(compFs)                                :+:
+        injectFT[Mounting, S]                              :+:
+        (compFs compose Inject[Analyze, BackendEffect])    :+:
         (compFs compose Inject[QueryFile, BackendEffect])  :+:
         (compFs compose Inject[ReadFile, BackendEffect])   :+:
         (compFs compose Inject[WriteFile, BackendEffect])  :+:
         (compFs compose Inject[ManageFile, BackendEffect]) :+:
-        injectFT[Module.Failure, S]                     :+:
-        injectFT[PathMismatchFailure, S]                :+:
-        injectFT[MountingFailure, S]                    :+:
+        injectFT[VCache, S]                                :+:
+        injectFT[Timing, S]                                :+:
+        injectFT[Module.Failure, S]                        :+:
+        injectFT[PathMismatchFailure, S]                   :+:
+        injectFT[MountingFailure, S]                       :+:
         injectFT[FileSystemFailure, S]
       }
     }
@@ -158,8 +334,9 @@ package object main {
       S0: Task :<: S,
       S1: PhysErr :<: S,
       S2: Mounting :<: S,
-      S3: MountingFailure :<: S,
-      S4: PathMismatchFailure :<: S
+      S3: VCache :<: S,
+      S4: MountingFailure :<: S,
+      S5: PathMismatchFailure :<: S
     ): Task[BackendEffect ~> Free[S, ?]] =
       for {
         startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
@@ -176,6 +353,7 @@ package object main {
               ViewState
           :\: MonotonicSeq
           :\: Mounting
+          :\: VCache
           :\: MountingFailure
           :\: PathMismatchFailure
           :/: BackendEffect
@@ -185,6 +363,7 @@ package object main {
           injectFT[Task, S].compose(KeyValueStore.impl.fromTaskRef(viewHRef)) :+:
           injectFT[Task, S].compose(MonotonicSeq.fromTaskRef(seqRef))         :+:
           injectFT[Mounting, S]                                               :+:
+          injectFT[VCache, S]                                                 :+:
           injectFT[MountingFailure, S]                                        :+:
           injectFT[PathMismatchFailure, S]                                    :+:
           hierarchicalFs
@@ -252,12 +431,16 @@ package object main {
   /** Provides the mount handlers to update the hierarchical
     * filesystem whenever a mount is added or removed.
     */
-  val mountHandler = MountRequestHandler[PhysFsEffM, HierarchicalFsEff](
-    physicalFileSystems translate flatMapSNT(
-      PhysFsEff.reifyNonFatalErrors[PhysFsEff] :+: injectFT[PhysErr, PhysFsEff]))
+  def mountHandler[S[_]](implicit S: FsAsk :<: S): Free[S, MountRequestHandler[PhysFsEffM, HierarchicalFsEff]] = {
+    FsAsk[S] map { physicalFileSystems =>
+      MountRequestHandler[PhysFsEffM, HierarchicalFsEff](
+        physicalFileSystems translate flatMapSNT(
+          PhysFsEff.reifyNonFatalErrors[PhysFsEff] :+: injectFT[PhysErr, PhysFsEff]))
+    }
+  }
 
-  import mountHandler.HierarchicalFsRef
-
+  // copied out of MountRequestHandler to avoid dependent typing
+  type HierarchicalFsRef[A] = AtomicRef[BackendEffect ~> Free[HierarchicalFsEff, ?], A]
   type MountedFsRef[A] = AtomicRef[Mounts[DefinitionResult[PhysFsEffM]], A]
 
   /** Effects required for mounting. */
@@ -306,7 +489,8 @@ package object main {
     )(implicit
       S0: F :<: S,
       S1: Task :<: S,
-      S2: PhysErr :<: S
+      S2: PhysErr :<: S,
+      S3: FsAsk :<: S
     ): Mounting ~> Free[S, ?] = {
       type G[A] = Coproduct[MountConfigs, MountEffM, A]
 
@@ -314,12 +498,16 @@ package object main {
         injectFT[F, S].compose(cfgsImpl) :+:
         free.foldMapNT(MountEff.interpreter[S](hrchFsRef, mntdFsRef))
 
-      val mounter: Mounting ~> Free[G, ?] =
-        quasar.fs.mount.Mounter.kvs[MountEffM, G](
-          mountHandler.mount[MountEff](_),
-          mountHandler.unmount[MountEff](_))
+      val mounter: Free[S, Mounting ~> Free[G, ?]] =
+        mountHandler map { handler =>
+          quasar.fs.mount.Mounter.kvs[MountEffM, G](
+            handler.mount[MountEff](_),
+            handler.unmount[MountEff](_))
+        }
 
-      free.foldMapNT(f) compose mounter
+      λ[Mounting ~> Free[S, ?]] { mounting =>
+        mounter.flatMap(nt => (free.foldMapNT(f) compose nt)(mounting))
+      }
     }
 
     def ephemeralMountConfigs[F[_]: Monad]: MountConfigs ~> F = {
@@ -379,7 +567,7 @@ package object main {
     }
   }
 
-  final case class CmdLineConfig(configPath: Option[FsFile], cmd: Cmd)
+  final case class CmdLineConfig(configPath: Option[FsFile], loadConfig: FsLoadCfg, cmd: Cmd)
 
   /** Either initialize the metastore or execute the start depending
     * on what command is provided by the user in the command line arguments
@@ -396,8 +584,12 @@ package object main {
       _     <- config.cmd match {
         case Cmd.Start =>
           for {
-            quasarFs <- Quasar.initFromMetaConfig(configOps.metaStoreConfig.get(cfg), persist)
-            _        <- start(cfg, quasarFs.interp).ensuring(κ(quasarFs.shutdown.liftM[MainErrT]))
+            quasarFs <- Quasar.initFromMetaConfig(
+              config.loadConfig,
+              configOps.metaStoreConfig.get(cfg),
+              persist)
+
+            _ <- start(cfg, quasarFs.interp).ensuring(κ(quasarFs.shutdown.liftM[MainErrT]))
           } yield ()
 
         case Cmd.InitUpdateMetaStore =>
