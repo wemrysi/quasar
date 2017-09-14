@@ -167,7 +167,7 @@ package object main extends Logging {
 
     val isolatedFS: Task[BackendDef[Task]] = config match {
       case JarDirectory(dir) =>
-        import java.util.jar.Manifest
+        import java.util.jar.JarFile
 
         for {
           file <- Task.delay(new File(posixCodec.unsafePrintPath(dir)))
@@ -177,8 +177,7 @@ package object main extends Logging {
           loaded <- jars traverse { jar =>
             val back = for {
               cl <- Task.delay(new URLClassLoader(Array(jar.toURI.toURL), ParentCL)).liftM[OptionT]
-              manifestIS <- OptionT(Task.delay(Option(cl.getResourceAsStream("META-INF/MANIFEST.MF"))))
-              manifest <- Task.delay(new Manifest(manifestIS)).liftM[OptionT]
+              manifest <- Task.delay(new JarFile(jar).getManifest()).liftM[OptionT]
               attrs <- Task.delay(manifest.getMainAttributes()).liftM[OptionT]
 
               moduleAttrValue <- OptionT(Task.delay(Option(attrs.getValue("Backend-Module"))))
