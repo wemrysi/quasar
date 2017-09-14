@@ -25,11 +25,8 @@ import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._, FileSystemError._
 
 import org.apache.spark.SparkContext
-import org.apache.spark.rdd._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-
-final case class SparkCursor(rdd: Option[RDD[(Data, Long)]], pointer: Int)
 
 object readfile {
 
@@ -37,15 +34,6 @@ object readfile {
   type Limit = Option[Positive]
 
   import ReadFile.ReadHandle
-
-  def chrooted[S[_]](prefix: ADir)(implicit
-    s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
-    s1: Read[SparkContext, ?] :<: S,
-    s2: MonotonicSeq :<: S,
-    s3: Task :<: S,
-    s4: SparkConnectorDetails :<: S
-  ): ReadFile ~> Free[S, ?] =
-    flatMapSNT(interpret) compose chroot.readFile[ReadFile](prefix)
 
   def interpret[S[_]](implicit
     s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,

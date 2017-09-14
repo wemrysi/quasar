@@ -63,7 +63,7 @@ object SparkElasticBackendModule extends SparkCoreBackendModule with ManagedWrit
   type Eff1[A]  = Coproduct[Read[SparkContext, ?], Eff0, A]
   type Eff2[A]  = Coproduct[ElasticCall, Eff1, A]
   type Eff3[A]  = Coproduct[MonotonicSeq, Eff2, A]
-  type Eff4[A]  = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Eff3, A]
+  type Eff4[A]  = Coproduct[KeyValueStore[ResultHandle, SparkCursor, ?], Eff3, A]
   type Eff5[A]  = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Eff4, A]
   type Eff6[A]  = Coproduct[KeyValueStore[WriteHandle, AFile, ?], Eff5, A]
   type Eff[A]   = Coproduct[SparkConnectorDetails, Eff6, A]
@@ -76,7 +76,7 @@ object SparkElasticBackendModule extends SparkCoreBackendModule with ManagedWrit
   def MonotonicSeqInj = Inject[MonotonicSeq, Eff]
   def TaskInj = Inject[Task, Eff]
   def SparkConnectorDetailsInj = Inject[SparkConnectorDetails, Eff]
-  def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, RddState, ?], Eff]
+  def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, SparkCursor, ?], Eff]
 
   def MonoSeqM = MonoSeq[M]
   def WriteKvsM = Kvs[M, WriteFile.WriteHandle, AFile]
@@ -108,7 +108,7 @@ object SparkElasticBackendModule extends SparkCoreBackendModule with ManagedWrit
     S0: Task :<: S, S1: PhysErr :<: S
   ): Task[Free[Eff, ?] ~> Free[S, ?]] =
     ( TaskRef(0L)                                 |@|
-      TaskRef(Map.empty[ResultHandle, RddState])  |@|
+      TaskRef(Map.empty[ResultHandle, SparkCursor])  |@|
       TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
       TaskRef(Map.empty[WriteHandle, AFile])) {
       (genState, rddStates, readCursors, writeCursors) => {
@@ -127,7 +127,7 @@ object SparkElasticBackendModule extends SparkCoreBackendModule with ManagedWrit
           (details.interpreter[Temp] andThen temp andThen injectNT[Task, S]) :+:
         (KeyValueStore.impl.fromTaskRef[WriteHandle, AFile](writeCursors) andThen injectNT[Task, S])  :+:
         (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](readCursors) andThen injectNT[Task, S]) :+:
-        (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
+        (KeyValueStore.impl.fromTaskRef[ResultHandle, SparkCursor](rddStates) andThen injectNT[Task, S]) :+:
         (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
         (elasticInterpreter andThen injectNT[Task, S]) :+:
         (read andThen injectNT[Task, S]) :+:

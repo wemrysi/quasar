@@ -38,7 +38,7 @@ import matryoshka.implicits._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
-final case class RddState(maybeRDD: Option[RDD[(Data, Long)]], pointer: Int)
+final case class SparkCursor(rdd: Option[RDD[(Data, Long)]], pointer: Int)
 
 trait SparkCoreBackendModule extends BackendModule {
 
@@ -56,7 +56,7 @@ trait SparkCoreBackendModule extends BackendModule {
   def MonotonicSeqInj: Inject[MonotonicSeq, Eff]
   def TaskInj: Inject[Task, Eff]
   def SparkConnectorDetailsInj: Inject[SparkConnectorDetails, Eff]
-  def QFKeyValueStoreInj: Inject[KeyValueStore[QueryFile.ResultHandle, RddState, ?], Eff]
+  def QFKeyValueStoreInj: Inject[KeyValueStore[QueryFile.ResultHandle, SparkCursor, ?], Eff]
 
   // common for all spark based connecotrs
   type M[A] = Free[Eff, A]
@@ -73,14 +73,14 @@ trait SparkCoreBackendModule extends BackendModule {
     TaskInj
   private final implicit def _SparkConnectorDetailsInj: Inject[SparkConnectorDetails, Eff] =
     SparkConnectorDetailsInj
-  private final implicit def _QFKeyValueStoreInj: Inject[KeyValueStore[QueryFile.ResultHandle, RddState, ?], Eff] =
+  private final implicit def _QFKeyValueStoreInj: Inject[KeyValueStore[QueryFile.ResultHandle, SparkCursor, ?], Eff] =
     QFKeyValueStoreInj
 
   def detailsOps: SparkConnectorDetails.Ops[Eff] = SparkConnectorDetails.Ops[Eff]
   def readScOps: Read.Ops[SparkContext, Eff] = Read.Ops[SparkContext, Eff]
   def msOps: MonotonicSeq.Ops[Eff] = MonotonicSeq.Ops[Eff]
-  def qfKvsOps: KeyValueStore.Ops[QueryFile.ResultHandle, RddState, Eff] =
-    KeyValueStore.Ops[QueryFile.ResultHandle, RddState, Eff]
+  def qfKvsOps: KeyValueStore.Ops[QueryFile.ResultHandle, SparkCursor, Eff] =
+    KeyValueStore.Ops[QueryFile.ResultHandle, SparkCursor, Eff]
 
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
@@ -144,15 +144,15 @@ trait SparkCoreBackendModule extends BackendModule {
 
     def evaluatePlan(rdd: Repr): Backend[ResultHandle] = (for {
       h <- msOps.next.map(ResultHandle(_))
-      _ <- qfKvsOps.put(h, RddState(rdd.zipWithIndex.persist.some, 0))
+      _ <- qfKvsOps.put(h, SparkCursor(rdd.zipWithIndex.persist.some, 0))
     } yield h).liftB :++> Vector(PhaseResult.detail("RDD", rdd.toDebugString))
 
     def more(h: ResultHandle): Backend[Vector[Data]] = (for {
     step <- detailsOps.readChunkSize
     res  <- (qfKvsOps.get(h).toRight(unknownResultHandle(h)).flatMap {
-      case RddState(None, _) =>
+      case SparkCursor(None, _) =>
         Vector.empty[Data].pure[EitherT[Free[Eff, ?], FileSystemError, ?]]
-      case RddState(Some(rdd), p) =>
+      case SparkCursor(Some(rdd), p) =>
         for {
           collected <- lift(Task.delay {
             rdd
@@ -162,8 +162,8 @@ trait SparkCoreBackendModule extends BackendModule {
           rddState <- lift(Task.delay {
             if(collected.isEmpty) {
               ignore(rdd.unpersist())
-              RddState(None, 0)
-            } else RddState(Some(rdd), p + step)
+              SparkCursor(None, 0)
+            } else SparkCursor(Some(rdd), p + step)
           }).into[Eff].liftM[FileSystemErrT]
           _ <- qfKvsOps.put(h, rddState).liftM[FileSystemErrT]
         } yield collected

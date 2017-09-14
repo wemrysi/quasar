@@ -28,8 +28,7 @@ import quasar.fs._,
   FileSystemError._, PathError._, WriteFile._,
   BackendDef.{DefinitionError, DefErrT},
   QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
-import quasar.physical.sparkcore.fs._
-import quasar.physical.sparkcore.fs.{SparkCoreBackendModule, SparkConnectorDetails}, SparkConnectorDetails._
+import quasar.physical.sparkcore.fs._, SparkConnectorDetails._
 import quasar.physical.sparkcore.fs.hdfs.parquet.ParquetRDD
 import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
 
@@ -57,11 +56,9 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
 
   def rootPrefix(cfg: HdfsConfig): ADir = cfg.prefix
 
-  
-
   val Type = FileSystemType("spark-hdfs")
 
-  type Eff1[A]  = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
+  type Eff1[A]  = Coproduct[KeyValueStore[ResultHandle, SparkCursor, ?], Read[SparkContext, ?], A]
   type Eff2[A]  = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Eff1, A]
   type Eff3[A]  = Coproduct[KeyValueStore[WriteHandle, HdfsWriteCursor, ?], Eff2, A]
   type Eff4[A]  = Coproduct[Task, Eff3, A]
@@ -78,7 +75,7 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
   def MonotonicSeqInj = Inject[MonotonicSeq, Eff]
   def TaskInj = Inject[Task, Eff]
   def SparkConnectorDetailsInj = Inject[SparkConnectorDetails, Eff]
-  def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, RddState, ?], Eff]
+  def QFKeyValueStoreInj = Inject[KeyValueStore[QueryFile.ResultHandle, SparkCursor, ?], Eff]
 
   def writersOps = KeyValueStore.Ops[WriteHandle, HdfsWriteCursor, Eff]
   def sequenceOps = MonotonicSeq.Ops[Eff]
@@ -103,7 +100,7 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
     S0: Task :<: S, S1: PhysErr :<: S
   ): Task[Free[Eff, ?] ~> Free[S, ?]] =
     (TaskRef(0L) |@|
-      TaskRef(Map.empty[ResultHandle, RddState]) |@|
+      TaskRef(Map.empty[ResultHandle, SparkCursor]) |@|
       TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
       TaskRef(Map.empty[WriteHandle, HdfsWriteCursor]) |@|
       generateHdfsFS(config)
@@ -121,7 +118,7 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
       injectNT[Task, S]  :+:
       (KeyValueStore.impl.fromTaskRef[WriteHandle, HdfsWriteCursor](writeCursors) andThen injectNT[Task, S])  :+:
       (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[Task, S]) :+:
-      (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
+      (KeyValueStore.impl.fromTaskRef[ResultHandle, SparkCursor](rddStates) andThen injectNT[Task, S]) :+:
       (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
 
       mapSNT[Eff, S](interpreter)
