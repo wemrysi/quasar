@@ -102,9 +102,11 @@ object SparkLocalBackendModule extends SparkCoreBackendModule with ChrootedInter
     def error(msg: String): DefErrT[Task, LocalConfig] =
       EitherT(NonEmptyList(msg).left[EnvironmentError].left[LocalConfig].point[Task])
 
+    @SuppressWarnings(Array("org.wartremover.warts.Null"))
     def forge(master: String, rootPath: String): DefErrT[Task, LocalConfig] =
       posixCodec.parseAbsDir(rootPath).map(unsafeSandboxAbs _).cata(
         (prefix: ADir) => {
+          java.lang.Thread.currentThread().setContextClassLoader(null)
           val sc = new SparkConf().setMaster(master).setAppName("quasar")
           LocalConfig(sc, prefix).point[DefErrT[Task, ?]]
         }, error(s"Could not extract a path from $rootPath"))

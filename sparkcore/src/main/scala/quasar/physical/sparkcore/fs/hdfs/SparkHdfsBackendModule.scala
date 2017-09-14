@@ -84,8 +84,10 @@ object SparkHdfsBackendModule extends SparkCoreBackendModule with ChrootedInterp
   def sequenceOps = MonotonicSeq.Ops[Eff]
   def hdfsFSOps = Read.Ops[HdfsFileSystem, Eff]
 
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def generateHdfsFS(sfsConf: HdfsConfig): Task[HdfsFileSystem] =
     for {
+      _ <- Task.delay(java.lang.Thread.currentThread.setContextClassLoader(null))
       fs <- Task.delay {
         val conf = new Configuration()
         conf.setBoolean("fs.hdfs.impl.disable.cache", true)
