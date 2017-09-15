@@ -6,7 +6,6 @@
     "query": "select count(*) as cnt from olympics order by cnt",
 
     "predicate": "exactly",
-    "ignoreResultOrder": true,
 
     "expected": [{ "cnt": 2311 }]
 }
