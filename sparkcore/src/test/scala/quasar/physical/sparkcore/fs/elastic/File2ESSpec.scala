@@ -20,7 +20,7 @@ import pathy._, Path._
 
 class File2ESSpec extends quasar.Qspec {
 
-  import SparkElasticBackendModule.{separator, file2ES}
+  import SparkElastic.{separator, file2ES}
   
   "file2ES" should {
     "create IndexType for first lvl file" in {

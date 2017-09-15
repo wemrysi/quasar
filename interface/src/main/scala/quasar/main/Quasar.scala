@@ -123,7 +123,6 @@ object Quasar {
       hfsRef     <- TaskRef(Empty.backendEffect[HierarchicalFsEffM]).liftM[MainErrT]
       mntdRef    <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
 
-      // TODO
       mounts <- physicalFileSystems(loadConfig).liftM[MainErrT]
 
       ephmralMnt =  KvsMounter.interpreter[Task, QErrsTCnxIO](
