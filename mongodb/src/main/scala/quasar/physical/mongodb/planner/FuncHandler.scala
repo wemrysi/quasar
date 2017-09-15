@@ -271,33 +271,27 @@ object FuncHandler {
             new (MapFuncCore[T, ?] ~> OptionFree[EX, ?]){
               implicit def hole[D](d: D): Free[EX, D] = Free.pure(d)
 
-
               def apply[A](mfc: MapFuncCore[T, A]): OptionFree[EX, A] = {
-                val fp26 = new ExprOpCoreF.fixpoint[Free[EX, A], EX](Free.roll)
-                val fp34 = new ExprOp3_4F.fixpoint[Free[EX, A], EX](Free.roll)
+                val fp26  = new ExprOpCoreF.fixpoint[Free[EX, A], EX](Free.roll)
+                val fp34  = new ExprOp3_4F.fixpoint[Free[EX, A], EX](Free.roll)
+                val check = new Check[Free[EX, A], EX](Free.roll)
 
                 import fp26._, fp34._
 
                 mfc.some collect {
                   case Length(a1) =>
-                    $cond($and(
-                      $lte($literal(Bson.Text("")), a1),
-                      $lt(a1, $literal(Bson.Doc()))),
+                    $cond(check.isString(a1),
                       $strLenCP(a1), $size(a1))
                   case Split(a1, a2) => $split(a1, a2)
                   case Substring(a1, a2, a3) =>
-                    $cond(
-                      $or(
+                    $cond($or(
                         $lt(a2, $literal(Bson.Int32(0))),
-                        $gt(a2, $strLenCP(a1))
-                      ),
+                        $gt(a2, $strLenCP(a1))),
                       $literal(Bson.Text("")),
                       $cond(
                         $lt(a3, $literal(Bson.Int32(0))),
                         $substrCP(a1, a2, $strLenCP(a1)),
-                        $substrCP(a1, a2, a3)
-                      )
-                    )
+                        $substrCP(a1, a2, a3)))
                   case ToString(a1) =>
                     mkToString(a1, $substrBytes)
                 }
