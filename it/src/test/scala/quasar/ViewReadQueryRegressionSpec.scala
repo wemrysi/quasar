@@ -21,8 +21,8 @@ import quasar.contrib.pathy.{ADir, APath}
 import quasar.effect._
 import quasar.fp._ , free._
 import quasar.fs.{Empty, PhysicalError, ReadFile}
-import quasar.fs.cache.VCache
 import quasar.fs.mount._, BackendDef.DefinitionResult, Fixture._
+import quasar.fs.mount.cache.VCache
 import quasar.main._
 import quasar.regression._
 import quasar.sql.{ScopedExpr, Sql}
