@@ -55,7 +55,7 @@ class ViewReadQueryRegressionSpec
         KvsMounter.interpreter[Task, FsAskPhysFsEff](
           KeyValueStore.impl.fromTaskRef(cfgsRef), hfsRef, mntdRef)
 
-      foldMapNT(FsAsk.runToF[Task](mounts) :+: reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
+      foldMapNT(Read.constant[Task, BackendDef[PhysFsEffM]](mounts) :+: reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
         .compose(mnt)
     }
 

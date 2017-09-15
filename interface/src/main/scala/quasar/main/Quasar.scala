@@ -21,7 +21,7 @@ import quasar.config.MetaStoreConfig
 import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
 import quasar.db.DbConnectionConfig
-import quasar.effect.{Timing, Failure}
+import quasar.effect.{Failure, Read, Timing}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
@@ -67,7 +67,7 @@ object Quasar {
       val f: QErrsCnxIOM ~> MainErrT[ConnectionIO, ?] =
         foldMapNT(
           liftMT[ConnectionIO, MainErrT] :+:
-          FsAsk.runToF[MainErrT[ConnectionIO, ?]](mounts) :+:
+          Read.constant[MainErrT[ConnectionIO, ?], BackendDef[PhysFsEffM]](mounts) :+:
           qErrsToMainErrT[ConnectionIO])
 
       Hoist[MainErrT].hoist(transactor.trans(implicitly[Monad[Task]])) compose f
@@ -83,7 +83,7 @@ object Quasar {
         foldMapNT(
           (liftMT[ConnectionIO, MainErrT] compose taskToConnectionIO) :+:
             liftMT[ConnectionIO, MainErrT] :+:
-            FsAsk.runToF[MainErrT[ConnectionIO, ?]](mounts) :+:
+            Read.constant[MainErrT[ConnectionIO, ?], BackendDef[PhysFsEffM]](mounts) :+:
             QErrsCnxIO.qErrsToMainErrT[ConnectionIO])
 
       Hoist[MainErrT].hoist(transactor.trans) compose f
@@ -156,7 +156,7 @@ object Quasar {
         (injectFT[Task, QErrs_Task] compose MetaStoreLocation.impl.default(metaRef, persist)) :+:
         injectFT[Task, QErrs_Task] :+:
         (injectFT[Task, QErrs_Task] compose connectionIOToTask) :+:
-        FsAsk.runToF[QErrs_TaskM](mounts) :+:
+        Read.constant[QErrs_TaskM, BackendDef[PhysFsEffM]](mounts) :+:
         injectFT[QErrs, QErrs_Task]
 
       val h: CoreEff ~> QErrs_TaskM =  foldMapNT(g) compose foldMapNT(f) compose runCore

@@ -108,7 +108,7 @@ package object main extends Logging {
    * is really best if you only sequence this task ''once'' per runtime.
    * It won't misbehave, but it will waste resources if you run it multiple
    * times.  Thus, all uses of the value from this Task should be handled
-   * by `FsAsk` (or an analogous `Kleisli`).
+   * by `Read[BackendDef[PhysFsEffM], ?]` (or an analogous `Kleisli`).
    */
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf", "org.wartremover.warts.Null"))
   def physicalFileSystems(config: FsLoadCfg): Task[BackendDef[PhysFsEffM]] = {
@@ -222,17 +222,7 @@ package object main extends Logging {
     isolatedFS.map(_.translate(injectFT[Task, PhysFsEff])).map(IList(_, CoreFS).fold)
   }
 
-  sealed trait FsAsk[A]
-
-  object FsAsk {
-    private case object Singleton extends FsAsk[BackendDef[PhysFsEffM]]
-
-    def runToF[F[_]: Applicative](mounts: BackendDef[PhysFsEffM]): FsAsk ~> F =
-      λ[FsAsk ~> F] { case Singleton => mounts.point[F] }
-
-    def apply[S[_]](implicit S: FsAsk :<: S): Free[S, BackendDef[PhysFsEffM]] =
-      Free.liftF[S, BackendDef[PhysFsEffM]](S.inj(Singleton))
-  }
+  type FsAsk[A] = Read[BackendDef[PhysFsEffM], A]
 
   /** A "terminal" effect, encompassing failures and other effects which
     * we may want to interpret using more than one implementation.
@@ -431,7 +421,7 @@ package object main extends Logging {
     * filesystem whenever a mount is added or removed.
     */
   def mountHandler[S[_]](implicit S: FsAsk :<: S): Free[S, MountRequestHandler[PhysFsEffM, HierarchicalFsEff]] = {
-    FsAsk[S] map { physicalFileSystems =>
+    Read.Ops[BackendDef[PhysFsEffM], S].ask map { physicalFileSystems =>
       MountRequestHandler[PhysFsEffM, HierarchicalFsEff](
         physicalFileSystems translate flatMapSNT(
           PhysFsEff.reifyNonFatalErrors[PhysFsEff] :+: injectFT[PhysErr, PhysFsEff]))
