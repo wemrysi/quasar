@@ -27,8 +27,8 @@ import quasar.db._
 import quasar.fp._, ski._
 import quasar.fp.free._
 import quasar.fs._
-import quasar.fs.cache.VCache
 import quasar.fs.mount._
+import quasar.fs.mount.cache.VCache
 import quasar.fs.mount.hierarchical._
 import quasar.fs.mount.module.Module
 import quasar.physical._, couchbase.Couchbase

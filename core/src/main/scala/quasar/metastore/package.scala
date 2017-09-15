@@ -20,8 +20,8 @@ import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile, APath, unsafeSandboxAbs}
 import quasar.db.Schema
 import quasar.fs.FileSystemType
-import quasar.fs.cache.ViewCache
-import quasar.fs.mount.{ConnectionUri, MountType}
+import quasar.fs.mount.cache.ViewCache
+import quasar.fs.mount.{ConnectionUri, MountType, MountConfig}
 
 import java.sql.Timestamp
 import java.time.Instant
@@ -129,23 +129,29 @@ package object metastore {
       _.fold(_.value, "view", "module"))
   }
 
+  implicit val viewConfigMeta: Meta[MountConfig.ViewConfig] = {
+    Meta[ConnectionUri].xmap[MountConfig.ViewConfig](
+      uri => MountConfig.ViewConfig.tupled(MountConfig.viewCfgFromUri(uri).leftMap(unexpectedValue).merge),
+      viewConfig => MountConfig.viewCfgAsUri(viewConfig.query,viewConfig.vars))
+  }
+
   implicit val pathedViewCacheComposite: Composite[PathedViewCache] =
     Composite[(
-      AFile, ConnectionUri, Option[Instant], Option[Long], Int, Option[String],
+      AFile, MountConfig.ViewConfig, Option[Instant], Option[Long], Int, Option[String],
       Option[Instant], Long, Instant, ViewCache.Status, Option[String], AFile, Option[String]
     )].xmap(
-      { case (path, query, lastUpdate, executionMillis, cacheReads, assignee,
+      { case (path, viewConfig, lastUpdate, executionMillis, cacheReads, assignee,
               assigneeStart, maxAge, refreshAfter, status, errorMsg, dataFile, tmpDataFile) =>
           PathedViewCache(
             path,
             ViewCache(
-              query, lastUpdate, executionMillis, cacheReads, assignee,
+              viewConfig, lastUpdate, executionMillis, cacheReads, assignee,
               assigneeStart, maxAge, refreshAfter, status, errorMsg, dataFile,
               tmpDataFile ∘ (tf => unsafeSandboxAbs(
                 posixCodec.parseAbsFile(tf)
                   .getOrElse(unexpectedValue("not an absolute file path: " + tf))))))
       },
-      c => (c.path, c.vc.query, c.vc.lastUpdate, c.vc.executionMillis, c.vc.cacheReads, c.vc.assignee,
+      c => (c.path, c.vc.viewConfig, c.vc.lastUpdate, c.vc.executionMillis, c.vc.cacheReads, c.vc.assignee,
              c.vc.assigneeStart, c.vc.maxAgeSeconds, c.vc.refreshAfter, c.vc.status, c.vc.errorMsg, c.vc.dataFile,
              c.vc.tmpDataFile ∘ (posixCodec.printPath(_))))
 

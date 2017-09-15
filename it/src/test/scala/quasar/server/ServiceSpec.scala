@@ -66,16 +66,16 @@ class ServiceSpec extends quasar.Qspec {
     } yield r).run.unsafePerformSync
   }
 
-  val fileSystemConfigs =
+  val fileSystemConfigs: Map[APath, MountConfig.FileSystemConfig] =
     TestConfig.backendRefs
       .traverse { ref =>
         val connectionUri = TestConfig.loadConnectionUri(ref.ref)
-        connectionUri.map(MountConfig.fileSystemConfig(ref.fsType, _)).run
+        connectionUri.map(MountConfig.FileSystemConfig(ref.fsType, _)).run
       }.map(_
         .unite
         .zipWithIndex
         .map { case (c, i) => (rootDir </> dir("data") </> dir(i.toString)) -> c }
-        .toMap[APath, MountConfig])
+        .toMap[APath, MountConfig.FileSystemConfig])
       .unsafePerformSync
 
   def withFileSystemConfigs[A](result: => MatchResult[A]): Result =
@@ -84,6 +84,29 @@ class ServiceSpec extends quasar.Qspec {
       AsResult(result))
 
   "/mount/fs" should {
+
+    "mount filesystem" in withFileSystemConfigs {
+      val port = Http4sUtils.anyAvailablePort.unsafePerformSync
+
+      val r  = withServer(port) { baseUri: Uri =>
+        fileSystemConfigs.toList.traverse { case (f,c) => 
+          client.fetch(
+            Request(
+                uri = baseUri / "mount" / "fs",
+                method = Method.POST,
+                headers = Headers(Header("X-File-Name", c.typ.value + "/")))
+              .withBody(s"""{ "${c.typ.value}": { "connectionUri" : "${c.uri.value}" } }""")
+            )(Task.now) *>
+          client.fetch(
+            Request(
+              uri = baseUri / "mount" / "fs" / c.typ.value / "",
+              method = Method.GET)
+            )(Task.now)
+        }
+      }
+
+      r.map(_.forall(_.status == Ok)) must beRightDisjunction(true)
+    }
 
     "POST view" in {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync

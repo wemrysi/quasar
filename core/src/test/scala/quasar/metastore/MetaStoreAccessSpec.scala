@@ -17,9 +17,11 @@
 package quasar.metastore
 
 import slamdata.Predef._
+import quasar.Variables
 import quasar.fs.FileSystemType
-import quasar.fs.cache.ViewCache
 import quasar.fs.mount.{ConnectionUri, MountConfig}
+import quasar.fs.mount.cache.ViewCache
+import quasar.sql._
 
 import java.time.Instant
 
@@ -45,7 +47,7 @@ abstract class MetaStoreAccessSpec extends Specification with TaskChecker {
     val f = rootDir </> file("α")
     val instant = Instant.ofEpochSecond(0)
     val viewCache = ViewCache(
-      ConnectionUri("α"), None, None, 0, None, None,
+      MountConfig.ViewConfig(sqlB"α", Variables.empty), None, None, 0, None, None,
       0, instant, ViewCache.Status.Pending, None, f, None)
 
     // NB: these tests do not execute the queries or validate results, but only

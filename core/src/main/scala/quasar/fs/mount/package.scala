@@ -20,7 +20,7 @@ import slamdata.Predef.{Map, Vector}
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._, free._
-import quasar.fs.cache.VCache
+import quasar.fs.mount.cache.VCache
 
 import monocle.Lens
 import scalaz.{Lens => _, Failure => _, _}

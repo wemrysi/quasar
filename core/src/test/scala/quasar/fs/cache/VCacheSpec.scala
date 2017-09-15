@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.fs.cache
+package quasar.fs.mount.cache
 
 import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.effect.KeyValueStoreSpec
-import quasar.fs.cache.ViewCacheArbitrary._
+import quasar.fs.mount.cache.ViewCacheArbitrary._
 import quasar.metastore._
 
 import doobie.imports._

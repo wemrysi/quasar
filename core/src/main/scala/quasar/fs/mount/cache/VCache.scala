@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.fs.cache
+package quasar.fs.mount.cache
 
 import quasar.contrib.pathy.AFile
 import quasar.effect.KeyValueStore

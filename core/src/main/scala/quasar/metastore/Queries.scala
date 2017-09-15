@@ -18,7 +18,7 @@ package quasar.metastore
 
 import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile, APath}
-import quasar.fs.cache.ViewCache
+import quasar.fs.mount.cache.ViewCache
 import quasar.fs.mount.{MountConfig, MountType}, MountConfig.FileSystemConfig
 
 import java.time.Instant
@@ -66,7 +66,7 @@ trait Queries {
   def insertViewCache(path: AFile, viewCache: ViewCache): Update0 =
     sql"""INSERT INTO view_cache values (
             $path,
-            ${viewCache.query},
+            ${viewCache.viewConfig.asUri},
             ${viewCache.lastUpdate},
             ${viewCache.executionMillis},
             ${viewCache.cacheReads},
@@ -83,7 +83,7 @@ trait Queries {
     sql"""UPDATE view_cache
           SET
             path = $path,
-            query = ${viewCache.query},
+            query = ${viewCache.viewConfig.asUri},
             last_update = ${viewCache.lastUpdate},
             execution_millis = ${viewCache.executionMillis},
             cache_reads = ${viewCache.cacheReads},

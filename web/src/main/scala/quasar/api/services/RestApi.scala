@@ -23,9 +23,9 @@ import quasar.effect.Timing
 import quasar.fp.liftMT
 import quasar.fp.free.foldMapNT
 import quasar.fs._
-import quasar.fs.cache.VCache
 import quasar.fs.mount._
 import quasar.fs.mount.module.Module
+import quasar.fs.mount.cache.VCache
 import quasar.main.MetaStoreLocation
 
 import scala.concurrent.duration._
