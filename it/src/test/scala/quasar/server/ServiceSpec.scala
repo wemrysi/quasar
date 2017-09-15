@@ -83,7 +83,6 @@ class ServiceSpec extends quasar.Qspec {
       skipped("Warning: no test backends enabled"),
       AsResult(result))
 
-// curl -v -X PUT http://localhost:20223/mount/fs/mongo/ -d '{ "mongodb": { "connectionUri": "mongodb://192.168.99.100:27021/test" } }'
   "/mount/fs" should {
 
     "mount filesystem" in withFileSystemConfigs {
@@ -91,13 +90,13 @@ class ServiceSpec extends quasar.Qspec {
 
       val r  = withServer(port) { baseUri: Uri =>
         fileSystemConfigs.toList.traverse { case (f,c) => 
-          // client.fetch(
-            // Request(
-            //     uri = baseUri / "mount" / "fs",
-            //     method = Method.POST,
-            //     headers = Headers(Header("X-File-Name", c.typ.value + "/")))
-            //   .withBody(s"""{ "${c.typ.value}": { "connectionUri" : "${c.uri.value}" } }""")
-            //)(Task.now) *>
+          client.fetch(
+            Request(
+                uri = baseUri / "mount" / "fs",
+                method = Method.POST,
+                headers = Headers(Header("X-File-Name", c.typ.value + "/")))
+              .withBody(s"""{ "${c.typ.value}": { "connectionUri" : "${c.uri.value}" } }""")
+            )(Task.now) *>
           client.fetch(
             Request(
               uri = baseUri / "mount" / "fs" / c.typ.value / "",
@@ -105,11 +104,8 @@ class ServiceSpec extends quasar.Qspec {
             )(Task.now)
         }
       }
-      println(s"r: $r")
-      println(r.map(_.map(_.as[String].unsafePerformSync)))
-      println(s"r: $r")
-      r.map(_.forall(_.status == Ok)) must beRightDisjunction(true)
 
+      r.map(_.forall(_.status == Ok)) must beRightDisjunction(true)
     }
 
     "POST view" in {
