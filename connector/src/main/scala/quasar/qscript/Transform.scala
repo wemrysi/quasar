@@ -337,7 +337,7 @@ class Transform
                 Free.point(ReduceIndex(0.right)))))).embed)
         case None =>
           Target(
-            Ann(provs, HoleF),
+            Ann(Nil, HoleF),
             QC.inj(Reduce[T, T[F]](
               values(0).value,
               Nil,
