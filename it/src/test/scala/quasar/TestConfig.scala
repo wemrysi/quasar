@@ -50,11 +50,10 @@ object TestConfig {
   val MONGO_3_2       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_2")      , BackendCapability.All), mongodb.MongoDb.Type)
   val MONGO_3_4       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_4")      , BackendCapability.All), mongodb.MongoDb.Type)
   val MONGO_READ_ONLY = ExternalBackendRef(BackendRef(BackendName("mongodb_read_only"), ISet singleton BackendCapability.query()), mongodb.MongoDb.Type)
-  val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), sparkcore.fs.hdfs.SparkHdfsBackendModule.Type)
-  val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), sparkcore.fs.local.SparkLocalBackendModule.Type)
-  val SPARK_ELASTIC   = ExternalBackendRef(BackendRef(BackendName("spark_elastic")    , BackendCapability.All), sparkcore.fs.elastic.FsType)
-  val SPARK_CASSANDRA = ExternalBackendRef(BackendRef(BackendName("spark_cassandra")  , BackendCapability.All), sparkcore.fs.cassandra.FsType)
-
+  val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), sparkcore.fs.hdfs.SparkHdfs.Type)
+  val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), sparkcore.fs.local.SparkLocal.Type)
+  val SPARK_ELASTIC   = ExternalBackendRef(BackendRef(BackendName("spark_elastic")    , BackendCapability.All), sparkcore.fs.elastic.SparkElastic.Type)
+  val SPARK_CASSANDRA = ExternalBackendRef(BackendRef(BackendName("spark_cassandra")  , BackendCapability.All), sparkcore.fs.cassandra.SparkCassandra.Type)
 
   lazy val backendRefs: List[ExternalBackendRef] = List(
     COUCHBASE,

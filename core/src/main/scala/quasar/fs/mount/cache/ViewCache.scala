@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.fs.cache
+package quasar.fs.mount.cache
 
 import slamdata.Predef._
 import quasar.contrib.pathy.AFile
-import quasar.fs.mount.ConnectionUri
+import quasar.fs.mount.MountConfig
 
 import java.time.{Duration => JDuration, Instant}
 import scala.concurrent.duration._
@@ -26,7 +26,7 @@ import scala.concurrent.duration._
 import scalaz._, Scalaz._
 
 final case class ViewCache(
-  query: ConnectionUri,
+  viewConfig: MountConfig.ViewConfig,
   lastUpdate: Option[Instant],
   executionMillis: Option[Long],
   cacheReads: Int,
@@ -59,7 +59,7 @@ object ViewCache {
     Equal.equal {
       case (ViewCache(l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12),
             ViewCache(r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12)) =>
-        l1 ≟ r1 && l2 ≟ r2 && l3 ≟ r3 && l4 ≟ r4 && l5 ≟ r5 && l6 ≟ r6 &&
+        (l1: MountConfig) ≟ (r1: MountConfig) && l2 ≟ r2 && l3 ≟ r3 && l4 ≟ r4 && l5 ≟ r5 && l6 ≟ r6 &&
         l7 ≟ r7 && l8 ≟ r8 && l9 ≟ r9 && l10 ≟ r10 && l11 ≟ r11 && l12 ≟ r12
     }
   }

@@ -200,7 +200,7 @@ If no metastore configuration is specified, the default configuration will use a
 An example H2 configuration would look something like
 ```json
 "h2": {
-  "location": "`database_url`"
+  "file": "`database_url`"
 }
 ```
 

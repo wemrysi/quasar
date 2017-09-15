@@ -19,7 +19,7 @@ package quasar.metastore
 import slamdata.Predef._
 import quasar.contrib.pathy._
 import quasar.db._
-import quasar.fs.cache.ViewCache
+import quasar.fs.mount.cache.ViewCache
 import quasar.fs.mount.{MountConfig, MountType, MountingError}, MountConfig.FileSystemConfig
 
 import java.time.Instant

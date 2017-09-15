@@ -23,7 +23,7 @@ import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fp.free._
 import quasar.fs._, FileSystemError._, PathError._, MountType._
-import quasar.fs.cache.VCache
+import quasar.fs.mount.cache.VCache
 import quasar.sql.FunctionDecl
 
 import pathy.Path._

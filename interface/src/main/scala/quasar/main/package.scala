@@ -27,8 +27,8 @@ import quasar.db._
 import quasar.fp._, ski._
 import quasar.fp.free._
 import quasar.fs._
-import quasar.fs.cache.VCache
 import quasar.fs.mount._
+import quasar.fs.mount.cache.VCache
 import quasar.fs.mount.hierarchical._
 import quasar.fs.mount.module.Module
 import quasar.physical._, couchbase.Couchbase
@@ -65,10 +65,10 @@ package object main {
     mimir.Mimir.definition translate injectFT[Task, PhysFsEff],
     mongodb.MongoDb.definition translate injectFT[Task, PhysFsEff],
     skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff],
-    sparkcore.fs.hdfs.SparkHdfsBackendModule.definition translate injectFT[Task, PhysFsEff],
-    sparkcore.fs.elastic.definition[PhysFsEff],
-    sparkcore.fs.cassandra.definition[PhysFsEff],
-    sparkcore.fs.local.SparkLocalBackendModule.definition translate injectFT[Task, PhysFsEff]
+    sparkcore.fs.hdfs.SparkHdfs.definition translate injectFT[Task, PhysFsEff],
+    sparkcore.fs.elastic.SparkElastic.definition translate injectFT[Task, PhysFsEff],
+    sparkcore.fs.cassandra.SparkCassandra.definition translate injectFT[Task, PhysFsEff],
+    sparkcore.fs.local.SparkLocal.definition translate injectFT[Task, PhysFsEff]
   ).fold
 
   /** A "terminal" effect, encompassing failures and other effects which

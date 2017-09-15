@@ -22,10 +22,10 @@ import quasar.contrib.scalaz.eitherT._
 import quasar.Data
 import quasar.effect.{Failure, Timing}
 import quasar.fp._, free._
-import quasar.fs.cache.{VCache, ViewCache}
 import quasar.fs._, InMemory._
 import quasar.fs.mount._, Mounting.PathTypeMismatch
 import quasar.fs.mount.module.Module
+import quasar.fs.mount.cache.{VCache, ViewCache}
 import quasar.metastore.H2MetaStoreFixture
 import quasar.metastore.MetaStoreFixture.createNewTestMetaStoreConfig
 import quasar.sql._
@@ -84,7 +84,7 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
       val i = Instant.parse("1970-01-01T01:00:00Z")
 
       val viewCache = ViewCache(
-        MountConfig.viewConfigUri(expr, Variables.empty), None, None, 0, None, None,
+        MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
         600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
 
       def eval: Task[Free[Eff, ?] ~> Task] = eff(i) ∘ (foldMapNT(_))

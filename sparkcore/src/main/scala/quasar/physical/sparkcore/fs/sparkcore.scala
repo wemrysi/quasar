@@ -38,7 +38,9 @@ import matryoshka.implicits._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
-trait SparkCoreBackendModule extends BackendModule {
+final case class SparkCursor(rdd: Option[RDD[(Data, Long)]], pointer: Int)
+
+trait SparkCore extends BackendModule {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
@@ -54,10 +56,9 @@ trait SparkCoreBackendModule extends BackendModule {
   def MonotonicSeqInj: Inject[MonotonicSeq, Eff]
   def TaskInj: Inject[Task, Eff]
   def SparkConnectorDetailsInj: Inject[SparkConnectorDetails, Eff]
-  def QFKeyValueStoreInj: Inject[KeyValueStore[QueryFile.ResultHandle, queryfile.RddState, ?], Eff]
+  def QFKeyValueStoreInj: Inject[KeyValueStore[QueryFile.ResultHandle, SparkCursor, ?], Eff]
 
   // common for all spark based connecotrs
-
   type M[A] = Free[Eff, A]
   type QS[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
   type Repr = RDD[Data]
@@ -72,14 +73,14 @@ trait SparkCoreBackendModule extends BackendModule {
     TaskInj
   private final implicit def _SparkConnectorDetailsInj: Inject[SparkConnectorDetails, Eff] =
     SparkConnectorDetailsInj
-  private final implicit def _QFKeyValueStoreInj: Inject[KeyValueStore[QueryFile.ResultHandle, queryfile.RddState, ?], Eff] =
+  private final implicit def _QFKeyValueStoreInj: Inject[KeyValueStore[QueryFile.ResultHandle, SparkCursor, ?], Eff] =
     QFKeyValueStoreInj
 
   def detailsOps: SparkConnectorDetails.Ops[Eff] = SparkConnectorDetails.Ops[Eff]
   def readScOps: Read.Ops[SparkContext, Eff] = Read.Ops[SparkContext, Eff]
   def msOps: MonotonicSeq.Ops[Eff] = MonotonicSeq.Ops[Eff]
-  def qfKvsOps: KeyValueStore.Ops[QueryFile.ResultHandle, queryfile.RddState, Eff] =
-    KeyValueStore.Ops[QueryFile.ResultHandle, queryfile.RddState, Eff]
+  def qfKvsOps: KeyValueStore.Ops[QueryFile.ResultHandle, SparkCursor, Eff] =
+    KeyValueStore.Ops[QueryFile.ResultHandle, SparkCursor, Eff]
 
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
@@ -134,7 +135,6 @@ trait SparkCoreBackendModule extends BackendModule {
 
   object SparkQueryFileModule extends QueryFileModule {
     import QueryFile._
-    import queryfile.RddState
 
     def executePlan(rdd: RDD[Data], out: AFile): Backend[AFile] = {
       val execute =  detailsOps.storeData(rdd, out).as(out).liftB
@@ -144,12 +144,33 @@ trait SparkCoreBackendModule extends BackendModule {
 
     def evaluatePlan(rdd: Repr): Backend[ResultHandle] = (for {
       h <- msOps.next.map(ResultHandle(_))
-      _ <- qfKvsOps.put(h, RddState(rdd.zipWithIndex.persist.some, 0))
+      _ <- qfKvsOps.put(h, SparkCursor(rdd.zipWithIndex.persist.some, 0))
     } yield h).liftB :++> Vector(PhaseResult.detail("RDD", rdd.toDebugString))
 
-    def more(h: ResultHandle): Backend[Vector[Data]] = queryfile.more[Eff](h).liftB.unattempt
+    def more(h: ResultHandle): Backend[Vector[Data]] = (for {
+    step <- detailsOps.readChunkSize
+    res  <- (qfKvsOps.get(h).toRight(unknownResultHandle(h)).flatMap {
+      case SparkCursor(None, _) =>
+        Vector.empty[Data].pure[EitherT[Free[Eff, ?], FileSystemError, ?]]
+      case SparkCursor(Some(rdd), p) =>
+        for {
+          collected <- lift(Task.delay {
+            rdd
+              .filter(d => d._2 >= p && d._2 < (p + step))
+              .map(_._1).collect.toVector
+          }).into[Eff].liftM[FileSystemErrT]
+          rddState <- lift(Task.delay {
+            if(collected.isEmpty) {
+              ignore(rdd.unpersist())
+              SparkCursor(None, 0)
+            } else SparkCursor(Some(rdd), p + step)
+          }).into[Eff].liftM[FileSystemErrT]
+          _ <- qfKvsOps.put(h, rddState).liftM[FileSystemErrT]
+        } yield collected
+    }).run
+  } yield res).liftB.unattempt
 
-    def close(h: ResultHandle): Configured[Unit] = queryfile.close[Eff](h).liftM[ConfiguredT]
+    def close(h: ResultHandle): Configured[Unit] = qfKvsOps.delete(h).liftM[ConfiguredT]
 
     def explain(rdd: RDD[Data]): Backend[String] =
       rdd.toDebugString.point[Backend]

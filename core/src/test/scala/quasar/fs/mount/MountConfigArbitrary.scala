@@ -36,11 +36,11 @@ trait MountConfigArbitrary {
       uri <- Arbitrary.arbitrary[ConnectionUri]
     } yield fileSystemConfig(typ, uri)
 
-  private[mount] def genViewConfig: Gen[MountConfig] =
+  private[fs] def genViewConfig: Gen[ViewConfig] =
     for {
       scopedExpr <- Arbitrary.arbitrary[ScopedExpr[Fix[Sql]]]
       vars <- Arbitrary.arbitrary[Variables]
-    } yield viewConfig(scopedExpr, vars)
+    } yield ViewConfig(scopedExpr, vars)
 }
 
 object MountConfigArbitrary extends MountConfigArbitrary
