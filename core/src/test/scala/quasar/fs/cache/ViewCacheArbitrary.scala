@@ -18,7 +18,7 @@ package quasar.fs.mount.cache
 
 import quasar.contrib.pathy._
 import quasar.DateArbitrary._
-import quasar.fs.mount._ //ConnectionUriArbitrary._
+import quasar.fs.mount._
 import slamdata.Predef._
 
 import java.time.Instant
