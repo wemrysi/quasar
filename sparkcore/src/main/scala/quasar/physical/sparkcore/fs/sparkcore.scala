@@ -98,11 +98,12 @@ trait SparkCore extends BackendModule {
   private val overrideContextCL = {
     for {
       thread <- Task.delay(Thread.currentThread())
+      tcl <- Task.delay(getClass.getClassLoader)
       ccl <- Task.delay(thread.getContextClassLoader())
-      _ <- if (ccl eq null)
+      _ <- if (ccl eq tcl)
         Task.now(())
       else
-        Task.delay(thread.setContextClassLoader(null))    // force spark to use its own classloader
+        Task.delay(thread.setContextClassLoader(tcl))    // force spark to use its own classloader
     } yield ()
   }
 

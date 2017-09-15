@@ -117,10 +117,10 @@ object SparkLocal extends SparkCore with ChrootedInterpreter {
     })
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
+  @SuppressWarnings(Array("org.wartremover.warts.Null", "org.wartremover.warts.Throw"))
   def generateSC: LocalConfig => DefErrT[Task, SparkContext] = (config: LocalConfig) => EitherT(Task.delay {
     // look, I didn't make Spark the way it is...
-    java.lang.Thread.currentThread().setContextClassLoader(null)
+    java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
 
     new SparkContext(config.sparkConf).right[DefinitionError]
   }.handleWith {

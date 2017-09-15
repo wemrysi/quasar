@@ -55,7 +55,7 @@ object SparkElastic extends SparkCore with ManagedWriteFile[AFile] with Chrooted
 
   def rootPrefix(cfg: ElasticConfig): ADir = rootDir
 
-  
+
 
   val Type = FileSystemType("spark-elastic")
 
@@ -211,7 +211,7 @@ object SparkElastic extends SparkCore with ManagedWriteFile[AFile] with Chrooted
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   private def initSC: Config => DefErrT[Task, SparkContext] = (config: Config) => EitherT(Task.delay {
     // look, I didn't make Spark the way it is...
-    java.lang.Thread.currentThread().setContextClassLoader(null)
+    java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
 
     new SparkContext(config.sparkConf).right[DefinitionError]
   }.handleWith {
