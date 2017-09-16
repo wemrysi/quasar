@@ -285,8 +285,8 @@ object FuncHandler {
                   case Split(a1, a2) => $split(a1, a2)
                   case Substring(a1, a2, a3) =>
                     $cond($or(
-                        $lt(a2, $literal(Bson.Int32(0))),
-                        $gt(a2, $strLenCP(a1))),
+                      $lt(a2, $literal(Bson.Int32(0))),
+                      $gt(a2, $strLenCP(a1))),
                       $literal(Bson.Text("")),
                       $cond(
                         $lt(a3, $literal(Bson.Int32(0))),

@@ -642,6 +642,11 @@ object $millisecondF {
 object $condF {
   def apply[EX[_], A](predicate: A, ifTrue: A, ifFalse: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
     I.inj(ExprOpCoreF.$condF[A](predicate, ifTrue, ifFalse))
+
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A, A)] =
+    I.prj(expr) collect {
+      case ExprOpCoreF.$condF(con, ifTrue, ifFalse) => (con, ifTrue, ifFalse)
+    }
 }
 object $ifNullF {
   def apply[EX[_], A](expr: A, replacement: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =

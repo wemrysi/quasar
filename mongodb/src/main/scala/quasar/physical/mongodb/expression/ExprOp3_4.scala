@@ -86,7 +86,26 @@ object ExprOp3_4F {
   implicit def ops[F[_]: Functor](implicit I: ExprOp3_4F :<: F): ExprOpOps.Aux[ExprOp3_4F, F] = new ExprOpOps[ExprOp3_4F] {
     type OUT[A] = F[A]
 
-    val simplify: AlgebraM[Option, ExprOp3_4F, Fix[F]] = κ(None)
+    val simplify: AlgebraM[Option, ExprOp3_4F, Fix[F]] = {
+      val fp26  = new ExprOpCoreF.fixpoint[Fix[ExprOpCoreF], ExprOpCoreF](Fix(_))
+      val check = Check[Fix[ExprOpCoreF], ExprOpCoreF]
+
+      import fp26.{$cond, $literal}, ExprOpCoreF._
+
+      {
+        case $condF(
+          Fix($andF(
+            Fix($lteF(Fix($literalF(Bson.Text(""))), field)),
+            Fix($ltF(_, Fix($literalF(Bson.Doc(_))))))),
+          Fix($condF(
+            Fix($andF(
+              Fix($lteF(Fix($literalF(Bson.Text(""))), _)),
+              Fix($ltF(_, Fix($literalF(Bson.Doc(_))))))),
+            Fix($strLenCPF(_)),
+            Fix($sizeF(_)))),
+          Fix($literalF(Bson.Undefined))) => $cond(check.isString(field), $strLenCP(field), $literal(Bson.Undefined)).some
+      }
+    }
 
     def bson: Algebra[ExprOp3_4F, Bson] = {
       case $indexOfBytesF(s, t, b) => Bson.Doc("$indexOfBytes" -> Bson.Arr(List(List(s, t), toList(b)).join))
