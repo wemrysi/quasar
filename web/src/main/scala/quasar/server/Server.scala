@@ -22,7 +22,8 @@ import quasar.api.{redirectService, staticFileService, ResponseOr, ResponseT}
 import quasar.cli.Cmd
 import quasar.config._
 import quasar.console.{logErrors, stdout}
-import quasar.contrib.pathy.{ADir, AFile}
+import quasar.contrib.pathy.{ADir, AFile, APath}
+import quasar.contrib.scalaz._
 import quasar.contrib.scopt._
 import quasar.db.DbConnectionConfig
 import quasar.fp._
@@ -57,29 +58,37 @@ object Server {
         .flatMap(fromCliOptions(_))
 
     def fromCliOptions(opts: CliOptions): MainTask[WebCmdLineConfig] = {
-      import scala.sys
+      import java.lang.RuntimeException
 
-      val loadConfig = opts.loadConfig.fold(
-        plugins => FsLoadCfg.JarDirectory(ADir.fromFile(plugins).getOrElse(sys.error("plugin directory does not exist (or is a file)"))),
+      val loadConfigM: Task[FsLoadCfg] = opts.loadConfig.fold(
+        { plugins =>
+          val err = Task.fail(new RuntimeException("plugin directory does not exist (or is a file)"))
+          ADir.fromFile(plugins).getOrElseF(err).map(FsLoadCfg.JarDirectory(_))
+        },
         { backends =>
-          val entries = backends.toList map {
+          val entriesM: Task[IList[(ClassName, ClassPath)]] = IList(backends: _*) traverse {
             case (name, paths) =>
-              val apaths = paths.toList.flatMap(path => ADir.fromFile(path).orElse(AFile.fromFile(path)).toList)
+              for {
+                unflattened <- IList(paths: _*) traverse { path =>
+                  val results =
+                    ADir.fromFile(path).covary[APath].orElse(AFile.fromFile(path).covary[APath])
 
-              val cn = ClassName(name)
-              val cp = ClassPath(IList.fromList(apaths))
+                  results.toListT.run.map(IList.fromList(_))
+                }
 
-              cn -> cp
+                apaths = unflattened.flatten
+              } yield ClassName(name) -> ClassPath(apaths)
           }
 
-          FsLoadCfg.ExplodedDirs(IList.fromList(entries))
+          entriesM.map(FsLoadCfg.ExplodedDirs(_))
         })
 
       (StaticContent.fromCliOptions("/files", opts) ⊛
         opts.config.fold(none[FsFile].point[MainTask])(cfg =>
           FsPath.parseSystemFile(cfg)
             .toRight(s"Invalid path to config file: $cfg")
-            .map(some))) ((content, cfgPath) =>
+            .map(some)) ⊛
+        loadConfigM.liftM[MainErrT]) ((content, cfgPath, loadConfig) =>
         WebCmdLineConfig(
           opts.cmd, content.toList, content.map(_.loc), opts.port, cfgPath, loadConfig, opts.openClient))
     }
