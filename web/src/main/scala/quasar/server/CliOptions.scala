@@ -21,10 +21,11 @@ import quasar.build.BuildInfo
 import quasar.cli.Cmd, Cmd._
 
 import java.io.File
-import monocle.Lens
-import monocle.macros.Lenses
 import scala.collection.Seq     // uh, yeah
 import scala.util.{Left, Right}
+
+import monocle.Lens
+import monocle.macros.Lenses
 import scalaz.{\/-, -\/, \/}
 import scalaz.std.either._
 import scalaz.std.list._

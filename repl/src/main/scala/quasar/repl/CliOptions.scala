@@ -23,6 +23,7 @@ import quasar.cli.Cmd, Cmd._
 import java.io.File
 import scala.collection.Seq     // uh, yeah
 import scala.util.{Left, Right}
+
 import scalaz.std.either._
 import scalaz.std.list._
 import scalaz.syntax.traverse._

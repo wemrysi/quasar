@@ -28,9 +28,9 @@ import quasar.fs.mount._, BackendDef._
 import quasar.effect._
 import quasar.qscript.{Read => _, _}
 
+import java.lang.Thread
 import scala.Predef.implicitly
 
-import java.lang.Thread
 import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
 import pathy.Path._
