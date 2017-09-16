@@ -32,7 +32,7 @@ import quasar.fs.mount._
 import quasar.fs.mount.cache.VCache
 import quasar.fs.mount.hierarchical._
 import quasar.fs.mount.module.Module
-import quasar.physical._ // , couchbase.Couchbase
+import quasar.physical._
 import quasar.main.config.loadConfigFile
 import quasar.metastore._
 
