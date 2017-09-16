@@ -166,7 +166,7 @@ object Main {
       backends <- backendsM.liftM[MainErrT]
 
       _ <- initMetaStoreOrStart[CoreConfig](
-        CmdLineConfig(cfgPath, FsLoadCfg.ExplodedDirs(backends), opts.cmd),
+        CmdLineConfig(cfgPath, BackendConfig.ExplodedDirs(backends), opts.cmd),
         (_, quasarInter) => startRepl(quasarInter).liftM[MainErrT],
         // The REPL does not allow you to change metastore
         // so no need to supply a function to persist the metastore

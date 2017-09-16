@@ -39,7 +39,7 @@ class ApiSpec extends quasar.Qspec {
         firstMetaConf <- MetaStoreFixture.createNewTestMetaStoreConfig
 
         quasarFS <- Quasar.initWithDbConfig(
-          FsLoadCfg.Empty,
+          BackendConfig.Empty,
           firstMetaConf,
           _ => ().point[MainTask]).leftMap(e => new scala.Exception(e.shows)).run.unattempt
 
@@ -64,7 +64,7 @@ class ApiSpec extends quasar.Qspec {
       (for {
         metaConf <- MetaStoreFixture.createNewTestMetaStoreConfig
         quasarFS <- Quasar.initWithDbConfig(
-          FsLoadCfg.Empty,
+          BackendConfig.Empty,
           metaConf,
           _ => ().point[MainTask]).leftMap(e => new scala.Exception(e.shows)).run.unattempt
         run0 = quasarFS.taskInter

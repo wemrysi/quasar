@@ -46,7 +46,7 @@ object Server {
       redirect: Option[String],
       port: Option[Int],
       configPath: Option[FsFile],
-      loadConfig: FsLoadCfg,
+      loadConfig: BackendConfig,
       openClient: Boolean) {
 
     def toCmdLineConfig: CmdLineConfig = CmdLineConfig(configPath, loadConfig, cmd)
@@ -60,10 +60,10 @@ object Server {
     def fromCliOptions(opts: CliOptions): MainTask[WebCmdLineConfig] = {
       import java.lang.RuntimeException
 
-      val loadConfigM: Task[FsLoadCfg] = opts.loadConfig.fold(
+      val loadConfigM: Task[BackendConfig] = opts.loadConfig.fold(
         { plugins =>
           val err = Task.fail(new RuntimeException("plugin directory does not exist (or is a file)"))
-          ADir.fromFile(plugins).getOrElseF(err).map(FsLoadCfg.JarDirectory(_))
+          ADir.fromFile(plugins).getOrElseF(err).map(BackendConfig.JarDirectory(_))
         },
         { backends =>
           val entriesM: Task[IList[(ClassName, ClassPath)]] = IList(backends: _*) traverse {
@@ -80,7 +80,7 @@ object Server {
               } yield ClassName(name) -> ClassPath(apaths)
           }
 
-          entriesM.map(FsLoadCfg.ExplodedDirs(_))
+          entriesM.map(BackendConfig.ExplodedDirs(_))
         })
 
       (StaticContent.fromCliOptions("/files", opts) ⊛

@@ -49,7 +49,7 @@ class ViewReadQueryRegressionSpec
       TaskRef(Map[APath, MountConfig](path -> MountConfig.viewConfig(ScopedExpr(expr, Nil), vars))) |@|
       TaskRef(Empty.backendEffect[HierarchicalFsEffM]) |@|
       TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]) |@|
-      physicalFileSystems(FsLoadCfg.Empty)   // test views just against mimir
+      physicalFileSystems(BackendConfig.Empty)   // test views just against mimir
     ) { (cfgsRef, hfsRef, mntdRef, mounts) =>
       val mnt =
         KvsMounter.interpreter[Task, FsAskPhysFsEff](

@@ -60,25 +60,25 @@ package object main extends Logging {
   final case class ClassName(value: String) extends AnyVal
   final case class ClassPath(value: IList[APath]) extends AnyVal
 
-  sealed trait FsLoadCfg extends Product with Serializable
+  sealed trait BackendConfig extends Product with Serializable
 
   /**
    * APaths relative to real filesystem root
    */
-  object FsLoadCfg {
+  object BackendConfig {
 
     /**
      * This should only be used for testing purposes.  It represents a
      * configuration in which no backends will be loaded at all.
      */
-    val Empty: FsLoadCfg = ExplodedDirs(IList.empty)
+    val Empty: BackendConfig = ExplodedDirs(IList.empty)
 
     /**
      * A single directory containing jars, each of which will be
      * loaded as a backend.  With each jar, the `BackendModule` class
      * name will be determined from the `Manifest.mf` file.
      */
-    final case class JarDirectory(dir: ADir) extends FsLoadCfg
+    final case class JarDirectory(dir: ADir) extends BackendConfig
 
     /**
      * Any files in the classpath will be loaded as jars; any directories
@@ -87,7 +87,7 @@ package object main extends Logging {
      * class name of the `BackendModule` implemented as a Scala object.
      * In most cases, this means the class name here will end with a `$`
      */
-    final case class ExplodedDirs(backends: IList[(ClassName, ClassPath)]) extends FsLoadCfg
+    final case class ExplodedDirs(backends: IList[(ClassName, ClassPath)]) extends BackendConfig
   }
 
   // all of the backends which are included in the core distribution
@@ -111,7 +111,7 @@ package object main extends Logging {
    * by `Read[BackendDef[PhysFsEffM], ?]` (or an analogous `Kleisli`).
    */
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf", "org.wartremover.warts.Null"))
-  def physicalFileSystems(config: FsLoadCfg): Task[BackendDef[PhysFsEffM]] = {
+  def physicalFileSystems(config: BackendConfig): Task[BackendDef[PhysFsEffM]] = {
     import java.io.File
     import java.lang.{
       ClassCastException,
@@ -124,7 +124,7 @@ package object main extends Logging {
     }
     import java.net.URLClassLoader
 
-    import FsLoadCfg._
+    import BackendConfig._
 
     // this is a side-effect in the same way that `new` is a side-effect
     val ParentCL = this.getClass.getClassLoader
@@ -556,7 +556,7 @@ package object main extends Logging {
     }
   }
 
-  final case class CmdLineConfig(configPath: Option[FsFile], loadConfig: FsLoadCfg, cmd: Cmd)
+  final case class CmdLineConfig(configPath: Option[FsFile], loadConfig: BackendConfig, cmd: Cmd)
 
   /** Either initialize the metastore or execute the start depending
     * on what command is provided by the user in the command line arguments

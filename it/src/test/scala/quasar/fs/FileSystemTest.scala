@@ -141,7 +141,7 @@ object FileSystemTest {
 
   def allFsUT: Task[IList[SupportedFs[BackendEffect]]] = {
     for {
-      loadConfig <- TestConfig.testFsLoadCfg
+      loadConfig <- TestConfig.testBackendConfig
       mounts <- physicalFileSystems(loadConfig)
       loc <- localFsUT(mounts)
       ext <- externalFsUT(mounts)
