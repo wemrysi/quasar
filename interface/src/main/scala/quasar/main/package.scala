@@ -60,36 +60,6 @@ package object main extends Logging {
   final case class ClassName(value: String) extends AnyVal
   final case class ClassPath(value: IList[APath]) extends AnyVal
 
-  sealed trait BackendConfig extends Product with Serializable
-
-  /**
-   * APaths relative to real filesystem root
-   */
-  object BackendConfig {
-
-    /**
-     * This should only be used for testing purposes.  It represents a
-     * configuration in which no backends will be loaded at all.
-     */
-    val Empty: BackendConfig = ExplodedDirs(IList.empty)
-
-    /**
-     * A single directory containing jars, each of which will be
-     * loaded as a backend.  With each jar, the `BackendModule` class
-     * name will be determined from the `Manifest.mf` file.
-     */
-    final case class JarDirectory(dir: ADir) extends BackendConfig
-
-    /**
-     * Any files in the classpath will be loaded as jars; any directories
-     * will be assumed to contain class files (e.g. the target output of
-     * SBT compile).  The class name should be the fully qualified Java
-     * class name of the `BackendModule` implemented as a Scala object.
-     * In most cases, this means the class name here will end with a `$`
-     */
-    final case class ExplodedDirs(backends: IList[(ClassName, ClassPath)]) extends BackendConfig
-  }
-
   // all of the backends which are included in the core distribution
   private val CoreFS = IList(
     // Couchbase.definition translate injectFT[Task, PhysFsEff],
