@@ -37,8 +37,9 @@ services:
 
   quasar_metastore:
     container_name: quasar_metastore
-    image: postgres:9.6
+    image: postgres:9.6.5-alpine
     privileged: true
+    network_mode: "bridge"
     ports:
       - "5432:5432"
 

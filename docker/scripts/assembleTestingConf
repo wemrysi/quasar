@@ -49,7 +49,8 @@ configure_couchbase() {
 # it/testing.conf
 #
 configure_metastore() {
-  echo 'postgresql_metastore="{\"host\":\"'$DOCKERIP'\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"' >> $CONFIGFILE
+  METASTOREIP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' quasar_metastore)
+  echo 'postgresql_metastore="{\"host\":\"'$METASTOREIP'\",\"port\":5432,\"database\":\"metastore\",\"userName\":\"postgres\",\"password\":\"\"}"' >> $CONFIGFILE
 }
 
 ##########################################
