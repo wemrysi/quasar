@@ -208,7 +208,6 @@ object SparkElastic extends SparkCore with ManagedWriteFile[AFile] with Chrooted
     OptionT(jar).toRight(NonEmptyList("Could not fetch sparkcore.jar").left[EnvironmentError])
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
   private def initSC: Config => DefErrT[Task, SparkContext] = (config: Config) => EitherT(Task.delay {
     // look, I didn't make Spark the way it is...
     java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
