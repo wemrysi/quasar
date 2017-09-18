@@ -17,6 +17,7 @@
 package quasar.ejson
 
 import slamdata.Predef.{Byte => SByte, Char => SChar, Map => SMap, _}
+import quasar.{RenderTree, NonTerminal, Terminal}, RenderTree.ops._
 import quasar.contrib.matryoshka._
 import quasar.fp._
 
@@ -66,6 +67,25 @@ sealed abstract class CommonInstances extends CommonInstances0 {
         case Dec(v)  => Cord(s"Dec($v)")
       })
     }
+
+  implicit val renderTree: Delay[RenderTree, Common] =
+    new Delay[RenderTree, Common] {
+      def apply[A](rt: RenderTree[A]) = {
+        implicit val rtA = rt
+        RenderTree.make {
+          case Arr(vs) => NonTerminal("Array" :: c, none, vs map (_.render))
+          case Null()  => Terminal("Null" :: c, none)
+          case Bool(b) => t("Bool", b)
+          case Str(v)  => t("Str", v)
+          case Dec(v)  => t("Dec", v)
+        }
+      }
+
+      val c = List("Common")
+
+      def t[A: Show](l: String, a: A) =
+        Terminal(l :: c, some(a.shows))
+    }
 }
 
 sealed abstract class CommonInstances0 {
@@ -112,6 +132,14 @@ sealed abstract class ObjInstances extends ObjInstances0 {
       def apply[α](shw: Show[α]) = {
         implicit val shwA: Show[α] = shw
         Show.show(o => (o.value: SMap[String, α]).show)
+      }
+    }
+
+  implicit val renderTree: Delay[RenderTree, Obj] =
+    new Delay[RenderTree, Obj] {
+      def apply[A](rt: RenderTree[A]) = {
+        implicit val rtA = rt
+        RenderTree.make(obj => NonTerminal(List("Obj"), None, List(obj.value.render)))
       }
     }
 }
@@ -200,6 +228,35 @@ sealed abstract class ExtensionInstances {
         case Char(v)    => Cord(s"Char($v)")
         case Int(v)     => Cord(s"Int($v)")
       })
+    }
+
+  implicit val renderTree: Delay[RenderTree, Extension] =
+    new Delay[RenderTree, Extension] {
+      def apply[A](rt: RenderTree[A]) = {
+        implicit val rtA = rt
+        implicit val sc: Show[SChar] = scalaz.std.anyVal.char
+        RenderTree.make {
+          case Meta(v, m) =>
+            NonTerminal("Meta" :: c, none, List(
+              nt("Value", v),
+              nt("Metadata", m)))
+
+          case Map(v)  =>
+            NonTerminal("Map" :: c, none, v map (_.render))
+
+          case Byte(b) => t("Byte", b)
+          case Char(v)  => t("Char", v)
+          case Int(v)  => t("Int", v)
+        }
+      }
+
+      val c = List("Extension")
+
+      def nt[A: RenderTree](l: String, a: A) =
+        NonTerminal(l :: c, none, a.render :: Nil)
+
+      def t[A: Show](l: String, a: A) =
+        Terminal(l :: c, some(a.shows))
     }
 
   ////
