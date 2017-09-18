@@ -99,14 +99,14 @@ package object main extends Logging {
     // this is a side-effect in the same way that `new` is a side-effect
     val ParentCL = this.getClass.getClassLoader
 
-    def loadBackend(cn: String, cl: ClassLoader): OptionT[Task, BackendDef[Task]] = {
+    def loadBackend(classname: String, classloader: ClassLoader): OptionT[Task, BackendDef[Task]] = {
       for {
         clazz <- OptionT(Task delay {
           try {
-            Some(cl.loadClass(cn))
+            Some(classloader.loadClass(classname))
           } catch {
             case cnf: ClassNotFoundException =>
-              log.warn(s"could not locate class for backend module '$cn'", cnf)
+              log.warn(s"could not locate class for backend module '$classname'", cnf)
 
               None
           }
@@ -117,17 +117,17 @@ package object main extends Logging {
             Some(clazz.getDeclaredField("MODULE$").get(null).asInstanceOf[BackendModule])
           } catch {
             case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
-              log.warn(s"backend module '$cn' does not appear to be a singleton object", e)
+              log.warn(s"backend module '$classname' does not appear to be a singleton object", e)
 
               None
 
             case e: ExceptionInInitializerError =>
-              log.warn(s"backend module '$cn' failed to load with exception", e)
+              log.warn(s"backend module '$classname' failed to load with exception", e)
 
               None
 
             case _: ClassCastException =>
-              log.warn(s"backend module '$cn' is not actually a subtype of BackendModule")
+              log.warn(s"backend module '$classname' is not actually a subtype of BackendModule")
 
               None
           }
