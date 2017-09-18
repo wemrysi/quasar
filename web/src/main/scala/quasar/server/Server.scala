@@ -22,7 +22,7 @@ import quasar.api.{redirectService, staticFileService, ResponseOr, ResponseT}
 import quasar.cli.Cmd
 import quasar.config._
 import quasar.console.{logErrors, stdout}
-import quasar.contrib.pathy.{ADir, AFile, APath}
+import quasar.contrib.pathy.ADir
 import quasar.contrib.scalaz._
 import quasar.contrib.scopt._
 import quasar.db.DbConnectionConfig
@@ -65,23 +65,7 @@ object Server {
           val err = Task.fail(new RuntimeException("plugin directory does not exist (or is a file)"))
           ADir.fromFile(plugins).getOrElseF(err).map(BackendConfig.JarDirectory(_))
         },
-        { backends =>
-          val entriesM: Task[IList[(ClassName, ClassPath)]] = IList(backends: _*) traverse {
-            case (name, paths) =>
-              for {
-                unflattened <- IList(paths: _*) traverse { path =>
-                  val results =
-                    ADir.fromFile(path).covary[APath].orElse(AFile.fromFile(path).covary[APath])
-
-                  results.toListT.run.map(IList.fromList(_))
-                }
-
-                apaths = unflattened.flatten
-              } yield ClassName(name) -> ClassPath(apaths)
-          }
-
-          entriesM.map(BackendConfig.ExplodedDirs(_))
-        })
+        backends => BackendConfig.fromBackends(IList.fromList(backends)))
 
       (StaticContent.fromCliOptions("/files", opts) ⊛
         opts.config.fold(none[FsFile].point[MainTask])(cfg =>

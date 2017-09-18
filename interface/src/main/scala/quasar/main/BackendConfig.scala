@@ -17,9 +17,15 @@
 package quasar.main
 
 import slamdata.Predef._
-import quasar.contrib.pathy.ADir
+import quasar.contrib.pathy.{ADir, AFile, APath}
+import quasar.contrib.scalaz._
+
+import java.io.File
+import scala.collection.Seq   // uh, yeah
 
 import scalaz.IList
+import scalaz.concurrent.Task
+import scalaz.syntax.traverse._
 
 sealed trait BackendConfig extends Product with Serializable
 
@@ -33,6 +39,24 @@ object BackendConfig {
    * configuration in which no backends will be loaded at all.
    */
   val Empty: BackendConfig = ExplodedDirs(IList.empty)
+
+  def fromBackends(backends: IList[(String, Seq[File])]): Task[BackendConfig] = {
+    val entriesM: Task[IList[(ClassName, ClassPath)]] = backends traverse {
+      case (name, paths) =>
+        for {
+          unflattened <- IList(paths: _*) traverse { path =>
+            val results =
+              ADir.fromFile(path).covary[APath].orElse(AFile.fromFile(path).covary[APath])
+
+            results.toListT.run.map(IList.fromList(_))
+          }
+
+          apaths = unflattened.flatten
+        } yield ClassName(name) -> ClassPath(apaths)
+    }
+
+    entriesM.map(BackendConfig.ExplodedDirs(_))
+  }
 
   /**
    * A single directory containing jars, each of which will be
