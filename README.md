@@ -1,4 +1,4 @@
-Ï[![Build status](https://travis-ci.org/quasar-analytics/quasar.svg?branch=master)](https://travis-ci.org/quasar-analytics/quasar)
+[![Build status](https://travis-ci.org/quasar-analytics/quasar.svg?branch=master)](https://travis-ci.org/quasar-analytics/quasar)
 [![Coverage Status](https://coveralls.io/repos/quasar-analytics/quasar/badge.svg)](https://coveralls.io/r/quasar-analytics/quasar)
 [![Latest version](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web/latest.svg)](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web)
 [![Join the chat at https://gitter.im/quasar-analytics/quasar](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/quasar-analytics/quasar?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
@@ -115,7 +115,7 @@ To build a JAR for the REPL, which allows entering commands at a command-line pr
 ./sbt 'repl/assembly'
 ```
 
-The path of the JAR will be `./repl/target/scala-2.11/quasar-repl-assembly-[version].jar`, where `[version]` is the Quasar version number.
+The path of the JAR will be `./.targets/repl/scala-2.11/quasar-repl-assembly-[version].jar`, where `[version]` is the Quasar version number.
 
 To run the JAR, execute the following command:
 
@@ -159,7 +159,7 @@ To build a JAR containing a lightweight HTTP server that allows you to programma
 ./sbt 'web/assembly'
 ```
 
-The path of the JAR will be `./web/target/scala-2.11/quasar-web-assembly-[version].jar`, where `[version]` is the Quasar version number.
+The path of the JAR will be `./.targets/web/scala-2.11/quasar-web-assembly-[version].jar`, where `[version]` is the Quasar version number.
 
 To run the JAR, execute the following command:
 
@@ -169,6 +169,63 @@ java -jar [<path to jar>] [-c <config file>]
 
 Web jar users, will also need the metadata store. See [here](#full-testing-prerequisite-docker-and-docker-compose) for getting up and running with one using docker.
 
+### Backends
+
+By default, neither the REPL nor the web assemblies contain any backends *other* than mimir.  Thus, if you invoke them as shown above, the only mount type that will be understood will be `mimir`.  In order to use other mounts – such as mongodb – you will need to build the relevant backend and place the JAR in a directory where quasar can find it.  This can be done in one of two ways
+
+#### Plugins Directory
+
+Create a directory where you will place individual backend JARs:
+
+```bash
+$ mkdir plugins/
+```
+
+Now run the `assembly` task for the relevant backend:
+
+```bash
+$ ./sbt mongodb/assembly
+```
+
+The path to the JAR will be something like `./.targets/mongodb/scala-2.11/quasar-mongodb-internal-assembly-23.1.5.jar`, though the exact name of the JAR (and the directory path in question) will of course depend on the backend built (for example, `sparkcore/assembly` will produce a very different JAR from `mongodb/assembly`).
+
+For each backend that you wish to support, run that backend's `assembly` and copy the JAR file into your new `plugins/` directory.  Once this is done, you can launch the web assembly using the following sort of command:
+
+```bash
+java -jar [<path to jar>] [-c <config file>] -P plugins/
+```
+
+All of the JARs within the `plugins/` directory will be loaded as a backend provider, and their relevant mount type will be made available by quasar.
+
+This technique (a directory containing multiple plugin JARs) only works with the web assembly.  If you wish to use the REPL, you will need to use the second method (which works with both).
+
+#### Individual Backend Configuration
+
+This technique is designed for local development use, where the backend implementation is changing frequently.  Under certain circumstances though, it may be useful for the pre-built JAR case.
+
+As with the plugins directory approach, you will need to run the `assembly` task for each backend that you want to use.  But instead of copying the JAR files into a directory, you will be referencing each JAR file individually using the `--backend` switch on the web or REPL JAR invocation:
+
+```bash
+java -jar [<path to jar>] [-c <config file>] --backend:quasar.physical.mongodb.MongoDb\\$=.targets/mongodb/scala-2.11/quasar-mongodb-internal-assembly-23.1.5.jar
+```
+
+Replace the JAR file in the above with the path to the backend who's `assembly` you ran.  The `--backend` switch may be repeated as many times as necessary: once for each backend you wish to add.  The value to the left of the `=` is the `BackendModule` object *class name* which defines the backend in question.  Note that we need to escape the `$` character which will be present in each class name, solely because of bash syntax.
+
+What follows is a list of class names for each supported backend:
+
+| mountKey          | class name                                               |
+|-------------------|----------------------------------------------------------|
+| `couchbase`       | `quasar.physical.couchbase.Couchbase$`                   |
+| `marklogic`       | `quasar.physical.marklogic.MarkLogic$`                   |
+| `mongodb`         | `quasar.physical.mongodb.MongoDb$`                       |
+| `spark-cassandra` | `quasar.physical.sparkcore.fs.cassandra.SparkCassandra$` |
+| `spark-elastic`   | `quasar.physical.sparkcore.fs.elastic.SparkElastic$`     |
+| `spark-hdfs`      | `quasar.physical.sparkcore.fs.hdfs.SparkHdfs$`           |
+| `spark-local`     | `quasar.physical.sparkcore.fs.local.SparkLocal$`         |
+
+Mimir is not included in the above, since it is already built into the core of quasar.
+
+The value to the *right* of the `=` is a *comma*-separated list of paths which will be used as the classpath for the backend in question.  You can include as many JARs or directories (containing classes) as you need, just as with any classpath configuration.
 
 ### Configure
 
@@ -360,7 +417,9 @@ Similar to views, modules can be mounted at any directory path. If a module's pa
 In order for Quasar to work with Apache Spark based connectors (like `spark-hdfs` or `spark-local`) you need to build `sparkcore.jar` and move it to same location where your `quasar-web.jar` is placed.
 To build sparkcore.jar:
 
-```./sbt 'set every sparkDependencyProvided := true' sparkcore/assembly```
+```
+./sbt 'set every sparkDependencyProvided := true' sparkcore/assembly
+```
 
 ## REPL Usage
 
@@ -374,6 +433,7 @@ the root, and it contains a database called `test`:
 ```
 
 The "tables" in SQL queries refer to collections in the database by name:
+
 ```
 💪 $ select * from zips where state="CO" limit 3
 Mongo
