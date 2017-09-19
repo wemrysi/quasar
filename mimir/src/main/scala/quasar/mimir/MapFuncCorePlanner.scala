@@ -216,10 +216,12 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
 
       case MapFuncsCore.ConcatMaps(a1, a2) =>
         (OuterObjectConcat[A](a1, a2): TransSpec[A]).point[F]
+
       case MapFuncsCore.ProjectIndex(src, ConstLiteral(CLong(index), _)) =>
         (DerefArrayStatic[A](src, CPathIndex(index.toInt)): TransSpec[A]).point[F]
       case MapFuncsCore.ProjectIndex(src, index) =>
         (DerefArrayDynamic[A](src, index): TransSpec[A]).point[F]
+
       case MapFuncsCore.ProjectField(src, ConstLiteral(CString(field), _)) =>
         (DerefObjectStatic[A](src, CPathField(field)): TransSpec[A]).point[F]
       case MapFuncsCore.ProjectField(src, field) =>
