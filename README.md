@@ -209,7 +209,7 @@ As with the plugins directory approach, you will need to run the `assembly` task
 java -jar [<path to jar>] [-c <config file>] --backend:quasar.physical.mongodb.MongoDb\$=.targets/mongodb/scala-2.11/quasar-mongodb-internal-assembly-23.1.5.jar
 ```
 
-Replace the JAR file in the above with the path to the backend who's `assembly` you ran.  The `--backend` switch may be repeated as many times as necessary: once for each backend you wish to add.  The value to the left of the `=` is the `BackendModule` object *class name* which defines the backend in question.  Note that we need to escape the `$` character which will be present in each class name, solely because of bash syntax.
+Replace the JAR file in the above with the path to the backend whose `assembly` you ran.  The `--backend` switch may be repeated as many times as necessary: once for each backend you wish to add.  The value to the left of the `=` is the `BackendModule` object *class name* which defines the backend in question.  Note that we need to escape the `$` character which will be present in each class name, solely because of bash syntax.
 
 What follows is a list of class names for each supported backend:
 
