@@ -1389,23 +1389,20 @@ object MongoDbPlanner {
   def toMongoQScript[T[_[_]] : BirecursiveT: EqualT: RenderTreeT: ShowT, M[_]: Monad: MonadFsErr: PhaseResultTell](
     qs: T[fs.MongoQScript[T, ?]],
     listContents: DiscoverPath.ListContents[M])(
-    implicit rewrite: Branches.Aux[T, fs.MongoQScript[T, ?]])
+    implicit branches: Branches.Aux[T, fs.MongoQScript[T, ?]])
       : M[T[fs.MongoQScript[T, ?]]] = {
 
     val O = new Optimize[T]
 
     for {
-      rewriteSortF <- qs
-        .transCata[T[fs.MongoQScript[T, ?]]](
-          liftId[T, fs.MongoQScript[T, ?]](
-            mapBeforeSort[T, fs.MongoQScript[T, ?], fs.MongoQScript[T, ?]](idPrism)))
-        .point[M]
-      rewriteSortFree <- rewrite
-        .run[T[fs.MongoQScript[T, ?]]](liftCoEnv[T, QScriptTotal[T, ?]](mapBeforeSort[T, QScriptTotal[T, ?], CoEnv[Hole, QScriptTotal[T, ?], ?]](coenvPrism[QScriptTotal[T, ?], Hole])))
-        .apply(rewriteSortF.project)
-        .embed
-        .point[M]
-      optimized <- rewriteSortFree
+      rewrite <- applyAlgebra(qs)(new Alg[T] {
+        def alg[F[_], G[_]: Functor]
+          (GtoF: PrismNT[G, F])
+          (implicit QC: QScriptCore[T, ?] :<: F)
+            : QScriptCore[T, T[G]] => F[T[G]] =
+          mapBeforeSort[T, F, G](GtoF)
+      }).point[M]
+      optimized <- rewrite
         .transCata[T[fs.MongoQScript[T, ?]]](
           liftFF[QScriptCore[T, ?], fs.MongoQScript[T, ?], T[fs.MongoQScript[T, ?]]](
             repeatedly(O.subsetBeforeMap[fs.MongoQScript[T, ?], fs.MongoQScript[T, ?]](reflNT[fs.MongoQScript[T, ?]]))))
