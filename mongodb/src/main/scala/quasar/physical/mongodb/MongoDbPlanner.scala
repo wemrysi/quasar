@@ -1418,7 +1418,7 @@ object MongoDbPlanner {
   def toMongoQScript[T[_[_]] : BirecursiveT: EqualT: RenderTreeT: ShowT, M[_]: Monad: MonadFsErr: PhaseResultTell](
     qs: T[fs.MongoQScript[T, ?]],
     listContents: DiscoverPath.ListContents[M])(
-    implicit rewrite: ApplyToCoEnv.Aux[T, fs.MongoQScript[T, ?]])
+    implicit rewrite: Branches.Aux[T, fs.MongoQScript[T, ?]])
       : M[T[fs.MongoQScript[T, ?]]] =
     for {
       rewriteSortF <- qs.transCata[T[fs.MongoQScript[T, ?]]](mapBeforeSortF[T, fs.MongoQScript[T, ?]]).point[M]

@@ -27,7 +27,19 @@ import simulacrum.typeclass
 
 import scalaz._
 
-@typeclass trait ApplyToCoEnv[F[_]] {
+// TODO Generalize to a Monocle Traversal, for example:
+//
+// ```
+// trait Branches[F[_]] {
+//   def branches[T[_[_]], A]: Traversal[F[A], FreeQS[T]]
+// }
+//
+// Branches[F].branches[T, A].modify(_.transCata(mapBeforeSortCoEnv[T, QScriptTotal[T, ?]])
+// ```
+//
+// This gives us a generic way to target all the branches and all the map funcs.
+// Additionally we can compose it with other optics and use other functions on Traversal.
+@typeclass trait Branches[F[_]] {
   type IT[F[_]]
 
   // TODO abstract `Hole`
@@ -37,9 +49,9 @@ import scalaz._
     : F[A] => F[A]
 }
 
-object ApplyToCoEnv {
+object Branches {
 
-  type Aux[T[_[_]], F[_]] = ApplyToCoEnv[F] { type IT[F[_]] = T[F] }
+  type Aux[T[_[_]], F[_]] = Branches[F] { type IT[F[_]] = T[F] }
 
   type CoEnvF[F[_]] = CoEnv[Hole, F, Free[F, Hole]]
 
@@ -47,8 +59,8 @@ object ApplyToCoEnv {
       : FreeQS[T] => FreeQS[T] =
     _.transCata[FreeQS[T]](alg)
 
-  implicit def const[T[_[_]], A]: ApplyToCoEnv.Aux[T, Const[A, ?]] =
-    new ApplyToCoEnv[Const[A, ?]] {
+  implicit def const[T[_[_]], A]: Branches.Aux[T, Const[A, ?]] =
+    new Branches[Const[A, ?]] {
       type IT[F[_]] = T[F]
 
       def run[B](alg: CoEnvF[QScriptTotal[IT, ?]] => CoEnvF[QScriptTotal[IT, ?]])
@@ -56,9 +68,9 @@ object ApplyToCoEnv {
     }
 
   implicit def coproduct[T[_[_]], F[_], G[_]]
-    (implicit F: ApplyToCoEnv.Aux[T, F], G: ApplyToCoEnv.Aux[T, G])
-      : ApplyToCoEnv.Aux[T, Coproduct[F, G, ?]] =
-    new ApplyToCoEnv[Coproduct[F, G, ?]] {
+    (implicit F: Branches.Aux[T, F], G: Branches.Aux[T, G])
+      : Branches.Aux[T, Coproduct[F, G, ?]] =
+    new Branches[Coproduct[F, G, ?]] {
       type IT[F[_]] = T[F]
 
       def run[A](alg: CoEnvF[QScriptTotal[IT, ?]] => CoEnvF[QScriptTotal[IT, ?]])
@@ -66,8 +78,8 @@ object ApplyToCoEnv {
         cp => Coproduct(cp.run.bimap(F.run(alg)(_), G.run(alg)(_)))
     }
 
-  implicit def qscriptCore[T[_[_]]]: ApplyToCoEnv.Aux[T, QScriptCore[T, ?]] =
-    new ApplyToCoEnv[QScriptCore[T, ?]] {
+  implicit def qscriptCore[T[_[_]]]: Branches.Aux[T, QScriptCore[T, ?]] =
+    new Branches[QScriptCore[T, ?]] {
       type IT[F[_]] = T[F]
 
       def run[A](alg: CoEnvF[QScriptTotal[IT, ?]] => CoEnvF[QScriptTotal[IT, ?]])
@@ -85,16 +97,16 @@ object ApplyToCoEnv {
       }
     }
 
-  implicit def projectBucket[T[_[_]]]: ApplyToCoEnv.Aux[T, ProjectBucket[T, ?]] =
-    new ApplyToCoEnv[ProjectBucket[T, ?]] {
+  implicit def projectBucket[T[_[_]]]: Branches.Aux[T, ProjectBucket[T, ?]] =
+    new Branches[ProjectBucket[T, ?]] {
       type IT[F[_]] = T[F]
 
       def run[A](alg: CoEnvF[QScriptTotal[IT, ?]] => CoEnvF[QScriptTotal[IT, ?]])
           : ProjectBucket[IT, A] => ProjectBucket[IT, A] = ι
     }
 
-  implicit def thetaJoin[T[_[_]]]: ApplyToCoEnv.Aux[T, ThetaJoin[T, ?]] =
-    new ApplyToCoEnv[ThetaJoin[T, ?]] {
+  implicit def thetaJoin[T[_[_]]]: Branches.Aux[T, ThetaJoin[T, ?]] =
+    new Branches[ThetaJoin[T, ?]] {
       type IT[F[_]] = T[F]
 
       def run[A](alg: CoEnvF[QScriptTotal[IT, ?]] => CoEnvF[QScriptTotal[IT, ?]])
@@ -109,8 +121,8 @@ object ApplyToCoEnv {
       }
     }
 
-  implicit def equiJoin[T[_[_]]]: ApplyToCoEnv.Aux[T, EquiJoin[T, ?]] =
-    new ApplyToCoEnv[EquiJoin[T, ?]] {
+  implicit def equiJoin[T[_[_]]]: Branches.Aux[T, EquiJoin[T, ?]] =
+    new Branches[EquiJoin[T, ?]] {
       type IT[F[_]] = T[F]
 
       def run[A](alg: CoEnvF[QScriptTotal[IT, ?]] => CoEnvF[QScriptTotal[IT, ?]])
