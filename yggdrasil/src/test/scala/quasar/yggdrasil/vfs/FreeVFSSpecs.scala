@@ -1030,11 +1030,13 @@ object FreeVFSSpecs extends Specification {
           }
       }
 
-      _ <- H.pattern[Unit] {
+      _ <- H.pattern[Boolean] {
         case CPL(LinkDir(from, to)) =>
           Task delay {
             from mustEqual (baseDir </> Path.dir(uuid.toString))
             to mustEqual (baseDir </> Path.dir("HEAD"))
+
+            true
           }
       }
     } yield ()
