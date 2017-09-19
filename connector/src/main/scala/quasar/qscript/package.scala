@@ -354,8 +354,6 @@ package object qscript {
 
     liftCo[T, F, Hole, Free[F, Hole]](partial)
   }
-
-
 }
 
 package qscript {
