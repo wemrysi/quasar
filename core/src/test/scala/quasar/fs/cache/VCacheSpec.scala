@@ -100,10 +100,6 @@ abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaS
   }
 }
 
-object VCacheSpec {
-
-}
-
 class VCacheH2Spec extends VCacheSpec with H2MetaStoreFixture {
   val schema: quasar.db.Schema[Int] = quasar.metastore.Schema.schema
 }
