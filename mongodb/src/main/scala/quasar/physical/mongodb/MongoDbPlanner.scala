@@ -1315,35 +1315,6 @@ object MongoDbPlanner {
     case x => QC.inj(x)
   }
 
-  def intermediate[T[_[_]]: BirecursiveT, F[_], G[_]: Functor]
-    (GtoF: PrismNT[G, F])
-    (implicit QC: QScriptCore[T, ?] :<: F)
-      : F[T[G]] => G[T[G]] =
-    ftg => GtoF.reverseGet(
-      liftFG[QScriptCore[T, ?], F, T[G]](mapBeforeSort[T, F, G](GtoF)).apply(ftg))
-
-  // qs.transCata[T[QScriptTotal]](mapBeforeSortF[QScriptTotal])
-  def mapBeforeSortF[T[_[_]]: BirecursiveT, F[_]: Functor]
-    (implicit QC: QScriptCore[T, ?] :<: F)
-      : F[T[F]] => F[T[F]] =
-    intermediate[T, F, F](idPrism)
-
-  type CoEnvF[F[_]] = CoEnv[Hole, F, Free[F, Hole]]
-
-  // free.transCata[FreeQS](mapBeforeSortCoEnv[QScriptTotal])
-  def mapBeforeSortCoEnv[T[_[_]]: BirecursiveT, F[_]: Functor]
-    (implicit QC: QScriptCore[T, ?] :<: F)
-      : CoEnvF[F] => CoEnvF[F] = {
-    val bij = coenvBijection[T, F, Hole]
-
-    val partial: F[Free[F, Hole]] => CoEnvF[F] = fa => {
-      intermediate[T, F, CoEnv[Hole, F, ?]](coenvPrism[F, Hole])
-        .apply(fa ∘ bij.toK.run) ∘ bij.fromK.run
-    }
-
-    liftCo[T, F, Hole, Free[F, Hole]](partial)
-  }
-
   // TODO: Allow backends to provide a “Read” type to the typechecker, which
   //       represents the type of values that can be stored in a collection.
   //       E.g., for MongoDB, it would be `Map(String, Top)`. This will help us
@@ -1421,9 +1392,9 @@ object MongoDbPlanner {
     implicit rewrite: Branches.Aux[T, fs.MongoQScript[T, ?]])
       : M[T[fs.MongoQScript[T, ?]]] =
     for {
-      rewriteSortF <- qs.transCata[T[fs.MongoQScript[T, ?]]](mapBeforeSortF[T, fs.MongoQScript[T, ?]]).point[M]
+      rewriteSortF <- qs.transCata[T[fs.MongoQScript[T, ?]]](liftId[T, fs.MongoQScript[T, ?]](mapBeforeSort[T, fs.MongoQScript[T, ?], fs.MongoQScript[T, ?]](idPrism))).point[M]
       rewriteSortFree <- rewrite
-        .run[T[fs.MongoQScript[T, ?]]](mapBeforeSortCoEnv[T, QScriptTotal[T, ?]])
+        .run[T[fs.MongoQScript[T, ?]]](liftCoEnv[T, QScriptTotal[T, ?]](mapBeforeSort[T, QScriptTotal[T, ?], CoEnv[Hole, QScriptTotal[T, ?], ?]](coenvPrism[QScriptTotal[T, ?], Hole])))
         .apply(rewriteSortF.project)
         .embed
         .point[M]

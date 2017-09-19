@@ -139,6 +139,8 @@ package object qscript {
   type CoEnvMap[T[_[_]], A]     = CoEnvMapA[T, Hole, A]
   type CoEnvJoin[T[_[_]], A]    = CoEnvMapA[T, JoinSide, A]
 
+  type CoEnvFree[F[_], A] = CoEnv[A, F, Free[F, A]]
+
   object ExtractFunc {
     def unapply[T[_[_]], A](fma: FreeMapA[T, A]): Option[MapFuncCore[T, _]] = fma match {
       case Embed(CoEnv(\/-(MFC(func: MapFuncCore[T, _])))) => Some(func)
@@ -323,6 +325,37 @@ package object qscript {
         : FreeQS[T] =
       pruneArrays0[FreeQS[T], CoEnvQS[T, ?]](state).apply(self)
   }
+
+  def liftAlgebra[T[_[_]]: BirecursiveT, F[_], G[_]: Functor]
+    (alg: QScriptCore[T, T[G]] => F[T[G]], GtoF: PrismNT[G, F])
+    (implicit QC: QScriptCore[T, ?] :<: F)
+      : F[T[G]] => G[T[G]] =
+    ftg => GtoF.reverseGet(
+      liftFG[QScriptCore[T, ?], F, T[G]](alg).apply(ftg))
+
+  // qs.transCata[T[QScriptTotal]](liftId[T, QScriptTotal])
+  def liftId[T[_[_]]: BirecursiveT, F[_]: Functor]
+    (alg: QScriptCore[T, T[F]] => F[T[F]])
+    (implicit QC: QScriptCore[T, ?] :<: F)
+      : F[T[F]] => F[T[F]] =
+    liftAlgebra[T, F, F](alg, idPrism)
+
+  // free.transCata[FreeQS](liftCoEnv[T, QScriptTotal])
+  def liftCoEnv[T[_[_]]: BirecursiveT, F[_]: Functor]
+    (alg: QScriptCore[T, T[CoEnv[Hole, F, ?]]] => F[T[CoEnv[Hole, F, ?]]])
+    (implicit QC: QScriptCore[T, ?] :<: F)
+      : CoEnvFree[F, Hole] => CoEnvFree[F, Hole] = {
+    val bij = coenvBijection[T, F, Hole]
+
+    val partial: F[Free[F, Hole]] => CoEnvFree[F, Hole] = fa => {
+      liftAlgebra[T, F, CoEnv[Hole, F, ?]](alg, coenvPrism[F, Hole])
+        .apply(fa ∘ bij.toK.run) ∘ bij.fromK.run
+    }
+
+    liftCo[T, F, Hole, Free[F, Hole]](partial)
+  }
+
+
 }
 
 package qscript {
