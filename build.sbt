@@ -438,7 +438,6 @@ lazy val it = project
   .configs(ExclusiveTests)
   .dependsOn(web % BothScopes, core % BothScopes)
   .settings(commonSettings)
-  .settings(noPublishSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.it)
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
