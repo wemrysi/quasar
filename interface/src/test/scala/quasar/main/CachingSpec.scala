@@ -59,7 +59,7 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
       (fs compose injectNT[ManageFile, FileSystem]) :+:
       Failure.toRuntimeError[Task, FileSystemError] :+:
       transactor.trans) compose
-    VCache.interp
+    VCache.interp[(ManageFile :\: FileSystemFailure :/: ConnectionIO)#M]
 
   def eff(i: Instant): Task[Eff ~> Task] =
     (runFs(InMemState.empty) ⊛ createNewTestMetaStoreConfig)((fs, metaConf) =>
