@@ -206,7 +206,7 @@ This technique is designed for local development use, where the backend implemen
 As with the plugins directory approach, you will need to run the `assembly` task for each backend that you want to use.  But instead of copying the JAR files into a directory, you will be referencing each JAR file individually using the `--backend` switch on the web or REPL JAR invocation:
 
 ```bash
-java -jar [<path to jar>] [-c <config file>] --backend:quasar.physical.mongodb.MongoDb\\$=.targets/mongodb/scala-2.11/quasar-mongodb-internal-assembly-23.1.5.jar
+java -jar [<path to jar>] [-c <config file>] --backend:quasar.physical.mongodb.MongoDb\$=.targets/mongodb/scala-2.11/quasar-mongodb-internal-assembly-23.1.5.jar
 ```
 
 Replace the JAR file in the above with the path to the backend who's `assembly` you ran.  The `--backend` switch may be repeated as many times as necessary: once for each backend you wish to add.  The value to the left of the `=` is the `BackendModule` object *class name* which defines the backend in question.  Note that we need to escape the `$` character which will be present in each class name, solely because of bash syntax.
