@@ -274,7 +274,15 @@ object FuncHandler {
               def apply[A](mfc: MapFuncCore[T, A]): OptionFree[EX, A] = {
                 val fp26  = new ExprOpCoreF.fixpoint[Free[EX, A], EX](Free.roll)
                 val fp34  = new ExprOp3_4F.fixpoint[Free[EX, A], EX](Free.roll)
-                val check = new Check[Free[EX, A], EX](Free.roll)
+
+                // TODO: Add to matryoshka
+                implicit def freeCorec[F[_], A]: Corecursive.Aux[Free[F, A], F] = new Corecursive[Free[F, A]] {
+                  type Base[A] = F[A]
+
+                  def embed(t: F[Free[F, A]])(implicit BF: Functor[F]): Free[F, A] = Free.roll(t)
+                }
+
+                val check = new Check[Free[EX, A], EX]
 
                 import fp26._, fp34._
 

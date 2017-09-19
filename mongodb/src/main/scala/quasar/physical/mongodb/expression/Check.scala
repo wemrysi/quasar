@@ -31,13 +31,13 @@ import scalaz._, Scalaz._
   * seen in the order of declarations in this class.
   */
 final class Check[T, EX[_]]
-  (embed: EX[T] => T)
   (implicit
+    TC: Corecursive.Aux[T, EX],
     EX: Functor[EX],
     I: ExprOpCoreF :<: EX) {
   import Check._
 
-  private val exprCoreFp = new ExprOpCoreF.fixpoint[T, EX](embed)
+  private val exprCoreFp = new ExprOpCoreF.fixpoint[T, EX](_.embed)
   import exprCoreFp._
 
   def isNull(expr: T): T = $eq($literal(Bson.Null), expr)
@@ -96,11 +96,6 @@ object Check {
     * constructors above.
     */
   // TODO: remove this when we no longer perform after-the-fact translation
-
-  def apply[T, EX[_]: Functor]
-    (implicit TC: Corecursive.Aux[T, EX], I: ExprOpCoreF :<: EX)
-      : Check[T, EX] = new Check[T, EX](_.embed)
-
   def unapply[T: Equal, EX[_]]
     (expr: T)
     (implicit TR: Recursive.Aux[T, EX], TC: Corecursive.Aux[T, EX], EX: Functor[EX], ev1: ExprOpCoreF :<: EX)

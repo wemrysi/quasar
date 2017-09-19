@@ -165,7 +165,7 @@ object MongoDbPlanner {
 
   // NB: it's only safe to emit "core" expr ops here, but we always use the
   // largest type in WorkflowOp, so they're immediately injected into ExprOp.
-  val check = Check[Fix[ExprOp], ExprOp]
+  val check = new Check[Fix[ExprOp], ExprOp]
 
   def ejsonToExpression[M[_]: Applicative: MonadFsErr, EJ]
     (ej: EJ)(implicit EJ: Recursive.Aux[EJ, EJson])
