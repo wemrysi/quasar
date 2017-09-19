@@ -29,6 +29,7 @@ import quasar.contrib.scalaz.writerT._
 import quasar.effect._
 import quasar.effect.uuid.UuidReader
 import quasar.ejson.EJson
+import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
 import quasar.fs.impl.{dataStreamRead, dataStreamClose}
@@ -94,6 +95,12 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
       mlfsq.run.liftB >>= (_.fold(
         mlerr => mlPlannerErrorToFsError(mlerr).raiseError[Backend, A],
         _.point[Backend]))
+  }
+
+  def optimize[T[_[_]]: BirecursiveT: EqualT: ShowT]
+      : QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]] = {
+    val O = new Optimize[T]
+    O.optimize(reflNT[QSM[T, ?]])
   }
 
   def parseConfig(uri: ConnectionUri): DefErrT[Task, Config] =
