@@ -1390,7 +1390,10 @@ object MongoDbPlanner {
     qs: T[fs.MongoQScript[T, ?]],
     listContents: DiscoverPath.ListContents[M])(
     implicit rewrite: Branches.Aux[T, fs.MongoQScript[T, ?]])
-      : M[T[fs.MongoQScript[T, ?]]] =
+      : M[T[fs.MongoQScript[T, ?]]] = {
+
+    val O = new Optimize[T]
+
     for {
       rewriteSortF <- qs.transCata[T[fs.MongoQScript[T, ?]]](liftId[T, fs.MongoQScript[T, ?]](mapBeforeSort[T, fs.MongoQScript[T, ?], fs.MongoQScript[T, ?]](idPrism))).point[M]
       rewriteSortFree <- rewrite
@@ -1398,9 +1401,14 @@ object MongoDbPlanner {
         .apply(rewriteSortF.project)
         .embed
         .point[M]
-      mongoQs <- rewriteSortFree.transCataM(liftFGM(assumeReadType[M, T, fs.MongoQScript[T, ?]](Type.AnyObject)))
+      optimized <- rewriteSortFree.transCata[T[fs.MongoQScript[T, ?]]](
+        liftFF[QScriptCore[T, ?], fs.MongoQScript[T, ?], T[fs.MongoQScript[T, ?]]](
+          repeatedly(O.subsetBeforeMap[fs.MongoQScript[T, ?], fs.MongoQScript[T, ?]](reflNT[fs.MongoQScript[T, ?]]))))
+        .point[M]
+      mongoQs <- optimized.transCataM(liftFGM(assumeReadType[M, T, fs.MongoQScript[T, ?]](Type.AnyObject)))
       _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript (Mongo-specific)", mongoQs))
     } yield mongoQs
+  }
 
   def plan0
     [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,

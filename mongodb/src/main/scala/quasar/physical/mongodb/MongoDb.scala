@@ -67,10 +67,13 @@ object MongoDb
   def ReadKvsM = Kvs[M, ReadFile.ReadHandle, BsonCursor]
   def WriteKvsM = Kvs[M, WriteFile.WriteHandle, Collection]
 
+  // we don't apply `O.subsetBeforeMap` because we need to apply that
+  // after we apply `mapBeforeSort`
   def optimize[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]] = {
     val O = new Optimize[T]
-    O.optimize(reflNT[QSM[T, ?]])
+    liftFF[QScriptCore[T, ?], QSM[T, ?], T[QSM[T, ?]]](
+      repeatedly(O.filterBeforeUnion[QSM[T, ?]]))
   }
 
   def parseConfig(uri: ConnectionUri): BackendDef.DefErrT[Task, Config] =
