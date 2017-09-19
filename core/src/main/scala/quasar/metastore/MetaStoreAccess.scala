@@ -56,9 +56,9 @@ trait MetaStoreAccess {
   def lookupViewCache(path: AFile): ConnectionIO[Option[ViewCache]] =
     (Queries.lookupViewCache(path) ∘ (_.vc)).option
 
-  def updateInsertViewCache(path: AFile, viewCache: ViewCache): ConnectionIO[Unit] =
-    runOneRowUpdateOpt(Queries.updateViewCache(path, viewCache)).isEmpty >>= (_.whenM(
-      runOneRowUpdate(Queries.insertViewCache(path, viewCache))))
+  def insertUpdateViewCache(path: AFile, viewCache: ViewCache): ConnectionIO[Unit] =
+    Queries.insertViewCache(path, viewCache).run.void.except(_ =>
+      runOneRowUpdate(Queries.updateViewCache(path, viewCache)))
 
   def updateViewCacheErrorMsg(path: AFile, errorMsg: String): ConnectionIO[Unit] =
     runOneRowUpdate(Queries.updateViewCacheErrorMsg(path, errorMsg))

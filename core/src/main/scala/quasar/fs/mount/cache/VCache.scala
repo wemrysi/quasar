@@ -64,9 +64,9 @@ object VCache {
     case Get(k) =>
       injectFT[ConnectionIO, S].apply(lookupViewCache(k))
     case Put(k, v) =>
-      deleteThen(k, κ(updateInsertViewCache(k, v)))
+      deleteThen(k, κ(insertUpdateViewCache(k, v)))
     case CompareAndPut(k, expect, v) =>
-      deleteThen(k, vc => (vc ≟ expect).fold(updateInsertViewCache(k, v).as(true), false.η[ConnectionIO]))
+      deleteThen(k, vc => (vc ≟ expect).fold(insertUpdateViewCache(k, v).as(true), false.η[ConnectionIO]))
     case Delete(k) =>
       deleteThen(k, κ(runOneRowUpdate(Queries.deleteViewCache(k))))
   }
