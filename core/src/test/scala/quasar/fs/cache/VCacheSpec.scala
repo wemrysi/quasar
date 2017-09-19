@@ -69,7 +69,7 @@ abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaS
     )._2.unsafePerformSync.contents must_= Map.empty
   }
 
-  "CompareAndPut deletes existing cache files" >> {
+  "CompareAndPut deletes cache files when expect matches" >> {
     val f = rootDir </> file("f")
     val dataFile = rootDir </> file("dataFile")
     val tmpDataFile = rootDir </> file("tmpDataFile")
@@ -82,6 +82,21 @@ abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaS
       vcache.put(f, viewCache) >> vcache.compareAndPut(f, viewCache.some, viewCache),
       List(dataFile, tmpDataFile)
     )._2.unsafePerformSync.contents must_= Map.empty
+  }
+
+  "CompareAndPut preserves cache files when expect doesn't match" >> {
+    val f = rootDir </> file("f")
+    val dataFile = rootDir </> file("dataFile")
+    val tmpDataFile = rootDir </> file("tmpDataFile")
+    val expr = sqlB"α"
+    val viewCache = ViewCache(
+      MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
+      600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, dataFile, tmpDataFile.some)
+
+    evalWithFiles(
+      vcache.compareAndPut(f, viewCache.some, viewCache),
+      List(dataFile, tmpDataFile)
+    )._2.unsafePerformSync.contents.keys.toList must_= List(dataFile, tmpDataFile)
   }
 
   "Delete deletes cache files" >> {
