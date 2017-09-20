@@ -605,12 +605,7 @@ class PlannerSpec extends
             $cond(
               $and($lte($literal(Bson.Arr()), $field("bar")),
                 $lt($field("bar"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
-              $cond(
-                $and(
-                  $lte($literal(Bson.Text("")), $field("bar")),
-                  $lt($field("bar"), $literal(Bson.Doc()))),
-                $strLenCP($field("bar")),
-                $size($field("bar"))),
+              $size($field("bar")),
               $literal(Bson.Undefined))),
           ExcludeId)))
     }
@@ -2639,12 +2634,7 @@ class PlannerSpec extends
               $cond($and(
                 $lte($literal(Bson.Text("")), $field("city")),
                 $lt($field("city"), $literal(Bson.Doc()))),
-                $cond(
-                  $and(
-                    $lte($literal(Bson.Text("")), $field("city")),
-                    $lt($field("city"), $literal(Bson.Doc()))),
-                  $strLenCP($field("city")),
-                  $size($field("city"))),
+                $strLenCP($field("city")),
                 $literal(Bson.Undefined))),
           IgnoreId)))
     }
