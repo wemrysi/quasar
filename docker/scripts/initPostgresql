@@ -8,10 +8,6 @@ while ! pg_isready; do
   sleep 1
 done
 
-#cat >/var/lib/postgresql/data/pg_hba.conf <<EOL
-#host   all  all  0.0.0.0/0  trust
-#EOL
-
 psql -v ON_ERROR_STOP=1 --username "postgres" <<-EOSQL
     CREATE DATABASE "$1";
 EOSQL

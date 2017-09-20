@@ -24,7 +24,6 @@ init_metastore() {
   docker restart quasar_metastore
   docker cp $SCRIPTS_DIR/initPostgresql quasar_metastore:/tmp/initPostgresql
   docker exec quasar_metastore /tmp/initPostgresql metastore
-  #docker restart quasar_metastore
 }
 
 init_couchbase() {
