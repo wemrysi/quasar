@@ -40,6 +40,11 @@ package object scalaz {
     }
   }
 
+  implicit final class OptionTOps[F[_], A](val self: OptionT[F, A]) extends AnyVal {
+    def covary[B >: A](implicit F: Functor[F]): OptionT[F, B] =
+      OptionT(self.run.map(opt => opt: Option[B]))
+  }
+
   implicit def toMonadTell_Ops[F[_], W, A](fa: F[A])(implicit F: MonadTell_[F, W]): MonadTell_Ops[F, W, A] =
     new MonadTell_Ops[F, W, A](fa)
 

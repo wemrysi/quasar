@@ -60,14 +60,22 @@ class ServiceSpec extends quasar.Qspec {
       _          <- schema.updateToLatest.transact(transactor).liftM[MainErrT]
       _          <- metastoreInit.transact(transactor).liftM[MainErrT]
       metaRef    <- TaskRef(metastore).liftM[MainErrT]
-      quasarFs   <- Quasar.initWithMeta(metaRef, _ => ().point[MainTask])
+      quasarFs   <- Quasar.initWithMeta(BackendConfig.Empty, metaRef, _ => ().point[MainTask])
       shutdown   <- Server.startServer(quasarFs.interp, port, Nil, None, _ => ().point[MainTask]).liftM[MainErrT]
       r          <- f(uri).onFinish(κ(shutdown.onFinish(κ(quasarFs.shutdown)))).liftM[MainErrT]
     } yield r).run.unsafePerformSync
   }
 
+  /*
+   * TODO collapse this a bit
+   *
+   * This code dates back to a time when we tested everything in the
+   * filesystem config.  Now, we just test against mimir (here).  This
+   * code should be collapsed and inlined, and the tests re-specialized
+   * to a single backend (mimir).  I'm just in a hurry right now...
+   */
   val fileSystemConfigs: Map[APath, MountConfig.FileSystemConfig] =
-    TestConfig.backendRefs
+    List(TestConfig.MIMIR)
       .traverse { ref =>
         val connectionUri = TestConfig.loadConnectionUri(ref.ref)
         connectionUri.map(MountConfig.FileSystemConfig(ref.fsType, _)).run
@@ -89,7 +97,7 @@ class ServiceSpec extends quasar.Qspec {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync
 
       val r  = withServer(port) { baseUri: Uri =>
-        fileSystemConfigs.toList.traverse { case (f,c) => 
+        fileSystemConfigs.toList.traverse { case (f,c) =>
           client.fetch(
             Request(
                 uri = baseUri / "mount" / "fs",
@@ -176,7 +184,7 @@ class ServiceSpec extends quasar.Qspec {
       }
 
       r ==== finalCfg.asJson.right
-    }
+    }.flakyTest("this test is actually non-deterministic depending on server scheduling")
 
     "MOVE view" in {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync

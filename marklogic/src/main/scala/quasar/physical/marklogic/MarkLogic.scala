@@ -44,6 +44,7 @@ import quasar.qscript.{Read => QRead, _}
 
 import scala.Predef.implicitly
 
+import eu.timepit.refined.auto._
 import matryoshka._
 import matryoshka.implicits._
 import pathy.Path._
@@ -51,7 +52,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 
-final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
+sealed class MarkLogic protected (readChunkSize: Positive, writeChunkSize: Positive)
     extends BackendModule
     with ManagedQueryFile[XccDataStream]
     with ManagedWriteFile[AFile]
@@ -343,7 +344,4 @@ final class MarkLogic(readChunkSize: Positive, writeChunkSize: Positive)
   }
 }
 
-object MarkLogic {
-  def apply(readChunkSize: Positive, writeChunkSize: Positive): BackendModule =
-    new MarkLogic(readChunkSize, writeChunkSize)
-}
+object MarkLogic extends MarkLogic(10000L, 10000L)
