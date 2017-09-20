@@ -19,6 +19,7 @@ package quasar.fs.cache
 import slamdata.Predef._
 import quasar.common.PhaseResultT
 import quasar.contrib.pathy.{ADir, AFile}
+import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.Timing
 import quasar.frontend.SemanticErrsT
@@ -36,6 +37,7 @@ import java.time.{Duration => JDuration, Instant}
 import scala.concurrent.duration._
 
 import doobie.free.connection.ConnectionIO
+import eu.timepit.refined.auto._
 import pathy.Path._
 import scalaz._, Scalaz._, NonEmptyList.nels
 import scalaz.concurrent.Task
@@ -100,18 +102,20 @@ object ViewCacheRefresh {
     basePath: ADir, tmpDataPath: AFile, view: MountConfig.ViewConfig
   )(implicit
     Q: QueryFile.Ops[S],
-    S0: WriteFile :<: S,
+    W: WriteFile.Ops[S],
     S1: ManageFile :<: S,
-    S2: Mounting :<: S
-  ): Q.transforms.CompExecM[AFile] = {
+    S2: Mounting :<: S,
+    S3: Task :<: S
+  ): Q.transforms.CompExecM[Unit] = {
     val fsQ = new FilesystemQueries[S]
 
     for {
       q       <- EitherT(EitherT(
                    (quasar.resolveImports_[S](view.query, basePath).leftMap(nels(_)).run.run ∘ (_.sequence))
                      .liftM[PhaseResultT]))
-      r       <- fsQ.executeQuery(q, view.vars, basePath, tmpDataPath)
-    } yield r
+      r       <- fsQ.queryResults(q, view.vars, basePath, 0L, none)
+      _       <- lift(W.save(tmpDataPath, r).runLog.run)
+    } yield ()
   }
 
   def lift[S[_], A](
