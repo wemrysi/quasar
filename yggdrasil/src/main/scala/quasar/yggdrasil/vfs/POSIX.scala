@@ -44,10 +44,10 @@ object POSIX {
   def mkDir[S[_]](target: ADir)(implicit S: POSIXOp :<: S): Free[S, Unit] =
     Free.liftF(S.inj(MkDir(target)))
 
-  def linkDir[S[_]](src: ADir, target: ADir)(implicit S: POSIXOp :<: S): Free[S, Unit] =
+  def linkDir[S[_]](src: ADir, target: ADir)(implicit S: POSIXOp :<: S): Free[S, Boolean] =
     Free.liftF(S.inj(LinkDir(src, target)))
 
-  def linkFile[S[_]](src: AFile, target: AFile)(implicit S: POSIXOp :<: S): Free[S, Unit] =
+  def linkFile[S[_]](src: AFile, target: AFile)(implicit S: POSIXOp :<: S): Free[S, Boolean] =
     Free.liftF(S.inj(LinkFile(src, target)))
 
   def move[S[_]](src: AFile, target: AFile)(implicit S: POSIXOp :<: S): Free[S, Unit] =

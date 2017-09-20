@@ -33,7 +33,7 @@ import scalaz.syntax.traverse._
 
 import scodec.bits.ByteVector
 
-import java.io.File
+import java.io.{File, IOException}
 import java.nio.file.{Files, StandardCopyOption}
 import java.util.UUID
 
@@ -90,9 +90,13 @@ object RealPOSIX {
           val ptarget = canonicalize(target).toPath()
 
           Task delay {
-            Files.createSymbolicLink(ptarget, psrc)
+            try {
+              Files.createSymbolicLink(ptarget, psrc)
 
-            ()
+              true
+            } catch {
+              case _: IOException => false
+            }
           }
 
         case LinkFile(src, target) =>
@@ -100,9 +104,13 @@ object RealPOSIX {
           val ptarget = canonicalize(target).toPath()
 
           Task delay {
-            Files.createSymbolicLink(ptarget, psrc)
+            try {
+              Files.createSymbolicLink(ptarget, psrc)
 
-            ()
+              true
+            } catch {
+              case _: IOException => false
+            }
           }
 
         case Move(src, target) =>
