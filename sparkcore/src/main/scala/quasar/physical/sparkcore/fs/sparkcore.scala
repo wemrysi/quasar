@@ -94,6 +94,15 @@ trait SparkCore extends BackendModule {
 
   type LowerLevel[A] = Coproduct[Task, PhysErr, A]
 
+  /*
+   * The classloader stuff is a bit tricky here.  Basically, Spark and Hadoop
+   * are circumventing the classloader hierarchy by reading the context classloader.
+   * This is rather annoying, but there's not a lot we can do about it.  The
+   * context classloader is stored in a thread local, but since we're running on
+   * a pool, we don't really have tight control over which thread we're on.  So
+   * we have to constantly and aggressively re-set the context classloader.  This
+   * is also done prior to generating the SparkContext in the derived connectors.
+   */
   @SuppressWarnings(Array("org.wartremover.warts.Equals", "org.wartremover.warts.Null"))
   private val overrideContextCL = {
     for {
