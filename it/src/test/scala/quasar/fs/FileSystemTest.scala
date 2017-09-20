@@ -25,11 +25,8 @@ import quasar.fp.free._
 import quasar.fs.mount._, BackendDef.DefinitionResult, Fixture._
 import quasar.fs.mount.cache.VCache
 import quasar.effect._
-import quasar.main.{KvsMounter, HierarchicalFsEffM, PhysFsEff, PhysFsEffM}
-import quasar.mimir
+import quasar.main.{physicalFileSystems, FsAsk, KvsMounter, HierarchicalFsEffM, PhysFsEff, PhysFsEffM}
 import quasar.physical._
-import quasar.physical.couchbase.Couchbase
-import quasar.physical.marklogic.MarkLogic
 import quasar.regression.{interpretHfsIO, HfsIO}
 
 import scala.Either
@@ -142,36 +139,32 @@ object FileSystemTest {
 
   //--- FileSystems to Test ---
 
-  def allFsUT: Task[IList[SupportedFs[BackendEffect]]] =
-    (localFsUT |@| externalFsUT) { (loc, ext) =>
-      (loc ::: ext) map (sf => sf.copy(impl = sf.impl.map(ut => ut.contramapF(chroot.backendEffect[BackendEffect](ut.testDir)))))
-    }
-
-  def fsTestConfig(fsType: FileSystemType, fsDef: BackendDef[Free[filesystems.Eff, ?]])
-    : PartialFunction[(MountConfig, ADir), Task[(BackendEffect ~> Task, Task[Unit])]] = {
-    case (MountConfig.FileSystemConfig(FileSystemType(fsType.value), uri), dir) =>
-      filesystems.testFileSystem(uri, dir, fsDef.apply(fsType, uri).run)
-  }
-
-  def fsTestConfig0(fsType: FileSystemType, fsDef: BackendDef[Task])
-      : PartialFunction[(MountConfig, ADir), Task[(BackendEffect ~> Task, Task[Unit])]] =
-    fsTestConfig(fsType, fsDef translate injectFT[Task, filesystems.Eff])
-
-  def externalFsUT = {
-    TestConfig.externalFileSystems {
-      fsTestConfig0(couchbase.fs.FsType, Couchbase.definition) orElse
-      fsTestConfig0(marklogic.fs.FsType, MarkLogic(10000L, 10000L).definition) orElse
-      fsTestConfig0(mimir.Mimir.Type, mimir.Mimir.definition) orElse
-      fsTestConfig0(mongodb.MongoDb.Type, mongodb.MongoDb.definition) orElse
-      fsTestConfig0(sparkcore.fs.hdfs.SparkHdfs.Type, sparkcore.fs.hdfs.SparkHdfs.definition)  orElse
-      fsTestConfig0(sparkcore.fs.local.SparkLocal.Type, sparkcore.fs.local.SparkLocal.definition) orElse
-      fsTestConfig0(sparkcore.fs.elastic.SparkElastic.Type, sparkcore.fs.elastic.SparkElastic.definition) orElse
-      fsTestConfig0(sparkcore.fs.cassandra.SparkCassandra.Type, sparkcore.fs.cassandra.SparkCassandra.definition)
+  def allFsUT: Task[IList[SupportedFs[BackendEffect]]] = {
+    for {
+      loadConfig <- TestConfig.testBackendConfig
+      mounts <- physicalFileSystems(loadConfig)
+      loc <- localFsUT(mounts)
+      ext <- externalFsUT(mounts)
+    } yield {
+      (loc ::: ext) map { sf =>
+        sf.copy(impl = sf.impl.map(ut => ut.contramapF(chroot.backendEffect[BackendEffect](ut.testDir))))
+      }
     }
   }
 
-  def localFsUT: Task[IList[SupportedFs[BackendEffect]]] =
-    (inMemUT |@| hierarchicalUT |@| nullViewUT) { (mem, hier, nullUT) =>
+  def externalFsUT(mounts: BackendDef[PhysFsEffM]) = {
+    TestConfig externalFileSystems {
+      case (tpe, uri) =>
+        filesystems.testFileSystem(
+          mounts.translate(
+            foldMapNT(
+              injectFT[Task, filesystems.Eff] :+:
+              injectFT[PhysErr, filesystems.Eff])).apply(tpe, uri).run)
+    }
+  }
+
+  def localFsUT(mounts: BackendDef[PhysFsEffM]): Task[IList[SupportedFs[BackendEffect]]] =
+    (inMemUT |@| hierarchicalUT |@| nullViewUT(mounts)) { (mem, hier, nullUT) =>
       IList(
         SupportedFs(mem.ref, mem.some),
         SupportedFs(hier.ref, hier.some),
@@ -179,7 +172,7 @@ object FileSystemTest {
       )
     }
 
-  def nullViewUT: Task[FileSystemUT[BackendEffect]] =
+  def nullViewUT(mounts: BackendDef[PhysFsEffM]): Task[FileSystemUT[BackendEffect]] =
     (
       inMemUT                                             |@|
       TaskRef(0L)                                         |@|
@@ -191,10 +184,10 @@ object FileSystemTest {
       (mem, seqRef, viewState, cfgsRef, hfsRef, mntdRef) =>
 
       val mounting: Mounting ~> Task = {
-        val toPhysFs = KvsMounter.interpreter[Task, PhysFsEff](
+        val toPhysFs = KvsMounter.interpreter[Task, Coproduct[FsAsk, PhysFsEff, ?]](
           KeyValueStore.impl.fromTaskRef(cfgsRef), hfsRef, mntdRef)
 
-        foldMapNT(reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
+        foldMapNT(Read.constant[Task, BackendDef[PhysFsEffM]](mounts) :+: reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
           .compose(toPhysFs)
       }
 

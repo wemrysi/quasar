@@ -81,8 +81,10 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
   def sequenceOps = MonotonicSeq.Ops[Eff]
   def hdfsFSOps = Read.Ops[HdfsFileSystem, Eff]
 
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def generateHdfsFS(sfsConf: HdfsConfig): Task[HdfsFileSystem] =
     for {
+      _ <- Task.delay(java.lang.Thread.currentThread.setContextClassLoader(null))
       fs <- Task.delay {
         val conf = new Configuration()
         conf.setBoolean("fs.hdfs.impl.disable.cache", true)
@@ -200,7 +202,11 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
     OptionT(jar).toRight(NonEmptyList("Could not fetch sparkcore.jar").left[EnvironmentError])
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
   private def initSC: HdfsConfig => DefErrT[Task, SparkContext] = (config: HdfsConfig) => EitherT(Task.delay {
+    // look, I didn't make Spark the way it is...
+    java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
+
     new SparkContext(config.sparkConf).right[DefinitionError]
   }.handleWith {
     case ex : SparkException if ex.getMessage.contains("SPARK-2243") =>

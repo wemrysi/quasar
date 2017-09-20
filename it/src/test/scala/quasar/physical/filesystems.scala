@@ -19,12 +19,11 @@ package quasar.physical
 import slamdata.Predef._
 import quasar.connector.{EnvironmentError, EnvErr}
 import quasar.config.{CfgErr, ConfigError}
-import quasar.contrib.pathy._
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
-import quasar.fs.mount.{ConnectionUri, BackendDef}
+import quasar.fs.mount.BackendDef
 
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -34,8 +33,6 @@ object filesystems {
   type EffM[A] = Free[Eff, A]
 
   def testFileSystem(
-    uri: ConnectionUri,
-    prefix: ADir,
     f: Free[Eff, BackendDef.DefinitionError \/ BackendDef.DefinitionResult[Free[Eff, ?]]]
   ): Task[(BackendEffect ~> Task, Task[Unit])] = {
     val fsDef = f.flatMap[BackendDef.DefinitionResult[EffM]] {

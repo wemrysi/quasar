@@ -23,10 +23,12 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.foldable._
 import quasar.contrib.scalaz.writerT._
 import quasar.fp._
+import quasar.fp.free._
 import quasar.fp.ski._
 import quasar.frontend._
 import quasar.fs._, FileSystemError._, FileSystemTest._
 import quasar.main.FilesystemQueries
+import quasar.physical.filesystems
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.fs.MongoDbFileSystemSpec.mongoFsUT
 import quasar.regression._
@@ -365,14 +367,17 @@ class MongoDbFileSystemSpec
 }
 
 object MongoDbFileSystemSpec {
+
   // NB: No `chroot` here as we want to test deleting top-level
   //     dirs (i.e. databases).
   val mongoFsUT: Task[IList[SupportedFs[BackendEffectIO]]] =
     (Functor[Task] compose Functor[IList])
       .map(
-        TestConfig.externalFileSystems(
-          FileSystemTest.fsTestConfig0(MongoDb.Type, MongoDb.definition)
-        ).handleWith[IList[SupportedFs[BackendEffect]]] {
+        (TestConfig externalFileSystems {
+          case (tpe, uri) =>
+            filesystems.testFileSystem(
+              MongoDb.definition.translate(injectFT[Task, filesystems.Eff]).apply(tpe, uri).run)
+        }).handleWith[IList[SupportedFs[BackendEffect]]] {
           case _: TestConfig.UnsupportedFileSystemConfig => Task.now(IList.empty)
         }
       )(_.liftIO)
