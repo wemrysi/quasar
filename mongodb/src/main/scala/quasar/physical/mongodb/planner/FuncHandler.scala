@@ -150,7 +150,6 @@ object FuncHandler {
               case Upper(a1)             => $toUpper(a1)
               case Substring(a1, a2, a3) => $substr(a1, a2, a3)
               case ToString(a1)          => mkToString(a1, $substr)
-              case Length(a1)            => $size(a1)
               case Cond(a1, a2, a3)      => $cond(a1, a2, a3)
 
               case Or(a1, a2)            => $or(a1, a2)

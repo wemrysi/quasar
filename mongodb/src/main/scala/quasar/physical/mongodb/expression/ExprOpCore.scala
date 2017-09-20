@@ -695,6 +695,9 @@ object $literal {
 }
 
 object $size {
+  def apply[EX[_], A](arr: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$sizeF(arr))
+
   def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOpCoreF :<: EX): Option[T] =
     $sizeF.unapply(T.project(expr))
 }

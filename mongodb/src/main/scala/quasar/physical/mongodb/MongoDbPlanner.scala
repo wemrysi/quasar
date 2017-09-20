@@ -208,16 +208,12 @@ object MongoDbPlanner {
       case Constant(v1) => ejsonToExpression[M, T[EJson]](v1)
       case Now() => execTime map ($literal(_))
 
-      case Length(a1) => unimplemented[M, Fix[ExprOp]]("Length expression")
       /* NB: Quasar strings are arrays of characters. However, MongoDB
              represent strings and arrays as distinct types. Moreoever, SQL^2
              exposes two functions: `array_length` to obtain the length of an array
              and `length` to obtain the length of a string. This distinction, however,
              is lost when LP is translated into QScript  */
-
-      /* FIXME: Will only work for Arrays, not Strings. Uncommenting the following line leads
-                to broken plans when the planner attempts to use $size on an array */
-      // case Length(a1) => $size(a1).point[M]
+      case Length(a1) => $size(a1).point[M]
       case Date(a1) => unimplemented[M, Fix[ExprOp]]("Date expression")
       case Time(a1) => unimplemented[M, Fix[ExprOp]]("Time expression")
       case Timestamp(a1) => unimplemented[M, Fix[ExprOp]]("Timestamp expression")
