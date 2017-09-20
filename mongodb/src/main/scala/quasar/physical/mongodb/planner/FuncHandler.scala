@@ -150,6 +150,7 @@ object FuncHandler {
               case Upper(a1)             => $toUpper(a1)
               case Substring(a1, a2, a3) => $substr(a1, a2, a3)
               case ToString(a1)          => mkToString(a1, $substr)
+              case Length(a1)            => $size(a1)
               case Cond(a1, a2, a3)      => $cond(a1, a2, a3)
 
               case Or(a1, a2)            => $or(a1, a2)
@@ -275,21 +276,9 @@ object FuncHandler {
                 val fp26  = new ExprOpCoreF.fixpoint[Free[EX, A], EX](Free.roll)
                 val fp34  = new ExprOp3_4F.fixpoint[Free[EX, A], EX](Free.roll)
 
-                // TODO: Add to matryoshka
-                implicit def freeCorec[F[_], A]: Corecursive.Aux[Free[F, A], F] = new Corecursive[Free[F, A]] {
-                  type Base[A] = F[A]
-
-                  def embed(t: F[Free[F, A]])(implicit BF: Functor[F]): Free[F, A] = Free.roll(t)
-                }
-
-                val check = new Check[Free[EX, A], EX]
-
                 import fp26._, fp34._
 
                 mfc.some collect {
-                  case Length(a1) =>
-                    $cond(check.isString(a1),
-                      $strLenCP(a1), $size(a1))
                   case Split(a1, a2) => $split(a1, a2)
                   case Substring(a1, a2, a3) =>
                     $cond($or(
@@ -302,6 +291,7 @@ object FuncHandler {
                         $substrCP(a1, a2, a3)))
                   case ToString(a1) =>
                     mkToString(a1, $substrBytes)
+                  case Length(a1) => $strLenCP(a1)
                 }
               }
             }
