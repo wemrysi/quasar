@@ -213,7 +213,7 @@ object MongoDbPlanner {
              exposes two functions: `array_length` to obtain the length of an array
              and `length` to obtain the length of a string. This distinction, however,
              is lost when LP is translated into QScript  */
-      case Length(a1) => $size(a1).point[M]
+      case Length(a1) =>unimplemented[M, Fix[ExprOp]]("Length expression")
       case Date(a1) => unimplemented[M, Fix[ExprOp]]("Date expression")
       case Time(a1) => unimplemented[M, Fix[ExprOp]]("Time expression")
       case Timestamp(a1) => unimplemented[M, Fix[ExprOp]]("Timestamp expression")
@@ -242,12 +242,8 @@ object MongoDbPlanner {
 
       case Guard(expr, Type.Str, cont @ $strLenCP(_), fallback) =>
         $cond(check.isString(expr), cont, fallback).point[M]
-      case Guard(expr, Type.Str, $size(_), fallback) =>
-        unimplemented[M, Fix[ExprOp]]("String length expression not implemented for Mongo without $strLenCP")
       case Guard(expr, Type.FlexArr(_, _, _), $strLenCP(str), fallback) =>
         $cond(check.isArray(expr), $size(str), fallback).point[M]
-      case Guard(expr, Type.FlexArr(_, _, _), cont @ $size(_), fallback) =>
-        $cond(check.isArray(expr), cont, fallback).point[M]
       // NB: This is maybe a NOP for Fix[ExprOp]s, as they (all?) safely
       //     short-circuit when given the wrong type. However, our guards may be
       //     more restrictive than the operation, in which case we still want to
