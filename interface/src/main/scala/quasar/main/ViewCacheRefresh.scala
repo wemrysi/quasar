@@ -73,7 +73,7 @@ object ViewCacheRefresh {
       tf  <- lift(M.tempFile(viewPath).run)
       ts1 <- lift(T.timestamp ∘ (_.right[FileSystemError]))
       _   <- lift(assigneeStart(viewPath, assigneeId, ts1, tf) ∘ (_.right[FileSystemError]))
-      _   <- writeViewCache[S](rootDir, tf, vc.viewConfig)
+      _   <- writeViewCache[S](fileParent(viewPath), tf, vc.viewConfig)
       _   <- lift(M.moveFile(tf, vc.dataFile, Overwrite).run)
       ts2 <- lift(T.timestamp ∘ (_.right[FileSystemError]))
       em  <- lift(free.lift(Task.delay(JDuration.between(ts1, ts2).toMillis)).into[S] ∘ (_.right[FileSystemError]))

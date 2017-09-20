@@ -33,14 +33,14 @@ object VCache {
 
   implicit def Ops[S[_]](implicit S0: VCache :<: S): Ops[S] = KeyValueStore.Ops[AFile, ViewCache, S]
 
-  def deleteVCacheFiles[S[_]](
-    vc: ViewCache
+  def deleteFiles[S[_]](
+    files: List[AFile]
   )(implicit
     M: ManageFile.Ops[S],
     E: Failure.Ops[FileSystemError, S]
   ): Free[S, Unit] =
     E.unattempt(
-      (M.delete(vc.dataFile) >> (vc.tmpDataFile.traverse_(M.delete(_)))).run ∘ (_.bimap(
+      files.traverse_(M.delete(_)).run ∘ (_.bimap(
         {
           case PathErr(PathNotFound(_)) => ().right[FileSystemError]
           case e => e.left
@@ -57,7 +57,7 @@ object VCache {
   ): Free[S, A] =
     for {
       vc <- injectFT[ConnectionIO, S].apply(lookupViewCache(k))
-      _  <- vc.foldMap(deleteVCacheFiles[S])
+      _  <- vc.foldMap(c => deleteFiles[S](c.dataFile :: c.tmpDataFile.toList))
       r  <- injectFT[ConnectionIO, S].apply(op)
     } yield r
 
@@ -75,8 +75,13 @@ object VCache {
     case CompareAndPut(k, expect, v) =>
       injectFT[ConnectionIO, S].apply(lookupViewCache(k)) >>= (vc =>
         (vc ≟ expect).fold(
-          (vc.traverse(deleteVCacheFiles[S]) >>
-            injectFT[ConnectionIO, S].apply(insertOrUpdateViewCache(k, v))).as(true),
+          {
+            vc.foldMap(c =>
+              deleteFiles(
+                ((c.dataFile ≠ v.dataFile) ?? List(c.dataFile)) :::
+                ((c.tmpDataFile ≠ v.tmpDataFile) ?? c.tmpDataFile.toList))) >>
+            injectFT[ConnectionIO, S].apply(insertOrUpdateViewCache(k, v))
+          }.as(true),
           false.η[Free[S, ?]]))
     case Delete(k) =>
       deleteVCacheFilesThen(k, runOneRowUpdate(Queries.deleteViewCache(k)))
