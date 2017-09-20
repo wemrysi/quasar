@@ -72,6 +72,28 @@ val targetSettings = Seq(
   }
 )
 
+lazy val backendRewrittenRunSettings = Seq(
+  run := Def.inputTaskDyn {
+    val log = streams.value.log
+    val args = complete.DefaultParsers.spaceDelimited("<arg>").parsed
+
+    log.info("Computing classpaths of dependent backends...")
+
+    val parentCp = (fullClasspath in connector in Compile).value.files
+    val backends = isolatedBackends.value map {
+      case (name, childCp) =>
+        val classpathStr =
+          createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(",")
+
+        "--backend:" + name + "=" + classpathStr
+    }
+
+    // the leading string is significant here!  #sbtwtfbarbecue
+    val argStr = (args ++ backends).mkString(" ", " ", "")
+
+    (run in Compile).toTask(argStr)
+  }.evaluated)
+
 // In Travis, the processor count is reported as 32, but only ~2 cores are
 // actually available to run.
 concurrentRestrictions in Global := {
@@ -105,10 +127,10 @@ lazy val assemblySettings = Seq(
     case PathList("org", "apache", "hadoop", "yarn", xs @ _*) => MergeStrategy.last
     case PathList("com", "google", "common", "base", xs @ _*) => MergeStrategy.last
     case "log4j.properties"                                   => MergeStrategy.discard
-    // After recent library version upgrades there seems to be a library pulling 
+    // After recent library version upgrades there seems to be a library pulling
     // in the scala-lang scala-compiler 2.11.11 jar. It comes bundled with jansi OS libraries
-    // which conflict with similar jansi libraries brought in by fusesource.jansi.jansi-1.11 
-    // So the merge needed the following lines to avoid the "deduplicate: different file contents found" 
+    // which conflict with similar jansi libraries brought in by fusesource.jansi.jansi-1.11
+    // So the merge needed the following lines to avoid the "deduplicate: different file contents found"
     // produced by web/assembly. Look into removing this once we move to scala v2.11.11.
     case s if s.endsWith("libjansi.jnilib")                   => MergeStrategy.last
     case s if s.endsWith("jansi.dll")                         => MergeStrategy.last
@@ -155,10 +177,27 @@ lazy val githubReleaseSettings =
       pushChanges)
   )
 
+def isolatedBackendSettings(classnames: String*) = Seq(
+  isolatedBackends in Global ++=
+    classnames.map(_ -> (fullClasspath in Compile).value.files),
+
+  packageOptions in assembly +=
+    Package.ManifestAttributes(new java.util.jar.Attributes.Name("Backend-Module") -> classnames.mkString(" ")))
+
 lazy val isCIBuild               = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
 lazy val isIsolatedEnv           = settingKey[Boolean]("True if running in an isolated environment")
 lazy val exclusiveTestTag        = settingKey[String]("Tag for exclusive execution tests")
 lazy val sparkDependencyProvided = settingKey[Boolean]("Whether or not the spark dependency should be marked as provided. If building for use in a Spark cluster, one would set this to true otherwise setting it to false will allow you to run the assembly jar on it's own")
+
+lazy val isolatedBackends =
+  taskKey[Seq[(String, Seq[File])]]("Global-only setting which contains all of the classpath-isolated backends")
+
+isolatedBackends in Global := Seq()
+
+lazy val sideEffectTestFSConfig = taskKey[Unit]("Rewrite the JVM environment to contain the filesystem classpath information for integration tests")
+
+def createBackendEntry(childPath: Seq[File], parentPath: Seq[File]): Seq[File] =
+  (childPath.toSet -- parentPath.toSet).toSeq
 
 lazy val root = project.in(file("."))
   .settings(commonSettings)
@@ -173,30 +212,38 @@ lazy val root = project.in(file("."))
 //  └──────────┼───────────┴─────────┴──────┘
 //         interface
 
-        foundation,
-//     / / | | \ \
-//
+       foundation,
+//       /   \
       ejson, js,
 //       \  /
-        common,    // <------------------------------------------------------
-//        |    \                                                             \
-    effect, frontend,                                                       precog,
-//   |       |  |  \________________________________________________________  |
-                                                                           blueeyes,
-//                                                                            |
-                                                                           niflheim,
-//   |    |   |                                                               |
-    sql, connector,                                                        yggdrasil,
-//   |   /  | | \ \______ __________________________________________________  |
-//   |  /   | |  \                                                          \ |
-    core, couchbase, marklogic, mongodb, skeleton, sparkcore,   mimir,
-//      \ \ | / /                                                           /
-        interface,
-//        /   \
-       repl,  web,
-//             |
-              it)
-  .enablePlugins(AutomateHeaderPlugin)
+        common,   // <--
+//     /       \        \
+    effect, frontend,  precog,
+//   |         |    \    |
+                      blueeyes,
+//   |         |         |
+                      niflheim,
+//   |         |         |
+    sql, connector,   yggdrasil,
+//   |   /  | | \ \______|__________________________________
+//   |  /   | |  \      /     \         \         \         \
+    core, skeleton, mimir, marklogic, mongodb, couchbase, sparkcore,
+//      \     |     /         |          |         |         |
+          interface,   //     |          |         |         |
+//          /  \              |          |         |         |
+         repl, web,   //      |          |         |         |
+//              |             |          |         |         |
+                it,   //      |          |         |         |
+//   ___________|_____________/          |         |         |
+//  /           |      __________________/         |         |
+//  |          /|\    /          __________________/         |
+//  |         / | \  /          /             _______________/
+//  |        /  |  \/__________/______       /
+//  |       /   |  /    \     /        \    /
+  marklogicIt, mongoIt, couchbaseIt, sparkcoreIt
+//
+// NB: the *It projects are temporary until we polyrepo
+  ).enablePlugins(AutomateHeaderPlugin)
 
 // common components
 
@@ -326,6 +373,8 @@ lazy val couchbase = project
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.couchbase)
+  .settings(githubReleaseSettings)
+  .settings(isolatedBackendSettings("quasar.physical.couchbase.Couchbase$"))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the MarkLogic connector.
@@ -337,6 +386,8 @@ lazy val marklogic = project
   .settings(targetSettings)
   .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
   .settings(libraryDependencies ++= Dependencies.marklogic)
+  .settings(githubReleaseSettings)
+  .settings(isolatedBackendSettings("quasar.physical.marklogic.MarkLogic$"))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the MongoDB connector.
@@ -355,6 +406,8 @@ lazy val mongodb = project
       Wart.AsInstanceOf,
       Wart.Equals,
       Wart.Overloading))
+  .settings(githubReleaseSettings)
+  .settings(isolatedBackendSettings("quasar.physical.mongodb.MongoDb$"))
   .enablePlugins(AutomateHeaderPlugin)
 
 /** A connector outline, meant to be copied and incrementally filled in while
@@ -376,12 +429,18 @@ lazy val sparkcore = project
     )
   .settings(commonSettings)
   .settings(targetSettings)
-  .settings(githubReleaseSettings)
+  // .settings(githubReleaseSettings)
   .settings(assemblyJarName in assembly := "sparkcore.jar")
   .settings(parallelExecution in Test := false)
   .settings(
     sparkDependencyProvided := false,
     libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value))
+  .settings(
+    isolatedBackendSettings(
+      "quasar.physical.sparkcore.fs.cassandra.SparkCassandra$",
+      "quasar.physical.sparkcore.fs.elastic.SparkElastic$",
+      "quasar.physical.sparkcore.fs.hdfs.SparkHdfs$",
+      "quasar.physical.sparkcore.fs.local.SparkLocal$"))
   .enablePlugins(AutomateHeaderPlugin)
 
 // interfaces
@@ -392,10 +451,6 @@ lazy val interface = project
   .settings(name := "quasar-interface-internal")
   .dependsOn(
     core % BothScopes,
-    couchbase,
-    marklogic % BothScopes,
-    mongodb,
-    sparkcore,
     skeleton,
     mimir)
   .settings(commonSettings)
@@ -412,6 +467,7 @@ lazy val repl = project
   .settings(noPublishSettings)
   .settings(githubReleaseSettings)
   .settings(targetSettings)
+  .settings(backendRewrittenRunSettings)
   .settings(
     fork in run := true,
     connectInput in run := true,
@@ -427,6 +483,7 @@ lazy val web = project
   .settings(publishTestsSettings)
   .settings(githubReleaseSettings)
   .settings(targetSettings)
+  .settings(backendRewrittenRunSettings)
   .settings(
     mainClass in Compile := Some("quasar.server.Server"),
     libraryDependencies ++= Dependencies.web)
@@ -435,18 +492,92 @@ lazy val web = project
 /** Integration tests that have some dependency on a running connector.
   */
 lazy val it = project
+  .settings(name := "quasar-it-internal")
   .configs(ExclusiveTests)
   .dependsOn(web % BothScopes, core % BothScopes)
   .settings(commonSettings)
-  .settings(noPublishSettings)
+  .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.it)
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
+  .settings(
+    sideEffectTestFSConfig := {
+      val LoadCfgProp = "slamdata.internal.fs-load-cfg"
+
+      if (java.lang.System.getProperty(LoadCfgProp, "").isEmpty) {
+        val parentCp = (fullClasspath in connector in Compile).value.files
+        val backends = isolatedBackends.value map {
+          case (name, childCp) =>
+            val classpathStr =
+              createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(":")
+
+            name + "=" + classpathStr
+        }
+
+        // we aren't forking tests, so we just set the property in the current JVM
+        java.lang.System.setProperty(LoadCfgProp, backends.mkString(";"))
+      }
+
+      ()
+    },
+
+    test := Def.taskDyn {
+      val _ = sideEffectTestFSConfig.value
+
+      test in Test
+    }.value)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val marklogicIt = project
+  .configs(ExclusiveTests)
+  .dependsOn(it % BothScopes, marklogic % BothScopes)
+  .settings(commonSettings)
+  .settings(noPublishSettings)
+  .settings(targetSettings)
+  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
+  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
+  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
+  .settings(parallelExecution in Test := false)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val mongoIt = project
+  .configs(ExclusiveTests)
+  .dependsOn(it % BothScopes, mongodb)
+  .settings(commonSettings)
+  .settings(noPublishSettings)
+  .settings(targetSettings)
+  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
+  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
+  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
+  .settings(parallelExecution in Test := false)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val couchbaseIt = project
+  .configs(ExclusiveTests)
+  .dependsOn(it % BothScopes, couchbase)
+  .settings(commonSettings)
+  .settings(noPublishSettings)
+  .settings(targetSettings)
+  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
+  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
+  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
+  .settings(parallelExecution in Test := false)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val sparkcoreIt = project
+  .configs(ExclusiveTests)
+  .dependsOn(it % BothScopes, sparkcore)
+  .settings(commonSettings)
+  .settings(noPublishSettings)
+  .settings(targetSettings)
+  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
+  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
+  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
+  .settings(parallelExecution in Test := false)
+  .enablePlugins(AutomateHeaderPlugin)
 
 /***** PRECOG *****/
 

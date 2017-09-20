@@ -56,7 +56,7 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
 
   def rootPrefix(cfg: Config): ADir = cfg.prefix
 
-  
+
 
   val Type = FileSystemType("spark-cassandra")
 
@@ -197,6 +197,7 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
   }
 
   private def initSC: Config => DefErrT[Task, SparkContext] = (config: Config) => EitherT(Task.delay {
+    java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
     new SparkContext(config.sparkConf).right[DefinitionError]
   }.handleWith {
     case ex : SparkException if ex.getMessage.contains("SPARK-2243") =>
@@ -302,7 +303,7 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
         _              <- if(tableExists) ().point[Free[Eff, ?]] else cass.createTable(ks, tb)
       } yield file).liftB
     }
-    
+
     def writeChunk(f: AFile, chunk: Vector[Data]): Configured[Vector[FileSystemError]] = {
       implicit val codec: DataCodec = DataCodec.Precise
 

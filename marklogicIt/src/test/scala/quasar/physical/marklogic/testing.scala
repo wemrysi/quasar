@@ -21,7 +21,6 @@ import quasar.Data
 import quasar.connector.EnvironmentError
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect._
-import quasar.fp.numeric.Positive
 import quasar.fs._
 import quasar.fs.mount._
 
@@ -33,16 +32,14 @@ object testing {
   import xcc._, xquery._, fs._
 
   def multiFormatDef(
-    uri: ConnectionUri,
-    readChunkSize: Positive,
-    writeChunkSize: Positive
+    uri: ConnectionUri
   ): Task[(BackendEffect ~> Task, BackendEffect ~> Task, Task[Unit])] = {
     def failOnError[A](err: BackendDef.DefinitionError): Task[A] =
       err.fold[Task[A]](
         errs => Task.fail(new RuntimeException(errs intercalate ", ")),
         ee   => Task.fail(new RuntimeException(ee.shows)))
 
-    val defn = MarkLogic(readChunkSize, writeChunkSize).definition
+    val defn = MarkLogic.definition
 
     MarkLogicConfig.fromUriString[EitherT[Task, ErrorMessages, ?]](uri.value)
       .leftMap(_.left[EnvironmentError])
