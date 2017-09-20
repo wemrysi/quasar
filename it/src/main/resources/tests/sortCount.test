@@ -1,0 +1,11 @@
+{
+    "name": "sort of a single value reduction",
+
+    "data": "olympics.data",
+
+    "query": "select count(*) as cnt from olympics order by cnt",
+
+    "predicate": "exactly",
+
+    "expected": [{ "cnt": 2311 }]
+}
