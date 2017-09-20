@@ -435,6 +435,7 @@ lazy val web = project
 /** Integration tests that have some dependency on a running connector.
   */
 lazy val it = project
+  .settings(name := "quasar-it-internal")
   .configs(ExclusiveTests)
   .dependsOn(web % BothScopes, core % BothScopes)
   .settings(commonSettings)
