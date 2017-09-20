@@ -184,7 +184,7 @@ class ServiceSpec extends quasar.Qspec {
       }
 
       r ==== finalCfg.asJson.right
-    }.flakyTest   // FIXME this test is actually non-deterministic depending on server scheduling
+    }.flakyTest("this test is actually non-deterministic depending on server scheduling")
 
     "MOVE view" in {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync
