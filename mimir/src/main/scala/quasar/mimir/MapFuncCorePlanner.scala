@@ -55,8 +55,9 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         // EJson => Data => JValue => RValue => Table
         val data: Data = ejson.cata(Data.fromEJson)
         val jvalue: JValue = JValue.fromData(data)
-        val rvalue: RValue = RValue.fromJValue(jvalue)
-        transRValue(rvalue, id).point[F]
+        val rvalue: Option[RValue] = RValue.fromJValue(jvalue)
+
+        rvalue.map(transRValue(_, id)).getOrElse(undefined(id)).point[F]
 
       case MapFuncsCore.JoinSideName(_) => ??? // should never be received
 

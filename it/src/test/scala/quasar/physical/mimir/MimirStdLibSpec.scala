@@ -140,8 +140,10 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
 
   private def dataToTransSpec(data: Data): cake.trans.TransSpec1 = {
     val jvalue: JValue = JValue.fromData(data)
-    val rvalue: RValue = RValue.fromJValue(jvalue)
-    cake.trans.transRValue(rvalue, cake.trans.TransSpec1.Id)
+
+    RValue.fromJValue(jvalue) map { rvalue =>
+      cake.trans.transRValue(rvalue, cake.trans.TransSpec1.Id)
+    } getOrElse cake.trans.TransSpec1.Undef
   }
 
   private def actual(table: cake.Table): List[Data] =

@@ -309,7 +309,7 @@ trait DAG extends Instructions {
         case instr @ RootInstr() => {
           val rvalue = instr match {
             case PushString(str) => CString(str)
-            case PushNum(num)    => CType.toCValue(JNum(BigDecimal(num, MathContext.UNLIMITED)))
+            case PushNum(num)    => CType.toCValue(JNum(BigDecimal(num, MathContext.UNLIMITED))).get
             case PushTrue        => CBoolean(true)
             case PushFalse       => CBoolean(false)
             case PushNull        => CNull
@@ -340,7 +340,7 @@ trait DAG extends Instructions {
       def buildConstRoot(instr: Instruction): Either[StackError, (Root, Vector[Instruction])] = {
         val rvalue = instr match {
           case PushString(str) => CString(str)
-          case PushNum(num)    => CType.toCValue(JNum(BigDecimal(num, MathContext.UNLIMITED)))
+          case PushNum(num)    => CType.toCValue(JNum(BigDecimal(num, MathContext.UNLIMITED))).get
           case PushTrue        => CBoolean(true)
           case PushFalse       => CBoolean(false)
           case PushNull        => CNull
