@@ -77,6 +77,7 @@ object VCache {
         (vc ≟ expect).fold(
           {
             vc.foldMap(c =>
+              // Only delete files that differ from the replacement view cache
               deleteFiles(
                 ((c.dataFile ≠ v.dataFile) ?? List(c.dataFile)) :::
                 ((c.tmpDataFile ≠ v.tmpDataFile) ?? c.tmpDataFile.toList))) >>
