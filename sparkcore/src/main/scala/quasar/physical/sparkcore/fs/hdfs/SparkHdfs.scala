@@ -205,7 +205,7 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   private def initSC: HdfsConfig => DefErrT[Task, SparkContext] = (config: HdfsConfig) => EitherT(Task.delay {
     // look, I didn't make Spark the way it is...
-    java.lang.Thread.currentThread().setContextClassLoader(null)
+    java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
 
     new SparkContext(config.sparkConf).right[DefinitionError]
   }.handleWith {

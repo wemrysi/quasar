@@ -17,10 +17,11 @@
 package quasar
 
 import slamdata.Predef._
+import quasar.contrib.scalaz._
 import quasar.contrib.pathy._
 import quasar.fs._
 import quasar.fs.mount.{BackendDef, ConnectionUri, MountConfig}
-import quasar.main.{ClassName, ClassPath, FsLoadCfg}
+import quasar.main.{ClassName, ClassPath, BackendConfig}
 
 import pathy.Path._
 import knobs.{Required, Optional, FileResource}
@@ -183,25 +184,30 @@ object TestConfig {
         fail[ADir](s"Test data dir must be an absolute dir, got: $s").liftM[OptionT])
     } getOrElse DefaultTestPrefix
 
-  val testFsLoadCfg: Task[FsLoadCfg] = {
+  val testBackendConfig: Task[BackendConfig] = {
     val confStrM =
       Task.delay(java.lang.System.getProperty("slamdata.internal.fs-load-cfg", ""))
 
-    confStrM map { confStr =>
+    confStrM flatMap { confStr =>
       import java.io.File
 
-      val backends = confStr.split(";").toList map { backend =>
+      val backendsM = IList(confStr.split(";"): _*) traverse { backend =>
         val List(name, classpath) = backend.split("=").toList
 
-        val apaths = classpath.split(":").toList flatMap { path =>
-          val file = new File(path)
-          ADir.fromFile(file).orElse(AFile.fromFile(file)).toList
-        }
+        for {
+          unflattened <- IList(classpath.split(":"): _*) traverse { path =>
+            val file = new File(path)
+            val results =
+              ADir.fromFile(file).covary[APath].orElse(AFile.fromFile(file).covary[APath])
 
-        ClassName(name) -> ClassPath(IList.fromList(apaths))
+            results.toListT.run.map(IList.fromList(_))
+          }
+
+          apaths = unflattened.flatten
+        } yield ClassName(name) -> ClassPath(apaths)
       }
 
-      FsLoadCfg.ExplodedDirs(IList.fromList(backends))
+      backendsM.map(BackendConfig.ExplodedDirs(_))
     }
   }
 

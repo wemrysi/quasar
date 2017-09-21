@@ -60,22 +60,30 @@ class ServiceSpec extends quasar.Qspec {
       _          <- schema.updateToLatest.transact(transactor).liftM[MainErrT]
       _          <- metastoreInit.transact(transactor).liftM[MainErrT]
       metaRef    <- TaskRef(metastore).liftM[MainErrT]
-      quasarFs   <- Quasar.initWithMeta(FsLoadCfg.Empty, metaRef, _ => ().point[MainTask])
+      quasarFs   <- Quasar.initWithMeta(BackendConfig.Empty, metaRef, _ => ().point[MainTask])
       shutdown   <- Server.startServer(quasarFs.interp, port, Nil, None, _ => ().point[MainTask]).liftM[MainErrT]
       r          <- f(uri).onFinish(κ(shutdown.onFinish(κ(quasarFs.shutdown)))).liftM[MainErrT]
     } yield r).run.unsafePerformSync
   }
 
-  val fileSystemConfigs =
-    TestConfig.backendRefs
+  /*
+   * TODO collapse this a bit
+   *
+   * This code dates back to a time when we tested everything in the
+   * filesystem config.  Now, we just test against mimir (here).  This
+   * code should be collapsed and inlined, and the tests re-specialized
+   * to a single backend (mimir).  I'm just in a hurry right now...
+   */
+  val fileSystemConfigs: Map[APath, MountConfig.FileSystemConfig] =
+    List(TestConfig.MIMIR)
       .traverse { ref =>
         val connectionUri = TestConfig.loadConnectionUri(ref.ref)
-        connectionUri.map(MountConfig.fileSystemConfig(ref.fsType, _)).run
+        connectionUri.map(MountConfig.FileSystemConfig(ref.fsType, _)).run
       }.map(_
         .unite
         .zipWithIndex
         .map { case (c, i) => (rootDir </> dir("data") </> dir(i.toString)) -> c }
-        .toMap[APath, MountConfig])
+        .toMap[APath, MountConfig.FileSystemConfig])
       .unsafePerformSync
 
   def withFileSystemConfigs[A](result: => MatchResult[A]): Result =
@@ -84,6 +92,29 @@ class ServiceSpec extends quasar.Qspec {
       AsResult(result))
 
   "/mount/fs" should {
+
+    "mount filesystem" in withFileSystemConfigs {
+      val port = Http4sUtils.anyAvailablePort.unsafePerformSync
+
+      val r  = withServer(port) { baseUri: Uri =>
+        fileSystemConfigs.toList.traverse { case (f,c) =>
+          client.fetch(
+            Request(
+                uri = baseUri / "mount" / "fs",
+                method = Method.POST,
+                headers = Headers(Header("X-File-Name", c.typ.value + "/")))
+              .withBody(s"""{ "${c.typ.value}": { "connectionUri" : "${c.uri.value}" } }""")
+            )(Task.now) *>
+          client.fetch(
+            Request(
+              uri = baseUri / "mount" / "fs" / c.typ.value / "",
+              method = Method.GET)
+            )(Task.now)
+        }
+      }
+
+      r.map(_.forall(_.status == Ok)) must beRightDisjunction(true)
+    }
 
     "POST view" in {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync
@@ -153,7 +184,7 @@ class ServiceSpec extends quasar.Qspec {
       }
 
       r ==== finalCfg.asJson.right
-    }.flakyTest   // FIXME this test is actually non-deterministic depending on server scheduling
+    }.flakyTest("this test is actually non-deterministic depending on server scheduling")
 
     "MOVE view" in {
       val port = Http4sUtils.anyAvailablePort.unsafePerformSync

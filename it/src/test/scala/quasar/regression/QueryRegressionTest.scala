@@ -386,7 +386,7 @@ object QueryRegressionTest {
 
   val externalFS: Task[IList[SupportedFs[BackendEffectIO]]] =
     for {
-      loadConfig <- TestConfig.testFsLoadCfg
+      loadConfig <- TestConfig.testBackendConfig
       mounts <- physicalFileSystems(loadConfig)
       uts    <- (Functor[Task] compose Functor[IList]).map(FileSystemTest.externalFsUT(mounts))(_.liftIO)
       mntDir =  rootDir </> dir("hfs-mnt")

@@ -24,7 +24,7 @@ import quasar.contrib.scalaz.disjunction._
 import quasar.effect.Timing
 import quasar.fp._, numeric._
 import quasar.fs._
-import quasar.fs.cache.VCache
+import quasar.fs.mount.cache.VCache
 
 import java.nio.charset.StandardCharsets
 import java.time.Duration

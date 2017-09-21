@@ -24,9 +24,9 @@ import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fp._
 import quasar.fp.free, free._
 import quasar.fs._, InMemory._
-import quasar.fs.cache.VCache
 import quasar.fs.mount._
 import quasar.fs.mount.Fixture._
+import quasar.fs.mount.cache.VCache
 import quasar.sql._
 import quasar.sql.Arbitraries._
 

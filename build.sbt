@@ -82,8 +82,10 @@ lazy val backendRewrittenRunSettings = Seq(
     val parentCp = (fullClasspath in connector in Compile).value.files
     val backends = isolatedBackends.value map {
       case (name, childCp) =>
-        val cpStr = createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(",")
-        "--backend:" + name + "=" + cpStr
+        val classpathStr =
+          createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(",")
+
+        "--backend:" + name + "=" + classpathStr
     }
 
     // the leading string is significant here!  #sbtwtfbarbecue
@@ -490,10 +492,11 @@ lazy val web = project
 /** Integration tests that have some dependency on a running connector.
   */
 lazy val it = project
+  .settings(name := "quasar-it-internal")
   .configs(ExclusiveTests)
   .dependsOn(web % BothScopes, core % BothScopes)
   .settings(commonSettings)
-  .settings(noPublishSettings)
+  .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.it)
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
@@ -508,8 +511,10 @@ lazy val it = project
         val parentCp = (fullClasspath in connector in Compile).value.files
         val backends = isolatedBackends.value map {
           case (name, childCp) =>
-            val cpStr = createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(":")
-            name + "=" + cpStr
+            val classpathStr =
+              createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(":")
+
+            name + "=" + classpathStr
         }
 
         // we aren't forking tests, so we just set the property in the current JVM

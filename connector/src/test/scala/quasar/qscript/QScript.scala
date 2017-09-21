@@ -730,6 +730,52 @@ class QScriptSpec
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
+    "convert a sort of a single value unary reduction" in {
+      val lp = fullCompileExp(sqlE"select count(*) as cnt from zips order by cnt")
+      val qs = convert(lc.some, lp)
+
+      qs must beSome(beTreeEqual(chain(
+        ReadR(rootDir </> file("zips")),
+        QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)),
+        QC.inj(Reduce((),
+          Nil,
+          List(ReduceFuncs.Count[FreeMap](HoleF)),
+          ConcatArraysR(
+            MakeArrayR(MakeMapR(StrLit("cnt"), ReduceIndexF(0.right))),
+            MakeArrayR(ReduceIndexF(0.right))))),
+        QC.inj(Sort((),
+          Nil,
+          (ProjectIndexR(HoleF, IntLit(1)), SortDir.asc).wrapNel)),
+        QC.inj(Map((), ProjectIndexR(HoleF, IntLit(0)))))(
+        implicitly, Corecursive[Fix[QS], QS])))
+    }
+
+    "convert a sort of a single value binary reduction" in {
+      val lp = fullCompileExp(sqlE"select {y : z ...} as x from zips order by x")
+      val qs = convert(lc.some, lp)
+
+      qs must beSome(beTreeEqual(chain(
+        ReadR(rootDir </> file("zips")),
+        QC.inj(LeftShift((), HoleF, IncludeId, RightSideF)),
+        QC.inj(Reduce((),
+          Nil,
+          List(ReduceFuncs.UnshiftMap[FreeMap](
+            ProjectIndexR(HoleF, IntLit(1)),
+            ProjectIndexR(
+              ConcatArraysR(
+                MakeArrayR(ProjectIndexR(HoleF, IntLit(0))),
+                MakeArrayR(ProjectIndexR(HoleF, IntLit(1)))),
+              IntLit(2)))),
+          ConcatArraysR(
+            MakeArrayR(MakeMapR(StrLit("x"), ReduceIndexF(0.right))),
+            MakeArrayR(ReduceIndexF(0.right))))),
+        QC.inj(Sort((),
+          Nil,
+          (ProjectIndexR(HoleF, IntLit(1)), SortDir.asc).wrapNel)),
+        QC.inj(Map((), ProjectIndexR(HoleF, IntLit(0)))))(
+        implicitly, Corecursive[Fix[QS], QS])))
+    }
+
     "convert a non-static array projection" in {
       val lp = fullCompileExp(sqlE"select (loc || [7, 8])[0] from zips")
       val qs = convert(lc.some, lp)

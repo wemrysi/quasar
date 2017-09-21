@@ -100,11 +100,9 @@ object SparkLocal extends SparkCore with ChrootedInterpreter {
     def error(msg: String): DefErrT[Task, LocalConfig] =
       EitherT(NonEmptyList(msg).left[EnvironmentError].left[LocalConfig].point[Task])
 
-    @SuppressWarnings(Array("org.wartremover.warts.Null"))
     def forge(master: String, rootPath: String): DefErrT[Task, LocalConfig] =
       posixCodec.parseAbsDir(rootPath).map(unsafeSandboxAbs _).cata(
         (prefix: ADir) => {
-          java.lang.Thread.currentThread().setContextClassLoader(null)
           val sc = new SparkConf().setMaster(master).setAppName("quasar")
           LocalConfig(sc, prefix).point[DefErrT[Task, ?]]
         }, error(s"Could not extract a path from $rootPath"))
@@ -117,10 +115,9 @@ object SparkLocal extends SparkCore with ChrootedInterpreter {
     })
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def generateSC: LocalConfig => DefErrT[Task, SparkContext] = (config: LocalConfig) => EitherT(Task.delay {
     // look, I didn't make Spark the way it is...
-    java.lang.Thread.currentThread().setContextClassLoader(null)
+    java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
 
     new SparkContext(config.sparkConf).right[DefinitionError]
   }.handleWith {

@@ -22,8 +22,8 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.fp._
 import quasar.fp.free._
-import quasar.fs.cache.VCache
 import quasar.fs.mount._, BackendDef.DefinitionResult, Fixture._
+import quasar.fs.mount.cache.VCache
 import quasar.effect._
 import quasar.main.{physicalFileSystems, FsAsk, KvsMounter, HierarchicalFsEffM, PhysFsEff, PhysFsEffM}
 import quasar.physical._
@@ -141,7 +141,7 @@ object FileSystemTest {
 
   def allFsUT: Task[IList[SupportedFs[BackendEffect]]] = {
     for {
-      loadConfig <- TestConfig.testFsLoadCfg
+      loadConfig <- TestConfig.testBackendConfig
       mounts <- physicalFileSystems(loadConfig)
       loc <- localFsUT(mounts)
       ext <- externalFsUT(mounts)
@@ -187,7 +187,7 @@ object FileSystemTest {
         val toPhysFs = KvsMounter.interpreter[Task, Coproduct[FsAsk, PhysFsEff, ?]](
           KeyValueStore.impl.fromTaskRef(cfgsRef), hfsRef, mntdRef)
 
-        foldMapNT(FsAsk.runToF[Task](mounts) :+: reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
+        foldMapNT(Read.constant[Task, BackendDef[PhysFsEffM]](mounts) :+: reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
           .compose(toPhysFs)
       }
 

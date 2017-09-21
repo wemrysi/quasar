@@ -28,9 +28,9 @@ import quasar.fs.mount._, BackendDef._
 import quasar.effect._
 import quasar.qscript.{Read => _, _}
 
+import java.lang.Thread
 import scala.Predef.implicitly
 
-import java.lang.Thread
 import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
 import pathy.Path._
@@ -94,15 +94,25 @@ trait SparkCore extends BackendModule {
 
   type LowerLevel[A] = Coproduct[Task, PhysErr, A]
 
+  /*
+   * The classloader stuff is a bit tricky here.  Basically, Spark and Hadoop
+   * are circumventing the classloader hierarchy by reading the context classloader.
+   * This is rather annoying, but there's not a lot we can do about it.  The
+   * context classloader is stored in a thread local, but since we're running on
+   * a pool, we don't really have tight control over which thread we're on.  So
+   * we have to constantly and aggressively re-set the context classloader.  This
+   * is also done prior to generating the SparkContext in the derived connectors.
+   */
   @SuppressWarnings(Array("org.wartremover.warts.Equals", "org.wartremover.warts.Null"))
   private val overrideContextCL = {
     for {
       thread <- Task.delay(Thread.currentThread())
+      tcl <- Task.delay(getClass.getClassLoader)
       ccl <- Task.delay(thread.getContextClassLoader())
-      _ <- if (ccl eq null)
+      _ <- if (ccl eq tcl)
         Task.now(())
       else
-        Task.delay(thread.setContextClassLoader(null))    // force spark to use its own classloader
+        Task.delay(thread.setContextClassLoader(tcl))    // force spark to use its own classloader
     } yield ()
   }
 

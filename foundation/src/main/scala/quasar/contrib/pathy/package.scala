@@ -26,6 +26,7 @@ import argonaut._
 import _root_.pathy.Path, Path._
 import _root_.pathy.argonaut._
 import _root_.scalaz._, Scalaz._
+import _root_.scalaz.concurrent.Task
 
 package object pathy {
   type AbsPath[T] = Path[Abs,T,Sandboxed]
@@ -52,20 +53,26 @@ package object pathy {
 
   object ADir {
 
-    // performs some effects; I'm probably going to regret this...
-    def fromFile(file: JFile): Option[ADir] = {
-      val check = file.exists() && file.isDirectory()
-      // trailing '/' is significant!  yay, pathy...
-      posixCodec.parseAbsDir(file.getAbsolutePath + "/").map(unsafeSandboxAbs).filter(_ => check)
+    def fromFile(file: JFile): OptionT[Task, ADir] = {
+      val back = Task delay {
+        val check = file.exists() && file.isDirectory()
+        // trailing '/' is significant!  yay, pathy...
+        posixCodec.parseAbsDir(file.getAbsolutePath + "/").map(unsafeSandboxAbs).filter(_ => check)
+      }
+
+      OptionT(back)
     }
   }
 
   object AFile {
 
-    // performs some effects; I'm probably going to regret this...
-    def fromFile(file: JFile): Option[AFile] = {
-      val check = file.exists() && file.isFile()
-      posixCodec.parseAbsFile(file.getAbsolutePath).map(unsafeSandboxAbs).filter(_ => check)
+    def fromFile(file: JFile): OptionT[Task, AFile] = {
+      val back = Task delay {
+        val check = file.exists() && file.isFile()
+        posixCodec.parseAbsFile(file.getAbsolutePath).map(unsafeSandboxAbs).filter(_ => check)
+      }
+
+      OptionT(back)
     }
   }
 

@@ -24,7 +24,7 @@ import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
 import quasar.fp._, free._
 import quasar.fs._, InMemory.InMemState
-import quasar.fs.cache.{VCache, ViewCache}
+import quasar.fs.mount.cache.{VCache, ViewCache}
 import quasar.frontend.logicalplan.{Free => _, free => _, _}
 import quasar.sql._, ExprArbitrary._
 import quasar.std._, IdentityLib.Squash, StdLib._, set._
@@ -390,7 +390,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     "move view cache" >> prop { (f1: AFile, f2: AFile) =>
       val expr = sqlB"α"
       val viewCache = ViewCache(
-        MountConfig.viewConfigUri(expr, Variables.empty), None, None, 0, None, None,
+        MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
         600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, f1, None)
 
       val vc = Map(f1 -> viewCache)
@@ -434,7 +434,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     "delete with view cache" >> prop { (p: AFile) =>
       val expr = sqlB"α"
       val viewCache = ViewCache(
-        MountConfig.viewConfigUri(expr, Variables.empty), None, None, 0, None, None,
+        MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
         600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, p, None)
 
       val vc = Map(p -> viewCache)
@@ -647,7 +647,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val fb = rootDir </> file("b")
       val viewCache =
         ViewCache(
-          MountConfig.viewConfigUri(sqlB"α", Variables.empty), None, None, 0, None, None,
+          MountConfig.ViewConfig(sqlB"α", Variables.empty), None, None, 0, None, None,
           4.seconds.toSeconds, nineteenSixty, ViewCache.Status.Successful, None, fb, None)
 
       resolvedRefsVC(Map.empty, Map(fa -> viewCache), lpf.read(fa)) must beRightDisjunction.like {
@@ -717,7 +717,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       val vcache = Map[AFile, ViewCache](
         (rootDir </> file("vcache")) -> ViewCache(
-          MountConfig.viewConfigUri(sqlB"α", Variables.empty), None, None, 0, None, None,
+          MountConfig.ViewConfig(sqlB"α", Variables.empty), None, None, 0, None, None,
           4.seconds.toSeconds, nineteenSixty, ViewCache.Status.Successful, None, dest, None))
 
       resolvedRefsVC(vs, vcache, lpf.read(rootDir </> file("view"))) must beRightDisjunction.like {

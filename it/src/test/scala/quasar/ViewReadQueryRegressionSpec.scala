@@ -21,8 +21,8 @@ import quasar.contrib.pathy.{ADir, APath}
 import quasar.effect._
 import quasar.fp._ , free._
 import quasar.fs.{Empty, PhysicalError, ReadFile}
-import quasar.fs.cache.VCache
 import quasar.fs.mount._, BackendDef.DefinitionResult, Fixture._
+import quasar.fs.mount.cache.VCache
 import quasar.main._
 import quasar.regression._
 import quasar.sql.{ScopedExpr, Sql}
@@ -49,13 +49,13 @@ class ViewReadQueryRegressionSpec
       TaskRef(Map[APath, MountConfig](path -> MountConfig.viewConfig(ScopedExpr(expr, Nil), vars))) |@|
       TaskRef(Empty.backendEffect[HierarchicalFsEffM]) |@|
       TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]) |@|
-      physicalFileSystems(FsLoadCfg.Empty)   // test views just against mimir
+      physicalFileSystems(BackendConfig.Empty)   // test views just against mimir
     ) { (cfgsRef, hfsRef, mntdRef, mounts) =>
       val mnt =
         KvsMounter.interpreter[Task, FsAskPhysFsEff](
           KeyValueStore.impl.fromTaskRef(cfgsRef), hfsRef, mntdRef)
 
-      foldMapNT(FsAsk.runToF[Task](mounts) :+: reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
+      foldMapNT(Read.constant[Task, BackendDef[PhysFsEffM]](mounts) :+: reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
         .compose(mnt)
     }
 

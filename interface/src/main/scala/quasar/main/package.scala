@@ -28,11 +28,11 @@ import quasar.db._
 import quasar.fp._, ski._
 import quasar.fp.free._
 import quasar.fs._
-import quasar.fs.cache.VCache
 import quasar.fs.mount._
+import quasar.fs.mount.cache.VCache
 import quasar.fs.mount.hierarchical._
 import quasar.fs.mount.module.Module
-import quasar.physical._ // , couchbase.Couchbase
+import quasar.physical._
 import quasar.main.config.loadConfigFile
 import quasar.metastore._
 
@@ -60,36 +60,6 @@ package object main extends Logging {
   final case class ClassName(value: String) extends AnyVal
   final case class ClassPath(value: IList[APath]) extends AnyVal
 
-  sealed trait FsLoadCfg extends Product with Serializable
-
-  /**
-   * APaths relative to real filesystem root
-   */
-  object FsLoadCfg {
-
-    /**
-     * This should only be used for testing purposes.  It represents a
-     * configuration in which no backends will be loaded at all.
-     */
-    val Empty: FsLoadCfg = ExplodedDirs(IList.empty)
-
-    /**
-     * A single directory containing jars, each of which will be
-     * loaded as a backend.  With each jar, the `BackendModule` class
-     * name will be determined from the `Manifest.mf` file.
-     */
-    final case class JarDirectory(dir: ADir) extends FsLoadCfg
-
-    /**
-     * Any files in the classpath will be loaded as jars; any directories
-     * will be assumed to contain class files (e.g. the target output of
-     * SBT compile).  The class name should be the fully qualified Java
-     * class name of the `BackendModule` implemented as a Scala object.
-     * In most cases, this means the class name here will end with a `$`
-     */
-    final case class ExplodedDirs(backends: IList[(ClassName, ClassPath)]) extends FsLoadCfg
-  }
-
   // all of the backends which are included in the core distribution
   private val CoreFS = IList(
     // Couchbase.definition translate injectFT[Task, PhysFsEff],
@@ -108,10 +78,10 @@ package object main extends Logging {
    * is really best if you only sequence this task ''once'' per runtime.
    * It won't misbehave, but it will waste resources if you run it multiple
    * times.  Thus, all uses of the value from this Task should be handled
-   * by `FsAsk` (or an analogous `Kleisli`).
+   * by `Read[BackendDef[PhysFsEffM], ?]` (or an analogous `Kleisli`).
    */
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf", "org.wartremover.warts.Null"))
-  def physicalFileSystems(config: FsLoadCfg): Task[BackendDef[PhysFsEffM]] = {
+  def physicalFileSystems(config: BackendConfig): Task[BackendDef[PhysFsEffM]] = {
     import java.io.File
     import java.lang.{
       ClassCastException,
@@ -124,19 +94,19 @@ package object main extends Logging {
     }
     import java.net.URLClassLoader
 
-    import FsLoadCfg._
+    import BackendConfig._
 
     // this is a side-effect in the same way that `new` is a side-effect
     val ParentCL = this.getClass.getClassLoader
 
-    def loadBackend(cn: String, cl: ClassLoader): OptionT[Task, BackendDef[Task]] = {
+    def loadBackend(classname: String, classloader: ClassLoader): OptionT[Task, BackendDef[Task]] = {
       for {
         clazz <- OptionT(Task delay {
           try {
-            Some(cl.loadClass(cn))
+            Some(classloader.loadClass(classname))
           } catch {
             case cnf: ClassNotFoundException =>
-              log.warn(s"could not locate class for backend module '$cn'", cnf)
+              log.warn(s"could not locate class for backend module '$classname'", cnf)
 
               None
           }
@@ -147,17 +117,17 @@ package object main extends Logging {
             Some(clazz.getDeclaredField("MODULE$").get(null).asInstanceOf[BackendModule])
           } catch {
             case e @ (_: NoSuchFieldException | _: IllegalAccessException | _: IllegalArgumentException | _: NullPointerException) =>
-              log.warn(s"backend module '$cn' does not appear to be a singleton object", e)
+              log.warn(s"backend module '$classname' does not appear to be a singleton object", e)
 
               None
 
             case e: ExceptionInInitializerError =>
-              log.warn(s"backend module '$cn' failed to load with exception", e)
+              log.warn(s"backend module '$classname' failed to load with exception", e)
 
               None
 
             case _: ClassCastException =>
-              log.warn(s"backend module '$cn' is not actually a subtype of BackendModule")
+              log.warn(s"backend module '$classname' is not actually a subtype of BackendModule")
 
               None
           }
@@ -222,17 +192,7 @@ package object main extends Logging {
     isolatedFS.map(_.translate(injectFT[Task, PhysFsEff])).map(IList(_, CoreFS).fold)
   }
 
-  sealed trait FsAsk[A]
-
-  object FsAsk {
-    private case object Singleton extends FsAsk[BackendDef[PhysFsEffM]]
-
-    def runToF[F[_]: Applicative](mounts: BackendDef[PhysFsEffM]): FsAsk ~> F =
-      λ[FsAsk ~> F] { case Singleton => mounts.point[F] }
-
-    def apply[S[_]](implicit S: FsAsk :<: S): Free[S, BackendDef[PhysFsEffM]] =
-      Free.liftF[S, BackendDef[PhysFsEffM]](S.inj(Singleton))
-  }
+  type FsAsk[A] = Read[BackendDef[PhysFsEffM], A]
 
   /** A "terminal" effect, encompassing failures and other effects which
     * we may want to interpret using more than one implementation.
@@ -431,7 +391,7 @@ package object main extends Logging {
     * filesystem whenever a mount is added or removed.
     */
   def mountHandler[S[_]](implicit S: FsAsk :<: S): Free[S, MountRequestHandler[PhysFsEffM, HierarchicalFsEff]] = {
-    FsAsk[S] map { physicalFileSystems =>
+    Read.Ops[BackendDef[PhysFsEffM], S].ask map { physicalFileSystems =>
       MountRequestHandler[PhysFsEffM, HierarchicalFsEff](
         physicalFileSystems translate flatMapSNT(
           PhysFsEff.reifyNonFatalErrors[PhysFsEff] :+: injectFT[PhysErr, PhysFsEff]))
@@ -566,7 +526,7 @@ package object main extends Logging {
     }
   }
 
-  final case class CmdLineConfig(configPath: Option[FsFile], loadConfig: FsLoadCfg, cmd: Cmd)
+  final case class CmdLineConfig(configPath: Option[FsFile], loadConfig: BackendConfig, cmd: Cmd)
 
   /** Either initialize the metastore or execute the start depending
     * on what command is provided by the user in the command line arguments
