@@ -11,6 +11,8 @@ services:
 # needed by the  postgreql container
 before_install:
   - sudo /etc/init.d/postgresql stop
+  - sudo /etc/init.d/mysql stop
+  - sudo service memcached stop
 
 # create all the docker containers we need for IT testing per matrix build
 install:
@@ -74,8 +76,8 @@ env:
     - CONNECTOR=mongodb_3_2
     - CONNECTOR=mongodb_3_4
     - CONNECTOR=mongodb_read_only
-    - CONNECTOR=spark_local_test
-    - CONNECTOR=spark_hdfs
+    # - CONNECTOR=spark_local_test
+    # - CONNECTOR=spark_hdfs
   # - CONNECTOR=spark_cassandra
   # - CONNECTOR=spark_elasticsearch
   # - CONNECTOR=spark_ftp

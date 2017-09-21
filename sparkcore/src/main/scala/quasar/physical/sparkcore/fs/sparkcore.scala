@@ -28,6 +28,7 @@ import quasar.fs.mount._, BackendDef._
 import quasar.effect._
 import quasar.qscript.{Read => _, _}
 
+import java.lang.Thread
 import scala.Predef.implicitly
 
 import org.apache.spark.rdd.RDD
@@ -92,10 +93,33 @@ trait SparkCore extends BackendModule {
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]
 
   type LowerLevel[A] = Coproduct[Task, PhysErr, A]
+
+  /*
+   * The classloader stuff is a bit tricky here.  Basically, Spark and Hadoop
+   * are circumventing the classloader hierarchy by reading the context classloader.
+   * This is rather annoying, but there's not a lot we can do about it.  The
+   * context classloader is stored in a thread local, but since we're running on
+   * a pool, we don't really have tight control over which thread we're on.  So
+   * we have to constantly and aggressively re-set the context classloader.  This
+   * is also done prior to generating the SparkContext in the derived connectors.
+   */
+  @SuppressWarnings(Array("org.wartremover.warts.Equals", "org.wartremover.warts.Null"))
+  private val overrideContextCL = {
+    for {
+      thread <- Task.delay(Thread.currentThread())
+      tcl <- Task.delay(getClass.getClassLoader)
+      ccl <- Task.delay(thread.getContextClassLoader())
+      _ <- if (ccl eq tcl)
+        Task.now(())
+      else
+        Task.delay(thread.setContextClassLoader(tcl))    // force spark to use its own classloader
+    } yield ()
+  }
+
   def lowerToTask: LowerLevel ~> Task = λ[LowerLevel ~> Task](_.fold(
     injectNT[Task, Task],
     Failure.mapError[PhysicalError, Exception](_.cause) andThen Failure.toCatchable[Task, Exception]
-  ))
+  )).andThen(λ[Task ~> Task](overrideContextCL >> _))
 
   def toTask(sc: SparkContext, config: Config): Task[M ~> Task] =
     toLowerLevel[LowerLevel](sc, config).map(_ andThen foldMapNT(lowerToTask))
@@ -124,7 +148,7 @@ trait SparkCore extends BackendModule {
     def open(f: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = for {
       h <- readfile.open[Eff](f, offset, limit).liftB.unattempt
     } yield ReadHandle(f, h.id)
-    
+
     def read(h: ReadHandle): Backend[Vector[Data]] =
       readfile.read[Eff](h).liftB.unattempt
 
@@ -183,7 +207,7 @@ trait SparkCore extends BackendModule {
   }
 
   def QueryFileModule: QueryFileModule = SparkQueryFileModule
-  
+
   abstract class SparkCoreManageFileModule extends ManageFileModule {
     import ManageFile._, ManageFile.MoveScenario._
     import quasar.fs.impl.ensureMoveSemantics

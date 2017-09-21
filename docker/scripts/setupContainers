@@ -20,6 +20,7 @@ init_metastore() {
   # a restart of the container is needed here due to
   # http://askubuntu.com/questions/308054/how-to-create-s-pgsql-5432
   echo "configuring metastore..."
+  docker exec quasar_metastore bash -c 'head -n -1 /var/lib/postgresql/data/pg_hba.conf > /tmp/pg_hba.tmp; echo "host    all    all    0.0.0.0/0    trust" >> /tmp/pg_hba.tmp; mv /tmp/pg_hba.tmp /var/lib/postgresql/data/pg_hba.conf'
   docker restart quasar_metastore
   docker cp $SCRIPTS_DIR/initPostgresql quasar_metastore:/tmp/initPostgresql
   docker exec quasar_metastore /tmp/initPostgresql metastore

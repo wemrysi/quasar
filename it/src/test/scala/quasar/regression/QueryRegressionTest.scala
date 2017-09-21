@@ -29,7 +29,7 @@ import quasar.contrib.pathy._
 import quasar.fp._, free._
 import quasar.fp.ski._
 import quasar.fs._
-import quasar.main.FilesystemQueries
+import quasar.main.{physicalFileSystems, FilesystemQueries}
 import quasar.fs.mount.{Mounts, hierarchical}
 import quasar.sql, sql.{Query, Sql}
 
@@ -386,7 +386,9 @@ object QueryRegressionTest {
 
   val externalFS: Task[IList[SupportedFs[BackendEffectIO]]] =
     for {
-      uts    <- (Functor[Task] compose Functor[IList]).map(FileSystemTest.externalFsUT)(_.liftIO)
+      loadConfig <- TestConfig.testBackendConfig
+      mounts <- physicalFileSystems(loadConfig)
+      uts    <- (Functor[Task] compose Functor[IList]).map(FileSystemTest.externalFsUT(mounts))(_.liftIO)
       mntDir =  rootDir </> dir("hfs-mnt")
       hfsUts <- uts.traverse(sb => sb.impl.map(ut =>
                   hierarchicalFSIO(mntDir, ut.testInterp).map { f: BackendEffectIO ~> Task =>

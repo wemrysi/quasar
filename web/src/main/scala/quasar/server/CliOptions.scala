@@ -20,24 +20,33 @@ import slamdata.Predef._
 import quasar.build.BuildInfo
 import quasar.cli.Cmd, Cmd._
 
+import java.io.File
+import scala.collection.Seq     // uh, yeah
+import scala.util.{Left, Right}
+
 import monocle.Lens
 import monocle.macros.Lenses
+import scalaz.{\/-, -\/, \/}
+import scalaz.std.either._
+import scalaz.std.list._
+import scalaz.syntax.traverse._
 import scopt.OptionParser
 
 /** Command-line options supported by Quasar. */
 @Lenses
 final case class CliOptions(
-  cmd: Cmd,
-  config: Option[String],
-  contentLoc: Option[String],
-  contentPath: Option[String],
-  contentPathRelative: Boolean,
-  openClient: Boolean,
-  port: Option[Int])
+    cmd: Cmd,
+    config: Option[String],
+    loadConfig: File \/ List[(String, Seq[File])],
+    contentLoc: Option[String],
+    contentPath: Option[String],
+    contentPathRelative: Boolean,
+    openClient: Boolean,
+    port: Option[Int])
 
 object CliOptions {
   val default: CliOptions =
-    CliOptions(Cmd.Start, None, None, None, false, false, None)
+    CliOptions(Cmd.Start, None, \/-(Nil), None, None, false, false, None)
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val parser = new CliOptionsParser(Lens.id[CliOptions], "quasar") {
@@ -53,11 +62,36 @@ object CliOptions {
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   class CliOptionsParser[C](l: Lens[C, CliOptions], cmdName: String)
-    extends OptionParser[C](cmdName) {
+      extends OptionParser[C](cmdName) {
 
     opt[String]('c', "config") action { (x, c) =>
       (l composeLens config).set(Some(x))(c)
     } text("path to the config file to use")
+
+    opt[File]('p', "plugins") validate { x =>
+      if (!x.exists()) {
+        Left(s"plugin directory $x does not exist")
+      } else {
+        if (!x.isDirectory())
+          Left(s"plugin directory $x exists but is not a directory")
+        else
+          Right(())
+      }
+    } action { (x, c) =>
+      (l composeLens loadConfig).set(-\/(x))(c)
+    } text("path to the plugins directory containing JAR files which will be loaded as backends")
+
+    // we hide this one because it's only intended for local development
+    opt[(String, Seq[File])]("backend").hidden.unbounded validate { x =>
+      x._2.toList traverse { file =>
+        if (file.exists())
+          Right(())
+        else
+          Left(s"backend classpath entry $file does not exist")
+      } void
+    } action { (x, c) =>
+      (l composeLens loadConfig).modify(old => old.fold(p => -\/(p), bs => \/-(x :: bs)))(c)
+    }
 
     opt[String]('L', "content-location") action { (x, c) =>
       (l composeLens contentLoc).set(Some(x))(c)

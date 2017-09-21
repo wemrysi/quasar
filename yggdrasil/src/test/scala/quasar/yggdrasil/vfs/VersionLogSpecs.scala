@@ -277,11 +277,13 @@ object VersionLogSpecs extends Specification {
             }
         }
 
-        _ <- HWT.pattern[Unit] {
+        _ <- HWT.pattern[Boolean] {
           case CPL(LinkDir(from, to)) =>
             Task delay {
               from mustEqual (BaseDir </> Path.dir(v.value.toString))
               to mustEqual (BaseDir </> Path.dir("HEAD"))
+
+              true
             }
         }
       } yield ()

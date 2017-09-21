@@ -22,6 +22,8 @@ import quasar.api.{redirectService, staticFileService, ResponseOr, ResponseT}
 import quasar.cli.Cmd
 import quasar.config._
 import quasar.console.{logErrors, stdout}
+import quasar.contrib.pathy.ADir
+import quasar.contrib.scalaz._
 import quasar.contrib.scopt._
 import quasar.db.DbConnectionConfig
 import quasar.fp._
@@ -39,13 +41,15 @@ import scalaz.concurrent.Task
 object Server {
 
   final case class WebCmdLineConfig(
-    cmd: Cmd,
-    staticContent: List[StaticContent],
-    redirect: Option[String],
-    port: Option[Int],
-    configPath: Option[FsFile],
-    openClient: Boolean) {
-    def toCmdLineConfig: CmdLineConfig = CmdLineConfig(configPath, cmd)
+      cmd: Cmd,
+      staticContent: List[StaticContent],
+      redirect: Option[String],
+      port: Option[Int],
+      configPath: Option[FsFile],
+      loadConfig: BackendConfig,
+      openClient: Boolean) {
+
+    def toCmdLineConfig: CmdLineConfig = CmdLineConfig(configPath, loadConfig, cmd)
   }
 
   object WebCmdLineConfig {
@@ -53,14 +57,25 @@ object Server {
       CliOptions.parser.safeParse(args, CliOptions.default)
         .flatMap(fromCliOptions(_))
 
-    def fromCliOptions(opts: CliOptions): MainTask[WebCmdLineConfig] =
+    def fromCliOptions(opts: CliOptions): MainTask[WebCmdLineConfig] = {
+      import java.lang.RuntimeException
+
+      val loadConfigM: Task[BackendConfig] = opts.loadConfig.fold(
+        { plugins =>
+          val err = Task.fail(new RuntimeException("plugin directory does not exist (or is a file)"))
+          ADir.fromFile(plugins).getOrElseF(err).map(BackendConfig.JarDirectory(_))
+        },
+        backends => BackendConfig.fromBackends(IList.fromList(backends)))
+
       (StaticContent.fromCliOptions("/files", opts) ⊛
         opts.config.fold(none[FsFile].point[MainTask])(cfg =>
           FsPath.parseSystemFile(cfg)
             .toRight(s"Invalid path to config file: $cfg")
-            .map(some))) ((content, cfgPath) =>
+            .map(some)) ⊛
+        loadConfigM.liftM[MainErrT]) ((content, cfgPath, loadConfig) =>
         WebCmdLineConfig(
-          opts.cmd, content.toList, content.map(_.loc), opts.port, cfgPath, opts.openClient))
+          opts.cmd, content.toList, content.map(_.loc), opts.port, cfgPath, loadConfig, opts.openClient))
+    }
   }
 
   def nonApiService(
