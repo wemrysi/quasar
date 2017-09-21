@@ -18,7 +18,7 @@ fi
 if [[ "$TRAVIS" == "true"                                              &&
       ("$TRAVIS_BRANCH" == "master" || "$TRAVIS_BRANCH" == backport/*) &&
       "$TRAVIS_REPO_SLUG" == "quasar-analytics/quasar" ]] ; then
-  "$SBT" 'set every sparkDependencyProvided := true' githubReleaseAll
+  "$SBT" 'project repl' githubRelease 'project web' githubRelease 'project sparkcore' 'set every sparkDependencyProvided := true' githubRelease
 else
   echo "GITHUB_TOKEN defined, but Travis not running in quasar-analytics/quasar branches master or backport/*, so skipping publish"
 fi
