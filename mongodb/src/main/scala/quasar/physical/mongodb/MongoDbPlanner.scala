@@ -208,9 +208,6 @@ object MongoDbPlanner {
       case Constant(v1) => ejsonToExpression[M, T[EJson]](v1)
       case Now() => execTime map ($literal(_))
 
-      // FIXME: Will only work for Arrays, not Strings
-      // case Length(a1) => $size(a1).point[M]
-      case Length(a1) => unimplemented[M, Fix[ExprOp]]("Length expression")
       case Date(a1) => unimplemented[M, Fix[ExprOp]]("Date expression")
       case Time(a1) => unimplemented[M, Fix[ExprOp]]("Time expression")
       case Timestamp(a1) => unimplemented[M, Fix[ExprOp]]("Timestamp expression")
@@ -236,6 +233,22 @@ object MongoDbPlanner {
       case ProjectField(a1, a2) => unimplemented[M, Fix[ExprOp]](s"ProjectField expression")
       case ProjectIndex(a1, a2)  => unimplemented[M, Fix[ExprOp]]("ProjectIndex expression")
       case DeleteField(a1, a2)  => unimplemented[M, Fix[ExprOp]]("DeleteField expression")
+
+      // NB: Quasar strings are arrays of characters. However, MongoDB
+      //     represent strings and arrays as distinct types. Moreoever, SQL^2
+      //     exposes two functions: `array_length` to obtain the length of an
+      //     array and `length` to obtain the length of a string. This
+      //     distinction, however, is lost when LP is translated into
+      //     QScript. There's only one `Length` MapFunc. The workaround here
+      //     detects calls to array_length or length indirectly through the
+      //     typechecks inserted around calls to `Length` or `ArrayLength` in
+      //     LP typechecks.
+
+      case Length(a1) => unimplemented[M, Fix[ExprOp]]("Length expression")
+      case Guard(expr, Type.Str, cont @ $strLenCP(_), fallback) =>
+        $cond(check.isString(expr), cont, fallback).point[M]
+      case Guard(expr, Type.FlexArr(_, _, _), $strLenCP(str), fallback) =>
+        $cond(check.isArray(expr), $size(str), fallback).point[M]
 
       // NB: This is maybe a NOP for Fix[ExprOp]s, as they (all?) safely
       //     short-circuit when given the wrong type. However, our guards may be
@@ -281,9 +294,9 @@ object MongoDbPlanner {
           }
         exprCheck(typ).fold(cont)(f => $cond(f(expr), cont, fallback)).point[M]
 
-      case Range(_, _)        => unimplemented[M, Fix[ExprOp]]("Range expression")
-      case Search(_, _, _)    => unimplemented[M, Fix[ExprOp]]("Search expression")
-      case Split(_, _)        => unimplemented[M, Fix[ExprOp]]("Split expression")
+      case Range(_, _)     => unimplemented[M, Fix[ExprOp]]("Range expression")
+      case Search(_, _, _) => unimplemented[M, Fix[ExprOp]]("Search expression")
+      case Split(_, _)     => unimplemented[M, Fix[ExprOp]]("Split expression")
     }
 
     val handleSpecialDerived: MapFuncDerived[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
@@ -614,10 +627,10 @@ object MongoDbPlanner {
     }
 
     val handleSpecialDerived: MapFuncDerived[T, JsCore] => M[JsCore] = {
-      case Abs(a1)       => unimplemented[M, JsCore]("Abs JS")
-      case Ceil(a1)      => unimplemented[M, JsCore]("Ceil JS")
-      case Floor(a1)     => unimplemented[M, JsCore]("Floor JS")
-      case Trunc(a1)     => unimplemented[M, JsCore]("Trunc JS")
+      case Abs(a1)   => unimplemented[M, JsCore]("Abs JS")
+      case Ceil(a1)  => unimplemented[M, JsCore]("Ceil JS")
+      case Floor(a1) => unimplemented[M, JsCore]("Floor JS")
+      case Trunc(a1) => unimplemented[M, JsCore]("Trunc JS")
     }
 
     val handleSpecial: MapFunc[T, JsCore] => M[JsCore] = {
