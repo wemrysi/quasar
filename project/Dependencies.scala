@@ -17,7 +17,7 @@ object Dependencies {
   private val monocleVersion      = "1.4.0"
   private val pathyVersion        = "0.2.11"
   private val raptureVersion      = "2.0.0-M9"
-  private val refinedVersion      = "0.8.2"
+  private val refinedVersion      = "0.8.3"
   private val scodecBitsVersion   = "1.1.2"
   private val http4sVersion       = "0.16.0a"
   private val scalacheckVersion   = "1.13.4"
