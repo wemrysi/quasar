@@ -1290,29 +1290,30 @@ object MongoDbPlanner {
     f
   }
 
-  def mapBeforeSort[T[_[_]]: BirecursiveT, F[_], G[_]: Functor]
-    (GtoF: PrismNT[G, F])
-    (implicit QC: QScriptCore[T, ?] :<: F)
-      : QScriptCore[T, T[G]] => F[T[G]] = {
-    case qs @ Map(Embed(src), fm) =>
-      GtoF.get(src) >>= QC.prj match {
-        case Some(Sort(innerSrc, bucket, order)) =>
-          val innerMap = GtoF.reverseGet(QC.inj(Map(innerSrc,
-	    // qscript <3 arrays
-            Free.roll(MFC(MF.ConcatArrays(
-              Free.roll(MFC(MF.MakeArray(fm))),
-              Free.roll(MFC(MF.MakeArray(HoleF[T]))))))))).embed
-          QC.inj(Map(
-            GtoF.reverseGet(QC.inj(Sort(innerMap,
-              bucket.map(_ >> Free.roll[MapFunc[T, ?], Hole](MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(1))))),
-              order.map {
-                case (fm, dir) =>
-                  (fm >> Free.roll[MapFunc[T, ?], Hole](MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(1)))), dir)
-              }))).embed,
-            Free.roll(MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(0))))))
-        case _ => QC.inj(qs)
+  def mapBeforeSort[T[_[_]]: BirecursiveT]: Trans[T] =
+    new Trans[T] {
+      def trans[F[_], G[_]: Functor]
+          (GtoF: PrismNT[G, F])
+          (implicit QC: QScriptCore[T, ?] :<: F) = {
+        case qs @ Map(Embed(src), fm) =>
+          GtoF.get(src) >>= QC.prj match {
+            case Some(Sort(innerSrc, bucket, order)) =>
+              val innerMap =
+                GtoF.reverseGet(QC.inj(Map(
+                  innerSrc,
+                  MapFuncCore.StaticArray(List(fm, HoleF[T]))))).embed
+              QC.inj(Map(
+                GtoF.reverseGet(QC.inj(Sort(innerMap,
+                  bucket.map(_ >> Free.roll[MapFunc[T, ?], Hole](MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(1))))),
+                  order.map {
+                    case (fm, dir) =>
+                      (fm >> Free.roll[MapFunc[T, ?], Hole](MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(1)))), dir)
+                  }))).embed,
+                Free.roll(MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(0))))))
+            case _ => QC.inj(qs)
+          }
+        case x => QC.inj(x)
       }
-    case x => QC.inj(x)
   }
 
   // TODO: Allow backends to provide a “Read” type to the typechecker, which
@@ -1395,13 +1396,7 @@ object MongoDbPlanner {
     val O = new Optimize[T]
 
     for {
-      rewrite <- applyAlgebra(qs)(new Alg[T] {
-        def alg[F[_], G[_]: Functor]
-          (GtoF: PrismNT[G, F])
-          (implicit QC: QScriptCore[T, ?] :<: F)
-            : QScriptCore[T, T[G]] => F[T[G]] =
-          mapBeforeSort[T, F, G](GtoF)
-      }).point[M]
+      rewrite <- applyTrans(qs)(mapBeforeSort[T]).point[M]
       optimized <- rewrite
         .transCata[T[fs.MongoQScript[T, ?]]](
           liftFF[QScriptCore[T, ?], fs.MongoQScript[T, ?], T[fs.MongoQScript[T, ?]]](
