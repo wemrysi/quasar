@@ -1,4 +1,3 @@
-import github.GithubPlugin._
 import quasar.project._
 
 import java.lang.{Integer, String, Throwable}
@@ -8,6 +7,8 @@ import scala.collection.immutable.Map
 
 import de.heikoseeberger.sbtheader.HeaderPlugin
 import de.heikoseeberger.sbtheader.license.Apache2_0
+import github.GithubPlugin._
+import org.kohsuke.github.GHRelease
 import sbt._, Aggregation.KeyValue, Keys._
 import sbt.std.Transform.DummyTaskMap
 import sbt.TestFrameworks.Specs2
@@ -176,6 +177,10 @@ lazy val publishTestsSettings = Seq(
   publishArtifact in (Test, packageBin) := true
 )
 
+lazy val githubReleaseAll = taskKey[Seq[GHRelease]]("Release all relevant projects to Github")
+
+githubReleaseAll in Global := Seq()
+
 lazy val githubReleaseSettings =
   githubSettings ++ Seq(
     GithubKeys.assets := Seq(assembly.value),
@@ -189,8 +194,8 @@ lazy val githubReleaseSettings =
       runTest,
       setReleaseVersion,
       commitReleaseVersion,
-      pushChanges)
-  )
+      pushChanges),
+    githubReleaseAll in Global += GithubKeys.githubRelease.value)
 
 def isolatedBackendSettings(classnames: String*) = Seq(
   isolatedBackends in Global ++=
