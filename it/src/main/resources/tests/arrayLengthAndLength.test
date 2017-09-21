@@ -2,6 +2,8 @@
     "name": "Retrieve array length and string length",
 
     "backends": {
+        "mimir": "pending",
+        "couchbase": "ignoreFieldOrder"
     },
 
     "data": "smallZips.data",
