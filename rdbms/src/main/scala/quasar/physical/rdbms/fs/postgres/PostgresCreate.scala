@@ -16,30 +16,29 @@
 
 package quasar.physical.rdbms.fs.postgres
 
-import quasar.physical.rdbms.fs.RdbmsCreateTable
+import quasar.physical.rdbms.fs.RdbmsCreate
 import quasar.physical.rdbms.common._
 import slamdata.Predef._
-
 import doobie.syntax.string._
 import doobie.free.connection.ConnectionIO
 import doobie.util.fragment.Fragment
+
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
 
-trait PostgresCreateJsonTable extends RdbmsCreateTable {
+trait PostgresCreate extends RdbmsCreate {
+
+  override def createSchema(schema: CustomSchema): ConnectionIO[Unit] = {
+    (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(schema.shows)).update.run.map(_ => ())
+  }
 
   override def createTable(tablePath: TablePath): ConnectionIO[Unit] = {
-
-    val createSchema: ConnectionIO[Unit] = tablePath.schema match {
+    val createSchemaQuery: ConnectionIO[Unit] = tablePath.schema match {
       case DefaultSchema => ().point[ConnectionIO]
-      case CustomSchema(name) => (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(name)).update.run.map(_ => ())
+      case c: CustomSchema => createSchema(c)
     }
 
-    createSchema
-      .flatMap(_ =>
-        (fr"CREATE TABLE IF NOT EXISTS"
-          ++ Fragment.const(tablePath.shows)
-          ++ fr"(data json NOT NULL)").update.run)
+    (createSchemaQuery *> (fr"CREATE TABLE IF NOT EXISTS" ++ Fragment.const(tablePath.shows) ++ fr"(data json NOT NULL)").update.run)
       .map(_ => ())
   }
 }

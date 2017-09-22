@@ -30,7 +30,7 @@ import scalaz.Monad
 import scalaz.syntax.monad._
 import scalaz.std.vector._
 
-trait RdbmsWriteFile extends RdbmsInsert with RdbmsDescribeTable with RdbmsCreateTable {
+trait RdbmsWriteFile extends RdbmsInsert with RdbmsDescribeTable with RdbmsCreate {
   this: Rdbms =>
 
   import WriteFile._
