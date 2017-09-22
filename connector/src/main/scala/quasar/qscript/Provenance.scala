@@ -52,7 +52,7 @@ object Provenance {
     import P.{flattenBoth, nubNadas}
 
     def bothEq(x: Provenance[T], y: Provenance[T]): Boolean =
-      (nubNadas <<< flattenBoth)(x) containsTheSameElementsAs (nubNadas <<< flattenBoth)(y)
+      (nubNadas <<< flattenBoth)(x) equalsAsSets (nubNadas <<< flattenBoth)(y)
 
     Equal.equal {
       case (Nada(),        Nada())        => true

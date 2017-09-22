@@ -341,7 +341,7 @@ private[quasar] sealed abstract class TypeFInstances {
       def apply[A](eql: Equal[A]): Equal[TypeF[J, A]] = {
         implicit val eqlA: Equal[A] = eql
         Equal.equal((x, y) => (x, y) match {
-          case (Unioned(xs), Unioned(ys)) => xs containsTheSameElementsAs ys
+          case (Unioned(xs), Unioned(ys)) => xs equalsAsSets ys
           case _                          => generic(x) ≟ generic(y)
         })
       }

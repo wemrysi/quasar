@@ -66,7 +66,7 @@ object EqMap extends EqMapInstances {
 sealed abstract class EqMapInstances {
   implicit def equal[A: Equal, B: Equal]: Equal[EqMap[A, B]] =
     Equal.equal { (x, y) =>
-      x.toList containsTheSameElementsAs y.toList
+      x.toList equalsAsSets y.toList
     }
 
   implicit def show[A: Show, B: Show]: Show[EqMap[A, B]] =
