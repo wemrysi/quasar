@@ -126,7 +126,7 @@ object Outline extends OutlineInstances {
     }
   }
 
-  // TODO: Is there a way to avoid this? EJson needs to be normalized before
+  // TODO: Is there a way to avoid this? Metadata must be elided prior to
   //       comparing for equality.
   implicit def freeEJsonEqual[A: Equal]: Equal[Free[EJson, A]] =
     new Equal[Free[EJson, A]] {
