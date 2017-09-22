@@ -20,16 +20,23 @@ import slamdata.Predef._
 import quasar.build.BuildInfo
 import quasar.cli.Cmd, Cmd._
 
+import java.io.File
+import scala.collection.Seq     // uh, yeah
+import scala.util.{Left, Right}
+
+import scalaz.std.either._
+import scalaz.std.list._
+import scalaz.syntax.traverse._
 import scopt.OptionParser
 
 /** Command-line options supported by the Quasar REPL. */
 final case class CliOptions(
-  cmd: Cmd,
-  config: Option[String])
+    cmd: Cmd,
+    config: Option[String],
+    backends: List[(String, Seq[File])])
 
 object CliOptions {
-  val default: CliOptions =
-    CliOptions(Start, None)
+  val default: CliOptions = CliOptions(Start, None, Nil)
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val parser: OptionParser[CliOptions] = new OptionParser[CliOptions]("quasar") {
@@ -38,6 +45,20 @@ object CliOptions {
     opt[String]('c', "config") action { (x, c) =>
       c.copy(config = Some(x))
     } text("path to the config file to use")
+
+    opt[(String, Seq[File])]("backend").required.unbounded validate { x =>
+      import scala.language.postfixOps   // thanks, SIP-18, this is valuable...
+
+      x._2.toList traverse { file =>
+        if (file.exists())
+          Right(())
+        else
+          Left(s"backend classpath entry $file does not exist")
+      } void
+    } action { (pair, c) =>
+      // reverses the input order; really doesn't matter
+      c.copy(backends = pair :: c.backends)
+    }
 
     help("help") text("prints this usage text\n")
 

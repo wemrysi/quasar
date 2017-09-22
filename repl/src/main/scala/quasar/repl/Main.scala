@@ -17,8 +17,10 @@
 package quasar.repl
 
 import slamdata.Predef._
+import quasar.build.BuildInfo
 import quasar.config._
 import quasar.console._
+import quasar.contrib.scalaz._
 import quasar.contrib.scopt._
 import quasar.effect._
 import quasar.fp._
@@ -61,7 +63,7 @@ object Main {
           })
           .create())
 
-      console.setPrompt(new Prompt("💪 $ "))
+      console.setPrompt(new Prompt(s"(v${BuildInfo.version}) 💪 $$ "))
 
       val i: DriverEff ~> MainTask =
         Failure.toError[MainTask, String]                  :+:
@@ -141,12 +143,16 @@ object Main {
   def safeMain(args: Vector[String]): Task[Unit] =
     logErrors(for {
       opts    <- CliOptions.parser.safeParse(args, CliOptions.default)
+
       cfgPath <- opts.config.fold(none[FsFile].point[MainTask])(cfg =>
         FsPath.parseSystemFile(cfg)
           .toRight(s"Invalid path to config file: $cfg.")
           .map(some))
+
+      backends <- BackendConfig.fromBackends(IList.fromList(opts.backends)).liftM[MainErrT]
+
       _ <- initMetaStoreOrStart[CoreConfig](
-        CmdLineConfig(cfgPath, opts.cmd),
+        CmdLineConfig(cfgPath, backends, opts.cmd),
         (_, quasarInter) => startRepl(quasarInter).liftM[MainErrT],
         // The REPL does not allow you to change metastore
         // so no need to supply a function to persist the metastore

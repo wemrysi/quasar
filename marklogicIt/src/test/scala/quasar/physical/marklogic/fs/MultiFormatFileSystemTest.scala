@@ -57,7 +57,7 @@ abstract class MultiFormatFileSystemTest extends quasar.Qspec with CompilerHelpe
       ref.supports(BackendCapability.query())
     } take 1 traverse {
       case (_, uri, _) =>
-        (testing.multiFormatDef(uri, 10000L, 10000L) |@| testsRoot) { (mfd, root) =>
+        (testing.multiFormatDef(uri) |@| testsRoot) { (mfd, root) =>
           val (js, xml, close) = mfd
           val chrootJs  = foldMapNT(js) compose chroot.backendEffect[BackendEffect](root)
           val chrootXml = foldMapNT(xml) compose chroot.backendEffect[BackendEffect](root)
