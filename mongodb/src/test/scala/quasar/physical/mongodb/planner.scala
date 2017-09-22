@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.common.{Map => _, _}
+import quasar.contrib.specs2.PendingWithActualTracking
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
@@ -40,7 +41,7 @@ import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import org.scalacheck._
-import org.specs2.execute.Result
+import org.specs2.execute._
 import org.specs2.matcher.{Matcher, Expectable}
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -49,7 +50,8 @@ class PlannerSpec extends
     org.specs2.mutable.Specification with
     org.specs2.ScalaCheck with
     CompilerHelpers with
-    TreeMatchers {
+    TreeMatchers with
+    PendingWithActualTracking {
 
   import StdLib.{set => s, _}
   import structural._
@@ -66,17 +68,23 @@ class PlannerSpec extends
   def emit[A: RenderTree](label: String, v: A): EitherWriter[A] =
     EitherT[Writer[PhaseResults, ?], FileSystemError, A](Writer(Vector(PhaseResult.tree(label, v)), v.right))
 
-  case class equalToWorkflow(expected: Workflow)
+  case class equalToWorkflow(expected: Workflow, addDetails: Boolean)
       extends Matcher[Crystallized[WorkflowF]] {
     def apply[S <: Crystallized[WorkflowF]](s: Expectable[S]) = {
-      def diff(l: S, r: Workflow): String = {
-        val lt = RenderTree[Crystallized[WorkflowF]].render(l)
-        (lt diff r.render).shows
-      }
+
+      val st = RenderTree[Crystallized[WorkflowF]].render(s.value)
+
+      val diff: String = (st diff expected.render).shows
+
+      val details =
+        if (addDetails) FailureDetails(st.shows, expected.render.shows)
+        else NoDetails
+
       result(expected == s.value.op,
-             "\ntrees are equal:\n" + diff(s.value, expected),
-             "\ntrees are not equal:\n" + diff(s.value, expected),
-             s)
+             "\ntrees are equal:\n" + diff,
+             "\ntrees are not equal:\n" + diff,
+             s,
+             details)
     }
   }
 
@@ -189,7 +197,8 @@ class PlannerSpec extends
   def planLog(query: Fix[Sql]): Vector[PhaseResult] =
     queryPlanner(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents, Instant.now).run.written
 
-  def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf))
+  def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf, addDetails = false))
+  def beWorkflow0(wf: Workflow) = beRight(equalToWorkflow(wf, addDetails = true))
 
   implicit def toBsonField(name: String) = BsonField.Name(name)
   implicit def toLeftShape(shape: Reshape[ExprOp]): Reshape.Shape[ExprOp] = -\/ (shape)
@@ -540,7 +549,7 @@ class PlannerSpec extends
 
     "plan filter array element" in {
       plan(sqlE"select loc from zips where loc[0] < -73") must
-      beWorkflow(chain[Workflow](
+      beWorkflow0(chain[Workflow](
         $read(collection("db", "zips")),
         $match(Selector.Where(
           If(
@@ -562,7 +571,74 @@ class PlannerSpec extends
         $project(
           reshape("value" -> $field("loc")),
           ExcludeId)))
-    }.pendingUntilFixed(notOnPar)
+    }.pendingWithActual(notOnPar,
+      """Chain
+        |├─ $ReadF(db; zips)
+        |├─ $ProjectF
+        |│  ├─ Name("0" -> {
+        |│  │       "$cond": [
+        |│  │         {
+        |│  │           "$and": [
+        |│  │             { "$lte": [{ "$literal": [] }, "$loc"] },
+        |│  │             { "$lt": ["$loc", { "$literal": BinData(0, "") }] }]
+        |│  │         },
+        |│  │         {
+        |│  │           "$cond": [
+        |│  │             {
+        |│  │               "$or": [
+        |│  │                 {
+        |│  │                   "$and": [
+        |│  │                     {
+        |│  │                       "$lt": [
+        |│  │                         { "$literal": null },
+        |│  │                         {
+        |│  │                           "$arrayElemAt": ["$loc", { "$literal": NumberInt("0") }]
+        |│  │                         }]
+        |│  │                     },
+        |│  │                     {
+        |│  │                       "$lt": [
+        |│  │                         {
+        |│  │                           "$arrayElemAt": ["$loc", { "$literal": NumberInt("0") }]
+        |│  │                         },
+        |│  │                         { "$literal": {  } }]
+        |│  │                     }]
+        |│  │                 },
+        |│  │                 {
+        |│  │                   "$and": [
+        |│  │                     {
+        |│  │                       "$lte": [
+        |│  │                         { "$literal": false },
+        |│  │                         {
+        |│  │                           "$arrayElemAt": ["$loc", { "$literal": NumberInt("0") }]
+        |│  │                         }]
+        |│  │                     },
+        |│  │                     {
+        |│  │                       "$lt": [
+        |│  │                         {
+        |│  │                           "$arrayElemAt": ["$loc", { "$literal": NumberInt("0") }]
+        |│  │                         },
+        |│  │                         { "$literal": new RegExp("", "") }]
+        |│  │                     }]
+        |│  │                 }]
+        |│  │             },
+        |│  │             {
+        |│  │               "$lt": [
+        |│  │                 { "$arrayElemAt": ["$loc", { "$literal": NumberInt("0") }] },
+        |│  │                 { "$literal": NumberInt("-73") }]
+        |│  │             },
+        |│  │             { "$literal": undefined }]
+        |│  │         },
+        |│  │         { "$literal": undefined }]
+        |│  │     })
+        |│  ├─ Name("src" -> "$$ROOT")
+        |│  ╰─ IgnoreId
+        |├─ $MatchF
+        |│  ╰─ Doc
+        |│     ╰─ Expr($0 -> Eq(Bool(true)))
+        |╰─ $ProjectF
+        |   ├─ Name("value" -> "$src.loc")
+        |   ╰─ ExcludeId""".stripMargin
+    )
 
     "plan select array element (3.0-)" in {
       plan3_0(sqlE"select loc[0] from zips") must
