@@ -53,7 +53,6 @@ trait RdbmsQueryFile {
       val c = for {
         childSchemas <- findChildSchemas(schema)
         childTables <- findChildTables(schema)
-        _ = println(childSchemas)
         childDirs = childSchemas.map(d => -\/(Schema.lastDirName(d))).toSet
         childFiles = childTables.map(t => \/-(Path.FileName(t.shows))).toSet
       }
