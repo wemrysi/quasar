@@ -100,8 +100,8 @@ object MongoDb
 
   def doPlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       N[_]: Monad: MonadFsErr: PhaseResultTell]
-      (qs: T[QSM[T, ?]], ctx: fs.QueryContext[N], execTime: Instant): N[Repr] =
-      MongoDbPlanner.planExecTime[T, N](qs, ctx, execTime)
+      (qs: T[QSM[T, ?]], ctx: fs.QueryContext[N], queryModel: MongoQueryModel, execTime: Instant): N[Repr] =
+      MongoDbPlanner.planExecTime[T, N](qs, ctx, queryModel, execTime)
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
@@ -110,10 +110,11 @@ object MongoDb
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       qs: T[QSM[T, ?]]): Backend[Repr] =
     for {
+      v <- config[Backend].map(_.serverVersion)
       ctx <- toBackendP(fs.QueryContext.queryContext[T, Backend](qs, QueryFileModule.listContents))
       _ <- checkPathsExist(qs)
       execTime <- QueryFileModule.queryTime.liftM[PhaseResultT].liftM[FileSystemErrT]
-      p <- doPlan[T, Backend](qs, ctx, execTime)
+      p <- doPlan[T, Backend](qs, ctx, MongoQueryModel(v), execTime)
     } yield p
 
   private type PhaseRes[A] = PhaseResultT[ConfiguredT[M, ?], A]
@@ -203,12 +204,12 @@ object MongoDb
   }
 
   object ManagedWriteFileModule extends ManagedWriteFileModule {
-    private def dataToDocument(d: Data): FileSystemError \/ Bson.Doc =
-      BsonCodec.fromData(d)
+    private def dataToDocument(v: BsonVersion, d: Data): FileSystemError \/ Bson.Doc =
+      BsonCodec.fromData(v, d)
         .leftMap(err => FileSystemError.writeFailed(d, err.shows))
         .flatMap {
           case doc @ Bson.Doc(_) => doc.right
-          case otherwise => FileSystemError.writeFailed(d, "MongoDB is only able to store documents").left
+          case otherwise         => FileSystemError.writeFailed(d, "MongoDB is only able to store documents").left
         }
 
     def writeCursor(file: AFile): Backend[Collection] =
@@ -217,9 +218,16 @@ object MongoDb
         coll => toM(MongoDbIO.ensureCollection(coll) *> coll.point[MongoDbIO]).liftB)
 
     def writeChunk(c: Collection, chunk: Vector[Data])
+        : Configured[Vector[FileSystemError]] =
+      for {
+        v <- config[Configured].map(cfg => MongoQueryModel.toBsonVersion(MongoQueryModel(cfg.serverVersion)))
+        r <- doWriteChunk(v, c, chunk)
+      } yield r
+
+    private def doWriteChunk(v: BsonVersion, c: Collection, chunk: Vector[Data])
         : Configured[Vector[FileSystemError]] = {
       val (errs, docs) = chunk foldMap { d =>
-        dataToDocument(d).fold(
+        dataToDocument(v, d).fold(
           e => (Vector(e), Vector()),
           d => (Vector(), Vector(d)))
       }
