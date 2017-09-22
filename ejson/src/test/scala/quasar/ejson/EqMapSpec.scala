@@ -31,7 +31,15 @@ class EqMapSpec extends Spec with EqMapArbitrary {
     }
 
     "delete" >> prop { m: EqMap[SInt, String] =>
-      m.toList.headOption.flatMap(kv => m.delete(kv._1).lookup(kv._1)) ≟ None
+      m.toList.toZipper.all(_.positions.all { z =>
+        val others = z.lefts ++ z.rights
+        val (k, _) = z.focus
+        val m0 = m.delete(k)
+
+        m0.lookup(k).isEmpty && others.all {
+          case (k, v) => m0.lookup(k).exists(_ ≟ v)
+        }
+      })
     }
   }
 }
