@@ -81,8 +81,9 @@ object PreferProjection extends PreferProjectionInstances {
       (f: A => Outline.Shape)
       : FreeMapA[T, A] =
     fm.elgotZygo(
-      interpret(f, Outline[MapFunc[T, ?]].outlineƒ),
-      projectComplementƒ[T, MapFunc[T, ?], A] >>> (_.transCata[FreeMapA[T, A]](MapFuncCore.normalize)))
+        interpret(f, Outline[MapFunc[T, ?]].outlineƒ),
+        projectComplementƒ[T, MapFunc[T, ?], A])
+      .transCata[FreeMapA[T, A]](MapFuncCore.normalize)
 
   /** Replaces field deletion of a map having statically known structure with a
     * projection of the complement of the deleted field.
