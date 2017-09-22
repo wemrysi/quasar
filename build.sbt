@@ -517,11 +517,8 @@ lazy val it = project
     sideEffectTestFSConfig := {
       val LoadCfgProp = "slamdata.internal.fs-load-cfg"
       val cfgP = java.lang.System.getProperty(LoadCfgProp, "")
-      scala.Predef.println(">>>>>>>>>>>>>>>>>>>>1" + cfgP.toString)
       if (java.lang.System.getProperty(LoadCfgProp, "").isEmpty) {
         val parentCp = (fullClasspath in connector in Compile).value.files
-        val f = ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " + connector.toString
-        scala.Predef.println(f)
         val backends = isolatedBackends.value map {
           case (name, childCp) =>
             val classpathStr =
