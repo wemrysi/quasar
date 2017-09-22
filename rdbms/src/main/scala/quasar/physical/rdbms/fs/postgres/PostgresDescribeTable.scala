@@ -38,10 +38,8 @@ trait PostgresDescribeTable extends RdbmsDescribeTable {
   }
 
   private def whereSchemaAndTable(tablePath: TablePath): Fragment = {
-    val schemaName = tablePath.schema match {
-      case DefaultSchema => "public"
-      case CustomSchema(name) => name
-    }
+    val schemaName = tablePath.schema.shows
+
     fr"WHERE TABLE_SCHEMA=" ++
   Fragment.const("'" + schemaName + "'") ++
     fr"AND TABLE_NAME =" ++

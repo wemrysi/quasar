@@ -16,6 +16,7 @@
 
 package quasar.physical.rdbms
 
+import monocle.Prism
 import slamdata.Predef._
 import pathy.Path
 import pathy.Path.DirName
@@ -46,15 +47,20 @@ object common {
           DirName(name.substring(startIndex))
       }
     }
+
+    val default = Prism.partial[Schema, DefaultSchema.type] {
+      case DefaultSchema => DefaultSchema
+    }(scala.Predef.identity)
+
+    val custom = Prism.partial[Schema, CustomSchema] {
+      case c: CustomSchema => c
+    }(scala.Predef.identity)
   }
 
   final case class TableName(name: String) extends AnyVal
   final case class TablePath(schema: Schema, table: TableName)
 
-  implicit val showSchema: Show[Schema] = Show.shows {
-    case DefaultSchema => ""
-    case CustomSchema(name) => s"$name"
-  }
+  implicit val showCustomSchema: Show[CustomSchema] = Show.shows(_.name)
 
   implicit val showTableName: Show[TableName] =
     Show.shows(_.name)
@@ -79,7 +85,6 @@ object common {
         case "" => DefaultSchema
         case pathStr => CustomSchema(pathStr)
       }
-
     }
 
     def create(file: AFile): TablePath = {
