@@ -23,6 +23,7 @@ import quasar.connector._
 import quasar.contrib.scalaz.MonadReader_
 import quasar.contrib.pathy._
 import quasar.effect.{Kvs, MonoSeq}
+import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fp.ski.κ
 import quasar.fs._
@@ -65,6 +66,15 @@ object MongoDb
   def MonoSeqM = MonoSeq[M]
   def ReadKvsM = Kvs[M, ReadFile.ReadHandle, BsonCursor]
   def WriteKvsM = Kvs[M, WriteFile.WriteHandle, Collection]
+
+  // we don't apply `O.subsetBeforeMap` because we need to apply that
+  // after we apply `mapBeforeSort`
+  def optimize[T[_[_]]: BirecursiveT: EqualT: ShowT]
+      : QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]] = {
+    val O = new Optimize[T]
+    liftFF[QScriptCore[T, ?], QSM[T, ?], T[QSM[T, ?]]](
+      repeatedly(O.filterBeforeUnion[QSM[T, ?]]))
+  }
 
   def parseConfig(uri: ConnectionUri): BackendDef.DefErrT[Task, Config] =
     fs.parseConfig(uri)
