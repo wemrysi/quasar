@@ -109,12 +109,7 @@ object Dependencies {
       .exclude("commons-logging", "commons-logging")          // create an assembly jar without conflicts
       .exclude("commons-logging", "commons-logging")          // It would seem though that things work without them...
       .exclude("com.esotericsoftware.minlog", "minlog")       // It's likely this list will need to be updated
-      .exclude("org.spark-project.spark", "unused")           // anytime the Spark dependency itselft is updated
-      //FIXME Mongo driver requires Netty 4.1 which conflicts with Spark's Netty (4.0).
-      //For now just excluding Spark's Netty (and thus breaking Spark).
-      //This should be resolved once both Spark and new Mongo are on BackendModule (#2216 resp #2094)
-      //and we have dynamic backend loading in place (#2105).
-      .exclude("io.netty", "netty-all"),
+      .exclude("org.spark-project.spark", "unused"),          // anytime the Spark dependency itselft is updated
     ("org.apache.spark" %% "spark-sql" % "2.2.0" % (if(sparkProvided) "provided" else "compile"))
       .exclude("aopalliance", "aopalliance")                  // Same limitation
       .exclude("javax.inject", "javax.inject")                // as above for
