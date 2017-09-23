@@ -17,7 +17,6 @@
 package quasar.regression
 
 import slamdata.Predef._
-import quasar.BackendName
 
 import argonaut._, Json._
 
@@ -27,4 +26,4 @@ case class ExpectedResult(
   ignoredFields:     List[JsonField],
   ignoreFieldOrder:  Boolean,
   ignoreResultOrder: Boolean,
-  backends:          Map[BackendName, TestDirective])
+  backends:          Directives)
