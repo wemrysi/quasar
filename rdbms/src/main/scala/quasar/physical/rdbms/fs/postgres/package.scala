@@ -16,14 +16,12 @@
 
 package quasar.physical.rdbms.fs
 
-import quasar.fs.FileSystemType
 import quasar.physical.rdbms.common.{CustomSchema, DefaultSchema, Schema}
 import quasar.physical.rdbms.common._
 import scalaz.Show
 
 package object postgres {
 
-  val FsType = FileSystemType("postgres")
   val DefaultSchemaName = "public"
 
   implicit val showSchema: Show[Schema] = Show.shows {

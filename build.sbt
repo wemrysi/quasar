@@ -433,7 +433,7 @@ lazy val rdbms = project
 /** Implementation of the Spark connector.
   */
 lazy val sparkcore = project
-  .settings(name := "quasar-4-internal")
+  .settings(name := "quasar-sparkcore-internal")
   .dependsOn(
     connector % BothScopes
     )

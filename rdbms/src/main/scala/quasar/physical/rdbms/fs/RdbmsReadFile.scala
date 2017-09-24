@@ -69,13 +69,14 @@ trait RdbmsReadFile extends RdbmsDescribeTable {
         .vector
     }
 
-    private def toInt(long: Long, varName: String): Backend[\/[FileSystemError, Int]] =
-        (
-          \/.fromTryCatchNonFatal(long.toInt)
-            .leftMap(
-              _ => FileSystemError.readFailed(long.toString, s"$varName not convertible to Int.")
-            ).point[ConnectionIO]
+    private def toInt(long: Long, varName: String): Backend[\/[FileSystemError, Int]] = {
+      (
+        \/.fromTryCatchNonFatal(long.toInt)
+          .leftMap(
+            _ => FileSystemError.readFailed(long.toString, s"$varName not convertible to Int.")
+          ).point[ConnectionIO]
         ).liftB
+    }
 
     def openExisting(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
       for {

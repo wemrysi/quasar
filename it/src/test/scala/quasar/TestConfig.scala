@@ -21,12 +21,11 @@ import quasar.contrib.scalaz._
 import quasar.contrib.pathy._
 import quasar.fs._
 import quasar.fs.mount.{BackendDef, ConnectionUri, MountConfig}
-import quasar.main.{BackendConfig, ClassName, ClassPath}
-import pathy.Path._
-import knobs.{FileResource, Optional, Required}
+import quasar.main.{ClassName, ClassPath, BackendConfig}
 
-import scalaz._
-import Scalaz._
+import pathy.Path._
+import knobs.{Required, Optional, FileResource}
+import scalaz._, Scalaz._
 import scalaz.concurrent._
 
 object TestConfig {
@@ -43,12 +42,12 @@ object TestConfig {
   val TestPathPrefixEnvName = "QUASAR_TEST_PATH_PREFIX"
 
   /**
-    * External Backends.
-    *
-    * This is an artifact of the fact that we haven't inverted the dependency between
-    * `it` and the connectors.  Hence, the redundant hard-coding of constants.  We
-    * should get rid of this abomination as soon as possible.
-    */
+   * External Backends.
+   *
+   * This is an artifact of the fact that we haven't inverted the dependency between
+   * `it` and the connectors.  Hence, the redundant hard-coding of constants.  We
+   * should get rid of this abomination as soon as possible.
+   */
   val COUCHBASE       = ExternalBackendRef(BackendRef(BackendName("couchbase")        , BackendCapability.All), FileSystemType("couchbase"))
   val MARKLOGIC_JSON  = ExternalBackendRef(BackendRef(BackendName("marklogic_json")   , BackendCapability.All), FileSystemType("marklogic"))
   val MARKLOGIC_XML   = ExternalBackendRef(BackendRef(BackendName("marklogic_xml")    , BackendCapability.All), FileSystemType("marklogic"))
@@ -94,12 +93,12 @@ object TestConfig {
     * to select an interpreter for a given config.
     */
   def externalFileSystems[S[_]](
-                                 pf: PartialFunction[BackendDef.FsCfg, Task[(S ~> Task, Task[Unit])]]
-                               ): Task[IList[SupportedFs[S]]] = {
+    pf: PartialFunction[BackendDef.FsCfg, Task[(S ~> Task, Task[Unit])]]
+  ): Task[IList[SupportedFs[S]]] = {
     def fs(
-            envName: String,
-            typ: FileSystemType
-          ): OptionT[Task, Task[(S ~> Task, Task[Unit])]] =
+      envName: String,
+      typ: FileSystemType
+    ): OptionT[Task, Task[(S ~> Task, Task[Unit])]] =
       TestConfig.loadConnectionUri(envName) flatMapF { uri =>
         pf.lift((typ, uri)).cata(
           Task.delay(_),
@@ -123,10 +122,10 @@ object TestConfig {
         testRef  <- rsrc(test).liftM[OptionT]
         setupRef <- setup.cata(rsrc, Task.now(testRef)).liftM[OptionT]
       } yield FileSystemUT(r.ref,
-        embed(testRef.get.map(_._1)),
-        embed(setupRef.get.map(_._1)),
-        p </> dir("run" + s),
-        testRef.release *> setupRef.release)
+          embed(testRef.get.map(_._1)),
+          embed(setupRef.get.map(_._1)),
+          p </> dir("run" + s),
+          testRef.release *> setupRef.release)
     }
 
     TestConfig.testDataPrefix flatMap { prefix =>
@@ -147,8 +146,8 @@ object TestConfig {
   def confValue(name: String): OptionT[Task, String] = {
     val config = knobs.loadImmutable(
       Optional(FileResource(new java.io.File(confFile)))        ::
-        Required(FileResource(new java.io.File(defaultConfFile))) ::
-        Nil)
+      Required(FileResource(new java.io.File(defaultConfFile))) ::
+      Nil)
     OptionT(config.map(_.lookup[String](name)))
   }
 

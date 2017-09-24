@@ -50,8 +50,8 @@ import scalaz.stream.Process
   *       filesystems would run concurrently.
   */
 abstract class FileSystemTest[S[_]](
-                                     val fileSystems: Task[IList[SupportedFs[S]]]
-                                   ) extends quasar.Qspec {
+  val fileSystems: Task[IList[SupportedFs[S]]]
+) extends quasar.Qspec {
 
   sequential
 
@@ -159,7 +159,7 @@ object FileSystemTest {
           mounts.translate(
             foldMapNT(
               injectFT[Task, filesystems.Eff] :+:
-                injectFT[PhysErr, filesystems.Eff])).apply(tpe, uri).run)
+              injectFT[PhysErr, filesystems.Eff])).apply(tpe, uri).run)
     }
   }
 
@@ -175,44 +175,44 @@ object FileSystemTest {
   def nullViewUT(mounts: BackendDef[PhysFsEffM]): Task[FileSystemUT[BackendEffect]] =
     (
       inMemUT                                             |@|
-        TaskRef(0L)                                         |@|
-        ViewState.toTask(Map())                             |@|
-        TaskRef(Map[APath, MountConfig]())                  |@|
-        TaskRef(Empty.backendEffect[HierarchicalFsEffM])       |@|
-        TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
-      ) {
+      TaskRef(0L)                                         |@|
+      ViewState.toTask(Map())                             |@|
+      TaskRef(Map[APath, MountConfig]())                  |@|
+      TaskRef(Empty.backendEffect[HierarchicalFsEffM])       |@|
+      TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
+    ) {
       (mem, seqRef, viewState, cfgsRef, hfsRef, mntdRef) =>
 
-        val mounting: Mounting ~> Task = {
-          val toPhysFs = KvsMounter.interpreter[Task, Coproduct[FsAsk, PhysFsEff, ?]](
-            KeyValueStore.impl.fromTaskRef(cfgsRef), hfsRef, mntdRef)
+      val mounting: Mounting ~> Task = {
+        val toPhysFs = KvsMounter.interpreter[Task, Coproduct[FsAsk, PhysFsEff, ?]](
+          KeyValueStore.impl.fromTaskRef(cfgsRef), hfsRef, mntdRef)
 
-          foldMapNT(Read.constant[Task, BackendDef[PhysFsEffM]](mounts) :+: reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
-            .compose(toPhysFs)
-        }
+        foldMapNT(Read.constant[Task, BackendDef[PhysFsEffM]](mounts) :+: reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
+          .compose(toPhysFs)
+      }
 
-        type ViewBackendEffect[A] = (
-          Mounting
-            :\: PathMismatchFailure
-            :\: MountingFailure
-            :\: ViewState
-            :\: VCache
-            :\: MonotonicSeq
-            :/: BackendEffect
-          )#M[A]
+      type ViewBackendEffect[A] = (
+        Mounting
+          :\: PathMismatchFailure
+          :\: MountingFailure
+          :\: ViewState
+          :\: VCache
+          :\: MonotonicSeq
+          :/: BackendEffect
+      )#M[A]
 
-        val memPlus: ViewBackendEffect ~> Task = mounting :+:
-          Failure.toRuntimeError[Task, Mounting.PathTypeMismatch] :+:
-          Failure.toRuntimeError[Task, MountingError] :+:
-          viewState :+:
-          runConstantVCache[Task](Map.empty) :+:
-          MonotonicSeq.fromTaskRef(seqRef) :+:
-          mem.testInterp
+      val memPlus: ViewBackendEffect ~> Task = mounting :+:
+      Failure.toRuntimeError[Task, Mounting.PathTypeMismatch] :+:
+      Failure.toRuntimeError[Task, MountingError] :+:
+      viewState :+:
+      runConstantVCache[Task](Map.empty) :+:
+      MonotonicSeq.fromTaskRef(seqRef) :+:
+      mem.testInterp
 
-        val fs = foldMapNT(memPlus) compose view.backendEffect[ViewBackendEffect]
-        val ref = BackendRef.name.set(BackendName("No-view"))(mem.ref)
+      val fs = foldMapNT(memPlus) compose view.backendEffect[ViewBackendEffect]
+      val ref = BackendRef.name.set(BackendName("No-view"))(mem.ref)
 
-        FileSystemUT(ref, fs, fs, mem.testDir, mem.close)
+      FileSystemUT(ref, fs, fs, mem.testDir, mem.close)
     }
 
   def hierarchicalUT: Task[FileSystemUT[BackendEffect]] = {

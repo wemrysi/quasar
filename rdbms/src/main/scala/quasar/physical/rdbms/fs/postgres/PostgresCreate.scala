@@ -39,6 +39,6 @@ trait PostgresCreate extends RdbmsCreate {
     }
 
     (createSchemaQuery *> (fr"CREATE TABLE IF NOT EXISTS" ++ Fragment.const(tablePath.shows) ++ fr"(data json NOT NULL)").update.run)
-      .map(_ => ())
+      .void
   }
 }

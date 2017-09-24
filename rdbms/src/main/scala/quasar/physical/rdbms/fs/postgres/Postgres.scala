@@ -17,6 +17,7 @@
 package quasar.physical.rdbms.fs.postgres
 
 import quasar.connector.EnvironmentError
+import quasar.fs.FileSystemType
 import quasar.fs.mount.BackendDef.DefinitionError
 import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.Rdbms
@@ -27,9 +28,9 @@ import slamdata.Predef._
 import scalaz.{-\/, NonEmptyList, \/, \/-}
 import scalaz.syntax.either._
 
-object Postgres extends Rdbms with PostgresInsert with PostgresDescribeTable with PostgresCreateJsonTable {
+object Postgres extends Rdbms with PostgresInsert with PostgresDescribeTable with PostgresCreate with PostgresMove {
 
-  override val Type = FsType
+  override val Type = FileSystemType("postgres")
 
   val driverClass = "org.postgresql.Driver"
 
