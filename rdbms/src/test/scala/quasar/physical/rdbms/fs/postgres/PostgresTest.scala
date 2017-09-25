@@ -16,10 +16,10 @@
 
 package quasar.physical.rdbms.fs.postgres
 
-import quasar.Qspec
+import slamdata.Predef._
 import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
-import slamdata.Predef._
+import quasar.Qspec
 
 import scalaz.{-\/, NonEmptyList, \/-}
 
@@ -36,7 +36,7 @@ class PostgresTest extends Qspec {
   private def expectParsingError(forConnectionUri: String) = {
     Postgres.parseConnectionUri(ConnectionUri(forConnectionUri)) must_===
       -\/(-\/(NonEmptyList(s"Cannot extract credentials from URI [$forConnectionUri]. " +
-        s"Expected format: jdbc:postgres://host:port/db_name?user=username(&password=pw)")))
+        s"Expected format: jdbc:postgresql://host:port/db_name?user=username(&password=pw)")))
   }
 
   "Postgres" should {

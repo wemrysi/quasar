@@ -16,29 +16,35 @@
 
 package quasar.physical.rdbms.fs.postgres
 
+import slamdata.Predef._
 import quasar.connector.EnvironmentError
+import quasar.Data
 import quasar.fs.FileSystemType
 import quasar.fs.mount.BackendDef.DefinitionError
 import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.fs._
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
-import slamdata.Predef._
 
+import java.net.URI
+
+import doobie.util.meta.Meta
 import scalaz.{-\/, NonEmptyList, \/, \/-}
 import scalaz.syntax.either._
 
-object Postgres extends Rdbms with PostgresInsert with PostgresDescribeTable with PostgresCreate with PostgresMove {
+object Postgres
+    extends Rdbms
+    with PostgresInsert
+    with PostgresDescribeTable
+    with PostgresCreate
+    with PostgresMove {
 
   override val Type = FileSystemType("postgres")
 
   val driverClass = "org.postgresql.Driver"
-
   val formatHint =
-    "jdbc:postgres://host:port/db_name?user=username(&password=pw)"
-  val JdbcUriOuter = """(jdbc:postgresql://[^\?]*)(.*)$""".r
-  val UserPasswordParams = """^\?user=(.*)&password=([^&]*)(.*)$""".r
-  val OnlyUserParams = """^\?user=([^&]*)(.*)$""".r
+    "jdbc:postgresql://host:port/db_name?user=username(&password=pw)"
+  val jdbcPrefixLength = "jdbc".length
 
   private def parsingErr(uri: ConnectionUri) =
     -\/(NonEmptyList(
@@ -46,12 +52,18 @@ object Postgres extends Rdbms with PostgresInsert with PostgresDescribeTable wit
 
   override def parseConnectionUri(
       uri: ConnectionUri): \/[DefinitionError, JdbcConnectionInfo] = {
-    val connectionInfo = uri.value match {
-      case JdbcUriOuter(url, params) =>
-        val userPass = params match {
-          case UserPasswordParams(u, p, _) => \/-((u, Some(p)))
-          case OnlyUserParams(u, _) => \/-((u, None))
-          case _ => parsingErr(uri)
+
+    val jUri = new URI(uri.value.substring(jdbcPrefixLength + 1))
+    val connectionInfo = (Option(jUri.getScheme),
+                          Option(jUri.getAuthority),
+                          Option(jUri.getPath),
+                          Option(jUri.getQuery)) match {
+      case (Some("postgresql"), Some(authority), Some(db), Some(query)) =>
+        val url = s"jdbc:postgresql://$authority$db"
+        val userPass = query.split("&").flatMap(_.split("=")).toList match {
+          case "user" :: u :: "password" :: p :: _ => \/-((u, Some(p)))
+          case "user" :: u :: _                    => \/-((u, None))
+          case _                                   => parsingErr(uri)
         }
         userPass.map {
           case (u, p) => JdbcConnectionInfo(driverClass, url, u, p)
@@ -62,5 +74,5 @@ object Postgres extends Rdbms with PostgresInsert with PostgresDescribeTable wit
     connectionInfo.leftMap(_.left[EnvironmentError])
   }
 
-  override lazy val dataMeta = postgres.mapping.JsonDataMeta
+  override lazy val dataMeta: Meta[Data] = postgres.mapping.JsonDataMeta
 }
