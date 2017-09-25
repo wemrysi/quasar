@@ -24,20 +24,20 @@ services:
   quasar_mongodb_3_2:
     container_name: quasar_mongodb_3_2
     image: mongo:3.2
-    command: ["mongod", "--smallfiles"]
+    command: ["mongod", "--smallfiles", "--storageEngine", "ephemeralForTest"]
     ports:
       - "27021:27017"
 
   quasar_mongodb_3_4:
     container_name: quasar_mongodb_3_4
     image: mongo:3.4
-    command: ["mongod", "--smallfiles"]
+    command: ["mongod", "--smallfiles", "--storageEngine", "ephemeralForTest"]
     ports:
       - "27022:27017"
 
   quasar_metastore:
     container_name: quasar_metastore
-    image: postgres:9.6
+    image: postgres:9.6.5
     privileged: true
     ports:
       - "5432:5432"
