@@ -33,10 +33,8 @@ import quasar.main.{physicalFileSystems, FilesystemQueries}
 import quasar.fs.mount.{Mounts, hierarchical}
 import quasar.sql, sql.{Query, Sql}
 
-import java.io.{File => JFile, FileInputStream}
 import java.math.{MathContext, RoundingMode}
 import scala.concurrent.duration._
-import scala.io.Source
 import scala.util.matching.Regex
 
 import argonaut._, Argonaut._
@@ -373,12 +371,6 @@ abstract class QueryRegressionTest[S[_]](
         else
           Process.halt)
 
-  /** Returns the contents of the file as a `String`. */
-  def textContents(file: RFile): Task[String] =
-    Task.delay(Source.fromInputStream(new FileInputStream(jFile(file))).mkString)
-
-  private def jFile(path: Path[_, _, Sandboxed]): JFile =
-    new JFile(posixCodec.printPath(path))
 }
 
 object QueryRegressionTest {
