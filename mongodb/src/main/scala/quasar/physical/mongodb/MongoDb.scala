@@ -29,16 +29,19 @@ import quasar.fp.ski.κ
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.physical.mongodb.fs.bsoncursor._
+import quasar.physical.mongodb.mongoiterable._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 import quasar.qscript.analysis._
 
 import java.time.Instant
+import scala.Predef.implicitly
+
 import matryoshka._
 import matryoshka.data._
+import org.bson.BsonValue
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import scala.Predef.implicitly
 
 object MongoDb
     extends BackendModule
@@ -196,7 +199,7 @@ object MongoDb
         iter <- MongoDbIO.find(coll)
         iter2 =  iter.skip(offset.value.toInt)
         iter3 = limit.map(l => iter2.limit(l.value.toInt)).getOrElse(iter2)
-        cur  <- MongoDbIO.async(iter3.batchCursor)
+        cur  <- MongoDbIO.async(iter3.widen[BsonValue].batchCursor)
       } yield cur
 
     def readCursor(f: AFile, offset: Natural, limit: Option[Positive])
