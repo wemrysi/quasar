@@ -19,7 +19,6 @@ package quasar.fs.cache
 import slamdata.Predef._
 import quasar.common.PhaseResultT
 import quasar.contrib.pathy.{ADir, AFile}
-import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.Timing
 import quasar.frontend.SemanticErrsT
@@ -113,8 +112,7 @@ object ViewCacheRefresh {
       q       <- EitherT(EitherT(
                    (quasar.resolveImports_[S](view.query, basePath).leftMap(nels(_)).run.run ∘ (_.sequence))
                      .liftM[PhaseResultT]))
-      r       <- fsQ.queryResults(q, view.vars, basePath, 0L, none)
-      _       <- lift(W.save(tmpDataPath, r).runLog.run)
+      _       <- fsQ.executeQuery(q, view.vars, basePath, tmpDataPath)
     } yield ()
   }
 
