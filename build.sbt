@@ -1,4 +1,6 @@
 import github.GithubPlugin._
+
+import scala.Predef._
 import quasar.project._
 
 import java.lang.{Integer, String, Throwable}
@@ -6,9 +8,7 @@ import scala.{Boolean, List, Predef, None, Some, StringContext, sys, Unit}, Pred
 import scala.collection.Seq
 import scala.collection.immutable.Map
 
-import de.heikoseeberger.sbtheader.HeaderPlugin
-import de.heikoseeberger.sbtheader.license.Apache2_0
-import sbt._, Aggregation.KeyValue, Keys._
+import sbt._, Keys._
 import sbt.std.Transform.DummyTaskMap
 import sbt.TestFrameworks.Specs2
 import sbtrelease._, ReleaseStateTransformations._, Utilities._
@@ -106,7 +106,7 @@ lazy val backendRewrittenRunSettings = Seq(
       def trace(t: => Throwable): Unit = delegate.trace(t)
     }
 
-    toError(r.run(main, (fullClasspath in Compile).value.files, args ++ backends, filtered))
+    r.run(main, (fullClasspath in Compile).value.files, args ++ backends, filtered)
   })
 
 // In Travis, the processor count is reported as 32, but only ~2 cores are
@@ -522,16 +522,16 @@ lazy val it = project
     sideEffectTestFSConfig := {
       val LoadCfgProp = "slamdata.internal.fs-load-cfg"
 
+      val parentCp = (fullClasspath in connector in Compile).value.files
+      val backends = isolatedBackends.value map {
+        case (name, childCp) =>
+          val classpathStr =
+            createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(":")
+
+          name + "=" + classpathStr
+      }
+
       if (java.lang.System.getProperty(LoadCfgProp, "").isEmpty) {
-        val parentCp = (fullClasspath in connector in Compile).value.files
-        val backends = isolatedBackends.value map {
-          case (name, childCp) =>
-            val classpathStr =
-              createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(":")
-
-            name + "=" + classpathStr
-        }
-
         // we aren't forking tests, so we just set the property in the current JVM
         java.lang.System.setProperty(LoadCfgProp, backends.mkString(";"))
       }
@@ -596,16 +596,6 @@ lazy val sparkcoreIt = project
 
 /***** PRECOG *****/
 
-// copied from sbt-slamdata (remove redundancy when slamdata/sbt-slamdata#23 is fixed)
-val headerSettings = Seq(
-  headers := Map(
-     ("scala", Apache2_0("2014–2017", "SlamData Inc.")),
-     ("java",  Apache2_0("2014–2017", "SlamData Inc."))),
-   licenses += (("Apache 2", url("http://www.apache.org/licenses/LICENSE-2.0"))),
-   checkHeaders := {
-     if ((createHeaders in Compile).value.nonEmpty) sys.error("headers not all present")
-  })
-
 import precogbuild.Build._
 
 lazy val precog = project.setup
@@ -613,7 +603,7 @@ lazy val precog = project.setup
   .dependsOn(common % BothScopes)
   .withWarnings
   .deps(Dependencies.precog: _*)
-  .settings(headerSettings)
+  .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
@@ -624,7 +614,7 @@ lazy val blueeyes = project.setup
   .dependsOn(precog % BothScopes, frontend)
   .withWarnings
   .settings(libraryDependencies += "com.google.guava" %  "guava" % "13.0")
-  .settings(headerSettings)
+  .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
@@ -641,7 +631,7 @@ lazy val mimir = project.setup
 
       "co.fs2" %% "fs2-core"   % "0.9.6",
       "co.fs2" %% "fs2-scalaz" % "0.2.0"))
-  .settings(headerSettings)
+  .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
@@ -657,7 +647,7 @@ lazy val niflheim = project.setup
       "com.typesafe.akka"  %% "akka-actor" % "2.3.11",
       "org.typelevel"      %% "spire"      % "0.14.1", // TODO use spireVersion from project/Dependencies.scala
       "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
-  .settings(headerSettings)
+  .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
@@ -678,7 +668,7 @@ lazy val yggdrasil = project.setup
       "co.fs2" %% "fs2-scalaz" % "0.2.0",
 
       "com.codecommit" %% "smock" % "0.3-specs2-3.8.4" % "test"))
-  .settings(headerSettings)
+  .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
