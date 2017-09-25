@@ -20,14 +20,19 @@ import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile, PathSegment}
 import quasar.Data
 import quasar.fp.free.lift
+import quasar.fs.FileSystemError._
+import quasar.fs.PathError._
 import quasar.fs.QueryFile
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.common._
-
 import pathy.Path
+
 import scalaz.{-\/, Monad, \/-}
-import scalaz.syntax.show._
 import scalaz.syntax.monad._
+import scalaz.syntax.show._
+import scalaz.syntax.std.boolean._
+import scalaz.std.vector._
+
 
 trait RdbmsQueryFile {
   this: Rdbms =>
@@ -50,15 +55,16 @@ trait RdbmsQueryFile {
 
     override def listContents(dir: ADir): Backend[Set[PathSegment]] = {
       val schema = TablePath.dirToSchema(dir)
-      val c = for {
+      schemaExists(schema).liftB.flatMap(_.unlessM(ME.raiseError(pathErr(pathNotFound(dir))))) *>
+        (for {
         childSchemas <- findChildSchemas(schema)
         childTables <- findChildTables(schema)
         childDirs = childSchemas.map(d => -\/(Schema.lastDirName(d))).toSet
         childFiles = childTables.map(t => \/-(Path.FileName(t.shows))).toSet
       }
-        yield childDirs ++ childFiles
-      c
-    }.liftB
+        yield childDirs ++ childFiles)
+          .liftB
+    }
 
     override def close(h: ResultHandle): Configured[Unit] = ???
   }
