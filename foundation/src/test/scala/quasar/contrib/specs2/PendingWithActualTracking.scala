@@ -24,15 +24,16 @@ import org.specs2.execute._
   * Specs2 trait that is like "pendingUntilFixed" but additionally tracks
   * actual results. It fails a test in case the expected actual is not equal to
   * the (actual) actual.
+  * Note: Style of this code is adopted from specs2 (PendingUntilFixed.scala).
   */
 trait PendingWithActualTracking {
 
   implicit def toPendingWithActualTracking[T : AsResult](t: =>T)
-    : PendingWithActualTracking[T] = new PendingWithActualTracking(t)
+    : PendingWithActualTrackingClass[T] = new PendingWithActualTrackingClass(t)
 
   private def c(msg: String, extra: String) = if (msg == "") msg else msg + extra
 
-  class PendingWithActualTracking[T : AsResult](t: =>T) {
+  class PendingWithActualTrackingClass[T : AsResult](t: =>T) {
     def pendingWithActual(m: String, expectedActual: String): Result = ResultExecution.execute(AsResult(t)) match {
       case s @ Success(_,_) =>
         Failure(m + " Fixed now, you should remove the 'pendingWithActual' marker")
