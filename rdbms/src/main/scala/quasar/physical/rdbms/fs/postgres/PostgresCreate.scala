@@ -16,13 +16,13 @@
 
 package quasar.physical.rdbms.fs.postgres
 
+import slamdata.Predef._
 import quasar.physical.rdbms.fs.RdbmsCreate
 import quasar.physical.rdbms.common._
-import slamdata.Predef._
+
 import doobie.syntax.string._
 import doobie.free.connection.ConnectionIO
 import doobie.util.fragment.Fragment
-
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
 

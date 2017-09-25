@@ -16,8 +16,9 @@
 
 package quasar.physical.rdbms.fs
 
-import quasar.physical.rdbms.common.{CustomSchema, Schema, TableName, TablePath}
 import slamdata.Predef._
+import quasar.physical.rdbms.common.{CustomSchema, Schema, TableName, TablePath}
+
 import doobie.imports.ConnectionIO
 
 trait RdbmsDescribeTable {

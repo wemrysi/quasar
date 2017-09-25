@@ -16,24 +16,22 @@
 
 package quasar.physical.rdbms.fs
 
-
-import quasar.Data
+import slamdata.Predef._
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
+import quasar.Data
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.common.TablePath
-import slamdata.Predef._
-import eu.timepit.refined.api.RefType.ops._
 
 import doobie.free.connection.ConnectionIO
 import doobie.syntax.string._
 import doobie.syntax.process._
 import doobie.util.fragment.Fragment
 import doobie.util.meta.Meta
-
+import eu.timepit.refined.api.RefType.ops._
 import scalaz._
 import Scalaz._
 

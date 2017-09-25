@@ -16,13 +16,13 @@
 
 package quasar.physical.rdbms.fs.postgres
 
+import slamdata.Predef._
 import quasar.Data
 import quasar.fs.FileSystemError
 import quasar.physical.rdbms.common.TablePath
 import quasar.physical.rdbms.fs.RdbmsInsert
-import slamdata.Predef._
-import doobie.free.connection.ConnectionIO
 
+import doobie.free.connection.ConnectionIO
 import doobie.imports.{Meta, Update}
 import doobie.syntax.string._
 import doobie.util.fragment.Fragment

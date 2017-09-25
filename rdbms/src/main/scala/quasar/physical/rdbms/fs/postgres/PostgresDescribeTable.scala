@@ -16,12 +16,12 @@
 
 package quasar.physical.rdbms.fs.postgres
 
+import slamdata.Predef._
 import quasar.physical.rdbms.common.{Schema, _}
 import quasar.physical.rdbms.fs.RdbmsDescribeTable
-import slamdata.Predef._
-import doobie.imports._
 import quasar.physical.rdbms.common.TablePath.Separator
 
+import doobie.imports._
 import scalaz.syntax.show._
 import scalaz.syntax.applicative._
 

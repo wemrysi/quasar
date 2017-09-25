@@ -16,14 +16,15 @@
 
 package quasar.physical.rdbms
 
-import pathy.Path
-import Path.{FileName, dir1, _}
 import quasar.physical.rdbms.common.{CustomSchema, DefaultSchema, TableName, TablePath}
 import quasar.Qspec
 import quasar.contrib.pathy.AFile
 import quasar.contrib.pathy._
-import pathy.scalacheck.PathyArbitrary._
 import quasar.physical.rdbms.testutils.RdbmsPathyArbitrary.Generators._
+
+import pathy.Path
+import Path.{FileName, dir1, _}
+import pathy.scalacheck.PathyArbitrary._
 
 class TablePathSpec extends Qspec {
 

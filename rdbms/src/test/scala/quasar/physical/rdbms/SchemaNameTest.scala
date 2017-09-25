@@ -20,9 +20,9 @@ import quasar.Qspec
 import quasar.physical.rdbms.common.TablePath.Separator
 import quasar.physical.rdbms.common.{CustomSchema, Schema}
 import quasar.physical.rdbms.testutils.RdbmsPathyArbitrary._
+
 import pathy.Path.DirName
 import pathy.Path.DirName._
-
 import scalaz.syntax.show._
 
 class SchemaNameTest extends Qspec {

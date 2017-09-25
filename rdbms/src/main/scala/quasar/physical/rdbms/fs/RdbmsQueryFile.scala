@@ -16,15 +16,15 @@
 
 package quasar.physical.rdbms.fs
 
-import pathy.Path
-import quasar.Data
+import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile, PathSegment}
+import quasar.Data
 import quasar.fp.free.lift
 import quasar.fs.QueryFile
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.common._
-import slamdata.Predef._
 
+import pathy.Path
 import scalaz.{-\/, Monad, \/-}
 import scalaz.syntax.show._
 import scalaz.syntax.monad._

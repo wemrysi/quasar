@@ -16,13 +16,13 @@
 
 package quasar.physical.rdbms
 
-import monocle.Prism
 import slamdata.Predef._
 import pathy.Path
 import pathy.Path.DirName
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 
+import monocle.Prism
 import scalaz._
 import Scalaz._
 

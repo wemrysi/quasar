@@ -16,8 +16,7 @@
 
 package quasar.physical.rdbms
 
-import scala.Predef.implicitly
-import matryoshka.{BirecursiveT, Delay, EqualT, RecursiveT, ShowT}
+import slamdata.Predef._
 import quasar.connector.BackendModule
 import quasar.contrib.pathy.{AFile, APath}
 import quasar.contrib.scalaz.MonadReader_
@@ -35,10 +34,12 @@ import quasar.fs.WriteFile.WriteHandle
 import quasar.physical.rdbms.common.{Config, TablePath}
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 import quasar.{RenderTree, RenderTreeT}
-import slamdata.Predef._
+
+import scala.Predef.implicitly
+
 import doobie.hikari.hikaritransactor.HikariTransactor
 import doobie.imports.ConnectionIO
-
+import matryoshka.{BirecursiveT, Delay, EqualT, RecursiveT, ShowT}
 import scalaz._
 import Scalaz._
 import scalaz.concurrent.Task

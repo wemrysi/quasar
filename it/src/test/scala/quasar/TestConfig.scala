@@ -23,8 +23,8 @@ import quasar.fs._
 import quasar.fs.mount.{BackendDef, ConnectionUri, MountConfig}
 import quasar.main.{ClassName, ClassPath, BackendConfig}
 
-import pathy.Path._
 import knobs.{Required, Optional, FileResource}
+import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent._
 

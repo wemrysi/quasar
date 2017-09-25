@@ -16,14 +16,14 @@
 
 package quasar.physical.rdbms.fs
 
-import quasar.Data
+import slamdata.Predef._
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
+import quasar.Data
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fs._
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.common.TablePath
-import slamdata.Predef._
 
 import doobie.imports.Meta
 import scalaz.Monad

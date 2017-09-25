@@ -16,10 +16,10 @@
 
 package quasar.physical.rdbms.fs.postgres
 
-import doobie.util.meta.Meta
-import org.postgresql.util.PGobject
 import quasar.{Data, DataCodec}
 
+import doobie.util.meta.Meta
+import org.postgresql.util.PGobject
 import scalaz.syntax.show._
 
 package object mapping {
