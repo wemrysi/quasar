@@ -36,8 +36,7 @@ object Postgres
     extends Rdbms
     with PostgresInsert
     with PostgresDescribeTable
-    with PostgresCreate
-    with PostgresMove {
+    with PostgresCreate {
 
   override val Type = FileSystemType("postgres")
 
