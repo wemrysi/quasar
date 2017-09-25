@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.common.{Map => _, _}
+import quasar.contrib.pathy._, Helpers._
 import quasar.contrib.specs2.PendingWithActualTracking
 import quasar.fp._
 import quasar.fp.ski._
@@ -33,6 +34,7 @@ import quasar.qscript.DiscoverPath
 import quasar.sql , sql.{fixpoint => sqlF, _}
 import quasar.std._
 
+import java.io.{File => JFile}
 import java.time.Instant
 import scala.Either
 
@@ -64,6 +66,15 @@ class PlannerSpec extends
     EitherT[Writer[Vector[PhaseResult], ?], FileSystemError, A]
 
   val notOnPar = "Not on par with old (LP-based) connector."
+
+  private val resourcesDir: RDir =
+    currentDir[Sandboxed] </> dir("mongodb") </> dir("src") </> dir("test") </>
+    dir("resources") </> dir("planner")
+
+  private def toRFile(testName: String): RFile = resourcesDir </>
+    file(testName.replaceAll(" ", "_")) <:> "txt"
+
+  private def testFile(testName: String): JFile = jFile(toRFile(testName))
 
   def emit[A: RenderTree](label: String, v: A): EitherWriter[A] =
     EitherT[Writer[PhaseResults, ?], FileSystemError, A](Writer(Vector(PhaseResult.tree(label, v)), v.right))
@@ -550,23 +561,7 @@ class PlannerSpec extends
            reshape(
              "value" -> $field("__tmp3")),
            ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; foo)
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> "$ts")
-        |│  ├─ Name("1" -> { "$year": "$ts" })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ And
-        |│     ├─ Doc
-        |│     │  ╰─ Expr($0 -> Type(Date))
-        |│     ╰─ Doc
-        |│        ╰─ Expr($1 -> Eq(Int32(2016)))
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$src")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan filter by date field (SD-1508)"))
 
     "plan filter array element" in {
       plan(sqlE"select loc from zips where loc[0] < -73") must
@@ -592,74 +587,7 @@ class PlannerSpec extends
         $project(
           reshape("value" -> $field("loc")),
           ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> {
-        |│  │       "$cond": [
-        |│  │         {
-        |│  │           "$and": [
-        |│  │             { "$lte": [{ "$literal": [] }, "$loc"] },
-        |│  │             { "$lt": ["$loc", { "$literal": BinData(0, "") }] }]
-        |│  │         },
-        |│  │         {
-        |│  │           "$cond": [
-        |│  │             {
-        |│  │               "$or": [
-        |│  │                 {
-        |│  │                   "$and": [
-        |│  │                     {
-        |│  │                       "$lt": [
-        |│  │                         { "$literal": null },
-        |│  │                         {
-        |│  │                           "$arrayElemAt": ["$loc", { "$literal": NumberInt("0") }]
-        |│  │                         }]
-        |│  │                     },
-        |│  │                     {
-        |│  │                       "$lt": [
-        |│  │                         {
-        |│  │                           "$arrayElemAt": ["$loc", { "$literal": NumberInt("0") }]
-        |│  │                         },
-        |│  │                         { "$literal": {  } }]
-        |│  │                     }]
-        |│  │                 },
-        |│  │                 {
-        |│  │                   "$and": [
-        |│  │                     {
-        |│  │                       "$lte": [
-        |│  │                         { "$literal": false },
-        |│  │                         {
-        |│  │                           "$arrayElemAt": ["$loc", { "$literal": NumberInt("0") }]
-        |│  │                         }]
-        |│  │                     },
-        |│  │                     {
-        |│  │                       "$lt": [
-        |│  │                         {
-        |│  │                           "$arrayElemAt": ["$loc", { "$literal": NumberInt("0") }]
-        |│  │                         },
-        |│  │                         { "$literal": new RegExp("", "") }]
-        |│  │                     }]
-        |│  │                 }]
-        |│  │             },
-        |│  │             {
-        |│  │               "$lt": [
-        |│  │                 { "$arrayElemAt": ["$loc", { "$literal": NumberInt("0") }] },
-        |│  │                 { "$literal": NumberInt("-73") }]
-        |│  │             },
-        |│  │             { "$literal": undefined }]
-        |│  │         },
-        |│  │         { "$literal": undefined }]
-        |│  │     })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$src.loc")
-        |   ╰─ ExcludeId""".stripMargin
-    )
+    }.pendingWithActual(notOnPar, testFile("plan filter array element"))
 
     "plan select array element (3.0-)" in {
       plan3_0(sqlE"select loc[0] from zips") must
@@ -841,25 +769,7 @@ class PlannerSpec extends
         $project(
           reshape("value" -> $field("src")),
           ExcludeId)))
-    }.pendingWithActual("#2541",
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: _.city)
-        |│  │     ├─ Key(1: NumberLong(_.city.length))
-        |│  │     ╰─ Key(src: _)
-        |│  ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ And
-        |│     ├─ Doc
-        |│     │  ╰─ Expr($0 -> Type(Text))
-        |│     ╰─ Doc
-        |│        ╰─ Expr($1 -> Lt(Int32(4)))
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$src")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual("#2541", testFile("plan simple js filter 3.2"))
 
     "plan filter with js and non-js 3.2" in {
       val mjs = javascript[JsCore](_.embed)
@@ -897,42 +807,7 @@ class PlannerSpec extends
         $project(
           reshape("value" -> $field("src")),
           ExcludeId)))
-    }.pendingWithActual("#2541",
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: _.pop)
-        |│  │     ├─ Key(1: _.city)
-        |│  │     ├─ Key(2: NumberLong(_.city.length))
-        |│  │     ├─ Key(3: _.pop)
-        |│  │     ╰─ Key(src: _)
-        |│  ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ And
-        |│     ├─ Or
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($0 -> Type(Int32))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($0 -> Type(Int64))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($0 -> Type(Dec))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($0 -> Type(Text))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($0 -> Type(Date))
-        |│     │  ╰─ Doc
-        |│     │     ╰─ Expr($0 -> Type(Bool))
-        |│     ├─ Doc
-        |│     │  ╰─ Expr($1 -> Type(Text))
-        |│     ├─ Doc
-        |│     │  ╰─ Expr($2 -> Lt(Int32(4)))
-        |│     ╰─ Doc
-        |│        ╰─ Expr($3 -> Lt(Int32(20000)))
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$src")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual("#2541", testFile("plan filter with js and non-js 3.2"))
 
     "plan filter with between" in {
       plan(sqlE"select * from foo where bar between 10 and 100") must
@@ -976,18 +851,7 @@ class PlannerSpec extends
                  Selector.Type(BsonType.Text)),
                Selector.Doc(BsonField.Name("bar") ->
                  Selector.Regex("^Z.*$", false, true, false, false)))))))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; foo)
-        |╰─ $MatchF
-        |   ╰─ And
-        |      ├─ Doc
-        |      │  ╰─ Expr($bar -> Type(Text))
-        |      ╰─ Or
-        |         ├─ Doc
-        |         │  ╰─ Expr($bar -> Regex(^A.*$,false,true,false,false))
-        |         ╰─ Doc
-        |            ╰─ Expr($bar -> Regex(^Z.*$,false,true,false,false))""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan filter with LIKE and OR"))
 
     "plan filter with field in constant set" in {
       plan(sqlE"""select * from zips where state in ("AZ", "CO")""") must
@@ -1005,21 +869,7 @@ class PlannerSpec extends
             If(Call(Select(ident("Array"), "isArray"), List(Select(ident("this"), "loc"))),
               BinOp(Neq, jscore.Literal(Js.Num(-1, false)), Call(Select(Select(ident("this"), "loc"), "indexOf"), List(jscore.Literal(Js.Num(43.058514, true))))),
             ident("undefined")).toJs))))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: Array.isArray(_.loc) ? -1 !== _.loc.indexOf(43.058514) : undefined)
-        |│  │     ╰─ Key(src: _)
-        |│  ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$src")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan filter with field containing constant value"))
 
     "filter field in single-element set" in {
       plan(sqlE"""select * from zips where state in ("NV")""") must
@@ -1050,21 +900,7 @@ class PlannerSpec extends
                 Call(Select(Select(ident("this"), "loc"), "indexOf"),
                   List(Select(ident("this"), "pop")))),
               ident("undefined")).toJs))))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: Array.isArray(_.loc) ? -1 !== _.loc.indexOf(_.pop) : undefined)
-        |│  │     ╰─ Key(src: _)
-        |│  ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$src")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan filter with field containing other field"))
 
     "plan filter with ~" in {
       plan(sqlE"""select * from zips where city ~ "^B[AEIOU]+LD.*" """) must beWorkflow(chain[Workflow](
@@ -1139,32 +975,7 @@ class PlannerSpec extends
         $project(
           reshape("value" -> $field("__tmp9")),
           ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; a)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: _.pattern)
-        |│  │     ├─ Key(1: _.target)
-        |│  │     ├─ Key(2: (new RegExp(_.pattern, "m")).test("foo"))
-        |│  │     ├─ Key(3: (new RegExp(_.pattern, "m")).test(_.target))
-        |│  │     ╰─ Key(src: _)
-        |│  ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ And
-        |│     ├─ Doc
-        |│     │  ╰─ Expr($0 -> Type(Text))
-        |│     ├─ Doc
-        |│     │  ╰─ Expr($1 -> Type(Text))
-        |│     ╰─ Or
-        |│        ├─ Doc
-        |│        │  ╰─ Expr($2 -> Eq(Bool(true)))
-        |│        ╰─ Doc
-        |│           ╰─ Expr($3 -> Eq(Bool(true)))
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$src")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan filter with alternative ~"))
 
     "plan filter with negate(s)" in {
       plan(sqlE"select * from foo where bar != -10 and baz > -1.0") must
@@ -1266,26 +1077,7 @@ class PlannerSpec extends
           $group(
             grouped("count" -> $sum($literal(Bson.Int32(1)))),
             \/-($literal(Bson.Null)))))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; slamengine_commits)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: (Array.isArray(_.parents) && (isObject(_.parents[0]) && (! Array.isArray(_.parents[0])))) ? _.parents[0].sha === "56d1caf5d082d1a6840090986e277d36d03f1859" : undefined)
-        |│  │     ╰─ Key(src: _)
-        |│  ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  ╰─ Scope(Map())
-        |╰─ $GroupF
-        |   ├─ Grouped
-        |   │  ╰─ Name("count" -> { "$sum": { "$literal": NumberInt("1") } })
-        |   ╰─ By({ "$literal": null })""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan filter with both index and field projections"))
 
     "plan simple having filter" in {
       plan(sqlE"select city from zips group by city having count(*) > 10") must
@@ -1300,149 +1092,7 @@ class PlannerSpec extends
         $project(
           reshape("value" -> $field("_id", "0")),
           ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $FoldLeftF
-        |│  │  │  ├─ Chain
-        |│  │  │  │  ├─ $ReadF(db; zips)
-        |│  │  │  │  ├─ $SimpleMapF
-        |│  │  │  │  │  ├─ Map
-        |│  │  │  │  │  │  ╰─ Let(__val)
-        |│  │  │  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │  │  │     ╰─ JsCore([__val[0], __val[1]])
-        |│  │  │  │  │  ╰─ Scope(Map())
-        |│  │  │  │  ├─ $GroupF
-        |│  │  │  │  │  ├─ Grouped
-        |│  │  │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-        |│  │  │  │  │  ╰─ By({ "$literal": null })
-        |│  │  │  │  ╰─ $ProjectF
-        |│  │  │  │     ├─ Name("_id" -> "$_id")
-        |│  │  │  │     ├─ Name("value")
-        |│  │  │  │     │  ├─ Name("left" -> "$0")
-        |│  │  │  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │  │  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │  │  │     ╰─ IncludeId
-        |│  │  │  ╰─ Chain
-        |│  │  │     ├─ $ReadF(db; zips)
-        |│  │  │     ├─ $SimpleMapF
-        |│  │  │     │  ├─ Map
-        |│  │  │     │  │  ╰─ Let(__val)
-        |│  │  │     │  │     ├─ JsCore([_._id, _])
-        |│  │  │     │  │     ╰─ JsCore([__val[0], __val[1]])
-        |│  │  │     │  ╰─ Scope(Map())
-        |│  │  │     ├─ $GroupF
-        |│  │  │     │  ├─ Grouped
-        |│  │  │     │  │  ╰─ Name("f0" -> { "$sum": { "$literal": NumberInt("1") } })
-        |│  │  │     │  ╰─ By({ "$literal": null })
-        |│  │  │     ├─ $MapF
-        |│  │  │     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value.f0] }] })
-        |│  │  │     │  ╰─ Scope(Map())
-        |│  │  │     ╰─ $ReduceF
-        |│  │  │        ├─ JavaScript(function (key, values) {
-        |│  │  │        │               var result = { "left": [], "right": [] };
-        |│  │  │        │               values.forEach(
-        |│  │  │        │                 function (value) {
-        |│  │  │        │                   result.left = result.left.concat(value.left);
-        |│  │  │        │                   result.right = result.right.concat(value.right)
-        |│  │  │        │                 });
-        |│  │  │        │               return result
-        |│  │  │        │             })
-        |│  │  │        ╰─ Scope(Map())
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ Doc
-        |│  │  │     ├─ NotExpr($left -> Size(0))
-        |│  │  │     ╰─ NotExpr($right -> Size(0))
-        |│  │  ├─ $UnwindF(DocField(BsonField.Name("right")))
-        |│  │  ├─ $UnwindF(DocField(BsonField.Name("left")))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ JsCore([_.left, _.right])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $ProjectF
-        |│  │  │  ├─ Name("0" -> { "$literal": true })
-        |│  │  │  ├─ Name("1" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  │  │  ├─ Name("src" -> "$$ROOT")
-        |│  │  │  ╰─ IgnoreId
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ And
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($0 -> Eq(Bool(true)))
-        |│  │  │     ╰─ Doc
-        |│  │  │        ╰─ Expr($1 -> Gt(Int32(10)))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ JsCore([
-        |│  │  │  │            _.src[0][0],
-        |│  │  │  │            (isObject(_.src[0][1]) && (! Array.isArray(_.src[0][1]))) ? _.src[0][1] : undefined,
-        |│  │  │  │            _.src[1] > 10])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; zips)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ JsCore([__val[0], __val[1]])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore([_.left, _.right])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> { "$literal": true })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(f0: _.src[0][1].city)
-        |│  │     ╰─ Key(b0: [
-        |│  │            (isObject(_.src[1][1]) && (! Array.isArray(_.src[1][1]))) ? _.src[1][1].city : undefined])
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  │  ╰─ Name("f0" -> { "$first": "$f0" })
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> "$b0")
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$f0")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan simple having filter"))
 
     "plan having with multiple projections" in {
       plan(sqlE"select city, sum(pop) from zips group by city having sum(pop) > 50000") must
@@ -1466,320 +1116,7 @@ class PlannerSpec extends
             "city" -> $field("_id", "0"),
             "1"    -> $include()),
           IgnoreId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $FoldLeftF
-        |│  │  │  ├─ Chain
-        |│  │  │  │  ├─ $FoldLeftF
-        |│  │  │  │  │  ├─ Chain
-        |│  │  │  │  │  │  ├─ $ReadF(db; zips)
-        |│  │  │  │  │  │  ├─ $SimpleMapF
-        |│  │  │  │  │  │  │  ├─ Map
-        |│  │  │  │  │  │  │  │  ╰─ Let(__val)
-        |│  │  │  │  │  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │  │  │  │  │     ╰─ JsCore([
-        |│  │  │  │  │  │  │  │               __val[0],
-        |│  │  │  │  │  │  │  │               __val[1],
-        |│  │  │  │  │  │  │  │               [
-        |│  │  │  │  │  │  │  │                 __val[0],
-        |│  │  │  │  │  │  │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│  │  │  │  │  │  │  │                 [
-        |│  │  │  │  │  │  │  │                   (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined],
-        |│  │  │  │  │  │  │  │                 __val[1]]])
-        |│  │  │  │  │  │  │  ╰─ Scope(Map())
-        |│  │  │  │  │  │  ├─ $GroupF
-        |│  │  │  │  │  │  │  ├─ Grouped
-        |│  │  │  │  │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-        |│  │  │  │  │  │  │  ╰─ By({ "$literal": null })
-        |│  │  │  │  │  │  ╰─ $ProjectF
-        |│  │  │  │  │  │     ├─ Name("_id" -> "$_id")
-        |│  │  │  │  │  │     ├─ Name("value")
-        |│  │  │  │  │  │     │  ├─ Name("left" -> "$0")
-        |│  │  │  │  │  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │  │  │  │  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │  │  │  │  │     ╰─ IncludeId
-        |│  │  │  │  │  ╰─ Chain
-        |│  │  │  │  │     ├─ $ReadF(db; zips)
-        |│  │  │  │  │     ├─ $SimpleMapF
-        |│  │  │  │  │     │  ├─ Map
-        |│  │  │  │  │     │  │  ╰─ Let(__val)
-        |│  │  │  │  │     │  │     ├─ Let(__val)
-        |│  │  │  │  │     │  │     │  ├─ JsCore([_._id, _])
-        |│  │  │  │  │     │  │     │  ╰─ JsCore([
-        |│  │  │  │  │     │  │     │            __val[0],
-        |│  │  │  │  │     │  │     │            __val[1],
-        |│  │  │  │  │     │  │     │            [
-        |│  │  │  │  │     │  │     │              __val[0],
-        |│  │  │  │  │     │  │     │              (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│  │  │  │  │     │  │     │              [
-        |│  │  │  │  │     │  │     │                (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined],
-        |│  │  │  │  │     │  │     │              __val[1]]])
-        |│  │  │  │  │     │  │     ╰─ Obj
-        |│  │  │  │  │     │  │        ╰─ Key(f0: ((isNumber(
-        |│  │  │  │  │     │  │               (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) || ((((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) instanceof NumberInt) || (((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) instanceof NumberLong))) && (isObject(__val[1]) && (! Array.isArray(__val[1])))) ? __val[1].pop : undefined)
-        |│  │  │  │  │     │  ╰─ Scope(Map())
-        |│  │  │  │  │     ├─ $GroupF
-        |│  │  │  │  │     │  ├─ Grouped
-        |│  │  │  │  │     │  │  ╰─ Name("f0" -> { "$sum": "$f0" })
-        |│  │  │  │  │     │  ╰─ By({ "$literal": null })
-        |│  │  │  │  │     ├─ $MapF
-        |│  │  │  │  │     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value.f0] }] })
-        |│  │  │  │  │     │  ╰─ Scope(Map())
-        |│  │  │  │  │     ╰─ $ReduceF
-        |│  │  │  │  │        ├─ JavaScript(function (key, values) {
-        |│  │  │  │  │        │               var result = { "left": [], "right": [] };
-        |│  │  │  │  │        │               values.forEach(
-        |│  │  │  │  │        │                 function (value) {
-        |│  │  │  │  │        │                   result.left = result.left.concat(value.left);
-        |│  │  │  │  │        │                   result.right = result.right.concat(value.right)
-        |│  │  │  │  │        │                 });
-        |│  │  │  │  │        │               return result
-        |│  │  │  │  │        │             })
-        |│  │  │  │  │        ╰─ Scope(Map())
-        |│  │  │  │  ├─ $MatchF
-        |│  │  │  │  │  ╰─ Doc
-        |│  │  │  │  │     ├─ NotExpr($left -> Size(0))
-        |│  │  │  │  │     ╰─ NotExpr($right -> Size(0))
-        |│  │  │  │  ├─ $UnwindF(DocField(BsonField.Name("right")))
-        |│  │  │  │  ├─ $UnwindF(DocField(BsonField.Name("left")))
-        |│  │  │  │  ├─ $SimpleMapF
-        |│  │  │  │  │  ├─ Map
-        |│  │  │  │  │  │  ╰─ JsCore([_.left, _.right])
-        |│  │  │  │  │  ╰─ Scope(Map())
-        |│  │  │  │  ├─ $ProjectF
-        |│  │  │  │  │  ├─ Name("0" -> { "$literal": true })
-        |│  │  │  │  │  ├─ Name("1" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  │  │  │  │  ├─ Name("src" -> "$$ROOT")
-        |│  │  │  │  │  ╰─ IgnoreId
-        |│  │  │  │  ├─ $MatchF
-        |│  │  │  │  │  ╰─ And
-        |│  │  │  │  │     ├─ Doc
-        |│  │  │  │  │     │  ╰─ Expr($0 -> Eq(Bool(true)))
-        |│  │  │  │  │     ╰─ Doc
-        |│  │  │  │  │        ╰─ Expr($1 -> Gt(Int32(50000)))
-        |│  │  │  │  ├─ $SimpleMapF
-        |│  │  │  │  │  ├─ Map
-        |│  │  │  │  │  │  ╰─ JsCore([
-        |│  │  │  │  │  │            _.src[0][0],
-        |│  │  │  │  │  │            (isObject(_.src[0][1]) && (! Array.isArray(_.src[0][1]))) ? _.src[0][1] : undefined,
-        |│  │  │  │  │  │            _.src[1] > 50000])
-        |│  │  │  │  │  ╰─ Scope(Map())
-        |│  │  │  │  ├─ $GroupF
-        |│  │  │  │  │  ├─ Grouped
-        |│  │  │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-        |│  │  │  │  │  ╰─ By({ "$literal": null })
-        |│  │  │  │  ╰─ $ProjectF
-        |│  │  │  │     ├─ Name("_id" -> "$_id")
-        |│  │  │  │     ├─ Name("value")
-        |│  │  │  │     │  ├─ Name("left" -> "$0")
-        |│  │  │  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │  │  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │  │  │     ╰─ IncludeId
-        |│  │  │  ╰─ Chain
-        |│  │  │     ├─ $ReadF(db; zips)
-        |│  │  │     ├─ $SimpleMapF
-        |│  │  │     │  ├─ Map
-        |│  │  │     │  │  ╰─ Let(__val)
-        |│  │  │     │  │     ├─ JsCore([_._id, _])
-        |│  │  │     │  │     ╰─ JsCore([
-        |│  │  │     │  │               __val[0],
-        |│  │  │     │  │               __val[1],
-        |│  │  │     │  │               [
-        |│  │  │     │  │                 __val[0],
-        |│  │  │     │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│  │  │     │  │                 [
-        |│  │  │     │  │                   (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined],
-        |│  │  │     │  │                 __val[1]]])
-        |│  │  │     │  ╰─ Scope(Map())
-        |│  │  │     ├─ $MapF
-        |│  │  │     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value] }] })
-        |│  │  │     │  ╰─ Scope(Map())
-        |│  │  │     ╰─ $ReduceF
-        |│  │  │        ├─ JavaScript(function (key, values) {
-        |│  │  │        │               var result = { "left": [], "right": [] };
-        |│  │  │        │               values.forEach(
-        |│  │  │        │                 function (value) {
-        |│  │  │        │                   result.left = result.left.concat(value.left);
-        |│  │  │        │                   result.right = result.right.concat(value.right)
-        |│  │  │        │                 });
-        |│  │  │        │               return result
-        |│  │  │        │             })
-        |│  │  │        ╰─ Scope(Map())
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ Doc
-        |│  │  │     ├─ NotExpr($left -> Size(0))
-        |│  │  │     ╰─ NotExpr($right -> Size(0))
-        |│  │  ├─ $UnwindF(DocField(BsonField.Name("right")))
-        |│  │  ├─ $UnwindF(DocField(BsonField.Name("left")))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ JsCore([_.left, _.right])
-        |│  │  │  │     ╰─ Obj
-        |│  │  │  │        ├─ Key(f0: __val[0][1].city)
-        |│  │  │  │        ╰─ Key(b0: [
-        |│  │  │  │               (isObject(__val[1][1]) && (! Array.isArray(__val[1][1]))) ? __val[1][1].city : undefined])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("f0" -> { "$first": "$f0" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$b0")
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$f0" })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $FoldLeftF
-        |│     │  ├─ Chain
-        |│     │  │  ├─ $ReadF(db; zips)
-        |│     │  │  ├─ $SimpleMapF
-        |│     │  │  │  ├─ Map
-        |│     │  │  │  │  ╰─ Let(__val)
-        |│     │  │  │  │     ├─ JsCore([_._id, _])
-        |│     │  │  │  │     ╰─ JsCore([
-        |│     │  │  │  │               __val[0],
-        |│     │  │  │  │               __val[1],
-        |│     │  │  │  │               [
-        |│     │  │  │  │                 __val[0],
-        |│     │  │  │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│     │  │  │  │                 [
-        |│     │  │  │  │                   (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined],
-        |│     │  │  │  │                 __val[1]]])
-        |│     │  │  │  ╰─ Scope(Map())
-        |│     │  │  ├─ $GroupF
-        |│     │  │  │  ├─ Grouped
-        |│     │  │  │  │  ╰─ Name("0" -> { "$push": { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] } })
-        |│     │  │  │  ╰─ By({ "$literal": null })
-        |│     │  │  ╰─ $ProjectF
-        |│     │  │     ├─ Name("_id" -> "$_id")
-        |│     │  │     ├─ Name("value")
-        |│     │  │     │  ├─ Name("left" -> "$0")
-        |│     │  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│     │  │     │  ╰─ Name("_id" -> "$_id")
-        |│     │  │     ╰─ IncludeId
-        |│     │  ╰─ Chain
-        |│     │     ├─ $ReadF(db; zips)
-        |│     │     ├─ $SimpleMapF
-        |│     │     │  ├─ Map
-        |│     │     │  │  ╰─ Let(__val)
-        |│     │     │  │     ├─ JsCore([_._id, _])
-        |│     │     │  │     ╰─ JsCore([
-        |│     │     │  │               __val[0],
-        |│     │     │  │               __val[1],
-        |│     │     │  │               [
-        |│     │     │  │                 __val[0],
-        |│     │     │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│     │     │  │                 [
-        |│     │     │  │                   (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined],
-        |│     │     │  │                 __val[1]]])
-        |│     │     │  ╰─ Scope(Map())
-        |│     │     ├─ $ProjectF
-        |│     │     │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] })
-        |│     │     │  ╰─ IgnoreId
-        |│     │     ├─ $SimpleMapF
-        |│     │     │  ├─ Map
-        |│     │     │  │  ╰─ Obj
-        |│     │     │  │     ├─ Key(f0: ((isNumber(
-        |│     │     │  │     │      (isObject(_["0"][3]) && (! Array.isArray(_["0"][3]))) ? _["0"][3].pop : undefined) || ((((isObject(_["0"][3]) && (! Array.isArray(_["0"][3]))) ? _["0"][3].pop : undefined) instanceof NumberInt) || (((isObject(_["0"][3]) && (! Array.isArray(_["0"][3]))) ? _["0"][3].pop : undefined) instanceof NumberLong))) && (isObject(_["0"][3]) && (! Array.isArray(_["0"][3])))) ? _["0"][3].pop : undefined)
-        |│     │     │  │     ╰─ Key(b0: [
-        |│     │     │  │            (isObject(_["0"][3]) && (! Array.isArray(_["0"][3]))) ? _["0"][3].city : undefined])
-        |│     │     │  ╰─ Scope(Map())
-        |│     │     ├─ $GroupF
-        |│     │     │  ├─ Grouped
-        |│     │     │  │  ╰─ Name("f0" -> { "$sum": "$f0" })
-        |│     │     │  ╰─ By
-        |│     │     │     ╰─ Name("0" -> "$b0")
-        |│     │     ├─ $MapF
-        |│     │     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value.f0] }] })
-        |│     │     │  ╰─ Scope(Map())
-        |│     │     ╰─ $ReduceF
-        |│     │        ├─ JavaScript(function (key, values) {
-        |│     │        │               var result = { "left": [], "right": [] };
-        |│     │        │               values.forEach(
-        |│     │        │                 function (value) {
-        |│     │        │                   result.left = result.left.concat(value.left);
-        |│     │        │                   result.right = result.right.concat(value.right)
-        |│     │        │                 });
-        |│     │        │               return result
-        |│     │        │             })
-        |│     │        ╰─ Scope(Map())
-        |│     ├─ $MatchF
-        |│     │  ╰─ Doc
-        |│     │     ├─ NotExpr($left -> Size(0))
-        |│     │     ╰─ NotExpr($right -> Size(0))
-        |│     ├─ $UnwindF(DocField(BsonField.Name("right")))
-        |│     ├─ $UnwindF(DocField(BsonField.Name("left")))
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([_.left, _.right])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $ProjectF
-        |│     │  ├─ Name("0" -> { "$literal": true })
-        |│     │  ├─ Name("1" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│     │  ├─ Name("src" -> "$$ROOT")
-        |│     │  ╰─ IgnoreId
-        |│     ├─ $MatchF
-        |│     │  ╰─ And
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($0 -> Eq(Bool(true)))
-        |│     │     ╰─ Doc
-        |│     │        ╰─ Expr($1 -> Gt(Int32(50000)))
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Obj
-        |│     │  │     ├─ Key(f0: (isNumber(_.src[0][1].pop) || ((_.src[0][1].pop instanceof NumberInt) || (_.src[0][1].pop instanceof NumberLong))) ? _.src[0][1].pop : undefined)
-        |│     │  │     ╰─ Key(b0: _.src[0][2])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $GroupF
-        |│     │  ├─ Grouped
-        |│     │  │  ╰─ Name("f0" -> { "$sum": "$f0" })
-        |│     │  ╰─ By
-        |│     │     ╰─ Name("0" -> "$b0")
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value.f0] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore([_.left, _.right])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> { "$literal": true })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |╰─ $ProjectF
-        |   ├─ Name("city" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ├─ Name("1" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] })
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan having with multiple projections"))
 
     "prefer projection+filter over JS filter" in {
       plan(sqlE"select * from zips where city <> state") must
@@ -1825,37 +1162,7 @@ class PlannerSpec extends
         $project(
           reshape("value" -> $field("__tmp5")),
           ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> "$pop")
-        |│  ├─ Name("1" -> { "$ne": ["$city", "$state"] })
-        |│  ├─ Name("2" -> "$pop")
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ And
-        |│     ├─ Or
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($0 -> Type(Int32))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($0 -> Type(Int64))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($0 -> Type(Dec))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($0 -> Type(Text))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($0 -> Type(Date))
-        |│     │  ╰─ Doc
-        |│     │     ╰─ Expr($0 -> Type(Bool))
-        |│     ├─ Doc
-        |│     │  ╰─ Expr($1 -> Eq(Bool(true)))
-        |│     ╰─ Doc
-        |│        ╰─ Expr($2 -> Lt(Int32(10000)))
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$src")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("prefer projection+filter over nested JS filter"))
 
     "filter on constant true" in {
       plan(sqlE"select * from zips where true") must
@@ -1915,44 +1222,14 @@ class PlannerSpec extends
           $project(
             reshape("value" -> $field("bar")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; foo)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ JsCore([_.bar, _])
-        |│  │     ╰─ Obj
-        |│  │        ├─ Key(0: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].bar : undefined)
-        |│  │        ╰─ Key(src: __val)
-        |│  ╰─ Scope(Map())
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Ascending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan simple sort with field in projection"))
 
     "plan simple sort with wildcard" in {
       plan(sqlE"select * from zips order by pop") must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "zips")),
           $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ JsCore([_, _])
-        |│  │     ╰─ Obj
-        |│  │        ├─ Key(0: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined)
-        |│  │        ╰─ Key(src: __val)
-        |│  ╰─ Scope(Map())
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Ascending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan simple sort with wildcard"))
 
     "plan sort with expression in key" in {
       plan(sqlE"select baz from foo order by bar/10") must
@@ -1977,26 +1254,7 @@ class PlannerSpec extends
           $project(
             reshape("baz" -> $field("baz")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; foo)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ Arr
-        |│  │     │  ├─ Obj
-        |│  │     │  │  ╰─ Key(baz: _.baz)
-        |│  │     │  ╰─ Ident(_)
-        |│  │     ╰─ Obj
-        |│  │        ├─ Key(0: (((isNumber(
-        |│  │        │      (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].bar : undefined) || ((((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].bar : undefined) instanceof NumberInt) || (((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].bar : undefined) instanceof NumberLong))) || (((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].bar : undefined) instanceof Date)) && (isObject(__val[1]) && (! Array.isArray(__val[1])))) ? __val[1].bar / 10 : undefined)
-        |│  │        ╰─ Key(src: __val)
-        |│  ╰─ Scope(Map())
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Ascending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan sort with expression in key"))
 
     "plan select with wildcard and field" in {
       plan(sqlE"select *, pop from zips") must
@@ -2024,19 +1282,7 @@ class PlannerSpec extends
                 obj(
                   "pop2"  -> Select(ident("x"), "pop"))))))),
             ListMap())))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |╰─ $SimpleMapF
-        |   ├─ Map
-        |   │  ╰─ SpliceObjects
-        |   │     ├─ SpliceObjects
-        |   │     │  ├─ Ident(_)
-        |   │     │  ╰─ Obj
-        |   │     │     ╰─ Key(city2: _.city)
-        |   │     ╰─ Obj
-        |   │        ╰─ Key(pop2: _.pop)
-        |   ╰─ Scope(Map())""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan select with wildcard and two fields"))
 
     "plan select with wildcard and two constants" in {
       plan(sqlE"""select *, "1", "2" from zips""") must
@@ -2051,19 +1297,7 @@ class PlannerSpec extends
                 obj(
                   "2" -> jscore.Literal(Js.Str("2")))))))),
             ListMap())))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |╰─ $SimpleMapF
-        |   ├─ Map
-        |   │  ╰─ SpliceObjects
-        |   │     ├─ SpliceObjects
-        |   │     │  ├─ Ident(_)
-        |   │     │  ╰─ Obj
-        |   │     │     ╰─ Key(1: "1")
-        |   │     ╰─ Obj
-        |   │        ╰─ Key(2: "2")
-        |   ╰─ Scope(Map())""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan select with wildcard and two constants"))
 
     "plan select with multiple wildcards and fields" in {
       plan(sqlE"select state as state2, *, city as city2, *, pop as pop2 from zips where pop < 1000") must
@@ -2089,41 +1323,7 @@ class PlannerSpec extends
           $project(
             reshape("value" -> $field("__tmp2")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $MatchF
-        |│  ╰─ And
-        |│     ├─ Or
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Int32))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Int64))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Dec))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Text))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Date))
-        |│     │  ╰─ Doc
-        |│     │     ╰─ Expr($pop -> Type(Bool))
-        |│     ╰─ Doc
-        |│        ╰─ Expr($pop -> Lt(Int32(1000)))
-        |╰─ $SimpleMapF
-        |   ├─ Map
-        |   │  ╰─ SpliceObjects
-        |   │     ├─ SpliceObjects
-        |   │     │  ├─ SpliceObjects
-        |   │     │  │  ├─ SpliceObjects
-        |   │     │  │  │  ├─ Obj
-        |   │     │  │  │  │  ╰─ Key(state2: _.state)
-        |   │     │  │  │  ╰─ Ident(_)
-        |   │     │  │  ╰─ Obj
-        |   │     │  │     ╰─ Key(city2: _.city)
-        |   │     │  ╰─ Ident(_)
-        |   │     ╰─ Obj
-        |   │        ╰─ Key(pop2: _.pop)
-        |   ╰─ Scope(Map())""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan select with multiple wildcards and fields"))
 
     "plan sort with wildcard and expression in key" in {
       plan(sqlE"select * from zips order by pop*10 desc") must
@@ -2154,23 +1354,7 @@ class PlannerSpec extends
           $project(
             reshape("value" -> $field("__tmp2")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ JsCore([remove(_, "__sd__0"), _])
-        |│  │     ╰─ Obj
-        |│  │        ├─ Key(0: ((isNumber(
-        |│  │        │      (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) || ((((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) instanceof NumberInt) || (((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) instanceof NumberLong))) && (isObject(__val[1]) && (! Array.isArray(__val[1])))) ? __val[1].pop * 10 : undefined)
-        |│  │        ╰─ Key(src: __val)
-        |│  ╰─ Scope(Map())
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Descending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan sort with wildcard and expression in key"))
 
     "plan simple sort with field not in projections" in {
       plan(sqlE"select name from person order by height") must
@@ -2185,25 +1369,7 @@ class PlannerSpec extends
           $project(
             reshape("name" -> $field("name")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; person)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ Arr
-        |│  │     │  ├─ Obj
-        |│  │     │  │  ╰─ Key(name: _.name)
-        |│  │     │  ╰─ Ident(_)
-        |│  │     ╰─ Obj
-        |│  │        ├─ Key(0: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].height : undefined)
-        |│  │        ╰─ Key(src: __val)
-        |│  ╰─ Scope(Map())
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Ascending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan simple sort with field not in projections"))
 
     "plan sort with expression and alias" in {
       plan(sqlE"select pop/1000 as popInK from zips order by popInK") must
@@ -2224,25 +1390,7 @@ class PlannerSpec extends
                   $literal(Bson.Undefined))),
             IgnoreId),
           $sort(NonEmptyList(BsonField.Name("popInK") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ Arr
-        |│  │     │  ├─ Obj
-        |│  │     │  │  ╰─ Key(popInK: ((isNumber(_.pop) || ((_.pop instanceof NumberInt) || (_.pop instanceof NumberLong))) || (_.pop instanceof Date)) ? _.pop / 1000 : undefined)
-        |│  │     │  ╰─ Ident(_)
-        |│  │     ╰─ Obj
-        |│  │        ├─ Key(0: ((isObject(__val[1]) && (! Array.isArray(__val[1]))) && ((isNumber(__val[1].pop) || ((__val[1].pop instanceof NumberInt) || (__val[1].pop instanceof NumberLong))) || (__val[1].pop instanceof Date))) ? __val[1].pop / 1000 : undefined)
-        |│  │        ╰─ Key(src: __val)
-        |│  ╰─ Scope(Map())
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Ascending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan sort with expression and alias"))
 
     "plan sort with filter" in {
       plan(sqlE"select city, pop from zips where pop <= 1000 order by pop desc, city") must
@@ -2260,45 +1408,7 @@ class PlannerSpec extends
           $sort(NonEmptyList(
             BsonField.Name("pop") -> SortDir.Descending,
             BsonField.Name("city") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $MatchF
-        |│  ╰─ And
-        |│     ├─ Or
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Int32))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Int64))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Dec))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Text))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Date))
-        |│     │  ╰─ Doc
-        |│     │     ╰─ Expr($pop -> Type(Bool))
-        |│     ╰─ Doc
-        |│        ╰─ Expr($pop -> Lte(Int32(1000)))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ Arr
-        |│  │     │  ├─ Obj
-        |│  │     │  │  ├─ Key(city: _.city)
-        |│  │     │  │  ╰─ Key(pop: _.pop)
-        |│  │     │  ╰─ Ident(_)
-        |│  │     ╰─ Obj
-        |│  │        ├─ Key(0: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined)
-        |│  │        ├─ Key(1: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined)
-        |│  │        ╰─ Key(src: __val)
-        |│  ╰─ Scope(Map())
-        |├─ $SortF
-        |│  ├─ SortKey(0 -> Descending)
-        |│  ╰─ SortKey(1 -> Ascending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan sort with filter"))
 
     "plan sort with expression, alias, and filter" in {
       plan(sqlE"select pop/1000 as popInK from zips where pop >= 1000 order by popInK") must
@@ -2322,43 +1432,7 @@ class PlannerSpec extends
                   $literal(Bson.Undefined))),
             ExcludeId),
           $sort(NonEmptyList(BsonField.Name("popInK") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $MatchF
-        |│  ╰─ And
-        |│     ├─ Or
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Int32))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Int64))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Dec))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Text))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Date))
-        |│     │  ╰─ Doc
-        |│     │     ╰─ Expr($pop -> Type(Bool))
-        |│     ╰─ Doc
-        |│        ╰─ Expr($pop -> Gte(Int32(1000)))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ Arr
-        |│  │     │  ├─ Obj
-        |│  │     │  │  ╰─ Key(popInK: ((isNumber(_.pop) || ((_.pop instanceof NumberInt) || (_.pop instanceof NumberLong))) || (_.pop instanceof Date)) ? _.pop / 1000 : undefined)
-        |│  │     │  ╰─ Ident(_)
-        |│  │     ╰─ Obj
-        |│  │        ├─ Key(0: (((isNumber(
-        |│  │        │      (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) || ((((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) instanceof NumberInt) || (((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) instanceof NumberLong))) || (((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) instanceof Date)) && (isObject(__val[1]) && (! Array.isArray(__val[1])))) ? __val[1].pop / 1000 : undefined)
-        |│  │        ╰─ Key(src: __val)
-        |│  ╰─ Scope(Map())
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Ascending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan sort with expression, alias, and filter"))
 
     "plan multiple column sort with wildcard" in {
       plan(sqlE"select * from zips order by pop, city desc") must
@@ -2367,28 +1441,7 @@ class PlannerSpec extends
          $sort(NonEmptyList(
            BsonField.Name("pop") -> SortDir.Ascending,
            BsonField.Name("city") -> SortDir.Descending))))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ Let(__val)
-        |│  │     │  ├─ JsCore([_._id, _])
-        |│  │     │  ╰─ JsCore([
-        |│  │     │            (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│  │     │            __val])
-        |│  │     ╰─ Obj
-        |│  │        ├─ Key(0: (isObject(__val[1][1]) && (! Array.isArray(__val[1][1]))) ? __val[1][1].pop : undefined)
-        |│  │        ├─ Key(1: (isObject(__val[1][1]) && (! Array.isArray(__val[1][1]))) ? __val[1][1].city : undefined)
-        |│  │        ╰─ Key(src: __val)
-        |│  ╰─ Scope(Map())
-        |├─ $SortF
-        |│  ├─ SortKey(0 -> Ascending)
-        |│  ╰─ SortKey(1 -> Descending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan multiple column sort with wildcard"))
 
     "plan many sort columns" in {
       plan(sqlE"select * from zips order by pop, state, city, a4, a5, a6") must
@@ -2401,36 +1454,7 @@ class PlannerSpec extends
            BsonField.Name("a4") -> SortDir.Ascending,
            BsonField.Name("a5") -> SortDir.Ascending,
            BsonField.Name("a6") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ Let(__val)
-        |│  │     │  ├─ JsCore([_._id, _])
-        |│  │     │  ╰─ JsCore([
-        |│  │     │            (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│  │     │            __val])
-        |│  │     ╰─ Obj
-        |│  │        ├─ Key(0: (isObject(__val[1][1]) && (! Array.isArray(__val[1][1]))) ? __val[1][1].pop : undefined)
-        |│  │        ├─ Key(1: (isObject(__val[1][1]) && (! Array.isArray(__val[1][1]))) ? __val[1][1].state : undefined)
-        |│  │        ├─ Key(2: (isObject(__val[1][1]) && (! Array.isArray(__val[1][1]))) ? __val[1][1].city : undefined)
-        |│  │        ├─ Key(3: (isObject(__val[1][1]) && (! Array.isArray(__val[1][1]))) ? __val[1][1].a4 : undefined)
-        |│  │        ├─ Key(4: (isObject(__val[1][1]) && (! Array.isArray(__val[1][1]))) ? __val[1][1].a5 : undefined)
-        |│  │        ├─ Key(5: (isObject(__val[1][1]) && (! Array.isArray(__val[1][1]))) ? __val[1][1].a6 : undefined)
-        |│  │        ╰─ Key(src: __val)
-        |│  ╰─ Scope(Map())
-        |├─ $SortF
-        |│  ├─ SortKey(0 -> Ascending)
-        |│  ├─ SortKey(1 -> Ascending)
-        |│  ├─ SortKey(2 -> Ascending)
-        |│  ├─ SortKey(3 -> Ascending)
-        |│  ├─ SortKey(4 -> Ascending)
-        |│  ╰─ SortKey(5 -> Ascending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan many sort columns"))
 
     "plan efficient count and field ref" in {
       plan(sqlE"SELECT city, COUNT(*) AS cnt FROM zips ORDER BY cnt DESC") must
@@ -2445,92 +1469,7 @@ class PlannerSpec extends
             $unwind(DocField("city")),
             $sort(NonEmptyList(BsonField.Name("cnt") -> SortDir.Descending)))
         }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; zips)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │     ╰─ JsCore([__val[0], __val[1]])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; zips)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ JsCore([__val[0], __val[1]])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $GroupF
-        |│     │  ├─ Grouped
-        |│     │  │  ╰─ Name("f0" -> { "$sum": { "$literal": NumberInt("1") } })
-        |│     │  ╰─ By({ "$literal": null })
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value.f0] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore([_.left, _.right])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> { "$literal": true })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Arr
-        |│  │     ├─ Obj
-        |│  │     │  ├─ Key(city: (isObject(_.src[0][1]) && (! Array.isArray(_.src[0][1]))) ? _.src[0][1].city : undefined)
-        |│  │     │  ╰─ Key(cnt: _.src[1])
-        |│  │     ╰─ JsCore(_.src)
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> {
-        |│  │       "$arrayElemAt": [
-        |│  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-        |│  │         { "$literal": NumberInt("1") }]
-        |│  │     })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Descending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan efficient count and field ref"))
 
     "plan count and js expr" in {
       plan(sqlE"SELECT COUNT(*) as cnt, LENGTH(city) FROM zips") must
@@ -2551,112 +1490,7 @@ class PlannerSpec extends
               \/-($literal(Bson.Null))),
             $unwind(DocField("1")))
         }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; zips)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │     ╰─ JsCore([
-        |│  │  │  │               __val[0],
-        |│  │  │  │               (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined,
-        |│  │  │  │               (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? NumberLong(__val[1].city.length) : undefined,
-        |│  │  │  │               __val[1]])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("f0" -> { "$sum": { "$literal": NumberInt("1") } })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$f0" })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; zips)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ JsCore([
-        |│     │  │               __val[0],
-        |│     │  │               (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined,
-        |│     │  │               (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? NumberLong(__val[1].city.length) : undefined,
-        |│     │  │               __val[1]])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore([_.left, _.right])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> { "$literal": true })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |╰─ $ProjectF
-        |   ├─ Name("cnt" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ├─ Name("1" -> {
-        |   │       "$cond": [
-        |   │         {
-        |   │           "$and": [
-        |   │             {
-        |   │               "$lte": [
-        |   │                 { "$literal": "" },
-        |   │                 {
-        |   │                   "$arrayElemAt": [
-        |   │                     { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] },
-        |   │                     { "$literal": NumberInt("1") }]
-        |   │                 }]
-        |   │             },
-        |   │             {
-        |   │               "$lt": [
-        |   │                 {
-        |   │                   "$arrayElemAt": [
-        |   │                     { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] },
-        |   │                     { "$literal": NumberInt("1") }]
-        |   │                 },
-        |   │                 { "$literal": {  } }]
-        |   │             }]
-        |   │         },
-        |   │         {
-        |   │           "$arrayElemAt": [
-        |   │             { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] },
-        |   │             { "$literal": NumberInt("2") }]
-        |   │         },
-        |   │         { "$literal": undefined }]
-        |   │     })
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan count and js expr"))
 
     "plan trivial group by" in {
       plan(sqlE"select city from zips group by city") must
@@ -2668,23 +1502,7 @@ class PlannerSpec extends
         $project(
           reshape("value" -> $field("_id", "0")),
           ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: [_.city])
-        |│  │     ╰─ Key(content: _)
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  │  ╰─ Name("f0" -> { "$first": "$content.city" })
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> "$0")
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$f0")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan trivial group by"))
 
     "plan useless group by expression" in {
       plan(sqlE"select city from zips group by lower(city)") must
@@ -2744,98 +1562,7 @@ class PlannerSpec extends
                 $field("__tmp11")),
             "1" -> $field("1")),
           IgnoreId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: [_.city, _.state])
-        |│  │     ╰─ Key(content: _)
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  │  ├─ Name("f0" -> {
-        |│  │  │       "$first": {
-        |│  │  │         "$cond": [
-        |│  │  │           {
-        |│  │  │             "$or": [
-        |│  │  │               {
-        |│  │  │                 "$and": [
-        |│  │  │                   { "$lte": [{ "$literal": [] }, "$content.city"] },
-        |│  │  │                   { "$lt": ["$content.city", { "$literal": BinData(0, "") }] }]
-        |│  │  │               },
-        |│  │  │               {
-        |│  │  │                 "$and": [
-        |│  │  │                   { "$lte": [{ "$literal": "" }, "$content.city"] },
-        |│  │  │                   { "$lt": ["$content.city", { "$literal": {  } }] }]
-        |│  │  │               }]
-        |│  │  │           },
-        |│  │  │           "$content.city",
-        |│  │  │           { "$literal": undefined }]
-        |│  │  │       }
-        |│  │  │     })
-        |│  │  ├─ Name("f1" -> {
-        |│  │  │       "$first": {
-        |│  │  │         "$cond": [
-        |│  │  │           {
-        |│  │  │             "$or": [
-        |│  │  │               {
-        |│  │  │                 "$and": [
-        |│  │  │                   { "$lte": [{ "$literal": [] }, "$content.state"] },
-        |│  │  │                   { "$lt": ["$content.state", { "$literal": BinData(0, "") }] }]
-        |│  │  │               },
-        |│  │  │               {
-        |│  │  │                 "$and": [
-        |│  │  │                   { "$lte": [{ "$literal": "" }, "$content.state"] },
-        |│  │  │                   { "$lt": ["$content.state", { "$literal": {  } }] }]
-        |│  │  │               }]
-        |│  │  │           },
-        |│  │  │           "$content.state",
-        |│  │  │           { "$literal": undefined }]
-        |│  │  │       }
-        |│  │  │     })
-        |│  │  ╰─ Name("f2" -> {
-        |│  │          "$sum": {
-        |│  │            "$cond": [
-        |│  │              {
-        |│  │                "$and": [
-        |│  │                  { "$lt": [{ "$literal": null }, "$content.pop"] },
-        |│  │                  { "$lt": ["$content.pop", { "$literal": "" }] }]
-        |│  │              },
-        |│  │              "$content.pop",
-        |│  │              { "$literal": undefined }]
-        |│  │          }
-        |│  │        })
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> "$0")
-        |╰─ $ProjectF
-        |   ├─ Name("0" -> {
-        |   │       "$let": {
-        |   │         "vars": {
-        |   │           "a1": {
-        |   │             "$let": {
-        |   │               "vars": { "a1": "$f0", "a2": { "$literal": ", " } },
-        |   │               "in": {
-        |   │                 "$cond": [
-        |   │                   { "$and": [{ "$isArray": "$$a1" }, { "$isArray": "$$a2" }] },
-        |   │                   { "$concatArrays": ["$$a1", "$$a2"] },
-        |   │                   { "$concat": ["$$a1", "$$a2"] }]
-        |   │               }
-        |   │             }
-        |   │           },
-        |   │           "a2": "$f1"
-        |   │         },
-        |   │         "in": {
-        |   │           "$cond": [
-        |   │             { "$and": [{ "$isArray": "$$a1" }, { "$isArray": "$$a2" }] },
-        |   │             { "$concatArrays": ["$$a1", "$$a2"] },
-        |   │             { "$concat": ["$$a1", "$$a2"] }]
-        |   │         }
-        |   │       }
-        |   │     })
-        |   ├─ Name("1" -> "$f2")
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan useful group by"))
 
     "plan group by expression" in {
       plan(sqlE"select city, sum(pop) from zips group by lower(city)") must
@@ -2861,103 +1588,7 @@ class PlannerSpec extends
                 $toLower($field("city")),
                 $literal(Bson.Undefined))))),
         $unwind(DocField(BsonField.Name("city")))))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; zips)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │     ╰─ JsCore([
-        |│  │  │  │               __val[0],
-        |│  │  │  │               [__val[0]],
-        |│  │  │  │               (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│  │  │  │               [
-        |│  │  │  │                 (isString(
-        |│  │  │  │                   (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined) && (isObject(__val[1]) && (! Array.isArray(__val[1])))) ? __val[1].city.toLowerCase() : undefined],
-        |│  │  │  │               __val[1]])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; zips)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ Let(__val)
-        |│     │  │     │  ├─ JsCore([_._id, _])
-        |│     │  │     │  ╰─ JsCore([
-        |│     │  │     │            __val[0],
-        |│     │  │     │            [__val[0]],
-        |│     │  │     │            (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│     │  │     │            [
-        |│     │  │     │              (isString(
-        |│     │  │     │                (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined) && (isObject(__val[1]) && (! Array.isArray(__val[1])))) ? __val[1].city.toLowerCase() : undefined],
-        |│     │  │     │            __val[1]])
-        |│     │  │     ╰─ Obj
-        |│     │  │        ├─ Key(f0: ((isNumber(
-        |│     │  │        │      (isObject(__val[4]) && (! Array.isArray(__val[4]))) ? __val[4].pop : undefined) || ((((isObject(__val[4]) && (! Array.isArray(__val[4]))) ? __val[4].pop : undefined) instanceof NumberInt) || (((isObject(__val[4]) && (! Array.isArray(__val[4]))) ? __val[4].pop : undefined) instanceof NumberLong))) && (isObject(__val[4]) && (! Array.isArray(__val[4])))) ? __val[4].pop : undefined)
-        |│     │  │        ╰─ Key(b0: [
-        |│     │  │               (isString(
-        |│     │  │                 (isObject(__val[4]) && (! Array.isArray(__val[4]))) ? __val[4].city : undefined) && (isObject(__val[4]) && (! Array.isArray(__val[4])))) ? __val[4].city.toLowerCase() : undefined])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $GroupF
-        |│     │  ├─ Grouped
-        |│     │  │  ╰─ Name("f0" -> { "$sum": "$f0" })
-        |│     │  ╰─ By
-        |│     │     ╰─ Name("0" -> "$b0")
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value.f0] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore([_.left, _.right])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> { "$literal": true })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(city: _.src[0][2].city)
-        |│  │     ╰─ Key(1: _.src[1])
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("city" -> true)
-        |   ├─ Name("1" -> true)
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan group by expression"))
 
     "plan group by month" in {
       plan(sqlE"""select avg(score) as a, DATE_PART("month", `date`) as m from caloriesBurnedData group by DATE_PART("month", `date`)""") must
@@ -2986,47 +1617,7 @@ class PlannerSpec extends
               "a" -> $include(),
               "m" -> $field("_id", "0")),
             IgnoreId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; caloriesBurnedData)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: [(_.date instanceof Date) ? _.date.getUTCMonth() + 1 : undefined])
-        |│  │     ╰─ Key(content: _)
-        |│  ╰─ Scope(Map())
-        |╰─ $GroupF
-        |   ├─ Grouped
-        |   │  ├─ Name("a" -> {
-        |   │  │       "$avg": {
-        |   │  │         "$cond": [
-        |   │  │           {
-        |   │  │             "$and": [
-        |   │  │               { "$lt": [{ "$literal": null }, "$content.score"] },
-        |   │  │               { "$lt": ["$content.score", { "$literal": "" }] }]
-        |   │  │           },
-        |   │  │           "$content.score",
-        |   │  │           { "$literal": undefined }]
-        |   │  │       }
-        |   │  │     })
-        |   │  ╰─ Name("m" -> {
-        |   │          "$first": {
-        |   │            "$cond": [
-        |   │              {
-        |   │                "$and": [
-        |   │                  {
-        |   │                    "$lte": [
-        |   │                      { "$literal": ISODate("-292275055-05-16T16:47:04.192Z") },
-        |   │                      "$content.date"]
-        |   │                  },
-        |   │                  { "$lt": ["$content.date", { "$literal": new RegExp("", "") }] }]
-        |   │              },
-        |   │              { "$month": "$content.date" },
-        |   │              { "$literal": undefined }]
-        |   │          }
-        |   │        })
-        |   ╰─ By
-        |      ╰─ Name("0" -> "$0")""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan group by month"))
 
     // FIXME: Needs an actual expectation
     "plan expr3 with grouping" in {
@@ -3052,22 +1643,7 @@ class PlannerSpec extends
                 "value" -> $field("__tmp0")),
               ExcludeId))
         }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; bar)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ╰─ Key(0: [_.baz])
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  │  ╰─ Name("f0" -> { "$sum": { "$literal": NumberInt("1") } })
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> "$0")
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$f0")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan count grouped by single field"))
 
     "plan count and sum grouped by single field" in {
       plan(sqlE"select count(*) as cnt, sum(biz) as sm from bar group by baz") must
@@ -3087,32 +1663,7 @@ class PlannerSpec extends
                       $literal(Bson.Undefined)))),
               -\/(reshape("0" -> $field("baz")))))
         }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; bar)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: [_.baz])
-        |│  │     ╰─ Key(content: _)
-        |│  ╰─ Scope(Map())
-        |╰─ $GroupF
-        |   ├─ Grouped
-        |   │  ├─ Name("cnt" -> { "$sum": { "$literal": NumberInt("1") } })
-        |   │  ╰─ Name("sm" -> {
-        |   │          "$sum": {
-        |   │            "$cond": [
-        |   │              {
-        |   │                "$and": [
-        |   │                  { "$lt": [{ "$literal": null }, "$content.biz"] },
-        |   │                  { "$lt": ["$content.biz", { "$literal": "" }] }]
-        |   │              },
-        |   │              "$content.biz",
-        |   │              { "$literal": undefined }]
-        |   │          }
-        |   │        })
-        |   ╰─ By
-        |      ╰─ Name("0" -> "$0")""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan count and sum grouped by single field"))
 
     "plan sum grouped by single field with filter" in {
       plan(sqlE"""select sum(pop) as sm from zips where state="CO" group by city""") must
@@ -3132,34 +1683,7 @@ class PlannerSpec extends
                     $literal(Bson.Undefined)))),
               -\/(reshape("0" -> $field("city")))))
         }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($state -> Eq(Text(CO)))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: [_.city])
-        |│  │     ╰─ Key(content: _)
-        |│  ╰─ Scope(Map())
-        |╰─ $GroupF
-        |   ├─ Grouped
-        |   │  ╰─ Name("sm" -> {
-        |   │          "$sum": {
-        |   │            "$cond": [
-        |   │              {
-        |   │                "$and": [
-        |   │                  { "$lt": [{ "$literal": null }, "$content.pop"] },
-        |   │                  { "$lt": ["$content.pop", { "$literal": "" }] }]
-        |   │              },
-        |   │              "$content.pop",
-        |   │              { "$literal": undefined }]
-        |   │          }
-        |   │        })
-        |   ╰─ By
-        |      ╰─ Name("0" -> "$0")""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan sum grouped by single field with filter"))
 
     "plan count and field when grouped" in {
       plan(sqlE"select count(*) as cnt, city from zips group by city") must
@@ -3176,21 +1700,7 @@ class PlannerSpec extends
                 "city" -> $field("_id", "0")),
               IgnoreId))
         }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: [_.city])
-        |│  │     ╰─ Key(content: _)
-        |│  ╰─ Scope(Map())
-        |╰─ $GroupF
-        |   ├─ Grouped
-        |   │  ├─ Name("cnt" -> { "$sum": { "$literal": NumberInt("1") } })
-        |   │  ╰─ Name("city" -> { "$first": "$content.city" })
-        |   ╰─ By
-        |      ╰─ Name("0" -> "$0")""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan count and field when grouped"))
 
     "collect unaggregated fields into single doc when grouping" in {
       plan(sqlE"select city, state, sum(pop) from zips") must
@@ -3222,96 +1732,7 @@ class PlannerSpec extends
             "state" -> $field("__tmp3", "state"),
             "2"     -> $field("2")),
           IgnoreId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; zips)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │     ╰─ Arr
-        |│  │  │  │        ├─ JsCore(__val[0])
-        |│  │  │  │        ├─ Obj
-        |│  │  │  │        │  ╰─ Key(city: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined)
-        |│  │  │  │        ├─ Obj
-        |│  │  │  │        │  ╰─ Key(state: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].state : undefined)
-        |│  │  │  │        ╰─ JsCore(__val[1])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; zips)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ Let(__val)
-        |│     │  │     │  ├─ JsCore([_._id, _])
-        |│     │  │     │  ╰─ Arr
-        |│     │  │     │     ├─ JsCore(__val[0])
-        |│     │  │     │     ├─ Obj
-        |│     │  │     │     │  ╰─ Key(city: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined)
-        |│     │  │     │     ├─ Obj
-        |│     │  │     │     │  ╰─ Key(state: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].state : undefined)
-        |│     │  │     │     ╰─ JsCore(__val[1])
-        |│     │  │     ╰─ Obj
-        |│     │  │        ╰─ Key(f0: ((isNumber(
-        |│     │  │               (isObject(__val[3]) && (! Array.isArray(__val[3]))) ? __val[3].pop : undefined) || ((((isObject(__val[3]) && (! Array.isArray(__val[3]))) ? __val[3].pop : undefined) instanceof NumberInt) || (((isObject(__val[3]) && (! Array.isArray(__val[3]))) ? __val[3].pop : undefined) instanceof NumberLong))) && (isObject(__val[3]) && (! Array.isArray(__val[3])))) ? __val[3].pop : undefined)
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $GroupF
-        |│     │  ├─ Grouped
-        |│     │  │  ╰─ Name("f0" -> { "$sum": "$f0" })
-        |│     │  ╰─ By({ "$literal": null })
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value.f0] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore([_.left, _.right])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> { "$literal": true })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |╰─ $SimpleMapF
-        |   ├─ Map
-        |   │  ╰─ SpliceObjects
-        |   │     ├─ SpliceObjects
-        |   │     │  ├─ JsCore(_.src[0][1])
-        |   │     │  ╰─ JsCore(_.src[0][2])
-        |   │     ╰─ Obj
-        |   │        ╰─ Key(2: _.src[1])
-        |   ╰─ Scope(Map())""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("collect unaggregated fields into single doc when grouping"))
 
     "plan unaggregated field when grouping, second case" in {
       // NB: the point being that we don't want to push $$ROOT
@@ -3341,85 +1762,7 @@ class PlannerSpec extends
                 "pop" -> $field("pop")),
               IgnoreId))
         }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; zips)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ Let(__val)
-        |│  │  │  │     │  ├─ JsCore([_._id, _])
-        |│  │  │  │     │  ╰─ JsCore([__val[0], __val[1]])
-        |│  │  │  │     ╰─ Obj
-        |│  │  │  │        ╰─ Key(f0: (((isNumber(
-        |│  │  │  │               (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) || ((((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) instanceof NumberInt) || (((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) instanceof NumberLong))) || (((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) instanceof Date)) && (isObject(__val[1]) && (! Array.isArray(__val[1])))) ? __val[1].pop : undefined)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("f0" -> { "$max": "$f0" })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$f0" })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; zips)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ JsCore([__val[0], __val[1]])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore([_.left, _.right])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> { "$literal": true })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: _.src[0] / 1000)
-        |│  │     ╰─ Key(pop: (isObject(_.src[1][1]) && (! Array.isArray(_.src[1][1]))) ? _.src[1][1].pop : undefined)
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("0" -> true)
-        |   ├─ Name("pop" -> true)
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan unaggregated field when grouping, second case"))
 
     "plan double aggregation with another projection" in {
       plan(sqlE"select sum(avg(pop)), min(city) from zips group by foo") must
@@ -3454,162 +1797,7 @@ class PlannerSpec extends
               \/-($literal(Bson.Null))),
             $unwind(DocField("1")))
         }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; zips)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Obj
-        |│  │  │  │     ├─ Key(0: [_.foo])
-        |│  │  │  │     ╰─ Key(content: _)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ├─ Name("f0" -> {
-        |│  │  │  │  │       "$avg": {
-        |│  │  │  │  │         "$cond": [
-        |│  │  │  │  │           {
-        |│  │  │  │  │             "$and": [
-        |│  │  │  │  │               { "$lt": [{ "$literal": null }, "$content.pop"] },
-        |│  │  │  │  │               { "$lt": ["$content.pop", { "$literal": "" }] }]
-        |│  │  │  │  │           },
-        |│  │  │  │  │           "$content.pop",
-        |│  │  │  │  │           { "$literal": undefined }]
-        |│  │  │  │  │       }
-        |│  │  │  │  │     })
-        |│  │  │  │  ╰─ Name("f1" -> {
-        |│  │  │  │          "$min": {
-        |│  │  │  │            "$cond": [
-        |│  │  │  │              {
-        |│  │  │  │                "$or": [
-        |│  │  │  │                  {
-        |│  │  │  │                    "$and": [
-        |│  │  │  │                      { "$lt": [{ "$literal": null }, "$content.city"] },
-        |│  │  │  │                      { "$lt": ["$content.city", { "$literal": {  } }] }]
-        |│  │  │  │                  },
-        |│  │  │  │                  {
-        |│  │  │  │                    "$and": [
-        |│  │  │  │                      { "$lte": [{ "$literal": false }, "$content.city"] },
-        |│  │  │  │                      { "$lt": ["$content.city", { "$literal": new RegExp("", "") }] }]
-        |│  │  │  │                  }]
-        |│  │  │  │              },
-        |│  │  │  │              "$content.city",
-        |│  │  │  │              { "$literal": undefined }]
-        |│  │  │  │          }
-        |│  │  │  │        })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$0")
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ JsCore([[_._id["0"]], _.f0, [[_._id["0"]], _.f1]])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("f0" -> { "$sum": { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] } })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$f0" })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; zips)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Obj
-        |│     │  │     ├─ Key(0: [_.foo])
-        |│     │  │     ╰─ Key(content: _)
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $GroupF
-        |│     │  ├─ Grouped
-        |│     │  │  ├─ Name("f0" -> {
-        |│     │  │  │       "$avg": {
-        |│     │  │  │         "$cond": [
-        |│     │  │  │           {
-        |│     │  │  │             "$and": [
-        |│     │  │  │               { "$lt": [{ "$literal": null }, "$content.pop"] },
-        |│     │  │  │               { "$lt": ["$content.pop", { "$literal": "" }] }]
-        |│     │  │  │           },
-        |│     │  │  │           "$content.pop",
-        |│     │  │  │           { "$literal": undefined }]
-        |│     │  │  │       }
-        |│     │  │  │     })
-        |│     │  │  ╰─ Name("f1" -> {
-        |│     │  │          "$min": {
-        |│     │  │            "$cond": [
-        |│     │  │              {
-        |│     │  │                "$or": [
-        |│     │  │                  {
-        |│     │  │                    "$and": [
-        |│     │  │                      { "$lt": [{ "$literal": null }, "$content.city"] },
-        |│     │  │                      { "$lt": ["$content.city", { "$literal": {  } }] }]
-        |│     │  │                  },
-        |│     │  │                  {
-        |│     │  │                    "$and": [
-        |│     │  │                      { "$lte": [{ "$literal": false }, "$content.city"] },
-        |│     │  │                      { "$lt": ["$content.city", { "$literal": new RegExp("", "") }] }]
-        |│     │  │                  }]
-        |│     │  │              },
-        |│     │  │              "$content.city",
-        |│     │  │              { "$literal": undefined }]
-        |│     │  │          }
-        |│     │  │        })
-        |│     │  ╰─ By
-        |│     │     ╰─ Name("0" -> "$0")
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([[_._id["0"]], _.f0, [[_._id["0"]], _.f1]])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $ProjectF
-        |│     │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] })
-        |│     │  ╰─ IgnoreId
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value["0"]] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore([_.left, _.right])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> { "$literal": true })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |╰─ $ProjectF
-        |   ├─ Name("0" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ├─ Name("1" -> {
-        |   │       "$arrayElemAt": [
-        |   │         { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] },
-        |   │         { "$literal": NumberInt("1") }]
-        |   │     })
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan double aggregation with another projection"))
 
     "plan aggregation on grouped field" in {
       plan(sqlE"select city, count(city) from zips group by city") must
@@ -3626,21 +1814,7 @@ class PlannerSpec extends
                 "1"    -> $include()),
               IgnoreId))
         }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: [_.city])
-        |│  │     ╰─ Key(content: _)
-        |│  ╰─ Scope(Map())
-        |╰─ $GroupF
-        |   ├─ Grouped
-        |   │  ├─ Name("city" -> { "$first": "$content.city" })
-        |   │  ╰─ Name("1" -> { "$sum": { "$literal": NumberInt("1") } })
-        |   ╰─ By
-        |      ╰─ Name("0" -> "$0")""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan aggregation on grouped field"))
 
     "plan multiple expressions using same field" in {
       plan(sqlE"select pop, sum(pop), pop/1000 from zips") must
@@ -3682,154 +1856,7 @@ class PlannerSpec extends
             "1"   -> $field("1"),
             "2"   -> $field("__tmp5", "2")),
           IgnoreId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $FoldLeftF
-        |│  │  │  ├─ Chain
-        |│  │  │  │  ├─ $ReadF(db; zips)
-        |│  │  │  │  ├─ $SimpleMapF
-        |│  │  │  │  │  ├─ Map
-        |│  │  │  │  │  │  ╰─ Let(__val)
-        |│  │  │  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │  │  │     ╰─ JsCore([
-        |│  │  │  │  │  │               __val[0],
-        |│  │  │  │  │  │               __val[1],
-        |│  │  │  │  │  │               [
-        |│  │  │  │  │  │                 __val[0],
-        |│  │  │  │  │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined,
-        |│  │  │  │  │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop / 1000 : undefined]])
-        |│  │  │  │  │  ╰─ Scope(Map())
-        |│  │  │  │  ├─ $GroupF
-        |│  │  │  │  │  ├─ Grouped
-        |│  │  │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-        |│  │  │  │  │  ╰─ By({ "$literal": null })
-        |│  │  │  │  ╰─ $ProjectF
-        |│  │  │  │     ├─ Name("_id" -> "$_id")
-        |│  │  │  │     ├─ Name("value")
-        |│  │  │  │     │  ├─ Name("left" -> "$0")
-        |│  │  │  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │  │  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │  │  │     ╰─ IncludeId
-        |│  │  │  ╰─ Chain
-        |│  │  │     ├─ $ReadF(db; zips)
-        |│  │  │     ├─ $SimpleMapF
-        |│  │  │     │  ├─ Map
-        |│  │  │     │  │  ╰─ Let(__val)
-        |│  │  │     │  │     ├─ Let(__val)
-        |│  │  │     │  │     │  ├─ JsCore([_._id, _])
-        |│  │  │     │  │     │  ╰─ JsCore([
-        |│  │  │     │  │     │            __val[0],
-        |│  │  │     │  │     │            __val[1],
-        |│  │  │     │  │     │            [
-        |│  │  │     │  │     │              __val[0],
-        |│  │  │     │  │     │              (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined,
-        |│  │  │     │  │     │              (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop / 1000 : undefined]])
-        |│  │  │     │  │     ╰─ Obj
-        |│  │  │     │  │        ╰─ Key(f0: ((isNumber(
-        |│  │  │     │  │               (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) || ((((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) instanceof NumberInt) || (((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) instanceof NumberLong))) && (isObject(__val[1]) && (! Array.isArray(__val[1])))) ? __val[1].pop : undefined)
-        |│  │  │     │  ╰─ Scope(Map())
-        |│  │  │     ├─ $GroupF
-        |│  │  │     │  ├─ Grouped
-        |│  │  │     │  │  ╰─ Name("f0" -> { "$sum": "$f0" })
-        |│  │  │     │  ╰─ By({ "$literal": null })
-        |│  │  │     ├─ $MapF
-        |│  │  │     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value.f0] }] })
-        |│  │  │     │  ╰─ Scope(Map())
-        |│  │  │     ╰─ $ReduceF
-        |│  │  │        ├─ JavaScript(function (key, values) {
-        |│  │  │        │               var result = { "left": [], "right": [] };
-        |│  │  │        │               values.forEach(
-        |│  │  │        │                 function (value) {
-        |│  │  │        │                   result.left = result.left.concat(value.left);
-        |│  │  │        │                   result.right = result.right.concat(value.right)
-        |│  │  │        │                 });
-        |│  │  │        │               return result
-        |│  │  │        │             })
-        |│  │  │        ╰─ Scope(Map())
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ Doc
-        |│  │  │     ├─ NotExpr($left -> Size(0))
-        |│  │  │     ╰─ NotExpr($right -> Size(0))
-        |│  │  ├─ $UnwindF(DocField(BsonField.Name("right")))
-        |│  │  ├─ $UnwindF(DocField(BsonField.Name("left")))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ JsCore([_.left, _.right])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; zips)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ JsCore([
-        |│     │  │               __val[0],
-        |│     │  │               __val[1],
-        |│     │  │               [
-        |│     │  │                 __val[0],
-        |│     │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined,
-        |│     │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop / 1000 : undefined]])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Arr
-        |│  │     ├─ Arr
-        |│  │     │  ├─ JsCore(_.left[0][0])
-        |│  │     │  ├─ Obj
-        |│  │     │  │  ╰─ Key(pop: (isObject(_.left[0][1]) && (! Array.isArray(_.left[0][1]))) ? _.left[0][1].pop : undefined)
-        |│  │     │  ╰─ Obj
-        |│  │     │     ╰─ Key(1: _.left[1])
-        |│  │     ╰─ JsCore(_.right[2])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> { "$literal": true })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |╰─ $SimpleMapF
-        |   ├─ Map
-        |   │  ╰─ SpliceObjects
-        |   │     ├─ SpliceObjects
-        |   │     │  ├─ JsCore(_.src[0][1])
-        |   │     │  ╰─ JsCore(_.src[0][2])
-        |   │     ╰─ Obj
-        |   │        ╰─ Key(2: ((isNumber(_.src[1][1]) || ((_.src[1][1] instanceof NumberInt) || (_.src[1][1] instanceof NumberLong))) || (_.src[1][1] instanceof Date)) ? _.src[1][2] : undefined)
-        |   ╰─ Scope(Map())""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan multiple expressions using same field"))
 
     "plan sum of expression in expression with another projection when grouped" in {
       plan(sqlE"select city, sum(pop-1)/1000 from zips group by city") must
@@ -3851,53 +1878,7 @@ class PlannerSpec extends
             "city" -> $field("_id", "0"),
             "1"    -> divide($field("__tmp6"), $literal(Bson.Int32(1000)))),
           IgnoreId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: [_.city])
-        |│  │     ╰─ Key(content: _)
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  │  ├─ Name("f0" -> { "$first": "$content.city" })
-        |│  │  ╰─ Name("f1" -> {
-        |│  │          "$sum": {
-        |│  │            "$cond": [
-        |│  │              {
-        |│  │                "$and": [
-        |│  │                  { "$lt": [{ "$literal": null }, "$content.pop"] },
-        |│  │                  { "$lt": ["$content.pop", { "$literal": "" }] }]
-        |│  │              },
-        |│  │              { "$subtract": ["$content.pop", { "$literal": NumberInt("1") }] },
-        |│  │              { "$literal": undefined }]
-        |│  │          }
-        |│  │        })
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> "$0")
-        |╰─ $ProjectF
-        |   ├─ Name("city" -> "$f0")
-        |   ├─ Name("1" -> {
-        |   │       "$cond": [
-        |   │         {
-        |   │           "$eq": [{ "$literal": NumberInt("1000") }, { "$literal": NumberInt("0") }]
-        |   │         },
-        |   │         {
-        |   │           "$cond": [
-        |   │             { "$eq": ["$f1", { "$literal": NumberInt("0") }] },
-        |   │             { "$literal": NaN },
-        |   │             {
-        |   │               "$cond": [
-        |   │                 { "$gt": ["$f1", { "$literal": NumberInt("0") }] },
-        |   │                 { "$literal": Infinity },
-        |   │                 { "$literal": -Infinity }]
-        |   │             }]
-        |   │         },
-        |   │         { "$divide": ["$f1", { "$literal": NumberInt("1000") }] }]
-        |   │     })
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan sum of expression in expression with another projection when grouped"))
 
     "plan length of min (JS on top of reduce)" in {
       plan3_2(sqlE"select state, length(min(city)) as shortest from zips group by state") must
@@ -3931,42 +1912,7 @@ class PlannerSpec extends
               "state"    -> $include(),
               "shortest" -> $include()),
             IgnoreId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: [_.state])
-        |│  │     ╰─ Key(content: _)
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  │  ├─ Name("f0" -> { "$first": "$content.state" })
-        |│  │  ╰─ Name("f1" -> {
-        |│  │          "$min": {
-        |│  │            "$cond": [
-        |│  │              {
-        |│  │                "$and": [
-        |│  │                  { "$lte": [{ "$literal": "" }, "$content.city"] },
-        |│  │                  { "$lt": ["$content.city", { "$literal": {  } }] }]
-        |│  │              },
-        |│  │              "$content.city",
-        |│  │              { "$literal": undefined }]
-        |│  │          }
-        |│  │        })
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> "$0")
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(state: _.f0)
-        |│  │     ╰─ Key(shortest: NumberLong(_.f1.length))
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("state" -> true)
-        |   ├─ Name("shortest" -> true)
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan length of min (JS on top of reduce)"))
 
     "plan js expr grouped by js expr" in {
       plan3_2(sqlE"select length(city) as len, count(*) as cnt from zips group by length(city)") must
@@ -4064,28 +2010,7 @@ class PlannerSpec extends
               reshape("value" -> $field("__tmp2")),
               ExcludeId))
         }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; usa_factbook)
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> {
-        |│  │       "$cond": [
-        |│  │         {
-        |│  │           "$and": [
-        |│  │             { "$lte": [{ "$literal": {  } }, "$geo"] },
-        |│  │             { "$lt": ["$geo", { "$literal": [] }] }]
-        |│  │         },
-        |│  │         "$geo",
-        |│  │         { "$literal": undefined }]
-        |│  │     })
-        |│  ╰─ IgnoreId
-        |├─ $SimpleMapF
-        |│  ├─ Flatten
-        |│  │  ╰─ JsCore(_["0"])
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$0")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan object flatten"))
 
     "plan array project with concat (3.0-)" in {
       plan3_0(sqlE"select city, loc[0] from zips") must
@@ -4150,16 +2075,7 @@ class PlannerSpec extends
               reshape("value" -> $field("__tmp4")),
               ExcludeId))
         }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($city -> Eq(Text(BOULDER)))
-        |╰─ $SimpleMapF
-        |   ├─ Map
-        |   │  ╰─ JsCore((Array.isArray(_.loc) || isString(_.loc)) ? (Array.isArray(_.loc) || Array.isArray([_.pop])) ? _.loc.concat([_.pop]) : _.loc + [_.pop] : undefined)
-        |   ╰─ Scope(Map())""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan array concat with filter"))
 
     "plan array flatten" in {
       plan(sqlE"select loc[*] from zips") must
@@ -4181,28 +2097,7 @@ class PlannerSpec extends
               reshape("value" -> $field("__tmp2")),
               ExcludeId))
         }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> {
-        |│  │       "$cond": [
-        |│  │         {
-        |│  │           "$and": [
-        |│  │             { "$lte": [{ "$literal": [] }, "$loc"] },
-        |│  │             { "$lt": ["$loc", { "$literal": BinData(0, "") }] }]
-        |│  │         },
-        |│  │         "$loc",
-        |│  │         { "$literal": undefined }]
-        |│  │     })
-        |│  ╰─ IgnoreId
-        |├─ $SimpleMapF
-        |│  ├─ Flatten
-        |│  │  ╰─ JsCore(_["0"])
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$0")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan array flatten"))
 
     "plan array concat" in {
       plan(sqlE"select loc || [ 0, 1, 2 ] from zips") must beWorkflow0 {
@@ -4228,42 +2123,7 @@ class PlannerSpec extends
             reshape("value" -> $field("__tmp4")),
             ExcludeId))
       }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> {
-        |   │       "$cond": [
-        |   │         {
-        |   │           "$or": [
-        |   │             {
-        |   │               "$and": [
-        |   │                 { "$lte": [{ "$literal": [] }, "$loc"] },
-        |   │                 { "$lt": ["$loc", { "$literal": BinData(0, "") }] }]
-        |   │             },
-        |   │             {
-        |   │               "$and": [
-        |   │                 { "$lte": [{ "$literal": "" }, "$loc"] },
-        |   │                 { "$lt": ["$loc", { "$literal": {  } }] }]
-        |   │             }]
-        |   │         },
-        |   │         {
-        |   │           "$let": {
-        |   │             "vars": {
-        |   │               "a1": "$loc",
-        |   │               "a2": { "$literal": [NumberInt("0"), NumberInt("1"), NumberInt("2")] }
-        |   │             },
-        |   │             "in": {
-        |   │               "$cond": [
-        |   │                 { "$and": [{ "$isArray": "$$a1" }, { "$isArray": "$$a2" }] },
-        |   │                 { "$concatArrays": ["$$a1", "$$a2"] },
-        |   │                 { "$concat": ["$$a1", "$$a2"] }]
-        |   │             }
-        |   │           }
-        |   │         },
-        |   │         { "$literal": undefined }]
-        |   │     })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan array concat"))
 
     "plan array flatten with unflattened field" in {
       plan(sqlE"SELECT `_id` as zip, loc as loc, loc[*] as coord FROM zips") must
@@ -4289,46 +2149,7 @@ class PlannerSpec extends
                 "coord" -> $field("__tmp2")),
               IgnoreId))
         }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |╰─ $SimpleMapF
-        |   ├─ Map
-        |   │  ╰─ Obj
-        |   │     ├─ Key(s)
-        |   │     │  ╰─ Let(__val)
-        |   │     │     ├─ JsCore([_._id, _])
-        |   │     │     ╰─ Arr
-        |   │     │        ├─ Obj
-        |   │     │        │  ╰─ Key(zip: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1]._id : undefined)
-        |   │     │        ├─ Obj
-        |   │     │        │  ╰─ Key(loc: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].loc : undefined)
-        |   │     │        ╰─ JsCore([
-        |   │     │                  __val[0],
-        |   │     │                  (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].loc : undefined])
-        |   │     ╰─ Key(f)
-        |   │        ╰─ Let(__val)
-        |   │           ├─ Let(__val)
-        |   │           │  ├─ JsCore([_._id, _])
-        |   │           │  ╰─ Arr
-        |   │           │     ├─ Obj
-        |   │           │     │  ╰─ Key(zip: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1]._id : undefined)
-        |   │           │     ├─ Obj
-        |   │           │     │  ╰─ Key(loc: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].loc : undefined)
-        |   │           │     ╰─ JsCore([
-        |   │           │               __val[0],
-        |   │           │               (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].loc : undefined])
-        |   │           ╰─ JsCore(Array.isArray(__val[2][1]) ? __val[2][1] : undefined)
-        |   ├─ Flatten
-        |   │  ╰─ JsCore(_.f)
-        |   ├─ Map
-        |   │  ╰─ SpliceObjects
-        |   │     ├─ SpliceObjects
-        |   │     │  ├─ JsCore(_.s[0])
-        |   │     │  ╰─ JsCore(_.s[1])
-        |   │     ╰─ Obj
-        |   │        ╰─ Key(coord: _.f)
-        |   ╰─ Scope(Map())""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan array flatten with unflattened field"))
 
     "unify flattened fields" in {
       plan(sqlE"select loc[*] from zips where loc[*] < 0") must
@@ -4350,51 +2171,7 @@ class PlannerSpec extends
         $project(
           reshape("value" -> $field("__tmp6")),
           ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(s: (function (__val) {
-        |│  │     │      return [
-        |│  │     │        __val[0],
-        |│  │     │        __val[1],
-        |│  │     │        [
-        |│  │     │          __val[0],
-        |│  │     │          (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].loc : undefined]]
-        |│  │     │    })(
-        |│  │     │      [_._id, _]))
-        |│  │     ╰─ Key(f: (function (__val) { return Array.isArray(__val[2][1]) ? __val[2][1] : undefined })(
-        |│  │            (function (__val) {
-        |│  │              return [
-        |│  │                __val[0],
-        |│  │                __val[1],
-        |│  │                [
-        |│  │                  __val[0],
-        |│  │                  (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].loc : undefined]]
-        |│  │            })(
-        |│  │              [_._id, _])))
-        |│  ├─ Flatten
-        |│  │  ╰─ JsCore(_.f)
-        |│  ├─ Map
-        |│  │  ╰─ JsCore([
-        |│  │            (isObject(_.s[1]) && (! Array.isArray(_.s[1]))) ? _.s[1] : undefined,
-        |│  │            _.f < 0])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |╰─ $SimpleMapF
-        |   ├─ Map
-        |   │  ╰─ JsCore(Array.isArray(_.src[0].loc) ? _.src[0].loc : undefined)
-        |   ├─ Flatten
-        |   │  ╰─ Ident(_)
-        |   ╰─ Scope(Map())""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("unify flattened fields"))
 
     "group by flattened field" in {
       plan(sqlE"select substring(parents[*].sha, 0, 1), count(*) from slamengine_commits group by substring(parents[*].sha, 0, 1)") must
@@ -4427,198 +2204,7 @@ class PlannerSpec extends
             "0" -> $field("_id", "0"),
             "1" -> $include()),
           IgnoreId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; slamengine_commits)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │     ╰─ JsCore([
-        |│  │  │  │               __val[0],
-        |│  │  │  │               __val[1],
-        |│  │  │  │               [
-        |│  │  │  │                 __val[0],
-        |│  │  │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].parents : undefined],
-        |│  │  │  │               (Array.isArray(
-        |│  │  │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].parents : undefined) && (isObject(__val[1]) && (! Array.isArray(__val[1])))) ? __val[1].parents : undefined])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $ProjectF
-        |│  │  │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("3") }] })
-        |│  │  │  ╰─ IgnoreId
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Flatten
-        |│  │  │  │  ╰─ JsCore(_["0"])
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Obj
-        |│  │  │  │     ├─ Key(0: [
-        |│  │  │  │     │      isString(_["0"].sha) ? (0 < 0) ? "" : (1 < 0) ? _["0"].sha.substr(0, _["0"].sha.length) : _["0"].sha.substr(0, 1) : undefined])
-        |│  │  │  │     ╰─ Key(content: _["0"])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("f0" -> {
-        |│  │  │  │          "$first": {
-        |│  │  │  │            "$cond": [
-        |│  │  │  │              {
-        |│  │  │  │                "$and": [
-        |│  │  │  │                  { "$lte": [{ "$literal": "" }, "$content.sha"] },
-        |│  │  │  │                  { "$lt": ["$content.sha", { "$literal": {  } }] }]
-        |│  │  │  │              },
-        |│  │  │  │              {
-        |│  │  │  │                "$cond": [
-        |│  │  │  │                  {
-        |│  │  │  │                    "$or": [
-        |│  │  │  │                      {
-        |│  │  │  │                        "$lt": [
-        |│  │  │  │                          { "$literal": NumberInt("0") },
-        |│  │  │  │                          { "$literal": NumberInt("0") }]
-        |│  │  │  │                      },
-        |│  │  │  │                      {
-        |│  │  │  │                        "$gt": [
-        |│  │  │  │                          { "$literal": NumberInt("0") },
-        |│  │  │  │                          { "$strLenCP": "$content.sha" }]
-        |│  │  │  │                      }]
-        |│  │  │  │                  },
-        |│  │  │  │                  { "$literal": "" },
-        |│  │  │  │                  {
-        |│  │  │  │                    "$cond": [
-        |│  │  │  │                      {
-        |│  │  │  │                        "$lt": [
-        |│  │  │  │                          { "$literal": NumberInt("1") },
-        |│  │  │  │                          { "$literal": NumberInt("0") }]
-        |│  │  │  │                      },
-        |│  │  │  │                      {
-        |│  │  │  │                        "$substrCP": [
-        |│  │  │  │                          "$content.sha",
-        |│  │  │  │                          { "$literal": NumberInt("0") },
-        |│  │  │  │                          { "$strLenCP": "$content.sha" }]
-        |│  │  │  │                      },
-        |│  │  │  │                      {
-        |│  │  │  │                        "$substrCP": [
-        |│  │  │  │                          "$content.sha",
-        |│  │  │  │                          { "$literal": NumberInt("0") },
-        |│  │  │  │                          { "$literal": NumberInt("1") }]
-        |│  │  │  │                      }]
-        |│  │  │  │                  }]
-        |│  │  │  │              },
-        |│  │  │  │              { "$literal": undefined }]
-        |│  │  │  │          }
-        |│  │  │  │        })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$0")
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ JsCore([[_._id["0"]], _.f0])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> {
-        |│  │  │             "$arrayElemAt": [
-        |│  │  │               { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("0") }] },
-        |│  │  │               { "$literal": NumberInt("0") }]
-        |│  │  │           })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; slamengine_commits)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ JsCore([
-        |│     │  │               __val[0],
-        |│     │  │               __val[1],
-        |│     │  │               [
-        |│     │  │                 __val[0],
-        |│     │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].parents : undefined],
-        |│     │  │               (Array.isArray(
-        |│     │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].parents : undefined) && (isObject(__val[1]) && (! Array.isArray(__val[1])))) ? __val[1].parents : undefined])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $ProjectF
-        |│     │  ├─ Name("s" -> "$$ROOT")
-        |│     │  ├─ Name("f" -> {
-        |│     │  │       "$cond": [
-        |│     │  │         {
-        |│     │  │           "$and": [
-        |│     │  │             {
-        |│     │  │               "$lte": [
-        |│     │  │                 { "$literal": [] },
-        |│     │  │                 {
-        |│     │  │                   "$arrayElemAt": [
-        |│     │  │                     { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] },
-        |│     │  │                     { "$literal": NumberInt("1") }]
-        |│     │  │                 }]
-        |│     │  │             },
-        |│     │  │             {
-        |│     │  │               "$lt": [
-        |│     │  │                 {
-        |│     │  │                   "$arrayElemAt": [
-        |│     │  │                     { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] },
-        |│     │  │                     { "$literal": NumberInt("1") }]
-        |│     │  │                 },
-        |│     │  │                 { "$literal": BinData(0, "") }]
-        |│     │  │             }]
-        |│     │  │         },
-        |│     │  │         {
-        |│     │  │           "$arrayElemAt": [
-        |│     │  │             { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] },
-        |│     │  │             { "$literal": NumberInt("1") }]
-        |│     │  │         },
-        |│     │  │         { "$literal": undefined }]
-        |│     │  │     })
-        |│     │  ╰─ IgnoreId
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Flatten
-        |│     │  │  ╰─ JsCore(_.f)
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([
-        |│     │  │            (isObject(_.s[1]) && (! Array.isArray(_.s[1]))) ? _.s[1] : undefined,
-        |│     │  │            [
-        |│     │  │              isString(_.f.sha) ? (0 < 0) ? "" : (1 < 0) ? _.f.sha.substr(0, _.f.sha.length) : _.f.sha.substr(0, 1) : undefined]])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $GroupF
-        |│     │  ├─ Grouped
-        |│     │  │  ╰─ Name("f0" -> { "$sum": { "$literal": NumberInt("1") } })
-        |│     │  ╰─ By
-        |│     │     ╰─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([[_._id["0"]], _.f0])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [{ "0": value[0][0] }, { "left": [], "right": [value] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |╰─ $ProjectF
-        |   ├─ Name("0" -> { "$arrayElemAt": ["$left", { "$literal": NumberInt("1") }] })
-        |   ├─ Name("1" -> { "$arrayElemAt": ["$right", { "$literal": NumberInt("1") }] })
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("group by flattened field"))
 
     "unify flattened fields with unflattened field" in {
       plan(sqlE"select `_id` as zip, loc[*] from zips order by loc[*]") must
@@ -4642,55 +2228,7 @@ class PlannerSpec extends
             "loc" -> $field("__tmp2")),
           IgnoreId),
         $sort(NonEmptyList(BsonField.Name("loc") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(s: (function (__val) {
-        |│  │     │      return [
-        |│  │     │        __val[0],
-        |│  │     │        __val[1],
-        |│  │     │        [
-        |│  │     │          __val[0],
-        |│  │     │          (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].loc : undefined]]
-        |│  │     │    })(
-        |│  │     │      [_._id, _]))
-        |│  │     ╰─ Key(f: (function (__val) { return Array.isArray(__val[2][1]) ? __val[2][1] : undefined })(
-        |│  │            (function (__val) {
-        |│  │              return [
-        |│  │                __val[0],
-        |│  │                __val[1],
-        |│  │                [
-        |│  │                  __val[0],
-        |│  │                  (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].loc : undefined]]
-        |│  │            })(
-        |│  │              [_._id, _])))
-        |│  ├─ Flatten
-        |│  │  ╰─ JsCore(_.f)
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ Arr
-        |│  │     │  ├─ Obj
-        |│  │     │  │  ├─ Key(zip: (isObject(_.s[1]) && (! Array.isArray(_.s[1]))) ? _.s[1]._id : undefined)
-        |│  │     │  │  ╰─ Key(loc: _.f)
-        |│  │     │  ╰─ JsCore(_.f)
-        |│  │     ╰─ JsCore([__val[0], __val])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> {
-        |│  │       "$arrayElemAt": [
-        |│  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-        |│  │         { "$literal": NumberInt("1") }]
-        |│  │     })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Ascending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("unify flattened fields with unflattened field"))
 
     "unify flattened with double-flattened" in {
       plan(sqlE"""select * from user_comments where (comments[*].id LIKE "%Dr%" OR comments[*].replyTo[*] LIKE "%Dr%")""") must
@@ -4731,216 +2269,7 @@ class PlannerSpec extends
         $project(
           reshape("value" -> $field("__tmp19", "__tmp15")),
           ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; user_comments)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │     ╰─ JsCore([
-        |│  │  │  │               __val[0],
-        |│  │  │  │               __val[1],
-        |│  │  │  │               [
-        |│  │  │  │                 __val[0],
-        |│  │  │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].comments : undefined]])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; user_comments)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ JsCore([
-        |│     │  │               __val[0],
-        |│     │  │               __val[1],
-        |│     │  │               [
-        |│     │  │                 __val[0],
-        |│     │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].comments : undefined]])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $ProjectF
-        |│     │  ├─ Name("s" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] })
-        |│     │  ├─ Name("f" -> {
-        |│     │  │       "$cond": [
-        |│     │  │         {
-        |│     │  │           "$and": [
-        |│     │  │             {
-        |│     │  │               "$lte": [
-        |│     │  │                 { "$literal": [] },
-        |│     │  │                 {
-        |│     │  │                   "$arrayElemAt": [
-        |│     │  │                     { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] },
-        |│     │  │                     { "$literal": NumberInt("1") }]
-        |│     │  │                 }]
-        |│     │  │             },
-        |│     │  │             {
-        |│     │  │               "$lt": [
-        |│     │  │                 {
-        |│     │  │                   "$arrayElemAt": [
-        |│     │  │                     { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] },
-        |│     │  │                     { "$literal": NumberInt("1") }]
-        |│     │  │                 },
-        |│     │  │                 { "$literal": BinData(0, "") }]
-        |│     │  │             }]
-        |│     │  │         },
-        |│     │  │         {
-        |│     │  │           "$arrayElemAt": [
-        |│     │  │             { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] },
-        |│     │  │             { "$literal": NumberInt("1") }]
-        |│     │  │         },
-        |│     │  │         { "$literal": undefined }]
-        |│     │  │     })
-        |│     │  ╰─ IgnoreId
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ SubMap
-        |│     │  │  ├─ JsCore(_.f)
-        |│     │  │  ╰─ Let(m)
-        |│     │  │     ├─ JsCore(_.f)
-        |│     │  │     ╰─ Call
-        |│     │  │        ├─ JsCore(Object.keys(m).map)
-        |│     │  │        ╰─ Fun(Name(k))
-        |│     │  │           ╰─ JsCore([k, m[k]])
-        |│     │  ├─ Flatten
-        |│     │  │  ╰─ JsCore(_.f)
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([
-        |│     │  │            _.f[1].id,
-        |│     │  │            (new RegExp("^.*Dr.*$", "m")).test(_.f[1].id),
-        |│     │  │            [_.f[0], _.s[0], _.f[1].replyTo]])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $ProjectF
-        |│     │  ├─ Name("s" -> "$$ROOT")
-        |│     │  ├─ Name("f" -> {
-        |│     │  │       "$cond": [
-        |│     │  │         {
-        |│     │  │           "$and": [
-        |│     │  │             {
-        |│     │  │               "$lte": [
-        |│     │  │                 { "$literal": [] },
-        |│     │  │                 {
-        |│     │  │                   "$arrayElemAt": [
-        |│     │  │                     { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] },
-        |│     │  │                     { "$literal": NumberInt("2") }]
-        |│     │  │                 }]
-        |│     │  │             },
-        |│     │  │             {
-        |│     │  │               "$lt": [
-        |│     │  │                 {
-        |│     │  │                   "$arrayElemAt": [
-        |│     │  │                     { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] },
-        |│     │  │                     { "$literal": NumberInt("2") }]
-        |│     │  │                 },
-        |│     │  │                 { "$literal": BinData(0, "") }]
-        |│     │  │             }]
-        |│     │  │         },
-        |│     │  │         {
-        |│     │  │           "$arrayElemAt": [
-        |│     │  │             { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] },
-        |│     │  │             { "$literal": NumberInt("2") }]
-        |│     │  │         },
-        |│     │  │         { "$literal": undefined }]
-        |│     │  │     })
-        |│     │  ╰─ IgnoreId
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Flatten
-        |│     │  │  ╰─ JsCore(_.f)
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([
-        |│     │  │            isString(_.s[0]) ? _.s[1] : undefined,
-        |│     │  │            (new RegExp("^.*Dr.*$", "m")).test(_.f)])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore([_.left, _.right])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> { "$literal": true })
-        |│  ├─ Name("1" -> {
-        |│  │       "$arrayElemAt": [
-        |│  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-        |│  │         { "$literal": NumberInt("0") }]
-        |│  │     })
-        |│  ├─ Name("2" -> {
-        |│  │       "$arrayElemAt": [
-        |│  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-        |│  │         { "$literal": NumberInt("1") }]
-        |│  │     })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ And
-        |│     ├─ Doc
-        |│     │  ╰─ Expr($0 -> Eq(Bool(true)))
-        |│     ╰─ Or
-        |│        ├─ Doc
-        |│        │  ╰─ Expr($1 -> Eq(Bool(true)))
-        |│        ╰─ Doc
-        |│           ╰─ Expr($2 -> Eq(Bool(true)))
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> {
-        |   │       "$cond": [
-        |   │         {
-        |   │           "$and": [
-        |   │             {
-        |   │               "$lte": [
-        |   │                 { "$literal": {  } },
-        |   │                 {
-        |   │                   "$arrayElemAt": [
-        |   │                     { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] },
-        |   │                     { "$literal": NumberInt("1") }]
-        |   │                 }]
-        |   │             },
-        |   │             {
-        |   │               "$lt": [
-        |   │                 {
-        |   │                   "$arrayElemAt": [
-        |   │                     { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] },
-        |   │                     { "$literal": NumberInt("1") }]
-        |   │                 },
-        |   │                 { "$literal": [] }]
-        |   │             }]
-        |   │         },
-        |   │         {
-        |   │           "$arrayElemAt": [
-        |   │             { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] },
-        |   │             { "$literal": NumberInt("1") }]
-        |   │         },
-        |   │         { "$literal": undefined }]
-        |   │     })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("unify flattened with double-flattened"))
 
     "plan limit with offset" in {
       plan(sqlE"SELECT * FROM zips OFFSET 100 LIMIT 5") must
@@ -4963,27 +2292,7 @@ class PlannerSpec extends
             $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Descending)),
             $limit(5))
         }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ Arr
-        |│  │     │  ├─ Obj
-        |│  │     │  │  ├─ Key(city: (isObject(_) && (! Array.isArray(_))) ? _.city : undefined)
-        |│  │     │  │  ╰─ Key(pop: (isObject(_) && (! Array.isArray(_))) ? _.pop : undefined)
-        |│  │     │  ╰─ Ident(_)
-        |│  │     ╰─ Obj
-        |│  │        ├─ Key(0: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined)
-        |│  │        ╰─ Key(src: __val)
-        |│  ╰─ Scope(Map())
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Descending)
-        |├─ $LimitF(5)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan sort and limit"))
 
     "plan simple single field selection and limit" in {
       plan(sqlE"SELECT city FROM zips LIMIT 5") must
@@ -4995,22 +2304,7 @@ class PlannerSpec extends
               reshape("value" -> $field("city")),
               ExcludeId))
         }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $LimitF(5)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> {
-        |   │       "$cond": [
-        |   │         {
-        |   │           "$and": [
-        |   │             { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-        |   │             { "$lt": ["$$ROOT", { "$literal": [] }] }]
-        |   │         },
-        |   │         "$city",
-        |   │         { "$literal": undefined }]
-        |   │     })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan simple single field selection and limit"))
 
     "plan complex group by with sorting and limiting" in {
       plan(sqlE"SELECT city, SUM(pop) AS pop FROM zips GROUP BY city ORDER BY pop") must
@@ -5035,56 +2329,7 @@ class PlannerSpec extends
               IgnoreId),
             $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Ascending)))
         }
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: [_.city])
-        |│  │     ╰─ Key(content: _)
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  │  ├─ Name("f0" -> { "$first": "$content.city" })
-        |│  │  ╰─ Name("f1" -> {
-        |│  │          "$sum": {
-        |│  │            "$cond": [
-        |│  │              {
-        |│  │                "$and": [
-        |│  │                  { "$lt": [{ "$literal": null }, "$content.pop"] },
-        |│  │                  { "$lt": ["$content.pop", { "$literal": "" }] }]
-        |│  │              },
-        |│  │              "$content.pop",
-        |│  │              { "$literal": undefined }]
-        |│  │          }
-        |│  │        })
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> "$0")
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ Arr
-        |│  │     │  ├─ JsCore(_._id["0"])
-        |│  │     │  ├─ Obj
-        |│  │     │  │  ├─ Key(city: _.f0)
-        |│  │     │  │  ╰─ Key(pop: _.f1)
-        |│  │     │  ╰─ JsCore(_.f1)
-        |│  │     ╰─ JsCore([__val[1], __val])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> {
-        |│  │       "$arrayElemAt": [
-        |│  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-        |│  │         { "$literal": NumberInt("2") }]
-        |│  │     })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Ascending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan complex group by with sorting and limiting"))
 
     "plan filter and expressions with IS NULL" in {
       plan(sqlE"select foo is null from zips where foo is null") must
@@ -5142,29 +2387,7 @@ class PlannerSpec extends
               "city"  -> $field("_id", "0"),
               "state" -> $field("_id", "1")),
             IgnoreId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(f0)
-        |│  │     │  ╰─ Obj
-        |│  │     │     ├─ Key(city: _.city)
-        |│  │     │     ╰─ Key(state: _.state)
-        |│  │     ╰─ Key(b0)
-        |│  │        ╰─ Obj
-        |│  │           ├─ Key(city: _.city)
-        |│  │           ╰─ Key(state: _.state)
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  │  ╰─ Name("f0" -> { "$first": "$f0" })
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> "$b0")
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$f0")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan simple distinct"))
 
     "plan distinct as expression" in {
       plan(sqlE"select count(distinct(city)) from zips") must
@@ -5179,27 +2402,7 @@ class PlannerSpec extends
           $project(
             reshape("value" -> $field("__tmp2")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> "$city")
-        |├─ $ProjectF
-        |│  ├─ Name("f0" -> "$_id.0")
-        |│  ╰─ IgnoreId
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore([[_._id["0"]], _.f0])
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  │  ╰─ Name("f0" -> { "$sum": { "$literal": NumberInt("1") } })
-        |│  ╰─ By({ "$literal": null })
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$f0")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan distinct as expression"))
 
     "plan distinct of expression as expression" in {
       plan(sqlE"select count(distinct substring(city, 0, 1)) from zips") must
@@ -5224,70 +2427,7 @@ class PlannerSpec extends
           $project(
             reshape("value" -> $field("__tmp8")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> {
-        |│             "$cond": [
-        |│               {
-        |│                 "$and": [
-        |│                   { "$lte": [{ "$literal": "" }, "$city"] },
-        |│                   { "$lt": ["$city", { "$literal": {  } }] }]
-        |│               },
-        |│               {
-        |│                 "$cond": [
-        |│                   {
-        |│                     "$or": [
-        |│                       {
-        |│                         "$lt": [
-        |│                           { "$literal": NumberInt("0") },
-        |│                           { "$literal": NumberInt("0") }]
-        |│                       },
-        |│                       {
-        |│                         "$gt": [{ "$literal": NumberInt("0") }, { "$strLenCP": "$city" }]
-        |│                       }]
-        |│                   },
-        |│                   { "$literal": "" },
-        |│                   {
-        |│                     "$cond": [
-        |│                       {
-        |│                         "$lt": [
-        |│                           { "$literal": NumberInt("1") },
-        |│                           { "$literal": NumberInt("0") }]
-        |│                       },
-        |│                       {
-        |│                         "$substrCP": [
-        |│                           "$city",
-        |│                           { "$literal": NumberInt("0") },
-        |│                           { "$strLenCP": "$city" }]
-        |│                       },
-        |│                       {
-        |│                         "$substrCP": [
-        |│                           "$city",
-        |│                           { "$literal": NumberInt("0") },
-        |│                           { "$literal": NumberInt("1") }]
-        |│                       }]
-        |│                   }]
-        |│               },
-        |│               { "$literal": undefined }]
-        |│           })
-        |├─ $ProjectF
-        |│  ├─ Name("f0" -> "$_id.0")
-        |│  ╰─ IgnoreId
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore([[_._id["0"]], _.f0])
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  │  ╰─ Name("f0" -> { "$sum": { "$literal": NumberInt("1") } })
-        |│  ╰─ By({ "$literal": null })
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$f0")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan distinct of expression as expression"))
 
     "plan distinct of wildcard" in {
       plan(sqlE"select distinct * from zips") must
@@ -5305,20 +2445,7 @@ class PlannerSpec extends
           $project(
             reshape("value" -> $field("_id", "0")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore(remove(_, "_id"))
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> "$$ROOT")
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$_id.0")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan distinct of wildcard"))
 
     "plan distinct of wildcard as expression" in {
       plan(sqlE"select count(distinct *) from zips") must
@@ -5339,31 +2466,7 @@ class PlannerSpec extends
           $project(
             reshape("value" -> $field("__tmp6")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore(remove(_, "_id"))
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> "$$ROOT")
-        |├─ $ProjectF
-        |│  ├─ Name("f0" -> "$_id.0")
-        |│  ╰─ IgnoreId
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore([[_._id["0"]], _.f0])
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  │  ╰─ Name("f0" -> { "$sum": { "$literal": NumberInt("1") } })
-        |│  ╰─ By({ "$literal": null })
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$f0")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan distinct of wildcard as expression"))
 
     "plan distinct with simple order by" in {
       plan(sqlE"select distinct city from zips order by city") must
@@ -5381,35 +2484,7 @@ class PlannerSpec extends
               reshape("city" -> $field("_id", "0")),
               IgnoreId),
             $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Ascending))))
-    }.pendingWithActual("#1803",
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> "$city")
-        |├─ $ProjectF
-        |│  ├─ Name("f0" -> "$_id.0")
-        |│  ╰─ IgnoreId
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ JsCore([_._id["0"], _.f0])
-        |│  │     ╰─ JsCore([__val[1], __val])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> {
-        |│  │       "$arrayElemAt": [
-        |│  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-        |│  │         { "$literal": NumberInt("1") }]
-        |│  │     })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Ascending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual("#1803", testFile("plan distinct with simple order by"))
 
     "plan distinct with unrelated order by" in {
       plan(sqlE"select distinct city from zips order by pop desc") must
@@ -5436,53 +2511,7 @@ class PlannerSpec extends
             $project(
               reshape("city" -> $field("city")),
               ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Arr
-        |│  │     ├─ Obj
-        |│  │     │  ├─ Key(city: _.city)
-        |│  │     │  ╰─ Key(__sd__0: _.pop)
-        |│  │     ╰─ JsCore(_.pop)
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Descending)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(0: remove(_.src[0], "__sd__0"))
-        |│  │     ╰─ Key(content: _.src)
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  │  ╰─ Name("f0" -> { "$first": { "$arrayElemAt": ["$content", { "$literal": NumberInt("0") }] } })
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> "$0")
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ JsCore([_._id["0"], _.f0, _.f0.__sd__0])
-        |│  │     ╰─ JsCore([remove(__val[1], "__sd__0"), __val])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> {
-        |│  │       "$arrayElemAt": [
-        |│  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-        |│  │         { "$literal": NumberInt("2") }]
-        |│  │     })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Descending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan distinct with unrelated order by"))
 
     "plan distinct as function with group" in {
       plan(sqlE"select state, count(distinct(city)) from zips group by state") must
@@ -5496,120 +2525,7 @@ class PlannerSpec extends
               "state" -> $first($field("__tmp0", "state")),
               "1"     -> $sum($literal(Bson.Int32(1)))),
             \/-($literal(Bson.Null)))))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; zips)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Obj
-        |│  │  │  │     ├─ Key(0: [(isObject(_) && (! Array.isArray(_))) ? _.state : undefined])
-        |│  │  │  │     ╰─ Key(content: _)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("f0" -> {
-        |│  │  │  │          "$first": {
-        |│  │  │  │            "$cond": [
-        |│  │  │  │              {
-        |│  │  │  │                "$and": [
-        |│  │  │  │                  { "$lte": [{ "$literal": {  } }, "$content"] },
-        |│  │  │  │                  { "$lt": ["$content", { "$literal": [] }] }]
-        |│  │  │  │              },
-        |│  │  │  │              "$content.state",
-        |│  │  │  │              { "$literal": undefined }]
-        |│  │  │  │          }
-        |│  │  │  │        })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$0")
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ JsCore([[_._id["0"]], _.f0])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> {
-        |│  │  │             "$arrayElemAt": [
-        |│  │  │               { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("0") }] },
-        |│  │  │               { "$literal": NumberInt("0") }]
-        |│  │  │           })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; zips)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Obj
-        |│     │  │     ├─ Key(0: (isObject(_) && (! Array.isArray(_))) ? _.city : undefined)
-        |│     │  │     ├─ Key(1: [(isObject(_) && (! Array.isArray(_))) ? _.state : undefined])
-        |│     │  │     ╰─ Key(content: _)
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $GroupF
-        |│     │  ├─ Grouped
-        |│     │  │  ╰─ Name("f0" -> {
-        |│     │  │          "$first": {
-        |│     │  │            "$cond": [
-        |│     │  │              {
-        |│     │  │                "$and": [
-        |│     │  │                  { "$lte": [{ "$literal": {  } }, "$content"] },
-        |│     │  │                  { "$lt": ["$content", { "$literal": [] }] }]
-        |│     │  │              },
-        |│     │  │              "$content.city",
-        |│     │  │              { "$literal": undefined }]
-        |│     │  │          }
-        |│     │  │        })
-        |│     │  ╰─ By
-        |│     │     ├─ Name("0" -> "$0")
-        |│     │     ╰─ Name("1" -> "$1")
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([[_._id["0"], _._id["1"]], _.f0])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $GroupF
-        |│     │  ├─ Grouped
-        |│     │  │  ╰─ Name("f0" -> { "$sum": { "$literal": NumberInt("1") } })
-        |│     │  ╰─ By
-        |│     │     ╰─ Name("0" -> {
-        |│     │             "$arrayElemAt": [
-        |│     │               { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("0") }] },
-        |│     │               { "$literal": NumberInt("1") }]
-        |│     │           })
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([[_._id["0"]], _.f0])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [{ "0": value[0][0] }, { "left": [], "right": [value] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |╰─ $ProjectF
-        |   ├─ Name("state" -> { "$arrayElemAt": ["$left", { "$literal": NumberInt("1") }] })
-        |   ├─ Name("1" -> { "$arrayElemAt": ["$right", { "$literal": NumberInt("1") }] })
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan distinct as function with group"))
 
     "plan distinct with sum and group" in {
       plan(sqlE"SELECT DISTINCT SUM(pop) AS totalPop, city, state FROM zips GROUP BY city") must
@@ -5646,125 +2562,7 @@ class PlannerSpec extends
               "city"     -> $field("_id", "1"),
               "state"    -> $field("_id", "2")),
             IgnoreId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; zips)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ Let(__val)
-        |│  │  │  │     │  ├─ JsCore([_._id, _])
-        |│  │  │  │     │  ╰─ JsCore([
-        |│  │  │  │     │            __val[0],
-        |│  │  │  │     │            (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│  │  │  │     │            [
-        |│  │  │  │     │              (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined],
-        |│  │  │  │     │            __val[1]])
-        |│  │  │  │     ╰─ Obj
-        |│  │  │  │        ├─ Key(f0: ((isNumber(
-        |│  │  │  │        │      (isObject(__val[3]) && (! Array.isArray(__val[3]))) ? __val[3].pop : undefined) || ((((isObject(__val[3]) && (! Array.isArray(__val[3]))) ? __val[3].pop : undefined) instanceof NumberInt) || (((isObject(__val[3]) && (! Array.isArray(__val[3]))) ? __val[3].pop : undefined) instanceof NumberLong))) && (isObject(__val[3]) && (! Array.isArray(__val[3])))) ? __val[3].pop : undefined)
-        |│  │  │  │        ├─ Key(f1: (isObject(__val[3]) && (! Array.isArray(__val[3]))) ? __val[3].city : undefined)
-        |│  │  │  │        ╰─ Key(b0: [
-        |│  │  │  │               (isObject(__val[3]) && (! Array.isArray(__val[3]))) ? __val[3].city : undefined])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ├─ Name("f0" -> { "$sum": "$f0" })
-        |│  │  │  │  ╰─ Name("f1" -> { "$first": "$f1" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$b0")
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Arr
-        |│  │  │  │     ├─ JsCore(_._id["0"])
-        |│  │  │  │     ├─ Obj
-        |│  │  │  │     │  ╰─ Key(totalPop: _.f0)
-        |│  │  │  │     ╰─ Obj
-        |│  │  │  │        ╰─ Key(city: _.f1)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; zips)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ JsCore([
-        |│     │  │               __val[0],
-        |│     │  │               (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│     │  │               [
-        |│     │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined],
-        |│     │  │               __val[1]])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore([_.left, _.right])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> { "$literal": true })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(f0)
-        |│  │     │  ╰─ SpliceObjects
-        |│  │     │     ├─ SpliceObjects
-        |│  │     │     │  ├─ JsCore(_.src[0][1])
-        |│  │     │     │  ╰─ JsCore(_.src[0][2])
-        |│  │     │     ╰─ Obj
-        |│  │     │        ╰─ Key(state: _.src[1][1].state)
-        |│  │     ╰─ Key(b0)
-        |│  │        ╰─ SpliceObjects
-        |│  │           ├─ SpliceObjects
-        |│  │           │  ├─ JsCore(_.src[0][1])
-        |│  │           │  ╰─ JsCore(_.src[0][2])
-        |│  │           ╰─ Obj
-        |│  │              ╰─ Key(state: _.src[1][1].state)
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  │  ╰─ Name("f0" -> { "$first": "$f0" })
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> "$b0")
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$f0")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan distinct with sum and group"))
 
     "plan distinct with sum, group, and orderBy" in {
       plan(sqlE"SELECT DISTINCT SUM(pop) AS totalPop, city, state FROM zips GROUP BY city ORDER BY totalPop DESC") must
@@ -5805,141 +2603,7 @@ class PlannerSpec extends
               IgnoreId),
             $sort(NonEmptyList(BsonField.Name("totalPop") -> SortDir.Descending))))
 
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; zips)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ Let(__val)
-        |│  │  │  │     │  ├─ JsCore([_._id, _])
-        |│  │  │  │     │  ╰─ JsCore([
-        |│  │  │  │     │            __val[0],
-        |│  │  │  │     │            (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│  │  │  │     │            [
-        |│  │  │  │     │              (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined],
-        |│  │  │  │     │            __val[1]])
-        |│  │  │  │     ╰─ Obj
-        |│  │  │  │        ├─ Key(f0: ((isNumber(
-        |│  │  │  │        │      (isObject(__val[3]) && (! Array.isArray(__val[3]))) ? __val[3].pop : undefined) || ((((isObject(__val[3]) && (! Array.isArray(__val[3]))) ? __val[3].pop : undefined) instanceof NumberInt) || (((isObject(__val[3]) && (! Array.isArray(__val[3]))) ? __val[3].pop : undefined) instanceof NumberLong))) && (isObject(__val[3]) && (! Array.isArray(__val[3])))) ? __val[3].pop : undefined)
-        |│  │  │  │        ├─ Key(f1: (isObject(__val[3]) && (! Array.isArray(__val[3]))) ? __val[3].city : undefined)
-        |│  │  │  │        ╰─ Key(b0: [
-        |│  │  │  │               (isObject(__val[3]) && (! Array.isArray(__val[3]))) ? __val[3].city : undefined])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ├─ Name("f0" -> { "$sum": "$f0" })
-        |│  │  │  │  ╰─ Name("f1" -> { "$first": "$f1" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$b0")
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Arr
-        |│  │  │  │     ├─ JsCore(_._id["0"])
-        |│  │  │  │     ├─ Obj
-        |│  │  │  │     │  ╰─ Key(totalPop: _.f0)
-        |│  │  │  │     ╰─ Obj
-        |│  │  │  │        ╰─ Key(city: _.f1)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; zips)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ JsCore([
-        |│     │  │               __val[0],
-        |│     │  │               (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│     │  │               [
-        |│     │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined],
-        |│     │  │               __val[1]])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore([_.left, _.right])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> { "$literal": true })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(f0)
-        |│  │     │  ╰─ SpliceObjects
-        |│  │     │     ├─ SpliceObjects
-        |│  │     │     │  ├─ JsCore(_.src[0][1])
-        |│  │     │     │  ╰─ JsCore(_.src[0][2])
-        |│  │     │     ╰─ Obj
-        |│  │     │        ╰─ Key(state: _.src[1][1].state)
-        |│  │     ╰─ Key(b0)
-        |│  │        ╰─ SpliceObjects
-        |│  │           ├─ SpliceObjects
-        |│  │           │  ├─ JsCore(_.src[0][1])
-        |│  │           │  ╰─ JsCore(_.src[0][2])
-        |│  │           ╰─ Obj
-        |│  │              ╰─ Key(state: _.src[1][1].state)
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  │  ╰─ Name("f0" -> { "$first": "$f0" })
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> "$b0")
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ JsCore([_._id["0"], _.f0, _.f0.totalPop])
-        |│  │     ╰─ JsCore([__val[1], __val])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> {
-        |│  │       "$arrayElemAt": [
-        |│  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-        |│  │         { "$literal": NumberInt("2") }]
-        |│  │     })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Descending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan distinct with sum, group, and orderBy"))
 
     //
     "plan order by JS expr with filter" in {
@@ -5965,44 +2629,7 @@ class PlannerSpec extends
               "city" -> $field("city"),
               "pop"  -> $field("pop")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $MatchF
-        |│  ╰─ And
-        |│     ├─ Or
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Int32))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Int64))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Dec))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Text))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($pop -> Type(Date))
-        |│     │  ╰─ Doc
-        |│     │     ╰─ Expr($pop -> Type(Bool))
-        |│     ╰─ Doc
-        |│        ╰─ Expr($pop -> Gt(Int32(1000)))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ Arr
-        |│  │     │  ├─ Obj
-        |│  │     │  │  ├─ Key(city: _.city)
-        |│  │     │  │  ╰─ Key(pop: _.pop)
-        |│  │     │  ╰─ Ident(_)
-        |│  │     ╰─ Obj
-        |│  │        ├─ Key(0: (isString(
-        |│  │        │      (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined) && (isObject(__val[1]) && (! Array.isArray(__val[1])))) ? NumberLong(__val[1].city.length) : undefined)
-        |│  │        ╰─ Key(src: __val)
-        |│  ╰─ Scope(Map())
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Ascending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan order by JS expr with filter"))
 
     "plan select length()" in {
       plan3_2(sqlE"select length(city) from zips") must
@@ -6055,50 +2682,7 @@ class PlannerSpec extends
       plan(sqlE"SELECT (DISTINCT foo.bar) + (DISTINCT foo.baz) FROM foo") must
         beWorkflow0(
           $read(collection("db", "zips")))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; foo)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ JsCore(remove(_, "_id"))
-        |│  ╰─ Scope(Map())
-        |├─ $GroupF
-        |│  ├─ Grouped
-        |│  ╰─ By
-        |│     ╰─ Name("0" -> "$$ROOT")
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> {
-        |   │       "$cond": [
-        |   │         {
-        |   │           "$and": [
-        |   │             { "$lt": [{ "$literal": null }, "$_id.0.baz"] },
-        |   │             { "$lt": ["$_id.0.baz", { "$literal": "" }] }]
-        |   │         },
-        |   │         {
-        |   │           "$cond": [
-        |   │             {
-        |   │               "$or": [
-        |   │                 {
-        |   │                   "$and": [
-        |   │                     { "$lt": [{ "$literal": null }, "$_id.0.bar"] },
-        |   │                     { "$lt": ["$_id.0.bar", { "$literal": "" }] }]
-        |   │                 },
-        |   │                 {
-        |   │                   "$and": [
-        |   │                     {
-        |   │                       "$lte": [
-        |   │                         { "$literal": ISODate("-292275055-05-16T16:47:04.192Z") },
-        |   │                         "$_id.0.bar"]
-        |   │                     },
-        |   │                     { "$lt": ["$_id.0.bar", { "$literal": new RegExp("", "") }] }]
-        |   │                 }]
-        |   │             },
-        |   │             { "$add": ["$_id.0.bar", "$_id.0.baz"] },
-        |   │             { "$literal": undefined }]
-        |   │         },
-        |   │         { "$literal": undefined }]
-        |   │     })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan combination of two distinct sets"))
 
     "plan filter with timestamp and interval" in {
       val date0 = Bson.Date.fromInstant(Instant.parse("2014-11-17T00:00:00Z")).get
@@ -6141,47 +2725,7 @@ class PlannerSpec extends
           $project(
             reshape("value" -> $field("__tmp7")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; days)
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> "$date")
-        |│  ├─ Name("1" -> "$date")
-        |│  ├─ Name("2" -> "$date")
-        |│  ├─ Name("3" -> { "$subtract": ["$date", { "$literal": 4.32E7 }] })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ And
-        |│     ├─ Or
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($0 -> Type(Int32))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($0 -> Type(Int64))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($0 -> Type(Dec))
-        |│     │  ╰─ Doc
-        |│     │     ╰─ Expr($0 -> Type(Date))
-        |│     ├─ Or
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($1 -> Type(Int32))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($1 -> Type(Int64))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($1 -> Type(Dec))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($1 -> Type(Text))
-        |│     │  ├─ Doc
-        |│     │  │  ╰─ Expr($1 -> Type(Date))
-        |│     │  ╰─ Doc
-        |│     │     ╰─ Expr($1 -> Type(Bool))
-        |│     ├─ Doc
-        |│     │  ╰─ Expr($2 -> Lt(Date(1416261600000)))
-        |│     ╰─ Doc
-        |│        ╰─ Expr($3 -> Gt(Date(1416182400000)))
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> "$src")
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan filter with timestamp and interval"))
 
     "plan time_of_day (JS)" in {
       plan(sqlE"select time_of_day(ts) from days") must
@@ -6239,47 +2783,7 @@ class PlannerSpec extends
                 BsonField.Name("ts") -> Selector.Gte(date29)),
               Selector.Doc(
                 BsonField.Name("ts") -> Selector.Lt(date30)))))))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; logs)
-        |╰─ $MatchF
-        |   ╰─ And
-        |      ├─ Or
-        |      │  ├─ Doc
-        |      │  │  ╰─ Expr($ts -> Type(Int32))
-        |      │  ├─ Doc
-        |      │  │  ╰─ Expr($ts -> Type(Int64))
-        |      │  ├─ Doc
-        |      │  │  ╰─ Expr($ts -> Type(Dec))
-        |      │  ├─ Doc
-        |      │  │  ╰─ Expr($ts -> Type(Text))
-        |      │  ├─ Doc
-        |      │  │  ╰─ Expr($ts -> Type(Date))
-        |      │  ╰─ Doc
-        |      │     ╰─ Expr($ts -> Type(Bool))
-        |      ├─ Or
-        |      │  ├─ Doc
-        |      │  │  ╰─ Expr($ts -> Type(Int32))
-        |      │  ├─ Doc
-        |      │  │  ╰─ Expr($ts -> Type(Int64))
-        |      │  ├─ Doc
-        |      │  │  ╰─ Expr($ts -> Type(Dec))
-        |      │  ├─ Doc
-        |      │  │  ╰─ Expr($ts -> Type(Text))
-        |      │  ├─ Doc
-        |      │  │  ╰─ Expr($ts -> Type(Date))
-        |      │  ╰─ Doc
-        |      │     ╰─ Expr($ts -> Type(Bool))
-        |      ╰─ Or
-        |         ├─ And
-        |         │  ├─ Doc
-        |         │  │  ╰─ Expr($ts -> Gt(Date(1421884800000)))
-        |         │  ├─ Doc
-        |         │  │  ╰─ Expr($ts -> Lte(Date(1422316800000)))
-        |         │  ╰─ Doc
-        |         │     ╰─ Expr($ts -> Neq(Date(1422144000000)))
-        |         ╰─ Doc
-        |            ╰─ Expr($ts -> Eq(Date(1422489600000)))""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan filter on date"))
 
     "plan js and filter with id" in {
       Bson.ObjectId.fromString("0123456789abcdef01234567").fold[Result](
@@ -6437,85 +2941,7 @@ class PlannerSpec extends
                 reshape("value" -> $field(JoinDir.Right.name, "city")),
                 ExcludeId)),
             false).op)
-    }.pendingWithActual("#1560",
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; zips)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │     ╰─ Obj
-        |│  │  │  │        ├─ Key(0: __val[1])
-        |│  │  │  │        ├─ Key(1: true)
-        |│  │  │  │        ╰─ Key(src: __val)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ And
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │     ╰─ Doc
-        |│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Obj
-        |│  │  │  │     ├─ Key(0: _.src[1]._id)
-        |│  │  │  │     ╰─ Key(content: _.src)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$0")
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; zips2)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ Obj
-        |│     │  │        ├─ Key(0: __val[1])
-        |│     │  │        ├─ Key(1: true)
-        |│     │  │        ╰─ Key(src: __val)
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MatchF
-        |│     │  ╰─ And
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($0 -> Type(Doc))
-        |│     │     ╰─ Doc
-        |│     │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [{ "0": value.src[1]._id }, { "left": [], "right": [value.src] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |╰─ $SimpleMapF
-        |   ├─ Map
-        |   │  ╰─ JsCore(_.right[1].city)
-        |   ╰─ Scope(Map())""".stripMargin)
+    }.pendingWithActual("#1560", testFile("plan simple join (map-reduce)"))
 
     "plan simple join ($lookup)" in {
       plan(sqlE"select zips2.city from zips join zips2 on zips.`_id` = zips2.`_id`") must
@@ -6533,85 +2959,7 @@ class PlannerSpec extends
           $project(
             reshape("value" -> $field(JoinDir.Right.name, "city")),
             ExcludeId)))
-    }.pendingWithActual("#1560",
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; zips)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ JsCore([_._id, _])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $ProjectF
-        |│  │  │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  │  │  ├─ Name("1" -> { "$literal": true })
-        |│  │  │  ├─ Name("src" -> "$$ROOT")
-        |│  │  │  ╰─ IgnoreId
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ And
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │     ╰─ Doc
-        |│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Obj
-        |│  │  │  │     ├─ Key(0: _.src[1]._id)
-        |│  │  │  │     ╰─ Key(content: _.src)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$0")
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; zips2)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([_._id, _])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $ProjectF
-        |│     │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│     │  ├─ Name("1" -> { "$literal": true })
-        |│     │  ├─ Name("src" -> "$$ROOT")
-        |│     │  ╰─ IgnoreId
-        |│     ├─ $MatchF
-        |│     │  ╰─ And
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($0 -> Type(Doc))
-        |│     │     ╰─ Doc
-        |│     │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [{ "0": value.src[1]._id }, { "left": [], "right": [value.src] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |╰─ $SimpleMapF
-        |   ├─ Map
-        |   │  ╰─ JsCore(_.right[1].city)
-        |   ╰─ Scope(Map())""".stripMargin)
+    }.pendingWithActual("#1560", testFile("plan simple join ($lookup)"))
 
     "plan simple join with sharded inputs" in {
       // NB: cannot use $lookup, so fall back to the old approach
@@ -6697,137 +3045,7 @@ class PlannerSpec extends
               reshape("value" -> $field("__tmp11", "city")),
               ExcludeId)),
           false).op)
-    }.pendingWithActual("#1560",
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; zips)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │     ╰─ Obj
-        |│  │  │  │        ├─ Key(0: __val[1]._id)
-        |│  │  │  │        ├─ Key(1: true)
-        |│  │  │  │        ├─ Key(2: __val[1])
-        |│  │  │  │        ├─ Key(3: true)
-        |│  │  │  │        ╰─ Key(src: __val)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ And
-        |│  │  │     ├─ Or
-        |│  │  │     │  ├─ Doc
-        |│  │  │     │  │  ╰─ Expr($0 -> Type(Int32))
-        |│  │  │     │  ├─ Doc
-        |│  │  │     │  │  ╰─ Expr($0 -> Type(Int64))
-        |│  │  │     │  ├─ Doc
-        |│  │  │     │  │  ╰─ Expr($0 -> Type(Dec))
-        |│  │  │     │  ├─ Doc
-        |│  │  │     │  │  ╰─ Expr($0 -> Type(Text))
-        |│  │  │     │  ├─ Doc
-        |│  │  │     │  │  ╰─ Expr($0 -> Type(Date))
-        |│  │  │     │  ╰─ Doc
-        |│  │  │     │     ╰─ Expr($0 -> Type(Bool))
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($2 -> Type(Doc))
-        |│  │  │     ╰─ Doc
-        |│  │  │        ╰─ Expr($3 -> Eq(Bool(true)))
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$src" })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; zips2)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ Obj
-        |│     │  │        ├─ Key(0: __val[1]._id)
-        |│     │  │        ├─ Key(1: true)
-        |│     │  │        ├─ Key(2: __val[1])
-        |│     │  │        ├─ Key(3: true)
-        |│     │  │        ╰─ Key(src: __val)
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MatchF
-        |│     │  ╰─ And
-        |│     │     ├─ Or
-        |│     │     │  ├─ Doc
-        |│     │     │  │  ╰─ Expr($0 -> Type(Int32))
-        |│     │     │  ├─ Doc
-        |│     │     │  │  ╰─ Expr($0 -> Type(Int64))
-        |│     │     │  ├─ Doc
-        |│     │     │  │  ╰─ Expr($0 -> Type(Dec))
-        |│     │     │  ├─ Doc
-        |│     │     │  │  ╰─ Expr($0 -> Type(Text))
-        |│     │     │  ├─ Doc
-        |│     │     │  │  ╰─ Expr($0 -> Type(Date))
-        |│     │     │  ╰─ Doc
-        |│     │     │     ╰─ Expr($0 -> Type(Bool))
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($1 -> Eq(Bool(true)))
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($2 -> Type(Doc))
-        |│     │     ╰─ Doc
-        |│     │        ╰─ Expr($3 -> Eq(Bool(true)))
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value.src] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ JsCore([
-        |│  │     │         [
-        |│  │     │           _.left[0],
-        |│  │     │           [_.left[0]],
-        |│  │     │           _.left[1],
-        |│  │     │           ((((isNumber(_.left[1]._id) || ((_.left[1]._id instanceof NumberInt) || (_.left[1]._id instanceof NumberLong))) || isString(_.left[1]._id)) || ((_.left[1]._id instanceof Date) || ((typeof _.left[1]._id) === "boolean"))) ? true : false) && ((isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? true : false)],
-        |│  │     │         [
-        |│  │     │           _.right[0],
-        |│  │     │           [_.right[0]],
-        |│  │     │           _.right[1],
-        |│  │     │           ((((isNumber(_.right[1]._id) || ((_.right[1]._id instanceof NumberInt) || (_.right[1]._id instanceof NumberLong))) || isString(_.right[1]._id)) || ((_.right[1]._id instanceof Date) || ((typeof _.right[1]._id) === "boolean"))) ? true : false) && ((isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? true : false)]])
-        |│  │     ╰─ Obj
-        |│  │        ├─ Key(0: true)
-        |│  │        ├─ Key(1: __val[0][2]._id < __val[1][2]._id)
-        |│  │        ╰─ Key(src: __val)
-        |│  ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ And
-        |│     ├─ Doc
-        |│     │  ╰─ Expr($0 -> Eq(Bool(true)))
-        |│     ╰─ Doc
-        |│        ╰─ Expr($1 -> Eq(Bool(true)))
-        |╰─ $SimpleMapF
-        |   ├─ Map
-        |   │  ╰─ JsCore((isObject(_.src[1][2]) && (! Array.isArray(_.src[1][2]))) ? _.src[1][2].city : undefined)
-        |   ╰─ Scope(Map())""".stripMargin)
+    }.pendingWithActual("#1560", testFile("plan non-equi join"))
 
     "plan simple inner equi-join (map-reduce)" in {
       plan2_6(
@@ -6862,93 +3080,7 @@ class PlannerSpec extends
                     $literal(Bson.Undefined))),
               IgnoreId)),
           false).op)
-    }.pendingWithActual("#1560",
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; foo)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │     ╰─ Obj
-        |│  │  │  │        ├─ Key(0: __val[1])
-        |│  │  │  │        ├─ Key(1: true)
-        |│  │  │  │        ╰─ Key(src: __val)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ And
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │     ╰─ Doc
-        |│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Obj
-        |│  │  │  │     ├─ Key(0: _.src[1].id)
-        |│  │  │  │     ╰─ Key(content: _.src)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$0")
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; bar)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ Obj
-        |│     │  │        ├─ Key(0: __val[1])
-        |│     │  │        ├─ Key(1: true)
-        |│     │  │        ╰─ Key(src: __val)
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MatchF
-        |│     │  ╰─ And
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($0 -> Type(Doc))
-        |│     │     ╰─ Doc
-        |│     │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) {
-        |│     │  │               return [{ "0": value.src[1].foo_id }, { "left": [], "right": [value.src] }]
-        |│     │  │             })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(name: (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1].name : undefined)
-        |│  │     ╰─ Key(address: (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1].address : undefined)
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("name" -> true)
-        |   ├─ Name("address" -> true)
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual("#1560", testFile("plan simple inner equi-join (map-reduce)"))
 
     "plan simple inner equi-join ($lookup)" in {
       plan3_4(
@@ -6982,93 +3114,7 @@ class PlannerSpec extends
               $field(JoinDir.Right.name, "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
-    }.pendingWithActual("#1560",
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; foo)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ JsCore([_._id, _])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $ProjectF
-        |│  │  │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  │  │  ├─ Name("1" -> { "$literal": true })
-        |│  │  │  ├─ Name("src" -> "$$ROOT")
-        |│  │  │  ╰─ IgnoreId
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ And
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │     ╰─ Doc
-        |│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Obj
-        |│  │  │  │     ├─ Key(0: _.src[1].id)
-        |│  │  │  │     ╰─ Key(content: _.src)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$0")
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; bar)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([_._id, _])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $ProjectF
-        |│     │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│     │  ├─ Name("1" -> { "$literal": true })
-        |│     │  ├─ Name("src" -> "$$ROOT")
-        |│     │  ╰─ IgnoreId
-        |│     ├─ $MatchF
-        |│     │  ╰─ And
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($0 -> Type(Doc))
-        |│     │     ╰─ Doc
-        |│     │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) {
-        |│     │  │               return [{ "0": value.src[1].foo_id }, { "left": [], "right": [value.src] }]
-        |│     │  │             })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(name: (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1].name : undefined)
-        |│  │     ╰─ Key(address: (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1].address : undefined)
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("name" -> true)
-        |   ├─ Name("address" -> true)
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual("#1560", testFile("plan simple inner equi-join ($lookup)"))
 
     "plan simple inner equi-join with expression ($lookup)" in {
       plan3_4(
@@ -7106,95 +3152,7 @@ class PlannerSpec extends
               $field(JoinDir.Right.name, "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
-    }.pendingWithActual("#1560",
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; foo)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │     ╰─ Obj
-        |│  │  │  │        ├─ Key(0: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].id : undefined)
-        |│  │  │  │        ├─ Key(1: true)
-        |│  │  │  │        ╰─ Key(src: __val)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ And
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($0 -> Type(Text))
-        |│  │  │     ╰─ Doc
-        |│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Obj
-        |│  │  │  │     ├─ Key(0: (isObject(_.src[1]) && (! Array.isArray(_.src[1]))) ? _.src[1].id.toLowerCase() : undefined)
-        |│  │  │  │     ╰─ Key(content: _.src)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$0")
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; bar)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([_._id, _])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $ProjectF
-        |│     │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│     │  ├─ Name("1" -> { "$literal": true })
-        |│     │  ├─ Name("src" -> "$$ROOT")
-        |│     │  ╰─ IgnoreId
-        |│     ├─ $MatchF
-        |│     │  ╰─ And
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($0 -> Type(Doc))
-        |│     │     ╰─ Doc
-        |│     │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) {
-        |│     │  │               return [{ "0": value.src[1].foo_id }, { "left": [], "right": [value.src] }]
-        |│     │  │             })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(name: ((isObject(
-        |│  │     │      (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1] : undefined) && (! Array.isArray(
-        |│  │     │      (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1] : undefined))) && (isObject(_.left[1]) && (! Array.isArray(_.left[1])))) ? _.left[1].name : undefined)
-        |│  │     ╰─ Key(address: (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1].address : undefined)
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("name" -> true)
-        |   ├─ Name("address" -> true)
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual("#1560", testFile("plan simple inner equi-join with expression ($lookup)"))
 
     "plan simple inner equi-join with pre-filtering ($lookup)" in {
       plan3_4(
@@ -7237,113 +3195,7 @@ class PlannerSpec extends
               $field(JoinDir.Right.name, "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
-    }.pendingWithActual("#1560",
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; foo)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ JsCore([_._id, _])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $ProjectF
-        |│  │  │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  │  │  ├─ Name("1" -> { "$literal": true })
-        |│  │  │  ├─ Name("src" -> "$$ROOT")
-        |│  │  │  ╰─ IgnoreId
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ And
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │     ╰─ Doc
-        |│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Obj
-        |│  │  │  │     ├─ Key(0: _.src[1].id)
-        |│  │  │  │     ╰─ Key(content: _.src)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$0")
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; bar)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ Obj
-        |│     │  │        ├─ Key(0: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].rating : undefined)
-        |│     │  │        ├─ Key(1: __val[1])
-        |│     │  │        ├─ Key(2: __val[1].rating)
-        |│     │  │        ╰─ Key(src: __val)
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MatchF
-        |│     │  ╰─ And
-        |│     │     ├─ Or
-        |│     │     │  ├─ Doc
-        |│     │     │  │  ╰─ Expr($0 -> Type(Int32))
-        |│     │     │  ├─ Doc
-        |│     │     │  │  ╰─ Expr($0 -> Type(Int64))
-        |│     │     │  ├─ Doc
-        |│     │     │  │  ╰─ Expr($0 -> Type(Dec))
-        |│     │     │  ├─ Doc
-        |│     │     │  │  ╰─ Expr($0 -> Type(Text))
-        |│     │     │  ├─ Doc
-        |│     │     │  │  ╰─ Expr($0 -> Type(Date))
-        |│     │     │  ╰─ Doc
-        |│     │     │     ╰─ Expr($0 -> Type(Bool))
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($1 -> Type(Doc))
-        |│     │     ╰─ Doc
-        |│     │        ╰─ Expr($2 -> Gte(Int32(4)))
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) {
-        |│     │  │               return [
-        |│     │  │                 {
-        |│     │  │                   "0": (isObject(value.src[1]) && (! Array.isArray(value.src[1]))) ? value.src[1].foo_id : undefined
-        |│     │  │                 },
-        |│     │  │                 { "left": [], "right": [value.src] }]
-        |│     │  │             })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(name: (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1].name : undefined)
-        |│  │     ╰─ Key(address: ((isObject(
-        |│  │            (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1] : undefined) && (! Array.isArray(
-        |│  │            (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1] : undefined))) && (isObject(_.right[1]) && (! Array.isArray(_.right[1])))) ? _.right[1].address : undefined)
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("name" -> true)
-        |   ├─ Name("address" -> true)
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual("#1560", testFile("plan simple inner equi-join with pre-filtering ($lookup)"))
 
     "plan simple outer equi-join with wildcard" in {
       plan(sqlE"select * from foo full join bar on foo.id = bar.foo_id") must
@@ -7392,105 +3244,7 @@ class PlannerSpec extends
               reshape("value" -> $field("__tmp7")),
               ExcludeId)),
           false).op)
-    }.pendingWithActual("#1560",
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; foo)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ JsCore([_._id, _])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $ProjectF
-        |│  │  │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  │  │  ├─ Name("1" -> { "$literal": true })
-        |│  │  │  ├─ Name("src" -> "$$ROOT")
-        |│  │  │  ╰─ IgnoreId
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ And
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │     ╰─ Doc
-        |│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Obj
-        |│  │  │  │     ├─ Key(0: _.src[1].id)
-        |│  │  │  │     ╰─ Key(content: _.src)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$0")
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; bar)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([_._id, _])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $ProjectF
-        |│     │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│     │  ├─ Name("1" -> { "$literal": true })
-        |│     │  ├─ Name("src" -> "$$ROOT")
-        |│     │  ╰─ IgnoreId
-        |│     ├─ $MatchF
-        |│     │  ╰─ And
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($0 -> Type(Doc))
-        |│     │     ╰─ Doc
-        |│     │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) {
-        |│     │  │               return [{ "0": value.src[1].foo_id }, { "left": [], "right": [value.src] }]
-        |│     │  │             })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("left" -> {
-        |│  │       "$cond": [
-        |│  │         { "$eq": [{ "$size": "$left" }, { "$literal": NumberInt("0") }] },
-        |│  │         { "$literal": [{  }] },
-        |│  │         "$left"]
-        |│  │     })
-        |│  ├─ Name("right" -> {
-        |│  │       "$cond": [
-        |│  │         { "$eq": [{ "$size": "$right" }, { "$literal": NumberInt("0") }] },
-        |│  │         { "$literal": [{  }] },
-        |│  │         "$right"]
-        |│  │     })
-        |│  ╰─ IgnoreId
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |╰─ $SimpleMapF
-        |   ├─ Map
-        |   │  ╰─ If
-        |   │     ├─ JsCore(isObject(_.right[1]) && (! Array.isArray(_.right[1])))
-        |   │     ├─ If
-        |   │     │  ├─ JsCore(isObject(_.left[1]) && (! Array.isArray(_.left[1])))
-        |   │     │  ├─ SpliceObjects
-        |   │     │  │  ├─ JsCore(_.left[1])
-        |   │     │  │  ╰─ JsCore(_.right[1])
-        |   │     │  ╰─ Ident(undefined)
-        |   │     ╰─ Ident(undefined)
-        |   ╰─ Scope(Map())""".stripMargin)
+    }.pendingWithActual("#1560", testFile("plan simple outer equi-join with wildcard"))
 
     "plan simple left equi-join (map-reduce)" in {
       plan(
@@ -7532,101 +3286,7 @@ class PlannerSpec extends
                     $literal(Bson.Undefined))),
               IgnoreId)),
           false).op)
-    }.pendingWithActual("#1560",
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; foo)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ JsCore([_._id, _])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $ProjectF
-        |│  │  │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  │  │  ├─ Name("1" -> { "$literal": true })
-        |│  │  │  ├─ Name("src" -> "$$ROOT")
-        |│  │  │  ╰─ IgnoreId
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ And
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │     ╰─ Doc
-        |│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Obj
-        |│  │  │  │     ├─ Key(0: _.src[1].id)
-        |│  │  │  │     ╰─ Key(content: _.src)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$0")
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; bar)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([_._id, _])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $ProjectF
-        |│     │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│     │  ├─ Name("1" -> { "$literal": true })
-        |│     │  ├─ Name("src" -> "$$ROOT")
-        |│     │  ╰─ IgnoreId
-        |│     ├─ $MatchF
-        |│     │  ╰─ And
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($0 -> Type(Doc))
-        |│     │     ╰─ Doc
-        |│     │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) {
-        |│     │  │               return [{ "0": value.src[1].foo_id }, { "left": [], "right": [value.src] }]
-        |│     │  │             })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ NotExpr($left -> Size(0))
-        |├─ $ProjectF
-        |│  ├─ Name("left" -> "$left")
-        |│  ├─ Name("right" -> {
-        |│  │       "$cond": [
-        |│  │         { "$eq": [{ "$size": "$right" }, { "$literal": NumberInt("0") }] },
-        |│  │         { "$literal": [{  }] },
-        |│  │         "$right"]
-        |│  │     })
-        |│  ╰─ IgnoreId
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(name: (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1].name : undefined)
-        |│  │     ╰─ Key(address: (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1].address : undefined)
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("name" -> true)
-        |   ├─ Name("address" -> true)
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual("#1560", testFile("plan simple left equi-join (map-reduce)"))
 
     "plan simple left equi-join ($lookup)" in {
       plan3_4(
@@ -7658,101 +3318,7 @@ class PlannerSpec extends
               $field(JoinDir.Right.name, "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
-    }.pendingWithActual("TODO: left/right joins in $lookup",
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; foo)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ JsCore([_._id, _])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $ProjectF
-        |│  │  │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  │  │  ├─ Name("1" -> { "$literal": true })
-        |│  │  │  ├─ Name("src" -> "$$ROOT")
-        |│  │  │  ╰─ IgnoreId
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ And
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │     ╰─ Doc
-        |│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Obj
-        |│  │  │  │     ├─ Key(0: _.src[1].id)
-        |│  │  │  │     ╰─ Key(content: _.src)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$0")
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; bar)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([_._id, _])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $ProjectF
-        |│     │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│     │  ├─ Name("1" -> { "$literal": true })
-        |│     │  ├─ Name("src" -> "$$ROOT")
-        |│     │  ╰─ IgnoreId
-        |│     ├─ $MatchF
-        |│     │  ╰─ And
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($0 -> Type(Doc))
-        |│     │     ╰─ Doc
-        |│     │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) {
-        |│     │  │               return [{ "0": value.src[1].foo_id }, { "left": [], "right": [value.src] }]
-        |│     │  │             })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ NotExpr($left -> Size(0))
-        |├─ $ProjectF
-        |│  ├─ Name("left" -> "$left")
-        |│  ├─ Name("right" -> {
-        |│  │       "$cond": [
-        |│  │         { "$eq": [{ "$size": "$right" }, { "$literal": NumberInt("0") }] },
-        |│  │         { "$literal": [{  }] },
-        |│  │         "$right"]
-        |│  │     })
-        |│  ╰─ IgnoreId
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(name: (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1].name : undefined)
-        |│  │     ╰─ Key(address: (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1].address : undefined)
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("name" -> true)
-        |   ├─ Name("address" -> true)
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual("TODO: left/right joins in $lookup", testFile("plan simple left equi-join ($lookup)"))
 
     "plan simple right equi-join ($lookup)" in {
       plan3_4(
@@ -7784,101 +3350,7 @@ class PlannerSpec extends
               $field(JoinDir.Right.name, "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
-    }.pendingWithActual("TODO: left/right joins in $lookup",
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; foo)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ JsCore([_._id, _])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $ProjectF
-        |│  │  │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  │  │  ├─ Name("1" -> { "$literal": true })
-        |│  │  │  ├─ Name("src" -> "$$ROOT")
-        |│  │  │  ╰─ IgnoreId
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ And
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │     ╰─ Doc
-        |│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Obj
-        |│  │  │  │     ├─ Key(0: _.src[1].id)
-        |│  │  │  │     ╰─ Key(content: _.src)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$0")
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; bar)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([_._id, _])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $ProjectF
-        |│     │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│     │  ├─ Name("1" -> { "$literal": true })
-        |│     │  ├─ Name("src" -> "$$ROOT")
-        |│     │  ╰─ IgnoreId
-        |│     ├─ $MatchF
-        |│     │  ╰─ And
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($0 -> Type(Doc))
-        |│     │     ╰─ Doc
-        |│     │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) {
-        |│     │  │               return [{ "0": value.src[1].foo_id }, { "left": [], "right": [value.src] }]
-        |│     │  │             })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $ProjectF
-        |│  ├─ Name("left" -> {
-        |│  │       "$cond": [
-        |│  │         { "$eq": [{ "$size": "$left" }, { "$literal": NumberInt("0") }] },
-        |│  │         { "$literal": [{  }] },
-        |│  │         "$left"]
-        |│  │     })
-        |│  ├─ Name("right" -> "$right")
-        |│  ╰─ IgnoreId
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(name: (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1].name : undefined)
-        |│  │     ╰─ Key(address: (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1].address : undefined)
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("name" -> true)
-        |   ├─ Name("address" -> true)
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual("TODO: left/right joins in $lookup", testFile("plan simple right equi-join ($lookup)"))
 
     "plan 3-way right equi-join (map-reduce)" in {
       plan2_6(
@@ -7948,207 +3420,7 @@ class PlannerSpec extends
                     $literal(Bson.Undefined))),
               IgnoreId)),
           true).op)
-    }.pendingWithActual("#1560",
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $FoldLeftF
-        |│  │  │  ├─ Chain
-        |│  │  │  │  ├─ $ReadF(db; foo)
-        |│  │  │  │  ├─ $SimpleMapF
-        |│  │  │  │  │  ├─ Map
-        |│  │  │  │  │  │  ╰─ Let(__val)
-        |│  │  │  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │  │  │     ╰─ Obj
-        |│  │  │  │  │  │        ├─ Key(0: __val[1])
-        |│  │  │  │  │  │        ├─ Key(1: true)
-        |│  │  │  │  │  │        ╰─ Key(src: __val)
-        |│  │  │  │  │  ╰─ Scope(Map())
-        |│  │  │  │  ├─ $MatchF
-        |│  │  │  │  │  ╰─ And
-        |│  │  │  │  │     ├─ Doc
-        |│  │  │  │  │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │  │  │     ╰─ Doc
-        |│  │  │  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  │  │  ├─ $SimpleMapF
-        |│  │  │  │  │  ├─ Map
-        |│  │  │  │  │  │  ╰─ Obj
-        |│  │  │  │  │  │     ├─ Key(0: _.src[1].id)
-        |│  │  │  │  │  │     ╰─ Key(content: _.src)
-        |│  │  │  │  │  ╰─ Scope(Map())
-        |│  │  │  │  ├─ $GroupF
-        |│  │  │  │  │  ├─ Grouped
-        |│  │  │  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│  │  │  │  │  ╰─ By
-        |│  │  │  │  │     ╰─ Name("0" -> "$0")
-        |│  │  │  │  ╰─ $ProjectF
-        |│  │  │  │     ├─ Name("_id" -> "$_id")
-        |│  │  │  │     ├─ Name("value")
-        |│  │  │  │     │  ├─ Name("left" -> "$0")
-        |│  │  │  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │  │  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │  │  │     ╰─ IncludeId
-        |│  │  │  ╰─ Chain
-        |│  │  │     ├─ $ReadF(db; bar)
-        |│  │  │     ├─ $SimpleMapF
-        |│  │  │     │  ├─ Map
-        |│  │  │     │  │  ╰─ Let(__val)
-        |│  │  │     │  │     ├─ JsCore([_._id, _])
-        |│  │  │     │  │     ╰─ Obj
-        |│  │  │     │  │        ├─ Key(0: __val[1])
-        |│  │  │     │  │        ├─ Key(1: true)
-        |│  │  │     │  │        ╰─ Key(src: __val)
-        |│  │  │     │  ╰─ Scope(Map())
-        |│  │  │     ├─ $MatchF
-        |│  │  │     │  ╰─ And
-        |│  │  │     │     ├─ Doc
-        |│  │  │     │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │     │     ╰─ Doc
-        |│  │  │     │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  │     ├─ $MapF
-        |│  │  │     │  ├─ JavaScript(function (key, value) {
-        |│  │  │     │  │               return [{ "0": value.src[1].foo_id }, { "left": [], "right": [value.src] }]
-        |│  │  │     │  │             })
-        |│  │  │     │  ╰─ Scope(Map())
-        |│  │  │     ╰─ $ReduceF
-        |│  │  │        ├─ JavaScript(function (key, values) {
-        |│  │  │        │               var result = { "left": [], "right": [] };
-        |│  │  │        │               values.forEach(
-        |│  │  │        │                 function (value) {
-        |│  │  │        │                   result.left = result.left.concat(value.left);
-        |│  │  │        │                   result.right = result.right.concat(value.right)
-        |│  │  │        │                 });
-        |│  │  │        │               return result
-        |│  │  │        │             })
-        |│  │  │        ╰─ Scope(Map())
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ Doc
-        |│  │  │     ├─ NotExpr($left -> Size(0))
-        |│  │  │     ╰─ NotExpr($right -> Size(0))
-        |│  │  ├─ $UnwindF(DocField(BsonField.Name("right")))
-        |│  │  ├─ $UnwindF(DocField(BsonField.Name("left")))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ JsCore([[_.left[0], _.left[1]], [_.right[0], _.right[1]]])
-        |│  │  │  │     ╰─ Obj
-        |│  │  │  │        ├─ Key(0: __val[1][1])
-        |│  │  │  │        ├─ Key(1: true)
-        |│  │  │  │        ╰─ Key(src: __val)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ And
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │     ╰─ Doc
-        |│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Obj
-        |│  │  │  │     ├─ Key(0: _.src[1][1].id)
-        |│  │  │  │     ╰─ Key(content: _.src)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$0")
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; baz)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ Obj
-        |│     │  │        ├─ Key(0: __val[1])
-        |│     │  │        ├─ Key(1: true)
-        |│     │  │        ╰─ Key(src: __val)
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MatchF
-        |│     │  ╰─ And
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($0 -> Type(Doc))
-        |│     │     ╰─ Doc
-        |│     │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) {
-        |│     │  │               return [{ "0": value.src[1].bar_id }, { "left": [], "right": [value.src] }]
-        |│     │  │             })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $ProjectF
-        |│  ├─ Name("left" -> {
-        |│  │       "$cond": [
-        |│  │         { "$eq": [{ "$size": "$left" }, { "$literal": NumberInt("0") }] },
-        |│  │         { "$literal": [{  }] },
-        |│  │         "$left"]
-        |│  │     })
-        |│  ├─ Name("right" -> "$right")
-        |│  ╰─ IgnoreId
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(name)
-        |│  │     │  ╰─ If
-        |│  │     │     ├─ BinOp(&&)
-        |│  │     │     │  ├─ Call
-        |│  │     │     │  │  ├─ Ident(isObject)
-        |│  │     │     │  │  ╰─ Obj
-        |│  │     │     │  │     ├─ Key(left: _.left[0][1])
-        |│  │     │     │  │     ╰─ Key(right: _.left[1][1])
-        |│  │     │     │  ╰─ UnOp(!)
-        |│  │     │     │     ╰─ Call
-        |│  │     │     │        ├─ JsCore(Array.isArray)
-        |│  │     │     │        ╰─ Obj
-        |│  │     │     │           ├─ Key(left: _.left[0][1])
-        |│  │     │     │           ╰─ Key(right: _.left[1][1])
-        |│  │     │     ├─ JsCore((isObject(_.left[0][1]) && (! Array.isArray(_.left[0][1]))) ? _.left[0][1].name : undefined)
-        |│  │     │     ╰─ Ident(undefined)
-        |│  │     ├─ Key(address)
-        |│  │     │  ╰─ If
-        |│  │     │     ├─ BinOp(&&)
-        |│  │     │     │  ├─ Call
-        |│  │     │     │  │  ├─ Ident(isObject)
-        |│  │     │     │  │  ╰─ Obj
-        |│  │     │     │  │     ├─ Key(left: _.left[0][1])
-        |│  │     │     │  │     ╰─ Key(right: _.left[1][1])
-        |│  │     │     │  ╰─ UnOp(!)
-        |│  │     │     │     ╰─ Call
-        |│  │     │     │        ├─ JsCore(Array.isArray)
-        |│  │     │     │        ╰─ Obj
-        |│  │     │     │           ├─ Key(left: _.left[0][1])
-        |│  │     │     │           ╰─ Key(right: _.left[1][1])
-        |│  │     │     ├─ JsCore((isObject(_.left[1][1]) && (! Array.isArray(_.left[1][1]))) ? _.left[1][1].address : undefined)
-        |│  │     │     ╰─ Ident(undefined)
-        |│  │     ╰─ Key(zip: (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1].zip : undefined)
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("name" -> true)
-        |   ├─ Name("address" -> true)
-        |   ├─ Name("zip" -> true)
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual("#1560", testFile("plan 3-way right equi-join (map-reduce)"))
 
     "plan 3-way equi-join ($lookup)" in {
       plan3_4(
@@ -8210,203 +3482,7 @@ class PlannerSpec extends
                 $field(JoinDir.Right.name, "zip"),
                 $literal(Bson.Undefined))),
             IgnoreId)))
-    }.pendingWithActual("#1560",
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $FoldLeftF
-        |│  │  │  ├─ Chain
-        |│  │  │  │  ├─ $ReadF(db; foo)
-        |│  │  │  │  ├─ $SimpleMapF
-        |│  │  │  │  │  ├─ Map
-        |│  │  │  │  │  │  ╰─ JsCore([_._id, _])
-        |│  │  │  │  │  ╰─ Scope(Map())
-        |│  │  │  │  ├─ $ProjectF
-        |│  │  │  │  │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  │  │  │  │  ├─ Name("1" -> { "$literal": true })
-        |│  │  │  │  │  ├─ Name("src" -> "$$ROOT")
-        |│  │  │  │  │  ╰─ IgnoreId
-        |│  │  │  │  ├─ $MatchF
-        |│  │  │  │  │  ╰─ And
-        |│  │  │  │  │     ├─ Doc
-        |│  │  │  │  │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │  │  │     ╰─ Doc
-        |│  │  │  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  │  │  ├─ $SimpleMapF
-        |│  │  │  │  │  ├─ Map
-        |│  │  │  │  │  │  ╰─ Obj
-        |│  │  │  │  │  │     ├─ Key(0: _.src[1].id)
-        |│  │  │  │  │  │     ╰─ Key(content: _.src)
-        |│  │  │  │  │  ╰─ Scope(Map())
-        |│  │  │  │  ├─ $GroupF
-        |│  │  │  │  │  ├─ Grouped
-        |│  │  │  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│  │  │  │  │  ╰─ By
-        |│  │  │  │  │     ╰─ Name("0" -> "$0")
-        |│  │  │  │  ╰─ $ProjectF
-        |│  │  │  │     ├─ Name("_id" -> "$_id")
-        |│  │  │  │     ├─ Name("value")
-        |│  │  │  │     │  ├─ Name("left" -> "$0")
-        |│  │  │  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │  │  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │  │  │     ╰─ IncludeId
-        |│  │  │  ╰─ Chain
-        |│  │  │     ├─ $ReadF(db; bar)
-        |│  │  │     ├─ $SimpleMapF
-        |│  │  │     │  ├─ Map
-        |│  │  │     │  │  ╰─ JsCore([_._id, _])
-        |│  │  │     │  ╰─ Scope(Map())
-        |│  │  │     ├─ $ProjectF
-        |│  │  │     │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  │  │     │  ├─ Name("1" -> { "$literal": true })
-        |│  │  │     │  ├─ Name("src" -> "$$ROOT")
-        |│  │  │     │  ╰─ IgnoreId
-        |│  │  │     ├─ $MatchF
-        |│  │  │     │  ╰─ And
-        |│  │  │     │     ├─ Doc
-        |│  │  │     │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │     │     ╰─ Doc
-        |│  │  │     │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  │     ├─ $MapF
-        |│  │  │     │  ├─ JavaScript(function (key, value) {
-        |│  │  │     │  │               return [{ "0": value.src[1].foo_id }, { "left": [], "right": [value.src] }]
-        |│  │  │     │  │             })
-        |│  │  │     │  ╰─ Scope(Map())
-        |│  │  │     ╰─ $ReduceF
-        |│  │  │        ├─ JavaScript(function (key, values) {
-        |│  │  │        │               var result = { "left": [], "right": [] };
-        |│  │  │        │               values.forEach(
-        |│  │  │        │                 function (value) {
-        |│  │  │        │                   result.left = result.left.concat(value.left);
-        |│  │  │        │                   result.right = result.right.concat(value.right)
-        |│  │  │        │                 });
-        |│  │  │        │               return result
-        |│  │  │        │             })
-        |│  │  │        ╰─ Scope(Map())
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ Doc
-        |│  │  │     ├─ NotExpr($left -> Size(0))
-        |│  │  │     ╰─ NotExpr($right -> Size(0))
-        |│  │  ├─ $UnwindF(DocField(BsonField.Name("right")))
-        |│  │  ├─ $UnwindF(DocField(BsonField.Name("left")))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ JsCore([[_.left[0], _.left[1]], [_.right[0], _.right[1]]])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $ProjectF
-        |│  │  │  ├─ Name("0" -> {
-        |│  │  │  │       "$arrayElemAt": [
-        |│  │  │  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-        |│  │  │  │         { "$literal": NumberInt("1") }]
-        |│  │  │  │     })
-        |│  │  │  ├─ Name("1" -> { "$literal": true })
-        |│  │  │  ├─ Name("src" -> "$$ROOT")
-        |│  │  │  ╰─ IgnoreId
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ And
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │     ╰─ Doc
-        |│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Obj
-        |│  │  │  │     ├─ Key(0: _.src[1][1].id)
-        |│  │  │  │     ╰─ Key(content: _.src)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> "$0")
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; baz)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([_._id, _])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $ProjectF
-        |│     │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│     │  ├─ Name("1" -> { "$literal": true })
-        |│     │  ├─ Name("src" -> "$$ROOT")
-        |│     │  ╰─ IgnoreId
-        |│     ├─ $MatchF
-        |│     │  ╰─ And
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($0 -> Type(Doc))
-        |│     │     ╰─ Doc
-        |│     │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) {
-        |│     │  │               return [{ "0": value.src[1].bar_id }, { "left": [], "right": [value.src] }]
-        |│     │  │             })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(name)
-        |│  │     │  ╰─ If
-        |│  │     │     ├─ BinOp(&&)
-        |│  │     │     │  ├─ Call
-        |│  │     │     │  │  ├─ Ident(isObject)
-        |│  │     │     │  │  ╰─ Obj
-        |│  │     │     │  │     ├─ Key(left: _.left[0][1])
-        |│  │     │     │  │     ╰─ Key(right: _.left[1][1])
-        |│  │     │     │  ╰─ UnOp(!)
-        |│  │     │     │     ╰─ Call
-        |│  │     │     │        ├─ JsCore(Array.isArray)
-        |│  │     │     │        ╰─ Obj
-        |│  │     │     │           ├─ Key(left: _.left[0][1])
-        |│  │     │     │           ╰─ Key(right: _.left[1][1])
-        |│  │     │     ├─ JsCore((isObject(_.left[0][1]) && (! Array.isArray(_.left[0][1]))) ? _.left[0][1].name : undefined)
-        |│  │     │     ╰─ Ident(undefined)
-        |│  │     ├─ Key(address)
-        |│  │     │  ╰─ If
-        |│  │     │     ├─ BinOp(&&)
-        |│  │     │     │  ├─ Call
-        |│  │     │     │  │  ├─ Ident(isObject)
-        |│  │     │     │  │  ╰─ Obj
-        |│  │     │     │  │     ├─ Key(left: _.left[0][1])
-        |│  │     │     │  │     ╰─ Key(right: _.left[1][1])
-        |│  │     │     │  ╰─ UnOp(!)
-        |│  │     │     │     ╰─ Call
-        |│  │     │     │        ├─ JsCore(Array.isArray)
-        |│  │     │     │        ╰─ Obj
-        |│  │     │     │           ├─ Key(left: _.left[0][1])
-        |│  │     │     │           ╰─ Key(right: _.left[1][1])
-        |│  │     │     ├─ JsCore((isObject(_.left[1][1]) && (! Array.isArray(_.left[1][1]))) ? _.left[1][1].address : undefined)
-        |│  │     │     ╰─ Ident(undefined)
-        |│  │     ╰─ Key(zip: (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1].zip : undefined)
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("name" -> true)
-        |   ├─ Name("address" -> true)
-        |   ├─ Name("zip" -> true)
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual("#1560", testFile("plan 3-way equi-join ($lookup)"))
 
     "plan count of $lookup" in {
       plan3_4(
@@ -8437,318 +3513,7 @@ class PlannerSpec extends
             "_id" -> $field("_id", "0"),
             "1"   -> $include),
           IgnoreId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $FoldLeftF
-        |│  │  │  ├─ Chain
-        |│  │  │  │  ├─ $ReadF(db; zips)
-        |│  │  │  │  ├─ $SimpleMapF
-        |│  │  │  │  │  ├─ Map
-        |│  │  │  │  │  │  ╰─ JsCore([_._id, _])
-        |│  │  │  │  │  ╰─ Scope(Map())
-        |│  │  │  │  ├─ $ProjectF
-        |│  │  │  │  │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  │  │  │  │  ├─ Name("1" -> { "$literal": true })
-        |│  │  │  │  │  ├─ Name("src" -> "$$ROOT")
-        |│  │  │  │  │  ╰─ IgnoreId
-        |│  │  │  │  ├─ $MatchF
-        |│  │  │  │  │  ╰─ And
-        |│  │  │  │  │     ├─ Doc
-        |│  │  │  │  │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │  │  │     ╰─ Doc
-        |│  │  │  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  │  │  ├─ $SimpleMapF
-        |│  │  │  │  │  ├─ Map
-        |│  │  │  │  │  │  ╰─ Obj
-        |│  │  │  │  │  │     ├─ Key(0: _.src[1]._id)
-        |│  │  │  │  │  │     ╰─ Key(content: _.src)
-        |│  │  │  │  │  ╰─ Scope(Map())
-        |│  │  │  │  ├─ $GroupF
-        |│  │  │  │  │  ├─ Grouped
-        |│  │  │  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│  │  │  │  │  ╰─ By
-        |│  │  │  │  │     ╰─ Name("0" -> "$0")
-        |│  │  │  │  ╰─ $ProjectF
-        |│  │  │  │     ├─ Name("_id" -> "$_id")
-        |│  │  │  │     ├─ Name("value")
-        |│  │  │  │     │  ├─ Name("left" -> "$0")
-        |│  │  │  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │  │  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │  │  │     ╰─ IncludeId
-        |│  │  │  ╰─ Chain
-        |│  │  │     ├─ $ReadF(db; largeZips)
-        |│  │  │     ├─ $SimpleMapF
-        |│  │  │     │  ├─ Map
-        |│  │  │     │  │  ╰─ JsCore([_._id, _])
-        |│  │  │     │  ╰─ Scope(Map())
-        |│  │  │     ├─ $ProjectF
-        |│  │  │     │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  │  │     │  ├─ Name("1" -> { "$literal": true })
-        |│  │  │     │  ├─ Name("src" -> "$$ROOT")
-        |│  │  │     │  ╰─ IgnoreId
-        |│  │  │     ├─ $MatchF
-        |│  │  │     │  ╰─ And
-        |│  │  │     │     ├─ Doc
-        |│  │  │     │     │  ╰─ Expr($0 -> Type(Doc))
-        |│  │  │     │     ╰─ Doc
-        |│  │  │     │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  │     ├─ $MapF
-        |│  │  │     │  ├─ JavaScript(function (key, value) {
-        |│  │  │     │  │               return [
-        |│  │  │     │  │                 { "0": value.src[1].TestProgramId },
-        |│  │  │     │  │                 { "left": [], "right": [value.src] }]
-        |│  │  │     │  │             })
-        |│  │  │     │  ╰─ Scope(Map())
-        |│  │  │     ╰─ $ReduceF
-        |│  │  │        ├─ JavaScript(function (key, values) {
-        |│  │  │        │               var result = { "left": [], "right": [] };
-        |│  │  │        │               values.forEach(
-        |│  │  │        │                 function (value) {
-        |│  │  │        │                   result.left = result.left.concat(value.left);
-        |│  │  │        │                   result.right = result.right.concat(value.right)
-        |│  │  │        │                 });
-        |│  │  │        │               return result
-        |│  │  │        │             })
-        |│  │  │        ╰─ Scope(Map())
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ Doc
-        |│  │  │     ├─ NotExpr($left -> Size(0))
-        |│  │  │     ╰─ NotExpr($right -> Size(0))
-        |│  │  ├─ $UnwindF(DocField(BsonField.Name("right")))
-        |│  │  ├─ $UnwindF(DocField(BsonField.Name("left")))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Arr
-        |│  │  │  │     ├─ Access
-        |│  │  │  │     │  ├─ Obj
-        |│  │  │  │     │  │  ├─ Key(left: _.left[1])
-        |│  │  │  │     │  │  ╰─ Key(right: _.right[1])
-        |│  │  │  │     │  ╰─ Literal(0)
-        |│  │  │  │     ├─ JsCore([
-        |│  │  │  │     │         (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1]._id : undefined])
-        |│  │  │  │     ├─ JsCore(_.left[1])
-        |│  │  │  │     ├─ JsCore(_.left[1]._id)
-        |│  │  │  │     ╰─ Arr
-        |│  │  │  │        ├─ Access
-        |│  │  │  │        │  ├─ Obj
-        |│  │  │  │        │  │  ├─ Key(left: _.left[1])
-        |│  │  │  │        │  │  ╰─ Key(right: _.right[1])
-        |│  │  │  │        │  ╰─ Literal(0)
-        |│  │  │  │        ├─ JsCore([
-        |│  │  │  │        │         (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1]._id : undefined])
-        |│  │  │  │        ├─ Arr
-        |│  │  │  │        │  ├─ Access
-        |│  │  │  │        │  │  ├─ Obj
-        |│  │  │  │        │  │  │  ├─ Key(left: _.left[1])
-        |│  │  │  │        │  │  │  ╰─ Key(right: _.right[1])
-        |│  │  │  │        │  │  ╰─ Literal(0)
-        |│  │  │  │        │  ╰─ JsCore([
-        |│  │  │  │        │            (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1]._id : undefined])
-        |│  │  │  │        ├─ JsCore(_.right[1])
-        |│  │  │  │        ╰─ If
-        |│  │  │  │           ├─ JsCore(isObject(_.left[1]) && (! Array.isArray(_.left[1])))
-        |│  │  │  │           ├─ SpliceObjects
-        |│  │  │  │           │  ├─ JsCore(_.left[1])
-        |│  │  │  │           │  ╰─ JsCore(_.right[1])
-        |│  │  │  │           ╰─ Ident(undefined)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("f0" -> {
-        |│  │  │  │          "$first": {
-        |│  │  │  │            "$cond": [
-        |│  │  │  │              {
-        |│  │  │  │                "$and": [
-        |│  │  │  │                  {
-        |│  │  │  │                    "$lte": [
-        |│  │  │  │                      { "$literal": {  } },
-        |│  │  │  │                      { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] }]
-        |│  │  │  │                  },
-        |│  │  │  │                  {
-        |│  │  │  │                    "$lt": [
-        |│  │  │  │                      { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("2") }] },
-        |│  │  │  │                      { "$literal": [] }]
-        |│  │  │  │                  }]
-        |│  │  │  │              },
-        |│  │  │  │              { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("3") }] },
-        |│  │  │  │              { "$literal": undefined }]
-        |│  │  │  │          }
-        |│  │  │  │        })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ JsCore([[_._id["0"]], _.f0])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-        |│  │  │  ╰─ By
-        |│  │  │     ╰─ Name("0" -> {
-        |│  │  │             "$arrayElemAt": [
-        |│  │  │               { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("0") }] },
-        |│  │  │               { "$literal": NumberInt("0") }]
-        |│  │  │           })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $FoldLeftF
-        |│     │  ├─ Chain
-        |│     │  │  ├─ $ReadF(db; zips)
-        |│     │  │  ├─ $SimpleMapF
-        |│     │  │  │  ├─ Map
-        |│     │  │  │  │  ╰─ JsCore([_._id, _])
-        |│     │  │  │  ╰─ Scope(Map())
-        |│     │  │  ├─ $ProjectF
-        |│     │  │  │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│     │  │  │  ├─ Name("1" -> { "$literal": true })
-        |│     │  │  │  ├─ Name("src" -> "$$ROOT")
-        |│     │  │  │  ╰─ IgnoreId
-        |│     │  │  ├─ $MatchF
-        |│     │  │  │  ╰─ And
-        |│     │  │  │     ├─ Doc
-        |│     │  │  │     │  ╰─ Expr($0 -> Type(Doc))
-        |│     │  │  │     ╰─ Doc
-        |│     │  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│     │  │  ├─ $SimpleMapF
-        |│     │  │  │  ├─ Map
-        |│     │  │  │  │  ╰─ Obj
-        |│     │  │  │  │     ├─ Key(0: _.src[1]._id)
-        |│     │  │  │  │     ╰─ Key(content: _.src)
-        |│     │  │  │  ╰─ Scope(Map())
-        |│     │  │  ├─ $GroupF
-        |│     │  │  │  ├─ Grouped
-        |│     │  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│     │  │  │  ╰─ By
-        |│     │  │  │     ╰─ Name("0" -> "$0")
-        |│     │  │  ╰─ $ProjectF
-        |│     │  │     ├─ Name("_id" -> "$_id")
-        |│     │  │     ├─ Name("value")
-        |│     │  │     │  ├─ Name("left" -> "$0")
-        |│     │  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│     │  │     │  ╰─ Name("_id" -> "$_id")
-        |│     │  │     ╰─ IncludeId
-        |│     │  ╰─ Chain
-        |│     │     ├─ $ReadF(db; largeZips)
-        |│     │     ├─ $SimpleMapF
-        |│     │     │  ├─ Map
-        |│     │     │  │  ╰─ JsCore([_._id, _])
-        |│     │     │  ╰─ Scope(Map())
-        |│     │     ├─ $ProjectF
-        |│     │     │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│     │     │  ├─ Name("1" -> { "$literal": true })
-        |│     │     │  ├─ Name("src" -> "$$ROOT")
-        |│     │     │  ╰─ IgnoreId
-        |│     │     ├─ $MatchF
-        |│     │     │  ╰─ And
-        |│     │     │     ├─ Doc
-        |│     │     │     │  ╰─ Expr($0 -> Type(Doc))
-        |│     │     │     ╰─ Doc
-        |│     │     │        ╰─ Expr($1 -> Eq(Bool(true)))
-        |│     │     ├─ $MapF
-        |│     │     │  ├─ JavaScript(function (key, value) {
-        |│     │     │  │               return [
-        |│     │     │  │                 { "0": value.src[1].TestProgramId },
-        |│     │     │  │                 { "left": [], "right": [value.src] }]
-        |│     │     │  │             })
-        |│     │     │  ╰─ Scope(Map())
-        |│     │     ╰─ $ReduceF
-        |│     │        ├─ JavaScript(function (key, values) {
-        |│     │        │               var result = { "left": [], "right": [] };
-        |│     │        │               values.forEach(
-        |│     │        │                 function (value) {
-        |│     │        │                   result.left = result.left.concat(value.left);
-        |│     │        │                   result.right = result.right.concat(value.right)
-        |│     │        │                 });
-        |│     │        │               return result
-        |│     │        │             })
-        |│     │        ╰─ Scope(Map())
-        |│     ├─ $MatchF
-        |│     │  ╰─ Doc
-        |│     │     ├─ NotExpr($left -> Size(0))
-        |│     │     ╰─ NotExpr($right -> Size(0))
-        |│     ├─ $UnwindF(DocField(BsonField.Name("right")))
-        |│     ├─ $UnwindF(DocField(BsonField.Name("left")))
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Arr
-        |│     │  │     ├─ Access
-        |│     │  │     │  ├─ Obj
-        |│     │  │     │  │  ├─ Key(left: _.left[1])
-        |│     │  │     │  │  ╰─ Key(right: _.right[1])
-        |│     │  │     │  ╰─ Literal(0)
-        |│     │  │     ├─ JsCore([
-        |│     │  │     │         (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1]._id : undefined])
-        |│     │  │     ├─ JsCore(_.left[1])
-        |│     │  │     ├─ JsCore(_.left[1]._id)
-        |│     │  │     ╰─ Arr
-        |│     │  │        ├─ Access
-        |│     │  │        │  ├─ Obj
-        |│     │  │        │  │  ├─ Key(left: _.left[1])
-        |│     │  │        │  │  ╰─ Key(right: _.right[1])
-        |│     │  │        │  ╰─ Literal(0)
-        |│     │  │        ├─ JsCore([
-        |│     │  │        │         (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1]._id : undefined])
-        |│     │  │        ├─ Arr
-        |│     │  │        │  ├─ Access
-        |│     │  │        │  │  ├─ Obj
-        |│     │  │        │  │  │  ├─ Key(left: _.left[1])
-        |│     │  │        │  │  │  ╰─ Key(right: _.right[1])
-        |│     │  │        │  │  ╰─ Literal(0)
-        |│     │  │        │  ╰─ JsCore([
-        |│     │  │        │            (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1]._id : undefined])
-        |│     │  │        ├─ JsCore(_.right[1])
-        |│     │  │        ╰─ If
-        |│     │  │           ├─ JsCore(isObject(_.left[1]) && (! Array.isArray(_.left[1])))
-        |│     │  │           ├─ SpliceObjects
-        |│     │  │           │  ├─ JsCore(_.left[1])
-        |│     │  │           │  ╰─ JsCore(_.right[1])
-        |│     │  │           ╰─ Ident(undefined)
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $GroupF
-        |│     │  ├─ Grouped
-        |│     │  │  ╰─ Name("f0" -> { "$sum": { "$literal": NumberInt("1") } })
-        |│     │  ╰─ By
-        |│     │     ╰─ Name("0" -> {
-        |│     │             "$arrayElemAt": [
-        |│     │               { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("4") }] },
-        |│     │               { "$literal": NumberInt("1") }]
-        |│     │           })
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([[_._id["0"]], _.f0])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [{ "0": value[0][0] }, { "left": [], "right": [value] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |╰─ $ProjectF
-        |   ├─ Name("_id" -> { "$arrayElemAt": ["$left", { "$literal": NumberInt("1") }] })
-        |   ├─ Name("1" -> { "$arrayElemAt": ["$right", { "$literal": NumberInt("1") }] })
-        |   ╰─ IncludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan count of $lookup"))
 
     "plan join with multiple conditions" in {
       plan(sqlE"select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth from slamengine_commits as l join slamengine_commits as r on r.sha = l.parents[0].sha and l.author.login = r.author.login") must
@@ -8818,134 +3583,7 @@ class PlannerSpec extends
                     $literal(Bson.Undefined))),
               IgnoreId)),
         false).op)
-    }.pendingWithActual("#1560",
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; slamengine_commits)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │     ╰─ JsCore([
-        |│  │  │  │               __val[0],
-        |│  │  │  │               [__val[0]],
-        |│  │  │  │               (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│  │  │  │               (((isObject(
-        |│  │  │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].parents[0] : undefined) && (! Array.isArray(
-        |│  │  │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].parents[0] : undefined))) ? true : false) && (Array.isArray(
-        |│  │  │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].parents : undefined) ? true : false)) && ((isObject(
-        |│  │  │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].author : undefined) && (! Array.isArray(
-        |│  │  │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].author : undefined))) ? true : false),
-        |│  │  │  │               [
-        |│  │  │  │                 __val[0],
-        |│  │  │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│  │  │  │                 (isObject(
-        |│  │  │  │                   (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].author : undefined) && (! Array.isArray(
-        |│  │  │  │                   (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].author : undefined))) ? true : false]])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $ProjectF
-        |│  │  │  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("3") }] })
-        |│  │  │  ├─ Name("src" -> "$$ROOT")
-        |│  │  │  ╰─ IgnoreId
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ Doc
-        |│  │  │     ╰─ Expr($0 -> Eq(Bool(true)))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Obj
-        |│  │  │  │     ├─ Key(0: _.src[2].parents[0].sha)
-        |│  │  │  │     ├─ Key(1: _.src[2].author.login)
-        |│  │  │  │     ╰─ Key(content: _.src)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
-        |│  │  │  ╰─ By
-        |│  │  │     ├─ Name("0" -> "$0")
-        |│  │  │     ╰─ Name("1" -> "$1")
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; slamengine_commits)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ JsCore([
-        |│     │  │               __val[0],
-        |│     │  │               [__val[0]],
-        |│     │  │               (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│     │  │               (((isObject(
-        |│     │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].parents[0] : undefined) && (! Array.isArray(
-        |│     │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].parents[0] : undefined))) ? true : false) && (Array.isArray(
-        |│     │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].parents : undefined) ? true : false)) && ((isObject(
-        |│     │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].author : undefined) && (! Array.isArray(
-        |│     │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].author : undefined))) ? true : false),
-        |│     │  │               [
-        |│     │  │                 __val[0],
-        |│     │  │                 (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1] : undefined,
-        |│     │  │                 (isObject(
-        |│     │  │                   (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].author : undefined) && (! Array.isArray(
-        |│     │  │                   (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].author : undefined))) ? true : false]])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $ProjectF
-        |│     │  ├─ Name("0" -> {
-        |│     │  │       "$arrayElemAt": [
-        |│     │  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("4") }] },
-        |│     │  │         { "$literal": NumberInt("2") }]
-        |│     │  │     })
-        |│     │  ├─ Name("src" -> "$$ROOT")
-        |│     │  ╰─ IgnoreId
-        |│     ├─ $MatchF
-        |│     │  ╰─ Doc
-        |│     │     ╰─ Expr($0 -> Eq(Bool(true)))
-        |│     ├─ $ProjectF
-        |│     │  ├─ Name("0" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("4") }] })
-        |│     │  ╰─ IgnoreId
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) {
-        |│     │  │               return [
-        |│     │  │                 { "0": value["0"][1].sha, "1": value["0"][1].author.login },
-        |│     │  │                 { "left": [], "right": [value["0"]] }]
-        |│     │  │             })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(child: (isObject(_.left[2]) && (! Array.isArray(_.left[2]))) ? _.left[2].sha : undefined)
-        |│  │     ├─ Key(c_auth: ((isObject(_.left[2]) && (! Array.isArray(_.left[2]))) && (isObject(_.left[2].author) && (! Array.isArray(_.left[2].author)))) ? _.left[2].author.login : undefined)
-        |│  │     ├─ Key(parent: (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1].sha : undefined)
-        |│  │     ╰─ Key(p_auth: ((isObject(_.right[1]) && (! Array.isArray(_.right[1]))) && (isObject(_.right[1].author) && (! Array.isArray(_.right[1].author)))) ? _.right[1].author.login : undefined)
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("child" -> true)
-        |   ├─ Name("c_auth" -> true)
-        |   ├─ Name("parent" -> true)
-        |   ├─ Name("p_auth" -> true)
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual("#1560", testFile("plan join with multiple conditions"))
 
     "plan join with non-JS-able condition" in {
       plan(sqlE"select z1.city as city1, z1.loc, z2.city as city2, z2.pop from zips as z1 join zips as z2 on z1.loc[*] = z2.loc[*]") must
@@ -9009,148 +3647,7 @@ class PlannerSpec extends
                     $literal(Bson.Undefined))),
               IgnoreId)),
           false).op)
-    }.pendingWithActual("#1560",
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; zips)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │     ╰─ Obj
-        |│  │  │  │        ├─ Key(0: Array.isArray(
-        |│  │  │  │        │      (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].loc : undefined) ? true : false)
-        |│  │  │  │        ╰─ Key(src: __val)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ Doc
-        |│  │  │     ╰─ Expr($0 -> Eq(Bool(true)))
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ JsCore([
-        |│  │  │  │     │         _.src[0],
-        |│  │  │  │     │         (isObject(_.src[1]) && (! Array.isArray(_.src[1]))) ? _.src[1] : undefined,
-        |│  │  │  │     │         Array.isArray(
-        |│  │  │  │     │           (isObject(_.src[1]) && (! Array.isArray(_.src[1]))) ? _.src[1].loc : undefined) ? true : false])
-        |│  │  │  │     ╰─ Obj
-        |│  │  │  │        ├─ Key(s: __val)
-        |│  │  │  │        ╰─ Key(f: __val[1].loc)
-        |│  │  │  ├─ SubMap
-        |│  │  │  │  ├─ JsCore(_.f)
-        |│  │  │  │  ╰─ Let(m)
-        |│  │  │  │     ├─ JsCore(_.f)
-        |│  │  │  │     ╰─ Call
-        |│  │  │  │        ├─ JsCore(Object.keys(m).map)
-        |│  │  │  │        ╰─ Fun(Name(k))
-        |│  │  │  │           ╰─ JsCore([k, m[k]])
-        |│  │  │  ├─ Flatten
-        |│  │  │  │  ╰─ JsCore(_.f)
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ JsCore([_.s, [_.s, _.f]])
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-        |│  │  │  ╰─ By
-        |│  │  │     ├─ Name("0" -> {
-        |│  │  │     │       "$arrayElemAt": [
-        |│  │  │     │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-        |│  │  │     │         { "$literal": NumberInt("0") }]
-        |│  │  │     │     })
-        |│  │  │     ╰─ Name("1" -> {
-        |│  │  │             "$arrayElemAt": [
-        |│  │  │               {
-        |│  │  │                 "$arrayElemAt": [
-        |│  │  │                   { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-        |│  │  │                   { "$literal": NumberInt("1") }]
-        |│  │  │               },
-        |│  │  │               { "$literal": NumberInt("1") }]
-        |│  │  │           })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; zips)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ Obj
-        |│     │  │        ├─ Key(0: Array.isArray(
-        |│     │  │        │      (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].loc : undefined) ? true : false)
-        |│     │  │        ╰─ Key(src: __val)
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MatchF
-        |│     │  ╰─ Doc
-        |│     │     ╰─ Expr($0 -> Eq(Bool(true)))
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([
-        |│     │  │     │         _.src[0],
-        |│     │  │     │         (isObject(_.src[1]) && (! Array.isArray(_.src[1]))) ? _.src[1] : undefined,
-        |│     │  │     │         Array.isArray(
-        |│     │  │     │           (isObject(_.src[1]) && (! Array.isArray(_.src[1]))) ? _.src[1].loc : undefined) ? true : false])
-        |│     │  │     ╰─ Obj
-        |│     │  │        ├─ Key(s: __val)
-        |│     │  │        ╰─ Key(f: __val[1].loc)
-        |│     │  ├─ SubMap
-        |│     │  │  ├─ JsCore(_.f)
-        |│     │  │  ╰─ Let(m)
-        |│     │  │     ├─ JsCore(_.f)
-        |│     │  │     ╰─ Call
-        |│     │  │        ├─ JsCore(Object.keys(m).map)
-        |│     │  │        ╰─ Fun(Name(k))
-        |│     │  │           ╰─ JsCore([k, m[k]])
-        |│     │  ├─ Flatten
-        |│     │  │  ╰─ JsCore(_.f)
-        |│     │  ├─ Map
-        |│     │  │  ╰─ JsCore([_.s, [_.s, _.f]])
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) {
-        |│     │  │               return [
-        |│     │  │                 { "0": value[1][0], "1": value[1][1][1] },
-        |│     │  │                 { "left": [], "right": [value] }]
-        |│     │  │             })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(city1: (isObject(_.left[0][1]) && (! Array.isArray(_.left[0][1]))) ? _.left[0][1].city : undefined)
-        |│  │     ├─ Key(loc: (isObject(_.left[0][1]) && (! Array.isArray(_.left[0][1]))) ? _.left[0][1].loc : undefined)
-        |│  │     ├─ Key(city2: (isObject(_.right[0][1]) && (! Array.isArray(_.right[0][1]))) ? _.right[0][1].city : undefined)
-        |│  │     ╰─ Key(pop: (isObject(_.right[0][1]) && (! Array.isArray(_.right[0][1]))) ? _.right[0][1].pop : undefined)
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("city1" -> true)
-        |   ├─ Name("loc" -> true)
-        |   ├─ Name("city2" -> true)
-        |   ├─ Name("pop" -> true)
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual("#1560", testFile("plan join with non-JS-able condition"))
 
     "plan simple cross" in {
       plan(sqlE"select zips2.city from zips, zips2 where zips.pop < zips2.pop") must
@@ -9213,137 +3710,7 @@ class PlannerSpec extends
               reshape("value" -> $field("__tmp11", "city")),
               ExcludeId)),
           false).op)
-    }.pendingWithActual("#1560",
-      """Chain
-        |├─ $FoldLeftF
-        |│  ├─ Chain
-        |│  │  ├─ $ReadF(db; zips)
-        |│  │  ├─ $SimpleMapF
-        |│  │  │  ├─ Map
-        |│  │  │  │  ╰─ Let(__val)
-        |│  │  │  │     ├─ JsCore([_._id, _])
-        |│  │  │  │     ╰─ Obj
-        |│  │  │  │        ├─ Key(0: __val[1].pop)
-        |│  │  │  │        ├─ Key(1: true)
-        |│  │  │  │        ├─ Key(2: __val[1])
-        |│  │  │  │        ├─ Key(3: true)
-        |│  │  │  │        ╰─ Key(src: __val)
-        |│  │  │  ╰─ Scope(Map())
-        |│  │  ├─ $MatchF
-        |│  │  │  ╰─ And
-        |│  │  │     ├─ Or
-        |│  │  │     │  ├─ Doc
-        |│  │  │     │  │  ╰─ Expr($0 -> Type(Int32))
-        |│  │  │     │  ├─ Doc
-        |│  │  │     │  │  ╰─ Expr($0 -> Type(Int64))
-        |│  │  │     │  ├─ Doc
-        |│  │  │     │  │  ╰─ Expr($0 -> Type(Dec))
-        |│  │  │     │  ├─ Doc
-        |│  │  │     │  │  ╰─ Expr($0 -> Type(Text))
-        |│  │  │     │  ├─ Doc
-        |│  │  │     │  │  ╰─ Expr($0 -> Type(Date))
-        |│  │  │     │  ╰─ Doc
-        |│  │  │     │     ╰─ Expr($0 -> Type(Bool))
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($1 -> Eq(Bool(true)))
-        |│  │  │     ├─ Doc
-        |│  │  │     │  ╰─ Expr($2 -> Type(Doc))
-        |│  │  │     ╰─ Doc
-        |│  │  │        ╰─ Expr($3 -> Eq(Bool(true)))
-        |│  │  ├─ $GroupF
-        |│  │  │  ├─ Grouped
-        |│  │  │  │  ╰─ Name("0" -> { "$push": "$src" })
-        |│  │  │  ╰─ By({ "$literal": null })
-        |│  │  ╰─ $ProjectF
-        |│  │     ├─ Name("_id" -> "$_id")
-        |│  │     ├─ Name("value")
-        |│  │     │  ├─ Name("left" -> "$0")
-        |│  │     │  ├─ Name("right" -> { "$literal": [] })
-        |│  │     │  ╰─ Name("_id" -> "$_id")
-        |│  │     ╰─ IncludeId
-        |│  ╰─ Chain
-        |│     ├─ $ReadF(db; zips2)
-        |│     ├─ $SimpleMapF
-        |│     │  ├─ Map
-        |│     │  │  ╰─ Let(__val)
-        |│     │  │     ├─ JsCore([_._id, _])
-        |│     │  │     ╰─ Obj
-        |│     │  │        ├─ Key(0: __val[1].pop)
-        |│     │  │        ├─ Key(1: true)
-        |│     │  │        ├─ Key(2: __val[1])
-        |│     │  │        ├─ Key(3: true)
-        |│     │  │        ╰─ Key(src: __val)
-        |│     │  ╰─ Scope(Map())
-        |│     ├─ $MatchF
-        |│     │  ╰─ And
-        |│     │     ├─ Or
-        |│     │     │  ├─ Doc
-        |│     │     │  │  ╰─ Expr($0 -> Type(Int32))
-        |│     │     │  ├─ Doc
-        |│     │     │  │  ╰─ Expr($0 -> Type(Int64))
-        |│     │     │  ├─ Doc
-        |│     │     │  │  ╰─ Expr($0 -> Type(Dec))
-        |│     │     │  ├─ Doc
-        |│     │     │  │  ╰─ Expr($0 -> Type(Text))
-        |│     │     │  ├─ Doc
-        |│     │     │  │  ╰─ Expr($0 -> Type(Date))
-        |│     │     │  ╰─ Doc
-        |│     │     │     ╰─ Expr($0 -> Type(Bool))
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($1 -> Eq(Bool(true)))
-        |│     │     ├─ Doc
-        |│     │     │  ╰─ Expr($2 -> Type(Doc))
-        |│     │     ╰─ Doc
-        |│     │        ╰─ Expr($3 -> Eq(Bool(true)))
-        |│     ├─ $MapF
-        |│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value.src] }] })
-        |│     │  ╰─ Scope(Map())
-        |│     ╰─ $ReduceF
-        |│        ├─ JavaScript(function (key, values) {
-        |│        │               var result = { "left": [], "right": [] };
-        |│        │               values.forEach(
-        |│        │                 function (value) {
-        |│        │                   result.left = result.left.concat(value.left);
-        |│        │                   result.right = result.right.concat(value.right)
-        |│        │                 });
-        |│        │               return result
-        |│        │             })
-        |│        ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ├─ NotExpr($left -> Size(0))
-        |│     ╰─ NotExpr($right -> Size(0))
-        |├─ $UnwindF(DocField(BsonField.Name("right")))
-        |├─ $UnwindF(DocField(BsonField.Name("left")))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ JsCore([
-        |│  │     │         [
-        |│  │     │           _.left[0],
-        |│  │     │           [_.left[0]],
-        |│  │     │           _.left[1],
-        |│  │     │           ((((isNumber(_.left[1].pop) || ((_.left[1].pop instanceof NumberInt) || (_.left[1].pop instanceof NumberLong))) || isString(_.left[1].pop)) || ((_.left[1].pop instanceof Date) || ((typeof _.left[1].pop) === "boolean"))) ? true : false) && ((isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? true : false)],
-        |│  │     │         [
-        |│  │     │           _.right[0],
-        |│  │     │           [_.right[0]],
-        |│  │     │           _.right[1],
-        |│  │     │           ((((isNumber(_.right[1].pop) || ((_.right[1].pop instanceof NumberInt) || (_.right[1].pop instanceof NumberLong))) || isString(_.right[1].pop)) || ((_.right[1].pop instanceof Date) || ((typeof _.right[1].pop) === "boolean"))) ? true : false) && ((isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? true : false)]])
-        |│  │     ╰─ Obj
-        |│  │        ├─ Key(0: true)
-        |│  │        ├─ Key(1: __val[0][2].pop < __val[1][2].pop)
-        |│  │        ╰─ Key(src: __val)
-        |│  ╰─ Scope(Map())
-        |├─ $MatchF
-        |│  ╰─ And
-        |│     ├─ Doc
-        |│     │  ╰─ Expr($0 -> Eq(Bool(true)))
-        |│     ╰─ Doc
-        |│        ╰─ Expr($1 -> Eq(Bool(true)))
-        |╰─ $SimpleMapF
-        |   ├─ Map
-        |   │  ╰─ JsCore((isObject(_.src[1][2]) && (! Array.isArray(_.src[1][2]))) ? _.src[1][2].city : undefined)
-        |   ╰─ Scope(Map())""".stripMargin)
+    }.pendingWithActual("#1560", testFile("plan simple cross"))
 
     def countOps(wf: Workflow, p: PartialFunction[WorkflowF[Fix[WorkflowF]], Boolean]): Int = {
       wf.foldMap(op => if (p.lift(op.unFix).getOrElse(false)) 1 else 0)
@@ -9604,25 +3971,7 @@ class PlannerSpec extends
           reshape("bar" -> $field("bar")),
           IgnoreId),
         $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; foo)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ Arr
-        |│  │     │  ├─ Obj
-        |│  │     │  │  ╰─ Key(bar: _.bar)
-        |│  │     │  ╰─ Ident(_)
-        |│  │     ╰─ Obj
-        |│  │        ├─ Key(0: __val[1].bar)
-        |│  │        ╰─ Key(src: __val)
-        |│  ╰─ Scope(Map())
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Ascending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan simple Sort"))
 
     "plan Sort with expression" in {
       val lp =
@@ -9694,25 +4043,7 @@ class PlannerSpec extends
         $project(
           reshape("bar" -> $field("bar")),
           ExcludeId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; foo)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Let(__val)
-        |│  │     ├─ Arr
-        |│  │     │  ├─ Obj
-        |│  │     │  │  ╰─ Key(bar: _.bar)
-        |│  │     │  ╰─ Ident(_)
-        |│  │     ╰─ Obj
-        |│  │        ├─ Key(0: __val[1].bar / 10.0)
-        |│  │        ╰─ Key(src: __val)
-        |│  ╰─ Scope(Map())
-        |├─ $SortF
-        |│  ╰─ SortKey(0 -> Ascending)
-        |╰─ $ProjectF
-        |   ├─ Name("value" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-        |   ╰─ ExcludeId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan Sort expression (and extra project)"))
 
     "plan with extra squash and flattening" in {
       // NB: this case occurs when a view's LP is embedded in a larger query
@@ -9794,53 +4125,7 @@ class PlannerSpec extends
         $project(
           reshape("city" -> $field("_id", "0")),
           IgnoreId)))
-    }.pendingWithActual(notOnPar,
-      """Chain
-        |├─ $ReadF(db; zips)
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ├─ Key(s: (function (__val) {
-        |│  │     │      return [
-        |│  │     │        __val[0],
-        |│  │     │        __val[1],
-        |│  │     │        [
-        |│  │     │          __val[0],
-        |│  │     │          (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].loc : undefined]]
-        |│  │     │    })(
-        |│  │     │      [_._id, _]))
-        |│  │     ╰─ Key(f: (function (__val) { return Array.isArray(__val[2][1]) ? __val[2][1] : undefined })(
-        |│  │            (function (__val) {
-        |│  │              return [
-        |│  │                __val[0],
-        |│  │                __val[1],
-        |│  │                [
-        |│  │                  __val[0],
-        |│  │                  (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].loc : undefined]]
-        |│  │            })(
-        |│  │              [_._id, _])))
-        |│  ├─ Flatten
-        |│  │  ╰─ JsCore(_.f)
-        |│  ├─ Map
-        |│  │  ╰─ JsCore([
-        |│  │            (isObject(_.s[1]) && (! Array.isArray(_.s[1]))) ? _.s[1] : undefined,
-        |│  │            (new RegExp("^.*MONT.*$", "m")).test(_.f)])
-        |│  ╰─ Scope(Map())
-        |├─ $ProjectF
-        |│  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-        |│  ├─ Name("src" -> "$$ROOT")
-        |│  ╰─ IgnoreId
-        |├─ $MatchF
-        |│  ╰─ Doc
-        |│     ╰─ Expr($0 -> Eq(Bool(true)))
-        |├─ $SimpleMapF
-        |│  ├─ Map
-        |│  │  ╰─ Obj
-        |│  │     ╰─ Key(city: _.src[0].city)
-        |│  ╰─ Scope(Map())
-        |╰─ $ProjectF
-        |   ├─ Name("city" -> true)
-        |   ╰─ IgnoreId""".stripMargin)
+    }.pendingWithActual(notOnPar, testFile("plan with extra squash and flattening"))
   }
 
   "planner log" should {

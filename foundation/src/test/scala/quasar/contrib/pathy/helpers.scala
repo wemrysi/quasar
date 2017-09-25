@@ -26,7 +26,11 @@ import _root_.scalaz.concurrent.Task
 object Helpers {
   /** Returns the contents of the file as a `String`. */
   def textContents(file: RFile): Task[String] =
-    Task.delay(scala.io.Source.fromInputStream(new FileInputStream(jFile(file))).mkString)
+    jtextContents(jFile(file))
+
+  /** Returns the contents of the file as a `String`. */
+  def jtextContents(file: JFile): Task[String] =
+    Task.delay(scala.io.Source.fromInputStream(new FileInputStream(file)).mkString)
 
   def jFile(path: Path[_, _, Sandboxed]): JFile =
     new JFile(posixCodec.printPath(path))
