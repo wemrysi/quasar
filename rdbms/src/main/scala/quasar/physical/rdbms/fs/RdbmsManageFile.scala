@@ -24,22 +24,28 @@ import quasar.contrib.scalaz.eitherT._
 import quasar.effect.MonotonicSeq
 import quasar.fs._
 import quasar.physical.rdbms.Rdbms
+import quasar.physical.rdbms.common.TablePath.dirToSchema
 import quasar.physical.rdbms.common._
 import slamdata.Predef._
 
 import scalaz.Scalaz._
 import scalaz._
 
-trait RdbmsManageFile extends RdbmsDescribeTable with RdbmsCreateTable {
+trait RdbmsManageFile extends RdbmsDescribeTable with RdbmsCreate {
   this: Rdbms =>
   implicit def MonadM: Monad[M]
 
-  def dropSchema(schema: Schema): ConnectionIO[Unit] =
+  def dropSchema(schema: CustomSchema): ConnectionIO[Unit] =
     (fr"DROP SCHEMA" ++ Fragment.const(schema.shows) ++ fr"CASCADE").update.run
       .map(_ => ())
 
-  def dropSchemaWithChildren(parent: Schema): Backend[Unit] =
+  def dropSchemaWithChildren(parent: CustomSchema): Backend[Unit] =
     findChildSchemas(parent).flatMap(cs => (cs :+ parent).foldMap(dropSchema)).liftB
+
+  def dirToCustomSchema(dir: ADir): \/[FileSystemError, CustomSchema] = {
+    Schema.custom.getOption(dirToSchema(dir)).toRightDisjunction(
+      FileSystemError.pathErr(PathError.invalidPath(dir, "Directory points to default schema.")))
+  }
 
   override def ManageFileModule = new ManageFileModule {
 
@@ -59,21 +65,22 @@ trait RdbmsManageFile extends RdbmsDescribeTable with RdbmsCreateTable {
       } yield ()
     }
 
-    def deleteSchema(aDir: ADir): Backend[Unit] = {
-      val schema = TablePath.dirToSchema(aDir)
-          for {
-            exists <- schemaExists(schema).liftB
-            _ <- exists.unlessM(ME.raiseError(
-              FileSystemError.pathErr(PathError.pathNotFound(aDir))))
-            _ <- dropSchemaWithChildren(schema)
-          } yield ()
+    def deleteDir(aDir: ADir): Backend[Unit] = {
+      ME.unattempt(dirToCustomSchema(aDir).traverse { schema =>
+        for {
+          exists <- schemaExists(schema).liftB
+          _ <- exists.unlessM(ME.raiseError(
+            FileSystemError.pathErr(PathError.pathNotFound(aDir))))
+          _ <- dropSchemaWithChildren(schema)
+        } yield ()
+      })
     }
 
     override def delete(path: APath): Backend[Unit] = {
       Path
         .maybeFile(path)
         .map(deleteTable)
-        .orElse(Path.maybeDir(path).map(deleteSchema))
+        .orElse(Path.maybeDir(path).map(deleteDir))
         .getOrElse(().point[Backend])
     }
 
