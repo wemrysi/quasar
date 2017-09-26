@@ -17,7 +17,9 @@ Chain
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
-│  │     ├─ Key(0: remove(_.src[0], "__sd__0"))
+│  │     ├─ Key(0)
+│  │     │  ╰─ Obj
+│  │     │     ╰─ Key(city: _.src[0].city)
 │  │     ╰─ Key(content: _.src)
 │  ╰─ Scope(Map())
 ├─ $GroupF
@@ -29,7 +31,10 @@ Chain
 │  ├─ Map
 │  │  ╰─ Let(__val)
 │  │     ├─ JsCore([_._id["0"], _.f0, _.f0.__sd__0])
-│  │     ╰─ JsCore([remove(__val[1], "__sd__0"), __val])
+│  │     ╰─ Arr
+│  │        ├─ Obj
+│  │        │  ╰─ Key(city: __val[1].city)
+│  │        ╰─ Ident(__val)
 │  ╰─ Scope(Map())
 ├─ $ProjectF
 │  ├─ Name("0" -> {
