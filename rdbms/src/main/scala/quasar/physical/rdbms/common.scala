@@ -55,27 +55,17 @@ object common {
     val custom = Prism.partial[Schema, CustomSchema] {
       case c: CustomSchema => c
     }(scala.Predef.identity)
+
+    implicit val showCustomSchema: Show[CustomSchema] = Show.shows(_.name.toLowerCase)
   }
 
   final case class TableName(name: String) extends AnyVal
   final case class TablePath(schema: Schema, table: TableName)
 
-  implicit val showCustomSchema: Show[CustomSchema] = Show.shows(_.name)
-
-  implicit val showTableName: Show[TableName] =
-    Show.shows(_.name)
-
-  implicit val showPath: Show[TablePath] = Show.shows { tp =>
-    tp.schema match {
-      case DefaultSchema => tp.table.shows
-      case CustomSchema(name) => s"$name.${tp.table.shows}"
-    }
-  }
-
   object TablePath {
 
-    val Separator = "__child_"
-    val SeparatorRegex = "__child_"
+    val Separator = "__c_"
+    val SeparatorRegex = "__c_"
 
     def dirToSchema(dir: ADir): Schema = {
       Path.flatten(None, None, None, Some(_), Some(_), dir)
@@ -91,6 +81,16 @@ object common {
       val filename = Path.fileName(file).value
       val schema = Path.parentDir(file).map(dirToSchema).getOrElse(DefaultSchema)
       new TablePath(schema, TableName(filename))
+    }
+
+    implicit val showTableName: Show[TableName] =
+      Show.shows(_.name.toLowerCase)
+
+    implicit val showPath: Show[TablePath] = Show.shows { tp =>
+      tp.schema match {
+        case DefaultSchema => tp.table.shows
+        case s: CustomSchema => s"${s.shows}.${tp.table.shows}"
+      }
     }
   }
 }

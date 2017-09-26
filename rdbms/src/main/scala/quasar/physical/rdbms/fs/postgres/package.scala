@@ -26,6 +26,6 @@ package object postgres {
 
   implicit val showSchema: Show[Schema] = Show.shows {
     case DefaultSchema => DefaultSchemaName
-    case c: CustomSchema => showCustomSchema.shows(c)
+    case c: CustomSchema => Schema.showCustomSchema.shows(c)
   }
 }

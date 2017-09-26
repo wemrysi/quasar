@@ -18,7 +18,7 @@ package quasar.physical.rdbms.fs.postgres
 
 import slamdata.Predef._
 import quasar.physical.rdbms.fs.RdbmsCreate
-import quasar.physical.rdbms.common._
+import quasar.physical.rdbms.common.{CustomSchema, DefaultSchema, TablePath}
 
 import doobie.syntax.string._
 import doobie.free.connection.ConnectionIO
@@ -29,7 +29,7 @@ import scalaz.syntax.show._
 trait PostgresCreate extends RdbmsCreate {
 
   override def createSchema(schema: CustomSchema): ConnectionIO[Unit] = {
-    (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(schema.shows)).update.run.map(_ => ())
+    (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(schema.shows)).update.run.void
   }
 
   override def createTable(tablePath: TablePath): ConnectionIO[Unit] = {

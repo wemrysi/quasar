@@ -17,9 +17,9 @@
 package quasar.physical.rdbms.fs.postgres
 
 import slamdata.Predef._
-import quasar.physical.rdbms.common.{Schema, _}
+import quasar.physical.rdbms.common.{CustomSchema, DefaultSchema, Schema, TableName, TablePath}
 import quasar.physical.rdbms.fs.RdbmsDescribeTable
-import quasar.physical.rdbms.common.TablePath.Separator
+import quasar.physical.rdbms.common.TablePath._
 
 import doobie.imports._
 import scalaz.syntax.show._
@@ -38,23 +38,21 @@ trait PostgresDescribeTable extends RdbmsDescribeTable {
   }
 
   private def whereSchemaAndTable(tablePath: TablePath): Fragment = {
-    val schemaName = tablePath.schema.shows
-
-    fr"WHERE TABLE_SCHEMA=" ++
-  Fragment.const("'" + schemaName + "'") ++
+    fr"WHERE TABLE_SCHEMA =" ++
+    Fragment.const("'" + tablePath.schema.shows + "'") ++
     fr"AND TABLE_NAME =" ++
     Fragment.const("'" + tablePath.table.shows + "'")
   }
 
   private def whereSchema(schemaName: String): Fragment =
-    fr"WHERE TABLE_SCHEMA=" ++
+    fr"WHERE TABLE_SCHEMA =" ++
       Fragment.const("'" + schemaName + "'")
 
 
   override def findChildTables(schema: Schema): ConnectionIO[Vector[TableName]] = {
     val whereClause = schema match {
       case DefaultSchema => fr""
-      case CustomSchema(name) => fr"WHERE TABLE_SCHEMA = $name"
+      case c: CustomSchema => fr"WHERE TABLE_SCHEMA = ${c.shows}"
     }
 
     (fr"select TABLE_NAME from information_schema.tables" ++ whereClause)
@@ -66,8 +64,8 @@ trait PostgresDescribeTable extends RdbmsDescribeTable {
   override def findChildSchemas(parent: Schema): ConnectionIO[Vector[CustomSchema]] = {
     val whereClause = parent match {
       case DefaultSchema => fr""
-      case CustomSchema(name) =>
-        fr"WHERE SCHEMA_NAME LIKE" ++ Fragment.const("'" + name + Separator + "%'")
+      case c: CustomSchema =>
+        fr"WHERE SCHEMA_NAME LIKE" ++ Fragment.const("'" + c.shows + Separator + "%'")
     }
     (fr"SELECT SCHEMA_NAME FROM information_schema.schemata" ++ whereClause)
       .query[String]
@@ -78,8 +76,8 @@ trait PostgresDescribeTable extends RdbmsDescribeTable {
   override def schemaExists(schema: Schema): ConnectionIO[Boolean] =
     schema match {
       case DefaultSchema => true.point[ConnectionIO]
-      case CustomSchema(name) =>
-        descQuery(whereSchema(name), _.nonEmpty)
+      case c: CustomSchema =>
+        descQuery(whereSchema(c.shows), _.nonEmpty)
     }
 
   override def tableExists(

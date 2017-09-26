@@ -24,7 +24,8 @@ import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
 import quasar.fs.QueryFile
 import quasar.physical.rdbms.Rdbms
-import quasar.physical.rdbms.common._
+import quasar.physical.rdbms.common.{Schema, TablePath}
+import quasar.physical.rdbms.common.TablePath.showTableName
 import pathy.Path
 
 import scalaz.{-\/, Monad, \/-}
