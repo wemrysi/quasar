@@ -107,7 +107,7 @@ class Transform
         val uniSide: rewrite.BranchUnification[F, JoinSide, T[F]] =
           rewrite.unifySimpleBranchesJoinSide(src, lBranch, rBranch)(rebaseT[T, F])
 
-        def c2[A: Equal: Show](
+        def c2[A: Equal: Show: RenderTree](
           uni: rewrite.BranchUnification[F, A, T[F]])
             : Option[(F[T[F]], FreeMap, FreeMap)] =
           for {
@@ -117,7 +117,7 @@ class Transform
             res <- uni.combine(c)
           } yield (res, lacc, racc)
 
-        def c3[A: Equal: Show](
+        def c3[A: Equal: Show: RenderTree](
           uni: rewrite.BranchUnification[F, A, T[F]],
           bucket: JoinFunc)
             : Option[(F[T[F]], FreeMap, FreeMap, FreeMap)] =
@@ -129,7 +129,7 @@ class Transform
             res <- uni.combine(c)
           } yield (res, bacc, lacc, racc)
 
-        def c4[A: Equal: Show](
+        def c4[A: Equal: Show: RenderTree](
           uni: rewrite.BranchUnification[F, A, T[F]],
           lBucket: JoinFunc,
           rBucket: JoinFunc)
