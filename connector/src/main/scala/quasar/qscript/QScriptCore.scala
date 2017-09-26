@@ -297,6 +297,7 @@ object QScriptCore {
               Unreferenced(),
               HoleF,
               HoleF).some
+
           case (Map(_, m1), Map(_, m2)) =>
             // TODO: optimize cases where one side is a subset of the other
             val (mf, lv, rv) = concat(m1 >> left, m2 >> right)
@@ -304,29 +305,35 @@ object QScriptCore {
               Map(Extern, mf),
               lv,
               rv).some
+
           case (
-            Reduce(_, bucket1, func1, rep1),
-            Reduce(_, bucket2, func2, rep2)) =>
-            val mapL = bucket1 ∘ (b => norm.freeMF(b >> left))
-            val mapR = bucket2 ∘ (b => norm.freeMF(b >> right))
+            Reduce(_, bucket1, reducers1, repair1),
+            Reduce(_, bucket2, reducers2, repair2)) =>
 
-            (mapL ≟ mapR).option {
-              val funcL = func1 ∘ (_ ∘ (_ >> left))
-              val funcR = func2 ∘ (_ ∘ (_ >> right))
+            val bucketL = bucket1 ∘ (b => norm.freeMF(b >> left))
+            val bucketR = bucket2 ∘ (b => norm.freeMF(b >> right))
 
-              (funcL ≟ funcR && rep1 ≟ rep2).fold(
-                SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
-                  Reduce(Extern, mapL, funcL, rep1),
-                  HoleF,
-                  HoleF),
-              {
-                val (newRep, lrep, rrep) = concat(rep1, rep2 ∘ (_.incr(func1.length)))
+            (bucketL ≟ bucketR).option {
+              val reducersL = reducers1 ∘ (_ ∘ (_ >> left))
+              val reducersR = reducers2 ∘ (_ ∘ (_ >> right))
+
+              // TODO determine if the left and right reducers overlap
+              if (reducersL ≟ reducersR) {
+                val (newRepair, repairL, repairR) = concat(repair1, repair2)
 
                 SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
-                  Reduce(Extern, mapL, funcL ++ funcR, newRep),
-                  lrep,
-                  rrep)
-              })
+                  Reduce(Extern, bucketL, reducersL, newRepair),
+                  repairL,
+                  repairR)
+              } else {
+                val (newRepair, repairL, repairR) =
+                  concat(repair1, repair2 ∘ (_.incr(reducers1.length)))
+
+                SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
+                  Reduce(Extern, bucketL, reducersL ++ reducersR, newRepair),
+                  repairL,
+                  repairR)
+              }
             }
 
           case (
