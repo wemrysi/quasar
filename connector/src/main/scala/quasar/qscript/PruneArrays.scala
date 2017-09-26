@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import slamdata.Predef.{ Map => ScalaMap, _ }
-import quasar.RenderTreeT
+import quasar.{RenderTree, RenderTreeT}
 import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
@@ -78,7 +78,7 @@ object PATypes {
       : M[F[A]]
 }
 
-class PAHelpers[T[_[_]]: BirecursiveT: EqualT: RenderTreeT] extends TTypes[T] {
+class PAHelpers[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T] {
   import PATypes._
 
   type IndexMapping = ScalaMap[BigInt, BigInt]
@@ -177,7 +177,7 @@ class PAHelpers[T[_[_]]: BirecursiveT: EqualT: RenderTreeT] extends TTypes[T] {
   /** Prune the provided `array` keeping only the indices in `indicesToKeep`,
     * eliding it altogether if only a single element is retained.
     */
-  def rewriteRepair[A](repair: FreeMapA[A], seen: SeenIndices): Option[FreeMapA[A]] =
+  def rewriteRepair[A: Show: RenderTree](repair: FreeMapA[A], seen: SeenIndices): Option[FreeMapA[A]] =
     repair.project.some collect {
       case StaticArray(array) =>
         val rewrite = new quasar.qscript.Rewrite[T]
@@ -275,7 +275,7 @@ object PruneArrays {
   implicit def shiftedRead[A]: PruneArrays[Const[ShiftedRead[A], ?]] = default
   implicit def deadEnd: PruneArrays[Const[DeadEnd, ?]] = default
 
-  implicit def thetaJoin[T[_[_]]: BirecursiveT: EqualT: RenderTreeT]: PruneArrays[ThetaJoin[T, ?]] =
+  implicit def thetaJoin[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: PruneArrays[ThetaJoin[T, ?]] =
     new PruneArrays[ThetaJoin[T, ?]] {
       val helpers = new PAHelpers[T]
       import helpers._
@@ -315,7 +315,7 @@ object PruneArrays {
         })
     }
 
-  implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: RenderTreeT]: PruneArrays[EquiJoin[T, ?]] =
+  implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: PruneArrays[EquiJoin[T, ?]] =
     new PruneArrays[EquiJoin[T, ?]] {
       val helpers = new PAHelpers[T]
       import helpers._
@@ -361,7 +361,7 @@ object PruneArrays {
   def extractFromMap[A](map: ScalaMap[A, KnownIndices], key: A): KnownIndices =
     map.get(key).getOrElse(Set.empty.some)
 
-  implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT: RenderTreeT]
+  implicit def projectBucket[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       : PruneArrays[ProjectBucket[T, ?]] =
     new PruneArrays[ProjectBucket[T, ?]] {
 
@@ -390,7 +390,7 @@ object PruneArrays {
       }
     }
 
-  implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT: RenderTreeT]
+  implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       : PruneArrays[QScriptCore[T, ?]] =
     new PruneArrays[QScriptCore[T, ?]] {
 
