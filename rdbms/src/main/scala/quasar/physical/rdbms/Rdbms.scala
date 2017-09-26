@@ -29,17 +29,17 @@ import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.mount.BackendDef.{DefErrT, DefinitionError}
 import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.fs._
-import quasar.qscript.{::/::, ::\::, EquiJoin, ExtractPath, Injectable, QScriptCore, QScriptTotal, ShiftedRead, Unicoalesce, Unirewrite}
+import quasar.qscript.{::/::, ::\::, EquiJoin, ExtractPath, Injectable, Optimize, QScriptCore, QScriptTotal, ShiftedRead, Unicoalesce, Unirewrite}
 import quasar.fs.WriteFile.WriteHandle
 import quasar.physical.rdbms.common.{Config, TablePath}
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
-import quasar.{RenderTree, RenderTreeT}
+import quasar.{RenderTree, RenderTreeT, fp}
 
 import scala.Predef.implicitly
-
 import doobie.hikari.hikaritransactor.HikariTransactor
 import doobie.imports.ConnectionIO
 import matryoshka.{BirecursiveT, Delay, EqualT, RecursiveT, ShowT}
+
 import scalaz._
 import Scalaz._
 import scalaz.concurrent.Task
@@ -77,6 +77,11 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
     QSM[T, ?],
     QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
+
+  override def optimize[T[_[_]]: BirecursiveT: EqualT: ShowT]: QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]] = {
+    val O = new Optimize[T]
+    O.optimize(fp.reflNT[QSM[T, ?]])
+  }
 
   def parseConfig(uri: ConnectionUri): DefErrT[Task, Config] =
     EitherT(Task.delay(parseConnectionUri(uri).map(Config.apply)))
