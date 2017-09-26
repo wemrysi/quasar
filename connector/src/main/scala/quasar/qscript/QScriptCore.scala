@@ -16,7 +16,7 @@
 
 package quasar.qscript
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => ScalaMap, _}
 import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.common.SortDir
 import quasar.contrib.matryoshka._
@@ -34,8 +34,11 @@ sealed abstract class QScriptCore[T[_[_]], A] extends Product with Serializable
 @Lenses final case class Map[T[_[_]], A](src: A, f: FreeMap[T])
     extends QScriptCore[T, A]
 
+/** Left indexes into the bucket. Right indexes into the reducers.
+  */
 @Lenses final case class ReduceIndex(idx: Int \/ Int) {
-  def incr(j: Int): ReduceIndex = ReduceIndex(idx ∘ (_ + j))
+  def shift(mapping: ScalaMap[Int, Int]): ReduceIndex =
+    ReduceIndex(idx ∘ (x => x + mapping.get(x).getOrElse(0)))
 }
 
 object ReduceIndex {
@@ -317,7 +320,6 @@ object QScriptCore {
               val reducersL = reducers1 ∘ (_ ∘ (_ >> left))
               val reducersR = reducers2 ∘ (_ ∘ (_ >> right))
 
-              // TODO determine if the left and right reducers overlap
               if (reducersL ≟ reducersR) {
                 val (newRepair, repairL, repairR) = concat(repair1, repair2)
 
@@ -326,11 +328,26 @@ object QScriptCore {
                   repairL,
                   repairR)
               } else {
+                // this isn't performant but the lists are typically small
+                val (newReducers, _mappingR) =
+                  reducersR.foldLeft((reducersL, List.empty[Int])) {
+                    case ((acc, indices), value) =>
+                      reducersL.indexWhere(_ ≟ value) match {
+                        case -1 => // the right value does not exist on the left
+                          (acc :+ value, indices :+ acc.length)
+                        case i => // the right value exists on the left
+                          (acc, indices :+ i)
+                      }
+                  }
+
+                val mappingR: ScalaMap[Int, Int] =
+                  _mappingR.zipWithIndex.map(_.swap).toMap
+
                 val (newRepair, repairL, repairR) =
-                  concat(repair1, repair2 ∘ (_.incr(reducers1.length)))
+                  concat(repair1, repair2 ∘ (_.shift(mappingR)))
 
                 SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
-                  Reduce(Extern, bucketL, reducersL ++ reducersR, newRepair),
+                  Reduce(Extern, bucketL, newReducers, newRepair),
                   repairL,
                   repairR)
               }
