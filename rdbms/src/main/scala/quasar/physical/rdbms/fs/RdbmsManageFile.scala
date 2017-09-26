@@ -16,52 +16,135 @@
 
 package quasar.physical.rdbms.fs
 
-import doobie.imports._
-import pathy.Path
-import pathy.Path._
+import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile, APath}
+import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.MonotonicSeq
+import quasar.fp.free.lift
+import quasar.fs.ManageFile.MoveScenario.{DirToDir, FileToFile}
 import quasar.fs._
+import quasar.fs.FileSystemError._
+import quasar.fs.PathError._
+import quasar.fs.impl.ensureMoveSemantics
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.common.TablePath.dirToSchema
 import quasar.physical.rdbms.common._
-import slamdata.Predef._
 
-import scalaz.Scalaz._
+import doobie.imports._
+import pathy.Path
+import pathy.Path._
 import scalaz._
+import Scalaz._
 
-trait RdbmsManageFile extends RdbmsDescribeTable with RdbmsCreate {
+trait RdbmsManageFile
+    extends RdbmsDescribeTable
+    with RdbmsCreate
+    with RdbmsMove {
   this: Rdbms =>
   implicit def MonadM: Monad[M]
 
-  def dropSchema(schema: CustomSchema): ConnectionIO[Unit] =
-    (fr"DROP SCHEMA" ++ Fragment.const(schema.shows) ++ fr"CASCADE").update.run
-      .map(_ => ())
+  def dropTableIfExists(table: TablePath): ConnectionIO[Unit]
 
-  def dropSchemaWithChildren(parent: CustomSchema): Backend[Unit] =
-    findChildSchemas(parent).flatMap(cs => (cs :+ parent).foldMap(dropSchema)).liftB
+  def dropTable(table: TablePath): ConnectionIO[Unit] = {
+    (fr"DROP TABLE" ++ Fragment.const(table.shows)).update.run.void
+  }
+
+  def dropSchema(schema: CustomSchema): ConnectionIO[Unit] = {
+    (fr"DROP SCHEMA" ++ Fragment.const(schema.shows) ++ fr"CASCADE").update.run.void
+  }
 
   def dirToCustomSchema(dir: ADir): \/[FileSystemError, CustomSchema] = {
-    Schema.custom.getOption(dirToSchema(dir)).toRightDisjunction(
-      FileSystemError.pathErr(PathError.invalidPath(dir, "Directory points to default schema.")))
+    Schema.custom
+      .getOption(dirToSchema(dir))
+      .toRightDisjunction(pathErr(invalidPath(dir, "Directory points to default schema.")))
   }
 
   override def ManageFileModule = new ManageFileModule {
 
-    override def move(
-        scenario: ManageFile.MoveScenario,
-        semantics: MoveSemantics): Backend[Unit] =
-      // TODO
-      ().point[Backend]
+    def dropSchemaWithChildren(parent: CustomSchema): ConnectionIO[Unit] = {
+      findChildSchemas(parent)
+        .flatMap(cs => (cs :+ parent).foldMap(dropSchema))
+    }
 
-    def deleteTable(aFile: AFile): Backend[Unit] = {
+    def tempSchema: M[CustomSchema] = {
+      MonotonicSeq
+        .Ops[Eff]
+        .next
+        .map { i =>
+          CustomSchema(s"__quasar_tmp_schema_$i")
+        }
+        .flatMap(s => lift(createSchema(s).map(_ => s)).into[Eff])
+    }
+
+    override def move(scenario: ManageFile.MoveScenario,
+                      semantics: MoveSemantics): Backend[Unit] = {
+
+      def moveFile(src: AFile, dst: AFile): M[Unit] = {
+        val dstPath = TablePath.create(dst)
+        tempSchema.flatMap { tmp =>
+          lift(for {
+            _ <- dropTableIfExists(dstPath)
+            tmpTable <- moveTableToSchema(TablePath.create(src), tmp)
+            renamed <- renameTable(tmpTable, dstPath.table)
+            _ <- Schema.custom.getOption(dstPath.schema).traverse(createSchema)
+            _ <- moveTableToSchema(renamed, dstPath.schema)
+          } yield ()).into[Eff]
+        }
+      }
+
+      def moveDir(src: ADir, dst: ADir): FileSystemErrT[M, Unit] = {
+        val schemas = for {
+          srcSchema <- dirToCustomSchema(src)
+          dstSchema <- dirToCustomSchema(dst)
+        } yield (srcSchema, dstSchema)
+
+        val dbCalls = schemas.traverse {
+          case (srcSchema, dstSchema) =>
+
+            for {
+              dstSchemaExists <- schemaExists(dstSchema)
+              _ <- dstSchemaExists.whenM(dropSchema(dstSchema))
+              _ <- renameSchema(srcSchema, dstSchema)
+            } yield ()
+        }
+
+        EitherT.eitherT(lift(dbCalls).into[Eff])
+      }
+
+      def fExists: APath => M[Boolean] = { path =>
+        lift(
+          refineType(path).fold(
+            d => schemaExists(dirToSchema(d)),
+            f => tableExists(TablePath.create(f))
+          )).into[Eff]
+      }
+
+      scenario match {
+        case FileToFile(sf, df) =>
+          for {
+            _ <- (((ensureMoveSemantics(sf, df, fExists, semantics)
+              .toLeft(()) *>
+              moveFile(sf, df).liftM[FileSystemErrT]).run).liftB).unattempt
+          } yield ()
+
+        case DirToDir(sd, dd) =>
+          for {
+            _ <- (((ensureMoveSemantics(sd, dd, fExists, semantics)
+              .toLeft(()) *>
+              moveDir(sd, dd)).run).liftB).unattempt
+          } yield ()
+      }
+    }
+
+    def deleteFile(aFile: AFile): Backend[Unit] = {
       val dbTablePath = TablePath.create(aFile)
       for {
         exists <- tableExists(dbTablePath).liftB
         _ <- exists.unlessM(
-          ME.raiseError(FileSystemError.pathErr(PathError.pathNotFound(aFile))))
-        _ <- (fr"DROP TABLE" ++ Fragment.const(dbTablePath.shows)).update.run.liftB
+          ME.raiseError(pathErr(pathNotFound(aFile))))
+        _ <- (fr"DROP TABLE" ++ Fragment
+          .const(dbTablePath.shows)).update.run.liftB
       } yield ()
     }
 
@@ -69,9 +152,9 @@ trait RdbmsManageFile extends RdbmsDescribeTable with RdbmsCreate {
       ME.unattempt(dirToCustomSchema(aDir).traverse { schema =>
         for {
           exists <- schemaExists(schema).liftB
-          _ <- exists.unlessM(ME.raiseError(
-            FileSystemError.pathErr(PathError.pathNotFound(aDir))))
-          _ <- dropSchemaWithChildren(schema)
+          _ <- exists.unlessM(
+            ME.raiseError(pathErr(pathNotFound(aDir))))
+          _ <- dropSchemaWithChildren(schema).liftB
         } yield ()
       })
     }
@@ -79,31 +162,22 @@ trait RdbmsManageFile extends RdbmsDescribeTable with RdbmsCreate {
     override def delete(path: APath): Backend[Unit] = {
       Path
         .maybeFile(path)
-        .map(deleteTable)
+        .map(deleteFile)
         .orElse(Path.maybeDir(path).map(deleteDir))
         .getOrElse(().point[Backend])
     }
 
     override def tempFile(near: APath): Backend[AFile] = {
-      def tempFilePath(near: APath): Backend[AFile] = {
-        MonotonicSeq
-          .Ops[Eff]
-          .next
-          .map { i =>
-            val tmpFilename = file(s"__quasar_tmp_table_$i")
-            refineType(near).fold(d => {
-              d </> tmpFilename
-            }, f => fileParent(f) </> tmpFilename)
-          }
-          .liftB
-      }
-
-      for {
-        path <- tempFilePath(near)
-        _ <- createTable(TablePath.create(path)).liftB
-      }
-        yield path
+      MonotonicSeq
+        .Ops[Eff]
+        .next
+        .map { i =>
+          val tmpFilename = file(s"__quasar_tmp_table_$i")
+          refineType(near).fold(d => {
+            d </> tmpFilename
+          }, f => fileParent(f) </> tmpFilename)
+        }
+        .liftB
     }
-
   }
 }
