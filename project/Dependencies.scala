@@ -99,6 +99,17 @@ object Dependencies {
     )
   }
 
+  def rdbmscore = {
+    Seq(
+      "org.tpolecat" %% "doobie-core"       % doobieVersion,
+      "org.tpolecat" %% "doobie-postgres"   % doobieVersion,
+      "org.tpolecat" %% "doobie-hikari"     % doobieVersion,
+      "org.tpolecat" %% "doobie-h2"         % doobieVersion,
+      ("org.tpolecat" %% "doobie-specs2"     % doobieVersion % Test)
+        .exclude("org.specs2", "specs2-core_2.11") // conflicting version
+    )
+  }
+
   def sparkcore(sparkProvided: Boolean) = Seq(
     ("org.apache.spark" %% "spark-core" % "2.2.0" % (if(sparkProvided) "provided" else "compile"))
       .exclude("aopalliance", "aopalliance")                  // It seems crazy that we need to do this,

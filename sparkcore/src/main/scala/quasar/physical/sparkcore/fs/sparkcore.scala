@@ -79,8 +79,8 @@ trait SparkCore extends BackendModule {
 
   def optimize[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]] = {
-    val O = new Optimize[T]
-    O.optimize(fp.reflNT[QSM[T, ?]])
+      val O = new Optimize[T]
+      O.optimize(fp.reflNT[QSM[T, ?]])
   }
 
   def detailsOps: SparkConnectorDetails.Ops[Eff] = SparkConnectorDetails.Ops[Eff]

@@ -182,7 +182,6 @@ trait BackendModule {
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Unicoalesce.Capture[T, QS[T]]
 
   def optimize[T[_[_]]: BirecursiveT: EqualT: ShowT]: QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]]
-
   type Config
   def parseConfig(uri: ConnectionUri): DefErrT[Task, Config]
 
