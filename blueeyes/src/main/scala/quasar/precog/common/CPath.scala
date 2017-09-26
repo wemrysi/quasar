@@ -55,6 +55,9 @@ sealed trait CPath { self =>
   def \:(that: String): CPath = CPath(CPathField(that) +: self.nodes)
   def \:(that: Int): CPath    = CPath(CPathIndex(that) +: self.nodes)
 
+  def hasPrefixComponent(p: CPathNode): Boolean = nodes.startsWith(p :: Nil)
+  def hasSuffixComponent(p: CPathNode): Boolean = nodes.endsWith(p :: Nil)
+
   def hasPrefix(p: CPath): Boolean = nodes.startsWith(p.nodes)
   def hasSuffix(p: CPath): Boolean = nodes.endsWith(p.nodes)
 
