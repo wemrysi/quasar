@@ -1,10 +1,9 @@
 package quasar.project
 
-import scala.{Option, Boolean}
-import java.lang.{String, System}
+import scala.Boolean
 import scala.collection.Seq
 
-import sbt._, Keys._
+import sbt._
 
 object Dependencies {
   private val algebraVersion      = "0.7.0"
