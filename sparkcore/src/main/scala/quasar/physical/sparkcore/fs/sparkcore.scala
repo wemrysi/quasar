@@ -166,8 +166,8 @@ trait SparkCore extends BackendModule {
   object SparkQueryFileModule extends QueryFileModule {
     import QueryFile._
 
-    def executePlan(rdd: RDD[Data], out: AFile): Backend[AFile] = {
-      val execute =  detailsOps.storeData(rdd, out).as(out).liftB
+    def executePlan(rdd: RDD[Data], out: AFile): Backend[Unit] = {
+      val execute =  detailsOps.storeData(rdd, out).liftB
       val log     = Vector(PhaseResult.detail("RDD", rdd.toDebugString))
       execute :++> log
     }
