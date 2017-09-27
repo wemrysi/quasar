@@ -489,7 +489,6 @@ lazy val repl = project
   .settings(name := "quasar-repl")
   .dependsOn(interface, foundation % BothScopes)
   .settings(commonSettings)
-  .settings(noPublishSettings)
   .settings(githubReleaseSettings)
   .settings(targetSettings)
   .settings(backendRewrittenRunSettings)
