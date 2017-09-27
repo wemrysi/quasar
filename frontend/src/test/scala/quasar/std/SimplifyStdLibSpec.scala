@@ -46,6 +46,7 @@ class SimplifyStdLibSpec extends StdLibSpec {
     case (relations.Lte, List(Data.Date(_), Data.Timestamp(_))) => notHandled
     case (relations.Gt, List(Data.Date(_), Data.Timestamp(_))) => notHandled
     case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => notHandled
+    case (relations.IfUndefined, _) => notHandled
 
     case (date.ExtractCentury, _) => notHandled
     case (date.ExtractDayOfMonth, _) => notHandled
@@ -66,6 +67,8 @@ class SimplifyStdLibSpec extends StdLibSpec {
     case (date.ExtractWeek, _) => notHandled
     case (date.ExtractYear, _) => notHandled
     case (date.Now, _) => notHandled
+
+    case (structural.ObjectProject, List(Data.Obj(fields), Data.Str(field))) if !fields.contains(field) => notHandled
 
     case _ => ().right
   }

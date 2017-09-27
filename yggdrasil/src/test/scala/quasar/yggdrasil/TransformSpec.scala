@@ -1107,19 +1107,21 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       })
 
       def isOk(results: M[Stream[JValue]]) = results.copoint must_== (sample.data flatMap {
-        case JObject(fields) => {
-          val back = JObject(fields filter { case (name,value) => name == "value" && value.isInstanceOf[JObject] })
-          if (back \ "value" \ "value1" == JUndefined || back \ "value" \ "value2" == JUndefined)
+        case obj @ JObject(_) =>
+          if (obj \ "value" == JUndefined)
             None
+          else if (obj \ "value" \ "value1" == JUndefined && obj \ "value" \ "value2" == JUndefined)
+            None
+          else if (obj \ "value" \ "value2" == JUndefined)
+            Some(JObject("value" -> JObject("value1" -> obj \ "value" \ "value1")))
           else
-            Some(back)
-        }
+            Some(JObject("value" -> JObject("value2" -> obj \ "value" \ "value2")))
 
         case _ => None
       })
 
-    isOk(resultsInner)
-    isOk(resultsOuter)
+      isOk(resultsInner)
+      isOk(resultsOuter)
     }
   }
 
@@ -1177,6 +1179,29 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       isOk(resultsOuter)
       isOk(resultsInner)
     }
+  }
+
+  def testObjectOverwriteWithDifferingVectorTypes = {
+    val JArray(elements) = JParser.parseUnsafe("""[
+      [{"a": 1}, 2]
+    ]""")
+
+    val sample = SampleData(elements.toStream)
+    val table = fromSample(sample)
+
+    val spec = DerefObjectStatic(
+      OuterObjectConcat(
+        WrapObject(
+          DerefArrayStatic(Leaf(Source), CPathIndex(1)),
+          "foo"),
+        WrapObject(
+          DerefArrayStatic(Leaf(Source), CPathIndex(0)),
+          "foo")),
+      CPathField("foo"))
+
+    val results = toJson(table.transform(spec))
+
+    results.copoint mustEqual Stream(JObject("a" -> JNum(1)))
   }
 
   def testInnerObjectConcatJoinSemantics = {

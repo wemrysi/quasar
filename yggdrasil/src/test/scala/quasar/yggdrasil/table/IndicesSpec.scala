@@ -106,7 +106,7 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
     }
 
     def subtableSet(index: TableIndex, ids: Seq[Int], vs: Seq[RValue]): Set[RValue] =
-      index.getSubTable(ids, vs).toJson.copoint.toSet.map(RValue.fromJValue)
+      index.getSubTable(ids, vs).toJson.copoint.toSet.flatMap(RValue.fromJValue)
 
     def test(vs: Seq[RValue], result: Set[RValue]) =
       subtableSet(index, Array(0, 1), vs) must_== result

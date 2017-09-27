@@ -423,7 +423,7 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
                     val emptyBits = buildOuterBits(leftEmptyBits, rightEmptyBits, leftObjectBits, rightObjectBits)
 
                     val emptyObjects    = buildEmptyObjects(emptyBits)
-                    val nonemptyObjects = buildNonemptyObjects(leftFields, rightFields)
+                    val nonemptyObjects = buildNonemptyObjects(leftFields, rightFields, sr.size)
 
                     emptyObjects ++ nonemptyObjects
                   }
@@ -485,7 +485,7 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
                       val (emptyBits, nonemptyBits) = buildInnerBits(leftEmptyBits, rightEmptyBits, leftObjectBits, rightObjectBits)
 
                       val emptyObjects    = buildEmptyObjects(emptyBits)
-                      val nonemptyObjects = buildNonemptyObjects(leftFields, rightFields)
+                      val nonemptyObjects = buildNonemptyObjects(leftFields, rightFields, sr.size)
 
                       val result = emptyObjects ++ nonemptyObjects
 
@@ -1276,59 +1276,76 @@ trait ObjectConcatHelpers extends ConcatHelpers {
     else Map(ColumnRef(CPath.Identity, CEmptyObject) -> EmptyObjectColumn(emptyBits))
   }
 
-  def buildNonemptyObjects(leftFields: Map[ColumnRef, Column], rightFields: Map[ColumnRef, Column]) = {
+  def buildNonemptyObjects(
+      leftFields: Map[ColumnRef, Column],
+      rightFields: Map[ColumnRef, Column],
+      rightSize: Int): Map[ColumnRef, Column] = {
+
+    val leftPrefixes: Set[CPathField] = leftFields.keySet collect {
+      case ColumnRef(CPath(field @ CPathField(_), _*), _) => field
+    }
+
+    val rightPrefixes: Set[CPathField] = rightFields.keySet collect {
+      case ColumnRef(CPath(field @ CPathField(_), _*), _) => field
+    }
+
+    val innerPrefixes = leftPrefixes.intersect(rightPrefixes)
+
     val (leftInner, leftOuter) = leftFields partition {
-      case (ColumnRef(path, _), _)                         =>
-        rightFields exists { case (ColumnRef(path2, _), _) => path == path2 }
+      case (ColumnRef(path, _), _) => innerPrefixes.exists(path.hasPrefixComponent)
     }
 
     val (rightInner, rightOuter) = rightFields partition {
-      case (ColumnRef(path, _), _)                        =>
-        leftFields exists { case (ColumnRef(path2, _), _) => path == path2 }
+      case (ColumnRef(path, _), _) => innerPrefixes.exists(path.hasPrefixComponent)
     }
 
-    val innerPaths = Set(leftInner.keys map { _.selector } toSeq: _*)
-
-    // for all columns which have an identical path
-    val mergedPairs: Set[(ColumnRef, Column)] = innerPaths flatMap { path =>
-      // find the right columns with the path
-      val rightSelection = rightInner filter {
-        case (ColumnRef(path2, _), _) => path == path2
-      }
-
-      // find the left columns with the path that will NOT be merged
+    // for all overlapping prefixes between left and right
+    val mergedPairs: Map[ColumnRef, Column] = innerPrefixes.flatMap({ prefix =>
+      // find the left columns with the prefix
       val leftSelection = leftInner filter {
-        case (ref @ ColumnRef(path2, _), _) =>
-          path == path2 && !rightSelection.contains(ref)
+        case (ColumnRef(path, _), _) => path.hasPrefixComponent(prefix)
       }
 
-      // merge the right and left columns of the same types
-      val rightMerged = rightSelection map {
-        case (ref, col) =>
-          if (leftInner.contains(ref))
-            ref -> cf.util.UnionRight(leftInner(ref), col).get
-          else
-            ref -> col
+      // find the right columns with the prefix
+      val rightSelection = rightInner filter {
+        case (ColumnRef(path, _), _) => path.hasPrefixComponent(prefix)
       }
 
-      // a predicate which indicates where all right columns are defined
-      val rightFilter: Int => Boolean = {
-        val cols = rightMerged.toList map { case (_, col) => col }
-
-        // we use forall rather than exists since we optimize for homogeneity
-        row => cols.forall(!_.isDefinedAt(row))
+      // where is this subset of right columns defined
+      // wherever they are defined, we need to poke holes in the left at this prefix
+      val mask = new BitSet(rightSize)
+      rightSelection foreach {
+        case (_, col) => mask.or(col.definedAt(0, rightSize))
       }
 
-      // poke holes in the left (of differing types) where the right is defined
-      val leftFiltered = leftSelection map {
-        case (ref, col) =>
-          ref -> cf.util.filterBy(rightFilter)(col).get
+      // it's more efficient to use cf.util.filter, but that requires leftSize
+      val filter = cf.util.filterBy(i => !mask.get(i))
+
+      // poke holes in the left WHEREVER the right is defined (at the current prefix)
+      val leftMasked = leftSelection map {
+        case (ref, col) => ref -> filter(col).get
       }
 
-      // glue it all back together
-      rightMerged ++ leftFiltered
-    }
+      // find all of the shared path/type pairs EXACTLY at prefix
+      val toMergeRefs = leftSelection.keySet filter {
+        case ref @ ColumnRef(CPath(prefix), _) => rightSelection.contains(ref)
+        case _ => false
+      }
 
+      // pull out the merge refs; we're just going to catenate all this stuff
+      val leftUnmerged = leftMasked -- toMergeRefs
+      val rightUnmerged = rightSelection -- toMergeRefs
+
+      // merge the pairs we found
+      val merged: Map[ColumnRef, Column] = toMergeRefs.map({ ref =>
+        ref -> cf.util.UnionRight(leftMasked(ref), rightSelection(ref)).get
+      })(collection.breakOut)
+
+      // catenate all the things
+      leftUnmerged ++ rightUnmerged ++ merged
+    })(collection.breakOut)
+
+    // ...ditto
     leftOuter ++ rightOuter ++ mergedPairs
   }
 }
