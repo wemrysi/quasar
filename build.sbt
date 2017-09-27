@@ -106,7 +106,7 @@ lazy val backendRewrittenRunSettings = Seq(
       def trace(t: => Throwable): Unit = delegate.trace(t)
     }
 
-    r.run(main, (fullClasspath in Compile).value.files, args ++ backends, filtered)
+    toError(r.run(main, (fullClasspath in Compile).value.files, args ++ backends, filtered))
   })
 
 // In Travis, the processor count is reported as 32, but only ~2 cores are
