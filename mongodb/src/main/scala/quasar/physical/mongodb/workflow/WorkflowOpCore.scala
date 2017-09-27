@@ -159,7 +159,7 @@ object $project {
     : FixOp[F] =
     $project[F](
       shape,
-      shape.get(IdName).fold[IdHandling](IgnoreId)(κ(IncludeId)))
+      shape.get(IdName).fold[IdHandling](ExcludeId)(κ(IncludeId)))
 }
 
 final case class $RedactF[A](src: A, value: Fix[ExprOp])

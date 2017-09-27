@@ -20,12 +20,12 @@ import slamdata.Predef.{Boolean, Vector}
 import quasar.Data
 import quasar.fs.DataCursor
 import quasar.physical.mongodb._
+import quasar.physical.mongodb.workflow.WrapperSigilLabel
 
 import scala.Option
 import scala.collection.JavaConverters._
 
-import org.bson.{BsonDocument, BsonValue}
-import scalaz._, Id._
+import org.bson.BsonValue
 import scalaz.concurrent.Task
 import scalaz.syntax.compose._
 import scalaz.syntax.monad._
@@ -51,13 +51,14 @@ object bsoncursor {
 
       ////
 
-      val withoutId: BsonDocument => BsonDocument =
-        d => (d: Id[BsonDocument]) map (_ remove "_id") as d
+      val elideSigil: BsonValue => BsonValue =
+        v => bsonvalue.document
+          .getOption(v)
+          .flatMap(d => Option(d.get(WrapperSigilLabel)))
+          .getOrElse(v)
 
       val toData: BsonValue => Data =
-        (BsonCodec.toData _) <<<
-        Bson.fromRepr        <<<
-        bsonvalue.document.modify(withoutId)
+        (BsonCodec.toData _) <<< Bson.fromRepr <<< elideSigil
 
       def isClosed(cursor: BsonCursor): MongoDbIO[Boolean] =
         MongoDbIO.liftTask(Task.delay(cursor.isClosed))

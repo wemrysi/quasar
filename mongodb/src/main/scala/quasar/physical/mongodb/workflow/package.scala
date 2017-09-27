@@ -75,10 +75,29 @@ package object workflow {
       Inject[WorkflowOpCoreF, WorkflowF].prj(p.op)
   }
 
+  /** Quasar-specific sigil, used to construct a singleton result object under
+    * the following conditions:
+    *
+    * 1. Emitting a document value in aggregation when `$replaceRoot` is not available.
+    *
+    * 2. Emitting a value in aggregation when its type is unknown.
+    *
+    * 3. Emitting map-reduce results as the final stage of a query.
+    *
+    * NB: This can end up in data at rest due to write-back queries or caching, thus
+    *     we must always support eliding this particular name when reading or
+    *     querying data, even if the "primary" sigil name is changed.
+    */
+  val WrapperSigilLabel = "__quasar_mongodb_wrapper"
+  val WrapperSigilName  = BsonField.Name(WrapperSigilLabel)
+  val WrapperSigilVar   = DocVar.ROOT(WrapperSigilName)
+
+  /** MapReduce result expression key. */
   val ExprLabel  = "value"
   val ExprName   = BsonField.Name(ExprLabel)
   val ExprVar    = DocVar.ROOT(ExprName)
 
+  /** MapReduce result identity key. */
   val IdLabel  = "_id"
   val IdName   = BsonField.Name(IdLabel)
   val IdVar    = DocVar.ROOT(IdName)
@@ -656,7 +675,7 @@ package object workflow {
         def fixShape(wf: Fix[F]) =
           simpleShape(wf).fold(
             finished)(
-            n => $project[F](Reshape(n.map(_ -> \/-($include())).toListMap), IgnoreId).apply(finished))
+            n => $project[F](Reshape(n.map(_ -> \/-($include())).toListMap)).apply(finished))
 
         @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def promoteKnownShape(wf: Fix[F]): Fix[F] = wf.project match {
