@@ -45,7 +45,7 @@ trait RdbmsQueryFile {
 
     override def explain(repr: Repr): Backend[String] = ???
 
-    override def executePlan(repr: Repr, out: AFile): Backend[AFile] = ???
+    override def executePlan(repr: Repr, out: AFile): Backend[Unit] = ???
 
     override def evaluatePlan(repr: Repr): Backend[ResultHandle] = ???
 
