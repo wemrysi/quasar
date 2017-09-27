@@ -59,11 +59,13 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case (relations.Lte, List(Data.Date(_), Data.Timestamp(_))) => Pending("TODO").left
     case (relations.Gt, List(Data.Date(_), Data.Timestamp(_))) => Pending("TODO").left
     case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => Pending("TODO").left
+    case (relations.IfUndefined, _) => Pending("TODO").left
 
     case (date.ExtractDayOfYear, _)    => Skipped("TODO").left
     case (date.ExtractWeek, _)         => Skipped("TODO").left
 
     case (structural.ConcatOp, _)      => Pending("TODO").left
+    case (structural.ObjectProject, _) => Pending("TODO").left
 
     case _                             => ().right
   }
