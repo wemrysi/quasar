@@ -16,7 +16,7 @@
 
 package quasar.qscript
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => ScalaMap, _}
 import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.common.SortDir
 import quasar.contrib.matryoshka._
@@ -34,8 +34,11 @@ sealed abstract class QScriptCore[T[_[_]], A] extends Product with Serializable
 @Lenses final case class Map[T[_[_]], A](src: A, f: FreeMap[T])
     extends QScriptCore[T, A]
 
+/** Left indexes into the bucket. Right indexes into the reducers.
+  */
 @Lenses final case class ReduceIndex(idx: Int \/ Int) {
-  def incr(j: Int): ReduceIndex = ReduceIndex(idx ∘ (_ + j))
+  def shift(mapping: ScalaMap[Int, Int]): ReduceIndex =
+    ReduceIndex(idx ∘ (x => x + mapping.get(x).getOrElse(0)))
 }
 
 object ReduceIndex {
@@ -297,6 +300,7 @@ object QScriptCore {
               Unreferenced(),
               HoleF,
               HoleF).some
+
           case (Map(_, m1), Map(_, m2)) =>
             // TODO: optimize cases where one side is a subset of the other
             val (mf, lv, rv) = concat(m1 >> left, m2 >> right)
@@ -304,29 +308,49 @@ object QScriptCore {
               Map(Extern, mf),
               lv,
               rv).some
+
           case (
-            Reduce(_, bucket1, func1, rep1),
-            Reduce(_, bucket2, func2, rep2)) =>
-            val mapL = bucket1 ∘ (b => norm.freeMF(b >> left))
-            val mapR = bucket2 ∘ (b => norm.freeMF(b >> right))
+            Reduce(_, bucket1, reducers1, repair1),
+            Reduce(_, bucket2, reducers2, repair2)) =>
 
-            (mapL ≟ mapR).option {
-              val funcL = func1 ∘ (_ ∘ (_ >> left))
-              val funcR = func2 ∘ (_ ∘ (_ >> right))
+            val bucketL = bucket1 ∘ (b => norm.freeMF(b >> left))
+            val bucketR = bucket2 ∘ (b => norm.freeMF(b >> right))
 
-              (funcL ≟ funcR && rep1 ≟ rep2).fold(
-                SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
-                  Reduce(Extern, mapL, funcL, rep1),
-                  HoleF,
-                  HoleF),
-              {
-                val (newRep, lrep, rrep) = concat(rep1, rep2 ∘ (_.incr(func1.length)))
+            (bucketL ≟ bucketR).option {
+              val reducersL = reducers1 ∘ (_ ∘ (_ >> left))
+              val reducersR = reducers2 ∘ (_ ∘ (_ >> right))
+
+              if (reducersL ≟ reducersR) {
+                val (newRepair, repairL, repairR) = concat(repair1, repair2)
 
                 SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
-                  Reduce(Extern, mapL, funcL ++ funcR, newRep),
-                  lrep,
-                  rrep)
-              })
+                  Reduce(Extern, bucketL, reducersL, newRepair),
+                  repairL,
+                  repairR)
+              } else {
+                // this isn't performant but the lists are typically small
+                val (newReducers, _mappingR) =
+                  reducersR.foldLeft((reducersL, List.empty[Int])) {
+                    case ((acc, indices), value) =>
+                      reducersL.indexWhere(_ ≟ value) match {
+                        case -1 => // the right value does not exist on the left
+                          (acc :+ value, indices :+ acc.length)
+                        case i => // the right value exists on the left
+                          (acc, indices :+ i)
+                      }
+                  }
+
+                val mappingR: ScalaMap[Int, Int] =
+                  _mappingR.zipWithIndex.map(_.swap).toMap
+
+                val (newRepair, repairL, repairR) =
+                  concat(repair1, repair2 ∘ (_.shift(mappingR)))
+
+                SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
+                  Reduce(Extern, bucketL, newReducers, newRepair),
+                  repairL,
+                  repairR)
+              }
             }
 
           case (
