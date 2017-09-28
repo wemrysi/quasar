@@ -18,6 +18,8 @@ package quasar
 package connector
 
 import slamdata.Predef._
+import quasar.Data
+import quasar.Data._int
 import quasar.common._
 import quasar.contrib.pathy._
 import quasar.contrib.matryoshka._
@@ -25,13 +27,17 @@ import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric.{Natural, Positive}
-import quasar.frontend.logicalplan.LogicalPlan
+import quasar.frontend.logicalplan.{Read => LPRead, LogicalPlan}
 import quasar.fs._
 import quasar.fs.mount._
-import quasar.qscript._
+import quasar.fs.PathError.invalidPath
+import quasar.qscript._, analysis._
+import quasar.std.StdLib.agg
 
-import matryoshka._
+import matryoshka.{Hole => _, _}
+import matryoshka.data._
 import matryoshka.implicits._
+import pathy.Path.{file, peel, file1}
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -46,7 +52,9 @@ trait BackendModule {
   type BackendT[F[_], A]    = FileSystemErrT[PhaseResultT[ConfiguredT[F, ?], ?], A]
   type Backend[A]           = BackendT[M, A]
 
-  private final implicit def _FunctorQSM[T[_[_]]] = FunctorQSM[T]
+  private final implicit def _CardinalityQSM: Cardinality[QSM[Fix, ?]] = CardinalityQSM
+  private final implicit def _CostQSM: Cost[QSM[Fix, ?]] = CostQSM
+  private final implicit def _TraverseQSM[T[_[_]]] = TraverseQSM[T]
   private final implicit def _DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]] = DelayRenderTreeQSM
   private final implicit def _ExtractPathQSM[T[_[_]]: RecursiveT]: ExtractPath[QSM[T, ?], APath] = ExtractPathQSM
   private final implicit def _QSCoreInject[T[_[_]]] = QSCoreInject[T]
@@ -76,8 +84,39 @@ trait BackendModule {
         (runM compose runCfg compose runFs, close)
     }
 
-  private final def analyzeInterpreter: Analyze ~> Configured =
-    Empty.analyze[Configured]
+  def pathCard: APath => Backend[Int] = (apath: APath) => {
+    val afile: Option[AFile] = peel(apath).map {
+      case (dirPath, \/-(fileName)) => dirPath </> file1(fileName)
+      case (dirPath, -\/(dirName))  => dirPath </> file(dirName.value)
+    }
+
+    def lpFromPath[LP](p: FPath)(implicit LP: Corecursive.Aux[LP, LogicalPlan]): LP =
+      LP.embed(agg.Count(LP.embed(LPRead(p))))
+
+    def first(plan: Fix[LogicalPlan]): Backend[Option[Data]] = for {
+      pp <- lpToRepr[Fix](plan)
+      h  <- QueryFileModule.evaluatePlan(pp.repr)
+      vs <- QueryFileModule.more(h)
+      _  <- QueryFileModule.close(h).liftB
+    } yield vs.headOption
+
+    val lp: Backend[Fix[LogicalPlan]] =
+      EitherT.fromDisjunction(afile.map(p => lpFromPath[Fix[LogicalPlan]](p)) \/> FileSystemError.pathErr(invalidPath(apath, "Cardinality unsupported")))
+
+    (lp >>= (first _)) map (_.flatMap(d => _int.getOption(d).map(_.toInt)) | 0)
+  }
+
+  private final def analyzeInterpreter: Analyze ~> Configured = {
+    val lc: DiscoverPath.ListContents[Backend] =
+      QueryFileModule.listContents(_)
+
+    λ[Analyze ~> Configured]({
+      case Analyze.QueryCost(lp) => (for {
+        qs <- lpToQScript[Fix, Backend](lp, lc)
+        c  <- qs.zygoM(CardinalityQSM.calculate[Backend](pathCard), CostQSM.evaluate[Backend](pathCard))
+      } yield c).run.value
+    })
+  }
 
   private final def fsInterpreter: FileSystem ~> Configured = {
     val qfInter: QueryFile ~> Configured = λ[QueryFile ~> Configured] {
@@ -173,7 +212,9 @@ trait BackendModule {
   type Repr
   type M[A]
 
-  def FunctorQSM[T[_[_]]]: Functor[QSM[T, ?]]
+  def CardinalityQSM: Cardinality[QSM[Fix, ?]]
+  def CostQSM: Cost[QSM[Fix, ?]]
+  def TraverseQSM[T[_[_]]]: Traverse[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]]
   def ExtractPathQSM[T[_[_]]: RecursiveT]: ExtractPath[QSM[T, ?], APath]
   def QSCoreInject[T[_[_]]]: QScriptCore[T, ?] :<: QSM[T, ?]

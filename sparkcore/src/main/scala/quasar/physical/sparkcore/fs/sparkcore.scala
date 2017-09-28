@@ -27,6 +27,7 @@ import quasar.fs._, FileSystemError._
 import quasar.fs.mount._, BackendDef._
 import quasar.effect._
 import quasar.qscript.{Read => _, _}
+import quasar.qscript.analysis._
 
 import java.lang.Thread
 import scala.Predef.implicitly
@@ -35,6 +36,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
 import pathy.Path._
 import matryoshka._
+import matryoshka.data._
 import matryoshka.implicits._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -89,7 +91,12 @@ trait SparkCore extends BackendModule {
   def qfKvsOps: KeyValueStore.Ops[QueryFile.ResultHandle, SparkCursor, Eff] =
     KeyValueStore.Ops[QueryFile.ResultHandle, SparkCursor, Eff]
 
-  def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
+  import Cost._
+  import Cardinality._
+
+  def CardinalityQSM: Cardinality[QSM[Fix, ?]] = Cardinality[QSM[Fix, ?]]
+  def CostQSM: Cost[QSM[Fix, ?]] = Cost[QSM[Fix, ?]]
+  def TraverseQSM[T[_[_]]] = Traverse[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
     implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]

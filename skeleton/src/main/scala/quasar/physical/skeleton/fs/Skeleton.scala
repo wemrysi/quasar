@@ -25,8 +25,10 @@ import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.qscript._
+import quasar.qscript.analysis._
 
 import matryoshka._
+import matryoshka.data._
 import scalaz._
 import scalaz.concurrent.Task
 import scala.Predef.implicitly
@@ -43,7 +45,12 @@ object Skeleton extends BackendModule {
   type Repr = Unit
   type M[A] = Nothing
 
-  def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
+  import Cost._
+  import Cardinality._
+
+  def CardinalityQSM: Cardinality[QSM[Fix, ?]] = Cardinality[QSM[Fix, ?]]
+  def CostQSM: Cost[QSM[Fix, ?]] = Cost[QSM[Fix, ?]]
+  def TraverseQSM[T[_[_]]] = Traverse[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]
   def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]

@@ -29,6 +29,7 @@ import quasar.fp.ski.κ
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.qscript._
+import quasar.qscript.analysis._
 
 import quasar.blueeyes.json.{JNum, JValue}
 import quasar.precog.common.{ColumnRef, CPath, CPathField, CPathIndex, Path}
@@ -161,7 +162,12 @@ object Mimir extends BackendModule with Logging {
 
   def cake[F[_]](implicit F: MonadReader_[F, Cake]): F[Cake] = F.ask
 
-  def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
+  import Cost._
+  import Cardinality._
+
+  def CardinalityQSM: Cardinality[QSM[Fix, ?]] = Cardinality[QSM[Fix, ?]]
+  def CostQSM: Cost[QSM[Fix, ?]] = Cost[QSM[Fix, ?]]
+  def TraverseQSM[T[_[_]]] = Traverse[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]
   def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
