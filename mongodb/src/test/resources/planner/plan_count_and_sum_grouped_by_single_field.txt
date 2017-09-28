@@ -1,11 +1,5 @@
 Chain
 ├─ $ReadF(db; bar)
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(0: [_.baz])
-│  │     ╰─ Key(content: _)
-│  ╰─ Scope(Map())
 ╰─ $GroupF
    ├─ Grouped
    │  ├─ Name("cnt" -> { "$sum": { "$literal": NumberInt("1") } })
@@ -14,12 +8,12 @@ Chain
    │            "$cond": [
    │              {
    │                "$and": [
-   │                  { "$lt": [{ "$literal": null }, "$content.biz"] },
-   │                  { "$lt": ["$content.biz", { "$literal": "" }] }]
+   │                  { "$lt": [{ "$literal": null }, "$biz"] },
+   │                  { "$lt": ["$biz", { "$literal": "" }] }]
    │              },
-   │              "$content.biz",
+   │              "$biz",
    │              { "$literal": undefined }]
    │          }
    │        })
    ╰─ By
-      ╰─ Name("0" -> "$0")
+      ╰─ Name("0" -> ["$baz"])
