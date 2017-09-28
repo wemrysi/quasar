@@ -69,10 +69,19 @@ object RValue {
     case _              => None
   }
 
-  def fromJValue(jv: JValue): RValue = jv match {
-    case JObject(fields)  => RObject(fields mapValues fromJValue toMap)
-    case JArray(elements) => RArray(elements map fromJValue)
-    case other            => CType.toCValue(other)
+  def fromJValue(jv: JValue): Option[RValue] = jv match {
+    case JObject(fields) if !fields.isEmpty =>
+      val transformed: Map[String, RValue] = fields.flatMap({
+        case (key, value) => fromJValue(value).map(key -> _).toList
+      })(collection.breakOut)
+
+      Some(RObject(transformed))
+
+    case JArray(elements) if !elements.isEmpty =>
+      Some(RArray(elements.flatMap(fromJValue(_).toList)))
+
+    case other =>
+      CType.toCValue(other)
   }
 
   def unsafeInsert(rootTarget: RValue, rootPath: CPath, rootValue: RValue): RValue = {
@@ -285,23 +294,34 @@ object CType {
     case _                                                => None
   }
 
-  // TODO Should return Option[CValue]... is this even used?
-  // Yes; it is used only in RoutingTable.scala
   @inline
-  final def toCValue(jval: JValue): CValue = (jval: @unchecked) match {
-    case JString(s)    => CString(s)
-    case JBool(b)      => CBoolean(b)
-    case JNull         => CNull
-    case JObject.empty => CEmptyObject
-    case JArray.empty  => CEmptyArray
-    case JNum(d)       =>
+  final def toCValue(jval: JValue): Option[CValue] = jval match {
+    case JString(s) =>
+      Some(CString(s))
+
+    case JBool(b) =>
+      Some(CBoolean(b))
+
+    case JNull =>
+      Some(CNull)
+
+    case JObject.empty =>
+      Some(CEmptyObject)
+
+    case JArray.empty =>
+      Some(CEmptyArray)
+
+    case JNum(d) =>
       forJValue(jval) match {
-        case Some(CLong)   => CLong(d.toLong)
-        case Some(CDouble) => CDouble(d.toDouble)
-        case _             => CNum(d)
+        case Some(CLong) => Some(CLong(d.toLong))
+        case Some(CDouble) => Some(CDouble(d.toDouble))
+        case _ => Some(CNum(d))
       }
+
     case JArray(_) =>
       sys.error("TODO: Allow for homogeneous JArrays -> CArray.")
+
+    case JUndefined => None
   }
 
   @inline

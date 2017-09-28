@@ -55,8 +55,9 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         // EJson => Data => JValue => RValue => Table
         val data: Data = ejson.cata(Data.fromEJson)
         val jvalue: JValue = JValue.fromData(data)
-        val rvalue: RValue = RValue.fromJValue(jvalue)
-        transRValue(rvalue, id).point[F]
+        val rvalue: Option[RValue] = RValue.fromJValue(jvalue)
+
+        rvalue.map(transRValue(_, id)).getOrElse(undefined(id)).point[F]
 
       case MapFuncsCore.JoinSideName(_) => ??? // should never be received
 
@@ -216,10 +217,12 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
 
       case MapFuncsCore.ConcatMaps(a1, a2) =>
         (OuterObjectConcat[A](a1, a2): TransSpec[A]).point[F]
+
       case MapFuncsCore.ProjectIndex(src, ConstLiteral(CLong(index), _)) =>
         (DerefArrayStatic[A](src, CPathIndex(index.toInt)): TransSpec[A]).point[F]
       case MapFuncsCore.ProjectIndex(src, index) =>
         (DerefArrayDynamic[A](src, index): TransSpec[A]).point[F]
+
       case MapFuncsCore.ProjectField(src, ConstLiteral(CString(field), _)) =>
         (DerefObjectStatic[A](src, CPathField(field)): TransSpec[A]).point[F]
       case MapFuncsCore.ProjectField(src, field) =>

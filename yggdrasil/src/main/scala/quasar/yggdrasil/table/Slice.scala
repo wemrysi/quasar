@@ -1698,7 +1698,8 @@ object Slice {
     }
   }
 
-  def fromJValues(values: Stream[JValue]): Slice = fromRValues(values.map(RValue.fromJValue))
+  def fromJValues(values: Stream[JValue]): Slice =
+    fromRValues(values.map(RValue.fromJValue).collect({ case Some(x) => x }))
 
   def fromRValues(values: Stream[RValue]): Slice = {
     val sliceSize = values.size

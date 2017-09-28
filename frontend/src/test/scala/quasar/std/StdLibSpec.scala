@@ -1304,9 +1304,47 @@ abstract class StdLibSpec extends Qspec {
         // TODO: Timestamp, Interval, cross-type comparison
       }
 
-      // TODO: can this be tested?
-      // "IfUndefined" >> {
-      // }
+      "IfUndefined" >> {
+        """NA ?? 42""" >> {
+          binary(
+            IfUndefined(_, _).embed,
+            Data.NA,
+            Data.Int(42),
+            Data.Int(42))
+        }
+
+        """1 ?? 2""" >> {
+          binary(
+            IfUndefined(_, _).embed,
+            Data.Int(1),
+            Data.Int(2),
+            Data.Int(1))
+        }
+
+        """{"a": 1} ?? 2""" >> {
+          binary(
+            IfUndefined(_, _).embed,
+            Data.Obj("a" -> Data.Int(1)),
+            Data.Int(2),
+            Data.Obj("a" -> Data.Int(1)))
+        }
+
+        """{"a": NA, "b": 2} ?? 3""" >> {
+          binary(
+            IfUndefined(_, _).embed,
+            Data.Obj("a" -> Data.NA, "b" -> Data.Int(2)),
+            Data.Int(3),
+            Data.Obj("b" -> Data.Int(2)))
+        }
+
+        """[NA, 2] ?? 3""" >> {
+          binary(
+            IfUndefined(_, _).embed,
+            Data.Arr(Data.NA :: Data.Int(2) :: Nil),
+            Data.Int(3),
+            Data.Arr(Data.Int(2) :: Nil))
+        }
+      }
 
       "And" >> {
         "false, false" >> {
@@ -1385,29 +1423,63 @@ abstract class StdLibSpec extends Qspec {
         }
       }
 
+      "ObjectProject" >> {
+        """({"a":1}).a""" >> {
+          binary(
+            ObjectProject(_, _).embed,
+            Data.Obj("a" -> Data.Int(1)),
+            Data.Str("a"),
+            Data.Int(1))
+        }
+
+        """({"a":1, "b":2}).b""" >> {
+          binary(
+            ObjectProject(_, _).embed,
+            Data.Obj("a" -> Data.Int(1), "b" -> Data.Int(2)),
+            Data.Str("b"),
+            Data.Int(2))
+        }
+
+        """({"a":1, "b":2}).c""" >> {
+          binary(
+            ObjectProject(_, _).embed,
+            Data.Obj("a" -> Data.Int(1), "b" -> Data.Int(2)),
+            Data.Str("c"),
+            Data.NA)
+        }
+
+        """({}).c""" >> {
+          binary(
+            ObjectProject(_, _).embed,
+            Data.Obj(),
+            Data.Str("c"),
+            Data.NA)
+        }
+      }
+
       "DeleteField" >> {
         "{a:1, b:2} delete .a" >> {
           binary(
             DeleteField(_, _).embed,
-            Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2))),
+            Data.Obj("a" -> Data.Int(1), "b" -> Data.Int(2)),
             Data.Str("a"),
-            Data.Obj(ListMap("b" -> Data.Int(2))))
+            Data.Obj("b" -> Data.Int(2)))
         }
 
         "{a:1, b:2} delete .b" >> {
           binary(
             DeleteField(_, _).embed,
-            Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2))),
+            Data.Obj("a" -> Data.Int(1), "b" -> Data.Int(2)),
             Data.Str("b"),
-            Data.Obj(ListMap("a" -> Data.Int(1))))
+            Data.Obj("a" -> Data.Int(1)))
         }
 
         "{a:1, b:2} delete .c" >> {
           binary(
             DeleteField(_, _).embed,
-            Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2))),
+            Data.Obj("a" -> Data.Int(1), "b" -> Data.Int(2)),
             Data.Str("c"),
-            Data.Obj(ListMap("a" -> Data.Int(1), "b" -> Data.Int(2))))
+            Data.Obj("a" -> Data.Int(1), "b" -> Data.Int(2)))
         }
       }
 

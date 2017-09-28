@@ -19,9 +19,7 @@ package quasar.fs
 import slamdata.Predef._
 import quasar.effect.LiftedOps
 import quasar.frontend.logicalplan.LogicalPlan
-import quasar.qscript.analysis._
 
-import matryoshka.{Hole => _, _}
 import matryoshka.data.Fix
 import scalaz._
 
