@@ -34,11 +34,13 @@ import quasar.fs.WriteFile.WriteHandle
 import quasar.physical.rdbms.common.{Config, TablePath}
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 import quasar.{RenderTree, RenderTreeT, fp}
+import quasar.qscript.analysis._
 
 import scala.Predef.implicitly
 import doobie.hikari.hikaritransactor.HikariTransactor
 import doobie.imports.ConnectionIO
 import matryoshka.{BirecursiveT, Delay, EqualT, RecursiveT, ShowT}
+import matryoshka.data._
 
 import scalaz._
 import Scalaz._
@@ -64,7 +66,12 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
     val liftB: Backend[A] = lift(m).into[Eff].liftB
   }
 
-  def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
+  import Cost._
+  import Cardinality._
+
+  def CardinalityQSM: Cardinality[QSM[Fix, ?]] = Cardinality[QSM[Fix, ?]]
+  def CostQSM: Cost[QSM[Fix, ?]] = Cost[QSM[Fix, ?]]
+  def TraverseQSM[T[_[_]]] = Traverse[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
     implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT]                               = ExtractPath[QSM[T, ?], APath]
