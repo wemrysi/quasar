@@ -20,7 +20,7 @@ import quasar.precog.common._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
 
-import java.math.{MathContext, RoundingMode}
+import BigDecimal.RoundingMode
 
 trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait UnaryLib extends ColumnarTableLib {
@@ -57,12 +57,12 @@ trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       // use these rather than the ones in MathLib
       // TODO remove the old ones in MathLib
       object Ceil extends Op1F1(UnaryNamespace, "ceil") {
-        private val ctx = new MathContext(0, RoundingMode.CEILING)
         val tpe = UnaryOperationType(JNumberT, JNumberT)
         def f1: F1 = CF1P("builtin::unary::ceil") {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, math.ceil)
+
           case c: LongColumn   => new LongFrom.L(c, n => true, x => x)
-          case c: NumColumn    => new NumFrom.N(c, n => true, _.round(ctx))
+          case c: NumColumn    => new NumFrom.N(c, n => true, _.setScale(0, RoundingMode.CEILING))
         }
 
         def spec[A <: SourceType]: TransSpec[A] => TransSpec[A] = { transSpec =>
@@ -71,12 +71,11 @@ trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       }
 
       object Floor extends Op1F1(UnaryNamespace, "floor") {
-        private val ctx = new MathContext(0, RoundingMode.FLOOR)
         val tpe = UnaryOperationType(JNumberT, JNumberT)
         def f1: F1 = CF1P("builtin::unary::floor") {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, math.floor)
           case c: LongColumn   => new LongFrom.L(c, n => true, x => x)
-          case c: NumColumn    => new NumFrom.N(c, n => true, _.round(ctx))
+          case c: NumColumn    => new NumFrom.N(c, n => true, _.setScale(0, RoundingMode.FLOOR))
         }
 
         def spec[A <: SourceType]: TransSpec[A] => TransSpec[A] = { transSpec =>
@@ -85,7 +84,6 @@ trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       }
 
       object Trunc extends Op1F1(UnaryNamespace, "trunc") {
-        private val ctx = new MathContext(0, RoundingMode.DOWN)
         val tpe = UnaryOperationType(JNumberT, JNumberT)
         def f1: F1 = CF1P("builtin::unary::trunc") {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, { d =>
@@ -94,7 +92,7 @@ trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
             if (result > d) math.floor(d) else result
           })
           case c: LongColumn   => new LongFrom.L(c, n => true, x => x)
-          case c: NumColumn    => new NumFrom.N(c, n => true, _.round(ctx))
+          case c: NumColumn    => new NumFrom.N(c, n => true, _.setScale(0, RoundingMode.DOWN))
         }
 
         def spec[A <: SourceType]: TransSpec[A] => TransSpec[A] = { transSpec =>
