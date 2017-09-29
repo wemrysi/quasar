@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.physical.mongodb.fs
+package quasar.physical.mongodb
 
 import quasar.fp.ski.ι
 

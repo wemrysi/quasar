@@ -39,7 +39,7 @@ import scala.Predef.implicitly
 
 import matryoshka._
 import matryoshka.data._
-import org.bson.BsonValue
+import org.bson.{BsonDocument, BsonValue}
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -110,10 +110,16 @@ object MongoDb
     toBackendP(e.run.run)
   }
 
-  def doPlan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
+  def doPlan[
+      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       N[_]: Monad: MonadFsErr: PhaseResultTell]
-      (qs: T[QSM[T, ?]], ctx: fs.QueryContext[N], queryModel: MongoQueryModel, execTime: Instant): N[Repr] =
-      MongoDbPlanner.planExecTime[T, N](qs, ctx, queryModel, execTime)
+      (qs: T[QSM[T, ?]],
+        ctx: fs.QueryContext,
+        queryModel: MongoQueryModel,
+        anyDoc: Collection => OptionT[N, BsonDocument],
+        execTime: Instant)
+      : N[Repr] =
+    MongoDbPlanner.planExecTime[T, N](qs, ctx, queryModel, anyDoc, execTime)
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
@@ -123,10 +129,11 @@ object MongoDb
       qs: T[QSM[T, ?]]): Backend[Repr] =
     for {
       v <- config[Backend].map(_.serverVersion)
-      ctx <- toBackendP(fs.QueryContext.queryContext[T, Backend](qs, QueryFileModule.listContents))
+      ctx <- toBackendP(fs.QueryContext.queryContext[T, Backend](qs))
       _ <- checkPathsExist(qs)
       execTime <- QueryFileModule.queryTime.liftM[PhaseResultT].liftM[FileSystemErrT]
-      p <- doPlan[T, Backend](qs, ctx, MongoQueryModel(v), execTime)
+      anyDoc = (c: Collection) => MongoDbIO.first(c).mapT(x => toM(x).liftB)
+      p <- doPlan[T, Backend](qs, ctx, MongoQueryModel(v), anyDoc, execTime)
     } yield p
 
   private type PhaseRes[A] = PhaseResultT[ConfiguredT[M, ?], A]

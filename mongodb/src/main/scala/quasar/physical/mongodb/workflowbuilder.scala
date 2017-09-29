@@ -558,14 +558,14 @@ object WorkflowBuilder {
     (implicit ev: WorkflowOpCoreF :<: F)
     : (Fix[F], Base) = {
     (base, struct) match {
-      case (Field(WrapperSigilName), None) =>
-        (graph, Field(WrapperSigilName))
+      case (Field(QuasarSigilName), None) =>
+        (graph, Field(QuasarSigilName))
 
       case (_, None) =>
         (chain(graph,
-          $project[F](Reshape(ListMap(WrapperSigilName -> \/-($var(base.toDocVar)))),
+          $project[F](Reshape(ListMap(QuasarSigilName -> \/-($var(base.toDocVar)))),
             ExcludeId)),
-          Field(WrapperSigilName))
+          Field(QuasarSigilName))
 
       case (_, Some(fields)) =>
         (chain(graph,

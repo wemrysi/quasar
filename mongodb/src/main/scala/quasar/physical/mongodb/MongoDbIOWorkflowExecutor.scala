@@ -103,7 +103,7 @@ private[mongodb] final class MongoDbIOWorkflowExecutor
   protected def mapReduceCursor(src: Collection, mr: MapReduce) = {
     // NB: MapReduce results look like { _id: <reduce key>, value: <reduced value> }
     def unwrap(doc: BsonDocument): BsonValue =
-      doc.get("value", doc)
+      doc.get(sigil.Value, doc)
 
     toCursor(MongoDbIO.mapReduceIterable(src, mr).map(Functor[MongoIterable].map(_)(unwrap)))
   }

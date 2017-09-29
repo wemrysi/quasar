@@ -20,20 +20,16 @@ import slamdata.Predef._
 import quasar.Data
 import quasar.fs.DataCursor
 import quasar.physical.mongodb._
-import quasar.physical.mongodb.workflow.{ExprLabel, WrapperSigilLabel}
 
 import scala.Option
 import scala.collection.JavaConverters._
 
 import org.bson.BsonValue
-import scalaz.Kleisli
 import scalaz.concurrent.Task
 import scalaz.syntax.compose._
 import scalaz.syntax.monad._
-import scalaz.syntax.plus._
 import scalaz.syntax.std.option._
 import scalaz.std.function._
-import scalaz.std.option._
 import scalaz.std.vector._
 
 object bsoncursor {
@@ -54,23 +50,8 @@ object bsoncursor {
 
       ////
 
-      /** Returns the value of the named field or `None` if the input isn't
-        * a document or the field doesn't exist.
-        */
-      def fieldValue(name: String): BsonValue => Option[BsonValue] =
-        v => bsonvalue.document.getOption(v).flatMap(d => Option(d.get(name)))
-
-      val sigilValue: BsonValue => Option[BsonValue] =
-        fieldValue(WrapperSigilLabel)
-
-      val mapReduceSigilValue: BsonValue => Option[BsonValue] =
-        Kleisli(sigilValue) <==< fieldValue(ExprLabel)
-
-      val elideSigil: BsonValue => BsonValue =
-        v => (sigilValue(v) <+> mapReduceSigilValue(v)) | v
-
       val toData: BsonValue => Data =
-        (BsonCodec.toData _) <<< Bson.fromRepr <<< elideSigil
+        (BsonCodec.toData _) <<< Bson.fromRepr <<< sigil.elideQusarSigil
 
       def isClosed(cursor: BsonCursor): MongoDbIO[Boolean] =
         MongoDbIO.liftTask(Task.delay(cursor.isClosed))

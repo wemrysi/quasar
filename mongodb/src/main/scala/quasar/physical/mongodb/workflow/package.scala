@@ -75,31 +75,16 @@ package object workflow {
       Inject[WorkflowOpCoreF, WorkflowF].prj(p.op)
   }
 
-  /** Quasar-specific sigil, used to construct a singleton result object under
-    * the following conditions:
-    *
-    * 1. Emitting a document value in aggregation when `$replaceRoot` is not available.
-    *
-    * 2. Emitting a value in aggregation when its type is unknown.
-    *
-    * 3. Emitting map-reduce results as the final stage of a query.
-    *
-    * NB: This can end up in data at rest due to write-back queries or caching, thus
-    *     we must always support eliding this particular name when reading or
-    *     querying data, even if the "primary" sigil name is changed.
-    */
-  val WrapperSigilLabel = "__quasar_mongodb_wrapper"
-  val WrapperSigilName  = BsonField.Name(WrapperSigilLabel)
-  val WrapperSigilVar   = DocVar.ROOT(WrapperSigilName)
+  /** Quasar result sigil. */
+  val QuasarSigilName  = BsonField.Name(sigil.Quasar)
+  val QuasarSigilVar   = DocVar.ROOT(QuasarSigilName)
 
   /** MapReduce result expression key. */
-  val ExprLabel  = "value"
-  val ExprName   = BsonField.Name(ExprLabel)
+  val ExprName   = BsonField.Name(sigil.Value)
   val ExprVar    = DocVar.ROOT(ExprName)
 
   /** MapReduce result identity key. */
-  val IdLabel  = "_id"
-  val IdName   = BsonField.Name(IdLabel)
+  val IdName   = BsonField.Name(sigil.Id)
   val IdVar    = DocVar.ROOT(IdName)
 
   // NB: it's only safe to emit "core" expr ops here, but we always use the
@@ -705,7 +690,7 @@ package object workflow {
           $simpleMap[F](
             NonEmptyList(MapExpr(jscore.JsFn(
               finalValue,
-              jscore.obj(WrapperSigilLabel -> jscore.Ident(finalValue))))),
+              jscore.obj(sigil.Quasar -> jscore.Ident(finalValue))))),
             ListMap()).apply(mr)
 
         case other => other
