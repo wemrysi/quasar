@@ -31,7 +31,6 @@ import argonaut._, Argonaut._, EncodeJsonScalaz._
 import org.http4s.dsl._
 import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
 @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
 object metadata {
@@ -89,7 +88,7 @@ object metadata {
       InvalidMountNode.invalidMountNodeEncodeJson(_),
       FsNode.fsNodeEncodeJson(_)))
 
-  def service[S[_]](implicit S0: Task :<: S, Q: QueryFile.Ops[S], M: Mounting.Ops[S]): QHttpService[S] = {
+  def service[S[_]](implicit Q: QueryFile.Ops[S], M: Mounting.Ops[S], C: Catchable[Free[S, ?]]): QHttpService[S] = {
 
     def mkNodes(parent: ADir, names: Set[PathSegment]): Q.M[Set[InvalidMountNode \/ FsNode]] =
       // First we check if this directory is a module, if so, we return `FsNode` that

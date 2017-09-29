@@ -19,6 +19,7 @@ package quasar.api.services
 import slamdata.Predef._
 import quasar.api._, ToApiError.ops._, ToQResponse.ops._
 import quasar.api.{Destination, HeaderParam}
+import quasar.contrib.scalaz.catchable._
 import quasar.effect.Timing
 import quasar.fp.liftMT
 import quasar.fp.free.foldMapNT

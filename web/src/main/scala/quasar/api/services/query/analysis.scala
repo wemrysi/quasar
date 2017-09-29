@@ -33,7 +33,6 @@ import matryoshka._
 import matryoshka.data.Fix
 import org.http4s.dsl._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
 object analysis {
   private val lpr = new LogicalPlanR[Fix[LogicalPlan]]
@@ -42,9 +41,9 @@ object analysis {
 
   def service[S[_]](implicit
       A: Analyze.Ops[S],
+      C: Catchable[Free[S, ?]],
       S0: Mounting :<: S,
-      S1: FileSystemFailure :<: S,
-      S2: Task :<: S
+      S1: FileSystemFailure :<: S
   ): QHttpService[S] = {
     def constantResponse(data: List[Data]): Json =
       Json(
