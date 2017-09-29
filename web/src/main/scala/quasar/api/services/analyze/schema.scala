@@ -20,6 +20,7 @@ import slamdata.Predef.{-> => _, _}
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
 import quasar.api.services.query._
+import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.disjunction._
 import quasar.contrib.scalaz.foldable._
 import quasar.ejson.EJson

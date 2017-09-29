@@ -393,9 +393,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
                 a <- data.service[Eff].apply(Request(uri = pathUri(f)))
                 b <- data.service[Eff].apply(Request(uri = pathUri(g)))
                 c <- vcache.get(f).run
-              } yield (a, b, c)).foldMap(it) >>= {
-                case (a, b, c) => (a.toHttpResponse(ir) ⊛ b.toHttpResponse(ir) ⊛ c.η[Task]).tupled
-              }
+              } yield (a.toHttpResponse(ir), b.toHttpResponse(ir), c)).foldMap(it)
             }.unsafePerformSync
 
             respA.status must_= Status.Ok
@@ -425,9 +423,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
                 a <- data.service[Eff].apply(Request(uri = pathUri(f)))
                 b <- data.service[Eff].apply(Request(uri = pathUri(g)))
                 c <- vcache.get(f).run
-              } yield (a, b, c)).foldMap(it) >>= {
-                case (a, b, c) => (a.toHttpResponse(ir) ⊛ b.toHttpResponse(ir) ⊛ c.η[Task]).tupled
-              }
+              } yield (a.toHttpResponse(ir), b.toHttpResponse(ir), c)).foldMap(it)
             }.unsafePerformSync
 
             respA.status must_= Status.Ok

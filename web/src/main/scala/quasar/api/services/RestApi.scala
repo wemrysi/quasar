@@ -126,7 +126,7 @@ object RestApi {
     }
 
   val errorHandling: HttpMiddleware =
-    _.mapK(_ handleWith {
+    _.mapK(_ handle {
       case msgFail: MessageFailure =>
         msgFail.toApiError
           .toResponse[Task]
