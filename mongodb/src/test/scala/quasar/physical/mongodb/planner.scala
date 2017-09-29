@@ -1517,12 +1517,12 @@ class PlannerSpec extends
       beWorkflow0(chain[Workflow](
         $read(collection("db", "zips")),
         $group(
-          grouped(),
-          -\/(reshape("0" -> $field("city")))),
+          grouped("f0" -> $first($field("city"))),
+          -\/(reshape("0" -> $arrayLit(List($field("city")))))),
         $project(
-          reshape("value" -> $field("_id", "0")),
+          reshape("value" -> $field("f0")),
           ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan trivial group by"))
+    }
 
     "plan useless group by expression" in {
       plan(sqlE"select city from zips group by lower(city)") must
