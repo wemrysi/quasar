@@ -106,8 +106,13 @@ jobs:
         - set -e
         - './sbt ++$TRAVIS_SCALA_VERSION doc web/assembly'
         - scripts/testJar
+
+        # release to sonatype
         - scripts/quasarPublishAndTag
-        - scripts/afterSuccess
+
+        # release to github
+        - scripts/publishJar
+
         - set +e
 
 notifications:
