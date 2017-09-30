@@ -25,6 +25,13 @@ import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
+/**
+ * Translates static QScript structures, which cannot currently be handled
+ * by `FuncHandler`, because they are not basic elements of QScript.
+ *
+ * TODO: once QScript supports multiple arguments for `MakeMap` and `MakeArray`,
+ * we should be able to remove this.
+ */
 trait StaticHandler[T[_[_]], EX[_]] {
   def handle[A](fm: FreeMapA[T, A]): Option[EX[FreeMapA[T, A]]]
 }
