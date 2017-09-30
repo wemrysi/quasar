@@ -25,55 +25,30 @@ import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
-trait StaticHandler {
-  def handle[T[_[_]]: BirecursiveT, M[_]: Monad, A]
-    (alg: AlgebraM[M, CoEnvMapA[T, A, ?], Fix[ExprOp]])
-    (fm: FreeMapA[T, A])
-      : Option[M[Fix[ExprOp]]]
+trait StaticHandler[T[_[_]], EX[_]] {
+  def handle[A](fm: FreeMapA[T, A]): Option[EX[FreeMapA[T, A]]]
 }
 
 object StaticHandler {
 
-  def handleOpsCore[T[_[_]]: BirecursiveT, M[_]: Monad, EX[_]: Traverse, A]
-    (alg: AlgebraM[M, CoEnvMapA[T, A, ?], Fix[ExprOp]])
-    (fm: FreeMapA[T, A])
+  def v2_6[T[_[_]]: BirecursiveT, EX[_]: Traverse, A]
     (implicit e26: ExprOpCoreF :<: EX)
-      : Option[M[Fix[ExprOp]]] = None
-
-  def handleOps3_2[T[_[_]]: BirecursiveT, M[_]: Monad, EX[_]: Traverse, A]
-    (alg: AlgebraM[M, CoEnvMapA[T, A, ?], Fix[ExprOp]])
-    (fm: FreeMapA[T, A])
-    (implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX, e32: ExprOp3_2F :<: EX)
-      : Option[M[Fix[ExprOp]]] = {
-    val fp32 = new ExprOp3_2F.fixpoint[Fix[ExprOp], ExprOp](Fix(_))
-    fm.project.some collect {
-      case MapFuncCore.StaticArray(a) =>
-        val cs: M[List[Fix[ExprOp]]] = a.map(_.cataM(alg)).sequence
-        cs.map(fp32.$arrayLit)
+      : StaticHandler[T, EX] =
+    new StaticHandler[T, EX] {
+      def handle[A](fm: FreeMapA[T, A]): Option[EX[FreeMapA[T, A]]] =
+        None
     }
-  }
 
-  object v2_6 {
-    def apply(): StaticHandler =
-      new StaticHandler {
-
-        def handle[T[_[_]]: BirecursiveT, M[_]: Monad, A]
-          (alg: AlgebraM[M, CoEnvMapA[T, A, ?], Fix[ExprOp]])
-          (fm: FreeMapA[T, A])
-            : Option[M[Fix[ExprOp]]] =
-          handleOpsCore[T, M, Expr2_6, A](alg)(fm)
+  def v3_2[T[_[_]]: BirecursiveT, EX[_]: Traverse, A]
+    (implicit e26: ExprOpCoreF :<: EX, e30: ExprOp3_0F :<: EX, e32: ExprOp3_2F :<: EX)
+      : StaticHandler[T, EX] =
+    new StaticHandler[T, EX] {
+      def handle[A](fm: FreeMapA[T, A]): Option[EX[FreeMapA[T, A]]] = {
+        val h3_2 = fm.project.some collect {
+          case MapFuncCore.StaticArray(a) =>
+            $arrayLitF(a)
+        }
+        h3_2 orElse v2_6[T, EX, A].handle(fm)
       }
-  }
-
-  object v3_2 {
-    def apply(): StaticHandler =
-      new StaticHandler {
-
-        def handle[T[_[_]]: BirecursiveT, M[_]: Monad, A]
-          (alg: AlgebraM[M, CoEnvMapA[T, A, ?], Fix[ExprOp]])
-          (fm: FreeMapA[T, A])
-            : Option[M[Fix[ExprOp]]] =
-          handleOps3_2[T, M, Expr3_2, A](alg)(fm)
-      }
-  }
+    }
 }

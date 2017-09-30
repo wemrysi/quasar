@@ -25,4 +25,4 @@ final case class PlannerConfig[
   T[_[_]]: BirecursiveT: ShowT,
   EX[_]: Traverse](
   funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?],
-  staticHandler: StaticHandler)
+  staticHandler: StaticHandler[T, EX])

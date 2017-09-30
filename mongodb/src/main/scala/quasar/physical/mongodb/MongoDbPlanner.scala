@@ -110,11 +110,16 @@ object MongoDbPlanner {
     (recovery: A => Fix[ExprOp])
     (implicit inj: EX :<: ExprOp)
       : M[Fix[ExprOp]] = {
-    val alg: AlgebraM[M, CoEnvMapA[T, A, ?], Fix[ExprOp]] = interpretM[M, MapFunc[T, ?], A, Fix[ExprOp]](
-      recovery(_).point[M],
-      expression(cfg.funcHandler))
-    val expr: Option[M[Fix[ExprOp]]] = cfg.staticHandler.handle(alg)(fm)
-    expr.cata(x => x, fm.cataM(alg))
+
+    val alg: AlgebraM[M, CoEnvMapA[T, A, ?], Fix[ExprOp]] =
+      interpretM[M, MapFunc[T, ?], A, Fix[ExprOp]](
+        recovery(_).point[M],
+        expression(cfg.funcHandler))
+        
+    def convert(e: EX[FreeMapA[T, A]]): M[Fix[ExprOp]] =
+      inj(e.map(_.cataM(alg))).sequence.map(_.embed)
+
+    cfg.staticHandler.handle(fm).map(convert) getOrElse fm.cataM(alg)
   }
 
   def getSelector
@@ -1489,7 +1494,7 @@ object MongoDbPlanner {
           JoinHandler.fallback[Workflow3_2F, WBM](
             JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
             JoinHandler.mapReduce)
-        val cfg = PlannerConfig(FuncHandler.handle3_4[MapFunc[T, ?]](bsonVersion), StaticHandler.v3_2())
+        val cfg = PlannerConfig[T, Expr3_4](FuncHandler.handle3_4(bsonVersion), StaticHandler.v3_2)
         plan0[T, M, Workflow3_2F, Expr3_4](queryContext.listContents, joinHandler, cfg, bsonVersion)(qs)
 
       case `3.2` =>
@@ -1497,17 +1502,17 @@ object MongoDbPlanner {
           JoinHandler.fallback[Workflow3_2F, WBM](
             JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
             JoinHandler.mapReduce)
-        val cfg = PlannerConfig(FuncHandler.handle3_2[MapFunc[T, ?]](bsonVersion), StaticHandler.v3_2())
+        val cfg = PlannerConfig[T, Expr3_2](FuncHandler.handle3_2(bsonVersion), StaticHandler.v3_2)
         plan0[T, M, Workflow3_2F, Expr3_2](queryContext.listContents, joinHandler, cfg, bsonVersion)(qs)
 
-      case `3.0`     =>
+      case `3.0` =>
         val joinHandler = JoinHandler.mapReduce[WBM, Workflow2_6F]
-        val cfg = PlannerConfig(FuncHandler.handle3_0[MapFunc[T, ?]](bsonVersion), StaticHandler.v2_6())
+        val cfg = PlannerConfig[T, Expr3_0](FuncHandler.handle3_0(bsonVersion), StaticHandler.v2_6)
         plan0[T, M, Workflow2_6F, Expr3_0](queryContext.listContents, joinHandler, cfg, bsonVersion)(qs).map(_.inject[WorkflowF])
 
-      case _     =>
+      case _ =>
         val joinHandler = JoinHandler.mapReduce[WBM, Workflow2_6F]
-        val cfg = PlannerConfig(FuncHandler.handle2_6[MapFunc[T, ?]](bsonVersion), StaticHandler.v2_6())
+        val cfg = PlannerConfig[T, Expr2_6](FuncHandler.handle2_6(bsonVersion), StaticHandler.v2_6)
         plan0[T, M, Workflow2_6F, Expr2_6](queryContext.listContents, joinHandler, cfg, bsonVersion)(qs).map(_.inject[WorkflowF])
     }
   }
