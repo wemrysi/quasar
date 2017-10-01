@@ -375,6 +375,33 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
         }
       }
 
+      "succeed with module mount if destination is within src" >> {
+        val src = rootDir </> dir("foo")
+        val dst = rootDir </> dir("foo") </> dir("bar")
+        runTest { service =>
+          for {
+            _        <- M.mountModule(src, sampleStatements)
+
+            r        <- service(Request(
+              method = MOVE,
+              uri = pathUri(src),
+              headers = Headers(destination(dst))))
+
+            (res, mntd) = r
+            body     <- lift(res.as[String]).into[Eff]
+
+            srcAfter <- M.lookupConfig(src).run.run
+            dstAfter <- M.lookupConfig(dst).run.run
+          } yield {
+            (body must_== s"moved ${printPath(src)} to ${printPath(dst)}") and
+              (res.status must_== Ok)                                      and
+              (mntd must_== Set(MR.mountModule(dst, sampleStatements)))    and
+              (srcAfter must beNone)                                       and
+              (dstAfter must beSome(MountConfig.moduleConfig(sampleStatements).right[MountingError]))
+          }
+        }
+      }
+
       "be 404 with missing source" >> prop { (src: ADir, dst: ADir) =>
         runTest { service =>
           for {
