@@ -59,6 +59,7 @@ object QueryFile {
       TJ:      ThetaJoin[T, ?] :<: QS,
       PB:  ProjectBucket[T, ?] :<: QS,
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]],
+      refEq: RefEq[T, QS],
       mergeable: Mergeable.Aux[T, QS],
       render: Delay[RenderTree, QS],
       eq: Delay[Equal, QS],

@@ -57,6 +57,7 @@ class Transform
     PB: ProjectBucket[T, ?] :<: F,
     // TODO: Remove this one once we have multi-sorted AST
     FI: Injectable.Aux[F, QScriptTotal[T, ?]],
+    refEq: RefEq[T, F],
     render: Delay[RenderTree, F],
     mergeable: Mergeable.Aux[T, F],
     eq: Delay[Equal, F],
