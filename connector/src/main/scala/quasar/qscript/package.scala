@@ -159,7 +159,7 @@ package object qscript {
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
 
-  def concat[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, A: Equal: Show]
+  def concat[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, A: Equal: Show: RenderTree]
     (l: FreeMapA[T, A], r: FreeMapA[T, A])
       : (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
 
@@ -206,7 +206,7 @@ package object qscript {
     foundR orElse foundL getOrElse concat0
   }
 
-  def concat3[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, A: Equal: Show](
+  def concat3[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, A: Equal: Show: RenderTree](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T]) = {
 
@@ -215,7 +215,7 @@ package object qscript {
     (lcr, getL >> getLC, getC >> getLC, getR)
   }
 
-  def concat4[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, A: Equal: Show](
+  def concat4[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, A: Equal: Show: RenderTree](
     l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A], r2: FreeMapA[T, A]):
       (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T], FreeMap[T]) = {
 

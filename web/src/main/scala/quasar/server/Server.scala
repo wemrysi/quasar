@@ -106,8 +106,7 @@ object Server {
     import RestApi._
 
     val f: QErrs_Task ~> ResponseOr =
-      liftMT[Task, ResponseT] :+:
-        qErrsToResponseOr
+      liftMT[Task, ResponseT] :+: qErrsToResponseT[Task]
 
     (reload: Int => Task[String \/ Unit]) =>
       finalizeServices(

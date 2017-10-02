@@ -17,21 +17,26 @@
 package quasar.api
 
 import slamdata.Predef._
+import quasar.contrib.scalaz.catchable._
 import quasar.fp._, free._
 import quasar.fp.ski._
 
 import org.http4s.dsl._
 import org.http4s.headers.Host
+import org.http4s.{Request, Uri}
+import org.http4s.util.CaseInsensitiveString
 import scalaz._
 import scalaz.syntax.applicative._
 import scalaz.concurrent.Task
+import scalaz.syntax.std.option._
 import scalaz.stream.Process
 import scodec.bits.ByteVector
 import scala.math.max
 
-class QResponseSpec extends quasar.Qspec {
-  import QResponse.{PROCESS_EFFECT_THRESHOLD_BYTES, HttpResponseStreamFailureException}
-  import QResponseSpec._
+class QHttpServiceSpec extends quasar.Qspec {
+  import QHttpService.PROCESS_EFFECT_THRESHOLD_BYTES
+  import QResponse.HttpResponseStreamFailureException
+  import QHttpServiceSpec._
 
   type StrIO[A] = Coproduct[Str, Task, A]
   type StrIOM[A] = Free[StrIO, A]
@@ -56,24 +61,35 @@ class QResponseSpec extends quasar.Qspec {
     f :+: liftMT[Task, ResponseT]
   }
 
-  "toHttpResponse" should {
+  val request = Request(uri = Uri(CaseInsensitiveString.empty.some))
+
+  "response" should {
+
     "sucessful evaluation" >> {
       "has same status" >> {
-        val res = QResponse.empty[StrIO].toHttpResponse(evalStr())
-        res.unsafePerformSync.status must_== NoContent
+        QHttpService { case _ => QResponse.empty[StrIO].η[Free[StrIO, ?]] }
+          .toHttpService(evalStr())(request)
+          .map(_.orNotFound.status)
+          .unsafePerformSync must_=== NoContent
       }
 
       "has same headers" >> {
         val qr = QResponse.json[String, StrIO](Ok, "foo")
-        val res = qr.toHttpResponse(evalStr())
-        res.unsafePerformSync.headers.toList must_== qr.headers.toList
+
+        QHttpService { case _ => qr.η[Free[StrIO, ?]] }
+          .toHttpService(evalStr())(request)
+          .map(_.orNotFound.headers.toList)
+          .unsafePerformSync must_=== qr.headers.toList
       }
 
       "has body of interpreted values" >> {
         val qr = QResponse.streaming[StrIO, String](
           strs("a", "b", "c", "d", "e"))
-        val res = qr.toHttpResponse(evalStr())
-        res.as[String].unsafePerformSync must_== "abcde"
+
+        QHttpService { case _ => qr.η[Free[StrIO, ?]] }
+          .toHttpService(evalStr())(request)
+          .flatMap(_.orNotFound.as[String])
+          .unsafePerformSync must_=== "abcde"
       }
     }
 
@@ -82,24 +98,34 @@ class QResponseSpec extends quasar.Qspec {
         QResponse.streaming[StrIO, String](strs("one", "two", "three"))
 
       "has alternate response status" >> {
-        failStream.toHttpResponse(evalStr("one"))
-          .unsafePerformSync.status must_== BadRequest
+        QHttpService { case _ => failStream.η[Free[StrIO, ?]] }
+          .toHttpService(evalStr("one"))(request)
+          .map(_.orNotFound.status)
+          .unsafePerformSync must_=== BadRequest
       }
 
       "has alternate response headers" >> {
-        failStream.toHttpResponse(evalStr("one"))
-          .unsafePerformSync.headers.get(Host) must beSome(errHost)
+        QHttpService { case _ => failStream.η[Free[StrIO, ?]] }
+          .toHttpService(evalStr("one"))(request)
+          .map(_.orNotFound.headers.get(Host))
+          .unsafePerformSync must_=== errHost.some
       }
 
       "has alternate response body" >> {
-        failStream.toHttpResponse(evalStr("one"))
-          .as[String].unsafePerformSync must_== "FAIL"
+        QHttpService { case _ => failStream.η[Free[StrIO, ?]] }
+          .toHttpService(evalStr("one"))(request)
+          .flatMap(_.orNotFound.as[String])
+          .unsafePerformSync must_=== "FAIL"
       }
 
       "responds with alternate response when a small amount of data before first effect" >> {
         val pad = Process.emit(ByteVector.low(max(0L, PROCESS_EFFECT_THRESHOLD_BYTES - 1)))
         val padStream = failStream.copy(body = pad.append[StrIOM, ByteVector](failStream.body))
-        padStream.toHttpResponse(evalStr("one")).as[String].unsafePerformSync must_== "FAIL"
+
+        QHttpService { case _ => padStream.η[Free[StrIO, ?]] }
+          .toHttpService(evalStr("one"))(request)
+          .flatMap(_.orNotFound.as[String])
+          .unsafePerformSync must_=== "FAIL"
       }
 
       "responds with alternate response when other internal effects before first effect" >> {
@@ -107,21 +133,27 @@ class QResponseSpec extends quasar.Qspec {
         val pad = Process.emit(ByteVector.low(max(0L, PROCESS_EFFECT_THRESHOLD_BYTES / 2)))
         val stm = pad.append[StrIOM, ByteVector](failStream.body intersperse hi)
 
-        failStream.copy(body = stm).toHttpResponse(evalStr("one"))
-          .as[String].unsafePerformSync must_== "FAIL"
+        QHttpService { case _ => QResponse.streaming(stm).η[Free[StrIO, ?]] }
+          .toHttpService(evalStr("one"))(request)
+          .flatMap(_.orNotFound.as[String])
+          .unsafePerformSync must_=== "FAIL"
       }
 
       "results in response stream failure exception when fails in middle of stream" >> {
         val pad = Process.emit(ByteVector.low(PROCESS_EFFECT_THRESHOLD_BYTES))
-        failStream.copy(body = pad.append[StrIOM, ByteVector](failStream.body))
-          .toHttpResponse(evalStr("two"))
-          .as[String].unsafePerformSync must throwA[HttpResponseStreamFailureException]
+
+        QHttpService { case _ =>
+          failStream.copy(body = pad.append[StrIOM, ByteVector](failStream.body)).η[Free[StrIO, ?]]
+        }
+          .toHttpService(evalStr("two"))(request)
+          .flatMap(_.orNotFound.as[String])
+          .unsafePerformSync must throwA[HttpResponseStreamFailureException]
       }
     }
   }
 }
 
-object QResponseSpec {
+object QHttpServiceSpec {
   final case class Str[A](s: String, k: String => A)
 
   object Str {

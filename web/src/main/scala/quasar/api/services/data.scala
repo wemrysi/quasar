@@ -20,6 +20,7 @@ import slamdata.Predef.{ -> => _, _ }
 import quasar.Data
 import quasar.api._, ToQResponse.ops._, ToApiError.ops._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.disjunction._
 import quasar.effect.Timing
 import quasar.fp._, numeric._

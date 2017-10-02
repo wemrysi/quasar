@@ -20,6 +20,7 @@ import slamdata.Predef.{ -> => _, _ }
 import quasar.fp.ski._
 import quasar.api._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.catchable._
 import quasar.contrib.std._
 import quasar.fp.numeric._
 import quasar.fs._
@@ -87,7 +88,7 @@ object metadata {
       InvalidMountNode.invalidMountNodeEncodeJson(_),
       FsNode.fsNodeEncodeJson(_)))
 
-  def service[S[_]](implicit Q: QueryFile.Ops[S], M: Mounting.Ops[S]): QHttpService[S] = {
+  def service[S[_]](implicit Q: QueryFile.Ops[S], M: Mounting.Ops[S], C: Catchable[Free[S, ?]]): QHttpService[S] = {
 
     def mkNodes(parent: ADir, names: Set[PathSegment]): Q.M[Set[InvalidMountNode \/ FsNode]] =
       // First we check if this directory is a module, if so, we return `FsNode` that
