@@ -21,6 +21,7 @@ import quasar.{Variables, VariablesArbitrary}
 import quasar.api._, ApiErrorEntityDecoder._, PathUtils._
 import quasar.api.matchers._
 import quasar.contrib.pathy._, PathArbitrary._
+import quasar.contrib.scalaz.catchable._
 import quasar.fp._
 import quasar.fp.free, free._
 import quasar.fs._, InMemory._
@@ -46,13 +47,13 @@ import shapeless.tag.@@
 
 object MetadataFixture {
 
-  type Eff[A] = (QueryFile :\: Mounting :/: VCache)#M[A]
+  type Eff[A] = (Task :\: QueryFile :\: Mounting :/: VCache)#M[A]
 
   def runQuery(mem: InMemState): QueryFile ~> Task =
     queryFile andThen evalNT[Id, InMemState](mem) andThen pointNT[Task]
 
   def runQueryWithMounts(mem: InMemState, mnts: Map[APath, MountConfig]): QueryFile ~> Task = {
-    val run: Eff ~> Task = runQuery(mem) :+: runConstantMount[Task](mnts) :+: runConstantVCache[Task](Map.empty)
+    val run: Eff ~> Task = reflNT[Task] :+: runQuery(mem) :+: runConstantMount[Task](mnts) :+: runConstantVCache[Task](Map.empty)
     val addViews = view.queryFile[Eff]
     val addModules = flatMapSNT(transformIn[QueryFile, Eff, Free[Eff, ?]](module.queryFile[Eff], liftFT))
     addViews andThen addModules andThen foldMapNT(run)
@@ -60,7 +61,12 @@ object MetadataFixture {
 
   def service(mem: InMemState, mnts: Map[APath, MountConfig]): Service[Request, Response] = {
     metadata.service[Eff].toHttpService(
-      liftMT[Task, ResponseT] compose (runQueryWithMounts(mem, mnts) :+: runConstantMount[Task](mnts) :+: runConstantVCache[Task](Map.empty))).orNotFound
+      liftMT[Task, ResponseT] compose (
+        reflNT[Task]                  :+:
+        runQueryWithMounts(mem, mnts) :+:
+        runConstantMount[Task](mnts)  :+:
+        runConstantVCache[Task](Map.empty)
+      )).orNotFound
   }
 }
 

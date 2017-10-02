@@ -21,6 +21,7 @@ import quasar.api._
 import quasar.api.ApiError._
 import quasar.api.ToQResponse._
 import quasar.api.ToQResponse.ops._
+import quasar.contrib.scalaz.catchable._
 import quasar.contrib.pathy._
 import quasar.effect.Failure
 import quasar.fp._, numeric._

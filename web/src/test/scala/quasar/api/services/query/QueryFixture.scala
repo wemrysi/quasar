@@ -21,6 +21,7 @@ import quasar.api._
 import quasar.api.PathUtils._
 import quasar.api.services.Fixture._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.catchable._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._

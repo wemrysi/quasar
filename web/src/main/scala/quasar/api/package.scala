@@ -36,7 +36,6 @@ import scalaz.concurrent.Task
 
 package object api {
   type ResponseT[F[_], A]   = EitherT[F, Response, A]
-  type ResponseIOT[F[_], A] = EitherT[F, Task[Response], A]
   type ResponseOr[A]        = ResponseT[Task, A]
 
   type ApiErrT[F[_], A] = EitherT[F, ApiError, A]
@@ -46,25 +45,16 @@ package object api {
     */
   def failureResponseOr[E](implicit E: ToQResponse[E, ResponseOr])
     : Failure[E, ?] ~> ResponseOr =
-    joinResponseOr compose failureResponseIOT[Task, E]
+    failureResponseT[Task, E]
 
-  def failureResponseIOT[F[_]: Monad, E](implicit E: ToQResponse[E, ResponseOr])
-    : Failure[E, ?] ~> ResponseIOT[F, ?] = {
+  def failureResponseT[F[_]: Monad, E](implicit E: ToQResponse[E, ResponseOr])
+    : Failure[E, ?] ~> ResponseT[F, ?] = {
 
-    def errToResp(e: E): Task[Response] =
+    def errToResp(e: E): Response =
       e.toResponse[ResponseOr].toHttpResponse(NaturalTransformation.refl)
 
     convertError[F](errToResp) compose Failure.toError[EitherT[F, E, ?], E]
   }
-
-  /** Sequences the `Response` on the left with the outer `Task`. */
-  val joinResponseOr: ResponseIOT[Task, ?] ~> ResponseOr =
-    new (ResponseIOT[Task, ?] ~> ResponseOr) {
-      def apply[A](et: ResponseIOT[Task, A]) =
-        EitherT(et.run.flatMap(_.fold(
-          _.map(_.left[A]),
-          _.right[Response].point[Task])))
-    }
 
   // https://tools.ietf.org/html/rfc7234#section-4.2.4
   val StaleHeader = Header(Warning.name.value, """110 - "Response is Stale"""")
