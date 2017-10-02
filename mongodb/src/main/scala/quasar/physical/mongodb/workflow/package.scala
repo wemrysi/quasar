@@ -21,6 +21,7 @@ import quasar.{NonTerminal, RenderTree, RenderedTree}, RenderTree.ops._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.jscore, jscore.JsCore
+import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.optimize.pipeline._
 import quasar.physical.mongodb.workflowtask._
@@ -585,6 +586,41 @@ package object workflow {
       }
     }
 
+  private def wrapArrayInLet[T[_[_]]: CorecursiveT, EX[_]: Functor]
+    (expr: EX[T[EX]])
+    (implicit ev: ExprOpCoreF :<: EX, ev32: ExprOp3_2F :<: EX)
+      : EX[T[EX]] = expr match {
+    case a @ $arrayLitF(_) =>
+      $letF(ListMap(DocVar.Name("a") -> a.embed),
+        $varF[EX, T[EX]](DocVar.Name("a")()).embed)
+    case x => x
+  }
+
+  private def wrapArrayLit[EX[_]: Functor]
+    (accum: AccumOp[Fix[EX]])
+    (implicit ev: ExprOpCoreF :<: EX, ev32: ExprOp3_2F :<: EX)
+      : AccumOp[Fix[EX]] = {
+
+    def wrap(expr: Fix[EX]): Fix[EX] = (wrapArrayInLet[Fix, EX](expr.unFix)).embed
+
+    accum match {
+      case $addToSet(value) => $addToSet(wrap(value))
+      case $avg(value)      => $avg(wrap(value))
+      case $first(value)    => $first(wrap(value))
+      case $last(value)     => $last(wrap(value))
+      case $max(value)      => $max(wrap(value))
+      case $min(value)      => $min(wrap(value))
+      case $push(value)     => $push(wrap(value))
+      case $sum(value)      => $sum(wrap(value))
+    }
+  }
+
+  private def wrapArrayLitExprInLet[EX[_]: Functor]
+    (grouped: Grouped[EX])
+    (implicit ev: ExprOpCoreF :<: EX, ev32: ExprOp3_2F :<: EX, ev2: ExprOpOps.Uni[ExprOp])
+      : Grouped[EX] =
+    Grouped(grouped.value.map(t => t._1 -> wrapArrayLit[EX](t._2)))
+
   // NB: no need for a typeclass if implementing this way, but it will be needed
   // as soon as we need to match on anything here that isn't in core.
   implicit def crystallizeWorkflowF[F[_]: Functor: Classify: Coalesce: Refs](
@@ -623,6 +659,11 @@ package object workflow {
                 case I($ReduceF(_, _, _)) => x
                 case _ => chain(x, $reduce[F]($ReduceF.reduceFoldLeft, ListMap()))
               })))
+          case I(g @ $GroupF(src, grouped, by)) =>
+            // We can't use arrays directly inside accumulators because of
+            // https://jira.mongodb.org/browse/SERVER-23839
+            // so let's wrap arrays in a let
+            I($GroupF(src, wrapArrayLitExprInLet(grouped), by))
 
           case op => op
         }

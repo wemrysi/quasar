@@ -31,30 +31,15 @@ package object accumulator {
       (implicit exprOps: ExprOpOps.Uni[EX]): AccumOp[Fix[EX]] =
     t.map(_.cata(exprOps.rewriteRefs(applyVar)))
 
-  private def wrapInLet(bson: Bson): Bson =
-    Bson.Doc("$let" -> Bson.Doc(
-      "vars" -> Bson.Doc("a" -> bson),
-      "in" -> Bson.Text("$$a")))
-
-  // We can't use arrays directly inside accumulators because of
-  // https://jira.mongodb.org/browse/SERVER-23839
-  // Ideally this wrapping would happen before we have translated to Bson
-  // but the trade-off is that in that case this wrapping needs to occur at all
-  // call-sites which would be prone to errors.
-  private def wrapArrInLet(bson: Bson): Bson = bson match {
-    case a:Bson.Arr => wrapInLet(a)
-    case x => x
-  }
-
   val groupBsonƒ: AccumOp[Bson] => Bson = {
-    case $addToSet(value) => Bson.Doc("$addToSet" -> wrapArrInLet(value))
-    case $push(value)     => Bson.Doc("$push" -> wrapArrInLet(value))
-    case $first(value)    => Bson.Doc("$first" -> wrapArrInLet(value))
-    case $last(value)     => Bson.Doc("$last" -> wrapArrInLet(value))
-    case $max(value)      => Bson.Doc("$max" -> wrapArrInLet(value))
-    case $min(value)      => Bson.Doc("$min" -> wrapArrInLet(value))
-    case $avg(value)      => Bson.Doc("$avg" -> wrapArrInLet(value))
-    case $sum(value)      => Bson.Doc("$sum" -> wrapArrInLet(value))
+    case $addToSet(value) => Bson.Doc("$addToSet" -> value)
+    case $push(value)     => Bson.Doc("$push" -> value)
+    case $first(value)    => Bson.Doc("$first" -> value)
+    case $last(value)     => Bson.Doc("$last" -> value)
+    case $max(value)      => Bson.Doc("$max" -> value)
+    case $min(value)      => Bson.Doc("$min" -> value)
+    case $avg(value)      => Bson.Doc("$avg" -> value)
+    case $sum(value)      => Bson.Doc("$sum" -> value)
   }
 
   def groupBson[EX[_]: Functor](g: AccumOp[Fix[EX]])(implicit exprOps: ExprOpOps.Uni[EX]) =
