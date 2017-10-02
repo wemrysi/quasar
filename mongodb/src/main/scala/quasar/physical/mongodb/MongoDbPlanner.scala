@@ -296,6 +296,10 @@ object MongoDbPlanner {
       case Ceil(a1) => unimplemented[M, Fix[ExprOp]]("Ceil expression")
       case Floor(a1) => unimplemented[M, Fix[ExprOp]]("Floor expression")
       case Trunc(a1) => unimplemented[M, Fix[ExprOp]]("Trunc expression")
+      case Round(a1) => unimplemented[M, Fix[ExprOp]]("Round expression")
+      case FloorScale(a1, a2) => unimplemented[M, Fix[ExprOp]]("FloorScale expression")
+      case CeilScale(a1, a2) => unimplemented[M, Fix[ExprOp]]("CeilScale expression")
+      case RoundScale(a1, a2) => unimplemented[M, Fix[ExprOp]]("RoundScale expression")
     }
 
     val handleSpecial: MapFunc[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
@@ -623,6 +627,10 @@ object MongoDbPlanner {
       case Ceil(a1)  => unimplemented[M, JsCore]("Ceil JS")
       case Floor(a1) => unimplemented[M, JsCore]("Floor JS")
       case Trunc(a1) => unimplemented[M, JsCore]("Trunc JS")
+      case Round(a1) => unimplemented[M, JsCore]("Round JS")
+      case FloorScale(a1, a2) => unimplemented[M, JsCore]("FloorScale JS")
+      case CeilScale(a1, a2) => unimplemented[M, JsCore]("CeilScale JS")
+      case RoundScale(a1, a2) => unimplemented[M, JsCore]("RoundScale JS")
     }
 
     val handleSpecial: MapFunc[T, JsCore] => M[JsCore] = {

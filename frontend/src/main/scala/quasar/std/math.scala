@@ -344,6 +344,73 @@ trait MathLib extends Library {
         case t             => success(Func.Input1(t))
       })
 
+    val Round = UnaryFunc(
+      Mapping,
+      "Rounds a numeric value to the closest integer, defaulting to a half-even strategy",
+      Type.Numeric,
+      Func.Input1(Type.Numeric),
+      noSimplification,
+      partialTyperV[nat._1] {
+        case Sized(Type.Const(Data.Int(v)))      => success(Type.Const(Data.Int(v)))
+        case Sized(Type.Const(Data.Dec(v)))      => success(Type.Const(Data.Dec(v.setScale(0, RoundingMode.HALF_EVEN))))
+        case Sized(t) if Type.Numeric contains t => success(t)
+      },
+      untyper[nat._1] {
+        case Type.Const(d) => success(Func.Input1(d.dataType))
+        case t             => success(Func.Input1(t))
+      })
+
+    val FloorScale = BinaryFunc(
+      Mapping,
+      "Returns the nearest number less-than or equal-to a given number, with the specified number of decimal digits",
+      Type.Numeric,
+      Func.Input2(Type.Numeric, Type.Numeric),
+      noSimplification,
+      (partialTyperV[nat._2] {
+        case Sized(Type.Const(Data.Int(v)), v2) if Type.Numeric.contains(v2) => success(Type.Const(Data.Int(v)))
+        case Sized(Type.Const(Data.Dec(v)), Type.Const(Data.Int(s))) if s < Int.MaxValue && s >= 0 => success(Type.Const(Data.Dec(v.setScale(s.toInt, RoundingMode.FLOOR))))
+
+        case Sized(_, Type.Const(Data.Int(n))) if n < 0 => failure(NonEmptyList(GenericError("Scale must be >= 0")))
+        case Sized(_, Type.Const(Data.Number(n))) if n < 0 => failure(NonEmptyList(GenericError("Scale must be >= 0")))
+
+        case Sized(v1, v2) if Type.Numeric.contains(v1) && Type.Numeric.contains(v2) => success(v1)
+      }),
+      biReflexiveUnapply)
+
+    val CeilScale = BinaryFunc(
+      Mapping,
+      "Returns the nearest number greater-than or equal-to a given number, with the specified number of decimal digits",
+      Type.Numeric,
+      Func.Input2(Type.Numeric, Type.Numeric),
+      noSimplification,
+      (partialTyperV[nat._2] {
+        case Sized(Type.Const(Data.Int(v)), v2) if Type.Numeric.contains(v2) => success(Type.Const(Data.Int(v)))
+        case Sized(Type.Const(Data.Dec(v)), Type.Const(Data.Int(s))) if s < Int.MaxValue && s >= 0 => success(Type.Const(Data.Dec(v.setScale(s.toInt, RoundingMode.CEILING))))
+
+        case Sized(_, Type.Const(Data.Int(n))) if n < 0 => failure(NonEmptyList(GenericError("Scale must be >= 0")))
+        case Sized(_, Type.Const(Data.Number(n))) if n < 0 => failure(NonEmptyList(GenericError("Scale must be >= 0")))
+
+        case Sized(v1, v2) if Type.Numeric.contains(v1) && Type.Numeric.contains(v2) => success(v1)
+      }),
+      biReflexiveUnapply)
+
+    val RoundScale = BinaryFunc(
+      Mapping,
+      "Returns the nearest number to a given number with the specified number of decimal digits",
+      Type.Numeric,
+      Func.Input2(Type.Numeric, Type.Numeric),
+      noSimplification,
+      (partialTyperV[nat._2] {
+        case Sized(Type.Const(Data.Int(v)), v2) if Type.Numeric.contains(v2) => success(Type.Const(Data.Int(v)))
+        case Sized(Type.Const(Data.Dec(v)), Type.Const(Data.Int(s))) if s < Int.MaxValue && s >= 0 => success(Type.Const(Data.Dec(v.setScale(s.toInt, RoundingMode.HALF_EVEN))))
+
+        case Sized(_, Type.Const(Data.Int(n))) if n < 0 => failure(NonEmptyList(GenericError("Scale must be >= 0")))
+        case Sized(_, Type.Const(Data.Number(n))) if n < 0 => failure(NonEmptyList(GenericError("Scale must be >= 0")))
+
+        case Sized(v1, v2) if Type.Numeric.contains(v1) && Type.Numeric.contains(v2) => success(v1)
+      }),
+      biReflexiveUnapply)
+
   // Note: there are 2 interpretations of `%` which return different values for negative numbers.
   // Depending on the interpretation `-5.5 % 1` can either be `-0.5` or `0.5`.
   // Generally, the first interpretation seems to be referred to as "remainder" and the 2nd as "modulo".

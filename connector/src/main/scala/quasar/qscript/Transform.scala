@@ -478,7 +478,7 @@ class Transform
         if func.effect ≟ Mapping =>
       val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)
       Target(
-        Ann[T](base.buckets, Free.roll(MapFunc.translateBinaryMapping(IC)(func)(lval, rval))),
+        Ann[T](base.buckets, Free.roll(MapFunc.translateBinaryMapping(IC, ID)(func)(lval, rval))),
         base.src).right[PlannerError]
 
     case lp.InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3))

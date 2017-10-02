@@ -66,6 +66,7 @@ object MapFunc {
     case math.Floor => a => MFD(D.Floor(a))
     case math.Negate => a => MFC(C.Negate(a))
     case math.Trunc => a => MFD(D.Trunc(a))
+    case math.Round => a => MFD(D.Round(a))
     case relations.Not => a => MFC(C.Not(a))
     case string.Length => a => MFC(C.Length(a))
     case string.Lower => a => MFC(C.Lower(a))
@@ -80,7 +81,7 @@ object MapFunc {
   }
 
   def translateBinaryMapping[T[_[_]], MF[_], A]
-      (implicit MFC: MapFuncCore[T, ?] :<: MF)
+      (implicit MFC: MapFuncCore[T, ?] :<: MF, MFD: MapFuncDerived[T, ?] :<: MF)
       : BinaryFunc => (A, A) => MF[A] = {
     // NB: ArrayLength takes 2 params because of SQL, but we really don’t care
     //     about the second. And it shouldn’t even have two in LP.
@@ -91,6 +92,9 @@ object MapFunc {
     case math.Divide => (a1, a2) => MFC(C.Divide(a1, a2))
     case math.Modulo => (a1, a2) => MFC(C.Modulo(a1, a2))
     case math.Power => (a1, a2) => MFC(C.Power(a1, a2))
+    case math.CeilScale => (a1, a2) => MFD(D.CeilScale(a1, a2))
+    case math.FloorScale => (a1, a2) => MFD(D.FloorScale(a1, a2))
+    case math.RoundScale => (a1, a2) => MFD(D.RoundScale(a1, a2))
     case relations.Eq => (a1, a2) => MFC(C.Eq(a1, a2))
     case relations.Neq => (a1, a2) => MFC(C.Neq(a1, a2))
     case relations.Lt => (a1, a2) => MFC(C.Lt(a1, a2))
