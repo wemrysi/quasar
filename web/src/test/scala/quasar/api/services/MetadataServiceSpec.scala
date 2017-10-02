@@ -21,6 +21,7 @@ import quasar.{Variables, VariablesArbitrary}
 import quasar.api._, ApiErrorEntityDecoder._, PathUtils._
 import quasar.api.matchers._
 import quasar.contrib.pathy._, PathArbitrary._
+import quasar.contrib.scalaz.catchable._
 import quasar.fp._
 import quasar.fs._, InMemory._
 import quasar.fs.mount._

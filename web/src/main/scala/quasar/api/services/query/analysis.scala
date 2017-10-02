@@ -21,6 +21,7 @@ import quasar._
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz.catchable._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount.Mounting
@@ -40,6 +41,7 @@ object analysis {
 
   def service[S[_]](implicit
       A: Analyze.Ops[S],
+      C: Catchable[Free[S, ?]],
       S0: Mounting :<: S,
       S1: FileSystemFailure :<: S
   ): QHttpService[S] = {

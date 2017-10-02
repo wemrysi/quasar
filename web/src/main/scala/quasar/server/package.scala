@@ -24,19 +24,14 @@ import quasar.fs.mount.module.Module
 import quasar.main._
 
 import scalaz.{~>, Monad}
-import scalaz.concurrent.Task
 
 package object server {
   import Mounting.PathTypeMismatch
 
-  def qErrsToResponseIOT[F[_]: Monad]: QErrs ~> ResponseIOT[F, ?] =
-    failureResponseIOT[F, PhysicalError]    :+:
-    failureResponseIOT[F, Module.Error]     :+:
-    failureResponseIOT[F, PathTypeMismatch] :+:
-    failureResponseIOT[F, MountingError]    :+:
-    failureResponseIOT[F, FileSystemError]
-
-  /** Interprets errors into `Response`s, for use in web services. */
-  val qErrsToResponseOr: QErrs ~> ResponseOr =
-    joinResponseOr compose qErrsToResponseIOT[Task]
+  def qErrsToResponseT[F[_]: Monad]: QErrs ~> ResponseT[F, ?] =
+    failureResponseT[F, PhysicalError]    :+:
+    failureResponseT[F, Module.Error]     :+:
+    failureResponseT[F, PathTypeMismatch] :+:
+    failureResponseT[F, MountingError]    :+:
+    failureResponseT[F, FileSystemError]
 }
