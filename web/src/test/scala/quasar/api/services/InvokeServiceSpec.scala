@@ -57,7 +57,7 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
   import PathError.pathNotFound
 
   def service(mem: InMemState, mounts: Map[APath, MountConfig] = Map.empty): Service[Request, Response] =
-    HttpService.lift(req => Fixture.inMemFS_(mem, MountingsConfig(mounts)).flatMap { fs =>
+    HttpService.lift(req => Fixture.inMemFSWeb(mem, MountingsConfig(mounts)).flatMap { fs =>
       invoke.service[CoreEffIO].toHttpService(fs).apply(req)
     }).orNotFound
 

@@ -34,7 +34,7 @@ import scalaz._, Scalaz._, concurrent.Task
 class MetastoreServiceSpec extends quasar.Qspec {
 
   def service(persist: DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]): Service[Request, Response] = {
-    val inter = Fixture.inMemFS_(persist = persist).unsafePerformSync
+    val inter = Fixture.inMemFSWeb(persist = persist).unsafePerformSync
     quasar.api.services.metastore.service[CoreEffIO].toHttpService(inter).orNotFound
   }
 

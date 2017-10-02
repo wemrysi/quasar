@@ -45,7 +45,7 @@ import shapeless.tag.@@
 object MetadataFixture {
 
   def service(mem: InMemState, mnts: Map[APath, MountConfig]): Service[Request, Response] = {
-    val inter = Fixture.inMemFS_(mem, MountingsConfig(mnts)).unsafePerformSync
+    val inter = Fixture.inMemFSWeb(mem, MountingsConfig(mnts)).unsafePerformSync
     metadata.service[CoreEffIO].toHttpService(inter).orNotFound
   }
 

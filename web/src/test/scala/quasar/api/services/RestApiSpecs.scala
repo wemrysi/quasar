@@ -28,7 +28,7 @@ import scalaz.{Failure => _, _}, Scalaz._
 
 class RestApiSpecs extends quasar.Qspec {
 
-  val service = Fixture.inMemFS_() map { runEff =>
+  val service = Fixture.inMemFSWeb() map { runEff =>
     RestApi.finalizeServices(RestApi.toHttpServices(
       runEff,
       RestApi.coreServices[CoreEffIO])).orNotFound

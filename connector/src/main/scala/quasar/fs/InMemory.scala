@@ -264,7 +264,7 @@ object InMemory {
   def runFs(initial: InMemState): Task[FileSystem ~> Task] =
     runStatefully(initial).map(_ compose fileSystem)
 
-  def runFs0(initial: InMemState): Task[BackendEffect ~> Task] =
+  def runBackend(initial: InMemState): Task[BackendEffect ~> Task] =
     runStatefully(initial).map(_ compose fileSystem0)
 
   ////

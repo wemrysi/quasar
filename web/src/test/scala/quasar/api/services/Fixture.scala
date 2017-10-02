@@ -140,7 +140,7 @@ object Fixture {
     for {
       vc        <- viewCache
       mount     <- mountingInter(mounts.toMap)
-      fs0       <- InMemory.runFs0(state)
+      fs0       <- InMemory.runBackend(state)
       fs        <- runFsWithViewsAndModules(fs0, state, mounts, vc, mount)
       metaRef   <- metaRefTask
     } yield {
@@ -163,7 +163,7 @@ object Fixture {
     }
   }
 
-  def inMemFS_(
+  def inMemFSWeb(
     state: InMemState = InMemState.empty,
     mounts: MountingsConfig = MountingsConfig.empty,
     persist: quasar.db.DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]

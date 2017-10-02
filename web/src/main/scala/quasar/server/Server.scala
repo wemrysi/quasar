@@ -97,7 +97,7 @@ object Server {
   }
 
   def webInter[S[_]](eval: S ~> QErrs_TaskM): S ~> ResponseOr =
-    foldMapNT(liftMT[Task, ResponseT] :+: qErrsToResponseOr) compose eval
+    foldMapNT(liftMT[Task, ResponseT] :+: qErrsToResponseT[Task]) compose eval
 
   def serviceStarter(
     defaultPort: Int,
