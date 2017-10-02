@@ -22,7 +22,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.jscore, jscore.JsCore
 import quasar.physical.mongodb.accumulator._
-import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.expression._, transform.wrapArrayInLet
 import quasar.physical.mongodb.optimize.pipeline._
 import quasar.physical.mongodb.workflowtask._
 
@@ -586,15 +586,6 @@ package object workflow {
       }
     }
 
-  private def wrapArrayInLet[T[_[_]]: CorecursiveT, EX[_]: Functor]
-    (expr: EX[T[EX]])
-    (implicit ev: ExprOpCoreF :<: EX, ev32: ExprOp3_2F :<: EX)
-      : EX[T[EX]] = expr match {
-    case a @ $arrayLitF(_) =>
-      $letF(ListMap(DocVar.Name("a") -> a.embed),
-        $varF[EX, T[EX]](DocVar.Name("a")()).embed)
-    case x => x
-  }
 
   private def wrapArrayLit[EX[_]: Functor]
     (accum: AccumOp[Fix[EX]])
