@@ -594,16 +594,7 @@ package object workflow {
 
     def wrap(expr: Fix[EX]): Fix[EX] = (wrapArrayInLet[Fix, EX](expr.unFix)).embed
 
-    accum match {
-      case $addToSet(value) => $addToSet(wrap(value))
-      case $avg(value)      => $avg(wrap(value))
-      case $first(value)    => $first(wrap(value))
-      case $last(value)     => $last(wrap(value))
-      case $max(value)      => $max(wrap(value))
-      case $min(value)      => $min(wrap(value))
-      case $push(value)     => $push(wrap(value))
-      case $sum(value)      => $sum(wrap(value))
-    }
+    accum map wrap
   }
 
   private def wrapArrayLitExprInLet[EX[_]: Functor]
