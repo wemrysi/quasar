@@ -138,7 +138,7 @@ object Dependencies {
     ("com.sksamuel.elastic4s" %% "elastic4s-http"         % "5.4.6")
       .exclude("commons-logging", "commons-logging"),
     "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2",
-    // Please note that elastic4s-jackosn and elastic4s-testkit DON'T contain
+    // Please note that elastic4s-jackson and elastic4s-testkit DON'T contain
     // dependency to io.netty:netty-all in the elastic4s build.sbt. For the
     // unknown reasons however netty-all is a deriviative dependency (@daniel suspects
     // bug in ivy) thus we must exclude netty-all here since it is a conflicting version 4.1.x
