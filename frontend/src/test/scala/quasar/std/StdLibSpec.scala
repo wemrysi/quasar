@@ -1037,6 +1037,94 @@ abstract class StdLibSpec extends Qspec {
         }
       }
 
+      "Round" >> {
+        "any Int" >> prop { (x: BigInt) =>
+          unary(Round(_).embed, Data.Int(x), Data.Int(x))
+        }
+
+        "any Dec" >> prop { (x: BigDecimal) =>
+          unary(Round(_).embed, Data.Dec(x), Data.Dec(x.setScale(0, RoundingMode.HALF_EVEN)))
+        }
+      }
+
+      "CeilScale" >> {
+        "any Int 0" >> prop { (x: BigInt) =>
+          binary(CeilScale(_, _).embed, Data.Int(x), Data.Int(0), Data.Int(x))
+        }
+
+        "any Dec 0" >> prop { (x: BigDecimal) =>
+          binary(CeilScale(_, _).embed, Data.Dec(x), Data.Int(0), Data.Dec(x.setScale(0, RoundingMode.CEILING)))
+        }
+
+        "any Int 1" >> prop { (x: BigInt) =>
+          binary(CeilScale(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(x))
+        }
+
+        "any Dec 1" >> prop { (x: BigDecimal) =>
+          binary(CeilScale(_, _).embed, Data.Dec(x), Data.Int(1), Data.Dec(x.setScale(1, RoundingMode.CEILING)))
+        }
+
+        "any Int 2" >> prop { (x: BigInt) =>
+          binary(CeilScale(_, _).embed, Data.Int(x), Data.Int(2), Data.Int(x))
+        }
+
+        "any Dec 2" >> prop { (x: BigDecimal) =>
+          binary(CeilScale(_, _).embed, Data.Dec(x), Data.Int(2), Data.Dec(x.setScale(2, RoundingMode.CEILING)))
+        }
+      }
+
+      "FloorScale" >> {
+        "any Int 0" >> prop { (x: BigInt) =>
+          binary(FloorScale(_, _).embed, Data.Int(x), Data.Int(0), Data.Int(x))
+        }
+
+        "any Dec 0" >> prop { (x: BigDecimal) =>
+          binary(FloorScale(_, _).embed, Data.Dec(x), Data.Int(0), Data.Dec(x.setScale(0, RoundingMode.FLOOR)))
+        }
+
+        "any Int 1" >> prop { (x: BigInt) =>
+          binary(FloorScale(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(x))
+        }
+
+        "any Dec 1" >> prop { (x: BigDecimal) =>
+          binary(FloorScale(_, _).embed, Data.Dec(x), Data.Int(1), Data.Dec(x.setScale(1, RoundingMode.FLOOR)))
+        }
+
+        "any Int 2" >> prop { (x: BigInt) =>
+          binary(FloorScale(_, _).embed, Data.Int(x), Data.Int(2), Data.Int(x))
+        }
+
+        "any Dec 2" >> prop { (x: BigDecimal) =>
+          binary(FloorScale(_, _).embed, Data.Dec(x), Data.Int(2), Data.Dec(x.setScale(2, RoundingMode.FLOOR)))
+        }
+      }
+
+      "RoundScale" >> {
+        "any Int 0" >> prop { (x: BigInt) =>
+          binary(RoundScale(_, _).embed, Data.Int(x), Data.Int(0), Data.Int(x))
+        }
+
+        "any Dec 0" >> prop { (x: BigDecimal) =>
+          binary(RoundScale(_, _).embed, Data.Dec(x), Data.Int(0), Data.Dec(x.setScale(0, RoundingMode.HALF_EVEN)))
+        }
+
+        "any Int 1" >> prop { (x: BigInt) =>
+          binary(RoundScale(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(x))
+        }
+
+        "any Dec 1" >> prop { (x: BigDecimal) =>
+          binary(RoundScale(_, _).embed, Data.Dec(x), Data.Int(1), Data.Dec(x.setScale(1, RoundingMode.HALF_EVEN)))
+        }
+
+        "any Int 2" >> prop { (x: BigInt) =>
+          binary(RoundScale(_, _).embed, Data.Int(x), Data.Int(2), Data.Int(x))
+        }
+
+        "any Dec 2" >> prop { (x: BigDecimal) =>
+          binary(RoundScale(_, _).embed, Data.Dec(x), Data.Int(2), Data.Dec(x.setScale(2, RoundingMode.HALF_EVEN)))
+        }
+      }
+
       "Modulo" >> {
         "any int by 1" >> prop { (x: Int) =>
           binary(Modulo(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(0))
