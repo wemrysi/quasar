@@ -48,8 +48,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
     expr.transCata[Fix[QST]](SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet))
 
   def compactLeftShiftExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[Fix[QS]](
-      liftFG(injectRepeatedly(rewrite.compactLeftShift[QS, QS](idPrism).apply(_: QScriptCore[Fix[QS]]))))
+    expr.transCata[Fix[QS]](liftFG(injectRepeatedly(
+      rewrite.compactLeftShift[QS](PrismNT.inject).apply(_: QScriptCore[Fix[QS]]))))
 
   def includeToExcludeExpr(expr: Fix[QST]): Fix[QST] =
     expr.transCata[Fix[QST]](
@@ -72,9 +72,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
   "rewriter" should {
     "elide a no-op map in a constant boolean" in {
       val query = lpf.constant(Data.Bool(true))
-      val run: QSI[Fix[QSI]] => QSI[Fix[QSI]] = {
-        fa => QCI.prj(fa).fold(fa)(rewrite.elideNopQC(idPrism[QSI].reverseGet))
-      }
+      val run: QSI[Fix[QSI]] => QSI[Fix[QSI]] =
+        repeatedly((fa: QSI[Fix[QSI]]) => QCI.prj(fa) >>= rewrite.elideNopQC[QSI])
 
       QueryFile.convertAndNormalize[Fix, QSI](query)(run).toOption must
         equal(chain(
