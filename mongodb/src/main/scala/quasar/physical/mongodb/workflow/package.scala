@@ -601,7 +601,7 @@ package object workflow {
     (grouped: Grouped[EX])
     (implicit ev: ExprOpCoreF :<: EX, ev32: ExprOp3_2F :<: EX, ev2: ExprOpOps.Uni[ExprOp])
       : Grouped[EX] =
-    Grouped(grouped.value.map(t => t._1 -> wrapArrayLit[EX](t._2)))
+    Grouped(ListMap(grouped.value.mapValues(wrapArrayLit[EX]).toSeq: _*))
 
   // NB: no need for a typeclass if implementing this way, but it will be needed
   // as soon as we need to match on anything here that isn't in core.
