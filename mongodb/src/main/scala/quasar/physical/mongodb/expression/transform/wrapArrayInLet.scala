@@ -14,16 +14,18 @@
  * limitations under the License.
  */
 
-package quasar.physical.mongodb.expression
+package quasar.physical.mongodb.expression.transform
 
 import slamdata.Predef._
+
+import quasar.physical.mongodb.expression._
 
 import matryoshka._
 import matryoshka.implicits._
 import scalaz._
 
-object transform {
-  def wrapArrayInLet[T[_[_]]: CorecursiveT, EX[_]: Functor]
+object wrapArrayInLet {
+  def apply[T[_[_]]: CorecursiveT, EX[_]: Functor]
     (expr: EX[T[EX]])
     (implicit ev: ExprOpCoreF :<: EX, ev32: ExprOp3_2F :<: EX)
       : EX[T[EX]] = expr match {
