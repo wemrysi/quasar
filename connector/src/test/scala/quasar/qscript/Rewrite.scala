@@ -42,7 +42,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
     expr.transCata[Fix[QS]](orOriginal(Normalizable[QS].normalizeF(_: QS[Fix[QS]])))
 
   def normalizeExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[Fix[QS]](rewrite.normalize[QS])
+    expr.transCata[Fix[QS]](rewrite.normalizeTJ[QS])
 
   def simplifyJoinExpr(expr: Fix[QS]): Fix[QST] =
     expr.transCata[Fix[QST]](SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet))
@@ -148,7 +148,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
                 ProjectFieldR(HoleF, StrLit("l")),
                 StrLit("lon")))))
 
-      Coalesce[Fix, QST, QST].coalesceTJ(idPrism[QST].get).apply(exp).map(rewrite.normalize[QST]) must
+      Coalesce[Fix, QST, QST].coalesceTJ(idPrism[QST].get).apply(exp).map(rewrite.normalizeTJ[QST]) must
       equal(
         TJT.inj(ThetaJoin(
           QCT.inj(Unreferenced[Fix, Fix[QST]]()).embed,

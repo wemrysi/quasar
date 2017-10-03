@@ -80,7 +80,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
               N: Normalizable[G])
       : T[F] => T[G] = {
     _.codyna(
-      normalize[G] >>>
+      normalizeTJ[G] >>>
       liftFG(injectRepeatedly(C.coalesceSRNormalize[G, ADir](idPrism))) >>>
       liftFG(injectRepeatedly(C.coalesceSRNormalize[G, AFile](idPrism))) >>>
       (_.embed),
@@ -98,7 +98,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     N: Normalizable[G]
   ): T[F] => T[G] =
     _.codyna(
-      normalize[G] >>>
+      normalizeTJ[G] >>>
       liftFG(injectRepeatedly(C.coalesceSRNormalize[G, ADir](idPrism))) >>>
       (_.embed),
       ((_: T[F]).project) >>> (S.shiftReadDir(idPrism.reverseGet)(_)))
@@ -542,7 +542,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     normalizeWithBijection[F, G, A](bij)(prism, rebase, normTJ compose (prism apply _))
   }
 
-  def normalize[F[_]: Traverse: Normalizable](
+  def normalizeTJ[F[_]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<: F,
              TJ: ThetaJoin :<: F,
@@ -550,7 +550,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       F[T[F]] => F[T[F]] =
     normalizeTJBijection[F, F, T[F]](bijectionId)(idPrism, rebaseT)
 
-  def normalizeCoEnv[F[_]: Traverse: Normalizable](
+  def normalizeTJCoEnv[F[_]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<: F,
              TJ: ThetaJoin :<: F,

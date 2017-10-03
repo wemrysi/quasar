@@ -95,7 +95,7 @@ object QueryFile {
     val rewrite = new Rewrite[T]
 
     val normUntilFixpoint: T[QS] => Option[T[QS]] = tqs => {
-      val next = tqs.transAna[T[QS]](rewrite.normalize)
+      val next = tqs.transAna[T[QS]](rewrite.normalizeTJ)
       (next =/= tqs) option next
     }
 
@@ -137,7 +137,7 @@ object QueryFile {
     val rewrite = new Rewrite[T]
 
     val qs =
-      convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize)
+      convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalizeTJ)
         .leftMap(FileSystemError.planningFailed(lp.convertTo[Fix[LogicalPlan]], _)) ∘
         simplifyAndNormalize[T, QScriptInternal[T, ?], QS]
 
@@ -179,7 +179,7 @@ object QueryFile {
             Injectable.coproduct(Injectable.inject[Const[Read[ADir], ?], QScriptTotal[T, ?]],
               Injectable.inject[Const[Read[AFile], ?], QScriptTotal[T, ?]]))))
 
-    convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalize)
+    convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalizeTJ)
       .fold(
         perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix[LogicalPlan]], perr)),
         _.point[M])
