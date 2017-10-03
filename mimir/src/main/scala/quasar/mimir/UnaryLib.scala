@@ -88,11 +88,24 @@ trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         def f1: F1 = CF1P("builtin::unary::trunc") {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, { d =>
             val result = math.round(d)
-            // the JVM uses half-over rounding semantics by default
+            // the JVM uses half-even rounding semantics by default
             if (result > d) math.floor(d) else result
           })
           case c: LongColumn   => new LongFrom.L(c, n => true, x => x)
           case c: NumColumn    => new NumFrom.N(c, n => true, _.setScale(0, RoundingMode.DOWN))
+        }
+
+        def spec[A <: SourceType]: TransSpec[A] => TransSpec[A] = { transSpec =>
+          trans.Map1(transSpec, f1)
+        }
+      }
+
+      object Round extends Op1F1(UnaryNamespace, "round") {
+        val tpe = UnaryOperationType(JNumberT, JNumberT)
+        def f1: F1 = CF1P("builtin::unary::round") {
+          case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, math.round(_))
+          case c: LongColumn   => new LongFrom.L(c, n => true, x => x)
+          case c: NumColumn    => new NumFrom.N(c, n => true, _.setScale(0, RoundingMode.HALF_EVEN))
         }
 
         def spec[A <: SourceType]: TransSpec[A] => TransSpec[A] = { transSpec =>
