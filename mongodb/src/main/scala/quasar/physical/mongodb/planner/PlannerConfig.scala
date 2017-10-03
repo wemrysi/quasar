@@ -18,16 +18,10 @@ package quasar.physical.mongodb.planner
 
 import quasar.qscript.MapFunc
 import quasar.physical.mongodb.BsonVersion
-import quasar.physical.mongodb.workflow.{Coalesce, Crush, Crystallize}
 
-import matryoshka._
 import scalaz._
 
-final case class PlannerConfig[
-  T[_[_]]: BirecursiveT: ShowT,
-  EX[_]: Traverse,
-  WF[_]: Functor: Coalesce: Crush: Crystallize
-  ](
+final case class PlannerConfig[T[_[_]], EX[_], WF[_]](
   joinHandler: JoinHandler[WF, WBM],
   funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?],
   staticHandler: StaticHandler[T, EX],
