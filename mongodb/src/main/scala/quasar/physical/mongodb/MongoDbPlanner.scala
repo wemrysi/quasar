@@ -1408,21 +1408,28 @@ object MongoDbPlanner {
     implicit branches: Branches.Aux[T, fs.MongoQScript[T, ?]])
       : M[T[fs.MongoQScript[T, ?]]] = {
 
+    type MQS[A] = fs.MongoQScript[T, A]
+
     val O = new Optimize[T]
+    val R = new Rewrite[T]
 
     for {
       rewrite <- applyTrans(qs)(mapBeforeSort[T]).point[M]
       optimized <- rewrite
-        .transCata[T[fs.MongoQScript[T, ?]]](
-          liftFF[QScriptCore[T, ?], fs.MongoQScript[T, ?], T[fs.MongoQScript[T, ?]]](
-            repeatedly(O.subsetBeforeMap[fs.MongoQScript[T, ?], fs.MongoQScript[T, ?]](reflNT[fs.MongoQScript[T, ?]]))))
-        .point[M]
-      mongoQs <- optimized.transCataM(liftFGM(assumeReadType[M, T, fs.MongoQScript[T, ?]](Type.AnyObject)))
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript (Mongo-specific)", mongoQs))
+        .transCata[T[MQS]](liftFF[QScriptCore[T, ?], MQS, T[MQS]](
+          repeatedly(O.subsetBeforeMap[MQS, MQS](reflNT[MQS])))).point[M]
+
+      mongoQsOpt <- optimized.transCataM(liftFGM(assumeReadType[M, T, MQS](Type.AnyObject)))
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Assume Read Type)", mongoQsOpt))
+
       // TODO: Once field deletion is implemented for 3.4, this could be selectively applied, if necessary.
-      prefPrj = PreferProjection.preferProjection[fs.MongoQScript[T, ?]](mongoQs)
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript (Prefer Projection)", prefPrj))
-    } yield prefPrj
+      prefPrj = PreferProjection.preferProjection[MQS](mongoQsOpt)
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Prefer Projection)", prefPrj))
+
+      // TODO: apply all of Rewrite.normalize, not only elideNopQC
+      mongoQs <- prefPrj.transCata[T[MQS]](liftFG(R.elideNopQC(reflNT[MQS]))).point[M]
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Elided Nops)", mongoQs))
+    } yield mongoQs
   }
 
   def plan0
