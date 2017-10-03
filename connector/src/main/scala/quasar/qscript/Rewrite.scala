@@ -525,6 +525,38 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     fa => applyNormalizations[F, G](prism, rebase, normalizeJoins)
       .apply(fa ∘ bij.toK.run) ∘ bij.fromK.run
 
+  private def normalizeEJBijection[F[_]: Traverse: Normalizable, G[_]: Traverse, A](
+    bij: Bijection[A, T[G]])(
+    prism: PrismNT[G, F],
+    rebase: FreeQS => T[G] => Option[T[G]])(
+    implicit C:  Coalesce.Aux[T, F, F],
+             QC: QScriptCore :<: F,
+             EJ: EquiJoin :<: F,
+             FI: Injectable.Aux[F, QScriptTotal]):
+      F[A] => G[A] = {
+
+    val normEJ =
+      liftFFTrans(prism)(C.coalesceEJ[G](prism.get))
+
+    normalizeWithBijection[F, G, A](bij)(prism, rebase, normEJ compose (prism apply _))
+  }
+
+  def normalizeEJ[F[_]: Traverse: Normalizable](
+    implicit C:  Coalesce.Aux[T, F, F],
+             QC: QScriptCore :<: F,
+             EJ: EquiJoin :<: F,
+             FI: Injectable.Aux[F, QScriptTotal]):
+      F[T[F]] => F[T[F]] =
+    normalizeEJBijection[F, F, T[F]](bijectionId)(idPrism, rebaseT)
+
+  def normalizeEJCoEnv[F[_]: Traverse: Normalizable](
+    implicit C:  Coalesce.Aux[T, F, F],
+             QC: QScriptCore :<: F,
+             EJ: EquiJoin :<: F,
+             FI: Injectable.Aux[F, QScriptTotal]):
+      F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
+    normalizeEJBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism, rebaseTCo)
+
   private def normalizeTJBijection[F[_]: Traverse: Normalizable, G[_]: Traverse, A](
     bij: Bijection[A, T[G]])(
     prism: PrismNT[G, F],
