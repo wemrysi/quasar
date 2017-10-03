@@ -14,24 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.fs.mount
+package quasar.physical.mongodb.expression.transform
 
 import slamdata.Predef._
 
-import quasar.contrib.pathy._
-import quasar.effect.KeyValueStore
-import quasar.fs.mount.cache.{VCache, ViewCache}
-import quasar.fp._
+import quasar.physical.mongodb.expression._
 
-import monocle.Lens
-import scalaz._, Id._
+import matryoshka._
+import matryoshka.implicits._
+import scalaz._
 
-object Fixture {
-
-  def constant[F[_]: Applicative, K, V](m: Map[K, V]): KeyValueStore[K, V, ?] ~> F =
-    KeyValueStore.impl.toState[State[Map[K, V], ?]](Lens.id[Map[K, V]]) andThen
-    evalNT[Id, Map[K, V]](m) andThen pointNT[F]
-
-  def runConstantVCache[F[_]: Applicative](vcache: Map[AFile, ViewCache]): VCache ~> F =
-    constant[F, AFile, ViewCache](vcache)
+object wrapArrayInLet {
+  def apply[T[_[_]]: CorecursiveT, EX[_]: Functor]
+    (expr: EX[T[EX]])
+    (implicit ev: ExprOpCoreF :<: EX, ev32: ExprOp3_2F :<: EX)
+      : EX[T[EX]] = expr match {
+    case a @ $arrayLitF(_) =>
+      $letF(ListMap(DocVar.Name("a") -> a.embed),
+        $varF[EX, T[EX]](DocVar.Name("a")()).embed)
+    case x => x
+  }
 }

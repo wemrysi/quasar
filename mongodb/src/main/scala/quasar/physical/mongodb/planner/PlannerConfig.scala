@@ -14,24 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.fs.mount
+package quasar.physical.mongodb.planner
 
-import slamdata.Predef._
+import quasar.qscript.MapFunc
+import quasar.physical.mongodb.BsonVersion
 
-import quasar.contrib.pathy._
-import quasar.effect.KeyValueStore
-import quasar.fs.mount.cache.{VCache, ViewCache}
-import quasar.fp._
+import scalaz._
 
-import monocle.Lens
-import scalaz._, Id._
-
-object Fixture {
-
-  def constant[F[_]: Applicative, K, V](m: Map[K, V]): KeyValueStore[K, V, ?] ~> F =
-    KeyValueStore.impl.toState[State[Map[K, V], ?]](Lens.id[Map[K, V]]) andThen
-    evalNT[Id, Map[K, V]](m) andThen pointNT[F]
-
-  def runConstantVCache[F[_]: Applicative](vcache: Map[AFile, ViewCache]): VCache ~> F =
-    constant[F, AFile, ViewCache](vcache)
-}
+final case class PlannerConfig[T[_[_]], EX[_], WF[_]](
+  joinHandler: JoinHandler[WF, WBM],
+  funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?],
+  staticHandler: StaticHandler[T, EX],
+  bsonVersion: BsonVersion)
