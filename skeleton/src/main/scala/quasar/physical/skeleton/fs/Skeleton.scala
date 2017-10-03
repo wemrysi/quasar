@@ -33,7 +33,7 @@ import scalaz._
 import scalaz.concurrent.Task
 import scala.Predef.implicitly
 
-object Skeleton extends BackendModule {
+object Skeleton extends BackendModule with DefaultAnalyzeModule {
 
   // default QS subset; change if you're cool/weird/unique!
   type QS[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
@@ -50,6 +50,7 @@ object Skeleton extends BackendModule {
 
   def CardinalityQSM: Cardinality[QSM[Fix, ?]] = Cardinality[QSM[Fix, ?]]
   def CostQSM: Cost[QSM[Fix, ?]] = Cost[QSM[Fix, ?]]
+  def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
   def TraverseQSM[T[_[_]]] = Traverse[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]

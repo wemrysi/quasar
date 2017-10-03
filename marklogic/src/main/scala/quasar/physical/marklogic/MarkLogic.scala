@@ -56,6 +56,7 @@ import scalaz.stream.Process
 
 sealed class MarkLogic protected (readChunkSize: Positive, writeChunkSize: Positive)
     extends BackendModule
+    with DefaultAnalyzeModule
     with ManagedQueryFile[XccDataStream]
     with ManagedWriteFile[AFile]
     with ManagedReadFile[XccDataStream]
@@ -83,6 +84,7 @@ sealed class MarkLogic protected (readChunkSize: Positive, writeChunkSize: Posit
     Cost[QSM[Fix, ?]]
   }
   def TraverseQSM[T[_[_]]] = Traverse[QSM[T, ?]]
+  def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]
   def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]

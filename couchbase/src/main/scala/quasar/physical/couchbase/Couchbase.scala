@@ -19,7 +19,7 @@ package quasar.physical.couchbase
 import slamdata.Predef._
 import quasar._
 import quasar.common.{Int => _, Map => _, _}, PhaseResult.detail
-import quasar.connector.BackendModule
+import quasar.connector.{DefaultAnalyzeModule, BackendModule}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
@@ -41,7 +41,7 @@ import matryoshka.implicits._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-trait Couchbase extends BackendModule {
+trait Couchbase extends BackendModule with DefaultAnalyzeModule {
   type Eff[A] = (
     Task                                       :\:
     MonotonicSeq                               :\:
@@ -70,6 +70,7 @@ trait Couchbase extends BackendModule {
   def CardinalityQSM: Cardinality[QSM[Fix, ?]] = Cardinality[QSM[Fix, ?]]
   def CostQSM: Cost[QSM[Fix, ?]] = Cost[QSM[Fix, ?]]
   def TraverseQSM[T[_[_]]] = Traverse[QSM[T, ?]]
+  def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
     implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]

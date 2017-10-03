@@ -43,7 +43,8 @@ import scala.Predef.implicitly
 object MongoDb
     extends BackendModule
     with ManagedReadFile[BsonCursor]
-    with ManagedWriteFile[Collection] {
+    with ManagedWriteFile[Collection]
+    with DefaultAnalyzeModule {
 
   type QS[T[_[_]]] = fs.MongoQScriptCP[T]
 
@@ -60,6 +61,7 @@ object MongoDb
   def CardinalityQSM: Cardinality[QSM[Fix, ?]] = Cardinality[QSM[Fix, ?]]
   def CostQSM: Cost[QSM[Fix, ?]] = Cost[QSM[Fix, ?]]
   def TraverseQSM[T[_[_]]] = Traverse[QSM[T, ?]]
+  def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]
   def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]

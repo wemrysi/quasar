@@ -66,7 +66,7 @@ import quasar.yggdrasil.TableModule.{DesiredSortOrder, SortAscending}
 
 import scalaz.Leibniz.===
 
-object Mimir extends BackendModule with Logging {
+object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
   import FileSystemError._
   import PathError._
   import Precog.startTask
@@ -167,6 +167,7 @@ object Mimir extends BackendModule with Logging {
 
   def CardinalityQSM: Cardinality[QSM[Fix, ?]] = Cardinality[QSM[Fix, ?]]
   def CostQSM: Cost[QSM[Fix, ?]] = Cost[QSM[Fix, ?]]
+  def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
   def TraverseQSM[T[_[_]]] = Traverse[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]

@@ -17,7 +17,7 @@
 package quasar.physical.rdbms
 
 import slamdata.Predef._
-import quasar.connector.BackendModule
+import quasar.connector.{DefaultAnalyzeModule, BackendModule}
 import quasar.contrib.pathy.{AFile, APath}
 import quasar.contrib.scalaz.MonadReader_
 import quasar.effect.uuid.GenUUID
@@ -46,7 +46,7 @@ import scalaz._
 import Scalaz._
 import scalaz.concurrent.Task
 
-trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with RdbmsManageFile with RdbmsQueryFile with Interpreter {
+trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with RdbmsManageFile with RdbmsQueryFile with Interpreter with DefaultAnalyzeModule {
 
   type Eff[A] = (
       ConnectionIO :\:
@@ -71,6 +71,7 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
 
   def CardinalityQSM: Cardinality[QSM[Fix, ?]] = Cardinality[QSM[Fix, ?]]
   def CostQSM: Cost[QSM[Fix, ?]] = Cost[QSM[Fix, ?]]
+  def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
   def TraverseQSM[T[_[_]]] = Traverse[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
     implicitly[Delay[RenderTree, QSM[T, ?]]]
