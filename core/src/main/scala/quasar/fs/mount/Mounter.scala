@@ -142,9 +142,9 @@ object Mounter {
             (maybeDir(src) |@| maybeDir(dst))((srcDir, dstDir) =>
               store.descendants(srcDir).flatMap(_.toList.traverse_(move(srcDir, dstDir, _)))).sequence_
 
-          failIfExisting(dst) *>
-            handleRemount(src, dst) <*
-            moveNested.liftM[MntErrT]
+          // It's important to move the descendants first or else we will move the mount itself again
+          // if it's being moved to a path that is below it's current path. i.e. moving /foo/ to /foo/bar/
+          failIfExisting(dst) >> moveNested.liftM[MntErrT] >> handleRemount(src, dst)
         }.run
     }
   }
