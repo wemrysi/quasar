@@ -1230,14 +1230,14 @@ class PlannerSpec extends
           $project(
             reshape("value" -> $field("bar")),
             ExcludeId)))
-    }.pendingWithActual("#2771", testFile("plan simple sort with field in projection"))
+    }.pendingWithActual(notOnPar, testFile("plan simple sort with field in projection"))
 
     "plan simple sort with wildcard" in {
       plan(sqlE"select * from zips order by pop") must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "zips")),
           $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Ascending))))
-    }.pendingWithActual("#2771", testFile("plan simple sort with wildcard"))
+    }.pendingWithActual(notOnPar, testFile("plan simple sort with wildcard"))
 
     "plan sort with expression in key" in {
       plan(sqlE"select baz from foo order by bar/10") must
@@ -1377,7 +1377,7 @@ class PlannerSpec extends
           $project(
             reshape("name" -> $field("name")),
             ExcludeId)))
-    }.pendingWithActual("#2771", testFile("plan simple sort with field not in projections"))
+    }.pendingWithActual(notOnPar, testFile("plan simple sort with field not in projections"))
 
     "plan sort with expression and alias" in {
       plan(sqlE"select pop/1000 as popInK from zips order by popInK") must
@@ -2300,7 +2300,7 @@ class PlannerSpec extends
             $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Descending)),
             $limit(5))
         }
-    }.pendingWithActual("#2772", testFile("plan sort and limit"))
+    }.pendingWithActual(notOnPar, testFile("plan sort and limit"))
 
     "plan simple single field selection and limit" in {
       plan(sqlE"SELECT city FROM zips LIMIT 5") must
