@@ -18,7 +18,7 @@ package quasar.physical.sparkcore.fs
 
 import slamdata.Predef._
 import quasar._
-import quasar.connector.BackendModule
+import quasar.connector.{DefaultAnalyzeModule, BackendModule}
 import quasar.contrib.scalaz._
 import quasar.contrib.pathy._
 import quasar.common._
@@ -27,6 +27,7 @@ import quasar.fs._, FileSystemError._
 import quasar.fs.mount._, BackendDef._
 import quasar.effect._
 import quasar.qscript.{Read => _, _}
+import quasar.qscript.analysis._
 
 import java.lang.Thread
 import scala.Predef.implicitly
@@ -35,13 +36,14 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
 import pathy.Path._
 import matryoshka._
+import matryoshka.data._
 import matryoshka.implicits._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 final case class SparkCursor(rdd: Option[RDD[(Data, Long)]], pointer: Int)
 
-trait SparkCore extends BackendModule {
+trait SparkCore extends BackendModule with DefaultAnalyzeModule {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
@@ -89,7 +91,13 @@ trait SparkCore extends BackendModule {
   def qfKvsOps: KeyValueStore.Ops[QueryFile.ResultHandle, SparkCursor, Eff] =
     KeyValueStore.Ops[QueryFile.ResultHandle, SparkCursor, Eff]
 
+  import Cost._
+  import Cardinality._
+
+  def CardinalityQSM: Cardinality[QSM[Fix, ?]] = Cardinality[QSM[Fix, ?]]
+  def CostQSM: Cost[QSM[Fix, ?]] = Cost[QSM[Fix, ?]]
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
+  def TraverseQSM[T[_[_]]] = Traverse[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] =
     implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]

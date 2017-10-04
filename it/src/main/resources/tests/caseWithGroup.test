@@ -9,10 +9,7 @@
         "mongodb_3_0":       "ignoreResultOrder",
         "mongodb_3_2":       "ignoreFieldOrder",
         "mongodb_3_4":       "ignoreFieldOrder",
-        "mongodb_read_only": "ignoreResultOrder",
-        "spark_hdfs":        "pending",
-        "spark_local":       "pending",
-        "spark_cassandra":   "pending"	
+        "mongodb_read_only": "ignoreResultOrder"
     },
 
     "data": "zips.data",
