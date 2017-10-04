@@ -84,7 +84,7 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def generateHdfsFS(sfsConf: HdfsConfig): Task[HdfsFileSystem] =
     for {
-      _ <- Task.delay(java.lang.Thread.currentThread.setContextClassLoader(null))
+      _ <- Task.delay(java.lang.Thread.currentThread.setContextClassLoader(getClass.getClassLoader))
       fs <- Task.delay {
         val conf = new Configuration()
         conf.setBoolean("fs.hdfs.impl.disable.cache", true)
