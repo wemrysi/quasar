@@ -31,9 +31,11 @@ import quasar.fs.mount._
 import quasar.physical.mongodb.fs.bsoncursor._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
+import quasar.qscript.analysis._
 
 import java.time.Instant
 import matryoshka._
+import matryoshka.data._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scala.Predef.implicitly
@@ -41,7 +43,8 @@ import scala.Predef.implicitly
 object MongoDb
     extends BackendModule
     with ManagedReadFile[BsonCursor]
-    with ManagedWriteFile[Collection] {
+    with ManagedWriteFile[Collection]
+    with DefaultAnalyzeModule {
 
   type QS[T[_[_]]] = fs.MongoQScriptCP[T]
 
@@ -52,6 +55,12 @@ object MongoDb
 
   type M[A] = fs.MongoM[A]
 
+  import Cost._
+  import Cardinality._
+
+  def CardinalityQSM: Cardinality[QSM[Fix, ?]] = Cardinality[QSM[Fix, ?]]
+  def CostQSM: Cost[QSM[Fix, ?]] = Cost[QSM[Fix, ?]]
+  def TraverseQSM[T[_[_]]] = Traverse[QSM[T, ?]]
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]

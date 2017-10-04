@@ -18,6 +18,7 @@ package quasar
 package connector
 
 import slamdata.Predef._
+import quasar.Data
 import quasar.common._
 import quasar.contrib.pathy._
 import quasar.contrib.matryoshka._
@@ -30,7 +31,8 @@ import quasar.fs._
 import quasar.fs.mount._
 import quasar.qscript._
 
-import matryoshka._
+import matryoshka.{Hole => _, _}
+import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -76,8 +78,15 @@ trait BackendModule {
         (runM compose runCfg compose runFs, close)
     }
 
-  private final def analyzeInterpreter: Analyze ~> Configured =
-    Empty.analyze[Configured]
+
+  private final def analyzeInterpreter: Analyze ~> Configured = {
+    val lc: DiscoverPath.ListContents[Backend] =
+      QueryFileModule.listContents(_)
+
+    λ[Analyze ~> Configured]({
+      case Analyze.QueryCost(lp) => 10.right[FileSystemError].point[Configured]
+    })
+  }
 
   private final def fsInterpreter: FileSystem ~> Configured = {
     val qfInter: QueryFile ~> Configured = λ[QueryFile ~> Configured] {
@@ -234,6 +243,13 @@ trait BackendModule {
   }
 
   def ManageFileModule: ManageFileModule
+
+  trait AnalyzeModule {
+
+    def queryCost(qs: Fix[QSM[Fix, ?]]): Backend[Int]
+  }
+
+  def AnalyzeModule: AnalyzeModule
 }
 
 object BackendModule {
