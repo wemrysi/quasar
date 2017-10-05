@@ -88,7 +88,7 @@ trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         def f1: F1 = CF1P("builtin::unary::trunc") {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, { d =>
             val result = math.round(d)
-            // the JVM uses half-even rounding semantics by default
+            // the JVM uses half-up rounding semantics by default
             if (result > d) math.floor(d) else result
           })
           case c: LongColumn   => new LongFrom.L(c, n => true, x => x)
@@ -103,7 +103,19 @@ trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       object Round extends Op1F1(UnaryNamespace, "round") {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
         def f1: F1 = CF1P("builtin::unary::round") {
-          case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, math.round(_))
+          // encoding of half-even rounding
+          case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, { d =>
+            if (math.abs(d % 1) == 0.5) {
+              val candidate = math.ceil(d)
+
+              if (candidate % 2 == 0)
+                candidate
+              else
+                math.floor(d)
+            } else {
+              math.round(d)
+            }
+          })
           case c: LongColumn   => new LongFrom.L(c, n => true, x => x)
           case c: NumColumn    => new NumFrom.N(c, n => true, _.setScale(0, RoundingMode.HALF_EVEN))
         }
