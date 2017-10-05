@@ -25,7 +25,7 @@ import quasar.fp._, free._
 import quasar.fs._, InMemory._
 import quasar.fs.mount._, Mounting.PathTypeMismatch
 import quasar.fs.mount.module.Module
-import quasar.fs.mount.cache.{VCache, ViewCache}
+import quasar.fs.mount.cache.{VCache, ViewCache}, VCache.VCacheKVS
 import quasar.metastore.H2MetaStoreFixture
 import quasar.metastore.MetaStoreFixture.createNewTestMetaStoreConfig
 import quasar.sql._
@@ -54,7 +54,7 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
     case Timing.Nanos     => Task.now(0)
   }
 
-  def vcacheInterp(fs: FileSystem ~> Task): VCache ~> Task =
+  def vcacheInterp(fs: FileSystem ~> Task): VCacheKVS ~> Task =
     foldMapNT(
       (fs compose injectNT[ManageFile, FileSystem]) :+:
       Failure.toRuntimeError[Task, FileSystemError] :+:
@@ -95,7 +95,7 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
 
       def eval: Task[Free[Eff, ?] ~> Task] = eff(i) ∘ (foldMapNT(_))
 
-      val vcache = VCache.Ops[Eff]
+      val vcache = VCacheKVS.Ops[Eff]
 
       val r: (Option[ViewCache], FileSystemError \/ Vector[Data]) =
         (eval >>= { e =>

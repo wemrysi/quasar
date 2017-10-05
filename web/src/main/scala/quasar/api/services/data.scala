@@ -24,7 +24,7 @@ import quasar.contrib.scalaz.disjunction._
 import quasar.effect.Timing
 import quasar.fp._, numeric._
 import quasar.fs._
-import quasar.fs.mount.cache.VCache
+import quasar.fs.mount.cache.VCache, VCache.VCacheKVS
 
 import java.nio.charset.StandardCharsets
 import java.time.Duration
@@ -55,7 +55,7 @@ object data {
     Q: QueryFile.Ops[S],
     S0: Task :<: S,
     S1: FileSystemFailure :<: S,
-    S2: VCache :<: S,
+    S2: VCacheKVS :<: S,
     S3: Timing :<: S
   ): QHttpService[S] = QHttpService {
 
@@ -119,7 +119,7 @@ object data {
     R: ReadFile.Ops[S],
     Q: QueryFile.Ops[S],
     T: Timing.Ops[S],
-    VC: VCache.Ops[S],
+    VC: VCacheKVS.Ops[S],
     S0: FileSystemFailure :<: S,
     S1: Task :<: S
   ): Free[S, QResponse[S]] =

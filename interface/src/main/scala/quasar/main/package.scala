@@ -29,7 +29,7 @@ import quasar.fp._, ski._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
-import quasar.fs.mount.cache.VCache
+import quasar.fs.mount.cache.VCache, VCache.VCacheKVS
 import quasar.fs.mount.hierarchical._
 import quasar.fs.mount.module.Module
 import quasar.physical._
@@ -211,7 +211,7 @@ package object main extends Logging {
     (
       MetaStoreLocation :\: Module :\: Mounting :\: Analyze :\:
       QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :\:
-      VCache :\: Timing :/: CoreErrs
+      VCacheKVS :\: Timing :/: CoreErrs
     )#M[A]
 
   object CoreEff {
@@ -220,7 +220,7 @@ package object main extends Logging {
      metaRef: TaskRef[MetaStore],
      persist: quasar.db.DbConnectionConfig => MainTask[Unit]
     ): Task[CoreEff ~> QErrs_TaskM] = {
-      val vcacheInterp: VCache ~> QErrs_TaskM =
+      val vcacheInterp: VCacheKVS ~> QErrs_TaskM =
         foldMapNT(
           (fsThing.core compose Inject[ManageFile, BackendEffect]) :+:
             injectFT[FileSystemFailure, QErrs_Task]                     :+:
@@ -251,11 +251,11 @@ package object main extends Logging {
 
     def runFsWithViewsAndModules(
       fs: BackendEffect ~> QErrs_TaskM,
-      vc: VCache ~> QErrs_TaskM,
+      vc: VCacheKVS ~> QErrs_TaskM,
       mount: Mounting ~> QErrs_TaskM
     ): Task[BackendEffect ~> QErrs_TaskM] = {
 
-      type V[A] = (VCache :\: Mounting :/: QErrs_Task)#M[A]
+      type V[A] = (VCacheKVS :\: Mounting :/: QErrs_Task)#M[A]
 
       overlayModulesViews[V, QErrs_Task](fs).map { toV =>
         val vToTask = vc :+: mount :+: injectFT[QErrs_Task, QErrs_Task]

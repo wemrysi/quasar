@@ -26,8 +26,8 @@ import quasar.fp.free.foldMapNT
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.module.Module
-import quasar.fs.mount.cache.VCache
 import quasar.main.MetaStoreLocation
+import quasar.fs.mount.cache.VCache, VCache.VCacheKVS
 
 import scala.concurrent.duration._
 import scala.collection.immutable.ListMap
@@ -56,7 +56,7 @@ object RestApi {
         S10: Module.Failure :<: S,
         S11: Analyze :<: S,
         S12: MetaStoreLocation :<: S,
-        S13: VCache :<: S,
+        S13: VCacheKVS :<: S,
         S14: Timing :<: S
       ): Map[String, QHttpService[S]] =
     ListMap(

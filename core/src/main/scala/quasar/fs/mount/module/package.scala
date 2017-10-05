@@ -23,7 +23,7 @@ import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fp.free._
 import quasar.fs._, FileSystemError._, PathError._, MountType._
-import quasar.fs.mount.cache.VCache
+import quasar.fs.mount.cache.VCache.VCacheKVS
 import quasar.sql.FunctionDecl
 
 import pathy.Path._
@@ -133,7 +133,7 @@ package object module {
                         S3: QueryFile :<: S,
                         S4: MonotonicSeq :<: S,
                         S5: ViewState :<: S,
-                        S6: VCache :<: S,
+                        S6: VCacheKVS :<: S,
                         S7: Mounting :<: S,
                         S8: MountingFailure :<: S,
                         S9: PathMismatchFailure :<: S
@@ -151,7 +151,7 @@ package object module {
                         S3: QueryFile :<: S,
                         S4: MonotonicSeq :<: S,
                         S5: ViewState :<: S,
-                        S6: VCache :<: S,
+                        S6: VCacheKVS :<: S,
                         S7: Mounting :<: S,
                         S8: MountingFailure :<: S,
                         S9: PathMismatchFailure :<: S,

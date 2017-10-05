@@ -23,7 +23,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
-import quasar.fs.mount.cache.VCache
+import quasar.fs.mount.cache.VCache.VCacheKVS
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, Optimizer}
 
 import matryoshka._
@@ -38,7 +38,7 @@ object nonFsMounts {
   /** Intercept and handle moves and deletes involving view path(s); all others are passed untouched. */
   def manageFile[S[_]](mountsIn: ADir => Free[S, Set[RPath]])(
                         implicit
-                        VC: VCache.Ops[S],
+                        VC: VCacheKVS.Ops[S],
                         S0: ManageFile :<: S,
                         S1: QueryFile :<: S,
                         S2: Mounting :<: S,
@@ -205,7 +205,7 @@ object nonFsMounts {
 
   ////
 
-  private def vcacheGet[S[_]](p: APath)(implicit VC: VCache.Ops[S]): OptionT[Free[S, ?], AFile] =
+  private def vcacheGet[S[_]](p: APath)(implicit VC: VCacheKVS.Ops[S]): OptionT[Free[S, ?], AFile] =
     OptionT(maybeFile(p).η[Free[S, ?]]) >>= (f => VC.get(f).as(f))
 
 }

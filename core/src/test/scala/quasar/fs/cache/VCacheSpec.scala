@@ -37,6 +37,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaStoreFixture {
+  import VCache.VCacheKVS
 
   sequential
 
@@ -48,14 +49,14 @@ abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaS
       (taskToConnectionIO compose Failure.toRuntimeError[Task, FileSystemError])                                :+:
       reflNT[ConnectionIO]))
 
-  def eval[A](program: Free[VCache, A]): A = evalWithFiles(program, Nil)._1
+  def eval[A](program: Free[VCacheKVS, A]): A = evalWithFiles(program, Nil)._1
 
-  def evalWithFiles[A](program: Free[VCache, A], files: List[AFile]): (A, Task[InMemState]) =
+  def evalWithFiles[A](program: Free[VCacheKVS, A], files: List[AFile]): (A, Task[InMemState]) =
     (interp(files) >>= { case (i, s) =>
       program.foldMap(foldMapNT(i) compose VCache.interp[Eff]).transact(transactor).strengthR(s)
     }).unsafePerformSync
 
-  val vcache = VCache.Ops[VCache]
+  val vcache = VCacheKVS.Ops[VCacheKVS]
 
   "Put deletes existing cache files" >> {
     val f = rootDir </> file("f")

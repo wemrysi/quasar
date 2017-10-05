@@ -29,9 +29,13 @@ import doobie.imports.ConnectionIO
 import scalaz._, Scalaz._
 
 object VCache {
-  type Ops[S[_]] = KeyValueStore.Ops[AFile, ViewCache, S]
+  type VCacheKVS[A] = KeyValueStore[AFile, ViewCache, A]
 
-  implicit def Ops[S[_]](implicit S0: VCache :<: S): Ops[S] = KeyValueStore.Ops[AFile, ViewCache, S]
+  object VCacheKVS {
+    type Ops[S[_]] = KeyValueStore.Ops[AFile, ViewCache, S]
+
+    def Ops[S[_]](implicit S0: VCacheKVS :<: S): Ops[S] = KeyValueStore.Ops[AFile, ViewCache, S]
+  }
 
   def deleteFiles[S[_]](
     files: List[AFile]
@@ -65,7 +69,7 @@ object VCache {
     S0: ManageFile :<: S,
     S1: FileSystemFailure :<: S,
     S2: ConnectionIO :<: S
-  ): VCache ~> Free[S, ?] = λ[VCache ~> Free[S, ?]] {
+  ): VCacheKVS ~> Free[S, ?] = λ[VCacheKVS ~> Free[S, ?]] {
     case Keys() =>
       injectFT[ConnectionIO, S].apply(Queries.viewCachePaths.list ∘ (_.toVector))
     case Get(k) =>

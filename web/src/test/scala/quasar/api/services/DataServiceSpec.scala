@@ -34,7 +34,7 @@ import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount.MountConfig
-import quasar.fs.mount.cache.{VCache, ViewCache}
+import quasar.fs.mount.cache.{VCache, ViewCache}, VCache.VCacheKVS
 import quasar.sql._
 import quasar.Variables
 
@@ -73,7 +73,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import PathError.pathNotFound
 
   type Eff2[A] = Coproduct[FileSystemFailure, FileSystem, A]
-  type Eff1[A] = Coproduct[VCache, Eff2, A]
+  type Eff1[A] = Coproduct[VCacheKVS, Eff2, A]
   type Eff0[A] = Coproduct[Timing, Eff1, A]
   type Eff[A]  = Coproduct[Task, Eff0, A]
   type EffM[A] = Free[Eff, A]
@@ -83,9 +83,9 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
     case Timing.Nanos     => Task.now(0)
   }
 
-  val vcacheInterp: Task[VCache ~> Task] = KeyValueStore.impl.default[AFile, ViewCache]
+  val vcacheInterp: Task[VCacheKVS ~> Task] = KeyValueStore.impl.default[AFile, ViewCache]
 
-  val vcache = VCache.Ops[Eff]
+  val vcache = VCacheKVS.Ops[Eff]
 
   def effRespOr(fs: FileSystem ~> Task): Task[Eff ~> ResponseOr] =
     vcacheInterp ∘ (vci =>
@@ -95,14 +95,14 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
       failureResponseOr[FileSystemError]                                       :+:
       (liftMT[Task, ResponseT] compose fs))
 
-  def effTaskInterp(fs: FileSystem ~> Task, i: Instant, vci: VCache ~> Task): Eff ~> Task =
+  def effTaskInterp(fs: FileSystem ~> Task, i: Instant, vci: VCacheKVS ~> Task): Eff ~> Task =
     reflNT[Task]                                  :+:
     timingInterp(i)                               :+:
     vci                                           :+:
     Failure.toRuntimeError[Task, FileSystemError] :+:
     fs
 
-  def effRespOrInterp(fs: FileSystem ~> Task, i: Instant, vci: VCache ~> Task): Eff ~> ResponseOr =
+  def effRespOrInterp(fs: FileSystem ~> Task, i: Instant, vci: VCacheKVS ~> Task): Eff ~> ResponseOr =
     liftMT[Task, ResponseT]                           :+:
     (liftMT[Task, ResponseT] compose timingInterp(i)) :+:
     (liftMT[Task, ResponseT] compose vci)             :+:

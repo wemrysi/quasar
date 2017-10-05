@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.contrib.pathy._
 import quasar.effect.KeyValueStore
-import quasar.fs.mount.cache.{VCache, ViewCache}
+import quasar.fs.mount.cache.{VCache, ViewCache}, VCache.VCacheKVS
 import quasar.fp._
 
 import monocle.Lens
@@ -32,6 +32,6 @@ object Fixture {
     KeyValueStore.impl.toState[State[Map[K, V], ?]](Lens.id[Map[K, V]]) andThen
     evalNT[Id, Map[K, V]](m) andThen pointNT[F]
 
-  def runConstantVCache[F[_]: Applicative](vcache: Map[AFile, ViewCache]): VCache ~> F =
+  def runConstantVCache[F[_]: Applicative](vcache: Map[AFile, ViewCache]): VCacheKVS ~> F =
     constant[F, AFile, ViewCache](vcache)
 }
