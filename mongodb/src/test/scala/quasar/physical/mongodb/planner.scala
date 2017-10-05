@@ -488,6 +488,17 @@ class PlannerSpec extends
            IgnoreId)))
     }
 
+    "plan select map with field" in {
+      plan(sqlE"""select { "p": pop }, state from zips""") must
+       beWorkflow(chain[Workflow](
+         $read(collection("db", "zips")),
+         $project(
+           reshape(
+             "0" -> objectLit("p" -> $field("pop")),
+             "state" -> $field("state")),
+           IgnoreId)))
+    }
+
     "plan now() with a literal timestamp" in {
       val time = Instant.parse("2016-08-25T00:00:00.000Z")
       val bsTime = Bson.Date.fromInstant(time).get
