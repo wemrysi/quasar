@@ -364,7 +364,7 @@ trait MathLib extends Library {
       Mapping,
       "Returns the nearest number less-than or equal-to a given number, with the specified number of decimal digits",
       Type.Numeric,
-      Func.Input2(Type.Numeric, Type.Numeric),
+      Func.Input2(Type.Numeric, Type.Int),
       noSimplification,
       (partialTyperV[nat._2] {
         case Sized(v @ Type.Const(Data.Int(_)), Type.Const(Data.Int(s))) if s >= 0 => success(v)
@@ -379,7 +379,7 @@ trait MathLib extends Library {
       Mapping,
       "Returns the nearest number greater-than or equal-to a given number, with the specified number of decimal digits",
       Type.Numeric,
-      Func.Input2(Type.Numeric, Type.Numeric),
+      Func.Input2(Type.Numeric, Type.Int),
       noSimplification,
       (partialTyperV[nat._2] {
         case Sized(v @ Type.Const(Data.Int(_)), Type.Const(Data.Int(s))) if s >= 0 => success(v)
@@ -394,7 +394,7 @@ trait MathLib extends Library {
       Mapping,
       "Returns the nearest number to a given number with the specified number of decimal digits",
       Type.Numeric,
-      Func.Input2(Type.Numeric, Type.Numeric),
+      Func.Input2(Type.Numeric, Type.Int),
       noSimplification,
       (partialTyperV[nat._2] {
         case Sized(v @ Type.Const(Data.Int(_)), Type.Const(Data.Int(s))) if s >= 0 => success(v)
