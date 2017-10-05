@@ -53,7 +53,7 @@ object StaticHandler {
         fm.project match {
           case MapFuncCore.StaticMap(m) =>
             val x: Option[List[(BsonField.Name, FreeMapA[T, A])]] =
-              m.map(t => toBsonFieldName(t._1) map ((_, t._2))).sequence
+              m.traverse(t => toBsonFieldName(t._1) map ((_, t._2)))
             x.map(l => $objectLitF(ListMap(l : _*)))
           case _ => none
         }
