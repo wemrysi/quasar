@@ -1233,7 +1233,7 @@ abstract class StdLibSpec extends Qspec {
             binary(FloorScale(_, _).embed, Data.Dec(-0.5), Data.Int(scale), Data.Dec(-0.5))
           }
 
-          "-0.25 -> 0.3" >> {
+          "-0.25 -> -0.3" >> {
             binary(FloorScale(_, _).embed, Data.Dec(-0.25), Data.Int(scale), Data.Dec(-0.3))
           }
         }
