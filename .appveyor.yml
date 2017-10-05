@@ -10,7 +10,6 @@ branches:
 
 skip_tags: true
 
-# TODO add ivy/coursier artifact cache
 cache:
   - .targets
   - '%localappdata%\coursier'
