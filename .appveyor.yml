@@ -5,8 +5,8 @@ pull_requests:
 
 branches:
   only:
-  - master
-  - /^backport\/v.*/
+    - master
+    - /^backport\/v.*/
 
 skip_tags: true
 
