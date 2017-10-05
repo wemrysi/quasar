@@ -479,6 +479,26 @@ class PlannerSpec extends
              ListMap())))
     }
 
+    "plan select map" in {
+      plan(sqlE"""select { "p": pop } from zips""") must
+       beWorkflow(chain[Workflow](
+         $read(collection("db", "zips")),
+         $project(
+           reshape("p" -> $field("pop")),
+           IgnoreId)))
+    }
+
+    "plan select map with field" in {
+      plan(sqlE"""select { "p": pop }, state from zips""") must
+       beWorkflow(chain[Workflow](
+         $read(collection("db", "zips")),
+         $project(
+           reshape(
+             "0" -> objectLit("p" -> $field("pop")),
+             "state" -> $field("state")),
+           IgnoreId)))
+    }
+
     "plan now() with a literal timestamp" in {
       val time = Instant.parse("2016-08-25T00:00:00.000Z")
       val bsTime = Bson.Date.fromInstant(time).get
@@ -2400,14 +2420,12 @@ class PlannerSpec extends
           $group(
             grouped(),
             -\/(reshape(
-              "0" -> $field("city"),
-              "1" -> $field("state")))),
+              "0" -> objectLit("city" -> $field("city"), "state" -> $field("state"))))),
           $project(
             reshape(
-              "city"  -> $field("_id", "0"),
-              "state" -> $field("_id", "1")),
-            IgnoreId)))
-    }.pendingWithActual(notOnPar, testFile("plan simple distinct"))
+              "value" -> $field("_id", "0")),
+            ExcludeId)))
+    }
 
     "plan distinct as expression" in {
       plan(sqlE"select count(distinct(city)) from zips") must

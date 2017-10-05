@@ -91,6 +91,7 @@ object ExprOpCoreF {
   final case class $condF[A](predicate: A, ifTrue: A, ifFalse: A)
       extends ExprOpCoreF[A]
   final case class $ifNullF[A](expr: A, replacement: A) extends ExprOpCoreF[A]
+  final case class $objectLitF[A](map: ListMap[BsonField.Name, A]) extends ExprOpCoreF[A]
 
   implicit val equal: Delay[Equal, ExprOpCoreF] =
     new Delay[Equal, ExprOpCoreF] {
@@ -135,6 +136,7 @@ object ExprOpCoreF {
           case ($multiplyF(l1, r1), $multiplyF(l2, r2)) => (l1 ≟ l2) && (r1 ≟ r2)
           case ($neqF(l1, r1), $neqF(l2, r2))       => (l1 ≟ l2) && (r1 ≟ r2)
           case ($notF(v1), $notF(v2))               => v1 ≟ v2
+          case ($objectLitF(v1), $objectLitF(v2))   => v1 ≟ v2
           case ($orF(a1, b1, cs1 @ _*), $orF(a2, b2, cs2 @ _*)) => (a1 ≟ a2) && (b1 ≟ b2) && (cs1.toList ≟ cs2.toList)
           case ($secondF(v1), $secondF(v2))         => v1 ≟ v2
           case ($strcasecmpF(a1, b1), $strcasecmpF(a2, b2)) => (a1 ≟ a2) && (b1 ≟ b2)
@@ -191,6 +193,8 @@ object ExprOpCoreF {
         case $multiplyF(a, b)     => (f(a) |@| f(b))($multiplyF(_, _))
         case $neqF(a, b)          => (f(a) |@| f(b))($neqF(_, _))
         case $notF(a)             => G.map(f(a))($notF(_))
+        case $objectLitF(a)       =>
+          G.map(a.map(t => t._1 -> f(t._2)).sequence[G, B])($objectLitF(_))
         case $orF(a, b, cs @ _*)  => (f(a) |@| f(b) |@| cs.toList.traverse(f))($orF(_, _, _: _*))
         case $secondF(a)          => G.map(f(a))($secondF(_))
         case $strcasecmpF(a, b)   => (f(a) |@| f(b))($strcasecmpF(_, _))
@@ -281,6 +285,7 @@ object ExprOpCoreF {
       case $condF(predicate, ifTrue, ifFalse) =>
         Bson.Doc("$cond" -> Bson.Arr(predicate, ifTrue, ifFalse))
       case $ifNullF(expr, replacement)   => Bson.Doc("$ifNull" -> Bson.Arr(expr, replacement))
+      case $objectLitF(m)                => Bson.Doc(m.map(t => t._1.value -> t._2))
     }
 
     def rebase[T](base: T)(implicit T: Recursive.Aux[T, OUT]) = {
@@ -376,6 +381,8 @@ object ExprOpCoreF {
                                          = convert($condF(predicate, ifTrue, ifFalse))
     def $ifNull(expr: T, replacement: T): T
                                          = convert($ifNullF(expr, replacement))
+    def $objectLit(map: ListMap[BsonField.Name, T]): T
+                                         = convert($objectLitF(map))
 
     val $$ROOT: T    = $var(DocVar.ROOT())
     val $$CURRENT: T = $var(DocVar.CURRENT())
@@ -700,4 +707,16 @@ object $size {
 
   def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOpCoreF :<: EX): Option[T] =
     $sizeF.unapply(T.project(expr))
+}
+
+object objectLit {
+  def apply(kv: (String, Fix[ExprOp])*): Fix[ExprOp] = {
+    val fp = ExprOpCoreF.fixpoint[Fix[ExprOp], ExprOp](Fix(_))
+    fp.$objectLit(ListMap(kv.map(t => BsonField.Name(t._1) -> t._2) : _*))
+  }
+}
+
+object $objectLitF {
+  def apply[EX[_], A](value: ListMap[BsonField.Name, A])(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$objectLitF(value))
 }
