@@ -299,13 +299,12 @@ trait MathLib extends Library {
     val Ceil = UnaryFunc(
       Mapping,
       "Returns the nearest integer greater than or equal to a numeric value",
-      Type.Numeric,
+      Type.Int,
       Func.Input1(Type.Numeric),
       noSimplification,
       partialTyperV[nat._1] {
         case Sized(Type.Const(Data.Int(v)))      => success(Type.Const(Data.Int(v)))
         case Sized(Type.Const(Data.Dec(v)))      => success(Type.Const(Data.Dec(v.setScale(0, RoundingMode.CEILING))))
-        case Sized(t) if Type.Numeric contains t => success(t)
       },
       untyper[nat._1] {
         case Type.Const(d) => success(Func.Input1(d.dataType))
@@ -315,13 +314,12 @@ trait MathLib extends Library {
     val Floor = UnaryFunc(
       Mapping,
       "Returns the nearest integer less than or equal to a numeric value",
-      Type.Numeric,
+      Type.Int,
       Func.Input1(Type.Numeric),
       noSimplification,
       partialTyperV[nat._1] {
         case Sized(Type.Const(Data.Int(v)))      => success(Type.Const(Data.Int(v)))
         case Sized(Type.Const(Data.Dec(v)))      => success(Type.Const(Data.Dec(v.setScale(0, RoundingMode.FLOOR))))
-        case Sized(t) if Type.Numeric contains t => success(t)
       },
       untyper[nat._1] {
         case Type.Const(d) => success(Func.Input1(d.dataType))
@@ -331,13 +329,12 @@ trait MathLib extends Library {
     val Trunc = UnaryFunc(
       Mapping,
       "Truncates a numeric value towards zero",
-      Type.Numeric,
+      Type.Int,
       Func.Input1(Type.Numeric),
       noSimplification,
       partialTyperV[nat._1] {
         case Sized(Type.Const(Data.Int(v)))      => success(Type.Const(Data.Int(v)))
         case Sized(Type.Const(Data.Dec(v)))      => success(Type.Const(Data.Int(v.toBigInt)))
-        case Sized(t) if Type.Numeric contains t => success(t)
       },
       untyper[nat._1] {
         case Type.Const(d) => success(Func.Input1(d.dataType))
