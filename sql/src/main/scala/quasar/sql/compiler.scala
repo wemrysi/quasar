@@ -222,6 +222,10 @@ final class Compiler[M[_], T: Equal]
       CIName("ceil")                    -> math.Ceil,
       CIName("floor")                   -> math.Floor,
       CIName("trunc")                   -> math.Trunc,
+      CIName("round")                   -> math.Round,
+      CIName("floor_scale")             -> math.FloorScale, // these functions
+      CIName("ceil_scale")              -> math.CeilScale,  // are used extensively
+      CIName("round_scale")             -> math.RoundScale, // for charting and pivot tables
       CIName("between")                 -> relations.Between,
       CIName("where")                   -> set.Filter,
       CIName("within")                  -> set.Within,

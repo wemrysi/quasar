@@ -42,6 +42,7 @@ final class MapFuncDerivedPlanner[T[_[_]]: BirecursiveT, F[_]: Monad]
       case MapFuncsDerived.Floor(src) => Unary.Floor.spec(src).point[F]
       case MapFuncsDerived.Abs(src) => Unary.Abs.spec(src).point[F]
       case MapFuncsDerived.Trunc(src) => Unary.Trunc.spec(src).point[F]
+      case MapFuncsDerived.Round(src) => Unary.Round.spec(src).point[F]
       case x => ExpandMapFunc.expand[T, F, TransSpec[A]](core.plan(cake)(id), κ(None)).apply(x)
     }
   }

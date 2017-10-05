@@ -1037,6 +1037,366 @@ abstract class StdLibSpec extends Qspec {
         }
       }
 
+      "Round" >> {
+        "any Int" >> prop { (x: BigInt) =>
+          unary(Round(_).embed, Data.Int(x), Data.Int(x))
+        }
+
+        "0.5 -> 0" >> {
+          unary(Round(_).embed, Data.Dec(0.5), Data.Int(0))
+        }
+
+        "1.5 -> 2" >> {
+          unary(Round(_).embed, Data.Dec(1.5), Data.Int(2))
+        }
+
+        "1.75 -> 2" >> {
+          unary(Round(_).embed, Data.Dec(1.75), Data.Int(2))
+        }
+
+        "2.5 -> 2" >> {
+          unary(Round(_).embed, Data.Dec(2.5), Data.Int(2))
+        }
+
+        "2.75 -> 3" >> {
+          unary(Round(_).embed, Data.Dec(2.75), Data.Int(3))
+        }
+
+        "-0.5 -> 0" >> {
+          unary(Round(_).embed, Data.Dec(-0.5), Data.Int(0))
+        }
+
+        "-1.5 -> -2" >> {
+          unary(Round(_).embed, Data.Dec(-1.5), Data.Int(-2))
+        }
+
+        "-2.5 -> -2" >> {
+          unary(Round(_).embed, Data.Dec(-2.5), Data.Int(-2))
+        }
+      }
+
+      "CeilScale" >> {
+        "scale 0" >> {
+          val scale = 0
+
+          "any Int" >> prop { (x: BigInt) =>
+            binary(CeilScale(_, _).embed, Data.Int(x), Data.Int(scale), Data.Int(x))
+          }
+
+          "0.5 -> 1" >> {
+            binary(CeilScale(_, _).embed, Data.Dec(0.5), Data.Int(scale), Data.Int(1))
+          }
+
+          "1.5 -> 2" >> {
+            binary(CeilScale(_, _).embed, Data.Dec(1.5), Data.Int(scale), Data.Int(2))
+          }
+
+          "2.5 -> 3" >> {
+            binary(CeilScale(_, _).embed, Data.Dec(2.5), Data.Int(scale), Data.Int(3))
+          }
+
+          "-0.5 -> 0" >> {
+            binary(CeilScale(_, _).embed, Data.Dec(-0.5), Data.Int(scale), Data.Int(0))
+          }
+
+          "-1.5 -> -1" >> {
+            binary(CeilScale(_, _).embed, Data.Dec(-1.5), Data.Int(scale), Data.Int(-1))
+          }
+
+          "-2.5 -> -2" >> {
+            binary(CeilScale(_, _).embed, Data.Dec(-2.5), Data.Int(scale), Data.Int(-2))
+          }
+        }
+
+        "scale 1" >> {
+          val scale = 1
+
+          "any Int" >> prop { (x: BigInt) =>
+            binary(CeilScale(_, _).embed, Data.Int(x), Data.Int(scale), Data.Int(x))
+          }
+
+          "0.5 -> 0.5" >> {
+            binary(CeilScale(_, _).embed, Data.Dec(0.5), Data.Int(scale), Data.Dec(0.5))
+          }
+
+          "0.25 -> 0.3" >> {
+            binary(CeilScale(_, _).embed, Data.Dec(0.25), Data.Int(scale), Data.Dec(0.3))
+          }
+
+          "-0.5 -> -0.5" >> {
+            binary(CeilScale(_, _).embed, Data.Dec(-0.5), Data.Int(scale), Data.Dec(-0.5))
+          }
+
+          "-0.25 -> 0.2" >> {
+            binary(CeilScale(_, _).embed, Data.Dec(-0.25), Data.Int(scale), Data.Dec(-0.2))
+          }
+        }
+
+        "scale 2" >> {
+          val scale = 2
+
+          "any Int" >> prop { (x: BigInt) =>
+            binary(CeilScale(_, _).embed, Data.Int(x), Data.Int(scale), Data.Int(x))
+          }
+
+          "0.5 -> 0.5" >> {
+            binary(CeilScale(_, _).embed, Data.Dec(0.5), Data.Int(scale), Data.Dec(0.5))
+          }
+
+          "0.25 -> 0.25" >> {
+            binary(CeilScale(_, _).embed, Data.Dec(0.25), Data.Int(scale), Data.Dec(0.25))
+          }
+
+          "0.125 -> 0.13" >> {
+            binary(CeilScale(_, _).embed, Data.Dec(0.125), Data.Int(scale), Data.Dec(0.13))
+          }
+
+          "-0.5 -> -0.5" >> {
+            binary(CeilScale(_, _).embed, Data.Dec(-0.5), Data.Int(scale), Data.Dec(-0.5))
+          }
+
+          "-0.25 -> 0.25" >> {
+            binary(CeilScale(_, _).embed, Data.Dec(-0.25), Data.Int(scale), Data.Dec(-0.25))
+          }
+
+          "-0.125 -> -0.12" >> {
+            binary(CeilScale(_, _).embed, Data.Dec(-0.125), Data.Int(scale), Data.Dec(-0.12))
+          }
+        }
+
+        "scale -1" >> {
+          val scale = -1
+
+          "1 -> 10" >> {
+            binary(CeilScale(_, _).embed, Data.Int(1), Data.Int(scale), Data.Int(10))
+          }
+
+          "10 -> 10" >> {
+            binary(CeilScale(_, _).embed, Data.Int(10), Data.Int(scale), Data.Int(10))
+          }
+
+          "12345 -> 12350" >> {
+            binary(CeilScale(_, _).embed, Data.Int(12345), Data.Int(scale), Data.Int(12350))
+          }
+        }
+      }
+
+      "FloorScale" >> {
+        "scale 0" >> {
+          val scale = 0
+
+          "any Int" >> prop { (x: BigInt) =>
+            binary(FloorScale(_, _).embed, Data.Int(x), Data.Int(scale), Data.Int(x))
+          }
+
+          "0.5 -> 0" >> {
+            binary(FloorScale(_, _).embed, Data.Dec(0.5), Data.Int(scale), Data.Int(0))
+          }
+
+          "1.5 -> 1" >> {
+            binary(FloorScale(_, _).embed, Data.Dec(1.5), Data.Int(scale), Data.Int(1))
+          }
+
+          "2.5 -> 2" >> {
+            binary(FloorScale(_, _).embed, Data.Dec(2.5), Data.Int(scale), Data.Int(2))
+          }
+
+          "-0.5 -> -1" >> {
+            binary(FloorScale(_, _).embed, Data.Dec(-0.5), Data.Int(scale), Data.Int(-1))
+          }
+
+          "-1.5 -> -2" >> {
+            binary(FloorScale(_, _).embed, Data.Dec(-1.5), Data.Int(scale), Data.Int(-2))
+          }
+
+          "-2.5 -> -3" >> {
+            binary(FloorScale(_, _).embed, Data.Dec(-2.5), Data.Int(scale), Data.Int(-3))
+          }
+        }
+
+        "scale 1" >> {
+          val scale = 1
+
+          "any Int" >> prop { (x: BigInt) =>
+            binary(FloorScale(_, _).embed, Data.Int(x), Data.Int(scale), Data.Int(x))
+          }
+
+          "0.5 -> 0.5" >> {
+            binary(FloorScale(_, _).embed, Data.Dec(0.5), Data.Int(scale), Data.Dec(0.5))
+          }
+
+          "0.25 -> 0.2" >> {
+            binary(FloorScale(_, _).embed, Data.Dec(0.25), Data.Int(scale), Data.Dec(0.2))
+          }
+
+          "-0.5 -> -0.5" >> {
+            binary(FloorScale(_, _).embed, Data.Dec(-0.5), Data.Int(scale), Data.Dec(-0.5))
+          }
+
+          "-0.25 -> -0.3" >> {
+            binary(FloorScale(_, _).embed, Data.Dec(-0.25), Data.Int(scale), Data.Dec(-0.3))
+          }
+        }
+
+        "scale 2" >> {
+          val scale = 2
+
+          "any Int" >> prop { (x: BigInt) =>
+            binary(FloorScale(_, _).embed, Data.Int(x), Data.Int(scale), Data.Int(x))
+          }
+
+          "0.5 -> 0.5" >> {
+            binary(FloorScale(_, _).embed, Data.Dec(0.5), Data.Int(scale), Data.Dec(0.5))
+          }
+
+          "0.25 -> 0.25" >> {
+            binary(FloorScale(_, _).embed, Data.Dec(0.25), Data.Int(scale), Data.Dec(0.25))
+          }
+
+          "0.125 -> 0.12" >> {
+            binary(FloorScale(_, _).embed, Data.Dec(0.125), Data.Int(scale), Data.Dec(0.12))
+          }
+
+          "-0.5 -> -0.5" >> {
+            binary(FloorScale(_, _).embed, Data.Dec(-0.5), Data.Int(scale), Data.Dec(-0.5))
+          }
+
+          "-0.25 -> 0.25" >> {
+            binary(FloorScale(_, _).embed, Data.Dec(-0.25), Data.Int(scale), Data.Dec(-0.25))
+          }
+
+          "-0.125 -> -0.13" >> {
+            binary(FloorScale(_, _).embed, Data.Dec(-0.125), Data.Int(scale), Data.Dec(-0.13))
+          }
+        }
+
+        "scale -1" >> {
+          val scale = -1
+
+          "1 -> 0" >> {
+            binary(FloorScale(_, _).embed, Data.Int(1), Data.Int(scale), Data.Int(0))
+          }
+
+          "10 -> 10" >> {
+            binary(FloorScale(_, _).embed, Data.Int(10), Data.Int(scale), Data.Int(10))
+          }
+
+          "12345 -> 12340" >> {
+            binary(FloorScale(_, _).embed, Data.Int(12345), Data.Int(scale), Data.Int(12340))
+          }
+        }
+      }
+
+      "RoundScale" >> {
+        "scale 0" >> {
+          val scale = 0
+
+          "any Int" >> prop { (x: BigInt) =>
+            binary(RoundScale(_, _).embed, Data.Int(x), Data.Int(scale), Data.Int(x))
+          }
+
+          "0.5 -> 0" >> {
+            binary(RoundScale(_, _).embed, Data.Dec(0.5), Data.Int(scale), Data.Int(0))
+          }
+
+          "1.5 -> 2" >> {
+            binary(RoundScale(_, _).embed, Data.Dec(1.5), Data.Int(scale), Data.Int(2))
+          }
+
+          "1.75 -> 2" >> {
+            binary(RoundScale(_, _).embed, Data.Dec(1.75), Data.Int(scale), Data.Int(2))
+          }
+
+          "2.5 -> 2" >> {
+            binary(RoundScale(_, _).embed, Data.Dec(2.5), Data.Int(scale), Data.Int(2))
+          }
+
+          "2.75 -> 3" >> {
+            binary(RoundScale(_, _).embed, Data.Dec(2.75), Data.Int(scale), Data.Int(3))
+          }
+
+          "-0.5 -> 0" >> {
+            binary(RoundScale(_, _).embed, Data.Dec(-0.5), Data.Int(scale), Data.Int(0))
+          }
+
+          "-1.5 -> -2" >> {
+            binary(RoundScale(_, _).embed, Data.Dec(-1.5), Data.Int(scale), Data.Int(-2))
+          }
+
+          "-2.5 -> -2" >> {
+            binary(RoundScale(_, _).embed, Data.Dec(-2.5), Data.Int(scale), Data.Int(-2))
+          }
+        }
+
+        "scale 1" >> {
+          val scale = 1
+
+          "any Int" >> prop { (x: BigInt) =>
+            binary(RoundScale(_, _).embed, Data.Int(x), Data.Int(scale), Data.Int(x))
+          }
+
+          "0.5 -> 0.5" >> {
+            binary(RoundScale(_, _).embed, Data.Dec(0.5), Data.Int(scale), Data.Dec(0.5))
+          }
+
+          "1.5 -> 1.5" >> {
+            binary(RoundScale(_, _).embed, Data.Dec(1.5), Data.Int(scale), Data.Dec(1.5))
+          }
+
+          "1.75 -> 1.8" >> {
+            binary(RoundScale(_, _).embed, Data.Dec(1.75), Data.Int(scale), Data.Dec(1.8))
+          }
+
+          "1.65 -> 1.6" >> {
+            binary(RoundScale(_, _).embed, Data.Dec(1.65), Data.Int(scale), Data.Dec(1.6))
+          }
+
+          "-0.5 -> -0.5" >> {
+            binary(RoundScale(_, _).embed, Data.Dec(-0.5), Data.Int(scale), Data.Dec(-0.5))
+          }
+
+          "-1.5 -> -1.5" >> {
+            binary(RoundScale(_, _).embed, Data.Dec(-1.5), Data.Int(scale), Data.Dec(-1.5))
+          }
+
+          "-1.75 -> -1.8" >> {
+            binary(RoundScale(_, _).embed, Data.Dec(-1.75), Data.Int(scale), Data.Dec(-1.8))
+          }
+
+          "-1.85 -> -1.8" >> {
+            binary(RoundScale(_, _).embed, Data.Dec(-1.85), Data.Int(scale), Data.Dec(-1.8))
+          }
+        }
+
+        "scale -1" >> {
+          val scale = -1
+
+          "1 -> 0" >> {
+            binary(RoundScale(_, _).embed, Data.Int(1), Data.Int(scale), Data.Int(0))
+          }
+
+          "5 -> 0" >> {
+            binary(RoundScale(_, _).embed, Data.Int(5), Data.Int(scale), Data.Int(0))
+          }
+
+          "10 -> 10" >> {
+            binary(RoundScale(_, _).embed, Data.Int(10), Data.Int(scale), Data.Int(10))
+          }
+
+          "12345 -> 12340" >> {
+            binary(RoundScale(_, _).embed, Data.Int(12345), Data.Int(scale), Data.Int(12340))
+          }
+
+          "12335 -> 12340" >> {
+            binary(RoundScale(_, _).embed, Data.Int(12335), Data.Int(scale), Data.Int(12340))
+          }
+
+          "123 -> 120" >> {
+            binary(RoundScale(_, _).embed, Data.Int(123), Data.Int(scale), Data.Int(120))
+          }
+        }
+      }
+
       "Modulo" >> {
         "any int by 1" >> prop { (x: Int) =>
           binary(Modulo(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(0))

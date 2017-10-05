@@ -299,13 +299,13 @@ trait MathLib extends Library {
     val Ceil = UnaryFunc(
       Mapping,
       "Returns the nearest integer greater than or equal to a numeric value",
-      Type.Numeric,
+      Type.Int,
       Func.Input1(Type.Numeric),
       noSimplification,
       partialTyperV[nat._1] {
         case Sized(Type.Const(Data.Int(v)))      => success(Type.Const(Data.Int(v)))
         case Sized(Type.Const(Data.Dec(v)))      => success(Type.Const(Data.Dec(v.setScale(0, RoundingMode.CEILING))))
-        case Sized(t) if Type.Numeric contains t => success(t)
+        case Sized(t) if Type.Numeric.contains(t) => success(t)
       },
       untyper[nat._1] {
         case Type.Const(d) => success(Func.Input1(d.dataType))
@@ -315,13 +315,13 @@ trait MathLib extends Library {
     val Floor = UnaryFunc(
       Mapping,
       "Returns the nearest integer less than or equal to a numeric value",
-      Type.Numeric,
+      Type.Int,
       Func.Input1(Type.Numeric),
       noSimplification,
       partialTyperV[nat._1] {
         case Sized(Type.Const(Data.Int(v)))      => success(Type.Const(Data.Int(v)))
         case Sized(Type.Const(Data.Dec(v)))      => success(Type.Const(Data.Dec(v.setScale(0, RoundingMode.FLOOR))))
-        case Sized(t) if Type.Numeric contains t => success(t)
+        case Sized(t) if Type.Numeric.contains(t) => success(t)
       },
       untyper[nat._1] {
         case Type.Const(d) => success(Func.Input1(d.dataType))
@@ -331,18 +331,79 @@ trait MathLib extends Library {
     val Trunc = UnaryFunc(
       Mapping,
       "Truncates a numeric value towards zero",
-      Type.Numeric,
+      Type.Int,
       Func.Input1(Type.Numeric),
       noSimplification,
       partialTyperV[nat._1] {
         case Sized(Type.Const(Data.Int(v)))      => success(Type.Const(Data.Int(v)))
         case Sized(Type.Const(Data.Dec(v)))      => success(Type.Const(Data.Int(v.toBigInt)))
-        case Sized(t) if Type.Numeric contains t => success(t)
+        case Sized(t) if Type.Numeric.contains(t) => success(t)
       },
       untyper[nat._1] {
         case Type.Const(d) => success(Func.Input1(d.dataType))
         case t             => success(Func.Input1(t))
       })
+
+    val Round = UnaryFunc(
+      Mapping,
+      "Rounds a numeric value to the closest integer, utilizing a half-even strategy",
+      Type.Int,
+      Func.Input1(Type.Numeric),
+      noSimplification,
+      partialTyperV[nat._1] {
+        case Sized(Type.Const(Data.Int(v))) => success(Type.Const(Data.Int(v)))
+        case Sized(Type.Const(Data.Dec(v))) => success(Type.Const(Data.Dec(v.setScale(0, RoundingMode.HALF_EVEN))))
+        case Sized(t) if Type.Numeric.contains(t) => success(t)
+      },
+      untyper[nat._1] {
+        case Type.Const(d) => success(Func.Input1(d.dataType))
+        case t             => success(Func.Input1(t))
+      })
+
+    val FloorScale = BinaryFunc(
+      Mapping,
+      "Returns the nearest number less-than or equal-to a given number, with the specified number of decimal digits",
+      Type.Numeric,
+      Func.Input2(Type.Numeric, Type.Int),
+      noSimplification,
+      (partialTyperV[nat._2] {
+        case Sized(v @ Type.Const(Data.Int(_)), Type.Const(Data.Int(s))) if s >= 0 => success(v)
+        case Sized(Type.Const(Data.Int(v)), Type.Const(Data.Int(s))) => success(Type.Const(Data.Dec(BigDecimal(v).setScale(s.toInt, RoundingMode.FLOOR))))
+        case Sized(Type.Const(Data.Dec(v)), Type.Const(Data.Int(s))) => success(Type.Const(Data.Dec(v.setScale(s.toInt, RoundingMode.FLOOR))))
+
+        case Sized(t1, t2) if Type.Numeric.contains(t1) && Type.Numeric.contains(t2) => success(t1)
+      }),
+      biReflexiveUnapply)
+
+    val CeilScale = BinaryFunc(
+      Mapping,
+      "Returns the nearest number greater-than or equal-to a given number, with the specified number of decimal digits",
+      Type.Numeric,
+      Func.Input2(Type.Numeric, Type.Int),
+      noSimplification,
+      (partialTyperV[nat._2] {
+        case Sized(v @ Type.Const(Data.Int(_)), Type.Const(Data.Int(s))) if s >= 0 => success(v)
+        case Sized(Type.Const(Data.Int(v)), Type.Const(Data.Int(s))) => success(Type.Const(Data.Dec(BigDecimal(v).setScale(s.toInt, RoundingMode.CEILING))))
+        case Sized(Type.Const(Data.Dec(v)), Type.Const(Data.Int(s))) => success(Type.Const(Data.Dec(v.setScale(s.toInt, RoundingMode.CEILING))))
+
+        case Sized(t1, t2) if Type.Numeric.contains(t1) && Type.Numeric.contains(t2) => success(t1)
+      }),
+      biReflexiveUnapply)
+
+    val RoundScale = BinaryFunc(
+      Mapping,
+      "Returns the nearest number to a given number with the specified number of decimal digits",
+      Type.Numeric,
+      Func.Input2(Type.Numeric, Type.Int),
+      noSimplification,
+      (partialTyperV[nat._2] {
+        case Sized(v @ Type.Const(Data.Int(_)), Type.Const(Data.Int(s))) if s >= 0 => success(v)
+        case Sized(Type.Const(Data.Int(v)), Type.Const(Data.Int(s))) => success(Type.Const(Data.Dec(BigDecimal(v).setScale(s.toInt, RoundingMode.HALF_EVEN))))
+        case Sized(Type.Const(Data.Dec(v)), Type.Const(Data.Int(s))) => success(Type.Const(Data.Dec(v.setScale(s.toInt, RoundingMode.HALF_EVEN))))
+
+        case Sized(t1, t2) if Type.Numeric.contains(t1) && Type.Numeric.contains(t2) => success(t1)
+      }),
+      biReflexiveUnapply)
 
   // Note: there are 2 interpretations of `%` which return different values for negative numbers.
   // Depending on the interpretation `-5.5 % 1` can either be `-0.5` or `0.5`.

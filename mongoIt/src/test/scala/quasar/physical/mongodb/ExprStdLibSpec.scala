@@ -68,6 +68,10 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (math.Modulo, _) => Skipped("sometimes causes mongo container crash").left
     case (math.Trunc, _) => Skipped("sometimes causes mongo container crash").left
     case (math.Power, _) if lt3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
+    //These 3 derived funcs are defined in terms of Power which is not available in MongoDb < 3.2
+    case (math.CeilScale, _) if lt3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
+    case (math.FloorScale, _) if lt3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
+    case (math.RoundScale, _) if lt3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
 
     case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
     case (relations.Lt, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
