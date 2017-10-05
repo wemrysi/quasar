@@ -17,6 +17,9 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
+
+import quasar.ejson._
+import quasar.physical.mongodb.BsonField
 import quasar.physical.mongodb.expression._
 import quasar.qscript._
 
@@ -42,8 +45,18 @@ object StaticHandler {
     (implicit e26: ExprOpCoreF :<: EX)
       : StaticHandler[T, EX] =
     new StaticHandler[T, EX] {
+
+      def toBsonFieldName(ej: T[EJson]): Option[BsonField.Name] =
+        (CommonEJson.prj(ej.project) >>= (str.getOption(_))).map(BsonField.Name(_))
+
       def handle[A](fm: FreeMapA[T, A]): Option[EX[FreeMapA[T, A]]] =
-        None
+        fm.project match {
+          case MapFuncCore.StaticMap(m) =>
+            val x: Option[List[(BsonField.Name, FreeMapA[T, A])]] =
+              m.traverse(t => toBsonFieldName(t._1) map ((_, t._2)))
+            x.map(l => $objectLitF(ListMap(l : _*)))
+          case _ => none
+        }
     }
 
   def v3_2[T[_[_]]: BirecursiveT, EX[_]: Traverse, A]
