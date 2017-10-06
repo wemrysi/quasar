@@ -756,13 +756,15 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
         response.as[ApiError].unsafePerformSync must beHeaderMissingError("Destination")
       }
       "be 404 for missing source file" >> prop { (file: AFile, destFile: AFile) =>
-        testMove(
-          from = file,
-          to = destFile,
-          state = emptyMem,
-          status = Status.NotFound,
-          body = (_: ApiError) must beApiErrorLike(pathNotFound(file)),
-          newState = Unchanged)
+        file ≠ destFile ==> {
+          testMove(
+            from = file,
+            to = destFile,
+            state = emptyMem,
+            status = Status.NotFound,
+            body = (_: ApiError) must beApiErrorLike(pathNotFound(file)),
+            newState = Unchanged)
+        }
       }
       "be 400 if attempting to move a dir into a file" >> prop {(fs: NonEmptyDir, file: AFile) =>
         testMove(
@@ -868,13 +870,15 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
         response.as[ApiError].unsafePerformSync must beHeaderMissingError("Destination")
       }
       "be 404 for missing source file" >> prop { (file: AFile, destFile: AFile) =>
-        testCopy(
-          from = file,
-          to = destFile,
-          state = emptyMem,
-          status = Status.NotFound,
-          body = (_: ApiError) must beApiErrorLike(pathNotFound(file)),
-          newState = Unchanged)
+        file ≠ destFile ==> {
+          testCopy(
+            from = file,
+            to = destFile,
+            state = emptyMem,
+            status = Status.NotFound,
+            body = (_: ApiError) must beApiErrorLike(pathNotFound(file)),
+            newState = Unchanged)
+        }
       }
       "be 400 if attempting to copy a dir into a file" >> prop {(fs: NonEmptyDir, file: AFile) =>
         testCopy(
