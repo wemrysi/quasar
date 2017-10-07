@@ -1,10 +1,14 @@
 {
     "name": "use type_of function",
     "backends": {
-        "couchbase":      "pending",
-        "mimir":"pendingIgnoreFieldOrder",
-        "spark_hdfs":     "pending",
-        "spark_local":    "pending",
+        "couchbase":       "pending",
+        "mimir":           "pendingIgnoreFieldOrder",
+        "mongodb_2_6":     "pending",
+        "mongodb_3_0":     "pending",
+        "mongodb_3_2":     "pending",
+        "mongodb_3_4":     "pending",
+        "spark_hdfs":      "pending",
+        "spark_local":     "pending",
         "spark_cassandra": "pending"
     },
     "data": "nested_foo.data",
@@ -13,16 +17,16 @@
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [
-      { "foo": "nope",                           "type": "number" },
-      { "foo": "nope",                           "type": "number" },
-      { "foo": "nope",                           "type": "number" },
-      { "foo": "zap",                            "type": "array"  },
-      { "foo": [15, [{ "baz": ["quux"] }]],      "type": "array"  },
-      { "foo": ["15z", [{ "baz": ["qx"] }]],     "type": "array"  },
-      { "foo": [18, ["meh", { "baz": ["qx"] }]], "type": "array"  },
-      { "foo": [16, [{ "baz": "mooooo" }]],      "type": "array"  },
-      { "foo": { "bar": 15, "baz": ["qx"] },     "type": "map"    },
-      { "foo": { "bar": "a15", "baz": ["qx"] },  "type": "map"    },
-      { "foo": [17, [{ "baz": ["qx"] }]],        "type": "array"  }
+      { "foo": "nope",                           "type": "integer" },
+      { "foo": "nope",                           "type": "integer" },
+      { "foo": "nope",                           "type": "integer" },
+      { "foo": "zap",                            "type": "array"   },
+      { "foo": [15, [{ "baz": ["quux"] }]],      "type": "array"   },
+      { "foo": ["15z", [{ "baz": ["qx"] }]],     "type": "array"   },
+      { "foo": [18, ["meh", { "baz": ["qx"] }]], "type": "array"   },
+      { "foo": [16, [{ "baz": "mooooo" }]],      "type": "array"   },
+      { "foo": { "bar": 15, "baz": ["qx"] },     "type": "map"     },
+      { "foo": { "bar": "a15", "baz": ["qx"] },  "type": "map"     },
+      { "foo": [17, [{ "baz": ["qx"] }]],        "type": "array"   }
     ]
 }
