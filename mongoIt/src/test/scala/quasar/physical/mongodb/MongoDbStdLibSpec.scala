@@ -98,17 +98,8 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
       prg((0 until args.length).toList.map(idx => lpf.free(Symbol("arg" + idx))))
         .cataM[Result \/ ?, Unit](shortCircuitLP(args)).swap.toOption
 
-    final case class SingleResultCheckedMatcher(check: ValueCheck[Data]) extends OptionLikeCheckedMatcher[List, Data, Data](
-      "a single result",
-      {
-        case Data.Obj(m) :: Nil =>
-          m.toList match {
-            case (_, v) :: Nil => v.some
-            case _             => None
-          }
-        case _ => None
-      },
-      check)
+    final case class SingleResultCheckedMatcher(check: ValueCheck[Data])
+        extends OptionLikeCheckedMatcher[List, Data, Data]("a single result", _.headOption, check)
 
     def beSingleResult(t: ValueCheck[Data]) = SingleResultCheckedMatcher(t)
 
