@@ -33,6 +33,9 @@ trait RefEq[T[_[_]], F[_]] {
   def refEqƒ: Algebra[F, RefEq.FreeShape[T]]
 }
 
+/* Computes access to the results of a qscript node,
+ * seen through the source.
+ */
 object RefEq extends RefEqInstances {
 
   sealed trait ShapeMeta[T[_[_]]]
@@ -122,6 +125,9 @@ sealed abstract class RefEqInstances {
       }
     }
 
+  // TODO We can improve the shape detection for `Sort`, `Filter`
+  // and `Subset` by preserving the predicates and/or keys, similarly
+  // to how we preserve reducers.
   implicit def qscriptCore[T[_[_]]]: RefEq[T, QScriptCore[T, ?]] =
     new RefEq[T, QScriptCore[T, ?]] {
       def refEqƒ: Algebra[QScriptCore[T, ?], FreeShape[T]] = {
@@ -141,17 +147,14 @@ sealed abstract class RefEqInstances {
 	        .getOrElse(freeShape[T](UnequalShape()))
 
             case ReduceIndex(\/-(idx)) =>
-              IList.fromList(reducers).index(idx).map {
-	        case ReduceFuncs.Arbitrary(inner) => inner >> shape
-		case ReduceFuncs.First(inner) => inner >> shape
-		case ReduceFuncs.Last(inner) => inner >> shape
-		case func => freeShape[T](Reducing[T](func))
-	      }.getOrElse(freeShape[T](UnequalShape()))
+              IList.fromList(reducers).index(idx)
+	        .map(func => freeShape[T](Reducing[T](func)))
+		.getOrElse(freeShape[T](UnequalShape()))
           }
 
-        case Sort(shape, _, _) => shape
-        case Filter(shape, _) => shape
-        case Subset(shape, _, _, _) => shape
+        case Sort(shape, _, _) => freeShape[T](UnequalShape())
+        case Filter(shape, _) => freeShape[T](UnequalShape())
+        case Subset(shape, _, _, _) => freeShape[T](UnequalShape())
 
         case Union(_, _, _) => freeShape[T](UnequalShape())
 

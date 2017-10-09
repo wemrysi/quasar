@@ -315,31 +315,32 @@ object QScriptCore {
             Reduce(_, bucket1, reducers1, repair1),
             Reduce(_, bucket2, reducers2, repair2)) =>
 
-            val bucketL: List[FreeMap[IT]] = bucket1 ∘ (b => norm.freeMF(b >> lacc))
-
-            val bucketLEq: List[RefEq.FreeShape[IT]] =
+            val lBucketEq: List[RefEq.FreeShape[IT]] =
 	      bucket1 ∘ (b => RefEq.normalize(b >> left.shape))
 
-            val bucketREq: List[RefEq.FreeShape[IT]] =
+            val rBucketEq: List[RefEq.FreeShape[IT]] =
 	      bucket2 ∘ (b => RefEq.normalize(b >> right.shape))
 
-            (bucketLEq ≟ bucketREq).option {
-              val reducersL = reducers1 ∘ (_ ∘ (_ >> lacc))
-              val reducersR = reducers2 ∘ (_ ∘ (_ >> racc))
+            (lBucketEq ≟ rBucketEq).option {
+              val lReducers = reducers1 ∘ (_ ∘ (_ >> lacc))
+              val rReducers = reducers2 ∘ (_ ∘ (_ >> racc))
 
-              if (reducersL ≟ reducersR) {
-                val (newRepair, repairL, repairR) = concat(repair1, repair2)
+              // we arbitrarily choose the left or the right bucket in the result
+              val lBucket: List[FreeMap[IT]] = bucket1 ∘ (b => norm.freeMF(b >> lacc))
+
+              if (lReducers ≟ rReducers) {
+                val (newRepair, lRepair, rRepair) = concat(repair1, repair2)
 
                 SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
-                  Reduce(Extern, bucketL, reducersL, newRepair),
-                  repairL,
-                  repairR)
+                  Reduce(Extern, lBucket, lReducers, newRepair),
+                  lRepair,
+                  rRepair)
               } else {
                 // this isn't performant but the lists are typically small
                 val (newReducers, _mappingR) =
-                  reducersR.foldLeft((reducersL, List.empty[Int])) {
+                  rReducers.foldLeft((lReducers, List.empty[Int])) {
                     case ((acc, indices), value) =>
-                      reducersL.indexWhere(_ ≟ value) match {
+                      lReducers.indexWhere(_ ≟ value) match {
                         case -1 => // the right value does not exist on the left
                           (acc :+ value, indices :+ acc.length)
                         case i => // the right value exists on the left
@@ -350,13 +351,13 @@ object QScriptCore {
                 val mappingR: ScalaMap[Int, Int] =
                   _mappingR.zipWithIndex.map(_.swap).toMap
 
-                val (newRepair, repairL, repairR) =
+                val (newRepair, lRepair, rRepair) =
                   concat(repair1, repair2 ∘ (_.shift(mappingR)))
 
                 SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
-                  Reduce(Extern, bucketL, newReducers, newRepair),
-                  repairL,
-                  repairR)
+                  Reduce(Extern, lBucket, newReducers, newRepair),
+                  lRepair,
+                  rRepair)
               }
             }
 
@@ -364,8 +365,8 @@ object QScriptCore {
             LeftShift(_, struct1, id1, repair1),
             LeftShift(_, struct2, id2, repair2)) =>
 
-	    val lFuncEq: RefEq.FreeShape[IT] = RefEq.normalize(struct1 >> left.shape)
-	    val rFuncEq: RefEq.FreeShape[IT] = RefEq.normalize(struct2 >> right.shape)
+            val lStructEq: RefEq.FreeShape[IT] = RefEq.normalize(struct1 >> left.shape)
+            val rStructEq: RefEq.FreeShape[IT] = RefEq.normalize(struct2 >> right.shape)
 
             val idAccess: IdStatus => JoinFunc[IT] = {
               case ExcludeId =>
@@ -379,7 +380,7 @@ object QScriptCore {
               case IncludeId => RightSideF
             }
 
-            (lFuncEq ≟ rFuncEq).option {
+            (lStructEq ≟ rStructEq).option {
               def constructMerge(access1: JoinFunc[IT], access2: JoinFunc[IT]) = {
                 val (repair, repL, repR) =
                   concat(
@@ -391,8 +392,12 @@ object QScriptCore {
                       case LeftSide  => racc >> LeftSideF
                       case RightSide => access2
                     }))
+
+                // we arbitrarily choose the left or the right struct in the result
+                val lStruct: FreeMap[IT] = norm.freeMF(struct1 >> lacc)
+
                 SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
-                  LeftShift(Extern, norm.freeMF(struct1 >> lacc), id1 |+| id2, repair),
+                  LeftShift(Extern, lStruct, id1 |+| id2, repair),
                   repL,
                   repR)
               }
@@ -405,7 +410,11 @@ object QScriptCore {
           case (Filter(s1, c1), Filter(_, c2)) =>
 	    val lCondEq: RefEq.FreeShape[IT] = RefEq.normalize(c1 >> left.shape)
 	    val rCondEq: RefEq.FreeShape[IT] = RefEq.normalize(c2 >> right.shape)
-            (lCondEq ≟ rCondEq).option(SrcMerge(Filter(s1, norm.freeMF(c1 >> lacc)), lacc, racc))
+
+            // we arbitrarily choose the left or the right condition in the result
+	    val lCond: FreeMap[IT] = norm.freeMF(c1 >> lacc)
+
+            (lCondEq ≟ rCondEq).option(SrcMerge(Filter(s1, lCond), lacc, racc))
 
           case (Sort(s1, b1, o1), Sort(_, b2, o2)) =>
             val lBucketEq = b1.map(b => RefEq.normalize(b >> left.shape))
@@ -415,6 +424,7 @@ object QScriptCore {
             val rOrderEq = o2.map(_.leftMap(o => RefEq.normalize(o >> right.shape)))
 
             (lBucketEq ≟ rBucketEq && lOrderEq ≟ rOrderEq).option {
+              // we arbitrarily choose the left or the right bucket and order in the result
               val lBucket = b1.map(b => norm.freeMF(b >> lacc))
               val lOrder = o1.map(_.leftMap(o => norm.freeMF(o >> lacc)))
               SrcMerge(Sort(s1, lBucket, lOrder), lacc, racc)
