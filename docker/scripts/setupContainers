@@ -60,13 +60,13 @@ init_spark_local() {
 }
 
 init_spark_connector() {
-    echo "building sparkcore.jar"
-    cd $SCRIPTS_DIR/../..
-    ./sbt 'set every sparkDependencyProvided := true' sparkcore/assembly
+    echo "nothing to be configured ..."
 }
 
 init_spark_cluster() {
-    echo "nothing to be configured for quasar_spark_cluster"
+    echo "building sparkcore.jar"
+    cd $SCRIPTS_DIR/../..
+    ./sbt 'set every sparkDependencyProvided := true' sparkcore/assembly
 }
 
 ##########################################
