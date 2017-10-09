@@ -56,7 +56,7 @@ object sigil {
   // Sigils in BsonValues
 
   /** Returns the value under any Quasar sigil or the input if not found. */
-  def elideQusarSigil: BsonValue => BsonValue =
+  def elideQuasarSigil: BsonValue => BsonValue =
     v => (quasarValue(v) <+> mapReduceQuasarValue(v)) | v
 
   /** The value under the MapReduce value field, if found. */
