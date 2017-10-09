@@ -34,7 +34,7 @@ object sigil {
   /** Quasar-specific sigil, used to construct a singleton result object under
     * the following conditions:
     *
-    * 1. Emitting a document value in aggregation when `$replaceRoot` is not available.
+    * 1. Emitting a document value in aggregation when `$replaceRoot` is not applicable.
     *
     * 2. Emitting a value in aggregation when its type is unknown.
     *
