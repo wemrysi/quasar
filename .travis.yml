@@ -58,6 +58,7 @@ script:
       couchbase) SPECIFIC_DELEGATE="couchbaseIt/testOnly -- xonly" ;;
       marklogic_*) SPECIFIC_DELEGATE="marklogicIt/testOnly -- xonly" ;;
       mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly" ;;
+      spark_hdfs) ./sbt 'set every sparkDependencyProvided := true' sparkcore/assembly ;;
       *) ;;
     esac
 
