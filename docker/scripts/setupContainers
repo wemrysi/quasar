@@ -75,6 +75,7 @@ init_spark_cluster() {
 #
 apply_configuration() {
   CONTAINER=$1
+  echo "apply configuration for " $CONTAINER
   if [[ $CONTAINER == "quasar_mongodb_read_only"   ]]; then init_mongo;                                  fi
   if [[ $CONTAINER == "quasar_couchbase"           ]]; then init_couchbase;                              fi
   if [[ $CONTAINER == "quasar_marklogic_xml"       ]]; then init_marklogic $DOCKERIP 8001 8002 enabled;  fi
