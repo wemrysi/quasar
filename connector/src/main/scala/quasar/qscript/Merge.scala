@@ -22,6 +22,7 @@ import quasar.Planner._
 import quasar.contrib.matryoshka._
 import quasar.ejson.implicits._
 import quasar.fp.{ ExternallyManaged => EM, _ }
+import quasar.qscript.analysis.RefEq
 
 import matryoshka._
 import matryoshka.data._

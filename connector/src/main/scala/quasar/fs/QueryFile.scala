@@ -29,6 +29,7 @@ import quasar.fp.ski._
 import quasar.frontend.SemanticErrsT
 import quasar.frontend.logicalplan.{LogicalPlan, Optimizer}
 import quasar.qscript._
+import quasar.qscript.analysis.RefEq
 
 import matryoshka.{Transform => _, _}
 import matryoshka.data.Fix

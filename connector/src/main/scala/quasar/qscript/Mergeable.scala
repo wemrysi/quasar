@@ -18,6 +18,7 @@ package quasar.qscript
 
 import slamdata.Predef._
 import quasar.fp.{ ExternallyManaged => EM, _ }
+import quasar.qscript.analysis.RefEq
 
 import matryoshka._
 import matryoshka.patterns.CoEnv

@@ -14,16 +14,17 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qscript.analysis
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => _, _}
 
 import quasar._
 import quasar.RenderTree.ops._
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.qscript._
 
-import matryoshka._
+import matryoshka.{Hole => _, _}
 import matryoshka.data.free._
 import matryoshka.implicits._
 import matryoshka.patterns._
@@ -34,7 +35,7 @@ trait RefEq[T[_[_]], F[_]] {
 }
 
 /* Computes access to the results of a qscript node,
- * seen through the source.
+ * seen transitively through the source.
  */
 object RefEq extends RefEqInstances {
 

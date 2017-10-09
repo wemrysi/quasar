@@ -26,6 +26,7 @@ import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
 import quasar.qscript.MapFuncCore._
 import quasar.qscript.MapFuncsCore._
+import quasar.qscript.analysis.RefEq
 import quasar.sql.JoinDir
 import quasar.std.StdLib._
 
