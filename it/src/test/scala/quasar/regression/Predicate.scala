@@ -158,12 +158,7 @@ object Predicate {
 
     // Removes the element at `idx` from `as`.
     private def deleteAt[A](idx: Int, as: Vector[A]): Vector[A] =
-      if (idx < 0)
-        as
-      else {
-        val (l, r) = as splitAt (idx + 1)
-        l.dropRight(1) ++ r
-      }
+      as.patch(idx, Nil, 1)
   }
 
   /** Must START WITH the elements, in order. */
