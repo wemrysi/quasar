@@ -47,7 +47,7 @@ object RefEq extends RefEqInstances {
   implicit def equal[T[_[_]]: BirecursiveT: EqualT]: Equal[ShapeMeta[T]] = {
     Equal.equal {
       case (EqualShape(), EqualShape()) => true
-      case (UnequalShape(), UnequalShape()) => true
+      case (UnequalShape(), UnequalShape()) => false
       case (Reducing(funcL), Reducing(funcR)) => funcL ≟ funcR
       case (Shifting(idL, structL), Shifting(idR, structR)) => idL ≟ idR && structL ≟ structR
       case (_, _) => false
@@ -152,9 +152,9 @@ sealed abstract class RefEqInstances {
 		.getOrElse(freeShape[T](UnequalShape()))
           }
 
-        case Sort(shape, _, _) => freeShape[T](UnequalShape())
-        case Filter(shape, _) => freeShape[T](UnequalShape())
-        case Subset(shape, _, _, _) => freeShape[T](UnequalShape())
+        case Sort(_, _, _) => freeShape[T](UnequalShape())
+        case Filter(_, _) => freeShape[T](UnequalShape())
+        case Subset(_, _, _, _) => freeShape[T](UnequalShape())
 
         case Union(_, _, _) => freeShape[T](UnequalShape())
 
@@ -162,8 +162,16 @@ sealed abstract class RefEqInstances {
       }
     }
 
-  implicit def projectBucket[T[_[_]]]: RefEq[T, ProjectBucket[T, ?]] =
-    constShape[T, ProjectBucket[T, ?]](UnequalShape())
+  implicit def projectBucket[T[_[_]]](implicit QS: RefEq[T, QScriptCore[T, ?]])
+      : RefEq[T, ProjectBucket[T, ?]] =
+    new RefEq[T, ProjectBucket[T, ?]] {
+      def refEqƒ: Algebra[ProjectBucket[T, ?], FreeShape[T]] = {
+        case BucketField(shape, value, name) =>
+          QS.refEqƒ(Map(shape, Free.roll(MFC(MapFuncsCore.ProjectField(value, name)))))
+        case BucketIndex(shape, value, index) =>
+          QS.refEqƒ(Map(shape, Free.roll(MFC(MapFuncsCore.ProjectIndex(value, index)))))
+      }
+    }
 
   implicit def constRead[T[_[_]], A]: RefEq[T, Const[Read[A], ?]] =
     constShape[T, Const[Read[A], ?]](EqualShape())

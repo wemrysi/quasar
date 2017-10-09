@@ -282,6 +282,16 @@ object QScriptCore {
         }
     }
 
+  // When checking equality of `FreeMap`s we check their literal equality and
+  // their referential equality. It is imperative that we do not _only_ check
+  // their referential equality as this may be false (because we failed to
+  // see through the shape) while their literal equality holds.
+  // This is code smell in that referential equality should ideally be an
+  // extension of literal equality.
+  //
+  // TODO Address the above problem so that in the least it's not possible to
+  // only check for referentially equality without checking for literal equality.
+  // Ideally we can unify these definitions more though.
   implicit def mergeable[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]:
       Mergeable.Aux[T, QScriptCore[T, ?]] =
     new Mergeable[QScriptCore[T, ?]] {
@@ -315,18 +325,19 @@ object QScriptCore {
             Reduce(_, bucket1, reducers1, repair1),
             Reduce(_, bucket2, reducers2, repair2)) =>
 
-            val lBucketEq: List[RefEq.FreeShape[IT]] =
+            // we arbitrarily choose the left or the right bucket in the result
+            val lBucket: List[FreeMap[IT]] = bucket1 ∘ (b => norm.freeMF(b >> lacc))
+            val rBucket: List[FreeMap[IT]] = bucket2 ∘ (b => norm.freeMF(b >> racc))
+
+            lazy val lBucketEq: List[RefEq.FreeShape[IT]] =
 	      bucket1 ∘ (b => RefEq.normalize(b >> left.shape))
 
-            val rBucketEq: List[RefEq.FreeShape[IT]] =
+            lazy val rBucketEq: List[RefEq.FreeShape[IT]] =
 	      bucket2 ∘ (b => RefEq.normalize(b >> right.shape))
 
-            (lBucketEq ≟ rBucketEq).option {
+            (lBucket ≟ rBucket || lBucketEq ≟ rBucketEq).option {
               val lReducers = reducers1 ∘ (_ ∘ (_ >> lacc))
               val rReducers = reducers2 ∘ (_ ∘ (_ >> racc))
-
-              // we arbitrarily choose the left or the right bucket in the result
-              val lBucket: List[FreeMap[IT]] = bucket1 ∘ (b => norm.freeMF(b >> lacc))
 
               if (lReducers ≟ rReducers) {
                 val (newRepair, lRepair, rRepair) = concat(repair1, repair2)
@@ -365,8 +376,12 @@ object QScriptCore {
             LeftShift(_, struct1, id1, repair1),
             LeftShift(_, struct2, id2, repair2)) =>
 
-            val lStructEq: RefEq.FreeShape[IT] = RefEq.normalize(struct1 >> left.shape)
-            val rStructEq: RefEq.FreeShape[IT] = RefEq.normalize(struct2 >> right.shape)
+            // we arbitrarily choose the left or the right struct in the result
+            val lStruct: FreeMap[IT] = norm.freeMF(struct1 >> lacc)
+            val rStruct: FreeMap[IT] = norm.freeMF(struct2 >> racc)
+
+            lazy val lStructEq: RefEq.FreeShape[IT] = RefEq.normalize(struct1 >> left.shape)
+            lazy val rStructEq: RefEq.FreeShape[IT] = RefEq.normalize(struct2 >> right.shape)
 
             val idAccess: IdStatus => JoinFunc[IT] = {
               case ExcludeId =>
@@ -380,7 +395,7 @@ object QScriptCore {
               case IncludeId => RightSideF
             }
 
-            (lStructEq ≟ rStructEq).option {
+            (lStruct ≟ rStruct || lStructEq ≟ rStructEq).option {
               def constructMerge(access1: JoinFunc[IT], access2: JoinFunc[IT]) = {
                 val (repair, repL, repR) =
                   concat(
@@ -392,9 +407,6 @@ object QScriptCore {
                       case LeftSide  => racc >> LeftSideF
                       case RightSide => access2
                     }))
-
-                // we arbitrarily choose the left or the right struct in the result
-                val lStruct: FreeMap[IT] = norm.freeMF(struct1 >> lacc)
 
                 SrcMerge[QScriptCore[IT, ExternallyManaged], FreeMap[IT]](
                   LeftShift(Extern, lStruct, id1 |+| id2, repair),
@@ -408,27 +420,34 @@ object QScriptCore {
             }
 
           case (Filter(s1, c1), Filter(_, c2)) =>
-	    val lCondEq: RefEq.FreeShape[IT] = RefEq.normalize(c1 >> left.shape)
-	    val rCondEq: RefEq.FreeShape[IT] = RefEq.normalize(c2 >> right.shape)
-
             // we arbitrarily choose the left or the right condition in the result
 	    val lCond: FreeMap[IT] = norm.freeMF(c1 >> lacc)
+	    val rCond: FreeMap[IT] = norm.freeMF(c2 >> racc)
 
-            (lCondEq ≟ rCondEq).option(SrcMerge(Filter(s1, lCond), lacc, racc))
+	    lazy val lCondEq: RefEq.FreeShape[IT] = RefEq.normalize(c1 >> left.shape)
+	    lazy val rCondEq: RefEq.FreeShape[IT] = RefEq.normalize(c2 >> right.shape)
+
+            (lCond ≟ rCond || lCondEq ≟ rCondEq).option(SrcMerge(Filter(s1, lCond), lacc, racc))
 
           case (Sort(s1, b1, o1), Sort(_, b2, o2)) =>
-            val lBucketEq = b1.map(b => RefEq.normalize(b >> left.shape))
-            val rBucketEq = b2.map(b => RefEq.normalize(b >> right.shape))
+            // we arbitrarily choose the left or the right bucket in the result
+            val lBucket = b1.map(b => norm.freeMF(b >> lacc))
+            val rBucket = b2.map(b => norm.freeMF(b >> racc))
 
-            val lOrderEq = o1.map(_.leftMap(o => RefEq.normalize(o >> left.shape)))
-            val rOrderEq = o2.map(_.leftMap(o => RefEq.normalize(o >> right.shape)))
+            // we arbitrarily choose the left or the right order in the result
+            val lOrder = o1.map(_.leftMap(o => norm.freeMF(o >> lacc)))
+            val rOrder = o2.map(_.leftMap(o => norm.freeMF(o >> racc)))
 
-            (lBucketEq ≟ rBucketEq && lOrderEq ≟ rOrderEq).option {
-              // we arbitrarily choose the left or the right bucket and order in the result
-              val lBucket = b1.map(b => norm.freeMF(b >> lacc))
-              val lOrder = o1.map(_.leftMap(o => norm.freeMF(o >> lacc)))
-              SrcMerge(Sort(s1, lBucket, lOrder), lacc, racc)
-	    }
+            lazy val lBucketEq = b1.map(b => RefEq.normalize(b >> left.shape))
+            lazy val rBucketEq = b2.map(b => RefEq.normalize(b >> right.shape))
+
+            lazy val lOrderEq = o1.map(_.leftMap(o => RefEq.normalize(o >> left.shape)))
+            lazy val rOrderEq = o2.map(_.leftMap(o => RefEq.normalize(o >> right.shape)))
+
+            ((lBucket ≟ rBucket || lBucketEq ≟ rBucketEq) &&
+	      (lOrder ≟ rOrder || lOrderEq ≟ rOrderEq)).option {
+                SrcMerge(Sort(s1, lBucket, lOrder), lacc, racc)
+	      }
 
           case (Subset(s1, f1, o1, c1), Subset(_, f2, o2, c2)) =>
             val from1 = rebaseBranch(f1, lacc)
