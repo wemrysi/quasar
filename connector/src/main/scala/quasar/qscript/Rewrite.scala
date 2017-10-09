@@ -399,15 +399,15 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
   }
 
   def compactLeftShift[F[_]: Functor]
-      (QCToG: PrismNT[F, QScriptCore])
+      (QCToF: PrismNT[F, QScriptCore])
       : QScriptCore[T[F]] => Option[F[T[F]]] = {
     case qs @ LeftShift(Embed(src), struct, ExcludeId, joinFunc) =>
-      (QCToG.get(src), struct.resume) match {
+      (QCToF.get(src), struct.resume) match {
         // LeftShift(Map(_, MakeArray(_)), Hole, ExcludeId, _)
         case (Some(Map(innerSrc, fm)), \/-(SrcHole)) =>
           fm.resume match {
             case -\/(MFC(MakeArray(value))) =>
-              QCToG(Map(innerSrc, joinFunc >>= {
+              QCToF(Map(innerSrc, joinFunc >>= {
                 case LeftSide => fm
                 case RightSide => value
               })).some
@@ -415,7 +415,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
           }
         // LeftShift(_, MakeArray(_), ExcludeId, _)
         case (_, -\/(MFC(MakeArray(value)))) =>
-          QCToG(Map(src.embed, joinFunc >>= {
+          QCToF(Map(src.embed, joinFunc >>= {
             case LeftSide => HoleF
             case RightSide => value
           })).some
