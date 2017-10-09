@@ -627,7 +627,7 @@ package object workflow {
           deleteUnusedFields(reorderOps(simplifyGroup[F](op)))
 
         def fixShape(wf: Fix[F]) =
-          simpleShape(wf).fold(wf) { n =>
+          simpleShape(wf).fold(finished) { n =>
             $project[F](Reshape(n.strengthR($include().right).toListMap)).apply(finished)
           }
 
