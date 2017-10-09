@@ -22,7 +22,7 @@ import quasar.Planner._
 import quasar.contrib.matryoshka._
 import quasar.ejson.implicits._
 import quasar.fp.{ ExternallyManaged => EM, _ }
-import quasar.qscript.analysis.RefEq
+import quasar.qscript.analysis.DeepShape
 
 import matryoshka._
 import matryoshka.data._
@@ -32,7 +32,7 @@ import scalaz._, Scalaz._
 
 class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T] {
 
-  type ZipperList[G[_]] = List[(G[EM], RefEq.FreeShape[T])]
+  type ZipperList[G[_]] = List[(G[EM], DeepShape.FreeShape[T])]
 
   case class ZipperSides(
     lSide: FreeMap,
@@ -49,7 +49,7 @@ class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T]
 
   // TODO: Convert to NEL
   private def linearize[G[_]: Traverse]
-      : Algebra[EnvT[RefEq.FreeShape[T], G, ?], ZipperList[G]] =
+      : Algebra[EnvT[DeepShape.FreeShape[T], G, ?], ZipperList[G]] =
     _.run match {
       case (shape, gshape) => (gshape.as[EM](Extern), shape) :: gshape.fold
     }
@@ -103,15 +103,15 @@ class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T]
     (input: S[H])
     (implicit
       R: Recursive.Aux[S[H], G],
-      Eq: RefEq[T, G])
-      : Cofree[G, RefEq.FreeShape[T]] =
-    RefEq.annotated.apply[G].apply[T, S[H]](input)
+      Eq: DeepShape[T, G])
+      : Cofree[G, DeepShape.FreeShape[T]] =
+    DeepShape.annotated.apply[G].apply[T, S[H]](input)
 
   private def makeList[S[_[_]], G[_]: Traverse, H[_]]
     (input: S[H])
     (implicit
       R: Recursive.Aux[S[H], G],
-      Eq: RefEq[T, G])
+      Eq: DeepShape[T, G])
       : ZipperList[G] =
     withShape[S, G, H](input).cata(linearize[G]).reverse
 
@@ -120,7 +120,7 @@ class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T]
     (implicit
       mergeable: Mergeable.Aux[T, G],
       R: Recursive.Aux[S[H], G],
-      Eq: RefEq[T, G])
+      Eq: DeepShape[T, G])
       : ZipperAcc[G] =
     elgot((
       ZipperSides(HoleF[T], HoleF[T]),
@@ -133,7 +133,7 @@ class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T]
       mergeable: Mergeable.Aux[T, G],
       C: Corecursive.Aux[S[H], G],
       R: Recursive.Aux[S[H], G],
-      Eq: RefEq[T, G],
+      Eq: DeepShape[T, G],
       DE: Const[DeadEnd, ?] :<: H)
       : SrcMerge[S[H], FreeQS] = {
 
@@ -151,7 +151,7 @@ class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T]
       mergeable: Mergeable.Aux[T, G],
       coalesce: Coalesce.Aux[T, G, G],
       N: Normalizable[G],
-      Eq: RefEq[T, G],
+      Eq: DeepShape[T, G],
       DE: Const[DeadEnd, ?] :<: G,
       QC: QScriptCore :<: G,
       FI: Injectable.Aux[G, QScriptTotal]):

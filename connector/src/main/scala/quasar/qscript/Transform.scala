@@ -26,7 +26,7 @@ import quasar.fp._
 import quasar.frontend.{logicalplan => lp}
 import quasar.qscript.MapFuncCore._
 import quasar.qscript.MapFuncsCore._
-import quasar.qscript.analysis.RefEq
+import quasar.qscript.analysis.DeepShape
 import quasar.sql.JoinDir
 import quasar.std.StdLib._
 
@@ -58,7 +58,7 @@ class Transform
     PB: ProjectBucket[T, ?] :<: F,
     // TODO: Remove this one once we have multi-sorted AST
     FI: Injectable.Aux[F, QScriptTotal[T, ?]],
-    refEq: RefEq[T, F],
+    shape: DeepShape[T, F],
     render: Delay[RenderTree, F],
     mergeable: Mergeable.Aux[T, F],
     eq: Delay[Equal, F],

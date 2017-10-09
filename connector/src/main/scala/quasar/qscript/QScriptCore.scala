@@ -21,7 +21,7 @@ import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.fp._
-import quasar.qscript.analysis.RefEq
+import quasar.qscript.analysis.DeepShape
 
 import matryoshka._
 import matryoshka.data._
@@ -330,11 +330,11 @@ object QScriptCore {
             val lBucket: List[FreeMap[IT]] = bucket1 ∘ (b => norm.freeMF(b >> lacc))
             val rBucket: List[FreeMap[IT]] = bucket2 ∘ (b => norm.freeMF(b >> racc))
 
-            lazy val lBucketEq: List[RefEq.FreeShape[IT]] =
-	      bucket1 ∘ (b => RefEq.normalize(b >> left.shape))
+            lazy val lBucketEq: List[DeepShape.FreeShape[IT]] =
+	      bucket1 ∘ (b => DeepShape.normalize(b >> left.shape))
 
-            lazy val rBucketEq: List[RefEq.FreeShape[IT]] =
-	      bucket2 ∘ (b => RefEq.normalize(b >> right.shape))
+            lazy val rBucketEq: List[DeepShape.FreeShape[IT]] =
+	      bucket2 ∘ (b => DeepShape.normalize(b >> right.shape))
 
             (lBucket ≟ rBucket || lBucketEq ≟ rBucketEq).option {
               val lReducers = reducers1 ∘ (_ ∘ (_ >> lacc))
@@ -381,8 +381,8 @@ object QScriptCore {
             val lStruct: FreeMap[IT] = norm.freeMF(struct1 >> lacc)
             val rStruct: FreeMap[IT] = norm.freeMF(struct2 >> racc)
 
-            lazy val lStructEq: RefEq.FreeShape[IT] = RefEq.normalize(struct1 >> left.shape)
-            lazy val rStructEq: RefEq.FreeShape[IT] = RefEq.normalize(struct2 >> right.shape)
+            lazy val lStructEq: DeepShape.FreeShape[IT] = DeepShape.normalize(struct1 >> left.shape)
+            lazy val rStructEq: DeepShape.FreeShape[IT] = DeepShape.normalize(struct2 >> right.shape)
 
             val idAccess: IdStatus => JoinFunc[IT] = {
               case ExcludeId =>
@@ -425,8 +425,8 @@ object QScriptCore {
 	    val lCond: FreeMap[IT] = norm.freeMF(c1 >> lacc)
 	    val rCond: FreeMap[IT] = norm.freeMF(c2 >> racc)
 
-	    lazy val lCondEq: RefEq.FreeShape[IT] = RefEq.normalize(c1 >> left.shape)
-	    lazy val rCondEq: RefEq.FreeShape[IT] = RefEq.normalize(c2 >> right.shape)
+	    lazy val lCondEq: DeepShape.FreeShape[IT] = DeepShape.normalize(c1 >> left.shape)
+	    lazy val rCondEq: DeepShape.FreeShape[IT] = DeepShape.normalize(c2 >> right.shape)
 
             (lCond ≟ rCond || lCondEq ≟ rCondEq).option(SrcMerge(Filter(s1, lCond), lacc, racc))
 
@@ -439,11 +439,11 @@ object QScriptCore {
             val lOrder = o1.map(_.leftMap(o => norm.freeMF(o >> lacc)))
             val rOrder = o2.map(_.leftMap(o => norm.freeMF(o >> racc)))
 
-            lazy val lBucketEq = b1.map(b => RefEq.normalize(b >> left.shape))
-            lazy val rBucketEq = b2.map(b => RefEq.normalize(b >> right.shape))
+            lazy val lBucketEq = b1.map(b => DeepShape.normalize(b >> left.shape))
+            lazy val rBucketEq = b2.map(b => DeepShape.normalize(b >> right.shape))
 
-            lazy val lOrderEq = o1.map(_.leftMap(o => RefEq.normalize(o >> left.shape)))
-            lazy val rOrderEq = o2.map(_.leftMap(o => RefEq.normalize(o >> right.shape)))
+            lazy val lOrderEq = o1.map(_.leftMap(o => DeepShape.normalize(o >> left.shape)))
+            lazy val rOrderEq = o2.map(_.leftMap(o => DeepShape.normalize(o >> right.shape)))
 
             ((lBucket ≟ rBucket || lBucketEq ≟ rBucketEq) &&
 	      (lOrder ≟ rOrder || lOrderEq ≟ rOrderEq)).option {

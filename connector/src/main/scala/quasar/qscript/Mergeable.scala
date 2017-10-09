@@ -18,7 +18,7 @@ package quasar.qscript
 
 import slamdata.Predef._
 import quasar.fp.{ ExternallyManaged => EM, _ }
-import quasar.qscript.analysis.RefEq
+import quasar.qscript.analysis.DeepShape
 
 import matryoshka._
 import matryoshka.patterns.CoEnv
@@ -55,7 +55,7 @@ object Mergeable {
   final case class MergeSide[T[_[_]], F[_]](
     access: FreeMap[T],
     source: F[EM],
-    shape: RefEq.FreeShape[T])
+    shape: DeepShape.FreeShape[T])
 
   implicit def const[T[_[_]]: EqualT, A: Equal]: Mergeable.Aux[T, Const[A, ?]] =
     new Mergeable[Const[A, ?]] {

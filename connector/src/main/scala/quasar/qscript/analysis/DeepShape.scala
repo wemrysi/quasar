@@ -31,14 +31,14 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 
-trait RefEq[T[_[_]], F[_]] {
-  def refEqƒ: Algebra[F, RefEq.FreeShape[T]]
+trait DeepShape[T[_[_]], F[_]] {
+  def deepShapeƒ: Algebra[F, DeepShape.FreeShape[T]]
 }
 
 /* Computes access to the results of a qscript node,
  * seen transitively through the source.
  */
-object RefEq extends RefEqInstances {
+object DeepShape extends DeepShapeInstances {
 
   sealed trait ShapeMeta[T[_[_]]]
   final case class EqualShape[T[_[_]]]() extends ShapeMeta[T]
@@ -78,11 +78,11 @@ object RefEq extends RefEqInstances {
           TR: Recursive.Aux[S, F],
           Fu: Functor[F],
           Fo: Foldable[F],
-          R: RefEq[T, F])
+          R: DeepShape[T, F])
           : Cofree[F, FreeShape[T]] = {
 
         val tupled: Cofree[F, (FreeShape[T], List[FreeShape[T]])] =
-          s.cata(attributeAlgebra[F, (FreeShape[T], List[FreeShape[T]])](selfAndChildren(R.refEqƒ)))
+          s.cata(attributeAlgebra[F, (FreeShape[T], List[FreeShape[T]])](selfAndChildren(R.deepShapeƒ)))
 
         tupled.map {
           case (_, children) =>
@@ -93,46 +93,46 @@ object RefEq extends RefEqInstances {
   }
 }
 
-sealed abstract class RefEqInstances {
-  import RefEq._
+sealed abstract class DeepShapeInstances {
+  import DeepShape._
 
   implicit def coproduct[T[_[_]], F[_], G[_]]
-    (implicit F: RefEq[T, F], G: RefEq[T, G])
-      : RefEq[T, Coproduct[F, G, ?]] =
-    new RefEq[T, Coproduct[F, G, ?]] {
-      def refEqƒ: Algebra[Coproduct[F, G, ?], FreeShape[T]] =
-        _.run.fold(F.refEqƒ, G.refEqƒ)
+    (implicit F: DeepShape[T, F], G: DeepShape[T, G])
+      : DeepShape[T, Coproduct[F, G, ?]] =
+    new DeepShape[T, Coproduct[F, G, ?]] {
+      def deepShapeƒ: Algebra[Coproduct[F, G, ?], FreeShape[T]] =
+        _.run.fold(F.deepShapeƒ, G.deepShapeƒ)
     }
 
-  implicit def coenv[T[_[_]], F[_]](implicit F: RefEq[T, F])
-      : RefEq[T, CoEnv[Hole, F, ?]] =
-    new RefEq[T, CoEnv[Hole, F, ?]] {
-      def refEqƒ: Algebra[CoEnv[Hole, F, ?], FreeShape[T]] =
-        _.run.fold(κ(freeShape[T](EqualShape())), F.refEqƒ)
+  implicit def coenv[T[_[_]], F[_]](implicit F: DeepShape[T, F])
+      : DeepShape[T, CoEnv[Hole, F, ?]] =
+    new DeepShape[T, CoEnv[Hole, F, ?]] {
+      def deepShapeƒ: Algebra[CoEnv[Hole, F, ?], FreeShape[T]] =
+        _.run.fold(κ(freeShape[T](EqualShape())), F.deepShapeƒ)
     }
 
-  implicit def thetaJoin[T[_[_]]]: RefEq[T, ThetaJoin[T, ?]] =
-    new RefEq[T, ThetaJoin[T, ?]] {
-      def refEqƒ: Algebra[ThetaJoin[T, ?], FreeShape[T]] = {
+  implicit def thetaJoin[T[_[_]]]: DeepShape[T, ThetaJoin[T, ?]] =
+    new DeepShape[T, ThetaJoin[T, ?]] {
+      def deepShapeƒ: Algebra[ThetaJoin[T, ?], FreeShape[T]] = {
         case ThetaJoin(shape, lBranch, rBranch, _, _, combine) =>
-          refEqBranches(shape, lBranch, rBranch, combine)
+          deepShapeBranches(shape, lBranch, rBranch, combine)
       }
     }
 
-  implicit def equiJoin[T[_[_]]]: RefEq[T, EquiJoin[T, ?]] =
-    new RefEq[T, EquiJoin[T, ?]] {
-      def refEqƒ: Algebra[EquiJoin[T, ?], FreeShape[T]] = {
+  implicit def equiJoin[T[_[_]]]: DeepShape[T, EquiJoin[T, ?]] =
+    new DeepShape[T, EquiJoin[T, ?]] {
+      def deepShapeƒ: Algebra[EquiJoin[T, ?], FreeShape[T]] = {
         case EquiJoin(shape, lBranch, rBranch, _, _, combine) =>
-          refEqBranches(shape, lBranch, rBranch, combine)
+          deepShapeBranches(shape, lBranch, rBranch, combine)
       }
     }
 
   // TODO We can improve the shape detection for `Sort`, `Filter`
   // and `Subset` by preserving the predicates and/or keys, similarly
   // to how we preserve reducers.
-  implicit def qscriptCore[T[_[_]]]: RefEq[T, QScriptCore[T, ?]] =
-    new RefEq[T, QScriptCore[T, ?]] {
-      def refEqƒ: Algebra[QScriptCore[T, ?], FreeShape[T]] = {
+  implicit def qscriptCore[T[_[_]]]: DeepShape[T, QScriptCore[T, ?]] =
+    new DeepShape[T, QScriptCore[T, ?]] {
+      def deepShapeƒ: Algebra[QScriptCore[T, ?], FreeShape[T]] = {
 
         case Map(shape, fm) => fm >> shape
 
@@ -164,41 +164,41 @@ sealed abstract class RefEqInstances {
       }
     }
 
-  implicit def projectBucket[T[_[_]]](implicit QS: RefEq[T, QScriptCore[T, ?]])
-      : RefEq[T, ProjectBucket[T, ?]] =
-    new RefEq[T, ProjectBucket[T, ?]] {
-      def refEqƒ: Algebra[ProjectBucket[T, ?], FreeShape[T]] = {
+  implicit def projectBucket[T[_[_]]](implicit QS: DeepShape[T, QScriptCore[T, ?]])
+      : DeepShape[T, ProjectBucket[T, ?]] =
+    new DeepShape[T, ProjectBucket[T, ?]] {
+      def deepShapeƒ: Algebra[ProjectBucket[T, ?], FreeShape[T]] = {
         case BucketField(shape, value, name) =>
-          QS.refEqƒ(Map(shape, Free.roll(MFC(MapFuncsCore.ProjectField(value, name)))))
+          QS.deepShapeƒ(Map(shape, Free.roll(MFC(MapFuncsCore.ProjectField(value, name)))))
         case BucketIndex(shape, value, index) =>
-          QS.refEqƒ(Map(shape, Free.roll(MFC(MapFuncsCore.ProjectIndex(value, index)))))
+          QS.deepShapeƒ(Map(shape, Free.roll(MFC(MapFuncsCore.ProjectIndex(value, index)))))
       }
     }
 
-  implicit def constRead[T[_[_]], A]: RefEq[T, Const[Read[A], ?]] =
+  implicit def constRead[T[_[_]], A]: DeepShape[T, Const[Read[A], ?]] =
     constShape[T, Const[Read[A], ?]](EqualShape())
 
-  implicit def constShiftedRead[T[_[_]], A]: RefEq[T, Const[ShiftedRead[A], ?]] =
+  implicit def constShiftedRead[T[_[_]], A]: DeepShape[T, Const[ShiftedRead[A], ?]] =
     constShape[T, Const[ShiftedRead[A], ?]](EqualShape())
 
-  implicit def constDeadEnd[T[_[_]]]: RefEq[T, Const[DeadEnd, ?]] =
+  implicit def constDeadEnd[T[_[_]]]: DeepShape[T, Const[DeadEnd, ?]] =
     constShape[T, Const[DeadEnd, ?]](EqualShape())
 
   def freeShape[T[_[_]]](shape: ShapeMeta[T]): FreeShape[T] =
     Free.point[MapFunc[T, ?], ShapeMeta[T]](shape)
 
-  private def constShape[T[_[_]], F[_]](shape: ShapeMeta[T]): RefEq[T, F] =
-    new RefEq[T, F] {
-      def refEqƒ: Algebra[F, FreeShape[T]] = κ(freeShape[T](shape))
+  private def constShape[T[_[_]], F[_]](shape: ShapeMeta[T]): DeepShape[T, F] =
+    new DeepShape[T, F] {
+      def deepShapeƒ: Algebra[F, FreeShape[T]] = κ(freeShape[T](shape))
     }
 
   private def interpretBranch[T[_[_]]]
     (branch: FreeQS[T])
-    (implicit QT: RefEq[T, QScriptTotal[T, ?]])
+    (implicit QT: DeepShape[T, QScriptTotal[T, ?]])
       : FreeShape[T] =
-    branch.cata(interpret(κ(freeShape[T](EqualShape())), QT.refEqƒ))
+    branch.cata(interpret(κ(freeShape[T](EqualShape())), QT.deepShapeƒ))
 
-  private def refEqBranches[T[_[_]]](
+  private def deepShapeBranches[T[_[_]]](
     shape: FreeShape[T],
     lBranch: FreeQS[T],
     rBranch: FreeQS[T],
