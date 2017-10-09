@@ -20,6 +20,7 @@ import slamdata.Predef.{Map => _, _}
 
 import quasar._
 import quasar.RenderTree.ops._
+import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.qscript._

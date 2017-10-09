@@ -379,13 +379,6 @@ package object qscript {
       .apply(rewriteF.project)
       .embed
   }
-
-  def selfAndChildren[F[_]: Functor: Foldable, A](alg: Algebra[F, A])
-      : Algebra[F, (A, List[A])] =
-    faas => {
-      val fa = faas map (_._1)
-      (alg(fa), fa.toList)
-    }
 }
 
 package qscript {
