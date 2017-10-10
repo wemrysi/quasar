@@ -86,6 +86,7 @@ object DeepShape extends DeepShapeInstances {
 
         tupled.map {
           case (_, children) =>
+            // this is only correct for types with a single recursive parameter
             children.headOption.getOrElse(freeShape[T](UnequalShape()))
         }
       }
