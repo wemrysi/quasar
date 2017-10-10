@@ -27,6 +27,7 @@ import quasar.qscript.MapFuncsCore._
 
 import matryoshka.Algebra
 import matryoshka.data._
+import pathy.Path._
 import scalaz._, Scalaz._
 
 final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[Fix] {
@@ -90,6 +91,33 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
 
       "Unreferenced" >> {
         deepShapeQS(Unreferenced()) must equal(freeShape[Fix](RootShape()))
+      }
+    }
+
+    "Root" >> {
+      "Read" >> {
+        def deepShapeRead[A]: Algebra[Const[Read[A], ?], FreeShape[Fix]] =
+          implicitly[DeepShape[Fix, Const[Read[A], ?]]].deepShapeƒ
+
+        val qs = Read(rootDir[Sandboxed] </> dir("foo"))
+
+        deepShapeRead(Const(qs)) must equal(freeShape[Fix](RootShape()))
+      }
+
+      "ShiftedRead" >> {
+        def deepShapeSR[A]: Algebra[Const[ShiftedRead[A], ?], FreeShape[Fix]] =
+          implicitly[DeepShape[Fix, Const[ShiftedRead[A], ?]]].deepShapeƒ
+
+        val qs = ShiftedRead(rootDir[Sandboxed] </> dir("foo"), IdOnly)
+
+        deepShapeSR(Const(qs)) must equal(freeShape[Fix](RootShape()))
+      }
+
+      "DeadEnd" >> {
+        def deepShapeDE: Algebra[Const[DeadEnd, ?], FreeShape[Fix]] =
+          implicitly[DeepShape[Fix, Const[DeadEnd, ?]]].deepShapeƒ
+
+        deepShapeDE(Const(Root)) must equal(freeShape[Fix](RootShape()))
       }
     }
 
