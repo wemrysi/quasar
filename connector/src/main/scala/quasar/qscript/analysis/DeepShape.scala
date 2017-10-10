@@ -177,15 +177,17 @@ sealed abstract class DeepShapeInstances {
     }
 
   implicit def projectBucket[T[_[_]]](implicit QS: DeepShape[T, QScriptCore[T, ?]])
-      : DeepShape[T, ProjectBucket[T, ?]] =
+      : DeepShape[T, ProjectBucket[T, ?]] = {
+
+    val proj = new SimplifiableProjectionT[T]
+
     new DeepShape[T, ProjectBucket[T, ?]] {
       def deepShapeƒ: Algebra[ProjectBucket[T, ?], FreeShape[T]] = {
-        case BucketField(shape, value, name) =>
-          QS.deepShapeƒ(Map(shape, Free.roll(MFC(MapFuncsCore.ProjectField(value, name)))))
-        case BucketIndex(shape, value, index) =>
-          QS.deepShapeƒ(Map(shape, Free.roll(MFC(MapFuncsCore.ProjectIndex(value, index)))))
+        qs => QS.deepShapeƒ(
+          proj.ProjectBucket[QScriptCore[T, ?]].simplifyProjection(qs))
       }
     }
+  }
 
   implicit def constRead[T[_[_]], A]: DeepShape[T, Const[Read[A], ?]] =
     constShape[T, Const[Read[A], ?]](RootShape())

@@ -34,7 +34,8 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
 
   "DeepShape" >> {
 
-    val shape: FreeShape[Fix] = ProjectFieldR(freeShape[Fix](RootShape()), StrLit("quxx"))
+    val shape: FreeShape[Fix] =
+      ProjectFieldR(freeShape[Fix](RootShape()), StrLit("quxx"))
 
     "QScriptCore" >> {
 
@@ -89,6 +90,29 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
 
       "Unreferenced" >> {
         deepShapeQS(Unreferenced()) must equal(freeShape[Fix](RootShape()))
+      }
+    }
+
+    "ProjectBucket" >> {
+
+      val deepShapePB: Algebra[ProjectBucket, FreeShape[Fix]] =
+        implicitly[DeepShape[Fix, ProjectBucket]].deepShapeƒ
+
+      val value: FreeMap = ProjectIndexR(HoleF[Fix], IntLit(7))
+      val access: FreeMap = ProjectIndexR(HoleF[Fix], IntLit(5))
+
+      "BucketField" >> {
+        val qs = BucketField(shape, value, access)
+        val expected = ProjectFieldR(value >> shape, access >> shape)
+
+        deepShapePB(qs) must equal(expected)
+      }
+
+      "BucketIndex" >> {
+        val qs = BucketIndex(shape, value, access)
+        val expected = ProjectIndexR(value >> shape, access >> shape)
+
+        deepShapePB(qs) must equal(expected)
       }
     }
 
