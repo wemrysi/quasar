@@ -20,7 +20,7 @@ import slamdata.Predef.{Map => _, _}
 
 import scala.Predef.implicitly
 
-import quasar.common.JoinType
+import quasar.common.{JoinType, SortDir}
 import quasar.qscript._
 import quasar.fp._
 import quasar.qscript.MapFuncsCore._
@@ -32,6 +32,27 @@ import scalaz._, Scalaz._
 
 final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[Fix] {
   import DeepShape._
+
+  // a version of ShapeMeta equality that compares `UnknownShape`s as equal
+  // used for comparing test results
+  private def equalUnknown: Equal[FreeShape[Fix]] = {
+    val shapeEq: Equal[ShapeMeta[Fix]] = {
+      Equal.equal {
+        case (UnknownShape(), UnknownShape()) => true
+        case (l, r) => DeepShape.equal[Fix].equal(l, r)
+      }
+    }
+
+    new Equal[FreeShape[Fix]] {
+      def equal(left: FreeShape[Fix], right: FreeShape[Fix]) =
+        freeEqual[MapFunc].apply(shapeEq).equal(left, right)
+    }
+  }
+
+  implicit class EqualShape(lhs: FreeShape[Fix]) {
+    def must_equalShape(rhs: FreeShape[Fix]) =
+      lhs must equal(rhs)(equalUnknown, implicitly[Show[FreeShape[Fix]]])
+  }
 
   "DeepShape" >> {
 
@@ -47,7 +68,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         val func: FreeMap = ProjectIndexR(HoleF[Fix], IntLit(3))
         val qs = Map(shape, func)
 
-        deepShapeQS(qs) must equal(func >> shape)
+        deepShapeQS(qs) must_equalShape(func >> shape)
       }
 
       "LeftShift" >> {
@@ -65,7 +86,55 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
             MakeArrayR(AddR(shape, IntLit(9))),
             MakeArrayR(SubtractR(freeShape(Shifting(IdOnly, struct >> shape)), IntLit(10))))
 
-        deepShapeQS(qs) must equal(expected)
+        deepShapeQS(qs) must_equalShape(expected)
+      }
+
+      "Sort" >> {
+        val bucket: FreeMap = ProjectIndexR(HoleF[Fix], IntLit(3))
+        val order: FreeMap = ProjectIndexR(HoleF[Fix], IntLit(5))
+
+        val qs = Sort(shape, List(bucket), NonEmptyList[(FreeMap, SortDir)]((order, SortDir.Ascending)))
+
+        deepShapeQS(qs) must_equalShape(freeShape[Fix](UnknownShape()))
+      }
+
+      "Filter" >> {
+        val func: FreeMap = ProjectIndexR(HoleF[Fix], IntLit(3))
+        val qs = Filter(shape, func)
+
+        deepShapeQS(qs) must_equalShape(freeShape[Fix](UnknownShape()))
+      }
+
+      "Subset" >> {
+        val from: FreeQS =
+          Free.roll(QCT.inj(Map(
+            Free.point(SrcHole),
+            ProjectFieldR(HoleF, StrLit("foo")))))
+
+        val count: FreeQS =
+          Free.roll(QCT.inj(Map(
+            Free.point(SrcHole),
+            ProjectFieldR(HoleF, StrLit("bar")))))
+
+        val qs = Subset(shape, from, Take, count)
+
+        deepShapeQS(qs) must_equalShape(freeShape[Fix](UnknownShape()))
+      }
+
+      "Union" >> {
+        val lBranch: FreeQS =
+          Free.roll(QCT.inj(Map(
+            Free.point(SrcHole),
+            ProjectFieldR(HoleF, StrLit("foo")))))
+
+        val rBranch: FreeQS =
+          Free.roll(QCT.inj(Map(
+            Free.point(SrcHole),
+            ProjectFieldR(HoleF, StrLit("bar")))))
+
+        val qs = Union(shape, lBranch, rBranch)
+
+        deepShapeQS(qs) must_equalShape(freeShape[Fix](UnknownShape()))
       }
 
       "Reduce" >> {
@@ -86,11 +155,11 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
             MakeArrayR(AddR(bucket(0) >> shape, IntLit(9))),
             MakeArrayR(SubtractR(freeShape(Reducing(reducers(0).map(_ >> shape))), IntLit(10))))
 
-        deepShapeQS(qs) must equal(expected)
+        deepShapeQS(qs) must_equalShape(expected)
       }
 
       "Unreferenced" >> {
-        deepShapeQS(Unreferenced()) must equal(freeShape[Fix](RootShape()))
+        deepShapeQS(Unreferenced()) must_equalShape(freeShape[Fix](RootShape()))
       }
     }
 
@@ -101,7 +170,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
 
         val qs = Read(rootDir[Sandboxed] </> dir("foo"))
 
-        deepShapeRead(Const(qs)) must equal(freeShape[Fix](RootShape()))
+        deepShapeRead(Const(qs)) must_equalShape(freeShape[Fix](RootShape()))
       }
 
       "ShiftedRead" >> {
@@ -110,14 +179,14 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
 
         val qs = ShiftedRead(rootDir[Sandboxed] </> dir("foo"), IdOnly)
 
-        deepShapeSR(Const(qs)) must equal(freeShape[Fix](RootShape()))
+        deepShapeSR(Const(qs)) must_equalShape(freeShape[Fix](RootShape()))
       }
 
       "DeadEnd" >> {
         def deepShapeDE: Algebra[Const[DeadEnd, ?], FreeShape[Fix]] =
           implicitly[DeepShape[Fix, Const[DeadEnd, ?]]].deepShapeƒ
 
-        deepShapeDE(Const(Root)) must equal(freeShape[Fix](RootShape()))
+        deepShapeDE(Const(Root)) must_equalShape(freeShape[Fix](RootShape()))
       }
     }
 
@@ -133,14 +202,14 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         val qs = BucketField(shape, value, access)
         val expected = ProjectFieldR(value >> shape, access >> shape)
 
-        deepShapePB(qs) must equal(expected)
+        deepShapePB(qs) must_equalShape(expected)
       }
 
       "BucketIndex" >> {
         val qs = BucketIndex(shape, value, access)
         val expected = ProjectIndexR(value >> shape, access >> shape)
 
-        deepShapePB(qs) must equal(expected)
+        deepShapePB(qs) must_equalShape(expected)
       }
     }
 
@@ -191,7 +260,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
               ProjectFieldR(shape, StrLit("bar")),
               IntLit(2)))))
 
-        deepShapeTJ(qs) must equal(expected)
+        deepShapeTJ(qs) must_equalShape(expected)
       }
 
       "EquiJoin" >> {
@@ -216,7 +285,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
               ProjectFieldR(shape, StrLit("bar")),
               IntLit(2)))))
 
-        deepShapeEJ(qs) must equal(expected)
+        deepShapeEJ(qs) must_equalShape(expected)
       }
     }
   }
