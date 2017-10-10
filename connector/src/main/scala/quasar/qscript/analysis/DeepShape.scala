@@ -56,6 +56,14 @@ object DeepShape extends DeepShapeInstances {
     }
   }
 
+  implicit def show[T[_[_]]: ShowT]: Show[ShapeMeta[T]] =
+    Show.shows {
+      case RootShape() => "RootShape()"
+      case UnknownShape() => "UnknownShape()"
+      case Reducing(func) => s"Reducing(${func.shows})"
+      case Shifting(id, func) => s"Shifting(${id.shows}, ${func.shows})"
+    }
+
   implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: RenderTree[ShapeMeta[T]] =
     RenderTree.make {
       case RootShape() => Terminal(List("RootShape"), none)
