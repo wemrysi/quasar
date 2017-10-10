@@ -41,15 +41,15 @@ trait DeepShape[T[_[_]], F[_]] {
 object DeepShape extends DeepShapeInstances {
 
   sealed trait ShapeMeta[T[_[_]]]
-  final case class EqualShape[T[_[_]]]() extends ShapeMeta[T]
-  final case class UnequalShape[T[_[_]]]() extends ShapeMeta[T]
+  final case class RootShape[T[_[_]]]() extends ShapeMeta[T]
+  final case class UnknownShape[T[_[_]]]() extends ShapeMeta[T]
   final case class Reducing[T[_[_]]](func: ReduceFunc[FreeMap[T]]) extends ShapeMeta[T]
   final case class Shifting[T[_[_]]](id: IdStatus, struct: FreeMap[T]) extends ShapeMeta[T]
 
   implicit def equal[T[_[_]]: BirecursiveT: EqualT]: Equal[ShapeMeta[T]] = {
     Equal.equal {
-      case (EqualShape(), EqualShape()) => true
-      case (UnequalShape(), UnequalShape()) => false
+      case (RootShape(), RootShape()) => true
+      case (UnknownShape(), UnknownShape()) => false
       case (Reducing(funcL), Reducing(funcR)) => funcL ≟ funcR
       case (Shifting(idL, structL), Shifting(idR, structR)) => idL ≟ idR && structL ≟ structR
       case (_, _) => false
@@ -58,8 +58,8 @@ object DeepShape extends DeepShapeInstances {
 
   implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: RenderTree[ShapeMeta[T]] =
     RenderTree.make {
-      case EqualShape() => Terminal(List("EqualShape"), none)
-      case UnequalShape() => Terminal(List("UnequalShape"), none)
+      case RootShape() => Terminal(List("RootShape"), none)
+      case UnknownShape() => Terminal(List("UnknownShape"), none)
       case Reducing(func) => NonTerminal(List("Reducing"), None, func.render :: Nil)
       case Shifting(id, func) => NonTerminal(List("Shifting"), None, id.render :: func.render :: Nil)
     }
@@ -87,7 +87,7 @@ object DeepShape extends DeepShapeInstances {
         tupled.map {
           case (_, children) =>
             // this is only correct for types with a single recursive parameter
-            children.headOption.getOrElse(freeShape[T](UnequalShape()))
+            children.headOption.getOrElse(freeShape[T](UnknownShape()))
         }
       }
     }
@@ -109,7 +109,7 @@ sealed abstract class DeepShapeInstances {
       : DeepShape[T, CoEnv[Hole, F, ?]] =
     new DeepShape[T, CoEnv[Hole, F, ?]] {
       def deepShapeƒ: Algebra[CoEnv[Hole, F, ?], FreeShape[T]] =
-        _.run.fold(κ(freeShape[T](EqualShape())), F.deepShapeƒ)
+        _.run.fold(κ(freeShape[T](RootShape())), F.deepShapeƒ)
     }
 
   implicit def thetaJoin[T[_[_]]]: DeepShape[T, ThetaJoin[T, ?]] =
@@ -147,21 +147,21 @@ sealed abstract class DeepShapeInstances {
           repair >>= {
             case ReduceIndex(-\/(idx)) =>
               IList.fromList(bucket).index(idx).map(_ >> shape)
-	        .getOrElse(freeShape[T](UnequalShape()))
+	        .getOrElse(freeShape[T](UnknownShape()))
 
             case ReduceIndex(\/-(idx)) =>
               IList.fromList(reducers).index(idx)
 	        .map(func => freeShape[T](Reducing[T](func)))
-		.getOrElse(freeShape[T](UnequalShape()))
+		.getOrElse(freeShape[T](UnknownShape()))
           }
 
-        case Sort(_, _, _) => freeShape[T](UnequalShape())
-        case Filter(_, _) => freeShape[T](UnequalShape())
-        case Subset(_, _, _, _) => freeShape[T](UnequalShape())
+        case Sort(_, _, _) => freeShape[T](UnknownShape())
+        case Filter(_, _) => freeShape[T](UnknownShape())
+        case Subset(_, _, _, _) => freeShape[T](UnknownShape())
 
-        case Union(_, _, _) => freeShape[T](UnequalShape())
+        case Union(_, _, _) => freeShape[T](UnknownShape())
 
-        case Unreferenced() => freeShape[T](EqualShape())
+        case Unreferenced() => freeShape[T](RootShape())
       }
     }
 
@@ -177,13 +177,13 @@ sealed abstract class DeepShapeInstances {
     }
 
   implicit def constRead[T[_[_]], A]: DeepShape[T, Const[Read[A], ?]] =
-    constShape[T, Const[Read[A], ?]](EqualShape())
+    constShape[T, Const[Read[A], ?]](RootShape())
 
   implicit def constShiftedRead[T[_[_]], A]: DeepShape[T, Const[ShiftedRead[A], ?]] =
-    constShape[T, Const[ShiftedRead[A], ?]](EqualShape())
+    constShape[T, Const[ShiftedRead[A], ?]](RootShape())
 
   implicit def constDeadEnd[T[_[_]]]: DeepShape[T, Const[DeadEnd, ?]] =
-    constShape[T, Const[DeadEnd, ?]](EqualShape())
+    constShape[T, Const[DeadEnd, ?]](RootShape())
 
   def freeShape[T[_[_]]](shape: ShapeMeta[T]): FreeShape[T] =
     Free.point[MapFunc[T, ?], ShapeMeta[T]](shape)
@@ -197,7 +197,7 @@ sealed abstract class DeepShapeInstances {
     (branch: FreeQS[T])
     (implicit QT: DeepShape[T, QScriptTotal[T, ?]])
       : FreeShape[T] =
-    branch.cata(interpret(κ(freeShape[T](EqualShape())), QT.deepShapeƒ))
+    branch.cata(interpret(κ(freeShape[T](RootShape())), QT.deepShapeƒ))
 
   private def deepShapeBranches[T[_[_]]](
     shape: FreeShape[T],
