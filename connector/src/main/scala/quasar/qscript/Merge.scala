@@ -103,7 +103,7 @@ class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T]
     (input: S[H])
     (implicit
       R: Recursive.Aux[S[H], G],
-      Eq: DeepShape[T, G])
+      shape: DeepShape[T, G])
       : Cofree[G, DeepShape.FreeShape[T]] =
     DeepShape.annotated.apply[G].apply[T, S[H]](input)
 
@@ -111,7 +111,7 @@ class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T]
     (input: S[H])
     (implicit
       R: Recursive.Aux[S[H], G],
-      Eq: DeepShape[T, G])
+      shape: DeepShape[T, G])
       : ZipperList[G] =
     withShape[S, G, H](input).cata(linearize[G]).reverse
 
@@ -133,7 +133,7 @@ class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T]
       mergeable: Mergeable.Aux[T, G],
       C: Corecursive.Aux[S[H], G],
       R: Recursive.Aux[S[H], G],
-      Eq: DeepShape[T, G],
+      shape: DeepShape[T, G],
       DE: Const[DeadEnd, ?] :<: H)
       : SrcMerge[S[H], FreeQS] = {
 
@@ -151,7 +151,7 @@ class Merge[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T]
       mergeable: Mergeable.Aux[T, G],
       coalesce: Coalesce.Aux[T, G, G],
       N: Normalizable[G],
-      Eq: DeepShape[T, G],
+      shape: DeepShape[T, G],
       DE: Const[DeadEnd, ?] :<: G,
       QC: QScriptCore :<: G,
       FI: Injectable.Aux[G, QScriptTotal]):

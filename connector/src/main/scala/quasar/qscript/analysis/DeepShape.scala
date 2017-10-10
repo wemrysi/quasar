@@ -194,10 +194,10 @@ sealed abstract class DeepShapeInstances {
     }
 
   private def interpretBranch[T[_[_]]]
-    (branch: FreeQS[T])
+    (branch: FreeQS[T], shape: FreeShape[T])
     (implicit QT: DeepShape[T, QScriptTotal[T, ?]])
       : FreeShape[T] =
-    branch.cata(interpret(κ(freeShape[T](RootShape())), QT.deepShapeƒ))
+    branch.cata(interpret(κ(shape), QT.deepShapeƒ))
 
   private def deepShapeBranches[T[_[_]]](
     shape: FreeShape[T],
@@ -205,9 +205,8 @@ sealed abstract class DeepShapeInstances {
     rBranch: FreeQS[T],
     combine: JoinFunc[T])
       : FreeShape[T] =
-
     combine >>= {
-      case LeftSide => interpretBranch(lBranch) >> shape
-      case RightSide => interpretBranch(rBranch) >> shape
-  }
+      case LeftSide => interpretBranch(lBranch, shape)
+      case RightSide => interpretBranch(rBranch, shape)
+    }
 }
