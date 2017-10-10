@@ -20,9 +20,11 @@ import slamdata.Predef._
 import quasar.fp._, free._
 import quasar.fp.ski._
 
+import scala.concurrent.duration._
+
 import org.http4s.dsl._
 import org.http4s.headers.Host
-import org.http4s.{Request, Uri}
+import org.http4s.{Request, Response, Uri}
 import org.http4s.util.CaseInsensitiveString
 import scalaz._
 import scalaz.syntax.applicative._
@@ -146,14 +148,11 @@ class QHttpServiceSpec extends quasar.Qspec {
       "supports infinite streams without loading everything into memory" >> {
         val continuous: Process[StrIOM, String] = Process.constant("filler")
 
-        val body = QHttpService { case _ => QResponse.streaming(continuous) }
-          .toHttpService(evalStr("two")).orNotFound(request)
-          .unsafePerformSync.body
-
         // If we were no longer properly streaming and instead loading everything
-        // into memory, this line would never complete (I think)
-        body.take(5).run.unsafePerformSync
-        ok
+        // into memory before sending a response, this `Task` will timeout
+        QHttpService { case _ => QResponse.streaming(continuous) }
+          .toHttpService(evalStr("two")).orNotFound(request)
+          .timed(10.seconds).unsafePerformSync must beAnInstanceOf[Response]
       }
     }
   }
