@@ -20,11 +20,12 @@ import slamdata.Predef.{Map => _, _}
 
 import scala.Predef.implicitly
 
+import quasar.common.JoinType
 import quasar.qscript._
 import quasar.fp._
 import quasar.qscript.MapFuncsCore._
 
-import matryoshka._
+import matryoshka.Algebra
 import matryoshka.data._
 import scalaz._, Scalaz._
 
@@ -32,12 +33,13 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
   import DeepShape._
 
   "DeepShape" >> {
+
+    val shape: FreeShape[Fix] = ProjectFieldR(freeShape[Fix](RootShape()), StrLit("quxx"))
+
     "QScriptCore" >> {
 
       val deepShapeQS: Algebra[QScriptCore, FreeShape[Fix]] =
         implicitly[DeepShape[Fix, QScriptCore]].deepShapeƒ
-
-      val shape: FreeShape[Fix] = ProjectFieldR(freeShape[Fix](RootShape()), StrLit("quxx"))
 
       "Map" >> {
         val func: FreeMap = ProjectIndexR(HoleF[Fix], IntLit(3))
@@ -59,7 +61,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         val expected: FreeShape[Fix] =
           ConcatArraysR(
             MakeArrayR(AddR(shape, IntLit(9))),
-            MakeArrayR(SubtractR(freeShape(Shifting(IdOnly, struct)), IntLit(10))))
+            MakeArrayR(SubtractR(freeShape(Shifting(IdOnly, struct >> shape)), IntLit(10))))
 
         deepShapeQS(qs) must equal(expected)
       }
@@ -80,7 +82,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         val expected: FreeShape[Fix] =
           ConcatArraysR(
             MakeArrayR(AddR(bucket(0) >> shape, IntLit(9))),
-            MakeArrayR(SubtractR(freeShape(Reducing(reducers(0))), IntLit(10))))
+            MakeArrayR(SubtractR(freeShape(Reducing(reducers(0).map(_ >> shape))), IntLit(10))))
 
         deepShapeQS(qs) must equal(expected)
       }
@@ -88,6 +90,54 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
       "Unreferenced" >> {
         deepShapeQS(Unreferenced()) must equal(freeShape[Fix](RootShape()))
       }
+    }
+
+    "ThetaJoin" >> {
+
+      val deepShapeTJ: Algebra[ThetaJoin, FreeShape[Fix]] =
+        implicitly[DeepShape[Fix, ThetaJoin]].deepShapeƒ
+
+      val lBranch: FreeQS =
+        Free.roll(QCT.inj(LeftShift(
+          Free.roll(QCT.inj(Map(
+            Free.point(SrcHole),
+            ProjectFieldR(HoleF, StrLit("foo"))))),
+          HoleF,
+          IncludeId,
+          RightSideF)))
+
+      val rBranch: FreeQS =
+        Free.roll(QCT.inj(LeftShift(
+          Free.roll(QCT.inj(Map(
+            Free.point(SrcHole),
+            ProjectFieldR(HoleF, StrLit("bar"))))),
+          HoleF,
+          IncludeId,
+          LeftSideF)))
+
+      val combine: JoinFunc =
+        Free.roll(MFC(Add(
+          ProjectIndexR(LeftSideF, IntLit(1)),
+          ProjectIndexR(RightSideF, IntLit(2)))))
+
+      val qs = ThetaJoin(
+        shape,
+        lBranch,
+        rBranch,
+        BoolLit[Fix, JoinSide](true),
+        JoinType.Inner,
+        combine)
+
+      val expected: FreeShape[Fix] =
+        Free.roll(MFC(Add(
+          ProjectIndexR(
+            freeShape(Shifting(IncludeId, ProjectFieldR(shape, StrLit("foo")))),
+            IntLit(1)),
+          ProjectIndexR(
+            ProjectFieldR(shape, StrLit("bar")),
+            IntLit(2)))))
+
+      deepShapeTJ(qs) must equal(expected)
     }
   }
 }

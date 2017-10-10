@@ -40,22 +40,26 @@ trait DeepShape[T[_[_]], F[_]] {
  */
 object DeepShape extends DeepShapeInstances {
 
+  type FreeShape[T[_[_]]] = FreeMapA[T, ShapeMeta[T]]
+
   sealed trait ShapeMeta[T[_[_]]]
   final case class RootShape[T[_[_]]]() extends ShapeMeta[T]
   final case class UnknownShape[T[_[_]]]() extends ShapeMeta[T]
-  final case class Reducing[T[_[_]]](func: ReduceFunc[FreeMap[T]]) extends ShapeMeta[T]
-  final case class Shifting[T[_[_]]](id: IdStatus, struct: FreeMap[T]) extends ShapeMeta[T]
+  final case class Reducing[T[_[_]]](func: ReduceFunc[FreeShape[T]]) extends ShapeMeta[T]
+  final case class Shifting[T[_[_]]](id: IdStatus, struct: FreeShape[T]) extends ShapeMeta[T]
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def equal[T[_[_]]: BirecursiveT: EqualT]: Equal[ShapeMeta[T]] = {
     Equal.equal {
       case (RootShape(), RootShape()) => true
-      case (UnknownShape(), UnknownShape()) => false
+      case (UnknownShape(), UnknownShape()) => false // two unknown shapes always compare as `false`
       case (Reducing(funcL), Reducing(funcR)) => funcL ≟ funcR
       case (Shifting(idL, structL), Shifting(idR, structR)) => idL ≟ idR && structL ≟ structR
       case (_, _) => false
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def show[T[_[_]]: ShowT]: Show[ShapeMeta[T]] =
     Show.shows {
       case RootShape() => "RootShape()"
@@ -64,6 +68,7 @@ object DeepShape extends DeepShapeInstances {
       case Shifting(id, func) => s"Shifting(${id.shows}, ${func.shows})"
     }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]: RenderTree[ShapeMeta[T]] =
     RenderTree.make {
       case RootShape() => Terminal(List("RootShape"), none)
@@ -71,8 +76,6 @@ object DeepShape extends DeepShapeInstances {
       case Reducing(func) => NonTerminal(List("Reducing"), None, func.render :: Nil)
       case Shifting(id, func) => NonTerminal(List("Shifting"), None, id.render :: func.render :: Nil)
     }
-
-  type FreeShape[T[_[_]]] = FreeMapA[T, ShapeMeta[T]]
 
   def normalize[T[_[_]]: BirecursiveT: EqualT](shape: FreeShape[T]): FreeShape[T] =
     shape.transCata[FreeShape[T]](MapFuncCore.normalize[T, ShapeMeta[T]])
@@ -146,21 +149,21 @@ sealed abstract class DeepShapeInstances {
         case Map(shape, fm) => fm >> shape
 
         case LeftShift(shape, struct, id, repair) =>
-	  repair >>= {
-	    case LeftSide => shape
-	    case RightSide => freeShape[T](Shifting[T](id, struct))
+          repair >>= {
+            case LeftSide => shape
+            case RightSide => freeShape[T](Shifting[T](id, struct >> shape))
 	  }
 
         case Reduce(shape, bucket, reducers, repair) =>
           repair >>= {
             case ReduceIndex(-\/(idx)) =>
               IList.fromList(bucket).index(idx).map(_ >> shape)
-	        .getOrElse(freeShape[T](UnknownShape()))
+                .getOrElse(freeShape[T](UnknownShape()))
 
             case ReduceIndex(\/-(idx)) =>
               IList.fromList(reducers).index(idx)
-	        .map(func => freeShape[T](Reducing[T](func)))
-		.getOrElse(freeShape[T](UnknownShape()))
+                .map(func => freeShape[T](Reducing[T](func.map(_ >> shape))))
+                .getOrElse(freeShape[T](UnknownShape()))
           }
 
         case Sort(_, _, _) => freeShape[T](UnknownShape())
