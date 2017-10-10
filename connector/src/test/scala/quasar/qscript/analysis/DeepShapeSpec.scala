@@ -92,10 +92,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
       }
     }
 
-    "ThetaJoin" >> {
-
-      val deepShapeTJ: Algebra[ThetaJoin, FreeShape[Fix]] =
-        implicitly[DeepShape[Fix, ThetaJoin]].deepShapeƒ
+    "Joins" >> {
 
       val lBranch: FreeQS =
         Free.roll(QCT.inj(LeftShift(
@@ -120,24 +117,55 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
           ProjectIndexR(LeftSideF, IntLit(1)),
           ProjectIndexR(RightSideF, IntLit(2)))))
 
-      val qs = ThetaJoin(
-        shape,
-        lBranch,
-        rBranch,
-        BoolLit[Fix, JoinSide](true),
-        JoinType.Inner,
-        combine)
+      "ThetaJoin" >> {
 
-      val expected: FreeShape[Fix] =
-        Free.roll(MFC(Add(
-          ProjectIndexR(
-            freeShape(Shifting(IncludeId, ProjectFieldR(shape, StrLit("foo")))),
-            IntLit(1)),
-          ProjectIndexR(
-            ProjectFieldR(shape, StrLit("bar")),
-            IntLit(2)))))
+        val deepShapeTJ: Algebra[ThetaJoin, FreeShape[Fix]] =
+          implicitly[DeepShape[Fix, ThetaJoin]].deepShapeƒ
 
-      deepShapeTJ(qs) must equal(expected)
+        val qs = ThetaJoin(
+          shape,
+          lBranch,
+          rBranch,
+          BoolLit[Fix, JoinSide](true),
+          JoinType.Inner,
+          combine)
+
+        val expected: FreeShape[Fix] =
+          Free.roll(MFC(Add(
+            ProjectIndexR(
+              freeShape(Shifting(IncludeId, ProjectFieldR(shape, StrLit("foo")))),
+              IntLit(1)),
+            ProjectIndexR(
+              ProjectFieldR(shape, StrLit("bar")),
+              IntLit(2)))))
+
+        deepShapeTJ(qs) must equal(expected)
+      }
+
+      "EquiJoin" >> {
+
+        val deepShapeEJ: Algebra[EquiJoin, FreeShape[Fix]] =
+          implicitly[DeepShape[Fix, EquiJoin]].deepShapeƒ
+
+        val qs = EquiJoin(
+          shape,
+          lBranch,
+          rBranch,
+          List((BoolLit[Fix, Hole](true), BoolLit[Fix, Hole](true))),
+          JoinType.Inner,
+          combine)
+
+        val expected: FreeShape[Fix] =
+          Free.roll(MFC(Add(
+            ProjectIndexR(
+              freeShape(Shifting(IncludeId, ProjectFieldR(shape, StrLit("foo")))),
+              IntLit(1)),
+            ProjectIndexR(
+              ProjectFieldR(shape, StrLit("bar")),
+              IntLit(2)))))
+
+        deepShapeEJ(qs) must equal(expected)
+      }
     }
   }
 }
