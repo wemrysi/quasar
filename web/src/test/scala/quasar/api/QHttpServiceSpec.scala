@@ -135,12 +135,25 @@ class QHttpServiceSpec extends quasar.Qspec {
       }
 
       "results in response stream failure exception when failure appears too far away in stream" >> {
-        val pad = Process.emitAll[String](List.fill(3000)("jsdfsdfsdfsf"))
+        val pad = Process.emitAll[String](List.fill(50)("jsdfsdfsdfsf"))
 
         QHttpService { case _ => QResponse.streaming(pad.append[StrIOM, String](failStream)) }
           .toHttpService(evalStr("two"))(request)
           .flatMap(_.orNotFound.as[String])
           .unsafePerformSync must throwA[HttpResponseStreamFailureException]
+      }
+
+      "supports infinite streams without loading everything into memory" >> {
+        val continuous: Process[StrIOM, String] = Process.constant("filler")
+
+        val body = QHttpService { case _ => QResponse.streaming(continuous) }
+          .toHttpService(evalStr("two")).orNotFound(request)
+          .unsafePerformSync.body
+
+        // If we were no longer properly streaming and instead loading everything
+        // into memory, this line would never complete (I think)
+        body.take(5).run.unsafePerformSync
+        ok
       }
     }
   }

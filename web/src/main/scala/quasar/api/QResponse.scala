@@ -100,9 +100,21 @@ object QResponse {
       Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](free.injectFT))
 
   /**
-    * This QResponse constructor guards against `Processes` that include "expected"
-    * errors as part of the head of the `Process` so that these get transformed into
-    * useful Http responses to the user of endpoints who make use of such streams.
+    * This QResponse constructor attempts to eliminate all effects in this
+    * stream that aren't actually part of the response stream by eagerly evaluating
+    * the "first few" effects of the stream. Examples of such effects are
+    * opening a quasar filesystem file, initiating a query to a connector, etc. Doing so
+    * allows us to provide a proper error response to clients instead of sending a
+    * Http OK and then failing to stream the response body because actually it
+    * turned out the file didn't exist after all.
+    *
+    * The better fix for this problem would probably be to avoid constructing
+    * such processes (at least for use in the web layer) and instead make a
+    * distinction between the effects that create a stream and the effects
+    * that "run" the stream.
+    *
+    * In the meantime, this constructor should mostly do the right thing if
+    * provided with such processes.
     */
   @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   def streaming[S[_], A]

@@ -54,7 +54,7 @@ trait ProcessOps {
       firstStep[F2, O2] flatMap { next =>
         val (hd, tl) = next.unemit
 
-        if (hd.isEmpty || p(hd))
+        if (hd.isEmpty || p(hd) || tl.isHalt)
           (Process.emitAll(hd) ++ tl).point[F2]
         else
           (Process.emitAll(hd) ++ tl).stepUntil(p)
