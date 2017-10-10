@@ -191,14 +191,22 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
     } yield HdfsConfig(sparkConf, hdfsUrl, rootPath)
   }
 
+  // SPARKCORE_PATH
   private def sparkCoreJar: DefErrT[Task, APath] = {
     /* Points to quasar-web.jar or target/classes if run from sbt repl/run */
-    val fetchProjectRootPath = Task.delay {
+    val fetchProjectRootPath: Task[Option[APath]] = Task.delay {
+      println(s"fetching project rooot path")
       val pathStr = URLDecoder.decode(this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath, "UTF-8")
+      println(s"pathStr is $pathStr")
       posixCodec.parsePath[Option[APath]](_ => None, Some(_).map(unsafeSandboxAbs), _ => None, Some(_).map(unsafeSandboxAbs))(pathStr)
     }
     val jar: Task[Option[APath]] =
-      fetchProjectRootPath.map(_.flatMap(s => parentDir(s).map(_ </> file("sparkcore.jar"))))
+      fetchProjectRootPath.map(_.flatMap{ s =>
+        parentDir(s).map(parentDir(_)).join.map(root => {
+          println(s"###### $root")
+          root </> file("sparkcore.jar")
+        })
+      })
     OptionT(jar).toRight(NonEmptyList("Could not fetch sparkcore.jar").left[EnvironmentError])
   }
 
