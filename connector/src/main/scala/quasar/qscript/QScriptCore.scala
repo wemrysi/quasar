@@ -21,7 +21,7 @@ import quasar.{NonTerminal, Terminal, RenderTree, RenderTreeT}, RenderTree.ops._
 import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.fp._
-import quasar.qscript.analysis.DeepShape
+import quasar.qscript.analysis.{DeepShape, RefEq}
 
 import matryoshka._
 import matryoshka.data._
@@ -336,7 +336,7 @@ object QScriptCore {
             lazy val rBucketEq: List[DeepShape.FreeShape[IT]] =
 	      bucket2 ∘ (b => DeepShape.normalize(b >> right.shape))
 
-            (lBucket ≟ rBucket || DeepShape.refEq(lBucketEq, rBucketEq)).option {
+            (lBucket ≟ rBucket || RefEq.refEq(lBucketEq, rBucketEq)).option {
               val lReducers = reducers1 ∘ (_ ∘ (_ >> lacc))
               val rReducers = reducers2 ∘ (_ ∘ (_ >> racc))
 
@@ -396,7 +396,7 @@ object QScriptCore {
               case IncludeId => RightSideF
             }
 
-            (lStruct ≟ rStruct || DeepShape.refEq(lStructEq, rStructEq)).option {
+            (lStruct ≟ rStruct || RefEq.refEq(lStructEq, rStructEq)).option {
               def constructMerge(access1: JoinFunc[IT], access2: JoinFunc[IT]) = {
                 val (repair, repL, repR) =
                   concat(
@@ -428,7 +428,7 @@ object QScriptCore {
 	    lazy val lCondEq: DeepShape.FreeShape[IT] = DeepShape.normalize(c1 >> left.shape)
 	    lazy val rCondEq: DeepShape.FreeShape[IT] = DeepShape.normalize(c2 >> right.shape)
 
-            (lCond ≟ rCond || DeepShape.refEq(lCondEq, rCondEq))
+            (lCond ≟ rCond || RefEq.refEq(lCondEq, rCondEq))
               .option(SrcMerge(Filter(s1, lCond), lacc, racc))
 
           case (Sort(s1, b1, o1), Sort(_, b2, o2)) =>
@@ -446,8 +446,8 @@ object QScriptCore {
             lazy val lOrderEq = o1.map(_.leftMap(o => DeepShape.normalize(o >> left.shape)))
             lazy val rOrderEq = o2.map(_.leftMap(o => DeepShape.normalize(o >> right.shape)))
 
-            ((lBucket ≟ rBucket || DeepShape.refEq(lBucketEq, rBucketEq)) &&
-	      (lOrder ≟ rOrder || DeepShape.refEq(lOrderEq, rOrderEq))).option {
+            ((lBucket ≟ rBucket || RefEq.refEq(lBucketEq, rBucketEq)) &&
+	      (lOrder ≟ rOrder || RefEq.refEq(lOrderEq, rOrderEq))).option {
                 SrcMerge(Sort(s1, lBucket, lOrder), lacc, racc)
 	      }
 
