@@ -331,10 +331,10 @@ object QScriptCore {
             val rBucket: List[FreeMap[IT]] = bucket2 ∘ (b => norm.freeMF(b >> racc))
 
             lazy val lBucketEq: List[DeepShape.FreeShape[IT]] =
-	      bucket1 ∘ (b => DeepShape.normalize(b >> left.shape))
+              bucket1 ∘ (b => DeepShape.normalize(b >> left.shape))
 
             lazy val rBucketEq: List[DeepShape.FreeShape[IT]] =
-	      bucket2 ∘ (b => DeepShape.normalize(b >> right.shape))
+              bucket2 ∘ (b => DeepShape.normalize(b >> right.shape))
 
             (lBucket ≟ rBucket || RefEq.refEq(lBucketEq, rBucketEq)).option {
               val lReducers = reducers1 ∘ (_ ∘ (_ >> lacc))
