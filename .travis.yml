@@ -55,9 +55,9 @@ script:
     SPECIFIC_DELEGATE=
 
     case $CONNECTOR in
-      couchbase) SPECIFIC_DELEGATE="couchbaseIt/testOnly -- xonly" ;;
-      marklogic_*) SPECIFIC_DELEGATE="marklogicIt/testOnly -- xonly" ;;
-      mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly" ;;
+      couchbase) SPECIFIC_DELEGATE="couchbaseIt/testOnly -- xonly failtrace" ;;
+      marklogic_*) SPECIFIC_DELEGATE="marklogicIt/testOnly -- xonly failtrace" ;;
+      mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly failtrace" ;;
       spark_hdfs) ./sbt 'set every sparkDependencyProvided := true' sparkcore/assembly ;;
       *) ;;
     esac
@@ -69,7 +69,7 @@ script:
   - |-
     ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
       it/sideEffectTestFSConfig \
-      "it/testOnly -- xonly" \
+      "it/testOnly -- xonly failtrace" \
       "$SPECIFIC_DELEGATE"
 
   - set +e
@@ -99,8 +99,8 @@ jobs:
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
             it/sideEffectTestFSConfig \
-            "testOnly -- xonly" \
-            "exclusive:testOnly -- xonly"
+            "testOnly -- xonly failtrace" \
+            "exclusive:testOnly -- xonly failtrace"
 
     - stage: publish
       env:
