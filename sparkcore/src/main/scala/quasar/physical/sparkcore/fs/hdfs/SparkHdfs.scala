@@ -193,21 +193,15 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
 
   // SPARKCORE_PATH
   private def sparkCoreJar: DefErrT[Task, APath] = {
-    /* Points to quasar-web.jar or target/classes if run from sbt repl/run */
-    val fetchProjectRootPath: Task[Option[APath]] = Task.delay {
-      println(s"fetching project rooot path")
+    /* Points to plugin directory (one level below quasar-web.jar in the FS hierarchy) */
+    val fetchPluginPath: OptionT[Task, APath] = OptionT(Task.delay {
       val pathStr = URLDecoder.decode(this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath, "UTF-8")
-      println(s"pathStr is $pathStr")
       posixCodec.parsePath[Option[APath]](_ => None, Some(_).map(unsafeSandboxAbs), _ => None, Some(_).map(unsafeSandboxAbs))(pathStr)
+    })
+    val jar: OptionT[Task, APath] = fetchPluginPath >>= { s =>
+      OptionT(parentDir(s).map(parentDir(_)).join.map(_ </> file("sparkcore.jar")).point[Task])
     }
-    val jar: Task[Option[APath]] =
-      fetchProjectRootPath.map(_.flatMap{ s =>
-        parentDir(s).map(parentDir(_)).join.map(root => {
-          println(s"###### $root")
-          root </> file("sparkcore.jar")
-        })
-      })
-    OptionT(jar).toRight(NonEmptyList("Could not fetch sparkcore.jar").left[EnvironmentError])
+    jar.toRight(NonEmptyList("Could not fetch sparkcore.jar").left[EnvironmentError])
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
