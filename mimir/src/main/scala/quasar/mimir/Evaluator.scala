@@ -33,8 +33,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.Queue
 
 trait EvaluatorModule[M[+ _]]
-    extends CrossOrdering
-    with Memoizer
+    extends Memoizer
     with TypeInferencer
     with CondRewriter
     with OpFinderModule[M]
@@ -91,12 +90,9 @@ trait EvaluatorModule[M[+ _]]
 
     def fullRewriteDAG(optimize: Boolean, ctx: EvaluationContext): DepGraph => DepGraph = {
       stagedRewriteDAG(optimize, ctx) andThen
-        (orderCrosses _) andThen
         composeOptimizations(
           optimize,
           List[DepGraph => DepGraph](
-            // TODO: Predicate pullups break a SnapEngage query (see PLATFORM-951)
-            //predicatePullups(_, ctx),
             inferTypes(JType.JUniverseT), { g =>
               megaReduce(g, findReductions(g, ctx))
             },
