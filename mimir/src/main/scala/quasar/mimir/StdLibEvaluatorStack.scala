@@ -24,8 +24,7 @@ trait StdLibEvaluatorStack[M[+ _]]
     with StdLibModule[M]
     with StdLibOpFinderModule[M]
     with StdLibStaticInlinerModule[M]
-    with ReductionFinderModule[M]
-    with JoinOptimizerModule[M] {
+    with ReductionFinderModule[M] {
 
   trait Lib extends StdLib with StdLibOpFinder
   object library extends Lib
