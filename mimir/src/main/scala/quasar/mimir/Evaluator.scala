@@ -37,7 +37,6 @@ trait EvaluatorModule[M[+ _]]
     with TypeInferencer
     with CondRewriter
     with OpFinderModule[M]
-    with StaticInlinerModule[M]
     with ReductionFinderModule[M]
     with TransSpecableModule[M]
     with TableModule[M] // Remove this explicit dep!
@@ -52,8 +51,7 @@ trait EvaluatorModule[M[+ _]]
 
   abstract class EvaluatorLike[N[+ _]](N0: Monad[N])(implicit mn: M ~> N, nm: N ~> M)
       extends OpFinder
-      with ReductionFinder
-      with StaticInliner {
+      with ReductionFinder {
 
     import library._
     import trans._
@@ -83,7 +81,6 @@ trait EvaluatorModule[M[+ _]]
       composeOptimizations(
         optimize,
         List(
-          inlineStatics(_, ctx),
           rewriteConditionals(_)
         ))
     }

@@ -23,7 +23,6 @@ trait StdLibEvaluatorStack[M[+ _]]
     extends EvaluatorModule[M]
     with StdLibModule[M]
     with StdLibOpFinderModule[M]
-    with StdLibStaticInlinerModule[M]
     with ReductionFinderModule[M] {
 
   trait Lib extends StdLib with StdLibOpFinder
@@ -31,8 +30,7 @@ trait StdLibEvaluatorStack[M[+ _]]
 
   abstract class Evaluator[N[+ _]](N0: Monad[N])(implicit mn: M ~> N, nm: N ~> M)
       extends EvaluatorLike[N](N0)(mn, nm)
-      with StdLibOpFinder
-      with StdLibStaticInliner {
+      with StdLibOpFinder {
 
     val Exists = library.Exists
     val Forall = library.Forall
