@@ -35,7 +35,6 @@ import scala.collection.immutable.Queue
 trait EvaluatorModule[M[+ _]]
     extends Memoizer
     with TypeInferencer
-    with CondRewriter
     with OpFinderModule[M]
     with ReductionFinderModule[M]
     with TransSpecableModule[M]
@@ -75,15 +74,8 @@ trait EvaluatorModule[M[+ _]]
       if (optimize) funcs.reverse.map(Endo[DepGraph]).suml.run else identity
 
     // Have to be idempotent on subgraphs
-    def stagedRewriteDAG(optimize: Boolean, ctx: EvaluationContext): DepGraph => DepGraph = {
-      // rewrites are written in `andThen` order
-      // we reverse above because our semigroup uses `compose`
-      composeOptimizations(
-        optimize,
-        List(
-          rewriteConditionals(_)
-        ))
-    }
+    def stagedRewriteDAG(optimize: Boolean, ctx: EvaluationContext): DepGraph => DepGraph =
+      identity
 
     def fullRewriteDAG(optimize: Boolean, ctx: EvaluationContext): DepGraph => DepGraph = {
       stagedRewriteDAG(optimize, ctx) andThen
