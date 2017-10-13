@@ -59,7 +59,6 @@ object CompositeFileSystem {
     mountTypes: BackendDef[PhysFsEffM],
     mounts: MountingsConfig
   ): MainTask[FSThing] = for {
-    metastore  <- metaRef.read.liftM[MainErrT]
     hfsRef     <- TaskRef(Empty.backendEffect[HierarchicalFsEffM]).liftM[MainErrT]
     mntdRef    <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
 
