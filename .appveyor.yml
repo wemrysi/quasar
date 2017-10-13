@@ -12,6 +12,8 @@ skip_tags: true
 
 cache:
   - .targets
+  - project\target
+  - project\project\target
   - '%localappdata%\coursier'
   - 'C:\Users\appveyor\.sbt'
   - 'C:\Users\appveyor\.ivy2'
