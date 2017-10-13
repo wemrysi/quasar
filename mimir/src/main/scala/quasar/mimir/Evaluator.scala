@@ -42,7 +42,6 @@ trait EvaluatorModule[M[+ _]]
     with StaticInlinerModule[M]
     with ReductionFinderModule[M]
     with TransSpecableModule[M]
-    with PredicatePullupsModule[M]
     with TableModule[M] // Remove this explicit dep!
     with TableLibModule[M] {
 
@@ -57,8 +56,7 @@ trait EvaluatorModule[M[+ _]]
       extends OpFinder
       with ReductionFinder
       with StaticInliner
-      with JoinOptimizer
-      with PredicatePullups {
+      with JoinOptimizer {
 
     import library._
     import trans._
