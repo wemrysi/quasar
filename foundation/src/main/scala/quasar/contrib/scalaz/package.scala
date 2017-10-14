@@ -45,6 +45,10 @@ package object scalaz {
       OptionT(self.run.map(opt => opt: Option[B]))
   }
 
+  implicit final class MoreBindOps[F[_], A](val self: F[A])(implicit val F: Bind[F]) extends _root_.scalaz.syntax.Ops[F[A]] {
+    def <<[B](b: => F[B]): F[A] = F.bind(self)(a => b.as(a))
+  }
+
   implicit def toMonadTell_Ops[F[_], W, A](fa: F[A])(implicit F: MonadTell_[F, W]): MonadTell_Ops[F, W, A] =
     new MonadTell_Ops[F, W, A](fa)
 

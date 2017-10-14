@@ -100,29 +100,35 @@ object Fixture {
     }
   }
 
+  def inMemFsThing(
+    state: InMemState = InMemState.empty,
+    mounts: MountingsConfig = MountingsConfig.empty
+  ): Task[FSThing] = {
+    val noShutdown: Task[Unit] = Task.now(())
+    (InMemory.runBackend(state) |@| mountingInter(mounts.toMap))((fs, mount) =>
+      FSThing(
+        fs andThen injectFT[Task, QErrs_Task],
+        mount andThen injectFT[Task, QErrs_Task],
+        noShutdown))
+  }
+
   def inMemFS(
     state: InMemState = InMemState.empty,
     mounts: MountingsConfig = MountingsConfig.empty,
-    metaRef: TaskRef[MetaStore] = MetaStoreFixture.createNewTestMetastore.flatMap(TaskRef(_)).unsafePerformSync,
+    metaRefT: Task[TaskRef[MetaStore]] = MetaStoreFixture.createNewTestMetastore().flatMap(TaskRef(_)),
     persist: quasar.db.DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]
-  ): Task[CoreEffIO ~> QErrs_TaskM] = {
-    val noShutdown: Task[Unit] = Task.now(())
+  ): Task[CoreEffIO ~> QErrs_TaskM] =
     for {
-      fs      <- InMemory.runBackend(state)
-      mount   <- mountingInter(mounts.toMap)
-      fsThing = FSThing(
-                  fs andThen injectFT[Task, QErrs_Task],
-                  mount andThen injectFT[Task, QErrs_Task],
-                  noShutdown)
+      metaRef <- metaRefT
+      fsThing <- inMemFsThing(state, mounts)
       eval    <- CoreEff.defaultImpl(fsThing, metaRef, persist)
     } yield injectFT[Task, QErrs_Task] :+: eval
-  }
 
   def inMemFSWeb(
     state: InMemState = InMemState.empty,
     mounts: MountingsConfig = MountingsConfig.empty,
-    metaRef: TaskRef[MetaStore] = MetaStoreFixture.createNewTestMetastore.flatMap(TaskRef(_)).unsafePerformSync,
+    metaRefT: Task[TaskRef[MetaStore]] = MetaStoreFixture.createNewTestMetastore().flatMap(TaskRef(_)),
     persist: quasar.db.DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]
   ): Task[CoreEffIO ~> ResponseOr] =
-    inMemFS(state, mounts, metaRef, persist).map(Server.webInter)
+    inMemFS(state, mounts, metaRefT, persist).map(Server.webInter)
 }

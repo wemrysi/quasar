@@ -18,6 +18,7 @@ package quasar.main
 
 import slamdata.Predef._
 import quasar.config.MetaStoreConfig
+import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
 import quasar.db.DbConnectionConfig
 import quasar.fp._
@@ -40,7 +41,7 @@ final case class Quasar(interp: CoreEff ~> QErrs_TaskM, shutdown: Task[Unit]) {
     Quasar.toTask compose interp
 
   def extendShutdown(step: Task[Unit]): Quasar =
-    copy(shutdown = shutdown >> step)
+    copy(shutdown = shutdown.attemptNonFatal.void >> step)
 }
 
 object Quasar {
