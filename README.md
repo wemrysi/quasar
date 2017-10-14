@@ -26,7 +26,7 @@ See the instructions below for running and configuring these JARs.
 
 ## Building from Source
 
-**Note**: This requires Java 8 and Bash (Linux, Mac, or Cygwin on Windows).
+**Note**: This requires Java 8 and Bash (Linux, Mac).  Bash is not required on Windows, but the non-SBT infrastructure (e.g. the docker scripts) currently only works on Unix platforms.
 
 ### Build
 
@@ -34,14 +34,13 @@ The following sections explain how to build and run the various subprojects.
 
 #### Basic Compile & Test
 
-To compile the project and run tests, first clone the quasar repo and then execute the following command:
+To compile the project and run tests, first clone the quasar repo and then execute the following command (if on Windows, reverse the slashes):
 
 ```bash
 ./sbt test
 ```
 
-Note: please note that we are not using here a system wide sbt, but our own copy of it (under ./sbt). This is primarily
- done for determinism. In order to have a reproducible build, the helper script needs to be part of the repo.
+Note: please note that we are not using here a system wide sbt, but our own copy of it (under ./sbt). This is primarily done for determinism. In order to have a reproducible build, the helper script needs to be part of the repo.
 
 Running the full test suite can be done using docker containers for various backends:
 
