@@ -23,9 +23,8 @@ environment:
   JAVA_HOME: 'C:\Program Files\Java\jdk1.8.0'
   PATH: '%JAVA_HOME%\bin;%PATH%'
 
-# TODO remove target cache here
-# before_build:
-  # - cmd:
+before_build:
+  - cmd: 'IF "%APPVEYOR_PULL_REQUEST_NUMBER%"=="" (.\sbt clean)'
 
 build_script:
   - cmd: .\sbt ++"2.11.8" test:compile
