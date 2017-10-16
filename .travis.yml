@@ -60,7 +60,7 @@ script:
       mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly failtrace" ;;
 
       spark_hdfs)
-        ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION" \
+        ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
           'set every assemblyJarName in assembly := "sparkcore.jar"' \
           'set every sparkDependencyProvided := true' \
           sparkcore/assembly
@@ -70,11 +70,11 @@ script:
     esac
 
   # workaround for the fact that travis caching isn't working. when it starts working again, remove this
-  - travis_wait 40 ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION" connector/test:compile
+  - travis_wait 40 ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
 
   # then run the tests (note that this re-runs some tests; we can get rid of that once we have polyrepo)
   - |-
-    ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION" \
+    ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
       it/sideEffectTestFSConfig \
       "it/testOnly -- xonly failtrace" \
       "$SPECIFIC_DELEGATE"
@@ -93,7 +93,7 @@ jobs:
         - set -e
 
         - |-
-          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION" \
+          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
             checkHeaders \
             test:compile
 
@@ -104,7 +104,7 @@ jobs:
       env:
       script:
         - |-
-          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION" \
+          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
             it/sideEffectTestFSConfig \
             "testOnly -- xonly failtrace" \
             "exclusive:testOnly -- xonly failtrace"
@@ -113,7 +113,7 @@ jobs:
       env:
       script:
         - set -e
-        - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION" doc web/assembly'
+        - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc web/assembly'
         - scripts/testJar
 
         # release to sonatype
@@ -121,7 +121,7 @@ jobs:
 
         # recreate sparkcore.jar, which is just going to hang out
         - |-
-          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION" \
+          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
             'set every assemblyJarName in assembly := "sparkcore.jar"' \
             'set every sparkDependencyProvided := true' \
             sparkcore/assembly
