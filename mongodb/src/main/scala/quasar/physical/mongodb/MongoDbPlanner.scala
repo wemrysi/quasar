@@ -37,7 +37,6 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
 import quasar.qscript.{Coalesce => _, _}
-import quasar.qscript.{MapFuncsCore => MF}
 import quasar.std.StdLib._ // TODO: remove this
 
 import java.time.Instant
@@ -1302,32 +1301,6 @@ object MongoDbPlanner {
       case x => x.point[M]
     }
     f
-  }
-
-  def mapBeforeSort[T[_[_]]: BirecursiveT]: Trans[T] =
-    new Trans[T] {
-      def trans[F[_], G[_]: Functor]
-          (GtoF: PrismNT[G, F])
-          (implicit QC: QScriptCore[T, ?] :<: F) = {
-        case qs @ Map(Embed(src), fm) =>
-          GtoF.get(src) >>= QC.prj match {
-            case Some(Sort(innerSrc, bucket, order)) =>
-              val innerMap =
-                GtoF.reverseGet(QC.inj(Map(
-                  innerSrc,
-                  MapFuncCore.StaticArray(List(fm, HoleF[T]))))).embed
-              QC.inj(Map(
-                GtoF.reverseGet(QC.inj(Sort(innerMap,
-                  bucket.map(_ >> Free.roll[MapFunc[T, ?], Hole](MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(1))))),
-                  order.map {
-                    case (fm, dir) =>
-                      (fm >> Free.roll[MapFunc[T, ?], Hole](MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(1)))), dir)
-                  }))).embed,
-                Free.roll(MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(0))))))
-            case _ => QC.inj(qs)
-          }
-        case x => QC.inj(x)
-      }
   }
 
   object FreeShiftedRead {
