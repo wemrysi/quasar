@@ -35,6 +35,7 @@ import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
+import quasar.physical.mongodb.planner.common._
 import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
 import quasar.qscript.{Coalesce => _, _}
 import quasar.std.StdLib._ // TODO: remove this
@@ -73,13 +74,6 @@ object MongoDbPlanner {
   implicit def mongoQScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[fs.MongoQScript[T, ?], QScriptTotal[T, ?]] =
     ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
-  private def raiseErr[M[_], A](err: FileSystemError)(
-    implicit ev: MonadFsErr[M]
-  ): M[A] = ev.raiseError(err)
-
-  private def handleErr[M[_], A](ma: M[A])(f: FileSystemError => M[A])(
-    implicit ev: MonadFsErr[M]
-  ): M[A] = ev.handleError(ma)(f)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
@@ -1282,103 +1276,6 @@ object MongoDbPlanner {
     f: PartialFunction[T[F], A]):
       CoalgebraM[A \/ ?, F, T[F]] =
     tf => (f.lift(tf) \/> tf.project).swap
-
-  def elideMoreGeneralGuards[M[_]: Applicative: MonadFsErr, T[_[_]]: RecursiveT]
-    (subType: Type)
-      : CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {
-    def f: CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {
-      case free @ CoEnv(\/-(MFC(MapFuncsCore.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, fb)))) =>
-        if (typ.contains(subType)) cont.project.point[M]
-        // TODO: Error if there is no overlap between the types.
-        else {
-          val union = subType ⨯ typ
-          if (union ≟ Type.Bottom)
-            raiseErr(qscriptPlanningFailed(InternalError.fromMsg(s"can only contain ${subType.shows}, but a(n) ${typ.shows} is expected")))
-          else {
-            CoEnv[Hole, MapFunc[T, ?], FreeMap[T]](MFC(MapFuncsCore.Guard[T, FreeMap[T]](HoleF[T], union, cont, fb)).right).point[M]
-          }
-        }
-      case x => x.point[M]
-    }
-    f
-  }
-
-  object FreeShiftedRead {
-    def unapply[T[_[_]]](fq: FreeQS[T])(
-      implicit QSR: Const[ShiftedRead[AFile], ?] :<: QScriptTotal[T, ?]
-    ) : Option[ShiftedRead[AFile]] = fq match {
-      case Embed(CoEnv(\/-(QSR(qsr: Const[ShiftedRead[AFile], _])))) => qsr.getConst.some
-      case _ => none
-    }
-  }
-
-  // TODO: Allow backends to provide a “Read” type to the typechecker, which
-  //       represents the type of values that can be stored in a collection.
-  //       E.g., for MongoDB, it would be `Map(String, Top)`. This will help us
-  //       generate more correct PatternGuards in the first place, rather than
-  //       trying to strip out unnecessary ones after the fact
-  // FIXME: This doesn’t yet traverse branches, so it leaves in some checks.
-  def assumeReadType[M[_]: Monad: MonadFsErr, T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Functor]
-    (typ: Type)
-    (implicit
-      QC: QScriptCore[T, ?] :<: F,
-      SR: Const[ShiftedRead[AFile], ?] :<: F)
-      : QScriptCore[T, T[F]] => M[F[T[F]]] = {
-    case f @ Filter(src, cond) =>
-      src.project match {
-        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
-           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
-           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
-           | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
-           | SR(Const(ShiftedRead(_, ExcludeId))) =>
-          ((MapFuncCore.flattenAnd(cond))
-            .traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))))
-            .map(_.toList.filter {
-              case MapFuncsCore.BoolLit(true) => false
-              case _                      => true
-            } match {
-              case Nil    => src.project
-              case h :: t => QC(Filter(src, t.foldLeft[FreeMap[T]](h)((acc, e) => Free.roll(MFC(MapFuncsCore.And(acc, e))))))
-            })
-        case _ => QC.inj(f).point[M]
-      }
-    case ls @ LeftShift(src, struct, id, repair) =>
-      src.project match {
-        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
-           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
-           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
-           | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
-           | SR(Const(ShiftedRead(_, ExcludeId))) =>
-          struct.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
-          (struct => QC.inj(LeftShift(src, struct, id, repair)))
-        case _ => QC.inj(ls).point[M]
-      }
-    case m @ qscript.Map(src, mf) =>
-      src.project match {
-        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
-           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
-           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
-           | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
-           | SR(Const(ShiftedRead(_, ExcludeId))) =>
-          mf.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
-          (mf => QC.inj(qscript.Map(src, mf)))
-        case _ => QC.inj(m).point[M]
-      }
-    case r @ Reduce(src, b, red, rep) =>
-      src.project match {
-        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
-           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
-           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
-           | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
-           | SR(Const(ShiftedRead(_, ExcludeId))) =>
-          (b.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))) ⊛
-            red.traverse(_.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ)))))(
-            (b, red) => QC.inj(Reduce(src, b, red, rep)))
-        case _ => QC.inj(r).point[M]
-      }
-    case qc =>
-      QC.inj(qc).point[M]
-  }
 
   // TODO: This should perhaps be _in_ PhaseResults or something
   def log[M[_]: Monad, A: RenderTree]
