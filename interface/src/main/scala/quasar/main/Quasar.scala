@@ -73,10 +73,10 @@ object Quasar {
   def initWithMeta(loadConfig: BackendConfig, metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
     for {
       fsThing  <- CompositeFileSystem.initWithMountsInMetaStore(loadConfig,metaRef)
-      quasarFS <- initWithFSThing(fsThing, metaRef, persist).liftM[MainErrT]
+      quasarFS <- initWithFS(fsThing, metaRef, persist).liftM[MainErrT]
     } yield quasarFS.extendShutdown(fsThing.shutdown)
 
-  def initWithFSThing(fsThing: FSThing, metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): Task[Quasar] =
+  def initWithFS(fsThing: FS, metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): Task[Quasar] =
     for {
       finalEval  <- CoreEff.defaultImpl(fsThing, metaRef, persist)
 

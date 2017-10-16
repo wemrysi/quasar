@@ -100,19 +100,19 @@ object Fixture {
     }
   }
 
-  def inMemFsThing(
+  def inMemFS(
     state: InMemState = InMemState.empty,
     mounts: MountingsConfig = MountingsConfig.empty
-  ): Task[FSThing] = {
+  ): Task[FS] = {
     val noShutdown: Task[Unit] = Task.now(())
     (InMemory.runBackend(state) |@| mountingInter(mounts.toMap))((fs, mount) =>
-      FSThing(
+      FS(
         fs andThen injectFT[Task, QErrs_Task],
         mount andThen injectFT[Task, QErrs_Task],
         noShutdown))
   }
 
-  def inMemFS(
+  def inMemFSEval(
     state: InMemState = InMemState.empty,
     mounts: MountingsConfig = MountingsConfig.empty,
     metaRefT: Task[TaskRef[MetaStore]] = MetaStoreFixture.createNewTestMetastore().flatMap(TaskRef(_)),
@@ -120,7 +120,7 @@ object Fixture {
   ): Task[CoreEffIO ~> QErrs_TaskM] =
     for {
       metaRef <- metaRefT
-      fsThing <- inMemFsThing(state, mounts)
+      fsThing <- inMemFS(state, mounts)
       eval    <- CoreEff.defaultImpl(fsThing, metaRef, persist)
     } yield injectFT[Task, QErrs_Task] :+: eval
 
@@ -130,5 +130,5 @@ object Fixture {
     metaRefT: Task[TaskRef[MetaStore]] = MetaStoreFixture.createNewTestMetastore().flatMap(TaskRef(_)),
     persist: quasar.db.DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]
   ): Task[CoreEffIO ~> ResponseOr] =
-    inMemFS(state, mounts, metaRefT, persist).map(Server.webInter)
+    inMemFSEval(state, mounts, metaRefT, persist).map(Server.webInter)
 }

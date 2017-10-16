@@ -58,7 +58,7 @@ object CompositeFileSystem {
     metaRef: TaskRef[MetaStore],
     mountTypes: BackendDef[PhysFsEffM],
     mounts: MountingsConfig
-  ): MainTask[FSThing] = for {
+  ): MainTask[FS] = for {
     hfsRef     <- TaskRef(Empty.backendEffect[HierarchicalFsEffM]).liftM[MainErrT]
     mntdRef    <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
 
@@ -82,10 +82,10 @@ object CompositeFileSystem {
       injectFT[Task, QErrs_Task] :+:
       injectFT[QErrs, QErrs_Task]
     val h: BackendEffect ~> QErrs_TaskM = foldMapNT(f) compose runCore
-    FSThing(h, mounting, mntdRef.read >>= closeAllFsMounts _)
+    FS(h, mounting, mntdRef.read >>= closeAllFsMounts _)
   }
 
-  def initWithMountsInMetaStore(loadConfig: BackendConfig, metaRef: TaskRef[MetaStore]): MainTask[FSThing] =
+  def initWithMountsInMetaStore(loadConfig: BackendConfig, metaRef: TaskRef[MetaStore]): MainTask[FS] =
     for {
       mountTypes <- physicalFileSystems(loadConfig).liftM[MainErrT]
 

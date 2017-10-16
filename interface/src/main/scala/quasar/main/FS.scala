@@ -14,22 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.contrib.scalaz
+package quasar.main
 
-import slamdata.Predef.{Int, Unit}
+import slamdata.Predef.Unit
+import quasar.fs.BackendEffect
+import quasar.fs.mount.Mounting
 
-import org.specs2.mutable.Specification
+import scalaz.~>
 import scalaz.concurrent.Task
 
-class MoreBindOpsSpec extends Specification {
-  import bind._
-
-  "MoreBindOps" >> {
-    "<<" >> {
-      var state = true
-      val t1: Task[Int] = Task.delay{state = true; 7}
-      val t2: Task[Unit]  = Task.delay(state = false)
-      ((t1 << t2).unsafePerformSync must_=== 7) and (state must_=== false)
-    }
-  }
-}
+final case class FS(
+  core: BackendEffect ~> QErrs_TaskM,
+  mounting: Mounting ~> QErrs_TaskM,
+  shutdown: Task[Unit])

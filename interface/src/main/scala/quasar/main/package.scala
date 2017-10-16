@@ -216,9 +216,9 @@ package object main extends Logging {
 
   object CoreEff {
     def defaultImpl(
-      fsThing: FSThing,
-      metaRef: TaskRef[MetaStore],
-      persist: quasar.db.DbConnectionConfig => MainTask[Unit]
+     fsThing: FS,
+     metaRef: TaskRef[MetaStore],
+     persist: quasar.db.DbConnectionConfig => MainTask[Unit]
     ): Task[CoreEff ~> QErrs_TaskM] = {
       val vcacheInterp: VCache ~> QErrs_TaskM =
         foldMapNT(

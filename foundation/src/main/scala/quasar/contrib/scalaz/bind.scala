@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.main
+package quasar.contrib.scalaz
 
-import slamdata.Predef.Unit
-import quasar.fs.BackendEffect
-import quasar.fs.mount.Mounting
+import _root_.scalaz._, Scalaz._
 
-import scalaz.~>
-import scalaz.concurrent.Task
+trait bind {
 
-final case class FSThing(
-  core: BackendEffect ~> QErrs_TaskM,
-  mounting: Mounting ~> QErrs_TaskM,
-  shutdown: Task[Unit])
+  implicit final class MoreBindOps[F[_], A](val self: F[A])(implicit val F: Bind[F]) extends _root_.scalaz.syntax.Ops[F[A]] {
+    def <<[B](b: => F[B]): F[A] = F.bind(self)(a => b.as(a))
+  }
+
+}
+
+object bind extends bind
