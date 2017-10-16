@@ -1392,10 +1392,11 @@ object MongoDbPlanner {
       M[_]: Monad: MonadFsErr: PhaseResultTell]
       (anyDoc: Collection => OptionT[M, BsonDocument],
         qs: T[fs.MongoQScript[T, ?]])
-      (implicit branches: Branches.Aux[T, fs.MongoQScript[T, ?]])
+      (implicit BR: Branches[T, fs.MongoQScript[T, ?]])
       : M[T[fs.MongoQScript[T, ?]]] = {
 
     type MQS[A] = fs.MongoQScript[T, A]
+    type QST[A] = QScriptTotal[T, A]
 
     val O = new Optimize[T]
     val R = new Rewrite[T]
@@ -1404,23 +1405,26 @@ object MongoDbPlanner {
     //       them with normalization as the last step and run until fixpoint. Currently plans are
     //       too sensitive to the order in which these are applied.
     for {
-      mongoQS0 <- qs.transCataM(liftFGM(assumeReadType[M, T, fs.MongoQScript[T, ?]](Type.AnyObject)))
-      mongoQS1 <- mongoQS0.transCataM(elideQuasarSigil[T, fs.MongoQScript[T, ?], M](anyDoc))
-      mongoQS2 =  mongoQS1.transCata[T[fs.MongoQScript[T, ?]]](R.normalizeEJ[fs.MongoQScript[T, ?]])
+      mongoQS0 <- qs.transCataM(liftFGM(assumeReadType[M, T, MQS](Type.AnyObject)))
+      mongoQS1 <- mongoQS0.transCataM(elideQuasarSigil[T, MQS, M](anyDoc))
+      mongoQS2 =  mongoQS1.transCata[T[MQS]](R.normalizeEJ[MQS])
       _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo", mongoQS2))
 
       // NB: Normalizing after these appears to revert the effects of `mapBeforeSort`.
-      mongoQS3 =  applyTrans(mongoQS2)(mapBeforeSort[T])
-      mongoQS4 =  mongoQS3.transCata[T[fs.MongoQScript[T, ?]]](
-                    liftFF[QScriptCore[T, ?], fs.MongoQScript[T, ?], T[fs.MongoQScript[T, ?]]](
-                      repeatedly(O.subsetBeforeMap[fs.MongoQScript[T, ?], fs.MongoQScript[T, ?]](
-                        reflNT[fs.MongoQScript[T, ?]]))))
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Shuffle Maps)", mongoQS4))
+      mongoQS3 =  mongoQS2.transCata[T[MQS]](liftId[T, MQS](mapBeforeSort[T].trans(idPrism[MQS])))
+      mongoQS4 =  BR.branches.modify(
+        _.transCata[FreeQS[T]](liftCoEnv[T, QST](mapBeforeSort[T].trans(coenvPrism[QST, Hole])))
+        )(mongoQS3.project).embed
+      mongoQS5 =  mongoQS4.transCata[T[MQS]](
+                    liftFF[QScriptCore[T, ?], MQS, T[MQS]](
+                      repeatedly(O.subsetBeforeMap[MQS, MQS](
+                        reflNT[MQS]))))
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Shuffle Maps)", mongoQS5))
 
       // TODO: Once field deletion is implemented for 3.4, this could be selectively applied, if necessary.
-      mongoQS5 =  PreferProjection.preferProjection[fs.MongoQScript[T, ?]](mongoQS4)
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Prefer Projection)", mongoQS5))
-    } yield mongoQS5
+      mongoQS6 =  PreferProjection.preferProjection[MQS](mongoQS5)
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Prefer Projection)", mongoQS6))
+    } yield mongoQS6
   }
 
   def plan0
