@@ -30,6 +30,7 @@ env:
     - CONNECTOR=spark_local_test
     - CONNECTOR=spark_hdfs
   global:
+    - 'SBT="./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION"'
     - COURSIER_PROGRESS=0
 
 # this is also the test stage :eyeroll:
@@ -58,16 +59,23 @@ script:
       couchbase) SPECIFIC_DELEGATE="couchbaseIt/testOnly -- xonly failtrace" ;;
       marklogic_*) SPECIFIC_DELEGATE="marklogicIt/testOnly -- xonly failtrace" ;;
       mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly failtrace" ;;
-      spark_hdfs) ./sbt 'set every sparkDependencyProvided := true' sparkcore/assembly ;;
+
+      spark_hdfs)
+        $SBT \
+          'set every assemblyJarName in assembly := "sparkcore.jar"' \
+          'set every sparkDependencyProvided := true' \
+          sparkcore/assembly
+        ;;
+
       *) ;;
     esac
 
   # workaround for the fact that travis caching isn't working. when it starts working again, remove this
-  - travis_wait 40 ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
+  - travis_wait 40 $SBT connector/test:compile
 
   # then run the tests (note that this re-runs some tests; we can get rid of that once we have polyrepo)
   - |-
-    ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
+    $SBT \
       it/sideEffectTestFSConfig \
       "it/testOnly -- xonly failtrace" \
       "$SPECIFIC_DELEGATE"
@@ -86,7 +94,7 @@ jobs:
         - set -e
 
         - |-
-          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
+          $SBT \
             checkHeaders \
             test:compile
 
@@ -97,7 +105,7 @@ jobs:
       env:
       script:
         - |-
-          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
+          $SBT \
             it/sideEffectTestFSConfig \
             "testOnly -- xonly failtrace" \
             "exclusive:testOnly -- xonly failtrace"
@@ -106,11 +114,19 @@ jobs:
       env:
       script:
         - set -e
-        - './sbt ++$TRAVIS_SCALA_VERSION doc web/assembly'
+        - '$SBT doc web/assembly'
         - scripts/testJar
 
         # release to sonatype
         - scripts/quasarPublishAndTag
+
+        # recreate sparkcore.jar, which is just going to hang out
+        - |-
+          $SBT \
+            'set every assemblyJarName in assembly := "sparkcore.jar"' \
+            'set every sparkDependencyProvided := true' \
+            sparkcore/assembly
+          ;;
 
         # release to github
         - scripts/publishJar
