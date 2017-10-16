@@ -1408,23 +1408,26 @@ object MongoDbPlanner {
       mongoQS0 <- qs.transCataM(liftFGM(assumeReadType[M, T, MQS](Type.AnyObject)))
       mongoQS1 <- mongoQS0.transCataM(elideQuasarSigil[T, MQS, M](anyDoc))
       mongoQS2 =  mongoQS1.transCata[T[MQS]](R.normalizeEJ[MQS])
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo", mongoQS2))
+      mongoQS3 =  BR.branches.modify(
+        _.transCata[FreeQS[T]](liftCo(R.normalizeEJCoEnv[QScriptTotal[T, ?]]))
+        )(mongoQS2.project).embed
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo", mongoQS3))
 
       // NB: Normalizing after these appears to revert the effects of `mapBeforeSort`.
-      mongoQS3 =  mongoQS2.transCata[T[MQS]](liftId[T, MQS](mapBeforeSort[T].trans(idPrism[MQS])))
-      mongoQS4 =  BR.branches.modify(
+      mongoQS4 =  mongoQS3.transCata[T[MQS]](liftId[T, MQS](mapBeforeSort[T].trans(idPrism[MQS])))
+      mongoQS5 =  BR.branches.modify(
         _.transCata[FreeQS[T]](liftCoEnv[T, QST](mapBeforeSort[T].trans(coenvPrism[QST, Hole])))
-        )(mongoQS3.project).embed
-      mongoQS5 =  mongoQS4.transCata[T[MQS]](
+      )(mongoQS4.project).embed
+      mongoQS6 =  mongoQS5.transCata[T[MQS]](
                     liftFF[QScriptCore[T, ?], MQS, T[MQS]](
                       repeatedly(O.subsetBeforeMap[MQS, MQS](
                         reflNT[MQS]))))
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Shuffle Maps)", mongoQS5))
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Shuffle Maps)", mongoQS6))
 
       // TODO: Once field deletion is implemented for 3.4, this could be selectively applied, if necessary.
-      mongoQS6 =  PreferProjection.preferProjection[MQS](mongoQS5)
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Prefer Projection)", mongoQS6))
-    } yield mongoQS6
+      mongoQS7 =  PreferProjection.preferProjection[MQS](mongoQS6)
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Prefer Projection)", mongoQS7))
+    } yield mongoQS7
   }
 
   def plan0
