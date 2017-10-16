@@ -55,7 +55,7 @@ class ServiceSpec extends quasar.Qspec {
     val uri = Uri(authority = Some(Authority(port = Some(port))))
 
     (for {
-      metastore  <- createNewTestMetastore.liftM[MainErrT]
+      metastore  <- createNewTestMetastore().liftM[MainErrT]
       transactor = metastore.trans.transactor
       _          <- schema.updateToLatest.transact(transactor).liftM[MainErrT]
       _          <- metastoreInit.transact(transactor).liftM[MainErrT]
