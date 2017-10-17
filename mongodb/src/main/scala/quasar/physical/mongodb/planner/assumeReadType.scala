@@ -43,6 +43,21 @@ object assumeReadType {
     }
   }
 
+  object HasShiftedRead {
+    def unapply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, A](qs: F[A])(implicit
+          QC: QScriptCore[T, ?] :<: F,
+          SR: Const[ShiftedRead[AFile], ?] :<: F,
+          ev: Recursive.Aux[A, F])
+        : Option[F[A]] = qs match {
+      case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
+         | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
+         | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
+         | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
+         | SR(Const(ShiftedRead(_, ExcludeId))) => qs.some
+      case _ => none
+    }
+  }
+
   def elideMoreGeneralGuards[M[_]: Applicative: MonadFsErr, T[_[_]]: RecursiveT]
     (subType: Type)
       : CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {
@@ -77,11 +92,7 @@ object assumeReadType {
       : QScriptCore[T, T[F]] => M[F[T[F]]] = {
     case f @ Filter(src, cond) =>
       src.project match {
-        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
-           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
-           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
-           | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
-           | SR(Const(ShiftedRead(_, ExcludeId))) =>
+        case HasShiftedRead(_) =>
           ((MapFuncCore.flattenAnd(cond))
             .traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))))
             .map(_.toList.filter {
@@ -95,33 +106,21 @@ object assumeReadType {
       }
     case ls @ LeftShift(src, struct, id, repair) =>
       src.project match {
-        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
-           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
-           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
-           | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
-           | SR(Const(ShiftedRead(_, ExcludeId))) =>
+        case HasShiftedRead(_) =>
           struct.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
           (struct => QC.inj(LeftShift(src, struct, id, repair)))
         case _ => QC.inj(ls).point[M]
       }
     case m @ qscript.Map(src, mf) =>
       src.project match {
-        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
-           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
-           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
-           | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
-           | SR(Const(ShiftedRead(_, ExcludeId))) =>
+        case HasShiftedRead(_) =>
           mf.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
           (mf => QC.inj(qscript.Map(src, mf)))
         case _ => QC.inj(m).point[M]
       }
     case r @ Reduce(src, b, red, rep) =>
       src.project match {
-        case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
-           | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
-           | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
-           | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
-           | SR(Const(ShiftedRead(_, ExcludeId))) =>
+        case HasShiftedRead(_) =>
           (b.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))) ⊛
             red.traverse(_.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ)))))(
             (b, red) => QC.inj(Reduce(src, b, red, rep)))
