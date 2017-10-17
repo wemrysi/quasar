@@ -35,7 +35,7 @@ import com.mongodb.async._
 import com.mongodb.async.client._
 import org.bson.{BsonBoolean, BsonDocument, BSONException, Document}
 import scalaz.{Failure => _, _}, Scalaz._
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream._
 
 final class MongoDbIO[A] private (protected val r: ReaderT[Task, MongoClient, A]) {
@@ -405,7 +405,7 @@ object MongoDbIO {
   private[mongodb] def find(c: Collection): MongoDbIO[FindIterable[BsonDocument]] =
     collection(c) map (_.find)
 
-  private[mongodb] def async[A](f: SingleResultCallback[A] => Unit): MongoDbIO[A] =
+  private[mongodb] def async[A](f: SingleResultCallback[A] => Unit)(implicit S: Strategy): MongoDbIO[A] =
     liftTask(Task.async(cb => f(new DisjunctionCallback(cb))))
 
   implicit val mongoDbInstance: Monad[MongoDbIO] with Catchable[MongoDbIO] =
@@ -453,7 +453,7 @@ object MongoDbIO {
       go(cur) onComplete Process.eval_(MongoDbIO(_ => cur.close())))
   }
 
-  private final class DisjunctionCallback[A](f: Throwable \/ A => Unit)
+  private final class DisjunctionCallback[A](f: Throwable \/ A => Unit)(implicit S: Strategy)
     extends SingleResultCallback[A] {
 
     def onResult(result: A, error: Throwable): Unit =
