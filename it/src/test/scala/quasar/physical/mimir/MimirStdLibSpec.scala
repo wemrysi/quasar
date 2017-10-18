@@ -165,10 +165,12 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
               prg,
               _.fold(dataToTransSpec(arg))))
 
-        lazy val primary = ((actual(table) must haveSize(1)) and
-          (actual(table).head must beCloseTo(expected)))
+        val result = actual(table)
 
-        lazy val fallback = ((actual(table) must haveSize(0))) and
+        lazy val primary = ((result must haveSize(1)) and
+          (result.head must beCloseTo(expected)))
+
+        lazy val fallback = ((result must haveSize(0))) and
           (expected mustEqual Data.NA)
 
         (primary or fallback).toResult
@@ -189,10 +191,12 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
               dataToTransSpec(arg1),
               dataToTransSpec(arg2))))
 
-        lazy val primary = ((actual(table) must haveSize(1)) and
-          (actual(table).head must beCloseTo(expected)))
+        val result = actual(table)
 
-        lazy val fallback = ((actual(table) must haveSize(0))) and
+        lazy val primary = ((result must haveSize(1)) and
+          (result.head must beCloseTo(expected)))
+
+        lazy val fallback = ((result must haveSize(0))) and
           (expected mustEqual Data.NA)
 
         (primary or fallback).toResult
@@ -215,10 +219,12 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
               dataToTransSpec(arg2),
               dataToTransSpec(arg3))))
 
-        lazy val primary = ((actual(table) must haveSize(1)) and
-          (actual(table).head must beCloseTo(expected)))
+        val result = actual(table)
 
-        lazy val fallback = ((actual(table) must haveSize(0))) and
+        lazy val primary = ((result must haveSize(1)) and
+          (result.head must beCloseTo(expected)))
+
+        lazy val fallback = ((result must haveSize(0))) and
           (expected mustEqual Data.NA)
 
         (primary or fallback).toResult
