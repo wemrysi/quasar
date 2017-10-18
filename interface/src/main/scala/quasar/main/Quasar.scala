@@ -21,9 +21,11 @@ import quasar.config.MetaStoreConfig
 import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
 import quasar.db.DbConnectionConfig
+import quasar.effect.Writer
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
+import quasar.fs.mount.cache.VCache
 import quasar.metastore._
 
 import scalaz._, Scalaz._
@@ -36,9 +38,9 @@ import scalaz.concurrent.Task
   * @param interp
   * @param shutdown Trigger the underlying connector drivers to shutdown cleanly.
   */
-final case class Quasar(interp: CoreEff ~> QErrs_TaskM, shutdown: Task[Unit]) {
-  val taskInter: CoreEff ~> Task =
-    Quasar.toTask compose interp
+final case class Quasar(interp: CoreEff ~> QErrs_CW_TaskM, shutdown: Task[Unit]) {
+  val taskInter: Task[CoreEff ~> Task] =
+    Quasar.toTask ∘ (_ compose interp)
 
   def extendShutdown(step: Task[Unit]): Quasar =
     copy(shutdown = shutdown.attemptNonFatal.void >> step)
@@ -79,15 +81,15 @@ object Quasar {
   def initWithFS(fsThing: FS, metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): Task[Quasar] =
     for {
       finalEval  <- CoreEff.defaultImpl(fsThing, metaRef, persist)
-
+      tTask      <- toTask
       cacheCtx   <- Caching.viewCacheRefreshCtx(foldMapNT(
-        reflNT[Task]       :+:
-          connectionIOToTask(metaRef) :+:
-          (finalEval andThen toTask)))
-
+                      reflNT[Task]                :+:
+                      connectionIOToTask(metaRef) :+:
+                      (finalEval andThen tTask)))
       _          <- cacheCtx.start
     } yield Quasar(finalEval, cacheCtx.shutdown)
 
-  val toTask: QErrs_TaskM ~> Task =
-    foldMapNT(reflNT[Task] :+: QErrs.toCatchable[Task])
+  val toTask: Task[QErrs_CW_TaskM ~> Task] =
+    TaskRef(List.empty[VCache.Expiration]) ∘ (r =>
+      foldMapNT(Writer.fromTaskRef(r) :+: reflNT[Task] :+: QErrs.toCatchable[Task]))
 }

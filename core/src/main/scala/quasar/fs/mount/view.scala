@@ -242,6 +242,8 @@ object view {
     S0: VCacheKVS :<: S,
     M: Mounting.Ops[S]
   ): FileSystemErrT[Free[S, ?], Fix[LP]] = {
+    val VC = VCacheKVS.Ops[S]
+
     def lift(e: Set[FPath], plan: Fix[LP]) =
       plan.project.map((e, _)).point[SemanticErrsT[FileSystemErrT[Free[S, ?], ?], ?]]
 
@@ -261,10 +263,13 @@ object view {
       } yield r).run.run
 
     def vcacheRead(loc: AFile): OptionT[Free[S, ?], FileSystemError \/ (SemanticErrors \/ Fix[LP])] =
-      VCacheKVS.Ops[S].get(loc) >>= (vc =>
-        OptionT(
-          ((vc.status ≟ ViewCache.Status.Successful).option(lp.Read[Fix[LP]](vc.dataFile).embed) ∘ (
-            _.right[SemanticErrors].right[FileSystemError])).η[Free[S, ?]]))
+      for {
+        vc <- VC.get(loc)
+        _  <- VC.modify(loc, vc => vc.copy(cacheReads = vc.cacheReads + 1)).liftM[OptionT]
+        r  <- OptionT(
+                ((vc.status ≟ ViewCache.Status.Successful).option(lp.Read[Fix[LP]](vc.dataFile).embed) ∘ (
+                  _.right[SemanticErrors].right[FileSystemError])).η[Free[S, ?]])
+      } yield r
 
     // NB: simplify incoming queries to the raw, idealized LP which is simpler
     //     to manage.

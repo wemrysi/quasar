@@ -18,12 +18,14 @@ package quasar.fs.mount.cache
 
 import slamdata.Predef._
 import quasar.contrib.pathy.AFile
-import quasar.effect.{Failure, KeyValueStore}
+import quasar.effect.{Failure, KeyValueStore, Writer}
 import quasar.fp.free.injectFT
 import quasar.fs.{FileSystemError, FileSystemFailure, ManageFile}
 import quasar.fs.FileSystemError.PathErr
 import quasar.fs.PathError.PathNotFound
 import quasar.metastore._, KeyValueStore._, MetaStoreAccess._
+
+import java.time.{Duration, Instant}
 
 import doobie.imports.ConnectionIO
 import scalaz._, Scalaz._
@@ -36,6 +38,16 @@ object VCache {
 
     def Ops[S[_]](implicit S0: VCacheKVS :<: S): Ops[S] = KeyValueStore.Ops[AFile, ViewCache, S]
   }
+
+  type VCacheExpW[A] = Writer[List[Expiration], A]
+
+  object VCacheExpW {
+    type Ops[S[_]] = Writer.Ops[List[Expiration], S]
+  }
+
+  type ExpirationsT[F[_], A] = WriterT[F, List[Expiration], A]
+
+  final case class Expiration(v: Instant)
 
   def deleteFiles[S[_]](
     files: List[AFile]
@@ -66,6 +78,7 @@ object VCache {
     } yield r
 
   def interp[S[_]](implicit
+    W: VCacheExpW.Ops[S],
     S0: ManageFile :<: S,
     S1: FileSystemFailure :<: S,
     S2: ConnectionIO :<: S
@@ -73,7 +86,14 @@ object VCache {
     case Keys() =>
       injectFT[ConnectionIO, S].apply(Queries.viewCachePaths.list ∘ (_.toVector))
     case Get(k) =>
-      injectFT[ConnectionIO, S].apply(lookupViewCache(k))
+      injectFT[ConnectionIO, S].apply(lookupViewCache(k)) >>= { vc =>
+        val expirations =
+          vc.foldMap(c => c.lastUpdate.foldMap(lu =>
+            List(Expiration(
+              \/.fromTryCatchNonFatal(lu.plus(Duration.ofSeconds(c.maxAgeSeconds))) | Instant.MAX))))
+
+        W.tell(expirations).as(vc)
+      }
     case Put(k, v) =>
       deleteVCacheFilesThen(k, insertOrUpdateViewCache(k, v))
     case CompareAndPut(k, expect, v) =>
