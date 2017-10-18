@@ -43,10 +43,10 @@ object Branches {
       def branches[A]: Traversal[Coproduct[G, H, A], FreeQS[T]] =
         new Traversal[Coproduct[G, H, A], FreeQS[T]] {
           def modifyF[F[_]: Applicative](f: FreeQS[T] => F[FreeQS[T]])(s: Coproduct[G, H, A]): F[Coproduct[G, H, A]] = {
-            s.run.bimap(
+            s.run.bitraverse[F, G[A], H[A]](
               G.branches.modifyF(f),
               H.branches.modifyF(f)
-            ).bisequence[F, G[A], H[A]].map(Coproduct(_))
+            ).map(Coproduct(_))
           }
         }
     }
