@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import matryoshka._
+import matryoshka.patterns._
 
 import monocle._
 import scalaz._, Scalaz._
@@ -99,4 +100,15 @@ object Branches {
           }
         }
     }
+
+  implicit def coEnv[T[_[_]], E, G[_]](implicit G: Branches[T, G]): Branches[T, CoEnv[E, G, ?]] =
+    new Branches[T, CoEnv[E, G, ?]] {
+      def branches[A]: Traversal[CoEnv[E, G, A], FreeQS[T]] =
+        new Traversal[CoEnv[E, G, A], FreeQS[T]] {
+          def modifyF[F[_]: Applicative](f: FreeQS[T] => F[FreeQS[T]])(s: CoEnv[E, G, A]): F[CoEnv[E, G, A]] =
+            s.run.traverse(G.branches.modifyF(f)).map(CoEnv(_))
+        }
+    }
+
+  def apply[T[_[_]], F[_]](implicit ev: Branches[T, F]): Branches[T, F] = ev
 }
