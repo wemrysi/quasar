@@ -22,7 +22,7 @@ import quasar.connector._
 import quasar.contrib.scalaz._
 import quasar.contrib.pathy._
 import quasar.common._
-import quasar.fp._, free._
+import quasar.fp._, free._, ski.κ
 import quasar.fs._, FileSystemError._
 import quasar.fs.mount._, BackendDef._
 import quasar.effect._
@@ -143,23 +143,25 @@ trait SparkCore extends BackendModule with DefaultAnalyzeModule {
   def sparkCoreJar: DefErrT[Task, APath] = {
 
     val absStrToAPath: String => Option[APath] = (str: String) => posixCodec.parsePath[Option[APath]](
-      _ => None,
-      Some(_).map(unsafeSandboxAbs),
-      _ => None,
-      Some(_).map(unsafeSandboxAbs))(str)
+      κ(None), unsafeSandboxAbs(_).some, κ(None), unsafeSandboxAbs(_).some)(str)
 
-    val sparkCorePathEnv: OptionT[Task, APath] = OptionT(Task.delay {
+    val pathFromEnvVariable: Task[Option[APath]] = Task.delay {
       scala.sys.env.get("SPARKCORE_JAR_PATH").map(absStrToAPath).join
-    })
-
-    val fetchPluginPath: OptionT[Task, APath] = OptionT(Task.delay {
-      val encodedPathStr = this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath
-      absStrToAPath(URLDecoder.decode(encodedPathStr, "UTF-8"))
-    })
-    val jar: OptionT[Task, APath] = fetchPluginPath >>= { s =>
-      OptionT(parentDir(s).map(parentDir(_)).join.map(_ </> file("sparkcore.jar")).point[Task])
     }
-    jar.toRight(NonEmptyList("Could not fetch sparkcore.jar").left[EnvironmentError])
+
+    val pathFromProjectRoot: OptionT[Task, APath] = for {
+      pluginFolderPath <- OptionT(Task.delay {
+        val encodedPathStr = this.getClass().getProtectionDomain.getCodeSource.getLocation.toURI.getPath
+        absStrToAPath(URLDecoder.decode(encodedPathStr, "UTF-8"))
+      })
+      rootPath <- OptionT(parentDir(pluginFolderPath).map(parentDir(_)).join.point[Task])
+    } yield rootPath </> file("sparkcore.jar")
+
+    val finalPath: OptionT[Task, APath] = OptionT(pathFromEnvVariable >>= (_.cata(
+      path => path.some.point[Task], pathFromProjectRoot.run
+    )))
+    
+    finalPath.toRight(NonEmptyList("Could not fetch sparkcore.jar").left[EnvironmentError])
   }
 
   def initSC: Config => DefErrT[Task, SparkContext] = (config: Config) => EitherT(Task.delay {
