@@ -896,12 +896,15 @@ class PlannerSpec extends
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $match(
-           Selector.And(
-             Selector.Doc(
-               BsonField.Name("bar") -> Selector.Type(BsonType.Text)),
-             Selector.Or(
+           Selector.Or(
+             Selector.And(
                Selector.Doc(
-                 BsonField.Name("bar") -> Selector.Regex("^A.*$", false, true, false, false)),
+                 BsonField.Name("bar") -> Selector.Type(BsonType.Text)),
+               Selector.Doc(
+                 BsonField.Name("bar") -> Selector.Regex("^A.*$", false, true, false, false))),
+             Selector.And(
+               Selector.Doc(
+                 BsonField.Name("bar") -> Selector.Type(BsonType.Text)),
                Selector.Doc(
                  BsonField.Name("bar") -> Selector.Regex("^Z.*$", false, true, false, false)))))))
     }
@@ -1000,22 +1003,25 @@ class PlannerSpec extends
         $read(collection("db", "a")),
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
           "0" -> Select(ident("x"), "pattern"),
-          "1" -> Select(ident("x"), "target"),
-          "2" -> Call(
+          "1" -> Call(
             Select(New(Name("RegExp"), List(Select(ident("x"), "pattern"), jscore.Literal(Js.Str("m")))), "test"),
             List(jscore.Literal(Js.Str("foo")))),
-          "3" -> Call(
+          "2" -> Select(ident("x"), "pattern"),
+          "3" -> Select(ident("x"), "target"),
+          "4" -> Call(
             Select(New(Name("RegExp"), List(Select(ident("x"), "pattern"), jscore.Literal(Js.Str("m")))), "test"),
             List(Select(ident("x"), "target"))),
           "src" -> ident("x"))))),
           ListMap()),
         $match(
-          Selector.And(
-            Selector.Doc(BsonField.Name("0") -> Selector.Type(BsonType.Text)),
-            Selector.Doc(BsonField.Name("1") -> Selector.Type(BsonType.Text)),
-            Selector.Or(
-              Selector.Doc(BsonField.Name("2") -> Selector.Eq(Bson.Bool(true))),
-              Selector.Doc(BsonField.Name("3") -> Selector.Eq(Bson.Bool(true)))))),
+          Selector.Or(
+            Selector.And(
+              Selector.Doc(BsonField.Name("0") -> Selector.Type(BsonType.Text)),
+              Selector.Doc(BsonField.Name("1") -> Selector.Eq(Bson.Bool(true)))),
+            Selector.And(
+              Selector.Doc(BsonField.Name("2") -> Selector.Type(BsonType.Text)),
+              Selector.Doc(BsonField.Name("3") -> Selector.Type(BsonType.Text)),
+              Selector.Doc(BsonField.Name("4") -> Selector.Eq(Bson.Bool(true)))))),
         $project(
           reshape(sigil.Quasar -> $field("src")),
           ExcludeId)))
