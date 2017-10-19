@@ -66,17 +66,9 @@ script:
           'set every sparkDependencyProvided := true' \
           sparkcore/assembly
 
-        echo "spark-hdfs!"
-
         cp ./.targets/sparkcore/scala-2.11/sparkcore.jar $TRAVIS_BUILD_DIR
         
-        echo "ls $TRAVIS_BUILD_DIR"
-
-        ls $TRAVIS_BUILD_DIR
-        
         export SPARKCORE_JAR_PATH="$TRAVIS_BUILD_DIR/sparkcore.jar"
-
-        echo "SPARKCORE_JAR_PATH =" $SPARKCORE_JAR_PATH
 
         ;;
 
