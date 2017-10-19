@@ -355,13 +355,6 @@ package object qscript {
 
     liftCo[T, F, Hole, Free[F, Hole]](partial)
   }
-
-  trait Trans[T[_[_]]] {
-    def trans[F[_], G[_]: Functor]
-      (GtoF: PrismNT[G, F])
-      (implicit QC: QScriptCore[T, ?] :<: F)
-        : QScriptCore[T, T[G]] => F[T[G]]
-  }
 }
 
 package qscript {

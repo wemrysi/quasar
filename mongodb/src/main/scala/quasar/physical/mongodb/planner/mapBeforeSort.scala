@@ -26,29 +26,34 @@ import scalaz._, Scalaz._
 
 object mapBeforeSort {
 
-  def apply[T[_[_]]: BirecursiveT]: Trans[T] =
-    new Trans[T] {
-      def trans[F[_], G[_]: Functor]
-          (GtoF: PrismNT[G, F])
-          (implicit QC: QScriptCore[T, ?] :<: F): QScriptCore[T, T[G]] => F[T[G]] = {
-        case qs @ Map(Embed(src), fm) =>
-          GtoF.get(src) >>= QC.prj match {
+  def apply[T[_[_]]: CorecursiveT]: Trans[QScriptCore[T, ?]] =
+    new Trans[QScriptCore[T, ?]] {
+
+      private def projectIndex(i: Int): FreeMap[T] = Free.roll(MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(i))))
+
+      def trans[A, G[_]: Functor]
+        (GtoF: PrismNT[G, QScriptCore[T, ?]])
+        (implicit TC: Corecursive.Aux[A, G], TR: Recursive.Aux[A, G])
+          : QScriptCore[T, A] => G[A] = {
+        case qs @ Map(src, fm) =>
+          GtoF.get(src.project) match {
             case Some(Sort(innerSrc, bucket, order)) =>
               val innerMap =
-                GtoF.reverseGet(QC.inj(Map(
+                GtoF.reverseGet(Map(
                   innerSrc,
-                  MapFuncCore.StaticArray(List(fm, HoleF[T]))))).embed
-              QC.inj(Map(
-                GtoF.reverseGet(QC.inj(Sort(innerMap,
-                  bucket.map(_ >> Free.roll[MapFunc[T, ?], Hole](MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(1))))),
+                  MapFuncCore.StaticArray(List(fm, HoleF[T])))).embed
+              val m = Map(
+                GtoF.reverseGet(Sort(innerMap,
+                  bucket.map(_ >> projectIndex(1)),
                   order.map {
                     case (fm, dir) =>
-                      (fm >> Free.roll[MapFunc[T, ?], Hole](MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(1)))), dir)
-                  }))).embed,
-                Free.roll(MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(0))))))
-            case _ => QC.inj(qs)
+                      (fm >> projectIndex(1), dir)
+                  })).embed,
+                projectIndex(0))
+              GtoF.reverseGet(m)
+            case _ => GtoF.reverseGet(qs)
           }
-        case x => QC.inj(x)
+        case x => GtoF.reverseGet(x)
       }
   }
 }
