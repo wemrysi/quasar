@@ -87,7 +87,7 @@ object Branches {
         }
     }
 
-  implicit def equiJoin[T[_[_]]: quasar.RenderTreeT]: Branches[T, EquiJoin[T, ?]] =
+  implicit def equiJoin[T[_[_]]]: Branches[T, EquiJoin[T, ?]] =
     new Branches[T, EquiJoin[T, ?]] {
       def branches[A]: Traversal[EquiJoin[T, A], FreeQS[T]] =
         new Traversal[EquiJoin[T, A], FreeQS[T]] {
