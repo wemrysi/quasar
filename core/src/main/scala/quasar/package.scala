@@ -31,17 +31,10 @@ import quasar.fs.mount.Mounting
 import quasar.sql._
 import quasar.std.StdLib.set._
 
-import java.lang.{Runnable, Runtime, Thread}
-import java.util.concurrent.{Executors, ExecutorService, ThreadFactory}
-import java.util.concurrent.atomic.AtomicInteger
-import scala.concurrent.ExecutionContext
-import scala.math
-
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Strategy
 
 package object quasar {
   private def phase[A: RenderTree](label: String, r: SemanticErrors \/ A):
@@ -49,24 +42,6 @@ package object quasar {
     EitherT(r.point[PhaseResultW]) flatMap { a =>
       (a.set(Vector(PhaseResult.tree(label, a)))).liftM[SemanticErrsT]
     }
-
-  implicit val CPUExecutor: ExecutorService = {
-    val numThreads = math.max(Runtime.getRuntime.availableProcessors, 4)
-    Executors.newFixedThreadPool(numThreads, new ThreadFactory {
-      private val counter = new AtomicInteger(0)
-
-      def newThread(r: Runnable): Thread = {
-        val t = new Thread(r)
-        t.setName(s"quasar-cpu-thread-${counter.getAndIncrement}")
-        t
-      }
-    })
-  }
-
-  implicit val CPUExecutionContext: ExecutionContext =
-    ExecutionContext.fromExecutorService(CPUExecutor)
-
-  implicit val CPUStrategy: Strategy = Strategy.Executor(CPUExecutor)
 
   /** Compiles a query into raw LogicalPlan, which has not yet been optimized or
     * typechecked.
