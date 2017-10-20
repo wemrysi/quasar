@@ -70,14 +70,20 @@ trait BackendModule {
         (parseConfig(uri) >>= interpreter) map { case (f, c) => DefinitionResult(f, c) }
     }
 
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+  def shift: Task[Unit] = Task.async { cb =>
+    scalaz.concurrent.Strategy.DefaultStrategy(cb(\/-(())))
+    ()
+  }
+
   def interpreter(cfg: Config): DefErrT[Task, (BackendEffect ~> Task, Task[Unit])] =
     compile(cfg) map {
       case (runM, close) =>
         val runCfg = λ[Configured ~> M](_.run(cfg))
         val runFs: BackendEffect ~> Configured = analyzeInterpreter :+: fsInterpreter
-        (runM compose runCfg compose runFs, close)
+        val shiftNat: Task ~> Task = Lambda[Task ~> Task](_.flatMap(a => shift >> Task.now(a)))
+        (shiftNat compose runM compose runCfg compose runFs, close)
     }
-
 
   private final def analyzeInterpreter: Analyze ~> Configured = {
     val lc: DiscoverPath.ListContents[Backend] =

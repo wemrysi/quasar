@@ -456,7 +456,10 @@ object MongoDbIO {
   private final class DisjunctionCallback[A](f: Throwable \/ A => Unit)(implicit S: Strategy)
     extends SingleResultCallback[A] {
 
-    def onResult(result: A, error: Throwable): Unit =
-      f(Option(error) <\/ result)
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    def onResult(result: A, error: Throwable): Unit = {
+      scalaz.concurrent.Strategy.DefaultStrategy(f(Option(error) <\/ result))
+      ()
+    }
   }
 }

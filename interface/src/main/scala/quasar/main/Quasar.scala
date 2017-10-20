@@ -70,10 +70,19 @@ object Quasar {
       quasarFS  <- initWithMeta(loadConfig, metaRef, persist)
     } yield quasarFS.extendShutdown(metaRef.read.flatMap(_.shutdown))
 
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+  def shift: Task[Unit] = Task.async { cb =>
+    scalaz.concurrent.Strategy.DefaultStrategy(cb(\/-(())))
+    ()
+  }
+
   def initWithMeta(loadConfig: BackendConfig, metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
     for {
+      _ <- shift.liftM[MainErrT]
       fsThing  <- CompositeFileSystem.initWithMountsInMetaStore(loadConfig,metaRef)
+      _ <- shift.liftM[MainErrT]
       quasarFS <- initWithFS(fsThing, metaRef, persist).liftM[MainErrT]
+      _ <- shift.liftM[MainErrT]
     } yield quasarFS.extendShutdown(fsThing.shutdown)
 
   def initWithFS(fsThing: FS, metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): Task[Quasar] =
