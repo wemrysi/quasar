@@ -19,6 +19,7 @@ package quasar.main
 import slamdata.Predef._
 import quasar.config.MetaStoreConfig
 import quasar.contrib.scalaz.catchable._
+import quasar.contrib.scalaz.concurrent._
 import quasar.contrib.scalaz.eitherT._
 import quasar.db.DbConnectionConfig
 import quasar.fp._
@@ -69,12 +70,6 @@ object Quasar {
       metaRef   <- TaskRef(metastore).liftM[MainErrT]
       quasarFS  <- initWithMeta(loadConfig, metaRef, persist)
     } yield quasarFS.extendShutdown(metaRef.read.flatMap(_.shutdown))
-
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  def shift: Task[Unit] = Task.async { cb =>
-    scalaz.concurrent.Strategy.DefaultStrategy(cb(\/-(())))
-    ()
-  }
 
   def initWithMeta(loadConfig: BackendConfig, metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
     for {

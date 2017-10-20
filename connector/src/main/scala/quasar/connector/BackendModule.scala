@@ -23,6 +23,7 @@ import quasar.common._
 import quasar.contrib.pathy._
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._, eitherT._
+import quasar.contrib.scalaz.concurrent._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric.{Natural, Positive}
@@ -69,12 +70,6 @@ trait BackendModule {
       case (Type, uri) =>
         (parseConfig(uri) >>= interpreter) map { case (f, c) => DefinitionResult(f, c) }
     }
-
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  def shift: Task[Unit] = Task.async { cb =>
-    scalaz.concurrent.Strategy.DefaultStrategy(cb(\/-(())))
-    ()
-  }
 
   def interpreter(cfg: Config): DefErrT[Task, (BackendEffect ~> Task, Task[Unit])] =
     compile(cfg) map {
