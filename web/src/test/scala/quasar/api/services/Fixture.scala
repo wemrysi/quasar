@@ -19,7 +19,7 @@ package quasar.api.services
 import slamdata.Predef._
 import quasar.api.{ResponseOr, ResponseT}
 import quasar.contrib.pathy._
-import quasar.effect.{Writer, _}
+import quasar.effect._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
@@ -120,15 +120,16 @@ object Fixture {
     persist: quasar.db.DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]
   ): Task[CoreEffIO ~> QErrs_TaskM] =
     for {
-      r       <- TaskRef(List.empty[VCache.Expiration])
+      r       <- TaskRef(Tags.Min(Option.empty[VCache.Expiration]))
       metaRef <- metaRefT
       fsThing <- inMemFS(state, mounts)
       eval    <- CoreEff.defaultImpl(fsThing, metaRef, persist)
     } yield
-        (injectFT[Task, QErrs_CW_Task] :+: eval) andThen
+        (injectFT[Task, QErrs_CRW_Task] :+: eval) andThen
         foldMapNT(
-          (Writer.fromTaskRef(r) andThen injectFT[Task, QErrs_Task]) :+:
-          injectFT[Task, QErrs_Task]                                 :+:
+          (Read.fromTaskRef(r) andThen injectFT[Task, QErrs_Task])  :+:
+          (Write.fromTaskRef(r) andThen injectFT[Task, QErrs_Task]) :+:
+          injectFT[Task, QErrs_Task]                                :+:
           injectFT[QErrs, QErrs_Task])
 
   def inMemFSWeb(

@@ -18,30 +18,29 @@ package quasar.api
 
 import slamdata.Predef._
 import quasar.effect.Timing
-import quasar.fs.mount.cache.VCache, VCache.VCacheExpW
+import quasar.fs.mount.cache.VCache, VCache.VCacheExpR
 
 import org.http4s.Header
 import org.http4s.headers.Expires
 import org.http4s.util.Renderer
 import scalaz._, Scalaz._
+import scalaz.syntax.tag._
 
 object VCacheMiddleware {
   def apply[S[_]](
     service: QHttpService[S]
   )(implicit
-    W: VCacheExpW.Ops[S],
+    R: VCacheExpR.Ops[S],
     T: Timing.Ops[S],
     C: Catchable[Free[S, ?]]
-  ): QHttpService[S] = {
+  ): QHttpService[S] =
     QHttpService { case req =>
-      (service(req) ⊛ W.listen ⊛ T.timestamp) { case (resp, ex, ts) =>
-        val cacheHeaders =
-          ex.sortWith(_.v isBefore _.v).headOption.foldMap(e =>
-            Header(Expires.name.value, Renderer.renderString(e.v)) ::
-            ts.isAfter(e.v).fold(List(StaleHeader), Nil))
+      (service(req) ⊛ R.ask ⊛ T.timestamp) { case (resp, ex, ts) =>
+        val cacheHeaders = ex.unwrap.foldMap(e =>
+          Header(Expires.name.value, Renderer.renderString(e.v)) ::
+          ts.isAfter(e.v).fold(List(StaleHeader), Nil))
 
         resp.modifyHeaders(_ ++ cacheHeaders)
       }
     }
-  }
 }

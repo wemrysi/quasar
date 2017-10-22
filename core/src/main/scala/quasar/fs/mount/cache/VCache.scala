@@ -18,7 +18,7 @@ package quasar.fs.mount.cache
 
 import slamdata.Predef._
 import quasar.contrib.pathy.AFile
-import quasar.effect.{Failure, KeyValueStore, Writer}
+import quasar.effect.{Failure, KeyValueStore, Read, Write}
 import quasar.fp.free.injectFT
 import quasar.fs.{FileSystemError, FileSystemFailure, ManageFile}
 import quasar.fs.FileSystemError.PathErr
@@ -39,15 +39,25 @@ object VCache {
     def Ops[S[_]](implicit S0: VCacheKVS :<: S): Ops[S] = KeyValueStore.Ops[AFile, ViewCache, S]
   }
 
-  type VCacheExpW[A] = Writer[List[Expiration], A]
+  type VCacheExpR[A] = Read[MinOption[Expiration], A]
+  type VCacheExpW[A] = Write[MinOption[Expiration], A]
+
+  object VCacheExpR {
+    type Ops[S[_]] = Read.Ops[MinOption[Expiration], S]
+  }
 
   object VCacheExpW {
-    type Ops[S[_]] = Writer.Ops[List[Expiration], S]
+    type Ops[S[_]] = Write.Ops[MinOption[Expiration], S]
   }
 
   type ExpirationsT[F[_], A] = WriterT[F, List[Expiration], A]
 
   final case class Expiration(v: Instant)
+
+  object Expiration {
+    implicit val order: Order[Expiration] =
+      Order.order((a, b) => Ordering.fromInt(a.v compareTo b.v))
+  }
 
   def deleteFiles[S[_]](
     files: List[AFile]
@@ -88,9 +98,12 @@ object VCache {
     case Get(k) =>
       injectFT[ConnectionIO, S].apply(lookupViewCache(k)) >>= { vc =>
         val expirations =
-          vc.foldMap(c => c.lastUpdate.foldMap(lu =>
-            List(Expiration(
-              \/.fromTryCatchNonFatal(lu.plus(Duration.ofSeconds(c.maxAgeSeconds))) | Instant.MAX))))
+          Tags.Min(
+            vc >>= (c => c.lastUpdate ∘ (lu =>
+              Expiration(
+                \/.fromTryCatchNonFatal(
+                  lu.plus(Duration.ofSeconds(c.maxAgeSeconds))
+                ) | Instant.MAX))))
 
         W.tell(expirations).as(vc)
       }

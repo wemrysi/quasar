@@ -17,33 +17,26 @@
 package quasar.effect
 
 import slamdata.Predef._
-import quasar.fp.{ski, TaskRef}, ski.ι
+import quasar.fp.TaskRef
 
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-sealed abstract class Writer[W, A]
+sealed abstract class Write[W, A]
 
-object Writer {
-  final case class Tell[W](w: W) extends Writer[W, Unit]
+object Write {
+  final case class Tell[W](w: W) extends Write[W, Unit]
 
-  final case class Listen[W, A](f: W => A) extends Writer[W, A]
-
-  final class Ops[W, S[_]](implicit S: Writer[W, ?] :<: S) extends LiftedOps[Writer[W, ?], S] {
+  final class Ops[W, S[_]](implicit S: Write[W, ?] :<: S) extends LiftedOps[Write[W, ?], S] {
     def tell(w: W): FreeS[Unit] = lift(Tell(w))
-
-    def listen: FreeS[W] = listenW(ι)
-
-    def listenW[A](f: W => A): FreeS[A] = lift(Listen(f))
   }
 
   object Ops {
-    implicit def apply[W, S[_]](implicit S: Writer[W, ?] :<: S): Ops[W, S] = new Ops[W, S]
+    implicit def apply[W, S[_]](implicit S: Write[W, ?] :<: S): Ops[W, S] = new Ops[W, S]
   }
 
-  def fromTaskRef[W: Semigroup](tr: TaskRef[W]): Writer[W, ?] ~> Task =
-    λ[Writer[W, ?] ~> Task] {
+  def fromTaskRef[W: Semigroup](tr: TaskRef[W]): Write[W, ?] ~> Task =
+    λ[Write[W, ?] ~> Task] {
       case Tell(w)   => tr.modify(_  ⊹ w).void
-      case Listen(f) => tr.read ∘ (f)
     }
 }

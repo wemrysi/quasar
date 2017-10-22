@@ -29,13 +29,12 @@ import quasar.api.MessageFormatGen._
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.contrib.scalaz.catchable._
 import quasar.csv.CsvParser
-import quasar.effect.Writer
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount._, MountConfig.viewConfig0
-import quasar.fs.mount.cache.{VCache, ViewCache}
+import quasar.fs.mount.cache.ViewCache
 import quasar.sql._
 import quasar.Variables
 
@@ -71,11 +70,10 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import VCacheFixture._
 
   def effRespOr(fs: FileSystem ~> Task): Task[Eff ~> ResponseOr] =
-    (TaskRef(List.empty[VCache.Expiration]) ⊛ vcacheInterp)((r, vci) =>
+    vcacheInterp ∘ (vci =>
       liftMT[Task, ResponseT]                                                  :+:
       (liftMT[Task, ResponseT] compose timingInterp(Instant.ofEpochSecond(0))) :+:
       (liftMT[Task, ResponseT] compose vci)                                    :+:
-      (liftMT[Task, ResponseT] compose Writer.fromTaskRef(r))                  :+:
       failureResponseOr[FileSystemError]                                       :+:
       (liftMT[Task, ResponseT] compose fs))
 

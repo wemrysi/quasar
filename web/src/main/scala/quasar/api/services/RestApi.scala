@@ -26,7 +26,7 @@ import quasar.fp.free.foldMapNT
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.module.Module
-import quasar.fs.mount.cache.VCache, VCache.{VCacheExpW, VCacheKVS}
+import quasar.fs.mount.cache.VCache, VCache.{VCacheExpR, VCacheKVS}
 import quasar.main.MetaStoreLocation
 import quasar.fs.mount.cache.VCache, VCache.VCacheKVS
 
@@ -58,7 +58,7 @@ object RestApi {
         S11: Analyze :<: S,
         S12: MetaStoreLocation :<: S,
         S13: VCacheKVS :<: S,
-        S15: VCacheExpW :<: S,
+        S15: VCacheExpR :<: S,
         S14: Timing :<: S
       ): Map[String, QHttpService[S]] =
     ListMap(

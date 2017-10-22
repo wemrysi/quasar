@@ -19,14 +19,15 @@ package quasar.api.services
 import slamdata.Predef._
 import quasar.api._
 import quasar.contrib.pathy._
-import quasar.effect.{Writer, _}
+import quasar.effect._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.metastore.MetaStoreFixture
 import quasar.fs.mount._
-import quasar.fs.mount.cache.{VCache, ViewCache}, VCache.{VCacheKVS, VCacheExpW}
+import quasar.fs.mount.cache.{VCache, ViewCache}
+import quasar.fs.mount.cache.VCache.{VCacheKVS, VCacheExpR, VCacheExpW}
 import quasar.fs.ReadFile.ReadHandle
 import quasar.metastore.H2MetaStoreFixture
 
@@ -41,16 +42,22 @@ import eu.timepit.refined.auto._
 trait VCacheFixture extends H2MetaStoreFixture {
   import InMemory._
 
-  // TODO: Move Eff back to DataServiceSpec?
-  type Eff3[A] = Coproduct[FileSystemFailure, FileSystem, A]
-  type Eff2[A] = Coproduct[VCacheExpW, Eff3, A]
+  type Eff2[A] = Coproduct[FileSystemFailure, FileSystem, A]
   type Eff1[A] = Coproduct[VCacheKVS, Eff2, A]
   type Eff0[A] = Coproduct[Timing, Eff1, A]
   type Eff[A]  = Coproduct[Task, Eff0, A]
   type EffM[A] = Free[Eff, A]
 
-  type ViewEff[A] =
-    (PathMismatchFailure :\: MountingFailure :\: Mounting :\: ViewState :\: MonotonicSeq :/: Eff)#M[A]
+  type ViewEff[A] = (
+    PathMismatchFailure :\:
+    MountingFailure     :\:
+    Mounting            :\:
+    ViewState           :\:
+    MonotonicSeq        :\:
+    VCacheExpR          :\:
+    VCacheExpW          :/:
+    Eff
+  )#M[A]
 
   val vcacheInterp: Task[VCacheKVS ~> Task] = KeyValueStore.impl.default[AFile, ViewCache]
 
@@ -67,11 +74,11 @@ trait VCacheFixture extends H2MetaStoreFixture {
     p: (ViewEff ~> Task, ViewEff ~> ResponseOr) => Task[A]
   ): Task[A] = {
     def viewFs: Task[ViewEff ~> Task] =
-      (runFs(inMemState)                         ⊛
-       TaskRef(mounts)                           ⊛
-       TaskRef(Map.empty[ReadHandle, ResultSet]) ⊛
-       MonotonicSeq.fromZero                     ⊛
-       TaskRef(List.empty[VCache.Expiration])    ⊛
+      (runFs(inMemState)                          ⊛
+       TaskRef(mounts)                            ⊛
+       TaskRef(Map.empty[ReadHandle, ResultSet])  ⊛
+       MonotonicSeq.fromZero                      ⊛
+       TaskRef(Tags.Min(none[VCache.Expiration])) ⊛
        MetaStoreFixture.createNewTestTransactor()
       ) { (fs, m, vs, s, r, t) =>
         val mountingInter =
@@ -83,15 +90,16 @@ trait VCacheFixture extends H2MetaStoreFixture {
           injectFT[Mounting, ViewEff]            :+:
           injectFT[ViewState, ViewEff]           :+:
           injectFT[MonotonicSeq, ViewEff]        :+:
+          injectFT[VCacheExpR, ViewEff]          :+:
+          injectFT[VCacheExpW, ViewEff]          :+:
           injectFT[Task, ViewEff]                :+:
           injectFT[Timing, ViewEff]              :+:
           injectFT[VCacheKVS, ViewEff]           :+:
-          injectFT[VCacheExpW, ViewEff]          :+:
           injectFT[FileSystemFailure, ViewEff]   :+:
           view.fileSystem[ViewEff]
 
         val cw: VCacheExpW ~> Task =
-          Writer.fromTaskRef(r)
+          Write.fromTaskRef(r)
 
         val vc: VCacheKVS ~> Task =
           foldMapNT(
@@ -108,10 +116,11 @@ trait VCacheFixture extends H2MetaStoreFixture {
           mountingInter                                           :+:
           KeyValueStore.impl.fromTaskRef(vs)                      :+:
           s                                                       :+:
+          Read.fromTaskRef(r)                                     :+:
+          cw                                                      :+:
           reflNT[Task]                                            :+:
           timingInterp(now)                                       :+:
           vc                                                      :+:
-          cw                                                      :+:
           Failure.toRuntimeError[Task, FileSystemError]           :+:
           fs
 

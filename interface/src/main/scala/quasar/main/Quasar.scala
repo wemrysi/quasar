@@ -21,7 +21,7 @@ import quasar.config.MetaStoreConfig
 import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
 import quasar.db.DbConnectionConfig
-import quasar.effect.Writer
+import quasar.effect.{Read, Write}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
@@ -38,7 +38,7 @@ import scalaz.concurrent.Task
   * @param interp
   * @param shutdown Trigger the underlying connector drivers to shutdown cleanly.
   */
-final case class Quasar(interp: CoreEff ~> QErrs_CW_TaskM, shutdown: Task[Unit]) {
+final case class Quasar(interp: CoreEff ~> QErrs_CRW_TaskM, shutdown: Task[Unit]) {
   val taskInter: Task[CoreEff ~> Task] =
     Quasar.toTask ∘ (_ compose interp)
 
@@ -89,7 +89,11 @@ object Quasar {
       _          <- cacheCtx.start
     } yield Quasar(finalEval, cacheCtx.shutdown)
 
-  val toTask: Task[QErrs_CW_TaskM ~> Task] =
-    TaskRef(List.empty[VCache.Expiration]) ∘ (r =>
-      foldMapNT(Writer.fromTaskRef(r) :+: reflNT[Task] :+: QErrs.toCatchable[Task]))
+  val toTask: Task[QErrs_CRW_TaskM ~> Task] =
+    TaskRef(Tags.Min(none[VCache.Expiration])) ∘ (r =>
+      foldMapNT(
+        Read.fromTaskRef(r)  :+:
+        Write.fromTaskRef(r) :+:
+        reflNT[Task]         :+:
+        QErrs.toCatchable[Task]))
 }

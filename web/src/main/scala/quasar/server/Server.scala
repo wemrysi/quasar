@@ -25,10 +25,10 @@ import quasar.console.{logErrors, stdout}
 import quasar.contrib.scalaz._
 import quasar.contrib.scopt._
 import quasar.db.DbConnectionConfig
-import quasar.effect.Writer
+import quasar.effect.{Read, Write}
 import quasar.fp._
 import quasar.fp.free._
-import quasar.fs.mount.cache.VCache, VCache.VCacheExpW
+import quasar.fs.mount.cache.VCache, VCache.{VCacheExpR, VCacheExpW}
 import quasar.main._
 import quasar.server.Http4sUtils.{openBrowser, waitForUserEnter}
 
@@ -102,27 +102,31 @@ object Server {
     defaultPort: Int,
     staticContent: List[StaticContent],
     redirect: Option[String],
-    eval: CoreEff ~> QErrs_CW_TaskM,
+    eval: CoreEff ~> QErrs_CRW_TaskM,
     persistPortChange: Int => MainTask[Unit]
   ): PortChangingServer.ServiceStarter = {
     import RestApi._
 
-    def interp: Task[CoreEffIOW ~> ResponseOr] =
-      TaskRef(List.empty[VCache.Expiration]) ∘ (r =>
+    def interp: Task[CoreEffIORW ~> ResponseOr] =
+      TaskRef(Tags.Min(none[VCache.Expiration])) ∘ (r =>
         foldMapNT(
-          (liftMT[Task, ResponseT] compose Writer.fromTaskRef(r)) :+:
-            liftMT[Task, ResponseT]                               :+:
-            qErrsToResponseT[Task]
-        ) compose
-          (injectFT[VCacheExpW, QErrs_CW_Task] :+: injectFT[Task, QErrs_CW_Task] :+: eval))
+          (liftMT[Task, ResponseT] compose Read.fromTaskRef(r))  :+:
+          (liftMT[Task, ResponseT] compose Write.fromTaskRef(r)) :+:
+          liftMT[Task, ResponseT]                                :+:
+          qErrsToResponseT[Task]
+        ) compose (
+          injectFT[VCacheExpR, QErrs_CRW_Task] :+:
+          injectFT[VCacheExpW, QErrs_CRW_Task] :+:
+          injectFT[Task, QErrs_CRW_Task]       :+:
+          eval))
 
     (reload: Int => Task[String \/ Unit]) =>
     finalizeServices(
-      toHttpServicesF[CoreEffIOW](
-        λ[Free[CoreEffIOW, ?] ~> ResponseOr] { fa =>
+      toHttpServicesF[CoreEffIORW](
+        λ[Free[CoreEffIORW, ?] ~> ResponseOr] { fa =>
           interp.liftM[ResponseT] >>= (fa foldMap _)
         },
-        coreServices[CoreEffIOW]
+        coreServices[CoreEffIORW]
       ) ++ additionalServices
     ) orElse nonApiService(defaultPort, Kleisli(persistPortChange andThen (a => a.run)) >> Kleisli(reload), staticContent, redirect)
   }
@@ -132,7 +136,7 @@ object Server {
     * @return A `Task` that can be used to shutdown the server
     */
   def startServer(
-    quasarInter: CoreEff ~> QErrs_CW_TaskM,
+    quasarInter: CoreEff ~> QErrs_CRW_TaskM,
     port: Int,
     staticContent: List[StaticContent],
     redirect: Option[String],

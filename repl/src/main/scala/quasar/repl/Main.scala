@@ -134,9 +134,9 @@ object Main {
           _.point[DriverEffM]))
     }
 
-  def startRepl(quasarInter: CoreEff ~> QErrs_CW_TaskM): Task[Unit] =
+  def startRepl(quasarInter: CoreEff ~> QErrs_CRW_TaskM): Task[Unit] =
     for {
-      qetmt   <- QErrs_CW_Task.toMainTask
+      qetmt   <- QErrs_CRW_Task.toMainTask
       runCmd  <- repl[CoreEff](mt compose qetmt compose quasarInter)
       _       <- driver(runCmd)
     } yield ()
