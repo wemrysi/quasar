@@ -21,7 +21,7 @@ import quasar.fp._
 import quasar.fp.free
 import quasar.fp.ski._
 import org.http4s.{Request, Response, Status, HttpService}
-import scalaz._, Scalaz._
+import scalaz._
 import scalaz.concurrent.Task
 
 final case class QHttpService[S[_]] private (val f: PartialFunction[Request, Free[S, QResponse[S]]]) {
@@ -41,11 +41,11 @@ final case class QHttpService[S[_]] private (val f: PartialFunction[Request, Fre
     new QHttpService(f orElse other.f)
 
   def toHttpService(i: S ~> ResponseOr): HttpService =
-    toHttpServiceF(free.foldMapNT(i).η[Task])
+    toHttpServiceF(free.foldMapNT(i))
 
-  def toHttpServiceF(i: Task[Free[S, ?] ~> ResponseOr]): HttpService = {
+  def toHttpServiceF(i: Free[S, ?] ~> ResponseOr): HttpService = {
     def mkResponse(prg: Free[S, QResponse[S]]): Task[Response] =
-      i >>= (it => it(prg).map(_.toHttpResponseF(it)).merge)
+      i(prg).map(_.toHttpResponseF(i)).merge
 
     HttpService(f andThen mkResponse)
   }

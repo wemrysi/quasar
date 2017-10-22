@@ -118,8 +118,12 @@ object Server {
 
     (reload: Int => Task[String \/ Unit]) =>
     finalizeServices(
-      toHttpServices(interp, coreServices[CoreEffIOW]) ++
-        additionalServices
+      toHttpServicesF[CoreEffIOW](
+        λ[Free[CoreEffIOW, ?] ~> ResponseOr] { fa =>
+          interp.liftM[ResponseT] >>= (fa foldMap _)
+        },
+        coreServices[CoreEffIOW]
+      ) ++ additionalServices
     ) orElse nonApiService(defaultPort, Kleisli(persistPortChange andThen (a => a.run)) >> Kleisli(reload), staticContent, redirect)
   }
 

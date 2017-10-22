@@ -93,13 +93,13 @@ object RestApi {
   }
 
   def toHttpServices[S[_]](
-    f: Task[S ~> ResponseOr],
+    f: S ~> ResponseOr,
     svcs: Map[String, QHttpService[S]])
     : Map[String, HttpService] =
-    toHttpServicesF(f ∘ (foldMapNT(_)), svcs)
+    toHttpServicesF(foldMapNT(f), svcs)
 
   def toHttpServicesF[S[_]](
-    f: Task[Free[S, ?] ~> ResponseOr],
+    f: Free[S, ?] ~> ResponseOr,
     svcs: Map[String, QHttpService[S]])
     : Map[String, HttpService] =
     svcs.mapValues(_.toHttpServiceF(f))
