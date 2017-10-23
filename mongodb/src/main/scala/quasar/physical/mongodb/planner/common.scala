@@ -14,11 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.fs.mount
+package quasar.physical.mongodb.planner
 
-import quasar.contrib.pathy.AFile
-import quasar.effect.KeyValueStore
+import quasar.fs.{FileSystemError, MonadFsErr}
 
-package object cache {
-  type VCache[A] = KeyValueStore[AFile, ViewCache, A]
+object common {
+  def raiseErr[M[_], A](err: FileSystemError)(
+    implicit ev: MonadFsErr[M]
+  ): M[A] = ev.raiseError(err)
+
+  def handleErr[M[_], A](ma: M[A])(f: FileSystemError => M[A])(
+    implicit ev: MonadFsErr[M]
+  ): M[A] = ev.handleError(ma)(f)
 }

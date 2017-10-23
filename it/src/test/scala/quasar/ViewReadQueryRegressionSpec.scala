@@ -22,7 +22,7 @@ import quasar.effect._
 import quasar.fp._ , free._
 import quasar.fs.{Empty, PhysicalError, ReadFile}
 import quasar.fs.mount._, BackendDef.DefinitionResult, Fixture._
-import quasar.fs.mount.cache.VCache
+import quasar.fs.mount.cache.VCache, VCache.VCacheKVS
 import quasar.main._
 import quasar.regression._
 import quasar.sql.{ScopedExpr, Sql}
@@ -40,7 +40,7 @@ class ViewReadQueryRegressionSpec
 
   val suiteName = "View Reads"
 
-  type ViewFS[A] = (Mounting :\: ViewState :\: VCache :\: MonotonicSeq :/: BackendEffectIO)#M[A]
+  type ViewFS[A] = (Mounting :\: ViewState :\: VCacheKVS :\: MonotonicSeq :/: BackendEffectIO)#M[A]
 
   type FsAskPhysFsEff[A] = Coproduct[FsAsk, PhysFsEff, A]
 

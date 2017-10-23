@@ -14,24 +14,29 @@
  * limitations under the License.
  */
 
-package quasar.fs.mount
+package quasar.effect
 
 import slamdata.Predef._
+import quasar.fp.TaskRef
 
-import quasar.contrib.pathy._
-import quasar.effect.KeyValueStore
-import quasar.fs.mount.cache.{VCache, ViewCache}, VCache.VCacheKVS
-import quasar.fp._
+import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 
-import monocle.Lens
-import scalaz._, Id._
+sealed abstract class Write[W, A]
 
-object Fixture {
+object Write {
+  final case class Tell[W](w: W) extends Write[W, Unit]
 
-  def constant[F[_]: Applicative, K, V](m: Map[K, V]): KeyValueStore[K, V, ?] ~> F =
-    KeyValueStore.impl.toState[State[Map[K, V], ?]](Lens.id[Map[K, V]]) andThen
-    evalNT[Id, Map[K, V]](m) andThen pointNT[F]
+  final class Ops[W, S[_]](implicit S: Write[W, ?] :<: S) extends LiftedOps[Write[W, ?], S] {
+    def tell(w: W): FreeS[Unit] = lift(Tell(w))
+  }
 
-  def runConstantVCache[F[_]: Applicative](vcache: Map[AFile, ViewCache]): VCacheKVS ~> F =
-    constant[F, AFile, ViewCache](vcache)
+  object Ops {
+    implicit def apply[W, S[_]](implicit S: Write[W, ?] :<: S): Ops[W, S] = new Ops[W, S]
+  }
+
+  def fromTaskRef[W: Semigroup](tr: TaskRef[W]): Write[W, ?] ~> Task =
+    λ[Write[W, ?] ~> Task] {
+      case Tell(w)   => tr.modify(_  ⊹ w).void
+    }
 }

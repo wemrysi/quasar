@@ -18,21 +18,28 @@ package quasar.api.services
 
 import slamdata.Predef._
 import quasar.api._
+import quasar.effect.{Read, Write}
+import quasar.fp._, free._
 import quasar.main._
+import quasar.fs.mount.cache.VCache
 
 import org.http4s._, Method.MOVE
 import org.http4s.dsl._
 import org.http4s.headers._
 import org.specs2.matcher.TraversableMatchers._
 import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.concurrent.Task
 
 class RestApiSpecs extends quasar.Qspec {
 
-  val service = Fixture.inMemFSWeb() map { runEff =>
-    RestApi.finalizeServices(RestApi.toHttpServices(
-      runEff,
-      RestApi.coreServices[CoreEffIO])).orNotFound
-  }
+  val service =
+    (Fixture.inMemFSWeb() ⊛ TaskRef(Tags.Min(Option.empty[VCache.Expiration])))((runEff, r) =>
+      RestApi.finalizeServices(RestApi.toHttpServices(
+        (liftMT[Task, ResponseT] compose Read.fromTaskRef(r))  :+:
+        (liftMT[Task, ResponseT] compose Write.fromTaskRef(r)) :+:
+        runEff,
+        RestApi.coreServices[CoreEffIORW]
+      )).orNotFound)
 
   "OPTIONS" should {
 

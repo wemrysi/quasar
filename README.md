@@ -388,7 +388,7 @@ A cached view is created by adding the `Cache-Control: max-age=<seconds>`  heade
 
 Like ordinary views, cached views appear as a file in the filesystem.
 
-When serving a cached view the `/data/fs/` endpoint includes a `Expires: <http-date>` header informed by `max-age`. A reasonably provisioned server will keep cached views fresh. If it does fall behind the response will include the `Warning: 110 - "Response is Stale"` header. The `Expires` header is absent from non-cached views.
+When serving requests involving cached views an `Expires: <http-date>` header informed by the `max-age` of involved views is included. A reasonably provisioned server will keep cached views fresh. If it does fall behind the response will include the `Warning: 110 - "Response is Stale"` header. The `Expires` header is absent from responses that do not involve cached views.
 
 ### Module mounts
 

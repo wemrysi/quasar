@@ -17,7 +17,7 @@
 package quasar.api.services
 
 import slamdata.Predef._
-import quasar.api.ResponseOr
+import quasar.api.{ResponseOr, ResponseT}
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._
@@ -25,12 +25,13 @@ import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.InMemory.InMemState
 import quasar.fs.mount._
+import quasar.fs.mount.cache.VCache
 import quasar.metastore.{MetaStore, MetaStoreFixture}
 import quasar.api.JsonFormat.{SingleArray, LineDelimited}
 import quasar.api.JsonPrecision.{Precise, Readable}
 import quasar.api.MessageFormat.JsonContentType
 import quasar.main._
-import quasar.server.Server
+import quasar.server
 
 import argonaut.{Json, Argonaut}
 import Argonaut._
@@ -125,11 +126,18 @@ object Fixture {
     persist: quasar.db.DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]
   ): Task[(CoreEffIO ~> QErrs_TaskM, Task[InMemState])] =
     for {
+      r         <- TaskRef(Tags.Min(Option.empty[VCache.Expiration]))
       metaRef   <- metaRefT
       result    <- inMemFSInspect(state, mounts)
       (fs, ref) = result
       eval      <- CoreEff.defaultImpl(fs, metaRef, persist)
-    } yield (injectFT[Task, QErrs_Task] :+: eval, ref)
+    } yield
+      (injectFT[Task, QErrs_Task] :+: eval, ref) andThen
+      foldMapNT(
+        (Read.fromTaskRef(r) andThen injectFT[Task, QErrs_Task])  :+:
+        (Write.fromTaskRef(r) andThen injectFT[Task, QErrs_Task]) :+:
+        injectFT[Task, QErrs_Task]                                :+:
+        injectFT[QErrs, QErrs_Task])
 
   def inMemFSEval(
      state: InMemState = InMemState.empty,
