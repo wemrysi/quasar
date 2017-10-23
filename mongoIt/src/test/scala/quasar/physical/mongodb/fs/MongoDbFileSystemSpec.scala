@@ -249,7 +249,7 @@ class MongoDbFileSystemSpec
                   .run.value.unsafePerformSync)
                must beSome(Planner.NoFilesFound(List.empty[ADir]))))
 
-            sql.fixParser.parseExpr(sql.Query(f(posixCodec.printPath(file)))) fold (
+            sql.fixParser.parseExpr(f(posixCodec.printPath(file))) fold (
               err => ko(s"Parsing failed: ${err.shows}"),
               check0)
           }
