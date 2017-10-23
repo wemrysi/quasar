@@ -489,8 +489,8 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
       case Failure(msg, input)  => \/.left(GenericParsingError(s"$msg; but found `${input.first.chars}'"))
     }
 
-  val parse: Query => ParsingError \/ ScopedExpr[T[Sql]] = query =>
-    parseScopedExpr(query.value)
+  val parse: String => ParsingError \/ ScopedExpr[T[Sql]] = query =>
+    parseScopedExpr(query)
 
   def parseScopedExpr(scopedExprString: String): ParsingError \/ ScopedExpr[T[Sql]] =
     parseWithParser(scopedExprString, scopedExpr).map(_.map(normalize))
@@ -501,8 +501,8 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
   def parseBlock(blockString: String): ParsingError \/ Block[T[Sql]] =
     parseWithParser(blockString, block).map(_.map(normalize))
 
-  val parseExpr: Query => ParsingError \/ T[Sql] = query =>
-    parseWithParser(query.value, expr).map(normalize)
+  val parseExpr: String => ParsingError \/ T[Sql] = query =>
+    parseWithParser(query, expr).map(normalize)
 
   private def normalize: T[Sql] => T[Sql] = _.transAna[T[Sql]](repeatedly(normalizeƒ)).makeTables(Nil)
 }

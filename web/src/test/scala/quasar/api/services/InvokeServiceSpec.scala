@@ -149,6 +149,56 @@ class InvokeServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s 
             val response = service(state, mounts)(request).unsafePerformSync
             isExpectedResponse(sampleData, response, MessageFormat.Default)
           }}
+        "if function references a view" >>
+          prop { (moduleDir: ADir,
+                  sampleData: Vector[Data]) => moduleDir ≠ rootDir ==> {
+            val dataFile = rootDir </> file("dataFile")
+            val viewFile = rootDir </> file("viewFile")
+            val statements =
+              sqlM"""
+                    CREATE FUNCTION FOO(:a)
+                      BEGIN
+                        select * from `/viewFile`
+                      END
+                """
+            val mounts = Map(
+              (moduleDir: APath) -> MountConfig.moduleConfig(statements),
+              (viewFile:  APath) -> MountConfig.viewConfig0(sqlB"select * from `/dataFile`"))
+            val state = InMemState.fromFiles(Map(dataFile -> sampleData))
+            val request = Request(uri = pathUri(moduleDir </> file("FOO")).copy(query = Query.fromPairs("a" -> "true")))
+            val response = service(state, mounts)(request).unsafePerformSync
+            isExpectedResponse(sampleData, response, MessageFormat.Default)
+          }}
+        "if function references a function in another module" >>
+              prop { (moduleDir: ADir,
+                      dataFile: PathOf[Abs, File, Sandboxed, AlphaCharacters],
+                      sampleData: Vector[Data]) => moduleDir ≠ rootDir ==> {
+                val otherModuleDirPath = rootDir </> dir("otherModule")
+                val otherModuleStatements =
+                  sqlM"""
+                        CREATE FUNCTION BAR(:a)
+                          BEGIN
+                            select * from :a
+                          END
+                      """
+                val statements =
+                  sqlM"""
+                         IMPORT `/otherModule/`;
+                         CREATE FUNCTION FOO(:a)
+                           BEGIN
+                             tmp := BAR(:a);
+                             SELECT * FROM tmp
+                         END
+                      """
+                val mounts = Map(
+                  (moduleDir: APath) -> MountConfig.moduleConfig(statements),
+                  (otherModuleDirPath: APath) -> MountConfig.moduleConfig(otherModuleStatements))
+                val state = InMemState.fromFiles(Map(dataFile.path -> sampleData))
+                val arg = "`" + posixCodec.printPath(dataFile.path) + "`"
+                val request = Request(uri = pathUri(moduleDir </> file("FOO")).copy(query = Query.fromPairs("a" -> arg)))
+                val response = service(state, mounts)(request).unsafePerformSync
+                isExpectedResponse(sampleData, response, MessageFormat.Default)
+              }}
       }
       "if query in function is constant even if not supported by connector" >>
         prop { (functionFile: PathOf[Abs, File, Sandboxed, AlphaCharacters]) =>

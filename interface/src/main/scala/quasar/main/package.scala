@@ -227,13 +227,12 @@ package object main extends Logging {
             (connectionIOToTask(metaRef) andThen injectFT[Task, QErrs_Task])
         ) compose
           VCache.interp[(ManageFile :\: FileSystemFailure :/: ConnectionIO)#M]
-      type MountingFileSystem[A] = Coproduct[Mounting, BackendEffect, A]
-      val module = Module.impl.default[MountingFileSystem] andThen foldMapNT(fsThing.mounting :+: fsThing.core)
+      type Mounting_Backend[A] = Coproduct[Mounting, BackendEffect, A]
       for {
         fs <- runFsWithViewsAndModules(fsThing.core, vcacheInterp, fsThing.mounting)
       } yield {
         (MetaStoreLocation.impl.default(metaRef, persist) andThen injectFT[Task, QErrs_Task]) :+:
-          module                                                                              :+:
+          (Module.impl.default[Mounting_Backend] andThen foldMapNT(fsThing.mounting :+: fs))  :+:
           fsThing.mounting                                                                    :+:
           (injectNT[Analyze, BackendEffect] andThen fs)                                       :+:
           (injectNT[QueryFile, BackendEffect] andThen fs)                                     :+:

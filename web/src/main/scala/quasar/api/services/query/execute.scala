@@ -27,7 +27,7 @@ import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount.Mounting
 import quasar.main.FilesystemQueries
-import quasar.sql.{ScopedExpr, Query, Sql}
+import quasar.sql.{ScopedExpr, Sql}
 
 import argonaut._, Argonaut._
 import matryoshka.data.Fix
@@ -85,7 +85,7 @@ object execute {
           } else {
             respond(requiredHeader(Destination, req) flatMap { destination =>
               val parseRes: ApiError \/ ScopedExpr[Fix[Sql]] =
-                sql.fixParser.parse(Query(query)).leftMap(_.toApiError)
+                sql.fixParser.parse(query).leftMap(_.toApiError)
 
               val absDestination: ApiError \/ AFile =
                 destinationFile(destination.value) map (res =>
