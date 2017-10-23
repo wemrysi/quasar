@@ -17,7 +17,9 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
+import quasar.concurrent.Pools._
 import quasar.contrib.scalaz.optionT._
+import quasar.contrib.scalaz.concurrent._
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.ski._
@@ -405,8 +407,14 @@ object MongoDbIO {
   private[mongodb] def find(c: Collection): MongoDbIO[FindIterable[BsonDocument]] =
     collection(c) map (_.find)
 
-  private[mongodb] def async[A](f: SingleResultCallback[A] => Unit)(implicit S: Strategy): MongoDbIO[A] =
-    liftTask(Task.async(cb => f(new DisjunctionCallback(cb))))
+  private[mongodb] def async[A](f: SingleResultCallback[A] => Unit): MongoDbIO[A] = {
+    val back = for {
+      a <- Task.async[A](cb => f(new DisjunctionCallback(cb)))
+      _ <- shift
+    } yield a
+
+    liftTask(back)
+  }
 
   implicit val mongoDbInstance: Monad[MongoDbIO] with Catchable[MongoDbIO] =
     new Monad[MongoDbIO] with Catchable[MongoDbIO] {
@@ -456,10 +464,7 @@ object MongoDbIO {
   private final class DisjunctionCallback[A](f: Throwable \/ A => Unit)(implicit S: Strategy)
     extends SingleResultCallback[A] {
 
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    def onResult(result: A, error: Throwable): Unit = {
-      scalaz.concurrent.Strategy.DefaultStrategy(f(Option(error) <\/ result))
-      ()
-    }
+    def onResult(result: A, error: Throwable): Unit =
+      f(Option(error) <\/ result)
   }
 }
