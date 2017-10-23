@@ -24,7 +24,7 @@ import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
 import quasar.fp._, free._
 import quasar.fs._, InMemory.InMemState
-import quasar.fs.mount.cache.{VCache, ViewCache}
+import quasar.fs.mount.cache.{VCache, ViewCache}, VCache.VCacheKVS
 import quasar.frontend.logicalplan.{Free => _, free => _, _}
 import quasar.sql._, ExprArbitrary._
 import quasar.std._, IdentityLib.Squash, StdLib._, set._
@@ -84,7 +84,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   def runMounting[F[_]](implicit F: MonadState[F, VS]): Mounting ~> F =
     free.foldMapNT(KeyValueStore.impl.toState[F](VS.mountConfigs)) compose Mounter.trivial[MountConfigs]
 
-  def runVCache[F[_]](implicit F: MonadState[F, VS]): VCache ~> F =
+  def runVCache[F[_]](implicit F: MonadState[F, VS]): VCacheKVS ~> F =
     KeyValueStore.impl.toState[F](VS.vcache)
 
   def runViewFileSystem[F[_]](
@@ -126,7 +126,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       views.toList.traverse_ { case (loc, expr) => mounting.mountView(loc, ScopedExpr(expr, Nil), Variables.empty) }
 
     val initVCache: Free[ViewFileSystem, Unit] =
-      vcache.toList.traverse_ { case (f, vc) => VCache.Ops[ViewFileSystem].put(f, vc) }
+      vcache.toList.traverse_ { case (f, vc) => VCacheKVS.Ops[ViewFileSystem].put(f, vc) }
 
     val toBeTraced: Free[ViewFileSystem, A] =
       mountViews *> initVCache *> t.flatMapSuspension(view.fileSystem[ViewFileSystem])
@@ -612,7 +612,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     def unsafeParse(sqlQry: String): Fix[Sql] =
       sql.fixParser.parseExpr(sql.Query(sqlQry)).toOption.get
 
-    type Eff[A] = Coproduct[Mounting, VCache, A]
+    type Eff[A] = Coproduct[Mounting, VCacheKVS, A]
 
     def resolvedRefsVC[A](
       views: Map[AFile, Fix[Sql]], vcache: Map[AFile, ViewCache], lp: Fix[LogicalPlan]

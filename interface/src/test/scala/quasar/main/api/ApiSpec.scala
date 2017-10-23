@@ -43,8 +43,8 @@ class ApiSpec extends quasar.Qspec {
           firstMetaConf,
           _ => ().point[MainTask]).leftMap(e => new scala.Exception(e.shows)).run.unattempt
 
-        run0 = quasarFS.taskInter
         result <- (for {
+          run0          <- quasarFS.taskInter
           _             <- mount.mountOrReplace(sampleMountPath, sampleMount, false).foldMap(run0)
           mountIsThere  <- mount.lookupConfig(sampleMountPath).run.run.map(_.isDefined).foldMap(run0)
           otherMetaConf <- MetaStoreFixture.createNewTestMetaStoreConfig
@@ -67,7 +67,7 @@ class ApiSpec extends quasar.Qspec {
           BackendConfig.Empty,
           metaConf,
           _ => ().point[MainTask]).leftMap(e => new scala.Exception(e.shows)).run.unattempt
-        run0 = quasarFS.taskInter
+        run0 <- quasarFS.taskInter
         result <- (for {
           result  <- MetaStoreLocation.Ops[CoreEff].set(metaConf, initialize = true).foldMap(run0)
         } yield {
