@@ -193,18 +193,9 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
         )
 
     val s3InfoOrErr: DefErrT[Task, Option[S3Info]] =
-      uriOrErr.map(uri => for {
-        accessKey <- uri.params.get("s3AccessKey")
-        secretKey <- uri.params.get("s3SecretKey")
-        endpoint  <- uri.params.get("s3Endpoint")
-      } yield S3Info(accessKey, secretKey, endpoint))
+      uriOrErr.map(uri => (uri.params.get("s3AccessKey") |@| uri.params.get("s3SecretKey") |@| uri.params.get("s3Endpoint")) (S3Info(_, _, _)))
 
-    for {
-      sparkConf <- sparkConfOrErr
-      hdfsUrl   <- hdfsUrlOrErr
-      rootPath  <- rootPathOrErr
-      s3Info    <- s3InfoOrErr
-    } yield HdfsConfig(sparkConf, hdfsUrl, rootPath, s3Info)
+    (sparkConfOrErr |@| hdfsUrlOrErr |@| rootPathOrErr |@| s3Info) (HdfsConfig(_, _, _, _))
   }
 
   def getSparkConf: Config => SparkConf = _.sparkConf
