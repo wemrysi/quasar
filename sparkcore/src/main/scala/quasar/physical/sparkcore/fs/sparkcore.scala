@@ -55,6 +55,8 @@ trait SparkCore extends BackendModule with DefaultAnalyzeModule {
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
 
+  import SparkCore.shiftReShift
+
   // conntector specific
   type Eff[A]
   def toLowerLevel[S[_]](sc: SparkContext, config: Config)(implicit
@@ -116,21 +118,13 @@ trait SparkCore extends BackendModule with DefaultAnalyzeModule {
 
   type LowerLevel[A] = Coproduct[Task, PhysErr, A]
 
-  def shiftReShift: Task ~> Task = λ[Task ~> Task] { ta =>
-    for {
-      _ <- shift(SparkCore.CPUStrategy)
-      a <- ta
-      _ <- shift(Pools.CPUStrategy)
-    } yield a
-  }
-
   def lowerToTask: LowerLevel ~> Task = λ[LowerLevel ~> Task](_.fold(
     injectNT[Task, Task],
     Failure.mapError[PhysicalError, Exception](_.cause) andThen Failure.toCatchable[Task, Exception]
-  )).andThen(shiftReShift)
+  ))
 
   def toTask(sc: SparkContext, config: Config): Task[M ~> Task] =
-    toLowerLevel[LowerLevel](sc, config).map(_ andThen foldMapNT(lowerToTask))
+    toLowerLevel[LowerLevel](sc, config).map(_ andThen foldMapNT(lowerToTask)).map(_.andThen(shiftReShift))
 
   def sparkCoreJar: DefErrT[Task, APath] = {
 
@@ -157,14 +151,12 @@ trait SparkCore extends BackendModule with DefaultAnalyzeModule {
   }
 
   def initSC: Config => DefErrT[Task, SparkContext] = (config: Config) => EitherT(Task.delay {
-    // look, I didn't make Spark the way it is...
-    java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
     new SparkContext(getSparkConf(config)).right[DefinitionError]
   }.handleWith {
     case ex : SparkException if ex.getMessage.contains("SPARK-2243") =>
       NonEmptyList("You can not mount second Spark based connector... " +
         "Please unmount existing one first.").left[EnvironmentError].left[SparkContext].point[Task]
-  })
+  }).mapT(shiftReShift(_))
 
   def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] = for {
     jar <- sparkCoreJar
@@ -284,6 +276,14 @@ trait SparkCore extends BackendModule with DefaultAnalyzeModule {
 }
 
 object SparkCore {
+
+  def shiftReShift: Task ~> Task = λ[Task ~> Task] { ta =>
+    for {
+      _ <- shift(SparkCore.CPUStrategy)
+      a <- ta
+      _ <- shift(Pools.CPUStrategy)
+    } yield a
+  }
 
   // we build a special pool for spark to avoid a) starvation, and b) thread local pollution
   private[sparkcore] val CPUExecutor: ExecutorService = {
