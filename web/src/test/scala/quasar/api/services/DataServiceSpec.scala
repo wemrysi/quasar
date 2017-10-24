@@ -340,6 +340,28 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
             response.status must_=== Status.Ok
           }
+          "download single zipped file and then re-upload zipped file" >> { 
+            val baseDir = rootDir[Sandboxed]
+            val sampleFile = baseDir </> file("foo.json")
+            val data = Vector(Data.Obj("a" -> Data.Str("foo"), "b" -> Data.Bool(true)))
+            val initialContent = Map(sampleFile -> data)
+
+            val downloadRequest = Request(
+                  uri = pathUri(sampleFile),
+                  headers = Headers(Header("Accept", "application/zip,application/json;disposition=\"attachment;filename*=UTF-8''foo.zip\"")))
+            val (originalService, _) = serviceRef(InMemState.fromFiles(initialContent))
+            val zippedResponse = originalService(downloadRequest).flatMap(_.as[ByteVector]).unsafePerformSync
+
+            val uploadRequest = Request(uri = pathUri(baseDir), method = Method.PUT)
+                                  .withBody(zippedResponse).unsafePerformSync
+                                  .withContentType(`Content-Type`(MediaType.`application/zip`).some)
+            val (emptyService, getState) = serviceRef(InMemState.empty)
+            val uploadResponse = emptyService(uploadRequest).unsafePerformSync
+
+            uploadResponse.as[String].unsafePerformSync must_=== ""
+            uploadResponse.status must_=== Status.Ok
+            getState.unsafePerformSync.contents must_=== initialContent
+          }
           "zipped csv" >> {
             val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.csv.zip"))
             val sampleFile = rootDir[Sandboxed] </> file("foo")

@@ -84,15 +84,22 @@ package object services {
     S0: Failure[E, ?] :<: S,
     S1: Task :<: S
   ): Free[S, QResponse[S]] = {
-    val headers: List[Header] = `Content-Type`(MediaType.`application/zip`) :: 
-      (format.disposition.toList: List[Header])
-    val p = format.encode(data).map(str => ByteVector.view(str.getBytes(StandardCharsets.UTF_8)))
+    val headers: List[Header] = `Content-Type`(MediaType.`application/zip`) :: (format.disposition.toList: List[Header])
+
     val suffix = format match {
           case JsonContentType(_, _, _) => "json"
           case Csv(_, _) => "csv"
         }
-    val f = currentDir[Sandboxed] </> file1[Sandboxed](fileName(filePath).changeExtension(κ(suffix))) 
-    val z = Zip.zipFiles(Map(f -> p))
+
+    val f = currentDir[Sandboxed] </> file1[Sandboxed](fileName(filePath).changeExtension(κ(suffix)))
+    val qFilesAndContent = List(f).toList.map { file => (file, format.encode(data)) }
+
+    val metadata = ArchiveMetadata(List(f).strengthR(FileMetadata(`Content-Type`(format.mediaType))).toMap)
+    val metaFileAndContent = (ArchiveMetadata.HiddenFile, Process.emit(metadata.asJson.spaces2))
+
+    val allFiles = metaFileAndContent :: qFilesAndContent
+    val z = Zip.zipFiles(allFiles.toMap.mapValues(strContent => strContent.map(str => ByteVector.view(str.getBytes(StandardCharsets.UTF_8)))))
+
     QResponse.streaming(z).map(QResponse.headers.modify(_ ++ headers))
   }
 
