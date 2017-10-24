@@ -25,8 +25,10 @@ import quasar.console.{logErrors, stdout}
 import quasar.contrib.scalaz._
 import quasar.contrib.scopt._
 import quasar.db.DbConnectionConfig
+import quasar.effect.{Read, Write}
 import quasar.fp._
 import quasar.fp.free._
+import quasar.fs.mount.cache.VCache, VCache.{VCacheExpR, VCacheExpW}
 import quasar.main._
 import quasar.server.Http4sUtils.{openBrowser, waitForUserEnter}
 
@@ -96,23 +98,37 @@ object Server {
 
   }
 
-  def webInter[S[_]](eval: S ~> QErrs_TaskM): S ~> ResponseOr =
-    foldMapNT(liftMT[Task, ResponseT] :+: qErrsToResponseT[Task]) compose eval
-
   def serviceStarter(
     defaultPort: Int,
     staticContent: List[StaticContent],
     redirect: Option[String],
-    eval: CoreEff ~> QErrs_TaskM,
+    eval: CoreEff ~> QErrs_CRW_TaskM,
     persistPortChange: Int => MainTask[Unit]
   ): PortChangingServer.ServiceStarter = {
     import RestApi._
 
+    def interp: Task[CoreEffIORW ~> ResponseOr] =
+      TaskRef(Tags.Min(none[VCache.Expiration])) ∘ (r =>
+        foldMapNT(
+          (liftMT[Task, ResponseT] compose Read.fromTaskRef(r))  :+:
+          (liftMT[Task, ResponseT] compose Write.fromTaskRef(r)) :+:
+          liftMT[Task, ResponseT]                                :+:
+          qErrsToResponseT[Task]
+        ) compose (
+          injectFT[VCacheExpR, QErrs_CRW_Task] :+:
+          injectFT[VCacheExpW, QErrs_CRW_Task] :+:
+          injectFT[Task, QErrs_CRW_Task]       :+:
+          eval))
+
     (reload: Int => Task[String \/ Unit]) =>
-      finalizeServices(
-        toHttpServices(liftMT[Task, ResponseT] :+: webInter(eval), coreServices[CoreEffIO]) ++
-        additionalServices
-      ) orElse nonApiService(defaultPort, Kleisli(persistPortChange andThen (a => a.run)) >> Kleisli(reload), staticContent, redirect)
+    finalizeServices(
+      toHttpServicesF[CoreEffIORW](
+        λ[Free[CoreEffIORW, ?] ~> ResponseOr] { fa =>
+          interp.liftM[ResponseT] >>= (fa foldMap _)
+        },
+        coreServices[CoreEffIORW]
+      ) ++ additionalServices
+    ) orElse nonApiService(defaultPort, Kleisli(persistPortChange andThen (a => a.run)) >> Kleisli(reload), staticContent, redirect)
   }
 
   /**
@@ -120,15 +136,15 @@ object Server {
     * @return A `Task` that can be used to shutdown the server
     */
   def startServer(
-    quasarInter: CoreEff ~> QErrs_TaskM,
+    quasarInter: CoreEff ~> QErrs_CRW_TaskM,
     port: Int,
     staticContent: List[StaticContent],
     redirect: Option[String],
     persistPortChange: Int => MainTask[Unit]
-  ): Task[Task[Unit]] = {
-    val starter = serviceStarter(defaultPort = port, staticContent, redirect, quasarInter, persistPortChange)
-    PortChangingServer.start(initialPort = port, starter)
-  }
+  ): Task[Task[Unit]] =
+    PortChangingServer.start(
+      initialPort = port,
+      serviceStarter(defaultPort = port, staticContent, redirect, quasarInter, persistPortChange))
 
   def persistMetaStore(configPath: Option[FsFile]): DbConnectionConfig => MainTask[Unit] =
     persistWebConfig(configPath, conn => _.copy(metastore = MetaStoreConfig(conn).some))

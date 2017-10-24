@@ -22,7 +22,7 @@ import quasar.contrib.pathy._
 import quasar.effect.{KeyValueStore, Timing}
 import quasar.fp._, ski._
 import quasar.fs.mount._
-import quasar.fs.mount.cache.{VCache, ViewCache}
+import quasar.fs.mount.cache.{VCache, ViewCache}, VCache.VCacheKVS
 import quasar.fs.ManageFile
 
 import argonaut._, Argonaut._
@@ -45,7 +45,7 @@ object mount {
     S1: ManageFile :<: S,
     S2: MountingFailure :<: S,
     S3: PathMismatchFailure :<: S,
-    S4: VCache :<: S,
+    S4: VCacheKVS :<: S,
     S5: Timing :<: S
   ): QHttpService[S] =
     QHttpService {
@@ -94,7 +94,7 @@ object mount {
 
   ////
 
-  private def vcache[S[_]](implicit S0: VCache :<: S) = KeyValueStore.Ops[AFile, ViewCache, S]
+  private def vcache[S[_]](implicit S0: VCacheKVS :<: S) = KeyValueStore.Ops[AFile, ViewCache, S]
 
   private def move[S[_], T](
     src: AbsPath[T],
@@ -105,7 +105,7 @@ object mount {
     M: Mounting.Ops[S],
     S0: MountingFailure :<: S,
     S1: PathMismatchFailure :<: S,
-    S2: VCache :<: S
+    S2: VCacheKVS :<: S
   ): EitherT[Free[S, ?], ApiError, String] =
     parse(dstStr).map(unsafeSandboxAbs).cata(dst =>
       ((refineType(src) ⊛ refineType(dst))((s, d) =>
@@ -130,7 +130,7 @@ object mount {
     S0: Task :<: S,
     S1: MountingFailure :<: S,
     S2: PathMismatchFailure :<: S,
-    S3: VCache :<: S
+    S3: VCacheKVS :<: S
   ): EitherT[Free[S, ?], ApiError, Boolean] =
     for {
       body  <- free.lift(EntityDecoder.decodeString(req))
@@ -160,7 +160,7 @@ object mount {
     MF: ManageFile.Ops[S],
     T:  Timing.Ops[S],
     S0: Task :<: S,
-    S1: VCache :<: S
+    S1: VCacheKVS :<: S
   ): EitherT[Free[S, ?], ApiError, Unit] =
     for {
       tempFile      <- MF.tempFile(viewPath).leftMap(_.toApiError)
