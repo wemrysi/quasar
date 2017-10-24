@@ -232,22 +232,21 @@ package object main extends Logging {
         ) compose
           VCache.interp[(VCacheExpW :\: ManageFile :\: FileSystemFailure :/: ConnectionIO)#M]
 
-      type MountingFileSystem[A] = Coproduct[Mounting, BackendEffect, A]
-
-      val module = Module.impl.default[MountingFileSystem] andThen foldMapNT(fsThing.mounting :+: fsThing.core)
-
+      type Mounting_Backend[A] = Coproduct[Mounting, BackendEffect, A]
       for {
         fs <- runFsWithViewsAndModules(fsThing.core, vcacheInterp, fsThing.mounting)
       } yield {
+        val module = Module.impl.default[Mounting_Backend] andThen
+          foldMapNT((fsThing.mounting andThen mapSNT(injectNT[QErrs_Task, QErrs_CRW_Task])) :+: fs)
         (MetaStoreLocation.impl.default(metaRef, persist) andThen injectFT[Task, QErrs_CRW_Task]) :+:
-        (module andThen mapSNT(injectNT[QErrs_Task, QErrs_CRW_Task]))                             :+:
+        module                                                                                    :+:
         (fsThing.mounting andThen mapSNT(injectNT[QErrs_Task, QErrs_CRW_Task]))                   :+:
-        (injectNT[Analyze, BackendEffect] andThen fs)                                            :+:
-        (injectNT[QueryFile, BackendEffect] andThen fs)                                          :+:
-        (injectNT[ReadFile, BackendEffect] andThen fs)                                           :+:
-        (injectNT[WriteFile, BackendEffect] andThen fs)                                          :+:
-        (injectNT[ManageFile, BackendEffect] andThen fs)                                         :+:
-        vcacheInterp                                                                             :+:
+        (injectNT[Analyze, BackendEffect] andThen fs)                                             :+:
+        (injectNT[QueryFile, BackendEffect] andThen fs)                                           :+:
+        (injectNT[ReadFile, BackendEffect] andThen fs)                                            :+:
+        (injectNT[WriteFile, BackendEffect] andThen fs)                                           :+:
+        (injectNT[ManageFile, BackendEffect] andThen fs)                                          :+:
+        vcacheInterp                                                                              :+:
         (Timing.toTask andThen injectFT[Task, QErrs_CRW_Task])                                    :+:
         injectFT[Module.Failure, QErrs_CRW_Task]                                                  :+:
         injectFT[PathMismatchFailure, QErrs_CRW_Task]                                             :+:

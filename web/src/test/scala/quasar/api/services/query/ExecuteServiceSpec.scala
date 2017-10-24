@@ -128,7 +128,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
   }
 
   def toLP(q: String, vars: Variables): Fix[LogicalPlan] =
-      sql.fixParser.parseExpr(sql.Query(q)).fold(
+      sql.fixParser.parseExpr(q).fold(
         error => scala.sys.error(s"could not compile query: $q due to error: $error"),
         expr => quasar.queryPlan(expr, vars, rootDir, 0L, None).run.value.toOption.get).valueOr(_ => scala.sys.error("unsupported constant plan"))
 
@@ -449,7 +449,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
         val err: SemanticError =
           SemanticError.WrongArgumentCount(CIName("sum"), 1, 4)
 
-        val expr: Fix[Sql] = sql.fixParser.parseExpr(sql.Query(q)).valueOr(
+        val expr: Fix[Sql] = sql.fixParser.parseExpr(q).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
@@ -464,12 +464,12 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
           response = _ must equal(NonEmptyList(err).toApiError :+ ("phases" := phases)))
       }
       "be 500 for execution error" >> {
-        val q = s"select * from `/foo`"
+        val q = "select * from `/foo`"
         val lp = toLP(q, Variables.empty)
         val msg = "EXEC FAILED"
         val err = executionFailed_(lp, msg)
 
-        val expr: Fix[Sql] = sql.fixParser.parseExpr(sql.Query(q)).valueOr(
+        val expr: Fix[Sql] = sql.fixParser.parseExpr(q).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =

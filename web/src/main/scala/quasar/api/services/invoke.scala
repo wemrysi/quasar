@@ -25,6 +25,7 @@ import quasar.contrib.pathy._
 import quasar.effect.Failure
 import quasar.fp._, numeric._
 import quasar.fs.mount.module.Module
+import quasar.sql.fixParser
 
 import org.http4s.dsl._
 import org.http4s.headers.Accept
@@ -48,7 +49,8 @@ object invoke {
             dir => apiError(BadRequest withReason "Path must be a file").toResponse[S].point[Free[S, ?]],
             file => {
               val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
-              invoke[S](requestedFormat, file, req.params, offset, limit)
+              val relevantParams = req.params - "offset" - "limit"
+              invoke[S](requestedFormat, file, relevantParams, offset, limit)
             })
         }.sequence
       }
@@ -67,5 +69,7 @@ object invoke {
     S0: Failure[Module.Error, ?] :<: S,
     S1: Task :<: S
   ): Free[S, QResponse[S]] =
-      formattedDataResponse(format, I.invokeFunction(filePath, args, offset, limit))
+    args.traverse(fixParser.parseExpr).fold(
+      parseError => parseError.toResponse[S].point[Free[S, ?]],
+      parsedArgs => formattedDataResponse(format, I.invokeFunction(filePath, parsedArgs, offset, limit)))
 }

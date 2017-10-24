@@ -41,10 +41,10 @@ package object query {
 
   object QueryParam extends QueryParamDecoderMatcher[Query]("q")
 
-  def queryParam(params: Map[String, Seq[String]]): ApiError \/ Query =
+  def queryParam(params: Map[String, Seq[String]]): ApiError \/ String =
     params.getOrElse("q", Seq.empty) match {
       case Seq(x) =>
-        Query(x).right
+        x.right
 
       case Seq() =>
         ApiError.fromStatus(

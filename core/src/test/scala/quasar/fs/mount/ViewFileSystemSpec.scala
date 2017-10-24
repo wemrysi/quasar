@@ -158,9 +158,6 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     ViewInterpResult(vs, r)
   }
 
-  def parseExpr(query: String) =
-    fixParser.parseExpr(Query(query)).toOption.get
-
   implicit val RenderedTreeRenderTree = new RenderTree[RenderedTree] {
     def render(t: RenderedTree) = t
   }
@@ -168,7 +165,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   "ReadFile.open" should {
     "translate simple read to query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
-      val expr = parseExpr("select * from `/zips`")
+      val expr = sqlE"select * from `/zips`"
       val lp = queryPlan(expr, Variables.empty, rootDir, 0L, None).run.run._2.toOption.get
 
       val views = Map(p -> expr)
@@ -192,7 +189,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
     "translate limited read to query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
-      val expr = parseExpr("select * from `/zips`")
+      val expr = sqlE"select * from `/zips`"
 
       val views = Map(p -> expr)
 
@@ -224,8 +221,8 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val p1 = rootDir[Sandboxed] </> dir("view") </> file("view1")
 
       val views = Map(
-        p0 -> parseExpr("select * from `/zips`"),
-        p1 -> parseExpr("select * from view0"))
+        p0 -> sqlE"select * from `/zips`",
+        p1 -> sqlE"select * from view0")
 
       val f = (for {
         h <- read.unsafe.open(p1, 0L, None)
@@ -249,7 +246,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val p = rootDir[Sandboxed] </> dir("view") </> file("view0")
 
       val views = Map(
-        p -> parseExpr("1 + 2"))
+        p -> sqlE"1 + 2")
 
       val f = (for {
         h <- read.unsafe.open(p, 0L, None)
@@ -264,7 +261,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
     "read from closed handle (error)" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
-      val expr = parseExpr("select * from zips")
+      val expr = sqlE"select * from zips"
 
       val views = Map(p -> expr)
 
@@ -279,7 +276,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
     "double close (no-op)" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
-      val expr = parseExpr("select * from zips")
+      val expr = sqlE"select * from zips"
 
       val views = Map(p -> expr)
 
@@ -296,7 +293,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   "WriteFile.open" should {
     "fail with view path" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
-      val expr = parseExpr("select * from zips")
+      val expr = sqlE"select * from zips"
 
       val views = Map(p -> expr)
       val f = write.unsafe.open(p).run
@@ -313,7 +310,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
     val srcPath = rootDir </> dir("view") </> file("simpleZips")
     val dstPath = rootDir </> dir("foo") </> file("bar")
-    val expr = parseExpr("select * from zips")
+    val expr = sqlE"select * from zips"
 
     def moveShouldSucceed(views: Map[AFile, Fix[Sql]], files: List[AFile], moveSemantic: MoveSemantics) = {
       val f = manage.move(fileToFile(srcPath, dstPath), moveSemantic).run
@@ -363,7 +360,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val v1 = rootDir[Sandboxed] </> dir("view") </> file("viewA")
       val v2 = rootDir[Sandboxed] </> dir("view") </> file("viewB")
       val destDir = rootDir[Sandboxed] </> dir("zoo")
-      val expr = parseExpr("select * from zips")
+      val expr = sqlE"select * from zips"
 
       val f = manage.move(dirToDir(rootDir </> dir("view"), destDir), MoveSemantics.FailIfExists).run
 
@@ -377,7 +374,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val destDir = rootDir[Sandboxed] </> dir("zoo")
       val viewFile = file("simpleZips")
       val dataFile = file("complexFile")
-      val expr = parseExpr("select * from zips")
+      val expr = sqlE"select * from zips"
 
       val f = manage.move(dirToDir(srcDir, destDir), MoveSemantics.FailIfExists).run
 
@@ -407,7 +404,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   "ManageFile.delete" should {
     "delete with view path" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
-      val expr = parseExpr("select * from zips")
+      val expr = sqlE"select * from zips"
 
       val views = Map(p -> expr)
 
@@ -419,7 +416,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     "delete with view subpath" in {
       val vp = rootDir[Sandboxed] </> dir("view")
       val p = vp </> file("simpleZips")
-      val expr = parseExpr("select * from zips")
+      val expr = sqlE"select * from zips"
 
       val views = Map(p -> expr)
 
@@ -451,7 +448,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   "QueryFile.exec" should {
     "handle simple query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
-      val expr = parseExpr("select * from `/zips`")
+      val expr = sqlE"select * from `/zips`"
 
       val views = Map(p -> expr)
 
@@ -466,7 +463,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   "QueryFile.eval" should {
     "handle simple query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
-      val expr = parseExpr("select * from `/zips`")
+      val expr = sqlE"select * from `/zips`"
 
       val views = Map(p -> expr)
 
@@ -493,7 +490,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   "QueryFile.explain" should {
     "handle simple query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
-      val expr = parseExpr("select * from `/zips`")
+      val expr = sqlE"select * from `/zips`"
 
       val views = Map(p -> expr)
 
@@ -510,7 +507,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       Map(aDir -> Set[PathSegment](FileName("afile").right, DirName("adir").left))
 
     "preserve files and dirs in the presence of non-conflicting views" >> prop { (aDir: ADir) =>
-      val expr = parseExpr("select * from zips")
+      val expr = sqlE"select * from zips"
 
       val views = Map(
         (aDir </> file("view1")) -> expr,
@@ -529,7 +526,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     }
 
     "overlay files and dirs with conflicting paths" >> prop { (aDir: ADir) =>
-      val expr = parseExpr("select * from zips")
+      val expr = sqlE"select * from zips"
 
       val views = Map(
         (aDir </> file("afile")) -> expr,
@@ -610,7 +607,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   "resolveViewRefs" >> {
     def unsafeParse(sqlQry: String): Fix[Sql] =
-      sql.fixParser.parseExpr(sql.Query(sqlQry)).toOption.get
+      sql.fixParser.parseExpr(sqlQry).toOption.get
 
     type Eff[A] = Coproduct[Mounting, VCacheKVS, A]
 
@@ -633,7 +630,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
     "trivial read" >> {
       val p = rootDir </> dir("view") </> file("justZips")
-      val vs = Map[AFile, Fix[Sql]](p -> unsafeParse("select * from `/zips`"))
+      val vs = Map[AFile, Fix[Sql]](p -> sqlE"select * from `/zips`")
 
       resolvedRefs(vs, lpf.read(p)) must beRightDisjunction.like {
         case r => r must beTreeEqual(
@@ -658,7 +655,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
     "trivial read with relative path" >> {
       val p = rootDir </> dir("foo") </> file("justZips")
-      val vs = Map[AFile, Fix[Sql]](p -> unsafeParse("select * from zips"))
+      val vs = Map[AFile, Fix[Sql]](p -> sqlE"select * from zips")
 
       resolvedRefs(vs, lpf.read(p)) must beRightDisjunction.like {
         case r => r must beTreeEqual(
@@ -668,7 +665,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     }
 
     "non-trivial" >> {
-      val inner = unsafeParse("select city, state from `/zips` order by state")
+      val inner = sqlE"select city, state from `/zips` order by state"
 
       val p = rootDir </> dir("view") </> file("simpleZips")
 
@@ -698,9 +695,9 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     "multi-level" >> {
       val vs = Map[AFile, Fix[Sql]](
         (rootDir </> dir("view") </> file("view1")) ->
-          unsafeParse("select * from `/zips`"),
+          sqlE"select * from `/zips`",
         (rootDir </> dir("view") </> file("view2")) ->
-          unsafeParse("select * from view1"))
+          sqlE"select * from view1")
 
       resolvedRefs(vs, lpf.read(rootDir </> dir("view") </> file("view2"))) must
         beRightDisjunction.like { case r => r must beTreeEqual(
@@ -711,7 +708,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     "multi-level with view cache" >> {
       val vs = Map[AFile, Fix[Sql]](
         (rootDir </> file("view")) ->
-          unsafeParse("select * from vcache"))
+          sqlE"select * from vcache")
 
       val dest = rootDir </> file("dest")
 
@@ -736,7 +733,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val zp = rootDir </> file("zips")
 
       val vs = Map[AFile, Fix[Sql]](
-        vp -> unsafeParse("select * from `/zips`"))
+        vp -> sqlE"select * from `/zips`")
 
       val q = lpf.join(
         lpf.read(vp),
