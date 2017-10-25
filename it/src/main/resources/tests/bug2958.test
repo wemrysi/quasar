@@ -1,0 +1,12 @@
+{
+  "name": "bug2958",
+  "data": "bug2958.data",
+  "query": "SELECT OBJECT_CONCAT(DELETE_FIELD(t0, \"b\"), {\"c\": OBJECT_CONCAT(t0.c, t0.b) ?? t0.b}) FROM bug2958 AS t0",
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
+  "expected": [
+  {"a": 1, "c": 2},
+  {"a": 2, "c": 4},
+  {"a": 3, "c": 6}
+  ]
+}
