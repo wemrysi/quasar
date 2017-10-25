@@ -24,7 +24,7 @@ import quasar.fp.free._
 import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.WriteFile.WriteHandle
 import quasar.physical.rdbms.common.TablePath
-import quasar.physical.rdbms.fs.SqlReadCursor
+import quasar.physical.rdbms.model.DbDataStream
 
 import doobie.imports.Transactor
 import scalaz.concurrent.Task
@@ -36,12 +36,12 @@ trait Interpreter {
 
   def interp(xa: Task[Transactor[Task]]): Task[Eff ~> Task] =
     (
-      TaskRef(Map.empty[ReadHandle, SqlReadCursor]) |@|
-      TaskRef(Map.empty[WriteHandle, TablePath]) |@|
+      TaskRef(Map.empty[ReadHandle, DbDataStream]) |@|
+        TaskRef(Map.empty[WriteHandle, TablePath]) |@|
         xa.map(_.trans) |@|
         TaskRef(0L) |@|
         GenUUID.type1[Task]
-    )(
+      )(
       (kvR, kvW, x, i, genUUID) =>
         reflNT[Task]                        :+:
           x :+:

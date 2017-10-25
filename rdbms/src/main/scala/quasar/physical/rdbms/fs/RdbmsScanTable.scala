@@ -14,33 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.physical.rdbms
+package quasar.physical.rdbms.fs
 
 import slamdata.Predef._
-import quasar.effect.uuid.GenUUID
-import quasar.effect.{KeyValueStore, MonotonicSeq}
-import quasar.fp.{:/:, :\:}
-import quasar.fs.ReadFile.ReadHandle
-import quasar.fs.WriteFile.WriteHandle
-import quasar.fs.impl.DataStream
 import quasar.physical.rdbms.common.TablePath
+import quasar.fp.numeric.{Natural, Positive}
 
-import doobie.imports.ConnectionIO
-import scalaz.Free
-import scalaz.concurrent.Task
+import doobie.util.fragment.Fragment
 
-package object model {
-
-  final case class DbDataStream(stream: DataStream[Task], close: Task[Unit])
-
-  type Eff[A] = (
-    Task :\:
-      ConnectionIO :\:
-      MonotonicSeq :\:
-      GenUUID :\:
-      KeyValueStore[ReadHandle, DbDataStream, ?] :/:
-      KeyValueStore[WriteHandle, TablePath, ?]
-  )#M[A]
-
-  type M[A] = Free[Eff, A]
+trait RdbmsScanTable {
+  def selectAllQuery(tablePath: TablePath, offset: Natural, limit: Option[Positive]): Fragment
 }

@@ -20,99 +20,57 @@ import slamdata.Predef._
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
 import quasar.Data
-import quasar.effect.{KeyValueStore, MonotonicSeq}
+import quasar.effect.{Kvs, MonoSeq}
+import quasar.effect.Kvs._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.common.TablePath
+import quasar.connector.ManagedReadFile
+import quasar.fp.free.lift
+import quasar.physical.rdbms.model.DbDataStream
+import quasar.fs.impl.{dataStreamClose, dataStreamRead}
 
-import doobie.free.connection.ConnectionIO
-import doobie.syntax.string._
 import doobie.syntax.process._
-import doobie.util.fragment.Fragment
 import doobie.util.meta.Meta
-import eu.timepit.refined.api.RefType.ops._
 import scalaz._
 import Scalaz._
 
-final case class SqlReadCursor(data: Vector[Data])
-
-trait RdbmsReadFile extends RdbmsDescribeTable {
+trait RdbmsReadFile extends RdbmsDescribeTable with RdbmsScanTable with ManagedReadFile[DbDataStream] {
   this: Rdbms =>
 
+  private val chunkSize = 512
   import ReadFile._
-
-  private val kvs = KeyValueStore.Ops[ReadHandle, SqlReadCursor, Eff]
 
   implicit def MonadM: Monad[M]
   implicit def dataMeta: Meta[Data]
+  def MonoSeqM: MonoSeq[M] = MonoSeq[M]
+  def ReadKvsM: Kvs[M, ReadHandle, DbDataStream] = Kvs[M, ReadHandle, DbDataStream]
 
-  val ReadFileModule: ReadFileModule = new ReadFileModule {
+  def ManagedReadFileModule: ManagedReadFileModule = new ManagedReadFileModule {
 
-    private def readAll(
-        dbPath: TablePath,
-        offset: Int,
-        limit: Option[Int]
-    ): ConnectionIO[Vector[Data]] = {
-      val streamWithOffset = (fr"select * from" ++ Fragment.const(dbPath.shows))
-        .query[Data]
-        .process
-        .drop(offset)
-
-      val streamWithLimit = limit match {
-        case Some(l) => streamWithOffset.take(l)
-        case None    => streamWithOffset
-      }
-      streamWithLimit
-        .vector
+    override def nextChunk(c: DbDataStream): Backend[(DbDataStream, Vector[Data])] = {
+      ME.unattempt(dataStreamRead(c.stream).map(_.rightMap {
+        case (newStream, data) => (c.copy(stream = newStream), data)
+      }).liftB)
     }
 
-    private def toInt(long: Long, varName: String): Backend[\/[FileSystemError, Int]] = {
-      (
-        \/.fromTryCatchNonFatal(long.toInt)
-          .leftMap(
-            _ => FileSystemError.readFailed(long.toString, s"$varName not convertible to Int.")
-          ).point[ConnectionIO]
-        ).liftB
-    }
-
-    def openExisting(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
-      for {
-        i <- MonotonicSeq.Ops[Eff].next.liftB
-        dbPath = TablePath.create(file)
-        handle = ReadHandle(file, i)
-        limitInt <- limit.traverse(l => ME.unattempt(toInt(l.unwrap, "limit")))
-        offsetInt <- ME.unattempt(toInt(offset.unwrap, "offset"))
-        sqlResult <- readAll(dbPath, offsetInt, limitInt).liftB
-        _ <- kvs.put(handle, SqlReadCursor(sqlResult)).liftB
-      } yield handle
-    }
-
-    def openMissing(file: AFile): Backend[ReadHandle] = {
-      for {
-        i <- MonotonicSeq.Ops[Eff].next.liftB
-        handle = ReadHandle(file, i)
-        _ <- kvs.put(handle, SqlReadCursor(Vector.empty)).liftB
-      } yield handle
-    }
-
-    override def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
+    override def readCursor(file: AFile, offset: Natural, limit: Option[Positive]): Backend[DbDataStream] = {
       val dbPath = TablePath.create(file)
-      for {
-        exists <- tableExists(dbPath).liftB
-        handle <- if (exists) openExisting(file, offset, limit) else openMissing(file)
-      } yield handle
+       MR.ask.flatMap { cfg =>
+        transactor(cfg).map { xa =>
+          DbDataStream(selectAllQuery(dbPath, offset, limit)
+            .query[Data]
+            .process
+            .chunk(chunkSize)
+            .map(_.right[FileSystemError])
+            .transact(xa), xa.configure(_.close()))
+        }.liftB
+      }
     }
 
-    override def read(h: ReadHandle): Backend[Vector[Data]] = {
-      for {
-        c <- ME.unattempt(kvs.get(h).toRight(FileSystemError.unknownReadHandle(h)).run.liftB)
-        data = c.data
-        _ <- kvs.put(h, SqlReadCursor(Vector.empty)).liftB
-      } yield data
+    override def closeCursor(c: DbDataStream): Configured[Unit] = {
+      lift(dataStreamClose(c.stream) *> c.close).into[Eff].liftM[ConfiguredT]
     }
-
-    override def close(h: ReadHandle): Configured[Unit] =
-      kvs.delete(h).liftM[ConfiguredT]
   }
 }
