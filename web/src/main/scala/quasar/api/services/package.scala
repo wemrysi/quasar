@@ -92,13 +92,13 @@ package object services {
         }
 
     val f = currentDir[Sandboxed] </> file1[Sandboxed](fileName(filePath).changeExtension(κ(suffix)))
-    val qFilesAndContent = List(f).toList.map { file => (file, format.encode(data)) }
+    val dataFileAndContent = Map(f -> format.encode(data))
 
-    val metadata = ArchiveMetadata(List(f).strengthR(FileMetadata(`Content-Type`(format.mediaType))).toMap)
-    val metaFileAndContent = (ArchiveMetadata.HiddenFile, Process.emit(metadata.asJson.spaces2))
+    val metadata = ArchiveMetadata(Map(f -> FileMetadata(`Content-Type`(format.mediaType))))
+    val metaFileAndContent = Map(ArchiveMetadata.HiddenFile -> Process.emit(metadata.asJson.spaces2))
 
-    val allFiles = metaFileAndContent :: qFilesAndContent
-    val z = Zip.zipFiles(allFiles.toMap.mapValues(strContent => strContent.map(str => ByteVector.view(str.getBytes(StandardCharsets.UTF_8)))))
+    val fileAndMeta = metaFileAndContent ++ dataFileAndContent
+    val z = Zip.zipFiles(fileAndMeta.mapValues(strContent => strContent.map(str => ByteVector.view(str.getBytes(StandardCharsets.UTF_8)))))
 
     QResponse.streaming(z).map(QResponse.headers.modify(_ ++ headers))
   }
