@@ -35,8 +35,12 @@ import doobie.syntax.process._
 import doobie.util.meta.Meta
 import scalaz._
 import Scalaz._
+import scalaz.concurrent.Task
 
-trait RdbmsReadFile extends RdbmsDescribeTable with RdbmsScanTable with ManagedReadFile[DbDataStream] {
+trait RdbmsReadFile
+    extends RdbmsDescribeTable
+    with RdbmsScanTable
+    with ManagedReadFile[DbDataStream] {
   this: Rdbms =>
 
   private val chunkSize = 512
@@ -45,28 +49,49 @@ trait RdbmsReadFile extends RdbmsDescribeTable with RdbmsScanTable with ManagedR
   implicit def MonadM: Monad[M]
   implicit def dataMeta: Meta[Data]
   def MonoSeqM: MonoSeq[M] = MonoSeq[M]
-  def ReadKvsM: Kvs[M, ReadHandle, DbDataStream] = Kvs[M, ReadHandle, DbDataStream]
+  def ReadKvsM: Kvs[M, ReadHandle, DbDataStream] =
+    Kvs[M, ReadHandle, DbDataStream]
 
   def ManagedReadFileModule: ManagedReadFileModule = new ManagedReadFileModule {
 
-    override def nextChunk(c: DbDataStream): Backend[(DbDataStream, Vector[Data])] = {
-      ME.unattempt(dataStreamRead(c.stream).map(_.rightMap {
-        case (newStream, data) => (c.copy(stream = newStream), data)
-      }).liftB)
+    override def nextChunk(
+        c: DbDataStream): Backend[(DbDataStream, Vector[Data])] = {
+      ME.unattempt(
+        dataStreamRead(c.stream)
+          .map(_.rightMap {
+            case (newStream, data) => (c.copy(stream = newStream), data)
+          })
+          .liftB)
     }
 
-    override def readCursor(file: AFile, offset: Natural, limit: Option[Positive]): Backend[DbDataStream] = {
+    def getTableCursor(
+        dbPath: TablePath,
+        cfg: Config,
+        offset: Natural,
+        limit: Option[Positive]
+    ): Backend[DbDataStream] = {
+
+      transactor(cfg).map { xa =>
+        DbDataStream(selectAllQuery(dbPath, offset, limit)
+                       .query[Data]
+                       .process
+                       .chunk(chunkSize)
+                       .map(_.right[FileSystemError])
+                       .transact(xa),
+                     xa.configure(_.close()))
+      }.liftB
+    }
+
+    override def readCursor(file: AFile,
+                            offset: Natural,
+                            limit: Option[Positive]): Backend[DbDataStream] = {
       val dbPath = TablePath.create(file)
-       MR.ask.flatMap { cfg =>
-        transactor(cfg).map { xa =>
-          DbDataStream(selectAllQuery(dbPath, offset, limit)
-            .query[Data]
-            .process
-            .chunk(chunkSize)
-            .map(_.right[FileSystemError])
-            .transact(xa), xa.configure(_.close()))
-        }.liftB
-      }
+      for {
+        cfg <- MR.ask
+        exists <- tableExists(dbPath).liftB
+        cursor <- if (exists) getTableCursor(dbPath, cfg, offset, limit)
+          else Task.now(DbDataStream.empty).liftB
+      } yield cursor
     }
 
     override def closeCursor(c: DbDataStream): Configured[Unit] = {

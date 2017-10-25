@@ -28,10 +28,16 @@ import quasar.physical.rdbms.common.TablePath
 import doobie.imports.ConnectionIO
 import scalaz.Free
 import scalaz.concurrent.Task
+import scalaz.stream.Process
 
 package object model {
 
   final case class DbDataStream(stream: DataStream[Task], close: Task[Unit])
+
+  object DbDataStream {
+    def empty =
+      DbDataStream(Process.empty, Task.now(()))
+  }
 
   type Eff[A] = (
     Task :\:
