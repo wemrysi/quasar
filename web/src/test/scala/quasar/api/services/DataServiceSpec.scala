@@ -19,9 +19,9 @@ package quasar.api.services
 import scala.Predef.$conforms
 import slamdata.Predef._
 import quasar.{Data, RepresentableData}
-import quasar.DataArbitrary._
-import quasar.DateArbitrary._
-import quasar.RepresentableDataArbitrary._
+import quasar.DateGenerators._
+import quasar.DataGenerators._
+import quasar.RepresentableDataGenerators._
 import quasar.api._,
   ApiErrorEntityDecoder._, PathUtils._, MessageFormat.JsonContentType, MessageFormatGen._
 import quasar.api.matchers._
@@ -537,7 +537,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             }
           val expectedData = List(
             Data.Obj(ListMap("a" -> Data.Int(1))),
-            Data.Obj(ListMap("b" -> Data.Time(java.time.LocalTime.parse("12:34:56")))))
+            Data.Obj(ListMap("b" -> Data.LocalTime(java.time.LocalTime.parse("12:34:56")))))
           "Json" >> {
             val line1 = Json("a" := 1)
             val preciseLine2 = Json("b" := Json("$time" := "12:34:56"))

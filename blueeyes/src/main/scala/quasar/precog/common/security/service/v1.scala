@@ -25,7 +25,7 @@ import quasar.precog.common.security._
 
 import shapeless.HNil
 
-import java.time.LocalDateTime
+import java.time.{Instant, LocalDateTime}
 
 object v1 {
   case class GrantDetails(grantId: GrantId,

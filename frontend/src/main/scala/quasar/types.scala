@@ -256,12 +256,18 @@ trait TypeInstances {
         jString("Bool")
       case Binary =>
         jString("Binary")
-      case Timestamp =>
-        jString("Timestamp")
-      case Date =>
-        jString("Date")
-      case Time =>
-        jString("Time")
+      case OffsetDateTime =>
+        jString("OffsetDateTime")
+      case OffsetTime =>
+        jString("OffsetTime")
+      case Type.OffsetDate =>
+        jString("OffsetDate")
+      case LocalDateTime =>
+        jString("LocalDateTime")
+      case LocalTime =>
+        jString("LocalTime")
+      case LocalDate =>
+        jString("LocalDate")
       case Interval =>
         jString("Interval")
       case Id =>
@@ -401,9 +407,12 @@ object Type extends TypeInstances {
     case Dec => Nil
     case Bool => Nil
     case Binary => Nil
-    case Timestamp => Nil
-    case Date => Nil
-    case Time => Nil
+    case OffsetDateTime => Nil
+    case OffsetTime => Nil
+    case OffsetDate => Nil
+    case LocalDateTime => Nil
+    case LocalTime => Nil
+    case LocalDate => Nil
     case Interval => Nil
     case Id => Nil
     case Arr(value) => value
@@ -437,7 +446,7 @@ object Type extends TypeInstances {
       case FlexArr(min, max, value) => wrap(value, FlexArr(min, max, _))
       case Arr(value)               => value.traverse(f).map(Arr)
       case Obj(map, uk)             =>
-        ((map ∘ f).sequence |@| uk.traverse(f))(Obj)
+        (map.traverse(f) |@| uk.traverse(f))(Obj)
 
       case x @ Coproduct(_, _) =>
         for {
@@ -468,9 +477,12 @@ object Type extends TypeInstances {
   final case object Dec               extends Type
   final case object Bool              extends Type
   final case object Binary            extends Type
-  final case object Timestamp         extends Type
-  final case object Date              extends Type
-  final case object Time              extends Type
+  final case object OffsetDateTime    extends Type
+  final case object OffsetTime        extends Type
+  final case object OffsetDate        extends Type
+  final case object LocalDateTime     extends Type
+  final case object LocalTime         extends Type
+  final case object LocalDate         extends Type
   final case object Interval          extends Type
   final case object Id                extends Type
 
@@ -529,9 +541,12 @@ object Type extends TypeInstances {
   val AnyArray = FlexArr(0, None, Top)
   val AnyObject = Obj(Map(), Some(Top))
   val Numeric = Int ⨿ Dec
-  val Temporal = Timestamp ⨿ Date ⨿ Time
+  val Temporal = OffsetDateTime ⨿ OffsetDate ⨿ OffsetTime ⨿ LocalDateTime ⨿ LocalDate ⨿ LocalTime
   val Comparable = Numeric ⨿ Interval ⨿ Str ⨿ Temporal ⨿ Bool
   val Syntaxed = Type.Null ⨿ Type.Comparable
+  val HasDate = OffsetDateTime ⨿ OffsetDate ⨿ LocalDateTime ⨿ LocalDate
+  val HasTime = OffsetDateTime ⨿ OffsetTime ⨿ LocalDateTime ⨿ LocalTime
+  val HasOffset = OffsetDateTime ⨿ OffsetDate ⨿ OffsetTime
 
   @SuppressWarnings(Array("org.wartremover.warts.Equals", "org.wartremover.warts.Recursion"))
   implicit val equal: Equal[Type] = Equal.equal((a, b) => (a, b) match {
@@ -543,11 +558,14 @@ object Type extends TypeInstances {
        | (Dec,       Dec)
        | (Bool,      Bool)
        | (Binary,    Binary)
-       | (Timestamp, Timestamp)
-       | (Date,      Date)
-       | (Time,      Time)
-       | (Interval,  Interval)
-       | (Id,        Id) =>
+       | (OffsetDateTime, OffsetDateTime)
+       | (OffsetTime,     OffsetTime)
+       | (OffsetDate,     OffsetDate)
+       | (LocalDateTime,  LocalDateTime)
+       | (LocalTime,      LocalTime)
+       | (LocalDate,      LocalDate)
+       | (Interval,       Interval)
+       | (Id,             Id) =>
       true
     case (Const(a), Const(b)) => a ≟ b
     case (Arr(as), Arr(bs)) => as ≟ bs

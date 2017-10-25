@@ -29,8 +29,9 @@ import quasar.physical.couchbase.planner.Planner.mapFuncPlanner
 import quasar.Planner.PlannerError
 import quasar.qscript._
 import quasar.std.StdLibSpec
+import quasar.{DateGenerators, DateTimeInterval}
 
-import java.time.LocalDate
+import java.time._
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -59,11 +60,11 @@ class CouchbaseStdLibSpec extends StdLibSpec {
 
   def ignoreSomeBinary(prg: FreeMapA[Fix, BinaryArg], arg1: QData, arg2: QData)(run: => Result): Result =
     (prg, arg1, arg2) match {
-      case (ExtractFunc(MapFuncsCore.Eq(_,_)), QData.Date(_), QData.Timestamp(_)) => pending
-      case (ExtractFunc(MapFuncsCore.Lt(_,_)), QData.Date(_), QData.Timestamp(_)) => pending
-      case (ExtractFunc(MapFuncsCore.Lte(_,_)), QData.Date(_), QData.Timestamp(_)) => pending
-      case (ExtractFunc(MapFuncsCore.Gt(_,_)), QData.Date(_), QData.Timestamp(_)) => pending
-      case (ExtractFunc(MapFuncsCore.Gte(_,_)), QData.Date(_), QData.Timestamp(_)) => pending
+//      case (ExtractFunc(MapFuncsCore.Eq(_,_)), QData.Date(_), QData.Timestamp(_)) => pending
+//      case (ExtractFunc(MapFuncsCore.Lt(_,_)), QData.Date(_), QData.Timestamp(_)) => pending
+//      case (ExtractFunc(MapFuncsCore.Lte(_,_)), QData.Date(_), QData.Timestamp(_)) => pending
+//      case (ExtractFunc(MapFuncsCore.Gt(_,_)), QData.Date(_), QData.Timestamp(_)) => pending
+//      case (ExtractFunc(MapFuncsCore.Gte(_,_)), QData.Date(_), QData.Timestamp(_)) => pending
       case (ExtractFunc(MapFuncsCore.IfUndefined(_,_)), _, _) => pending
       case (ExtractFunc(MapFuncsCore.ProjectField(_,_)), _, _) => pending
       case _ => run
@@ -160,6 +161,9 @@ class CouchbaseStdLibSpec extends StdLibSpec {
         LocalDate.of(9999, 12, 31).toEpochDay
       ) ∘ (LocalDate.ofEpochDay(_))
 
+    def timeDomain: Gen[LocalTime] = DateGenerators.genLocalTime
+    def intervalDomain: Gen[DateTimeInterval] = DateGenerators.genDateTimeInterval
+    def timezoneDomain: Gen[ZoneOffset] = DateGenerators.genZoneOffset
   }
 
   TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>

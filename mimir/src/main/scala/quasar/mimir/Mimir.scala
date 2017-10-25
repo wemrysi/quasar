@@ -31,8 +31,8 @@ import quasar.fs.mount._
 import quasar.qscript._
 import quasar.qscript.analysis._
 
-import quasar.blueeyes.json.{JNum, JValue}
-import quasar.precog.common.{ColumnRef, CPath, CPathField, CPathIndex, Path}
+import quasar.blueeyes.json.JValue
+import quasar.precog.common.{ColumnRef, CNumericValue, CPath, CPathField, CPathIndex, Path}
 import quasar.yggdrasil.TableModule
 import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
@@ -571,7 +571,7 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
           back <- {
             def result = for {
               vals <- countRepr.table.toJson
-              nums = vals collect { case n: JNum => n.toLong.toInt } // TODO error if we get something strange
+              nums = vals collect { case n: CNumericValue[_] => n.toCNum.value.toInt } // TODO error if we get something strange
               number = nums.head
               compacted = fromRepr.table.compact(fromRepr.P.trans.TransSpec1.Id)
               retainsOrder = op != Sample

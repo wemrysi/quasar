@@ -38,6 +38,7 @@ object N1QL extends N1QLInstances {
   final case class Arr[A](l: List[A])                             extends N1QL[A]
   final case class Date[A](a1: A)                                 extends N1QL[A]
   final case class Time[A](a1: A)                                 extends N1QL[A]
+  // TODO: Come back to this
   final case class Timestamp[A](a1: A)                            extends N1QL[A]
   final case class Null[A]()                                      extends N1QL[A]
   final case class Unreferenced[A]()                              extends N1QL[A]

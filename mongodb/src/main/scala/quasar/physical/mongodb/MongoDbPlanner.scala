@@ -80,19 +80,10 @@ object MongoDbPlanner {
       Type => Option[In => Out] =
         typ => f.lift(typ).fold(
           typ match {
-            case Type.Interval => generateTypeCheck(or)(f)(Type.Dec)
+//            TODO: Come back to this
+            case Type.OffsetDateTime | Type.OffsetTime | Type.OffsetDate |
+                 Type.LocalDateTime | Type.LocalTime | Type.LocalDate | Type.Interval => generateTypeCheck(or)(f)(Type.Str)
             case Type.Arr(_) => generateTypeCheck(or)(f)(Type.AnyArray)
-            case Type.Timestamp
-               | Type.Timestamp ⨿ Type.Date
-               | Type.Timestamp ⨿ Type.Date ⨿ Type.Time =>
-              generateTypeCheck(or)(f)(Type.Date)
-            case Type.Timestamp ⨿ Type.Date ⨿ Type.Time ⨿ Type.Interval =>
-              // Just repartition to match the right cases
-              generateTypeCheck(or)(f)(Type.Interval ⨿ Type.Date)
-            case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str ⨿ (Type.Timestamp ⨿ Type.Date ⨿ Type.Time) ⨿ Type.Bool =>
-              // Just repartition to match the right cases
-              generateTypeCheck(or)(f)(
-                Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str ⨿ (Type.Date ⨿ Type.Bool))
             case a ⨿ b =>
               (generateTypeCheck(or)(f)(a) ⊛ generateTypeCheck(or)(f)(b))(
                 (a, b) => ((expr: In) => or(a(expr), b(expr))))
@@ -204,9 +195,12 @@ object MongoDbPlanner {
       case Constant(v1) => unimplemented[M, Fix[ExprOp]]("Constant expression")
       case Now() => execTime map ($literal(_))
 
-      case Date(a1) => unimplemented[M, Fix[ExprOp]]("Date expression")
-      case Time(a1) => unimplemented[M, Fix[ExprOp]]("Time expression")
-      case Timestamp(a1) => unimplemented[M, Fix[ExprOp]]("Timestamp expression")
+      case OffsetDate(a1) => unimplemented[M, Fix[ExprOp]]("OffsetDate expression")
+      case OffsetTime(a1) => unimplemented[M, Fix[ExprOp]]("OffsetTime expression")
+      case OffsetDateTime(a1) => unimplemented[M, Fix[ExprOp]]("OffsetDateTime expression")
+      case LocalDate(a1) => unimplemented[M, Fix[ExprOp]]("LocalDate expression")
+      case LocalTime(a1) => unimplemented[M, Fix[ExprOp]]("LocalTime expression")
+      case LocalDateTime(a1) => unimplemented[M, Fix[ExprOp]]("LocalDateTime expression")
       case Interval(a1) => unimplemented[M, Fix[ExprOp]]("Interval expression")
       case StartOfDay(a1) => unimplemented[M, Fix[ExprOp]]("StartOfDay expression")
       case TemporalTrunc(a1, a2) => unimplemented[M, Fix[ExprOp]]("TemporalTrunc expression")
@@ -281,11 +275,12 @@ object MongoDbPlanner {
             case Type.Binary => check.isBinary
             case Type.Id => check.isId
             case Type.Bool => check.isBoolean
-            case Type.Date => check.isDateOrTimestamp // FIXME: use isDate here when >= 3.0
+            case Type.LocalDate => check.isDate // FIXME: use isDate here when >= 3.0
             // NB: Some explicit coproducts for adjacent types.
             case Type.Int ⨿ Type.Dec ⨿ Type.Str => check.isNumberOrString
             case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str => check.isNumberOrString
-            case Type.Date ⨿ Type.Bool => check.isDateTimestampOrBoolean
+//            TODO: Come back to this
+            case Type.LocalDate ⨿ Type.Bool => check.isDateTimestampOrBoolean
             case Type.Syntaxed => check.isSyntaxed
           }
         exprCheck(typ).fold(cont)(f => $cond(f(expr), cont, fallback)).point[M]
@@ -349,18 +344,20 @@ object MongoDbPlanner {
       case Now() => execTime map (ts => New(Name("ISODate"), List(ts)))
       case Length(a1) =>
         Call(ident("NumberLong"), List(Select(a1, "length"))).point[M]
-      case Date(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.dateRegex + "$")))), "test"), List(a1)),
-          Call(ident("ISODate"), List(a1)),
-          ident("undefined")).point[M]
-      case Time(a1) =>
+//        TODO: Come back to this
+//      case LocalDate(a1) =>
+//        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.dateRegex + "$")))), "test"), List(a1)),
+//          Call(ident("ISODate"), List(a1)),
+//          ident("undefined")).point[M]
+      case LocalTime(a1) =>
         If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.timeRegex + "$")))), "test"), List(a1)),
           a1,
           ident("undefined")).point[M]
-      case Timestamp(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.timestampRegex + "$")))), "test"), List(a1)),
-          Call(ident("ISODate"), List(a1)),
-          ident("undefined")).point[M]
+//        TODO: Come back to this
+//      case OffsetDateTime(a1) =>
+//        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.timestampRegex + "$")))), "test"), List(a1)),
+//          Call(ident("ISODate"), List(a1)),
+//          ident("undefined")).point[M]
       case Interval(a1) => unimplemented[M, JsCore]("Interval JS")
       case TimeOfDay(a1) => {
         def pad2(x: JsCore) =
@@ -432,7 +429,7 @@ object MongoDbPlanner {
             ident("x"))).point[M]
       case ExtractIsoYear(date) =>
         Call(Select(date, "getUTCFullYear"), Nil).point[M]
-      case ExtractMicroseconds(date) =>
+      case ExtractMicrosecond(date) =>
         BinOp(jscore.Mult,
           BinOp(jscore.Add,
             Call(Select(date, "getUTCMilliseconds"), Nil),
@@ -446,7 +443,7 @@ object MongoDbPlanner {
             BinOp(jscore.Div,
               Call(Select(date, "getUTCFullYear"), Nil),
               Literal(Js.Num(1000, false))))))).point[M]
-      case ExtractMilliseconds(date) =>
+      case ExtractMillisecond(date) =>
         BinOp(jscore.Add,
           Call(Select(date, "getUTCMilliseconds"), Nil),
           BinOp(jscore.Mult,
@@ -607,7 +604,13 @@ object MongoDbPlanner {
             case Type.Binary           => isBinary
             case Type.Id               => isObjectId
             case Type.Bool             => isBoolean
-            case Type.Date             => isDate
+//            TODO: Come back to it
+//            case Type.OffsetDateTime   => isOffsetDateTime
+//            case Type.OffsetDate       => isOffsetDate
+//            case Type.OffsetTime       => isOffsetTime
+//            case Type.LocalDateTime    => isLocalDateTime
+//            case Type.LocalDate        => isLocalDate
+//            case Type.LocalTime        => isLocalTime
           }
         jsCheck(typ).fold[M[JsCore]](
           raiseErr(qscriptPlanningFailed(InternalError.fromMsg("uncheckable type"))))(
@@ -703,9 +706,9 @@ object MongoDbPlanner {
     }
 
     object IsDate {
-      def unapply(v: (T[MapFunc[T, ?]], Output)): Option[Data.Date] =
+      def unapply(v: (T[MapFunc[T, ?]], Output)): Option[Data.LocalDate] =
         v._1.project match {
-          case MFC(Constant(d @ Data.Date(_))) => Some(d)
+          case MFC(Constant(d @ Data.LocalDate(_))) => Some(d)
           case _                               => None
         }
     }
@@ -746,23 +749,23 @@ object MongoDbPlanner {
           case (_, _) => -\/(InternalError fromMsg node.map(_._1).shows)
         }
 
-      def relDateOp1(f: Bson.Date => Selector.Condition, date: Data.Date, g: Data.Date => Data.Timestamp, index: Int): Output =
-        Bson.Date.fromInstant(g(date).value).fold[Output](
-          -\/(NonRepresentableData(g(date))))(
-          d => \/-((
-            { case x :: Nil => Selector.Doc(x -> f(d)) },
-            List(There(index, Here[T]())))))
-
-      def relDateOp2(conj: (Selector, Selector) => Selector, f1: Bson.Date => Selector.Condition, f2: Bson.Date => Selector.Condition, date: Data.Date, g1: Data.Date => Data.Timestamp, g2: Data.Date => Data.Timestamp, index: Int): Output =
-        ((Bson.Date.fromInstant(g1(date).value) \/> NonRepresentableData(g1(date))) ⊛
-          (Bson.Date.fromInstant(g2(date).value) \/> NonRepresentableData(g2(date))))((d1, d2) =>
-          (
-            { case x :: Nil =>
-              conj(
-                Selector.Doc(x -> f1(d1)),
-                Selector.Doc(x -> f2(d2)))
-            },
-            List(There(index, Here[T]()))))
+//      def relDateOp1(f: Bson.Date => Selector.Condition, date: Data.LocalDate, g: Data.LocalDate => Data.Timestamp, index: Int): Output =
+//        Bson.Date.fromInstant(g(date).value).fold[Output](
+//          -\/(NonRepresentableData(g(date))))(
+//          d => \/-((
+//            { case x :: Nil => Selector.Doc(x -> f(d)) },
+//            List(There(index, Here[T]())))))
+//
+//      def relDateOp2(conj: (Selector, Selector) => Selector, f1: Bson.Date => Selector.Condition, f2: Bson.Date => Selector.Condition, date: Data.LocalDate, g1: Data.LocalDate => Data.Timestamp, g2: Data.LocalDate => Data.Timestamp, index: Int): Output =
+//        ((Bson.Date.fromInstant(g1(date).value) \/> NonRepresentableData(g1(date))) ⊛
+//          (Bson.Date.fromInstant(g2(date).value) \/> NonRepresentableData(g2(date))))((d1, d2) =>
+//          (
+//            { case x :: Nil =>
+//              conj(
+//                Selector.Doc(x -> f1(d1)),
+//                Selector.Doc(x -> f2(d2)))
+//            },
+//            List(There(index, Here[T]()))))
 
       def invoke2Nel(x: Output, y: Output)(f: (Selector, Selector) => Selector):
           Output =
@@ -796,23 +799,23 @@ object MongoDbPlanner {
       func match {
         case MFC(Constant(_))        => \/-(default)
 
-        case MFC(Gt(_, IsDate(d2)))  => relDateOp1(Selector.Gte, d2, date.startOfNextDay, 0)
-        case MFC(Lt(IsDate(d1), _))  => relDateOp1(Selector.Gte, d1, date.startOfNextDay, 1)
+//        case MFC(Gt(_, IsDate(d2)))  => relDateOp1(Selector.Gte, d2, date.startOfNextDay, 0)
+//        case MFC(Lt(IsDate(d1), _))  => relDateOp1(Selector.Gte, d1, date.startOfNextDay, 1)
 
-        case MFC(Lt(_, IsDate(d2)))  => relDateOp1(Selector.Lt,  d2, date.startOfDay, 0)
-        case MFC(Gt(IsDate(d1), _))  => relDateOp1(Selector.Lt,  d1, date.startOfDay, 1)
+//        case MFC(Lt(_, IsDate(d2)))  => relDateOp1(Selector.Lt,  d2, date.startOfDay, 0)
+//        case MFC(Gt(IsDate(d1), _))  => relDateOp1(Selector.Lt,  d1, date.startOfDay, 1)
 
-        case MFC(Gte(_, IsDate(d2))) => relDateOp1(Selector.Gte, d2, date.startOfDay, 0)
-        case MFC(Lte(IsDate(d1), _)) => relDateOp1(Selector.Gte, d1, date.startOfDay, 1)
+//        case MFC(Gte(_, IsDate(d2))) => relDateOp1(Selector.Gte, d2, date.startOfDay, 0)
+//        case MFC(Lte(IsDate(d1), _)) => relDateOp1(Selector.Gte, d1, date.startOfDay, 1)
 
-        case MFC(Lte(_, IsDate(d2))) => relDateOp1(Selector.Lt,  d2, date.startOfNextDay, 0)
-        case MFC(Gte(IsDate(d1), _)) => relDateOp1(Selector.Lt,  d1, date.startOfNextDay, 1)
+//        case MFC(Lte(_, IsDate(d2))) => relDateOp1(Selector.Lt,  d2, date.startOfNextDay, 0)
+//        case MFC(Gte(IsDate(d1), _)) => relDateOp1(Selector.Lt,  d1, date.startOfNextDay, 1)
 
-        case MFC(Eq(_, IsDate(d2))) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d2, date.startOfDay, date.startOfNextDay, 0)
-        case MFC(Eq(IsDate(d1), _)) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d1, date.startOfDay, date.startOfNextDay, 1)
+//        case MFC(Eq(_, IsDate(d2))) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d2, date.startOfDay, date.startOfNextDay, 0)
+//        case MFC(Eq(IsDate(d1), _)) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d1, date.startOfDay, date.startOfNextDay, 1)
 
-        case MFC(Neq(_, IsDate(d2))) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d2, date.startOfDay, date.startOfNextDay, 0)
-        case MFC(Neq(IsDate(d1), _)) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d1, date.startOfDay, date.startOfNextDay, 1)
+//        case MFC(Neq(_, IsDate(d2))) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d2, date.startOfDay, date.startOfNextDay, 0)
+//        case MFC(Neq(IsDate(d1), _)) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d1, date.startOfDay, date.startOfNextDay, 1)
 
         case MFC(Eq(a, b))  => reversibleRelop(a, b)(func)
         case MFC(Neq(a, b)) => reversibleRelop(a, b)(func)
@@ -866,7 +869,7 @@ object MongoDbPlanner {
               case Type.Id =>
                 ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.ObjectId)))
               case Type.Bool => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Bool)))
-              case Type.Date =>
+              case Type.LocalDate =>
                 ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Date)))
             }
           selCheck(typ).fold[OutputM[PartialSelector[T]]](

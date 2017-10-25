@@ -289,7 +289,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
     def load(table: Table, tpe: JType): EitherT[Future, ResourceError, Table] = {
       for {
-        _ <- EitherT.right(table.toJson.map(json => log.trace("Starting load from " + json.toList.map(_.renderCompact))))
+        _ <- EitherT.right(table.toJson.map(json => log.trace("Starting load from " + json.toList.map(_.toJValue.renderCompact))))
         paths <- EitherT.right(pathsM(table))
 
         projections <- paths.toList traverse { path =>

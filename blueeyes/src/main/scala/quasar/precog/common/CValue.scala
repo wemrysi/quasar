@@ -18,14 +18,23 @@ package quasar.precog
 package common
 
 import quasar.precog._
-import quasar.blueeyes._, json._, serialization._
+import quasar.blueeyes._
+import quasar.DateTimeInterval
+import json._
+import serialization._
 import DefaultSerialization._
-import scalaz._, Scalaz._, Ordering._
+
+import scalaz._
+import Scalaz._
+import Ordering._
 import java.math.MathContext.UNLIMITED
-import java.time.ZonedDateTime
+import java.time._
+
+import quasar.OffsetDate
 
 sealed trait RValue { self =>
   def toJValue: JValue
+  def toJValueRaw: JValue
 
   def \(fieldName: String): RValue
 
@@ -67,6 +76,25 @@ object RValue {
     case RArray.empty   => Some(CEmptyArray)
     case RObject.empty  => Some(CEmptyObject)
     case _              => None
+  }
+
+
+  def fromJValueRaw(jv: JValue): RValue = {
+    def loop(jv: JValue): Option[RValue] = jv match {
+      case JObject(fields) if fields.nonEmpty =>
+        val transformed: Map[String, RValue] = fields.flatMap({
+          case (key, value) => loop(value).map(key -> _).toList
+        })(collection.breakOut)
+
+        Some(RObject(transformed))
+
+      case JArray(elements) if elements.nonEmpty =>
+        Some(RArray(elements.flatMap(loop(_).toList)))
+
+      case other =>
+        CType.toCValueRaw(other)
+    }
+    loop(jv).getOrElse(CUndefined)
   }
 
   def fromJValue(jv: JValue): Option[RValue] = jv match {
@@ -144,6 +172,7 @@ object RValue {
 
 case class RObject(fields: Map[String, RValue]) extends RValue {
   def toJValue                     = JObject(fields mapValues (_.toJValue) toMap)
+  def toJValueRaw                  = JObject(fields mapValues (_.toJValueRaw) toMap)
   def \(fieldName: String): RValue = fields(fieldName)
 }
 
@@ -154,6 +183,7 @@ object RObject {
 
 case class RArray(elements: List[RValue]) extends RValue {
   def toJValue                     = JArray(elements map { _.toJValue })
+  def toJValueRaw                  = JArray(elements map { _.toJValueRaw })
   def \(fieldName: String): RValue = CUndefined
 }
 
@@ -175,6 +205,7 @@ sealed trait CWrappedValue[A] extends CValue {
   def cType: CValueType[A]
   def value: A
   def toJValue = cType.jValueFor(value)
+  def toJValueRaw = cType.jValueForRaw(value)
 }
 
 sealed trait CNumericValue[A] extends CWrappedValue[A] {
@@ -190,8 +221,13 @@ object CValue {
     case (CLong(al), CLong(bl))                                                       => al ?|? bl
     case (CDouble(ad), CDouble(bd))                                                   => ad ?|? bd
     case (CNum(an), CNum(bn))                                                         => fromInt(an compare bn)
-    case (CDate(ad), CDate(bd))                                                       => fromInt(ad compareTo bd)
-    case (CPeriod(ad), CPeriod(bd))                                                   => ad.toDuration ?|? bd.toDuration
+    case (CLocalDateTime(ad), CLocalDateTime(bd))                                     => fromInt(ad compareTo bd)
+    case (CLocalDate(ad), CLocalDate(bd))                                             => fromInt(ad compareTo bd)
+    case (CLocalTime(ad), CLocalTime(bd))                                             => fromInt(ad compareTo bd)
+    case (COffsetDateTime(ad), COffsetDateTime(bd))                                   => fromInt(ad compareTo bd)
+    case (COffsetDate(ad), COffsetDate(bd))                                           => fromInt(ad compareTo bd)
+    case (COffsetTime(ad), COffsetTime(bd))                                           => fromInt(ad compareTo bd)
+    case (CDuration(ad), CDuration(bd))                                               => fromInt(ad compareTo bd)
     case (CArray(as, CArrayType(atpe)), CArray(bs, CArrayType(btpe))) if atpe == btpe => as.toStream.map(x => atpe(x): CValue) ?|? bs.toStream.map(x => btpe(x))
     case (a: CNumericValue[_], b: CNumericValue[_])                                   => (a.toCNum: CValue) ?|? b.toCNum
     case (a, b)                                                                       => a.cType ?|? b.cType
@@ -203,19 +239,24 @@ sealed trait CType extends Serializable {
   def isNumeric: Boolean = false
 
   @inline
-  private[common] final def typeIndex = this match {
-    case CUndefined    => 0
-    case CBoolean      => 1
-    case CString       => 2
-    case CLong         => 4
-    case CDouble       => 6
-    case CNum          => 7
-    case CEmptyObject  => 8
-    case CEmptyArray   => 9
-    case CArrayType(_) => 10 // TODO: Should this account for the element type?
-    case CNull         => 11
-    case CDate         => 12
-    case CPeriod       => 13
+  private[common] final def typeIndex: Int = this match {
+    case CUndefined      => 0
+    case CBoolean        => 1
+    case CString         => 2
+    case CLong           => 3
+    case CDouble         => 4
+    case CNum            => 5
+    case CEmptyObject    => 6
+    case CEmptyArray     => 7
+    case CNull           => 8
+    case COffsetDateTime => 9
+    case COffsetTime     => 10
+    case COffsetDate     => 11
+    case CLocalDateTime  => 12
+    case CLocalTime      => 13
+    case CLocalDate      => 14
+    case CDuration       => 15
+    case CArrayType(t)   => 16 + t.typeIndex
   }
 }
 
@@ -227,6 +268,7 @@ sealed trait CValueType[A] extends CType { self =>
   def apply(a: A): CWrappedValue[A]
   def order(a: A, b: A): scalaz.Ordering
   def jValueFor(a: A): JValue
+  def jValueForRaw(a: A): JValue = jValueFor(a)
 }
 
 sealed trait CNumericType[A] extends CValueType[A] {
@@ -245,26 +287,36 @@ object CType {
     case CEmptyObject         => "EmptyObject"
     case CEmptyArray          => "EmptyArray"
     case CArrayType(elemType) => "Array[%s]" format nameOf(elemType)
-    case CDate                => "Timestamp"
-    case CPeriod              => "Period"
+    case COffsetDateTime      => "OffsetDateTime"
+    case COffsetTime          => "OffsetTime"
+    case COffsetDate          => "OffsetDate"
+    case CLocalDateTime       => "LocalDateTime"
+    case CLocalTime           => "LocalTime"
+    case CLocalDate           => "LocalDate"
+    case CDuration            => "Duration"
     case CUndefined           => sys.error("CUndefined cannot be serialized")
   }
 
   val ArrayName = """Array[(.*)]""".r
 
   def fromName(n: String): Option[CType] = n match {
-    case "String"        => Some(CString)
-    case "Boolean"       => Some(CBoolean)
-    case "Long"          => Some(CLong)
-    case "Double"        => Some(CDouble)
-    case "Decimal"       => Some(CNum)
-    case "Null"          => Some(CNull)
-    case "EmptyObject"   => Some(CEmptyObject)
-    case "EmptyArray"    => Some(CEmptyArray)
-    case "Timestamp"     => Some(CDate)
-    case "Period"        => Some(CPeriod)
-    case ArrayName(elem) => fromName(elem) collect { case tp: CValueType[_] => CArrayType(tp) }
-    case _               => None
+    case "String"         => Some(CString)
+    case "Boolean"        => Some(CBoolean)
+    case "Long"           => Some(CLong)
+    case "Double"         => Some(CDouble)
+    case "Decimal"        => Some(CNum)
+    case "Null"           => Some(CNull)
+    case "EmptyObject"    => Some(CEmptyObject)
+    case "EmptyArray"     => Some(CEmptyArray)
+    case "OffsetDateTime" => Some(COffsetDateTime)
+    case "OffsetDate"     => Some(COffsetDate)
+    case "OffsetTime"     => Some(COffsetTime)
+    case "LocalDateTime"  => Some(CLocalDateTime)
+    case "LocalDate"      => Some(CLocalDate)
+    case "LocalTime"      => Some(CLocalTime)
+    case "Duration"       => Some(CDuration)
+    case ArrayName(elem)  => fromName(elem) collect { case tp: CValueType[_] => CArrayType(tp) }
+    case _                => None
   }
 
   implicit val decomposer: Decomposer[CType] = new Decomposer[CType] {
@@ -292,6 +344,41 @@ object CType {
     case (CLong | CDouble | CNum, CLong | CDouble | CNum) => Some(CNum)
     case (CArrayType(et1), CArrayType(et2))               => unify(et1, et2) collect { case t: CValueType[_] => CArrayType(t) }
     case _                                                => None
+  }
+
+  @inline
+  final def toCValueRaw(jval: JValue): Option[CValue] = jval match {
+    case JString(s) =>
+      Some(CString(s))
+
+    case JBool(b) =>
+      Some(CBoolean(b))
+
+    case JNull =>
+      Some(CNull)
+
+    case JObject.empty =>
+      Some(CEmptyObject)
+
+    case JArray.empty =>
+      Some(CEmptyArray)
+
+    case JNumLong(d) =>
+      Some(CLong(d))
+
+    case JNumDouble(d) =>
+      Some(CDouble(d))
+
+    case JNumStr(d) =>
+      Some(CNum(BigDecimal(d)))
+
+    case JNumBigDec(d) =>
+      Some(CNum(d))
+
+    case JArray(_) =>
+      sys.error("TODO: Allow for homogeneous JArrays -> CArray.")
+
+    case JUndefined => None
   }
 
   @inline
@@ -355,6 +442,19 @@ object CType {
     case _             => None
   }
 
+  final def forJValueRaw(jval: JValue): Option[CType] = jval match {
+    case JBool(_) => Some(CBoolean)
+    case JNumLong(_) => Some(CLong)
+    case JNumDouble(_) => Some(CDouble)
+    case JNumBigDec(_) | JNumStr(_) => Some(CNum)
+    case JString(_)    => Some(CString)
+    case JNull         => Some(CNull)
+    case JArray(Nil)   => Some(CEmptyArray)
+    case JObject.empty => Some(CEmptyObject)
+    case JArray.empty  => None // TODO Allow homogeneous JArrays -> CType
+    case _             => None
+  }
+
   implicit val CTypeOrder: scalaz.Order[CType] = Order order {
     case (CArrayType(t1), CArrayType(t2)) => (t1: CType) ?|? t2
     case (x, y)                           => x.typeIndex ?|? y.typeIndex
@@ -371,8 +471,13 @@ object CValueType {
   implicit def long: CValueType[Long]                     = CLong
   implicit def double: CValueType[Double]                 = CDouble
   implicit def bigDecimal: CValueType[BigDecimal]         = CNum
-  implicit def dateTime: CValueType[ZonedDateTime]        = CDate
-  implicit def period: CValueType[Period]                 = CPeriod
+  implicit def offsetDateTime: CValueType[OffsetDateTime] = COffsetDateTime
+  implicit def offsetTime: CValueType[OffsetTime]         = COffsetTime
+  implicit def offsetDate: CValueType[OffsetDate]         = COffsetDate
+  implicit def localDateTime: CValueType[LocalDateTime]   = CLocalDateTime
+  implicit def localTime: CValueType[LocalTime]           = CLocalTime
+  implicit def localDate: CValueType[LocalDate]           = CLocalDate
+  implicit def duration: CValueType[DateTimeInterval]     = CDuration
   implicit def array[A](implicit elemType: CValueType[A]) = CArrayType(elemType)
 }
 
@@ -474,7 +579,7 @@ sealed abstract class CBoolean(val value: Boolean) extends CWrappedValue[Boolean
 case object CTrue  extends CBoolean(true)
 case object CFalse extends CBoolean(false)
 
-object CBoolean extends CValueType[Boolean] {
+case object CBoolean extends CValueType[Boolean] {
   def apply(value: Boolean)    = if (value) CTrue else CFalse
   def unapply(cbool: CBoolean) = Some(cbool.value)
   val classTag: CTag[Boolean] = implicitly[CTag[Boolean]]
@@ -492,10 +597,11 @@ case class CLong(value: Long) extends CNumericValue[Long] {
 
 case object CLong extends CNumericType[Long] {
   val classTag: CTag[Long] = implicitly[CTag[Long]]
-  def readResolve()              = CLong
-  def order(v1: Long, v2: Long)  = longInstance.order(v1, v2)
-  def jValueFor(v: Long): JValue = JNum(bigDecimalFor(v))
-  def bigDecimalFor(v: Long)     = BigDecimal(v, UNLIMITED)
+  def readResolve()                          = CLong
+  def order(v1: Long, v2: Long)              = longInstance.order(v1, v2)
+  def jValueFor(v: Long): JValue             = JNum(bigDecimalFor(v))
+  override def jValueForRaw(v: Long): JValue = JNumLong(v)
+  def bigDecimalFor(v: Long)                 = BigDecimal(v, UNLIMITED)
 }
 
 case class CDouble(value: Double) extends CNumericValue[Double] {
@@ -504,10 +610,11 @@ case class CDouble(value: Double) extends CNumericValue[Double] {
 
 case object CDouble extends CNumericType[Double] {
   val classTag: CTag[Double] = implicitly[CTag[Double]]
-  def readResolve()                 = CDouble
-  def order(v1: Double, v2: Double) = doubleInstance.order(v1, v2)
-  def jValueFor(v: Double)          = JNum(BigDecimal(v.toString, UNLIMITED))
-  def bigDecimalFor(v: Double)      = BigDecimal(v.toString, UNLIMITED)
+  def readResolve()                    = CDouble
+  def order(v1: Double, v2: Double)    = doubleInstance.order(v1, v2)
+  def jValueFor(v: Double)             = JNum(BigDecimal(v.toString, UNLIMITED))
+  override def jValueForRaw(v: Double) = JNumDouble(v)
+  def bigDecimalFor(v: Double)         = BigDecimal(v.toString, UNLIMITED)
 }
 
 case class CNum(value: BigDecimal) extends CNumericValue[BigDecimal] {
@@ -519,32 +626,89 @@ case object CNum extends CNumericType[BigDecimal] {
   def readResolve()                         = CNum
   def order(v1: BigDecimal, v2: BigDecimal) = bigDecimalOrder.order(v1, v2)
   def jValueFor(v: BigDecimal)              = JNum(v)
+  override def jValueForRaw(v: BigDecimal)  = JNumBigDec(v)
   def bigDecimalFor(v: BigDecimal)          = v
 }
 
 //
-// Dates and Periods
+// Dates, Times and Periods
+// TODO: format correctly
 //
-case class CDate(value: ZonedDateTime) extends CWrappedValue[ZonedDateTime] {
-  val cType = CDate
+case class COffsetDateTime(value: OffsetDateTime) extends CWrappedValue[OffsetDateTime] {
+  val cType = COffsetDateTime
 }
 
-case object CDate extends CValueType[ZonedDateTime] {
-  val classTag: CTag[ZonedDateTime]      = implicitly[CTag[ZonedDateTime]]
-  def readResolve()                     = CDate
-  def order(v1: ZonedDateTime, v2: ZonedDateTime) = sys.error("todo")
-  def jValueFor(v: ZonedDateTime)            = JString(v.toString)
+case object COffsetDateTime extends CValueType[OffsetDateTime] {
+  val classTag: CTag[OffsetDateTime]                = implicitly[CTag[OffsetDateTime]]
+  def readResolve()                                 = COffsetDateTime
+  def order(v1: OffsetDateTime, v2: OffsetDateTime) = sys.error("todo")
+  def jValueFor(v: OffsetDateTime)                  = JString(v.toString)
 }
 
-case class CPeriod(value: Period) extends CWrappedValue[Period] {
-  val cType = CPeriod
+case class COffsetDate(value: OffsetDate) extends CWrappedValue[OffsetDate] {
+  val cType = COffsetDate
 }
 
-case object CPeriod extends CValueType[Period] {
-  val classTag: CTag[Period]    = implicitly[CTag[Period]]
-  def readResolve()                 = CPeriod
-  def order(v1: Period, v2: Period) = sys.error("todo")
-  def jValueFor(v: Period)          = JString(v.toString)
+case object COffsetDate extends CValueType[OffsetDate] {
+  val classTag: CTag[OffsetDate]            = implicitly[CTag[OffsetDate]]
+  def readResolve()                         = COffsetDate
+  def order(v1: OffsetDate, v2: OffsetDate) = sys.error("todo")
+  def jValueFor(v: OffsetDate)              = JString(v.toString)
+}
+
+case class COffsetTime(value: OffsetTime) extends CWrappedValue[OffsetTime] {
+  val cType = COffsetTime
+}
+
+case object COffsetTime extends CValueType[OffsetTime] {
+  val classTag: CTag[OffsetTime]            = implicitly[CTag[OffsetTime]]
+  def readResolve()                         = COffsetTime
+  def order(v1: OffsetTime, v2: OffsetTime) = sys.error("todo")
+  def jValueFor(v: OffsetTime)              = JString(v.toString)
+}
+
+case class CLocalDateTime(value: LocalDateTime) extends CWrappedValue[LocalDateTime] {
+  val cType = CLocalDateTime
+}
+
+case object CLocalDateTime extends CValueType[LocalDateTime] {
+  val classTag: CTag[LocalDateTime]           = implicitly[CTag[LocalDateTime]]
+  def readResolve()                       = CLocalDateTime
+  def order(v1: LocalDateTime, v2: LocalDateTime) = sys.error("todo")
+  def jValueFor(v: LocalDateTime)             = JString(v.toString)
+}
+
+case class CLocalTime(value: LocalTime) extends CWrappedValue[LocalTime] {
+  val cType = CLocalTime
+}
+
+case object CLocalTime extends CValueType[LocalTime] {
+  val classTag: CTag[LocalTime]           = implicitly[CTag[LocalTime]]
+  def readResolve()                       = CLocalTime
+  def order(v1: LocalTime, v2: LocalTime) = sys.error("todo")
+  def jValueFor(v: LocalTime)             = JString(v.toString)
+}
+
+case class CLocalDate(value: LocalDate) extends CWrappedValue[LocalDate] {
+  val cType = CLocalDate
+}
+
+case object CLocalDate extends CValueType[LocalDate] {
+  val classTag: CTag[LocalDate]         = implicitly[CTag[LocalDate]]
+  def readResolve()                   = CLocalDate
+  def order(v1: LocalDate, v2: LocalDate) = sys.error("todo")
+  def jValueFor(v: LocalDate)           = JString(v.toString)
+}
+
+case class CDuration(value: DateTimeInterval) extends CWrappedValue[DateTimeInterval] {
+  val cType = CDuration
+}
+
+case object CDuration extends CValueType[DateTimeInterval] {
+  val classTag: CTag[DateTimeInterval]                  = implicitly[CTag[DateTimeInterval]]
+  def readResolve()                                     = CDuration
+  def order(v1: DateTimeInterval, v2: DateTimeInterval) = sys.error("todo")
+  def jValueFor(v: DateTimeInterval)                    = JString(v.toString)
 }
 
 //
@@ -553,16 +717,19 @@ case object CPeriod extends CValueType[Period] {
 case object CNull extends CNullType with CNullValue {
   def readResolve() = CNull
   def toJValue      = JNull
+  def toJValueRaw   = JNull
 }
 
 case object CEmptyObject extends CNullType with CNullValue {
   def readResolve() = CEmptyObject
   def toJValue      = JObject(Nil)
+  def toJValueRaw   = JObject(Nil)
 }
 
 case object CEmptyArray extends CNullType with CNullValue {
   def readResolve() = CEmptyArray
   def toJValue      = JArray(Nil)
+  def toJValueRaw   = JArray(Nil)
 }
 
 //
@@ -571,4 +738,5 @@ case object CEmptyArray extends CNullType with CNullValue {
 case object CUndefined extends CNullType with CNullValue {
   def readResolve() = CUndefined
   def toJValue      = JUndefined
+  def toJValueRaw   = JUndefined
 }

@@ -20,9 +20,6 @@ import slamdata.Predef._
 import quasar.fp._
 import quasar.fp.ski._
 
-import java.time.format.DateTimeFormatter
-import java.time.ZoneOffset.UTC
-
 import argonaut._, Argonaut._
 import scalaz._, Scalaz._
 
@@ -66,16 +63,13 @@ object DataCodec {
   def render(data: Data)(implicit C: DataCodec): Option[String] =
     C.encode(data).map(_.pretty(minspace))
 
-  val dateTimeFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX")
-
-  val timeFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
-
   val Precise = new DataCodec {
-    val TimestampKey = "$timestamp"
-    val DateKey = "$date"
-    val TimeKey = "$time"
+    val LocalDateTimeKey = "$localdatetime"
+    val LocalDateKey = "$localdate"
+    val LocalTimeKey = "$localtime"
+    val OffsetDateTimeKey = "$offsetdatetime"
+    val OffsetDateKey = "$offsetdate"
+    val OffsetTimeKey = "$offsettime"
     val IntervalKey = "$interval"
     val BinaryKey = "$binary"
     val ObjKey = "$obj"
@@ -95,16 +89,19 @@ object DataCodec {
         case Arr(value) => Json.array(value.map(encode).unite: _*).some
         case Set(_)     => None
 
-        case Timestamp(value) => Json.obj(TimestampKey -> jString(value.atZone(UTC).format(dateTimeFormatter))).some
-        case Date(value)      => Json.obj(DateKey      -> jString(value.toString)).some
-        case Time(value)      => Json.obj(TimeKey      -> jString(value.format(timeFormatter))).some
-        case Interval(value)  => Json.obj(IntervalKey  -> jString(value.toString)).some
+        case OffsetDateTime(value)  => Json.obj(OffsetDateTimeKey -> jString(value.toString)).some
+        case Data.OffsetDate(value) => Json.obj(OffsetDateKey     -> jString(value.toString)).some
+        case OffsetTime(value)      => Json.obj(OffsetTimeKey     -> jString(value.toString)).some
+        case LocalDateTime(value)   => Json.obj(LocalDateTimeKey  -> jString(value.toString)).some
+        case LocalDate(value)       => Json.obj(LocalDateKey      -> jString(value.toString)).some
+        case LocalTime(value)       => Json.obj(LocalTimeKey      -> jString(value.toString)).some
+        case Interval(value)        => Json.obj(IntervalKey       -> jString(value.toString)).some
 
-        case bin @ Binary(_)  => Json.obj(BinaryKey    -> jString(bin.base64)).some
+        case bin @ Binary(_)        => Json.obj(BinaryKey         -> jString(bin.base64)).some
 
-        case Id(value)        => Json.obj(IdKey        -> jString(value)).some
+        case Id(value)              => Json.obj(IdKey             -> jString(value)).some
 
-        case NA               => None
+        case NA                     => None
       }
     }
 
@@ -129,15 +126,18 @@ object DataCodec {
             obj.toList.traverse { case (k, v) => decode(v).map(k -> _) }.map(pairs => Data.Obj(ListMap(pairs: _*)))
 
           obj.toList match {
-            case (`TimestampKey`, value) :: Nil => unpack(value.string, "string value for $timestamp")(parseTimestamp(_).leftMap(err => ParseError(err.message)))
-            case (`DateKey`, value) :: Nil      => unpack(value.string, "string value for $date")(parseDate(_).leftMap(err => ParseError(err.message)))
-            case (`TimeKey`, value) :: Nil      => unpack(value.string, "string value for $time")(parseTime(_).leftMap(err => ParseError(err.message)))
-            case (`IntervalKey`, value) :: Nil  => unpack(value.string, "string value for $interval")(parseInterval(_).leftMap(err => ParseError(err.message)))
-            case (`ObjKey`, value) :: Nil       => unpack(value.obj,    "object value for $obj")(decodeObj)
-            case (`BinaryKey`, value) :: Nil    => unpack(value.string, "string value for $binary") { str =>
+            case (`OffsetDateTimeKey`, value) :: Nil => unpack(value.string, "string value for $offsetdatetime")(parseOffsetDateTime(_).leftMap(err => ParseError(err.message)))
+            case (`OffsetTimeKey`, value) :: Nil     => unpack(value.string, "string value for $offsettime")(parseOffsetTime(_).leftMap(err => ParseError(err.message)))
+            case (`OffsetDateKey`, value) :: Nil     => unpack(value.string, "string value for $offsetdate")(parseOffsetDate(_).leftMap(err => ParseError(err.message)))
+            case (`LocalDateTimeKey`, value) :: Nil  => unpack(value.string, "string value for $localdatetime")(parseLocalDateTime(_).leftMap(err => ParseError(err.message)))
+            case (`LocalTimeKey`, value) :: Nil      => unpack(value.string, "string value for $localtime")(parseLocalTime(_).leftMap(err => ParseError(err.message)))
+            case (`LocalDateKey`, value) :: Nil      => unpack(value.string, "string value for $localdate")(parseLocalDate(_).leftMap(err => ParseError(err.message)))
+            case (`IntervalKey`, value) :: Nil       => unpack(value.string, "string value for $interval")(parseInterval(_).leftMap(err => ParseError(err.message)))
+            case (`ObjKey`, value) :: Nil            => unpack(value.obj,    "object value for $obj")(decodeObj)
+            case (`BinaryKey`, value) :: Nil         => unpack(value.string, "string value for $binary") { str =>
               \/.fromTryCatchNonFatal(Data.Binary.fromArray(new sun.misc.BASE64Decoder().decodeBuffer(str))).leftMap(_ => UnexpectedValueError("BASE64-encoded data", json))
             }
-            case (`IdKey`, value) :: Nil        => unpack(value.string, "string value for $oid")(str => \/-(Data.Id(str)))
+            case (`IdKey`, value) :: Nil             => unpack(value.string, "string value for $oid")(str => \/-(Data.Id(str)))
             case _ => obj.fields.find(_.startsWith("$")).fold(decodeObj(obj))(κ(-\/(UnescapedKeyError(json))))
           }
         })
@@ -161,10 +161,13 @@ object DataCodec {
         case Arr(value) => Json.array(value.map(encode).unite: _*).some
         case Set(_)     => None
 
-        case Timestamp(value) => jString(value.toString).some
-        case Date(value)      => jString(value.toString).some
-        case Time(value)      => jString(value.toString).some
-        case Interval(value)  => jString(value.toString).some
+        case OffsetDateTime(value)  => jString(value.toString).some
+        case OffsetTime(value)      => jString(value.toString).some
+        case Data.OffsetDate(value) => jString(value.toString).some
+        case LocalDateTime(value)   => jString(value.toString).some
+        case LocalTime(value)       => jString(value.toString).some
+        case LocalDate(value)       => jString(value.toString).some
+        case Interval(value)        => jString(value.toString).some
 
         case bin @ Binary(_)  => jString(bin.base64).some
 
@@ -186,10 +189,14 @@ object DataCodec {
         str => {
           import std.DateLib._
 
+          // TODO: make this not stupidly slow
           val converted = List(
-              parseTimestamp(str),
-              parseDate(str),
-              parseTime(str),
+              parseOffsetDateTime(str),
+              parseOffsetTime(str),
+              parseOffsetDate(str),
+              parseLocalDateTime(str),
+              parseLocalTime(str),
+              parseLocalDate(str),
               parseInterval(str))
           \/-(converted.flatMap(_.toList).headOption.getOrElse(Data.Str(str)))
         },
@@ -211,10 +218,6 @@ object DataCodec {
     case Data.Int(x)                                        => x.isValidLong
     case Data.Arr(list)                                     => list.forall(representable(_, codec))
     case Data.Obj(map)                                      => map.values.forall(representable(_, codec))
-    // Unfortunately currently there is a bug where intervals do not serialize/deserialize properly
-    // and although it would appear to work for a human observer,
-    // the runtime instances are not found to be "equal" which is breaking tests
-    case Data.Interval(_)                                   => false
     case _                                                  => true
   }
 }

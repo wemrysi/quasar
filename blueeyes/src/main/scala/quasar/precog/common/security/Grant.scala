@@ -28,8 +28,7 @@ import quasar.blueeyes.json.serialization.Versioned._
 import scalaz._, Scalaz._
 
 import shapeless.HNil
-
-import java.time.LocalDateTime
+import java.time.{Instant, LocalDateTime}
 
 case class Grant(grantId: GrantId,
                  name: Option[String],

@@ -95,6 +95,47 @@ trait ScalacheckSupport {
 
   def genAlphaNumString: Gen[String]   = alphaNumChar.list ^^ (_.mkString)
   def genBigDecimal: Gen[BigDecimal]   = Arbitrary.arbBigDecimal.arbitrary
+  // mostly copied from scalacheck, but the scale range is tweaked from (-300, 300) to (-100, 100).
+  // this is a hack to avoid underflow and overflow exceptions during tests. It's still a problem.
+  def genSmallScaleBigDecimal: Gen[BigDecimal] = {
+    import java.math.MathContext, MathContext._
+
+    val genMathContext0: Gen[MathContext] =
+      oneOf(DECIMAL32, DECIMAL64, DECIMAL128)
+
+    val long: Gen[Long] =
+      Gen.choose(Long.MinValue, Long.MaxValue).map(x => if (x == 0) 1L else x)
+
+    val genWholeBigDecimal: Gen[BigDecimal] =
+      long.map(BigDecimal(_))
+
+    val genSmallBigDecimal: Gen[BigDecimal] =
+      for {
+        mc <- genMathContext0
+        n <- long
+        d <- long
+      } yield BigDecimal(n, 0, mc) / d
+
+    val genLargeBigDecimal: Gen[BigDecimal] =
+      for {
+        n <- arbitrary[BigInt]
+        scale <- Gen.choose(-100, 100)
+      } yield BigDecimal(n, scale, UNLIMITED)
+
+    val genSpecificBigDecimal: Gen[BigDecimal] =
+      oneOf(
+        BigDecimal(0),
+        BigDecimal(1),
+        BigDecimal(-1),
+        BigDecimal("1e-300"),
+        BigDecimal("-1e-300"))
+
+    frequency(
+      (5, genWholeBigDecimal),
+      (10, genSmallBigDecimal),
+      (10, genLargeBigDecimal),
+      (5, genSpecificBigDecimal))
+  }
   def genBigInt: Gen[BigInt]           = Arbitrary.arbBigInt.arbitrary
   def genBool: Gen[Boolean]            = oneOf(true, false)
   def genByte: Gen[Byte]               = choose(Byte.MinValue, Byte.MaxValue) ^^ (_.toByte)
@@ -110,6 +151,22 @@ trait ScalacheckSupport {
   def genPosLong: Gen[Long]            = choose(1L, Long.MaxValue)
   def genStartAndEnd: Gen[Int -> Int]  = genMinus10To10 >> (s => (0 upTo 20) ^^ (e => s -> e))
   def genString: Gen[String]           = Arbitrary.arbString.arbitrary
+  // mostly copied from scalacheck excluding control characters
+  def genJSONChar: Gen[Char]           = {
+    // exclude 0xFFFE due to this bug: http://bit.ly/1QryQZy
+    // also exclude 0xFFFF as it is not unicode: http://bit.ly/2cVBrzK
+    // excludes
+    val validRangesInclusive = List[(Char, Char)](
+      (0x0020, 0xD7FF),
+      (0xE000, 0xFFFD)
+    )
+
+    Gen.frequency((validRangesInclusive.map {
+      case (first, last) => (last + 1 - first, Gen.choose[Char](first, last))
+    }: List[(Int, Gen[Char])]): _*)
+  }
+
+  def genJSONString: Gen[String]       = Gen.listOf(genJSONChar).map(_.mkString)
 
   implicit class ScalacheckIntOps(private val n: Int) {
     def upTo(end: Int): Gen[Int] = choose(n, end)

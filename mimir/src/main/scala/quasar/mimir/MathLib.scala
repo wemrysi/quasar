@@ -16,6 +16,7 @@
 
 package quasar.mimir
 
+import quasar.DateTimeInterval
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
 

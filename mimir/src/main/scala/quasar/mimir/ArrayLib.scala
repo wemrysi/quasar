@@ -25,198 +25,337 @@ import quasar.yggdrasil.table._
 
 trait ArrayLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait ArrayLib extends ColumnarTableLib {
-    import StdLib.dateToStrCol
-
     override def _libMorphism1 = super._libMorphism1 ++ Set(Flatten)
 
     // this isn't really an array function, but I don't know where else to put it
     // this is basically lower <= target <= upper, except with support for strings
+    // and dates/times/datetimes
     lazy val between: CFN = CFNP("std::array::between") {
       case List(target: LongColumn, lower: LongColumn, upper: LongColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: DoubleColumn, lower: LongColumn, upper: LongColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: NumColumn, lower: LongColumn, upper: LongColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: LongColumn, lower: DoubleColumn, upper: LongColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: DoubleColumn, lower: DoubleColumn, upper: LongColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: NumColumn, lower: DoubleColumn, upper: LongColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: LongColumn, lower: NumColumn, upper: LongColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: DoubleColumn, lower: NumColumn, upper: LongColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: NumColumn, lower: NumColumn, upper: LongColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: LongColumn, lower: LongColumn, upper: DoubleColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: DoubleColumn, lower: LongColumn, upper: DoubleColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: NumColumn, lower: LongColumn, upper: DoubleColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: LongColumn, lower: DoubleColumn, upper: DoubleColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: DoubleColumn, lower: DoubleColumn, upper: DoubleColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: NumColumn, lower: DoubleColumn, upper: DoubleColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: LongColumn, lower: NumColumn, upper: DoubleColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: DoubleColumn, lower: NumColumn, upper: DoubleColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: NumColumn, lower: NumColumn, upper: DoubleColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: LongColumn, lower: LongColumn, upper: NumColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: DoubleColumn, lower: LongColumn, upper: NumColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: NumColumn, lower: LongColumn, upper: NumColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: LongColumn, lower: DoubleColumn, upper: NumColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: DoubleColumn, lower: DoubleColumn, upper: NumColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: NumColumn, lower: DoubleColumn, upper: NumColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: LongColumn, lower: NumColumn, upper: NumColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: DoubleColumn, lower: NumColumn, upper: NumColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: NumColumn, lower: NumColumn, upper: NumColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            t >= lower(row) && t <= upper(row)
+          }
+          def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
+        }
+
+      case List(target: OffsetDateTimeColumn, lower: OffsetDateTimeColumn, upper: OffsetDateTimeColumn) =>
+        new BoolColumn {
+          def apply(row: Int) = {
+            val t = target(row)
+            lower(row).compareTo(t) <= 0 && t.compareTo(upper(row)) <= 0
+          }
+          def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
+        }
+
+      case List(target: OffsetDateColumn, lower: OffsetDateColumn, upper: OffsetDateColumn) =>
+        new BoolColumn {
+          def apply(row: Int) = {
+            val t = target(row)
+            lower(row).compareTo(t) <= 0 && t.compareTo(upper(row)) <= 0
+          }
+          def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
+        }
+
+      case List(target: OffsetTimeColumn, lower: OffsetTimeColumn, upper: OffsetTimeColumn) =>
+        new BoolColumn {
+          def apply(row: Int) = {
+            val t = target(row)
+            lower(row).compareTo(t) <= 0 && t.compareTo(upper(row)) <= 0
+          }
+          def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
+        }
+
+      case List(target: LocalDateTimeColumn, lower: LocalDateTimeColumn, upper: LocalDateTimeColumn) =>
+        new BoolColumn {
+          def apply(row: Int) = {
+            val t = target(row)
+            lower(row).compareTo(t) <= 0 && t.compareTo(upper(row)) <= 0
+          }
+          def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
+        }
+
+      case List(target: LocalDateColumn, lower: LocalDateColumn, upper: LocalDateColumn) =>
+        new BoolColumn {
+          def apply(row: Int) = {
+            val t = target(row)
+            lower(row).compareTo(t) <= 0 && t.compareTo(upper(row)) <= 0
+          }
+          def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
+        }
+
+      case List(target: LocalTimeColumn, lower: LocalTimeColumn, upper: LocalTimeColumn) =>
+        new BoolColumn {
+          def apply(row: Int) = {
+            val t = target(row)
+            lower(row).compareTo(t) <= 0 && t.compareTo(upper(row)) <= 0
+          }
+          def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
+        }
+
+      case List(target: DurationColumn, lower: DurationColumn, upper: DurationColumn) =>
+        new BoolColumn {
+          def apply(row: Int) = {
+            val t = target(row)
+            lower(row).compareTo(t) <= 0 && t.compareTo(upper(row)) <= 0
+          }
+          def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
+        }
+
+      case List(target: BoolColumn, lower: BoolColumn, upper: BoolColumn) =>
+        new BoolColumn {
+          def apply(row: Int) = {
+            val t = target(row)
+            val l = lower(row)
+            val u = upper(row)
+            ((l == t) && (t == u)) || (!l && ((!t && u) || (t && u)))
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
       case List(target: StrColumn, lower: StrColumn, upper: StrColumn) =>
         new BoolColumn {
-          def apply(row: Int) = target(row) >= lower(row) && target(row) <= upper(row)
+          def apply(row: Int) = {
+            val t = target(row)
+            lower(row) <= t && t <= upper(row)
+          }
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
-
-      case List(target: DateColumn, lower: StrColumn, upper: StrColumn) =>
-        between(List(dateToStrCol(target), lower, upper)).get
-
-      case List(target: StrColumn, lower: DateColumn, upper: StrColumn) =>
-        between(List(target, dateToStrCol(lower), upper)).get
-
-      case List(target: DateColumn, lower: DateColumn, upper: StrColumn) =>
-        between(List(dateToStrCol(target), dateToStrCol(lower), upper)).get
-
-      case List(target: DateColumn, lower: StrColumn, upper: DateColumn) =>
-        between(List(dateToStrCol(target), lower, dateToStrCol(upper))).get
-
-      case List(target: StrColumn, lower: DateColumn, upper: DateColumn) =>
-        between(List(target, dateToStrCol(lower), dateToStrCol(upper))).get
-
-      case List(target: DateColumn, lower: DateColumn, upper: DateColumn) =>
-        between(List(dateToStrCol(target), dateToStrCol(lower), dateToStrCol(upper))).get
     }
 
     object Flatten extends Morphism1(Vector(), "flatten") {
@@ -322,17 +461,57 @@ trait ArrayLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
                 ref -> col
               }
 
-              case (ref @ ColumnRef(_, CDate), colTable) => {
-                val col = new ModUnionColumn(colTable) with DateColumn {
-                  def apply(i: Int) = col(i).asInstanceOf[DateColumn](row(i))
+              case (ref @ ColumnRef(_, COffsetDateTime), colTable) => {
+                val col = new ModUnionColumn(colTable) with OffsetDateTimeColumn {
+                  def apply(i: Int) = col(i).asInstanceOf[OffsetDateTimeColumn](row(i))
                 }
 
                 ref -> col
               }
 
-              case (ref @ ColumnRef(_, CPeriod), colTable) => {
-                val col = new ModUnionColumn(colTable) with PeriodColumn {
-                  def apply(i: Int) = col(i).asInstanceOf[PeriodColumn](row(i))
+              case (ref @ ColumnRef(_, COffsetTime), colTable) => {
+                val col = new ModUnionColumn(colTable) with OffsetTimeColumn {
+                  def apply(i: Int) = col(i).asInstanceOf[OffsetTimeColumn](row(i))
+                }
+
+                ref -> col
+              }
+
+              case (ref @ ColumnRef(_, COffsetDate), colTable) => {
+                val col = new ModUnionColumn(colTable) with OffsetDateColumn {
+                  def apply(i: Int) = col(i).asInstanceOf[OffsetDateColumn](row(i))
+                }
+
+                ref -> col
+              }
+
+              case (ref @ ColumnRef(_, CLocalDateTime), colTable) => {
+                val col = new ModUnionColumn(colTable) with LocalDateTimeColumn {
+                  def apply(i: Int) = col(i).asInstanceOf[LocalDateTimeColumn](row(i))
+                }
+
+                ref -> col
+              }
+
+              case (ref @ ColumnRef(_, CLocalTime), colTable) => {
+                val col = new ModUnionColumn(colTable) with LocalTimeColumn {
+                  def apply(i: Int) = col(i).asInstanceOf[LocalTimeColumn](row(i))
+                }
+
+                ref -> col
+              }
+
+              case (ref @ ColumnRef(_, CLocalDate), colTable) => {
+                val col = new ModUnionColumn(colTable) with LocalDateColumn {
+                  def apply(i: Int) = col(i).asInstanceOf[LocalDateColumn](row(i))
+                }
+
+                ref -> col
+              }
+
+              case (ref @ ColumnRef(_, CDuration), colTable) => {
+                val col = new ModUnionColumn(colTable) with DurationColumn {
+                  def apply(i: Int) = col(i).asInstanceOf[DurationColumn](row(i))
                 }
 
                 ref -> col

@@ -28,8 +28,9 @@ import quasar.physical.marklogic.testing
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 import quasar.std._
+import quasar.{DateGenerators, DateTimeInterval}
 
-import java.time.LocalDate
+import java.time._
 import scala.math.{abs, round}
 
 import com.marklogic.xcc.ContentSource
@@ -46,11 +47,12 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
 
   def ignoreSome(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data)(run: => Result): Result =
     (prg, arg1, arg2) match {
-      case (ExtractFunc(MapFuncsCore.Eq(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
-      case (ExtractFunc(MapFuncsCore.Lt(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
-      case (ExtractFunc(MapFuncsCore.Lte(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
-      case (ExtractFunc(MapFuncsCore.Gt(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
-      case (ExtractFunc(MapFuncsCore.Gte(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
+//      TODO: Come back to this
+//      case (ExtractFunc(MapFuncsCore.Eq(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
+//      case (ExtractFunc(MapFuncsCore.Lt(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
+//      case (ExtractFunc(MapFuncsCore.Lte(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
+//      case (ExtractFunc(MapFuncsCore.Gt(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
+//      case (ExtractFunc(MapFuncsCore.Gte(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
       case (ExtractFunc(MapFuncsCore.Split(_,_)), _, _) => pending
       case (ExtractFunc(MapFuncsCore.Within(_,_)), _, _) => pending
       case (ExtractFunc(MapFuncsCore.IfUndefined(_,_)), _, _) => pending
@@ -125,6 +127,10 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
         LocalDate.of(1000, 1, 1).toEpochDay,
         LocalDate.of(9999, 12, 31).toEpochDay
       ) ∘ (LocalDate.ofEpochDay(_))
+
+    def timeDomain: Gen[LocalTime] = DateGenerators.genLocalTime
+    def intervalDomain: Gen[DateTimeInterval] = DateGenerators.genDateTimeInterval
+    def timezoneDomain: Gen[ZoneOffset] = DateGenerators.genZoneOffset
 
     ////
 

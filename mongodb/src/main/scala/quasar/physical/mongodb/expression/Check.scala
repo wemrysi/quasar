@@ -101,7 +101,7 @@ object Check {
     (implicit TR: Recursive.Aux[T, EX], TC: Corecursive.Aux[T, EX], EX: Functor[EX], ev1: ExprOpCoreF :<: EX)
       : Option[(T, Type)] = {
     val exp = new ExprOpCoreF.fixpoint[T, EX](_.embed)
-    import exp._
+//    import exp._
 
     val nilMap = ListMap.empty[String, Bson]
     expr match {
@@ -112,20 +112,23 @@ object Check {
       case IsBetween(Bson.Binary(`minBinary`), x, Bson.ObjectId(`minOid`))  => (x, Type.Binary).some
       case IsBetween(Bson.ObjectId(`minOid`),  x, Bson.Bool(false))         => (x, Type.Id).some
       case IsBetweenIncl(Bson.Bool(false),     x, Bson.Bool(true))          => (x, Type.Bool).some
-      case IsBetween(`minDate`,  x, `minRegex`)               => (x, Type.Date ⨿ Type.Timestamp).some
-      case IsBetween(`minDate`,  x, `minTimestamp`)           => (x, Type.Date).some
-      case IsBetween(`minTimestamp`,           x, `minRegex`)               => (x, Type.Timestamp).some
+//      TODO: Come back to it
+//      case IsBetween(`minDate`,  x, `minRegex`)                             => (x, Type.LocalDate ⨿ Type.Timestamp).some
+//      case IsBetween(`minDate`,  x, `minTimestamp`)                         => (x, Type.LocalDate).some
+//      case IsBetween(`minTimestamp`,           x, `minRegex`)               => (x, Type.Timestamp).some
 
       case IsBetween(Bson.Doc(`nilMap`),       x, Bson.Binary(`minBinary`)) => (x, Type.AnyObject ⨿ Type.AnyArray).some
-      case IsBetween(Bson.Binary(`minBinary`), x, `minRegex`)               => (x, Type.Binary ⨿ Type.Id ⨿ Type.Bool ⨿ Type.Date ⨿ Type.Timestamp).some
-      case IsBetween(Bson.Bool(false),         x, `minRegex`)               => (x, Type.Bool ⨿ Type.Date ⨿ Type.Timestamp).some
+//      TODO: Come back to it
+      case IsBetween(Bson.Binary(`minBinary`), x, `minRegex`)               => (x, Type.Binary ⨿ Type.Id ⨿ Type.Bool).some
+      case IsBetween(Bson.Bool(false),         x, `minRegex`)               => (x, Type.Bool).some
       case IsBetweenExcl(Bson.Null,            x, Bson.Doc(`nilMap`))       => (x, Type.Numeric ⨿ Type.Str).some
 
-      case $or(
-            $lt(x1, $literal(Bson.Doc(`nilMap`))),
-            IsBetween(Bson.ObjectId(`minOid`), x2, `minRegex`))
-            if x1 ≟ x2 =>
-        (x1, Type.Null ⨿ Type.Numeric ⨿ Type.Str ⨿ Type.Id ⨿ Type.Bool ⨿ Type.Date ⨿ Type.Timestamp).some
+//      TODO: Come back to it
+//      case $or(
+//            $lt(x1, $literal(Bson.Doc(`nilMap`))),
+//            IsBetween(Bson.ObjectId(`minOid`), x2, `minRegex`))
+//            if x1 ≟ x2 =>
+//        (x1, Type.Null ⨿ Type.Numeric ⨿ Type.Str ⨿ Type.Id ⨿ Type.Bool ⨿ Type.LocalDate ⨿ Type.Timestamp).some
 
       case _ => None
     }

@@ -35,6 +35,7 @@ import shapeless.Nat
   */
 class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
   /** Identify constructs that are expected not to be implemented in JS. */
+  // TODO: Come back to this
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     case (string.Lower, _)              => Pending("TODO").left
     case (string.Upper, _)              => Pending("TODO").left
@@ -42,8 +43,6 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
 
     case (string.ToString, Data.Dec(_) :: Nil) =>
       Pending("Dec printing doesn't match precisely").left
-    case (string.ToString, Data.Date(_) :: Nil) =>
-      Skipped("Date prints timestamp").left
     case (string.ToString, Data.Interval(_) :: Nil) =>
       Pending("Interval prints numeric representation").left
 
@@ -54,11 +53,6 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case (date.ExtractIsoYear, _)      => Skipped("Returns incorrect year at beginning and end.").left
     case (date.Now, _)                 => Skipped("Returns correct result, but wrapped into Data.Dec instead of Data.Interval").left
 
-    case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => Pending("TODO").left
-    case (relations.Lt, List(Data.Date(_), Data.Timestamp(_))) => Pending("TODO").left
-    case (relations.Lte, List(Data.Date(_), Data.Timestamp(_))) => Pending("TODO").left
-    case (relations.Gt, List(Data.Date(_), Data.Timestamp(_))) => Pending("TODO").left
-    case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => Pending("TODO").left
     case (relations.IfUndefined, _) => Pending("TODO").left
 
     case (date.ExtractDayOfYear, _)    => Skipped("TODO").left
@@ -71,8 +65,8 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
   }
 
   def shortCircuitTC(args: List[Data]): Result \/ Unit = args match {
-    case Data.Date(_) :: Nil => Skipped("TODO").left
-    case Data.Time(_) :: Nil => Skipped("TODO").left
+//    case Data.Date(_) :: Nil => Skipped("TODO").left
+//    case Data.Time(_) :: Nil => Skipped("TODO").left
     case _                   => ().right
   }
 

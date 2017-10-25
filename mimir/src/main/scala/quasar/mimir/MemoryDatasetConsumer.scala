@@ -46,8 +46,8 @@ trait MemoryDatasetConsumer[M[+ _]] extends EvaluatorModule[M] {
       var extractIdTime: Long      = 0L
       var jvalueToSValueTime: Long = 0L
 
-      val events = json map { jvalue =>
-        (Vector(extractIds(jvalue \ "key"): _*), jvalueToSValue(jvalue \ "value"))
+      val events = json map { rvalue =>
+        (Vector(extractIds(rvalue.toJValue \ "key"): _*), jvalueToSValue(rvalue.toJValue \ "value"))
       }
 
       val back = events.toSet

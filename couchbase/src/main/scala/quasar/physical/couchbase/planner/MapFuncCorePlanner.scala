@@ -17,19 +17,21 @@
 package quasar.physical.couchbase.planner
 
 import slamdata.Predef._
-import quasar.DataCodec, DataCodec.Precise.{DateKey, IntervalKey, TimeKey, TimestampKey}
+import quasar.DataCodec, DataCodec.Precise.{LocalDateKey, LocalDateTimeKey, LocalTimeKey, IntervalKey,
+                                            OffsetDateKey, OffsetDateTimeKey, OffsetTimeKey}
 import quasar.{Data => QData, Type => QType, NameGenerator}
 import quasar.fp._
 import quasar.physical.couchbase._, N1QL.{Eq, Split, _}, Case._, Select.{Value, _}
 import quasar.Planner.PlannerErrorME
 import quasar.qscript, qscript.{MapFuncCore, MapFuncsCore => MF}
-import quasar.std.StdLib.string.{dateRegex, timeRegex, timestampRegex}
-import quasar.std.TemporalPart, TemporalPart._
+import quasar.std.StdLib.string.{dateRegex, timeRegex}
+import quasar.TemporalPart, TemporalPart._
 
 import matryoshka._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
+@SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
 final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: NameGenerator: PlannerErrorME]
   extends Planner[T, F, MapFuncCore[T, ?]] {
 
@@ -69,9 +71,12 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
 
   def unwrap(a1: T[N1QL]): T[N1QL] =
     IfMissing(
-      SelectField(a1, str(DateKey)).embed,
-      SelectField(a1, str(TimeKey)).embed,
-      SelectField(a1, str(TimestampKey)).embed,
+      SelectField(a1, str(OffsetDateTimeKey)).embed,
+      SelectField(a1, str(OffsetDateKey)).embed,
+      SelectField(a1, str(OffsetTimeKey)).embed,
+      SelectField(a1, str(LocalDateTimeKey)).embed,
+      SelectField(a1, str(LocalDateKey)).embed,
+      SelectField(a1, str(LocalTimeKey)).embed,
       SelectField(a1, str(IntervalKey)).embed,
       a1).embed
 
@@ -115,35 +120,37 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
       DateTruncStr(dt, temporalPart(part)).embed
   }
 
+  // TODO: Come back to it
   def temporalTrunc(part: TemporalPart, a: T[N1QL]): T[N1QL] =
-    Case(
-      WhenThen(
-        SelectField(a, str(DateKey)).embed,
-        Date(SelectElem(
-          Split(
-            trunc(part, ConcatStr(SelectField(a, str(DateKey)).embed, zeroTimeSuffix).embed), dateTimeDelim).embed,
-          int(0)).embed).embed),
-      WhenThen(
-        SelectField(a, str(TimeKey)).embed,
-        Time((part === Week).fold(
-          zeroTime,
-          SelectElem(
-            Split(
-              SelectElem(
-                Split(
-                  trunc(part, ConcatStr(
-                    ConcatStr(dateFillPrefix, SelectField(a, str(TimeKey)).embed).embed,
-                    zeroUTC).embed),
-                  dateTimeDelim).embed,
-                int(1)).embed,
-              zeroUTC).embed,
-            int(0)).embed)).embed),
-      WhenThen(
-        SelectField(a, str(TimestampKey)).embed,
-        Timestamp(trunc(part, SelectField(a, str(TimestampKey)).embed)).embed)
-    )(
-      Else(DateTruncStr(a, temporalPart(part)).embed)
-    ).embed
+    ???
+//    Case(
+//      WhenThen(
+//        SelectField(a, str(LocalDateKey)).embed,
+//        Date(SelectElem(
+//          Split(
+//            trunc(part, ConcatStr(SelectField(a, str(LocalDateKey)).embed, zeroTimeSuffix).embed), dateTimeDelim).embed,
+//          int(0)).embed).embed),
+//      WhenThen(
+//        SelectField(a, str(LocalTimeKey)).embed,
+//        Time((part === Week).fold(
+//          zeroTime,
+//          SelectElem(
+//            Split(
+//              SelectElem(
+//                Split(
+//                  trunc(part, ConcatStr(
+//                    ConcatStr(dateFillPrefix, SelectField(a, str(LocalTimeKey)).embed).embed,
+//                    zeroUTC).embed),
+//                  dateTimeDelim).embed,
+//                int(1)).embed,
+//              zeroUTC).embed,
+//            int(0)).embed)).embed),
+//      WhenThen(
+//        SelectField(a, str(TimestampKey)).embed,
+//        Timestamp(trunc(part, SelectField(a, str(TimestampKey)).embed)).embed)
+//    )(
+//      Else(DateTruncStr(a, temporalPart(part)).embed)
+//    ).embed
 
   def fracZero(a1: T[N1QL]): T[N1QL] =
     Case(
@@ -154,8 +161,8 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
 
   def rel(op: N1QL[T[N1QL]]): T[N1QL] = {
     def handleDates(a1: T[N1QL], a2: T[N1QL], o: (T[N1QL], T[N1QL]) => N1QL[T[N1QL]]): T[N1QL] = {
-      val a1Date = SelectField(a1, str(DateKey)).embed
-      val a2Date = SelectField(a2, str(DateKey)).embed
+      val a1Date = SelectField(a1, str(LocalDateKey)).embed
+      val a2Date = SelectField(a2, str(LocalDateKey)).embed
       val a1U = unwrap(a1)
       val a2U = unwrap(a2)
       IfMissingOrNull(
@@ -207,12 +214,20 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
       ).embed.η[F]
 
     // date
-    case MF.Date(a1) =>
-      datetime(a1, DateKey, dateRegex.r).η[F]
-    case MF.Time(a1) =>
-      datetime(a1, TimeKey, timeRegex.r).η[F]
-    case MF.Timestamp(a1) =>
-      datetime(a1, TimestampKey, timestampRegex.r).η[F]
+    case MF.LocalDate(a1) =>
+      datetime(a1, LocalDateKey, dateRegex.r).η[F]
+    case MF.LocalTime(a1) =>
+      datetime(a1, LocalTimeKey, timeRegex.r).η[F]
+    case MF.LocalDateTime(a1) =>
+      ???
+    case MF.OffsetDate(a1) =>
+      ???
+    case MF.OffsetTime(a1) =>
+      ???
+    case MF.OffsetDateTime(a1) =>
+      ???
+//      TODO: Come back to this
+//      datetime(a1, TimestampKey, dateTimeRegex.r).η[F]
     case MF.Interval(a1) =>
       Case(
         WhenThen(IsNotNull(SelectField(a1, str(IntervalKey)).embed).embed, a1)
@@ -220,31 +235,33 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
         Else(Null[T[N1QL]].embed)
       ).embed.η[F]
     case MF.TimeOfDay(a1) =>
-      def fracZeroTime(a1: T[N1QL]): T[N1QL] = {
-        val fz = fracZero(a1)
-        Case(
-          WhenThen(IsNotNull(fz).embed, Time(fz).embed)
-        )(
-          Else(undefined)
-        ).embed
-      }
+//      TODO: Come back to this
+//      def fracZeroTime(a1: T[N1QL]): T[N1QL] = {
+//        val fz = fracZero(a1)
+//        Case(
+//          WhenThen(IsNotNull(fz).embed, Time(fz).embed)
+//        )(
+//          Else(undefined)
+//        ).embed
+//      }
 
-      def timeFromTS(a1: T[N1QL]): T[N1QL] =
-        Time(SelectElem(
-          Split(
-            SelectElem(
-              Split(SelectField(a1, str(TimestampKey)).embed,  dateTimeDelim).embed,
-              int(1)).embed,
-            zeroUTC).embed,
-          int(0)).embed).embed
-
-      Case(
-        WhenThen(SelectField(a1, str(DateKey)).embed, undefined),
-        WhenThen(SelectField(a1, str(TimeKey)).embed, a1),
-        WhenThen(SelectField(a1, str(TimestampKey)).embed, timeFromTS(a1))
-      )(
-        Else(fracZeroTime(MillisToUTC(Millis(a1).embed, zeroTime.some).embed))
-      ).embed.η[F]
+//      def timeFromTS(a1: T[N1QL]): T[N1QL] =
+//        Time(SelectElem(
+//          Split(
+//            SelectElem(
+//              Split(SelectField(a1, str(TimestampKey)).embed,  dateTimeDelim).embed,
+//              int(1)).embed,
+//            zeroUTC).embed,
+//          int(0)).embed).embed
+//
+//      Case(
+//        WhenThen(SelectField(a1, str(LocalDateKey)).embed, undefined),
+//        WhenThen(SelectField(a1, str(LocalTimeKey)).embed, a1),
+//        WhenThen(SelectField(a1, str(TimestampKey)).embed, timeFromTS(a1))
+//      )(
+//        Else(fracZeroTime(MillisToUTC(Millis(a1).embed, zeroTime.some).embed))
+//      ).embed.η[F]
+      ???
     case MF.ToTimestamp(a1) =>
       Timestamp(MillisToUTC(a1, none).embed).embed.η[F]
     case MF.TypeOf(a1) =>
@@ -260,32 +277,34 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
     case MF.ExtractDayOfYear(a1)      =>
       extract(a1, dayOfYear).η[F]
     case MF.ExtractEpoch(a1) =>
-      Div(
-        Millis(
-          Case(
-            WhenThen(
-              SelectField(a1, str(DateKey)).embed,
-              ConcatStr(
-                SelectField(a1, str(DateKey)).embed,
-                zeroTimeSuffix).embed),
-            WhenThen(
-              SelectField(a1, str(TimeKey)).embed,
-              undefined)
-          )(
-            Else(IfMissing(
-              SelectField(a1, str(TimestampKey)).embed,
-              a1).embed)
-          ).embed
-        ).embed,
-        int(1000)
-      ).embed.η[F]
+      // TODO: Come back to it
+      ???
+//      Div(
+//        Millis(
+//          Case(
+//            WhenThen(
+//              SelectField(a1, str(LocalDateKey)).embed,
+//              ConcatStr(
+//                SelectField(a1, str(LocalDateKey)).embed,
+//                zeroTimeSuffix).embed),
+//            WhenThen(
+//              SelectField(a1, str(LocalTimeKey)).embed,
+//              undefined)
+//          )(
+//            Else(IfMissing(
+//              SelectField(a1, str(TimestampKey)).embed,
+//              a1).embed)
+//          ).embed
+//        ).embed,
+//        int(1000)
+//      ).embed.η[F]
     case MF.ExtractHour(a1) =>
       extract(a1, hour).η[F]
     case MF.ExtractIsoDayOfWeek(a1) =>
       extract(a1, isoDow).η[F]
     case MF.ExtractIsoYear(a1)        =>
       extract(a1, isoYear).η[F]
-    case MF.ExtractMicroseconds(a1) =>
+    case MF.ExtractMicrosecond(a1) =>
       Mult(
         Add(
           Mult(extract(a1, second), int(1000)).embed,
@@ -294,7 +313,7 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
       ).embed.η[F]
     case MF.ExtractMillennium(a1) =>
       Ceil(Div(extract(a1, year), int(1000)).embed).embed.η[F]
-    case MF.ExtractMilliseconds(a1) =>
+    case MF.ExtractMillisecond(a1) =>
       Add(
         Mult(extract(a1, second), int(1000)).embed,
         extract(a1, millisecond)
@@ -320,17 +339,19 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
       extract(a1, isoWeek).η[F]
     case MF.ExtractYear(a1) =>
       extract(a1, year).η[F]
+//    TODO: Come back to it
     case MF.StartOfDay(a1) =>
-        Case(
-          WhenThen(
-            SelectField(a1, str(TimestampKey)).embed,
-            Timestamp(trunc(Day, SelectField(a1, str(TimestampKey)).embed)).embed),
-          WhenThen(
-            SelectField(a1, str(DateKey)).embed,
-            Timestamp(trunc(Day, ConcatStr(SelectField(a1, str(DateKey)).embed, zeroTimeSuffix).embed)).embed)
-        )(
-          Else(undefined)
-        ).embed.η[F]
+      ???
+//        Case(
+//          WhenThen(
+//            SelectField(a1, str(TimestampKey)).embed,
+//            Timestamp(trunc(Day, SelectField(a1, str(TimestampKey)).embed)).embed),
+//          WhenThen(
+//            SelectField(a1, str(LocalDateKey)).embed,
+//            Timestamp(trunc(Day, ConcatStr(SelectField(a1, str(LocalDateKey)).embed, zeroTimeSuffix).embed)).embed)
+//        )(
+//          Else(undefined)
+//        ).embed.η[F]
     case MF.TemporalTrunc(Microsecond | Millisecond, a2) =>
       a2.η[F]
     case MF.TemporalTrunc(a1, a2) =>
@@ -449,7 +470,13 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
       )(
         Else(RegexContains(a1, ConcatStr(str("(?s)"), a2).embed).embed)
       ).embed.η[F]
-    case MF.Split(a1, a2) =>
+    case MF.SetTimezone(a1, a2)   =>
+      ???
+    case MF.SetTimezoneMinute(a1, a2)   =>
+      ???
+    case MF.SetTimezoneHour(a1, a2)   =>
+      ???
+    case MF.Split(a1, a2)         =>
       Split(a1, a2).embed.η[F]
     case MF.Substring(a1, a2, a3) =>
       Case(

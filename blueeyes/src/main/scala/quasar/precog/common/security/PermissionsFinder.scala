@@ -16,12 +16,12 @@
 
 package quasar.precog.common.security
 
-import quasar.blueeyes._
 import quasar.precog.common.Path
 import quasar.precog.common.accounts.AccountFinder
 import quasar.precog.common.security.service.v1
 
 import scalaz._, Scalaz._
+import java.time.Instant
 
 object PermissionsFinder {
   import Permission._

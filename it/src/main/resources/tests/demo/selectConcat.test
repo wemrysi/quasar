@@ -1,7 +1,7 @@
 {
     "name": "select string concatenation",
     "backends": {
-        "mimir":"pendingIgnoreFieldOrder",
+        "mimir": "ignoreFieldOrder",
         "couchbase": "ignoreFieldOrder"
     },
     "NB": "Pending for mimir due to Q#2692.",

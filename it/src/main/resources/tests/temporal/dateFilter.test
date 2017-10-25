@@ -2,6 +2,7 @@
     "name": "filter on date part",
 
     "backends": {
+        "mimir": "pendingIgnoreFieldOrder"
     },
 
     "data": "../days.data",

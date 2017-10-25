@@ -17,18 +17,20 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar.{Data, DateArbitrary, GenericFunc}
+import quasar.{Data, DateGenerators, GenericFunc}
 import quasar.RenderTree.ops._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib._
-
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import org.specs2.execute._
-import org.scalacheck.Arbitrary, Arbitrary._
-import scalaz.{Failure => _, _}, Scalaz._
+import org.scalacheck.Arbitrary
+import Arbitrary._
+
+import scalaz.{Failure => _, _}
+import Scalaz._
 import shapeless.Nat
 
 /** Test the typers and simplifiers defined in the std lib functions themselves.
@@ -39,33 +41,8 @@ class SimplifyStdLibSpec extends StdLibSpec {
   val notHandled: Result \/ Unit = Skipped("not simplified").left
 
   def shortCircuit[N <: Nat](func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
-    case (relations.Between, _) => notHandled
-
-    case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => notHandled
-    case (relations.Lt, List(Data.Date(_), Data.Timestamp(_))) => notHandled
-    case (relations.Lte, List(Data.Date(_), Data.Timestamp(_))) => notHandled
-    case (relations.Gt, List(Data.Date(_), Data.Timestamp(_))) => notHandled
-    case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => notHandled
     case (relations.IfUndefined, _) => notHandled
 
-    case (date.ExtractCentury, _) => notHandled
-    case (date.ExtractDayOfMonth, _) => notHandled
-    case (date.ExtractDecade, _) => notHandled
-    case (date.ExtractDayOfWeek, _) => notHandled
-    case (date.ExtractDayOfYear, _) => notHandled
-    case (date.ExtractEpoch, _) => notHandled
-    case (date.ExtractHour, _) => notHandled
-    case (date.ExtractIsoDayOfWeek, _) => notHandled
-    case (date.ExtractIsoYear, _) => notHandled
-    case (date.ExtractMicroseconds, _) => notHandled
-    case (date.ExtractMillennium, _) => notHandled
-    case (date.ExtractMilliseconds, _) => notHandled
-    case (date.ExtractMinute, _) => notHandled
-    case (date.ExtractMonth, _) => notHandled
-    case (date.ExtractQuarter, _) => notHandled
-    case (date.ExtractSecond, _) => notHandled
-    case (date.ExtractWeek, _) => notHandled
-    case (date.ExtractYear, _) => notHandled
     case (date.Now, _) => notHandled
 
     case (structural.ObjectProject, List(Data.Obj(fields), Data.Str(field))) if !fields.contains(field) => notHandled
@@ -76,7 +53,6 @@ class SimplifyStdLibSpec extends StdLibSpec {
   /** Identify constructs that are expected not to be implemented. */
   def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LP, Unit] = {
     case Invoke(func, _)     => shortCircuit(func, args)
-    case TemporalTrunc(_, _) => notHandled
     case _                   => ().right
   }
 
@@ -116,7 +92,13 @@ class SimplifyStdLibSpec extends StdLibSpec {
 
     def stringDomain = arbitrary[String]
 
-    def dateDomain = DateArbitrary.genDate
+    def dateDomain = DateGenerators.genLocalDate
+
+    def timeDomain = DateGenerators.genLocalTime
+
+    def timezoneDomain = DateGenerators.genZoneOffset
+
+    def intervalDomain = DateGenerators.genInterval
   }
 
   tests(runner)

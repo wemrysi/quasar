@@ -44,8 +44,8 @@ final case class ConstrainedPlan[T]
 // TODO: Move constraints to methods and/or pull the constructors into own class.
 final class LogicalPlanR[T]
   (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) {
-  import quasar.std.DateLib._, quasar.std.StdLib, StdLib._, structural._
-  import quasar.std.TemporalPart
+  import quasar.std.StdLib, StdLib._, structural._
+  import quasar.TemporalPart
 
   def read(path: FPath) = lp.read[T](path).embed
   def constant(data: Data) = lp.constant[T](data).embed
@@ -359,11 +359,13 @@ final class LogicalPlanR[T]
         case Sort(expr, ords) =>
           unifyOrCheck(inf, expr.inferred, sort(appConst(expr, constant(Data.NA)), ords map (_ leftMap (appConst(_, constant(Data.NA))))))
         case TemporalTrunc(part, src) =>
+          import DataDateTimeExtractors._
           val typer: Func.Typer[Nat._1] = StdLib.partialTyperV[nat._1] {
-              case Sized(Type.Const(d @ Data.Date(_)))      => truncDate(part, d).validationNel ∘ (Type.Const(_))
-              case Sized(Type.Const(t @ Data.Time(_)))      => truncTime(part, t).validationNel ∘ (Type.Const(_))
-              case Sized(Type.Const(t @ Data.Timestamp(_))) => truncTimestamp(part, t).validationNel ∘ (Type.Const(_))
-              case Sized(t)                                 => t.success
+            // TODO: Add offset/datetime types
+              case Sized(Type.Const(CanLensDateTime(s))) => Type.Const(s.peeks(datetime.truncDateTime(part, _))).success
+              case Sized(Type.Const(CanLensTime(s)))     => Type.Const(s.peeks(datetime.truncTime(part, _))).success
+              case Sized(Type.Const(CanLensDate(s)))     => Type.Const(s.peeks(datetime.truncDate(part, _))).success
+              case Sized(t)                              => t.success
             }
 
           val constructLPNode: Func.Input[T, Nat._1] => T = { case Sized(i) => temporalTrunc(part, i) }

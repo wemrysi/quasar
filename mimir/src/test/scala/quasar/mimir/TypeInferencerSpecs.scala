@@ -101,7 +101,10 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
     }
   }
 
-  val cLiterals = Set(CBoolean, CLong, CDouble, CNum, CString, CNull, CDate, CPeriod)
+  val cLiterals = Set(CBoolean, CLong, CDouble, CNum, CString, CNull,
+    CLocalDateTime, CLocalTime, CLocalDate, COffsetDateTime, COffsetTime, COffsetDate, CDuration)
+  val cStrLike = Set(CString,
+    CLocalDateTime, CLocalTime, CLocalDate, COffsetDateTime, COffsetTime, COffsetDate, CDuration)
 
   "type inference" should {
     "propagate structure/type information through a trivial Join/DerefObject node" in {
@@ -188,7 +191,7 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
       val result = extractLoads(inferTypes(JType.JPrimitiveUnfixedT)(input))
 
       val expected = Map(
-        "/file" -> Map(JPath("column") -> Set(CString, CDate)))
+        "/file" -> Map(JPath("column") -> Set(CString)))
 
       result must_== expected
     }
@@ -208,8 +211,8 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
       val result = extractLoads(inferTypes(JType.JPrimitiveUnfixedT)(input))
 
       val expected = Map(
-        "/file0" -> Map(JPath("column0") -> Set(CString, CDate)),
-        "/file1" -> Map(JPath("column1") -> Set(CString, CDate)))
+        "/file0" -> Map(JPath("column0") -> Set(CString)),
+        "/file1" -> Map(JPath("column1") -> Set(CString)))
 
       result must_== expected
     }

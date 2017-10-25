@@ -191,7 +191,7 @@ object FuncHandler {
                   $literal(Bson.Int32(7)),
                   $subtract($dayOfWeek(a1), $literal(Bson.Int32(1))))
               // TODO: case ExtractIsoYear(a1) =>
-              case ExtractMicroseconds(a1) =>
+              case ExtractMicrosecond(a1) =>
                 $multiply(
                   $add(
                     $multiply($second(a1), $literal(Bson.Int32(1000))),
@@ -199,7 +199,7 @@ object FuncHandler {
                   $literal(Bson.Int32(1000)))
               case ExtractMillennium(a1) =>
                 trunc($divide($add($year(a1), $literal(Bson.Int32(999))), $literal(Bson.Int32(1000))))
-              case ExtractMilliseconds(a1) =>
+              case ExtractMillisecond(a1) =>
                 $add(
                   $multiply($second(a1), $literal(Bson.Int32(1000))),
                   $millisecond(a1))

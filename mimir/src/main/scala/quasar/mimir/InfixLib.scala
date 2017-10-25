@@ -18,12 +18,11 @@ package quasar.mimir
 
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
-
 import quasar.precog.util.NumericComparisons
 
 trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait InfixLib extends ColumnarTableLib {
-    import StdLib.{ BoolFrom, DoubleFrom, LongFrom, NumFrom, StrFrom, doubleIsDefined, StrAndDateT, dateToStrCol }
+    import StdLib.{ BoolFrom, DoubleFrom, LongFrom, NumFrom, StrFrom, doubleIsDefined }
 
     object Infix {
       val InfixNamespace = Vector("std", "infix")
@@ -69,9 +68,236 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         }
       }
 
-      val Add = new InfixOp2("add", _ + _, _ + _, _ + _)
-      val Sub = new InfixOp2("subtract", _ - _, _ - _, _ - _)
-      val Mul = new InfixOp2("multiply", _ * _, _ * _, _ * _)
+      val Add = new Op2F2(InfixNamespace, "add") {
+        val tpe = BinaryOperationType(JType.JRelativeT, JType.JRelativeT, JType.JRelativeT)
+        def f2: F2 = CF2P("builtin::infix::op2::add") {
+          case (c1: LongColumn, c2: LongColumn) =>
+            new LongFrom.LL(c1, c2, longOk, _ + _)
+
+          case (c1: LongColumn, c2: DoubleColumn) =>
+            new NumFrom.LD(c1, c2, numOk, _ + _)
+
+          case (c1: LongColumn, c2: NumColumn) =>
+            new NumFrom.LN(c1, c2, numOk, _ + _)
+
+          case (c1: DoubleColumn, c2: LongColumn) =>
+            new NumFrom.DL(c1, c2, numOk, _ + _)
+
+          case (c1: DoubleColumn, c2: DoubleColumn) =>
+            new DoubleFrom.DD(c1, c2, doubleOk, _ + _)
+
+          case (c1: DoubleColumn, c2: NumColumn) =>
+            new NumFrom.DN(c1, c2, numOk, _ + _)
+
+          case (c1: NumColumn, c2: LongColumn) =>
+            new NumFrom.NL(c1, c2, numOk, _ + _)
+
+          case (c1: NumColumn, c2: DoubleColumn) =>
+            new NumFrom.ND(c1, c2, numOk, _ + _)
+
+          case (c1: NumColumn, c2: NumColumn) =>
+            new NumFrom.NN(c1, c2, numOk, _ + _)
+
+          case (c1: OffsetDateTimeColumn, c2: DurationColumn) =>
+            new OffsetDateTimeColumn {
+              def apply(row: Int) = c2(row).addToOffset(c1(row))
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
+            }
+
+          case (c1: OffsetDateColumn, c2: DurationColumn) =>
+            new OffsetDateColumn {
+              def apply(row: Int) = {
+                val r = c1(row)
+                quasar.OffsetDate(r.date.plus(c2(row).toPeriod), r.offset)
+              }
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isDateLike
+            }
+
+          case (c1: OffsetTimeColumn, c2: DurationColumn) =>
+            new OffsetTimeColumn {
+              def apply(row: Int) = c1(row).plus(c2(row).toDuration)
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isTimeLike
+            }
+
+          case (c1: LocalDateTimeColumn, c2: DurationColumn) =>
+            new LocalDateTimeColumn {
+              def apply(row: Int) = c2(row).addTo(c1(row))
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
+            }
+
+          case (c1: LocalDateColumn, c2: DurationColumn) =>
+            new LocalDateColumn {
+              def apply(row: Int) = c1(row).plus(c2(row).toPeriod)
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isDateLike
+            }
+
+          case (c1: LocalTimeColumn, c2: DurationColumn) =>
+            new LocalTimeColumn {
+              def apply(row: Int) = c1(row).plus(c2(row).toDuration)
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isTimeLike
+            }
+
+          case (c1: DurationColumn, c2: OffsetDateTimeColumn) =>
+            new OffsetDateTimeColumn {
+              def apply(row: Int) = c1(row).addToOffset(c2(row))
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
+            }
+
+          case (c1: DurationColumn, c2: OffsetDateColumn) =>
+            new OffsetDateColumn {
+              def apply(row: Int) = {
+                val r = c2(row)
+                quasar.OffsetDate(r.date.plus(c1(row).toPeriod), r.offset)
+              }
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c1(row).isDateLike
+            }
+
+          case (c1: DurationColumn, c2: OffsetTimeColumn) =>
+            new OffsetTimeColumn {
+              def apply(row: Int) = c2(row).plus(c1(row).toDuration)
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c1(row).isTimeLike
+            }
+
+          case (c1: DurationColumn, c2: LocalDateTimeColumn) =>
+            new LocalDateTimeColumn {
+              def apply(row: Int) = c1(row).addTo(c2(row))
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
+            }
+
+          case (c1: DurationColumn, c2: LocalDateColumn) =>
+            new LocalDateColumn {
+              def apply(row: Int) = c2(row).plus(c1(row).toPeriod)
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c1(row).isDateLike
+            }
+
+          case (c1: DurationColumn, c2: LocalTimeColumn) =>
+            new LocalTimeColumn {
+              def apply(row: Int) = c2(row).plus(c1(row).toDuration)
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c1(row).isTimeLike
+            }
+
+          case (c1: DurationColumn, c2: DurationColumn) =>
+            new DurationColumn {
+              def apply(row: Int) = c1(row).plus(c2(row))
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
+            }
+        }
+      }
+
+      val Sub = new Op2F2(InfixNamespace, "subtract") {
+        val tpe = BinaryOperationType(JType.JAbsoluteT, JType.JRelativeT, JType.JAbsoluteT)
+        def f2: F2 = CF2P("builtin::infix::op2::subtract") {
+          case (c1: LongColumn, c2: LongColumn) =>
+            new LongFrom.LL(c1, c2, longOk, _ - _)
+
+          case (c1: LongColumn, c2: DoubleColumn) =>
+            new NumFrom.LD(c1, c2, numOk, _ - _)
+
+          case (c1: LongColumn, c2: NumColumn) =>
+            new NumFrom.LN(c1, c2, numOk, _ - _)
+
+          case (c1: DoubleColumn, c2: LongColumn) =>
+            new NumFrom.DL(c1, c2, numOk, _ - _)
+
+          case (c1: DoubleColumn, c2: DoubleColumn) =>
+            new DoubleFrom.DD(c1, c2, doubleOk, _ - _)
+
+          case (c1: DoubleColumn, c2: NumColumn) =>
+            new NumFrom.DN(c1, c2, numOk, _ - _)
+
+          case (c1: NumColumn, c2: LongColumn) =>
+            new NumFrom.NL(c1, c2, numOk, _ - _)
+
+          case (c1: NumColumn, c2: DoubleColumn) =>
+            new NumFrom.ND(c1, c2, numOk, _ - _)
+
+          case (c1: NumColumn, c2: NumColumn) =>
+            new NumFrom.NN(c1, c2, numOk, _ - _)
+
+          case (c1: OffsetDateTimeColumn, c2: DurationColumn) =>
+            new OffsetDateTimeColumn {
+              def apply(row: Int) = c2(row).subtractFromOffset(c1(row))
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
+            }
+
+          case (c1: OffsetDateColumn, c2: DurationColumn) =>
+            new OffsetDateColumn {
+              def apply(row: Int) = {
+                val r = c1(row)
+                quasar.OffsetDate(r.date.minus(c2(row).toPeriod), r.offset)
+              }
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isDateLike
+            }
+
+          case (c1: OffsetTimeColumn, c2: DurationColumn) =>
+            new OffsetTimeColumn {
+              def apply(row: Int) = c1(row).minus(c2(row).toDuration)
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isTimeLike
+            }
+
+          case (c1: LocalDateTimeColumn, c2: DurationColumn) =>
+            new LocalDateTimeColumn {
+              def apply(row: Int) = c2(row).subtractFrom(c1(row))
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
+            }
+
+          case (c1: LocalDateColumn, c2: DurationColumn) =>
+            new LocalDateColumn {
+              def apply(row: Int) = c1(row).minus(c2(row).toPeriod)
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isDateLike
+            }
+
+          case (c1: LocalTimeColumn, c2: DurationColumn) =>
+            new LocalTimeColumn {
+              def apply(row: Int) = c1(row).minus(c2(row).toDuration)
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isTimeLike
+            }
+        }
+      }
+
+      val Mul = new Op2F2(InfixNamespace, "multiply") {
+        val tpe = BinaryOperationType(JType.JRelativeT, JType.JRelativeT, JType.JRelativeT)
+        def f2: F2 = CF2P("builtin::infix::op2::multiply") {
+          case (c1: LongColumn, c2: LongColumn) =>
+            new LongFrom.LL(c1, c2, longOk, _ * _)
+
+          case (c1: LongColumn, c2: DoubleColumn) =>
+            new NumFrom.LD(c1, c2, numOk, _ * _)
+
+          case (c1: LongColumn, c2: NumColumn) =>
+            new NumFrom.LN(c1, c2, numOk, _ * _)
+
+          case (c1: DoubleColumn, c2: LongColumn) =>
+            new NumFrom.DL(c1, c2, numOk, _ * _)
+
+          case (c1: DoubleColumn, c2: DoubleColumn) =>
+            new DoubleFrom.DD(c1, c2, doubleOk, _ * _)
+
+          case (c1: DoubleColumn, c2: NumColumn) =>
+            new NumFrom.DN(c1, c2, numOk, _ * _)
+
+          case (c1: NumColumn, c2: LongColumn) =>
+            new NumFrom.NL(c1, c2, numOk, _ * _)
+
+          case (c1: NumColumn, c2: DoubleColumn) =>
+            new NumFrom.ND(c1, c2, numOk, _ * _)
+
+          case (c1: NumColumn, c2: NumColumn) =>
+            new NumFrom.NN(c1, c2, numOk, _ * _)
+
+          case (c1: LongColumn, c2: DurationColumn) =>
+            new DurationColumn {
+              def apply(row: Int) = c2(row).multiply(c1(row).toInt)
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
+            }
+
+          case (c1: DurationColumn, c2: LongColumn) =>
+            new DurationColumn {
+              def apply(row: Int) = c1(row).multiply(c2(row).toInt)
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
+            }
+        }
+      }
 
       // div needs to make sure to use Double even for division with longs
       val Div = new Op2F2(InfixNamespace, "divide") {
@@ -219,8 +445,26 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
           case (c1: NumColumn, c2: NumColumn) =>
             new BoolFrom.NN(c1, c2, (x, y) => true, (x, y) => f(compare(x, y)))
 
-          case (c1: DateColumn, c2: DateColumn) =>
-            new BoolFrom.DtDt(c1, c2, (x, y) => true, (x, y) => f(compare(x, y)))
+          case (c1: StrColumn, c2: StrColumn) =>
+            new BoolFrom.SS(c1, c2, (x, y) => true, (x, y) => f(x.compareTo(y)))
+
+          case (c1: OffsetDateTimeColumn, c2: OffsetDateTimeColumn) =>
+            new BoolFrom.OdtmOdtm(c1, c2, (x, y) => true, (x, y) => f(compare(x, y)))
+
+          case (c1: OffsetDateColumn, c2: OffsetDateColumn) =>
+            new BoolFrom.OdtOdt(c1, c2, (x, y) => true, (x, y) => f(compare(x, y)))
+
+          case (c1: OffsetTimeColumn, c2: OffsetTimeColumn) =>
+            new BoolFrom.OtmOtm(c1, c2, (x, y) => true, (x, y) => f(compare(x, y)))
+
+          case (c1: LocalDateTimeColumn, c2: LocalDateTimeColumn) =>
+            new BoolFrom.LdtmLdtm(c1, c2, (x, y) => true, (x, y) => f(compare(x, y)))
+
+          case (c1: LocalDateColumn, c2: LocalDateColumn) =>
+            new BoolFrom.LdtLdt(c1, c2, (x, y) => true, (x, y) => f(compare(x, y)))
+
+          case (c1: LocalTimeColumn, c2: LocalTimeColumn) =>
+            new BoolFrom.LtmLtm(c1, c2, (x, y) => true, (x, y) => f(compare(x, y)))
         }
       }
 
@@ -241,16 +485,13 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
       val concatString = new Op2F2(InfixNamespace, "concatString") {
         //@deprecated, see the DEPRECATED comment in StringLib
-        val tpe = BinaryOperationType(StrAndDateT, StrAndDateT, JTextT)
+        val tpe = BinaryOperationType(JTextT, JTextT, JTextT)
 
         private def build(c1: StrColumn, c2: StrColumn) =
           new StrFrom.SS(c1, c2, _ != null && _ != null, _ + _)
 
         def f2: F2 = CF2P("builtin::infix:concatString") {
-          case (c1: StrColumn, c2: StrColumn)   => build(c1, c2)
-          case (c1: DateColumn, c2: StrColumn)  => build(dateToStrCol(c1), c2)
-          case (c1: StrColumn, c2: DateColumn)  => build(c1, dateToStrCol(c2))
-          case (c1: DateColumn, c2: DateColumn) => build(dateToStrCol(c1), dateToStrCol(c2))
+          case (c1: StrColumn, c2: StrColumn) => build(c1, c2)
         }
       }
     }

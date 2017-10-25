@@ -47,6 +47,7 @@ import shapeless.{Nat}
 /** Test the implementation of the standard library for one of MongoDb's
   * evaluators.
   */
+// TODO: Come back to this
 abstract class MongoDbStdLibSpec extends StdLibSpec {
   val lpf = new lp.LogicalPlanR[Fix[LP]]
 
@@ -74,7 +75,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
       * produced by the MongoDB backend, in cases where MongoDB cannot represent
       * the type natively. */
     def massage(expected: Data): Data = expected match {
-      case Data.Time(time) => Data.Str(time.format(DataCodec.timeFormatter))
+//      case Data.Time(time) => Data.Str(time.format(DataCodec.timeFormatter))
       case _               => expected
     }
 

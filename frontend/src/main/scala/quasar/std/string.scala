@@ -22,7 +22,6 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
-import java.time.ZoneOffset.UTC
 import scala.util.matching.Regex
 
 import matryoshka._
@@ -332,18 +331,21 @@ trait StringLib extends Library {
     Func.Input1(Type.Syntaxed),
     noSimplification,
     partialTyperV[nat._1] {
-      case Sized(Type.Const(data)) => (data match {
-        case Data.Str(str)     => success(str)
-        case Data.Null         => success("null")
-        case Data.Bool(b)      => success(b.shows)
-        case Data.Int(i)       => success(i.shows)
-        case Data.Dec(d)       => success(d.shows)
-        case Data.Timestamp(t) => success(t.atZone(UTC).format(DataCodec.dateTimeFormatter))
-        case Data.Date(d)      => success(d.toString)
-        case Data.Time(t)      => success(t.format(DataCodec.timeFormatter))
-        case Data.Interval(i)  => success(i.toString)
+      case Sized(Type.Const(data))  => (data match {
+        case Data.Str(str)          => success(str)
+        case Data.Null              => success("null")
+        case Data.Bool(b)           => success(b.shows)
+        case Data.Int(i)            => success(i.shows)
+        case Data.Dec(d)            => success(d.shows)
+        case Data.OffsetDateTime(t) => success(t.toString)
+        case Data.OffsetTime(t)     => success(t.toString)
+        case Data.OffsetDate(d)     => success(d.toString)
+        case Data.LocalDateTime(t)  => success(t.toString)
+        case Data.LocalTime(t)      => success(t.toString)
+        case Data.LocalDate(d)      => success(d.toString)
+        case Data.Interval(i)       => success(i.toString)
         // NB: Should not be able to hit this case, because of the domain.
-        case other             =>
+        case other                  =>
           failureNel(
             TypeError(
               Type.Syntaxed,
@@ -358,9 +360,12 @@ trait StringLib extends Library {
           Boolean.tpe(Func.Input1(x)) <+>
           Integer.tpe(Func.Input1(x)) <+>
           Decimal.tpe(Func.Input1(x)) <+>
-          DateLib.Date.tpe(Func.Input1(x)) <+>
-          DateLib.Time.tpe(Func.Input1(x)) <+>
-          DateLib.Timestamp.tpe(Func.Input1(x)) <+>
+          DateLib.OffsetDateTime.tpe(Func.Input1(x)) <+>
+          DateLib.OffsetTime.tpe(Func.Input1(x)) <+>
+          DateLib.OffsetDate.tpe(Func.Input1(x)) <+>
+          DateLib.LocalDateTime.tpe(Func.Input1(x)) <+>
+          DateLib.LocalTime.tpe(Func.Input1(x)) <+>
+          DateLib.LocalDate.tpe(Func.Input1(x)) <+>
           DateLib.Interval.tpe(Func.Input1(x)))
           .map(Func.Input1(_))
     })

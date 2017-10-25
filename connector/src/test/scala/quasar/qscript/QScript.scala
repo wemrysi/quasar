@@ -658,7 +658,7 @@ class QScriptSpec
                   Type.Obj(ScalaMap(),Some(Type.Top)),
                   ProjectFieldR(HoleF, StrLit("pop")),
                   Free.roll(MFC(Undefined()))))),
-                Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
+                Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.LocalDate, Type.Coproduct(Type.LocalTime, Type.Bool)))))),
                 Free.roll(MFC(Guard(
                   HoleF,
                   Type.Obj(ScalaMap(),Some(Type.Top)),
@@ -672,7 +672,7 @@ class QScriptSpec
                   Type.Obj(ScalaMap(),Some(Type.Top)),
                   ProjectFieldR(HoleF, StrLit("city")),
                   Free.roll(MFC(Undefined()))))),
-                Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
+                Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.LocalDate, Type.Coproduct(Type.LocalTime, Type.Bool)))))),
                 Free.roll(MFC(Guard(
                   HoleF,
                   Type.Obj(ScalaMap(),Some(Type.Top)),
@@ -710,7 +710,7 @@ class QScriptSpec
                      ProjectIndexR(RightSideF, IntLit(1)),
                      StrLit("pop")))),
                    Free.roll(MFC(Undefined()))))),
-                 Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
+                 Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.LocalDate, Type.Coproduct(Type.LocalTime, Type.Bool)))))),
                  Free.roll(MFC(Guard(
                    ProjectIndexR(RightSideF, IntLit(1)),
                    Type.Obj(ScalaMap(),Some(Type.Top)),
@@ -838,7 +838,7 @@ class QScriptSpec
               Type.Obj(ScalaMap(),Some(Type.Top)),
               ProjectIndexR(ProjectFieldR(HoleF, StrLit("loc")), IntLit(0)),
               Free.roll(MFC(Undefined()))))),
-            Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
+            Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.LocalDate, Type.Coproduct(Type.LocalTime, Type.Bool)))))),
             Free.roll(MFC(Guard(
               HoleF,
               Type.Obj(ScalaMap(),Some(Type.Top)),
@@ -888,7 +888,7 @@ class QScriptSpec
             MakeArrayR(guard(ι)),
             MakeArrayR(Free.roll(MFC(Guard(
               guard(ProjectFieldR(_, StrLit("pop"))),
-              Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
+              Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.LocalDate, Type.Coproduct(Type.LocalTime, Type.Bool)))))),
               guard(jf => Free.roll(MFC(Lte(ProjectFieldR(jf, StrLit("pop")), IntLit(10))))),
               Free.roll(MFC(Undefined()))))))))),
         QC.inj(Filter((),
@@ -947,7 +947,7 @@ class QScriptSpec
             MakeArrayR(guard(ι)),
             MakeArrayR(Free.roll(MFC(Guard(
               guard(ProjectFieldR(_, StrLit("pop"))),
-              Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
+              Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.LocalDate, Type.Coproduct(Type.LocalTime, Type.Bool)))))),
               guard(jf => Free.roll(MFC(Lte(ProjectFieldR(jf, StrLit("pop")), IntLit(10))))),
               Free.roll(MFC(Undefined()))))))))),
         QC.inj(Filter((),

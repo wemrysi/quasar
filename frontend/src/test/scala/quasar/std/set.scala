@@ -17,10 +17,10 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar.{Func, TypeArbitrary}
+import quasar.{Func, TypeGenerators}
 import quasar.fp.ski._
 
-class SetSpec extends quasar.Qspec with TypeArbitrary {
+class SetSpec extends quasar.Qspec with TypeGenerators {
   import SetLib._
   import quasar.Data
   import quasar.Type

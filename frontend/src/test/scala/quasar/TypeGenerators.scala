@@ -17,12 +17,12 @@
 package quasar
 
 import slamdata.Predef.{Set => _, _}
-import quasar.DataArbitrary._
+import quasar.DataGenerators._
 import quasar.Type._
 
 import org.scalacheck._, Gen._
 
-trait TypeArbitrary {
+trait TypeGenerators {
   implicit def arbitraryType: Arbitrary[Type] = Arbitrary { Gen.sized(depth => typeGen(depth/25)) }
 
   def arbitrarySimpleType = Arbitrary { Gen.sized(depth => complexGen(depth/25, simpleGen)) }
@@ -65,9 +65,10 @@ trait TypeArbitrary {
 
   def simpleGen: Gen[Type] = Gen.oneOf(terminalGen, simpleConstGen)
 
-  def terminalGen: Gen[Type] = Gen.oneOf(Null, Str, Type.Int, Dec, Bool, Binary, Timestamp, Date, Time, Interval)
+  def terminalGen: Gen[Type] = Gen.oneOf(Null, Str, Type.Int, Dec, Bool, Binary,
+      OffsetDateTime, Type.OffsetDate, OffsetTime, LocalDateTime, LocalDate, LocalTime, Interval)
 
-  def simpleConstGen: Gen[Type] = DataArbitrary.simpleData.map(Const(_))
+  def simpleConstGen: Gen[Type] = DataGenerators.simpleData.map(Const(_))
   def constGen: Gen[Type] = Arbitrary.arbitrary[Data].map(Const(_))
 
   def fieldGen: Gen[(String, Type)] = for {
@@ -93,4 +94,4 @@ trait TypeArbitrary {
   def arrayGen: Gen[Type] = Gen.oneOf(arrGen, flexArrayGen)
 }
 
-object TypeArbitrary extends TypeArbitrary
+object TypeGenerators extends TypeGenerators

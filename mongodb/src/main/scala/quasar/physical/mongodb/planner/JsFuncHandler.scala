@@ -22,7 +22,7 @@ import quasar.javascript.Js
 import quasar.jscore, jscore.{Name, JsCoreF}
 import quasar.std.StdLib._
 import quasar.qscript._, MapFuncsCore._
-import quasar.std.TemporalPart._
+import quasar.TemporalPart._
 
 import scala.Predef.implicitly
 
@@ -207,20 +207,21 @@ object JsFuncHandler {
                   If(Call(select(Call(ident("RegExp"), List(litStr("^" + string.floatRegex + "$"))), "test"), List(str)),
                     Call(ident("parseFloat"), List(str)),
                     ident("undefined"))
-              case Date(str) =>
+              case LocalDate(str) =>
                 If(Call(select(Call(ident("RegExp"), List(litStr("^" + string.dateRegex + "$"))), "test"), List(str)),
                   Call(ident("ISODate"), List(str)),
                   ident("undefined"))
-              case Time(str) =>
+              case LocalTime(str) =>
                 If(Call(select(Call(ident("RegExp"), List(litStr("^" + string.timeRegex + "$"))), "test"), List(str)),
                   str,
                   ident("undefined"))
-              case Timestamp(str) =>
+              case LocalDateTime(str) =>
                 If(Call(select(Call(ident("RegExp"), List(litStr("^" + string.timestampRegex + "$"))), "test"), List(str)),
                   Call(ident("ISODate"), List(str)),
                   ident("undefined"))
               // TODO: case Interval(str) =>
               case ToString(value) =>
+                // TODO: Come back to this
                 If(isInt(value),
                   // NB: This is a terrible way to turn an int into a string, but the
                   //     only one that doesn’t involve converting to a decimal and
@@ -263,7 +264,7 @@ object JsFuncHandler {
                     litNum(7),
                     ident("x")))
               // TODO: case ExtractIsoYear(date) =>
-              case ExtractMicroseconds(date) =>
+              case ExtractMicrosecond(date) =>
                 BinOp(jscore.Mult,
                   BinOp(jscore.Add,
                     millisecond(date),
@@ -272,7 +273,7 @@ object JsFuncHandler {
                       litNum(1000))),
                   litNum(1000))
               case ExtractMillennium(date) => millennium(date)
-              case ExtractMilliseconds(date) =>
+              case ExtractMillisecond(date) =>
                 BinOp(jscore.Add,
                   millisecond(date),
                   BinOp(jscore.Mult,

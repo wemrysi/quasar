@@ -20,8 +20,9 @@ import quasar.precog.common._
 import quasar.precog._, TestSupport._
 import quasar.precog.util._
 import quasar.yggdrasil.table._
+import quasar.OffsetDate
 
-import java.time.ZonedDateTime
+import java.time._
 
 import scala.specialized
 
@@ -39,12 +40,18 @@ class CPathTraversalSpec extends Specification {
       }
     }
 
-    implicit val LongColBuilder   = builder[Long](ArrayLongColumn(_, _))
-    implicit val StrColBuilder    = builder[String](ArrayStrColumn(_, _))
-    implicit val BoolColBuilder   = builder[Boolean](ArrayBoolColumn(_, _))
-    implicit val DoubleColBuilder = builder[Double](ArrayDoubleColumn(_, _))
-    implicit val NumColBuilder    = builder[BigDecimal](ArrayNumColumn(_, _))
-    implicit val DateColBuilder   = builder[ZonedDateTime](ArrayDateColumn(_, _))
+    implicit val LongColBuilder      = builder[Long](ArrayLongColumn(_, _))
+    implicit val StrColBuilder       = builder[String](ArrayStrColumn(_, _))
+    implicit val BoolColBuilder      = builder[Boolean](ArrayBoolColumn(_, _))
+    implicit val DoubleColBuilder    = builder[Double](ArrayDoubleColumn(_, _))
+    implicit val NumColBuilder       = builder[BigDecimal](ArrayNumColumn(_, _))
+    // TODO: add offset/datetime
+    implicit val LocalDateTimeColBuilder  = builder[LocalDateTime](ArrayLocalDateTimeColumn(_, _))
+    implicit val LocalTimeColBuilder      = builder[LocalTime](ArrayLocalTimeColumn(_, _))
+    implicit val LocalDateColBuilder      = builder[LocalDate](ArrayLocalDateColumn(_, _))
+    implicit val OffsetDateTimeColBuilder  = builder[OffsetDateTime](ArrayOffsetDateTimeColumn(_, _))
+    implicit val OffsetTimeColBuilder      = builder[OffsetTime](ArrayOffsetTimeColumn(_, _))
+    implicit val OffsetDateColBuilder      = builder[OffsetDate](ArrayOffsetDateColumn(_, _))
     implicit def HomogeneousArrayColBuilder[@specialized(Boolean, Long, Double) A: CValueType] =
       builder[Array[A]](ArrayHomogeneousArrayColumn(_, _))
   }

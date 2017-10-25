@@ -39,7 +39,7 @@ private[qscript] final class MapFuncCorePlanner[
   import expr.{emptySeq, if_, let_, some, try_}, XQuery.flwor
 
   // wart: uses `eq` (3x) and `ne`
-  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
+  @SuppressWarnings(Array("org.wartremover.warts.Equals", "org.wartremover.warts.NonUnitStatements"))
   val plan: AlgebraM[F, MapFuncCore[T, ?], XQuery] = {
     case Constant(ejson)              => EJsonPlanner.plan[T[EJson], F, FMT](ejson)
     case Undefined()                  => emptySeq.point[F]
@@ -48,9 +48,12 @@ private[qscript] final class MapFuncCorePlanner[
     case Length(arrOrstr)             => lib.length[F] apply arrOrstr
 
     // time
-    case Date(s)                      => lib.asDate[F] apply s
-    case Time(s)                      => xs.time(s).point[F]
-    case Timestamp(s)                 => xs.dateTime(s).point[F]
+    case OffsetDateTime(s)            => xs.dateTime(s).point[F]
+    case OffsetDate(s)                => lib.asDate[F] apply s
+    case OffsetTime(s)                => xs.time(s).point[F]
+    case LocalDateTime(s)             => xs.dateTime(s).point[F]
+    case LocalDate(s)                 => lib.asDate[F] apply s
+    case LocalTime(s)                 => xs.time(s).point[F]
     case Interval(s)                  => xs.dayTimeDuration(s).point[F]
     case StartOfDay(date)             => lib.startOfDay[F] apply date
     case TemporalTrunc(part, src)     => lib.temporalTrunc[F](part) apply src
@@ -70,11 +73,11 @@ private[qscript] final class MapFuncCorePlanner[
     case ExtractHour(time)            => asDateTime(time) map fn.hoursFromDateTime
     case ExtractIsoDayOfWeek(time)    => asDate(time) map (xdmp.weekdayFromDate)
     case ExtractIsoYear(time)         => asDateTime(time) flatMap (lib.isoyearFromDateTime[F].apply(_))
-    case ExtractMicroseconds(time)    => asDateTime(time) map (dt =>
+    case ExtractMicrosecond(time)    => asDateTime(time) map (dt =>
                                            mkSeq_(fn.secondsFromDateTime(dt) * 1000000.xqy))
     case ExtractMillennium(time)      => asDateTime(time) map (dt =>
                                            fn.ceiling(fn.yearFromDateTime(dt) div 1000.xqy))
-    case ExtractMilliseconds(time)    => asDateTime(time) map (dt =>
+    case ExtractMillisecond(time)    => asDateTime(time) map (dt =>
                                            mkSeq_(fn.secondsFromDateTime(dt) * 1000.xqy))
     case ExtractMinute(time)          => asDateTime(time) map fn.minutesFromDateTime
     case ExtractMonth(time)           => asDateTime(time) map fn.monthFromDateTime
@@ -87,6 +90,10 @@ private[qscript] final class MapFuncCorePlanner[
                                            fn.minutesFromDuration(fn.timezoneFromDateTime(dt)))
     case ExtractWeek(time)            => asDate(time) map (xdmp.weekFromDate)
     case ExtractYear(time)            => asDateTime(time) map fn.yearFromDateTime
+      // TODO: Come back to this
+    case SetTimezone(s, t)            => ???
+    case SetTimezoneMinute(m, t)      => ???
+    case SetTimezoneHour(h, t)        => ???
 
     // math
     case Negate(x)                    => SP.castIfNode(x) map (-_)

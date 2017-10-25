@@ -17,7 +17,7 @@
 package quasar.fs.mount.cache
 
 import quasar.contrib.pathy._
-import quasar.DateArbitrary._
+import quasar.DateGenerators._
 import quasar.fs.mount._
 import slamdata.Predef._
 

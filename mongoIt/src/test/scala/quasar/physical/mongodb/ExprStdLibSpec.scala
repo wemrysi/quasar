@@ -50,7 +50,8 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (string.Split, _) if (!is3_4(backend)) => Skipped("not implemented in aggregation on MongoDB < 3.4").left
     case (string.Substring, List(Data.Str(s), _, _)) if (!is3_4(backend) && !isPrintableAscii(s)) =>
       Skipped("only printable ascii supported on MongoDB < 3.4").left
-    case (string.ToString, List(Data.Timestamp(_) | Data.Date(_))) => Skipped("Implemented, but formatted incorrectly").left
+//    TODO: Come back to this
+//    case (string.ToString, List(Data.Timestamp(_) | Data.Date(_))) => Skipped("Implemented, but formatted incorrectly").left
 
     case (quasar.std.SetLib.Within, _)      => notHandled.left
 
@@ -73,11 +74,12 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (math.FloorScale, _) if lt3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
     case (math.RoundScale, _) if lt3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
 
-    case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
-    case (relations.Lt, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
-    case (relations.Lte, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
-    case (relations.Gt, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
-    case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
+//    TODO: Come back to this
+//    case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
+//    case (relations.Lt, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
+//    case (relations.Lte, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
+//    case (relations.Gt, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
+//    case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
     case (relations.IfUndefined, _) => notHandled.left
 
     case (structural.ConcatOp, _)   => notHandled.left

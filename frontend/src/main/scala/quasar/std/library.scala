@@ -39,7 +39,7 @@ trait Library {
   protected def constTyper[N <: Nat](codomain: Codomain): Typer[N] =
     _ => success(codomain)
 
-  private def partialTyperOV[N <: Nat](f: Domain[N] => Option[VCodomain]): Typer[N] = { args =>
+  protected def partialTyperOV[N <: Nat](f: Domain[N] => Option[VCodomain]): Typer[N] = { args =>
     f(args).getOrElse {
       val msg: String = s"Unknown arguments: $args"
       failure(NonEmptyList(SemanticError.GenericError(msg)))

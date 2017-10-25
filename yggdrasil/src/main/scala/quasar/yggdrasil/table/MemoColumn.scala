@@ -17,7 +17,8 @@
 package quasar.yggdrasil
 package table
 
-import java.time.ZonedDateTime
+import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
+import quasar.{DateTimeInterval, OffsetDate}
 
 class MemoBoolColumn(c: BoolColumn) extends BoolColumn {
   private[this] var row0          = -1
@@ -69,9 +70,69 @@ class MemoStrColumn(c: StrColumn) extends StrColumn {
   }
 }
 
-class MemoDateColumn(c: DateColumn) extends DateColumn {
+class MemoDurationColumn(c: DurationColumn) extends DurationColumn {
+  private[this] var row0                   = -1
+  private[this] var memo: DateTimeInterval = _
+  def isDefinedAt(row: Int) = c.isDefinedAt(row)
+  def apply(row: Int) = {
+    if (row != row0) { row0 = row; memo = c(row) }
+    memo
+  }
+}
+
+class MemoOffsetDateTimeColumn(c: OffsetDateTimeColumn) extends OffsetDateTimeColumn {
+  private[this] var row0                 = -1
+  private[this] var memo: OffsetDateTime = _
+  def isDefinedAt(row: Int) = c.isDefinedAt(row)
+  def apply(row: Int) = {
+    if (row != row0) { row0 = row; memo = c(row) }
+    memo
+  }
+}
+
+class MemoOffsetTimeColumn(c: OffsetTimeColumn) extends OffsetTimeColumn {
+  private[this] var row0             = -1
+  private[this] var memo: OffsetTime = _
+  def isDefinedAt(row: Int) = c.isDefinedAt(row)
+  def apply(row: Int) = {
+    if (row != row0) { row0 = row; memo = c(row) }
+    memo
+  }
+}
+
+class MemoOffsetDateColumn(c: OffsetDateColumn) extends OffsetDateColumn {
+  private[this] var row0             = -1
+  private[this] var memo: OffsetDate = _
+  def isDefinedAt(row: Int) = c.isDefinedAt(row)
+  def apply(row: Int) = {
+    if (row != row0) { row0 = row; memo = c(row) }
+    memo
+  }
+}
+
+class MemoLocalDateTimeColumn(c: LocalDateTimeColumn) extends LocalDateTimeColumn {
+  private[this] var row0                = -1
+  private[this] var memo: LocalDateTime = _
+  def isDefinedAt(row: Int) = c.isDefinedAt(row)
+  def apply(row: Int) = {
+    if (row != row0) { row0 = row; memo = c(row) }
+    memo
+  }
+}
+
+class MemoLocalTimeColumn(c: LocalTimeColumn) extends LocalTimeColumn {
+  private[this] var row0            = -1
+  private[this] var memo: LocalTime = _
+  def isDefinedAt(row: Int) = c.isDefinedAt(row)
+  def apply(row: Int) = {
+    if (row != row0) { row0 = row; memo = c(row) }
+    memo
+  }
+}
+
+class MemoLocalDateColumn(c: LocalDateColumn) extends LocalDateColumn {
   private[this] var row0           = -1
-  private[this] var memo: ZonedDateTime = _
+  private[this] var memo: LocalDate = _
   def isDefinedAt(row: Int) = c.isDefinedAt(row)
   def apply(row: Int) = {
     if (row != row0) { row0 = row; memo = c(row) }

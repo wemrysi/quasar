@@ -23,18 +23,18 @@ import scalaz._
 import scalaz.syntax.comonad._
 import scalaz.syntax.std.boolean._
 import SampleData._
-import CValueGenerators._
+import SJValueGenerators._
 import quasar.precog.TestSupport._, Gen._
 
 trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
   class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule[Need] {
     val M = Need.need
     val Some((idCount, schema)) = sampleData.schema
-    val actualSchema = inferSchema(sampleData.data map { _ \ "value" })
+    val actualSchema = inferSchema(sampleData.data map { _.toJValue \ "value" })
 
     val projections = List(actualSchema).map { subschema =>
 
-      val stream = sampleData.data flatMap { jv =>
+      val stream = sampleData.data.map(_.toJValue) flatMap { jv =>
         val back = subschema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {
           case (obj, (jpath, ctype)) => {
             val vpath = JPath(JPathField("value") :: jpath.nodes)
@@ -62,7 +62,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
   def testLoadDense(sample: SampleData) = {
     val module = new BlockStoreLoadTestModule(sample)
 
-    val expected = sample.data flatMap { jv =>
+    val expected = sample.data.map(_.toJValueRaw) flatMap { jv =>
       val back = module.schema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {
         case (obj, (jpath, ctype)) => {
           val vpath = JPath(JPathField("value") :: jpath.nodes)
@@ -82,7 +82,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
     val cschema = module.schema map { case (jpath, ctype) => ColumnRef(CPath(jpath), ctype) }
 
     val result = module.Table.constString(Set("/test")).load("dummyAPIKey", Schema.mkType(cschema).get).flatMap(t => EitherT.right(t.toJson)).run.copoint
-    result.map(_.toList) must_== \/.right(expected.toList)
+    result.map(_.toList) must_== \/.right(expected.toList.map(RValue.fromJValueRaw))
   }
 
   def checkLoadDense = {
@@ -101,7 +101,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
           },
           "key":[1]
         }
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""") --> classOf[JArray]).elements.toStream.map(RValue.fromJValueRaw),
       Some(
         (1 , List(JPath(".u") -> CBoolean, JPath(".md") -> CString, JPath(".l") -> CEmptyArray))
       )
@@ -121,7 +121,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
           },
           "key":[2,1]
         }
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""") --> classOf[JArray]).elements.toStream.map(RValue.fromJValueRaw),
       Some(
         (2, List(JPath(".fa") -> CNull, JPath(".hW") -> CLong, JPath(".rzp") -> CEmptyObject))
       )
@@ -155,7 +155,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
            },
            "key":[2,1,1]
          }
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""") --> classOf[JArray]).elements.toStream.map(RValue.fromJValueRaw),
       Some(
         (3, List(JPath(".f.bn[0]") -> CNull,
                  JPath(".f.wei") -> CLong,
@@ -189,7 +189,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
           },
           "key":[1,1]
         }
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""") --> classOf[JArray]).elements.toStream.map(RValue.fromJValueRaw),
       Some(
         (2, List(JPath(".dV.d") -> CBoolean,
                  JPath(".dV.l") -> CBoolean,
@@ -293,7 +293,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
           },
           "key":[9]
         }
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""") --> classOf[JArray]).elements.toStream.map(RValue.fromJValueRaw),
       Some((1, List((JPath(".o8agyghfjxe") -> CEmptyArray),
                     (JPath(".fg[0]") -> CBoolean),
                     (JPath(".fg[1]") -> CNum),

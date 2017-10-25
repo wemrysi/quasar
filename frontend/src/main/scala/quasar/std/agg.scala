@@ -19,13 +19,13 @@ package quasar.std
 import slamdata.Predef._
 import quasar._
 
-import java.time.Duration
 import scalaz._, Validation.{success, failureNel}
 import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.syntax.bifunctor._
 import scalaz.syntax.traverse._
 import scalaz.syntax.std.list._
+import scalaz.syntax.monoid._
 import scalaz.syntax.std.option._
 import shapeless.{Data => _, :: => _, _}
 
@@ -68,7 +68,7 @@ trait AggLib extends Library {
 
       case Sized(Type.Const(s @ Data.Set(xs))) if s.dataType == Type.Interval =>
         ivlSet(xs)
-          .map(ys => Type.Const(Data.Interval(ys.foldLeft(Duration.ZERO)(_ plus _))))
+          .map(ys => Type.Const(Data.Interval(ys.foldLeft(DateTimeInterval.zero)(_ |+| _))))
           .validationNel
 
       case Sized(t) =>
@@ -187,12 +187,11 @@ trait AggLib extends Library {
 
   private val numSet: List[Data] => SemanticError \/ List[BigDecimal] =
     set =>
-      errSetF.map(ivlSet(set))(d => BigDecimal(d.toMillis))
-        .orElse(errSetF.map(intSet(set))(BigDecimal(_)))
+        errSetF.map(intSet(set))(BigDecimal(_))
         .orElse(decSet(set))
         .leftAs(SemanticError.DomainError(Data.Set(set), some("Expected Set of numeric values")))
 
-  private val ivlSet: List[Data] => SemanticError \/ List[Duration] =
+  private val ivlSet: List[Data] => SemanticError \/ List[DateTimeInterval] =
     homogenizedPF({ case Data.Interval(d) => d }, "Expected Set(Interval)")
 
   private val decSet: List[Data] => SemanticError \/ List[BigDecimal] =

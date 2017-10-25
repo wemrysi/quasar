@@ -17,18 +17,22 @@
 package quasar.std
 
 import slamdata.Predef._, BigDecimal.RoundingMode
-import quasar.{Data, DataCodec, Qspec, Type}
-import quasar.DateArbitrary._
+import quasar.{Data, Qspec, Type}
+import quasar.DataGenerators.{dataArbitrary => _, _}
 import quasar.frontend.logicalplan._
+import quasar.{DateGenerators, DateTimeInterval, OffsetDate => JOffsetDate, TemporalPart}
+import quasar.datetime.{truncDateTime, truncDate, truncTime}
 
-import java.time._, ZoneOffset.UTC
+import java.time.{Instant, LocalDate => JLocalDate, LocalDateTime => JLocalDateTime, LocalTime => JLocalTime, ZoneOffset}
+import java.time.{OffsetDateTime => JOffsetDateTime, OffsetTime => JOffsetTime}
+import quasar.pkg.tests._
 import scala.collection.Traversable
 import scala.math.abs
 import scala.util.matching.Regex
 
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import org.specs2.execute.{Failure, Result}
+import org.specs2.execute.Result
 import org.specs2.matcher.{Expectable, Matcher}
 import org.specs2.specification.core.Fragment
 import org.scalacheck.{Arbitrary, Gen}
@@ -66,13 +70,21 @@ abstract class StdLibSpec extends Qspec {
     implicit val arbBigInt = Arbitrary[BigInt] { runner.intDomain }
     implicit val arbBigDecimal = Arbitrary[BigDecimal] { runner.decDomain }
     implicit val arbString = Arbitrary[String] { runner.stringDomain }
-    implicit val arbDate = Arbitrary[LocalDate] { runner.dateDomain }
+    implicit val arbDate = Arbitrary[JLocalDate] { runner.dateDomain }
+    implicit val arbTime = Arbitrary[JLocalTime] { runner.timeDomain }
+    implicit val arbDateTime = Arbitrary[JLocalDateTime] { (runner.dateDomain, runner.timeDomain) >> JLocalDateTime.of }
     implicit val arbData = Arbitrary[Data] {
       Gen.oneOf(
         runner.intDomain.map(Data.Int(_)),
         runner.decDomain.map(Data.Dec(_)),
         runner.stringDomain.map(Data.Str(_)))
     }
+    implicit val arbOffsetDateTime = Arbitrary[JOffsetDateTime] { (arbDateTime.gen, runner.timezoneDomain) >> JOffsetDateTime.of }
+    implicit val arbOffsetDate =
+      Arbitrary[JOffsetDate] { (runner.dateDomain, runner.timezoneDomain) >> (JOffsetDate(_, _)) }
+    implicit val arbOffsetTime =
+      Arbitrary[JOffsetTime] { (runner.timeDomain, runner.timezoneDomain) >> JOffsetTime.of }
+    implicit val arbInterval = Arbitrary[DateTimeInterval] { runner.intervalDomain }
 
     def commute(
         prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
@@ -259,30 +271,30 @@ abstract class StdLibSpec extends Qspec {
         //   unary(ToString(_).embed, Data.Dec(x), Data.Str(x.toString))
         // }
 
-        "timestamp" >> {
-          def test(x: Instant) = unary(
+        "datetime" >> {
+          def test(x: JOffsetDateTime) = unary(
             ToString(_).embed,
-            Data.Timestamp(x),
-            Data.Str(x.atZone(UTC).format(DataCodec.dateTimeFormatter)))
+            Data.OffsetDateTime(x),
+            Data.Str(x.toString))
 
-          "zero fractional seconds" >> test(Instant.EPOCH)
+          "zero fractional seconds" >> test(Instant.EPOCH.atOffset(ZoneOffset.UTC))
 
-          "any" >> prop (test(_: Instant))
+          "any" >> prop (test(_: JOffsetDateTime))
         }
 
-        "date" >> prop { (x: LocalDate) =>
-          unary(ToString(_).embed, Data.Date(x), Data.Str(x.toString))
+        "date" >> prop { (x: JLocalDate) =>
+          unary(ToString(_).embed, Data.LocalDate(x), Data.Str(x.toString))
         }
 
         "time" >> {
-          def test(x: LocalTime) = unary(
+          def test(x: JLocalTime) = unary(
             ToString(_).embed,
-            Data.Time(x),
-            Data.Str(x.format(DataCodec.timeFormatter)))
+            Data.LocalTime(x),
+            Data.Str(x.toString))
 
-          "zero fractional seconds" >> test(LocalTime.NOON)
+          "zero fractional seconds" >> test(JLocalTime.NOON)
 
-          "any" >> prop (test(_: LocalTime))
+          "any" >> prop (test(_: JLocalTime))
         }
 
         // TODO: Enable
@@ -294,365 +306,378 @@ abstract class StdLibSpec extends Qspec {
 
     "DateLib" >> {
       import DateLib._
+      def unaryB[I](
+                 prg: Fix[LogicalPlan] => Fix[LogicalPlan],
+                 input: I, expected: Data)(implicit arbF: Arbitrary[Builder[I, Data]]): Prop =
+        prop { (b: Builder[I, Data]) =>
+          unary(prg, b.f(input), expected)
+        }
+
+      def unaryBE[I](
+                     prg: Fix[LogicalPlan] => Fix[LogicalPlan],
+                     input: I, expected: I)(implicit arbF: Arbitrary[Builder[I, Data]]): Prop =
+        prop { (b: Builder[I, Data]) =>
+          unary(prg, b.f(input), b.f(expected))
+        }
 
       "ExtractCentury" >> {
         "0001-01-01" >> {
-          unary(ExtractCentury(_).embed, Data.Date(LocalDate.parse("0001-01-01")), Data.Int(1))
+          unaryB(ExtractCentury(_).embed, JLocalDate.parse("0001-01-01"), Data.Int(1))
         }
 
         "2000-01-01" >> {
-          unary(ExtractCentury(_).embed, Data.Date(LocalDate.parse("2000-01-01")), Data.Int(20))
+          unaryB(ExtractCentury(_).embed, JLocalDate.parse("2000-01-01"), Data.Int(20))
         }
 
         "2001-01-01" >> {
-          unary(ExtractCentury(_).embed, Data.Date(LocalDate.parse("2001-01-01")), Data.Int(21))
+          unaryB(ExtractCentury(_).embed, JLocalDate.parse("2001-01-01"), Data.Int(21))
         }
 
         "midnight 0001-01-01" >> {
-          unary(ExtractCentury(_).embed, Data.Timestamp(Instant.parse("0001-01-01T00:00:00.000Z")), Data.Int(1))
+          unaryB(ExtractCentury(_).embed, JLocalDateTime.parse("0001-01-01T00:00:00.000"), Data.Int(1))
         }
 
         "midnight 2000-01-01" >> {
-          unary(ExtractCentury(_).embed, Data.Timestamp(Instant.parse("2000-01-01T00:00:00.000Z")), Data.Int(20))
+          unaryB(ExtractCentury(_).embed, JLocalDateTime.parse("2000-01-01T00:00:00.000"), Data.Int(20))
         }
 
         "midnight 2001-01-01" >> {
-          unary(ExtractCentury(_).embed, Data.Timestamp(Instant.parse("2001-01-01T00:00:00.000Z")), Data.Int(21))
+          unaryB(ExtractCentury(_).embed, JLocalDateTime.parse("2001-01-01T00:00:00.000"), Data.Int(21))
         }
       }
 
       "ExtractDayOfMonth" >> {
         "2016-01-01" >> {
-          unary(ExtractDayOfMonth(_).embed, Data.Date(LocalDate.parse("2016-01-01")), Data.Int(1))
+          unaryB(ExtractDayOfMonth(_).embed, JLocalDate.parse("2016-01-01"), Data.Int(1))
         }
 
         "midnight 2016-01-01" >> {
-          unary(ExtractDayOfMonth(_).embed, Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")), Data.Int(1))
+          unaryB(ExtractDayOfMonth(_).embed, JLocalDateTime.parse("2016-01-01T00:00:00.000"), Data.Int(1))
         }
 
         "2016-02-29" >> {
-          unary(ExtractDayOfMonth(_).embed, Data.Date(LocalDate.parse("2016-02-29")), Data.Int(29))
+          unaryB(ExtractDayOfMonth(_).embed, JLocalDate.parse("2016-02-29"), Data.Int(29))
         }
 
         "midnight 2016-02-29" >> {
-          unary(ExtractDayOfMonth(_).embed, Data.Timestamp(Instant.parse("2016-02-29T00:00:00.000Z")), Data.Int(29))
+          unaryB(ExtractDayOfMonth(_).embed, JLocalDateTime.parse("2016-02-29T00:00:00.000"), Data.Int(29))
         }
       }
 
       "ExtractDecade" >> {
         "1999-12-31" >> {
-          unary(ExtractDecade(_).embed, Data.Date(LocalDate.parse("1999-12-31")), Data.Int(199))
+          unaryB(ExtractDecade(_).embed, JLocalDate.parse("1999-12-31"), Data.Int(199))
         }
 
         "midnight 1999-12-31" >> {
-          unary(ExtractDecade(_).embed, Data.Timestamp(Instant.parse("1999-12-31T00:00:00.000Z")), Data.Int(199))
+          unaryB(ExtractDecade(_).embed, JLocalDateTime.parse("1999-12-31T00:00:00.000"), Data.Int(199))
         }
       }
 
       "ExtractDayOfWeek" >> {
         "2016-09-28" >> {
-          unary(ExtractDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-09-28")), Data.Int(3))
+          unaryB(ExtractDayOfWeek(_).embed, JLocalDate.parse("2016-09-28"), Data.Int(3))
         }
 
         "midnight 2016-09-28" >> {
-          unary(ExtractDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-09-28T00:00:00.000Z")), Data.Int(3))
+          unaryB(ExtractDayOfWeek(_).embed, JLocalDateTime.parse("2016-09-28T00:00:00.000"), Data.Int(3))
         }
 
         "2016-10-02" >> {
-          unary(ExtractDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-10-02")), Data.Int(0))
+          unaryB(ExtractDayOfWeek(_).embed, JLocalDate.parse("2016-10-02"), Data.Int(0))
         }
 
         "midnight 2016-10-02" >> {
-          unary(ExtractDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-10-02T00:00:00.000Z")), Data.Int(0))
+          unaryB(ExtractDayOfWeek(_).embed, JLocalDateTime.parse("2016-10-02T00:00:00.000"), Data.Int(0))
         }
 
         "2016-10-08" >> {
-          unary(ExtractDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-10-08")), Data.Int(6))
+          unaryB(ExtractDayOfWeek(_).embed, JLocalDate.parse("2016-10-08"), Data.Int(6))
         }
 
         "noon 2016-10-08" >> {
-          unary(ExtractDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-10-08T12:00:00.000Z")), Data.Int(6))
+          unaryB(ExtractDayOfWeek(_).embed, JLocalDateTime.parse("2016-10-08T12:00:00.000"), Data.Int(6))
         }
       }
 
       "ExtractDayOfYear" >> {
         "2016-03-01" >> {
-          unary(ExtractDayOfYear(_).embed, Data.Date(LocalDate.parse("2016-03-01")), Data.Int(61))
+          unaryB(ExtractDayOfYear(_).embed, JLocalDate.parse("2016-03-01"), Data.Int(61))
         }
 
         "midnight 2016-03-01" >> {
-          unary(ExtractDayOfYear(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Int(61))
+          unaryB(ExtractDayOfYear(_).embed, JLocalDateTime.parse("2016-03-01T00:00:00.000"), Data.Int(61))
         }
 
         "2017-03-01" >> {
-          unary(ExtractDayOfYear(_).embed, Data.Date(LocalDate.parse("2017-03-01")), Data.Int(60))
+          unaryB(ExtractDayOfYear(_).embed, JLocalDate.parse("2017-03-01"), Data.Int(60))
         }
 
         "midnight 2017-03-01" >> {
-          unary(ExtractDayOfYear(_).embed, Data.Timestamp(Instant.parse("2017-03-01T00:00:00.000Z")), Data.Int(60))
+          unaryB(ExtractDayOfYear(_).embed, JLocalDateTime.parse("2017-03-01T00:00:00.000"), Data.Int(60))
         }
       }
 
       "ExtractEpoch" >> {
-        "2016-09-29" >> {
-          unary(ExtractEpoch(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Dec(1475107200.0))
-        }
-
         "2016-09-29 12:34:56.789" >> {
-          unary(ExtractEpoch(_).embed, Data.Timestamp(Instant.parse("2016-09-29T12:34:56.789Z")), Data.Dec(1475152496.789))
+          unary(ExtractEpoch(_).embed, Data.OffsetDateTime(JOffsetDateTime.parse("2016-09-29T12:34:56.789Z")), Data.Dec(1475152496.789))
         }
       }
 
       "ExtractHour" >> {
-        "2016-09-29" >> {
-          unary(ExtractHour(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Int(0))
-        }
-
         "midnight 2016-09-29" >> {
-          unary(ExtractHour(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Int(0))
+          unaryB(ExtractHour(_).embed, JLocalDateTime.parse("2016-03-01T00:00:00.000"), Data.Int(0))
         }
 
         "2016-09-29 12:34:56.789" >> {
-          unary(ExtractHour(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Int(12))
+          unaryB(ExtractHour(_).embed, JLocalDateTime.parse("2016-03-01T12:34:56.789"), Data.Int(12))
         }
       }
 
       "ExtractIsoDayOfWeek" >> {
         "2016-09-28" >> {
-          unary(ExtractIsoDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-09-28")), Data.Int(3))
+          unaryB(ExtractIsoDayOfWeek(_).embed, JLocalDate.parse("2016-09-28"), Data.Int(3))
         }
 
         "midnight 2016-09-28" >> {
-          unary(ExtractIsoDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-09-28T00:00:00.000Z")), Data.Int(3))
+          unaryB(ExtractIsoDayOfWeek(_).embed, JLocalDateTime.parse("2016-09-28T00:00:00.000"), Data.Int(3))
         }
 
         "2016-10-02" >> {
-          unary(ExtractIsoDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-10-02")), Data.Int(7))
+          unaryB(ExtractIsoDayOfWeek(_).embed, JLocalDate.parse("2016-10-02"), Data.Int(7))
         }
 
         "midnight 2016-10-02" >> {
-          unary(ExtractIsoDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-10-02T00:00:00.000Z")), Data.Int(7))
+          unaryB(ExtractIsoDayOfWeek(_).embed, JLocalDateTime.parse("2016-10-02T00:00:00.000"), Data.Int(7))
         }
       }
 
       "ExtractIsoYear" >> {
         "2006-01-01" >> {
-          unary(ExtractIsoYear(_).embed, Data.Date(LocalDate.parse("2006-01-01")), Data.Int(2005))
+          unaryB(ExtractIsoYear(_).embed, JLocalDate.parse("2006-01-01"), Data.Int(2005))
         }
 
         "midnight 2006-01-01" >> {
-          unary(ExtractIsoYear(_).embed, Data.Timestamp(Instant.parse("2006-01-01T00:00:00.000Z")), Data.Int(2005))
+          unaryB(ExtractIsoYear(_).embed, JLocalDateTime.parse("2006-01-01T00:00:00.000"), Data.Int(2005))
         }
 
         "2006-01-02" >> {
-          unary(ExtractIsoYear(_).embed, Data.Date(LocalDate.parse("2006-01-02")), Data.Int(2006))
+          unaryB(ExtractIsoYear(_).embed, JLocalDate.parse("2006-01-02"), Data.Int(2006))
         }
 
         "midnight 2006-01-02" >> {
-          unary(ExtractIsoYear(_).embed, Data.Timestamp(Instant.parse("2006-01-02T00:00:00.000Z")), Data.Int(2006))
+          unaryB(ExtractIsoYear(_).embed, JLocalDateTime.parse("2006-01-02T00:00:00.000"), Data.Int(2006))
         }
       }
 
-      "ExtractMicroseconds" >> {
-        "2016-09-29" >> {
-          unary(ExtractMicroseconds(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Dec(0))
-        }
-
+      "ExtractMicrosecond" >> {
         "midnight 2016-09-29" >> {
-          unary(ExtractMicroseconds(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Dec(0))
+          unaryB(ExtractMicrosecond(_).embed, JLocalDateTime.parse("2016-03-01T00:00:00.000"), Data.Dec(0))
         }
 
         "2016-09-29 12:34:56.789" >> {
-          unary(ExtractMicroseconds(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Dec(56.789e6))
+          unaryB(ExtractMicrosecond(_).embed, JLocalDateTime.parse("2016-03-01T12:34:56.789"), Data.Dec(56.789e6))
         }
       }
-
 
       "ExtractMillennium" >> {
         "0001-01-01" >> {
-          unary(ExtractMillennium(_).embed, Data.Date(LocalDate.parse("0001-01-01")), Data.Int(1))
+          unaryB(ExtractMillennium(_).embed, JLocalDate.parse("0001-01-01"), Data.Int(1))
         }
 
         "2000-01-01" >> {
-          unary(ExtractMillennium(_).embed, Data.Date(LocalDate.parse("2000-01-01")), Data.Int(2))
+          unaryB(ExtractMillennium(_).embed, JLocalDate.parse("2000-01-01"), Data.Int(2))
         }
 
         "2001-01-01" >> {
-          unary(ExtractMillennium(_).embed, Data.Date(LocalDate.parse("2001-01-01")), Data.Int(3))
+          unaryB(ExtractMillennium(_).embed, JLocalDate.parse("2001-01-01"), Data.Int(3))
         }
 
         "midnight 0001-01-01" >> {
-          unary(ExtractMillennium(_).embed, Data.Timestamp(Instant.parse("0001-01-01T00:00:00.000Z")), Data.Int(1))
+          unaryB(ExtractMillennium(_).embed, JLocalDateTime.parse("0001-01-01T00:00:00.000"), Data.Int(1))
         }
 
         "midnight 2000-01-01" >> {
-          unary(ExtractMillennium(_).embed, Data.Timestamp(Instant.parse("2000-01-01T00:00:00.000Z")), Data.Int(2))
+          unaryB(ExtractMillennium(_).embed, JLocalDateTime.parse("2000-01-01T00:00:00.000"), Data.Int(2))
         }
 
         "midnight 2001-01-01" >> {
-          unary(ExtractMillennium(_).embed, Data.Timestamp(Instant.parse("2001-01-01T00:00:00.000Z")), Data.Int(3))
+          unaryB(ExtractMillennium(_).embed, JLocalDateTime.parse("2001-01-01T00:00:00.000"), Data.Int(3))
         }
       }
 
-      "ExtractMilliseconds" >> {
-        "2016-09-29" >> {
-          unary(ExtractMilliseconds(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Dec(0))
-        }
-
+      "ExtractMillisecond" >> {
         "midnight 2016-09-29" >> {
-          unary(ExtractMilliseconds(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Dec(0))
+          unaryB(ExtractMillisecond(_).embed, JLocalDateTime.parse("2016-03-01T00:00:00.000"), Data.Dec(0))
         }
 
         "2016-09-29 12:34:56.789" >> {
-          unary(ExtractMilliseconds(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Dec(56.789e3))
+          unaryB(ExtractMillisecond(_).embed, JLocalDateTime.parse("2016-03-01T12:34:56.789"), Data.Dec(56.789e3))
         }
       }
 
       "ExtractMinute" >> {
-        "2016-09-29" >> {
-          unary(ExtractMinute(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Int(0))
-        }
-
         "midnight 2016-09-29" >> {
-          unary(ExtractMinute(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Int(0))
+          unaryB(ExtractMinute(_).embed, JLocalDateTime.parse("2016-03-01T00:00:00.000"), Data.Int(0))
         }
 
         "2016-09-29 12:34:56.789" >> {
-          unary(ExtractMinute(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Int(34))
+          unaryB(ExtractMinute(_).embed, JLocalDateTime.parse("2016-03-01T12:34:56.789"), Data.Int(34))
         }
       }
 
       "ExtractMonth" >> {
         "2016-01-01" >> {
-          unary(ExtractMonth(_).embed, Data.Date(LocalDate.parse("2016-01-01")), Data.Int(1))
+          unaryB(ExtractMonth(_).embed, JLocalDate.parse("2016-01-01"), Data.Int(1))
         }
 
         "midnight 2016-01-01" >> {
-          unary(ExtractMonth(_).embed, Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")), Data.Int(1))
+          unaryB(ExtractMonth(_).embed, JLocalDateTime.parse("2016-01-01T00:00:00.000"), Data.Int(1))
         }
 
         "2016-02-29" >> {
-          unary(ExtractMonth(_).embed, Data.Date(LocalDate.parse("2016-02-29")), Data.Int(2))
+          unaryB(ExtractMonth(_).embed, JLocalDate.parse("2016-02-29"), Data.Int(2))
         }
 
         "midnight 2016-02-29" >> {
-          unary(ExtractMonth(_).embed, Data.Timestamp(Instant.parse("2016-02-29T00:00:00.000Z")), Data.Int(2))
+          unaryB(ExtractMonth(_).embed, JLocalDateTime.parse("2016-02-29T00:00:00.000"), Data.Int(2))
         }
       }
 
       "ExtractQuarter" >> {
         "2016-10-03" >> {
-          unary(ExtractQuarter(_).embed, Data.Date(LocalDate.parse("2016-10-03")), Data.Int(4))
+          unaryB(ExtractQuarter(_).embed, JLocalDate.parse("2016-10-03"), Data.Int(4))
         }
 
         "midnight 2016-10-03" >> {
-          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2016-10-03T00:00:00.000Z")), Data.Int(4))
+          unaryB(ExtractQuarter(_).embed, JLocalDateTime.parse("2016-10-03T00:00:00.000"), Data.Int(4))
         }
 
         "2016-03-31 (leap year)" >> {
-          unary(ExtractQuarter(_).embed, Data.Date(LocalDate.parse("2016-03-31")), Data.Int(1))
+          unaryB(ExtractQuarter(_).embed, JLocalDate.parse("2016-03-31"), Data.Int(1))
         }
 
         "midnight 2016-03-31 (leap year)" >> {
-          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2016-03-31T00:00:00.000Z")), Data.Int(1))
+          unaryB(ExtractQuarter(_).embed, JLocalDateTime.parse("2016-03-31T00:00:00.000"), Data.Int(1))
         }
 
         "2016-04-01 (leap year)" >> {
-          unary(ExtractQuarter(_).embed, Data.Date(LocalDate.parse("2016-04-01")), Data.Int(2))
+          unaryB(ExtractQuarter(_).embed, JLocalDate.parse("2016-04-01"), Data.Int(2))
         }
 
         "midnight 2016-04-01 (leap year)" >> {
-          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2016-04-01T00:00:00.000Z")), Data.Int(2))
+          unaryB(ExtractQuarter(_).embed, JLocalDateTime.parse("2016-04-01T00:00:00.000"), Data.Int(2))
         }
 
         "2017-03-31" >> {
-          unary(ExtractQuarter(_).embed, Data.Date(LocalDate.parse("2017-03-31")), Data.Int(1))
+          unaryB(ExtractQuarter(_).embed, JLocalDate.parse("2017-03-31"), Data.Int(1))
         }
 
         "midnight 2017-03-31" >> {
-          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2017-03-31T00:00:00.000Z")), Data.Int(1))
+          unaryB(ExtractQuarter(_).embed, JLocalDateTime.parse("2017-03-31T00:00:00.000"), Data.Int(1))
         }
 
         "2017-04-01" >> {
-          unary(ExtractQuarter(_).embed, Data.Date(LocalDate.parse("2017-04-01")), Data.Int(2))
+          unaryB(ExtractQuarter(_).embed, JLocalDate.parse("2017-04-01"), Data.Int(2))
         }
 
         "midnight 2017-04-01" >> {
-          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2017-04-01T00:00:00.000Z")), Data.Int(2))
+          unaryB(ExtractQuarter(_).embed, JLocalDateTime.parse("2017-04-01T00:00:00.000"), Data.Int(2))
         }
       }
 
       "ExtractSecond" >> {
-        "2016-09-29" >> {
-          unary(ExtractSecond(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Dec(0))
-        }
-
         "midnight 2016-09-29" >> {
-          unary(ExtractSecond(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Dec(0))
+          unaryB(ExtractSecond(_).embed, JLocalDateTime.parse("2016-03-01T00:00:00.000"), Data.Dec(0))
         }
 
         "2016-09-29 12:34:56.789" >> {
-          unary(ExtractSecond(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Dec(56.789))
+          unaryB(ExtractSecond(_).embed, JLocalDateTime.parse("2016-03-01T12:34:56.789"), Data.Dec(56.789))
         }
       }
 
-      // TODO: ExtractTimezone
-      // TODO: ExtractTimezoneHour
-      // TODO: ExtractTimezoneMinute
+      "ExtractTimezone" >> {
+        "2016-01-01+01:01:01" >> {
+          unary(ExtractTimezone(_).embed, Data.OffsetDate(quasar.OffsetDate.parse("2016-01-01+01:01:01")), Data.Int(3661))
+        }
+        "01:02:03+01:01:01" >> {
+          unary(ExtractTimezone(_).embed, Data.OffsetTime(JOffsetTime.parse("01:02:03+01:01:01")), Data.Int(3661))
+        }
+        "2016-01-01T01:02:03+01:01:01" >> {
+          unary(ExtractTimezone(_).embed, Data.OffsetDateTime(JOffsetDateTime.parse("2016-01-01T01:02:03+01:01:01")), Data.Int(3661))
+        }
+      }
+
+      "ExtractTimezoneMinute" >> {
+        "2016-01-01+01:01:01" >> {
+          unary(ExtractTimezoneMinute(_).embed, Data.OffsetDate(quasar.OffsetDate.parse("2016-01-01+01:01:01")), Data.Int(1))
+        }
+        "01:02:03+01:01:01" >> {
+          unary(ExtractTimezoneMinute(_).embed, Data.OffsetTime(JOffsetTime.parse("01:02:03+01:01:01")), Data.Int(1))
+        }
+        "2016-01-01T01:02:03+01:01:01" >> {
+          unary(ExtractTimezoneMinute(_).embed, Data.OffsetDateTime(JOffsetDateTime.parse("2016-01-01T01:02:03+01:01:01")), Data.Int(1))
+        }
+      }
+
+      "ExtractTimezoneHour" >> {
+        "2016-01-01+01:01:01" >> {
+          unary(ExtractTimezoneHour(_).embed, Data.OffsetDate(quasar.OffsetDate.parse("2016-01-01+01:01:01")), Data.Int(1))
+        }
+        "01:02:03+01:01:01" >> {
+          unary(ExtractTimezoneHour(_).embed, Data.OffsetTime(JOffsetTime.parse("01:02:03+01:01:01")), Data.Int(1))
+        }
+        "2016-01-01T01:02:03+01:01:01" >> {
+          unary(ExtractTimezoneHour(_).embed, Data.OffsetDateTime(JOffsetDateTime.parse("2016-01-01T01:02:03+01:01:01")), Data.Int(1))
+        }
+      }
 
       "ExtractWeek" >> {
         "2016-01-01" >> {
-          unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2016-01-01")), Data.Int(53))
+          unaryB(ExtractWeek(_).embed, JLocalDate.parse("2016-01-01"), Data.Int(53))
         }
 
         "midnight 2016-01-01" >> {
-          unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")), Data.Int(53))
+          unaryB(ExtractWeek(_).embed, JLocalDateTime.parse("2016-01-01T00:00:00.000"), Data.Int(53))
         }
 
         "2001-02-16" >> {
-          unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2001-02-16")), Data.Int(7))
+          unaryB(ExtractWeek(_).embed, JLocalDate.parse("2001-02-16"), Data.Int(7))
         }
 
         "midnight 2016-10-03" >> {
-          unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2001-02-16T00:00:00.000Z")), Data.Int(7))
+          unaryB(ExtractWeek(_).embed, JLocalDateTime.parse("2001-02-16T00:00:00.000"), Data.Int(7))
         }
 
         "2005-01-01" >> {
-          unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2005-01-01")), Data.Int(53))
+          unaryB(ExtractWeek(_).embed, JLocalDate.parse("2005-01-01"), Data.Int(53))
         }
 
         "midnight 2005-01-01" >> {
-          unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2005-01-01T00:00:00.000Z")), Data.Int(53))
+          unaryB(ExtractWeek(_).embed, JLocalDateTime.parse("2005-01-01T00:00:00.000"), Data.Int(53))
         }
       }
 
       "ExtractYear" >> {
         "1999-12-31" >> {
-          unary(ExtractYear(_).embed, Data.Date(LocalDate.parse("1999-12-31")), Data.Int(1999))
+          unaryB(ExtractYear(_).embed, JLocalDate.parse("1999-12-31"), Data.Int(1999))
         }
 
         "midnight 1999-12-31" >> {
-          unary(ExtractYear(_).embed, Data.Timestamp(Instant.parse("1999-12-31T00:00:00.000Z")), Data.Int(1999))
+          unaryB(ExtractYear(_).embed, JLocalDateTime.parse("1999-12-31T00:00:00.000"), Data.Int(1999))
         }
       }
 
       "StartOfDay" >> {
-        "timestamp" >> prop { (x: Instant) =>
-          val t = x.atZone(UTC)
-
-          truncZonedDateTime(TemporalPart.Day, t).fold(
-            e => Failure(e.shows),
-            tt => unary(
-              StartOfDay(_).embed,
-              Data.Timestamp(x),
-              Data.Timestamp(tt.toInstant)))
+        "datetime" >> prop { (x: JLocalDateTime) =>
+          unary(StartOfDay(_).embed, Data.LocalDateTime(x), Data.LocalDateTime(truncDateTime(TemporalPart.Day, x)))
         }
 
-        "date" >> prop { (x: LocalDate) =>
+        "date" >> prop { (x: JLocalDate) =>
           unary(
             StartOfDay(_).embed,
-            Data.Date(x),
-            Data.Timestamp(x.atStartOfDay(UTC).toInstant))
+            Data.LocalDate(x),
+            Data.LocalDateTime(JLocalDateTime.of(x, JLocalTime.MIN)))
         }
       }
 
@@ -662,202 +687,188 @@ abstract class StdLibSpec extends Qspec {
         "now" >> prop { (_: Int) =>
           val now = Now[Fix[LogicalPlan]]
 
-          nullary(Subtract(now.embed, now.embed).embed, Data.Interval(Duration.ZERO))
+          nullary(Subtract(now.embed, now.embed).embed, Data.Interval(DateTimeInterval.zero))
         }
       }
 
+      "OffsetDate" >> prop { (v: JOffsetDate) =>
+        unary(OffsetDate(_).embed, Data.Str(v.toString), Data.OffsetDate(v))
+      }
+
+      "OffsetDateTime" >> prop { (v: JOffsetDateTime) =>
+        unary(OffsetDateTime(_).embed, Data.Str(v.toString), Data.OffsetDateTime(v))
+      }
+
+      "OffsetTime" >> prop { (v: JOffsetTime) =>
+        unary(OffsetTime(_).embed, Data.Str(v.toString), Data.OffsetTime(v))
+      }
+
+      "LocalDate" >> prop { (v: JLocalDate) =>
+        unary(LocalDate(_).embed, Data.Str(v.toString), Data.LocalDate(v))
+      }
+
+      "LocalDateTime" >> prop { (v: JLocalDateTime) =>
+        unary(LocalDateTime(_).embed, Data.Str(v.toString), Data.LocalDateTime(v))
+      }
+
+      "LocalTime" >> prop { (v: JLocalTime) =>
+        unary(LocalTime(_).embed, Data.Str(v.toString), Data.LocalTime(v))
+      }
+
       "TemporalTrunc" >> {
-        def truncZonedDateTimeTimestamp(p: TemporalPart, i: Instant): Result =
-          truncZonedDateTime(p, i.atZone(UTC)).fold(
-            e => Failure(e.shows),
-            tt => unary(
-              TemporalTrunc(p, _).embed,
-              Data.Timestamp(i),
-              Data.Timestamp(tt.toInstant)))
+        def truncOffsetDateTime(p: TemporalPart, i: JOffsetDateTime): Result =
+          unary(
+            TemporalTrunc(p, _).embed,
+            Data.OffsetDateTime(i),
+            Data.OffsetDateTime(JOffsetDateTime.of(truncDateTime(p, i.toLocalDateTime), i.getOffset)))
 
         "Q#1966" >>
-          truncZonedDateTimeTimestamp(
+          truncOffsetDateTime(
             TemporalPart.Century,
-            Instant.parse("2000-03-01T06:15:45.204Z"))
+            JOffsetDateTime.parse("2000-03-01T06:15:45.204Z"))
 
-        "timestamp Century" >> prop { x: Instant =>
-          truncZonedDateTimeTimestamp(TemporalPart.Century, x)
+        "datetime Century" >> prop { x: JOffsetDateTime =>
+          truncOffsetDateTime(TemporalPart.Century, x)
         }
 
-        "timestamp Day" >> prop { x: Instant =>
-          truncZonedDateTimeTimestamp(TemporalPart.Day, x)
+        "datetime Day" >> prop { x: JOffsetDateTime =>
+          truncOffsetDateTime(TemporalPart.Day, x)
         }
 
-        "timestamp Decade" >> prop { x: Instant =>
-          truncZonedDateTimeTimestamp(TemporalPart.Decade, x)
+        "datetime Decade" >> prop { x: JOffsetDateTime =>
+          truncOffsetDateTime(TemporalPart.Decade, x)
         }
 
-        "timestamp Hour" >> prop { x: Instant =>
-          truncZonedDateTimeTimestamp(TemporalPart.Hour, x)
+        "datetime Hour" >> prop { x: JOffsetDateTime =>
+          truncOffsetDateTime(TemporalPart.Hour, x)
         }
 
-        "timestamp Microsecond" >> prop { x: Instant =>
-          truncZonedDateTimeTimestamp(TemporalPart.Microsecond, x)
+        "datetime Microsecond" >> prop { x: JOffsetDateTime =>
+          truncOffsetDateTime(TemporalPart.Microsecond, x)
         }
 
-        "timestamp Millennium" >> prop { x: Instant =>
-          truncZonedDateTimeTimestamp(TemporalPart.Millennium, x)
+        "datetime Millennium" >> prop { x: JOffsetDateTime =>
+          truncOffsetDateTime(TemporalPart.Millennium, x)
         }
 
-        "timestamp Millisecond" >> prop { x: Instant =>
-          truncZonedDateTimeTimestamp(TemporalPart.Millisecond, x)
+        "datetime Millisecond" >> prop { x: JOffsetDateTime =>
+          truncOffsetDateTime(TemporalPart.Millisecond, x)
         }
 
-        "timestamp Minute" >> prop { x: Instant =>
-          truncZonedDateTimeTimestamp(TemporalPart.Minute, x)
+        "datetime Minute" >> prop { x: JOffsetDateTime =>
+          truncOffsetDateTime(TemporalPart.Minute, x)
         }
 
-        "timestamp Month" >> prop { x: Instant =>
-          truncZonedDateTimeTimestamp(TemporalPart.Month, x)
+        "datetime Month" >> prop { x: JOffsetDateTime =>
+          truncOffsetDateTime(TemporalPart.Month, x)
         }
 
-        "timestamp Quarter" >> prop { x: Instant =>
-          truncZonedDateTimeTimestamp(TemporalPart.Quarter, x)
+        "datetime Quarter" >> prop { x: JOffsetDateTime =>
+          truncOffsetDateTime(TemporalPart.Quarter, x)
         }
 
-        "timestamp Second" >> prop { x: Instant =>
-          truncZonedDateTimeTimestamp(TemporalPart.Second, x)
+        "datetime Second" >> prop { x: JOffsetDateTime =>
+          truncOffsetDateTime(TemporalPart.Second, x)
         }
 
-        "timestamp Week" >> prop { x: Instant =>
-          truncZonedDateTimeTimestamp(TemporalPart.Week, x)
+        "datetime Week" >> prop { x: JOffsetDateTime =>
+          truncOffsetDateTime(TemporalPart.Week, x)
         }
 
-        "timestamp Year" >> prop { x: Instant =>
-          truncZonedDateTimeTimestamp(TemporalPart.Year, x)
+        "datetime Year" >> prop { x: JOffsetDateTime =>
+          truncOffsetDateTime(TemporalPart.Year, x)
         }
 
-        def truncZonedDateTimeDate(p: TemporalPart, d: LocalDate): Result =
-          truncZonedDateTime(p, d.atStartOfDay(UTC)).fold(
-            e => Failure(e.shows),
-            tt => unary(
-              TemporalTrunc(p, _).embed,
-              Data.Date(d),
-              Data.Date(tt.toLocalDate)))
+        def truncDateʹ(p: TemporalPart, d: JLocalDate): Result =
+          unary(
+            TemporalTrunc(p, _).embed,
+            Data.LocalDate(d),
+            Data.LocalDate(truncDate(p, d)))
 
-        "date Century" >> prop { d: LocalDate =>
-          truncZonedDateTimeDate(TemporalPart.Century, d)
+        "date Century" >> prop { d: JLocalDate =>
+          truncDateʹ(TemporalPart.Century, d)
         }
 
-        "date Day" >> prop { d: LocalDate =>
-          truncZonedDateTimeDate(TemporalPart.Day, d)
+        "date Day" >> prop { d: JLocalDate =>
+          truncDateʹ(TemporalPart.Day, d)
         }
 
-        "date Decade" >> prop { d: LocalDate =>
-          truncZonedDateTimeDate(TemporalPart.Decade, d)
+        "date Decade" >> prop { d: JLocalDate =>
+          truncDateʹ(TemporalPart.Decade, d)
         }
 
-        "date Hour" >> prop { d: LocalDate =>
-          truncZonedDateTimeDate(TemporalPart.Hour, d)
+        "date Hour" >> prop { d: JLocalDate =>
+          truncDateʹ(TemporalPart.Hour, d)
         }
 
-        "date Microsecond" >> prop { d: LocalDate =>
-          truncZonedDateTimeDate(TemporalPart.Microsecond, d)
+        "date Microsecond" >> prop { d: JLocalDate =>
+          truncDateʹ(TemporalPart.Microsecond, d)
         }
 
-        "date Millennium" >> prop { d: LocalDate =>
-          truncZonedDateTimeDate(TemporalPart.Millennium, d)
+        "date Millennium" >> prop { d: JLocalDate =>
+          truncDateʹ(TemporalPart.Millennium, d)
         }
 
-        "date Millisecond" >> prop { d: LocalDate =>
-          truncZonedDateTimeDate(TemporalPart.Millisecond, d)
+        "date Millisecond" >> prop { d: JLocalDate =>
+          truncDateʹ(TemporalPart.Millisecond, d)
         }
 
-        "date Minute" >> prop { d: LocalDate =>
-          truncZonedDateTimeDate(TemporalPart.Minute, d)
+        "date Minute" >> prop { d: JLocalDate =>
+          truncDateʹ(TemporalPart.Minute, d)
         }
 
-        "date Month" >> prop { d: LocalDate =>
-          truncZonedDateTimeDate(TemporalPart.Month, d)
+        "date Month" >> prop { d: JLocalDate =>
+          truncDateʹ(TemporalPart.Month, d)
         }
 
-        "date Quarter" >> prop { d: LocalDate =>
-          truncZonedDateTimeDate(TemporalPart.Quarter, d)
+        "date Quarter" >> prop { d: JLocalDate =>
+          truncDateʹ(TemporalPart.Quarter, d)
         }
 
-        "date Second" >> prop { d: LocalDate =>
-          truncZonedDateTimeDate(TemporalPart.Second, d)
+        "date Second" >> prop { d: JLocalDate =>
+          truncDateʹ(TemporalPart.Second, d)
         }
 
-        "date Week" >> prop { d: LocalDate =>
-          truncZonedDateTimeDate(TemporalPart.Week, d)
+        "date Week" >> prop { d: JLocalDate =>
+          truncDateʹ(TemporalPart.Week, d)
         }
 
-        "date Year" >> prop { d: LocalDate =>
-          truncZonedDateTimeDate(TemporalPart.Year, d)
+        "date Year" >> prop { d: JLocalDate =>
+          truncDateʹ(TemporalPart.Year, d)
         }
 
-        def truncLocalTimeʹ(p: TemporalPart, t: LocalTime): Result =
-          truncLocalTime(p, t).fold(
-            e => Failure(e.shows),
-            tt => unary(
-              TemporalTrunc(p, _).embed,
-              Data.Time(t),
-              Data.Time(tt)))
+        def truncLocalTimeʹ(p: TemporalPart, t: JLocalTime): Result =
+          unary(
+            TemporalTrunc(p, _).embed,
+            Data.LocalTime(t),
+            Data.LocalTime(truncTime(p, t)))
 
-        "time Century" >> prop { t: LocalTime =>
-          truncLocalTimeʹ(TemporalPart.Century, t)
-        }
-
-        "time Day" >> prop { t: LocalTime =>
-          truncLocalTimeʹ(TemporalPart.Day, t)
-        }
-
-        "time Decade" >> prop { t: LocalTime =>
-          truncLocalTimeʹ(TemporalPart.Decade, t)
-        }
-
-        "time Hour" >> prop { t: LocalTime =>
+        "time Hour" >> prop { t: JLocalTime =>
           truncLocalTimeʹ(TemporalPart.Hour, t)
         }
 
-        "time Microsecond" >> prop { t: LocalTime =>
+        "time Microsecond" >> prop { t: JLocalTime =>
           truncLocalTimeʹ(TemporalPart.Microsecond, t)
         }
 
-        "time Millennium" >> prop { t: LocalTime =>
-          truncLocalTimeʹ(TemporalPart.Millennium, t)
-        }
-
-        "time Millisecond" >> prop { t: LocalTime =>
+        "time Millisecond" >> prop { t: JLocalTime =>
           truncLocalTimeʹ(TemporalPart.Millisecond, t)
         }
 
-        "time Minute" >> prop { t: LocalTime =>
+        "time Minute" >> prop { t: JLocalTime =>
           truncLocalTimeʹ(TemporalPart.Minute, t)
         }
 
-        "time Month" >> prop { t: LocalTime =>
-          truncLocalTimeʹ(TemporalPart.Month, t)
-        }
-
-        "time Quarter" >> prop { t: LocalTime =>
-          truncLocalTimeʹ(TemporalPart.Quarter, t)
-        }
-
-        "time Second" >> prop { t: LocalTime =>
+        "time Second" >> prop { t: JLocalTime =>
           truncLocalTimeʹ(TemporalPart.Second, t)
-        }
-
-        "time Week" >> prop { t: LocalTime =>
-          truncLocalTimeʹ(TemporalPart.Week, t)
-        }
-
-        "time Year" >> prop { t: LocalTime =>
-          truncLocalTimeʹ(TemporalPart.Year, t)
         }
       }
 
       "TimeOfDay" >> {
-        "timestamp" >> {
-          val now = Instant.now
-          val expected = now.atZone(ZoneOffset.UTC).toLocalTime
-          unary(TimeOfDay(_).embed, Data.Timestamp(now), Data.Time(expected))
+        "datetime" >> {
+          val now = JOffsetDateTime.now
+          val expected = now.toOffsetTime
+          unary(TimeOfDay(_).embed, Data.OffsetDateTime(now), Data.OffsetTime(expected))
         }
       }
     }
@@ -884,7 +895,54 @@ abstract class StdLibSpec extends Qspec {
           commute(Add(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x + y))
         }
 
-        // TODO: Timestamp + Interval, Date + Interval, Time + Interval
+        {
+          implicit val arbInterval = Arbitrary(DateGenerators.genDateInterval)
+          "OffsetDate/Interval" >> prop { (x: JOffsetDate, i: DateTimeInterval) =>
+            val dateInterval = (i.seconds == 0) && (i.nanos == 0)
+            dateInterval ==> {
+              val result = x.date.plusYears(i.years.toLong).plusMonths(i.months.toLong).plusDays(i.days.toLong)
+              commute(Add(_, _).embed, Data.OffsetDate(x), Data.Interval(i), Data.OffsetDate(quasar.OffsetDate(result, x.offset)))
+            }
+          }
+        }
+
+        {
+          implicit val arbInterval = Arbitrary(DateGenerators.genTimeInterval)
+          "OffsetTime/Interval" >> prop { (x: JOffsetTime, i: DateTimeInterval) =>
+            val result = x.plusSeconds(i.seconds).plusNanos(i.nanos.toLong)
+            commute(Add(_, _).embed, Data.OffsetTime(x), Data.Interval(i), Data.OffsetTime(result))
+          }
+        }
+
+        "OffsetDateTime/Interval" >> prop { (x: JOffsetDateTime, i: DateTimeInterval) =>
+          val result = x
+            .plusYears(i.years.toLong).plusMonths(i.months.toLong).plusDays(i.days.toLong)
+            .plusSeconds(i.seconds).plusNanos(i.nanos.toLong)
+          commute(Add(_, _).embed, Data.OffsetDateTime(x), Data.Interval(i), Data.OffsetDateTime(result))
+        }
+
+        {
+          implicit val arbInterval = Arbitrary(DateGenerators.genDateInterval)
+          "LocalDate/Interval" >> prop { (x: JLocalDate, i: DateTimeInterval) =>
+            val result = x.plusYears(i.years.toLong).plusMonths(i.months.toLong).plusDays(i.days.toLong)
+            commute(Add(_, _).embed, Data.LocalDate(x), Data.Interval(i), Data.LocalDate(result))
+          }
+        }
+
+        {
+          implicit val arbInterval = Arbitrary(DateGenerators.genTimeInterval)
+          "LocalTime/Interval" >> prop { (x: JLocalTime, i: DateTimeInterval) =>
+            val result = x.plusSeconds(i.seconds).plusNanos(i.nanos.toLong)
+            commute(Add(_, _).embed, Data.LocalTime(x), Data.Interval(i), Data.LocalTime(result))
+          }
+        }
+
+        "LocalDateTime/Interval" >> prop { (x: JLocalDateTime, i: DateTimeInterval) =>
+          val result = x
+            .plusYears(i.years.toLong).plusMonths(i.months.toLong).plusDays(i.days.toLong)
+            .plusSeconds(i.seconds).plusNanos(i.nanos.toLong)
+          commute(Add(_, _).embed, Data.LocalDateTime(x), Data.Interval(i), Data.LocalDateTime(result))
+        }
       }
 
       "Multiply" >> {
@@ -902,7 +960,9 @@ abstract class StdLibSpec extends Qspec {
         //   commute(Multiply(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x * y))
         // }
 
-        // TODO: Interval * Int
+        "int/Interval" >> prop { (x: Int, i: DateTimeInterval) =>
+          commute(Multiply(_, _).embed, Data.Int(x), Data.Interval(i), Data.Interval(i.multiply(x)))
+        }
       }
 
       "Power" >> {
@@ -955,10 +1015,43 @@ abstract class StdLibSpec extends Qspec {
             binary(Subtract(_, _).embed, Data.Dec(y), Data.Int(x), Data.Dec(y - x))
         }
 
-        // TODO:
-        // Timestamp - Timestamp, Timestamp - Interval,
-        // Date - Date, Date - Interval,
-        // Time - Time, Time + Interval
+        "LocalDateTime/Interval" >> prop { (x: JLocalDateTime, y: DateTimeInterval) =>
+           binary(Subtract(_, _).embed, Data.LocalDateTime(x), Data.Interval(y), Data.LocalDateTime(y.subtractFrom(x)))
+        }
+
+        {
+          implicit val arbInterval = Arbitrary(DateGenerators.genDateInterval)
+          "LocalDate/Interval" >> prop { (x: JLocalDate, y: DateTimeInterval) =>
+            binary(Subtract(_, _).embed, Data.LocalDate(x), Data.Interval(y), Data.LocalDate(x.minus(y.toPeriod)))
+          }
+        }
+
+        {
+          implicit val arbInterval = Arbitrary(DateGenerators.genTimeInterval)
+          "LocalTime/Interval" >> prop { (x: JLocalTime, y: DateTimeInterval) =>
+            binary(Subtract(_, _).embed, Data.LocalTime(x), Data.Interval(y), Data.LocalTime(x.minus(y.toDuration)))
+          }
+        }
+
+        "OffsetDateTime/Interval" >> prop { (x: JOffsetDateTime, y: DateTimeInterval) =>
+          binary(Subtract(_, _).embed, Data.OffsetDateTime(x), Data.Interval(y), Data.OffsetDateTime(y.subtractFromOffset(x)))
+        }
+
+        {
+          implicit val arbInterval = Arbitrary(DateGenerators.genDateInterval)
+          "OffsetDate/Interval" >> prop { (x: quasar.OffsetDate, y: DateTimeInterval) =>
+            binary(Subtract(_, _).embed, Data.OffsetDate(x), Data.Interval(y), Data.OffsetDate(x.minus(y.toPeriod)))
+          }
+        }
+
+        {
+          implicit val arbInterval = Arbitrary(DateGenerators.genTimeInterval)
+          "OffsetTime/Interval" >> prop { (x: JOffsetTime, y: DateTimeInterval) =>
+            binary(Subtract(_, _).embed, Data.OffsetTime(x), Data.Interval(y), Data.OffsetTime(x.minus(y.toDuration)))
+          }
+        }
+
+        // TODO: LocalDateTime/LocalDateTime, LocalDate, LocalTime/LocalTime
       }
 
       "Divide" >> {
@@ -989,7 +1082,9 @@ abstract class StdLibSpec extends Qspec {
           unary(Negate(_).embed, Data.Dec(x), Data.Dec(-x))
         }
 
-        // TODO: Interval
+        "any Interval" >> prop { (x: DateTimeInterval) =>
+          unary(Negate(_).embed, Data.Interval(x), Data.Interval(x.multiply(-1)))
+        }
       }
 
       "Abs" >> {
@@ -1000,11 +1095,6 @@ abstract class StdLibSpec extends Qspec {
         "any Dec" >> prop { (x: BigDecimal) =>
           unary(Abs(_).embed, Data.Dec(x), Data.Dec(x.abs))
         }
-
-        // TODO: add support for interval
-        // "any Interval" >> prop { (x: Duration) =>
-        //   unary(Abs(_).embed, Data.Interval(x), if (x.isNegative) Data.Interval(x.negated) else Data.Interval(x))
-        // }
       }
 
       "Trunc" >> {
@@ -1431,24 +1521,12 @@ abstract class StdLibSpec extends Qspec {
       import RelationsLib._
 
       "Eq" >> {
-        "any Int with self" >> prop { (x: BigInt) =>
-          binary(Eq(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(true))
-        }
-
         "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
           binary(Eq(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x == y))
         }
 
-        "any Dec with self" >> prop { (x: BigDecimal) =>
-          binary(Eq(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(true))
-        }
-
         "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
           binary(Eq(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x == y))
-        }
-
-        "any Str with self" >> prop { (x: String) =>
-          binary(Eq(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(true))
         }
 
         "any two Strs" >> prop { (x: String, y: String) =>
@@ -1467,31 +1545,15 @@ abstract class StdLibSpec extends Qspec {
             binary(Eq(_, _).embed, x, y, Data.Bool(false))
         }
 
-        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
-          binary(Eq(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
-        }
-        // TODO: the rest of the types
       }
 
       "Neq" >> {
-        "any Int with self" >> prop { (x: BigInt) =>
-          binary(Neq(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(false))
-        }
-
         "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
           binary(Neq(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x != y))
         }
 
-        "any Dec with self" >> prop { (x: BigDecimal) =>
-          binary(Neq(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(false))
-        }
-
         "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
           binary(Neq(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x != y))
-        }
-
-        "any Str with self" >> prop { (x: String) =>
-          binary(Neq(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(false))
         }
 
         "any two Strs" >> prop { (x: String, y: String) =>
@@ -1514,154 +1576,141 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "Lt" >> {
-        "any Int with self" >> prop { (x: BigInt) =>
-          binary(Lt(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(false))
-        }
-
         "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
           binary(Lt(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x < y))
-        }
-
-        "any Dec with self" >> prop { (x: BigDecimal) =>
-          binary(Lt(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(false))
         }
 
         "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
           binary(Lt(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x < y))
         }
 
-        "any Str with self" >> prop { (x: String) =>
-          binary(Lt(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(false))
-        }
-
         "any two Strs" >> prop { (x: String, y: String) =>
           binary(Lt(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x < y))
         }
 
-        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
-          binary(Lt(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        "any value with self" >> prop { (x: Data) =>
+          binary(Lt(_, _).embed, x, x, Data.Bool(false))
         }
-        // TODO: Timestamp, Interval, cross-type comparison
       }
 
       "Lte" >> {
-        "any Int with self" >> prop { (x: BigInt) =>
-          binary(Lte(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(true))
-        }
-
         "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
           binary(Lte(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x <= y))
-        }
-
-        "any Dec with self" >> prop { (x: BigDecimal) =>
-          binary(Lte(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(true))
         }
 
         "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
           binary(Lte(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x <= y))
         }
 
-        "any Str with self" >> prop { (x: String) =>
-          binary(Lte(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(true))
-        }
-
         "any two Strs" >> prop { (x: String, y: String) =>
           binary(Lte(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x <= y))
         }
 
-        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
-          binary(Lte(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        "any value with self" >> prop { (x: Data) =>
+          binary(Lte(_, _).embed, x, x, Data.Bool(true))
         }
       }
 
       "Gt" >> {
-        "any Int with self" >> prop { (x: BigInt) =>
-          binary(Gt(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(false))
-        }
-
         "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
           binary(Gt(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x > y))
-        }
-
-        "any Dec with self" >> prop { (x: BigDecimal) =>
-          binary(Gt(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(false))
         }
 
         "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
           binary(Gt(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x > y))
         }
 
-        "any Str with self" >> prop { (x: String) =>
-          binary(Gt(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(false))
-        }
-
         "any two Strs" >> prop { (x: String, y: String) =>
           binary(Gt(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x > y))
         }
-        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
-          binary(Gt(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+
+        "any value with self" >> prop { (x: Data) =>
+          binary(Gt(_, _).embed, x, x, Data.Bool(false))
         }
       }
 
       "Gte" >> {
-        "any Int with self" >> prop { (x: BigInt) =>
-          binary(Gte(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(true))
-        }
-
         "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
           binary(Gte(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x >= y))
-        }
-
-        "any Dec with self" >> prop { (x: BigDecimal) =>
-          binary(Gte(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(true))
         }
 
         "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
           binary(Gte(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x >= y))
         }
 
-        "any Str with self" >> prop { (x: String) =>
-          binary(Gte(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(true))
-        }
-
         "any two Strs" >> prop { (x: String, y: String) =>
           binary(Gte(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x >= y))
         }
 
-        "any date & timestamp" >> prop { (d: LocalDate, i: Instant) =>
-          binary(Gte(_, _).embed, Data.Date(d), Data.Timestamp(i), Data.NA)
+        "any value with self" >> prop { (x: Data) =>
+          binary(Gte(_, _).embed, x, x, Data.Bool(true))
         }
+
       }
 
       "Between" >> {
-        "any Int with self" >> prop { (x: BigInt) =>
-          ternary(Between(_, _, _).embed, Data.Int(x), Data.Int(x), Data.Int(x), Data.Bool(true))
+        "any three Ints" >> prop { (lo: BigInt, mid: BigInt, hi: BigInt) =>
+          val result = lo <= mid && mid <= hi
+          ternary(Between(_, _, _).embed, Data.Int(mid), Data.Int(lo), Data.Int(hi), Data.Bool(result))
         }
 
-        "any three Ints" >> prop { (x1: BigInt, x2: BigInt, x3: BigInt) =>
-          val xs = List(x1, x2, x3).sorted
-          ternary(Between(_, _, _).embed, Data.Int(xs(1)), Data.Int(xs(0)), Data.Int(xs(2)), Data.Bool(true))
+        "any three Decs" >> prop { (lo: BigDecimal, mid: BigDecimal, hi: BigDecimal) =>
+          val result = lo <= mid && mid <= hi
+          ternary(Between(_, _, _).embed, Data.Dec(mid), Data.Dec(lo), Data.Dec(hi), Data.Bool(result))
         }
 
-        "any Dec with self" >> prop { (x: BigDecimal) =>
-          ternary(Between(_, _, _).embed, Data.Dec(x), Data.Dec(x), Data.Dec(x), Data.Bool(true))
+        "any three Strs" >> prop { (lo: String, mid: String, hi: String) =>
+          val result = lo <= mid && mid <= hi
+          ternary(Between(_, _, _).embed, Data.Str(mid), Data.Str(lo), Data.Str(hi), Data.Bool(result))
         }
 
-        "any three Decs" >> prop { (x1: BigDecimal, x2: BigDecimal, x3: BigDecimal) =>
-          val xs = List(x1, x2, x3).sorted
-          ternary(Between(_, _, _).embed, Data.Dec(xs(1)), Data.Dec(xs(0)), Data.Dec(xs(2)), Data.Bool(true))
+        "any three Bools" >> prop { (lo: Boolean, mid: Boolean, hi: Boolean) =>
+          val result = (lo, mid, hi) match {
+            case (false, true, true)   => true
+            case (false, false, true)  => true
+            case (true, true, true)    => true
+            case (false, false, false) => true
+            case _ => false
+          }
+          ternary(Between(_, _, _).embed, Data.Bool(mid), Data.Bool(lo), Data.Bool(hi), Data.Bool(result))
         }
 
-        "any Str with self" >> prop { (x: String) =>
-          ternary(Between(_, _, _).embed, Data.Str(x), Data.Str(x), Data.Str(x), Data.Bool(true))
+        "any three OffsetDateTimes" >> prop { (lo: JOffsetDateTime, mid: JOffsetDateTime, hi: JOffsetDateTime) =>
+          val result = lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0
+          ternary(Between(_, _, _).embed, Data.OffsetDateTime(mid), Data.OffsetDateTime(lo), Data.OffsetDateTime(hi), Data.Bool(result))
         }
 
-        "any three Strs" >> prop { (x1: String, x2: String, x3: String) =>
-          val xs = List(x1, x2, x3).sorted
-          ternary(Between(_, _, _).embed, Data.Str(xs(1)), Data.Str(xs(0)), Data.Str(xs(2)), Data.Bool(true))
+        "any three OffsetDates" >> prop { (lo: JOffsetDate, mid: JOffsetDate, hi: JOffsetDate) =>
+          val result = lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0
+          ternary(Between(_, _, _).embed, Data.OffsetDate(mid), Data.OffsetDate(lo), Data.OffsetDate(hi), Data.Bool(result))
         }
 
-        // TODO: Timestamp, Interval, cross-type comparison
+        "any three OffsetTimes" >> prop { (lo: JOffsetTime, mid: JOffsetTime, hi: JOffsetTime) =>
+          val result = lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0
+          ternary(Between(_, _, _).embed, Data.OffsetTime(mid), Data.OffsetTime(lo), Data.OffsetTime(hi), Data.Bool(result))
+        }
+
+        "any three LocalDateTimes" >> prop { (lo: JLocalDateTime, mid: JLocalDateTime, hi: JLocalDateTime) =>
+          val result = lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0
+          ternary(Between(_, _, _).embed, Data.LocalDateTime(mid), Data.LocalDateTime(lo), Data.LocalDateTime(hi), Data.Bool(result))
+        }
+
+        "any three LocalDates" >> prop { (lo: JLocalDate, mid: JLocalDate, hi: JLocalDate) =>
+          val result = lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0
+          ternary(Between(_, _, _).embed, Data.LocalDate(mid), Data.LocalDate(lo), Data.LocalDate(hi), Data.Bool(result))
+        }
+
+        "any three LocalTimes" >> prop { (lo: JLocalTime, mid: JLocalTime, hi: JLocalTime) =>
+          val result = lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0
+          ternary(Between(_, _, _).embed, Data.LocalTime(mid), Data.LocalTime(lo), Data.LocalTime(hi), Data.Bool(result))
+        }
+
+        "any three Intervals" >> prop { (lo: DateTimeInterval, mid: DateTimeInterval, hi: DateTimeInterval) =>
+          val result = lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0
+          ternary(Between(_, _, _).embed, Data.Interval(mid), Data.Interval(lo), Data.Interval(hi), Data.Bool(result))
+        }
+
+        // TODO: Cross-type comparison
       }
 
       "IfUndefined" >> {
