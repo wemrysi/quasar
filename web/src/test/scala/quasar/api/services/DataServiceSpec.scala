@@ -338,8 +338,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
             response.status must_=== Status.Ok
             zipfile.take(2) must_=== zipMagicByte
-
-
             Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </> file("foo.json")))
 
           }
@@ -382,7 +380,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             response.status must_=== Status.Ok
             zipfile.take(2) must_=== zipMagicByte
             Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </> file("foo.csv")))
-
           }
           "zipped via request headers" >> {
             val sampleFile = rootDir[Sandboxed] </> file("foo")
@@ -396,7 +393,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             response.status must_=== Status.Ok
             zipfile.take(2) must_=== zipMagicByte
             Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </> file("foo.json")))
-
           }
         }
       }
