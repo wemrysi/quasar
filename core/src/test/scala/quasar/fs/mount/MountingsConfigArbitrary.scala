@@ -24,7 +24,10 @@ import org.scalacheck.{Arbitrary, Gen}
 trait MountingsConfigArbitrary {
 
   implicit val mountingsConfigArbitrary: Arbitrary[MountingsConfig] =
-    Arbitrary(Gen.listOf(Gen.oneOf(genFileSystemConfigEntry, genViewConfigEntry)).map(l => MountingsConfig(l.toMap)))
+    Arbitrary(Gen.listOf(genAllMountTypes).map(l => MountingsConfig(l.toMap)))
+
+  private def genAllMountTypes: Gen[(APath, MountConfig)] =
+    Gen.oneOf(genFileSystemConfigEntry, genViewConfigEntry, genModuleConfigEntry)
 
   private def genFileSystemConfigEntry: Gen[(APath, MountConfig)] =
     for {
@@ -36,6 +39,12 @@ trait MountingsConfigArbitrary {
     for {
       file   <- Arbitrary.arbitrary[AFile]
       config <- MountConfigArbitrary.genViewConfig
+    } yield (file, config)
+
+  private def genModuleConfigEntry: Gen[(APath, MountConfig)] =
+    for {
+      file   <- Arbitrary.arbitrary[ADir]
+      config <- MountConfigArbitrary.genModuleConfig
     } yield (file, config)
 }
 

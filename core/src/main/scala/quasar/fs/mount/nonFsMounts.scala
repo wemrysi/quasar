@@ -62,7 +62,12 @@ object nonFsMounts {
     def overwriteMount(src: APath, dst: APath): Free[S, Unit] =
       deleteMount(dst) *> mount.remount(src, dst)
 
-    def dirToDirOp(src: ADir, dst: ADir, op: PathPair => manage.M[Unit], semantics: MoveSemantics): Free[S, FileSystemError \/ Unit] = {
+    def dirToDirOp(
+      src: ADir,
+      dst: ADir,
+      op: PathPair => manage.M[Unit],
+      underlyingOp: manage.M[Unit]
+    ): Free[S, FileSystemError \/ Unit] = {
       def moveAll(srcMounts: Set[RPath]): manage.M[Unit] =
         if (srcMounts.isEmpty)
           pathErr(pathNotFound(src)).raiseError[manage.M, Unit]
@@ -102,7 +107,7 @@ object nonFsMounts {
           .run
 
       mountsIn(src).flatMap { mounts =>
-        manage.moveDir(src, dst, semantics).fold(
+        underlyingOp.fold(
           onFileSystemError(mounts, _),
           κ(onFileSystemSuccess(mounts))
         ).join
@@ -167,8 +172,8 @@ object nonFsMounts {
             mount.mount(pair.dst, config).map(_.right[FileSystemError])
 
         case (None, _, _) =>
-            manage.copy(pair).run
-        }
+          manage.copy(pair).run
+      }
 
       EitherT(
         vcacheGet(pair.src).fold(
@@ -197,12 +202,12 @@ object nonFsMounts {
     λ[ManageFile ~> Free[S, ?]] {
       case Move(pair, semantics) =>
         pair.fold(
-          (src, dst) => dirToDirOp(src, dst, mountMove(_, semantics), semantics),
+          (src, dst) => dirToDirOp(src, dst, mountMove(_, semantics), manage.moveDir(src, dst, semantics)),
           (src, dst) => mountMove(PathPair.FileToFile(src, dst), semantics).run)
 
       case Copy(pair) =>
         pair.fold(
-          (src, dst) => dirToDirOp(src, dst, mountCopy, MoveSemantics.FailIfExists),
+          (src, dst) => dirToDirOp(src, dst, mountCopy, manage.copyDir(src, dst)),
           (src, dst) => mountCopy(PathPair.FileToFile(src, dst)).run)
 
       case Delete(path) =>
