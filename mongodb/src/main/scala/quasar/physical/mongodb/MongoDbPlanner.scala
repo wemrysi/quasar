@@ -654,19 +654,19 @@ object MongoDbPlanner {
     },
     List(Here[T]()))
 
+  def invoke2Nel[T[_[_]]](x: OutputM[PartialSelector[T]], y: OutputM[PartialSelector[T]])(f: (Selector, Selector) => Selector):
+      OutputM[PartialSelector[T]] =
+    (x ⊛ y) { case ((f1, p1), (f2, p2)) =>
+      ({ case list =>
+        f(f1(list.take(p1.size)), f2(list.drop(p1.size)))
+      },
+        p1.map(There(0, _)) ++ p2.map(There(1, _)))
+    }
+
   def typeSelector[T[_[_]]: RecursiveT: ShowT]:
       GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = {
 
     import MapFuncsCore._
-
-    def invoke2Nel(x: OutputM[PartialSelector[T]], y: OutputM[PartialSelector[T]])(f: (Selector, Selector) => Selector):
-        OutputM[PartialSelector[T]] =
-      (x ⊛ y) { case ((f1, p1), (f2, p2)) =>
-        ({ case list =>
-          f(f1(list.take(p1.size)), f2(list.drop(p1.size)))
-        },
-          p1.map(There(0, _)) ++ p2.map(There(1, _)))
-      }
 
     {
       case MFC(And(a, b)) => invoke2Nel(a._2, b._2)(Selector.And.apply(_, _))
@@ -822,15 +822,6 @@ object MongoDbPlanner {
                 Selector.Doc(x -> f2(d2)))
             },
             List(There(index, Here[T]()))))
-
-      def invoke2Nel(x: Output, y: Output)(f: (Selector, Selector) => Selector):
-          Output =
-        (x ⊛ y) { case ((f1, p1), (f2, p2)) =>
-          ({ case list =>
-            f(f1(list.take(p1.size)), f2(list.drop(p1.size)))
-          },
-            p1.map(There(0, _)) ++ p2.map(There(1, _)))
-        }
 
       val flipCore: MapFuncCore[T, _] => Option[MapFuncCore[T, _]] = {
         case Eq(a, b)  => Some(Eq(a, b))
