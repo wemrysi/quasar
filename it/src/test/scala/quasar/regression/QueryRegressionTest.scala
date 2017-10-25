@@ -32,7 +32,7 @@ import quasar.fp.ski._
 import quasar.fs._
 import quasar.main.{physicalFileSystems, FilesystemQueries}
 import quasar.fs.mount.{Mounts, hierarchical}
-import quasar.sql, sql.{Query, Sql}
+import quasar.sql, sql.Sql
 
 import java.math.{MathContext, RoundingMode}
 import scala.concurrent.duration._
@@ -270,7 +270,7 @@ abstract class QueryRegressionTest[S[_]](
       toCompExec compose injectTask
 
     val parseTask: Task[Fix[Sql]] =
-      sql.fixParser.parseExpr(Query(qry))
+      sql.fixParser.parseExpr(qry)
         .fold(e => Task.fail(new RuntimeException(e.message)),
         _.mkPathsAbsolute(loc).point[Task])
 

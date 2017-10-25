@@ -43,7 +43,7 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
     } yield cld
   }
 
-  def unsafeParse(query: String) = fixParser.parseExpr(Query(query)).valueOr(err => scala.sys.error(s"False assumption in test, could not parse due to underlying issue: $err"))
+  def unsafeParse(query: String) = fixParser.parseExpr(query).valueOr(err => scala.sys.error(s"False assumption in test, could not parse due to underlying issue: $err"))
 
   val parseAndAnnotate: Fix[Sql] => NonEmptyList[SemanticError] \/ Cofree[Sql, SemanticAnalysis.Annotations] = query => {
     val normed = normalizeProjections(query)

@@ -54,7 +54,6 @@ object Module {
     final case class FSError(fsErr: FileSystemError) extends Error
     final case class SemErrors(semErrs: NonEmptyList[SemanticError]) extends Error
     final case class ArgumentsMissing(missing: List[CIName]) extends Error
-    final case class ParsingErr(parsingErr: ParsingError) extends Error
 
     val fsError = Prism.partial[Error, FileSystemError] {
       case FSError(fsErr) => fsErr
@@ -68,9 +67,6 @@ object Module {
       case ArgumentsMissing(missing) => missing
     } (ArgumentsMissing(_))
 
-    val parsingErr = Prism.partial[Error, ParsingError] {
-      case ParsingErr(pErr) => pErr
-    } (ParsingErr(_))
 
     implicit val show: Show[Error] =
       Show.shows {
@@ -79,12 +75,11 @@ object Module {
           s"Encountered the following semantic errors while attempting to invoke function: ${e.shows}"
         case ArgumentsMissing(missing) =>
           s"The following arguments are missing: $missing"
-        case ParsingErr(e) => e.shows
       }
   }
 
 
-  final case class InvokeModuleFunction(path: AFile, args: Map[String, String], offset: Natural, limit: Option[Positive])
+  final case class InvokeModuleFunction(path: AFile, args: Map[String, Fix[Sql]], offset: Natural, limit: Option[Positive])
     extends Module[Error \/ (List[Data] \/ ResultHandle)]
 
   final case class More(handle: ResultHandle)
@@ -101,7 +96,7 @@ object Module {
 
     type M[A] = ErrorT[FreeS, A]
 
-    def invokeFunction(path: AFile, args: Map[String, String], offset: Natural, limit: Option[Positive]): M[List[Data] \/ ResultHandle] =
+    def invokeFunction(path: AFile, args: Map[String, Fix[Sql]], offset: Natural, limit: Option[Positive]): M[List[Data] \/ ResultHandle] =
       EitherT(lift(InvokeModuleFunction(path, args, offset, limit)))
 
     /** Read a chunk of data from the file represented by the given handle.
@@ -124,8 +119,10 @@ object Module {
   final class Ops[S[_]](implicit val unsafe: Unsafe[S]) {
     type M[A] = unsafe.M[A]
 
-    /** Returns mounts located at a path having the given prefix. */
-    def invokeFunction(path: AFile, args: Map[String, String], offset: Natural, limit: Option[Positive]): Process[M, Data] = {
+    /** Returns the result of evaluating the function specified by the file path provided with the supplied
+      * args
+      */
+    def invokeFunction(path: AFile, args: Map[String, Fix[Sql]], offset: Natural, limit: Option[Positive]): Process[M, Data] = {
       // TODO: use DataCursor.process for the appropriate cursor type
       def closeHandle(dataOrHandle: List[Data] \/ ResultHandle): Process[M, Nothing] =
         dataOrHandle.fold(_ => Process.empty, h => Process.eval_[M, Unit](unsafe.close(h).liftM[ErrorT]))
@@ -146,7 +143,7 @@ object Module {
       }
     }
 
-    def invokeFunction_(path: AFile, args: Map[String, String], offset: Natural, limit: Option[Positive])(implicit
+    def invokeFunction_(path: AFile, args: Map[String, Fix[Sql]], offset: Natural, limit: Option[Positive])(implicit
       SO: Failure :<: S
     ): Process[Free[S, ?], Data] = {
       val nat: M ~> Free[S, ?] = λ[M ~> Free[S, ?]] { x => Failure.Ops[Error, S].unattempt(x.run) }
@@ -182,10 +179,8 @@ object Module {
                               .toRightDisjunction(notFoundError).point[Free[S, ?]])
             maybeAllArgs =  funcDec.args.map(arg => iArgs.get(arg)).sequence
             missingArgs  =  funcDec.args.filter(arg => !iArgs.contains(arg))
-            userArgs     <- EitherT(maybeAllArgs.toRightDisjunction(argumentsMissing(missingArgs)).point[Free[S, ?]])
-            parsedArgs   <- EitherT(userArgs.traverse(argString => fixParser.parseExpr(Query(argString)))
-                              .leftMap(parsingErr(_)).point[Free[S, ?]])
-            scopedExpr   =  ScopedExpr(invokeFunction[Fix[Sql]](CIName(name), parsedArgs).embed, moduleConfig.statements)
+            allArgs     <- EitherT(maybeAllArgs.toRightDisjunction(argumentsMissing(missingArgs)).point[Free[S, ?]])
+            scopedExpr   =  ScopedExpr(invokeFunction[Fix[Sql]](CIName(name), allArgs).embed, moduleConfig.statements)
             sql          <- EitherT(resolveImports_(scopedExpr, currentDir).leftMap(e => semErrors(e.wrapNel)).run.leftMap(fsError(_))).flattenLeft
             dataOrLP     <- EitherT(quasar.queryPlan(sql, Variables.empty, basePath = currentDir, offset, limit)
                               .run.value.leftMap(semErrors(_)).point[Free[S, ?]])
