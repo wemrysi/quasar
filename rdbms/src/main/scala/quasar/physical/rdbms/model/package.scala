@@ -16,37 +16,28 @@
 
 package quasar.physical.rdbms
 
-import slamdata.Predef.Map
-import quasar.effect.{KeyValueStore, MonotonicSeq}
+import doobie.imports.ConnectionIO
 import quasar.effect.uuid.GenUUID
-import quasar.fp.{TaskRef, reflNT}
-import quasar.fp.free._
+import quasar.effect.{KeyValueStore, MonotonicSeq}
+import quasar.fp.{:/:, :\:}
 import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.WriteFile.WriteHandle
 import quasar.physical.rdbms.common.TablePath
 import quasar.physical.rdbms.fs.SqlReadCursor
 
-import doobie.imports.Transactor
+import scalaz.Free
 import scalaz.concurrent.Task
-import scalaz.syntax.applicative._
-import scalaz.~>
 
-trait Interpreter {
-  this: Rdbms =>
+package object model {
 
-  def interp(xa: Task[Transactor[Task]]): Task[Eff ~> Task] =
-    (
-      TaskRef(Map.empty[ReadHandle, SqlReadCursor]) |@|
-      TaskRef(Map.empty[WriteHandle, TablePath]) |@|
-        xa.map(_.trans) |@|
-        TaskRef(0L) |@|
-        GenUUID.type1[Task]
-    )(
-      (kvR, kvW, x, i, genUUID) =>
-        reflNT[Task]                        :+:
-          x :+:
-          MonotonicSeq.fromTaskRef(i) :+:
-          genUUID :+:
-          KeyValueStore.impl.fromTaskRef(kvR) :+:
-          KeyValueStore.impl.fromTaskRef(kvW))
+  type Eff[A] = (
+    Task :\:
+      ConnectionIO :\:
+      MonotonicSeq :\:
+      GenUUID :\:
+      KeyValueStore[ReadHandle, SqlReadCursor, ?] :/:
+      KeyValueStore[WriteHandle, TablePath, ?]
+  )#M[A]
+
+  type M[A] = Free[Eff, A]
 }
