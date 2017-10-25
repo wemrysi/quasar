@@ -26,11 +26,11 @@ import quasar.fs.MonadFsErr
 import quasar.fs.mount.BackendDef.{DefErrT, DefinitionError}
 import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.fs._
+import quasar.physical.rdbms.common._
 import quasar.qscript.{EquiJoin, ExtractPath, Injectable, Optimize, QScriptCore, QScriptTotal, ShiftedRead, Unicoalesce, Unirewrite}
-import quasar.physical.rdbms.common.Config
+import quasar.qscript.analysis._
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 import quasar.{RenderTree, RenderTreeT, fp}
-import quasar.qscript.analysis._
 
 import scala.Predef.implicitly
 

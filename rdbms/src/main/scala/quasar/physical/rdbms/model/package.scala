@@ -60,4 +60,3 @@ package object model {
     def mapToStringName(implicit tm: TypeMapper): String = tm.map(cte)
   }
 }
-
