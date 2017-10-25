@@ -106,4 +106,12 @@ package object matryoshka {
       def zip[A, B](a: ⇒ AlgebraM[M, F, A], b: ⇒ AlgebraM[M, F, B]) =
         w => Bitraverse[(?, ?)].bisequence((a(w ∘ (_._1)), b(w ∘ (_._2))))
     }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def transHyloM[T, F[_], G[_]: Traverse, U, H[_]: Traverse, M[_]: Monad]
+    (t: T)
+    (φ: G[U] => M[H[U]], ψ: F[T] => M[G[T]])
+    (implicit T: Recursive.Aux[T, F], U: Corecursive.Aux[U, H], BF: Traverse[F])
+  : M[U] =
+    T.traverseR(t)(ψ(_) >>= (_.traverse(transHyloM(_)(φ, ψ))) >>= φ)
 }
