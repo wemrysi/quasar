@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import slamdata.Predef._
+import quasar.contrib.matryoshka.transHyloM
 import quasar.fp._
 
 import matryoshka._
@@ -32,14 +33,6 @@ trait TransM[F[_], M[_]] {
 }
 
 object TransM {
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def transHyloM[T, F[_], G[_]: Traverse, U, H[_]: Traverse, M[_]: Monad]
-    (t: T)
-    (φ: G[U] => M[H[U]], ψ: F[T] => M[G[T]])
-    (implicit T: Recursive.Aux[T, F], U: Corecursive.Aux[U, H], BF: Traverse[F])
-  : M[U] =
-    T.traverseR(t)(ψ(_) >>= (_.traverse(transHyloM(_)(φ, ψ))) >>= φ)
 
   def apply[T[_[_]]: BirecursiveT, F[_], G[_]: Traverse, M[_]: Monad]
       (trans: TransM[F, M], t: T[G])
