@@ -1311,7 +1311,7 @@ object MongoDbPlanner {
       _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo", mongoQS3))
 
       // NB: Normalizing after these appears to revert the effects of `mapBeforeSort`.
-      mongoQS4 =  Trans(mapBeforeSort[T], mongoQS3)
+      mongoQS4 <- TransM(mapBeforeSort[T, M], mongoQS3)
       mongoQS5 =  mongoQS4.transCata[T[MQS]](
                     liftFF[QScriptCore[T, ?], MQS, T[MQS]](
                       repeatedly(O.subsetBeforeMap[MQS, MQS](

@@ -26,12 +26,17 @@ import scalaz._, Scalaz._
 
 object mapBeforeSort {
 
-  def apply[T[_[_]]: CorecursiveT]: Trans[QScriptCore[T, ?]] =
-    new Trans[QScriptCore[T, ?]] {
+  def apply[T[_[_]]: CorecursiveT, M[_]: Applicative]: TransM[QScriptCore[T, ?], M] =
+    new TransM[QScriptCore[T, ?], M] {
 
       private def projectIndex(i: Int): FreeMap[T] = Free.roll(MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(i))))
 
       def trans[A, G[_]: Functor]
+        (GtoF: PrismNT[G, QScriptCore[T, ?]])
+        (implicit TC: Corecursive.Aux[A, G], TR: Recursive.Aux[A, G])
+          : QScriptCore[T, A] => M[G[A]] = qs => doTrans[A, G](GtoF).apply(qs).point[M]
+
+      private def doTrans[A, G[_]: Functor]
         (GtoF: PrismNT[G, QScriptCore[T, ?]])
         (implicit TC: Corecursive.Aux[A, G], TR: Recursive.Aux[A, G])
           : QScriptCore[T, A] => G[A] = {
