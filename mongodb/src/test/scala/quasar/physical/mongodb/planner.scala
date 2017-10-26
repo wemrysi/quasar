@@ -2356,7 +2356,7 @@ class PlannerSpec extends
 
     "plan simple single field selection and limit" in {
       plan(sqlE"SELECT city FROM zips LIMIT 5") must
-        beWorkflow0 {
+        beWorkflow {
           chain[Workflow](
             $read(collection("db", "zips")),
             $limit(5),
@@ -2364,7 +2364,7 @@ class PlannerSpec extends
               reshape(sigil.Quasar -> $field("city")),
               ExcludeId))
         }
-    }.pendingWithActual(notOnPar, testFile("plan simple single field selection and limit"))
+    }
 
     "plan complex group by with sorting and limiting" in {
       plan(sqlE"SELECT city, SUM(pop) AS pop FROM zips GROUP BY city ORDER BY pop") must

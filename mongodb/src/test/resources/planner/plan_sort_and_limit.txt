@@ -5,8 +5,8 @@ Chain
 │  │  ╰─ Let(__val)
 │  │     ├─ Arr
 │  │     │  ├─ Obj
-│  │     │  │  ├─ Key(city: (isObject(_) && (! Array.isArray(_))) ? _.city : undefined)
-│  │     │  │  ╰─ Key(pop: (isObject(_) && (! Array.isArray(_))) ? _.pop : undefined)
+│  │     │  │  ├─ Key(city: _.city)
+│  │     │  │  ╰─ Key(pop: _.pop)
 │  │     │  ╰─ Ident(_)
 │  │     ╰─ Obj
 │  │        ├─ Key(0: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined)

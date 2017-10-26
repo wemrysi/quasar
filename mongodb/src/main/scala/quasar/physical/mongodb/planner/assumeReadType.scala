@@ -43,19 +43,17 @@ object assumeReadType {
     }
   }
 
-  object HasShiftedRead {
-    def unapply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, A](qs: F[A])(implicit
-          QC: QScriptCore[T, ?] :<: F,
-          SR: Const[ShiftedRead[AFile], ?] :<: F,
-          ev: Recursive.Aux[A, F])
-        : Option[F[A]] = qs match {
-      case QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))
-         | QC(Sort(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _, _))
-         | QC(Sort(Embed(QC(Filter(Embed(SR(Const(ShiftedRead(_, ExcludeId)))), _))), _ , _))
-         | QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _))
-         | SR(Const(ShiftedRead(_, ExcludeId))) => qs.some
-      case _ => none
-    }
+  def isRewrite[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, G[_]: Functor, A](GtoF: PrismNT[G, F], qs: G[A])(implicit
+    QC: QScriptCore[T, ?] :<: F,
+    SR: Const[ShiftedRead[AFile], ?] :<: F,
+    ev: Recursive.Aux[A, G])
+      : Boolean = qs match {
+    case GtoF(QC(Filter(Embed(GtoF(SR(Const(ShiftedRead(_, ExcludeId))))), _)))
+       | GtoF(QC(Sort(Embed(GtoF(SR(Const(ShiftedRead(_, ExcludeId))))), _, _)))
+       | GtoF(QC(Sort(Embed(GtoF(QC(Filter(Embed(GtoF(SR(Const(ShiftedRead(_, ExcludeId))))), _)))), _ , _)))
+       | GtoF(QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _)))
+       | GtoF(SR(Const(ShiftedRead(_, ExcludeId)))) => true
+    case _ => false
   }
 
   def elideMoreGeneralGuards[M[_]: Applicative: MonadFsErr, T[_[_]]: RecursiveT]
@@ -78,55 +76,53 @@ object assumeReadType {
     f
   }
 
-  // TODO: Allow backends to provide a “Read” type to the typechecker, which
-  //       represents the type of values that can be stored in a collection.
-  //       E.g., for MongoDB, it would be `Map(String, Top)`. This will help us
-  //       generate more correct PatternGuards in the first place, rather than
-  //       trying to strip out unnecessary ones after the fact
-  // FIXME: This doesn’t yet traverse branches, so it leaves in some checks.
-  def apply[M[_]: Monad: MonadFsErr, T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Functor]
-    (typ: Type)
-    (implicit
-      QC: QScriptCore[T, ?] :<: F,
-      SR: Const[ShiftedRead[AFile], ?] :<: F)
-      : QScriptCore[T, T[F]] => M[F[T[F]]] = {
-    case f @ Filter(src, cond) =>
-      src.project match {
-        case HasShiftedRead(_) =>
-          ((MapFuncCore.flattenAnd(cond))
-            .traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))))
-            .map(_.toList.filter {
-              case MapFuncsCore.BoolLit(true) => false
-              case _                      => true
-            } match {
-              case Nil    => src.project
-              case h :: t => QC(Filter(src, t.foldLeft[FreeMap[T]](h)((acc, e) => Free.roll(MFC(MapFuncsCore.And(acc, e))))))
-            })
-        case _ => QC.inj(f).point[M]
+def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
+  (typ: Type)
+  (implicit
+    QC: QScriptCore[T, ?] :<: F,
+    SR: Const[ShiftedRead[AFile], ?] :<: F)
+    : TransM[F, M] =
+  new TransM[F, M] {
+
+    def trans[A, G[_]: Functor]
+      (GtoF: PrismNT[G, F])
+      (implicit TC: Corecursive.Aux[A, G], TR: Recursive.Aux[A, G])
+        : F[A] => M[G[A]] = {
+        case f @ QC(Filter(src, cond)) =>
+          if (isRewrite[T, F, G, A](GtoF, src.project)) {
+            ((MapFuncCore.flattenAnd(cond))
+              .traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))))
+              .map(_.toList.filter {
+                case MapFuncsCore.BoolLit(true) => false
+                case _ => true
+              } match {
+                case Nil => src.project
+                case h :: t => GtoF.reverseGet(
+                  QC(Filter(src, t.foldLeft[FreeMap[T]](h)((acc, e) => Free.roll(MFC(MapFuncsCore.And(acc, e)))))))
+              })
+          } else
+            GtoF.reverseGet(f).point[M]
+        case ls @ QC(LeftShift(src, struct, id, repair)) =>
+          if (isRewrite[T, F, G, A](GtoF, src.project)) {
+            struct.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
+            (struct => GtoF.reverseGet(QC(LeftShift(src, struct, id, repair))))
+          } else
+            GtoF.reverseGet(ls).point[M]
+        case m @ QC(qscript.Map(src, mf)) =>
+          if (isRewrite[T, F, G, A](GtoF, src.project)) {
+            mf.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
+            (mf => GtoF.reverseGet(QC(qscript.Map(src, mf))))
+          } else
+            GtoF.reverseGet(m).point[M]
+        case r @ QC(Reduce(src, b, red, rep)) =>
+          if (isRewrite[T, F, G, A](GtoF, src.project)) {
+            (b.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))) ⊛
+              red.traverse(_.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ)))))(
+              (b, red) => GtoF.reverseGet(QC(Reduce(src, b, red, rep))))
+          } else
+            GtoF.reverseGet(r).point[M]
+        case qc =>
+          GtoF.reverseGet(qc).point[M]
       }
-    case ls @ LeftShift(src, struct, id, repair) =>
-      src.project match {
-        case HasShiftedRead(_) =>
-          struct.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
-          (struct => QC.inj(LeftShift(src, struct, id, repair)))
-        case _ => QC.inj(ls).point[M]
-      }
-    case m @ qscript.Map(src, mf) =>
-      src.project match {
-        case HasShiftedRead(_) =>
-          mf.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
-          (mf => QC.inj(qscript.Map(src, mf)))
-        case _ => QC.inj(m).point[M]
-      }
-    case r @ Reduce(src, b, red, rep) =>
-      src.project match {
-        case HasShiftedRead(_) =>
-          (b.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))) ⊛
-            red.traverse(_.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ)))))(
-            (b, red) => QC.inj(Reduce(src, b, red, rep)))
-        case _ => QC.inj(r).point[M]
-      }
-    case qc =>
-      QC.inj(qc).point[M]
   }
 }
