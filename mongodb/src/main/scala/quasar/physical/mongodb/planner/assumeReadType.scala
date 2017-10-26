@@ -81,8 +81,8 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
   (implicit
     QC: QScriptCore[T, ?] :<: F,
     SR: Const[ShiftedRead[AFile], ?] :<: F)
-    : TransM[F, M] =
-  new TransM[F, M] {
+    : Trans[F, M] =
+  new Trans[F, M] {
 
     def trans[A, G[_]: Functor]
       (GtoF: PrismNT[G, F])

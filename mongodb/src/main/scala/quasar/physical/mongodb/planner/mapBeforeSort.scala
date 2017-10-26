@@ -26,8 +26,8 @@ import scalaz._, Scalaz._
 
 object mapBeforeSort {
 
-  def apply[T[_[_]]: CorecursiveT, M[_]: Applicative]: TransM[QScriptCore[T, ?], M] =
-    new TransM[QScriptCore[T, ?], M] {
+  def apply[T[_[_]]: CorecursiveT, M[_]: Applicative]: Trans[QScriptCore[T, ?], M] =
+    new Trans[QScriptCore[T, ?], M] {
 
       private def projectIndex(i: Int): FreeMap[T] = Free.roll(MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(i))))
 
