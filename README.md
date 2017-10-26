@@ -188,10 +188,10 @@ The path to the JAR will be something like `./.targets/mongodb/scala-2.11/quasar
 For each backend that you wish to support, run that backend's `assembly` and copy the JAR file into your new `plugins/` directory.  Once this is done, you can launch the web assembly using the following sort of command:
 
 ```bash
-java -jar [<path to jar>] [-c <config file>] -P plugins/
+java -jar [<path to quasar jar>] [-c <config file>] -P plugins/
 ```
 
-All of the JARs within the `plugins/` directory will be loaded as a backend provider, and their relevant mount type will be made available by quasar.
+All of the JARs within the `plugins/` directory will be loaded as a backend provider, and their relevant mount type will be made available by quasar. Be sure that no two different versions of the same connector are found within this directory.
 
 This technique (a directory containing multiple plugin JARs) only works with the web assembly.  If you wish to use the REPL, you will need to use the second method (which works with both).
 
@@ -388,7 +388,7 @@ A cached view is created by adding the `Cache-Control: max-age=<seconds>`  heade
 
 Like ordinary views, cached views appear as a file in the filesystem.
 
-When serving a cached view the `/data/fs/` endpoint includes a `Expires: <http-date>` header informed by `max-age`. A reasonably provisioned server will keep cached views fresh. If it does fall behind the response will include the `Warning: 110 - "Response is Stale"` header. The `Expires` header is absent from non-cached views.
+When serving requests involving cached views an `Expires: <http-date>` header informed by the `max-age` of involved views is included. A reasonably provisioned server will keep cached views fresh. If it does fall behind the response will include the `Warning: 110 - "Response is Stale"` header. The `Expires` header is absent from responses that do not involve cached views.
 
 ### Module mounts
 

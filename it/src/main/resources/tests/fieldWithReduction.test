@@ -1,0 +1,67 @@
+{
+    "name": "select field with reduction",
+
+    "backends": {
+        "couchbase": "pending"
+    },
+
+    "data": "extraSmallZips.data",
+
+    "query": "select state, sum(pop) from extraSmallZips",
+
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+
+    "expected": [
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545},
+        {"state":"MA","1":433545}
+    ]
+}

@@ -14,25 +14,29 @@
  * limitations under the License.
  */
 
-package quasar.physical.mongodb.expression.transform
+package quasar.effect
 
 import slamdata.Predef._
+import quasar.fp.TaskRef
 
-import quasar.physical.mongodb.BsonField
-import quasar.physical.mongodb.expression._
+import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 
-import matryoshka._
-import matryoshka.implicits._
-import scalaz._
+sealed abstract class Write[W, A]
 
-object wrapArrayInLet {
-  def apply[T[_[_]]: CorecursiveT, EX[_]: Functor]
-    (expr: EX[T[EX]])
-    (implicit ev: ExprOpCoreF :<: EX, ev32: ExprOp3_2F :<: EX)
-      : EX[T[EX]] = expr match {
-    case a @ $arrayLitF(_) =>
-      $letF(ListMap(DocVar.Name("a") -> a.embed),
-        $varF[EX, T[EX]](DocVar.ROOT(BsonField.Name("$a"))).embed)
-    case x => x
+object Write {
+  final case class Tell[W](w: W) extends Write[W, Unit]
+
+  final class Ops[W, S[_]](implicit S: Write[W, ?] :<: S) extends LiftedOps[Write[W, ?], S] {
+    def tell(w: W): FreeS[Unit] = lift(Tell(w))
   }
+
+  object Ops {
+    implicit def apply[W, S[_]](implicit S: Write[W, ?] :<: S): Ops[W, S] = new Ops[W, S]
+  }
+
+  def fromTaskRef[W: Semigroup](tr: TaskRef[W]): Write[W, ?] ~> Task =
+    λ[Write[W, ?] ~> Task] {
+      case Tell(w)   => tr.modify(_  ⊹ w).void
+    }
 }

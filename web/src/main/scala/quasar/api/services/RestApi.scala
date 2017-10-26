@@ -18,7 +18,7 @@ package quasar.api.services
 
 import slamdata.Predef._
 import quasar.api._, ToApiError.ops._, ToQResponse.ops._
-import quasar.api.{Destination, HeaderParam}
+import quasar.api.{Destination, HeaderParam, VCacheMiddleware}
 import quasar.contrib.scalaz.catchable._
 import quasar.effect.Timing
 import quasar.fp.liftMT
@@ -26,8 +26,9 @@ import quasar.fp.free.foldMapNT
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.module.Module
-import quasar.fs.mount.cache.VCache
+import quasar.fs.mount.cache.VCache, VCache.{VCacheExpR, VCacheKVS}
 import quasar.main.MetaStoreLocation
+import quasar.fs.mount.cache.VCache, VCache.VCacheKVS
 
 import scala.concurrent.duration._
 import scala.collection.immutable.ListMap
@@ -56,7 +57,8 @@ object RestApi {
         S10: Module.Failure :<: S,
         S11: Analyze :<: S,
         S12: MetaStoreLocation :<: S,
-        S13: VCache :<: S,
+        S13: VCacheKVS :<: S,
+        S15: VCacheExpR :<: S,
         S14: Timing :<: S
       ): Map[String, QHttpService[S]] =
     ListMap(
@@ -69,7 +71,7 @@ object RestApi {
       "/invoke/fs"    -> invoke.service[S],
       "/schema/fs"    -> analyze.schema.service[S],
       "/metastore"    -> metastore.service[S]
-    )
+    ).mapValues(VCacheMiddleware[S](_))
 
   val additionalServices: Map[String, HttpService] =
     ListMap(

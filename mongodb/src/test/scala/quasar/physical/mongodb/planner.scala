@@ -3996,7 +3996,7 @@ class PlannerSpec extends
     genReduceStr.flatMap(x => sqlF.InvokeFunctionR(CIName("length"), List(x))))  // requires JS
 
   implicit def shrinkQuery(implicit SS: Shrink[Fix[Sql]]): Shrink[Query] = Shrink { q =>
-    fixParser.parseExpr(q).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))
+    fixParser.parseExpr(q.value).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))
   }
 
   /**

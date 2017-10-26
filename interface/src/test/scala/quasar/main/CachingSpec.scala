@@ -20,12 +20,12 @@ import slamdata.Predef._
 import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
 import quasar.Data
-import quasar.effect.{Failure, Timing}
+import quasar.effect.{Failure, Timing, Write}
 import quasar.fp._, free._
 import quasar.fs._, InMemory._
 import quasar.fs.mount._, Mounting.PathTypeMismatch
 import quasar.fs.mount.module.Module
-import quasar.fs.mount.cache.{VCache, ViewCache}
+import quasar.fs.mount.cache.{VCache, ViewCache}, VCache.{VCacheKVS, VCacheExpW}
 import quasar.metastore.H2MetaStoreFixture
 import quasar.metastore.MetaStoreFixture.createNewTestMetaStoreConfig
 import quasar.sql._
@@ -54,15 +54,21 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
     case Timing.Nanos     => Task.now(0)
   }
 
-  def vcacheInterp(fs: FileSystem ~> Task): VCache ~> Task =
+  def vcacheInterp(fs: FileSystem ~> Task, cw: VCacheExpW ~> Task): VCacheKVS ~> Task =
     foldMapNT(
       (fs compose injectNT[ManageFile, FileSystem]) :+:
       Failure.toRuntimeError[Task, FileSystemError] :+:
-      transactor.trans) compose
-    VCache.interp[(ManageFile :\: FileSystemFailure :/: ConnectionIO)#M]
+      transactor.trans :+:
+      cw
+    ) compose
+      VCache.interp[(ManageFile :\: FileSystemFailure :\: ConnectionIO :/: VCacheExpW)#M]
 
   def eff(i: Instant): Task[Eff ~> Task] =
-    (runFs(InMemState.empty) ⊛ createNewTestMetaStoreConfig)((fs, metaConf) =>
+    (
+      runFs(InMemState.empty)      ⊛
+      createNewTestMetaStoreConfig ⊛
+      TaskRef(Tags.Min(Option.empty[VCache.Expiration]))
+    )((fs, metaConf, r) =>
       NaturalTransformation.refl[Task]                                          :+:
       transactor.trans                                                          :+:
       MetaStoreLocation.impl.constant(metaConf)                                 :+:
@@ -73,7 +79,7 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
       (fs compose Inject[ReadFile, FileSystem])                                 :+:
       (fs compose Inject[WriteFile, FileSystem])                                :+:
       (fs compose Inject[ManageFile, FileSystem])                               :+:
-      vcacheInterp(fs)                                                          :+:
+      vcacheInterp(fs, Write.fromTaskRef(r))                                    :+:
       timingInterp(i)                                                           :+:
       Failure.toRuntimeError[Task, Module.Error]                                :+:
       Failure.toRuntimeError[Task, PathTypeMismatch]                            :+:
@@ -95,7 +101,7 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
 
       def eval: Task[Free[Eff, ?] ~> Task] = eff(i) ∘ (foldMapNT(_))
 
-      val vcache = VCache.Ops[Eff]
+      val vcache = VCacheKVS.Ops[Eff]
 
       val r: (Option[ViewCache], FileSystemError \/ Vector[Data]) =
         (eval >>= { e =>

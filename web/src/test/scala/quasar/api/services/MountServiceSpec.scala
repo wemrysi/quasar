@@ -27,7 +27,7 @@ import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount.{MountRequest => MR, _}
-import quasar.fs.mount.cache.{VCache, ViewCache}
+import quasar.fs.mount.cache.{VCache, ViewCache}, VCache.VCacheKVS
 import quasar.sql._
 
 import java.time.Instant
@@ -49,7 +49,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
   import posixCodec.printPath
   import PathError._, Mounting.PathTypeMismatch
 
-  type Eff[A] = (Task :\: Timing :\: VCache :\: ManageFile :\: Mounting :\: MountingFailure :/: PathMismatchFailure)#M[A]
+  type Eff[A] = (Task :\: Timing :\: VCacheKVS :\: ManageFile :\: Mounting :\: MountingFailure :/: PathMismatchFailure)#M[A]
 
   type Mounted = Set[MR]
   type TestSvc = Request => Free[Eff, (Response, Mounted)]
@@ -69,9 +69,9 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
     case Timing.Nanos     => Task.now(0)
   }
 
-  val vcacheInterp: Task[VCache ~> Task] = KeyValueStore.impl.default[AFile, ViewCache]
+  val vcacheInterp: Task[VCacheKVS ~> Task] = KeyValueStore.impl.default[AFile, ViewCache]
 
-  val vcache = VCache.Ops[Eff]
+  val vcache = VCacheKVS.Ops[Eff]
 
   def runTest[A](f: TestSvc => Free[Eff, A]): A = {
     type MEff[A] = Coproduct[Task, MountConfigs, A]

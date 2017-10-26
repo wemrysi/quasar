@@ -139,7 +139,6 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
         apiError(
           BadRequest withReason "Arguments missing to function call",
           "missing arguments" := missing)
-      case Module.Error.ParsingErr(parsingErr)    => parsingErr.toApiError
     }
 
   implicit def physicalErrorToApiError: ToApiError[PhysicalError] =

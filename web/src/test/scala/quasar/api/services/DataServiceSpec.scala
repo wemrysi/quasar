@@ -27,14 +27,14 @@ import quasar.api._,
 import quasar.api.matchers._
 import quasar.api.MessageFormatGen._
 import quasar.contrib.pathy._, PathArbitrary._
+import quasar.contrib.scalaz.catchable._
 import quasar.csv.CsvParser
-import quasar.effect.{Failure, KeyValueStore, Timing}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._
-import quasar.fs.mount.MountConfig
-import quasar.fs.mount.cache.{VCache, ViewCache}
+import quasar.fs.mount._, MountConfig.viewConfig0
+import quasar.fs.mount.cache.ViewCache
 import quasar.sql._
 import quasar.Variables
 
@@ -53,7 +53,7 @@ import org.http4s.util.Renderer
 import org.specs2.specification.core.Fragment
 import org.specs2.execute.AsResult
 import org.specs2.matcher.MatchResult
-import pathy.Path, Path._
+import pathy.Path, Path._ 
 import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Failure => _, Zip =>_, _}, Scalaz._
@@ -61,31 +61,13 @@ import scalaz.concurrent.Task
 import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.stream.Process
 import scodec.bits._
-
-import eu.timepit.refined.numeric.{NonNegative, Negative, Positive => RPositive}
-import eu.timepit.refined.auto._
-import eu.timepit.refined.scalacheck.numeric._
 import shapeless.tag.@@
 
 class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import Fixture._, InMemory._, JsonPrecision._, JsonFormat._
   import FileSystemFixture.{ReadWriteT, ReadWrites, amendWrites}
   import PathError.pathNotFound
-
-  type Eff2[A] = Coproduct[FileSystemFailure, FileSystem, A]
-  type Eff1[A] = Coproduct[VCache, Eff2, A]
-  type Eff0[A] = Coproduct[Timing, Eff1, A]
-  type Eff[A]  = Coproduct[Task, Eff0, A]
-  type EffM[A] = Free[Eff, A]
-
-  def timingInterp(i: Instant) = λ[Timing ~> Task] {
-    case Timing.Timestamp => Task.now(i)
-    case Timing.Nanos     => Task.now(0)
-  }
-
-  val vcacheInterp: Task[VCache ~> Task] = KeyValueStore.impl.default[AFile, ViewCache]
-
-  val vcache = VCache.Ops[Eff]
+  import VCacheFixture._
 
   def effRespOr(fs: FileSystem ~> Task): Task[Eff ~> ResponseOr] =
     vcacheInterp ∘ (vci =>
@@ -94,20 +76,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
       (liftMT[Task, ResponseT] compose vci)                                    :+:
       failureResponseOr[FileSystemError]                                       :+:
       (liftMT[Task, ResponseT] compose fs))
-
-  def effTaskInterp(fs: FileSystem ~> Task, i: Instant, vci: VCache ~> Task): Eff ~> Task =
-    reflNT[Task]                                  :+:
-    timingInterp(i)                               :+:
-    vci                                           :+:
-    Failure.toRuntimeError[Task, FileSystemError] :+:
-    fs
-
-  def effRespOrInterp(fs: FileSystem ~> Task, i: Instant, vci: VCache ~> Task): Eff ~> ResponseOr =
-    liftMT[Task, ResponseT]                           :+:
-    (liftMT[Task, ResponseT] compose timingInterp(i)) :+:
-    (liftMT[Task, ResponseT] compose vci)             :+:
-    failureResponseOr[FileSystemError]                :+:
-    (liftMT[Task, ResponseT] compose fs)
 
   def service(mem: InMemState): Service[Request, Response] =
     HeaderParam(GZip(HttpService.lift(req => runFs(mem) >>= (fs => effRespOr(fs) >>= (r =>
@@ -139,14 +107,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
       fsErrs >>= (i => data.service[Eff].toHttpService(i).apply(req))
     })
   }
-
-  def evalViewTest[A](now: Instant)(p: (Eff ~> Task, Eff ~> ResponseOr) => Task[A]): Task[A] =
-    (runFs(InMemState.empty) ⊛ vcacheInterp)((fs, vci) => {
-      val it: Eff ~> Task       = effTaskInterp(fs, now, vci)
-      val ir: Eff ~> ResponseOr = effRespOrInterp(fs, now, vci)
-
-      p(it, ir)
-    }).join
 
   val csv = MediaType.`text/csv`
 
@@ -324,39 +284,62 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             response.status must_=== Status.Ok
           }
           "zipped json" >> {
-            val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.json.zip"))
+            val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.zip"))
             val sampleFile = rootDir[Sandboxed] </> file("foo")
             val data = Vector(Data.Obj("a" -> Data.Str("bar"), "b" -> Data.Bool(true)))
             val request = Request(
               uri = pathUri(sampleFile),
-              headers = Headers(Header("Accept", "application/zip,application/json;disposition=\"attachment;filename*=UTF-8''foo.json.zip\"")))
+              headers = Headers(Header("Accept", "application/zip,application/json;disposition=\"attachment;filename*=UTF-8''foo.zip\"")))
             val response = service(fileSystemWithSampleFile(data))(request).unsafePerformSync
             val zipfile = response.as[ByteVector].unsafePerformSync
             val zipMagicByte: ByteVector = hex"504b" // zip file magic byte
 
-            Zip.unzipFiles(response.body).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file("foo.json")))
-            zipfile.take(2) must_=== zipMagicByte
             response.headers.get(`Content-Disposition`.name) must_=== Some(disposition)
             response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
             response.status must_=== Status.Ok
+            zipfile.take(2) must_=== zipMagicByte
+            Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </> file("foo.json")))
+
+          }
+          "download single zipped file and then re-upload zipped file" >> { 
+            val baseDir = rootDir[Sandboxed]
+            val sampleFile = baseDir </> file("foo.json")
+            val data = Vector(Data.Obj("a" -> Data.Str("foo"), "b" -> Data.Bool(true)))
+            val initialContent = Map(sampleFile -> data)
+
+            val downloadRequest = Request(
+                  uri = pathUri(sampleFile),
+                  headers = Headers(Header("Accept", "application/zip,application/json;disposition=\"attachment;filename*=UTF-8''foo.zip\"")))
+            val originalService = service(InMemState.fromFiles(initialContent))
+            val zippedResponse = originalService(downloadRequest).flatMap(_.as[ByteVector]).unsafePerformSync
+
+            val uploadRequest = Request(uri = pathUri(baseDir), method = Method.PUT)
+                                  .withBody(zippedResponse).unsafePerformSync
+                                  .withContentType(`Content-Type`(MediaType.`application/zip`).some)
+            val (emptyService, getState) = serviceRef(InMemState.empty)
+            val uploadResponse = emptyService(uploadRequest).unsafePerformSync
+
+            uploadResponse.as[String].unsafePerformSync must_=== ""
+            uploadResponse.status must_=== Status.Ok
+            getState.unsafePerformSync.contents must_=== initialContent
           }
           "zipped csv" >> {
-            val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.csv.zip"))
+            val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.zip"))
             val sampleFile = rootDir[Sandboxed] </> file("foo")
             val data = Vector(Data.Str("a,b\n1,2"))
             val request = Request(
               uri = pathUri(sampleFile),
               headers = Headers(
-                Header("Accept", "application/zip,text/csv;columnDelimiter=\",\";quoteChar=\"\\\"\";escapeChar=\"\\\"\";disposition=\"attachment;filename*=UTF-8''foo.csv.zip\"")))
+                Header("Accept", "application/zip,text/csv;columnDelimiter=\",\";quoteChar=\"\\\"\";escapeChar=\"\\\"\";disposition=\"attachment;filename*=UTF-8''foo.zip\"")))
             val response = service(fileSystemWithSampleFile(data))(request).unsafePerformSync
             val zipfile = response.as[ByteVector].unsafePerformSync
             val zipMagicByte: ByteVector = hex"504b" // zip file magic byte
 
-            Zip.unzipFiles(response.body).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file("foo.csv")))
-            zipfile.take(2) must_=== zipMagicByte
             response.headers.get(`Content-Disposition`.name) must_=== Some(disposition)
             response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
             response.status must_=== Status.Ok
+            zipfile.take(2) must_=== zipMagicByte
+            Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </> file("foo.csv")))
           }
           "zipped via request headers" >> {
             val sampleFile = rootDir[Sandboxed] </> file("foo")
@@ -366,32 +349,32 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             val zipfile = response.as[ByteVector].unsafePerformSync
             val zipMagicByte: ByteVector = hex"504b" // zip file magic byte
 
-            Zip.unzipFiles(response.body).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file("foo.json")))
-            zipfile.take(2) must_=== zipMagicByte
             response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
             response.status must_=== Status.Ok
+            zipfile.take(2) must_=== zipMagicByte
+            Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </> file("foo.json")))
           }
         }
       }
 
       "respond with view cache data" >> {
         "fresh" >> prop {
-            (f: AFile, g: AFile, d: Vector[Data], now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
+            (f: AFile, g: AFile, now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
             val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
             lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isBefore(lastUpdate.plus(maxAge)) && f ≠ g
           } ==> {
-            val expr = sqlB"α"
+            val expr = sqlB"""select { "α": 7 }"""
             val viewCache = ViewCache(
               MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
               maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
+            val mounts = Map[APath, MountConfig](f -> viewConfig0(expr))
+            val memState = InMemState.fromFiles(Map(g -> Vector(Data.Obj("α" -> Data._int(7)))))
 
-            val memState = InMemState.fromFiles(Map(g -> d))
-
-            val (respA, respB, vc) = evalViewTest(now) { (it, ir) =>
+            val (respA, respB, vc) = evalViewTest(now, mounts, memState) { (it, ir) =>
               (for {
                 _ <- vcache.put(f, viewCache)
-                a <- data.service[Eff].apply(Request(uri = pathUri(f)))
-                b <- data.service[Eff].apply(Request(uri = pathUri(g)))
+                a <- VCacheMiddleware(data.service[ViewEff]).apply(Request(uri = pathUri(f)))
+                b <- data.service[ViewEff].apply(Request(uri = pathUri(g)))
                 c <- vcache.get(f).run
               } yield (a.toHttpResponse(ir), b.toHttpResponse(ir), c)).foldMap(it)
             }.unsafePerformSync
@@ -406,22 +389,22 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
         }
 
         "stale" >> prop {
-            (f: AFile, g: AFile, d: Vector[Data], now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
+            (f: AFile, g: AFile, now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
             val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
-              lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isAfter(lastUpdate.plus(maxAge))
+              lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isAfter(lastUpdate.plus(maxAge)) && f ≠ g
           } ==> {
-            val expr = sqlB"α"
+            val expr = sqlB"""select { "α": 7 }"""
             val viewCache = ViewCache(
               MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
               maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
+            val mounts = Map[APath, MountConfig](f -> viewConfig0(expr))
+            val memState = InMemState.fromFiles(Map(g -> Vector(Data.Obj("α" -> Data._int(7)))))
 
-            val memState = InMemState.fromFiles(Map(g -> d))
-
-            val (respA, respB, vc) = evalViewTest(now) { (it, ir) =>
+            val (respA, respB, vc) = evalViewTest(now, mounts, memState) { (it, ir) =>
               (for {
                 _ <- vcache.put(f, viewCache)
-                a <- data.service[Eff].apply(Request(uri = pathUri(f)))
-                b <- data.service[Eff].apply(Request(uri = pathUri(g)))
+                a <- VCacheMiddleware(data.service[ViewEff]).apply(Request(uri = pathUri(f)))
+                b <- data.service[ViewEff].apply(Request(uri = pathUri(g)))
                 c <- vcache.get(f).run
               } yield (a.toHttpResponse(ir), b.toHttpResponse(ir), c)).foldMap(it)
             }.unsafePerformSync

@@ -219,7 +219,7 @@ object Repl {
             for {
               state <- RS.get
               out   =  state.cwd </> file(name)
-              expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
+              expr  <- DF.unattempt_(sql.fixParser.parse(q.value).leftMap(_.message))
               block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
               query =  fsQ.executeQuery(block, Variables.fromMap(state.variables), state.cwd, out)
               _     <- runQuery(state, query)(κ(
@@ -228,7 +228,7 @@ object Repl {
           },
           for {
             state <- RS.get
-            expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
+            expr  <- DF.unattempt_(sql.fixParser.parse(q.value).leftMap(_.message))
             vars  =  Variables.fromMap(state.variables)
             lim   =  (state.summaryCount > 0).option(state.summaryCount)
             block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
@@ -240,7 +240,7 @@ object Repl {
       case Explain(q) =>
         for {
           state <- RS.get
-          expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
+          expr  <- DF.unattempt_(sql.fixParser.parse(q.value).leftMap(_.message))
           vars  =  Variables.fromMap(state.variables)
           block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
           t     <- fsQ.explainQuery(block, vars, state.cwd).run.run.run
@@ -256,7 +256,7 @@ object Repl {
       case Compile(q) =>
         for {
           state <- RS.get
-          expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
+          expr  <- DF.unattempt_(sql.fixParser.parse(q.value).leftMap(_.message))
           vars  =  Variables.fromMap(state.variables)
           block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
           (log0, result) = compileQuery(block, vars, state.cwd)
@@ -275,7 +275,7 @@ object Repl {
       case Schema(q) =>
         for {
           state <- RS.get
-          expr  <- DF.unattempt_(sql.fixParser.parse(q).leftMap(_.message))
+          expr  <- DF.unattempt_(sql.fixParser.parse(q.value).leftMap(_.message))
           vars  =  Variables.fromMap(state.variables)
           r     <- DF.unattemptT(analysis.querySchema[S, Fix[EJson], Double](
                      expr, vars, state.cwd, 1000L, analysis.CompressionSettings.Default
