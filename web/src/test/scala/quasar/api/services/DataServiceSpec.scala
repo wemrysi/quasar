@@ -53,7 +53,7 @@ import org.http4s.util.Renderer
 import org.specs2.specification.core.Fragment
 import org.specs2.execute.AsResult
 import org.specs2.matcher.MatchResult
-import pathy.Path, Path._
+import pathy.Path, Path._ 
 import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Failure => _, Zip =>_, _}, Scalaz._
@@ -284,39 +284,62 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             response.status must_=== Status.Ok
           }
           "zipped json" >> {
-            val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.json.zip"))
+            val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.zip"))
             val sampleFile = rootDir[Sandboxed] </> file("foo")
             val data = Vector(Data.Obj("a" -> Data.Str("bar"), "b" -> Data.Bool(true)))
             val request = Request(
               uri = pathUri(sampleFile),
-              headers = Headers(Header("Accept", "application/zip,application/json;disposition=\"attachment;filename*=UTF-8''foo.json.zip\"")))
+              headers = Headers(Header("Accept", "application/zip,application/json;disposition=\"attachment;filename*=UTF-8''foo.zip\"")))
             val response = service(fileSystemWithSampleFile(data))(request).unsafePerformSync
             val zipfile = response.as[ByteVector].unsafePerformSync
             val zipMagicByte: ByteVector = hex"504b" // zip file magic byte
 
-            Zip.unzipFiles(response.body).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file("foo.json")))
-            zipfile.take(2) must_=== zipMagicByte
             response.headers.get(`Content-Disposition`.name) must_=== Some(disposition)
             response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
             response.status must_=== Status.Ok
+            zipfile.take(2) must_=== zipMagicByte
+            Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </> file("foo.json")))
+
+          }
+          "download single zipped file and then re-upload zipped file" >> { 
+            val baseDir = rootDir[Sandboxed]
+            val sampleFile = baseDir </> file("foo.json")
+            val data = Vector(Data.Obj("a" -> Data.Str("foo"), "b" -> Data.Bool(true)))
+            val initialContent = Map(sampleFile -> data)
+
+            val downloadRequest = Request(
+                  uri = pathUri(sampleFile),
+                  headers = Headers(Header("Accept", "application/zip,application/json;disposition=\"attachment;filename*=UTF-8''foo.zip\"")))
+            val originalService = service(InMemState.fromFiles(initialContent))
+            val zippedResponse = originalService(downloadRequest).flatMap(_.as[ByteVector]).unsafePerformSync
+
+            val uploadRequest = Request(uri = pathUri(baseDir), method = Method.PUT)
+                                  .withBody(zippedResponse).unsafePerformSync
+                                  .withContentType(`Content-Type`(MediaType.`application/zip`).some)
+            val (emptyService, getState) = serviceRef(InMemState.empty)
+            val uploadResponse = emptyService(uploadRequest).unsafePerformSync
+
+            uploadResponse.as[String].unsafePerformSync must_=== ""
+            uploadResponse.status must_=== Status.Ok
+            getState.unsafePerformSync.contents must_=== initialContent
           }
           "zipped csv" >> {
-            val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.csv.zip"))
+            val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.zip"))
             val sampleFile = rootDir[Sandboxed] </> file("foo")
             val data = Vector(Data.Str("a,b\n1,2"))
             val request = Request(
               uri = pathUri(sampleFile),
               headers = Headers(
-                Header("Accept", "application/zip,text/csv;columnDelimiter=\",\";quoteChar=\"\\\"\";escapeChar=\"\\\"\";disposition=\"attachment;filename*=UTF-8''foo.csv.zip\"")))
+                Header("Accept", "application/zip,text/csv;columnDelimiter=\",\";quoteChar=\"\\\"\";escapeChar=\"\\\"\";disposition=\"attachment;filename*=UTF-8''foo.zip\"")))
             val response = service(fileSystemWithSampleFile(data))(request).unsafePerformSync
             val zipfile = response.as[ByteVector].unsafePerformSync
             val zipMagicByte: ByteVector = hex"504b" // zip file magic byte
 
-            Zip.unzipFiles(response.body).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file("foo.csv")))
-            zipfile.take(2) must_=== zipMagicByte
             response.headers.get(`Content-Disposition`.name) must_=== Some(disposition)
             response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
             response.status must_=== Status.Ok
+            zipfile.take(2) must_=== zipMagicByte
+            Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </> file("foo.csv")))
           }
           "zipped via request headers" >> {
             val sampleFile = rootDir[Sandboxed] </> file("foo")
@@ -326,10 +349,10 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             val zipfile = response.as[ByteVector].unsafePerformSync
             val zipMagicByte: ByteVector = hex"504b" // zip file magic byte
 
-            Zip.unzipFiles(response.body).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file("foo.json")))
-            zipfile.take(2) must_=== zipMagicByte
             response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
             response.status must_=== Status.Ok
+            zipfile.take(2) must_=== zipMagicByte
+            Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </> file("foo.json")))
           }
         }
       }
