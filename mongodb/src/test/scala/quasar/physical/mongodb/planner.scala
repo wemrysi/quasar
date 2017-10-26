@@ -1276,10 +1276,10 @@ class PlannerSpec extends
 
     "plan simple sort with wildcard" in {
       plan(sqlE"select * from zips order by pop") must
-        beWorkflow0(chain[Workflow](
+        beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar, testFile("plan simple sort with wildcard"))
+    }
 
     "plan sort with expression in key" in {
       plan(sqlE"select baz from foo order by bar/10") must
