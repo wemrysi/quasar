@@ -55,7 +55,7 @@ import org.http4s.util.Renderer
 import org.specs2.specification.core.Fragment
 import org.specs2.execute.AsResult
 import org.specs2.matcher.MatchResult
-import pathy.Path, Path._ 
+import pathy.Path, Path._
 import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Failure => _, Zip =>_, _}, Scalaz._
@@ -292,7 +292,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </> file("foo.json")))
 
           }
-          "download single zipped file and then re-upload zipped file" >> { 
+          "download single zipped file and then re-upload zipped file" >> {
             val baseDir = rootDir[Sandboxed]
             val sampleFile = baseDir </> file("foo.json")
             val data = Vector(Data.Obj("a" -> Data.Str("foo"), "b" -> Data.Bool(true)))
@@ -312,7 +312,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
 
             uploadResponse.as[String].unsafePerformSync must_=== ""
             uploadResponse.status must_=== Status.Ok
-            getState.unsafePerformSync.contents must_=== initialContent
+            getState.unsafePerformSync._1.contents must_=== initialContent
           }
           "zipped csv" >> {
             val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.zip"))
