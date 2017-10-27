@@ -18,6 +18,7 @@ package quasar.physical.mongodb.expression.transform
 
 import slamdata.Predef._
 
+import quasar.physical.mongodb.BsonField
 import quasar.physical.mongodb.expression._
 
 import matryoshka._
@@ -31,7 +32,7 @@ object wrapArrayInLet {
       : EX[T[EX]] = expr match {
     case a @ $arrayLitF(_) =>
       $letF(ListMap(DocVar.Name("a") -> a.embed),
-        $varF[EX, T[EX]](DocVar.Name("a")()).embed)
+        $varF[EX, T[EX]](DocVar.ROOT(BsonField.Name("$a"))).embed)
     case x => x
   }
 }
