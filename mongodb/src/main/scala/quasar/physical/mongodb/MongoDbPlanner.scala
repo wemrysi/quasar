@@ -1036,36 +1036,32 @@ object MongoDbPlanner {
             val (keys, dirs) = (bucket.toIList.map((_, SortDir.asc)) <::: order).unzip
             keys.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _))
               .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
-          case Filter(src, cond0) => {
+          case Filter(src0, cond0) => {
             // TODO: Apply elideMoreGeneralGuards to all FreeMap's in the plan, not only here
             cond0.transCataM(assumeReadType.elideMoreGeneralGuards[M, T](Type.AnyObject)) >>= { cond =>
               val selectors = getSelector[T, M, EX](cond, selector[T](cfg.bsonVersion)).toOption
               val typeSelectors = getSelector[T, M, EX](cond, typeSelector[T]).toOption
 
+              def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
+                  M[WorkflowBuilder[WF]] = {
+                val (sel, inputs) = partialSel
+
+                inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
+                  .map(WB.filter(src, _, sel))
+              }
+
               (selectors, typeSelectors) match {
-                case (Some((_, Nil)), Some((typeSel, typeInputs))) =>
-                  typeInputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
-                    .map(WB.filter(src, _, typeSel))
-                case (Some((sel, inputs)), Some((_, Nil))) =>
-                  inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
-                    .map(WB.filter(src, _, sel))
-                case (Some((sel, inputs)), Some((typeSel, typeInputs))) =>
-                  typeInputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
-                    .map(WB.filter(src, _, typeSel))
-                    .flatMap(src0 =>
-                      inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
-                        .map(WB.filter(src0, _, sel)))
-                case (Some((sel, inputs)), None) =>
-                  inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
-                    .map(WB.filter(src, _, sel))
+                case (None, Some(typeSel)) => filterBuilder(src0, typeSel)
+                case (Some(sel), None) => filterBuilder(src0, sel)
+                case (Some(sel), Some(typeSel)) => filterBuilder(src0, typeSel) >>= (filterBuilder(_, sel))
                 case _ =>
                   handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, cond).map {
                     // TODO: Postpone decision until we know whether we are going to
                     //       need mapReduce anyway.
-                    case cond @ HasThat(_) => WB.filter(src, List(cond), {
+                    case cond @ HasThat(_) => WB.filter(src0, List(cond), {
                       case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
                     })
-                    case \&/.This(js) => WB.filter(src, Nil, {
+                    case \&/.This(js) => WB.filter(src0, Nil, {
                       case Nil => Selector.Where(js(jscore.ident("this")).toJs)
                     })
                   }
