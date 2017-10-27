@@ -139,7 +139,11 @@ package object module {
                         S9: PathMismatchFailure :<: S
                       ): FileSystem ~> Free[S, ?] = {
     val mount = Mounting.Ops[S]
-    val manageFile = nonFsMounts.manageFile(dir => mount.modulesHavingPrefix_(dir).map(paths => paths.map(p => (p:RPath))))
+    // Module is a directory so we want to add "ourselves" to the result of `modulesHavingPrefix`
+    val manageFile = nonFsMounts.manageFile { dir =>
+      (mount.modulesHavingPrefix_(dir).map(paths => paths.map(p => (p: RPath))) |@| mount.lookupConfig(dir).toOption.run.run)((children, self) =>
+        children ++ self.join.as(currentDir).toSet)
+    }
     interpretFileSystem[Free[S, ?]](queryFile, readFile, writeFile, manageFile)
   }
   // FIX-ME

@@ -92,6 +92,10 @@ object KeyValueStore {
     def move(src: K, dst: K): FreeS[Unit] =
       get(src).flatMapF(delete(src) *> put(dst, _)).run.void
 
+    /** Copies the value at src to dst */
+    def copy(src: K, dst: K): FreeS[Unit] =
+      get(src).flatMapF(put(dst, _)).run.void
+
     /** Atomically updates the value associated with the given key with the
       * result of applying the given function to the current value, if defined.
       */

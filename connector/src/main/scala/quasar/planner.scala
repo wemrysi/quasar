@@ -80,11 +80,11 @@ object Planner {
   }
 
   final case class NoFilesFound(dirs: List[ADir]) extends PlannerError {
-    def message = dirs.map(posixCodec.printPath) match {
+    def message = dirs match {
       case Nil => "No paths provided to read from."
       case ds  =>
         "None of these directories contain any files to read from: " ++
-          ds.mkString(", ")
+          ds.map(posixCodec.printPath).mkString(", ")
       }
   }
 
