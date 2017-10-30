@@ -443,7 +443,7 @@ final class LogicalPlanR[T]
     // that the entire thing returns `Type.Top`, then we feed that into the outermost untyper,
     // asking "if this expression returns `Type.Top`, what are the types of the arguments?"
     // We then continue in a top-down fashion, calling untypers exclusively to infer all of
-    // the types.
+    // the types. This process is (partially) documented in InferTypesSpec
     // Only the type *checker* calls the typers, because untypers always have the option to
     //"give up" and return a fixed input type regardless of the expected output.
     // In several other areas where we have no type information, we feed in `Type.Top` as well.
