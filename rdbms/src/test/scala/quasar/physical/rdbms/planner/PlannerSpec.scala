@@ -92,6 +92,7 @@ class PlannerSpec extends Qspec with SqlExprSupport {
               alias = id0.some))
         })
     }
+
     def expectShiftedReadRepr(forIdStatus: IdStatus,
                               expectedRepr: SqlExpr[Fix[SqlExpr]]) = {
       val path: AFile = rootDir </> dir("db") </> file("foo")

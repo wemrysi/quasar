@@ -27,10 +27,9 @@ import quasar.fs.WriteFile.WriteHandle
 import quasar.fs.impl.DataStream
 import quasar.physical.rdbms.fs.WriteCursor
 import quasar.qscript.{EquiJoin, QScriptCore, ShiftedRead}
-import scalaz.Const
 
 import doobie.imports.{ConnectionIO, Transactor}
-import scalaz.Free
+import scalaz.{Const, Free}
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 

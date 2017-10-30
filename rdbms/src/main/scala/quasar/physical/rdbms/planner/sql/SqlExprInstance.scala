@@ -51,7 +51,6 @@ trait SqlExprTraverse {
           (f(from.v) ∘ (From(_, from.alias ∘ (a => Id[B](a.v))))))(
           SelectRow(_, _)
         )
-
     }
   }
 }

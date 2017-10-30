@@ -62,6 +62,5 @@ object PostgresRenderQuery extends RenderQuery {
     case SelectRow(selection, from) =>
       val fromExpr = s" from ${from.v}"
       s"(select ${selection.v}$fromExpr ${rowAlias(selection.alias)})".right
-
   }
 }

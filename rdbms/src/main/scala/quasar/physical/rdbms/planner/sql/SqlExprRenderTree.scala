@@ -50,7 +50,6 @@ trait SqlExprRenderTree {
           case WithIds(v) =>
             nonTerminal("With ids", v)
           case Select(selection, from, filter) =>
-
             NonTerminal(
               "Select" :: Nil,
               none,

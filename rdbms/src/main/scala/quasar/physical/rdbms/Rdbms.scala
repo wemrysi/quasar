@@ -31,11 +31,14 @@ import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.fs._
 import quasar.physical.rdbms.common.Config
 import quasar.Planner.PlannerError
+import quasar.qscript.{ExtractPath, Injectable, Optimize, QScriptCore, QScriptTotal, Unicoalesce, Unirewrite}
+import quasar.Planner.PlannerError
+import quasar.physical.rdbms.planner.Planner
+import quasar.physical.rdbms.planner.sql.SqlExpr
 import quasar.physical.rdbms.common._
 import quasar.physical.rdbms.planner.Planner
 import quasar.physical.rdbms.planner.sql.SqlExpr
 import quasar.qscript.analysis._
-import quasar.qscript.{ExtractPath, Injectable, Optimize, QScriptCore, QScriptTotal, Unicoalesce, Unirewrite}
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 import quasar.{RenderTree, RenderTreeT, fp}
 
@@ -46,6 +49,7 @@ import doobie.hikari.hikaritransactor.HikariTransactor
 import matryoshka.{BirecursiveT, Delay, EqualT, RecursiveT, ShowT}
 import matryoshka.implicits._
 import matryoshka.data._
+
 import scalaz._
 import Scalaz._
 import scalaz.concurrent.Task
