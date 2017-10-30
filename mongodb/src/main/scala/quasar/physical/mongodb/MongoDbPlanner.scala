@@ -71,10 +71,6 @@ object MongoDbPlanner {
   type OutputM[A]      = PlannerError \/ A
   type ExecTimeR[F[_]] = MonadReader_[F, Instant]
 
-  implicit def mongoQScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[fs.MongoQScript[T, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
-
-
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
       Type => Option[In => Out] =
