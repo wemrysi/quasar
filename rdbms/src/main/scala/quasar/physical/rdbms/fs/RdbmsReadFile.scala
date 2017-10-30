@@ -72,7 +72,7 @@ trait RdbmsReadFile
         offset: Natural,
         limit: Option[Positive]
     ): Backend[DbDataStream] = {
-      MT.ask.map { xa =>
+      MRT.ask.map { xa =>
         DbDataStream(
           selectAllQuery(dbPath, offset, limit)
             .query[Data]
