@@ -35,7 +35,6 @@ import quasar.fs.mount._, BackendDef._
 import quasar.physical.sparkcore.fs._
 import quasar.physical.sparkcore.fs.SparkCore
 import quasar.physical.sparkcore.fs.{SparkCore, SparkConnectorDetails}, SparkConnectorDetails._
-import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
 
 import org.apache.spark._
 import org.apache.spark.rdd._
@@ -63,9 +62,6 @@ object SparkElastic extends SparkCore with ManagedWriteFile[AFile] with Chrooted
   type Eff5[A]  = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Eff4, A]
   type Eff6[A]  = Coproduct[KeyValueStore[WriteHandle, AFile, ?], Eff5, A]
   type Eff[A]   = Coproduct[SparkConnectorDetails, Eff6, A]
-
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
-        ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
   def ReadSparkContextInj = Inject[Read[SparkContext, ?], Eff]
   def RFKeyValueStoreInj = Inject[KeyValueStore[ReadFile.ReadHandle, SparkCursor, ?], Eff]

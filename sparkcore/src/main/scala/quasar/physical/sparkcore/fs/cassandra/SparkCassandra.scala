@@ -34,7 +34,6 @@ import quasar.fs.mount._, BackendDef._
 import quasar.physical.sparkcore.fs._
 import quasar.physical.sparkcore.fs.SparkCore
 import quasar.physical.sparkcore.fs.{SparkCore, SparkConnectorDetails}, SparkConnectorDetails._
-import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
 
 import org.apache.spark._
 import org.apache.spark.rdd._
@@ -63,9 +62,6 @@ object SparkCassandra extends SparkCore with ManagedWriteFile[AFile] with Chroot
   type Eff2[A] = Coproduct[CassandraDDL, Eff3, A]
   type Eff1[A] = Coproduct[MonotonicSeq, Eff2, A]
   type Eff[A]  = Coproduct[SparkConnectorDetails, Eff1, A]
-
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
   def ReadSparkContextInj = Inject[Read[SparkContext, ?], Eff]
   def RFKeyValueStoreInj = Inject[KeyValueStore[ReadFile.ReadHandle, SparkCursor, ?], Eff]
