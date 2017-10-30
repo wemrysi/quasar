@@ -17,11 +17,16 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef.{Map => SMap, _}
+import quasar.fp._
 
-import matryoshka.{Algebra, Birecursive, Coalgebra}
+import monocle.macros.Lenses
+import matryoshka._
 import scalaz.{Applicative, Traverse}
+import scalaz.syntax.equal._
 import scalaz.syntax.traverse._
+import scalaz.syntax.std.boolean._
 
+@Lenses
 final case class QSUGraph[T[_[_]]](
     root: Symbol,
     vertices: SMap[Symbol, QScriptUniform[T, Symbol]]) {
@@ -39,20 +44,38 @@ final case class QSUGraph[T[_[_]]](
   def refocus(node: Symbol): QSUGraph[T] =
     copy(root = node)
 
+  /** Removes the `src` vertex, replacing any references to it with `target`. */
+  def replace(src: Symbol, target: Symbol): QSUGraph[T] = {
+    import QScriptUniform._
+
+    def replaceIfSrc(sym: Symbol): Symbol =
+      (sym === src) ? target | sym
+
+    if (vertices.isDefinedAt(src) && vertices.isDefinedAt(target))
+      QSUGraph(
+        replaceIfSrc(root),
+        (vertices - src) mapValues {
+          case JoinSideRef(s) => JoinSideRef(replaceIfSrc(s))
+          case other          => other map replaceIfSrc
+        })
+    else
+      this
+  }
+
   // projects the root of the graph (which we assume exists)
   def unfold: QScriptUniform[T, QSUGraph[T]] =
     vertices(root).map(refocus)
 }
 
-object QSUGraph {
+object QSUGraph extends QSUGraphInstances {
 
   /**
    * The pattern functor for `QSUGraph[T]`.
    */
+  @Lenses
   final case class QSUPattern[T[_[_]], A](root: Symbol, qsu: QScriptUniform[T, A])
 
   object QSUPattern {
-
     implicit def traverse[T[_[_]]]: Traverse[QSUPattern[T, ?]] =
       new Traverse[QSUPattern[T, ?]] {
         def traverseImpl[G[_]: Applicative, A, B](pattern: QSUPattern[T, A])(f: A => G[B])
@@ -62,23 +85,6 @@ object QSUGraph {
               qsu.traverse(f).map(QSUPattern[T, B](root, _))
           }
       }
-
-    // only correct given compacted subgraphs which agree on names
-    private def φ[T[_[_]]]: Algebra[QSUPattern[T, ?], QSUGraph[T]] = {
-      case QSUPattern(root, qsu) =>
-        val initial: QSUGraph[T] = QSUGraph[T](root, SMap(root -> qsu.map(_.root)))
-
-        qsu.foldRight(initial) {
-          case (graph, acc) => graph ++: acc // retain the root from the right
-        }
-    }
-
-    private def ψ[T[_[_]]]: Coalgebra[QSUPattern[T, ?], QSUGraph[T]] = graph => {
-      QSUPattern[T, QSUGraph[T]](graph.root, graph.unfold)
-    }
-
-    implicit def birecursive[T[_[_]]]: Birecursive.Aux[QSUGraph[T], QSUPattern[T, ?]] =
-      Birecursive.algebraIso(φ[T], ψ[T])
   }
 
   /**
@@ -208,16 +214,49 @@ object QSUGraph {
 
     object Nullary {
       def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
-        case g: QSU.Nullary[T, QSUGraph[T], _] => QSU.Nullary.unapply(g)
+        case g: QSU.Nullary[T, QSUGraph[T]] => QSU.Nullary.unapply(g)
         case _ => None
       }
     }
 
     object Constant {
       def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
-        case g: QSU.Nullary[T, QSUGraph[T], _] => QSU.Constant.unapply(g)
+        case g: QSU.Nullary[T, QSUGraph[T]] => QSU.Constant.unapply(g)
         case _ => None
       }
     }
+  }
+}
+
+sealed abstract class QSUGraphInstances extends QSUGraphInstances0 {
+  import QSUGraph._
+
+  implicit def corecursive[T[_[_]]]: Corecursive.Aux[QSUGraph[T], QSUPattern[T, ?]] =
+    birecursive[T]
+
+  implicit def recursive[T[_[_]]]: Recursive.Aux[QSUGraph[T], QSUPattern[T, ?]] =
+    birecursive[T]
+}
+
+sealed abstract class QSUGraphInstances0 {
+  import QSUGraph._
+
+  implicit def birecursive[T[_[_]]]: Birecursive.Aux[QSUGraph[T], QSUPattern[T, ?]] =
+    Birecursive.algebraIso(φ[T], ψ[T])
+
+  ////
+
+  // only correct given compacted subgraphs which agree on names
+  private def φ[T[_[_]]]: Algebra[QSUPattern[T, ?], QSUGraph[T]] = {
+    case QSUPattern(root, qsu) =>
+      val initial: QSUGraph[T] = QSUGraph[T](root, SMap(root -> qsu.map(_.root)))
+
+      qsu.foldRight(initial) {
+        case (graph, acc) => graph ++: acc // retain the root from the right
+      }
+  }
+
+  private def ψ[T[_[_]]]: Coalgebra[QSUPattern[T, ?], QSUGraph[T]] = graph => {
+    QSUPattern[T, QSUGraph[T]](graph.root, graph.unfold)
   }
 }

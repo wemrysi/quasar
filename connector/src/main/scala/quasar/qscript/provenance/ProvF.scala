@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.fp.ski.κ
 
 import matryoshka._
-import monocle.Prism
+import monocle.{Prism, Traversal}
 import scalaz._, Scalaz._
 
 /**
@@ -80,6 +80,14 @@ object ProvF extends ProvFInstances {
         case Then(l, r) => (l, r)
       } {
         case (l, r) => Then(l, r)
+      }
+
+    def identities[A]: Traversal[ProvF[D, I, A], I] =
+      new Traversal[ProvF[D, I, A], I] {
+        def modifyF[F[_]: Applicative](f: I => F[I])(pf: ProvF[D, I, A]) =
+          identity.getOrModify(pf).fold(
+            grouping.modifyF(f),
+            i => f(i) map (identity(_)))
       }
   }
 

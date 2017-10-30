@@ -24,6 +24,7 @@ import quasar.qscript._
 import quasar.qscript.provenance._
 
 import matryoshka._
+import matryoshka.implicits._
 import matryoshka.data._
 import scalaz.{Lens => _, _}, Scalaz._
 
@@ -52,6 +53,18 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
       jks.foldMapLeft1(eqCond)((l, r) => Free.roll(MFC(And(l, eqCond(r)))))
     }
   }
+
+  /** Renames `from` to `to` in the given dimensions. */
+  def rename(from: Symbol, to: Symbol, dims: Dimensions[P]): Dimensions[P] = {
+    def rename0(sym: Symbol): Symbol =
+      (sym === from) ? to | sym
+
+    dims map (_.transCata[P](pfo.identities modify (_ map rename0)))
+  }
+
+  ////
+
+  private val pfo = ProvF.Optics[D, I]
 }
 
 object QProv {

@@ -24,7 +24,7 @@ import quasar.ejson.EJson
 import quasar.qscript._
 
 import matryoshka.{BirecursiveT, Delay, EqualT, ShowT}
-import scalaz.{:<:, Applicative, Bitraverse, Equal, NonEmptyList => NEL, Scalaz, Show, Traverse}
+import scalaz.{:<:, Applicative, Bitraverse, Equal, Forall, NonEmptyList => NEL, Scalaz, Show, Traverse}
 
 sealed trait QScriptUniform[T[_[_]], A] extends Product with Serializable
 
@@ -41,11 +41,8 @@ object QScriptUniform {
       case GroupBy(left, right) =>
         (f(left) |@| f(right))(GroupBy(_, _))
 
-      case DimEdit(source, DTrans.Squash()) =>
-        f(source).map(DimEdit(_, DTrans.Squash()))
-
-      case DimEdit(source, DTrans.PushValue(value)) =>
-        (f(source) |@| f(value))((s, v) => DimEdit(s, DTrans.PushValue(v)))
+      case DimEdit(source, dtrans) =>
+        f(source).map(DimEdit(_, dtrans))
 
       case LPJoin(left, right, condition, joinType, leftRef, rightRef) =>
         (f(left) |@| f(right) |@| f(condition))(LPJoin(_, _, _, joinType, leftRef, rightRef))
@@ -124,13 +121,13 @@ object QScriptUniform {
 
   final case class DimEdit[T[_[_]], A](
       source: A,
-      trans: DTrans[A]) extends QScriptUniform[T, A]
+      trans: DTrans[T]) extends QScriptUniform[T, A]
 
-  sealed trait DTrans[A] extends Product with Serializable
+  sealed trait DTrans[T[_[_]]] extends Product with Serializable
 
   object DTrans {
-    final case class Squash[A]() extends DTrans[A]
-    final case class PushValue[A](source: A) extends DTrans[A]
+    final case class Squash[T[_[_]]]() extends DTrans[T]
+    final case class Group[T[_[_]]](getKey: FreeMap[T]) extends DTrans[T]
   }
 
   // LPish
@@ -218,16 +215,16 @@ object QScriptUniform {
       source: A,
       predicate: FreeMap[T]) extends QScriptUniform[T, A]
 
-  final case class Nullary[T[_[_]], A, B](mf: MapFunc[T, B]) extends QScriptUniform[T, A]
+  final case class Nullary[T[_[_]], A](mf: Forall[MapFunc[T, ?]]) extends QScriptUniform[T, A]
 
   object Constant {
 
     def apply[T[_[_]], A](ejson: T[EJson])(implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?]): QScriptUniform[T, A] =
-      Nullary(IC(MapFuncsCore.Constant(ejson)))
+      Nullary(Forall(_(IC(MapFuncsCore.Constant(ejson)))))
 
-    def unapply[T[_[_]], A, B](nary: Nullary[T, A, B])(implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?]): Option[T[EJson]] = {
-      nary match {
-        case Nullary(IC(MapFuncsCore.Constant(ejson))) => Some(ejson)
+    def unapply[T[_[_]], A](nary: Nullary[T, A])(implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?]): Option[T[EJson]] = {
+      nary.mf[A] match {
+        case IC(MapFuncsCore.Constant(ejson)) => Some(ejson)
         case _ => None
       }
     }

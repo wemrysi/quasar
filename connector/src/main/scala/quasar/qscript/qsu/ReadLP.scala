@@ -50,7 +50,7 @@ import matryoshka.{AlgebraM, BirecursiveT}
 import matryoshka.implicits._
 import matryoshka.patterns.{interpretM, CoEnv}
 import pathy.Path.{rootDir, Sandboxed}
-import scalaz.{\/, Free, Inject, Monad, NonEmptyList => NEL, StateT}
+import scalaz.{\/, Forall, Free, Inject, Monad, NonEmptyList => NEL, StateT}
 import scalaz.std.tuple._
 import scalaz.syntax.bifunctor._
 import scalaz.syntax.either._
@@ -92,7 +92,7 @@ sealed abstract class ReadLP[
       val back = fromData(data).fold[PlannerError \/ QSU[Symbol]](
         {
           case Data.NA =>
-            QSU.Nullary(IC(MapFuncsCore.Undefined[T, Symbol]())).right
+            QSU.Nullary[T, Symbol](Forall(_(IC(MapFuncsCore.Undefined())))).right
 
           case d =>
             NonRepresentableData(d).left

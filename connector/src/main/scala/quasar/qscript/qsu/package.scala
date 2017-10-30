@@ -17,7 +17,8 @@
 package quasar.qscript
 
 import slamdata.Predef.{Map => SMap, _}
+import quasar.qscript.provenance.Dimensions
 
 package object qsu {
-  type ProvGraph[T[_[_]]] = SMap[Symbol, QProv.P[T]]
+  type QSUDims[T[_[_]]] = SMap[Symbol, Dimensions[QProv.P[T]]]
 }

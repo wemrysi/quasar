@@ -35,11 +35,19 @@ trait Dimension[D, I, P] {
   val empty: Dimensions[P] =
     IList[P]()
 
+  /** Updates the dimensional stack by sequencing a new dimension from value
+    * space with the current head dimension.
+    */
+  def flatten(id: I, ds: Dimensions[P]): Dimensions[P] =
+    nest(lshift(id, ds))
+
   /** Joins two dimensions into a single dimension stack, starting from the base. */
   def join(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D], I: Equal[I]): Dimensions[P] =
     alignRtoL(ls, rs)(ι, ι, (l, r) => if (l ≟ r) l else both(l, r))
 
-  /** Shifts the dimensional stack by pushing a new dimension from value space onto the stack. */
+  /** Shifts the dimensional stack by pushing a new dimension from value space
+    * onto the stack.
+    */
   def lshift(id: I, ds: Dimensions[P]): Dimensions[P] =
     identity(id) :: ds
 
