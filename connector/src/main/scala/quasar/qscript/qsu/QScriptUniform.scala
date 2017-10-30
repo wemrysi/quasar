@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qscript.qsu
 
+import slamdata.Predef._
 import quasar.{RenderTree, RenderTreeT}
 import quasar.common.{JoinType, SortDir}
-import quasar.fp.numeric.Natural
 import quasar.contrib.pathy.AFile
-import slamdata.Predef._
+import quasar.fp.numeric.Natural
+import quasar.qscript._
 
 import matryoshka.{BirecursiveT, Delay, EqualT, ShowT}
 import scalaz.{Equal, NonEmptyList => NEL, Traverse}

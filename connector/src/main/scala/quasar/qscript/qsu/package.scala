@@ -16,8 +16,8 @@
 
 package quasar.qscript
 
-import slamdata.Predef.{Map => SMap, Symbol}
+import slamdata.Predef.{Map => SMap, _}
 
-final case class QSUGraph[T[_[_]]](
-    root: Symbol,
-    vertices: SMap[Symbol, QScriptUniform[T, Symbol]])
+package object qsu {
+  type ProvGraph[T[_[_]]] = SMap[Symbol, QProv.P[T]]
+}

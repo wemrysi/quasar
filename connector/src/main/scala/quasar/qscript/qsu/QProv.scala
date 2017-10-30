@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qscript.qsu
 
 import slamdata.Predef.{Eq => _, _}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski.ι
+import quasar.qscript._
 import quasar.qscript.provenance._
 
 import matryoshka._
