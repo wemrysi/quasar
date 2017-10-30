@@ -37,15 +37,15 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     mapFuncPlanner: Planner[T, F, MapFunc[T, ?]])
     extends Planner[T, F, QScriptCore[T, ?]] {
 
-  def processFreeMap(f: FreeMap[T]): F[T[SqlExpr]] =
+  def processFreeMap(f: FreeMap[T], alias: SqlExpr.Id[T[SqlExpr]]): F[T[SqlExpr]] =
     f.cataM(
-      interpretM(κ(AllCols[T[SqlExpr]]().embed.η[F]), mapFuncPlanner.plan))
+      interpretM(κ(AllCols[T[SqlExpr]](alias.v).embed.η[F]), mapFuncPlanner.plan))
 
   def plan: AlgebraM[F, QScriptCore[T, ?], T[SqlExpr]] = {
     case qscript.Map(src, f) =>
       for {
         generatedAlias <- genId[T[SqlExpr], F]
-        selection <- processFreeMap(f)
+        selection <- processFreeMap(f, generatedAlias)
       } yield
         Select(
           Selection(selection, none),

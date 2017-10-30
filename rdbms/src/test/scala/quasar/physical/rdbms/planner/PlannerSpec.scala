@@ -65,7 +65,7 @@ class PlannerSpec extends Qspec with SqlExprSupport {
       alias: Option[SqlExpr.Id[Fix[SqlExpr]]] = None): Selection[Fix[SqlExpr]] =
     Selection[Fix[SqlExpr]](v, alias)
 
-  def * : Fix[SqlExpr] = Fix(AllCols())
+  def * : Fix[SqlExpr] = Fix(AllCols("row"))
 
   def fromTable(
       name: String,

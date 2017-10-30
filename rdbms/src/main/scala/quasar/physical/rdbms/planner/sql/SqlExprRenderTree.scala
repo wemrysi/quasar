@@ -35,6 +35,9 @@ trait SqlExprRenderTree {
         def nonTerminal(typ: String, c: A*): RenderedTree =
           NonTerminal(typ :: Nil, none, c.toList ∘ r.render)
 
+        def nt(tpe: String, label: Option[String], child: A) =
+          NonTerminal(tpe :: Nil, label, List(r.render(child)))
+
         RenderTree.make {
           case Id(v) =>
             Terminal("Id" :: Nil, v.some)
@@ -42,15 +45,11 @@ trait SqlExprRenderTree {
             Terminal("Table" :: Nil, v.some)
           case RowIds() =>
             Terminal("row ids" :: Nil, none)
-          case AllCols() =>
+          case AllCols(_) =>
             Terminal("*" :: Nil, none)
-          case SomeCols(names) =>
-            Terminal("Columns" :: Nil, names.mkString(",").some)
           case WithIds(v) =>
             nonTerminal("With ids", v)
           case Select(selection, from, filter) =>
-            def nt(tpe: String, label: Option[String], child: A) =
-              NonTerminal(tpe :: Nil, label, List(r.render(child)))
 
             NonTerminal(
               "Select" :: Nil,
@@ -58,6 +57,14 @@ trait SqlExprRenderTree {
               nt("selection", selection.alias ∘ (_.v), selection.v) ::
                 nt("from", from.alias ∘ (_.v), from.v) ::
                 (filter ∘ (f => nt("filter", none, f.v))).toList
+            )
+          case SelectRow(selection, from) =>
+
+            NonTerminal(
+              "Select" :: Nil,
+              none,
+              nt("selection", selection.alias ∘ (_.v), selection.v) ::
+                List(nt("from", from.alias ∘ (_.v), from.v))
             )
         }
       }

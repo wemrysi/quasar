@@ -88,6 +88,16 @@ trait SqlExprSupport {
       Postgres.lpToQScript(lp, listContents))).run.run._2.map(qsToRepr[Fix])
   }
 
+  implicit def idNameGenerator: NameGenerator[Id] =
+    new NameGenerator[Id] {
+      var counter = 0L
+      def freshName = {
+        val str = counter.toString
+        counter += 1
+        str
+      }
+    }
+
   implicit def taskNameGenerator: NameGenerator[Task] =
     new NameGenerator[Task] {
       var counter = 0L
@@ -97,6 +107,7 @@ trait SqlExprSupport {
         Task.delay(str)
       }
     }
+
   implicit val tmerr = new MonadError_[Task, PlannerError] {
     override def raiseError[A](e: PlannerError): Task[A] =
       Task.fail(new Exception(e.message))

@@ -34,8 +34,7 @@ trait SqlExprTraverse {
       case Id(str)             => G.point(Id(str))
       case Table(name)         => G.point(Table(name))
       case RowIds()            => G.point(RowIds())
-      case AllCols()           => G.point(AllCols())
-      case SomeCols(names)     => G.point(SomeCols(names))
+      case AllCols(v)           => G.point(AllCols(v))
       case WithIds(v)          => f(v) ∘ WithIds.apply
 
       case Select(selection, from, filterOpt) =>
@@ -45,6 +44,14 @@ trait SqlExprTraverse {
           filterOpt.traverse(i => f(i.v) ∘ Filter.apply))(
           Select(_, _, _)
         )
+
+      case SelectRow(selection, from) =>
+        val sel = f(selection.v) ∘ (i => Selection(i, selection.alias ∘ (a => Id[B](a.v))))
+        (sel ⊛
+          (f(from.v) ∘ (From(_, from.alias ∘ (a => Id[B](a.v))))))(
+          SelectRow(_, _)
+        )
+
     }
   }
 }
