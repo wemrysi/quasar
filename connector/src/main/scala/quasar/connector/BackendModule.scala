@@ -20,9 +20,11 @@ package connector
 import slamdata.Predef._
 import quasar.Data
 import quasar.common._
+import quasar.concurrent.Pools._
 import quasar.contrib.pathy._
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._, eitherT._
+import quasar.contrib.scalaz.concurrent._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric.{Natural, Positive}
@@ -70,14 +72,16 @@ trait BackendModule {
         (parseConfig(uri) >>= interpreter) map { case (f, c) => DefinitionResult(f, c) }
     }
 
-  def interpreter(cfg: Config): DefErrT[Task, (BackendEffect ~> Task, Task[Unit])] =
-    compile(cfg) map {
+  def interpreter(cfg: Config): DefErrT[Task, (BackendEffect ~> Task, Task[Unit])] = {
+    val shiftNat: Task ~> Task = λ[Task ~> Task](_.flatMap(a => shift >> Task.now(a)))
+
+    compile(cfg).mapT(shiftNat(_)) map {
       case (runM, close) =>
         val runCfg = λ[Configured ~> M](_.run(cfg))
         val runFs: BackendEffect ~> Configured = analyzeInterpreter :+: fsInterpreter
-        (runM compose runCfg compose runFs, close)
+        (shiftNat compose runM compose runCfg compose runFs, close >> shift)
     }
-
+  }
 
   private final def analyzeInterpreter: Analyze ~> Configured = {
     val lc: DiscoverPath.ListContents[Backend] =

@@ -18,8 +18,10 @@ package quasar.physical.sparkcore.fs
 
 import slamdata.Predef._
 import quasar._
+import quasar.concurrent.Pools
 import quasar.connector._
 import quasar.contrib.scalaz._
+import quasar.contrib.scalaz.concurrent._
 import quasar.contrib.pathy._
 import quasar.common._
 import quasar.fp._, free._, ski.κ
@@ -29,9 +31,13 @@ import quasar.effect._
 import quasar.qscript.{Read => _, _}
 import quasar.qscript.analysis._
 
-import java.lang.Thread
+import java.lang.{Runnable, Runtime, Thread}
 import scala.Predef.implicitly
 import java.net.URLDecoder
+import java.util.concurrent.{Executors, ExecutorService, ThreadFactory}
+import java.util.concurrent.atomic.AtomicInteger
+import scala.concurrent.ExecutionContext
+import scala.{math, StringContext}
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark._
@@ -40,7 +46,7 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import scalaz.{Failure => _, _}, Scalaz._
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Strategy, Task}
 
 final case class SparkCursor(rdd: Option[RDD[(Data, Long)]], pointer: Int)
 
@@ -48,6 +54,8 @@ trait SparkCore extends BackendModule with DefaultAnalyzeModule {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
+
+  import SparkCore.shiftReShift
 
   // conntector specific
   type Eff[A]
@@ -110,35 +118,13 @@ trait SparkCore extends BackendModule with DefaultAnalyzeModule {
 
   type LowerLevel[A] = Coproduct[Task, PhysErr, A]
 
-  /*
-   * The classloader stuff is a bit tricky here.  Basically, Spark and Hadoop
-   * are circumventing the classloader hierarchy by reading the context classloader.
-   * This is rather annoying, but there's not a lot we can do about it.  The
-   * context classloader is stored in a thread local, but since we're running on
-   * a pool, we don't really have tight control over which thread we're on.  So
-   * we have to constantly and aggressively re-set the context classloader.  This
-   * is also done prior to generating the SparkContext in the derived connectors.
-   */
-  @SuppressWarnings(Array("org.wartremover.warts.Equals", "org.wartremover.warts.Null"))
-  private val overrideContextCL = {
-    for {
-      thread <- Task.delay(Thread.currentThread())
-      tcl <- Task.delay(getClass.getClassLoader)
-      ccl <- Task.delay(thread.getContextClassLoader())
-      _ <- if (ccl eq tcl)
-        Task.now(())
-      else
-        Task.delay(thread.setContextClassLoader(tcl))    // force spark to use its own classloader
-    } yield ()
-  }
-
   def lowerToTask: LowerLevel ~> Task = λ[LowerLevel ~> Task](_.fold(
     injectNT[Task, Task],
     Failure.mapError[PhysicalError, Exception](_.cause) andThen Failure.toCatchable[Task, Exception]
-  )).andThen(λ[Task ~> Task](overrideContextCL >> _))
+  ))
 
   def toTask(sc: SparkContext, config: Config): Task[M ~> Task] =
-    toLowerLevel[LowerLevel](sc, config).map(_ andThen foldMapNT(lowerToTask))
+    toLowerLevel[LowerLevel](sc, config).map(_ andThen foldMapNT(lowerToTask)).map(_.andThen(shiftReShift))
 
   def sparkCoreJar: DefErrT[Task, APath] = {
 
@@ -160,19 +146,17 @@ trait SparkCore extends BackendModule with DefaultAnalyzeModule {
     val finalPath: OptionT[Task, APath] = OptionT(pathFromEnvVariable >>= (_.cata(
       path => path.some.point[Task], pathFromProjectRoot.run
     )))
-    
+
     finalPath.toRight(NonEmptyList("Could not fetch sparkcore.jar").left[EnvironmentError])
   }
 
   def initSC: Config => DefErrT[Task, SparkContext] = (config: Config) => EitherT(Task.delay {
-    // look, I didn't make Spark the way it is...
-    java.lang.Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
     new SparkContext(getSparkConf(config)).right[DefinitionError]
   }.handleWith {
     case ex : SparkException if ex.getMessage.contains("SPARK-2243") =>
       NonEmptyList("You can not mount second Spark based connector... " +
         "Please unmount existing one first.").left[EnvironmentError].left[SparkContext].point[Task]
-  })
+  }).mapT(shiftReShift(_))
 
   def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] = for {
     jar <- sparkCoreJar
@@ -289,4 +273,46 @@ trait SparkCore extends BackendModule with DefaultAnalyzeModule {
     }
     ).into[Eff].liftB.unattempt
   }
+}
+
+object SparkCore {
+
+  def shiftReShift: Task ~> Task = λ[Task ~> Task] { ta =>
+    for {
+      _ <- shift(SparkCore.CPUStrategy)
+      a <- ta
+      _ <- shift(Pools.CPUStrategy)
+    } yield a
+  }
+
+  // we build a special pool for spark to avoid a) starvation, and b) thread local pollution
+  private[sparkcore] val CPUExecutor: ExecutorService = {
+    val numThreads = math.max(Runtime.getRuntime.availableProcessors, 4)
+    Executors.newFixedThreadPool(numThreads, new ThreadFactory {
+      private val counter = new AtomicInteger(0)
+
+      def newThread(r: Runnable): Thread = {
+        val t = new Thread(r)
+
+        /*
+         * The classloader stuff is a bit tricky here.  Basically, Spark and Hadoop
+         * are circumventing the classloader hierarchy by reading the context classloader.
+         * This is rather annoying, but there's not a lot we can do about it.  The
+         * context classloader is stored in a thread local, but since we're running on
+         * a pool, we don't really have tight control over which thread we're on.  So
+         * we have to constantly and aggressively re-set the context classloader.  This
+         * is also done prior to generating the SparkContext in the derived connectors.
+         */
+        t.setContextClassLoader(getClass.getClassLoader)
+
+        t.setName(s"sparkcore-cpu-thread-${counter.getAndIncrement}")
+        t
+      }
+    })
+  }
+
+  private[sparkcore] val CPUExecutionContext: ExecutionContext =
+    ExecutionContext.fromExecutorService(CPUExecutor)
+
+  private[sparkcore] val CPUStrategy: Strategy = Strategy.Executor(CPUExecutor)
 }
