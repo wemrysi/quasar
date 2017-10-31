@@ -17,32 +17,36 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef.{Eq => _, _}
+import quasar.ejson._
+import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.fp.ski.ι
 import quasar.qscript._
 import quasar.qscript.provenance._
 
 import matryoshka._
+import matryoshka.data._
 import scalaz.{Lens => _, _}, Scalaz._
 
 import MapFuncsCore._
 
-// TODO: Still need to add reification once we understand how it should work.
 final class QProv[T[_[_]]: BirecursiveT: EqualT]
-    extends Dimension[Symbol, Symbol, QProv.P[T]]
+    extends Dimension[T[EJson], FreeMapA[T, Symbol], QProv.P[T]]
     with TTypes[T] {
 
-  type D     = Symbol
-  type I     = Symbol
-  type PF[A] = QProv.PF[A]
+  type D     = T[EJson]
+  type I     = FreeMapA[Symbol]
+  type PF[A] = QProv.PF[T, A]
   type P     = QProv.P[T]
 
   val prov: Prov[D, I, P] =
-    Prov[D, I, P](ι)
+    Prov[D, I, P](ejs => Free.roll(MFC[T, I](Constant(ejs))))
 
+  /** The `JoinFunc` representing the autojoin of the given dimensions. */
   def autojoinCondition(ls: Dimensions[P], rs: Dimensions[P])(f: Symbol => FreeMap): JoinFunc = {
     def eqCond(k: JoinKeys.JoinKey[I]): JoinFunc =
-      Free.roll(MFC(Eq(f(k.left).as(LeftSide), f(k.right).as(RightSide))))
+      Free.roll(MFC(Eq(
+        k.left.flatMap(f).as(LeftSide),
+        k.right.flatMap(f).as(RightSide))))
 
     autojoinKeys(ls, rs).keys.toNel.fold[JoinFunc](BoolLit(true)) { jks =>
       jks.foldMapLeft1(eqCond)((l, r) => Free.roll(MFC(And(l, eqCond(r)))))
@@ -51,8 +55,8 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
 }
 
 object QProv {
-  type PF[A]      = ProvF[Symbol, Symbol, A]
-  type P[T[_[_]]] = T[PF]
+  type PF[T[_[_]], A] = ProvF[T[EJson], FreeMapA[T, Symbol], A]
+  type P[T[_[_]]]     = T[PF[T, ?]]
 
   def apply[T[_[_]]: BirecursiveT: EqualT]: QProv[T] =
     new QProv[T]
