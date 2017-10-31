@@ -183,7 +183,6 @@ sealed abstract class ReadLP[
       val node = QSU.AutoJoin[T, Symbol](NEL(expr.root, cont.root, fallback.root), translated)
       withName(node).map(_ :++ expr :++ cont :++ fallback)
 
-
     case lp.JoinSideName(name) =>
       withName(QSU.JoinSideRef[T, Symbol](name))
 
