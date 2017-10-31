@@ -88,11 +88,23 @@ sealed abstract class ReadLP[
 
       transpose >>= projectConstIdx(ValueIndex)
 
+    case lp.InvokeUnapply(StructuralLib.FlattenMapKeys, Sized(a)) =>
+      val transpose =
+        withName(QSU.Transpose[T, Symbol](a.root, QSU.Rotation.FlattenMap)).map(_ :++ a)
+
+      transpose >>= projectConstIdx(IdIndex)
+
     case lp.InvokeUnapply(StructuralLib.FlattenArray, Sized(a)) =>
       val transpose =
         withName(QSU.Transpose[T, Symbol](a.root, QSU.Rotation.FlattenArray)).map(_ :++ a)
 
       transpose >>= projectConstIdx(ValueIndex)
+
+    case lp.InvokeUnapply(StructuralLib.FlattenArrayIndices, Sized(a)) =>
+      val transpose =
+        withName(QSU.Transpose[T, Symbol](a.root, QSU.Rotation.FlattenArray)).map(_ :++ a)
+
+      transpose >>= projectConstIdx(IdIndex)
 
     case lp.InvokeUnapply(StructuralLib.ShiftMap, Sized(a)) =>
       val transpose =
@@ -100,11 +112,23 @@ sealed abstract class ReadLP[
 
       transpose >>= projectConstIdx(ValueIndex)
 
+    case lp.InvokeUnapply(StructuralLib.ShiftMapKeys, Sized(a)) =>
+      val transpose =
+        withName(QSU.Transpose[T, Symbol](a.root, QSU.Rotation.ShiftMap)).map(_ :++ a)
+
+      transpose >>= projectConstIdx(IdIndex)
+
     case lp.InvokeUnapply(StructuralLib.ShiftArray, Sized(a)) =>
       val transpose =
         withName(QSU.Transpose[T, Symbol](a.root, QSU.Rotation.ShiftArray)).map(_ :++ a)
 
       transpose >>= projectConstIdx(ValueIndex)
+
+    case lp.InvokeUnapply(StructuralLib.ShiftArrayIndices, Sized(a)) =>
+      val transpose =
+        withName(QSU.Transpose[T, Symbol](a.root, QSU.Rotation.ShiftArray)).map(_ :++ a)
+
+      transpose >>= projectConstIdx(IdIndex)
 
     case lp.InvokeUnapply(SetLib.GroupBy, Sized(a, b)) =>
       withName(QSU.GroupBy[T, Symbol](a.root, b.root)).map(_ :++ a :++ b)
