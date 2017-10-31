@@ -16,14 +16,22 @@
 
 package quasar.qscript.qsu
 
-import quasar.{NameGenerator, Planner}, Planner.PlannerError
+import quasar.{Data, NameGenerator, Planner}, Planner.{NonRepresentableData, PlannerError}
+import quasar.contrib.pathy.mkAbsolute
 import quasar.contrib.scalaz.MonadError_
+import quasar.ejson.EJson
 import quasar.frontend.{logicalplan => lp}
-import slamdata.Predef._
+import quasar.qscript.MapFuncsCore
+import quasar.qscript.qsu.{QScriptUniform => QSU}
+import slamdata.Predef.{Map => SMap, _}
 
 import matryoshka.{AlgebraM, BirecursiveT}
 import matryoshka.implicits._
-import scalaz.Monad
+import matryoshka.patterns.{interpretM, CoEnv}
+import pathy.Path.{rootDir, Sandboxed}
+import scalaz.{\/, Monad}
+import scalaz.syntax.either._
+import scalaz.syntax.monad._
 
 sealed abstract class ReadLP[
     T[_[_]]: BirecursiveT,
@@ -34,8 +42,19 @@ sealed abstract class ReadLP[
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val transform: AlgebraM[F, lp.LogicalPlan, QSUGraph[T]] = {
-    case lp.Read(path) => ???
-    case lp.Constant(data) => ???
+    case lp.Read(path) =>
+      val afile = mkAbsolute(rootDir[Sandboxed], path)    // TODO this is almost certainly wrong
+      withName(QSU.Read(afile))
+
+    case lp.Constant(data) =>
+      val back = fromData(data).fold[PlannerError \/ QSU[T, Symbol]](
+        {
+          case Data.NA => QSU.Nullary(MapFuncsCore.Undefined[T, Symbol]()).right
+          case d => NonRepresentableData(d).left
+        },
+        { x: T[EJson] => QSU.Constant[T, Symbol](x).right })
+
+      MonadError_[F, PlannerError].unattempt(back.point[F]).flatMap(withName)
 
     case lp.InvokeUnapply(func, values) => ???
 
@@ -50,6 +69,21 @@ sealed abstract class ReadLP[
     case lp.TemporalTrunc(part, src) => ???
 
     case lp.Typecheck(expr, tpe, cont, fallback) => ???
+  }
+
+  private def withName(node: QSU[T, Symbol]): F[QSUGraph[T]] = {
+    for {
+      name <- NameGenerator[F].prefixedName("qsu")
+      sym = Symbol(name)
+    } yield QSUGraph(root = sym, SMap(sym -> node))
+  }
+
+  private def fromData(data: Data): Data \/ T[EJson] = {
+    data.hyloM[Data \/ ?, CoEnv[Data, EJson, ?], T[EJson]](
+      interpretM[Data \/ ?, EJson, Data, T[EJson]](
+        _.left,
+        _.embed.right),
+      Data.toEJson[EJson].apply(_).right)
   }
 }
 

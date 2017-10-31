@@ -20,4 +20,15 @@ import slamdata.Predef.{Map => SMap, Symbol}
 
 final case class QSUGraph[T[_[_]]](
     root: Symbol,
-    vertices: SMap[Symbol, QScriptUniform[T, Symbol]])
+    vertices: SMap[Symbol, QScriptUniform[T, Symbol]]) {
+
+  /**
+   * Uniquely merge the graphs, retaining the root from the right.
+   */
+  def ++:(left: QSUGraph[T]): QSUGraph[T] = QSUGraph(root, vertices ++ left.vertices)
+
+  /**
+   * Uniquely merge the graphs, retaining the root from the left.
+   */
+  def :++(right: QSUGraph[T]): QSUGraph[T] = right ++: this
+}

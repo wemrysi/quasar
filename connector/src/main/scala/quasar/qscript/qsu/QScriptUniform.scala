@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.{RenderTree, RenderTreeT}
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
+import quasar.ejson.EJson
 import quasar.fp.numeric.Natural
 import quasar.qscript._
 
@@ -144,8 +145,18 @@ object QScriptUniform {
       source: A,
       predicate: FreeMap[T]) extends QScriptUniform[T, A]
 
-  // Constant(ejson) = Nullary(Constant(ejson))
   final case class Nullary[T[_[_]], A, B](mf: MapFuncCore[T, B]) extends QScriptUniform[T, A]
+
+  object Constant {
+
+    def apply[T[_[_]], A](ejson: T[EJson]): QScriptUniform[T, A] =
+      Nullary(MapFuncsCore.Constant(ejson))
+
+    def unapply[T[_[_]], A, B](nary: Nullary[T, A, B]): Option[T[EJson]] = nary match {
+      case Nullary(MapFuncsCore.Constant(ejson)) => Some(ejson)
+      case _ => None
+    }
+  }
 
   final case class JoinSideRef[T[_[_]], A](id: Symbol) extends QScriptUniform[T, A]
 }
