@@ -121,14 +121,14 @@ object construction {
         rollCore(MapFuncsCore.MakeArray(a1))
       def Meta[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
         rollCore(MapFuncsCore.Meta(a1))
-      def ProjectField[A](src: FreeMapA[T, A], field: FreeMapA[T, A]): FreeMapA[T, A] =
-        rollCore(MapFuncsCore.ProjectField(src, field))
-      def ProjectFieldS[A](src: FreeMapA[T, A], field: String): FreeMapA[T, A] =
-        ProjectField(src, Constant(EJson.str(field)))
-      def DeleteField[A](src: FreeMapA[T, A], field: FreeMapA[T, A]): FreeMapA[T, A] =
-        rollCore(MapFuncsCore.DeleteField(src, field))
-      def DeleteFieldS[A](src: FreeMapA[T, A], field: String): FreeMapA[T, A] =
-        DeleteField(src, Constant(EJson.str(field)))
+      def ProjectKey[A](src: FreeMapA[T, A], key: FreeMapA[T, A]): FreeMapA[T, A] =
+        rollCore(MapFuncsCore.ProjectKey(src, key))
+      def ProjectKeyS[A](src: FreeMapA[T, A], key: String): FreeMapA[T, A] =
+        ProjectKey(src, Constant(EJson.str(key)))
+      def DeleteKey[A](src: FreeMapA[T, A], key: FreeMapA[T, A]): FreeMapA[T, A] =
+        rollCore(MapFuncsCore.DeleteKey(src, key))
+      def DeleteKeyS[A](src: FreeMapA[T, A], key: String): FreeMapA[T, A] =
+        DeleteKey(src, Constant(EJson.str(key)))
       def MakeMap[A](key: FreeMapA[T, A], src: FreeMapA[T, A]): FreeMapA[T, A] =
         rollCore(MapFuncsCore.MakeMap(key, src))
       def MakeMapS[A](key: String, src: FreeMapA[T, A]): FreeMapA[T, A] =
@@ -247,8 +247,8 @@ object construction {
         core(qscript.Subset(src, from.mapSuspension(injTotal.inject), op, count.mapSuspension(injTotal.inject)))
       def Unreferenced: R =
         core(qscript.Unreferenced())
-      def BucketField(src: R, value: FreeMap[T], name: FreeMap[T])(implicit F: Injectable.Aux[ProjectBucket[T, ?], F]): R =
-        embed(F.inject(qscript.BucketField(src, value, name)))
+      def BucketKey(src: R, value: FreeMap[T], name: FreeMap[T])(implicit F: Injectable.Aux[ProjectBucket[T, ?], F]): R =
+        embed(F.inject(qscript.BucketKey(src, value, name)))
       def BucketIndex(src: R, value: FreeMap[T], index: FreeMap[T])(implicit F: Injectable.Aux[ProjectBucket[T, ?], F]): R =
         embed(F.inject(qscript.BucketIndex(src, value, index)))
       def ThetaJoin(src: R,

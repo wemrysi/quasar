@@ -84,7 +84,7 @@ object Cardinality {
   implicit def projectBucket[T[_[_]] : RecursiveT: ShowT]: Cardinality[ProjectBucket[T, ?]] =
     new Cardinality[ProjectBucket[T, ?]] {
       def calculate[M[_] : Monad](pathCard: APath => M[Int]): AlgebraM[M, ProjectBucket[T, ?], Int] = {
-        case BucketField(card, _, _) => card.point[M]
+        case BucketKey(card, _, _) => card.point[M]
         case BucketIndex(card, _, _) => card.point[M]
       }
     }

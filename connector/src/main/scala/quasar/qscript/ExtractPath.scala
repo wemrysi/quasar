@@ -126,7 +126,7 @@ sealed abstract class ExtractPathInstances0 {
     implicit val projectBucket: ExtractPath[ProjectBucket[T, ?], APath] =
       new ExtractPath[ProjectBucket[T, ?], APath] {
         def extractPath[G[_]: ApplicativePlus] = {
-          case BucketField(paths, _, _) => paths
+          case BucketKey(paths, _, _) => paths
           case BucketIndex(paths, _, _) => paths
         }
       }

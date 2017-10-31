@@ -217,11 +217,11 @@ object MongoDbPlanner {
       case MakeArray(a1) => unimplemented[M, Fix[ExprOp]]("MakeArray expression")
       case MakeMap(a1, a2) => unimplemented[M, Fix[ExprOp]]("MakeMap expression")
       case ConcatMaps(a1, a2) => unimplemented[M, Fix[ExprOp]]("ConcatMap expression")
-      case ProjectField($var(dv), $literal(Bson.Text(field))) =>
-        $var(dv \ BsonField.Name(field)).point[M]
-      case ProjectField(a1, a2) => unimplemented[M, Fix[ExprOp]](s"ProjectField expression")
+      case ProjectKey($var(dv), $literal(Bson.Text(key))) =>
+        $var(dv \ BsonField.Name(key)).point[M]
+      case ProjectKey(a1, a2) => unimplemented[M, Fix[ExprOp]](s"ProjectKey expression")
       case ProjectIndex(a1, a2)  => unimplemented[M, Fix[ExprOp]]("ProjectIndex expression")
-      case DeleteField(a1, a2)  => unimplemented[M, Fix[ExprOp]]("DeleteField expression")
+      case DeleteKey(a1, a2)  => unimplemented[M, Fix[ExprOp]]("DeleteKey expression")
 
       // NB: Quasar strings are arrays of characters. However, MongoDB
       //     represent strings and arrays as distinct types. Moreoever, SQL^2
@@ -579,9 +579,9 @@ object MongoDbPlanner {
       case ConcatMaps(Embed(ObjF(o1)), Embed(ObjF(o2))) =>
         Obj(o1 ++ o2).point[M]
       case ConcatMaps(a1, a2) => SpliceObjects(List(a1, a2)).point[M]
-      case ProjectField(a1, a2) => Access(a1, a2).point[M]
+      case ProjectKey(a1, a2) => Access(a1, a2).point[M]
       case ProjectIndex(a1, a2) => Access(a1, a2).point[M]
-      case DeleteField(a1, a2)  => Call(ident("remove"), List(a1, a2)).point[M]
+      case DeleteKey(a1, a2)  => Call(ident("remove"), List(a1, a2)).point[M]
 
       case Guard(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
@@ -668,7 +668,7 @@ object MongoDbPlanner {
       case MFC(And(a, b)) => invoke2Nel(a._2, b._2)(Selector.And.apply(_, _))
       case MFC(Or(a, b)) => invoke2Nel(a._2, b._2)(Selector.Or.apply(_, _))
 
-      case node @ MFC(Guard((Embed(MFC(ProjectField(Embed(MFC(Undefined())), _))), _), typ, cont, _)) =>
+      case node @ MFC(Guard((Embed(MFC(ProjectKey(Embed(MFC(Undefined())), _))), _), typ, cont, _)) =>
         def selCheck: Type => Option[BsonField => Selector] =
           generateTypeCheck[BsonField, Selector](Selector.Or(_, _)) {
             case Type.Null => ((f: BsonField) =>  Selector.Doc(f -> Selector.Type(BsonType.Null)))
@@ -948,13 +948,13 @@ object MongoDbPlanner {
                     getExprBuilder[T, M, WF, EX](
                       cfg.funcHandler, cfg.staticHandler)(
                       dataset,
-                        Free.roll(MFC(MapFuncsCore.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))))
+                        Free.roll(MFC(MapFuncsCore.ProjectKey[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))))
                   case IncludeId =>
                     getExprBuilder[T, M, WF, EX](
                       cfg.funcHandler, cfg.staticHandler)(
                       dataset,
                         MapFuncCore.StaticArray(List(
-                          Free.roll(MFC(MapFuncsCore.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))),
+                          Free.roll(MFC(MapFuncsCore.ProjectKey[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))),
                           HoleF)))
                   case ExcludeId => dataset.point[M]
                 }
@@ -1109,8 +1109,8 @@ object MongoDbPlanner {
                 JoinSource(lb, lk),
                 JoinSource(rb, rk))) >>=
                 (getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(_, qs.combine >>= {
-                  case LeftSide => Free.roll(MFC(MapFuncsCore.ProjectField(HoleF, MapFuncsCore.StrLit("left"))))
-                  case RightSide => Free.roll(MFC(MapFuncsCore.ProjectField(HoleF, MapFuncsCore.StrLit("right"))))
+                  case LeftSide => Free.roll(MFC(MapFuncsCore.ProjectKey(HoleF, MapFuncsCore.StrLit("left"))))
+                  case RightSide => Free.roll(MFC(MapFuncsCore.ProjectKey(HoleF, MapFuncsCore.StrLit("right"))))
                 }))).join
           }).join
       }

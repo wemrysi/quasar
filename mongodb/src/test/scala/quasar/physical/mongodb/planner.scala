@@ -3967,11 +3967,11 @@ class PlannerSpec extends
         lpf.let(
           'tmp0, read("db/foo"),
           lpf.let(
-            'tmp1, makeObj("bar" -> lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("bar")))),
+            'tmp1, makeObj("bar" -> lpf.invoke2(MapProject, lpf.free('tmp0), lpf.constant(Data.Str("bar")))),
             lpf.let('tmp2,
               lpf.sort(
                 lpf.free('tmp1),
-                (lpf.invoke2(ObjectProject, lpf.free('tmp1), lpf.constant(Data.Str("bar"))), SortDir.asc).wrapNel),
+                (lpf.invoke2(MapProject, lpf.free('tmp1), lpf.constant(Data.Str("bar"))), SortDir.asc).wrapNel),
               lpf.free('tmp2))))
 
       planLP(lp) must beWorkflow0(chain[Workflow](
@@ -3989,7 +3989,7 @@ class PlannerSpec extends
           lpf.sort(
             lpf.free('tmp0),
             (math.Divide[Fix[LP]](
-              lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
+              lpf.invoke2(MapProject, lpf.free('tmp0), lpf.constant(Data.Str("bar"))),
               lpf.constant(Data.Dec(10.0))).embed, SortDir.asc).wrapNel))
 
       planLP(lp) must beWorkflow(chain[Workflow](
@@ -4014,11 +4014,11 @@ class PlannerSpec extends
             lpf.invoke2(s.Filter,
               lpf.free('tmp0),
               lpf.invoke2(relations.Eq,
-                lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("baz"))),
+                lpf.invoke2(MapProject, lpf.free('tmp0), lpf.constant(Data.Str("baz"))),
                 lpf.constant(Data.Int(0)))),
             lpf.sort(
               lpf.free('tmp1),
-              (lpf.invoke2(ObjectProject, lpf.free('tmp1), lpf.constant(Data.Str("bar"))), SortDir.asc).wrapNel)))
+              (lpf.invoke2(MapProject, lpf.free('tmp1), lpf.constant(Data.Str("bar"))), SortDir.asc).wrapNel)))
 
       planLP(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
@@ -4034,11 +4034,11 @@ class PlannerSpec extends
           lpf.let(
             'tmp9,
             makeObj(
-              "bar" -> lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("bar")))),
+              "bar" -> lpf.invoke2(MapProject, lpf.free('tmp0), lpf.constant(Data.Str("bar")))),
             lpf.sort(
               lpf.free('tmp9),
               (math.Divide[Fix[LP]](
-                lpf.invoke2(ObjectProject, lpf.free('tmp9), lpf.constant(Data.Str("bar"))),
+                lpf.invoke2(MapProject, lpf.free('tmp9), lpf.constant(Data.Str("bar"))),
                 lpf.constant(Data.Dec(10.0))).embed, SortDir.asc).wrapNel)))
 
       planLP(lp) must beWorkflow0(chain[Workflow](
@@ -4073,14 +4073,14 @@ class PlannerSpec extends
           lpf.invoke1(identity.Squash,
             makeObj(
               "city" ->
-                lpf.invoke2(ObjectProject,
+                lpf.invoke2(MapProject,
                   lpf.invoke2(s.Filter,
                     lpf.free('tmp0),
                     lpf.invoke3(string.Search,
                       lpf.invoke1(FlattenArray,
                         lpf.let(
                           'check1,
-                          lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("loc"))),
+                          lpf.invoke2(MapProject, lpf.free('tmp0), lpf.constant(Data.Str("loc"))),
                           lpf.typecheck(
                             lpf.free('check1),
                             Type.FlexArr(0, None, Type.Str),

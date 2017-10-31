@@ -512,9 +512,9 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])
         (implicit QC: QScriptCore :<: OUT) = {
-        case BucketField(Embed(src), value, field) => FToOut.get(src) >>= QC.prj >>= {
+        case BucketKey(Embed(src), value, key) => FToOut.get(src) >>= QC.prj >>= {
           case Map(srcInner, mf) =>
-            BucketField(srcInner, value >> mf, field >> mf).some
+            BucketKey(srcInner, value >> mf, key >> mf).some
           case _ => None
         }
         case BucketIndex(Embed(src), value, index) => FToOut.get(src) >>= QC.prj >>= {

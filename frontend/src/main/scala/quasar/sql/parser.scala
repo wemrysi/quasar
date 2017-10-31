@@ -33,7 +33,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 sealed abstract class DerefType[T[_[_]]] extends Product with Serializable
-final case class ObjectDeref[T[_[_]]](expr: T[Sql])      extends DerefType[T]
+final case class MapDeref[T[_[_]]](expr: T[Sql])         extends DerefType[T]
 final case class ArrayDeref[T[_[_]]](expr: T[Sql])       extends DerefType[T]
 final case class DimChange[T[_[_]]](unop: UnaryOperator) extends DerefType[T]
 
@@ -336,12 +336,12 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
 
   def deref_expr: Parser[T[Sql]] = primary_expr ~ (rep(
     (op(".") ~> (
-      (ident ^^ (stringLiteral[T[Sql]](_).embed)) ^^ (ObjectDeref(_))))  |
+      (ident ^^ (stringLiteral[T[Sql]](_).embed)) ^^ (MapDeref(_)))) |
       op("{*:}")               ^^^ DimChange[T](FlattenMapKeys)      |
       (op("{*}") | op("{:*}")) ^^^ DimChange[T](FlattenMapValues)    |
       op("{_:}")               ^^^ DimChange[T](ShiftMapKeys)        |
       (op("{_}") | op("{:_}")) ^^^ DimChange[T](ShiftMapValues)      |
-      (op("{") ~> (expr ^^ (ObjectDeref(_))) <~ op("}"))             |
+      (op("{") ~> (expr ^^ (MapDeref(_))) <~ op("}"))                |
       op("[*:]")               ^^^ DimChange[T](FlattenArrayIndices) |
       (op("[*]") | op("[:*]")) ^^^ DimChange[T](FlattenArrayValues)  |
       op("[_:]")               ^^^ DimChange[T](ShiftArrayIndices)   |
@@ -351,7 +351,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     case lhs ~ derefs ~ wild =>
       wild.foldLeft(derefs.foldLeft[T[Sql]](lhs)((lhs, deref) => (deref match {
         case DimChange(unop)  => Unop(lhs, unop)
-        case ObjectDeref(rhs) => FieldDeref(lhs, rhs)
+        case MapDeref(rhs) => KeyDeref(lhs, rhs)
         case ArrayDeref(rhs)  => IndexDeref(lhs, rhs)
       }).embed))((lhs, rhs) => splice(lhs.some).embed)
   }

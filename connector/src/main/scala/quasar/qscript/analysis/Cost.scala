@@ -80,7 +80,7 @@ object Cost {
   implicit def projectBucket[T[_[_]]]: Cost[ProjectBucket[T, ?]] =
     new Cost[ProjectBucket[T, ?]] {
       def evaluate[M[_] : Monad](pathCard: APath => M[Int]): GAlgebraM[(Int, ?), M, ProjectBucket[T, ?], Int] = {
-        case BucketField((card, cost), _, _) => (card + cost).point[M]
+        case BucketKey((card, cost), _, _) => (card + cost).point[M]
         case BucketIndex((card, cost), _, _) => (card + cost).point[M]
       }
     }

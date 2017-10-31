@@ -74,8 +74,8 @@ final class EquiJoinPlanner[
 
   object KeyMetaId {
     def unapply(mf: FreeMap[T]): Boolean = mf.resume match {
-      case -\/(MFC(mfs.ProjectField(Embed(CoEnv(\/-(MFC(mfs.Meta(_))))), mfs.StrLit("id")))) => true
-      case _                                                                                 => false
+      case -\/(MFC(mfs.ProjectKey(Embed(CoEnv(\/-(MFC(mfs.Meta(_))))), mfs.StrLit("id")))) => true
+      case _                                                                               => false
     }
   }
 
