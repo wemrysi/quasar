@@ -56,7 +56,18 @@ trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] {
     
     override def explain(repr: Fix[SqlExpr]): Backend[String] = ???
 
-    override def executePlan(repr: Fix[SqlExpr], out: AFile): Backend[Unit] = ???
+    override def executePlan(repr: Fix[SqlExpr], out: AFile): Backend[Unit] = {
+      ME.unattempt(renderQuery.asString(repr)
+        .leftMap(QScriptPlanningFailed.apply)
+        .traverse { q =>
+          val tablePath = TablePath.create(out)
+          val cmd = Fragment.const("CREATE TABLE") ++
+          Fragment.const(tablePath.shows) ++
+          Fragment.const("AS") ++
+          Fragment.const(q)
+        cmd.update.run.liftB
+      }).void
+    }
 
     override def resultsCursor(repr: Fix[SqlExpr]): Backend[DbDataStream] = {
       ME.unattempt(renderQuery.asString(repr)
