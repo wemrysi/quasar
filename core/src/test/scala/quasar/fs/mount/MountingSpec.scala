@@ -21,11 +21,10 @@ import slamdata.Predef._
 import quasar.Variables
 import quasar.contrib.pathy.{ADir, AFile, APath}
 import quasar.fs.{PathError, FileSystemType}
-import quasar.sql, sql.{ScopedExpr, Sql}
+import quasar.sql._
 
 import matryoshka._
 import matryoshka.data.Fix
-import matryoshka.implicits._
 import monocle.function.Field1
 import monocle.std.{disjunction => D}
 import org.specs2.execute._
@@ -40,7 +39,7 @@ abstract class MountingSpec[S[_]](
   S2: PathMismatchFailure :<: S
 ) extends quasar.Qspec {
 
-  import MountConfig.{viewConfig, fileSystemConfig}
+  import MountConfig.{viewConfig0, fileSystemConfig}
 
   def interpName: String
   def interpret: S ~> Task
@@ -56,11 +55,11 @@ abstract class MountingSpec[S[_]](
       s >> a.foldMap(interpret).unsafePerformSync
   }
 
-  val noVars   = Variables.fromMap(Map.empty)
-  val exprA    = ScopedExpr(sql.stringLiteral[Fix[Sql]]("A").embed, Nil)
-  val exprB    = ScopedExpr(sql.stringLiteral[Fix[Sql]]("B").embed, Nil)
-  val viewCfgA = viewConfig(exprA, noVars)
-  val viewCfgB = viewConfig(exprB, noVars)
+  val noVars   = Variables.empty
+  val exprA    = sqlB"A"
+  val exprB    = sqlB"B"
+  val viewCfgA = viewConfig0(exprA)
+  val viewCfgB = viewConfig0(exprB)
 
   val dbType   = FileSystemType("db")
   val uriA     = ConnectionUri("db://example.com/A")
@@ -95,7 +94,7 @@ abstract class MountingSpec[S[_]](
         val dA = rootDir </> dir("d1") </> dir("A")
         val dB = rootDir </> dir("d2") </> dir("B")
 
-        val mnts = Map[APath, MountType](
+        val expected = Map[APath, MountType](
           f1 -> MountType.viewMount(),
           f2 -> MountType.viewMount(),
           dA -> MountType.fileSystemMount(dbType))
@@ -107,7 +106,7 @@ abstract class MountingSpec[S[_]](
           mountFileSystem(dB, dbType, uriB)
 
         (setup *> havingPrefix(rootDir </> dir("d1")))
-          .map(_ must_=== mnts ∘ (_.right))
+          .map(_ must_=== expected ∘ (_.right))
       }
 
       "returns nothing when no mounts have the given prefix" >>* {

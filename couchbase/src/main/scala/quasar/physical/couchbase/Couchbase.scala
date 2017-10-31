@@ -51,10 +51,10 @@ trait Couchbase extends BackendModule with DefaultAnalyzeModule {
     KeyValueStore[ResultHandle, Cursor, ?]
   )#M[A]
 
-  type QS[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
+  type QS[T[_[_]]] = CouchbaseQScriptCP[T]
 
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
+    quasar.physical.couchbase.qScriptToQScriptTotal[T]
 
   type Repr = Mu[N1QL]
 

@@ -19,6 +19,7 @@ package quasar.main
 import slamdata.Predef._
 import quasar.config.MetaStoreConfig
 import quasar.contrib.scalaz.catchable._
+import quasar.contrib.scalaz.concurrent._
 import quasar.contrib.scalaz.eitherT._
 import quasar.db.DbConnectionConfig
 import quasar.effect.{Read, Write}
@@ -74,8 +75,11 @@ object Quasar {
 
   def initWithMeta(loadConfig: BackendConfig, metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): MainTask[Quasar] =
     for {
+      _ <- shift.liftM[MainErrT]
       fsThing  <- CompositeFileSystem.initWithMountsInMetaStore(loadConfig,metaRef)
+      _ <- shift.liftM[MainErrT]
       quasarFS <- initWithFS(fsThing, metaRef, persist).liftM[MainErrT]
+      _ <- shift.liftM[MainErrT]
     } yield quasarFS.extendShutdown(fsThing.shutdown)
 
   def initWithFS(fsThing: FS, metaRef: TaskRef[MetaStore], persist: DbConnectionConfig => MainTask[Unit]): Task[Quasar] =

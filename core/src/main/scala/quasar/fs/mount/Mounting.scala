@@ -36,7 +36,8 @@ object Mounting {
 
   /** Provides for accessing many mounts at once, which allows certain
     * operations (like determining which paths in a directory refer to
-    * mounts) to be implemented more efficiently.
+    * mounts) to be implemented more efficiently. A mount at the supplied
+    * prefix is not returned as part of the result.
     */
   final case class HavingPrefix(dir: ADir)
     extends Mounting[Map[APath, MountingError \/ MountType]]
