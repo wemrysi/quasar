@@ -16,7 +16,7 @@
 
 package quasar.qscript.qsu
 
-import quasar.{NameGenerator, Planner}
+import quasar.{NameGenerator, Planner}, Planner.PlannerError
 import quasar.contrib.scalaz.MonadError_
 import quasar.frontend.{logicalplan => lp}
 import slamdata.Predef._
@@ -25,21 +25,15 @@ import matryoshka.{AlgebraM, BirecursiveT}
 import matryoshka.implicits._
 import scalaz.Monad
 
-object ReadLP {
-  import Planner.PlannerError
+sealed abstract class ReadLP[
+    T[_[_]]: BirecursiveT,
+    F[_]: Monad: MonadError_[?[_], PlannerError]: NameGenerator] {
 
-  def apply[
-      T[_[_]]: BirecursiveT,
-      F[_]: Monad: MonadError_[?[_], PlannerError]: NameGenerator](
-      plan: T[lp.LogicalPlan]): F[QSUGraph[T]] =
-    plan.cataM(transform[T, F])
+  def apply(plan: T[lp.LogicalPlan]): F[QSUGraph[T]] =
+    plan.cataM(transform)
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  def transform[
-      T[_[_]]: BirecursiveT,
-      F[_]: Monad: MonadError_[?[_], PlannerError]: NameGenerator]
-    : AlgebraM[F, lp.LogicalPlan, QSUGraph[T]] = {
-
+  val transform: AlgebraM[F, lp.LogicalPlan, QSUGraph[T]] = {
     case lp.Read(path) => ???
     case lp.Constant(data) => ???
 
@@ -57,4 +51,12 @@ object ReadLP {
 
     case lp.Typecheck(expr, tpe, cont, fallback) => ???
   }
+}
+
+object ReadLP {
+
+  def apply[
+      T[_[_]]: BirecursiveT,
+      F[_]: Monad: MonadError_[?[_], PlannerError]: NameGenerator]: ReadLP[T, F] =
+    new ReadLP[T, F] {}
 }
