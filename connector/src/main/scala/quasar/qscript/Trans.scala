@@ -40,7 +40,6 @@ object Trans {
       : M[T[G]] =
     applyTrans(trans, PrismNT.inject)(t)
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def applyTrans[T[_[_]]: BirecursiveT, F[_], G[_]: Traverse, M[_]: Monad]
       (trans: Trans[F, M], GtoF: PrismNT[G, F])
       (t: T[G])
@@ -61,7 +60,7 @@ object Trans {
 
   ////
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion", "org.wartremover.warts.NonUnitStatements"))
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def transBranches[T[_[_]]: BirecursiveT, F[_], M[_]: Monad]
       (trans: Trans[F, M], QTtoF: PrismNT[QScriptTotal[T, ?], F])
       (fqs: FreeQS[T])
