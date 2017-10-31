@@ -73,8 +73,11 @@ trait SparkCore extends BackendModule with DefaultAnalyzeModule {
 
   // common for all spark based connecotrs
   type M[A] = Free[Eff, A]
-  type QS[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
+  type QS[T[_[_]]] = SparkCoreQScriptCP[T]
   type Repr = RDD[Data]
+
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
+    quasar.physical.sparkcore.fs.qScriptToQScriptTotal[T]
 
   private final implicit def _ReadSparkContextInj: Inject[Read[SparkContext, ?], Eff] =
     ReadSparkContextInj
