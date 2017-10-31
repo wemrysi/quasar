@@ -17,6 +17,7 @@
 package quasar.qscript.qsu
 
 import quasar.{
+  ejson,
   BinaryFunc,
   Data,
   Mapping,
@@ -56,6 +57,9 @@ sealed abstract class ReadLP[
   private val IC = Inject[MapFuncCore, MapFunc]
   private val ID = Inject[MapFuncDerived, MapFunc]
 
+  private val IdIndex = 0
+  private val ValueIndex = 1
+
   def apply(plan: T[lp.LogicalPlan]): F[QSUGraph[T]] =
     plan.cataM(transform)
 
@@ -79,19 +83,28 @@ sealed abstract class ReadLP[
       MonadError_[F, PlannerError].unattempt(back.point[F]).flatMap(withName)
 
     case lp.InvokeUnapply(StructuralLib.FlattenMap, Sized(a)) =>
-      withName(QSU.Transpose[T, Symbol](a.root, QSU.Rotation.FlattenMap)).map(_ :++ a)
+      val transpose =
+        withName(QSU.Transpose[T, Symbol](a.root, QSU.Rotation.FlattenMap)).map(_ :++ a)
 
+      transpose >>= projectConstIdx(ValueIndex)
 
     case lp.InvokeUnapply(StructuralLib.FlattenArray, Sized(a)) =>
-      withName(QSU.Transpose[T, Symbol](a.root, QSU.Rotation.FlattenArray)).map(_ :++ a)
+      val transpose =
+        withName(QSU.Transpose[T, Symbol](a.root, QSU.Rotation.FlattenArray)).map(_ :++ a)
 
-    // TODO key/index variants?
+      transpose >>= projectConstIdx(ValueIndex)
 
     case lp.InvokeUnapply(StructuralLib.ShiftMap, Sized(a)) =>
-      withName(QSU.Transpose[T, Symbol](a.root, QSU.Rotation.ShiftMap)).map(_ :++ a)
+      val transpose =
+        withName(QSU.Transpose[T, Symbol](a.root, QSU.Rotation.ShiftMap)).map(_ :++ a)
+
+      transpose >>= projectConstIdx(ValueIndex)
 
     case lp.InvokeUnapply(StructuralLib.ShiftArray, Sized(a)) =>
-      withName(QSU.Transpose[T, Symbol](a.root, QSU.Rotation.ShiftArray)).map(_ :++ a)
+      val transpose =
+        withName(QSU.Transpose[T, Symbol](a.root, QSU.Rotation.ShiftArray)).map(_ :++ a)
+
+      transpose >>= projectConstIdx(ValueIndex)
 
     case lp.InvokeUnapply(SetLib.GroupBy, Sized(a, b)) =>
       withName(QSU.GroupBy[T, Symbol](a.root, b.root)).map(_ :++ a :++ b)
@@ -172,6 +185,15 @@ sealed abstract class ReadLP[
       val graphs = src <:: order.map(_._1)
 
       withName(node).map(g => graphs.foldLeft(g)(_ :++ _))
+  }
+
+  private def projectConstIdx(idx: Int)(parent: QSUGraph[T]): F[QSUGraph[T]] = {
+    for {
+      idxG <- withName(QSU.Constant[T, Symbol](
+        ejson.ExtEJson(ejson.Int[T[EJson]](idx)).embed))
+      func = IC(MapFuncsCore.ProjectIndex[T, Int](0, 1))
+      nodeG <- withName(QSU.AutoJoin[T, Symbol](NEL(parent.root, idxG.root), func))
+    } yield nodeG :++ idxG :++ parent
   }
 
   private def withName(node: QSU[T, Symbol]): F[QSUGraph[T]] = {
