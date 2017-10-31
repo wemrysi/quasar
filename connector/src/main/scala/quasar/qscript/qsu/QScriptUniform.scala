@@ -21,11 +21,10 @@ import quasar.{RenderTree, RenderTreeT}
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.EJson
-import quasar.fp.numeric.Natural
 import quasar.qscript._
 
 import matryoshka.{BirecursiveT, Delay, EqualT, ShowT}
-import scalaz.{Equal, NonEmptyList => NEL, Traverse}
+import scalaz.{:<:, Equal, NonEmptyList => NEL, Traverse}
 
 sealed trait QScriptUniform[T[_[_]], A] extends Product with Serializable
 
@@ -43,7 +42,7 @@ object QScriptUniform {
 
   final case class AutoJoin[T[_[_]], A](
       sources: NEL[A],
-      combiner: MapFuncCore[T, Natural]) extends QScriptUniform[T, A]
+      combiner: MapFunc[T, Int]) extends QScriptUniform[T, A]
 
   final case class GroupBy[T[_[_]], A](
       left: A,
@@ -66,8 +65,8 @@ object QScriptUniform {
       right: A,
       condition: A,
       joinType: JoinType,
-      leftRef: JoinSide,
-      rightRef: JoinSide) extends QScriptUniform[T, A]
+      leftRef: Symbol,
+      rightRef: Symbol) extends QScriptUniform[T, A]
 
   // QScriptish
   final case class ThetaJoin[T[_[_]], A](
@@ -141,20 +140,26 @@ object QScriptUniform {
       predicate: A) extends QScriptUniform[T, A]
 
   // QScriptish
-  final case class QFilter[T[_[_]], A](
+  final case class QSFilter[T[_[_]], A](
       source: A,
       predicate: FreeMap[T]) extends QScriptUniform[T, A]
 
-  final case class Nullary[T[_[_]], A, B](mf: MapFuncCore[T, B]) extends QScriptUniform[T, A]
+  final case class Nullary[T[_[_]], A, B](mf: MapFunc[T, B]) extends QScriptUniform[T, A]
 
   object Constant {
 
-    def apply[T[_[_]], A](ejson: T[EJson]): QScriptUniform[T, A] =
-      Nullary(MapFuncsCore.Constant(ejson))
+    def apply[T[_[_]], A](ejson: T[EJson])(implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?]): QScriptUniform[T, A] =
+      Nullary(IC(MapFuncsCore.Constant(ejson)))
 
-    def unapply[T[_[_]], A, B](nary: Nullary[T, A, B]): Option[T[EJson]] = nary match {
-      case Nullary(MapFuncsCore.Constant(ejson)) => Some(ejson)
-      case _ => None
+    def unapply[T[_[_]], A, B](nary: Nullary[T, A, B])(implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?]): Option[T[EJson]] = {
+      object Extract {
+        def unapply[A](mfc: MapFunc[T, A]): Option[MapFuncCore[T, A]] = IC.prj(mfc)
+      }
+
+      nary match {
+        case Nullary(Extract(MapFuncsCore.Constant(ejson))) => Some(ejson)
+        case _ => None
+      }
     }
   }
 

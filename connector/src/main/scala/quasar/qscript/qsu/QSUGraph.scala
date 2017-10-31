@@ -16,11 +16,26 @@
 
 package quasar.qscript.qsu
 
-import slamdata.Predef.{Map => SMap, Symbol}
+import quasar.fp._
+import slamdata.Predef.{Map => SMap, _}
+
+import scalaz.syntax.equal._
 
 final case class QSUGraph[T[_[_]]](
     root: Symbol,
     vertices: SMap[Symbol, QScriptUniform[T, Symbol]]) {
+
+  def rename(from: Symbol, to: Symbol): QSUGraph[T] = {
+    val root2 = if (from === root)
+      from
+    else
+      root
+
+    val vertices2 =
+      vertices.get(from).map(node => vertices - from + (to -> node)).getOrElse(vertices)
+
+    QSUGraph(root2, vertices2)
+  }
 
   /**
    * Uniquely merge the graphs, retaining the root from the right.
