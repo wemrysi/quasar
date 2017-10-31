@@ -22,6 +22,7 @@ import quasar.common.PhaseResult._
 import quasar.connector.{BackendModule, DefaultAnalyzeModule}
 import quasar.contrib.pathy.APath
 import quasar.contrib.scalaz.{MonadReader_, MonadTell_}
+import quasar.effect.MonoSeq
 import quasar.fp.free._
 import quasar.fs.FileSystemError._
 import quasar.fs.MonadFsErr
@@ -45,7 +46,6 @@ import doobie.hikari.hikaritransactor.HikariTransactor
 import matryoshka.{BirecursiveT, Delay, EqualT, RecursiveT, ShowT}
 import matryoshka.implicits._
 import matryoshka.data._
-
 import scalaz._
 import Scalaz._
 import scalaz.concurrent.Task
@@ -57,6 +57,7 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
   type Eff[A] = model.Eff[A]
   type M[A] = model.M[A]
   type Config = common.Config
+  val chunkSize = 512
 
   implicit class LiftEffBackend[F[_], A](m: F[A])(implicit I: F :<: Eff) {
     val liftB: Backend[A] = lift(m).into[Eff].liftB
@@ -65,6 +66,7 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
   import Cost._
   import Cardinality._
 
+  def MonoSeqM: MonoSeq[M] = MonoSeq[M]
   def CardinalityQSM: Cardinality[QSM[Fix, ?]] = Cardinality[QSM[Fix, ?]]
   def CostQSM: Cost[QSM[Fix, ?]] = Cost[QSM[Fix, ?]]
   def FunctorQSM[T[_[_]]] = Functor[QSM[T, ?]]

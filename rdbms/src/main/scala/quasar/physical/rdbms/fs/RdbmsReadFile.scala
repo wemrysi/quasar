@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.eitherT._
 import quasar.Data
-import quasar.effect.{Kvs, MonoSeq}
+import quasar.effect.Kvs
 import quasar.effect.Kvs._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._
@@ -45,12 +45,10 @@ trait RdbmsReadFile
     with ManagedReadFile[DbDataStream] {
   this: Rdbms =>
 
-  private val chunkSize = 512
   import ReadFile._
 
   implicit def MonadM: Monad[M]
   implicit def dataMeta: Meta[Data]
-  def MonoSeqM: MonoSeq[M] = MonoSeq[M]
   def ReadKvsM: Kvs[M, ReadHandle, DbDataStream] =
     Kvs[M, ReadHandle, DbDataStream]
 

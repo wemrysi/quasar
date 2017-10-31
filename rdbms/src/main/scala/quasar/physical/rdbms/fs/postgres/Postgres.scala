@@ -24,6 +24,8 @@ import quasar.fs.mount.BackendDef.DefinitionError
 import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.fs._
+import quasar.physical.rdbms.fs.postgres.planner.PostgresRenderQuery
+import quasar.physical.rdbms.planner.RenderQuery
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 
 import java.net.URI
@@ -76,4 +78,5 @@ object Postgres
   }
 
   override lazy val dataMeta: Meta[Data] = postgres.mapping.JsonDataMeta
+  override lazy val renderQuery: RenderQuery = PostgresRenderQuery
 }

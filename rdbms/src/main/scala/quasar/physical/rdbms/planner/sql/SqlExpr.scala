@@ -25,8 +25,7 @@ object SqlExpr extends SqlExprInstances {
   import Select._
   final case class Id[T](v: String) extends SqlExpr[T]
 
-  final case class SelectRow[T](selection: Selection[T],
-                                from: From[T])
+  final case class SelectRow[T](selection: Selection[T], from: From[T])
       extends SqlExpr[T]
 
   final case class Select[T](selection: Selection[T],
