@@ -224,7 +224,7 @@ package object qscript {
     (lcr2, getL >> getLCR, getC >> getLCR, getR >> getLCR, getR2)
   }
 
-  def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
+  def rebase[M[_]: Bind, A](in: M[A], key: M[A]): M[A] = in >> key
 
   // FIXME: Should this also normalize EquiJoins?
   def rebaseBranch[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](

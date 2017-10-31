@@ -238,7 +238,7 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
 
   def ProjectBucket = make(
     λ[ProjectBucket ~> (Option ∘ ProjectBucket)#λ] {
-      case BucketField(a, v, f) => makeNorm(v, f)(freeMFEq(_), freeMFEq(_))(BucketField(a, _, _))
+      case BucketKey(a, v, k) => makeNorm(v, k)(freeMFEq(_), freeMFEq(_))(BucketKey(a, _, _))
       case BucketIndex(a, v, i) => makeNorm(v, i)(freeMFEq(_), freeMFEq(_))(BucketIndex(a, _, _))
     }
   )

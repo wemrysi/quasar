@@ -121,16 +121,16 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
               lpf.invoke2(Filter,
                 lpf.free('__tmp1),
                 lpf.typecheck(
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("foo"))),
+                  lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("foo"))),
                   Type.Obj(Map(), Some(Type.Top)),
                   lpf.constant(Data.Bool(true)),
                   lpf.constant(Data.Bool(false)))),
               JoinType.Inner,
               JoinCondition('__leftJoin9, '__rightJoin10,
                 lpf.invoke2(Eq,
-                  lpf.invoke2(ObjectProject, lpf.joinSideName('__leftJoin9), lpf.constant(Data.Str("x"))),
-                  lpf.invoke2(ObjectProject,
-                    lpf.invoke2(ObjectProject, lpf.joinSideName('__rightJoin10), lpf.constant(Data.Str("foo"))),
+                  lpf.invoke2(MapProject, lpf.joinSideName('__leftJoin9), lpf.constant(Data.Str("x"))),
+                  lpf.invoke2(MapProject,
+                    lpf.invoke2(MapProject, lpf.joinSideName('__rightJoin10), lpf.constant(Data.Str("foo"))),
                     lpf.constant(Data.Str("bar"))))))),
           lpf.invoke1(Squash,
             lpf.let('__tmp4,
@@ -143,7 +143,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                   lpf.typecheck(
                     lpf.free('__tmp5),
                     Type.Obj(Map(), Some(Type.Top)),
-                    lpf.invoke2(ObjectConcat, lpf.free('__tmp5), lpf.free('__tmp4)),
+                    lpf.invoke2(MapConcat, lpf.free('__tmp5), lpf.free('__tmp4)),
                     lpf.constant(Data.NA))),
                   lpf.constant(Data.NA))))))
     }
@@ -165,25 +165,25 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                   lpf.invoke2(And,
                     lpf.typecheck(
                       lpf.invoke2(ArrayProject,
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("parents"))),
+                        lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("parents"))),
                         lpf.constant(Data.Int(0))),
                       Type.Obj(Map(), Some(Type.Top)),
                       lpf.constant(Data.Bool(true)),
                       lpf.constant(Data.Bool(false))),
                     lpf.typecheck(
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("parents"))),
+                      lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("parents"))),
                       Type.FlexArr(0, None, Type.Top),
                       lpf.constant(Data.Bool(true)),
                       lpf.constant(Data.Bool(false)))),
                   lpf.typecheck(
-                    lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("author"))),
+                    lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("author"))),
                     Type.Obj(Map(), Some(Type.Top)),
                     lpf.constant(Data.Bool(true)),
                     lpf.constant(Data.Bool(false))))),
               lpf.invoke2(Filter, // filter right side types
                 lpf.free('__tmp3),
                 lpf.typecheck(
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp3), lpf.constant(Data.Str("author"))),
+                  lpf.invoke2(MapProject, lpf.free('__tmp3), lpf.constant(Data.Str("author"))),
                   Type.Obj(Map(), Some(Type.Top)),
                   lpf.constant(Data.Bool(true)),
                   lpf.constant(Data.Bool(false)))),
@@ -191,18 +191,18 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
               JoinCondition('__leftJoin9, '__rightJoin10,
                 lpf.invoke2(And, // join post type filters
                   lpf.invoke2(Eq,
-                    lpf.invoke2(ObjectProject, lpf.joinSideName('__rightJoin10), lpf.constant(Data.Str("sha"))),
-                    lpf.invoke2(ObjectProject,
+                    lpf.invoke2(MapProject, lpf.joinSideName('__rightJoin10), lpf.constant(Data.Str("sha"))),
+                    lpf.invoke2(MapProject,
                       lpf.invoke2(ArrayProject,
-                        lpf.invoke2(ObjectProject, lpf.joinSideName('__leftJoin9), lpf.constant(Data.Str("parents"))),
+                        lpf.invoke2(MapProject, lpf.joinSideName('__leftJoin9), lpf.constant(Data.Str("parents"))),
                         lpf.constant(Data.Int(0))),
                       lpf.constant(Data.Str("sha")))),
                   lpf.invoke2(Eq,
-                    lpf.invoke2(ObjectProject,
-                      lpf.invoke2(ObjectProject, lpf.joinSideName('__leftJoin9), lpf.constant(Data.Str("author"))),
+                    lpf.invoke2(MapProject,
+                      lpf.invoke2(MapProject, lpf.joinSideName('__leftJoin9), lpf.constant(Data.Str("author"))),
                       lpf.constant(Data.Str("login"))),
-                    lpf.invoke2(ObjectProject,
-                      lpf.invoke2(ObjectProject, lpf.joinSideName('__rightJoin10), lpf.constant(Data.Str("author"))),
+                    lpf.invoke2(MapProject,
+                      lpf.invoke2(MapProject, lpf.joinSideName('__rightJoin10), lpf.constant(Data.Str("author"))),
                       lpf.constant(Data.Str("login"))))))))),
         postJoin)
 
@@ -218,19 +218,19 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testTypedLogicalPlanCompile(query,
         complexJoinTypecheck(
           lpf.invoke1(Squash,
-            lpf.invoke2(ObjectConcat,
-              lpf.invoke2(ObjectConcat,
-                lpf.invoke2(ObjectConcat,
-                  lpf.invoke2(MakeObject,
+            lpf.invoke2(MapConcat,
+              lpf.invoke2(MapConcat,
+                lpf.invoke2(MapConcat,
+                  lpf.invoke2(MakeMap,
                     lpf.constant(Data.Str("child")),
                     lpf.let('__tmp5,
                       JoinDir.Left.projectFrom(lpf.free('__tmp0)),
                       lpf.typecheck(
                         lpf.free('__tmp5),
                         Type.Obj(Map(), Some(Type.Top)),
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp5), lpf.constant(Data.Str("sha"))),
+                        lpf.invoke2(MapProject, lpf.free('__tmp5), lpf.constant(Data.Str("sha"))),
                         lpf.constant(Data.NA)))),
-                  lpf.invoke2(MakeObject,
+                  lpf.invoke2(MakeMap,
                     lpf.constant(Data.Str("c_auth")),
                     lpf.let('__tmp6,
                       JoinDir.Left.projectFrom(lpf.free('__tmp0)),
@@ -238,23 +238,23 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                         lpf.free('__tmp6),
                         Type.Obj(Map(), Some(Type.Top)),
                         lpf.let('__tmp7,
-                          lpf.invoke2(ObjectProject, lpf.free('__tmp6), lpf.constant(Data.Str("author"))),
+                          lpf.invoke2(MapProject, lpf.free('__tmp6), lpf.constant(Data.Str("author"))),
                           lpf.typecheck(
                             lpf.free('__tmp7),
                             Type.Obj(Map(), Some(Type.Top)),
-                            lpf.invoke2(ObjectProject, lpf.free('__tmp7), lpf.constant(Data.Str("login"))),
+                            lpf.invoke2(MapProject, lpf.free('__tmp7), lpf.constant(Data.Str("login"))),
                             lpf.constant(Data.NA))),
                         lpf.constant(Data.NA))))),
-                lpf.invoke2(MakeObject,
+                lpf.invoke2(MakeMap,
                   lpf.constant(Data.Str("parent")),
                   lpf.let('__tmp8,
                     JoinDir.Right.projectFrom(lpf.free('__tmp0)),
                     lpf.typecheck(
                       lpf.free('__tmp8),
                       Type.Obj(Map(), Some(Type.Top)),
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp8), lpf.constant(Data.Str("sha"))),
+                      lpf.invoke2(MapProject, lpf.free('__tmp8), lpf.constant(Data.Str("sha"))),
                       lpf.constant(Data.NA))))),
-              lpf.invoke2(MakeObject,
+              lpf.invoke2(MakeMap,
                 lpf.constant(Data.Str("p_auth")),
                 lpf.let('__tmp9,
                   JoinDir.Right.projectFrom(lpf.free('__tmp0)),
@@ -262,11 +262,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                     lpf.free('__tmp9),
                     Type.Obj(Map(), Some(Type.Top)),
                     lpf.let('__tmp10,
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp9), lpf.constant(Data.Str("author"))),
+                      lpf.invoke2(MapProject, lpf.free('__tmp9), lpf.constant(Data.Str("author"))),
                       lpf.typecheck(
                         lpf.free('__tmp10),
                         Type.Obj(Map(), Some(Type.Top)),
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp10), lpf.constant(Data.Str("login"))),
+                        lpf.invoke2(MapProject, lpf.free('__tmp10), lpf.constant(Data.Str("login"))),
                         lpf.constant(Data.NA))),
                     lpf.constant(Data.NA))))))))
     }
@@ -292,12 +292,12 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                   lpf.free('__tmp6),
                   Type.Obj(Map(), Some(Type.Top)),
                   lpf.let('__tmp7,
-                    lpf.invoke2(ObjectProject, lpf.free('__tmp6), lpf.constant(Data.Str("author"))),
+                    lpf.invoke2(MapProject, lpf.free('__tmp6), lpf.constant(Data.Str("author"))),
                     lpf.typecheck(
                       lpf.free('__tmp7),
                       Type.Obj(Map(), Some(Type.Top)),
                       lpf.let('__tmp8,
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp7), lpf.constant(Data.Str("login"))),
+                        lpf.invoke2(MapProject, lpf.free('__tmp7), lpf.constant(Data.Str("login"))),
                         lpf.typecheck(
                           lpf.free('__tmp8),
                           Type.FlexArr(0, None, Type.Top) ⨿ Type.Str,
@@ -307,12 +307,12 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                               lpf.free('__tmp9),
                               Type.Obj(Map(), Some(Type.Top)),
                               lpf.let('__tmp10,
-                                lpf.invoke2(ObjectProject, lpf.free('__tmp9), lpf.constant(Data.Str("author"))),
+                                lpf.invoke2(MapProject, lpf.free('__tmp9), lpf.constant(Data.Str("author"))),
                                 lpf.typecheck(
                                   lpf.free('__tmp10),
                                   Type.Obj(Map(), Some(Type.Top)),
                                   lpf.let('__tmp11,
-                                    lpf.invoke2(ObjectProject, lpf.free('__tmp10), lpf.constant(Data.Str("login"))),
+                                    lpf.invoke2(MapProject, lpf.free('__tmp10), lpf.constant(Data.Str("login"))),
                                     lpf.typecheck(
                                       lpf.free('__tmp11),
                                       Type.FlexArr(0, None, Type.Top) ⨿ Type.Str,
@@ -328,19 +328,19 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                       lpf.constant(Data.NA))),
                   lpf.constant(Data.NA)))),
             lpf.invoke1(Squash,
-              lpf.invoke2(ObjectConcat,
-                lpf.invoke2(ObjectConcat,
-                  lpf.invoke2(ObjectConcat,
-                    lpf.invoke2(MakeObject,
+              lpf.invoke2(MapConcat,
+                lpf.invoke2(MapConcat,
+                  lpf.invoke2(MapConcat,
+                    lpf.invoke2(MakeMap,
                       lpf.constant(Data.Str("child")),
                       lpf.let('__tmp12,
                         JoinDir.Left.projectFrom(lpf.free('__tmp5)),
                         lpf.typecheck(
                           lpf.free('__tmp12),
                           Type.Obj(Map(), Some(Type.Top)),
-                          lpf.invoke2(ObjectProject, lpf.free('__tmp12), lpf.constant(Data.Str("sha"))),
+                          lpf.invoke2(MapProject, lpf.free('__tmp12), lpf.constant(Data.Str("sha"))),
                           lpf.constant(Data.NA)))),
-                    lpf.invoke2(MakeObject,
+                    lpf.invoke2(MakeMap,
                       lpf.constant(Data.Str("c_auth")),
                       lpf.let('__tmp13,
                         JoinDir.Left.projectFrom(lpf.free('__tmp5)),
@@ -348,23 +348,23 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                           lpf.free('__tmp13),
                           Type.Obj(Map(), Some(Type.Top)),
                           lpf.let('__tmp14,
-                            lpf.invoke2(ObjectProject, lpf.free('__tmp13), lpf.constant(Data.Str("author"))),
+                            lpf.invoke2(MapProject, lpf.free('__tmp13), lpf.constant(Data.Str("author"))),
                             lpf.typecheck(
                               lpf.free('__tmp14),
                               Type.Obj(Map(), Some(Type.Top)),
-                              lpf.invoke2(ObjectProject, lpf.free('__tmp14), lpf.constant(Data.Str("login"))),
+                              lpf.invoke2(MapProject, lpf.free('__tmp14), lpf.constant(Data.Str("login"))),
                               lpf.constant(Data.NA))),
                           lpf.constant(Data.NA))))),
-                  lpf.invoke2(MakeObject,
+                  lpf.invoke2(MakeMap,
                     lpf.constant(Data.Str("parent")),
                     lpf.let('__tmp15,
                       JoinDir.Right.projectFrom(lpf.free('__tmp5)),
                       lpf.typecheck(
                         lpf.free('__tmp15),
                         Type.Obj(Map(), Some(Type.Top)),
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp15), lpf.constant(Data.Str("sha"))),
+                        lpf.invoke2(MapProject, lpf.free('__tmp15), lpf.constant(Data.Str("sha"))),
                         lpf.constant(Data.NA))))),
-                lpf.invoke2(MakeObject,
+                lpf.invoke2(MakeMap,
                   lpf.constant(Data.Str("p_auth")),
                   lpf.let('__tmp16,
                     JoinDir.Right.projectFrom(lpf.free('__tmp5)),
@@ -372,11 +372,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                       lpf.free('__tmp16),
                       Type.Obj(Map(), Some(Type.Top)),
                       lpf.let('__tmp17,
-                        lpf.invoke2(ObjectProject, lpf.free('__tmp16), lpf.constant(Data.Str("author"))),
+                        lpf.invoke2(MapProject, lpf.free('__tmp16), lpf.constant(Data.Str("author"))),
                         lpf.typecheck(
                           lpf.free('__tmp17),
                           Type.Obj(Map(), Some(Type.Top)),
-                          lpf.invoke2(ObjectProject, lpf.free('__tmp17), lpf.constant(Data.Str("login"))),
+                          lpf.invoke2(MapProject, lpf.free('__tmp17), lpf.constant(Data.Str("login"))),
                           lpf.constant(Data.NA))),
                       lpf.constant(Data.NA)))))))))
     }
@@ -386,7 +386,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"select substring(bar, 2, 3) from foo",
         lpf.invoke1(Squash,
           lpf.invoke3(Substring,
-            lpf.invoke2(ObjectProject, read("foo"), lpf.constant(Data.Str("bar"))),
+            lpf.invoke2(MapProject, read("foo"), lpf.constant(Data.Str("bar"))),
             lpf.constant(Data.Int(2)),
             lpf.constant(Data.Int(3)))))
     }
@@ -395,7 +395,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         sqlE"select length(bar) from foo",
         lpf.invoke1(Squash,
-          lpf.invoke1(Length, lpf.invoke2(ObjectProject, read("foo"), lpf.constant(Data.Str("bar"))))))
+          lpf.invoke1(Length, lpf.invoke2(MapProject, read("foo"), lpf.constant(Data.Str("bar"))))))
     }
 
     "compile simple select *" in {
@@ -416,11 +416,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             JoinType.Inner,
             JoinCondition('__leftJoin9, '__rightJoin10, lpf.constant(Data.Bool(true)))),
           lpf.invoke1(Squash,
-            lpf.invoke2(ObjectConcat,
+            lpf.invoke2(MapConcat,
               JoinDir.Left.projectFrom(lpf.free('__tmp0)),
               makeObj(
                 "address" ->
-                  lpf.invoke2(ObjectProject,
+                  lpf.invoke2(MapProject,
                     JoinDir.Right.projectFrom(lpf.free('__tmp0)),
                     lpf.constant(Data.Str("address"))))))))
     }
@@ -435,15 +435,15 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             JoinType.Inner,
             JoinCondition('__leftJoin9, '__rightJoin10, lpf.constant(Data.Bool(true)))),
           lpf.invoke1(Squash,
-            lpf.invoke2(ObjectConcat,
-              lpf.invoke2(ObjectProject,
-                lpf.invoke2(ObjectProject,
+            lpf.invoke2(MapConcat,
+              lpf.invoke2(MapProject,
+                lpf.invoke2(MapProject,
                   JoinDir.Left.projectFrom(lpf.free('__tmp0)),
                   lpf.constant(Data.Str("bar"))),
                 lpf.constant(Data.Str("baz"))),
               makeObj(
                 "address" ->
-                  lpf.invoke2(ObjectProject,
+                  lpf.invoke2(MapProject,
                     JoinDir.Right.projectFrom(lpf.free('__tmp0)),
                     lpf.constant(Data.Str("address"))))))))
     }
@@ -454,8 +454,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.let('__tmp0, read("city"),
           lpf.invoke1(Squash,
             makeObj(
-              "name"  -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("name"))),
-              "place" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("place")))))))
+              "name"  -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("name"))),
+              "place" -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("place")))))))
     }
 
     "compile basic let" in {
@@ -508,7 +508,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       val query = sqlE"select foo from (bar := 12; select * from baz) as quag"
       val expectation =
         lpf.invoke1(Squash,
-          lpf.invoke2(ObjectProject,
+          lpf.invoke2(MapProject,
             lpf.invoke1(Squash, read("baz")),
             lpf.constant(Data.Str("foo"))))
 
@@ -519,7 +519,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       val query = sqlE"select foo from (bar := 12; select * from bar) as quag"
       val expectation =
         lpf.invoke1(Squash,
-          lpf.invoke2(ObjectProject,
+          lpf.invoke2(MapProject,
             lpf.invoke1(Squash, lpf.constant(Data.Int(12))),
             lpf.constant(Data.Str("foo"))))
 
@@ -530,7 +530,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       val query = sqlE"select bar from (bar := 12; select * from bar) as quag"
       val expectation =
         lpf.invoke1(Squash,
-          lpf.invoke2(ObjectProject,
+          lpf.invoke2(MapProject,
             lpf.invoke1(Squash, lpf.constant(Data.Int(12))),
             lpf.constant(Data.Str("bar"))))
 
@@ -586,8 +586,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         sqlE"select foo.bar from baz",
         lpf.invoke1(Squash,
-          lpf.invoke2(ObjectProject,
-            lpf.invoke2(ObjectProject, read("baz"), lpf.constant(Data.Str("foo"))),
+          lpf.invoke2(MapProject,
+            lpf.invoke2(MapProject, read("baz"), lpf.constant(Data.Str("foo"))),
             lpf.constant(Data.Str("bar")))))
     }
 
@@ -597,7 +597,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         sqlE"select foo.bar from foo",
         lpf.invoke1(Squash,
-          lpf.invoke2(ObjectProject, read("foo"), lpf.constant(Data.Str("bar")))))
+          lpf.invoke2(MapProject, read("foo"), lpf.constant(Data.Str("bar")))))
     }
 
     "compile two term addition from one table" in {
@@ -606,15 +606,15 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.let('__tmp0, read("baz"),
           lpf.invoke1(Squash,
             lpf.invoke2(Add,
-              lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("foo"))),
-              lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar")))))))
+              lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("foo"))),
+              lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar")))))))
     }
 
     "compile negate" in {
       testLogicalPlanCompile(
         sqlE"select -foo from bar",
         lpf.invoke1(Squash,
-          lpf.invoke1(Negate, lpf.invoke2(ObjectProject, read("bar"), lpf.constant(Data.Str("foo"))))))
+          lpf.invoke1(Negate, lpf.invoke2(MapProject, read("bar"), lpf.constant(Data.Str("foo"))))))
     }
 
     "compile modulo" in {
@@ -623,19 +623,19 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.let('__tmp0, read("bar"),
           lpf.invoke1(Squash,
             lpf.invoke2(Modulo,
-              lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("foo"))),
-              lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("baz")))))))
+              lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("foo"))),
+              lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("baz")))))))
     }
 
     "compile coalesce" in {
       testLogicalPlanCompile(
         sqlE"select coalesce(bar, baz) from foo",
         lpf.let('__tmp0, read("foo"),
-          lpf.let('__tmp1, lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+          lpf.let('__tmp1, lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
             lpf.invoke1(Squash,
               lpf.invoke3(Cond,
                 lpf.invoke2(Eq, lpf.free('__tmp1), lpf.constant(Data.Null)),
-                lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("baz"))),
+                lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("baz"))),
                 lpf.free('__tmp1))))))
     }
 
@@ -644,7 +644,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"""select date_part("day", baz) from foo""",
         lpf.invoke1(Squash,
           lpf.invoke1(ExtractDayOfMonth,
-            lpf.invoke2(ObjectProject, read("foo"), lpf.constant(Data.Str("baz"))))))
+            lpf.invoke2(MapProject, read("foo"), lpf.constant(Data.Str("baz"))))))
     }
 
     "compile conditional" in {
@@ -654,10 +654,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.invoke1(Squash,
             lpf.invoke3(Cond,
               lpf.invoke2(Lt,
-                lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("pop"))),
+                lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("pop"))),
                 lpf.constant(Data.Int(10000))),
-              lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
-              lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("loc")))))))
+              lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
+              lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("loc")))))))
     }
 
     "compile conditional (match) without else" in {
@@ -689,7 +689,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"select array_length(bar, 1) from foo",
         lpf.invoke1(Squash,
           lpf.invoke2(ArrayLength,
-            lpf.invoke2(ObjectProject, read("foo"), lpf.constant(Data.Str("bar"))),
+            lpf.invoke2(MapProject, read("foo"), lpf.constant(Data.Str("bar"))),
             lpf.constant(Data.Int(1)))))
     }
 
@@ -699,10 +699,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.let('__tmp0, read("baz"),
           lpf.invoke1(Squash,
             lpf.invoke2(Concat,
-              lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("foo"))),
+              lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("foo"))),
               lpf.invoke2(Concat,
                 lpf.constant(Data.Str(" ")),
-                lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))))))))
+                lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))))))))
     }
 
     "filter on constant false" in {
@@ -723,7 +723,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             lpf.invoke2(Filter,
               lpf.free('__tmp0),
               lpf.invoke3(Between,
-                lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+                lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
                 lpf.constant(Data.Int(1)),
                 lpf.constant(Data.Int(10)))))))
     }
@@ -737,7 +737,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
               lpf.free('__tmp0),
               lpf.invoke1(Not,
                 lpf.invoke3(Between,
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+                  lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
                   lpf.constant(Data.Int(1)),
                   lpf.constant(Data.Int(10))))))))
     }
@@ -747,11 +747,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"""select bar from foo where bar like "a%" """,
         lpf.let('__tmp0, read("foo"),
           lpf.invoke1(Squash,
-            lpf.invoke2(ObjectProject,
+            lpf.invoke2(MapProject,
               lpf.invoke2(Filter,
                 lpf.free('__tmp0),
                 lpf.invoke3(Search,
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+                  lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
                   lpf.constant(Data.Str("^a.*$")),
                   lpf.constant(Data.Bool(false)))),
               lpf.constant(Data.Str("bar"))))))
@@ -762,11 +762,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"""select bar from foo where bar like "a=%" escape "=" """,
         lpf.let('__tmp0, read("foo"),
           lpf.invoke1(Squash,
-            lpf.invoke2(ObjectProject,
+            lpf.invoke2(MapProject,
               lpf.invoke2(Filter,
                 lpf.free('__tmp0),
                 lpf.invoke3(Search,
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+                  lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
                   lpf.constant(Data.Str("^a%$")),
                   lpf.constant(Data.Bool(false)))),
               lpf.constant(Data.Str("bar"))))))
@@ -777,11 +777,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"""select bar from foo where bar not like "a%" """,
         lpf.let('__tmp0, read("foo"),
           lpf.invoke1(Squash,
-            lpf.invoke2(ObjectProject, lpf.invoke2(Filter,
+            lpf.invoke2(MapProject, lpf.invoke2(Filter,
               lpf.free('__tmp0),
               lpf.invoke1(Not,
                 lpf.invoke3(Search,
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+                  lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
                   lpf.constant(Data.Str("^a.*$")),
                   lpf.constant(Data.Bool(false))))),
               lpf.constant(Data.Str("bar"))))))
@@ -792,11 +792,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"""select bar from foo where bar ~ "a.$$" """,
         lpf.let('__tmp0, read("foo"),
           lpf.invoke1(Squash,
-            lpf.invoke2(ObjectProject,
+            lpf.invoke2(MapProject,
               lpf.invoke2(Filter,
                 lpf.free('__tmp0),
                 lpf.invoke3(Search,
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+                  lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
                   lpf.constant(Data.Str("a.$")),
                   lpf.constant(Data.Bool(false)))),
               lpf.constant(Data.Str("bar"))))))
@@ -809,7 +809,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.invoke2(Add,
             lpf.invoke2(Divide,
               lpf.invoke2(Multiply,
-                lpf.invoke2(ObjectProject, read("cities"), lpf.constant(Data.Str("avgTemp"))),
+                lpf.invoke2(MapProject, read("cities"), lpf.constant(Data.Str("avgTemp"))),
                 lpf.constant(Data.Int(9))),
               lpf.constant(Data.Int(5))),
             lpf.constant(Data.Int(32)))))
@@ -821,7 +821,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.invoke1(Squash,
           lpf.invoke2(Divide,
             lpf.invoke2(Add,
-              lpf.invoke2(ObjectProject, read("cities"), lpf.constant(Data.Str("avgTemp"))),
+              lpf.invoke2(MapProject, read("cities"), lpf.constant(Data.Str("avgTemp"))),
               lpf.constant(Data.Int(32))),
             lpf.constant(Data.Int(5)))))
     }
@@ -836,7 +836,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             JoinType.Inner,
             JoinCondition('__leftJoin9, '__rightJoin10, lpf.constant(Data.Bool(true)))),
           lpf.invoke1(Squash,
-            lpf.invoke2(ObjectConcat,
+            lpf.invoke2(MapConcat,
               JoinDir.Left.projectFrom(lpf.free('__tmp0)),
               JoinDir.Right.projectFrom(lpf.free('__tmp0))))))
     }
@@ -852,10 +852,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             JoinCondition('__leftJoin9, '__rightJoin10, lpf.constant(Data.Bool(true)))),
           lpf.invoke1(Squash,
             lpf.invoke2(Multiply,
-              lpf.invoke2(ObjectProject,
+              lpf.invoke2(MapProject,
                 JoinDir.Left.projectFrom(lpf.free('__tmp0)),
                 lpf.constant(Data.Str("age"))),
-              lpf.invoke2(ObjectProject,
+              lpf.invoke2(MapProject,
                 JoinDir.Right.projectFrom(lpf.free('__tmp0)),
                 lpf.constant(Data.Str("modelYear")))))))
     }
@@ -864,7 +864,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         sqlE"select name from person where 1",
         lpf.invoke1(Squash,
-          lpf.invoke2(ObjectProject,
+          lpf.invoke2(MapProject,
             lpf.invoke2(Filter, read("person"), lpf.constant(Data.Int(1))),
             lpf.constant(Data.Str("name")))))
     }
@@ -874,11 +874,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"select name from person where age > 18",
         lpf.let('__tmp0, read("person"),
           lpf.invoke1(Squash,
-            lpf.invoke2(ObjectProject,
+            lpf.invoke2(MapProject,
               lpf.invoke2(Filter,
                 lpf.free('__tmp0),
                 lpf.invoke2(Gt,
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("age"))),
+                  lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("age"))),
                   lpf.constant(Data.Int(18)))),
               lpf.constant(Data.Str("name"))))))
     }
@@ -891,7 +891,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             lpf.invoke1(Count,
               lpf.invoke2(GroupBy,
                 lpf.free('__tmp0),
-                MakeArrayN[Fix[LP]](lpf.invoke2(ObjectProject,
+                MakeArrayN[Fix[LP]](lpf.invoke2(MapProject,
                   lpf.free('__tmp0),
                   lpf.constant(Data.Str("name")))).embed)))))
     }
@@ -905,10 +905,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
               lpf.free('__tmp0),
               MakeArrayN[Fix[LP]](
                 lpf.invoke1(Lower,
-                  lpf.invoke2(ObjectProject,
+                  lpf.invoke2(MapProject,
                     lpf.free('__tmp0),
                     lpf.constant(Data.Str("name")))),
-                lpf.invoke2(ObjectProject,
+                lpf.invoke2(MapProject,
                   lpf.free('__tmp0),
                   lpf.constant(Data.Str("gender")))).embed),
             lpf.invoke1(Squash,
@@ -916,13 +916,13 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                 "0" ->
                   lpf.invoke1(Arbitrary,
                     lpf.invoke1(Lower,
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("name"))))),
+                      lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("name"))))),
                 "gender" ->
                   lpf.invoke1(Arbitrary,
-                    lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("gender")))),
+                    lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("gender")))),
                 "2" ->
                   lpf.invoke1(Avg,
-                    lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("age")))))))))
+                    lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("age")))))))))
     }
 
     "compile group by with perverse aggregated expression" in {
@@ -931,10 +931,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.let('__tmp0, read("person"),
           lpf.invoke1(Squash,
             lpf.invoke1(Count,
-              lpf.invoke2(ObjectProject,
+              lpf.invoke2(MapProject,
                 lpf.invoke2(GroupBy,
                   lpf.free('__tmp0),
-                  MakeArrayN[Fix[LP]](lpf.invoke2(ObjectProject,
+                  MakeArrayN[Fix[LP]](lpf.invoke2(MapProject,
                     lpf.free('__tmp0),
                     lpf.constant(Data.Str("name")))).embed),
                 lpf.constant(Data.Str("name")))))))
@@ -945,18 +945,18 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"select sum(pop) * 100 from zips",
         lpf.invoke1(Squash,
           lpf.invoke2(Multiply,
-            lpf.invoke1(Sum, lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("pop")))),
+            lpf.invoke1(Sum, lpf.invoke2(MapProject, read("zips"), lpf.constant(Data.Str("pop")))),
             lpf.constant(Data.Int(100)))))
     }
 
     val setA =
       lpf.let('__tmp0, read("zips"),
         lpf.invoke1(Squash, makeObj(
-          "loc" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("loc"))),
-          "pop" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("pop"))))))
+          "loc" -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("loc"))),
+          "pop" -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("pop"))))))
     val setB =
       lpf.invoke1(Squash,
-        lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("city"))))
+        lpf.invoke2(MapProject, read("zips"), lpf.constant(Data.Str("city"))))
 
     "compile union" in {
       testLogicalPlanCompile(
@@ -1064,7 +1064,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile map shift / unshift" in {
-      val inner = lpf.invoke1(ShiftMap, lpf.invoke2(ObjectProject, lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("commit"))), lpf.constant(Data.Str("author"))))
+      val inner = lpf.invoke1(ShiftMap, lpf.invoke2(MapProject, lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("commit"))), lpf.constant(Data.Str("author"))))
 
       testLogicalPlanCompile(
         sqlE"select {commit.author{:_}: length(commit.author{:_}) ...} from slamengine_commits",
@@ -1073,7 +1073,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "compile map shift / unshift keys" in {
-      val inner = lpf.invoke1(ShiftMapKeys, lpf.invoke2(ObjectProject, lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("commit"))), lpf.constant(Data.Str("author"))))
+      val inner = lpf.invoke1(ShiftMapKeys, lpf.invoke2(MapProject, lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("commit"))), lpf.constant(Data.Str("author"))))
 
       testLogicalPlanCompile(
         sqlE"select {commit.author{_:}: length(commit.author{_:})...} from slamengine_commits",
@@ -1087,7 +1087,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.invoke1(Squash,
           lpf.invoke1(UnshiftArray,
             lpf.invoke2(Divide,
-              lpf.invoke1(ShiftArray, lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("loc")))),
+              lpf.invoke1(ShiftArray, lpf.invoke2(MapProject, read("zips"), lpf.constant(Data.Str("loc")))),
               lpf.constant(Data.Int(10))))))
     }
 
@@ -1097,7 +1097,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.invoke1(Squash,
           lpf.invoke1(UnshiftArray,
             lpf.invoke2(Multiply,
-              lpf.invoke1(ShiftArrayIndices, lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("loc")))),
+              lpf.invoke1(ShiftArrayIndices, lpf.invoke2(MapProject, read("zips"), lpf.constant(Data.Str("loc")))),
               lpf.constant(Data.Int(10))))))
     }
 
@@ -1105,7 +1105,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         sqlE"select loc[:*] from zips",
         lpf.invoke1(Squash,
-          lpf.invoke1(FlattenArray, lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("loc"))))))
+          lpf.invoke1(FlattenArray, lpf.invoke2(MapProject, read("zips"), lpf.constant(Data.Str("loc"))))))
     }
 
     "compile simple order by" in {
@@ -1115,12 +1115,12 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.let('__tmp1,
             lpf.invoke1(Squash,
               makeObj(
-                "name" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("name"))),
-                "__sd__0" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("height"))))),
-            lpf.invoke2(DeleteField,
+                "name" -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("name"))),
+                "__sd__0" -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("height"))))),
+            lpf.invoke2(DeleteKey,
               lpf.sort(
                 lpf.free('__tmp1),
-                (lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0"))), SortDir.asc).wrapNel),
+                (lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0"))), SortDir.asc).wrapNel),
               lpf.constant(Data.Str("__sd__0"))))))
     }
 
@@ -1129,7 +1129,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         sqlE"select name from person order by name",
         lpf.let('__tmp0,
           lpf.invoke1(Squash,
-            lpf.invoke2(ObjectProject, read("person"), lpf.constant(Data.Str("name")))),
+            lpf.invoke2(MapProject, read("person"), lpf.constant(Data.Str("name")))),
           lpf.sort(
             lpf.free('__tmp0),
             (lpf.free('__tmp0), SortDir.asc).wrapNel)))
@@ -1142,7 +1142,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.invoke1(Squash,
             lpf.invoke1(
               FlattenArray,
-              lpf.invoke2(ObjectProject,
+              lpf.invoke2(MapProject,
                 read("foo"),
                 lpf.constant(Data.Str("quux"))))),
           lpf.sort(
@@ -1158,19 +1158,19 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             lpf.invoke2(Filter,
               lpf.free('__tmp0),
               lpf.invoke2(Eq,
-                lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("gender"))),
+                lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("gender"))),
                 lpf.constant(Data.Str("male")))),
             lpf.let('__tmp2,
               lpf.invoke1(Squash,
                 makeObj(
-                  "name"    -> lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("name"))),
-                  "__sd__0" -> lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("height"))))),
-              lpf.invoke2(DeleteField,
+                  "name"    -> lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("name"))),
+                  "__sd__0" -> lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("height"))))),
+              lpf.invoke2(DeleteKey,
                 lpf.sort(
                   lpf.free('__tmp2),
                   NonEmptyList(
-                    (lpf.invoke2(ObjectProject, lpf.free('__tmp2), lpf.constant(Data.Str("name"))), SortDir.asc),
-                    (lpf.invoke2(ObjectProject, lpf.free('__tmp2), lpf.constant(Data.Str("__sd__0"))), SortDir.asc))),
+                    (lpf.invoke2(MapProject, lpf.free('__tmp2), lpf.constant(Data.Str("name"))), SortDir.asc),
+                    (lpf.invoke2(MapProject, lpf.free('__tmp2), lpf.constant(Data.Str("__sd__0"))), SortDir.asc))),
                 lpf.constant(Data.Str("__sd__0")))))))
     }
 
@@ -1180,7 +1180,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.let('__tmp0, lpf.invoke1(Squash, read("person")),
           lpf.sort(
             lpf.free('__tmp0),
-            (lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("height"))), SortDir.asc).wrapNel)))
+            (lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("height"))), SortDir.asc).wrapNel)))
     }
 
     "compile simple order by with ascending and descending" in {
@@ -1190,8 +1190,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.sort(
             lpf.free('__tmp0),
             NonEmptyList(
-              (lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("height"))), SortDir.desc),
-              (lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("name"))), SortDir.asc)))))
+              (lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("height"))), SortDir.desc),
+              (lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("name"))), SortDir.asc)))))
     }
 
     "compile simple order by with expression" in {
@@ -1200,16 +1200,16 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.let('__tmp0, read("person"),
           lpf.let('__tmp1,
             lpf.invoke1(Squash,
-              lpf.invoke2(ObjectConcat,
+              lpf.invoke2(MapConcat,
                 lpf.free('__tmp0),
                 makeObj(
                   "__sd__0" -> lpf.invoke2(Multiply,
-                    lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("height"))),
+                    lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("height"))),
                     lpf.constant(Data.Dec(2.54)))))),
-            lpf.invoke2(DeleteField,
+            lpf.invoke2(DeleteKey,
               lpf.sort(
                 lpf.free('__tmp1),
-                (lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0"))), SortDir.asc).wrapNel),
+                (lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0"))), SortDir.asc).wrapNel),
               lpf.constant(Data.Str("__sd__0"))))))
     }
 
@@ -1219,10 +1219,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.let('__tmp0,
           lpf.invoke1(Squash,
             makeObj(
-              "name" -> lpf.invoke2(ObjectProject, read("person"), lpf.constant(Data.Str("firstName"))))),
+              "name" -> lpf.invoke2(MapProject, read("person"), lpf.constant(Data.Str("firstName"))))),
           lpf.sort(
             lpf.free('__tmp0),
-            (lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("name"))), SortDir.asc).wrapNel)))
+            (lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("name"))), SortDir.asc).wrapNel)))
     }
 
     "compile simple order by with expression in synthetic field" in {
@@ -1232,15 +1232,15 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.let('__tmp1,
             lpf.invoke1(Squash,
               makeObj(
-                "name" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("name"))),
+                "name" -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("name"))),
                 "__sd__0" ->
                   lpf.invoke2(Multiply,
-                    lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("height"))),
+                    lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("height"))),
                     lpf.constant(Data.Dec(2.54))))),
-            lpf.invoke2(DeleteField,
+            lpf.invoke2(DeleteKey,
               lpf.sort(
                 lpf.free('__tmp1),
-                (lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0"))), SortDir.asc).wrapNel),
+                (lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0"))), SortDir.asc).wrapNel),
               lpf.constant(Data.Str("__sd__0"))))))
     }
 
@@ -1251,19 +1251,19 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.let('__tmp1,
             lpf.invoke1(Squash,
               makeObj(
-                "bar" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
+                "bar" -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("bar"))),
                 "__sd__0" -> lpf.invoke2(Divide,
-                  lpf.invoke2(ObjectProject,
-                    lpf.invoke2(ObjectProject,
-                      lpf.invoke2(ObjectProject, lpf.free('__tmp0),
+                  lpf.invoke2(MapProject,
+                    lpf.invoke2(MapProject,
+                      lpf.invoke2(MapProject, lpf.free('__tmp0),
                         lpf.constant(Data.Str("bar"))),
                       lpf.constant(Data.Str("baz"))),
                     lpf.constant(Data.Str("quux"))),
                   lpf.constant(Data.Int(3))))),
-            lpf.invoke2(DeleteField,
+            lpf.invoke2(DeleteKey,
               lpf.sort(
                 lpf.free('__tmp1),
-                (lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0"))), SortDir.asc).wrapNel),
+                (lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0"))), SortDir.asc).wrapNel),
               lpf.constant(Data.Str("__sd__0"))))))
     }
 
@@ -1316,21 +1316,21 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             lpf.invoke2(Filter,
               lpf.free('__tmp0),
               lpf.invoke2(Gt,
-                lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("height"))),
+                lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("height"))),
                 lpf.constant(Data.Int(60)))),
             lpf.let('__tmp2,    // group by gender, height
               lpf.invoke2(GroupBy,
                 lpf.free('__tmp1),
                 MakeArrayN[Fix[LP]](
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("gender"))),
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("height")))).embed),
+                  lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("gender"))),
+                  lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("height")))).embed),
               lpf.let('__tmp3,
                 lpf.invoke1(Squash,     // select height*2.54 as cm
                   makeObj(
                     "cm" ->
                       lpf.invoke2(Multiply,
                         lpf.invoke1(Arbitrary,
-                          lpf.invoke2(ObjectProject,
+                          lpf.invoke2(MapProject,
                             lpf.invoke2(Filter,   // having count(*) > 10
                               lpf.free('__tmp2),
                               lpf.invoke2(Gt, lpf.invoke1(Count, lpf.free('__tmp2)), lpf.constant(Data.Int(10)))),
@@ -1340,7 +1340,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                   lpf.invoke2(Drop,
                     lpf.sort(  // order by cm
                       lpf.free('__tmp3),
-                      (lpf.invoke2(ObjectProject, lpf.free('__tmp3), lpf.constant(Data.Str("cm"))), SortDir.asc).wrapNel),
+                      (lpf.invoke2(MapProject, lpf.free('__tmp3), lpf.constant(Data.Str("cm"))), SortDir.asc).wrapNel),
                     lpf.constant(Data.Int(10))), // offset 10
                   lpf.constant(Data.Int(5))))))))    // limit 5
     }
@@ -1349,7 +1349,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
         sqlE"select sum(height) from person",
         lpf.invoke1(Squash,
-          lpf.invoke1(Sum, lpf.invoke2(ObjectProject, read("person"), lpf.constant(Data.Str("height"))))))
+          lpf.invoke1(Sum, lpf.invoke2(MapProject, read("person"), lpf.constant(Data.Str("height"))))))
     }
 
     "compile simple inner equi-join" in {
@@ -1364,16 +1364,16 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             JoinType.Inner,
             JoinCondition('__leftJoin9, '__rightJoin10,
               lpf.invoke2(Eq,
-                lpf.invoke2(ObjectProject, lpf.joinSideName('__leftJoin9), lpf.constant(Data.Str("id"))),
-                lpf.invoke2(ObjectProject, lpf.joinSideName('__rightJoin10), lpf.constant(Data.Str("foo_id")))))),
+                lpf.invoke2(MapProject, lpf.joinSideName('__leftJoin9), lpf.constant(Data.Str("id"))),
+                lpf.invoke2(MapProject, lpf.joinSideName('__rightJoin10), lpf.constant(Data.Str("foo_id")))))),
           lpf.invoke1(Squash,
                 makeObj(
                   "name" ->
-                    lpf.invoke2(ObjectProject,
+                    lpf.invoke2(MapProject,
                       JoinDir.Left.projectFrom(lpf.free('__tmp0)),
                       lpf.constant(Data.Str("name"))),
                   "address" ->
-                    lpf.invoke2(ObjectProject,
+                    lpf.invoke2(MapProject,
                       JoinDir.Right.projectFrom(lpf.free('__tmp0)),
                       lpf.constant(Data.Str("address")))))))
     }
@@ -1437,24 +1437,24 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                 lpf.invoke2(Filter,
                   lpf.free('__tmp0),
                   lpf.invoke2(Lt,
-                    lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("x"))),
+                    lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("x"))),
                     lpf.constant(Data.Int(10)))),
                 lpf.invoke2(Filter,
                   lpf.free('__tmp1),
                   lpf.invoke2(Eq,
-                    lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("y"))),
+                    lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("y"))),
                     lpf.constant(Data.Int(20)))),
                 JoinType.Inner,
                 JoinCondition('__leftJoin23, '__rightJoin24,
                   lpf.invoke2(Eq,
-                    lpf.invoke2(ObjectProject, lpf.joinSideName('__leftJoin23), lpf.constant(Data.Str("id"))),
-                    lpf.invoke2(ObjectProject, lpf.joinSideName('__rightJoin24), lpf.constant(Data.Str("foo_id")))))),
+                    lpf.invoke2(MapProject, lpf.joinSideName('__leftJoin23), lpf.constant(Data.Str("id"))),
+                    lpf.invoke2(MapProject, lpf.joinSideName('__rightJoin24), lpf.constant(Data.Str("foo_id")))))),
               lpf.invoke1(Squash,
                 makeObj(
-                  "name" -> lpf.invoke2(ObjectProject,
+                  "name" -> lpf.invoke2(MapProject,
                     JoinDir.Left.projectFrom(lpf.free('__tmp2)),
                     lpf.constant(Data.Str("name"))),
-                  "address" -> lpf.invoke2(ObjectProject,
+                  "address" -> lpf.invoke2(MapProject,
                     JoinDir.Right.projectFrom(lpf.free('__tmp2)),
                     lpf.constant(Data.Str("address")))))))))
     }
@@ -1469,16 +1469,16 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             JoinType.LeftOuter,
             JoinCondition('left1, 'right2,
               lpf.invoke2(Lt,
-                lpf.invoke2(ObjectProject, lpf.joinSideName('left1), lpf.constant(Data.Str("id"))),
-                lpf.invoke2(ObjectProject, lpf.joinSideName('right2), lpf.constant(Data.Str("foo_id")))))),
+                lpf.invoke2(MapProject, lpf.joinSideName('left1), lpf.constant(Data.Str("id"))),
+                lpf.invoke2(MapProject, lpf.joinSideName('right2), lpf.constant(Data.Str("foo_id")))))),
           lpf.invoke1(Squash,
             makeObj(
               "name" ->
-                lpf.invoke2(ObjectProject,
+                lpf.invoke2(MapProject,
                   JoinDir.Left.projectFrom(lpf.free('__tmp0)),
                   lpf.constant(Data.Str("name"))),
               "address" ->
-                lpf.invoke2(ObjectProject,
+                lpf.invoke2(MapProject,
                   JoinDir.Right.projectFrom(lpf.free('__tmp0)),
                   lpf.constant(Data.Str("address")))))))
     }
@@ -1494,29 +1494,29 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
               JoinType.Inner,
               JoinCondition('left3, 'right4,
                 lpf.invoke2(Eq,
-                  lpf.invoke2(ObjectProject,
+                  lpf.invoke2(MapProject,
                     lpf.joinSideName('left3),
                     lpf.constant(Data.Str("id"))),
-                  lpf.invoke2(ObjectProject,
+                  lpf.invoke2(MapProject,
                     lpf.joinSideName('right4),
                     lpf.constant(Data.Str("foo_id")))))),
             read("baz"),
             JoinType.Inner,
             JoinCondition('__leftJoin23, '__rightJoin24,
               lpf.invoke2(Eq,
-                lpf.invoke2(ObjectProject, lpf.joinSideName('__rightJoin24),
+                lpf.invoke2(MapProject, lpf.joinSideName('__rightJoin24),
                   lpf.constant(Data.Str("bar_id"))),
-                lpf.invoke2(ObjectProject,
+                lpf.invoke2(MapProject,
                   JoinDir.Right.projectFrom(lpf.joinSideName('__leftJoin23)),
                   lpf.constant(Data.Str("id")))))),
           lpf.invoke1(Squash,
             makeObj(
               "name" ->
-                lpf.invoke2(ObjectProject,
+                lpf.invoke2(MapProject,
                   JoinDir.Left.projectFrom(JoinDir.Left.projectFrom(lpf.free('__tmp0))),
                   lpf.constant(Data.Str("name"))),
               "address" ->
-                lpf.invoke2(ObjectProject,
+                lpf.invoke2(MapProject,
                   JoinDir.Right.projectFrom(JoinDir.Left.projectFrom(lpf.free('__tmp0))),
                   lpf.constant(Data.Str("address")))))))
     }
@@ -1534,12 +1534,12 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.let('__tmp1,
             lpf.invoke1(Squash,
               makeObj(
-                "name" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
-                "size" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("pop"))))),
+                "name" -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
+                "size" -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("pop"))))),
             lpf.invoke1(Squash,
               makeObj(
-                "name" -> lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("name"))),
-                "size" -> lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("size"))))))))
+                "name" -> lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("name"))),
+                "size" -> lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("size"))))))))
     }
 
     "compile sub-select with same un-qualified names" in {
@@ -1549,12 +1549,12 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.let('__tmp1,
             lpf.invoke1(Squash,
               makeObj(
-                "city" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
-                "pop" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("pop"))))),
+                "city" -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
+                "pop" -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("pop"))))),
             lpf.invoke1(Squash,
               makeObj(
-                "city" -> lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("city"))),
-                "pop" -> lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("pop"))))))))
+                "city" -> lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("city"))),
+                "pop" -> lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("pop"))))))))
     }
 
     "compile simple distinct" in {
@@ -1563,7 +1563,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.let(
           '__tmp0,
           lpf.invoke1(Squash,
-            lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("city")))),
+            lpf.invoke2(MapProject, read("zips"), lpf.constant(Data.Str("city")))),
           lpf.invoke1(Arbitrary,
             lpf.invoke2(GroupBy, lpf.free('__tmp0), lpf.free('__tmp0)))))
     }
@@ -1574,7 +1574,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.let(
           '__tmp0,
           lpf.invoke1(Squash,
-            lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("city")))),
+            lpf.invoke2(MapProject, read("zips"), lpf.constant(Data.Str("city")))),
           lpf.let(
             '__tmp1,
             lpf.sort(lpf.free('__tmp0), (lpf.free('__tmp0), SortDir.asc).wrapNel),
@@ -1594,24 +1594,24 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.let('__tmp1,
             lpf.invoke1(Squash,
               makeObj(
-                "city" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
-                "__sd__0" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("pop"))))),
+                "city" -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
+                "__sd__0" -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("pop"))))),
             lpf.let('__tmp2,
               lpf.sort(
                 lpf.free('__tmp1),
-                (lpf.invoke2(ObjectProject, lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0"))), SortDir.desc).wrapNel),
-              lpf.invoke2(DeleteField,
+                (lpf.invoke2(MapProject, lpf.free('__tmp1), lpf.constant(Data.Str("__sd__0"))), SortDir.desc).wrapNel),
+              lpf.invoke2(DeleteKey,
                 lpf.sort(
                   lpf.invoke1(First,
                     lpf.invoke2(GroupBy,
                       lpf.free('__tmp2),
-                      lpf.invoke2(DeleteField,
+                      lpf.invoke2(DeleteKey,
                         lpf.free('__tmp2),
                         lpf.constant(Data.Str("__sd__0"))))),
-                  (lpf.invoke2(ObjectProject, lpf.invoke1(First,
+                  (lpf.invoke2(MapProject, lpf.invoke1(First,
                     lpf.invoke2(GroupBy,
                       lpf.free('__tmp2),
-                      lpf.invoke2(DeleteField,
+                      lpf.invoke2(DeleteKey,
                         lpf.free('__tmp2),
                         lpf.constant(Data.Str("__sd__0"))))), lpf.constant(Data.Str("__sd__0"))), SortDir.desc).wrapNel),
                 lpf.constant(Data.Str("__sd__0")))))))
@@ -1623,7 +1623,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.let(
           '__tmp0,
           lpf.invoke1(Lower,
-            lpf.invoke2(ObjectProject, read("zips"), lpf.constant(Data.Str("city")))),
+            lpf.invoke2(MapProject, read("zips"), lpf.constant(Data.Str("city")))),
           lpf.invoke1(Squash,
             lpf.invoke1(Count,
               lpf.invoke1(Arbitrary,
@@ -1638,8 +1638,8 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             '__tmp1,
             lpf.invoke1(Squash,
               makeObj(
-                "CTY" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
-                "ST" -> lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("state"))))),
+                "CTY" -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("city"))),
+                "ST" -> lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("state"))))),
             lpf.invoke1(Arbitrary,
               lpf.invoke2(GroupBy, lpf.free('__tmp1), lpf.free('__tmp1))))))
     }
@@ -1683,11 +1683,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(sqlE"select name from zips where age < :age",
         lpf.let('__tmp0, read("zips"),
           lpf.invoke1(Squash,
-            lpf.invoke2(ObjectProject,
+            lpf.invoke2(MapProject,
               lpf.invoke2(Filter,
                 lpf.free('__tmp0),
                 lpf.invoke2(Lt,
-                  lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("age"))),
+                  lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("age"))),
                   lpf.free('age))),
               lpf.constant(Data.Str("name"))))))
     }
@@ -1712,15 +1712,15 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.let('tmp1,
             lpf.invoke2(GroupBy,
               lpf.free('tmp0),
-              MakeArrayN[Fix[LP]](lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("city")))).embed),
-            lpf.invoke2(ObjectProject, lpf.free('tmp1), lpf.constant(Data.Str("city")))))
+              MakeArrayN[Fix[LP]](lpf.invoke2(MapProject, lpf.free('tmp0), lpf.constant(Data.Str("city")))).embed),
+            lpf.invoke2(MapProject, lpf.free('tmp1), lpf.constant(Data.Str("city")))))
       val exp =
         lpf.let('tmp0, read("zips"),
           lpf.invoke1(Arbitrary,
-            lpf.invoke2(ObjectProject,
+            lpf.invoke2(MapProject,
               lpf.invoke2(GroupBy,
                 lpf.free('tmp0),
-                MakeArrayN[Fix[LP]](lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("city")))).embed), lpf.constant(Data.Str("city")))))
+                MakeArrayN[Fix[LP]](lpf.invoke2(MapProject, lpf.free('tmp0), lpf.constant(Data.Str("city")))).embed), lpf.constant(Data.Str("city")))))
 
       reduceGroupKeys(lp) must equalToPlan(exp)
     }
@@ -1731,18 +1731,18 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           lpf.let('tmp1,
             lpf.invoke2(GroupBy,
               lpf.free('tmp0),
-              MakeArrayN[Fix[LP]](lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("city")))).embed),
+              MakeArrayN[Fix[LP]](lpf.invoke2(MapProject, lpf.free('tmp0), lpf.constant(Data.Str("city")))).embed),
             lpf.let('tmp2,
               lpf.invoke2(Filter, lpf.free('tmp1), lpf.invoke2(Gt, lpf.invoke1(Count, lpf.free('tmp1)), lpf.constant(Data.Int(10)))),
-              lpf.invoke2(ObjectProject, lpf.free('tmp2), lpf.constant(Data.Str("city"))))))
+              lpf.invoke2(MapProject, lpf.free('tmp2), lpf.constant(Data.Str("city"))))))
       val exp =
         lpf.let('tmp0, read("zips"),
           lpf.let('tmp1,
             lpf.invoke2(GroupBy,
               lpf.free('tmp0),
-              MakeArrayN[Fix[LP]](lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("city")))).embed),
+              MakeArrayN[Fix[LP]](lpf.invoke2(MapProject, lpf.free('tmp0), lpf.constant(Data.Str("city")))).embed),
             lpf.invoke1(Arbitrary,
-              lpf.invoke2(ObjectProject,
+              lpf.invoke2(MapProject,
                 lpf.invoke2(Filter,
                   lpf.free('tmp1),
                   lpf.invoke2(Gt, lpf.invoke1(Count, lpf.free('tmp1)), lpf.constant(Data.Int(10)))),
@@ -1755,10 +1755,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       val lp =
         lpf.let('tmp0, read("zips"),
           lpf.invoke1(Count,
-            lpf.invoke2(ObjectProject,
+            lpf.invoke2(MapProject,
               lpf.invoke2(GroupBy,
                 lpf.free('tmp0),
-                MakeArrayN[Fix[LP]](lpf.invoke2(ObjectProject, lpf.free('tmp0),
+                MakeArrayN[Fix[LP]](lpf.invoke2(MapProject, lpf.free('tmp0),
                   lpf.constant(Data.Str("city")))).embed), lpf.constant(Data.Str("city")))))
 
       reduceGroupKeys(lp) must equalToPlan(lp)
@@ -1772,13 +1772,13 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             lpf.invoke2(GroupBy,
               lpf.free('tmp0),
               MakeArrayN[Fix[LP]](
-                lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("city"))),
-                lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("state")))).embed),
+                lpf.invoke2(MapProject, lpf.free('tmp0), lpf.constant(Data.Str("city"))),
+                lpf.invoke2(MapProject, lpf.free('tmp0), lpf.constant(Data.Str("state")))).embed),
             makeObj(
-              "city" -> lpf.invoke2(ObjectProject, lpf.free('tmp1), lpf.constant(Data.Str("city"))),
-              "1"    -> lpf.invoke1(Count, lpf.invoke2(ObjectProject, lpf.free('tmp1), lpf.constant(Data.Str("state")))),
-              "loc"  -> lpf.invoke2(ObjectProject, lpf.free('tmp1), lpf.constant(Data.Str("loc"))),
-              "2"    -> lpf.invoke1(Sum, lpf.invoke2(ObjectProject, lpf.free('tmp1), lpf.constant(Data.Str("pop")))))))
+              "city" -> lpf.invoke2(MapProject, lpf.free('tmp1), lpf.constant(Data.Str("city"))),
+              "1"    -> lpf.invoke1(Count, lpf.invoke2(MapProject, lpf.free('tmp1), lpf.constant(Data.Str("state")))),
+              "loc"  -> lpf.invoke2(MapProject, lpf.free('tmp1), lpf.constant(Data.Str("loc"))),
+              "2"    -> lpf.invoke1(Sum, lpf.invoke2(MapProject, lpf.free('tmp1), lpf.constant(Data.Str("pop")))))))
       val exp =
         lpf.let('tmp0,
           read("zips"),
@@ -1786,13 +1786,13 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             lpf.invoke2(GroupBy,
               lpf.free('tmp0),
               MakeArrayN[Fix[LP]](
-                lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("city"))),
-                lpf.invoke2(ObjectProject, lpf.free('tmp0), lpf.constant(Data.Str("state")))).embed),
+                lpf.invoke2(MapProject, lpf.free('tmp0), lpf.constant(Data.Str("city"))),
+                lpf.invoke2(MapProject, lpf.free('tmp0), lpf.constant(Data.Str("state")))).embed),
             makeObj(
-              "city" -> lpf.invoke1(Arbitrary, lpf.invoke2(ObjectProject, lpf.free('tmp1), lpf.constant(Data.Str("city")))),
-              "1"    -> lpf.invoke1(Count, lpf.invoke2(ObjectProject, lpf.free('tmp1), lpf.constant(Data.Str("state")))),
-              "loc"  -> lpf.invoke2(ObjectProject, lpf.free('tmp1), lpf.constant(Data.Str("loc"))),
-              "2"    -> lpf.invoke1(Sum, lpf.invoke2(ObjectProject, lpf.free('tmp1), lpf.constant(Data.Str("pop")))))))
+              "city" -> lpf.invoke1(Arbitrary, lpf.invoke2(MapProject, lpf.free('tmp1), lpf.constant(Data.Str("city")))),
+              "1"    -> lpf.invoke1(Count, lpf.invoke2(MapProject, lpf.free('tmp1), lpf.constant(Data.Str("state")))),
+              "loc"  -> lpf.invoke2(MapProject, lpf.free('tmp1), lpf.constant(Data.Str("loc"))),
+              "2"    -> lpf.invoke1(Sum, lpf.invoke2(MapProject, lpf.free('tmp1), lpf.constant(Data.Str("pop")))))))
 
       reduceGroupKeys(lp) must equalToPlan(exp)
     }

@@ -57,16 +57,16 @@ object ProjectPath extends ProjectPathInstances {
     fpm.transCata[FreePathMap[T]](alg)
   }
 
-  def foldProjectField[T[_[_]]: RecursiveT](fm: FreeMap[T]): FreePathMap[T] = {
+  def foldProjectKey[T[_[_]]: RecursiveT](fm: FreeMap[T]): FreePathMap[T] = {
     val alg: AlgebraicGTransform[(FreeMap[T], ?), FreePathMap[T], CoMapFunc[T, ?], CoPathMapFunc[T, ?]] = {
-      case CoEnv(\/-(MFC(MFCore.ProjectField((_, Embed(CoEnv(\/-(PathProject(path))))), (MFCore.StrLit(field), _))))) => {
-        val dir0 = path.path </> dir(field)
+      case CoEnv(\/-(MFC(MFCore.ProjectKey((_, Embed(CoEnv(\/-(PathProject(path))))), (MFCore.StrLit(key), _))))) => {
+        val dir0 = path.path </> dir(key)
         val pp   = ProjectPath(path.src, dir0)
 
         CoEnv(Inject[ProjectPath, PathMapFunc[T, ?]].inj(pp).right)
       }
-      case CoEnv(\/-(MFC(MFCore.ProjectField((Embed(CoEnv(src)), _), (MFCore.StrLit(field), _))))) => {
-        val dir0 = rootDir[Sandboxed] </> dir(field)
+      case CoEnv(\/-(MFC(MFCore.ProjectKey((Embed(CoEnv(src)), _), (MFCore.StrLit(key), _))))) => {
+        val dir0 = rootDir[Sandboxed] </> dir(key)
         val desc = src.fold(κ(Free.point[PathMapFunc[T, ?],  Hole](SrcHole)),
           Free.roll(_).mapSuspension(injectNT[MapFunc[T, ?], PathMapFunc[T, ?]]))
         val pp   = ProjectPath(desc, dir0)

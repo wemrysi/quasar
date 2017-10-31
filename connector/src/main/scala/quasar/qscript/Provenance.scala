@@ -35,7 +35,7 @@ import scalaz._, Scalaz._
 sealed abstract class Provenance[T[_[_]]]
 @Lenses final case class Nada[T[_[_]]]() extends Provenance[T]
 @Lenses final case class Value[T[_[_]]](expr: FreeMap[T]) extends Provenance[T]
-@Lenses final case class Proj[T[_[_]]](field: T[EJson]) extends Provenance[T]
+@Lenses final case class Proj[T[_[_]]](key: T[EJson]) extends Provenance[T]
 @Lenses final case class Both[T[_[_]]](l: Provenance[T], r: Provenance[T])
     extends Provenance[T]
 @Lenses final case class OneOf[T[_[_]]](l: Provenance[T], r: Provenance[T])
@@ -73,7 +73,7 @@ object Provenance {
   implicit def show[T[_[_]]: ShowT]: Show[Provenance[T]] = Show.show {
     case Nada() => Cord("Nada")
     case Value(expr) => Cord("Value(") ++ expr.show ++ Cord(")")
-    case Proj(field) => Cord("Proj(") ++ field.show ++ Cord(")")
+    case Proj(key) => Cord("Proj(") ++ key.show ++ Cord(")")
     case Both(l, r) => Cord("Both(") ++ l.show ++ Cord(", ") ++ r.show ++ Cord(")")
     case OneOf(l, r) => Cord("OneOf(") ++ l.show ++ Cord(", ") ++ r.show ++ Cord(")")
     case Then(l, r) => Cord("Then(") ++ l.show ++ Cord(", ") ++ r.show ++ Cord(")")
