@@ -49,7 +49,6 @@ import doobie.hikari.hikaritransactor.HikariTransactor
 import matryoshka.{BirecursiveT, Delay, EqualT, RecursiveT, ShowT}
 import matryoshka.implicits._
 import matryoshka.data._
-
 import scalaz._
 import Scalaz._
 import scalaz.concurrent.Task
