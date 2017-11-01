@@ -192,7 +192,6 @@ object MongoDbPlanner {
         .getOrElseF(raiseErr(
           qscriptPlanningFailed(InternalError.fromMsg("Could not get the current timestamp"))))
 
-
     val handleSpecialCore: MapFuncCore[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
       case Constant(v1) => unimplemented[M, Fix[ExprOp]]("Constant expression")
       case Now() => execTime map ($literal(_))
@@ -212,7 +211,15 @@ object MongoDbPlanner {
         unimplemented[M, Fix[ExprOp]]("ExtractIsoYear expression")
       case Integer(a1) => unimplemented[M, Fix[ExprOp]]("Integer expression")
       case Decimal(a1) => unimplemented[M, Fix[ExprOp]]("Decimal expression")
-      case ToString(a1) => unimplemented[M, Fix[ExprOp]]("ToString expression")
+      // NB: Using $substr or $substrBytes to convert to string does not work for ObjectId, so we force
+      //     this to be planned using JS
+      case ToString($var(DocVar(DocVar.ROOT, Some(BsonField.Name("_id"))))) =>
+        unimplemented[M, Fix[ExprOp]]("ToString _id expression")
+      // FIXME: $substr is deprecated in Mongo 3.4. This implementation should be
+      //        versioned along with the other functions in FuncHandler, taking into
+      //        account the special case for ObjectId above. Mongo 3.4 should
+      //        use $substrBytes instead of $substr
+      case ToString(a1) => mkToString(a1, $substr).point[M]
 
       case MakeArray(a1) => unimplemented[M, Fix[ExprOp]]("MakeArray expression")
       case MakeMap(a1, a2) => unimplemented[M, Fix[ExprOp]]("MakeMap expression")
@@ -540,19 +547,6 @@ object MongoDbPlanner {
         If(BinOp(jscore.Eq, a1, Literal(Js.Str("null"))),
           Literal(Js.Null),
           ident("undefined")).point[M]
-      case ToString(a1) =>
-        If(isInt(a1),
-          // NB: This is a terrible way to turn an int into a string, but the
-          //     only one that doesn’t involve converting to a decimal and
-          //     losing precision.
-          Call(Select(Call(ident("String"), List(a1)), "replace"), List(
-            Call(ident("RegExp"), List(
-              Literal(Js.Str("[^-0-9]+")),
-              Literal(Js.Str("g")))),
-            Literal(Js.Str("")))),
-          If(binop(jscore.Or, isTimestamp(a1), isDate(a1)),
-            Call(Select(a1, "toISOString"), Nil),
-            Call(ident("String"), List(a1)))).point[M]
       case Search(a1, a2, a3) =>
         Call(
           Select(

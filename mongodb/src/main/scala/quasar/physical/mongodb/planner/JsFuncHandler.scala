@@ -220,6 +220,7 @@ object JsFuncHandler {
                   Call(ident("ISODate"), List(str)),
                   ident("undefined"))
               // TODO: case Interval(str) =>
+
               case ToString(value) =>
                 If(isInt(value),
                   // NB: This is a terrible way to turn an int into a string, but the
@@ -230,11 +231,13 @@ object JsFuncHandler {
                       litStr("[^-0-9]+"),
                       litStr("g"))),
                     litStr(""))),
-                  If(BinOp(jscore.Or, isTimestamp(value), isDate(value)),
-                    Call(select(value, "toISOString"), Nil),
-                    Call(ident("String"), List(value))))
-              // TODO: case ToTimestamp(str) =>
+                  If(isObjectId(value),
+                    Call(select(value, "toString"), Nil),
+                    (If(binop(jscore.Or, isTimestamp(value), isDate(value)),
+                      Call(select(value, "toISOString"), Nil),
+                      Call(ident("String"), List(value))))))
 
+              // TODO: case ToTimestamp(str) =>
               case TimeOfDay(date) =>
                 Let(Name("t"), date,
                   binop(jscore.Add,

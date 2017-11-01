@@ -531,7 +531,7 @@ object Type extends TypeInstances {
   val Numeric = Int ⨿ Dec
   val Temporal = Timestamp ⨿ Date ⨿ Time
   val Comparable = Numeric ⨿ Interval ⨿ Str ⨿ Temporal ⨿ Bool
-  val Syntaxed = Type.Null ⨿ Type.Comparable
+  val Syntaxed = Type.Null ⨿ Type.Comparable ⨿ Id
 
   @SuppressWarnings(Array("org.wartremover.warts.Equals", "org.wartremover.warts.Recursion"))
   implicit val equal: Equal[Type] = Equal.equal((a, b) => (a, b) match {
