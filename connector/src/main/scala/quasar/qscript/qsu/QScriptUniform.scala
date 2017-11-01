@@ -152,12 +152,8 @@ object QScriptUniform {
       Nullary(IC(MapFuncsCore.Constant(ejson)))
 
     def unapply[T[_[_]], A, B](nary: Nullary[T, A, B])(implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?]): Option[T[EJson]] = {
-      object Extract {
-        def unapply[A](mfc: MapFunc[T, A]): Option[MapFuncCore[T, A]] = IC.prj(mfc)
-      }
-
       nary match {
-        case Nullary(Extract(MapFuncsCore.Constant(ejson))) => Some(ejson)
+        case Nullary(IC(MapFuncsCore.Constant(ejson))) => Some(ejson)
         case _ => None
       }
     }
