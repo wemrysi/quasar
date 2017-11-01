@@ -30,7 +30,6 @@ sealed trait QScriptUniform[T[_[_]], A] extends Product with Serializable
 
 object QScriptUniform {
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   implicit def traverse[T[_[_]]]: Traverse[QScriptUniform[T, ?]] = new Traverse[QScriptUniform[T, ?]] {
     // we need both apply and traverse syntax, which conflict
     import Scalaz._
