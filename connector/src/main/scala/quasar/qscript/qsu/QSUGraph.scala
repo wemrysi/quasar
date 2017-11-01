@@ -18,6 +18,7 @@ package quasar.qscript.qsu
 
 import slamdata.Predef.{Map => SMap, _}
 
+import matryoshka.{Algebra, Birecursive, Coalgebra}
 import scalaz.{Applicative, Traverse}
 import scalaz.syntax.traverse._
 
@@ -51,6 +52,7 @@ object QSUGraph {
   final case class QSUPattern[T[_[_]], A](root: Symbol, qsu: QScriptUniform[T, A])
 
   object QSUPattern {
+
     implicit def traverse[T[_[_]]]: Traverse[QSUPattern[T, ?]] =
       new Traverse[QSUPattern[T, ?]] {
         def traverseImpl[G[_]: Applicative, A, B](pattern: QSUPattern[T, A])(f: A => G[B])
@@ -60,6 +62,23 @@ object QSUGraph {
               qsu.traverse(f).map(QSUPattern[T, B](root, _))
           }
       }
+
+    private def φ[T[_[_]]]: Algebra[QSUPattern[T, ?], QSUGraph[T]] = {
+      case QSUPattern(root, qsu) =>
+        val vertices: SMap[Symbol, QScriptUniform[T, Symbol]] =
+          qsu.foldRight(SMap(root -> qsu.map(_.root))) {
+            case (graph, acc) => graph.vertices ++ acc
+          }
+
+        QSUGraph[T](root, vertices)
+    }
+
+    private def ψ[T[_[_]]]: Coalgebra[QSUPattern[T, ?], QSUGraph[T]] = graph => {
+      QSUPattern[T, QSUGraph[T]](graph.root, graph.project)
+    }
+
+    implicit def birecursive[T[_[_]]]: Birecursive.Aux[QSUGraph[T], QSUPattern[T, ?]] =
+      Birecursive.algebraIso(φ[T], ψ[T])
   }
 
   /**
