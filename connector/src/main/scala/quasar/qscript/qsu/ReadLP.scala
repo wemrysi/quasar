@@ -32,7 +32,18 @@ import quasar.contrib.scalaz.{MonadError_, MonadState_}
 import quasar.ejson.EJson
 import quasar.frontend.{logicalplan => lp}
 import quasar.std.{IdentityLib, SetLib, StructuralLib}
-import quasar.qscript.{Hole, MapFunc, MapFuncsCore, MFC, ReduceFunc, SrcHole, TTypes}
+import quasar.qscript.{
+  Drop,
+  Hole,
+  MapFunc,
+  MapFuncsCore,
+  MFC,
+  ReduceFunc,
+  Sample,
+  SrcHole,
+  Take,
+  TTypes
+}
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import slamdata.Predef.{Map => SMap, _}
 
@@ -145,6 +156,15 @@ sealed abstract class ReadLP[
 
     case lp.InvokeUnapply(SetLib.Filter, Sized(a, b)) =>
       extend2(a, b)(QSU.LPFilter[T, Symbol](_, _))
+
+    case lp.InvokeUnapply(SetLib.Sample, Sized(a, b)) =>
+      extend2(a, b)(QSU.Subset[T, Symbol](_, Sample, _))
+
+    case lp.InvokeUnapply(SetLib.Take, Sized(a, b)) =>
+      extend2(a, b)(QSU.Subset[T, Symbol](_, Take, _))
+
+    case lp.InvokeUnapply(SetLib.Drop, Sized(a, b)) =>
+      extend2(a, b)(QSU.Subset[T, Symbol](_, Drop, _))
 
     case lp.InvokeUnapply(func: UnaryFunc, Sized(a)) if func.effect === Reduction =>
       val translated = ReduceFunc.translateUnaryReduction[Unit](func)(())
