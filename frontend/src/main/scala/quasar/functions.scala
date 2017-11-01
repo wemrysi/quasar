@@ -59,9 +59,9 @@ final case class NullaryFunc
     val simplify: Func.Simplifier)
     extends GenericFunc[nat._0] {
   val domain = Sized[List]()
-  val typer0: Func.Typer[nat._0] = _ => Validation.success(codomain)
+  val typer0: Func.Typer[nat._0] = _ => Some(Validation.success(codomain))
   val untyper0: Func.Untyper[nat._0] = {
-    case ((funcDomain, _), _) => Validation.success(funcDomain)
+    case ((funcDomain, _), _) => Some(Validation.success(funcDomain))
   }
 
   def apply[A](): LP[A] =
@@ -123,10 +123,16 @@ sealed abstract class GenericFunc[N <: Nat](implicit toInt: ToInt[N]) { self =>
     args.sized[N].map(applyGeneric)
 
   final def tpe(args: Func.Domain[N]): Func.VCodomain =
-    typer0(args)
+    typer0(args).orElse {
+      Some(Success(codomain)).filter(_ => args.zip(domain).forall { case (a, d) => d.contains(a) })
+    }.getOrElse {
+      val msg: String = s"Unknown arguments: $args"
+      Failure(NonEmptyList(SemanticError.GenericError(msg)))
+    }
 
-  final def untpe(tpe: Func.Codomain): Func.VDomain[N] =
-    untyper0((domain, codomain), tpe)
+  final def untpe(tpe: Func.Codomain): Func.VDomain[N] = {
+    untyper0((domain, codomain), tpe).getOrElse(Success(domain))
+  }
 
   final def arity: Int = domain.length
 
@@ -287,8 +293,8 @@ object Func {
   type VDomain[N <: Nat] = ValidationNel[SemanticError, Domain[N]]
   type VCodomain = ValidationNel[SemanticError, Codomain]
 
-  type Typer[N <: Nat] = Domain[N] => VCodomain
-  type Untyper[N <: Nat] = ((Domain[N], Codomain), Codomain) => VDomain[N]
+  type Typer[N <: Nat] = Domain[N] => Option[VCodomain]
+  type Untyper[N <: Nat] = ((Domain[N], Codomain), Codomain) => Option[VDomain[N]]
 
   def Input1[A](a1: A): Input[A, nat._1] = Sized[List](a1)
   def Input2[A](a1: A, a2: A): Input[A, nat._2] = Sized[List](a1, a2)

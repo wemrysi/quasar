@@ -238,9 +238,11 @@ trait SetLib extends Library {
     Func.Input2(Type.Top, Type.Top),
     noSimplification,
     partialTyper[nat._2] {
-      case Sized(Type.Const(Data.Set(Nil)), s2) => s2
-      case Sized(s1, Type.Const(Data.Set(Nil))) => s1
-      case Sized(s1, s2)                        => s1 ⨿ s2
+      case Sized(Type.Const(Data.Set(Nil)), s2)           => s2
+      case Sized(s1, Type.Const(Data.Set(Nil)))           => s1
+      case Sized(s1, s2)
+        if s1.contains(Type.Top) || s2.contains(Type.Top) => Type.Top
+      case Sized(s1, s2)                                  => s1 ⨿ s2
     },
     untyper[nat._2](t => success(Func.Input2(t, t))))
 

@@ -8,8 +8,8 @@ Chain
 │  │     │  │  ╰─ Key(baz: _.baz)
 │  │     │  ╰─ Ident(_)
 │  │     ╰─ Obj
-│  │        ├─ Key(0: (((isNumber(
-│  │        │      (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].bar : undefined) || ((((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].bar : undefined) instanceof NumberInt) || (((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].bar : undefined) instanceof NumberLong))) || (((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].bar : undefined) instanceof Date)) && (isObject(__val[1]) && (! Array.isArray(__val[1])))) ? __val[1].bar / 10 : undefined)
+│  │        ├─ Key(0: ((isNumber(
+│  │        │      (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].bar : undefined) || ((((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].bar : undefined) instanceof NumberInt) || (((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].bar : undefined) instanceof NumberLong))) && (isObject(__val[1]) && (! Array.isArray(__val[1])))) ? __val[1].bar / 10 : undefined)
 │  │        ╰─ Key(src: __val)
 │  ╰─ Scope(Map())
 ├─ $SortF
