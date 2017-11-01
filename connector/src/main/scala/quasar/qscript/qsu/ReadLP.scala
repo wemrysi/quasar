@@ -66,8 +66,12 @@ sealed abstract class ReadLP[
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val transform: AlgebraM[F, lp.LogicalPlan, QSUGraph[T]] = {
     case lp.Read(path) =>
-      val afile = mkAbsolute(rootDir[Sandboxed], path)    // TODO this is almost certainly wrong
-      withName(QSU.Read[T, Symbol](afile))
+      val afile = mkAbsolute(rootDir[Sandboxed], path)
+
+      for {
+        read <- withName(QSU.Read[T, Symbol](afile))
+        back <- extend1(read)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftMap))
+      } yield back
 
     case lp.Constant(data) =>
       val back = fromData(data).fold[PlannerError \/ QSU[T, Symbol]](
