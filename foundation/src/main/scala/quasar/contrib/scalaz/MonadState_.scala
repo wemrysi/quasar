@@ -18,19 +18,21 @@ package quasar.contrib.scalaz
 
 import slamdata.Predef._
 
-import scalaz.MonadState
+import scalaz.{Bind, Functor, MonadState}
 
 /** A version of MonadState that doesn't extend Monad to avoid ambiguous
   * implicits in the presence of multiple "mtl" constraints.
   */
-trait MonadState_[F[_], S] { self =>
-  def MS: MonadState[F, S]
-
-  def bind[A, B](fa: F[A])(f: (A) ⇒ F[B]): F[B]
+trait MonadState_[F[_], S] {
   def get: F[S]
   def init: F[S]
-  def point[A](a: ⇒ A): F[A]
   def put(s: S): F[Unit]
+
+  def gets[A](f: S => A)(implicit F: Functor[F]): F[A] =
+    F.map(init)(f)
+
+  def modify(f: S => S)(implicit F: Bind[F]): F[Unit] =
+    F.bind(init)(f andThen put)
 }
 
 object MonadState_ {
@@ -39,15 +41,8 @@ object MonadState_ {
   implicit def monadStateNoMonad[F[_], S](implicit F: MonadState[F, S])
       : MonadState_[F, S] =
     new MonadState_[F, S] {
-      def MS = F
-
-      def bind[A, B](fa: F[A])(f: (A) ⇒ F[B]) = F.bind(fa)(f)
       def get = F.get
       def init = F.init
-      def point[A](a: ⇒ A) = F.point(a)
       def put(s: S) = F.put(s)
     }
-
-  implicit def toMonadState[F[_], S](ms: MonadState_[F, S]): MonadState[F, S] =
-    ms.MS
 }
