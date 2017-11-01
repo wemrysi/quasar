@@ -18,6 +18,7 @@ package quasar.qscript.qsu
 
 import slamdata.Predef.{Map => SMap, _}
 
+import scalaz.{Applicative, Traverse}
 import scalaz.syntax.traverse._
 
 final case class QSUGraph[T[_[_]]](
@@ -43,6 +44,23 @@ final case class QSUGraph[T[_[_]]](
 }
 
 object QSUGraph {
+
+  /**
+   * The pattern functor for `QSUGraph[T]`.
+   */
+  final case class QSUPattern[T[_[_]], A](root: Symbol, qsu: QScriptUniform[T, A])
+
+  object QSUPattern {
+    implicit def traverse[T[_[_]]]: Traverse[QSUPattern[T, ?]] =
+      new Traverse[QSUPattern[T, ?]] {
+        def traverseImpl[G[_]: Applicative, A, B](pattern: QSUPattern[T, A])(f: A => G[B])
+            : G[QSUPattern[T, B]] =
+          pattern match {
+            case QSUPattern(root, qsu) =>
+              qsu.traverse(f).map(QSUPattern[T, B](root, _))
+          }
+      }
+  }
 
   /**
    * This object contains extraction helpers in terms of QSU nodes.
