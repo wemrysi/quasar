@@ -24,14 +24,84 @@ import quasar.ejson.EJson
 import quasar.qscript._
 
 import matryoshka.{BirecursiveT, Delay, EqualT, ShowT}
-import scalaz.{:<:, Equal, NonEmptyList => NEL, Traverse}
+import scalaz.{:<:, Applicative, Bitraverse, Equal, NonEmptyList => NEL, Scalaz, Traverse}
 
 sealed trait QScriptUniform[T[_[_]], A] extends Product with Serializable
 
 object QScriptUniform {
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  implicit def traverse[T[_[_]]]: Traverse[QScriptUniform[T, ?]] = ???
+  implicit def traverse[T[_[_]]]: Traverse[QScriptUniform[T, ?]] = new Traverse[QScriptUniform[T, ?]] {
+    // we need both apply and traverse syntax, which conflict
+    import Scalaz._
+
+    def traverseImpl[G[_]: Applicative, A, B](qsu: QScriptUniform[T, A])(f: A => G[B]): G[QScriptUniform[T, B]] = qsu match {
+      case AutoJoin(sources, combiner) =>
+        sources.traverse(f).map(nel => AutoJoin(nel, combiner))
+
+      case GroupBy(left, right) =>
+        (f(left) |@| f(right))(GroupBy(_, _))
+
+      case DimEdit(source, DTrans.Squash()) =>
+        f(source).map(DimEdit(_, DTrans.Squash()))
+
+      case DimEdit(source, DTrans.PushValue(value)) =>
+        (f(source) |@| f(value))((s, v) => DimEdit(s, DTrans.PushValue(v)))
+
+      case LPJoin(left, right, condition, joinType, leftRef, rightRef) =>
+        (f(left) |@| f(right) |@| f(condition))(LPJoin(_, _, _, joinType, leftRef, rightRef))
+
+      case ThetaJoin(left, right, condition, joinType) =>
+        (f(left) |@| f(right))(ThetaJoin(_, _, condition, joinType))
+
+      case Map(source, fm) =>
+        f(source).map(Map(_, fm))
+
+      case Read(path) => (Read(path): QScriptUniform[T, B]).point[G]
+
+      case Transpose(source, rotations) =>
+        f(source).map(Transpose(_, rotations))
+
+      case LeftShift(source, struct, idStatus, repair) =>
+        f(source).map(LeftShift(_, struct, idStatus, repair))
+
+      case LPReduce(source, reduce) =>
+        f(source).map(LPReduce(_, reduce))
+
+      case QSReduce(source, reducers, buckets, repair) =>
+        f(source).map(QSReduce(_, reducers, buckets, repair))
+
+      case Distinct(source) =>
+        f(source).map(Distinct(_))
+
+      case Sort(source, order) =>
+        val T = Bitraverse[(?, ?)].leftTraverse[SortDir]
+
+        val source2G = f(source)
+        val orders2G = order.traverse(p => T.traverse(p)(f))
+
+        (source2G |@| orders2G)(Sort(_, _))
+
+      case UniformSort(source, buckets, order) =>
+        f(source).map(UniformSort(_, buckets, order))
+
+      case Union(left, right) =>
+        (f(left) |@| f(right))(Union(_, _))
+
+      case Subset(from, op, count) =>
+        (f(from) |@| f(count))(Subset(_, op, _))
+
+      case LPFilter(source, predicate) =>
+        (f(source) |@| f(predicate))(LPFilter(_, _))
+
+      case QSFilter(source, predicate) =>
+        f(source).map(QSFilter(_, predicate))
+
+      case Nullary(mf) => (Nullary(mf): QScriptUniform[T, B]).point[G]
+
+      case JoinSideRef(id) => (JoinSideRef(id): QScriptUniform[T, B]).point[G]
+    }
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]
