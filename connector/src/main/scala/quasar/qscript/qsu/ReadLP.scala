@@ -28,7 +28,7 @@ import quasar.{
 }
 import quasar.Planner.{NonRepresentableData, PlannerError}
 import quasar.contrib.pathy.mkAbsolute
-import quasar.contrib.scalaz.MonadError_
+import quasar.contrib.scalaz.{MonadError_, MonadState_}
 import quasar.ejson.EJson
 import quasar.frontend.{logicalplan => lp}
 import quasar.std.{IdentityLib, SetLib, StructuralLib}
@@ -40,7 +40,7 @@ import matryoshka.{AlgebraM, BirecursiveT}
 import matryoshka.implicits._
 import matryoshka.patterns.{interpretM, CoEnv}
 import pathy.Path.{rootDir, Sandboxed}
-import scalaz.{\/, Free, Inject, Monad, NonEmptyList => NEL}
+import scalaz.{\/, Free, Inject, Monad, NonEmptyList => NEL, StateT}
 import scalaz.std.tuple._
 import scalaz.syntax.bifunctor._
 import scalaz.syntax.either._
@@ -54,6 +54,9 @@ sealed abstract class ReadLP[
     F[_]: Monad: MonadError_[?[_], PlannerError]: NameGenerator]
     extends TTypes[T] {
 
+  type G[A] = StateT[F, SMap[QSU[T, Symbol], Symbol], A]
+  private val MS = MonadState_[G, SMap[QSU[T, Symbol], Symbol]]
+
   private val IC = Inject[MapFuncCore, MapFunc]
   private val ID = Inject[MapFuncDerived, MapFunc]
 
@@ -61,10 +64,10 @@ sealed abstract class ReadLP[
   private val ValueIndex = 1
 
   def apply(plan: T[lp.LogicalPlan]): F[QSUGraph[T]] =
-    plan.cataM(transform)
+    plan.cataM(transform).eval(SMap())
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  val transform: AlgebraM[F, lp.LogicalPlan, QSUGraph[T]] = {
+  val transform: AlgebraM[G, lp.LogicalPlan, QSUGraph[T]] = {
     case lp.Read(path) =>
       val afile = mkAbsolute(rootDir[Sandboxed], path)
 
@@ -84,7 +87,7 @@ sealed abstract class ReadLP[
         },
         { x: T[EJson] => QSU.Constant[T, Symbol](x).right })
 
-      MonadError_[F, PlannerError].unattempt(back.point[F]).flatMap(withName)
+      MonadError_[G, PlannerError].unattempt(back.point[G]).flatMap(withName)
 
     case lp.InvokeUnapply(StructuralLib.FlattenMap, Sized(a)) =>
       val transpose =
@@ -182,10 +185,13 @@ sealed abstract class ReadLP[
         QSU.LPJoin[T, Symbol](_, _, _, tpe, leftN, rightN))
 
     case lp.Free(name) =>
-      QSUGraph[T](name, SMap()).point[F]
+      QSUGraph[T](name, SMap()).point[G]
 
     case lp.Let(name, form, in) =>
-      (form.rename(form.root, name) ++: in).point[F]
+      for {
+        reverse <- MS.get
+        _ <- MS.put(reverse.updated(form.vertices(form.root), name))
+      } yield form.rename(form.root, name) ++: in
 
     case lp.Sort(src, order) =>
       val node = QSU.Sort[T, Symbol](src.root, order.map(_.leftMap(_.root)))
@@ -194,7 +200,7 @@ sealed abstract class ReadLP[
       withName(node).map(g => graphs.foldLeft(g)(_ :++ _))
   }
 
-  private def projectConstIdx(idx: Int)(parent: QSUGraph[T]): F[QSUGraph[T]] = {
+  private def projectConstIdx(idx: Int)(parent: QSUGraph[T]): G[QSUGraph[T]] = {
     for {
       idxG <- withName(
         QSU.Constant[T, Symbol](
@@ -205,30 +211,41 @@ sealed abstract class ReadLP[
   }
 
   private def autoJoin2(e1: QSUGraph[T], e2: QSUGraph[T])(
-      constr: (Int, Int) => MapFunc[Int]): F[QSUGraph[T]] =
+      constr: (Int, Int) => MapFunc[Int]): G[QSUGraph[T]] =
     extend2(e1, e2)((e1, e2) => QSU.AutoJoin[T, Symbol](NEL(e1, e2), constr(0, 1)))
 
   private def autoJoin3(e1: QSUGraph[T], e2: QSUGraph[T], e3: QSUGraph[T])(
-      constr: (Int, Int, Int) => MapFunc[Int]): F[QSUGraph[T]] =
+      constr: (Int, Int, Int) => MapFunc[Int]): G[QSUGraph[T]] =
     extend3(e1, e2, e3)((e1, e2, e3) => QSU.AutoJoin[T, Symbol](NEL(e1, e2, e3), constr(0, 1, 2)))
 
   private def extend1(parent: QSUGraph[T])(
-      constr: Symbol => QSU[T, Symbol]): F[QSUGraph[T]] =
+      constr: Symbol => QSU[T, Symbol]): G[QSUGraph[T]] =
     withName(constr(parent.root)).map(_ :++ parent)
 
   private def extend2(parent1: QSUGraph[T], parent2: QSUGraph[T])(
-      constr: (Symbol, Symbol) => QSU[T, Symbol]): F[QSUGraph[T]] =
+      constr: (Symbol, Symbol) => QSU[T, Symbol]): G[QSUGraph[T]] =
     withName(constr(parent1.root, parent2.root)).map(_ :++ parent1 :++ parent2)
 
   private def extend3(parent1: QSUGraph[T], parent2: QSUGraph[T], parent3: QSUGraph[T])(
-      constr: (Symbol, Symbol, Symbol) => QSU[T, Symbol]): F[QSUGraph[T]] =
+      constr: (Symbol, Symbol, Symbol) => QSU[T, Symbol]): G[QSUGraph[T]] =
     withName(constr(parent1.root, parent2.root, parent3.root)).map(_ :++ parent1 :++ parent2 :++ parent3)
 
-  private def withName(node: QSU[T, Symbol]): F[QSUGraph[T]] = {
+  private def withName(node: QSU[T, Symbol]): G[QSUGraph[T]] = {
     for {
-      name <- NameGenerator[F].prefixedName("qsu")
-      sym = Symbol(name)
-    } yield QSUGraph(root = sym, SMap(sym -> node))
+      reverse <- MS.get
+
+      back <- reverse.get(node) match {
+        case Some(sym) =>
+          QSUGraph[T](root = sym, SMap()).point[G]
+
+        case None =>
+          for {
+            name <- NameGenerator[G].prefixedName("qsu")
+            sym = Symbol(name)
+            _ <- MS.put(reverse + (node -> sym))
+          } yield QSUGraph[T](root = sym, SMap(sym -> node))
+      }
+    } yield back
   }
 
   private def fromData(data: Data): Data \/ T[EJson] = {
