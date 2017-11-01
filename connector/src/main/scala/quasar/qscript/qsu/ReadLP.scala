@@ -153,16 +153,10 @@ sealed abstract class ReadLP[
       extend1(a)(QSU.Map[T, Symbol](_, Free.roll[MapFunc, Hole](translated)))
 
     case lp.InvokeUnapply(func: BinaryFunc, Sized(a, b)) if func.effect === Mapping =>
-      val translated =
-        MapFunc.translateBinaryMapping[T, MapFunc, Int].apply(func)(0, 1)
-
-      extend2(a, b)((a, b) => QSU.AutoJoin[T, Symbol](NEL(a, b), translated))
+      autoJoin2(a, b)(MapFunc.translateBinaryMapping[T, MapFunc, Int].apply(func))
 
     case lp.InvokeUnapply(func: TernaryFunc, Sized(a, b, c)) if func.effect === Mapping =>
-      val translated =
-        MapFunc.translateTernaryMapping[T, MapFunc, Int].apply(func)(0, 1, 2)
-
-      extend3(a, b, c)((a, b, c) => QSU.AutoJoin[T, Symbol](NEL(a, b, c), translated))
+      autoJoin3(a, b, c)(MapFunc.translateTernaryMapping[T, MapFunc, Int].apply(func))
 
     case lp.InvokeUnapply(func, values) => ???
 
@@ -174,11 +168,7 @@ sealed abstract class ReadLP[
             MFC(MapFuncsCore.TemporalTrunc(part, Free.pure[MapFunc, Hole](SrcHole))))))
 
     case lp.Typecheck(expr, tpe, cont, fallback) =>
-      val translated = IC(MapFuncsCore.Guard[T, Int](0, tpe, 1, 2))
-
-      extend3(expr, cont, fallback) { (e, c, f) =>
-        QSU.AutoJoin[T, Symbol](NEL(e, c, f), translated)
-      }
+      autoJoin3(expr, cont, fallback)((e, c, f) => IC(MapFuncsCore.Guard[T, Int](e, tpe, c, f)))
 
     case lp.JoinSideName(name) =>
       withName(QSU.JoinSideRef[T, Symbol](name))
@@ -206,10 +196,17 @@ sealed abstract class ReadLP[
         QSU.Constant[T, Symbol](
           ejson.ExtEJson(ejson.Int[T[EJson]](idx)).embed))
 
-      func = IC(MapFuncsCore.ProjectIndex[T, Int](0, 1))
-      back <- extend2(parent, idxG)((p, i) => QSU.AutoJoin[T, Symbol](NEL(p, i), func))
+      back <- autoJoin2(parent, idxG)((p, i) => IC(MapFuncsCore.ProjectIndex[T, Int](p, i)))
     } yield back
   }
+
+  private def autoJoin2(e1: QSUGraph[T], e2: QSUGraph[T])(
+      constr: (Int, Int) => MapFunc[Int]): F[QSUGraph[T]] =
+    extend2(e1, e2)((e1, e2) => QSU.AutoJoin[T, Symbol](NEL(e1, e2), constr(0, 1)))
+
+  private def autoJoin3(e1: QSUGraph[T], e2: QSUGraph[T], e3: QSUGraph[T])(
+      constr: (Int, Int, Int) => MapFunc[Int]): F[QSUGraph[T]] =
+    extend3(e1, e2, e3)((e1, e2, e3) => QSU.AutoJoin[T, Symbol](NEL(e1, e2, e3), constr(0, 1, 2)))
 
   private def extend1(parent: QSUGraph[T])(
       constr: Symbol => QSU[T, Symbol]): F[QSUGraph[T]] =
