@@ -16,11 +16,14 @@
 
 package quasar.qscript.qsu
 
-import slamdata.Predef.StringContext
+import slamdata.Predef._
 
 import quasar.contrib.pathy.AFile
+import quasar.fp._
 import quasar.qscript.{
+  educatedToTotal,
   Filter,
+  Hole,
   JoinSide,
   LeftShift,
   LeftSideF,
@@ -31,6 +34,7 @@ import quasar.qscript.{
   Reduce,
   RightSideF,
   Sort,
+  SrcHole,
   SrcMerge,
   Subset,
   ThetaJoin,
@@ -40,62 +44,144 @@ import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.QSUGraph.QSUPattern
 import quasar.sql.JoinDir
 
-import matryoshka.{Corecursive, CorecursiveT, Coalgebra, Recursive, ShowT}
-import scalaz.{Const, Free, Inject}
+import matryoshka.{Corecursive, CorecursiveT, Coalgebra, ElgotAlgebra, Recursive, ShowT}
+import matryoshka.data.free._
+import matryoshka.patterns.CoEnv
+import scalaz.{~>, -\/, Const, Free, Inject, ISet, ICons, INil, NaturalTransformation, Order, Show}
+import scalaz.Scalaz._ // it's taking > 200sec per compile iteration when figuring out what to import
 
 sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T] {
   import QSUPattern._
 
-  private def mergeSources(left: QSUGraph, right: QSUGraph)
-      : SrcMerge[QSUGraph, FreeQS] =
-    slamdata.Predef.???
+  type QSE[A] = QScriptEducated[A]
+  type QSU[A] = QScriptUniform[A]
 
-  val graduateƒ: Coalgebra[QScriptEducated, QSUGraph] =
-    Recursive[QSUGraph, QSUPattern[T, ?]].project(_) match {
-      case QSUPattern(root, qsu) => qsu match {
+  private def mergeSources(left: QSUGraph, right: QSUGraph): SrcMerge[QSUGraph, FreeQS] = {
+    val source: QSUGraph = MergeSources.merge(left, right)
+    SrcMerge(source, graduateCoEnv(source.root, left), graduateCoEnv(source.root, right))
+  }
 
-        case QSU.Read(path) =>
-          Inject[Const[Read[AFile], ?], QScriptEducated].inj(Const(Read(path)))
+  object MergeSources {
 
-        case QSU.Map(source, fm) =>
-          QCE(Map[T, QSUGraph](source, fm))
+    case class Edge(from: Symbol, to: Symbol)
 
-        case QSU.QSFilter(source, fm) =>
-          QCE(Filter[T, QSUGraph](source, fm))
-
-        case QSU.QSReduce(source, buckets, reducers, repair) =>
-          QCE(Reduce[T, QSUGraph](source, buckets, reducers, repair))
-
-        case QSU.LeftShift(source, struct, idStatus, repair) =>
-          QCE(LeftShift[T, QSUGraph](source, struct, idStatus, repair))
-
-        case QSU.UniformSort(source, buckets, order) =>
-          QCE(Sort[T, QSUGraph](source, buckets, order))
-
-        case QSU.Union(left, right) =>
-          val SrcMerge(source, lBranch, rBranch) = mergeSources(left, right)
-          QCE(Union[T, QSUGraph](source, lBranch, rBranch))
-
-        case QSU.Subset(from, op, count) =>
-          val SrcMerge(source, fromBranch, countBranch) = mergeSources(from, count)
-          QCE(Subset[T, QSUGraph](source, fromBranch, op, countBranch))
-
-        case QSU.ThetaJoin(left, right, condition, joinType) =>
-          val SrcMerge(source, lBranch, rBranch) = mergeSources(left, right)
-
-          val combine: JoinFunc =
-             Free.roll(MFC(ConcatMaps(
-               Free.roll(MFC(MakeMap(StrLit[T, JoinSide](JoinDir.Left.name), LeftSideF))),
-               Free.roll(MFC(MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), RightSideF))))))
-
-          Inject[ThetaJoin, QScriptEducated].inj(
-            ThetaJoin[T, QSUGraph](source, lBranch, rBranch, condition, joinType, combine))
-
-        case qsu =>
-          scala.sys.error(s"Found an unexpected LP-ish $qsu.") // TODO use Show to print
+    object Edge {
+      implicit val order: Order[Edge] = Order.order {
+        case (e1, e2) =>
+          Order[(Symbol, Symbol)].order((e1.from, e1.to), (e2.from, e2.to))
       }
     }
 
-  def graduate(graph: QSUGraph): T[QScriptEducated] =
-    Corecursive[T[QScriptEducated], QScriptEducated].ana[QSUGraph](graph)(graduateƒ)
+    // (QSUGraph, QSUPattern[T, ISet[Edge]]) => ISet[Edge]
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+    val findEdgesƒ: ElgotAlgebra[(QSUGraph, ?), QSUPattern[T, ?], ISet[Edge]] = slamdata.Predef.???
+
+    // try elgotPara
+    private def findEdges(graph: QSUGraph): ISet[Edge] =
+      Recursive[QSUGraph, QSUPattern[T, ?]].elgotPara[ISet[Edge]](graph)(findEdgesƒ)
+
+    private def findSourceCandidate(left: ISet[Edge], right: ISet[Edge]): ISet[Edge] =
+      left intersection right
+
+    // FIXME real error handling
+    private def edgesToRoot(edges: ISet[Edge]): Symbol = {
+      val (tos, froms): (ISet[Symbol], ISet[Symbol]) =
+        edges.foldRight[(ISet[Symbol], ISet[Symbol])]((ISet.empty, ISet.empty)) {
+          case (Edge(from, to), (froms, tos)) =>
+            (froms.insert(from), tos.insert(to))
+        }
+
+      val rootCandidate: ISet[Symbol] = tos difference froms
+
+      // Foldable[ISet]
+      rootCandidate.toIList match {
+        case ICons(head, INil()) => head
+        case _ => scala.sys.error(s"Source merging failed. Candidates: ${Show[ISet[Symbol]].shows(rootCandidate)}")
+      }
+    }
+
+    def merge(left: QSUGraph, right: QSUGraph): QSUGraph = {
+      QSUGraph[T](
+        edgesToRoot(findSourceCandidate(findEdges(left), findEdges(right))),
+        left.vertices)
+    }
+  }
+
+  private def educate(qsu: QSU[QSUGraph]): QSE[QSUGraph] =
+    qsu match {
+      case QSU.Read(path) =>
+        Inject[Const[Read[AFile], ?], QSE].inj(Const(Read(path)))
+
+      case QSU.Map(source, fm) =>
+        QCE(Map[T, QSUGraph](source, fm))
+
+      case QSU.QSFilter(source, fm) =>
+        QCE(Filter[T, QSUGraph](source, fm))
+
+      case QSU.QSReduce(source, buckets, reducers, repair) =>
+        QCE(Reduce[T, QSUGraph](source, buckets, reducers, repair))
+
+      case QSU.LeftShift(source, struct, idStatus, repair) =>
+        QCE(LeftShift[T, QSUGraph](source, struct, idStatus, repair))
+
+      case QSU.UniformSort(source, buckets, order) =>
+        QCE(Sort[T, QSUGraph](source, buckets, order))
+
+      case QSU.Union(left, right) =>
+        val SrcMerge(source, lBranch, rBranch) = mergeSources(left, right)
+        QCE(Union[T, QSUGraph](source, lBranch, rBranch))
+
+      case QSU.Subset(from, op, count) =>
+        val SrcMerge(source, fromBranch, countBranch) = mergeSources(from, count)
+        QCE(Subset[T, QSUGraph](source, fromBranch, op, countBranch))
+
+      case QSU.ThetaJoin(left, right, condition, joinType) =>
+        val SrcMerge(source, lBranch, rBranch) = mergeSources(left, right)
+
+        val combine: JoinFunc =
+           Free.roll(MFC(ConcatMaps(
+             Free.roll(MFC(MakeMap(StrLit[T, JoinSide](JoinDir.Left.name), LeftSideF))),
+             Free.roll(MFC(MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), RightSideF))))))
+
+        Inject[ThetaJoin, QSE].inj(
+          ThetaJoin[T, QSUGraph](source, lBranch, rBranch, condition, joinType, combine))
+
+      case qsu =>
+        scala.sys.error(s"Found an unexpected LP-ish $qsu.") // TODO use Show to print
+    }
+
+  private def graduateƒ[F[_]](halt: Option[(Symbol, F[QSUGraph])])(lift: QSE ~> F)
+      : Coalgebra[F, QSUGraph] = graph => {
+
+    val pattern: QSUPattern[T, QSUGraph] =
+      Recursive[QSUGraph, QSUPattern[T, ?]].project(graph)
+
+    def default: F[QSUGraph] = lift(educate(pattern.qsu))
+
+    halt match {
+      case Some((name, output)) =>
+        pattern match {
+          case QSUPattern(`name`, _) => output
+          case _ => default
+        }
+      case None => default
+    }
+  }
+
+  private def graduateCoEnv(source: Symbol, graph: QSUGraph): FreeQS = {
+    type CoEnvTotal[A] = CoEnv[Hole, QScriptTotal, A]
+
+    val halt: Option[(Symbol, CoEnvTotal[QSUGraph])] =
+      Some((source, CoEnv.coEnv(-\/(SrcHole))))
+
+    val lift: QSE ~> CoEnvTotal =
+      educatedToTotal[T].inject andThen PrismNT.coEnv[QScriptTotal, Hole].reverseGet
+
+    Corecursive[FreeQS, CoEnvTotal].ana[QSUGraph](graph)(
+      graduateƒ[CoEnvTotal](halt)(lift))
+  }
+
+  def graduate(graph: QSUGraph): T[QSE] =
+    Corecursive[T[QSE], QSE].ana[QSUGraph](graph)(
+      graduateƒ[QSE](None)(NaturalTransformation.refl[QSE]))
 }

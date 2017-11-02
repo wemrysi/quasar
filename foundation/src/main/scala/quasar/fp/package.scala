@@ -246,6 +246,7 @@ package object fp
 
   implicit val symbolEqual: Equal[Symbol] = Equal.equalA
   implicit val symbolShow: Show[Symbol] = Show.showFromToString
+  implicit val symbolOrder: Order[Symbol] = Order.order((s1, s2) => Order[String].order(s1.name, s2.name))
 
   implicit final class QuasarFreeOps[F[_], A](val self: Free[F, A]) extends scala.AnyVal {
     type Self    = Free[F, A]

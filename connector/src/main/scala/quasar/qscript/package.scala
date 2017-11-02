@@ -87,6 +87,10 @@ package object qscript {
   type QScriptEducated[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[AFile], ?])#M[A]
 
+  def educatedToTotal[T[_[_]]]
+      : Injectable.Aux[QScriptEducated[T, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[Read[AFile], ?]])
+
   object QCE {
     def apply[T[_[_]], A](qc: QScriptCore[T, A]): QScriptEducated[T, A] =
       Inject[QScriptCore[T, ?], QScriptEducated[T, ?]].inj(qc)
