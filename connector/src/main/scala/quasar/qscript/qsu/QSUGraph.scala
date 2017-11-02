@@ -65,12 +65,11 @@ object QSUGraph {
 
     private def φ[T[_[_]]]: Algebra[QSUPattern[T, ?], QSUGraph[T]] = {
       case QSUPattern(root, qsu) =>
-        val vertices: SMap[Symbol, QScriptUniform[T, Symbol]] =
-          qsu.foldRight(SMap(root -> qsu.map(_.root))) {
-            case (graph, acc) => graph.vertices ++ acc
-          }
+        val initial: QSUGraph[T] = QSUGraph[T](root, SMap(root -> qsu.map(_.root)))
 
-        QSUGraph[T](root, vertices)
+        qsu.foldRight(initial) {
+          case (graph, acc) => graph ++: acc // retain the root from the right
+        }
     }
 
     private def ψ[T[_[_]]]: Coalgebra[QSUPattern[T, ?], QSUGraph[T]] = graph => {
