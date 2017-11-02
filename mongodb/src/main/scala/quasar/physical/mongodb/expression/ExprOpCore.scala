@@ -387,6 +387,18 @@ object ExprOpCoreF {
     val $$ROOT: T    = $var(DocVar.ROOT())
     val $$CURRENT: T = $var(DocVar.CURRENT())
 
+    def mkToString(a1: T, func: (T, T, T) => T): T =
+      $cond(
+        $eq(a1, $literal(Bson.Null)),
+        $literal(Bson.Text("null")),
+        $cond(
+          $eq(a1, $literal(Bson.Bool(false))),
+          $literal(Bson.Text("false")),
+          $cond(
+            $eq(a1, $literal(Bson.Bool(true))),
+            $literal(Bson.Text("true")),
+            func(a1, $literal(Bson.Int32(0)), $literal(Bson.Int32(-1))))))
+
     def mkTypeOf(a1: T, func: T => T): T =
       // TODO: With type info, we could reduce the number of comparisons necessary.
       $cond($lt(a1, $literal(Bson.Null)),                          $literal(Bson.Undefined),
