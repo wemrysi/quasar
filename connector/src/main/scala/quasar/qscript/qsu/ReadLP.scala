@@ -41,8 +41,7 @@ import quasar.qscript.{
   ReduceFunc,
   Sample,
   SrcHole,
-  Take,
-  TTypes
+  Take
 }
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import slamdata.Predef.{Map => SMap, _}
@@ -63,9 +62,11 @@ import shapeless.Sized
 sealed abstract class ReadLP[
     T[_[_]]: BirecursiveT,
     F[_]: Monad: MonadError_[?[_], PlannerError]: NameGenerator]
-    extends TTypes[T] {
+    extends QSUTTypes[T] {
 
+  type QSU[A] = QScriptUniform[A]
   type G[A] = StateT[F, SMap[QSU[Symbol], Symbol], A]
+
   private val MS = MonadState_[G, SMap[QSU[Symbol], Symbol]]
 
   private val IC = Inject[MapFuncCore, MapFunc]

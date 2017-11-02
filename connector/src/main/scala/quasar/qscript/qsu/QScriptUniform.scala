@@ -24,7 +24,7 @@ import quasar.ejson.EJson
 import quasar.qscript._
 
 import matryoshka.{BirecursiveT, Delay, EqualT, ShowT}
-import scalaz.{:<:, Applicative, Bitraverse, Equal, NonEmptyList => NEL, Scalaz, Traverse}
+import scalaz.{:<:, Applicative, Bitraverse, Equal, NonEmptyList => NEL, Scalaz, Show, Traverse}
 
 sealed trait QScriptUniform[T[_[_]], A] extends Product with Serializable
 
@@ -103,11 +103,16 @@ object QScriptUniform {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]
-      : Delay[RenderTree, QScriptCore[T, ?]] = ???
+  implicit def show[T[_[_]]: ShowT]
+      : Delay[Show, QScriptUniform[T, ?]] = ???
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  implicit def equal[T[_[_]]: BirecursiveT: EqualT]: Delay[Equal, QScriptCore[T, ?]] = ???
+  implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]
+      : Delay[RenderTree, QScriptUniform[T, ?]] = ???
+
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+  implicit def equal[T[_[_]]: BirecursiveT: EqualT]
+      : Delay[Equal, QScriptUniform[T, ?]] = ???
 
   final case class AutoJoin[T[_[_]], A](
       sources: NEL[A],

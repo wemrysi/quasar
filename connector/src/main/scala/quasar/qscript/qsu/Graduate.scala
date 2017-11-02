@@ -16,6 +16,8 @@
 
 package quasar.qscript.qsu
 
+import slamdata.Predef.StringContext
+
 import quasar.contrib.pathy.AFile
 import quasar.qscript.{
   Filter,
@@ -32,17 +34,16 @@ import quasar.qscript.{
   SrcMerge,
   Subset,
   ThetaJoin,
-  TTypes,
   Union}
 import quasar.qscript.MapFuncsCore.{ConcatMaps, MakeMap, StrLit}
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.QSUGraph.QSUPattern
 import quasar.sql.JoinDir
 
-import matryoshka.{Corecursive, CorecursiveT, Coalgebra, Recursive}
+import matryoshka.{Corecursive, CorecursiveT, Coalgebra, Recursive, ShowT}
 import scalaz.{Const, Free, Inject}
 
-sealed abstract class Graduate[T[_[_]]: CorecursiveT] extends TTypes[T] {
+sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T] {
   import QSUPattern._
 
   private def mergeSources(left: QSUGraph, right: QSUGraph)
@@ -90,7 +91,8 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT] extends TTypes[T] {
           Inject[ThetaJoin, QScriptEducated].inj(
             ThetaJoin[T, QSUGraph](source, lBranch, rBranch, condition, joinType, combine))
 
-        case _ => scala.sys.error("found an LPish thing")
+        case qsu =>
+          scala.sys.error(s"Found an unexpected LP-ish $qsu.") // TODO use Show to print
       }
     }
 
