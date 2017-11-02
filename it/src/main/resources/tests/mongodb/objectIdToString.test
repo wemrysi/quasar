@@ -1,0 +1,20 @@
+{
+  "name": "convert ObjectId to String",
+  "data": "../objectids.data",
+  "query": "select to_string(oid(bar)) from `../objectids` order by `_id`",
+  "backends": {
+    "couchbase":      "skip",
+    "marklogic_json": "skip",
+    "marklogic_xml":  "skip",
+    "mimir":          "skip",
+    "spark_hdfs":     "skip",
+    "spark_local":    "skip",
+    "spark_cassandra":"skip"
+  },
+  "predicate": "exactly",
+  "expected": [
+    { "0": "ObjectId(\"4f95e00d9060633ce7fbab93\")" },
+    { "0": "ObjectId(\"4f95e0119060633ce7fbab95\")" },
+    { "0": "ObjectId(\"4f95e0119060633ce7fbab97\")" }
+  ]
+}
