@@ -595,6 +595,7 @@ object MongoDbPlanner {
             case Type.Id               => isObjectId
             case Type.Bool             => isBoolean
             case Type.Date             => isDate
+            case Type.Syntaxed         => isSyntaxed
           }
         jsCheck(typ).fold[M[JsCore]](
           raiseErr(qscriptPlanningFailed(InternalError.fromMsg("uncheckable type"))))(
