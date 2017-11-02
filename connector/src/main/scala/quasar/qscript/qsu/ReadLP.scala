@@ -65,8 +65,8 @@ sealed abstract class ReadLP[
     F[_]: Monad: MonadError_[?[_], PlannerError]: NameGenerator]
     extends TTypes[T] {
 
-  type G[A] = StateT[F, SMap[QSU[T, Symbol], Symbol], A]
-  private val MS = MonadState_[G, SMap[QSU[T, Symbol], Symbol]]
+  type G[A] = StateT[F, SMap[QSU[Symbol], Symbol], A]
+  private val MS = MonadState_[G, SMap[QSU[Symbol], Symbol]]
 
   private val IC = Inject[MapFuncCore, MapFunc]
   private val ID = Inject[MapFuncDerived, MapFunc]
@@ -74,11 +74,11 @@ sealed abstract class ReadLP[
   private val IdIndex = 0
   private val ValueIndex = 1
 
-  def apply(plan: T[lp.LogicalPlan]): F[QSUGraph[T]] =
+  def apply(plan: T[lp.LogicalPlan]): F[QSUGraph] =
     plan.cataM(transform).eval(SMap())
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  val transform: AlgebraM[G, lp.LogicalPlan, QSUGraph[T]] = {
+  val transform: AlgebraM[G, lp.LogicalPlan, QSUGraph] = {
     case lp.Read(path) =>
       val afile = mkAbsolute(rootDir[Sandboxed], path)
 
@@ -88,7 +88,7 @@ sealed abstract class ReadLP[
       } yield back
 
     case lp.Constant(data) =>
-      val back = fromData(data).fold[PlannerError \/ QSU[T, Symbol]](
+      val back = fromData(data).fold[PlannerError \/ QSU[Symbol]](
         {
           case Data.NA =>
             QSU.Nullary(IC(MapFuncsCore.Undefined[T, Symbol]())).right
@@ -227,7 +227,7 @@ sealed abstract class ReadLP[
       withName(node).map(g => graphs.foldLeft(g)(_ :++ _))
   }
 
-  private def projectConstIdx(idx: Int)(parent: QSUGraph[T]): G[QSUGraph[T]] = {
+  private def projectConstIdx(idx: Int)(parent: QSUGraph): G[QSUGraph] = {
     for {
       idxG <- withName(
         QSU.Constant[T, Symbol](
@@ -237,27 +237,27 @@ sealed abstract class ReadLP[
     } yield back
   }
 
-  private def autoJoin2(e1: QSUGraph[T], e2: QSUGraph[T])(
-      constr: (Int, Int) => MapFunc[Int]): G[QSUGraph[T]] =
+  private def autoJoin2(e1: QSUGraph, e2: QSUGraph)(
+      constr: (Int, Int) => MapFunc[Int]): G[QSUGraph] =
     extend2(e1, e2)((e1, e2) => QSU.AutoJoin[T, Symbol](NEL(e1, e2), constr(0, 1)))
 
-  private def autoJoin3(e1: QSUGraph[T], e2: QSUGraph[T], e3: QSUGraph[T])(
-      constr: (Int, Int, Int) => MapFunc[Int]): G[QSUGraph[T]] =
+  private def autoJoin3(e1: QSUGraph, e2: QSUGraph, e3: QSUGraph)(
+      constr: (Int, Int, Int) => MapFunc[Int]): G[QSUGraph] =
     extend3(e1, e2, e3)((e1, e2, e3) => QSU.AutoJoin[T, Symbol](NEL(e1, e2, e3), constr(0, 1, 2)))
 
-  private def extend1(parent: QSUGraph[T])(
-      constr: Symbol => QSU[T, Symbol]): G[QSUGraph[T]] =
+  private def extend1(parent: QSUGraph)(
+      constr: Symbol => QSU[Symbol]): G[QSUGraph] =
     withName(constr(parent.root)).map(_ :++ parent)
 
-  private def extend2(parent1: QSUGraph[T], parent2: QSUGraph[T])(
-      constr: (Symbol, Symbol) => QSU[T, Symbol]): G[QSUGraph[T]] =
+  private def extend2(parent1: QSUGraph, parent2: QSUGraph)(
+      constr: (Symbol, Symbol) => QSU[Symbol]): G[QSUGraph] =
     withName(constr(parent1.root, parent2.root)).map(_ :++ parent1 :++ parent2)
 
-  private def extend3(parent1: QSUGraph[T], parent2: QSUGraph[T], parent3: QSUGraph[T])(
-      constr: (Symbol, Symbol, Symbol) => QSU[T, Symbol]): G[QSUGraph[T]] =
+  private def extend3(parent1: QSUGraph, parent2: QSUGraph, parent3: QSUGraph)(
+      constr: (Symbol, Symbol, Symbol) => QSU[Symbol]): G[QSUGraph] =
     withName(constr(parent1.root, parent2.root, parent3.root)).map(_ :++ parent1 :++ parent2 :++ parent3)
 
-  private def withName(node: QSU[T, Symbol]): G[QSUGraph[T]] = {
+  private def withName(node: QSU[Symbol]): G[QSUGraph] = {
     for {
       reverse <- MS.get
 

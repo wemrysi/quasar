@@ -83,6 +83,10 @@ package object qscript {
       Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].prj(qt)
   }
 
+  /** Initial QScript. */
+  type QScriptEducated[T[_[_]], A] =
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[AFile], ?])#M[A]
+
   /** QScript that has not gone through Read conversion. */
   type QScript[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[DeadEnd, ?])#M[A]
