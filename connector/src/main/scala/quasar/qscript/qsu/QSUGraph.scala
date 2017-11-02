@@ -63,6 +63,7 @@ object QSUGraph {
           }
       }
 
+    // only correct given compacted subgraphs which agree on names
     private def φ[T[_[_]]]: Algebra[QSUPattern[T, ?], QSUGraph[T]] = {
       case QSUPattern(root, qsu) =>
         val initial: QSUGraph[T] = QSUGraph[T](root, SMap(root -> qsu.map(_.root)))
