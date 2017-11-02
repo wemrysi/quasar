@@ -67,8 +67,8 @@ object QScriptUniform {
       case LPReduce(source, reduce) =>
         f(source).map(LPReduce(_, reduce))
 
-      case QSReduce(source, reducers, buckets, repair) =>
-        f(source).map(QSReduce(_, reducers, buckets, repair))
+      case QSReduce(source, buckets, reducers, repair) =>
+        f(source).map(QSReduce(_, buckets, reducers, repair))
 
       case Distinct(source) =>
         f(source).map(Distinct(_))
@@ -179,8 +179,8 @@ object QScriptUniform {
   // QScriptish
   final case class QSReduce[T[_[_]], A](
       source: A,
-      reducers: List[ReduceFunc[FreeMap[T]]],
       buckets: List[FreeMap[T]],
+      reducers: List[ReduceFunc[FreeMap[T]]],
       repair: FreeMapA[T, ReduceIndex]) extends QScriptUniform[T, A]
 
   final case class Distinct[T[_[_]], A](source: A) extends QScriptUniform[T, A]

@@ -87,6 +87,14 @@ package object qscript {
   type QScriptEducated[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[AFile], ?])#M[A]
 
+  object QCE {
+    def apply[T[_[_]], A](qc: QScriptCore[T, A]): QScriptEducated[T, A] =
+      Inject[QScriptCore[T, ?], QScriptEducated[T, ?]].inj(qc)
+  
+    def unapply[T[_[_]], A](qt: QScriptEducated[T, A]): Option[QScriptCore[T, A]] =
+      Inject[QScriptCore[T, ?], QScriptEducated[T, ?]].prj(qt)
+  }
+
   /** QScript that has not gone through Read conversion. */
   type QScript[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[DeadEnd, ?])#M[A]
