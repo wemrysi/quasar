@@ -28,10 +28,7 @@ object IntersectGraphs {
   private final case class Edge(from: Symbol, to: Symbol)
 
   private object Edge {
-    implicit val order: Order[Edge] = Order.order {
-      case (e1, e2) =>
-        Order[(Symbol, Symbol)].order((e1.from, e1.to), (e2.from, e2.to))
-    }
+    implicit val order: Order[Edge] = Order.orderBy(e => (e.from, e.to))
   }
 
   private def findEdges[F[_]: Foldable](vertices: SMap[Symbol, F[Symbol]])
@@ -42,10 +39,7 @@ object IntersectGraphs {
 
   private def edgesToRoot(edges: ISet[Edge]): Symbol = {
     val (froms, tos): (ISet[Symbol], ISet[Symbol]) =
-      edges.foldRight[(ISet[Symbol], ISet[Symbol])]((ISet.empty, ISet.empty)) {
-        case (Edge(from, to), (froms, tos)) =>
-          (froms.insert(from), tos.insert(to))
-      }
+      edges foldMap (e => (ISet.singleton(e.from), ISet.singleton(e.to)))
 
     val rootCandidates: ISet[Symbol] = froms difference tos
 
