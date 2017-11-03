@@ -88,8 +88,8 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
       (GtoF: PrismNT[G, F])
       (implicit TC: Corecursive.Aux[A, G], TR: Recursive.Aux[A, G])
         : F[A] => M[G[A]] = {
-        case f @ QC(Filter(src, cond)) =>
-          if (isRewrite[T, F, G, A](GtoF, src.project)) {
+        case f @ QC(Filter(src, cond))
+          if (isRewrite[T, F, G, A](GtoF, src.project)) =>
             ((MapFuncCore.flattenAnd(cond))
               .traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))))
               .map(_.toList.filter {
@@ -100,34 +100,24 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
                 case h :: t => GtoF.reverseGet(
                   QC(Filter(src, t.foldLeft[FreeMap[T]](h)((acc, e) => Free.roll(MFC(MapFuncsCore.And(acc, e)))))))
               })
-          } else
-            GtoF.reverseGet(f).point[M]
-        case ls @ QC(LeftShift(src, struct, id, repair)) =>
-          if (isRewrite[T, F, G, A](GtoF, src.project)) {
+        case ls @ QC(LeftShift(src, struct, id, repair))
+          if (isRewrite[T, F, G, A](GtoF, src.project)) =>
             struct.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
             (s => GtoF.reverseGet(QC(LeftShift(src, s, id, repair))))
-          } else
-            GtoF.reverseGet(ls).point[M]
-        case m @ QC(qscript.Map(src, mf)) =>
-          if (isRewrite[T, F, G, A](GtoF, src.project)) {
+        case m @ QC(qscript.Map(src, mf))
+          if (isRewrite[T, F, G, A](GtoF, src.project)) =>
             mf.transCataM(elideMoreGeneralGuards[M, T](typ)) ∘
             (mf0 => GtoF.reverseGet(QC(qscript.Map(src, mf0))))
-          } else
-            GtoF.reverseGet(m).point[M]
-        case r @ QC(Reduce(src, b, red, rep)) =>
-          if (isRewrite[T, F, G, A](GtoF, src.project)) {
+        case r @ QC(Reduce(src, b, red, rep))
+          if (isRewrite[T, F, G, A](GtoF, src.project)) =>
             (b.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))) ⊛
               red.traverse(_.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ)))))(
               (b0, red0) => GtoF.reverseGet(QC(Reduce(src, b0, red0, rep))))
-          } else
-            GtoF.reverseGet(r).point[M]
-        case s @ QC(Sort(src, b, order)) =>
-          if (isRewrite[T, F, G, A](GtoF, src.project)) {
+        case s @ QC(Sort(src, b, order))
+          if (isRewrite[T, F, G, A](GtoF, src.project)) =>
             (b.traverse(_.transCataM(elideMoreGeneralGuards[M, T](typ))) ⊛
               order.traverse(t => t._1.transCataM(elideMoreGeneralGuards[M, T](typ)).map(x => (x, t._2))))(
               (b0, order0) => GtoF.reverseGet(QC(Sort(src, b0, order0))))
-          } else
-            GtoF.reverseGet(s).point[M]
         case qc =>
           GtoF.reverseGet(qc).point[M]
       }
