@@ -139,6 +139,10 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T
         val SrcMerge(source, fromBranch, countBranch) = mergeSources(from, count)
         QCE(Subset[T, QSUGraph](source, fromBranch, op, countBranch))
 
+      case QSU.Distinct(source) => slamdata.Predef.??? // TODO
+
+      case QSU.Nullary(mf) => slamdata.Predef.??? // TODO
+
       case QSU.ThetaJoin(left, right, condition, joinType) =>
         val SrcMerge(source, lBranch, rBranch) = mergeSources(left, right)
 
