@@ -16,7 +16,7 @@
 
 package quasar.qscript.qsu
 
-import slamdata.Predef.{Map => SMap, _}
+import slamdata.Predef._
 
 import quasar.contrib.pathy.AFile
 import quasar.fp._
@@ -47,8 +47,7 @@ import quasar.sql.JoinDir
 import matryoshka.{Corecursive, CorecursiveT, Coalgebra, Recursive, ShowT}
 import matryoshka.data.free._
 import matryoshka.patterns.CoEnv
-import scalaz.{~>, -\/, Const, Foldable, Free, Inject, ISet, ICons, INil, NaturalTransformation, Order, Show}
-import scalaz.Scalaz._ // it's taking > 200sec per compile iteration when figuring out what to import
+import scalaz.{~>, -\/, Const, Free, Inject, NaturalTransformation}
 
 sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T] {
   import QSUPattern._
@@ -57,51 +56,12 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T
   private type QSU[A] = QScriptUniform[A]
 
   private def mergeSources(left: QSUGraph, right: QSUGraph): SrcMerge[QSUGraph, FreeQS] = {
-    val root: Symbol = MergeSources.merge[QSU](left.vertices, right.vertices)
+    val root: Symbol = IntersectGraphs.intersect[QSU](left.vertices, right.vertices)
 
     SrcMerge(
       QSUGraph[T](root, left.vertices),
       graduateCoEnv(root, left),
       graduateCoEnv(root, right))
-  }
-
-  private object MergeSources {
-
-    private case class Edge(from: Symbol, to: Symbol)
-
-    private object Edge {
-      implicit val order: Order[Edge] = Order.order {
-        case (e1, e2) =>
-          Order[(Symbol, Symbol)].order((e1.from, e1.to), (e2.from, e2.to))
-      }
-    }
-
-    private def findEdges[F[_]: Foldable](vertices: SMap[Symbol, F[Symbol]])
-        : ISet[Edge] =
-      vertices.toList foldMap {
-        case (from, node) => node.foldMap(to => ISet.singleton(Edge(from, to)))
-      }
-
-    private def edgesToRoot(edges: ISet[Edge]): Symbol = {
-      val (froms, tos): (ISet[Symbol], ISet[Symbol]) =
-        edges.foldRight[(ISet[Symbol], ISet[Symbol])]((ISet.empty, ISet.empty)) {
-          case (Edge(from, to), (froms, tos)) =>
-            (froms.insert(from), tos.insert(to))
-        }
-
-      val rootCandidates: ISet[Symbol] = froms difference tos
-
-      // Foldable[ISet]
-      rootCandidates.toIList match {
-        case ICons(head, INil()) => head
-        // FIXME real error handling
-        case _ => scala.sys.error(s"Source merging failed. Candidates: ${Show[ISet[Symbol]].shows(rootCandidates)}")
-      }
-    }
-
-    def merge[F[_]: Foldable](left: SMap[Symbol, F[Symbol]], right: SMap[Symbol, F[Symbol]])
-        : Symbol =
-      edgesToRoot(findEdges[F](left) intersection findEdges[F](right))
   }
 
   private def educate(qsu: QSU[QSUGraph]): QSE[QSUGraph] =
