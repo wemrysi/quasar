@@ -57,7 +57,7 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T
   private type QSU[A] = QScriptUniform[A]
 
   private def mergeSources(left: QSUGraph, right: QSUGraph): SrcMerge[QSUGraph, FreeQS] = {
-    val source: QSUGraph = MergeSources.merge(left, right)
+    val source: QSUGraph = MergeSources.merge(left.vertices, right.vertices)
     SrcMerge(source, graduateCoEnv(source.root, left), graduateCoEnv(source.root, right))
   }
 
@@ -95,9 +95,10 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T
       }
     }
 
-    def merge(left: QSUGraph, right: QSUGraph): QSUGraph = {
-      val edges: ISet[Edge] = findEdges(left.vertices) intersection findEdges(right.vertices)
-      QSUGraph[T](edgesToRoot(edges), left.vertices)
+    def merge(left: SMap[Symbol, QSU[Symbol]], right: SMap[Symbol, QSU[Symbol]])
+        : QSUGraph = {
+      val edges: ISet[Edge] = findEdges(left) intersection findEdges(right)
+      QSUGraph[T](edgesToRoot(edges), left)
     }
   }
 
