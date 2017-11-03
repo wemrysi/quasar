@@ -73,10 +73,14 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T
     }
 
     // (QSUGraph, QSUPattern[T, ISet[Edge]]) => ISet[Edge]
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    val findEdgesƒ: ElgotAlgebra[(QSUGraph, ?), QSUPattern[T, ?], ISet[Edge]] = slamdata.Predef.???
+    val findEdgesƒ: ElgotAlgebra[(QSUGraph, ?), QSUPattern[T, ?], ISet[Edge]] = {
+      case (QSUGraph(root, vertices), QSUPattern(_, qsu)) =>
+        val previousEdges: ISet[Edge] = ISet.unions(qsu.toList)
+        val newEdges: ISet[Edge] = ISet.fromList(vertices(root).toList.map(Edge(root, _)))
 
-    // try elgotPara
+        previousEdges union newEdges
+    }
+
     private def findEdges(graph: QSUGraph): ISet[Edge] =
       Recursive[QSUGraph, QSUPattern[T, ?]].elgotPara[ISet[Edge]](graph)(findEdgesƒ)
 
