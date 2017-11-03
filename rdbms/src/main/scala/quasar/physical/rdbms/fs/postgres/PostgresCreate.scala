@@ -18,7 +18,8 @@ package quasar.physical.rdbms.fs.postgres
 
 import slamdata.Predef._
 import quasar.physical.rdbms.fs.RdbmsCreate
-import quasar.physical.rdbms.common.{Schema, TablePath}
+import quasar.physical.rdbms.common._
+import quasar.physical.rdbms.model._
 
 import doobie.syntax.string._
 import doobie.free.connection.ConnectionIO
@@ -37,7 +38,24 @@ trait PostgresCreate extends RdbmsCreate {
     }.void
   }
 
-  override def createTable(tablePath: TablePath): ConnectionIO[Unit] =
+  def postgresType(tpe: ColumnType): String = { // TODO move this outside and extend
+    tpe match {
+      case JsonCol => "jsonb"
+      case StringCol => "text"
+      case IntCol => "bigint"
+      case NullCol => "int"
+    }
+  }
+
+  override def createTable(tablePath: TablePath, model: TableModel): ConnectionIO[Unit] =
     (createSchema(tablePath.schema) *> (fr"CREATE TABLE IF NOT EXISTS" ++ Fragment
-      .const(tablePath.shows) ++ fr"(data json NOT NULL)").update.run).void
+      .const(tablePath.shows) ++ fr"(" ++ modelToColumns(model) ++ fr")").update.run).void
+
+  def modelToColumns(model: TableModel): Fragment = {
+    model match {
+      case JsonTable => Fragment.const("data jsonb NOT NULL")
+      case ColumnarTable(cols) =>
+        cols.toList.foldMap(c => Fragment.const(s"${c.name} ${postgresType(c.tpe)}"))
+    }
+  }
 }

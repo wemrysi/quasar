@@ -24,6 +24,7 @@ import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fs._
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.common.TablePath
+import quasar.physical.rdbms.model.JsonTable
 
 import doobie.imports.Meta
 import scalaz.Monad
@@ -63,7 +64,8 @@ trait RdbmsWriteFile extends RdbmsInsert with RdbmsDescribeTable with RdbmsCreat
       for {
         i <- MonotonicSeq.Ops[Eff].next.liftB
         dbPath = TablePath.create(file)
-        _ <- createTable(dbPath).liftB
+        // TODO derive model from chunk using TableModel.fromData(), store model in handle and update it on inserting when necessary
+        _ <- createTable(dbPath, JsonTable).liftB
         handle = WriteHandle(file, i)
         _ <- writeKvs.put(handle, dbPath).liftB
       } yield handle
