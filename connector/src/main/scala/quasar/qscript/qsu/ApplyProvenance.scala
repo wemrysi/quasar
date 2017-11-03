@@ -106,7 +106,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
 
       case Subset(from, _, count) => dims.join(from, count).point[F]
 
-      case ThetaJoin(left, right, _, _) => dims.join(left, right).point[F]
+      case ThetaJoin(left, right, _, _, _) => dims.join(left, right).point[F]
 
       case Transpose(src, rot) =>
         val tid: dims.I = Free.pure(gpf.root)

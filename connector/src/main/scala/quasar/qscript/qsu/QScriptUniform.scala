@@ -47,8 +47,8 @@ object QScriptUniform {
       case LPJoin(left, right, condition, joinType, leftRef, rightRef) =>
         (f(left) |@| f(right) |@| f(condition))(LPJoin(_, _, _, joinType, leftRef, rightRef))
 
-      case ThetaJoin(left, right, condition, joinType) =>
-        (f(left) |@| f(right))(ThetaJoin(_, _, condition, joinType))
+      case ThetaJoin(left, right, condition, joinType, combiner) =>
+        (f(left) |@| f(right))(ThetaJoin(_, _, condition, joinType, combiner))
 
       case Map(source, fm) =>
         f(source).map(Map(_, fm))
@@ -144,7 +144,8 @@ object QScriptUniform {
       left: A,
       right: A,
       condition: JoinFunc[T],
-      joinType: JoinType) extends QScriptUniform[T, A]
+      joinType: JoinType,
+      combiner: JoinFunc[T]) extends QScriptUniform[T, A]
 
   final case class Map[T[_[_]], A](
       source: A,

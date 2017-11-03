@@ -24,30 +24,24 @@ import quasar.qscript.{
   educatedToTotal,
   Filter,
   Hole,
-  JoinSide,
   LeftShift,
-  LeftSideF,
   Map,
-  MFC,
   QCE,
   Read,
   Reduce,
-  RightSideF,
   Sort,
   SrcHole,
   SrcMerge,
   Subset,
   ThetaJoin,
   Union}
-import quasar.qscript.MapFuncsCore.{ConcatMaps, MakeMap, StrLit}
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.QSUGraph.QSUPattern
-import quasar.sql.JoinDir
 
 import matryoshka.{Corecursive, CorecursiveT, Coalgebra, Recursive, ShowT}
 import matryoshka.data.free._
 import matryoshka.patterns.CoEnv
-import scalaz.{~>, -\/, Const, Free, Inject, NaturalTransformation}
+import scalaz.{~>, -\/, Const, Inject, NaturalTransformation}
 
 sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T] {
   import QSUPattern._
@@ -96,16 +90,11 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T
 
       case QSU.Nullary(mf) => slamdata.Predef.??? // TODO
 
-      case QSU.ThetaJoin(left, right, condition, joinType) =>
+      case QSU.ThetaJoin(left, right, condition, joinType, combiner) =>
         val SrcMerge(source, lBranch, rBranch) = mergeSources(left, right)
 
-        val combine: JoinFunc =
-           Free.roll(MFC(ConcatMaps(
-             Free.roll(MFC(MakeMap(StrLit[T, JoinSide](JoinDir.Left.name), LeftSideF))),
-             Free.roll(MFC(MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), RightSideF))))))
-
         Inject[ThetaJoin, QSE].inj(
-          ThetaJoin[T, QSUGraph](source, lBranch, rBranch, condition, joinType, combine))
+          ThetaJoin[T, QSUGraph](source, lBranch, rBranch, condition, joinType, combiner))
 
       case qsu =>
         scala.sys.error(s"Found an unexpected LP-ish $qsu.") // TODO use Show to print

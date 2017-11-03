@@ -17,10 +17,14 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef._
-import quasar.contrib.scalaz.MonadError_
-import quasar.qscript.{JoinSide, LeftSide, RightSide}
 
-import scalaz.{Applicative, ValidationNel, Scalaz}, Scalaz._
+import quasar.contrib.scalaz.MonadError_
+import quasar.qscript.{JoinFunc, JoinSide, LeftSide, LeftSideF, MFC, RightSide, RightSideF}
+import quasar.qscript.MapFuncsCore.{ConcatMaps, MakeMap, StrLit}
+import quasar.sql.JoinDir
+
+import matryoshka.CorecursiveT
+import scalaz.{Applicative, Free, ValidationNel, Scalaz}, Scalaz._
 
 /** Extracts `MapFunc` expressions from operations by requiring an argument
   * to be a function of one or more sibling arguments and erroring if not.
@@ -34,7 +38,7 @@ object ExtractFreeMap {
   type ErrorM[F[_]] = MonadError_[F, String]
   def ErrorM[F[_]](implicit ev: ErrorM[F]): ErrorM[F] = ev
 
-  def apply[T[_[_]], F[_]: Applicative: ErrorM](graph: QSUGraph[T]): F[QSUGraph[T]] =
+  def apply[T[_[_]]: CorecursiveT, F[_]: Applicative: ErrorM](graph: QSUGraph[T]): F[QSUGraph[T]] =
     QSUGraph.vertices[T].modifyF(_ traverse {
       case GroupBy(src, key) =>
         MappableRegion.unaryOf(src, graph refocus key)
@@ -47,8 +51,13 @@ object ExtractFreeMap {
           .toSuccessNel(s"Invalid filter predicate, $predicate, must be a mappable function of $src.")
 
       case LPJoin(left, right, cond, jtype, lref, rref) =>
+        val combiner: JoinFunc[T] =
+          Free.roll(MFC(ConcatMaps(
+            Free.roll(MFC(MakeMap(StrLit[T, JoinSide](JoinDir.Left.name), LeftSideF))),
+            Free.roll(MFC(MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), RightSideF))))))
+
         MappableRegion.funcOf(replaceRefs(graph, lref, rref), graph refocus cond)
-          .map(ThetaJoin(left, right, _, jtype))
+          .map(ThetaJoin(left, right, _, jtype, combiner))
           .toSuccessNel(s"Invalid join condition, $cond, must be a mappable function of $left and $right.")
 
       case Sort(src, keys) =>
