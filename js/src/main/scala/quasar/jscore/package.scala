@@ -98,6 +98,16 @@ package object jscore {
       case (ObjF(values), LiteralF(Js.Str(name))) => values.get(Name(name)).map(_.project)
       case (_,            _)                      => None
     }
+    case SpliceObjectsF(l) => {
+      // FIXME: avoid list appending
+      (l.foldLeft((false, List.empty[Fix[JsCoreF]])) {
+        case ((b, l), Fix(SpliceObjectsF(s))) => (true, l ++ s)
+        case ((b, l), i) => (b, l :+ i)
+      }) match {
+        case (true, l) => SpliceObjectsF(l).some
+        case _ => none
+      }
+    }
     case IfF(Literal(Js.Bool(cond)), cons, alt) =>
       (if (cond) cons else alt).project.some
     case IfF(cond0, If(cond1, cons, alt1), alt0) if alt0 ≟ alt1 =>

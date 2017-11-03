@@ -1272,14 +1272,14 @@ class PlannerSpec extends
           $read(collection("db", "zips")),
           $simpleMap(
             NonEmptyList(MapExpr(JsFn(Name("x"),
-              SpliceObjects(List(
+              obj(sigil.Quasar -> SpliceObjects(List(
                 ident("x"),
                 obj(
                   "city2" -> Select(ident("x"), "city")),
                 obj(
-                  "pop2"  -> Select(ident("x"), "pop"))))))),
+                  "pop2"  -> Select(ident("x"), "pop")))))))),
             ListMap())))
-    }.pendingWithActual("#2841", testFile("plan select with wildcard and two fields"))
+    }
 
     "plan select with wildcard and two constants" in {
       plan(sqlE"""select *, "1", "2" from zips""") must
@@ -1287,14 +1287,14 @@ class PlannerSpec extends
           $read(collection("db", "zips")),
           $simpleMap(
             NonEmptyList(MapExpr(JsFn(Name("x"),
-              SpliceObjects(List(
+              obj(sigil.Quasar -> SpliceObjects(List(
                 ident("x"),
                 obj(
                   "1" -> jscore.Literal(Js.Str("1"))),
                 obj(
-                  "2" -> jscore.Literal(Js.Str("2")))))))),
+                  "2" -> jscore.Literal(Js.Str("2"))))))))),
             ListMap())))
-    }.pendingWithActual("#2841", testFile("plan select with wildcard and two constants"))
+    }
 
     "plan select with multiple wildcards and fields" in {
       plan(sqlE"select state as state2, *, city as city2, *, pop as pop2 from zips where pop < 1000") must
@@ -1306,8 +1306,7 @@ class PlannerSpec extends
               BsonField.Name("pop") -> Selector.Lt(Bson.Int32(1000))))),
           $simpleMap(
             NonEmptyList(MapExpr(JsFn(Name("x"),
-              obj(
-                "__tmp2" -> SpliceObjects(List(
+              obj(sigil.Quasar -> SpliceObjects(List(
                   obj(
                     "state2" -> Select(ident("x"), "state")),
                   ident("x"),
@@ -1316,11 +1315,8 @@ class PlannerSpec extends
                   ident("x"),
                   obj(
                     "pop2" -> Select(ident("x"), "pop")))))))),
-            ListMap()),
-          $project(
-            reshape(sigil.Quasar -> $field("__tmp2")),
-            ExcludeId)))
-    }.pendingWithActual("#2841", testFile("plan select with multiple wildcards and fields"))
+            ListMap())))
+    }
 
     "plan sort with wildcard and expression in key" in {
       plan(sqlE"select * from zips order by pop*10 desc") must
