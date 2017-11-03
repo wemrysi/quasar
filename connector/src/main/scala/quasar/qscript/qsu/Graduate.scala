@@ -63,9 +63,9 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T
 
   object MergeSources {
 
-    case class Edge(from: Symbol, to: Symbol)
+    private case class Edge(from: Symbol, to: Symbol)
 
-    object Edge {
+    private object Edge {
       implicit val order: Order[Edge] = Order.order {
         case (e1, e2) =>
           Order[(Symbol, Symbol)].order((e1.from, e1.to), (e2.from, e2.to))
@@ -73,7 +73,7 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T
     }
 
     // (QSUGraph, QSUPattern[T, ISet[Edge]]) => ISet[Edge]
-    val findEdgesƒ: ElgotAlgebra[(QSUGraph, ?), QSUPattern[T, ?], ISet[Edge]] = {
+    private val findEdgesƒ: ElgotAlgebra[(QSUGraph, ?), QSUPattern[T, ?], ISet[Edge]] = {
       case (QSUGraph(root, vertices), QSUPattern(_, qsu)) =>
         val previousEdges: ISet[Edge] = ISet.unions(qsu.toList)
         val newEdges: ISet[Edge] = ISet.fromList(vertices(root).toList.map(Edge(root, _)))
