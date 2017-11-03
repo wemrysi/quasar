@@ -47,7 +47,7 @@ import quasar.sql.JoinDir
 import matryoshka.{Corecursive, CorecursiveT, Coalgebra, Recursive, ShowT}
 import matryoshka.data.free._
 import matryoshka.patterns.CoEnv
-import scalaz.{~>, -\/, Const, Free, Inject, ISet, ICons, INil, NaturalTransformation, Order, Show}
+import scalaz.{~>, -\/, Const, Foldable, Free, Inject, ISet, ICons, INil, NaturalTransformation, Order, Show}
 import scalaz.Scalaz._ // it's taking > 200sec per compile iteration when figuring out what to import
 
 sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T] {
@@ -57,8 +57,12 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T
   private type QSU[A] = QScriptUniform[A]
 
   private def mergeSources(left: QSUGraph, right: QSUGraph): SrcMerge[QSUGraph, FreeQS] = {
-    val source: QSUGraph = MergeSources.merge(left.vertices, right.vertices)
-    SrcMerge(source, graduateCoEnv(source.root, left), graduateCoEnv(source.root, right))
+    val root: Symbol = MergeSources.merge[QSU](left.vertices, right.vertices)
+
+    SrcMerge(
+      QSUGraph[T](root, left.vertices),
+      graduateCoEnv(root, left),
+      graduateCoEnv(root, right))
   }
 
   private object MergeSources {
@@ -72,7 +76,7 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T
       }
     }
 
-    private def findEdges(vertices: SMap[Symbol, QSU[Symbol]])
+    private def findEdges[F[_]: Foldable](vertices: SMap[Symbol, F[Symbol]])
         : ISet[Edge] =
       vertices.toList foldMap {
         case (from, node) => node.foldMap(to => ISet.singleton(Edge(from, to)))
@@ -95,11 +99,9 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T
       }
     }
 
-    def merge(left: SMap[Symbol, QSU[Symbol]], right: SMap[Symbol, QSU[Symbol]])
-        : QSUGraph = {
-      val edges: ISet[Edge] = findEdges(left) intersection findEdges(right)
-      QSUGraph[T](edgesToRoot(edges), left)
-    }
+    def merge[F[_]: Foldable](left: SMap[Symbol, F[Symbol]], right: SMap[Symbol, F[Symbol]])
+        : Symbol =
+      edgesToRoot(findEdges[F](left) intersection findEdges[F](right))
   }
 
   private def educate(qsu: QSU[QSUGraph]): QSE[QSUGraph] =
