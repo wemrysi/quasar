@@ -82,7 +82,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
 
       case GroupBy(_, _) => unexpectedError("GroupBy", gpf.root)
 
-      case JoinSideRef(_) => dims.empty.point[F]
+      case JoinSideRef(_) => unexpectedError("JoinSideRef", gpf.root)
 
       case LeftShift(_, _, _, _) => unexpectedError("LeftShift", gpf.root)
 
