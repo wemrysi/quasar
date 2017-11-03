@@ -54,14 +54,14 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T
   import QSUPattern._
 
   type QSE[A] = QScriptEducated[A]
-  type QSU[A] = QScriptUniform[A]
+  private type QSU[A] = QScriptUniform[A]
 
   private def mergeSources(left: QSUGraph, right: QSUGraph): SrcMerge[QSUGraph, FreeQS] = {
     val source: QSUGraph = MergeSources.merge(left, right)
     SrcMerge(source, graduateCoEnv(source.root, left), graduateCoEnv(source.root, right))
   }
 
-  object MergeSources {
+  private object MergeSources {
 
     private case class Edge(from: Symbol, to: Symbol)
 
@@ -84,30 +84,26 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T
     private def findEdges(graph: QSUGraph): ISet[Edge] =
       Recursive[QSUGraph, QSUPattern[T, ?]].elgotPara[ISet[Edge]](graph)(findEdgesƒ)
 
-    private def findSourceCandidate(left: ISet[Edge], right: ISet[Edge]): ISet[Edge] =
-      left intersection right
-
-    // FIXME real error handling
     private def edgesToRoot(edges: ISet[Edge]): Symbol = {
-      val (tos, froms): (ISet[Symbol], ISet[Symbol]) =
+      val (froms, tos): (ISet[Symbol], ISet[Symbol]) =
         edges.foldRight[(ISet[Symbol], ISet[Symbol])]((ISet.empty, ISet.empty)) {
           case (Edge(from, to), (froms, tos)) =>
             (froms.insert(from), tos.insert(to))
         }
 
-      val rootCandidate: ISet[Symbol] = tos difference froms
+      val rootCandidates: ISet[Symbol] = froms difference tos
 
       // Foldable[ISet]
-      rootCandidate.toIList match {
+      rootCandidates.toIList match {
         case ICons(head, INil()) => head
-        case _ => scala.sys.error(s"Source merging failed. Candidates: ${Show[ISet[Symbol]].shows(rootCandidate)}")
+        // FIXME real error handling
+        case _ => scala.sys.error(s"Source merging failed. Candidates: ${Show[ISet[Symbol]].shows(rootCandidates)}")
       }
     }
 
     def merge(left: QSUGraph, right: QSUGraph): QSUGraph = {
-      QSUGraph[T](
-        edgesToRoot(findSourceCandidate(findEdges(left), findEdges(right))),
-        left.vertices)
+      val edges: ISet[Edge] = findEdges(left) intersection findEdges(right)
+      QSUGraph[T](edgesToRoot(edges), left.vertices)
     }
   }
 
