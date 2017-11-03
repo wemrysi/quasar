@@ -16,7 +16,7 @@
 
 package quasar.qscript.qsu
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => SMap, _}
 
 import quasar.contrib.pathy.AFile
 import quasar.fp._
@@ -44,7 +44,7 @@ import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.QSUGraph.QSUPattern
 import quasar.sql.JoinDir
 
-import matryoshka.{Corecursive, CorecursiveT, Coalgebra, ElgotAlgebra, Recursive, ShowT}
+import matryoshka.{Corecursive, CorecursiveT, Coalgebra, Recursive, ShowT}
 import matryoshka.data.free._
 import matryoshka.patterns.CoEnv
 import scalaz.{~>, -\/, Const, Free, Inject, ISet, ICons, INil, NaturalTransformation, Order, Show}
@@ -72,17 +72,11 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T
       }
     }
 
-    // (QSUGraph, QSUPattern[T, ISet[Edge]]) => ISet[Edge]
-    private val findEdgesƒ: ElgotAlgebra[(QSUGraph, ?), QSUPattern[T, ?], ISet[Edge]] = {
-      case (QSUGraph(root, vertices), QSUPattern(_, qsu)) =>
-        val previousEdges: ISet[Edge] = ISet.unions(qsu.toList)
-        val newEdges: ISet[Edge] = ISet.fromList(vertices(root).toList.map(Edge(root, _)))
-
-        previousEdges union newEdges
-    }
-
-    private def findEdges(graph: QSUGraph): ISet[Edge] =
-      Recursive[QSUGraph, QSUPattern[T, ?]].elgotPara[ISet[Edge]](graph)(findEdgesƒ)
+    private def findEdges(vertices: SMap[Symbol, QSU[Symbol]])
+        : ISet[Edge] =
+      vertices.toList foldMap {
+        case (from, node) => node.foldMap(to => ISet.singleton(Edge(from, to)))
+      }
 
     private def edgesToRoot(edges: ISet[Edge]): Symbol = {
       val (froms, tos): (ISet[Symbol], ISet[Symbol]) =
@@ -102,7 +96,7 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T
     }
 
     def merge(left: QSUGraph, right: QSUGraph): QSUGraph = {
-      val edges: ISet[Edge] = findEdges(left) intersection findEdges(right)
+      val edges: ISet[Edge] = findEdges(left.vertices) intersection findEdges(right.vertices)
       QSUGraph[T](edgesToRoot(edges), left.vertices)
     }
   }
