@@ -24,6 +24,7 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
+import scalaz.syntax.tag._
 
 package object jscore {
   /** Javascript AST (functional subset) */
@@ -99,14 +100,12 @@ package object jscore {
       case (_,            _)                      => None
     }
     case SpliceObjectsF(l) => {
-      // FIXME: avoid list appending
-      (l.foldLeft((false, List.empty[Fix[JsCoreF]])) {
-        case ((b, l), Fix(SpliceObjectsF(s))) => (true, l ++ s)
-        case ((b, l), i) => (b, l :+ i)
-      }) match {
-        case (true, l) => SpliceObjectsF(l).some
-        case _ => none
-      }
+      l.foldMap {
+        case Fix(SpliceObjectsF(l)) => (true.disjunction, l)
+        case i                      => (false.disjunction, List(i))
+      }.cobind {
+        case (b, l) => b.unwrap.option(SpliceObjectsF(l))
+      }.copoint
     }
     case IfF(Literal(Js.Bool(cond)), cons, alt) =>
       (if (cond) cons else alt).project.some
