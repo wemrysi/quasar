@@ -240,7 +240,6 @@ trait MathLib extends Library {
     },
     (partialTyperV[nat._2] {
       case Sized(v1, TOne())  => success(v1)
-      case Sized(v1, TZero()) => success(Type.Const(Data.NA))
 
       case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))       => success(Type.Const(Data.Dec(BigDecimal(v1) / BigDecimal(v2))))
       case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => success(Type.Const(Data.Dec(v1 / v2)))
@@ -405,8 +404,6 @@ trait MathLib extends Library {
     Func.Input2(MathRel, Type.Numeric),
     noSimplification,
     (partialTyperV[nat._2] {
-      case Sized(_, TZero()) => success(Type.Const(Data.NA))
-
       case Sized(v1, TOne()) if Type.Int.contains(v1)                      => success(TZero())
       case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))       => success(Type.Const(Data.Int(v1 % v2)))
       case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => success(Type.Const(Data.Dec(v1 % v2)))

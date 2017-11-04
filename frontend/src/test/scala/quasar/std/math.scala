@@ -109,16 +109,6 @@ class MathSpec extends quasar.Qspec with TypeArbitrary {
       expr should beSuccessful(Const(Dec(2.5)))
     }
 
-    "divide by zero" in {
-      val expr = Divide.tpe(Func.Input2(TOne(), TZero()))
-      expr must beSuccessful(Const(NA))
-    }
-
-    "divide by zero (dec)" in {
-      val expr = Divide.tpe(Func.Input2(Const(Dec(1.0)), Const(Dec(0.0))))
-      expr must beSuccessful(Const(NA))
-    }
-
     "fold simple modulo" in {
       val expr = Modulo.tpe(Func.Input2(Const(Int(6)), Const(Int(3))))
       expr should beSuccessful(TZero())
@@ -137,16 +127,6 @@ class MathSpec extends quasar.Qspec with TypeArbitrary {
     "fold non-zero modulo (dec)" in {
       val expr = Modulo.tpe(Func.Input2(Const(Int(5)), Const(Dec(2.2))))
       expr should beSuccessful(Const(Dec(0.6)))
-    }
-
-    "modulo by zero" in {
-      val expr = Modulo.tpe(Func.Input2(TOne(), TZero()))
-      expr must beSuccessful(Const(NA))
-    }
-
-    "modulo by zero (dec)" in {
-      val expr = Modulo.tpe(Func.Input2(Const(Dec(1.0)), Const(Dec(0.0))))
-      expr must beSuccessful(Const(NA))
     }
 
     "typecheck number raised to 0th power" >> prop { (t: Type) =>
