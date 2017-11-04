@@ -35,7 +35,11 @@ class StdLibTypeCoherenceSpec extends quasar.Qspec with quasar.TypeArbitrary {
         case Type.Const(d) => d.dataType
         case _ => o
       }
-      if (unconst == Type.Bottom) {
+      if (o == Type.Const(Data.NA)) {
+        // typers cannot produce Data.NA without causing bugs for now because of the simplifier not
+        // folding array indices and object keys with values of undefined
+        failure
+      } else if (unconst == Type.Bottom) {
         // untypers do not need to deal with `Type.Bottom` as an expected type,
         // nor constant types
         success
@@ -60,7 +64,13 @@ class StdLibTypeCoherenceSpec extends quasar.Qspec with quasar.TypeArbitrary {
       ov.toEither match {
         case Left(_) => failure
         case Right(oresult) =>
-          Type.typecheck(oresult, output).toEither.fold[Result](_ => failure, _ => success)
+          if (oresult == Type.Const(Data.NA)) {
+            // typers cannot produce Data.NA without causing bugs for now because of the simplifier not
+            // folding array indices and object keys with values of undefined
+            failure
+          } else {
+            Type.typecheck(oresult, output).toEither.fold[Result](_ => failure, _ => success)
+          }
       }
     }.right.getOrElse(success)
   }
