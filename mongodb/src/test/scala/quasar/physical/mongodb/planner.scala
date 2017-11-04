@@ -1223,10 +1223,10 @@ class PlannerSpec extends
 
     "plan simple sort with wildcard" in {
       plan(sqlE"select * from zips order by pop") must
-        beWorkflow0(chain[Workflow](
+        beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar, testFile("plan simple sort with wildcard"))
+    }
 
     "plan sort with expression in key" in {
       plan(sqlE"select baz from foo order by bar/10") must
@@ -2303,7 +2303,7 @@ class PlannerSpec extends
 
     "plan simple single field selection and limit" in {
       plan(sqlE"SELECT city FROM zips LIMIT 5") must
-        beWorkflow0 {
+        beWorkflow {
           chain[Workflow](
             $read(collection("db", "zips")),
             $limit(5),
@@ -2311,7 +2311,7 @@ class PlannerSpec extends
               reshape(sigil.Quasar -> $field("city")),
               ExcludeId))
         }
-    }.pendingWithActual(notOnPar, testFile("plan simple single field selection and limit"))
+    }
 
     "plan complex group by with sorting and limiting" in {
       plan(sqlE"SELECT city, SUM(pop) AS pop FROM zips GROUP BY city ORDER BY pop") must
