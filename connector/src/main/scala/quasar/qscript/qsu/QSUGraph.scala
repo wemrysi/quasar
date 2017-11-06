@@ -232,6 +232,13 @@ object QSUGraph extends QSUGraphInstances {
         case _ => None
       }
     }
+
+    object JoinSideRef {
+      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
+        case g: QSU.JoinSideRef[T, QSUGraph[T]] => QSU.JoinSideRef.unapply(g)
+        case _ => None
+      }
+    }
   }
 }
 
