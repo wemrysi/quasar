@@ -16,16 +16,19 @@
 
 package quasar.physical.rdbms.fs
 
-import doobie.free.connection.ConnectionIO
 import quasar.Data
 import quasar.fs.FileSystemError
 import quasar.physical.rdbms.common.TablePath
+import quasar.physical.rdbms.model.TableModel
 import slamdata.Predef.Vector
+
+import doobie.free.connection.ConnectionIO
 
 trait RdbmsInsert {
 
   def batchInsert(
       dbPath: TablePath,
-      chunk: Vector[Data]
+      chunk: Vector[Data],
+      model: TableModel
   ): ConnectionIO[Vector[FileSystemError]]
 }

@@ -79,7 +79,7 @@ trait RdbmsWriteFile
             .liftB)
         dbPath = c.tablePath
         newModel <- prepareTable(c, chunk)
-        _ <- batchInsert(dbPath, chunk).liftB
+        _ <- batchInsert(dbPath, chunk, newModel).liftB
         _ <- writeKvs.put(h, WriteCursor(dbPath, model = Some(newModel))).liftB
       } yield Vector()).run.value.map(_.valueOr(Vector(_)))
     }
