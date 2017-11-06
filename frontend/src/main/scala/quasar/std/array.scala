@@ -35,7 +35,7 @@ trait ArrayLib extends Library {
           if (i == 1) =>
         // TODO: we should support dims other than 1, but it's work
         success(Type.Const(Data.Int(arr.length)))
-      case Sized(Type.AnyArray, Type.Const(Data.Int(_))) =>
+      case Sized(Type.AnyArray, t) if t.contains(Type.Int) =>
         success(Type.Int)
     },
     basicUntyper)
