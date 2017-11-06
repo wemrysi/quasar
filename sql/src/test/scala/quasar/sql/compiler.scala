@@ -105,6 +105,27 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.constant(Data.Int(1)))
     }
 
+    "compile query from Q#2755" in {
+      val query = sqlE"""select substring("abcdefg", 0, trunc(pop / 10000)) from zips"""
+
+      testTypedLogicalPlanCompile(query,
+        lpf.invoke1(Squash,
+          lpf.let('__tmp0,
+            read("zips"),
+            lpf.typecheck(lpf.free('__tmp0), Type.Obj(Map(), Some(Type.Top)),
+              lpf.let('__tmp1,
+                lpf.invoke2(ObjectProject, lpf.free('__tmp0), lpf.constant(Data.Str("pop"))),
+                lpf.typecheck(lpf.free('__tmp1), Type.Coproduct(Type.Coproduct(Type.Int, Type.Dec), Type.Interval),
+                  lpf.let('__tmp2,
+                    lpf.invoke2(Divide, lpf.free('__tmp1), lpf.constant(Data.Int(10000))),
+                    lpf.typecheck(lpf.free('__tmp2), Type.Dec,
+                      lpf.invoke3(Substring, lpf.constant(Data.Str("abcdefg")), lpf.constant(Data.Int(0)), lpf.invoke1(Trunc, lpf.free('__tmp2))),
+                      lpf.constant(Data.NA))
+                  ),
+                  lpf.constant(Data.NA))),
+              lpf.constant(Data.NA)))))
+    }
+
     "compile with typecheck in join condition" in {
       val query = sqlE"select * from zips join smallZips on zips.x = smallZips.foo.bar"
 
