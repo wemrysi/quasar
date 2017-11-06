@@ -26,14 +26,12 @@ import scalaz.Scalaz._
 
 final class LPtoQS[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
   def apply[F[_]: Monad: PlannerErrorME: NameGenerator](lp: T[LogicalPlan])
-      : F[T[QScriptEducated]] = {
+      : F[T[QScriptEducated]] =
     for {
       read <- ReadLP[T, F].apply(lp)
       extracted <- ExtractFreeMap[T, F](read)
       authenticated <- ApplyProvenance[T].apply[F](extracted)
       reified <- ReifyProvenance[T].apply[F](authenticated)
-    } yield {
-      Graduate[T].apply(reified.graph)
-    }
-  }
+      graduated <- Graduate[T].apply[F](reified.graph)
+    } yield graduated
 }
