@@ -42,6 +42,12 @@ case object JsonTable extends TableModel
 final case class ColumnarTable(columns: Set[ColumnDesc])
   extends TableModel
 
+object ColumnarTable {
+  import TableModel._
+
+  def fromColumns(cs: List[ColumnDesc]): ColumnarTable = ColumnarTable(TreeSet.empty ++ cs)
+}
+
 object TableModel {
 
   implicit val columnDescOrdering: Ordering[ColumnDesc] =
@@ -78,7 +84,7 @@ object TableModel {
               .getOrElse(c.some)
           }
           .map(cs =>
-            ColumnarTable(TreeSet.empty ++ cs ++ newCols.diff(cols)): TableModel)
+            ColumnarTable.fromColumns(cs ++ newCols.diff(cols)): TableModel)
           .getOrElse(JsonTable)
       }
 
@@ -116,9 +122,9 @@ object TableModel {
   def rowModel(row: Data): TableModel = {
     row match {
       case Data.Obj(fields) =>
-        ColumnarTable(TreeSet.empty ++ fields.map {
+        ColumnarTable.fromColumns(fields.map {
           case (label, value) => ColumnDesc(label, columnType(value))
-        })
+        }.toList)
       case _ => JsonTable
     }
   }
