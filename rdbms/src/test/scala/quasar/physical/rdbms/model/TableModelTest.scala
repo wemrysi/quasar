@@ -19,10 +19,12 @@ package quasar.physical.rdbms.model
 import quasar.{Data, DataCodec, Qspec}
 import slamdata.Predef._
 import TableModel._
+
+import scala.collection.immutable.TreeSet
+
 import org.scalacheck.Gen
 import org.scalacheck.Prop._
 import org.specs2.scalacheck.Parameters
-
 import scalaz._
 import Scalaz._
 
@@ -51,18 +53,18 @@ class TableModelTest extends Qspec {
       val row = data("""{"name":"John","surname":"Smith","birthYear":1980}""")
       TableModel.fromData(Vector(row)) should beRightDisjunction(
         ColumnarTable(
-          ISet.fromList(List(ColumnDesc("name", StringCol),
+          TreeSet(ColumnDesc("name", StringCol),
             ColumnDesc("birthYear", IntCol),
-            ColumnDesc("surname", StringCol)))))
+            ColumnDesc("surname", StringCol))))
     }
 
     "devise columnar schema for homogenous data" in {
       val row = data("""{"age": 25,"id":"748abf","keys": [4, 5, 6, 7]}""")
       TableModel.fromData(Vector(row, row, row, row, row, row)) should beRightDisjunction(
         ColumnarTable(
-          ISet.fromList(List(ColumnDesc("age", IntCol),
+          TreeSet(ColumnDesc("age", IntCol),
             ColumnDesc("keys", JsonCol),
-            ColumnDesc("id", StringCol)))))
+            ColumnDesc("id", StringCol))))
     }
 
     "devise columnar schema when extra columns appear" in {
@@ -81,13 +83,13 @@ class TableModelTest extends Qspec {
           row))) { rows =>
 
         TableModel.fromData(rows) should beRightDisjunction(
-          ColumnarTable(ISet.fromList(List(
+          ColumnarTable(TreeSet(
             ColumnDesc("age", IntCol),
             ColumnDesc("keys", JsonCol),
             ColumnDesc("id", StringCol),
             ColumnDesc("extra-col", StringCol),
             ColumnDesc("another-extra-col", StringCol)
-          ))))
+          )))
       }
     }
 
@@ -100,13 +102,13 @@ class TableModelTest extends Qspec {
 
         TableModel.fromData(rows) should beRightDisjunction(
           ColumnarTable(
-            ISet.fromList(List(ColumnDesc("age", IntCol),
+            TreeSet(ColumnDesc("age", IntCol),
               ColumnDesc("keys", JsonCol),
-              ColumnDesc("id", StringCol)))))
+              ColumnDesc("id", StringCol))))
       }
     }
 
-    "devise columnar schema when some columns get nulled and some added" in {
+    "devise columnar schema when some columns get nulled and some get added" in {
         val row = data("""{"age": 25,"id":"748abf","keys": [4, 5, 6, 7]}""")
         val updatedRow1 = data("""{"id":"a748abf","keys": []}""")
         val updatedRow2 = data("""{"extra": {"nested1": "val"}, "id":"a748abf","keys": []}""")
@@ -120,11 +122,10 @@ class TableModelTest extends Qspec {
 
         TableModel.fromData(rows) should beRightDisjunction(
           ColumnarTable(
-            ISet.fromList(
-              List(ColumnDesc("age", IntCol),
+            TreeSet(ColumnDesc("age", IntCol),
                 ColumnDesc("keys", JsonCol),
                 ColumnDesc("id", StringCol),
-                ColumnDesc("extra", JsonCol)))))
+                ColumnDesc("extra", JsonCol))))
       }
     }
 
@@ -142,12 +143,11 @@ class TableModelTest extends Qspec {
 
         TableModel.fromData(rows) should beRightDisjunction(
           ColumnarTable(
-            ISet.fromList(
-              List(ColumnDesc("age", IntCol),
+            TreeSet(ColumnDesc("age", IntCol),
                 ColumnDesc("keys", JsonCol),
                 ColumnDesc("id", StringCol),
                 ColumnDesc("extra", IntCol),
-                ColumnDesc("extra2", StringCol)))))
+                ColumnDesc("extra2", StringCol))))
       }
     }
 
@@ -169,10 +169,9 @@ class TableModelTest extends Qspec {
 
         TableModel.fromData(rows) should beRightDisjunction(
           ColumnarTable(
-            ISet.fromList(
-              List(ColumnDesc("age", IntCol),
+            TreeSet(ColumnDesc("age", IntCol),
                 ColumnDesc("id", StringCol),
-                ColumnDesc("name", StringCol)))))
+                ColumnDesc("name", StringCol))))
       }
     }
   }

@@ -21,6 +21,9 @@ import quasar.Data
 import quasar.fs.FileSystemError
 import quasar.fs.FileSystemError._
 
+import scala.collection.immutable.TreeSet
+import scala.math.Ordering
+
 import scalaz._
 import Scalaz._
 
@@ -36,12 +39,13 @@ sealed trait TableModel
 
 case object JsonTable extends TableModel
 
-final case class ColumnarTable(columns: ISet[ColumnDesc])
+final case class ColumnarTable(columns: Set[ColumnDesc])
   extends TableModel
 
 object TableModel {
 
-  implicit val columnDescOrder: Order[ColumnDesc] = Order.orderBy(_.name)
+  implicit val columnDescOrdering: Ordering[ColumnDesc] =
+    Ordering.fromLessThan[ColumnDesc](_.name < _.name)
 
   implicit val columnTypeEq: Equal[ColumnType] = Equal.equalA
 
@@ -52,18 +56,17 @@ object TableModel {
     * reconciles data types for both (data is heterogenous).
     */
   implicit val tableModelMonoid: Monoid[TableModel] = new Monoid[TableModel] {
-    override def zero: TableModel = ColumnarTable(ISet.empty)
+    override def zero: TableModel = ColumnarTable(TreeSet.empty)
     def empty: TableModel = zero
 
     override def append(s1: TableModel, s2: => TableModel): TableModel = {
 
-      def updateCols(cols: ISet[ColumnDesc],
-                     newCols: ISet[ColumnDesc]): TableModel = {
+      def updateCols(cols: Set[ColumnDesc],
+                     newCols: Set[ColumnDesc]): TableModel = {
         cols.toList
           .traverse { c =>
             newCols
-              .lookupIndex(c)
-              .flatMap(newCols.elemAt)
+              .find(_.name === c.name)
               .map { newC =>
                 if (c.tpe === NullCol)
                   newC.some
@@ -75,7 +78,7 @@ object TableModel {
               .getOrElse(c.some)
           }
           .map(cs =>
-            ColumnarTable(ISet.fromList(cs) ⊹ newCols.difference(cols)): TableModel)
+            ColumnarTable(TreeSet.empty ++ cs ++ newCols.diff(cols)): TableModel)
           .getOrElse(JsonTable)
       }
 
@@ -92,7 +95,6 @@ object TableModel {
       }
     }
   }
-
 
   def simpleColumnType(data: Data): ColumnType = {
     data match {
@@ -114,9 +116,9 @@ object TableModel {
   def rowModel(row: Data): TableModel = {
     row match {
       case Data.Obj(fields) =>
-        ColumnarTable(ISet.fromList(fields.map {
+        ColumnarTable(TreeSet.empty ++ fields.map {
           case (label, value) => ColumnDesc(label, columnType(value))
-        }.toList))
+        })
       case _ => JsonTable
     }
   }
