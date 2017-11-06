@@ -78,6 +78,6 @@ class PlannerQScriptSpec extends
         $project(
           reshape(sigil.Quasar -> $field(JoinDir.Right.name, "city")),
           ExcludeId)))
-    }.pendingWithActual("#1560", qtestFile("plan simple join ($lookup)"))
+    }
   }
 }
