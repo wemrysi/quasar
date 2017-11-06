@@ -238,19 +238,23 @@ trait MathLib extends Library {
           case _                                         => None
         }
     },
-    (partialTyperV[nat._2] {
+    partialTyperV[nat._2] {
       case Sized(v1, TOne())  => success(v1)
 
-      case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))       => success(Type.Const(Data.Dec(BigDecimal(v1) / BigDecimal(v2))))
-      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => success(Type.Const(Data.Dec(v1 / v2)))
+      case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))
+        if v2 != BigInt(0)                                                => success(Type.Const(Data.Dec(BigDecimal(v1) / BigDecimal(v2))))
+      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2)))
+        if v2 != BigDecimal(0)                                            => success(Type.Const(Data.Dec(v1 / v2)))
 
       // TODO: handle interval divided by Dec (not provided by threeten). See SD-582.
-      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Int(v2)))  => success(Type.Const(Data.Interval(v1.dividedBy(v2.longValue))))
+      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Int(v2))) => success(Type.Const(Data.Interval(v1.dividedBy(v2.longValue))))
       case Sized(t1, t2)
-        if Type.Interval.contains(t1) && Type.Int.contains(t2)             => success(Type.Interval)
+        if Type.Interval.contains(t1) && Type.Int.contains(t2)            => success(Type.Interval)
       case Sized(t1, t2)
-        if Type.Interval.contains(t1) && Type.Interval.contains(t2)        => success(Type.Dec)
-    }) ||| numericWidening,
+        if Type.Interval.contains(t1) && Type.Interval.contains(t2)       => success(Type.Dec)
+      case Sized(t1, t2)
+        if Type.Numeric.contains(t1) && Type.Numeric.contains(t2)         => success(Type.Dec)
+    },
     untyper[nat._2](t => Type.typecheck(Type.Interval, t).fold(
       κ(success(Func.Input2(MathRel, MathRel))),
       κ(success(Func.Input2(Type.Interval, Type.Int))))))
@@ -405,10 +409,18 @@ trait MathLib extends Library {
     noSimplification,
     (partialTyperV[nat._2] {
       case Sized(v1, TOne()) if Type.Int.contains(v1)                      => success(TZero())
-      case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))       => success(Type.Const(Data.Int(v1 % v2)))
-      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => success(Type.Const(Data.Dec(v1 % v2)))
+      case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))
+        if v2 != BigInt(0)                                                 => success(Type.Const(Data.Int(v1 % v2)))
+      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2)))
+        if v2 != BigDecimal(0)                                             => success(Type.Const(Data.Dec(v1 % v2)))
       case Sized(Type.Interval, t) if Type.Numeric.contains(t)             => success(Type.Interval)
-    }) ||| numericWidening,
+      case Sized(t1, t2)
+        if Type.Int.contains(t1) && Type.Int.contains(t2)                  => success(Type.Int)
+      case Sized(t1, t2)
+        if Type.Dec.contains(t1) && Type.Dec.contains(t2)                  => success(Type.Dec)
+      case Sized(t1, t2)
+        if Type.Numeric.contains(t1) && Type.Numeric.contains(t2)          => success(Type.Numeric)
+    }),
     partialUntyper[nat._2] {
       case Type.Int => Func.Input2(Type.Int, Type.Int)
       case t if Type.Numeric.contains(t) => Func.Input2(Type.Numeric, Type.Numeric)
