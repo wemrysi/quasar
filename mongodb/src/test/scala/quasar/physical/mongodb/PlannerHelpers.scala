@@ -225,6 +225,20 @@ object PlannerHelpers {
   def planLog(query: Fix[Sql]): Vector[PhaseResult] =
     queryPlanner(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents, emptyDoc, Instant.now).run.written
 
+  def qplan0(
+    qs: Fix[fs.MongoQScript[Fix, ?]],
+    model: MongoQueryModel,
+    stats: Collection => Option[CollectionStatistics],
+    indexes: Collection => Option[Set[Index]],
+    anyDoc: Collection => OptionT[EitherWriter, BsonDocument]
+  ): Either[FileSystemError, Crystallized[WorkflowF]] =
+    MongoDb.doPlan(qs, fs.QueryContext(stats, indexes), model, anyDoc, Instant.now).run.value.toEither
+
+  def qplan(qs: Fix[fs.MongoQScript[Fix, ?]]): Either[FileSystemError, Crystallized[WorkflowF]] =
+    qplan0(qs, MongoQueryModel.`3.4`, defaultStats, defaultIndexes, emptyDoc)
+
+  def qtestFile(testName: String): JFile = jFile(toRFile("q " + testName))
+
 }
 
 trait PlannerHelpers extends
