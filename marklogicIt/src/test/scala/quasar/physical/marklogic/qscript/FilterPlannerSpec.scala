@@ -96,7 +96,7 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
       Free.roll(MFC(MFCore.Eq(lhs, MFCore.StrLit(rhs))))
 
     def projectField(str: String): FreeMap[Fix] =
-      Free.roll(MFC(MFCore.ProjectField(HoleF, MFCore.StrLit(str))))
+      Free.roll(MFC(MFCore.ProjectKey(HoleF, MFCore.StrLit(str))))
 
     def shiftedRead(path: ADir): Fix[QSR] =
       Fix(Inject[SR, QSR].inj(Const(ShiftedRead(path, IncludeId))))

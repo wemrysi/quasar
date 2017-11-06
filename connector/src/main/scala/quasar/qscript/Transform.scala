@@ -384,10 +384,10 @@ class Transform
       Free.roll(MFC(MakeMap(StrLit[T, JoinSide](JoinDir.Left.name), left.as(LeftSide)))),
       Free.roll(MFC(MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), right.as(RightSide)))))))
 
-  private def ProjectTarget(prefix: Target[F], field: T[EJson]): Target[F] = {
+  private def ProjectTarget(prefix: Target[F], key: T[EJson]): Target[F] = {
     val Ann(provs, values) = prefix.ann
-    Target(Ann(provenance.Proj(field) :: provs, HoleF),
-      PB.inj(BucketField(prefix.value, values, Free.roll(MFC(Constant[T, FreeMap](field))))).embed)
+    Target(Ann(provenance.Proj(key) :: provs, HoleF),
+      PB.inj(BucketKey(prefix.value, values, Free.roll(MFC(Constant[T, FreeMap](key))))).embed)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -456,15 +456,15 @@ class Transform
         Ann(buckets, Free.roll[MapFunc, Hole](MapFunc.translateUnaryMapping(IC, ID)(func)(value))),
         a1.value).right
 
-    case lp.InvokeUnapply(structural.ObjectProject, Sized(a1, a2)) =>
+    case lp.InvokeUnapply(structural.MapProject, Sized(a1, a2)) =>
       val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)
       // FIXME: This is a workaround because ProjectBucket doesn’t currently
       //        propagate provenance. (#1573)
       Target(
-        Ann[T](base.buckets, Free.roll(MFC(ProjectField(lval, rval)))),
+        Ann[T](base.buckets, Free.roll(MFC(ProjectKey(lval, rval)))),
         base.src).right
       // (Ann[T](buckets, HoleF[T]),
-      //   PB.inj(BucketField(src, lval, rval)).embed).right
+      //   PB.inj(BucketKey(src, lval, rval)).embed).right
 
     case lp.InvokeUnapply(structural.ArrayProject, Sized(a1, a2)) =>
       val AutoJoinResult(base, lval, rval) = autojoin(a1, a2)

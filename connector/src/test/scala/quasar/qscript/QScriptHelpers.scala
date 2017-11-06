@@ -85,17 +85,17 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
       FreeMapA[A] =
     Free.roll(MFC(MapFuncsCore.Constant[Fix, FreeMapA[A]](value)))
 
-  def ProjectFieldR[A](src: FreeMapA[A], field: FreeMapA[A]):
+  def ProjectKeyR[A](src: FreeMapA[A], key: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MFC(MapFuncsCore.ProjectField(src, field)))
+    Free.roll(MFC(MapFuncsCore.ProjectKey(src, key)))
 
-  def DeleteFieldR[A](src: FreeMapA[A], field: FreeMapA[A]):
+  def DeleteKeyR[A](src: FreeMapA[A], key: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MFC(MapFuncsCore.DeleteField(src, field)))
+    Free.roll(MFC(MapFuncsCore.DeleteKey(src, key)))
 
-  def ProjectIndexR[A](src: FreeMapA[A], field: FreeMapA[A]):
+  def ProjectIndexR[A](src: FreeMapA[A], key: FreeMapA[A]):
       FreeMapA[A] =
-    Free.roll(MFC(MapFuncsCore.ProjectIndex(src, field)))
+    Free.roll(MFC(MapFuncsCore.ProjectIndex(src, key)))
 
   def MakeArrayR[A](src: FreeMapA[A]):
       FreeMapA[A] =
@@ -226,6 +226,6 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
       ejson.CommonEJson(ejson.Str[Fix[EJson]]("j")).embed,
       ejsonArr(l, r)))
 
-  def ejsonProjectField(field: Fix[EJson]) =
-    ejsonMap((ejson.CommonEJson(ejson.Str[Fix[EJson]]("f")).embed, field))
+  def ejsonProjectKey(key: Fix[EJson]) =
+    ejsonMap((ejson.CommonEJson(ejson.Str[Fix[EJson]]("f")).embed, key))
 }

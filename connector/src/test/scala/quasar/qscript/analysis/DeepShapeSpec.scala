@@ -36,7 +36,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
   "DeepShape" >> {
 
     val shape: FreeShape[Fix] =
-      ProjectFieldR(freeShape[Fix](RootShape()), StrLit("quxx"))
+      ProjectKeyR(freeShape[Fix](RootShape()), StrLit("quxx"))
 
     "QScriptCore" >> {
 
@@ -88,12 +88,12 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         val from: FreeQS =
           Free.roll(QCT.inj(Map(
             Free.point(SrcHole),
-            ProjectFieldR(HoleF, StrLit("foo")))))
+            ProjectKeyR(HoleF, StrLit("foo")))))
 
         val count: FreeQS =
           Free.roll(QCT.inj(Map(
             Free.point(SrcHole),
-            ProjectFieldR(HoleF, StrLit("bar")))))
+            ProjectKeyR(HoleF, StrLit("bar")))))
 
         val qs = Subset(shape, from, Take, count)
 
@@ -104,12 +104,12 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         val lBranch: FreeQS =
           Free.roll(QCT.inj(Map(
             Free.point(SrcHole),
-            ProjectFieldR(HoleF, StrLit("foo")))))
+            ProjectKeyR(HoleF, StrLit("foo")))))
 
         val rBranch: FreeQS =
           Free.roll(QCT.inj(Map(
             Free.point(SrcHole),
-            ProjectFieldR(HoleF, StrLit("bar")))))
+            ProjectKeyR(HoleF, StrLit("bar")))))
 
         val qs = Union(shape, lBranch, rBranch)
 
@@ -120,7 +120,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         val bucket: List[FreeMap] = List(ProjectIndexR(HoleF[Fix], IntLit(3)))
 
         val reducers: List[ReduceFunc[FreeMap]] =
-          List(ReduceFuncs.Sum(ProjectFieldR(HoleF[Fix], StrLit("foobar"))))
+          List(ReduceFuncs.Sum(ProjectKeyR(HoleF[Fix], StrLit("foobar"))))
 
         val repair: FreeMapA[ReduceIndex] =
           ConcatArraysR(
@@ -177,9 +177,9 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
       val value: FreeMap = ProjectIndexR(HoleF[Fix], IntLit(7))
       val access: FreeMap = ProjectIndexR(HoleF[Fix], IntLit(5))
 
-      "BucketField" >> {
-        val qs = BucketField(shape, value, access)
-        val expected = ProjectFieldR(value >> shape, access >> shape)
+      "BucketKey" >> {
+        val qs = BucketKey(shape, value, access)
+        val expected = ProjectKeyR(value >> shape, access >> shape)
 
         deepShapePB(qs) must equal(expected)
       }
@@ -198,7 +198,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         Free.roll(QCT.inj(LeftShift(
           Free.roll(QCT.inj(Map(
             Free.point(SrcHole),
-            ProjectFieldR(HoleF, StrLit("foo"))))),
+            ProjectKeyR(HoleF, StrLit("foo"))))),
           HoleF,
           IncludeId,
           RightSideF)))
@@ -207,7 +207,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         Free.roll(QCT.inj(LeftShift(
           Free.roll(QCT.inj(Map(
             Free.point(SrcHole),
-            ProjectFieldR(HoleF, StrLit("bar"))))),
+            ProjectKeyR(HoleF, StrLit("bar"))))),
           HoleF,
           IncludeId,
           LeftSideF)))
@@ -233,10 +233,10 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         val expected: FreeShape[Fix] =
           Free.roll(MFC(Add(
             ProjectIndexR(
-              freeShape(Shifting(IncludeId, ProjectFieldR(shape, StrLit("foo")))),
+              freeShape(Shifting(IncludeId, ProjectKeyR(shape, StrLit("foo")))),
               IntLit(1)),
             ProjectIndexR(
-              ProjectFieldR(shape, StrLit("bar")),
+              ProjectKeyR(shape, StrLit("bar")),
               IntLit(2)))))
 
         deepShapeTJ(qs) must equal(expected)
@@ -258,10 +258,10 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         val expected: FreeShape[Fix] =
           Free.roll(MFC(Add(
             ProjectIndexR(
-              freeShape(Shifting(IncludeId, ProjectFieldR(shape, StrLit("foo")))),
+              freeShape(Shifting(IncludeId, ProjectKeyR(shape, StrLit("foo")))),
               IntLit(1)),
             ProjectIndexR(
-              ProjectFieldR(shape, StrLit("bar")),
+              ProjectKeyR(shape, StrLit("bar")),
               IntLit(2)))))
 
         deepShapeEJ(qs) must equal(expected)

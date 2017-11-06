@@ -308,9 +308,9 @@ final class LogicalPlanR[T]
       term match {
         case Read(c)         => unifyOrCheck(inf, Type.Top, read(c))
         case Constant(d)     => unifyOrCheck(inf, Type.Const(d), constant(d))
-        case InvokeUnapply(MakeObject, Sized(name, value)) =>
-          lift(MakeObject.tpe(Func.Input2(name, value).map(_.inferred)).disjunction).flatMap(
-            applyConstraints(_, value)(MakeObject(name.plan, _).embed))
+        case InvokeUnapply(MakeMap, Sized(name, value)) =>
+          lift(MakeMap.tpe(Func.Input2(name, value).map(_.inferred)).disjunction).flatMap(
+            applyConstraints(_, value)(MakeMap(name.plan, _).embed))
         case InvokeUnapply(MakeArray, Sized(value)) =>
           lift(MakeArray.tpe(Func.Input1(value).map(_.inferred)).disjunction).flatMap(
             applyConstraints(_, value)(MakeArray(_).embed))

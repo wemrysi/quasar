@@ -21,6 +21,8 @@ import quasar.common.SortDir
 import quasar.javascript.Js
 import quasar.fs.PhysicalError
 import quasar.namegen._
+import quasar.qscript._
+import quasar.contrib.pathy.AFile
 
 import com.mongodb.async.AsyncBatchCursor
 import org.bson.BsonValue
@@ -45,4 +47,17 @@ package object mongodb {
     case SortDir.Ascending => Bson.Int32(1)
     case SortDir.Descending => Bson.Int32(-1)
   }
+
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[fs.MongoQScriptCP[T]#M, QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
+
+  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable.Aux[QScriptCore[T, ?], fs.MongoQScriptCP[T]#M] =
+    Injectable.inject[QScriptCore[T, ?], fs.MongoQScriptCP[T]#M]
+
+  implicit def equiJoinToQScript[T[_[_]]]: Injectable.Aux[EquiJoin[T, ?], fs.MongoQScriptCP[T]#M] =
+    Injectable.inject[EquiJoin[T, ?], fs.MongoQScriptCP[T]#M]
+
+  implicit def shiftedReadToQScript[T[_[_]]]: Injectable.Aux[Const[ShiftedRead[AFile], ?], fs.MongoQScriptCP[T]#M] =
+    Injectable.inject[Const[ShiftedRead[AFile], ?], fs.MongoQScriptCP[T]#M]
+
 }

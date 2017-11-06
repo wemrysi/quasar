@@ -48,10 +48,10 @@ class QueryFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsU
     lpr.invoke1(
       identity.Squash,
       lpr.invoke2(
-        structural.MakeObject,
+        structural.MakeMap,
         lpr.constant(Data._str(to)),
         lpr.invoke2(
-          structural.ObjectProject,
+          structural.MapProject,
           lpr.read(src),
           lpr.constant(Data._str(from)))))
 

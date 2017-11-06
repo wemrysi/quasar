@@ -74,7 +74,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
       "Map" should {
         "returns cardinality of already processed part of qscript" in {
           val cardinality = 40
-          val map = quasar.qscript.Map(cardinality, ProjectFieldR(HoleF, StrLit("field")))
+          val map = quasar.qscript.Map(cardinality, ProjectKeyR(HoleF, StrLit("key")))
           compile(map) must_== cardinality
         }
       }
@@ -93,7 +93,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         }
         "returns cardinality of half fo already processed part of qscript" in {
           val cardinality = 100
-          val bucket: List[FreeMap] = List(ProjectFieldR(HoleF, StrLit("country")))
+          val bucket: List[FreeMap] = List(ProjectKeyR(HoleF, StrLit("country")))
           val repair: Free[MapFunc, ReduceIndex] = Free.point(ReduceIndex(0.right))
           val reduce = Reduce(cardinality, bucket, List.empty, repair)
           compile(reduce) must_== cardinality / 2
@@ -102,8 +102,8 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
       "Sort" should {
         "returns cardinality of already processed part of qscript" in {
           val cardinality = 60
-          def bucket = List(ProjectFieldR(HoleF, StrLit("field")))
-          def order = (ProjectFieldR(HoleF, StrLit("field")), SortDir.asc).wrapNel
+          def bucket = List(ProjectKeyR(HoleF, StrLit("key")))
+          def order = (ProjectKeyR(HoleF, StrLit("key")), SortDir.asc).wrapNel
           val sort = quasar.qscript.Sort(cardinality, bucket, order)
           compile(sort) must_== cardinality
         }
@@ -118,7 +118,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
           */
         "returns half of cardinality of already processed part of qscript" in {
           val cardinality = 50
-          def func: FreeMap = Free.roll(MFC(Lt(ProjectFieldR(HoleF, StrLit("age")), IntLit(24))))
+          def func: FreeMap = Free.roll(MFC(Lt(ProjectKeyR(HoleF, StrLit("age")), IntLit(24))))
           val filter = quasar.qscript.Filter(cardinality, func)
           compile(filter) must_== cardinality / 2
         }
@@ -175,7 +175,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         "returns cardinality of 10 x cardinality of already processed part of qscript" in {
           val cardinality = 60
           val func: FreeMap =
-            Free.roll(MFC(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("field")), StrLit("value"))))
+            Free.roll(MFC(MapFuncsCore.Eq(ProjectKeyR(HoleF, StrLit("key")), StrLit("value"))))
           val joinFunc: JoinFunc = (LeftSide : JoinSide).point[Free[MapFunc, ?]]
           val leftShift = LeftShift(cardinality, func, IdOnly, joinFunc)
           compile(leftShift) must_== cardinality * 10
@@ -185,8 +185,8 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         "returns cardinality of sum lBranch + rBranch" in {
           val cardinality = 100
           def func(country: String): FreeMap =
-            Free.roll(MFC(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("country")), StrLit(country))))
-          def left: FreeQS = Free.roll(QCT.inj(quasar.qscript.Map(HoleQS, ProjectFieldR(HoleF, StrLit("field")))))
+            Free.roll(MFC(MapFuncsCore.Eq(ProjectKeyR(HoleF, StrLit("country")), StrLit(country))))
+          def left: FreeQS = Free.roll(QCT.inj(quasar.qscript.Map(HoleQS, ProjectKeyR(HoleF, StrLit("key")))))
           def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func("US"))))
           val union = quasar.qscript.Union(cardinality, left, right)
           compile(union) must_== cardinality + (cardinality / 2)
@@ -203,8 +203,8 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
       "returns cardinality of already processed part of qscript" in {
         val compile = Cardinality.projectBucket[Fix].calculate(empty)
         val cardinality = 45
-        def func: FreeMap = Free.roll(MFC(Lt(ProjectFieldR(HoleF, StrLit("age")), IntLit(24))))
-        val bucket = BucketField(cardinality, func, func)
+        def func: FreeMap = Free.roll(MFC(Lt(ProjectKeyR(HoleF, StrLit("age")), IntLit(24))))
+        val bucket = BucketKey(cardinality, func, func)
         compile(bucket) must_== cardinality
       }
     }
@@ -214,8 +214,8 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         val compile = Cardinality.equiJoin[Fix].calculate(empty)
         val cardinality = 100
         val func: FreeMap =
-          Free.roll(MFC(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("field")), StrLit("val"))))
-        def left: FreeQS = Free.roll(QCT.inj(quasar.qscript.Map(HoleQS, ProjectFieldR(HoleF, StrLit("field")))))
+          Free.roll(MFC(MapFuncsCore.Eq(ProjectKeyR(HoleF, StrLit("key")), StrLit("val"))))
+        def left: FreeQS = Free.roll(QCT.inj(quasar.qscript.Map(HoleQS, ProjectKeyR(HoleF, StrLit("key")))))
         def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func)))
         val joinFunc: JoinFunc = (LeftSide : JoinSide).point[Free[MapFunc, ?]]
         val join = quasar.qscript.EquiJoin(cardinality, left, right, List((func, func)), JoinType.Inner, joinFunc)
@@ -228,8 +228,8 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         val compile = Cardinality.thetaJoin[Fix].calculate(empty)
         val cardinality = 100
         val func: FreeMap =
-          Free.roll(MFC(MapFuncsCore.Eq(ProjectFieldR(HoleF, StrLit("field")), StrLit("val"))))
-        def left: FreeQS = Free.roll(QCT.inj(quasar.qscript.Map(HoleQS, ProjectFieldR(HoleF, StrLit("field")))))
+          Free.roll(MFC(MapFuncsCore.Eq(ProjectKeyR(HoleF, StrLit("key")), StrLit("val"))))
+        def left: FreeQS = Free.roll(QCT.inj(quasar.qscript.Map(HoleQS, ProjectKeyR(HoleF, StrLit("key")))))
         def right: FreeQS = Free.roll(QCT.inj(Filter(HoleQS, func)))
         val joinFunc: JoinFunc = (LeftSide : JoinSide).point[Free[MapFunc, ?]]
         val join = quasar.qscript.ThetaJoin(cardinality, left, right, joinFunc, JoinType.Inner, joinFunc)

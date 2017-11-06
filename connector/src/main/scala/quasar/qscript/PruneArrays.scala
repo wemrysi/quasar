@@ -374,15 +374,15 @@ object PruneArrays {
 
       def find[M[_], A](in: ProjectBucket[A])(implicit M: MonadState[M, RewriteState]) =
         in match {
-          case BucketField(_, value, name) => findInBucket(value, name)
+          case BucketKey(_, value, name) => findInBucket(value, name)
           case BucketIndex(_, value, index) => findInBucket(value, index)
         }
 
       def remap[M[_], A](env: RewriteState, in: ProjectBucket[A])(implicit M: MonadState[M, RewriteState]) = {
         val mapping: SeenIndices => ProjectBucket[A] =
           indexMapping >>> (repl => in match {
-            case BucketField(src, value, name) =>
-              BucketField(src, remapIndicesInFunc(value, repl), remapIndicesInFunc(name, repl))
+            case BucketKey(src, value, name) =>
+              BucketKey(src, remapIndicesInFunc(value, repl), remapIndicesInFunc(name, repl))
             case BucketIndex(src, value, index) =>
               BucketIndex(src, remapIndicesInFunc(value, repl), remapIndicesInFunc(index, repl))
           })

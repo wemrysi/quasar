@@ -98,7 +98,7 @@ class QScriptSpec
             Free.roll(MFC(Guard(
               RightSideF,
               Type.Obj(ScalaMap(),Some(Type.Top)),
-              ProjectFieldR(RightSideF, StrLit("foo")),
+              ProjectKeyR(RightSideF, StrLit("foo")),
               Free.roll(MFC(Undefined())))))))))))))
     }
 
@@ -122,7 +122,7 @@ class QScriptSpec
               Free.roll(MFC(Guard(
                 ProjectIndexR(RightSideF, IntLit(1)),
                 Type.Obj(scala.Predef.Map(), Type.Top.some),
-                ProjectFieldR(
+                ProjectKeyR(
                   ProjectIndexR(RightSideF, IntLit(1)),
                   StrLit("city")),
                 Free.roll(MFC(Undefined()))))))))))))),
@@ -145,9 +145,9 @@ class QScriptSpec
             Free.roll(MFC(Guard(
               HoleF, Type.Obj(ScalaMap(), Type.Top.some),
               Free.roll(MFC(Guard(
-                ProjectFieldR(HoleF, StrLit("pop")),
+                ProjectKeyR(HoleF, StrLit("pop")),
                 Type.Coproduct(Type.Coproduct(Type.Int, Type.Dec), Type.Interval),
-                ProjectFieldR(HoleF, StrLit("pop")),
+                ProjectKeyR(HoleF, StrLit("pop")),
                 Free.roll(MFC(Undefined()))))),
               Free.roll(MFC(Undefined()))))))),
           Free.roll(MFC(MakeMap(StrLit("pop"), ReduceIndexF(0.right)))))))(
@@ -188,14 +188,14 @@ class QScriptSpec
               Free.roll(MFC(Guard(
                 RightSideF,
                 Type.Obj(ScalaMap(),Some(Type.Top)),
-                ProjectFieldR(RightSideF, StrLit("city")),
+                ProjectKeyR(RightSideF, StrLit("city")),
                 Free.roll(MFC(Undefined())))))))),
             Free.roll(MFC(MakeMap(
               StrLit("state"),
               Free.roll(MFC(Guard(
                 RightSideF,
                 Type.Obj(ScalaMap(),Some(Type.Top)),
-                ProjectFieldR(RightSideF, StrLit("state")),
+                ProjectKeyR(RightSideF, StrLit("state")),
                 Free.roll(MFC(Undefined()))))))))))))))))
     }
 
@@ -204,7 +204,7 @@ class QScriptSpec
       beSome(beTreeEqual(chain(
         ReadR(rootDir </> dir("some") </> file("bar")),
         QC.inj(LeftShift((),
-          ProjectFieldR(HoleF, StrLit("car")),
+          ProjectKeyR(HoleF, StrLit("car")),
           ExcludeId,
           RightSideF)))))
     }
@@ -217,14 +217,14 @@ class QScriptSpec
           Free.roll(QCT.inj(LeftShift(
             Free.roll(QCT.inj(Map(
               Free.point(SrcHole),
-              ProjectFieldR(HoleF, StrLit("foo"))))),
+              ProjectKeyR(HoleF, StrLit("foo"))))),
             HoleF,
             IncludeId,
             RightSideF))),
           Free.roll(QCT.inj(LeftShift(
             Free.roll(QCT.inj(Map(
               Free.point(SrcHole),
-              ProjectFieldR(HoleF, StrLit("bar"))))),
+              ProjectKeyR(HoleF, StrLit("bar"))))),
             HoleF,
             IncludeId,
             RightSideF))),
@@ -240,17 +240,17 @@ class QScriptSpec
         None,
         identity.Squash(
           makeObj(
-            "name" -> structural.ObjectProject(
+            "name" -> structural.MapProject(
               lpRead("/city"),
               lpf.constant(Data.Str("name"))).embed)).embed) must
       beSome(beTreeEqual(chain(
         RootR,
         QC.inj(LeftShift((),
-          ProjectFieldR(HoleF, StrLit("city")),
+          ProjectKeyR(HoleF, StrLit("city")),
           ExcludeId,
           Free.roll(MFC(MakeMap[Fix, JoinFunc](
             StrLit[Fix, JoinSide]("name"),
-            ProjectFieldR(RightSideF, StrLit("name"))))))))))
+            ProjectKeyR(RightSideF, StrLit("name"))))))))))
     }
 
     "convert a basic reduction" in {
@@ -273,16 +273,16 @@ class QScriptSpec
         None,
         makeObj(
           "0" ->
-            agg.Sum(structural.ObjectProject(lpRead("/person"), lpf.constant(Data.Str("height"))).embed).embed)) must
+            agg.Sum(structural.MapProject(lpRead("/person"), lpf.constant(Data.Str("height"))).embed).embed)) must
       beSome(beTreeEqual(chain(
         RootR,
         QC.inj(LeftShift((),
-          ProjectFieldR(HoleF, StrLit("person")),
+          ProjectKeyR(HoleF, StrLit("person")),
           ExcludeId,
           RightSideF)),
         QC.inj(Reduce((),
           Nil,
-          List(ReduceFuncs.Sum[FreeMap](ProjectFieldR(HoleF, StrLit("height")))),
+          List(ReduceFuncs.Sum[FreeMap](ProjectKeyR(HoleF, StrLit("height")))),
           Free.roll(MFC(MakeMap(StrLit("0"), Free.point(ReduceIndex(0.right))))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
@@ -294,13 +294,13 @@ class QScriptSpec
         makeObj(
           "loc" ->
             structural.FlattenArray(
-              structural.ObjectProject(lpRead("/zips"), lpf.constant(Data.Str("loc"))).embed).embed)) must
+              structural.MapProject(lpRead("/zips"), lpf.constant(Data.Str("loc"))).embed).embed)) must
       beSome(beTreeEqual(chain(
         RootR,
         QC.inj(LeftShift((),
-          ProjectFieldR(HoleF, StrLit("zips")),
+          ProjectKeyR(HoleF, StrLit("zips")),
           ExcludeId,
-          ProjectFieldR(RightSideF, StrLit("loc")))),
+          ProjectKeyR(RightSideF, StrLit("loc")))),
         QC.inj(LeftShift((),
           HoleF,
           ExcludeId,
@@ -371,19 +371,19 @@ class QScriptSpec
           structural.ShiftArray(
             structural.ArrayConcat(
               structural.ArrayConcat(
-                structural.ObjectProject(lpf.free('x), lpf.constant(Data.Str("baz"))).embed,
-                structural.ObjectProject(lpf.free('x), lpf.constant(Data.Str("quux"))).embed).embed,
-              structural.ObjectProject(lpf.free('x), lpf.constant(Data.Str("ducks"))).embed).embed).embed).embed) must
+                structural.MapProject(lpf.free('x), lpf.constant(Data.Str("baz"))).embed,
+                structural.MapProject(lpf.free('x), lpf.constant(Data.Str("quux"))).embed).embed,
+              structural.MapProject(lpf.free('x), lpf.constant(Data.Str("ducks"))).embed).embed).embed).embed) must
       beSome(beTreeEqual(chain(
         RootR,
         QC.inj(LeftShift((),
-          ProjectFieldR(ProjectFieldR(HoleF, StrLit("foo")), StrLit("bar")),
+          ProjectKeyR(ProjectKeyR(HoleF, StrLit("foo")), StrLit("bar")),
           ExcludeId,
           Free.roll(MFC(ConcatArrays[Fix, JoinFunc](
             Free.roll(MFC(ConcatArrays[Fix, JoinFunc](
-              ProjectFieldR(RightSideF, StrLit("baz")),
-              ProjectFieldR(RightSideF, StrLit("quux"))))),
-            ProjectFieldR(RightSideF, StrLit("ducks"))))))),
+              ProjectKeyR(RightSideF, StrLit("baz")),
+              ProjectKeyR(RightSideF, StrLit("quux"))))),
+            ProjectKeyR(RightSideF, StrLit("ducks"))))))),
         QC.inj(LeftShift((), HoleF, ExcludeId, RightSideF)))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
@@ -397,7 +397,7 @@ class QScriptSpec
             structural.UnshiftArray(
               math.Multiply(
                 structural.ShiftArrayIndices(
-                  structural.ObjectProject(lpRead("/zips"), lpf.constant(Data.Str("loc"))).embed).embed,
+                  structural.MapProject(lpRead("/zips"), lpf.constant(Data.Str("loc"))).embed).embed,
                 lpf.constant(Data.Int(10))).embed).embed)) must
       beSome(beTreeEqual(chain(
         ReadR(rootDir </> file("zips")),
@@ -408,7 +408,7 @@ class QScriptSpec
             Free.roll(MFC(MakeArray(LeftSideF))),
             Free.roll(MFC(MakeArray(RightSideF)))))))),
         QC.inj(LeftShift((),
-          ProjectFieldR(
+          ProjectKeyR(
             ProjectIndexR(ProjectIndexR(HoleF, IntLit(1)), IntLit(1)),
             StrLit("loc")),
           IdOnly,
@@ -438,7 +438,7 @@ class QScriptSpec
         StdLib.set.Filter(
           lpRead("/bar"),
           relations.Between(
-            structural.ObjectProject(lpRead("/bar"), lpf.constant(Data.Str("baz"))).embed,
+            structural.MapProject(lpRead("/bar"), lpf.constant(Data.Str("baz"))).embed,
             lpf.constant(Data.Int(1)),
             lpf.constant(Data.Int(10))).embed).embed) must
       beSome(beTreeEqual(chain(
@@ -450,7 +450,7 @@ class QScriptSpec
             Free.roll(MFC(MakeArray(ProjectIndexR(RightSideF, IntLit(1))))),
             Free.roll(MFC(MakeArray(
               Free.roll(MFC(Between(
-                ProjectFieldR(
+                ProjectKeyR(
                   ProjectIndexR(RightSideF, IntLit(1)),
                   StrLit("baz")),
                 IntLit(1),
@@ -460,7 +460,7 @@ class QScriptSpec
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
-    // an example of how logical plan expects magical "left" and "right" fields to exist
+    // an example of how logical plan expects magical "left" and "right" keys to exist
     "convert magical query" in {
       // "select * from person, car",
       convert(
@@ -472,7 +472,7 @@ class QScriptSpec
             JoinType.Inner,
             lp.JoinCondition('__leftJoin5, '__rightJoin6, lpf.constant(Data.Bool(true)))).embed,
           identity.Squash(
-            structural.ObjectConcat(
+            structural.MapConcat(
               JoinDir.Left.projectFrom(lpf.free('__tmp0)),
               JoinDir.Right.projectFrom(lpf.free('__tmp0))).embed).embed).embed) must
       beSome(beTreeEqual(chain(
@@ -506,15 +506,15 @@ class QScriptSpec
             JoinType.Inner,
             lp.JoinCondition('__leftJoin9, '__rightJoin10,
               relations.Eq(
-                structural.ObjectProject(lpf.joinSideName('__leftJoin9), lpf.constant(Data.Str("id"))).embed,
-                structural.ObjectProject(lpf.joinSideName('__rightJoin10), lpf.constant(Data.Str("foo_id"))).embed).embed)),
+                structural.MapProject(lpf.joinSideName('__leftJoin9), lpf.constant(Data.Str("id"))).embed,
+                structural.MapProject(lpf.joinSideName('__rightJoin10), lpf.constant(Data.Str("foo_id"))).embed).embed)),
           makeObj(
             "name" ->
-              structural.ObjectProject(
+              structural.MapProject(
                 JoinDir.Left.projectFrom(lpf.free('__tmp0)),
                 lpf.constant(Data.Str("name"))).embed,
             "address" ->
-              structural.ObjectProject(
+              structural.MapProject(
                 JoinDir.Right.projectFrom(lpf.free('__tmp0)),
                 lpf.constant(Data.Str("address"))).embed))
 
@@ -523,32 +523,32 @@ class QScriptSpec
           RootR,
           TJ.inj(ThetaJoin((),
             Free.roll(QCT.inj(LeftShift(
-              Free.roll(QCT.inj(Map(HoleQS, ProjectFieldR(HoleF, StrLit("foo"))))),
+              Free.roll(QCT.inj(Map(HoleQS, ProjectKeyR(HoleF, StrLit("foo"))))),
               HoleF,
               IncludeId,
               RightSideF))),
             Free.roll(QCT.inj(LeftShift(
-              Free.roll(QCT.inj(Map(HoleQS, ProjectFieldR(HoleF, StrLit("bar"))))),
+              Free.roll(QCT.inj(Map(HoleQS, ProjectKeyR(HoleF, StrLit("bar"))))),
               HoleF,
               IncludeId,
               RightSideF))),
             Free.roll(MFC(Eq(
-              ProjectFieldR(
+              ProjectKeyR(
                 ProjectIndexR(LeftSideF, IntLit(1)),
                 StrLit("id")),
-              ProjectFieldR(
+              ProjectKeyR(
                 ProjectIndexR(RightSideF, IntLit(1)),
                 StrLit("foo_id"))))),
             JoinType.Inner,
             ConcatMapsR(
               MakeMapR(
                 StrLit("name"),
-                ProjectFieldR(
+                ProjectKeyR(
                   ProjectIndexR(LeftSideF, IntLit(1)),
                   StrLit("name"))),
               MakeMapR(
                 StrLit("address"),
-                ProjectFieldR(
+                ProjectKeyR(
                   ProjectIndexR(RightSideF, IntLit(1)),
                   StrLit("address")))))))))
     }
@@ -599,7 +599,7 @@ class QScriptSpec
                   Free.roll(MFC(Guard(
                     ProjectIndexR(RightSideF, IntLit(1)),
                     Type.Obj(ScalaMap(),Some(Type.Top)),
-                    ProjectFieldR(
+                    ProjectKeyR(
                       ProjectIndexR(RightSideF, IntLit(1)),
                       StrLit("city")),
                     Free.roll(MFC(Undefined())))))))),
@@ -608,7 +608,7 @@ class QScriptSpec
                   Free.roll(MFC(Guard(
                     ProjectIndexR(RightSideF, IntLit(1)),
                     Type.Obj(ScalaMap(),Some(Type.Top)),
-                    ProjectFieldR(
+                    ProjectKeyR(
                       ProjectIndexR(RightSideF, IntLit(1)),
                       StrLit("pop")),
                     Free.roll(MFC(Undefined())))))))))))))),
@@ -616,33 +616,33 @@ class QScriptSpec
               Free.roll(MFC(Guard(
                 ProjectIndexR(RightSideF, IntLit(1)),
                 Type.Obj(ScalaMap(),Some(Type.Top)),
-                ProjectFieldR(
+                ProjectKeyR(
                   ProjectIndexR(RightSideF, IntLit(1)),
                   StrLit("pop")),
                 Free.roll(MFC(Undefined()))))))))))))),
         // FIXME #2034
-        // this `Sort` should sort by the representation of the synthetic field "__sd0__"
+        // this `Sort` should sort by the representation of the synthetic key "__sd0__"
         QC.inj(Sort((),
           Nil,
           (ProjectIndexR(HoleF, IntLit(1)) -> SortDir.asc).wrapNel)),
         QC.inj(Reduce((),
-          List(Free.roll(MFC(DeleteField(ProjectIndexR(HoleF, IntLit(0)), StrLit("__sd__0"))))),
+          List(Free.roll(MFC(DeleteKey(ProjectIndexR(HoleF, IntLit(0)), StrLit("__sd__0"))))),
           List(ReduceFuncs.First(ProjectIndexR(HoleF, IntLit(0)))),
           Free.roll(MFC(ConcatArrays(
             Free.roll(MFC(ConcatArrays(
               Free.roll(MFC(MakeArray(ReduceIndexF(0.left)))),
               Free.roll(MFC(MakeArray(ReduceIndexF(0.right))))))),
             Free.roll(MFC(MakeArray(
-              ProjectFieldR(ReduceIndexF(0.right), StrLit("__sd__0")))))))))),
+              ProjectKeyR(ReduceIndexF(0.right), StrLit("__sd__0")))))))))),
         QC.inj(Sort((),
           Nil,
           (ProjectIndexR(HoleF, IntLit(2)) -> SortDir.asc).wrapNel)),
         QC.inj(Map((),
-          Free.roll(MFC(DeleteField(ProjectIndexR(HoleF, IntLit(1)), StrLit("__sd__0")))))))(
+          Free.roll(MFC(DeleteKey(ProjectIndexR(HoleF, IntLit(1)), StrLit("__sd__0")))))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
-    "convert a multi-field reduce" in {
+    "convert a multi-key reduce" in {
       val lp = fullCompileExp(sqlE"select max(pop), min(city) from zips")
       val qs = convert(lc.some, lp)
       qs must beSome(beTreeEqual(chain(
@@ -656,13 +656,13 @@ class QScriptSpec
                 Free.roll(MFC(Guard(
                   HoleF,
                   Type.Obj(ScalaMap(),Some(Type.Top)),
-                  ProjectFieldR(HoleF, StrLit("pop")),
+                  ProjectKeyR(HoleF, StrLit("pop")),
                   Free.roll(MFC(Undefined()))))),
                 Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
                 Free.roll(MFC(Guard(
                   HoleF,
                   Type.Obj(ScalaMap(),Some(Type.Top)),
-                  ProjectFieldR(HoleF, StrLit("pop")),
+                  ProjectKeyR(HoleF, StrLit("pop")),
                   Free.roll(MFC(Undefined()))))),
                 Free.roll(MFC(Undefined())))))),
             ReduceFuncs.Min(
@@ -670,13 +670,13 @@ class QScriptSpec
                 Free.roll(MFC(Guard(
                   HoleF,
                   Type.Obj(ScalaMap(),Some(Type.Top)),
-                  ProjectFieldR(HoleF, StrLit("city")),
+                  ProjectKeyR(HoleF, StrLit("city")),
                   Free.roll(MFC(Undefined()))))),
                 Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
                 Free.roll(MFC(Guard(
                   HoleF,
                   Type.Obj(ScalaMap(),Some(Type.Top)),
-                  ProjectFieldR(HoleF, StrLit("city")),
+                  ProjectKeyR(HoleF, StrLit("city")),
                   Free.roll(MFC(Undefined()))))),
                 Free.roll(MFC(Undefined()))))))),
           Free.roll(MFC(ConcatMaps(
@@ -706,7 +706,7 @@ class QScriptSpec
                  Free.roll(MFC(Guard(
                    ProjectIndexR(RightSideF, IntLit(1)),
                    Type.Obj(ScalaMap(),Some(Type.Top)),
-                   Free.roll(MFC(ProjectField(
+                   Free.roll(MFC(ProjectKey(
                      ProjectIndexR(RightSideF, IntLit(1)),
                      StrLit("pop")))),
                    Free.roll(MFC(Undefined()))))),
@@ -715,7 +715,7 @@ class QScriptSpec
                    ProjectIndexR(RightSideF, IntLit(1)),
                    Type.Obj(ScalaMap(),Some(Type.Top)),
                    Free.roll(MFC(Gt(
-                     Free.roll(MFC(ProjectField(
+                     Free.roll(MFC(ProjectKey(
                        ProjectIndexR(RightSideF, IntLit(1)),
                        StrLit("pop")))),
                      IntLit(1000)))),
@@ -789,11 +789,11 @@ class QScriptSpec
             RightSideF,
             Type.Obj(ScalaMap(),Some(Type.Top)),
             Free.roll(MFC(Guard(
-              ProjectFieldR(RightSideF, StrLit("loc")),
+              ProjectKeyR(RightSideF, StrLit("loc")),
               Type.FlexArr(0, None, Type.Top),
               ProjectIndexR(
                 ConcatArraysR(
-                  ProjectFieldR(RightSideF, StrLit("loc")),
+                  ProjectKeyR(RightSideF, StrLit("loc")),
                   Free.roll(MFC(Constant(ejsonArr(ejsonInt(7), ejsonInt(8)))))),
                 IntLit(0)),
               Free.roll(MFC(Undefined()))))),
@@ -813,7 +813,7 @@ class QScriptSpec
             RightSideF,
             Type.Obj(ScalaMap(),Some(Type.Top)),
             Free.roll(MFC(Guard(
-              ProjectFieldR(RightSideF, StrLit("loc")),
+              ProjectKeyR(RightSideF, StrLit("loc")),
               Type.FlexArr(0, None, Type.Top),
               IntLit(8),
               Free.roll(MFC(Undefined()))))),
@@ -829,21 +829,21 @@ class QScriptSpec
           Free.roll(MFC(Guard(
             HoleF,
             Type.Obj(ScalaMap(),Some(Type.Top)),
-            ProjectFieldR(HoleF, StrLit("loc")),
+            ProjectKeyR(HoleF, StrLit("loc")),
             Free.roll(MFC(Undefined()))))),
           Type.FlexArr(0, None, Type.Top),
           Free.roll(MFC(Guard(
             Free.roll(MFC(Guard(
               HoleF,
               Type.Obj(ScalaMap(),Some(Type.Top)),
-              ProjectIndexR(ProjectFieldR(HoleF, StrLit("loc")), IntLit(0)),
+              ProjectIndexR(ProjectKeyR(HoleF, StrLit("loc")), IntLit(0)),
               Free.roll(MFC(Undefined()))))),
             Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
             Free.roll(MFC(Guard(
               HoleF,
               Type.Obj(ScalaMap(),Some(Type.Top)),
               Free.roll(MFC(Gt(
-                ProjectIndexR(ProjectFieldR(HoleF, StrLit("loc")), IntLit(0)),
+                ProjectIndexR(ProjectKeyR(HoleF, StrLit("loc")), IntLit(0)),
                 DecLit(-78.0)))),
               Free.roll(MFC(Undefined()))))),
             Free.roll(MFC(Undefined()))))),
@@ -887,37 +887,37 @@ class QScriptSpec
           ConcatArraysR(
             MakeArrayR(guard(ι)),
             MakeArrayR(Free.roll(MFC(Guard(
-              guard(ProjectFieldR(_, StrLit("pop"))),
+              guard(ProjectKeyR(_, StrLit("pop"))),
               Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
-              guard(jf => Free.roll(MFC(Lte(ProjectFieldR(jf, StrLit("pop")), IntLit(10))))),
+              guard(jf => Free.roll(MFC(Lte(ProjectKeyR(jf, StrLit("pop")), IntLit(10))))),
               Free.roll(MFC(Undefined()))))))))),
         QC.inj(Filter((),
           ProjectIndexR(HoleF, IntLit(1)))),
         // FIXME #2034
-        // this `Sort` should sort by the representation of the synthetic field "__sd0__"
+        // this `Sort` should sort by the representation of the synthetic key "__sd0__"
         QC.inj(Sort((),
           Nil,
-          (ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")), SortDir.asc).wrapNel)),
+          (ProjectKeyR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")), SortDir.asc).wrapNel)),
         QC.inj(Reduce((),
           List(
             MakeMapR(
               StrLit("city"),
-              ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("city")))),
+              ProjectKeyR(ProjectIndexR(HoleF, IntLit(0)), StrLit("city")))),
           List(
             ReduceFuncs.First(ConcatMapsR(
-              MakeMapR(StrLit("city"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("city"))),
-              MakeMapR(StrLit("__sd__0"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))))),
+              MakeMapR(StrLit("city"), ProjectKeyR(ProjectIndexR(HoleF, IntLit(0)), StrLit("city"))),
+              MakeMapR(StrLit("__sd__0"), ProjectKeyR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))))),
           ConcatArraysR(
             ConcatArraysR(
               MakeArrayR(ReduceIndexF(0.left)),
               MakeArrayR(ReduceIndexF(0.right))),
-            MakeArrayR(ProjectFieldR(ReduceIndexF(0.right), StrLit("__sd__0")))))),
+            MakeArrayR(ProjectKeyR(ReduceIndexF(0.right), StrLit("__sd__0")))))),
         // FIXME #2034
-        // this `Sort` should sort by the representation of the synthetic field "__sd0__"
+        // this `Sort` should sort by the representation of the synthetic key "__sd0__"
         QC.inj(Sort((),
           Nil,
           (ProjectIndexR(HoleF, IntLit(2)), SortDir.asc).wrapNel)),
-        QC.inj(Map((), DeleteFieldR(ProjectIndexR(HoleF, IntLit(1)), StrLit("__sd__0")))))(
+        QC.inj(Map((), DeleteKeyR(ProjectIndexR(HoleF, IntLit(1)), StrLit("__sd__0")))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -934,7 +934,7 @@ class QScriptSpec
 
       val cond: FreeMap =
         Free.roll(MFC(Cond(
-          Free.roll(MFC(Eq(ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("state")), StrLit("MA")))),
+          Free.roll(MFC(Eq(ProjectKeyR(ProjectIndexR(HoleF, IntLit(0)), StrLit("state")), StrLit("MA")))),
           StrLit("Massachusetts"),
           StrLit("unknown"))))
 
@@ -946,35 +946,35 @@ class QScriptSpec
           ConcatArraysR(
             MakeArrayR(guard(ι)),
             MakeArrayR(Free.roll(MFC(Guard(
-              guard(ProjectFieldR(_, StrLit("pop"))),
+              guard(ProjectKeyR(_, StrLit("pop"))),
               Type.Coproduct(Type.Int, Type.Coproduct(Type.Dec, Type.Coproduct(Type.Interval, Type.Coproduct(Type.Str, Type.Coproduct(Type.Timestamp, Type.Coproduct(Type.Date, Type.Coproduct(Type.Time, Type.Bool))))))),
-              guard(jf => Free.roll(MFC(Lte(ProjectFieldR(jf, StrLit("pop")), IntLit(10))))),
+              guard(jf => Free.roll(MFC(Lte(ProjectKeyR(jf, StrLit("pop")), IntLit(10))))),
               Free.roll(MFC(Undefined()))))))))),
         QC.inj(Filter((),
           ProjectIndexR(HoleF, IntLit(1)))),
         // FIXME #2034
-        // this `Sort` should sort by the representation of the synthetic field "__sd0__"
+        // this `Sort` should sort by the representation of the synthetic key "__sd0__"
         QC.inj(Sort((),
           Nil,
-          (ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")), SortDir.asc).wrapNel)),
+          (ProjectKeyR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")), SortDir.asc).wrapNel)),
         QC.inj(Reduce((),
           List(MakeMapR(StrLit("name"), cond)),
           List(
             ReduceFuncs.First(ConcatMapsR(
               MakeMapR(StrLit("name"), cond),
-              MakeMapR(StrLit("__sd__0"), ProjectFieldR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))))),
+              MakeMapR(StrLit("__sd__0"), ProjectKeyR(ProjectIndexR(HoleF, IntLit(0)), StrLit("pop")))))),
           ConcatArraysR(
             ConcatArraysR(
               MakeArrayR(ReduceIndexF(0.left)),
               MakeArrayR(ReduceIndexF(0.right))),
-            MakeArrayR(ProjectFieldR(ReduceIndexF(0.right), StrLit("__sd__0")))))),
+            MakeArrayR(ProjectKeyR(ReduceIndexF(0.right), StrLit("__sd__0")))))),
         // FIXME #2034
-        // this `Sort` should sort by the representation of the synthetic field "__sd0__"
+        // this `Sort` should sort by the representation of the synthetic key "__sd0__"
         QC.inj(Sort((),
           Nil,
           (ProjectIndexR(HoleF, IntLit(2)), SortDir.asc).wrapNel)),
         QC.inj(Map((),
-          DeleteFieldR(ProjectIndexR(HoleF, IntLit(1)), StrLit("__sd__0")))))(
+          DeleteKeyR(ProjectIndexR(HoleF, IntLit(1)), StrLit("__sd__0")))))(
         implicitly, Corecursive[Fix[QS], QS])))
     }
 
@@ -994,7 +994,7 @@ class QScriptSpec
               MakeArrayR(Free.roll(MFC(Guard(
                 ProjectIndexR(RightSideF, IntLit(1)),
                 Type.Obj(ScalaMap(), Some(Type.Top)),
-                ProjectFieldR(
+                ProjectKeyR(
                   ProjectIndexR(RightSideF, IntLit(1)),
                   StrLit("loc")),
                 Free.roll(MFC(Undefined()))))))))))),
@@ -1011,7 +1011,7 @@ class QScriptSpec
               Free.roll(MFC(Guard(
                 ProjectIndexR(LeftSideF, IntLit(0)),
                 Type.Obj(ScalaMap(), Some(Type.Top)),
-                ProjectFieldR(
+                ProjectKeyR(
                   ProjectIndexR(LeftSideF, IntLit(0)),
                   StrLit("city")),
                 Free.roll(MFC(Undefined())))))),

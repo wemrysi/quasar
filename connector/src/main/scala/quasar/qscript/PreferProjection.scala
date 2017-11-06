@@ -85,8 +85,8 @@ object PreferProjection extends PreferProjectionInstances {
         projectComplementƒ[T, MapFunc[T, ?], A])
       .transCata[FreeMapA[T, A]](MapFuncCore.normalize)
 
-  /** Replaces field deletion of a map having statically known structure with a
-    * projection of the complement of the deleted field.
+  /** Replaces key deletion of a map having statically known structure with a
+    * projection of the complement of the deleted key.
     */
   def projectComplementƒ[T[_[_]]: BirecursiveT, F[_]: Functor, A]
       (implicit I: MapFuncCore[T, ?] :<: F)
@@ -98,13 +98,13 @@ object PreferProjection extends PreferProjectionInstances {
     val P = PrismNT.inject[MapFuncCore[T, ?], F] compose PrismNT.coEnv[F, A]
 
     {
-      case (shape, mfc @ P(DeleteField(src, _))) =>
+      case (shape, mfc @ P(DeleteKey(src, _))) =>
         val projections = shape.resume.swap.toOption collect {
           case ExtEJson(ejson.Map(kvs)) =>
             kvs.traverse { case (k, _) => asEjs[T](k) } map { keys =>
               val maps = keys.map { k =>
                 val c = P(Constant[T, U](k)).embed
-                P(MakeMap[T, U](c, P(ProjectField[T, U](src, c)).embed)).embed
+                P(MakeMap[T, U](c, P(ProjectKey[T, U](src, c)).embed)).embed
               }
 
               maps.foldLeft1Opt((a, b) => P(ConcatMaps(a, b)).embed) | P(MapFuncCore.EmptyMap[T, U]).embed

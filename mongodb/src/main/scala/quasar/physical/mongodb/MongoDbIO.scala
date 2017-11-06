@@ -17,7 +17,9 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
+import quasar.concurrent.Pools._
 import quasar.contrib.scalaz.optionT._
+import quasar.contrib.scalaz.concurrent._
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.ski._
@@ -35,7 +37,7 @@ import com.mongodb.async._
 import com.mongodb.async.client._
 import org.bson.{BsonBoolean, BsonDocument, BSONException, Document}
 import scalaz.{Failure => _, _}, Scalaz._
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream._
 
 final class MongoDbIO[A] private (protected val r: ReaderT[Task, MongoClient, A]) {
@@ -405,8 +407,14 @@ object MongoDbIO {
   private[mongodb] def find(c: Collection): MongoDbIO[FindIterable[BsonDocument]] =
     collection(c) map (_.find)
 
-  private[mongodb] def async[A](f: SingleResultCallback[A] => Unit): MongoDbIO[A] =
-    liftTask(Task.async(cb => f(new DisjunctionCallback(cb))))
+  private[mongodb] def async[A](f: SingleResultCallback[A] => Unit): MongoDbIO[A] = {
+    val back = for {
+      a <- Task.async[A](cb => f(new DisjunctionCallback(cb)))
+      _ <- shift
+    } yield a
+
+    liftTask(back)
+  }
 
   implicit val mongoDbInstance: Monad[MongoDbIO] with Catchable[MongoDbIO] =
     new Monad[MongoDbIO] with Catchable[MongoDbIO] {
@@ -453,7 +461,7 @@ object MongoDbIO {
       go(cur) onComplete Process.eval_(MongoDbIO(_ => cur.close())))
   }
 
-  private final class DisjunctionCallback[A](f: Throwable \/ A => Unit)
+  private final class DisjunctionCallback[A](f: Throwable \/ A => Unit)(implicit S: Strategy)
     extends SingleResultCallback[A] {
 
     def onResult(result: A, error: Throwable): Unit =
