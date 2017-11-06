@@ -280,6 +280,14 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
             (TRead("baz"), SortDir.Descending))) => ok
       }
     }
+
+    "compress redundant first- and second-order nodes" in {
+      val qgraphM = reader(lpf.invoke2(SetLib.Filter, read("foo"), read("foo")))
+      val result = evaluate(qgraphM).toOption
+
+      result must beSome
+      result.get.vertices must haveSize(3)
+    }
   }
 
   object TRead {
