@@ -25,14 +25,13 @@ import scalaz.{Bind, Functor, MonadState}
   */
 trait MonadState_[F[_], S] {
   def get: F[S]
-  def init: F[S]
   def put(s: S): F[Unit]
 
   def gets[A](f: S => A)(implicit F: Functor[F]): F[A] =
-    F.map(init)(f)
+    F.map(get)(f)
 
   def modify(f: S => S)(implicit F: Bind[F]): F[Unit] =
-    F.bind(init)(f andThen put)
+    F.bind(get)(f andThen put)
 }
 
 object MonadState_ {
@@ -42,7 +41,6 @@ object MonadState_ {
       : MonadState_[F, S] =
     new MonadState_[F, S] {
       def get = F.get
-      def init = F.init
       def put(s: S) = F.put(s)
     }
 }
