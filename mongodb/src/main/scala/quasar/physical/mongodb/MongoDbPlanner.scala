@@ -348,6 +348,8 @@ object MongoDbPlanner {
         raiseErr[M, JsCore](qscriptPlanningFailed(UnexpectedJoinSide(n)))
       case Now() => execTime map (ts => New(Name("ISODate"), List(ts)))
       case Interval(a1) => unimplemented[M, JsCore]("Interval JS")
+
+      // TODO: De-duplicate and move these to JsFuncHandler
       case ExtractCentury(date) =>
         Call(ident("NumberLong"), List(
           Call(Select(ident("Math"), "ceil"), List(
@@ -451,7 +453,6 @@ object MongoDbPlanner {
                 Literal(Js.Num(7, false))),
               Literal(Js.Num(1, false))))))).point[M]
 
-      // TODO: move these to JsFuncHandler
       case MakeMap(Embed(LiteralF(Js.Str(str))), a2) => Obj(ListMap(Name(str) -> a2)).point[M]
       // TODO: pull out the literal, and handle this case in other situations
       case MakeMap(a1, a2) => Obj(ListMap(Name("__Quasar_non_string_map") ->
