@@ -42,6 +42,12 @@ case object JsonTable extends TableModel
 final case class ColumnarTable(columns: Set[ColumnDesc])
   extends TableModel
 
+sealed trait AlterColumn
+
+final case class AddColumn(name: String, tpe: ColumnType) extends AlterColumn
+final case class ModifyColumn(name: String, tpe: ColumnType) extends AlterColumn
+
+
 object ColumnarTable {
   import TableModel._
 
@@ -49,6 +55,26 @@ object ColumnarTable {
 }
 
 object TableModel {
+
+  def alter(initial: TableModel, newModel: TableModel): \/[FileSystemError, Set[AlterColumn]] = {
+    initial match {
+      case JsonTable => Set.empty.right
+      case ColumnarTable(initialCols) =>
+        val result = initial ⊹ newModel
+        result match {
+          case JsonTable =>
+            unsupportedOperation(s"Cannot update columnar model $initial to single-column json model.").left
+          case ColumnarTable(resultCols) =>
+            val newCols = resultCols -- initialCols
+            val updatedCols = (resultCols -- newCols).filter { rc =>
+              initialCols.exists {
+                pc => pc.name === rc.name && (pc.tpe ≠ rc.tpe)
+              }
+            }.map(c => ModifyColumn(c.name, c.tpe))
+            (newCols.map(c => AddColumn(c.name, c.tpe): AlterColumn) ++ updatedCols).right
+        }
+    }
+  }
 
   implicit val columnDescOrdering: Ordering[ColumnDesc] =
     Ordering.fromLessThan[ColumnDesc](_.name < _.name)

@@ -43,7 +43,7 @@ class TableModelTest extends Qspec {
     Gen.delay(permStream.next())
   }
 
-  "Table Model" should {
+  "Table Model Monoid" should {
 
     "fail for empty vector" in {
       TableModel.fromData(Vector.empty) should beLeftDisjunction
@@ -174,5 +174,44 @@ class TableModelTest extends Qspec {
                 ColumnDesc("name", StringCol))))
       }
     }
+  }
+
+  "Table Model alter" should {
+
+    "return no updates if initial model is json-based" in {
+      TableModel.alter(JsonTable, JsonTable) should beRightDisjunction(Set.empty)
+      TableModel.alter(JsonTable, ColumnarTable(Set(ColumnDesc("l", IntCol)))) should beRightDisjunction(Set.empty)
+    }
+
+    "fail if updating from columnar to json-based single column model" in {
+      TableModel.alter(ColumnarTable(Set(ColumnDesc("l", IntCol))), JsonTable) should beLeftDisjunction
+    }
+
+    "return no updates if both initial and new model are the same" in {
+      val model = ColumnarTable(Set(ColumnDesc("l", IntCol), ColumnDesc("s", StringCol)))
+      TableModel.alter(model, model) should beRightDisjunction(Set.empty)
+    }
+
+    "return information about new columns" in {
+      val initial = ColumnarTable(Set(ColumnDesc("c1", IntCol), ColumnDesc("c2", StringCol)))
+      val newModel = ColumnarTable(Set(ColumnDesc("c3", IntCol), ColumnDesc("c4", StringCol), ColumnDesc("c1", IntCol)))
+      TableModel.alter(initial, newModel) should beRightDisjunction(
+        Set(AddColumn("c3", IntCol), AddColumn("c4", StringCol)))
+    }
+
+    "return information about updated columns" in {
+      val initial = ColumnarTable(Set(ColumnDesc("c1", IntCol), ColumnDesc("c2", NullCol), ColumnDesc("c3", NullCol)))
+      val newModel = ColumnarTable(Set(ColumnDesc("c2", StringCol), ColumnDesc("c3", IntCol)))
+      TableModel.alter(initial, newModel) should beRightDisjunction(
+        Set(ModifyColumn("c2", StringCol), ModifyColumn("c3", IntCol)))
+    }
+
+    "return information about updated and added columns" in {
+      val initial = ColumnarTable(Set(ColumnDesc("c1", IntCol), ColumnDesc("c2", NullCol)))
+      val newModel = ColumnarTable(Set(ColumnDesc("c2", StringCol), ColumnDesc("c3", IntCol)))
+      TableModel.alter(initial, newModel) should beRightDisjunction(
+        Set(ModifyColumn("c2", StringCol), AddColumn("c3", IntCol)))
+    }
+
   }
 }

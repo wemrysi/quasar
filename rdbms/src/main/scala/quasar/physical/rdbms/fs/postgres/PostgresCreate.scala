@@ -38,7 +38,7 @@ trait PostgresCreate extends RdbmsCreate {
     }.void
   }
 
-  def postgresType(tpe: ColumnType): String = { // TODO move this outside and extend
+  def pgType(tpe: ColumnType): String = { // TODO move this outside and extend
     tpe match {
       case JsonCol => "jsonb"
       case StringCol => "text"
@@ -55,7 +55,17 @@ trait PostgresCreate extends RdbmsCreate {
     model match {
       case JsonTable => Fragment.const("data jsonb NOT NULL")
       case ColumnarTable(cols) =>
-        cols.toList.foldMap(c => Fragment.const(s"${c.name} ${postgresType(c.tpe)}"))
+        cols.toList.foldMap(c => Fragment.const(s"${c.name} ${pgType(c.tpe)}"))
     }
+  }
+
+  override def alterTable(tablePath: TablePath, cols: Set[AlterColumn]): ConnectionIO[Unit] = {
+    if (cols.isEmpty)
+      ().point[ConnectionIO]
+    else
+      cols.map {
+        case AddColumn(name, tpe) => Fragment.const(s"ADD COLUMN $name ${pgType(tpe)}")
+        case ModifyColumn(name, tpe) => Fragment.const(s"MODIFY COLUMN $name ${pgType(tpe)}")
+      }.toList.intercalate(fr",").update.run.void
   }
 }
