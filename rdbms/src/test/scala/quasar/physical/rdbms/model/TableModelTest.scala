@@ -19,22 +19,26 @@ package quasar.physical.rdbms.model
 import quasar.{Data, DataCodec, Qspec}
 import slamdata.Predef._
 import TableModel._
-
 import org.scalacheck.Gen
 import org.scalacheck.Prop._
+import org.specs2.scalacheck.Parameters
+
 import scalaz._
 import Scalaz._
 
 class TableModelTest extends Qspec {
 
   implicit val codec: DataCodec = DataCodec.Precise
+  implicit val params: Parameters = Parameters(minTestsOk = 1000)
+
 
   def data(str: String): Data =
     DataCodec.parse(str).valueOr(err => scala.sys.error(err.shows))
   
   def permutations[T](v: Vector[T]): Gen[Vector[T]] = {
-    val perms = v.permutations
-    Gen.oneOf(perms.toList)
+    val perms = v.permutations.toList
+    val permStream = Stream.continually(perms).flatMap(_.toStream).toIterator
+    Gen.delay(permStream.next())
   }
 
   "Table Model" should {
