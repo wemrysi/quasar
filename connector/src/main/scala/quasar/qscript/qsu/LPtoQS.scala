@@ -35,3 +35,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
       graduated <- Graduate[T].apply[F](reified.graph)
     } yield graduated
 }
+
+object LPtoQS {
+  def apply[T[_[_]]: BirecursiveT: EqualT]: LPtoQS[T] = new LPtoQS[T]
+}
