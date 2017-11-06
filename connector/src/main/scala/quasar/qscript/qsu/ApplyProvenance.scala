@@ -17,7 +17,9 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef.{Map => SMap, _}
-import quasar.contrib.scalaz.{MonadError_, MonadState_}
+
+import quasar.Planner.{PlannerErrorME, InternalError}
+import quasar.contrib.scalaz.MonadState_
 import quasar.ejson
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
@@ -46,13 +48,9 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
   type GStateM[F[_]] = MonadState_[F, QSUGraph[T]]
   def GStateM[F[_]](implicit ev: GStateM[F]): GStateM[F] = ev
 
-  // TODO: Real errors
-  type ErrorM[F[_]] = MonadError_[F, String]
-  def ErrorM[F[_]](implicit ev: ErrorM[F]): ErrorM[F] = ev
-
   val dims = QProv[T]
 
-  def apply[F[_]: Monad: ErrorM](graph: QSUGraph[T]): F[AuthenticatedQSU[T]] = {
+  def apply[F[_]: Monad: PlannerErrorME](graph: QSUGraph[T]): F[AuthenticatedQSU[T]] = {
     type X[A] = StateT[F, QSUGraph[T], A]
     graph.elgotZygoM(computeProvenanceƒ[X], applyProvenanceƒ[X])
       .run(graph)
@@ -69,7 +67,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
       (nodeId, node.foldRight[QSUDims[T]](SMap(nodeId -> nodeDims))(_._2 ++ _)).point[F]
   }
 
-  def computeProvenanceƒ[F[_]: Monad: ErrorM]: AlgebraM[F, GPF, Dims] =
+  def computeProvenanceƒ[F[_]: Monad: PlannerErrorME]: AlgebraM[F, GPF, Dims] =
     gpf => gpf.qsu match {
       case AutoJoin(srcs, _) => srcs.foldLeft1(dims.join(_, _)).point[F]
 
@@ -130,8 +128,9 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
     (segs.head :: segs.tail).join
   }
 
-  private def unexpectedError[F[_]: ErrorM, A](nodeName: String, id: Symbol): F[A] =
-    ErrorM[F].raiseError(s"ComputeProvenance: Encountered unexpected $nodeName[$id].")
+  private def unexpectedError[F[_]: PlannerErrorME, A](nodeName: String, id: Symbol): F[A] =
+    PlannerErrorME[F].raiseError(
+      InternalError(s"ComputeProvenance: Encountered unexpected $nodeName[$id].", None))
 }
 
 object ApplyProvenance {

@@ -18,8 +18,8 @@ package quasar.qscript.qsu
 
 import slamdata.Predef._
 
+import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.common.JoinType
-import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.κ
 import quasar.qscript.{HoleF, IncludeId, LeftSideF, MFC, ReduceIndexF, RightSideF}
 import quasar.qscript.ReduceFunc._
@@ -35,12 +35,9 @@ final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] 
 
   type QSU[A] = QScriptUniform[A]
 
-  type ErrorM[F[_]] = MonadError_[F, String]
-  def ErrorM[F[_]](implicit ev: ErrorM[F]): ErrorM[F] = ev
-
   val prov = new QProv[T]
 
-  private def toQScript[F[_]: Applicative: ErrorM](dims: QSUDims[T])
+  private def toQScript[F[_]: Applicative: PlannerErrorME](dims: QSUDims[T])
       : QSU[Symbol] => F[QSU[Symbol]] = {
     case QSU.AutoJoin(sources, combiner0) =>
       sources.list match {
@@ -60,7 +57,8 @@ final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] 
 
         // TODO support autojoins of any size - requires name generation
         case _ =>
-          ErrorM[F].raiseError(s"AutoJoin on a list of size ${sources.size} is not supported.")
+          PlannerErrorME[F].raiseError(
+            InternalError(s"AutoJoin on a list of size ${sources.size} is not supported.", None))
       }
 
     case QSU.Transpose(source, _) =>
@@ -79,10 +77,9 @@ final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] 
     case qsu => qsu.point[F]
   }
 
-  def reifyProvenance[F[_]: Monad: ErrorM](qsuF: F[AuthenticatedQSU[T]])
+  def apply[F[_]: Monad: PlannerErrorME](qsu: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] =
     for {
-      qsu <- qsuF
       vertices <- qsu.graph.vertices.traverse[F, QSU[Symbol]](toQScript[F](qsu.dims))
     } yield {
       AuthenticatedQSU[T](QSUGraph(qsu.graph.root, vertices), qsu.dims)

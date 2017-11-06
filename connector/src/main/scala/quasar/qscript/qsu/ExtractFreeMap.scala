@@ -18,7 +18,7 @@ package quasar.qscript.qsu
 
 import slamdata.Predef._
 
-import quasar.contrib.scalaz.MonadError_
+import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.qscript.{JoinFunc, JoinSide, LeftSide, LeftSideF, MFC, RightSide, RightSideF}
 import quasar.qscript.MapFuncsCore.{ConcatMaps, MakeMap, StrLit}
 import quasar.sql.JoinDir
@@ -35,10 +35,8 @@ import scalaz.{Applicative, Free, ValidationNel, Scalaz}, Scalaz._
 object ExtractFreeMap {
   import QScriptUniform._
 
-  type ErrorM[F[_]] = MonadError_[F, String]
-  def ErrorM[F[_]](implicit ev: ErrorM[F]): ErrorM[F] = ev
-
-  def apply[T[_[_]]: CorecursiveT, F[_]: Applicative: ErrorM](graph: QSUGraph[T]): F[QSUGraph[T]] =
+  def apply[T[_[_]]: CorecursiveT, F[_]: Applicative: PlannerErrorME](graph: QSUGraph[T])
+      : F[QSUGraph[T]] =
     QSUGraph.vertices[T].modifyF(_ traverse {
       case GroupBy(src, key) =>
         MappableRegion.unaryOf(src, graph refocus key)
@@ -68,7 +66,7 @@ object ExtractFreeMap {
         } map (UniformSort(src, Nil, _))
 
       case other => other.point[ValidationNel[String, ?]]
-    })(graph).fold(e => ErrorM[F].raiseError(e intercalate ", "), _.point[F])
+    })(graph).fold(e => PlannerErrorME[F].raiseError(InternalError(e intercalate ", ", None)), _.point[F])
 
   ////
 

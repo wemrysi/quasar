@@ -38,12 +38,12 @@ import quasar.qscript.{
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.QSUGraph.QSUPattern
 
-import matryoshka.{Corecursive, CorecursiveT, Coalgebra, Recursive, ShowT}
+import matryoshka.{Corecursive, CorecursiveT, Coalgebra, Recursive}
 import matryoshka.data.free._
 import matryoshka.patterns.CoEnv
 import scalaz.{~>, -\/, Const, Inject, NaturalTransformation}
 
-sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T] {
+final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
   import QSUPattern._
 
   type QSE[A] = QScriptEducated[A]
@@ -131,7 +131,12 @@ sealed abstract class Graduate[T[_[_]]: CorecursiveT: ShowT] extends QSUTTypes[T
       graduateƒ[CoEnvTotal](halt)(lift))
   }
 
-  def graduate(graph: QSUGraph): T[QSE] =
+  def apply(graph: QSUGraph): T[QSE] =
     Corecursive[T[QSE], QSE].ana[QSUGraph](graph)(
       graduateƒ[QSE](None)(NaturalTransformation.refl[QSE]))
+}
+
+object Graduate {
+  def apply[T[_[_]]: CorecursiveT]: Graduate[T] =
+    new Graduate[T]
 }
