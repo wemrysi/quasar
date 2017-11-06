@@ -342,6 +342,7 @@ trait StringLib extends Library {
         case Data.Date(d)      => success(d.toString)
         case Data.Time(t)      => success(t.format(DataCodec.timeFormatter))
         case Data.Interval(i)  => success(i.toString)
+        case Data.Id(i)        => success(i.toString)
         // NB: Should not be able to hit this case, because of the domain.
         case other             =>
           failureNel(
@@ -361,7 +362,9 @@ trait StringLib extends Library {
           DateLib.Date.tpe(Func.Input1(x)) <+>
           DateLib.Time.tpe(Func.Input1(x)) <+>
           DateLib.Timestamp.tpe(Func.Input1(x)) <+>
-          DateLib.Interval.tpe(Func.Input1(x)))
+          DateLib.Interval.tpe(Func.Input1(x)) <+>
+          IdentityLib.ToId.tpe(Func.Input1(x))
+        )
           .map(Func.Input1(_))
     })
 }

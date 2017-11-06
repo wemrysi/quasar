@@ -212,9 +212,9 @@ object MongoDbPlanner {
         unimplemented[M, Fix[ExprOp]]("ExtractIsoYear expression")
       case Integer(a1) => unimplemented[M, Fix[ExprOp]]("Integer expression")
       case Decimal(a1) => unimplemented[M, Fix[ExprOp]]("Decimal expression")
-      // NB: Using $substr or $substrBytes to convert to string does not work for ObjectId, so we force
-      //     this to be planned using JS
-      case ToString($var(DocVar(DocVar.ROOT, Some(BsonField.Name("_id"))))) =>
+      // NB: The aggregation implementation of `ToString` does not handle ObjectId
+      //     Here we force this case to be planned using JS
+      case ToString($var(DocVar(_, Some(BsonField.Name("_id"))))) =>
         unimplemented[M, Fix[ExprOp]]("ToString _id expression")
       // FIXME: $substr is deprecated in Mongo 3.4. This implementation should be
       //        versioned along with the other functions in FuncHandler, taking into
@@ -344,54 +344,10 @@ object MongoDbPlanner {
 
     val handleSpecialCore: MapFuncCore[T, JsCore] => M[JsCore] = {
       case Constant(v1) => ejsonToJs[M, T[EJson]](v1)
-      case ToId(a1) => New(Name("ObjectId"), List(a1)).point[M]
-      case Undefined() => ident("undefined").point[M]
       case JoinSideName(n) =>
         raiseErr[M, JsCore](qscriptPlanningFailed(UnexpectedJoinSide(n)))
       case Now() => execTime map (ts => New(Name("ISODate"), List(ts)))
-      case Length(a1) =>
-        Call(ident("NumberLong"), List(Select(a1, "length"))).point[M]
-      case Date(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.dateRegex + "$")))), "test"), List(a1)),
-          Call(ident("ISODate"), List(a1)),
-          ident("undefined")).point[M]
-      case Time(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.timeRegex + "$")))), "test"), List(a1)),
-          a1,
-          ident("undefined")).point[M]
-      case Timestamp(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.timestampRegex + "$")))), "test"), List(a1)),
-          Call(ident("ISODate"), List(a1)),
-          ident("undefined")).point[M]
       case Interval(a1) => unimplemented[M, JsCore]("Interval JS")
-      case TimeOfDay(a1) => {
-        def pad2(x: JsCore) =
-          Let(Name("x"), x,
-            If(
-              BinOp(jscore.Lt, ident("x"), Literal(Js.Num(10, false))),
-              BinOp(jscore.Add, Literal(Js.Str("0")), ident("x")),
-              ident("x")))
-        def pad3(x: JsCore) =
-          Let(Name("x"), x,
-            If(
-              BinOp(jscore.Lt, ident("x"), Literal(Js.Num(100, false))),
-              BinOp(jscore.Add, Literal(Js.Str("00")), ident("x")),
-              If(
-                BinOp(jscore.Lt, ident("x"), Literal(Js.Num(10, false))),
-                BinOp(jscore.Add, Literal(Js.Str("0")), ident("x")),
-                ident("x"))))
-        Let(Name("t"), a1,
-          binop(jscore.Add,
-            pad2(Call(Select(ident("t"), "getUTCHours"), Nil)),
-            Literal(Js.Str(":")),
-            pad2(Call(Select(ident("t"), "getUTCMinutes"), Nil)),
-            Literal(Js.Str(":")),
-            pad2(Call(Select(ident("t"), "getUTCSeconds"), Nil)),
-            Literal(Js.Str(".")),
-            pad3(Call(Select(ident("t"), "getUTCMilliseconds"), Nil)))).point[M]
-      }
-      case ToTimestamp(a1) => New(Name("Date"), List(a1)).point[M]
-
       case ExtractCentury(date) =>
         Call(ident("NumberLong"), List(
           Call(Select(ident("Math"), "ceil"), List(
@@ -495,73 +451,7 @@ object MongoDbPlanner {
                 Literal(Js.Num(7, false))),
               Literal(Js.Num(1, false))))))).point[M]
 
-      case ExtractYear(date) => Call(Select(date, "getUTCFullYear"), Nil).point[M]
-
-      case Negate(a1)       => UnOp(Neg, a1).point[M]
-      case Add(a1, a2)      => BinOp(jscore.Add, a1, a2).point[M]
-      case Multiply(a1, a2) => BinOp(Mult, a1, a2).point[M]
-      case Subtract(a1, a2) => BinOp(Sub, a1, a2).point[M]
-      case Divide(a1, a2)   => BinOp(Div, a1, a2).point[M]
-      case Modulo(a1, a2)   => BinOp(Mod, a1, a2).point[M]
-      case Power(a1, a2)    => Call(Select(ident("Math"), "pow"), List(a1, a2)).point[M]
-
-      case Not(a1)     => UnOp(jscore.Not, a1).point[M]
-      case Eq(a1, a2)  => BinOp(jscore.Eq, a1, a2).point[M]
-      case Neq(a1, a2) => BinOp(jscore.Neq, a1, a2).point[M]
-      case Lt(a1, a2)  => BinOp(jscore.Lt, a1, a2).point[M]
-      case Lte(a1, a2) => BinOp(jscore.Lte, a1, a2).point[M]
-      case Gt(a1, a2)  => BinOp(jscore.Gt, a1, a2).point[M]
-      case Gte(a1, a2) => BinOp(jscore.Gte, a1, a2).point[M]
-      case IfUndefined(a1, a2) =>
-        // TODO: Only evaluate `value` once.
-        If(BinOp(jscore.Eq, a1, ident("undefined")), a2, a1).point[M]
-      case And(a1, a2) => BinOp(jscore.And, a1, a2).point[M]
-      case Or(a1, a2)  => BinOp(jscore.Or, a1, a2).point[M]
-      case Between(a1, a2, a3) =>
-        Call(ident("&&"), List(
-          Call(ident("<="), List(a2, a1)),
-          Call(ident("<="), List(a1, a3)))).point[M]
-      case Cond(a1, a2, a3) => If(a1, a2, a3).point[M]
-
-      case Within(a1, a2) =>
-        BinOp(jscore.Neq,
-          Literal(Js.Num(-1, false)),
-          Call(Select(a2, "indexOf"), List(a1))).point[M]
-
       // TODO: move these to JsFuncHandler
-      case Lower(a1) => Call(Select(a1, "toLowerCase"), Nil).point[M]
-      case Upper(a1) => Call(Select(a1, "toUpperCase"), Nil).point[M]
-      case Bool(a1) =>
-        If(BinOp(jscore.Eq, a1, Literal(Js.Str("true"))),
-          Literal(Js.Bool(true)),
-          If(BinOp(jscore.Eq, a1, Literal(Js.Str("false"))),
-            Literal(Js.Bool(false)),
-            ident("undefined"))).point[M]
-      case Integer(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.intRegex + "$")))), "test"), List(a1)),
-          Call(ident("NumberLong"), List(a1)),
-          ident("undefined")).point[M]
-      case Decimal(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.floatRegex + "$")))), "test"), List(a1)),
-          Call(ident("parseFloat"), List(a1)),
-          ident("undefined")).point[M]
-      case Null(a1) =>
-        If(BinOp(jscore.Eq, a1, Literal(Js.Str("null"))),
-          Literal(Js.Null),
-          ident("undefined")).point[M]
-      case Search(a1, a2, a3) =>
-        Call(
-          Select(
-            New(Name("RegExp"), List(
-              a2,
-              If(a3, Literal(Js.Str("im")), Literal(Js.Str("m"))))),
-            "test"),
-          List(a1)).point[M]
-      case Substring(a1, a2, a3) =>
-        Call(Select(a1, "substr"), List(a2, a3)).point[M]
-      case Split(a1, a2) =>
-        Call(Select(a1, "split"), List(a2)).point[M]
-
       case MakeMap(Embed(LiteralF(Js.Str(str))), a2) => Obj(ListMap(Name(str) -> a2)).point[M]
       // TODO: pull out the literal, and handle this case in other situations
       case MakeMap(a1, a2) => Obj(ListMap(Name("__Quasar_non_string_map") ->
@@ -575,9 +465,6 @@ object MongoDbPlanner {
       case ConcatMaps(Embed(ObjF(o1)), Embed(ObjF(o2))) =>
         Obj(o1 ++ o2).point[M]
       case ConcatMaps(a1, a2) => SpliceObjects(List(a1, a2)).point[M]
-      case ProjectKey(a1, a2) => Access(a1, a2).point[M]
-      case ProjectIndex(a1, a2) => Access(a1, a2).point[M]
-      case DeleteKey(a1, a2)  => Call(ident("remove"), List(a1, a2)).point[M]
 
       case Guard(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
@@ -603,17 +490,6 @@ object MongoDbPlanner {
           raiseErr(qscriptPlanningFailed(InternalError.fromMsg("uncheckable type"))))(
           f => If(f(expr), cont, fallback).point[M])
 
-      // FIXME: Doesn't work for Char.
-      case Range(start, end)        =>
-        Call(
-          Select(
-            Call(Select(ident("Array"), "apply"), List(
-              Literal(Js.Null),
-              Call(ident("Array"), List(BinOp(Sub, end, start))))),
-            "map"),
-          List(
-            Fun(List(Name("element"), Name("index")),
-              BinOp(jscore.Add, ident("index"), start)))).point[M]
     }
 
     val handleSpecialDerived: MapFuncDerived[T, JsCore] => M[JsCore] = {
