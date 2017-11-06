@@ -8,7 +8,7 @@ Chain
 │  │     │  │  ╰─ Key(name: _.name)
 │  │     │  ╰─ Ident(_)
 │  │     ╰─ Obj
-│  │        ├─ Key(0: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].height : undefined)
+│  │        ├─ Key(0: __val[1].height)
 │  │        ╰─ Key(src: __val)
 │  ╰─ Scope(Map())
 ├─ $SortF

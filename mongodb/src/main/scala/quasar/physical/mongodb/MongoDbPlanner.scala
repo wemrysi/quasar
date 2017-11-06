@@ -1327,7 +1327,7 @@ object MongoDbPlanner {
     //       them with normalization as the last step and run until fixpoint. Currently plans are
     //       too sensitive to the order in which these are applied.
     for {
-      mongoQS0 <- qs.transCataM(liftFGM(assumeReadType[M, T, MQS](Type.AnyObject)))
+      mongoQS0 <- Trans(assumeReadType[T, MQS, M](Type.AnyObject), qs)
       mongoQS1 <- mongoQS0.transCataM(elideQuasarSigil[T, MQS, M](anyDoc))
       mongoQS2 =  mongoQS1.transCata[T[MQS]](R.normalizeEJ[MQS])
       mongoQS3 =  BR.branches.modify(
@@ -1336,7 +1336,7 @@ object MongoDbPlanner {
       _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo", mongoQS3))
 
       // NB: Normalizing after these appears to revert the effects of `mapBeforeSort`.
-      mongoQS4 =  Trans(mapBeforeSort[T], mongoQS3)
+      mongoQS4 <- Trans(mapBeforeSort[T, M], mongoQS3)
       mongoQS5 =  mongoQS4.transCata[T[MQS]](
                     liftFF[QScriptCore[T, ?], MQS, T[MQS]](
                       repeatedly(O.subsetBeforeMap[MQS, MQS](
