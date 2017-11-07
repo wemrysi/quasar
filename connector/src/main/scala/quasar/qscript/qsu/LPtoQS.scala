@@ -21,20 +21,24 @@ import quasar.Planner.PlannerErrorME
 import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka.{BirecursiveT, EqualT}
-import scalaz.Monad
+import scalaz.{Kleisli => K, Monad}
 import scalaz.Scalaz._
 
 final class LPtoQS[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
   def apply[F[_]: Monad: PlannerErrorME: NameGenerator](lp: T[LogicalPlan])
-      : F[T[QScriptEducated]] =
-    for {
-      read <- ReadLP[T].apply[F](lp)
-      earlyRewritten = RecognizeDistinct[T].apply(read)
-      extracted <- ExtractFreeMap[T, F](earlyRewritten)
-      authenticated <- ApplyProvenance[T].apply[F](extracted)
-      reified <- ReifyProvenance[T].apply[F](authenticated)
-      graduated <- Graduate[T].apply[F](reified.graph)
-    } yield graduated
+      : F[T[QScriptEducated]] = {
+
+    val lpToQs =
+      K(ReadLP[T].apply[F])          ∘
+      RecognizeDistinct[T].apply     >==>
+      ExtractFreeMap[T, F]           >==>
+      ApplyProvenance[T].apply[F]    >=>
+      K(ReifyProvenance[T].apply[F]) ∘
+      (_.graph)                      >==>
+      Graduate[T].apply[F]
+
+    lpToQs(lp)
+  }
 }
 
 object LPtoQS {
