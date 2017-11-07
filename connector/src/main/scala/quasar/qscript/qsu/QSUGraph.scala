@@ -128,6 +128,13 @@ object QSUGraph extends QSUGraphInstances {
       }
     }
 
+    object Read {
+      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
+        case g: QSU.Read[T, QSUGraph[T]] => QSU.Read.unapply(g)
+        case _ => None
+      }
+    }
+
     object Map {
       def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
         case g: QSU.Map[T, QSUGraph[T]] => QSU.Map.unapply(g)
@@ -222,6 +229,13 @@ object QSUGraph extends QSUGraphInstances {
     object Constant {
       def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
         case g: QSU.Nullary[T, QSUGraph[T]] => QSU.Constant.unapply(g)
+        case _ => None
+      }
+    }
+
+    object JoinSideRef {
+      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
+        case g: QSU.JoinSideRef[T, QSUGraph[T]] => QSU.JoinSideRef.unapply(g)
         case _ => None
       }
     }

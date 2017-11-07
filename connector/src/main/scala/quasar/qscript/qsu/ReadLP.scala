@@ -218,7 +218,9 @@ sealed abstract class ReadLP[
         val vertices2 =
           form.vertices.get(form.root).map(node => form.vertices - form.root + (name -> node)).getOrElse(form.vertices)
 
-        QSUGraph(root2, vertices2)
+        val updated = QSUGraph(root2, vertices2)
+
+        in :++ updated
       }
 
     case lp.Sort(src, order) =>
