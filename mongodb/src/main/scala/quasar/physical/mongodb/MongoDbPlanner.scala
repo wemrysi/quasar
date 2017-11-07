@@ -713,64 +713,60 @@ object MongoDbPlanner {
       def reversibleRelop(x: (T[MapFunc[T, ?]], Output), y: (T[MapFunc[T, ?]], Output))(f: MapFunc[T, _]): Output =
         (relFunc(f) ⊛ flip(f).flatMap(relFunc))(relop(x, y)(_, _)).getOrElse(-\/(InternalError fromMsg "couldn’t decipher operation"))
 
-      @unchecked
-      def galg(node: MapFunc[T, (T[MapFunc[T, ?]], Output)]): Output =
-        node match {
-          case MFC(Constant(_))        => \/-(default)
+      func match {
+        case MFC(Constant(_))        => \/-(default)
 
-          case MFC(Gt(_, IsDate(d2)))  => relDateOp1(Selector.Gte, d2, date.startOfNextDay, 0)
-          case MFC(Lt(IsDate(d1), _))  => relDateOp1(Selector.Gte, d1, date.startOfNextDay, 1)
+        case MFC(Gt(_, IsDate(d2)))  => relDateOp1(Selector.Gte, d2, date.startOfNextDay, 0)
+        case MFC(Lt(IsDate(d1), _))  => relDateOp1(Selector.Gte, d1, date.startOfNextDay, 1)
 
-          case MFC(Lt(_, IsDate(d2)))  => relDateOp1(Selector.Lt,  d2, date.startOfDay, 0)
-          case MFC(Gt(IsDate(d1), _))  => relDateOp1(Selector.Lt,  d1, date.startOfDay, 1)
+        case MFC(Lt(_, IsDate(d2)))  => relDateOp1(Selector.Lt,  d2, date.startOfDay, 0)
+        case MFC(Gt(IsDate(d1), _))  => relDateOp1(Selector.Lt,  d1, date.startOfDay, 1)
 
-          case MFC(Gte(_, IsDate(d2))) => relDateOp1(Selector.Gte, d2, date.startOfDay, 0)
-          case MFC(Lte(IsDate(d1), _)) => relDateOp1(Selector.Gte, d1, date.startOfDay, 1)
+        case MFC(Gte(_, IsDate(d2))) => relDateOp1(Selector.Gte, d2, date.startOfDay, 0)
+        case MFC(Lte(IsDate(d1), _)) => relDateOp1(Selector.Gte, d1, date.startOfDay, 1)
 
-          case MFC(Lte(_, IsDate(d2))) => relDateOp1(Selector.Lt,  d2, date.startOfNextDay, 0)
-          case MFC(Gte(IsDate(d1), _)) => relDateOp1(Selector.Lt,  d1, date.startOfNextDay, 1)
+        case MFC(Lte(_, IsDate(d2))) => relDateOp1(Selector.Lt,  d2, date.startOfNextDay, 0)
+        case MFC(Gte(IsDate(d1), _)) => relDateOp1(Selector.Lt,  d1, date.startOfNextDay, 1)
 
-          case MFC(Eq(_, IsDate(d2))) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d2, date.startOfDay, date.startOfNextDay, 0)
-          case MFC(Eq(IsDate(d1), _)) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d1, date.startOfDay, date.startOfNextDay, 1)
+        case MFC(Eq(_, IsDate(d2))) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d2, date.startOfDay, date.startOfNextDay, 0)
+        case MFC(Eq(IsDate(d1), _)) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d1, date.startOfDay, date.startOfNextDay, 1)
 
-          case MFC(Neq(_, IsDate(d2))) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d2, date.startOfDay, date.startOfNextDay, 0)
-          case MFC(Neq(IsDate(d1), _)) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d1, date.startOfDay, date.startOfNextDay, 1)
+        case MFC(Neq(_, IsDate(d2))) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d2, date.startOfDay, date.startOfNextDay, 0)
+        case MFC(Neq(IsDate(d1), _)) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d1, date.startOfDay, date.startOfNextDay, 1)
 
-          case MFC(Eq(a, b))  => reversibleRelop(a, b)(func)
-          case MFC(Neq(a, b)) => reversibleRelop(a, b)(func)
-          case MFC(Lt(a, b))  => reversibleRelop(a, b)(func)
-          case MFC(Lte(a, b)) => reversibleRelop(a, b)(func)
-          case MFC(Gt(a, b))  => reversibleRelop(a, b)(func)
-          case MFC(Gte(a, b)) => reversibleRelop(a, b)(func)
+        case MFC(Eq(a, b))  => reversibleRelop(a, b)(func)
+        case MFC(Neq(a, b)) => reversibleRelop(a, b)(func)
+        case MFC(Lt(a, b))  => reversibleRelop(a, b)(func)
+        case MFC(Lte(a, b)) => reversibleRelop(a, b)(func)
+        case MFC(Gt(a, b))  => reversibleRelop(a, b)(func)
+        case MFC(Gte(a, b)) => reversibleRelop(a, b)(func)
 
-          case MFC(Within(a, b)) =>
-            relop(a, b)(
-              Selector.In.apply _,
-              x => Selector.ElemMatch(\/-(Selector.In(Bson.Arr(List(x))))))
+        case MFC(Within(a, b)) =>
+          relop(a, b)(
+            Selector.In.apply _,
+            x => Selector.ElemMatch(\/-(Selector.In(Bson.Arr(List(x))))))
 
-          case MFC(Search(_, IsText(patt), IsBool(b))) =>
-            \/-(({ case List(f1) =>
-              Selector.Doc(ListMap(f1 -> Selector.Expr(Selector.Regex(patt, b, true, false, false)))) },
-              List(There(0, Here[T]()))))
+        case MFC(Search(_, IsText(patt), IsBool(b))) =>
+          \/-(({ case List(f1) =>
+            Selector.Doc(ListMap(f1 -> Selector.Expr(Selector.Regex(patt, b, true, false, false)))) },
+            List(There(0, Here[T]()))))
 
-          case MFC(Between(_, IsBson(lower), IsBson(upper))) =>
-            \/-(({ case List(f) => Selector.And(
-              Selector.Doc(f -> Selector.Gte(lower)),
-              Selector.Doc(f -> Selector.Lte(upper)))
-            },
-              List(There(0, Here[T]()))))
+        case MFC(Between(_, IsBson(lower), IsBson(upper))) =>
+          \/-(({ case List(f) => Selector.And(
+            Selector.Doc(f -> Selector.Gte(lower)),
+            Selector.Doc(f -> Selector.Lte(upper)))
+          },
+            List(There(0, Here[T]()))))
 
-          case MFC(And(a, b)) => invoke2Nel(a._2, b._2)(Selector.And.apply _)
-          case MFC(Or(a, b)) => invoke2Nel(a._2, b._2)(Selector.Or.apply _)
-          case MFC(Not((_, v))) =>
-            v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
+        case MFC(And(a, b)) => invoke2Nel(a._2, b._2)(Selector.And.apply _)
+        case MFC(Or(a, b)) => invoke2Nel(a._2, b._2)(Selector.Or.apply _)
+        case MFC(Not((_, v))) =>
+          v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
 
-          case MFC(Guard(_, typ, (_, cont), _)) => cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+        case MFC(Guard(_, typ, (_, cont), _)) => cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
 
-          case _ => -\/(InternalError fromMsg node.map(_._1).shows)
-        }
-
-      galg(func)
+        case _ => -\/(InternalError fromMsg node.map(_._1).shows)
+      }
     }
 
     invoke(node) <+> \/-(default)
