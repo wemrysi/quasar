@@ -19,8 +19,9 @@ package quasar.repl
 import slamdata.Predef._
 
 import quasar.{Data, DataCodec, Variables, resolveImports, queryPlan}
-import quasar.common.PhaseResults
-import quasar.connector.CompileM
+import quasar.Planner.PlannerError
+import quasar.common.{PhaseResult, PhaseResults}
+import quasar.connector.{BackendModule, CompileM}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.csv.CsvWriter
@@ -28,12 +29,12 @@ import quasar.effect._
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.frontend.SemanticErrors
-import quasar.frontend.logicalplan.{LogicalPlanR, LogicalPlan}
+import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fp._, ski._, numeric._
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.main.{analysis, FilesystemQueries, Prettify}
-import quasar.qscript.{DiscoverPath, QScriptRead, qScriptReadToQscriptTotal}
+import quasar.qscript.qsu.LPtoQS
 import quasar.sql.Sql
 import quasar.sql
 
@@ -150,18 +151,19 @@ object Repl {
       } yield ()
 
     def compileQuery(expr: Fix[Sql], vars: Variables, basePath: ADir): (PhaseResults, SemanticErrors \/ (FileSystemError \/ Unit)) = {
+      import FileSystemError._
+
       type M[A] = FileSystemErrT[CompileM, A]
-      val lpr = new LogicalPlanR[Fix[LogicalPlan]]
 
-      def absFiles(lp: Fix[LogicalPlan]): List[AFile] =
-        lpr.paths(lp).foldMap(f => refineTypeAbs(f).swap.toList)
+      def logQS(lp: Fix[LogicalPlan]): M[Unit] =
+        LPtoQS[Fix].apply[EitherT[StateT[CompileM, Long, ?], PlannerError, ?]](lp)
+          .leftMap(qscriptPlanningFailed(_))
+          .mapT(_.eval(0))
+          .flatMap(qs => BackendModule.logPhase[M](PhaseResult.tree("QScript (Educated)", qs)))
 
-      queryPlan(expr, vars, basePath, 0L, None).liftM[FileSystemErrT]
-        .flatMap(_.fold(
-          _  => ().point[M],
-          lp => QueryFile.convertToQScriptRead[Fix, M, QScriptRead[Fix, ?]](
-                  DiscoverPath.ListContents.static[List, M](absFiles(lp)))(
-                  lp).void))
+      queryPlan(expr, vars, basePath, 0L, None)
+        .liftM[FileSystemErrT]
+        .flatMap(_.traverse_(logQS))
         .run.run.run
     }
 
