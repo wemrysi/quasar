@@ -490,7 +490,8 @@ object MongoDbPlanner {
         jsCheck(typ).fold[M[JsCore]](
           raiseErr(qscriptPlanningFailed(InternalError.fromMsg("uncheckable type"))))(
           f => If(f(expr), cont, fallback).point[M])
-
+      // TODO: Specify the function name for pattern match failures
+      case _ => unimplemented[M, JsCore]("JS function")
     }
 
     val handleSpecialDerived: MapFuncDerived[T, JsCore] => M[JsCore] = {
@@ -714,7 +715,9 @@ object MongoDbPlanner {
         (relFunc(f) ⊛ flip(f).flatMap(relFunc))(relop(x, y)(_, _)).getOrElse(-\/(InternalError fromMsg "couldn’t decipher operation"))
 
       func match {
-        case MFC(Constant(_))        => \/-(default)
+        case MFC(Constant(_)) => \/-(default)
+        case MFC(And(a, b))   => invoke2Nel(a._2, b._2)(Selector.And.apply _)
+        case MFC(Or(a, b))    => invoke2Nel(a._2, b._2)(Selector.Or.apply _)
 
         case MFC(Gt(_, IsDate(d2)))  => relDateOp1(Selector.Gte, d2, date.startOfNextDay, 0)
         case MFC(Lt(IsDate(d1), _))  => relDateOp1(Selector.Gte, d1, date.startOfNextDay, 1)
@@ -741,31 +744,33 @@ object MongoDbPlanner {
         case MFC(Gt(a, b))  => reversibleRelop(a, b)(func)
         case MFC(Gte(a, b)) => reversibleRelop(a, b)(func)
 
-        case MFC(Within(a, b)) =>
-          relop(a, b)(
-            Selector.In.apply _,
-            x => Selector.ElemMatch(\/-(Selector.In(Bson.Arr(List(x))))))
+        // NB: workaround patmat exhaustiveness checker bug. Merge with previous `match`
+        //     once solved.
+        case x => x match {
+          case MFC(Within(a, b)) =>
+            relop(a, b)(
+              Selector.In.apply _,
+              x => Selector.ElemMatch(\/-(Selector.In(Bson.Arr(List(x))))))
 
-        case MFC(Search(_, IsText(patt), IsBool(b))) =>
-          \/-(({ case List(f1) =>
-            Selector.Doc(ListMap(f1 -> Selector.Expr(Selector.Regex(patt, b, true, false, false)))) },
-            List(There(0, Here[T]()))))
+          case MFC(Search(_, IsText(patt), IsBool(b))) =>
+            \/-(({ case List(f1) =>
+              Selector.Doc(ListMap(f1 -> Selector.Expr(Selector.Regex(patt, b, true, false, false)))) },
+              List(There(0, Here[T]()))))
 
-        case MFC(Between(_, IsBson(lower), IsBson(upper))) =>
-          \/-(({ case List(f) => Selector.And(
-            Selector.Doc(f -> Selector.Gte(lower)),
-            Selector.Doc(f -> Selector.Lte(upper)))
-          },
-            List(There(0, Here[T]()))))
+          case MFC(Between(_, IsBson(lower), IsBson(upper))) =>
+            \/-(({ case List(f) => Selector.And(
+              Selector.Doc(f -> Selector.Gte(lower)),
+              Selector.Doc(f -> Selector.Lte(upper)))
+            },
+              List(There(0, Here[T]()))))
 
-        case MFC(And(a, b)) => invoke2Nel(a._2, b._2)(Selector.And.apply _)
-        case MFC(Or(a, b)) => invoke2Nel(a._2, b._2)(Selector.Or.apply _)
-        case MFC(Not((_, v))) =>
-          v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
+          case MFC(Not((_, v))) =>
+            v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
 
-        case MFC(Guard(_, typ, (_, cont), _)) => cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+          case MFC(Guard(_, typ, (_, cont), _)) => cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
 
-        case _ => -\/(InternalError fromMsg node.map(_._1).shows)
+          case _ => -\/(InternalError fromMsg node.map(_._1).shows)
+        }
       }
     }
 
