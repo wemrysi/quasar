@@ -21,14 +21,14 @@ import quasar.{RenderTree, RenderTreeT}
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.matryoshka.birecursiveIso
 import quasar.contrib.pathy.AFile
-import quasar.ejson.EJson
 import quasar.fp.{τ, PrismNT}
+import quasar.fp.ski.κ
 import quasar.qscript._
 
 import matryoshka.{BirecursiveT, Delay, EqualT, ShowT}
 import monocle.{Prism, PTraversal, Traversal}
 import pathy.Path
-import scalaz.{:<:, Applicative, Bitraverse, Equal, Forall, Free, NonEmptyList => NEL, Scalaz, Show, Traverse}
+import scalaz.{Applicative, Bitraverse, Equal, Free, NonEmptyList => NEL, Scalaz, Show, Traverse}
 
 sealed trait QScriptUniform[T[_[_]], A] extends Product with Serializable
 
@@ -38,7 +38,8 @@ object QScriptUniform {
     // we need both apply and traverse syntax, which conflict
     import Scalaz._
 
-    def traverseImpl[G[_]: Applicative, A, B](qsu: QScriptUniform[T, A])(f: A => G[B]): G[QScriptUniform[T, B]] = qsu match {
+    def traverseImpl[G[_]: Applicative, A, B](qsu: QScriptUniform[T, A])(f: A => G[B])
+        : G[QScriptUniform[T, B]] = qsu match {
       case AutoJoin(sources, combiner) =>
         sources.traverse(f).map(nel => AutoJoin(nel, combiner))
 
@@ -97,9 +98,9 @@ object QScriptUniform {
       case QSFilter(source, predicate) =>
         f(source).map(QSFilter(_, predicate))
 
-      case Nullary(mf) => (Nullary(mf): QScriptUniform[T, B]).point[G]
-
       case JoinSideRef(id) => (JoinSideRef(id): QScriptUniform[T, B]).point[G]
+
+      case Unreferenced() => (Unreferenced(): QScriptUniform[T, B]).point[G]
     }
   }
 
@@ -220,20 +221,7 @@ object QScriptUniform {
       source: A,
       predicate: FreeMap[T]) extends QScriptUniform[T, A]
 
-  final case class Nullary[T[_[_]], A](mf: Forall[MapFunc[T, ?]]) extends QScriptUniform[T, A]
-
-  object Constant {
-
-    def apply[T[_[_]], A](ejson: T[EJson])(implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?]): QScriptUniform[T, A] =
-      Nullary(Forall(_(IC(MapFuncsCore.Constant(ejson)))))
-
-    def unapply[T[_[_]], A](nary: Nullary[T, A])(implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?]): Option[T[EJson]] = {
-      nary.mf[A] match {
-        case IC(MapFuncsCore.Constant(ejson)) => Some(ejson)
-        case _ => None
-      }
-    }
-  }
+  final case class Unreferenced[T[_[_]], A]() extends QScriptUniform[T, A]
 
   final case class JoinSideRef[T[_[_]], A](id: Symbol) extends QScriptUniform[T, A]
 
@@ -288,10 +276,10 @@ object QScriptUniform {
         case Map(a, fm) => (a, fm)
       } { case (a, fm) => Map(a, fm) }
 
-    def nullary[A]: Prism[QScriptUniform[A], Forall[MapFunc]] =
-      Prism.partial[QScriptUniform[A], Forall[MapFunc]] {
-        case Nullary(mf) => mf
-      } (Nullary(_))
+    def unreferenced[A]: Prism[QScriptUniform[A], Unit] =
+      Prism.partial[QScriptUniform[A], Unit] {
+        case Unreferenced() => ()
+      } (κ(Unreferenced()))
 
     def qsFilter[A]: Prism[QScriptUniform[A], (A, FreeMap)] =
       Prism.partial[QScriptUniform[A], (A, FreeMap)] {
@@ -422,8 +410,8 @@ object QScriptUniform {
     def map1(src: QSU, f: MapFuncCore[Hole]): QSU =
       map(src, Free.roll(mfc(f as HoleF[T])))
 
-    val nullary: Prism[QSU, Forall[MapFunc]] =
-      iso composePrism O.nullary
+    val unreferenced: Prism[QSU, Unit] =
+      iso composePrism O.unreferenced
 
     val qsFilter: Prism[QSU, (QSU, FreeMap)] =
       iso composePrism O.qsFilter

@@ -96,7 +96,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
 
       case Map(src, _) => src.point[F]
 
-      case Nullary(_) => dims.empty.point[F]
+      case Unreferenced() => dims.empty.point[F]
 
       case Read(file) => dims.squash(segments(file).map(projStr).reverse).point[F]
 
