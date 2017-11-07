@@ -29,7 +29,8 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
       : F[T[QScriptEducated]] =
     for {
       read <- ReadLP[T].apply[F](lp)
-      extracted <- ExtractFreeMap[T, F](read)
+      earlyRewritten = RecognizeDistinct[T].apply(read)
+      extracted <- ExtractFreeMap[T, F](earlyRewritten)
       authenticated <- ApplyProvenance[T].apply[F](extracted)
       reified <- ReifyProvenance[T].apply[F](authenticated)
       graduated <- Graduate[T].apply[F](reified.graph)

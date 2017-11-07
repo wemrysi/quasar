@@ -24,7 +24,7 @@ import quasar.fp._
 import monocle.macros.Lenses
 import matryoshka._
 import matryoshka.implicits._
-import scalaz.{Applicative, Monad, Traverse, Scalaz, State, StateT}, Scalaz._
+import scalaz.{Applicative, Id, Monad, MonadState, Traverse, Scalaz, State, StateT}, Scalaz._
 
 @Lenses
 final case class QSUGraph[T[_[_]]](
@@ -61,6 +61,61 @@ final case class QSUGraph[T[_[_]]](
     else
       this
   }
+
+  def overwriteAtRoot(qsu: QScriptUniform[T, Symbol]): QSUGraph[T] =
+    QSUGraph(root, vertices.updated(root, qsu))
+
+  /**
+   * Allows rewriting of arbitrary subgraphs.  Rewrites are
+   * applied in a bottom-up (leaves-first) order, which avoids
+   * ambiguities when changing nodes that are visible to subsequent
+   * rewrites.  The one caveat here is that all "changes" to the graph
+   * must be additive in nature.  You can never remove a node.
+   * Rewrites to the definition of a node are valid, but you cannot
+   * remove it from the graph, as other nodes will still point to it.
+   * This becomes relevant if you want to transform some subgraph
+   * g into f(g).  When this happens, you must internally generate a
+   * new symbol for g and rewrite your subgraph to point to that new
+   * g, then the composite graph f(g) must be given the original symbol.
+   * As a safety check, because this case is just entirely unsound, the
+   * symbol you return at the root is entirely ignored in favor of the
+   * original root at that locus.
+   */
+  def rewriteM[F[_]: Monad](pf: PartialFunction[QSUGraph[T], F[QSUGraph[T]]]): F[QSUGraph[T]] = {
+    type G[A] = StateT[F, Set[Symbol], A]
+    val MS = MonadState[G, Set[Symbol]]
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def inner(g: QSUGraph[T]): G[QSUGraph[T]] = {
+      for {
+        visited <- MS.get
+
+        back <- if (visited(root)) {
+          this.point[G]
+        } else {
+          for {
+            _ <- MS.modify(_ + root)
+            recursive <- g.unfold.traverse(inner)
+
+            collapsed =
+              recursive.foldRight(SMap[Symbol, QScriptUniform[T, Symbol]]())(_.vertices ++ _)
+
+            self2 = QSUGraph(root, collapsed)
+
+            applied <- if (pf.isDefinedAt(self2))
+              pf(self2).liftM[StateT[?[_], Set[Symbol], ?]]
+            else
+              self2.point[G]
+          } yield applied.copy(root = self2.root)   // prevent users from building invalid graphs
+        }
+      } yield back
+    }
+
+    inner(this).eval(Set())
+  }
+
+  def rewrite(pf: PartialFunction[QSUGraph[T], QSUGraph[T]]): QSUGraph[T] =
+    rewriteM(pf.andThen(_.point[Id]))
 
   // projects the root of the graph (which we assume exists)
   def unfold: QScriptUniform[T, QSUGraph[T]] =
