@@ -974,7 +974,7 @@ class PlannerSpec extends
     }
 
     "select partially-applied substring" in {
-      plan3_2(sqlE"""select substring("abcdefghijklmnop", 5, pop / 10000) from zips""") must
+      plan3_2(sqlE"""select substring("abcdefghijklmnop", 5, trunc(pop / 10000)) from zips""") must
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $project(
@@ -984,12 +984,49 @@ class PlannerSpec extends
                   $and(
                     $lt($literal(Bson.Null), $field("pop")),
                     $lt($field("pop"), $literal(Bson.Text("")))),
-                  $substr(
-                    $literal(Bson.Text("fghijklmnop")),
-                    $literal(Bson.Int32(0)),
-                    divide($field("pop"), $literal(Bson.Int32(10000)))),
-                  $literal(Bson.Undefined))),
-            ExcludeId)))
+                  $cond(
+                    $and(
+                      $lt($literal(Bson.Null),
+                        $cond(
+                          $eq($literal(Bson.Int32(10000)), $literal(Bson.Int32(0))),
+                          $cond(
+                            $eq($field("pop"), $literal(Bson.Int32(0))),
+                            $literal(Bson.Dec(Double.NaN)),
+                            $cond(
+                              $gt($field("pop"), $literal(Bson.Int32(0))),
+                              $literal(Bson.Dec(Double.PositiveInfinity)),
+                              $literal(Bson.Dec(Double.NegativeInfinity)))
+                          ),
+                          $divide($field("pop"), $literal(Bson.Int32(10000))))),
+                        $lt(
+                          $cond(
+                            $eq($literal(Bson.Int32(10000)), $literal(Bson.Int32(0))),
+                            $cond(
+                              $eq($field("pop"), $literal(Bson.Int32(0))),
+                              $literal(Bson.Dec(Double.NaN)),
+                              $cond(
+                                $gt($field("pop"), $literal(Bson.Int32(0))),
+                                $literal(Bson.Dec(Double.PositiveInfinity)),
+                                $literal(Bson.Dec(Double.NegativeInfinity)))),
+                            $divide($field("pop"), $literal(Bson.Int32(10000)))),
+                          $literal(Bson.Text(""))
+                        )),
+                    $substr(
+                      $literal(Bson.Text("fghijklmnop")),
+                      $literal(Bson.Int32(0)),
+                      $trunc(
+                        $cond(
+                          $eq($literal(Bson.Int32(10000)), $literal(Bson.Int32(0))),
+                          $cond(
+                            $eq($field("pop"), $literal(Bson.Int32(0))),
+                            $literal(Bson.Dec(Double.NaN)),
+                            $cond(
+                              $gt($field("pop"), $literal(Bson.Int32(0))),
+                              $literal(Bson.Dec(Double.PositiveInfinity)),
+                              $literal(Bson.Dec(Double.NegativeInfinity)))),
+                          $divide($field("pop"), $literal(Bson.Int32(10000)))))),
+                  $literal(Bson.Undefined)),
+                $literal(Bson.Undefined))))))
     }
 
     "drop nothing" in {
