@@ -76,8 +76,8 @@ trait StructuralLib extends Library {
     noSimplification,
     {
       // TODO: This should actually result in metadata when we switch to EJson.
-      case Sized(Const(_)) => success(Const(Data.NA))
-      case _               => success(Top)
+      case Sized(Const(_)) => Some(success(Const(Data.NA)))
+      case _               => Some(success(Top))
     },
     basicUntyper[nat._1])
 
