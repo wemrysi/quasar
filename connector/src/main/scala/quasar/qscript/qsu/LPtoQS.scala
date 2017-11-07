@@ -28,7 +28,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
   def apply[F[_]: Monad: PlannerErrorME: NameGenerator](lp: T[LogicalPlan])
       : F[T[QScriptEducated]] =
     for {
-      read <- ReadLP[T, F].apply(lp)
+      read <- ReadLP[T].apply[F](lp)
       extracted <- ExtractFreeMap[T, F](read)
       authenticated <- ApplyProvenance[T].apply[F](extracted)
       reified <- ReifyProvenance[T].apply[F](authenticated)

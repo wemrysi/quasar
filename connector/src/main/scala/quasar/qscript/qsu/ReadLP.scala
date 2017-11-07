@@ -59,15 +59,9 @@ import scalaz.syntax.foldable._
 import scalaz.syntax.monad._
 import shapeless.Sized
 
-sealed abstract class ReadLP[
-    T[_[_]]: BirecursiveT,
-    F[_]: Monad: MonadError_[?[_], PlannerError]: NameGenerator]
-    extends QSUTTypes[T] {
-
-  type QSU[A] = QScriptUniform[A]
-  type G[A] = StateT[F, SMap[QSU[Symbol], Symbol], A]
-
-  private val MS = MonadState_[G, SMap[QSU[Symbol], Symbol]]
+final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
+  private type GState = SMap[QSU[Symbol], Symbol]
+  private type QSU[A] = QScriptUniform[A]
 
   private val IC = Inject[MapFuncCore, MapFunc]
   private val ID = Inject[MapFuncDerived, MapFunc]
@@ -75,17 +69,23 @@ sealed abstract class ReadLP[
   private val IdIndex = 0
   private val ValueIndex = 1
 
-  def apply(plan: T[lp.LogicalPlan]): F[QSUGraph] =
-    plan.cataM(readLPƒ).eval(SMap())
+  def apply[
+      F[_]: Monad: MonadError_[?[_], PlannerError]: NameGenerator](
+      plan: T[lp.LogicalPlan]): F[QSUGraph] =
+    plan.cataM(readLPƒ[StateT[F, GState, ?]]).eval(SMap())
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  val readLPƒ: AlgebraM[G, lp.LogicalPlan, QSUGraph] = {
+  def readLPƒ[
+      G[_]: Monad: MonadError_[?[_], PlannerError]: NameGenerator](
+      implicit MS: MonadState_[G, GState])
+      : AlgebraM[G, lp.LogicalPlan, QSUGraph] = {
+
     case lp.Read(path) =>
       val afile = mkAbsolute(rootDir[Sandboxed], path)
 
       for {
-        read <- withName(QSU.Read[T, Symbol](afile))
-        back <- extend1(read)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftMap))
+        read <- withName[G](QSU.Read[T, Symbol](afile))
+        back <- extend1[G](read)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftMap))
       } yield back
 
     case lp.Constant(data) =>
@@ -99,77 +99,77 @@ sealed abstract class ReadLP[
         },
         { x: T[EJson] => QSU.Constant[T, Symbol](x).right })
 
-      MonadError_[G, PlannerError].unattempt(back.point[G]).flatMap(withName)
+      MonadError_[G, PlannerError].unattempt(back.point[G]).flatMap(withName[G])
 
     case lp.InvokeUnapply(StructuralLib.FlattenMap, Sized(a)) =>
       val transpose =
-        extend1(a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.FlattenMap))
+        extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.FlattenMap))
 
-      transpose >>= projectConstIdx(ValueIndex)
+      transpose >>= projectConstIdx[G](ValueIndex)
 
     case lp.InvokeUnapply(StructuralLib.FlattenMapKeys, Sized(a)) =>
       val transpose =
-        extend1(a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.FlattenMap))
+        extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.FlattenMap))
 
-      transpose >>= projectConstIdx(IdIndex)
+      transpose >>= projectConstIdx[G](IdIndex)
 
     case lp.InvokeUnapply(StructuralLib.FlattenArray, Sized(a)) =>
       val transpose =
-        extend1(a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.FlattenArray))
+        extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.FlattenArray))
 
-      transpose >>= projectConstIdx(ValueIndex)
+      transpose >>= projectConstIdx[G](ValueIndex)
 
     case lp.InvokeUnapply(StructuralLib.FlattenArrayIndices, Sized(a)) =>
       val transpose =
-        extend1(a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.FlattenArray))
+        extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.FlattenArray))
 
-      transpose >>= projectConstIdx(IdIndex)
+      transpose >>= projectConstIdx[G](IdIndex)
 
     case lp.InvokeUnapply(StructuralLib.ShiftMap, Sized(a)) =>
       val transpose =
-        extend1(a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftMap))
+        extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftMap))
 
-      transpose >>= projectConstIdx(ValueIndex)
+      transpose >>= projectConstIdx[G](ValueIndex)
 
     case lp.InvokeUnapply(StructuralLib.ShiftMapKeys, Sized(a)) =>
       val transpose =
-        extend1(a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftMap))
+        extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftMap))
 
-      transpose >>= projectConstIdx(IdIndex)
+      transpose >>= projectConstIdx[G](IdIndex)
 
     case lp.InvokeUnapply(StructuralLib.ShiftArray, Sized(a)) =>
       val transpose =
-        extend1(a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftArray))
+        extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftArray))
 
-      transpose >>= projectConstIdx(ValueIndex)
+      transpose >>= projectConstIdx[G](ValueIndex)
 
     case lp.InvokeUnapply(StructuralLib.ShiftArrayIndices, Sized(a)) =>
       val transpose =
-        extend1(a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftArray))
+        extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftArray))
 
-      transpose >>= projectConstIdx(IdIndex)
+      transpose >>= projectConstIdx[G](IdIndex)
 
     case lp.InvokeUnapply(SetLib.GroupBy, Sized(a, b)) =>
-      extend2(a, b)(QSU.GroupBy[T, Symbol](_, _))
+      extend2[G](a, b)(QSU.GroupBy[T, Symbol](_, _))
 
     case lp.InvokeUnapply(IdentityLib.Squash, Sized(a)) =>
-      extend1(a)(QSU.DimEdit[T, Symbol](_, QSU.DTrans.Squash()))
+      extend1[G](a)(QSU.DimEdit[T, Symbol](_, QSU.DTrans.Squash()))
 
     case lp.InvokeUnapply(SetLib.Filter, Sized(a, b)) =>
-      extend2(a, b)(QSU.LPFilter[T, Symbol](_, _))
+      extend2[G](a, b)(QSU.LPFilter[T, Symbol](_, _))
 
     case lp.InvokeUnapply(SetLib.Sample, Sized(a, b)) =>
-      extend2(a, b)(QSU.Subset[T, Symbol](_, Sample, _))
+      extend2[G](a, b)(QSU.Subset[T, Symbol](_, Sample, _))
 
     case lp.InvokeUnapply(SetLib.Take, Sized(a, b)) =>
-      extend2(a, b)(QSU.Subset[T, Symbol](_, Take, _))
+      extend2[G](a, b)(QSU.Subset[T, Symbol](_, Take, _))
 
     case lp.InvokeUnapply(SetLib.Drop, Sized(a, b)) =>
-      extend2(a, b)(QSU.Subset[T, Symbol](_, Drop, _))
+      extend2[G](a, b)(QSU.Subset[T, Symbol](_, Drop, _))
 
     case lp.InvokeUnapply(func: UnaryFunc, Sized(a)) if func.effect === Reduction =>
       val translated = ReduceFunc.translateUnaryReduction[Unit](func)(())
-      extend1(a)(QSU.LPReduce[T, Symbol](_, translated))
+      extend1[G](a)(QSU.LPReduce[T, Symbol](_, translated))
 
     case lp.InvokeUnapply(func: BinaryFunc, Sized(a, b)) if func.effect === Reduction => ???
 
@@ -178,31 +178,31 @@ sealed abstract class ReadLP[
         MapFunc.translateUnaryMapping[T, MapFunc, Free[MapFunc, Hole]].apply(func)(
           Free.pure[MapFunc, Hole](SrcHole))
 
-      extend1(a)(QSU.Map[T, Symbol](_, Free.roll[MapFunc, Hole](translated)))
+      extend1[G](a)(QSU.Map[T, Symbol](_, Free.roll[MapFunc, Hole](translated)))
 
     case lp.InvokeUnapply(func: BinaryFunc, Sized(a, b)) if func.effect === Mapping =>
-      autoJoin2(a, b)(MapFunc.translateBinaryMapping[T, MapFunc, Int].apply(func))
+      autoJoin2[G](a, b)(MapFunc.translateBinaryMapping[T, MapFunc, Int].apply(func))
 
     case lp.InvokeUnapply(func: TernaryFunc, Sized(a, b, c)) if func.effect === Mapping =>
-      autoJoin3(a, b, c)(MapFunc.translateTernaryMapping[T, MapFunc, Int].apply(func))
+      autoJoin3[G](a, b, c)(MapFunc.translateTernaryMapping[T, MapFunc, Int].apply(func))
 
     case lp.InvokeUnapply(func, values) => ???
 
     case lp.TemporalTrunc(part, src) =>
-      extend1(src)(
+      extend1[G](src)(
         QSU.Map[T, Symbol](
           _,
           Free.roll[MapFunc, Hole](
             MFC(MapFuncsCore.TemporalTrunc(part, Free.pure[MapFunc, Hole](SrcHole))))))
 
     case lp.Typecheck(expr, tpe, cont, fallback) =>
-      autoJoin3(expr, cont, fallback)((e, c, f) => IC(MapFuncsCore.Guard[T, Int](e, tpe, c, f)))
+      autoJoin3[G](expr, cont, fallback)((e, c, f) => IC(MapFuncsCore.Guard[T, Int](e, tpe, c, f)))
 
     case lp.JoinSideName(name) =>
-      withName(QSU.JoinSideRef[T, Symbol](name))
+      withName[G](QSU.JoinSideRef[T, Symbol](name))
 
     case lp.Join(left, right, tpe, lp.JoinCondition(leftN, rightN, cond)) =>
-      extend3(left, right, cond)(
+      extend3[G](left, right, cond)(
         QSU.LPJoin[T, Symbol](_, _, _, tpe, leftN, rightN))
 
     case lp.Free(name) =>
@@ -227,40 +227,51 @@ sealed abstract class ReadLP[
       val node = QSU.Sort[T, Symbol](src.root, order.map(_.leftMap(_.root)))
       val graphs = src <:: order.map(_._1)
 
-      withName(node).map(g => graphs.foldLeft(g)(_ :++ _))
+      withName[G](node).map(g => graphs.foldLeft(g)(_ :++ _))
   }
 
-  private def projectConstIdx(idx: Int)(parent: QSUGraph): G[QSUGraph] = {
+  private def projectConstIdx[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](
+      idx: Int)(
+      parent: QSUGraph): G[QSUGraph] = {
+
     for {
-      idxG <- withName(
+      idxG <- withName[G](
         QSU.Constant[T, Symbol](
           ejson.ExtEJson(ejson.Int[T[EJson]](idx)).embed))
 
-      back <- autoJoin2(parent, idxG)((p, i) => IC(MapFuncsCore.ProjectIndex[T, Int](p, i)))
+      back <- autoJoin2[G](parent, idxG)((p, i) => IC(MapFuncsCore.ProjectIndex[T, Int](p, i)))
     } yield back
   }
 
-  private def autoJoin2(e1: QSUGraph, e2: QSUGraph)(
+  private def autoJoin2[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](
+      e1: QSUGraph, e2: QSUGraph)(
       constr: (Int, Int) => MapFunc[Int]): G[QSUGraph] =
-    extend2(e1, e2)((e1, e2) => QSU.AutoJoin[T, Symbol](NEL(e1, e2), constr(0, 1)))
+    extend2[G](e1, e2)((e1, e2) => QSU.AutoJoin[T, Symbol](NEL(e1, e2), constr(0, 1)))
 
-  private def autoJoin3(e1: QSUGraph, e2: QSUGraph, e3: QSUGraph)(
+  private def autoJoin3[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](
+      e1: QSUGraph, e2: QSUGraph, e3: QSUGraph)(
       constr: (Int, Int, Int) => MapFunc[Int]): G[QSUGraph] =
-    extend3(e1, e2, e3)((e1, e2, e3) => QSU.AutoJoin[T, Symbol](NEL(e1, e2, e3), constr(0, 1, 2)))
+    extend3[G](e1, e2, e3)((e1, e2, e3) => QSU.AutoJoin[T, Symbol](NEL(e1, e2, e3), constr(0, 1, 2)))
 
-  private def extend1(parent: QSUGraph)(
+  private def extend1[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](
+      parent: QSUGraph)(
       constr: Symbol => QSU[Symbol]): G[QSUGraph] =
-    withName(constr(parent.root)).map(_ :++ parent)
+    withName[G](constr(parent.root)).map(_ :++ parent)
 
-  private def extend2(parent1: QSUGraph, parent2: QSUGraph)(
+  private def extend2[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](
+      parent1: QSUGraph, parent2: QSUGraph)(
       constr: (Symbol, Symbol) => QSU[Symbol]): G[QSUGraph] =
-    withName(constr(parent1.root, parent2.root)).map(_ :++ parent1 :++ parent2)
+    withName[G](constr(parent1.root, parent2.root)).map(_ :++ parent1 :++ parent2)
 
-  private def extend3(parent1: QSUGraph, parent2: QSUGraph, parent3: QSUGraph)(
+  private def extend3[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](
+      parent1: QSUGraph, parent2: QSUGraph, parent3: QSUGraph)(
       constr: (Symbol, Symbol, Symbol) => QSU[Symbol]): G[QSUGraph] =
-    withName(constr(parent1.root, parent2.root, parent3.root)).map(_ :++ parent1 :++ parent2 :++ parent3)
+    withName[G](constr(parent1.root, parent2.root, parent3.root)).map(_ :++ parent1 :++ parent2 :++ parent3)
 
-  private def withName(node: QSU[Symbol]): G[QSUGraph] = {
+  private def withName[G[_]: Monad: NameGenerator](
+      node: QSU[Symbol])(
+      implicit MS: MonadState_[G, GState]): G[QSUGraph] = {
+
     for {
       reverse <- MS.get
 
@@ -288,8 +299,5 @@ sealed abstract class ReadLP[
 }
 
 object ReadLP {
-  def apply[
-      T[_[_]]: BirecursiveT,
-      F[_]: Monad: MonadError_[?[_], PlannerError]: NameGenerator]: ReadLP[T, F] =
-    new ReadLP[T, F] {}
+  def apply[T[_[_]]: BirecursiveT]: ReadLP[T] = new ReadLP[T]
 }
