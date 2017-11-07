@@ -43,6 +43,7 @@ private[qscript] final class MapFuncCorePlanner[
   val plan: AlgebraM[F, MapFuncCore[T, ?], XQuery] = {
     case Constant(ejson)              => EJsonPlanner.plan[T[EJson], F, FMT](ejson)
     case Undefined()                  => emptySeq.point[F]
+    case ToId(_)                      => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unreachable("ToId unimplemented"))
     case JoinSideName(n)              => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unreachable(s"JoinSideName(${Show[Symbol].shows(n)})"))
 
     case Length(arrOrstr)             => lib.length[F] apply arrOrstr

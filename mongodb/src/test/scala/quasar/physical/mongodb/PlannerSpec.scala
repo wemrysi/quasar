@@ -19,7 +19,6 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.common.{Map => _, _}
-import quasar.contrib.pathy._, Helpers._
 import quasar.contrib.specs2.PendingWithActualTracking
 import quasar.fp._
 import quasar.fp.ski._
@@ -30,11 +29,9 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript.DiscoverPath
 import quasar.sql , sql.{fixpoint => sqlF, _}
 import quasar.std._
 
-import java.io.{File => JFile}
 import java.time.Instant
 import scala.Either
 
@@ -45,15 +42,11 @@ import matryoshka.implicits._
 import org.bson.{BsonDocument, BsonDouble}
 import org.scalacheck._
 import org.specs2.execute._
-import org.specs2.matcher.{Matcher, Expectable}
 import pathy.Path._
 import scalaz._, Scalaz._
 
 class PlannerSpec extends
-    org.specs2.mutable.Specification with
-    org.specs2.ScalaCheck with
-    CompilerHelpers with
-    TreeMatchers with
+    PlannerHelpers with
     PendingWithActualTracking {
 
   import StdLib.{set => s, _}
@@ -63,197 +56,11 @@ class PlannerSpec extends
   import jscore._
   import CollectionUtil._
 
-  type EitherWriter[A] =
-    EitherT[Writer[Vector[PhaseResult], ?], FileSystemError, A]
-
-  val notOnPar = "Not on par with old (LP-based) connector."
-
-  private val resourcesDir: RDir =
-    currentDir[Sandboxed] </> dir("mongodb") </> dir("src") </> dir("test") </>
-    dir("resources") </> dir("planner")
-
-  private def toRFile(testName: String): RFile = resourcesDir </>
-    file(testName.replaceAll(" ", "_")) <:> "txt"
-
-  private def testFile(testName: String): JFile = jFile(toRFile(testName))
-
-  def emit[A: RenderTree](label: String, v: A): EitherWriter[A] =
-    EitherT[Writer[PhaseResults, ?], FileSystemError, A](Writer(Vector(PhaseResult.tree(label, v)), v.right))
-
-  case class equalToWorkflow(expected: Workflow, addDetails: Boolean)
-      extends Matcher[Crystallized[WorkflowF]] {
-    def apply[S <: Crystallized[WorkflowF]](s: Expectable[S]) = {
-
-      val st = RenderTree[Crystallized[WorkflowF]].render(s.value)
-
-      val diff: String = (st diff expected.render).shows
-
-      val details =
-        if (addDetails) FailureDetails(st.shows, expected.render.shows)
-        else NoDetails
-
-      result(expected == s.value.op,
-             "\ntrees are equal:\n" + diff,
-             "\ntrees are not equal:\n" + diff,
-             s,
-             details)
-    }
-  }
-
   import fixExprOp._
-  val expr3_0Fp: ExprOp3_0F.fixpoint[Fix[ExprOp], ExprOp] =
-    new ExprOp3_0F.fixpoint[Fix[ExprOp], ExprOp](_.embed)
-  import expr3_0Fp._
-  val expr3_2Fp: ExprOp3_2F.fixpoint[Fix[ExprOp], ExprOp] =
-    new ExprOp3_2F.fixpoint[Fix[ExprOp], ExprOp](_.embed)
-  import expr3_2Fp._
-  val expr3_4Fp: ExprOp3_4F.fixpoint[Fix[ExprOp], ExprOp] =
-    new ExprOp3_4F.fixpoint[Fix[ExprOp], ExprOp](_.embed)
-  import expr3_4Fp._
-
-  val basePath = rootDir[Sandboxed] </> dir("db")
-
-  val listContents: DiscoverPath.ListContents[EitherWriter] =
-    dir => (
-      if (dir ≟ rootDir)
-        Set(
-          DirName("db").left[FileName],
-          DirName("db1").left,
-          DirName("db2").left)
-      else
-        Set(
-          FileName("foo").right[DirName],
-          FileName("zips").right,
-          FileName("zips2").right,
-          FileName("largeZips").right,
-          FileName("a").right,
-          FileName("slamengine_commits").right,
-          FileName("person").right,
-          FileName("caloriesBurnedData").right,
-          FileName("bar").right,
-          FileName("baz").right,
-          FileName("usa_factbook").right,
-          FileName("user_comments").right,
-          FileName("days").right,
-          FileName("logs").right,
-          FileName("usa_factbook").right,
-          FileName("cities").right)).point[EitherWriter]
-
-  val emptyDoc: Collection => OptionT[EitherWriter, BsonDocument] =
-    _ => OptionT.some(new BsonDocument)
-
-  implicit val monadTell: MonadTell[EitherT[PhaseResultT[Id, ?], FileSystemError, ?], PhaseResults] =
-    EitherT.monadListen[WriterT[Id, Vector[PhaseResult], ?], PhaseResults, FileSystemError](
-      WriterT.writerTMonadListen[Id, Vector[PhaseResult]])
-
-  def compileSqlToLP[M[_]: Monad: MonadFsErr: PhaseResultTell](sql: Fix[Sql]): M[Fix[LP]] = {
-    val (log, s) = queryPlan(sql, Variables.empty, basePath, 0L, None).run.run
-    val lp = s.fold(
-      e => scala.sys.error(e.shows),
-      d => d.fold(e => scala.sys.error(e.shows), ι)
-    )
-    for {
-      _ <- scala.Predef.implicitly[PhaseResultTell[M]].tell(log)
-    } yield lp
-  }
-
-  def queryPlanner[M[_]: Monad: MonadFsErr: PhaseResultTell]
-      (sql: Fix[Sql],
-        model: MongoQueryModel,
-        stats: Collection => Option[CollectionStatistics],
-        indexes: Collection => Option[Set[Index]],
-        lc: DiscoverPath.ListContents[M],
-        anyDoc: Collection => OptionT[M, BsonDocument],
-        execTime: Instant)
-      : M[Crystallized[WorkflowF]] = {
-    for {
-      lp <- compileSqlToLP[M](sql)
-      qs <- MongoDb.lpToQScript(lp, lc)
-      repr <- MongoDb.doPlan[Fix, M](qs, fs.QueryContext(stats, indexes), model, anyDoc, execTime)
-    } yield repr
-  }
-
-  val defaultStats: Collection => Option[CollectionStatistics] =
-    κ(CollectionStatistics(10, 100, false).some)
-  val defaultIndexes: Collection => Option[Set[Index]] =
-    κ(Set(Index("_id_", NonEmptyList(BsonField.Name("_id") -> IndexType.Ascending), false)).some)
-
-  def indexes(ps: (Collection, BsonField)*): Collection => Option[Set[Index]] =  {
-    val map: Map[Collection, Set[Index]] = ps.toList.foldMap { case (c, f) => Map(c -> Set(Index(f.asText + "_", NonEmptyList(f -> IndexType.Ascending), false))) }
-    c => map.get(c).orElse(defaultIndexes(c))
-  }
-  def plan0(
-    query: Fix[Sql],
-    model: MongoQueryModel,
-    stats: Collection => Option[CollectionStatistics],
-    indexes: Collection => Option[Set[Index]],
-    anyDoc: Collection => OptionT[EitherWriter, BsonDocument]
-  ): Either[FileSystemError, Crystallized[WorkflowF]] =
-    queryPlanner(query, model, stats, indexes, listContents, anyDoc, Instant.now).run.value.toEither
-
-  def plan2_6(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`2.6`, κ(None), κ(None), emptyDoc)
-
-  def plan3_0(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`3.0`, κ(None), κ(None), emptyDoc)
-
-  def plan3_2(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, emptyDoc)
-
-  def plan3_4(
-    query: Fix[Sql],
-    stats: Collection => Option[CollectionStatistics],
-    indexes: Collection => Option[Set[Index]],
-    anyDoc: Collection => OptionT[EitherWriter, BsonDocument]
-  ): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`3.4`, stats, indexes, anyDoc)
+  import PlannerHelpers._, expr3_0Fp._, expr3_2Fp._, expr3_4Fp._
 
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan3_4(query, defaultStats, defaultIndexes, emptyDoc)
-
-  def planAt(time: Instant, query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    queryPlanner(query, MongoQueryModel.`3.4`, defaultStats, defaultIndexes, listContents, emptyDoc, time).run.value.toEither
-
-  def planLP(logical: Fix[LP]): Either[FileSystemError, Crystallized[WorkflowF]] = {
-    (for {
-     _  <- emit("Input", logical)
-     simplified <- emit("Simplified", optimizer.simplify(logical))
-     qs <- MongoDb.lpToQScript(simplified, listContents)
-     phys <- MongoDb.doPlan[Fix, EitherWriter](qs, fs.QueryContext(defaultStats, defaultIndexes), MongoQueryModel.`3.2`, emptyDoc, Instant.now)
-    } yield phys).run.value.toEither
-  }
-
-  def planLog(query: Fix[Sql]): Vector[PhaseResult] =
-    queryPlanner(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents, emptyDoc, Instant.now).run.written
-
-  def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf, addDetails = false))
-  def beWorkflow0(wf: Workflow) = beRight(equalToWorkflow(wf, addDetails = true))
-
-  implicit def toBsonField(name: String) = BsonField.Name(name)
-  implicit def toLeftShape(shape: Reshape[ExprOp]): Reshape.Shape[ExprOp] = -\/ (shape)
-  implicit def toRightShape(exprOp: Fix[ExprOp]):   Reshape.Shape[ExprOp] =  \/-(exprOp)
-
-  def isNumeric(field: BsonField): Selector =
-    Selector.Or(
-      Selector.Doc(field -> Selector.Type(BsonType.Int32)),
-      Selector.Doc(field -> Selector.Type(BsonType.Int64)),
-      Selector.Doc(field -> Selector.Type(BsonType.Dec)),
-      Selector.Doc(field -> Selector.Type(BsonType.Text)),
-      Selector.Or(
-        Selector.Doc(field -> Selector.Type(BsonType.Date)),
-        Selector.Doc(field -> Selector.Type(BsonType.Bool))))
-
-  def divide(a1: Fix[ExprOp], a2: Fix[ExprOp]) =
-    $cond($eq(a2, $literal(Bson.Int32(0))),
-      $cond($eq(a1, $literal(Bson.Int32(0))),
-        $literal(Bson.Dec(Double.NaN)),
-        $cond($gt(a1, $literal(Bson.Int32(0))),
-          $literal(Bson.Dec(Double.PositiveInfinity)),
-          $literal(Bson.Dec(Double.NegativeInfinity)))),
-      $divide(a1, a2))
-
-  val underSigil: JsFn =
-    JsFn(Name("__to_sigil"), obj(sigil.Quasar -> ident("__to_sigil")))
+    PlannerHelpers.plan(query)
 
   "plan from query string" should {
     "plan simple select *" in {
@@ -1167,7 +974,7 @@ class PlannerSpec extends
     }
 
     "select partially-applied substring" in {
-      plan3_2(sqlE"""select substring("abcdefghijklmnop", 5, pop / 10000) from zips""") must
+      plan3_2(sqlE"""select substring("abcdefghijklmnop", 5, trunc(pop / 10000)) from zips""") must
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $project(
@@ -1177,12 +984,49 @@ class PlannerSpec extends
                   $and(
                     $lt($literal(Bson.Null), $field("pop")),
                     $lt($field("pop"), $literal(Bson.Text("")))),
-                  $substr(
-                    $literal(Bson.Text("fghijklmnop")),
-                    $literal(Bson.Int32(0)),
-                    divide($field("pop"), $literal(Bson.Int32(10000)))),
-                  $literal(Bson.Undefined))),
-            ExcludeId)))
+                  $cond(
+                    $and(
+                      $lt($literal(Bson.Null),
+                        $cond(
+                          $eq($literal(Bson.Int32(10000)), $literal(Bson.Int32(0))),
+                          $cond(
+                            $eq($field("pop"), $literal(Bson.Int32(0))),
+                            $literal(Bson.Dec(Double.NaN)),
+                            $cond(
+                              $gt($field("pop"), $literal(Bson.Int32(0))),
+                              $literal(Bson.Dec(Double.PositiveInfinity)),
+                              $literal(Bson.Dec(Double.NegativeInfinity)))
+                          ),
+                          $divide($field("pop"), $literal(Bson.Int32(10000))))),
+                        $lt(
+                          $cond(
+                            $eq($literal(Bson.Int32(10000)), $literal(Bson.Int32(0))),
+                            $cond(
+                              $eq($field("pop"), $literal(Bson.Int32(0))),
+                              $literal(Bson.Dec(Double.NaN)),
+                              $cond(
+                                $gt($field("pop"), $literal(Bson.Int32(0))),
+                                $literal(Bson.Dec(Double.PositiveInfinity)),
+                                $literal(Bson.Dec(Double.NegativeInfinity)))),
+                            $divide($field("pop"), $literal(Bson.Int32(10000)))),
+                          $literal(Bson.Text(""))
+                        )),
+                    $substr(
+                      $literal(Bson.Text("fghijklmnop")),
+                      $literal(Bson.Int32(0)),
+                      $trunc(
+                        $cond(
+                          $eq($literal(Bson.Int32(10000)), $literal(Bson.Int32(0))),
+                          $cond(
+                            $eq($field("pop"), $literal(Bson.Int32(0))),
+                            $literal(Bson.Dec(Double.NaN)),
+                            $cond(
+                              $gt($field("pop"), $literal(Bson.Int32(0))),
+                              $literal(Bson.Dec(Double.PositiveInfinity)),
+                              $literal(Bson.Dec(Double.NegativeInfinity)))),
+                          $divide($field("pop"), $literal(Bson.Int32(10000)))))),
+                  $literal(Bson.Undefined)),
+                $literal(Bson.Undefined))))))
     }
 
     "drop nothing" in {
@@ -1223,10 +1067,10 @@ class PlannerSpec extends
 
     "plan simple sort with wildcard" in {
       plan(sqlE"select * from zips order by pop") must
-        beWorkflow0(chain[Workflow](
+        beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar, testFile("plan simple sort with wildcard"))
+    }
 
     "plan sort with expression in key" in {
       plan(sqlE"select baz from foo order by bar/10") must
@@ -2299,7 +2143,7 @@ class PlannerSpec extends
 
     "plan simple single field selection and limit" in {
       plan(sqlE"SELECT city FROM zips LIMIT 5") must
-        beWorkflow0 {
+        beWorkflow {
           chain[Workflow](
             $read(collection("db", "zips")),
             $limit(5),
@@ -2307,7 +2151,7 @@ class PlannerSpec extends
               reshape(sigil.Quasar -> $field("city")),
               ExcludeId))
         }
-    }.pendingWithActual(notOnPar, testFile("plan simple single field selection and limit"))
+    }
 
     "plan complex group by with sorting and limiting" in {
       plan(sqlE"SELECT city, SUM(pop) AS pop FROM zips GROUP BY city ORDER BY pop") must
