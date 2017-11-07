@@ -42,25 +42,23 @@ class PlannerQScriptSpec extends
   import CollectionUtil._
   import Reshape.reshape
 
-  val constr =
+  val (func, free, fix) =
     quasar.qscript.construction.mkDefaults[Fix, fs.MongoQScript[Fix, ?]]
-
-  import constr._1._, constr._2.{Hole => _, _}, constr.{_3 => fix}
 
   //TODO make this independent of MongoQScript and move to a place where all
   //     connector tests can refer to it
   val simpleJoin: Fix[fs.MongoQScript[Fix, ?]] =
     fix.EquiJoin(
       fix.Unreferenced,
-      Filter(
-        ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-        Guard(Hole, Type.Obj(ScalaMap(),Some(Type.Top)), Constant(bool[Fix](true)), Constant(bool[Fix](false)))),
-      Filter(
-        ShiftedRead[AFile](rootDir </> dir("db") </> file("smallZips"), qscript.ExcludeId),
-        Guard(Hole, Type.Obj(ScalaMap(),Some(Type.Top)), Constant(bool[Fix](true)), Constant(bool[Fix](false)))),
-      List((ProjectKeyS(Hole, "_id"), ProjectKeyS(Hole, "_id"))),
+      free.Filter(
+        free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
+        func.Guard(func.Hole, Type.Obj(ScalaMap(),Some(Type.Top)), func.Constant(bool[Fix](true)), func.Constant(bool[Fix](false)))),
+      free.Filter(
+        free.ShiftedRead[AFile](rootDir </> dir("db") </> file("smallZips"), qscript.ExcludeId),
+        func.Guard(func.Hole, Type.Obj(ScalaMap(),Some(Type.Top)), func.Constant(bool[Fix](true)), func.Constant(bool[Fix](false)))),
+      List((func.ProjectKeyS(func.Hole, "_id"), func.ProjectKeyS(func.Hole, "_id"))),
       JoinType.Inner,
-      ProjectKey(RightSide, Constant(str[Fix]("city"))))
+      func.ProjectKeyS(func.RightSide, "city"))
 
   "plan from qscript" should {
     "plan simple join ($lookup)" in {
