@@ -103,9 +103,9 @@ package object jscore {
       l.foldMap {
         case Fix(SpliceObjectsF(l)) => (true.disjunction, l)
         case i                      => (false.disjunction, List(i))
-      }.cobind {
+      } match {
         case (b, l) => b.unwrap.option(SpliceObjectsF(l))
-      }.copoint
+      }
     }
     case IfF(Literal(Js.Bool(cond)), cons, alt) =>
       (if (cond) cons else alt).project.some
