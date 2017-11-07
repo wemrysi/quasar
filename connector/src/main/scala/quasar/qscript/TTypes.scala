@@ -61,7 +61,7 @@ class SimplifiableProjectionT[T[_[_]]] extends TTypes[T] {
 
   def ProjectBucket[G[_]](implicit QC: QScriptCore :<: G) = make(
     λ[ProjectBucket ~> G] {
-      case BucketField(src, value, field) => QC.inj(Map(src, Free.roll(MFC(MapFuncsCore.ProjectField(value, field)))))
+      case BucketKey(src, value, key) => QC.inj(Map(src, Free.roll(MFC(MapFuncsCore.ProjectKey(value, key)))))
       case BucketIndex(src, value, index) => QC.inj(Map(src, Free.roll(MFC(MapFuncsCore.ProjectIndex(value, index)))))
     }
   )

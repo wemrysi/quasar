@@ -165,7 +165,7 @@ trait SetLib extends Library {
       case Sized(s1, s2, _) => Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> s2), None)
     },
     untyper[nat._3](t =>
-      (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
+      (t.mapKey(Type.Const(JoinDir.Left.data)) |@| t.mapKey(Type.Const(JoinDir.Right.data)))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
 
   // TODO: deprecated - delete when old mongo is deleted
@@ -183,7 +183,7 @@ trait SetLib extends Library {
         Type.Obj(Map(JoinDir.Left.name -> s1, JoinDir.Right.name -> (s2 ⨿ Type.Null)), None)
     },
     untyper[nat._3](t =>
-      (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
+      (t.mapKey(Type.Const(JoinDir.Left.data)) |@| t.mapKey(Type.Const(JoinDir.Right.data)))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
 
   // TODO: deprecated - delete when old mongo is deleted
@@ -200,7 +200,7 @@ trait SetLib extends Library {
       case Sized(s1, s2, _) => Type.Obj(Map(JoinDir.Left.name -> (s1 ⨿ Type.Null), JoinDir.Right.name -> s2), None)
     },
     untyper[nat._3](t =>
-      (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
+      (t.mapKey(Type.Const(JoinDir.Left.data)) |@| t.mapKey(Type.Const(JoinDir.Right.data)))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
 
   // TODO: deprecated - delete when old mongo is deleted
@@ -217,7 +217,7 @@ trait SetLib extends Library {
         Type.Obj(Map(JoinDir.Left.name -> (s1 ⨿ Type.Null), JoinDir.Right.name -> (s2 ⨿ Type.Null)), None)
     },
     untyper[nat._3](t =>
-      (t.objectField(Type.Const(JoinDir.Left.data)) |@| t.objectField(Type.Const(JoinDir.Right.data)))((l, r) =>
+      (t.mapKey(Type.Const(JoinDir.Left.data)) |@| t.mapKey(Type.Const(JoinDir.Right.data)))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
 
   val GroupBy = BinaryFunc(
@@ -238,9 +238,11 @@ trait SetLib extends Library {
     Func.Input2(Type.Top, Type.Top),
     noSimplification,
     partialTyper[nat._2] {
-      case Sized(Type.Const(Data.Set(Nil)), s2) => s2
-      case Sized(s1, Type.Const(Data.Set(Nil))) => s1
-      case Sized(s1, s2)                        => s1 ⨿ s2
+      case Sized(Type.Const(Data.Set(Nil)), s2)           => s2
+      case Sized(s1, Type.Const(Data.Set(Nil)))           => s1
+      case Sized(s1, s2)
+        if s1.contains(Type.Top) || s2.contains(Type.Top) => Type.Top
+      case Sized(s1, s2)                                  => s1 ⨿ s2
     },
     untyper[nat._2](t => success(Func.Input2(t, t))))
 

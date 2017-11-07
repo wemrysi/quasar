@@ -244,9 +244,9 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[_]: Functor]
       def handleDirs[M[_]: Monad: MonadFsErr](
         g: ListContents[M],
         dirs: List[ADir],
-        field: String)
+        key: String)
           : M[List[ADir] \&/ T[OUT]] =
-        dirs.traverseM(fileType(g).apply(_, field).fold(
+        dirs.traverseM(fileType(g).apply(_, key).fold(
           df => List(df ∘ (file => RF.inj(Const[Read[AFile], T[OUT]](Read(file))).embed)),
           Nil)) ∘ {
           case Nil => -\&/(Nil)
@@ -264,19 +264,19 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[_]: Functor]
               }))
         }
 
-      def rebucket(out: T[OUT], value: FreeMap, field: String) =
-        PB.inj(BucketField(out, value, StrLit(field))).embed
+      def rebucket(out: T[OUT], value: FreeMap, key: String) =
+        PB.inj(BucketKey(out, value, StrLit(key))).embed
 
       def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) = {
         // FIXME: `value` must be `HoleF`.
-        case BucketField(src, value, StrLit(field)) =>
+        case BucketKey(src, value, StrLit(key)) =>
           src.fold(
-            handleDirs(g, _, field),
-            out => \&/-(rebucket(out, value, field)).point[M],
-            (dirs, out) => handleDirs(g, dirs, field) ∘ {
-              case This(dirs)        => Both(dirs, rebucket(out, value, field))
-              case That(files)       => That(union(NonEmptyList(files, rebucket(out, value, field))))
-              case Both(dirs, files) => Both(dirs, union(NonEmptyList(files, rebucket(out, value, field))))
+            handleDirs(g, _, key),
+            out => \&/-(rebucket(out, value, key)).point[M],
+            (dirs, out) => handleDirs(g, dirs, key) ∘ {
+              case This(dirs)        => Both(dirs, rebucket(out, value, key))
+              case That(files)       => That(union(NonEmptyList(files, rebucket(out, value, key))))
+              case Both(dirs, files) => Both(dirs, union(NonEmptyList(files, rebucket(out, value, key))))
             })
         case x => x.traverse(unionAll(g)) ∘ (in => \&/-(PB.inj(in).embed))
       }

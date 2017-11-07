@@ -18,18 +18,24 @@ package quasar
 package connector
 
 import slamdata.Predef._
+
+import quasar.Planner.PlannerError
 import quasar.Data
 import quasar.common._
+import quasar.concurrent.Pools._
 import quasar.contrib.pathy._
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._, eitherT._
+import quasar.contrib.scalaz.concurrent._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fs._
+import quasar.fs.FileSystemError.qscriptPlanningFailed
 import quasar.fs.mount._
 import quasar.qscript._
+import quasar.qscript.qsu.LPtoQS
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
@@ -70,14 +76,16 @@ trait BackendModule {
         (parseConfig(uri) >>= interpreter) map { case (f, c) => DefinitionResult(f, c) }
     }
 
-  def interpreter(cfg: Config): DefErrT[Task, (BackendEffect ~> Task, Task[Unit])] =
-    compile(cfg) map {
+  def interpreter(cfg: Config): DefErrT[Task, (BackendEffect ~> Task, Task[Unit])] = {
+    val shiftNat: Task ~> Task = λ[Task ~> Task](_.flatMap(a => shift >> Task.now(a)))
+
+    compile(cfg).mapT(shiftNat(_)) map {
       case (runM, close) =>
         val runCfg = λ[Configured ~> M](_.run(cfg))
         val runFs: BackendEffect ~> Configured = analyzeInterpreter :+: fsInterpreter
-        (runM compose runCfg compose runFs, close)
+        (shiftNat compose runM compose runCfg compose runFs, close >> shift)
     }
-
+  }
 
   private final def analyzeInterpreter: Analyze ~> Configured = {
     val lc: DiscoverPath.ListContents[Backend] =
@@ -142,12 +150,16 @@ trait BackendModule {
 
     type QSR[A] = QScriptRead[T, A]
 
+    type X[A] = EitherT[StateT[M, Long, ?], PlannerError, A]
+
     val R = new Rewrite[T]
 
     for {
-      qs <- QueryFile.convertToQScriptRead[T, M, QSR](lc)(lp)
-      shifted <- Unirewrite[T, QS[T], M](R, lc).apply(qs)
+      qs <- MonadFsErr[M].unattempt(
+        LPtoQS[T].apply[X](lp).leftMap(qscriptPlanningFailed(_)).run.eval(0))
+      _ <- logPhase[M](PhaseResult.tree("QScript (Educated)", qs))
 
+      shifted <- Unirewrite[T, QS[T], M](R, lc).apply(qs)
       _ <- logPhase[M](PhaseResult.tree("QScript (ShiftRead)", shifted))
 
       optimized =

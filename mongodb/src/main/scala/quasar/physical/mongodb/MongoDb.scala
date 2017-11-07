@@ -52,7 +52,7 @@ object MongoDb
   type QS[T[_[_]]] = fs.MongoQScriptCP[T]
 
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
+    physical.mongodb.qScriptToQScriptTotal[T]
 
   type Repr = Crystallized[WorkflowF]
 

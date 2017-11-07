@@ -40,7 +40,7 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
   implicit val params = Parameters(maxSize = 10)
 
   "projectComplement" >> {
-    "replace field deletion of statically known structure with projection of complement" >> prop {
+    "replace key deletion of statically known structure with projection of complement" >> prop {
       (k1: Fix[EJson], k2: Fix[EJson], k3: Fix[EJson]) => (k1 =/= k2 && k2 =/= k3 && k1 =/= k3) ==> {
 
       val m =
@@ -51,7 +51,7 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
           MakeMapR(ConstantR(k3), HoleF))
 
       val in =
-        DeleteFieldR(m, ConstantR(k2))
+        DeleteKeyR(m, ConstantR(k2))
 
       val out =
         ConcatMapsR(
@@ -61,7 +61,7 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
       projectComplement(in)(κ(Outline.unknownF)) must_= out
     }}
 
-    "preserve field deletion when structure isn't statically known" >> prop {
+    "preserve key deletion when structure isn't statically known" >> prop {
       (k1: Fix[EJson], k2: Fix[EJson], k3: Fix[EJson]) => (k1 =/= k2 && k2 =/= k3 && k1 =/= k3) ==> {
 
       val m =
@@ -72,12 +72,12 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
           HoleF)
 
       val in =
-        DeleteFieldR(m, ConstantR(k2))
+        DeleteKeyR(m, ConstantR(k2))
 
       projectComplement(in)(κ(Outline.unknownF)) must_= in
     }}
 
-    "preserve field deletion when any key not statically known" >> prop {
+    "preserve key deletion when any key not statically known" >> prop {
       (k1: Fix[EJson], k2: Fix[EJson], v1: Fix[EJson]) => (k1 =/= k2) ==> {
 
       val m =
@@ -88,7 +88,7 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
           MakeMapR(ProjectIndexR(HoleF, ConstantR(ejsonInt(1))), ConstantR(v1)))
 
       val in =
-        DeleteFieldR(m, ConstantR(k2))
+        DeleteKeyR(m, ConstantR(k2))
 
       projectComplement(in)(κ(Outline.unknownF)) must_= in
     }}
@@ -105,19 +105,19 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
           ejsonStr("b") -> ProjectIndexR(RightSideF, ConstantR(ejsonInt(2))),
           ejsonStr("c") -> ProjectIndexR(RightSideF, ConstantR(ejsonInt(5))))))).embed
 
-    def fieldF[A](name: String): FreeMapA[A] =
+    def keyF[A](name: String): FreeMapA[A] =
       ConstantR[A](ejsonStr(name))
 
-    def prjFrom[A](src: FreeMapA[A], field: String, fields: String*): FreeMapA[A] =
-      MapFuncCore.StaticMap((field :: fields.toList) map { name =>
-        ejsonStr(name) -> ProjectFieldR(src, fieldF(name))
+    def prjFrom[A](src: FreeMapA[A], key: String, keys: String*): FreeMapA[A] =
+      MapFuncCore.StaticMap((key :: keys.toList) map { name =>
+        ejsonStr(name) -> ProjectKeyR(src, keyF(name))
       })
 
     "Map" >> {
       val q =
         QC(Map(
           base,
-          DeleteFieldR(HoleF, fieldF("b")))).embed
+          DeleteKeyR(HoleF, keyF("b")))).embed
 
       val e =
         QC(Map(
@@ -131,10 +131,10 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
       val q =
         QC(LeftShift(
           base,
-          DeleteFieldR(HoleF, fieldF("c")),
+          DeleteKeyR(HoleF, keyF("c")),
           IncludeId,
           MapFuncCore.StaticArray(List(
-            DeleteFieldR(DeleteFieldR(LeftSideF, fieldF("a")), fieldF("b")),
+            DeleteKeyR(DeleteKeyR(LeftSideF, keyF("a")), keyF("b")),
             RightSideF)))).embed
 
       val e =
@@ -155,12 +155,12 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
       val q =
         QC(Reduce(
           base,
-          List(DeleteFieldR(HoleF, fieldF("a"))),
-          List(Count(HoleF), First(DeleteFieldR(HoleF, fieldF("b")))),
+          List(DeleteKeyR(HoleF, keyF("a"))),
+          List(Count(HoleF), First(DeleteKeyR(HoleF, keyF("b")))),
           MapFuncCore.StaticArray(List(
             ReduceIndexF(0.right),
-            DeleteFieldR(ReduceIndexF(1.right), fieldF("a")),
-            DeleteFieldR(ReduceIndexF(0.left), fieldF("c")))))).embed
+            DeleteKeyR(ReduceIndexF(1.right), keyF("a")),
+            DeleteKeyR(ReduceIndexF(0.left), keyF("c")))))).embed
 
       val e =
         QC(Reduce(
@@ -179,8 +179,8 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
       val q =
         QC(Sort(
           base,
-          List(DeleteFieldR(DeleteFieldR(HoleF, fieldF("a")), fieldF("c"))),
-          NonEmptyList((DeleteFieldR(HoleF, fieldF("b")), SortDir.Ascending)))).embed
+          List(DeleteKeyR(DeleteKeyR(HoleF, keyF("a")), keyF("c"))),
+          NonEmptyList((DeleteKeyR(HoleF, keyF("b")), SortDir.Ascending)))).embed
 
       val e =
         QC(Sort(
@@ -195,7 +195,7 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
       val q =
         QC(Filter(
           base,
-          EqR(DeleteFieldR(HoleF, fieldF("a")), HoleF))).embed
+          EqR(DeleteKeyR(HoleF, keyF("a")), HoleF))).embed
 
       val e =
         QC(Filter(
@@ -211,13 +211,13 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
           base,
           Free.roll(QCT(Map(
             HoleQS,
-            DeleteFieldR(HoleF, fieldF("c"))))),
+            DeleteKeyR(HoleF, keyF("c"))))),
           Take,
           Free.roll(QCT(Reduce(
             HoleQS,
             List(),
-            List(ReduceFuncs.First(DeleteFieldR(HoleF, fieldF("a")))),
-            DeleteFieldR(ReduceIndexF(0.right), fieldF("b"))))))).embed
+            List(ReduceFuncs.First(DeleteKeyR(HoleF, keyF("a")))),
+            DeleteKeyR(ReduceIndexF(0.right), keyF("b"))))))).embed
 
       val e =
         QC(Subset(
@@ -241,17 +241,17 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
           base,
           Free.roll(QCT(Map(
             HoleQS,
-            DeleteFieldR(HoleF, fieldF("a"))))),
+            DeleteKeyR(HoleF, keyF("a"))))),
           Free.roll(QCT(Map(
             HoleQS,
-            DeleteFieldR(HoleF, fieldF("b"))))),
+            DeleteKeyR(HoleF, keyF("b"))))),
           EqR(
-            DeleteFieldR(LeftSideF, fieldF("b")),
-            DeleteFieldR(RightSideF, fieldF("a"))),
+            DeleteKeyR(LeftSideF, keyF("b")),
+            DeleteKeyR(RightSideF, keyF("a"))),
           JoinType.Inner,
           MapFuncCore.StaticMap(List(
-            ejsonStr("left") -> DeleteFieldR(LeftSideF, fieldF("c")),
-            ejsonStr("right") -> DeleteFieldR(RightSideF, fieldF("c")))))).embed
+            ejsonStr("left") -> DeleteKeyR(LeftSideF, keyF("c")),
+            ejsonStr("right") -> DeleteKeyR(RightSideF, keyF("c")))))).embed
 
       val e =
         TJ(ThetaJoin(

@@ -307,7 +307,7 @@ trait StringLib extends Library {
         \/.fromTryCatchNonFatal(BigDecimal(str)).fold(
            κ(failureNel(InvalidStringCoercion(str, "a string containing an decimal number".left))),
           i => success(Type.Const(Data.Dec(i))))
-      case Sized(Type.Str) => success(Type.Int)
+      case Sized(Type.Str) => success(Type.Dec)
     },
     untyper[nat._1](x => ToString.tpe(Func.Input1(x)).map(Func.Input1(_))))
 

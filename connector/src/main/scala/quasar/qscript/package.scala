@@ -84,12 +84,13 @@ package object qscript {
   }
 
   /** Initial QScript. */
+  // FIXME should not include `Read[ADir]`
   type QScriptEducated[T[_[_]], A] =
-    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[AFile], ?])#M[A]
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :\: Const[Read[ADir], ?] :/: Const[Read[AFile], ?])#M[A]
 
   def educatedToTotal[T[_[_]]]
       : Injectable.Aux[QScriptEducated[T, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::/::[T, ThetaJoin[T, ?], Const[Read[AFile], ?]])
+    ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[Read[ADir], ?], Const[Read[AFile], ?]]))
 
   object QCE {
     def apply[T[_[_]], A](qc: QScriptCore[T, A]): QScriptEducated[T, A] =
@@ -240,7 +241,7 @@ package object qscript {
     (lcr2, getL >> getLCR, getC >> getLCR, getR >> getLCR, getR2)
   }
 
-  def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
+  def rebase[M[_]: Bind, A](in: M[A], key: M[A]): M[A] = in >> key
 
   // FIXME: Should this also normalize EquiJoins?
   def rebaseBranch[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](

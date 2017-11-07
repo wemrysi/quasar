@@ -33,7 +33,7 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
       val query = SelectR(SelectAll,
         Proj(IdentR("name"), None) :: Nil,
         Some(TableRelationAST(file("person"), None)),
-        Some(BinopR(IdentR("person"), StringLiteralR("age"), FieldDeref)),
+        Some(BinopR(IdentR("person"), StringLiteralR("age"), KeyDeref)),
         None,
         None)
 
@@ -50,10 +50,10 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
       val query = SelectR(SelectAll,
         Proj(IdentR("name"), None) :: Nil,
         Some(TableRelationAST(file("person"), None)),
-        Some(BinopR(IdentR("person"), StringLiteralR("age"), FieldDeref)),
+        Some(BinopR(IdentR("person"), StringLiteralR("age"), KeyDeref)),
         Some(GroupBy(
-          BinopR(IdentR("person"), StringLiteralR("height"), FieldDeref) :: Nil,
-          Some(BinopR(IdentR("person"), StringLiteralR("initials"), FieldDeref)))),
+          BinopR(IdentR("person"), StringLiteralR("height"), KeyDeref) :: Nil,
+          Some(BinopR(IdentR("person"), StringLiteralR("initials"), KeyDeref)))),
         None)
 
       SemanticAnalysis.normalizeProjections(query) must beTree(
@@ -71,9 +71,9 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
       val query = SelectR(SelectDistinct,
         Proj(IdentR("name"), None) :: Nil,
         Some(TableRelationAST(file("person"), None)),
-        Some(BinopR(IdentR("person"), StringLiteralR("age"), FieldDeref)),
-        Some(GroupBy(BinopR(IdentR("person"), StringLiteralR("height"), FieldDeref) :: Nil, None)),
-        Some(OrderBy((asc, BinopR(IdentR("person"), StringLiteralR("shoe size"), FieldDeref)).wrapNel)))
+        Some(BinopR(IdentR("person"), StringLiteralR("age"), KeyDeref)),
+        Some(GroupBy(BinopR(IdentR("person"), StringLiteralR("height"), KeyDeref) :: Nil, None)),
+        Some(OrderBy((asc, BinopR(IdentR("person"), StringLiteralR("shoe size"), KeyDeref)).wrapNel)))
 
       SemanticAnalysis.normalizeProjections(query) must beTree(
         SelectR(SelectDistinct,
@@ -88,7 +88,7 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
       val query = SelectR(SelectAll,
         Proj(IdentR("name"), None) :: Nil,
         Some(TableRelationAST(file("person"), None)),
-        Some(BinopR(IdentR("animal"), StringLiteralR("name"), FieldDeref)),
+        Some(BinopR(IdentR("animal"), StringLiteralR("name"), KeyDeref)),
         None,
         None)
 
@@ -99,7 +99,7 @@ class SemanticsSpec extends quasar.Qspec with TreeMatchers {
       val query = SelectR(SelectAll,
         Proj(IdentR("name"), None) :: Nil,
         Some(TableRelationAST(file("person"), Some("Full Name"))),
-        Some(BinopR(IdentR("Full Name"), StringLiteralR("first"), FieldDeref)),
+        Some(BinopR(IdentR("Full Name"), StringLiteralR("first"), KeyDeref)),
         None,
         None)
 

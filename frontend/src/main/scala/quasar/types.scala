@@ -131,12 +131,12 @@ sealed abstract class Type extends Product with Serializable { self =>
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  final def objectField(field: Type): SemanticResult[Type] = {
-    if (Type.lub(field, Str) ≠ Str) failureNel(TypeError(Str, field, None))
-    else (field, this) match {
+  final def mapKey(key: Type): SemanticResult[Type] = {
+    if (Type.lub(key, Str) ≠ Str) failureNel(TypeError(Str, key, None))
+    else (key, this) match {
       case (_, x @ Coproduct (_, _)) => {
         implicit val or: Monoid[Type] = Type.TypeOrMonoid
-        val rez = x.flatten.map(_.objectField(field))
+        val rez = x.flatten.map(_.mapKey(key))
         rez.foldMap(_.getOrElse(Bottom)) match {
           case x if simplify(x) ≟ Bottom => rez.concatenate
           case x                         => success(x)
@@ -148,14 +148,14 @@ sealed abstract class Type extends Product with Serializable { self =>
           failureNel(TypeError(AnyObject, this, None)))(
           success)
 
-      case (Const(Data.Str(field)), Const(Data.Obj(map))) =>
+      case (Const(Data.Str(key)), Const(Data.Obj(map))) =>
         // TODO: import toSuccess as method on Option (via ToOptionOps)?
-        toSuccess(map.get(field).map(Const(_)))(nels(MissingField(field)))
+        toSuccess(map.get(key).map(Const(_)))(nels(MissingField(key)))
 
-      case (Const(Data.Str(field)), Obj(map, uk)) =>
-        map.get(field).fold(
+      case (Const(Data.Str(key)), Obj(map, uk)) =>
+        map.get(key).fold(
           uk.fold[SemanticResult[Type]](
-            failureNel(MissingField(field)))(
+            failureNel(MissingField(key)))(
             success))(
           success)
 
