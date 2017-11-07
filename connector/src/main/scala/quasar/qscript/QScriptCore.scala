@@ -64,7 +64,7 @@ object ReduceIndex {
   *
   * E.g., in:
   *     LeftShift(x,
-  *               ProjectField(SrcHole, "bar"),
+  *               ProjectKey(SrcHole, "bar"),
   *               ExcludeId,
   *               ConcatMaps(LeftSide, MakeMap("bar", RightSide)))```
   * If `x` consists of things that look like `{ foo: 7, bar: [1, 2, 3] }`, then

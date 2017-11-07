@@ -524,7 +524,7 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
         })
     case MF.ConcatMaps(a1, a2) =>
       ConcatObj(a1, a2).embed.η[F]
-    case MF.ProjectField(a1, a2) =>
+    case MF.ProjectKey(a1, a2) =>
       genId[T[N1QL], F] ∘ (id1 => selectOrElse(
         a1,
         Select(
@@ -552,7 +552,7 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
           groupBy = none,
           orderBy = nil).embed,
         SelectElem(a1, a2).embed))
-    case MF.DeleteField(a1, a2) =>
+    case MF.DeleteKey(a1, a2) =>
       ObjRemove(a1, a2).embed.η[F]
 
     case MF.Meta(a1) =>

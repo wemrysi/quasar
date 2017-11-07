@@ -172,10 +172,10 @@ final class Optimizer[T: Equal]
     case Constant(Data.Obj(map)) =>
       Some(map.keys.map(n => lpr.constant(Data.Str(n))).toList)
     case Sort(src, _) => src._2
-    case InvokeUnapply(DeleteField, Sized(src, field)) =>
-      src._2.map(_.filterNot(_ ≟ field._1))
-    case InvokeUnapply(MakeObject, Sized(field, _)) => Some(List(field._1))
-    case InvokeUnapply(ObjectConcat, srcs) => srcs.traverse(_._2).map(_.flatten)
+    case InvokeUnapply(DeleteKey, Sized(src, key)) =>
+      src._2.map(_.filterNot(_ ≟ key._1))
+    case InvokeUnapply(MakeMap, Sized(key, _)) => Some(List(key._1))
+    case InvokeUnapply(MapConcat, srcs) => srcs.traverse(_._2).map(_.flatten)
     // NB: the remaining Invoke cases simply pass through or combine shapes
     //     from their inputs. It would be great if this information could be
     //     handled generically by the type system.
@@ -209,14 +209,14 @@ final class Optimizer[T: Equal]
       preserveFree0(x)(_._1)
 
     (node match {
-      case InvokeUnapply(DeleteField, Sized(src, field)) =>
+      case InvokeUnapply(DeleteKey, Sized(src, key)) =>
         src._2._2.fold(
-          DeleteField(preserveFree(src), preserveFree(field)).embed) {
-          fields =>
-            val name = uniqueName("src", fields)
+          DeleteKey(preserveFree(src), preserveFree(key)).embed) {
+          keys =>
+            val name = uniqueName("src", keys)
               lpr.let(name, preserveFree(src),
-                MakeObjectN(fields.filterNot(_ == field._2._1).map(f =>
-                  f -> ObjectProject(lpr.free(name), f).embed): _*).embed)
+                MakeMapN(keys.filterNot(_ == key._2._1).map(f =>
+                  f -> MapProject(lpr.free(name), f).embed): _*).embed)
         }
       case lp => lp.map(preserveFree).embed
     },

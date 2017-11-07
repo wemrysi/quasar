@@ -30,7 +30,6 @@ import quasar.fs._,
   QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.physical.sparkcore.fs._
 import quasar.physical.sparkcore.fs.SparkCore
-import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
 
 import java.io.{FileNotFoundException, File, PrintWriter}
 import java.lang.Exception
@@ -59,9 +58,6 @@ object SparkLocal extends SparkCore with ChrootedInterpreter {
   type Eff5[A]  = Coproduct[PhysErr, Eff4, A]
   type Eff6[A]  = Coproduct[MonotonicSeq, Eff5, A]
   type Eff[A]   = Coproduct[SparkConnectorDetails, Eff6, A]
-
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
-        ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
   def ReadSparkContextInj = Inject[Read[SparkContext, ?], Eff]
   def RFKeyValueStoreInj = Inject[KeyValueStore[ReadFile.ReadHandle, SparkCursor, ?], Eff]

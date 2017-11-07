@@ -72,7 +72,7 @@ private[qscript] abstract class FilterPlanner[T[_[_]]: RecursiveT, FMT] {
   /* Discards nested projection guards. The existence of a path range index a/b/c
    * guarantees that the nested projection a/b/c is valid. */
   private def rewrite(fm: FreeMap[T]): FreePathMap[T] =
-    ProjectPath.elideGuards(ProjectPath.foldProjectField(fm))
+    ProjectPath.elideGuards(ProjectPath.foldProjectKey(fm))
 
   object StarIndexPlanner {
     def apply[Q](src: Search[Q], fm: FreeMap[T])(

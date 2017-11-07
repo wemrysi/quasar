@@ -92,11 +92,11 @@ package object sql {
   ): Option[String] = {
     val loop: T => (Option[String] \/ (Option[String] \/ T)) =
       _.project match {
-        case Ident(name) if !relationName.element(name)    => some(name).left
-        case Binop(_, Embed(StringLiteral(v)), FieldDeref) => some(v).left
-        case Unop(arg, FlattenMapValues)                   => arg.right.right
-        case Unop(arg, FlattenArrayValues)                 => arg.right.right
-        case _                                             => None.left
+        case Ident(name) if !relationName.element(name)  => some(name).left
+        case Binop(_, Embed(StringLiteral(v)), KeyDeref) => some(v).left
+        case Unop(arg, FlattenMapValues)                 => arg.right.right
+        case Unop(arg, FlattenArrayValues)               => arg.right.right
+        case _                                           => None.left
       }
 
     \/.loopRight(expr.right, ι[Option[String]], loop)
@@ -320,7 +320,7 @@ package object sql {
       }.mkString("{", ", ", "}")
       case Splice(expr) => expr.fold("*")("(" + _._2 + ").*")
       case Binop(lhs, rhs, op) => op match {
-        case FieldDeref => rhs._1.project match {
+        case KeyDeref => rhs._1.project match {
           case StringLiteral(str) => "(" + lhs._2 + ")." + _qq("`", str)
           case _                   => "(" + lhs._2 + "){" + rhs._2 + "}"
         }

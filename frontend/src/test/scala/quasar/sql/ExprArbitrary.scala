@@ -127,7 +127,7 @@ trait ExprArbitrary {
           IfUndefined, Range, Or, And, Eq, Neq, Ge, Gt, Le, Lt,
           Concat, Plus, Minus, Mult, Div, Mod, Pow, In, UnshiftMap))(
         BinopR(_, _, _)),
-      1 -> (exprGen(depth) ⊛ exprGen(depth))(BinopR(_, _, FieldDeref)),
+      1 -> (exprGen(depth) ⊛ exprGen(depth))(BinopR(_, _, KeyDeref)),
       1 -> (exprGen(depth) ⊛ exprGen(depth))(BinopR(_, _, IndexDeref)),
       2 -> (exprGen(depth) ⊛
         Gen.oneOf(

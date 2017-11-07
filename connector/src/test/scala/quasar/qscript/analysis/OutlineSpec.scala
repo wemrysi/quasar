@@ -82,7 +82,7 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
     }}
 
     "map construction with at least one non-constant key is not static" >> prop { k1: Fix[EJson] =>
-      val k2 = ProjectFieldR(HoleF, ConstantR(ejsonStr("fieldName")))
+      val k2 = ProjectKeyR(HoleF, ConstantR(ejsonStr("keyName")))
       val fm = ConcatMapsR(MakeMapR(ConstantR(k1), uv), MakeMapR(k2, uv))
 
       outlineFM(fm) must_= mapF
@@ -95,7 +95,7 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
       outlineFM(fm) must_= ss
     }
 
-    "concatenation of maps preserves field order" >> prop {
+    "concatenation of maps preserves key order" >> prop {
       (k1: Fix[EJson], k2: Fix[EJson], k3: Fix[EJson]) => (k1 =/= k2 && k1 =/= k3 && k2 =/= k3) ==> {
 
       val l =
@@ -112,30 +112,30 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
       outlineFM(ConcatMapsR(l, r)) must_= ss
     }}
 
-    "field projection on static map results in field value" >> prop {
+    "key projection on static map results in key value" >> prop {
       (k1: Fix[EJson], k2: Fix[EJson]) => (k1 =/= k2) ==> {
 
       val fm =
-        ProjectFieldR(
+        ProjectKeyR(
           ConcatMapsR(MakeMapR(ConstantR(k1), mv), MakeMapR(ConstantR(k2), av)),
           ConstantR(k1))
 
       outlineFM(fm) must_= mapF
     }}
 
-    "field projection on static map without field results in undefined" >> prop {
+    "key projection on static map without key results in undefined" >> prop {
       (k1: Fix[EJson], k2: Fix[EJson]) => (k1 =/= k2) ==> {
 
-      val fm = ProjectFieldR(MakeMapR(ConstantR(k1), av), ConstantR(k2))
+      val fm = ProjectKeyR(MakeMapR(ConstantR(k1), av), ConstantR(k2))
 
       outlineFM(fm) must_= undefinedF
     }}
 
-    "field deletion on static map results in static field deleted" >> prop {
+    "key deletion on static map results in static key deleted" >> prop {
       (k1: Fix[EJson], k2: Fix[EJson]) => (k1 =/= k2) ==> {
 
       val fm =
-        DeleteFieldR(
+        DeleteKeyR(
           ConcatMapsR(MakeMapR(ConstantR(k2), av), MakeMapR(ConstantR(k1), mv)),
           ConstantR(k1))
 
@@ -145,10 +145,10 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
       outlineFM(fm) must_= ss
     }}
 
-    "field deletion of nonexistent on static map is identity" >> prop {
+    "key deletion of nonexistent on static map is identity" >> prop {
       (k1: Fix[EJson], k2: Fix[EJson]) => (k1 =/= k2) ==> {
 
-      val fm = DeleteFieldR(MakeMapR(ConstantR(k1), av), ConstantR(k2))
+      val fm = DeleteKeyR(MakeMapR(ConstantR(k1), av), ConstantR(k2))
 
       val ss = rollS(ExtEJson(ejson.Map(List(toFree(k1) -> arrF))))
 

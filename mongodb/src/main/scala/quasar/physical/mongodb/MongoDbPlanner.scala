@@ -71,10 +71,6 @@ object MongoDbPlanner {
   type OutputM[A]      = PlannerError \/ A
   type ExecTimeR[F[_]] = MonadReader_[F, Instant]
 
-  implicit def mongoQScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[fs.MongoQScript[T, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
-
-
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
       Type => Option[In => Out] =
@@ -121,8 +117,7 @@ object MongoDbPlanner {
 
   def getSelector
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, EX[_]: Traverse]
-    (v: BsonVersion)
-    (fm: FreeMap[T])
+    (fm: FreeMap[T], galg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]])
     (implicit inj: EX :<: ExprOp)
       : OutputM[PartialSelector[T]] =
     fm.zygo(
@@ -130,9 +125,7 @@ object MongoDbPlanner {
         κ(MFC(MapFuncsCore.Undefined[T, T[MapFunc[T, ?]]]()).embed),
         _.embed),
       ginterpret[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], Hole, OutputM[PartialSelector[T]]](
-        κ(defaultSelector[T].point[OutputM]),
-        selector[T](v)))
-
+        κ(defaultSelector[T].point[OutputM]), galg))
 
   def processMapFunc[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR, A]
     (fm: FreeMapA[T, A])(recovery: A => JsCore)
@@ -224,11 +217,11 @@ object MongoDbPlanner {
       case MakeArray(a1) => unimplemented[M, Fix[ExprOp]]("MakeArray expression")
       case MakeMap(a1, a2) => unimplemented[M, Fix[ExprOp]]("MakeMap expression")
       case ConcatMaps(a1, a2) => unimplemented[M, Fix[ExprOp]]("ConcatMap expression")
-      case ProjectField($var(dv), $literal(Bson.Text(field))) =>
-        $var(dv \ BsonField.Name(field)).point[M]
-      case ProjectField(a1, a2) => unimplemented[M, Fix[ExprOp]](s"ProjectField expression")
+      case ProjectKey($var(dv), $literal(Bson.Text(key))) =>
+        $var(dv \ BsonField.Name(key)).point[M]
+      case ProjectKey(a1, a2) => unimplemented[M, Fix[ExprOp]](s"ProjectKey expression")
       case ProjectIndex(a1, a2)  => unimplemented[M, Fix[ExprOp]]("ProjectIndex expression")
-      case DeleteField(a1, a2)  => unimplemented[M, Fix[ExprOp]]("DeleteField expression")
+      case DeleteKey(a1, a2)  => unimplemented[M, Fix[ExprOp]]("DeleteKey expression")
 
       // NB: Quasar strings are arrays of characters. However, MongoDB
       //     represent strings and arrays as distinct types. Moreoever, SQL^2
@@ -586,9 +579,9 @@ object MongoDbPlanner {
       case ConcatMaps(Embed(ObjF(o1)), Embed(ObjF(o2))) =>
         Obj(o1 ++ o2).point[M]
       case ConcatMaps(a1, a2) => SpliceObjects(List(a1, a2)).point[M]
-      case ProjectField(a1, a2) => Access(a1, a2).point[M]
+      case ProjectKey(a1, a2) => Access(a1, a2).point[M]
       case ProjectIndex(a1, a2) => Access(a1, a2).point[M]
-      case DeleteField(a1, a2)  => Call(ident("remove"), List(a1, a2)).point[M]
+      case DeleteKey(a1, a2)  => Call(ident("remove"), List(a1, a2)).point[M]
 
       case Guard(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
@@ -656,6 +649,68 @@ object MongoDbPlanner {
         field -> Selector.Expr(Selector.Eq(Bson.Bool(true)))))
     },
     List(Here[T]()))
+
+  def invoke2Nel[T[_[_]]](x: OutputM[PartialSelector[T]], y: OutputM[PartialSelector[T]])(f: (Selector, Selector) => Selector):
+      OutputM[PartialSelector[T]] =
+    (x ⊛ y) { case ((f1, p1), (f2, p2)) =>
+      ({ case list =>
+        f(f1(list.take(p1.size)), f2(list.drop(p1.size)))
+      },
+        p1.map(There(0, _)) ++ p2.map(There(1, _)))
+    }
+
+  def typeSelector[T[_[_]]: RecursiveT: ShowT]:
+      GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = {
+
+    import MapFuncsCore._
+
+    {
+      case MFC(And(a, b)) => invoke2Nel(a._2, b._2)(Selector.And.apply(_, _))
+      case MFC(Or(a, b)) => invoke2Nel(a._2, b._2)(Selector.Or.apply(_, _))
+
+      case node @ MFC(Guard((Embed(MFC(ProjectKey(Embed(MFC(Undefined())), _))), _), typ, cont, _)) =>
+        def selCheck: Type => Option[BsonField => Selector] =
+          generateTypeCheck[BsonField, Selector](Selector.Or(_, _)) {
+            case Type.Null => ((f: BsonField) =>  Selector.Doc(f -> Selector.Type(BsonType.Null)))
+            case Type.Dec => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Dec)))
+            case Type.Int =>
+              ((f: BsonField) => Selector.Or(
+                Selector.Doc(f -> Selector.Type(BsonType.Int32)),
+                Selector.Doc(f -> Selector.Type(BsonType.Int64))))
+            case Type.Int ⨿ Type.Dec ⨿ Type.Interval =>
+              ((f: BsonField) =>
+                Selector.Or(
+                  Selector.Doc(f -> Selector.Type(BsonType.Int32)),
+                  Selector.Doc(f -> Selector.Type(BsonType.Int64)),
+                  Selector.Doc(f -> Selector.Type(BsonType.Dec))))
+            case Type.Str => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Text)))
+            case Type.Obj(_, _) =>
+              ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Doc)))
+
+            // NB: Selector.Type(BsonType.Arr) will not match arrays, instead we use the suggestion in Mongo docs
+            // See: https://docs.mongodb.com/manual/reference/operator/query/type/#document-querying-by-array-type
+            case Type.FlexArr(_, _, _) =>
+              ((f: BsonField) => Selector.Doc(f -> Selector.ElemMatch(Selector.Exists(true).right)))
+            case Type.Binary =>
+              ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Binary)))
+            case Type.Id =>
+              ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.ObjectId)))
+            case Type.Bool => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Bool)))
+            case Type.Date =>
+              ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Date)))
+          }
+        selCheck(typ).fold[OutputM[PartialSelector[T]]](
+          -\/(InternalError.fromMsg(node.map(_._1).shows)))(
+          f =>
+          \/-(cont._2.fold[PartialSelector[T]](
+            κ(({ case List(field) => f(field) }, List(There(0, Here[T]())))),
+            { case (f2, p2) => ({ case head :: tail => Selector.And(f(head), f2(tail)) }, There(0, Here[T]()) :: p2.map(There(1, _)))
+            })))
+
+      case node @ _ => -\/(InternalError fromMsg node.map(_._1).shows)
+    }
+  }
+
 
   /** The selector phase tries to turn expressions into MongoDB selectors – i.e.
     * Mongo query expressions. Selectors are only used for the filtering
@@ -764,15 +819,6 @@ object MongoDbPlanner {
             },
             List(There(index, Here[T]()))))
 
-      def invoke2Nel(x: Output, y: Output)(f: (Selector, Selector) => Selector):
-          Output =
-        (x ⊛ y) { case ((f1, p1), (f2, p2)) =>
-          ({ case list =>
-            f(f1(list.take(p1.size)), f2(list.drop(p1.size)))
-          },
-            p1.map(There(0, _)) ++ p2.map(There(1, _)))
-        }
-
       val flipCore: MapFuncCore[T, _] => Option[MapFuncCore[T, _]] = {
         case Eq(a, b)  => Some(Eq(a, b))
         case Neq(a, b) => Some(Neq(a, b))
@@ -843,41 +889,7 @@ object MongoDbPlanner {
         case MFC(Not((_, v))) =>
           v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
 
-        case MFC(Guard(_, typ, cont, _)) =>
-          def selCheck: Type => Option[BsonField => Selector] =
-            generateTypeCheck[BsonField, Selector](Selector.Or(_, _)) {
-              case Type.Null => ((f: BsonField) =>  Selector.Doc(f -> Selector.Type(BsonType.Null)))
-              case Type.Dec => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Dec)))
-              case Type.Int =>
-                ((f: BsonField) => Selector.Or(
-                  Selector.Doc(f -> Selector.Type(BsonType.Int32)),
-                  Selector.Doc(f -> Selector.Type(BsonType.Int64))))
-              case Type.Int ⨿ Type.Dec ⨿ Type.Interval =>
-                ((f: BsonField) =>
-                  Selector.Or(
-                    Selector.Doc(f -> Selector.Type(BsonType.Int32)),
-                    Selector.Doc(f -> Selector.Type(BsonType.Int64)),
-                    Selector.Doc(f -> Selector.Type(BsonType.Dec))))
-              case Type.Str => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Text)))
-              case Type.Obj(_, _) =>
-                ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Doc)))
-              case Type.Binary =>
-                ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Binary)))
-              case Type.Id =>
-                ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.ObjectId)))
-              case Type.Bool => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Bool)))
-              case Type.Date =>
-                ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Date)))
-            }
-          selCheck(typ).fold[OutputM[PartialSelector[T]]](
-            -\/(InternalError.fromMsg(node.map(_._1).shows)))(
-            f =>
-            \/-(cont._2.fold[PartialSelector[T]](
-              κ(({ case List(field) => f(field) }, List(There(0, Here[T]())))),
-              { case (f2, p2) =>
-                ({ case head :: tail => Selector.And(f(head), f2(tail)) },
-                  There(0, Here[T]()) :: p2.map(There(1, _)))
-              })))
+        case MFC(Guard(_, typ, (_, cont), _)) => cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
 
         case _ => -\/(InternalError fromMsg node.map(_._1).shows)
       }
@@ -936,13 +948,13 @@ object MongoDbPlanner {
                     getExprBuilder[T, M, WF, EX](
                       cfg.funcHandler, cfg.staticHandler)(
                       dataset,
-                        Free.roll(MFC(MapFuncsCore.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))))
+                        Free.roll(MFC(MapFuncsCore.ProjectKey[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))))
                   case IncludeId =>
                     getExprBuilder[T, M, WF, EX](
                       cfg.funcHandler, cfg.staticHandler)(
                       dataset,
                         MapFuncCore.StaticArray(List(
-                          Free.roll(MFC(MapFuncsCore.ProjectField[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))),
+                          Free.roll(MFC(MapFuncsCore.ProjectKey[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))),
                           HoleF)))
                   case ExcludeId => dataset.point[M]
                 }
@@ -1020,22 +1032,38 @@ object MongoDbPlanner {
             val (keys, dirs) = (bucket.toIList.map((_, SortDir.asc)) <::: order).unzip
             keys.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _))
               .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
-          case Filter(src, cond) =>
-            getSelector[T, M, EX](cfg.bsonVersion)(cond).fold(
-              _ => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, cond).map {
-                // TODO: Postpone decision until we know whether we are going to
-                //       need mapReduce anyway.
-                case cond @ HasThat(_) => WB.filter(src, List(cond), {
-                  case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
-                })
-                case \&/.This(js) => WB.filter(src, Nil, {
-                  case Nil => Selector.Where(js(jscore.ident("this")).toJs)
-                })
-              },
-              {
-                case (sel, inputs) =>
-                  inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond))).map(WB.filter(src, _, sel))
-              })
+          case Filter(src0, cond0) => {
+            // TODO: Apply elideMoreGeneralGuards to all FreeMap's in the plan, not only here
+            cond0.transCataM(assumeReadType.elideMoreGeneralGuards[M, T](Type.AnyObject)) >>= { cond =>
+              val selectors = getSelector[T, M, EX](cond, selector[T](cfg.bsonVersion)).toOption
+              val typeSelectors = getSelector[T, M, EX](cond, typeSelector[T]).toOption
+
+              def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
+                  M[WorkflowBuilder[WF]] = {
+                val (sel, inputs) = partialSel
+
+                inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
+                  .map(WB.filter(src, _, sel))
+              }
+
+              (selectors, typeSelectors) match {
+                case (None, Some(typeSel)) => filterBuilder(src0, typeSel)
+                case (Some(sel), None) => filterBuilder(src0, sel)
+                case (Some(sel), Some(typeSel)) => filterBuilder(src0, typeSel) >>= (filterBuilder(_, sel))
+                case _ =>
+                  handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, cond).map {
+                    // TODO: Postpone decision until we know whether we are going to
+                    //       need mapReduce anyway.
+                    case cond @ HasThat(_) => WB.filter(src0, List(cond), {
+                      case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
+                    })
+                    case \&/.This(js) => WB.filter(src0, Nil, {
+                      case Nil => Selector.Where(js(jscore.ident("this")).toJs)
+                    })
+                  }
+              }
+            }
+          }
           case Union(src, lBranch, rBranch) =>
             (rebaseWB[T, M, WF, EX](cfg, lBranch, src) ⊛
               rebaseWB[T, M, WF, EX](cfg, rBranch, src))(
@@ -1081,8 +1109,8 @@ object MongoDbPlanner {
                 JoinSource(lb, lk),
                 JoinSource(rb, rk))) >>=
                 (getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(_, qs.combine >>= {
-                  case LeftSide => Free.roll(MFC(MapFuncsCore.ProjectField(HoleF, MapFuncsCore.StrLit("left"))))
-                  case RightSide => Free.roll(MFC(MapFuncsCore.ProjectField(HoleF, MapFuncsCore.StrLit("right"))))
+                  case LeftSide => Free.roll(MFC(MapFuncsCore.ProjectKey(HoleF, MapFuncsCore.StrLit("left"))))
+                  case RightSide => Free.roll(MFC(MapFuncsCore.ProjectKey(HoleF, MapFuncsCore.StrLit("right"))))
                 }))).join
           }).join
       }
@@ -1302,7 +1330,7 @@ object MongoDbPlanner {
     //       them with normalization as the last step and run until fixpoint. Currently plans are
     //       too sensitive to the order in which these are applied.
     for {
-      mongoQS0 <- qs.transCataM(liftFGM(assumeReadType[M, T, MQS](Type.AnyObject)))
+      mongoQS0 <- Trans(assumeReadType[T, MQS, M](Type.AnyObject), qs)
       mongoQS1 <- mongoQS0.transCataM(elideQuasarSigil[T, MQS, M](anyDoc))
       mongoQS2 =  mongoQS1.transCata[T[MQS]](R.normalizeEJ[MQS])
       mongoQS3 =  BR.branches.modify(
@@ -1311,7 +1339,7 @@ object MongoDbPlanner {
       _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo", mongoQS3))
 
       // NB: Normalizing after these appears to revert the effects of `mapBeforeSort`.
-      mongoQS4 =  Trans(mapBeforeSort[T], mongoQS3)
+      mongoQS4 <- Trans(mapBeforeSort[T, M], mongoQS3)
       mongoQS5 =  mongoQS4.transCata[T[MQS]](
                     liftFF[QScriptCore[T, ?], MQS, T[MQS]](
                       repeatedly(O.subsetBeforeMap[MQS, MQS](

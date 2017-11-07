@@ -233,6 +233,19 @@ final class LogicalPlanR[T]
   private def lift[A](v: SemDisj[A]): NameT[SemDisj, A] =
     quasar.namegen.lift[SemDisj](v)
 
+  def constrain(inf: Type, poss: Type): Option[Type] = {
+    @inline def coproductMembers(ty: Type): Option[NonEmptyList[Type]] = ty match {
+      case tc: Type.Coproduct => Some(tc.flatten)
+      case _                  => None
+    }
+    (coproductMembers(inf) |@| coproductMembers(poss)) { (is, ps) =>
+      is.list.toList.intersect(ps.list.toList) match {
+        case (x :: xs) => Some(xs.foldLeft(x)(Type.Coproduct(_, _)))
+        case Nil => None
+      }
+    }.flatten.orElse(Some(inf).filter(poss.contains))
+  }
+
   /** This function compares the inferred (required) type with the possible type
     * from the collection.
     * • if it’s a const type, replace the node with a constant
@@ -247,10 +260,14 @@ final class LogicalPlanR[T]
         case Type.Const(d) => constant(d)
         case _             => term
       }))
-    } else if (poss.contains(inf)) {
-      emitName(freshName("checku").map(name =>
-        ConstrainedPlan(inf, List(NamedConstraint(name, inf, term)), free(name))))
-    } else lift((SemanticError.genericError(s"You provided a ${poss.shows} where we expected a ${inf.shows} in $term")).wrapNel.left)
+    } else {
+      constrain(inf, poss).fold(
+        lift[ConstrainedPlan[T]]((SemanticError.genericError(s"You provided a ${poss.shows} where we expected a ${inf.shows} in $term")).wrapNel.left)
+      )(constraint =>
+        emitName(freshName("checku").map(name =>
+          ConstrainedPlan(inf, List(NamedConstraint(name, constraint, term)), free(name))))
+      )
+    }
 
   private def appConst
     (constraints: ConstrainedPlan[T], fallback: T) =
@@ -291,9 +308,9 @@ final class LogicalPlanR[T]
       term match {
         case Read(c)         => unifyOrCheck(inf, Type.Top, read(c))
         case Constant(d)     => unifyOrCheck(inf, Type.Const(d), constant(d))
-        case InvokeUnapply(MakeObject, Sized(name, value)) =>
-          lift(MakeObject.tpe(Func.Input2(name, value).map(_.inferred)).disjunction).flatMap(
-            applyConstraints(_, value)(MakeObject(name.plan, _).embed))
+        case InvokeUnapply(MakeMap, Sized(name, value)) =>
+          lift(MakeMap.tpe(Func.Input2(name, value).map(_.inferred)).disjunction).flatMap(
+            applyConstraints(_, value)(MakeMap(name.plan, _).embed))
         case InvokeUnapply(MakeArray, Sized(value)) =>
           lift(MakeArray.tpe(Func.Input1(value).map(_.inferred)).disjunction).flatMap(
             applyConstraints(_, value)(MakeArray(_).embed))
@@ -334,7 +351,7 @@ final class LogicalPlanR[T]
         case InvokeUnapply(func @ TernaryFunc(_, _, _, _, _, _, _), Sized(a1, a2, a3)) =>
           checkGenericInvoke(inf, func, Func.Input3(a1, a2, a3))
         case Typecheck(expr, typ, cont, fallback) =>
-          val typer: Func.Typer[Nat._3] = {
+          val typer: Func.Domain[Nat._3] => Func.VCodomain = {
             case Sized(_, t2, _) => Type.glb(t2, typ).success
           }
           val construct: Func.Input[T, Nat._3] => T = {
@@ -359,7 +376,7 @@ final class LogicalPlanR[T]
         case Sort(expr, ords) =>
           unifyOrCheck(inf, expr.inferred, sort(appConst(expr, constant(Data.NA)), ords map (_ leftMap (appConst(_, constant(Data.NA))))))
         case TemporalTrunc(part, src) =>
-          val typer: Func.Typer[Nat._1] = StdLib.partialTyperV[nat._1] {
+          val typer: Func.Domain[Nat._1] => Func.VCodomain = {
               case Sized(Type.Const(d @ Data.Date(_)))      => truncDate(part, d).validationNel ∘ (Type.Const(_))
               case Sized(Type.Const(t @ Data.Time(_)))      => truncTime(part, t).validationNel ∘ (Type.Const(_))
               case Sized(Type.Const(t @ Data.Timestamp(_))) => truncTimestamp(part, t).validationNel ∘ (Type.Const(_))
@@ -374,7 +391,7 @@ final class LogicalPlanR[T]
 
   private def checkInvoke[N <: Nat](
     inf: Type,
-    typer: Func.Typer[N],
+    typer: Func.Domain[N] => Func.VCodomain,
     constructLPNode: Func.Input[T, N] => T,
     args: Func.Input[ConstrainedPlan[T], N]
   ): NameT[SemDisj, ConstrainedPlan[T]] = {
@@ -395,9 +412,9 @@ final class LogicalPlanR[T]
     val constructLPNode = invoke(func, _: Func.Input[T, N])
     func.effect match {
       case Mapping =>
-        checkInvoke(inf, func.typer0, constructLPNode, args)
+        checkInvoke(inf, func.tpe, constructLPNode, args)
       case _ =>
-        lift(func.typer0(args.map(_.inferred)).disjunction).flatMap(
+        lift(func.tpe(args.map(_.inferred)).disjunction).flatMap(
           unifyOrCheck(inf, _, constructLPNode(args.map(appConst(_, constant(Data.NA))))))
     }
   }
@@ -411,7 +428,7 @@ final class LogicalPlanR[T]
     tpe: JoinType)
       : NameT[SemDisj, ConstrainedPlan[T]] = {
     val const = args.map(appConst(_, constant(Data.NA)))
-    lift(func.typer0(args.map(_.inferred)).disjunction).flatMap(
+    lift(func.tpe(args.map(_.inferred)).disjunction).flatMap(
       unifyOrCheck(inf, _, join(const(0), const(1), tpe, JoinCondition(lName, rName, const(2)))))
   }
 

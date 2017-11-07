@@ -26,8 +26,8 @@ Chain
 │  │     │  │  ╰─ Key(pop: _.pop)
 │  │     │  ╰─ Ident(_)
 │  │     ╰─ Obj
-│  │        ├─ Key(0: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined)
-│  │        ├─ Key(1: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].city : undefined)
+│  │        ├─ Key(0: __val[1].pop)
+│  │        ├─ Key(1: __val[1].city)
 │  │        ╰─ Key(src: __val)
 │  ╰─ Scope(Map())
 ├─ $SortF

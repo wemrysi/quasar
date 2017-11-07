@@ -55,7 +55,7 @@ object SemanticAnalysis {
           case (_, \/-(pathy.Path.FileName(file))) => file
         }
         constantState(sel, head)
-      case op @ Binop(Embed(Ident(name)), Embed(StringLiteral(expr)), FieldDeref) =>
+      case op @ Binop(Embed(Ident(name)), Embed(StringLiteral(expr)), KeyDeref) =>
         gets {
           case Some(head) => (head === name).fold(ident[T](expr), op)
           case None => op
@@ -65,10 +65,10 @@ object SemanticAnalysis {
 
   private val syntheticPrefix = "__sd__"
 
-  /** Inserts synthetic fields into the projections of each `select` stmt to
+  /** Inserts synthetic keys into the projections of each `select` stmt to
     * hold the values that will be used in sorting, and annotates each new
     * projection with Synthetic.SortKey. The compiler will generate a step to
-    * remove these fields after the sort operation.
+    * remove these keys after the sort operation.
     */
   def projectSortKeysƒ[T: Equal](implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql])
       : Sql[T] => Option[Sql[T]] = {
