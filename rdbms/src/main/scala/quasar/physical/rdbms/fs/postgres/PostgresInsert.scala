@@ -17,13 +17,18 @@
 package quasar.physical.rdbms.fs.postgres
 
 import slamdata.Predef._
-import quasar.Data
+import quasar.{Data, DataCodec}
 import quasar.fs.FileSystemError
 import quasar.physical.rdbms.common.TablePath
 import quasar.physical.rdbms.fs.RdbmsInsert
-import quasar.physical.rdbms.model.{ColumnDesc, ColumnarTable, JsonTable, TableModel}
-
+import quasar.physical.rdbms.model.{
+  ColumnDesc,
+  ColumnarTable,
+  JsonTable,
+  TableModel
+}
 import doobie.imports._
+
 import scalaz._
 import Scalaz._
 
@@ -31,19 +36,54 @@ trait PostgresInsert extends RdbmsInsert {
 
   implicit def dataMeta: Meta[Data]
 
-  def toColValues(cols: Set[ColumnDesc])(row: Data): \/[FileSystemError, List[String]] = {
+  implicit val codec: DataCodec = DataCodec.Precise
+
+  def toColValues(cols: Set[ColumnDesc])(
+      row: Data): \/[FileSystemError, Map[String, String]] = {
     row match {
       case Data.Obj(fields) =>
-        (fields.toList.filter(f => cols.exists(_.name === f._1)).sortBy(_._1).map {
-          case (_, v) =>
-            v match {
-              case Data.Obj(innerJs) => "{TODO decode this to JS string}"// TODO
-              case Data.Int(num) => s"$num"
-              case Data.Str(txt) => s"'$txt'"
-              case _ => s"TODO" // TODO
-            }
-        }).right
-      case _ => FileSystemError.unsupportedOperation(s"Unexpected data row $row not matching model $cols").left
+        fields.toVector
+          .filter(f => cols.exists(_.name === f._1))
+          .map {
+            case (n, v) =>
+              (n, v match {
+                case Data.Obj(_) | Data.Arr(_)  => "'" + DataCodec.render(v).getOrElse("{}") + "'"
+                case Data.Int(num) => s"$num"
+                case Data.Str(txt) => s"'$txt'"
+                case _ => s"""'{"$n": "unsupported""}'""" // TODO
+              })
+          }
+          .toMap
+          .right
+      case _ =>
+        FileSystemError
+          .unsupportedOperation(
+            s"Unexpected data row $row not matching model $cols")
+          .left
+    }
+  }
+
+  def buildQuery(chunk: Vector[Data],
+                 cols: Set[ColumnDesc],
+                 dbPath: TablePath): \/[FileSystemError, Vector[Fragment]] = {
+    val insertIntoTable = fr"insert into " ++ Fragment.const(dbPath.shows)
+
+    chunk.traverse(toColValues(cols)).map { insertColVectors =>
+      insertColVectors.map { colMap =>
+
+        val colNamesFragment =
+          insertIntoTable ++ fr"(" ++ Fragment.const(
+            colMap.keys.mkString(",")) ++
+            fr")"
+
+        val colValsFragment =
+              fr"values (" ++
+          colMap.values.toList
+            .map(v => Fragment.const(v))
+            .intercalate(fr",") ++ fr")"
+
+        colNamesFragment ++ colValsFragment
+      }
     }
   }
 
@@ -53,8 +93,6 @@ trait PostgresInsert extends RdbmsInsert {
       model: TableModel
   ): ConnectionIO[Vector[FileSystemError]] = {
 
-    val insertIntoTable = fr"insert into " ++ Fragment.const(dbPath.shows)
-
     model match {
       case JsonTable =>
         val fQuery = fr"(data) values(?::JSON)"
@@ -62,17 +100,12 @@ trait PostgresInsert extends RdbmsInsert {
           .updateMany(chunk)
           .map(_ => Vector.empty[FileSystemError])
       case ColumnarTable(cols) =>
-        (chunk.traverse(toColValues(cols)).traverse {
-            valRows => valRows.traverse { valRow =>
-              val query = insertIntoTable ++ fr"(" ++ Fragment.const(cols.map(_.name).mkString(",")) ++
-                fr") values (" ++
-                valRow.map(v => Fragment.const(v)).intercalate(fr",") ++ fr")"
-              query.update.run.void
-            }
-        }).map {
-          case -\/(err) => Vector(err)
-          case _ => Vector.empty
-        }
+        buildQuery(chunk, cols, dbPath)
+          .traverse(_.foldMap(_.update.run.void))
+          .map {
+            case -\/(err) => Vector(err)
+            case _        => Vector.empty
+          }
     }
   }
 }
