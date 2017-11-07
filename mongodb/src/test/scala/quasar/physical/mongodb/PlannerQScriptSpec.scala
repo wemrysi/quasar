@@ -27,8 +27,6 @@ import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
 import quasar.sql.JoinDir
 
-import scala.collection.immutable.{Map => ScalaMap}
-
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix
 import pathy.Path._
@@ -52,10 +50,10 @@ class PlannerQScriptSpec extends
       fix.Unreferenced,
       free.Filter(
         free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-        func.Guard(func.Hole, Type.Obj(ScalaMap(),Some(Type.Top)), func.Constant(bool[Fix](true)), func.Constant(bool[Fix](false)))),
+        func.Guard(func.Hole, Type.AnyObject, func.Constant(bool[Fix](true)), func.Constant(bool[Fix](false)))),
       free.Filter(
         free.ShiftedRead[AFile](rootDir </> dir("db") </> file("smallZips"), qscript.ExcludeId),
-        func.Guard(func.Hole, Type.Obj(ScalaMap(),Some(Type.Top)), func.Constant(bool[Fix](true)), func.Constant(bool[Fix](false)))),
+        func.Guard(func.Hole, Type.AnyObject, func.Constant(bool[Fix](true)), func.Constant(bool[Fix](false)))),
       List((func.ProjectKeyS(func.Hole, "_id"), func.ProjectKeyS(func.Hole, "_id"))),
       JoinType.Inner,
       func.ProjectKeyS(func.RightSide, "city"))
