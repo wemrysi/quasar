@@ -24,6 +24,7 @@ import quasar.ejson.EJson
 import quasar.qscript._
 
 import matryoshka.{BirecursiveT, Delay, EqualT, ShowT}
+import monocle.{Prism, PTraversal, Traversal}
 import scalaz.{:<:, Applicative, Bitraverse, Equal, Forall, NonEmptyList => NEL, Scalaz, Show, Traverse}
 
 sealed trait QScriptUniform[T[_[_]], A] extends Product with Serializable
@@ -232,4 +233,141 @@ object QScriptUniform {
   }
 
   final case class JoinSideRef[T[_[_]], A](id: Symbol) extends QScriptUniform[T, A]
+
+  final class Optics[T[_[_]]] private () extends QSUTTypes[T] {
+    def autojoin[A]: Prism[QScriptUniform[A], (NEL[A], MapFunc[Int])] =
+      Prism.partial[QScriptUniform[A], (NEL[A], MapFunc[Int])] {
+        case AutoJoin(args, func) => (args, func)
+      } { case (args, func) => AutoJoin(args, func) }
+
+    def dimEdit[A]: Prism[QScriptUniform[A], (A, DTrans[T])] =
+      Prism.partial[QScriptUniform[A], (A, DTrans[T])] {
+        case DimEdit(a, dt) => (a, dt)
+      } { case (a, dt) => DimEdit(a, dt) }
+
+    def distinct[A]: Prism[QScriptUniform[A], A] =
+      Prism.partial[QScriptUniform[A], A] {
+        case Distinct(a) => a
+      } (Distinct(_))
+
+    def groupBy[A]: Prism[QScriptUniform[A], (A, A)] =
+      Prism.partial[QScriptUniform[A], (A, A)] {
+        case GroupBy(l, r) => (l, r)
+      } { case (l, r) => GroupBy(l, r) }
+
+    def joinSideRef[A]: Prism[QScriptUniform[A], Symbol] =
+      Prism.partial[QScriptUniform[A], Symbol] {
+        case JoinSideRef(s) => s
+      } (JoinSideRef(_))
+
+    def leftShift[A]: Prism[QScriptUniform[A], (A, FreeMap, IdStatus, JoinFunc)] =
+      Prism.partial[QScriptUniform[A], (A, FreeMap, IdStatus, JoinFunc)] {
+        case LeftShift(s, fm, ids, jf) => (s, fm, ids, jf)
+      } { case (s, fm, ids, jf) => LeftShift(s, fm, ids, jf) }
+
+    def lpFilter[A]: Prism[QScriptUniform[A], (A, A)] =
+      Prism.partial[QScriptUniform[A], (A, A)] {
+        case LPFilter(s, p) => (s, p)
+      } { case (s, p) => LPFilter(s, p) }
+
+    def lpJoin[A]: Prism[QScriptUniform[A], (A, A, A, JoinType, Symbol, Symbol)] =
+      Prism.partial[QScriptUniform[A], (A, A, A, JoinType, Symbol, Symbol)] {
+        case LPJoin(l, r, c, t, lr, rr) => (l, r, c, t, lr, rr)
+      } { case (l, r, c, t, lr, rr) => LPJoin(l, r, c, t, lr, rr) }
+
+    def lpReduce[A]: Prism[QScriptUniform[A], (A, ReduceFunc[Unit])] =
+      Prism.partial[QScriptUniform[A], (A, ReduceFunc[Unit])] {
+        case LPReduce(a, rf) => (a, rf)
+      } { case (a, rf) => LPReduce(a, rf) }
+
+    def map[A]: Prism[QScriptUniform[A], (A, FreeMap)] =
+      Prism.partial[QScriptUniform[A], (A, FreeMap)] {
+        case Map(a, fm) => (a, fm)
+      } { case (a, fm) => Map(a, fm) }
+
+    def nullary[A]: Prism[QScriptUniform[A], Forall[MapFunc]] =
+      Prism.partial[QScriptUniform[A], Forall[MapFunc]] {
+        case Nullary(mf) => mf
+      } (Nullary(_))
+
+    def qsFilter[A]: Prism[QScriptUniform[A], (A, FreeMap)] =
+      Prism.partial[QScriptUniform[A], (A, FreeMap)] {
+        case QSFilter(a, p) => (a, p)
+      } { case (a, p) => QSFilter(a, p) }
+
+    def qsReduce[A]: Prism[QScriptUniform[A], (A, List[FreeMap], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])] =
+      Prism.partial[QScriptUniform[A], (A, List[FreeMap], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])] {
+        case QSReduce(a, bs, rfs, rep) => (a, bs, rfs, rep)
+      } { case (a, bs, rfs, rep) => QSReduce(a, bs, rfs, rep) }
+
+    def read[A]: Prism[QScriptUniform[A], AFile] =
+      Prism.partial[QScriptUniform[A], AFile] {
+        case Read(f) => f
+      } (Read(_))
+
+    def sort[A]: Prism[QScriptUniform[A], (A, NEL[(A, SortDir)])] =
+      Prism.partial[QScriptUniform[A], (A, NEL[(A, SortDir)])] {
+        case Sort(a, keys) => (a, keys)
+      } { case (a, keys) => Sort(a, keys) }
+
+    def subset[A]: Prism[QScriptUniform[A], (A, SelectionOp, A)] =
+      Prism.partial[QScriptUniform[A], (A, SelectionOp, A)] {
+        case Subset(f, op, c) => (f, op, c)
+      } { case (f, op, c) => Subset(f, op, c) }
+
+    def thetaJoin[A]: Prism[QScriptUniform[A], (A, A, JoinFunc, JoinType, JoinFunc)] =
+      Prism.partial[QScriptUniform[A], (A, A, JoinFunc, JoinType, JoinFunc)] {
+        case ThetaJoin(l, r, c, t, b) => (l, r, c, t, b)
+      } { case (l, r, c, t, b) => ThetaJoin(l, r, c, t, b) }
+
+    def transpose[A]: Prism[QScriptUniform[A], (A, Rotation)] =
+      Prism.partial[QScriptUniform[A], (A, Rotation)] {
+        case Transpose(a, r) => (a, r)
+      } { case (a, r) => Transpose(a, r) }
+
+    def uniformSort[A]: Prism[QScriptUniform[A], (A, List[FreeMap], NEL[(FreeMap, SortDir)])] =
+      Prism.partial[QScriptUniform[A], (A, List[FreeMap], NEL[(FreeMap, SortDir)])] {
+        case UniformSort(a, buckets, keys) => (a, buckets, keys)
+      } { case (a, buckets, keys) => UniformSort(a, buckets, keys) }
+
+    def union[A]: Prism[QScriptUniform[A], (A, A)] =
+      Prism.partial[QScriptUniform[A], (A, A)] {
+        case Union(l, r) => (l, r)
+      } { case (l, r) => Union(l, r) }
+
+    def freeMaps[A]: Traversal[QScriptUniform[A], FreeMap] =
+      new Traversal[QScriptUniform[A], FreeMap] {
+        import Scalaz._
+
+        def modifyF[F[_]: Applicative](f: FreeMap => F[FreeMap])(qsu: QScriptUniform[A]) =
+          qsu match {
+            case DimEdit(a, DTrans.Group(x)) =>
+              f(x) map (y => DimEdit(a, DTrans.Group(y)))
+
+            case LeftShift(a, x, ids, rep) =>
+              f(x) map (LeftShift(a, _, ids, rep))
+
+            case Map(a, x) =>
+              f(x) map (Map(a, _))
+
+            case QSFilter(a, x) =>
+              f(x) map (QSFilter(a, _))
+
+            case QSReduce(a, bs, reds, rep) =>
+              (bs.traverse(f) |@| Traverse[List].compose[ReduceFunc].traverse(reds)(f))(QSReduce(a, _, _, rep))
+
+            case UniformSort(s, bs, keys) =>
+              (bs.traverse(f) |@| keys.traverse { case (x, d) => f(x) strengthR d })(UniformSort(s, _, _))
+
+            case other => other.point[F]
+          }
+      }
+
+    def holes[A, B]: PTraversal[QScriptUniform[A], QScriptUniform[B], A, B] =
+      PTraversal.fromTraverse[QScriptUniform, A, B]
+  }
+
+  object Optics {
+    def apply[T[_[_]]]: Optics[T] = new Optics[T]
+  }
 }
