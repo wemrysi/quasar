@@ -124,14 +124,11 @@ class JsCoreSpecs extends quasar.Qspec with TreeMatchers with ScalazMatchers {
     }
 
     "reduce multiple splice obj to single splice obj" in {
-      val anif = If(
-                   BinOp(And,
+      val anif = If(BinOp(And,
                     Call(ident("isObject"),List(ident("value"))),
-                    UnOp(Not,Call(Access(ident("Array"),Literal(Js.Str("isArray"))),List(ident("value"))))
-                   ),
+                    UnOp(Not,Call(Access(ident("Array"),Literal(Js.Str("isArray"))),List(ident("value"))))),
                    Access(ident("value"), Literal(Js.Str("city"))),
-                   ident("undefined")
-                 )
+                   ident("undefined"))
 
       val obj1 = Obj(ListMap(Name("city1") -> anif))
       val obj2 = Obj(ListMap(Name("city2") -> anif))
