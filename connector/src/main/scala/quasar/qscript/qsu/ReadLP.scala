@@ -76,10 +76,10 @@ sealed abstract class ReadLP[
   private val ValueIndex = 1
 
   def apply(plan: T[lp.LogicalPlan]): F[QSUGraph] =
-    plan.cataM(transform).eval(SMap())
+    plan.cataM(readLPƒ).eval(SMap())
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  val transform: AlgebraM[G, lp.LogicalPlan, QSUGraph] = {
+  val readLPƒ: AlgebraM[G, lp.LogicalPlan, QSUGraph] = {
     case lp.Read(path) =>
       val afile = mkAbsolute(rootDir[Sandboxed], path)
 
