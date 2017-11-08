@@ -23,7 +23,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
-import quasar.fs.mount.cache.VCache
+import quasar.fs.mount.cache.VCache.VCacheKVS
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, Optimizer}
 
 import matryoshka._
@@ -38,7 +38,7 @@ object nonFsMounts {
   /** Intercept and handle moves and deletes involving view path(s); all others are passed untouched. */
   def manageFile[S[_]](mountsIn: ADir => Free[S, Set[RPath]])(
                         implicit
-                        VC: VCache.Ops[S],
+                        VC: VCacheKVS.Ops[S],
                         S0: ManageFile :<: S,
                         S1: QueryFile :<: S,
                         S2: Mounting :<: S,
@@ -62,17 +62,22 @@ object nonFsMounts {
     def overwriteMount(src: APath, dst: APath): Free[S, Unit] =
       deleteMount(dst) *> mount.remount(src, dst)
 
-    def dirToDirMove(src: ADir, dst: ADir, semantics: MoveSemantics): Free[S, FileSystemError \/ Unit] = {
+    def dirToDirOp(
+      src: ADir,
+      dst: ADir,
+      op: PathPair => manage.M[Unit],
+      underlyingOp: manage.M[Unit]
+    ): Free[S, FileSystemError \/ Unit] = {
       def moveAll(srcMounts: Set[RPath]): manage.M[Unit] =
         if (srcMounts.isEmpty)
           pathErr(pathNotFound(src)).raiseError[manage.M, Unit]
         else
           srcMounts
             .traverse_ { mountPath =>
-              val scenario = refineType(mountPath).fold[PathPair](
+              val pair = refineType(mountPath).fold[PathPair](
                 m => PathPair.DirToDir(src </> m, dst </> m),
                 m => PathPair.FileToFile(src </> m, dst </> m))
-              mountMove(scenario, semantics)
+              op(pair)
             }
 
       /** Abort if there is a fileSystem error related to the destination
@@ -102,49 +107,78 @@ object nonFsMounts {
           .run
 
       mountsIn(src).flatMap { mounts =>
-        manage.moveDir(src, dst, semantics).fold(
+        underlyingOp.fold(
           onFileSystemError(mounts, _),
           κ(onFileSystemSuccess(mounts))
         ).join
       }
     }
 
-    def mountMove(scenario: PathPair, semantics: MoveSemantics): manage.M[Unit] = {
-      val destinationNonEmpty = scenario match {
+    def mountMove(pair: PathPair, semantics: MoveSemantics): manage.M[Unit] = {
+      val destinationNonEmpty = pair match {
         case PathPair.FileToFile(_, dst) => query.fileExists(dst)
         case PathPair.DirToDir(_, dst)   => query.ls(dst).run.map(_.toOption.map(_.nonEmpty).getOrElse(false))
       }
 
       def cacheMove(s: AFile) =
-        refineType(scenario.dst)
+        refineType(pair.dst)
           .leftMap(p => pathErr(PathError.invalidPath(p, "view mount destination must be a file")))
           .traverse(d => VC.move(s, d))
 
-      val move = (mount.exists(scenario.src) |@| mount.exists(scenario.dst) |@| destinationNonEmpty).tupled.flatMap {
+      val move = (mount.exists(pair.src) |@| mount.exists(pair.dst) |@| destinationNonEmpty).tupled.flatMap {
         case (srcMountExists, dstMountExists, dstNonEmpty) => (semantics match {
           case FailIfExists if dstMountExists || dstNonEmpty =>
-            pathErr(pathExists(scenario.dst)).raiseError[manage.M, Unit]
+            pathErr(pathExists(pair.dst)).raiseError[manage.M, Unit]
 
           case FailIfMissing if !(dstMountExists || dstNonEmpty) =>
-            pathErr(pathNotFound(scenario.dst)).raiseError[manage.M, Unit]
+            pathErr(pathNotFound(pair.dst)).raiseError[manage.M, Unit]
 
           case _ if srcMountExists && dstNonEmpty =>
             // NB: We ignore the result of the filesystem delete as we're willing to
             //     shadow existing files if it fails for any reason.
-            (manage.delete(scenario.dst).run *> overwriteMount(scenario.src, scenario.dst)).liftM[FileSystemErrT]
+            (manage.delete(pair.dst).run *> overwriteMount(pair.src, pair.dst)).liftM[FileSystemErrT]
 
           case _ if srcMountExists && !dstNonEmpty =>
-            overwriteMount(scenario.src, scenario.dst).liftM[FileSystemErrT]
+            overwriteMount(pair.src, pair.dst).liftM[FileSystemErrT]
 
           case _ =>
-            manage.move(scenario, semantics)
+            manage.move(pair, semantics)
         }).run
       }
 
       EitherT(
-        vcacheGet(scenario.src).fold(
+        vcacheGet(pair.src).fold(
           cacheMove,
           move).join)
+    }
+
+    def mountCopy(pair: PathPair): manage.M[Unit] = {
+      val destinationNonEmpty = pair match {
+        case PathPair.FileToFile(_, dst) => query.fileExists(dst)
+        case PathPair.DirToDir(_, dst)   => query.ls(dst).run.map(_.toOption.map(_.nonEmpty).getOrElse(false))
+      }
+
+      def cacheCopy(s: AFile) =
+        refineType(pair.dst)
+          .leftMap(p => pathErr(PathError.invalidPath(p, "view mount destination must be a file")))
+          .traverse(d => VC.copy(s, d))
+
+      val copy = (mount.lookupConfig(pair.src).toOption.run.run.map(_.flatten) |@| mount.exists(pair.dst) |@| destinationNonEmpty).tupled.flatMap {
+        case (Some(config), dstMountExists, dstNonEmpty) =>
+          if (dstMountExists || dstNonEmpty)
+            pathErr(pathExists(pair.dst)).left[Unit].point[mount.FreeS]
+
+          else
+            mount.mount(pair.dst, config).map(_.right[FileSystemError])
+
+        case (None, _, _) =>
+          manage.copy(pair).run
+      }
+
+      EitherT(
+        vcacheGet(pair.src).fold(
+          cacheCopy,
+          copy).join)
     }
 
     def mountDelete(path: APath): Free[S, FileSystemError \/ Unit] = {
@@ -166,13 +200,15 @@ object nonFsMounts {
     }
 
     λ[ManageFile ~> Free[S, ?]] {
-      case Move(scenario, semantics) =>
-        scenario.fold(
-          (src, dst) => dirToDirMove(src, dst, semantics),
+      case Move(pair, semantics) =>
+        pair.fold(
+          (src, dst) => dirToDirOp(src, dst, mountMove(_, semantics), manage.moveDir(src, dst, semantics)),
           (src, dst) => mountMove(PathPair.FileToFile(src, dst), semantics).run)
 
       case Copy(pair) =>
-        unsupportedOperation("It is not yet possible to copy views and modules").left.point[Free[S, ?]]
+        pair.fold(
+          (src, dst) => dirToDirOp(src, dst, mountCopy, manage.copyDir(src, dst)),
+          (src, dst) => mountCopy(PathPair.FileToFile(src, dst)).run)
 
       case Delete(path) =>
         mountDelete(path)
@@ -205,7 +241,7 @@ object nonFsMounts {
 
   ////
 
-  private def vcacheGet[S[_]](p: APath)(implicit VC: VCache.Ops[S]): OptionT[Free[S, ?], AFile] =
+  private def vcacheGet[S[_]](p: APath)(implicit VC: VCacheKVS.Ops[S]): OptionT[Free[S, ?], AFile] =
     OptionT(maybeFile(p).η[Free[S, ?]]) >>= (f => VC.get(f).as(f))
 
 }

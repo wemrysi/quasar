@@ -154,6 +154,7 @@ object JsFuncHandler {
               case Divide(a1, a2)   => BinOp(jscore.Div, a1, a2)
               case Modulo(a1, a2)   => BinOp(jscore.Mod, a1, a2)
               case Negate(a1)       => UnOp(jscore.Neg, a1)
+              case Undefined()      => ident("undefined")
 
               case MapFuncsCore.Eq(a1, a2)  => BinOp(jscore.Eq, a1, a2)
               case Neq(a1, a2) => BinOp(jscore.Neq, a1, a2)
@@ -178,6 +179,10 @@ object JsFuncHandler {
                   If(BinOp(jscore.Lt, len, litNum(0)),
                     Call(select(field, "substr"), List(start, select(field, "length"))),
                     Call(select(field, "substr"), List(start, len))))
+              case MapFuncsCore.Split(a1, a2) =>
+                Call(select(a1, "split"), List(a2))
+              case Lower(a1) => Call(select(a1, "toLowerCase"), Nil)
+              case Upper(a1) => Call(select(a1, "toUpperCase"), Nil)
               case Search(field, pattern, insen) =>
                   Call(
                     select(
@@ -186,6 +191,10 @@ object JsFuncHandler {
                         If(insen, litStr("im"), litStr("m")))),
                       "test"),
                     List(field))
+              case Within(a1, a2) =>
+                BinOp(jscore.Neq,
+                  Literal(Js.Num(-1, false)),
+                  Call(select(a2, "indexOf"), List(a1)))
               case Null(str) =>
                 If(
                   BinOp(jscore.Eq, str, litStr("null")),
@@ -220,6 +229,7 @@ object JsFuncHandler {
                   Call(ident("ISODate"), List(str)),
                   ident("undefined"))
               // TODO: case Interval(str) =>
+
               case ToString(value) =>
                 If(isInt(value),
                   // NB: This is a terrible way to turn an int into a string, but the
@@ -230,11 +240,13 @@ object JsFuncHandler {
                       litStr("[^-0-9]+"),
                       litStr("g"))),
                     litStr(""))),
-                  If(BinOp(jscore.Or, isTimestamp(value), isDate(value)),
-                    Call(select(value, "toISOString"), Nil),
-                    Call(ident("String"), List(value))))
-              // TODO: case ToTimestamp(str) =>
+                  If(isObjectId(value),
+                    Call(select(value, "toString"), Nil),
+                    (If(binop(jscore.Or, isTimestamp(value), isDate(value)),
+                      Call(select(value, "toISOString"), Nil),
+                      Call(ident("String"), List(value))))))
 
+              case ToTimestamp(a1) => New(Name("Date"), List(a1))
               case TimeOfDay(date) =>
                 Let(Name("t"), date,
                   binop(jscore.Add,
@@ -347,8 +359,9 @@ object JsFuncHandler {
               case TemporalTrunc(Year, date) =>
                 dateZ(year(date), litNum(1), litNum(1), litNum(0), litNum(0), litNum(0), litNum(0))
 
-              case ProjectField(obj, field) => Access(obj, field)
+              case ProjectKey(obj, key) => Access(obj, key)
               case ProjectIndex(arr, index) => Access(arr, index)
+              case DeleteKey(a1, a2) => Call(ident("remove"), List(a1, a2))
 
               // TODO: This doesn't return the right values most of the time.
               case TypeOf(v) =>
@@ -363,7 +376,25 @@ object JsFuncHandler {
                       Literal(Js.Str("array")),
                       ident("typ"))))
 
+              case IfUndefined(a1, a2) =>
+                // TODO: Only evaluate `value` once.
+                If(BinOp(jscore.Eq, a1, ident("undefined")), a2, a1)
+
+              case ToId(a1) => New(Name("ObjectId"), List(a1))
               case Cond(i, t, e) => If(i, t, e)
+
+              // FIXME: Doesn't work for Char.
+              case Range(start, end) =>
+                Call(
+                  select(
+                    Call(select(ident("Array"), "apply"), List(
+                      Literal(Js.Null),
+                      Call(ident("Array"), List(BinOp(jscore.Sub, end, start))))),
+                    "map"),
+                  List(
+                    Fun(List(Name("element"), Name("index")),
+                      BinOp(jscore.Add, ident("index"), start))))
+
             }
 
             partial(mfc) orElse (mfc match {

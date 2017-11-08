@@ -23,7 +23,7 @@ import quasar.contrib.scalaz.eitherT._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs.mount._, BackendDef.DefinitionResult, Fixture._
-import quasar.fs.mount.cache.VCache
+import quasar.fs.mount.cache.VCache, VCache.VCacheKVS
 import quasar.effect._
 import quasar.main.{physicalFileSystems, FsAsk, KvsMounter, HierarchicalFsEffM, PhysFsEff, PhysFsEffM}
 import quasar.physical._
@@ -231,7 +231,7 @@ object FileSystemTest {
           :\: PathMismatchFailure
           :\: MountingFailure
           :\: ViewState
-          :\: VCache
+          :\: VCacheKVS
           :\: MonotonicSeq
           :/: BackendEffect
       )#M[A]

@@ -83,4 +83,14 @@ final case class javascript[R](embed: JsCoreF[R] => R) {
 
   def isObjectId(expr: R): R =
     BinOp(Instance, expr, ident("ObjectId"))
+
+  def isTemporal(expr: R): R =
+    BinOp(Or, isDate(expr), isTimestamp(expr))
+
+  def isSyntaxed(expr: R): R =
+    BinOp(Or,
+      isObjectId(expr),
+      BinOp(Or,
+        BinOp(Or, isNull(expr), BinOp(Or, isAnyNumber(expr), isTemporal(expr))),
+        isBoolean(expr)))
 }

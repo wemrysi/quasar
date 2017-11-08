@@ -29,7 +29,7 @@ import quasar.fp._, ski._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
-import quasar.fs.mount.cache.VCache
+import quasar.fs.mount.cache.VCache, VCache.{VCacheExpR, VCacheExpW, VCacheKVS}
 import quasar.fs.mount.hierarchical._
 import quasar.fs.mount.module.Module
 import quasar.physical._
@@ -206,12 +206,13 @@ package object main extends Logging {
   }
 
   /** Effect comprising the core Quasar apis. */
-  type CoreEffIO[A] = Coproduct[Task, CoreEff, A]
+  type CoreEffIO[A] =  Coproduct[Task, CoreEff, A]
+  type CoreEffIORW[A] = (VCacheExpR :\: VCacheExpW :/: CoreEffIO)#M[A]
   type CoreEff[A]   =
     (
       MetaStoreLocation :\: Module :\: Mounting :\: Analyze :\:
       QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :\:
-      VCache :\: Timing :/: CoreErrs
+      VCacheKVS :\: Timing :/: CoreErrs
     )#M[A]
 
   object CoreEff {
@@ -219,46 +220,55 @@ package object main extends Logging {
      fsThing: FS,
      metaRef: TaskRef[MetaStore],
      persist: quasar.db.DbConnectionConfig => MainTask[Unit]
-    ): Task[CoreEff ~> QErrs_TaskM] = {
-      val vcacheInterp: VCache ~> QErrs_TaskM =
+    ): Task[CoreEff ~> QErrs_CRW_TaskM] = {
+      val vcacheInterp: VCacheKVS ~> QErrs_CRW_TaskM =
         foldMapNT(
-          (fsThing.core compose Inject[ManageFile, BackendEffect]) :+:
-            injectFT[FileSystemFailure, QErrs_Task]                     :+:
-            (connectionIOToTask(metaRef) andThen injectFT[Task, QErrs_Task])
+          injectFT[VCacheExpW, QErrs_CRW_Task]           :+:
+          (Inject[ManageFile, BackendEffect] andThen
+           fsThing.core                      andThen
+           mapSNT(injectNT[QErrs_Task, QErrs_CRW_Task])) :+:
+          injectFT[FileSystemFailure, QErrs_CRW_Task]    :+:
+          (connectionIOToTask(metaRef) andThen injectFT[Task, QErrs_CRW_Task])
         ) compose
-          VCache.interp[(ManageFile :\: FileSystemFailure :/: ConnectionIO)#M]
-      type MountingFileSystem[A] = Coproduct[Mounting, BackendEffect, A]
-      val module = Module.impl.default[MountingFileSystem] andThen foldMapNT(fsThing.mounting :+: fsThing.core)
+          VCache.interp[(VCacheExpW :\: ManageFile :\: FileSystemFailure :/: ConnectionIO)#M]
+
+      type Mounting_Backend[A] = Coproduct[Mounting, BackendEffect, A]
       for {
         fs <- runFsWithViewsAndModules(fsThing.core, vcacheInterp, fsThing.mounting)
       } yield {
-        (MetaStoreLocation.impl.default(metaRef, persist) andThen injectFT[Task, QErrs_Task]) :+:
-          module                                                                              :+:
-          fsThing.mounting                                                                    :+:
-          (injectNT[Analyze, BackendEffect] andThen fs)                                       :+:
-          (injectNT[QueryFile, BackendEffect] andThen fs)                                     :+:
-          (injectNT[ReadFile, BackendEffect] andThen fs)                                      :+:
-          (injectNT[WriteFile, BackendEffect] andThen fs)                                     :+:
-          (injectNT[ManageFile, BackendEffect] andThen fs)                                    :+:
-          vcacheInterp                                                                        :+:
-          (Timing.toTask andThen injectFT[Task, QErrs_Task])                                  :+:
-          injectFT[Module.Failure, QErrs_Task]                                                :+:
-          injectFT[PathMismatchFailure, QErrs_Task]                                           :+:
-          injectFT[MountingFailure, QErrs_Task]                                               :+:
-          injectFT[FileSystemFailure, QErrs_Task]
+        val module = Module.impl.default[Mounting_Backend] andThen
+          foldMapNT((fsThing.mounting andThen mapSNT(injectNT[QErrs_Task, QErrs_CRW_Task])) :+: fs)
+        (MetaStoreLocation.impl.default(metaRef, persist) andThen injectFT[Task, QErrs_CRW_Task]) :+:
+        module                                                                                    :+:
+        (fsThing.mounting andThen mapSNT(injectNT[QErrs_Task, QErrs_CRW_Task]))                   :+:
+        (injectNT[Analyze, BackendEffect] andThen fs)                                             :+:
+        (injectNT[QueryFile, BackendEffect] andThen fs)                                           :+:
+        (injectNT[ReadFile, BackendEffect] andThen fs)                                            :+:
+        (injectNT[WriteFile, BackendEffect] andThen fs)                                           :+:
+        (injectNT[ManageFile, BackendEffect] andThen fs)                                          :+:
+        vcacheInterp                                                                              :+:
+        (Timing.toTask andThen injectFT[Task, QErrs_CRW_Task])                                    :+:
+        injectFT[Module.Failure, QErrs_CRW_Task]                                                  :+:
+        injectFT[PathMismatchFailure, QErrs_CRW_Task]                                             :+:
+        injectFT[MountingFailure, QErrs_CRW_Task]                                                 :+:
+        injectFT[FileSystemFailure, QErrs_CRW_Task]
       }
     }
 
     def runFsWithViewsAndModules(
       fs: BackendEffect ~> QErrs_TaskM,
-      vc: VCache ~> QErrs_TaskM,
+      vc: VCacheKVS ~> QErrs_CRW_TaskM,
       mount: Mounting ~> QErrs_TaskM
-    ): Task[BackendEffect ~> QErrs_TaskM] = {
+    ): Task[BackendEffect ~> QErrs_CRW_TaskM] = {
 
-      type V[A] = (VCache :\: Mounting :/: QErrs_Task)#M[A]
+      type V[A] = (VCacheKVS :\: Mounting :/: QErrs_Task)#M[A]
 
       overlayModulesViews[V, QErrs_Task](fs).map { toV =>
-        val vToTask = vc :+: mount :+: injectFT[QErrs_Task, QErrs_Task]
+        val vToTask =
+          vc                                                          :+:
+          (mount andThen mapSNT(injectNT[QErrs_Task, QErrs_CRW_Task])) :+:
+          injectFT[QErrs_Task, QErrs_CRW_Task]
+
         toV andThen foldMapNT(vToTask)
       }
     }
@@ -460,13 +470,20 @@ package object main extends Logging {
     )
   }
 
-  type QErrs_Task[A] = Coproduct[Task, QErrs, A]
+  type QErrs_Task[A]  = Coproduct[Task, QErrs, A]
   type QErrs_TaskM[A] = Free[QErrs_Task, A]
 
-  object QErrs_Task {
-    def toMainTask: QErrs_TaskM ~> MainTask = {
-      foldMapNT(liftMT[Task, MainErrT] :+: QErrs.toCatchable[MainTask])
-    }
+  type QErrs_CRW_Task[A]  = (VCacheExpR :\: VCacheExpW :/: QErrs_Task)#M[A]
+  type QErrs_CRW_TaskM[A] = Free[QErrs_CRW_Task, A]
+
+  object QErrs_CRW_Task {
+    def toMainTask: Task[QErrs_CRW_TaskM ~> MainTask] =
+      TaskRef(Tags.Min(none[VCache.Expiration])) ∘ (r =>
+        foldMapNT(
+          (liftMT[Task, MainErrT] compose Read.fromTaskRef(r))  :+:
+          (liftMT[Task, MainErrT] compose Write.fromTaskRef(r)) :+:
+          liftMT[Task, MainErrT]                                :+:
+          QErrs.toCatchable[MainTask]))
   }
 
   final case class CmdLineConfig(configPath: Option[FsFile], loadConfig: BackendConfig, cmd: Cmd)
@@ -476,7 +493,7 @@ package object main extends Logging {
     */
   def initMetaStoreOrStart[C: argonaut.DecodeJson](
     config: CmdLineConfig,
-    start: (C, CoreEff ~> QErrs_TaskM) => MainTask[Unit],
+    start: (C, CoreEff ~> QErrs_CRW_TaskM) => MainTask[Unit],
     persist: DbConnectionConfig => MainTask[Unit]
   )(implicit
     configOps: ConfigOps[C]

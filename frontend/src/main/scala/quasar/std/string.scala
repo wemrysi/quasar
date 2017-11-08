@@ -307,7 +307,7 @@ trait StringLib extends Library {
         \/.fromTryCatchNonFatal(BigDecimal(str)).fold(
            κ(failureNel(InvalidStringCoercion(str, "a string containing an decimal number".left))),
           i => success(Type.Const(Data.Dec(i))))
-      case Sized(Type.Str) => success(Type.Int)
+      case Sized(Type.Str) => success(Type.Dec)
     },
     untyper[nat._1](x => ToString.tpe(Func.Input1(x)).map(Func.Input1(_))))
 
@@ -342,6 +342,7 @@ trait StringLib extends Library {
         case Data.Date(d)      => success(d.toString)
         case Data.Time(t)      => success(t.format(DataCodec.timeFormatter))
         case Data.Interval(i)  => success(i.toString)
+        case Data.Id(i)        => success(i.toString)
         // NB: Should not be able to hit this case, because of the domain.
         case other             =>
           failureNel(
@@ -361,7 +362,9 @@ trait StringLib extends Library {
           DateLib.Date.tpe(Func.Input1(x)) <+>
           DateLib.Time.tpe(Func.Input1(x)) <+>
           DateLib.Timestamp.tpe(Func.Input1(x)) <+>
-          DateLib.Interval.tpe(Func.Input1(x)))
+          DateLib.Interval.tpe(Func.Input1(x)) <+>
+          IdentityLib.ToId.tpe(Func.Input1(x))
+        )
           .map(Func.Input1(_))
     })
 }

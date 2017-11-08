@@ -20,7 +20,7 @@ import slamdata.Predef.{Map, Vector}
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._, free._
-import quasar.fs.mount.cache.VCache
+import quasar.fs.mount.cache.VCache.VCacheKVS
 
 import monocle.Lens
 import scalaz.{Lens => _, Failure => _, _}
@@ -83,7 +83,7 @@ package object mount {
     :\: PathMismatchFailure
     :\: MountingFailure
     :\: ViewState
-    :\: VCache
+    :\: VCacheKVS
     :\: MonotonicSeq
     :/: FileSystem
   )#M[A]
@@ -94,7 +94,7 @@ package object mount {
       mismatchFailure: PathMismatchFailure ~> F,
       mountingFailure: MountingFailure ~> F,
       viewState: ViewState ~> F,
-      vcache: VCache ~> F,
+      vcache: VCacheKVS ~> F,
       monotonicSeq: MonotonicSeq ~> F,
       fileSystem: FileSystem ~> F
     ): ViewFileSystem ~> F =
@@ -106,13 +106,13 @@ package object mount {
   )(implicit
     S0: T :<: S,
     S1: Task :<: S,
-    S2: VCache :<: S,
+    S2: VCacheKVS :<: S,
     S3: Mounting :<: S,
     S4: MountingFailure :<: S,
     S5: PathMismatchFailure :<: S
   ): Task[BackendEffect ~> Free[S, ?]] = {
     type V[A] = (
-      VCache              :\:
+      VCacheKVS           :\:
       ViewState           :\:
       MonotonicSeq        :\:
       Mounting            :\:
@@ -126,7 +126,7 @@ package object mount {
       viewHRef   <- TaskRef[ViewState.ViewHandles](Map())
     } yield {
       val compFs: V ~> Free[S, ?] =
-        injectFT[VCache, S]                                                 :+:
+        injectFT[VCacheKVS, S]                                              :+:
         injectFT[Task, S].compose(KeyValueStore.impl.fromTaskRef(viewHRef)) :+:
         injectFT[Task, S].compose(MonotonicSeq.fromTaskRef(seqRef))         :+:
         injectFT[Mounting, S]                                               :+:

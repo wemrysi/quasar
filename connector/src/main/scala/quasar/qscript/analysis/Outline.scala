@@ -183,15 +183,15 @@ sealed abstract class OutlineInstances {
 
         case ConcatMaps(_, _) => mapF
 
-        case DeleteField(
+        case DeleteKey(
           Embed(CoEnv(\/-(ExtEJson(ejson.Map(kvs))))),
           k @ Embed(CoEnv(\/-(_)))) =>
 
           Free.roll(ExtEJson(ejson.Map(kvs.filterNot(_._1 === k))))
 
-        case DeleteField(_, _) => mapF
+        case DeleteKey(_, _) => mapF
 
-        case ProjectField(
+        case ProjectKey(
           Embed(CoEnv(\/-(ExtEJson(ejson.Map(kvs))))),
           k @ Embed(CoEnv(\/-(_)))) =>
 

@@ -6,7 +6,7 @@ Chain
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
-│  │     ├─ Key(0: (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].bar : undefined)
+│  │     ├─ Key(0: _["0"][1].bar)
 │  │     ╰─ Key(src: _["0"])
 │  ╰─ Scope(Map())
 ├─ $SortF

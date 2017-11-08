@@ -21,13 +21,10 @@ import quasar.Data
 import quasar.api._, ToQResponse.ops._, ToApiError.ops._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.disjunction._
-import quasar.effect.Timing
 import quasar.fp._, numeric._
 import quasar.fs._
-import quasar.fs.mount.cache.VCache
 
 import java.nio.charset.StandardCharsets
-import java.time.Duration
 
 import argonaut.Parse
 import argonaut.Argonaut._
@@ -35,8 +32,7 @@ import argonaut.ArgonautScalaz._
 import eu.timepit.refined.auto._
 import org.http4s._
 import org.http4s.dsl._
-import org.http4s.headers.{`Content-Type`, Accept, Expires}
-import org.http4s.util.Renderer
+import org.http4s.headers.{`Content-Type`, Accept}
 import pathy.Path._
 import pathy.argonaut.PosixCodecJson._
 import scalaz.{Zip => _, _}, Scalaz._
@@ -54,9 +50,7 @@ object data {
     M: ManageFile.Ops[S],
     Q: QueryFile.Ops[S],
     S0: Task :<: S,
-    S1: FileSystemFailure :<: S,
-    S2: VCache :<: S,
-    S3: Timing :<: S
+    S1: FileSystemFailure :<: S
   ): QHttpService[S] = QHttpService {
 
     case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) =>
@@ -118,8 +112,6 @@ object data {
   )(implicit
     R: ReadFile.Ops[S],
     Q: QueryFile.Ops[S],
-    T: Timing.Ops[S],
-    VC: VCache.Ops[S],
     S0: FileSystemFailure :<: S,
     S1: Task :<: S
   ): Free[S, QResponse[S]] =
@@ -129,32 +121,13 @@ object data {
         val headers =
           `Content-Type`(MediaType.`application/zip`) ::
             (format.disposition.toList: List[Header])
-        QResponse.streaming(p).map(QResponse.headers.modify(_ ++ headers))
+        QResponse.streaming(p) ∘ (_.modifyHeaders(_ ++ headers))
       },
       filePath => {
-        val statusFile: Free[S, (Headers, AFile)] =
-          (for {
-            vc <- VC.get(filePath)
-            cr <- (T.timestamp.liftM[OptionT] ⊛ OptionT(vc.lastUpdate.η[Free[S, ?]])) { (ts, lu) =>
-                    val expiration = lu.plus(Duration.ofSeconds(vc.maxAgeSeconds))
-
-                    (
-                      Headers(
-                        Header(Expires.name.value, Renderer.renderString(expiration)) ::
-                        ts.isAfter(expiration).fold(List(StaleHeader), Nil)),
-                      vc.dataFile
-                    )
-                  }
-            _  <- VC.modify(filePath, vc => vc.copy(cacheReads = vc.cacheReads + 1)).liftM[OptionT]
-          } yield cr) | ((Headers.empty, filePath))
-
-        statusFile flatMap { case (h, f) =>
-          val d = R.scan(f, offset, limit)
+          val d = R.scan(filePath, offset, limit)
           zipped.fold(
-            formattedZipDataResponse(format, f, d),
-            formattedDataResponse(format, d)
-          ).map(_.modifyHeaders(_ ++ h))
-        }
+            formattedZipDataResponse(format, filePath, d),
+            formattedDataResponse(format, d))
       })
 
   private def parseDestination(dstString: String): ApiError \/ APath = {

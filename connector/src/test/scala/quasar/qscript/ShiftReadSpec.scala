@@ -56,7 +56,7 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
 
     "shift a simple aggregated read" in {
       convert(lc.some,
-        structural.MakeObject(
+        structural.MakeMap(
           lpf.constant(Data.Str("0")),
           agg.Count(lpRead("/foo/bar")).embed).embed).map(
         _.codyna(

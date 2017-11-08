@@ -51,3 +51,4 @@ package object model {
 
   type M[A] = Free[Eff, A]
 }
+

@@ -27,14 +27,16 @@ import quasar.api._,
 import quasar.api.matchers._
 import quasar.api.MessageFormatGen._
 import quasar.contrib.pathy._, PathArbitrary._
+import quasar.contrib.scalaz.catchable._
 import quasar.csv.CsvParser
-import quasar.effect.{Failure, KeyValueStore, Timing}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._
-import quasar.fs.mount.MountConfig
-import quasar.fs.mount.cache.{VCache, ViewCache}
+import quasar.fs.mount._, MountConfigArbitrary._
+import MountConfig.{ModuleConfig, ViewConfig, viewConfig0}
+import quasar.fs.mount.cache.ViewCache
+import quasar.main.CoreEffIO
 import quasar.sql._
 import quasar.Variables
 
@@ -61,65 +63,20 @@ import scalaz.concurrent.Task
 import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.stream.Process
 import scodec.bits._
-
-import eu.timepit.refined.numeric.{NonNegative, Negative, Positive => RPositive}
-import eu.timepit.refined.auto._
-import eu.timepit.refined.scalacheck.numeric._
 import shapeless.tag.@@
 
 class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import Fixture._, InMemory._, JsonPrecision._, JsonFormat._
   import FileSystemFixture.{ReadWriteT, ReadWrites, amendWrites}
   import PathError.pathNotFound
+  import VCacheFixture._
 
-  type Eff2[A] = Coproduct[FileSystemFailure, FileSystem, A]
-  type Eff1[A] = Coproduct[VCache, Eff2, A]
-  type Eff0[A] = Coproduct[Timing, Eff1, A]
-  type Eff[A]  = Coproduct[Task, Eff0, A]
-  type EffM[A] = Free[Eff, A]
+  def service(mem: InMemState, mounts: MountingsConfig = MountingsConfig.empty): Service[Request, Response] =
+    serviceRef(mem, mounts)._1
 
-  def timingInterp(i: Instant) = λ[Timing ~> Task] {
-    case Timing.Timestamp => Task.now(i)
-    case Timing.Nanos     => Task.now(0)
-  }
-
-  val vcacheInterp: Task[VCache ~> Task] = KeyValueStore.impl.default[AFile, ViewCache]
-
-  val vcache = VCache.Ops[Eff]
-
-  def effRespOr(fs: FileSystem ~> Task): Task[Eff ~> ResponseOr] =
-    vcacheInterp ∘ (vci =>
-      liftMT[Task, ResponseT]                                                  :+:
-      (liftMT[Task, ResponseT] compose timingInterp(Instant.ofEpochSecond(0))) :+:
-      (liftMT[Task, ResponseT] compose vci)                                    :+:
-      failureResponseOr[FileSystemError]                                       :+:
-      (liftMT[Task, ResponseT] compose fs))
-
-  def effTaskInterp(fs: FileSystem ~> Task, i: Instant, vci: VCache ~> Task): Eff ~> Task =
-    reflNT[Task]                                  :+:
-    timingInterp(i)                               :+:
-    vci                                           :+:
-    Failure.toRuntimeError[Task, FileSystemError] :+:
-    fs
-
-  def effRespOrInterp(fs: FileSystem ~> Task, i: Instant, vci: VCache ~> Task): Eff ~> ResponseOr =
-    liftMT[Task, ResponseT]                           :+:
-    (liftMT[Task, ResponseT] compose timingInterp(i)) :+:
-    (liftMT[Task, ResponseT] compose vci)             :+:
-    failureResponseOr[FileSystemError]                :+:
-    (liftMT[Task, ResponseT] compose fs)
-
-  def service(mem: InMemState): Service[Request, Response] =
-    HeaderParam(GZip(HttpService.lift(req => runFs(mem) >>= (fs => effRespOr(fs) >>= (r =>
-      data.service[Eff].toHttpService(r).apply(req)))))).orNotFound
-
-  def serviceRef(mem: InMemState): (Service[Request, Response], Task[InMemState]) = {
-    val (inter, ref) = runInspect(mem).unsafePerformSync
-    val svc =
-      HeaderParam(GZip(HttpService.lift(req =>
-        effRespOr(inter compose fileSystem) >>= (r =>
-          data.service[Eff].toHttpService(r).apply(req))))).orNotFound
-
+  def serviceRef(mem: InMemState, mounts: MountingsConfig = MountingsConfig.empty): (Service[Request, Response], Task[(InMemState, Map[APath, MountConfig])]) = {
+    val (inter, ref) = inMemFSWebInspect(mem, mounts).unsafePerformSync
+    val svc = HeaderParam(GZip(data.service[CoreEffIO].toHttpService(inter))).orNotFound
     (svc, ref)
   }
 
@@ -128,27 +85,21 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
 
   def serviceErrs(mem: InMemState, writeErrors: FileSystemError*): HttpService = {
     type RW[A] = ReadWriteT[ResponseOr, A]
-    HttpService.lift(req => runFs(mem) flatMap { fs =>
-      val fs0: Task[Eff ~> ResponseOr] = effRespOr(fs)
-      val g: Task[WriteFile ~> RW] = fs0 ∘ (i => amendWrites(restrict[ResponseOr, WriteFile, Eff](i)))
-      val f: Task[Eff ~> RW] = fs0 ∘ (liftMT[ResponseOr, ReadWriteT] compose _)
-      val fsErrs: Task[Eff ~> ResponseOr] =
-        (f ⊛ g)((fʹ, gʹ) =>
-          evalNT[ResponseOr, ReadWrites]((Nil, List(writeErrors.toVector))) compose free.transformIn(gʹ, fʹ))
+    val fs0: Task[CoreEffIO ~> ResponseOr] = inMemFSWeb(mem)
+    val g: Task[WriteFile ~> RW] = fs0 ∘ (i => amendWrites(restrict[ResponseOr, WriteFile, CoreEffIO](i)))
+    val f: Task[CoreEffIO ~> RW] = fs0 ∘ (liftMT[ResponseOr, ReadWriteT] compose _)
+    val fsErrs: Task[CoreEffIO ~> ResponseOr] =
+      (f ⊛ g)((fʹ, gʹ) =>
+        evalNT[ResponseOr, ReadWrites]((Nil, List(writeErrors.toVector))) compose free.transformIn(gʹ, fʹ))
 
-      fsErrs >>= (i => data.service[Eff].toHttpService(i).apply(req))
-    })
+    data.service[CoreEffIO].toHttpService(fsErrs.unsafePerformSync)
   }
 
-  def evalViewTest[A](now: Instant)(p: (Eff ~> Task, Eff ~> ResponseOr) => Task[A]): Task[A] =
-    (runFs(InMemState.empty) ⊛ vcacheInterp)((fs, vci) => {
-      val it: Eff ~> Task       = effTaskInterp(fs, now, vci)
-      val ir: Eff ~> ResponseOr = effRespOrInterp(fs, now, vci)
-
-      p(it, ir)
-    }).join
-
   val csv = MediaType.`text/csv`
+
+  trait StateChange
+  object Unchanged extends StateChange
+  case class Changed(data: FileMap = Map.empty, mounts: Map[APath, MountConfig] = Map.empty) extends StateChange
 
   "Data Service" should {
     "GET" >> {
@@ -324,39 +275,62 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             response.status must_=== Status.Ok
           }
           "zipped json" >> {
-            val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.json.zip"))
+            val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.zip"))
             val sampleFile = rootDir[Sandboxed] </> file("foo")
             val data = Vector(Data.Obj("a" -> Data.Str("bar"), "b" -> Data.Bool(true)))
             val request = Request(
               uri = pathUri(sampleFile),
-              headers = Headers(Header("Accept", "application/zip,application/json;disposition=\"attachment;filename*=UTF-8''foo.json.zip\"")))
+              headers = Headers(Header("Accept", "application/zip,application/json;disposition=\"attachment;filename*=UTF-8''foo.zip\"")))
             val response = service(fileSystemWithSampleFile(data))(request).unsafePerformSync
             val zipfile = response.as[ByteVector].unsafePerformSync
             val zipMagicByte: ByteVector = hex"504b" // zip file magic byte
 
-            Zip.unzipFiles(response.body).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file("foo.json")))
-            zipfile.take(2) must_=== zipMagicByte
             response.headers.get(`Content-Disposition`.name) must_=== Some(disposition)
             response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
             response.status must_=== Status.Ok
+            zipfile.take(2) must_=== zipMagicByte
+            Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </> file("foo.json")))
+
+          }
+          "download single zipped file and then re-upload zipped file" >> {
+            val baseDir = rootDir[Sandboxed]
+            val sampleFile = baseDir </> file("foo.json")
+            val data = Vector(Data.Obj("a" -> Data.Str("foo"), "b" -> Data.Bool(true)))
+            val initialContent = Map(sampleFile -> data)
+
+            val downloadRequest = Request(
+                  uri = pathUri(sampleFile),
+                  headers = Headers(Header("Accept", "application/zip,application/json;disposition=\"attachment;filename*=UTF-8''foo.zip\"")))
+            val originalService = service(InMemState.fromFiles(initialContent))
+            val zippedResponse = originalService(downloadRequest).flatMap(_.as[ByteVector]).unsafePerformSync
+
+            val uploadRequest = Request(uri = pathUri(baseDir), method = Method.PUT)
+                                  .withBody(zippedResponse).unsafePerformSync
+                                  .withContentType(`Content-Type`(MediaType.`application/zip`).some)
+            val (emptyService, getState) = serviceRef(InMemState.empty)
+            val uploadResponse = emptyService(uploadRequest).unsafePerformSync
+
+            uploadResponse.as[String].unsafePerformSync must_=== ""
+            uploadResponse.status must_=== Status.Ok
+            getState.unsafePerformSync._1.contents must_=== initialContent
           }
           "zipped csv" >> {
-            val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.csv.zip"))
+            val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.zip"))
             val sampleFile = rootDir[Sandboxed] </> file("foo")
             val data = Vector(Data.Str("a,b\n1,2"))
             val request = Request(
               uri = pathUri(sampleFile),
               headers = Headers(
-                Header("Accept", "application/zip,text/csv;columnDelimiter=\",\";quoteChar=\"\\\"\";escapeChar=\"\\\"\";disposition=\"attachment;filename*=UTF-8''foo.csv.zip\"")))
+                Header("Accept", "application/zip,text/csv;columnDelimiter=\",\";quoteChar=\"\\\"\";escapeChar=\"\\\"\";disposition=\"attachment;filename*=UTF-8''foo.zip\"")))
             val response = service(fileSystemWithSampleFile(data))(request).unsafePerformSync
             val zipfile = response.as[ByteVector].unsafePerformSync
             val zipMagicByte: ByteVector = hex"504b" // zip file magic byte
 
-            Zip.unzipFiles(response.body).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file("foo.csv")))
-            zipfile.take(2) must_=== zipMagicByte
             response.headers.get(`Content-Disposition`.name) must_=== Some(disposition)
             response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
             response.status must_=== Status.Ok
+            zipfile.take(2) must_=== zipMagicByte
+            Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </> file("foo.csv")))
           }
           "zipped via request headers" >> {
             val sampleFile = rootDir[Sandboxed] </> file("foo")
@@ -366,32 +340,32 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             val zipfile = response.as[ByteVector].unsafePerformSync
             val zipMagicByte: ByteVector = hex"504b" // zip file magic byte
 
-            Zip.unzipFiles(response.body).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file("foo.json")))
-            zipfile.take(2) must_=== zipMagicByte
             response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
             response.status must_=== Status.Ok
+            zipfile.take(2) must_=== zipMagicByte
+            Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </> file("foo.json")))
           }
         }
       }
 
       "respond with view cache data" >> {
         "fresh" >> prop {
-            (f: AFile, g: AFile, d: Vector[Data], now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
+            (f: AFile, g: AFile, now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
             val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
             lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isBefore(lastUpdate.plus(maxAge)) && f ≠ g
           } ==> {
-            val expr = sqlB"α"
+            val expr = sqlB"""select { "α": 7 }"""
             val viewCache = ViewCache(
               MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
               maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
+            val mounts = Map[APath, MountConfig](f -> viewConfig0(expr))
+            val memState = InMemState.fromFiles(Map(g -> Vector(Data.Obj("α" -> Data._int(7)))))
 
-            val memState = InMemState.fromFiles(Map(g -> d))
-
-            val (respA, respB, vc) = evalViewTest(now) { (it, ir) =>
+            val (respA, respB, vc) = evalViewTest(now, mounts, memState) { (it, ir) =>
               (for {
                 _ <- vcache.put(f, viewCache)
-                a <- data.service[Eff].apply(Request(uri = pathUri(f)))
-                b <- data.service[Eff].apply(Request(uri = pathUri(g)))
+                a <- VCacheMiddleware(data.service[ViewEff]).apply(Request(uri = pathUri(f)))
+                b <- data.service[ViewEff].apply(Request(uri = pathUri(g)))
                 c <- vcache.get(f).run
               } yield (a.toHttpResponse(ir), b.toHttpResponse(ir), c)).foldMap(it)
             }.unsafePerformSync
@@ -406,22 +380,22 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
         }
 
         "stale" >> prop {
-            (f: AFile, g: AFile, d: Vector[Data], now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
+            (f: AFile, g: AFile, now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
             val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
-              lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isAfter(lastUpdate.plus(maxAge))
+              lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isAfter(lastUpdate.plus(maxAge)) && f ≠ g
           } ==> {
-            val expr = sqlB"α"
+            val expr = sqlB"""select { "α": 7 }"""
             val viewCache = ViewCache(
               MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
               maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
+            val mounts = Map[APath, MountConfig](f -> viewConfig0(expr))
+            val memState = InMemState.fromFiles(Map(g -> Vector(Data.Obj("α" -> Data._int(7)))))
 
-            val memState = InMemState.fromFiles(Map(g -> d))
-
-            val (respA, respB, vc) = evalViewTest(now) { (it, ir) =>
+            val (respA, respB, vc) = evalViewTest(now, mounts, memState) { (it, ir) =>
               (for {
                 _ <- vcache.put(f, viewCache)
-                a <- data.service[Eff].apply(Request(uri = pathUri(f)))
-                b <- data.service[Eff].apply(Request(uri = pathUri(g)))
+                a <- VCacheMiddleware(data.service[ViewEff]).apply(Request(uri = pathUri(f)))
+                b <- data.service[ViewEff].apply(Request(uri = pathUri(g)))
                 c <- vcache.get(f).run
               } yield (a.toHttpResponse(ir), b.toHttpResponse(ir), c)).foldMap(it)
             }.unsafePerformSync
@@ -494,7 +468,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             val (service, ref) = serviceRef(emptyMem)
             val response = service(request).unsafePerformSync
             expectBody(response.as[A].unsafePerformSync)
-            ref.unsafePerformSync must_=== emptyMem
+            ref.unsafePerformSync must_===((emptyMem, Map.empty))
           }
           "invalid body" >> {
             "no body" >> prop { file: AFile =>
@@ -573,7 +547,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
                 if (method == Method.PUT) Map(sampleFile -> expected.toVector)
                 // POST has append semantics
                 else /*method == Method.POST*/ Map(sampleFile -> (preExistingContent ++ expected.toVector))
-              ref.unsafePerformSync.contents must_=== expectedWithPreExisting
+              ref.unsafePerformSync._1.contents must_=== expectedWithPreExisting
             }
           val expectedData = List(
             Data.Obj(ListMap("a" -> Data.Int(1))),
@@ -654,7 +628,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
 
         uploadResponse.as[String].unsafePerformSync must_=== ""
         uploadResponse.status must_=== Status.Ok
-        getState.unsafePerformSync.contents must_=== initialContent
+        getState.unsafePerformSync._1.contents must_=== initialContent
       }
 
       def utf8Bytes(str: String): Process[Task, ByteVector] =
@@ -692,7 +666,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           } yield {
             body must_=== ""
             response.status must_=== Status.Ok
-            state.contents must_=== contentMap
+            state._1.contents must_=== contentMap
           }).unsafePerformSync
         }
       }
@@ -719,19 +693,16 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           response.status must_=== Status.BadRequest
           error must beApiErrorLike[DecodeFailure](
             InvalidMessageBodyFailure("metadata not found: " + posixCodec.printPath(ArchiveMetadata.HiddenFile)))
-          state.contents must_=== Map.empty
+          state._1.contents must_=== Map.empty
         }).unsafePerformSync
       }
     }
     "MOVE" >> {
-      trait StateChange
-      object Unchanged extends StateChange
-      case class Changed(newContents: FileMap) extends StateChange
-
       def testMove[A: EntityDecoder, R: AsResult](
           from: APath,
           to: APath,
           state: InMemState,
+          mounts: Map[APath, MountConfig],
           body: A => R,
           status: Status,
           newState: StateChange) = {
@@ -740,15 +711,17 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           uri = pathUri(from),
           headers = Headers(Header("Destination", UriPathCodec.printPath(to))),
           method = Method.MOVE)
-        val (service, ref) = serviceRef(state)
+        val (service, ref) = serviceRef(state, MountingsConfig(mounts))
         val response = service(request).unsafePerformSync
         response.status must_=== status
         body(response.as[A].unsafePerformSync)
-        val expectedNewContents = newState match {
-          case Unchanged => state.contents
-          case Changed(newContents) => newContents
+        val expectedNewState = newState match {
+          case Unchanged => (state.contents, mounts)
+          case Changed(newContents, newMounts) => (newContents, newMounts)
         }
-        ref.unsafePerformSync.contents must_=== expectedNewContents
+        val (actualNewState, newMounts) = ref.unsafePerformSync
+        (actualNewState.contents must_= expectedNewState._1) and
+        (newMounts must_= expectedNewState._2)
       }
       "be 400 for missing Destination header" >> prop { path: AFile =>
         val request = Request(uri = pathUri(path), method = Method.MOVE)
@@ -761,6 +734,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             from = file,
             to = destFile,
             state = emptyMem,
+            mounts = Map.empty,
             status = Status.NotFound,
             body = (_: ApiError) must beApiErrorLike(pathNotFound(file)),
             newState = Unchanged)
@@ -771,6 +745,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           from = fs.dir,
           to = file,
           state = fs.state,
+          mounts = Map.empty,
           status = Status.BadRequest,
           body = (_: ApiError) must beApiErrorWithMessage(
             Status.BadRequest withReason "Illegal move.",
@@ -783,6 +758,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           from = fs.file,
           to = dir,
           state = fs.state,
+          mounts = Map.empty,
           status = Status.BadRequest,
           body = (_: ApiError) must beApiErrorWithMessage(
             Status.BadRequest withReason "Illegal move.",
@@ -796,19 +772,45 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             from = fs.file,
             to = file,
             state = fs.state,
+            mounts = Map.empty,
             status = Status.Created,
-            body = (str: String) => str must_=== "",
-            newState = Changed(Map(file -> fs.contents)))
+            body = (str: String) => str must_= "",
+            newState = Changed(data = Map(file -> fs.contents)))
       }
-      "be 201 with dir" >> prop {(fs: NonEmptyDir, dir: ADir) =>
+      "be 201 with view file" >> prop {(src: AFile, dst: AFile, viewConfig: ViewConfig) =>
+        (src ≠ dst) ==>
+          testMove(
+            from = src,
+            to = dst,
+            state = emptyMem,
+            mounts = Map(src -> viewConfig),
+            status = Status.Created,
+            body = (str: String) => str must_= "",
+            newState = Changed(mounts = Map(dst -> viewConfig)))
+      }
+      "be 201 with module directory" >> prop {(src: ADir, dst: ADir, moduleConfig: ModuleConfig) =>
+        (src ≠ dst) ==>
+          testMove(
+            from = src,
+            to = dst,
+            state = emptyMem,
+            mounts = Map(src -> moduleConfig),
+            status = Status.Created,
+            body = (str: String) => str must_= "",
+            newState = Changed(mounts = Map(dst -> moduleConfig)))
+      }
+      "be 201 with dir containing data files, a view and a module" >> prop {(fs: NonEmptyDir, dir: ADir, moduleConfig: ModuleConfig, moduleDir: RDir, viewConfig: ViewConfig, viewFile: RFile) =>
         (fs.dir ≠ dir) ==>
           testMove(
             from = fs.dir,
             to = dir,
             state = fs.state,
+            mounts = Map((fs.dir </> moduleDir) -> moduleConfig, (fs.dir </> viewFile) -> viewConfig),
             status = Status.Created,
             body = (str: String) => str must_=== "",
-            newState = Changed(fs.filesInDir.map{ case (relFile,data) => (dir </> relFile, data)}.list.toList.toMap))
+            newState = Changed(
+              data = fs.filesInDir.map{ case (relFile,data) => (dir </> relFile, data)}.list.toList.toMap,
+              mounts = Map((dir </> moduleDir) -> moduleConfig, (dir </> viewFile) -> viewConfig)))
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
 
       "be 400 with file to same location" >> prop {(fs: SingleFileMemState) =>
@@ -816,6 +818,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           from = fs.file,
           to = fs.file,
           state = fs.state,
+          mounts = Map.empty,
           status = Status.BadRequest,
           body = (_: ApiError) must_=== ApiError.fromMsg(
             Status.BadRequest withReason "Destination is same path as source",
@@ -828,6 +831,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           from = fs.dir,
           to = fs.dir,
           state = fs.state,
+          mounts = Map.empty,
           status = Status.BadRequest,
           body = { err: ApiError =>
             (err.status.reason must_=== "Path exists.") and
@@ -838,14 +842,11 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
       // NB: this test is slow because NonEmptyDir instances are still relatively large
     }
     "COPY" >> {
-      trait StateChange
-      object Unchanged extends StateChange
-      case class Changed(newContents: FileMap) extends StateChange
-
       def testCopy[A: EntityDecoder, R: AsResult](
         from: APath,
         to: APath,
         state: InMemState,
+        mounts: Map[APath, MountConfig],
         body: A => R,
         status: Status,
         newState: StateChange) = {
@@ -854,15 +855,17 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           uri = pathUri(from),
           headers = Headers(Header("Destination", UriPathCodec.printPath(to))),
           method = Method.COPY)
-        val (service, ref) = serviceRef(state)
+        val (service, ref) = serviceRef(state, MountingsConfig(mounts))
         val response = service(request).unsafePerformSync
         response.status must_=== status
         body(response.as[A].unsafePerformSync)
         val expectedNewContents = newState match {
-          case Unchanged => state.contents
-          case Changed(newContents) => newContents
+          case Unchanged => (state.contents, mounts)
+          case c: Changed => (c.data, c.mounts)
         }
-        ref.unsafePerformSync.contents must_=== expectedNewContents
+        val (newState0, newMounts) = ref.unsafePerformSync
+        (newState0.contents must_= expectedNewContents._1) and
+          (newMounts must_= expectedNewContents._2)
       }
       "be 400 for missing Destination header" >> prop { path: AFile =>
         val request = Request(uri = pathUri(path), method = Method.COPY)
@@ -875,6 +878,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             from = file,
             to = destFile,
             state = emptyMem,
+            mounts = Map.empty,
             status = Status.NotFound,
             body = (_: ApiError) must beApiErrorLike(pathNotFound(file)),
             newState = Unchanged)
@@ -885,6 +889,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           from = fs.dir,
           to = file,
           state = fs.state,
+          mounts = Map.empty,
           status = Status.BadRequest,
           body = (_: ApiError) must beApiErrorWithMessage(
             Status.BadRequest withReason "Illegal move.",
@@ -897,6 +902,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           from = fs.file,
           to = dir,
           state = fs.state,
+          mounts = Map.empty,
           status = Status.BadRequest,
           body = (_: ApiError) must beApiErrorWithMessage(
             Status.BadRequest withReason "Illegal move.",
@@ -910,25 +916,56 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             from = fs.file,
             to = file,
             state = fs.state,
+            mounts = Map.empty,
             status = Status.Created,
             body = (str: String) => str must_=== "",
-            newState = Changed(Map(file -> fs.contents, fs.file -> fs.contents)))
+            newState = Changed(data = Map(file -> fs.contents, fs.file -> fs.contents)))
       }
-      "be 201 with dir" >> prop {(fs: NonEmptyDir, dir: ADir) =>
-        (fs.dir ≠ dir) ==>
+      "be 201 with view file" >> prop {(src: AFile, dst: AFile, viewConfig: ViewConfig) =>
+        (src ≠ dst) ==>
+          testCopy(
+            from = src,
+            to = dst,
+            state = InMemState.empty,
+            mounts = Map(src -> viewConfig),
+            status = Status.Created,
+            body = (str: String) => str must_= "",
+            newState = Changed(mounts = Map(
+              src -> viewConfig,
+              dst -> viewConfig)))
+      }
+      "be 201 with module directory" >> prop {(src: ADir, dst: ADir, moduleConfig: ModuleConfig) =>
+        (src ≠ dst) ==>
+          testCopy(
+            from = src,
+            to = dst,
+            state = InMemState.empty,
+            mounts = Map(src -> moduleConfig),
+            status = Status.Created,
+            body = (str: String) => str must_= "",
+            newState = Changed(mounts = Map(
+              src -> moduleConfig,
+              dst -> moduleConfig)))
+      }
+      "be 201 with dir containing data files, a view and a module" >> prop {(fs: NonEmptyDir, dst: ADir, viewFile: RFile, viewConfig: ViewConfig, moduleDir: RDir, moduleConfig: ModuleConfig) =>
+        (fs.dir ≠ dst) ==>
           testCopy(
             from = fs.dir,
-            to = dir,
+            to = dst,
             state = fs.state,
+            mounts = Map((fs.dir </> viewFile) -> viewConfig, (fs.dir </> moduleDir) -> moduleConfig),
             status = Status.Created,
-            body = (str: String) => str must_=== "",
-            newState = Changed(fs.filesInDir.map{ case (relFile,data) => (dir </> relFile, data)}.list.toList.toMap ++ fs.state.contents))
+            body = (str: String) => str must_= "",
+            newState = Changed(
+              data = fs.filesInDir.map{ case (relFile,data) => (dst </> relFile, data)}.list.toList.toMap ++ fs.state.contents,
+              mounts = Map((fs.dir </> viewFile) -> viewConfig, (fs.dir </> moduleDir) -> moduleConfig, (dst </> viewFile) -> viewConfig, (dst </> moduleDir) -> moduleConfig)))
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
       "be 400 with file to same location" >> prop {(fs: SingleFileMemState) =>
         testCopy(
           from = fs.file,
           to = fs.file,
           state = fs.state,
+          mounts = Map.empty,
           status = Status.BadRequest,
           body = (_: ApiError) must_=== ApiError.fromMsg(
             Status.BadRequest withReason "Destination is same path as source",
@@ -941,6 +978,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           from = fs.dir,
           to = fs.dir,
           state = fs.state,
+          mounts = Map.empty,
           status = Status.BadRequest,
           body = { err: ApiError =>
             (err.status.reason must_=== "Path exists.") and
@@ -956,14 +994,14 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
         val (service, ref) = serviceRef(filesystem.state)
         val response = service(request).unsafePerformSync
         response.status must_=== Status.NoContent
-        ref.unsafePerformSync.contents must_=== Map() // The filesystem no longer contains that file
+        ref.unsafePerformSync._1.contents must_=== Map() // The filesystem no longer contains that file
       }
       "be 204 with existing dir" >> prop { filesystem: NonEmptyDir =>
         val request = Request(uri = pathUri(filesystem.dir), method = Method.DELETE)
         val (service, ref) = serviceRef(filesystem.state)
         val response = service(request).unsafePerformSync
         response.status must_=== Status.NoContent
-        ref.unsafePerformSync.contents must_=== Map() // The filesystem no longer contains that folder
+        ref.unsafePerformSync._1.contents must_=== Map() // The filesystem no longer contains that folder
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
        .flakyTest("scalacheck: 'Gave up after only 1 passed tests. 11 tests were discarded.'")
       "be 404 with missing file" >> prop { file: AbsFile[Sandboxed] =>

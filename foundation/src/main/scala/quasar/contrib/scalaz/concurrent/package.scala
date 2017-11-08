@@ -14,11 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.fs.mount
+package quasar.contrib.scalaz
 
-import quasar.contrib.pathy.AFile
-import quasar.effect.KeyValueStore
+import slamdata.Predef.Unit
 
-package object cache {
-  type VCache[A] = KeyValueStore[AFile, ViewCache, A]
+import scalaz.\/-
+import scalaz.concurrent.{Strategy, Task}
+
+package object concurrent {
+
+  // cribbed from cats-effect
+  def shift(implicit S: Strategy): Task[Unit] = {
+    Task async { cb =>
+      val _ = S(cb(\/-(())))
+
+      ()
+    }
+  }
 }

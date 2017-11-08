@@ -26,7 +26,7 @@ object SqlInterpolator {
 
   object Expr extends StaticInterpolator[Fix[Sql]] {
     def parse(s: String): String \/ Fix[Sql] =
-      parser[Fix].parseExpr(Query(s)).leftMap(parseError => s"Not a valid SQL expression: $parseError")
+      parser[Fix].parseExpr(s).leftMap(parseError => s"Not a valid SQL expression: $parseError")
   }
 
   object ScopedExpr extends StaticInterpolator[ScopedExpr[Fix[Sql]]] {

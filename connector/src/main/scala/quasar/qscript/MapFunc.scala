@@ -61,6 +61,7 @@ object MapFunc {
     case date.TimeOfDay => a => MFC(C.TimeOfDay(a))
     case date.ToTimestamp => a => MFC(C.ToTimestamp(a))
     case identity.TypeOf => a => MFC(C.TypeOf(a))
+    case identity.ToId => a => MFC(C.ToId(a))
     case math.Abs => a => MFD(D.Abs(a))
     case math.Ceil => a => MFD(D.Ceil(a))
     case math.Floor => a => MFD(D.Floor(a))
@@ -106,11 +107,11 @@ object MapFunc {
     case relations.Or => (a1, a2) => MFC(C.Or(a1, a2))
     case set.Within => (a1, a2) => MFC(C.Within(a1, a2))
     case string.Split => (a1, a2) => MFC(C.Split(a1, a2))
-    case structural.MakeObject => (a1, a2) => MFC(C.MakeMap(a1, a2))
-    case structural.ObjectConcat => (a1, a2) => MFC(C.ConcatMaps(a1, a2))
+    case structural.MakeMap => (a1, a2) => MFC(C.MakeMap(a1, a2))
+    case structural.MapConcat => (a1, a2) => MFC(C.ConcatMaps(a1, a2))
     case structural.ArrayProject => (a1, a2) => MFC(C.ProjectIndex(a1, a2))
-    case structural.ObjectProject => (a1, a2) => MFC(C.ProjectField(a1, a2))
-    case structural.DeleteField => (a1, a2) => MFC(C.DeleteField(a1, a2))
+    case structural.MapProject => (a1, a2) => MFC(C.ProjectKey(a1, a2))
+    case structural.DeleteKey => (a1, a2) => MFC(C.DeleteKey(a1, a2))
     case string.Concat
        | structural.ArrayConcat
        | structural.ConcatOp => (a1, a2) => MFC(C.ConcatArrays(a1, a2))

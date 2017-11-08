@@ -38,8 +38,8 @@ Chain
 │     ├─ $SimpleMapF
 │     │  ├─ Map
 │     │  │  ╰─ Obj
-│     │  │     ╰─ Key(f0: (((isNumber(
-│     │  │            (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].pop : undefined) || ((((isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].pop : undefined) instanceof NumberInt) || (((isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].pop : undefined) instanceof NumberLong))) || (((isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].pop : undefined) instanceof Date)) && (isObject(_["0"][1]) && (! Array.isArray(_["0"][1])))) ? _["0"][1].pop : undefined)
+│     │  │     ╰─ Key(f0: ((isNumber(
+│     │  │            (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].pop : undefined) || ((((isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].pop : undefined) instanceof NumberInt) || (((isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].pop : undefined) instanceof NumberLong))) && (isObject(_["0"][1]) && (! Array.isArray(_["0"][1])))) ? _["0"][1].pop : undefined)
 │     │  ╰─ Scope(Map())
 │     ├─ $GroupF
 │     │  ├─ Grouped

@@ -34,9 +34,7 @@ import scalaz._, Scalaz._
 class SQLParserSpec extends quasar.Qspec {
   import SqlQueries._, ExprArbitrary._
 
-  implicit def stringToQuery(s: String): Query = Query(s)
-
-  def parse(query: Query): ParsingError \/ Fix[Sql] =
+  def parse(query: String): ParsingError \/ Fix[Sql] =
     fixParser.parseExpr(query)
 
   "SQLParser" should {
@@ -675,7 +673,7 @@ class SQLParserSpec extends quasar.Qspec {
 
       parsed.fold(
         _ => println(node.render.shows + "\n" + pprint(node)),
-        p => if (p != node) println(pprint(p) + "\n" + (node.render diff p.render).show))
+        p => if (p ≠ node) println(pprint(p) + "\n" + (node.render diff p.render).show))
 
       parsed must beRightDisjOrDiff(node)
     }.set(minTestsOk = 1000) // one cannot test a parser too much
@@ -689,7 +687,7 @@ class SQLParserSpec extends quasar.Qspec {
     "pprint an import statement should escpae backticks" >> {
       val `import` = Import[Fix[Sql]](currentDir </> dir("di") </> dir("k`~ireW.5u1+fOh") </> dir("j"))
       val string = List(`import`).pprint
-      string must_== raw"import `./di/k\`~ireW.5u1+fOh/j/`"
+      string must_= raw"import `./di/k\`~ireW.5u1+fOh/j/`"
       fixParser.parseModule(string) must_=== List(`import`).right
     }
 
@@ -699,7 +697,7 @@ class SQLParserSpec extends quasar.Qspec {
 
         ast should beRightDisjunction
 
-        ((ast ∘ ((pprint[Fix[Sql]] _) >>> (Query(_)))) >>= (parse(_))) must_=== ast
+        ast.map(pprint[Fix[Sql]] _).flatMap(parse) must_=== ast
       }
 
       "quoted variable names" in

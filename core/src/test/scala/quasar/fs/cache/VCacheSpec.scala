@@ -19,11 +19,12 @@ package quasar.fs.mount.cache
 import slamdata.Predef._
 import quasar.{Data, Variables}
 import quasar.contrib.pathy._
-import quasar.effect.{Failure, KeyValueStoreSpec}
+import quasar.effect.{Failure, KeyValueStoreSpec, Write}
 import quasar.fp._, free._
 import quasar.fs.{FileSystem, FileSystemFailure, FileSystemError, InMemory, ManageFile}
 import quasar.fs.InMemory.InMemState
 import quasar.fs.mount.MountConfig
+import quasar.fs.mount.cache.VCache.VCacheExpW
 import quasar.fs.mount.cache.ViewCacheArbitrary._
 import quasar.metastore._
 import quasar.sql._
@@ -37,25 +38,32 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaStoreFixture {
+  import VCache.VCacheKVS
 
   sequential
 
-  type Eff[A] = (ManageFile :\: FileSystemFailure :/: ConnectionIO)#M[A]
+  type Eff[A] = (ManageFile :\: FileSystemFailure :\: ConnectionIO :/: VCacheExpW)#M[A]
 
   def interp(files: List[AFile]): Task[(Eff ~> ConnectionIO, Task[InMemState])] =
-    InMemory.runInspect(InMemState.fromFiles(files.strengthR(Vector[Data]()).toMap)) ∘ (_.leftMap(inMemFS =>
-      (taskToConnectionIO compose inMemFS compose InMemory.fileSystem compose injectNT[ManageFile, FileSystem]) :+:
-      (taskToConnectionIO compose Failure.toRuntimeError[Task, FileSystemError])                                :+:
-      reflNT[ConnectionIO]))
+    (
+      InMemory.runInspect(InMemState.fromFiles(files.strengthR(Vector[Data]()).toMap)) ⊛
+      TaskRef(Tags.Min(Option.empty[VCache.Expiration]))
+    )((inMem, r) =>
+      inMem.leftMap(inMemFS =>
+        (taskToConnectionIO compose inMemFS compose
+          InMemory.fileSystem compose injectNT[ManageFile, FileSystem])            :+:
+        (taskToConnectionIO compose Failure.toRuntimeError[Task, FileSystemError]) :+:
+        reflNT[ConnectionIO]                                                       :+:
+        (taskToConnectionIO compose Write.fromTaskRef(r))))
 
-  def eval[A](program: Free[VCache, A]): A = evalWithFiles(program, Nil)._1
+  def eval[A](program: Free[VCacheKVS, A]): A = evalWithFiles(program, Nil)._1
 
-  def evalWithFiles[A](program: Free[VCache, A], files: List[AFile]): (A, Task[InMemState]) =
+  def evalWithFiles[A](program: Free[VCacheKVS, A], files: List[AFile]): (A, Task[InMemState]) =
     (interp(files) >>= { case (i, s) =>
       program.foldMap(foldMapNT(i) compose VCache.interp[Eff]).transact(transactor).strengthR(s)
     }).unsafePerformSync
 
-  val vcache = VCache.Ops[VCache]
+  val vcache = VCacheKVS.Ops[VCacheKVS]
 
   "Put deletes existing cache files" >> {
     val f = rootDir </> file("f")

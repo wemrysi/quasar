@@ -249,6 +249,8 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
       Timestamp(MillisToUTC(a1, none).embed).embed.η[F]
     case MF.TypeOf(a1) =>
       unimplemented("TypeOf")
+    case MF.ToId(a1) =>
+      unimplemented("ToId")
     case MF.ExtractCentury(a1) =>
       Ceil(Div(extract(a1, year), int(100)).embed).embed.η[F]
     case MF.ExtractDayOfMonth(a1) =>
@@ -524,7 +526,7 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
         })
     case MF.ConcatMaps(a1, a2) =>
       ConcatObj(a1, a2).embed.η[F]
-    case MF.ProjectField(a1, a2) =>
+    case MF.ProjectKey(a1, a2) =>
       genId[T[N1QL], F] ∘ (id1 => selectOrElse(
         a1,
         Select(
@@ -552,7 +554,7 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
           groupBy = none,
           orderBy = nil).embed,
         SelectElem(a1, a2).embed))
-    case MF.DeleteField(a1, a2) =>
+    case MF.DeleteKey(a1, a2) =>
       ObjRemove(a1, a2).embed.η[F]
 
     case MF.Meta(a1) =>

@@ -30,7 +30,6 @@ import quasar.fs._,
   QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.physical.sparkcore.fs._, SparkConnectorDetails._
 import quasar.physical.sparkcore.fs.hdfs.parquet.ParquetRDD
-import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
 
 import java.io.BufferedWriter
 import java.net.{URLDecoder, URI}
@@ -47,7 +46,9 @@ import scalaz.concurrent.Task
 
 final case class HdfsWriteCursor(hdfs: HdfsFileSystem, bw: BufferedWriter)
 
-final case class HdfsConfig(sparkConf: SparkConf, hdfsUriStr: String, prefix: ADir)
+final case class S3Info(accessKey: String, securityKey: String, region: String)
+
+final case class HdfsConfig(sparkConf: SparkConf, hdfsUriStr: String, prefix: ADir, s3: Option[S3Info])
 
 object SparkHdfs extends SparkCore with ChrootedInterpreter {
 
@@ -67,9 +68,6 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
   type Eff7[A]  = Coproduct[SparkConnectorDetails, Eff6, A]
   type Eff[A]   = Coproduct[Read[HdfsFileSystem, ?], Eff7, A]
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
-        ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
-
   def ReadSparkContextInj = Inject[Read[SparkContext, ?], Eff]
   def RFKeyValueStoreInj = Inject[KeyValueStore[ReadFile.ReadHandle, SparkCursor, ?], Eff]
   def MonotonicSeqInj = Inject[MonotonicSeq, Eff]
@@ -86,9 +84,15 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
     for {
       _ <- Task.delay(java.lang.Thread.currentThread.setContextClassLoader(getClass.getClassLoader))
       fs <- Task.delay {
-        val conf = new Configuration()
-        conf.setBoolean("fs.hdfs.impl.disable.cache", true)
-        HdfsFileSystem.get(new URI(sfsConf.hdfsUriStr), conf)
+        val configuration = sfsConf.s3.map { info =>
+          val conf = new Configuration()
+          conf.set("fs.s3a.access.key", info.accessKey)
+          conf.set("fs.s3a.secret.key", info.securityKey)
+          conf.set("fs.s3a.endpoint",   info.region)
+          conf
+        }.getOrElse(new Configuration())
+        configuration.setBoolean("fs.hdfs.impl.disable.cache", true)
+        HdfsFileSystem.get(new URI(sfsConf.hdfsUriStr), configuration)
       }
       uriStr = fs.getUri().toASCIIString()
       _ <- if(uriStr.startsWith("file:///")) Task.fail(new RuntimeException("Provided URL is not valid HDFS URL")) else ().point[Task]
@@ -184,11 +188,10 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
             .fold(liftErr("'rootPath' is not a valid path").left[ADir])(_.right[DefinitionError]).point[Task])
         )
 
-    for {
-      sparkConf <- sparkConfOrErr
-      hdfsUrl <- hdfsUrlOrErr
-      rootPath <- rootPathOrErr
-    } yield HdfsConfig(sparkConf, hdfsUrl, rootPath)
+    val s3InfoOrErr: DefErrT[Task, Option[S3Info]] =
+      uriOrErr.map(uri => (uri.params.get("s3AccessKey") |@| uri.params.get("s3SecretKey") |@| uri.params.get("s3Endpoint")) (S3Info(_, _, _)))
+
+    (sparkConfOrErr |@| hdfsUrlOrErr |@| rootPathOrErr |@| s3InfoOrErr) (HdfsConfig(_, _, _, _))
   }
 
   def getSparkConf: Config => SparkConf = _.sparkConf
@@ -196,7 +199,12 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
   def generateSC: (APath, HdfsConfig) => DefErrT[Task, SparkContext] =
     (jar, conf) => initSC(conf).map { sc =>
       sc.addJar(posixCodec.printPath(jar))
-      sc
+      conf.s3.map { info =>
+        sc.hadoopConfiguration.set("fs.s3a.access.key", info.accessKey)
+        sc.hadoopConfiguration.set("fs.s3a.secret.key", info.securityKey)
+        sc.hadoopConfiguration.set("fs.s3a.endpoint",   info.region)
+        sc
+      }.getOrElse(sc)
     }
 
   private def toPath(apath: APath): Free[Eff, Path] = lift(Task.delay {

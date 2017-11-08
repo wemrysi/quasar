@@ -29,9 +29,9 @@ import shapeless.{Data => _, :: => _, _}
 trait StructuralLib extends Library {
   import Type._
 
-  val MakeObject = BinaryFunc(
+  val MakeMap = BinaryFunc(
     Mapping,
-    "Makes a singleton object containing a single field",
+    "Makes a singleton map containing a single key",
     AnyObject,
     Func.Input2(Str, Top),
     noSimplification,
@@ -45,7 +45,7 @@ trait StructuralLib extends Library {
     partialUntyperV[nat._2] {
       case Obj(map, uk) => map.headOption.fold(
         uk.fold[Func.VDomain[nat._2]](
-          failure(NonEmptyList(GenericError("MAKE_OBJECT can’t result in an empty object"))))(
+          failure(NonEmptyList(GenericError("MAKE_MAP can’t result in an empty map"))))(
           t => success(Func.Input2(Str, t)))) {
         case (key, value) => success(Func.Input2(Const(Data.Str(key)), value))
       }
@@ -76,14 +76,14 @@ trait StructuralLib extends Library {
     noSimplification,
     {
       // TODO: This should actually result in metadata when we switch to EJson.
-      case Sized(Const(_)) => success(Const(Data.NA))
-      case _               => success(Top)
+      case Sized(Const(_)) => Some(success(Const(Data.NA)))
+      case _               => Some(success(Top))
     },
     basicUntyper[nat._1])
 
-  val ObjectConcat: BinaryFunc = BinaryFunc(
+  val MapConcat: BinaryFunc = BinaryFunc(
     Mapping,
-    "A right-biased merge of two objects into one object",
+    "A right-biased merge of two maps into one map",
     AnyObject,
     Func.Input2(AnyObject, AnyObject),
     noSimplification,
@@ -94,8 +94,8 @@ trait StructuralLib extends Library {
           else if (map2.isEmpty) map1
           else                   map1 ++ map2)))
 
-      case Sized(Const(o1 @ Data.Obj(_)), o2) => ObjectConcat.tpe(Func.Input2(o1.dataType, o2))
-      case Sized(o1, Const(o2 @ Data.Obj(_))) => ObjectConcat.tpe(Func.Input2(o1, o2.dataType))
+      case Sized(Const(o1 @ Data.Obj(_)), o2) => MapConcat.tpe(Func.Input2(o1.dataType, o2))
+      case Sized(o1, Const(o2 @ Data.Obj(_))) => MapConcat.tpe(Func.Input2(o1, o2.dataType))
 
       case Sized(Obj(map1, uk1), Obj(map2, None))      => success(Obj(map1 ++ map2, uk1))
       case Sized(Obj(map1, uk1), Obj(map2, Some(uk2))) =>
@@ -180,9 +180,9 @@ trait StructuralLib extends Library {
       case x if x.contains(Type.Str)       => StringLib.Concat.untpe(x)
     })
 
-  val ObjectProject = BinaryFunc(
+  val MapProject = BinaryFunc(
     Mapping,
-    "Extracts a specified field of an object",
+    "Extracts a specified key of an object",
     Top,
     Func.Input2(AnyObject, Str),
     new Func.Simplifier {
@@ -190,13 +190,13 @@ trait StructuralLib extends Library {
         (orig: LP[T])
         (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
         orig match {
-          case InvokeUnapply(_, Sized(Embed(MakeObjectN(obj)), Embed(field))) =>
-            obj.map(_.leftMap(_.project)).toListMap.get(field).map(_.project)
+          case InvokeUnapply(_, Sized(Embed(MakeMapN(m)), Embed(key))) =>
+            m.map(_.leftMap(_.project)).toListMap.get(key).map(_.project)
           case _ => None
         }
     },
     partialTyperV[nat._2] {
-      case Sized(v1, v2) => v1.objectField(v2)
+      case Sized(v1, v2) => v1.mapKey(v2)
     },
     basicUntyper)
 
@@ -213,9 +213,9 @@ trait StructuralLib extends Library {
     },
     basicUntyper)
 
-  val DeleteField: BinaryFunc = BinaryFunc(
+  val DeleteKey: BinaryFunc = BinaryFunc(
     Mapping,
-    "Deletes a specified field from an object",
+    "Deletes a specified key from a map",
     AnyObject,
     Func.Input2(AnyObject, Str),
     noSimplification,
@@ -405,15 +405,14 @@ trait StructuralLib extends Library {
 
   // TODO: fix types and add the VirtualFuncs to the list of functions
 
-  // val MakeObjectN = new VirtualFunc {
-  object MakeObjectN {
+  object MakeMapN {
     // Note: signature does not match VirtualFunc
     def apply[T](args: (T, T)*)(implicit T: Corecursive.Aux[T, LP]): LP[T] =
       args.toList match {
         case Nil      => Constant(Data.Obj())
         case x :: xs  =>
-          xs.foldLeft(MakeObject(x._1, x._2))((a, b) =>
-            ObjectConcat(a.embed, MakeObject(b._1, b._2).embed))
+          xs.foldLeft(MakeMap(x._1, x._2))((a, b) =>
+            MapConcat(a.embed, MakeMap(b._1, b._2).embed))
       }
 
     // Note: signature does not match VirtualFunc
@@ -421,8 +420,8 @@ trait StructuralLib extends Library {
     def unapply[T](t: LP[T])(implicit T: Recursive.Aux[T, LP]):
         Option[List[(T, T)]] =
       t match {
-        case InvokeUnapply(MakeObject, Sized(name, expr)) => Some(List((name, expr)))
-        case InvokeUnapply(ObjectConcat, Sized(a, b))     => (unapply(a.project) ⊛ unapply(b.project))(_ ::: _)
+        case InvokeUnapply(MakeMap, Sized(name, expr)) => Some(List((name, expr)))
+        case InvokeUnapply(MapConcat, Sized(a, b))     => (unapply(a.project) ⊛ unapply(b.project))(_ ::: _)
         case _                                             => None
       }
   }

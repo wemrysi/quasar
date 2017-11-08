@@ -20,15 +20,22 @@ import slamdata.Predef._
 import quasar._
 import quasar.api._, ApiErrorEntityDecoder._, ToApiError.ops._
 import quasar.api.matchers._
+import quasar.api.services.VCacheFixture
 import quasar.api.services.Fixture._
 import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._, PathArbitrary._
+import quasar.contrib.scalaz.catchable._
+import quasar.DateArbitrary._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._, mount._
+import quasar.fs.mount.cache.ViewCache
+import quasar.fs.mount.MountConfig.viewConfig0
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.sql.{Positive => _, _}
+
+import java.time.{Instant, Duration}
 
 import argonaut.{Json => AJson, _}, Argonaut._
 import eu.timepit.refined.api.Refined
@@ -36,9 +43,11 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
 import eu.timepit.refined.scalacheck.numeric._
 import matryoshka.data.Fix
+import org.http4s
 import org.http4s._
-import org.http4s.syntax.service._
 import org.http4s.argonaut._
+import org.http4s.headers._
+import org.http4s.util.Renderer
 import org.specs2.matcher.MatchResult
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
@@ -48,12 +57,14 @@ import rapture.json._, jsonBackends.json4s._, patternMatching.exactObjects._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
+import shapeless.tag.@@
 import quasar.api.PathUtils._
 
-class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
+class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import queryFixture._
   import posixCodec.printPath
   import FileSystemError.executionFailed_
+  import VCacheFixture.{Eff => _, _}
 
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
@@ -117,7 +128,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
   }
 
   def toLP(q: String, vars: Variables): Fix[LogicalPlan] =
-      sql.fixParser.parseExpr(sql.Query(q)).fold(
+      sql.fixParser.parseExpr(q).fold(
         error => scala.sys.error(s"could not compile query: $q due to error: $error"),
         expr => quasar.queryPlan(expr, vars, rootDir, 0L, None).run.value.toOption.get).valueOr(_ => scala.sys.error("unsupported constant plan"))
 
@@ -145,6 +156,70 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           },
           stateCheck = Some(s => s.contents.keys must contain(expectedDestinationPath)))
       }}
+    }
+    "response with view cache headers" >> {
+      "fresh" >> prop {
+          (now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
+          val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
+          lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isBefore(lastUpdate.plus(maxAge))
+        } ==> {
+          val f = rootDir </> file("f")
+          val g = rootDir </> file("g")
+          val expr = sqlB"""select { "α": 7 }"""
+          val viewCache = ViewCache(
+            MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
+            maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
+          val mounts = Map[APath, MountConfig](f -> viewConfig0(expr))
+
+          val (resp, vc) = evalViewTest(now, mounts, InMemState.empty) { (it, ir) =>
+            (for {
+              _ <- vcache.put(f, viewCache)
+              a <- VCacheMiddleware(execute.service[ViewEff]).apply(
+                     Request(uri = (pathUri(f) / "").copy(query =
+                       http4s.Query.fromPairs(
+                         "q" -> s"select * from `../${fileName(f).value}`"))))
+              c <- vcache.get(f).run
+            } yield (a.toHttpResponse(ir), c)).foldMap(it)
+          }.unsafePerformSync
+
+          resp.status must_= Status.Ok
+          resp.headers.get(Expires.name) ∘ (_.value) must_=
+            Renderer.renderString(lastUpdate.plus(Duration.ofSeconds(maxAgeSecs.toLong))).some
+          vc ∘ (_.cacheReads) must_= (viewCache.cacheReads ⊹ 1).some
+        }
+      }
+
+      "stale" >> prop {
+          (now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
+          val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
+            lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isAfter(lastUpdate.plus(maxAge))
+        } ==> {
+          val f = rootDir </> file("f")
+          val g = rootDir </> file("g")
+          val expr = sqlB"""select { "α": 7 }"""
+          val viewCache = ViewCache(
+            MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
+            maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
+          val mounts = Map[APath, MountConfig](f -> viewConfig0(expr))
+
+          val (resp, vc) = evalViewTest(now, mounts, InMemState.empty) { (it, ir) =>
+            (for {
+              _ <- vcache.put(f, viewCache)
+              a <- VCacheMiddleware(execute.service[ViewEff]).apply(
+                Request(uri = (pathUri(f) / "").copy(query =
+                  http4s.Query.fromPairs(
+                    "q" -> s"select * from `../${fileName(f).value}`"))))
+              c <- vcache.get(f).run
+            } yield (a.toHttpResponse(ir), c)).foldMap(it)
+          }.unsafePerformSync
+
+          resp.status must_= Status.Ok
+          resp.headers.get(Warning) ∘ (_.value) must_= StaleHeader.value.some
+          resp.headers.get(Expires) ∘ (_.value) must_=
+            Renderer.renderString(lastUpdate.plus(Duration.ofSeconds(maxAgeSecs.toLong))).some
+          vc ∘ (_.cacheReads) must_= (viewCache.cacheReads ⊹ 1).some
+         }
+      }
     }
     "execute a query with offset and limit and a variable" >> {
       def queryAndExpectedLP(aFile: AFile, varName: AlphaCharacters, var_ : Int): (String, Fix[LogicalPlan]) = {
@@ -374,7 +449,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
         val err: SemanticError =
           SemanticError.WrongArgumentCount(CIName("sum"), 1, 4)
 
-        val expr: Fix[Sql] = sql.fixParser.parseExpr(sql.Query(q)).valueOr(
+        val expr: Fix[Sql] = sql.fixParser.parseExpr(q).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
@@ -389,12 +464,12 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
           response = _ must equal(NonEmptyList(err).toApiError :+ ("phases" := phases)))
       }
       "be 500 for execution error" >> {
-        val q = s"select * from `/foo`"
+        val q = "select * from `/foo`"
         val lp = toLP(q, Variables.empty)
         val msg = "EXEC FAILED"
         val err = executionFailed_(lp, msg)
 
-        val expr: Fix[Sql] = sql.fixParser.parseExpr(sql.Query(q)).valueOr(
+        val expr: Fix[Sql] = sql.fixParser.parseExpr(q).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =

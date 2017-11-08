@@ -26,8 +26,9 @@ import quasar.fs.MonadFsErr
 import quasar.fs.mount.BackendDef.{DefErrT, DefinitionError}
 import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.fs._
-import quasar.qscript.{::/::, ::\::, EquiJoin, ExtractPath, Injectable, Optimize, QScriptCore, QScriptTotal, ShiftedRead, Unicoalesce, Unirewrite}
-import quasar.physical.rdbms.common._
+
+import quasar.qscript.{EquiJoin, ExtractPath, Injectable, Optimize, QScriptCore, QScriptTotal, ShiftedRead, Unicoalesce, Unirewrite}
+import quasar.physical.rdbms.common.Config
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 import quasar.{RenderTree, RenderTreeT, fp}
 import quasar.qscript.analysis._
@@ -71,8 +72,7 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
 
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[
     QSM[T, ?],
-    QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
+    QScriptTotal[T, ?]] = quasar.physical.rdbms.qScriptToQScriptTotal[T]
 
   override def optimize[T[_[_]]: BirecursiveT: EqualT: ShowT]: QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]] = {
     val O = new Optimize[T]

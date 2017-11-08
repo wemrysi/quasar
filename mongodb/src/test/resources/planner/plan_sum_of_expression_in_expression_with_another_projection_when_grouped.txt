@@ -7,11 +7,40 @@ Chain
 │  │          "$sum": {
 │  │            "$cond": [
 │  │              {
-│  │                "$and": [
-│  │                  { "$lt": [{ "$literal": null }, "$pop"] },
-│  │                  { "$lt": ["$pop", { "$literal": "" }] }]
+│  │                "$or": [
+│  │                  {
+│  │                    "$and": [
+│  │                      { "$lt": [{ "$literal": null }, "$pop"] },
+│  │                      { "$lt": ["$pop", { "$literal": "" }] }]
+│  │                  },
+│  │                  {
+│  │                    "$and": [
+│  │                      {
+│  │                        "$lte": [
+│  │                          { "$literal": ISODate("-292275055-05-16T16:47:04.192Z") },
+│  │                          "$pop"]
+│  │                      },
+│  │                      { "$lt": ["$pop", { "$literal": new RegExp("", "") }] }]
+│  │                  }]
 │  │              },
-│  │              { "$subtract": ["$pop", { "$literal": NumberInt("1") }] },
+│  │              {
+│  │                "$cond": [
+│  │                  {
+│  │                    "$and": [
+│  │                      {
+│  │                        "$lt": [
+│  │                          { "$literal": null },
+│  │                          { "$subtract": ["$pop", { "$literal": NumberInt("1") }] }]
+│  │                      },
+│  │                      {
+│  │                        "$lt": [
+│  │                          { "$subtract": ["$pop", { "$literal": NumberInt("1") }] },
+│  │                          { "$literal": "" }]
+│  │                      }]
+│  │                  },
+│  │                  { "$subtract": ["$pop", { "$literal": NumberInt("1") }] },
+│  │                  { "$literal": undefined }]
+│  │              },
 │  │              { "$literal": undefined }]
 │  │          }
 │  │        })

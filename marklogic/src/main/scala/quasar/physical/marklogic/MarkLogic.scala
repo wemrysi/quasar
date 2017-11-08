@@ -40,7 +40,7 @@ import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._, Xcc.ops._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript.{Read => QRead, _}
+import quasar.qscript.{Read => _, _}
 import quasar.qscript.analysis._
 
 import scala.Predef.implicitly
@@ -72,7 +72,7 @@ sealed class MarkLogic protected (readChunkSize: Positive, writeChunkSize: Posit
   val Type = FsType
 
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[QRead[AFile], ?]]))
+    physical.marklogic.qScriptToQScriptTotal[T]
 
   // BackendModule
   def CardinalityQSM: Cardinality[QSM[Fix, ?]] = {

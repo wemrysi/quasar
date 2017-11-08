@@ -86,18 +86,16 @@ Chain
 │  │     │  ╰─ Let(__val)
 │  │     │     ├─ JsCore([_.left, _.right])
 │  │     │     ╰─ SpliceObjects
-│  │     │        ├─ SpliceObjects
-│  │     │        │  ├─ JsCore(__val[0][1])
-│  │     │        │  ╰─ JsCore(__val[0][2])
+│  │     │        ├─ JsCore(__val[0][1])
+│  │     │        ├─ JsCore(__val[0][2])
 │  │     │        ╰─ Obj
 │  │     │           ╰─ Key(state: __val[1][1].state)
 │  │     ╰─ Key(b0)
 │  │        ╰─ Let(__val)
 │  │           ├─ JsCore([_.left, _.right])
 │  │           ╰─ SpliceObjects
-│  │              ├─ SpliceObjects
-│  │              │  ├─ JsCore(__val[0][1])
-│  │              │  ╰─ JsCore(__val[0][2])
+│  │              ├─ JsCore(__val[0][1])
+│  │              ├─ JsCore(__val[0][2])
 │  │              ╰─ Obj
 │  │                 ╰─ Key(state: __val[1][1].state)
 │  ╰─ Scope(Map())

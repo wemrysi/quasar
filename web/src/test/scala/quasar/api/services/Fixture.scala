@@ -17,7 +17,7 @@
 package quasar.api.services
 
 import slamdata.Predef._
-import quasar.api.ResponseOr
+import quasar.api.{ResponseOr, ResponseT}
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._
@@ -25,12 +25,13 @@ import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.InMemory.InMemState
 import quasar.fs.mount._
+import quasar.fs.mount.cache.VCache
 import quasar.metastore.{MetaStore, MetaStoreFixture}
 import quasar.api.JsonFormat.{SingleArray, LineDelimited}
 import quasar.api.JsonPrecision.{Precise, Readable}
 import quasar.api.MessageFormat.JsonContentType
 import quasar.main._
-import quasar.server.Server
+import quasar.server.qErrsToResponseT
 
 import argonaut.{Json, Argonaut}
 import Argonaut._
@@ -87,7 +88,10 @@ object Fixture {
       }
   }
 
-  def mountingInter(mounts: Map[APath, MountConfig]): Task[Mounting ~> Task] = {
+  def mountingInter(mounts: Map[APath, MountConfig]): Task[Mounting ~> Task] =
+    mountingInterInspect(mounts).map{ case (inter, ref) => inter }
+
+  def mountingInterInspect(mounts: Map[APath, MountConfig]): Task[(Mounting ~> Task, Task[Map[APath, MountConfig]])] = {
     type MEff[A] = Coproduct[Task, MountConfigs, A]
     TaskRef(mounts).map { configsRef =>
 
@@ -96,33 +100,55 @@ object Fixture {
       val meff: MEff ~> Task =
         reflNT[Task] :+: KeyValueStore.impl.fromTaskRef(configsRef)
 
-      foldMapNT(meff) compose mounter
+      (foldMapNT(meff) compose mounter, configsRef.read)
     }
   }
 
   def inMemFS(
     state: InMemState = InMemState.empty,
     mounts: MountingsConfig = MountingsConfig.empty
-  ): Task[FS] = {
+  ): Task[FS] =
+    inMemFSInspect(state, mounts).map { case (inter, ref) => inter }
+
+  def inMemFSInspect(
+    state: InMemState = InMemState.empty,
+    mounts: MountingsConfig = MountingsConfig.empty
+  ): Task[(FS, Task[(InMemState, Map[APath, MountConfig])])] = {
     val noShutdown: Task[Unit] = Task.now(())
-    (InMemory.runBackend(state) |@| mountingInter(mounts.toMap))((fs, mount) =>
-      FS(
-        fs andThen injectFT[Task, QErrs_Task],
-        mount andThen injectFT[Task, QErrs_Task],
-        noShutdown))
+    (InMemory.runBackendInspect(state) |@| mountingInterInspect(mounts.toMap))((fsAndRef, mountAndRef) =>
+      (FS(
+        fsAndRef._1 andThen injectFT[Task, QErrs_Task],
+        mountAndRef._1 andThen injectFT[Task, QErrs_Task],
+        noShutdown), (fsAndRef._2 |@| mountAndRef._2).tupled))
   }
 
-  def inMemFSEval(
+  def inMemFSEvalInspect(
     state: InMemState = InMemState.empty,
     mounts: MountingsConfig = MountingsConfig.empty,
     metaRefT: Task[TaskRef[MetaStore]] = MetaStoreFixture.createNewTestMetastore().flatMap(TaskRef(_)),
     persist: quasar.db.DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]
-  ): Task[CoreEffIO ~> QErrs_TaskM] =
+  ): Task[(CoreEffIO ~> QErrs_TaskM, Task[(InMemState, Map[APath, MountConfig])])] =
     for {
-      metaRef <- metaRefT
-      fsThing <- inMemFS(state, mounts)
-      eval    <- CoreEff.defaultImpl(fsThing, metaRef, persist)
-    } yield injectFT[Task, QErrs_Task] :+: eval
+      r         <- TaskRef(Tags.Min(Option.empty[VCache.Expiration]))
+      metaRef   <- metaRefT
+      result    <- inMemFSInspect(state, mounts)
+      (fs, ref) = result
+      eval      <- CoreEff.defaultImpl(fs, metaRef, persist)
+    } yield
+      (injectFT[Task, QErrs_CRW_Task] :+: eval andThen
+      foldMapNT(
+        (Read.fromTaskRef(r) andThen injectFT[Task, QErrs_Task])  :+:
+        (Write.fromTaskRef(r) andThen injectFT[Task, QErrs_Task]) :+:
+        injectFT[Task, QErrs_Task]                                :+:
+        injectFT[QErrs, QErrs_Task]), ref)
+
+  def inMemFSEval(
+     state: InMemState = InMemState.empty,
+     mounts: MountingsConfig = MountingsConfig.empty,
+     metaRefT: Task[TaskRef[MetaStore]] = MetaStoreFixture.createNewTestMetastore().flatMap(TaskRef(_)),
+     persist: quasar.db.DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]
+   ): Task[CoreEffIO ~> QErrs_TaskM] =
+    inMemFSEvalInspect(state, mounts, metaRefT, persist).map{ case (inter, ref) => inter }
 
   def inMemFSWeb(
     state: InMemState = InMemState.empty,
@@ -130,5 +156,15 @@ object Fixture {
     metaRefT: Task[TaskRef[MetaStore]] = MetaStoreFixture.createNewTestMetastore().flatMap(TaskRef(_)),
     persist: quasar.db.DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]
   ): Task[CoreEffIO ~> ResponseOr] =
-    inMemFSEval(state, mounts, metaRefT, persist).map(Server.webInter)
+    inMemFSWebInspect(state, mounts, metaRefT, persist).map{ case (inter, ref) => inter }
+
+  def inMemFSWebInspect(
+    state: InMemState = InMemState.empty,
+    mounts: MountingsConfig = MountingsConfig.empty,
+    metaRefT: Task[TaskRef[MetaStore]] = MetaStoreFixture.createNewTestMetastore().flatMap(TaskRef(_)),
+    persist: quasar.db.DbConnectionConfig => MainTask[Unit] = _ => ().point[MainTask]
+  ): Task[(CoreEffIO ~> ResponseOr, Task[(InMemState, Map[APath, MountConfig])])] =
+    inMemFSEvalInspect(state, mounts, metaRefT, persist).map { case (inter, ref) =>
+      (foldMapNT(liftMT[Task, ResponseT] :+: qErrsToResponseT[Task]) compose inter, ref)
+    }
 }

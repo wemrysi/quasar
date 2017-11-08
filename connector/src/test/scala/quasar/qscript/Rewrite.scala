@@ -128,24 +128,24 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             Free.roll(SRTF.inj(Const(ShiftedRead(sampleFile, IncludeId)))),
             Free.roll(SRTF.inj(Const(ShiftedRead(sampleFile, IncludeId)))),
             AndR(
-              EqR(ProjectFieldR(LeftSideF, StrLit("l_id")), ProjectFieldR(RightSideF, StrLit("r_id"))),
+              EqR(ProjectKeyR(LeftSideF, StrLit("l_id")), ProjectKeyR(RightSideF, StrLit("r_id"))),
               EqR(
                 AddR(
-                  ProjectFieldR(LeftSideF, StrLit("l_min")),
-                  ProjectFieldR(LeftSideF, StrLit("l_max"))),
+                  ProjectKeyR(LeftSideF, StrLit("l_min")),
+                  ProjectKeyR(LeftSideF, StrLit("l_max"))),
                 SubtractR(
-                  ProjectFieldR(RightSideF, StrLit("l_max")),
-                  ProjectFieldR(RightSideF, StrLit("l_min"))))),
+                  ProjectKeyR(RightSideF, StrLit("l_max")),
+                  ProjectKeyR(RightSideF, StrLit("l_min"))))),
             JoinType.Inner,
             ConcatMapsR(
               MakeMapR(StrLit("l"), LeftSideF),
               MakeMapR(StrLit("r"), RightSideF)))).embed,
             LtR(
-              ProjectFieldR(
-                ProjectFieldR(HoleF, StrLit("l")),
+              ProjectKeyR(
+                ProjectKeyR(HoleF, StrLit("l")),
                 StrLit("lat")),
-              ProjectFieldR(
-                ProjectFieldR(HoleF, StrLit("l")),
+              ProjectKeyR(
+                ProjectKeyR(HoleF, StrLit("l")),
                 StrLit("lon")))))
 
       Coalesce[Fix, QST, QST].coalesceTJ(idPrism[QST].get).apply(exp).map(rewrite.normalizeTJ[QST]) must
@@ -156,17 +156,17 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
           Free.roll(SRTF.inj(Const(ShiftedRead(sampleFile, IncludeId)))),
           AndR(
             AndR(
-              EqR(ProjectFieldR(LeftSideF, StrLit("l_id")), ProjectFieldR(RightSideF, StrLit("r_id"))),
+              EqR(ProjectKeyR(LeftSideF, StrLit("l_id")), ProjectKeyR(RightSideF, StrLit("r_id"))),
               EqR(
                 AddR(
-                  ProjectFieldR(LeftSideF, StrLit("l_min")),
-                  ProjectFieldR(LeftSideF, StrLit("l_max"))),
+                  ProjectKeyR(LeftSideF, StrLit("l_min")),
+                  ProjectKeyR(LeftSideF, StrLit("l_max"))),
                 SubtractR(
-                  ProjectFieldR(RightSideF, StrLit("l_max")),
-                  ProjectFieldR(RightSideF, StrLit("l_min"))))),
+                  ProjectKeyR(RightSideF, StrLit("l_max")),
+                  ProjectKeyR(RightSideF, StrLit("l_min"))))),
             LtR(
-              ProjectFieldR(LeftSideF, StrLit("lat")),
-              ProjectFieldR(LeftSideF, StrLit("lon")))),
+              ProjectKeyR(LeftSideF, StrLit("lat")),
+              ProjectKeyR(LeftSideF, StrLit("lon")))),
           JoinType.Inner,
           ConcatMapsR(
             MakeMapR(StrLit("l"), LeftSideF),
@@ -198,7 +198,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
           Free.roll(QCT.inj(LeftShift(
             Free.roll(QCT.inj(Map(
               Free.roll(DET.inj(Const[DeadEnd, FreeQS](Root))),
-              ProjectFieldR(HoleF, StrLit("city"))))),
+              ProjectKeyR(HoleF, StrLit("city"))))),
             HoleF,
             IncludeId,
             ConcatArraysR(
@@ -209,7 +209,7 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             StrLit("name")))),
           BoolLit[Fix, JoinSide](true),
           JoinType.Inner,
-          ProjectFieldR(
+          ProjectKeyR(
             ProjectIndexR(
               ProjectIndexR(LeftSideF, IntLit(1)),
               IntLit(1)),
@@ -220,9 +220,9 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
         chain(
           RootR,
           QC.inj(LeftShift((),
-            ProjectFieldR(HoleF, StrLit("city")),
+            ProjectKeyR(HoleF, StrLit("city")),
             ExcludeId,
-            ProjectFieldR(RightSideF, StrLit("name"))))))
+            ProjectKeyR(RightSideF, StrLit("name"))))))
     }
 
     "fold a constant doubly-nested array value" in {
@@ -319,20 +319,20 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
           AndR(AndR(
             // reversed equality
             EqR(
-              ProjectFieldR(RightSideF, StrLit("r_id")),
-              ProjectFieldR(LeftSideF, StrLit("l_id"))),
+              ProjectKeyR(RightSideF, StrLit("r_id")),
+              ProjectKeyR(LeftSideF, StrLit("l_id"))),
             // more complicated expression, duplicated refs
             EqR(
               AddR(
-                ProjectFieldR(LeftSideF, StrLit("l_min")),
-                ProjectFieldR(LeftSideF, StrLit("l_max"))),
+                ProjectKeyR(LeftSideF, StrLit("l_min")),
+                ProjectKeyR(LeftSideF, StrLit("l_max"))),
               SubtractR(
-                ProjectFieldR(RightSideF, StrLit("l_max")),
-                ProjectFieldR(RightSideF, StrLit("l_min"))))),
+                ProjectKeyR(RightSideF, StrLit("l_max")),
+                ProjectKeyR(RightSideF, StrLit("l_min"))))),
             // inequality
             LtR(
-              ProjectFieldR(LeftSideF, StrLit("l_lat")),
-              ProjectFieldR(RightSideF, StrLit("r_lat")))),
+              ProjectKeyR(LeftSideF, StrLit("l_lat")),
+              ProjectKeyR(RightSideF, StrLit("r_lat")))),
           JoinType.Inner,
           ConcatMapsR(LeftSideF, RightSideF)))
 
@@ -344,23 +344,23 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
               Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
               Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
               List(
-                (ProjectFieldR(HoleF, StrLit("l_id")),
-                  ProjectFieldR(HoleF, StrLit("r_id"))),
+                (ProjectKeyR(HoleF, StrLit("l_id")),
+                  ProjectKeyR(HoleF, StrLit("r_id"))),
                 (AddR(
-                  ProjectFieldR(HoleF, StrLit("l_min")),
-                  ProjectFieldR(HoleF, StrLit("l_max"))),
+                  ProjectKeyR(HoleF, StrLit("l_min")),
+                  ProjectKeyR(HoleF, StrLit("l_max"))),
                   SubtractR(
-                    ProjectFieldR(HoleF, StrLit("l_max")),
-                    ProjectFieldR(HoleF, StrLit("l_min"))))),
+                    ProjectKeyR(HoleF, StrLit("l_max")),
+                    ProjectKeyR(HoleF, StrLit("l_min"))))),
               JoinType.Inner,
               ConcatArraysR(
                 MakeArrayR(LeftSideF),
                 MakeArrayR(RightSideF)))).embed,
             LtR(
-              ProjectFieldR(
+              ProjectKeyR(
                 ProjectIndexR(HoleF, IntLit(0)),
                 StrLit("l_lat")),
-              ProjectFieldR(
+              ProjectKeyR(
                 ProjectIndexR(HoleF, IntLit(1)),
                 StrLit("r_lat"))))).embed,
           ConcatMapsR(
@@ -444,8 +444,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
               Type.AnyObject,
               UndefinedR,
               EqR(
-                ProjectFieldR(RightSideF, StrLit("r_id")),
-                ProjectFieldR(LeftSideF, StrLit("l_id")))))),
+                ProjectKeyR(RightSideF, StrLit("r_id")),
+                ProjectKeyR(LeftSideF, StrLit("l_id")))))),
             JoinType.Inner,
             ConcatMapsR(
               Free.roll(MFC(Guard(
@@ -467,8 +467,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
                 BoolLit(true))))))),
             Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
             EqR(
-              ProjectFieldR(RightSideF, StrLit("r_id")),
-              ProjectFieldR(LeftSideF, StrLit("l_id"))),
+              ProjectKeyR(RightSideF, StrLit("r_id")),
+              ProjectKeyR(LeftSideF, StrLit("l_id"))),
             JoinType.Inner,
             ConcatMapsR(LeftSideF, RightSideF))).embed
 
@@ -485,8 +485,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
               LeftSideF,
               Type.AnyObject,
               EqR(
-                ProjectFieldR(RightSideF, StrLit("r_id")),
-                ProjectFieldR(LeftSideF, StrLit("l_id"))),
+                ProjectKeyR(RightSideF, StrLit("r_id")),
+                ProjectKeyR(LeftSideF, StrLit("l_id"))),
               UndefinedR))),
             JoinType.Inner,
             ConcatMapsR(
@@ -509,8 +509,8 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
                 BoolLit(false))))))),
             Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
             EqR(
-              ProjectFieldR(RightSideF, StrLit("r_id")),
-              ProjectFieldR(LeftSideF, StrLit("l_id"))),
+              ProjectKeyR(RightSideF, StrLit("r_id")),
+              ProjectKeyR(LeftSideF, StrLit("l_id"))),
             JoinType.Inner,
             ConcatMapsR(LeftSideF, RightSideF))).embed
 
@@ -524,15 +524,15 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
             Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
             Free.roll(MFC(Cond(
-              LtR(ProjectFieldR(LeftSideF, StrLit("x")), IntLit(7)),
+              LtR(ProjectKeyR(LeftSideF, StrLit("x")), IntLit(7)),
               UndefinedR,
               EqR(
-                ProjectFieldR(RightSideF, StrLit("r_id")),
-                ProjectFieldR(LeftSideF, StrLit("l_id")))))),
+                ProjectKeyR(RightSideF, StrLit("r_id")),
+                ProjectKeyR(LeftSideF, StrLit("l_id")))))),
             JoinType.Inner,
             ConcatMapsR(
               Free.roll(MFC(Cond(
-                LtR(ProjectFieldR(LeftSideF, StrLit("x")), IntLit(7)),
+                LtR(ProjectKeyR(LeftSideF, StrLit("x")), IntLit(7)),
                 UndefinedR,
                 LeftSideF))),
               RightSideF))).embed
@@ -542,11 +542,11 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
             Free.roll(QCT(Filter(
               Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
-              NotR(LtR(ProjectFieldR(HoleF, StrLit("x")), IntLit(7)))))),
+              NotR(LtR(ProjectKeyR(HoleF, StrLit("x")), IntLit(7)))))),
             Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
             EqR(
-              ProjectFieldR(RightSideF, StrLit("r_id")),
-              ProjectFieldR(LeftSideF, StrLit("l_id"))),
+              ProjectKeyR(RightSideF, StrLit("r_id")),
+              ProjectKeyR(LeftSideF, StrLit("l_id"))),
             JoinType.Inner,
             ConcatMapsR(LeftSideF, RightSideF))).embed
 
@@ -560,15 +560,15 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
             Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
             Free.roll(MFC(Cond(
-              LtR(ProjectFieldR(LeftSideF, StrLit("x")), IntLit(7)),
+              LtR(ProjectKeyR(LeftSideF, StrLit("x")), IntLit(7)),
               EqR(
-                ProjectFieldR(RightSideF, StrLit("r_id")),
-                ProjectFieldR(LeftSideF, StrLit("l_id"))),
+                ProjectKeyR(RightSideF, StrLit("r_id")),
+                ProjectKeyR(LeftSideF, StrLit("l_id"))),
               UndefinedR))),
             JoinType.Inner,
             ConcatMapsR(
               Free.roll(MFC(Cond(
-                LtR(ProjectFieldR(LeftSideF, StrLit("x")), IntLit(7)),
+                LtR(ProjectKeyR(LeftSideF, StrLit("x")), IntLit(7)),
                 LeftSideF,
                 UndefinedR))),
               RightSideF))).embed
@@ -578,11 +578,11 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
             QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
             Free.roll(QCT(Filter(
               Free.roll(RTF.inj(Const(Read(rootDir </> file("foo"))))),
-              LtR(ProjectFieldR(HoleF, StrLit("x")), IntLit(7))))),
+              LtR(ProjectKeyR(HoleF, StrLit("x")), IntLit(7))))),
             Free.roll(RTF.inj(Const(Read(rootDir </> file("bar"))))),
             EqR(
-              ProjectFieldR(RightSideF, StrLit("r_id")),
-              ProjectFieldR(LeftSideF, StrLit("l_id"))),
+              ProjectKeyR(RightSideF, StrLit("r_id")),
+              ProjectKeyR(LeftSideF, StrLit("l_id"))),
             JoinType.Inner,
             ConcatMapsR(LeftSideF, RightSideF))).embed
 
