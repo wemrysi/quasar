@@ -281,11 +281,6 @@ object QScriptUniform {
         case Map(a, fm) => (a, fm)
       } { case (a, fm) => Map(a, fm) }
 
-    def unreferenced[A]: Prism[QScriptUniform[A], Unit] =
-      Prism.partial[QScriptUniform[A], Unit] {
-        case Unreferenced() => ()
-      } (κ(Unreferenced()))
-
     def qsFilter[A]: Prism[QScriptUniform[A], (A, FreeMap)] =
       Prism.partial[QScriptUniform[A], (A, FreeMap)] {
         case QSFilter(a, p) => (a, p)
@@ -325,6 +320,11 @@ object QScriptUniform {
       Prism.partial[QScriptUniform[A], (A, A)] {
         case Union(l, r) => (l, r)
       } { case (l, r) => Union(l, r) }
+
+    def unreferenced[A]: Prism[QScriptUniform[A], Unit] =
+      Prism.partial[QScriptUniform[A], Unit] {
+        case Unreferenced() => ()
+      } (κ(Unreferenced()))
 
     def freeMaps[A]: Traversal[QScriptUniform[A], FreeMap] =
       new Traversal[QScriptUniform[A], FreeMap] {
@@ -413,9 +413,6 @@ object QScriptUniform {
     def map1(src: QSU, f: MapFuncCore[Hole]): QSU =
       map(src, Free.roll(mfc(f as HoleF[T])))
 
-    val unreferenced: Prism[QSU, Unit] =
-      iso composePrism O.unreferenced
-
     val qsFilter: Prism[QSU, (QSU, FreeMap)] =
       iso composePrism O.qsFilter
 
@@ -445,6 +442,9 @@ object QScriptUniform {
 
     val union: Prism[QSU, (QSU, QSU)] =
       iso composePrism O.union
+
+    val unreferenced: Prism[QSU, Unit] =
+      iso composePrism O.unreferenced
   }
 
   object Dsl {
