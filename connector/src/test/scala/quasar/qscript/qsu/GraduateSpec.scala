@@ -23,7 +23,15 @@ import quasar.Planner.PlannerError
 import quasar.contrib.pathy.AFile
 import quasar.fp._
 import quasar.qscript.construction
-import quasar.qscript.HoleF
+import quasar.qscript.{
+  HoleF,
+  IncludeId,
+  LeftSideF,
+  ReduceFunc,
+  ReduceFuncs,
+  ReduceIndex,
+  ReduceIndexF,
+  RightSideF}
 import quasar.qscript.MapFuncsCore.IntLit
 
 import matryoshka.EqualT
@@ -31,7 +39,7 @@ import matryoshka.data.Fix, Fix._
 import matryoshka.implicits._
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}
 import pathy.Path, Path.{file, Sandboxed}
-import scalaz.\/
+import scalaz.{\/, \/-}
 import scalaz.Scalaz._
 
 object GraduateSpec extends Qspec with QSUTTypes[Fix] {
@@ -61,8 +69,39 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
     "convert Map" in {
       val fm: FreeMap = func.Add(HoleF, IntLit(17))
+
       val qgraph: Fix[QSU] = qsu.map(qsu.read(afile), fm)
       val qscript: Fix[QSE] = qse.Map(qse.Read[AFile](afile), fm)
+
+      qgraph must graduateAs(qscript)
+    }
+
+    "convert QSFilter" in {
+      val fm: FreeMap = func.Add(HoleF, IntLit(17))
+
+      val qgraph: Fix[QSU] = qsu.qsFilter(qsu.read(afile), fm)
+      val qscript: Fix[QSE] = qse.Filter(qse.Read[AFile](afile), fm)
+
+      qgraph must graduateAs(qscript)
+    }
+
+    "convert QSReduce" in {
+      val buckets: List[FreeMap] = List(func.Add(HoleF, IntLit(17)))
+      val reducers: List[ReduceFunc[FreeMap]] = List(ReduceFuncs.Count(HoleF))
+      val repair: FreeMapA[ReduceIndex] = ReduceIndexF(\/-(0))
+
+      val qgraph: Fix[QSU] = qsu.qsReduce(qsu.read(afile), buckets, reducers, repair)
+      val qscript: Fix[QSE] = qse.Reduce(qse.Read[AFile](afile), buckets, reducers, repair)
+
+      qgraph must graduateAs(qscript)
+    }
+
+    "convert LeftShift" in {
+      val struct: FreeMap = func.Add(HoleF, IntLit(17))
+      val repair: JoinFunc = func.ConcatArrays(func.MakeArray(LeftSideF), func.MakeArray(RightSideF))
+
+      val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile), struct, IncludeId, repair)
+      val qscript: Fix[QSE] = qse.LeftShift(qse.Read[AFile](afile), struct, IncludeId, repair)
 
       qgraph must graduateAs(qscript)
     }
