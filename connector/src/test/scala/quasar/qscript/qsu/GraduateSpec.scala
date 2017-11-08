@@ -19,7 +19,8 @@ package quasar.qscript.qsu
 import slamdata.Predef._
 
 import quasar.Qspec
-import quasar.Planner.PlannerError
+import quasar.Planner.{InternalError, PlannerError}
+import quasar.common.SortDir
 import quasar.contrib.pathy.AFile
 import quasar.fp._
 import quasar.qscript.construction
@@ -39,7 +40,7 @@ import matryoshka.data.Fix, Fix._
 import matryoshka.implicits._
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}
 import pathy.Path, Path.{file, Sandboxed}
-import scalaz.{\/, \/-}
+import scalaz.{\/, \/-, NonEmptyList => NEL}
 import scalaz.Scalaz._
 
 object GraduateSpec extends Qspec with QSUTTypes[Fix] {
@@ -60,50 +61,78 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
   "graduating QSU to QScript" should {
 
-    "convert Read" in {
-      val qgraph: Fix[QSU] = qsu.read(afile)
-      val qscript: Fix[QSE] = qse.Read[AFile](afile)
+    "convert the QScript-ish nodes" >> {
 
-      qgraph must graduateAs(qscript)
+      "convert Read" in {
+        val qgraph: Fix[QSU] = qsu.read(afile)
+        val qscript: Fix[QSE] = qse.Read[AFile](afile)
+
+        qgraph must graduateAs(qscript)
+      }
+
+      "convert Map" in {
+        val fm: FreeMap = func.Add(HoleF, IntLit(17))
+
+        val qgraph: Fix[QSU] = qsu.map(qsu.read(afile), fm)
+        val qscript: Fix[QSE] = qse.Map(qse.Read[AFile](afile), fm)
+
+        qgraph must graduateAs(qscript)
+      }
+
+      "convert QSFilter" in {
+        val fm: FreeMap = func.Add(HoleF, IntLit(17))
+
+        val qgraph: Fix[QSU] = qsu.qsFilter(qsu.read(afile), fm)
+        val qscript: Fix[QSE] = qse.Filter(qse.Read[AFile](afile), fm)
+
+        qgraph must graduateAs(qscript)
+      }
+
+      "convert QSReduce" in {
+        val buckets: List[FreeMap] = List(func.Add(HoleF, IntLit(17)))
+        val reducers: List[ReduceFunc[FreeMap]] = List(ReduceFuncs.Count(HoleF))
+        val repair: FreeMapA[ReduceIndex] = ReduceIndexF(\/-(0))
+
+        val qgraph: Fix[QSU] = qsu.qsReduce(qsu.read(afile), buckets, reducers, repair)
+        val qscript: Fix[QSE] = qse.Reduce(qse.Read[AFile](afile), buckets, reducers, repair)
+
+        qgraph must graduateAs(qscript)
+      }
+
+      "convert LeftShift" in {
+        val struct: FreeMap = func.Add(HoleF, IntLit(17))
+        val repair: JoinFunc = func.ConcatArrays(func.MakeArray(LeftSideF), func.MakeArray(RightSideF))
+
+        val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile), struct, IncludeId, repair)
+        val qscript: Fix[QSE] = qse.LeftShift(qse.Read[AFile](afile), struct, IncludeId, repair)
+
+        qgraph must graduateAs(qscript)
+      }
+
+      "convert QSSort" in {
+        val buckets: List[FreeMap] = List(func.Add(HoleF, IntLit(17)))
+        val order: NEL[(FreeMap, SortDir)] = NEL(HoleF -> SortDir.Descending)
+
+        val qgraph: Fix[QSU] = qsu.qsSort(qsu.read(afile), buckets, order)
+        val qscript: Fix[QSE] = qse.Sort(qse.Read[AFile](afile), buckets, order)
+
+        qgraph must graduateAs(qscript)
+      }
+
+      "convert Unreferenced" in {
+        val qgraph: Fix[QSU] = qsu.unreferenced()
+        val qscript: Fix[QSE] = qse.Unreferenced
+
+        qgraph must graduateAs(qscript)
+      }
     }
 
-    "convert Map" in {
-      val fm: FreeMap = func.Add(HoleF, IntLit(17))
+    "fail to convert the LP-ish nodes" >> {
+      "not convert LPFilter" in {
+        val qgraph: Fix[QSU] = qsu.lpFilter(qsu.read(afile), qsu.read(afile))
 
-      val qgraph: Fix[QSU] = qsu.map(qsu.read(afile), fm)
-      val qscript: Fix[QSE] = qse.Map(qse.Read[AFile](afile), fm)
-
-      qgraph must graduateAs(qscript)
-    }
-
-    "convert QSFilter" in {
-      val fm: FreeMap = func.Add(HoleF, IntLit(17))
-
-      val qgraph: Fix[QSU] = qsu.qsFilter(qsu.read(afile), fm)
-      val qscript: Fix[QSE] = qse.Filter(qse.Read[AFile](afile), fm)
-
-      qgraph must graduateAs(qscript)
-    }
-
-    "convert QSReduce" in {
-      val buckets: List[FreeMap] = List(func.Add(HoleF, IntLit(17)))
-      val reducers: List[ReduceFunc[FreeMap]] = List(ReduceFuncs.Count(HoleF))
-      val repair: FreeMapA[ReduceIndex] = ReduceIndexF(\/-(0))
-
-      val qgraph: Fix[QSU] = qsu.qsReduce(qsu.read(afile), buckets, reducers, repair)
-      val qscript: Fix[QSE] = qse.Reduce(qse.Read[AFile](afile), buckets, reducers, repair)
-
-      qgraph must graduateAs(qscript)
-    }
-
-    "convert LeftShift" in {
-      val struct: FreeMap = func.Add(HoleF, IntLit(17))
-      val repair: JoinFunc = func.ConcatArrays(func.MakeArray(LeftSideF), func.MakeArray(RightSideF))
-
-      val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile), struct, IncludeId, repair)
-      val qscript: Fix[QSE] = qse.LeftShift(qse.Read[AFile](afile), struct, IncludeId, repair)
-
-      qgraph must graduateAs(qscript)
+        qgraph must notGraduate
+      }
     }
   }
 
@@ -114,10 +143,34 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
         actual.bimap[MatchResult[S], MatchResult[S]](
         { err =>
-          failure(s"graduating produced planner error: ${err.shows}", s)
+          failure(s"graduating produced unexpected planner error: ${err.shows}", s)
         },
         { qscript =>
-          result(EqualT[Fix].equal[QSE](qscript, expected), "yay", "boo", s)
+          result(
+            EqualT[Fix].equal[QSE](qscript, expected),
+            s"received expected qscript:\n${qscript.shows}",
+            s"received unexpected qscript:\n${qscript.shows}",
+            s)
+        }).merge
+      }
+    }
+  }
+
+  def notGraduate: Matcher[Fix[QSU]] = {
+    new Matcher[Fix[QSU]] {
+      def apply[S <: Fix[QSU]](s: Expectable[S]): MatchResult[S] = {
+        val actual: F[Fix[QSE]] = grad[F](QSUGraph.fromTree[Fix](s.value))
+
+        // TODO better equality checking for PlannerError
+        actual.bimap[MatchResult[S], MatchResult[S]](
+        {
+          case err @ InternalError(_, None) =>
+            success(s"received expected InternalError: ${(err: PlannerError).shows}", s)
+          case err =>
+            failure(s"expected an InternalError without a cause, received: ${err.shows}", s)
+        },
+        { qscript =>
+          failure(s"expected an error but found qscript:\n${qscript.shows}", s)
         }).merge
       }
     }
