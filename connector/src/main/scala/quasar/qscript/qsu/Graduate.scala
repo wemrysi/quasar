@@ -35,7 +35,8 @@ import quasar.qscript.{
   SrcMerge,
   Subset,
   ThetaJoin,
-  Union}
+  Union,
+  Unreferenced}
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.QSUGraph.QSUPattern
 
@@ -99,7 +100,8 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
 
       case QSU.Distinct(source) => slamdata.Predef.??? // TODO
 
-      case QSU.Nullary(mf) => slamdata.Predef.??? // TODO
+      case QSU.Unreferenced() =>
+        QCE(Unreferenced[T, QSUGraph]()).point[F]
 
       case QSU.ThetaJoin(left, right, condition, joinType, combiner) =>
         val SrcMerge(source, lBranch, rBranch) = mergeSources[F](left, right)

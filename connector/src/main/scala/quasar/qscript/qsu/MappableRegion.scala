@@ -75,9 +75,6 @@ object MappableRegion {
       case QSUPattern(_, Map(srcG, mf)) =>
         mf.as(srcG).left
 
-      case QSUPattern(_, Nullary(mf)) =>
-        CoEnv(mf[QSUGraph[T]].right[QSUGraph[T]]).right
-
       case _ =>
         CoEnv(g.left).right
     }

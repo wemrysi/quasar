@@ -295,17 +295,10 @@ object QSUGraph extends QSUGraphInstances {
       }
     }
 
-    object Nullary {
-      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
-        case g: QSU.Nullary[T, QSUGraph[T]] => QSU.Nullary.unapply(g)
-        case _ => None
-      }
-    }
-
-    object Constant {
-      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
-        case g: QSU.Nullary[T, QSUGraph[T]] => QSU.Constant.unapply(g)
-        case _ => None
+    object Unreferenced {
+      def unapply[T[_[_]]](g: QSUGraph[T]): Boolean = g.unfold match {
+        case g: QSU.Unreferenced[T, QSUGraph[T]] => QSU.Unreferenced.unapply(g)
+        case _ => false
       }
     }
 

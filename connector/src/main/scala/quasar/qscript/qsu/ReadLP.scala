@@ -22,6 +22,7 @@ import quasar.{
   Data,
   Mapping,
   NameGenerator,
+  NullaryFunc,
   Reduction,
   TernaryFunc,
   UnaryFunc
@@ -50,7 +51,7 @@ import matryoshka.{AlgebraM, BirecursiveT}
 import matryoshka.implicits._
 import matryoshka.patterns.{interpretM, CoEnv}
 import pathy.Path.{rootDir, Sandboxed}
-import scalaz.{\/, Forall, Free, Inject, Monad, NonEmptyList => NEL, StateT}
+import scalaz.{\/, Free, Inject, Monad, NonEmptyList => NEL, StateT}
 import scalaz.std.tuple._
 import scalaz.syntax.bifunctor._
 import scalaz.syntax.either._
@@ -89,17 +90,19 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
       } yield back
 
     case lp.Constant(data) =>
-      val back = fromData(data).fold[PlannerError \/ QSU[Symbol]](
+      val back = fromData(data).fold[PlannerError \/ MapFunc[FreeMap]](
         {
           case Data.NA =>
-            QSU.Nullary[T, Symbol](Forall(_(IC(MapFuncsCore.Undefined())))).right
+            IC(MapFuncsCore.Undefined()).right
 
           case d =>
             NonRepresentableData(d).left
         },
-        { x: T[EJson] => QSU.Constant[T, Symbol](x).right })
+        { ejson: T[EJson] => IC(MapFuncsCore.Constant(ejson)).right })
 
-      MonadError_[G, PlannerError].unattempt(back.point[G]).flatMap(withName[G])
+      MonadError_[G, PlannerError]
+        .unattempt(back.point[G])
+        .flatMap(nullary[G])
 
     case lp.InvokeUnapply(StructuralLib.FlattenMap, Sized(a)) =>
       val transpose =
@@ -173,6 +176,12 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
 
     case lp.InvokeUnapply(func: BinaryFunc, Sized(a, b)) if func.effect === Reduction => ???
 
+    case lp.InvokeUnapply(func: NullaryFunc, Sized()) if func.effect === Mapping =>
+      val translated =
+        MapFunc.translateNullaryMapping[T, MapFunc, Free[MapFunc, Hole]].apply(func)
+
+      nullary[G](translated)
+
     case lp.InvokeUnapply(func: UnaryFunc, Sized(a)) if func.effect === Mapping =>
       val translated =
         MapFunc.translateUnaryMapping[T, MapFunc, Free[MapFunc, Hole]].apply(func)(
@@ -230,15 +239,20 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
       withName[G](node).map(g => graphs.foldLeft(g)(_ :++ _))
   }
 
+  private def nullary[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](func: MapFunc[FreeMap])
+      : G[QSUGraph] =
+    for {
+      source <- withName[G](QSU.Unreferenced[T, Symbol]())
+      back <- extend1[G](source)(QSU.Map[T, Symbol](_, Free.roll(func)))
+    } yield back
+
   private def projectConstIdx[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](
       idx: Int)(
       parent: QSUGraph): G[QSUGraph] = {
+    val const: T[EJson] = ejson.ExtEJson(ejson.Int[T[EJson]](idx)).embed
 
     for {
-      idxG <- withName[G](
-        QSU.Constant[T, Symbol](
-          ejson.ExtEJson(ejson.Int[T[EJson]](idx)).embed))
-
+      idxG <- nullary[G](IC(MapFuncsCore.Constant(const)))
       back <- autoJoin2[G](parent, idxG)((p, i) => IC(MapFuncsCore.ProjectIndex[T, Int](p, i)))
     } yield back
   }

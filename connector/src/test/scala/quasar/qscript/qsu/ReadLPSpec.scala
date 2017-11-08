@@ -55,13 +55,12 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
     }
 
     // we can't do this as a property test because Data and EJson don't round-trip! :-(
-    "convert Constant nodes" >> {
+    "convert constant nodes" >> {
       "Int" >> {
         val data = Data.Int(42)
 
         lpf.constant(data) must readQsuAs {
-          case Constant(ejson) =>
-            ejson.cata(Data.fromEJson) mustEqual data
+          case DataConstant(`data`) => ok
         }
       }
 
@@ -69,8 +68,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
         val data = Data.Str("foo")
 
         lpf.constant(data) must readQsuAs {
-          case Constant(ejson) =>
-            ejson.cata(Data.fromEJson) mustEqual data
+          case DataConstant(`data`) => ok
         }
       }
     }
@@ -319,7 +317,8 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
 
   object DataConstant {
     def unapply(qgraph: QSUGraph): Option[Data] = qgraph match {
-      case Constant(ejson) => Some(ejson.cata(Data.fromEJson))
+      case Map(Unreferenced(), FMFC1(MapFuncsCore.Constant(ejson))) =>
+        Some(ejson.cata(Data.fromEJson))
       case _ => None
     }
   }
