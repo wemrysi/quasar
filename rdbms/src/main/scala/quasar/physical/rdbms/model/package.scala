@@ -40,12 +40,12 @@ package object model {
   }
 
   type Eff[A] = (
-    Task :\:
-      ConnectionIO :\:
-      MonotonicSeq :\:
-      GenUUID :\:
-      KeyValueStore[ReadHandle, DbDataStream, ?] :/:
-      KeyValueStore[WriteHandle, TablePath, ?]
+          Task
+      :\: ConnectionIO
+      :\: MonotonicSeq
+      :\: GenUUID
+      :\: KeyValueStore[ReadHandle, DbDataStream, ?]
+      :/: KeyValueStore[WriteHandle, TablePath, ?]
   )#M[A]
 
   type M[A] = Free[Eff, A]
