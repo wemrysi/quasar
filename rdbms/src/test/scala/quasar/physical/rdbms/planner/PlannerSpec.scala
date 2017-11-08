@@ -62,10 +62,13 @@ class PlannerSpec extends Qspec with SqlExprSupport {
 
   def selection(
       v: Fix[SqlExpr],
-      alias: Option[SqlExpr.Id[Fix[SqlExpr]]] = None): Selection[Fix[SqlExpr]] =
+      alias: Option[SqlExpr.Id[Fix[SqlExpr]]] = id0.some): Selection[Fix[SqlExpr]] =
     Selection[Fix[SqlExpr]](v, alias)
 
-  def * : Fix[SqlExpr] = Fix(AllCols("row"))
+
+  def id0Token: String = "_0"
+  def id0 : Id[Fix[SqlExpr]] = Id(id0Token)
+  def * : Fix[SqlExpr] = Fix(AllCols(id0Token))
 
   def fromTable(
       name: String,
@@ -84,12 +87,11 @@ class PlannerSpec extends Qspec with SqlExprSupport {
       plan(sqlE"select * from foo") must
         beRepr({
           select(
-            selection(*),
-            From(Fix(Select(selection(*), fromTable("db.foo"), filter = None)),
-                 alias = Id("_0").some))
+            selection(*, alias = None),
+            From(Fix(SelectRow(selection(*), fromTable("db.foo"))),
+              alias = id0.some))
         })
     }
-
     def expectShiftedReadRepr(forIdStatus: IdStatus,
                               expectedRepr: SqlExpr[Fix[SqlExpr]]) = {
       val path: AFile = rootDir </> dir("db") </> file("foo")
@@ -105,19 +107,19 @@ class PlannerSpec extends Qspec with SqlExprSupport {
 
     "build plan including ids" in {
       expectShiftedReadRepr(forIdStatus = IncludeId, expectedRepr = {
-        select(selection(Fix(WithIds(*))), fromTable("db.foo"))
+        SelectRow(selection(Fix(WithIds(*))), fromTable("db.foo"))
       })
     }
 
     "build plan only for ids" in {
       expectShiftedReadRepr(forIdStatus = IdOnly, expectedRepr = {
-        select(selection(Fix(RowIds())), fromTable("db.foo"))
+        SelectRow(selection(Fix(RowIds())), fromTable("db.foo"))
       })
     }
 
     "build plan only for excluded ids" in {
       expectShiftedReadRepr(forIdStatus = ExcludeId, expectedRepr = {
-        select(selection(*), fromTable("db.foo"))
+        SelectRow(selection(*), fromTable("db.foo"))
       })
     }
   }
