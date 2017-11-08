@@ -24,6 +24,7 @@ import quasar.effect.{Kvs, MonoSeq}
 import quasar.effect.Kvs._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._
+import quasar.fs.FileSystemError._
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.common.TablePath
 import quasar.connector.ManagedReadFile
@@ -35,6 +36,7 @@ import doobie.syntax.process._
 import doobie.util.meta.Meta
 import scalaz._
 import Scalaz._
+import scalaz.stream.Process._
 import scalaz.concurrent.Task
 
 trait RdbmsReadFile
@@ -72,13 +74,16 @@ trait RdbmsReadFile
     ): Backend[DbDataStream] = {
 
       transactor(cfg).map { xa =>
-        DbDataStream(selectAllQuery(dbPath, offset, limit)
-                       .query[Data]
-                       .process
-                       .chunk(chunkSize)
-                       .map(_.right[FileSystemError])
-                       .transact(xa),
-                     xa.configure(_.close()))
+        DbDataStream(
+          selectAllQuery(dbPath, offset, limit)
+            .query[Data]
+            .process
+            .chunk(chunkSize)
+            .attempt(ex =>
+              emit(readFailed(dbPath.shows, ex.getLocalizedMessage)))
+            .transact(xa),
+          xa.configure(_.close())
+        )
       }.liftB
     }
 
