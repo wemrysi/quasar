@@ -61,10 +61,10 @@ trait SqlExprRenderTree {
           case SelectRow(selection, from) =>
 
             NonTerminal(
-              "Select" :: Nil,
+              "SelectRow" :: Nil,
               none,
-              nt("selection", selection.alias ∘ (_.v), selection.v) ::
-                List(nt("from", from.alias ∘ (_.v), from.v))
+              nt("selectionInRow", selection.alias ∘ (_.v), selection.v) ::
+                List(nt("fromInRow`", from.alias ∘ (_.v), from.v))
             )
         }
       }
