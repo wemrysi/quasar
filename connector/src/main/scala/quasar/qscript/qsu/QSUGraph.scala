@@ -253,16 +253,16 @@ object QSUGraph extends QSUGraphInstances {
       }
     }
 
-    object Sort {
+    object LPSort {
       def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
-        case g: QSU.Sort[T, QSUGraph[T]] => QSU.Sort.unapply(g)
+        case g: QSU.LPSort[T, QSUGraph[T]] => QSU.LPSort.unapply(g)
         case _ => None
       }
     }
 
-    object UniformSort {
+    object QSSort {
       def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
-        case g: QSU.UniformSort[T, QSUGraph[T]] => QSU.UniformSort.unapply(g)
+        case g: QSU.QSSort[T, QSUGraph[T]] => QSU.QSSort.unapply(g)
         case _ => None
       }
     }
