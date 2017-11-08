@@ -62,10 +62,12 @@ trait PostgresCreate extends RdbmsCreate {
   override def alterTable(tablePath: TablePath, cols: Set[AlterColumn]): ConnectionIO[Unit] = {
     if (cols.isEmpty)
       ().point[ConnectionIO]
-    else
-      cols.map {
-        case AddColumn(name, tpe) => Fragment.const(s"ADD COLUMN $name ${pgType(tpe)}")
-        case ModifyColumn(name, tpe) => Fragment.const(s"MODIFY COLUMN $name ${pgType(tpe)}")
-      }.toList.intercalate(fr",").update.run.void
+    else {
+      (fr"ALTER TABLE" ++ Fragment.const(tablePath.shows) ++
+        cols.map {
+          case AddColumn(name, tpe) => Fragment.const(s"ADD COLUMN $name ${pgType(tpe)}")
+          case ModifyColumn(name, tpe) => Fragment.const(s"MODIFY COLUMN $name ${pgType(tpe)}")
+        }.toList.intercalate(fr",")).update.run.void
+    }
   }
 }
