@@ -458,4 +458,8 @@ object QScriptUniform {
     val union: Prism[QSU, (QSU, QSU)] =
       iso composePrism O.union
   }
+
+  object Dsl {
+    def apply[T[_[_]]: BirecursiveT]: Dsl[T] = new Dsl[T]
+  }
 }
