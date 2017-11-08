@@ -17,7 +17,7 @@
 package quasar.physical.rdbms
 
 import slamdata.Predef.Map
-import quasar.effect.{KeyValueStore, MonotonicSeq}
+import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.effect.uuid.GenUUID
 import quasar.fp.{TaskRef, reflNT}
 import quasar.fp.free._
@@ -29,7 +29,7 @@ import quasar.physical.rdbms.model.DbDataStream
 import doobie.imports.Transactor
 import scalaz.concurrent.Task
 import scalaz.syntax.applicative._
-import scalaz.~>
+import scalaz.{~>}
 
 trait Interpreter {
   this: Rdbms =>
@@ -38,15 +38,16 @@ trait Interpreter {
     (
       TaskRef(Map.empty[ReadHandle, DbDataStream])  |@|
         TaskRef(Map.empty[WriteHandle, TablePath])  |@|
-        xa.map(_.trans)                             |@|
+        xa                                          |@|
         TaskRef(0L)                                 |@|
         GenUUID.type1[Task]
       )(
       (kvR, kvW, x, i, genUUID) =>
-        reflNT[Task]                          :+:
-          x                                   :+:
-          MonotonicSeq.fromTaskRef(i)         :+:
-          genUUID                             :+:
-          KeyValueStore.impl.fromTaskRef(kvR) :+:
+        reflNT[Task]                               :+:
+          Read.constant[Task, Transactor[Task]](x) :+:
+          x.trans                                  :+:
+          MonotonicSeq.fromTaskRef(i)              :+:
+          genUUID                                  :+:
+          KeyValueStore.impl.fromTaskRef(kvR)      :+:
           KeyValueStore.impl.fromTaskRef(kvW))
 }

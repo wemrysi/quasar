@@ -16,31 +16,32 @@
 
 package quasar.physical.rdbms
 
-import slamdata.Predef._
 import quasar.effect.uuid.GenUUID
-import quasar.effect.{KeyValueStore, MonotonicSeq}
+import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.fp.{:/:, :\:}
 import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.WriteFile.WriteHandle
 import quasar.fs.impl.DataStream
 import quasar.physical.rdbms.common.TablePath
+import doobie.imports.{ConnectionIO, Transactor}
 
-import doobie.imports.ConnectionIO
 import scalaz.Free
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 
 package object model {
 
-  final case class DbDataStream(stream: DataStream[Task], close: Task[Unit])
+  final case class DbDataStream(stream: DataStream[Task])
+
+  type ReadTransactor[A] = Read[Transactor[Task], A]
 
   object DbDataStream {
-    def empty =
-      DbDataStream(Process.empty, Task.now(()))
+    def empty = DbDataStream(Process.empty)
   }
 
   type Eff[A] = (
           Task
+      :\: ReadTransactor
       :\: ConnectionIO
       :\: MonotonicSeq
       :\: GenUUID

@@ -34,6 +34,7 @@ import quasar.qscript.analysis._
 
 import scala.Predef.implicitly
 
+import doobie.imports.Transactor
 import doobie.hikari.hikaritransactor.HikariTransactor
 import matryoshka.{BirecursiveT, Delay, EqualT, RecursiveT, ShowT}
 import matryoshka.data._
@@ -97,6 +98,7 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
   }
 
   lazy val MR                   = MonadReader_[Backend, Config]
+  lazy val MT                   = quasar.effect.Read.monadReader_[Transactor[Task], Eff]
   lazy val ME                   = MonadFsErr[Backend]
 
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](

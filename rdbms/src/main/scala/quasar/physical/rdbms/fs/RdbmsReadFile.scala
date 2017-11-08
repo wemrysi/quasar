@@ -32,8 +32,8 @@ import quasar.fp.free.lift
 import quasar.physical.rdbms.model.DbDataStream
 import quasar.fs.impl.{dataStreamClose, dataStreamRead}
 
-import doobie.syntax.process._
 import doobie.util.meta.Meta
+import doobie.syntax.process._
 import scalaz._
 import Scalaz._
 import scalaz.stream.Process._
@@ -72,8 +72,7 @@ trait RdbmsReadFile
         offset: Natural,
         limit: Option[Positive]
     ): Backend[DbDataStream] = {
-
-      transactor(cfg).map { xa =>
+      MT.ask.map { xa =>
         DbDataStream(
           selectAllQuery(dbPath, offset, limit)
             .query[Data]
@@ -81,9 +80,7 @@ trait RdbmsReadFile
             .chunk(chunkSize)
             .attempt(ex =>
               emit(readFailed(dbPath.shows, ex.getLocalizedMessage)))
-            .transact(xa),
-          xa.configure(_.close())
-        )
+            .transact(xa))
       }.liftB
     }
 
@@ -100,7 +97,7 @@ trait RdbmsReadFile
     }
 
     override def closeCursor(c: DbDataStream): Configured[Unit] = {
-      lift(dataStreamClose(c.stream) *> c.close).into[Eff].liftM[ConfiguredT]
+      lift(dataStreamClose(c.stream)).into[Eff].liftM[ConfiguredT]
     }
   }
 }
