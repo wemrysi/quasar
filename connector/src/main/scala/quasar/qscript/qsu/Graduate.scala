@@ -92,25 +92,30 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
     else
       lub(Set(left.root), Set(right.root), Set(left.root, right.root))
 
-    // we merge the vertices in the result, just in case the graphs are additively applied to a common root
+    // we merge the vertices in the result, just in case the graphs are
+    // additively applied to a common root
+    val mergedVertices: SMap[Symbol, QSU[Symbol]] =
+      left.vertices ++ right.vertices
+
     source.headOption match {
       case hole @ Some(root) =>
         for {
           lGrad <- graduateCoEnv[F](hole, left)
           rGrad <- graduateCoEnv[F](hole, right)
-        } yield SrcMerge(QSUGraph[T](root, left.vertices ++ right.vertices), lGrad, rGrad)
-          
+        } yield SrcMerge(QSUGraph[T](root, mergedVertices), lGrad, rGrad)
+
       case None =>
         for {
           lGrad <- graduateCoEnv[F](None, left)
           rGrad <- graduateCoEnv[F](None, right)
-          name <- NameGenerator[F].prefixedName("merge")
-          sym = Symbol(name)
+          name <- NameGenerator[F].prefixedName("merged")
         } yield {
-          val newVertices: SMap[Symbol, QSU[Symbol]] = 
-            left.vertices ++ right.vertices + (sym -> QSU.Unreferenced[T, Symbol]())
+          val root: Symbol = Symbol(name)
 
-          SrcMerge(QSUGraph[T](sym, newVertices), lGrad, rGrad)
+          val newVertices: SMap[Symbol, QSU[Symbol]] =
+            mergedVertices + (root -> QSU.Unreferenced[T, Symbol]())
+
+          SrcMerge(QSUGraph[T](root, newVertices), lGrad, rGrad)
         }
     }
   }
