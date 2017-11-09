@@ -16,15 +16,14 @@
 
 package quasar.ejson
 
-import slamdata.Predef.{Int => _, Map => _, _}
-import quasar.contrib.matryoshka.totally
+import slamdata.Predef.{Byte => SByte, Char => SChar, Int => _, Map => _, _}
+import quasar.contrib.matryoshka.{project, totally}
 
 import matryoshka._
 import matryoshka.implicits._
 import scalaz.Coproduct
 import scalaz.std.list._
 import scalaz.std.option._
-import scalaz.syntax.bind._
 import scalaz.syntax.traverse._
 
 object EJson {
@@ -37,32 +36,41 @@ object EJson {
   def fromExt[T](e: Extension[T])(implicit T: Corecursive.Aux[T, EJson]): T =
     ExtEJson(e).embed
 
-  def arr[T[_[_]]](xs: T[EJson]*)(implicit T: CorecursiveT[T]): T[EJson] =
+  def arr[T](xs: T*)(implicit T: Corecursive.Aux[T, EJson]): T =
     fromCommon(Arr(xs.toList))
 
-  def bool[T[_[_]]](b: Boolean)(implicit T: CorecursiveT[T]): T[EJson] =
+  def bool[T](b: Boolean)(implicit T: Corecursive.Aux[T, EJson]): T =
     fromCommon(Bool(b))
 
-  def dec[T[_[_]]](d: BigDecimal)(implicit T: CorecursiveT[T]): T[EJson] =
+  def byte[T](b: SByte)(implicit T: Corecursive.Aux[T, EJson]): T =
+    fromExt(Byte(b))
+
+  def char[T](c: SChar)(implicit T: Corecursive.Aux[T, EJson]): T =
+    fromExt(Char(c))
+
+  def dec[T](d: BigDecimal)(implicit T: Corecursive.Aux[T, EJson]): T =
     fromCommon(Dec(d))
 
-  def nul[T[_[_]]](implicit T: CorecursiveT[T]): T[EJson] =
-    fromCommon(Null())
-
-  def str[T[_[_]]](s: String)(implicit T: CorecursiveT[T]): T[EJson] =
-    fromCommon(Str(s))
-
-  def int[T[_[_]]](d: BigInt)(implicit T: CorecursiveT[T]): T[EJson] =
+  def int[T](d: BigInt)(implicit T: Corecursive.Aux[T, EJson]): T =
     fromExt(Int(d))
 
-  def obj[T[_[_]]](xs: (String, T[EJson])*)(implicit T: CorecursiveT[T]): T[EJson] =
-    map((xs.map { case (s, t) => str[T](s) -> t }): _*)
-
-  def map[T[_[_]]](xs: (T[EJson], T[EJson])*)(implicit T: CorecursiveT[T]): T[EJson] =
+  def map[T](xs: (T, T)*)(implicit T: Corecursive.Aux[T, EJson]): T =
     fromExt(Map(xs.toList))
 
+  def meta[T](v: T, m: T)(implicit T: Corecursive.Aux[T, EJson]): T =
+    fromExt(Meta(v, m))
+
+  def nul[T](implicit T: Corecursive.Aux[T, EJson]): T =
+    fromCommon(Null())
+
+  def obj[T](xs: (String, T)*)(implicit T: Corecursive.Aux[T, EJson]): T =
+    map((xs.map { case (s, t) => str[T](s) -> t }): _*)
+
+  def str[T](s: String)(implicit T: Corecursive.Aux[T, EJson]): T =
+    fromCommon(Str(s))
+
   def isNull[T](ej: T)(implicit T: Recursive.Aux[T, EJson]): Boolean =
-    CommonEJson.prj(ej.project) exists (quasar.ejson.nul.nonEmpty(_))
+    project[T, EJson].composePrism(optics.nul).nonEmpty(ej)
 
   /** Replaces `Meta` nodes with their value component. */
   def elideMetadata[T](
@@ -76,7 +84,7 @@ object EJson {
     implicit T: Corecursive.Aux[T, EJson]
   ): EJson[T] => EJson[T] = totally {
     case CommonEJson(Str(s)) =>
-      CommonEJson(quasar.ejson.arr[T](s.toList map (c => fromExt(quasar.ejson.char[T](c)))))
+      optics.arr[T](s.toList map (c => char[T](c)))
   }
 
   /** Replace an array of characters with a string. */
@@ -86,7 +94,8 @@ object EJson {
     TR: Recursive.Aux[T, EJson]
   ): EJson[T] => EJson[T] = totally {
     case a @ CommonEJson(Arr(t :: ts)) =>
-      (t :: ts).traverse(t => ExtEJson.prj(t.project) >>= (quasar.ejson.char[T].getOption(_)))
-        .fold(a)(cs => CommonEJson(quasar.ejson.str[T](cs.mkString)))
+      (t :: ts)
+        .traverse(Fixed[T].char.getOption)
+        .fold(a)(cs => optics.str[T](cs.mkString))
   }
 }

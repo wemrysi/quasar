@@ -21,9 +21,13 @@ import quasar.{RenderTree, NonTerminal}, RenderTree.ops._
 import quasar.fp._
 
 import matryoshka._
+import monocle.Iso
 import scalaz.{Applicative, Equal, Order, Scalaz, Show, Traverse}, Scalaz._
 
-final case class Obj[A](value: ListMap[String, A])
+final case class Obj[A](value: ListMap[String, A]) {
+  def obj[A] =
+    Iso[Obj[A], ListMap[String, A]](_.value)(Obj(_))
+}
 
 object Obj extends ObjInstances
 

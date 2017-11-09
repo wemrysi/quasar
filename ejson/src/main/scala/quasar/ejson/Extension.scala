@@ -22,6 +22,7 @@ import quasar.contrib.matryoshka._
 import quasar.fp._
 
 import matryoshka._
+import monocle.Prism
 import scalaz.{Applicative, Cord, Equal, IMap, Order, Scalaz, Show, Traverse}, Scalaz._
 
 /** This is an extension to JSON that allows arbitrary expressions as map (née
@@ -38,10 +39,31 @@ final case class Int[A](value: BigInt)       extends Extension[A]
 
 object Extension extends ExtensionInstances {
   def fromObj[A](f: String => A): Obj[A] => Extension[A] =
-    obj => map(obj.value.toList.map(_.leftMap(f)))
+    obj => Optics.map(obj.value.toList.map(_.leftMap(f)))
+
+  object Optics {
+    def byte[A] =
+      Prism.partial[Extension[A], scala.Byte] { case Byte(b) => b } (Byte(_))
+
+    def char[A] =
+      Prism.partial[Extension[A], scala.Char] { case Char(c) => c } (Char(_))
+
+    def int[A] =
+      Prism.partial[Extension[A], BigInt] { case Int(i) => i } (Int(_))
+
+    def map[A] =
+      Prism.partial[Extension[A], List[(A, A)]] { case Map(m) => m } (Map(_))
+
+    def meta[A] =
+      Prism.partial[Extension[A], (A, A)] {
+        case Meta(v, m) => (v, m)
+      } ((Meta(_: A, _: A)).tupled)
+  }
 }
 
 sealed abstract class ExtensionInstances {
+  import Extension.Optics._
+
   /** Structural ordering, which _does_ consider metadata and thus needs to
     * be elided before using for proper semantics.
     */

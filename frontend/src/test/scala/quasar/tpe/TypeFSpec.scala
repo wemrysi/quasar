@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.algebra._
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
-import quasar.ejson, ejson.{CommonEJson, EJson, EJsonArbitrary}
+import quasar.ejson.{EJson, EJsonArbitrary, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._, Helpers._
 
@@ -41,6 +41,8 @@ final class TypeFSpec extends Spec with TypeFArbitrary with EJsonArbitrary {
 
   type J = Fix[EJson]
   type T = Fix[TypeF[J, ?]]
+
+  val J = Fixed[J]
 
   implicit def typeFIntEqual[A: Equal]: Equal[TypeF[Int, A]] =
     TypeF.structuralEqual(Equal[Int])(Equal[A])
@@ -152,13 +154,13 @@ final class TypeFSpec extends Spec with TypeFArbitrary with EJsonArbitrary {
 
     "str <: char[]" >> prop { (s: String) =>
       isSubtypeOf[J](
-        const[J, T](CommonEJson(ejson.str[J]("s" + s)).embed).embed,
+        const[J, T](J.str("s" + s)).embed,
         arr[J, T](simple[J, T](SimpleType.Char).embed.right).embed)
     }
 
     "[] = ''" >> {
       val emptyArr = arr[J, T](IList().left).embed
-      val emptyStr = const[J, T](CommonEJson(ejson.str[J]("")).embed).embed
+      val emptyStr = const[J, T](J.str("")).embed
       emptyArr ≟ emptyStr
     }
   }

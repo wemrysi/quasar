@@ -18,8 +18,10 @@ package quasar.ejson
 
 import slamdata.Predef._
 import quasar.{RenderTree, NonTerminal, Terminal}, RenderTree.ops._
+import quasar.fp.ski.κ
 
 import matryoshka._
+import monocle.Prism
 import scalaz.{Applicative, Cord, Equal, Order, Scalaz, Show, Traverse}, Scalaz._
 
 sealed abstract class Common[A]
@@ -29,7 +31,24 @@ final case class Bool[A](value: Boolean)   extends Common[A]
 final case class Str[A](value: String)     extends Common[A]
 final case class Dec[A](value: BigDecimal) extends Common[A]
 
-object Common extends CommonInstances
+object Common extends CommonInstances {
+  object Optics {
+    def arr[A] =
+      Prism.partial[Common[A], List[A]] { case Arr(a) => a } (Arr(_))
+
+    def bool[A] =
+      Prism.partial[Common[A], Boolean] { case Bool(b) => b } (Bool(_))
+
+    def dec[A] =
+      Prism.partial[Common[A], BigDecimal] { case Dec(bd) => bd } (Dec(_))
+
+    def nul[A] =
+      Prism.partial[Common[A], Unit] { case Null() => () } (κ(Null()))
+
+    def str[A] =
+      Prism.partial[Common[A], String] { case Str(s) => s } (Str(_))
+  }
+}
 
 sealed abstract class CommonInstances extends CommonInstances0 {
   implicit val traverse: Traverse[Common] = new Traverse[Common] {
@@ -87,6 +106,8 @@ sealed abstract class CommonInstances extends CommonInstances0 {
 }
 
 sealed abstract class CommonInstances0 {
+  import Common.Optics._
+
   implicit val equal: Delay[Equal, Common] =
     new Delay[Equal, Common] {
       def apply[α](eql: Equal[α]) = {
