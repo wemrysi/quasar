@@ -87,30 +87,6 @@ package object ejson {
     def fromExt[T](e: Extension[T])(implicit T: Corecursive.Aux[T, EJson]): T =
       ExtEJson(e).embed
 
-    def arr[T[_[_]]](xs: T[EJson]*)(implicit T: CorecursiveT[T]): T[EJson] =
-      fromCommon(Arr(xs.toList))
-
-    def bool[T[_[_]]](b: Boolean)(implicit T: CorecursiveT[T]): T[EJson] =
-      fromCommon(Bool(b))
-
-    def dec[T[_[_]]](d: BigDecimal)(implicit T: CorecursiveT[T]): T[EJson] =
-      fromCommon(Dec(d))
-
-    def nul[T[_[_]]](implicit T: CorecursiveT[T]): T[EJson] =
-      fromCommon(Null())
-
-    def str[T[_[_]]](s: String)(implicit T: CorecursiveT[T]): T[EJson] =
-      fromCommon(Str(s))
-
-    def int[T[_[_]]](d: BigInt)(implicit T: CorecursiveT[T]): T[EJson] =
-      fromExt(ejson.Int(d))
-
-    def obj[T[_[_]]](xs: (String, T[EJson])*)(implicit T: CorecursiveT[T]): T[EJson] =
-      map((xs.map { case (s, t) => str[T](s) -> t }): _*)
-
-    def map[T[_[_]]](xs: (T[EJson], T[EJson])*)(implicit T: CorecursiveT[T]): T[EJson] =
-      fromExt(ejson.Map(xs.toList))
-
     def isNull[T](ej: T)(implicit T: Recursive.Aux[T, EJson]): Boolean =
       CommonEJson.prj(ej.project) exists (ejson.nul.nonEmpty(_))
 

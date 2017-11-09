@@ -37,7 +37,7 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.planner.common._
 import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
-import quasar.qscript.{Coalesce => _, _}
+import quasar.qscript.{Coalesce => _, _}, RenderQScriptDSL._
 import quasar.std.StdLib._ // TODO: remove this
 
 import java.time.Instant
@@ -1336,7 +1336,7 @@ object MongoDbPlanner {
       mongoQS3 =  BR.branches.modify(
         _.transCata[FreeQS[T]](liftCo(R.normalizeEJCoEnv[QScriptTotal[T, ?]]))
         )(mongoQS2.project).embed
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo", mongoQS3))
+      _ <- BackendModule.logPhase[M](PhaseResult.treeAndCode("QScript Mongo", mongoQS3))
 
       // NB: Normalizing after these appears to revert the effects of `mapBeforeSort`.
       mongoQS4 <- Trans(mapBeforeSort[T, M], mongoQS3)
@@ -1344,11 +1344,11 @@ object MongoDbPlanner {
                     liftFF[QScriptCore[T, ?], MQS, T[MQS]](
                       repeatedly(O.subsetBeforeMap[MQS, MQS](
                         reflNT[MQS]))))
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Shuffle Maps)", mongoQS5))
+      _ <- BackendModule.logPhase[M](PhaseResult.treeAndCode("QScript Mongo (Shuffle Maps)", mongoQS5))
 
       // TODO: Once field deletion is implemented for 3.4, this could be selectively applied, if necessary.
       mongoQS6 =  PreferProjection.preferProjection[MQS](mongoQS5)
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Prefer Projection)", mongoQS6))
+      _ <- BackendModule.logPhase[M](PhaseResult.treeAndCode("QScript Mongo (Prefer Projection)", mongoQS6))
     } yield mongoQS6
   }
 

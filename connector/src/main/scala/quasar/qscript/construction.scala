@@ -22,13 +22,14 @@ import matryoshka.data.Fix
 
 import scalaz._
 import scalaz.Leibniz.===
-import quasar.qscript
+import quasar.{ejson, qscript}
 import quasar.common.{JoinType, SortDir}
 import quasar.std.TemporalPart
 import quasar.ejson.EJson
 
 object construction {
   final case class Func[T[_[_]]]()(implicit corec: CorecursiveT[T]) {
+      val EJ = EJsonDSL[T]
       private def rollCore[A](in: MapFuncCore[T, FreeMapA[T, A]]): FreeMapA[T, A] = Free.roll(MFC(in))
       private def rollDerived[A](in: MapFuncDerived[T, FreeMapA[T, A]]): FreeMapA[T, A] = Free.roll(MFD(in))
       def Constant[A](in: T[EJson]): FreeMapA[T, A] =
@@ -124,19 +125,19 @@ object construction {
       def ProjectKey[A](src: FreeMapA[T, A], key: FreeMapA[T, A]): FreeMapA[T, A] =
         rollCore(MapFuncsCore.ProjectKey(src, key))
       def ProjectKeyS[A](src: FreeMapA[T, A], key: String): FreeMapA[T, A] =
-        ProjectKey(src, Constant(EJson.str(key)))
+        ProjectKey(src, Constant(EJ.str(key)))
       def DeleteKey[A](src: FreeMapA[T, A], key: FreeMapA[T, A]): FreeMapA[T, A] =
         rollCore(MapFuncsCore.DeleteKey(src, key))
       def DeleteKeyS[A](src: FreeMapA[T, A], key: String): FreeMapA[T, A] =
-        DeleteKey(src, Constant(EJson.str(key)))
+        DeleteKey(src, Constant(EJ.str(key)))
       def MakeMap[A](key: FreeMapA[T, A], src: FreeMapA[T, A]): FreeMapA[T, A] =
         rollCore(MapFuncsCore.MakeMap(key, src))
       def MakeMapS[A](key: String, src: FreeMapA[T, A]): FreeMapA[T, A] =
-        MakeMap(Constant(EJson.str(key)), src)
+        MakeMap(Constant(EJ.str(key)), src)
       def ProjectIndex[A](src: FreeMapA[T, A], index: FreeMapA[T, A]): FreeMapA[T, A] =
         rollCore(MapFuncsCore.ProjectIndex(src, index))
       def ProjectIndexI[A](src: FreeMapA[T, A], index: Int): FreeMapA[T, A] =
-        ProjectIndex(src, Constant(EJson.int(index)))
+        ProjectIndex(src, Constant(EJ.int(index)))
       def ConcatArrays[A](left: FreeMapA[T, A], right: FreeMapA[T, A]): FreeMapA[T, A] =
         rollCore(MapFuncsCore.ConcatArrays(left, right))
       def ConcatMaps[A](left: FreeMapA[T, A], right: FreeMapA[T, A]): FreeMapA[T, A] =
@@ -212,6 +213,33 @@ object construction {
         rollDerived(MapFuncsDerived.RoundScale(a1, a2))
   }
 
+  final case class EJsonDSL[T[_[_]]](implicit T: CorecursiveT[T]) {
+    def arr(xs: T[EJson]*): T[EJson] =
+      EJson.fromCommon(ejson.Arr(xs.toList))
+
+    def bool(b: Boolean): T[EJson] =
+      EJson.fromCommon(ejson.Bool(b))
+
+    def dec(d: BigDecimal): T[EJson] =
+      EJson.fromCommon(ejson.Dec(d))
+
+    def nul: T[EJson] =
+      EJson.fromCommon(ejson.Null())
+
+    def str(s: String): T[EJson] =
+      EJson.fromCommon(ejson.Str(s))
+
+    def int(d: BigInt): T[EJson] =
+      EJson.fromExt(ejson.Int(d))
+
+    def obj(xs: (String, T[EJson])*): T[EJson] =
+      map((xs.map { case (s, t) => str(s) -> t }): _*)
+
+    def map(xs: (T[EJson], T[EJson])*): T[EJson] =
+      EJson.fromExt(ejson.Map(xs.toList))
+
+  }
+
   final case class Dsl[T[_[_]], F[_], R](embed: F[R] => R)
                                         (implicit corec: CorecursiveT[T],
                                          injCore: Injectable.Aux[QScriptCore[T, ?], F],
@@ -282,8 +310,8 @@ object construction {
 
   def mkDefaults[T[_[_]]: CorecursiveT, F[_]](implicit
                                               injCore: Injectable.Aux[QScriptCore[T, ?], F],
-                                              injTotal: Injectable.Aux[F, QScriptTotal[T, ?]]): (Func[T], Dsl[T, F, Free[F, Hole]], Dsl[T, F, Fix[F]]) =
-    (Func[T], mkFree[T, F], mkFix[T, F])
+                                              injTotal: Injectable.Aux[F, QScriptTotal[T, ?]]): (Func[T], EJsonDSL[T], Dsl[T, F, Free[F, Hole]], Dsl[T, F, Fix[F]]) =
+    (Func[T], EJsonDSL[T], mkFree[T, F], mkFix[T, F])
 
   def mkFree[T[_[_]]: CorecursiveT, F[_]](implicit
                                           injCore: Injectable.Aux[QScriptCore[T, ?], F],
