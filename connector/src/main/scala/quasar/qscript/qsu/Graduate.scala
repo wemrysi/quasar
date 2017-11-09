@@ -75,7 +75,10 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
       val lexp = lnodes.flatMap(_.foldLeft(Set[Symbol]())(_ + _))
       val rexp = rnodes.flatMap(_.foldLeft(Set[Symbol]())(_ + _))
 
-      val check = (lexp intersect visited) union (rexp intersect visited)
+      val check =
+        (lexp intersect visited) union
+        (rexp intersect visited) union
+        (lexp intersect rexp)
 
       check.headOption.orElse(lub(lexp, rexp, visited.union(lexp).union(rexp)))
     }
