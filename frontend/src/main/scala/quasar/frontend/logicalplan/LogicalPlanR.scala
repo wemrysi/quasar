@@ -345,7 +345,7 @@ final class LogicalPlanR[T]
         case InvokeUnapply(relations.IfUndefined, Sized(condition, fallback)) =>
           val args = Func.Input2(condition, fallback)
           val constructLPNode = invoke(relations.IfUndefined, _: Func.Input[T, nat._2])
-          lift(relations.IfUndefined.typer0(args.map(_.inferred)).disjunction).flatMap(
+          lift(relations.IfUndefined.tpe(args.map(_.inferred)).disjunction).flatMap(
             unifyOrCheck(inf, _, constructLPNode(args.map(appConst(_, constant(Data.NA))))))
         case InvokeUnapply(func @ NullaryFunc(_, _, _, _), Sized()) =>
           checkGenericInvoke(inf, func, Sized[List]())
