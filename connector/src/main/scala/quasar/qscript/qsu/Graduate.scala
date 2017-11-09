@@ -16,8 +16,9 @@
 
 package quasar.qscript.qsu
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => SMap, _}
 
+import quasar.NameGenerator
 import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.contrib.pathy.AFile
 import quasar.fp._
@@ -52,13 +53,13 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
   type QSE[A] = QScriptEducated[A]
   private type QSU[A] = QScriptUniform[A]
 
-  def apply[F[_]: Monad: PlannerErrorME](graph: QSUGraph): F[T[QSE]] =
+  def apply[F[_]: Monad: PlannerErrorME: NameGenerator](graph: QSUGraph): F[T[QSE]] =
     Corecursive[T[QSE], QSE].anaM[F, QSUGraph](graph)(
       graduateƒ[F, QSE](None)(NaturalTransformation.refl[QSE]))
 
-  private def mergeSources[F[_]: Monad: PlannerErrorME](
+  private def mergeSources[F[_]: Monad: PlannerErrorME: NameGenerator](
       left: QSUGraph,
-      right: QSUGraph): SrcMerge[QSUGraph, F[FreeQS]] = {
+      right: QSUGraph): F[SrcMerge[QSUGraph, FreeQS]] = {
 
     val lvert = left.vertices
     val rvert = right.vertices
@@ -67,7 +68,7 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
     def lub(
         lefts: Set[Symbol],
         rights: Set[Symbol],
-        visited: Set[Symbol]): Option[Symbol] = {
+        visited: Set[Symbol]): Set[Symbol] = {
 
       val lnodes = lefts.map(lvert)
       val rnodes = rights.map(rvert)
@@ -75,30 +76,47 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
       val lexp = lnodes.flatMap(_.foldLeft(Set[Symbol]())(_ + _))
       val rexp = rnodes.flatMap(_.foldLeft(Set[Symbol]())(_ + _))
 
-      val check =
+      val check: Set[Symbol] =
         (lexp intersect visited) union
         (rexp intersect visited) union
         (lexp intersect rexp)
 
-      check.headOption.orElse(lub(lexp, rexp, visited.union(lexp).union(rexp)))
+      if (!check.isEmpty)
+        check
+      else
+        lub(lexp, rexp, visited.union(lexp).union(rexp))
     }
 
-    val maybeSource = if (left.root === right.root)
-      Some(left.root)
+    val source: Set[Symbol] = if (left.root === right.root)
+      Set(left.root)
     else
       lub(Set(left.root), Set(right.root), Set(left.root, right.root))
 
-    maybeSource map { root =>
-      SrcMerge(
-        // we merge the vertices, just in case the graphs are additively applied to a common root
-        QSUGraph[T](root, left.vertices ++ right.vertices),
-        graduateCoEnv[F](root, left),
-        graduateCoEnv[F](root, right))
-    } getOrElse scala.sys.error(s"Source merging failed from ${left.root} and ${right.root} in ${lvert ++ rvert}")
+    // we merge the vertices in the result, just in case the graphs are additively applied to a common root
+    source.headOption match {
+      case hole @ Some(root) =>
+        for {
+          lGrad <- graduateCoEnv[F](hole, left)
+          rGrad <- graduateCoEnv[F](hole, right)
+        } yield SrcMerge(QSUGraph[T](root, left.vertices ++ right.vertices), lGrad, rGrad)
+          
+      case None =>
+        for {
+          lGrad <- graduateCoEnv[F](None, left)
+          rGrad <- graduateCoEnv[F](None, right)
+          name <- NameGenerator[F].prefixedName("merge")
+          sym = Symbol(name)
+        } yield {
+          val newVertices: SMap[Symbol, QSU[Symbol]] = 
+            left.vertices ++ right.vertices + (sym -> QSU.Unreferenced[T, Symbol]())
+
+          SrcMerge(QSUGraph[T](sym, newVertices), lGrad, rGrad)
+        }
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  private def educate[F[_]: Monad: PlannerErrorME](qsu: QSU[QSUGraph])
+  private def educate[F[_]: Monad: PlannerErrorME: NameGenerator](qsu: QSU[QSUGraph])
       : F[QSE[QSUGraph]] =
     qsu match {
       case QSU.Read(path) =>
@@ -120,14 +138,16 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
         QCE(Sort[T, QSUGraph](source, buckets, order)).point[F]
 
       case QSU.Union(left, right) =>
-        val SrcMerge(source, lBranch, rBranch) = mergeSources[F](left, right)
-        (lBranch |@| rBranch)((l, r) =>
-          QCE(Union[T, QSUGraph](source, l, r)))
+        mergeSources[F](left, right) map {
+          case SrcMerge(source, lBranch, rBranch) =>
+            QCE(Union[T, QSUGraph](source, lBranch, rBranch))
+        }
 
       case QSU.Subset(from, op, count) =>
-        val SrcMerge(source, fromBranch, countBranch) = mergeSources[F](from, count)
-        (fromBranch |@| countBranch)((f, c) =>
-          QCE(Subset[T, QSUGraph](source, f, op, c)))
+        mergeSources[F](from, count) map {
+          case SrcMerge(source, fromBranch, countBranch) =>
+            QCE(Subset[T, QSUGraph](source, fromBranch, op, countBranch))
+        }
 
       case QSU.Distinct(source) => slamdata.Predef.??? // TODO
 
@@ -135,18 +155,18 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
         QCE(Unreferenced[T, QSUGraph]()).point[F]
 
       case QSU.ThetaJoin(left, right, condition, joinType, combiner) =>
-        val SrcMerge(source, lBranch, rBranch) = mergeSources[F](left, right)
-
-        (lBranch |@| rBranch)((l, r) =>
-          Inject[ThetaJoin, QSE].inj(
-            ThetaJoin[T, QSUGraph](source, l, r, condition, joinType, combiner)))
+        mergeSources[F](left, right) map {
+          case SrcMerge(source, lBranch, rBranch) =>
+            Inject[ThetaJoin, QSE].inj(
+              ThetaJoin[T, QSUGraph](source, lBranch, rBranch, condition, joinType, combiner))
+        }
 
       case qsu =>
         PlannerErrorME[F].raiseError(
           InternalError(s"Found an unexpected LP-ish $qsu.", None)) // TODO use Show to print
     }
 
-  private def graduateƒ[F[_]: Monad: PlannerErrorME, G[_]](
+  private def graduateƒ[F[_]: Monad: PlannerErrorME: NameGenerator, G[_]](
     halt: Option[(Symbol, F[G[QSUGraph]])])(
     lift: QSE ~> G)
       : CoalgebraM[F, G, QSUGraph] = graph => {
@@ -166,12 +186,13 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
     }
   }
 
-  private def graduateCoEnv[F[_]: Monad: PlannerErrorME](source: Symbol, graph: QSUGraph)
+  private def graduateCoEnv[F[_]: Monad: PlannerErrorME: NameGenerator]
+    (hole: Option[Symbol], graph: QSUGraph)
       : F[FreeQS] = {
     type CoEnvTotal[A] = CoEnv[Hole, QScriptTotal, A]
 
     val halt: Option[(Symbol, F[CoEnvTotal[QSUGraph]])] =
-      Some((source, CoEnv.coEnv[Hole, QScriptTotal, QSUGraph](-\/(SrcHole)).point[F]))
+      hole.map((_, CoEnv.coEnv[Hole, QScriptTotal, QSUGraph](-\/(SrcHole)).point[F]))
 
     val lift: QSE ~> CoEnvTotal =
       educatedToTotal[T].inject andThen PrismNT.coEnv[QScriptTotal, Hole].reverseGet
