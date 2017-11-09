@@ -342,6 +342,11 @@ final class LogicalPlanR[T]
           consts <- emitName[SemDisj, Func.Input[T, nat._1]](Func.Input1(arg).traverse(ensureConstraint(_, constant(Data.Obj(ListMap("" -> Data.NA))))))
           plan  <- unifyOrCheck(inf, types, invoke(structural.FlattenMap, consts))
         } yield plan
+        case InvokeUnapply(relations.IfUndefined, Sized(condition, fallback)) =>
+          val args = Func.Input2(condition, fallback)
+          val constructLPNode = invoke(relations.IfUndefined, _: Func.Input[T, nat._2])
+          lift(relations.IfUndefined.typer0(args.map(_.inferred)).disjunction).flatMap(
+            unifyOrCheck(inf, _, constructLPNode(args.map(appConst(_, constant(Data.NA))))))
         case InvokeUnapply(func @ NullaryFunc(_, _, _, _), Sized()) =>
           checkGenericInvoke(inf, func, Sized[List]())
         case InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) =>

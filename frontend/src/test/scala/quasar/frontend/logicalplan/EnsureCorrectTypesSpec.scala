@@ -17,11 +17,10 @@
 package quasar.frontend.logicalplan
 
 import slamdata.Predef._
-import quasar.Data
-import quasar.Type
+import quasar.{Data, Type}
 import quasar.contrib.pathy._
 import quasar.fp.ski.κ
-import quasar.std._, StdLib._, set._, structural._
+import quasar.std._, StdLib._, set._, structural._, relations._
 
 import matryoshka.data.Fix
 import org.specs2.execute._
@@ -49,8 +48,8 @@ class EnsureCorrectTypesSpec extends quasar.Qspec with quasar.TreeMatchers {
 
     "leave untouched if is let with free variables" in {
       val lp = lpf.let('__tmp0,
-                 lpf.free('sym),
-                 lpf.free('sym))
+        lpf.free('sym),
+        lpf.free('sym))
       ensure(lp){ typed =>
         typed must_== lp
       }
@@ -107,6 +106,76 @@ class EnsureCorrectTypesSpec extends quasar.Qspec with quasar.TreeMatchers {
           )
         )
 
+      ensure(lp)(_  must beTreeEqual(expected))
+    }
+
+    /** bug #2958 */
+    "contain type constraints within ifundefined" in {
+      val lp =
+        lpf.let('__tmp0,
+          lpf.read("afile"),
+          lpf.invoke2 (
+            MakeMap,
+            lpf.constant(Data.Str("c")),
+            lpf.invoke2(
+              IfUndefined,
+              lpf.invoke2(
+                MapConcat,
+                lpf.invoke2(
+                  MapProject,
+                  lpf.free('__tmp0), // Map
+                  lpf.constant(Data.Str("c"))),
+                lpf.invoke2(
+                  MapProject,
+                  lpf.free('__tmp0),
+                  lpf.constant(Data.Str("b"))
+                )
+              ),
+              lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("b")))
+            )
+          )
+        )
+
+      val expected =
+        lpf.let('__tmp0,
+          lpf.let('__checku0,
+            lpf.read("afile"),
+            lpf.typecheck(
+              lpf.free('__checku0),
+              Type.Obj(Map(), Some(Type.Top)),
+              lpf.free('__checku0),
+              lpf.constant(Data.NA)
+            )
+          ),
+          lpf.invoke2 (
+            MakeMap,
+            lpf.constant(Data.Str("c")),
+            lpf.invoke2(
+              IfUndefined,
+              lpf.let('__checku2,
+                lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("b"))),
+                lpf.typecheck(
+                  lpf.free('__checku2),
+                  Type.Obj(Map(), Some(Type.Top)),
+                  lpf.let('__checku1,
+                    lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("c"))),
+                    lpf.typecheck(
+                      lpf.free('__checku1),
+                      Type.Obj(Map(), Some(Type.Top)),
+                      lpf.invoke2(MapConcat,
+                        lpf.free('__checku1),
+                        lpf.free('__checku2)
+                      ),
+                      lpf.constant(Data.NA)
+                    )
+                  ),
+                  lpf.constant(Data.NA)
+                )
+              ),
+              lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("b")))
+            )
+          )
+        )
       ensure(lp)(_  must beTreeEqual(expected))
     }
 
