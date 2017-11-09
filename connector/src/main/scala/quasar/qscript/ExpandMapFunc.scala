@@ -18,7 +18,7 @@ package quasar.qscript
 
 import slamdata.Predef._
 
-import quasar.ejson
+import quasar.ejson.EJson
 import quasar.qscript.{MapFuncsDerived => D}, MapFuncsCore._
 
 import matryoshka._
@@ -59,10 +59,10 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
       type OutFree[A] = (OUT ∘ Free[OUT, ?])#λ[A]
 
       def intR[A](i: Int): Free[OUT, A] =
-        Free.roll(MFC(Constant(ejson.EJson.fromExt(ejson.int(i)))))
+        Free.roll(MFC(Constant(EJson.int(i))))
 
       def decR[A](d: BigDecimal): Free[OUT, A] =
-        Free.roll(MFC(Constant(ejson.EJson.fromCommon(ejson.dec(d)))))
+        Free.roll(MFC(Constant(EJson.dec(d))))
 
       def truncR[A](a: Free[OUT, A]): Free[OUT, A] =
         Free.roll[OUT, A](trunc(a))

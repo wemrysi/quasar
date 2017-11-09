@@ -25,6 +25,7 @@ import quasar.contrib.pathy.Helpers._
 import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.writerT._
 import quasar.ejson
+import quasar.ejson.Common.{Optics => CO}
 import quasar.frontend._
 import quasar.contrib.pathy._
 import quasar.fp._, free._
@@ -186,7 +187,7 @@ abstract class QueryRegressionTest[S[_]](
     * they have different precisions for their floating point values.
     */
   val reducePrecision =
-    λ[EndoK[ejson.Common]](ejson.dec.modify(_.round(TestContext))(_))
+    λ[EndoK[ejson.Common]](CO.dec.modify(_.round(TestContext))(_))
 
   val normalizeJson: Json => Json =
     j => Recursive[Json, ejson.Json].transCata(j)(liftFF(reducePrecision[Json]))

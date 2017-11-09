@@ -34,6 +34,8 @@ import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
 
 class EJsonSpecs extends Spec with EJsonArbitrary {
+  import Extension.Optics.meta
+
   // To keep generated EJson managable
   implicit val params = Parameters(maxSize = 10)
 

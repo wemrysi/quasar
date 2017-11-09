@@ -214,7 +214,7 @@ sealed abstract class TypeStatInstances {
     JR: Recursive.Aux[J, EJson]
   ): J = {
     def emap(xs: (String, J)*): J =
-      E(ejs.map(xs.toList.map(_.leftMap(_.asEJson[J])))).embed
+      ejs.Fixed[J].map(xs.toList.map(_.leftMap(_.asEJson[J])))
 
     def kmap(kind: String, rest: (String, J)*): J =
       emap(("kind" -> kind.asEJson[J]) +: rest : _*)

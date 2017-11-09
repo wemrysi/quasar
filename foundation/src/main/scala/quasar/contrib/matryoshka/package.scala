@@ -35,6 +35,11 @@ package object matryoshka {
       first)(
       (prev, next) => x => prev(x).fold(next(x))(orOriginal(next)(_).some))
 
+  def birecursiveIso[T, F[_]: Functor]
+      (implicit TC: Corecursive.Aux[T, F], TR: Recursive.Aux[T, F])
+      : Iso[T, F[T]] =
+    Iso[T, F[T]](TR.project(_))(TC.embed(_))
+
   object convertToFree {
     def apply[F[_], A] = new PartiallyApplied[F, A]
     final class PartiallyApplied[F[_], A] {
