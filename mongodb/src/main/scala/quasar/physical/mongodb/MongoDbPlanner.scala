@@ -192,10 +192,10 @@ object MongoDbPlanner {
         .getOrElseF(raiseErr(
           qscriptPlanningFailed(InternalError.fromMsg("Could not get the current timestamp"))))
 
-
     val handleSpecialCore: MapFuncCore[T, Fix[ExprOp]] => M[Fix[ExprOp]] = {
       case Constant(v1) => unimplemented[M, Fix[ExprOp]]("Constant expression")
       case Now() => execTime map ($literal(_))
+      case ToId(a1) => unimplemented[M, Fix[ExprOp]]("ToId expression")
 
       case Date(a1) => unimplemented[M, Fix[ExprOp]]("Date expression")
       case Time(a1) => unimplemented[M, Fix[ExprOp]]("Time expression")
@@ -212,7 +212,15 @@ object MongoDbPlanner {
         unimplemented[M, Fix[ExprOp]]("ExtractIsoYear expression")
       case Integer(a1) => unimplemented[M, Fix[ExprOp]]("Integer expression")
       case Decimal(a1) => unimplemented[M, Fix[ExprOp]]("Decimal expression")
-      case ToString(a1) => unimplemented[M, Fix[ExprOp]]("ToString expression")
+      // NB: The aggregation implementation of `ToString` does not handle ObjectId
+      //     Here we force this case to be planned using JS
+      case ToString($var(DocVar(_, Some(BsonField.Name("_id"))))) =>
+        unimplemented[M, Fix[ExprOp]]("ToString _id expression")
+      // FIXME: $substr is deprecated in Mongo 3.4. This implementation should be
+      //        versioned along with the other functions in FuncHandler, taking into
+      //        account the special case for ObjectId above. Mongo 3.4 should
+      //        use $substrBytes instead of $substr
+      case ToString(a1) => mkToString(a1, $substr).point[M]
 
       case MakeArray(a1) => unimplemented[M, Fix[ExprOp]]("MakeArray expression")
       case MakeMap(a1, a2) => unimplemented[M, Fix[ExprOp]]("MakeMap expression")
@@ -336,53 +344,12 @@ object MongoDbPlanner {
 
     val handleSpecialCore: MapFuncCore[T, JsCore] => M[JsCore] = {
       case Constant(v1) => ejsonToJs[M, T[EJson]](v1)
-      case Undefined() => ident("undefined").point[M]
       case JoinSideName(n) =>
         raiseErr[M, JsCore](qscriptPlanningFailed(UnexpectedJoinSide(n)))
       case Now() => execTime map (ts => New(Name("ISODate"), List(ts)))
-      case Length(a1) =>
-        Call(ident("NumberLong"), List(Select(a1, "length"))).point[M]
-      case Date(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.dateRegex + "$")))), "test"), List(a1)),
-          Call(ident("ISODate"), List(a1)),
-          ident("undefined")).point[M]
-      case Time(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.timeRegex + "$")))), "test"), List(a1)),
-          a1,
-          ident("undefined")).point[M]
-      case Timestamp(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.timestampRegex + "$")))), "test"), List(a1)),
-          Call(ident("ISODate"), List(a1)),
-          ident("undefined")).point[M]
       case Interval(a1) => unimplemented[M, JsCore]("Interval JS")
-      case TimeOfDay(a1) => {
-        def pad2(x: JsCore) =
-          Let(Name("x"), x,
-            If(
-              BinOp(jscore.Lt, ident("x"), Literal(Js.Num(10, false))),
-              BinOp(jscore.Add, Literal(Js.Str("0")), ident("x")),
-              ident("x")))
-        def pad3(x: JsCore) =
-          Let(Name("x"), x,
-            If(
-              BinOp(jscore.Lt, ident("x"), Literal(Js.Num(100, false))),
-              BinOp(jscore.Add, Literal(Js.Str("00")), ident("x")),
-              If(
-                BinOp(jscore.Lt, ident("x"), Literal(Js.Num(10, false))),
-                BinOp(jscore.Add, Literal(Js.Str("0")), ident("x")),
-                ident("x"))))
-        Let(Name("t"), a1,
-          binop(jscore.Add,
-            pad2(Call(Select(ident("t"), "getUTCHours"), Nil)),
-            Literal(Js.Str(":")),
-            pad2(Call(Select(ident("t"), "getUTCMinutes"), Nil)),
-            Literal(Js.Str(":")),
-            pad2(Call(Select(ident("t"), "getUTCSeconds"), Nil)),
-            Literal(Js.Str(".")),
-            pad3(Call(Select(ident("t"), "getUTCMilliseconds"), Nil)))).point[M]
-      }
-      case ToTimestamp(a1) => New(Name("Date"), List(a1)).point[M]
 
+      // TODO: De-duplicate and move these to JsFuncHandler
       case ExtractCentury(date) =>
         Call(ident("NumberLong"), List(
           Call(Select(ident("Math"), "ceil"), List(
@@ -486,86 +453,6 @@ object MongoDbPlanner {
                 Literal(Js.Num(7, false))),
               Literal(Js.Num(1, false))))))).point[M]
 
-      case ExtractYear(date) => Call(Select(date, "getUTCFullYear"), Nil).point[M]
-
-      case Negate(a1)       => UnOp(Neg, a1).point[M]
-      case Add(a1, a2)      => BinOp(jscore.Add, a1, a2).point[M]
-      case Multiply(a1, a2) => BinOp(Mult, a1, a2).point[M]
-      case Subtract(a1, a2) => BinOp(Sub, a1, a2).point[M]
-      case Divide(a1, a2)   => BinOp(Div, a1, a2).point[M]
-      case Modulo(a1, a2)   => BinOp(Mod, a1, a2).point[M]
-      case Power(a1, a2)    => Call(Select(ident("Math"), "pow"), List(a1, a2)).point[M]
-
-      case Not(a1)     => UnOp(jscore.Not, a1).point[M]
-      case Eq(a1, a2)  => BinOp(jscore.Eq, a1, a2).point[M]
-      case Neq(a1, a2) => BinOp(jscore.Neq, a1, a2).point[M]
-      case Lt(a1, a2)  => BinOp(jscore.Lt, a1, a2).point[M]
-      case Lte(a1, a2) => BinOp(jscore.Lte, a1, a2).point[M]
-      case Gt(a1, a2)  => BinOp(jscore.Gt, a1, a2).point[M]
-      case Gte(a1, a2) => BinOp(jscore.Gte, a1, a2).point[M]
-      case IfUndefined(a1, a2) =>
-        // TODO: Only evaluate `value` once.
-        If(BinOp(jscore.Eq, a1, ident("undefined")), a2, a1).point[M]
-      case And(a1, a2) => BinOp(jscore.And, a1, a2).point[M]
-      case Or(a1, a2)  => BinOp(jscore.Or, a1, a2).point[M]
-      case Between(a1, a2, a3) =>
-        Call(ident("&&"), List(
-          Call(ident("<="), List(a2, a1)),
-          Call(ident("<="), List(a1, a3)))).point[M]
-      case Cond(a1, a2, a3) => If(a1, a2, a3).point[M]
-
-      case Within(a1, a2) =>
-        BinOp(jscore.Neq,
-          Literal(Js.Num(-1, false)),
-          Call(Select(a2, "indexOf"), List(a1))).point[M]
-
-      // TODO: move these to JsFuncHandler
-      case Lower(a1) => Call(Select(a1, "toLowerCase"), Nil).point[M]
-      case Upper(a1) => Call(Select(a1, "toUpperCase"), Nil).point[M]
-      case Bool(a1) =>
-        If(BinOp(jscore.Eq, a1, Literal(Js.Str("true"))),
-          Literal(Js.Bool(true)),
-          If(BinOp(jscore.Eq, a1, Literal(Js.Str("false"))),
-            Literal(Js.Bool(false)),
-            ident("undefined"))).point[M]
-      case Integer(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.intRegex + "$")))), "test"), List(a1)),
-          Call(ident("NumberLong"), List(a1)),
-          ident("undefined")).point[M]
-      case Decimal(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.floatRegex + "$")))), "test"), List(a1)),
-          Call(ident("parseFloat"), List(a1)),
-          ident("undefined")).point[M]
-      case Null(a1) =>
-        If(BinOp(jscore.Eq, a1, Literal(Js.Str("null"))),
-          Literal(Js.Null),
-          ident("undefined")).point[M]
-      case ToString(a1) =>
-        If(isInt(a1),
-          // NB: This is a terrible way to turn an int into a string, but the
-          //     only one that doesn’t involve converting to a decimal and
-          //     losing precision.
-          Call(Select(Call(ident("String"), List(a1)), "replace"), List(
-            Call(ident("RegExp"), List(
-              Literal(Js.Str("[^-0-9]+")),
-              Literal(Js.Str("g")))),
-            Literal(Js.Str("")))),
-          If(binop(jscore.Or, isTimestamp(a1), isDate(a1)),
-            Call(Select(a1, "toISOString"), Nil),
-            Call(ident("String"), List(a1)))).point[M]
-      case Search(a1, a2, a3) =>
-        Call(
-          Select(
-            New(Name("RegExp"), List(
-              a2,
-              If(a3, Literal(Js.Str("im")), Literal(Js.Str("m"))))),
-            "test"),
-          List(a1)).point[M]
-      case Substring(a1, a2, a3) =>
-        Call(Select(a1, "substr"), List(a2, a3)).point[M]
-      case Split(a1, a2) =>
-        Call(Select(a1, "split"), List(a2)).point[M]
-
       case MakeMap(Embed(LiteralF(Js.Str(str))), a2) => Obj(ListMap(Name(str) -> a2)).point[M]
       // TODO: pull out the literal, and handle this case in other situations
       case MakeMap(a1, a2) => Obj(ListMap(Name("__Quasar_non_string_map") ->
@@ -579,9 +466,6 @@ object MongoDbPlanner {
       case ConcatMaps(Embed(ObjF(o1)), Embed(ObjF(o2))) =>
         Obj(o1 ++ o2).point[M]
       case ConcatMaps(a1, a2) => SpliceObjects(List(a1, a2)).point[M]
-      case ProjectKey(a1, a2) => Access(a1, a2).point[M]
-      case ProjectIndex(a1, a2) => Access(a1, a2).point[M]
-      case DeleteKey(a1, a2)  => Call(ident("remove"), List(a1, a2)).point[M]
 
       case Guard(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
@@ -601,22 +485,13 @@ object MongoDbPlanner {
             case Type.Id               => isObjectId
             case Type.Bool             => isBoolean
             case Type.Date             => isDate
+            case Type.Syntaxed         => isSyntaxed
           }
         jsCheck(typ).fold[M[JsCore]](
           raiseErr(qscriptPlanningFailed(InternalError.fromMsg("uncheckable type"))))(
           f => If(f(expr), cont, fallback).point[M])
-
-      // FIXME: Doesn't work for Char.
-      case Range(start, end)        =>
-        Call(
-          Select(
-            Call(Select(ident("Array"), "apply"), List(
-              Literal(Js.Null),
-              Call(ident("Array"), List(BinOp(Sub, end, start))))),
-            "map"),
-          List(
-            Fun(List(Name("element"), Name("index")),
-              BinOp(jscore.Add, ident("index"), start)))).point[M]
+      // TODO: Specify the function name for pattern match failures
+      case _ => unimplemented[M, JsCore]("JS function")
     }
 
     val handleSpecialDerived: MapFuncDerived[T, JsCore] => M[JsCore] = {
@@ -840,7 +715,9 @@ object MongoDbPlanner {
         (relFunc(f) ⊛ flip(f).flatMap(relFunc))(relop(x, y)(_, _)).getOrElse(-\/(InternalError fromMsg "couldn’t decipher operation"))
 
       func match {
-        case MFC(Constant(_))        => \/-(default)
+        case MFC(Constant(_)) => \/-(default)
+        case MFC(And(a, b))   => invoke2Nel(a._2, b._2)(Selector.And.apply _)
+        case MFC(Or(a, b))    => invoke2Nel(a._2, b._2)(Selector.Or.apply _)
 
         case MFC(Gt(_, IsDate(d2)))  => relDateOp1(Selector.Gte, d2, date.startOfNextDay, 0)
         case MFC(Lt(IsDate(d1), _))  => relDateOp1(Selector.Gte, d1, date.startOfNextDay, 1)
@@ -867,31 +744,33 @@ object MongoDbPlanner {
         case MFC(Gt(a, b))  => reversibleRelop(a, b)(func)
         case MFC(Gte(a, b)) => reversibleRelop(a, b)(func)
 
-        case MFC(Within(a, b)) =>
-          relop(a, b)(
-            Selector.In.apply _,
-            x => Selector.ElemMatch(\/-(Selector.In(Bson.Arr(List(x))))))
+        // NB: workaround patmat exhaustiveness checker bug. Merge with previous `match`
+        //     once solved.
+        case x => x match {
+          case MFC(Within(a, b)) =>
+            relop(a, b)(
+              Selector.In.apply _,
+              x => Selector.ElemMatch(\/-(Selector.In(Bson.Arr(List(x))))))
 
-        case MFC(Search(_, IsText(patt), IsBool(b))) =>
-          \/-(({ case List(f1) =>
-            Selector.Doc(ListMap(f1 -> Selector.Expr(Selector.Regex(patt, b, true, false, false)))) },
-            List(There(0, Here[T]()))))
+          case MFC(Search(_, IsText(patt), IsBool(b))) =>
+            \/-(({ case List(f1) =>
+              Selector.Doc(ListMap(f1 -> Selector.Expr(Selector.Regex(patt, b, true, false, false)))) },
+              List(There(0, Here[T]()))))
 
-        case MFC(Between(_, IsBson(lower), IsBson(upper))) =>
-          \/-(({ case List(f) => Selector.And(
-            Selector.Doc(f -> Selector.Gte(lower)),
-            Selector.Doc(f -> Selector.Lte(upper)))
-          },
-            List(There(0, Here[T]()))))
+          case MFC(Between(_, IsBson(lower), IsBson(upper))) =>
+            \/-(({ case List(f) => Selector.And(
+              Selector.Doc(f -> Selector.Gte(lower)),
+              Selector.Doc(f -> Selector.Lte(upper)))
+            },
+              List(There(0, Here[T]()))))
 
-        case MFC(And(a, b)) => invoke2Nel(a._2, b._2)(Selector.And.apply _)
-        case MFC(Or(a, b)) => invoke2Nel(a._2, b._2)(Selector.Or.apply _)
-        case MFC(Not((_, v))) =>
-          v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
+          case MFC(Not((_, v))) =>
+            v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
 
-        case MFC(Guard(_, typ, (_, cont), _)) => cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+          case MFC(Guard(_, typ, (_, cont), _)) => cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
 
-        case _ => -\/(InternalError fromMsg node.map(_._1).shows)
+          case _ => -\/(InternalError fromMsg node.map(_._1).shows)
+        }
       }
     }
 

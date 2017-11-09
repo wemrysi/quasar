@@ -122,6 +122,33 @@ class JsCoreSpecs extends quasar.Qspec with TreeMatchers with ScalazMatchers {
 
       x.simplify must_=== Arr(List(ident("y"), ident("y"), If(ident("r"), Select(ident("r"), "foo"), ident("bar"))))
     }
+
+    "reduce multiple splice obj to single splice obj" in {
+      val anif = If(BinOp(And,
+                    Call(ident("isObject"),List(ident("value"))),
+                    UnOp(Not,Call(Access(ident("Array"),Literal(Js.Str("isArray"))),List(ident("value"))))),
+                   Access(ident("value"), Literal(Js.Str("city"))),
+                   ident("undefined"))
+
+      val obj1 = Obj(ListMap(Name("city1") -> anif))
+      val obj2 = Obj(ListMap(Name("city2") -> anif))
+      val obj3 = Obj(ListMap(Name("city3") -> anif))
+      val obj4 = Obj(ListMap(Name("pop1")  -> anif))
+      val obj5 = Obj(ListMap(Name("pop2")  -> anif))
+
+      val z = SpliceObjects(List(
+                SpliceObjects(List(
+                  SpliceObjects(List(
+                    SpliceObjects(List(
+                      SpliceObjects(List(ident("value"),
+                        obj1)),
+                    obj2)),
+                  obj3)),
+                obj4)),
+              obj5))
+
+      z.simplify must_=== SpliceObjects(List(ident("value"), obj1, obj2, obj3, obj4, obj5))
+    }
   }
 
   "RenderTree" should {

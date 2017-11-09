@@ -834,7 +834,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           mounts = Map.empty,
           status = Status.BadRequest,
           body = { err: ApiError =>
-            (err.status.reason must_=== "Path exists.") and
+            (err.status.reason must_=== "Destination is same path as source") and
             (err.detail("path") must beSome)
           },
           newState = Unchanged)
@@ -981,7 +981,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           mounts = Map.empty,
           status = Status.BadRequest,
           body = { err: ApiError =>
-            (err.status.reason must_=== "Path exists.") and
+            (err.status.reason must_=== "Destination is same path as source") and
               (err.detail("path") must beSome)
           },
           newState = Unchanged)

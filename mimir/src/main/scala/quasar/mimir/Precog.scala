@@ -119,7 +119,7 @@ final class Precog private (dataDir0: File)
     new PermissionsFinder(apiKeyFinder, accountFinder, Instant.EPOCH)
 
   val actorSystem: ActorSystem =
-    ActorSystem("nihdbExecutorActorSystem")
+    ActorSystem("nihdbExecutorActorSystem", classLoader = Some(getClass.getClassLoader))
 
   private val props: Props = Props(Chef(
     VersionedCookedBlockFormat(Map(1 -> V1CookedBlockFormat)),
