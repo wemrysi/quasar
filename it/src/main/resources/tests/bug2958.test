@@ -2,9 +2,10 @@
   "name": "bug2958",
   "data": "bug2958.data",
   "backends": {
-    "couchbase":         "pending"
+    "couchbase":         "pending",
+    "marklogic_xml":     "pending"
   },
-  "NB": "couchbase is pending becasue the value c contains null. this seem however to be an independent couchbase issue (thus pending)",
+  "NB": "couchbase is pending becasue the value c contains null.  marklogic_xml  is pending because the valeu c is {}. Both issues seem connector specific and are not related to bug2958",
   "query": "SELECT MAP_CONCAT(DELETE_KEY(t0, \"b\"), {\"c\": MAP_CONCAT(t0.c, t0.b) ?? t0.b}) FROM bug2958 AS t0",
   "predicate": "exactly",
   "ignoreResultOrder": true,
