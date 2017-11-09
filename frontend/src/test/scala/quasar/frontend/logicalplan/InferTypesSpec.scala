@@ -16,11 +16,9 @@
 
 package quasar.frontend.logicalplan
 
-import slamdata.Predef._
 import quasar.Type
-import quasar.fp.ski.κ
 
-import scala.Symbol
+import quasar.fp.ski.κ
 
 import matryoshka.data.Fix
 import org.specs2.execute._
@@ -28,35 +26,29 @@ import scalaz.Cofree
 
 class InferTypesSpec extends quasar.Qspec {
 
-  val lpr = new LogicalPlanR[Fix[LogicalPlan]]
+  val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
   def infer(lp: Fix[LogicalPlan])(eval: Cofree[LogicalPlan, Type] => ResultLike): Result = 
-    lpr.inferTypes(Type.Top, lp).fold(κ(failure), eval(_).toResult)
+    lpf.inferTypes(Type.Top, lp).fold(κ(failure), eval(_).toResult)
   
   "inferTypes" should  {
 
     "be Top for Free" in {
-      val lp: Fix[LogicalPlan] = mkFree("sym")
-      infer(lp) { cf =>
+      infer(lpf.free('sym)) { cf =>
         cf.head must_== Type.Top
-        cf.tail must_== mkFree("sym").unFix
+        cf.tail must_== lpf.free('sym).unFix
       }
     }
 
     "be Top for Let(Free, Free)" in {
-      val lp: Fix[LogicalPlan] = Fix(Let(Symbol("sym"), mkFree("sym"), mkFree("sym")))
-      infer(lp) { cf =>
+      infer(lpf.let('sym, lpf.free('sym), lpf.free('sym))) { cf =>
         cf.head must_== Type.Top
         val (sym, form, in) = let.getOption(cf.tail).get
-        sym must_== Symbol("sym")
+        sym must_== 'sym
         form.head must_== Type.Top
-        free.getOption(form.tail).get must_== Symbol("sym")
-        free.getOption(in.tail).get must_== Symbol("sym")
+        free.getOption(form.tail).get must_== 'sym
+        free.getOption(in.tail).get must_== 'sym
       }
     }
   }
-
-  private def mkFree(symbol: String): Fix[LogicalPlan] =
-    Fix(Free(Symbol(symbol)))
-
 }
