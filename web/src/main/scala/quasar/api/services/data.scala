@@ -124,10 +124,15 @@ object data {
         QResponse.streaming(p) ∘ (_.modifyHeaders(_ ++ headers))
       },
       filePath => {
-          val d = R.scan(filePath, offset, limit)
-          zipped.fold(
-            formattedZipDataResponse(format, filePath, d),
-            formattedDataResponse(format, d))
+        Q.fileExists(filePath).flatMap { exists =>
+          if (exists) {
+            val d = R.scan(filePath, offset, limit)
+            zipped.fold(
+              formattedZipDataResponse(format, filePath, d),
+              formattedDataResponse(format, d))
+                 // ToQResponse is called explicitly because Scala type inference fails otherwise...
+          } else ToQResponse[ApiError, S].toResponse(FileSystemError.pathErr(PathError.pathNotFound(filePath)).toApiError).point[Free[S, ?]]
+        }
       })
 
   private def parseDestination(dstString: String): ApiError \/ APath = {

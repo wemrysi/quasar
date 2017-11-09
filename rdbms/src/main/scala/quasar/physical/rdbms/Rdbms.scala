@@ -17,49 +17,38 @@
 package quasar.physical.rdbms
 
 import slamdata.Predef._
-import quasar.connector.{DefaultAnalyzeModule, BackendModule}
+import quasar.connector.{BackendModule, DefaultAnalyzeModule}
 import quasar.contrib.pathy.{AFile, APath}
 import quasar.contrib.scalaz.MonadReader_
-import quasar.effect.uuid.GenUUID
-import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp.{:/:, :\:}
 import quasar.fp.free._
 import quasar.fs.MonadFsErr
-import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.mount.BackendDef.{DefErrT, DefinitionError}
 import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.fs._
+
 import quasar.qscript.{EquiJoin, ExtractPath, Injectable, Optimize, QScriptCore, QScriptTotal, ShiftedRead, Unicoalesce, Unirewrite}
-import quasar.fs.WriteFile.WriteHandle
-import quasar.physical.rdbms.common.{Config, TablePath}
+import quasar.physical.rdbms.common.Config
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 import quasar.{RenderTree, RenderTreeT, fp}
 import quasar.qscript.analysis._
 
 import scala.Predef.implicitly
+
+import doobie.imports.Transactor
 import doobie.hikari.hikaritransactor.HikariTransactor
-import doobie.imports.ConnectionIO
 import matryoshka.{BirecursiveT, Delay, EqualT, RecursiveT, ShowT}
 import matryoshka.data._
-
 import scalaz._
 import Scalaz._
 import scalaz.concurrent.Task
 
 trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with RdbmsManageFile with RdbmsQueryFile with Interpreter with DefaultAnalyzeModule {
 
-  type Eff[A] = (
-      ConnectionIO :\:
-      MonotonicSeq :\:
-      GenUUID :\:
-      KeyValueStore[ReadHandle, SqlReadCursor, ?] :/:
-      KeyValueStore[WriteHandle, TablePath, ?]
-  )#M[A]
-
   type QS[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
   type Repr        = String // TODO define best Repr for a SQL query (Doobie Fragment?)
-  type M[A]        = Free[Eff, A]
-
+  type Eff[A] = model.Eff[A]
+  type M[A] = model.M[A]
   type Config = common.Config
 
   implicit class LiftEffBackend[F[_], A](m: F[A])(implicit I: F :<: Eff) {
@@ -93,19 +82,23 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
   def parseConfig(uri: ConnectionUri): DefErrT[Task, Config] =
     EitherT(Task.delay(parseConnectionUri(uri).map(Config.apply)))
 
-
-  def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] = {
-    val xa = HikariTransactor[Task](
+  def transactor(cfg: Config): Task[HikariTransactor[Task]] = {
+    HikariTransactor[Task](
       cfg.connInfo.driverClassName,
       cfg.connInfo.url,
       cfg.connInfo.userName,
       cfg.connInfo.password.getOrElse("")
     )
+  }
+
+  def compile(cfg: Config): DefErrT[Task, (M ~> Task, Task[Unit])] = {
+    val xa = transactor(cfg)
     val close = xa.flatMap(_.configure(_.close()))
     (interp(xa) ∘ (i => (foldMapNT[Eff, Task](i), close))).liftM[DefErrT]
   }
 
   lazy val MR                   = MonadReader_[Backend, Config]
+  lazy val MT                   = quasar.effect.Read.monadReader_[Transactor[Task], Eff]
   lazy val ME                   = MonadFsErr[Backend]
 
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
