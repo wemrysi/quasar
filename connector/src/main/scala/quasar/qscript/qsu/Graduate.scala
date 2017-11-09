@@ -56,14 +56,43 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
     Corecursive[T[QSE], QSE].anaM[F, QSUGraph](graph)(
       graduateƒ[F, QSE](None)(NaturalTransformation.refl[QSE]))
 
-  private def mergeSources[F[_]: Monad: PlannerErrorME](left: QSUGraph, right: QSUGraph)
-      : SrcMerge[QSUGraph, F[FreeQS]] = {
-    val root: Symbol = IntersectGraphs.intersect[QSU](left.vertices, right.vertices)
+  private def mergeSources[F[_]: Monad: PlannerErrorME](
+      left: QSUGraph,
+      right: QSUGraph): SrcMerge[QSUGraph, F[FreeQS]] = {
 
-    SrcMerge(
-      QSUGraph[T](root, left.vertices),
-      graduateCoEnv[F](root, left),
-      graduateCoEnv[F](root, right))
+    val lvert = left.vertices
+    val rvert = right.vertices
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def lub(
+        lefts: Set[Symbol],
+        rights: Set[Symbol],
+        visited: Set[Symbol]): Option[Symbol] = {
+
+      val lnodes = lefts.map(lvert)
+      val rnodes = rights.map(rvert)
+
+      val lexp = lnodes.flatMap(_.foldLeft(Set[Symbol]())(_ + _))
+      val rexp = rnodes.flatMap(_.foldLeft(Set[Symbol]())(_ + _))
+
+      val check = (lexp intersect visited) union (rexp intersect visited)
+
+      //
+      check.headOption.orElse(lub(lexp, rexp, visited.union(lexp).union(rexp)))
+    }
+
+    val maybeSource = if (left.root === right.root)
+      Some(left.root)
+    else
+      lub(Set(left.root), Set(right.root), Set(left.root, right.root))
+
+    maybeSource map { root =>
+      SrcMerge(
+        // we merge the vertices, just in case the graphs are additively applied to a common root
+        QSUGraph[T](root, left.vertices ++ right.vertices),
+        graduateCoEnv[F](root, left),
+        graduateCoEnv[F](root, right))
+    } getOrElse scala.sys.error(s"Source merging failed from ${left.root} and ${right.root} in ${lvert ++ rvert}")
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
