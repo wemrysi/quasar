@@ -27,9 +27,9 @@ import quasar.{
   TernaryFunc,
   UnaryFunc
 }
-import quasar.Planner.{NonRepresentableData, PlannerError}
+import quasar.Planner.{NonRepresentableData, PlannerError, PlannerErrorME}
 import quasar.contrib.pathy.mkAbsolute
-import quasar.contrib.scalaz.{MonadError_, MonadState_}
+import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson
 import quasar.frontend.{logicalplan => lp}
 import quasar.std.{IdentityLib, SetLib, StructuralLib}
@@ -71,13 +71,13 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
   private val ValueIndex = 1
 
   def apply[
-      F[_]: Monad: MonadError_[?[_], PlannerError]: NameGenerator](
+      F[_]: Monad: PlannerErrorME: NameGenerator](
       plan: T[lp.LogicalPlan]): F[QSUGraph] =
     plan.cataM(readLPƒ[StateT[F, GState, ?]]).eval(SMap())
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def readLPƒ[
-      G[_]: Monad: MonadError_[?[_], PlannerError]: NameGenerator](
+      G[_]: Monad: PlannerErrorME: NameGenerator](
       implicit MS: MonadState_[G, GState])
       : AlgebraM[G, lp.LogicalPlan, QSUGraph] = {
 
@@ -100,7 +100,7 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
         },
         { ejson: T[EJson] => IC(MapFuncsCore.Constant(ejson)).right })
 
-      MonadError_[G, PlannerError]
+      PlannerErrorME[G]
         .unattempt(back.point[G])
         .flatMap(nullary[G])
 
