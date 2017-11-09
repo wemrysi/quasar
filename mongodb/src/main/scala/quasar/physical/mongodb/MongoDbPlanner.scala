@@ -535,15 +535,37 @@ object MongoDbPlanner {
     }
 
   def typeSelector[T[_[_]]: RecursiveT: ShowT]:
-      GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = {
+      GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = { node =>
 
     import MapFuncsCore._
 
-    {
-      case MFC(And(a, b)) => invoke2Nel(a._2, b._2)(Selector.And.apply(_, _))
-      case MFC(Or(a, b)) => invoke2Nel(a._2, b._2)(Selector.Or.apply(_, _))
+    def invoke2Rel[T[_[_]]](x: OutputM[PartialSelector[T]], y: OutputM[PartialSelector[T]])(f: (Selector, Selector) => Selector):
+        OutputM[PartialSelector[T]] =
+      (x.toOption, y.toOption) match {
+        case (Some((f1, p1)), Some((f2, p2))) => invoke2Nel(x, y)(f)
+        case (Some((f1, p1)), None)           => (f1, p1.map(There(0, _))).right
+        case (None, Some((f2, p2)))           => (f2, p2.map(There(1, _))).right
+        case (None, None)                     => InternalError.fromMsg(node.map(_._1).shows).left
+      }
 
-      case node @ MFC(Guard((Embed(MFC(ProjectKey(Embed(MFC(Undefined())), _))), _), typ, cont, _)) =>
+    node match {
+      // NB: the pick of Selector for these two cases determine how restrictive the
+      //     extracted typechecks are. See #2883 for more details
+      case MFC(And(a, b)) => invoke2Rel(a._2, b._2)(Selector.And(_, _))
+      case MFC(Or(a, b))  => invoke2Rel(a._2, b._2)(Selector.Or(_, _))
+
+      // NB: we want to extract typechecks from both sides of a comparison operator
+      //     Typechecks extracted from both sides are ANDed. Similarly to `MFC(And(_, _))`
+      //     and `MFC(Or(_, _))` the selector choice can be tweaked depending on how
+      //     strict we want to be with extracted typechecks. See #2883
+      case MFC(Eq(a, b))  => invoke2Rel(a._2, b._2)(Selector.And(_, _))
+      case MFC(Neq(a, b)) => invoke2Rel(a._2, b._2)(Selector.And(_, _))
+      case MFC(Lt(a, b))  => invoke2Rel(a._2, b._2)(Selector.And(_, _))
+      case MFC(Lte(a, b)) => invoke2Rel(a._2, b._2)(Selector.And(_, _))
+      case MFC(Gt(a, b))  => invoke2Rel(a._2, b._2)(Selector.And(_, _))
+      case MFC(Gte(a, b)) => invoke2Rel(a._2, b._2)(Selector.And(_, _))
+
+      case MFC(Guard((Embed(MFC(ProjectKey(Embed(MFC(Undefined())), _))), _), typ, cont, _)) =>
         def selCheck: Type => Option[BsonField => Selector] =
           generateTypeCheck[BsonField, Selector](Selector.Or(_, _)) {
             case Type.Null => ((f: BsonField) =>  Selector.Doc(f -> Selector.Type(BsonType.Null)))
@@ -582,7 +604,7 @@ object MongoDbPlanner {
             { case (f2, p2) => ({ case head :: tail => Selector.And(f(head), f2(tail)) }, There(0, Here[T]()) :: p2.map(There(1, _)))
             })))
 
-      case node @ _ => -\/(InternalError fromMsg node.map(_._1).shows)
+      case _ => -\/(InternalError fromMsg node.map(_._1).shows)
     }
   }
 
@@ -767,7 +789,7 @@ object MongoDbPlanner {
           case MFC(Not((_, v))) =>
             v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
 
-          case MFC(Guard(_, typ, (_, cont), _)) => cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+          case MFC(Guard(_, typ, (_, cont), (Embed(MFC(Undefined())), _))) => cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
 
           case _ => -\/(InternalError fromMsg node.map(_._1).shows)
         }
