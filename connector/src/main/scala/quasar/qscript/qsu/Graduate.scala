@@ -77,7 +77,6 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
 
       val check = (lexp intersect visited) union (rexp intersect visited)
 
-      //
       check.headOption.orElse(lub(lexp, rexp, visited.union(lexp).union(rexp)))
     }
 
