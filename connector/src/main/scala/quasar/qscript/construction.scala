@@ -98,6 +98,8 @@ object construction {
         rollCore(MapFuncsCore.ToTimestamp(a1))
       def TypeOf[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
         rollCore(MapFuncsCore.TypeOf(a1))
+    def ToId[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.ToId(a1))
       def Negate[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
         rollCore(MapFuncsCore.Negate(a1))
       def Not[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =

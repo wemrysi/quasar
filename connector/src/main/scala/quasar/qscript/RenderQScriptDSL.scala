@@ -175,6 +175,7 @@ object RenderQScriptDSL {
             case TimeOfDay(a1)             => ("TimeOfDay", fa(base, a1).right :: Nil)
             case ToTimestamp(a1)           => ("ToTimestamp", fa(base, a1).right :: Nil)
             case TypeOf(a1)                => ("TypeOf", fa(base, a1).right :: Nil)
+            case ToId(a1)                  => ("ToId", fa(base, a1).right :: Nil)
             case Negate(a1)                => ("Negate", fa(base, a1).right :: Nil)
             case Not(a1)                   => ("Not", fa(base, a1).right :: Nil)
             case Length(a1)                => ("Length", fa(base, a1).right :: Nil)
