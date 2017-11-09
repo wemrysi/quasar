@@ -21,7 +21,6 @@ import quasar._
 import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._
 import quasar.contrib.specs2.PendingWithActualTracking
-import quasar.ejson.EJson._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
@@ -40,7 +39,7 @@ class PlannerQScriptSpec extends
   import CollectionUtil._
   import Reshape.reshape
 
-  val (func, free, fix) =
+  val (func, json, free, fix) =
     quasar.qscript.construction.mkDefaults[Fix, fs.MongoQScript[Fix, ?]]
 
   //TODO make this independent of MongoQScript and move to a place where all
@@ -50,10 +49,10 @@ class PlannerQScriptSpec extends
       fix.Unreferenced,
       free.Filter(
         free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-        func.Guard(func.Hole, Type.AnyObject, func.Constant(bool[Fix](true)), func.Constant(bool[Fix](false)))),
+        func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
       free.Filter(
         free.ShiftedRead[AFile](rootDir </> dir("db") </> file("smallZips"), qscript.ExcludeId),
-        func.Guard(func.Hole, Type.AnyObject, func.Constant(bool[Fix](true)), func.Constant(bool[Fix](false)))),
+        func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
       List((func.ProjectKeyS(func.Hole, "_id"), func.ProjectKeyS(func.Hole, "_id"))),
       JoinType.Inner,
       func.ProjectKeyS(func.RightSide, "city"))
