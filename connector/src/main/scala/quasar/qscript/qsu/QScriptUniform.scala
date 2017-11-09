@@ -21,14 +21,17 @@ import quasar.{RenderTree, RenderTreeT}
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.matryoshka.birecursiveIso
 import quasar.contrib.pathy.AFile
+import quasar.ejson.{EJson, Fixed}
 import quasar.fp.{τ, PrismNT}
 import quasar.fp.ski.κ
 import quasar.qscript._
 
-import matryoshka.{BirecursiveT, Delay, EqualT, ShowT}
+import matryoshka.{BirecursiveT, Delay, Embed, EqualT, ShowT}
+import matryoshka.data._
+import matryoshka.patterns.CoEnv
 import monocle.{Prism, PTraversal, Traversal}
 import pathy.Path
-import scalaz.{Applicative, Bitraverse, Equal, Free, NonEmptyList => NEL, Scalaz, Show, Traverse}
+import scalaz.{\/-, Applicative, Bitraverse, Equal, Free, NonEmptyList => NEL, Scalaz, Show, Traverse}
 
 sealed trait QScriptUniform[T[_[_]], A] extends Product with Serializable
 
@@ -366,7 +369,9 @@ object QScriptUniform {
     import Scalaz._
 
     type QSU = T[QScriptUniform]
+    type J   = T[EJson]
 
+    private val J = Fixed[J]
     private val O = Optics[T]
     private val iso = birecursiveIso[QSU, QScriptUniform]
     private def mfc[A] = PrismNT.inject[MapFuncCore, MapFunc].asPrism[A]
@@ -379,6 +384,41 @@ object QScriptUniform {
 
     def autojoin3(left: QSU, center: QSU, right: QSU, combiner: (τ, τ, τ) => Ternary[T, τ]): QSU =
       autojoin(NEL(left, center, right), mfc(τ[λ[α => (α, α, α) => Ternary[T, α]]](combiner)[Int](0, 1, 2)))
+
+    val constant: Prism[QSU, J] =
+      Prism[QSU, T[EJson]](qsu => map.getOption(qsu) collect {
+        case (Unreferenced(), Embed(CoEnv(\/-(MFC(MapFuncsCore.Constant(ejs)))))) => ejs
+      })(ejs => map(unreferenced(), Free.roll(mfc[FreeMap](MapFuncsCore.Constant(ejs)))))
+
+    val carr: Prism[QSU, List[J]] =
+      constant composePrism J.arr
+
+    val cbool: Prism[QSU, Boolean] =
+      constant composePrism J.bool
+
+    val cbyte: Prism[QSU, Byte] =
+      constant composePrism J.byte
+
+    val cchar: Prism[QSU, Char] =
+      constant composePrism J.char
+
+    val cdec: Prism[QSU, BigDecimal] =
+      constant composePrism J.dec
+
+    val cint: Prism[QSU, BigInt] =
+      constant composePrism J.int
+
+    val cmap: Prism[QSU, List[(J, J)]] =
+      constant composePrism J.map
+
+    val cmeta: Prism[QSU, (J, J)] =
+      constant composePrism J.meta
+
+    val cnull: Prism[QSU, Unit] =
+      constant composePrism J.nul
+
+    val cstr: Prism[QSU, String] =
+      constant composePrism J.str
 
     val dimEdit: Prism[QSU, (QSU, DTrans[T])] =
       iso composePrism O.dimEdit
