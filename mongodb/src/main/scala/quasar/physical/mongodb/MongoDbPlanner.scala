@@ -555,8 +555,8 @@ object MongoDbPlanner {
       case MFC(Or(a, b))  => invoke2Rel(a._2, b._2)(Selector.Or(_, _))
 
       // NB: we want to extract typechecks from both sides of a comparison operator
-      //     Typechecks extracted from both sides are ANDed. Similarly to `MFC(And(_, _))`
-      //     and `MFC(Or(_, _))` the selector choice can be tweaked depending on how
+      //     Typechecks extracted from both sides are ANDed. Similarly to the `And`
+      //     and `Or` case above, the selector choice can be tweaked depending on how
       //     strict we want to be with extracted typechecks. See #2883
       case MFC(Eq(a, b))  => invoke2Rel(a._2, b._2)(Selector.And(_, _))
       case MFC(Neq(a, b)) => invoke2Rel(a._2, b._2)(Selector.And(_, _))
@@ -936,8 +936,8 @@ object MongoDbPlanner {
           case Filter(src0, cond0) => {
             // TODO: Apply elideMoreGeneralGuards to all FreeMap's in the plan, not only here
             cond0.transCataM(assumeReadType.elideMoreGeneralGuards[M, T](Type.AnyObject)) >>= { cond =>
-              val selectors = getSelector[T, M, EX](cond, selector[T](cfg.bsonVersion)).toOption
-              val typeSelectors = getSelector[T, M, EX](cond, typeSelector[T]).toOption
+              val selectors = getSelector[T, M, EX](cond, selector[T](cfg.bsonVersion))
+              val typeSelectors = getSelector[T, M, EX](cond, typeSelector[T])
 
               def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
                   M[WorkflowBuilder[WF]] = {
@@ -947,7 +947,7 @@ object MongoDbPlanner {
                   .map(WB.filter(src, _, sel))
               }
 
-              (selectors, typeSelectors) match {
+              (selectors.toOption, typeSelectors.toOption) match {
                 case (None, Some(typeSel)) => filterBuilder(src0, typeSel)
                 case (Some(sel), None) => filterBuilder(src0, sel)
                 case (Some(sel), Some(typeSel)) => filterBuilder(src0, typeSel) >>= (filterBuilder(_, sel))
