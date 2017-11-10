@@ -1231,7 +1231,7 @@ object MongoDbPlanner {
     } yield mongoQS5
   }
 
-  def plan1
+  def buildWorkflow
     [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
       M[_]: Monad: PhaseResultTell: MonadFsErr: ExecTimeR,
       WF[_]: Functor: Coalesce: Crush: Crystallize,
@@ -1240,21 +1240,17 @@ object MongoDbPlanner {
     (qs: T[fs.MongoQScript[T, ?]])
     (implicit
       ev0: WorkflowOpCoreF :<: WF,
-      ev1: WorkflowBuilder.Ops[WF],
-      ev2: EX :<: ExprOp,
-      ev3: RenderTree[Fix[WF]])
-      : M[Crystallized[WF]] =
+      ev1: EX :<: ExprOp,
+      ev2: RenderTree[Fix[WF]])
+      : M[Fix[WF]] =
     for {
       wb <- log(
         "Workflow Builder",
         qs.cataM[M, WorkflowBuilder[WF]](
           Planner[T, fs.MongoQScript[T, ?]].plan[M, WF, EX](cfg).apply(_) ∘
             (_.transCata[Fix[WorkflowBuilderF[WF, ?]]](repeatedly(WorkflowBuilder.normalize[WF, Fix[WorkflowBuilderF[WF, ?]]])))))
-      wf1 <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb)))
-      wf2 <- log(
-        "Workflow (crystallized)",
-        Crystallize[WF].crystallize(wf1).point[M])
-    } yield wf2
+      wf <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb)))
+    } yield wf
 
   def plan0
     [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
@@ -1271,26 +1267,29 @@ object MongoDbPlanner {
       ev3: RenderTree[Fix[WF]])
       : M[Crystallized[WF]] = {
 
-    def doPlan[F[_]: Monad: ExecTimeR](qs0: T[fs.MongoQScript[T, ?]]) =
-      plan1[T, FileSystemErrT[PhaseResultT[F, ?], ?], WF, EX](cfg)(qs0).run.run
+    def doBuildWorkflow[F[_]: Monad: ExecTimeR](qs0: T[fs.MongoQScript[T, ?]]) =
+      buildWorkflow[T, FileSystemErrT[PhaseResultT[F, ?], ?], WF, EX](cfg)(qs0).run.run
 
     for {
       qs0 <- toMongoQScript[T, M](anyDoc, qs)
-      logRes0 <- doPlan[M](qs0)
+      logRes0 <- doBuildWorkflow[M](qs0)
       (log0, res0) = logRes0
-      wf <- res0 match {
-              case \/-(wf0) if (needsMapBeforeSort(wf0.op)) =>
-                // TODO look into adding mapBeforeSort to WorkflowBuilder or Workflow stage
-                // instead, so that we can avoid having to rerun some transformations.
-                // See #3063
-                log("QScript Mongo (Map Before Sort)",
-                  Trans(mapBeforeSort[T, M], qs0)) >>= plan1[T, M, WF, EX](cfg)
-              case \/-(wf0) =>
-                  PhaseResultTell[M].tell(log0) *> wf0.point[M]
-              case -\/(err0) =>
-                PhaseResultTell[M].tell(log0) *> raiseErr[M, Crystallized[WF]](err0)
-           }
-    } yield wf
+      wf0 <- res0 match {
+               case \/-(wf) if (needsMapBeforeSort(wf)) =>
+                 // TODO look into adding mapBeforeSort to WorkflowBuilder or Workflow stage
+                 // instead, so that we can avoid having to rerun some transformations.
+                 // See #3063
+                 log("QScript Mongo (Map Before Sort)",
+                   Trans(mapBeforeSort[T, M], qs0)) >>= buildWorkflow[T, M, WF, EX](cfg)
+               case \/-(wf) =>
+                 PhaseResultTell[M].tell(log0) *> wf.point[M]
+               case -\/(err) =>
+                 PhaseResultTell[M].tell(log0) *> raiseErr[M, Fix[WF]](err)
+             }
+      wf1 <- log(
+        "Workflow (crystallized)",
+        Crystallize[WF].crystallize(wf0).point[M])
+    } yield wf1
   }
 
   def planExecTime[
