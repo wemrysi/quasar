@@ -647,6 +647,8 @@ Retrieves data from the specified path in the [format](#data-formats) specified 
 
 If the supplied path represents a directory (ends with a slash), this request produces a `zip` archive containing the contents of the named directory, database, etc. Each file in the archive is formatted as specified in the request query and/or `Accept` header.
 
+If the supplied path does not exist, a 404 `NotFound` response is returned.
+
 ### PUT /data/fs/[path]
 
 Replace data at the specified path. Uploaded data may be in any of the [supported formats](#data-formats) and the request must include the appropriate `Content-Type` header indicating the format used.

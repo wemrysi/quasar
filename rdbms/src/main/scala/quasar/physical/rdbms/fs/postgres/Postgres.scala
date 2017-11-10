@@ -37,6 +37,7 @@ object Postgres
     with PostgresInsert
     with PostgresDescribeTable
     with PostgresCreate
+    with PostgresScanTable
     with PostgresMove {
 
   override val Type = FileSystemType("postgres")

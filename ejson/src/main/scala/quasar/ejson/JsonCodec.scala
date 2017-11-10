@@ -27,6 +27,8 @@ import monocle.Prism
 import scalaz._, Scalaz.{char => charz, _}
 
 object JsonCodec {
+  import Common.{Optics => C}
+
   /** Encode an EJson value as Json.
     *
     * In order to remain compatible with JSON and achieve a compact encoding
@@ -60,13 +62,13 @@ object JsonCodec {
       MetaObj(v, m).embed
 
     case ExtEJson(Byte(b)) =>
-      SingletonObj(ByteK, CommonJson(dec[J](BigDecimal(b.toInt))).embed).embed
+      SingletonObj(ByteK, CommonJson(C.dec[J](BigDecimal(b.toInt))).embed).embed
 
     case ExtEJson(Char(c)) =>
       SingletonObj(CharK, OneChar[J](c).embed).embed
 
     case ExtEJson(Int(i)) =>
-      SingletonObj(IntK, CommonJson(dec[J](BigDecimal(i))).embed).embed
+      SingletonObj(IntK, CommonJson(C.dec[J](BigDecimal(i))).embed).embed
 
     case ExtEJson(Map(entries)) =>
       val sigildEntries =
@@ -95,29 +97,29 @@ object JsonCodec {
         ExtEJson(Meta(v, m)).right
 
       case SingletonObj(`ByteK`, v) =>
-        extractC(dec[J], v.project)
+        extractC(C.dec[J], v.project)
           .filter(_.isValidByte)
-          .map(d => EE[J].composePrism(byte)(d.toByte))
+          .map(d => optics.byte[J](d.toByte))
           .toRightDisjunction(DecodingFailed("expected a byte", v))
 
       case SingletonObj(`CharK`, v) =>
         some(v.project)
-          .collect { case OneChar(c) => EE[J].composePrism(char)(c) }
+          .collect { case OneChar(c) => optics.char[J](c) }
           .toRightDisjunction(DecodingFailed("expected a single character", v))
 
       case SingletonObj(`IntK`, v) =>
-        extractC(dec[J], v.project)
-          .flatMap(_.toBigIntExact.map(EE[J].composePrism(int)(_)))
+        extractC(C.dec[J], v.project)
+          .flatMap(_.toBigIntExact.map(optics.int[J](_)))
           .toRightDisjunction(DecodingFailed("expected an integer", v))
 
       case SingletonObj(`MapK`, v) =>
         MapArr.unapply(v.project)
-          .map(xs => ExtEJson(Map(xs)))
+          .map(optics.map[J](_))
           .toRightDisjunction(DecodingFailed("expected an array of map entries", v))
 
       case ObjJson(Obj(m)) =>
         ExtEJson(Map(m.toList.map(_.leftMap(s =>
-          CJ[J].composePrism(str)(unsigild(s)).embed
+          CJ[J].composePrism(C.str)(unsigild(s)).embed
         )))).right
 
       case CommonJson(c) =>
@@ -138,7 +140,6 @@ object JsonCodec {
   ////
 
   private def CJ[A] = Prism[Json[A], Common[A]](CommonJson.prj)(CommonJson.inj)
-  private def EE[A] = Prism[EJson[A], Extension[A]](ExtEJson.prj)(ExtEJson.inj)
 
   private def extractC[A, B](p: Prism[Common[A], B], j: Json[A]): Option[B] =
     CJ[A].composePrism(p).getOption(j)
@@ -153,7 +154,7 @@ object JsonCodec {
     (isSigild(s) && ExtKeys.notMember(s)) ? s.drop(1) | s
 
   private def sigildJs[A]: Json[A] => Json[A] = totally {
-    case CommonJson(Str(s)) if isSigild(s) => CommonJson(str[A](sigild(s)))
+    case CommonJson(Str(s)) if isSigild(s) => CommonJson(C.str[A](sigild(s)))
   }
 
   private object OneChar {
@@ -161,7 +162,7 @@ object JsonCodec {
       CommonJson(Str(c.toString))
 
     def unapply[A](js: Json[A]): Option[SChar] =
-      CJ[A].composePrism(str)
+      CJ[A].composePrism(C.str)
         .getOption(js)
         .flatMap(s => s.headOption.filter(κ(s.length ≟ 1)))
   }
@@ -195,7 +196,7 @@ object JsonCodec {
     def unapply[J](js: Json[J])(
       implicit J: Recursive.Aux[J, Json]
     ): Option[List[(J, J)]] =
-      CJ[J].composePrism(arr)
+      CJ[J].composePrism(C.arr)
         .getOption(js)
         .flatMap(_.traverse(j => MapEntry.unapply(j.project)))
   }

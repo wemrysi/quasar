@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz.zipper._
 import quasar.ejson
-import quasar.ejson.{CommonEJson => C, EJson, EncodeEJson, EncodeEJsonK, ExtEJson => E, Type => EType, TypeTag}
+import quasar.ejson.{EJson, EncodeEJson, EncodeEJsonK, ExtEJson => E, Type => EType, TypeTag}
 import quasar.ejson.implicits._
 import quasar.fp.{coproductEqual, coproductShow}
 import quasar.fp.ski.κ
@@ -252,7 +252,7 @@ sealed abstract class StructuralTypeInstances extends StructuralTypeInstances0 {
         def encodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]) = {
           case TTags(     Nil, j) => j.asEJsonK
           case TTags(t :: Nil, j) => tagEjs(t.asEJson[J], j.asEJsonK)
-          case TTags(     ts , j) => tagEjs(C(ejson.arr(ts map (_.asEJson[J]))).embed, j.asEJsonK)
+          case TTags(     ts , j) => tagEjs(ejson.Fixed[J].arr(ts map (_.asEJson[J])), j.asEJsonK)
         }
 
         val encType = EncodeEJsonK[TypeF[L, ?]]
@@ -261,12 +261,9 @@ sealed abstract class StructuralTypeInstances extends StructuralTypeInstances0 {
           implicit
           JC: Corecursive.Aux[J, EJson],
           JR: Recursive.Aux[J, EJson]
-        ): J = v.project match {
-          case E(ejson.Map(xs)) =>
-            E(ejson.map((C(ejson.str[J]("tag")).embed, tejs) :: xs)).embed
-
-          case other =>
-            C(ejson.arr[J](List(tejs, v))).embed
+        ): J = {
+          val j = ejson.Fixed[J]
+          j.map.modifyOption((j.str("tag"), tejs) :: _)(v) | j.arr(List(tejs, v))
         }
       }
   }

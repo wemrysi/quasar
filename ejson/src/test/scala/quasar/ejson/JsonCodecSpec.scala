@@ -31,6 +31,7 @@ import scalaz._, Scalaz._
 
 final class JsonCodecSpec extends Qspec with EJsonArbitrary {
   import JsonCodec.DecodingFailed
+  import Common.Optics.{nul, str}
 
   implicit val params = Parameters(maxSize = 10)
 
