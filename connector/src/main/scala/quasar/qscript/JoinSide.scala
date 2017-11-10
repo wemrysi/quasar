@@ -29,3 +29,14 @@ object JoinSide {
   implicit val show: Show[JoinSide] = Show.showFromToString
   implicit val renderTree: RenderTree[JoinSide] = RenderTree.fromShowAsType("JoinSide")
 }
+
+sealed abstract class JoinSide3
+final object LeftSide3 extends JoinSide3
+final object Center extends JoinSide3
+final object RightSide3 extends JoinSide3
+
+object JoinSide3 {
+  implicit val equal: Equal[JoinSide3] = Equal.equalRef
+  implicit val show: Show[JoinSide3] = Show.showFromToString
+  implicit val renderTree: RenderTree[JoinSide3] = RenderTree.fromShowAsType("JoinSide3")
+}

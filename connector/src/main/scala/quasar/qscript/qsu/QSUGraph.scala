@@ -169,9 +169,16 @@ object QSUGraph extends QSUGraphInstances {
   object Extractors {
     import quasar.qscript.qsu.{QScriptUniform => QSU}
 
-    object AutoJoin {
+    object AutoJoin2 {
       def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
-        case g: QSU.AutoJoin[T, QSUGraph[T]] => QSU.AutoJoin.unapply(g)
+        case g: QSU.AutoJoin2[T, QSUGraph[T]] => QSU.AutoJoin2.unapply(g)
+        case _ => None
+      }
+    }
+
+    object AutoJoin3 {
+      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
+        case g: QSU.AutoJoin3[T, QSUGraph[T]] => QSU.AutoJoin3.unapply(g)
         case _ => None
       }
     }

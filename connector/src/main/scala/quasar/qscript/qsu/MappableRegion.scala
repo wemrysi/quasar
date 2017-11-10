@@ -20,13 +20,16 @@ import slamdata.Predef.{tailrec, Boolean, Option, Symbol}
 import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.qscript.{
+  Center,
   FreeMap,
   FreeMapA,
   JoinFunc,
   JoinSide,
   LeftSide,
+  LeftSide3,
   MapFunc,
   RightSide,
+  RightSide3,
   SrcHole
 }
 
@@ -38,7 +41,6 @@ import scalaz.{-\/, \/-, Kleisli, Traverse}
 import scalaz.std.option._
 import scalaz.syntax.either._
 import scalaz.syntax.equal._
-import scalaz.syntax.foldable._
 import scalaz.syntax.plus._
 import scalaz.syntax.std.boolean._
 
@@ -69,8 +71,18 @@ object MappableRegion {
       case QSUPattern(s, _) if halt(s) =>
         CoEnv(g.left)
 
-      case QSUPattern(_, AutoJoin(srcs, combine)) =>
-        CoEnv(combine.map(srcs.toVector).right[QSUGraph[T]])
+      case QSUPattern(_, AutoJoin2(left, right, combine)) =>
+        CoEnv(combine.map {
+          case LeftSide => left
+          case RightSide => right
+        }.right[QSUGraph[T]])
+
+      case QSUPattern(_, AutoJoin3(left, center, right, combine)) =>
+        CoEnv(combine.map {
+          case LeftSide3 => left
+          case Center => center
+          case RightSide3 => right
+        }.right[QSUGraph[T]])
 
       case QSUPattern(s, Map(srcG, fm)) =>
         fm.project.run match {

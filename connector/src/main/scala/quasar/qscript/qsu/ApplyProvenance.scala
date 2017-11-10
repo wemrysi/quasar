@@ -69,7 +69,9 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
 
   def computeProvenanceƒ[F[_]: Monad: PlannerErrorME]: AlgebraM[F, GPF, Dims] =
     gpf => gpf.qsu match {
-      case AutoJoin(srcs, _) => srcs.foldLeft1(dims.join(_, _)).point[F]
+      case AutoJoin2(left, right, _) => dims.join(left, right).point[F]
+
+      case AutoJoin3(left, center, right, _) => dims.join(dims.join(left, center), right).point[F]
 
       case DimEdit(src, DTrans.Squash()) => dims.squash(src).point[F]
 

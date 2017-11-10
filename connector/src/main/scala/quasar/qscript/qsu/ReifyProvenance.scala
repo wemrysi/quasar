@@ -18,7 +18,7 @@ package quasar.qscript.qsu
 
 import slamdata.Predef._
 
-import quasar.Planner.{InternalError, PlannerErrorME}
+import quasar.Planner.PlannerErrorME
 import quasar.common.JoinType
 import quasar.fp.ski.κ
 import quasar.qscript.{HoleF, IncludeId, LeftSideF, MFC, ReduceIndexF, RightSideF}
@@ -28,7 +28,7 @@ import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
 import matryoshka.{BirecursiveT, EqualT}
-import scalaz.{\/-, Applicative, Free, ICons, INil, Monad}
+import scalaz.{\/-, Applicative, Free, Monad}
 import scalaz.Scalaz._
 
 final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
@@ -37,29 +37,16 @@ final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] 
 
   val prov = new QProv[T]
 
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   private def toQScript[F[_]: Applicative: PlannerErrorME](dims: QSUDims[T])
       : QSU[Symbol] => F[QSU[Symbol]] = {
-    case QSU.AutoJoin(sources, combiner0) =>
-      sources.list match {
-        case ICons(left, ICons(right, INil())) =>
-          val condition: JoinFunc =
-            prov.autojoinCondition(dims(left), dims(right))(κ(HoleF))
+    case QSU.AutoJoin2(left, right, _combiner) =>
+      val condition: JoinFunc = prov.autojoinCondition(dims(left), dims(right))(κ(HoleF))
+      val combiner: JoinFunc = Free.roll(_combiner.map(Free.point(_)))
+      val qsu: QSU[Symbol] = QSU.ThetaJoin(left, right, condition, JoinType.Inner, combiner)
+      qsu.point[F]
 
-          val combiner: JoinFunc = Free.roll(combiner0.map {
-            case 0 => LeftSideF
-            case 1 => RightSideF
-            case n => scala.sys.error(s"AutoJoin combiner has wrong size $n. Expected size 2.")
-          })
-
-          val qsu: QSU[Symbol] = QSU.ThetaJoin(left, right, condition, JoinType.Inner, combiner)
-
-          qsu.point[F]
-
-        // TODO support autojoins of any size - requires name generation
-        case _ =>
-          PlannerErrorME[F].raiseError(
-            InternalError(s"AutoJoin on a list of size ${sources.size} is not supported.", None))
-      }
+    case QSU.AutoJoin3(left, center, right, combiner) => slamdata.Predef.???
 
     case QSU.Transpose(source, _) =>
       // TODO only reify the identity/value information when it's used

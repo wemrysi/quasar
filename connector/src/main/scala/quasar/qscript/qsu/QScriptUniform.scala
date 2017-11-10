@@ -43,8 +43,11 @@ object QScriptUniform {
 
     def traverseImpl[G[_]: Applicative, A, B](qsu: QScriptUniform[T, A])(f: A => G[B])
         : G[QScriptUniform[T, B]] = qsu match {
-      case AutoJoin(sources, combiner) =>
-        sources.traverse(f).map(nel => AutoJoin(nel, combiner))
+      case AutoJoin2(left, right, combiner) =>
+        (f(left) |@| f(right))(AutoJoin2(_, _, combiner))
+
+      case AutoJoin3(left, center, right, combiner) =>
+        (f(left) |@| f(center) |@| f(right))(AutoJoin3(_, _, _, combiner))
 
       case GroupBy(left, right) =>
         (f(left) |@| f(right))(GroupBy(_, _))
@@ -119,9 +122,16 @@ object QScriptUniform {
   implicit def equal[T[_[_]]: BirecursiveT: EqualT]
       : Delay[Equal, QScriptUniform[T, ?]] = ???
 
-  final case class AutoJoin[T[_[_]], A](
-      sources: NEL[A],
-      combiner: MapFunc[T, Int]) extends QScriptUniform[T, A]
+  final case class AutoJoin2[T[_[_]], A](
+      left: A,
+      right: A,
+      combiner: MapFunc[T, JoinSide]) extends QScriptUniform[T, A]
+
+  final case class AutoJoin3[T[_[_]], A](
+      left: A,
+      center: A,
+      right: A,
+      combiner: MapFunc[T, JoinSide3]) extends QScriptUniform[T, A]
 
   final case class GroupBy[T[_[_]], A](
       left: A,
@@ -229,10 +239,15 @@ object QScriptUniform {
   final case class JoinSideRef[T[_[_]], A](id: Symbol) extends QScriptUniform[T, A]
 
   final class Optics[T[_[_]]] private () extends QSUTTypes[T] {
-    def autojoin[A]: Prism[QScriptUniform[A], (NEL[A], MapFunc[Int])] =
-      Prism.partial[QScriptUniform[A], (NEL[A], MapFunc[Int])] {
-        case AutoJoin(args, func) => (args, func)
-      } { case (args, func) => AutoJoin(args, func) }
+    def autojoin2[A]: Prism[QScriptUniform[A], (A, A, MapFunc[JoinSide])] =
+      Prism.partial[QScriptUniform[A], (A, A, MapFunc[JoinSide])] {
+        case AutoJoin2(left, right, func) => (left, right, func)
+      } { case (left, right, func) => AutoJoin2(left, right, func) }
+
+    def autojoin3[A]: Prism[QScriptUniform[A], (A, A, A, MapFunc[JoinSide3])] =
+      Prism.partial[QScriptUniform[A], (A, A, A, MapFunc[JoinSide3])] {
+        case AutoJoin3(left, center, right, func) => (left, center, right, func)
+      } { case (left, center, right, func) => AutoJoin3(left, center, right, func) }
 
     def dimEdit[A]: Prism[QScriptUniform[A], (A, DTrans[T])] =
       Prism.partial[QScriptUniform[A], (A, DTrans[T])] {
@@ -380,14 +395,19 @@ object QScriptUniform {
     private val iso = birecursiveIso[QSU, QScriptUniform]
     private def mfc[A] = PrismNT.inject[MapFuncCore, MapFunc].asPrism[A]
 
-    val autojoin: Prism[QSU, (NEL[QSU], MapFunc[Int])] =
-      iso composePrism O.autojoin
+    val _autojoin2: Prism[QSU, (QSU, QSU, MapFunc[JoinSide])] =
+      iso composePrism O.autojoin2
+
+    val _autojoin3: Prism[QSU, (QSU, QSU, QSU, MapFunc[JoinSide3])] =
+      iso composePrism O.autojoin3
 
     def autojoin2(left: QSU, right: QSU, combiner: CPS[Bin]): QSU =
-      autojoin(NEL(left, right), mfc(Forall[Bin](combiner)[Int](0, 1)))
+      _autojoin2(left, right,
+        mfc(Forall[Bin](combiner)[JoinSide](LeftSide, RightSide)))
 
     def autojoin3(left: QSU, center: QSU, right: QSU, combiner: CPS[Tri]): QSU =
-      autojoin(NEL(left, center, right), mfc(Forall[Tri](combiner)[Int](0, 1, 2)))
+      _autojoin3(left, center, right,
+        mfc(Forall[Tri](combiner)[JoinSide3](LeftSide3, Center, RightSide3)))
 
     val constant: Prism[QSU, J] =
       Prism[QSU, T[EJson]](qsu => map.getOption(qsu) collect {

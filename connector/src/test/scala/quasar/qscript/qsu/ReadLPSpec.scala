@@ -21,7 +21,21 @@ import quasar.Planner.PlannerError
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.scalaz.{NonEmptyListE => NELE}
 import quasar.frontend.logicalplan.{JoinCondition, LogicalPlan}
-import quasar.qscript.{Drop, Hole, MapFuncsCore, ReduceFuncs, Sample, SrcHole, Take}
+import quasar.qscript.{
+  Center,
+  Drop,
+  Hole,
+  JoinSide,
+  JoinSide3,
+  LeftSide,
+  LeftSide3,
+  MapFuncsCore,
+  ReduceFuncs,
+  RightSide,
+  RightSide3,
+  Sample,
+  SrcHole,
+  Take}
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.sql.CompilerHelpers
 import quasar.std.{AggLib, IdentityLib, MathLib, RelationsLib, SetLib, StructuralLib, TemporalPart}
@@ -78,7 +92,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
         case AutoJoin2C(
           Transpose(TRead(_), QSU.Rotation.FlattenMap),
           DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(0, 1)) => i mustEqual 1
+          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => i mustEqual 1
       }
     }
 
@@ -87,7 +101,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
         case AutoJoin2C(
           Transpose(TRead(_), QSU.Rotation.FlattenMap),
           DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(0, 1)) => i mustEqual 0
+          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => i mustEqual 0
       }
     }
 
@@ -96,7 +110,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
         case AutoJoin2C(
           Transpose(TRead(_), QSU.Rotation.FlattenArray),
           DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(0, 1)) => i mustEqual 1
+          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => i mustEqual 1
       }
     }
 
@@ -105,7 +119,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
         case AutoJoin2C(
           Transpose(TRead(_), QSU.Rotation.FlattenArray),
           DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(0, 1)) => i mustEqual 0
+          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => i mustEqual 0
       }
     }
 
@@ -114,7 +128,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
         case AutoJoin2C(
           Transpose(TRead(_), QSU.Rotation.ShiftMap),
           DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(0, 1)) => i mustEqual 1
+          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => i mustEqual 1
       }
     }
 
@@ -123,7 +137,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
         case AutoJoin2C(
           Transpose(TRead(_), QSU.Rotation.ShiftMap),
           DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(0, 1)) => i mustEqual 0
+          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => i mustEqual 0
       }
     }
 
@@ -132,7 +146,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
         case AutoJoin2C(
           Transpose(TRead(_), QSU.Rotation.ShiftArray),
           DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(0, 1)) => i mustEqual 1
+          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => i mustEqual 1
       }
     }
 
@@ -141,7 +155,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
         case AutoJoin2C(
           Transpose(TRead(_), QSU.Rotation.ShiftArray),
           DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(0, 1)) => i mustEqual 0
+          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => i mustEqual 0
       }
     }
 
@@ -198,7 +212,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
         case AutoJoin2C(
           TRead("foo"),
           TRead("bar"),
-          MapFuncsCore.Add(0, 1)) => ok
+          MapFuncsCore.Add(LeftSide, RightSide)) => ok
       }
     }
 
@@ -208,7 +222,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
           TRead("foo"),
           TRead("bar"),
           TRead("baz"),
-          MapFuncsCore.Cond(0, 1, 2)) => ok
+          MapFuncsCore.Cond(LeftSide3, Center, RightSide3)) => ok
       }
     }
 
@@ -224,7 +238,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
           TRead("foo"),
           TRead("bar"),
           TRead("baz"),
-          MapFuncsCore.Guard(0, Type.AnyObject, 1, 2)) => ok
+          MapFuncsCore.Guard(LeftSide3, Type.AnyObject, Center, RightSide3)) => ok
       }
     }
 
@@ -302,15 +316,15 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
   }
 
   object AutoJoin2C {
-    def unapply(qgraph: QSUGraph): Option[(QSUGraph, QSUGraph, MapFuncCore[Int])] = qgraph match {
-      case AutoJoin(NELE(left, right), IC(mfc)) => Some((left, right, mfc))
+    def unapply(qgraph: QSUGraph): Option[(QSUGraph, QSUGraph, MapFuncCore[JoinSide])] = qgraph match {
+      case AutoJoin2(left, right, IC(mfc)) => Some((left, right, mfc))
       case _ => None
     }
   }
 
   object AutoJoin3C {
-    def unapply(qgraph: QSUGraph): Option[(QSUGraph, QSUGraph, QSUGraph, MapFuncCore[Int])] = qgraph match {
-      case AutoJoin(NELE(left, center, right), IC(mfc)) => Some((left, center, right, mfc))
+    def unapply(qgraph: QSUGraph): Option[(QSUGraph, QSUGraph, QSUGraph, MapFuncCore[JoinSide3])] = qgraph match {
+      case AutoJoin3(left, center, right, IC(mfc)) => Some((left, center, right, mfc))
       case _ => None
     }
   }

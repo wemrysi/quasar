@@ -34,12 +34,19 @@ import quasar.ejson.EJson
 import quasar.frontend.{logicalplan => lp}
 import quasar.std.{IdentityLib, SetLib, StructuralLib}
 import quasar.qscript.{
+  Center,
   Drop,
   Hole,
+  JoinSide,
+  JoinSide3,
+  LeftSide,
+  LeftSide3,
   MapFunc,
   MapFuncsCore,
   MFC,
   ReduceFunc,
+  RightSide,
+  RightSide3,
   Sample,
   SrcHole,
   Take
@@ -51,7 +58,7 @@ import matryoshka.{AlgebraM, BirecursiveT}
 import matryoshka.implicits._
 import matryoshka.patterns.{interpretM, CoEnv}
 import pathy.Path.{rootDir, Sandboxed}
-import scalaz.{\/, Free, Inject, Monad, NonEmptyList => NEL, StateT}
+import scalaz.{\/, Free, Inject, Monad, StateT}
 import scalaz.std.tuple._
 import scalaz.syntax.bifunctor._
 import scalaz.syntax.either._
@@ -190,10 +197,10 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
       extend1[G](a)(QSU.Map[T, Symbol](_, Free.roll[MapFunc, Hole](translated)))
 
     case lp.InvokeUnapply(func: BinaryFunc, Sized(a, b)) if func.effect === Mapping =>
-      autoJoin2[G](a, b)(MapFunc.translateBinaryMapping[T, MapFunc, Int].apply(func))
+      autoJoin2[G](a, b)(MapFunc.translateBinaryMapping[T, MapFunc, JoinSide].apply(func))
 
     case lp.InvokeUnapply(func: TernaryFunc, Sized(a, b, c)) if func.effect === Mapping =>
-      autoJoin3[G](a, b, c)(MapFunc.translateTernaryMapping[T, MapFunc, Int].apply(func))
+      autoJoin3[G](a, b, c)(MapFunc.translateTernaryMapping[T, MapFunc, JoinSide3].apply(func))
 
     case lp.InvokeUnapply(func, values) => ???
 
@@ -205,7 +212,7 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
             MFC(MapFuncsCore.TemporalTrunc(part, Free.pure[MapFunc, Hole](SrcHole))))))
 
     case lp.Typecheck(expr, tpe, cont, fallback) =>
-      autoJoin3[G](expr, cont, fallback)((e, c, f) => IC(MapFuncsCore.Guard[T, Int](e, tpe, c, f)))
+      autoJoin3[G](expr, cont, fallback)((e, c, f) => IC(MapFuncsCore.Guard[T, JoinSide3](e, tpe, c, f)))
 
     case lp.JoinSideName(name) =>
       withName[G](QSU.JoinSideRef[T, Symbol](name))
@@ -253,19 +260,19 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
 
     for {
       idxG <- nullary[G](IC(MapFuncsCore.Constant(const)))
-      back <- autoJoin2[G](parent, idxG)((p, i) => IC(MapFuncsCore.ProjectIndex[T, Int](p, i)))
+      back <- autoJoin2[G](parent, idxG)((p, i) => IC(MapFuncsCore.ProjectIndex[T, JoinSide](p, i)))
     } yield back
   }
 
   private def autoJoin2[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](
       e1: QSUGraph, e2: QSUGraph)(
-      constr: (Int, Int) => MapFunc[Int]): G[QSUGraph] =
-    extend2[G](e1, e2)((e1, e2) => QSU.AutoJoin[T, Symbol](NEL(e1, e2), constr(0, 1)))
+      constr: (JoinSide, JoinSide) => MapFunc[JoinSide]): G[QSUGraph] =
+    extend2[G](e1, e2)((e1, e2) => QSU.AutoJoin2[T, Symbol](e1, e2, constr(LeftSide, RightSide)))
 
   private def autoJoin3[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](
       e1: QSUGraph, e2: QSUGraph, e3: QSUGraph)(
-      constr: (Int, Int, Int) => MapFunc[Int]): G[QSUGraph] =
-    extend3[G](e1, e2, e3)((e1, e2, e3) => QSU.AutoJoin[T, Symbol](NEL(e1, e2, e3), constr(0, 1, 2)))
+      constr: (JoinSide3, JoinSide3, JoinSide3) => MapFunc[JoinSide3]): G[QSUGraph] =
+    extend3[G](e1, e2, e3)((e1, e2, e3) => QSU.AutoJoin3[T, Symbol](e1, e2, e3, constr(LeftSide3, Center, RightSide3)))
 
   private def extend1[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](
       parent: QSUGraph)(
