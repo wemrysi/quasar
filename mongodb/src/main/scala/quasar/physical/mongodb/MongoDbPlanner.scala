@@ -1286,7 +1286,7 @@ object MongoDbPlanner {
     def liftDoc[F[_]: Monad: ExecTimeR]
       (d: Collection => OptionT[F, BsonDocument])
         : Collection => OptionT[FileSystemErrT[PhaseResultT[F, ?], ?], BsonDocument] =
-      d andThen (r => OptionT(r.run.liftM[PhaseResultT[?[_], ?]].liftM[FileSystemErrT[?[_], ?]]))
+      d andThen (_.mapT(_.liftM[PhaseResultT[?[_], ?]].liftM[FileSystemErrT[?[_], ?]]))
 
     def doPlan[F[_]: Monad: ExecTimeR]
       (d: Collection => OptionT[F, BsonDocument], applyMapBeforeSort: Boolean) =
@@ -1315,7 +1315,7 @@ object MongoDbPlanner {
       anyDoc: Collection => OptionT[M, BsonDocument],
       execTime: Instant)
       : M[Crystallized[WorkflowF]] = {
-    val peek = anyDoc andThen (r => OptionT(r.run.liftM[ReaderT[?[_], Instant, ?]]))
+    val peek = anyDoc andThen (_.mapT(_.liftM[ReaderT[?[_], Instant, ?]]))
     plan[T, ReaderT[M, Instant, ?]](qs, queryContext, queryModel, peek).run(execTime)
   }
 
