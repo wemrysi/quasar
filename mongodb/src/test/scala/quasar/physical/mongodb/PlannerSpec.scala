@@ -4052,8 +4052,8 @@ class PlannerSpec extends
           "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "QScript", "QScript (ShiftRead)", "QScript (Optimized)",
-          "QScript Mongo", "QScript Mongo (Map Before Sort)",
-          "QScript Mongo (Subset Before Map)", "QScript Mongo (Prefer Projection)",
+          "QScript Mongo", "QScript Mongo (Subset Before Map)",
+          "QScript Mongo (Prefer Projection)", "QScript Mongo (Map Before Sort)",
           "Workflow Builder", "Workflow (raw)", "Workflow (crystallized)")
     }
 

@@ -1195,8 +1195,7 @@ object MongoDbPlanner {
       T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
       M[_]: Monad: MonadFsErr: PhaseResultTell]
       (anyDoc: Collection => OptionT[M, BsonDocument],
-        qs: T[fs.MongoQScript[T, ?]],
-        applyMapBeforeSort: Boolean)
+        qs: T[fs.MongoQScript[T, ?]])
       (implicit BR: Branches[T, fs.MongoQScript[T, ?]])
       : M[T[fs.MongoQScript[T, ?]]] = {
 
@@ -1218,26 +1217,18 @@ object MongoDbPlanner {
         )(mongoQS2.project).embed
       _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo", mongoQS3))
 
-      // NB: Normalizing after these appears to revert the effects of `mapBeforeSort`.
-      // TODO look into adding mapBeforeSort to WorkflowBuilder or Workflow stage
-      // instead, so that we can avoid having to rerun the transformations.
-      // See #3063
-      mongoQS4 <- if (applyMapBeforeSort)
-                    log("QScript Mongo (Map Before Sort)",
-                      Trans(mapBeforeSort[T, M], mongoQS3))
-                  else mongoQS3.point[M]
-      mongoQS5 =  mongoQS4.transCata[T[MQS]](
+      mongoQS4 =  mongoQS3.transCata[T[MQS]](
                     liftFF[QScriptCore[T, ?], MQS, T[MQS]](
                       repeatedly(O.subsetBeforeMap[MQS, MQS](
                         reflNT[MQS]))))
       _ <- BackendModule.logPhase[M](
              PhaseResult.tree("QScript Mongo (Subset Before Map)",
-             mongoQS5))
+             mongoQS4))
 
       // TODO: Once field deletion is implemented for 3.4, this could be selectively applied, if necessary.
-      mongoQS6 =  PreferProjection.preferProjection[MQS](mongoQS5)
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Prefer Projection)", mongoQS6))
-    } yield mongoQS6
+      mongoQS5 =  PreferProjection.preferProjection[MQS](mongoQS4)
+      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Prefer Projection)", mongoQS5))
+    } yield mongoQS5
   }
 
   def plan1
@@ -1245,9 +1236,7 @@ object MongoDbPlanner {
       M[_]: Monad: PhaseResultTell: MonadFsErr: ExecTimeR,
       WF[_]: Functor: Coalesce: Crush: Crystallize,
       EX[_]: Traverse]
-    (anyDoc: Collection => OptionT[M, BsonDocument],
-      cfg: PlannerConfig[T, EX, WF],
-      applyMapBeforeSort: Boolean)
+    (cfg: PlannerConfig[T, EX, WF])
     (qs: T[fs.MongoQScript[T, ?]])
     (implicit
       ev0: WorkflowOpCoreF :<: WF,
@@ -1256,10 +1245,9 @@ object MongoDbPlanner {
       ev3: RenderTree[Fix[WF]])
       : M[Crystallized[WF]] =
     for {
-      opt <- toMongoQScript[T, M](anyDoc, qs, applyMapBeforeSort)
       wb <- log(
         "Workflow Builder",
-        opt.cataM[M, WorkflowBuilder[WF]](
+        qs.cataM[M, WorkflowBuilder[WF]](
           Planner[T, fs.MongoQScript[T, ?]].plan[M, WF, EX](cfg).apply(_) ∘
             (_.transCata[Fix[WorkflowBuilderF[WF, ?]]](repeatedly(WorkflowBuilder.normalize[WF, Fix[WorkflowBuilderF[WF, ?]]])))))
       wf1 <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb)))
@@ -1283,21 +1271,20 @@ object MongoDbPlanner {
       ev3: RenderTree[Fix[WF]])
       : M[Crystallized[WF]] = {
 
-    def liftDoc[F[_]: Monad: ExecTimeR]
-      (d: Collection => OptionT[F, BsonDocument])
-        : Collection => OptionT[FileSystemErrT[PhaseResultT[F, ?], ?], BsonDocument] =
-      d andThen (_.mapT(_.liftM[PhaseResultT[?[_], ?]].liftM[FileSystemErrT[?[_], ?]]))
-
-    def doPlan[F[_]: Monad: ExecTimeR]
-      (d: Collection => OptionT[F, BsonDocument], applyMapBeforeSort: Boolean) =
-      plan1[T, FileSystemErrT[PhaseResultT[F, ?], ?], WF, EX](liftDoc(d), cfg, applyMapBeforeSort)(qs).run.run
+    def doPlan[F[_]: Monad: ExecTimeR](qs0: T[fs.MongoQScript[T, ?]]) =
+      plan1[T, FileSystemErrT[PhaseResultT[F, ?], ?], WF, EX](cfg)(qs0).run.run
 
     for {
-      logRes0 <- doPlan[M](anyDoc, applyMapBeforeSort = false)
+      qs0 <- toMongoQScript[T, M](anyDoc, qs)
+      logRes0 <- doPlan[M](qs0)
       (log0, res0) = logRes0
       wf <- res0 match {
               case \/-(wf0) if (needsMapBeforeSort(wf0.op)) =>
-                plan1[T, M, WF, EX](anyDoc, cfg, applyMapBeforeSort = true)(qs)
+                // TODO look into adding mapBeforeSort to WorkflowBuilder or Workflow stage
+                // instead, so that we can avoid having to rerun some transformations.
+                // See #3063
+                log("QScript Mongo (Map Before Sort)",
+                  Trans(mapBeforeSort[T, M], qs0)) >>= plan1[T, M, WF, EX](cfg)
               case \/-(wf0) =>
                   PhaseResultTell[M].tell(log0) *> wf0.point[M]
               case -\/(err0) =>
