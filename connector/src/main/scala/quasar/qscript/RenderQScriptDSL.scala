@@ -341,6 +341,27 @@ object RenderQScriptDSL {
       }
     }
 
+  def projectBucketRenderDelay[T[_[_]]: RecursiveT]: Delay[RenderQScriptDSL, ProjectBucket[T, ?]] =
+    new Delay[RenderQScriptDSL, ProjectBucket[T, ?]] {
+      val freeMap = freeMapRender[T, Hole](holeRender("func"))
+      def apply[A](A: RenderQScriptDSL[A]) = {
+        (base: String, a: ProjectBucket[T, A]) => a match {
+          case BucketKey(src, value, name) =>
+            val args = A(base, src).right ::
+              freeMap(base, value).right ::
+              freeMap(base, name).right ::
+              Nil
+            DSLTree(base, "BucketKey", args)
+          case BucketIndex(src, value, index) =>
+            val args = A(base, src).right ::
+              freeMap(base, value).right ::
+              freeMap(base, index).right ::
+              Nil
+            DSLTree(base, "BucketIndex", args)
+        }
+      }
+    }
+
   def thetaJoinRenderDelay[T[_[_]]: RecursiveT]: Delay[RenderQScriptDSL, ThetaJoin[T, ?]] =
     new Delay[RenderQScriptDSL, ThetaJoin[T, ?]] {
       def apply[A](A: RenderQScriptDSL[A]) = {
@@ -380,75 +401,40 @@ object RenderQScriptDSL {
       }
     }
 
-  def readFileRenderDelay: Delay[RenderQScriptDSL, Const[Read[AFile], ?]] =
-    new Delay[RenderQScriptDSL, Const[Read[AFile], ?]] {
-      def apply[A](fa: RenderQScriptDSL[A]): RenderQScriptDSL[Const[Read[AFile], A]] = {
-        (base: String, a: Const[Read[AFile], A]) => a match {
-          case Const(Read(p)) =>
-            DSLTree(base, "Read[AFile]", p.shows.left :: Nil)
-        }
+  def delayRenderConst[B](render: RenderQScriptDSL[B]): Delay[RenderQScriptDSL, Const[B, ?]] =
+    new Delay[RenderQScriptDSL, Const[B, ?]] {
+      def apply[A](fa: RenderQScriptDSL[A]): RenderQScriptDSL[Const[B, A]] = {
+        (b, a) => render(b, a.getConst)
       }
     }
+
+  def readFileRenderDelay: Delay[RenderQScriptDSL, Const[Read[AFile], ?]] =
+    delayRenderConst(
+      (base: String, a: Read[AFile]) =>
+        DSLTree(base, "Read[AFile]", a.path.shows.left :: Nil)
+    )
 
   def readDirRenderDelay: Delay[RenderQScriptDSL, Const[Read[ADir], ?]] =
-    new Delay[RenderQScriptDSL, Const[Read[ADir], ?]] {
-      def apply[A](fa: RenderQScriptDSL[A]): RenderQScriptDSL[Const[Read[ADir], A]] = {
-        (base: String, a: Const[Read[ADir], A]) => a match {
-          case Const(Read(p)) =>
-            DSLTree(base, "Read[ADir]", p.shows.left :: Nil)
-        }
-      }
-    }
+    delayRenderConst(
+      (base: String, a: Read[ADir]) =>
+        DSLTree(base, "Read[ADir]", a.path.shows.left :: Nil)
+    )
 
   def shiftedReadFileRenderDelay: Delay[RenderQScriptDSL, Const[ShiftedRead[AFile], ?]] =
-    new Delay[RenderQScriptDSL, Const[ShiftedRead[AFile], ?]] {
-      def apply[A](fa: RenderQScriptDSL[A]): RenderQScriptDSL[Const[ShiftedRead[AFile], A]] = {
-        (base: String, a: Const[ShiftedRead[AFile], A]) => a match {
-          case Const(ShiftedRead(p, idStatus)) =>
-            DSLTree(base, "ShiftedRead[AFile]", p.shows.left :: idStatus.shows.left :: Nil)
-        }
-      }
-    }
+    delayRenderConst(
+      (base: String, a: ShiftedRead[AFile]) =>
+        DSLTree(base, "ShiftedRead[AFile]", a.path.shows.left :: a.idStatus.shows.left :: Nil)
+    )
 
   def shiftedReadDirRenderDelay: Delay[RenderQScriptDSL, Const[ShiftedRead[ADir], ?]] =
-    new Delay[RenderQScriptDSL, Const[ShiftedRead[ADir], ?]] {
-      def apply[A](fa: RenderQScriptDSL[A]): RenderQScriptDSL[Const[ShiftedRead[ADir], A]] = {
-        (base: String, a: Const[ShiftedRead[ADir], A]) => a match {
-          case Const(ShiftedRead(p, idStatus)) =>
-            DSLTree(base, "ShiftedRead[ADir]", p.shows.left :: idStatus.shows.left :: Nil)
-        }
-      }
-    }
+    delayRenderConst(
+      (base: String, a: ShiftedRead[ADir]) =>
+        DSLTree(base, "ShiftedRead[ADir]", a.path.shows.left :: a.idStatus.shows.left :: Nil)
+    )
 
   def deadEndRenderDelay: Delay[RenderQScriptDSL, Const[DeadEnd, ?]] =
-    new Delay[RenderQScriptDSL, Const[DeadEnd, ?]] {
-      def apply[A](fa: RenderQScriptDSL[A]): RenderQScriptDSL[Const[DeadEnd, A]] = {
-        (base: String, a: Const[DeadEnd, A]) => a match {
-          case Const(Root) =>
-            DSLTree(base, "Root", Nil)
-        }
-      }
-    }
-
-  def projectBucketRenderDelay[T[_[_]]: RecursiveT]: Delay[RenderQScriptDSL, ProjectBucket[T, ?]] =
-    new Delay[RenderQScriptDSL, ProjectBucket[T, ?]] {
-      val freeMap = freeMapRender[T, Hole](holeRender("func"))
-      def apply[A](A: RenderQScriptDSL[A]) = {
-        (base: String, a: ProjectBucket[T, A]) => a match {
-          case BucketKey(src, value, name) =>
-            val args = A(base, src).right ::
-              freeMap(base, value).right ::
-              freeMap(base, name).right ::
-              Nil
-            DSLTree(base, "BucketKey", args)
-          case BucketIndex(src, value, index) =>
-            val args = A(base, src).right ::
-              freeMap(base, value).right ::
-              freeMap(base, index).right ::
-              Nil
-            DSLTree(base, "BucketIndex", args)
-        }
-      }
-    }
-
+    delayRenderConst(
+      (base: String, a: DeadEnd) =>
+        DSLTree(base, "Root", Nil)
+    )
 }
