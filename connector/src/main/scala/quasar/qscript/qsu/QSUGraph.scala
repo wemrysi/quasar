@@ -34,7 +34,7 @@ final case class QSUGraph[T[_[_]]](
   /**
    * Uniquely merge the graphs, retaining the root from the right.
    */
-  def ++:(left: QSUGraph[T]): QSUGraph[T] = QSUGraph(root, vertices ++ left.vertices)
+  def ++:(left: QSUGraph[T]): QSUGraph[T] = QSUGraph(root, left.vertices ++ vertices)
 
   /**
    * Uniquely merge the graphs, retaining the root from the left.
