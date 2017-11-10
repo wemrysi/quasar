@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
 import quasar.{ejson => ejs}
-import quasar.ejson.{CommonEJson => C, EJsonArbitrary, ExtEJson => E}
+import quasar.ejson.EJsonArbitrary
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.tpe._
@@ -30,6 +30,7 @@ import scala.Predef.$conforms
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
+import monocle.syntax.fields._
 import org.specs2.scalacheck._
 import org.specs2.scalaz._
 import scalaz._, Scalaz._
@@ -49,12 +50,13 @@ final class StructuralTypeSpec extends Spec
   type J = TypedEJson[Fix]
   type S = StructuralType[J, Int]
 
+  val J = ejs.Fixed[J]
+  val metaTag = J.meta composeLens _2 composePrism J.tpe
+
   def mkST(j: J): S = StructuralType.fromEJsonK[J](1, j)
 
-  def diffTags(x: J, y: J): Boolean = (x, y) match {
-    case (Embed(E(ejs.Meta(_, Embed(ejs.Type(x))))), Embed(E(ejs.Meta(_, Embed(ejs.Type(y)))))) => x ≠ y
-    case _ => true
-  }
+  def diffTags(x: J, y: J): Boolean =
+    (metaTag.getOption(x) |@| metaTag.getOption(y))(_ ≠ _) | true
 
   checkAll(propz.equal.laws[S])
   checkAll(propz.semigroup.laws[S])
@@ -77,7 +79,7 @@ final class StructuralTypeSpec extends Spec
     }}
 
     "known and unknown arrays merge union of known with lub" >> prop { (xs: List[J], y: SimpleType) =>
-      val arr = mkST(C(ejs.Arr(xs)).embed)
+      val arr = mkST(J.arr(xs))
       val ySimple = envT(1, TypeST(TypeF.simple[J, S](y))).embed
       val lubArr = envT(1, TypeST(TypeF.arr[J, S](ySimple.right))).embed
       val consts = xs.toIList.map(mkST)
@@ -116,8 +118,8 @@ final class StructuralTypeSpec extends Spec
     "unions merge by accumulating mergeable values" >> prop { (xs: IList[S], ys: IList[S], i: BigInt, s: String, st: SimpleType) =>
       val xst = envT(1, TypeST(TypeF.arr[J, S](xs.left))).embed
       val yst = envT(1, TypeST(TypeF.arr[J, S](ys.left))).embed
-      val ist = mkST(E(ejs.int[J](i)).embed)
-      val sst = mkST(C(ejs.str[J](s)).embed)
+      val ist = mkST(J.int(i))
+      val sst = mkST(J.str(s))
       val pst = envT(1, TypeST(TypeF.simple[J, S](st))).embed
       val a   = envT(1, TypeST(TypeF.union[J, S](xst, ist, IList(pst)))).embed
       val b   = envT(1, TypeST(TypeF.union[J, S](yst, sst, IList(pst)))).embed

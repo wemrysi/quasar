@@ -19,8 +19,7 @@ package quasar.tpe
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz.foldable._
-import quasar.ejson
-import quasar.ejson.{CommonEJson => C, ExtEJson => E, EJson, EncodeEJson, EncodeEJsonK}
+import quasar.ejson.{Common, CommonEJson => C, Extension, ExtEJson => E, EJson, EncodeEJson, EncodeEJsonK}
 import quasar.fp.ski.κ
 
 import scala.Tuple2
@@ -359,46 +358,49 @@ private[quasar] sealed abstract class TypeFInstances {
 
   implicit def encodeEJsonK[A](implicit A: EncodeEJson[A]): EncodeEJsonK[TypeF[A, ?]] =
     new EncodeEJsonK[TypeF[A, ?]] {
+      import Common.{Optics => CO}
+      import Extension.{Optics => EO}
+
       def encodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Algebra[TypeF[A, ?], J] = {
         case Bottom()        => tlabel("bottom")
         case Top()           => tlabel("top")
         case Simple(s)       => tlabel(SimpleType.name(s))
         case Const(a)        => tof("const", A.encode[J](a))
-        case Union(x, y, zs) => tof("sum", C(ejson.arr((x :: y :: zs).toList)).embed)
+        case Union(x, y, zs) => tof("sum", C(CO.arr((x :: y :: zs).toList)).embed)
 
         case Arr(a) =>
-          tof("array", a.leftMap(js => C(ejson.arr(js.toList)).embed).merge)
+          tof("array", a.leftMap(js => C(CO.arr(js.toList)).embed).merge)
 
         case Map(kvs, unk) =>
           val jjs   = kvs.toList.map(_.leftMap(A.encode[J](_)))
           val other = unk map { case (k, v) => (
-            C(ejson.str[J]("other")).embed,
+            C(CO.str[J]("other")).embed,
             map1(
-              C(ejson.str[J]("keys")).embed   -> k,
-              C(ejson.str[J]("values")).embed -> v)
+              C(CO.str[J]("keys")).embed   -> k,
+              C(CO.str[J]("values")).embed -> v)
           )}
-          tof("map", E(ejson.map(jjs)).embed, other.toList: _*)
+          tof("map", E(EO.map(jjs)).embed, other.toList: _*)
       }
 
       private def map1[J](assoc: (J, J), assocs: (J, J)*)(
         implicit J: Corecursive.Aux[J, EJson]
       ): J =
-        E(ejson.map(assoc :: assocs.toList)).embed
+        E(EO.map(assoc :: assocs.toList)).embed
 
       private def tmap[J](v: J, assocs: (J, J)*)(
         implicit J: Corecursive.Aux[J, EJson]
       ): J =
-        map1(C(ejson.str[J]("type")).embed -> v, assocs: _*)
+        map1(C(CO.str[J]("type")).embed -> v, assocs: _*)
 
       private def tlabel[J](label: String, assocs: (J, J)*)(
         implicit J: Corecursive.Aux[J, EJson]
       ): J =
-        tmap(C(ejson.str[J](label)).embed, assocs: _*)
+        tmap(C(CO.str[J](label)).embed, assocs: _*)
 
       private def tof[J](label: String, of: J, assocs: (J, J)*)(
         implicit J: Corecursive.Aux[J, EJson]
       ): J =
-        tlabel(label, ((C(ejson.str[J]("of")).embed -> of) :: assocs.toList): _*)
+        tlabel(label, ((C(CO.str[J]("of")).embed -> of) :: assocs.toList): _*)
     }
 
   implicit def traverse[J]: Traverse[TypeF[J, ?]] =
