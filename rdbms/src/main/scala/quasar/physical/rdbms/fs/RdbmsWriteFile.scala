@@ -89,7 +89,8 @@ trait RdbmsWriteFile
       for {
         i <- MonotonicSeq.Ops[Eff].next.liftB
         handle = WriteHandle(file, i)
-        _ <- writeKvs.put(handle, WriteCursor(dbPath, model = None)).liftB
+        initialModel <- tableModel(dbPath).liftB
+        _ <- writeKvs.put(handle, WriteCursor(dbPath, initialModel)).liftB
       } yield handle
     }
 
