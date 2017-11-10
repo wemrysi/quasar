@@ -22,7 +22,7 @@ import quasar.common.{JoinType, SortDir}
 import quasar.contrib.matryoshka.birecursiveIso
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
-import quasar.fp.{τ, PrismNT}
+import quasar.fp.PrismNT
 import quasar.fp.ski.κ
 import quasar.qscript._
 
@@ -31,7 +31,7 @@ import matryoshka.data._
 import matryoshka.patterns.CoEnv
 import monocle.{Prism, PTraversal, Traversal}
 import pathy.Path
-import scalaz.{\/-, Applicative, Bitraverse, Equal, Free, NonEmptyList => NEL, Scalaz, Show, Traverse}
+import scalaz.{\/-, Applicative, Bitraverse, Equal, Forall, Free, NonEmptyList => NEL, Scalaz, Show, Traverse}
 
 sealed trait QScriptUniform[T[_[_]], A] extends Product with Serializable
 
@@ -367,9 +367,13 @@ object QScriptUniform {
 
   final class Dsl[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
     import Scalaz._
+    import Forall.CPS
 
     type QSU = T[QScriptUniform]
     type J   = T[EJson]
+
+    type Bin[A] = (A, A) => Binary[T, A]
+    type Tri[A] = (A, A, A) => Ternary[T, A]
 
     private val J = Fixed[J]
     private val O = Optics[T]
@@ -379,11 +383,11 @@ object QScriptUniform {
     val autojoin: Prism[QSU, (NEL[QSU], MapFunc[Int])] =
       iso composePrism O.autojoin
 
-    def autojoin2(left: QSU, right: QSU, combiner: (τ, τ) => Binary[T, τ]): QSU =
-      autojoin(NEL(left, right), mfc(τ[λ[α => (α, α) => Binary[T, α]]](combiner)[Int](0, 1)))
+    def autojoin2(left: QSU, right: QSU, combiner: CPS[Bin]): QSU =
+      autojoin(NEL(left, right), mfc(Forall[Bin](combiner)[Int](0, 1)))
 
-    def autojoin3(left: QSU, center: QSU, right: QSU, combiner: (τ, τ, τ) => Ternary[T, τ]): QSU =
-      autojoin(NEL(left, center, right), mfc(τ[λ[α => (α, α, α) => Ternary[T, α]]](combiner)[Int](0, 1, 2)))
+    def autojoin3(left: QSU, center: QSU, right: QSU, combiner: CPS[Tri]): QSU =
+      autojoin(NEL(left, center, right), mfc(Forall[Tri](combiner)[Int](0, 1, 2)))
 
     val constant: Prism[QSU, J] =
       Prism[QSU, T[EJson]](qsu => map.getOption(qsu) collect {
