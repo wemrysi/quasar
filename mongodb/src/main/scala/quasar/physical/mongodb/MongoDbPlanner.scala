@@ -1219,6 +1219,9 @@ object MongoDbPlanner {
       _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo", mongoQS3))
 
       // NB: Normalizing after these appears to revert the effects of `mapBeforeSort`.
+      // TODO look into adding mapBeforeSort to WorkflowBuilder or Workflow stage
+      // instead, so that we can avoid having to rerun the transformations.
+      // See #3063
       mongoQS4 <- if (applyMapBeforeSort)
                     log("QScript Mongo (Map Before Sort)",
                       Trans(mapBeforeSort[T, M], mongoQS3))
