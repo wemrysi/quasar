@@ -271,7 +271,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
         NEL(
           read("bar") -> SortDir.Ascending,
           read("baz") -> SortDir.Descending)) must readQsuAs {
-        case Sort(
+        case LPSort(
           TRead("foo"),
           NELE(
             (TRead("bar"), SortDir.Ascending),

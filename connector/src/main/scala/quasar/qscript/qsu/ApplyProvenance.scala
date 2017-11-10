@@ -90,17 +90,19 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
 
       case LPReduce(src, _) => dims.reduce(src).point[F]
 
+      case LPSort(_, _) => unexpectedError("LPSort", gpf.root)
+
       case QSFilter(src, _) => src.point[F]
 
       case QSReduce(src, _, _, _) => dims.reduce(src).point[F]
+
+      case QSSort(src, _, _) => src.point[F]
 
       case Map(src, _) => src.point[F]
 
       case Unreferenced() => dims.empty.point[F]
 
       case Read(file) => dims.squash(segments(file).map(projStr).reverse).point[F]
-
-      case Sort(_, _) => unexpectedError("Sort", gpf.root)
 
       case Subset(from, _, count) => dims.join(from, count).point[F]
 
@@ -112,8 +114,6 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
           case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, src)
           case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, src)
         }).point[F]
-
-      case UniformSort(src, _, _) => src.point[F]
 
       case Union(left, right) => dims.union(left, right).point[F]
     }

@@ -58,12 +58,12 @@ object ExtractFreeMap {
           .map(ThetaJoin(left, right, _, jtype, combiner))
           .toSuccessNel(s"Invalid join condition, $cond, must be a mappable function of $left and $right.")
 
-      case Sort(src, keys) =>
+      case LPSort(src, keys) =>
         keys traverse { case (k, sortDir) =>
           MappableRegion.unaryOf(src, graph refocus k)
             .strengthR(sortDir)
             .toSuccessNel(s"Invalid sort key, $k, must be a mappable function of $src.")
-        } map (UniformSort(src, Nil, _))
+        } map (QSSort(src, Nil, _))
 
       case other => other.point[ValidationNel[String, ?]]
     })(graph).fold(e => PlannerErrorME[F].raiseError(InternalError(e intercalate ", ", None)), _.point[F])

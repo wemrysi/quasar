@@ -233,7 +233,7 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
       }
 
     case lp.Sort(src, order) =>
-      val node = QSU.Sort[T, Symbol](src.root, order.map(_.leftMap(_.root)))
+      val node = QSU.LPSort[T, Symbol](src.root, order.map(_.leftMap(_.root)))
       val graphs = src <:: order.map(_._1)
 
       withName[G](node).map(g => graphs.foldLeft(g)(_ :++ _))

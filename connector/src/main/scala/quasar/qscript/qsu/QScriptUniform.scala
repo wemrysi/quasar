@@ -75,16 +75,16 @@ object QScriptUniform {
       case Distinct(source) =>
         f(source).map(Distinct(_))
 
-      case Sort(source, order) =>
+      case LPSort(source, order) =>
         val T = Bitraverse[(?, ?)].leftTraverse[SortDir]
 
         val source2G = f(source)
         val orders2G = order.traverse(p => T.traverse(p)(f))
 
-        (source2G |@| orders2G)(Sort(_, _))
+        (source2G |@| orders2G)(LPSort(_, _))
 
-      case UniformSort(source, buckets, order) =>
-        f(source).map(UniformSort(_, buckets, order))
+      case QSSort(source, buckets, order) =>
+        f(source).map(QSSort(_, buckets, order))
 
       case Union(left, right) =>
         (f(left) |@| f(right))(Union(_, _))
@@ -194,12 +194,12 @@ object QScriptUniform {
   final case class Distinct[T[_[_]], A](source: A) extends QScriptUniform[T, A]
 
   // LPish
-  final case class Sort[T[_[_]], A](
+  final case class LPSort[T[_[_]], A](
       source: A,
       order: NEL[(A, SortDir)]) extends QScriptUniform[T, A]
 
   // QScriptish
-  final case class UniformSort[T[_[_]], A](
+  final case class QSSort[T[_[_]], A](
       source: A,
       buckets: List[FreeMap[T]],
       order: NEL[(FreeMap[T], SortDir)]) extends QScriptUniform[T, A]
@@ -271,6 +271,11 @@ object QScriptUniform {
         case LPReduce(a, rf) => (a, rf)
       } { case (a, rf) => LPReduce(a, rf) }
 
+    def lpSort[A]: Prism[QScriptUniform[A], (A, NEL[(A, SortDir)])] =
+      Prism.partial[QScriptUniform[A], (A, NEL[(A, SortDir)])] {
+        case LPSort(a, keys) => (a, keys)
+      } { case (a, keys) => LPSort(a, keys) }
+
     def map[A]: Prism[QScriptUniform[A], (A, FreeMap)] =
       Prism.partial[QScriptUniform[A], (A, FreeMap)] {
         case Map(a, fm) => (a, fm)
@@ -291,15 +296,15 @@ object QScriptUniform {
         case QSReduce(a, bs, rfs, rep) => (a, bs, rfs, rep)
       } { case (a, bs, rfs, rep) => QSReduce(a, bs, rfs, rep) }
 
+    def qsSort[A]: Prism[QScriptUniform[A], (A, List[FreeMap], NEL[(FreeMap, SortDir)])] =
+      Prism.partial[QScriptUniform[A], (A, List[FreeMap], NEL[(FreeMap, SortDir)])] {
+        case QSSort(a, buckets, keys) => (a, buckets, keys)
+      } { case (a, buckets, keys) => QSSort(a, buckets, keys) }
+
     def read[A]: Prism[QScriptUniform[A], AFile] =
       Prism.partial[QScriptUniform[A], AFile] {
         case Read(f) => f
       } (Read(_))
-
-    def sort[A]: Prism[QScriptUniform[A], (A, NEL[(A, SortDir)])] =
-      Prism.partial[QScriptUniform[A], (A, NEL[(A, SortDir)])] {
-        case Sort(a, keys) => (a, keys)
-      } { case (a, keys) => Sort(a, keys) }
 
     def subset[A]: Prism[QScriptUniform[A], (A, SelectionOp, A)] =
       Prism.partial[QScriptUniform[A], (A, SelectionOp, A)] {
@@ -315,11 +320,6 @@ object QScriptUniform {
       Prism.partial[QScriptUniform[A], (A, Rotation)] {
         case Transpose(a, r) => (a, r)
       } { case (a, r) => Transpose(a, r) }
-
-    def uniformSort[A]: Prism[QScriptUniform[A], (A, List[FreeMap], NEL[(FreeMap, SortDir)])] =
-      Prism.partial[QScriptUniform[A], (A, List[FreeMap], NEL[(FreeMap, SortDir)])] {
-        case UniformSort(a, buckets, keys) => (a, buckets, keys)
-      } { case (a, buckets, keys) => UniformSort(a, buckets, keys) }
 
     def union[A]: Prism[QScriptUniform[A], (A, A)] =
       Prism.partial[QScriptUniform[A], (A, A)] {
@@ -347,8 +347,8 @@ object QScriptUniform {
             case QSReduce(a, bs, reds, rep) =>
               (bs.traverse(f) |@| Traverse[List].compose[ReduceFunc].traverse(reds)(f))(QSReduce(a, _, _, rep))
 
-            case UniformSort(s, bs, keys) =>
-              (bs.traverse(f) |@| keys.traverse { case (x, d) => f(x) strengthR d })(UniformSort(s, _, _))
+            case QSSort(s, bs, keys) =>
+              (bs.traverse(f) |@| keys.traverse { case (x, d) => f(x) strengthR d })(QSSort(s, _, _))
 
             case other => other.point[F]
           }
@@ -404,6 +404,9 @@ object QScriptUniform {
     val lpReduce: Prism[QSU, (QSU, ReduceFunc[Unit])] =
       iso composePrism O.lpReduce
 
+    val lpSort: Prism[QSU, (QSU, NEL[(QSU, SortDir)])] =
+      iso composePrism O.lpSort
+
     val map: Prism[QSU, (QSU, FreeMap)] =
       iso composePrism O.map
 
@@ -419,11 +422,11 @@ object QScriptUniform {
     val qsReduce: Prism[QSU, (QSU, List[FreeMap], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])] =
       iso composePrism O.qsReduce
 
+    val qsSort: Prism[QSU, (QSU, List[FreeMap], NEL[(FreeMap, SortDir)])] =
+      iso composePrism O.qsSort
+
     val read: Prism[QSU, AFile] =
       iso composePrism O.read
-
-    val sort: Prism[QSU, (QSU, NEL[(QSU, SortDir)])] =
-      iso composePrism O.sort
 
     val subset: Prism[QSU, (QSU, SelectionOp, QSU)] =
       iso composePrism O.subset
@@ -439,9 +442,6 @@ object QScriptUniform {
 
     def tread1(name: String): QSU =
       tread(Path.rootDir </> Path.file(name))
-
-    val uniformSort: Prism[QSU, (QSU, List[FreeMap], NEL[(FreeMap, SortDir)])] =
-      iso composePrism O.uniformSort
 
     val union: Prism[QSU, (QSU, QSU)] =
       iso composePrism O.union
