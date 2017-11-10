@@ -85,6 +85,21 @@ object MappableRegionSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
       mr1(tree) must beTreeEqual(exp)
     }
 
+    "convert map" >> {
+      val tree =
+        qsu.map(
+          qsu.autojoin2(
+            qsu.read(orders),
+            qsu.cstr("foo"),
+            _(ProjectKey(_, _))),
+          func.MakeArray(func.Hole))
+
+      val exp =
+        func.MakeArray(projectStrKey("foo"))
+
+      mr1(tree) must beTreeEqual(exp)
+    }
+
     "stop at non-mapping nodes" >> {
       val tree =
         qsu.autojoin2(
