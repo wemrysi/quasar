@@ -789,7 +789,7 @@ object MongoDbPlanner {
     type IT[G[_]]
 
     def plan
-      [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+      [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush, EX[_]: Traverse]
       (cfg: PlannerConfig[IT, EX, WF])
       (implicit
         ev0: WorkflowOpCoreF :<: WF,
@@ -808,7 +808,7 @@ object MongoDbPlanner {
       new Planner[Const[ShiftedRead[AFile], ?]] {
         type IT[G[_]] = T[G]
         def plan
-          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush, EX[_]: Traverse]
           (cfg: PlannerConfig[T, EX, WF])
           (implicit
             ev0: WorkflowOpCoreF :<: WF,
@@ -848,7 +848,7 @@ object MongoDbPlanner {
         @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
         def plan
           [M[_]: Monad: ExecTimeR: MonadFsErr,
-            WF[_]: Functor: Coalesce: Crush: Crystallize,
+            WF[_]: Functor: Coalesce: Crush,
             EX[_]: Traverse]
           (cfg: PlannerConfig[T, EX, WF])
           (implicit
@@ -967,7 +967,7 @@ object MongoDbPlanner {
       new Planner[EquiJoin[T, ?]] {
         type IT[G[_]] = T[G]
         def plan
-          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush, EX[_]: Traverse]
           (cfg: PlannerConfig[T, EX, WF])
           (implicit
             ev0: WorkflowOpCoreF :<: WF,
@@ -1000,7 +1000,7 @@ object MongoDbPlanner {
       new Planner[Coproduct[F, G, ?]] {
         type IT[G[_]] = T[G]
         def plan
-          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush, EX[_]: Traverse]
           (cfg: PlannerConfig[T, EX, WF])
           (implicit
             ev0: WorkflowOpCoreF :<: WF,
@@ -1020,7 +1020,7 @@ object MongoDbPlanner {
         type IT[G[_]] = T[G]
 
         def plan
-          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush, EX[_]: Traverse]
           (cfg: PlannerConfig[T, EX, WF])
           (implicit
             ev0: WorkflowOpCoreF :<: WF,
@@ -1143,7 +1143,7 @@ object MongoDbPlanner {
       (JsFn(JsFn.defaultName, _))
 
   def rebaseWB
-    [T[_[_]]: EqualT, M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush: Crystallize, EX[_]: Traverse]
+    [T[_[_]]: EqualT, M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush, EX[_]: Traverse]
     (cfg: PlannerConfig[T, EX, WF],
       free: FreeQS[T],
       src: WorkflowBuilder[WF])
@@ -1234,7 +1234,7 @@ object MongoDbPlanner {
   def buildWorkflow
     [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
       M[_]: Monad: PhaseResultTell: MonadFsErr: ExecTimeR,
-      WF[_]: Functor: Coalesce: Crush: Crystallize,
+      WF[_]: Functor: Coalesce: Crush,
       EX[_]: Traverse]
     (cfg: PlannerConfig[T, EX, WF])
     (qs: T[fs.MongoQScript[T, ?]])
