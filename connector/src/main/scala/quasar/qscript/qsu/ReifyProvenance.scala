@@ -16,19 +16,35 @@
 
 package quasar.qscript.qsu
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => SMap, _}
 
+import quasar.NameGenerator
 import quasar.Planner.PlannerErrorME
 import quasar.common.JoinType
+import quasar.ejson.implicits._
+import quasar.fp._
 import quasar.fp.ski.κ
-import quasar.qscript.{HoleF, IncludeId, LeftSideF, MFC, ReduceIndexF, RightSideF}
+import quasar.qscript.{
+  construction,
+  Center,
+  Hole,
+  HoleF,
+  IncludeId,
+  JoinSide,
+  LeftSide3,
+  LeftSideF,
+  ReduceIndexF,
+  RightSide3,
+  RightSideF}
+import quasar.qscript.provenance.Dimensions
 import quasar.qscript.ReduceFunc._
-import quasar.qscript.MapFuncsCore.ConcatArrays
+import quasar.qscript.MapFuncsCore.IntLit
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
-import matryoshka.{BirecursiveT, EqualT}
-import scalaz.{\/-, Applicative, Free, Monad}
+import matryoshka._
+import matryoshka.data._
+import scalaz.{\/-, Applicative, Bind, Free, Functor, Monad}
 import scalaz.Scalaz._
 
 final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
@@ -36,41 +52,110 @@ final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] 
   type QSU[A] = QScriptUniform[A]
 
   val prov = new QProv[T]
+  val func = construction.Func[T]
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  private def toQScript[F[_]: Applicative: PlannerErrorME](dims: QSUDims[T])
-      : QSU[Symbol] => F[QSU[Symbol]] = {
+  case class NewVertex(name: Symbol, value: QSU[Symbol], dims: Dimensions[prov.P])
+
+  type X[F[_], A] = F[(List[NewVertex], A)]
+
+  def appX[F[_]: Monad]: Applicative[X[F, ?]] = new Applicative[X[F, ?]] {
+
+    def ap[A, B](fa: => X[F, A])(f: => X[F, A => B]): X[F, B] =
+      Bind[F].bind(fa) {
+        case (verts0, a) => Functor[F].map(f) {
+          case (verts1, func) => (verts0 ++ verts1, func(a))
+        }
+      }
+
+    def point[A](a: => A): X[F, A] =
+      Applicative[F].point(List[NewVertex]() -> a)
+  }
+
+  private def toQScript[F[_]: Monad: PlannerErrorME: NameGenerator](dims: QSUDims[T])
+      : QSU[Symbol] => X[F, QSU[Symbol]] = {
     case QSU.AutoJoin2(left, right, _combiner) =>
-      val condition: JoinFunc = prov.autojoinCondition(dims(left), dims(right))(κ(HoleF))
-      val combiner: JoinFunc = Free.roll(_combiner.map(Free.point(_)))
-      val qsu: QSU[Symbol] = QSU.ThetaJoin(left, right, condition, JoinType.Inner, combiner)
-      qsu.point[F]
+      val condition: JoinFunc =
+        prov.autojoinCondition(dims(left), dims(right))(κ(HoleF))
 
-    case QSU.AutoJoin3(left, center, right, combiner) => slamdata.Predef.???
+      val combiner: JoinFunc =
+        Free.roll(_combiner.map(Free.point(_)))
+
+      val qsu: QSU[Symbol] =
+        QSU.ThetaJoin(left, right, condition, JoinType.Inner, combiner)
+
+      appX[F].point(qsu)
+
+    case QSU.AutoJoin3(left, center, right, combiner3) =>
+      val _condition: JoinFunc =
+        prov.autojoinCondition(dims(left), dims(center))(κ(HoleF))
+
+      val _combiner: JoinFunc = // <3 [[]]
+        func.ConcatArrays(func.MakeArray(LeftSideF), func.MakeArray(RightSideF))
+
+      val _join: QSU[Symbol] =
+        QSU.ThetaJoin(left, center, _condition, JoinType.Inner, _combiner)
+
+      def projLeft[A](hole: FreeMapA[A]): FreeMapA[A] =
+        func.ProjectIndex(IntLit(0), hole)
+
+      def projCenter[A](hole: FreeMapA[A]): FreeMapA[A] =
+        func.ProjectIndex(IntLit(1), hole)
+
+      val combiner: JoinFunc = Free.roll(combiner3 map {
+        case LeftSide3 => projLeft[JoinSide](LeftSideF)
+        case Center => projCenter[JoinSide](LeftSideF)
+        case RightSide3 => RightSideF
+      })
+
+      val newDims: Dimensions[prov.P] = prov.join(dims(left), dims(center))
+
+      def rewriteCondition: Symbol => FreeMap = _ match {
+        case `left` => projLeft[Hole](HoleF)
+        case `center` => projCenter[Hole](HoleF)
+        case _ => HoleF
+      }
+
+      val condition: JoinFunc =
+        prov.autojoinCondition(newDims, dims(right))(rewriteCondition)
+
+      NameGenerator[F].prefixedName("reify").map { name =>
+        val sym = Symbol(name)
+        val qsu = QSU.ThetaJoin(sym, right, condition, JoinType.Inner, combiner)
+        val newVertex = NewVertex(sym, _join, newDims)
+        (List(newVertex), qsu)
+      }
 
     case QSU.Transpose(source, _) =>
       // TODO only reify the identity/value information when it's used
-      val repair: JoinFunc = Free.roll(MFC(ConcatArrays(LeftSideF, RightSideF)))
+      val repair: JoinFunc = func.ConcatArrays(func.MakeArray(LeftSideF), func.MakeArray(RightSideF))
       val qsu: QSU[Symbol] = QSU.LeftShift[T, Symbol](source, HoleF, IncludeId, repair)
-
-      qsu.point[F]
+      appX[F].point(qsu)
 
     case QSU.LPReduce(source, reduce) =>
       val bucket: FreeMap = slamdata.Predef.??? // TODO computed from provenance
       val qsu: QSU[Symbol] = QSU.QSReduce[T, Symbol](source, List(bucket), List(reduce.map(κ(HoleF))), ReduceIndexF(\/-(0)))
+      appX[F].point(qsu)
 
-      qsu.point[F]
-
-    case qsu => qsu.point[F]
+    case qsu =>
+      appX[F].point(qsu)
   }
 
-  def apply[F[_]: Monad: PlannerErrorME](qsu: AuthenticatedQSU[T])
-      : F[AuthenticatedQSU[T]] =
-    for {
-      vertices <- qsu.graph.vertices.traverse[F, QSU[Symbol]](toQScript[F](qsu.dims))
-    } yield {
-      AuthenticatedQSU[T](QSUGraph(qsu.graph.root, vertices), qsu.dims)
+  def apply[F[_]: Monad: PlannerErrorME: NameGenerator](qsu: AuthenticatedQSU[T])
+      : F[AuthenticatedQSU[T]] = {
+
+    val pair: F[(List[NewVertex], SMap[Symbol, QSU[Symbol]])] =
+      qsu.graph.vertices.traverse[X[F, ?], QSU[Symbol]](toQScript[F](qsu.dims))(appX[F])
+
+    pair.map {
+      case (nw, oldVertices) =>
+        val (newV, newD) =
+          nw.foldLeft((SMap[Symbol, QSU[Symbol]](), SMap[Symbol, Dimensions[prov.P]]())) {
+            case ((vAcc, dAcc), NewVertex(name, value, dims)) =>
+              (vAcc + (name -> value), dAcc + (name -> dims))
+          }
+        AuthenticatedQSU[T](QSUGraph(qsu.graph.root, oldVertices ++ newV), qsu.dims ++ newD)
     }
+  }
 }
 
 object ReifyProvenance {
