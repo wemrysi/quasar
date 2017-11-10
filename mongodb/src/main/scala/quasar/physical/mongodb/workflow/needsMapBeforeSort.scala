@@ -19,18 +19,17 @@ package quasar.physical.mongodb.workflow
 import slamdata.Predef._
 
 import matryoshka._
-import matryoshka.data.Fix
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 object needsMapBeforeSort {
 
-  def apply[F[_]: Traverse](wf: Fix[F])
+  def apply[T[_[_]]: BirecursiveT, F[_]: Traverse](wf: T[F])
     (implicit I: WorkflowOpCoreF :<: F)
       : Boolean = {
-    val alg: AlgebraM[Option, F, Fix[F]] = {
+    val alg: AlgebraM[Option, F, T[F]] = {
       case I($SimpleMapF(Embed(I($SortF(_, _))), _, _)) => none
-      case x => Fix(x).some
+      case x => x.embed.some
     }
     wf.cataM(alg).isEmpty
   }
