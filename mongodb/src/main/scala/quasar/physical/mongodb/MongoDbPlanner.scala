@@ -1206,8 +1206,6 @@ object MongoDbPlanner {
     val O = new Optimize[T]
     val R = new Rewrite[T]
 
-    val variation = if (applyMapBeforeSort) "extended" else "simple"
-
     // TODO: All of these need to be applied through branches. We may also be able to compose
     //       them with normalization as the last step and run until fixpoint. Currently plans are
     //       too sensitive to the order in which these are applied.
@@ -1221,14 +1219,16 @@ object MongoDbPlanner {
       _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo", mongoQS3))
 
       // NB: Normalizing after these appears to revert the effects of `mapBeforeSort`.
-      mongoQS4 <- if (applyMapBeforeSort) Trans(mapBeforeSort[T, M], mongoQS3)
+      mongoQS4 <- if (applyMapBeforeSort)
+                    log("QScript Mongo (Map Before Sort)",
+                      Trans(mapBeforeSort[T, M], mongoQS3))
                   else mongoQS3.point[M]
       mongoQS5 =  mongoQS4.transCata[T[MQS]](
                     liftFF[QScriptCore[T, ?], MQS, T[MQS]](
                       repeatedly(O.subsetBeforeMap[MQS, MQS](
                         reflNT[MQS]))))
       _ <- BackendModule.logPhase[M](
-             PhaseResult.tree(s"QScript Mongo (Shuffle Maps - $variation)",
+             PhaseResult.tree("QScript Mongo (Subset Before Map)",
              mongoQS5))
 
       // TODO: Once field deletion is implemented for 3.4, this could be selectively applied, if necessary.
