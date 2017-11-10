@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.algebra._
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
-import quasar.ejson, ejson.{CommonEJson => C, EJsonArbitrary, ExtEJson => E, z85}
+import quasar.ejson, ejson.{EJsonArbitrary, TypeTag, z85}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.numeric.Positive
@@ -53,19 +53,21 @@ final class CompressionSpec extends quasar.Qspec
   type J = TypedEJson[Fix]
   type S = SST[J, Real]
 
+  val J = ejson.Fixed[J]
+
   case class LeafEjs(ejs: J) {
     def toSST: S = SST.fromEJson(Real(1), ejs)
   }
 
   implicit val arbitraryLeafEjs: Arbitrary[LeafEjs] =
     Arbitrary(Gen.oneOf(
-      Gen.const(C(ejson.nul[J]()).embed),
-      arbitrary[Boolean] map (b => C(ejson.bool[J](b)).embed),
-      arbitrary[String] map (s => C(ejson.str[J](s)).embed),
-      arbitrary[BigDecimal] map (d => C(ejson.dec[J](d)).embed),
-      arbitrary[Byte] map (b => E(ejson.byte[J](b)).embed),
-      arbitrary[Char] map (c => E(ejson.char[J](c)).embed),
-      arbitrary[BigInt] map (i => E(ejson.int[J](i)).embed)
+      Gen.const(J.nul()),
+      arbitrary[Boolean] map (b => J.bool(b)),
+      arbitrary[String] map (s => J.str(s)),
+      arbitrary[BigDecimal] map (d => J.dec(d)),
+      arbitrary[Byte] map (b => J.byte(b)),
+      arbitrary[Char] map (c => J.char(c)),
+      arbitrary[BigInt] map (i => J.int(i))
     ) map (LeafEjs(_)))
 
   implicit val orderLeafEjs: Order[LeafEjs] =
@@ -83,14 +85,14 @@ final class CompressionSpec extends quasar.Qspec
         (cs: ISet[Char], n: BigInt, b: Byte, unk0: Option[(LeafEjs, LeafEjs)]) => (cs.size > 1) ==> {
 
         val chars = cs.toIList map f
-        val int = E(ejson.int[J](n)).embed
-        val byte = E(ejson.byte[J](b)).embed
-        val nul = SST.fromEJson(Real(1), C(ejson.nul[J]()).embed)
+        val int = J.int(n)
+        val byte = J.byte(b)
+        val nul = SST.fromEJson(Real(1), J.nul())
         val m0 = IMap.fromFoldable((int :: byte :: chars) strengthR nul)
         val unk  = unk0.map(_.umap(_.toSST))
         val msst = envT(cnt1, TypeST(TypeF.map[J, S](m0, unk))).embed
 
-        val uval = SST.fromEJson(Real(cs.size), C(ejson.nul[J]()).embed)
+        val uval = SST.fromEJson(Real(cs.size), J.nul())
         val ukey = chars.foldMap1Opt(c => SST.fromEJson(Real(1), c))
         val m1   = IMap.fromFoldable(IList(byte, int) strengthR nul)
         val unk1 = ukey.strengthR(uval) |+| unk
@@ -99,12 +101,9 @@ final class CompressionSpec extends quasar.Qspec
         msst.transCata[S](compression.coalesceKeys(2L)) must_= exp
       }}
 
-    test("type", c => E(ejson.char[J](c)).embed)
+    test("type", J.char(_))
 
-    test("tag", c => E(ejson.Meta(
-      E(ejson.char[J](c)).embed,
-      ejson.Type[J](ejson.TypeTag("cp"))
-    )).embed)
+    test("tag", c => J.meta(J.char(c), J.tpe(TypeTag("cp"))))
 
     "ignores map where size of keys does not exceed maxSize" >> prop {
       (xs: IList[(LeafEjs, LeafEjs)], unk0: Option[(LeafEjs, LeafEjs)]) =>
@@ -136,8 +135,8 @@ final class CompressionSpec extends quasar.Qspec
 
     "combines multiple instances of a primary type in unions" >> prop {
       (sts: NonEmptyList[SimpleType], a1: NonEmptyList[J], a2: NonEmptyList[J]) =>
-      val as1 = SST.fromEJson(Real(1), C(ejson.arr[J](a1.toList)).embed)
-      val as2 = SST.fromEJson(Real(1), C(ejson.arr[J](a2.toList)).embed)
+      val as1 = SST.fromEJson(Real(1), J.arr(a1.toList))
+      val as2 = SST.fromEJson(Real(1), J.arr(a2.toList))
       val xs  = sts.list.map(st => envT(cnt1, TypeST(TypeF.simple[J, S](st))).embed)
       val cnt = TypeStat.count(Real(xs.length + 2))
 
@@ -162,9 +161,9 @@ final class CompressionSpec extends quasar.Qspec
 
         val u1 = head.bimap(_ => SST.fromEJson(Real(1), f('x')), _.toSST)
         val u2 = head.bimap(
-          c => g(TypeStat.fromEJson(Real(1), E(ejson.char[J](c)).embed), SimpleType.Char).embed,
+          c => g(TypeStat.fromEJson(Real(1), J.char(c)), SimpleType.Char).embed,
           _.toSST)
-        val kv1 = kv.bimap(i => E(ejson.int[J](i)).embed, _.toSST)
+        val kv1 = kv.bimap(J.int(_), _.toSST)
         val cs = xs.toList.map(_.bimap(f, _.toSST))
         val m = IMap.fromFoldable(kv1 :: cs)
         val sst1 = envT(cnt1, TypeST(TypeF.map(m, u1.some))).embed
@@ -187,13 +186,13 @@ final class CompressionSpec extends quasar.Qspec
 
         val u1 = head.bimap(_ => SST.fromEJson(Real(1), f('x')), _.toSST)
         val u2 = head.bimap(
-          c => g(TypeStat.fromEJson(Real(1), E(ejson.char[J](c)).embed), SimpleType.Char).embed,
+          c => g(TypeStat.fromEJson(Real(1), J.char(c)), SimpleType.Char).embed,
           _.toSST)
         val st = envT(cnt1, TypeST(TypeF.simple[J, S](SimpleType.Dec))).embed
         val tp = envT(cnt1, TypeST(TypeF.top[J, S]())).embed
         val u1u = u1.leftMap(s => envT(cnt1, TypeST(TypeF.union[J, S](tp, s, IList(st)))).embed)
         val u2u = u2.leftMap(s => envT(cnt1, TypeST(TypeF.union[J, S](s, st, IList(tp)))).embed)
-        val kv1 = kv.bimap(i => E(ejson.int[J](i)).embed, _.toSST)
+        val kv1 = kv.bimap(J.int(_), _.toSST)
         val cs = xs.toList.map(_.bimap(f, _.toSST))
         val m = IMap.fromFoldable(kv1 :: cs)
         val sst1 = envT(cnt1, TypeST(TypeF.map(m, u1u.some))).embed
@@ -214,15 +213,13 @@ final class CompressionSpec extends quasar.Qspec
     }
 
     test("type",
-      c => E(ejson.char[J](c)).embed,
+      J.char(_),
       (ts, st) => envT(ts, TypeST(TypeF.simple[J, S](st))))
 
     test("tag",
-      c => E(ejson.Meta(
-        E(ejson.char[J](c)).embed,
-        ejson.Type[J](ejson.TypeTag("codepoint")))).embed,
+      c => J.meta(J.char(c), J.tpe(TypeTag("codepoint"))),
       (ts, st) => envT(TypeStat.count(ts.size), TagST[J](Tagged(
-        ejson.TypeTag("codepoint"),
+        TypeTag("codepoint"),
         envT(ts, TypeST(TypeF.simple[J, S](st))).embed))))
 
     "has no effect on maps when all keys are known" >> prop { xs: IList[(LeafEjs, LeafEjs)] =>
@@ -241,11 +238,9 @@ final class CompressionSpec extends quasar.Qspec
     }
 
     "has no effect on maps when primary tag not in unknown" >> prop { xs: IList[(LeafEjs, LeafEjs)] =>
-      val foo = ejson.TypeTag("foo")
-      val bar = ejson.TypeTag("bar")
-      val m = IMap.fromFoldable(xs.map(_.bimap(
-        l => E(ejson.Meta(l.ejs, ejson.Type[J](foo))).embed,
-        _.toSST)))
+      val foo = TypeTag("foo")
+      val bar = TypeTag("bar")
+      val m = IMap.fromFoldable(xs.map(_.bimap(l => J.meta(l.ejs, J.tpe(foo)), _.toSST)))
       val T = envT(cnt1, TagST[J](Tagged(bar, envT(cnt1, TypeST(TypeF.top[J, S]())).embed))).embed
       val sst = envT(cnt1, TypeST(TypeF.map[J, S](m, Some((T, T))))).embed
 
@@ -260,8 +255,8 @@ final class CompressionSpec extends quasar.Qspec
       val alen: Positive = Positive(xs.length.toLong) getOrElse 1L
       val lt: Positive = Positive((xs.length - 1).toLong) getOrElse 1L
       val rlen = Real(xs.length).some
-      val ints = xs.map(i => E(ejson.int[J](i)).embed)
-      val xsst = SST.fromEJson(Real(1), C(ejson.arr[J](ints.toList)).embed)
+      val ints = xs.map(J.int(_))
+      val xsst = SST.fromEJson(Real(1), J.arr(ints.toList))
 
       val sum = ints.foldMap1(x => SST.fromEJson(Real(1), x))
       val coll = TypeStat.coll(Real(1), rlen, rlen)
@@ -279,7 +274,7 @@ final class CompressionSpec extends quasar.Qspec
       val plen: Positive = Positive(s.length.toLong) getOrElse 1L
       val lt: Positive = Positive((s.length - 1).toLong) getOrElse 1L
       val rlen = Real(s.length).some
-      val str  = SST.fromEJson(Real(1), C(ejson.str[J](s)).embed)
+      val str  = SST.fromEJson(Real(1), J.str(s))
 
       val char = envT(cnt1, TypeST(TypeF.simple[J, S](SimpleType.Char))).embed
       val coll = TypeStat.coll(Real(1), rlen, rlen)
@@ -297,9 +292,9 @@ final class CompressionSpec extends quasar.Qspec
       (bs: ISet[Byte], c1: Char, c2: Char, c3: Char, d1: BigDecimal) =>
       ((bs.size > 3) && (ISet.fromFoldable(IList(c1, c2, c3)).size ≟ 3)) ==> {
 
-      val bytes = bs.toIList.map(b => SST.fromEJson(Real(1), E(ejson.byte[J](b)).embed))
-      val chars = IList(c1, c2, c3).map(c => SST.fromEJson(Real(1), E(ejson.char[J](c)).embed))
-      val dec = SST.fromEJson(Real(1), C(ejson.dec[J](d1)).embed)
+      val bytes = bs.toIList.map(b => SST.fromEJson(Real(1), J.byte(b)))
+      val chars = IList(c1, c2, c3).map(c => SST.fromEJson(Real(1), J.char(c)))
+      val dec = SST.fromEJson(Real(1), J.dec(d1))
 
       val compByte = envT(
         bytes.foldMap1Opt(_.copoint) | TypeStat.count(Real(0)),
@@ -328,10 +323,7 @@ final class CompressionSpec extends quasar.Qspec
     "compresses all encoded binary strings" >> prop { bs: Vector[Byte] =>
       val bytes   = ByteVector(bs)
       val encoded = z85.encode(bytes)
-      val ejs     = E(ejson.meta[J](
-                      C(ejson.str[J](encoded)).embed,
-                      ejson.SizedType[J](ejson.TypeTag.Binary, BigInt(bytes.size))
-                    )).embed
+      val ejs     = J.meta(J.str(encoded), J.sizedTpe(TypeTag.Binary, BigInt(bytes.size)))
       val sst     = SST.fromEJson(Real(1), ejs)
 
       val byte    = envT(cnt1, TypeST(TypeF.simple[J, S](SimpleType.Byte))).embed

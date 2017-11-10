@@ -20,8 +20,8 @@ import quasar._
 import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._
 import quasar.contrib.specs2.PendingWithActualTracking
-import quasar.ejson.EJson._
 import quasar.javascript._
+import quasar.ejson.{EJson, Fixed}
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
@@ -47,6 +47,8 @@ class PlannerQScriptSpec extends
   val (func, free, fix) =
     quasar.qscript.construction.mkDefaults[Fix, fs.MongoQScript[Fix, ?]]
 
+  val ejs = Fixed[Fix[EJson]]
+
   //TODO make this independent of MongoQScript and move to a place where all
   //     connector tests can refer to it
   val simpleJoin: Fix[fs.MongoQScript[Fix, ?]] =
@@ -54,10 +56,10 @@ class PlannerQScriptSpec extends
       fix.Unreferenced,
       free.Filter(
         free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-        func.Guard(func.Hole, Type.AnyObject, func.Constant(bool[Fix](true)), func.Constant(bool[Fix](false)))),
+        func.Guard(func.Hole, Type.AnyObject, func.Constant(ejs.bool(true)), func.Constant(ejs.bool(false)))),
       free.Filter(
         free.ShiftedRead[AFile](rootDir </> dir("db") </> file("smallZips"), qscript.ExcludeId),
-        func.Guard(func.Hole, Type.AnyObject, func.Constant(bool[Fix](true)), func.Constant(bool[Fix](false)))),
+        func.Guard(func.Hole, Type.AnyObject, func.Constant(ejs.bool(true)), func.Constant(ejs.bool(false)))),
       List((func.ProjectKeyS(func.Hole, "_id"), func.ProjectKeyS(func.Hole, "_id"))),
       JoinType.Inner,
       func.ProjectKeyS(func.RightSide, "city"))
@@ -90,8 +92,8 @@ class PlannerQScriptSpec extends
           Guard(
             ProjectKeyS(ProjectIndexI(Hole, 1), "parentid"),
             Type.Str,
-            Constant(bool[Fix](false)),
-            Constant(bool[Fix](true))))) must beWorkflow0(
+            Constant(ejs.bool(false)),
+            Constant(ejs.bool(true))))) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "zips")),
           $project(reshape("0" -> $arrayLit(List($field("_id"), $$ROOT)))),

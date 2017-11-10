@@ -18,7 +18,7 @@ package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
 
-import quasar.ejson._
+import quasar.ejson.{EJson, Fixed}
 import quasar.physical.mongodb.BsonField
 import quasar.physical.mongodb.expression._
 import quasar.qscript._
@@ -45,9 +45,8 @@ object StaticHandler {
     (implicit e26: ExprOpCoreF :<: EX)
       : StaticHandler[T, EX] =
     new StaticHandler[T, EX] {
-
       def toBsonFieldName(ej: T[EJson]): Option[BsonField.Name] =
-        (CommonEJson.prj(ej.project) >>= (str.getOption(_))).map(BsonField.Name(_))
+        Fixed[T[EJson]].str.getOption(ej) map (BsonField.Name(_))
 
       def handle[A](fm: FreeMapA[T, A]): Option[EX[FreeMapA[T, A]]] =
         fm.project match {

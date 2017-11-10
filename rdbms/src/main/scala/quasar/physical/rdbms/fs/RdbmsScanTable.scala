@@ -14,19 +14,14 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.physical.rdbms.fs
 
-import scalaz.{Coproduct, Inject}
+import slamdata.Predef._
+import quasar.physical.rdbms.common.TablePath
+import quasar.fp.numeric.{Natural, Positive}
 
-package object ejson {
+import doobie.util.fragment.Fragment
 
-  /** For _strict_ JSON, you want something like `Obj[Mu[Json]]`.
-    */
-  type Json[A]    = Coproduct[Obj, Common, A]
-  val ObjJson     = Inject[Obj, Json]
-  val CommonJson  = Inject[Common, Json]
-
-  type EJson[A]   = Coproduct[Extension, Common, A]
-  val ExtEJson    = Inject[Extension, EJson]
-  val CommonEJson = Inject[Common, EJson]
+trait RdbmsScanTable {
+  def selectAllQuery(tablePath: TablePath, offset: Natural, limit: Option[Positive]): Fragment
 }
