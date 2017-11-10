@@ -31,12 +31,12 @@ import matryoshka.data.Fix, Fix._
 import matryoshka.implicits._
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}
 import pathy.Path, Path.{file, Sandboxed}
-import scalaz.\/
+import scalaz.{\/, EitherT, Need, StateT}
 import scalaz.Scalaz._
 
 object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
-  type F[A] = PlannerError \/ A
+  type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
   type QSU[A] = QScriptUniform[A]
   type QSE[A] = QScriptEducated[A]
@@ -71,7 +71,8 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
   def graduateAs(expected: Fix[QSE]): Matcher[Fix[QSU]] = {
     new Matcher[Fix[QSU]] {
       def apply[S <: Fix[QSU]](s: Expectable[S]): MatchResult[S] = {
-        val actual: F[Fix[QSE]] = grad[F](QSUGraph.fromTree[Fix](s.value))
+        val actual: PlannerError \/ Fix[QSE] =
+          evaluate(grad[F](QSUGraph.fromTree[Fix](s.value)))
 
         actual.bimap[MatchResult[S], MatchResult[S]](
         { err =>
@@ -83,4 +84,6 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
       }
     }
   }
+
+  def evaluate[A](fa: F[A]): PlannerError \/ A = fa.run.eval(0L).value
 }
