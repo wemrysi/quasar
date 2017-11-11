@@ -21,4 +21,5 @@ import quasar.qscript.provenance.Dimensions
 
 package object qsu {
   type QSUDims[T[_[_]]] = SMap[Symbol, Dimensions[QProv.P[T]]]
+  type QSUNodes[T[_[_]]] = SMap[Symbol, QScriptUniform[T, Symbol]]
 }

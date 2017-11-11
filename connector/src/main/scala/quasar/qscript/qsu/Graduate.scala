@@ -16,7 +16,7 @@
 
 package quasar.qscript.qsu
 
-import slamdata.Predef.{Map => SMap, _}
+import slamdata.Predef._
 
 import quasar.NameGenerator
 import quasar.Planner.{InternalError, PlannerErrorME}
@@ -94,8 +94,7 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
 
     // we merge the vertices in the result, just in case the graphs are
     // additively applied to a common root
-    val mergedVertices: SMap[Symbol, QSU[Symbol]] =
-      left.vertices ++ right.vertices
+    val mergedVertices: QSUNodes[T] = left.vertices ++ right.vertices
 
     source.headOption match {
       case hole @ Some(root) =>
@@ -112,7 +111,7 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
         } yield {
           val root: Symbol = Symbol(name)
 
-          val newVertices: SMap[Symbol, QSU[Symbol]] =
+          val newVertices: QSUNodes[T] =
             mergedVertices + (root -> QSU.Unreferenced[T, Symbol]())
 
           SrcMerge(QSUGraph[T](root, newVertices), lGrad, rGrad)

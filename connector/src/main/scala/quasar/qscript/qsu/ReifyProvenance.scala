@@ -143,13 +143,14 @@ final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] 
   def apply[F[_]: Monad: PlannerErrorME: NameGenerator](qsu: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] = {
 
-    val pair: F[(List[NewVertex], SMap[Symbol, QSU[Symbol]])] =
-      qsu.graph.vertices.traverse[X[F, ?], QSU[Symbol]](toQScript[F](qsu.dims))(appX[F])
+    val pair: F[(List[NewVertex], QSUNodes[T])] =
+      qsu.graph.vertices.traverse[X[F, ?], QSU[Symbol]](
+        toQScript[F](qsu.dims))(appX[F])
 
     pair.map {
       case (nw, oldVertices) =>
         val (newV, newD) =
-          nw.foldLeft((SMap[Symbol, QSU[Symbol]](), SMap[Symbol, Dimensions[prov.P]]())) {
+          nw.foldLeft[(QSUNodes[T], QSUDims[T])](SMap() -> SMap()) {
             case ((vAcc, dAcc), NewVertex(name, value, dims)) =>
               (vAcc + (name -> value), dAcc + (name -> dims))
           }
