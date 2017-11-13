@@ -22,7 +22,7 @@ import quasar.contrib.pathy._
 import quasar.sql._
 import quasar.fp.free.foldMapNT
 import quasar.fs.{FileSystemError, QueryFile, ReadFile}
-import quasar.fs.mount.{Mounting, MountConfig}
+import quasar.fs.mount.{Mounting, MountConfig, MountingError}
 import quasar.fs.mount.module.Module
 
 import matryoshka.data.Fix
@@ -45,7 +45,7 @@ final case class QuasarAPIImpl[F[_]: Monad](inter: CoreEff ~> F) {
   def createModule(path: ADir, statements: List[Statement[Fix[Sql]]]) =
     mount.mount(path, MountConfig.moduleConfig(statements)) foldMap inter
 
-  def getMount(path: APath) =
+  def getMount(path: APath): F[Option[MountingError \/ MountConfig]] =
     mount.lookupConfig(path).run.run.foldMap(inter)
 
   def ls(path: ADir): F[FileSystemError \/ Set[PathSegment]] =
