@@ -29,7 +29,7 @@ import scalaz.{Applicative, Id, Monad, MonadState, Traverse, Scalaz, State, Stat
 @Lenses
 final case class QSUGraph[T[_[_]]](
     root: Symbol,
-    vertices: QSUNodes[T]) {
+    vertices: QSUVerts[T]) {
 
   /**
    * Uniquely merge the graphs, retaining the root from the right.
@@ -98,7 +98,7 @@ final case class QSUGraph[T[_[_]]](
             recursive <- g.unfold.traverse(inner)
 
             collapsed =
-              recursive.foldRight[QSUNodes[T]](SMap())(_.vertices ++ _)
+              recursive.foldRight[QSUVerts[T]](SMap())(_.vertices ++ _)
 
             self2 = QSUGraph(root, collapsed)
 

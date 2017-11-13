@@ -94,7 +94,7 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
 
     // we merge the vertices in the result, just in case the graphs are
     // additively applied to a common root
-    val mergedVertices: QSUNodes[T] = left.vertices ++ right.vertices
+    val mergedVertices: QSUVerts[T] = left.vertices ++ right.vertices
 
     source.headOption match {
       case hole @ Some(root) =>
@@ -111,7 +111,7 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
         } yield {
           val root: Symbol = Symbol(name)
 
-          val newVertices: QSUNodes[T] =
+          val newVertices: QSUVerts[T] =
             mergedVertices + (root -> QSU.Unreferenced[T, Symbol]())
 
           SrcMerge(QSUGraph[T](root, newVertices), lGrad, rGrad)
