@@ -93,7 +93,8 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
 
       for {
         read <- withName[G](QSU.Read[T, Symbol](afile))
-        back <- extend1[G](read)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftMap))
+        shifted <- extend1[G](read)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftMap))
+        back <- projectConstIdx[G](ValueIndex)(shifted)
       } yield back
 
     case lp.Constant(data) =>
