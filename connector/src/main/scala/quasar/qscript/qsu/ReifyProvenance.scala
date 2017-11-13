@@ -38,7 +38,7 @@ import quasar.qscript.{
   RightSideF}
 import quasar.qscript.provenance.Dimensions
 import quasar.qscript.ReduceFunc._
-import quasar.qscript.MapFuncsCore.IntLit
+import quasar.qscript.MapFuncsCore.StrLit
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
@@ -86,43 +86,51 @@ final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] 
       appX[F].point(qsu)
 
     case QSU.AutoJoin3(left, center, right, combiner3) =>
-      val _condition: JoinFunc =
-        prov.autojoinCondition(dims(left), dims(center))(κ(HoleF))
+      (NameGenerator[F].prefixedName("autojoin") |@|
+        NameGenerator[F].prefixedName("leftAccess") |@|
+        NameGenerator[F].prefixedName("centerAccess")) {
 
-      val _combiner: JoinFunc = // <3 [[]]
-        func.ConcatArrays(func.MakeArray(LeftSideF), func.MakeArray(RightSideF))
+        case (joinName, lName, cName) =>
 
-      val _join: QSU[Symbol] =
-        QSU.ThetaJoin(left, center, _condition, JoinType.Inner, _combiner)
+          val _condition: JoinFunc =
+            prov.autojoinCondition(dims(left), dims(center))(κ(HoleF))
 
-      def projLeft[A](hole: FreeMapA[A]): FreeMapA[A] =
-        func.ProjectIndex(IntLit(0), hole)
+          def _combiner: JoinFunc =
+            func.ConcatMaps(
+              func.MakeMap(StrLit(lName), LeftSideF),
+              func.MakeMap(StrLit(cName), RightSideF))
 
-      def projCenter[A](hole: FreeMapA[A]): FreeMapA[A] =
-        func.ProjectIndex(IntLit(1), hole)
+          def _join: QSU[Symbol] =
+            QSU.ThetaJoin(left, center, _condition, JoinType.Inner, _combiner)
 
-      val combiner: JoinFunc = Free.roll(combiner3 map {
-        case LeftSide3 => projLeft[JoinSide](LeftSideF)
-        case Center => projCenter[JoinSide](LeftSideF)
-        case RightSide3 => RightSideF
-      })
+          def projLeft[A](hole: FreeMapA[A]): FreeMapA[A] =
+            func.ProjectKey(StrLit(lName), hole)
 
-      val newDims: Dimensions[prov.P] = prov.join(dims(left), dims(center))
+          def projCenter[A](hole: FreeMapA[A]): FreeMapA[A] =
+            func.ProjectKey(StrLit(cName), hole)
 
-      def rewriteCondition: Symbol => FreeMap = _ match {
-        case `left` => projLeft[Hole](HoleF)
-        case `center` => projCenter[Hole](HoleF)
-        case _ => HoleF
-      }
+          val combiner: JoinFunc = Free.roll(combiner3 map {
+            case LeftSide3 => projLeft[JoinSide](LeftSideF)
+            case Center => projCenter[JoinSide](LeftSideF)
+            case RightSide3 => RightSideF
+          })
 
-      val condition: JoinFunc =
-        prov.autojoinCondition(newDims, dims(right))(rewriteCondition)
+          val newDims: Dimensions[prov.P] = prov.join(dims(left), dims(center))
 
-      NameGenerator[F].prefixedName("reify").map { name =>
-        val sym = Symbol(name)
-        val qsu = QSU.ThetaJoin(sym, right, condition, JoinType.Inner, combiner)
-        val newVertex = NewVertex(sym, _join, newDims)
-        (List(newVertex), qsu)
+          def rewriteCondition: Symbol => FreeMap = _ match {
+            case `left` => projLeft[Hole](HoleF)
+            case `center` => projCenter[Hole](HoleF)
+            case _ => HoleF
+          }
+
+          val condition: JoinFunc =
+            prov.autojoinCondition(newDims, dims(right))(rewriteCondition)
+
+          val sym = Symbol(joinName)
+          val qsu = QSU.ThetaJoin(sym, right, condition, JoinType.Inner, combiner)
+          val newVertex = NewVertex(sym, _join, newDims)
+
+          (List(newVertex), qsu)
       }
 
     case QSU.Transpose(source, _) =>
