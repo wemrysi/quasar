@@ -16,6 +16,7 @@
 
 package quasar.physical.rdbms
 
+import slamdata.Predef._
 import quasar.effect.uuid.GenUUID
 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.fp.{:/:, :\:}
@@ -50,5 +51,13 @@ package object model {
   )#M[A]
 
   type M[A] = Free[Eff, A]
+
+  implicit class StringTypeMapperOps(s: String) {
+    def mapToColumnType(implicit tm: TypeMapper): ColumnType = tm.comap(s)
+  }
+
+  implicit class ColumnTypeMapperOps(cte: ColumnType) {
+    def mapToStringName(implicit tm: TypeMapper): String = tm.map(cte)
+  }
 }
 

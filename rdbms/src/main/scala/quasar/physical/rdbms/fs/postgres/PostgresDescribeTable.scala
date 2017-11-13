@@ -88,12 +88,7 @@ trait PostgresDescribeTable extends RdbmsDescribeTable {
   def tableModel(tablePath: TablePath): ConnectionIO[Option[TableModel]] = {
     val cols = descQuery(whereSchemaAndTable(tablePath), _.map {
       case (colName, colTypeStr) =>
-        ColumnDesc(colName, colTypeStr.toLowerCase match {
-          case "text" | "varchar" => StringCol
-          case "int" | "bigint" => IntCol
-          case "jsonb" | "json" => JsonCol
-            // TODO more types
-        })
+        ColumnDesc(colName, colTypeStr.mapToColumnType)
     })
 
     cols.map {

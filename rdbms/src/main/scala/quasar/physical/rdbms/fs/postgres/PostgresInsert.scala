@@ -17,16 +17,11 @@
 package quasar.physical.rdbms.fs.postgres
 
 import slamdata.Predef._
-import quasar.{Data, DataCodec}
+import quasar.Data
 import quasar.fs.FileSystemError
 import quasar.physical.rdbms.common.TablePath
 import quasar.physical.rdbms.fs.RdbmsInsert
-import quasar.physical.rdbms.model.{
-  ColumnDesc,
-  ColumnarTable,
-  JsonTable,
-  TableModel
-}
+import quasar.physical.rdbms.model._
 import doobie.imports._
 
 import scalaz._
@@ -36,22 +31,15 @@ trait PostgresInsert extends RdbmsInsert {
 
   implicit def dataMeta: Meta[Data]
 
-  implicit val codec: DataCodec = DataCodec.Precise
-
   def toColValues(cols: Set[ColumnDesc])(
-      row: Data): \/[FileSystemError, Map[String, String]] = {
+      row: Data)(implicit formatter: DataFormatter): \/[FileSystemError, Map[String, String]] = {
     row match {
       case Data.Obj(fields) =>
         fields.toVector
           .filter(f => cols.exists(_.name === f._1))
           .map {
             case (n, v) =>
-              (n, v match {
-                case Data.Obj(_) | Data.Arr(_)  => "'" + DataCodec.render(v).getOrElse("{}") + "'"
-                case Data.Int(num) => s"$num"
-                case Data.Str(txt) => s"'$txt'"
-                case _ => s"""'{"$n": "unsupported""}'""" // TODO
-              })
+              (n, formatter(n, v))
           }
           .toMap
           .right

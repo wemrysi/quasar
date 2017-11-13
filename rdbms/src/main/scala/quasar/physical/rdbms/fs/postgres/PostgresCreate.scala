@@ -38,15 +38,6 @@ trait PostgresCreate extends RdbmsCreate {
     }.void
   }
 
-  def pgType(tpe: ColumnType): String = { // TODO move this outside and extend
-    tpe match {
-      case JsonCol => "jsonb"
-      case StringCol => "text"
-      case IntCol => "bigint"
-      case NullCol => "int"
-    }
-  }
-
   override def createTable(tablePath: TablePath, model: TableModel): ConnectionIO[Unit] =
     (createSchema(tablePath.schema) *> (fr"CREATE TABLE IF NOT EXISTS" ++ Fragment
       .const(tablePath.shows) ++ fr"(" ++ modelToColumns(model) ++ fr")").update.run).void
@@ -55,7 +46,7 @@ trait PostgresCreate extends RdbmsCreate {
     model match {
       case JsonTable => Fragment.const("data jsonb NOT NULL")
       case ColumnarTable(cols) =>
-        cols.toList.foldMap(c => Fragment.const(s"${c.name} ${pgType(c.tpe)}"))
+        cols.toList.foldMap(c => Fragment.const(s"${c.name} ${c.tpe.mapToStringName}"))
     }
   }
 
@@ -65,8 +56,8 @@ trait PostgresCreate extends RdbmsCreate {
     else {
       (fr"ALTER TABLE" ++ Fragment.const(tablePath.shows) ++
         cols.map {
-          case AddColumn(name, tpe) => Fragment.const(s"ADD COLUMN $name ${pgType(tpe)}")
-          case ModifyColumn(name, tpe) => Fragment.const(s"MODIFY COLUMN $name ${pgType(tpe)}")
+          case AddColumn(name, tpe) => Fragment.const(s"ADD COLUMN $name ${tpe.mapToStringName}")
+          case ModifyColumn(name, tpe) => Fragment.const(s"MODIFY COLUMN $name ${tpe.mapToStringName}")
         }.toList.intercalate(fr",")).update.run.void
     }
   }
