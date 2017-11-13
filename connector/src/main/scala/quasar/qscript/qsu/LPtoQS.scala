@@ -30,6 +30,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
 
     val lpToQs =
       K(ReadLP[T].apply[F])          ∘
+      EliminateUnary[T].apply        ∘
       RecognizeDistinct[T].apply     >==>
       ExtractFreeMap[T, F]           >==>
       ApplyProvenance[T].apply[F]    >=>

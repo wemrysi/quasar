@@ -208,7 +208,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
 
     "convert unary mapping function" in {
       lpf.invoke1(MathLib.Negate, read("foo")) must readQsuAs {
-        case Map(TRead("foo"), FMFC1(MapFuncsCore.Negate(SrcHole))) => ok
+        case Unary(TRead("foo"), IC(MapFuncsCore.Negate(SrcHole))) => ok
       }
     }
 
@@ -233,7 +233,9 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
 
     "convert TemporalTrunc" in {
       lpf.temporalTrunc(TemporalPart.Decade, read("foo")) must readQsuAs {
-        case Map(TRead("foo"), FMFC1(MapFuncsCore.TemporalTrunc(TemporalPart.Decade, SrcHole))) => ok
+        case Unary(
+          TRead("foo"),
+          IC(MapFuncsCore.TemporalTrunc(TemporalPart.Decade, SrcHole))) => ok
       }
     }
 
@@ -303,7 +305,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
       val result = evaluate(qgraphM).toOption
 
       result must beSome
-      result.get.vertices must haveSize(5)
+      result.get.vertices must haveSize(6)
     }
   }
 
@@ -340,7 +342,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
 
   object DataConstant {
     def unapply(qgraph: QSUGraph): Option[Data] = qgraph match {
-      case Map(Unreferenced(), FMFC1(MapFuncsCore.Constant(ejson))) =>
+      case Unary(Unreferenced(), IC(MapFuncsCore.Constant(ejson))) =>
         Some(ejson.cata(Data.fromEJson))
       case _ => None
     }

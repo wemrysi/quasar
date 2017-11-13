@@ -218,6 +218,13 @@ object QSUGraph extends QSUGraphInstances {
       }
     }
 
+    object Unary {
+      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
+        case g: QSU.Unary[T, QSUGraph[T]] => QSU.Unary.unapply(g)
+        case _ => None
+      }
+    }
+
     object Map {
       def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
         case g: QSU.Map[T, QSUGraph[T]] => QSU.Map.unapply(g)
