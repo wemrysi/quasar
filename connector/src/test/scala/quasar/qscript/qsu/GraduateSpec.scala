@@ -119,6 +119,19 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
         qgraph must graduateAs(qscript)
       }
 
+      "convert Distinct" in {
+        val qgraph: Fix[QSU] = qsu.distinct(qsu.read(afile))
+
+        val qscript: Fix[QSE] =
+          qse.Reduce(
+            qse.Read[AFile](afile),
+            List(HoleF),
+            List(ReduceFuncs.Arbitrary(HoleF)),
+            ReduceIndexF(\/-(0)))
+
+        qgraph must graduateAs(qscript)
+      }
+
       "convert Unreferenced" in {
         val qgraph: Fix[QSU] = qsu.unreferenced()
         val qscript: Fix[QSE] = qse.Unreferenced
