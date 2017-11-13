@@ -19,13 +19,13 @@ package quasar.api.services.query
 import slamdata.Predef._
 import quasar.api._
 import quasar.api.PathUtils._
-import quasar.api.services.Fixture._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.catchable._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._, mount._
+import quasar.main.Fixture.mountingInter
 import quasar.sql._
 import quasar.sql.fixpoint._
 
