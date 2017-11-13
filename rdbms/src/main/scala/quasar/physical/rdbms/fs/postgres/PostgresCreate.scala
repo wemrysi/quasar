@@ -23,13 +23,15 @@ import quasar.physical.rdbms.common.{CustomSchema, DefaultSchema, TablePath}
 import doobie.syntax.string._
 import doobie.free.connection.ConnectionIO
 import doobie.util.fragment.Fragment
-import scalaz.syntax.monad._
-import scalaz.syntax.show._
+import scalaz._
+import Scalaz._
 
 trait PostgresCreate extends RdbmsCreate {
 
   override def createSchema(schema: CustomSchema): ConnectionIO[Unit] = {
-    (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(schema.shows)).update.run.void
+    (schema :: schema.parents).traverse { s =>
+      (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(s.shows)).update.run
+    }.void
   }
 
   override def createTable(tablePath: TablePath): ConnectionIO[Unit] = {
