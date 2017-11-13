@@ -22,6 +22,8 @@ import scalaz.Show
 
 package object postgres {
 
+  implicit lazy val postgresDbParams: DbParams = DbParams(DefaultSchemaName)
+
   val DefaultSchemaName = "public"
 
   implicit val showSchema: Show[Schema] = Show.shows {

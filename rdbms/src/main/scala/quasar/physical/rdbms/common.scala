@@ -27,6 +27,7 @@ import scalaz._
 import Scalaz._
 
 object common {
+  final case class DbParams(defaultSchemaName: String)
 
   final case class Config(connInfo: JdbcConnectionInfo)
 
@@ -34,18 +35,45 @@ object common {
 
   final case object DefaultSchema extends Schema
 
-  final case class CustomSchema(name: String) extends Schema
+  final case class CustomSchema(name: String) extends Schema {
 
+    private def lastDirNameStr: String = {
+      val lastSeparatorIndex = name.lastIndexOf(TablePath.Separator)
+      val startIndex = if (lastSeparatorIndex > 0) lastSeparatorIndex + TablePath.Separator.length else 0
+      name.substring(startIndex)
+    }
+
+    def lastDirName: DirName = {
+      DirName(lastDirNameStr)
+    }
+
+    def isDirectChildOf(supposedParent: Schema)(implicit dbParams: DbParams): Boolean = {
+      supposedParent match {
+        case DefaultSchema =>
+          parents.lastOption.contains(supposedParent)
+        case CustomSchema(parentName) =>
+          this.name === parentName + TablePath.Separator + lastDirNameStr
+      }
+    }
+
+    def parents(implicit dbParams: DbParams): List[Schema] = {
+      name.split(TablePath.SeparatorRegex)
+        .toList
+        .dropRight(1)
+        .scanLeft(List.empty[String])(_:+_)
+        .drop(1)
+        .map(dirs => dirs.mkString(TablePath.Separator))
+        .map(Schema.apply)
+    }
+  }
 
   object Schema {
-    def lastDirName(schema: Schema): DirName = {
-      schema match {
-        case DefaultSchema => DirName("")
-        case CustomSchema(name) =>
-          val lastSeparatorIndex = name.lastIndexOf(TablePath.Separator)
-          val startIndex = if (lastSeparatorIndex > 0) lastSeparatorIndex + TablePath.Separator.length else 0
-          DirName(name.substring(startIndex))
-      }
+
+    def apply(name: String)(implicit dbParams: DbParams): Schema = {
+      if (name === dbParams.defaultSchemaName)
+        DefaultSchema
+      else
+        CustomSchema(name)
     }
 
     val default = Prism.partial[Schema, DefaultSchema.type] {
