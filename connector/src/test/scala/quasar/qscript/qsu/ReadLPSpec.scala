@@ -24,9 +24,6 @@ import quasar.frontend.logicalplan.{JoinCondition, LogicalPlan}
 import quasar.qscript.{
   Center,
   Drop,
-  Hole,
-  JoinSide,
-  JoinSide3,
   LeftSide,
   LeftSide3,
   MapFuncsCore,
@@ -42,11 +39,9 @@ import quasar.std.{AggLib, IdentityLib, MathLib, RelationsLib, SetLib, Structura
 import slamdata.Predef._
 
 import matryoshka.data.Fix
-import matryoshka.implicits._
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}
 import scalaz.{\/, EitherT, Inject, Need, NonEmptyList => NEL, StateT}
 import scalaz.syntax.bifunctor._
-import scalaz.syntax.functor._
 import scalaz.syntax.show._
 import pathy.Path, Path.{file, Sandboxed}
 
@@ -306,54 +301,6 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
 
       result must beSome
       result.get.vertices must haveSize(6)
-    }
-  }
-
-  object TRead {
-    def unapply(qgraph: QSUGraph): Option[String] = qgraph match {
-      case AutoJoin2C(
-        Transpose(Read(path), QSU.Rotation.ShiftMap),
-        DataConstant(Data.Int(i)),
-        MapFuncsCore.ProjectIndex(LeftSide, RightSide)) if i == 1 =>
-
-        for {
-          (front, end) <- Path.peel(path)
-          file <- end.toOption
-          if Path.peel(front).isEmpty
-        } yield file.value
-
-      case _ => None
-    }
-  }
-
-  object AutoJoin2C {
-    def unapply(qgraph: QSUGraph): Option[(QSUGraph, QSUGraph, MapFuncCore[JoinSide])] = qgraph match {
-      case AutoJoin2(left, right, IC(mfc)) => Some((left, right, mfc))
-      case _ => None
-    }
-  }
-
-  object AutoJoin3C {
-    def unapply(qgraph: QSUGraph): Option[(QSUGraph, QSUGraph, QSUGraph, MapFuncCore[JoinSide3])] = qgraph match {
-      case AutoJoin3(left, center, right, IC(mfc)) => Some((left, center, right, mfc))
-      case _ => None
-    }
-  }
-
-  object DataConstant {
-    def unapply(qgraph: QSUGraph): Option[Data] = qgraph match {
-      case Unary(Unreferenced(), IC(MapFuncsCore.Constant(ejson))) =>
-        Some(ejson.cata(Data.fromEJson))
-      case _ => None
-    }
-  }
-
-  // TODO doesn't guarantee only one function; could be more!
-  object FMFC1 {
-    def unapply(fm: FreeMap): Option[MapFuncCore[Hole]] = {
-      fm.resume.swap.toOption collect {
-        case IC(mfc) => mfc.map(_ => SrcHole: Hole)
-      }
     }
   }
 

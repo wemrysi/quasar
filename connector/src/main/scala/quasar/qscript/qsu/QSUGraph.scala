@@ -167,7 +167,23 @@ object QSUGraph extends QSUGraphInstances {
    * This object contains extraction helpers in terms of QSU nodes.
    */
   object Extractors {
+    import quasar.Data
     import quasar.qscript.qsu.{QScriptUniform => QSU}
+    import quasar.qscript.{
+      FreeMap,
+      Hole,
+      JoinSide,
+      JoinSide3,
+      LeftSide,
+      MapFunc,
+      MapFuncsCore,
+      MapFuncCore,
+      RightSide,
+      SrcHole
+    }
+
+    import pathy.Path
+    import scalaz.:<:
 
     object AutoJoin2 {
       def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
@@ -319,6 +335,77 @@ object QSUGraph extends QSUGraphInstances {
     object JoinSideRef {
       def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
         case g: QSU.JoinSideRef[T, QSUGraph[T]] => QSU.JoinSideRef.unapply(g)
+        case _ => None
+      }
+    }
+
+    object AutoJoin2C {
+      def unapply[T[_[_]]](qgraph: QSUGraph[T])(
+          implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?])
+          : Option[(QSUGraph[T], QSUGraph[T], MapFuncCore[T, JoinSide])] = qgraph match {
+
+        case AutoJoin2(left, right, IC(mfc)) => Some((left, right, mfc))
+        case _ => None
+      }
+    }
+
+    object AutoJoin3C {
+      def unapply[T[_[_]]](qgraph: QSUGraph[T])(
+          implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?])
+          : Option[(QSUGraph[T], QSUGraph[T], QSUGraph[T], MapFuncCore[T, JoinSide3])] = qgraph match {
+
+        case AutoJoin3(left, center, right, IC(mfc)) => Some((left, center, right, mfc))
+        case _ => None
+      }
+    }
+
+    object DataConstant {
+      def unapply[T[_[_]]: BirecursiveT](qgraph: QSUGraph[T])(
+          implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?]): Option[Data] = qgraph match {
+
+        case Unary(Unreferenced(), IC(MapFuncsCore.Constant(ejson))) =>
+          Some(ejson.cata(Data.fromEJson))
+        case _ => None
+      }
+    }
+
+    object DataConstantMapped {
+      def unapply[T[_[_]]: BirecursiveT](qgraph: QSUGraph[T])(
+          implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?]): Option[Data] = qgraph match {
+
+        case Map(Unreferenced(), FMFC1(MapFuncsCore.Constant(ejson))) =>
+          Some(ejson.cata(Data.fromEJson))
+        case _ => None
+      }
+    }
+
+    // TODO doesn't guarantee only one function; could be more!
+    object FMFC1 {
+      def unapply[T[_[_]]](fm: FreeMap[T])(
+          implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?]): Option[MapFuncCore[T, Hole]] = {
+
+        fm.resume.swap.toOption collect {
+          case IC(mfc) => mfc.map(_ => SrcHole: Hole)
+        }
+      }
+    }
+
+    object TRead {
+      @SuppressWarnings(Array("org.wartremover.warts.Equals"))
+      def unapply[T[_[_]]: BirecursiveT](qgraph: QSUGraph[T])(
+          implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?]): Option[String] = qgraph match {
+
+        case AutoJoin2C(
+          Transpose(Read(path), QSU.Rotation.ShiftMap),
+          DataConstant(Data.Int(i)),
+          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) if i == 1 =>
+
+          for {
+            (front, end) <- Path.peel(path)
+            file <- end.toOption
+            if Path.peel(front).isEmpty
+          } yield file.value
+
         case _ => None
       }
     }

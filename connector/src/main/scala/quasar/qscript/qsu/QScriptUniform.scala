@@ -514,7 +514,10 @@ object QScriptUniform {
       iso composePrism O.transpose
 
     def tread(file: AFile): QSU =
-      transpose(read(file), Rotation.ShiftMap)
+      autojoin2(
+        transpose(read(file), Rotation.ShiftMap),
+        cint(1),
+        _(MapFuncsCore.ProjectIndex(_, _)))
 
     def tread1(name: String): QSU =
       tread(Path.rootDir </> Path.file(name))
