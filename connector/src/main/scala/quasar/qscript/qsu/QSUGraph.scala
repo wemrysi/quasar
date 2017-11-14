@@ -420,9 +420,12 @@ object QSUGraph extends QSUGraphInstances {
           implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?]): Option[String] = qgraph match {
 
         case AutoJoin2C(
-          Transpose(Read(path), QSU.Rotation.ShiftMap),
-          DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) if i == 1 =>
+          AutoJoin2C(
+            Transpose(Read(path), QSU.Rotation.ShiftMap),
+            DataConstant(Data.Int(i1)),
+            MapFuncsCore.ProjectIndex(LeftSide, RightSide)),
+          DataConstant(Data.Int(i2)),
+          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) if i1 == 1 && i2 == 1 =>
 
           for {
             (front, end) <- Path.peel(path)
