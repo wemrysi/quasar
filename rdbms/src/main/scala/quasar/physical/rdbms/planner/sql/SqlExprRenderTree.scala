@@ -39,6 +39,8 @@ trait SqlExprRenderTree {
           NonTerminal(tpe :: Nil, label, List(r.render(child)))
 
         RenderTree.make {
+          case Constant(d) =>
+            Terminal("Constant" :: Nil, d.shows.some)
           case Id(v) =>
             Terminal("Id" :: Nil, v.some)
           case Table(v) =>

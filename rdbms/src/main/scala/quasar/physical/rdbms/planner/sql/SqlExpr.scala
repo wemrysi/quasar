@@ -17,6 +17,7 @@
 package quasar.physical.rdbms.planner.sql
 
 import slamdata.Predef._
+import quasar.Data
 
 sealed abstract class SqlExpr[T]
 
@@ -35,6 +36,8 @@ object SqlExpr extends SqlExprInstances {
   final case class From[T](v: T, alias: Option[Id[T]])
   final case class Selection[T](v: T, alias: Option[Id[T]])
   final case class Table[T](name: String) extends SqlExpr[T]
+
+  final case class Constant[T](data: Data) extends SqlExpr[T]
 
   object Select {
     final case class Filter[T](v: T)

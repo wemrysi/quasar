@@ -17,7 +17,8 @@
 package quasar.physical.rdbms.fs.postgres.planner
 
 import slamdata.Predef._
-import quasar.Planner.PlannerError
+import quasar.Data
+import quasar.Planner.{NonRepresentableData, PlannerError}
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.physical.rdbms.planner.RenderQuery
 import quasar.physical.rdbms.planner.sql.SqlExpr
@@ -62,5 +63,9 @@ object PostgresRenderQuery extends RenderQuery {
     case SelectRow(selection, from) =>
       val fromExpr = s" from ${from.v}"
       s"(select ${selection.v}$fromExpr ${rowAlias(selection.alias)})".right
+    case Constant(Data.Str(v)) =>
+      v.flatMap { case ''' => "''"; case iv => iv.toString }.self.right
+    case Constant(v) =>
+      DataCodec.render(v) \/> NonRepresentableData(v)
   }
 }
