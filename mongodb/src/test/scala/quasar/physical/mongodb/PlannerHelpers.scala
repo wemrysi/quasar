@@ -134,6 +134,7 @@ object PlannerHelpers {
           FileName("cars2").right,
           FileName("zips").right,
           FileName("zips2").right,
+          FileName("extraSmallZips").right,
           FileName("smallZips").right,
           FileName("largeZips").right,
           FileName("a").right,
