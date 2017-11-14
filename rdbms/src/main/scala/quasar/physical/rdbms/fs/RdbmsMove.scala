@@ -17,7 +17,7 @@
 package quasar.physical.rdbms.fs
 
 import doobie.imports.ConnectionIO
-import quasar.physical.rdbms.common.{CustomSchema, Schema, TableName, TablePath}
+import quasar.physical.rdbms.common.{Schema, TableName, TablePath}
 import slamdata.Predef.Unit
 
 trait RdbmsMove {
@@ -25,5 +25,5 @@ trait RdbmsMove {
   def dropTableIfExists(table: TablePath): ConnectionIO[Unit]
   def moveTableToSchema(table: TablePath, dst: Schema): ConnectionIO[TablePath]
   def renameTable(table: TablePath, newName: TableName): ConnectionIO[TablePath]
-  def renameSchema(schema: CustomSchema, newName: CustomSchema): ConnectionIO[Unit]
+  def renameSchema(schema: Schema, newName: Schema): ConnectionIO[Unit]
 }
