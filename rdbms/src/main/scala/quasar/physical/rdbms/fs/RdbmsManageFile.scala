@@ -50,29 +50,23 @@ trait RdbmsManageFile
     (fr"DROP TABLE" ++ Fragment.const(table.shows)).update.run.void
   }
 
-  def dropSchema(schema: CustomSchema): ConnectionIO[Unit] = {
+  def dropSchema(schema: Schema): ConnectionIO[Unit] = {
     (fr"DROP SCHEMA" ++ Fragment.const(schema.shows) ++ fr"CASCADE").update.run.void
-  }
-
-  def dirToCustomSchema(dir: ADir): \/[FileSystemError, CustomSchema] = {
-    Schema.custom
-      .getOption(dirToSchema(dir))
-      .toRightDisjunction(pathErr(invalidPath(dir, "Directory points to default schema.")))
   }
 
   override def ManageFileModule = new ManageFileModule {
 
-    def dropSchemaWithChildren(parent: CustomSchema): ConnectionIO[Unit] = {
+    def dropSchemaWithChildren(parent: Schema): ConnectionIO[Unit] = {
       findChildSchemas(parent)
         .flatMap(cs => (cs :+ parent).foldMap(dropSchema))
     }
 
-    def tempSchema: M[CustomSchema] = {
+    def tempSchema: M[Schema] = {
       MonotonicSeq
         .Ops[Eff]
         .next
         .map { i =>
-          CustomSchema(s"__quasar_tmp_schema_$i")
+          Schema(s"__quasar_tmp_schema_$i")
         }
         .flatMap(s => lift(createSchema(s).map(_ => s)).into[Eff])
     }
@@ -87,29 +81,23 @@ trait RdbmsManageFile
             _ <- dropTableIfExists(dstPath)
             tmpTable <- moveTableToSchema(TablePath.create(src), tmp)
             renamed <- renameTable(tmpTable, dstPath.table)
-            _ <- Schema.custom.getOption(dstPath.schema).traverse(createSchema)
+            _ <- createSchema(dstPath.schema)
             _ <- moveTableToSchema(renamed, dstPath.schema)
           } yield ()).into[Eff]
         }
       }
 
       def moveDir(src: ADir, dst: ADir): FileSystemErrT[M, Unit] = {
-        val schemas = for {
-          srcSchema <- dirToCustomSchema(src)
-          dstSchema <- dirToCustomSchema(dst)
-        } yield (srcSchema, dstSchema)
+        val srcSchema = dirToSchema(src)
+        val dstSchema = dirToSchema(dst)
 
-        val dbCalls = schemas.traverse {
-          case (srcSchema, dstSchema) =>
+        val dbCalls = for {
+          dstSchemaExists <- schemaExists(dstSchema)
+          _ <- dstSchemaExists.whenM(dropSchema(dstSchema))
+          _ <- renameSchema(srcSchema, dstSchema)
+        } yield ()
 
-            for {
-              dstSchemaExists <- schemaExists(dstSchema)
-              _ <- dstSchemaExists.whenM(dropSchema(dstSchema))
-              _ <- renameSchema(srcSchema, dstSchema)
-            } yield ()
-        }
-
-        EitherT.eitherT(lift(dbCalls).into[Eff])
+        lift(dbCalls).into[Eff].liftM[FileSystemErrT]
       }
 
       def fExists: APath => M[Boolean] = { path =>
@@ -138,28 +126,27 @@ trait RdbmsManageFile
     }
 
     def copy(pair: ManageFile.PathPair): Backend[Unit] =
-      ME.raiseError(unsupportedOperation("Rdbms connector does not currently support copying"))
+      ME.raiseError(
+        unsupportedOperation(
+          "Rdbms connector does not currently support copying"))
 
     def deleteFile(aFile: AFile): Backend[Unit] = {
       val dbTablePath = TablePath.create(aFile)
       for {
         exists <- tableExists(dbTablePath).liftB
-        _ <- exists.unlessM(
-          ME.raiseError(pathErr(pathNotFound(aFile))))
+        _ <- exists.unlessM(ME.raiseError(pathErr(pathNotFound(aFile))))
         _ <- (fr"DROP TABLE" ++ Fragment
           .const(dbTablePath.shows)).update.run.liftB
       } yield ()
     }
 
     def deleteDir(aDir: ADir): Backend[Unit] = {
-      ME.unattempt(dirToCustomSchema(aDir).traverse { schema =>
-        for {
-          exists <- schemaExists(schema).liftB
-          _ <- exists.unlessM(
-            ME.raiseError(pathErr(pathNotFound(aDir))))
-          _ <- dropSchemaWithChildren(schema).liftB
-        } yield ()
-      })
+      val schema = dirToSchema(aDir)
+      for {
+        exists <- schemaExists(schema).liftB
+        _ <- exists.unlessM(ME.raiseError(pathErr(pathNotFound(aDir))))
+        _ <- dropSchemaWithChildren(schema).liftB
+      } yield ()
     }
 
     override def delete(path: APath): Backend[Unit] = {

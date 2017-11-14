@@ -18,38 +18,34 @@ package quasar.physical.rdbms
 
 import quasar.Qspec
 import quasar.physical.rdbms.common.TablePath.Separator
-import quasar.physical.rdbms.common.{CustomSchema, DbParams, DefaultSchema}
+import quasar.physical.rdbms.common.Schema
 import quasar.physical.rdbms.testutils.RdbmsPathyArbitrary._
+
 import pathy.Path.DirName
 import pathy.Path.DirName._
-
 import scalaz.syntax.show._
 
-class SchemaNameTest extends Qspec {
-
-  implicit val dbParams: DbParams = DbParams("public")
+class SchemaNameSpec extends Qspec {
 
   "Schema Name" should {
 
     "return correct last dir name" in {
       prop { (d1: DirName, d2: DirName, d3: DirName) =>
-        CustomSchema(d1.shows).lastDirName must_=== d1
-        CustomSchema(d1.shows + Separator + d2.shows).lastDirName must_=== d2
-        CustomSchema(d1.shows + Separator + d2.shows + Separator + d3.shows).lastDirName must_=== d3
+        Schema(d1.shows).lastDirName must_=== d1
+        Schema(d1.shows + Separator + d2.shows).lastDirName must_=== d2
+        Schema(d1.shows + Separator + d2.shows + Separator + d3.shows).lastDirName must_=== d3
       }
     }
 
     "check whether schema is a child to another" in {
       prop { (d1: DirName, d2: DirName, d3: DirName) =>
 
-        CustomSchema("public" + Separator + d1.shows)
-          .isDirectChildOf(DefaultSchema) must beTrue
-        CustomSchema(d1.shows + Separator + d2.shows)
-          .isDirectChildOf(CustomSchema(d1.shows)) must beTrue
-        CustomSchema(d1.shows + Separator + d2.shows + Separator + d3.shows)
-          .isDirectChildOf(CustomSchema(d1.shows)) must beFalse
-        CustomSchema(d1.shows + Separator + d2.shows + Separator + d3.shows)
-          .isDirectChildOf(CustomSchema(d1.shows + Separator + d2.shows)) must beTrue
+        Schema(d1.shows + Separator + d2.shows)
+          .isDirectChildOf(Schema(d1.shows)) must beTrue
+        Schema(d1.shows + Separator + d2.shows + Separator + d3.shows)
+          .isDirectChildOf(Schema(d1.shows)) must beFalse
+        Schema(d1.shows + Separator + d2.shows + Separator + d3.shows)
+          .isDirectChildOf(Schema(d1.shows + Separator + d2.shows)) must beTrue
       }
     }
   }

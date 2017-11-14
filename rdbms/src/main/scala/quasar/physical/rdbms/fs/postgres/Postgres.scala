@@ -25,11 +25,10 @@ import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.fs._
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
+
 import java.net.URI
 
 import doobie.util.meta.Meta
-import quasar.physical.rdbms.common.DbParams
-
 import scalaz.{-\/, NonEmptyList, \/, \/-}
 import scalaz.syntax.either._
 
@@ -43,7 +42,6 @@ object Postgres
 
   override val Type = FileSystemType("postgres")
 
-  implicit lazy val dbParams: DbParams = postgresDbParams
   val driverClass = "org.postgresql.Driver"
   val formatHint =
     "jdbc:postgresql://host:port/db_name?user=username(&password=pw)"

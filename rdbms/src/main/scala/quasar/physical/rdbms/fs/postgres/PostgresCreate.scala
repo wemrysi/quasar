@@ -18,7 +18,7 @@ package quasar.physical.rdbms.fs.postgres
 
 import slamdata.Predef._
 import quasar.physical.rdbms.fs.RdbmsCreate
-import quasar.physical.rdbms.common.{CustomSchema, DefaultSchema, TablePath}
+import quasar.physical.rdbms.common.{Schema, TablePath}
 
 import doobie.syntax.string._
 import doobie.free.connection.ConnectionIO
@@ -28,19 +28,16 @@ import Scalaz._
 
 trait PostgresCreate extends RdbmsCreate {
 
-  override def createSchema(schema: CustomSchema): ConnectionIO[Unit] = {
+  override def createSchema(schema: Schema): ConnectionIO[Unit] = {
     (schema :: schema.parents).traverse { s =>
-      (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(s.shows)).update.run
+      if (s.isRoot)
+        ().point[ConnectionIO]
+      else
+        (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(s.shows)).update.run.void
     }.void
   }
 
-  override def createTable(tablePath: TablePath): ConnectionIO[Unit] = {
-    val createSchemaQuery: ConnectionIO[Unit] = tablePath.schema match {
-      case DefaultSchema => ().point[ConnectionIO]
-      case c: CustomSchema => createSchema(c)
-    }
-
-    (createSchemaQuery *> (fr"CREATE TABLE IF NOT EXISTS" ++ Fragment.const(tablePath.shows) ++ fr"(data json NOT NULL)").update.run)
-      .void
-  }
+  override def createTable(tablePath: TablePath): ConnectionIO[Unit] =
+    (createSchema(tablePath.schema) *> (fr"CREATE TABLE IF NOT EXISTS" ++ Fragment
+      .const(tablePath.shows) ++ fr"(data json NOT NULL)").update.run).void
 }
