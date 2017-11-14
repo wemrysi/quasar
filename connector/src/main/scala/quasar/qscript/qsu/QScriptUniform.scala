@@ -61,6 +61,9 @@ object QScriptUniform {
       case ThetaJoin(left, right, condition, joinType, combiner) =>
         (f(left) |@| f(right))(ThetaJoin(_, _, condition, joinType, combiner))
 
+      case Unary(source, mf) =>
+        f(source).map(Unary(_, mf))
+
       case Map(source, fm) =>
         f(source).map(Map(_, fm))
 
@@ -164,6 +167,10 @@ object QScriptUniform {
       condition: JoinFunc[T],
       joinType: JoinType,
       combiner: JoinFunc[T]) extends QScriptUniform[T, A]
+
+  final case class Unary[T[_[_]], A](
+      source: A,
+      mf: MapFunc[T, Hole]) extends QScriptUniform[T, A]
 
   final case class Map[T[_[_]], A](
       source: A,
@@ -293,6 +300,11 @@ object QScriptUniform {
       Prism.partial[QScriptUniform[A], (A, NEL[(A, SortDir)])] {
         case LPSort(a, keys) => (a, keys)
       } { case (a, keys) => LPSort(a, keys) }
+
+    def unary[A]: Prism[QScriptUniform[A], (A, MapFunc[Hole])] =
+      Prism.partial[QScriptUniform[A], (A, MapFunc[Hole])] {
+        case Unary(a, mf) => (a, mf)
+      } { case (a, mf) => Unary(a, mf) }
 
     def map[A]: Prism[QScriptUniform[A], (A, FreeMap)] =
       Prism.partial[QScriptUniform[A], (A, FreeMap)] {
@@ -471,6 +483,9 @@ object QScriptUniform {
     val lpSort: Prism[QSU, (QSU, NEL[(QSU, SortDir)])] =
       iso composePrism O.lpSort
 
+    val unary: Prism[QSU, (QSU, MapFunc[Hole])] =
+      iso composePrism O.unary
+
     val map: Prism[QSU, (QSU, FreeMap)] =
       iso composePrism O.map
 
@@ -499,7 +514,10 @@ object QScriptUniform {
       iso composePrism O.transpose
 
     def tread(file: AFile): QSU =
-      transpose(read(file), Rotation.ShiftMap)
+      autojoin2(
+        transpose(read(file), Rotation.ShiftMap),
+        cint(1),
+        _(MapFuncsCore.ProjectIndex(_, _)))
 
     def tread1(name: String): QSU =
       tread(Path.rootDir </> Path.file(name))

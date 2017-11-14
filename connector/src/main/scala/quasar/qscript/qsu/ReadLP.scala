@@ -43,7 +43,6 @@ import quasar.qscript.{
   LeftSide3,
   MapFunc,
   MapFuncsCore,
-  MFC,
   ReduceFunc,
   RightSide,
   RightSide3,
@@ -58,7 +57,7 @@ import matryoshka.{AlgebraM, BirecursiveT}
 import matryoshka.implicits._
 import matryoshka.patterns.{interpretM, CoEnv}
 import pathy.Path.{rootDir, Sandboxed}
-import scalaz.{\/, Free, Inject, Monad, StateT}
+import scalaz.{\/, Inject, Monad, StateT}
 import scalaz.std.tuple._
 import scalaz.syntax.bifunctor._
 import scalaz.syntax.either._
@@ -91,13 +90,16 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
     case lp.Read(path) =>
       val afile = mkAbsolute(rootDir[Sandboxed], path)
 
-      for {
+      val shiftedRead = for {
         read <- withName[G](QSU.Read[T, Symbol](afile))
-        back <- extend1[G](read)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftMap))
-      } yield back
+        shifted <- extend1[G](read)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftMap))
+      } yield shifted
+
+      // first projects out of outer shift structure, second projects out of inner
+      shiftedRead >>= projectConstIdx[G](ValueIndex) >>= projectConstIdx[G](ValueIndex)
 
     case lp.Constant(data) =>
-      val back = fromData(data).fold[PlannerError \/ MapFunc[FreeMap]](
+      val back = fromData(data).fold[PlannerError \/ MapFunc[Hole]](
         {
           case Data.NA =>
             IC(MapFuncsCore.Undefined()).right
@@ -184,17 +186,16 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
     case lp.InvokeUnapply(func: BinaryFunc, Sized(a, b)) if func.effect === Reduction => ???
 
     case lp.InvokeUnapply(func: NullaryFunc, Sized()) if func.effect === Mapping =>
-      val translated =
-        MapFunc.translateNullaryMapping[T, MapFunc, Free[MapFunc, Hole]].apply(func)
+      val translated: MapFunc[Hole] =
+        MapFunc.translateNullaryMapping[T, MapFunc, Hole].apply(func)
 
       nullary[G](translated)
 
     case lp.InvokeUnapply(func: UnaryFunc, Sized(a)) if func.effect === Mapping =>
       val translated =
-        MapFunc.translateUnaryMapping[T, MapFunc, Free[MapFunc, Hole]].apply(func)(
-          Free.pure[MapFunc, Hole](SrcHole))
+        MapFunc.translateUnaryMapping[T, MapFunc, Hole].apply(func)(SrcHole)
 
-      extend1[G](a)(QSU.Map[T, Symbol](_, Free.roll[MapFunc, Hole](translated)))
+      extend1[G](a)(QSU.Unary[T, Symbol](_, translated))
 
     case lp.InvokeUnapply(func: BinaryFunc, Sized(a, b)) if func.effect === Mapping =>
       autoJoin2[G](a, b)(MapFunc.translateBinaryMapping[T, MapFunc, JoinSide].apply(func))
@@ -206,10 +207,9 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
 
     case lp.TemporalTrunc(part, src) =>
       extend1[G](src)(
-        QSU.Map[T, Symbol](
+        QSU.Unary[T, Symbol](
           _,
-          Free.roll[MapFunc, Hole](
-            MFC(MapFuncsCore.TemporalTrunc(part, Free.pure[MapFunc, Hole](SrcHole))))))
+          IC(MapFuncsCore.TemporalTrunc(part, SrcHole))))
 
     case lp.Typecheck(expr, tpe, cont, fallback) =>
       autoJoin3[G](expr, cont, fallback)((e, c, f) => IC(MapFuncsCore.Guard[T, JoinSide3](e, tpe, c, f)))
@@ -246,11 +246,11 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
       withName[G](node).map(g => graphs.foldLeft(g)(_ :++ _))
   }
 
-  private def nullary[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](func: MapFunc[FreeMap])
+  private def nullary[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](func: MapFunc[Hole])
       : G[QSUGraph] =
     for {
       source <- withName[G](QSU.Unreferenced[T, Symbol]())
-      back <- extend1[G](source)(QSU.Map[T, Symbol](_, Free.roll(func)))
+      back <- extend1[G](source)(QSU.Unary[T, Symbol](_, func))
     } yield back
 
   private def projectConstIdx[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](

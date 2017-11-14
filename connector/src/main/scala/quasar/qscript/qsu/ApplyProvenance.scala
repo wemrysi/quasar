@@ -100,6 +100,8 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
 
       case QSSort(src, _, _) => src.point[F]
 
+      case Unary(_, _) => unexpectedError("Unary", gpf.root)
+
       case Map(src, _) => src.point[F]
 
       case Unreferenced() => dims.empty.point[F]

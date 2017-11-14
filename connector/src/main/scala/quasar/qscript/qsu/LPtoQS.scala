@@ -16,24 +16,27 @@
 
 package quasar.qscript.qsu
 
+import slamdata.Predef.AnyVal
 import quasar.NameGenerator
 import quasar.Planner.PlannerErrorME
 import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka.{BirecursiveT, EqualT}
-import scalaz.{Kleisli => K, Monad}
-import scalaz.Scalaz._
+import scalaz.{Functor, Kleisli => K, Monad}
 
 final class LPtoQS[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
+  import LPtoQS.MapSyntax
+
   def apply[F[_]: Monad: PlannerErrorME: NameGenerator](lp: T[LogicalPlan])
       : F[T[QScriptEducated]] = {
 
     val lpToQs =
-      K(ReadLP[T].apply[F])          ∘
+      K(ReadLP[T].apply[F])          >-
+      EliminateUnary[T].apply        >-
       RecognizeDistinct[T].apply     >==>
       ExtractFreeMap[T, F]           >==>
       ApplyProvenance[T].apply[F]    >=>
-      K(ReifyProvenance[T].apply[F]) ∘
+      K(ReifyProvenance[T].apply[F]) >-
       (_.graph)                      >==>
       Graduate[T].apply[F]
 
@@ -43,4 +46,9 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
 
 object LPtoQS {
   def apply[T[_[_]]: BirecursiveT: EqualT]: LPtoQS[T] = new LPtoQS[T]
+
+  final implicit class MapSyntax[F[_], A](val self: F[A]) extends AnyVal {
+    def >-[B](f: A => B)(implicit F: Functor[F]): F[B] =
+      F.map(self)(f)
+  }
 }

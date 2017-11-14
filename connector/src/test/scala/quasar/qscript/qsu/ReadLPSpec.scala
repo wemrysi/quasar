@@ -24,9 +24,6 @@ import quasar.frontend.logicalplan.{JoinCondition, LogicalPlan}
 import quasar.qscript.{
   Center,
   Drop,
-  Hole,
-  JoinSide,
-  JoinSide3,
   LeftSide,
   LeftSide3,
   MapFuncsCore,
@@ -42,11 +39,9 @@ import quasar.std.{AggLib, IdentityLib, MathLib, RelationsLib, SetLib, Structura
 import slamdata.Predef._
 
 import matryoshka.data.Fix
-import matryoshka.implicits._
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}
 import scalaz.{\/, EitherT, Inject, Need, NonEmptyList => NEL, StateT}
 import scalaz.syntax.bifunctor._
-import scalaz.syntax.functor._
 import scalaz.syntax.show._
 import pathy.Path, Path.{file, Sandboxed}
 
@@ -63,7 +58,16 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
   "reading lp into qsu" should {
     "convert Read nodes" in {
       read("foobar") must readQsuAs {
-        case Transpose(Read(path), QSU.Rotation.ShiftMap) =>
+        case AutoJoin2C(
+          AutoJoin2C(
+            Transpose(Read(path), QSU.Rotation.ShiftMap),
+            DataConstant(Data.Int(i1)),
+            MapFuncsCore.ProjectIndex(LeftSide, RightSide)),
+          DataConstant(Data.Int(i2)),
+          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) =>
+
+          i1 mustEqual 1
+          i2 mustEqual 1
           path mustEqual (root </> file("foobar"))
       }
     }
@@ -203,7 +207,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
 
     "convert unary mapping function" in {
       lpf.invoke1(MathLib.Negate, read("foo")) must readQsuAs {
-        case Map(TRead("foo"), FMFC1(MapFuncsCore.Negate(SrcHole))) => ok
+        case Unary(TRead("foo"), IC(MapFuncsCore.Negate(SrcHole))) => ok
       }
     }
 
@@ -228,7 +232,9 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
 
     "convert TemporalTrunc" in {
       lpf.temporalTrunc(TemporalPart.Decade, read("foo")) must readQsuAs {
-        case Map(TRead("foo"), FMFC1(MapFuncsCore.TemporalTrunc(TemporalPart.Decade, SrcHole))) => ok
+        case Unary(
+          TRead("foo"),
+          IC(MapFuncsCore.TemporalTrunc(TemporalPart.Decade, SrcHole))) => ok
       }
     }
 
@@ -298,51 +304,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
       val result = evaluate(qgraphM).toOption
 
       result must beSome
-      result.get.vertices must haveSize(3)
-    }
-  }
-
-  object TRead {
-    def unapply(qgraph: QSUGraph): Option[String] = qgraph match {
-      case Transpose(Read(path), QSU.Rotation.ShiftMap) =>
-        for {
-          (front, end) <- Path.peel(path)
-          file <- end.toOption
-          if Path.peel(front).isEmpty
-        } yield file.value
-
-      case _ => None
-    }
-  }
-
-  object AutoJoin2C {
-    def unapply(qgraph: QSUGraph): Option[(QSUGraph, QSUGraph, MapFuncCore[JoinSide])] = qgraph match {
-      case AutoJoin2(left, right, IC(mfc)) => Some((left, right, mfc))
-      case _ => None
-    }
-  }
-
-  object AutoJoin3C {
-    def unapply(qgraph: QSUGraph): Option[(QSUGraph, QSUGraph, QSUGraph, MapFuncCore[JoinSide3])] = qgraph match {
-      case AutoJoin3(left, center, right, IC(mfc)) => Some((left, center, right, mfc))
-      case _ => None
-    }
-  }
-
-  object DataConstant {
-    def unapply(qgraph: QSUGraph): Option[Data] = qgraph match {
-      case Map(Unreferenced(), FMFC1(MapFuncsCore.Constant(ejson))) =>
-        Some(ejson.cata(Data.fromEJson))
-      case _ => None
-    }
-  }
-
-  // TODO doesn't guarantee only one function; could be more!
-  object FMFC1 {
-    def unapply(fm: FreeMap): Option[MapFuncCore[Hole]] = {
-      fm.resume.swap.toOption collect {
-        case IC(mfc) => mfc.map(_ => SrcHole: Hole)
-      }
+      result.get.vertices must haveSize(7)
     }
   }
 

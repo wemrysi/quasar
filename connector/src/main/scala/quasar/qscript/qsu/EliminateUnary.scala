@@ -16,25 +16,21 @@
 
 package quasar.qscript.qsu
 
-import quasar.fp._
-import quasar.qscript.ReduceFuncs
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 
 import matryoshka.BirecursiveT
-import scalaz.syntax.equal._
+import scalaz.Free
+import scalaz.syntax.applicative._
 
-final class RecognizeDistinct[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
+final class EliminateUnary[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
   import QSUGraph.Extractors._
 
-  // pattern from compileDistinct in compiler.scala
-  // TODO this is dumb; we shouldn't be replicating patterns like this
   def apply(qgraph: QSUGraph): QSUGraph = qgraph rewrite {
-    case qgraph @ LPReduce(GroupBy(orig1, orig2), ReduceFuncs.Arbitrary(()))
-        if orig1.root === orig2.root =>
-      qgraph.overwriteAtRoot(QSU.Distinct(orig1.root))
+    case qgraph @ Unary(source, mf) =>
+      qgraph.overwriteAtRoot(QSU.Map(source.root, Free.roll(mf.map(_.point[FreeMapA]))))
   }
 }
 
-object RecognizeDistinct {
-  def apply[T[_[_]]: BirecursiveT]: RecognizeDistinct[T] = new RecognizeDistinct[T]
+object EliminateUnary {
+  def apply[T[_[_]]: BirecursiveT]: EliminateUnary[T] = new EliminateUnary[T]
 }
