@@ -95,7 +95,7 @@ package object qscript {
   object QCE {
     def apply[T[_[_]], A](qc: QScriptCore[T, A]): QScriptEducated[T, A] =
       Inject[QScriptCore[T, ?], QScriptEducated[T, ?]].inj(qc)
-  
+
     def unapply[T[_[_]], A](qt: QScriptEducated[T, A]): Option[QScriptCore[T, A]] =
       Inject[QScriptCore[T, ?], QScriptEducated[T, ?]].prj(qt)
   }

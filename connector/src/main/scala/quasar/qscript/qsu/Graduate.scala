@@ -21,7 +21,9 @@ import slamdata.Predef._
 import quasar.NameGenerator
 import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.contrib.pathy.AFile
+import quasar.contrib.scalaz.MonadReader_
 import quasar.fp._
+import quasar.fp.ski.κ
 import quasar.qscript.{
   educatedToTotal,
   Filter,
@@ -47,21 +49,33 @@ import quasar.qscript.qsu.QSUGraph.QSUPattern
 import matryoshka.{Corecursive, CorecursiveT, CoalgebraM, Recursive}
 import matryoshka.data.free._
 import matryoshka.patterns.CoEnv
-import scalaz.{~>, -\/, \/-, Const, Inject, Monad, NaturalTransformation}
+import scalaz.{~>, -\/, \/-, Const, Inject, Monad, NaturalTransformation, ReaderT}
 import scalaz.Scalaz._
 
 final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
   import QSUPattern._
 
   type QSE[A] = QScriptEducated[A]
-  private type QSU[A] = QScriptUniform[A]
 
   def apply[F[_]: Monad: PlannerErrorME: NameGenerator](graph: QSUGraph): F[T[QSE]] = {
-    Corecursive[T[QSE], QSE].anaM[F, QSUGraph](graph)(
-      graduateƒ[F, QSE](None)(NaturalTransformation.refl[QSE]))
+    type G[A] = ReaderT[F, References, A]
+
+    ReifyIdentities[T].apply[F](graph) flatMap {
+      case (refs, reifiedGraph) =>
+        val grad = graduateƒ[G, QSE](None)(NaturalTransformation.refl[QSE])
+
+        Corecursive[T[QSE], QSE]
+          .anaM[G, QSUGraph](reifiedGraph)(grad)
+          .run(refs)
+    }
   }
 
-  private def mergeSources[F[_]: Monad: PlannerErrorME: NameGenerator](
+  ////
+
+  private type QSU[A] = QScriptUniform[A]
+  private type RefsR[F[_]] = MonadReader_[F, References]
+
+  private def mergeSources[F[_]: Monad: PlannerErrorME: NameGenerator: RefsR](
       left: QSUGraph,
       right: QSUGraph): F[SrcMerge[QSUGraph, FreeQS]] = {
 
@@ -127,8 +141,17 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
     }
   }
 
-  private def educate[F[_]: Monad: PlannerErrorME: NameGenerator](qsu: QSU[QSUGraph])
-      : F[QSE[QSUGraph]] =
+  private def educate[F[_]: Monad: PlannerErrorME: NameGenerator: RefsR](name: Symbol, qsu: QSU[QSUGraph])
+      : F[QSE[QSUGraph]] = {
+
+    val MR = MonadReader_[F, References]
+
+    def holeAs(sym: Symbol): Hole => Symbol =
+      κ(sym)
+
+    def resolveAccess[A](fa: FreeAccess[A])(f: A => Symbol): F[FreeMapA[A]] =
+      MR.asks(_.resolveAccess(name, fa)(f))
+
     qsu match {
       case QSU.Read(path) =>
         Inject[Const[Read[AFile], ?], QSE].inj(Const(Read(path))).point[F]
@@ -140,15 +163,17 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
         QCE(Filter[T, QSUGraph](source, fm)).point[F]
 
       case QSU.QSReduce(source, buckets, reducers, repair) =>
-        val qsBuckets = buckets.map(_.map(Access.src.get(_)))
-        QCE(Reduce[T, QSUGraph](source, qsBuckets, reducers, repair)).point[F]
+        buckets traverse (resolveAccess(_)(holeAs(source.root))) map { bs =>
+          QCE(Reduce[T, QSUGraph](source, bs, reducers, repair))
+        }
 
       case QSU.LeftShift(source, struct, idStatus, repair) =>
         QCE(LeftShift[T, QSUGraph](source, struct, idStatus, repair)).point[F]
 
       case QSU.QSSort(source, buckets, order) =>
-        val qsBuckets = buckets.map(_.map(Access.src.get(_)))
-        QCE(Sort[T, QSUGraph](source, qsBuckets, order)).point[F]
+        buckets traverse (resolveAccess(_)(holeAs(source.root))) map { bs =>
+          QCE(Sort[T, QSUGraph](source, bs, order))
+        }
 
       case QSU.Union(left, right) =>
         mergeSources[F](left, right) map {
@@ -164,31 +189,35 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
 
       // TODO distinct should be its own node in qscript proper
       case QSU.Distinct(source) =>
-        QCE(Reduce[T, QSUGraph](
-          source,
-          // Bucket by the value
-          List(fm),
-          // Emit the input verbatim as it may include identities.
-          List(ReduceFuncs.Arbitrary(HoleF)),
-          ReduceIndexF(\/-(0))))
+        resolveAccess(HoleF map (Access.value(_)))(holeAs(source.root)) map { fm =>
+          QCE(Reduce[T, QSUGraph](
+            source,
+            // Bucket by the value
+            List(fm),
+            // Emit the input verbatim as it may include identities.
+            List(ReduceFuncs.Arbitrary(HoleF)),
+            ReduceIndexF(\/-(0))))
+        }
 
       case QSU.Unreferenced() =>
         QCE(Unreferenced[T, QSUGraph]()).point[F]
 
       case QSU.ThetaJoin(left, right, condition, joinType, combiner) =>
-        val qsCondition = condition.map(Access.src.get(_))
-        mergeSources[F](left, right) map {
-          case SrcMerge(source, lBranch, rBranch) =>
-            Inject[ThetaJoin, QSE].inj(
-              ThetaJoin[T, QSUGraph](source, lBranch, rBranch, qsCondition, joinType, combiner))
+        val qsCondition = resolveAccess(condition)(_.fold(left.root, right.root))
+
+        (mergeSources[F](left, right) |@| qsCondition) { (srcs, cond) =>
+          val SrcMerge(source, lBranch, rBranch) = srcs
+          Inject[ThetaJoin, QSE].inj(
+            ThetaJoin[T, QSUGraph](source, lBranch, rBranch, cond, joinType, combiner))
         }
 
       case qsu =>
         PlannerErrorME[F].raiseError(
           InternalError(s"Found an unexpected LP-ish $qsu.", None)) // TODO use Show to print
     }
+  }
 
-  private def graduateƒ[F[_]: Monad: PlannerErrorME: NameGenerator, G[_]](
+  private def graduateƒ[F[_]: Monad: PlannerErrorME: NameGenerator: RefsR, G[_]](
     halt: Option[(Symbol, F[G[QSUGraph]])])(
     lift: QSE ~> G)
       : CoalgebraM[F, G, QSUGraph] = graph => {
@@ -196,7 +225,7 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
     val pattern: QSUPattern[T, QSUGraph] =
       Recursive[QSUGraph, QSUPattern[T, ?]].project(graph)
 
-    def default: F[G[QSUGraph]] = educate[F](pattern.qsu).map(lift)
+    def default: F[G[QSUGraph]] = educate[F](pattern.root, pattern.qsu).map(lift)
 
     halt match {
       case Some((name, output)) =>
@@ -208,7 +237,7 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
     }
   }
 
-  private def graduateCoEnv[F[_]: Monad: PlannerErrorME: NameGenerator]
+  private def graduateCoEnv[F[_]: Monad: PlannerErrorME: NameGenerator: RefsR]
     (hole: Option[Symbol], graph: QSUGraph)
       : F[FreeQS] = {
     type CoEnvTotal[A] = CoEnv[Hole, QScriptTotal, A]

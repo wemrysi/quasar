@@ -172,7 +172,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
               concatArr),
             qsu.cint(1),
             Free.roll[MapFunc, Access[JoinSide]](
-              MFC(MapFuncsCore.Constant[Fix, Free[MapFunc, Access[JoinSide]]](
+              MFC(MapFuncsCore.Constant[Fix, FreeAccess[JoinSide]](
                 Fixed[Fix[EJson]].bool(true)))),
             JoinType.Inner,
             projectIdx),

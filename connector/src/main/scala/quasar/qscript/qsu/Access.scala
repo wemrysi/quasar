@@ -28,7 +28,17 @@ import scalaz.syntax.applicative._
 import scalaz.syntax.show._
 
 /** Describes access to the value and identity of `A`. */
-sealed abstract class Access[A]
+sealed abstract class Access[A] {
+  /** Surfaces symbols accessed, using the provided function in the `Value`
+    * case.
+    */
+  def symbolic(value: A => Symbol): Access[Symbol] =
+    this match {
+      case Access.Bucket(s, i, _) => Access.bucket(s, i, s)
+      case Access.Identity(s, _)  => Access.identity(s, s)
+      case Access.Value(a)        => Access.value(value(a))
+    }
+}
 
 object Access extends AccessInstances {
   final case class Bucket[A](of: Symbol, idx: Int, src: A) extends Access[A]

@@ -20,6 +20,7 @@ import slamdata.Predef.{Map => SMap, _}
 import quasar.qscript.provenance.Dimensions
 
 package object qsu {
+  type FreeAccess[T[_[_]], A] = FreeMapA[T, Access[A]]
   type QSUDims[T[_[_]]] = SMap[Symbol, Dimensions[QProv.P[T]]]
   type QSUVerts[T[_[_]]] = SMap[Symbol, QScriptUniform[T, Symbol]]
 }
