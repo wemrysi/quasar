@@ -99,21 +99,19 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
 
       case LPJoin(_, _, _, _, _, _) => unexpectedError("LPJoin", gpf.root)
 
-      case LPReduce(src, _) => dims.reduce(src).point[F]
+      case LPReduce(src, _) => dims.bucketAccess(gpf.root, dims.reduce(src)).point[F]
 
       case LPSort(_, _) => unexpectedError("LPSort", gpf.root)
 
       case QSFilter(src, _) => src.point[F]
 
-      case QSReduce(src, _, _, _) => dims.reduce(src).point[F]
+      case QSReduce(src, _, _, _) => unexpectedError("QSReduce", gpf.root)
 
       case QSSort(src, _, _) => src.point[F]
 
       case Unary(_, _) => unexpectedError("Unary", gpf.root)
 
       case Map(src, _) => src.point[F]
-
-      case Unreferenced() => dims.empty.point[F]
 
       case Read(file) => dims.squash(segments(file).map(projStr).reverse).point[F]
 
@@ -129,6 +127,8 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
         }).point[F]
 
       case Union(left, right) => dims.union(left, right).point[F]
+
+      case Unreferenced() => dims.empty.point[F]
     }
 
   ////

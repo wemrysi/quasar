@@ -23,11 +23,9 @@ import quasar.Planner.PlannerErrorME
 import quasar.common.JoinType
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.fp.ski.κ
 import quasar.qscript.{
   construction,
   Center,
-  Hole,
   HoleF,
   JoinSide,
   LeftSide3,
@@ -43,7 +41,7 @@ import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
 import matryoshka._
 import matryoshka.data._
-import scalaz.{\/-, Applicative, Free, Monad, WriterT}
+import scalaz.{\/-, Free, Monad, WriterT}
 import scalaz.Scalaz._
 
 final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
@@ -51,6 +49,7 @@ final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] 
   type QSU[A] = QScriptUniform[A]
 
   val prov = new QProv[T]
+  val qsu  = QScriptUniform.Optics[T]
   val func = construction.Func[T]
 
   case class NewVertex(name: Symbol, value: QSU[Symbol], dims: Dimensions[prov.P])
@@ -67,10 +66,7 @@ final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] 
       val combiner: JoinFunc =
         Free.roll(_combiner.map(Free.point(_)))
 
-      val qsu: QSU[Symbol] =
-        QSU.ThetaJoin(left, right, condition, JoinType.Inner, combiner)
-
-      Applicative[X[F, ?]].point[QSU[Symbol]](qsu)
+      qsu.thetaJoin(left, right, condition, JoinType.Inner, combiner).point[X[F, ?]]
 
     case QSU.AutoJoin3(left, center, right, combiner3) => WriterT.writerT {
       (NameGenerator[F].prefixedName("autojoin") |@|
@@ -88,7 +84,7 @@ final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] 
               func.MakeMap(StrLit(cName), RightSideF))
 
           def _join: QSU[Symbol] =
-            QSU.ThetaJoin(left, center, _condition, JoinType.Inner, _combiner)
+            qsu.thetaJoin(left, center, _condition, JoinType.Inner, _combiner)
 
           def projLeft[A](hole: FreeMapA[A]): FreeMapA[A] =
             func.ProjectKey(StrLit(lName), hole)
@@ -108,28 +104,30 @@ final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] 
             prov.autojoinCondition(newDims, dims(right))
 
           val sym = Symbol(joinName)
-          val qsu: QSU[Symbol] = QSU.ThetaJoin(sym, right, condition, JoinType.Inner, combiner)
+          val tjoin = qsu.thetaJoin(sym, right, condition, JoinType.Inner, combiner)
           val newVertex = NewVertex(sym, _join, newDims)
 
-          (List(newVertex), qsu)
+          (List(newVertex), tjoin)
       }
     }
 
     case QSU.LPReduce(source, reduce) =>
-      val bucket: FreeAccess[Hole] = slamdata.Predef.??? // TODO computed from provenance
-      val qsu: QSU[Symbol] = QSU.QSReduce[T, Symbol](source, List(bucket), List(reduce.map(κ(HoleF))), ReduceIndexF(\/-(0)))
-      Applicative[X[F, ?]].point[QSU[Symbol]](qsu)
+      val buckets = prov.buckets(prov.reduce(dims(source)))
+      qsu.qsReduce(source, buckets, List(reduce as HoleF[T]), ReduceIndexF[T](\/-(0))).point[X[F, ?]]
 
-    case qsu =>
-      Applicative[X[F, ?]].point[QSU[Symbol]](qsu)
+    case QSU.QSSort(source, Nil, keys) =>
+      val buckets = prov.buckets(prov.reduce(dims(source)))
+      qsu.qsSort(source, buckets, keys).point[X[F, ?]]
+
+    case other =>
+      other.point[X[F, ?]]
   }
 
   def apply[F[_]: Monad: PlannerErrorME: NameGenerator](qsu: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] = {
 
     val pair: X[F, QSUVerts[T]] =
-      qsu.graph.vertices.traverse[X[F, ?], QSU[Symbol]](
-        toQScript[F](qsu.dims))(Applicative[X[F, ?]])
+      qsu.graph.vertices.traverse(toQScript[F](qsu.dims))
 
     pair.run.map {
       case (nw, oldVertices) =>

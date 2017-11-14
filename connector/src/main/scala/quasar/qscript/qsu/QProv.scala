@@ -92,18 +92,14 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
     }
   }
 
-  /** Returns the reified dimensions for the given `src` and new dimensions that
-    * reference the given buckets.
-    */
-  def buckets(src: Symbol, dims: Dimensions[P]): (Dimensions[P], List[I]) = {
-    def mkBuckets(maps: IList[SInt ==>> I]): List[I] =
-      LastVal.unsubst(maps.foldMap(LastVal.subst(_))).values
+  /** Converts identity access in `dims` to bucket access of `src`. */
+  def bucketAccess(src: Symbol, dims: Dimensions[P]): Dimensions[P] =
+    bucketedDims(src, dims)._1
 
-    dims.reverse
-      .traverse(bucketedIds[State[SInt, ?]](src, _))
-      .eval(0)
-      .unzip
-      .bimap(_.reverse, mkBuckets _)
+  /** Reifies the identities in the given `Dimensions`. */
+  def buckets(dims: Dimensions[P]): List[I] = {
+    val maps = bucketedDims(Symbol(""), dims)._2
+    LastVal.unsubst(maps.foldMap(LastVal.subst(_))).values
   }
 
   /** Renames `from` to `to` in the given dimensions. */
@@ -118,6 +114,14 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
 
   private val pfo = ProvF.Optics[D, I]
   private val FMA = Functor[FreeMapA].compose[Access]
+
+  // NB: Computed together to ensure indices align properly.
+  private def bucketedDims(src: Symbol, dims: Dimensions[P]): (Dimensions[P], IList[SInt ==>> I]) =
+    dims.reverse
+      .traverse(bucketedIds[State[SInt, ?]](src, _))
+      .eval(0)
+      .unzip
+      .leftMap(_.reverse)
 }
 
 object QProv {
