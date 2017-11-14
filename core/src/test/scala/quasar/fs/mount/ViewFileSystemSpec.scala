@@ -607,7 +607,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   "resolveViewRefs" >> {
     def unsafeParse(sqlQry: String): Fix[Sql] =
-      sql.fixParser.parseExpr(sqlQry).toOption.get
+      sql.fixParser.parseExpr(sqlQry).valueOr(_ => scala.sys.error("Expected sql query to parse but it did not"))
 
     type Eff[A] = Coproduct[Mounting, VCacheKVS, A]
 
@@ -761,7 +761,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val qlp =
         quasar.queryPlan(q, Variables.empty, rootDir, 0L, None)
           .run.value.toOption.get
-          .valueOr(_ => scala.sys.error("impossible constant plan"))
+          .valueOr(_ => scala.sys.error("Expected a non-constant plan but received a constant plan"))
 
       val vs = Map[AFile, Fix[Sql]](p -> q)
 
