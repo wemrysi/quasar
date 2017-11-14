@@ -229,3 +229,5 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
   def ejsonProjectKey(key: Fix[EJson]) =
     ejsonMap((ejson.CommonEJson(ejson.Str[Fix[EJson]]("f")).embed, key))
 }
+
+object QScriptHelpers extends QScriptHelpers

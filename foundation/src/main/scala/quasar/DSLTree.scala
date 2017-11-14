@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import scalaz._
 
-final case class DSLTree(base: String, label: String, children: List[String \/ DSLTree])
+final case class DSLTree(base: String, label: String, children: Option[List[String \/ DSLTree]])
 
 object DSLTree {
   implicit val dslTreeShow: Show[DSLTree] = new Show[DSLTree] {
@@ -39,15 +39,14 @@ object DSLTree {
             nel.tail.foldLeft(Cord.empty) { (b, a) =>
               (if (b.nonEmpty) b :+ firstArgEnd else b) ++ showArg(a, indent)
             } :- ')'
-        }(IList.fromList(args)).getOrElse(Cord(""))
+        }(IList.fromList(args)).getOrElse(Cord("()"))
       }
       def showIndent(f: DSLTree, indent: Int) =
         f match {
           case DSLTree(base, label, children) =>
-            val args = showArgs(children, indent)
+            val args = children.fold(Cord.empty)(showArgs(_, indent))
             if (base.isEmpty && label.isEmpty) args
             else if (base.isEmpty) Cord(label) ++ args
-            else if (children.isEmpty) Cord(base + "." + label)
             else Cord(base + "." + label) ++ args
         }
       showIndent(f, 0)

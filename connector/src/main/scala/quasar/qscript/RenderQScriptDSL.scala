@@ -27,9 +27,10 @@ import quasar.fp._
 import quasar.fp.ski._
 import slamdata.Predef
 
-import scalaz.{Const, Coproduct, Free, Functor}
+import scalaz.{\/, Const, Coproduct, Free, Functor}
 import scalaz.syntax.bifunctor._
 import scalaz.syntax.either._
+import scalaz.syntax.std.option._
 import scalaz.syntax.show._
 import scalaz.syntax.std.tuple._
 import scalaz.std.anyVal._
@@ -55,7 +56,7 @@ object RenderQScriptDSL {
   def freeDelayRenderQScriptDSL[T[_[_]]: RecursiveT, F[_]: Functor, A]
   (D: Delay[RenderQScriptDSL, F], A: RenderQScriptDSL[A]): RenderQScriptDSL[Free[F, A]] = {
     def toDsl(base: String, a: Free[F, A]): DSLTree =
-      a.resume.fold[DSLTree](D[Free[F, A]](toDsl)("free", _), A("free", _))
+      a.resume.fold(D[Free[F, A]](toDsl)("free", _), A("free", _))
     toDsl
   }
 
@@ -84,18 +85,19 @@ object RenderQScriptDSL {
         val base = "json"
         val (label, children) = a.run.fold({
           case ejson.Meta(value, meta) => ("meta", fa(base, value).right :: fa(base, meta).right :: Nil)
-          case ejson.Map(value)        => ("map", value.map(t => DSLTree("", "", t.umap(fa(base, _).right).toIndexedSeq.toList).right))
+          case ejson.Map(value)        => ("map",
+            DSLTree("", "List", (value.map(t => DSLTree("", "", t.umap(fa(base, _).right).toIndexedSeq.toList.some).right).some)).right :: Nil)
           case ejson.Byte(value)       => ("byte", value.toString.left :: Nil)
           case ejson.Char(value)       => ("char", ("'" + value.toString + "'").left :: Nil)
           case ejson.Int(value)        => ("int", value.toString.left :: Nil)
         }, {
-          case ejson.Arr(value)  => ("arr", value.map(fa(base, _).right))
-          case ejson.Null()      => ("null", Nil)
+          case ejson.Arr(value)  => ("arr", DSLTree("", "List", value.map(fa(base, _).right).some).right :: Nil)
+          case ejson.Null()      => ("nul", Nil)
           case ejson.Bool(value) => ("bool", value.toString.left :: Nil)
           case ejson.Str(value)  => ("str", ("\"" + value + "\"").left :: Nil)
           case ejson.Dec(value)  => ("dec", value.toString.left :: Nil)
         })
-        DSLTree(base, label, children)
+        DSLTree(base, label, children.some)
     }
   }
 
@@ -140,124 +142,128 @@ object RenderQScriptDSL {
         (base: String, mf: MapFunc[T, A]) =>
           val prefix = "func"
           val (label, children) = mf.run.fold({
-            case Constant(ejson) => ("Constant", eJsonRenderQScriptDSL[T].apply(base, ejson).right :: Nil)
-            case Undefined()     => ("Undefined", Nil)
-            case JoinSideName(n) => ("JoinSideName", n.shows.left :: Nil)
-            case Now()           => ("Now", Nil)
+            case Constant(ejson) => ("Constant", (eJsonRenderQScriptDSL[T].apply(base, ejson).right :: Nil).some)
+            case Undefined()     => ("Undefined", none)
+            case JoinSideName(n) => ("JoinSideName", (n.shows.left :: Nil).some)
+            case Now()           => ("Now", none)
 
-            case ExtractCentury(a1)        => ("ExtractCentury", fa(base, a1).right :: Nil)
-            case ExtractDayOfMonth(a1)     => ("ExtractDayOfMonth", fa(base, a1).right :: Nil)
-            case ExtractDecade(a1)         => ("ExtractDecade", fa(base, a1).right :: Nil)
-            case ExtractDayOfWeek(a1)      => ("ExtractDayOfWeek", fa(base, a1).right :: Nil)
-            case ExtractDayOfYear(a1)      => ("ExtractDayOfYear", fa(base, a1).right :: Nil)
-            case ExtractEpoch(a1)          => ("ExtractEpoch", fa(base, a1).right :: Nil)
-            case ExtractHour(a1)           => ("ExtractHour", fa(base, a1).right :: Nil)
-            case ExtractIsoDayOfWeek(a1)   => ("ExtractIsoDayOfWeek", fa(base, a1).right :: Nil)
-            case ExtractIsoYear(a1)        => ("ExtractIsoYear", fa(base, a1).right :: Nil)
-            case ExtractMicroseconds(a1)   => ("ExtractMicroseconds", fa(base, a1).right :: Nil)
-            case ExtractMillennium(a1)     => ("ExtractMillennium", fa(base, a1).right :: Nil)
-            case ExtractMilliseconds(a1)   => ("ExtractMilliseconds", fa(base, a1).right :: Nil)
-            case ExtractMinute(a1)         => ("ExtractMinute", fa(base, a1).right :: Nil)
-            case ExtractMonth(a1)          => ("ExtractMonth", fa(base, a1).right :: Nil)
-            case ExtractQuarter(a1)        => ("ExtractQuarter", fa(base, a1).right :: Nil)
-            case ExtractSecond(a1)         => ("ExtractSecond", fa(base, a1).right :: Nil)
-            case ExtractTimezone(a1)       => ("ExtractTimezone", fa(base, a1).right :: Nil)
-            case ExtractTimezoneHour(a1)   => ("ExtractTimezoneHour", fa(base, a1).right :: Nil)
-            case ExtractTimezoneMinute(a1) => ("ExtractTimezoneMinute", fa(base, a1).right :: Nil)
-            case ExtractWeek(a1)           => ("ExtractWeek", fa(base, a1).right :: Nil)
-            case ExtractYear(a1)           => ("ExtractYear", fa(base, a1).right :: Nil)
-            case Date(a1)                  => ("Date", fa(base, a1).right :: Nil)
-            case Time(a1)                  => ("Time", fa(base, a1).right :: Nil)
-            case Timestamp(a1)             => ("Timestamp", fa(base, a1).right :: Nil)
-            case Interval(a1)              => ("Interval", fa(base, a1).right :: Nil)
-            case StartOfDay(a1)            => ("StartOfDay", fa(base, a1).right :: Nil)
-            case TemporalTrunc(a1, a2)     => ("TemporalTrunc", a1.shows.left :: fa(base, a2).right :: Nil)
-            case TimeOfDay(a1)             => ("TimeOfDay", fa(base, a1).right :: Nil)
-            case ToTimestamp(a1)           => ("ToTimestamp", fa(base, a1).right :: Nil)
-            case TypeOf(a1)                => ("TypeOf", fa(base, a1).right :: Nil)
-            case ToId(a1)                  => ("ToId", fa(base, a1).right :: Nil)
-            case Negate(a1)                => ("Negate", fa(base, a1).right :: Nil)
-            case Not(a1)                   => ("Not", fa(base, a1).right :: Nil)
-            case Length(a1)                => ("Length", fa(base, a1).right :: Nil)
-            case Lower(a1)                 => ("Lower", fa(base, a1).right :: Nil)
-            case Upper(a1)                 => ("Upper", fa(base, a1).right :: Nil)
-            case Bool(a1)                  => ("Bool", fa(base, a1).right :: Nil)
-            case Integer(a1)               => ("Integer", fa(base, a1).right :: Nil)
-            case Decimal(a1)               => ("Decimal", fa(base, a1).right :: Nil)
-            case Null(a1)                  => ("Null", fa(base, a1).right :: Nil)
-            case ToString(a1)              => ("ToString", fa(base, a1).right :: Nil)
-            case MakeArray(a1)             => ("Makefarray", fa(base, a1).right :: Nil)
-            case Meta(a1)                  => ("Meta", fa(base, a1).right :: Nil)
+            case ExtractCentury(a1)        => ("ExtractCentury", (fa(base, a1).right :: Nil).some)
+            case ExtractDayOfMonth(a1)     => ("ExtractDayOfMonth", (fa(base, a1).right :: Nil).some)
+            case ExtractDecade(a1)         => ("ExtractDecade", (fa(base, a1).right :: Nil).some)
+            case ExtractDayOfWeek(a1)      => ("ExtractDayOfWeek", (fa(base, a1).right :: Nil).some)
+            case ExtractDayOfYear(a1)      => ("ExtractDayOfYear", (fa(base, a1).right :: Nil).some)
+            case ExtractEpoch(a1)          => ("ExtractEpoch", (fa(base, a1).right :: Nil).some)
+            case ExtractHour(a1)           => ("ExtractHour", (fa(base, a1).right :: Nil).some)
+            case ExtractIsoDayOfWeek(a1)   => ("ExtractIsoDayOfWeek", (fa(base, a1).right :: Nil).some)
+            case ExtractIsoYear(a1)        => ("ExtractIsoYear", (fa(base, a1).right :: Nil).some)
+            case ExtractMicroseconds(a1)   => ("ExtractMicroseconds", (fa(base, a1).right :: Nil).some)
+            case ExtractMillennium(a1)     => ("ExtractMillennium", (fa(base, a1).right :: Nil).some)
+            case ExtractMilliseconds(a1)   => ("ExtractMilliseconds", (fa(base, a1).right :: Nil).some)
+            case ExtractMinute(a1)         => ("ExtractMinute", (fa(base, a1).right :: Nil).some)
+            case ExtractMonth(a1)          => ("ExtractMonth", (fa(base, a1).right :: Nil).some)
+            case ExtractQuarter(a1)        => ("ExtractQuarter", (fa(base, a1).right :: Nil).some)
+            case ExtractSecond(a1)         => ("ExtractSecond", (fa(base, a1).right :: Nil).some)
+            case ExtractTimezone(a1)       => ("ExtractTimezone", (fa(base, a1).right :: Nil).some)
+            case ExtractTimezoneHour(a1)   => ("ExtractTimezoneHour", (fa(base, a1).right :: Nil).some)
+            case ExtractTimezoneMinute(a1) => ("ExtractTimezoneMinute", (fa(base, a1).right :: Nil).some)
+            case ExtractWeek(a1)           => ("ExtractWeek", (fa(base, a1).right :: Nil).some)
+            case ExtractYear(a1)           => ("ExtractYear", (fa(base, a1).right :: Nil).some)
+            case Date(a1)                  => ("Date", (fa(base, a1).right :: Nil).some)
+            case Time(a1)                  => ("Time", (fa(base, a1).right :: Nil).some)
+            case Timestamp(a1)             => ("Timestamp", (fa(base, a1).right :: Nil).some)
+            case Interval(a1)              => ("Interval", (fa(base, a1).right :: Nil).some)
+            case StartOfDay(a1)            => ("StartOfDay", (fa(base, a1).right :: Nil).some)
+            case TemporalTrunc(a1, a2)     => ("TemporalTrunc", (DSLTree("TemporalPart", a1.shows, none).right :: fa(base, a2).right :: Nil).some)
+            case TimeOfDay(a1)             => ("TimeOfDay", (fa(base, a1).right :: Nil).some)
+            case ToTimestamp(a1)           => ("ToTimestamp", (fa(base, a1).right :: Nil).some)
+            case TypeOf(a1)                => ("TypeOf", (fa(base, a1).right :: Nil).some)
+            case ToId(a1)                  => ("ToId", (fa(base, a1).right :: Nil).some)
+            case Negate(a1)                => ("Negate", (fa(base, a1).right :: Nil).some)
+            case Not(a1)                   => ("Not", (fa(base, a1).right :: Nil).some)
+            case Length(a1)                => ("Length", (fa(base, a1).right :: Nil).some)
+            case Lower(a1)                 => ("Lower", (fa(base, a1).right :: Nil).some)
+            case Upper(a1)                 => ("Upper", (fa(base, a1).right :: Nil).some)
+            case Bool(a1)                  => ("Bool", (fa(base, a1).right :: Nil).some)
+            case Integer(a1)               => ("Integer", (fa(base, a1).right :: Nil).some)
+            case Decimal(a1)               => ("Decimal", (fa(base, a1).right :: Nil).some)
+            case Null(a1)                  => ("Null", (fa(base, a1).right :: Nil).some)
+            case ToString(a1)              => ("ToString", (fa(base, a1).right :: Nil).some)
+            case MakeArray(a1)             => ("MakeArray", (fa(base, a1).right :: Nil).some)
+            case Meta(a1)                  => ("Meta", (fa(base, a1).right :: Nil).some)
 
-            case Add(a1, a2)          => ("Add", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case Multiply(a1, a2)     => ("Multiply", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case Subtract(a1, a2)     => ("Subtract", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case Divide(a1, a2)       => ("Divide", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case Modulo(a1, a2)       => ("Modulo", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case Power(a1, a2)        => ("Power", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case Eq(a1, a2)           => ("Eq", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case Neq(a1, a2)          => ("Neq", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case Lt(a1, a2)           => ("Lt", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case Lte(a1, a2)          => ("Lte", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case Gt(a1, a2)           => ("Gt", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case Gte(a1, a2)          => ("Gte", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case IfUndefined(a1, a2)  => ("IfUndefined", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case And(a1, a2)          => ("fand", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case Or(a1, a2)           => ("Or", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case Within(a1, a2)       => ("Within", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case MakeMap(a1, a2)      => ("MakeMap", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case ConcatMaps(a1, a2)   => ("ConcatMaps", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case ProjectIndex(a1, a2) => ("ProjectIndex", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case ProjectKey(a1, a2)   => ("ProjectField", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case DeleteKey(a1, a2)    => ("DeleteField", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case ConcatArrays(a1, a2) => ("Concatfarrays", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case Range(a1, a2)        => ("Range", fa(base, a1).right :: fa(base, a2).right :: Nil)
-            case Split(a1, a2)        => ("Split", fa(base, a1).right :: fa(base, a2).right :: Nil)
+            case Add(a1, a2)          => ("Add", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case Multiply(a1, a2)     => ("Multiply", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case Subtract(a1, a2)     => ("Subtract", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case Divide(a1, a2)       => ("Divide", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case Modulo(a1, a2)       => ("Modulo", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case Power(a1, a2)        => ("Power", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case Eq(a1, a2)           => ("Eq", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case Neq(a1, a2)          => ("Neq", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case Lt(a1, a2)           => ("Lt", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case Lte(a1, a2)          => ("Lte", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case Gt(a1, a2)           => ("Gt", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case Gte(a1, a2)          => ("Gte", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case IfUndefined(a1, a2)  => ("IfUndefined", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case And(a1, a2)          => ("And", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case Or(a1, a2)           => ("Or", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case Within(a1, a2)       => ("Within", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case MakeMap(a1, a2)      => ("MakeMap", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case ConcatMaps(a1, a2)   => ("ConcatMaps", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case ProjectIndex(a1, a2) => ("ProjectIndex", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case ProjectKey(a1, a2)   => ("ProjectKey", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case DeleteKey(a1, a2)    => ("DeleteKey", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case ConcatArrays(a1, a2) => ("ConcatArrays", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case Range(a1, a2)        => ("Range", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case Split(a1, a2)        => ("Split", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
 
-            case Between(a1, a2, a3)    => ("Between", fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil)
-            case Cond(a1, a2, a3)       => ("Cond", fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil)
-            case Search(a1, a2, a3)     => ("Search", fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil)
-            case Substring(a1, a2, a3)  => ("Substring", fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil)
+            case Between(a1, a2, a3)    => ("Between", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
+            case Cond(a1, a2, a3)       => ("Cond", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
+            case Search(a1, a2, a3)     => ("Search", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
+            case Substring(a1, a2, a3)  => ("Substring", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
             case Guard(a1, tpe, a2, a3) =>
-              ("Guard", fa(base, a1).right :: showType(tpe).left :: fa(base, a2).right :: fa(base, a3).right :: Nil)
+              ("Guard", (fa(base, a1).right :: showType(tpe).left :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
           },
             {
-              case Abs(a1)   => ("Abs", fa(base, a1).right :: Nil)
-              case Ceil(a1)  => ("Ceil", fa(base, a1).right :: Nil)
-              case Floor(a1) => ("Floor", fa(base, a1).right :: Nil)
-              case Trunc(a1) => ("Trunc", fa(base, a1).right :: Nil)
-              case Round(a1) => ("Round", fa(base, a1).right :: Nil)
+              case Abs(a1)   => ("Abs", (fa(base, a1).right :: Nil).some)
+              case Ceil(a1)  => ("Ceil", (fa(base, a1).right :: Nil).some)
+              case Floor(a1) => ("Floor", (fa(base, a1).right :: Nil).some)
+              case Trunc(a1) => ("Trunc", (fa(base, a1).right :: Nil).some)
+              case Round(a1) => ("Round", (fa(base, a1).right :: Nil).some)
 
-              case FloorScale(a1, a2) => ("FloorScale", fa(base, a1).right :: fa(base, a2).right :: Nil)
-              case CeilScale(a1, a2)  => ("CeilScale", fa(base, a1).right :: fa(base, a2).right :: Nil)
-              case RoundScale(a1, a2) => ("RoundScale", fa(base, a1).right :: fa(base, a2).right :: Nil)
+              case FloorScale(a1, a2) => ("FloorScale", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case CeilScale(a1, a2)  => ("CeilScale", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case RoundScale(a1, a2) => ("RoundScale", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
             })
           DSLTree(prefix, label, children)
       }
     }
 
-  def freeMapRender[T[_[_]]: RecursiveT, A](A: RenderQScriptDSL[A]): RenderQScriptDSL[FreeMapA[T, A]] = {
+  def freeMapARender[T[_[_]]: RecursiveT, A](A: RenderQScriptDSL[A]): RenderQScriptDSL[FreeMapA[T, A]] = {
     def toDsl(base: String, mf: FreeMapA[T, A]): DSLTree =
       mf.resume.fold(mapFuncRenderQScriptDSLDelay[T].apply[FreeMapA[T, A]](toDsl)(base, _), A(base, _))
     toDsl
   }
 
   def holeRender(base: String): RenderQScriptDSL[Hole] = {
-    (_, a: Hole) => DSLTree(base, "Hole", Nil)
+    (_, a: Hole) => DSLTree(base, "Hole", none)
   }
 
   def joinSideRender(base: String): RenderQScriptDSL[JoinSide] = {
     (_, a: JoinSide) => DSLTree(base, a match {
       case LeftSide => "LeftSide"
       case RightSide => "RightSide"
-    }, Nil)
+    }, none)
   }
 
-  def reduceIndexRender: RenderQScriptDSL[ReduceIndex] = {
-    (base: String, a: ReduceIndex) =>
-      val label = a.idx.fold(κ("Left"), κ("Right"))
+  def freeMapRender[T[_[_]]: RecursiveT] = freeMapARender(holeRender("func"))
+  def joinFuncRender[T[_[_]]: RecursiveT] = freeMapARender(joinSideRender("func"))
+  def freeMapReduceIndexRender[T[_[_]]: RecursiveT] = freeMapARender(reduceIndexRender("func"))
+
+  def reduceIndexRender(base: String): RenderQScriptDSL[ReduceIndex] = {
+    (_, a: ReduceIndex) =>
+      val suffix = a.idx.fold(κ(".left"), κ(".right"))
       val idx = a.idx.merge
-      DSLTree(base, label, idx.toString.left :: Nil)
+      DSLTree(base, "ReduceIndex", ((idx.toString + suffix).left :: Nil).some)
   }
 
   def qscriptTotalRenderDelay[T[_[_]]: RecursiveT]: Delay[RenderQScriptDSL, QScriptTotal[T, ?]] =
@@ -277,55 +283,62 @@ object RenderQScriptDSL {
   def fixQSRender[T[_[_]]: RecursiveT]: RenderQScriptDSL[Fix[QScriptTotal[T, ?]]] =
     delayRenderQScriptDSL(qscriptTotalRenderDelay[T])
 
+  def reduceFuncRender[T[_[_]]: RecursiveT]: RenderQScriptDSL[ReduceFunc[FreeMap[T]]] = { (base, rf) =>
+    val freeMap = freeMapRender[T]
+    rf match {
+      case ReduceFuncs.Count(a) => DSLTree("ReduceFuncs", "Count", (freeMap(base, a).right :: Nil).some)
+      case ReduceFuncs.Sum(a) => DSLTree("ReduceFuncs", "Sum", (freeMap(base, a).right :: Nil).some)
+      case ReduceFuncs.Min(a) => DSLTree("ReduceFuncs", "Min", (freeMap(base, a).right :: Nil).some)
+      case ReduceFuncs.Max(a) => DSLTree("ReduceFuncs", "Max", (freeMap(base, a).right :: Nil).some)
+      case ReduceFuncs.Avg(a) => DSLTree("ReduceFuncs", "Avg", (freeMap(base, a).right :: Nil).some)
+      case ReduceFuncs.Arbitrary(a) => DSLTree("ReduceFuncs", "Arbitrary", (freeMap(base, a).right :: Nil).some)
+      case ReduceFuncs.First(a) => DSLTree("ReduceFuncs", "First", (freeMap(base, a).right :: Nil).some)
+      case ReduceFuncs.Last(a) => DSLTree("ReduceFuncs", "Last", (freeMap(base, a).right :: Nil).some)
+      case ReduceFuncs.UnshiftArray(a) => DSLTree("ReduceFuncs", "UnshiftArray", (freeMap(base, a).right :: Nil).some)
+      case ReduceFuncs.UnshiftMap(a1, a2) =>
+        DSLTree("ReduceFuncs", "UnshiftMap", (freeMap(base, a1).right :: freeMap(base, a2).right :: Nil).some)
+    }
+  }
+
   def qscriptCoreRenderDelay[T[_[_]]: RecursiveT]: Delay[RenderQScriptDSL, QScriptCore[T, ?]] =
     new Delay[RenderQScriptDSL, QScriptCore[T, ?]] {
       def apply[A](A: RenderQScriptDSL[A]): RenderQScriptDSL[QScriptCore[T, A]] = {
-        val freeMap = freeMapRender[T, Hole](holeRender("func"))
-        val joinFunc = freeMapRender[T, JoinSide](joinSideRender("func"))
-        val reduceIndex = freeMapRender[T, ReduceIndex](reduceIndexRender)
+        val freeMap = freeMapRender[T]
+        val joinFunc = joinFuncRender[T]
+        val reduceIndex = freeMapReduceIndexRender[T]
         val freeQS = freeQSRender[T]
         (base: String, qsc: QScriptCore[T, A]) => qsc match {
           case Map(src, f) =>
-            DSLTree(base, "Map", A(base, src).right :: freeMap(base, f).right :: Nil)
+            DSLTree(base, "Map", (A(base, src).right :: freeMap(base, f).right :: Nil).some)
+
           case LeftShift(src, struct, idStatus, repair) =>
             DSLTree(base, "LeftShift",
-              A(base, src).right :: freeMap(base, struct).right :: idStatus.shows.left :: joinFunc(base, repair).right :: Nil)
+              (A(base, src).right :: freeMap(base, struct).right :: idStatus.shows.left :: joinFunc(base, repair).right :: Nil).some)
+
           case Reduce(src, bucket, reducers, repair) =>
-            val bucketArg = DSLTree("", "List", bucket.map(freeMap(base, _).right))
-            val reducersArg = DSLTree("", "List", reducers.map {
-              case ReduceFuncs.Count(a) => DSLTree("ReduceFuncs", "Count", freeMap(base, a).right :: Nil)
-              case ReduceFuncs.Sum(a) => DSLTree("ReduceFuncs", "Sum", freeMap(base, a).right :: Nil)
-              case ReduceFuncs.Min(a) => DSLTree("ReduceFuncs", "Min", freeMap(base, a).right :: Nil)
-              case ReduceFuncs.Max(a) => DSLTree("ReduceFuncs", "Max", freeMap(base, a).right :: Nil)
-              case ReduceFuncs.Avg(a) => DSLTree("ReduceFuncs", "Avg", freeMap(base, a).right :: Nil)
-              case ReduceFuncs.Arbitrary(a) => DSLTree("ReduceFuncs", "Arbitrary", freeMap(base, a).right :: Nil)
-              case ReduceFuncs.First(a) => DSLTree("ReduceFuncs", "First", freeMap(base, a).right :: Nil)
-              case ReduceFuncs.Last(a) => DSLTree("ReduceFuncs", "Last", freeMap(base, a).right :: Nil)
-              case ReduceFuncs.UnshiftArray(a) => DSLTree("ReduceFuncs", "UnshiftArray", freeMap(base, a).right :: Nil)
-              case ReduceFuncs.UnshiftMap(a1, a2) =>
-                DSLTree("ReduceFuncs", "UnshiftMap", freeMap(base, a1).right :: freeMap(base, a2).right :: Nil)
-            }.map(_.right))
-            DSLTree(base, "Reduce", A(base, src).right :: bucketArg.right :: reducersArg.right :: reduceIndex(base, repair).right :: Nil)
+            val bucketArg = DSLTree("", "List", bucket.map(freeMap(base, _).right).some)
+            val reducersArg = DSLTree("", "List", reducers.map(reduceFuncRender[T].apply(base, _).right).some)
+            DSLTree(base, "Reduce", (A(base, src).right :: bucketArg.right :: reducersArg.right :: reduceIndex(base, repair).right :: Nil).some)
 
           case Sort(src, bucket, order) =>
             val args = A(base, src).right ::
-              DSLTree("", "List", bucket.map(freeMap(base, _).right)).right ::
+              DSLTree("", "List", bucket.map(freeMap(base, _).right).some).right ::
               DSLTree("", "NonEmptyList",
                 order.map { case (f, o) =>
-                  DSLTree("", "", freeMap(base, f).right :: DSLTree("SortDir", o.shows, Nil).right :: Nil).right
-                }.list.toList).right :: Nil
-            DSLTree(base, "Sort", args)
+                  DSLTree("", "", (freeMap(base, f).right :: DSLTree("SortDir", o.shows, none).right :: Nil).some).right
+                }.list.toList.some).right :: Nil
+            DSLTree(base, "Sort", args.some)
 
           case Union(src, lBranch, rBranch) =>
             val args = A(base, src).right ::
               freeQS(base, lBranch).right ::
               freeQS(base, rBranch).right ::
               Nil
-            DSLTree(base, "Union", args)
+            DSLTree(base, "Union", args.some)
 
           case Filter(src, f) =>
             val args = A(base, src).right :: freeMap(base, f).right :: Nil
-            DSLTree(base, "Filter", args)
+            DSLTree(base, "Filter", args.some)
 
           case Subset(src, from, op, count) =>
             val args = A(base, src).right ::
@@ -333,17 +346,17 @@ object RenderQScriptDSL {
               op.shows.left ::
               freeQS(base, count).right ::
               Nil
-            DSLTree(base, "Subset", args)
+            DSLTree(base, "Subset", args.some)
 
           case Unreferenced() =>
-            DSLTree(base, "Unreferenced", Nil)
+            DSLTree(base, "Unreferenced", none)
         }
       }
     }
 
   def projectBucketRenderDelay[T[_[_]]: RecursiveT]: Delay[RenderQScriptDSL, ProjectBucket[T, ?]] =
     new Delay[RenderQScriptDSL, ProjectBucket[T, ?]] {
-      val freeMap = freeMapRender[T, Hole](holeRender("func"))
+      val freeMap = freeMapRender[T]
       def apply[A](A: RenderQScriptDSL[A]) = {
         (base: String, a: ProjectBucket[T, A]) => a match {
           case BucketKey(src, value, name) =>
@@ -351,13 +364,14 @@ object RenderQScriptDSL {
               freeMap(base, value).right ::
               freeMap(base, name).right ::
               Nil
-            DSLTree(base, "BucketKey", args)
+            DSLTree(base, "BucketKey", args.some)
+
           case BucketIndex(src, value, index) =>
             val args = A(base, src).right ::
               freeMap(base, value).right ::
               freeMap(base, index).right ::
               Nil
-            DSLTree(base, "BucketIndex", args)
+            DSLTree(base, "BucketIndex", args.some)
         }
       }
     }
@@ -367,16 +381,16 @@ object RenderQScriptDSL {
       def apply[A](A: RenderQScriptDSL[A]) = {
         (base: String, a: ThetaJoin[T, A]) => a match {
           case ThetaJoin(src, lBranch, rBranch, on, f, combine) =>
-            val joinFunc = freeMapRender[T, JoinSide](joinSideRender("func"))
+            val joinFunc = joinFuncRender[T]
             val freeQS = freeQSRender[T]
             val args = A(base, src).right ::
               freeQS(base, lBranch).right ::
               freeQS(base, rBranch).right ::
               joinFunc(base, on).right ::
-              DSLTree("JoinType", f.shows, Nil).right ::
+              DSLTree("JoinType", f.shows, none).right ::
               joinFunc(base, combine).right ::
               Nil
-            DSLTree(base, "ThetaJoin", args)
+            DSLTree(base, "ThetaJoin", args.some)
         }
       }
     }
@@ -386,17 +400,17 @@ object RenderQScriptDSL {
       def apply[A](A: RenderQScriptDSL[A]) = {
         (base: String, a: EquiJoin[T, A]) => a match {
           case EquiJoin(src, lBranch, rBranch, key, f, combine) =>
-            val freeMap = freeMapRender[T, Hole](holeRender("func"))
-            val joinFunc = freeMapRender[T, JoinSide](joinSideRender("func"))
+            val freeMap = freeMapRender[T]
+            val joinFunc = joinFuncRender[T]
             val freeQS = freeQSRender[T]
             val args = A(base, src).right ::
               freeQS(base, lBranch).right ::
               freeQS(base, rBranch).right ::
-              DSLTree("", "List", key.map { case (k, v) => DSLTree("", "", freeMap(base, k).right :: freeMap(base, v).right :: Nil).right }).right ::
-              DSLTree("JoinType", f.shows, Nil).right ::
+              DSLTree("", "List", key.map { case (k, v) => DSLTree("", "", (freeMap(base, k).right :: freeMap(base, v).right :: Nil).some).right }.some).right ::
+              DSLTree("JoinType", f.shows, none).right ::
               joinFunc(base, combine).right ::
               Nil
-            DSLTree(base, "EquiJoin", args)
+            DSLTree(base, "EquiJoin", args.some)
         }
       }
     }
@@ -411,30 +425,30 @@ object RenderQScriptDSL {
   def readFileRenderDelay: Delay[RenderQScriptDSL, Const[Read[AFile], ?]] =
     delayRenderConst(
       (base: String, a: Read[AFile]) =>
-        DSLTree(base, "Read[AFile]", a.path.shows.left :: Nil)
+        DSLTree(base, "Read[AFile]", (a.path.shows.left :: Nil).some)
     )
 
   def readDirRenderDelay: Delay[RenderQScriptDSL, Const[Read[ADir], ?]] =
     delayRenderConst(
       (base: String, a: Read[ADir]) =>
-        DSLTree(base, "Read[ADir]", a.path.shows.left :: Nil)
+        DSLTree(base, "Read[ADir]", (a.path.shows.left :: Nil).some)
     )
 
   def shiftedReadFileRenderDelay: Delay[RenderQScriptDSL, Const[ShiftedRead[AFile], ?]] =
     delayRenderConst(
       (base: String, a: ShiftedRead[AFile]) =>
-        DSLTree(base, "ShiftedRead[AFile]", a.path.shows.left :: a.idStatus.shows.left :: Nil)
+        DSLTree(base, "ShiftedRead[AFile]", (a.path.shows.left :: a.idStatus.shows.left :: Nil).some)
     )
 
   def shiftedReadDirRenderDelay: Delay[RenderQScriptDSL, Const[ShiftedRead[ADir], ?]] =
     delayRenderConst(
       (base: String, a: ShiftedRead[ADir]) =>
-        DSLTree(base, "ShiftedRead[ADir]", a.path.shows.left :: a.idStatus.shows.left :: Nil)
+        DSLTree(base, "ShiftedRead[ADir]", (a.path.shows.left :: a.idStatus.shows.left :: Nil).some)
     )
 
   def deadEndRenderDelay: Delay[RenderQScriptDSL, Const[DeadEnd, ?]] =
     delayRenderConst(
       (base: String, a: DeadEnd) =>
-        DSLTree(base, "Root", Nil)
+        DSLTree(base, "Root", none)
     )
 }

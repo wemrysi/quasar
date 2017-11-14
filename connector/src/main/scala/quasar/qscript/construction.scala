@@ -195,6 +195,7 @@ object construction {
     def Hole: FreeMap[T] = Free.pure(SrcHole)
     def LeftSide: JoinFunc[T] = Free.pure(qscript.LeftSide)
     def RightSide: JoinFunc[T] = Free.pure(qscript.RightSide)
+    def ReduceIndex(i: Int \/ Int): FreeMapA[T, ReduceIndex] = Free.pure(qscript.ReduceIndex(i))
 
     def Abs[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
       rollDerived(MapFuncsDerived.Abs(a1))
