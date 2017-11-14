@@ -20,19 +20,34 @@ import slamdata.Predef._
 
 import quasar.Qspec
 import quasar.Planner.{InternalError, PlannerError}
-import quasar.common.SortDir
+import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
+import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.qscript.construction
 import quasar.qscript.{
+  Hole,
   HoleF,
   IncludeId,
+  JoinSide,
+  LeftShift,
   LeftSideF,
+  Map,
+  MapFuncsCore,
+  MFC,
+  QCE,
+  QCT,
+  Read,
   ReduceFunc,
   ReduceFuncs,
   ReduceIndex,
   ReduceIndexF,
-  RightSideF}
+  RightSideF,
+  SrcHole,
+  Take,
+  ThetaJoin,
+  Unreferenced
+}
 import quasar.qscript.MapFuncsCore.IntLit
 
 import matryoshka.EqualT
@@ -40,7 +55,7 @@ import matryoshka.data.Fix, Fix._
 import matryoshka.implicits._
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}
 import pathy.Path, Path.{file, Sandboxed}
-import scalaz.{\/, \/-, EitherT, Need, NonEmptyList => NEL, StateT}
+import scalaz.{\/, \/-, Const, EitherT, Free, Inject, Need, NonEmptyList => NEL, StateT}
 import scalaz.Scalaz._
 
 object GraduateSpec extends Qspec with QSUTTypes[Fix] {
@@ -49,6 +64,10 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
   type QSU[A] = QScriptUniform[A]
   type QSE[A] = QScriptEducated[A]
+
+  val QCRI = Inject[Const[Read[AFile], ?], QScriptEducated]
+  val QCRIT = Inject[Const[Read[AFile], ?], QScriptTotal]
+  val QCETJ = Inject[ThetaJoin, QScriptEducated]
 
   val grad = Graduate[Fix]
 
@@ -62,7 +81,6 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
   "graduating QSU to QScript" should {
 
     "convert the QScript-ish nodes" >> {
-
       "convert Read" in {
         val qgraph: Fix[QSU] = qsu.read(afile)
         val qscript: Fix[QSE] = qse.Read[AFile](afile)
@@ -134,6 +152,70 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
         qgraph must notGraduate
       }
     }
+
+    "graduate naive `select * from zips`" in {
+      val concatArr =
+        func.ConcatArrays(func.MakeArray(LeftSideF), func.MakeArray(RightSideF))
+
+      val projectIdx = func.ProjectIndex(LeftSideF, RightSideF)
+
+      val qgraph =
+        qsu.subset(
+          qsu.thetaJoin(
+            qsu.leftShift(
+              qsu.read(root </> file("zips")),
+              HoleF[Fix],
+              IncludeId,
+              concatArr),
+            qsu.cint(1),
+            Free.roll[MapFunc, JoinSide](
+              MFC(MapFuncsCore.Constant[Fix, Free[MapFunc, JoinSide]](
+                Fixed[Fix[EJson]].bool(true)))),
+            JoinType.Inner,
+            projectIdx),
+          Take,
+          qsu.cint(11))
+
+      val lhs: Free[QScriptTotal, Hole] =
+        Free.roll[QScriptTotal, Hole](
+          QCT(
+            LeftShift[Fix, Free[QScriptTotal, Hole]](
+              Free.roll[QScriptTotal, Hole](
+                QCRIT(
+                  Const[Read[AFile], Free[QScriptTotal, Hole]](
+                    Read[AFile](root </> file("zips"))))),
+              HoleF[Fix],
+              IncludeId,
+              concatArr)))
+
+      val rhs: Free[QScriptTotal, Hole] =
+        Free.roll[QScriptTotal, Hole](
+          QCT(
+            Map[Fix, Free[QScriptTotal, Hole]](
+              Free.roll[QScriptTotal, Hole](QCT(Unreferenced[Fix, Free[QScriptTotal, Hole]]())),
+              func.Constant(Fixed[Fix[EJson]].int(1)))))
+
+      val qscript =
+        qse.Subset(
+          qse.Unreferenced,
+          Free.roll[QSE, Hole](
+            QCETJ(
+              ThetaJoin[Fix, Free[QSE, Hole]](
+                Free.roll[QSE, Hole](QCE(Unreferenced[Fix, Free[QSE, Hole]]())),
+                lhs,
+                rhs,
+                func.Constant(Fixed[Fix[EJson]].bool(true)),
+                JoinType.Inner,
+                projectIdx))),
+          Take,
+          Free.roll[QSE, Hole](
+            QCE(
+              Map[Fix, Free[QSE, Hole]](
+                Free.pure[QSE, Hole](SrcHole),
+                func.Constant(Fixed[Fix[EJson]].int(11))))))
+
+      qgraph must graduateAs(qscript)
+    }
   }
 
   def graduateAs(expected: Fix[QSE]): Matcher[Fix[QSU]] = {
@@ -150,7 +232,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
           result(
             EqualT[Fix].equal[QSE](qscript, expected),
             s"received expected qscript:\n${qscript.shows}",
-            s"received unexpected qscript:\n${qscript.shows}",
+            s"received unexpected qscript:\n${qscript.shows}\nexpected:\n${expected.shows}",
             s)
         }).merge
       }
