@@ -30,32 +30,24 @@ import quasar.qscript.{
   HoleF,
   IncludeId,
   JoinSide,
-  LeftShift,
   LeftSideF,
-  Map,
   MapFuncsCore,
   MFC,
-  QCE,
-  QCT,
-  Read,
   ReduceFunc,
   ReduceFuncs,
   ReduceIndex,
   ReduceIndexF,
   RightSideF,
   SrcHole,
-  Take,
-  ThetaJoin,
-  Unreferenced
+  Take
 }
 import quasar.qscript.MapFuncsCore.IntLit
 
 import matryoshka.EqualT
 import matryoshka.data.Fix, Fix._
-import matryoshka.implicits._
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}
 import pathy.Path, Path.{file, Sandboxed}
-import scalaz.{\/, \/-, Const, EitherT, Free, Inject, Need, NonEmptyList => NEL, StateT}
+import scalaz.{\/, \/-, EitherT, Free, Need, NonEmptyList => NEL, StateT}
 import scalaz.Scalaz._
 
 object GraduateSpec extends Qspec with QSUTTypes[Fix] {
@@ -65,15 +57,11 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
   type QSU[A] = QScriptUniform[A]
   type QSE[A] = QScriptEducated[A]
 
-  val QCRI = Inject[Const[Read[AFile], ?], QScriptEducated]
-  val QCRIT = Inject[Const[Read[AFile], ?], QScriptTotal]
-  val QCETJ = Inject[ThetaJoin, QScriptEducated]
-
   val grad = Graduate[Fix]
 
   val qsu = QScriptUniform.Dsl[Fix]
-  val qse = construction.Dsl[Fix, QSE, Fix[QSE]](_.embed)
-  val func = construction.Func[Fix]
+
+  val (func, fqse, qse) = construction.mkDefaults[Fix, QSE]
 
   val root = Path.rootDir[Sandboxed]
   val afile: AFile = root </> file("foobar")
@@ -176,43 +164,30 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
           Take,
           qsu.cint(11))
 
-      val lhs: Free[QScriptTotal, Hole] =
-        Free.roll[QScriptTotal, Hole](
-          QCT(
-            LeftShift[Fix, Free[QScriptTotal, Hole]](
-              Free.roll[QScriptTotal, Hole](
-                QCRIT(
-                  Const[Read[AFile], Free[QScriptTotal, Hole]](
-                    Read[AFile](root </> file("zips"))))),
-              HoleF[Fix],
-              IncludeId,
-              concatArr)))
+      val lhs: Free[QSE, Hole] =
+        fqse.LeftShift(
+          fqse.Read(root </> file("zips")),
+          HoleF[Fix],
+          IncludeId,
+          concatArr)
 
-      val rhs: Free[QScriptTotal, Hole] =
-        Free.roll[QScriptTotal, Hole](
-          QCT(
-            Map[Fix, Free[QScriptTotal, Hole]](
-              Free.roll[QScriptTotal, Hole](QCT(Unreferenced[Fix, Free[QScriptTotal, Hole]]())),
-              func.Constant(Fixed[Fix[EJson]].int(1)))))
+      val rhs: Free[QSE, Hole] =
+        fqse.Map(fqse.Unreferenced, func.Constant(Fixed[Fix[EJson]].int(1)))
 
       val qscript =
         qse.Subset(
           qse.Unreferenced,
-          Free.roll[QSE, Hole](
-            QCETJ(
-              ThetaJoin[Fix, Free[QSE, Hole]](
-                Free.roll[QSE, Hole](QCE(Unreferenced[Fix, Free[QSE, Hole]]())),
-                lhs,
-                rhs,
-                func.Constant(Fixed[Fix[EJson]].bool(true)),
-                JoinType.Inner,
-                projectIdx))),
+          fqse.ThetaJoin(
+            fqse.Unreferenced,
+            lhs,
+            rhs,
+            func.Constant(Fixed[Fix[EJson]].bool(true)),
+            JoinType.Inner,
+            projectIdx),
           Take,
-          Free.roll[QSE, Hole](
-            QCE(
-              Map[Fix, Free[QSE, Hole]](
-                Free.pure[QSE, Hole](SrcHole),
-                func.Constant(Fixed[Fix[EJson]].int(11))))))
+          fqse.Map(
+            Free.pure[QSE, Hole](SrcHole),
+            func.Constant(Fixed[Fix[EJson]].int(11))))
 
       qgraph must graduateAs(qscript)
     }
