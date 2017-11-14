@@ -19,11 +19,12 @@ package quasar.qscript.qsu
 import slamdata.Predef._
 import quasar.fp.symbolOrder
 
-import monocle.{PLens, Prism}
-import scalaz.{Apply, Equal, Order, Show, Traverse1}
+import monocle.{PLens, Prism, Traversal}
+import scalaz.{Applicative, Apply, Equal, Order, Show, Traverse1}
 import scalaz.std.anyVal._
 import scalaz.std.option._
 import scalaz.std.tuple._
+import scalaz.syntax.applicative._
 import scalaz.syntax.show._
 
 /** Describes access to the value and identity of `A`. */
@@ -54,6 +55,16 @@ object Access extends AccessInstances {
       case Identity(s, _)  => Identity(s, b)
       case Value(_)        => Value(b)
     }}
+
+  def symbols[A]: Traversal[Access[A], Symbol] =
+    new Traversal[Access[A], Symbol] {
+      def modifyF[F[_]: Applicative](f: Symbol => F[Symbol])(a: Access[A]) =
+        a match {
+          case Bucket(s, i, a) => f(s) map (Bucket(_, i, a))
+          case Identity(s, a)  => f(s) map (Identity(_, a))
+          case Value(a)        => value(a).point[F]
+        }
+    }
 
   def value[A]: Prism[Access[A], A] =
     Prism.partial[Access[A], A] {

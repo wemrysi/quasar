@@ -96,10 +96,11 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
       "convert QSReduce" in {
         val buckets: List[FreeMap] = List(func.Add(HoleF, IntLit(17)))
+        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value(_)))
         val reducers: List[ReduceFunc[FreeMap]] = List(ReduceFuncs.Count(HoleF))
         val repair: FreeMapA[ReduceIndex] = ReduceIndexF(\/-(0))
 
-        val qgraph: Fix[QSU] = qsu.qsReduce(qsu.read(afile), buckets, reducers, repair)
+        val qgraph: Fix[QSU] = qsu.qsReduce(qsu.read(afile), abuckets, reducers, repair)
         val qscript: Fix[QSE] = qse.Reduce(qse.Read[AFile](afile), buckets, reducers, repair)
 
         qgraph must graduateAs(qscript)
@@ -117,9 +118,10 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
       "convert QSSort" in {
         val buckets: List[FreeMap] = List(func.Add(HoleF, IntLit(17)))
+        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value(_)))
         val order: NEL[(FreeMap, SortDir)] = NEL(HoleF -> SortDir.Descending)
 
-        val qgraph: Fix[QSU] = qsu.qsSort(qsu.read(afile), buckets, order)
+        val qgraph: Fix[QSU] = qsu.qsSort(qsu.read(afile), abuckets, order)
         val qscript: Fix[QSE] = qse.Sort(qse.Read[AFile](afile), buckets, order)
 
         qgraph must graduateAs(qscript)
@@ -169,8 +171,8 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
               IncludeId,
               concatArr),
             qsu.cint(1),
-            Free.roll[MapFunc, JoinSide](
-              MFC(MapFuncsCore.Constant[Fix, Free[MapFunc, JoinSide]](
+            Free.roll[MapFunc, Access[JoinSide]](
+              MFC(MapFuncsCore.Constant[Fix, Free[MapFunc, Access[JoinSide]]](
                 Fixed[Fix[EJson]].bool(true)))),
             JoinType.Inner,
             projectIdx),

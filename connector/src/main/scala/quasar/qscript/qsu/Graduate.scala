@@ -140,13 +140,15 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
         QCE(Filter[T, QSUGraph](source, fm)).point[F]
 
       case QSU.QSReduce(source, buckets, reducers, repair) =>
-        QCE(Reduce[T, QSUGraph](source, buckets, reducers, repair)).point[F]
+        val qsBuckets = buckets.map(_.map(Access.src.get(_)))
+        QCE(Reduce[T, QSUGraph](source, qsBuckets, reducers, repair)).point[F]
 
       case QSU.LeftShift(source, struct, idStatus, repair) =>
         QCE(LeftShift[T, QSUGraph](source, struct, idStatus, repair)).point[F]
 
       case QSU.QSSort(source, buckets, order) =>
-        QCE(Sort[T, QSUGraph](source, buckets, order)).point[F]
+        val qsBuckets = buckets.map(_.map(Access.src.get(_)))
+        QCE(Sort[T, QSUGraph](source, qsBuckets, order)).point[F]
 
       case QSU.Union(left, right) =>
         mergeSources[F](left, right) map {
@@ -172,10 +174,11 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
         QCE(Unreferenced[T, QSUGraph]()).point[F]
 
       case QSU.ThetaJoin(left, right, condition, joinType, combiner) =>
+        val qsCondition = condition.map(Access.src.get(_))
         mergeSources[F](left, right) map {
           case SrcMerge(source, lBranch, rBranch) =>
             Inject[ThetaJoin, QSE].inj(
-              ThetaJoin[T, QSUGraph](source, lBranch, rBranch, condition, joinType, combiner))
+              ThetaJoin[T, QSUGraph](source, lBranch, rBranch, qsCondition, joinType, combiner))
         }
 
       case qsu =>

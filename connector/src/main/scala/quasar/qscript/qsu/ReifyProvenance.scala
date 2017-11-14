@@ -61,8 +61,8 @@ final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] 
       : QSU[Symbol] => X[F, QSU[Symbol]] = {
 
     case QSU.AutoJoin2(left, right, _combiner) =>
-      val condition: JoinFunc =
-        prov.autojoinCondition(dims(left), dims(right))(κ(HoleF))
+      val condition: FreeAccess[JoinSide] =
+        prov.autojoinCondition(dims(left), dims(right))
 
       val combiner: JoinFunc =
         Free.roll(_combiner.map(Free.point(_)))
@@ -79,8 +79,8 @@ final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] 
 
         case (joinName, lName, cName) =>
 
-          val _condition: JoinFunc =
-            prov.autojoinCondition(dims(left), dims(center))(κ(HoleF))
+          val _condition: FreeAccess[JoinSide] =
+            prov.autojoinCondition(dims(left), dims(center))
 
           def _combiner: JoinFunc =
             func.ConcatMaps(
@@ -104,14 +104,8 @@ final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] 
 
           val newDims: Dimensions[prov.P] = prov.join(dims(left), dims(center))
 
-          def rewriteCondition: Symbol => FreeMap = _ match {
-            case `left` => projLeft[Hole](HoleF)
-            case `center` => projCenter[Hole](HoleF)
-            case _ => HoleF
-          }
-
-          val condition: JoinFunc =
-            prov.autojoinCondition(newDims, dims(right))(rewriteCondition)
+          val condition: FreeAccess[JoinSide] =
+            prov.autojoinCondition(newDims, dims(right))
 
           val sym = Symbol(joinName)
           val qsu: QSU[Symbol] = QSU.ThetaJoin(sym, right, condition, JoinType.Inner, combiner)
@@ -122,7 +116,7 @@ final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] 
     }
 
     case QSU.LPReduce(source, reduce) =>
-      val bucket: FreeMap = slamdata.Predef.??? // TODO computed from provenance
+      val bucket: FreeAccess[Hole] = slamdata.Predef.??? // TODO computed from provenance
       val qsu: QSU[Symbol] = QSU.QSReduce[T, Symbol](source, List(bucket), List(reduce.map(κ(HoleF))), ReduceIndexF(\/-(0)))
       Applicative[X[F, ?]].point[QSU[Symbol]](qsu)
 

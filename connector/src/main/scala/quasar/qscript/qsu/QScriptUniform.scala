@@ -164,7 +164,7 @@ object QScriptUniform {
   final case class ThetaJoin[T[_[_]], A](
       left: A,
       right: A,
-      condition: JoinFunc[T],
+      condition: FreeMapA[T, Access[JoinSide]],
       joinType: JoinType,
       combiner: JoinFunc[T]) extends QScriptUniform[T, A]
 
@@ -226,7 +226,7 @@ object QScriptUniform {
   // QScriptish
   final case class QSReduce[T[_[_]], A](
       source: A,
-      buckets: List[FreeMap[T]],
+      buckets: List[FreeMapA[T, Access[Hole]]],
       reducers: List[ReduceFunc[FreeMap[T]]],
       repair: FreeMapA[T, ReduceIndex]) extends QScriptUniform[T, A]
 
@@ -240,7 +240,7 @@ object QScriptUniform {
   // QScriptish
   final case class QSSort[T[_[_]], A](
       source: A,
-      buckets: List[FreeMap[T]],
+      buckets: List[FreeMapA[T, Access[Hole]]],
       order: NEL[(FreeMap[T], SortDir)]) extends QScriptUniform[T, A]
 
   final case class Union[T[_[_]], A](left: A, right: A) extends QScriptUniform[T, A]
@@ -335,13 +335,13 @@ object QScriptUniform {
         case QSFilter(a, p) => (a, p)
       } { case (a, p) => QSFilter(a, p) }
 
-    def qsReduce[A]: Prism[QScriptUniform[A], (A, List[FreeMap], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])] =
-      Prism.partial[QScriptUniform[A], (A, List[FreeMap], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])] {
+    def qsReduce[A]: Prism[QScriptUniform[A], (A, List[FreeAccess[Hole]], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])] =
+      Prism.partial[QScriptUniform[A], (A, List[FreeAccess[Hole]], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])] {
         case QSReduce(a, bs, rfs, rep) => (a, bs, rfs, rep)
       } { case (a, bs, rfs, rep) => QSReduce(a, bs, rfs, rep) }
 
-    def qsSort[A]: Prism[QScriptUniform[A], (A, List[FreeMap], NEL[(FreeMap, SortDir)])] =
-      Prism.partial[QScriptUniform[A], (A, List[FreeMap], NEL[(FreeMap, SortDir)])] {
+    def qsSort[A]: Prism[QScriptUniform[A], (A, List[FreeAccess[Hole]], NEL[(FreeMap, SortDir)])] =
+      Prism.partial[QScriptUniform[A], (A, List[FreeAccess[Hole]], NEL[(FreeMap, SortDir)])] {
         case QSSort(a, buckets, keys) => (a, buckets, keys)
       } { case (a, buckets, keys) => QSSort(a, buckets, keys) }
 
@@ -355,8 +355,8 @@ object QScriptUniform {
         case Subset(f, op, c) => (f, op, c)
       } { case (f, op, c) => Subset(f, op, c) }
 
-    def thetaJoin[A]: Prism[QScriptUniform[A], (A, A, JoinFunc, JoinType, JoinFunc)] =
-      Prism.partial[QScriptUniform[A], (A, A, JoinFunc, JoinType, JoinFunc)] {
+    def thetaJoin[A]: Prism[QScriptUniform[A], (A, A, FreeAccess[JoinSide], JoinType, JoinFunc)] =
+      Prism.partial[QScriptUniform[A], (A, A, FreeAccess[JoinSide], JoinType, JoinFunc)] {
         case ThetaJoin(l, r, c, t, b) => (l, r, c, t, b)
       } { case (l, r, c, t, b) => ThetaJoin(l, r, c, t, b) }
 
@@ -394,10 +394,14 @@ object QScriptUniform {
               f(x) map (QSFilter(a, _))
 
             case QSReduce(a, bs, reds, rep) =>
-              (bs.traverse(f) |@| Traverse[List].compose[ReduceFunc].traverse(reds)(f))(QSReduce(a, _, _, rep))
+              Traverse[List].compose[ReduceFunc]
+                .traverse(reds)(f)
+                .map(QSReduce(a, bs, _, rep))
 
             case QSSort(s, bs, keys) =>
-              (bs.traverse(f) |@| keys.traverse { case (x, d) => f(x) strengthR d })(QSSort(s, _, _))
+              keys.traverse {
+                case (x, d) => f(x) strengthR d
+              } map (QSSort(s, bs, _))
 
             case other => other.point[F]
           }
@@ -514,10 +518,10 @@ object QScriptUniform {
     val qsFilter: Prism[QSU, (QSU, FreeMap)] =
       iso composePrism O.qsFilter
 
-    val qsReduce: Prism[QSU, (QSU, List[FreeMap], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])] =
+    val qsReduce: Prism[QSU, (QSU, List[FreeAccess[Hole]], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])] =
       iso composePrism O.qsReduce
 
-    val qsSort: Prism[QSU, (QSU, List[FreeMap], NEL[(FreeMap, SortDir)])] =
+    val qsSort: Prism[QSU, (QSU, List[FreeAccess[Hole]], NEL[(FreeMap, SortDir)])] =
       iso composePrism O.qsSort
 
     val read: Prism[QSU, AFile] =
@@ -526,7 +530,7 @@ object QScriptUniform {
     val subset: Prism[QSU, (QSU, SelectionOp, QSU)] =
       iso composePrism O.subset
 
-    val thetaJoin: Prism[QSU, (QSU, QSU, JoinFunc, JoinType, JoinFunc)] =
+    val thetaJoin: Prism[QSU, (QSU, QSU, FreeAccess[JoinSide], JoinType, JoinFunc)] =
       iso composePrism O.thetaJoin
 
     val transpose: Prism[QSU, (QSU, Retain, Rotation)] =

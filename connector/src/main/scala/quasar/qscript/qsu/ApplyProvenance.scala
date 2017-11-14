@@ -24,7 +24,7 @@ import quasar.ejson
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.qscript.{ExcludeId, HoleF, IdOnly, IdStatus, RightSideF}
+import quasar.qscript.{ExcludeId, HoleF, IdOnly, IdStatus, RightSideF, SrcHole}
 import quasar.qscript.provenance._
 
 import matryoshka._
@@ -85,7 +85,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
       case DimEdit(src, DTrans.Squash()) => dims.squash(src).point[F]
 
       case DimEdit(src, DTrans.Group(k)) =>
-        dims.swap(0, 1, dims.lshift(k as gpf.root, src)).point[F]
+        dims.swap(0, 1, dims.lshift(k as Access.value(SrcHole), src)).point[F]
 
       case Distinct(src) => src.point[F]
 
@@ -122,7 +122,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
       case ThetaJoin(left, right, _, _, _) => dims.join(left, right).point[F]
 
       case Transpose(src, _, rot) =>
-        val tid: dims.I = Free.pure(gpf.root)
+        val tid: dims.I = Free.pure(Access.identity(gpf.root, SrcHole))
         (rot match {
           case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, src)
           case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, src)
