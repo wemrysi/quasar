@@ -565,6 +565,8 @@ object MongoDbPlanner {
       case MFC(Gt(a, b))  => invoke2Rel(a._2, b._2)(Selector.And(_, _))
       case MFC(Gte(a, b)) => invoke2Rel(a._2, b._2)(Selector.And(_, _))
 
+      // NB: Undefined() is Hole in disguise here. We don't have a way to directly represent
+      //     a FreeMap's leaves with this fixpoint, so we use Undefined() instead.
       case MFC(Guard((Embed(MFC(ProjectKey(Embed(MFC(Undefined())), _))), _), typ, cont, _)) =>
         def selCheck: Type => Option[BsonField => Selector] =
           generateTypeCheck[BsonField, Selector](Selector.Or(_, _)) {
