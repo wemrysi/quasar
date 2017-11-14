@@ -27,7 +27,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import slamdata.Predef
 
-import scalaz.{\/, Const, Coproduct, Free, Functor}
+import scalaz.{Const, Coproduct, Free, Functor}
 import scalaz.syntax.bifunctor._
 import scalaz.syntax.either._
 import scalaz.syntax.std.option._
