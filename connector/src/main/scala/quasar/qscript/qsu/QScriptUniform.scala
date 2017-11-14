@@ -168,6 +168,12 @@ object QScriptUniform {
       joinType: JoinType,
       combiner: JoinFunc[T]) extends QScriptUniform[T, A]
 
+  /**
+   * This is a non-free (as in monad) variant of Map.  We need it
+   * in ReadLP so that graph compaction is defined, which is required
+   * because compaction utilizes an `SMap[QSU[Symbol], Symbol]`, which
+   * isn't valid when the `QSU`s inside the keys are libre.
+   */
   final case class Unary[T[_[_]], A](
       source: A,
       mf: MapFunc[T, Hole]) extends QScriptUniform[T, A]
