@@ -17,7 +17,7 @@
 package quasar.qscript.qsu
 
 import quasar.{Data, Qspec}
-import quasar.qscript.{Hole, LeftSide, MapFuncsCore, RightSide, SrcHole}
+import quasar.qscript.{Hole, LeftSide, MapFuncsCore, RightSide, SrcHole, Take}
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 
 import matryoshka.data.Fix
@@ -49,6 +49,42 @@ object EliminateUnarySpec extends Qspec with QSUTTypes[Fix] {
           Transpose(Read(_), QSU.Rotation.ShiftMap),
           DataConstantMapped(Data.Int(_)),
           MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => ok
+      }
+    }
+
+    "eliminate unary around and within a read" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.unary(qsu.tread1("foo"), IC(MapFuncsCore.Negate(SrcHole: Hole))))
+
+      elim(qgraph) must beLike {
+        case Map(
+          AutoJoin2C(
+            Transpose(Read(_), QSU.Rotation.ShiftMap),
+            DataConstantMapped(Data.Int(_)),
+            MapFuncsCore.ProjectIndex(LeftSide, RightSide)),
+          FMFC1(MapFuncsCore.Negate(SrcHole))) => ok
+      }
+    }
+
+    "eliminate unary around and within a read within a subset" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.subset(
+          qsu.unary(
+            qsu.tread1("foo"),
+            IC(MapFuncsCore.Negate(SrcHole: Hole))),
+          Take,
+          qsu.cint(11)))
+
+      elim(qgraph) must beLike {
+        case Subset(
+          Map(
+            AutoJoin2C(
+              Transpose(Read(_), QSU.Rotation.ShiftMap),
+              DataConstantMapped(Data.Int(_)),
+              MapFuncsCore.ProjectIndex(LeftSide, RightSide)),
+            FMFC1(MapFuncsCore.Negate(SrcHole))),
+          Take,
+          DataConstantMapped(Data.Int(i))) => i mustEqual 11
       }
     }
   }

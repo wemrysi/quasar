@@ -26,7 +26,7 @@ final class EliminateUnary[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
   import QSUGraph.Extractors._
 
   def apply(qgraph: QSUGraph): QSUGraph = qgraph rewrite {
-    case Unary(source, mf) =>
+    case qgraph @ Unary(source, mf) =>
       qgraph.overwriteAtRoot(QSU.Map(source.root, Free.roll(mf.map(_.point[FreeMapA]))))
   }
 }

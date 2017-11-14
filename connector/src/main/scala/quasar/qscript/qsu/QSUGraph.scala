@@ -90,17 +90,41 @@ final case class QSUGraph[T[_[_]]](
       for {
         visited <- MS.get
 
-        back <- if (visited(root)) {
+        back <- if (visited(g.root)) {
           this.point[G]
         } else {
           for {
-            _ <- MS.modify(_ + root)
-            recursive <- g.unfold.traverse(inner)
+            _ <- MS.modify(_ + g.root)
 
-            collapsed =
-              recursive.foldRight[QSUVerts[T]](SMap())(_.vertices ++ _)
+            recursive <- g.unfold traverse { sg =>
+              for {
+                previs <- MS.get
+                sg2 <- inner(sg)
+                postvis <- MS.get
+              } yield (sg2, postvis &~ previs)
+            }
 
-            self2 = QSUGraph(root, collapsed)
+            index = recursive.foldLeft[SMap[Symbol, Set[Symbol]]](SMap()) {
+              case (acc, (sg, snapshot)) =>
+                val sym = sg.root
+
+                if (acc.contains(sym))
+                  acc.updated(sym, acc(sym).union(snapshot))
+                else
+                  acc + (sym -> snapshot)
+            }
+
+            sum = index.values.reduceOption(_ union _).getOrElse(Set())
+
+            // remove the keys which were touched from the original
+            preimage = g.vertices -- sum
+
+            collapsed = recursive.foldLeft[QSUVerts[T]](preimage) {
+              case (acc, (sg, _)) =>
+                acc ++ (sg.vertices -- (sum &~ index(sg.root)))
+            }
+
+            self2 = QSUGraph(g.root, collapsed)
 
             applied <- if (pf.isDefinedAt(self2))
               pf(self2).liftM[StateT[?[_], Set[Symbol], ?]]

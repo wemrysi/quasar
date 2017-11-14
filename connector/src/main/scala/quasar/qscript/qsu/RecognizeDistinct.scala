@@ -29,7 +29,7 @@ final class RecognizeDistinct[T[_[_]]: BirecursiveT] private () extends QSUTType
   // pattern from compileDistinct in compiler.scala
   // TODO this is dumb; we shouldn't be replicating patterns like this
   def apply(qgraph: QSUGraph): QSUGraph = qgraph rewrite {
-    case LPReduce(GroupBy(orig1, orig2), ReduceFuncs.Arbitrary(()))
+    case qgraph @ LPReduce(GroupBy(orig1, orig2), ReduceFuncs.Arbitrary(()))
         if orig1.root === orig2.root =>
       qgraph.overwriteAtRoot(QSU.Distinct(orig1.root))
   }
