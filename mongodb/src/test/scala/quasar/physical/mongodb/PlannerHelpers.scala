@@ -130,8 +130,11 @@ object PlannerHelpers {
       else
         Set(
           FileName("foo").right[DirName],
+          FileName("cars").right,
+          FileName("cars2").right,
           FileName("zips").right,
           FileName("zips2").right,
+          FileName("smallZips").right,
           FileName("largeZips").right,
           FileName("a").right,
           FileName("slamengine_commits").right,
