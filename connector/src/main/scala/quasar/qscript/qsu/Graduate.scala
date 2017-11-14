@@ -53,9 +53,10 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
   type QSE[A] = QScriptEducated[A]
   private type QSU[A] = QScriptUniform[A]
 
-  def apply[F[_]: Monad: PlannerErrorME: NameGenerator](graph: QSUGraph): F[T[QSE]] =
+  def apply[F[_]: Monad: PlannerErrorME: NameGenerator](graph: QSUGraph): F[T[QSE]] = {
     Corecursive[T[QSE], QSE].anaM[F, QSUGraph](graph)(
       graduateƒ[F, QSE](None)(NaturalTransformation.refl[QSE]))
+  }
 
   private def mergeSources[F[_]: Monad: PlannerErrorME: NameGenerator](
       left: QSUGraph,
@@ -70,21 +71,25 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
         rights: Set[Symbol],
         visited: Set[Symbol]): Set[Symbol] = {
 
-      val lnodes = lefts.map(lvert)
-      val rnodes = rights.map(rvert)
+      if (lefts.isEmpty || rights.isEmpty) {
+        Set()
+      } else {
+        val lnodes = lefts.map(lvert)
+        val rnodes = rights.map(rvert)
 
-      val lexp = lnodes.flatMap(_.foldLeft(Set[Symbol]())(_ + _))
-      val rexp = rnodes.flatMap(_.foldLeft(Set[Symbol]())(_ + _))
+        val lexp = lnodes.flatMap(_.foldLeft(Set[Symbol]())(_ + _))
+        val rexp = rnodes.flatMap(_.foldLeft(Set[Symbol]())(_ + _))
 
-      val check: Set[Symbol] =
-        (lexp intersect visited) union
-        (rexp intersect visited) union
-        (lexp intersect rexp)
+        val check: Set[Symbol] =
+          (lexp intersect visited) union
+          (rexp intersect visited) union
+          (lexp intersect rexp)
 
-      if (!check.isEmpty)
-        check
-      else
-        lub(lexp, rexp, visited.union(lexp).union(rexp))
+        if (!check.isEmpty)
+          check
+        else
+          lub(lexp, rexp, visited.union(lexp).union(rexp))
+      }
     }
 
     val source: Set[Symbol] = if (left.root === right.root)
