@@ -38,6 +38,7 @@ object SqlExpr extends SqlExprInstances {
   final case class Table[T](name: String) extends SqlExpr[T]
 
   final case class Constant[T](data: Data) extends SqlExpr[T]
+  final case class Infix[T](op: String, left: T, right: T) extends SqlExpr[T]
 
   object Select {
     final case class Filter[T](v: T)

@@ -51,6 +51,8 @@ trait SqlExprRenderTree {
             Terminal("*" :: Nil, none)
           case WithIds(v) =>
             nonTerminal("With ids", v)
+          case Infix(op, left, right) =>
+            nonTerminal(op, left, right)
           case Select(selection, from, filter) =>
             NonTerminal(
               "Select" :: Nil,

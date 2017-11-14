@@ -53,6 +53,7 @@ object PostgresRenderQuery extends RenderQuery {
       v.right
     case AllCols(alias) =>
       s"row_to_json($alias)".right
+    case Infix(sym, left, right) => s"($left) $sym ($right)".right
     case WithIds(str)    => s"(row_number() over(), $str)".right
     case RowIds()        => "row_number() over()".right
     case Select(selection, from, filterOpt) =>
