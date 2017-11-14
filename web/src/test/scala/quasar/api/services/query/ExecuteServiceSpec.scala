@@ -33,6 +33,7 @@ import quasar.fs._, InMemory._, mount._
 import quasar.fs.mount.cache.ViewCache
 import quasar.fs.mount.MountConfig.viewConfig0
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
+import quasar.main.Fixture.mountingInter
 import quasar.sql.{Positive => _, _}
 
 import java.time.{Instant, Duration}

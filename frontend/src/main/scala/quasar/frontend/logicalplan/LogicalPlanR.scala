@@ -342,6 +342,11 @@ final class LogicalPlanR[T]
           consts <- emitName[SemDisj, Func.Input[T, nat._1]](Func.Input1(arg).traverse(ensureConstraint(_, constant(Data.Obj(ListMap("" -> Data.NA))))))
           plan  <- unifyOrCheck(inf, types, invoke(structural.FlattenMap, consts))
         } yield plan
+        case InvokeUnapply(relations.IfUndefined, Sized(condition, fallback)) =>
+          val args = Func.Input2(condition, fallback)
+          val constructLPNode = invoke(relations.IfUndefined, _: Func.Input[T, nat._2])
+          lift(relations.IfUndefined.tpe(args.map(_.inferred)).disjunction).flatMap(
+            unifyOrCheck(inf, _, constructLPNode(args.map(appConst(_, constant(Data.NA))))))
         case InvokeUnapply(func @ NullaryFunc(_, _, _, _), Sized()) =>
           checkGenericInvoke(inf, func, Sized[List]())
         case InvokeUnapply(func @ UnaryFunc(_, _, _, _, _, _, _), Sized(a1)) =>
@@ -442,9 +447,10 @@ final class LogicalPlanR[T]
     // Firstly we infer the types in the LogicalPlan. We start with the assumption
     // that the entire thing returns `Type.Top`, then we feed that into the outermost untyper,
     // asking "if this expression returns `Type.Top`, what are the types of the arguments?"
-    // We then continue in a top-down fashion, calling untypers exclusively to infer all of the types.
-    // Only the type *checker* calls the typers, because untypers always have the option to "give up"
-    // and return a fixed input type regardless of the expected output.
+    // We then continue in a top-down fashion, calling untypers exclusively to infer all of
+    // the types. This process is (partially) documented in InferTypesSpec
+    // Only the type *checker* calls the typers, because untypers always have the option to
+    //"give up" and return a fixed input type regardless of the expected output.
     // In several other areas where we have no type information, we feed in `Type.Top` as well.
 
     // Secondly we check the types. Type checking means calling typers in a bottom-up
@@ -454,7 +460,8 @@ final class LogicalPlanR[T]
     // Note that this means there is *no reason* to return a constant type from an untyper.
     // Not only do they not exist yet, because `Type.Top` is the starting assumption of
     // type inference, but even if they did, they could only propagate backwards.
-    // Elaborating, there is no way to work back from the knowledge that a function returns a constant
+    // Elaborating, there is no way to work back from the knowledge that a function returns
+    // a constant
     // to the knowledge that the function's parameters are constants, because
     // there is no way to know a function returns a constant unless you already know
     // the parameters are constants!
