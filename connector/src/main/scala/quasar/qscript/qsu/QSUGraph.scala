@@ -144,9 +144,41 @@ final case class QSUGraph[T[_[_]]](
   // projects the root of the graph (which we assume exists)
   def unfold: QScriptUniform[T, QSUGraph[T]] =
     vertices(root).map(refocus)
+
+  /**
+   * Note that because this is using SMap, we cannot guarantee
+   * uniqueness is handled correctly if nodes include Free.
+   * Make sure you do not rely on this.  Also please note that this
+   * function is linear in the number of nodes, so try not to call
+   * it too often.
+   */
+  def generateRevIndex: QSUGraph.RevIdx[T] =
+    vertices map { case (key, value) => value -> key }
 }
 
 object QSUGraph extends QSUGraphInstances {
+  type RevIdx[T[_[_]]] = SMap[QScriptUniform[T, Symbol], Symbol]
+
+  def withName[T[_[_]], F[_]: Monad: NameGenerator](
+      node: QScriptUniform[T, Symbol])(
+      implicit MS: MonadState_[F, SMap[QScriptUniform[T, Symbol], Symbol]]): F[QSUGraph[T]] = {
+
+    for {
+      reverse <- MS.get
+
+      back <- reverse.get(node) match {
+        case Some(sym) =>
+          QSUGraph[T](root = sym, SMap()).point[F]
+
+        case None =>
+          for {
+            name <- NameGenerator[F].prefixedName("qsu")
+            sym = Symbol(name)
+            _ <- MS.put(reverse + (node -> sym))
+          } yield QSUGraph[T](root = sym, SMap(sym -> node))
+      }
+    } yield back
+  }
 
   /** Construct a QSUGraph from a tree of `QScriptUniform` by compacting
     * common subtrees.

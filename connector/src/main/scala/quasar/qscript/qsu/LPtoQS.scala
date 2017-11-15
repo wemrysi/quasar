@@ -35,6 +35,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
       EliminateUnary[T].apply        >-
       RecognizeDistinct[T].apply     >==>
       ExtractFreeMap[T, F]           >==>
+      MinimizeAutoJoins[T].apply[F]  >==>
       ApplyProvenance[T].apply[F]    >=>
       K(ReifyProvenance[T].apply[F]) >-
       (_.graph)                      >==>
