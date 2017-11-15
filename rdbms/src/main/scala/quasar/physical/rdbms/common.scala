@@ -17,47 +17,56 @@
 package quasar.physical.rdbms
 
 import slamdata.Predef._
-import pathy.Path
-import pathy.Path.DirName
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 
-import monocle.Prism
+import pathy.Path
+import pathy.Path.DirName
 import scalaz._
 import Scalaz._
 
 object common {
-
   final case class Config(connInfo: JdbcConnectionInfo)
 
-  sealed trait Schema
+  final case class Schema(name: String) {
 
-  final case object DefaultSchema extends Schema
+    def isRoot: Boolean = name.isEmpty
 
-  final case class CustomSchema(name: String) extends Schema
+    private def lastDirNameStr: String = {
+      val lastSeparatorIndex = name.lastIndexOf(TablePath.Separator)
+      val startIndex =
+        if (lastSeparatorIndex > 0)
+          lastSeparatorIndex + TablePath.Separator.length
+        else 0
+      name.substring(startIndex)
+    }
 
+    def lastDirName: DirName = {
+      DirName(lastDirNameStr)
+    }
 
-  object Schema {
-    def lastDirName(schema: Schema): DirName = {
-      schema match {
-        case DefaultSchema => DirName("")
-        case CustomSchema(name) =>
-          val lastSeparatorIndex = name.lastIndexOf(TablePath.Separator)
-          val startIndex = if (lastSeparatorIndex > 0) lastSeparatorIndex + TablePath.Separator.length else 0
-          DirName(name.substring(startIndex))
+    def isDirectChildOf(supposedParent: Schema): Boolean = {
+      supposedParent.name match {
+        case "" =>
+          !this.name.contains(TablePath.Separator)
+        case parentName =>
+          this.name === parentName + TablePath.Separator + lastDirNameStr
       }
     }
 
-    val default = Prism.partial[Schema, DefaultSchema.type] {
-      case DefaultSchema => DefaultSchema
-    }(scala.Predef.identity)
-
-    val custom = Prism.partial[Schema, CustomSchema] {
-      case c: CustomSchema => c
-    }(scala.Predef.identity)
-
-    implicit val showCustomSchema: Show[CustomSchema] = Show.shows(_.name.toLowerCase)
+    def parents: List[Schema] = {
+      name
+        .split(TablePath.SeparatorRegex)
+        .toList
+        .dropRight(1)
+        .scanLeft(List.empty[String])(_ :+ _)
+        .drop(1)
+        .map(dirs => dirs.mkString(TablePath.Separator))
+        .map(Schema.apply)
+    }
   }
+
+  implicit val showSchema: Show[Schema] = Show.shows(_.name.toLowerCase)
 
   final case class TableName(name: String) extends AnyVal
   final case class TablePath(schema: Schema, table: TableName)
@@ -68,18 +77,18 @@ object common {
     val SeparatorRegex = "__c_"
 
     def dirToSchema(dir: ADir): Schema = {
-      Path.flatten(None, None, None, Some(_), Some(_), dir)
-        .toIList
-        .unite
-        .intercalate(Separator) match {
-        case "" => DefaultSchema
-        case pathStr => CustomSchema(pathStr)
-      }
+      Schema(
+        Path
+          .flatten(None, None, None, Some(_), Some(_), dir)
+          .toIList
+          .unite
+          .intercalate(TablePath.Separator))
     }
 
     def create(file: AFile): TablePath = {
       val filename = Path.fileName(file).value
-      val schema = Path.parentDir(file).map(dirToSchema).getOrElse(DefaultSchema)
+      val schema =
+        Path.parentDir(file).map(dirToSchema).getOrElse(Schema(""))
       new TablePath(schema, TableName(filename))
     }
 
@@ -87,10 +96,7 @@ object common {
       Show.shows(_.name.toLowerCase)
 
     implicit val showPath: Show[TablePath] = Show.shows { tp =>
-      tp.schema match {
-        case DefaultSchema => tp.table.shows
-        case s: CustomSchema => s"${s.shows}.${tp.table.shows}"
-      }
+      s"${tp.schema.shows}.${tp.table.shows}"
     }
   }
 }
