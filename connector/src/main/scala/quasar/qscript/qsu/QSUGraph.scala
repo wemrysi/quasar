@@ -161,7 +161,7 @@ object QSUGraph extends QSUGraphInstances {
 
   def withName[T[_[_]], F[_]: Monad: NameGenerator](
       node: QScriptUniform[T, Symbol])(
-      implicit MS: MonadState_[F, SMap[QScriptUniform[T, Symbol], Symbol]]): F[QSUGraph[T]] = {
+      implicit MS: MonadState_[F, RevIdx[T]]): F[QSUGraph[T]] = {
 
     for {
       reverse <- MS.get

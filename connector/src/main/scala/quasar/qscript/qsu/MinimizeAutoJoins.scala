@@ -31,8 +31,7 @@ import quasar.qscript.qsu.{QScriptUniform => QSU}
 import slamdata.Predef._
 
 import matryoshka.BirecursiveT
-import scalaz.{~>, Free, Monad, StateT}
-import scalaz.std.list._
+import scalaz.{Free, Monad, StateT}
 import scalaz.syntax.foldable._
 import scalaz.syntax.monad._
 
@@ -47,7 +46,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
         val fml = MappableRegion.maximal(left)
         val fmr = MappableRegion.maximal(right)
 
-        val minimized = minimizeSources(extractSources(fml) ::: extractSources(fmr))
+        val minimized = minimizeSources(fml.toList ::: fmr.toList)
 
         lazy val extended = combiner map {
           case LeftSide => fml.map(_ => SrcHole: Hole)
@@ -62,7 +61,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
         val fmr = MappableRegion.maximal(right)
 
         val minimized =
-          minimizeSources(extractSources(fml) ::: extractSources(fmc) ::: extractSources(fmr))
+          minimizeSources(fml.toList ::: fmc.toList ::: fmr.toList)
 
         lazy val extended = combiner map {
           case LeftSide3 => fml.map(_ => SrcHole: Hole)
@@ -112,9 +111,6 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
 
     minimized
   }
-
-  private def extractSources[A](fma: FreeMapA[A]): List[A] =
-    fma.foldMap(λ[MapFunc ~> List](_.toList))
 }
 
 object MinimizeAutoJoins {
