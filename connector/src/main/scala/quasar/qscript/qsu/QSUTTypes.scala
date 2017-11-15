@@ -20,6 +20,7 @@ import quasar.qscript.TTypes
 
 trait QSUTTypes[T[_[_]]] extends TTypes[T] {
   type QSUGraph = quasar.qscript.qsu.QSUGraph[T]
+  type RevIdx = quasar.qscript.qsu.QSUGraph.RevIdx[T]
   type QScriptUniform[A] = quasar.qscript.qsu.QScriptUniform[T, A]
   type QScriptEducated[A] = quasar.qscript.QScriptEducated[T, A]
 }

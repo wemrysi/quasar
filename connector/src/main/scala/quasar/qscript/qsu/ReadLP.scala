@@ -67,7 +67,6 @@ import scalaz.syntax.monad._
 import shapeless.Sized
 
 final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
-  private type GState = SMap[QSU[Symbol], Symbol]
   private type QSU[A] = QScriptUniform[A]
 
   private val IC = Inject[MapFuncCore, MapFunc]
@@ -79,12 +78,12 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
   def apply[
       F[_]: Monad: PlannerErrorME: NameGenerator](
       plan: T[lp.LogicalPlan]): F[QSUGraph] =
-    plan.cataM(readLPƒ[StateT[F, GState, ?]]).eval(SMap())
+    plan.cataM(readLPƒ[StateT[F, RevIdx, ?]]).eval(SMap())
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def readLPƒ[
       G[_]: Monad: PlannerErrorME: NameGenerator](
-      implicit MS: MonadState_[G, GState])
+      implicit MS: MonadState_[G, RevIdx])
       : AlgebraM[G, lp.LogicalPlan, QSUGraph] = {
 
     case lp.Read(path) =>
@@ -246,14 +245,14 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
       withName[G](node).map(g => graphs.foldLeft(g)(_ :++ _))
   }
 
-  private def nullary[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](func: MapFunc[Hole])
+  private def nullary[G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]](func: MapFunc[Hole])
       : G[QSUGraph] =
     for {
       source <- withName[G](QSU.Unreferenced[T, Symbol]())
       back <- extend1[G](source)(QSU.Unary[T, Symbol](_, func))
     } yield back
 
-  private def projectConstIdx[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](
+  private def projectConstIdx[G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]](
       idx: Int)(
       parent: QSUGraph): G[QSUGraph] = {
     val const: T[EJson] = ejson.ExtEJson(ejson.Int[T[EJson]](idx)).embed
@@ -264,51 +263,34 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
     } yield back
   }
 
-  private def autoJoin2[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](
+  private def autoJoin2[G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]](
       e1: QSUGraph, e2: QSUGraph)(
       constr: (JoinSide, JoinSide) => MapFunc[JoinSide]): G[QSUGraph] =
     extend2[G](e1, e2)((e1, e2) => QSU.AutoJoin2[T, Symbol](e1, e2, constr(LeftSide, RightSide)))
 
-  private def autoJoin3[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](
+  private def autoJoin3[G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]](
       e1: QSUGraph, e2: QSUGraph, e3: QSUGraph)(
       constr: (JoinSide3, JoinSide3, JoinSide3) => MapFunc[JoinSide3]): G[QSUGraph] =
     extend3[G](e1, e2, e3)((e1, e2, e3) => QSU.AutoJoin3[T, Symbol](e1, e2, e3, constr(LeftSide3, Center, RightSide3)))
 
-  private def extend1[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](
+  private def extend1[G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]](
       parent: QSUGraph)(
       constr: Symbol => QSU[Symbol]): G[QSUGraph] =
     withName[G](constr(parent.root)).map(_ :++ parent)
 
-  private def extend2[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](
+  private def extend2[G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]](
       parent1: QSUGraph, parent2: QSUGraph)(
       constr: (Symbol, Symbol) => QSU[Symbol]): G[QSUGraph] =
     withName[G](constr(parent1.root, parent2.root)).map(_ :++ parent1 :++ parent2)
 
-  private def extend3[G[_]: Monad: NameGenerator: MonadState_[?[_], GState]](
+  private def extend3[G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]](
       parent1: QSUGraph, parent2: QSUGraph, parent3: QSUGraph)(
       constr: (Symbol, Symbol, Symbol) => QSU[Symbol]): G[QSUGraph] =
     withName[G](constr(parent1.root, parent2.root, parent3.root)).map(_ :++ parent1 :++ parent2 :++ parent3)
 
-  private def withName[G[_]: Monad: NameGenerator](
-      node: QSU[Symbol])(
-      implicit MS: MonadState_[G, GState]): G[QSUGraph] = {
-
-    for {
-      reverse <- MS.get
-
-      back <- reverse.get(node) match {
-        case Some(sym) =>
-          QSUGraph[T](root = sym, SMap()).point[G]
-
-        case None =>
-          for {
-            name <- NameGenerator[G].prefixedName("qsu")
-            sym = Symbol(name)
-            _ <- MS.put(reverse + (node -> sym))
-          } yield QSUGraph[T](root = sym, SMap(sym -> node))
-      }
-    } yield back
-  }
+  private def withName[G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]](
+      node: QSU[Symbol]): G[QSUGraph] =
+    QSUGraph.withName[T, G](node)
 
   private def fromData(data: Data): Data \/ T[EJson] = {
     data.hyloM[Data \/ ?, CoEnv[Data, EJson, ?], T[EJson]](
