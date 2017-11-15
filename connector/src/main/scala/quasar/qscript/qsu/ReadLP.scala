@@ -90,11 +90,13 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
     case lp.Read(path) =>
       val afile = mkAbsolute(rootDir[Sandboxed], path)
 
-      for {
+      val shiftedRead = for {
         read <- withName[G](QSU.Read[T, Symbol](afile))
         shifted <- extend1[G](read)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftMap))
-        back <- projectConstIdx[G](ValueIndex)(shifted)
-      } yield back
+      } yield shifted
+
+      // first projects out of outer shift structure, second projects out of inner
+      shiftedRead >>= projectConstIdx[G](ValueIndex) >>= projectConstIdx[G](ValueIndex)
 
     case lp.Constant(data) =>
       val back = fromData(data).fold[PlannerError \/ MapFunc[Hole]](

@@ -59,11 +59,15 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
     "convert Read nodes" in {
       read("foobar") must readQsuAs {
         case AutoJoin2C(
-          Transpose(Read(path), QSU.Rotation.ShiftMap),
-          DataConstant(Data.Int(i)),
+          AutoJoin2C(
+            Transpose(Read(path), QSU.Rotation.ShiftMap),
+            DataConstant(Data.Int(i1)),
+            MapFuncsCore.ProjectIndex(LeftSide, RightSide)),
+          DataConstant(Data.Int(i2)),
           MapFuncsCore.ProjectIndex(LeftSide, RightSide)) =>
 
-          i mustEqual 1
+          i1 mustEqual 1
+          i2 mustEqual 1
           path mustEqual (root </> file("foobar"))
       }
     }
@@ -300,7 +304,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
       val result = evaluate(qgraphM).toOption
 
       result must beSome
-      result.get.vertices must haveSize(6)
+      result.get.vertices must haveSize(7)
     }
   }
 
