@@ -26,11 +26,14 @@ import quasar.qscript.{
   educatedToTotal,
   Filter,
   Hole,
+  HoleF,
   LeftShift,
   Map,
   QCE,
   Read,
   Reduce,
+  ReduceFuncs,
+  ReduceIndexF,
   Sort,
   SrcHole,
   SrcMerge,
@@ -44,7 +47,7 @@ import quasar.qscript.qsu.QSUGraph.QSUPattern
 import matryoshka.{Corecursive, CorecursiveT, CoalgebraM, Recursive}
 import matryoshka.data.free._
 import matryoshka.patterns.CoEnv
-import scalaz.{~>, -\/, Const, Inject, Monad, NaturalTransformation}
+import scalaz.{~>, -\/, \/-, Const, Inject, Monad, NaturalTransformation}
 import scalaz.Scalaz._
 
 final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
@@ -124,7 +127,6 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   private def educate[F[_]: Monad: PlannerErrorME: NameGenerator](qsu: QSU[QSUGraph])
       : F[QSE[QSUGraph]] =
     qsu match {
@@ -158,7 +160,13 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
             QCE(Subset[T, QSUGraph](source, fromBranch, op, countBranch))
         }
 
-      case QSU.Distinct(source) => slamdata.Predef.??? // TODO
+      // TODO distinct should be its own node in qscript proper
+      case QSU.Distinct(source) =>
+        QCE(Reduce[T, QSUGraph](
+          source,
+          List(HoleF),
+          List(ReduceFuncs.Arbitrary(HoleF)),
+          ReduceIndexF(\/-(0)))).point[F]
 
       case QSU.Unreferenced() =>
         QCE(Unreferenced[T, QSUGraph]()).point[F]
