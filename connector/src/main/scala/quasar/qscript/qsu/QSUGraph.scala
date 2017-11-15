@@ -91,7 +91,7 @@ final case class QSUGraph[T[_[_]]](
         visited <- MS.get
 
         back <- if (visited(g.root)) {
-          this.point[G]
+          g.point[G]
         } else {
           for {
             _ <- MS.modify(_ + g.root)
