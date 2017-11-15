@@ -20,11 +20,14 @@ import slamdata.Predef.{Map => SMap, _}
 import quasar.NameGenerator
 import quasar.contrib.scalaz.MonadState_
 import quasar.fp._
+import quasar.fp.ski.κ
 
 import monocle.macros.Lenses
 import matryoshka._
+import matryoshka.data._
 import matryoshka.implicits._
-import scalaz.{Applicative, Id, Monad, MonadState, Traverse, Scalaz, State, StateT}, Scalaz._
+import matryoshka.patterns.EnvT
+import scalaz.{Applicative, Cofree, Id, Monad, MonadState, Traverse, Scalaz, State, StateT}, Scalaz._
 
 @Lenses
 final case class QSUGraph[T[_[_]]](
@@ -190,32 +193,55 @@ object QSUGraph extends QSUGraphInstances {
     } yield back
   }
 
+  import quasar.qscript.qsu.{QScriptUniform => QSU}
+
+  type NodeNames[T[_[_]]] = SMap[QSU[T, Symbol], Symbol]
+  type Renames[T[_[_]]] = SMap[Symbol, Symbol]
+
+  type NameState[T[_[_]], F[_]] = MonadState_[F, (NodeNames[T], Renames[T])]
+
+  def NameState[T[_[_]], F[_]: NameState[T, ?[_]]] =
+    MonadState_[F, (NodeNames[T], Renames[T])]
+
+  /** Construct a QSUGraph from a tree of `QScriptUniform` by compacting
+    * common subtrees, providing a mapping from the provided attribute to
+    * the final graph vertex names.
+    */
+  def fromAnnotatedTree[T[_[_]]: RecursiveT](qsu: Cofree[QSU[T, ?], Option[Symbol]])
+      : (Renames[T], QSUGraph[T]) = {
+
+    type F[A] = StateT[State[Long, ?], (NodeNames[T], Renames[T]), A]
+
+    qsu.cataM(fromTreeƒ[T, F]).run((SMap(), SMap())).map {
+      case ((_, s), r) => (s, r)
+    }.eval(0)
+  }
+
   /** Construct a QSUGraph from a tree of `QScriptUniform` by compacting
     * common subtrees.
     */
-  def fromTree[T[_[_]]: RecursiveT](qsu: T[QScriptUniform[T, ?]]): QSUGraph[T] = {
-    type F[A] = StateT[State[Long, ?], NodeNames[T], A]
-    qsu.cataM(fromTreeƒ[T, F]).eval(SMap()).eval(0)
+  def fromTree[T[_[_]]: RecursiveT](qsu: T[QSU[T, ?]]): QSUGraph[T] =
+    fromAnnotatedTree[T](
+      qsu.cata(attributeAlgebra[QSU[T, ?], Option[Symbol]](κ(None))))._2
+
+  private def fromTreeƒ[T[_[_]], F[_]: Monad: NameGenerator: NameState[T, ?[_]]]
+      : AlgebraM[F, EnvT[Option[Symbol], QSU[T, ?], ?], QSUGraph[T]] = {
+    case EnvT((sym, qsu)) =>
+      for {
+        pair <- NameState[T, F].get
+        (nodes, renames) = pair
+        node =  qsu.map(_.root)
+        name <- nodes.get(node).getOrElseF(
+                  NameGenerator[F] prefixedName "__fromTree" map (Symbol(_)))
+        _ <- NameState[T, F].put((nodes + (node -> name), sym.fold(renames)(s => renames + (s -> name))))
+      } yield qsu.foldRight(QSUGraph(name, SMap(name -> node)))(_ ++: _)
   }
-
-  type NodeNames[T[_[_]]] = SMap[QScriptUniform[T, Symbol], Symbol]
-  type NodeNamesM[T[_[_]], F[_]] = MonadState_[F, NodeNames[T]]
-
-  def fromTreeƒ[T[_[_]], F[_]: Monad: NameGenerator: NodeNamesM[T, ?[_]]]
-      : AlgebraM[F, QScriptUniform[T, ?], QSUGraph[T]] =
-    qsu => for {
-      nodes <- MonadState_[F, NodeNames[T]].get
-      node  =  qsu map (_.root)
-      name  <- nodes.get(node).getOrElseF(
-                 NameGenerator[F] prefixedName "__fromTree" map (Symbol(_)))
-      _     <- MonadState_[F, NodeNames[T]].put(nodes + (node -> name))
-    } yield qsu.foldRight(QSUGraph(name, SMap(name -> node)))(_ ++: _)
 
   /**
    * The pattern functor for `QSUGraph[T]`.
    */
   @Lenses
-  final case class QSUPattern[T[_[_]], A](root: Symbol, qsu: QScriptUniform[T, A])
+  final case class QSUPattern[T[_[_]], A](root: Symbol, qsu: QSU[T, A])
 
   object QSUPattern {
     implicit def traverse[T[_[_]]]: Traverse[QSUPattern[T, ?]] =
@@ -234,7 +260,6 @@ object QSUGraph extends QSUGraphInstances {
    */
   object Extractors {
     import quasar.Data
-    import quasar.qscript.qsu.{QScriptUniform => QSU}
     import quasar.qscript.{
       FreeMap,
       Hole,
