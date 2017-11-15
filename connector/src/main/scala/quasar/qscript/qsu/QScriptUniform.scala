@@ -19,19 +19,32 @@ package quasar.qscript.qsu
 import slamdata.Predef._
 import quasar.{RenderTree, RenderTreeT}
 import quasar.common.{JoinType, SortDir}
-import quasar.contrib.matryoshka.birecursiveIso
+import quasar.contrib.matryoshka.{birecursiveIso, envTIso}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp.PrismNT
-import quasar.fp.ski.κ
+import quasar.fp.ski.{ι, κ}
 import quasar.qscript._
 
 import matryoshka.{BirecursiveT, Delay, Embed, EqualT, ShowT}
 import matryoshka.data._
-import matryoshka.patterns.CoEnv
-import monocle.{Prism, PTraversal, Traversal}
+import matryoshka.patterns.{CoEnv, EnvT}
+import monocle.{Iso, Prism, PTraversal, Traversal}
 import pathy.Path
-import scalaz.{\/-, Applicative, Bitraverse, Equal, Forall, Free, NonEmptyList => NEL, Scalaz, Show, Traverse}
+import scalaz.{
+  \/-,
+  Applicative,
+  Bitraverse,
+  Cofree,
+  Equal,
+  Forall,
+  Free,
+  Functor,
+  Id,
+  NonEmptyList => NEL,
+  Scalaz,
+  Show,
+  Traverse}
 
 sealed trait QScriptUniform[T[_[_]], A] extends Product with Serializable
 
@@ -355,6 +368,11 @@ object QScriptUniform {
         case Subset(f, op, c) => (f, op, c)
       } { case (f, op, c) => Subset(f, op, c) }
 
+    def subsetEnvT[A]: Prism[(Symbol, QScriptUniform[A]), (Symbol, (A, SelectionOp, A))] =
+      Prism.partial[(Symbol, QScriptUniform[A]), (Symbol, (A, SelectionOp, A))] {
+        case (sym -> Subset(f, op, c)) => (sym -> ((f, op, c)))
+      } { case (sym -> ((f, op, c))) => (sym -> Subset(f, op, c)) }
+
     def thetaJoin[A]: Prism[QScriptUniform[A], (A, A, JoinFunc, JoinType, JoinFunc)] =
       Prism.partial[QScriptUniform[A], (A, A, JoinFunc, JoinType, JoinFunc)] {
         case ThetaJoin(l, r, c, t, b) => (l, r, c, t, b)
@@ -411,141 +429,210 @@ object QScriptUniform {
     def apply[T[_[_]]]: Optics[T] = new Optics[T]
   }
 
-  final class Dsl[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
+  sealed abstract class Dsl[T[_[_]]: BirecursiveT, F[_]: Functor, A] extends QSUTTypes[T] {
     import Scalaz._
     import Forall.CPS
 
-    type QSU = T[QScriptUniform]
-    type J   = T[EJson]
+    val iso: Iso[A, F[QScriptUniform[A]]]
+    def lifting[S, A]: Prism[S, A] => Prism[F[S], F[A]]
 
     type Bin[A] = (A, A) => Binary[T, A]
     type Tri[A] = (A, A, A) => Ternary[T, A]
 
-    private val J = Fixed[J]
     private val O = Optics[T]
-    private val iso = birecursiveIso[QSU, QScriptUniform]
-    private def mfc[A] = PrismNT.inject[MapFuncCore, MapFunc].asPrism[A]
 
-    val _autojoin2: Prism[QSU, (QSU, QSU, MapFunc[JoinSide])] =
-      iso composePrism O.autojoin2
+    def mfc[A] = PrismNT.inject[MapFuncCore, MapFunc].asPrism[A]
 
-    val _autojoin3: Prism[QSU, (QSU, QSU, QSU, MapFunc[JoinSide3])] =
-      iso composePrism O.autojoin3
+    private def composeLifting[G[_]](optic: Prism[QScriptUniform[A], G[A]]) =
+      iso composePrism lifting[QScriptUniform[A], G[A]](optic)
 
-    def autojoin2(left: QSU, right: QSU, combiner: CPS[Bin]): QSU =
-      _autojoin2(left, right,
-        mfc(Forall[Bin](combiner)[JoinSide](LeftSide, RightSide)))
+    def _autojoin2: Prism[A, F[(A, A, MapFunc[JoinSide])]] = {
+      type G[A] = (A, A, MapFunc[JoinSide])
+      composeLifting[G](O.autojoin2[A])
+    }
 
-    def autojoin3(left: QSU, center: QSU, right: QSU, combiner: CPS[Tri]): QSU =
-      _autojoin3(left, center, right,
-        mfc(Forall[Tri](combiner)[JoinSide3](LeftSide3, Center, RightSide3)))
+    def _autojoin3: Prism[A, F[(A, A, A, MapFunc[JoinSide3])]] = {
+      type G[A] = (A, A, A, MapFunc[JoinSide3])
+      composeLifting[G](O.autojoin3[A])
+    }
 
-    val constant: Prism[QSU, J] =
-      Prism[QSU, T[EJson]](qsu => map.getOption(qsu) collect {
+    def autojoin2(input: F[(A, A, CPS[Bin])]): A =
+      _autojoin2(input.map {
+        case (left, right, combiner) =>
+          (left, right,
+	    mfc(Forall[Bin](combiner)[JoinSide](LeftSide, RightSide)))
+      })
+
+    def autojoin3(input: F[(A, A, A, CPS[Tri])]): A =
+      _autojoin3(input.map {
+        case (left, center, right, combiner) =>
+          (left, center, right,
+	    mfc(Forall[Tri](combiner)[JoinSide3](LeftSide3, Center, RightSide3)))
+      })
+
+    def dimEdit: Prism[A, F[(A, DTrans[T])]] =
+      composeLifting[(?, DTrans[T])](O.dimEdit[A])
+
+    def distinct: Prism[A, F[A]] =
+      composeLifting[Id](O.distinct[A])
+
+    def groupBy: Prism[A, F[(A, A)]] = {
+      type G[A] = (A, A)
+      composeLifting[G](O.groupBy[A])
+    }
+
+    def joinSideRef: Prism[A, F[Symbol]] = {
+      type G[A] = Symbol
+      composeLifting[G](O.joinSideRef[A])
+    }
+
+    def leftShift: Prism[A, F[(A, FreeMap, IdStatus, JoinFunc)]] = {
+      composeLifting[(?, FreeMap, IdStatus, JoinFunc)](O.leftShift[A])
+    }
+
+    def lpFilter: Prism[A, F[(A, A)]] = {
+      type G[A] = (A, A)
+      composeLifting[G](O.lpFilter[A])
+    }
+
+    def lpJoin: Prism[A, F[(A, A, A, JoinType, Symbol, Symbol)]] = {
+      type G[A] = (A, A, A, JoinType, Symbol, Symbol)
+      composeLifting[G](O.lpJoin[A])
+    }
+
+    def lpReduce: Prism[A, F[(A, ReduceFunc[Unit])]] =
+      composeLifting[(?, ReduceFunc[Unit])](O.lpReduce[A])
+
+    def lpSort: Prism[A, F[(A, NEL[(A, SortDir)])]] = {
+      type G[A] = (A, NEL[(A, SortDir)])
+      composeLifting[G](O.lpSort[A])
+    }
+
+    def unary: Prism[A, F[(A, MapFunc[Hole])]] =
+      composeLifting[(?, MapFunc[Hole])](O.unary[A])
+
+    def map: Prism[A, F[(A, FreeMap)]] =
+      composeLifting[(?, FreeMap)](O.map[A])
+
+    def map1(pair: F[(A, MapFuncCore[Hole])]): A =
+      map(pair.map {
+        case(src, f) => (src, Free.roll(mfc(f as HoleF[T])))
+      })
+
+    def qsFilter: Prism[A, F[(A, FreeMap)]] =
+      composeLifting[(?, FreeMap)](O.qsFilter[A])
+
+    def qsReduce: Prism[A, F[(A, List[FreeMap], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])]] =
+      composeLifting[(?, List[FreeMap], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])](O.qsReduce[A])
+
+    def qsSort: Prism[A, F[(A, List[FreeMap], NEL[(FreeMap, SortDir)])]] =
+      composeLifting[(?, List[FreeMap], NEL[(FreeMap, SortDir)])](O.qsSort[A])
+
+    def read: Prism[A, F[AFile]] = {
+      type G[_] = AFile
+      composeLifting[G](O.read[A])
+    }
+
+    def subset: Prism[A, F[(A, SelectionOp, A)]] = {
+      type G[A] = (A, SelectionOp, A)
+      composeLifting[G](O.subset[A])
+    }
+
+    def thetaJoin: Prism[A, F[(A, A, JoinFunc, JoinType, JoinFunc)]] = {
+      type G[A] = (A, A, JoinFunc, JoinType, JoinFunc)
+      composeLifting[G](O.thetaJoin[A])
+    }
+
+    def transpose: Prism[A, F[(A, Retain, Rotation)]] =
+      composeLifting[(?, Retain, Rotation)](O.transpose[A])
+
+    def union: Prism[A, F[(A, A)]] = {
+      type G[A] = (A, A)
+      composeLifting[G](O.union[A])
+    }
+
+    def unreferenced: Prism[A, F[Unit]] = {
+      type G[_] = Unit
+      composeLifting[G](O.unreferenced[A])
+    }
+  }
+
+  sealed abstract class DslT[T[_[_]]: BirecursiveT] private () extends Dsl[T, Id.Id, T[QScriptUniform[T, ?]]] {
+
+    type QSU[A] = QScriptUniform[A]
+
+    private val J = Fixed[T[EJson]]
+
+    // read
+    def tread(file: AFile): T[QSU] =
+      transpose(read(file), Retain.Values, Rotation.ShiftMap)
+
+    def tread1(name: String): T[QSU] =
+      tread(Path.rootDir </> Path.file(name))
+
+    // constants
+    val constant: Prism[T[QSU], T[EJson]] =
+      Prism[T[QSU], T[EJson]](map.getOption(_) collect {
         case (Unreferenced(), Embed(CoEnv(\/-(MFC(MapFuncsCore.Constant(ejs)))))) => ejs
       })(ejs => map(unreferenced(), Free.roll(mfc[FreeMap](MapFuncsCore.Constant(ejs)))))
 
-    val carr: Prism[QSU, List[J]] =
+    val carr: Prism[T[QSU], List[T[EJson]]] =
       constant composePrism J.arr
 
-    val cbool: Prism[QSU, Boolean] =
+    val cbool: Prism[T[QSU], Boolean] =
       constant composePrism J.bool
 
-    val cbyte: Prism[QSU, Byte] =
+    val cbyte: Prism[T[QSU], Byte] =
       constant composePrism J.byte
 
-    val cchar: Prism[QSU, Char] =
+    val cchar: Prism[T[QSU], Char] =
       constant composePrism J.char
 
-    val cdec: Prism[QSU, BigDecimal] =
+    val cdec: Prism[T[QSU], BigDecimal] =
       constant composePrism J.dec
 
-    val cint: Prism[QSU, BigInt] =
+    val cint: Prism[T[QSU], BigInt] =
       constant composePrism J.int
 
-    val cmap: Prism[QSU, List[(J, J)]] =
+    val cmap: Prism[T[QSU], List[(T[EJson], T[EJson])]] =
       constant composePrism J.map
 
-    val cmeta: Prism[QSU, (J, J)] =
+    val cmeta: Prism[T[QSU], (T[EJson], T[EJson])] =
       constant composePrism J.meta
 
-    val cnull: Prism[QSU, Unit] =
+    val cnull: Prism[T[QSU], Unit] =
       constant composePrism J.nul
 
-    val cstr: Prism[QSU, String] =
+    val cstr: Prism[T[QSU], String] =
       constant composePrism J.str
-
-    val dimEdit: Prism[QSU, (QSU, DTrans[T])] =
-      iso composePrism O.dimEdit
-
-    val distinct: Prism[QSU, QSU] =
-      iso composePrism O.distinct
-
-    val groupBy: Prism[QSU, (QSU, QSU)] =
-      iso composePrism O.groupBy
-
-    val joinSideRef: Prism[QSU, Symbol] =
-      iso composePrism O.joinSideRef
-
-    val leftShift: Prism[QSU, (QSU, FreeMap, IdStatus, JoinFunc)] =
-      iso composePrism O.leftShift
-
-    val lpFilter: Prism[QSU, (QSU, QSU)] =
-      iso composePrism O.lpFilter
-
-    val lpJoin: Prism[QSU, (QSU, QSU, QSU, JoinType, Symbol, Symbol)] =
-      iso composePrism O.lpJoin
-
-    val lpReduce: Prism[QSU, (QSU, ReduceFunc[Unit])] =
-      iso composePrism O.lpReduce
-
-    val lpSort: Prism[QSU, (QSU, NEL[(QSU, SortDir)])] =
-      iso composePrism O.lpSort
-
-    val unary: Prism[QSU, (QSU, MapFunc[Hole])] =
-      iso composePrism O.unary
-
-    val map: Prism[QSU, (QSU, FreeMap)] =
-      iso composePrism O.map
-
-    def map1(src: QSU, f: MapFuncCore[Hole]): QSU =
-      map(src, Free.roll(mfc(f as HoleF[T])))
-
-    val qsFilter: Prism[QSU, (QSU, FreeMap)] =
-      iso composePrism O.qsFilter
-
-    val qsReduce: Prism[QSU, (QSU, List[FreeMap], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])] =
-      iso composePrism O.qsReduce
-
-    val qsSort: Prism[QSU, (QSU, List[FreeMap], NEL[(FreeMap, SortDir)])] =
-      iso composePrism O.qsSort
-
-    val read: Prism[QSU, AFile] =
-      iso composePrism O.read
-
-    val subset: Prism[QSU, (QSU, SelectionOp, QSU)] =
-      iso composePrism O.subset
-
-    val thetaJoin: Prism[QSU, (QSU, QSU, JoinFunc, JoinType, JoinFunc)] =
-      iso composePrism O.thetaJoin
-
-    val transpose: Prism[QSU, (QSU, Retain, Rotation)] =
-      iso composePrism O.transpose
-
-    def tread(file: AFile): QSU =
-      transpose(read(file), Retain.Values, Rotation.ShiftMap)
-
-    def tread1(name: String): QSU =
-      tread(Path.rootDir </> Path.file(name))
-
-    val union: Prism[QSU, (QSU, QSU)] =
-      iso composePrism O.union
-
-    val unreferenced: Prism[QSU, Unit] =
-      iso composePrism O.unreferenced
   }
 
-  object Dsl {
-    def apply[T[_[_]]: BirecursiveT]: Dsl[T] = new Dsl[T]
+  object DslT {
+    def apply[T[_[_]]: BirecursiveT]: DslT[T] =
+      new DslT {
+        val iso: Iso[T[QSU], QSU[T[QSU]]] = birecursiveIso[T[QSU], QSU]
+        def lifting[S, A]: Prism[S, A] => Prism[S, A] = ι
+      }
+  }
+
+  object AnnotatedDsl {
+    import Scalaz._
+
+    def apply[T[_[_]]: BirecursiveT, A]
+        : Dsl[T, (A, ?), Cofree[QScriptUniform[T, ?], A]] = {
+
+      type QSU[B] = QScriptUniform[T, B]
+      type CoQSU = Cofree[QSU, A]
+
+      new Dsl[T, (A, ?), CoQSU] {
+
+        val iso: Iso[CoQSU, (A, QSU[CoQSU])] =
+          birecursiveIso[CoQSU, EnvT[A, QSU, ?]]
+            .composeIso(envTIso[A, QSU, CoQSU])
+
+        def lifting[S, B]: Prism[S, B] => Prism[(A, S), (A, B)] =
+	  _.second[A]
+      }
+    }
   }
 }

@@ -59,7 +59,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
   val grad = Graduate[Fix]
 
-  val qsu = QScriptUniform.Dsl[Fix]
+  val qsu = QScriptUniform.DslT[Fix]
 
   val (func, fqse, qse) = construction.mkDefaults[Fix, QSE]
 

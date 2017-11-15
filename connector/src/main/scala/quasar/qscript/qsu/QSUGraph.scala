@@ -196,21 +196,21 @@ object QSUGraph extends QSUGraphInstances {
   import quasar.qscript.qsu.{QScriptUniform => QSU}
 
   type NodeNames[T[_[_]]] = SMap[QSU[T, Symbol], Symbol]
-  type Renames[T[_[_]]] = SMap[Symbol, Symbol]
+  type Renames = SMap[Symbol, Symbol]
 
-  type NameState[T[_[_]], F[_]] = MonadState_[F, (NodeNames[T], Renames[T])]
+  type NameState[T[_[_]], F[_]] = MonadState_[F, (NodeNames[T], Renames)]
 
   def NameState[T[_[_]], F[_]: NameState[T, ?[_]]] =
-    MonadState_[F, (NodeNames[T], Renames[T])]
+    MonadState_[F, (NodeNames[T], Renames)]
 
   /** Construct a QSUGraph from a tree of `QScriptUniform` by compacting
     * common subtrees, providing a mapping from the provided attribute to
     * the final graph vertex names.
     */
   def fromAnnotatedTree[T[_[_]]: RecursiveT](qsu: Cofree[QSU[T, ?], Option[Symbol]])
-      : (Renames[T], QSUGraph[T]) = {
+      : (Renames, QSUGraph[T]) = {
 
-    type F[A] = StateT[State[Long, ?], (NodeNames[T], Renames[T]), A]
+    type F[A] = StateT[State[Long, ?], (NodeNames[T], Renames), A]
 
     qsu.cataM(fromTreeƒ[T, F]).run((SMap(), SMap())).map {
       case ((_, s), r) => (s, r)
