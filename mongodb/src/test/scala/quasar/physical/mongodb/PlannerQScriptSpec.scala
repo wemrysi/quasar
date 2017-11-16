@@ -187,286 +187,89 @@ class PlannerQScriptSpec extends
           free.Filter(
             free.ShiftedRead[AFile](
               rootDir </> dir("db") </> file("extraSmallZips"),
-              qscript.IncludeId),
+              qscript.ExcludeId),
             func.Guard(
-              func.ProjectIndex(
-                func.Hole,
-                func.Constant(
-                  json.int(
-                    1))),
-              Type.Obj(Map(), Some(Type.Top)),
-              func.Constant(
-                json.bool(
-                  true)),
-              func.Constant(
-                json.bool(
-                  false)))),
+              func.Hole,
+              Type.AnyObject,
+              func.Constant(json.bool(true)),
+              func.Constant(json.bool(false)))),
           free.Filter(
             free.ShiftedRead[AFile](
               rootDir </> dir("db") </> file("smallZips"),
-              qscript.IncludeId),
+              qscript.ExcludeId),
             func.Guard(
-              func.ProjectIndex(
-                func.Hole,
-                func.Constant(
-                  json.int(
-                    1))),
-              Type.Obj(Map(), Some(Type.Top)),
-              func.Constant(
-                json.bool(
-                  true)),
-              func.Constant(
-                json.bool(
-                  false)))),
+              func.Hole,
+              Type.AnyObject,
+              func.Constant(json.bool(true)),
+              func.Constant(json.bool(false)))),
           List(
             (
-              func.ProjectKey(
-                func.ProjectIndex(
-                  func.Hole,
-                  func.Constant(
-                    json.int(
-                      1))),
-                func.Constant(
-                  json.str(
-                    "_id"))),
-              func.ProjectKey(
-                func.ProjectIndex(
-                  func.Hole,
-                  func.Constant(
-                    json.int(
-                      1))),
-                func.Constant(
-                  json.str(
-                    "_id"))))),
+              func.ProjectKeyS(func.Hole, "_id"),
+              func.ProjectKeyS(func.Hole, "_id"))),
           JoinType.Inner,
           func.ConcatArrays(
-            func.MakeArray(
-              func.ConcatArrays(
-                func.MakeArray(
-                  func.ProjectIndex(
-                    func.LeftSide,
-                    func.Constant(
-                      json.int(
-                        0)))),
-                func.MakeArray(
-                  func.ProjectIndex(
-                    func.LeftSide,
-                    func.Constant(
-                      json.int(
-                        1)))))),
-            func.MakeArray(
-              func.ConcatArrays(
-                func.MakeArray(
-                  func.ProjectIndex(
-                    func.RightSide,
-                    func.Constant(
-                      json.int(
-                        0)))),
-                func.MakeArray(
-                  func.ProjectIndex(
-                    func.RightSide,
-                    func.Constant(
-                      json.int(
-                        1)))))))),
+            func.MakeArray(func.LeftSide),
+            func.MakeArray(func.RightSide))),
         func.Guard(
-          func.ProjectIndex(
-            func.ProjectIndex(
-              func.Hole,
-              func.Constant(
-                json.int(
-                  1))),
-            func.Constant(
-              json.int(
-                1))),
-          Type.Obj(Map(), Some(Type.Top)),
-          func.Constant(
-            json.bool(
-              true)),
-          func.Constant(
-            json.bool(
-              false)))),
+          func.ProjectIndexI(func.Hole, 1),
+          Type.AnyObject,
+          func.Constant(json.bool(true)),
+          func.Constant(json.bool(false)))),
       free.Filter(
         free.ShiftedRead[AFile](
           rootDir </> dir("db") </> file("zips"),
-          qscript.IncludeId),
+          qscript.ExcludeId),
         func.Guard(
-          func.ProjectIndex(
-            func.Hole,
-            func.Constant(
-              json.int(
-                1))),
-          Type.Obj(Map(), Some(Type.Top)),
-          func.Constant(
-            json.bool(
-              true)),
-          func.Constant(
-            json.bool(
-              false)))),
+          func.Hole,
+          Type.AnyObject,
+          func.Constant(json.bool(true)),
+          func.Constant(json.bool(false)))),
       List(
         (
-          func.ProjectKey(
-            func.ProjectIndex(
-              func.ProjectIndex(
-                func.Hole,
-                func.Constant(
-                  json.int(
-                    1))),
-              func.Constant(
-                json.int(
-                  1))),
-            func.Constant(
-              json.str(
-                "_id"))),
-          func.ProjectKey(
-            func.ProjectIndex(
-              func.Hole,
-              func.Constant(
-                json.int(
-                  1))),
-            func.Constant(
-              json.str(
-                "_id"))))),
+          func.ProjectKeyS(func.ProjectIndexI(func.Hole, 1), "_id"),
+          func.ProjectKeyS(func.Hole, "_id"))),
       JoinType.Inner,
       func.ConcatMaps(
         func.ConcatMaps(
           func.MakeMap(
-            func.Constant(
-              json.str(
-                "city")),
+            func.Constant(json.str("city")),
             func.Guard(
               func.ConcatMaps(
                 func.MakeMap(
-                  func.Constant(
-                    json.str(
-                      "left")),
-                  func.ProjectIndex(
-                    func.ProjectIndex(
-                      func.LeftSide,
-                      func.Constant(
-                        json.int(
-                          0))),
-                    func.Constant(
-                      json.int(
-                        1)))),
+                  func.Constant(json.str("left")),
+                  func.ProjectIndexI(func.LeftSide, 0)),
                 func.MakeMap(
-                  func.Constant(
-                    json.str(
-                      "right")),
-                  func.ProjectIndex(
-                    func.ProjectIndex(
-                      func.LeftSide,
-                      func.Constant(
-                        json.int(
-                          1))),
-                    func.Constant(
-                      json.int(
-                        1))))),
-              Type.Obj(Map(), Some(Type.Top)),
+                  func.Constant(json.str("right")),
+                  func.ProjectIndexI(func.LeftSide, 1))),
+              Type.AnyObject,
               func.Guard(
-                func.ProjectIndex(
-                  func.ProjectIndex(
-                    func.LeftSide,
-                    func.Constant(
-                      json.int(
-                        0))),
-                  func.Constant(
-                    json.int(
-                      1))),
-                Type.Obj(Map(), Some(Type.Top)),
-                func.ProjectKey(
-                  func.ProjectIndex(
-                    func.ProjectIndex(
-                      func.LeftSide,
-                      func.Constant(
-                        json.int(
-                          0))),
-                    func.Constant(
-                      json.int(
-                        1))),
-                  func.Constant(
-                    json.str(
-                      "city"))),
+                func.ProjectIndexI(func.LeftSide, 0),
+                Type.AnyObject,
+                func.ProjectKeyS(func.ProjectIndexI(func.LeftSide, 0), "city"),
                 func.Undefined),
               func.Undefined)),
           func.MakeMap(
-            func.Constant(
-              json.str(
-                "state")),
+            func.Constant(json.str("state")),
             func.Guard(
               func.ConcatMaps(
+                func.MakeMap(func.Constant(json.str("left")),
+                  func.ProjectIndexI(func.LeftSide, 0)),
                 func.MakeMap(
-                  func.Constant(
-                    json.str(
-                      "left")),
-                  func.ProjectIndex(
-                    func.ProjectIndex(
-                      func.LeftSide,
-                      func.Constant(
-                        json.int(
-                          0))),
-                    func.Constant(
-                      json.int(
-                        1)))),
-                func.MakeMap(
-                  func.Constant(
-                    json.str(
-                      "right")),
-                  func.ProjectIndex(
-                    func.ProjectIndex(
-                      func.LeftSide,
-                      func.Constant(
-                        json.int(
-                          1))),
-                    func.Constant(
-                      json.int(
-                        1))))),
-              Type.Obj(Map(), Some(Type.Top)),
+                  func.Constant(json.str("right")),
+                  func.ProjectIndexI(func.LeftSide, 1))),
+              Type.AnyObject,
               func.Guard(
-                func.ProjectIndex(
-                  func.ProjectIndex(
-                    func.LeftSide,
-                    func.Constant(
-                      json.int(
-                        1))),
-                  func.Constant(
-                    json.int(
-                      1))),
-                Type.Obj(Map(), Some(Type.Top)),
-                func.ProjectKey(
-                  func.ProjectIndex(
-                    func.ProjectIndex(
-                      func.LeftSide,
-                      func.Constant(
-                        json.int(
-                          1))),
-                    func.Constant(
-                      json.int(
-                        1))),
-                  func.Constant(
-                    json.str(
-                      "state"))),
+                func.ProjectIndexI(func.LeftSide, 1),
+                Type.AnyObject,
+                func.ProjectKeyS(func.ProjectIndexI(func.LeftSide, 1), "state"),
                 func.Undefined),
               func.Undefined))),
         func.MakeMap(
-          func.Constant(
-            json.str(
-              "pop")),
+          func.Constant(json.str("pop")),
           func.Guard(
-            func.ProjectIndex(
-              func.RightSide,
-              func.Constant(
-                json.int(
-                  1))),
-            Type.Obj(Map(), Some(Type.Top)),
-            func.ProjectKey(
-              func.ProjectIndex(
-                func.RightSide,
-                func.Constant(
-                  json.int(
-                    1))),
-              func.Constant(
-                json.str(
-                  "pop"))),
+            func.RightSide,
+            Type.AnyObject,
+            func.ProjectKeyS(func.RightSide, "pop"),
             func.Undefined))))
 
   "plan from qscript" should {
@@ -592,6 +395,63 @@ class PlannerQScriptSpec extends
           IgnoreId)))
           // Not on agg
     }.pendingWithActual(notOnPar, qtestFile("plan simple inner equi-join with pre-filtering ($lookup)"))
+
+    "plan 3-way equi-join ($lookup)" in {
+      qplan(simpleInnerEquiJoinWithPrefiltering) must beWorkflow0(chain[Workflow](
+        $read(collection("db", "extraSmallZips")),
+        $match(Selector.Doc(
+          BsonField.Name("_id") -> Selector.Exists(true))),
+        $project(reshape(JoinDir.Left.name -> $$ROOT)),
+        $lookup(
+          CollectionName("smallZips"),
+          JoinHandler.LeftName \ BsonField.Name("_id"),
+          BsonField.Name("_id"),
+          JoinHandler.RightName),
+        $unwind(DocField(JoinHandler.RightName)),
+        $match(Selector.Doc(
+          JoinHandler.RightName \ BsonField.Name("_id") -> Selector.Exists(true))),
+        $project(reshape(JoinDir.Left.name -> $$ROOT)),
+        $lookup(
+          CollectionName("zips"),
+          JoinHandler.LeftName \ JoinHandler.RightName \ BsonField.Name("_id"),
+          BsonField.Name("_id"),
+          JoinHandler.RightName),
+        $unwind(DocField(JoinHandler.RightName)),
+        $project(reshape(
+          "city" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+              $cond(
+                $and(
+                  $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Left.name)),
+                  $lt($field(JoinDir.Left.name, JoinDir.Left.name), $literal(Bson.Arr()))),
+                $field(JoinDir.Left.name, JoinDir.Left.name, "city"),
+                $literal(Bson.Undefined)),
+              $literal(Bson.Undefined)),
+          "state" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+              $cond(
+                $and(
+                  $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Right.name)),
+                  $lt($field(JoinDir.Left.name, JoinDir.Right.name), $literal(Bson.Arr()))),
+                $field(JoinDir.Left.name, JoinDir.Right.name, "state"),
+                $literal(Bson.Undefined)),
+              $literal(Bson.Undefined)),
+          "pop" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+              $field(JoinDir.Right.name, "pop"),
+              $literal(Bson.Undefined))),
+          IgnoreId)))
+          // Not on agg
+    }.pendingWithActual(notOnPar, qtestFile("plan 3-way equi-join ($lookup)"))
 
     "plan typechecks with JS when unable to extract ExprOp" in {
       import fix.{Filter, ShiftedRead}, qscript.IncludeId
