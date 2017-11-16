@@ -53,8 +53,6 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
   def apply[F[_]: Monad: PlannerErrorME](graph: QSUGraph[T]): F[AuthenticatedQSU[T]] = {
     type X[A] = StateT[F, QSUGraph[T], A]
 
-    println(s"applying things to $graph")
-
     graph.elgotZygoM(computeProvenanceƒ[X], applyProvenanceƒ[X])
       .run(graph)
       .map { case (g, (_, d)) => AuthenticatedQSU(g, d) }
