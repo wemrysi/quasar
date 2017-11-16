@@ -159,11 +159,10 @@ object Repl {
         lpr.paths(lp).foldMap(f => refineTypeAbs(f).swap.toList)
 
       queryPlan(expr, vars, basePath, 0L, None).liftM[FileSystemErrT]
-        .flatMap(_.fold(
-          _  => ().point[M],
-          lp => QueryFile.convertToQScriptRead[Fix, M, QScriptRead[Fix, ?]](
-                  DiscoverPath.ListContents.static[List, M](absFiles(lp)))(
-                  lp).void))
+        .flatMap(lp =>
+          QueryFile.convertToQScriptRead[Fix, M, QScriptRead[Fix, ?]](
+            DiscoverPath.ListContents.static[List, M](absFiles(lp)))(
+            lp).void)
         .run.run.run
     }
 
@@ -294,7 +293,7 @@ object Repl {
 
 
       case Save(f, v) =>
-        write(W.saveThese(_, _), f, v)
+        write(W.saveThese(_, _).as(Vector.empty), f, v)
 
       case Append(f, v) =>
         write(W.appendThese(_, _), f, v)

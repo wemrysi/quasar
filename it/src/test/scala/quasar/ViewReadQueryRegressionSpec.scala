@@ -40,7 +40,7 @@ class ViewReadQueryRegressionSpec
 
   val suiteName = "View Reads"
 
-  type ViewFS[A] = (Mounting :\: ViewState :\: VCacheKVS :\: MonotonicSeq :/: BackendEffectIO)#M[A]
+  type ViewFS[A] = (Mounting :\: view.State :\: VCacheKVS :\: MonotonicSeq :/: BackendEffectIO)#M[A]
 
   type FsAskPhysFsEff[A] = Coproduct[FsAsk, PhysFsEff, A]
 
@@ -82,7 +82,7 @@ class ViewReadQueryRegressionSpec
   }
 
   def interpViews(mnts: Mounting ~> Task): Task[ViewFS ~> BackendEffectIO] =
-    (ViewState.toTask(Map()) |@| seq)((v, s) =>
+    (view.State.toTask(Map()) |@| seq)((v, s) =>
       (injectNT[Task, BackendEffectIO] compose mnts)                               :+:
       (injectNT[Task, BackendEffectIO] compose v)                                  :+:
       (injectNT[Task, BackendEffectIO] compose runConstantVCache[Task](Map.empty)) :+:

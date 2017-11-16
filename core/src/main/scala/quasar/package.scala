@@ -104,15 +104,12 @@ package object quasar {
              .run.run ∘ (_ \/> (pathErr(pathNotFound(d))))))
     ).run >>= (i => EitherT(EitherT.right(i.η[Free[S, ?]])))
 
-  /** Returns the `LogicalPlan` for the given SQL^2 query, or a list of
-    * results, if the query was foldable to a constant.
-    */
+  /** Returns the `LogicalPlan` for the given SQL^2 query */
   def queryPlan(
     expr: Fix[Sql], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive]):
-      CompileM[List[Data] \/ Fix[LP]] =
+      CompileM[Fix[LP]] =
     precompile[Fix[LP]](expr, vars, basePath)
       .flatMap(lp => preparePlan(addOffsetLimit(lp, off, lim)))
-      .map(refineConstantPlan)
 
   def addOffsetLimit[T]
     (lp: T, off: Natural, lim: Option[Positive])

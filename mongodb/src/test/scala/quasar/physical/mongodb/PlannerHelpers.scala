@@ -155,10 +155,7 @@ object PlannerHelpers {
 
   def compileSqlToLP[M[_]: Monad: MonadFsErr: PhaseResultTell](sql: Fix[Sql]): M[Fix[LP]] = {
     val (log, s) = queryPlan(sql, Variables.empty, basePath, 0L, None).run.run
-    val lp = s.fold(
-      e => scala.sys.error(e.shows),
-      d => d.fold(e => scala.sys.error(e.shows), ι)
-    )
+    val lp = s.valueOr(e => scala.sys.error(e.shows))
     for {
       _ <- scala.Predef.implicitly[PhaseResultTell[M]].tell(log)
     } yield lp

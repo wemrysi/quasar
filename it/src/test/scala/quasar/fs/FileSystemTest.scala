@@ -211,9 +211,9 @@ object FileSystemTest {
     (
       inMemUT                                             |@|
       TaskRef(0L)                                         |@|
-      ViewState.toTask(Map())                             |@|
+      view.State.toTask(Map())                            |@|
       TaskRef(Map[APath, MountConfig]())                  |@|
-      TaskRef(Empty.backendEffect[HierarchicalFsEffM])       |@|
+      TaskRef(Empty.backendEffect[HierarchicalFsEffM])    |@|
       TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
     ) {
       (mem, seqRef, viewState, cfgsRef, hfsRef, mntdRef) =>
@@ -230,7 +230,7 @@ object FileSystemTest {
         Mounting
           :\: PathMismatchFailure
           :\: MountingFailure
-          :\: ViewState
+          :\: view.State
           :\: VCacheKVS
           :\: MonotonicSeq
           :/: BackendEffect

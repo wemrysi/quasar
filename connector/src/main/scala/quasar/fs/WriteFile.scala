@@ -112,7 +112,7 @@ object WriteFile {
     /** Same as `save` but accepts chunked `Data`. */
     def saveChunked(dst: AFile, src: Process[F, Vector[Data]])
                    (implicit MF: ManageFile.Ops[S])
-                   : Process[M, FileSystemError] = {
+                   : Process[M, Unit] = {
 
       saveChunked0(dst, src, MoveSemantics.Overwrite)
     }
@@ -123,7 +123,7 @@ object WriteFile {
       */
     def save(dst: AFile, src: Process[F, Data])
             (implicit MF: ManageFile.Ops[S])
-            : Process[M, FileSystemError] = {
+            : Process[M, Unit] = {
 
       saveChunked(dst, src map (Vector(_)))
     }
@@ -134,7 +134,7 @@ object WriteFile {
       */
     def saveThese(dst: AFile, data: Vector[Data])
                  (implicit MF: ManageFile.Ops[S])
-                 : M[Vector[FileSystemError]] = {
+                 : M[Unit] = {
 
       saveThese0(dst, data, MoveSemantics.Overwrite)
     }
@@ -142,39 +142,41 @@ object WriteFile {
     /** Same as `create` but accepts chunked `Data`. */
     def createChunked(dst: AFile, src: Process[F, Vector[Data]])
                      (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
-                     : Process[M, FileSystemError] = {
+                     : Process[M, Unit] = {
 
       QF.fileExistsM(dst).liftM[Process].ifM(
-        shouldNotExist(dst).liftM[Process],
+        Process.eval_(shouldNotExist(dst)),
         saveChunked0(dst, src, MoveSemantics.FailIfExists))
     }
 
     /** Create the given file with the contents of `src`. Fails if already exists. */
     def create(dst: AFile, src: Process[F, Data])
               (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
-              : Process[M, FileSystemError] = {
+              : Process[M, Unit] = {
 
       createChunked(dst, src map (Vector(_)))
     }
 
-    /** Create the given file with the contents of `data`. Fails if already exists. */
+    /** Create the given file with the contents of `data`. Fails if already exists.
+      * May not write every given value in the presence of errors, returns
+      * a [[FileSystemError]] for each input value that failed to write. */
     def createThese(dst: AFile, data: Vector[Data])
                    (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
                    : M[Vector[FileSystemError]] = {
 
       QF.fileExistsM(dst).ifM(
-        shouldNotExist(dst) map (Vector(_)),
-        saveThese0(dst, data, MoveSemantics.FailIfExists))
+        shouldNotExist(dst).as(Vector.empty[FileSystemError]),
+        appendThese(dst, data))
     }
 
     /** Same as `replace` but accepts chunked `Data`. */
     def replaceChunked(dst: AFile, src: Process[F, Vector[Data]])
                       (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
-                      : Process[M, FileSystemError] = {
+                      : Process[M, Unit] = {
 
       QF.fileExistsM(dst).liftM[Process].ifM(
         saveChunked0(dst, src, MoveSemantics.FailIfMissing),
-        shouldExist(dst).liftM[Process])
+        Process.eval_(shouldExist(dst)))
     }
 
     /** Replace the contents of the given file with `src`. Fails if the file
@@ -182,63 +184,66 @@ object WriteFile {
       */
     def replace(dst: AFile, src: Process[F, Data])
                (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
-               : Process[M, FileSystemError] = {
+               : Process[M, Unit] = {
 
       replaceChunked(dst, src map (Vector(_)))
     }
 
     /** Replace the contents of the given file with `data`. Fails if the file
-      * doesn't exist.
+      * doesn't exist or if any errors were encountered during writing.
       */
     def replaceWithThese(dst: AFile, data: Vector[Data])
                         (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
-                        : M[Vector[FileSystemError]] = {
+                        : M[Unit] = {
 
       QF.fileExistsM(dst).ifM(
         saveThese0(dst, data, MoveSemantics.FailIfMissing),
-        shouldExist(dst) map (Vector(_)))
+        shouldExist(dst))
     }
 
     ////
 
     type GE[A] = G[FileSystemError,A]
 
-    private def shouldNotExist(dst: AFile): M[FileSystemError] =
+    private def shouldNotExist(dst: AFile): M[Unit] =
       MonadError[GE, FileSystemError].raiseError(pathErr(pathExists(dst)))
 
-    private def shouldExist(dst: AFile): M[FileSystemError] =
+    private def shouldExist(dst: AFile): M[Unit] =
       MonadError[GE, FileSystemError].raiseError(pathErr(pathNotFound(dst)))
 
     private def saveChunked0(dst: AFile, src: Process[F, Vector[Data]], sem: MoveSemantics)
                             (implicit MF: ManageFile.Ops[S])
-                            : Process[M, FileSystemError] = {
+                            : Process[M, Unit] = {
 
       def cleanupTmp(tmp: AFile)(t: Throwable): Process[M, Nothing] =
-        Process.eval_(ensureAbsent(tmp)).causedBy(Cause.Error(t))
+        Process.eval_(MF.deleteOrIgnore(tmp).liftM[FileSystemErrT]).causedBy(Cause.Error(t))
 
       MF.tempFile(dst).liftM[Process] flatMap { tmp =>
         appendChunked(tmp, src)
           .map(some).append(Process.emit(none))
+          // TODO: Explain why this is correct because `take(1)` seems all kind of
+          // wrong or write a test to expose the problem
           .take(1)
-          .flatMap(_.cata(
-            werr => ensureAbsent(tmp).as(werr).liftM[Process],
-            Process.eval_(MF.moveFile(tmp, dst, sem))))
+          .flatMap(_.cata[Process[M,Unit]](
+            werr => Process.eval[M, Unit](EitherT(MF.deleteOrIgnore(tmp).as(werr.left))),
+            Process.eval(MF.moveFile(tmp, dst, sem))))
           .onFailure(cleanupTmp(tmp))
       }
     }
 
     private def saveThese0(dst: AFile, data: Vector[Data], sem: MoveSemantics)
                           (implicit MF: ManageFile.Ops[S])
-                          : M[Vector[FileSystemError]] = {
+                          : M[Unit] = {
       for {
         tmp  <- MF.tempFile(dst)
         errs <- appendThese(tmp, data)
-        _    <- if (errs.isEmpty) MF.moveFile(tmp, dst, sem) else ensureAbsent(tmp)
-      } yield errs
+        _    <- errs.headOption.fold(
+                  MF.moveFile(tmp, dst, sem))(
+                  // There was at least one failure so cleanup the temp file and
+                  // fail the operation with the first error
+                  err => EitherT(MF.deleteOrIgnore(tmp).as(err.left)))
+      } yield ()
     }
-
-    private def ensureAbsent(f: AFile)(implicit MF: ManageFile.Ops[S]): M[Unit] =
-      MF.delete(f).run.void.liftM[FileSystemErrT]
   }
 
   object Ops {

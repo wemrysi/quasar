@@ -17,7 +17,7 @@
 package quasar.main.api
 
 import slamdata.Predef._
-import quasar.QuasarError
+import quasar.{Data, QuasarError}
 import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.stream._
 import quasar.db.DbConnectionConfig
@@ -107,6 +107,18 @@ class ApiSpec extends quasar.Qspec {
         } yield result).unsafePerformSync must_===
           pathErr(pathNotFound(rootDir </> file("noThing"))).left
       }
+    }
+    "create a view that selects a literal and read it later" >> {
+      testProgram(None)(for {
+        _      <- QuasarAPI.createView(rootDir </> file("constantView"), sqlB"""select "Hello World!"""")
+        result <- QuasarAPI.readFile(rootDir </> file("constantView")).runLogCatch
+      } yield result must_=== Vector(Data.Str("Hello World!")).right).unsafePerformSync
+    }
+    "create a view that selects a literal and query it later" >> {
+      testProgram(None)(for {
+        _      <- QuasarAPI.createView(rootDir </> file("constantView"), sqlB"""select "Hello World!"""")
+        result <- QuasarAPI.queryVec(rootDir, sqlB"select * from constantView")
+      } yield result must_=== Vector(Data.Str("Hello World!")).right.right).unsafePerformSync
     }
   }
 }

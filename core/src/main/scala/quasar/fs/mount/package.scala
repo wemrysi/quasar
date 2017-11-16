@@ -16,14 +16,14 @@
 
 package quasar.fs
 
-import slamdata.Predef.{Map, Vector}
+import slamdata.Predef.Vector
 import quasar.contrib.pathy._
+import quasar.Data
 import quasar.effect._
 import quasar.fp._, free._
 import quasar.fs.mount.cache.VCache.VCacheKVS
 
-import monocle.Lens
-import scalaz.{Lens => _, Failure => _, _}
+import scalaz.{Failure => _, _}
 import scalaz.concurrent.Task
 
 package object mount {
@@ -53,36 +53,11 @@ package object mount {
 
   //-- Views --
 
-  sealed abstract class ResultSet
-
-  object ResultSet {
-    final case class Data(values: Vector[quasar.Data])       extends ResultSet
-    final case class Read(handle: ReadFile.ReadHandle)       extends ResultSet
-    final case class Results(handle: QueryFile.ResultHandle) extends ResultSet
-  }
-
-  type ViewState[A] = KeyValueStore[ReadFile.ReadHandle, ResultSet, A]
-
-  object ViewState {
-    def Ops[S[_]](
-      implicit S: ViewState :<: S
-    ): KeyValueStore.Ops[ReadFile.ReadHandle, ResultSet, S] =
-      KeyValueStore.Ops[ReadFile.ReadHandle, ResultSet, S]
-
-    type ViewHandles = Map[ReadFile.ReadHandle, ResultSet]
-
-    def toTask(initial: ViewHandles): Task[ViewState ~> Task] =
-      TaskRef(initial) map KeyValueStore.impl.fromTaskRef
-
-    def toState[S](l: Lens[S, ViewHandles]): ViewState ~> State[S, ?] =
-      KeyValueStore.impl.toState[State[S,?]](l)
-  }
-
   type ViewFileSystem[A] = (
         Mounting
     :\: PathMismatchFailure
     :\: MountingFailure
-    :\: ViewState
+    :\: view.State
     :\: VCacheKVS
     :\: MonotonicSeq
     :/: FileSystem
@@ -93,7 +68,7 @@ package object mount {
       mounting: Mounting ~> F,
       mismatchFailure: PathMismatchFailure ~> F,
       mountingFailure: MountingFailure ~> F,
-      viewState: ViewState ~> F,
+      viewState: view.State ~> F,
       vcache: VCacheKVS ~> F,
       monotonicSeq: MonotonicSeq ~> F,
       fileSystem: FileSystem ~> F
@@ -112,8 +87,9 @@ package object mount {
     S5: PathMismatchFailure :<: S
   ): Task[BackendEffect ~> Free[S, ?]] = {
     type V[A] = (
+      constantPlans.State :\:
       VCacheKVS           :\:
-      ViewState           :\:
+      view.State          :\:
       MonotonicSeq        :\:
       Mounting            :\:
       MountingFailure     :\:
@@ -122,19 +98,25 @@ package object mount {
 
     for {
       startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
-      seqRef     <- TaskRef(startSeq)
-      viewHRef   <- TaskRef[ViewState.ViewHandles](Map())
+      seq     <- MonotonicSeq.from(startSeq)
+      viewKvs    <- KeyValueStore.impl.default[ReadFile.ReadHandle, view.ResultHandle]
+      constKvs   <- KeyValueStore.impl.default[QueryFile.ResultHandle, Vector[Data]]
     } yield {
       val compFs: V ~> Free[S, ?] =
+        injectFT[Task, S].compose(constKvs)                                 :+:
         injectFT[VCacheKVS, S]                                              :+:
-        injectFT[Task, S].compose(KeyValueStore.impl.fromTaskRef(viewHRef)) :+:
-        injectFT[Task, S].compose(MonotonicSeq.fromTaskRef(seqRef))         :+:
+        injectFT[Task, S].compose(viewKvs)                                  :+:
+        injectFT[Task, S].compose(seq)                                      :+:
         injectFT[Mounting, S]                                               :+:
         injectFT[MountingFailure, S]                                        :+:
         injectFT[PathMismatchFailure, S]                                    :+:
         (foldMapNT(injectFT[T, S]) compose f)
 
       flatMapSNT(compFs) compose
+        // The constant plan interpreter should appear last before the actual filesystem
+        // so that it can catch any plans that become constant after view and modules are
+        // involved
+        flatMapSNT(transformIn[QueryFile, V, Free[V, ?]](constantPlans.queryFile[V], liftFT)) compose
         flatMapSNT(transformIn[BackendEffect, V, Free[V, ?]](module.backendEffect[V], liftFT)) compose
         view.backendEffect[V]
     }

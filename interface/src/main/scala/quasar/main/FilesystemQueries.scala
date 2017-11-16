@@ -18,9 +18,7 @@ package quasar.main
 
 import slamdata.Predef._
 import quasar.{Data, queryPlan, Variables}
-import quasar.fp.ski.κ
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.disjunction._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.sql.Sql
@@ -46,11 +44,8 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
     off: Natural,
     lim: Option[Positive]):
       Process[CompExecM, Data] =
-    queryPlan(query, vars, basePath, off, lim).sequenceU.fold(
-      Process(_: _*),
-      compToCompExec(_)
-        .liftM[Process]
-        .flatMap(Q.evaluate(_).translate[CompExecM](execToCompExec)))
+    compToCompExec(queryPlan(query, vars, basePath, off, lim)).liftM[Process]
+      .flatMap(Q.evaluate(_).translate[CompExecM](execToCompExec))
 
   /** Returns the path to the result of executing the given SQL^2 query
     * using the given output file.
@@ -63,9 +58,7 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
     implicit W: WriteFile.Ops[S], MF: ManageFile.Ops[S]):
       CompExecM[Unit] =
     compToCompExec(queryPlan(query, vars, basePath, 0L, None))
-      .flatMap(lp => execToCompExec(lp.fold(
-        d => fsErrToExec(W.saveThese(out, d.toVector).flatMap(fse => (fse.headOption <\/ (())).liftT)),
-        Q.execute(_, out))))
+      .flatMap(lp => execToCompExec(Q.execute(lp, out)))
 
   /** Returns the physical execution plan for the given SQL^2 query. */
   def explainQuery(
@@ -74,9 +67,7 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
     basePath: ADir
   ): CompExecM[ExecutionPlan] =
     compToCompExec(queryPlan(query, vars, basePath, 0L, None))
-      .flatMap(lp => execToCompExec(lp.fold(
-        κ(ExecutionPlan(FileSystemType("none"), "Constant", ISet.empty).point[ExecM]),
-        Q.explain(_))))
+      .flatMap(lp => execToCompExec(Q.explain(lp)))
 
   /** The results of executing the given SQL^2 query. */
   def queryResults(
@@ -87,7 +78,5 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
     lim: Option[Positive]
   ): CompExecM[Process0[Data]] =
     compToCompExec(queryPlan(query, vars, basePath, off, lim))
-      .flatMap(_.fold(
-        ds => Process.emitAll(ds).point[CompExecM],
-        lp => execToCompExec(Q.results(lp))))
+      .flatMap(lp => execToCompExec(Q.results(lp)))
 }

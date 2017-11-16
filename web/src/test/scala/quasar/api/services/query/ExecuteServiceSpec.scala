@@ -27,13 +27,14 @@ import quasar.contrib.pathy._, PathArbitrary._
 import quasar.contrib.scalaz.catchable._
 import quasar.DateArbitrary._
 import quasar.fp._
+import quasar.fp.free.{foldMapNT, injectNT, liftFT}
 import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._, mount._
 import quasar.fs.mount.cache.ViewCache
 import quasar.fs.mount.MountConfig.viewConfig0
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
-import quasar.main.Fixture.mountingInter
+import quasar.main.CoreEffIO
 import quasar.sql.{Positive => _, _}
 
 import java.time.{Instant, Duration}
@@ -71,38 +72,26 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
 
   def executeServiceRef(
     mem: InMemState,
-    f: FileSystem ~> InMemoryFs,
+    f: QueryFile ~> Free[QueryFile, ?],
     mounts: Map[APath, MountConfig] = Map.empty
   ): (Service[Request, Response], Task[InMemState]) = {
-    val (inter, ref) = runInspect(mem).unsafePerformSync
-    val svc = HttpService.lift(req =>
-      execute.service[Eff]
-        .toHttpService(effRespOr(inter compose f, mountingInter(mounts).unsafePerformSync))
-        .apply(req)).orNotFound
+    val (inter, ref) = inMemFSWebInspect(mem, MountingsConfig(mounts)).unsafePerformSync
+    val finalInter = free.transformIn(f andThen foldMapNT(injectNT[QueryFile, CoreEffIO] andThen inter), inter)
+    val svc = execute.service[CoreEffIO].toHttpService(finalInter).orNotFound
 
-    (svc, ref)
+    (svc, ref.map{ case (mem, _) => mem })
   }
 
-  def failingExecPlan[F[_]: Applicative](msg: String, f: FileSystem ~> F): FileSystem ~> F = {
-    val qf: QueryFile ~> F =
-      f compose free.injectNT[QueryFile, FileSystem]
+  def failingExecPlan(msg: String): QueryFile ~> Free[QueryFile, ?] =
+    λ[QueryFile ~> Free[QueryFile, ?]] {
+      case QueryFile.ExecutePlan(lp, _) =>
+        (Vector[PhaseResult](), executionFailed_(lp, msg).left[Unit]).point[Free[QueryFile, ?]]
 
-    val failingQf: QueryFile ~> F = new (QueryFile ~> F) {
-      import QueryFile._
-      def apply[A](qa: QueryFile[A]) = qa match {
-        case ExecutePlan(lp, _) =>
-          (Vector[PhaseResult](), executionFailed_(lp, msg).left[Unit]).point[F]
-
-        case otherwise =>
-          qf(otherwise)
-      }
+      case otherwise => Free.liftF(otherwise)
     }
 
-    free.transformIn(failingQf, f)
-  }
-
   def post[A: EntityDecoder](
-    eval: FileSystem ~> InMemoryFs)(
+    eval: QueryFile ~> Free[QueryFile, ?])(
     path: ADir,
     query: Option[Query],
     destination: Option[FPath],
@@ -128,10 +117,9 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
     response(actualResponse.as[A].unsafePerformSync) and (actualResponse.status must_== status) and stateCheck0(ref.unsafePerformSync)
   }
 
-  def toLP(q: String, vars: Variables): Fix[LogicalPlan] =
-      sql.fixParser.parseExpr(q).fold(
-        error => scala.sys.error(s"could not compile query: $q due to error: $error"),
-        expr => quasar.queryPlan(expr, vars, rootDir, 0L, None).run.value.toOption.get).valueOr(_ => scala.sys.error("unsupported constant plan"))
+  def toLP(q: Fix[Sql], vars: Variables): Fix[LogicalPlan] =
+    quasar.queryPlan(q, vars, rootDir, 0L, None).run.value.valueOr(
+      err => scala.sys.error("Unexpected error compiling sql to LogicalPlan: " + err.shows))
 
   "Execute" should {
     "execute a simple query" >> {
@@ -146,7 +134,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
       }
       "POST" >> prop { (filesystem: SingleFileMemState, destination: FPath) => {
         val expectedDestinationPath = refineTypeAbs(destination).fold(ι, filesystem.parent </> _)
-        post[AJson](fileSystem)(
+        post[AJson](liftFT[QueryFile])(
           path = filesystem.parent,
           query = Some(Query(selectAll(file1(filesystem.filename)))),
           destination = Some(destination),
@@ -224,7 +212,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
     }
     "execute a query with offset and limit and a variable" >> {
       def queryAndExpectedLP(aFile: AFile, varName: AlphaCharacters, var_ : Int): (String, Fix[LogicalPlan]) = {
-        val query = selectAllWithVar(file1(fileName(aFile)), varName.value)
+        val query = pprint(selectAllWithVar(file1(fileName(aFile)), varName.value))
         val inlineQuery = selectAllWithVar(aFile, varName.value)
         val lp = toLP(inlineQuery, Variables.fromMap(Map(varName.value -> var_.toString)))
         (query,lp)
@@ -267,7 +255,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
       "POST" >> prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive, destination: FPath) =>
         val (query, lp) = queryAndExpectedLP(filesystem.file, varName, var_)
         val expectedDestinationPath = refineTypeAbs(destination).fold(ι, filesystem.parent </> _)
-        post[AJson](fileSystem)(
+        post[AJson](liftFT[QueryFile])(
           path = filesystem.parent,
           query = Some(Query(query, offset = Some(offset), limit = Some(limit), varNameAndValue = Some((varName.value, var_.toString)))),
           destination = Some(destination),
@@ -407,7 +395,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
     }
     "POST (error conditions)" >> {
       "be 404 for missing directory" >> prop { (dir: ADir, destination: AFile, filename: FileName) =>
-        post[String](fileSystem)(
+        post[String](liftFT[QueryFile])(
           path = dir,
           query = Some(Query(selectAll(file(filename.value)))),
           destination = Some(destination),
@@ -416,7 +404,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
           response = _ must_== "???")
       }.pendingUntilFixed("SD-773")
       "be 400 with missing query" >> prop { (filesystem: SingleFileMemState, destination: AFile) =>
-        post[ApiError](fileSystem)(
+        post[ApiError](liftFT[QueryFile])(
           path = filesystem.parent,
           query = None,
           destination = Some(destination),
@@ -426,7 +414,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
             Status.BadRequest withReason "No SQL^2 query found in message body.")))
       }
       "be 400 with missing Destination header" >> prop { filesystem: SingleFileMemState =>
-        post[ApiError](fileSystem)(
+        post[ApiError](liftFT[QueryFile])(
           path = filesystem.parent,
           query = Some(Query(selectAll(file(filesystem.filename.value)))),
           destination = None,
@@ -435,7 +423,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
           response = _ must beHeaderMissingError("Destination"))
       }
       "be 400 for query error" >> prop { (filesystem: SingleFileMemState, destination: AFile) =>
-        post[ApiError](fileSystem)(
+        post[ApiError](liftFT[QueryFile])(
           path = filesystem.parent,
           query = Some(Query("select date where")),
           destination = Some(destination),
@@ -456,7 +444,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
         val phases: PhaseResults =
           queryPlan(expr, Variables.empty, rootDir, 0L, None).run.written
 
-        post[ApiError](fileSystem)(
+        post[ApiError](liftFT[QueryFile])(
           path = fs.parent,
           query = Some(Query(q)),
           destination = Some(dst),
@@ -466,17 +454,16 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
       }
       "be 500 for execution error" >> {
         val q = "select * from `/foo`"
-        val lp = toLP(q, Variables.empty)
-        val msg = "EXEC FAILED"
-        val err = executionFailed_(lp, msg)
-
         val expr: Fix[Sql] = sql.fixParser.parseExpr(q).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))
+        val lp = toLP(expr, Variables.empty)
+        val msg = "EXEC FAILED"
+        val err = executionFailed_(lp, msg)
 
         val phases: PhaseResults =
           queryPlan(expr, Variables.empty, rootDir, 0L, None).run.written
 
-        post[ApiError](failingExecPlan(msg, fileSystem))(
+        post[ApiError](failingExecPlan(msg))(
           path = rootDir,
           query = Some(Query(q)),
           destination = Some(rootDir </> file("outA")),

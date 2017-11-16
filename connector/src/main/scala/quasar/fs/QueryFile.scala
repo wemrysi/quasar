@@ -345,6 +345,9 @@ object QueryFile {
       lsR(currentDir).foldLeft(Set.empty[RFile])(_ + _)
     }
 
+    def listContents(dir: ADir): M[Set[PathSegment]] =
+      EitherT(lift(ListContents(dir)))
+
     /** Returns whether the given file exists. */
     def fileExists(file: AFile): FreeS[Boolean] =
       lift(FileExists(file))
