@@ -44,10 +44,11 @@ class PlannerQScriptSpec extends
   import CollectionUtil._
   import Reshape.reshape
 
-  val (func, free, fix) =
+  val dsl =
     quasar.qscript.construction.mkDefaults[Fix, fs.MongoQScript[Fix, ?]]
+  import dsl._
 
-  val ejs = Fixed[Fix[EJson]]
+  val json = Fixed[Fix[EJson]]
 
   //TODO make this independent of MongoQScript and move to a place where all
   //     connector tests can refer to it
@@ -56,10 +57,10 @@ class PlannerQScriptSpec extends
       fix.Unreferenced,
       free.Filter(
         free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-        func.Guard(func.Hole, Type.AnyObject, func.Constant(ejs.bool(true)), func.Constant(ejs.bool(false)))),
+        func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
       free.Filter(
         free.ShiftedRead[AFile](rootDir </> dir("db") </> file("smallZips"), qscript.ExcludeId),
-        func.Guard(func.Hole, Type.AnyObject, func.Constant(ejs.bool(true)), func.Constant(ejs.bool(false)))),
+        func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
       List((func.ProjectKeyS(func.Hole, "_id"), func.ProjectKeyS(func.Hole, "_id"))),
       JoinType.Inner,
       func.ProjectKeyS(func.RightSide, "city"))

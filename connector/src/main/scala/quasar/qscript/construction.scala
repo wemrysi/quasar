@@ -29,7 +29,7 @@ import quasar.ejson.EJson
 
 object construction {
   final case class Func[T[_[_]]]()(implicit birec: BirecursiveT[T]) {
-    val ejs = ejson.Fixed[T[EJson]]
+    private val json = ejson.Fixed[T[EJson]]
     private def rollCore[A](in: MapFuncCore[T, FreeMapA[T, A]]): FreeMapA[T, A] = Free.roll(MFC(in))
     private def rollDerived[A](in: MapFuncDerived[T, FreeMapA[T, A]]): FreeMapA[T, A] = Free.roll(MFD(in))
     def Constant[A](in: T[EJson]): FreeMapA[T, A] =
@@ -127,19 +127,19 @@ object construction {
     def ProjectKey[A](src: FreeMapA[T, A], key: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.ProjectKey(src, key))
     def ProjectKeyS[A](src: FreeMapA[T, A], key: String): FreeMapA[T, A] =
-      ProjectKey(src, Constant(ejs.str(key)))
+      ProjectKey(src, Constant(json.str(key)))
     def DeleteKey[A](src: FreeMapA[T, A], key: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.DeleteKey(src, key))
     def DeleteKeyS[A](src: FreeMapA[T, A], key: String): FreeMapA[T, A] =
-      DeleteKey(src, Constant(ejs.str(key)))
+      DeleteKey(src, Constant(json.str(key)))
     def MakeMap[A](key: FreeMapA[T, A], src: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.MakeMap(key, src))
     def MakeMapS[A](key: String, src: FreeMapA[T, A]): FreeMapA[T, A] =
-      MakeMap(Constant(ejs.str(key)), src)
+      MakeMap(Constant(json.str(key)), src)
     def ProjectIndex[A](src: FreeMapA[T, A], index: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.ProjectIndex(src, index))
     def ProjectIndexI[A](src: FreeMapA[T, A], index: Int): FreeMapA[T, A] =
-      ProjectIndex(src, Constant(ejs.int(index)))
+      ProjectIndex(src, Constant(json.int(index)))
     def ConcatArrays[A](left: FreeMapA[T, A], right: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.ConcatArrays(left, right))
     def ConcatMaps[A](left: FreeMapA[T, A], right: FreeMapA[T, A]): FreeMapA[T, A] =
@@ -284,10 +284,17 @@ object construction {
       ev(Free.pure(SrcHole))
   }
 
+  class Defaults[T[_[_]]: BirecursiveT, F[_]](implicit injCore: Injectable.Aux[QScriptCore[T, ?], F],
+                                              injTotal: Injectable.Aux[F, QScriptTotal[T, ?]]) {
+    val func: Func[T] = Func[T]
+    val free: Dsl[T, F, Free[F, Hole]] = mkFree[T, F]
+    val fix: Dsl[T, F, Fix[F]] = mkFix[T, F]
+  }
+
   def mkDefaults[T[_[_]]: BirecursiveT, F[_]](implicit
                                               injCore: Injectable.Aux[QScriptCore[T, ?], F],
-                                              injTotal: Injectable.Aux[F, QScriptTotal[T, ?]]): (Func[T], Dsl[T, F, Free[F, Hole]], Dsl[T, F, Fix[F]]) =
-    (Func[T], mkFree[T, F], mkFix[T, F])
+                                              injTotal: Injectable.Aux[F, QScriptTotal[T, ?]]): Defaults[T, F] =
+    new Defaults[T, F]
 
   def mkFree[T[_[_]]: CorecursiveT, F[_]](implicit
                                           injCore: Injectable.Aux[QScriptCore[T, ?], F],
