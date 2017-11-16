@@ -18,13 +18,12 @@ package quasar.physical.rdbms.planner
 
 import slamdata.Predef._
 import quasar._
-  import quasar.contrib.pathy._
+import quasar.contrib.pathy._
 import quasar.fs.FileSystemError
 import quasar.Qspec
 import quasar.physical.rdbms.planner.sql.SqlExpr
 import quasar.qscript._
 import quasar.sql._
-
 import eu.timepit.refined.auto._
 import matryoshka._
 import matryoshka.data._
@@ -32,6 +31,8 @@ import matryoshka.implicits._
 import org.specs2.execute.NoDetails
 import org.specs2.matcher._
 import pathy.Path._
+import quasar.physical.rdbms.fs.postgres.planner.PostgresRenderQuery
+
 import scalaz._
 import Scalaz._
 import scalaz.concurrent.Task
@@ -53,6 +54,21 @@ class PlannerSpec extends Qspec with SqlExprSupport {
              NoDetails)
     }
   }
+
+  //TODO: generalize to any backing renderer
+  case class equalToSQL(expected: String) extends Matcher[\/[FileSystemError, Fix[QSM[Fix, ?]]]] {
+    def apply[S <: \/[FileSystemError, Fix[QSM[Fix, ?]]]](s: Expectable[S]) = {
+      val leftSql = s.value.map(qsToRepr[Fix]).flatMap(PostgresRenderQuery.asString(_))
+
+      val exp = expected.right[FileSystemError]
+
+      result(leftSql == exp, "", s"Query:\n$leftSql\nwas not equal to query:\n$exp", s, NoDetails)
+    }
+  }
+
+  def beSql(expected: String) =
+    equalToSQL(expected)
+
 
   def beRepr(expected: SqlExpr[Fix[SqlExpr]]) =
     equalToRepr[FileSystemError](Fix(expected))
@@ -123,6 +139,16 @@ class PlannerSpec extends Qspec with SqlExprSupport {
         SelectRow(selection(*), fromTable("db.foo"))
       })
     }
+  }
+
+  "MapFuncCore" should {
+
+    "represent addition" in {
+      qs(sqlE"select a+b from foo") must
+        beSql("select ((d->>'age')::numeric + (d->>'age')::numeric) from (select row_to_json(row) as d from foo row) as r;")
+    }.pendingUntilFixed("needs scoping mechanism to add idents correctly") //TODO
+
+
   }
 
 }

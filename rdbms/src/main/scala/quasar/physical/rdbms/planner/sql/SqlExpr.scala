@@ -25,6 +25,7 @@ object SqlExpr extends SqlExprInstances {
 
   import Select._
   final case class Id[T](v: String) extends SqlExpr[T]
+  final case class Ref[T](ref: T) extends SqlExpr[T]
   final case class Null[T]() extends SqlExpr[T]
 
   final case class SelectRow[T](selection: Selection[T], from: From[T])
@@ -38,8 +39,9 @@ object SqlExpr extends SqlExprInstances {
   final case class Selection[T](v: T, alias: Option[Id[T]])
   final case class Table[T](name: String) extends SqlExpr[T]
 
-  final case class Infix[T](op: String, left: T, right: T) extends SqlExpr[T]
+  final case class Op[T](op: String, left: T, right: T) extends SqlExpr[T]
   final case class Constant[T](data: Data) extends SqlExpr[T]
+
 
   object Select {
     final case class Filter[T](v: T)

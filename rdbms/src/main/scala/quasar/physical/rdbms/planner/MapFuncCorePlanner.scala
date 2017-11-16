@@ -69,10 +69,10 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.ExtractYear(f) =>  notImplemented
     case MFC.Now() =>  notImplemented
     case MFC.Negate(f) =>  notImplemented
-    case MFC.Add(f1, f2) =>  SQL.Infix[T[SQL]]("+", f1, f2).embed.η[F]
-    case MFC.Multiply(f1, f2) => SQL.Infix[T[SQL]]("*", f1, f2).embed.η[F]
-    case MFC.Subtract(f1, f2) =>  SQL.Infix[T[SQL]]("-", f1, f2).embed.η[F]
-    case MFC.Divide(f1, f2) => SQL.Infix[T[SQL]]("/", f1, f2).embed.η[F]
+    case MFC.Add(f1, f2) =>  SQL.Op[T[SQL]]("+", f1, f2).embed.η[F]
+    case MFC.Multiply(f1, f2) => SQL.Op[T[SQL]]("*", f1, f2).embed.η[F]
+    case MFC.Subtract(f1, f2) =>  SQL.Op[T[SQL]]("-", f1, f2).embed.η[F]
+    case MFC.Divide(f1, f2) => SQL.Op[T[SQL]]("/", f1, f2).embed.η[F]
     case MFC.Modulo(f1, f2) => notImplemented
     case MFC.Power(f1, f2) =>  notImplemented
     case MFC.Not(f) =>  notImplemented
@@ -103,7 +103,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.ConcatArrays(f1, f2) =>  notImplemented
     case MFC.ConcatMaps(f1, f2) =>  notImplemented
     case MFC.ProjectIndex(f1, f2) =>  notImplemented
-    case MFC.ProjectKey(fSrc, fKey) =>  fKey.η[F]
+    case MFC.ProjectKey(fSrc, fKey) =>  SQL.Ref[T[SQL]](fKey).embed.η[F]
     case MFC.DeleteKey(fSrc, fField) =>   notImplemented
     case MFC.Range(fFrom, fTo) =>  notImplemented
     case MFC.Guard(f1, fPattern, f2, ff3) => f2.η[F]

@@ -83,9 +83,13 @@ trait SqlExprSupport {
           FileName("bar2").right
         )).point[EitherWriter]
 
-  def plan(sql: Fix[Sql]) = {
+  def qs(sql: Fix[Sql]) = {
     (compileSqlToLP[EitherWriter](sql) >>= (lp =>
-      Postgres.lpToQScript(lp, listContents))).run.run._2.map(qsToRepr[Fix])
+      Postgres.lpToQScript(lp, listContents))).run.run._2
+  }
+
+  def plan(sql: Fix[Sql]) = {
+    qs(sql).map(qsToRepr[Fix])
   }
 
   implicit def idNameGenerator: NameGenerator[Id] =
