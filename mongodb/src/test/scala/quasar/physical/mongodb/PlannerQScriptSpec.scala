@@ -16,20 +16,22 @@
 
 package quasar.physical.mongodb
 
-import slamdata.Predef._
 import quasar._
 import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._
 import quasar.contrib.specs2.PendingWithActualTracking
+import quasar.javascript._
 import quasar.ejson.{EJson, Fixed}
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
 import quasar.sql.JoinDir
+import slamdata.Predef._
 
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix
 import pathy.Path._
+import scalaz._
 
 class PlannerQScriptSpec extends
     PlannerHelpers with
@@ -37,6 +39,8 @@ class PlannerQScriptSpec extends
 
   import fixExprOp._
   import PlannerHelpers._
+  import expr3_2Fp._
+  import jscore._
   import CollectionUtil._
   import Reshape.reshape
 
@@ -588,6 +592,42 @@ class PlannerQScriptSpec extends
           IgnoreId)))
           // Not on agg
     }.pendingWithActual(notOnPar, qtestFile("plan simple inner equi-join with pre-filtering ($lookup)"))
+
+    "plan typechecks with JS when unable to extract ExprOp" in {
+      import fix.{Filter, ShiftedRead}, qscript.IncludeId
+      import func.{Guard, Hole, ProjectKeyS, ProjectIndexI, Constant}
+
+      qplan(
+        Filter(
+          ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), IncludeId),
+          Guard(
+            ProjectKeyS(ProjectIndexI(Hole, 1), "parentid"),
+            Type.Str,
+            Constant(json.bool(false)),
+            Constant(json.bool(true))))) must beWorkflow0(
+        chain[Workflow](
+          $read(collection("db", "zips")),
+          $project(reshape("0" -> $arrayLit(List($field("_id"), $$ROOT)))),
+          $simpleMap(
+            NonEmptyList(MapExpr(JsFn(Name("x"), obj(
+              "0" ->
+                If(Call(ident("isString"),
+                  List(
+                    Select(Access(
+                      Access(
+                        ident("x"),
+                        jscore.Literal(Js.Str("0"))),
+                      jscore.Literal(Js.Num(1, false))), "parentid"))),
+                  jscore.Literal(Js.Bool(false)),
+                  jscore.Literal(Js.Bool(true))),
+              "src" -> Access(ident("x"), jscore.Literal(Js.Str("0")))
+            )))),
+            ListMap()),
+          $match(Selector.Doc(
+            BsonField.Name("0") -> Selector.Eq(Bson.Bool(true))
+          )),
+          $project(reshape(sigil.Quasar -> $field("src")))))
+    }
 
   }
 }

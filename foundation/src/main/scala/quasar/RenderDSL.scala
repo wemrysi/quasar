@@ -14,18 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.physical.rdbms.fs
+package quasar
 
-import quasar.physical.rdbms.common.{CustomSchema, DefaultSchema, Schema}
-import quasar.physical.rdbms.common._
-import scalaz.Show
+import simulacrum.typeclass
 
-package object postgres {
-
-  val DefaultSchemaName = "public"
-
-  implicit val showSchema: Show[Schema] = Show.shows {
-    case DefaultSchema => DefaultSchemaName
-    case c: CustomSchema => Schema.showCustomSchema.shows(c)
-  }
+@typeclass trait RenderDSL[A] {
+  def toDsl(a: A): DSLTree
 }

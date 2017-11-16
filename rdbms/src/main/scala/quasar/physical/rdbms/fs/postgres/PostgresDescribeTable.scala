@@ -17,8 +17,8 @@
 package quasar.physical.rdbms.fs.postgres
 
 import slamdata.Predef._
-import quasar.physical.rdbms.common.{CustomSchema, DefaultSchema, Schema, TableName, TablePath}
 import quasar.physical.rdbms.fs.RdbmsDescribeTable
+import quasar.physical.rdbms.common._
 import quasar.physical.rdbms.common.TablePath._
 
 import doobie.imports._
@@ -44,41 +44,44 @@ trait PostgresDescribeTable extends RdbmsDescribeTable {
     Fragment.const("'" + tablePath.table.shows + "'")
   }
 
-  private def whereSchema(schemaName: String): Fragment =
+  private def whereSchema(schema: Schema): Fragment =
+    if (schema.isRoot)
+      fr""
+  else
     fr"WHERE TABLE_SCHEMA =" ++
-      Fragment.const("'" + schemaName + "'")
+      Fragment.const("'" + schema.shows + "'")
 
 
   override def findChildTables(schema: Schema): ConnectionIO[Vector[TableName]] = {
-    val whereClause = schema match {
-      case DefaultSchema => fr""
-      case c: CustomSchema => fr"WHERE TABLE_SCHEMA = ${c.shows}"
-    }
-
-    (fr"select TABLE_NAME from information_schema.tables" ++ whereClause)
+    if (schema.isRoot)
+      Vector.empty.point[ConnectionIO]
+    else
+    (fr"select TABLE_NAME from information_schema.tables" ++ whereSchema(schema))
       .query[String]
       .vector
       .map(_.map(TableName.apply))
   }
 
-  override def findChildSchemas(parent: Schema): ConnectionIO[Vector[CustomSchema]] = {
-    val whereClause = parent match {
-      case DefaultSchema => fr""
-      case c: CustomSchema =>
-        fr"WHERE SCHEMA_NAME LIKE" ++ Fragment.const("'" + c.shows + Separator + "%'")
-    }
+  override def findChildSchemas(parent: Schema): ConnectionIO[Vector[Schema]] = {
+    val whereClause = if (parent.isRoot)
+        fr""
+      else
+        fr"WHERE SCHEMA_NAME LIKE" ++ Fragment.const("'" + parent.shows + Separator + "%'")
+
     (fr"SELECT SCHEMA_NAME FROM information_schema.schemata" ++ whereClause)
       .query[String]
       .vector
-      .map(_.map(CustomSchema.apply))
+      .map(_.map(Schema.apply))
   }
 
+
   override def schemaExists(schema: Schema): ConnectionIO[Boolean] =
-    schema match {
-      case DefaultSchema => true.point[ConnectionIO]
-      case c: CustomSchema =>
-        descQuery(whereSchema(c.shows), _.nonEmpty)
-    }
+    if (schema.isRoot) true.point[ConnectionIO]
+    else
+      sql"""SELECT 1 FROM information_schema.schemata WHERE SCHEMA_NAME=${schema.shows}"""
+      .query[Int]
+      .list
+      .map(_.nonEmpty)
 
   override def tableExists(
       tablePath: TablePath): ConnectionIO[Boolean] =

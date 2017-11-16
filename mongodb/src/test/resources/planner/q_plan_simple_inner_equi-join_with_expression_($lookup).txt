@@ -4,7 +4,16 @@ Chain
 │  ╰─ Doc
 │     ╰─ Expr($_id -> Type(Text))
 ├─ $ProjectF
-│  ├─ Name("0" -> { "$literal": true })
+│  ├─ Name("0" -> {
+│  │       "$cond": [
+│  │         {
+│  │           "$and": [
+│  │             { "$lte": [{ "$literal": "" }, "$_id"] },
+│  │             { "$lt": ["$_id", { "$literal": {  } }] }]
+│  │         },
+│  │         { "$literal": true },
+│  │         { "$literal": false }]
+│  │     })
 │  ├─ Name("src" -> "$$ROOT")
 │  ╰─ ExcludeId
 ├─ $MatchF

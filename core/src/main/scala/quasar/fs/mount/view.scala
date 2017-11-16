@@ -255,7 +255,7 @@ object view {
                             .run.run.map(_.map(_.right[FileSystemError]))
                         ))).leftMap(_.wrapNel)
         block        <- EitherT(EitherT(
-                          resolveImports_(viewConfig.query, rootDir).run.run.liftM[OptionT]
+                          resolveImports_(viewConfig.query, fileParent(loc)).run.run.liftM[OptionT]
                         )).leftMap(_.wrapNel)
         r            <- EitherT(EitherT(
                           precompile[Fix[LP]](block, viewConfig.vars, fileParent(loc))
