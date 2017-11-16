@@ -130,6 +130,8 @@ object PlannerHelpers {
       else
         Set(
           FileName("foo").right[DirName],
+          FileName("divide").right,
+          FileName("nullsWithMissing").right,
           FileName("cars").right,
           FileName("cars2").right,
           FileName("zips").right,

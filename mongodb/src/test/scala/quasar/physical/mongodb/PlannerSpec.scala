@@ -64,14 +64,14 @@ class PlannerSpec extends
 
   "plan from query string" should {
     "plan simple select *" in {
-      plan(sqlE"select * from foo") must beWorkflow(
-        $read[WorkflowF](collection("db", "foo")))
+      plan(sqlE"select * from smallZips") must beWorkflow(
+        $read[WorkflowF](collection("db", "smallZips")))
     }
 
     "plan count(*)" in {
-      plan(sqlE"select count(*) from foo") must beWorkflow(
+      plan(sqlE"select count(*) from zips") must beWorkflow(
         chain[Workflow](
-          $read(collection("db", "foo")),
+          $read(collection("db", "zips")),
           $group(
             grouped("f0" -> $sum($literal(Bson.Int32(1)))),
             \/-($literal(Bson.Null))),
@@ -81,93 +81,93 @@ class PlannerSpec extends
     }
 
     "plan simple field projection on single set" in {
-      plan(sqlE"select foo.bar from foo") must
+      plan(sqlE"select cars.name from cars") must
         beWorkflow(chain[Workflow](
-          $read(collection("db", "foo")),
+          $read(collection("db", "cars")),
           $project(
-            reshape(sigil.Quasar -> $field("bar")),
+            reshape(sigil.Quasar -> $field("name")),
             ExcludeId)))
     }
 
     "plan simple field projection on single set when table name is inferred" in {
-      plan(sqlE"select bar from foo") must
+      plan(sqlE"select name from cars") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "cars")),
          $project(
-           reshape(sigil.Quasar -> $field("bar")),
+           reshape(sigil.Quasar -> $field("name")),
            ExcludeId)))
     }
 
     "plan multiple field projection on single set when table name is inferred" in {
-      plan(sqlE"select bar, baz from foo") must
+      plan(sqlE"select name, year from cars") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "cars")),
          $project(
            reshape(
-             "bar" -> $field("bar"),
-             "baz" -> $field("baz")),
+             "name" -> $field("name"),
+             "year" -> $field("year")),
            ExcludeId)))
     }
 
     "plan simple addition on two fields" in {
-      plan(sqlE"select foo + bar from baz") must
+      plan(sqlE"select val1 + val2 from divide") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "baz")),
+         $read(collection("db", "divide")),
          $project(
            reshape(sigil.Quasar ->
              $cond(
                $and(
-                 $lt($literal(Bson.Null), $field("bar")),
-                 $lt($field("bar"), $literal(Bson.Text("")))),
+                 $lt($literal(Bson.Null), $field("val2")),
+                 $lt($field("val2"), $literal(Bson.Text("")))),
                $cond(
                  $or(
                    $and(
-                     $lt($literal(Bson.Null), $field("foo")),
-                     $lt($field("foo"), $literal(Bson.Text("")))),
+                     $lt($literal(Bson.Null), $field("val1")),
+                     $lt($field("val1"), $literal(Bson.Text("")))),
                    $and(
-                     $lte($literal(Check.minDate), $field("foo")),
-                     $lt($field("foo"), $literal(Bson.Regex("", ""))))),
-                 $add($field("foo"), $field("bar")),
+                     $lte($literal(Check.minDate), $field("val1")),
+                     $lt($field("val1"), $literal(Bson.Regex("", ""))))),
+                 $add($field("val1"), $field("val2")),
                  $literal(Bson.Undefined)),
                $literal(Bson.Undefined))),
            ExcludeId)))
     }
 
     "plan concat (3.0-)" in {
-      plan3_0(sqlE"select concat(bar, baz) from foo") must
+      plan3_0(sqlE"select concat(city, state) from extraSmallZips") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "extraSmallZips")),
          $project(
            reshape(sigil.Quasar ->
              $cond(
                $and(
-                 $lte($literal(Bson.Text("")), $field("baz")),
-                 $lt($field("baz"), $literal(Bson.Doc()))),
+                 $lte($literal(Bson.Text("")), $field("state")),
+                 $lt($field("state"), $literal(Bson.Doc()))),
                $cond(
                  $and(
-                   $lte($literal(Bson.Text("")), $field("bar")),
-                   $lt($field("bar"), $literal(Bson.Doc()))),
-                 $concat($field("bar"), $field("baz")),
+                   $lte($literal(Bson.Text("")), $field("city")),
+                   $lt($field("city"), $literal(Bson.Doc()))),
+                 $concat($field("city"), $field("state")),
                  $literal(Bson.Undefined)),
                $literal(Bson.Undefined))),
            ExcludeId)))
     }
 
     "plan concat (3.2+)" in {
-      plan3_2(sqlE"select concat(bar, baz) from foo") must
+      plan3_2(sqlE"select concat(city, state) from extraSmallZips") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "extraSmallZips")),
          $project(
            reshape(sigil.Quasar ->
              $cond(
                $and(
-                 $lte($literal(Bson.Text("")), $field("baz")),
-                 $lt($field("baz"), $literal(Bson.Doc()))),
+                 $lte($literal(Bson.Text("")), $field("state")),
+                 $lt($field("state"), $literal(Bson.Doc()))),
                $cond(
                  $and(
-                   $lte($literal(Bson.Text("")), $field("bar")),
-                   $lt($field("bar"), $literal(Bson.Doc()))),
-                 $let(ListMap(DocVar.Name("a1") -> $field("bar"), DocVar.Name("a2") -> $field("baz")),
+                   $lte($literal(Bson.Text("")), $field("city")),
+                   $lt($field("city"), $literal(Bson.Doc()))),
+                 $let(ListMap(DocVar.Name("a1") -> $field("city"), DocVar.Name("a2") -> $field("state")),
                    $cond($and($isArray($field("$a1")), $isArray($field("$a2"))),
                      $concatArrays(List($field("$a1"), $field("$a2"))),
                      $concat($field("$a1"), $field("$a2")))),
@@ -177,9 +177,9 @@ class PlannerSpec extends
     }
 
     "plan concat strings with ||" in {
-      plan(sqlE"""select city || ", " || state from zips""") must
+      plan(sqlE"""select city || ", " || state from extraSmallZips""") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "zips")),
+         $read(collection("db", "extraSmallZips")),
          $project(
            reshape(
              sigil.Quasar ->
@@ -219,30 +219,30 @@ class PlannerSpec extends
     }
 
     "plan concat strings with ||, constant on the right" in {
-      plan(sqlE"""select a || b || "..." from foo""") must
+      plan(sqlE"""select city || state || "..." from extraSmallZips""") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "extraSmallZips")),
          $project(
            reshape(
              "0" ->
                $cond(
                  $or(
                    $and(
-                     $lte($literal(Bson.Arr()), $field("b")),
-                     $lt($field("b"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                     $lte($literal(Bson.Arr()), $field("state")),
+                     $lt($field("state"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                    $and(
-                     $lte($literal(Bson.Text("")), $field("b")),
-                     $lt($field("b"), $literal(Bson.Doc())))),
+                     $lte($literal(Bson.Text("")), $field("state")),
+                     $lt($field("state"), $literal(Bson.Doc())))),
                  $cond(
                    $or(
                      $and(
-                       $lte($literal(Bson.Arr()), $field("a")),
-                       $lt($field("a"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                       $lte($literal(Bson.Arr()), $field("city")),
+                       $lt($field("city"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                      $and(
-                       $lte($literal(Bson.Text("")), $field("a")),
-                       $lt($field("a"), $literal(Bson.Doc())))),
+                       $lte($literal(Bson.Text("")), $field("city")),
+                       $lt($field("city"), $literal(Bson.Doc())))),
                    $concat( // TODO: ideally, this would be a single $concat
-                     $concat($field("a"), $field("b")),
+                     $concat($field("city"), $field("state")),
                      $literal(Bson.Text("..."))),
                    $literal(Bson.Undefined)),
                  $literal(Bson.Undefined))),
@@ -250,42 +250,42 @@ class PlannerSpec extends
     }.pendingUntilFixed("SD-639")
 
     "plan concat with unknown types" in {
-      plan(sqlE"select a || b from foo") must
+      plan(sqlE"select city || state from extraSmallZips") must
         beRight
     }.pendingUntilFixed("SD-639")
 
     "plan lower" in {
-      plan(sqlE"select lower(bar) from foo") must
+      plan(sqlE"select lower(city) from extraSmallZips") must
       beWorkflow(chain[Workflow](
-        $read(collection("db", "foo")),
+        $read(collection("db", "extraSmallZips")),
         $project(
           reshape(sigil.Quasar ->
             $cond(
               $and(
-                $lte($literal(Bson.Text("")), $field("bar")),
-                $lt($field("bar"), $literal(Bson.Doc()))),
-              $toLower($field("bar")),
+                $lte($literal(Bson.Text("")), $field("city")),
+                $lt($field("city"), $literal(Bson.Doc()))),
+              $toLower($field("city")),
               $literal(Bson.Undefined))),
           ExcludeId)))
     }
 
     "plan coalesce" in {
-      plan(sqlE"select coalesce(bar, baz) from foo") must
+      plan(sqlE"select coalesce(val, name) from nullsWithMissing") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "nullsWithMissing")),
          $project(
            reshape(sigil.Quasar ->
              $cond(
-               $eq($field("bar"), $literal(Bson.Null)),
-               $field("baz"),
-               $field("bar"))),
+               $eq($field("val"), $literal(Bson.Null)),
+               $field("name"),
+               $field("val"))),
            ExcludeId)))
     }
 
     "plan select array" in {
-      plan(sqlE"select [city, loc, pop] from zips") must
+      plan(sqlE"select [city, loc, pop] from extraSmallZips") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "zips")),
+         $read(collection("db", "extraSmallZips")),
          $project(
            reshape(sigil.Quasar ->
              $arrayLit(List($field("city"), $field("loc"), $field("pop")))),
@@ -293,9 +293,9 @@ class PlannerSpec extends
     }
 
     "plan select array (map-reduce)" in {
-      plan2_6(sqlE"select [city, loc, pop] from zips") must
+      plan2_6(sqlE"select [city, loc, pop] from extraSmallZips") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "zips")),
+         $read(collection("db", "extraSmallZips")),
          $simpleMap(
            NonEmptyList(MapExpr(JsFn(Name("x"),
              underSigil(Arr(List(Select(ident("x"), "city"), Select(ident("x"), "loc"), Select(ident("x"), "pop"))))))),
@@ -303,18 +303,18 @@ class PlannerSpec extends
     }
 
     "plan select map" in {
-      plan(sqlE"""select { "p": pop } from zips""") must
+      plan(sqlE"""select { "p": pop } from extraSmallZips""") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "zips")),
+         $read(collection("db", "extraSmallZips")),
          $project(
            reshape("p" -> $field("pop")),
            ExcludeId)))
     }
 
     "plan select map with field" in {
-      plan(sqlE"""select { "p": pop }, state from zips""") must
+      plan(sqlE"""select { "p": pop }, state from extraSmallZips""") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "zips")),
+         $read(collection("db", "extraSmallZips")),
          $project(
            reshape(
              "0" -> objectLit("p" -> $field("pop")),
@@ -326,43 +326,43 @@ class PlannerSpec extends
       val time = Instant.parse("2016-08-25T00:00:00.000Z")
       val bsTime = Bson.Date.fromInstant(time).get
 
-      planAt(time, sqlE"""select NOW(), bar from foo""") must
+      planAt(time, sqlE"""select NOW(), name from cars""") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "cars")),
          $project(
-           reshape("0" -> $literal(bsTime), "bar" -> $field("bar")))))
+           reshape("0" -> $literal(bsTime), "name" -> $field("name")))))
     }
 
     "plan date field extraction" in {
-      plan(sqlE"""select date_part("day", baz) from foo""") must
+      plan(sqlE"""select date_part("day", ts) from days""") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "days")),
          $project(
            reshape(sigil.Quasar ->
              $cond(
                $and(
-                 $lte($literal(Check.minDate), $field("baz")),
-                 $lt($field("baz"), $literal(Bson.Regex("", "")))),
-               $dayOfMonth($field("baz")),
+                 $lte($literal(Check.minDate), $field("ts")),
+                 $lt($field("ts"), $literal(Bson.Regex("", "")))),
+               $dayOfMonth($field("ts")),
                $literal(Bson.Undefined))),
            ExcludeId)))
     }
 
     "plan complex date field extraction" in {
-      plan(sqlE"""select date_part("quarter", baz) from foo""") must
+      plan(sqlE"""select date_part("quarter", ts) from days""") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "days")),
          $project(
            reshape(
              sigil.Quasar ->
                $cond(
                  $and(
-                   $lte($literal(Check.minDate), $field("baz")),
-                   $lt($field("baz"), $literal(Bson.Regex("", "")))),
+                   $lte($literal(Check.minDate), $field("ts")),
+                   $lt($field("ts"), $literal(Bson.Regex("", "")))),
                  $trunc(
                    $add(
                      $divide(
-                       $subtract($month($field("baz")), $literal(Bson.Int32(1))),
+                       $subtract($month($field("ts")), $literal(Bson.Int32(1))),
                        $literal(Bson.Int32(3))),
                      $literal(Bson.Int32(1)))),
                  $literal(Bson.Undefined))),
@@ -370,43 +370,43 @@ class PlannerSpec extends
     }
 
     "plan date field extraction: \"dow\"" in {
-      plan(sqlE"""select date_part("dow", baz) from foo""") must
+      plan(sqlE"""select date_part("dow", ts) from days""") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "days")),
          $project(
            reshape(
              sigil.Quasar ->
                $cond(
                  $and(
-                   $lte($literal(Check.minDate), $field("baz")),
-                   $lt($field("baz"), $literal(Bson.Regex("", "")))),
-                 $subtract($dayOfWeek($field("baz")), $literal(Bson.Int32(1))),
+                   $lte($literal(Check.minDate), $field("ts")),
+                   $lt($field("ts"), $literal(Bson.Regex("", "")))),
+                 $subtract($dayOfWeek($field("ts")), $literal(Bson.Int32(1))),
                  $literal(Bson.Undefined))),
            ExcludeId)))
     }
 
     "plan date field extraction: \"isodow\"" in {
-      plan(sqlE"""select date_part("isodow", baz) from foo""") must
+      plan(sqlE"""select date_part("isodow", ts) from days""") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "days")),
          $project(
            reshape(
              sigil.Quasar ->
                $cond(
                  $and(
-                   $lte($literal(Check.minDate), $field("baz")),
-                   $lt($field("baz"), $literal(Bson.Regex("", "")))),
-                 $cond($eq($dayOfWeek($field("baz")), $literal(Bson.Int32(1))),
+                   $lte($literal(Check.minDate), $field("ts")),
+                   $lt($field("ts"), $literal(Bson.Regex("", "")))),
+                 $cond($eq($dayOfWeek($field("ts")), $literal(Bson.Int32(1))),
                    $literal(Bson.Int32(7)),
-                   $subtract($dayOfWeek($field("baz")), $literal(Bson.Int32(1)))),
+                   $subtract($dayOfWeek($field("ts")), $literal(Bson.Int32(1)))),
                  $literal(Bson.Undefined))),
            ExcludeId)))
     }
 
     "plan filter by date field (SD-1508)" in {
-      plan(sqlE"""select * from foo where date_part("year", ts) = 2016""") must
+      plan(sqlE"""select * from days where date_part("year", ts) = 2016""") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "days")),
          $match(Selector.Doc(BsonField.Name("ts") -> Selector.Type(BsonType.Date))),
          $project(
            reshape(
@@ -422,9 +422,9 @@ class PlannerSpec extends
     }
 
     "plan filter array element" in {
-      plan(sqlE"select loc from zips where loc[0] < -73") must
+      plan(sqlE"select loc from extraSmallZips where loc[0] < -73") must
       beWorkflow0(chain[Workflow](
-        $read(collection("db", "zips")),
+        $read(collection("db", "extraSmallZips")),
         $match(Selector.Doc(BsonField.Name("loc") -> Selector.ElemMatch(Selector.Exists(true).right))),
         $project(
           reshape("0" -> $arrayElemAt($field("loc"), $literal(Bson.Int32(0))), "src" -> $$ROOT),
@@ -436,9 +436,9 @@ class PlannerSpec extends
     }
 
     "plan select array element (3.2+)" in {
-      plan3_2(sqlE"select loc[0] from zips") must
+      plan3_2(sqlE"select loc[0] from extraSmallZips") must
       beWorkflow(chain[Workflow](
-        $read(collection("db", "zips")),
+        $read(collection("db", "extraSmallZips")),
         $project(
           reshape(
             sigil.Quasar ->
@@ -452,28 +452,28 @@ class PlannerSpec extends
     }
 
     "plan array length" in {
-      plan(sqlE"select array_length(bar, 1) from zips") must
+      plan(sqlE"select array_length(loc, 1) from extraSmallZips") must
       beWorkflow(chain[Workflow](
-        $read(collection("db", "zips")),
+        $read(collection("db", "extraSmallZips")),
         $project(
           reshape(sigil.Quasar ->
             $cond(
-              $and($lte($literal(Bson.Arr()), $field("bar")),
-                $lt($field("bar"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
-              $size($field("bar")),
+              $and($lte($literal(Bson.Arr()), $field("loc")),
+                $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+              $size($field("loc")),
               $literal(Bson.Undefined))),
           ExcludeId)))
     }
 
     "plan array length 3.2" in {
-      plan3_2(sqlE"select array_length(bar, 1) from zips") must
+      plan3_2(sqlE"select array_length(loc, 1) from extraSmallZips") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "zips")),
+         $read(collection("db", "extraSmallZips")),
          $simpleMap(
            NonEmptyList(MapExpr(JsFn(Name("x"),
              underSigil(If(
-               Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "bar"))),
-               Call(ident("NumberLong"), List(Select(Select(ident("x"), "bar"), "length"))),
+               Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "loc"))),
+               Call(ident("NumberLong"), List(Select(Select(ident("x"), "loc"), "length"))),
                ident(Js.Undefined.ident)))))),
              ListMap())))
     }
@@ -498,9 +498,9 @@ class PlannerSpec extends
     }
 
     "plan conditional" in {
-      plan(sqlE"select case when pop < 10000 then city else loc end from zips") must
+      plan(sqlE"select case when pop < 10000 then city else loc end from extraSmallZips") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "zips")),
+         $read(collection("db", "extraSmallZips")),
          $project(
            reshape(
              sigil.Quasar ->
@@ -520,63 +520,63 @@ class PlannerSpec extends
     }
 
     "plan negate" in {
-      plan(sqlE"select -bar from foo") must
+      plan(sqlE"select -val1 from divide") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "divide")),
          $project(
            reshape(sigil.Quasar ->
              $cond(
                $and(
-                 $lt($literal(Bson.Null), $field("bar")),
-                 $lt($field("bar"), $literal(Bson.Text("")))),
-               $multiply($literal(Bson.Int32(-1)), $field("bar")),
+                 $lt($literal(Bson.Null), $field("val1")),
+                 $lt($field("val1"), $literal(Bson.Text("")))),
+               $multiply($literal(Bson.Int32(-1)), $field("val1")),
                $literal(Bson.Undefined))),
            ExcludeId)))
     }
 
     "plan simple filter" in {
-      plan(sqlE"select * from foo where bar > 10") must
+      plan(sqlE"select * from extraSmallZips where pop > 10000") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "extraSmallZips")),
          $match(Selector.And(
-           isNumeric(BsonField.Name("bar")),
+           isNumeric(BsonField.Name("pop")),
            Selector.Doc(
-             BsonField.Name("bar") -> Selector.Gt(Bson.Int32(10)))))))
+             BsonField.Name("pop") -> Selector.Gt(Bson.Int32(10000)))))))
     }
 
     "plan simple reversed filter" in {
-      plan(sqlE"select * from foo where 10 < bar") must
+      plan(sqlE"select * from extraSmallZips where 10000 < pop") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "extraSmallZips")),
          $match(Selector.And(
-           isNumeric(BsonField.Name("bar")),
+           isNumeric(BsonField.Name("pop")),
            Selector.Doc(
-             BsonField.Name("bar") -> Selector.Gt(Bson.Int32(10)))))))
+             BsonField.Name("pop") -> Selector.Gt(Bson.Int32(10000)))))))
     }
 
     "plan simple filter with expression in projection" in {
-      plan(sqlE"select a + b from foo where bar > 10") must
+      plan(sqlE"select val1 + val3 from divide where val2 > 2") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "divide")),
          $match(Selector.And(
-           isNumeric(BsonField.Name("bar")),
+           isNumeric(BsonField.Name("val2")),
            Selector.Doc(
-             BsonField.Name("bar") -> Selector.Gt(Bson.Int32(10))))),
+             BsonField.Name("val2") -> Selector.Gt(Bson.Int32(2))))),
          $project(
            reshape(sigil.Quasar ->
              $cond(
                $and(
-                 $lt($literal(Bson.Null), $field("b")),
-                 $lt($field("b"), $literal(Bson.Text("")))),
+                 $lt($literal(Bson.Null), $field("val3")),
+                 $lt($field("val3"), $literal(Bson.Text("")))),
                $cond(
                  $or(
                    $and(
-                     $lt($literal(Bson.Null), $field("a")),
-                     $lt($field("a"), $literal(Bson.Text("")))),
+                     $lt($literal(Bson.Null), $field("val1")),
+                     $lt($field("val1"), $literal(Bson.Text("")))),
                    $and(
-                     $lte($literal(Check.minDate), $field("a")),
-                     $lt($field("a"), $literal(Bson.Regex("", ""))))),
-                 $add($field("a"), $field("b")),
+                     $lte($literal(Check.minDate), $field("val1")),
+                     $lt($field("val1"), $literal(Bson.Regex("", ""))))),
+                 $add($field("val1"), $field("val3")),
                  $literal(Bson.Undefined)),
                $literal(Bson.Undefined))),
            ExcludeId)))
@@ -626,53 +626,53 @@ class PlannerSpec extends
     }
 
     "plan filter with between" in {
-      plan(sqlE"select * from foo where bar between 10 and 100") must
+      plan(sqlE"select * from extraSmallZips where pop between 10000 and 12000") must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "extraSmallZips")),
          $match(
            Selector.And(
-             isNumeric(BsonField.Name("bar")),
+             isNumeric(BsonField.Name("pop")),
              Selector.And(
                Selector.Doc(
-                 BsonField.Name("bar") -> Selector.Gte(Bson.Int32(10))),
+                 BsonField.Name("pop") -> Selector.Gte(Bson.Int32(10000))),
                Selector.Doc(
-                 BsonField.Name("bar") -> Selector.Lte(Bson.Int32(100))))))))
+                 BsonField.Name("pop") -> Selector.Lte(Bson.Int32(12000))))))))
     }
 
     "plan filter with like" in {
-      plan(sqlE"""select * from foo where bar like "A.%" """) must
+      plan(sqlE"""select * from extraSmallZips where city like "A.%" """) must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "extraSmallZips")),
          $match(Selector.And(
-           Selector.Doc(BsonField.Name("bar") ->
+           Selector.Doc(BsonField.Name("city") ->
              Selector.Type(BsonType.Text)),
            Selector.Doc(
-             BsonField.Name("bar") ->
+             BsonField.Name("city") ->
                Selector.Regex("^A\\..*$", false, true, false, false))))))
     }
 
     "plan filter with LIKE and OR" in {
-      plan(sqlE"""select * from foo where bar like "A%" or bar like "Z%" """) must
+      plan(sqlE"""select * from smallZips where city like "A%" or city like "Z%" """) must
        beWorkflow(chain[Workflow](
-         $read(collection("db", "foo")),
+         $read(collection("db", "smallZips")),
          $match(
            Selector.And(
              Selector.Or(
                Selector.Doc(
-                 BsonField.Name("bar") -> Selector.Type(BsonType.Text)),
+                 BsonField.Name("city") -> Selector.Type(BsonType.Text)),
                Selector.Doc(
-                 BsonField.Name("bar") -> Selector.Type(BsonType.Text))),
+                 BsonField.Name("city") -> Selector.Type(BsonType.Text))),
              Selector.Or(
                Selector.Doc(
-                 BsonField.Name("bar") -> Selector.Regex("^A.*$", false, true, false, false)),
+                 BsonField.Name("city") -> Selector.Regex("^A.*$", false, true, false, false)),
                Selector.Doc(
-                 BsonField.Name("bar") -> Selector.Regex("^Z.*$", false, true, false, false)))))))
+                 BsonField.Name("city") -> Selector.Regex("^Z.*$", false, true, false, false)))))))
     }
 
     "plan filter with field in constant set" in {
-      plan(sqlE"""select * from zips where state in ("AZ", "CO")""") must
+      plan(sqlE"""select * from smallZips where state in ("AZ", "CO")""") must
         beWorkflow(chain[Workflow](
-          $read(collection("db", "zips")),
+          $read(collection("db", "smallZips")),
           $match(Selector.Doc(BsonField.Name("state") ->
             Selector.In(Bson.Arr(List(Bson.Text("AZ"), Bson.Text("CO"))))))))
     }
