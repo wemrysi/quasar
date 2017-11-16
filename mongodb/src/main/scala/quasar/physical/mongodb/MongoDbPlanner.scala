@@ -37,7 +37,7 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.planner.common._
 import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
-import quasar.qscript.{Coalesce => _, _}
+import quasar.qscript.{Coalesce => _, _}, RenderQScriptDSL._
 import quasar.std.StdLib._ // TODO: remove this
 
 import java.time.Instant
@@ -1239,19 +1239,19 @@ object MongoDbPlanner {
       mongoQS3 =  BR.branches.modify(
         _.transCata[FreeQS[T]](liftCo(R.normalizeEJCoEnv[QScriptTotal[T, ?]]))
         )(mongoQS2.project).embed
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo", mongoQS3))
+      _ <- BackendModule.logPhase[M](PhaseResult.treeAndCode("QScript Mongo", mongoQS3))
 
       mongoQS4 =  mongoQS3.transCata[T[MQS]](
                     liftFF[QScriptCore[T, ?], MQS, T[MQS]](
                       repeatedly(O.subsetBeforeMap[MQS, MQS](
                         reflNT[MQS]))))
       _ <- BackendModule.logPhase[M](
-             PhaseResult.tree("QScript Mongo (Subset Before Map)",
+             PhaseResult.treeAndCode("QScript Mongo (Subset Before Map)",
              mongoQS4))
 
       // TODO: Once field deletion is implemented for 3.4, this could be selectively applied, if necessary.
       mongoQS5 =  PreferProjection.preferProjection[MQS](mongoQS4)
-      _ <- BackendModule.logPhase[M](PhaseResult.tree("QScript Mongo (Prefer Projection)", mongoQS5))
+      _ <- BackendModule.logPhase[M](PhaseResult.treeAndCode("QScript Mongo (Prefer Projection)", mongoQS5))
     } yield mongoQS5
   }
 
