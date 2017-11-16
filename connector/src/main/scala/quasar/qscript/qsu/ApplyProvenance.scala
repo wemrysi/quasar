@@ -22,13 +22,10 @@ import quasar.Planner.{PlannerErrorME, InternalError}
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson
 import quasar.ejson.EJson
-import quasar.ejson.implicits._
-import quasar.fp._
 import quasar.qscript.{ExcludeId, HoleF, IdOnly, IdStatus, RightSideF, SrcHole}
 import quasar.qscript.provenance._
 
 import matryoshka._
-import matryoshka.data._
 import matryoshka.implicits._
 import pathy.Path
 import scalaz.{Free, IList, Monad, StateT}

@@ -21,8 +21,6 @@ import slamdata.Predef.{Map => SMap, _}
 import quasar.NameGenerator
 import quasar.Planner.PlannerErrorME
 import quasar.common.JoinType
-import quasar.ejson.implicits._
-import quasar.fp._
 import quasar.qscript.{
   construction,
   Center,
@@ -40,7 +38,6 @@ import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
 import matryoshka._
-import matryoshka.data._
 import scalaz.{\/-, Free, Monad, WriterT}
 import scalaz.Scalaz._
 
