@@ -31,7 +31,6 @@ import scala.Predef.implicitly
 
 import matryoshka._
 import matryoshka.data.Fix
-import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 
