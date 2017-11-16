@@ -47,6 +47,7 @@ object PostgresRenderQuery extends RenderQuery {
   def rowAlias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => i.v))
 
   val alg: AlgebraM[PlannerError \/ ?, SqlExpr, String] = {
+    case Null() => "null".right
     case SqlExpr.Id(v) =>
       s"""$v""".right
     case Table(v) =>

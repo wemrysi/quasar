@@ -31,6 +31,7 @@ trait SqlExprTraverse {
     )(
         implicit G: Applicative[G]
     ): G[SqlExpr[B]] = fa match {
+      case Null()              => G.point(Null())
       case Constant(d)         => G.point(Constant(d))
       case Id(str)             => G.point(Id(str))
       case Table(name)         => G.point(Table(name))

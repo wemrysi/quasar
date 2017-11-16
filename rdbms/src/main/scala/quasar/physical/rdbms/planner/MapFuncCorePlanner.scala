@@ -31,12 +31,14 @@ import scalaz.{Divide => _,Split => _, _}, Scalaz._
 class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerErrorME]
     extends Planner[T, F, MapFuncCore[T, ?]] {
 
+  val undefined: T[SQL] = SQL.Null[T[SQL]]().embed
+
   private def notImplemented: F[T[SQL]] =
     MonadError_[F, PlannerError].raiseError(InternalError.fromMsg("not implemented"))
 
   def plan: AlgebraM[F, MapFuncCore[T, ?], T[SQL]] = {
-    case MFC.Constant(ejson) => SQL.Constant[T[SQL]](ejson.cata(Data.fromEJson)).embed.point[F]
-    case MFC.Undefined() =>  notImplemented
+    case MFC.Constant(ejson) => SQL.Constant[T[SQL]](ejson.cata(Data.fromEJson)).embed.η[F]
+    case MFC.Undefined() =>  undefined.η[F]
     case MFC.JoinSideName(n) =>  notImplemented
     case MFC.Length(f) => notImplemented
     case MFC.Date(f) =>  notImplemented
@@ -67,10 +69,10 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.ExtractYear(f) =>  notImplemented
     case MFC.Now() =>  notImplemented
     case MFC.Negate(f) =>  notImplemented
-    case MFC.Add(f1, f2) =>  SQL.Infix[T[SQL]]("+", f1, f2).embed.point[F]
-    case MFC.Multiply(f1, f2) => SQL.Infix[T[SQL]]("*", f1, f2).embed.point[F]
-    case MFC.Subtract(f1, f2) =>  SQL.Infix[T[SQL]]("-", f1, f2).embed.point[F]
-    case MFC.Divide(f1, f2) => SQL.Infix[T[SQL]]("/", f1, f2).embed.point[F]
+    case MFC.Add(f1, f2) =>  SQL.Infix[T[SQL]]("+", f1, f2).embed.η[F]
+    case MFC.Multiply(f1, f2) => SQL.Infix[T[SQL]]("*", f1, f2).embed.η[F]
+    case MFC.Subtract(f1, f2) =>  SQL.Infix[T[SQL]]("-", f1, f2).embed.η[F]
+    case MFC.Divide(f1, f2) => SQL.Infix[T[SQL]]("/", f1, f2).embed.η[F]
     case MFC.Modulo(f1, f2) => notImplemented
     case MFC.Power(f1, f2) =>  notImplemented
     case MFC.Not(f) =>  notImplemented
@@ -101,10 +103,10 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.ConcatArrays(f1, f2) =>  notImplemented
     case MFC.ConcatMaps(f1, f2) =>  notImplemented
     case MFC.ProjectIndex(f1, f2) =>  notImplemented
-    case MFC.ProjectKey(fSrc, fKey) =>  notImplemented
+    case MFC.ProjectKey(fSrc, fKey) =>  fKey.η[F]
     case MFC.DeleteKey(fSrc, fField) =>   notImplemented
     case MFC.Range(fFrom, fTo) =>  notImplemented
-    case MFC.Guard(f1, fPattern, f2, ff3) => notImplemented
+    case MFC.Guard(f1, fPattern, f2, ff3) => f2.η[F]
     case MFC.TypeOf(f) => notImplemented
     case _ => notImplemented
   }
