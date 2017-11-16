@@ -82,60 +82,70 @@ final case class QSUGraph[T[_[_]]](
    * original root at that locus.
    */
   def rewriteM[F[_]: Monad](pf: PartialFunction[QSUGraph[T], F[QSUGraph[T]]]): F[QSUGraph[T]] = {
-    type G[A] = StateT[F, Set[Symbol], A]
-    val MS = MonadState[G, Set[Symbol]]
+    type RewriteS = SMap[Symbol, QSUGraph[T]]
+    type G[A] = StateT[F, RewriteS, A]
+    val MS = MonadState[G, RewriteS]
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def inner(g: QSUGraph[T]): G[QSUGraph[T]] = {
       for {
         visited <- MS.get
 
-        back <- if (visited(g.root)) {
-          g.point[G]
-        } else {
-          for {
-            _ <- MS.modify(_ + g.root)
+        back <- visited.get(g.root) match {
+          case Some(result) =>
+            result.point[G]
 
-            recursive <- g.unfold traverse { sg =>
-              for {
-                previs <- MS.get
-                sg2 <- inner(sg)
-                postvis <- MS.get
-              } yield (sg2, postvis &~ previs)
-            }
+          case None =>
+            for {
+              recursive <- g.unfold traverse { sg =>
+                for {
+                  previsM <- MS.get
+                  previs = previsM.keySet
 
-            index = recursive.foldLeft[SMap[Symbol, Set[Symbol]]](SMap()) {
-              case (acc, (sg, snapshot)) =>
-                val sym = sg.root
+                  sg2 <- inner(sg)
 
-                if (acc.contains(sym))
-                  acc.updated(sym, acc(sym).union(snapshot))
-                else
-                  acc + (sym -> snapshot)
-            }
+                  postvisM <- MS.get
+                  postvis = postvisM.keySet
+                } yield (sg2, postvis &~ previs)
+              }
 
-            sum = index.values.reduceOption(_ union _).getOrElse(Set())
+              index = recursive.foldLeft[SMap[Symbol, Set[Symbol]]](SMap()) {
+                case (acc, (sg, snapshot)) =>
+                  val sym = sg.root
 
-            // remove the keys which were touched from the original
-            preimage = g.vertices -- sum
+                  if (acc.contains(sym))
+                    acc.updated(sym, acc(sym).union(snapshot))
+                  else
+                    acc + (sym -> snapshot)
+              }
 
-            collapsed = recursive.foldLeft[QSUVerts[T]](preimage) {
-              case (acc, (sg, _)) =>
-                acc ++ (sg.vertices -- (sum &~ index(sg.root)))
-            }
+              sum = index.values.reduceOption(_ union _).getOrElse(Set())
 
-            self2 = QSUGraph(g.root, collapsed)
+              // remove the keys which were touched from the original
+              preimage = g.vertices -- sum
 
-            applied <- if (pf.isDefinedAt(self2))
-              pf(self2).liftM[StateT[?[_], Set[Symbol], ?]]
-            else
-              self2.point[G]
-          } yield applied.copy(root = self2.root)   // prevent users from building invalid graphs
+              collapsed = recursive.foldLeft[QSUVerts[T]](preimage) {
+                case (acc, (sg, _)) =>
+                  acc ++ (sg.vertices -- (sum &~ index(sg.root)))
+              }
+
+              self2 = QSUGraph(g.root, collapsed)
+
+              applied <- if (pf.isDefinedAt(self2))
+                pf(self2).liftM[StateT[?[_], RewriteS, ?]]
+              else
+                self2.point[G]
+
+              // prevent users from building invalid graphs
+              back = applied.copy(root = self2.root)
+
+              _ <- MS.modify(_ + (g.root -> back))
+            } yield back
         }
       } yield back
     }
 
-    inner(this).eval(Set())
+    inner(this).eval(SMap())
   }
 
   def rewrite(pf: PartialFunction[QSUGraph[T], QSUGraph[T]]): QSUGraph[T] =

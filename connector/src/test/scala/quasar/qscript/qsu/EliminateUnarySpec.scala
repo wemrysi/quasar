@@ -16,11 +16,22 @@
 
 package quasar.qscript.qsu
 
-import quasar.{Data, Qspec}
-import quasar.qscript.{Hole, LeftSide, MapFuncsCore, RightSide, SrcHole, Take}
+import quasar.{Data, Qspec, Type}
+import quasar.ejson.{EJson, Fixed}
+import quasar.qscript.{
+  Hole,
+  LeftSide,
+  MapFuncsCore,
+  RightSide,
+  SrcHole,
+  Take
+}
 import quasar.qscript.qsu.{QScriptUniform => QSU}
+import slamdata.Predef._
 
 import matryoshka.data.Fix
+import org.specs2.matcher.Matcher
+import org.specs2.matcher.MatchersImplicits._
 import scalaz.Inject
 
 object EliminateUnarySpec extends Qspec with QSUTTypes[Fix] {
@@ -30,6 +41,8 @@ object EliminateUnarySpec extends Qspec with QSUTTypes[Fix] {
   val elim = EliminateUnary[Fix]
 
   val IC = Inject[MapFuncCore, MapFunc]
+
+  val J = Fixed[Fix[EJson]]
 
   "unary node elimination" should {
     "eliminate a single unary node" in {
@@ -87,5 +100,29 @@ object EliminateUnarySpec extends Qspec with QSUTTypes[Fix] {
           DataConstantMapped(Data.Int(i))) => i mustEqual 11
       }
     }
+
+    "eliminate unary on two branches of an autojoin3" in {
+      val tmp1 =
+        qsu.unary(
+          qsu.unreferenced(),
+          IC(MapFuncsCore.Constant[Fix, Hole](J.int(1))))
+
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin3(
+          tmp1,
+          tmp1,
+          qsu.unreferenced(),
+          _(MapFuncsCore.Guard(_, Type.AnyObject, _, _))))
+
+      elim(qgraph) must not(containUnary)
+    }
+  }
+
+  val containUnary: Matcher[QSUGraph] = { graph: QSUGraph =>
+    val nodes = graph.vertices.values collect {
+      case u @ QSU.Unary(_, _) => u
+    }
+
+    (!nodes.isEmpty, s"$graph contains unary nodes: $nodes", s"$graph does not contain any unary nodes")
   }
 }

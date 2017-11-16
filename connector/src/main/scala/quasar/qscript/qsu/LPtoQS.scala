@@ -20,9 +20,11 @@ import slamdata.Predef.AnyVal
 import quasar.NameGenerator
 import quasar.Planner.PlannerErrorME
 import quasar.frontend.logicalplan.LogicalPlan
+import slamdata.Predef._
 
 import matryoshka.{BirecursiveT, EqualT}
-import scalaz.{Functor, Kleisli => K, Monad}
+import scalaz.{Applicative, Functor, Kleisli => K, Monad}
+import scalaz.syntax.applicative._
 
 final class LPtoQS[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
   import LPtoQS.MapSyntax
@@ -31,17 +33,28 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
       : F[T[QScriptEducated]] = {
 
     val lpToQs =
-      K(ReadLP[T].apply[F])          >-
-      EliminateUnary[T].apply        >-
-      RecognizeDistinct[T].apply     >==>
-      ExtractFreeMap[T, F]           >==>
-      MinimizeAutoJoins[T].apply[F]  >==>
+      K(ReadLP[T].apply[F])          >=>
+      debug("ReadLP: ")              >-
+      EliminateUnary[T].apply        >=>
+      debug("EliminateUnary: ")      >-
+      RecognizeDistinct[T].apply     >=>
+      debug("RecognizeDistinct: ")   >==>
+      ExtractFreeMap[T, F]           >=>
+      debug("ExtractFM: ")           >==>
+      MinimizeAutoJoins[T].apply[F]  >=>
+      debug("MinimizeAJ: ")          >==>
       ApplyProvenance[T].apply[F]    >=>
       K(ReifyProvenance[T].apply[F]) >-
       (_.graph)                      >==>
       Graduate[T].apply[F]
 
     lpToQs(lp)
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  private def debug[F[_]: Applicative, A](prefix: String): K[F, A, A] = K { a =>
+    // println(prefix + a.toString)    // uh... yeah do better
+    a.point[F]
   }
 }
 
