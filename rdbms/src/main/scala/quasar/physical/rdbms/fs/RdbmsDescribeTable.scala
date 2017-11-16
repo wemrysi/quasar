@@ -17,13 +17,13 @@
 package quasar.physical.rdbms.fs
 
 import slamdata.Predef._
-import quasar.physical.rdbms.common.{CustomSchema, Schema, TableName, TablePath}
+import quasar.physical.rdbms.common.{Schema, TableName, TablePath}
 
 import doobie.imports.ConnectionIO
 
 trait RdbmsDescribeTable {
 
-  def findChildSchemas(parent: Schema): ConnectionIO[Vector[CustomSchema]]
+  def findChildSchemas(parent: Schema): ConnectionIO[Vector[Schema]]
   def findChildTables(schema: Schema): ConnectionIO[Vector[TableName]]
   def schemaExists(schema: Schema): ConnectionIO[Boolean]
   def tableExists(tablePath: TablePath): ConnectionIO[Boolean]

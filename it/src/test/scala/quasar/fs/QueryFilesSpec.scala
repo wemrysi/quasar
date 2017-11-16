@@ -87,10 +87,12 @@ class QueryFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsU
         val d1 = d </> dir("d1")
         val f1 = d1 </> file("f1")
         val f2 = d1 </> dir("d2") </> file("f1")
+        val f3 = d1 </> dir("d2") </> dir("d3") </> file("f3")
         val expectedNodes = List[PathSegment](DirName("d2").left, FileName("f1").right)
 
         val setup = write.save(f1, oneDoc.toProcess).drain ++
-                    write.save(f2, anotherDoc.toProcess).drain
+          write.save(f2, anotherDoc.toProcess).drain ++
+          write.save(f3, anotherDoc.toProcess).drain
 
         execT(fs.setupInterpM, setup).runVoid
 

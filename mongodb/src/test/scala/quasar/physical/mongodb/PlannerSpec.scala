@@ -1057,13 +1057,13 @@ class PlannerSpec extends
 
     "plan simple sort with field in projection" in {
       plan(sqlE"select bar from foo order by bar") must
-        beWorkflow0(chain[Workflow](
+        beWorkflow(chain[Workflow](
           $read(collection("db", "foo")),
           $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending)),
           $project(
             reshape(sigil.Quasar -> $field("bar")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan simple sort with field in projection"))
+    }
 
     "plan simple sort with wildcard" in {
       plan(sqlE"select * from zips order by pop") must
@@ -1074,28 +1074,24 @@ class PlannerSpec extends
 
     "plan sort with expression in key" in {
       plan(sqlE"select baz from foo order by bar/10") must
-        beWorkflow0(chain[Workflow](
+        beWorkflow(chain[Workflow](
           $read(collection("db", "foo")),
           $project(
             reshape(
-              "baz"    -> $field("baz"),
-              "__tmp2" ->
+              "0" ->
                 $cond(
-                  $or(
-                    $and(
-                      $lt($literal(Bson.Null), $field("bar")),
-                      $lt($field("bar"), $literal(Bson.Text("")))),
-                    $and(
-                      $lte($literal(Check.minDate), $field("bar")),
-                      $lt($field("bar"), $literal(Bson.Regex("", ""))))),
+                  $and(
+                    $lt($literal(Bson.Null), $field("bar")),
+                    $lt($field("bar"), $literal(Bson.Text("")))),
                   divide($field("bar"), $literal(Bson.Int32(10))),
-                  $literal(Bson.Undefined))),
-            IgnoreId),
-          $sort(NonEmptyList(BsonField.Name("__tmp2") -> SortDir.Ascending)),
+                  $literal(Bson.Undefined)),
+              "src"    -> $$ROOT),
+            ExcludeId),
+          $sort(NonEmptyList(BsonField.Name("0") -> SortDir.Ascending)),
           $project(
-            reshape("baz" -> $field("baz")),
+            reshape("baz" -> $field("src", "baz")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan sort with expression in key"))
+    }
 
     "plan select with wildcard and field" in {
       plan(sqlE"select *, pop from zips") must
@@ -1194,19 +1190,14 @@ class PlannerSpec extends
     }.pendingWithActual(notOnPar, testFile("plan sort with wildcard and expression in key"))
 
     "plan simple sort with field not in projections" in {
-      plan(sqlE"select name from person order by height") must
-        beWorkflow0(chain[Workflow](
-          $read(collection("db", "person")),
+      plan(sqlE"select city from zips order by pop") must
+        beWorkflow(chain[Workflow](
+          $read(collection("db", "zips")),
+          $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Ascending)),
           $project(
-            reshape(
-              "name"   -> $field("name"),
-              "__tmp0" -> $field("height")),
-            IgnoreId),
-          $sort(NonEmptyList(BsonField.Name("__tmp0") -> SortDir.Ascending)),
-          $project(
-            reshape("name" -> $field("name")),
+            reshape("city" -> $field("city")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan simple sort with field not in projections"))
+    }
 
     "plan sort with expression and alias" in {
       plan(sqlE"select pop/1000 as popInK from zips order by popInK") must
@@ -1227,25 +1218,25 @@ class PlannerSpec extends
                   $literal(Bson.Undefined))),
             IgnoreId),
           $sort(NonEmptyList(BsonField.Name("popInK") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar, testFile("plan sort with expression and alias"))
+    }.pendingWithActual(notOnPar, testFile("plan sort with expression and alias")) // at least on agg now
 
     "plan sort with filter" in {
       plan(sqlE"select city, pop from zips where pop <= 1000 order by pop desc, city") must
-        beWorkflow0(chain[Workflow](
+        beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $match(Selector.And(
             isNumeric(BsonField.Name("pop")),
             Selector.Doc(
               BsonField.Name("pop") -> Selector.Lte(Bson.Int32(1000))))),
+          $sort(NonEmptyList(
+            BsonField.Name("pop") -> SortDir.Descending,
+            BsonField.Name("city") -> SortDir.Ascending)),
           $project(
             reshape(
               "city" -> $field("city"),
               "pop"  -> $field("pop")),
-            IgnoreId),
-          $sort(NonEmptyList(
-            BsonField.Name("pop") -> SortDir.Descending,
-            BsonField.Name("city") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar, testFile("plan sort with filter"))
+            ExcludeId)))
+    }
 
     "plan sort with expression, alias, and filter" in {
       plan(sqlE"select pop/1000 as popInK from zips where pop >= 1000 order by popInK") must
@@ -1269,7 +1260,7 @@ class PlannerSpec extends
                   $literal(Bson.Undefined))),
             ExcludeId),
           $sort(NonEmptyList(BsonField.Name("popInK") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar, testFile("plan sort with expression, alias, and filter"))
+    }.pendingWithActual(notOnPar, testFile("plan sort with expression, alias, and filter")) // at least on agg now
 
     "plan multiple column sort with wildcard" in {
       plan(sqlE"select * from zips order by pop, city desc") must
@@ -1278,7 +1269,7 @@ class PlannerSpec extends
          $sort(NonEmptyList(
            BsonField.Name("pop") -> SortDir.Ascending,
            BsonField.Name("city") -> SortDir.Descending))))
-    }.pendingWithActual(notOnPar, testFile("plan multiple column sort with wildcard"))
+    }.pendingWithActual(notOnPar, testFile("plan multiple column sort with wildcard")) //possibly qscript issue includeid/excludeid
 
     "plan many sort columns" in {
       plan(sqlE"select * from zips order by pop, state, city, a4, a5, a6") must
@@ -1291,7 +1282,7 @@ class PlannerSpec extends
            BsonField.Name("a4") -> SortDir.Ascending,
            BsonField.Name("a5") -> SortDir.Ascending,
            BsonField.Name("a6") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar, testFile("plan many sort columns"))
+    }.pendingWithActual(notOnPar, testFile("plan many sort columns")) //possibly qscript issue includeid/excludeid
 
     "plan efficient count and field ref" in {
       plan(sqlE"SELECT city, COUNT(*) AS cnt FROM zips ORDER BY cnt DESC") must
@@ -2128,18 +2119,18 @@ class PlannerSpec extends
 
     "plan sort and limit" in {
       plan(sqlE"SELECT city, pop FROM zips ORDER BY pop DESC LIMIT 5") must
-        beWorkflow0 {
+        beWorkflow {
           chain[Workflow](
             $read(collection("db", "zips")),
+            $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Descending)),
+            $limit(5),
             $project(
               reshape(
                 "city" -> $field("city"),
                 "pop"  -> $field("pop")),
-              ExcludeId),
-            $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Descending)),
-            $limit(5))
+              ExcludeId))
         }
-    }.pendingWithActual(notOnPar, testFile("plan sort and limit"))
+    }
 
     "plan simple single field selection and limit" in {
       plan(sqlE"SELECT city FROM zips LIMIT 5") must
@@ -2334,7 +2325,9 @@ class PlannerSpec extends
               reshape("city" -> $field("_id", "0")),
               IgnoreId),
             $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Ascending))))
-    }.pendingWithActual("#1803", testFile("plan distinct with simple order by"))
+      //at least on agg now, but there's an unnecessary array element selection
+      //Name("0" -> { "$arrayElemAt": [["$_id.0", "$f0"], { "$literal": NumberInt("1") }] })
+    }.pendingWithActual(notOnPar, testFile("plan distinct with simple order by"))
 
     "plan distinct with unrelated order by" in {
       plan(sqlE"select distinct city from zips order by pop desc") must
@@ -2458,28 +2451,48 @@ class PlannerSpec extends
     //
     "plan order by JS expr with filter" in {
       plan3_2(sqlE"select city, pop from zips where pop > 1000 order by length(city)") must
-        beWorkflow0(chain[Workflow](
+        beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $match(Selector.And(
             isNumeric(BsonField.Name("pop")),
             Selector.Doc(
               BsonField.Name("pop") -> Selector.Gt(Bson.Int32(1000))))),
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-            "city"   -> Select(ident("x"), "city"),
-            "pop"    -> Select(ident("x"), "pop"),
-            "__tmp4" ->
+            "0" ->
               If(Call(ident("isString"), List(Select(ident("x"), "city"))),
                 Call(ident("NumberLong"),
                   List(Select(Select(ident("x"), "city"), "length"))),
-                ident("undefined")))))),
+                ident("undefined")),
+            "src"   -> ident("x"))))),
             ListMap()),
-          $sort(NonEmptyList(BsonField.Name("__tmp4") -> SortDir.Ascending)),
+          $sort(NonEmptyList(BsonField.Name("0") -> SortDir.Ascending)),
           $project(
             reshape(
-              "city" -> $field("city"),
-              "pop"  -> $field("pop")),
+              "city" -> $field("src", "city"),
+              "pop"  -> $field("src", "pop")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan order by JS expr with filter"))
+    }
+
+    "plan simple sort on map-reduce with mapBeforeSort" in {
+      plan3_2(sqlE"select length(city) from zips order by city") must
+        beWorkflow(chain[Workflow](
+          $read(collection("db", "zips")),
+          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), Let(Name("__val"),
+            Arr(List(
+              obj("0" -> If(
+                Call(ident("isString"), List(Select(ident("x"), "city"))),
+                Call(ident("NumberLong"),
+                  List(Select(Select(ident("x"), "city"), "length"))),
+                ident("undefined"))),
+              ident("x"))),
+            obj("0" -> Select(Access(ident("__val"), jscore.Literal(Js.Num(1, false))), "city"),
+                "src" -> ident("__val")))))),
+            ListMap()),
+          $sort(NonEmptyList(BsonField.Name("0") -> SortDir.Ascending)),
+          $project(
+            reshape(sigil.Quasar -> $arrayElemAt($field("src"), $literal(Bson.Int32(0)))),
+            ExcludeId)))
+    }
 
     "plan select length()" in {
       plan3_2(sqlE"select length(city) from zips") must
@@ -3814,13 +3827,13 @@ class PlannerSpec extends
                 (lpf.invoke2(MapProject, lpf.free('tmp1), lpf.constant(Data.Str("bar"))), SortDir.asc).wrapNel),
               lpf.free('tmp2))))
 
-      planLP(lp) must beWorkflow0(chain[Workflow](
+      planLP(lp) must beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
+        $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending)),
         $project(
           reshape("bar" -> $field("bar")),
-          IgnoreId),
-        $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar, testFile("plan simple Sort"))
+          ExcludeId)))
+    }
 
     "plan Sort with expression" in {
       val lp =
@@ -4024,7 +4037,19 @@ class PlannerSpec extends
           "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "QScript", "QScript (ShiftRead)", "QScript (Optimized)",
-          "QScript Mongo", "QScript Mongo (Shuffle Maps)", "QScript Mongo (Prefer Projection)",
+          "QScript Mongo", "QScript Mongo (Subset Before Map)", "QScript Mongo (Prefer Projection)",
+          "Workflow Builder", "Workflow (raw)", "Workflow (crystallized)")
+    }
+
+    "log mapBeforeSort when it is applied" in {
+      planLog(sqlE"select length(city) from zips order by city").map(_.name) must_===
+        Vector(
+          "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
+          "Sort Keys Projected", "Annotated Tree",
+          "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
+          "QScript", "QScript (ShiftRead)", "QScript (Optimized)",
+          "QScript Mongo", "QScript Mongo (Subset Before Map)",
+          "QScript Mongo (Prefer Projection)", "QScript Mongo (Map Before Sort)",
           "Workflow Builder", "Workflow (raw)", "Workflow (crystallized)")
     }
 
@@ -4041,7 +4066,7 @@ class PlannerSpec extends
           "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "QScript", "QScript (ShiftRead)", "QScript (Optimized)",
-          "QScript Mongo", "QScript Mongo (Shuffle Maps)", "QScript Mongo (Prefer Projection)")
+          "QScript Mongo", "QScript Mongo (Subset Before Map)", "QScript Mongo (Prefer Projection)")
     }
   }
 }

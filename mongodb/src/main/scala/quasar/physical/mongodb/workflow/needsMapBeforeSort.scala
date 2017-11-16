@@ -14,16 +14,23 @@
  * limitations under the License.
  */
 
-package quasar.physical.rdbms.fs
+package quasar.physical.mongodb.workflow
 
-import doobie.imports.ConnectionIO
-import quasar.physical.rdbms.common.{Schema, TableName, TablePath}
-import slamdata.Predef.Unit
+import slamdata.Predef._
 
-trait RdbmsMove {
+import matryoshka._
+import matryoshka.implicits._
+import scalaz._, Scalaz._
 
-  def dropTableIfExists(table: TablePath): ConnectionIO[Unit]
-  def moveTableToSchema(table: TablePath, dst: Schema): ConnectionIO[TablePath]
-  def renameTable(table: TablePath, newName: TableName): ConnectionIO[TablePath]
-  def renameSchema(schema: Schema, newName: Schema): ConnectionIO[Unit]
+object needsMapBeforeSort {
+
+  def apply[T[_[_]]: BirecursiveT, F[_]: Traverse](wf: T[F])
+    (implicit I: WorkflowOpCoreF :<: F)
+      : Boolean = {
+    val alg: AlgebraM[Option, F, T[F]] = {
+      case I($SimpleMapF(Embed(I($SortF(_, _))), _, _)) => none
+      case x => x.embed.some
+    }
+    wf.cataM(alg).isEmpty
+  }
 }

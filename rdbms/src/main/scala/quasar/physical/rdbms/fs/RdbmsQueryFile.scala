@@ -24,16 +24,15 @@ import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
 import quasar.fs.QueryFile
 import quasar.physical.rdbms.Rdbms
-import quasar.physical.rdbms.common.{Schema, TablePath}
+import quasar.physical.rdbms.common._
 import quasar.physical.rdbms.common.TablePath.showTableName
-import pathy.Path
 
+import pathy.Path
 import scalaz.{-\/, Monad, \/-}
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
 import scalaz.syntax.std.boolean._
 import scalaz.std.vector._
-
 
 trait RdbmsQueryFile {
   this: Rdbms =>
@@ -60,11 +59,10 @@ trait RdbmsQueryFile {
         (for {
         childSchemas <- findChildSchemas(schema)
         childTables <- findChildTables(schema)
-        childDirs = childSchemas.map(d => -\/(Schema.lastDirName(d))).toSet
+        childDirs = childSchemas.filter(_.isDirectChildOf(schema)).map(d => -\/(d.lastDirName)).toSet
         childFiles = childTables.map(t => \/-(Path.FileName(t.shows))).toSet
       }
-        yield childDirs ++ childFiles)
-          .liftB
+        yield childDirs ++ childFiles).liftB
     }
 
     override def close(h: ResultHandle): Configured[Unit] = ???
