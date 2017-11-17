@@ -97,10 +97,10 @@ package object mount {
       BackendEffect)#M[A]
 
     for {
-      startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
-      seq     <- MonotonicSeq.from(startSeq)
-      viewKvs    <- KeyValueStore.impl.default[ReadFile.ReadHandle, view.ResultHandle]
-      constKvs   <- KeyValueStore.impl.default[QueryFile.ResultHandle, Vector[Data]]
+      startSeq <- Task.delay(scala.util.Random.nextInt.toLong)
+      seq      <- MonotonicSeq.from(startSeq)
+      viewKvs  <- KeyValueStore.impl.default[ReadFile.ReadHandle, view.ResultHandle]
+      constKvs <- KeyValueStore.impl.default[QueryFile.ResultHandle, Vector[Data]]
     } yield {
       val compFs: V ~> Free[S, ?] =
         injectFT[Task, S].compose(constKvs)                                 :+:

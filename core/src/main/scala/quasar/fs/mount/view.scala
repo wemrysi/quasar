@@ -276,6 +276,14 @@ object view {
     //     to manage.
     val cleaned = plan.cata(optimizer.elideTypeCheckƒ)
 
+    // The `Set[FPath]` is to ensure we don't expand the same view within the SAME AST
+    // branch as that would be nonsensical and lead to an infinitely large LP
+    // Instead, we just ignore it letting the view refer to an underlying file
+    // with the same name
+    // Alternatively, we could error out saying a view cannot reference itself
+    // but we chose the former approach.
+    // Note: This does not prevent a view from being referenced twice in an expression, as
+    // those references would appear in separate branches and thus not share the same `Set[FPath]`
     val newLP: SemanticErrsT[FileSystemErrT[Free[S, ?], ?], Fix[LP]] =
       (Set[FPath](), cleaned).anaM[Fix[LP]] {
         case (e, i @ Embed(lp.Read(p))) if !(e contains p) =>
