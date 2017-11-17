@@ -63,7 +63,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
       val dims: SMap[String, Dimensions[qprov.P]] = SMap(
         "name0" -> IList(qprov.prov.proj(J.str("foobar"))),
-	"name1" -> IList(qprov.prov.proj(J.str("foobar"))))
+        "name1" -> IList(qprov.prov.proj(J.str("foobar"))))
 
       tree must haveDimensions(dims)
     }
@@ -73,9 +73,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
   // checks that the graph has not changed
   def haveDimensions(expected: SMap[String, Dimensions[qprov.P]])
       : Matcher[Cofree[QSU, String]] =
-
     new Matcher[Cofree[QSU, String]] {
-
       def apply[S <: Cofree[QSU, String]](s: Expectable[S]): MatchResult[S] = {
 
         val (renames, inputGraph): (QSUGraph.Renames, QSUGraph) =
