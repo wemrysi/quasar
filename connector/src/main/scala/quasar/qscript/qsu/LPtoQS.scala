@@ -44,7 +44,10 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
       MinimizeAutoJoins[T].apply[F]  >=>
       debug("MinimizeAJ: ")          >==>
       ApplyProvenance[T].apply[F]    >=>
-      K(ReifyProvenance[T].apply[F]) >-
+      debug("ApplyProv: ")           >-
+      ReifyBuckets[T]                >=>
+      debug("ReifyBuckets: ")        >==>
+      ReifyAutoJoins[T].apply[F]     >-
       (_.graph)                      >==>
       Graduate[T].apply[F]
 
@@ -53,7 +56,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   private def debug[F[_]: Applicative, A](prefix: String): K[F, A, A] = K { a =>
-    // println(prefix + a.toString)    // uh... yeah do better
+//  println("\n\n" + prefix + a.toString)    // uh... yeah do better
     a.point[F]
   }
 }
