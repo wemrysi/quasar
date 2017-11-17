@@ -29,7 +29,6 @@ import quasar.qscript.{
   Center,
   Hole,
   HoleF,
-  IncludeId,
   JoinSide,
   LeftSide3,
   LeftSideF,
@@ -121,12 +120,6 @@ final class ReifyProvenance[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] 
           (List(newVertex), qsu)
       }
     }
-
-    case QSU.Transpose(source, _) =>
-      // TODO only reify the identity/value information when it's used
-      val repair: JoinFunc = func.ConcatArrays(func.MakeArray(LeftSideF), func.MakeArray(RightSideF))
-      val qsu: QSU[Symbol] = QSU.LeftShift[T, Symbol](source, HoleF, IncludeId, repair)
-      Applicative[X[F, ?]].point[QSU[Symbol]](qsu)
 
     case QSU.LPReduce(source, reduce) =>
       val bucket: FreeMap = slamdata.Predef.??? // TODO computed from provenance

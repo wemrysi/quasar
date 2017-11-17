@@ -24,6 +24,7 @@ import quasar.ejson
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
+import quasar.qscript.{ExcludeId, HoleF, RightSideF}
 import quasar.qscript.provenance._
 
 import matryoshka._
@@ -63,6 +64,13 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
       val srcDims = dims.rename(deId, srcId, updDims)
       GStateM[F].modify(_.replace(deId, srcId))
         .as((srcId, qdims + (srcId -> srcDims)))
+
+    case (tdims, GPF(tid, Transpose((srcId, srcDims), _))) =>
+      GStateM[F].modify(
+        QSUGraph.vertices.modify(_.updated(
+          tid,
+          LeftShift(srcId, HoleF, ExcludeId, RightSideF))))
+        .as((tid, srcDims + (tid -> tdims)))
 
     case (nodeDims, GPF(nodeId, node)) =>
       (nodeId, node.foldRight[QSUDims[T]](SMap(nodeId -> nodeDims))(_._2 ++ _)).point[F]
