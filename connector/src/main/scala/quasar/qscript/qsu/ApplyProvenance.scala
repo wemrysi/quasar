@@ -24,7 +24,7 @@ import quasar.ejson
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.qscript.{ExcludeId, HoleF, RightSideF}
+import quasar.qscript.{ExcludeId, HoleF, IdOnly, IdStatus, RightSideF}
 import quasar.qscript.provenance._
 
 import matryoshka._
@@ -65,11 +65,11 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
       GStateM[F].modify(_.replace(deId, srcId))
         .as((srcId, qdims + (srcId -> srcDims)))
 
-    case (tdims, GPF(tid, Transpose((srcId, srcDims), _))) =>
+    case (tdims, GPF(tid, Transpose((srcId, srcDims), retain, _))) =>
       GStateM[F].modify(
         QSUGraph.vertices.modify(_.updated(
           tid,
-          LeftShift(srcId, HoleF, ExcludeId, RightSideF))))
+          LeftShift(srcId, HoleF, retain.fold[IdStatus](IdOnly, ExcludeId), RightSideF))))
         .as((tid, srcDims + (tid -> tdims)))
 
     case (nodeDims, GPF(nodeId, node)) =>
@@ -121,7 +121,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
 
       case ThetaJoin(left, right, _, _, _) => dims.join(left, right).point[F]
 
-      case Transpose(src, rot) =>
+      case Transpose(src, _, rot) =>
         val tid: dims.I = Free.pure(gpf.root)
         (rot match {
           case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, src)

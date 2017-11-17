@@ -58,16 +58,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
   "reading lp into qsu" should {
     "convert Read nodes" in {
       read("foobar") must readQsuAs {
-        case AutoJoin2C(
-          AutoJoin2C(
-            Transpose(Read(path), QSU.Rotation.ShiftMap),
-            DataConstant(Data.Int(i1)),
-            MapFuncsCore.ProjectIndex(LeftSide, RightSide)),
-          DataConstant(Data.Int(i2)),
-          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) =>
-
-          i1 mustEqual 1
-          i2 mustEqual 1
+        case Transpose(Read(path), QSU.Retain.Values, QSU.Rotation.ShiftMap) =>
           path mustEqual (root </> file("foobar"))
       }
     }
@@ -93,73 +84,49 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
 
     "convert FlattenMap" in {
       lpf.invoke1(StructuralLib.FlattenMap, read("foo")) must readQsuAs {
-        case AutoJoin2C(
-          Transpose(TRead(_), QSU.Rotation.FlattenMap),
-          DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => i mustEqual 1
+        case Transpose(TRead(_), QSU.Retain.Values, QSU.Rotation.FlattenMap) => ok
       }
     }
 
     "convert FlattenMapKeys" in {
       lpf.invoke1(StructuralLib.FlattenMapKeys, read("foo")) must readQsuAs {
-        case AutoJoin2C(
-          Transpose(TRead(_), QSU.Rotation.FlattenMap),
-          DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => i mustEqual 0
+        case Transpose(TRead(_), QSU.Retain.Identities, QSU.Rotation.FlattenMap) => ok
       }
     }
 
     "convert FlattenArray" in {
       lpf.invoke1(StructuralLib.FlattenArray, read("foo")) must readQsuAs {
-        case AutoJoin2C(
-          Transpose(TRead(_), QSU.Rotation.FlattenArray),
-          DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => i mustEqual 1
+        case Transpose(TRead(_), QSU.Retain.Values, QSU.Rotation.FlattenArray) => ok
       }
     }
 
     "convert FlattenArrayIndices" in {
       lpf.invoke1(StructuralLib.FlattenArrayIndices, read("foo")) must readQsuAs {
-        case AutoJoin2C(
-          Transpose(TRead(_), QSU.Rotation.FlattenArray),
-          DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => i mustEqual 0
+        case Transpose(TRead(_), QSU.Retain.Identities, QSU.Rotation.FlattenArray) => ok
       }
     }
 
     "convert ShiftMap" in {
       lpf.invoke1(StructuralLib.ShiftMap, read("foo")) must readQsuAs {
-        case AutoJoin2C(
-          Transpose(TRead(_), QSU.Rotation.ShiftMap),
-          DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => i mustEqual 1
+        case Transpose(TRead(_), QSU.Retain.Values, QSU.Rotation.ShiftMap) => ok
       }
     }
 
     "convert ShiftMapKeys" in {
       lpf.invoke1(StructuralLib.ShiftMapKeys, read("foo")) must readQsuAs {
-        case AutoJoin2C(
-          Transpose(TRead(_), QSU.Rotation.ShiftMap),
-          DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => i mustEqual 0
+        case Transpose(TRead(_), QSU.Retain.Identities, QSU.Rotation.ShiftMap) => ok
       }
     }
 
     "convert ShiftArray" in {
       lpf.invoke1(StructuralLib.ShiftArray, read("foo")) must readQsuAs {
-        case AutoJoin2C(
-          Transpose(TRead(_), QSU.Rotation.ShiftArray),
-          DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => i mustEqual 1
+        case Transpose(TRead(_), QSU.Retain.Values, QSU.Rotation.ShiftArray) => ok
       }
     }
 
     "convert ShiftArrayIndices" in {
       lpf.invoke1(StructuralLib.ShiftArrayIndices, read("foo")) must readQsuAs {
-        case AutoJoin2C(
-          Transpose(TRead(_), QSU.Rotation.ShiftArray),
-          DataConstant(Data.Int(i)),
-          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) => i mustEqual 0
+        case Transpose(TRead(_), QSU.Retain.Identities, QSU.Rotation.ShiftArray) => ok
       }
     }
 
@@ -304,7 +271,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
       val result = evaluate(qgraphM).toOption
 
       result must beSome
-      result.get.vertices must haveSize(7)
+      result.get.vertices must haveSize(3)
     }
   }
 

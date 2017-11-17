@@ -240,11 +240,9 @@ object QSUGraph extends QSUGraphInstances {
       Hole,
       JoinSide,
       JoinSide3,
-      LeftSide,
       MapFunc,
       MapFuncsCore,
       MapFuncCore,
-      RightSide,
       SrcHole
     }
 
@@ -461,14 +459,7 @@ object QSUGraph extends QSUGraphInstances {
       def unapply[T[_[_]]: BirecursiveT](qgraph: QSUGraph[T])(
           implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?]): Option[String] = qgraph match {
 
-        case AutoJoin2C(
-          AutoJoin2C(
-            Transpose(Read(path), QSU.Rotation.ShiftMap),
-            DataConstant(Data.Int(i1)),
-            MapFuncsCore.ProjectIndex(LeftSide, RightSide)),
-          DataConstant(Data.Int(i2)),
-          MapFuncsCore.ProjectIndex(LeftSide, RightSide)) if i1 == 1 && i2 == 1 =>
-
+        case Transpose(Read(path), QSU.Retain.Values, QSU.Rotation.ShiftMap) =>
           for {
             (front, end) <- Path.peel(path)
             file <- end.toOption

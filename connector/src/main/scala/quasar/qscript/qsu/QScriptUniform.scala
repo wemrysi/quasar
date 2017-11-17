@@ -69,8 +69,8 @@ object QScriptUniform {
 
       case Read(path) => (Read(path): QScriptUniform[T, B]).point[G]
 
-      case Transpose(source, rotations) =>
-        f(source).map(Transpose(_, rotations))
+      case Transpose(source, retain, rotations) =>
+        f(source).map(Transpose(_, retain, rotations))
 
       case LeftShift(source, struct, idStatus, repair) =>
         f(source).map(LeftShift(_, struct, idStatus, repair))
@@ -187,7 +187,20 @@ object QScriptUniform {
   // LPish
   final case class Transpose[T[_[_]], A](
       source: A,
+      retain: Retain,
       rotations: Rotation) extends QScriptUniform[T, A]
+
+  sealed trait Retain extends Product with Serializable {
+    def fold[A](ids: => A, vals: => A): A = this match {
+      case Retain.Identities => ids
+      case Retain.Values => vals
+    }
+  }
+
+  object Retain {
+    case object Identities extends Retain
+    case object Values extends Retain
+  }
 
   sealed trait Rotation extends Product with Serializable
 
@@ -347,10 +360,10 @@ object QScriptUniform {
         case ThetaJoin(l, r, c, t, b) => (l, r, c, t, b)
       } { case (l, r, c, t, b) => ThetaJoin(l, r, c, t, b) }
 
-    def transpose[A]: Prism[QScriptUniform[A], (A, Rotation)] =
-      Prism.partial[QScriptUniform[A], (A, Rotation)] {
-        case Transpose(a, r) => (a, r)
-      } { case (a, r) => Transpose(a, r) }
+    def transpose[A]: Prism[QScriptUniform[A], (A, Retain, Rotation)] =
+      Prism.partial[QScriptUniform[A], (A, Retain, Rotation)] {
+        case Transpose(a, ret, rot) => (a, ret, rot)
+      } { case (a, ret, rot) => Transpose(a, ret, rot) }
 
     def union[A]: Prism[QScriptUniform[A], (A, A)] =
       Prism.partial[QScriptUniform[A], (A, A)] {
@@ -516,14 +529,11 @@ object QScriptUniform {
     val thetaJoin: Prism[QSU, (QSU, QSU, JoinFunc, JoinType, JoinFunc)] =
       iso composePrism O.thetaJoin
 
-    val transpose: Prism[QSU, (QSU, Rotation)] =
+    val transpose: Prism[QSU, (QSU, Retain, Rotation)] =
       iso composePrism O.transpose
 
     def tread(file: AFile): QSU =
-      autojoin2(
-        transpose(read(file), Rotation.ShiftMap),
-        cint(1),
-        _(MapFuncsCore.ProjectIndex(_, _)))
+      transpose(read(file), Retain.Values, Rotation.ShiftMap)
 
     def tread1(name: String): QSU =
       tread(Path.rootDir </> Path.file(name))

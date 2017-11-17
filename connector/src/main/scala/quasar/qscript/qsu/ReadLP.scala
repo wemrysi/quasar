@@ -72,9 +72,6 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
   private val IC = Inject[MapFuncCore, MapFunc]
   private val ID = Inject[MapFuncDerived, MapFunc]
 
-  private val IdIndex = 0
-  private val ValueIndex = 1
-
   def apply[
       F[_]: Monad: PlannerErrorME: NameGenerator](
       plan: T[lp.LogicalPlan]): F[QSUGraph] =
@@ -91,11 +88,10 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
 
       val shiftedRead = for {
         read <- withName[G](QSU.Read[T, Symbol](afile))
-        shifted <- extend1[G](read)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftMap))
+        shifted <- extend1[G](read)(QSU.Transpose[T, Symbol](_, QSU.Retain.Values, QSU.Rotation.ShiftMap))
       } yield shifted
 
-      // first projects out of outer shift structure, second projects out of inner
-      shiftedRead >>= projectConstIdx[G](ValueIndex) >>= projectConstIdx[G](ValueIndex)
+      shiftedRead
 
     case lp.Constant(data) =>
       val back = fromData(data).fold[PlannerError \/ MapFunc[Hole]](
@@ -113,52 +109,28 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
         .flatMap(nullary[G])
 
     case lp.InvokeUnapply(StructuralLib.FlattenMap, Sized(a)) =>
-      val transpose =
-        extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.FlattenMap))
-
-      transpose >>= projectConstIdx[G](ValueIndex)
+      extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Retain.Values, QSU.Rotation.FlattenMap))
 
     case lp.InvokeUnapply(StructuralLib.FlattenMapKeys, Sized(a)) =>
-      val transpose =
-        extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.FlattenMap))
-
-      transpose >>= projectConstIdx[G](IdIndex)
+      extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Retain.Identities, QSU.Rotation.FlattenMap))
 
     case lp.InvokeUnapply(StructuralLib.FlattenArray, Sized(a)) =>
-      val transpose =
-        extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.FlattenArray))
-
-      transpose >>= projectConstIdx[G](ValueIndex)
+      extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Retain.Values, QSU.Rotation.FlattenArray))
 
     case lp.InvokeUnapply(StructuralLib.FlattenArrayIndices, Sized(a)) =>
-      val transpose =
-        extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.FlattenArray))
-
-      transpose >>= projectConstIdx[G](IdIndex)
+      extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Retain.Identities, QSU.Rotation.FlattenArray))
 
     case lp.InvokeUnapply(StructuralLib.ShiftMap, Sized(a)) =>
-      val transpose =
-        extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftMap))
-
-      transpose >>= projectConstIdx[G](ValueIndex)
+      extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Retain.Values, QSU.Rotation.ShiftMap))
 
     case lp.InvokeUnapply(StructuralLib.ShiftMapKeys, Sized(a)) =>
-      val transpose =
-        extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftMap))
-
-      transpose >>= projectConstIdx[G](IdIndex)
+      extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Retain.Identities, QSU.Rotation.ShiftMap))
 
     case lp.InvokeUnapply(StructuralLib.ShiftArray, Sized(a)) =>
-      val transpose =
-        extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftArray))
-
-      transpose >>= projectConstIdx[G](ValueIndex)
+      extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Retain.Values, QSU.Rotation.ShiftArray))
 
     case lp.InvokeUnapply(StructuralLib.ShiftArrayIndices, Sized(a)) =>
-      val transpose =
-        extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Rotation.ShiftArray))
-
-      transpose >>= projectConstIdx[G](IdIndex)
+      extend1[G](a)(QSU.Transpose[T, Symbol](_, QSU.Retain.Identities, QSU.Rotation.ShiftArray))
 
     case lp.InvokeUnapply(SetLib.GroupBy, Sized(a, b)) =>
       extend2[G](a, b)(QSU.GroupBy[T, Symbol](_, _))
