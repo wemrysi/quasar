@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar.fp.ski._
 import quasar.{NameGenerator, qscript}
 import quasar.Planner.{InternalError, PlannerErrorME}
-import quasar.physical.rdbms.planner.sql.SqlExpr.Select.AllCols
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
 import quasar.qscript.{FreeMap, MapFunc, QScriptCore}
@@ -38,8 +37,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     extends Planner[T, F, QScriptCore[T, ?]] {
 
   def processFreeMap(f: FreeMap[T], alias: SqlExpr.Id[T[SqlExpr]]): F[T[SqlExpr]] =
-    f.cataM(
-      interpretM(κ(AllCols[T[SqlExpr]](alias.v).embed.η[F]), mapFuncPlanner.plan))
+    f.cataM(interpretM(κ(alias.embed.η[F]), mapFuncPlanner.plan))
 
   def plan: AlgebraM[F, QScriptCore[T, ?], T[SqlExpr]] = {
     case qscript.Map(src, f) =>

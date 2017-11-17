@@ -44,7 +44,7 @@ object PostgresRenderQuery extends RenderQuery {
   }
   def alias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" as ${i.v}"))
 
-  def rowAlias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => i.v))
+  def rowAlias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" ${i.v}"))
 
   val alg: AlgebraM[PlannerError \/ ?, SqlExpr, String] = {
     case Null() => "null".right
@@ -54,8 +54,8 @@ object PostgresRenderQuery extends RenderQuery {
       v.right
     case AllCols(alias) =>
       s"row_to_json($alias)".right
-    case Ref(ref) => s"->>'$ref'".right
-    case Op(sym, left, right) => s"(($left) $sym ($right))".right
+    case Ref(src, ref) => s"$src->>'$ref'".right
+    case Op(sym, left, right) => s"(($left)::numeric $sym ($right)::numeric)".right
     case WithIds(str)    => s"(row_number() over(), $str)".right
     case RowIds()        => "row_number() over()".right
     case Select(selection, from, filterOpt) =>
@@ -65,7 +65,7 @@ object PostgresRenderQuery extends RenderQuery {
       s"(select $selectionStr$fromExpr$filter)".right
     case SelectRow(selection, from) =>
       val fromExpr = s" from ${from.v}"
-      s"(select ${selection.v}$fromExpr ${rowAlias(selection.alias)})".right
+      s"(select ${selection.v}${rowAlias(selection.alias)}$fromExpr${rowAlias(selection.alias)})".right
     case Constant(Data.Str(v)) =>
       v.flatMap { case ''' => "''"; case iv => iv.toString }.self.right
     case Constant(v) =>

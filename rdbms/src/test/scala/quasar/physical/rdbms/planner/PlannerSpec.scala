@@ -145,10 +145,7 @@ class PlannerSpec extends Qspec with SqlExprSupport {
 
     "represent addition" in {
       qs(sqlE"select a+b from foo") must
-        beSql("select ((d->>'age')::numeric + (d->>'age')::numeric) from (select row_to_json(row) as d from foo row) as r;")
-    }.pendingUntilFixed("needs scoping mechanism to add idents correctly") //TODO
-
-
+        beSql("(select ((_0->>'a')::numeric + (_0->>'b')::numeric) from (select row_to_json(_0) _0 from db.foo _0) as _0)")
+    }
   }
-
 }

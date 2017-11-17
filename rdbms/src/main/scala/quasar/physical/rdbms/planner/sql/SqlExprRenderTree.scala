@@ -49,14 +49,14 @@ trait SqlExprRenderTree {
             Terminal("Table" :: Nil, v.some)
           case RowIds() =>
             Terminal("row ids" :: Nil, none)
-          case AllCols(_) =>
-            Terminal("*" :: Nil, none)
+          case AllCols(alias) =>
+            Terminal(s"* ($alias)" :: Nil, none)
           case WithIds(v) =>
             nonTerminal("With ids", v)
           case Op(op, left, right) =>
             nonTerminal(op, left, right)
-          case Ref(ref) =>
-            nonTerminal("Reference", ref)
+          case Ref(src, ref) =>
+            nonTerminal("Reference", src, ref)
           case Select(selection, from, filter) =>
             NonTerminal(
               "Select" :: Nil,
