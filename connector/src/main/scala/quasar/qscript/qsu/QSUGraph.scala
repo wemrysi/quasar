@@ -27,7 +27,7 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns.EnvT
-import scalaz.{Applicative, Cofree, Id, Monad, MonadState, Traverse, Scalaz, State, StateT}, Scalaz._
+import scalaz.{Cofree, Id, Monad, MonadState, Scalaz, State, StateT}, Scalaz._
 
 @Lenses
 final case class QSUGraph[T[_[_]]](
@@ -170,6 +170,20 @@ final case class QSUGraph[T[_[_]]](
 }
 
 object QSUGraph extends QSUGraphInstances {
+
+  import quasar.qscript.qsu.{QScriptUniform => QSU}
+
+  // The pattern functor for `QSUGraph[T]`.
+  type QSUPattern[T[_[_]], A] = EnvT[Symbol, QSU[T, ?], A]
+
+  object QSUPattern {
+    def apply[T[_[_]], A](root: Symbol, qsu: QSU[T, A]): QSUPattern[T, A] =
+      EnvT.envT(root -> qsu)
+
+    def unapply[T[_[_]], A](pattern: QSUPattern[T, A]): Option[(Symbol, QSU[T, A])] =
+      pattern.run.some
+  }
+
   type RevIdx[T[_[_]]] = SMap[QScriptUniform[T, Symbol], Symbol]
 
   def withName[T[_[_]], F[_]: Monad: NameGenerator](
@@ -192,8 +206,6 @@ object QSUGraph extends QSUGraphInstances {
       }
     } yield back
   }
-
-  import quasar.qscript.qsu.{QScriptUniform => QSU}
 
   type NodeNames[T[_[_]]] = SMap[QSU[T, Symbol], Symbol]
   type Renames = SMap[Symbol, Symbol]
@@ -235,24 +247,6 @@ object QSUGraph extends QSUGraphInstances {
                   NameGenerator[F] prefixedName "__fromTree" map (Symbol(_)))
         _ <- NameState[T, F].put((nodes + (node -> name), sym.fold(renames)(s => renames + (s -> name))))
       } yield qsu.foldRight(QSUGraph(name, SMap(name -> node)))(_ ++: _)
-  }
-
-  /**
-   * The pattern functor for `QSUGraph[T]`.
-   */
-  @Lenses
-  final case class QSUPattern[T[_[_]], A](root: Symbol, qsu: QSU[T, A])
-
-  object QSUPattern {
-    implicit def traverse[T[_[_]]]: Traverse[QSUPattern[T, ?]] =
-      new Traverse[QSUPattern[T, ?]] {
-        def traverseImpl[G[_]: Applicative, A, B](pattern: QSUPattern[T, A])(f: A => G[B])
-            : G[QSUPattern[T, B]] =
-          pattern match {
-            case QSUPattern(root, qsu) =>
-              qsu.traverse(f).map(QSUPattern[T, B](root, _))
-          }
-      }
   }
 
   /**

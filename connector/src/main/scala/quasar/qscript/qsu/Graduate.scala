@@ -51,7 +51,6 @@ import scalaz.{~>, -\/, \/-, Const, Inject, Monad, NaturalTransformation}
 import scalaz.Scalaz._
 
 final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
-  import QSUPattern._
 
   type QSE[A] = QScriptEducated[A]
   private type QSU[A] = QScriptUniform[A]
@@ -191,7 +190,7 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
     val pattern: QSUPattern[T, QSUGraph] =
       Recursive[QSUGraph, QSUPattern[T, ?]].project(graph)
 
-    def default: F[G[QSUGraph]] = educate[F](pattern.qsu).map(lift)
+    def default: F[G[QSUGraph]] = educate[F](pattern.run._2).map(lift)
 
     halt match {
       case Some((name, output)) =>
