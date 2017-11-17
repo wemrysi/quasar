@@ -93,8 +93,8 @@ class PlannerQScriptSpec extends
           Guard(
             ProjectKeyS(ProjectIndexI(Hole, 1), "parentid"),
             Type.Str,
-            Constant(ejs.bool(false)),
-            Constant(ejs.bool(true))))) must beWorkflow0(
+            Constant(json.bool(false)),
+            Constant(json.bool(true))))) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "zips")),
           $project(reshape("0" -> $arrayLit(List($field("_id"), $$ROOT)))),
