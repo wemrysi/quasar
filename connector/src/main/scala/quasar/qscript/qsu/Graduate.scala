@@ -166,9 +166,11 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
       case QSU.Distinct(source) =>
         QCE(Reduce[T, QSUGraph](
           source,
-          List(HoleF),
+          // Bucket by the value
+          List(fm),
+          // Emit the input verbatim as it may include identities.
           List(ReduceFuncs.Arbitrary(HoleF)),
-          ReduceIndexF(\/-(0)))).point[F]
+          ReduceIndexF(\/-(0))))
 
       case QSU.Unreferenced() =>
         QCE(Unreferenced[T, QSUGraph]()).point[F]
