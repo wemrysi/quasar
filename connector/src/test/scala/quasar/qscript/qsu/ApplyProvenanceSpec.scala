@@ -42,7 +42,6 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
   val J = Fixed[Fix[EJson]]
 
   val qsu = QScriptUniform.AnnotatedDsl[Fix, String]
-  val opt = QScriptUniform.Optics[Fix]
   val func = construction.Func[Fix]
 
   val app = ApplyProvenance[Fix]
