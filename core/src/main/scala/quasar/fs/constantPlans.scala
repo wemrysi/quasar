@@ -17,14 +17,25 @@
 package quasar.fs
 
 import slamdata.Predef._
-import quasar.{Data, refineConstantPlan}
+import quasar.Data
 import quasar.common.PhaseResult
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fs.QueryFile._
+import quasar.frontend.logicalplan.{Constant, LogicalPlan}
 
+import matryoshka.data.Fix
+import matryoshka.implicits._
 import scalaz._, Scalaz._
 
 object constantPlans {
+
+  /** Identify plans which reduce to a (set of) constant value(s). */
+  def isConstant(lp: Fix[LogicalPlan]): Option[List[Data]] =
+    lp.project match {
+      case Constant(Data.Set(records)) => records.some
+      case Constant(value)             => List(value).some
+      case _                           => none
+    }
 
   type State[A] = KeyValueStore[QueryFile.ResultHandle, Vector[Data], A]
 
@@ -51,15 +62,15 @@ object constantPlans {
 
     λ[QueryFile ~> Free[S, ?]] {
       case ExecutePlan(lp, out) =>
-        refineConstantPlan(lp).fold(
+        isConstant(lp).fold(
+          query.execute(lp, out).run.run)(
           // I believe it is safe to call void here because we generated the data
-          data => write.saveThese(out, data.toVector).void.run.strengthL(Vector(constantPhase)),
-          lp   => query.execute(lp, out).run.run)
+          data => write.saveThese(out, data.toVector).void.run.strengthL(Vector(constantPhase)))
 
       case EvaluatePlan(lp) =>
-        refineConstantPlan(lp).fold(
-          data => dataHandle(data).map(h => (Vector(constantPhase), h.right)),
-          lp   => queryUnsafe.eval(lp).run.run)
+        isConstant(lp).fold(
+          queryUnsafe.eval(lp).run.run)(
+          data => dataHandle(data).map(h => (Vector(constantPhase), h.right)))
 
       case More(handle) =>
         state.get(handle).run.flatMap {
@@ -73,9 +84,9 @@ object constantPlans {
       case Explain(lp) =>
         val constantExecutionPlan =
           ExecutionPlan(FileSystemType("constant"), "none", ISet.empty)
-        refineConstantPlan(lp).fold(
-          data => (Vector(constantPhase), constantExecutionPlan.right[FileSystemError]).point[Free[S, ?]],
-          lp   => query.explain(lp).run.run)
+        isConstant(lp).fold(
+          query.explain(lp).run.run)(
+          data => (Vector(constantPhase), constantExecutionPlan.right[FileSystemError]).point[Free[S, ?]])
 
       case ListContents(dir) =>
         query.listContents(dir).run

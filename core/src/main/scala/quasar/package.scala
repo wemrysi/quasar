@@ -78,14 +78,6 @@ package object quasar {
       rewritten   <- phase("Rewritten Joins", optimizer.rewriteJoins(typechecked).right)
     } yield rewritten
 
-  /** Identify plans which reduce to a (set of) constant value(s). */
-  def refineConstantPlan(lp: Fix[LP]): List[Data] \/ Fix[LP] =
-    lp.project match {
-      case Constant(Data.Set(records)) => records.left
-      case Constant(value)             => List(value).left
-      case _                           => lp.right
-    }
-
   def resolveImports[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(implicit
     mount: Mounting.Ops[S],
     fsFail: Failure.Ops[FileSystemError, S]

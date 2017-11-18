@@ -18,6 +18,7 @@ package quasar.api.services.query
 
 import slamdata.Predef._
 import quasar._
+import quasar.Fixture.unsafeToLP
 import quasar.api._, ApiErrorEntityDecoder._, ToApiError.ops._
 import quasar.api.matchers._
 import quasar.api.services.VCacheFixture
@@ -117,10 +118,6 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
     response(actualResponse.as[A].unsafePerformSync) and (actualResponse.status must_== status) and stateCheck0(ref.unsafePerformSync)
   }
 
-  def toLP(q: Fix[Sql], vars: Variables): Fix[LogicalPlan] =
-    quasar.queryPlan(q, vars, rootDir, 0L, None).run.value.valueOr(
-      err => scala.sys.error("Unexpected error compiling sql to LogicalPlan: " + err.shows))
-
   "Execute" should {
     "execute a simple query" >> {
       "GET" >> prop { filesystem: SingleFileMemState =>
@@ -214,7 +211,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
       def queryAndExpectedLP(aFile: AFile, varName: AlphaCharacters, var_ : Int): (String, Fix[LogicalPlan]) = {
         val query = pprint(selectAllWithVar(file1(fileName(aFile)), varName.value))
         val inlineQuery = selectAllWithVar(aFile, varName.value)
-        val lp = toLP(inlineQuery, Variables.fromMap(Map(varName.value -> var_.toString)))
+        val lp = unsafeToLP(inlineQuery, Variables.fromMap(Map(varName.value -> var_.toString)))
         (query,lp)
       }
       "GET" >> prop { (
@@ -456,7 +453,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
         val q = "select * from `/foo`"
         val expr: Fix[Sql] = sql.fixParser.parseExpr(q).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))
-        val lp = toLP(expr, Variables.empty)
+        val lp = unsafeToLP(expr)
         val msg = "EXEC FAILED"
         val err = executionFailed_(lp, msg)
 
