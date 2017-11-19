@@ -23,14 +23,16 @@ import quasar.qscript.{
   construction,
   Hole,
   HoleF,
-  MapFuncsCore
+  MapFuncsCore,
+  ReduceFuncs,
+  ReduceIndex
 }
 import slamdata.Predef._
 
 import matryoshka._
 import matryoshka.data.Fix
 import pathy.Path, Path.Sandboxed
-import scalaz.{EitherT, Need, StateT}
+import scalaz.{\/-, EitherT, Free, Need, StateT}
 
 object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
@@ -81,6 +83,50 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         case Map(Read(_), fm) =>
           // must_=== doesn't work
           fm must beTreeEqual(func.Guard(HoleF, Type.AnyObject, HoleF, func.Undefined))
+      }
+    }
+
+    "coalesce two summed reductions" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2(
+          qsu.qsReduce(
+            qsu.read(afile),
+            Nil,
+            List(ReduceFuncs.Count(HoleF[Fix])),
+            Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+          qsu.qsReduce(
+            qsu.read(afile),
+            Nil,
+            List(ReduceFuncs.Sum(HoleF[Fix])),
+            Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+          _(MapFuncsCore.Add(_, _))))
+
+      runOn(qgraph) must beLike {
+        case Map(
+          QSReduce(
+            Read(_),
+            Nil,
+            List(ReduceFuncs.Count(h1), ReduceFuncs.Sum(h2)),
+            repair),
+          fm) =>
+
+          // must_=== doesn't work
+          h1 must beTreeEqual(HoleF[Fix])
+          h2 must beTreeEqual(HoleF[Fix])
+
+          repair must beTreeEqual(
+            func.ConcatMaps(
+              func.MakeMap(
+                Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0))),
+                func.Constant(J.str("0"))),
+              func.MakeMap(
+                Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(1))),
+                func.Constant(J.str("1")))))
+
+          fm must beTreeEqual(
+            func.Add(
+              func.ProjectKey(HoleF, func.Constant(J.str("0"))),
+              func.ProjectKey(HoleF, func.Constant(J.str("1")))))
       }
     }
   }

@@ -164,33 +164,35 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
 
             val lhead = lifted.head
 
-            val (_, (buckets, reducers, repair)) =
-              lifted.tail.foldLeft((lhead._1.length, lhead)) {
-                case ((offset, (lbuckets, lreducers, lrepair)), (rbuckets, rreducers, rrepair)) =>
+            val (_, _, (buckets, reducers, repair)) =
+              lifted.tail.foldLeft((lhead._1.length, lhead._2.length, lhead)) {
+                case ((boffset, roffset, (lbuckets, lreducers, lrepair)), (rbuckets, rreducers, rrepair)) =>
                   val buckets = lbuckets ::: rbuckets
                   val reducers = lreducers ::: rreducers
-                  val offset2 = offset + rbuckets.length
+
+                  val boffset2 = boffset + rbuckets.length
+                  val roffset2 = roffset + rreducers.length
 
                   val repair = func.ConcatMaps(
                     lrepair,
                     rrepair map {
                       case ReduceIndex(e) =>
-                        ReduceIndex(e.bimap(_ + offset, _ + offset))
+                        ReduceIndex(e.bimap(_ + boffset, _ + roffset))
                     })
 
-                  (offset2, (buckets, reducers, repair))
+                  (boffset2, roffset2, (buckets, reducers, repair))
               }
 
             // 107.7, All chiropractors, all the time
             val adjustedFM = fm flatMap { i =>
               // get the value back OUT of the map
-              func.ProjectKey(HoleF, func.Constant(J.str(i.toString)))
+              func.ProjectKey(HoleF[T], func.Constant(J.str(i.toString)))
             }
 
             val redPat = QSU.QSReduce[T, Symbol](source.root, buckets, reducers, repair)
 
             QSUGraph.withName[T, G](redPat) map { red =>
-              qgraph.overwriteAtRoot(QSU.Map[T, Symbol](red.root, adjustedFM))
+              qgraph.overwriteAtRoot(QSU.Map[T, Symbol](red.root, adjustedFM)) :++ red
             }
           } else {
             qgraph.point[G]
@@ -207,7 +209,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
   // note that if everything is Unreferenced, remap will be κ(-1),
   // which is weird but harmless
   private def minimizeSources(sources: List[(QSUGraph, Int)]): (Int => Int, List[QSUGraph]) = {
-    val (_, remap, _, minimized) =
+    val (_, remap, offset, minimized) =
       sources.foldRight((Set[Symbol](), SMap[Int, Int](), 0, List[QSUGraph]())) {
         // just drop unreferenced sources entirely
         case ((Unreferenced(), i), (mask, remap, offset, acc)) =>
@@ -221,7 +223,9 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
       }
 
     // if we're asking for a non-existent remap index, it's because it isn't referenced
-    (i => remap.getOrElse(i, -1), minimized)
+    // oh yeah, and we have to complement the remap because of the foldRight
+    // the - 1 here comes from the fact that we over-increment offset above
+    (i => remap.mapValues(offset - 1 - _).getOrElse(i, -1), minimized)
   }
 }
 
