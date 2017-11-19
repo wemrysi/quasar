@@ -130,14 +130,22 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
           (source, buckets, reducers, repair)
       }
 
+      // candidates.forall(_ ~= QSReduce)
       if (reducerAttempt.lengthCompare(candidates.length) === 0) {
         for {
+          // apply coalescence recursively to our sources
           extended <- reducerAttempt traverse {
             case desc @ (source, buckets, reducers, repair) =>
               // TODO this is a weird use of the function, but it should work
               // we're just trying to run ourselves recursively to extend the sources
               // this isn't likely to be a common case
               coalesceToMap[G](source, List(source), Free.pure(0)) map {
+                // coalesceToMap is always going to return... a Map, but
+                // what we care about is the source and the fm, not the
+                // node itself.  so we pull it apart (this is what's weird, btw)
+                //
+                // TODO short circuit this a bit if fm === Free.pure(Hole)
+                // I'm pretty sure the fallthrough case will never be hit
                 case Map(source2, fm) =>
                   (
                     source2,
@@ -152,6 +160,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
           // we know we're non-empty by structure of outer match
           (source, _, _, _) = extended.head
 
+          // is each reduction being applied to the same mappable root?
           back <- if (extended.forall(_._1.root === source.root)) {
             val lifted = extended.zipWithIndex map {
               case ((_, buckets, reducers, repair), i) =>
@@ -162,8 +171,11 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
                   func.MakeMap(repair, func.Constant(J.str(i.toString))))
             }
 
+            // this is fine, because we can't be here if candidates is empty
+            // doing it this way avoids an extra (and useless) Option state in the fold
             val lhead = lifted.head
 
+            // squish all the reducers down into lhead
             val (_, _, (buckets, reducers, repair)) =
               lifted.tail.foldLeft((lhead._1.length, lhead._2.length, lhead)) {
                 case ((boffset, roffset, (lbuckets, lreducers, lrepair)), (rbuckets, rreducers, rrepair)) =>
