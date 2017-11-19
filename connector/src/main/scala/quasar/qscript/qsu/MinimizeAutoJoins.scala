@@ -126,9 +126,34 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
 
     case candidates =>
       val reducerAttempt = candidates collect {
-        case g @ QSReduce(source, buckets, reducers, repair) =>
+        // TODO restricting to buckets === Nil, since that's the only thing that works
+        case g @ QSReduce(source, buckets @ Nil, reducers, repair) =>
           (source, buckets, reducers, repair)
       }
+
+      /*
+       * TODO note to self: things that aren't currently handled
+       *
+       * - It's currently all-or-nothing.  That's a bit naive, because
+       *   it might be possible to collapse a few reductions even while
+       *   others cannot be.  That's still an improvement, since it
+       *   results in materially reducing the number of ultimate theta
+       *   joins, not to mention passes over sourced data.
+       *
+       * - Our bucket handling is very much broken here.  This algorithm
+       *   really only works for buckets === Nil, so... that's a thing.
+       *   What we need to do is take AuthenticatedQSU and check the
+       *   provenance of the untouched sources of each QSReduce.  The
+       *   only reductions we can coalesce are those which have equal
+       *   provenance.
+       *
+       *   + Actually, in theory we could do even better here if we know
+       *     that the reductions in question are associative, since it's
+       *     ok to over-group, so long as we're able to perform an additional
+       *     reduction afterward to squish down the results that we over-
+       *     bucketed.  We don't actually have that guarantee right now,
+       *     but it would be cool to get there soon.
+       */
 
       // candidates.forall(_ ~= QSReduce)
       if (reducerAttempt.lengthCompare(candidates.length) === 0) {
