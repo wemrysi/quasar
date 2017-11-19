@@ -49,7 +49,7 @@ trait Dimension[D, I, P] {
     * onto the stack.
     */
   def lshift(id: I, ds: Dimensions[P]): Dimensions[P] =
-    identity(id) :: ds
+    value(id) :: ds
 
   /** Sequences the first and second dimensions. */
   def nest(ds: Dimensions[P]): Dimensions[P] =

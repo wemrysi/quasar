@@ -46,14 +46,11 @@ trait Prov[D, I, P] {
   def nada: Prism[P, Unit] =
     birecursiveIso[P, PF] composePrism O.nada[P]
 
-  def identity: Prism[P, I] =
-    birecursiveIso[P, PF] composePrism O.identity[P]
-
-  def grouping: Prism[P, I] =
-    birecursiveIso[P, PF] composePrism O.grouping[P]
-
   def proj: Prism[P, D] =
     birecursiveIso[P, PF] composePrism O.proj[P]
+
+  def value: Prism[P, I] =
+    birecursiveIso[P, PF] composePrism O.value[P]
 
   def both: Prism[P, (P, P)] =
     birecursiveIso[P, PF] composePrism O.both[P]
@@ -67,7 +64,7 @@ trait Prov[D, I, P] {
   // Operations
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def joinKeys(left: P, right: P)(implicit D: Equal[D], I: Equal[I]): JoinKeys[I] = {
+  def joinKeys(left: P, right: P)(implicit D: Equal[D]): JoinKeys[I] = {
     def joinBoths(l0: P, r0: P): JoinKeys[I] =
       JoinKeys(for {
         l <- flattenBoth(l0).join
@@ -93,32 +90,27 @@ trait Prov[D, I, P] {
       } yield k)
 
     (left.project, right.project) match {
-      case (Nada(), _)                => mempty[JoinKeys, I]
-      case (_, Nada())                => mempty[JoinKeys, I]
-      case (Identity(l), Identity(r)) => JoinKeys.singleton(l, r)
-      case (Grouping(l), Grouping(r)) => JoinKeys.singleton(l, r)
-      case (Proj(l), Proj(r))         => mempty[JoinKeys, I]
-      case (Identity(l), Proj(r))     => JoinKeys.singleton(l, dataId(r))
-      case (Proj(l), Identity(r))     => JoinKeys.singleton(dataId(l), r)
-      case (Grouping(l), Proj(r))     => JoinKeys.singleton(l, dataId(r))
-      case (Proj(l), Grouping(r))     => JoinKeys.singleton(dataId(l), r)
-      case (Grouping(l), Identity(r)) => JoinKeys.singleton(l, r)
-      case (Identity(l), Grouping(r)) => JoinKeys.singleton(l, r)
-      case (Both(_, _), _)            => joinBoths(left, right)
-      case (_, Both(_, _))            => joinBoths(left, right)
-      case (OneOf(_, _), _)           => joinOneOfs(left, right)
-      case (_, OneOf(_, _))           => joinOneOfs(left, right)
-      case (Then(_, _), _)            => joinThens(left, right)
-      case (_, Then(_, _))            => joinThens(left, right)
+      case (Nada(), _)          => mempty[JoinKeys, I]
+      case (_, Nada())          => mempty[JoinKeys, I]
+      case (Proj(_), Proj(_))   => mempty[JoinKeys, I]
+      case (Value(l), Value(r)) => JoinKeys.singleton(l, r)
+      case (Value(l), Proj(r))  => JoinKeys.singleton(l, dataId(r))
+      case (Proj(l), Value(r))  => JoinKeys.singleton(dataId(l), r)
+      case (Both(_, _), _)      => joinBoths(left, right)
+      case (_, Both(_, _))      => joinBoths(left, right)
+      case (OneOf(_, _), _)     => joinOneOfs(left, right)
+      case (_, OneOf(_, _))     => joinOneOfs(left, right)
+      case (Then(_, _), _)      => joinThens(left, right)
+      case (_, Then(_, _))      => joinThens(left, right)
     }
   }
 
   // Instances
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  implicit def provenanceEqual(implicit eqD: Equal[D], eqI: Equal[I]): Equal[P] = {
+  implicit def provenanceEqual(implicit eqD: Equal[D]): Equal[P] = {
     implicit def listSetPEqual: Equal[IList[P] @@ AsSet] =
-      asSetEqual[IList, P](Foldable[IList], provenanceEqual(eqD, eqI))
+      asSetEqual[IList, P](Foldable[IList], provenanceEqual(eqD))
 
     def thenEq(l: P, r: P): Boolean =
       AsSet(flattenThen(l)) ≟ AsSet(flattenThen(r))
@@ -131,17 +123,16 @@ trait Prov[D, I, P] {
       AsSet(nubNada(flattenOneOf(l))) ≟ AsSet(nubNada(flattenOneOf(r)))
 
     Equal.equal((x, y) => (x.project, y.project) match {
-      case (Nada(), Nada())           => true
-      case (Identity(l), Identity(r)) => l ≟ r
-      case (Grouping(l), Grouping(r)) => l ≟ r
-      case (Proj(l), Proj(r))         => l ≟ r
-      case (Both(_, _), _)            => bothEq(x, y)
-      case (_, Both(_, _))            => bothEq(x, y)
-      case (OneOf(_, _), _)           => oneOfEq(x, y)
-      case (_, OneOf(_, _))           => oneOfEq(x, y)
-      case (Then(_, _), _)            => thenEq(x, y)
-      case (_, Then(_, _))            => thenEq(x, y)
-      case _                          => false
+      case (Nada(), Nada())     => true
+      case (Value(_), Value(_)) => true
+      case (Proj(l), Proj(r))   => l ≟ r
+      case (Both(_, _), _)      => bothEq(x, y)
+      case (_, Both(_, _))      => bothEq(x, y)
+      case (OneOf(_, _), _)     => oneOfEq(x, y)
+      case (_, OneOf(_, _))     => oneOfEq(x, y)
+      case (Then(_, _), _)      => thenEq(x, y)
+      case (_, Then(_, _))      => thenEq(x, y)
+      case _                    => false
     })
   }
 

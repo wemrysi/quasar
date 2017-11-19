@@ -52,7 +52,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
         FMA.map(k.right)(κ(RightSide)))))
 
     autojoinKeys(ls, rs).keys.toNel.fold[FreeAccess[JoinSide]](BoolLit(true)) { jks =>
-      jks.foldMapLeft1(eqCond)((l, r) => Free.roll(MFC(And(l, eqCond(r)))))
+      jks.distinctE1.foldMapLeft1(eqCond)((l, r) => Free.roll(MFC(And(l, eqCond(r)))))
     }
   }
 
@@ -64,15 +64,6 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
     p.cataM(bucketedIdsƒ[M](src))
 
   def bucketedIdsƒ[M[_]: Monad](src: Symbol)(implicit M: MonadState_[M, SInt]): AlgebraM[M, PF, (P, SInt ==>> I)] = {
-    def bucket(idx: SInt): I =
-      Free.point(Access.bucket(src, idx, SrcHole))
-
-    def bucketed(f: I => P, i: I): M[(P, SInt ==>> I)] =
-      for {
-        idx <- M.get
-        _   <- M.put(idx + 1)
-      } yield (f(bucket(idx)), IMap.singleton(idx, i))
-
     def children
         (l: (P, SInt ==>> I), r: (P, SInt ==>> I))
         (f: (P, P) => P)
@@ -82,8 +73,13 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
       }
 
     {
-      case ProvF.Identity(i) => bucketed(prov.identity(_), i)
-      case ProvF.Grouping(i) => bucketed(prov.grouping(_), i)
+      case ProvF.Value(i) =>
+        for {
+          idx <- M.get
+          _   <- M.put(idx + 1)
+          b   =  Free.point(Access.bucket(src, idx, SrcHole)) : I
+        } yield (prov.value(b), IMap.singleton(idx, i))
+
       case ProvF.Nada()      => (prov.nada(), IMap.empty[SInt, I]).point[M]
       case ProvF.Proj(ejs)   => (prov.proj(ejs), IMap.empty[SInt, I]).point[M]
       case ProvF.Both(l, r)  => children(l, r)(prov.both(_, _))
@@ -107,7 +103,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
     def rename0(sym: Symbol): Symbol =
       (sym === from) ? to | sym
 
-    dims map (_.transCata[P](pfo.identities modify (_ map Access.symbols.modify(rename0))))
+    dims map (_.transCata[P](pfo.value modify (_ map Access.symbols.modify(rename0))))
   }
 
   ////
