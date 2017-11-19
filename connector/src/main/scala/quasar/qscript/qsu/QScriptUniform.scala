@@ -22,16 +22,20 @@ import quasar.common.{JoinType, SortDir}
 import quasar.contrib.matryoshka.birecursiveIso
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
-import quasar.fp.PrismNT
+import quasar.fp.{coproductShow, symbolShow, PrismNT}
 import quasar.fp.ski.κ
 import quasar.qscript._
 
-import matryoshka.{BirecursiveT, Delay, Embed, EqualT, ShowT}
+import matryoshka.{delayShow, BirecursiveT, Delay, Embed, EqualT, ShowT}
 import matryoshka.data._
 import matryoshka.patterns.CoEnv
 import monocle.{Prism, PTraversal, Traversal}
 import pathy.Path
-import scalaz.{\/-, Applicative, Bitraverse, Equal, Forall, Free, NonEmptyList => NEL, Scalaz, Show, Traverse}
+import scalaz.{\/-, Applicative, Bitraverse, Enum, Equal, Forall, Free, NonEmptyList => NEL, Order, Scalaz, Show, Traverse}
+import scalaz.std.anyVal._
+import scalaz.std.list._
+import scalaz.std.tuple._
+import scalaz.syntax.show._
 
 sealed trait QScriptUniform[T[_[_]], A] extends Product with Serializable
 
@@ -113,9 +117,79 @@ object QScriptUniform {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  implicit def show[T[_[_]]: ShowT]
-      : Delay[Show, QScriptUniform[T, ?]] = ???
+  implicit def show[T[_[_]]: ShowT]: Delay[Show, QScriptUniform[T, ?]] =
+    new Delay[Show, QScriptUniform[T, ?]] {
+      def apply[A](a: Show[A]) = {
+        implicit val showA = a
+        Show.shows {
+          case AutoJoin2(left, right, combiner) =>
+            s"AutoJoin2(${left.shows}, ${right.shows}, ${combiner.shows})"
+
+          case AutoJoin3(left, center, right, combiner) =>
+            s"AutoJoin3(${left.shows}, ${center.shows}, ${right.shows}, ${combiner.shows})"
+
+          case GroupBy(left, right) =>
+            s"GroupBy(${left.shows}, ${right.shows})"
+
+          case DimEdit(source, dtrans) =>
+            s"DimEdit(${source.shows}, ${dtrans.shows})"
+
+          case LPJoin(left, right, condition, joinType, leftRef, rightRef) =>
+            s"LPJoin(${left.shows}, ${right.shows}, ${condition.shows}, ${joinType.shows}, ${leftRef.shows}, ${rightRef.shows})"
+
+          case ThetaJoin(left, right, condition, joinType, combiner) =>
+            s"ThetaJoin(${left.shows}, ${right.shows}, ${condition.shows}, ${joinType.shows}, ${combiner.shows})"
+
+          case Unary(source, mf) =>
+            s"Unary(${source.shows}, ${mf.shows})"
+
+          case Map(source, fm) =>
+            s"Map(${source.shows}, ${fm.shows})"
+
+          case Read(path) =>
+            s"Read(${Path.posixCodec.printPath(path)})"
+
+          case Transpose(source, retain, rotations) =>
+            s"Transpose(${source.shows}, ${retain.shows}, ${rotations.shows})"
+
+          case LeftShift(source, struct, idStatus, repair) =>
+            s"LeftShift(${source.shows}, ${struct.shows}, ${idStatus.shows}, ${repair.shows})"
+
+          case LPReduce(source, reduce) =>
+            s"LPReduce(${source.shows}, ${reduce.shows})"
+
+          case QSReduce(source, buckets, reducers, repair) =>
+            s"QSReduce(${source.shows}, ${buckets.shows}, ${reducers.shows}, ${repair.shows})"
+
+          case Distinct(source) =>
+            s"Distinct(${source.shows})"
+
+          case LPSort(source, order) =>
+            s"LPSort(${source.shows}, ${order.shows})"
+
+          case QSSort(source, buckets, order) =>
+            s"QSSort(${source.shows}, ${buckets.shows}, ${order.shows})"
+
+          case Union(left, right) =>
+            s"Union(${left.shows}, ${right.shows})"
+
+          case Subset(from, op, count) =>
+            s"Subset(${from.shows}, ${op.shows}, ${count.shows})"
+
+          case LPFilter(source, predicate) =>
+            s"LPFilter(${source.shows}, ${predicate.shows})"
+
+          case QSFilter(source, predicate) =>
+            s"QSFilter(${source.shows}, ${predicate.shows})"
+
+          case JoinSideRef(id) =>
+            s"JoinSideRef(${id.shows})"
+
+          case Unreferenced() =>
+            "⊥"
+        }
+      }
+    }
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]
@@ -149,6 +223,12 @@ object QScriptUniform {
   object DTrans {
     final case class Squash[T[_[_]]]() extends DTrans[T]
     final case class Group[T[_[_]]](getKey: FreeMap[T]) extends DTrans[T]
+
+    implicit def show[T[_[_]]: ShowT]: Show[DTrans[T]] =
+      Show.shows[DTrans[T]] {
+        case Squash() => "Squash"
+        case Group(k) => s"Group(${k.shows})"
+      }
   }
 
   // LPish
@@ -200,15 +280,79 @@ object QScriptUniform {
   object Retain {
     case object Identities extends Retain
     case object Values extends Retain
+
+    implicit val enum: Enum[Retain] =
+      new Enum[Retain] {
+        def succ(r: Retain) =
+          r match {
+            case Identities => Values
+            case Values => Identities
+          }
+
+        def pred(r: Retain) =
+          r match {
+            case Identities => Values
+            case Values => Identities
+          }
+
+        override val min = Some(Identities)
+        override val max = Some(Values)
+
+        def order(x: Retain, y: Retain) =
+          Order[Int].order(toInt(x), toInt(y))
+
+        val toInt: Retain => Int = {
+          case Identities => 0
+          case Values     => 1
+        }
+      }
+
+    implicit val show: Show[Retain] =
+      Show.showFromToString
   }
 
   sealed trait Rotation extends Product with Serializable
 
   object Rotation {
     case object FlattenArray extends Rotation
-    case object FlattenMap extends Rotation
     case object ShiftArray extends Rotation
+    case object FlattenMap extends Rotation
     case object ShiftMap extends Rotation
+
+    implicit val enum: Enum[Rotation] =
+      new Enum[Rotation] {
+        def succ(r: Rotation) =
+          r match {
+            case FlattenArray => ShiftArray
+            case ShiftArray => FlattenMap
+            case FlattenMap => ShiftMap
+            case ShiftMap => FlattenArray
+          }
+
+        def pred(r: Rotation) =
+          r match {
+            case FlattenArray => ShiftMap
+            case ShiftArray => FlattenArray
+            case FlattenMap => ShiftArray
+            case ShiftMap => FlattenMap
+          }
+
+        override val min = Some(FlattenArray)
+        override val max = Some(ShiftMap)
+
+        def order(x: Rotation, y: Rotation) =
+          Order[Int].order(toInt(x), toInt(y))
+
+        val toInt: Rotation => Int = {
+          case FlattenArray => 0
+          case ShiftArray   => 1
+          case FlattenMap   => 2
+          case ShiftMap     => 3
+        }
+      }
+
+    implicit val show: Show[Rotation] =
+      Show.showFromToString
   }
 
   // QScriptish

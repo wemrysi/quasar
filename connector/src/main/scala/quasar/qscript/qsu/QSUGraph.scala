@@ -24,7 +24,7 @@ import quasar.fp._
 import monocle.macros.Lenses
 import matryoshka._
 import matryoshka.implicits._
-import scalaz.{Applicative, Monad, Monoid, MonadState, Traverse, Scalaz, State, StateT}, Scalaz._
+import scalaz.{Applicative, DList, Monad, Monoid, MonadState, Traverse, Scalaz, Show, State, StateT}, Scalaz._
 
 @Lenses
 final case class QSUGraph[T[_[_]]](
@@ -508,6 +508,15 @@ sealed abstract class QSUGraphInstances extends QSUGraphInstances0 {
 
   implicit def recursive[T[_[_]]]: Recursive.Aux[QSUGraph[T], QSUPattern[T, ?]] =
     birecursive[T]
+
+  implicit def show[T[_[_]]: ShowT]: Show[QSUGraph[T]] =
+    Show.shows { g =>
+      val assocs = g.foldMapUp(sg => DList((sg.root, sg.vertices(sg.root))))
+
+      s"QSUGraph(${g.root.shows})[\n" +
+      assocs.toList.map({ case (k, v) => s"  ${k.shows} -> ${v.shows}" }).intercalate("\n") +
+      "\n]"
+    }
 }
 
 sealed abstract class QSUGraphInstances0 {
