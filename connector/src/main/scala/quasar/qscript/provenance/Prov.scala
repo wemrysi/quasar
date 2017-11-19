@@ -88,7 +88,7 @@ trait Prov[D, I, P] {
       JoinKeys(for {
         ls <- flattenThen(l0)
         rs <- flattenThen(r0)
-        (l, r) <- ls.fzip(rs) takeWhile { case (x, y) => x ≟ y }
+        (l, r) <- ls.reverse.fzip(rs.reverse) takeWhile { case (x, y) => x ≟ y }
         k  <- joinKeys(l, r).keys
       } yield k)
 

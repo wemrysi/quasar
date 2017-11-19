@@ -126,7 +126,7 @@ sealed abstract class ProvFInstances {
           case Proj(d)     => d.show
           case Both(l, r)  => Cord("(") ++ l.show ++ Cord(") /\\\\ (") ++ r.show ++ Cord(")")
           case OneOf(l, r) => Cord("(") ++ l.show ++ Cord(") \\// (") ++ r.show ++ Cord(")")
-          case Then(l, r)  => Cord("(") ++ l.show ++ Cord(") >> (") ++ r.show ++ Cord(")")
+          case Then(l, r)  => Cord("(") ++ l.show ++ Cord(") << (") ++ r.show ++ Cord(")")
         }
       }
     }
