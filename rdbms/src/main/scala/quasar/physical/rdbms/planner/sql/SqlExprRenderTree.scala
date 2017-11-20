@@ -53,7 +53,7 @@ trait SqlExprRenderTree {
             Terminal(s"* ($alias)" :: Nil, none)
           case WithIds(v) =>
             nonTerminal("With ids", v)
-          case Op(op, left, right) =>
+          case NumericOp(op, left, right) =>
             nonTerminal(op, left, right)
           case Ref(src, ref) =>
             nonTerminal("Reference", src, ref)

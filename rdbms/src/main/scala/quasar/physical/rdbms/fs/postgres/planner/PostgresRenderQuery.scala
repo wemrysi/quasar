@@ -55,7 +55,7 @@ object PostgresRenderQuery extends RenderQuery {
     case AllCols(alias) =>
       s"row_to_json($alias)".right
     case Ref(src, ref) => s"$src->>'$ref'".right
-    case Op(sym, left, right) => s"(($left)::numeric $sym ($right)::numeric)".right
+    case NumericOp(sym, left, right) => s"(($left)::numeric $sym ($right)::numeric)".right
     case WithIds(str)    => s"(row_number() over(), $str)".right
     case RowIds()        => "row_number() over()".right
     case Select(selection, from, filterOpt) =>

@@ -69,10 +69,10 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.ExtractYear(f) =>  notImplemented
     case MFC.Now() =>  notImplemented
     case MFC.Negate(f) =>  notImplemented
-    case MFC.Add(f1, f2) =>  SQL.Op[T[SQL]]("+", f1, f2).embed.η[F]
-    case MFC.Multiply(f1, f2) => SQL.Op[T[SQL]]("*", f1, f2).embed.η[F]
-    case MFC.Subtract(f1, f2) =>  SQL.Op[T[SQL]]("-", f1, f2).embed.η[F]
-    case MFC.Divide(f1, f2) => SQL.Op[T[SQL]]("/", f1, f2).embed.η[F]
+    case MFC.Add(f1, f2) =>  SQL.NumericOp[T[SQL]]("+", f1, f2).embed.η[F]
+    case MFC.Multiply(f1, f2) => SQL.NumericOp[T[SQL]]("*", f1, f2).embed.η[F]
+    case MFC.Subtract(f1, f2) =>  SQL.NumericOp[T[SQL]]("-", f1, f2).embed.η[F]
+    case MFC.Divide(f1, f2) => SQL.NumericOp[T[SQL]]("/", f1, f2).embed.η[F]
     case MFC.Modulo(f1, f2) => notImplemented
     case MFC.Power(f1, f2) =>  notImplemented
     case MFC.Not(f) =>  notImplemented

@@ -38,7 +38,7 @@ trait SqlExprTraverse {
       case Table(name)         => G.point(Table(name))
       case RowIds()            => G.point(RowIds())
       case AllCols(v)           => G.point(AllCols(v))
-      case Op(op, left, right) => (f(left) ⊛ f(right))(Op(op, _, _))
+      case NumericOp(op, left, right) => (f(left) ⊛ f(right))(NumericOp(op, _, _))
       case WithIds(v)          => f(v) ∘ WithIds.apply
 
       case Select(selection, from, filterOpt) =>
