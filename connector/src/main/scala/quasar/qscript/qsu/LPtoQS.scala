@@ -16,50 +16,66 @@
 
 package quasar.qscript.qsu
 
-import slamdata.Predef.AnyVal
+import slamdata.Predef._
 import quasar.NameGenerator
 import quasar.Planner.PlannerErrorME
+import quasar.fp.{coproductShow, symbolShow}
 import quasar.frontend.logicalplan.LogicalPlan
-import slamdata.Predef._
 
-import matryoshka.{BirecursiveT, EqualT}
+import matryoshka.{delayShow, showTShow, BirecursiveT, EqualT, ShowT}
+import matryoshka.data._
 import scalaz.{Applicative, Functor, Kleisli => K, Monad}
+import scalaz.std.map._
 import scalaz.syntax.applicative._
+import scalaz.syntax.show._
 
-final class LPtoQS[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
+final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
   import LPtoQS.MapSyntax
+  import ApplyProvenance.AuthenticatedQSU
 
   def apply[F[_]: Monad: PlannerErrorME: NameGenerator](lp: T[LogicalPlan])
       : F[T[QScriptEducated]] = {
 
     val lpToQs =
       K(ReadLP[T].apply[F])          >=>
-      debug("ReadLP: ")              >-
+      debugG("ReadLP: ")             >-
       EliminateUnary[T].apply        >=>
-      debug("EliminateUnary: ")      >-
+      debugG("EliminateUnary: ")     >-
       RecognizeDistinct[T].apply     >=>
-      debug("RecognizeDistinct: ")   >==>
+      debugG("RecognizeDistinct: ")  >==>
       ExtractFreeMap[T, F]           >=>
-      debug("ExtractFM: ")           >==>
+      debugG("ExtractFM: ")          >==>
       MinimizeAutoJoins[T].apply[F]  >=>
-      debug("MinimizeAJ: ")          >==>
+      debugG("MinimizeAJ: ")         >==>
       ApplyProvenance[T].apply[F]    >=>
-      K(ReifyProvenance[T].apply[F]) >-
+      debugAG("ApplyProv: ")         >-
+      ReifyBuckets[T]                >=>
+      debugAG("ReifyBuckets: ")      >==>
+      ReifyAutoJoins[T].apply[F]     >=>
+      debugAG("ReifyAutoJoins: ")    >-
       (_.graph)                      >==>
+      ReifyIdentities[T].apply[F]    >==>
       Graduate[T].apply[F]
 
     lpToQs(lp)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  private def debug[F[_]: Applicative, A](prefix: String): K[F, A, A] = K { a =>
-    // println(prefix + a.toString)    // uh... yeah do better
-    a.point[F]
-  }
+  private def debugG[F[_]: Applicative](prefix: String): K[F, QSUGraph, QSUGraph] =
+    K { g =>
+      println("\n\n" + prefix + g.shows)    // uh... yeah do better
+      g.point[F]
+    }
+
+  private def debugAG[F[_]: Applicative](prefix: String): K[F, AuthenticatedQSU[T], AuthenticatedQSU[T]] =
+    K { aqsu =>
+      println("\n\n" + prefix + aqsu.graph.shows + "\n" + aqsu.dims.shows)
+      aqsu.point[F]
+    }
 }
 
 object LPtoQS {
-  def apply[T[_[_]]: BirecursiveT: EqualT]: LPtoQS[T] = new LPtoQS[T]
+  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT]: LPtoQS[T] = new LPtoQS[T]
 
   final implicit class MapSyntax[F[_], A](val self: F[A]) extends AnyVal {
     def >-[B](f: A => B)(implicit F: Functor[F]): F[B] =

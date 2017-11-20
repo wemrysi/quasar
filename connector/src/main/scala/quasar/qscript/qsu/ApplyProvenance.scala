@@ -22,13 +22,10 @@ import quasar.Planner.{PlannerErrorME, InternalError}
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson
 import quasar.ejson.EJson
-import quasar.ejson.implicits._
-import quasar.fp._
-import quasar.qscript.{ExcludeId, HoleF, IdOnly, IdStatus, RightSideF}
+import quasar.qscript.{ExcludeId, HoleF, IdOnly, IdStatus, RightSideF, SrcHole}
 import quasar.qscript.provenance._
 
 import matryoshka._
-import matryoshka.data._
 import matryoshka.implicits._
 import pathy.Path
 import scalaz.{Free, IList, Monad, StateT}
@@ -86,7 +83,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
       case DimEdit(src, DTrans.Squash()) => dims.squash(src).point[F]
 
       case DimEdit(src, DTrans.Group(k)) =>
-        dims.swap(0, 1, dims.lshift(k as root, src)).point[F]
+        dims.swap(0, 1, dims.lshift(k as Access.value(SrcHole), src)).point[F]
 
       case Distinct(src) => src.point[F]
 
@@ -100,21 +97,19 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
 
       case LPJoin(_, _, _, _, _, _) => unexpectedError("LPJoin", root)
 
-      case LPReduce(src, _) => dims.reduce(src).point[F]
+      case LPReduce(src, _) => dims.bucketAccess(root, dims.reduce(src)).point[F]
 
       case LPSort(_, _) => unexpectedError("LPSort", root)
 
       case QSFilter(src, _) => src.point[F]
 
-      case QSReduce(src, _, _, _) => dims.reduce(src).point[F]
+      case QSReduce(src, _, _, _) => unexpectedError("QSReduce", root)
 
       case QSSort(src, _, _) => src.point[F]
 
       case Unary(_, _) => unexpectedError("Unary", root)
 
       case Map(src, _) => src.point[F]
-
-      case Unreferenced() => dims.empty.point[F]
 
       case Read(file) => dims.squash(segments(file).map(projStr).reverse).point[F]
 
@@ -123,13 +118,15 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
       case ThetaJoin(left, right, _, _, _) => dims.join(left, right).point[F]
 
       case Transpose(src, _, rot) =>
-        val tid: dims.I = Free.pure(root)
+        val tid: dims.I = Free.pure(Access.identity(root, SrcHole))
         (rot match {
           case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, src)
           case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, src)
         }).point[F]
 
       case Union(left, right) => dims.union(left, right).point[F]
+
+      case Unreferenced() => dims.empty.point[F]
     }
   }
 

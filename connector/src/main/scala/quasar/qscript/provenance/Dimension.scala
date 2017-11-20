@@ -28,7 +28,7 @@ trait Dimension[D, I, P] {
   import prov._
 
   /** Returns the `JoinKeys` describing the autojoin of the two dimension stacks. */
-  def autojoinKeys(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D], I: Equal[I]): JoinKeys[I] =
+  def autojoinKeys(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D]): JoinKeys[I] =
     ls.reverse.fzipWith(rs.reverse)(joinKeys).fold
 
   /** The empty dimension stack. */
@@ -42,14 +42,14 @@ trait Dimension[D, I, P] {
     nest(lshift(id, ds))
 
   /** Joins two dimensions into a single dimension stack, starting from the base. */
-  def join(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D], I: Equal[I]): Dimensions[P] =
-    alignRtoL(ls, rs)(ι, ι, (l, r) => if (l ≟ r) l else both(l, r))
+  def join(ls: Dimensions[P], rs: Dimensions[P]): Dimensions[P] =
+    alignRtoL(ls, rs)(ι, ι, both(_, _))
 
   /** Shifts the dimensional stack by pushing a new dimension from value space
     * onto the stack.
     */
   def lshift(id: I, ds: Dimensions[P]): Dimensions[P] =
-    identity(id) :: ds
+    value(id) :: ds
 
   /** Sequences the first and second dimensions. */
   def nest(ds: Dimensions[P]): Dimensions[P] =

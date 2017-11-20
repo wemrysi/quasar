@@ -55,7 +55,7 @@ object ExtractFreeMap {
             Free.roll(MFC(MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), RightSideF))))))
 
         MappableRegion.funcOf(replaceRefs(graph, lref, rref), graph refocus cond)
-          .map(ThetaJoin(left, right, _, jtype, combiner))
+          .map(jf => ThetaJoin(left, right, jf map (Access.value(_)), jtype, combiner))
           .toSuccessNel(s"Invalid join condition, $cond, must be a mappable function of $left and $right.")
 
       case LPSort(src, keys) =>

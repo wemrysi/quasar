@@ -22,11 +22,11 @@ import quasar.common.{JoinType, SortDir}
 import quasar.contrib.matryoshka.{birecursiveIso, envTIso}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
-import quasar.fp.PrismNT
 import quasar.fp.ski.{ι, κ}
+import quasar.fp.{coproductShow, symbolShow, PrismNT}
 import quasar.qscript._
 
-import matryoshka.{BirecursiveT, Delay, Embed, EqualT, ShowT}
+import matryoshka.{delayShow, BirecursiveT, Delay, Embed, EqualT, ShowT}
 import matryoshka.data._
 import matryoshka.patterns.{CoEnv, EnvT}
 import monocle.{Iso, Prism, PTraversal, Traversal}
@@ -36,6 +36,7 @@ import scalaz.{
   Applicative,
   Bitraverse,
   Cofree,
+  Enum,
   Equal,
   Forall,
   Free,
@@ -45,6 +46,11 @@ import scalaz.{
   Scalaz,
   Show,
   Traverse}
+import scalaz.{\/-, Applicative, Bitraverse, Enum, Equal, Forall, Free, NonEmptyList => NEL, Order, Scalaz, Show, Traverse}
+import scalaz.std.anyVal._
+import scalaz.std.list._
+import scalaz.std.tuple._
+import scalaz.syntax.show._
 
 sealed trait QScriptUniform[T[_[_]], A] extends Product with Serializable
 
@@ -126,9 +132,79 @@ object QScriptUniform {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  implicit def show[T[_[_]]: ShowT]
-      : Delay[Show, QScriptUniform[T, ?]] = ???
+  implicit def show[T[_[_]]: ShowT]: Delay[Show, QScriptUniform[T, ?]] =
+    new Delay[Show, QScriptUniform[T, ?]] {
+      def apply[A](a: Show[A]) = {
+        implicit val showA = a
+        Show.shows {
+          case AutoJoin2(left, right, combiner) =>
+            s"AutoJoin2(${left.shows}, ${right.shows}, ${combiner.shows})"
+
+          case AutoJoin3(left, center, right, combiner) =>
+            s"AutoJoin3(${left.shows}, ${center.shows}, ${right.shows}, ${combiner.shows})"
+
+          case GroupBy(left, right) =>
+            s"GroupBy(${left.shows}, ${right.shows})"
+
+          case DimEdit(source, dtrans) =>
+            s"DimEdit(${source.shows}, ${dtrans.shows})"
+
+          case LPJoin(left, right, condition, joinType, leftRef, rightRef) =>
+            s"LPJoin(${left.shows}, ${right.shows}, ${condition.shows}, ${joinType.shows}, ${leftRef.shows}, ${rightRef.shows})"
+
+          case ThetaJoin(left, right, condition, joinType, combiner) =>
+            s"ThetaJoin(${left.shows}, ${right.shows}, ${condition.shows}, ${joinType.shows}, ${combiner.shows})"
+
+          case Unary(source, mf) =>
+            s"Unary(${source.shows}, ${mf.shows})"
+
+          case Map(source, fm) =>
+            s"Map(${source.shows}, ${fm.shows})"
+
+          case Read(path) =>
+            s"Read(${Path.posixCodec.printPath(path)})"
+
+          case Transpose(source, retain, rotations) =>
+            s"Transpose(${source.shows}, ${retain.shows}, ${rotations.shows})"
+
+          case LeftShift(source, struct, idStatus, repair) =>
+            s"LeftShift(${source.shows}, ${struct.shows}, ${idStatus.shows}, ${repair.shows})"
+
+          case LPReduce(source, reduce) =>
+            s"LPReduce(${source.shows}, ${reduce.shows})"
+
+          case QSReduce(source, buckets, reducers, repair) =>
+            s"QSReduce(${source.shows}, ${buckets.shows}, ${reducers.shows}, ${repair.shows})"
+
+          case Distinct(source) =>
+            s"Distinct(${source.shows})"
+
+          case LPSort(source, order) =>
+            s"LPSort(${source.shows}, ${order.shows})"
+
+          case QSSort(source, buckets, order) =>
+            s"QSSort(${source.shows}, ${buckets.shows}, ${order.shows})"
+
+          case Union(left, right) =>
+            s"Union(${left.shows}, ${right.shows})"
+
+          case Subset(from, op, count) =>
+            s"Subset(${from.shows}, ${op.shows}, ${count.shows})"
+
+          case LPFilter(source, predicate) =>
+            s"LPFilter(${source.shows}, ${predicate.shows})"
+
+          case QSFilter(source, predicate) =>
+            s"QSFilter(${source.shows}, ${predicate.shows})"
+
+          case JoinSideRef(id) =>
+            s"JoinSideRef(${id.shows})"
+
+          case Unreferenced() =>
+            "⊥"
+        }
+      }
+    }
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   implicit def renderTree[T[_[_]]: RenderTreeT: ShowT]
@@ -162,6 +238,12 @@ object QScriptUniform {
   object DTrans {
     final case class Squash[T[_[_]]]() extends DTrans[T]
     final case class Group[T[_[_]]](getKey: FreeMap[T]) extends DTrans[T]
+
+    implicit def show[T[_[_]]: ShowT]: Show[DTrans[T]] =
+      Show.shows[DTrans[T]] {
+        case Squash() => "Squash"
+        case Group(k) => s"Group(${k.shows})"
+      }
   }
 
   // LPish
@@ -177,7 +259,7 @@ object QScriptUniform {
   final case class ThetaJoin[T[_[_]], A](
       left: A,
       right: A,
-      condition: JoinFunc[T],
+      condition: FreeMapA[T, Access[JoinSide]],
       joinType: JoinType,
       combiner: JoinFunc[T]) extends QScriptUniform[T, A]
 
@@ -213,15 +295,79 @@ object QScriptUniform {
   object Retain {
     case object Identities extends Retain
     case object Values extends Retain
+
+    implicit val enum: Enum[Retain] =
+      new Enum[Retain] {
+        def succ(r: Retain) =
+          r match {
+            case Identities => Values
+            case Values => Identities
+          }
+
+        def pred(r: Retain) =
+          r match {
+            case Identities => Values
+            case Values => Identities
+          }
+
+        override val min = Some(Identities)
+        override val max = Some(Values)
+
+        def order(x: Retain, y: Retain) =
+          Order[Int].order(toInt(x), toInt(y))
+
+        val toInt: Retain => Int = {
+          case Identities => 0
+          case Values     => 1
+        }
+      }
+
+    implicit val show: Show[Retain] =
+      Show.showFromToString
   }
 
   sealed trait Rotation extends Product with Serializable
 
   object Rotation {
     case object FlattenArray extends Rotation
-    case object FlattenMap extends Rotation
     case object ShiftArray extends Rotation
+    case object FlattenMap extends Rotation
     case object ShiftMap extends Rotation
+
+    implicit val enum: Enum[Rotation] =
+      new Enum[Rotation] {
+        def succ(r: Rotation) =
+          r match {
+            case FlattenArray => ShiftArray
+            case ShiftArray => FlattenMap
+            case FlattenMap => ShiftMap
+            case ShiftMap => FlattenArray
+          }
+
+        def pred(r: Rotation) =
+          r match {
+            case FlattenArray => ShiftMap
+            case ShiftArray => FlattenArray
+            case FlattenMap => ShiftArray
+            case ShiftMap => FlattenMap
+          }
+
+        override val min = Some(FlattenArray)
+        override val max = Some(ShiftMap)
+
+        def order(x: Rotation, y: Rotation) =
+          Order[Int].order(toInt(x), toInt(y))
+
+        val toInt: Rotation => Int = {
+          case FlattenArray => 0
+          case ShiftArray   => 1
+          case FlattenMap   => 2
+          case ShiftMap     => 3
+        }
+      }
+
+    implicit val show: Show[Rotation] =
+      Show.showFromToString
   }
 
   // QScriptish
@@ -239,7 +385,7 @@ object QScriptUniform {
   // QScriptish
   final case class QSReduce[T[_[_]], A](
       source: A,
-      buckets: List[FreeMap[T]],
+      buckets: List[FreeMapA[T, Access[Hole]]],
       reducers: List[ReduceFunc[FreeMap[T]]],
       repair: FreeMapA[T, ReduceIndex]) extends QScriptUniform[T, A]
 
@@ -253,7 +399,7 @@ object QScriptUniform {
   // QScriptish
   final case class QSSort[T[_[_]], A](
       source: A,
-      buckets: List[FreeMap[T]],
+      buckets: List[FreeMapA[T, Access[Hole]]],
       order: NEL[(FreeMap[T], SortDir)]) extends QScriptUniform[T, A]
 
   final case class Union[T[_[_]], A](left: A, right: A) extends QScriptUniform[T, A]
@@ -348,13 +494,13 @@ object QScriptUniform {
         case QSFilter(a, p) => (a, p)
       } { case (a, p) => QSFilter(a, p) }
 
-    def qsReduce[A]: Prism[QScriptUniform[A], (A, List[FreeMap], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])] =
-      Prism.partial[QScriptUniform[A], (A, List[FreeMap], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])] {
+    def qsReduce[A]: Prism[QScriptUniform[A], (A, List[FreeAccess[Hole]], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])] =
+      Prism.partial[QScriptUniform[A], (A, List[FreeAccess[Hole]], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])] {
         case QSReduce(a, bs, rfs, rep) => (a, bs, rfs, rep)
       } { case (a, bs, rfs, rep) => QSReduce(a, bs, rfs, rep) }
 
-    def qsSort[A]: Prism[QScriptUniform[A], (A, List[FreeMap], NEL[(FreeMap, SortDir)])] =
-      Prism.partial[QScriptUniform[A], (A, List[FreeMap], NEL[(FreeMap, SortDir)])] {
+    def qsSort[A]: Prism[QScriptUniform[A], (A, List[FreeAccess[Hole]], NEL[(FreeMap, SortDir)])] =
+      Prism.partial[QScriptUniform[A], (A, List[FreeAccess[Hole]], NEL[(FreeMap, SortDir)])] {
         case QSSort(a, buckets, keys) => (a, buckets, keys)
       } { case (a, buckets, keys) => QSSort(a, buckets, keys) }
 
@@ -368,8 +514,8 @@ object QScriptUniform {
         case Subset(f, op, c) => (f, op, c)
       } { case (f, op, c) => Subset(f, op, c) }
 
-    def thetaJoin[A]: Prism[QScriptUniform[A], (A, A, JoinFunc, JoinType, JoinFunc)] =
-      Prism.partial[QScriptUniform[A], (A, A, JoinFunc, JoinType, JoinFunc)] {
+    def thetaJoin[A]: Prism[QScriptUniform[A], (A, A, FreeAccess[JoinSide], JoinType, JoinFunc)] =
+      Prism.partial[QScriptUniform[A], (A, A, FreeAccess[JoinSide], JoinType, JoinFunc)] {
         case ThetaJoin(l, r, c, t, b) => (l, r, c, t, b)
       } { case (l, r, c, t, b) => ThetaJoin(l, r, c, t, b) }
 
@@ -407,10 +553,14 @@ object QScriptUniform {
               f(x) map (QSFilter(a, _))
 
             case QSReduce(a, bs, reds, rep) =>
-              (bs.traverse(f) |@| Traverse[List].compose[ReduceFunc].traverse(reds)(f))(QSReduce(a, _, _, rep))
+              Traverse[List].compose[ReduceFunc]
+                .traverse(reds)(f)
+                .map(QSReduce(a, bs, _, rep))
 
             case QSSort(s, bs, keys) =>
-              (bs.traverse(f) |@| keys.traverse { case (x, d) => f(x) strengthR d })(QSSort(s, _, _))
+              keys.traverse {
+                case (x, d) => f(x) strengthR d
+              } map (QSSort(s, bs, _))
 
             case other => other.point[F]
           }
@@ -517,11 +667,11 @@ object QScriptUniform {
     def qsFilter: Prism[A, F[(A, FreeMap)]] =
       composeLifting[(?, FreeMap)](O.qsFilter[A])
 
-    def qsReduce: Prism[A, F[(A, List[FreeMap], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])]] =
-      composeLifting[(?, List[FreeMap], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])](O.qsReduce[A])
+    def qsReduce: Prism[A, F[(A, List[FreeAccess[Hole]], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])]] =
+      composeLifting[(?, List[FreeAccess[Hole]], List[ReduceFunc[FreeMap]], FreeMapA[ReduceIndex])](O.qsReduce[A])
 
-    def qsSort: Prism[A, F[(A, List[FreeMap], NEL[(FreeMap, SortDir)])]] =
-      composeLifting[(?, List[FreeMap], NEL[(FreeMap, SortDir)])](O.qsSort[A])
+    def qsSort: Prism[A, F[(A, List[FreeAccess[Hole]], NEL[(FreeMap, SortDir)])]] =
+      composeLifting[(?, List[FreeAccess[Hole]], NEL[(FreeMap, SortDir)])](O.qsSort[A])
 
     def read: Prism[A, F[AFile]] = {
       type G[_] = AFile
@@ -533,8 +683,8 @@ object QScriptUniform {
       composeLifting[G](O.subset[A])
     }
 
-    def thetaJoin: Prism[A, F[(A, A, JoinFunc, JoinType, JoinFunc)]] = {
-      type G[A] = (A, A, JoinFunc, JoinType, JoinFunc)
+    def thetaJoin: Prism[A, F[(A, A, FreeAccess[JoinSide], JoinType, JoinFunc)]] = {
+      type G[A] = (A, A, FreeAccess[JoinSide], JoinType, JoinFunc)
       composeLifting[G](O.thetaJoin[A])
     }
 

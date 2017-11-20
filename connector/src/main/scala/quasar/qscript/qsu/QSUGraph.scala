@@ -27,7 +27,7 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns.EnvT
-import scalaz.{Cofree, Id, Monad, MonadState, Scalaz, State, StateT}, Scalaz._
+import scalaz.{Cofree, DList, Id, Monad, Monoid, MonadState, Scalaz, Show, State, StateT}, Scalaz._
 
 @Lenses
 final case class QSUGraph[T[_[_]]](
@@ -43,6 +43,33 @@ final case class QSUGraph[T[_[_]]](
    * Uniquely merge the graphs, retaining the root from the left.
    */
   def :++(right: QSUGraph[T]): QSUGraph[T] = right ++: this
+
+  /** A bottom up (leaves first) monoidal fold of the graph. */
+  def foldMapUpM[F[_]: Monad, A: Monoid](f: QSUGraph[T] => F[A]): F[A] = {
+    type VisitedT[X[_], A] = StateT[X, Set[Symbol], A]
+    type G[A] = VisitedT[F, A]
+    val MS = MonadState[G, Set[Symbol]]
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def inner(g: QSUGraph[T]): G[A] =
+      for {
+        visited <- MS.get
+
+        a <- if (visited(g.root))
+          mzero[A].point[G]
+        else
+          for {
+            _ <- MS.put(visited + g.root)
+            aSub <- g.unfold.foldMapM(inner)
+            aG <- f(g).liftM[VisitedT]
+          } yield aSub |+| aG
+      } yield a
+
+    inner(this).eval(Set())
+  }
+
+  def foldMapUp[A: Monoid](f: QSUGraph[T] => A): A =
+    foldMapUpM[Id, A](f)
 
   def refocus(node: Symbol): QSUGraph[T] =
     copy(root = node)
@@ -86,7 +113,8 @@ final case class QSUGraph[T[_[_]]](
    */
   def rewriteM[F[_]: Monad](pf: PartialFunction[QSUGraph[T], F[QSUGraph[T]]]): F[QSUGraph[T]] = {
     type RewriteS = SMap[Symbol, QSUGraph[T]]
-    type G[A] = StateT[F, RewriteS, A]
+    type VisitedT[X[_], A] = StateT[X, RewriteS, A]
+    type G[A] = VisitedT[F, A]
     val MS = MonadState[G, RewriteS]
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -135,7 +163,7 @@ final case class QSUGraph[T[_[_]]](
               self2 = QSUGraph(g.root, collapsed)
 
               applied <- if (pf.isDefinedAt(self2))
-                pf(self2).liftM[StateT[?[_], RewriteS, ?]]
+                pf(self2).liftM[VisitedT]
               else
                 self2.point[G]
 
@@ -499,6 +527,15 @@ sealed abstract class QSUGraphInstances extends QSUGraphInstances0 {
 
   implicit def recursive[T[_[_]]]: Recursive.Aux[QSUGraph[T], QSUPattern[T, ?]] =
     birecursive[T]
+
+  implicit def show[T[_[_]]: ShowT]: Show[QSUGraph[T]] =
+    Show.shows { g =>
+      val assocs = g.foldMapUp(sg => DList((sg.root, sg.vertices(sg.root))))
+
+      s"QSUGraph(${g.root.shows})[\n" +
+      assocs.toList.map({ case (k, v) => s"  ${k.shows} -> ${v.shows}" }).intercalate("\n") +
+      "\n]"
+    }
 }
 
 sealed abstract class QSUGraphInstances0 {

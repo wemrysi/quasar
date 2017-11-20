@@ -57,6 +57,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
   type QSU[A] = QScriptUniform[A]
   type QSE[A] = QScriptEducated[A]
 
+  val researched = ReifyIdentities[Fix]
   val grad = Graduate[Fix]
 
   val qsu = QScriptUniform.DslT[Fix]
@@ -96,10 +97,11 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
       "convert QSReduce" in {
         val buckets: List[FreeMap] = List(func.Add(HoleF, IntLit(17)))
+        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value(_)))
         val reducers: List[ReduceFunc[FreeMap]] = List(ReduceFuncs.Count(HoleF))
         val repair: FreeMapA[ReduceIndex] = ReduceIndexF(\/-(0))
 
-        val qgraph: Fix[QSU] = qsu.qsReduce(qsu.read(afile), buckets, reducers, repair)
+        val qgraph: Fix[QSU] = qsu.qsReduce(qsu.read(afile), abuckets, reducers, repair)
         val qscript: Fix[QSE] = qse.Reduce(qse.Read[AFile](afile), buckets, reducers, repair)
 
         qgraph must graduateAs(qscript)
@@ -117,9 +119,10 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
       "convert QSSort" in {
         val buckets: List[FreeMap] = List(func.Add(HoleF, IntLit(17)))
+        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value(_)))
         val order: NEL[(FreeMap, SortDir)] = NEL(HoleF -> SortDir.Descending)
 
-        val qgraph: Fix[QSU] = qsu.qsSort(qsu.read(afile), buckets, order)
+        val qgraph: Fix[QSU] = qsu.qsSort(qsu.read(afile), abuckets, order)
         val qscript: Fix[QSE] = qse.Sort(qse.Read[AFile](afile), buckets, order)
 
         qgraph must graduateAs(qscript)
@@ -169,8 +172,8 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
               IncludeId,
               concatArr),
             qsu.cint(1),
-            Free.roll[MapFunc, JoinSide](
-              MFC(MapFuncsCore.Constant[Fix, Free[MapFunc, JoinSide]](
+            Free.roll[MapFunc, Access[JoinSide]](
+              MFC(MapFuncsCore.Constant[Fix, FreeAccess[JoinSide]](
                 Fixed[Fix[EJson]].bool(true)))),
             JoinType.Inner,
             projectIdx),
@@ -210,7 +213,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
     new Matcher[Fix[QSU]] {
       def apply[S <: Fix[QSU]](s: Expectable[S]): MatchResult[S] = {
         val actual: PlannerError \/ Fix[QSE] =
-          evaluate(grad[F](QSUGraph.fromTree[Fix](s.value)))
+          evaluate(researched[F](QSUGraph.fromTree[Fix](s.value)) >>= grad[F])
 
         actual.bimap[MatchResult[S], MatchResult[S]](
         { err =>
@@ -231,7 +234,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
     new Matcher[Fix[QSU]] {
       def apply[S <: Fix[QSU]](s: Expectable[S]): MatchResult[S] = {
         val actual: PlannerError \/ Fix[QSE] =
-          evaluate(grad[F](QSUGraph.fromTree[Fix](s.value)))
+          evaluate(researched[F](QSUGraph.fromTree[Fix](s.value)) >>= grad[F])
 
         // TODO better equality checking for PlannerError
         actual.bimap[MatchResult[S], MatchResult[S]](
