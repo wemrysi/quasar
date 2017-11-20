@@ -109,7 +109,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
       case QSFilter(source, predicate) =>
         // tune into 102.5 FM, The Source
         val sourceFM = expandSecondOrder(MappableRegion.maximal(source))
-        func.Cond(sourceFM, sourceFM, func.Undefined[QSUGraph])
+        func.Cond(predicate.flatMap(κ(sourceFM)), sourceFM, func.Undefined[QSUGraph])
 
       // TODO should we handle LPFilter here just for completion sake?
 

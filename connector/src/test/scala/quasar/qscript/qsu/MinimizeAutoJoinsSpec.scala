@@ -182,6 +182,27 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               func.ProjectKey(HoleF, func.Constant(J.str("1")))))
       }
     }
+
+    "rewrite filter into cond only to avoid join" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2(
+          qsu.read(afile),
+          qsu.qsFilter(
+            qsu.read(afile),
+            func.Eq(HoleF[Fix], func.Constant(J.str("foo")))),
+          _(MapFuncsCore.Add(_, _))))
+
+      runOn(qgraph) must beLike {
+        case Map(Read(_), fm) =>
+          fm must beTreeEqual(
+            func.Add(
+              HoleF[Fix],
+              func.Cond(
+                func.Eq(HoleF[Fix], func.Constant(J.str("foo"))),
+                HoleF[Fix],
+                func.Undefined)))
+      }
+    }
   }
 
   def runOn(qgraph: QSUGraph): QSUGraph = {
