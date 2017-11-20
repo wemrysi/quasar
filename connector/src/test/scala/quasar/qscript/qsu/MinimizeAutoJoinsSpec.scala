@@ -185,7 +185,12 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
   }
 
   def runOn(qgraph: QSUGraph): QSUGraph = {
-    val results = maj[F](qgraph).run.eval(0L).value.toEither
+    val resultsF = for {
+      agraph <- ApplyProvenance[Fix].apply[F](qgraph)
+      back <- maj[F](agraph)
+    } yield back.graph
+
+    val results = resultsF.run.eval(0L).value.toEither
     results must beRight
 
     results.right.get

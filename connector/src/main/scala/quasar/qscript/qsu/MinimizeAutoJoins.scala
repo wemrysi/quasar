@@ -16,7 +16,7 @@
 
 package quasar.qscript.qsu
 
-import quasar.NameGenerator
+import quasar.{NameGenerator, Planner}, Planner.PlannerErrorME
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
@@ -36,10 +36,11 @@ import quasar.qscript.{
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import slamdata.Predef.{Map => SMap, _}
 
-import matryoshka.BirecursiveT
+import matryoshka.{BirecursiveT, EqualT}
 import scalaz.{Free, Monad, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
 
-final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
+final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSUTTypes[T] {
+  import ApplyProvenance.AuthenticatedQSU
   import QSUGraph.Extractors._
 
   private val func = construction.Func[T]
@@ -47,10 +48,12 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
 
   private val J = Fixed[T[EJson]]
 
-  def apply[F[_]: Monad: NameGenerator](qgraph: QSUGraph): F[QSUGraph] = {
-    type G[A] = StateT[F, RevIdx, A]
+  private val AP = ApplyProvenance[T]
 
-    val back = qgraph rewriteM {
+  def apply[F[_]: Monad: NameGenerator: PlannerErrorME](agraph: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] = {
+    type G[A] = StateT[StateT[F, RevIdx, ?], QSUDims[T], A]
+
+    val back = agraph.graph rewriteM {
       case qgraph @ AutoJoin2(left, right, combiner) =>
         val combiner2 = combiner map {
           case LeftSide => 0
@@ -69,11 +72,16 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
         coalesceToMap[G](qgraph, List(left, center, right), Free.liftF[MapFunc, Int](combiner2))
     }
 
-    back.eval(qgraph.generateRevIndex)
+    val lifted = back(agraph.dims) map {
+      case (dims, graph) => AuthenticatedQSU[T](graph, dims)
+    }
+
+    lifted.eval(agraph.graph.generateRevIndex)
   }
 
   // the Ints are indices into branches
-  private def coalesceToMap[G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]](
+  private def coalesceToMap[
+      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], QSUDims[T]]: PlannerErrorME](
       qgraph: QSUGraph,
       branches: List[QSUGraph],
       combiner: FreeMapA[Int]): G[QSUGraph] = {
@@ -108,13 +116,14 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
   // attempts to reduce the set of candidates to a single Map node, given a FreeMap[Int]
   // the Int indexes into the final number of distinct roots
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  private def coalesceRoots[G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]](
+  private def coalesceRoots[
+      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], QSUDims[T]]: PlannerErrorME](
       qgraph: QSUGraph,
       fm: => FreeMapA[Int],
       candidates: List[QSUGraph]): G[QSUGraph] = candidates match {
 
     case Nil =>
-      QSUGraph.withName[T, G](QSU.Unreferenced[T, Symbol]()) map { unref =>
+      updateGraph[G](QSU.Unreferenced[T, Symbol]()) map { unref =>
         qgraph.overwriteAtRoot(QSU.Map[T, Symbol](unref.root, fm.map(κ(srcHole)))) :++ unref
       }
 
@@ -226,7 +235,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
 
             val redPat = QSU.QSReduce[T, Symbol](source.root, buckets, reducers, repair)
 
-            QSUGraph.withName[T, G](redPat) map { red =>
+            updateGraph[G](redPat) map { red =>
               qgraph.overwriteAtRoot(QSU.Map[T, Symbol](red.root, adjustedFM)) :++ red
             }
           } else {
@@ -262,8 +271,23 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
     // the - 1 here comes from the fact that we over-increment offset above
     (i => remap.mapValues(offset - 1 - _).getOrElse(i, -1), minimized)
   }
+
+  private def updateGraph[
+      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], QSUDims[T]]: PlannerErrorME](
+      pat: QScriptUniform[Symbol]): G[QSUGraph] = {
+
+    for {
+      qgraph <- QSUGraph.withName[T, G](pat)
+
+      dims <- MonadState_[G, QSUDims[T]].get
+      computed <- AP.computeProvenanceƒ[G].apply(QSUGraph.QSUPattern(qgraph.root, pat.map(dims)))
+      dims2 = dims + (qgraph.root -> computed)
+      _ <- MonadState_[G, QSUDims[T]].put(dims2)
+    } yield qgraph
+  }
 }
 
 object MinimizeAutoJoins {
-  def apply[T[_[_]]: BirecursiveT]: MinimizeAutoJoins[T] = new MinimizeAutoJoins[T]
+  def apply[T[_[_]]: BirecursiveT: EqualT]: MinimizeAutoJoins[T] =
+    new MinimizeAutoJoins[T]
 }

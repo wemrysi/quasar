@@ -45,12 +45,12 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
       debugG("RecognizeDistinct: ")  >==>
       ExtractFreeMap[T, F]           >=>
       debugG("ExtractFM: ")          >==>
-      MinimizeAutoJoins[T].apply[F]  >=>
-      debugG("MinimizeAJ: ")         >==>
       ApplyProvenance[T].apply[F]    >=>
       debugAG("ApplyProv: ")         >-
       ReifyBuckets[T]                >=>
       debugAG("ReifyBuckets: ")      >==>
+      MinimizeAutoJoins[T].apply[F]  >=>
+      debugAG("MinimizeAJ: ")         >==>
       ReifyAutoJoins[T].apply[F]     >=>
       debugAG("ReifyAutoJoins: ")    >-
       (_.graph)                      >==>
