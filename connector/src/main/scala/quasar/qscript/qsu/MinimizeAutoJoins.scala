@@ -174,7 +174,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
                 case Map(source2, fm) =>
                   (
                     source2,
-                    buckets.map(_.flatMap(κ(fm))),
+                    buckets,    // buckets are based on access, so we don't need to modify here
                     reducers.map(_.map(_.flatMap(κ(fm)))),
                     repair)
 
@@ -198,26 +198,24 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT] private () extends QSUTType
 
             // this is fine, because we can't be here if candidates is empty
             // doing it this way avoids an extra (and useless) Option state in the fold
-            val lhead = lifted.head
+            val (buckets, lhreducers, lhrepair) = lifted.head
 
             // squish all the reducers down into lhead
-            val (_, _, (buckets, reducers, repair)) =
-              lifted.tail.foldLeft((lhead._1.length, lhead._2.length, lhead)) {
-                case ((boffset, roffset, (lbuckets, lreducers, lrepair)), (rbuckets, rreducers, rrepair)) =>
-                  val buckets = lbuckets ::: rbuckets
+            val (_, (reducers, repair)) =
+              lifted.tail.foldLeft((lhreducers.length, (lhreducers, lhrepair))) {
+                case ((roffset, (lreducers, lrepair)), (_, rreducers, rrepair)) =>
                   val reducers = lreducers ::: rreducers
 
-                  val boffset2 = boffset + rbuckets.length
                   val roffset2 = roffset + rreducers.length
 
                   val repair = func.ConcatMaps(
                     lrepair,
                     rrepair map {
                       case ReduceIndex(e) =>
-                        ReduceIndex(e.bimap(_ + boffset, _ + roffset))
+                        ReduceIndex(e.rightMap(_ + roffset))
                     })
 
-                  (boffset2, roffset2, (buckets, reducers, repair))
+                  (roffset2, (reducers, repair))
               }
 
             // 107.7, All chiropractors, all the time
