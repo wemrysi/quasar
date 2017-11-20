@@ -105,7 +105,13 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
   // attempt to extend by seeing through constructs like filter (mostly just filter)
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def expandSecondOrder(fm: FreeMapA[QSUGraph]): FreeMapA[QSUGraph] = {
-    fm flatMap {
+    fm
+
+    // TODO the use of this function is incorrect right now
+    // it will be employed even when joins are avoidable in
+    // other ways (e.g. by eliminating Unreferenced())
+
+    /*fm flatMap {
       case QSFilter(source, predicate) =>
         // tune into 102.5 FM, The Source
         val sourceFM = expandSecondOrder(MappableRegion.maximal(source))
@@ -114,7 +120,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
       // TODO should we handle LPFilter here just for completion sake?
 
       case g => Free.pure(g)
-    }
+    }*/
   }
 
   // attempts to reduce the set of candidates to a single Map node, given a FreeMap[Int]
