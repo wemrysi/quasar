@@ -19,6 +19,7 @@ package quasar.qscript.qsu
 import quasar.{NameGenerator, Planner}, Planner.PlannerErrorME
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.{EJson, Fixed}
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.qscript.{
@@ -49,6 +50,9 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
   private val J = Fixed[T[EJson]]
 
   private val AP = ApplyProvenance[T]
+  private val QP = QProv[T]
+
+  import QP.prov._
 
   def apply[F[_]: Monad: NameGenerator: PlannerErrorME](agraph: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] = {
     type G[A] = StateT[StateT[F, RevIdx, ?], QSUDims[T], A]
@@ -135,34 +139,9 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
 
     case candidates =>
       val reducerAttempt = candidates collect {
-        // TODO restricting to buckets === Nil, since that's the only thing that works
-        case g @ QSReduce(source, buckets @ Nil, reducers, repair) =>
+        case g @ QSReduce(source, buckets, reducers, repair) =>
           (source, buckets, reducers, repair)
       }
-
-      /*
-       * TODO note to self: things that aren't currently handled
-       *
-       * - It's currently all-or-nothing.  That's a bit naive, because
-       *   it might be possible to collapse a few reductions even while
-       *   others cannot be.  That's still an improvement, since it
-       *   results in materially reducing the number of ultimate theta
-       *   joins, not to mention passes over sourced data.
-       *
-       * - Our bucket handling is very much broken here.  This algorithm
-       *   really only works for buckets === Nil, so... that's a thing.
-       *   What we need to do is take AuthenticatedQSU and check the
-       *   provenance of the untouched sources of each QSReduce.  The
-       *   only reductions we can coalesce are those which have equal
-       *   provenance.
-       *
-       *   + Actually, in theory we could do even better here if we know
-       *     that the reductions in question are associative, since it's
-       *     ok to over-group, so long as we're able to perform an additional
-       *     reduction afterward to squish down the results that we over-
-       *     bucketed.  We don't actually have that guarantee right now,
-       *     but it would be cool to get there soon.
-       */
 
       // candidates.forall(_ ~= QSReduce)
       if (reducerAttempt.lengthCompare(candidates.length) === 0) {
@@ -192,10 +171,15 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
           }
 
           // we know we're non-empty by structure of outer match
-          (source, _, _, _) = extended.head
+          (source, buckets, _, _) = extended.head
 
-          // is each reduction being applied to the same mappable root?
-          back <- if (extended.forall(_._1.root === source.root)) {
+          dims <- MonadState_[G, QSUDims[T]].get
+
+          // do we have the same provenance at our roots?
+          rootProvCheck = extended.forall(t => dims(t._1.root) === dims(source.root))
+
+          // we need a stricter check than just provenance, since we have to inline maps
+          back <- if (rootProvCheck && extended.forall(_._1.root === source.root)) {
             val lifted = extended.zipWithIndex map {
               case ((_, buckets, reducers, repair), i) =>
                 (
@@ -207,7 +191,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
 
             // this is fine, because we can't be here if candidates is empty
             // doing it this way avoids an extra (and useless) Option state in the fold
-            val (buckets, lhreducers, lhrepair) = lifted.head
+            val (_, lhreducers, lhrepair) = lifted.head
 
             // squish all the reducers down into lhead
             val (_, (reducers, repair)) =
