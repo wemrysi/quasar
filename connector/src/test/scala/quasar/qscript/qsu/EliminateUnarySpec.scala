@@ -35,7 +35,7 @@ import scalaz.Inject
 object EliminateUnarySpec extends Qspec with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
 
-  val qsu = QScriptUniform.Dsl[Fix]
+  val qsu = QScriptUniform.DslT[Fix]
   val elim = EliminateUnary[Fix]
 
   val IC = Inject[MapFuncCore, MapFunc]
@@ -89,11 +89,11 @@ object EliminateUnarySpec extends Qspec with QSUTTypes[Fix] {
           IC(MapFuncsCore.Constant[Fix, Hole](J.int(1))))
 
       val qgraph = QSUGraph.fromTree[Fix](
-        qsu.autojoin3(
+        qsu.autojoin3((
           tmp1,
           tmp1,
           qsu.unreferenced(),
-          _(MapFuncsCore.Guard(_, Type.AnyObject, _, _))))
+          _(MapFuncsCore.Guard(_, Type.AnyObject, _, _)))))
 
       elim(qgraph) must not(containUnary)
     }

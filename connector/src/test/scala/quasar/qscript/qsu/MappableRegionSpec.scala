@@ -36,7 +36,7 @@ object MappableRegionSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
 
   val ejs = Fixed[Fix[EJson]]
   val QSU = QScriptUniform.Optics[Fix]
-  val qsu = QScriptUniform.Dsl[Fix]
+  val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
   val hole = (SrcHole: Hole)
 
@@ -54,10 +54,10 @@ object MappableRegionSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   "finding mappable region" should {
     "convert autojoin2" >> {
       val tree =
-        qsu.autojoin2(
+        qsu.autojoin2((
           qsu.map(qsu.read(orders), projectStrKey("foo")),
           qsu.map(qsu.read(orders), projectStrKey("bar")),
-          _(ConcatMaps(_, _)))
+          _(ConcatMaps(_, _))))
 
       val exp =
         func.ConcatMaps(projectStrKey("foo"), projectStrKey("bar"))
@@ -67,14 +67,14 @@ object MappableRegionSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
 
     "convert autojoin3" >> {
       val tree =
-        qsu.autojoin3(
-          qsu.autojoin2(
+        qsu.autojoin3((
+          qsu.autojoin2((
             qsu.map(qsu.read(orders), projectStrKey("baz")),
             qsu.cint(42),
-            _(Gt(_, _))),
+            _(Gt(_, _)))),
           qsu.map(qsu.read(orders), projectStrKey("quux")),
           qsu.cdec(32.56),
-          _(Cond(_, _, _)))
+          _(Cond(_, _, _))))
 
       val exp =
         func.Cond(
@@ -88,10 +88,10 @@ object MappableRegionSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
     "convert map" >> {
       val tree =
         qsu.map(
-          qsu.autojoin2(
+          qsu.autojoin2((
             qsu.read(orders),
             qsu.cstr("foo"),
-            _(ProjectKey(_, _))),
+            _(ProjectKey(_, _)))),
           func.MakeArray(func.Hole))
 
       val exp =
@@ -102,12 +102,12 @@ object MappableRegionSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
 
     "stop at non-mapping nodes" >> {
       val tree =
-        qsu.autojoin2(
+        qsu.autojoin2((
           qsu.lpFilter(
             qsu.read(orders),
             qsu.map(qsu.read(orders), projectStrKey("isOpen"))),
           qsu.map(qsu.read(orders), projectStrKey("clientName")),
-          _(MakeMap(_, _)))
+          _(MakeMap(_, _))))
 
       val exp =
         func.MakeMap(func.Hole, projectStrKey("clientName"))
@@ -120,14 +120,14 @@ object MappableRegionSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
         func.ProjectIndex(func.Hole, func.Constant(ejs.int(3)))
 
       val tree =
-        qsu.autojoin2(
+        qsu.autojoin2((
           qsu.map(
             qsu.lpFilter(
               qsu.read(orders),
               qsu.map(qsu.read(orders), projectStrKey("isClosed"))),
             prjIdx),
           qsu.cstr("closed"),
-          _(MakeMap(_, _)))
+          _(MakeMap(_, _))))
 
       val exp =
         func.MakeMap(func.Hole, func.Constant(ejs.str("closed")))

@@ -39,7 +39,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
-  val qsu = QScriptUniform.Dsl[Fix]
+  val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
   val maj = MinimizeAutoJoins[Fix]
 
@@ -50,14 +50,14 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
   "unary node elimination" should {
     "linearize .foo + .bar" in {
       val qgraph = QSUGraph.fromTree[Fix](
-        qsu.autojoin2(
+        qsu.autojoin2((
           qsu.map(
             qsu.read(afile),
             func.ProjectKey(HoleF, func.Constant(J.str("foo")))),
           qsu.map(
             qsu.read(afile),
             func.ProjectKey(HoleF, func.Constant(J.str("bar")))),
-          _(MapFuncsCore.Add(_, _))))
+          _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
         case Map(Read(_), fm) =>
@@ -71,13 +71,13 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
     "convert Typecheck to a Map(_, Guard)" in {
       val qgraph = QSUGraph.fromTree[Fix](
-        qsu.autojoin3(
+        qsu.autojoin3((
           qsu.read(afile),
           qsu.read(afile),
-          qsu.map1(
+          qsu.map1((
             qsu.unreferenced(),
-            MapFuncsCore.Undefined[Fix, Hole](): MapFuncCore[Hole]),
-          _(MapFuncsCore.Guard(_, Type.AnyObject, _, _))))
+            MapFuncsCore.Undefined[Fix, Hole](): MapFuncCore[Hole])),
+          _(MapFuncsCore.Guard(_, Type.AnyObject, _, _)))))
 
       runOn(qgraph) must beLike {
         case Map(Read(_), fm) =>
@@ -88,7 +88,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
     "coalesce two summed reductions" in {
       val qgraph = QSUGraph.fromTree[Fix](
-        qsu.autojoin2(
+        qsu.autojoin2((
           qsu.qsReduce(
             qsu.read(afile),
             Nil,
@@ -99,7 +99,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             Nil,
             List(ReduceFuncs.Sum(HoleF[Fix])),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
-          _(MapFuncsCore.Add(_, _))))
+          _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
         case Map(
@@ -132,14 +132,14 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
     "coalesce two summed reductions, one downstream of an autojoin" in {
       val qgraph = QSUGraph.fromTree[Fix](
-        qsu.autojoin2(
+        qsu.autojoin2((
           qsu.qsReduce(
-            qsu.autojoin2(
+            qsu.autojoin2((
               qsu.read(afile),
-              qsu.map1(
+              qsu.map1((
                 qsu.unreferenced(),
-                MapFuncsCore.Constant[Fix, Hole](J.str("hey"))),
-              _(MapFuncsCore.ConcatArrays(_, _))),
+                MapFuncsCore.Constant[Fix, Hole](J.str("hey")))),
+              _(MapFuncsCore.ConcatArrays(_, _)))),
             Nil,
             List(ReduceFuncs.Count(HoleF[Fix])),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
@@ -148,7 +148,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             Nil,
             List(ReduceFuncs.Sum(HoleF[Fix])),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
-          _(MapFuncsCore.Add(_, _))))
+          _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
         case Map(
@@ -185,12 +185,12 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
     "rewrite filter into cond only to avoid join" in {
       val qgraph = QSUGraph.fromTree[Fix](
-        qsu.autojoin2(
+        qsu.autojoin2((
           qsu.read(afile),
           qsu.qsFilter(
             qsu.read(afile),
             func.Eq(HoleF[Fix], func.Constant(J.str("foo")))),
-          _(MapFuncsCore.Add(_, _))))
+          _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
         case Map(Read(_), fm) =>

@@ -18,6 +18,7 @@ package quasar.qscript.provenance
 
 import slamdata.Predef._
 import quasar.contrib.matryoshka.birecursiveIso
+import quasar.fp.ski.κ
 
 import matryoshka._
 import matryoshka.implicits._
@@ -65,6 +66,10 @@ trait Prov[D, I, P] {
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def joinKeys(left: P, right: P)(implicit D: Equal[D]): JoinKeys[I] = {
+    // NB: We don't want to consider identities themselves when checking for
+    //     joinability, just that both sides are Value(_).
+    implicit val ignoreI: Equal[I] = Equal.equalBy(κ(()))
+
     def joinBoths(l0: P, r0: P): JoinKeys[I] =
       JoinKeys(for {
         l <- flattenBoth(l0).join
@@ -108,9 +113,9 @@ trait Prov[D, I, P] {
   // Instances
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  implicit def provenanceEqual(implicit eqD: Equal[D]): Equal[P] = {
+  implicit def provenanceEqual(implicit eqD: Equal[D], eqI: Equal[I]): Equal[P] = {
     implicit def listSetPEqual: Equal[IList[P] @@ AsSet] =
-      asSetEqual[IList, P](Foldable[IList], provenanceEqual(eqD))
+      asSetEqual[IList, P](Foldable[IList], provenanceEqual(eqD, eqI))
 
     def thenEq(l: P, r: P): Boolean =
       AsSet(flattenThen(l)) ≟ AsSet(flattenThen(r))
@@ -124,7 +129,7 @@ trait Prov[D, I, P] {
 
     Equal.equal((x, y) => (x.project, y.project) match {
       case (Nada(), Nada())     => true
-      case (Value(_), Value(_)) => true
+      case (Value(l), Value(r)) => l ≟ r
       case (Proj(l), Proj(r))   => l ≟ r
       case (Both(_, _), _)      => bothEq(x, y)
       case (_, Both(_, _))      => bothEq(x, y)

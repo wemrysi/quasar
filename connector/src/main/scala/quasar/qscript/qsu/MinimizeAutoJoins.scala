@@ -17,6 +17,7 @@
 package quasar.qscript.qsu
 
 import quasar.{NameGenerator, Planner}, Planner.PlannerErrorME
+import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
@@ -37,8 +38,9 @@ import quasar.qscript.{
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import slamdata.Predef.{Map => SMap, _}
 
-import matryoshka.{BirecursiveT, EqualT}
-import scalaz.{Free, Monad, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
+import matryoshka.{delayEqual, BirecursiveT, EqualT}
+import matryoshka.data.free._
+import scalaz.{Equal, Free, Monad, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
 
 final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSUTTypes[T] {
   import ApplyProvenance.AuthenticatedQSU
@@ -52,7 +54,9 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
   private val AP = ApplyProvenance[T]
   private val QP = QProv[T]
 
-  import QP.prov._
+  // needed to avoid bug in implicit search!  don't import QP.prov._
+  private implicit val QPEq: Equal[QP.P] =
+    QP.prov.provenanceEqual(scala.Predef.implicitly, Equal[FreeMapA[Access[Hole]]])
 
   def apply[F[_]: Monad: NameGenerator: PlannerErrorME](agraph: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] = {
     type G[A] = StateT[StateT[F, RevIdx, ?], QSUDims[T], A]

@@ -44,7 +44,9 @@ import scalaz.{Foldable, Free, Functor, IMap, ISet, Monad, NonEmptyList, StateT,
 import scalaz.Scalaz._
 
 final class ReifyIdentities[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
-  def apply[F[_]: Monad: NameGenerator](graph: QSUGraph): F[(References, QSUGraph)] =
+  import ReifyIdentities.ResearchedQSU
+
+  def apply[F[_]: Monad: NameGenerator](graph: QSUGraph): F[ResearchedQSU[T]] =
     reifyIdentities[F](gatherReferences(graph), graph)
 
   ////
@@ -118,7 +120,7 @@ final class ReifyIdentities[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
   private def reifyIdentities[F[_]: Monad: NameGenerator](
       refs: References,
       graph: QSUGraph)
-      : F[(References, QSUGraph)] = {
+      : F[ResearchedQSU[T]] = {
 
     import QSUGraph.{Extractors => E}
 
@@ -433,12 +435,14 @@ final class ReifyIdentities[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
         else
           reifiedGraph.point[F]
 
-        finalGraph strengthL reifiedRefs
+        finalGraph map (ResearchedQSU(reifiedRefs, _))
     }
   }
 }
 
 object ReifyIdentities {
+  final case class ResearchedQSU[T[_[_]]](refs: References[T], graph: QSUGraph[T])
+
   def apply[T[_[_]]: CorecursiveT]: ReifyIdentities[T] =
     new ReifyIdentities[T]
 }

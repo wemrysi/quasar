@@ -73,8 +73,9 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
       (nodeId, node.foldRight[QSUDims[T]](SMap(nodeId -> nodeDims))(_._2 ++ _)).point[F]
   }
 
-  def computeProvenanceƒ[F[_]: Monad: PlannerErrorME]: AlgebraM[F, GPF, Dims] =
-    gpf => gpf.qsu match {
+  def computeProvenanceƒ[F[_]: Monad: PlannerErrorME]: AlgebraM[F, GPF, Dims] = {
+    case GPF(root, qsu) => qsu match {
+
       case AutoJoin2(left, right, _) => dims.join(left, right).point[F]
 
       case AutoJoin3(left, center, right, _) => dims.join(dims.join(left, center), right).point[F]
@@ -86,27 +87,27 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
 
       case Distinct(src) => src.point[F]
 
-      case GroupBy(_, _) => unexpectedError("GroupBy", gpf.root)
+      case GroupBy(_, _) => unexpectedError("GroupBy", root)
 
-      case JoinSideRef(_) => unexpectedError("JoinSideRef", gpf.root)
+      case JoinSideRef(_) => unexpectedError("JoinSideRef", root)
 
-      case LeftShift(_, _, _, _) => unexpectedError("LeftShift", gpf.root)
+      case LeftShift(_, _, _, _) => unexpectedError("LeftShift", root)
 
-      case LPFilter(src, _) => unexpectedError("LPFilter", gpf.root)
+      case LPFilter(src, _) => unexpectedError("LPFilter", root)
 
-      case LPJoin(_, _, _, _, _, _) => unexpectedError("LPJoin", gpf.root)
+      case LPJoin(_, _, _, _, _, _) => unexpectedError("LPJoin", root)
 
-      case LPReduce(src, _) => dims.bucketAccess(gpf.root, dims.reduce(src)).point[F]
+      case LPReduce(src, _) => dims.bucketAccess(root, dims.reduce(src)).point[F]
 
-      case LPSort(_, _) => unexpectedError("LPSort", gpf.root)
+      case LPSort(_, _) => unexpectedError("LPSort", root)
 
       case QSFilter(src, _) => src.point[F]
 
-      case QSReduce(src, _, _, _) => dims.bucketAccess(gpf.root, dims.reduce(src)).point[F]
+      case QSReduce(src, _, _, _) => dims.bucketAccess(root, dims.reduce(src)).point[F]
 
       case QSSort(src, _, _) => src.point[F]
 
-      case Unary(_, _) => unexpectedError("Unary", gpf.root)
+      case Unary(_, _) => unexpectedError("Unary", root)
 
       case Map(src, _) => src.point[F]
 
@@ -117,7 +118,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
       case ThetaJoin(left, right, _, _, _) => dims.join(left, right).point[F]
 
       case Transpose(src, _, rot) =>
-        val tid: dims.I = Free.pure(Access.identity(gpf.root, SrcHole))
+        val tid: dims.I = Free.pure(Access.identity(root, SrcHole))
         (rot match {
           case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, src)
           case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, src)
@@ -127,6 +128,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
 
       case Unreferenced() => dims.empty.point[F]
     }
+  }
 
   ////
 

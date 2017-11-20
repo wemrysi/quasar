@@ -53,21 +53,18 @@ import scalaz.{~>, -\/, \/-, Const, Inject, Monad, NaturalTransformation, Reader
 import scalaz.Scalaz._
 
 final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
-  import QSUPattern._
+  import ReifyIdentities.ResearchedQSU
 
   type QSE[A] = QScriptEducated[A]
 
-  def apply[F[_]: Monad: PlannerErrorME: NameGenerator](graph: QSUGraph): F[T[QSE]] = {
+  def apply[F[_]: Monad: PlannerErrorME: NameGenerator](rqsu: ResearchedQSU[T]): F[T[QSE]] = {
     type G[A] = ReaderT[F, References, A]
 
-    ReifyIdentities[T].apply[F](graph) flatMap {
-      case (refs, reifiedGraph) =>
-        val grad = graduateƒ[G, QSE](None)(NaturalTransformation.refl[QSE])
+    val grad = graduateƒ[G, QSE](None)(NaturalTransformation.refl[QSE])
 
-        Corecursive[T[QSE], QSE]
-          .anaM[G, QSUGraph](reifiedGraph)(grad)
-          .run(refs)
-    }
+    Corecursive[T[QSE], QSE]
+      .anaM[G, QSUGraph](rqsu.graph)(grad)
+      .run(rqsu.refs)
   }
 
   ////
@@ -141,80 +138,81 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
     }
   }
 
-  private def educate[F[_]: Monad: PlannerErrorME: NameGenerator: RefsR](name: Symbol, qsu: QSU[QSUGraph])
-      : F[QSE[QSUGraph]] = {
+  private def educate[F[_]: Monad: PlannerErrorME: NameGenerator: RefsR]
+    (pattern: QSUPattern[T, QSUGraph])
+      : F[QSE[QSUGraph]] = pattern match {
+    case QSUPattern(name, qsu) =>
+      val MR = MonadReader_[F, References]
 
-    val MR = MonadReader_[F, References]
+      def holeAs(sym: Symbol): Hole => Symbol =
+        κ(sym)
 
-    def holeAs(sym: Symbol): Hole => Symbol =
-      κ(sym)
+      def resolveAccess[A](fa: FreeAccess[A])(f: A => Symbol): F[FreeMapA[A]] =
+        MR.asks(_.resolveAccess(name, fa)(f))
 
-    def resolveAccess[A](fa: FreeAccess[A])(f: A => Symbol): F[FreeMapA[A]] =
-      MR.asks(_.resolveAccess(name, fa)(f))
+      qsu match {
+        case QSU.Read(path) =>
+          Inject[Const[Read[AFile], ?], QSE].inj(Const(Read(path))).point[F]
 
-    qsu match {
-      case QSU.Read(path) =>
-        Inject[Const[Read[AFile], ?], QSE].inj(Const(Read(path))).point[F]
+        case QSU.Map(source, fm) =>
+          QCE(Map[T, QSUGraph](source, fm)).point[F]
 
-      case QSU.Map(source, fm) =>
-        QCE(Map[T, QSUGraph](source, fm)).point[F]
+        case QSU.QSFilter(source, fm) =>
+          QCE(Filter[T, QSUGraph](source, fm)).point[F]
 
-      case QSU.QSFilter(source, fm) =>
-        QCE(Filter[T, QSUGraph](source, fm)).point[F]
+        case QSU.QSReduce(source, buckets, reducers, repair) =>
+          buckets traverse (resolveAccess(_)(holeAs(source.root))) map { bs =>
+            QCE(Reduce[T, QSUGraph](source, bs, reducers, repair))
+          }
 
-      case QSU.QSReduce(source, buckets, reducers, repair) =>
-        buckets traverse (resolveAccess(_)(holeAs(source.root))) map { bs =>
-          QCE(Reduce[T, QSUGraph](source, bs, reducers, repair))
-        }
+        case QSU.LeftShift(source, struct, idStatus, repair) =>
+          QCE(LeftShift[T, QSUGraph](source, struct, idStatus, repair)).point[F]
 
-      case QSU.LeftShift(source, struct, idStatus, repair) =>
-        QCE(LeftShift[T, QSUGraph](source, struct, idStatus, repair)).point[F]
+        case QSU.QSSort(source, buckets, order) =>
+          buckets traverse (resolveAccess(_)(holeAs(source.root))) map { bs =>
+            QCE(Sort[T, QSUGraph](source, bs, order))
+          }
 
-      case QSU.QSSort(source, buckets, order) =>
-        buckets traverse (resolveAccess(_)(holeAs(source.root))) map { bs =>
-          QCE(Sort[T, QSUGraph](source, bs, order))
-        }
+        case QSU.Union(left, right) =>
+          mergeSources[F](left, right) map {
+            case SrcMerge(source, lBranch, rBranch) =>
+              QCE(Union[T, QSUGraph](source, lBranch, rBranch))
+          }
 
-      case QSU.Union(left, right) =>
-        mergeSources[F](left, right) map {
-          case SrcMerge(source, lBranch, rBranch) =>
-            QCE(Union[T, QSUGraph](source, lBranch, rBranch))
-        }
+        case QSU.Subset(from, op, count) =>
+          mergeSources[F](from, count) map {
+            case SrcMerge(source, fromBranch, countBranch) =>
+              QCE(Subset[T, QSUGraph](source, fromBranch, op, countBranch))
+          }
 
-      case QSU.Subset(from, op, count) =>
-        mergeSources[F](from, count) map {
-          case SrcMerge(source, fromBranch, countBranch) =>
-            QCE(Subset[T, QSUGraph](source, fromBranch, op, countBranch))
-        }
+        // TODO distinct should be its own node in qscript proper
+        case QSU.Distinct(source) =>
+          resolveAccess(HoleF map (Access.value(_)))(holeAs(source.root)) map { fm =>
+            QCE(Reduce[T, QSUGraph](
+              source,
+              // Bucket by the value
+              List(fm),
+              // Emit the input verbatim as it may include identities.
+              List(ReduceFuncs.Arbitrary(HoleF)),
+              ReduceIndexF(\/-(0))))
+          }
 
-      // TODO distinct should be its own node in qscript proper
-      case QSU.Distinct(source) =>
-        resolveAccess(HoleF map (Access.value(_)))(holeAs(source.root)) map { fm =>
-          QCE(Reduce[T, QSUGraph](
-            source,
-            // Bucket by the value
-            List(fm),
-            // Emit the input verbatim as it may include identities.
-            List(ReduceFuncs.Arbitrary(HoleF)),
-            ReduceIndexF(\/-(0))))
-        }
+        case QSU.Unreferenced() =>
+          QCE(Unreferenced[T, QSUGraph]()).point[F]
 
-      case QSU.Unreferenced() =>
-        QCE(Unreferenced[T, QSUGraph]()).point[F]
+        case QSU.ThetaJoin(left, right, condition, joinType, combiner) =>
+          val qsCondition = resolveAccess(condition)(_.fold(left.root, right.root))
 
-      case QSU.ThetaJoin(left, right, condition, joinType, combiner) =>
-        val qsCondition = resolveAccess(condition)(_.fold(left.root, right.root))
+          (mergeSources[F](left, right) |@| qsCondition) { (srcs, cond) =>
+            val SrcMerge(source, lBranch, rBranch) = srcs
+            Inject[ThetaJoin, QSE].inj(
+              ThetaJoin[T, QSUGraph](source, lBranch, rBranch, cond, joinType, combiner))
+          }
 
-        (mergeSources[F](left, right) |@| qsCondition) { (srcs, cond) =>
-          val SrcMerge(source, lBranch, rBranch) = srcs
-          Inject[ThetaJoin, QSE].inj(
-            ThetaJoin[T, QSUGraph](source, lBranch, rBranch, cond, joinType, combiner))
-        }
-
-      case qsu =>
-        PlannerErrorME[F].raiseError(
-          InternalError(s"Found an unexpected LP-ish $qsu.", None)) // TODO use Show to print
-    }
+        case qsu =>
+          PlannerErrorME[F].raiseError(
+            InternalError(s"Found an unexpected LP-ish $qsu.", None)) // TODO use Show to print
+      }
   }
 
   private def graduateƒ[F[_]: Monad: PlannerErrorME: NameGenerator: RefsR, G[_]](
@@ -225,7 +223,7 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
     val pattern: QSUPattern[T, QSUGraph] =
       Recursive[QSUGraph, QSUPattern[T, ?]].project(graph)
 
-    def default: F[G[QSUGraph]] = educate[F](pattern.root, pattern.qsu).map(lift)
+    def default: F[G[QSUGraph]] = educate[F](pattern).map(lift)
 
     halt match {
       case Some((name, output)) =>
