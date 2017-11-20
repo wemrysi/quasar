@@ -73,8 +73,8 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.Multiply(f1, f2) => SQL.NumericOp[T[SQL]]("*", f1, f2).embed.η[F]
     case MFC.Subtract(f1, f2) =>  SQL.NumericOp[T[SQL]]("-", f1, f2).embed.η[F]
     case MFC.Divide(f1, f2) => SQL.NumericOp[T[SQL]]("/", f1, f2).embed.η[F]
-    case MFC.Modulo(f1, f2) => notImplemented
-    case MFC.Power(f1, f2) =>  notImplemented
+    case MFC.Modulo(f1, f2) => SQL.Mod[T[SQL]](f1, f2).embed.η[F]
+    case MFC.Power(f1, f2) =>  SQL.Pow[T[SQL]](f1, f2).embed.η[F]
     case MFC.Not(f) =>  notImplemented
     case MFC.Eq(f1, f2) =>  notImplemented
     case MFC.Neq(f1, f2) =>  notImplemented

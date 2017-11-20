@@ -55,6 +55,10 @@ trait SqlExprRenderTree {
             nonTerminal("With ids", v)
           case NumericOp(op, left, right) =>
             nonTerminal(op, left, right)
+          case Mod(a1, a2) =>
+            nonTerminal("Mod", a1, a2)
+          case Pow(a1, a2) =>
+            nonTerminal("Pow", a1, a2)
           case Ref(src, ref) =>
             nonTerminal("Reference", src, ref)
           case Select(selection, from, filter) =>

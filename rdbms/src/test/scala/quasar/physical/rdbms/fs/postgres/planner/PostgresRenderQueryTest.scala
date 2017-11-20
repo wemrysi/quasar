@@ -93,6 +93,16 @@ class PostgresRenderQueryTest extends Qspec with SqlExprSupport with QScriptHelp
       Free.roll(MFC(MapFuncsCore.Divide(left, right)))
     }
 
+    def ModR[A](left: FreeMapA[A], right: FreeMapA[A]):
+    FreeMapA[A] = {
+      Free.roll(MFC(MapFuncsCore.Modulo(left, right)))
+    }
+
+    def PowR[A](left: FreeMapA[A], right: FreeMapA[A]):
+    FreeMapA[A] = {
+      Free.roll(MFC(MapFuncsCore.Power(left, right)))
+    }
+
     "render addition" in {
       val qs = AddR(pKey("a"), pKey("b"))
 
@@ -126,6 +136,20 @@ class PostgresRenderQueryTest extends Qspec with SqlExprSupport with QScriptHelp
 
       PostgresRenderQuery.asString(qsToRepr(qs)) must
         beRightDisjunction("((d->>'m1')::numeric * (((d->>'a')::numeric - (d->>'b')::numeric))::numeric)")
+    }
+
+    "render modulo" in {
+      val qs = ModR(pKey("mod1"), ConstantR(ejsonInt(33)))
+
+      PostgresRenderQuery.asString(qsToRepr(qs)) must
+        beRightDisjunction("mod((d->>'mod1')::numeric, (33)::numeric)")
+    }
+
+    "render power" in {
+      val qs = PowR(pKey("powKey"), ConstantR(ejsonInt(4)))
+
+      PostgresRenderQuery.asString(qsToRepr(qs)) must
+        beRightDisjunction("power((d->>'powKey')::numeric, (4)::numeric)")
     }
 
   }
