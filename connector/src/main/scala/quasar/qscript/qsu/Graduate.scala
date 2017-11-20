@@ -54,20 +54,18 @@ import scalaz.Scalaz._
 
 final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
   import QSUPattern._
+  import ReifyIdentities.ResearchedQSU
 
   type QSE[A] = QScriptEducated[A]
 
-  def apply[F[_]: Monad: PlannerErrorME: NameGenerator](graph: QSUGraph): F[T[QSE]] = {
+  def apply[F[_]: Monad: PlannerErrorME: NameGenerator](rqsu: ResearchedQSU[T]): F[T[QSE]] = {
     type G[A] = ReaderT[F, References, A]
 
-    ReifyIdentities[T].apply[F](graph) flatMap {
-      case (refs, reifiedGraph) =>
-        val grad = graduateƒ[G, QSE](None)(NaturalTransformation.refl[QSE])
+    val grad = graduateƒ[G, QSE](None)(NaturalTransformation.refl[QSE])
 
-        Corecursive[T[QSE], QSE]
-          .anaM[G, QSUGraph](reifiedGraph)(grad)
-          .run(refs)
-    }
+    Corecursive[T[QSE], QSE]
+      .anaM[G, QSUGraph](rqsu.graph)(grad)
+      .run(rqsu.refs)
   }
 
   ////

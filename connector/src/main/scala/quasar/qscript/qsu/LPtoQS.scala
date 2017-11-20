@@ -54,6 +54,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
       ReifyAutoJoins[T].apply[F]     >=>
       debugAG("ReifyAutoJoins: ")    >-
       (_.graph)                      >==>
+      ReifyIdentities[T].apply[F]    >==>
       Graduate[T].apply[F]
 
     lpToQs(lp)
