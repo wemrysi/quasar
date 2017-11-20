@@ -117,11 +117,11 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           repair must beTreeEqual(
             func.ConcatMaps(
               func.MakeMap(
-                Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0))),
-                func.Constant(J.str("0"))),
+                func.Constant(J.str("0")),
+                Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
               func.MakeMap(
-                Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(1))),
-                func.Constant(J.str("1")))))
+                func.Constant(J.str("1")),
+                Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(1))))))
 
           fm must beTreeEqual(
             func.Add(
@@ -170,11 +170,11 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           repair must beTreeEqual(
             func.ConcatMaps(
               func.MakeMap(
-                Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0))),
-                func.Constant(J.str("0"))),
+                func.Constant(J.str("0")),
+                Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
               func.MakeMap(
-                Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(1))),
-                func.Constant(J.str("1")))))
+                func.Constant(J.str("1")),
+                Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(1))))))
 
           fm must beTreeEqual(
             func.Add(

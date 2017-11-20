@@ -186,7 +186,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
                   buckets,
                   reducers,
                   // we use maps here to avoid definedness issues in reduction results
-                  func.MakeMap(repair, func.Constant(J.str(i.toString))))
+                  func.MakeMap(func.Constant(J.str(i.toString)), repair))
             }
 
             // this is fine, because we can't be here if candidates is empty
