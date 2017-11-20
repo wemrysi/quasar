@@ -368,11 +368,6 @@ object QScriptUniform {
         case Subset(f, op, c) => (f, op, c)
       } { case (f, op, c) => Subset(f, op, c) }
 
-    def subsetEnvT[A]: Prism[(Symbol, QScriptUniform[A]), (Symbol, (A, SelectionOp, A))] =
-      Prism.partial[(Symbol, QScriptUniform[A]), (Symbol, (A, SelectionOp, A))] {
-        case (sym -> Subset(f, op, c)) => (sym -> ((f, op, c)))
-      } { case (sym -> ((f, op, c))) => (sym -> Subset(f, op, c)) }
-
     def thetaJoin[A]: Prism[QScriptUniform[A], (A, A, JoinFunc, JoinType, JoinFunc)] =
       Prism.partial[QScriptUniform[A], (A, A, JoinFunc, JoinType, JoinFunc)] {
         case ThetaJoin(l, r, c, t, b) => (l, r, c, t, b)
