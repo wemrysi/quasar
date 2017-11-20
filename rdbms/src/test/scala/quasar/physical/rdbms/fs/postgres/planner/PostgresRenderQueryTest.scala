@@ -83,11 +83,49 @@ class PostgresRenderQueryTest extends Qspec with SqlExprSupport with QScriptHelp
     def qsToRepr(m: qscript.FreeMap[Fix]) =
       m.cataM(interpretM(aliasToHole("d"), core.plan)).unsafePerformSync
 
+    def MultiplyR[A](left: FreeMapA[A], right: FreeMapA[A]):
+    FreeMapA[A] = {
+      Free.roll(MFC(MapFuncsCore.Multiply(left, right)))
+    }
+
+    def DivideR[A](left: FreeMapA[A], right: FreeMapA[A]):
+    FreeMapA[A] = {
+      Free.roll(MFC(MapFuncsCore.Divide(left, right)))
+    }
+
     "render addition" in {
       val qs = AddR(pKey("a"), pKey("b"))
 
       PostgresRenderQuery.asString(qsToRepr(qs)) must
         beRightDisjunction("((d->>'a')::numeric + (d->>'b')::numeric)")
+    }
+
+    "render multiplication" in {
+      val qs = MultiplyR(pKey("m1"), pKey("m2"))
+
+      PostgresRenderQuery.asString(qsToRepr(qs)) must
+        beRightDisjunction("((d->>'m1')::numeric * (d->>'m2')::numeric)")
+    }
+
+    "render division" in {
+      val qs = DivideR(pKey("d1"), pKey("d2"))
+
+      PostgresRenderQuery.asString(qsToRepr(qs)) must
+        beRightDisjunction("((d->>'d1')::numeric / (d->>'d2')::numeric)")
+    }
+
+    "render subtraction" in {
+      val qs = SubtractR(pKey("sub1"), pKey("sub2"))
+
+      PostgresRenderQuery.asString(qsToRepr(qs)) must
+        beRightDisjunction("((d->>'sub1')::numeric - (d->>'sub2')::numeric)")
+    }
+
+    "render composite numeric operation" in {
+      val qs = MultiplyR(pKey("m1"), SubtractR(pKey("a"), pKey("b")))
+
+      PostgresRenderQuery.asString(qsToRepr(qs)) must
+        beRightDisjunction("((d->>'m1')::numeric * (((d->>'a')::numeric - (d->>'b')::numeric))::numeric)")
     }
 
   }
