@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._, Helpers._
+import quasar.contrib.specs2.PendingWithActualTracking
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
@@ -41,12 +42,30 @@ import matryoshka.implicits._
 import org.bson.BsonDocument
 import org.specs2.execute._
 import org.specs2.matcher.{Matcher, Expectable}
+import org.specs2.specification.core.Fragment
 import pathy.Path._
 import scalaz._, Scalaz._
 
 object PlannerHelpers {
+  sealed trait TestStatus
+  case object Ok extends TestStatus
+  case class Pending(s: String) extends TestStatus
+
+  case class QSpec(
+    sqlToQs: TestStatus,
+    qsToWf: TestStatus,
+    qscript: Fix[fs.MongoQScript[Fix, ?]]
+  )
+  case class PlanSpec(
+    name: String,
+    sqlToWf: TestStatus,
+    sql: Fix[Sql],
+    qspec: Option[QSpec],
+    workflow: Workflow
+  )
 
   val notOnPar = "Not on par with old (LP-based) connector."
+  val nonOptimalQs = "QScript not optimal"
 
   import fixExprOp._
 
@@ -170,6 +189,18 @@ object PlannerHelpers {
     } yield lp
   }
 
+  def sqlToQscript[M[_]: Monad: MonadFsErr: PhaseResultTell]
+      (sql: Fix[Sql],
+        lc: DiscoverPath.ListContents[M])
+      : M[Fix[fs.MongoQScript[Fix, ?]]] =
+    for {
+      lp <- compileSqlToLP[M](sql)
+      qs <- MongoDb.lpToQScript(lp, lc)
+    } yield qs
+
+  def planSqlToQScript(query: Fix[Sql]): Either[FileSystemError, Fix[fs.MongoQScript[Fix, ?]]] =
+    sqlToQscript(query, listContents).run.value.toEither
+
   def queryPlanner[M[_]: Monad: MonadFsErr: PhaseResultTell]
       (sql: Fix[Sql],
         model: MongoQueryModel,
@@ -178,13 +209,11 @@ object PlannerHelpers {
         lc: DiscoverPath.ListContents[M],
         anyDoc: Collection => OptionT[M, BsonDocument],
         execTime: Instant)
-      : M[Crystallized[WorkflowF]] = {
+      : M[Crystallized[WorkflowF]] =
     for {
-      lp <- compileSqlToLP[M](sql)
-      qs <- MongoDb.lpToQScript(lp, lc)
+      qs <- sqlToQscript(sql, lc)
       repr <- MongoDb.doPlan[Fix, M](qs, fs.QueryContext(stats, indexes), model, anyDoc, execTime)
     } yield repr
-  }
 
   val defaultStats: Collection => Option[CollectionStatistics] =
     κ(CollectionStatistics(10, 100, false).some)
@@ -251,7 +280,8 @@ trait PlannerHelpers extends
     org.specs2.mutable.Specification with
     org.specs2.ScalaCheck with
     CompilerHelpers with
-    TreeMatchers {
+    TreeMatchers with
+    PendingWithActualTracking {
 
   import PlannerHelpers._
 
@@ -266,4 +296,52 @@ trait PlannerHelpers extends
      phys <- MongoDb.doPlan[Fix, EitherWriter](qs, fs.QueryContext(defaultStats, defaultIndexes), MongoQueryModel.`3.2`, emptyDoc, Instant.now)
     } yield phys).run.value.toEither
   }
+
+  def testPlanSpec(s: PlanSpec): Fragment = {
+    val planName = s"plan ${s.name}"
+    planName >> {
+      s.qspec.map { qspec =>
+        val f = qtestFile(planName)
+        qspec.qsToWf match {
+          case Ok =>
+            "qscript -> wf" in {
+              if (f.exists) {
+                failure(s"$f exists but expectation status is Ok. Either change status or remove file.")
+              }
+              qplan(qspec.qscript) must beWorkflow(s.workflow)
+            }
+          case Pending(str) =>
+            "qscript -> wf" in {
+              qplan(qspec.qscript) must beWorkflow0(s.workflow)
+            }.pendingWithActual(str, f)
+        }
+        qspec.sqlToQs match {
+          case Ok =>
+            "sql^2 -> qscript" >> {
+              planSqlToQScript(s.sql) must beRight(beTreeEqual(qspec.qscript))
+            }
+          case Pending(str) =>
+            "sql^2 -> qscript" >> {
+              planSqlToQScript(s.sql) must beRight(beTreeEqual(qspec.qscript))
+            }.pendingUntilFixed(str)
+        }
+      }
+      val f = testFile(planName)
+      s.sqlToWf match {
+        case Ok =>
+          "sql^2 -> wf" in {
+            if (f.exists) {
+              failure(s"$f exists but expectation status is Ok. Either change status or remove file.")
+            }
+            PlannerHelpers.plan(s.sql) must beWorkflow(s.workflow)
+          }
+        case Pending(str) =>
+          "sql^2 -> wf" in {
+            PlannerHelpers.plan(s.sql) must beWorkflow0(s.workflow)
+          }.pendingWithActual(str, f)
+      }
+    }
+  }
+
+
 }

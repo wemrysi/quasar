@@ -49,7 +49,7 @@ Chain
 │  │     │  ╰─ Name("_id" -> "$_id")
 │  │     ╰─ IncludeId
 │  ╰─ Chain
-│     ├─ $ReadF(db; zips2)
+│     ├─ $ReadF(db; smallZips)
 │     ├─ $ProjectF
 │     │  ├─ Name("0" -> {
 │     │  │       "$cond": [

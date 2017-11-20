@@ -19,11 +19,14 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 import quasar._
 import quasar.common.{Map => _, _}
+import quasar.contrib.pathy._
 import quasar.contrib.specs2.PendingWithActualTracking
+import quasar.ejson.{EJson, Fixed}
 import quasar.fs._
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
 import quasar.sql._
 
@@ -33,6 +36,7 @@ import scala.Either
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix
 import org.specs2.execute._
+import pathy.Path._
 import scalaz._, Scalaz._
 
 /**
@@ -51,8 +55,112 @@ class PlannerSql2ExactSpec extends
   import fixExprOp._
   import PlannerHelpers._, expr3_0Fp._, expr3_2Fp._, expr3_4Fp._
 
+  val (func, free, fix) =
+    quasar.qscript.construction.mkDefaults[Fix, fs.MongoQScript[Fix, ?]]
+
+  val json = Fixed[Fix[EJson]]
+
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     PlannerHelpers.plan(query)
+
+  val specs = List(
+    PlanSpec(
+      "simple join ($lookup)",
+      sqlToWf = Pending(notOnPar),
+      sqlE"select smallZips.city from zips join smallZips on zips.`_id` = smallZips.`_id`",
+      QSpec(
+        sqlToQs = Pending(nonOptimalQs),
+        qsToWf = Ok,
+        fix.EquiJoin(
+          fix.Unreferenced,
+          free.Filter(
+            free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
+            func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
+          free.Filter(
+            free.ShiftedRead[AFile](rootDir </> dir("db") </> file("smallZips"), qscript.ExcludeId),
+            func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
+          List((func.ProjectKeyS(func.Hole, "_id"), func.ProjectKeyS(func.Hole, "_id"))),
+          JoinType.Inner,
+          func.ProjectKeyS(func.RightSide, "city"))).some,
+      chain[Workflow](
+        $read(collection("db", "zips")),
+        $match(Selector.Doc(
+          BsonField.Name("_id") -> Selector.Exists(true))),
+        $project(reshape(JoinDir.Left.name -> $$ROOT)),
+        $lookup(
+          CollectionName("smallZips"),
+          JoinHandler.LeftName \ BsonField.Name("_id"),
+          BsonField.Name("_id"),
+          JoinHandler.RightName),
+        $unwind(DocField(JoinHandler.RightName)),
+        $project(
+          reshape(sigil.Quasar -> $field(JoinDir.Right.name, "city")),
+          ExcludeId))),
+
+    PlanSpec(
+      "simple inner equi-join ($lookup)",
+      sqlToWf = Pending(notOnPar),
+      sqlE"select cars.name, cars2.year from cars join cars2 on cars.`_id` = cars2.`_id`",
+      QSpec(
+        sqlToQs = Pending(nonOptimalQs),
+        qsToWf = Ok,
+        fix.EquiJoin(
+          fix.Unreferenced,
+          free.Filter(
+            free.ShiftedRead[AFile](rootDir </> dir("db") </> file("cars"), qscript.ExcludeId),
+            func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
+          free.Filter(
+            free.ShiftedRead[AFile](rootDir </> dir("db") </> file("cars2"), qscript.ExcludeId),
+            func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
+          List((func.ProjectKeyS(func.Hole, "_id"), func.ProjectKeyS(func.Hole, "_id"))),
+          JoinType.Inner,
+          func.ConcatMaps(
+            func.MakeMap(
+              func.Constant(json.str("name")),
+              func.Guard(
+                func.LeftSide,
+                Type.AnyObject,
+                func.ProjectKeyS(func.LeftSide, "name"),
+                func.Undefined)),
+            func.MakeMap(
+              func.Constant(json.str("year")),
+              func.Guard(
+                func.RightSide,
+                Type.AnyObject,
+                func.ProjectKeyS(func.RightSide, "year"),
+                func.Undefined))))).some,
+      chain[Workflow](
+        $read(collection("db", "cars")),
+        $match(Selector.Doc(
+          BsonField.Name("_id") -> Selector.Exists(true))),
+        $project(reshape(JoinDir.Left.name -> $$ROOT)),
+        $lookup(
+          CollectionName("cars2"),
+          JoinHandler.LeftName \ BsonField.Name("_id"),
+          BsonField.Name("_id"),
+          JoinHandler.RightName),
+        $unwind(DocField(JoinHandler.RightName)),
+        $project(reshape(
+          "name" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                $lt($field(JoinDir.Left.name), $literal(Bson.Arr(Nil)))),
+              $field(JoinDir.Left.name, "name"),
+              $literal(Bson.Undefined)),
+          "year" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                $lt($field(JoinDir.Right.name), $literal(Bson.Arr(Nil)))),
+              $field(JoinDir.Right.name, "year"),
+              $literal(Bson.Undefined))),
+          ExcludeId)))
+  )
+
+  for (s <- specs) {
+    testPlanSpec(s)
+  }
 
   "plan from query string" should {
 

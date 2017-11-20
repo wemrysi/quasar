@@ -1351,24 +1351,6 @@ class PlannerSpec extends
             false).op)
     }.pendingWithActual("#1560", testFile("plan simple join (map-reduce)"))
 
-    "plan simple join ($lookup)" in {
-      plan(sqlE"select zips2.city from zips join zips2 on zips.`_id` = zips2.`_id`") must
-        beWorkflow0(chain[Workflow](
-          $read(collection("db", "zips")),
-          $match(Selector.Doc(
-            BsonField.Name("_id") -> Selector.Exists(true))),
-          $project(reshape(JoinDir.Left.name -> $$ROOT)),
-          $lookup(
-            CollectionName("zips2"),
-            JoinHandler.LeftName \ BsonField.Name("_id"),
-            BsonField.Name("_id"),
-            JoinHandler.RightName),
-          $unwind(DocField(JoinHandler.RightName)),
-          $project(
-            reshape(sigil.Quasar -> $field(JoinDir.Right.name, "city")),
-            ExcludeId)))
-    }.pendingWithActual("#1560", testFile("plan simple join ($lookup)"))
-
     "plan simple join with sharded inputs" in {
       // NB: cannot use $lookup, so fall back to the old approach
       val query = sqlE"select zips2.city from zips join zips2 on zips.`_id` = zips2.`_id`"
@@ -1490,41 +1472,6 @@ class PlannerSpec extends
               IgnoreId)),
           false).op)
     }.pendingWithActual("#1560", testFile("plan simple inner equi-join (map-reduce)"))
-
-    "plan simple inner equi-join ($lookup)" in {
-      plan3_4(
-        sqlE"select cars.name, cars2.year from cars join cars2 on cars.`_id` = cars2.`_id`",
-        defaultStats,
-        defaultIndexes,
-        emptyDoc) must
-      beWorkflow0(chain[Workflow](
-        $read(collection("db", "cars")),
-        $match(Selector.Doc(
-          BsonField.Name("_id") -> Selector.Exists(true))),
-        $project(reshape(JoinDir.Left.name -> $$ROOT)),
-        $lookup(
-          CollectionName("cars2"),
-          JoinHandler.LeftName \ BsonField.Name("_id"),
-          BsonField.Name("_id"),
-          JoinHandler.RightName),
-        $unwind(DocField(JoinHandler.RightName)),
-        $project(reshape(
-          "name" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                $lt($field(JoinDir.Left.name), $literal(Bson.Arr(Nil)))),
-              $field(JoinDir.Left.name, "name"),
-              $literal(Bson.Undefined)),
-          "year" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                $lt($field(JoinDir.Right.name), $literal(Bson.Arr(Nil)))),
-              $field(JoinDir.Right.name, "year"),
-              $literal(Bson.Undefined))),
-          ExcludeId)))
-    }.pendingWithActual("#1560", testFile("plan simple inner equi-join ($lookup)"))
 
     "plan simple inner equi-join with expression ($lookup)" in {
       plan3_4(

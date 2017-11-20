@@ -49,48 +49,6 @@ class PlannerQScriptSpec extends
 
   val json = Fixed[Fix[EJson]]
 
-  //TODO make this independent of MongoQScript and move to a place where all
-  //     connector tests can refer to it
-  val simpleJoin: Fix[fs.MongoQScript[Fix, ?]] =
-    fix.EquiJoin(
-      fix.Unreferenced,
-      free.Filter(
-        free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-        func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
-      free.Filter(
-        free.ShiftedRead[AFile](rootDir </> dir("db") </> file("smallZips"), qscript.ExcludeId),
-        func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
-      List((func.ProjectKeyS(func.Hole, "_id"), func.ProjectKeyS(func.Hole, "_id"))),
-      JoinType.Inner,
-      func.ProjectKeyS(func.RightSide, "city"))
-
-  val simpleInnerEquiJoin: Fix[fs.MongoQScript[Fix, ?]] =
-    fix.EquiJoin(
-      fix.Unreferenced,
-      free.Filter(
-        free.ShiftedRead[AFile](rootDir </> dir("db") </> file("cars"), qscript.ExcludeId),
-        func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
-      free.Filter(
-        free.ShiftedRead[AFile](rootDir </> dir("db") </> file("cars2"), qscript.ExcludeId),
-        func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
-      List((func.ProjectKeyS(func.Hole, "_id"), func.ProjectKeyS(func.Hole, "_id"))),
-      JoinType.Inner,
-      func.ConcatMaps(
-        func.MakeMap(
-          func.Constant(json.str("name")),
-          func.Guard(
-            func.LeftSide,
-            Type.AnyObject,
-            func.ProjectKeyS(func.LeftSide, "name"),
-            func.Undefined)),
-        func.MakeMap(
-          func.Constant(json.str("year")),
-          func.Guard(
-            func.RightSide,
-            Type.AnyObject,
-            func.ProjectKeyS(func.RightSide, "year"),
-            func.Undefined))))
-
   val simpleInnerEquiJoinWithExpression =
     fix.EquiJoin(
       fix.Unreferenced,
@@ -273,52 +231,6 @@ class PlannerQScriptSpec extends
             func.Undefined))))
 
   "plan from qscript" should {
-    "plan simple join ($lookup)" in {
-      qplan(simpleJoin) must beWorkflow(chain[Workflow](
-        $read(collection("db", "zips")),
-        $match(Selector.Doc(
-          BsonField.Name("_id") -> Selector.Exists(true))),
-        $project(reshape(JoinDir.Left.name -> $$ROOT)),
-        $lookup(
-          CollectionName("smallZips"),
-          JoinHandler.LeftName \ BsonField.Name("_id"),
-          BsonField.Name("_id"),
-          JoinHandler.RightName),
-        $unwind(DocField(JoinHandler.RightName)),
-        $project(
-          reshape(sigil.Quasar -> $field(JoinDir.Right.name, "city")),
-          ExcludeId)))
-    }
-
-    "plan simple inner equi-join ($lookup)" in {
-      qplan(simpleInnerEquiJoin) must beWorkflow(chain[Workflow](
-        $read(collection("db", "cars")),
-        $match(Selector.Doc(
-          BsonField.Name("_id") -> Selector.Exists(true))),
-        $project(reshape(JoinDir.Left.name -> $$ROOT)),
-        $lookup(
-          CollectionName("cars2"),
-          JoinHandler.LeftName \ BsonField.Name("_id"),
-          BsonField.Name("_id"),
-          JoinHandler.RightName),
-        $unwind(DocField(JoinHandler.RightName)),
-        $project(reshape(
-          "name" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                $lt($field(JoinDir.Left.name), $literal(Bson.Arr(Nil)))),
-              $field(JoinDir.Left.name, "name"),
-              $literal(Bson.Undefined)),
-          "year" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                $lt($field(JoinDir.Right.name), $literal(Bson.Arr(Nil)))),
-              $field(JoinDir.Right.name, "year"),
-              $literal(Bson.Undefined))),
-          ExcludeId)))
-    }
 
     "plan simple inner equi-join with expression ($lookup)" in {
       qplan(simpleInnerEquiJoinWithExpression) must beWorkflow0(chain[Workflow](
