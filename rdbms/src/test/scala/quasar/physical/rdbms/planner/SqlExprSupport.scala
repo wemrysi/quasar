@@ -42,8 +42,8 @@ import scalaz.concurrent.Task
 trait SqlExprSupport {
 
   type LP[A] = LogicalPlan[A]
-  type QS[T[_[_]]] = quasar.physical.rdbms.model.QS[T]
-  type QSM[T[_[_]], A] = QS[T]#M[A]
+  type RQS[T[_[_]]] = quasar.physical.rdbms.model.QS[T]
+  type QSM[T[_[_]], A] = RQS[T]#M[A]
 
   val basePath
   : Path[Path.Abs, Path.Dir, Sandboxed] = rootDir[Sandboxed] </> dir("db")
@@ -69,7 +69,7 @@ trait SqlExprSupport {
   type EitherWriter[A] =
     EitherT[Writer[Vector[PhaseResult], ?], FileSystemError, A]
 
-  val listContents: DiscoverPath.ListContents[EitherWriter] =
+  val rdbmsLs: DiscoverPath.ListContents[EitherWriter] =
     dir =>
       (if (dir ≟ rootDir)
         Set(DirName("db").left[FileName],
@@ -85,7 +85,7 @@ trait SqlExprSupport {
 
   def qs(sql: Fix[Sql]) = {
     (compileSqlToLP[EitherWriter](sql) >>= (lp =>
-      Postgres.lpToQScript(lp, listContents))).run.run._2
+      Postgres.lpToQScript(lp, rdbmsLs))).run.run._2
   }
 
   def plan(sql: Fix[Sql]) = {

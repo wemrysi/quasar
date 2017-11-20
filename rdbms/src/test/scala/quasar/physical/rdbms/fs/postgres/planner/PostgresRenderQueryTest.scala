@@ -16,20 +16,33 @@
 
 package quasar.physical.rdbms.fs.postgres.planner
 
-import quasar.Qspec
+import slamdata.Predef._
+
+import quasar.{Qspec, qscript}
 import quasar.physical.rdbms.planner.{Planner, SqlExprSupport}
-import quasar.qscript.{ExcludeId, IdOnly, IncludeId, ShiftedRead}
+import quasar.qscript._
 import quasar.contrib.pathy.AFile
-
 import matryoshka.data.Fix
+import quasar.qscript.MapFuncsCore.StrLit
 import pathy.Path._
-import scalaz.Const
-import scalaz.Scalaz.Id
+import quasar.fp.ski.κ
+import quasar.physical.rdbms.planner.sql.SqlExpr
 
-class PostgresRenderQueryTest extends Qspec with SqlExprSupport {
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns._
+import scalaz._
+import Scalaz._
+import scalaz.concurrent.Task
+
+class PostgresRenderQueryTest extends Qspec with SqlExprSupport with QScriptHelpers {
 
   def sr: Planner[Fix, Id, Const[ShiftedRead[AFile], ?]] =
     Planner.constShiftedReadFilePlanner[Fix, Id]
+
+  def core: Planner[Fix, Task, qscript.MapFunc[Fix, ?]] =
+    Planner.mapFuncPlanner[Fix, Task]
 
   "PostgresJsonRenderQuery" should {
     "render shifted read with ExcludeId" in {
@@ -38,7 +51,7 @@ class PostgresRenderQueryTest extends Qspec with SqlExprSupport {
       val repr = sr.plan(Const(ShiftedRead(afile, ExcludeId)))
 
       PostgresRenderQuery.asString(repr) must
-        beRightDisjunction("(select row_to_json(_0) from db.foo _0)")
+        beRightDisjunction("(select row_to_json(_0) _0 from db.foo _0)")
     }
 
     "render shifted read with IncludeId" in {
@@ -48,7 +61,7 @@ class PostgresRenderQueryTest extends Qspec with SqlExprSupport {
 
       PostgresRenderQuery.asString(repr) must
         beRightDisjunction(
-          "(select (row_number() over(), row_to_json(_0)) from db.foo _0)")
+          "(select (row_number() over(), row_to_json(_0)) _0 from db.foo _0)")
     }
 
     "render shifted read ids only" in {
@@ -57,7 +70,24 @@ class PostgresRenderQueryTest extends Qspec with SqlExprSupport {
       val repr = sr.plan(Const(ShiftedRead(afile, IdOnly)))
 
       PostgresRenderQuery.asString(repr) must
-        beRightDisjunction("(select row_number() over() from db.foo _0)")
+        beRightDisjunction("(select row_number() over() _0 from db.foo _0)")
+    }
+
+    def pKey(name: String) = ProjectKeyR(HoleF, StrLit(name))
+
+    def aliasToHole(aliasStr: String) = {
+      val id: SqlExpr[Fix[SqlExpr]] = SqlExpr.Id(aliasStr)
+      κ(id.embed.η[Task])
+    }
+
+    def qsToRepr(m: qscript.FreeMap[Fix]) =
+      m.cataM(interpretM(aliasToHole("d"), core.plan)).unsafePerformSync
+
+    "render addition" in {
+      val qs = AddR(pKey("a"), pKey("b"))
+
+      PostgresRenderQuery.asString(qsToRepr(qs)) must
+        beRightDisjunction("((d->>'a')::numeric + (d->>'b')::numeric)")
     }
 
   }
