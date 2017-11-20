@@ -17,6 +17,7 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef._
+import quasar.RenderTree
 import quasar.fp.symbolOrder
 
 import monocle.{PLens, Prism, Traversal}
@@ -96,6 +97,9 @@ sealed abstract class AccessInstances extends AccessInstances0 {
 
   implicit def order[A: Order]: Order[Access[A]] =
     Order.orderBy(generic(_))
+
+  implicit def renderTree[A: Show]: RenderTree[Access[A]] =
+    RenderTree.fromShowAsType("Access")
 
   implicit def show[A: Show]: Show[Access[A]] =
     Show.shows {

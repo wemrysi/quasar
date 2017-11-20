@@ -33,11 +33,11 @@ import scalaz.{Lens => _, _}, Scalaz._, Tags.LastVal
 import MapFuncsCore._
 
 final class QProv[T[_[_]]: BirecursiveT: EqualT]
-    extends Dimension[T[EJson], FreeMapA[T, Access[Hole]], QProv.P[T]]
+    extends Dimension[T[EJson], FreeMapA[T, Access[Symbol]], QProv.P[T]]
     with QSUTTypes[T] {
 
   type D     = T[EJson]
-  type I     = FreeAccess[Hole]
+  type I     = FreeAccess[Symbol]
   type PF[A] = QProv.PF[T, A]
   type P     = QProv.P[T]
 
@@ -77,7 +77,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
         for {
           idx <- M.get
           _   <- M.put(idx + 1)
-          b   =  Free.point(Access.bucket(src, idx, SrcHole)) : I
+          b   =  Free.point(Access.bucket(src, idx, src)) : I
         } yield (prov.value(b), IMap.singleton(idx, i))
 
       case ProvF.Nada()      => (prov.nada(), IMap.empty[SInt, I]).point[M]
@@ -103,7 +103,10 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
     def rename0(sym: Symbol): Symbol =
       (sym === from) ? to | sym
 
-    dims map (_.transCata[P](pfo.value modify (_ map Access.symbols.modify(rename0))))
+    val renameAccess =
+      Access.symbols.modify(rename0) <<< Access.src.modify(rename0)
+
+    dims map (_.transCata[P](pfo.value modify (_ map renameAccess)))
   }
 
   ////
@@ -121,7 +124,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
 }
 
 object QProv {
-  type PF[T[_[_]], A] = ProvF[T[EJson], FreeMapA[T, Access[Hole]], A]
+  type PF[T[_[_]], A] = ProvF[T[EJson], FreeMapA[T, Access[Symbol]], A]
   type P[T[_[_]]]     = T[PF[T, ?]]
 
   def apply[T[_[_]]: BirecursiveT: EqualT]: QProv[T] =

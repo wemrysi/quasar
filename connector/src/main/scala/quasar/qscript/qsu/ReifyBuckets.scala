@@ -18,35 +18,68 @@ package quasar.qscript.qsu
 
 import slamdata.Predef._
 
-import quasar.qscript.{HoleF, ReduceIndexF}
+import quasar.Planner.{InternalError, PlannerErrorME}
+import quasar.fp.ski.κ
+import quasar.fp.symbolOrder
+import quasar.qscript.{FreeMap, FreeMapA, Hole, HoleF, ReduceIndexF, SrcHole}
 
 import matryoshka._
+import scalaz.{Id, ISet, Monad, Traverse}
+import scalaz.std.list._
+import scalaz.std.option._
 import scalaz.syntax.either._
-import scalaz.syntax.functor._
+import scalaz.syntax.foldable._
+import scalaz.syntax.monad._
+import scalaz.syntax.std.option._
 
 object ReifyBuckets {
   import QSUGraph.Extractors._
   import ApplyProvenance.AuthenticatedQSU
 
-  def apply[T[_[_]]: BirecursiveT: EqualT](aqsu: AuthenticatedQSU[T]): AuthenticatedQSU[T] = {
+  def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Monad: PlannerErrorME](aqsu: AuthenticatedQSU[T])
+      : F[AuthenticatedQSU[T]] = {
+
     val prov = new QProv[T]
     val qsu  = QScriptUniform.Optics[T]
+    val LF   = Traverse[List].compose[FreeMapA[T, ?]]
+    val LFA  = LF.compose[Access]
 
-    val bucketsReified = aqsu.graph rewrite {
+    val bucketsReified = aqsu.graph rewriteM {
       case g @ LPReduce(source, reduce) =>
-        val src = source.root
-        val buckets = prov.buckets(prov.reduce(aqsu.dims(src)))
+        val buckets = prov.buckets(prov.reduce(aqsu.dims(source.root)))
+        val srcs = LF.foldMap(buckets)(a => ISet.fromFoldable(Access.value.getOption(a))).toIList
 
-        g.overwriteAtRoot(qsu.qsReduce(
-          src, buckets, List(reduce as HoleF[T]), ReduceIndexF[T](0.right)))
+        val discovered: F[(Symbol, FreeMap[T])] =
+          srcs.toNel.fold((source.root, HoleF[T]).point[F]) { syms =>
+            val region =
+              syms.findMapM[Id.Id, (Symbol, FreeMap[T])](
+                s => MappableRegion.unaryOf(s, source) strengthL s)
+
+            region getOrElseF {
+              PlannerErrorME[F].raiseError(InternalError(
+                s"ReifyBuckets: Expected to find a mappable region in ${source.root} based on one of ${syms}.",
+                None))
+            }
+          }
+
+        discovered map { case (newSrc, fm) =>
+          g.overwriteAtRoot(qsu.qsReduce(
+            newSrc,
+            LFA.map(buckets)(κ(SrcHole : Hole)),
+            List(reduce as fm),
+            ReduceIndexF[T](0.right)))
+        }
 
       case g @ QSSort(source, Nil, keys) =>
         val src = source.root
         val buckets = prov.buckets(prov.reduce(aqsu.dims(src)))
 
-        g.overwriteAtRoot(qsu.qsSort(src, buckets, keys))
+        g.overwriteAtRoot(qsu.qsSort(
+          src,
+          LFA.map(buckets)(κ(SrcHole : Hole)),
+          keys)).point[F]
     }
 
-    aqsu.copy(graph = bucketsReified)
+    bucketsReified map (g => aqsu.copy(graph = g))
   }
 }
