@@ -50,7 +50,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
       ReifyBuckets[T]                >=>
       debugAG("ReifyBuckets: ")      >==>
       MinimizeAutoJoins[T].apply[F]  >=>
-      debugAG("MinimizeAJ: ")         >==>
+      debugAG("MinimizeAJ: ")        >==>
       ReifyAutoJoins[T].apply[F]     >=>
       debugAG("ReifyAutoJoins: ")    >-
       (_.graph)                      >==>
