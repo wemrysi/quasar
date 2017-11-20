@@ -18,16 +18,18 @@ package quasar.physical.rdbms.fs.postgres.planner
 
 import slamdata.Predef._
 import quasar.Data
-import quasar.Planner.{NonRepresentableData, PlannerError}
+import quasar.DataCodec
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.physical.rdbms.planner.RenderQuery
 import quasar.physical.rdbms.planner.sql.SqlExpr
-import quasar.DataCodec
+import quasar.Planner.InternalError
+import quasar.Planner.{NonRepresentableData, PlannerError}
+import quasar.physical.rdbms.planner.sql.SqlExpr.Case.WhenThen
 
 import matryoshka._
 import matryoshka.implicits._
-import scalaz.Scalaz._
 import scalaz._
+import Scalaz._
 
 object PostgresRenderQuery extends RenderQuery {
   import SqlExpr._
@@ -54,7 +56,22 @@ object PostgresRenderQuery extends RenderQuery {
       v.right
     case AllCols(alias) =>
       s"row_to_json($alias)".right
-    case Ref(src, ref) => s"$src->>'$ref'".right
+    case Refs(srcs) =>
+      srcs match {
+        case Vector(first, second) => s"$first->>'$second'".right
+        case first +: mid :+ last =>
+          s"""$first->${mid.map(e => s"'$e'").intercalate("->")}->>'$last'""".right
+        case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
+      }
+    case Obj(m) =>
+      val params = m.map {
+        case (k, v) => s"'$k', $v"
+      }.mkString(",")
+      s"json_build_object($params)#>>'{}'".right
+    case RegexMatches(str, pattern) =>
+      s"($str ~ '$pattern')".right
+    case IsNotNull(expr) =>
+      s"($expr notnull)".right
     case NumericOp(sym, left, right) => s"(($left)::numeric $sym ($right)::numeric)".right
     case Mod(a1, a2) => s"mod(($a1)::numeric, ($a2)::numeric)".right
     case Pow(a1, a2) => s"power(($a1)::numeric, ($a2)::numeric)".right
@@ -72,5 +89,8 @@ object PostgresRenderQuery extends RenderQuery {
       v.flatMap { case ''' => "''"; case iv => iv.toString }.self.right
     case Constant(v) =>
       DataCodec.render(v) \/> NonRepresentableData(v)
+    case Case(wt, e) =>
+      val wts = wt ∘ { case WhenThen(w, t) => s"when $w then $t" }
+      s"(case ${wts.intercalate(" ")} else ${e.v} end)".right
   }
 }

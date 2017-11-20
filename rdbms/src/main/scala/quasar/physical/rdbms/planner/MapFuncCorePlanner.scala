@@ -16,28 +16,54 @@
 
 package quasar.physical.rdbms.planner
 
+import slamdata.Predef._
 import slamdata.Predef.{Eq => _}
 import quasar.Data
+import quasar.DataCodec, DataCodec.Precise.DateKey
 import quasar.Planner._
 import quasar.physical.rdbms.planner.sql.{SqlExpr => SQL}
+import quasar.physical.rdbms.planner.sql.SqlExpr._
+import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.qscript.{MapFuncsCore => MFC, _}
+import quasar.std.StdLib.string.dateRegex
 
 import matryoshka._
 import matryoshka.implicits._
-import scalaz.{Divide => _,Split => _, _}, Scalaz._
+import scalaz._
+import Scalaz._
 
 
 class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerErrorME]
     extends Planner[T, F, MapFuncCore[T, ?]] {
 
   val undefined: T[SQL] = SQL.Null[T[SQL]]().embed
-  
+
+  def str(s: String): T[SQL] = SQL.Constant[T[SQL]](Data.Str(s)).embed
+
+  def datetime(a1: T[SQL], key: String, regex: Regex): T[SQL] = {
+    val nr: Refs[T[SQL]] = a1.project match {
+      case Refs(elems) => Refs(elems :+ str(key))
+      case _ => Refs(Vector(a1, str(key)))
+    }
+
+    Case.build(
+      WhenThen(
+        IsNotNull(nr.embed).embed,
+        a1),
+      WhenThen(
+        RegexMatches(a1, str(regex.regex)).embed,
+        Obj(List(str(key) -> a1)).embed)
+    )(
+      Else(SQL.Null[T[SQL]].embed)
+    ).embed
+  }
+
   def plan: AlgebraM[F, MapFuncCore[T, ?], T[SQL]] = {
     case MFC.Constant(ejson) => SQL.Constant[T[SQL]](ejson.cata(Data.fromEJson)).embed.η[F]
     case MFC.Undefined() =>  undefined.η[F]
     case MFC.JoinSideName(n) =>  notImplemented("JoinSideName", this)
     case MFC.Length(f) => notImplemented("Length", this)
-    case MFC.Date(f) =>  notImplemented("Date", this)
+    case MFC.Date(f) => datetime(f, DateKey, dateRegex.r).η[F]
     case MFC.Time(f) =>  notImplemented("Time", this)
     case MFC.Timestamp(f) =>  notImplemented("TimeStamp", this)
     case MFC.Interval(f) =>  notImplemented("Interval", this)
@@ -99,7 +125,11 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.ConcatArrays(f1, f2) =>  notImplemented("ConcatArrays", this)
     case MFC.ConcatMaps(f1, f2) =>  notImplemented("ConcatMaps", this)
     case MFC.ProjectIndex(f1, f2) =>  notImplemented("ProjectIndex", this)
-    case MFC.ProjectKey(fSrc, fKey) => SQL.Ref[T[SQL]](fSrc, fKey).embed.η[F]
+    case MFC.ProjectKey(fSrc, fKey) =>
+      fSrc.project match {
+        case SQL.Refs(list) => SQL.Refs(list :+ fKey).embed.η[F]
+        case _ => SQL.Refs(Vector(fSrc, fKey)).embed.η[F]
+      }
     case MFC.DeleteKey(fSrc, fField) =>   notImplemented("DeleteKey", this)
     case MFC.Range(fFrom, fTo) =>  notImplemented("Range", this)
     case MFC.Guard(f1, fPattern, f2, ff3) => f2.η[F]

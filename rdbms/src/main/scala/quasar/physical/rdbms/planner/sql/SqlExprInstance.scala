@@ -21,7 +21,7 @@ import scalaz._, Scalaz._
 trait SqlExprInstances extends SqlExprTraverse with SqlExprRenderTree
 
 trait SqlExprTraverse {
-  import SqlExpr._, Select._
+  import SqlExpr._, Select._, Case._
 
   implicit val traverse: Traverse[SqlExpr] = new Traverse[SqlExpr] {
     def traverseImpl[G[_], A, B](
@@ -32,10 +32,13 @@ trait SqlExprTraverse {
         implicit G: Applicative[G]
     ): G[SqlExpr[B]] = fa match {
       case Null()              => G.point(Null())
+      case Obj(m)              => m.traverse(_.bitraverse(f, f)) ∘ (l => Obj(l))
       case Constant(d)         => G.point(Constant(d))
       case Id(str)             => G.point(Id(str))
-      case Ref(src, ref)       => (f(src) ⊛ f(ref))(Ref.apply)
+      case RegexMatches(a1, a2) => (f(a1) ⊛ f(a2))(RegexMatches(_, _))
+      case Refs(srcs)       =>  srcs.traverse(f) ∘ Refs.apply
       case Table(name)         => G.point(Table(name))
+      case IsNotNull(a1)       => f(a1) ∘ (IsNotNull(_))
       case RowIds()            => G.point(RowIds())
       case AllCols(v)          => G.point(AllCols(v))
       case NumericOp(op, left, right) => (f(left) ⊛ f(right))(NumericOp(op, _, _))
@@ -56,6 +59,13 @@ trait SqlExprTraverse {
         (sel ⊛
           (f(from.v) ∘ (From(_, from.alias ∘ (a => Id[B](a.v))))))(
           SelectRow(_, _)
+        )
+
+      case Case(wt, Else(e)) =>
+        (wt.traverse { case WhenThen(w, t) => (f(w) ⊛ f(t))(WhenThen(_, _)) } ⊛
+          f(e)
+          )((wt, e) =>
+          Case(wt, Else(e))
         )
     }
   }

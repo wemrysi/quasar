@@ -43,6 +43,15 @@ trait SqlExprRenderTree {
             Terminal("Null" :: Nil, none)
           case Constant(d) =>
             Terminal("Constant" :: Nil, d.shows.some)
+          case Obj(m) =>
+            NonTerminal("Obj" :: Nil, none, m.map { case (k, v) =>
+              NonTerminal("K → V" :: Nil, none,
+                List(r.render(k), r.render(v)))
+            })
+          case IsNotNull(a1) =>
+            nonTerminal("NotNull", a1)
+          case RegexMatches(a1, a2) =>
+            nonTerminal("RegexMatches", a1, a2)
           case Id(v) =>
             Terminal("Id" :: Nil, v.some)
           case Table(v) =>
@@ -59,8 +68,8 @@ trait SqlExprRenderTree {
             nonTerminal("Mod", a1, a2)
           case Pow(a1, a2) =>
             nonTerminal("Pow", a1, a2)
-          case Ref(src, ref) =>
-            nonTerminal("Reference", src, ref)
+          case Refs(srcs) =>
+            nonTerminal("References", srcs:_*)
           case Select(selection, from, filter) =>
             NonTerminal(
               "Select" :: Nil,
@@ -77,6 +86,12 @@ trait SqlExprRenderTree {
               nt("selectionInRow", selection.alias ∘ (_.v), selection.v) ::
                 List(nt("fromInRow`", from.alias ∘ (_.v), from.v))
             )
+
+          case Case(wt, e) =>
+            NonTerminal("Case" :: Nil, none,
+              (wt ∘ (i => nonTerminal("whenThen", i.when, i.`then`))).toList :+
+                nonTerminal("else", e.v))
+
         }
       }
     }

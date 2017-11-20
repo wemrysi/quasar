@@ -23,7 +23,6 @@ import quasar.physical.rdbms.planner.{Planner, SqlExprSupport}
 import quasar.qscript._
 import quasar.contrib.pathy.AFile
 import matryoshka.data.Fix
-import quasar.qscript.MapFuncsCore.StrLit
 import pathy.Path._
 import quasar.fp.ski.κ
 import quasar.physical.rdbms.planner.sql.SqlExpr
@@ -37,6 +36,8 @@ import Scalaz._
 import scalaz.concurrent.Task
 
 class PostgresRenderQueryTest extends Qspec with SqlExprSupport with QScriptHelpers {
+
+  val func = construction.Func[Fix]
 
   def sr: Planner[Fix, Id, Const[ShiftedRead[AFile], ?]] =
     Planner.constShiftedReadFilePlanner[Fix, Id]
@@ -73,7 +74,7 @@ class PostgresRenderQueryTest extends Qspec with SqlExprSupport with QScriptHelp
         beRightDisjunction("(select row_number() over() _0 from db.foo _0)")
     }
 
-    def pKey(name: String) = ProjectKeyR(HoleF, StrLit(name))
+    def pKey(name: String) = func.ProjectKeyS(func.Hole, name)
 
     def aliasToHole(aliasStr: String) = {
       val id: SqlExpr[Fix[SqlExpr]] = SqlExpr.Id(aliasStr)
@@ -101,6 +102,21 @@ class PostgresRenderQueryTest extends Qspec with SqlExprSupport with QScriptHelp
     def PowR[A](left: FreeMapA[A], right: FreeMapA[A]):
     FreeMapA[A] = {
       Free.roll(MFC(MapFuncsCore.Power(left, right)))
+    }
+
+    def SubtractR[A](left: FreeMapA[A], right: FreeMapA[A]):
+    FreeMapA[A] = {
+      Free.roll(MFC(MapFuncsCore.Subtract(left, right)))
+    }
+
+    def AddR[A](left: FreeMapA[A], right: FreeMapA[A]):
+    FreeMapA[A] = {
+      Free.roll(MFC(MapFuncsCore.Add(left, right)))
+    }
+
+    def DateR[A](expr: FreeMapA[A]):
+    FreeMapA[A] = {
+      Free.roll(MFC(MapFuncsCore.Date(expr)))
     }
 
     "render addition" in {
@@ -139,18 +155,32 @@ class PostgresRenderQueryTest extends Qspec with SqlExprSupport with QScriptHelp
     }
 
     "render modulo" in {
-      val qs = ModR(pKey("mod1"), ConstantR(ejsonInt(33)))
+      val qs = ModR(pKey("mod1"), func.Constant(json.int(33)))
 
       PostgresRenderQuery.asString(qsToRepr(qs)) must
         beRightDisjunction("mod((d->>'mod1')::numeric, (33)::numeric)")
     }
 
     "render power" in {
-      val qs = PowR(pKey("powKey"), ConstantR(ejsonInt(4)))
+      val qs = PowR(pKey("powKey"), func.Constant(json.int(4)))
 
       PostgresRenderQuery.asString(qsToRepr(qs)) must
         beRightDisjunction("power((d->>'powKey')::numeric, (4)::numeric)")
     }
 
+    "render date" in {
+      val qs = DateR(pKey("d1"))
+
+      PostgresRenderQuery.asString(qsToRepr(qs)) must
+        beRightDisjunction("(case when (d->'d1'->>'$date' notnull) then d->>'d1' when (d->>'d1' ~ " +
+          "'(?:\\d{4}-\\d{2}-\\d{2}|\\d{8})') then json_build_object('$date', d->>'d1')#>>'{}' else null end)")
+    }
+
+    "render composite key projection" in {
+      val qs = func.ProjectKeyS(func.ProjectKeyS(func.ProjectKeyS(func.Hole, "a"), "b"), "c")
+
+      PostgresRenderQuery.asString(qsToRepr(qs)) must
+        beRightDisjunction("d->'a'->'b'->>'c'")
+    }
   }
 }
