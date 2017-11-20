@@ -28,7 +28,7 @@ trait Dimension[D, I, P] {
   import prov._
 
   /** Returns the `JoinKeys` describing the autojoin of the two dimension stacks. */
-  def autojoinKeys(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D], I: Equal[I]): JoinKeys[I] =
+  def autojoinKeys(ls: Dimensions[P], rs: Dimensions[P])(implicit D: Equal[D]): JoinKeys[I] =
     ls.reverse.fzipWith(rs.reverse)(joinKeys).fold
 
   /** The empty dimension stack. */
