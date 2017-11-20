@@ -44,6 +44,8 @@ class PlannerLPSpec extends
   import fixExprOp._
   import PlannerHelpers._
 
+  //TODO the LP's should be translated to QScript
+  //Then these tests can move to PlannerQScriptSpec
   "plan from LogicalPlan" should {
     import StdLib._
 
