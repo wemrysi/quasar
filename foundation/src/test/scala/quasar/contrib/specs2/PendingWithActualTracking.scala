@@ -67,7 +67,7 @@ trait PendingWithActualTracking {
     def pendingWithActualTestMode(m: String, file: JFile): Result = ResultExecution.execute(AsResult(t)) match {
       case s @ Success(_,_) =>
         Failure(m + " Fixed now, you should remove the 'pendingWithActual' marker")
-      case f @ Failure(msg, e, stackTrace, FailureDetails(actual, expected)) =>
+      case Failure(_, _, _, FailureDetails(actual, _)) =>
         val expectedActual = unsafeRead(file)
         if (actual != expectedActual)
           Failure(m + " Behaviour has changed. Please review the test and set new expectation. New actual is: " + actual)
@@ -78,7 +78,7 @@ trait PendingWithActualTracking {
     }
 
     def pendingWithActualWriteMode(m: String, file: JFile): Result = ResultExecution.execute(AsResult(t)) match {
-      case f @ Failure(msg, e, stackTrace, FailureDetails(actual, expected)) =>
+      case Failure(_, _, _, FailureDetails(actual, _)) =>
         unsafeWrite(file, actual)
         Success(m + s" Wrote file with new actual $file")
       case other =>
