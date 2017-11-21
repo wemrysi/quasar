@@ -32,7 +32,7 @@ trait PostgresInsert extends RdbmsInsert {
   implicit def dataMeta: Meta[Data]
 
   def toColValues(cols: Set[ColumnDesc])(
-      row: Data)(implicit formatter: DataFormatter): \/[FileSystemError, Map[String, String]] = {
+      row: Data)(implicit formatter: DataFormatter): FileSystemError \/ Map[String, String] = {
     row match {
       case Data.Obj(fields) =>
         fields.toVector
@@ -53,7 +53,7 @@ trait PostgresInsert extends RdbmsInsert {
 
   def buildQuery(chunk: Vector[Data],
                  cols: Set[ColumnDesc],
-                 dbPath: TablePath): \/[FileSystemError, Vector[Fragment]] = {
+                 dbPath: TablePath): FileSystemError \/ Vector[Fragment] = {
     val insertIntoTable = fr"insert into " ++ Fragment.const(dbPath.shows)
 
     chunk.traverse(toColValues(cols)).map { insertColVectors =>

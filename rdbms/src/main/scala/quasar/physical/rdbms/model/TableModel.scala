@@ -56,7 +56,7 @@ object ColumnarTable {
 
 object TableModel {
 
-  def alter(initial: TableModel, newModel: TableModel): \/[FileSystemError, Set[AlterColumn]] = {
+  def alter(initial: TableModel, newModel: TableModel): FileSystemError \/ Set[AlterColumn] = {
     initial match {
       case JsonTable => Set.empty.right
       case ColumnarTable(initialCols) =>

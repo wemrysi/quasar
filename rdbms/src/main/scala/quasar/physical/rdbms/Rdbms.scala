@@ -105,5 +105,5 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
     ???
   } // TODO
 
-  def parseConnectionUri(uri: ConnectionUri): \/[DefinitionError, JdbcConnectionInfo]
+  def parseConnectionUri(uri: ConnectionUri): DefinitionError \/ JdbcConnectionInfo
 }
