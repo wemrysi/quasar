@@ -19,7 +19,7 @@ package quasar.physical.rdbms.planner
 import slamdata.Predef._
 import slamdata.Predef.{Eq => _}
 import quasar.Data
-import quasar.DataCodec, DataCodec.Precise.{DateKey, TimeKey, TimestampKey}
+import quasar.DataCodec, DataCodec.Precise.{DateKey, TimeKey, TimestampKey, IntervalKey}
 import quasar.Planner._
 import quasar.physical.rdbms.planner.sql.{SqlExpr => SQL}
 import quasar.physical.rdbms.planner.sql.SqlExpr._
@@ -40,15 +40,18 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
 
   def str(s: String): T[SQL] = SQL.Constant[T[SQL]](Data.Str(s)).embed
 
-  def datetime(a1: T[SQL], key: String, regex: Regex): T[SQL] = {
-    val nr: Refs[T[SQL]] = a1.project match {
+  def toKeyValue(expr: T[SQL], key: String): T[SQL] = {
+    val nr: Refs[T[SQL]] = expr.project match {
       case Refs(elems) => Refs(elems :+ str(key))
-      case _ => Refs(Vector(a1, str(key)))
+      case _ => Refs(Vector(expr, str(key)))
     }
+    nr.embed
+  }
 
+  def datetime(a1: T[SQL], key: String, regex: Regex): T[SQL] = {
     Case.build(
       WhenThen(
-        IsNotNull(nr.embed).embed,
+        IsNotNull(toKeyValue(a1, key)).embed,
         a1),
       WhenThen(
         RegexMatches(a1, str(regex.regex)).embed,
@@ -58,6 +61,8 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     ).embed
   }
 
+
+
   def plan: AlgebraM[F, MapFuncCore[T, ?], T[SQL]] = {
     case MFC.Constant(ejson) => SQL.Constant[T[SQL]](ejson.cata(Data.fromEJson)).embed.η[F]
     case MFC.Undefined() =>  undefined.η[F]
@@ -66,7 +71,13 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.Date(f) => datetime(f, DateKey, dateRegex.r).η[F]
     case MFC.Time(f) =>  datetime(f, TimeKey, timeRegex.r).η[F]
     case MFC.Timestamp(f) => datetime(f, TimestampKey, timestampRegex.r).η[F]
-    case MFC.Interval(f) =>  notImplemented("Interval", this)
+    case MFC.Interval(f) =>
+      Case.build(
+        WhenThen(IsNotNull(toKeyValue(f, IntervalKey)).embed, f)
+      )(
+        Else(SQL.Null[T[SQL]].embed)
+      ).embed.η[F]
+
     case MFC.StartOfDay(f) =>  notImplemented("StartOfDay", this)
     case MFC.TemporalTrunc(p, f) =>  notImplemented("TemporalTrunc", this)
     case MFC.TimeOfDay(f) =>  notImplemented("TimeOfDay", this)

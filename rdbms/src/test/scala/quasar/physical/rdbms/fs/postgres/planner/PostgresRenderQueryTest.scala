@@ -119,6 +119,11 @@ class PostgresRenderQueryTest extends Qspec with SqlExprSupport with QScriptHelp
       Free.roll(MFC(MapFuncsCore.Date(expr)))
     }
 
+    def IntervalR[A](expr: FreeMapA[A]):
+    FreeMapA[A] = {
+      Free.roll(MFC(MapFuncsCore.Interval(expr)))
+    }
+
     "render addition" in {
       val qs = AddR(pKey("a"), pKey("b"))
 
@@ -174,6 +179,13 @@ class PostgresRenderQueryTest extends Qspec with SqlExprSupport with QScriptHelp
       PostgresRenderQuery.asString(qsToRepr(qs)) must
         beRightDisjunction("(case when (d->'d1'->>'$date' notnull) then d->>'d1' when (d->>'d1' ~ " +
           "'(?:\\d{4}-\\d{2}-\\d{2}|\\d{8})') then json_build_object('$date', d->>'d1')#>>'{}' else null end)")
+    }
+
+    "render interval" in {
+      val qs = IntervalR(pKey("int"))
+
+      PostgresRenderQuery.asString(qsToRepr(qs)) must
+        beRightDisjunction("(case when (d->'int'->>'$interval' notnull) then d->>'int' else null end)")
     }
 
     "render composite key projection" in {
