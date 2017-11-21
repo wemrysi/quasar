@@ -56,7 +56,7 @@ class PlannerSpec extends
 
   "plan from query string" should {
 
-    "plan filter with both index and field projections" in {
+    "filter with both index and key projections" in {
       plan(sqlE"""select count(parents[0].sha) as count from slamengine_commits where parents[0].sha = "56d1caf5d082d1a6840090986e277d36d03f1859" """) must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "slamengine_commits")),
@@ -93,10 +93,10 @@ class PlannerSpec extends
             \/-($literal(Bson.Null)))))
     }.pendingWithActual(notOnPar, testFile("plan filter with both index and field projections"))
 
-    "plan having with multiple projections" in {
-      plan(sqlE"select city, sum(pop) from zips group by city having sum(pop) > 50000") must
+    "having with multiple projections" in {
+      plan(sqlE"select city, sum(pop) from extraSmallZips group by city having sum(pop) > 40000") must
       beWorkflow0(chain[Workflow](
-        $read(collection("db", "zips")),
+        $read(collection("db", "extraSmallZips")),
         $group(
           grouped(
             "1" ->
@@ -109,7 +109,7 @@ class PlannerSpec extends
                   $literal(Bson.Undefined)))),
           -\/(reshape("0" -> $field("city")))),
         $match(Selector.Doc(
-          BsonField.Name("1") -> Selector.Gt(Bson.Int32(50000)))),
+          BsonField.Name("1") -> Selector.Gt(Bson.Int32(40000)))),
         $project(
           reshape(
             "city" -> $field("_id", "0"),
@@ -117,53 +117,10 @@ class PlannerSpec extends
           IgnoreId)))
     }.pendingWithActual(notOnPar, testFile("plan having with multiple projections"))
 
-    "prefer projection+filter over JS filter" in {
-      plan(sqlE"select * from zips where city <> state") must
-      beWorkflow(chain[Workflow](
-        $read(collection("db", "zips")),
-        $project(
-          reshape(
-            "0" -> $neq($field("city"), $field("state")),
-            "src" -> $$ROOT),
-          ExcludeId),
-        $match(
-          Selector.Doc(
-            BsonField.Name("0") -> Selector.Eq(Bson.Bool(true)))),
-        $project(
-          reshape(sigil.Quasar -> $field("src")),
-          ExcludeId)))
-    }
-
-    "prefer projection+filter over nested JS filter" in {
-      plan(sqlE"select * from zips where city <> state and pop < 10000") must
-      beWorkflow0(chain[Workflow](
-        $read(collection("db", "zips")),
-        $match(Selector.Or(
-          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Int32)),
-          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Int64)),
-          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Dec)),
-          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Text)),
-          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Date)),
-          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Bool))
-        )),
-        $project(
-          reshape(
-            "0"   -> $neq($field("city"), $field("state")),
-            "1"   -> $field("pop"),
-            "src" -> $$ROOT),
-          ExcludeId),
-        $match(Selector.And(
-          Selector.Doc(BsonField.Name("0") -> Selector.Eq(Bson.Bool(true))),
-          Selector.Doc(BsonField.Name("1") -> Selector.Lt(Bson.Int32(10000))))),
-        $project(
-          reshape(sigil.Quasar -> $field("src")),
-          ExcludeId)))
-    }
-
     "select partially-applied substring" in {
-      plan3_2(sqlE"""select substring("abcdefghijklmnop", 5, trunc(pop / 10000)) from zips""") must
+      plan3_2(sqlE"""select substring("abcdefghijklmnop", 5, trunc(pop / 10000)) from extraSmallZips""") must
         beWorkflow(chain[Workflow](
-          $read(collection("db", "zips")),
+          $read(collection("db", "extraSmallZips")),
           $project(
             reshape(
               sigil.Quasar ->
@@ -216,8 +173,8 @@ class PlannerSpec extends
                 $literal(Bson.Undefined))))))
     }
 
-    "plan sort with wildcard and expression in key" in {
-      plan(sqlE"select * from zips order by pop*10 desc") must
+    "sort wildcard on expression" in {
+      plan(sqlE"select * from zips order by pop/10 desc") must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "zips")),
           $simpleMap(
@@ -247,7 +204,7 @@ class PlannerSpec extends
             ExcludeId)))
     }.pendingWithActual(notOnPar, testFile("plan sort with wildcard and expression in key"))
 
-    "plan sort with expression and alias" in {
+    "sort with expression and alias" in {
       plan(sqlE"select pop/1000 as popInK from zips order by popInK") must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "zips")),
@@ -268,7 +225,7 @@ class PlannerSpec extends
           $sort(NonEmptyList(BsonField.Name("popInK") -> SortDir.Ascending))))
     }.pendingWithActual(notOnPar, testFile("plan sort with expression and alias")) // at least on agg now
 
-    "plan sort with expression, alias, and filter" in {
+    "sort with expression, alias, and filter" in {
       plan(sqlE"select pop/1000 as popInK from zips where pop >= 1000 order by popInK") must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "zips")),
@@ -292,31 +249,10 @@ class PlannerSpec extends
           $sort(NonEmptyList(BsonField.Name("popInK") -> SortDir.Ascending))))
     }.pendingWithActual(notOnPar, testFile("plan sort with expression, alias, and filter")) // at least on agg now
 
-    "plan count and js expr" in {
-      plan(sqlE"SELECT COUNT(*) as cnt, LENGTH(city) FROM zips") must
-        beWorkflow0 {
-          chain[Workflow](
-            $read(collection("db", "zips")),
-            $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-              "1" ->
-                If(Call(ident("isString"), List(Select(ident("x"), "city"))),
-                  Call(ident("NumberLong"),
-                    List(Select(Select(ident("x"), "city"), "length"))),
-                  ident("undefined")))))),
-              ListMap()),
-            $group(
-              grouped(
-                "cnt" -> $sum($literal(Bson.Int32(1))),
-                "1"   -> $push($field("1"))),
-              \/-($literal(Bson.Null))),
-            $unwind(DocField("1")))
-        }
-    }.pendingWithActual(notOnPar, testFile("plan count and js expr"))
-
-    "plan useful group by" in {
-      plan(sqlE"""select city || ", " || state, sum(pop) from zips group by city, state""") must
+    "useful group by" in {
+      plan(sqlE"""select city || ", " || state, sum(pop) from extraSmallZips group by city, state""") must
       beWorkflow0(chain[Workflow](
-        $read(collection("db", "zips")),
+        $read(collection("db", "extraSmallZips")),
         $group(
           grouped(
             "__tmp10" ->
@@ -364,10 +300,10 @@ class PlannerSpec extends
           IgnoreId)))
     }.pendingWithActual(notOnPar, testFile("plan useful group by"))
 
-    "plan group by expression" in {
-      plan(sqlE"select city, sum(pop) from zips group by lower(city)") must
+    "group by simple expression" in {
+      plan(sqlE"select city, sum(pop) from extraSmallZips group by lower(city)") must
       beWorkflow0(chain[Workflow](
-        $read(collection("db", "zips")),
+        $read(collection("db", "extraSmallZips")),
         $group(
           grouped(
             "city" -> $push($field("city")),
@@ -390,27 +326,27 @@ class PlannerSpec extends
         $unwind(DocField(BsonField.Name("city")))))
     }.pendingWithActual(notOnPar, testFile("plan group by expression"))
 
-    "plan group by month" in {
-      plan(sqlE"""select avg(score) as a, DATE_PART("month", `date`) as m from caloriesBurnedData group by DATE_PART("month", `date`)""") must
+    "group by month" in {
+      plan(sqlE"""select avg(epoch), date_part("month", `ts`) from days group by date_part("month", `ts`)""") must
         beWorkflow0(chain[Workflow](
-          $read(collection("db", "caloriesBurnedData")),
+          $read(collection("db", "days")),
           $group(
             grouped(
               "a" ->
                 $avg(
                   $cond(
                     $and(
-                      $lt($literal(Bson.Null), $field("score")),
-                      $lt($field("score"), $literal(Bson.Text("")))),
-                    $field("score"),
+                      $lt($literal(Bson.Null), $field("epoch")),
+                      $lt($field("epoch"), $literal(Bson.Text("")))),
+                    $field("epoch"),
                     $literal(Bson.Undefined)))),
             -\/(reshape(
               "0" ->
                 $cond(
                   $and(
-                    $lte($literal(Check.minDate), $field("date")),
-                    $lt($field("date"), $literal(Bson.Regex("", "")))),
-                  $month($field("date")),
+                    $lte($literal(Check.minDate), $field("ts")),
+                    $lt($field("ts"), $literal(Bson.Regex("", "")))),
+                  $month($field("ts")),
                   $literal(Bson.Undefined))))),
           $project(
             reshape(
@@ -419,8 +355,8 @@ class PlannerSpec extends
             IgnoreId)))
     }.pendingWithActual(notOnPar, testFile("plan group by month"))
 
-    // FIXME: Needs an actual expectation
-    "plan expr3 with grouping" in {
+    // FIXME: Needs an actual expectation and an IT
+    "expr3 with grouping" in {
       plan(sqlE"select case when pop > 1000 then city else lower(city) end, count(*) from zips group by city") must
         beRight
     }

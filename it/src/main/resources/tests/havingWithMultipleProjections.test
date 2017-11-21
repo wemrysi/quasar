@@ -1,0 +1,14 @@
+{
+    "name": "having with multiple projections",
+    "backends": {
+    },
+    "data": "extraSmallZips.data",
+    "query": "select city, sum(pop) from extraSmallZips group by city having sum(pop) > 40000",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+        { "city": "HOLYOKE", "1": 43704 },
+        { "city": "MONTGOMERY", "1": 40117 },
+        { "city": "SPRINGFIELD", "1": 52147 }
+    ]
+}

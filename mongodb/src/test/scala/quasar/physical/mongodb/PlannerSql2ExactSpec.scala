@@ -1150,6 +1150,27 @@ class PlannerSql2ExactSpec extends
         }
     }.pendingWithActual(notOnPar, testFile("plan efficient count and field ref"))
 
+    "plan count and js expr" in {
+      plan(sqlE"SELECT COUNT(*) as cnt, LENGTH(city) FROM zips") must
+        beWorkflow0 {
+          chain[Workflow](
+            $read(collection("db", "zips")),
+            $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
+              "1" ->
+                If(Call(ident("isString"), List(Select(ident("x"), "city"))),
+                  Call(ident("NumberLong"),
+                    List(Select(Select(ident("x"), "city"), "length"))),
+                  ident("undefined")))))),
+              ListMap()),
+            $group(
+              grouped(
+                "cnt" -> $sum($literal(Bson.Int32(1))),
+                "1"   -> $push($field("1"))),
+              \/-($literal(Bson.Null))),
+            $unwind(DocField("1")))
+        }
+    }.pendingWithActual(notOnPar, testFile("plan count and js expr"))
+
     "plan trivial group by" in {
       plan(sqlE"select city from zips group by city") must
       beWorkflow0(chain[Workflow](
@@ -1259,6 +1280,49 @@ class PlannerSql2ExactSpec extends
           reshape(sigil.Quasar -> $field("_id", "0")),
           ExcludeId)))
     }.pendingWithActual(notOnPar, testFile("plan simple having filter"))
+
+    "prefer projection+filter over JS filter" in {
+      plan(sqlE"select * from zips where city <> state") must
+      beWorkflow(chain[Workflow](
+        $read(collection("db", "zips")),
+        $project(
+          reshape(
+            "0" -> $neq($field("city"), $field("state")),
+            "src" -> $$ROOT),
+          ExcludeId),
+        $match(
+          Selector.Doc(
+            BsonField.Name("0") -> Selector.Eq(Bson.Bool(true)))),
+        $project(
+          reshape(sigil.Quasar -> $field("src")),
+          ExcludeId)))
+    }
+
+    "prefer projection+filter over nested JS filter" in {
+      plan(sqlE"select * from zips where city <> state and pop < 10000") must
+      beWorkflow0(chain[Workflow](
+        $read(collection("db", "zips")),
+        $match(Selector.Or(
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Int32)),
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Int64)),
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Dec)),
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Text)),
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Date)),
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Bool))
+        )),
+        $project(
+          reshape(
+            "0"   -> $neq($field("city"), $field("state")),
+            "1"   -> $field("pop"),
+            "src" -> $$ROOT),
+          ExcludeId),
+        $match(Selector.And(
+          Selector.Doc(BsonField.Name("0") -> Selector.Eq(Bson.Bool(true))),
+          Selector.Doc(BsonField.Name("1") -> Selector.Lt(Bson.Int32(10000))))),
+        $project(
+          reshape(sigil.Quasar -> $field("src")),
+          ExcludeId)))
+    }
 
     "plan array project with concat (3.0-)" in {
       plan3_0(sqlE"select city, loc[0] from zips") must
