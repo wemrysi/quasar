@@ -63,6 +63,7 @@ class TableModelTest extends Spec  with ScalazMatchers {
 
   "Table Model Monoid" >> {
     checkAll(propz.monoid.laws[TableModel])
+    checkAll(propz.equal.laws[TableModel])
 
     "be commutative" >> {
       prop { (x: TableModel, y: TableModel) =>

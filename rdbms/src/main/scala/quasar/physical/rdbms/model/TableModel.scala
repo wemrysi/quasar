@@ -83,15 +83,10 @@ object TableModel {
 
   implicit val columnTypeEq: Equal[ColumnType] = Equal.equalA
 
-  implicit val tableModelEq: Equal[TableModel] = new Equal[TableModel] {
-
-    def equal(tm1: TableModel, tm2: TableModel): Boolean = {
-      (tm1, tm2) match {
-        case (JsonTable, JsonTable) => true
-        case (ColumnarTable(c1), ColumnarTable(c2)) => c1.toList === c2.toList
-        case _ => false
-      }
-    }
+  implicit val tableModelEq: Equal[TableModel] =  Equal.equal {
+    case (JsonTable, JsonTable) => true
+    case (ColumnarTable(c1), ColumnarTable(c2)) => c1.toList === c2.toList
+    case _ => false
   }
 
   implicit val tableModelShow: Show[TableModel] = Show.showFromToString[TableModel]
