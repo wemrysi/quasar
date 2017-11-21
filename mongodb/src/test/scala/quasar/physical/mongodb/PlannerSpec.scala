@@ -19,7 +19,7 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 import quasar._
 import quasar.common.{Map => _, _}
-import quasar.contrib.specs2.PendingWithActualTracking
+import quasar.contrib.specs2._
 import quasar.fs._
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
@@ -39,6 +39,9 @@ import scalaz._, Scalaz._
 class PlannerSpec extends
     PlannerWorkflowHelpers with
     PendingWithActualTracking {
+
+  //to write the new actuals:
+  //override val mode = WriteMode
 
   import Grouped.grouped
   import Reshape.reshape

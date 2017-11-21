@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._, Helpers._
-import quasar.contrib.specs2.PendingWithActualTracking
+import quasar.contrib.specs2._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
@@ -284,6 +284,8 @@ trait PlannerHelpers extends
     PendingWithActualTracking {
 
   import PlannerHelpers._
+
+  val mode = TestMode
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf, addDetails = false))
   def beWorkflow0(wf: Workflow) = beRight(equalToWorkflow(wf, addDetails = true))
