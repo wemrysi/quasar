@@ -76,6 +76,10 @@ trait SqlExprRenderTree {
             nonTerminal("Pow", a1, a2)
           case Neg(a1) =>
             nonTerminal("Neg", a1)
+          case And(a1, a2) =>
+            nonTerminal("And", a1, a2)
+          case Or(a1, a2) =>
+            nonTerminal("Or", a1, a2)
           case Refs(srcs) =>
             nonTerminal("References", srcs:_*)
           case Select(selection, from, filter) =>

@@ -101,7 +101,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.ExtractWeek(f) =>  notImplemented("ExtractWeek", this)
     case MFC.ExtractYear(f) =>  notImplemented("ExtractYear", this)
     case MFC.Now() =>  notImplemented("Now", this)
-    case MFC.Negate(f) =>  notImplemented("Negate", this)
+    case MFC.Negate(f) =>  SQL.Neg[T[SQL]](f).embed.η[F]
     case MFC.Add(f1, f2) =>  SQL.NumericOp[T[SQL]]("+", f1, f2).embed.η[F]
     case MFC.Multiply(f1, f2) => SQL.NumericOp[T[SQL]]("*", f1, f2).embed.η[F]
     case MFC.Subtract(f1, f2) =>  SQL.NumericOp[T[SQL]]("-", f1, f2).embed.η[F]
@@ -116,8 +116,8 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.Gt(f1, f2) =>  notImplemented("Gt", this)
     case MFC.Gte(f1, f2) => notImplemented("Gte", this)
     case MFC.IfUndefined(f1, f2) => notImplemented("IfUndefined", this)
-    case MFC.And(f1, f2) =>  notImplemented("And", this)
-    case MFC.Or(f1, f2) =>  notImplemented("Or", this)
+    case MFC.And(f1, f2) =>  SQL.And[T[SQL]](f1, f2).embed.η[F]
+    case MFC.Or(f1, f2) =>  SQL.Or[T[SQL]](f1, f2).embed.η[F]
     case MFC.Between(f1, f2, f3) =>  notImplemented("Between", this)
     case MFC.Cond(fCond, fThen, fElse) =>  notImplemented("Cond", this)
     case MFC.Within(f1, f2) =>  notImplemented("Within", this)

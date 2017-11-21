@@ -47,6 +47,8 @@ trait SqlExprTraverse {
       case NumericOp(op, left, right) => (f(left) ⊛ f(right))(NumericOp(op, _, _))
       case Mod(a1, a2)         => (f(a1) ⊛ f(a2))(Mod.apply)
       case Pow(a1, a2)         => (f(a1) ⊛ f(a2))(Pow.apply)
+      case And(a1, a2)         => (f(a1) ⊛ f(a2))(And(_, _))
+      case Or(a1, a2)          => (f(a1) ⊛ f(a2))(Or(_, _))
       case Neg(v)              => f(v) ∘ Neg.apply
       case WithIds(v)          => f(v) ∘ WithIds.apply
 

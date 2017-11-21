@@ -59,6 +59,9 @@ object SqlExpr extends SqlExprInstances {
   final case class Pow[T](a1: T, a2: T) extends SqlExpr[T]
   final case class Neg[T](a1: T) extends SqlExpr[T]
 
+  final case class And[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class Or[T](a1: T, a2: T) extends SqlExpr[T]
+
   final case class Constant[T](data: Data) extends SqlExpr[T]
 
   final case class RegexMatches[T](a1: T, a2: T) extends SqlExpr[T]

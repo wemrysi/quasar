@@ -84,6 +84,10 @@ object PostgresRenderQuery extends RenderQuery {
     case NumericOp(sym, left, right) => s"(($left)::numeric $sym ($right)::numeric)".right
     case Mod(a1, a2) => s"mod(($a1)::numeric, ($a2)::numeric)".right
     case Pow(a1, a2) => s"power(($a1)::numeric, ($a2)::numeric)".right
+    case And(a1, a2) =>
+      s"($a1 and $a2)".right
+    case Or(a1, a2) =>
+      s"($a1 or $a2)".right
     case Neg(str) => s"(-$str)".right
     case WithIds(str)    => s"(row_number() over(), $str)".right
     case RowIds()        => "row_number() over()".right
