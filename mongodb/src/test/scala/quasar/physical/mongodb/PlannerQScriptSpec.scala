@@ -44,8 +44,9 @@ class PlannerQScriptSpec extends
   import CollectionUtil._
   import Reshape.reshape
 
-  val (func, free, fix) =
+  val dsl =
     quasar.qscript.construction.mkDefaults[Fix, fs.MongoQScript[Fix, ?]]
+  import dsl._
 
   val json = Fixed[Fix[EJson]]
 

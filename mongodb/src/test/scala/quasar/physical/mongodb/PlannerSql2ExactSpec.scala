@@ -55,8 +55,9 @@ class PlannerSql2ExactSpec extends
   import fixExprOp._
   import PlannerHelpers._, expr3_0Fp._, expr3_2Fp._, expr3_4Fp._
 
-  val (func, free, fix) =
+  val dsl =
     quasar.qscript.construction.mkDefaults[Fix, fs.MongoQScript[Fix, ?]]
+  import dsl._
 
   val json = Fixed[Fix[EJson]]
 
