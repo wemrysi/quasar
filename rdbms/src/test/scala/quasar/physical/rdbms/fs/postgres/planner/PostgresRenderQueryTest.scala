@@ -17,8 +17,7 @@
 package quasar.physical.rdbms.fs.postgres.planner
 
 import slamdata.Predef._
-
-import quasar.{Qspec, qscript}
+import quasar.{Data, Qspec, qscript}
 import quasar.physical.rdbms.planner.{Planner, SqlExprSupport}
 import quasar.qscript._
 import quasar.contrib.pathy.AFile
@@ -26,6 +25,7 @@ import matryoshka.data.Fix
 import pathy.Path._
 import quasar.fp.ski.κ
 import quasar.physical.rdbms.planner.sql.SqlExpr
+import quasar.physical.rdbms.planner.sql.SqlExpr._
 
 import matryoshka._
 import matryoshka.data._
@@ -38,12 +38,15 @@ import scalaz.concurrent.Task
 class PostgresRenderQueryTest extends Qspec with SqlExprSupport with QScriptHelpers {
 
   val func = construction.Func[Fix]
+  import Scalaz.Id
 
   def sr: Planner[Fix, Id, Const[ShiftedRead[AFile], ?]] =
     Planner.constShiftedReadFilePlanner[Fix, Id]
 
   def core: Planner[Fix, Task, qscript.MapFunc[Fix, ?]] =
     Planner.mapFuncPlanner[Fix, Task]
+
+  def str(s: String): Fix[SqlExpr] = Constant[Fix[SqlExpr]](Data.Str(s)).embed
 
   "PostgresJsonRenderQuery" should {
     "render shifted read with ExcludeId" in {

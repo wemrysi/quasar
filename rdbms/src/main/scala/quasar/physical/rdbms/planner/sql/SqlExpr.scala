@@ -38,6 +38,8 @@ object SqlExpr extends SqlExprInstances {
   final case class Null[T]() extends SqlExpr[T]
   final case class Obj[T](m: List[(T, T)]) extends SqlExpr[T]
   final case class IsNotNull[T](a1: T) extends SqlExpr[T]
+  final case class ConcatStr[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class Time[T](a1: T) extends SqlExpr[T]
 
   final case class SelectRow[T](selection: Selection[T], from: From[T])
       extends SqlExpr[T]

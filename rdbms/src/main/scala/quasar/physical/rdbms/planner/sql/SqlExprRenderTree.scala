@@ -52,6 +52,10 @@ trait SqlExprRenderTree {
             nonTerminal("NotNull", a1)
           case RegexMatches(a1, a2) =>
             nonTerminal("RegexMatches", a1, a2)
+          case ConcatStr(a1, a2) =>
+            nonTerminal("ConcatStr", a1, a2)
+          case Time(a1) =>
+            nonTerminal("Time", a1)
           case Id(v) =>
             Terminal("Id" :: Nil, v.some)
           case Table(v) =>

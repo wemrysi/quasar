@@ -19,12 +19,13 @@ package quasar.physical.rdbms.fs.postgres.planner
 import slamdata.Predef._
 import quasar.Data
 import quasar.DataCodec
-import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
+import quasar.DataCodec.Precise.TimeKey
 import quasar.physical.rdbms.planner.RenderQuery
 import quasar.physical.rdbms.planner.sql.SqlExpr
+import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
+import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.Planner.InternalError
 import quasar.Planner.{NonRepresentableData, PlannerError}
-import quasar.physical.rdbms.planner.sql.SqlExpr.Case.WhenThen
 
 import matryoshka._
 import matryoshka.implicits._
@@ -48,6 +49,9 @@ object PostgresRenderQuery extends RenderQuery {
 
   def rowAlias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" ${i.v}"))
 
+  def buildJson(str: String): String =
+    s"json_build_object($str)#>>'{}'"
+
   val alg: AlgebraM[PlannerError \/ ?, SqlExpr, String] = {
     case Null() => "null".right
     case SqlExpr.Id(v) =>
@@ -64,14 +68,17 @@ object PostgresRenderQuery extends RenderQuery {
         case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
       }
     case Obj(m) =>
-      val params = m.map {
+      buildJson(m.map {
         case (k, v) => s"'$k', $v"
-      }.mkString(",")
-      s"json_build_object($params)#>>'{}'".right
+      }.mkString(",")).right
     case RegexMatches(str, pattern) =>
       s"($str ~ '$pattern')".right
     case IsNotNull(expr) =>
       s"($expr notnull)".right
+    case ConcatStr(str1, str2)  =>
+      s"$str1 || $str2".right
+    case Time(expr) =>
+      buildJson(s"""{ "$TimeKey": $expr }""").right
     case NumericOp(sym, left, right) => s"(($left)::numeric $sym ($right)::numeric)".right
     case Mod(a1, a2) => s"mod(($a1)::numeric, ($a2)::numeric)".right
     case Pow(a1, a2) => s"power(($a1)::numeric, ($a2)::numeric)".right

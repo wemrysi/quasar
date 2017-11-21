@@ -36,7 +36,9 @@ trait SqlExprTraverse {
       case Constant(d)         => G.point(Constant(d))
       case Id(str)             => G.point(Id(str))
       case RegexMatches(a1, a2) => (f(a1) ⊛ f(a2))(RegexMatches(_, _))
-      case Refs(srcs)       =>  srcs.traverse(f) ∘ Refs.apply
+      case ConcatStr(a1, a2)   => (f(a1) ⊛ f(a2))(ConcatStr(_, _))
+      case Time(a1)            => f(a1) ∘ Time.apply
+      case Refs(srcs)          =>  srcs.traverse(f) ∘ Refs.apply
       case Table(name)         => G.point(Table(name))
       case IsNotNull(a1)       => f(a1) ∘ (IsNotNull(_))
       case RowIds()            => G.point(RowIds())
