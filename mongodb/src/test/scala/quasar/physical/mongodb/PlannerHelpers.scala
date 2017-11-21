@@ -51,7 +51,7 @@ object PlannerHelpers {
   case object Ok extends TestStatus
   case class Pending(s: String) extends TestStatus
 
-  case class QSpec(
+  case class QsSpec(
     sqlToQs: TestStatus,
     qsToWf: TestStatus,
     qscript: Fix[fs.MongoQScript[Fix, ?]]
@@ -60,7 +60,7 @@ object PlannerHelpers {
     name: String,
     sqlToWf: TestStatus,
     sql: Fix[Sql],
-    qspec: Option[QSpec],
+    qspec: Option[QsSpec],
     workflow: Workflow
   )
 

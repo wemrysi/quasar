@@ -68,7 +68,7 @@ class PlannerSql2ExactSpec extends
       "simple join ($lookup)",
       sqlToWf = Pending(notOnPar),
       sqlE"select smallZips.city from zips join smallZips on zips.`_id` = smallZips.`_id`",
-      QSpec(
+      QsSpec(
         sqlToQs = Pending(nonOptimalQs),
         qsToWf = Ok,
         fix.EquiJoin(
@@ -101,7 +101,7 @@ class PlannerSql2ExactSpec extends
       "simple inner equi-join ($lookup)",
       sqlToWf = Pending(notOnPar),
       sqlE"select cars.name, cars2.year from cars join cars2 on cars.`_id` = cars2.`_id`",
-      QSpec(
+      QsSpec(
         sqlToQs = Pending(nonOptimalQs),
         qsToWf = Ok,
         fix.EquiJoin(
