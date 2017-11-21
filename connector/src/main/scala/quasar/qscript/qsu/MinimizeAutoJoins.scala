@@ -262,23 +262,19 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
   // note that if everything is Unreferenced, remap will be κ(-1),
   // which is weird but harmless
   private def minimizeSources(sources: List[(QSUGraph, Int)]): (Int => Int, List[QSUGraph]) = {
-    val (_, remap, offset, minimized) =
-      sources.foldRight((Set[Symbol](), SMap[Int, Int](), 0, List[QSUGraph]())) {
-        // just drop unreferenced sources entirely
-        case ((Unreferenced(), i), (mask, remap, offset, acc)) =>
-          (mask, remap + (i -> offset), offset, acc)
+    val (_, _, remap, minimized) =
+      sources.foldLeft((0, Set[Symbol](), SMap[Int, Int](), Vector[QSUGraph]())) {
+        case ((offset, seen, remap, acc), (Unreferenced(), _)) =>
+          (offset - 1, seen, remap, acc)
 
-        case ((g, i), (mask, remap, offset, acc)) =>
-          if (mask(g.root))
-            (mask, remap + (i -> offset), offset, acc)
-          else
-            (mask + g.root, remap + (i -> offset), offset + 1, g :: acc)
+        case ((offset, seen, remap, acc), (g, _)) if seen(g.root) =>
+          (offset - 1, seen, remap, acc)
+
+        case ((offset, seen, remap, acc), (g, i)) =>
+          (offset, seen + g.root, remap + (i -> (i + offset)), acc :+ g)
       }
 
-    // if we're asking for a non-existent remap index, it's because it isn't referenced
-    // oh yeah, and we have to complement the remap because of the foldRight
-    // the - 1 here comes from the fact that we over-increment offset above
-    (i => remap.mapValues(offset - 1 - _).getOrElse(i, -1), minimized)
+    (i => remap.getOrElse(i, -1), minimized.toList)
   }
 
   private def updateGraph[
