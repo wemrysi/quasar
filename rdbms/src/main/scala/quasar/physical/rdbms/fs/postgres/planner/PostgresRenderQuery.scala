@@ -75,6 +75,8 @@ object PostgresRenderQuery extends RenderQuery {
       s"($str ~ '$pattern')".right
     case IsNotNull(expr) =>
       s"($expr notnull)".right
+    case IfNull(a) =>
+      s"coalesce(${a.intercalate(", ")})".right
     case ConcatStr(str1, str2)  =>
       s"$str1 || $str2".right
     case Time(expr) =>
@@ -82,6 +84,7 @@ object PostgresRenderQuery extends RenderQuery {
     case NumericOp(sym, left, right) => s"(($left)::numeric $sym ($right)::numeric)".right
     case Mod(a1, a2) => s"mod(($a1)::numeric, ($a2)::numeric)".right
     case Pow(a1, a2) => s"power(($a1)::numeric, ($a2)::numeric)".right
+    case Neg(str) => s"(-$str)".right
     case WithIds(str)    => s"(row_number() over(), $str)".right
     case RowIds()        => "row_number() over()".right
     case Select(selection, from, filterOpt) =>

@@ -50,6 +50,8 @@ trait SqlExprRenderTree {
             })
           case IsNotNull(a1) =>
             nonTerminal("NotNull", a1)
+          case IfNull(a) =>
+            nonTerminal("IfNull", a.toList: _*)
           case RegexMatches(a1, a2) =>
             nonTerminal("RegexMatches", a1, a2)
           case ConcatStr(a1, a2) =>
@@ -72,6 +74,8 @@ trait SqlExprRenderTree {
             nonTerminal("Mod", a1, a2)
           case Pow(a1, a2) =>
             nonTerminal("Pow", a1, a2)
+          case Neg(a1) =>
+            nonTerminal("Neg", a1)
           case Refs(srcs) =>
             nonTerminal("References", srcs:_*)
           case Select(selection, from, filter) =>

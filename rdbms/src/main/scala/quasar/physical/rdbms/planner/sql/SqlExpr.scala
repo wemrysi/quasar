@@ -20,8 +20,9 @@ import slamdata.Predef._
 import quasar.Data
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case.{Else, WhenThen}
 
-import scalaz.NonEmptyList
+import scalaz.{NonEmptyList, OneAnd}
 import scalaz.NonEmptyList._
+import scalaz.OneAnd._
 
 sealed abstract class SqlExpr[T]
 
@@ -40,6 +41,7 @@ object SqlExpr extends SqlExprInstances {
   final case class IsNotNull[T](a1: T) extends SqlExpr[T]
   final case class ConcatStr[T](a1: T, a2: T) extends SqlExpr[T]
   final case class Time[T](a1: T) extends SqlExpr[T]
+  final case class IfNull[T](a: OneAnd[NonEmptyList, T]) extends SqlExpr[T]
 
   final case class SelectRow[T](selection: Selection[T], from: From[T])
       extends SqlExpr[T]
@@ -55,6 +57,7 @@ object SqlExpr extends SqlExprInstances {
   final case class NumericOp[T](op: String, left: T, right: T) extends SqlExpr[T]
   final case class Mod[T](a1: T, a2: T) extends SqlExpr[T]
   final case class Pow[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class Neg[T](a1: T) extends SqlExpr[T]
 
   final case class Constant[T](data: Data) extends SqlExpr[T]
 
@@ -64,6 +67,10 @@ object SqlExpr extends SqlExprInstances {
     final case class RowIds[T]() extends SqlExpr[T]
     final case class AllCols[T](alias: String) extends SqlExpr[T]
     final case class WithIds[T](v: T) extends SqlExpr[T]
+  }
+
+  object IfNull {
+    def build[T](a1: T, a2: T, a3: T*): IfNull[T] = IfNull(oneAnd(a1, nels(a2, a3: _*)))
   }
 
   final case class Case[T](
