@@ -229,9 +229,24 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
 
             val redPat = QSU.QSReduce[T, Symbol](source.root, buckets, reducers, repair)
 
-            updateGraph[G](redPat) map { red =>
-              qgraph.overwriteAtRoot(QSU.Map[T, Symbol](red.root, adjustedFM)) :++ red
-            }
+            for {
+              red <- updateGraph[G](redPat)
+              back = qgraph.overwriteAtRoot(QSU.Map[T, Symbol](red.root, adjustedFM)) :++ red
+
+              _ <- MonadState_[G, QSUDims[T]] modify { dims =>
+                dims map {
+                  case (key, value) =>
+                    val value2 = candidates.foldLeft(value) { (value, c) =>
+                      if (c.root =/= back.root)
+                        QP.rename(c.root, back.root, value)
+                      else
+                        value
+                    }
+
+                    key -> value2
+                }
+              }
+            } yield back
           } else {
             qgraph.point[G]
           }
