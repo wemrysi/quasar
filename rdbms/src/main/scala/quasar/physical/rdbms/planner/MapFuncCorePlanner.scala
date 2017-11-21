@@ -19,13 +19,13 @@ package quasar.physical.rdbms.planner
 import slamdata.Predef._
 import slamdata.Predef.{Eq => _}
 import quasar.Data
-import quasar.DataCodec, DataCodec.Precise.DateKey
+import quasar.DataCodec, DataCodec.Precise.{DateKey, TimeKey, TimestampKey}
 import quasar.Planner._
 import quasar.physical.rdbms.planner.sql.{SqlExpr => SQL}
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.qscript.{MapFuncsCore => MFC, _}
-import quasar.std.StdLib.string.dateRegex
+import quasar.std.StdLib.string.{dateRegex, timeRegex, timestampRegex}
 
 import matryoshka._
 import matryoshka.implicits._
@@ -64,8 +64,8 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.JoinSideName(n) =>  notImplemented("JoinSideName", this)
     case MFC.Length(f) => notImplemented("Length", this)
     case MFC.Date(f) => datetime(f, DateKey, dateRegex.r).η[F]
-    case MFC.Time(f) =>  notImplemented("Time", this)
-    case MFC.Timestamp(f) =>  notImplemented("TimeStamp", this)
+    case MFC.Time(f) =>  datetime(f, TimeKey, timeRegex.r).η[F]
+    case MFC.Timestamp(f) => datetime(f, TimestampKey, timestampRegex.r).η[F]
     case MFC.Interval(f) =>  notImplemented("Interval", this)
     case MFC.StartOfDay(f) =>  notImplemented("StartOfDay", this)
     case MFC.TemporalTrunc(p, f) =>  notImplemented("TemporalTrunc", this)
