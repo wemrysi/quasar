@@ -130,6 +130,70 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       }
     }
 
+    "coalesce three summed reductions" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.autojoin2((
+            qsu.qsReduce(
+              qsu.read(afile),
+              Nil,
+              List(ReduceFuncs.Count(HoleF[Fix])),
+              Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+            qsu.qsReduce(
+              qsu.read(afile),
+              Nil,
+              List(ReduceFuncs.Sum(HoleF[Fix])),
+              Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+            _(MapFuncsCore.Add(_, _)))),
+          qsu.qsReduce(
+            qsu.read(afile),
+            Nil,
+            List(ReduceFuncs.Max(HoleF[Fix])),
+            Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+          _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case Map(
+          QSReduce(
+            Read(_),
+            Nil,
+            List(ReduceFuncs.Count(h1), ReduceFuncs.Sum(h2), ReduceFuncs.Max(h3)),
+            repair),
+          fm) =>
+
+          // must_=== doesn't work
+          h1 must beTreeEqual(HoleF[Fix])
+          h2 must beTreeEqual(HoleF[Fix])
+          h3 must beTreeEqual(HoleF[Fix])
+
+          repair must beTreeEqual(
+            func.ConcatMaps(
+              func.MakeMap(
+                func.Constant(J.str("0")),
+                func.ConcatMaps(
+                  func.MakeMap(
+                    func.Constant(J.str("0")),
+                    Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+                  func.MakeMap(
+                    func.Constant(J.str("1")),
+                    Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(1)))))),
+              func.MakeMap(
+                func.Constant(J.str("1")),
+                Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(2))))))
+
+          fm must beTreeEqual(
+            func.Add(
+              func.Add(
+                func.ProjectKey(
+                  func.ProjectKey(HoleF, func.Constant(J.str("0"))),
+                  func.Constant(J.str("0"))),
+                func.ProjectKey(
+                  func.ProjectKey(HoleF, func.Constant(J.str("0"))),
+                  func.Constant(J.str("1")))),
+              func.ProjectKey(HoleF, func.Constant(J.str("1")))))
+      }
+    }
+
     "coalesce two summed reductions, one downstream of an autojoin" in {
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((

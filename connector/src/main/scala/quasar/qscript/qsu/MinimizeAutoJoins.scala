@@ -262,16 +262,16 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
   // note that if everything is Unreferenced, remap will be κ(-1),
   // which is weird but harmless
   private def minimizeSources(sources: List[(QSUGraph, Int)]): (Int => Int, List[QSUGraph]) = {
-    val (_, _, remap, minimized) =
-      sources.foldLeft((0, Set[Symbol](), SMap[Int, Int](), Vector[QSUGraph]())) {
-        case ((offset, seen, remap, acc), (Unreferenced(), _)) =>
-          (offset - 1, seen, remap, acc)
+    val (_, remap, minimized) =
+      sources.foldLeft((Set[Symbol](), SMap[Int, Int](), Vector[QSUGraph]())) {
+        case ((seen, remap, acc), (Unreferenced(), i)) =>
+          (seen, remap + (i -> (acc.length - 1)), acc)
 
-        case ((offset, seen, remap, acc), (g, _)) if seen(g.root) =>
-          (offset - 1, seen, remap, acc)
+        case ((seen, remap, acc), (g, i)) if seen(g.root) =>
+          (seen, remap + (i -> (acc.length - 1)), acc)
 
-        case ((offset, seen, remap, acc), (g, i)) =>
-          (offset, seen + g.root, remap + (i -> (i + offset)), acc :+ g)
+        case ((seen, remap, acc), (g, i)) =>
+          (seen + g.root, remap + (i -> acc.length), acc :+ g)
       }
 
     (i => remap.getOrElse(i, -1), minimized.toList)
