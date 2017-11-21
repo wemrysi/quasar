@@ -73,7 +73,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
       aqsu.point[F]
     }
 
-  private def maybePrint(str: String): Unit = {
+  private def maybePrint(str: => String): Unit = {
     // println(str)
 
     ()
