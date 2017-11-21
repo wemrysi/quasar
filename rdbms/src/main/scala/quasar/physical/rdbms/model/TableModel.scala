@@ -76,11 +76,25 @@ object TableModel {
     }
   }
 
+  implicit val columnDescEq: Equal[ColumnDesc] = Equal.equalBy(_.name)
+
   implicit val columnDescOrdering: Ordering[ColumnDesc] =
     Ordering.fromLessThan[ColumnDesc](_.name < _.name)
 
   implicit val columnTypeEq: Equal[ColumnType] = Equal.equalA
 
+  implicit val tableModelEq: Equal[TableModel] = new Equal[TableModel] {
+
+    def equal(tm1: TableModel, tm2: TableModel): Boolean = {
+      (tm1, tm2) match {
+        case (JsonTable, JsonTable) => true
+        case (ColumnarTable(c1), ColumnarTable(c2)) => c1.toList === c2.toList
+        case _ => false
+      }
+    }
+  }
+
+  implicit val tableModelShow: Show[TableModel] = Show.showFromToString[TableModel]
   /**
     * When updating current table model with new model, the resulting model
     * can be either extended by new columns, or just a JsonTable. The latter
