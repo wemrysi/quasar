@@ -2,6 +2,7 @@
     "name": "group by flattened field",
     "backends": {
         "couchbase":         "pending",
+        "marklogic":         "pending",
         "mimir":             "pending",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
