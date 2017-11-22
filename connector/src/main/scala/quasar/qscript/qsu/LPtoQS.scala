@@ -46,8 +46,8 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
       ExtractFreeMap[T, F]           >=>
       debugG("ExtractFM: ")          >==>
       ApplyProvenance[T].apply[F]    >=>
-      debugAG("ApplyProv: ")         >-
-      ReifyBuckets[T]                >=>
+      debugAG("ApplyProv: ")         >==>
+      ReifyBuckets[T, F]             >=>
       debugAG("ReifyBuckets: ")      >==>
       MinimizeAutoJoins[T].apply[F]  >=>
       debugAG("MinimizeAJ: ")        >==>
