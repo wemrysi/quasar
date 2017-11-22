@@ -1,7 +1,7 @@
 {
     "name": "left key join with multiple fields selected (Couchbase)",
     "backends": {
-        "couchbase":         "ignoreFieldOrder",
+        "couchbase":         "pendingIgnoreFieldOrder",
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
         "mimir":             "skip",
@@ -14,6 +14,7 @@
         "spark_local":       "skip",
         "spark_cassandra":   "skip"
     },
+    "NB": "Pending on couchbase due to #3158",
     "data": [],
     "query": "SELECT META(brewery).id AS brewery_meta_id,
                      brewery.name AS brewery_name,

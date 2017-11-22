@@ -1,14 +1,15 @@
 {
     "name": "basic analytic query",
     "backends": {
-        "couchbase":         "ignoreFieldOrder",
+        "couchbase":         "pendingIgnoreFieldOrder",
         "marklogic_json":    "ignoreFieldOrder",
         "mimir":             "ignoreFieldOrder",
         "mongodb_2_6":       "ignoreResultOrder",
         "mongodb_3_0":       "ignoreResultOrder",
         "mongodb_read_only": "ignoreResultOrder",
-	"spark_cassandra":   "pending"	
+        "spark_cassandra":   "pending"
     },
+    "NB": "Pending on couchbase due to #3158",
     "data": "../zips.data",
     "query": "SELECT state, COUNT(*) AS count, SUM(pop) AS sum, AVG(pop) AS avg, MIN(pop) AS min, MAX(pop) AS max FROM `../zips` WHERE pop > 10000 GROUP BY state ORDER BY max DESC, state OFFSET 1 LIMIT 10",
     "predicate": "exactly",
