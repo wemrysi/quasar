@@ -1,7 +1,7 @@
 Chain
 ├─ $FoldLeftF
 │  ├─ Chain
-│  │  ├─ $ReadF(db; zips)
+│  │  ├─ $ReadF(db; extraSmallZips)
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
 │  │  │  │  ╰─ Let(__val)
@@ -27,7 +27,7 @@ Chain
 │  │     │  ╰─ Name("_id" -> "$_id")
 │  │     ╰─ IncludeId
 │  ╰─ Chain
-│     ├─ $ReadF(db; zips)
+│     ├─ $ReadF(db; extraSmallZips)
 │     ├─ $SimpleMapF
 │     │  ├─ Map
 │     │  │  ╰─ Let(__val)
