@@ -1,6 +1,9 @@
 {
     "name": "select partially-applied substring",
     "backends": {
+        "spark_hdfs":        "pending",
+        "spark_local":       "pending",
+        "spark_cassandra":   "pending"
     },
     "data": "extraSmallZips.data",
     "query": "select substring(\"abcdefghijklmnop\", 5, trunc(pop / 10000)) from extraSmallZips",
