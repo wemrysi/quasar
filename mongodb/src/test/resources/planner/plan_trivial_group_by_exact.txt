@@ -1,0 +1,10 @@
+Chain
+├─ $ReadF(db; zips)
+├─ $GroupF
+│  ├─ Grouped
+│  │  ╰─ Name("f0" -> { "$first": "$city" })
+│  ╰─ By
+│     ╰─ Name("0" -> ["$city.city"])
+╰─ $ProjectF
+   ├─ Name("__quasar_mongodb_sigil" -> "$f0")
+   ╰─ ExcludeId

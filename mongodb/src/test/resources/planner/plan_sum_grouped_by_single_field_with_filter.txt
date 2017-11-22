@@ -18,7 +18,17 @@ Chain
 │  │          }
 │  │        })
 │  ╰─ By
-│     ╰─ Name("0" -> ["$city"])
+│     ╰─ Name("0" -> [
+│             {
+│               "$cond": [
+│                 {
+│                   "$and": [
+│                     { "$lt": [{ "$literal": null }, "$pop"] },
+│                     { "$lt": ["$pop", { "$literal": "" }] }]
+│                 },
+│                 "$pop.city",
+│                 { "$literal": undefined }]
+│             }])
 ╰─ $ProjectF
    ├─ Name("sm" -> "$f0")
    ╰─ ExcludeId
