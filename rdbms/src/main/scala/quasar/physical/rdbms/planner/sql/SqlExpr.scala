@@ -42,6 +42,8 @@ object SqlExpr extends SqlExprInstances {
   final case class ConcatStr[T](a1: T, a2: T) extends SqlExpr[T]
   final case class Time[T](a1: T) extends SqlExpr[T]
   final case class IfNull[T](a: OneAnd[NonEmptyList, T]) extends SqlExpr[T]
+  final case class ExprWithAlias[T](expr: T, alias: String) extends SqlExpr[T]
+  final case class ExprPair[T](a: T, b: T) extends SqlExpr[T]
 
   final case class SelectRow[T](selection: Selection[T], from: From[T])
       extends SqlExpr[T]

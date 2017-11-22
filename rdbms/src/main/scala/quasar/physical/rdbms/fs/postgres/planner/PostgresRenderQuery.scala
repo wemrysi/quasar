@@ -77,6 +77,10 @@ object PostgresRenderQuery extends RenderQuery {
       s"($expr notnull)".right
     case IfNull(a) =>
       s"coalesce(${a.intercalate(", ")})".right
+    case ExprWithAlias(expr: String, alias: String) =>
+      (if (expr === alias) s"$expr" else s"""$expr as "$alias"""").right
+    case ExprPair(expr1, expr2) =>
+      s"$expr1, $expr2".right
     case ConcatStr(str1, str2)  =>
       s"$str1 || $str2".right
     case Time(expr) =>

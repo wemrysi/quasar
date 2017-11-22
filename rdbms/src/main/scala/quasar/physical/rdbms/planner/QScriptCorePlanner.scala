@@ -50,7 +50,8 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           From(src, generatedAlias.some),
           filter = none
         ).embed
-
+    case qscript.Sort(src, bucket, order) =>
+      SqlExpr.Id[T[SqlExpr]]("TODO").embed.point[F]
     case other =>
       PlannerErrorME[F].raiseError(
         InternalError.fromMsg(s"unsupported QScriptCore: $other"))

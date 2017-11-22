@@ -54,6 +54,10 @@ trait SqlExprRenderTree {
             nonTerminal("IfNull", a.toList: _*)
           case RegexMatches(a1, a2) =>
             nonTerminal("RegexMatches", a1, a2)
+          case ExprWithAlias(e, a) =>
+            nonTerminal(s"ExprWithAlias($a)", e)
+          case ExprPair(expr1, expr2) =>
+            NonTerminal("Pair" :: Nil, none, List(expr1, expr2) ∘ r.render)
           case ConcatStr(a1, a2) =>
             nonTerminal("ConcatStr", a1, a2)
           case Time(a1) =>

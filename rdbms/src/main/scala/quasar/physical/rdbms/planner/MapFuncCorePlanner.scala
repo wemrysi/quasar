@@ -132,9 +132,15 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.Substring(fStr, fFrom, fCount) => notImplemented("Substring", this)
     case MFC.Split(fStr, fDelim) => notImplemented("Split", this)
     case MFC.MakeArray(f) =>  notImplemented("MakeArray", this)
-    case MFC.MakeMap(fK, fV) =>  notImplemented("MakeMap", this)
+    case MFC.MakeMap(key, value) =>
+      key.project match {
+              case Constant(Data.Str(keyStr)) =>
+                SQL.ExprWithAlias[T[SQL]](value, keyStr).embed.η[F]
+              case other =>
+                notImplemented(s"MakeMap with key = $other", this)
+            }
     case MFC.ConcatArrays(f1, f2) =>  notImplemented("ConcatArrays", this)
-    case MFC.ConcatMaps(f1, f2) =>  notImplemented("ConcatMaps", this)
+    case MFC.ConcatMaps(f1, f2) => ExprPair[T[SQL]](f1, f2).embed.η[F]
     case MFC.ProjectIndex(f1, f2) =>  notImplemented("ProjectIndex", this)
     case MFC.ProjectKey(fSrc, fKey) =>
       fSrc.project match {
