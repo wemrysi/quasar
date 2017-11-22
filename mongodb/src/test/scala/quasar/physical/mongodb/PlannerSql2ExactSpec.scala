@@ -1224,7 +1224,7 @@ class PlannerSql2ExactSpec extends
               \/-($literal(Bson.Null))),
             $unwind(DocField("1")))
         }
-    }.pendingWithActual(notOnPar, testFile("plan count and js expr"))
+    }.pendingUntilFixed
 
     "plan trivial group by" in {
       plan(sqlE"select city from zips group by city") must
@@ -1541,7 +1541,7 @@ class PlannerSql2ExactSpec extends
           $project(
             reshape(sigil.Quasar -> $field("__tmp6")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan distinct of wildcard as expression"))
+    }.pendingUntilFixed
 
     "plan distinct with simple order by" in {
       plan(sqlE"select distinct city from zips order by city") must
@@ -1561,7 +1561,7 @@ class PlannerSql2ExactSpec extends
             $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Ascending))))
       //at least on agg now, but there's an unnecessary array element selection
       //Name("0" -> { "$arrayElemAt": [["$_id.0", "$f0"], { "$literal": NumberInt("1") }] })
-    }.pendingWithActual(notOnPar, testFile("plan distinct with simple order by"))
+    }.pendingUntilFixed
 
     "plan distinct as function with group" in {
       plan(sqlE"select state, count(distinct(city)) from zips group by state") must
@@ -1575,7 +1575,7 @@ class PlannerSql2ExactSpec extends
               "state" -> $first($field("__tmp0", "state")),
               "1"     -> $sum($literal(Bson.Int32(1)))),
             \/-($literal(Bson.Null)))))
-    }.pendingWithActual(notOnPar, testFile("plan distinct as function with group"))
+    }.pendingUntilFixed
 
     "plan simple sort on map-reduce with mapBeforeSort" in {
       plan3_2(sqlE"select length(city) from zips order by city") must
@@ -1854,7 +1854,7 @@ class PlannerSql2ExactSpec extends
                 reshape(sigil.Quasar -> $field(JoinDir.Right.name, "city")),
                 ExcludeId)),
             false).op)
-    }.pendingWithActual("#1560", testFile("plan simple join (map-reduce)"))
+    }.pendingUntilFixed
 
     "plan simple join with sharded inputs" in {
       // NB: cannot use $lookup, so fall back to the old approach
@@ -1866,7 +1866,7 @@ class PlannerSql2ExactSpec extends
         defaultIndexes,
         emptyDoc) must_==
         plan2_6(query)
-    }.pendingUntilFixed(notOnPar)
+    }
 
     "plan simple join with sources in different DBs" in {
       // NB: cannot use $lookup, so fall back to the old approach
@@ -1878,6 +1878,6 @@ class PlannerSql2ExactSpec extends
       // NB: cannot use $lookup, so fall back to the old approach
       val query = sqlE"select smallZips.city from zips join smallZips on zips.`_id` = smallZips.`_id`"
       plan(query) must_== plan2_6(query)
-    }.pendingUntilFixed(notOnPar)
+    }
   }
 }
