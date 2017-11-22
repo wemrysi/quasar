@@ -24,9 +24,7 @@ import quasar.fp._
 
 import monocle.std.{disjunction => D}
 import pathy.Path._
-import scalaz._
-import Scalaz._
-import scalaz.stream._
+import scalaz._, Scalaz._
 
 class WriteFilesSpec extends FileSystemTest[BackendEffect](
   FileSystemTest.allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
@@ -102,12 +100,13 @@ class WriteFilesSpec extends FileSystemTest[BackendEffect](
         val f1 = d </> descendant1
         val descendant2 = dir[Sandboxed]("subdir2") </> file[Sandboxed]("subdirfile2")
         val f2 = d </> descendant2
-        val p = write.append(f1, oneDoc.toProcess).drain ++
-                write.append(f2, oneDoc.toProcess).drain ++
-                query.descendantFiles(d).liftM[Process]
+        val result = write.appendThese(f1, oneDoc) >>
+                     write.appendThese(f2, oneDoc) >>
+                     query.descendantFiles(d)
 
-        runLogT(run, p).map(_.flatMap(_.toVector))
-          .runEither must beRight(containTheSameElementsAs(List(descendant1, descendant2)))
+        run(result.run).unsafePerformSync must_=== Map[RFile, Node.Type](
+          descendant1 -> Node.Data,
+          descendant2 -> Node.Data).right
       }
 
       step(deleteForWriting(fs.setupInterpM).runVoid)

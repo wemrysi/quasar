@@ -21,7 +21,7 @@ import quasar.{Data, resolveImports, Variables, SemanticError}
 import quasar.contrib.pathy._
 import quasar.sql._
 import quasar.fp.free.foldMapNT
-import quasar.fs.{FileSystemError, QueryFile, ReadFile}
+import quasar.fs.{FileSystemError, QueryFile, ReadFile, Node}
 import quasar.fs.mount.{Mounting, MountConfig, MountingError}
 import quasar.fs.mount.module.Module
 
@@ -48,7 +48,7 @@ final case class QuasarAPIImpl[F[_]: Monad](inter: CoreEff ~> F) {
   def getMount(path: APath): F[Option[MountingError \/ MountConfig]] =
     mount.lookupConfig(path).run.run.foldMap(inter)
 
-  def ls(path: ADir): F[FileSystemError \/ Set[PathSegment]] =
+  def ls(path: ADir): F[FileSystemError \/ Set[Node]] =
     QueryFile.Ops[CoreEff].ls(path).run.foldMap(inter)
 
   def invoke(function: AFile, args: Map[String, Fix[Sql]]) =

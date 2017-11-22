@@ -16,12 +16,14 @@
 
 package quasar
 
+import quasar.contrib.pathy.PathSegment
 import quasar.contrib.scalaz.MonadError_
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.free._
 
-import scalaz.{Failure => _, _}
+import pathy.Path.{FileName, DirName}
+import scalaz.{Failure => _, _}, Scalaz._
 
 package object fs extends PhysicalErrorPrisms {
   type FileSystem[A] = (QueryFile :\: ReadFile :\: WriteFile :/: ManageFile)#M[A]
@@ -35,6 +37,52 @@ package object fs extends PhysicalErrorPrisms {
 
   object MonadFsErr {
     def apply[F[_]](implicit F: MonadFsErr[F]): MonadFsErr[F] = F
+  }
+
+  trait Node {
+    def segment: PathSegment
+    def `type`: Node.Type
+  }
+  trait FileNode extends Node {
+    def name: FileName
+    def segment: PathSegment = name.right
+  }
+  trait DirNode  extends Node {
+    def name: DirName
+    def segment: PathSegment = name.left
+  }
+  object Node {
+
+    trait Type
+    case object View        extends Type
+    case object Function    extends Type
+    case object Data        extends Type
+    case object Module      extends Type
+    case object ImplicitDir extends Type
+
+    final case class View(name: FileName) extends FileNode {
+      override def `type` = View
+    }
+    final case class Function(name: FileName) extends FileNode {
+      override def `type` = Function
+    }
+    final case class Data(name: FileName) extends FileNode {
+      override def `type` = Data
+    }
+    final case class Module(name: DirName) extends DirNode {
+      override def `type` = Module
+    }
+    final case class ImplicitDir(name: DirName) extends DirNode {
+      override def `type` = ImplicitDir
+    }
+
+    /** Converts the `PathSegment` into a `ImplicitDir` `Node` if it's a directory path segment and
+      * a `Data` `Node` if it's a file path segment
+      */
+    def fromSegment(p: PathSegment): Node =
+      p.fold[Node](ImplicitDir(_), Data(_))
+
+    implicit val equals: Equal[Node] = Equal.equalA
   }
 
   type PhysErr[A] = Failure[PhysicalError, A]

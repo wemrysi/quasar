@@ -23,13 +23,13 @@ import quasar.contrib.pathy._
 import quasar.contrib.std._
 import quasar.fp.numeric._
 import quasar.fs._
-import quasar.fs.mount._, MountConfig.moduleConfig
+import quasar.fs.mount._
 import quasar.sql.FunctionDecl
 
 import argonaut._, Argonaut._, EncodeJsonScalaz._
 import org.http4s.dsl._
 import pathy.Path._
-import scalaz._, Scalaz._
+import scalaz.{Node => _, _}, Scalaz._
 
 @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
 object metadata {
@@ -39,15 +39,15 @@ object metadata {
 
   object FsNode {
     @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-    def apply(pathSegment: PathSegment, mount: Option[String], args: Option[List[String]]): FsNode =
+    def apply(nodeType: Node, mount: Option[String], args: Option[List[String]]): FsNode =
       FsNode(
-        pathSegment.fold(_.value, _.value),
-        pathSegment.fold(κ("directory"), κ("file")),
+        nodeType.segment.fold(_.value, _.value),
+        nodeType.segment.fold(κ("directory"), κ("file")),
         mount,
         args)
 
     @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-    def apply(pathSegment: PathSegment, mount: Option[String]): FsNode = apply(pathSegment, mount, args = None)
+    def apply(nodeType: Node, mount: Option[String]): FsNode = apply(nodeType, mount, args = None)
 
     implicit val fsNodeOrder: Order[FsNode] =
       Order.orderBy(n => (n.name, n.typ, n.mount, n.args))
@@ -89,38 +89,36 @@ object metadata {
 
   def service[S[_]](implicit Q: QueryFile.Ops[S], M: Mounting.Ops[S], C: Catchable[Free[S, ?]]): QHttpService[S] = {
 
-    def mkNodes(parent: ADir, names: Set[PathSegment]): Q.M[Set[InvalidMountNode \/ FsNode]] =
+    def mkNodes(parent: ADir, names: Set[Node]): Q.M[Set[InvalidMountNode \/ FsNode]] =
       // First we check if this directory is a module, if so, we return `FsNode` that
       // have the additional args field
       //
       // We go through the trouble of "overlaying" things here as opposed to just using the MountConfig
       // so that interpreters are free to modify the results of `QueryFile` and those changes will be
       // reflected here
-      M.lookupConfig(parent).run
-        .flatMap(i => OptionT((i.toOption >>= (c => moduleConfig.getOption(c))).point[M.FreeS]))
-        .map { statements =>
-          val args = statements.collect {
-            case FunctionDecl(name, args, _ ) => name.value -> args.map(_.value)
-          }.toMap
-
-          names.map(name => FsNode(name, mount = None, args = args.get(stringValue(name))).right[InvalidMountNode])
-        }
-        // Or Else we optionally associate some metadata to FsNode's if they happen to be some kind of mount
-        .getOrElseF {
-          M.havingPrefix(parent).map { mounts =>
-            names map { name =>
-              val path = name.fold(parent </> dir1(_), parent </> file1(_))
-              mounts.get(path).cata(
-                _.bimap(
-                  e => InvalidMountNode(
-                    name.fold(_.value, _.value),
-                    MountingError.invalidMount.getOption(e) ∘ (_._1.fold(_.value, "view", "module")),
-                    e),
-                  t => FsNode(name, t.fold(_.value, "view", "module").some, none)),
-                FsNode(name, none, none).right)
-            }
+      M.lookupModuleConfigIgnoreError(parent).map { moduleConfig =>
+        val args = moduleConfig.declarations.map {
+          case FunctionDecl(name, args, _ ) => name.value -> args.map(_.value)
+        }.toMap
+        // TODO: Consider exposing args in `NodeType`
+        names.map(name => FsNode(name, mount = None, args = args.get(stringValue(name.segment))).right[InvalidMountNode])
+      }
+      // Or Else we optionally associate some metadata to FsNode's if they happen to be some kind of mount
+      .getOrElseF {
+        M.havingPrefix(parent).map { mounts =>
+          names map { name =>
+            val path = name.segment.fold(parent </> dir1(_), parent </> file1(_))
+            mounts.get(path).cata(
+              _.bimap(
+                e => InvalidMountNode(
+                  name.segment.fold(_.value, _.value),
+                  MountingError.invalidMount.getOption(e) ∘ (_._1.fold(_.value, "view", "module")),
+                  e),
+                t => FsNode(name, t.fold(_.value, "view", "module").some, none)),
+              FsNode(name, none, none).right)
           }
-        }.liftM[FileSystemErrT]
+        }
+      }.liftM[FileSystemErrT]
 
     def dirMetadata(d: ADir, offset: Natural, limit: Option[Positive]): Free[S, QResponse[S]] = respond(
       (offset.value.toIntSafe.toRightDisjunction(ApiError.fromMsg(BadRequest, "offset value is too large")) |@|

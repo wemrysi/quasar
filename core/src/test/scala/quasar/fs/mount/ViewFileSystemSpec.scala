@@ -39,7 +39,7 @@ import matryoshka.implicits._
 import monocle.macros.Lenses
 import pathy.{Path => PPath}, PPath._
 import pathy.scalacheck.PathyArbitrary._
-import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.{Failure => _, Node => _, _}, Scalaz._
 
 class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   import TraceFS._
@@ -102,7 +102,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       MonotonicSeq.toState[F](VS.seq),
       runFileSystem)
 
-  def traceViewFs(paths: Map[ADir, Set[PathSegment]]): ViewFileSystem ~> Traced =
+  def traceViewFs(paths: Map[ADir, Set[Node]]): ViewFileSystem ~> Traced =
     runViewFileSystem[Traced](
       liftMT[VST, ErrsT] compose
       liftMT[Trace, VSF] compose
@@ -110,16 +110,16 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   case class ViewInterpResultTrace[A](renderedTrees: Vector[RenderedTree], vs: VS, result: Errs \/ A)
 
-  def viewInterpTrace[A](views: Map[AFile, Fix[Sql]], paths: Map[ADir, Set[PathSegment]], t: Free[FileSystem, A])
+  def viewInterpTrace[A](views: Map[AFile, Fix[Sql]], paths: Map[ADir, Set[Node]], t: Free[FileSystem, A])
     : ViewInterpResultTrace[A] =
     viewInterpTrace(views, Map.empty[AFile, ViewCache], List.empty[AFile], paths, t)
 
   def viewInterpTrace[A](vcache: Map[AFile, ViewCache], t: Free[FileSystem, A])
       : ViewInterpResultTrace[A] =
-    viewInterpTrace(Map.empty[AFile, Fix[Sql]], vcache, List.empty[AFile], Map.empty[ADir, Set[PathSegment]], t)
+    viewInterpTrace(Map.empty[AFile, Fix[Sql]], vcache, List.empty[AFile], Map.empty[ADir, Set[Node]], t)
 
   def viewInterpTrace[A](
-    views: Map[AFile, Fix[Sql]], vcache: Map[AFile, ViewCache], files: List[AFile], paths: Map[ADir, Set[PathSegment]], t: Free[FileSystem, A])
+    views: Map[AFile, Fix[Sql]], vcache: Map[AFile, ViewCache], files: List[AFile], paths: Map[ADir, Set[Node]], t: Free[FileSystem, A])
     : ViewInterpResultTrace[A] = {
 
     val mountViews: Free[ViewFileSystem, Unit] =
@@ -504,7 +504,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   "QueryFile.ls" should {
     def twoNodes(aDir: ADir) =
-      Map(aDir -> Set[PathSegment](FileName("afile").right, DirName("adir").left))
+      Map(aDir -> Set[Node](Node.Data(FileName("afile")), Node.ImplicitDir(DirName("adir"))))
 
     "preserve files and dirs in the presence of non-conflicting views" >> prop { (aDir: ADir) =>
       val expr = sqlE"select * from zips"
@@ -519,10 +519,10 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         traceInterp(f, twoNodes(aDir))._1,
         VS.emptyWithViews(views),
         \/.right(\/.right(Set(
-          FileName("afile").right,
-          DirName("adir").left,
-          FileName("view1").right,
-          DirName("views").left))))
+          Node.Data(FileName("afile")),
+          Node.ImplicitDir(DirName("adir")),
+          Node.View(FileName("view1")),
+          Node.ImplicitDir(DirName("views"))))))
     }
 
     "overlay files and dirs with conflicting paths" >> prop { (aDir: ADir) =>
@@ -538,8 +538,9 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         traceInterp(f, twoNodes(aDir))._1,
         VS.emptyWithViews(views),
         \/.right(\/.right(Set(
-          FileName("afile").right, // hides the regular file
-          DirName("adir").left)))) // no conflict with same dir
+          Node.View(FileName("afile")),
+          Node.Data(FileName("afile")),
+          Node.ImplicitDir(DirName("adir")))))) // no conflict with same dir
     }
 
     "preserve empty dir result" >> prop { (aDir: ADir) =>
@@ -585,7 +586,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val ops = traceInterp(program, Map())._1
 
       val hasFile = {
-        val paths = Map(fileParent(file) -> Set(fileName(file).right[DirName]))
+        val paths = Map(fileParent(file) -> Set[Node](Node.Data(fileName(file))))
         viewInterpTrace(Map(), paths, program) must_=== ViewInterpResultTrace(ops, VS.empty, \/.right(true))
       }
       val noFile = {

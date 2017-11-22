@@ -33,7 +33,7 @@ import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path._
-import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.{Failure => _, Node => _, _}, Scalaz._
 
 object view {
   private val optimizer = new Optimizer[Fix[LP]]
@@ -147,9 +147,9 @@ object view {
         e => e.raiseError[ExecM, A],
         p => op(p)).run.run)
 
-    def listViews(dir: ADir): Free[S, Set[PathSegment]] =
-      mount.viewsHavingPrefix(dir).map(_ foldMap { f =>
-        f.relativeTo(dir).flatMap(firstSegmentName).toSet
+    def listViews(dir: ADir): Free[S, Set[Node]] =
+      mount.viewsHavingPrefix_(dir).map(_ foldMap { f =>
+        firstSegmentName(f).map(_.fold[Node](Node.ImplicitDir(_), Node.View(_))).toSet
       })
 
     λ[QueryFile ~> Free[S, ?]] {
