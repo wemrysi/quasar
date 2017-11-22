@@ -2,10 +2,14 @@
     "name": "flatten a single field as an object",
     "backends": {
         "couchbase":         "pending",
-        "marklogic_json":    "pending",
-        "marklogic_xml":     "pending",
-        "spark_local":       "pending",
+        "mimir":             "pending",
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_3_2":       "pending",
+        "mongodb_3_4":       "pending",
+        "mongodb_read_only": "pending",
         "spark_hdfs":        "pending",
+        "spark_local":       "pending",
         "spark_cassandra":   "pending"
     },
     "data": "nested_foo.data",
