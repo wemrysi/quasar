@@ -1,5 +1,5 @@
 Chain
-├─ $ReadF(db; zips)
+├─ $ReadF(db; extraSmallZips)
 ├─ $GroupF
 │  ├─ Grouped
 │  │  ├─ Name("f0" -> {

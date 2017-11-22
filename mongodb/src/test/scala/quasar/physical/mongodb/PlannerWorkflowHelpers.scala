@@ -151,10 +151,61 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
   }
 
   val WC = Inject[WorkflowOpCoreF, WorkflowF]
+  val WC32 = Inject[WorkflowOp3_2F, WorkflowF]
 
   def countAccumOps(wf: Workflow) = countOps(wf, { case WC($GroupF(_, _, _)) => true })
   def countUnwindOps(wf: Workflow) = countOps(wf, { case WC($UnwindF(_, _)) => true })
   def countMatchOps(wf: Workflow) = countOps(wf, { case WC($MatchF(_, _)) => true })
+
+  sealed trait OpType
+  case object Agg extends OpType
+  case object MapReduce extends OpType
+
+  sealed abstract class MongoOp(val tp: OpType)
+  case object PureOp extends MongoOp(Agg)
+  case object ReadOp extends MongoOp(Agg)
+  case object MatchOp extends MongoOp(Agg)
+  case object ProjectOp extends MongoOp(Agg)
+  case object RedactOp extends MongoOp(Agg)
+  case object LimitOp extends MongoOp(Agg)
+  case object SkipOp extends MongoOp(Agg)
+  case object UnwindOp extends MongoOp(Agg)
+  case object GroupOp extends MongoOp(Agg)
+  case object SortOp extends MongoOp(Agg)
+  case object GeoNearOp extends MongoOp(Agg)
+  case object OutOp extends MongoOp(Agg)
+  case object LookupOp extends MongoOp(Agg)
+  case object SampleOp extends MongoOp(Agg)
+  case object FoldLeftOp extends MongoOp(Agg)
+
+  case object MapOp extends MongoOp(MapReduce)
+  case object FlatMapOp extends MongoOp(MapReduce)
+  case object SimpleMapOp extends MongoOp(MapReduce)
+  case object ReduceOp extends MongoOp(MapReduce)
+
+  def opAlg: Algebra[WorkflowF, IList[MongoOp]] = {
+    case WC($PureF(_)) => IList(PureOp)
+    case WC($ReadF(_)) => IList(ReadOp)
+    case WC($MatchF(s, _)) => MatchOp :: s
+    case WC($ProjectF(s, _, _)) => ProjectOp :: s
+    case WC($RedactF(s, _)) => RedactOp :: s
+    case WC($LimitF(s, _)) => LimitOp :: s
+    case WC($SkipF(s, _)) => SkipOp :: s
+    case WC($UnwindF(s, _)) => UnwindOp :: s
+    case WC($GroupF(s, _, _)) => GroupOp :: s
+    case WC($SortF(s, _)) => SortOp :: s
+    case WC($GeoNearF(s, _, _, _, _, _, _, _, _, _)) => GeoNearOp :: s
+    case WC($OutF(s, _)) => OutOp :: s
+    case WC($FoldLeftF(s1, s2)) => (FoldLeftOp :: s1) ::: s2.list.flatten
+    case WC32($LookupF(s, _, _, _, _)) => LookupOp :: s
+    case WC32($SampleF(s, _)) => SampleOp :: s
+    case WC($MapF(s, _, _)) => MapOp :: s
+    case WC($FlatMapF(s, _, _)) => FlatMapOp :: s
+    case WC($SimpleMapF(s, _, _)) => SimpleMapOp :: s
+    case WC($ReduceF(s, _, _)) => ReduceOp :: s
+  }
+
+  def ops(wf: Workflow): IList[MongoOp] = wf.cata(opAlg).reverse
 
   def noConsecutiveProjectOps(wf: Workflow) =
     countOps(wf, { case WC($ProjectF(Embed(WC($ProjectF(_, _, _))), _, _)) => true }) aka "the occurrences of consecutive $project ops:" must_== 0
@@ -180,6 +231,18 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
         }.getOrElse(Nil)
       case _ => Nil
     }) aka "dangling references"
+
+  def notBroken(wf: Workflow) = {
+    noConsecutiveProjectOps(wf)
+    noConsecutiveSimpleMapOps(wf)
+    danglingReferences(wf) must_== Nil
+    brokenProjectOps(wf) must_== 0
+  }
+
+  def notBrokenWithOps(wf: Workflow, expectedOps: IList[MongoOp]) = {
+    notBroken(wf)
+    ops(wf) must_== expectedOps
+  }
 
   def rootPushes(wf: Workflow) =
     wf.foldMap(_.unFix match {

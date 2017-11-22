@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar._
 import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._
-import quasar.contrib.specs2.PendingWithActualTracking
+import quasar.contrib.specs2._
 import quasar.ejson.{EJson, Fixed}
 import quasar.fs._
 import quasar.javascript._
@@ -46,6 +46,9 @@ import scalaz._, Scalaz._
 class PlannerSql2ExactSpec extends
     PlannerHelpers with
     PendingWithActualTracking {
+
+  //to write the new actuals:
+  //override val mode = WriteMode
 
   import Grouped.grouped
   import Reshape.reshape
@@ -579,6 +582,54 @@ class PlannerSql2ExactSpec extends
                ident(Js.Undefined.ident)))))),
              ListMap())))
     }
+
+    "plan array flatten" in {
+      plan(sqlE"select loc[*] from zips") must
+        beWorkflow0 {
+          chain[Workflow](
+            $read(collection("db", "zips")),
+            $project(
+              reshape(
+                "__tmp2" ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Arr(List())), $field("loc")),
+                      $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                    $field("loc"),
+                    $literal(Bson.Arr(List(Bson.Undefined))))),
+              IgnoreId),
+            $unwind(DocField(BsonField.Name("__tmp2"))),
+            $project(
+              reshape(sigil.Quasar -> $field("__tmp2")),
+              ExcludeId))
+        }
+    }.pendingWithActual(notOnPar, testFile("plan array flatten"))
+
+    "plan array concat" in {
+      plan(sqlE"select loc || [ 0, 1, 2 ] from zips") must beWorkflow0 {
+        chain[Workflow](
+          $read(collection("db", "zips")),
+          $simpleMap(NonEmptyList(
+            MapExpr(JsFn(Name("x"),
+              Obj(ListMap(
+                Name("__tmp4") ->
+                  If(
+                    BinOp(jscore.Or,
+                      Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "loc"))),
+                      Call(ident("isString"), List(Select(ident("x"), "loc")))),
+                    SpliceArrays(List(
+                      Select(ident("x"), "loc"),
+                      Arr(List(
+                        jscore.Literal(Js.Num(0, false)),
+                        jscore.Literal(Js.Num(1, false)),
+                        jscore.Literal(Js.Num(2, false)))))),
+                    ident("undefined"))))))),
+            ListMap()),
+          $project(
+            reshape(sigil.Quasar -> $field("__tmp4")),
+            ExcludeId))
+      }
+    }.pendingWithActual(notOnPar, testFile("plan array concat"))
 
     "plan sum in expression" in {
       plan(sqlE"select sum(pop) * 100 from zips") must
@@ -1154,6 +1205,27 @@ class PlannerSql2ExactSpec extends
         }
     }.pendingWithActual(notOnPar, testFile("plan efficient count and field ref"))
 
+    "plan count and js expr" in {
+      plan(sqlE"SELECT COUNT(*) as cnt, LENGTH(city) FROM zips") must
+        beWorkflow0 {
+          chain[Workflow](
+            $read(collection("db", "zips")),
+            $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
+              "1" ->
+                If(Call(ident("isString"), List(Select(ident("x"), "city"))),
+                  Call(ident("NumberLong"),
+                    List(Select(Select(ident("x"), "city"), "length"))),
+                  ident("undefined")))))),
+              ListMap()),
+            $group(
+              grouped(
+                "cnt" -> $sum($literal(Bson.Int32(1))),
+                "1"   -> $push($field("1"))),
+              \/-($literal(Bson.Null))),
+            $unwind(DocField("1")))
+        }
+    }.pendingWithActual(notOnPar, testFile("plan count and js expr"))
+
     "plan trivial group by" in {
       plan(sqlE"select city from zips group by city") must
       beWorkflow0(chain[Workflow](
@@ -1273,6 +1345,63 @@ class PlannerSql2ExactSpec extends
       skipped("#3021")
     }
 
+    "prefer projection+filter over JS filter" in {
+      plan(sqlE"select * from zips where city <> state") must
+      beWorkflow(chain[Workflow](
+        $read(collection("db", "zips")),
+        $project(
+          reshape(
+            "0" -> $neq($field("city"), $field("state")),
+            "src" -> $$ROOT),
+          ExcludeId),
+        $match(
+          Selector.Doc(
+            BsonField.Name("0") -> Selector.Eq(Bson.Bool(true)))),
+        $project(
+          reshape(sigil.Quasar -> $field("src")),
+          ExcludeId)))
+    }
+
+    "prefer projection+filter over nested JS filter" in {
+      plan(sqlE"select * from zips where city <> state and pop < 10000") must
+      beWorkflow0(chain[Workflow](
+        $read(collection("db", "zips")),
+        $match(Selector.Or(
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Int32)),
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Int64)),
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Dec)),
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Text)),
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Date)),
+          Selector.Doc(BsonField.Name("pop") -> Selector.Type(BsonType.Bool))
+        )),
+        $project(
+          reshape(
+            "0"   -> $neq($field("city"), $field("state")),
+            "1"   -> $field("pop"),
+            "src" -> $$ROOT),
+          ExcludeId),
+        $match(Selector.And(
+          Selector.Doc(BsonField.Name("0") -> Selector.Eq(Bson.Bool(true))),
+          Selector.Doc(BsonField.Name("1") -> Selector.Lt(Bson.Int32(10000))))),
+        $project(
+          reshape(sigil.Quasar -> $field("src")),
+          ExcludeId)))
+    }
+
+    "plan simple JS inside expression" in {
+      plan3_2(sqlE"select length(city) + 1 from zips") must
+        beWorkflow(chain[Workflow](
+          $read(collection("db", "zips")),
+          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
+            underSigil(If(Call(ident("isString"), List(Select(ident("x"), "city"))),
+                BinOp(jscore.Add,
+                  Call(ident("NumberLong"),
+                    List(Select(Select(ident("x"), "city"), "length"))),
+                  jscore.Literal(Js.Num(1, false))),
+                ident("undefined")))))),
+            ListMap())))
+    }
+
     "plan array project with concat (3.0-)" in {
       plan3_0(sqlE"select city, loc[0] from zips") must
         beWorkflow {
@@ -1372,6 +1501,100 @@ class PlannerSql2ExactSpec extends
           $project(
             reshape(
               sigil.Quasar -> $field("_id", "0")),
+            ExcludeId)))
+    }
+
+    "plan distinct of wildcard" in {
+      plan(sqlE"select distinct * from zips") must
+        beWorkflow0(chain[Workflow](
+          $read(collection("db", "zips")),
+          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
+            obj(
+              "__tmp1" ->
+                Call(ident("remove"),
+                  List(ident("x"), jscore.Literal(Js.Str("_id")))))))),
+            ListMap()),
+          $group(
+            grouped(),
+            -\/(reshape("0" -> $field("__tmp1")))),
+          $project(
+            reshape(sigil.Quasar -> $field("_id", "0")),
+            ExcludeId)))
+    }.pendingWithActual(notOnPar, testFile("plan distinct of wildcard"))
+
+    "plan distinct of wildcard as expression" in {
+      plan(sqlE"select count(distinct *) from zips") must
+        beWorkflow0(chain[Workflow](
+          $read(collection("db", "zips")),
+          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
+            obj(
+              "__tmp4" ->
+                Call(ident("remove"),
+                  List(ident("x"), jscore.Literal(Js.Str("_id")))))))),
+            ListMap()),
+          $group(
+            grouped(),
+            -\/(reshape("0" -> $field("__tmp4")))),
+          $group(
+            grouped("__tmp6" -> $sum($literal(Bson.Int32(1)))),
+            \/-($literal(Bson.Null))),
+          $project(
+            reshape(sigil.Quasar -> $field("__tmp6")),
+            ExcludeId)))
+    }.pendingWithActual(notOnPar, testFile("plan distinct of wildcard as expression"))
+
+    "plan distinct with simple order by" in {
+      plan(sqlE"select distinct city from zips order by city") must
+        beWorkflow0(
+          chain[Workflow](
+            $read(collection("db", "zips")),
+            $project(
+              reshape("city" -> $field("city")),
+              IgnoreId),
+            $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Ascending)),
+            $group(
+              grouped(),
+              -\/(reshape("0" -> $field("city")))),
+            $project(
+              reshape("city" -> $field("_id", "0")),
+              IgnoreId),
+            $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Ascending))))
+      //at least on agg now, but there's an unnecessary array element selection
+      //Name("0" -> { "$arrayElemAt": [["$_id.0", "$f0"], { "$literal": NumberInt("1") }] })
+    }.pendingWithActual(notOnPar, testFile("plan distinct with simple order by"))
+
+    "plan distinct as function with group" in {
+      plan(sqlE"select state, count(distinct(city)) from zips group by state") must
+        beWorkflow0(chain[Workflow](
+          $read(collection("db", "zips")),
+          $group(
+            grouped("__tmp0" -> $first($$ROOT)),
+            -\/(reshape("0" -> $field("city")))),
+          $group(
+            grouped(
+              "state" -> $first($field("__tmp0", "state")),
+              "1"     -> $sum($literal(Bson.Int32(1)))),
+            \/-($literal(Bson.Null)))))
+    }.pendingWithActual(notOnPar, testFile("plan distinct as function with group"))
+
+    "plan simple sort on map-reduce with mapBeforeSort" in {
+      plan3_2(sqlE"select length(city) from zips order by city") must
+        beWorkflow(chain[Workflow](
+          $read(collection("db", "zips")),
+          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), Let(Name("__val"),
+            Arr(List(
+              obj("0" -> If(
+                Call(ident("isString"), List(Select(ident("x"), "city"))),
+                Call(ident("NumberLong"),
+                  List(Select(Select(ident("x"), "city"), "length"))),
+                ident("undefined"))),
+              ident("x"))),
+            obj("0" -> Select(Access(ident("__val"), jscore.Literal(Js.Num(1, false))), "city"),
+                "src" -> ident("__val")))))),
+            ListMap()),
+          $sort(NonEmptyList(BsonField.Name("0") -> SortDir.Ascending)),
+          $project(
+            reshape(sigil.Quasar -> $arrayElemAt($field("src"), $literal(Bson.Int32(0)))),
             ExcludeId)))
     }
 
@@ -1612,5 +1835,49 @@ class PlannerSql2ExactSpec extends
             ExcludeId))
       }
     }
+
+    "plan simple join (map-reduce)" in {
+      plan2_6(sqlE"select smallZips.city from zips join smallZips on zips.`_id` = smallZips.`_id`") must
+        beWorkflow0(
+          joinStructure(
+            $read(collection("db", "zips")), "__tmp0", $$ROOT,
+            $read(collection("db", "smallZips")),
+            reshape("0" -> $field("_id")),
+            Obj(ListMap(Name("0") -> Select(ident("value"), "_id"))).right,
+            chain[Workflow](_,
+              $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
+                JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
+                JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
+              $unwind(DocField(JoinHandler.LeftName)),
+              $unwind(DocField(JoinHandler.RightName)),
+              $project(
+                reshape(sigil.Quasar -> $field(JoinDir.Right.name, "city")),
+                ExcludeId)),
+            false).op)
+    }.pendingWithActual("#1560", testFile("plan simple join (map-reduce)"))
+
+    "plan simple join with sharded inputs" in {
+      // NB: cannot use $lookup, so fall back to the old approach
+      val query = sqlE"select smallZips.city from zips join smallZips on zips.`_id` = smallZips.`_id`"
+      plan3_4(query,
+        c => Map(
+          collection("db", "zips") -> CollectionStatistics(10, 100, true),
+          collection("db", "zips2") -> CollectionStatistics(15, 150, true)).get(c),
+        defaultIndexes,
+        emptyDoc) must_==
+        plan2_6(query)
+    }.pendingUntilFixed(notOnPar)
+
+    "plan simple join with sources in different DBs" in {
+      // NB: cannot use $lookup, so fall back to the old approach
+      val query = sqlE"select smallZips.city from `db1/zips` join `db2/smallZips` on zips.`_id` = smallZips.`_id`"
+      plan(query) must_== plan2_6(query)
+    }
+
+    "plan simple join with no index" in {
+      // NB: cannot use $lookup, so fall back to the old approach
+      val query = sqlE"select smallZips.city from zips join smallZips on zips.`_id` = smallZips.`_id`"
+      plan(query) must_== plan2_6(query)
+    }.pendingUntilFixed(notOnPar)
   }
 }

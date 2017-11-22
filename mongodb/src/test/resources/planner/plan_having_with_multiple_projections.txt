@@ -5,7 +5,7 @@ Chain
 │  │  │  ├─ Chain
 │  │  │  │  ├─ $FoldLeftF
 │  │  │  │  │  ├─ Chain
-│  │  │  │  │  │  ├─ $ReadF(db; zips)
+│  │  │  │  │  │  ├─ $ReadF(db; extraSmallZips)
 │  │  │  │  │  │  ├─ $SimpleMapF
 │  │  │  │  │  │  │  ├─ Map
 │  │  │  │  │  │  │  │  ╰─ Let(__val)
@@ -32,7 +32,7 @@ Chain
 │  │  │  │  │  │     │  ╰─ Name("_id" -> "$_id")
 │  │  │  │  │  │     ╰─ IncludeId
 │  │  │  │  │  ╰─ Chain
-│  │  │  │  │     ├─ $ReadF(db; zips)
+│  │  │  │  │     ├─ $ReadF(db; extraSmallZips)
 │  │  │  │  │     ├─ $SimpleMapF
 │  │  │  │  │     │  ├─ Map
 │  │  │  │  │     │  │  ╰─ Let(__val)
@@ -85,7 +85,7 @@ Chain
 │  │  │  │  │     ├─ Doc
 │  │  │  │  │     │  ╰─ Expr($0 -> Eq(Bool(true)))
 │  │  │  │  │     ╰─ Doc
-│  │  │  │  │        ╰─ Expr($1 -> Gt(Int32(50000)))
+│  │  │  │  │        ╰─ Expr($1 -> Gt(Int32(40000)))
 │  │  │  │  ├─ $GroupF
 │  │  │  │  │  ├─ Grouped
 │  │  │  │  │  │  ╰─ Name("0" -> {
@@ -135,7 +135,7 @@ Chain
 │  │  │  │  │  │                  {
 │  │  │  │  │  │                    "$gt": [
 │  │  │  │  │  │                      { "$arrayElemAt": ["$src", { "$literal": NumberInt("1") }] },
-│  │  │  │  │  │                      { "$literal": NumberInt("50000") }]
+│  │  │  │  │  │                      { "$literal": NumberInt("40000") }]
 │  │  │  │  │  │                  }]
 │  │  │  │  │  │              },
 │  │  │  │  │  │              "in": "$$a"
@@ -151,7 +151,7 @@ Chain
 │  │  │  │     │  ╰─ Name("_id" -> "$_id")
 │  │  │  │     ╰─ IncludeId
 │  │  │  ╰─ Chain
-│  │  │     ├─ $ReadF(db; zips)
+│  │  │     ├─ $ReadF(db; extraSmallZips)
 │  │  │     ├─ $SimpleMapF
 │  │  │     │  ├─ Map
 │  │  │     │  │  ╰─ Let(__val)
@@ -215,7 +215,7 @@ Chain
 │  ╰─ Chain
 │     ├─ $FoldLeftF
 │     │  ├─ Chain
-│     │  │  ├─ $ReadF(db; zips)
+│     │  │  ├─ $ReadF(db; extraSmallZips)
 │     │  │  ├─ $SimpleMapF
 │     │  │  │  ├─ Map
 │     │  │  │  │  ╰─ Let(__val)
@@ -242,7 +242,7 @@ Chain
 │     │  │     │  ╰─ Name("_id" -> "$_id")
 │     │  │     ╰─ IncludeId
 │     │  ╰─ Chain
-│     │     ├─ $ReadF(db; zips)
+│     │     ├─ $ReadF(db; extraSmallZips)
 │     │     ├─ $SimpleMapF
 │     │     │  ├─ Map
 │     │     │  │  ╰─ Let(__val)
@@ -303,7 +303,7 @@ Chain
 │     │     ├─ Doc
 │     │     │  ╰─ Expr($0 -> Eq(Bool(true)))
 │     │     ╰─ Doc
-│     │        ╰─ Expr($1 -> Gt(Int32(50000)))
+│     │        ╰─ Expr($1 -> Gt(Int32(40000)))
 │     ├─ $SimpleMapF
 │     │  ├─ Map
 │     │  │  ╰─ Obj

@@ -1,0 +1,20 @@
+{
+    "name": "sort with expression, alias, and filter",
+    "backends": {
+    },
+    "data": "zips.data",
+    "query": "select pop/1000 as popInK from zips where pop >= 1000 order by popInK",
+    "predicate": "initial",
+    "expected": [
+        { "popInK": 1.0 },
+        { "popInK": 1.0 },
+        { "popInK": 1.0 },
+        { "popInK": 1.0 },
+        { "popInK": 1.0 },
+        { "popInK": 1.001 },
+        { "popInK": 1.001 },
+        { "popInK": 1.001 },
+        { "popInK": 1.001 },
+        { "popInK": 1.001 },
+        { "popInK": 1.001 }]
+}
