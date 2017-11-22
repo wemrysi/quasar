@@ -58,302 +58,50 @@ class PlannerSpec extends
 
     "filter with both index and key projections" in {
       plan(sqlE"""select count(parents[0].sha) as count from slamengine_commits where parents[0].sha = "56d1caf5d082d1a6840090986e277d36d03f1859" """) must
-        beWorkflow0(chain[Workflow](
-          $read(collection("db", "slamengine_commits")),
-          $match(Selector.Where(
-            If(
-              BinOp(jscore.And,
-                Call(Select(ident("Array"), "isArray"), List(Select(ident("this"), "parents"))),
-                BinOp(jscore.And,
-                  Call(ident("isObject"), List(
-                    Access(
-                      Select(ident("this"), "parents"),
-                      jscore.Literal(Js.Num(0, false))))),
-                  UnOp(jscore.Not,
-                    Call(Select(ident("Array"), "isArray"), List(
-                      Access(
-                        Select(ident("this"), "parents"),
-                        jscore.Literal(Js.Num(0, false)))))))),
-              BinOp(jscore.Eq,
-                Select(
-                  Access(
-                    Select(ident("this"), "parents"),
-                    jscore.Literal(Js.Num(0, false))),
-                  "sha"),
-                jscore.Literal(Js.Str("56d1caf5d082d1a6840090986e277d36d03f1859"))),
-              ident("undefined")).toJs)),
-          // NB: This map _looks_ unnecessary, but is actually simpler than the
-          //     default impl that would be triggered by the $where selector
-          //     above.
-          $simpleMap(
-            NonEmptyList(MapExpr(JsFn(Name("x"), obj()))),
-            ListMap()),
-          $group(
-            grouped("count" -> $sum($literal(Bson.Int32(1)))),
-            \/-($literal(Bson.Null)))))
-    }.pendingWithActual(notOnPar, testFile("plan filter with both index and field projections"))
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, MatchOp, SimpleMapOp, GroupOp)))
+    }.pendingUntilFixed
 
     "having with multiple projections" in {
       plan(sqlE"select city, sum(pop) from extraSmallZips group by city having sum(pop) > 40000") must
-      beWorkflow0(chain[Workflow](
-        $read(collection("db", "extraSmallZips")),
-        $group(
-          grouped(
-            "1" ->
-              $sum(
-                $cond(
-                  $and(
-                    $lt($literal(Bson.Null), $field("pop")),
-                    $lt($field("pop"), $literal(Bson.Text("")))),
-                  $field("pop"),
-                  $literal(Bson.Undefined)))),
-          -\/(reshape("0" -> $field("city")))),
-        $match(Selector.Doc(
-          BsonField.Name("1") -> Selector.Gt(Bson.Int32(40000)))),
-        $project(
-          reshape(
-            "city" -> $field("_id", "0"),
-            "1"    -> $include()),
-          IgnoreId)))
-    }.pendingWithActual(notOnPar, testFile("plan having with multiple projections"))
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, MatchOp, ProjectOp)))
+    }.pendingUntilFixed
 
     "select partially-applied substring" in {
       plan3_2(sqlE"""select substring("abcdefghijklmnop", 5, trunc(pop / 10000)) from extraSmallZips""") must
-        beWorkflow(chain[Workflow](
-          $read(collection("db", "extraSmallZips")),
-          $project(
-            reshape(
-              sigil.Quasar ->
-                $cond(
-                  $and(
-                    $lt($literal(Bson.Null), $field("pop")),
-                    $lt($field("pop"), $literal(Bson.Text("")))),
-                  $cond(
-                    $and(
-                      $lt($literal(Bson.Null),
-                        $cond(
-                          $eq($literal(Bson.Int32(10000)), $literal(Bson.Int32(0))),
-                          $cond(
-                            $eq($field("pop"), $literal(Bson.Int32(0))),
-                            $literal(Bson.Dec(Double.NaN)),
-                            $cond(
-                              $gt($field("pop"), $literal(Bson.Int32(0))),
-                              $literal(Bson.Dec(Double.PositiveInfinity)),
-                              $literal(Bson.Dec(Double.NegativeInfinity)))
-                          ),
-                          $divide($field("pop"), $literal(Bson.Int32(10000))))),
-                        $lt(
-                          $cond(
-                            $eq($literal(Bson.Int32(10000)), $literal(Bson.Int32(0))),
-                            $cond(
-                              $eq($field("pop"), $literal(Bson.Int32(0))),
-                              $literal(Bson.Dec(Double.NaN)),
-                              $cond(
-                                $gt($field("pop"), $literal(Bson.Int32(0))),
-                                $literal(Bson.Dec(Double.PositiveInfinity)),
-                                $literal(Bson.Dec(Double.NegativeInfinity)))),
-                            $divide($field("pop"), $literal(Bson.Int32(10000)))),
-                          $literal(Bson.Text(""))
-                        )),
-                    $substr(
-                      $literal(Bson.Text("fghijklmnop")),
-                      $literal(Bson.Int32(0)),
-                      $trunc(
-                        $cond(
-                          $eq($literal(Bson.Int32(10000)), $literal(Bson.Int32(0))),
-                          $cond(
-                            $eq($field("pop"), $literal(Bson.Int32(0))),
-                            $literal(Bson.Dec(Double.NaN)),
-                            $cond(
-                              $gt($field("pop"), $literal(Bson.Int32(0))),
-                              $literal(Bson.Dec(Double.PositiveInfinity)),
-                              $literal(Bson.Dec(Double.NegativeInfinity)))),
-                          $divide($field("pop"), $literal(Bson.Int32(10000)))))),
-                  $literal(Bson.Undefined)),
-                $literal(Bson.Undefined))))))
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp)))
     }
 
     "sort wildcard on expression" in {
       plan(sqlE"select * from zips order by pop/10 desc") must
-        beWorkflow0(chain[Workflow](
-          $read(collection("db", "zips")),
-          $simpleMap(
-            NonEmptyList(MapExpr(JsFn(Name("__val"), SpliceObjects(List(
-              ident("__val"),
-              obj(
-                "__sd__0" ->
-                  jscore.If(
-                    BinOp(jscore.Or,
-                      Call(ident("isNumber"), List(Select(ident("__val"), "pop"))),
-                      BinOp(jscore.Or,
-                        BinOp(Instance, Select(ident("__val"), "pop"), ident("NumberInt")),
-                        BinOp(Instance, Select(ident("__val"), "pop"), ident("NumberLong")))),
-                    BinOp(Mult, Select(ident("__val"), "pop"), jscore.Literal(Js.Num(10, false))),
-                    ident("undefined")))))))),
-            ListMap()),
-          $simpleMap(
-            NonEmptyList(MapExpr(JsFn(Name("__val"), obj(
-              "__tmp2" ->
-                Call(ident("remove"),
-                  List(ident("__val"), jscore.Literal(Js.Str("__sd__0")))),
-              "__tmp3" -> Select(ident("__val"), "__sd__0"))))),
-            ListMap()),
-          $sort(NonEmptyList(BsonField.Name("__tmp3") -> SortDir.Descending)),
-          $project(
-            reshape(sigil.Quasar -> $field("__tmp2")),
-            ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan sort with wildcard and expression in key"))
+        //FIXME these 2 SimpleMapOps conflict with the asserts of notBroken
+        //See which one we have to change
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, SimpleMapOp, SimpleMapOp, SortOp, ProjectOp)))
+    }.pendingUntilFixed
 
     "sort with expression and alias" in {
       plan(sqlE"select pop/1000 as popInK from zips order by popInK") must
-        beWorkflow0(chain[Workflow](
-          $read(collection("db", "zips")),
-          $project(
-            reshape(
-              "popInK" ->
-                $cond(
-                  $or(
-                    $and(
-                      $lt($literal(Bson.Null), $field("pop")),
-                      $lt($field("pop"), $literal(Bson.Text("")))),
-                    $and(
-                      $lte($literal(Check.minDate), $field("pop")),
-                      $lt($field("pop"), $literal(Bson.Regex("", ""))))),
-                  divide($field("pop"), $literal(Bson.Int32(1000))),
-                  $literal(Bson.Undefined))),
-            IgnoreId),
-          $sort(NonEmptyList(BsonField.Name("popInK") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar, testFile("plan sort with expression and alias")) // at least on agg now
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, SortOp)))
+    }.pendingUntilFixed
 
     "sort with expression, alias, and filter" in {
       plan(sqlE"select pop/1000 as popInK from zips where pop >= 1000 order by popInK") must
-        beWorkflow0(chain[Workflow](
-          $read(collection("db", "zips")),
-          $match(Selector.And(
-            isNumeric(BsonField.Name("pop")),
-            Selector.Doc(BsonField.Name("pop") -> Selector.Gte(Bson.Int32(1000))))),
-          $project(
-            reshape(
-              "popInK" ->
-                $cond(
-                  $or(
-                    $and(
-                      $lt($literal(Bson.Null), $field("pop")),
-                      $lt($field("pop"), $literal(Bson.Text("")))),
-                    $and(
-                      $lte($literal(Check.minDate), $field("pop")),
-                      $lt($field("pop"), $literal(Bson.Regex("", ""))))),
-                  divide($field("pop"), $literal(Bson.Int32(1000))),
-                  $literal(Bson.Undefined))),
-            ExcludeId),
-          $sort(NonEmptyList(BsonField.Name("popInK") -> SortDir.Ascending))))
-    }.pendingWithActual(notOnPar, testFile("plan sort with expression, alias, and filter")) // at least on agg now
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, MatchOp, ProjectOp, SortOp)))
+    }.pendingUntilFixed
 
     "useful group by" in {
       plan(sqlE"""select city || ", " || state, sum(pop) from extraSmallZips group by city, state""") must
-      beWorkflow0(chain[Workflow](
-        $read(collection("db", "extraSmallZips")),
-        $group(
-          grouped(
-            "__tmp10" ->
-              $first(
-                $cond(
-                  $or(
-                    $and(
-                      $lte($literal(Bson.Arr()), $field("city")),
-                      $lt($field("city"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
-                    $and(
-                      $lte($literal(Bson.Text("")), $field("city")),
-                      $lt($field("city"), $literal(Bson.Doc())))),
-                  $field("city"),
-                  $literal(Bson.Undefined))),
-            "__tmp11" ->
-              $first(
-                $cond(
-                  $or(
-                    $and(
-                      $lte($literal(Bson.Arr()), $field("state")),
-                      $lt($field("state"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
-                    $and(
-                      $lte($literal(Bson.Text("")), $field("state")),
-                      $lt($field("state"), $literal(Bson.Doc())))),
-                  $field("state"),
-                  $literal(Bson.Undefined))),
-            "1" ->
-              $sum(
-                $cond(
-                  $and(
-                    $lt($literal(Bson.Null), $field("pop")),
-                    $lt($field("pop"), $literal(Bson.Text("")))),
-                  $field("pop"),
-                  $literal(Bson.Undefined)))),
-          -\/(reshape(
-            "0" -> $field("city"),
-            "1" -> $field("state")))),
-        $project(
-          reshape(
-            "0" ->
-              $concat(
-                $concat($field("__tmp10"), $literal(Bson.Text(", "))),
-                $field("__tmp11")),
-            "1" -> $field("1")),
-          IgnoreId)))
-    }.pendingWithActual(notOnPar, testFile("plan useful group by"))
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp)))
+    }
 
     "group by simple expression" in {
       plan(sqlE"select city, sum(pop) from extraSmallZips group by lower(city)") must
-      beWorkflow0(chain[Workflow](
-        $read(collection("db", "extraSmallZips")),
-        $group(
-          grouped(
-            "city" -> $push($field("city")),
-            "1" ->
-              $sum(
-                $cond(
-                  $and(
-                    $lt($literal(Bson.Null), $field("pop")),
-                    $lt($field("pop"), $literal(Bson.Text("")))),
-                  $field("pop"),
-                  $literal(Bson.Undefined)))),
-          -\/(reshape(
-            "0" ->
-              $cond(
-                $and(
-                  $lte($literal(Bson.Text("")), $field("city")),
-                  $lt($field("city"), $literal(Bson.Doc()))),
-                $toLower($field("city")),
-                $literal(Bson.Undefined))))),
-        $unwind(DocField(BsonField.Name("city")))))
-    }.pendingWithActual(notOnPar, testFile("plan group by expression"))
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, UnwindOp)))
+    }.pendingUntilFixed
 
     "group by month" in {
       plan(sqlE"""select avg(epoch), date_part("month", `ts`) from days group by date_part("month", `ts`)""") must
-        beWorkflow0(chain[Workflow](
-          $read(collection("db", "days")),
-          $group(
-            grouped(
-              "a" ->
-                $avg(
-                  $cond(
-                    $and(
-                      $lt($literal(Bson.Null), $field("epoch")),
-                      $lt($field("epoch"), $literal(Bson.Text("")))),
-                    $field("epoch"),
-                    $literal(Bson.Undefined)))),
-            -\/(reshape(
-              "0" ->
-                $cond(
-                  $and(
-                    $lte($literal(Check.minDate), $field("ts")),
-                    $lt($field("ts"), $literal(Bson.Regex("", "")))),
-                  $month($field("ts")),
-                  $literal(Bson.Undefined))))),
-          $project(
-            reshape(
-              "a" -> $include(),
-              "m" -> $field("_id", "0")),
-            IgnoreId)))
-    }.pendingWithActual(notOnPar, testFile("plan group by month"))
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp)))
+    }
 
     // FIXME: Needs an actual expectation and an IT
     "expr3 with grouping" in {
@@ -363,60 +111,13 @@ class PlannerSpec extends
 
     "plan count and sum grouped by single field" in {
       plan(sqlE"select count(*) as cnt, sum(pop) as sm from zips group by state") must
-        beWorkflow0 {
-          chain[Workflow](
-            $read(collection("db", "zips")),
-            $group(
-              grouped(
-                "f0" -> $sum($literal(Bson.Int32(1))),
-                "f1" ->
-                  $sum(
-                    $cond(
-                      $and(
-                        $lt($literal(Bson.Null), $field("pop")),
-                        $lt($field("pop"), $literal(Bson.Text("")))),
-                      $field("pop"),
-                      $literal(Bson.Undefined)))),
-              -\/(reshape("0" -> $arrayLit(List($field("state")))))),
-            $project(
-              reshape(
-                "cnt" -> $field("f0"),
-                "sm" -> $field("f1")),
-              ExcludeId))
-        }
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp)))
     }
 
     "collect unaggregated fields into single doc when grouping" in {
       plan(sqlE"select city, state, sum(pop) from zips") must
-      beWorkflow0(chain[Workflow](
-        $read(collection("db", "zips")),
-        $project(
-          reshape(
-            "__tmp3" -> reshape(
-              "city"  -> $field("city"),
-              "state" -> $field("state")),
-            "__tmp4" -> reshape(
-              "__tmp2" ->
-                $cond(
-                  $and(
-                    $lt($literal(Bson.Null), $field("pop")),
-                    $lt($field("pop"), $literal(Bson.Text("")))),
-                  $field("pop"),
-                  $literal(Bson.Undefined)))),
-          IgnoreId),
-        $group(
-          grouped(
-            "2" -> $sum($field("__tmp4", "__tmp2")),
-            "__tmp3" -> $push($field("__tmp3"))),
-          \/-($literal(Bson.Null))),
-        $unwind(DocField("__tmp3")),
-        $project(
-          reshape(
-            "city"  -> $field("__tmp3", "city"),
-            "state" -> $field("__tmp3", "state"),
-            "2"     -> $field("2")),
-          IgnoreId)))
-    }.pendingWithActual(notOnPar, testFile("collect unaggregated fields into single doc when grouping"))
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, GroupOp, UnwindOp, ProjectOp)))
+    }.pendingUntilFixed
 
     "plan unaggregated field when grouping, second case" in {
       // NB: the point being that we don't want to push $$ROOT
