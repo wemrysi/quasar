@@ -49,7 +49,7 @@ class PlannerSpec extends
   import CollectionUtil._
 
   import fixExprOp._
-  import PlannerHelpers._, expr3_2Fp._
+  import PlannerHelpers._
 
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     PlannerHelpers.plan(query)
@@ -150,7 +150,7 @@ class PlannerSpec extends
     }.pendingWithActual(notOnPar, testFile("plan unaggregated field when grouping, second case"))
 
     "plan double aggregation with another projection" in {
-      plan(sqlE"select sum(avg(pop)), min(city) from zips group by foo") must
+      plan(sqlE"select sum(avg(pop)), min(city) from zips group by state") must
         beWorkflow0 {
           chain[Workflow](
             $read(collection("db", "zips")),
@@ -174,7 +174,7 @@ class PlannerSpec extends
                       $lt($field("pop"), $literal(Bson.Text("")))),
                     $field("pop"),
                     $literal(Bson.Undefined)))),
-              -\/(reshape("0" -> $field("foo")))),
+              -\/(reshape("0" -> $field("state")))),
             $group(
               grouped(
                 "0" -> $sum($field("__tmp10")),
@@ -310,20 +310,6 @@ class PlannerSpec extends
               "len" -> $field("f0"),
               "cnt" -> $field("f1")),
             ExcludeId)))
-    }
-
-    "plan simple JS inside expression" in {
-      plan3_2(sqlE"select length(city) + 1 from zips") must
-        beWorkflow(chain[Workflow](
-          $read(collection("db", "zips")),
-          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
-            underSigil(If(Call(ident("isString"), List(Select(ident("x"), "city"))),
-                BinOp(jscore.Add,
-                  Call(ident("NumberLong"),
-                    List(Select(Select(ident("x"), "city"), "length"))),
-                  jscore.Literal(Js.Num(1, false))),
-                ident("undefined")))))),
-            ListMap())))
     }
 
     "plan expressions with ~"in {
@@ -703,65 +689,6 @@ class PlannerSpec extends
             ExcludeId)))
     }.pendingWithActual(notOnPar, testFile("plan distinct of expression as expression"))
 
-    "plan distinct of wildcard" in {
-      plan(sqlE"select distinct * from zips") must
-        beWorkflow0(chain[Workflow](
-          $read(collection("db", "zips")),
-          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
-            obj(
-              "__tmp1" ->
-                Call(ident("remove"),
-                  List(ident("x"), jscore.Literal(Js.Str("_id")))))))),
-            ListMap()),
-          $group(
-            grouped(),
-            -\/(reshape("0" -> $field("__tmp1")))),
-          $project(
-            reshape(sigil.Quasar -> $field("_id", "0")),
-            ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan distinct of wildcard"))
-
-    "plan distinct of wildcard as expression" in {
-      plan(sqlE"select count(distinct *) from zips") must
-        beWorkflow0(chain[Workflow](
-          $read(collection("db", "zips")),
-          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
-            obj(
-              "__tmp4" ->
-                Call(ident("remove"),
-                  List(ident("x"), jscore.Literal(Js.Str("_id")))))))),
-            ListMap()),
-          $group(
-            grouped(),
-            -\/(reshape("0" -> $field("__tmp4")))),
-          $group(
-            grouped("__tmp6" -> $sum($literal(Bson.Int32(1)))),
-            \/-($literal(Bson.Null))),
-          $project(
-            reshape(sigil.Quasar -> $field("__tmp6")),
-            ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan distinct of wildcard as expression"))
-
-    "plan distinct with simple order by" in {
-      plan(sqlE"select distinct city from zips order by city") must
-        beWorkflow0(
-          chain[Workflow](
-            $read(collection("db", "zips")),
-            $project(
-              reshape("city" -> $field("city")),
-              IgnoreId),
-            $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Ascending)),
-            $group(
-              grouped(),
-              -\/(reshape("0" -> $field("city")))),
-            $project(
-              reshape("city" -> $field("_id", "0")),
-              IgnoreId),
-            $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Ascending))))
-      //at least on agg now, but there's an unnecessary array element selection
-      //Name("0" -> { "$arrayElemAt": [["$_id.0", "$f0"], { "$literal": NumberInt("1") }] })
-    }.pendingWithActual(notOnPar, testFile("plan distinct with simple order by"))
-
     "plan distinct with unrelated order by" in {
       plan(sqlE"select distinct city from zips order by pop desc") must
         beWorkflow0(
@@ -788,20 +715,6 @@ class PlannerSpec extends
               reshape("city" -> $field("city")),
               ExcludeId)))
     }.pendingWithActual(notOnPar, testFile("plan distinct with unrelated order by"))
-
-    "plan distinct as function with group" in {
-      plan(sqlE"select state, count(distinct(city)) from zips group by state") must
-        beWorkflow0(chain[Workflow](
-          $read(collection("db", "zips")),
-          $group(
-            grouped("__tmp0" -> $first($$ROOT)),
-            -\/(reshape("0" -> $field("city")))),
-          $group(
-            grouped(
-              "state" -> $first($field("__tmp0", "state")),
-              "1"     -> $sum($literal(Bson.Int32(1)))),
-            \/-($literal(Bson.Null)))))
-    }.pendingWithActual(notOnPar, testFile("plan distinct as function with group"))
 
     "plan distinct with sum and group" in {
       plan(sqlE"SELECT DISTINCT SUM(pop) AS totalPop, city, state FROM zips GROUP BY city") must
@@ -881,139 +794,10 @@ class PlannerSpec extends
 
     }.pendingWithActual(notOnPar, testFile("plan distinct with sum, group, and orderBy"))
 
-    "plan simple sort on map-reduce with mapBeforeSort" in {
-      plan3_2(sqlE"select length(city) from zips order by city") must
-        beWorkflow(chain[Workflow](
-          $read(collection("db", "zips")),
-          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), Let(Name("__val"),
-            Arr(List(
-              obj("0" -> If(
-                Call(ident("isString"), List(Select(ident("x"), "city"))),
-                Call(ident("NumberLong"),
-                  List(Select(Select(ident("x"), "city"), "length"))),
-                ident("undefined"))),
-              ident("x"))),
-            obj("0" -> Select(Access(ident("__val"), jscore.Literal(Js.Num(1, false))), "city"),
-                "src" -> ident("__val")))))),
-            ListMap()),
-          $sort(NonEmptyList(BsonField.Name("0") -> SortDir.Ascending)),
-          $project(
-            reshape(sigil.Quasar -> $arrayElemAt($field("src"), $literal(Bson.Int32(0)))),
-            ExcludeId)))
-    }
-
     "plan time_of_day (JS)" in {
       plan(sqlE"select time_of_day(ts) from days") must
         beRight // NB: way too complicated to spell out here, and will change as JS generation improves
     }
-
-    def joinStructure0(
-      left: Workflow, leftName: String, leftBase: Fix[ExprOp], right: Workflow,
-      leftKey: Reshape.Shape[ExprOp], rightKey: (String, Fix[ExprOp], Reshape.Shape[ExprOp]) \/ JsCore,
-      fin: FixOp[WorkflowF],
-      swapped: Boolean) = {
-
-      val (leftLabel, rightLabel) =
-        if (swapped) (JoinDir.Right.name, JoinDir.Left.name) else (JoinDir.Left.name, JoinDir.Right.name)
-      def initialPipeOps(
-        src: Workflow, name: String, base: Fix[ExprOp], key: Reshape.Shape[ExprOp], mainLabel: String, otherLabel: String):
-          Workflow =
-        chain[Workflow](
-          src,
-          $group(grouped(name -> $push(base)), key),
-          $project(
-            reshape(
-              mainLabel  -> $field(name),
-              otherLabel -> $literal(Bson.Arr(List())),
-              "_id"      -> $include()),
-            IncludeId))
-      fin(
-        $foldLeft(
-          initialPipeOps(left, leftName, leftBase, leftKey, leftLabel, rightLabel),
-          chain[Workflow](
-            right,
-            rightKey.fold(
-              rk => initialPipeOps(_, rk._1, rk._2, rk._3, rightLabel, leftLabel),
-              rk => $map($MapF.mapKeyVal(("key", "value"),
-                rk.toJs,
-                Js.AnonObjDecl(List(
-                  (leftLabel, Js.AnonElem(List())),
-                  (rightLabel, Js.AnonElem(List(Js.Ident("value"))))))),
-                ListMap())),
-            $reduce(
-              Js.AnonFunDecl(List("key", "values"),
-                List(
-                  Js.VarDef(List(
-                    ("result", Js.AnonObjDecl(List(
-                      (leftLabel, Js.AnonElem(List())),
-                      (rightLabel, Js.AnonElem(List()))))))),
-                  Js.Call(Js.Select(Js.Ident("values"), "forEach"),
-                    List(Js.AnonFunDecl(List("value"),
-                      List(
-                        Js.BinOp("=",
-                          Js.Select(Js.Ident("result"), leftLabel),
-                          Js.Call(
-                            Js.Select(Js.Select(Js.Ident("result"), leftLabel), "concat"),
-                            List(Js.Select(Js.Ident("value"), leftLabel)))),
-                        Js.BinOp("=",
-                          Js.Select(Js.Ident("result"), rightLabel),
-                          Js.Call(
-                            Js.Select(Js.Select(Js.Ident("result"), rightLabel), "concat"),
-                            List(Js.Select(Js.Ident("value"), rightLabel)))))))),
-                  Js.Return(Js.Ident("result")))),
-              ListMap()))))
-    }
-
-    def joinStructure(
-        left: Workflow, leftName: String, leftBase: Fix[ExprOp], right: Workflow,
-        leftKey: Reshape.Shape[ExprOp], rightKey: (String, Fix[ExprOp], Reshape.Shape[ExprOp]) \/ JsCore,
-        fin: FixOp[WorkflowF],
-        swapped: Boolean) =
-      Crystallize[WorkflowF].crystallize(joinStructure0(left, leftName, leftBase, right, leftKey, rightKey, fin, swapped))
-
-    "plan simple join (map-reduce)" in {
-      plan2_6(sqlE"select zips2.city from zips join zips2 on zips.`_id` = zips2.`_id`") must
-        beWorkflow0(
-          joinStructure(
-            $read(collection("db", "zips")), "__tmp0", $$ROOT,
-            $read(collection("db", "zips2")),
-            reshape("0" -> $field("_id")),
-            Obj(ListMap(Name("0") -> Select(ident("value"), "_id"))).right,
-            chain[Workflow](_,
-              $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-                JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
-                JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
-              $unwind(DocField(JoinHandler.LeftName)),
-              $unwind(DocField(JoinHandler.RightName)),
-              $project(
-                reshape(sigil.Quasar -> $field(JoinDir.Right.name, "city")),
-                ExcludeId)),
-            false).op)
-    }.pendingWithActual("#1560", testFile("plan simple join (map-reduce)"))
-
-    "plan simple join with sharded inputs" in {
-      // NB: cannot use $lookup, so fall back to the old approach
-      val query = sqlE"select zips2.city from zips join zips2 on zips.`_id` = zips2.`_id`"
-      plan3_4(query,
-        c => Map(
-          collection("db", "zips") -> CollectionStatistics(10, 100, true),
-          collection("db", "zips2") -> CollectionStatistics(15, 150, true)).get(c),
-        defaultIndexes,
-        emptyDoc) must_==
-        plan2_6(query)
-    }.pendingUntilFixed(notOnPar)
-
-    "plan simple join with sources in different DBs" in {
-      // NB: cannot use $lookup, so fall back to the old approach
-      val query = sqlE"select zips2.city from `/db1/zips` join `/db2/zips2` on zips.`_id` = zips2.`_id`"
-      plan(query) must_== plan2_6(query)
-    }.pendingUntilFixed(notOnPar)
-
-    "plan simple join with no index" in {
-      // NB: cannot use $lookup, so fall back to the old approach
-      val query = sqlE"select zips2.city from zips join zips2 on zips.pop = zips2.pop"
-      plan(query) must_== plan2_6(query)
-    }.pendingUntilFixed(notOnPar)
 
     "plan non-equi join" in {
       plan(sqlE"select zips2.city from zips join zips2 on zips.`_id` < zips2.`_id`") must

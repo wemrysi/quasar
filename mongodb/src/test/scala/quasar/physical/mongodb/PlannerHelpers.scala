@@ -24,12 +24,14 @@ import quasar.contrib.specs2._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
-import quasar.{jscore => js}
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
+import quasar.javascript._
+import quasar.{jscore => js}
+import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.DiscoverPath
-import quasar.sql , sql._
+import quasar.sql._
 
 import java.io.{File => JFile}
 import java.time.Instant
@@ -47,6 +49,12 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 object PlannerHelpers {
+  import Grouped.grouped
+  import Reshape.reshape
+  import jscore._
+
+  import fixExprOp._
+
   sealed trait TestStatus
   case object Ok extends TestStatus
   case class Pending(s: String) extends TestStatus
@@ -273,6 +281,71 @@ object PlannerHelpers {
     qplan0(qs, MongoQueryModel.`3.4`, defaultStats, defaultIndexes, emptyDoc)
 
   def qtestFile(testName: String): JFile = jFile(toRFile("q " + testName))
+
+  def joinStructure0(
+    left: Workflow, leftName: String, leftBase: Fix[ExprOp], right: Workflow,
+    leftKey: Reshape.Shape[ExprOp], rightKey: (String, Fix[ExprOp], Reshape.Shape[ExprOp]) \/ JsCore,
+    fin: FixOp[WorkflowF],
+    swapped: Boolean) = {
+
+    val (leftLabel, rightLabel) =
+      if (swapped) (JoinDir.Right.name, JoinDir.Left.name) else (JoinDir.Left.name, JoinDir.Right.name)
+    def initialPipeOps(
+      src: Workflow, name: String, base: Fix[ExprOp], key: Reshape.Shape[ExprOp], mainLabel: String, otherLabel: String):
+        Workflow =
+      chain[Workflow](
+        src,
+        $group(grouped(name -> $push(base)), key),
+        $project(
+          reshape(
+            mainLabel  -> $field(name),
+            otherLabel -> $literal(Bson.Arr(List())),
+            "_id"      -> $include()),
+          IncludeId))
+    fin(
+      $foldLeft(
+        initialPipeOps(left, leftName, leftBase, leftKey, leftLabel, rightLabel),
+        chain[Workflow](
+          right,
+          rightKey.fold(
+            rk => initialPipeOps(_, rk._1, rk._2, rk._3, rightLabel, leftLabel),
+            rk => $map($MapF.mapKeyVal(("key", "value"),
+              rk.toJs,
+              Js.AnonObjDecl(List(
+                (leftLabel, Js.AnonElem(List())),
+                (rightLabel, Js.AnonElem(List(Js.Ident("value"))))))),
+              ListMap())),
+          $reduce(
+            Js.AnonFunDecl(List("key", "values"),
+              List(
+                Js.VarDef(List(
+                  ("result", Js.AnonObjDecl(List(
+                    (leftLabel, Js.AnonElem(List())),
+                    (rightLabel, Js.AnonElem(List()))))))),
+                Js.Call(Js.Select(Js.Ident("values"), "forEach"),
+                  List(Js.AnonFunDecl(List("value"),
+                    List(
+                      Js.BinOp("=",
+                        Js.Select(Js.Ident("result"), leftLabel),
+                        Js.Call(
+                          Js.Select(Js.Select(Js.Ident("result"), leftLabel), "concat"),
+                          List(Js.Select(Js.Ident("value"), leftLabel)))),
+                      Js.BinOp("=",
+                        Js.Select(Js.Ident("result"), rightLabel),
+                        Js.Call(
+                          Js.Select(Js.Select(Js.Ident("result"), rightLabel), "concat"),
+                          List(Js.Select(Js.Ident("value"), rightLabel)))))))),
+                Js.Return(Js.Ident("result")))),
+            ListMap()))))
+  }
+
+  def joinStructure(
+      left: Workflow, leftName: String, leftBase: Fix[ExprOp], right: Workflow,
+      leftKey: Reshape.Shape[ExprOp], rightKey: (String, Fix[ExprOp], Reshape.Shape[ExprOp]) \/ JsCore,
+      fin: FixOp[WorkflowF],
+      swapped: Boolean) =
+    Crystallize[WorkflowF].crystallize(joinStructure0(left, leftName, leftBase, right, leftKey, rightKey, fin, swapped))
+
 
 }
 
