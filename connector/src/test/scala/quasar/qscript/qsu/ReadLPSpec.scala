@@ -176,6 +176,12 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSU
       }
     }
 
+    "convert Union" in {
+      lpf.invoke2(SetLib.Union, read("foo"), read("bar")) must readQsuAs {
+        case Union(TRead("foo"), TRead("bar")) => ok
+      }
+    }
+
     "convert reductions" in {
       lpf.invoke1(AggLib.Count, read("foo")) must readQsuAs {
         case LPReduce(TRead("foo"), ReduceFuncs.Count(())) => ok
