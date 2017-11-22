@@ -60,11 +60,10 @@ class TableModelTest extends Spec  with ScalazMatchers {
 
   implicit val arbColDesc: Arbitrary[Set[ColumnDesc]] = Arbitrary(columnDescsGen)
 
+  checkAll(propz.equal.laws[TableModel])
+  checkAll(propz.monoid.laws[TableModel])
 
-  "Table Model Monoid" >> {
-    checkAll(propz.monoid.laws[TableModel])
-    checkAll(propz.equal.laws[TableModel])
-
+  "Table Model Monoid must" >> {
     "be commutative" >> {
       prop { (x: TableModel, y: TableModel) =>
         (x ⊹ y) must equal(y ⊹ x)
@@ -202,7 +201,7 @@ class TableModelTest extends Spec  with ScalazMatchers {
     }
   }
 
-  "Table Model alter" >> {
+  "Table Model alter must" >> {
 
     "return no updates if initial model is json-based" >> {
       TableModel.alter(JsonTable, JsonTable) must beRightDisjunction(Set.empty)
@@ -238,6 +237,5 @@ class TableModelTest extends Spec  with ScalazMatchers {
       TableModel.alter(initial, newModel) must beRightDisjunction(
         Set(ModifyColumn("c2", StringCol), AddColumn("c3", IntCol)))
     }
-
   }
 }
