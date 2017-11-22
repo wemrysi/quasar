@@ -1160,11 +1160,12 @@ class PlannerSql2ExactSpec extends
         $read(collection("db", "zips")),
         $group(
           grouped("f0" -> $first($field("city"))),
+          // FIXME: unnecessary but harmless $arrayLit
           -\/(reshape("0" -> $arrayLit(List($field("city")))))),
         $project(
           reshape(sigil.Quasar -> $field("f0")),
           ExcludeId)))
-    }.pendingWithActual("#3129 #3044", testFile("plan trivial group by exact"))
+    }
 
     "plan useless group by expression" in {
       plan(sqlE"select city from zips group by lower(city)") must
@@ -1203,7 +1204,7 @@ class PlannerSql2ExactSpec extends
             $match(Selector.Doc(
               BsonField.Name("state") -> Selector.Eq(Bson.Text("CO")))),
             $group(
-              grouped("sm" ->
+              grouped("f0" ->
                 $sum(
                   $cond(
                     $and(
@@ -1211,9 +1212,11 @@ class PlannerSql2ExactSpec extends
                       $lt($field("pop"), $literal(Bson.Text("")))),
                     $field("pop"),
                     $literal(Bson.Undefined)))),
-              -\/(reshape("0" -> $field("city")))))
+              // FIXME: unnecessary but harmless $arrayLit
+              -\/(reshape("0" -> $arrayLit(List($field("city")))))),
+            $project(reshape("sm" -> $field("f0"))))
         }
-    }.pendingWithActual(notOnPar, testFile("plan sum grouped by single field with filter"))
+    }
 
     "plan count and field when grouped" in {
       plan(sqlE"select count(*) as cnt, city from zips group by city") must
