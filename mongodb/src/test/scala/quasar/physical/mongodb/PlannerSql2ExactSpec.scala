@@ -583,6 +583,54 @@ class PlannerSql2ExactSpec extends
              ListMap())))
     }
 
+    "plan array flatten" in {
+      plan(sqlE"select loc[*] from zips") must
+        beWorkflow0 {
+          chain[Workflow](
+            $read(collection("db", "zips")),
+            $project(
+              reshape(
+                "__tmp2" ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Arr(List())), $field("loc")),
+                      $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                    $field("loc"),
+                    $literal(Bson.Arr(List(Bson.Undefined))))),
+              IgnoreId),
+            $unwind(DocField(BsonField.Name("__tmp2"))),
+            $project(
+              reshape(sigil.Quasar -> $field("__tmp2")),
+              ExcludeId))
+        }
+    }.pendingWithActual(notOnPar, testFile("plan array flatten"))
+
+    "plan array concat" in {
+      plan(sqlE"select loc || [ 0, 1, 2 ] from zips") must beWorkflow0 {
+        chain[Workflow](
+          $read(collection("db", "zips")),
+          $simpleMap(NonEmptyList(
+            MapExpr(JsFn(Name("x"),
+              Obj(ListMap(
+                Name("__tmp4") ->
+                  If(
+                    BinOp(jscore.Or,
+                      Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "loc"))),
+                      Call(ident("isString"), List(Select(ident("x"), "loc")))),
+                    SpliceArrays(List(
+                      Select(ident("x"), "loc"),
+                      Arr(List(
+                        jscore.Literal(Js.Num(0, false)),
+                        jscore.Literal(Js.Num(1, false)),
+                        jscore.Literal(Js.Num(2, false)))))),
+                    ident("undefined"))))))),
+            ListMap()),
+          $project(
+            reshape(sigil.Quasar -> $field("__tmp4")),
+            ExcludeId))
+      }
+    }.pendingWithActual(notOnPar, testFile("plan array concat"))
+
     "plan sum in expression" in {
       plan(sqlE"select sum(pop) * 100 from zips") must
       beWorkflow(chain[Workflow](
