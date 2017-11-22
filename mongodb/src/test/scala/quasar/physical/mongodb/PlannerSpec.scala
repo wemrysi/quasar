@@ -19,7 +19,7 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 import quasar._
 import quasar.common.{Map => _, _}
-import quasar.contrib.specs2.PendingWithActualTracking
+import quasar.contrib.specs2._
 import quasar.fs._
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
@@ -39,6 +39,9 @@ import scalaz._, Scalaz._
 class PlannerSpec extends
     PlannerWorkflowHelpers with
     PendingWithActualTracking {
+
+  //to write the new actuals:
+  //override val mode = WriteMode
 
   import Grouped.grouped
   import Reshape.reshape
@@ -1351,24 +1354,6 @@ class PlannerSpec extends
             false).op)
     }.pendingWithActual("#1560", testFile("plan simple join (map-reduce)"))
 
-    "plan simple join ($lookup)" in {
-      plan(sqlE"select zips2.city from zips join zips2 on zips.`_id` = zips2.`_id`") must
-        beWorkflow0(chain[Workflow](
-          $read(collection("db", "zips")),
-          $match(Selector.Doc(
-            BsonField.Name("_id") -> Selector.Exists(true))),
-          $project(reshape(JoinDir.Left.name -> $$ROOT)),
-          $lookup(
-            CollectionName("zips2"),
-            JoinHandler.LeftName \ BsonField.Name("_id"),
-            BsonField.Name("_id"),
-            JoinHandler.RightName),
-          $unwind(DocField(JoinHandler.RightName)),
-          $project(
-            reshape(sigil.Quasar -> $field(JoinDir.Right.name, "city")),
-            ExcludeId)))
-    }.pendingWithActual("#1560", testFile("plan simple join ($lookup)"))
-
     "plan simple join with sharded inputs" in {
       // NB: cannot use $lookup, so fall back to the old approach
       val query = sqlE"select zips2.city from zips join zips2 on zips.`_id` = zips2.`_id`"
@@ -1491,120 +1476,85 @@ class PlannerSpec extends
           false).op)
     }.pendingWithActual("#1560", testFile("plan simple inner equi-join (map-reduce)"))
 
-    "plan simple inner equi-join ($lookup)" in {
-      plan3_4(
-        sqlE"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id",
-        defaultStats,
-        indexes(collection("db", "bar") -> BsonField.Name("foo_id")),
-        emptyDoc) must
-      beWorkflow0(chain[Workflow](
-        $read(collection("db", "foo")),
-        $match(Selector.Doc(
-          BsonField.Name("id") -> Selector.Exists(true))),
-        $project(reshape(JoinDir.Left.name -> $$ROOT)),
-        $lookup(
-          CollectionName("bar"),
-          JoinHandler.LeftName \ BsonField.Name("id"),
-          BsonField.Name("foo_id"),
-          JoinHandler.RightName),
-        $unwind(DocField(JoinHandler.RightName)),
-        $project(reshape(
-          "name" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                $lt($field(JoinDir.Left.name), $literal(Bson.Arr(Nil)))),
-              $field(JoinDir.Left.name, "name"),
-              $literal(Bson.Undefined)),
-          "address" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                $lt($field(JoinDir.Right.name), $literal(Bson.Arr(Nil)))),
-              $field(JoinDir.Right.name, "address"),
-              $literal(Bson.Undefined))),
-          IgnoreId)))
-    }.pendingWithActual("#1560", testFile("plan simple inner equi-join ($lookup)"))
-
     "plan simple inner equi-join with expression ($lookup)" in {
       plan3_4(
-        sqlE"select foo.name, bar.address from foo join bar on lower(foo.id) = bar.foo_id",
+        sqlE"select zips.city, smallZips.state from zips join smallZips on lower(zips.`_id`) = smallZips.`_id`",
         defaultStats,
-        indexes(collection("db", "bar") -> BsonField.Name("foo_id")),
+        defaultIndexes,
         emptyDoc) must
       beWorkflow0(chain[Workflow](
-        $read(collection("db", "foo")),
+        $read(collection("db", "zips")),
         $project(reshape(
           JoinDir.Left.name -> $$ROOT,
-          "__tmp0" -> $toLower($field("id"))),
+          "__tmp0" -> $toLower($field("_id"))),
           IgnoreId),
         $lookup(
-          CollectionName("bar"),
+          CollectionName("smallZips"),
+          BsonField.Name("_id"),
           BsonField.Name("__tmp0"),
-          BsonField.Name("foo_id"),
           JoinHandler.RightName),
         $project(reshape(
           JoinDir.Left.name -> $field(JoinDir.Left.name),
           JoinDir.Right.name -> $field(JoinDir.Right.name))),
         $unwind(DocField(JoinHandler.RightName)),
         $project(reshape(
-          "name" ->
+          "city" ->
             $cond(
               $and(
                 $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
                 $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-              $field(JoinDir.Left.name, "name"),
+              $field(JoinDir.Left.name, "city"),
               $literal(Bson.Undefined)),
-          "address" ->
+          "state" ->
             $cond(
               $and(
                 $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
                 $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-              $field(JoinDir.Right.name, "address"),
+              $field(JoinDir.Right.name, "state"),
               $literal(Bson.Undefined))),
           IgnoreId)))
     }.pendingWithActual("#1560", testFile("plan simple inner equi-join with expression ($lookup)"))
 
     "plan simple inner equi-join with pre-filtering ($lookup)" in {
       plan3_4(
-        sqlE"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id where bar.rating >= 4",
+        sqlE"select zips.city, smallZips.state from zips join smallZips on zips.`_id` = smallZips.`_id` where smallZips.pop >= 10000",
         defaultStats,
-        indexes(collection("db", "foo") -> BsonField.Name("id")),
+        defaultIndexes,
         emptyDoc) must
       beWorkflow0(chain[Workflow](
-        $read(collection("db", "bar")),
+        $read(collection("db", "smallZips")),
         $match(
           Selector.And(
-            isNumeric(BsonField.Name("rating")),
+            isNumeric(BsonField.Name("pop")),
             Selector.Doc(
-              BsonField.Name("rating") -> Selector.Gte(Bson.Int32(4))))),
+              BsonField.Name("pop") -> Selector.Gte(Bson.Int32(10000))))),
         $project(reshape(
           JoinDir.Right.name -> $$ROOT,
-          "__tmp2" -> $field("foo_id")),
+          "__tmp2" -> $field("_id")),
           ExcludeId),
         $lookup(
-          CollectionName("foo"),
+          CollectionName("zips"),
           BsonField.Name("__tmp2"),
-          BsonField.Name("id"),
+          BsonField.Name("_id"),
           JoinHandler.LeftName),
         $project(reshape(
           JoinDir.Right.name -> $field(JoinDir.Right.name),
           JoinDir.Left.name -> $field(JoinDir.Left.name))),
         $unwind(DocField(JoinHandler.LeftName)),
         $project(reshape(
-          "name" ->
+          "city" ->
             $cond(
               $and(
                 $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
                 $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-              $field(JoinDir.Left.name, "name"),
+              $field(JoinDir.Left.name, "city"),
               $literal(Bson.Undefined)),
-          "address" ->
+          "state" ->
             $cond(
               $and(
                 $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
                 $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-              $field(JoinDir.Right.name, "address"),
+              $field(JoinDir.Right.name, "state"),
               $literal(Bson.Undefined))),
           IgnoreId)))
     }.pendingWithActual("#1560", testFile("plan simple inner equi-join with pre-filtering ($lookup)"))
@@ -1838,34 +1788,32 @@ class PlannerSpec extends
 
     "plan 3-way equi-join ($lookup)" in {
       plan3_4(
-        sqlE"select foo.name, bar.address, baz.zip from foo join bar on foo.id = bar.foo_id join baz on bar.id = baz.bar_id",
+        sqlE"select extraSmallZips.city, smallZips.state, zips.pop from extraSmallZips join smallZips on extraSmallZips.`_id` = smallZips.`_id` join zips on smallZips.`_id` = zips.`_id`",
         defaultStats,
-        indexes(
-          collection("db", "bar") -> BsonField.Name("foo_id"),
-          collection("db", "baz") -> BsonField.Name("bar_id")),
+        defaultIndexes,
         emptyDoc) must
         beWorkflow0(chain[Workflow](
-          $read(collection("db", "foo")),
+          $read(collection("db", "extraSmallZips")),
           $match(Selector.Doc(
-            BsonField.Name("id") -> Selector.Exists(true))),
+            BsonField.Name("_id") -> Selector.Exists(true))),
           $project(reshape(JoinDir.Left.name -> $$ROOT)),
           $lookup(
-            CollectionName("bar"),
-            JoinHandler.LeftName \ BsonField.Name("id"),
-            BsonField.Name("foo_id"),
+            CollectionName("smallZips"),
+            JoinHandler.LeftName \ BsonField.Name("_id"),
+            BsonField.Name("_id"),
             JoinHandler.RightName),
           $unwind(DocField(JoinHandler.RightName)),
           $match(Selector.Doc(
-            JoinHandler.RightName \ BsonField.Name("id") -> Selector.Exists(true))),
+            JoinHandler.RightName \ BsonField.Name("_id") -> Selector.Exists(true))),
           $project(reshape(JoinDir.Left.name -> $$ROOT)),
           $lookup(
-            CollectionName("baz"),
-            JoinHandler.LeftName \ JoinHandler.RightName \ BsonField.Name("id"),
-            BsonField.Name("bar_id"),
+            CollectionName("zips"),
+            JoinHandler.LeftName \ JoinHandler.RightName \ BsonField.Name("_id"),
+            BsonField.Name("_id"),
             JoinHandler.RightName),
           $unwind(DocField(JoinHandler.RightName)),
           $project(reshape(
-            "name" ->
+            "city" ->
               $cond(
                 $and(
                   $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
@@ -1874,10 +1822,10 @@ class PlannerSpec extends
                   $and(
                     $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Left.name)),
                     $lt($field(JoinDir.Left.name, JoinDir.Left.name), $literal(Bson.Arr()))),
-                  $field(JoinDir.Left.name, JoinDir.Left.name, "name"),
+                  $field(JoinDir.Left.name, JoinDir.Left.name, "city"),
                   $literal(Bson.Undefined)),
                 $literal(Bson.Undefined)),
-            "address" ->
+            "state" ->
               $cond(
                 $and(
                   $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
@@ -1886,15 +1834,15 @@ class PlannerSpec extends
                   $and(
                     $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Right.name)),
                     $lt($field(JoinDir.Left.name, JoinDir.Right.name), $literal(Bson.Arr()))),
-                  $field(JoinDir.Left.name, JoinDir.Right.name, "address"),
+                  $field(JoinDir.Left.name, JoinDir.Right.name, "state"),
                   $literal(Bson.Undefined)),
                 $literal(Bson.Undefined)),
-            "zip" ->
+            "pop" ->
               $cond(
                 $and(
                   $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
                   $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                $field(JoinDir.Right.name, "zip"),
+                $field(JoinDir.Right.name, "pop"),
                 $literal(Bson.Undefined))),
             IgnoreId)))
     }.pendingWithActual("#1560", testFile("plan 3-way equi-join ($lookup)"))
