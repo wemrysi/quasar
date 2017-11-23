@@ -55,7 +55,7 @@ final class DirectoryQueriesSpec extends MultiFormatFileSystemTest {
           .translate(runFsE(js))
           .runLog.run.map (_.toEither must beRight(contain(exactly(a, b, c))))
           .unsafePerformSync
-      }
+      }.pendingUntilFixed
 
       "only includes child documents of the format configured for the mount" >> {
         val loc: ADir = rootDir </> dir("onlyfmt")
@@ -91,7 +91,7 @@ final class DirectoryQueriesSpec extends MultiFormatFileSystemTest {
         (runFsE(xml)(saveXml) *> loadAndQueryJs)
           .run.map (_.toEither must beRight(contain(exactly(a, b, c))))
           .unsafePerformSync
-      }
+      }.pendingUntilFixed
     }
   }
 }
