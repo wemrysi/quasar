@@ -2,45 +2,20 @@ Chain
 ├─ $FoldLeftF
 │  ├─ Chain
 │  │  ├─ $ReadF(db; foo)
-│  │  ├─ $ProjectF
-│  │  │  ├─ Name("0" -> {
-│  │  │  │       "$cond": [
-│  │  │  │         {
-│  │  │  │           "$and": [
-│  │  │  │             {
-│  │  │  │               "$lte": [
-│  │  │  │                 { "$literal": {  } },
-│  │  │  │                 {
-│  │  │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
-│  │  │  │                 }]
-│  │  │  │             },
-│  │  │  │             {
-│  │  │  │               "$lt": [
-│  │  │  │                 {
-│  │  │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
-│  │  │  │                 },
-│  │  │  │                 { "$literal": [] }]
-│  │  │  │             }]
-│  │  │  │         },
-│  │  │  │         { "$literal": true },
-│  │  │  │         { "$literal": false }]
-│  │  │  │     })
-│  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
-│  │  │  ╰─ ExcludeId
-│  │  ├─ $MatchF
-│  │  │  ╰─ Doc
-│  │  │     ╰─ Expr($0 -> Eq(Bool(true)))
-│  │  ├─ $SimpleMapF
-│  │  │  ├─ Map
-│  │  │  │  ╰─ Obj
-│  │  │  │     ├─ Key(0: _.src[1].id)
-│  │  │  │     ╰─ Key(content: _.src)
-│  │  │  ╰─ Scope(Map())
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
-│  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
+│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
 │  │  │  ╰─ By
-│  │  │     ╰─ Name("0" -> "$0")
+│  │  │     ╰─ Name("0" -> {
+│  │  │             "$cond": [
+│  │  │               {
+│  │  │                 "$and": [
+│  │  │                   { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│  │  │                   { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │  │               },
+│  │  │               "$id",
+│  │  │               { "$literal": undefined }]
+│  │  │           })
 │  │  ╰─ $ProjectF
 │  │     ├─ Name("_id" -> "$_id")
 │  │     ├─ Name("value")
@@ -50,37 +25,13 @@ Chain
 │  │     ╰─ IncludeId
 │  ╰─ Chain
 │     ├─ $ReadF(db; bar)
-│     ├─ $ProjectF
-│     │  ├─ Name("0" -> {
-│     │  │       "$cond": [
-│     │  │         {
-│     │  │           "$and": [
-│     │  │             {
-│     │  │               "$lte": [
-│     │  │                 { "$literal": {  } },
-│     │  │                 {
-│     │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
-│     │  │                 }]
-│     │  │             },
-│     │  │             {
-│     │  │               "$lt": [
-│     │  │                 {
-│     │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
-│     │  │                 },
-│     │  │                 { "$literal": [] }]
-│     │  │             }]
-│     │  │         },
-│     │  │         { "$literal": true },
-│     │  │         { "$literal": false }]
-│     │  │     })
-│     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
-│     │  ╰─ ExcludeId
-│     ├─ $MatchF
-│     │  ╰─ Doc
-│     │     ╰─ Expr($0 -> Eq(Bool(true)))
 │     ├─ $MapF
 │     │  ├─ JavaScript(function (key, value) {
-│     │  │               return [{ "0": value.src[1].foo_id }, { "left": [], "right": [value.src] }]
+│     │  │               return [
+│     │  │                 {
+│     │  │                   "0": (isObject(value) && (! Array.isArray(value))) ? value.foo_id : undefined
+│     │  │                 },
+│     │  │                 { "left": [], "right": [value] }]
 │     │  │             })
 │     │  ╰─ Scope(Map())
 │     ╰─ $ReduceF
@@ -115,9 +66,13 @@ Chain
    │  ╰─ Obj
    │     ╰─ Key(__quasar_mongodb_sigil)
    │        ╰─ If
-   │           ├─ JsCore((isObject(_.right[1]) && (! Array.isArray(_.right[1]))) && (isObject(_.left[1]) && (! Array.isArray(_.left[1]))))
+   │           ├─ JsCore((isObject(
+   │           │         (isObject(_.right) && (! Array.isArray(_.right))) ? _.right : undefined) && (! Array.isArray(
+   │           │         (isObject(_.right) && (! Array.isArray(_.right))) ? _.right : undefined))) && ((isObject(
+   │           │         (isObject(_.left) && (! Array.isArray(_.left))) ? _.left : undefined) && (! Array.isArray(
+   │           │         (isObject(_.left) && (! Array.isArray(_.left))) ? _.left : undefined))) && ((isObject(_.left) && (! Array.isArray(_.left))) && (isObject(_.right) && (! Array.isArray(_.right))))))
    │           ├─ SpliceObjects
-   │           │  ├─ JsCore(_.left[1])
-   │           │  ╰─ JsCore(_.right[1])
+   │           │  ├─ JsCore(_.left)
+   │           │  ╰─ JsCore(_.right)
    │           ╰─ Ident(undefined)
    ╰─ Scope(Map())

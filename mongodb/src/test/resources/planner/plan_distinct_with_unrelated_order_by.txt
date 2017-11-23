@@ -1,51 +1,18 @@
 Chain
 ├─ $ReadF(db; zips)
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Arr
-│  │     ├─ Obj
-│  │     │  ├─ Key(city: _.city)
-│  │     │  ╰─ Key(__sd__0: _.pop)
-│  │     ╰─ JsCore(_.pop)
-│  ╰─ Scope(Map())
 ├─ $ProjectF
-│  ├─ Name("0" -> { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] })
-│  ├─ Name("src" -> "$$ROOT")
+│  ├─ Name("city" -> "$city")
+│  ├─ Name("__sd__0" -> "$pop")
 │  ╰─ ExcludeId
 ├─ $SortF
-│  ╰─ SortKey(0 -> Descending)
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(0)
-│  │     │  ╰─ Obj
-│  │     │     ╰─ Key(city: _.src[0].city)
-│  │     ╰─ Key(content: _.src)
-│  ╰─ Scope(Map())
+│  ╰─ SortKey(__sd__0 -> Descending)
 ├─ $GroupF
 │  ├─ Grouped
-│  │  ╰─ Name("f0" -> { "$first": { "$arrayElemAt": ["$content", { "$literal": NumberInt("0") }] } })
+│  │  ╰─ Name("f0" -> { "$first": "$$ROOT" })
 │  ╰─ By
-│     ╰─ Name("0" -> "$0")
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Let(__val)
-│  │     ├─ JsCore([_._id["0"], _.f0, _.f0.__sd__0])
-│  │     ╰─ Arr
-│  │        ├─ Obj
-│  │        │  ╰─ Key(city: __val[1].city)
-│  │        ╰─ Ident(__val)
-│  ╰─ Scope(Map())
-├─ $ProjectF
-│  ├─ Name("0" -> {
-│  │       "$arrayElemAt": [
-│  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-│  │         { "$literal": NumberInt("2") }]
-│  │     })
-│  ├─ Name("src" -> "$$ROOT")
-│  ╰─ ExcludeId
+│     ╰─ Name("0" -> { "city": "$city" })
 ├─ $SortF
-│  ╰─ SortKey(0 -> Descending)
+│  ╰─ SortKey(__sd__0 -> Descending)
 ╰─ $ProjectF
-   ├─ Name("__quasar_mongodb_sigil" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
+   ├─ Name("city" -> "$f0.city")
    ╰─ ExcludeId
