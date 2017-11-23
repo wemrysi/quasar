@@ -63,6 +63,14 @@ class TableModelTest extends Spec  with ScalazMatchers {
   checkAll(propz.equal.laws[TableModel])
   checkAll(propz.monoid.laws[TableModel])
 
+  "ColumnDesc must" >> {
+    "Define equality and hashcode in terms of its name (#3162)" >> {
+      prop { (col: ColumnDesc) =>
+        Set(col, col.copy(tpe = IntCol)) must_=== Set(col)
+      }
+    }
+  }
+
   "Table Model Monoid must" >> {
     "be commutative" >> {
       prop { (x: TableModel, y: TableModel) =>
