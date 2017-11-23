@@ -7,10 +7,14 @@
     "marklogic_json": "skip",
     "marklogic_xml":  "skip",
     "mimir":          "skip",
+    "mongodb_2_6":    "pending",
+    "mongodb_3_0":    "pending",
+    "mongodb_3_2":    "pending",
     "spark_hdfs":     "skip",
     "spark_local":    "skip",
     "spark_cassandra":"skip"
   },
+  "NB": "Pending on mongo due to #3152",
   "predicate": "exactly",
   "expected": [
     { "0": "ObjectId(\"4f95e00d9060633ce7fbab94\")", "_id": { "$oid": "4f95e00d9060633ce7fbab94" }, "bar": "4f95e00d9060633ce7fbab93" },
