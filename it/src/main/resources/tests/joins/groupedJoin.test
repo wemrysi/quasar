@@ -3,11 +3,9 @@
 
     "backends": {
         "couchbase": "skip",
-        "marklogic_json": "pendingIgnoreFieldOrder",
+        "marklogic_json": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
-
-    "NB": "The qscript for this query can be improved with better deep shape source merging.",
 
     "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
 
