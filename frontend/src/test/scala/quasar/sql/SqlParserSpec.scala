@@ -613,6 +613,11 @@ class SQLParserSpec extends quasar.Qspec {
         fixParser.parseModule(moduleString) must_===
           \/-(List(FunctionDecl(CIName("foo"), List(CIName("foo")), sqlE":foo")))
       }
+      "functions with escaped param names" in {
+        val moduleString = "CREATE FUNCTION FOO(:`foo`) BEGIN :`foo` END;"
+        fixParser.parseModule(moduleString) must_===
+          \/-(List(FunctionDecl(CIName("foo"), List(CIName("foo")), sqlE":foo")))
+      }
     }
 
     "parse scopedExpr" in {

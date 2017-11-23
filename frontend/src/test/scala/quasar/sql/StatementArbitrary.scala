@@ -42,7 +42,7 @@ trait StatementArbitrary {
     for {
       body <- Arbitrary.arbitrary[Fix[Sql]]
       name <- nonEmptyNameGen
-      args <- Gen.listOf(nonEmptyNameGen)
+      args <- Gen.listOf(Arbitrary.arbitrary[String].map(CIName(_)))
     } yield FunctionDecl(name, args, body)
 
   val nonEmptyNameGen: Gen[CIName] = Gen.identifier.map(CIName(_))

@@ -187,7 +187,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
       "succeed with correct SQL Statements" >> prop { d: ADir =>
         runTest { service =>
           val cfg = MountConfig.moduleConfig(sampleStatements)
-          val cfgStr = EncodeJson.of[MountConfig].encode(cfg)
+          val cfgJson = EncodeJson.of[MountConfig].encode(cfg)
 
           for {
             _    <- M.mountModule(d, sampleStatements)
@@ -195,7 +195,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             (res, _) = r
             body <- lift(res.as[Json]).into[Eff]
           } yield {
-            (body must_== cfgStr) and (res.status must_== Ok)
+            (body must_=== cfgJson) and (res.status must_=== Ok)
           }
         }
       }
