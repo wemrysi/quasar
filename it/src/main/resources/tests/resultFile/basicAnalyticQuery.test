@@ -6,9 +6,6 @@
         "mimir":             "ignoreFieldOrder",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
-        "mongodb_3_2":       "pending",
-        "mongodb_3_4":       "pending",
-        "mongodb_read_only": "pending",
         "spark_cassandra":   "pending"
     },
     "NB": "Pending on mongo due to #3152",
