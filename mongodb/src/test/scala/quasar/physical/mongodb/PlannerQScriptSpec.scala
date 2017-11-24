@@ -44,30 +44,274 @@ class PlannerQScriptSpec extends
   import CollectionUtil._
   import Reshape.reshape
 
-  val (func, free, fix) =
+  val dsl =
     quasar.qscript.construction.mkDefaults[Fix, fs.MongoQScript[Fix, ?]]
+  import dsl._
 
-  val ejs = Fixed[Fix[EJson]]
+  val json = Fixed[Fix[EJson]]
 
-  //TODO make this independent of MongoQScript and move to a place where all
-  //     connector tests can refer to it
-  val simpleJoin: Fix[fs.MongoQScript[Fix, ?]] =
+  val simpleInnerEquiJoinWithExpression =
     fix.EquiJoin(
       fix.Unreferenced,
       free.Filter(
         free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-        func.Guard(func.Hole, Type.AnyObject, func.Constant(ejs.bool(true)), func.Constant(ejs.bool(false)))),
+        func.Guard(
+          func.Guard(func.Hole, Type.AnyObject, func.ProjectKeyS(func.Hole, "_id"), func.Undefined),
+          Type.Str,
+          func.Constant(json.bool(true)),
+          func.Constant(json.bool(false)))),
       free.Filter(
         free.ShiftedRead[AFile](rootDir </> dir("db") </> file("smallZips"), qscript.ExcludeId),
-        func.Guard(func.Hole, Type.AnyObject, func.Constant(ejs.bool(true)), func.Constant(ejs.bool(false)))),
-      List((func.ProjectKeyS(func.Hole, "_id"), func.ProjectKeyS(func.Hole, "_id"))),
+        func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
+      List(
+        (
+          func.Guard(
+            func.Hole,
+            Type.AnyObject,
+            func.Lower(
+              func.ProjectKeyS(func.Hole, "_id")),
+            func.Undefined),
+          func.ProjectKeyS(func.Hole, "_id"))),
       JoinType.Inner,
-      func.ProjectKeyS(func.RightSide, "city"))
+      func.ConcatMaps(
+        func.MakeMap(
+          func.Constant(json.str("city")),
+          // qscript is generated with 3 guards here:
+          // func.Guard(
+          //   func.Guard(func.LeftSide, Type.AnyObject, func.LeftSide, func.Undefined),
+          //   Type.AnyObject,
+          //   func.Guard(func.LeftSide, Type.AnyObject, func.ProjectKeyS(func.LeftSide, "city"), func.Undefined),
+          //   func.Undefined)),
+          func.Guard(func.LeftSide, Type.AnyObject, func.ProjectKeyS(func.LeftSide, "city"), func.Undefined)),
+        func.MakeMap(
+          func.Constant(json.str("state")),
+          func.Guard(func.RightSide, Type.AnyObject, func.ProjectKeyS(func.RightSide, "state"), func.Undefined))))
+
+  val simpleInnerEquiJoinWithPrefiltering =
+    fix.EquiJoin(
+      fix.Unreferenced,
+      free.Filter(
+        free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
+        func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
+      free.Filter(
+        free.ShiftedRead[AFile](rootDir </> dir("test") </> file("smallZips"), qscript.ExcludeId),
+        func.Guard(
+          func.Guard(func.Hole, Type.AnyObject,
+            func.ProjectKeyS(func.Hole, "pop"),
+            func.Undefined),
+          Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Int, Type.Dec), Type.Interval), Type.Str), Type.Coproduct(Type.Coproduct(Type.Timestamp, Type.Date), Type.Time)), Type.Bool),
+          func.Guard(func.Hole, Type.AnyObject,
+            func.Gte(
+              func.ProjectKeyS(func.Hole, "pop"),
+              func.Constant(json.int(10000))),
+            func.Undefined),
+          func.Undefined)),
+      List(
+        (
+          func.ProjectKeyS(func.Hole, "_id"),
+          func.Guard(func.Hole, Type.AnyObject,
+            func.ProjectKeyS(func.Hole, "_id"),
+            func.Undefined))),
+      JoinType.Inner,
+      func.ConcatMaps(
+        func.MakeMap(
+          func.Constant(json.str("city")),
+          func.Guard(
+            func.LeftSide,
+            Type.AnyObject,
+            func.ProjectKeyS(func.LeftSide, "city"),
+            func.Undefined)),
+        func.MakeMap(
+          func.Constant(json.str("state")),
+          func.Guard(
+            func.Guard(
+              func.RightSide,
+              Type.AnyObject,
+              func.RightSide,
+              func.Undefined),
+            Type.AnyObject,
+            func.Guard(
+              func.RightSide,
+              Type.AnyObject,
+              func.ProjectKeyS(func.RightSide, "state"),
+              func.Undefined),
+            func.Undefined))))
+
+  val threeWayEquiJoin =
+    fix.EquiJoin(
+      fix.Unreferenced,
+      free.Filter(
+        free.EquiJoin(
+          free.Unreferenced,
+          free.Filter(
+            free.ShiftedRead[AFile](
+              rootDir </> dir("db") </> file("extraSmallZips"),
+              qscript.ExcludeId),
+            func.Guard(
+              func.Hole,
+              Type.AnyObject,
+              func.Constant(json.bool(true)),
+              func.Constant(json.bool(false)))),
+          free.Filter(
+            free.ShiftedRead[AFile](
+              rootDir </> dir("db") </> file("smallZips"),
+              qscript.ExcludeId),
+            func.Guard(
+              func.Hole,
+              Type.AnyObject,
+              func.Constant(json.bool(true)),
+              func.Constant(json.bool(false)))),
+          List(
+            (
+              func.ProjectKeyS(func.Hole, "_id"),
+              func.ProjectKeyS(func.Hole, "_id"))),
+          JoinType.Inner,
+          func.ConcatArrays(
+            func.MakeArray(func.LeftSide),
+            func.MakeArray(func.RightSide))),
+        func.Guard(
+          func.ProjectIndexI(func.Hole, 1),
+          Type.AnyObject,
+          func.Constant(json.bool(true)),
+          func.Constant(json.bool(false)))),
+      free.Filter(
+        free.ShiftedRead[AFile](
+          rootDir </> dir("db") </> file("zips"),
+          qscript.ExcludeId),
+        func.Guard(
+          func.Hole,
+          Type.AnyObject,
+          func.Constant(json.bool(true)),
+          func.Constant(json.bool(false)))),
+      List(
+        (
+          func.ProjectKeyS(func.ProjectIndexI(func.Hole, 1), "_id"),
+          func.ProjectKeyS(func.Hole, "_id"))),
+      JoinType.Inner,
+      func.ConcatMaps(
+        func.ConcatMaps(
+          func.MakeMap(
+            func.Constant(json.str("city")),
+            func.Guard(
+              func.ConcatMaps(
+                func.MakeMap(
+                  func.Constant(json.str("left")),
+                  func.ProjectIndexI(func.LeftSide, 0)),
+                func.MakeMap(
+                  func.Constant(json.str("right")),
+                  func.ProjectIndexI(func.LeftSide, 1))),
+              Type.AnyObject,
+              func.Guard(
+                func.ProjectIndexI(func.LeftSide, 0),
+                Type.AnyObject,
+                func.ProjectKeyS(func.ProjectIndexI(func.LeftSide, 0), "city"),
+                func.Undefined),
+              func.Undefined)),
+          func.MakeMap(
+            func.Constant(json.str("state")),
+            func.Guard(
+              func.ConcatMaps(
+                func.MakeMap(func.Constant(json.str("left")),
+                  func.ProjectIndexI(func.LeftSide, 0)),
+                func.MakeMap(
+                  func.Constant(json.str("right")),
+                  func.ProjectIndexI(func.LeftSide, 1))),
+              Type.AnyObject,
+              func.Guard(
+                func.ProjectIndexI(func.LeftSide, 1),
+                Type.AnyObject,
+                func.ProjectKeyS(func.ProjectIndexI(func.LeftSide, 1), "state"),
+                func.Undefined),
+              func.Undefined))),
+        func.MakeMap(
+          func.Constant(json.str("pop")),
+          func.Guard(
+            func.RightSide,
+            Type.AnyObject,
+            func.ProjectKeyS(func.RightSide, "pop"),
+            func.Undefined))))
 
   "plan from qscript" should {
-    "plan simple join ($lookup)" in {
-      qplan(simpleJoin) must beWorkflow0(chain[Workflow](
+
+    "plan simple inner equi-join with expression ($lookup)" in {
+      qplan(simpleInnerEquiJoinWithExpression) must beWorkflow0(chain[Workflow](
         $read(collection("db", "zips")),
+        $project(reshape(
+          JoinDir.Left.name -> $$ROOT,
+          "__tmp0" -> $toLower($field("_id"))),
+          IgnoreId),
+        $lookup(
+          CollectionName("smallZips"),
+          BsonField.Name("_id"),
+          BsonField.Name("__tmp0"),
+          JoinHandler.RightName),
+        $project(reshape(
+          JoinDir.Left.name -> $field(JoinDir.Left.name),
+          JoinDir.Right.name -> $field(JoinDir.Right.name))),
+        $unwind(DocField(JoinHandler.RightName)),
+        $project(reshape(
+          "city" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+              $field(JoinDir.Left.name, "city"),
+              $literal(Bson.Undefined)),
+          "state" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+              $field(JoinDir.Right.name, "state"),
+              $literal(Bson.Undefined))),
+          IgnoreId)))
+          // There are unnecessary stages and there's a $match that is a NOP
+          // but at least it's on agg
+    }.pendingWithActual(notOnPar, qtestFile("plan simple inner equi-join with expression ($lookup)"))
+
+    "plan simple inner equi-join with pre-filtering ($lookup)" in {
+      qplan(simpleInnerEquiJoinWithPrefiltering) must beWorkflow0(chain[Workflow](
+        $read(collection("db", "smallZips")),
+        $match(
+          Selector.And(
+            isNumeric(BsonField.Name("pop")),
+            Selector.Doc(
+              BsonField.Name("pop") -> Selector.Gte(Bson.Int32(10000))))),
+        $project(reshape(
+          JoinDir.Right.name -> $$ROOT,
+          "__tmp2" -> $field("_id")),
+          ExcludeId),
+        $lookup(
+          CollectionName("zips"),
+          BsonField.Name("__tmp2"),
+          BsonField.Name("_id"),
+          JoinHandler.LeftName),
+        $project(reshape(
+          JoinDir.Right.name -> $field(JoinDir.Right.name),
+          JoinDir.Left.name -> $field(JoinDir.Left.name))),
+        $unwind(DocField(JoinHandler.LeftName)),
+        $project(reshape(
+          "city" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+              $field(JoinDir.Left.name, "city"),
+              $literal(Bson.Undefined)),
+          "state" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+              $field(JoinDir.Right.name, "state"),
+              $literal(Bson.Undefined))),
+          IgnoreId)))
+          // Not on agg
+    }.pendingWithActual(notOnPar, qtestFile("plan simple inner equi-join with pre-filtering ($lookup)"))
+
+    "plan 3-way equi-join ($lookup)" in {
+      qplan(simpleInnerEquiJoinWithPrefiltering) must beWorkflow0(chain[Workflow](
+        $read(collection("db", "extraSmallZips")),
         $match(Selector.Doc(
           BsonField.Name("_id") -> Selector.Exists(true))),
         $project(reshape(JoinDir.Left.name -> $$ROOT)),
@@ -77,10 +321,50 @@ class PlannerQScriptSpec extends
           BsonField.Name("_id"),
           JoinHandler.RightName),
         $unwind(DocField(JoinHandler.RightName)),
-        $project(
-          reshape(sigil.Quasar -> $field(JoinDir.Right.name, "city")),
-          ExcludeId)))
-    }
+        $match(Selector.Doc(
+          JoinHandler.RightName \ BsonField.Name("_id") -> Selector.Exists(true))),
+        $project(reshape(JoinDir.Left.name -> $$ROOT)),
+        $lookup(
+          CollectionName("zips"),
+          JoinHandler.LeftName \ JoinHandler.RightName \ BsonField.Name("_id"),
+          BsonField.Name("_id"),
+          JoinHandler.RightName),
+        $unwind(DocField(JoinHandler.RightName)),
+        $project(reshape(
+          "city" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+              $cond(
+                $and(
+                  $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Left.name)),
+                  $lt($field(JoinDir.Left.name, JoinDir.Left.name), $literal(Bson.Arr()))),
+                $field(JoinDir.Left.name, JoinDir.Left.name, "city"),
+                $literal(Bson.Undefined)),
+              $literal(Bson.Undefined)),
+          "state" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+              $cond(
+                $and(
+                  $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Right.name)),
+                  $lt($field(JoinDir.Left.name, JoinDir.Right.name), $literal(Bson.Arr()))),
+                $field(JoinDir.Left.name, JoinDir.Right.name, "state"),
+                $literal(Bson.Undefined)),
+              $literal(Bson.Undefined)),
+          "pop" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+              $field(JoinDir.Right.name, "pop"),
+              $literal(Bson.Undefined))),
+          IgnoreId)))
+          // Not on agg
+    }.pendingWithActual(notOnPar, qtestFile("plan 3-way equi-join ($lookup)"))
 
     "plan typechecks with JS when unable to extract ExprOp" in {
       import fix.{Filter, ShiftedRead}, qscript.IncludeId
@@ -92,8 +376,8 @@ class PlannerQScriptSpec extends
           Guard(
             ProjectKeyS(ProjectIndexI(Hole, 1), "parentid"),
             Type.Str,
-            Constant(ejs.bool(false)),
-            Constant(ejs.bool(true))))) must beWorkflow0(
+            Constant(json.bool(false)),
+            Constant(json.bool(true))))) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "zips")),
           $project(reshape("0" -> $arrayLit(List($field("_id"), $$ROOT)))),
@@ -117,5 +401,6 @@ class PlannerQScriptSpec extends
           )),
           $project(reshape(sigil.Quasar -> $field("src")))))
     }
+
   }
 }

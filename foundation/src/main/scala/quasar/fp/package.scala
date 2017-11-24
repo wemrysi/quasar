@@ -244,8 +244,8 @@ package object fp
   implicit def finEqual[N <: Succ[_]]: Equal[Fin[N]] = Equal.equal((a, b) => true)
   implicit def finShow[N <: Succ[_]]: Show[Fin[N]] = Show.showFromToString
 
-  implicit val symbolEqual: Equal[Symbol] = Equal.equalA
   implicit val symbolShow: Show[Symbol] = Show.showFromToString
+  implicit val symbolOrder: Order[Symbol] = Order.orderBy(_.name)
 
   implicit final class QuasarFreeOps[F[_], A](val self: Free[F, A]) extends scala.AnyVal {
     type Self    = Free[F, A]

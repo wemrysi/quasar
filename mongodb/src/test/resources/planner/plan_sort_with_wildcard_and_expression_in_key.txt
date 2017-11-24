@@ -5,7 +5,7 @@ Chain
 │  │  ╰─ Let(__val)
 │  │     ├─ JsCore([remove(_, "__sd__0"), _])
 │  │     ╰─ Obj
-│  │        ├─ Key(0: (isNumber(__val[1].pop) || ((__val[1].pop instanceof NumberInt) || (__val[1].pop instanceof NumberLong))) ? __val[1].pop * 10 : undefined)
+│  │        ├─ Key(0: (isNumber(__val[1].pop) || ((__val[1].pop instanceof NumberInt) || (__val[1].pop instanceof NumberLong))) ? __val[1].pop / 10 : undefined)
 │  │        ╰─ Key(src: __val)
 │  ╰─ Scope(Map())
 ├─ $SortF

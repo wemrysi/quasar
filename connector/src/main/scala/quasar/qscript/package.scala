@@ -83,6 +83,23 @@ package object qscript {
       Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].prj(qt)
   }
 
+  /** Initial QScript. */
+  // FIXME should not include `Read[ADir]`
+  type QScriptEducated[T[_[_]], A] =
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :\: Const[Read[ADir], ?] :/: Const[Read[AFile], ?])#M[A]
+
+  def educatedToTotal[T[_[_]]]
+      : Injectable.Aux[QScriptEducated[T, ?], QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[Read[ADir], ?], Const[Read[AFile], ?]]))
+
+  object QCE {
+    def apply[T[_[_]], A](qc: QScriptCore[T, A]): QScriptEducated[T, A] =
+      Inject[QScriptCore[T, ?], QScriptEducated[T, ?]].inj(qc)
+
+    def unapply[T[_[_]], A](qt: QScriptEducated[T, A]): Option[QScriptCore[T, A]] =
+      Inject[QScriptCore[T, ?], QScriptEducated[T, ?]].prj(qt)
+  }
+
   /** QScript that has not gone through Read conversion. */
   type QScript[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[DeadEnd, ?])#M[A]

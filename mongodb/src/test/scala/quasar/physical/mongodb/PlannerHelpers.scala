@@ -20,15 +20,18 @@ import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._, Helpers._
+import quasar.contrib.specs2._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
-import quasar.{jscore => js}
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
+import quasar.javascript._
+import quasar.{jscore => js}
+import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.DiscoverPath
-import quasar.sql , sql._
+import quasar.sql._
 
 import java.io.{File => JFile}
 import java.time.Instant
@@ -41,12 +44,36 @@ import matryoshka.implicits._
 import org.bson.BsonDocument
 import org.specs2.execute._
 import org.specs2.matcher.{Matcher, Expectable}
+import org.specs2.specification.core.Fragment
 import pathy.Path._
 import scalaz._, Scalaz._
 
 object PlannerHelpers {
+  import Grouped.grouped
+  import Reshape.reshape
+  import jscore._
+
+  import fixExprOp._
+
+  sealed trait TestStatus
+  case object Ok extends TestStatus
+  case class Pending(s: String) extends TestStatus
+
+  case class QsSpec(
+    sqlToQs: TestStatus,
+    qsToWf: TestStatus,
+    qscript: Fix[fs.MongoQScript[Fix, ?]]
+  )
+  case class PlanSpec(
+    name: String,
+    sqlToWf: TestStatus,
+    sql: Fix[Sql],
+    qspec: Option[QsSpec],
+    workflow: Workflow
+  )
 
   val notOnPar = "Not on par with old (LP-based) connector."
+  val nonOptimalQs = "QScript not optimal"
 
   import fixExprOp._
 
@@ -134,10 +161,10 @@ object PlannerHelpers {
           FileName("nullsWithMissing").right,
           FileName("cars").right,
           FileName("cars2").right,
-          FileName("extraSmallZips").right,
-          FileName("smallZips").right,
           FileName("zips").right,
           FileName("zips2").right,
+          FileName("extraSmallZips").right,
+          FileName("smallZips").right,
           FileName("largeZips").right,
           FileName("a").right,
           FileName("slamengine_commits").right,
@@ -167,6 +194,18 @@ object PlannerHelpers {
     } yield lp
   }
 
+  def sqlToQscript[M[_]: Monad: MonadFsErr: PhaseResultTell]
+      (sql: Fix[Sql],
+        lc: DiscoverPath.ListContents[M])
+      : M[Fix[fs.MongoQScript[Fix, ?]]] =
+    for {
+      lp <- compileSqlToLP[M](sql)
+      qs <- MongoDb.lpToQScript(lp, lc)
+    } yield qs
+
+  def planSqlToQScript(query: Fix[Sql]): Either[FileSystemError, Fix[fs.MongoQScript[Fix, ?]]] =
+    sqlToQscript(query, listContents).run.value.toEither
+
   def queryPlanner[M[_]: Monad: MonadFsErr: PhaseResultTell]
       (sql: Fix[Sql],
         model: MongoQueryModel,
@@ -175,13 +214,11 @@ object PlannerHelpers {
         lc: DiscoverPath.ListContents[M],
         anyDoc: Collection => OptionT[M, BsonDocument],
         execTime: Instant)
-      : M[Crystallized[WorkflowF]] = {
+      : M[Crystallized[WorkflowF]] =
     for {
-      lp <- compileSqlToLP[M](sql)
-      qs <- MongoDb.lpToQScript(lp, lc)
+      qs <- sqlToQscript(sql, lc)
       repr <- MongoDb.doPlan[Fix, M](qs, fs.QueryContext(stats, indexes), model, anyDoc, execTime)
     } yield repr
-  }
 
   val defaultStats: Collection => Option[CollectionStatistics] =
     κ(CollectionStatistics(10, 100, false).some)
@@ -242,15 +279,83 @@ object PlannerHelpers {
 
   def qtestFile(testName: String): JFile = jFile(toRFile("q " + testName))
 
+  def joinStructure0(
+    left: Workflow, leftName: String, leftBase: Fix[ExprOp], right: Workflow,
+    leftKey: Reshape.Shape[ExprOp], rightKey: (String, Fix[ExprOp], Reshape.Shape[ExprOp]) \/ JsCore,
+    fin: FixOp[WorkflowF],
+    swapped: Boolean) = {
+
+    val (leftLabel, rightLabel) =
+      if (swapped) (JoinDir.Right.name, JoinDir.Left.name) else (JoinDir.Left.name, JoinDir.Right.name)
+    def initialPipeOps(
+      src: Workflow, name: String, base: Fix[ExprOp], key: Reshape.Shape[ExprOp], mainLabel: String, otherLabel: String):
+        Workflow =
+      chain[Workflow](
+        src,
+        $group(grouped(name -> $push(base)), key),
+        $project(
+          reshape(
+            mainLabel  -> $field(name),
+            otherLabel -> $literal(Bson.Arr(List())),
+            "_id"      -> $include()),
+          IncludeId))
+    fin(
+      $foldLeft(
+        initialPipeOps(left, leftName, leftBase, leftKey, leftLabel, rightLabel),
+        chain[Workflow](
+          right,
+          rightKey.fold(
+            rk => initialPipeOps(_, rk._1, rk._2, rk._3, rightLabel, leftLabel),
+            rk => $map($MapF.mapKeyVal(("key", "value"),
+              rk.toJs,
+              Js.AnonObjDecl(List(
+                (leftLabel, Js.AnonElem(List())),
+                (rightLabel, Js.AnonElem(List(Js.Ident("value"))))))),
+              ListMap())),
+          $reduce(
+            Js.AnonFunDecl(List("key", "values"),
+              List(
+                Js.VarDef(List(
+                  ("result", Js.AnonObjDecl(List(
+                    (leftLabel, Js.AnonElem(List())),
+                    (rightLabel, Js.AnonElem(List()))))))),
+                Js.Call(Js.Select(Js.Ident("values"), "forEach"),
+                  List(Js.AnonFunDecl(List("value"),
+                    List(
+                      Js.BinOp("=",
+                        Js.Select(Js.Ident("result"), leftLabel),
+                        Js.Call(
+                          Js.Select(Js.Select(Js.Ident("result"), leftLabel), "concat"),
+                          List(Js.Select(Js.Ident("value"), leftLabel)))),
+                      Js.BinOp("=",
+                        Js.Select(Js.Ident("result"), rightLabel),
+                        Js.Call(
+                          Js.Select(Js.Select(Js.Ident("result"), rightLabel), "concat"),
+                          List(Js.Select(Js.Ident("value"), rightLabel)))))))),
+                Js.Return(Js.Ident("result")))),
+            ListMap()))))
+  }
+
+  def joinStructure(
+      left: Workflow, leftName: String, leftBase: Fix[ExprOp], right: Workflow,
+      leftKey: Reshape.Shape[ExprOp], rightKey: (String, Fix[ExprOp], Reshape.Shape[ExprOp]) \/ JsCore,
+      fin: FixOp[WorkflowF],
+      swapped: Boolean) =
+    Crystallize[WorkflowF].crystallize(joinStructure0(left, leftName, leftBase, right, leftKey, rightKey, fin, swapped))
+
+
 }
 
 trait PlannerHelpers extends
     org.specs2.mutable.Specification with
     org.specs2.ScalaCheck with
     CompilerHelpers with
-    TreeMatchers {
+    TreeMatchers with
+    PendingWithActualTracking {
 
   import PlannerHelpers._
+
+  val mode = TestMode
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf, addDetails = false))
   def beWorkflow0(wf: Workflow) = beRight(equalToWorkflow(wf, addDetails = true))
@@ -263,4 +368,52 @@ trait PlannerHelpers extends
      phys <- MongoDb.doPlan[Fix, EitherWriter](qs, fs.QueryContext(defaultStats, defaultIndexes), MongoQueryModel.`3.2`, emptyDoc, Instant.now)
     } yield phys).run.value.toEither
   }
+
+  def testPlanSpec(s: PlanSpec): Fragment = {
+    val planName = s"plan ${s.name}"
+    planName >> {
+      s.qspec.map { qspec =>
+        val f = qtestFile(planName)
+        qspec.qsToWf match {
+          case Ok =>
+            "qscript -> wf" in {
+              if (f.exists) {
+                failure(s"$f exists but expectation status is Ok. Either change status or remove file.")
+              }
+              qplan(qspec.qscript) must beWorkflow(s.workflow)
+            }
+          case Pending(str) =>
+            "qscript -> wf" in {
+              qplan(qspec.qscript) must beWorkflow0(s.workflow)
+            }.pendingWithActual(str, f)
+        }
+        qspec.sqlToQs match {
+          case Ok =>
+            "sql^2 -> qscript" >> {
+              planSqlToQScript(s.sql) must beRight(beTreeEqual(qspec.qscript))
+            }
+          case Pending(str) =>
+            "sql^2 -> qscript" >> {
+              planSqlToQScript(s.sql) must beRight(beTreeEqual(qspec.qscript))
+            }.pendingUntilFixed(str)
+        }
+      }
+      val f = testFile(planName)
+      s.sqlToWf match {
+        case Ok =>
+          "sql^2 -> wf" in {
+            if (f.exists) {
+              failure(s"$f exists but expectation status is Ok. Either change status or remove file.")
+            }
+            PlannerHelpers.plan(s.sql) must beWorkflow(s.workflow)
+          }
+        case Pending(str) =>
+          "sql^2 -> wf" in {
+            PlannerHelpers.plan(s.sql) must beWorkflow0(s.workflow)
+          }.pendingWithActual(str, f)
+      }
+    }
+  }
+
+
 }
