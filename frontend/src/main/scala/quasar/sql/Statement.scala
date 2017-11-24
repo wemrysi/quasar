@@ -32,6 +32,8 @@ import scalaz.Liskov._
 
 sealed abstract class Statement[BODY] extends Product with Serializable {
   def pprint(implicit ev: BODY <~< String): String
+  def pprintF(implicit ev: BODY <~< Fix[Sql]): String =
+    this.map(b => quasar.sql.pprint(ev(b))).pprint
 }
 
 object Statement {
@@ -65,8 +67,10 @@ object Statement {
     FunctionDecl(name, args, f(body))
   def transformBodyM[M[_]: Functor, B](f: BODY => M[B]) =
     f(body).map(FunctionDecl(name, args, _))
-  override def pprint(implicit ev: BODY <~< String) =
-    s"CREATE FUNCTION ${name.shows}(${args.map(":" + _.shows).mkString(", ")})\n  BEGIN\n    ${ev(body)}\n  END"
+  override def pprint(implicit ev: BODY <~< String) = {
+    val argList = args.map(name => ":" + escape("`", name.shows)).mkString(", ")
+    s"CREATE FUNCTION ${name.shows}($argList)\n  BEGIN\n    ${ev(body)}\n  END"
+  }
   def applyArgs[T[_[_]]: BirecursiveT](argsProvided: List[T[Sql]])(implicit ev: BODY <~< T[Sql]): SemanticError \/ T[Sql] = {
     val expected = args.size
     val actual   = argsProvided.size
