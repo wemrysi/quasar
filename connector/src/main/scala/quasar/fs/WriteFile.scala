@@ -221,8 +221,9 @@ object WriteFile {
       MF.tempFile(dst).liftM[Process] flatMap { tmp =>
         appendChunked(tmp, src)
           .map(some).append(Process.emit(none))
-          // TODO: Explain why this is correct because `take(1)` seems all kind of
-          // wrong or write a test to expose the problem
+          // Since `appendChunked` only streams errors we only need to look at the first one
+          // to either have written the entire stream or to have seen the first error in
+          // which case we want to abort anyway
           .take(1)
           .flatMap(_.cata[Process[M,Unit]](
             werr => Process.eval[M, Unit](EitherT(MF.deleteOrIgnore(tmp).as(werr.left))),

@@ -30,7 +30,7 @@ import scalaz._, Scalaz._
 object constantPlans {
 
   /** Identify plans which reduce to a (set of) constant value(s). */
-  def isConstant(lp: Fix[LogicalPlan]): Option[List[Data]] =
+  def asConstant(lp: Fix[LogicalPlan]): Option[List[Data]] =
     lp.project match {
       case Constant(Data.Set(records)) => records.some
       case Constant(value)             => List(value).some
@@ -62,13 +62,12 @@ object constantPlans {
 
     λ[QueryFile ~> Free[S, ?]] {
       case ExecutePlan(lp, out) =>
-        isConstant(lp).fold(
+        asConstant(lp).fold(
           query.execute(lp, out).run.run)(
-          // I believe it is safe to call void here because we generated the data
-          data => write.saveThese(out, data.toVector).void.run.strengthL(Vector(constantPhase)))
+          data => write.saveThese(out, data.toVector).run.strengthL(Vector(constantPhase)))
 
       case EvaluatePlan(lp) =>
-        isConstant(lp).fold(
+        asConstant(lp).fold(
           queryUnsafe.eval(lp).run.run)(
           data => dataHandle(data).map(h => (Vector(constantPhase), h.right)))
 
@@ -84,7 +83,7 @@ object constantPlans {
       case Explain(lp) =>
         val constantExecutionPlan =
           ExecutionPlan(FileSystemType("constant"), "none", ISet.empty)
-        isConstant(lp).fold(
+        asConstant(lp).fold(
           query.explain(lp).run.run)(
           data => (Vector(constantPhase), constantExecutionPlan.right[FileSystemError]).point[Free[S, ?]])
 

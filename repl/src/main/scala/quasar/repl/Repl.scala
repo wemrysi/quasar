@@ -165,7 +165,7 @@ object Repl {
 
       queryPlan(expr, vars, basePath, 0L, None)
         .liftM[FileSystemErrT]
-        .flatMap(_.traverse_(logQS))
+        .flatMap(logQS)
         .run.run.run
     }
 

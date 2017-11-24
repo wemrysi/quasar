@@ -327,7 +327,7 @@ object QueryFile {
       * fails if the directory does not exist.
       */
     def ls(dir: ADir): M[Set[PathSegment]] =
-      EitherT(lift(ListContents(dir)))
+      listContents(dir)
 
     /** Returns all files in this directory and all of it's sub-directories
       * Fails if the directory does not exist.

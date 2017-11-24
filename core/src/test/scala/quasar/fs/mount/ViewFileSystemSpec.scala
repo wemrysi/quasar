@@ -742,7 +742,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       val qlp =
         quasar.queryPlan(q, Variables.empty, rootDir, 0L, None)
-          .run.value.valueOr(e => scala.sys.error("Unexpected error compiling sql query:" + e.shows))
+          .run.value.valueOr(e => scala.sys.error("Unexpected error compiling sql query: " + e.shows))
 
       val vs = Map[AFile, Fix[Sql]](p -> q)
 

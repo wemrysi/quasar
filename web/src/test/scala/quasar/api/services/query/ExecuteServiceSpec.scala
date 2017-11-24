@@ -143,6 +143,17 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
           stateCheck = Some(s => s.contents.keys must contain(expectedDestinationPath)))
       }}
     }
+    "execute a constant query" >> {
+      "GET" >> {
+        val query = "1 + 1"
+        get(executeService)(
+          path = rootDir,
+          query = Some(Query(query)),
+          state = emptyMem,
+          status = Status.Ok,
+          response = (a: String) => a must_=== "2\r\n")
+      }
+    }
     "response with view cache headers" >> {
       "fresh" >> prop {
           (now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
