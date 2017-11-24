@@ -1,0 +1,17 @@
+{
+  "name": "bug2227",
+  "NB": "This test is basically charting on queries with reductions",
+  "backends": {
+    "mimir": "ignoreFieldOrder"
+  },
+  "data": "patients.data",
+  "query": "select city, sum(cnt) as c from (select city, count(*) as cnt from patients where state = \"NY\" group by city order by count(*) desc) as meh group by city order by c desc",
+  "predicate": "atLeast",
+  "ignoreResultOrder": true,
+  "NB": "ignoreResultOrder is needed for atLeast, which sucks",
+  "expected": [
+    { "city": "NEW YORK", "c": 4 },
+    { "city": "ROCHESTER", "c": 2 },
+    { "city": "SOUTHAMPTON", "c": 1 }
+  ]
+}
