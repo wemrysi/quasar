@@ -1,0 +1,8 @@
+{
+    "name": "structureTestDeep",
+    "data": "structureTestDeep.data",
+    "query": "SELECT MAP_CONCAT(DELETE_KEY(t2, \"c\"), {\"test\": MAP_CONCAT(t2.test, {\"c\": MAP_CONCAT(t2.test.c, t2.c) ?? t2.c}) ?? {\"c\": t2.c}}) ?? t2 FROM (SELECT MAP_CONCAT(DELETE_KEY(t1, \"b\"), {\"test\": MAP_CONCAT(t1.test, {\"b\": MAP_CONCAT(t1.test.b, t1.b) ?? t1.b}) ?? {\"b\": t1.b}}) ?? t1 FROM (SELECT MAP_CONCAT(DELETE_KEY(t0, \"a\"), {\"test\": MAP_CONCAT(t0.test, {\"a\": MAP_CONCAT(t0.test.a, t0.a) ?? t0.a}) ?? {\"a\": t0.a}}) ?? t0 FROM structureTestDeep AS t0) AS t1) AS t2",
+    "NB": "Right now, this test is just checking compilation. Need confirmation from @garyb on the expected results",
+    "predicate": "exactly",
+    "expected": []
+}
