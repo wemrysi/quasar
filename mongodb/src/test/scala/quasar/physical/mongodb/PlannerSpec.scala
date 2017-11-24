@@ -75,6 +75,7 @@ class PlannerSpec extends
     "having with multiple projections" in {
       plan(sqlE"select city, sum(pop) from extraSmallZips group by city having sum(pop) > 40000") must
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, MatchOp, ProjectOp)))
+        // Q3021
         // FIXME Fails with:
         // [error] x having with multiple projections (5 seconds, 908 ms)
         // [error]  'Left(QScriptPlanningFailed(InternalError(Invalid filter predicate, 'qsu14, must be a mappable function of 'qsu8.,None)))' is not Right (PlannerSpec.scala:65)
@@ -107,6 +108,7 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp)))
     }
 
+    // Q3171
     // FIXME errors with
     // [error]     java.lang.IndexOutOfBoundsException: 1
     // [error]     	at scala.collection.LinearSeqOptimized$class.apply(LinearSeqOptimized.scala:65)
@@ -128,7 +130,8 @@ class PlannerSpec extends
     "expr3 with grouping" in {
       plan(sqlE"select case when pop > 1000 then city else lower(city) end, count(*) from zips group by city") must
         beRight
-        //FIXME fails with: an implementation is missing (ReifyIdentities.scala:358)
+        // Q3172
+        // FIXME fails with: an implementation is missing (ReifyIdentities.scala:358)
     }.pendingUntilFixed
 
     "plan count and sum grouped by single field" in {
@@ -197,6 +200,7 @@ class PlannerSpec extends
       plan(sqlE"SELECT `_id` as zip, loc as loc, loc[*] as coord FROM zips"),
       IList(ReadOp, ProjectOp, UnwindOp, ProjectOp))
 
+    // Q3021
     // FIXME fails with:
     // 'Left(QScriptPlanningFailed(InternalError(Invalid filter predicate, 'qsu10, must be a mappable function of 'qsu4.,None)))' is not Right (PlannerSpec.scala:63)
     // trackPending(
@@ -204,6 +208,7 @@ class PlannerSpec extends
     //   plan(sqlE"select loc[*] from zips where loc[*] < 0"),
     //   IList(ReadOp, ProjectOp, UnwindOp, MatchOp, ProjectOp))
 
+    // Q3021
     // FIXME fails with:
     // 'Left(QScriptPlanningFailed(InternalError(Invalid group key, 'qsu15, must be a mappable function of 'qsu4.,None)))' is not Right (PlannerSpec.scala:63)
     // trackPending(
@@ -216,6 +221,7 @@ class PlannerSpec extends
       plan(sqlE"select `_id` as zip, loc[*] from zips order by loc[*]"),
       IList(ReadOp, ProjectOp, UnwindOp, SortOp))
 
+    // Q3021
     // FIXME fails with:
     // 'Left(QScriptPlanningFailed(InternalError(Invalid filter predicate, 'qsu22, must be a mappable function of 'qsu4.,None)))' is not Right (PlannerSpec.scala:63)
     // trackPending(
@@ -896,9 +902,10 @@ class PlannerSpec extends
                     $literal(Bson.Undefined))),
               IgnoreId)),
           false).op)
-    //FIXME fails with:
-    //'Left(QScriptPlanningFailed(InternalError(Invalid join condition, 'qsu21, must be a mappable function of 'qsu11 and 'qsu14.,None)))' is not Right (PendingWithActualTracking.scala:94)
-    //}.pendingWithActual(notOnPar, testFile("plan join with non-JS-able condition"))
+    // Q3021
+    // FIXME fails with:
+    // 'Left(QScriptPlanningFailed(InternalError(Invalid join condition, 'qsu21, must be a mappable function of 'qsu11 and 'qsu14.,None)))' is not Right (PendingWithActualTracking.scala:94)
+    // }.pendingWithActual(notOnPar, testFile("plan join with non-JS-able condition"))
   }.pendingUntilFixed
 
     "plan simple cross" in {
@@ -979,6 +986,7 @@ class PlannerSpec extends
         appropriateColumns(wf, q)
         rootPushes(wf) must_== Nil
       }
+      //Q3174
       //FIXME has dangling reference
     }.pendingUntilFixed
   }
