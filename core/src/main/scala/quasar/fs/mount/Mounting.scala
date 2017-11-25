@@ -19,6 +19,7 @@ package quasar.fs.mount
 import slamdata.Predef._
 import quasar.{QuasarError, Variables}
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz._
 import quasar.effect.LiftedOps
 import quasar.fp.ski._
 import quasar.fs._
@@ -113,8 +114,7 @@ object Mounting {
         EitherT.right(OptionT(viewConfig.getOption(config).map(ViewConfig.tupled).point[FreeS])))
 
     def lookupViewConfigIgnoreError(path: AFile): OptionT[FreeS, ViewConfig] =
-      lookupViewConfig(path).run
-        .flatMap(either => OptionT(either.toOption.η[Free[S, ?]]))
+      lookupViewConfig(path).toOption.squash
 
     def lookupModuleConfig(path: ADir): EitherT[OptionT[FreeS, ?], MountingError, ModuleConfig] =
       lookupConfig(path).flatMap(config =>
