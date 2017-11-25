@@ -1,7 +1,7 @@
 {
     "name": "union",
     "backends": {
-        "mimir":"pendingIgnoreFieldOrder",
+        "mimir":"ignoreFieldOrder",
         "marklogic_xml": "skip",
         "couchbase": "pending"
     },

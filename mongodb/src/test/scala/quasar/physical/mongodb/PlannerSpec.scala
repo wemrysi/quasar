@@ -80,12 +80,12 @@ class PlannerSpec extends
     "sort with expression and alias" in {
       plan(sqlE"select pop/1000 as popInK from zips order by popInK") must
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, SortOp)))
-    }.pendingUntilFixed
+    }
 
     "sort with expression, alias, and filter" in {
       plan(sqlE"select pop/1000 as popInK from zips where pop >= 1000 order by popInK") must
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, MatchOp, ProjectOp, SortOp)))
-    }.pendingUntilFixed
+    }
 
     "useful group by" in {
       plan(sqlE"""select city || ", " || state, sum(pop) from extraSmallZips group by city, state""") must
@@ -106,7 +106,7 @@ class PlannerSpec extends
     "expr3 with grouping" in {
       plan(sqlE"select case when pop > 1000 then city else lower(city) end, count(*) from zips group by city") must
         beRight
-    }
+    }.pendingUntilFixed
 
     "plan count and sum grouped by single field" in {
       plan(sqlE"select count(*) as cnt, sum(pop) as sm from zips group by state") must
@@ -194,7 +194,7 @@ class PlannerSpec extends
     "plan complex group by with sorting and limiting" in {
       plan(sqlE"SELECT city, SUM(pop) AS pop FROM zips GROUP BY city ORDER BY pop") must
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp, SortOp)))
-    }.pendingUntilFixed
+    }
 
     "plan implicit group by with filter" in {
       plan(sqlE"""select avg(pop), min(city) from zips where state = "CO" """) must
@@ -204,12 +204,12 @@ class PlannerSpec extends
     "plan distinct as expression" in {
       plan(sqlE"select count(distinct(city)) from zips") must
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, GroupOp, ProjectOp)))
-    }.pendingUntilFixed
+    }
 
     "plan distinct of expression as expression" in {
       plan(sqlE"select count(distinct substring(city, 0, 1)) from zips") must
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, GroupOp, ProjectOp)))
-    }.pendingUntilFixed
+    }
 
     "plan distinct with unrelated order by" in {
       plan(sqlE"select distinct city from zips order by pop desc") must
@@ -292,7 +292,7 @@ class PlannerSpec extends
               reshape(sigil.Quasar -> $field("__tmp11", "city")),
               ExcludeId)),
           false).op)
-    }.pendingWithActual("#1560", testFile("plan non-equi join"))
+    }.pendingUntilFixed
 
     "plan simple inner equi-join (map-reduce)" in {
       plan2_6(
@@ -327,7 +327,7 @@ class PlannerSpec extends
                     $literal(Bson.Undefined))),
               IgnoreId)),
           false).op)
-    }.pendingWithActual("#1560", testFile("plan simple inner equi-join (map-reduce)"))
+    }.pendingUntilFixed
 
     "plan simple inner equi-join with expression ($lookup)" in {
       plan3_4(
@@ -366,7 +366,7 @@ class PlannerSpec extends
               $field(JoinDir.Right.name, "state"),
               $literal(Bson.Undefined))),
           IgnoreId)))
-    }.pendingWithActual("#1560", testFile("plan simple inner equi-join with expression ($lookup)"))
+    }.pendingUntilFixed
 
     "plan simple inner equi-join with pre-filtering ($lookup)" in {
       plan3_4(
@@ -410,7 +410,7 @@ class PlannerSpec extends
               $field(JoinDir.Right.name, "state"),
               $literal(Bson.Undefined))),
           IgnoreId)))
-    }.pendingWithActual("#1560", testFile("plan simple inner equi-join with pre-filtering ($lookup)"))
+    }.pendingUntilFixed
 
     "plan simple outer equi-join with wildcard" in {
       plan(sqlE"select * from foo full join bar on foo.id = bar.foo_id") must
@@ -459,7 +459,7 @@ class PlannerSpec extends
               reshape(sigil.Quasar -> $field("__tmp7")),
               ExcludeId)),
           false).op)
-    }.pendingWithActual("#1560", testFile("plan simple outer equi-join with wildcard"))
+    }.pendingUntilFixed
 
     "plan simple left equi-join (map-reduce)" in {
       plan(
@@ -501,7 +501,7 @@ class PlannerSpec extends
                     $literal(Bson.Undefined))),
               IgnoreId)),
           false).op)
-    }.pendingWithActual("#1560", testFile("plan simple left equi-join (map-reduce)"))
+    }.pendingUntilFixed
 
     "plan simple left equi-join ($lookup)" in {
       plan3_4(
@@ -534,7 +534,7 @@ class PlannerSpec extends
               $field(JoinDir.Right.name, "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
-    }.pendingWithActual("TODO: left/right joins in $lookup", testFile("plan simple left equi-join ($lookup)"))
+    }.pendingUntilFixed
 
     "plan simple right equi-join ($lookup)" in {
       plan3_4(
@@ -567,7 +567,7 @@ class PlannerSpec extends
               $field(JoinDir.Right.name, "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
-    }.pendingWithActual("TODO: left/right joins in $lookup", testFile("plan simple right equi-join ($lookup)"))
+    }.pendingUntilFixed
 
     "plan 3-way right equi-join (map-reduce)" in {
       plan2_6(
@@ -637,7 +637,7 @@ class PlannerSpec extends
                     $literal(Bson.Undefined))),
               IgnoreId)),
           true).op)
-    }.pendingWithActual("#1560", testFile("plan 3-way right equi-join (map-reduce)"))
+    }.pendingUntilFixed
 
     "plan 3-way equi-join ($lookup)" in {
       plan3_4(
@@ -698,7 +698,7 @@ class PlannerSpec extends
                 $field(JoinDir.Right.name, "pop"),
                 $literal(Bson.Undefined))),
             IgnoreId)))
-    }.pendingWithActual("#1560", testFile("plan 3-way equi-join ($lookup)"))
+    }.pendingUntilFixed
 
     "plan count of $lookup" in {
       plan3_4(
@@ -730,7 +730,7 @@ class PlannerSpec extends
             "_id" -> $field("_id", "0"),
             "1"   -> $include),
           IgnoreId)))
-    }.pendingWithActual(notOnPar, testFile("plan count of $lookup"))
+    }.pendingUntilFixed
 
     "plan join with multiple conditions" in {
       plan(sqlE"select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth from slamengine_commits as l join slamengine_commits as r on r.sha = l.parents[0].sha and l.author.login = r.author.login") must
@@ -800,7 +800,7 @@ class PlannerSpec extends
                     $literal(Bson.Undefined))),
               IgnoreId)),
         false).op)
-    }.pendingWithActual("#1560", testFile("plan join with multiple conditions"))
+    }.pendingUntilFixed
 
     "plan join with non-JS-able condition" in {
       plan(sqlE"select z1.city as city1, z1.loc, z2.city as city2, z2.pop from zips as z1 join zips as z2 on z1.loc[*] = z2.loc[*]") must
@@ -864,7 +864,7 @@ class PlannerSpec extends
                     $literal(Bson.Undefined))),
               IgnoreId)),
           false).op)
-    }.pendingWithActual("#1560", testFile("plan join with non-JS-able condition"))
+    }.pendingUntilFixed
 
     "plan simple cross" in {
       plan(sqlE"select zips2.city from zips, zips2 where zips.pop < zips2.pop") must
@@ -927,7 +927,7 @@ class PlannerSpec extends
               reshape(sigil.Quasar -> $field("__tmp11", "city")),
               ExcludeId)),
           false).op)
-    }.pendingWithActual("#1560", testFile("plan simple cross"))
+    }.pendingUntilFixed
 
     "SD-1263 specific case of plan multiple reducing projections (all, distinct, orderBy)" in {
       val q = sqlE"select distinct loc || [pop - 1] as p1, pop - 1 as p2 from zips group by territory order by p2".project.asInstanceOf[Select[Fix[Sql]]]
@@ -944,7 +944,7 @@ class PlannerSpec extends
         appropriateColumns(wf, q)
         rootPushes(wf) must_== Nil
       }
-    }
+    }.pendingUntilFixed
 
   }
 }

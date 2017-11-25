@@ -18,6 +18,8 @@ package quasar
 package connector
 
 import slamdata.Predef._
+
+import quasar.Planner.PlannerError
 import quasar.Data
 import quasar.common._
 import quasar.concurrent.Pools._
@@ -30,8 +32,10 @@ import quasar.fp.free._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fs._
+import quasar.fs.FileSystemError.qscriptPlanningFailed
 import quasar.fs.mount._
 import quasar.qscript._
+import quasar.qscript.qsu.LPtoQS
 import quasar.qscript.RenderQScriptDSL._
 
 import matryoshka.{Hole => _, _}
@@ -148,12 +152,16 @@ trait BackendModule {
 
     type QSR[A] = QScriptRead[T, A]
 
+    type X[A] = EitherT[StateT[M, Long, ?], PlannerError, A]
+
     val R = new Rewrite[T]
 
     for {
-      qs <- QueryFile.convertToQScriptRead[T, M, QSR](lc)(lp)
-      shifted <- Unirewrite[T, QS[T], M](R, lc).apply(qs)
+      qs <- MonadFsErr[M].unattempt(
+        LPtoQS[T].apply[X](lp).leftMap(qscriptPlanningFailed(_)).run.eval(0))
+      _ <- logPhase[M](PhaseResult.tree("QScript (Educated)", qs))
 
+      shifted <- Unirewrite[T, QS[T], M](R, lc).apply(qs)
       _ <- logPhase[M](PhaseResult.treeAndCode("QScript (ShiftRead)", shifted))
 
       optimized =

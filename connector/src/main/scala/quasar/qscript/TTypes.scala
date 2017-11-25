@@ -29,11 +29,11 @@ trait TTypes[T[_[_]]] {
   // Partially applying types with the known T.
   // In this context we shouldn't often need to refer to the original type
   // any longer, so reuse the name.
-  type EquiJoin[A]       = quasar.qscript.EquiJoin[T, A]
   type QScriptCore[A]    = quasar.qscript.QScriptCore[T, A]
   type QScriptTotal[A]   = quasar.qscript.QScriptTotal[T, A]
   type ProjectBucket[A]  = quasar.qscript.ProjectBucket[T, A]
   type ThetaJoin[A]      = quasar.qscript.ThetaJoin[T, A]
+  type EquiJoin[A]       = quasar.qscript.EquiJoin[T, A]
   type MapFuncCore[A]    = quasar.qscript.MapFuncCore[T, A]
   type MapFuncDerived[A] = quasar.qscript.MapFuncDerived[T, A]
   type MapFunc[A]        = quasar.qscript.MapFunc[T, A]

@@ -7,7 +7,8 @@
         "mimir":             "skip"
     },
 
-    "NB": "#1587: Disabled in couchbase due to lack of general join; disabled in mimir because it takes forever",
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
+    "NB2": "Disabled in mimir because it times out (on the qsu branch).",
 
     "data": ["../largeZips.data", "../zips.data"],
 

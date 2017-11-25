@@ -33,7 +33,17 @@ case object StringCol extends ColumnType
 case object IntCol extends ColumnType
 case object NullCol extends ColumnType
 
-final case class ColumnDesc(name: String, tpe: ColumnType)
+final case class ColumnDesc(name: String, tpe: ColumnType) {
+
+  override def equals(other: scala.Any): Boolean = {
+    other match {
+      case other@ColumnDesc(_, _) => TableModel.columnDescEq.equal(this, other)
+      case _                      => false
+    }
+  }
+
+  override def hashCode: Int = name.hashCode
+}
 
 sealed trait TableModel
 

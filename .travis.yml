@@ -15,7 +15,7 @@ stages:
   - name: test
   - name: publish
     # weirdly, we have to add the extra PR check
-    if: (NOT type = pull_request) AND (NOT branch IN (next-major))
+    if: (NOT type = pull_request) AND (NOT branch IN (next-major, qsu))
 
 # this all goes in the test stage
 env:
@@ -149,6 +149,7 @@ branches:
   only:
     - master
     - next-major
+    - qsu
     - /^backport.*$/
 
 cache:
