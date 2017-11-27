@@ -5,7 +5,6 @@
         "mimir":             "pending",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",
-        "mongodb_read_only": "pending",
         "spark_cassandra":   "pending"
     },
     "data": "olympics.data",
