@@ -18,7 +18,7 @@ package quasar.contrib.scalaz
 
 import slamdata.Predef._
 
-import scalaz.{Bind, Functor, Monad, MonadState, StateT}
+import scalaz.{Bind, Functor, Monad, Monoid, MonadState, StateT, WriterT}
 import scalaz.syntax.monad._
 
 /** A version of MonadState that doesn't extend Monad to avoid ambiguous
@@ -35,20 +35,30 @@ trait MonadState_[F[_], S] {
     F.bind(get)(f andThen put)
 }
 
-object MonadState_ {
+object MonadState_ extends MonadState_Instances {
   def apply[F[_], S](implicit F: MonadState_[F, S]): MonadState_[F, S] = F
+}
 
-  implicit def monadStateNoMonad[F[_], S](implicit F: MonadState[F, S])
-      : MonadState_[F, S] =
-    new MonadState_[F, S] {
-      def get = F.get
-      def put(s: S) = F.put(s)
-    }
-
+sealed abstract class MonadState_Instances extends MonadState_Instances0 {
   implicit def monadStateWithinState[F[_]: Monad, S1, S2](implicit F: MonadState_[F, S1])
       : MonadState_[StateT[F, S2, ?], S1] =
     new MonadState_[StateT[F, S2, ?], S1] {
       def get = F.get.liftM[StateT[?[_], S2, ?]]
       def put(s: S1) = F.put(s).liftM[StateT[?[_], S2, ?]]
+    }
+
+  implicit def writerTMonadState[F[_]: Monad, W: Monoid, S](implicit F: MonadState_[F, S]): MonadState_[WriterT[F, W, ?], S] =
+    new MonadState_[WriterT[F, W, ?], S] {
+      def get = F.get.liftM[WriterT[?[_], W, ?]]
+      def put(s: S) = F.put(s).liftM[WriterT[?[_], W, ?]]
+    }
+}
+
+sealed abstract class MonadState_Instances0 {
+  implicit def monadStateNoMonad[F[_], S](implicit F: MonadState[F, S])
+      : MonadState_[F, S] =
+    new MonadState_[F, S] {
+      def get = F.get
+      def put(s: S) = F.put(s)
     }
 }
