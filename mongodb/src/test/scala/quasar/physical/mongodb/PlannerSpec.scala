@@ -86,12 +86,10 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp)))
     }
 
-    trackPending(
-      "sort wildcard on expression",
-      plan(sqlE"select * from zips order by pop/10 desc"),
-      //FIXME these 2 SimpleMapOps conflict with the asserts of notBroken
-      //See which one we have to change
-      IList(ReadOp, SimpleMapOp, SimpleMapOp, SortOp, ProjectOp))
+    "sort wildcard on expression" in {
+      plan(sqlE"select * from zips order by pop/10 desc") must
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, SimpleMapOp, SortOp, ProjectOp)))
+    }
 
     "sort with expression and alias" in {
       plan(sqlE"select pop/1000 as popInK from zips order by popInK") must
