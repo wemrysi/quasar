@@ -54,11 +54,11 @@ Chain
 │  ├─ Map
 │  │  ╰─ Obj
 │  │     ├─ Key(zip: (isObject(_.s) && (! Array.isArray(_.s))) ? _.s._id : undefined)
-│  │     ├─ Key(loc: (isObject(_.s) && (! Array.isArray(_.s))) ? _.s.loc : undefined)
-│  │     ╰─ Key(coord: _.f)
+│  │     ╰─ Key(loc: _.f)
 │  ╰─ Scope(Map())
+├─ $SortF
+│  ╰─ SortKey(loc -> Ascending)
 ╰─ $ProjectF
    ├─ Name("zip" -> true)
    ├─ Name("loc" -> true)
-   ├─ Name("coord" -> true)
    ╰─ ExcludeId
