@@ -145,9 +145,9 @@ object mount {
                    BadRequest, msg).left))
       exists <- M.lookupType(path).run.isDefined.liftM[ApiErrT]
       _      <- (replaceIfExists && exists).fold(M.replace(path, bConf), M.mount(path, bConf)).liftM[ApiErrT]
-      maxAge =  req.headers.get(`Cache-Control`).flatMap(_.values.list.collectFirst(_ match {
+      maxAge =  req.headers.get(`Cache-Control`).flatMap(_.values.list.collectFirst {
                   case `max-age`(s) => s
-                }))
+                })
       _      <- (refineType(path).toOption ⊛ MountConfig.viewConfig.getOption(bConf).map(MountConfig.ViewConfig.tupled) ⊛ maxAge)(createNewViewCache[S])
                   .getOrElse(().point[EitherT[Free[S, ?], ApiError, ?]])
     } yield exists

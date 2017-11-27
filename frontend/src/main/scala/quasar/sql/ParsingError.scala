@@ -31,4 +31,9 @@ final case class ParsingPathError(error: PathError) extends ParsingError {
 
 object ParsingError {
   implicit val parsingErrorShow: Show[ParsingError] = Show.showFromToString
+  implicit val equal: Equal[ParsingError] = Equal.equal {
+    case (GenericParsingError(m1), GenericParsingError(m2)) => m1 ≟ m2
+    case (ParsingPathError(e1), ParsingPathError(e2))       => e1 ≟ e2
+    case _                                                  => false
+  }
 }
