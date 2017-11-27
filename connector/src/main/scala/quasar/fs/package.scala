@@ -39,21 +39,21 @@ package object fs extends PhysicalErrorPrisms {
     def apply[F[_]](implicit F: MonadFsErr[F]): MonadFsErr[F] = F
   }
 
-  trait Node {
+  sealed trait Node {
     def segment: PathSegment
     def `type`: Node.Type
   }
-  trait FileNode extends Node {
+  sealed trait FileNode extends Node {
     def name: FileName
     def segment: PathSegment = name.right
   }
-  trait DirNode  extends Node {
+  sealed trait DirNode  extends Node {
     def name: DirName
     def segment: PathSegment = name.left
   }
   object Node {
 
-    trait Type
+    sealed trait Type
     case object View        extends Type
     case object Function    extends Type
     case object Data        extends Type
