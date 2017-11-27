@@ -46,7 +46,7 @@ import org.specs2.execute._
 import org.specs2.matcher.{Matcher, Expectable}
 import org.specs2.specification.core.Fragment
 import pathy.Path._
-import scalaz._, Scalaz._
+import scalaz.{Success => _, _}, Scalaz._
 
 object PlannerHelpers {
   import Grouped.grouped
@@ -358,10 +358,21 @@ trait PlannerHelpers extends
 
   import PlannerHelpers._
 
-  val mode = TestMode
+  val mode: Mode = TestMode
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf, addDetails = false))
   def beWorkflow0(wf: Workflow) = beRight(equalToWorkflow(wf, addDetails = true))
+
+  def trackActual(wf: Crystallized[WorkflowF], file: JFile): Result = {
+    val st = RenderTree[Crystallized[WorkflowF]].render(wf)
+    mode match {
+      case TestMode =>
+        st.shows must_== unsafeRead(file)
+      case WriteMode =>
+        unsafeWrite(file, st.shows)
+        Success(s" Wrote file with new actual $file")
+    }
+  }
 
   def planLP(logical: Fix[LP]): Either[FileSystemError, Crystallized[WorkflowF]] = {
     (for {
