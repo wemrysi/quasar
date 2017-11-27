@@ -128,7 +128,7 @@ class PlannerSpec extends
     "expr3 with grouping" in {
       plan(sqlE"select case when pop > 1000 then city else lower(city) end, count(*) from zips group by city") must
         beRight
-        // Q3172
+        // Q3114
         // FIXME fails with: an implementation is missing (ReifyIdentities.scala:358)
     }.pendingUntilFixed
 
@@ -153,14 +153,12 @@ class PlannerSpec extends
     trackPending(
       "double aggregation with another projection",
       plan(sqlE"select sum(avg(pop)), min(city) from zips group by state"),
-      IList(ReadOp, GroupOp, GroupOp, UnwindOp)
-    )
+      IList(ReadOp, GroupOp, GroupOp, UnwindOp))
 
     trackPending(
       "multiple expressions using same field",
       plan(sqlE"select pop, sum(pop), pop/1000 from zips"),
-      IList(ReadOp, ProjectOp, GroupOp, UnwindOp, ProjectOp)
-    )
+      IList(ReadOp, ProjectOp, GroupOp, UnwindOp, ProjectOp))
 
     "plan sum of expression in expression with another projection when grouped" in {
       plan(sqlE"select city, sum(pop-1)/1000 from zips group by city") must
@@ -170,8 +168,7 @@ class PlannerSpec extends
     trackPending(
       "length of min (JS on top of reduce)",
       plan3_2(sqlE"select state, length(min(city)) as shortest from zips group by state"),
-      IList(ReadOp, GroupOp, ProjectOp, SimpleMapOp, ProjectOp)
-    )
+      IList(ReadOp, GroupOp, ProjectOp, SimpleMapOp, ProjectOp))
 
     "plan js expr grouped by js expr" in {
       plan3_2(sqlE"select length(city) as len, count(*) as cnt from zips group by length(city)") must
@@ -984,7 +981,7 @@ class PlannerSpec extends
         appropriateColumns(wf, q)
         rootPushes(wf) must_== Nil
       }
-      //Q3174
+      //Q3154
       //FIXME has dangling reference
     }.pendingUntilFixed
   }
