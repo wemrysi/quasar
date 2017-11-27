@@ -1,0 +1,20 @@
+{
+    "name": "sort with expression and alias",
+    "backends": {
+    },
+    "data": "largeZips.data",
+    "query": "select pop/1000 as popInK from largeZips order by popInK",
+    "predicate": "initial",
+    "expected": [
+        { "popInK": 0.0 },
+        { "popInK": 0.0 },
+        { "popInK": 0.01 },
+        { "popInK": 0.011 },
+        { "popInK": 0.021 },
+        { "popInK": 0.028 },
+        { "popInK": 0.034 },
+        { "popInK": 0.046 },
+        { "popInK": 0.049 },
+        { "popInK": 0.053 },
+        { "popInK": 0.053 }]
+}

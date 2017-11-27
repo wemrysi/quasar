@@ -1,9 +1,30 @@
 Chain
 ├─ $FoldLeftF
 │  ├─ Chain
-│  │  ├─ $ReadF(db; foo)
+│  │  ├─ $ReadF(db; zips)
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("0" -> { "$literal": true })
+│  │  │  ├─ Name("0" -> {
+│  │  │  │       "$cond": [
+│  │  │  │         {
+│  │  │  │           "$and": [
+│  │  │  │             {
+│  │  │  │               "$lte": [
+│  │  │  │                 { "$literal": {  } },
+│  │  │  │                 {
+│  │  │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
+│  │  │  │                 }]
+│  │  │  │             },
+│  │  │  │             {
+│  │  │  │               "$lt": [
+│  │  │  │                 {
+│  │  │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
+│  │  │  │                 },
+│  │  │  │                 { "$literal": [] }]
+│  │  │  │             }]
+│  │  │  │         },
+│  │  │  │         { "$literal": true },
+│  │  │  │         { "$literal": false }]
+│  │  │  │     })
 │  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $MatchF
@@ -12,7 +33,7 @@ Chain
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
 │  │  │  │  ╰─ Obj
-│  │  │  │     ├─ Key(0: _.src[1].id)
+│  │  │  │     ├─ Key(0: _.src[1]._id)
 │  │  │  │     ╰─ Key(content: _.src)
 │  │  │  ╰─ Scope(Map())
 │  │  ├─ $GroupF
@@ -28,24 +49,24 @@ Chain
 │  │     │  ╰─ Name("_id" -> "$_id")
 │  │     ╰─ IncludeId
 │  ╰─ Chain
-│     ├─ $ReadF(db; bar)
+│     ├─ $ReadF(db; smallZips)
 │     ├─ $ProjectF
 │     │  ├─ Name("0" -> ["$_id", "$$ROOT"])
 │     │  ╰─ ExcludeId
 │     ├─ $SimpleMapF
 │     │  ├─ Map
 │     │  │  ╰─ Obj
-│     │  │     ├─ Key(0: _["0"][1].rating)
+│     │  │     ├─ Key(0: _["0"][1].pop)
 │     │  │     ╰─ Key(src: _["0"])
 │     │  ╰─ Scope(Map())
 │     ├─ $MatchF
 │     │  ╰─ Doc
-│     │     ╰─ Expr($0 -> Gte(Int32(4)))
+│     │     ╰─ Expr($0 -> Gte(Int32(10000)))
 │     ├─ $MapF
 │     │  ├─ JavaScript(function (key, value) {
 │     │  │               return [
 │     │  │                 {
-│     │  │                   "0": (isObject(value.src[1]) && (! Array.isArray(value.src[1]))) ? value.src[1].foo_id : undefined
+│     │  │                   "0": (isObject(value.src[1]) && (! Array.isArray(value.src[1]))) ? value.src[1]._id : undefined
 │     │  │                 },
 │     │  │                 { "left": [], "right": [value.src] }]
 │     │  │             })
@@ -70,12 +91,12 @@ Chain
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
-│  │     ├─ Key(name: (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1].name : undefined)
-│  │     ╰─ Key(address: ((isObject(
+│  │     ├─ Key(city: (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1].city : undefined)
+│  │     ╰─ Key(state: ((isObject(
 │  │            (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1] : undefined) && (! Array.isArray(
-│  │            (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1] : undefined))) && (isObject(_.right[1]) && (! Array.isArray(_.right[1])))) ? _.right[1].address : undefined)
+│  │            (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1] : undefined))) && (isObject(_.right[1]) && (! Array.isArray(_.right[1])))) ? _.right[1].state : undefined)
 │  ╰─ Scope(Map())
 ╰─ $ProjectF
-   ├─ Name("name" -> true)
-   ├─ Name("address" -> true)
+   ├─ Name("city" -> true)
+   ├─ Name("state" -> true)
    ╰─ ExcludeId

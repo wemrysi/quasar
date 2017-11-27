@@ -20,10 +20,12 @@ import slamdata.Predef._
 import quasar.physical.rdbms.fs.RdbmsDescribeTable
 import quasar.physical.rdbms.common._
 import quasar.physical.rdbms.common.TablePath._
-
 import doobie.imports._
-import scalaz.syntax.show._
-import scalaz.syntax.applicative._
+import quasar.physical.rdbms.model._
+import quasar.physical.rdbms.model.TableModel._
+
+import scalaz._
+import Scalaz._
 
 trait PostgresDescribeTable extends RdbmsDescribeTable {
 
@@ -74,13 +76,31 @@ trait PostgresDescribeTable extends RdbmsDescribeTable {
       .map(_.map(Schema.apply))
   }
 
+
   override def schemaExists(schema: Schema): ConnectionIO[Boolean] =
     if (schema.isRoot) true.point[ConnectionIO]
     else
-      descQuery(whereSchema(schema), _.nonEmpty)
+      sql"""SELECT 1 FROM information_schema.schemata WHERE SCHEMA_NAME=${schema.shows}"""
+      .query[Int]
+      .list
+      .map(_.nonEmpty)
 
   override def tableExists(
       tablePath: TablePath): ConnectionIO[Boolean] =
     descQuery(whereSchemaAndTable(tablePath), _.nonEmpty)
+
+  def tableModel(tablePath: TablePath): ConnectionIO[Option[TableModel]] = {
+    val cols = descQuery(whereSchemaAndTable(tablePath), _.map {
+      case (colName, colTypeStr) =>
+        ColumnDesc(colName, colTypeStr.mapToColumnType)
+    })
+
+    cols.map {
+      case Nil => None
+      case c :: Nil if c.tpe === JsonCol => Some(JsonTable)
+      case multipleCols => Some(ColumnarTable.fromColumns(multipleCols))
+    }
+
+  }
 
 }

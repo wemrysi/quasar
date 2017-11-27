@@ -62,7 +62,10 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
   val qsu = QScriptUniform.DslT[Fix]
 
-  val (func, fqse, qse) = construction.mkDefaults[Fix, QSE]
+  val defaults = construction.mkDefaults[Fix, QSE]
+  val func = defaults.func
+  val fqse = defaults.free
+  val qse = defaults.fix
 
   val root = Path.rootDir[Sandboxed]
   val afile: AFile = root </> file("foobar")

@@ -1,5 +1,10 @@
 {
     "name": "filter, skip, limit, and count",
+    "backends": {
+        "couchbase":         "pending"
+    },
+
+    "NB": "Pending on couchbase due to #3158",
 
     "data": "zips.data",
 

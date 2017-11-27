@@ -22,7 +22,7 @@ import quasar.db.DbConnectionConfig
 import quasar.fp._
 import quasar.fp.free._
 import quasar.main._
-import quasar.metastore.MetaStoreFixture
+import quasar.metastore.{MetaStore, MetaStoreFixture, Schema}
 
 import argonaut._, Argonaut._
 import org.http4s._, Status._
@@ -57,8 +57,12 @@ class MetastoreServiceSpec extends quasar.Qspec {
             "userName" := "bob",
             "password" := "****"))
     }
-    "succeed in changing metastore" in {
+    "succeed in changing metastore without initialize parameter if metastore is already initialized" in {
       val newConn = MetaStoreFixture.createNewTestMetaStoreConfig.unsafePerformSync
+      // Connect to it beforehand to initialize it
+      val meta = MetaStore.connect(newConn, initializeOrUpdate = true, List(Schema.schema))
+                   .run.unsafePerformSync.valueOr(e => scala.sys.error("Failed to initialize test metastore because: " + e.message))
+      meta.shutdown.unsafePerformSync
       val req = Request(method = PUT).withBody(newConn.asJson).unsafePerformSync
       val resp = service()(req).unsafePerformSync
       val expectedUrl = DbConnectionConfig.connectionInfo(newConn).url
@@ -75,16 +79,23 @@ class MetastoreServiceSpec extends quasar.Qspec {
     }
     "persist change to metastore" in {
       val newConn = MetaStoreFixture.createNewTestMetaStoreConfig.unsafePerformSync
-      val req = Request(method = PUT).withBody(newConn.asJson).unsafePerformSync
+      val req = Request(method = PUT, uri = Uri().+?("initialize")).withBody(newConn.asJson).unsafePerformSync
       var persisted: DbConnectionConfig = null
       def persist(db: DbConnectionConfig): MainTask[Unit] = Task.delay(persisted = db).liftM[MainErrT]
       val resp = service(persist)(req).unsafePerformSync
-      persisted must_=== newConn
+      "Config was persisted" ==> (persisted must_=== newConn)
     }
     "fail to change metastore with invalid configuration" in {
       val req = Request(method = PUT).withBody(Json("hello" := "there")).unsafePerformSync
       val resp = service()(req).unsafePerformSync
       resp.as[String].unsafePerformSync must_=== """{ "error": { "status": "Bad Request", "detail": { "message": "unrecognized metastore type: hello; expected 'h2' or 'postgresql'" } } }"""
+      resp.status must_=== BadRequest
+    }
+    "fail to change metastore if metastore is not already initialized (or updated) and initialize parameter was not used" in {
+      val newConn = MetaStoreFixture.createNewTestMetaStoreConfig.unsafePerformSync
+      val req = Request(method = PUT).withBody(newConn.asJson).unsafePerformSync
+      val resp = service()(req).unsafePerformSync
+      resp.as[String].unsafePerformSync must_=== """{ "error": { "status": "Bad Request", "detail": { "message": "MetaStore requires initialization, try running the 'initUpdateMetaStore' command." } } }"""
       resp.status must_=== BadRequest
     }
   }

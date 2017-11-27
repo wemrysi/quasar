@@ -19,13 +19,10 @@ package quasar.qscript.qsu
 import slamdata.Predef._
 import quasar.NameGenerator
 import quasar.Planner.PlannerErrorME
-import quasar.fp.{coproductShow, symbolShow}
 import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka.{delayShow, showTShow, BirecursiveT, EqualT, ShowT}
-import matryoshka.data._
 import scalaz.{Applicative, Functor, Kleisli => K, Monad}
-import scalaz.std.map._
 import scalaz.syntax.applicative._
 import scalaz.syntax.show._
 
@@ -46,8 +43,8 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
       ExtractFreeMap[T, F]           >=>
       debugG("ExtractFM: ")          >==>
       ApplyProvenance[T].apply[F]    >=>
-      debugAG("ApplyProv: ")         >-
-      ReifyBuckets[T]                >=>
+      debugAG("ApplyProv: ")         >==>
+      ReifyBuckets[T, F]             >=>
       debugAG("ReifyBuckets: ")      >==>
       MinimizeAutoJoins[T].apply[F]  >=>
       debugAG("MinimizeAJ: ")        >==>
@@ -69,7 +66,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
 
   private def debugAG[F[_]: Applicative](prefix: String): K[F, AuthenticatedQSU[T], AuthenticatedQSU[T]] =
     K { aqsu =>
-      maybePrint("\n\n" + prefix + aqsu.graph.shows + "\n" + aqsu.dims.shows)
+      maybePrint("\n\n" + prefix + aqsu.shows)
       aqsu.point[F]
     }
 

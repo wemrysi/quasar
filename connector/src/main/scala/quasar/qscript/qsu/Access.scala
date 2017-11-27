@@ -81,9 +81,6 @@ object Access extends AccessInstances {
     Prism.partial[Access[A], A] {
       case Value(a) => a
     } (Value(_))
-
-  implicit def renderTree[A: Show]: RenderTree[Access[A]] =
-    RenderTree.fromShowAsType("Access")
 }
 
 sealed abstract class AccessInstances extends AccessInstances0 {
@@ -100,6 +97,9 @@ sealed abstract class AccessInstances extends AccessInstances0 {
 
   implicit def order[A: Order]: Order[Access[A]] =
     Order.orderBy(generic(_))
+
+  implicit def renderTree[A: Show]: RenderTree[Access[A]] =
+    RenderTree.fromShowAsType("Access")
 
   implicit def show[A: Show]: Show[Access[A]] =
     Show.shows {

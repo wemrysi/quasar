@@ -1,25 +1,21 @@
 Chain
 ├─ $FoldLeftF
 │  ├─ Chain
-│  │  ├─ $ReadF(db; foo)
-│  │  ├─ $ProjectF
-│  │  │  ├─ Name("0" -> { "$literal": true })
-│  │  │  ├─ Name("src" -> ["$_id", "$$ROOT"])
-│  │  │  ╰─ ExcludeId
-│  │  ├─ $MatchF
-│  │  │  ╰─ Doc
-│  │  │     ╰─ Expr($0 -> Eq(Bool(true)))
-│  │  ├─ $SimpleMapF
-│  │  │  ├─ Map
-│  │  │  │  ╰─ Obj
-│  │  │  │     ├─ Key(0: _.src[1].id)
-│  │  │  │     ╰─ Key(content: _.src)
-│  │  │  ╰─ Scope(Map())
+│  │  ├─ $ReadF(db; cars)
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
-│  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
+│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
 │  │  │  ╰─ By
-│  │  │     ╰─ Name("0" -> "$0")
+│  │  │     ╰─ Name("0" -> {
+│  │  │             "$cond": [
+│  │  │               {
+│  │  │                 "$and": [
+│  │  │                   { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│  │  │                   { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │  │               },
+│  │  │               "$_id",
+│  │  │               { "$literal": undefined }]
+│  │  │           })
 │  │  ╰─ $ProjectF
 │  │     ├─ Name("_id" -> "$_id")
 │  │     ├─ Name("value")
@@ -28,17 +24,14 @@ Chain
 │  │     │  ╰─ Name("_id" -> "$_id")
 │  │     ╰─ IncludeId
 │  ╰─ Chain
-│     ├─ $ReadF(db; bar)
-│     ├─ $ProjectF
-│     │  ├─ Name("0" -> { "$literal": true })
-│     │  ├─ Name("src" -> ["$_id", "$$ROOT"])
-│     │  ╰─ ExcludeId
-│     ├─ $MatchF
-│     │  ╰─ Doc
-│     │     ╰─ Expr($0 -> Eq(Bool(true)))
+│     ├─ $ReadF(db; cars2)
 │     ├─ $MapF
 │     │  ├─ JavaScript(function (key, value) {
-│     │  │               return [{ "0": value.src[1].foo_id }, { "left": [], "right": [value.src] }]
+│     │  │               return [
+│     │  │                 {
+│     │  │                   "0": (isObject(value) && (! Array.isArray(value))) ? value._id : undefined
+│     │  │                 },
+│     │  │                 { "left": [], "right": [value] }]
 │     │  │             })
 │     │  ╰─ Scope(Map())
 │     ╰─ $ReduceF
@@ -58,13 +51,95 @@ Chain
 │     ╰─ NotExpr($right -> Size(0))
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(name: (isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1].name : undefined)
-│  │     ╰─ Key(address: (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1].address : undefined)
-│  ╰─ Scope(Map())
 ╰─ $ProjectF
-   ├─ Name("name" -> true)
-   ├─ Name("address" -> true)
+   ├─ Name("name" -> {
+   │       "$cond": [
+   │         {
+   │           "$and": [
+   │             {
+   │               "$lte": [
+   │                 { "$literal": {  } },
+   │                 {
+   │                   "$cond": [
+   │                     {
+   │                       "$and": [
+   │                         { "$lte": [{ "$literal": {  } }, "$left"] },
+   │                         { "$lt": ["$left", { "$literal": [] }] }]
+   │                     },
+   │                     "$left",
+   │                     { "$literal": undefined }]
+   │                 }]
+   │             },
+   │             {
+   │               "$lt": [
+   │                 {
+   │                   "$cond": [
+   │                     {
+   │                       "$and": [
+   │                         { "$lte": [{ "$literal": {  } }, "$left"] },
+   │                         { "$lt": ["$left", { "$literal": [] }] }]
+   │                     },
+   │                     "$left",
+   │                     { "$literal": undefined }]
+   │                 },
+   │                 { "$literal": [] }]
+   │             }]
+   │         },
+   │         {
+   │           "$cond": [
+   │             {
+   │               "$and": [
+   │                 { "$lte": [{ "$literal": {  } }, "$left"] },
+   │                 { "$lt": ["$left", { "$literal": [] }] }]
+   │             },
+   │             "$left.name",
+   │             { "$literal": undefined }]
+   │         },
+   │         { "$literal": undefined }]
+   │     })
+   ├─ Name("year" -> {
+   │       "$cond": [
+   │         {
+   │           "$and": [
+   │             {
+   │               "$lte": [
+   │                 { "$literal": {  } },
+   │                 {
+   │                   "$cond": [
+   │                     {
+   │                       "$and": [
+   │                         { "$lte": [{ "$literal": {  } }, "$right"] },
+   │                         { "$lt": ["$right", { "$literal": [] }] }]
+   │                     },
+   │                     "$right",
+   │                     { "$literal": undefined }]
+   │                 }]
+   │             },
+   │             {
+   │               "$lt": [
+   │                 {
+   │                   "$cond": [
+   │                     {
+   │                       "$and": [
+   │                         { "$lte": [{ "$literal": {  } }, "$right"] },
+   │                         { "$lt": ["$right", { "$literal": [] }] }]
+   │                     },
+   │                     "$right",
+   │                     { "$literal": undefined }]
+   │                 },
+   │                 { "$literal": [] }]
+   │             }]
+   │         },
+   │         {
+   │           "$cond": [
+   │             {
+   │               "$and": [
+   │                 { "$lte": [{ "$literal": {  } }, "$right"] },
+   │                 { "$lt": ["$right", { "$literal": [] }] }]
+   │             },
+   │             "$right.year",
+   │             { "$literal": undefined }]
+   │         },
+   │         { "$literal": undefined }]
+   │     })
    ╰─ ExcludeId

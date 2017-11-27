@@ -56,7 +56,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
 
   // needed to avoid bug in implicit search!  don't import QP.prov._
   private implicit val QPEq: Equal[QP.P] =
-    QP.prov.provenanceEqual(scala.Predef.implicitly, Equal[FreeMapA[Access[Hole]]])
+    QP.prov.provenanceEqual(scala.Predef.implicitly, Equal[FreeMapA[Access[Symbol]]])
 
   def apply[F[_]: Monad: NameGenerator: PlannerErrorME](agraph: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] = {
     type G[A] = StateT[StateT[F, RevIdx, ?], QSUDims[T], A]
@@ -290,8 +290,8 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
       qgraph <- QSUGraph.withName[T, G](pat)
 
       dims <- MonadState_[G, QSUDims[T]].get
-      computed <- AP.computeProvenanceƒ[G].apply(QSUGraph.QSUPattern(qgraph.root, pat.map(dims)))
-      dims2 = dims + (qgraph.root -> computed)
+      computed <- AP.computeProvenanceƒ[G].apply(QSUGraph.QSUPattern(qgraph.root, pat.map(s => (s, dims(s)))))
+      dims2 = dims + (qgraph.root -> computed._2)
       _ <- MonadState_[G, QSUDims[T]].put(dims2)
     } yield qgraph
   }

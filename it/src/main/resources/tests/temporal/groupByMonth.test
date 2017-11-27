@@ -1,0 +1,19 @@
+{
+    "name": "group by month",
+
+    "backends": {
+    },
+
+    "data": "../days.data",
+
+    "query": "select avg(epoch), date_part(\"month\", `ts`) from `../days` group by date_part(\"month\", `ts`)",
+
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+
+    "expected": [
+        { "0": -1.0E+10, "1": 2 },
+        { "0": -1.0, "1": 12 },
+        { "0": 1.4085252E+12, "1": 8 }
+    ]
+}

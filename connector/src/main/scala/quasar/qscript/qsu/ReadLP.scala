@@ -151,6 +151,9 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
     case lp.InvokeUnapply(SetLib.Drop, Sized(a, b)) =>
       extend2[G](a, b)(QSU.Subset[T, Symbol](_, Drop, _))
 
+    case lp.InvokeUnapply(SetLib.Union, Sized(a, b)) =>
+      extend2[G](a, b)(QSU.Union[T, Symbol](_, _))
+
     case lp.InvokeUnapply(func: UnaryFunc, Sized(a)) if func.effect === Reduction =>
       val translated = ReduceFunc.translateUnaryReduction[Unit](func)(())
       extend1[G](a)(QSU.LPReduce[T, Symbol](_, translated))
@@ -175,7 +178,9 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
     case lp.InvokeUnapply(func: TernaryFunc, Sized(a, b, c)) if func.effect === Mapping =>
       autoJoin3[G](a, b, c)(MapFunc.translateTernaryMapping[T, MapFunc, JoinSide3].apply(func))
 
-    case lp.InvokeUnapply(func, values) => ???
+    case lp.InvokeUnapply(func, values) =>
+      println(s"hit this case with $func and $values")
+      ???
 
     case lp.TemporalTrunc(part, src) =>
       extend1[G](src)(
