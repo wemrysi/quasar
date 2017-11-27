@@ -19,8 +19,12 @@ package quasar.fs.mount
 import slamdata.Predef._
 import quasar.{Variables, VarName, VarValue}
 import quasar.sql._
+import quasar.sql.StatementArbitrary._
+
+import scala.Predef.$conforms
 
 import argonaut._, Argonaut._, JsonScalaz._
+import matryoshka.data.Fix
 import scalaz.Scalaz._
 
 class MountConfigSpec extends quasar.Qspec {
@@ -83,6 +87,13 @@ class MountConfigSpec extends quasar.Qspec {
         viewJson("sql2:///?q=%F%28select+*+from+zips%29")
           .as[MountConfig].toEither.leftMap(_._1) must beLeft
       }
+    }
+  }
+
+  "Module Config" should {
+    "be able to parse any printed module" >> prop { module: List[Statement[Fix[Sql]]] =>
+      val str = module.pprint
+      fixParser.parseModule(str) must_=== module.right
     }
   }
 }

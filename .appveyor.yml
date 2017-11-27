@@ -14,7 +14,7 @@ cache:
   - .targets
   - project\target
   - project\project\target
-  - '%localappdata%\coursier'
+  # - '%localappdata%\coursier'
   - 'C:\Users\appveyor\.sbt'
   - 'C:\Users\appveyor\.ivy2'
   - 'C:\Users\appveyor\.coursier'
@@ -22,6 +22,7 @@ cache:
 environment:
   JAVA_HOME: 'C:\Program Files\Java\jdk1.8.0'
   PATH: '%JAVA_HOME%\bin;%PATH%'
+  COURSIER_CACHE: 'C:\Users\appveyor\.coursier'
 
 before_build:
   - cmd: 'IF "%APPVEYOR_PULL_REQUEST_NUMBER%"=="" (.\sbt clean)'

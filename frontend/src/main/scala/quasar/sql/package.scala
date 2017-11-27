@@ -244,7 +244,7 @@ package object sql {
 
   private def _q(s: String): String = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
-  private def _qq(delimiter: String, s: String): String = s match {
+  private [sql] def escape(delimiter: String, s: String): String = s match {
     case SimpleNamePattern() => s
     case _                   => delimiter + s.replace("\\", "\\\\").replace(delimiter, "\\" + delimiter) + delimiter
   }
@@ -255,7 +255,7 @@ package object sql {
     (implicit T: Recursive.Aux[T, Sql])
       : String = {
 
-    def ppalias(a: String): String = "as " + _qq("`", a)
+    def ppalias(a: String): String = "as " + escape("`", a)
 
     def ppJoinType(tpe: JoinType): String = tpe match {
       case JoinType.Inner => "inner join"
@@ -266,11 +266,11 @@ package object sql {
 
     (r match {
       case IdentRelationAST(name, alias) =>
-        _qq("`", name) :: alias.map(ppalias).toList
+        escape("`", name) :: alias.map(ppalias).toList
       case VariRelationAST(vari, alias) =>
         pprintƒ.apply(vari) :: alias.map(ppalias).toList
       case TableRelationAST(path, alias) =>
-        _qq("`", prettyPrint(path)) :: alias.map(ppalias).toList
+        escape("`", prettyPrint(path)) :: alias.map(ppalias).toList
       case ExprRelationAST(expr, aliasName) =>
         List(expr._2, ppalias(aliasName))
       case JoinRelation(left, right, tpe, clause) =>
@@ -303,7 +303,7 @@ package object sql {
         List(
           Some("select"),
           isDistinct match { case `SelectDistinct` => Some("distinct"); case _ => None },
-          Some(projections.map(p => p.alias.foldLeft(p.expr._2)(_ + " as " + _qq("`", _))).mkString(", ")),
+          Some(projections.map(p => p.alias.foldLeft(p.expr._2)(_ + " as " + escape("`", _))).mkString(", ")),
           relations.map(r => "from " + pprintRelationƒ(r)),
           filter.map("where " + _._2),
           groupBy.map(g =>
@@ -312,7 +312,7 @@ package object sql {
               g.having.map("having " + _._2).toList).mkString(" ")),
           orderBy.map(o => List("order by", o.keys.map(x => x._2._2 + " " + x._1.shows) intercalate (", ")).mkString(" "))).foldMap(_.toList).mkString(" ") +
         ")"
-      case Vari(symbol) => ":" + _qq("`", symbol)
+      case Vari(symbol) => ":" + escape("`", symbol)
       case SetLiteral(exprs) => exprs.map(_._2).mkString("(", ", ", ")")
       case ArrayLiteral(exprs) => exprs.map(_._2).mkString("[", ", ", "]")
       case MapLiteral(exprs) => exprs.map {
@@ -321,7 +321,7 @@ package object sql {
       case Splice(expr) => expr.fold("*")("(" + _._2 + ").*")
       case Binop(lhs, rhs, op) => op match {
         case KeyDeref => rhs._1.project match {
-          case StringLiteral(str) => "(" + lhs._2 + ")." + _qq("`", str)
+          case StringLiteral(str) => "(" + lhs._2 + ")." + escape("`", str)
           case _                   => "(" + lhs._2 + "){" + rhs._2 + "}"
         }
         case IndexDeref => "(" + lhs._2 + ")[" + rhs._2 + "]"
@@ -343,7 +343,7 @@ package object sql {
           // NB: dis-ambiguates the query in case this is the leading projection
           if (op ≟ Distinct) "(" + s + ")" else s
       }
-      case Ident(name) => _qq("`", name)
+      case Ident(name) => escape("`", name)
       case InvokeFunction(name, args) =>
         (name, args) match {
           case (CIName("like"), (_, value) :: (_, pattern) :: (Embed(StringLiteral("\\")), _) :: Nil) =>
