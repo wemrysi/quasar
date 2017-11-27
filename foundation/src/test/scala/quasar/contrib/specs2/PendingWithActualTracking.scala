@@ -47,10 +47,10 @@ trait PendingWithActualTracking {
   implicit def toPendingWithActualTracking[T : AsResult](t: =>T)
     : PendingWithActualTrackingClass[T] = new PendingWithActualTrackingClass(t)
 
-  private def unsafeRead(f: JFile): String =
+  def unsafeRead(f: JFile): String =
     jtextContents(f).unsafePerformSync
 
-  private def unsafeWrite(jFile: jFile, contents: String): Unit = {
+  def unsafeWrite(jFile: jFile, contents: String): Unit = {
     java.nio.file.Files.write(
       jFile.toPath,
       contents.getBytes(java.nio.charset.StandardCharsets.UTF_8))
