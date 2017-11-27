@@ -4,6 +4,7 @@
     "data": "zips.data",
     "query": "SELECT 100 * SUM(pop) / (SELECT SUM(pop) FROM zips), state FROM zips GROUP BY state ORDER BY state LIMIT 5",
     "predicate": "exactly",
+    "NB": "These results are incorrect; they will be rectified when #3184 is fixed",
     "expected": [
         { "0": 100, "state": "AK" },
         { "0": 100, "state": "AL" },
