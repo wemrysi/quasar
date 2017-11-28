@@ -1,15 +1,28 @@
 {
     "name": "use subquery when there's a group by statement",
+    "backends": {
+        "couchbase":         "skip",
+        "marklogic_json":    "skip",
+        "marklogic_xml":     "skip",
+        "mongodb_2_6":       "skip",
+        "mongodb_3_0":       "skip",
+        "mongodb_3_2":       "skip",
+        "mongodb_3_4":       "skip",
+        "mongodb_read_only": "skip",
+        "spark_hdfs":        "skip",
+        "spark_local":       "skip",
+        "spark_cassandra":   "skip"
+    },
+    "NB": "skipped everywhere because of rounding issues",
     "NB": "#1929",
     "data": "zips.data",
     "query": "SELECT 100 * SUM(pop) / (SELECT SUM(pop) FROM zips), state FROM zips GROUP BY state ORDER BY state LIMIT 5",
     "predicate": "exactly",
-    "NB": "These results are incorrect; they will be rectified when #3184 is fixed",
     "expected": [
-        { "0": 100, "state": "AK" },
-        { "0": 100, "state": "AL" },
-        { "0": 100, "state": "AR" },
-        { "0": 100, "state": "AZ" },
-        { "0": 100, "state": "CA" }
+        { "0": 0.2192751935924, "state": "AK" },
+        { "0": 1.6265903246428, "state": "AL" },
+        { "0": 0.9463146173800, "state": "AR" },
+        { "0": 1.4754847259593, "state": "AZ" },
+        { "0": 11.9782141022606, "state": "CA" }
     ]
 }
