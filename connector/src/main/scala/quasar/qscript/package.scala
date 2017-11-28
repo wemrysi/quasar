@@ -19,9 +19,7 @@ package quasar
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
-import quasar.ejson.EJson
 import quasar.fp._
-import quasar.qscript.{provenance => prov}
 import quasar.qscript.MapFuncCore._
 import quasar.qscript.MapFuncsCore._
 
@@ -29,7 +27,6 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
 /** The various representations of an arbitrary query, as seen by the filesystem
@@ -154,7 +151,6 @@ package object qscript {
   type CoEnvQS[T[_[_]], A]      = CoEnv[Hole, QScriptTotal[T, ?], A]
   type CoEnvMapA[T[_[_]], A, B] = CoEnv[A, MapFunc[T, ?], B]
   type CoEnvMap[T[_[_]], A]     = CoEnvMapA[T, Hole, A]
-  type CoEnvJoin[T[_[_]], A]    = CoEnvMapA[T, JoinSide, A]
 
   type CoEnvFree[F[_], A] = CoEnv[A, F, Free[F, A]]
 
@@ -173,8 +169,6 @@ package object qscript {
     Free.point[MapFunc[T, ?], JoinSide](RightSide)
   def ReduceIndexF[T[_[_]]](i: Int \/ Int): FreeMapA[T, ReduceIndex] =
     Free.point[MapFunc[T, ?], ReduceIndex](ReduceIndex(i))
-
-  def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
 
   def concat[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, A: Equal: Show: RenderTree]
     (l: FreeMapA[T, A], r: FreeMapA[T, A])
@@ -329,35 +323,5 @@ package object qscript {
     }
 
     liftCo[T, F, Hole, Free[F, Hole]](partial)
-  }
-}
-
-package qscript {
-  final case class SrcMerge[A, B](src: A, lval: B, rval: B)
-
-  @Lenses final case class Ann[T[_[_]]](provenance: List[prov.Provenance[T]], values: FreeMap[T])
-
-  object Ann {
-    implicit def equal[T[_[_]]: BirecursiveT: EqualT](implicit J: Equal[T[EJson]]): Equal[Ann[T]] =
-      Equal.equal((a, b) => a.provenance ≟ b.provenance && a.values ≟ b.values)
-
-    implicit def show[T[_[_]]: ShowT]: Show[Ann[T]] =
-      Show.show(ann => Cord("Ann(") ++ ann.provenance.show ++ Cord(", ") ++ ann.values.show ++ Cord(")"))
-  }
-
-  @Lenses final case class Target[T[_[_]], F[_]](ann: Ann[T], value: T[F])
-
-  object Target {
-    implicit def equal[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor](
-      implicit F: Delay[Equal, F], J: Equal[T[EJson]]
-    ): Equal[Target[T, F]] =
-      Equal.equal((a, b) => a.ann ≟ b.ann && a.value ≟ b.value)
-
-    implicit def show[T[_[_]]: ShowT, F[_]: Functor](implicit F: Delay[Show, F])
-        : Show[Target[T, F]] =
-      Show.show(target =>
-        Cord("Target(") ++
-          target.ann.shows ++ Cord(", ") ++
-          target.value.shows ++ Cord(")"))
   }
 }
