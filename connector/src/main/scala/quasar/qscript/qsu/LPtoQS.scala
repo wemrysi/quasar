@@ -40,8 +40,8 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
       debugG("EliminateUnary: ")     >-
       RecognizeDistinct[T].apply     >=>
       debugG("RecognizeDistinct: ")  >==>
-      ExtractFreeMap[T, F]           >=>
-      debugG("ExtractFM: ")          >==>
+      ExtractFreeMap[T].apply[F]     >=>
+      debugG("ExtractFreeMap: ")     >==>
       ApplyProvenance[T].apply[F]    >=>
       debugAG("ApplyProv: ")         >==>
       ReifyBuckets[T, F]             >=>
