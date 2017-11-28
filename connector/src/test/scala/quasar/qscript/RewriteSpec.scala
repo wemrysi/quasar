@@ -73,19 +73,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
   "rewriter" should {
-    // TODO re-enable
-    //"elide a no-op map in a constant boolean" in {
-    //  import qsidsl._
-    //  val query = lpf.constant(Data.Bool(true))
-    //  val run: QSI[Fix[QSI]] => QSI[Fix[QSI]] =
-    //    repeatedly((fa: QSI[Fix[QSI]]) => QCI.prj(fa) >>= rewrite.elideNopQC[QSI])
-
-    //  QueryFile.convertAndNormalize[Fix, QSI](query)(run).toOption must
-    //    equal(
-    //      fix.Map(fix.Unreferenced, func.Constant(json.bool(true))).some)
-    //}
-
-    // TODO re-enable
+    // TODO re-enable when we can read from directories quasar#3095
     //"expand a directory read" in {
     //  import qstdsl._
     //  convert(lc.some, lpRead("/foo")).flatMap(
