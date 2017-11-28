@@ -32,7 +32,7 @@ import quasar.qscript.provenance.Dimensions
 import quasar.qscript.MapFuncsCore.StrLit
 
 import matryoshka._
-import scalaz.{Free, Monad, WriterT}
+import scalaz.{Monad, WriterT}
 import scalaz.Scalaz._
 
 final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
@@ -62,14 +62,11 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
   private def reifyAutoJoins[F[_]: Monad: NameGenerator](dims: QSUDims[T])
       : PartialFunction[QSUGraph, DimsT[F, QSUGraph]] = {
 
-    case g @ AutoJoin2(left, right, _combiner) =>
+    case g @ AutoJoin2(left, right, combiner) =>
       val (l, r) = (left.root, right.root)
 
       val condition: FreeAccess[JoinSide] =
         prov.autojoinCondition(dims(l), dims(r))
-
-      val combiner: JoinFunc =
-        Free.roll(_combiner.map(Free.point(_)))
 
       g.overwriteAtRoot(qsu.thetaJoin(
         l, r, condition, JoinType.Inner, combiner)).point[DimsT[F, ?]]
@@ -100,11 +97,11 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
           def projCenter[A](hole: FreeMapA[A]): FreeMapA[A] =
             func.ProjectKey(StrLit(cName), hole)
 
-          val combiner: JoinFunc = Free.roll(combiner3 map {
+          val combiner: JoinFunc = combiner3 flatMap {
             case LeftSide3 => projLeft[JoinSide](LeftSideF)
             case Center => projCenter[JoinSide](LeftSideF)
             case RightSide3 => RightSideF
-          })
+          }
 
           val lcDims: Dimensions[P] =
             prov.join(dims(l), dims(c))

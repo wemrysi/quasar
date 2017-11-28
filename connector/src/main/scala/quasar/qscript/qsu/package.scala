@@ -17,10 +17,28 @@
 package quasar.qscript
 
 import slamdata.Predef.{Map => SMap, _}
+import quasar.fp._
 import quasar.qscript.provenance.Dimensions
+
+import matryoshka._
+import matryoshka.data.free._
+import scalaz.Show
+import scalaz.std.list._
+import scalaz.std.string._
+import scalaz.syntax.foldable._
+import scalaz.syntax.show._
 
 package object qsu {
   type FreeAccess[T[_[_]], A] = FreeMapA[T, Access[A]]
   type QSUDims[T[_[_]]] = SMap[Symbol, Dimensions[QProv.P[T]]]
   type QSUVerts[T[_[_]]] = SMap[Symbol, QScriptUniform[T, Symbol]]
+
+  object QSUDims {
+    def show[T[_[_]]: ShowT]: Show[QSUDims[T]] =
+      Show.shows { dims =>
+        "QSUDims[\n" +
+        dims.toList.map({ case (k, v) => s"  ${k.shows} -> ${v.shows}"}).intercalate("\n") +
+        "\n]"
+      }
+  }
 }

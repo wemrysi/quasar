@@ -58,7 +58,7 @@ import matryoshka.{AlgebraM, BirecursiveT}
 import matryoshka.implicits._
 import matryoshka.patterns.{interpretM, CoEnv}
 import pathy.Path.{rootDir, Sandboxed}
-import scalaz.{\/, Inject, Monad, StateT}
+import scalaz.{\/, Free, Inject, Monad, StateT}
 import scalaz.std.tuple._
 import scalaz.syntax.bifunctor._
 import scalaz.syntax.either._
@@ -244,12 +244,14 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
   private def autoJoin2[G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]](
       e1: QSUGraph, e2: QSUGraph)(
       constr: (JoinSide, JoinSide) => MapFunc[JoinSide]): G[QSUGraph] =
-    extend2[G](e1, e2)((e1, e2) => QSU.AutoJoin2[T, Symbol](e1, e2, constr(LeftSide, RightSide)))
+    extend2[G](e1, e2)((e1, e2) =>
+      QSU.AutoJoin2[T, Symbol](e1, e2, Free.liftF(constr(LeftSide, RightSide))))
 
   private def autoJoin3[G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]](
       e1: QSUGraph, e2: QSUGraph, e3: QSUGraph)(
       constr: (JoinSide3, JoinSide3, JoinSide3) => MapFunc[JoinSide3]): G[QSUGraph] =
-    extend3[G](e1, e2, e3)((e1, e2, e3) => QSU.AutoJoin3[T, Symbol](e1, e2, e3, constr(LeftSide3, Center, RightSide3)))
+    extend3[G](e1, e2, e3)((e1, e2, e3) =>
+      QSU.AutoJoin3[T, Symbol](e1, e2, e3, Free.liftF(constr(LeftSide3, Center, RightSide3))))
 
   private def extend1[G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]](
       parent: QSUGraph)(

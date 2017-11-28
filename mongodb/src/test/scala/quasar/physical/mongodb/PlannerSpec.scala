@@ -40,7 +40,7 @@ class PlannerSpec extends
     PendingWithActualTracking {
 
   //to write the new actuals:
-  //override val mode = WriteMode
+  // override val mode = WriteMode
 
   import Grouped.grouped
   import Reshape.reshape
@@ -53,16 +53,32 @@ class PlannerSpec extends
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     PlannerHelpers.plan(query)
 
+  def trackPending(name: String, plan: Either[FileSystemError, Crystallized[WorkflowF]], expectedOps: IList[MongoOp]) = {
+    name >> {
+      "plan" in {
+        plan must beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps))
+      }.pendingUntilFixed
+
+      "track" in {
+        plan must beRight.which(cwf => trackActual(cwf, testFile(s"plan $name")))
+      }
+    }
+  }
+
   "plan from query string" should {
 
-    "filter with both index and key projections" in {
-      plan(sqlE"""select count(parents[0].sha) as count from slamengine_commits where parents[0].sha = "56d1caf5d082d1a6840090986e277d36d03f1859" """) must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, MatchOp, SimpleMapOp, GroupOp)))
-    }.pendingUntilFixed
+    trackPending(
+      "filter with both index and key projections",
+      plan(sqlE"""select count(parents[0].sha) as count from slamengine_commits where parents[0].sha = "56d1caf5d082d1a6840090986e277d36d03f1859" """),
+      IList(ReadOp, MatchOp, SimpleMapOp, GroupOp))
 
     "having with multiple projections" in {
       plan(sqlE"select city, sum(pop) from extraSmallZips group by city having sum(pop) > 40000") must
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, MatchOp, ProjectOp)))
+        // Q3021
+        // FIXME Fails with:
+        // [error] x having with multiple projections (5 seconds, 908 ms)
+        // [error]  'Left(QScriptPlanningFailed(InternalError(Invalid filter predicate, 'qsu14, must be a mappable function of 'qsu8.,None)))' is not Right (PlannerSpec.scala:65)
     }.pendingUntilFixed
 
     "select partially-applied substring" in {
@@ -72,10 +88,8 @@ class PlannerSpec extends
 
     "sort wildcard on expression" in {
       plan(sqlE"select * from zips order by pop/10 desc") must
-        //FIXME these 2 SimpleMapOps conflict with the asserts of notBroken
-        //See which one we have to change
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, SimpleMapOp, SimpleMapOp, SortOp, ProjectOp)))
-    }.pendingUntilFixed
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, SimpleMapOp, SortOp, ProjectOp)))
+    }
 
     "sort with expression and alias" in {
       plan(sqlE"select pop/1000 as popInK from zips order by popInK") must
@@ -92,10 +106,18 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp)))
     }
 
-    "group by simple expression" in {
-      plan(sqlE"select city, sum(pop) from extraSmallZips group by lower(city)") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, UnwindOp)))
-    }.pendingUntilFixed
+    // Q3171
+    // FIXME errors with
+    // [error]     java.lang.IndexOutOfBoundsException: 1
+    // [error]     	at scala.collection.LinearSeqOptimized$class.apply(LinearSeqOptimized.scala:65)
+    // [error]     	at scala.collection.immutable.List.apply(List.scala:84)
+    // [error]     	at scala.collection.immutable.List.apply(List.scala:84)
+    // [error]     	at scalaz.$bslash$div.fold(Either.scala:57)
+    // [error]     	at quasar.qscript.analysis.OutlineInstances$$anon$3.quasar$qscript$analysis$OutlineInstances$$anon$3$$$anonfun$24(Outline.scala:263)
+    // trackPending(
+    //   "group by simple expression",
+    //   plan(sqlE"select city, sum(pop) from extraSmallZips group by lower(city)"),
+    //   IList(ReadOp, GroupOp, UnwindOp))
 
     "group by month" in {
       plan(sqlE"""select avg(epoch), date_part("month", `ts`) from days group by date_part("month", `ts`)""") must
@@ -106,6 +128,8 @@ class PlannerSpec extends
     "expr3 with grouping" in {
       plan(sqlE"select case when pop > 1000 then city else lower(city) end, count(*) from zips group by city") must
         beRight
+        // Q3114
+        // FIXME fails with: an implementation is missing (ReifyIdentities.scala:358)
     }.pendingUntilFixed
 
     "plan count and sum grouped by single field" in {
@@ -113,10 +137,10 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp)))
     }
 
-    "collect unaggregated fields into single doc when grouping" in {
-      plan(sqlE"select city, state, sum(pop) from zips") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, GroupOp, UnwindOp, ProjectOp)))
-    }.pendingUntilFixed
+    trackPending(
+      "collect unaggregated fields into single doc when grouping",
+      plan(sqlE"select city, state, sum(pop) from zips"),
+      IList(ReadOp, ProjectOp, GroupOp, UnwindOp, ProjectOp))
 
     "plan unaggregated field when grouping, second case" in {
       plan(sqlE"select city, state, sum(pop) from zips") must
@@ -126,25 +150,25 @@ class PlannerSpec extends
         }
     }.pendingUntilFixed
 
-    "plan double aggregation with another projection" in {
-      plan(sqlE"select sum(avg(pop)), min(city) from zips group by state") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, GroupOp, UnwindOp)))
-    }.pendingUntilFixed
+    trackPending(
+      "double aggregation with another projection",
+      plan(sqlE"select sum(avg(pop)), min(city) from zips group by state"),
+      IList(ReadOp, GroupOp, GroupOp, UnwindOp))
 
-    "plan multiple expressions using same field" in {
-      plan(sqlE"select pop, sum(pop), pop/1000 from zips") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, GroupOp, UnwindOp, ProjectOp)))
-    }.pendingUntilFixed
+    trackPending(
+      "multiple expressions using same field",
+      plan(sqlE"select pop, sum(pop), pop/1000 from zips"),
+      IList(ReadOp, ProjectOp, GroupOp, UnwindOp, ProjectOp))
 
     "plan sum of expression in expression with another projection when grouped" in {
       plan(sqlE"select city, sum(pop-1)/1000 from zips group by city") must
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp)))
     }
 
-    "plan length of min (JS on top of reduce)" in {
-      plan3_2(sqlE"select state, length(min(city)) as shortest from zips group by state") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp, SimpleMapOp, ProjectOp)))
-    }.pendingUntilFixed
+    trackPending(
+      "length of min (JS on top of reduce)",
+      plan3_2(sqlE"select state, length(min(city)) as shortest from zips group by state"),
+      IList(ReadOp, GroupOp, ProjectOp, SimpleMapOp, ProjectOp))
 
     "plan js expr grouped by js expr" in {
       plan3_2(sqlE"select length(city) as len, count(*) as cnt from zips group by length(city)") must
@@ -156,40 +180,49 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, SimpleMapOp, ProjectOp)))
     }
 
-    "plan object flatten" in {
-      plan(sqlE"select geo{*} from usa_factbook") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, SimpleMapOp, ProjectOp)))
-    }.pendingUntilFixed
+    trackPending(
+      "object flatten",
+      plan(sqlE"select geo{*} from usa_factbook"),
+      IList(ReadOp, SimpleMapOp, ProjectOp))
 
-    "plan array concat with filter" in {
-      plan(sqlE"""select loc || [ pop ] from zips where city = "BOULDER" """) must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, MatchOp, SimpleMapOp, ProjectOp)))
-    }.pendingUntilFixed
+    trackPending(
+      "array concat with filter",
+      plan(sqlE"""select loc || [ pop ] from zips where city = "BOULDER" """),
+      IList(ReadOp, MatchOp, SimpleMapOp, ProjectOp))
 
-    "plan array flatten with unflattened field" in {
-      plan(sqlE"SELECT `_id` as zip, loc as loc, loc[*] as coord FROM zips") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, UnwindOp, ProjectOp)))
-    }.pendingUntilFixed
+    trackPending(
+      "array flatten with unflattened field",
+      plan(sqlE"SELECT `_id` as zip, loc as loc, loc[*] as coord FROM zips"),
+      IList(ReadOp, ProjectOp, UnwindOp, ProjectOp))
 
-    "unify flattened fields" in {
-      plan(sqlE"select loc[*] from zips where loc[*] < 0") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, UnwindOp, MatchOp, ProjectOp)))
-    }.pendingUntilFixed
+    // Q3021
+    // FIXME fails with:
+    // 'Left(QScriptPlanningFailed(InternalError(Invalid filter predicate, 'qsu10, must be a mappable function of 'qsu4.,None)))' is not Right (PlannerSpec.scala:63)
+    // trackPending(
+    //   "unify flattened fields",
+    //   plan(sqlE"select loc[*] from zips where loc[*] < 0"),
+    //   IList(ReadOp, ProjectOp, UnwindOp, MatchOp, ProjectOp))
 
-    "group by flattened field" in {
-      plan(sqlE"select substring(parents[*].sha, 0, 1), count(*) from slamengine_commits group by substring(parents[*].sha, 0, 1)") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, UnwindOp, GroupOp, ProjectOp)))
-    }.pendingUntilFixed
+    // Q3021
+    // FIXME fails with:
+    // 'Left(QScriptPlanningFailed(InternalError(Invalid group key, 'qsu15, must be a mappable function of 'qsu4.,None)))' is not Right (PlannerSpec.scala:63)
+    // trackPending(
+    //   "group by flattened field",
+    //   plan(sqlE"select substring(parents[*].sha, 0, 1), count(*) from slamengine_commits group by substring(parents[*].sha, 0, 1)"),
+    //   IList(ReadOp, ProjectOp, UnwindOp, GroupOp, ProjectOp))
 
-    "unify flattened fields with unflattened field" in {
-      plan(sqlE"select `_id` as zip, loc[*] from zips order by loc[*]") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, UnwindOp, SortOp)))
-    }.pendingUntilFixed
+    trackPending(
+      "unify flattened fields with unflattened field",
+      plan(sqlE"select `_id` as zip, loc[*] from zips order by loc[*]"),
+      IList(ReadOp, ProjectOp, UnwindOp, SortOp))
 
-    "unify flattened with double-flattened" in {
-      plan(sqlE"""select * from user_comments where (comments[*].id LIKE "%Dr%" OR comments[*].replyTo[*] LIKE "%Dr%")""") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, UnwindOp, ProjectOp, UnwindOp, MatchOp, ProjectOp)))
-    }.pendingUntilFixed
+    // Q3021
+    // FIXME fails with:
+    // 'Left(QScriptPlanningFailed(InternalError(Invalid filter predicate, 'qsu22, must be a mappable function of 'qsu4.,None)))' is not Right (PlannerSpec.scala:63)
+    // trackPending(
+    //   "unify flattened with double-flattened",
+    //   plan(sqlE"""select * from user_comments where (comments[*].id LIKE "%Dr%" OR comments[*].replyTo[*] LIKE "%Dr%")"""),
+    //   IList(ReadOp, ProjectOp, UnwindOp, ProjectOp, UnwindOp, MatchOp, ProjectOp))
 
     "plan complex group by with sorting and limiting" in {
       plan(sqlE"SELECT city, SUM(pop) AS pop FROM zips GROUP BY city ORDER BY pop") must
@@ -211,20 +244,20 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, GroupOp, ProjectOp)))
     }
 
-    "plan distinct with unrelated order by" in {
-      plan(sqlE"select distinct city from zips order by pop desc") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, SortOp, GroupOp, ProjectOp, SortOp, ProjectOp)))
-    }.pendingUntilFixed
+    trackPending(
+      "distinct with unrelated order by",
+      plan(sqlE"select distinct city from zips order by pop desc"),
+      IList(ReadOp, ProjectOp, SortOp, GroupOp, ProjectOp, SortOp, ProjectOp))
 
-    "plan distinct with sum and group" in {
-      plan(sqlE"SELECT DISTINCT SUM(pop) AS totalPop, city, state FROM zips GROUP BY city") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp, UnwindOp, GroupOp, ProjectOp)))
-    }.pendingUntilFixed
+    trackPending(
+      "distinct with sum and group",
+      plan(sqlE"SELECT DISTINCT SUM(pop) AS totalPop, city, state FROM zips GROUP BY city"),
+      IList(ReadOp, GroupOp, ProjectOp, UnwindOp, GroupOp, ProjectOp))
 
-    "plan distinct with sum, group, and orderBy" in {
-      plan(sqlE"SELECT DISTINCT SUM(pop) AS totalPop, city, state FROM zips GROUP BY city ORDER BY totalPop DESC") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp, UnwindOp, SortOp, GroupOp, ProjectOp, SortOp)))
-    }.pendingUntilFixed
+    trackPending(
+      "distinct with sum, group, and orderBy",
+      plan(sqlE"SELECT DISTINCT SUM(pop) AS totalPop, city, state FROM zips GROUP BY city ORDER BY totalPop DESC"),
+      IList(ReadOp, GroupOp, ProjectOp, UnwindOp, SortOp, GroupOp, ProjectOp, SortOp))
 
     "plan time_of_day (JS)" in {
       plan(sqlE"select time_of_day(ts) from days") must
@@ -292,7 +325,7 @@ class PlannerSpec extends
               reshape(sigil.Quasar -> $field("__tmp11", "city")),
               ExcludeId)),
           false).op)
-    }.pendingUntilFixed
+    }.pendingWithActual(notOnPar, testFile("plan non-equi join"))
 
     "plan simple inner equi-join (map-reduce)" in {
       plan2_6(
@@ -327,7 +360,7 @@ class PlannerSpec extends
                     $literal(Bson.Undefined))),
               IgnoreId)),
           false).op)
-    }.pendingUntilFixed
+    }.pendingWithActual(notOnPar, testFile("plan simple inner equi-join (map-reduce)"))
 
     "plan simple inner equi-join with expression ($lookup)" in {
       plan3_4(
@@ -366,7 +399,7 @@ class PlannerSpec extends
               $field(JoinDir.Right.name, "state"),
               $literal(Bson.Undefined))),
           IgnoreId)))
-    }.pendingUntilFixed
+    }.pendingWithActual(notOnPar, testFile("plan simple inner equi-join with expression ($lookup)"))
 
     "plan simple inner equi-join with pre-filtering ($lookup)" in {
       plan3_4(
@@ -410,7 +443,7 @@ class PlannerSpec extends
               $field(JoinDir.Right.name, "state"),
               $literal(Bson.Undefined))),
           IgnoreId)))
-    }.pendingUntilFixed
+    }.pendingWithActual(notOnPar, testFile("plan simple inner equi-join with pre-filtering ($lookup)"))
 
     "plan simple outer equi-join with wildcard" in {
       plan(sqlE"select * from foo full join bar on foo.id = bar.foo_id") must
@@ -459,7 +492,7 @@ class PlannerSpec extends
               reshape(sigil.Quasar -> $field("__tmp7")),
               ExcludeId)),
           false).op)
-    }.pendingUntilFixed
+    }.pendingWithActual(notOnPar, testFile("plan simple outer equi-join with wildcard"))
 
     "plan simple left equi-join (map-reduce)" in {
       plan(
@@ -501,7 +534,7 @@ class PlannerSpec extends
                     $literal(Bson.Undefined))),
               IgnoreId)),
           false).op)
-    }.pendingUntilFixed
+    }.pendingWithActual(notOnPar, testFile("plan simple left equi-join (map-reduce)"))
 
     "plan simple left equi-join ($lookup)" in {
       plan3_4(
@@ -534,7 +567,7 @@ class PlannerSpec extends
               $field(JoinDir.Right.name, "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
-    }.pendingUntilFixed
+    }.pendingWithActual("TODO: left/right joins in $lookup", testFile("plan simple left equi-join ($lookup)"))
 
     "plan simple right equi-join ($lookup)" in {
       plan3_4(
@@ -567,7 +600,7 @@ class PlannerSpec extends
               $field(JoinDir.Right.name, "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
-    }.pendingUntilFixed
+    }.pendingWithActual("TODO: left/right joins in $lookup", testFile("plan simple right equi-join ($lookup)"))
 
     "plan 3-way right equi-join (map-reduce)" in {
       plan2_6(
@@ -637,7 +670,7 @@ class PlannerSpec extends
                     $literal(Bson.Undefined))),
               IgnoreId)),
           true).op)
-    }.pendingUntilFixed
+    }.pendingWithActual(notOnPar, testFile("plan 3-way right equi-join (map-reduce)"))
 
     "plan 3-way equi-join ($lookup)" in {
       plan3_4(
@@ -698,7 +731,7 @@ class PlannerSpec extends
                 $field(JoinDir.Right.name, "pop"),
                 $literal(Bson.Undefined))),
             IgnoreId)))
-    }.pendingUntilFixed
+    }.pendingWithActual(notOnPar, testFile("plan 3-way equi-join ($lookup)"))
 
     "plan count of $lookup" in {
       plan3_4(
@@ -730,7 +763,7 @@ class PlannerSpec extends
             "_id" -> $field("_id", "0"),
             "1"   -> $include),
           IgnoreId)))
-    }.pendingUntilFixed
+    }.pendingWithActual(notOnPar, testFile("plan count of $lookup"))
 
     "plan join with multiple conditions" in {
       plan(sqlE"select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth from slamengine_commits as l join slamengine_commits as r on r.sha = l.parents[0].sha and l.author.login = r.author.login") must
@@ -800,7 +833,7 @@ class PlannerSpec extends
                     $literal(Bson.Undefined))),
               IgnoreId)),
         false).op)
-    }.pendingUntilFixed
+    }.pendingWithActual("#1560", testFile("plan join with multiple conditions"))
 
     "plan join with non-JS-able condition" in {
       plan(sqlE"select z1.city as city1, z1.loc, z2.city as city2, z2.pop from zips as z1 join zips as z2 on z1.loc[*] = z2.loc[*]") must
@@ -864,7 +897,11 @@ class PlannerSpec extends
                     $literal(Bson.Undefined))),
               IgnoreId)),
           false).op)
-    }.pendingUntilFixed
+    // Q3021
+    // FIXME fails with:
+    // 'Left(QScriptPlanningFailed(InternalError(Invalid join condition, 'qsu21, must be a mappable function of 'qsu11 and 'qsu14.,None)))' is not Right (PendingWithActualTracking.scala:94)
+    // }.pendingWithActual(notOnPar, testFile("plan join with non-JS-able condition"))
+  }.pendingUntilFixed
 
     "plan simple cross" in {
       plan(sqlE"select zips2.city from zips, zips2 where zips.pop < zips2.pop") must
@@ -927,7 +964,7 @@ class PlannerSpec extends
               reshape(sigil.Quasar -> $field("__tmp11", "city")),
               ExcludeId)),
           false).op)
-    }.pendingUntilFixed
+    }.pendingWithActual(notOnPar, testFile("plan simple cross"))
 
     "SD-1263 specific case of plan multiple reducing projections (all, distinct, orderBy)" in {
       val q = sqlE"select distinct loc || [pop - 1] as p1, pop - 1 as p2 from zips group by territory order by p2".project.asInstanceOf[Select[Fix[Sql]]]
@@ -944,7 +981,8 @@ class PlannerSpec extends
         appropriateColumns(wf, q)
         rootPushes(wf) must_== Nil
       }
+      //Q3154
+      //FIXME has dangling reference
     }.pendingUntilFixed
-
   }
 }
