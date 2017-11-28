@@ -32,7 +32,7 @@ import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
+class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
   val rewrite = new Rewrite[Fix]
 
   def normalizeFExpr(expr: Fix[QS]): Fix[QS] =
