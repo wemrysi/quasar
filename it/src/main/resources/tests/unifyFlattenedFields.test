@@ -1,5 +1,9 @@
 {
     "name": "unify flattened fields",
+    "backends": {
+        "couchbase": "pending",
+        "mongodb_read_only": "pending"
+    },
     "data": "zips.data",
     "query": "select loc[*] from zips where loc[*] < 0",
     "predicate": "atLeast",
