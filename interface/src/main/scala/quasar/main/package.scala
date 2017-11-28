@@ -207,7 +207,9 @@ package object main extends Logging {
       liftMT[F, MainErrT].compose(QErrs.toCatchable[F])
   }
 
-  /** Effect comprising the core Quasar apis. */
+  /** Effect comprising the core Quasar apis.
+    * NB: CoM is avoided due to significantly longer compile times at usage sites.
+    */
   type CoreEffIO[A]   = Coproduct[Task, CoreEff, A]
   type CoreEffIOW[A]  = Coproduct[VCacheExpW, CoreEffIO, A]
   type CoreEffIORW[A] = Coproduct[VCacheExpR, CoreEffIOW, A]
