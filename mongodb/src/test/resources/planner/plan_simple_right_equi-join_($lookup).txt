@@ -6,16 +6,7 @@ Chain
 │  │  │  ├─ Grouped
 │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
 │  │  │  ╰─ By
-│  │  │     ╰─ Name("0" -> {
-│  │  │             "$cond": [
-│  │  │               {
-│  │  │                 "$and": [
-│  │  │                   { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │  │                   { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│  │  │               },
-│  │  │               "$id",
-│  │  │               { "$literal": undefined }]
-│  │  │           })
+│  │  │     ╰─ Name("0" -> "$id")
 │  │  ╰─ $ProjectF
 │  │     ├─ Name("_id" -> "$_id")
 │  │     ├─ Name("value")
@@ -26,13 +17,7 @@ Chain
 │  ╰─ Chain
 │     ├─ $ReadF(db; bar)
 │     ├─ $MapF
-│     │  ├─ JavaScript(function (key, value) {
-│     │  │               return [
-│     │  │                 {
-│     │  │                   "0": (isObject(value) && (! Array.isArray(value))) ? value.foo_id : undefined
-│     │  │                 },
-│     │  │                 { "left": [], "right": [value] }]
-│     │  │             })
+│     │  ├─ JavaScript(function (key, value) { return [{ "0": value.foo_id }, { "left": [], "right": [value] }] })
 │     │  ╰─ Scope(Map())
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
@@ -60,94 +45,6 @@ Chain
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
 ╰─ $ProjectF
-   ├─ Name("name" -> {
-   │       "$cond": [
-   │         {
-   │           "$and": [
-   │             {
-   │               "$lte": [
-   │                 { "$literal": {  } },
-   │                 {
-   │                   "$cond": [
-   │                     {
-   │                       "$and": [
-   │                         { "$lte": [{ "$literal": {  } }, "$left"] },
-   │                         { "$lt": ["$left", { "$literal": [] }] }]
-   │                     },
-   │                     "$left",
-   │                     { "$literal": undefined }]
-   │                 }]
-   │             },
-   │             {
-   │               "$lt": [
-   │                 {
-   │                   "$cond": [
-   │                     {
-   │                       "$and": [
-   │                         { "$lte": [{ "$literal": {  } }, "$left"] },
-   │                         { "$lt": ["$left", { "$literal": [] }] }]
-   │                     },
-   │                     "$left",
-   │                     { "$literal": undefined }]
-   │                 },
-   │                 { "$literal": [] }]
-   │             }]
-   │         },
-   │         {
-   │           "$cond": [
-   │             {
-   │               "$and": [
-   │                 { "$lte": [{ "$literal": {  } }, "$left"] },
-   │                 { "$lt": ["$left", { "$literal": [] }] }]
-   │             },
-   │             "$left.name",
-   │             { "$literal": undefined }]
-   │         },
-   │         { "$literal": undefined }]
-   │     })
-   ├─ Name("address" -> {
-   │       "$cond": [
-   │         {
-   │           "$and": [
-   │             {
-   │               "$lte": [
-   │                 { "$literal": {  } },
-   │                 {
-   │                   "$cond": [
-   │                     {
-   │                       "$and": [
-   │                         { "$lte": [{ "$literal": {  } }, "$right"] },
-   │                         { "$lt": ["$right", { "$literal": [] }] }]
-   │                     },
-   │                     "$right",
-   │                     { "$literal": undefined }]
-   │                 }]
-   │             },
-   │             {
-   │               "$lt": [
-   │                 {
-   │                   "$cond": [
-   │                     {
-   │                       "$and": [
-   │                         { "$lte": [{ "$literal": {  } }, "$right"] },
-   │                         { "$lt": ["$right", { "$literal": [] }] }]
-   │                     },
-   │                     "$right",
-   │                     { "$literal": undefined }]
-   │                 },
-   │                 { "$literal": [] }]
-   │             }]
-   │         },
-   │         {
-   │           "$cond": [
-   │             {
-   │               "$and": [
-   │                 { "$lte": [{ "$literal": {  } }, "$right"] },
-   │                 { "$lt": ["$right", { "$literal": [] }] }]
-   │             },
-   │             "$right.address",
-   │             { "$literal": undefined }]
-   │         },
-   │         { "$literal": undefined }]
-   │     })
+   ├─ Name("name" -> "$left.name")
+   ├─ Name("address" -> "$right.address")
    ╰─ ExcludeId

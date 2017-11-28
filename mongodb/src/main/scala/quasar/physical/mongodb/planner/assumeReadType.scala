@@ -34,11 +34,14 @@ import scalaz._, Scalaz.{ToIdOps => _, _}
 
 object assumeReadType {
 
-  object FreeShiftedRead {
-    def unapply[T[_[_]]](fq: FreeQS[T])(
-      implicit QSR: Const[ShiftedRead[AFile], ?] :<: QScriptTotal[T, ?]
-    ) : Option[ShiftedRead[AFile]] = fq match {
-      case Embed(CoEnv(\/-(QSR(qsr: Const[ShiftedRead[AFile], _])))) => qsr.getConst.some
+  object SRT {
+    def unapply[T[_[_]], A](qt: QScriptTotal[T, A]): Option[ShiftedRead[AFile]] =
+      Inject[Const[ShiftedRead[AFile], ?], QScriptTotal[T, ?]].prj(qt).map(_.getConst)
+  }
+
+  object FreeQS {
+    def unapply[T[_[_]]](fq: FreeQS[T]): Option[QScriptTotal[T, FreeQS[T]]] = fq match {
+      case Embed(CoEnv(\/-(q))) => q.some
       case _ => none
     }
   }
@@ -51,8 +54,13 @@ object assumeReadType {
     case GtoF(QC(Filter(Embed(GtoF(SR(Const(ShiftedRead(_, ExcludeId))))), _)))
        | GtoF(QC(Sort(Embed(GtoF(SR(Const(ShiftedRead(_, ExcludeId))))), _, _)))
        | GtoF(QC(Sort(Embed(GtoF(QC(Filter(Embed(GtoF(SR(Const(ShiftedRead(_, ExcludeId))))), _)))), _ , _)))
-       | GtoF(QC(Subset(_, FreeShiftedRead(ShiftedRead(_, ExcludeId)), _ , _)))
+       | GtoF(QC(Subset(_, FreeQS(SRT(ShiftedRead(_, ExcludeId))), _ , _)))
        | GtoF(SR(Const(ShiftedRead(_, ExcludeId)))) => true
+    case _ => false
+  }
+
+  def isRewriteFree[T[_[_]]](fq: FreeQS[T]): Boolean = fq match {
+    case FreeQS(SRT(ShiftedRead(_, ExcludeId))) => true
     case _ => false
   }
 
@@ -76,10 +84,31 @@ object assumeReadType {
     f
   }
 
+  def elideMoreGeneralGuardsJoin[M[_]: Applicative: MonadFsErr, T[_[_]]: RecursiveT]
+    (joinSide: JoinSide, subType: Type)
+      : CoEnvJoin[T, JoinFunc[T]] => M[CoEnvJoin[T, JoinFunc[T]]] = {
+    def f: CoEnvJoin[T, JoinFunc[T]] => M[CoEnvJoin[T, JoinFunc[T]]] = {
+      case free @ CoEnv(\/-(MFC(MapFuncsCore.Guard(Embed(CoEnv(-\/(joinSide))), typ, cont, fb)))) =>
+        if (typ.contains(subType)) cont.project.point[M]
+        // TODO: Error if there is no overlap between the types.
+        else {
+          val union = subType ⨯ typ
+          if (union ≟ Type.Bottom)
+            raiseErr(qscriptPlanningFailed(InternalError.fromMsg(s"can only contain ${subType.shows}, but a(n) ${typ.shows} is expected")))
+          else {
+            CoEnv[JoinSide, MapFunc[T, ?], JoinFunc[T]](MFC(MapFuncsCore.Guard[T, JoinFunc[T]](Free.point[MapFunc[T, ?], JoinSide](joinSide), union, cont, fb)).right).point[M]
+          }
+        }
+      case x => x.point[M]
+    }
+    f
+  }
+
 def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
   (typ: Type)
   (implicit
     QC: QScriptCore[T, ?] :<: F,
+    EJ: EquiJoin[T, ?] :<: F,
     SR: Const[ShiftedRead[AFile], ?] :<: F)
     : Trans[F, M] =
   new Trans[F, M] {
@@ -87,7 +116,21 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
     def elide(fm: FreeMap[T]): M[FreeMap[T]] =
       fm.transCataM(elideMoreGeneralGuards[M, T](typ))
 
-    def trans[A, G[_]: Functor]
+    def elideJoinFunc(isRewrite: Boolean, joinSide: JoinSide, fm: JoinFunc[T]): M[JoinFunc[T]] =
+      if (isRewrite) fm.transCataM(elideMoreGeneralGuardsJoin[M, T](joinSide, typ))
+      else fm.point[M]
+
+    def elideLeftJoinKey(isRewrite: Boolean, key: List[(FreeMap[T], FreeMap[T])])
+        : M[List[(FreeMap[T], FreeMap[T])]] =
+      if (isRewrite) key.traverse(t => elide(t._1).map(x => (x, t._2)))
+      else key.point[M]
+
+    def elideRightJoinKey(isRewrite: Boolean, key: List[(FreeMap[T], FreeMap[T])])
+        : M[List[(FreeMap[T], FreeMap[T])]] =
+      if (isRewrite) key.traverse(t => elide(t._2).map(x => (t._1, x)))
+      else key.point[M]
+
+    override def trans[A, G[_]: Functor]
       (GtoF: PrismNT[G, F])
       (implicit TC: Corecursive.Aux[A, G], TR: Recursive.Aux[A, G])
         : F[A] => M[G[A]] = {
@@ -121,6 +164,15 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
             (b.traverse(elide) ⊛
               order.traverse(t => elide(t._1).map(x => (x, t._2))))(
               (b0, order0) => GtoF.reverseGet(QC(Sort(src, b0, order0))))
+        case ej @ EJ(EquiJoin(src, lBranch, rBranch, key, f, combine)) =>
+          val isRewriteL = isRewriteFree(lBranch)
+          val isRewriteR = isRewriteFree(rBranch)
+
+          ((elideLeftJoinKey(isRewriteL, key) >>=
+            (k => elideRightJoinKey(isRewriteR, k))) ⊛
+            (elideJoinFunc(isRewriteL, LeftSide, combine) >>=
+              (c => elideJoinFunc(isRewriteR, RightSide, c))))(
+              (k0, c0) => GtoF.reverseGet(EJ(EquiJoin(src, lBranch, rBranch, k0, f, c0))))
         case qc =>
           GtoF.reverseGet(qc).point[M]
       }

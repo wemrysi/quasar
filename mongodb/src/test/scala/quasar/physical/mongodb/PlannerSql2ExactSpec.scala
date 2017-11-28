@@ -70,22 +70,20 @@ class PlannerSql2ExactSpec extends
   val specs = List(
     PlanSpec(
       "simple join ($lookup)",
-      sqlToWf = Pending(notOnPar),
+      sqlToWf = Ok,
       sqlE"select smallZips.city from zips join smallZips on zips.`_id` = smallZips.`_id`",
       QsSpec(
-        sqlToQs = Pending(nonOptimalQs),
+        sqlToQs = Ok,
         qsToWf = Ok,
         fix.EquiJoin(
           fix.Unreferenced,
-          free.Filter(
-            free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-            func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
-          free.Filter(
-            free.ShiftedRead[AFile](rootDir </> dir("db") </> file("smallZips"), qscript.ExcludeId),
-            func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
-          List((func.ProjectKeyS(func.Hole, "_id"), func.ProjectKeyS(func.Hole, "_id"))),
+          free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
+          free.ShiftedRead[AFile](rootDir </> dir("db") </> file("smallZips"), qscript.ExcludeId),
+          List((
+            func.Guard(func.Hole, Type.AnyObject, func.ProjectKeyS(func.Hole, "_id"), func.Undefined),
+            func.Guard(func.Hole, Type.AnyObject, func.ProjectKeyS(func.Hole, "_id"), func.Undefined))),
           JoinType.Inner,
-          func.ProjectKeyS(func.RightSide, "city"))).some,
+          func.Guard(func.RightSide, Type.AnyObject, func.ProjectKeyS(func.RightSide, "city"), func.Undefined))).some,
       chain[Workflow](
         $read(collection("db", "zips")),
         $match(Selector.Doc(
@@ -103,35 +101,33 @@ class PlannerSql2ExactSpec extends
 
     PlanSpec(
       "simple inner equi-join ($lookup)",
-      sqlToWf = Pending(notOnPar),
+      sqlToWf = Ok,
       sqlE"select cars.name, cars2.year from cars join cars2 on cars.`_id` = cars2.`_id`",
       QsSpec(
-        sqlToQs = Pending(nonOptimalQs),
+        sqlToQs = Ok,
         qsToWf = Ok,
         fix.EquiJoin(
           fix.Unreferenced,
-          free.Filter(
-            free.ShiftedRead[AFile](rootDir </> dir("db") </> file("cars"), qscript.ExcludeId),
-            func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
-          free.Filter(
-            free.ShiftedRead[AFile](rootDir </> dir("db") </> file("cars2"), qscript.ExcludeId),
-            func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
-          List((func.ProjectKeyS(func.Hole, "_id"), func.ProjectKeyS(func.Hole, "_id"))),
+          free.ShiftedRead[AFile](rootDir </> dir("db") </> file("cars"), qscript.ExcludeId),
+          free.ShiftedRead[AFile](rootDir </> dir("db") </> file("cars2"), qscript.ExcludeId),
+          List((
+            func.Guard(func.Hole, Type.AnyObject, func.ProjectKeyS(func.Hole, "_id"), func.Undefined),
+            func.Guard(func.Hole, Type.AnyObject, func.ProjectKeyS(func.Hole, "_id"), func.Undefined))),
           JoinType.Inner,
           func.ConcatMaps(
             func.MakeMap(
               func.Constant(json.str("name")),
               func.Guard(
-                func.LeftSide,
+                func.Guard(func.LeftSide, Type.AnyObject, func.LeftSide, func.Undefined),
                 Type.AnyObject,
-                func.ProjectKeyS(func.LeftSide, "name"),
+                func.Guard(func.LeftSide, Type.AnyObject, func.ProjectKeyS(func.LeftSide, "name"), func.Undefined),
                 func.Undefined)),
             func.MakeMap(
               func.Constant(json.str("year")),
               func.Guard(
-                func.RightSide,
+                func.Guard(func.RightSide, Type.AnyObject, func.RightSide, func.Undefined),
                 Type.AnyObject,
-                func.ProjectKeyS(func.RightSide, "year"),
+                func.Guard(func.RightSide, Type.AnyObject, func.ProjectKeyS(func.RightSide, "year"), func.Undefined),
                 func.Undefined))))).some,
       chain[Workflow](
         $read(collection("db", "cars")),
@@ -145,20 +141,8 @@ class PlannerSql2ExactSpec extends
           JoinHandler.RightName),
         $unwind(DocField(JoinHandler.RightName)),
         $project(reshape(
-          "name" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                $lt($field(JoinDir.Left.name), $literal(Bson.Arr(Nil)))),
-              $field(JoinDir.Left.name, "name"),
-              $literal(Bson.Undefined)),
-          "year" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                $lt($field(JoinDir.Right.name), $literal(Bson.Arr(Nil)))),
-              $field(JoinDir.Right.name, "year"),
-              $literal(Bson.Undefined))),
+          "name" -> $field(JoinDir.Left.name, "name"),
+          "year" -> $field(JoinDir.Right.name, "year")),
           ExcludeId)))
   )
 
@@ -1872,12 +1856,12 @@ class PlannerSql2ExactSpec extends
       // NB: cannot use $lookup, so fall back to the old approach
       val query = sqlE"select smallZips.city from `db1/zips` join `db2/smallZips` on zips.`_id` = smallZips.`_id`"
       plan(query) must_== plan2_6(query)
-    }
+    }.pendingUntilFixed
 
     "plan simple join with no index" in {
       // NB: cannot use $lookup, so fall back to the old approach
       val query = sqlE"select smallZips.city from zips join smallZips on zips.`_id` = smallZips.`_id`"
       plan(query) must_== plan2_6(query)
-    }
+    }.pendingUntilFixed
   }
 }
