@@ -130,21 +130,21 @@ Chain
 │     ╰─ NotExpr($right -> Size(0))
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
+├─ $ProjectF
+│  ├─ Name("left" -> "$left")
+│  ├─ Name("right" -> "$right")
+│  ╰─ ExcludeId
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
 │  │     ├─ Key(f0)
-│  │     │  ╰─ Let(__val)
-│  │     │     ├─ JsCore([_.left, _.right])
-│  │     │     ╰─ SpliceObjects
-│  │     │        ├─ JsCore(__val[0])
-│  │     │        ╰─ JsCore(__val[1])
+│  │     │  ╰─ SpliceObjects
+│  │     │     ├─ JsCore(_.left)
+│  │     │     ╰─ JsCore(_.right)
 │  │     ╰─ Key(b0)
-│  │        ╰─ Let(__val)
-│  │           ├─ JsCore([_.left, _.right])
-│  │           ╰─ SpliceObjects
-│  │              ├─ JsCore(__val[0])
-│  │              ╰─ JsCore(__val[1])
+│  │        ╰─ SpliceObjects
+│  │           ├─ JsCore(_.left)
+│  │           ╰─ JsCore(_.right)
 │  ╰─ Scope(Map())
 ├─ $GroupF
 │  ├─ Grouped

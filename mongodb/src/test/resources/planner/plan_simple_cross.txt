@@ -112,23 +112,26 @@ Chain
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
 ├─ $ProjectF
-│  ├─ Name("0" -> ["$left", "$right"])
+│  ├─ Name("0" -> { "$literal": true })
+│  ├─ Name("1" -> { "$lt": ["$left.pop", "$right.pop"] })
+│  ├─ Name("src")
+│  │  ╰─ Name("right" -> "$right")
 │  ╰─ ExcludeId
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(0: true)
-│  │     ├─ Key(1: _["0"][0].pop < _["0"][1].pop)
-│  │     ╰─ Key(src: _["0"])
-│  ╰─ Scope(Map())
 ├─ $MatchF
 │  ╰─ And
 │     ├─ Doc
 │     │  ╰─ Expr($0 -> Eq(Bool(true)))
 │     ╰─ Doc
 │        ╰─ Expr($1 -> Eq(Bool(true)))
-╰─ $SimpleMapF
-   ├─ Map
-   │  ╰─ Obj
-   │     ╰─ Key(__quasar_mongodb_sigil: (isObject(_.src[1]) && (! Array.isArray(_.src[1]))) ? _.src[1].city : undefined)
-   ╰─ Scope(Map())
+╰─ $ProjectF
+   ├─ Name("__quasar_mongodb_sigil" -> {
+   │       "$cond": [
+   │         {
+   │           "$and": [
+   │             { "$lte": [{ "$literal": {  } }, "$src.right"] },
+   │             { "$lt": ["$src.right", { "$literal": [] }] }]
+   │         },
+   │         "$src.right.city",
+   │         { "$literal": undefined }]
+   │     })
+   ╰─ ExcludeId
