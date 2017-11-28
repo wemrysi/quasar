@@ -242,8 +242,8 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
                 dims map {
                   case (key, value) =>
                     val value2 = candidates.foldLeft(value) { (value, c) =>
-                      if (c.root =/= back.root)
-                        QP.rename(c.root, back.root, value)
+                      if (c.root =/= red.root)
+                        QP.rename(c.root, red.root, value)
                       else
                         value
                     }

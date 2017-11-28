@@ -18,6 +18,7 @@ package quasar.qscript.qsu
 
 import quasar.{Planner, Qspec, TreeMatchers, Type}, Planner.PlannerError
 import quasar.ejson.{EJson, Fixed}
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.qscript.{
   construction,
@@ -34,20 +35,28 @@ import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.data.free._
 import pathy.Path, Path.Sandboxed
-import scalaz.{\/-, EitherT, Free, Need, StateT}
+import scalaz.{\/-, EitherT, Equal, Free, IList, Need, StateT}
+import scalaz.syntax.applicative._
+import scalaz.syntax.std.option._
 
 object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
+  import ApplyProvenance.AuthenticatedQSU
+  import QScriptUniform.DTrans
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
   val maj = MinimizeAutoJoins[Fix]
+  val qprov = QProv[Fix]
 
   val J = Fixed[Fix[EJson]]
 
   val afile = Path.rootDir[Sandboxed] </> Path.file("afile")
+
+  implicit val eqP: Equal[qprov.P] =
+    qprov.prov.provenanceEqual(Equal[qprov.D], Equal[FreeMapA[Access[Symbol]]])
 
   "unary node elimination" should {
     "linearize .foo + .bar" in {
@@ -320,13 +329,48 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               func.ProjectKey(HoleF, func.Constant(J.str("1")))))
       }
     }
+
+    "remap coalesced bucket references in dimensions" in {
+      val aqsu = QScriptUniform.AnnotatedDsl[Fix, Symbol]
+
+      val readAndThings =
+        aqsu.map('n1, (
+          aqsu.dimEdit('n5, (
+            aqsu.read('n0, afile),
+            DTrans.Group(func.ProjectKeyS(func.Hole, "label")))),
+          func.Negate(func.ProjectKeyS(func.Hole, "metric"))))
+
+      val atree =
+        aqsu.autojoin2(('n4, (
+          aqsu.lpReduce('n2, (
+            readAndThings,
+            ReduceFuncs.Count(()))),
+          aqsu.lpReduce('n3, (
+            readAndThings,
+            ReduceFuncs.Sum(()))),
+          _(MapFuncsCore.Add(_, _)))))
+
+      val (remap, qgraph) =
+        QSUGraph.fromAnnotatedTree(atree map (_.some))
+
+      val expDims =
+        IList(qprov.prov.value(Access.bucket('qsu0, 0, 'qsu0).point[FreeMapA]))
+
+      val ds = runOn_(qgraph).dims
+
+      (ds(remap('n2)) must_= expDims) and (ds(remap('n3)) must_= expDims)
+    }
   }
 
-  def runOn(qgraph: QSUGraph): QSUGraph = {
+  def runOn(qgraph: QSUGraph): QSUGraph =
+    runOn_(qgraph).graph
+
+  def runOn_(qgraph: QSUGraph): AuthenticatedQSU[Fix] = {
     val resultsF = for {
-      agraph <- ApplyProvenance[Fix].apply[F](qgraph)
+      agraph0 <- ApplyProvenance[Fix].apply[F](qgraph)
+      agraph <- ReifyBuckets[Fix, F](agraph0)
       back <- maj[F](agraph)
-    } yield back.graph
+    } yield back
 
     val results = resultsF.run.eval(0L).value.toEither
     results must beRight
