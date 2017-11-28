@@ -16,7 +16,7 @@
 
 package quasar.qscript.qsu
 
-import slamdata.Predef.{tailrec, Boolean, Option, Symbol}
+import slamdata.Predef.{Boolean, Option, Symbol}
 import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.qscript.{
@@ -37,7 +37,7 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-import scalaz.{-\/, \/-, Kleisli, Traverse}
+import scalaz.{Kleisli, Free, Traverse}
 import scalaz.std.option._
 import scalaz.syntax.either._
 import scalaz.syntax.equal._
@@ -50,7 +50,8 @@ object MappableRegion {
   import QSUGraph.QSUPattern
 
   def apply[T[_[_]]](halt: Symbol => Boolean, g: QSUGraph[T]): FreeMapA[T, QSUGraph[T]] =
-    g.ana[FreeMapA[T, QSUGraph[T]]](mappableRegionƒ[T](halt, _))
+    Free.joinF[MapFunc[T, ?], QSUGraph[T]](
+      g.ana[Free[FreeMapA[T, ?], QSUGraph[T]]](mappableRegionƒ[T](halt, _)))
 
   def binaryOf[T[_[_]]](left: Symbol, right: Symbol, g: QSUGraph[T]): Option[JoinFunc[T]] =
     funcOf(Kleisli(replaceWith[JoinSide](left, LeftSide)) <+> Kleisli(replaceWith(right, RightSide)), g)
@@ -64,12 +65,14 @@ object MappableRegion {
   def unaryOf[T[_[_]]](src: Symbol, g: QSUGraph[T]): Option[FreeMap[T]] =
     funcOf(replaceWith(src, SrcHole), g)
 
-  @tailrec
   def mappableRegionƒ[T[_[_]]](halt: Symbol => Boolean, g: QSUGraph[T])
-      : CoEnv[QSUGraph[T], MapFunc[T, ?], QSUGraph[T]] =
+      : CoEnv[QSUGraph[T], FreeMapA[T, ?], QSUGraph[T]] =
     g.project match {
       case QSUPattern(s, _) if halt(s) =>
-        CoEnv(g.left)
+        CoEnv(g.left[FreeMapA[T, QSUGraph[T]]])
+
+      case QSUPattern(_, Map(srcG, fm)) =>
+        CoEnv(fm.map(_ => srcG).right[QSUGraph[T]])
 
       case QSUPattern(_, AutoJoin2(left, right, combine)) =>
         CoEnv(combine.map {
@@ -84,14 +87,8 @@ object MappableRegion {
           case RightSide3 => right
         }.right[QSUGraph[T]])
 
-      case QSUPattern(s, Map(srcG, fm)) =>
-        fm.project.run match {
-          case \/-(mf) => CoEnv(mf.map(fm1 => QSUPattern(s, Map(srcG, fm1)).embed).right)
-          case -\/(_)  => mappableRegionƒ[T](halt, srcG)
-        }
-
       case _ =>
-        CoEnv(g.left)
+        CoEnv(g.left[FreeMapA[T, QSUGraph[T]]])
     }
 
   ////
