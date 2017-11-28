@@ -1,6 +1,12 @@
 Chain
 ├─ $ReadF(db; zips)
 ├─ $ProjectF
+│  ├─ Name("identities" -> {
+│  │       "qsu1": { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("0") }] }
+│  │     })
+│  ├─ Name("value" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
+│  ╰─ ExcludeId
+├─ $ProjectF
 │  ├─ Name("s" -> "$$ROOT")
 │  ├─ Name("f" -> {
 │  │       "$cond": [
@@ -13,10 +19,10 @@ Chain
 │  │                   "$cond": [
 │  │                     {
 │  │                       "$and": [
-│  │                         { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │                         { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │                         { "$lte": [{ "$literal": {  } }, "$value"] },
+│  │                         { "$lt": ["$value", { "$literal": [] }] }]
 │  │                     },
-│  │                     "$loc",
+│  │                     "$value.loc",
 │  │                     { "$literal": undefined }]
 │  │                 }]
 │  │             },
@@ -26,10 +32,10 @@ Chain
 │  │                   "$cond": [
 │  │                     {
 │  │                       "$and": [
-│  │                         { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │                         { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │                         { "$lte": [{ "$literal": {  } }, "$value"] },
+│  │                         { "$lt": ["$value", { "$literal": [] }] }]
 │  │                     },
-│  │                     "$loc",
+│  │                     "$value.loc",
 │  │                     { "$literal": undefined }]
 │  │                 },
 │  │                 { "$literal": BinData(0, "") }]
@@ -39,10 +45,10 @@ Chain
 │  │           "$cond": [
 │  │             {
 │  │               "$and": [
-│  │                 { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │                 { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │                 { "$lte": [{ "$literal": {  } }, "$value"] },
+│  │                 { "$lt": ["$value", { "$literal": [] }] }]
 │  │             },
-│  │             "$loc",
+│  │             "$value.loc",
 │  │             { "$literal": undefined }]
 │  │         },
 │  │         { "$literal": undefined }]
@@ -53,8 +59,8 @@ Chain
 │  │  ╰─ JsCore(_.f)
 │  ├─ Map
 │  │  ╰─ Obj
-│  │     ├─ Key(zip: (isObject(_.s) && (! Array.isArray(_.s))) ? _.s._id : undefined)
-│  │     ├─ Key(loc: (isObject(_.s) && (! Array.isArray(_.s))) ? _.s.loc : undefined)
+│  │     ├─ Key(zip: (isObject(_.s.value) && (! Array.isArray(_.s.value))) ? _.s.value._id : undefined)
+│  │     ├─ Key(loc: (isObject(_.s.value) && (! Array.isArray(_.s.value))) ? _.s.value.loc : undefined)
 │  │     ╰─ Key(coord: _.f)
 │  ╰─ Scope(Map())
 ╰─ $ProjectF
