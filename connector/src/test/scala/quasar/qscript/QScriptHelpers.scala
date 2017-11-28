@@ -21,7 +21,6 @@ import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.ejson, ejson.{EJson, Fixed}
-import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fs._
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
@@ -88,8 +87,6 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
   def lpRead(path: String): Fix[LP] =
     lpf.read(unsafeSandboxAbs(posixCodec.parseAbsFile(path).get))
 
-  val prov = new provenance.ProvenanceT[Fix]
-
   /** A helper when writing examples that allows them to be written in order of
     * execution.
     */
@@ -132,14 +129,6 @@ trait QScriptHelpers extends CompilerHelpers with TTypes[Fix] {
   implicit val monadTell: MonadTell[FileSystemErrT[PhaseResultT[Id, ?], ?], PhaseResults] =
     EitherT.monadListen[WriterT[Id, Vector[PhaseResult], ?], PhaseResults, FileSystemError](
       WriterT.writerTMonadListen[Id, Vector[PhaseResult]])
-
-  def convert(lc: Option[DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Id, ?], ?]]], lp: Fix[LP]):
-      Option[Fix[QS]] =
-    lc.fold(
-      QueryFile.convertToQScript[Fix, QS](lp))(
-      QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Id, ?], ?], QS](_)(lp))
-      .toOption.run.copoint
-
 }
 
 object QScriptHelpers extends QScriptHelpers
