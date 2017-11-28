@@ -64,7 +64,17 @@ Chain
 │  │  │  │          }
 │  │  │  │        })
 │  │  │  ╰─ By
-│  │  │     ╰─ Name("0" -> ["$city"])
+│  │  │     ╰─ Name("0" -> [
+│  │  │             {
+│  │  │               "$cond": [
+│  │  │                 {
+│  │  │                   "$and": [
+│  │  │                     { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│  │  │                     { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │  │                 },
+│  │  │                 "$city",
+│  │  │                 { "$literal": undefined }]
+│  │  │             }])
 │  │  ├─ $ProjectF
 │  │  │  ├─ Name("totalPop" -> "$f0")
 │  │  │  ├─ Name("city" -> "$f1")

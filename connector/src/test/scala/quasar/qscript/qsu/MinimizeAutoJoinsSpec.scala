@@ -25,12 +25,14 @@ import quasar.qscript.{
   HoleF,
   MapFuncsCore,
   ReduceFuncs,
-  ReduceIndex
+  ReduceIndex,
+  SrcHole
 }
 import slamdata.Predef._
 
 import matryoshka._
 import matryoshka.data.Fix
+import matryoshka.data.free._
 import pathy.Path, Path.Sandboxed
 import scalaz.{\/-, EitherT, Free, Need, StateT}
 
@@ -267,6 +269,57 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                 func.Undefined)))
       }
     }.pendingUntilFixed
+
+    "coalesce two summed bucketing reductions, inlining functions into the buckets" in {
+      val readAndThings =
+        qsu.map1((
+          qsu.read(afile),
+          MapFuncsCore.Negate(SrcHole)))
+
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.qsReduce(
+            readAndThings,
+            List(HoleF[Fix].map(Access.value(_))),
+            List(ReduceFuncs.Count(HoleF[Fix])),
+            Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+          qsu.qsReduce(
+            readAndThings,
+            List(HoleF[Fix].map(Access.value(_))),
+            List(ReduceFuncs.Sum(HoleF[Fix])),
+            Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+          _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case Map(
+          QSReduce(
+            Read(_),
+            List(bucket),
+            List(ReduceFuncs.Count(h1), ReduceFuncs.Sum(h2)),
+            repair),
+          fm) =>
+
+          // must_=== doesn't work
+          bucket must beTreeEqual(func.Negate(HoleF.map(Access.value(_))))
+
+          h1 must beTreeEqual(func.Negate(HoleF[Fix]))
+          h2 must beTreeEqual(func.Negate(HoleF[Fix]))
+
+          repair must beTreeEqual(
+            func.ConcatMaps(
+              func.MakeMap(
+                func.Constant(J.str("0")),
+                Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+              func.MakeMap(
+                func.Constant(J.str("1")),
+                Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(1))))))
+
+          fm must beTreeEqual(
+            func.Add(
+              func.ProjectKey(HoleF, func.Constant(J.str("0"))),
+              func.ProjectKey(HoleF, func.Constant(J.str("1")))))
+      }
+    }
   }
 
   def runOn(qgraph: QSUGraph): QSUGraph = {
