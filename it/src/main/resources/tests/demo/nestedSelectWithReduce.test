@@ -1,7 +1,7 @@
 {
     "name": "select reduction from nested select",
     "backends": {
-        "couchbase":         "ignoreFieldOrder",
+        "couchbase":         "skip",
         "marklogic_json":    "ignoreFieldOrder",
         "mimir":             "pending",
         "mongodb_2_6":       "pending",
@@ -13,6 +13,7 @@
     },
     "NB": "pending on mongo due to oid issue",
     "NB": "pending on mimir due to sorting issue (should be pendingIgnoreFieldOrder, but that breaks because the predicate is buggy)",
+    "NB": "disabled on couchbase due to lack of general join",
     "data": "patients.data",
     "query": "SELECT AVG(cnt) as measure, state as category FROM
                 (SELECT COUNT(*) as cnt, state, gender FROM patients
