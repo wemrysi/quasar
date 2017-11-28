@@ -99,27 +99,4 @@ object EquiJoin {
         f(fa.src) ∘
           (EquiJoin(_, fa.lBranch, fa.rBranch, fa.key, fa.f, fa.combine))
     }
-
-  implicit def mergeable[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
-      : Mergeable.Aux[T, EquiJoin[T, ?]] =
-    new Mergeable[EquiJoin[T, ?]] {
-      type IT[F[_]] = T[F]
-
-      def mergeSrcs(
-        left: Mergeable.MergeSide[IT, EquiJoin[T, ?]],
-        right: Mergeable.MergeSide[IT, EquiJoin[T, ?]]) =
-        (left.source, right.source) match {
-          case (EquiJoin(s1, l1, r1, k1, f1, c1),
-                EquiJoin(_, l2, r2, k2, f2, c2)) =>
-            val left1 = rebaseBranch(l1, left.access)
-            val right1 = rebaseBranch(r1, left.access)
-            val left2 = rebaseBranch(l2, right.access)
-            val right2 = rebaseBranch(r2, right.access)
-
-            (left1 ≟ left2 && right1 ≟ right2 && k1 ≟ k2 && f1 ≟ f2).option {
-              val (merged, l, r) = concat(c1, c2)
-              SrcMerge(EquiJoin(s1, left1, right1, k1, f1, merged), l, r)
-            }
-        }
-    }
 }
