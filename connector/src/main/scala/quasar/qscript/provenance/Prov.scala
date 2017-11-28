@@ -141,6 +141,25 @@ trait Prov[D, I, P] {
     })
   }
 
+  // eliminate duplicates within contiguous Both/OneOf and reassociate to the left
+  def normalize(p: P)(implicit eqD: Equal[D], eqI: Equal[I]): P = {
+    def dedup[A: Equal](as: IList[A]): IList[A] = {
+      as.foldRight(IList.empty[A]) { (a, acc) =>
+        if (acc.any(_ === a))
+          acc
+        else
+          a :: acc
+      }
+    }
+
+    val inner: IList[P] =
+      dedup(flattenBoth(p).map(dedup(_))) map { ps =>
+        ps.reduceLeftOption(both(_, _)).getOrElse(nada())
+      }
+
+    inner.reduceLeftOption(oneOf(_, _)).getOrElse(nada())
+  }
+
   ////
 
   private def flattenBoth(p: P): IList[IList[P]] =
