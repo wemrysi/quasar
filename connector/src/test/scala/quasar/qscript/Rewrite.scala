@@ -368,19 +368,19 @@ class QScriptRewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptH
                     func.ProjectKey(func.Hole, func.Constant(json.str("l_max"))),
                     func.ProjectKey(func.Hole, func.Constant(json.str("l_min")))))),
               JoinType.Inner,
-              func.ConcatArrays(
-                func.MakeArray(func.LeftSide),
-                func.MakeArray(func.RightSide))),
+              func.ConcatMaps(
+                func.MakeMapS(SimplifyJoin.LeftK, func.LeftSide),
+                func.MakeMapS(SimplifyJoin.RightK, func.RightSide))),
             func.Lt(
               func.ProjectKey(
-                func.ProjectIndex(func.Hole, func.Constant(json.int(0))),
+                func.ProjectKeyS(func.Hole, SimplifyJoin.LeftK),
                 func.Constant(json.str("l_lat"))),
               func.ProjectKey(
-                func.ProjectIndex(func.Hole, func.Constant(json.int(1))),
+                func.ProjectKeyS(func.Hole, SimplifyJoin.RightK),
                 func.Constant(json.str("r_lat"))))),
           func.ConcatMaps(
-            func.ProjectIndex(func.Hole, func.Constant(json.int(0))),
-            func.ProjectIndex(func.Hole, func.Constant(json.int(1)))))
+            func.ProjectKeyS(func.Hole, SimplifyJoin.LeftK),
+            func.ProjectKeyS(func.Hole, SimplifyJoin.RightK)))
       }
     }
 
