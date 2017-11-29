@@ -150,8 +150,6 @@ package object qscript {
   type CoEnvMapA[T[_[_]], A, B] = CoEnv[A, MapFunc[T, ?], B]
   type CoEnvMap[T[_[_]], A]     = CoEnvMapA[T, Hole, A]
 
-  type CoEnvFree[F[_], A] = CoEnv[A, F, Free[F, A]]
-
   object ExtractFunc {
     def unapply[T[_[_]], A](fma: FreeMapA[T, A]): Option[MapFuncCore[T, _]] = fma match {
       case Embed(CoEnv(\/-(MFC(func: MapFuncCore[T, _])))) => Some(func)
@@ -169,18 +167,6 @@ package object qscript {
     Free.point[MapFunc[T, ?], ReduceIndex](ReduceIndex(i))
 
   def rebase[M[_]: Bind, A](in: M[A], key: M[A]): M[A] = in >> key
-
-  // FIXME: Should this also normalize EquiJoins?
-  def rebaseBranch[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
-    br: FreeQS[T],
-    fm: FreeMap[T]
-  ): FreeQS[T] = {
-    val rewrite = new quasar.qscript.rewrites.Rewrite[T]
-
-    (br >> Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(
-      Map(Free.point[QScriptTotal[T, ?], Hole](SrcHole), fm))))
-      .transCata[FreeQS[T]](liftCo(rewrite.normalizeTJCoEnv[QScriptTotal[T, ?]]))
-  }
 
   def rebaseT[T[_[_]]: BirecursiveT, F[_]: Traverse](
     target: FreeQS[T])(
@@ -228,33 +214,4 @@ package object qscript {
     Injectable.coproduct(
       Injectable.inject[F, QScriptTotal[T, ?]],
       Injectable.inject[G, QScriptTotal[T, ?]])
-
-  def liftAlgebra[T[_[_]]: BirecursiveT, F[_], G[_]: Functor]
-    (alg: QScriptCore[T, T[G]] => F[T[G]], GtoF: PrismNT[G, F])
-    (implicit QC: QScriptCore[T, ?] :<: F)
-      : F[T[G]] => G[T[G]] =
-    ftg => GtoF.reverseGet(
-      liftFG[QScriptCore[T, ?], F, T[G]](alg).apply(ftg))
-
-  // qs.transCata[T[QScriptTotal]](liftId[T, QScriptTotal])
-  def liftId[T[_[_]]: BirecursiveT, F[_]: Functor]
-    (alg: QScriptCore[T, T[F]] => F[T[F]])
-    (implicit QC: QScriptCore[T, ?] :<: F)
-      : F[T[F]] => F[T[F]] =
-    liftAlgebra[T, F, F](alg, idPrism)
-
-  // free.transCata[FreeQS](liftCoEnv[T, QScriptTotal])
-  def liftCoEnv[T[_[_]]: BirecursiveT, F[_]: Functor]
-    (alg: QScriptCore[T, T[CoEnv[Hole, F, ?]]] => F[T[CoEnv[Hole, F, ?]]])
-    (implicit QC: QScriptCore[T, ?] :<: F)
-      : CoEnvFree[F, Hole] => CoEnvFree[F, Hole] = {
-    val bij = coenvBijection[T, F, Hole]
-
-    val partial: F[Free[F, Hole]] => CoEnvFree[F, Hole] = fa => {
-      liftAlgebra[T, F, CoEnv[Hole, F, ?]](alg, coenvPrism[F, Hole])
-        .apply(fa ∘ bij.toK.run) ∘ bij.fromK.run
-    }
-
-    liftCo[T, F, Hole, Free[F, Hole]](partial)
-  }
 }
