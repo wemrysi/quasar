@@ -16,15 +16,17 @@
 
 package quasar.physical.rdbms
 
-import slamdata.Predef.Map
+import slamdata.Predef._
 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.effect.uuid.GenUUID
-import quasar.fp.{TaskRef, reflNT}
 import quasar.fp.free._
+import quasar.fp.{TaskRef, reflNT}
+import quasar.fs.QueryFile.ResultHandle
 import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.WriteFile.WriteHandle
 import quasar.physical.rdbms.fs.WriteCursor
 import quasar.physical.rdbms.model.DbDataStream
+import quasar.fs.QueryFile.ResultHandle
 
 import doobie.imports.Transactor
 import scalaz.concurrent.Task
@@ -36,18 +38,20 @@ trait Interpreter {
 
   def interp(xa: Task[Transactor[Task]]): Task[Eff ~> Task] =
     (
-      TaskRef(Map.empty[ReadHandle, DbDataStream])   |@|
-        TaskRef(Map.empty[WriteHandle, WriteCursor]) |@|
-        xa                                           |@|
-        TaskRef(0L)                                  |@|
+      TaskRef(Map.empty[ReadHandle, DbDataStream])     |@|
+        TaskRef(Map.empty[ResultHandle, DbDataStream]) |@|
+        TaskRef(Map.empty[WriteHandle, WriteCursor])   |@|
+        xa                                             |@|
+        TaskRef(0L)                                    |@|
         GenUUID.type1[Task]
       )(
-      (kvR, kvW, x, i, genUUID) =>
+      (kvR, kvRes, kvW, x, i, genUUID) =>
         reflNT[Task]                               :+:
           Read.constant[Task, Transactor[Task]](x) :+:
           x.trans                                  :+:
           MonotonicSeq.fromTaskRef(i)              :+:
           genUUID                                  :+:
           KeyValueStore.impl.fromTaskRef(kvR)      :+:
+          KeyValueStore.impl.fromTaskRef(kvRes)    :+:
           KeyValueStore.impl.fromTaskRef(kvW))
 }
