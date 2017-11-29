@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package quasar
-package connector
+package quasar.connector
 
 import slamdata.Predef._
 
+import quasar.{RenderTree, RenderTreeT}
 import quasar.Planner.PlannerError
 import quasar.Data
 import quasar.common._
@@ -36,6 +36,7 @@ import quasar.fs.FileSystemError.qscriptPlanningFailed
 import quasar.fs.mount._
 import quasar.qscript._
 import quasar.qscript.qsu.LPtoQS
+import quasar.qscript.rewrites.{Rewrite, Unicoalesce, Unirewrite}
 import quasar.qscript.RenderQScriptDSL._
 
 import matryoshka.{Hole => _, _}

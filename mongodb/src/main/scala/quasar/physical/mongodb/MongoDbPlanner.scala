@@ -37,7 +37,8 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.planner.common._
 import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
-import quasar.qscript.{Coalesce => _, _}, RenderQScriptDSL._
+import quasar.qscript._, RenderQScriptDSL._
+import quasar.qscript.rewrites.{Coalesce => _, Optimize, PreferProjection, Rewrite}
 import quasar.std.StdLib._ // TODO: remove this
 
 import java.time.Instant

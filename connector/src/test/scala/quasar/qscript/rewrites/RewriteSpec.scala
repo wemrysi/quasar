@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qscript.rewrites
 
 import slamdata.Predef._
 import quasar._
@@ -23,6 +23,7 @@ import quasar.contrib.pathy.{ADir, AFile}
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
+import quasar.qscript._
 import quasar.sql.CompilerHelpers
 
 import scala.Predef.implicitly

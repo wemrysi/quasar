@@ -14,22 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qscript.rewrites
 
 import slamdata.Predef._
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
+import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.ejson.{EJson, EJsonArbitrary}
 import quasar.ejson.implicits._
+import quasar.qscript._
 import quasar.qscript.analysis.Outline
+
 import matryoshka.data.Fix
 import matryoshka.data.free._
 import org.specs2.scalacheck._
 import pathy.Path._
-import quasar.contrib.pathy._
 
 import scalaz._
 import Scalaz._

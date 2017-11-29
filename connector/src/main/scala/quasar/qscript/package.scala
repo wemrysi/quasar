@@ -175,7 +175,7 @@ package object qscript {
     br: FreeQS[T],
     fm: FreeMap[T]
   ): FreeQS[T] = {
-    val rewrite = new Rewrite[T]
+    val rewrite = new quasar.qscript.rewrites.Rewrite[T]
 
     (br >> Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(
       Map(Free.point[QScriptTotal[T, ?], Hole](SrcHole), fm))))

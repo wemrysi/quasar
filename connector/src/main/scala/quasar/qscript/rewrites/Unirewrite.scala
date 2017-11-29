@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qscript.rewrites
 
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fs._
+import quasar.qscript._
 
 import matryoshka._
 import matryoshka.implicits._

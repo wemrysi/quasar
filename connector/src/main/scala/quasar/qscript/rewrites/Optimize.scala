@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qscript.rewrites
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => _, _}
 import quasar.contrib.matryoshka._
 import quasar.fp._
+import quasar.qscript._
 
 import matryoshka._
 import matryoshka.implicits._

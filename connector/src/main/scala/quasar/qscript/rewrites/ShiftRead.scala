@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qscript.rewrites
 
 import slamdata.Predef._
 import quasar.fp._
+import quasar.qscript._
 import quasar.qscript.MapFuncsCore._
 
-import matryoshka._
+import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns.CoEnv
