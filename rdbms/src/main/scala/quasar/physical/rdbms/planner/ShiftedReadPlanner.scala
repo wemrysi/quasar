@@ -51,7 +51,6 @@ class ShiftedReadPlanner[
         }
         SelectRow(Selection[R](fields, alias = rowAlias.some), from).embed
       }
-
   }
 
 }

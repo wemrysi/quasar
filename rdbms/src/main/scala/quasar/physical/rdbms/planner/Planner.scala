@@ -64,8 +64,12 @@ object Planner {
   : Planner[T, F, ThetaJoin[T, ?]] = unreachable("thetajoin")
 
   def mapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: Monad: NameGenerator: PlannerErrorME]
-  : Planner[T, F, MapFunc[T, ?]] = unreachable("mapFuncCore")
-
+      : Planner[T, F, MapFunc[T, ?]] = {
+    val core = new MapFuncCorePlanner[T, F]
+    val derived = new MapFuncDerivedPlanner(core)
+    coproduct(core, derived)
+  }
+  
   implicit def qScriptCorePlanner[
   T[_[_]]: BirecursiveT: ShowT,
   F[_]: Monad: NameGenerator: PlannerErrorME]
