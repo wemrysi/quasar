@@ -35,6 +35,9 @@ trait Dimension[D, I, P] {
   val empty: Dimensions[P] =
     IList[P]()
 
+  def canonicalize(ds: Dimensions[P])(implicit eqD: Equal[D], eqI: Equal[I]): Dimensions[P] =
+    ds.map(normalize)
+
   /** Updates the dimensional stack by sequencing a new dimension from value
     * space with the current head dimension.
     */

@@ -194,7 +194,10 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
           rootProvCheck = extended.forall(t => dims(t._1.root) === dims(source.root))
 
           // we need a stricter check than just provenance, since we have to inline maps
-          back <- if (rootProvCheck && extended.forall(_._1.root === source.root)) {
+          back <- if (rootProvCheck
+              && extended.forall(_._2 === buckets)
+              && extended.forall(_._1.root === source.root)) {
+
             val lifted = extended.zipWithIndex map {
               case ((_, buckets, reducers, repair), i) =>
                 (

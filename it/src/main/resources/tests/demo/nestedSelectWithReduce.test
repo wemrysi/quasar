@@ -2,22 +2,18 @@
     "name": "select reduction from nested select",
     "backends": {
         "couchbase":         "skip",
-        "marklogic_json":    "skip",
-        "marklogic_xml":     "skip",
-        "mimir":             "skip",
-        "mongodb_2_6":       "skip",
-        "mongodb_3_0":       "skip",
-        "mongodb_3_2":       "skip",
-        "mongodb_3_4":       "skip",
-        "mongodb_read_only": "skip",
-        "spark_hdfs":        "skip",
-        "spark_local":       "skip",
-        "spark_cassandra":   "skip"
+        "marklogic_json":    "ignoreFieldOrder",
+        "mimir":             "pending",
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_3_2":       "pending",
+        "mongodb_3_4":       "pending",
+        "mongodb_read_only": "pending"
+
     },
-    "NB": "When we enable pendingIgnoreFieldOrder for mimir, the test suite claims
-           the test is fixed even though it isn't. So this is a bug in our test
-           infrastructure. But the test is also broken for mimir.",
-    "NB2": "All tests are skipped because they sometimes pass and sometimes fail.",
+    "NB": "pending on mongo due to oid issue",
+    "NB": "pending on mimir due to sorting issue (should be pendingIgnoreFieldOrder, but that breaks because the predicate is buggy)",
+    "NB": "disabled on couchbase due to lack of general join",
     "data": "patients.data",
     "query": "SELECT AVG(cnt) as measure, state as category FROM
                 (SELECT COUNT(*) as cnt, state, gender FROM patients
