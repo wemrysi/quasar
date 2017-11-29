@@ -16,11 +16,11 @@
 
 package quasar.qscript
 
-import slamdata.Predef._
-import quasar.{Data, TreeMatchers}
+import slamdata.Predef.{List, Nil}
+
+import quasar.TreeMatchers
 import quasar.contrib.pathy.AFile
 import quasar.fp._
-import quasar.std.StdLib._
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -35,12 +35,12 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
     "eliminate Read nodes from a simple query" in {
       val sampleFile = rootDir </> file("bar")
 
-      val qScript =
+      val qScript: Fix[QS] =
         chainQS(
           qsdsl.fix.Read[AFile](sampleFile),
           qsdsl.fix.LeftShift(_, qsdsl.func.Hole, ExcludeId, qsdsl.func.RightSide))
 
-      val newQScript =
+      val newQScript: Fix[QST] =
         qScript.codyna(
           rewrite.normalizeTJ[QST] >>> (_.embed),
           ((_: Fix[QS]).project) >>> (ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_)))
@@ -53,20 +53,28 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
     }
 
     "shift a simple aggregated read" in {
-      import qstdsl._
-      convert(lc.some,
-        structural.MakeMap(
-          lpf.constant(Data.Str("0")),
-          agg.Count(lpRead("/foo/bar")).embed).embed).map(
-        _.codyna(
+      val qScript: Fix[QS] = qsdsl.fix.Reduce(
+        qsdsl.fix.LeftShift(
+          qsdsl.fix.Read[AFile](rootDir </> dir("foo") </> file("bar")),
+          qsdsl.func.Hole,
+          ExcludeId,
+          qsdsl.func.RightSide),
+        Nil,
+        List(ReduceFuncs.Count(qsdsl.func.Hole)),
+        qsdsl.func.MakeMapS("0", qsdsl.func.ReduceIndex(0.right)))
+
+      val newQScript: Fix[QST] =
+        qScript.codyna(
           rewrite.normalizeTJ[QST] >>> (_.embed),
-          ((_: Fix[QS]).project) >>> (ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_)))) must
+          ((_: Fix[QS]).project) >>> (ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_)))
+
+      newQScript must
         beTreeEqual(
-          fix.Reduce(
-            fix.ShiftedRead[AFile](rootDir </> dir("foo") </> file("bar"), IncludeId),
+          qstdsl.fix.Reduce(
+            qstdsl.fix.ShiftedRead[AFile](rootDir </> dir("foo") </> file("bar"), IncludeId),
             Nil,
-            List(ReduceFuncs.Count(func.ProjectIndexI(func.Hole, 1))),
-            func.MakeMapS("0", func.ReduceIndex(0.right))).some)
+            List(ReduceFuncs.Count(qstdsl.func.ProjectIndexI(qstdsl.func.Hole, 1))),
+            qstdsl.func.MakeMapS("0", qstdsl.func.ReduceIndex(0.right))))
     }
   }
 }

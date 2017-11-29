@@ -18,6 +18,7 @@ package quasar.qscript.qsu
 
 import slamdata.Predef.{Map => SMap, _}
 import quasar.NameGenerator
+import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.MonadState_
 import quasar.fp._
 import quasar.fp.ski.κ
@@ -27,7 +28,7 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns.EnvT
-import scalaz.{Cofree, DList, Id, Monad, Monoid, MonadState, Scalaz, Show, State, StateT}, Scalaz._
+import scalaz.{\/-, -\/, Cofree, DList, Id, Monad, Monoid, MonadState, Scalaz, Show, State, StateT}, Scalaz._
 
 @Lenses
 final case class QSUGraph[T[_[_]]](
@@ -478,7 +479,14 @@ object QSUGraph extends QSUGraphInstances {
           implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?])
           : Option[(QSUGraph[T], QSUGraph[T], MapFuncCore[T, JoinSide])] = qgraph match {
 
-        case AutoJoin2(left, right, IC(mfc)) => Some((left, right, mfc))
+        case AutoJoin2(left, right, fm) =>
+          fm.resumeTwice match {
+            case \/-(_) => None
+            case -\/(IC(func)) => func.traverse {
+              case -\/(_) => None
+              case \/-(side) => Some(side)
+            }.flatMap(f => Some((left, right, f)))
+          }
         case _ => None
       }
     }
@@ -488,7 +496,14 @@ object QSUGraph extends QSUGraphInstances {
           implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?])
           : Option[(QSUGraph[T], QSUGraph[T], QSUGraph[T], MapFuncCore[T, JoinSide3])] = qgraph match {
 
-        case AutoJoin3(left, center, right, IC(mfc)) => Some((left, center, right, mfc))
+        case AutoJoin3(left, center, right, fm) =>
+          fm.resumeTwice match {
+            case \/-(_) => None
+            case -\/(IC(func)) => func.traverse {
+              case -\/(_) => None
+              case \/-(side) => Some(side)
+            }.flatMap(f => Some((left, center, right, f)))
+          }
         case _ => None
       }
     }

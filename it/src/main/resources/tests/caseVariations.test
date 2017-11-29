@@ -15,8 +15,6 @@
 
     "NB": "Pending on mongo due to #3154",
 
-    "NB": "This is probably pending on mimir for the same reason that shortCities.test is pending: namely, qscript using arrays rather than objects to carry around information.",
-
     "data": "zips.data",
 
     "query": "select distinct

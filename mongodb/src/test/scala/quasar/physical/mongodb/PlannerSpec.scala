@@ -40,7 +40,7 @@ class PlannerSpec extends
     PendingWithActualTracking {
 
   //to write the new actuals:
-  //override val mode = WriteMode
+  // override val mode = WriteMode
 
   import Grouped.grouped
   import Reshape.reshape
@@ -86,12 +86,10 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp)))
     }
 
-    trackPending(
-      "sort wildcard on expression",
-      plan(sqlE"select * from zips order by pop/10 desc"),
-      //FIXME these 2 SimpleMapOps conflict with the asserts of notBroken
-      //See which one we have to change
-      IList(ReadOp, SimpleMapOp, SimpleMapOp, SortOp, ProjectOp))
+    "sort wildcard on expression" in {
+      plan(sqlE"select * from zips order by pop/10 desc") must
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, SimpleMapOp, SortOp, ProjectOp)))
+    }
 
     "sort with expression and alias" in {
       plan(sqlE"select pop/1000 as popInK from zips order by popInK") must
@@ -130,7 +128,7 @@ class PlannerSpec extends
     "expr3 with grouping" in {
       plan(sqlE"select case when pop > 1000 then city else lower(city) end, count(*) from zips group by city") must
         beRight
-        // Q3172
+        // Q3114
         // FIXME fails with: an implementation is missing (ReifyIdentities.scala:358)
     }.pendingUntilFixed
 
@@ -155,14 +153,12 @@ class PlannerSpec extends
     trackPending(
       "double aggregation with another projection",
       plan(sqlE"select sum(avg(pop)), min(city) from zips group by state"),
-      IList(ReadOp, GroupOp, GroupOp, UnwindOp)
-    )
+      IList(ReadOp, GroupOp, GroupOp, UnwindOp))
 
     trackPending(
       "multiple expressions using same field",
       plan(sqlE"select pop, sum(pop), pop/1000 from zips"),
-      IList(ReadOp, ProjectOp, GroupOp, UnwindOp, ProjectOp)
-    )
+      IList(ReadOp, ProjectOp, GroupOp, UnwindOp, ProjectOp))
 
     "plan sum of expression in expression with another projection when grouped" in {
       plan(sqlE"select city, sum(pop-1)/1000 from zips group by city") must
@@ -172,8 +168,7 @@ class PlannerSpec extends
     trackPending(
       "length of min (JS on top of reduce)",
       plan3_2(sqlE"select state, length(min(city)) as shortest from zips group by state"),
-      IList(ReadOp, GroupOp, ProjectOp, SimpleMapOp, ProjectOp)
-    )
+      IList(ReadOp, GroupOp, ProjectOp, SimpleMapOp, ProjectOp))
 
     "plan js expr grouped by js expr" in {
       plan3_2(sqlE"select length(city) as len, count(*) as cnt from zips group by length(city)") must
@@ -986,7 +981,7 @@ class PlannerSpec extends
         appropriateColumns(wf, q)
         rootPushes(wf) must_== Nil
       }
-      //Q3174
+      //Q3154
       //FIXME has dangling reference
     }.pendingUntilFixed
   }

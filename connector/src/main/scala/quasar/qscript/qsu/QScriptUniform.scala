@@ -43,10 +43,10 @@ import scalaz.{
   Functor,
   Id,
   NonEmptyList => NEL,
+  Order,
   Scalaz,
   Show,
   Traverse}
-import scalaz.{\/-, Applicative, Bitraverse, Enum, Equal, Forall, Free, NonEmptyList => NEL, Order, Scalaz, Show, Traverse}
 import scalaz.std.anyVal._
 import scalaz.std.list._
 import scalaz.std.tuple._
@@ -217,13 +217,13 @@ object QScriptUniform {
   final case class AutoJoin2[T[_[_]], A](
       left: A,
       right: A,
-      combiner: MapFunc[T, JoinSide]) extends QScriptUniform[T, A]
+      combiner: FreeMapA[T, JoinSide]) extends QScriptUniform[T, A]
 
   final case class AutoJoin3[T[_[_]], A](
       left: A,
       center: A,
       right: A,
-      combiner: MapFunc[T, JoinSide3]) extends QScriptUniform[T, A]
+      combiner: FreeMapA[T, JoinSide3]) extends QScriptUniform[T, A]
 
   final case class GroupBy[T[_[_]], A](
       left: A,
@@ -424,13 +424,13 @@ object QScriptUniform {
   final case class JoinSideRef[T[_[_]], A](id: Symbol) extends QScriptUniform[T, A]
 
   final class Optics[T[_[_]]] private () extends QSUTTypes[T] {
-    def autojoin2[A]: Prism[QScriptUniform[A], (A, A, MapFunc[JoinSide])] =
-      Prism.partial[QScriptUniform[A], (A, A, MapFunc[JoinSide])] {
+    def autojoin2[A]: Prism[QScriptUniform[A], (A, A, FreeMapA[JoinSide])] =
+      Prism.partial[QScriptUniform[A], (A, A, FreeMapA[JoinSide])] {
         case AutoJoin2(left, right, func) => (left, right, func)
       } { case (left, right, func) => AutoJoin2(left, right, func) }
 
-    def autojoin3[A]: Prism[QScriptUniform[A], (A, A, A, MapFunc[JoinSide3])] =
-      Prism.partial[QScriptUniform[A], (A, A, A, MapFunc[JoinSide3])] {
+    def autojoin3[A]: Prism[QScriptUniform[A], (A, A, A, FreeMapA[JoinSide3])] =
+      Prism.partial[QScriptUniform[A], (A, A, A, FreeMapA[JoinSide3])] {
         case AutoJoin3(left, center, right, func) => (left, center, right, func)
       } { case (left, center, right, func) => AutoJoin3(left, center, right, func) }
 
@@ -576,7 +576,6 @@ object QScriptUniform {
 
   sealed abstract class Dsl[T[_[_]]: BirecursiveT, F[_]: Functor, A] extends QSUTTypes[T] {
     import Scalaz._
-    import Forall.CPS
 
     val iso: Iso[A, F[QScriptUniform[A]]]
     def lifting[S, A]: Prism[S, A] => Prism[F[S], F[A]]
@@ -591,28 +590,28 @@ object QScriptUniform {
     private def composeLifting[G[_]](optic: Prism[QScriptUniform[A], G[A]]) =
       iso composePrism lifting[QScriptUniform[A], G[A]](optic)
 
-    def _autojoin2: Prism[A, F[(A, A, MapFunc[JoinSide])]] = {
-      type G[A] = (A, A, MapFunc[JoinSide])
+    def _autojoin2: Prism[A, F[(A, A, FreeMapA[JoinSide])]] = {
+      type G[A] = (A, A, FreeMapA[JoinSide])
       composeLifting[G](O.autojoin2[A])
     }
 
-    def _autojoin3: Prism[A, F[(A, A, A, MapFunc[JoinSide3])]] = {
-      type G[A] = (A, A, A, MapFunc[JoinSide3])
+    def _autojoin3: Prism[A, F[(A, A, A, FreeMapA[JoinSide3])]] = {
+      type G[A] = (A, A, A, FreeMapA[JoinSide3])
       composeLifting[G](O.autojoin3[A])
     }
 
-    def autojoin2(input: F[(A, A, CPS[Bin])]): A =
+    def autojoin2(input: F[(A, A, Forall.CPS[Bin])]): A =
       _autojoin2(input.map {
         case (left, right, combiner) =>
           (left, right,
-	    mfc(Forall[Bin](combiner)[JoinSide](LeftSide, RightSide)))
+           Free.liftF(mfc(Forall[Bin](combiner)[JoinSide](LeftSide, RightSide))))
       })
 
-    def autojoin3(input: F[(A, A, A, CPS[Tri])]): A =
+    def autojoin3(input: F[(A, A, A, Forall.CPS[Tri])]): A =
       _autojoin3(input.map {
         case (left, center, right, combiner) =>
           (left, center, right,
-	    mfc(Forall[Tri](combiner)[JoinSide3](LeftSide3, Center, RightSide3)))
+           Free.liftF(mfc(Forall[Tri](combiner)[JoinSide3](LeftSide3, Center, RightSide3))))
       })
 
     def dimEdit: Prism[A, F[(A, DTrans[T])]] =

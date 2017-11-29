@@ -8,18 +8,15 @@ Chain
 │  ╰─ ExcludeId
 ├─ $LookupF(from zips with (this).right.TestProgramId = (that)._id as left)
 ├─ $UnwindF(DocField(BsonField.Name("left")))
+├─ $ProjectF
+│  ├─ Name("left" -> "$left")
+│  ├─ Name("right" -> "$right")
+│  ╰─ ExcludeId
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
-│  │     ├─ Key(f0: (function (__val) {
-│  │     │      return (isObject(__val[0]) && (! Array.isArray(__val[0]))) ? __val[0]._id : undefined
-│  │     │    })(
-│  │     │      [_.left, _.right]))
-│  │     ╰─ Key(b0: (function (__val) {
-│  │            return [
-│  │              (isObject(__val[0]) && (! Array.isArray(__val[0]))) ? __val[0]._id : undefined]
-│  │          })(
-│  │            [_.left, _.right]))
+│  │     ├─ Key(f0: (isObject(_.left) && (! Array.isArray(_.left))) ? _.left._id : undefined)
+│  │     ╰─ Key(b0: [(isObject(_.left) && (! Array.isArray(_.left))) ? _.left._id : undefined])
 │  ╰─ Scope(Map())
 ╰─ $GroupF
    ├─ Grouped

@@ -38,5 +38,49 @@ Chain
 ├─ $UnwindF(DocField(BsonField.Name("left")))
 ╰─ $ProjectF
    ├─ Name("city" -> "$left.city")
-   ├─ Name("state" -> "$right.state")
+   ├─ Name("state" -> {
+   │       "$cond": [
+   │         {
+   │           "$and": [
+   │             {
+   │               "$lte": [
+   │                 { "$literal": {  } },
+   │                 {
+   │                   "$cond": [
+   │                     {
+   │                       "$and": [
+   │                         { "$lte": [{ "$literal": {  } }, "$right"] },
+   │                         { "$lt": ["$right", { "$literal": [] }] }]
+   │                     },
+   │                     "$right",
+   │                     { "$literal": undefined }]
+   │                 }]
+   │             },
+   │             {
+   │               "$lt": [
+   │                 {
+   │                   "$cond": [
+   │                     {
+   │                       "$and": [
+   │                         { "$lte": [{ "$literal": {  } }, "$right"] },
+   │                         { "$lt": ["$right", { "$literal": [] }] }]
+   │                     },
+   │                     "$right",
+   │                     { "$literal": undefined }]
+   │                 },
+   │                 { "$literal": [] }]
+   │             }]
+   │         },
+   │         {
+   │           "$cond": [
+   │             {
+   │               "$and": [
+   │                 { "$lte": [{ "$literal": {  } }, "$right"] },
+   │                 { "$lt": ["$right", { "$literal": [] }] }]
+   │             },
+   │             "$right.state",
+   │             { "$literal": undefined }]
+   │         },
+   │         { "$literal": undefined }]
+   │     })
    ╰─ ExcludeId

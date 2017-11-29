@@ -63,21 +63,21 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
 
     val back = agraph.graph rewriteM {
       case qgraph @ AutoJoin2(left, right, combiner) =>
-        val combiner2 = combiner map {
+        val combiner2: FreeMapA[Int] = combiner map {
           case LeftSide => 0
           case RightSide => 1
         }
 
-        coalesceToMap[G](qgraph, List(left, right), Free.liftF[MapFunc, Int](combiner2))
+        coalesceToMap[G](qgraph, List(left, right), combiner2)
 
       case qgraph @ AutoJoin3(left, center, right, combiner) =>
-        val combiner2 = combiner map {
+        val combiner2: FreeMapA[Int] = combiner map {
           case LeftSide3 => 0
           case Center => 1
           case RightSide3 => 2
         }
 
-        coalesceToMap[G](qgraph, List(left, center, right), Free.liftF[MapFunc, Int](combiner2))
+        coalesceToMap[G](qgraph, List(left, center, right), combiner2)
     }
 
     val lifted = back(agraph.dims) map {
@@ -170,9 +170,14 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
                 // TODO short circuit this a bit if fm === Free.pure(Hole)
                 // I'm pretty sure the fallthrough case will never be hit
                 case Map(source2, fm) =>
+                  def rewriteBucket(bucket: Access[Hole]): FreeMapA[Access[Hole]] = bucket match {
+                    case v @ Access.Value(_) => fm.map(κ(v))
+                    case other => Free.pure[MapFunc, Access[Hole]](other)
+                  }
+
                   (
                     source2,
-                    buckets,    // buckets are based on access, so we don't need to modify here
+                    buckets.map(_.flatMap(rewriteBucket)),
                     reducers.map(_.map(_.flatMap(κ(fm)))),
                     repair)
 

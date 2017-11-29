@@ -17,19 +17,14 @@
 package quasar
 
 import slamdata.Predef._
-import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
-import quasar.ejson.EJson
 import quasar.fp._
-import quasar.qscript.{provenance => prov}
 import quasar.qscript.MapFuncCore._
-import quasar.qscript.MapFuncsCore._
 
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
 /** The various representations of an arbitrary query, as seen by the filesystem
@@ -154,7 +149,6 @@ package object qscript {
   type CoEnvQS[T[_[_]], A]      = CoEnv[Hole, QScriptTotal[T, ?], A]
   type CoEnvMapA[T[_[_]], A, B] = CoEnv[A, MapFunc[T, ?], B]
   type CoEnvMap[T[_[_]], A]     = CoEnvMapA[T, Hole, A]
-  type CoEnvJoin[T[_[_]], A]    = CoEnvMapA[T, JoinSide, A]
 
   type CoEnvFree[F[_], A] = CoEnv[A, F, Free[F, A]]
 
@@ -173,73 +167,6 @@ package object qscript {
     Free.point[MapFunc[T, ?], JoinSide](RightSide)
   def ReduceIndexF[T[_[_]]](i: Int \/ Int): FreeMapA[T, ReduceIndex] =
     Free.point[MapFunc[T, ?], ReduceIndex](ReduceIndex(i))
-
-  def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
-
-  def concat[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, A: Equal: Show: RenderTree]
-    (l: FreeMapA[T, A], r: FreeMapA[T, A])
-      : (FreeMapA[T, A], FreeMap[T], FreeMap[T]) = {
-
-    val norm = Normalizable.normalizable[T]
-    val norml = norm.freeMF(l)
-    val normr = norm.freeMF(r)
-
-    def projectIndex(idx: Int): FreeMap[T] =
-      Free.roll(MFC(ProjectIndex(HoleF[T], IntLit[T, Hole](idx))))
-
-    def indexOf(elems: List[FreeMapA[T ,A]], value: FreeMapA[T, A]): Option[Int] =
-      IList.fromList(elems) indexOf value
-
-    def foundR =
-      StaticArray.unapply(norml.project)
-        .flatMap(indexOf(_, normr))
-        .map(idx => (norml, HoleF[T], projectIndex(idx)))
-
-    def foundL =
-      StaticArray.unapply(normr.project)
-        .flatMap(indexOf(_, norml))
-        .map(idx => (normr, projectIndex(idx), HoleF[T]))
-
-    def concat0 = (norml, normr) match {
-      case _ if norml ≟ normr =>
-        (norml, HoleF[T], HoleF[T])
-
-      case (Embed(CoEnv(\/-(MFC(Constant(_))))), _) =>
-        (normr, norml >> HoleF, HoleF[T])
-
-      case (_, Embed(CoEnv(\/-(MFC(Constant(_)))))) =>
-        (norml, HoleF[T], normr >> HoleF)
-
-      case (Embed(StaticArray(ls)), _) =>
-        (StaticArray(ls ::: List(normr)), HoleF[T], projectIndex(ls.length))
-
-      case (_, Embed(StaticArray(rs))) =>
-        (StaticArray(rs ::: List(norml)), projectIndex(rs.length), HoleF[T])
-
-      case _ =>
-        (StaticArray(List(norml, normr)), projectIndex(0), projectIndex(1))
-    }
-
-    foundR orElse foundL getOrElse concat0
-  }
-
-  def concat3[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, A: Equal: Show: RenderTree](
-    l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A]):
-      (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T]) = {
-
-    val (lc, getL, getC) = concat(l, c)
-    val (lcr, getLC, getR) = concat(lc, r)
-    (lcr, getL >> getLC, getC >> getLC, getR)
-  }
-
-  def concat4[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, A: Equal: Show: RenderTree](
-    l: FreeMapA[T, A], c: FreeMapA[T, A], r: FreeMapA[T, A], r2: FreeMapA[T, A]):
-      (FreeMapA[T, A], FreeMap[T], FreeMap[T], FreeMap[T], FreeMap[T]) = {
-
-    val (lcr, getL, getC, getR) = concat3(l, c, r)
-    val (lcr2, getLCR, getR2) = concat(lcr, r2)
-    (lcr2, getL >> getLCR, getC >> getLCR, getR >> getLCR, getR2)
-  }
 
   def rebase[M[_]: Bind, A](in: M[A], key: M[A]): M[A] = in >> key
 
@@ -302,48 +229,6 @@ package object qscript {
       Injectable.inject[F, QScriptTotal[T, ?]],
       Injectable.inject[G, QScriptTotal[T, ?]])
 
-  private def pruneArrays0[T, F[_]: Traverse](
-    state: PATypes.RewriteState)(
-    implicit
-      R: Recursive.Aux[T, F],
-      C: Corecursive.Aux[T, F],
-      P: PruneArrays[F])
-      : T => T = {
-    val pa = new PAFindRemap[T, F]
-    _.hyloM[State[PATypes.RewriteState, ?], pa.ArrayEnv, T](
-      pa.remapIndices[State[PATypes.RewriteState, ?]],
-      pa.findIndices[State[PATypes.RewriteState, ?]]
-    ).eval(state)
-  }
-
-  private def pruneArrays[T, F[_]: Traverse](
-    implicit
-      R: Recursive.Aux[T, F],
-      C: Corecursive.Aux[T, F],
-      P: PruneArrays[F])
-      : T => T =
-    pruneArrays0[T, F](PATypes.Ignore)
-
-  implicit final class BirecursiveOps[T[_[_]], F[_]](val self: T[F]) extends scala.AnyVal {
-    final def pruneArraysF(
-      implicit
-        T: BirecursiveT[T],
-        P: PruneArrays[F],
-        F: Traverse[F])
-        : T[F] =
-      pruneArrays[T[F], F].apply(self)
-  }
-
-  implicit final class FreeQSOps[T[_[_]]](val self: FreeQS[T]) extends scala.AnyVal {
-    final def pruneArraysBranch(
-      state: PATypes.RewriteState)(
-      implicit
-        T: BirecursiveT[T],
-        P: PruneArrays[CoEnvQS[T, ?]])
-        : FreeQS[T] =
-      pruneArrays0[FreeQS[T], CoEnvQS[T, ?]](state).apply(self)
-  }
-
   def liftAlgebra[T[_[_]]: BirecursiveT, F[_], G[_]: Functor]
     (alg: QScriptCore[T, T[G]] => F[T[G]], GtoF: PrismNT[G, F])
     (implicit QC: QScriptCore[T, ?] :<: F)
@@ -371,35 +256,5 @@ package object qscript {
     }
 
     liftCo[T, F, Hole, Free[F, Hole]](partial)
-  }
-}
-
-package qscript {
-  final case class SrcMerge[A, B](src: A, lval: B, rval: B)
-
-  @Lenses final case class Ann[T[_[_]]](provenance: List[prov.Provenance[T]], values: FreeMap[T])
-
-  object Ann {
-    implicit def equal[T[_[_]]: BirecursiveT: EqualT](implicit J: Equal[T[EJson]]): Equal[Ann[T]] =
-      Equal.equal((a, b) => a.provenance ≟ b.provenance && a.values ≟ b.values)
-
-    implicit def show[T[_[_]]: ShowT]: Show[Ann[T]] =
-      Show.show(ann => Cord("Ann(") ++ ann.provenance.show ++ Cord(", ") ++ ann.values.show ++ Cord(")"))
-  }
-
-  @Lenses final case class Target[T[_[_]], F[_]](ann: Ann[T], value: T[F])
-
-  object Target {
-    implicit def equal[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor](
-      implicit F: Delay[Equal, F], J: Equal[T[EJson]]
-    ): Equal[Target[T, F]] =
-      Equal.equal((a, b) => a.ann ≟ b.ann && a.value ≟ b.value)
-
-    implicit def show[T[_[_]]: ShowT, F[_]: Functor](implicit F: Delay[Show, F])
-        : Show[Target[T, F]] =
-      Show.show(target =>
-        Cord("Target(") ++
-          target.ann.shows ++ Cord(", ") ++
-          target.value.shows ++ Cord(")"))
   }
 }

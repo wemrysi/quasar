@@ -2,7 +2,7 @@
     "name": "Retrieve array length and string length",
 
     "backends": {
-        "mimir": "pending",
+        "mimir": "pendingIgnoreFieldOrder",
         "couchbase": "ignoreFieldOrder"
     },
 
