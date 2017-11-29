@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar.Planner.PlannerError
 import quasar.common.{PhaseResult, PhaseResultT, PhaseResultTell, PhaseResults}
 import quasar.contrib.scalaz.MonadError_
-import quasar.fp.ski.ι
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fs.{FileSystemError, MonadFsErr}
 import quasar.physical.rdbms.fs.postgres.Postgres
@@ -59,10 +58,7 @@ trait SqlExprSupport {
   def compileSqlToLP[M[_]: Monad: MonadFsErr: PhaseResultTell](
                                                                 sql: Fix[Sql]): M[Fix[LP]] = {
     val (_, s) = queryPlan(sql, Variables.empty, basePath, 0L, None).run.run
-    val lp = s.fold(
-      e => scala.sys.error(e.shows),
-      d => d.fold(e => scala.sys.error(e.shows), ι)
-    )
+    val lp = s valueOr (e => scala.sys.error(e.shows))
     lp.point[M]
   }
 
