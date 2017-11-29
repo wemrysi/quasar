@@ -43,7 +43,7 @@ import spire.math.ConvertableTo
 object analysis {
   /** Knobs controlling various aspects of SST compression.
     *
-    * @param arrayMaxSize    arrays larger than this will be compressed
+    * @param arrayMaxLength  arrays larger than this will be compressed
     * @param mapMaxSize      maps larger than this will be compressed
     * @param stringMaxLength all strings longer than this are compressed to char[]
     * @param unionMaxSize    unions larger than this will be compressed
@@ -151,9 +151,7 @@ object analysis {
       .leftMap(_.wrapNel)
       .flatMapF(query =>
         queryPlan(query, vars, baseDir, 0L, none).run.value
-          .traverse(_.fold(
-            xs => Process.emitAll(xs).point[Q.M],
-            sampleOfPlan[S](_, size))))
+          .traverse(sampleOfPlan[S](_, size)))
       .run
 
   def schemaToData[T[_[_]]: BirecursiveT, A: EncodeEJson: Equal: Field: NRoot](

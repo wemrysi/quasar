@@ -37,7 +37,6 @@ import org.http4s.headers.Accept
 import pathy.Path, Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.stream.Process
 
 object execute {
 
@@ -74,7 +73,7 @@ object execute {
                 .run.value)
             lpOrSemanticErr traverse (lp => formattedDataResponse(
                 MessageFormat.fromAccept(req.headers.get(Accept)),
-                lp.fold(Process(_: _*), Q.evaluate(_)).translate(xform.dropPhases)))
+                Q.evaluate(lp).translate(xform.dropPhases)))
           }
         })
 

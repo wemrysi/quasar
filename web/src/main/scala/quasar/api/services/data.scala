@@ -69,7 +69,7 @@ object data {
       upload(req, path, W.appendThese(_, _))
 
     case req @ PUT -> AsPath(path) =>
-      upload(req, path, W.saveThese(_, _))
+      upload(req, path, W.saveThese(_, _).as(Vector.empty))
 
     case req @ Method.MOVE -> AsPath(path) =>
       respond((for {

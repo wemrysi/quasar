@@ -181,7 +181,7 @@ object QueryFile {
       * fails if the directory does not exist.
       */
     def ls(dir: ADir): M[Set[PathSegment]] =
-      EitherT(lift(ListContents(dir)))
+      listContents(dir)
 
     /** Returns all files in this directory and all of it's sub-directories
       * Fails if the directory does not exist.
@@ -198,6 +198,9 @@ object QueryFile {
 
       lsR(currentDir).foldLeft(Set.empty[RFile])(_ + _)
     }
+
+    def listContents(dir: ADir): M[Set[PathSegment]] =
+      EitherT(lift(ListContents(dir)))
 
     /** Returns whether the given file exists. */
     def fileExists(file: AFile): FreeS[Boolean] =

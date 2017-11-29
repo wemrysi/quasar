@@ -34,8 +34,29 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.concurrent.Task
 
 object view {
+
+  sealed abstract class ResultHandle
+
+  private final case class ReadH(handle: ReadFile.ReadHandle)     extends ResultHandle
+  private final case class QueryH(handle: QueryFile.ResultHandle) extends ResultHandle
+
+  type State[A] = KeyValueStore[ReadFile.ReadHandle, ResultHandle, A]
+
+  object State {
+    def Ops[S[_]](
+      implicit S: State :<: S
+    ): KeyValueStore.Ops[ReadFile.ReadHandle, ResultHandle, S] =
+      KeyValueStore.Ops[ReadFile.ReadHandle, ResultHandle, S]
+
+    type ViewHandles = Map[ReadFile.ReadHandle, ResultHandle]
+
+    def toTask(initial: ViewHandles): Task[State ~> Task] =
+      TaskRef(initial) map KeyValueStore.impl.fromTaskRef
+  }
+
   private val optimizer = new Optimizer[Fix[LP]]
   private val lpr = optimizer.lpr
 
@@ -45,7 +66,7 @@ object view {
     S0: ReadFile :<: S,
     S1: QueryFile :<: S,
     S2: MonotonicSeq :<: S,
-    S3: ViewState :<: S,
+    S3: State :<: S,
     S4: VCacheKVS :<: S,
     S5: Mounting :<: S
   ): ReadFile ~> Free[S, ?] = {
@@ -54,36 +75,25 @@ object view {
     val readUnsafe = ReadFile.Unsafe[S]
     val queryUnsafe = QueryFile.Unsafe[S]
     val seq = MonotonicSeq.Ops[S]
-    val viewState = ViewState.Ops[S]
+    val state = State.Ops[S]
     val mount = Mounting.Ops[S]
 
     def openFile(f: AFile, off: Natural, lim: Option[Positive]): FileSystemErrT[Free[S, ?], ReadHandle] =
       for {
-        rh <- readUnsafe.open(f, off, lim)
-        h  <- seq.next.map(ReadHandle(f, _)).liftM[FileSystemErrT]
-        _  <- viewState.put(h, ResultSet.Read(rh)).liftM[FileSystemErrT]
-      } yield h
+        readHandle <- readUnsafe.open(f, off, lim)
+        handle     <- seq.next.map(ReadHandle(f, _)).liftM[FileSystemErrT]
+        _          <- state.put(handle, ReadH(readHandle)).liftM[FileSystemErrT]
+      } yield handle
 
     def openView(f: AFile, off: Natural, lim: Option[Positive]): FileSystemErrT[Free[S, ?], ReadHandle] = {
       val readLP = addOffsetLimit(lpr.read(f), off, lim)
 
-      def dataHandle(data: List[Data]): Free[S, ReadHandle] =
-        for {
-          h <- seq.next.map(ReadHandle(f, _))
-          _ <- viewState.put(h, ResultSet.Data(data.toVector))
-        } yield h
-
-      def queryHandle(lp: Fix[LP]): FileSystemErrT[Free[S, ?], ReadHandle] =
-        for {
-          qh <- EitherT(queryUnsafe.eval(lp).run.value)
-          h  <- seq.next.map(ReadHandle(f, _)).liftM[FileSystemErrT]
-          _  <- viewState.put(h, ResultSet.Results(qh)).liftM[FileSystemErrT]
-        } yield h
-
       for {
-        lp <- resolveViewRefs[S](readLP)
-        h  <- refineConstantPlan(lp).fold(dataHandle(_).liftM[FileSystemErrT], queryHandle)
-      } yield h
+        lp          <- resolveViewRefs[S](readLP)
+        queryHandle <- EitherT(queryUnsafe.eval(lp).run.value)
+        readHandle  <- seq.next.map(ReadHandle(f, _)).liftM[FileSystemErrT]
+        _           <- state.put(readHandle, QueryH(queryHandle)).liftM[FileSystemErrT]
+      } yield readHandle
     }
 
     λ[ReadFile ~> Free[S, ?]] {
@@ -93,24 +103,15 @@ object view {
           openFile(file, off, lim).run)
 
       case Read(handle) =>
-        viewState.get(handle).toRight(unknownReadHandle(handle)).flatMap {
-          case ResultSet.Data(values) =>
-            viewState.put(handle, ResultSet.Data(Vector.empty))
-              .as(values)
-              .liftM[FileSystemErrT]
-
-          case ResultSet.Read(handle) =>
-            readUnsafe.read(handle)
-
-          case ResultSet.Results(handle) =>
-            queryUnsafe.more(handle)
+        state.get(handle).toRight(unknownReadHandle(handle)).flatMap {
+          case QueryH(handle) => queryUnsafe.more(handle)
+          case ReadH(handle)  => readUnsafe.read(handle)
         }.run
 
       case Close(handle) =>
-        (viewState.get(handle) <* viewState.delete(handle).liftM[OptionT]).flatMapF {
-          case ResultSet.Data(_)         => ().point[Free[S, ?]]
-          case ResultSet.Read(handle)    => readUnsafe.close(handle)
-          case ResultSet.Results(handle) => queryUnsafe.close(handle)
+        state.get(handle).flatMapF {
+          case QueryH(queryHandle) => queryUnsafe.close(queryHandle) *> state.delete(handle)
+          case ReadH(handle)  => readUnsafe.close(handle)
         }.getOrElse(())
     }
   }
@@ -209,7 +210,7 @@ object view {
     S2: ManageFile :<: S,
     S3: QueryFile :<: S,
     S4: MonotonicSeq :<: S,
-    S5: ViewState :<: S,
+    S5: State :<: S,
     S6: VCacheKVS :<: S,
     S7: Mounting :<: S,
     S8: MountingFailure :<: S,
@@ -227,7 +228,7 @@ object view {
     S2: ManageFile :<: S,
     S3: QueryFile :<: S,
     S4: MonotonicSeq :<: S,
-    S5: ViewState :<: S,
+    S5: State :<: S,
     S6: VCacheKVS :<: S,
     S7: Mounting :<: S,
     S8: MountingFailure :<: S,
@@ -245,7 +246,7 @@ object view {
     val VC = VCacheKVS.Ops[S]
 
     def lift(e: Set[FPath], plan: Fix[LP]) =
-      plan.project.map((e, _)).point[SemanticErrsT[FileSystemErrT[Free[S, ?], ?], ?]]
+      plan.project.strengthL(e).point[SemanticErrsT[FileSystemErrT[Free[S, ?], ?], ?]]
 
     def compiledView(loc: AFile): OptionT[Free[S, ?], FileSystemError \/ (SemanticErrors \/ Fix[LP])] =
       (for {
@@ -275,12 +276,21 @@ object view {
     //     to manage.
     val cleaned = plan.cata(optimizer.elideTypeCheckƒ)
 
+    // The `Set[FPath]` is to ensure we don't expand the same view within the SAME AST
+    // branch as that would be nonsensical and lead to an infinitely large LP
+    // Instead, we just ignore it letting the view refer to an underlying file
+    // with the same name
+    // Alternatively, we could error out saying a view cannot reference itself
+    // but we chose the former approach.
+    // Note: This does not prevent a view from being referenced twice in an expression, as
+    // those references would appear in separate branches and thus not share the same `Set[FPath]`
     val newLP: SemanticErrsT[FileSystemErrT[Free[S, ?], ?], Fix[LP]] =
       (Set[FPath](), cleaned).anaM[Fix[LP]] {
         case (e, i @ Embed(lp.Read(p))) if !(e contains p) =>
-          refineTypeAbs(p).swap.map(f =>
-            EitherT(EitherT(vcacheRead(f) orElse compiledView(f) getOrElse i.right.right)).map(_.project.map((e + f, _)))
-          ).getOrElse(lift(e, i))
+          refineTypeAbs(p).swap.map { absFile =>
+            val inlinedView = vcacheRead(absFile) orElse compiledView(absFile) getOrElse i.right.right
+            EitherT(EitherT(inlinedView)).map(_.project.strengthL(e + absFile))
+          }.getOrElse(lift(e, i))
 
         case (e, i) => lift(e, i)
       } flatMap (resolved => EitherT(preparePlan(resolved).run.value.point[FileSystemErrT[Free[S, ?], ?]]))
