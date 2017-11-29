@@ -145,17 +145,17 @@ class PlannerSpec extends Qspec with SqlExprSupport {
 
     "represent addition" in {
       qs(sqlE"select a+b from foo") must
-        beSql("(select ((_0->>'a')::numeric + (_0->>'b')::numeric) from (select row_to_json(_0) _0 from db.foo _0) as _0)")
+        beSql("(select ((_0->>'a')::numeric + (_0->>'b')::numeric) from (select row_to_json(_0) _0 from db.foo _0) _0)")
     }
 
     "represent single-level reference" in {
       qs(sqlE"select a from foo") must
-        beSql("(select _0->>'a' from (select row_to_json(_0) _0 from db.foo _0) as _0)")
+        beSql("(select _0->>'a' from (select row_to_json(_0) _0 from db.foo _0) _0)")
     }
 
     "represent nested refs" in {
       qs(sqlE"select aa.bb.c.d from foo") must
-        beSql("(select _0->'aa'->'bb'->'c'->>'d' from (select row_to_json(_0) _0 from db.foo _0) as _0)")
+        beSql("(select _0->'aa'->'bb'->'c'->>'d' from (select row_to_json(_0) _0 from db.foo _0) _0)")
     }
   }
 
