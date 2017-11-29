@@ -42,6 +42,7 @@ import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{Read => _, _}
 import quasar.qscript.analysis._
+import quasar.qscript.rewrites.{Optimize, Unicoalesce, Unirewrite}
 
 import scala.Predef.implicitly
 

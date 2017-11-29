@@ -30,6 +30,7 @@ import quasar.fs.mount._, BackendDef._
 import quasar.effect._
 import quasar.qscript.{Read => _, _}
 import quasar.qscript.analysis._
+import quasar.qscript.rewrites.{Optimize, Unicoalesce, Unirewrite}
 
 import java.lang.{Runnable, Runtime, Thread}
 import scala.Predef.implicitly

@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qscript.rewrites
 
 import quasar.contrib.pathy.AFile
 import quasar.fp.coenvPrism
-import quasar.qscript.ShiftRead.FixFreeH
+import quasar.qscript._
+import quasar.qscript.rewrites.ShiftRead.FixFreeH
 
-import matryoshka._
+import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._

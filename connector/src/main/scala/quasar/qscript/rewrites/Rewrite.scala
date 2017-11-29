@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qscript.rewrites
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => _, _}
 import quasar.{RenderTree, RenderTreeT}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
@@ -24,12 +24,13 @@ import quasar.contrib.scalaz.bitraverse._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.MonadFsErr
+import quasar.qscript._
 import quasar.qscript.MapFuncCore._
 import quasar.qscript.MapFuncsCore._
 
 import scala.collection.immutable.{Map => ScalaMap}
 
-import matryoshka._
+import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
