@@ -6,16 +6,7 @@ Chain
 │  │  │  ├─ Grouped
 │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
 │  │  │  ╰─ By
-│  │  │     ╰─ Name("0" -> {
-│  │  │             "$cond": [
-│  │  │               {
-│  │  │                 "$and": [
-│  │  │                   { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │  │                   { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│  │  │               },
-│  │  │               "$bar_id",
-│  │  │               { "$literal": undefined }]
-│  │  │           })
+│  │  │     ╰─ Name("0" -> "$bar_id")
 │  │  ╰─ $ProjectF
 │  │     ├─ Name("_id" -> "$_id")
 │  │     ├─ Name("value")
@@ -31,16 +22,7 @@ Chain
 │     │  │  │  ├─ Grouped
 │     │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
 │     │  │  │  ╰─ By
-│     │  │  │     ╰─ Name("0" -> {
-│     │  │  │             "$cond": [
-│     │  │  │               {
-│     │  │  │                 "$and": [
-│     │  │  │                   { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │  │  │                   { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │  │  │               },
-│     │  │  │               "$id",
-│     │  │  │               { "$literal": undefined }]
-│     │  │  │           })
+│     │  │  │     ╰─ Name("0" -> "$id")
 │     │  │  ╰─ $ProjectF
 │     │  │     ├─ Name("_id" -> "$_id")
 │     │  │     ├─ Name("value")
@@ -51,13 +33,7 @@ Chain
 │     │  ╰─ Chain
 │     │     ├─ $ReadF(db; bar)
 │     │     ├─ $MapF
-│     │     │  ├─ JavaScript(function (key, value) {
-│     │     │  │               return [
-│     │     │  │                 {
-│     │     │  │                   "0": (isObject(value) && (! Array.isArray(value))) ? value.foo_id : undefined
-│     │     │  │                 },
-│     │     │  │                 { "left": [], "right": [value] }]
-│     │     │  │             })
+│     │     │  ├─ JavaScript(function (key, value) { return [{ "0": value.foo_id }, { "left": [], "right": [value] }] })
 │     │     │  ╰─ Scope(Map())
 │     │     ╰─ $ReduceF
 │     │        ├─ JavaScript(function (key, values) {
@@ -76,28 +52,6 @@ Chain
 │     │     ╰─ NotExpr($right -> Size(0))
 │     ├─ $UnwindF(DocField(BsonField.Name("right")))
 │     ├─ $UnwindF(DocField(BsonField.Name("left")))
-│     ├─ $ProjectF
-│     │  ├─ Name("left" -> {
-│     │  │       "$cond": [
-│     │  │         {
-│     │  │           "$and": [
-│     │  │             { "$lte": [{ "$literal": {  } }, "$left"] },
-│     │  │             { "$lt": ["$left", { "$literal": [] }] }]
-│     │  │         },
-│     │  │         "$left",
-│     │  │         { "$literal": undefined }]
-│     │  │     })
-│     │  ├─ Name("right" -> {
-│     │  │       "$cond": [
-│     │  │         {
-│     │  │           "$and": [
-│     │  │             { "$lte": [{ "$literal": {  } }, "$right"] },
-│     │  │             { "$lt": ["$right", { "$literal": [] }] }]
-│     │  │         },
-│     │  │         "$right",
-│     │  │         { "$literal": undefined }]
-│     │  │     })
-│     │  ╰─ ExcludeId
 │     ├─ $MatchF
 │     │  ╰─ Doc
 │     │     ╰─ Expr($right -> Type(Doc))
@@ -112,7 +66,9 @@ Chain
 │     │  │         { "$literal": true },
 │     │  │         { "$literal": false }]
 │     │  │     })
-│     │  ├─ Name("src" -> "$$ROOT")
+│     │  ├─ Name("src")
+│     │  │  ├─ Name("left" -> "$left")
+│     │  │  ╰─ Name("right" -> "$right")
 │     │  ╰─ ExcludeId
 │     ├─ $MatchF
 │     │  ╰─ Doc
@@ -182,9 +138,7 @@ Chain
 │  │     │     │           ╰─ Key(right: _.left.right)
 │  │     │     ├─ JsCore((isObject(_.left.right) && (! Array.isArray(_.left.right))) ? _.left.right.address : undefined)
 │  │     │     ╰─ Ident(undefined)
-│  │     ╰─ Key(zip: ((isObject(
-│  │            (isObject(_.right) && (! Array.isArray(_.right))) ? _.right : undefined) && (! Array.isArray(
-│  │            (isObject(_.right) && (! Array.isArray(_.right))) ? _.right : undefined))) && (isObject(_.right) && (! Array.isArray(_.right)))) ? _.right.zip : undefined)
+│  │     ╰─ Key(zip: _.right.zip)
 │  ╰─ Scope(Map())
 ╰─ $ProjectF
    ├─ Name("name" -> true)
