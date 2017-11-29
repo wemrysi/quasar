@@ -17,24 +17,19 @@
 package quasar.fs
 
 import slamdata.Predef._
-import quasar._, Planner._, RenderTree.ops._, RenderTreeT.ops._
-import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultW}
-import quasar.qscript.RenderQScriptDSL._
+import quasar._, RenderTree.ops._, RenderTreeT.ops._
+import quasar.common.{PhaseResults, PhaseResultT, PhaseResultW}
 import quasar.connector.CompileM
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.effect.LiftedOps
 import quasar.fp._
-import quasar.fp.ski._
 import quasar.frontend.SemanticErrsT
-import quasar.frontend.logicalplan.{LogicalPlan, Optimizer}
-import quasar.qscript._
-import quasar.qscript.analysis.DeepShape
+import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka.{Transform => _, _}
 import matryoshka.data.Fix
-import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz.{ToIdOps => _, _}
 import scalaz.stream.{Process0, Process}
@@ -48,147 +43,6 @@ object QueryFile {
     implicit val show: Show[ResultHandle] = Show.showFromToString
 
     implicit val order: Order[ResultHandle] = Order.orderBy(_.run)
-  }
-
-  def convertAndNormalize
-    [T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT, QS[_]: Traverse: Normalizable]
-    (lp: T[LogicalPlan])
-    (eval: QS[T[QS]] => QS[T[QS]])
-    (implicit
-      CQ: Coalesce.Aux[T, QS, QS],
-      DE:    Const[DeadEnd, ?] :<: QS,
-      QC:    QScriptCore[T, ?] :<: QS,
-      TJ:      ThetaJoin[T, ?] :<: QS,
-      PB:  ProjectBucket[T, ?] :<: QS,
-      FI: Injectable.Aux[QS, QScriptTotal[T, ?]],
-      shape: DeepShape[T, QS],
-      mergeable: Mergeable.Aux[T, QS],
-      render: Delay[RenderTree, QS],
-      eql: Delay[Equal, QS],
-      show: Delay[Show, QS])
-      : PlannerError \/ T[QS] = {
-    val transform = new Transform[T, QS]
-    val optimizer = new Optimizer[T[LogicalPlan]]
-
-    // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
-    //       so we don’t duplicate work.
-    //
-    // NB: `pullUpGroupBy` is necessary to correct LogicalPlan, but must be
-    //      applied after eliding let-bindings.
-    optimizer.pullUpGroupBy(lp.transCata[T[LogicalPlan]](orOriginal(optimizer.elideLets)))
-      .cataM[PlannerError \/ ?, Target[T, QS]](newLP => transform.lpToQScript(newLP.map(Target.value.modify(_.transAna[T[QS]](eval)))))
-      .map(target => QC.inj((transform.reifyResult(target.ann, target.value))).embed.transCata[T[QS]](eval))
-  }
-
-  def simplifyAndNormalize
-    [T[_[_]]: BirecursiveT: RenderTreeT: EqualT: ShowT,
-      IQS[_]: Functor,
-      QS[_]: Traverse: Normalizable]
-    (implicit
-      CI: Coalesce.Aux[T, IQS, IQS],
-      CQ: Coalesce.Aux[T, QS, QS],
-      SP: SimplifyProjection.Aux[IQS, QS],
-      PA: PruneArrays[QS],
-      QC: QScriptCore[T, ?] :<: QS,
-      TJ:   ThetaJoin[T, ?] :<: QS,
-      render: Delay[RenderTree, QS],
-      equal: Delay[Equal, QS],
-      FI: Injectable.Aux[QS, QScriptTotal[T, ?]])
-      : T[IQS] => T[QS] = {
-    val rewrite = new Rewrite[T]
-
-    val normUntilFixpoint: T[QS] => Option[T[QS]] = tqs => {
-      val next = tqs.transAna[T[QS]](rewrite.normalizeTJ)
-      (next =/= tqs) option next
-    }
-
-    iqs => repeatedly(normUntilFixpoint)(
-      iqs.transAna[T[QS]](SP.simplifyProjection))
-      .pruneArraysF
-  }
-
-  /** The shape of QScript that’s used during conversion from LP. */
-  private type QScriptInternal[T[_[_]], A] =
-    (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :/: Const[DeadEnd, ?])#M[A]
-
-  implicit def qScriptInternalToQscriptTotal[T[_[_]]]
-      : Injectable.Aux[QScriptInternal[T, ?], QScriptTotal[T, ?]] =
-    Injectable.coproduct(Injectable.inject[QScriptCore[T, ?], QScriptTotal[T, ?]],
-      Injectable.coproduct(Injectable.inject[ProjectBucket[T, ?], QScriptTotal[T, ?]],
-        Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
-          Injectable.inject[Const[DeadEnd, ?], QScriptTotal[T, ?]])))
-
-  /** This is a stop-gap function that QScript-based backends should use until
-    * LogicalPlan no longer needs to be exposed.
-    */
-  def convertToQScript
-    [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT, QS[_]: Traverse: Normalizable]
-    (lp: T[LogicalPlan])
-    (implicit
-      CQ: Coalesce.Aux[T, QS, QS],
-      PA: PruneArrays[QS],
-      DE:  Const[DeadEnd, ?] :<: QS,
-      QC:  QScriptCore[T, ?] :<: QS,
-      TJ:    ThetaJoin[T, ?] :<: QS,
-      FI: Injectable.Aux[QS, QScriptTotal[T, ?]],
-      eql: Delay[Equal, QS],
-      show: Delay[Show, QS],
-      renderI: Delay[RenderTree, QScriptInternal[T, ?]],
-      render: Delay[RenderTree, QS])
-      : EitherT[Writer[PhaseResults, ?], FileSystemError, T[QS]] = {
-    val transform = new Transform[T, QScriptInternal[T, ?]]
-    val rewrite = new Rewrite[T]
-
-    val qs =
-      convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalizeTJ)
-        .leftMap(FileSystemError.planningFailed(lp.convertTo[Fix[LogicalPlan]], _)) ∘
-        simplifyAndNormalize[T, QScriptInternal[T, ?], QS]
-
-    EitherT(Writer(
-      qs.fold(κ(Vector()), a => Vector(PhaseResult.treeAndCode("QScript", a))),
-      qs))
-  }
-
-  def convertToQScriptRead
-    [T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT, M[_]: Monad, QS[_]: Traverse: Normalizable]
-    (listContents: DiscoverPath.ListContents[M])
-    (lp: T[LogicalPlan])
-    (implicit
-      merr: MonadError_[M, FileSystemError],
-      mtell: MonadTell_[M, PhaseResults],
-      RD: Const[Read[ADir], ?]  :<: QS,
-      RF: Const[Read[AFile], ?] :<: QS,
-      QC:    QScriptCore[T, ?]  :<: QS,
-      TJ:      ThetaJoin[T, ?]  :<: QS,
-      CQ: Coalesce.Aux[T, QS, QS],
-      PA: PruneArrays[QS],
-      FI: Injectable.Aux[QS, QScriptTotal[T, ?]],
-      eql: Delay[Equal, QS],
-      show: Delay[Show, QS],
-      renderI: Delay[RenderTree, QScriptInternal[T, ?]],
-      render: Delay[RenderTree, QS])
-      : M[T[QS]] = {
-    val transform = new Transform[T, QScriptInternal[T, ?]]
-    val rewrite = new Rewrite[T]
-
-    type InterimQS[A] =
-      (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :\: Const[Read[ADir], ?] :/: Const[Read[AFile], ?])#M[A]
-
-    implicit val interimQsToQscriptTotal
-        : Injectable.Aux[InterimQS, QScriptTotal[T, ?]] =
-      Injectable.coproduct(Injectable.inject[QScriptCore[T, ?], QScriptTotal[T, ?]],
-        Injectable.coproduct(Injectable.inject[ProjectBucket[T, ?], QScriptTotal[T, ?]],
-          Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
-            Injectable.coproduct(Injectable.inject[Const[Read[ADir], ?], QScriptTotal[T, ?]],
-              Injectable.inject[Const[Read[AFile], ?], QScriptTotal[T, ?]]))))
-
-    convertAndNormalize[T, QScriptInternal[T, ?]](lp)(rewrite.normalizeTJ)
-      .fold(
-        perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix[LogicalPlan]], perr)),
-        _.point[M])
-      .flatMap(rewrite.pathify[M, QScriptInternal[T, ?], InterimQS](listContents))
-      .map(simplifyAndNormalize[T, InterimQS, QS])
-      .flatMap(qs => mtell.writer(Vector(PhaseResult.treeAndCode("QScript", qs)), qs))
   }
 
   /** The result of the query is stored in an output file, overwriting any existing
