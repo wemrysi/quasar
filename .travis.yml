@@ -29,7 +29,6 @@ env:
     - CONNECTOR=mongodb_read_only
     - CONNECTOR=spark_local_test
     - CONNECTOR=spark_hdfs
-    - CONNECTOR=postgres
   global:
     - COURSIER_PROGRESS=0
 
