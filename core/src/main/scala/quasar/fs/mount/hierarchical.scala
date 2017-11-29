@@ -374,7 +374,7 @@ object hierarchical {
       _        <- F.put(some(mntA)).liftM[FileSystemErrT]
     } yield ()
 
-    out.cata(d => lookupMnt(d) map some, none.right) flatMap (initMnt =>
+    out.traverse(lookupMnt) flatMap (initMnt =>
       plan.cataM[M, Unit] {
         // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
         case lp.Read(p) => mountFor(mkAbsolute(rootDir, p))

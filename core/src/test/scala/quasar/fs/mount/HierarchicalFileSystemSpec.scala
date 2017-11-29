@@ -129,7 +129,7 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
         .flatMap(expr => queryPlan(expr, Variables(Map()), rootDir, 0L, None).run.value.toOption)
         .get
 
-      runMntd(f(lp.valueOr(_ => scala.sys.error("impossible constant plan")), mntA </> file("out0")).run.value)
+      runMntd(f(lp, mntA </> file("out0")).run.value)
         .eval(emptyMS) must failDueToInvalidPath(mntC)
     }
 

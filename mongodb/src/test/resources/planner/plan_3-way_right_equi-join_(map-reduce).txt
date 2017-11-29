@@ -76,21 +76,51 @@ Chain
 │     │     ╰─ NotExpr($right -> Size(0))
 │     ├─ $UnwindF(DocField(BsonField.Name("right")))
 │     ├─ $UnwindF(DocField(BsonField.Name("left")))
-│     ├─ $SimpleMapF
-│     │  ├─ Map
-│     │  │  ╰─ Let(__val)
-│     │  │     ├─ JsCore([
-│     │  │     │         (isObject(_.left) && (! Array.isArray(_.left))) ? _.left : undefined,
-│     │  │     │         (isObject(_.right) && (! Array.isArray(_.right))) ? _.right : undefined])
-│     │  │     ╰─ Obj
-│     │  │        ├─ Key(0: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? true : false)
-│     │  │        ╰─ Key(src: __val)
-│     │  ╰─ Scope(Map())
+│     ├─ $ProjectF
+│     │  ├─ Name("left" -> {
+│     │  │       "$cond": [
+│     │  │         {
+│     │  │           "$and": [
+│     │  │             { "$lte": [{ "$literal": {  } }, "$left"] },
+│     │  │             { "$lt": ["$left", { "$literal": [] }] }]
+│     │  │         },
+│     │  │         "$left",
+│     │  │         { "$literal": undefined }]
+│     │  │     })
+│     │  ├─ Name("right" -> {
+│     │  │       "$cond": [
+│     │  │         {
+│     │  │           "$and": [
+│     │  │             { "$lte": [{ "$literal": {  } }, "$right"] },
+│     │  │             { "$lt": ["$right", { "$literal": [] }] }]
+│     │  │         },
+│     │  │         "$right",
+│     │  │         { "$literal": undefined }]
+│     │  │     })
+│     │  ╰─ ExcludeId
+│     ├─ $MatchF
+│     │  ╰─ Doc
+│     │     ╰─ Expr($right -> Type(Doc))
+│     ├─ $ProjectF
+│     │  ├─ Name("0" -> {
+│     │  │       "$cond": [
+│     │  │         {
+│     │  │           "$and": [
+│     │  │             { "$lte": [{ "$literal": {  } }, "$right"] },
+│     │  │             { "$lt": ["$right", { "$literal": [] }] }]
+│     │  │         },
+│     │  │         { "$literal": true },
+│     │  │         { "$literal": false }]
+│     │  │     })
+│     │  ├─ Name("src" -> "$$ROOT")
+│     │  ╰─ ExcludeId
 │     ├─ $MatchF
 │     │  ╰─ Doc
 │     │     ╰─ Expr($0 -> Eq(Bool(true)))
 │     ├─ $MapF
-│     │  ├─ JavaScript(function (key, value) { return [{ "0": value.src[1].id }, { "right": [], "left": [value.src] }] })
+│     │  ├─ JavaScript(function (key, value) {
+│     │  │               return [{ "0": value.src.right.id }, { "right": [], "left": [value.src] }]
+│     │  │             })
 │     │  ╰─ Scope(Map())
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
@@ -126,15 +156,15 @@ Chain
 │  │     │     │  ├─ Call
 │  │     │     │  │  ├─ Ident(isObject)
 │  │     │     │  │  ╰─ Obj
-│  │     │     │  │     ├─ Key(left: _.left[0])
-│  │     │     │  │     ╰─ Key(right: _.left[1])
+│  │     │     │  │     ├─ Key(left: _.left.left)
+│  │     │     │  │     ╰─ Key(right: _.left.right)
 │  │     │     │  ╰─ UnOp(!)
 │  │     │     │     ╰─ Call
 │  │     │     │        ├─ JsCore(Array.isArray)
 │  │     │     │        ╰─ Obj
-│  │     │     │           ├─ Key(left: _.left[0])
-│  │     │     │           ╰─ Key(right: _.left[1])
-│  │     │     ├─ JsCore((isObject(_.left[0]) && (! Array.isArray(_.left[0]))) ? _.left[0].name : undefined)
+│  │     │     │           ├─ Key(left: _.left.left)
+│  │     │     │           ╰─ Key(right: _.left.right)
+│  │     │     ├─ JsCore((isObject(_.left.left) && (! Array.isArray(_.left.left))) ? _.left.left.name : undefined)
 │  │     │     ╰─ Ident(undefined)
 │  │     ├─ Key(address)
 │  │     │  ╰─ If
@@ -142,15 +172,15 @@ Chain
 │  │     │     │  ├─ Call
 │  │     │     │  │  ├─ Ident(isObject)
 │  │     │     │  │  ╰─ Obj
-│  │     │     │  │     ├─ Key(left: _.left[0])
-│  │     │     │  │     ╰─ Key(right: _.left[1])
+│  │     │     │  │     ├─ Key(left: _.left.left)
+│  │     │     │  │     ╰─ Key(right: _.left.right)
 │  │     │     │  ╰─ UnOp(!)
 │  │     │     │     ╰─ Call
 │  │     │     │        ├─ JsCore(Array.isArray)
 │  │     │     │        ╰─ Obj
-│  │     │     │           ├─ Key(left: _.left[0])
-│  │     │     │           ╰─ Key(right: _.left[1])
-│  │     │     ├─ JsCore((isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1].address : undefined)
+│  │     │     │           ├─ Key(left: _.left.left)
+│  │     │     │           ╰─ Key(right: _.left.right)
+│  │     │     ├─ JsCore((isObject(_.left.right) && (! Array.isArray(_.left.right))) ? _.left.right.address : undefined)
 │  │     │     ╰─ Ident(undefined)
 │  │     ╰─ Key(zip: ((isObject(
 │  │            (isObject(_.right) && (! Array.isArray(_.right))) ? _.right : undefined) && (! Array.isArray(

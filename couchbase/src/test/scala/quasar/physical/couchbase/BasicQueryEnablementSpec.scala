@@ -94,9 +94,9 @@ class BasicQueryEnablementSpec
     qs.cataM(Planner[Fix, EitherT[Kleisli[Free[MonotonicSeq, ?], Context, ?], PlannerError, ?], QST].plan)
       .flatMapF(RenderQuery.compact(_).η[Kleisli[Free[MonotonicSeq, ?], Context, ?]])
       .run(Context(BucketName(cfg.ctx.bucket.name), cfg.ctx.docTypeKey))
-      .foldMap(MonotonicSeq.fromZero.unsafePerformSync)
+      .foldMap(MonotonicSeq.from(0L).unsafePerformSync)
       .unsafePerformSync
-      .fold(e => scala.sys.error(e.shows), ι)
+      .valueOr(e => scala.sys.error(e.shows))
 
   def testSql2ToN1ql(sql2: Fix[Sql], n1ql: String): Fragment =
     pprint(sql2) in (n1qlFromSql2(sql2) must_= n1ql)

@@ -64,7 +64,17 @@ Chain
 │  │  │  │          }
 │  │  │  │        })
 │  │  │  ╰─ By
-│  │  │     ╰─ Name("0" -> ["$city"])
+│  │  │     ╰─ Name("0" -> [
+│  │  │             {
+│  │  │               "$cond": [
+│  │  │                 {
+│  │  │                   "$and": [
+│  │  │                     { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│  │  │                     { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │  │                 },
+│  │  │                 "$city",
+│  │  │                 { "$literal": undefined }]
+│  │  │             }])
 │  │  ├─ $ProjectF
 │  │  │  ├─ Name("totalPop" -> "$f0")
 │  │  │  ├─ Name("city" -> "$f1")
@@ -120,21 +130,21 @@ Chain
 │     ╰─ NotExpr($right -> Size(0))
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
+├─ $ProjectF
+│  ├─ Name("left" -> "$left")
+│  ├─ Name("right" -> "$right")
+│  ╰─ ExcludeId
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
 │  │     ├─ Key(f0)
-│  │     │  ╰─ Let(__val)
-│  │     │     ├─ JsCore([_.left, _.right])
-│  │     │     ╰─ SpliceObjects
-│  │     │        ├─ JsCore(__val[0])
-│  │     │        ╰─ JsCore(__val[1])
+│  │     │  ╰─ SpliceObjects
+│  │     │     ├─ JsCore(_.left)
+│  │     │     ╰─ JsCore(_.right)
 │  │     ╰─ Key(b0)
-│  │        ╰─ Let(__val)
-│  │           ├─ JsCore([_.left, _.right])
-│  │           ╰─ SpliceObjects
-│  │              ├─ JsCore(__val[0])
-│  │              ╰─ JsCore(__val[1])
+│  │        ╰─ SpliceObjects
+│  │           ├─ JsCore(_.left)
+│  │           ╰─ JsCore(_.right)
 │  ╰─ Scope(Map())
 ├─ $GroupF
 │  ├─ Grouped

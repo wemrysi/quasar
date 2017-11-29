@@ -62,4 +62,7 @@ final case class QuasarAPIImpl[F[_]: Monad](inter: CoreEff ~> F) {
       expr   <- resolveImports[CoreEff](sql, workingDir).leftMap(_.wrapNel)
       stream <- EitherT(fsQ.queryResults(expr, Variables.empty, workingDir, off = 0L, lim = None).run.run.value)
     } yield stream).run.foldMap(inter)
+
+  def queryVec(workingDir: ADir, sql: ScopedExpr[Fix[Sql]]): F[NonEmptyList[SemanticError] \/ (FileSystemError \/ Vector[Data])] =
+    query(workingDir, sql).map(x => x.map(y => y.map(_.toVector)))
 }

@@ -11,8 +11,6 @@
 
     "NB": "Pending on mongo due to #3154",
 
-    "NB": "I had to turn mimir back off because this query seems to be affected by the array undefinedness issue pretty severely.",
-
     "data": "zips.data",
 
     "query": "select distinct city from zips order by pop desc limit 5",

@@ -56,7 +56,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   @Lenses
   case class VS(
-    seq: Long, handles: ViewState.ViewHandles, vcache: Map[AFile, ViewCache],
+    seq: Long, handles: view.State.ViewHandles, vcache: Map[AFile, ViewCache],
     mountConfigs: Map[APath, MountConfig], fs: InMemState)
 
   object VS {
@@ -166,7 +166,8 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     "translate simple read to query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = sqlE"select * from `/zips`"
-      val lp = queryPlan(expr, Variables.empty, rootDir, 0L, None).run.run._2.toOption.get
+      val lp = queryPlan(expr, Variables.empty, rootDir, 0L, None).run.run._2
+                 .valueOr(e => scala.sys.error("Unexpected semantic errors during compilation: " + e.shows))
 
       val views = Map(p -> expr)
 
@@ -177,11 +178,9 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       } yield ()).run
 
       val exp = (for {
-        h   <- query.unsafe.eval(lp.valueOr(_ => scala.sys.error("impossible constant plan")))
-        _   <- query.transforms.fsErrToExec(
-                query.unsafe.more(h))
-        _   <- query.transforms.fsErrToExec(
-                EitherT.right(query.unsafe.close(h)))
+        h   <- query.unsafe.eval(lp)
+        _   <- query.transforms.fsErrToExec(query.unsafe.more(h))
+        _   <- query.transforms.fsErrToExec(EitherT.right(query.unsafe.close(h)))
       } yield ()).run.run
 
       viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
@@ -238,23 +237,6 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         _   <- query.transforms.fsErrToExec(
                 EitherT.right(query.unsafe.close(h)))
       } yield ()).run.run
-
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
-    }
-
-    "translate read with constant" in {
-      val p = rootDir[Sandboxed] </> dir("view") </> file("view0")
-
-      val views = Map(
-        p -> sqlE"1 + 2")
-
-      val f = (for {
-        h <- read.unsafe.open(p, 0L, None)
-        _ <- read.unsafe.read(h)
-        _ <- EitherT.right(read.unsafe.close(h))
-      } yield ()).run
-
-      val exp = ().point[Free[FileSystem, ?]]
 
       viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
     }
@@ -761,8 +743,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       val qlp =
         quasar.queryPlan(q, Variables.empty, rootDir, 0L, None)
-          .run.value.toOption.get
-          .valueOr(_ => scala.sys.error("Expected a non-constant plan but received a constant plan"))
+          .run.value.valueOr(e => scala.sys.error("Unexpected error compiling sql query: " + e.shows))
 
       val vs = Map[AFile, Fix[Sql]](p -> q)
 

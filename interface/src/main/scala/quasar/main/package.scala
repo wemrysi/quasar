@@ -207,15 +207,22 @@ package object main extends Logging {
       liftMT[F, MainErrT].compose(QErrs.toCatchable[F])
   }
 
-  /** Effect comprising the core Quasar apis. */
-  type CoreEffIO[A] =  Coproduct[Task, CoreEff, A]
-  type CoreEffIORW[A] = (VCacheExpR :\: VCacheExpW :/: CoreEffIO)#M[A]
-  type CoreEff[A]   =
-    (
-      MetaStoreLocation :\: Module :\: Mounting :\: Analyze :\:
-      QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :\:
-      VCacheKVS :\: Timing :/: CoreErrs
-    )#M[A]
+  /** Effect comprising the core Quasar apis.
+    * NB: CoM is avoided due to significantly longer compile times at usage sites.
+    */
+  type CoreEffIO[A]   = Coproduct[Task, CoreEff, A]
+  type CoreEffIOW[A]  = Coproduct[VCacheExpW, CoreEffIO, A]
+  type CoreEffIORW[A] = Coproduct[VCacheExpR, CoreEffIOW, A]
+  type CoreEff8[A] = Coproduct[Timing, CoreErrs, A]
+  type CoreEff7[A] = Coproduct[VCacheKVS, CoreEff8, A]
+  type CoreEff6[A] = Coproduct[ManageFile, CoreEff7, A]
+  type CoreEff5[A] = Coproduct[WriteFile, CoreEff6, A]
+  type CoreEff4[A] = Coproduct[ReadFile, CoreEff5, A]
+  type CoreEff3[A] = Coproduct[QueryFile, CoreEff4, A]
+  type CoreEff2[A] = Coproduct[Analyze, CoreEff3, A]
+  type CoreEff1[A] = Coproduct[Mounting, CoreEff2, A]
+  type CoreEff0[A] = Coproduct[Module, CoreEff1, A]
+  type CoreEff[A]  = Coproduct[MetaStoreLocation, CoreEff0, A]
 
   object CoreEff {
     def defaultImpl(

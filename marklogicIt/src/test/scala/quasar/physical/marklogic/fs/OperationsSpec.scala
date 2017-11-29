@@ -127,7 +127,7 @@ final class OperationsSpec extends quasar.Qspec {
 
   def interpOpF(cs: ContentSource): Task[OpF ~> SR] = {
     val lt = liftMT[Task, SRT]
-    (GenUUID.type4[Task] |@| MonotonicSeq.fromZero) { (genUUID, monoSeq) =>
+    (GenUUID.type4[Task] |@| MonotonicSeq.from(0L)) { (genUUID, monoSeq) =>
       lt                                                :+:
       (lt compose genUUID)                              :+:
       (lt compose monoSeq)                              :+:

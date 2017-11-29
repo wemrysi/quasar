@@ -18,61 +18,126 @@ package quasar.qscript.qsu
 
 import slamdata.Predef._
 
+import quasar.NameGenerator
 import quasar.Planner.{InternalError, PlannerErrorME}
-import quasar.qscript.{JoinFunc, JoinSide, LeftSide, LeftSideF, MFC, RightSide, RightSideF}
-import quasar.qscript.MapFuncsCore.{ConcatMaps, MakeMap, StrLit}
+import quasar.common.SortDir
+import quasar.qscript.{construction, JoinSide, LeftSide, RightSide}
+import quasar.qscript.MapFuncsCore.StrLit
 import quasar.sql.JoinDir
 
-import matryoshka.CorecursiveT
-import scalaz.{Applicative, Free, ValidationNel, Scalaz}, Scalaz._
+import matryoshka.BirecursiveT
+import scalaz.{Applicative, Functor, Monad, Scalaz}, Scalaz._
 
 /** Extracts `MapFunc` expressions from operations by requiring an argument
-  * to be a function of one or more sibling arguments and erroring if not.
-  *
-  * NB: A temporary transformation for prototyping, each of the operations here
-  *     will eventually handle arguments having different dimensionality.
+  * to be a function of one or more sibling arguments and creating an
+  * autojoin if not.
   */
-object ExtractFreeMap {
+final class ExtractFreeMap[T[_[_]]: BirecursiveT] extends QSUTTypes[T] {
   import QScriptUniform._
+  import QSUGraph.Extractors
 
-  def apply[T[_[_]]: CorecursiveT, F[_]: Applicative: PlannerErrorME](graph: QSUGraph[T])
-      : F[QSUGraph[T]] =
-    QSUGraph.vertices[T].modifyF(_ traverse {
-      case GroupBy(src, key) =>
-        MappableRegion.unaryOf(src, graph refocus key)
-          .map(fm => DimEdit(src, DTrans.Group(fm)))
-          .toSuccessNel(s"Invalid group key, $key, must be a mappable function of $src.")
+  private type QSU[A] = QScriptUniform[A]
 
-      case LPFilter(src, predicate) =>
-        MappableRegion.unaryOf(src, graph refocus predicate)
-          .map(QSFilter(src, _))
-          .toSuccessNel(s"Invalid filter predicate, $predicate, must be a mappable function of $src.")
+  private val func = construction.Func[T]
 
-      case LPJoin(left, right, cond, jtype, lref, rref) =>
-        val combiner: JoinFunc[T] =
-          Free.roll(MFC(ConcatMaps(
-            Free.roll(MFC(MakeMap(StrLit[T, JoinSide](JoinDir.Left.name), LeftSideF))),
-            Free.roll(MFC(MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), RightSideF))))))
+  private def extract[F[_]: Applicative: NameGenerator: PlannerErrorME]
+      : PartialFunction[QSUGraph, F[QSUGraph]] = {
 
-        MappableRegion.funcOf(replaceRefs(graph, lref, rref), graph refocus cond)
-          .map(jf => ThetaJoin(left, right, jf map (Access.value(_)), jtype, combiner))
-          .toSuccessNel(s"Invalid join condition, $cond, must be a mappable function of $left and $right.")
+    case graph @ Extractors.GroupBy(src, key) =>
+      val srcRoot = src.root
+      val keyRoot = key.root
 
-      case LPSort(src, keys) =>
-        keys traverse { case (k, sortDir) =>
-          MappableRegion.unaryOf(src, graph refocus k)
-            .strengthR(sortDir)
-            .toSuccessNel(s"Invalid sort key, $k, must be a mappable function of $src.")
-        } map (QSSort(src, Nil, _))
+      MappableRegion.unaryOf(srcRoot, graph refocus keyRoot)
+        .map(fm => DimEdit(srcRoot, DTrans.Group(fm))) match {
 
-      case other => other.point[ValidationNel[String, ?]]
-    })(graph).fold(e => PlannerErrorME[F].raiseError(InternalError(e intercalate ", ", None)), _.point[F])
+          case Some(qs) =>
+            graph.overwriteAtRoot(qs).point[F]
+
+          case None =>
+            PlannerErrorME[F].raiseError[QSUGraph](
+              InternalError(s"Invalid group key, $key, must be a mappable function of $src.", None))
+        }
+
+    case graph @ Extractors.LPFilter(src, predicate) =>
+      val srcRoot = src.root
+      val predicateRoot = predicate.root
+
+      MappableRegion.unaryOf(srcRoot, graph refocus predicateRoot)
+        .map(QSFilter(srcRoot, _)) match {
+
+          case Some(qs) =>
+            graph.overwriteAtRoot(qs).point[F]
+
+          case None => (freshName[F] |@| freshName[F]) {
+            case (joinRoot, filterRoot) =>
+              val sKey: String = "source"
+              val pKey: String = "predicate"
+
+              val combine: JoinFunc = func.ConcatMaps(
+                func.MakeMap(StrLit(sKey), func.LeftSide),
+                func.MakeMap(StrLit(pKey), func.RightSide))
+
+              val join: QSU[Symbol] = AutoJoin2(srcRoot, predicateRoot, combine)
+              val filter: QSU[Symbol] = QSFilter(joinRoot, func.ProjectKey(func.Hole, StrLit(pKey)))
+              val result: QSU[Symbol] = Map(filterRoot, func.ProjectKey(func.Hole, StrLit(sKey)))
+
+              val QSUGraph(origRoot, origVerts) = graph
+
+              val newVerts: QSUVerts[T] = origVerts
+                .updated(joinRoot, join)
+                .updated(filterRoot, filter)
+                .updated(origRoot, result)
+
+              QSUGraph(origRoot, newVerts)
+          }
+       }
+
+    case graph @ Extractors.LPJoin(left, right, cond, jtype, lref, rref) =>
+      val combiner: JoinFunc =
+        func.ConcatMaps(
+          func.MakeMap(StrLit[T, JoinSide](JoinDir.Left.name), func.LeftSide),
+          func.MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), func.RightSide))
+
+      MappableRegion.funcOf(replaceRefs(graph, lref, rref), graph refocus cond.root)
+        .map(jf => ThetaJoin(left.root, right.root, jf map (Access.value(_)), jtype, combiner)) match {
+          case Some(qs) =>
+            graph.overwriteAtRoot(qs).point[F]
+          case None =>
+            PlannerErrorME[F].raiseError[QSUGraph](
+              InternalError(s"Invalid join condition, $cond, must be a mappable function of $left and $right.", None))
+        }
+
+    case graph @ Extractors.LPSort(src, keys) =>
+      val srcRoot = src.root
+
+      keys traverse { case (k, sortDir) =>
+        MappableRegion.unaryOf(srcRoot, graph refocus k.root).strengthR(sortDir) match {
+          case Some(pair) => pair.point[F]
+          case None =>
+            PlannerErrorME[F].raiseError[(FreeMap, SortDir)](
+              InternalError(s"Invalid sort key, $k, must be a mappable function of $src.", None))
+        }
+      } map { nel => graph.overwriteAtRoot(QSSort(srcRoot, Nil, nel)) }
+    }
+
+  def apply[F[_]: Monad: NameGenerator: PlannerErrorME](graph: QSUGraph)
+      : F[QSUGraph] =
+    graph.rewriteM[F](extract[F])
 
   ////
 
-  private def replaceRefs[T[_[_]]](g: QSUGraph[T], l: Symbol, r: Symbol): Symbol => Option[JoinSide] =
+  private def replaceRefs(g: QSUGraph, l: Symbol, r: Symbol)
+      : Symbol => Option[JoinSide] =
     s => g.vertices.get(s) collect {
       case JoinSideRef(`l`) => LeftSide
       case JoinSideRef(`r`) => RightSide
     }
+
+  private def freshName[F[_]: Functor: NameGenerator: PlannerErrorME]: F[Symbol] =
+    NameGenerator[F].prefixedName("extract") map (Symbol(_))
+}
+
+object ExtractFreeMap {
+  def apply[T[_[_]]: BirecursiveT]: ExtractFreeMap[T] =
+    new ExtractFreeMap[T]
 }

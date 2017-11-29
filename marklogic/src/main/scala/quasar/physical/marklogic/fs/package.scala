@@ -139,7 +139,7 @@ package object fs {
       KeyValueStore.impl.default[WriteHandle, AFile]          |@|
       KeyValueStore.impl.default[ReadHandle, XccDataStream]   |@|
       KeyValueStore.impl.default[ResultHandle, XccDataStream] |@|
-      MonotonicSeq.fromZero                                   |@|
+      MonotonicSeq.from(0L)                                   |@|
       GenUUID.type4[Task]
     ).tupled.map { case (whandles, rhandles, qhandles, seq, genUUID) =>
       contentSource flatMapF { cs =>
