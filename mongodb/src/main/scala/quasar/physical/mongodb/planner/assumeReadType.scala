@@ -64,11 +64,11 @@ object assumeReadType {
     case _ => false
   }
 
-  def elideMoreGeneralGuards[M[_]: Applicative: MonadFsErr, T[_[_]]: RecursiveT]
-    (subType: Type)
-      : CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {
-    def f: CoEnvMap[T, FreeMap[T]] => M[CoEnvMap[T, FreeMap[T]]] = {
-      case free @ CoEnv(\/-(MFC(MapFuncsCore.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, fb)))) =>
+  def elideMoreGeneralGuards[T[_[_]], M[_]: Applicative: MonadFsErr, A: Eq]
+    (hole: A, subType: Type)
+      : CoEnvMapA[T, A, FreeMapA[T, A]] => M[CoEnvMapA[T, A, FreeMapA[T, A]]] = {
+    def f: CoEnvMapA[T, A, FreeMapA[T, A]] => M[CoEnvMapA[T, A, FreeMapA[T, A]]] = {
+      case free @ CoEnv(\/-(MFC(MapFuncsCore.Guard(Embed(CoEnv(-\/(h))), typ, cont, fb)))) if (h ≟ hole) =>
         if (typ.contains(subType)) cont.project.point[M]
         // TODO: Error if there is no overlap between the types.
         else {
@@ -76,27 +76,7 @@ object assumeReadType {
           if (union ≟ Type.Bottom)
             raiseErr(qscriptPlanningFailed(InternalError.fromMsg(s"can only contain ${subType.shows}, but a(n) ${typ.shows} is expected")))
           else {
-            CoEnv[Hole, MapFunc[T, ?], FreeMap[T]](MFC(MapFuncsCore.Guard[T, FreeMap[T]](HoleF[T], union, cont, fb)).right).point[M]
-          }
-        }
-      case x => x.point[M]
-    }
-    f
-  }
-
-  def elideMoreGeneralGuardsJoin[M[_]: Applicative: MonadFsErr, T[_[_]]: RecursiveT]
-    (joinSide: JoinSide, subType: Type)
-      : CoEnvJoin[T, JoinFunc[T]] => M[CoEnvJoin[T, JoinFunc[T]]] = {
-    def f: CoEnvJoin[T, JoinFunc[T]] => M[CoEnvJoin[T, JoinFunc[T]]] = {
-      case free @ CoEnv(\/-(MFC(MapFuncsCore.Guard(Embed(CoEnv(-\/(joinSide))), typ, cont, fb)))) =>
-        if (typ.contains(subType)) cont.project.point[M]
-        // TODO: Error if there is no overlap between the types.
-        else {
-          val union = subType ⨯ typ
-          if (union ≟ Type.Bottom)
-            raiseErr(qscriptPlanningFailed(InternalError.fromMsg(s"can only contain ${subType.shows}, but a(n) ${typ.shows} is expected")))
-          else {
-            CoEnv[JoinSide, MapFunc[T, ?], JoinFunc[T]](MFC(MapFuncsCore.Guard[T, JoinFunc[T]](Free.point[MapFunc[T, ?], JoinSide](joinSide), union, cont, fb)).right).point[M]
+            CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]](MFC(MapFuncsCore.Guard[T, FreeMapA[T, A]](Free.point[MapFunc[T, ?], A](h), union, cont, fb)).right).point[M]
           }
         }
       case x => x.point[M]
@@ -114,10 +94,10 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
   new Trans[F, M] {
 
     def elide(fm: FreeMap[T]): M[FreeMap[T]] =
-      fm.transCataM(elideMoreGeneralGuards[M, T](typ))
+      fm.transCataM(elideMoreGeneralGuards[T, M, Hole](SrcHole, typ))
 
     def elideJoinFunc(isRewrite: Boolean, joinSide: JoinSide, fm: JoinFunc[T]): M[JoinFunc[T]] =
-      if (isRewrite) fm.transCataM(elideMoreGeneralGuardsJoin[M, T](joinSide, typ))
+      if (isRewrite) fm.transCataM(elideMoreGeneralGuards[T, M, JoinSide](joinSide, typ))
       else fm.point[M]
 
     def elideLeftJoinKey(isRewrite: Boolean, key: List[(FreeMap[T], FreeMap[T])])

@@ -937,7 +937,7 @@ object MongoDbPlanner {
               .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
           case Filter(src0, cond0) => {
             // TODO: Apply elideMoreGeneralGuards to all FreeMap's in the plan, not only here
-            cond0.transCataM(assumeReadType.elideMoreGeneralGuards[M, T](Type.AnyObject)) >>= { cond =>
+            cond0.transCataM(assumeReadType.elideMoreGeneralGuards[T, M, Hole](SrcHole, Type.AnyObject)) >>= { cond =>
               val selectors = getSelector[T, M, EX](cond, selector[T](cfg.bsonVersion))
               val typeSelectors = getSelector[T, M, EX](cond, typeSelector[T])
 
