@@ -1037,13 +1037,9 @@ class PlannerSql2ExactSpec extends
       plan(sqlE"select bar from foo order by bar") must
         beWorkflow(chain[Workflow](
           $read(collection("db", "foo")),
+          $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending)),
           $project(
-            reshape(
-              "0" -> $field("bar"),
-              "src" -> $field("bar")), ExcludeId),
-          $sort(NonEmptyList(BsonField.Name("0") -> SortDir.Ascending)),
-          $project(
-            reshape(sigil.Quasar -> $field("src")),
+            reshape(sigil.Quasar -> $field("bar")),
             ExcludeId)))
     }
 

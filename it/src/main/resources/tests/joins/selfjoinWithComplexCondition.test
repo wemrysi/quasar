@@ -5,15 +5,8 @@
         "couchbase": "pending",
         "marklogic_json": "timeout",
         "marklogic_xml": "timeout",
-        "mimir":       "ignoreFieldOrder",
-        "mongodb_2_6":       "pending",
-        "mongodb_3_0":       "pending",
-        "mongodb_3_2":       "pending",
-        "mongodb_3_4":       "pending",
-        "mongodb_read_only": "pending"
+        "mimir":       "ignoreFieldOrder"
     },
-
-    "NB": "Pending on mongo due to #3153",
 
     "NB": "#1587: Disabled in couchbase due to lack of general join.
            Mongo backends succeed, but timeout sporadically on travis.",
