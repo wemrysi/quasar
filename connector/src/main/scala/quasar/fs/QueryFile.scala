@@ -200,7 +200,7 @@ object QueryFile {
       lsR(currentDir).foldLeft(Set.empty[(RFile, Node.Type)])(_ + _).map(_.toMap)
     }
 
-    def listContents(dir: ADir): M[Set[PathSegment]] =
+    def listContents(dir: ADir): M[Set[Node]] =
       EitherT(lift(ListContents(dir)))
 
     /** Returns whether the given file exists. */
