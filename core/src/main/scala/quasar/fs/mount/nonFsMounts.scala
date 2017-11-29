@@ -37,14 +37,14 @@ object nonFsMounts {
 
   /** Intercept and handle moves and deletes involving view path(s); all others are passed untouched. */
   def manageFile[S[_]](mountsIn: ADir => Free[S, Set[RPath]])(
-                        implicit
-                        VC: VCacheKVS.Ops[S],
-                        S0: ManageFile :<: S,
-                        S1: QueryFile :<: S,
-                        S2: Mounting :<: S,
-                        S3: MountingFailure :<: S,
-                        S4: PathMismatchFailure :<: S
-                      ): ManageFile ~> Free[S, ?] = {
+    implicit
+    VC: VCacheKVS.Ops[S],
+    S0: ManageFile :<: S,
+    S1: QueryFile :<: S,
+    S2: Mounting :<: S,
+    S3: MountingFailure :<: S,
+    S4: PathMismatchFailure :<: S
+  ): ManageFile ~> Free[S, ?] = {
     import ManageFile._
     import MoveSemantics._
 

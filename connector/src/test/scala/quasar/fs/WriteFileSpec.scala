@@ -85,7 +85,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
       Mem.interpret(doWrite).exec(emptyMem).contents must_=== Map(f -> xs.toVector)
     }
 
-    withDataWriters(("save", write.save), ("saveThese", write.saveThese)) { (n, wt) =>
+    withDataWriters(("save", write.save(_, _).flatMap(_ => Process.empty[write.M, FileSystemError])), ("saveThese", write.saveThese(_,_).as(Vector.empty))) { (n, wt) =>
       s"$n should replace existing file" >> prop {
         (f: AFile, xs: NonEmptyList[Data], ys: NonEmptyList[Data]) =>
 
@@ -108,7 +108,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
         val before = InMemState.fromFiles(Map(f -> xs.toVector))
 
         Mem.interpretInjectingWriteErrors(write, List(ws)).run(before).leftMap(_.contents) must_===
-          ((before.contents, Vector(err).right.right))
+          ((before.contents, err.left))
       }
 
       s"$n should properly report errors when writing fails to create a file" >> prop { f: AFile =>
@@ -120,7 +120,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
 
           Mem.interpretInjectingWriteErrors(write, List(ws))
             .run(before)
-            .leftMap(_.contents) must_=== ((before.contents, Vector(err).right.right))
+            .leftMap(_.contents) must_=== ((before.contents, err.left))
       }
     }
 
@@ -138,7 +138,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
       Mem.interpret(doWrite).exec(before).contents must_=== before.contents
     }
 
-    withDataWriters(("create", write.create), ("createThese", write.createThese)) { (n, wt) =>
+    withDataWriters(("create", write.create(_, _).flatMap(_ => Process.empty[write.M, FileSystemError])), ("createThese", write.createThese)) { (n, wt) =>
       s"$n should fail if file exists" >> prop {
         (f: AFile, xs: NonEmptyList[Data], ys: NonEmptyList[Data]) =>
 
@@ -160,7 +160,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
       }
     }
 
-    withDataWriters(("replace", write.replace), ("replaceWithThese", write.replaceWithThese)) { (n, wt) =>
+    withDataWriters(("replace", write.replace(_, _).flatMap(_ => Process.empty[write.M, FileSystemError])), ("replaceWithThese", write.replaceWithThese(_, _).as(Vector.empty))) { (n, wt) =>
       s"$n should fail if the file does not exist" >> prop {
         (f: AFile, xs: Vector[Data]) =>
 
@@ -178,7 +178,7 @@ class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.Sca
           val before = InMemState.fromFiles(Map(f -> xs))
 
           Mem.interpretInjectingWriteErrors(write, List(ws))
-            .run(before).leftMap(_.contents) must_=== ((before.contents, Vector(err).right.right))
+            .run(before).leftMap(_.contents) must_=== ((before.contents, err.left))
         }
       }
 

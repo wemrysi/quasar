@@ -22,6 +22,7 @@ import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.fp.tree.{UnaryArg, BinaryArg, TernaryArg}
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, LogicalPlanR}
+import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.std._
 
@@ -30,6 +31,7 @@ import scala.sys
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
+import matryoshka.patterns.{interpretM, CoEnv}
 import org.specs2.execute.Result
 
 import scalaz._, Scalaz._
@@ -62,7 +64,14 @@ trait MapFuncStdLibTestRunner extends StdLibTestRunner {
     expected: Data
   ): Result
 
-  val qsr = new Transform[Fix, QScriptTotal[Fix, ?]]
+
+  def fromData(data: Data): Data \/ Fix[EJson] =
+    data.hyloM[Data \/ ?, CoEnv[Data, EJson, ?], Fix[EJson]](
+      interpretM[Data \/ ?, EJson, Data, Fix[EJson]](
+        _.left,
+        _.embed.right),
+      Data.toEJson[EJson].apply(_).right)
+
   val func = construction.Func[Fix]
 
   /** Translate to MapFunc (common to all QScript backends). */
@@ -87,7 +96,7 @@ trait MapFuncStdLibTestRunner extends StdLibTestRunner {
       case lp.Free(sym) => Free.pure(args(sym))
 
       case lp.Constant(data) =>
-        qsr.fromData(data).fold(
+        fromData(data).fold(
           _ => sys.error("invalid Data"),
           func.Constant)
 

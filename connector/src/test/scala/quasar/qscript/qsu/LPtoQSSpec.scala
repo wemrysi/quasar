@@ -16,9 +16,10 @@
 
 package quasar.qscript.qsu
 
-import quasar.{Qspec, RenderTree}, RenderTree.ops._
+import quasar.{Data, Qspec, RenderTree}, RenderTree.ops._
 import quasar.Planner.PlannerError
 import quasar.contrib.matryoshka._
+import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.qscript.construction
@@ -44,11 +45,22 @@ object LPtoQSSpec extends Qspec with CompilerHelpers with QSUTTypes[Fix] {
 
   val func = defaults.func
   val qs = defaults.fix
+  val json = Fixed[Fix[EJson]]
 
   val root = Path.rootDir[Sandboxed]
   val afoo = root </> file("foo")
 
   "logicalplan -> qscript" >> {
+    "constant value" >> {
+      val lp = lpf.constant(Data.Bool(true))
+
+      val expected = qs.Map(
+        qs.Unreferenced,
+        func.Constant(json.bool(true)))
+
+      lp must compileTo(expected)
+    }
+
     "select * from foo" >> {
       val lp = read("foo")
 

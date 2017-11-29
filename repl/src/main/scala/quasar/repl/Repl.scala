@@ -165,7 +165,7 @@ object Repl {
 
       queryPlan(expr, vars, basePath, 0L, None)
         .liftM[FileSystemErrT]
-        .flatMap(_.traverse_(logQS))
+        .flatMap(logQS)
         .run.run.run
     }
 
@@ -296,7 +296,7 @@ object Repl {
 
 
       case Save(f, v) =>
-        write(W.saveThese(_, _), f, v)
+        write(W.saveThese(_, _).as(Vector.empty), f, v)
 
       case Append(f, v) =>
         write(W.appendThese(_, _), f, v)

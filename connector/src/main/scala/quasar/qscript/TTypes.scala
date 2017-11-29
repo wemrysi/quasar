@@ -43,10 +43,7 @@ trait TTypes[T[_[_]]] {
   type CoEnvQS[A]        = quasar.qscript.CoEnvQS[T, A]
   type CoEnvMapA[A, B]   = quasar.qscript.CoEnvMapA[T, A, B]
   type CoEnvMap[A]       = quasar.qscript.CoEnvMap[T, A]
-  type CoEnvJoin[A]      = quasar.qscript.CoEnvJoin[T, A]
   type FreeQS            = quasar.qscript.FreeQS[T]
-  type Ann               = quasar.qscript.Ann[T]
-  type Target[F[_]]      = quasar.qscript.Target[T, F]
 }
 
 object TTypes {

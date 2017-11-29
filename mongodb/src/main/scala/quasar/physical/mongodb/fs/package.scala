@@ -120,7 +120,7 @@ package object fs {
 
   private def effToTask(cfg: MongoConfig): Task[Eff ~> Task] = {
     (
-      MonotonicSeq.fromZero |@|
+      MonotonicSeq.from(0L) |@|
       Task.delay(MongoDbIO.runNT(cfg.client)) |@|
       queryfile.run[BsonCursor, PhysFsEff](cfg.client, cfg.defaultDb) |@|
       managefile.run[PhysFsEff](cfg.client) |@|

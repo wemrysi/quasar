@@ -21,7 +21,7 @@ import quasar.fp._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 
-class QScriptOptimizeSpec extends quasar.Qspec with QScriptHelpers {
+class OptimizeSpec extends quasar.Qspec with QScriptHelpers {
   val optimize = new Optimize[Fix]
 
   def optimizeExpr(expr: Fix[QS]): Fix[QS] =

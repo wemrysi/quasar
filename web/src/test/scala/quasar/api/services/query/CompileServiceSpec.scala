@@ -18,6 +18,7 @@ package quasar.api.services.query
 
 import slamdata.Predef._
 import quasar.fs._, InMemory.InMemState
+import quasar.sql.pprint
 
 import argonaut.{Json => AJson}
 import org.http4s._
@@ -48,8 +49,7 @@ class CompileServiceSpec extends quasar.Qspec with FileSystemFixture {
     }
 
     "plan query with var" >> prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int) =>
-      val pathString = printPath(filesystem.file).drop(1)
-      val query = selectAllWithVar(file1(filesystem.filename),varName.value)
+      val query = pprint(selectAllWithVar(file1(filesystem.filename),varName.value))
       get[AJson](compileService)(
         path = filesystem.parent,
         query = Some(Query(query,varNameAndValue = Some((varName.value, var_.toString)))),
@@ -84,7 +84,7 @@ class CompileServiceSpec extends quasar.Qspec with FileSystemFixture {
         query = Some(Query("4 + 3")),
         state = InMemState.empty,
         status = Status.Ok,
-        response = json => Json.parse(json.nospaces) must_=== json""" { "type": "constant", "value": [7] }""")
+        response = json => Json.parse(json.nospaces) must_=== json"""{ "type": "constant", "physicalPlan": "none", "inputs": [] }""")
     }
 
   }
