@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.NameGenerator
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.qscript.{
@@ -36,11 +37,12 @@ import quasar.qscript.{
   ReduceIndex,
   ReduceIndexF}
 import quasar.qscript.MapFuncCore.{EmptyMap, StaticMap}
+import quasar.qscript.provenance.JoinKeys.JoinKey
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 
 import matryoshka.BirecursiveT
 import monocle.Lens
-import scalaz.{Foldable, Free, Functor, IMap, ISet, Monad, NonEmptyList, StateT, Traverse}
+import scalaz.{Foldable, Free, Functor, IList, IMap, ISet, Monad, NonEmptyList, StateT, Traverse}
 import scalaz.Scalaz._
 
 final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
@@ -63,7 +65,10 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
   private val Value: T[EJson] = EJson.str("value")
 
   private def bucketSymbol(src: Symbol, idx: Int): Symbol =
-    Symbol(s"${src.name}_$idx")
+    Symbol(s"${src.name}_b$idx")
+
+  private def groupKeySymbol(src: Symbol, idx: Int): Symbol =
+    Symbol(s"${src.name}_k$idx")
 
   private val lookupValue: FreeMap =
     func.ProjectKey(func.Hole, func.Constant(Value))
@@ -74,19 +79,28 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
   private def lookupIdentity(src: Symbol): FreeMap =
     func.ProjectKey(lookupIdentities, func.Constant(EJson.str(src.name)))
 
-  private val defaultAccess: Access[Symbol] => FreeMap = {
-    case Access.Bucket(src, idx, _) => lookupIdentity(bucketSymbol(src, idx))
-    case Access.Identity(src, _)    => lookupIdentity(src)
-    case Access.Value(_)            => func.Hole
+  private val defaultAccess: QAccess[Symbol] => FreeMap = {
+    case Access.Id(idAccess, _) => idAccess match {
+      case IdAccess.Bucket(src, idx) => lookupIdentity(bucketSymbol(src, idx))
+      case IdAccess.GroupKey(src, idx) => lookupIdentity(groupKeySymbol(src, idx))
+      case IdAccess.Identity(src) => lookupIdentity(src)
+      case IdAccess.Static(ejs) => func.Constant(ejs)
+    }
+    case Access.Value(_) => func.Hole
   }
 
-  private def bucketIdAccess(src: Symbol, buckets: List[FreeAccess[Hole]]): ISet[Access[Symbol]] =
+  private def bucketIdAccess(src: Symbol, buckets: List[FreeAccess[Hole]]): ISet[QAccess[Symbol]] =
     Foldable[List].compose[FreeMapA].foldMap(buckets) { access =>
       ISet.singleton(access.symbolic(κ(src)))
     }
 
-  private def recordAccesses[F[_]: Foldable](by: Symbol, fa: F[Access[Symbol]]): References =
-    fa.foldLeft(References.noRefs[T])((r, a) => r.recordAccess(by, a, defaultAccess(a)))
+  private def joinKeyAccess(src: Symbol, jk: JoinKey[QIdAccess]): IList[QAccess[Symbol]] =
+    IList(jk.left, jk.right) map { idA =>
+      Access.id(idA, IdAccess.symbols.headOption(idA) getOrElse src)
+    }
+
+  private def recordAccesses[F[_]: Foldable](by: Symbol, fa: F[QAccess[Symbol]]): References =
+    fa.foldLeft(References.noRefs[T, T[EJson]])((r, a) => r.recordAccess(by, a, defaultAccess(a)))
 
   private final case class ReifyState(status: ReifiedStatus, refs: References) {
     lazy val seen: ISet[Symbol] = status.keySet
@@ -106,12 +120,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
       case QSU.QSSort(source, buckets, order) =>
         recordAccesses(g.root, bucketIdAccess(source, buckets))
 
-      case QSU.ThetaJoin(left, right, condition, _, combiner) =>
-        val condAccess = condition map { access =>
-          access.symbolic(_.fold(left, right))
-        }
-
-        recordAccesses(g.root, condAccess)
+      case QSU.QSAutoJoin(left, right, joinKeys, combiner) =>
+        val keysAccess = joinKeys.keys >>= (joinKeyAccess(g.root, _))
+        recordAccesses(g.root, keysAccess)
 
       case other => References.noRefs
     })
@@ -128,7 +139,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
     type G[A] = ReifyT[F, A]
     val G = MonadState_[G, ReifyState]
 
-    def bucketsI(buckets: NonEmptyList[Access.Bucket[Symbol]]): FreeMapA[ReduceIndex] =
+    def bucketsI(buckets: NonEmptyList[IdAccess.Bucket[T[EJson]]]): FreeMapA[ReduceIndex] =
       makeI(buckets map (ba => (bucketSymbol(ba.of, ba.idx), ReduceIndexF[T](ba.idx.left))))
 
     def emitsIVMap(g: QSUGraph): G[Boolean] =
@@ -137,7 +148,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
     def freshName: F[Symbol] =
       NameGenerator[F].prefixedName("reify") map (Symbol(_))
 
-    def isReferenced(access: Access[Symbol]): G[Boolean] =
+    def isReferenced(access: QAccess[Symbol]): G[Boolean] =
       G.gets(_.refs.accessed.member(access))
 
     def includeIdRepair(oldRepair: JoinFunc, leftSide: JoinFunc): JoinFunc =
@@ -157,7 +168,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
         func.MakeMap(func.Constant(Identities), initialI),
         func.MakeMap(func.Constant(Value), initialV))
 
-    def modifyAccess(of: Access[Symbol])(f: FreeMap => FreeMap): G[Unit] =
+    def modifyAccess(of: QAccess[Symbol])(f: FreeMap => FreeMap): G[Unit] =
       G.modify(reifyRefs.modify(_.modifyAccess(of)(f)))
 
     /** Nests a graph in a Map vertex that wraps the original value in the value
@@ -179,7 +190,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
         _ <- setStatus(origRoot, true)
 
         replaceOldAccess = reifyRefs.modify(_.replaceAccess(origRoot, nestedRoot))
-        nestedAccess = Access.value(nestedRoot)
+        nestedAccess = Access.value[T[EJson], Symbol](nestedRoot)
         recordNewAccess = reifyRefs.modify(_.recordAccess(origRoot, nestedAccess, defaultAccess(nestedAccess)))
         modifyValueAccess = reifyRefs.modify(_.modifyAccess(Access.value(origRoot))(rebaseV))
 
@@ -218,7 +229,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
         preserveIV(source, g) as g
 
       case g @ E.LeftShift(source, struct, IdOnly, repair, rot) =>
-        emitsIVMap(source).tuple(isReferenced(Access.identity(g.root, g.root))) flatMap {
+        val idA = Access.id(IdAccess.identity[T[EJson]](g.root), g.root)
+
+        emitsIVMap(source).tuple(isReferenced(idA)) flatMap {
           case (true, true) =>
             onNeedsIV(g) as {
               val newRepair =
@@ -246,7 +259,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
         }
 
       case g @ E.LeftShift(source, struct, ExcludeId, repair, rot) =>
-        emitsIVMap(source).tuple(isReferenced(Access.identity(g.root, g.root))) flatMap {
+        val idA = Access.id(IdAccess.identity[T[EJson]](g.root), g.root)
+
+        emitsIVMap(source).tuple(isReferenced(idA)) flatMap {
           case (true, true) =>
             onNeedsIV(g) as {
               val newRepair =
@@ -288,6 +303,44 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
           } else g
         }
 
+      case g @ E.QSAutoJoin(left, right, keys, combiner) =>
+        emitsIVMap(left).tuple(emitsIVMap(right)) flatMap {
+          case (true, true) =>
+            onNeedsIV(g) as {
+              val newCombiner =
+                makeIV(
+                  func.ConcatMaps(
+                    lookupIdentities >> func.LeftSide,
+                    lookupIdentities >> func.RightSide),
+                  rebaseV(combiner))
+
+              g.overwriteAtRoot(O.qsAutoJoin(left.root, right.root, keys, newCombiner))
+            }
+
+          case (true, false) =>
+            onNeedsIV(g) as {
+              val newCombiner =
+                makeIV(
+                  lookupIdentities >> func.LeftSide,
+                  combiner >>= (_.fold(rebaseV(func.LeftSide), func.RightSide)))
+
+              g.overwriteAtRoot(O.qsAutoJoin(left.root, right.root, keys, newCombiner))
+            }
+
+          case (false, true) =>
+            onNeedsIV(g) as {
+              val newCombiner =
+                makeIV(
+                  lookupIdentities >> func.RightSide,
+                  combiner >>= (_.fold(func.LeftSide, rebaseV(func.RightSide))))
+
+              g.overwriteAtRoot(O.qsAutoJoin(left.root, right.root, keys, newCombiner))
+            }
+
+          case (false, false) =>
+            setStatus(g.root, false) as g
+        }
+
       case g @ E.QSFilter(source, p) =>
         preserveIV(source, g) map { emitsIV =>
           if (emitsIV)
@@ -298,8 +351,8 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
 
       case g @ E.QSReduce(source, buckets, reducers, repair) =>
         val referencedBuckets = buckets.indices.toList.traverse { i =>
-          val baccess = Access.Bucket(g.root, i, g.root)
-          isReferenced(baccess) map (_ option baccess)
+          val baccess = IdAccess.Bucket[T[EJson]](g.root, i)
+          isReferenced(Access.id(baccess, g.root)) map (_ option baccess)
         } map (_.unite.toNel)
 
         val newReducers = emitsIVMap(source) map {
@@ -334,26 +387,6 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
 
       case g @ E.ThetaJoin(left, right, condition, joinType, combiner) =>
         emitsIVMap(left).tuple(emitsIVMap(right)) flatMap {
-
-          // AutoJoin
-          // In this case we can merge the identities as, due to AutoJoin
-          // semantics, any keys appearing in both sides will have the same
-          // value.
-          case (true, true)
-            if (!condition.empty && condition.all(Access.value.isEmpty)) =>
-
-            onNeedsIV(g) as {
-              val newCombiner =
-                makeIV(
-                  func.ConcatMaps(
-                    lookupIdentities >> func.LeftSide,
-                    lookupIdentities >> func.RightSide),
-                  rebaseV(combiner))
-
-              g.overwriteAtRoot(O.thetaJoin(left.root, right.root, condition, joinType, newCombiner))
-            }
-
-          // "Real" ThetaJoin
           // FIXME
           case (true, true) => scala.Predef.???
             // In this case, we need to nest the identities from each side in a new map
@@ -441,7 +474,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
 }
 
 object ReifyIdentities {
-  final case class ResearchedQSU[T[_[_]]](refs: References[T], graph: QSUGraph[T])
+  final case class ResearchedQSU[T[_[_]]](refs: References[T, T[EJson]], graph: QSUGraph[T])
 
   def apply[T[_[_]]: BirecursiveT, F[_]: Monad: NameGenerator]
       (graph: QSUGraph[T])

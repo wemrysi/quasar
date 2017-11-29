@@ -367,6 +367,13 @@ object QSUGraph extends QSUGraphInstances {
       }
     }
 
+    object QSAutoJoin {
+      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
+        case g: QSU.QSAutoJoin[T, QSUGraph[T]] => QSU.QSAutoJoin.unapply(g)
+        case _ => None
+      }
+    }
+
     object GroupBy {
       def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
         case g: QSU.GroupBy[T, QSUGraph[T]] => QSU.GroupBy.unapply(g)
@@ -604,7 +611,7 @@ sealed abstract class QSUGraphInstances extends QSUGraphInstances0 {
       val assocs = g.foldMapUp(sg => DList((sg.root, sg.vertices(sg.root))))
 
       s"QSUGraph(${g.root.shows})[\n" +
-      assocs.toList.map({ case (k, v) => s"  ${k.shows} -> ${v.shows}" }).intercalate("\n") +
+      printMultiline(assocs.toList.toMap) +
       "\n]"
     }
 }

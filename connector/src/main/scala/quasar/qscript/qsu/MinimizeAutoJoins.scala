@@ -40,11 +40,11 @@ import quasar.qscript.{
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
-import matryoshka.{delayEqual, BirecursiveT, EqualT}
+import matryoshka.{delayEqual, BirecursiveT, EqualT, ShowT}
 import matryoshka.data.free._
-import scalaz.{Bind, Equal, Free, Monad, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
+import scalaz.{Bind, Equal, Free, Monad, Scalaz, StateT, Tags}, Scalaz._   // sigh, monad/traverse conflict
 
-final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSUTTypes[T] {
+final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extends QSUTTypes[T] {
   import QSUGraph.Extractors._
 
   private val func = construction.Func[T]
@@ -55,7 +55,13 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
 
   // needed to avoid bug in implicit search!  don't import QP.prov._
   private implicit val QPEq: Equal[QP.P] =
-    QP.prov.provenanceEqual(scala.Predef.implicitly, Equal[FreeMapA[Access[Symbol]]])
+    QP.prov.provenanceEqual(scala.Predef.implicitly, Equal[QIdAccess])
+
+  type MinStateM[F[_]] = MonadState_[F, MinimizationState]
+  def MinStateM[F[_]](implicit ev: MinStateM[F]): MinStateM[F] = ev
+
+  type RevIdxM[F[_]] = MonadState_[F, RevIdx]
+  def RevIdxM[F[_]](implicit ev: RevIdxM[F]): RevIdxM[F] = ev
 
   def apply[F[_]: Monad: NameGenerator: PlannerErrorME](agraph: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] = {
     type G[A] = StateT[StateT[F, RevIdx, ?], MinimizationState, A]
@@ -79,8 +85,8 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
         coalesceToMap[G](qgraph, List(left, center, right), combiner2)
     }
 
-    val lifted = back(MinimizationState(agraph.dims, Set())) map {
-      case (MinimizationState(dims, _), graph) => AuthenticatedQSU[T](graph, dims)
+    val lifted = back(MinimizationState(agraph.auth, Set())) map {
+      case (MinimizationState(auth, _), graph) => AuthenticatedQSU[T](graph, auth)
     }
 
     lifted.eval(agraph.graph.generateRevIndex)
@@ -88,13 +94,13 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
 
   // the Ints are indices into branches
   private def coalesceToMap[
-      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState]: PlannerErrorME](
+      G[_]: Monad: NameGenerator: RevIdxM: MinStateM: PlannerErrorME](
       qgraph: QSUGraph,
       branches: List[QSUGraph],
       combiner: FreeMapA[Int]): G[QSUGraph] = {
 
     for {
-      state <- MonadState_[G, MinimizationState].get
+      state <- MinStateM[G].get
 
       fms = branches.zipWithIndex map {
         case (g, i) =>
@@ -137,7 +143,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
   // the Int indexes into the final number of distinct roots
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   private def coalesceRoots[
-      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState]: PlannerErrorME](
+      G[_]: Monad: NameGenerator: RevIdxM: MinStateM: PlannerErrorME](
       qgraph: QSUGraph,
       fm: => FreeMapA[Int],
       candidates: List[QSUGraph]): G[QSUGraph] = candidates match {
@@ -194,9 +200,9 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
                     // TODO short circuit this a bit if fm === Free.pure(Hole)
                     // I'm pretty sure the fallthrough case will never be hit
                     case Map(source2, fm) =>
-                      def rewriteBucket(bucket: Access[Hole]): FreeMapA[Access[Hole]] = bucket match {
+                      def rewriteBucket(bucket: QAccess[Hole]): FreeMapA[QAccess[Hole]] = bucket match {
                         case v @ Access.Value(_) => fm.map(κ(v))
-                        case other => Free.pure[MapFunc, Access[Hole]](other)
+                        case other => Free.pure[MapFunc, QAccess[Hole]](other)
                       }
 
                       (
@@ -212,11 +218,13 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
               // we know we're non-empty by structure of outer match
               (source, buckets, _, _) = extended.head
 
-              state <- MonadState_[G, MinimizationState].get
-              dims = state.dims
+              auth <- MinStateM[G].gets(_.auth)
+              sourceDims <- auth.lookupDimsE[G](source.root)
 
               // do we have the same provenance at our roots?
-              rootProvCheck = extended.forall(t => dims(t._1.root) === dims(source.root))
+              rootProvCheck <- Tags.Conjunction.unsubst(extended foldMapM { case (src, _, _, _) =>
+                auth.lookupDimsE[G](src.root) map (ds => (ds === sourceDims).conjunction)
+              })
 
               // we need a stricter check than just provenance, since we have to inline maps
               back <- if (rootProvCheck
@@ -299,35 +307,27 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
       }
   }
 
-  private def failure[
-      G[_]: Monad: MonadState_[?[_], MinimizationState]](
-      graph: QSUGraph): G[QSUGraph] = {
-
-    val change = MonadState_[G, MinimizationState] modify { state =>
+  private def failure[G[_]: Monad: MinStateM](graph: QSUGraph): G[QSUGraph] = {
+    val change = MinStateM[G] modify { state =>
       state.copy(failed = state.failed + graph.root)
     }
 
     change.map(_ => graph)
   }
 
-  private def updateForCoalesce[G[_]: Bind: MonadState_[?[_], MinimizationState]](
+  private def updateForCoalesce[G[_]: Bind: MinStateM](
       candidates: List[QSUGraph],
       newRoot: Symbol): G[Unit] = {
 
-    MonadState_[G, MinimizationState] modify { state =>
-      val dims2 = state.dims map {
-        case (key, value) =>
-          val value2 = candidates.foldLeft(value) { (value, c) =>
-            if (c.root =/= newRoot)
-              QP.rename(c.root, newRoot, value)
-            else
-              value
-          }
-
-          key -> value2
+    MinStateM[G] modify { state =>
+      val auth2 = candidates.foldLeft(state.auth) { (auth, c) =>
+        if (c.root =/= newRoot)
+          auth.rename(c.root, newRoot)
+        else
+          auth
       }
 
-      state.copy(dims = dims2)
+      state.copy(auth = auth2)
     }
   }
 
@@ -352,28 +352,27 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
     (i => remap.getOrElse(i, -1), minimized.toList)
   }
 
-  private def updateGraph[
-      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState]: PlannerErrorME](
-      pat: QScriptUniform[Symbol]): G[QSUGraph] = {
+  private def updateGraph[G[_]: Monad: NameGenerator: RevIdxM: MinStateM: PlannerErrorME](
+      pat: QScriptUniform[Symbol])
+      : G[QSUGraph] = {
 
     for {
       qgraph <- QSUGraph.withName[T, G](pat)
 
-      state <- MonadState_[G, MinimizationState].get
-      computed <- ApplyProvenance.computeProvenanceƒ[T, G].apply(
-        QSUGraph.QSUPattern(qgraph.root, pat.map(s => (s, state.dims(s)))))
+      state <- MinStateM[G].get
 
-      dims2 = state.dims + (qgraph.root -> computed._2)
-      _ <- MonadState_[G, MinimizationState].put(state.copy(dims = dims2))
+      computed <- ApplyProvenance.computeProvenance[T, StateT[G, QAuth, ?]](qgraph).exec(state.auth)
+
+      _ <- MinStateM[G].put(state.copy(auth = computed))
     } yield qgraph
   }
 
-  case class MinimizationState(dims: QSUDims[T], failed: Set[Symbol])
+  case class MinimizationState(auth: QAuth, failed: Set[Symbol])
 }
 
 object MinimizeAutoJoins {
   def apply[
-      T[_[_]]: BirecursiveT: EqualT,
+      T[_[_]]: BirecursiveT: EqualT: ShowT,
       F[_]: Monad: NameGenerator: PlannerErrorME]
       (agraph: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] =

@@ -18,11 +18,11 @@ package quasar.qscript
 
 import slamdata.Predef.{Map => SMap, _}
 import quasar.Planner.{InternalError, PlannerErrorME}
+import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript.provenance.Dimensions
 
 import matryoshka._
-import matryoshka.data.free._
 import scalaz.{Free, Show}
 import scalaz.std.list._
 import scalaz.std.string._
@@ -30,24 +30,22 @@ import scalaz.syntax.foldable._
 import scalaz.syntax.show._
 
 package object qsu {
-  type FreeAccess[T[_[_]], A] = FreeMapA[T, Access[A]]
-  type QSUDims[T[_[_]]] = SMap[Symbol, Dimensions[QProv.P[T]]]
+  type QIdAccess[T[_[_]]] = IdAccess[T[EJson]]
+  type QAccess[T[_[_]], A] = Access[T[EJson], A]
+  type FreeAccess[T[_[_]], A] = FreeMapA[T, QAccess[T, A]]
+  type QDims[T[_[_]]] = Dimensions[QProv.P[T]]
   type QSUVerts[T[_[_]]] = SMap[Symbol, QScriptUniform[T, Symbol]]
 
   def AccessValueF[T[_[_]], A](a: A): FreeAccess[T, A] =
-    Free.pure[MapFunc[T, ?], Access[A]](Access.Value(a))
+    Free.pure[MapFunc[T, ?], QAccess[T, A]](Access.Value(a))
 
   def AccessValueHoleF[T[_[_]]]: FreeAccess[T, Hole] =
     AccessValueF[T, Hole](SrcHole)
 
-  object QSUDims {
-    def show[T[_[_]]: ShowT]: Show[QSUDims[T]] =
-      Show.shows { dims =>
-        "QSUDims[\n" +
-        dims.toList.map({ case (k, v) => s"  ${k.shows} -> ${v.shows}"}).intercalate("\n") +
-        "\n]"
-      }
-  }
+  def printMultiline[K: Show, V: Show](m: SMap[K, V]): String =
+    m.toList
+      .map({ case (k, v) => s"  ${k.shows} -> ${v.shows}"})
+      .intercalate("\n")
 
   def taggedInternalError[F[_]: PlannerErrorME, A](tag: String, fa: F[A]): F[A] =
     PlannerErrorME[F].handleError(fa)(e => PlannerErrorME[F].raiseError(e match {

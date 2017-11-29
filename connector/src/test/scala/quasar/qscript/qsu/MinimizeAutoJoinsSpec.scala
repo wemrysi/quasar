@@ -42,7 +42,6 @@ import matryoshka.data.Fix
 import matryoshka.data.free._
 import pathy.Path, Path.Sandboxed
 import scalaz.{\/-, EitherT, Equal, Free, IList, Need, StateT}
-import scalaz.syntax.applicative._
 import scalaz.syntax.std.option._
 
 object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
@@ -56,13 +55,14 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
   val func = construction.Func[Fix]
   val qprov = QProv[Fix]
 
+  type J = Fix[EJson]
   val J = Fixed[Fix[EJson]]
 
   val afile = Path.rootDir[Sandboxed] </> Path.file("afile")
   val afile2 = Path.rootDir[Sandboxed] </> Path.file("afile2")
 
   implicit val eqP: Equal[qprov.P] =
-    qprov.prov.provenanceEqual(Equal[qprov.D], Equal[FreeMapA[Access[Symbol]]])
+    qprov.prov.provenanceEqual(Equal[qprov.D], Equal[QIdAccess])
 
   "unary node elimination" should {
     "linearize .foo + .bar" in {
@@ -311,12 +311,12 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         qsu.autojoin2((
           qsu.qsReduce(
             readAndThings,
-            List(HoleF[Fix].map(Access.value(_))),
+            List(HoleF[Fix].map(Access.value[J, Hole](_))),
             List(ReduceFuncs.Count(HoleF[Fix])),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
           qsu.qsReduce(
             readAndThings,
-            List(HoleF[Fix].map(Access.value(_))),
+            List(HoleF[Fix].map(Access.value[J, Hole](_))),
             List(ReduceFuncs.Sum(HoleF[Fix])),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
           _(MapFuncsCore.Add(_, _)))))
@@ -331,7 +331,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           fm) =>
 
           // must_=== doesn't work
-          bucket must beTreeEqual(func.Negate(HoleF.map(Access.value(_))))
+          bucket must beTreeEqual(func.Negate(HoleF.map(Access.value[J, Hole](_))))
 
           h1 must beTreeEqual(func.Negate(HoleF[Fix]))
           h2 must beTreeEqual(func.Negate(HoleF[Fix]))
@@ -376,11 +376,11 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         QSUGraph.fromAnnotatedTree(atree map (_.some))
 
       val expDims =
-        IList(qprov.prov.value(Access.bucket('qsu0, 0, 'qsu0).point[FreeMapA]))
+        IList(qprov.prov.value(IdAccess.bucket('qsu0, 0)))
 
-      val ds = runOn_(qgraph).dims
+      val ds = runOn_(qgraph).auth.dims
 
-      (ds(remap('n2)) must_= expDims) and (ds(remap('n3)) must_= expDims)
+      (ds(remap('n4)) must_= expDims) and (ds('qsu0) must_= expDims)
     }
 
     "leave uncoalesced reductions of different bucketing" in {

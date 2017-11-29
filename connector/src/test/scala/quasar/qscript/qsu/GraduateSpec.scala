@@ -31,8 +31,6 @@ import quasar.qscript.{
   IncludeId,
   JoinSide,
   LeftSideF,
-  MapFuncsCore,
-  MFC,
   ReduceFunc,
   ReduceFuncs,
   ReduceIndex,
@@ -101,7 +99,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
       "convert QSReduce" in {
         val buckets: List[FreeMap] = List(func.Add(HoleF, IntLit(17)))
-        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value(_)))
+        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value[Fix[EJson], Hole](_)))
         val reducers: List[ReduceFunc[FreeMap]] = List(ReduceFuncs.Count(HoleF))
         val repair: FreeMapA[ReduceIndex] = ReduceIndexF(\/-(0))
 
@@ -123,7 +121,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
       "convert QSSort" in {
         val buckets: List[FreeMap] = List(func.Add(HoleF, IntLit(17)))
-        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value(_)))
+        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value[Fix[EJson], Hole](_)))
         val order: NEL[(FreeMap, SortDir)] = NEL(HoleF -> SortDir.Descending)
 
         val qgraph: Fix[QSU] = qsu.qsSort(qsu.read(afile), abuckets, order)
@@ -177,9 +175,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
               concatArr,
               Rotation.ShiftArray),
             qsu.cint(1),
-            Free.roll[MapFunc, Access[JoinSide]](
-              MFC(MapFuncsCore.Constant[Fix, FreeAccess[JoinSide]](
-                Fixed[Fix[EJson]].bool(true)))),
+            func.Constant[JoinSide](Fixed[Fix[EJson]].bool(true)),
             JoinType.Inner,
             projectIdx),
           Take,

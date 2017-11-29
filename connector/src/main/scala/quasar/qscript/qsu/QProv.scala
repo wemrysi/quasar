@@ -21,40 +21,24 @@ import quasar.contrib.scalaz.MonadState_
 import quasar.ejson._
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.fp.ski.κ
-import quasar.qscript._
 import quasar.qscript.provenance._
 
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
 import matryoshka.data._
-import scalaz.{Lens => _, _}, Scalaz._, Tags.LastVal
-
-import MapFuncsCore._
+import scalaz.{Lens => _, _}, Scalaz._, Tags.{MaxVal, LastVal}
 
 final class QProv[T[_[_]]: BirecursiveT: EqualT]
-    extends Dimension[T[EJson], FreeMapA[T, Access[Symbol]], QProv.P[T]]
+    extends Dimension[T[EJson], IdAccess[T[EJson]], QProv.P[T]]
     with QSUTTypes[T] {
 
   type D     = T[EJson]
-  type I     = FreeAccess[Symbol]
+  type I     = IdAccess[D]
   type PF[A] = QProv.PF[T, A]
   type P     = QProv.P[T]
 
   val prov: Prov[D, I, P] =
-    Prov[D, I, P](ejs => Free.roll(MFC[T, I](Constant(ejs))))
-
-  /** The `JoinFunc` representing the autojoin of the given dimensions. */
-  def autojoinCondition(ls: Dimensions[P], rs: Dimensions[P]): FreeAccess[JoinSide] = {
-    def eqCond(k: JoinKeys.JoinKey[I]): FreeAccess[JoinSide] =
-      Free.roll(MFC(Eq(
-        FMA.map(k.left)(κ(LeftSide)),
-        FMA.map(k.right)(κ(RightSide)))))
-
-    autojoinKeys(ls, rs).keys.toNel.fold[FreeAccess[JoinSide]](BoolLit(true)) { jks =>
-      jks.foldMapLeft1(eqCond)((l, r) => Free.roll(MFC(And(l, eqCond(r)))))
-    }
-  }
+    Prov[D, I, P](IdAccess.static(_))
 
   /** Returns a position map of the identities present in the given provenance
     * and a new provenance where the identities have been replaced with the
@@ -77,7 +61,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
         for {
           idx <- M.get
           _   <- M.put(idx + 1)
-          b   =  Free.point(Access.bucket(src, idx, src)) : I
+          b   =  IdAccess.bucket[D](src, idx)
         } yield (prov.value(b), IMap.singleton(idx, i))
 
       case ProvF.Nada()      => (prov.nada(), IMap.empty[SInt, I]).point[M]
@@ -98,21 +82,35 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
     LastVal.unsubst(maps.foldMap(LastVal.subst(_))).values
   }
 
+  /** The greatest index of group keys for `of` or None if none exist. */
+  def maxGroupKeyIndex(of: Symbol, dims: Dimensions[P]): Option[SInt] = {
+    def maxIndex(p: P): Option[SInt @@ MaxVal] =
+      p.foldMap(p0 => groupKey.getOption(p0) collect {
+        case (s, i) if s === of => MaxVal(i)
+      })
+
+    MaxVal.unsubst(dims foldMap maxIndex)
+  }
+
+  /** The index of the next group key for `of`. */
+  def nextGroupKeyIndex(of: Symbol, dims: Dimensions[P]): SInt =
+    maxGroupKeyIndex(of, dims).fold(0)(_ + 1)
+
   /** Renames `from` to `to` in the given dimensions. */
   def rename(from: Symbol, to: Symbol, dims: Dimensions[P]): Dimensions[P] = {
     def rename0(sym: Symbol): Symbol =
       (sym === from) ? to | sym
 
     val renameAccess =
-      Access.symbols.modify(rename0) <<< Access.src.modify(rename0)
+      IdAccess.symbols[D].modify(rename0)
 
-    canonicalize(dims map (_.transCata[P](pfo.value modify (_ map renameAccess))))
+    canonicalize(dims map (_.transCata[P](pfo.value modify renameAccess)))
   }
 
   ////
 
   private val pfo = ProvF.Optics[D, I]
-  private val FMA = Functor[FreeMapA].compose[Access]
+  private val groupKey = prov.value composePrism IdAccess.groupKey[D]
 
   // NB: Computed together to ensure indices align properly.
   private def bucketedDims(src: Symbol, dims: Dimensions[P]): (Dimensions[P], IList[SInt ==>> I]) =
@@ -124,7 +122,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
 }
 
 object QProv {
-  type PF[T[_[_]], A] = ProvF[T[EJson], FreeMapA[T, Access[Symbol]], A]
+  type PF[T[_[_]], A] = ProvF[T[EJson], IdAccess[T[EJson]], A]
   type P[T[_[_]]]     = T[PF[T, ?]]
 
   def apply[T[_[_]]: BirecursiveT: EqualT]: QProv[T] =

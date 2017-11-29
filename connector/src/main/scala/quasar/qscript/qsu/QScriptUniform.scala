@@ -25,8 +25,9 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.fp.ski.{ι, κ}
 import quasar.fp.{coproductShow, symbolShow, PrismNT}
 import quasar.qscript._
+import quasar.qscript.provenance.JoinKeys
 
-import matryoshka.{delayShow, BirecursiveT, Delay, Embed, EqualT, ShowT}
+import matryoshka.{delayShow, showTShow, BirecursiveT, Delay, Embed, EqualT, ShowT}
 import matryoshka.data._
 import matryoshka.patterns.{CoEnv, EnvT}
 import monocle.{Iso, Prism, PTraversal, Traversal}
@@ -67,6 +68,9 @@ object QScriptUniform {
 
       case AutoJoin3(left, center, right, combiner) =>
         (f(left) |@| f(center) |@| f(right))(AutoJoin3(_, _, _, combiner))
+
+      case QSAutoJoin(left, right, keys, combiner) =>
+        (f(left) |@| f(right))(QSAutoJoin(_, _, keys, combiner))
 
       case GroupBy(left, right) =>
         (f(left) |@| f(right))(GroupBy(_, _))
@@ -142,6 +146,9 @@ object QScriptUniform {
 
           case AutoJoin3(left, center, right, combiner) =>
             s"AutoJoin3(${left.shows}, ${center.shows}, ${right.shows}, ${combiner.shows})"
+
+          case QSAutoJoin(left, right, keys, combiner) =>
+            s"QSAutoJoin(${left.shows}, ${right.shows}, ${keys.shows}, ${combiner.shows})"
 
           case GroupBy(left, right) =>
             s"GroupBy(${left.shows}, ${right.shows})"
@@ -225,6 +232,12 @@ object QScriptUniform {
       right: A,
       combiner: FreeMapA[T, JoinSide3]) extends QScriptUniform[T, A]
 
+  final case class QSAutoJoin[T[_[_]], A](
+    left: A,
+    right: A,
+    keys: JoinKeys[QIdAccess[T]],
+    combiner: JoinFunc[T]) extends QScriptUniform[T, A]
+
   final case class GroupBy[T[_[_]], A](
       left: A,
       right: A) extends QScriptUniform[T, A]
@@ -259,7 +272,7 @@ object QScriptUniform {
   final case class ThetaJoin[T[_[_]], A](
       left: A,
       right: A,
-      condition: FreeMapA[T, Access[JoinSide]],
+      condition: JoinFunc[T],
       joinType: JoinType,
       combiner: JoinFunc[T]) extends QScriptUniform[T, A]
 
@@ -386,7 +399,7 @@ object QScriptUniform {
   // QScriptish
   final case class QSReduce[T[_[_]], A](
       source: A,
-      buckets: List[FreeMapA[T, Access[Hole]]],
+      buckets: List[FreeMapA[T, QAccess[T, Hole]]],
       reducers: List[ReduceFunc[FreeMap[T]]],
       repair: FreeMapA[T, ReduceIndex]) extends QScriptUniform[T, A]
 
@@ -400,7 +413,7 @@ object QScriptUniform {
   // QScriptish
   final case class QSSort[T[_[_]], A](
       source: A,
-      buckets: List[FreeMapA[T, Access[Hole]]],
+      buckets: List[FreeMapA[T, QAccess[T, Hole]]],
       order: NEL[(FreeMap[T], SortDir)]) extends QScriptUniform[T, A]
 
   final case class Union[T[_[_]], A](left: A, right: A) extends QScriptUniform[T, A]
@@ -490,6 +503,11 @@ object QScriptUniform {
         case Map(a, fm) => (a, fm)
       } { case (a, fm) => Map(a, fm) }
 
+    def qsAutoJoin[A]: Prism[QScriptUniform[A], (A, A, JoinKeys[QIdAccess], JoinFunc)] =
+      Prism.partial[QScriptUniform[A], (A, A, JoinKeys[QIdAccess], JoinFunc)] {
+        case QSAutoJoin(l, r, ks, c) => (l, r, ks, c)
+      } { case (l, r, ks, c) => QSAutoJoin(l, r, ks, c) }
+
     def qsFilter[A]: Prism[QScriptUniform[A], (A, FreeMap)] =
       Prism.partial[QScriptUniform[A], (A, FreeMap)] {
         case QSFilter(a, p) => (a, p)
@@ -515,8 +533,8 @@ object QScriptUniform {
         case Subset(f, op, c) => (f, op, c)
       } { case (f, op, c) => Subset(f, op, c) }
 
-    def thetaJoin[A]: Prism[QScriptUniform[A], (A, A, FreeAccess[JoinSide], JoinType, JoinFunc)] =
-      Prism.partial[QScriptUniform[A], (A, A, FreeAccess[JoinSide], JoinType, JoinFunc)] {
+    def thetaJoin[A]: Prism[QScriptUniform[A], (A, A, JoinFunc, JoinType, JoinFunc)] =
+      Prism.partial[QScriptUniform[A], (A, A, JoinFunc, JoinType, JoinFunc)] {
         case ThetaJoin(l, r, c, t, b) => (l, r, c, t, b)
       } { case (l, r, c, t, b) => ThetaJoin(l, r, c, t, b) }
 
@@ -664,6 +682,11 @@ object QScriptUniform {
         case(src, f) => (src, Free.roll(mfc(f as HoleF[T])))
       })
 
+    def qsAutoJoin: Prism[A, F[(A, A, JoinKeys[QIdAccess], JoinFunc)]] = {
+      type G[A] = (A, A, JoinKeys[QIdAccess], JoinFunc)
+      composeLifting[G](O.qsAutoJoin[A])
+    }
+
     def qsFilter: Prism[A, F[(A, FreeMap)]] =
       composeLifting[(?, FreeMap)](O.qsFilter[A])
 
@@ -683,8 +706,8 @@ object QScriptUniform {
       composeLifting[G](O.subset[A])
     }
 
-    def thetaJoin: Prism[A, F[(A, A, FreeAccess[JoinSide], JoinType, JoinFunc)]] = {
-      type G[A] = (A, A, FreeAccess[JoinSide], JoinType, JoinFunc)
+    def thetaJoin: Prism[A, F[(A, A, JoinFunc, JoinType, JoinFunc)]] = {
+      type G[A] = (A, A, JoinFunc, JoinType, JoinFunc)
       composeLifting[G](O.thetaJoin[A])
     }
 
@@ -776,7 +799,7 @@ object QScriptUniform {
             .composeIso(envTIso[A, QSU, CoQSU])
 
         def lifting[S, B]: Prism[S, B] => Prism[(A, S), (A, B)] =
-	  _.second[A]
+          _.second[A]
       }
     }
   }
