@@ -46,6 +46,9 @@ object SimplifyJoin {
     type G[A] = H[A]
   }
 
+  val LeftK = "left"
+  val RightK = "right"
+
   def apply[T[_[_]], F[_], G[_]](implicit ev: SimplifyJoin.Aux[T, F, G]) = ev
 
   def applyToBranch[T[_[_]]: BirecursiveT](branch: FreeQS[T]): FreeQS[T] = {
@@ -65,6 +68,8 @@ object SimplifyJoin {
 
       type IT[F[_]] = T[F]
       type G[A] = F[A]
+
+      val func = construction.Func[T]
 
       def simplifyJoin[H[_]: Functor](GtoH: G ~> H): ThetaJoin[T, T[H]] => H[T[H]] =
         tj => {
@@ -87,9 +92,7 @@ object SimplifyJoin {
                 val (fir, sec) = (separateConditions(a), separateConditions(b))
                 SimplifiedJoinCondition(
                   fir.keys ++ sec.keys,
-                  fir.filter.fold(
-                    sec.filter)(
-                    f => sec.filter.fold(f.some)(s => Free.roll(MFC(And[T, JoinFunc[T]](f, s))).some)))
+                  fir.filter.fold(sec.filter)(f => sec.filter.fold(f)(func.And(f, _)).some))
               case -\/(MFC(Eq(l, r))) =>
                 alignCondition(l, r).fold(
                   SimplifiedJoinCondition(Nil, fm.some))(
@@ -99,11 +102,12 @@ object SimplifyJoin {
 
           def mergeSides(jf: JoinFunc[T]): FreeMap[T] =
             jf >>= {
-              case LeftSide  => Free.roll(MFC(ProjectIndex(Free.point(SrcHole), IntLit(0))))
-              case RightSide => Free.roll(MFC(ProjectIndex(Free.point(SrcHole), IntLit(1))))
+              case LeftSide  => func.ProjectKeyS(func.Hole, LeftK)
+              case RightSide => func.ProjectKeyS(func.Hole, RightK)
             }
 
           val SimplifiedJoinCondition(keys, filter) = separateConditions(tj.on)
+
           GtoH(QC.inj(Map(filter.foldLeft(
             GtoH(EJ.inj(EquiJoin(
               tj.src,
@@ -111,9 +115,9 @@ object SimplifyJoin {
               applyToBranch(tj.rBranch),
               keys.map(k => (k.left, k.right)),
               tj.f,
-              Free.roll(MFC(ConcatArrays(
-                Free.roll(MFC(MakeArray(Free.point(LeftSide)))),
-                Free.roll(MFC(MakeArray(Free.point(RightSide)))))))))).embed)(
+              func.ConcatMaps(
+                func.MakeMapS(LeftK, func.LeftSide),
+                func.MakeMapS(RightK, func.RightSide))))).embed)(
             (ej, filt) => GtoH(QC.inj(Filter(ej, mergeSides(filt)))).embed),
             mergeSides(tj.combine))))
         }
