@@ -50,10 +50,10 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
           val insideOfTarget = descendants.list.map(target </> _)
 
           val state = InMemState fromFiles (insideOfTarget.toList ++ outsideOfTarget).map((_,data)).toMap
-          val expected = descendants.list.toList.distinct
+          val expected = descendants.list.toList.distinct.strengthR(Node.Data).toMap
 
           Mem.interpret(query.descendantFiles(target).run).eval(state).toEither must
-            beRight(containTheSameElementsAs(expected))
+            beRight(expected)
       }.setArbitrary2(nonEmptyListSmallerThan(10)).setArbitrary3(listSmallerThan(5))
         .set(workers = java.lang.Runtime.getRuntime.availableProcessors)
 

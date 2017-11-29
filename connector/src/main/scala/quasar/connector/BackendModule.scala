@@ -114,7 +114,8 @@ trait BackendModule {
           explanation <- QueryFileModule.explain(pp.repr)
         } yield ExecutionPlan(Type, explanation, pp.paths)).run.run
 
-      case QueryFile.ListContents(dir) => QueryFileModule.listContents(dir).run.value
+      case QueryFile.ListContents(dir) =>
+        QueryFileModule.listContents(dir).map(set => set.map(Node.fromSegment)).run.value
       case QueryFile.FileExists(file) => QueryFileModule.fileExists(file)
     }
 
