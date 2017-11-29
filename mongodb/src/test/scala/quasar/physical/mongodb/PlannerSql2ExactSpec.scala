@@ -22,6 +22,7 @@ import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._
 import quasar.contrib.specs2._
 import quasar.ejson.{EJson, Fixed}
+import quasar.fp.ski._
 import quasar.fs._
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
@@ -1855,13 +1856,14 @@ class PlannerSql2ExactSpec extends
     "plan simple join with sources in different DBs" in {
       // NB: cannot use $lookup, so fall back to the old approach
       val query = sqlE"select smallZips.city from `db1/zips` join `db2/smallZips` on zips.`_id` = smallZips.`_id`"
-      plan(query) must_== plan2_6(query)
-    }.pendingUntilFixed
+      plan0(query, rootDir[Sandboxed], MongoQueryModel.`3.4`, defaultStats, defaultIndexes, emptyDoc) must_==
+        plan0(query, rootDir[Sandboxed], MongoQueryModel.`2.6`, defaultStats, defaultIndexes, emptyDoc)
+    }
 
     "plan simple join with no index" in {
       // NB: cannot use $lookup, so fall back to the old approach
       val query = sqlE"select smallZips.city from zips join smallZips on zips.`_id` = smallZips.`_id`"
-      plan(query) must_== plan2_6(query)
-    }.pendingUntilFixed
+      plan3_4(query, defaultStats, κ(None), emptyDoc) must_== plan2_6(query)
+    }
   }
 }

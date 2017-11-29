@@ -145,7 +145,7 @@ object PlannerHelpers {
     }
   }
 
-  val basePath = rootDir[Sandboxed] </> dir("db")
+  val basePathDb = rootDir[Sandboxed] </> dir("db")
 
   val listContents: DiscoverPath.ListContents[EitherWriter] =
     dir => (
@@ -186,7 +186,8 @@ object PlannerHelpers {
     EitherT.monadListen[WriterT[Id, Vector[PhaseResult], ?], PhaseResults, FileSystemError](
       WriterT.writerTMonadListen[Id, Vector[PhaseResult]])
 
-  def compileSqlToLP[M[_]: Monad: MonadFsErr: PhaseResultTell](sql: Fix[Sql]): M[Fix[LP]] = {
+  def compileSqlToLP[M[_]: Monad: MonadFsErr: PhaseResultTell]
+      (sql: Fix[Sql], basePath: ADir): M[Fix[LP]] = {
     val (log, s) = queryPlan(sql, Variables.empty, basePath, 0L, None).run.run
     val lp = s.fold(
       e => scala.sys.error(e.shows),
@@ -199,18 +200,20 @@ object PlannerHelpers {
 
   def sqlToQscript[M[_]: Monad: MonadFsErr: PhaseResultTell]
       (sql: Fix[Sql],
+        basePath: ADir,
         lc: DiscoverPath.ListContents[M])
       : M[Fix[fs.MongoQScript[Fix, ?]]] =
     for {
-      lp <- compileSqlToLP[M](sql)
+      lp <- compileSqlToLP[M](sql, basePath)
       qs <- MongoDb.lpToQScript(lp, lc)
     } yield qs
 
   def planSqlToQScript(query: Fix[Sql]): Either[FileSystemError, Fix[fs.MongoQScript[Fix, ?]]] =
-    sqlToQscript(query, listContents).run.value.toEither
+    sqlToQscript(query, basePathDb, listContents).run.value.toEither
 
   def queryPlanner[M[_]: Monad: MonadFsErr: PhaseResultTell]
       (sql: Fix[Sql],
+        basePath: ADir,
         model: MongoQueryModel,
         stats: Collection => Option[CollectionStatistics],
         indexes: Collection => Option[Set[Index]],
@@ -219,7 +222,7 @@ object PlannerHelpers {
         execTime: Instant)
       : M[Crystallized[WorkflowF]] =
     for {
-      qs <- sqlToQscript(sql, lc)
+      qs <- sqlToQscript(sql, basePath, lc)
       repr <- MongoDb.doPlan[Fix, M](qs, fs.QueryContext(stats, indexes), model, anyDoc, execTime)
     } yield repr
 
@@ -235,21 +238,22 @@ object PlannerHelpers {
 
   def plan0(
     query: Fix[Sql],
+    basePath: ADir,
     model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]],
     anyDoc: Collection => OptionT[EitherWriter, BsonDocument]
   ): Either[FileSystemError, Crystallized[WorkflowF]] =
-    queryPlanner(query, model, stats, indexes, listContents, anyDoc, Instant.now).run.value.toEither
+    queryPlanner(query, basePath, model, stats, indexes, listContents, anyDoc, Instant.now).run.value.toEither
 
   def plan2_6(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`2.6`, κ(None), κ(None), emptyDoc)
+    plan0(query, basePathDb, MongoQueryModel.`2.6`, κ(None), κ(None), emptyDoc)
 
   def plan3_0(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`3.0`, κ(None), κ(None), emptyDoc)
+    plan0(query, basePathDb, MongoQueryModel.`3.0`, κ(None), κ(None), emptyDoc)
 
   def plan3_2(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, emptyDoc)
+    plan0(query, basePathDb, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, emptyDoc)
 
   def plan3_4(
     query: Fix[Sql],
@@ -257,16 +261,16 @@ object PlannerHelpers {
     indexes: Collection => Option[Set[Index]],
     anyDoc: Collection => OptionT[EitherWriter, BsonDocument]
   ): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`3.4`, stats, indexes, anyDoc)
+    plan0(query, basePathDb, MongoQueryModel.`3.4`, stats, indexes, anyDoc)
 
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan3_4(query, defaultStats, defaultIndexes, emptyDoc)
 
   def planAt(time: Instant, query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    queryPlanner(query, MongoQueryModel.`3.4`, defaultStats, defaultIndexes, listContents, emptyDoc, time).run.value.toEither
+    queryPlanner(query, basePathDb, MongoQueryModel.`3.4`, defaultStats, defaultIndexes, listContents, emptyDoc, time).run.value.toEither
 
   def planLog(query: Fix[Sql]): Vector[PhaseResult] =
-    queryPlanner(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents, emptyDoc, Instant.now).run.written
+    queryPlanner(query, basePathDb, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents, emptyDoc, Instant.now).run.written
 
   def qplan0(
     qs: Fix[fs.MongoQScript[Fix, ?]],
