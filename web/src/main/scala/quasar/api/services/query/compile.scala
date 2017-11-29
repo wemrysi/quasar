@@ -43,10 +43,6 @@ object compile {
     S0: Mounting :<: S,
     S1: FileSystemFailure :<: S
   ): QHttpService[S] = {
-    def constantResponse(data: List[Data]): Json =
-      Json(
-        "type"  := "constant",
-        "value" := data.map(DataCodec.Precise.encode).unite)
 
     def explainQuery(
       scopedExpr: sql.ScopedExpr[Fix[sql.Sql]],
@@ -61,11 +57,8 @@ object compile {
           block =>
             queryPlan(block, vars, basePath, offset, limit)
               .run.value
-              .traverse(_.fold(
-                data => constantResponse(data).right[ApiError].point[Free[S, ?]],
-                lp => Q.explain(lp).run.value.map(_.bimap(_.toApiError, _.asJson))))
+              .traverse(lp => Q.explain(lp).run.value.map(_.bimap(_.toApiError, _.asJson)))
               .map(_.valueOr(_.toApiError.left[Json])))
-
       }
 
     QHttpService {

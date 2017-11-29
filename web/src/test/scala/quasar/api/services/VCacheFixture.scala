@@ -52,7 +52,7 @@ trait VCacheFixture extends H2MetaStoreFixture {
     PathMismatchFailure :\:
     MountingFailure     :\:
     Mounting            :\:
-    ViewState           :\:
+    view.State          :\:
     MonotonicSeq        :\:
     VCacheExpR          :\:
     VCacheExpW          :/:
@@ -74,11 +74,11 @@ trait VCacheFixture extends H2MetaStoreFixture {
     p: (ViewEff ~> Task, ViewEff ~> ResponseOr) => Task[A]
   ): Task[A] = {
     def viewFs: Task[ViewEff ~> Task] =
-      (runFs(inMemState)                          ⊛
-       TaskRef(mounts)                            ⊛
-       TaskRef(Map.empty[ReadHandle, ResultSet])  ⊛
-       MonotonicSeq.fromZero                      ⊛
-       TaskRef(Tags.Min(none[VCache.Expiration])) ⊛
+      (runFs(inMemState)                                         ⊛
+       TaskRef(mounts)                                           ⊛
+       KeyValueStore.impl.default[ReadHandle, view.ResultHandle] ⊛
+       MonotonicSeq.from(0L)                                     ⊛
+       TaskRef(Tags.Min(none[VCache.Expiration]))                ⊛
        MetaStoreFixture.createNewTestTransactor()
       ) { (fs, m, vs, s, r, t) =>
         val mountingInter =
@@ -88,7 +88,7 @@ trait VCacheFixture extends H2MetaStoreFixture {
           injectFT[PathMismatchFailure, ViewEff] :+:
           injectFT[MountingFailure, ViewEff]     :+:
           injectFT[Mounting, ViewEff]            :+:
-          injectFT[ViewState, ViewEff]           :+:
+          injectFT[view.State, ViewEff]          :+:
           injectFT[MonotonicSeq, ViewEff]        :+:
           injectFT[VCacheExpR, ViewEff]          :+:
           injectFT[VCacheExpW, ViewEff]          :+:
@@ -114,7 +114,7 @@ trait VCacheFixture extends H2MetaStoreFixture {
           Failure.toRuntimeError[Task, Mounting.PathTypeMismatch] :+:
           Failure.toRuntimeError[Task, MountingError]             :+:
           mountingInter                                           :+:
-          KeyValueStore.impl.fromTaskRef(vs)                      :+:
+          vs                                                      :+:
           s                                                       :+:
           Read.fromTaskRef(r)                                     :+:
           cw                                                      :+:

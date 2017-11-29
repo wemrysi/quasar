@@ -19,36 +19,79 @@ package quasar.physical.rdbms.fs
 import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile, PathSegment}
 import quasar.Data
-import quasar.fp.free.lift
 import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
 import quasar.fs.QueryFile
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.common._
 import quasar.physical.rdbms.common.TablePath.showTableName
+import quasar.connector.ManagedQueryFile
+import quasar.effect.Kvs
+import quasar.fp.free.lift
+import quasar.fs.impl.{dataStreamClose, dataStreamRead}
+import quasar.physical.rdbms.model.DbDataStream
+import quasar.physical.rdbms.planner.RenderQuery
+import quasar.physical.rdbms.planner.sql.SqlExpr
 
+import doobie.syntax.process._
+import doobie.util.fragment.Fragment
+import matryoshka.data.Fix
 import pathy.Path
-import scalaz.{-\/, Monad, \/-}
-import scalaz.syntax.monad._
-import scalaz.syntax.show._
-import scalaz.syntax.std.boolean._
-import scalaz.std.vector._
+import scalaz._
+import Scalaz._
+import scalaz.stream.Process._
 
-trait RdbmsQueryFile {
-  this: Rdbms =>
+trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] {
+  self: Rdbms =>
 
   import QueryFile._
   implicit def MonadM: Monad[M]
+  override def ResultKvsM: Kvs[M, ResultHandle, DbDataStream] = Kvs[M, ResultHandle, DbDataStream]
+  def renderQuery: RenderQuery // TODO this should be chosen based on schema
 
-  def QueryFileModule: QueryFileModule = new QueryFileModule {
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import EitherT.eitherTMonad
 
-    override def explain(repr: Repr): Backend[String] = ???
+  override def ManagedQueryFileModule: ManagedQueryFileModule = new ManagedQueryFileModule {
+    
+    override def explain(repr: Fix[SqlExpr]): Backend[String] = ???
 
-    override def executePlan(repr: Repr, out: AFile): Backend[Unit] = ???
+    override def executePlan(repr: Fix[SqlExpr], out: AFile): Backend[Unit] = {
+      ME.unattempt(renderQuery.asString(repr)
+        .leftMap(QScriptPlanningFailed.apply)
+        .traverse { q =>
+          val tablePath = TablePath.create(out)
+          val cmd = Fragment.const("CREATE TABLE") ++
+          Fragment.const(tablePath.shows) ++
+          Fragment.const("AS") ++
+          Fragment.const(q)
+        cmd.update.run.liftB
+      }).void
+    }
 
-    override def evaluatePlan(repr: Repr): Backend[ResultHandle] = ???
+    override def resultsCursor(repr: Fix[SqlExpr]): Backend[DbDataStream] = {
+      ME.unattempt(renderQuery.asString(repr)
+        .leftMap(QScriptPlanningFailed.apply)
+        .traverse { qStr =>
+        MRT.ask.map { xa =>
+            DbDataStream(Fragment.const(qStr)
+              .query[Data]
+              .process
+              .chunk(chunkSize)
+              .attempt(ex =>
+                emit(readFailed(qStr, ex.getLocalizedMessage)))
+              .transact(xa))
+          }.liftB
+     })
+    }
 
-    override def more(h: ResultHandle): Backend[Vector[Data]] = ???
+    override def nextChunk(c: DbDataStream): Backend[(DbDataStream, Vector[Data])] =
+      ME.unattempt(
+        dataStreamRead(c.stream)
+          .map(_.rightMap {
+            case (newStream, data) => (c.copy(stream = newStream), data)
+          })
+          .liftB)
 
     override def fileExists(file: AFile): Configured[Boolean] =
       lift(tableExists(TablePath.create(file))).into[Eff].liftM[ConfiguredT]
@@ -65,6 +108,7 @@ trait RdbmsQueryFile {
         yield childDirs ++ childFiles).liftB
     }
 
-    override def close(h: ResultHandle): Configured[Unit] = ???
-  }
+    override def closeCursor(c: DbDataStream): Configured[Unit] =
+      lift(dataStreamClose(c.stream)).into[Eff].liftM[ConfiguredT]
+  } 
 }
