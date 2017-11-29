@@ -53,8 +53,8 @@ object MonotonicSeq {
       new Ops[S]
   }
 
-  def fromZero: Task[MonotonicSeq ~> Task] =
-    TaskRef(0L).map(fromTaskRef)
+  def from(l: Long): Task[MonotonicSeq ~> Task] =
+    TaskRef(l).map(fromTaskRef)
 
   /** Returns an interpreter of `MonotonicSeq` into `Task`, given a
     * `TaskRef[Long]`.

@@ -80,7 +80,7 @@ object Module {
 
 
   final case class InvokeModuleFunction(path: AFile, args: Map[String, Fix[Sql]], offset: Natural, limit: Option[Positive])
-    extends Module[Error \/ (List[Data] \/ ResultHandle)]
+    extends Module[Error \/ ResultHandle]
 
   final case class More(handle: ResultHandle)
     extends Module[FileSystemError \/ Vector[Data]]
@@ -96,7 +96,12 @@ object Module {
 
     type M[A] = ErrorT[FreeS, A]
 
-    def invokeFunction(path: AFile, args: Map[String, Fix[Sql]], offset: Natural, limit: Option[Positive]): M[List[Data] \/ ResultHandle] =
+    def invokeFunction(
+      path: AFile,
+      args: Map[String, Fix[Sql]],
+      offset: Natural,
+      limit: Option[Positive]
+    ): M[ResultHandle] =
       EitherT(lift(InvokeModuleFunction(path, args, offset, limit)))
 
     /** Read a chunk of data from the file represented by the given handle.
@@ -124,8 +129,8 @@ object Module {
       */
     def invokeFunction(path: AFile, args: Map[String, Fix[Sql]], offset: Natural, limit: Option[Positive]): Process[M, Data] = {
       // TODO: use DataCursor.process for the appropriate cursor type
-      def closeHandle(dataOrHandle: List[Data] \/ ResultHandle): Process[M, Nothing] =
-        dataOrHandle.fold(_ => Process.empty, h => Process.eval_[M, Unit](unsafe.close(h).liftM[ErrorT]))
+      def closeHandle(handle: ResultHandle): Process[M, Nothing] =
+        Process.eval_[M, Unit](unsafe.close(handle).liftM[ErrorT])
 
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def readUntilEmpty(h: ResultHandle): Process[M, Data] =
@@ -136,10 +141,8 @@ object Module {
             Process.emitAll(data) ++ readUntilEmpty(h)
         }
 
-      Process.bracket(unsafe.invokeFunction(path, args, offset, limit))(closeHandle) { dataOrHandle =>
-        dataOrHandle.fold(
-          data => Process.emitAll(data),
-          handle => readUntilEmpty(handle))
+      Process.bracket(unsafe.invokeFunction(path, args, offset, limit))(closeHandle) { handle =>
+        readUntilEmpty(handle)
       }
     }
 
@@ -179,13 +182,13 @@ object Module {
                               .toRightDisjunction(notFoundError).point[Free[S, ?]])
             maybeAllArgs =  funcDec.args.map(arg => iArgs.get(arg)).sequence
             missingArgs  =  funcDec.args.filter(arg => !iArgs.contains(arg))
-            allArgs     <- EitherT(maybeAllArgs.toRightDisjunction(argumentsMissing(missingArgs)).point[Free[S, ?]])
+            allArgs      <- EitherT(maybeAllArgs.toRightDisjunction(argumentsMissing(missingArgs)).point[Free[S, ?]])
             scopedExpr   =  ScopedExpr(invokeFunction[Fix[Sql]](CIName(name), allArgs).embed, moduleConfig.statements)
             sql          <- EitherT(resolveImports_(scopedExpr, currentDir).leftMap(e => semErrors(e.wrapNel)).run.leftMap(fsError(_))).flattenLeft
-            dataOrLP     <- EitherT(quasar.queryPlan(sql, Variables.empty, basePath = currentDir, offset, limit)
+            lp           <- EitherT(quasar.queryPlan(sql, Variables.empty, basePath = currentDir, offset, limit)
                               .run.value.leftMap(semErrors(_)).point[Free[S, ?]])
-            dataOrHandle <- dataOrLP.traverse(lp => EitherT(query.eval(lp).run.value).leftMap(fsError(_)))
-          } yield dataOrHandle.map(h => ResultHandle(h.run))).run
+            handle       <- EitherT(query.eval(lp).run.value).leftMap(fsError(_))
+          } yield ResultHandle(handle.run)).run
         case More(handle)  => query.more(QueryFile.ResultHandle(handle.run)).run
         case Close(handle) => query.close(QueryFile.ResultHandle(handle.run))
       }

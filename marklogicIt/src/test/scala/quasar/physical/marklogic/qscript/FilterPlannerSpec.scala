@@ -152,7 +152,7 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
   }
 
   private def runXcc[A](f: Free[XccEvalEff, A], sess: Session, cs: ContentSource): Task[A] =
-    MonotonicSeq.fromZero >>= { (monoSeq: MonotonicSeq ~> Task) =>
+    MonotonicSeq.from(0L) >>= { (monoSeq: MonotonicSeq ~> Task) =>
       val xccToTask: XccEvalEff ~> Task =
         reflNT[Task] :+: monoSeq :+: Read.constant[Task, Session](sess) :+: Read.constant[Task, ContentSource](cs)
       val eval: Free[XccEvalEff, ?] ~> Task = foldMapNT(xccToTask)
