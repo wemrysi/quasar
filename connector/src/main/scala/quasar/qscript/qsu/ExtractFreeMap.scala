@@ -26,7 +26,7 @@ import quasar.qscript.MapFuncsCore.StrLit
 import quasar.sql.JoinDir
 
 import matryoshka.BirecursiveT
-import scalaz.{Applicative, Functor, Monad, Scalaz}, Scalaz._
+import scalaz.{\/, -\/, \/-, Applicative, Functor, Monad, NonEmptyList => NEL, Scalaz}, Scalaz._
 
 /** Extracts `MapFunc` expressions from operations by requiring an argument
   * to be a function of one or more sibling arguments and creating an
@@ -40,7 +40,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
 
   private val func = construction.Func[T]
 
-  private def extract[F[_]: Applicative: NameGenerator: PlannerErrorME]
+  private def extract[F[_]: Monad: NameGenerator: PlannerErrorME]
       : PartialFunction[QSUGraph, F[QSUGraph]] = {
 
     // This will only work once #3170 is completed.
@@ -71,23 +71,68 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
         }
 
     case graph @ Extractors.LPSort(src, keys) =>
-      val srcRoot = src.root
+      val access: NEL[(FreeMap \/ Symbol, SortDir)] =
+        keys.map(_.leftMap { key =>
+          MappableRegion.unaryOf(src.root, graph refocus key.root) match {
+            case Some(fm) => fm.left[Symbol]
+            case None => key.root.right[FreeMap]
+          }
+        })
 
-      keys traverse { case (k, sortDir) =>
-        MappableRegion.unaryOf(srcRoot, graph refocus k.root).strengthR(sortDir) match {
-          case Some(pair) => pair.point[F]
-          case None =>
-            PlannerErrorME[F].raiseError[(FreeMap, SortDir)](
-              InternalError(s"Invalid sort key, $k, must be a mappable function of $src.", None))
+      val nonmappable: List[Symbol] = access.toList collect {
+        case ((\/-(sym), _)) => sym
+      }
+
+      def autojoinVerts(initial: Symbol): F[(Symbol, QSUVerts[T])] =
+        nonmappable.foldLeftM((initial, graph.vertices)) {
+          case ((src, verts), sym) =>
+            freshName[F].map { joinRoot =>
+              val join: QSU[Symbol] =
+	            AutoJoin2(src, sym, func.ConcatMaps(func.LeftSide, func.MakeMapS(sym.name, func.RightSide)))
+	          (joinRoot, verts.updated(joinRoot, join))
+            }
         }
-      } map { nel => graph.overwriteAtRoot(QSSort(srcRoot, Nil, nel)) }
+
+      if (nonmappable.isEmpty) {
+        keys traverse { case (k, sortDir) =>
+          MappableRegion.unaryOf(src.root, graph refocus k.root).strengthR(sortDir) match {
+            case Some(pair) => pair.point[F]
+            case None =>
+              PlannerErrorME[F].raiseError[(FreeMap, SortDir)](
+                InternalError(s"Invalid sort key, $k, must be a mappable function of $src.", None))
+          }
+        } map { nel => graph.overwriteAtRoot(QSSort(src.root, Nil, nel)) }
+      } else {
+        for {
+          sortRoot <- freshName[F]
+          interRoot <- freshName[F]
+          joined <- autojoinVerts(sortRoot)
+        } yield {
+          val (joinRoot, verts) = joined
+
+          val order: NEL[(FreeMap, SortDir)] =
+            access.map(_.leftMap {
+              case -\/(fm) => fm >> func.ProjectKey(func.Hole, StrLit("sort_source"))
+              case \/-(sym) => func.ProjectKey(func.Hole, StrLit(sym.name))
+            })
+
+          val sortSrc: QSU[Symbol] = Map(joinRoot, func.MakeMapS("sort_source", func.Hole))
+          val sort: QSU[Symbol] = QSSort(sortRoot, Nil, order)
+          val result: QSU[Symbol] = Map(interRoot, func.ProjectKey(func.Hole, StrLit("sort_source")))
+
+          val newVerts: QSUVerts[T] = verts
+            .updated(sortRoot, sortSrc)
+            .updated(interRoot, sort)
+            .updated(graph.root, result)
+
+          QSUGraph(graph.root, newVerts)
+        }
+      }
     }
 
   def apply[F[_]: Monad: NameGenerator: PlannerErrorME](graph: QSUGraph)
       : F[QSUGraph] =
     graph.rewriteM[F](extract[F])
-
-  ////
 
   private def autojoinFreeMap[F[_]: Applicative: NameGenerator: PlannerErrorME]
     (graph: QSUGraph, src: Symbol, target: Symbol)
