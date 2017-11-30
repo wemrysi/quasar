@@ -23,7 +23,7 @@ import quasar.fp.ski.κ
 import matryoshka._
 import matryoshka.implicits._
 import monocle.Prism
-import scalaz._, Scalaz._
+import scalaz.{NonEmptyList => NEL, _}, Scalaz._
 
 /**
   * @tparam D type of data
@@ -143,21 +143,22 @@ trait Prov[D, I, P] {
 
   // eliminate duplicates within contiguous Both/OneOf and reassociate to the left
   def normalize(p: P)(implicit eqD: Equal[D], eqI: Equal[I]): P = {
-    def dedup[A: Equal](as: IList[A]): IList[A] = {
-      as.foldRight(IList.empty[A]) { (a, acc) =>
-        if (acc.any(_ === a))
-          acc
-        else
-          a :: acc
-      }
+    def normalize0(alternates: NEL[NEL[P]]): P =
+      alternates
+        .map(_.distinctE1.foldLeft1(both(_, _)))
+        .distinctE1
+        .foldLeft1(oneOf(_, _))
+
+    val normalizeƒ: Algebra[PF, NEL[NEL[P]]] = {
+      case Both(l, r)  => (l |@| r)(_ append _)
+      case OneOf(l, r) => l append r
+      case Then(l, r)  => NEL(NEL(thenn(normalize0(l), normalize0(r))))
+      case Value(i)    => NEL(NEL(value(i)))
+      case Proj(d)     => NEL(NEL(proj(d)))
+      case Nada()      => NEL(NEL(nada()))
     }
 
-    val inner: IList[P] =
-      dedup(flattenBoth(p).map(dedup(_))) map { ps =>
-        ps.reduceLeftOption(both(_, _)).getOrElse(nada())
-      }
-
-    inner.reduceLeftOption(oneOf(_, _)).getOrElse(nada())
+    normalize0(p.cata(normalizeƒ))
   }
 
   ////

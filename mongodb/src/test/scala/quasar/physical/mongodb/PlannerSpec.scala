@@ -53,14 +53,16 @@ class PlannerSpec extends
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     PlannerHelpers.plan(query)
 
-  def trackPending(name: String, plan: Either[FileSystemError, Crystallized[WorkflowF]], expectedOps: IList[MongoOp]) = {
+  def trackPending(name: String, plan: => Either[FileSystemError, Crystallized[WorkflowF]], expectedOps: IList[MongoOp]) = {
     name >> {
+      lazy val plan0 = plan
+
       s"plan: $name" in {
-        plan must beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps))
+        plan0 must beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps))
       }.pendingUntilFixed
 
       s"track: $name" in {
-        plan must beRight.which(cwf => trackActual(cwf, testFile(s"plan $name")))
+        plan0 must beRight.which(cwf => trackActual(cwf, testFile(s"plan $name")))
       }
     }
   }
