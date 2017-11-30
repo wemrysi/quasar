@@ -51,7 +51,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] extends QSUTTypes[T] {
       }
 
     case graph @ Extractors.LPFilter(src, predicate) =>
-      autojoinFreeMap[F](graph, src.root, predicate.root)("filter_source", "fliter_predicate") {
+      autojoinFreeMap[F](graph, src.root, predicate.root)("filter_source", "filter_predicate") {
         case (sym, fm) => QSFilter(sym, fm)
       }
 
