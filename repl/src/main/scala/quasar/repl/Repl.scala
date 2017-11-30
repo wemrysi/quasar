@@ -212,12 +212,13 @@ object Repl {
         for {
           path  <- RS.get.map(_.targetDir(d))
           files <- DF.unattemptT(Q.ls(path).leftMap(_.shows))
-          names <- files.toList
-                    .traverse[Free[S, ?], String](_.fold(
-                      d => mountType[S](path </> dir1(d)).map(t =>
-                        d.value + t.cata(t => s"@ ($t)", "/")),
-                      f => mountType[S](path </> file1(f)).map(t =>
-                        f.value + t.cata(t => s"@ ($t)", ""))))
+          names =  files.toList.map {
+                     case Node.Data(name)        => name.value
+                     case Node.View(name)        => name.value + "@ (view)"
+                     case Node.ImplicitDir(name) => name.value + "/"
+                     case Node.Module(name)      => name.value + "@ (module)"
+                     case Node.Function(name)    => name.value + "@ (function)"
+                   }
           _     <- names.sorted.foldMap(P.println)
         } yield ()
 

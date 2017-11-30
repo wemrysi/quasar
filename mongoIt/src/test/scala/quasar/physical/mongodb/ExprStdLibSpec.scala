@@ -24,7 +24,8 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
 import quasar.physical.mongodb.WorkflowBuilder._
-import quasar.qscript.{Coalesce => _, _}
+import quasar.qscript._
+import quasar.qscript.rewrites.{Coalesce => _}
 import quasar.std.StdLib._
 
 import java.time.Instant

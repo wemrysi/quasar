@@ -384,7 +384,7 @@ object WorkflowBuilder {
       inputs match {
         case Nil => (op(Nil)(g), b).point[M]
         case _ =>
-          inputs.traverse {
+          inputs.map(rewriteExprPrefix(_, b)).traverse {
             case HasThat($var(DocField(x))) => x.some
             case _                          => none
           }.fold {

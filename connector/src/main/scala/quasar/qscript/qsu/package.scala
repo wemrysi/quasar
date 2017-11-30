@@ -22,7 +22,7 @@ import quasar.qscript.provenance.Dimensions
 
 import matryoshka._
 import matryoshka.data.free._
-import scalaz.Show
+import scalaz.{Free, Show}
 import scalaz.std.list._
 import scalaz.std.string._
 import scalaz.syntax.foldable._
@@ -32,6 +32,12 @@ package object qsu {
   type FreeAccess[T[_[_]], A] = FreeMapA[T, Access[A]]
   type QSUDims[T[_[_]]] = SMap[Symbol, Dimensions[QProv.P[T]]]
   type QSUVerts[T[_[_]]] = SMap[Symbol, QScriptUniform[T, Symbol]]
+
+  def AccessValueF[T[_[_]], A](a: A): FreeAccess[T, A] =
+    Free.pure[MapFunc[T, ?], Access[A]](Access.Value(a))
+
+  def AccessValueHoleF[T[_[_]]]: FreeAccess[T, Hole] =
+    AccessValueF[T, Hole](SrcHole)
 
   object QSUDims {
     def show[T[_[_]]: ShowT]: Show[QSUDims[T]] =

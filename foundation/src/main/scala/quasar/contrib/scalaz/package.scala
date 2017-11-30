@@ -45,6 +45,13 @@ package object scalaz {
       OptionT(self.run.map(opt => opt: Option[B]))
   }
 
+  // It's annoying that Scala doesn't allow us to define this generically for any `MonadTrans`
+  // but seems like a nice thing to have on `OptionT` at least
+  implicit final class NestedOptionTOps[F[_], A](val self: OptionT[OptionT[F, ?], A]) extends AnyVal {
+    def squash(implicit f: Functor[F]): OptionT[F, A] =
+      OptionT(self.run.run.map(_.join))
+  }
+
   implicit def toMonadTell_Ops[F[_], W, A](fa: F[A])(implicit F: MonadTell_[F, W]): MonadTell_Ops[F, W, A] =
     new MonadTell_Ops[F, W, A](fa)
 

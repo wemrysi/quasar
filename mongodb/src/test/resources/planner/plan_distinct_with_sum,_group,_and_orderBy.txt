@@ -84,7 +84,7 @@ Chain
 │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
 │  │  │  ╰─ By
 │  │  │     ├─ Name("0" -> "$identities.qsu18_0")
-│  │  │     ╰─ Name("1" -> "$identities.qsu18_1")
+│  │  │     ╰─ Name("1" -> "$identities.qsu18_0")
 │  │  ╰─ $ProjectF
 │  │     ├─ Name("_id" -> "$_id")
 │  │     ├─ Name("value")
@@ -152,7 +152,7 @@ Chain
 │  ╰─ By
 │     ╰─ Name("0" -> "$b0")
 ├─ $SortF
-│  ╰─ SortKey(totalPop -> Descending)
+│  ╰─ SortKey(f0.totalPop -> Descending)
 ╰─ $ProjectF
    ├─ Name("__quasar_mongodb_sigil" -> "$f0")
    ╰─ ExcludeId

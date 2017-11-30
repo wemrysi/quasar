@@ -1,26 +1,26 @@
 {
     "name": "show tests that likely have a bug prior to the connector",
     "backends": {
-        "couchbase":         "pending",
-        "marklogic_json":    "pending",
-        "marklogic_xml":     "pending",
-        "mimir":             "pending",
-        "mongodb_2_6":       "pending",
-        "mongodb_3_0":       "pending",
-        "mongodb_3_2":       "pending",
-        "mongodb_3_4":       "pending",
-        "mongodb_read_only": "pending",
-        "spark_hdfs":        "pending",
-        "spark_local":       "pending",
-        "spark_cassandra":   "pending"
+        "couchbase": "skip",
+        "marklogic_json": "pending",
+        "mimir": "pending",
+        "mongodb_2_6": "pending",
+        "mongodb_3_0": "pending",
+        "mongodb_3_2": "pending",
+        "mongodb_3_4": "pending",
+        "mongodb_read_only": "skip"
     },
+    "NB": "pending on mimir due to sparse arrays",
+    "NB": "disabled on couchbase due to lack of general join",
+    "NB": "skipped on mongodb_read_only because of 👻",
     "data": "newTests.data",
-    "TODO": "Change query to skip cases where the backend status is “ignore*”.",
-    "query":
-        "allBackends := 12;
-         select name from newTests where count(backends{_}) = allBackends",
-    "TODO2": "Collect the actual results and change this to “exactly”.",
-    "predicate": "atLeast",
-    "ignoreResultOrder": true,
-    "expected": ["cities with largest individual zip codes"]
+    "query": "select name from newTests where count(backends{_}) = 12 order by name limit 5",
+    "predicate": "exactly",
+    "expected": [
+        "convert a field to ObjectId",
+        "count grouped joined tables",
+        "expressions with `= null` and `is null`, with missing fields (pending #465)",
+        "flatten a single field as both object and array",
+        "flatten one side of a join condition"
+    ]
 }

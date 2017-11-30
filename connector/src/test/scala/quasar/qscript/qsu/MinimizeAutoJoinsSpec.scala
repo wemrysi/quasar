@@ -24,9 +24,12 @@ import quasar.qscript.{
   construction,
   Hole,
   HoleF,
+  LeftSide,
   MapFuncsCore,
   ReduceFuncs,
   ReduceIndex,
+  ReduceIndexF,
+  RightSide,
   SrcHole
 }
 import slamdata.Predef._
@@ -359,6 +362,29 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       val ds = runOn_(qgraph).dims
 
       (ds(remap('n2)) must_= expDims) and (ds(remap('n3)) must_= expDims)
+    }
+
+    "leave uncoalesced reductions of different bucketing" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.qsReduce(
+            qsu.read(afile),
+            Nil,
+            List(ReduceFuncs.Sum(HoleF[Fix])),
+            ReduceIndexF[Fix](\/-(0))),
+          qsu.qsReduce(
+            qsu.read(afile),
+            List(func.ProjectKey(AccessValueHoleF[Fix], func.Constant(J.str("state")))),
+            List(ReduceFuncs.Sum(HoleF[Fix])),
+            ReduceIndexF[Fix](\/-(0))),
+          _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case AutoJoin2C(
+          QSReduce(Read(_), Nil, _, _),
+          QSReduce(Read(_), List(_), _, _),
+          MapFuncsCore.Add(LeftSide, RightSide)) => ok
+      }
     }
   }
 

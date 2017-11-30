@@ -23,13 +23,11 @@ import quasar.fp.numeric._
 import quasar.fp.free._
 import quasar.fs._, FileSystemError._, PathError._, MountType._
 import quasar.fs.mount.cache.VCache.VCacheKVS
-import quasar.sql.FunctionDecl
 
 import pathy.Path._
-import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.{Failure => _, Node => _, _}, Scalaz._
 
 package object module {
-  import MountConfig._
 
   /** Intercept and fail any read to a module path; all others are passed untouched. */
   def readFile[S[_]](
@@ -79,16 +77,14 @@ package object module {
     val queryUnsafe = QueryFile.Unsafe[S]
     val mount = Mounting.Ops[S]
 
-    def listModules(dir: ADir): Free[S, Set[PathSegment]] =
-      mount.modulesHavingPrefix(dir).map(_ foldMap { d =>
-        d.relativeTo(dir).flatMap(firstSegmentName).toSet
-      })
+    def listModules(dir: ADir): Free[S, Set[Node]] =
+      mount.modulesHavingPrefix_(dir).map(_.foldMap(d =>
+        dirName(d).map[Node](Node.Module(_)).toSet))
 
-    def moduleFiles(dir: ADir): OptionT[Free[S, ?], Set[PathSegment]] =
-      mount.lookupConfig(dir).run
-        .flatMap(i => OptionT((i.toOption >>= (c => moduleConfig.getOption(c))).η[Free[S, ?]]))
-        .map(statements =>
-          statements.collect { case FunctionDecl(name, _, _) => liftFileName(FileName(name.value)) }.toSet)
+    def moduleFiles(dir: ADir): OptionT[Free[S, ?], Set[Node]] =
+      mount.lookupModuleConfigIgnoreError(dir).map(moduleConfig =>
+          moduleConfig.declarations.map(funcDef =>
+            Node.Function(FileName(funcDef.name.value))).toSet)
 
     λ[QueryFile ~> Free[S, ?]] {
       case ExecutePlan(lp, out) =>

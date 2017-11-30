@@ -52,7 +52,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
         FMA.map(k.right)(κ(RightSide)))))
 
     autojoinKeys(ls, rs).keys.toNel.fold[FreeAccess[JoinSide]](BoolLit(true)) { jks =>
-      jks.distinctE1.foldMapLeft1(eqCond)((l, r) => Free.roll(MFC(And(l, eqCond(r)))))
+      jks.foldMapLeft1(eqCond)((l, r) => Free.roll(MFC(And(l, eqCond(r)))))
     }
   }
 

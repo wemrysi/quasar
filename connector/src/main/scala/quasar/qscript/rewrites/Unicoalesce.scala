@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qscript.rewrites
 
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.qscript._
 
 import matryoshka._
 import scalaz._
