@@ -1,0 +1,16 @@
+{
+    "name": "conditional_input_step3",
+    "data": "patients.data",
+    "query": "temp0 := SELECT * FROM patients WHERE state = \"CO\" AND (CASE \"both\" WHEN \"male\" THEN gender = \"male\" WHEN \"female\" THEN gender = \"female\" WHEN \"both\" THEN gender IN (\"male\", \"female\") END) AND (CASE WHEN 40 > 0 THEN age >= 40 ELSE age > 0 END) AND (CASE WHEN 55 > 0 THEN age <= 55 ELSE age > 0 END);
+         SELECT AVG(weight) AS measure, city AS category, gender AS stack, null AS parallel FROM (temp0) AS tmp__1 GROUP BY gender, city ORDER BY gender ASC, city ASC LIMIT 6
+     ",
+    "predicate": "exactly",
+    "expected": [
+       { "measure": 214.0, "category": "ARVADA", "stack":            "female", "parallel": null},
+       { "measure": 126.0, "category": "ASPEN", "stack":             "female", "parallel": null},
+       { "measure": 195.5, "category": "AURORA", "stack":            "female", "parallel": null},
+       { "measure": 217.0, "category": "BATTLEMENT MESA", "stack":   "female", "parallel": null},
+       { "measure": 137.0, "category": "BROOMFIELD", "stack":        "female", "parallel": null},
+       { "measure": 172.0, "category": "BUFFALO CREEK", "stack":     "female", "parallel": null}
+    ]
+}

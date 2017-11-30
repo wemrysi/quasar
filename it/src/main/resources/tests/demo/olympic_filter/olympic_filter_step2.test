@@ -1,0 +1,15 @@
+{
+    "name": "olympic_filter_step2",
+    "data": "olympics.data",
+    "query": "temp0 := SELECT * FROM olympics;
+          SELECT discipline, city, gender, country, type FROM (temp0) AS res WHERE res.type IN (\"Gold\") order by type desc limit 6",
+    "predicate": "exactly",
+    "expected": [
+         { "discipline": "Figure skating", "city": "Chamonix", "gender": "W", "country": "AUT", "type": "Gold" },
+         { "discipline": "Speed skating" , "city": "Chamonix", "gender": "M", "country": "FIN", "type": "Gold" },
+         { "discipline": "Speed skating" , "city": "Chamonix", "gender": "M", "country": "FIN", "type": "Gold" },
+         { "discipline": "Curling"       , "city": "Chamonix", "gender": "M", "country": "GBR", "type": "Gold" },
+         { "discipline": "Figure skating", "city": "Chamonix", "gender": "X", "country": "AUT", "type": "Gold" },
+         { "discipline": "Biathlon"      , "city": "Chamonix", "gender": "M", "country": "SUI", "type": "Gold" }
+    ]
+}

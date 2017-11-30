@@ -1,0 +1,16 @@
+{
+    "name": "olympic_filter_step1",
+    "data": "olympics.data",
+    "query": "temp0 := SELECT * FROM olympics;
+         SELECT discipline, city, gender, country FROM (temp0) AS res WHERE res.country IN (\"AUT\") ORDER BY type DESC LIMIT 6   
+         ",
+    "predicate": "exactly",
+    "expected": [
+        { "discipline": "Figure skating", "city": "Chamonix"                , "gender": "M", "country": "AUT" },
+        { "discipline": "Figure skating", "city": "St. Moritz"              , "gender": "M", "country": "AUT" },
+        { "discipline": "Figure skating", "city": "Lake Placid"             , "gender": "W", "country": "AUT" },
+        { "discipline": "Figure skating", "city": "Garmisch-Partenkirchen"  , "gender": "X", "country": "AUT" },
+        { "discipline": "Figure skating", "city": "St. Moritz"              , "gender": "W", "country": "AUT" },
+        { "discipline": "Alpine Skiing", "city":  "Cortina d'Ampezzo"       , "gender": "W", "country": "AUT" }
+    ]
+}
