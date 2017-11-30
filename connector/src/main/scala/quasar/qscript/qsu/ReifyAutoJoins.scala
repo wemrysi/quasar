@@ -20,6 +20,8 @@ import slamdata.Predef._
 
 import quasar.NameGenerator
 import quasar.common.JoinType
+import quasar.ejson.implicits._
+import quasar.fp.{coproductEqual, symbolOrder}
 import quasar.qscript.{
   construction,
   Center,
@@ -32,6 +34,7 @@ import quasar.qscript.provenance.Dimensions
 import quasar.qscript.MapFuncsCore.StrLit
 
 import matryoshka._
+import matryoshka.data.free._
 import scalaz.{Monad, WriterT}
 import scalaz.Scalaz._
 

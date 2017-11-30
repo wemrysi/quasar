@@ -143,7 +143,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
         case Unreferenced() => dims.empty.point[F]
       }
 
-      computedDims.map(dims.canonicalize).strengthL(root)
+      computedDims strengthL root
   }
 
   ////
