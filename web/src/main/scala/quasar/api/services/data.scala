@@ -271,10 +271,14 @@ object data {
     R: ReadFile.Ops[S],
     Q: QueryFile.Ops[S]
   ): Process[R.M, ByteVector] =
-    Process.await(Q.descendantFiles(dir)) { quasarFiles =>
-      val metadata = ArchiveMetadata(quasarFiles.toList.strengthR(FileMetadata(`Content-Type`(format.mediaType))).toMap)
+    Process.await(Q.descendantFiles(dir)) { children =>
+      val files = children.collect {
+        case (f, Node.View) => f
+        case (f, Node.Data) => f
+      }.toList
+      val metadata = ArchiveMetadata(files.strengthR(FileMetadata(`Content-Type`(format.mediaType))).toMap)
       val metaFileAndContent = (ArchiveMetadata.HiddenFile, Process.emit(metadata.asJson.spaces2))
-      val qFilesAndContent = quasarFiles.toList.map { file =>
+      val qFilesAndContent = files.map { file =>
         val data = R.scan(dir </> file, offset, limit)
         (file, format.encode(data))
       }

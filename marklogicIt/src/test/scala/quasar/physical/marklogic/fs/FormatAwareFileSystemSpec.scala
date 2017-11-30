@@ -23,12 +23,12 @@ import quasar.contrib.scalaz.eitherT._
 import quasar.fs._
 
 import pathy.Path._
-import scalaz._, Scalaz._
+import scalaz.{Node => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
-  def dirSeg(name: String): PathSegment  = DirName(name).left
-  def fileSeg(name: String): PathSegment = FileName(name).right
+  def dirNode(name: String): Node  = Node.ImplicitDir(DirName(name))
+  def fileNode(name: String): Node = Node.Data(FileName(name))
 
   val beAFormatConflictError = beLike[Throwable] {
     case e: Exception => e.getMessage must contain("different format exists")
@@ -62,7 +62,7 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
         val saveXml = write.saveThese(xmlFile, Vector(xmlObj))
 
         (runFsE(xml)(saveXml) *> runFsE(js)(saveJs *> query.ls(cdir)))
-          .run.map(_.toEither must beRight(contain(exactly(fileSeg("jsfile")))))
+          .run.map(_.toEither must beRight(contain(exactly(fileNode("jsfile")))))
           .unsafePerformSync
       }
 
@@ -78,7 +78,7 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
         val saveXml = write.saveThese(xmlFile, Vector(xmlObj))
 
         (runFsE(xml)(saveXml) *> runFsE(js)(saveJs *> query.ls(cdir)))
-          .run.map(_.toEither must beRight(contain(exactly(fileSeg("jsfile")))))
+          .run.map(_.toEither must beRight(contain(exactly(fileNode("jsfile")))))
           .unsafePerformSync
       }
 
@@ -94,7 +94,7 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
         val saveXml = write.saveThese(xmlFile, Vector(xmlObj))
 
         (runFsE(xml)(saveXml) *> runFsE(js)(saveJs *> query.ls(cdir)))
-          .run.map(_.toEither must beRight(contain(exactly(dirSeg("jsdir1")))))
+          .run.map(_.toEither must beRight(contain(exactly(dirNode("jsdir1")))))
           .unsafePerformSync
       }
 
@@ -147,8 +147,8 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
           runFsE(xml)(query.ls(xmlDir)).run
         ) { (lsjs, jslsxml, lsxml) =>
           (lsjs.toEither    must beLeft)                                                and
-          (jslsxml.toEither must beRight(contain(exactly(fileSeg("A"), fileSeg("B"))))) and
-          (lsxml.toEither   must beRight(contain(exactly(fileSeg("C"), fileSeg("D")))))
+          (jslsxml.toEither must beRight(contain(exactly(fileNode("A"), fileNode("B"))))) and
+          (lsxml.toEither   must beRight(contain(exactly(fileNode("C"), fileNode("D")))))
         }
 
         (attemptMove.run *> checkSuccess).unsafePerformSync
@@ -177,8 +177,8 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
           runFsE( js)(query.ls( jsDir)).run |@|
           runFsE(xml)(query.ls(xmlDir)).run
         ) { (lsjs, lsxml) =>
-          (lsjs.toEither  must beRight(contain(exactly(fileSeg("A"), fileSeg("B"))))) and
-          (lsxml.toEither must beRight(contain(exactly(fileSeg("B"), fileSeg("C")))))
+          (lsjs.toEither  must beRight(contain(exactly(fileNode("A"), fileNode("B"))))) and
+          (lsxml.toEither must beRight(contain(exactly(fileNode("B"), fileNode("C")))))
         }
 
         (attemptMove |@| ensureNothingChanged)(_ and _).unsafePerformSync
@@ -208,8 +208,8 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
           runFsE(xml)(query.ls(srcDir)).run
         ) { (jssrc, jsdst, xmlsrc) =>
           (jssrc.toEither  must beLeft)                                                and
-          (jsdst.toEither  must beRight(contain(exactly(fileSeg("A"), fileSeg("B"))))) and
-          (xmlsrc.toEither must beRight(contain(exactly(fileSeg("C"), fileSeg("D")))))
+          (jsdst.toEither  must beRight(contain(exactly(fileNode("A"), fileNode("B"))))) and
+          (xmlsrc.toEither must beRight(contain(exactly(fileNode("C"), fileNode("D")))))
         }
 
         (attemptMove.run *> checkSuccess).unsafePerformSync
@@ -236,7 +236,7 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
           runFsE(xml)(query.ls(cdir)).run
         ) { (jsls, xmlls) =>
           (jsls.toEither  must beLeft)                                                and
-          (xmlls.toEither must beRight(contain(exactly(fileSeg("C"), fileSeg("D")))))
+          (xmlls.toEither must beRight(contain(exactly(fileNode("C"), fileNode("D")))))
         }
 
         (attemptDelete.run *> checkSuccess).unsafePerformSync
@@ -264,7 +264,7 @@ final class FormatAwareFileSystemSpec extends MultiFormatFileSystemTest {
           runFsE(xml)(query.ls(cdir)).run
         ) { (jsls, xmlls) =>
           (jsls.toEither  must beLeft)                                      and
-          (xmlls.toEither must beRight(contain(exactly(dirSeg("xmlsub")))))
+          (xmlls.toEither must beRight(contain(exactly(dirNode("xmlsub")))))
         }
 
         (attemptDeleteParent.run *> checkSuccess).unsafePerformSync

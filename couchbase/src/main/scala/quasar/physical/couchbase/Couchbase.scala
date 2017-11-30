@@ -32,6 +32,7 @@ import quasar.physical.couchbase.planner.Planner
 import quasar.Planner.PlannerError
 import quasar.qscript.{Map => _, _}
 import quasar.qscript.analysis._
+import quasar.qscript.rewrites.{Optimize, Unicoalesce, Unirewrite}
 
 import scala.Predef.implicitly
 

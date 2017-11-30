@@ -33,6 +33,7 @@ import quasar.physical.mongodb.mongoiterable._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 import quasar.qscript.analysis._
+import quasar.qscript.rewrites.{Optimize, Unicoalesce, Unirewrite}
 
 import java.time.Instant
 import scala.Predef.implicitly

@@ -38,13 +38,13 @@ object TraceFS {
 
   type Trace[A] = Writer[Vector[RenderedTree], A]
 
-  def qfTrace(paths: Map[ADir, Set[PathSegment]]) = new (QueryFile ~> Trace) {
+  def qfTrace(paths: Map[ADir, Set[Node]]) = new (QueryFile ~> Trace) {
     import QueryFile._
 
     def ls(dir: ADir) =
       paths.get(dir).cata(
         _.right,
-        if (dir === rootDir) Set[PathSegment]().right
+        if (dir === rootDir) Set[Node]().right
         else FileSystemError.pathErr(PathError.pathNotFound(dir)).left)
 
     def apply[A](qf: QueryFile[A]): Trace[A] =
@@ -59,7 +59,7 @@ object TraceFS {
           case FileExists(file)     =>
             ls(fileParent(file)).fold(
               κ(false),
-              _.contains(fileName(file).right))
+              _.contains(Node.Data(fileName(file))))
         }))
   }
 
@@ -101,10 +101,10 @@ object TraceFS {
         }))
   }
 
-  def traceFs(paths: Map[ADir, Set[PathSegment]]): FileSystem ~> Trace =
+  def traceFs(paths: Map[ADir, Set[Node]]): FileSystem ~> Trace =
     interpretFileSystem[Trace](qfTrace(paths), rfTrace, wfTrace, mfTrace)
 
-  def traceInterp[A](t: Free[FileSystem, A], paths: Map[ADir, Set[PathSegment]]): (Vector[RenderedTree], A) = {
+  def traceInterp[A](t: Free[FileSystem, A], paths: Map[ADir, Set[Node]]): (Vector[RenderedTree], A) = {
     new free.Interpreter(traceFs(paths)).interpret(t).run
   }
 }

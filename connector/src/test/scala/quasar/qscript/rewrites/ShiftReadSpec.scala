@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qscript.rewrites
 
 import slamdata.Predef.{List, Nil}
 
 import quasar.TreeMatchers
 import quasar.contrib.pathy.AFile
 import quasar.fp._
+import quasar.qscript._
 
 import matryoshka._
 import matryoshka.data.Fix
