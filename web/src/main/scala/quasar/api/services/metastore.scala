@@ -18,6 +18,7 @@ package quasar.api.services
 
 import slamdata.Predef.StringContext
 import quasar.api._
+import quasar.contrib.scalaz._
 import quasar.db.DbConnectionConfig
 import quasar.fp.free._
 import quasar.main.{MainErrT, MetaStoreLocation}
@@ -44,7 +45,8 @@ object metastore {
           _              <- EitherT(meta.set(connConfig, initialize))
           newUrl         =  DbConnectionConfig.connectionInfo(connConfig).url
           initializedStr =  if (initialize) "newly initialized " else ""
-        } yield s"Now using ${initializedStr}metastore located at $newUrl").leftMap(msg => ApiError.fromMsg(BadRequest, msg)))
+        } yield s"Now using ${initializedStr}metastore located at $newUrl")
+          .leftMapF(msg => lift(BadRequest(Json("error" := Json("status" := "UninitializedMetastore", "detail":= Json("message" := msg))))).into[S]))
     }
   }
 }
