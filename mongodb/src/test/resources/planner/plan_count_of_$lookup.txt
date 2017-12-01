@@ -16,7 +16,7 @@ Chain
 │  ├─ Map
 │  │  ╰─ Obj
 │  │     ├─ Key(f0: (isObject(_.left) && (! Array.isArray(_.left))) ? _.left._id : undefined)
-│  │     ╰─ Key(b0: [(isObject(_.left) && (! Array.isArray(_.left))) ? _.left._id : undefined])
+│  │     ╰─ Key(b0: (isObject(_.left) && (! Array.isArray(_.left))) ? _.left._id : undefined)
 │  ╰─ Scope(Map())
 ╰─ $GroupF
    ├─ Grouped
