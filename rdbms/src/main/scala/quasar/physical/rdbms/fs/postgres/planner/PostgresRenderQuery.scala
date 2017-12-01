@@ -42,7 +42,7 @@ object PostgresRenderQuery extends RenderQuery {
     val q = a.cataM(alg)
 
     a.project match {
-      case s: Select[T[SqlExpr]] => q ∘ (s => s"$s")
+      case s: Select[T[SqlExpr]] => q ∘ (s => s"select row_to_json(row) from $s row")
       case _                     => q ∘ ("" ⊹ _)
     }
   }
@@ -60,19 +60,35 @@ object PostgresRenderQuery extends RenderQuery {
     case Table(v) =>
       v.right
     case AllCols(alias) =>
-      s"row_to_json($alias)".right
+      s"*".right
     case Refs(srcs) =>
       srcs match {
-        case Vector(first, second) => s"$first->>'$second'".right
-        case first +: mid :+ last =>
-          s"""$first->${mid.map(e => s"'$e'").intercalate("->")}->>'$last'""".right
+        case Vector(key, value) =>
+          val valueStripped = value.stripPrefix("'").stripSuffix("'")
+          s"""$key.$valueStripped""".right
+        case key +: mid :+ last =>
+          val firstValStripped = ~mid.headOption.map(_.stripPrefix("'").stripSuffix("'"))
+          val midTail = mid.drop(1)
+          val midStr = if (midTail.nonEmpty)
+            s"->${midTail.map(e => s"'$e'").intercalate("->")}"
+          else
+            ""
+          s"""$key.$firstValStripped$midStr->'$last'""".right
         case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
       }
     case RefsSelectRow(srcs) =>
       srcs match {
-        case Vector(first, second) => s"""$first."$second"""".right
-        case first +: mid :+ last =>
-          s"""$first${mid.map(e => s"'$e'").intercalate("->")}->>'$last'""".right
+        case Vector(key, value) =>
+          val valueStripped = value.stripPrefix("'").stripSuffix("'")
+          s"""$key.$valueStripped""".right
+        case key +: mid :+ last =>
+          val firstValStripped = ~mid.headOption.map(_.stripPrefix("'").stripSuffix("'"))
+          val midTail = mid.drop(1)
+          val midStr = if (midTail.nonEmpty)
+            s"->${midTail.map(e => s"'$e'").intercalate("->")}"
+          else
+            ""
+          s"""$key.$firstValStripped$midStr->'$last'""".right
         case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
       }
     case Obj(m) =>
@@ -93,9 +109,9 @@ object PostgresRenderQuery extends RenderQuery {
       s"$str1 || $str2".right
     case Time(expr) =>
       buildJson(s"""{ "$TimeKey": $expr }""").right
-    case NumericOp(sym, left, right) => s"(($left)::numeric $sym ($right)::numeric)".right
-    case Mod(a1, a2) => s"mod(($a1)::numeric, ($a2)::numeric)".right
-    case Pow(a1, a2) => s"power(($a1)::numeric, ($a2)::numeric)".right
+    case NumericOp(sym, left, right) => s"(($left)::text::numeric $sym ($right)::text::numeric)".right
+    case Mod(a1, a2) => s"mod(($a1)::text::numeric, ($a2)::text::numeric)".right
+    case Pow(a1, a2) => s"power(($a1)::text::numeric, ($a2)::text::numeric)".right
     case And(a1, a2) =>
       s"($a1 and $a2)".right
     case Or(a1, a2) =>
@@ -124,7 +140,7 @@ object PostgresRenderQuery extends RenderQuery {
       else
        ""
 
-      s"(select ${selection.v}${rowAlias(selection.alias)}$fromExpr${rowAlias(selection.alias)}$orderByStr)".right
+      s"(select ${selection.v}$fromExpr$orderByStr)".right
     case Constant(Data.Str(v)) =>
       v.flatMap { case ''' => "''"; case iv => iv.toString }.self.right
     case Constant(v) =>

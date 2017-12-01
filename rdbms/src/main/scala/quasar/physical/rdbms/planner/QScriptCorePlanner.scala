@@ -45,12 +45,12 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
   def plan: AlgebraM[F, QScriptCore[T, ?], T[SqlExpr]] = {
     case qscript.Map(src, f) =>
       for {
-        generatedAlias <- genId[T[SqlExpr], F]
-        selection <- processFreeMap(f, generatedAlias)
+        fromAlias <- genId[T[SqlExpr], F]
+        selection <- processFreeMap(f, fromAlias)
       } yield
         Select(
           Selection(selection, none),
-          From(src, generatedAlias),
+          From(src, fromAlias),
           filter = none
         ).embed
     case qscript.Sort(src, bucket, order) =>
