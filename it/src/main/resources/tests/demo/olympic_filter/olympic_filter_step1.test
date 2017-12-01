@@ -1,6 +1,11 @@
 {
     "name": "olympic_filter_step1",
     "data": "olympics.data",
+    "backends": {
+       "couchbase":         "ignoreFieldOrder",
+       "marklogic_json":    "ignoreFieldOrder",
+       "mimir":             "ignoreFieldOrder"
+    },
     "query": "temp0 := SELECT * FROM olympics;
          SELECT discipline, city, gender, country FROM (temp0) AS res WHERE res.country IN (\"AUT\") ORDER BY type DESC LIMIT 6   
          ",
