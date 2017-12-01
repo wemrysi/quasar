@@ -21,7 +21,7 @@ import quasar.{Data, resolveImports, Variables, SemanticError}
 import quasar.contrib.pathy._
 import quasar.sql._
 import quasar.fp.free.foldMapNT
-import quasar.fs.{FileSystemError, QueryFile, ReadFile}
+import quasar.fs.{FileSystemError, QueryFile, ReadFile, Node}
 import quasar.fs.mount.{Mounting, MountConfig, MountingError}
 import quasar.fs.mount.module.Module
 
@@ -48,7 +48,7 @@ final case class QuasarAPIImpl[F[_]: Monad](inter: CoreEff ~> F) {
   def getMount(path: APath): F[Option[MountingError \/ MountConfig]] =
     mount.lookupConfig(path).run.run.foldMap(inter)
 
-  def ls(path: ADir): F[FileSystemError \/ Set[PathSegment]] =
+  def ls(path: ADir): F[FileSystemError \/ Set[Node]] =
     QueryFile.Ops[CoreEff].ls(path).run.foldMap(inter)
 
   def invoke(function: AFile, args: Map[String, Fix[Sql]]) =
@@ -62,4 +62,7 @@ final case class QuasarAPIImpl[F[_]: Monad](inter: CoreEff ~> F) {
       expr   <- resolveImports[CoreEff](sql, workingDir).leftMap(_.wrapNel)
       stream <- EitherT(fsQ.queryResults(expr, Variables.empty, workingDir, off = 0L, lim = None).run.run.value)
     } yield stream).run.foldMap(inter)
+
+  def queryVec(workingDir: ADir, sql: ScopedExpr[Fix[Sql]]): F[NonEmptyList[SemanticError] \/ (FileSystemError \/ Vector[Data])] =
+    query(workingDir, sql).map(x => x.map(y => y.map(_.toVector)))
 }

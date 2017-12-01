@@ -52,7 +52,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
         FMA.map(k.right)(κ(RightSide)))))
 
     autojoinKeys(ls, rs).keys.toNel.fold[FreeAccess[JoinSide]](BoolLit(true)) { jks =>
-      jks.distinctE1.foldMapLeft1(eqCond)((l, r) => Free.roll(MFC(And(l, eqCond(r)))))
+      jks.foldMapLeft1(eqCond)((l, r) => Free.roll(MFC(And(l, eqCond(r)))))
     }
   }
 
@@ -106,7 +106,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
     val renameAccess =
       Access.symbols.modify(rename0) <<< Access.src.modify(rename0)
 
-    dims map (_.transCata[P](pfo.value modify (_ map renameAccess)))
+    canonicalize(dims map (_.transCata[P](pfo.value modify (_ map renameAccess))))
   }
 
   ////

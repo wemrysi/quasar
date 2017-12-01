@@ -179,7 +179,7 @@ sealed abstract class DeepShapeInstances {
   implicit def projectBucket[T[_[_]]](implicit QS: DeepShape[T, QScriptCore[T, ?]])
       : DeepShape[T, ProjectBucket[T, ?]] = {
 
-    val proj = new SimplifiableProjectionT[T]
+    val proj = new rewrites.SimplifiableProjectionT[T]
 
     new DeepShape[T, ProjectBucket[T, ?]] {
       def deepShapeƒ: Algebra[ProjectBucket[T, ?], FreeShape[T]] = {

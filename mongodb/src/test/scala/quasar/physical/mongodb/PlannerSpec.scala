@@ -53,14 +53,16 @@ class PlannerSpec extends
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     PlannerHelpers.plan(query)
 
-  def trackPending(name: String, plan: Either[FileSystemError, Crystallized[WorkflowF]], expectedOps: IList[MongoOp]) = {
+  def trackPending(name: String, plan: => Either[FileSystemError, Crystallized[WorkflowF]], expectedOps: IList[MongoOp]) = {
     name >> {
-      "plan" in {
-        plan must beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps))
+      lazy val plan0 = plan
+
+      s"plan: $name" in {
+        plan0 must beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps))
       }.pendingUntilFixed
 
-      "track" in {
-        plan must beRight.which(cwf => trackActual(cwf, testFile(s"plan $name")))
+      s"track: $name" in {
+        plan0 must beRight.which(cwf => trackActual(cwf, testFile(s"plan $name")))
       }
     }
   }
@@ -185,10 +187,11 @@ class PlannerSpec extends
       plan(sqlE"select geo{*} from usa_factbook"),
       IList(ReadOp, SimpleMapOp, ProjectOp))
 
-    trackPending(
-      "array concat with filter",
-      plan(sqlE"""select loc || [ pop ] from zips where city = "BOULDER" """),
-      IList(ReadOp, MatchOp, SimpleMapOp, ProjectOp))
+
+    "plan array concat with filter" in {
+      plan(sqlE"""select loc || [ pop ] from zips where city = "BOULDER" """) must
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, MatchOp, SimpleMapOp)))
+    }
 
     trackPending(
       "array flatten with unflattened field",
@@ -244,10 +247,10 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, GroupOp, ProjectOp)))
     }
 
-    trackPending(
-      "distinct with unrelated order by",
-      plan(sqlE"select distinct city from zips order by pop desc"),
-      IList(ReadOp, ProjectOp, SortOp, GroupOp, ProjectOp, SortOp, ProjectOp))
+    "plan distinct with unrelated order by" in {
+      plan(sqlE"select distinct city from zips order by pop desc") must
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, SortOp, GroupOp, SortOp, ProjectOp)))
+    }
 
     trackPending(
       "distinct with sum and group",
@@ -981,8 +984,6 @@ class PlannerSpec extends
         appropriateColumns(wf, q)
         rootPushes(wf) must_== Nil
       }
-      //Q3154
-      //FIXME has dangling reference
-    }.pendingUntilFixed
+    }
   }
 }

@@ -30,7 +30,7 @@ import eu.timepit.refined.auto._
 import matryoshka.data.Fix
 import monocle.Lens
 import pathy.Path._
-import scalaz.{Lens => _, Failure => _, _}, Id.Id
+import scalaz.{Lens => _, Failure => _, Node => _, _}, Id.Id
 import scalaz.syntax.either._
 import scalaz.std.list._
 import shapeless.{Data => _, Coproduct => _, _}
@@ -129,7 +129,7 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
         .flatMap(expr => queryPlan(expr, Variables(Map()), rootDir, 0L, None).run.value.toOption)
         .get
 
-      runMntd(f(lp.valueOr(_ => scala.sys.error("impossible constant plan")), mntA </> file("out0")).run.value)
+      runMntd(f(lp, mntA </> file("out0")).run.value)
         .eval(emptyMS) must failDueToInvalidPath(mntC)
     }
 
@@ -213,12 +213,12 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
         }
 
         "of mount ancestor dir should return dir names" >> {
-          val dirs = Set[PathSegment](DirName("bar").left, DirName("foo").left)
+          val dirs = Set[Node](Node.ImplicitDir(DirName("bar")), Node.ImplicitDir(DirName("foo")))
           runMntd(query.ls(rootDir).run).eval(emptyMS) must_=== dirs.right
         }
 
         "of mount parent dir should return mount names" >> {
-          val mnts = Set[PathSegment](DirName("mntA").left, DirName("mntB").left)
+          val mnts = Set[Node](Node.ImplicitDir(DirName("mntA")), Node.ImplicitDir(DirName("mntB")))
           runMntd(query.ls(rootDir </> dir("bar")).run)
             .eval(emptyMS) must_=== mnts.right
         }

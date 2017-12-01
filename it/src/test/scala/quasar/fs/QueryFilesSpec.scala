@@ -88,7 +88,7 @@ class QueryFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsU
         val f1 = d1 </> file("f1")
         val f2 = d1 </> dir("d2") </> file("f1")
         val f3 = d1 </> dir("d2") </> dir("d3") </> file("f3")
-        val expectedNodes = List[PathSegment](DirName("d2").left, FileName("f1").right)
+        val expectedNodes = List[Node](Node.ImplicitDir(DirName("d2")), Node.Data(FileName("f1")))
 
         val setup = write.save(f1, oneDoc.toProcess).drain ++
           write.save(f2, anotherDoc.toProcess).drain ++
@@ -124,7 +124,7 @@ class QueryFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsU
 
         val p = query.ls(d)
 
-        val preDelete = List[PathSegment](FileName("f1").right, FileName("f2").right)
+        val preDelete = List[Node](Node.Data(FileName("f1")), Node.Data(FileName("f2")))
 
         runT(fs.testInterpM)(p)
           .runEither must beRight(containTheSameElementsAs(preDelete))

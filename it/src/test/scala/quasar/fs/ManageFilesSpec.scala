@@ -64,7 +64,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
       "moving a file to an existing path using FailIfExists semantics should fail with PathExists" >> {
         val f1 = managePrefix </> dir("failifexists") </> file("f1")
         val f2 = managePrefix </> dir("failifexists") </> file("f2")
-        val expectedFiles = List[PathSegment](FileName("f1").right, FileName("f2").right)
+        val expectedFiles = List[Node](Node.Data(FileName("f1")), Node.Data(FileName("f2")))
         val ls = query.ls(managePrefix </> dir("failifexists"))
         val p = write.save(f1, oneDoc.toProcess).drain ++
                 write.save(f2, oneDoc.toProcess).drain ++
@@ -94,7 +94,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
         val d = managePrefix </> dir("dnetoexists")
         val f1 = d </> file("f1")
         val f2 = d </> file("f2")
-        val expectedFiles = List[PathSegment](FileName("f2").right)
+        val expectedFiles = List[Node](Node.Data(FileName("f2")))
         val ls = query.ls(d)
         val p = write.save(f2, oneDoc.toProcess).drain ++
                 manage.moveFile(f1, f2, MoveSemantics.Overwrite)
@@ -121,16 +121,16 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
         execT(run, p).runOption must beSome(pathErr(pathExists(f1)))
       }
 
-      "moving a file to a nonexistent path when using FailIfMissing sematics should fail with dst NotFound" >> {
+      "moving a file to a nonexistent path when using FailIfMissing semantics should fail with dst NotFound" >> {
         val d = managePrefix </> dir("existstodne")
         val f1 = d </> file("f1")
         val f2 = d </> file("f2")
-        val expectedFiles = List[PathSegment](FileName("f1").right)
-        val p  = write.save(f1, oneDoc.toProcess).drain ++
-                 manage.moveFile(f1, f2, MoveSemantics.FailIfMissing).liftM[Process]
+        val expectedFiles = List[Node](Node.Data(FileName("f1")))
+        val p = write.saveThese(f1, oneDoc) >>
+                manage.moveFile(f1, f2, MoveSemantics.FailIfMissing)
 
-        (execT(run, p).runOption must beSome(pathErr(pathNotFound(f2)))) and
-        (runT(run)(query.ls(d)).runEither must beRight(containTheSameElementsAs(expectedFiles)))
+        (run(p.run).unsafePerformSync must_= pathErr(pathNotFound(f2)).left) and
+        (run(query.ls(d).run).unsafePerformSync.toEither must beRight(containTheSameElementsAs(expectedFiles)))
       }
 
       "moving a directory should move all files therein to dst path" >> {
@@ -140,7 +140,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
         val f1 = d1 </> file("f1")
         val f2 = d1 </> file("f2")
 
-        val expectedFiles = List[PathSegment](FileName("f1").right, FileName("f2").right)
+        val expectedFiles = List[Node](Node.Data(FileName("f1")), Node.Data(FileName("f2")))
 
         val p = write.save(f1, oneDoc.toProcess).drain ++
                 write.save(f2, anotherDoc.toProcess).drain ++
@@ -160,9 +160,9 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
 
         val f = d2 </> file("f")
 
-        val expectedRoot = List[PathSegment](DirName(".trash").left)
-        val expectedTrash = List[PathSegment](DirName("d2").left)
-        val expectedFiles = List[PathSegment](FileName("f").right)
+        val expectedRoot = List[Node](Node.ImplicitDir(DirName(".trash")))
+        val expectedTrash = List[Node](Node.ImplicitDir(DirName("d2")))
+        val expectedFiles = List[Node](Node.Data(FileName("f")))
 
         val p = write.save(f, oneDoc.toProcess).drain ++
                 manage.moveDir(d2, trash_d2, MoveSemantics.FailIfExists).liftM[Process]

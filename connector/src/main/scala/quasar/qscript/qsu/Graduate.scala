@@ -38,7 +38,6 @@ import quasar.qscript.{
   ReduceIndexF,
   Sort,
   SrcHole,
-  SrcMerge,
   Subset,
   ThetaJoin,
   Union,
@@ -71,6 +70,8 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
 
   private type QSU[A] = QScriptUniform[A]
   private type RefsR[F[_]] = MonadReader_[F, References]
+
+  private final case class SrcMerge[A, B](src: A, lval: B, rval: B)
 
   private def mergeSources[F[_]: Monad: PlannerErrorME: NameGenerator: RefsR](
       left: QSUGraph,

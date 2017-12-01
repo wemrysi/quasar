@@ -18,26 +18,23 @@ package quasar.fs.mount
 
 import slamdata.Predef._
 import quasar.contrib.pathy._
-import quasar.effect._
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fp.free._
 import quasar.fs._, FileSystemError._, PathError._, MountType._
 import quasar.fs.mount.cache.VCache.VCacheKVS
-import quasar.sql.FunctionDecl
 
 import pathy.Path._
-import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.{Failure => _, Node => _, _}, Scalaz._
 
 package object module {
-  import MountConfig._
 
   /** Intercept and fail any read to a module path; all others are passed untouched. */
   def readFile[S[_]](
-                      implicit
-                      S0: ReadFile :<: S,
-                      S4: Mounting :<: S
-                    ): ReadFile ~> Free[S, ?] = {
+    implicit
+    S0: ReadFile :<: S,
+    S4: Mounting :<: S
+  ): ReadFile ~> Free[S, ?] = {
     import ReadFile._
 
     val readUnsafe = ReadFile.Unsafe[S]
@@ -58,10 +55,10 @@ package object module {
 
   /** Intercept and fail any write to a module path; all others are passed untouched. */
   def writeFile[S[_]](
-                       implicit
-                       S0: WriteFile :<: S,
-                       S1: Mounting :<: S
-                     ): WriteFile ~> Free[S, ?] = {
+    implicit
+    S0: WriteFile :<: S,
+    S1: Mounting :<: S
+  ): WriteFile ~> Free[S, ?] = {
     val mount = Mounting.Ops[S]
     nonFsMounts.failSomeWrites(
       on = file => mount.lookupType(file).run.run.map(_.filter(_ ≟ ModuleMount.right).isDefined),
@@ -70,26 +67,24 @@ package object module {
 
   /** Overlay modules when enumerating files and directories. */
   def queryFile[S[_]](
-                       implicit
-                       S0: QueryFile :<: S,
-                       S1: Mounting :<: S
-                     ): QueryFile ~> Free[S, ?] = {
+    implicit
+    S0: QueryFile :<: S,
+    S1: Mounting :<: S
+  ): QueryFile ~> Free[S, ?] = {
     import QueryFile._
 
     val query = QueryFile.Ops[S]
     val queryUnsafe = QueryFile.Unsafe[S]
     val mount = Mounting.Ops[S]
 
-    def listModules(dir: ADir): Free[S, Set[PathSegment]] =
-      mount.modulesHavingPrefix(dir).map(_ foldMap { d =>
-        d.relativeTo(dir).flatMap(firstSegmentName).toSet
-      })
+    def listModules(dir: ADir): Free[S, Set[Node]] =
+      mount.modulesHavingPrefix_(dir).map(_.foldMap(d =>
+        dirName(d).map[Node](Node.Module(_)).toSet))
 
-    def moduleFiles(dir: ADir): OptionT[Free[S, ?], Set[PathSegment]] =
-      mount.lookupConfig(dir).run
-        .flatMap(i => OptionT((i.toOption >>= (c => moduleConfig.getOption(c))).η[Free[S, ?]]))
-        .map(statements =>
-          statements.collect { case FunctionDecl(name, _, _) => liftFileName(FileName(name.value)) }.toSet)
+    def moduleFiles(dir: ADir): OptionT[Free[S, ?], Set[Node]] =
+      mount.lookupModuleConfigIgnoreError(dir).map(moduleConfig =>
+          moduleConfig.declarations.map(funcDef =>
+            Node.Function(FileName(funcDef.name.value))).toSet)
 
     λ[QueryFile ~> Free[S, ?]] {
       case ExecutePlan(lp, out) =>
@@ -126,18 +121,16 @@ package object module {
   }
 
   def fileSystem[S[_]](
-                        implicit
-                        S0: ReadFile :<: S,
-                        S1: WriteFile :<: S,
-                        S2: ManageFile :<: S,
-                        S3: QueryFile :<: S,
-                        S4: MonotonicSeq :<: S,
-                        S5: ViewState :<: S,
-                        S6: VCacheKVS :<: S,
-                        S7: Mounting :<: S,
-                        S8: MountingFailure :<: S,
-                        S9: PathMismatchFailure :<: S
-                      ): FileSystem ~> Free[S, ?] = {
+    implicit
+    S0: ReadFile :<: S,
+    S1: WriteFile :<: S,
+    S2: ManageFile :<: S,
+    S3: QueryFile :<: S,
+    S6: VCacheKVS :<: S,
+    S7: Mounting :<: S,
+    S8: MountingFailure :<: S,
+    S9: PathMismatchFailure :<: S
+  ): FileSystem ~> Free[S, ?] = {
     val mount = Mounting.Ops[S]
     // Module is a directory so we want to add "ourselves" to the result of `modulesHavingPrefix`
     val manageFile = nonFsMounts.manageFile { dir =>
@@ -148,19 +141,17 @@ package object module {
   }
   // FIX-ME
   def backendEffect[S[_]](
-                        implicit
-                        S0: ReadFile :<: S,
-                        S1: WriteFile :<: S,
-                        S2: ManageFile :<: S,
-                        S3: QueryFile :<: S,
-                        S4: MonotonicSeq :<: S,
-                        S5: ViewState :<: S,
-                        S6: VCacheKVS :<: S,
-                        S7: Mounting :<: S,
-                        S8: MountingFailure :<: S,
-                        S9: PathMismatchFailure :<: S,
-                        S10: Analyze :<: S
-                      ): BackendEffect ~> Free[S, ?] = {
+    implicit
+    S0: ReadFile :<: S,
+    S1: WriteFile :<: S,
+    S2: ManageFile :<: S,
+    S3: QueryFile :<: S,
+    S6: VCacheKVS :<: S,
+    S7: Mounting :<: S,
+    S8: MountingFailure :<: S,
+    S9: PathMismatchFailure :<: S,
+    S10: Analyze :<: S
+  ): BackendEffect ~> Free[S, ?] = {
     (injectFT[Analyze, S]) :+: fileSystem[S]
   }
 }

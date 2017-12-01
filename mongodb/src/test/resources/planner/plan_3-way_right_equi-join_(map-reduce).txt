@@ -6,16 +6,7 @@ Chain
 │  │  │  ├─ Grouped
 │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
 │  │  │  ╰─ By
-│  │  │     ╰─ Name("0" -> {
-│  │  │             "$cond": [
-│  │  │               {
-│  │  │                 "$and": [
-│  │  │                   { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │  │                   { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│  │  │               },
-│  │  │               "$bar_id",
-│  │  │               { "$literal": undefined }]
-│  │  │           })
+│  │  │     ╰─ Name("0" -> "$bar_id")
 │  │  ╰─ $ProjectF
 │  │     ├─ Name("_id" -> "$_id")
 │  │     ├─ Name("value")
@@ -31,16 +22,7 @@ Chain
 │     │  │  │  ├─ Grouped
 │     │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
 │     │  │  │  ╰─ By
-│     │  │  │     ╰─ Name("0" -> {
-│     │  │  │             "$cond": [
-│     │  │  │               {
-│     │  │  │                 "$and": [
-│     │  │  │                   { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │  │  │                   { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │  │  │               },
-│     │  │  │               "$id",
-│     │  │  │               { "$literal": undefined }]
-│     │  │  │           })
+│     │  │  │     ╰─ Name("0" -> "$id")
 │     │  │  ╰─ $ProjectF
 │     │  │     ├─ Name("_id" -> "$_id")
 │     │  │     ├─ Name("value")
@@ -51,13 +33,7 @@ Chain
 │     │  ╰─ Chain
 │     │     ├─ $ReadF(db; bar)
 │     │     ├─ $MapF
-│     │     │  ├─ JavaScript(function (key, value) {
-│     │     │  │               return [
-│     │     │  │                 {
-│     │     │  │                   "0": (isObject(value) && (! Array.isArray(value))) ? value.foo_id : undefined
-│     │     │  │                 },
-│     │     │  │                 { "left": [], "right": [value] }]
-│     │     │  │             })
+│     │     │  ├─ JavaScript(function (key, value) { return [{ "0": value.foo_id }, { "left": [], "right": [value] }] })
 │     │     │  ╰─ Scope(Map())
 │     │     ╰─ $ReduceF
 │     │        ├─ JavaScript(function (key, values) {
@@ -76,21 +52,31 @@ Chain
 │     │     ╰─ NotExpr($right -> Size(0))
 │     ├─ $UnwindF(DocField(BsonField.Name("right")))
 │     ├─ $UnwindF(DocField(BsonField.Name("left")))
-│     ├─ $SimpleMapF
-│     │  ├─ Map
-│     │  │  ╰─ Let(__val)
-│     │  │     ├─ JsCore([
-│     │  │     │         (isObject(_.left) && (! Array.isArray(_.left))) ? _.left : undefined,
-│     │  │     │         (isObject(_.right) && (! Array.isArray(_.right))) ? _.right : undefined])
-│     │  │     ╰─ Obj
-│     │  │        ├─ Key(0: (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? true : false)
-│     │  │        ╰─ Key(src: __val)
-│     │  ╰─ Scope(Map())
+│     ├─ $MatchF
+│     │  ╰─ Doc
+│     │     ╰─ Expr($right -> Type(Doc))
+│     ├─ $ProjectF
+│     │  ├─ Name("0" -> {
+│     │  │       "$cond": [
+│     │  │         {
+│     │  │           "$and": [
+│     │  │             { "$lte": [{ "$literal": {  } }, "$right"] },
+│     │  │             { "$lt": ["$right", { "$literal": [] }] }]
+│     │  │         },
+│     │  │         { "$literal": true },
+│     │  │         { "$literal": false }]
+│     │  │     })
+│     │  ├─ Name("src")
+│     │  │  ├─ Name("left" -> "$left")
+│     │  │  ╰─ Name("right" -> "$right")
+│     │  ╰─ ExcludeId
 │     ├─ $MatchF
 │     │  ╰─ Doc
 │     │     ╰─ Expr($0 -> Eq(Bool(true)))
 │     ├─ $MapF
-│     │  ├─ JavaScript(function (key, value) { return [{ "0": value.src[1].id }, { "right": [], "left": [value.src] }] })
+│     │  ├─ JavaScript(function (key, value) {
+│     │  │               return [{ "0": value.src.right.id }, { "right": [], "left": [value.src] }]
+│     │  │             })
 │     │  ╰─ Scope(Map())
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
@@ -126,15 +112,15 @@ Chain
 │  │     │     │  ├─ Call
 │  │     │     │  │  ├─ Ident(isObject)
 │  │     │     │  │  ╰─ Obj
-│  │     │     │  │     ├─ Key(left: _.left[0])
-│  │     │     │  │     ╰─ Key(right: _.left[1])
+│  │     │     │  │     ├─ Key(left: _.left.left)
+│  │     │     │  │     ╰─ Key(right: _.left.right)
 │  │     │     │  ╰─ UnOp(!)
 │  │     │     │     ╰─ Call
 │  │     │     │        ├─ JsCore(Array.isArray)
 │  │     │     │        ╰─ Obj
-│  │     │     │           ├─ Key(left: _.left[0])
-│  │     │     │           ╰─ Key(right: _.left[1])
-│  │     │     ├─ JsCore((isObject(_.left[0]) && (! Array.isArray(_.left[0]))) ? _.left[0].name : undefined)
+│  │     │     │           ├─ Key(left: _.left.left)
+│  │     │     │           ╰─ Key(right: _.left.right)
+│  │     │     ├─ JsCore((isObject(_.left.left) && (! Array.isArray(_.left.left))) ? _.left.left.name : undefined)
 │  │     │     ╰─ Ident(undefined)
 │  │     ├─ Key(address)
 │  │     │  ╰─ If
@@ -142,19 +128,17 @@ Chain
 │  │     │     │  ├─ Call
 │  │     │     │  │  ├─ Ident(isObject)
 │  │     │     │  │  ╰─ Obj
-│  │     │     │  │     ├─ Key(left: _.left[0])
-│  │     │     │  │     ╰─ Key(right: _.left[1])
+│  │     │     │  │     ├─ Key(left: _.left.left)
+│  │     │     │  │     ╰─ Key(right: _.left.right)
 │  │     │     │  ╰─ UnOp(!)
 │  │     │     │     ╰─ Call
 │  │     │     │        ├─ JsCore(Array.isArray)
 │  │     │     │        ╰─ Obj
-│  │     │     │           ├─ Key(left: _.left[0])
-│  │     │     │           ╰─ Key(right: _.left[1])
-│  │     │     ├─ JsCore((isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? _.left[1].address : undefined)
+│  │     │     │           ├─ Key(left: _.left.left)
+│  │     │     │           ╰─ Key(right: _.left.right)
+│  │     │     ├─ JsCore((isObject(_.left.right) && (! Array.isArray(_.left.right))) ? _.left.right.address : undefined)
 │  │     │     ╰─ Ident(undefined)
-│  │     ╰─ Key(zip: ((isObject(
-│  │            (isObject(_.right) && (! Array.isArray(_.right))) ? _.right : undefined) && (! Array.isArray(
-│  │            (isObject(_.right) && (! Array.isArray(_.right))) ? _.right : undefined))) && (isObject(_.right) && (! Array.isArray(_.right)))) ? _.right.zip : undefined)
+│  │     ╰─ Key(zip: _.right.zip)
 │  ╰─ Scope(Map())
 ╰─ $ProjectF
    ├─ Name("name" -> true)

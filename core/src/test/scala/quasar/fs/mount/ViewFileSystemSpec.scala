@@ -39,7 +39,7 @@ import matryoshka.implicits._
 import monocle.macros.Lenses
 import pathy.{Path => PPath}, PPath._
 import pathy.scalacheck.PathyArbitrary._
-import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.{Failure => _, Node => _, _}, Scalaz._
 
 class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   import TraceFS._
@@ -56,7 +56,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   @Lenses
   case class VS(
-    seq: Long, handles: ViewState.ViewHandles, vcache: Map[AFile, ViewCache],
+    seq: Long, handles: view.State.ViewHandles, vcache: Map[AFile, ViewCache],
     mountConfigs: Map[APath, MountConfig], fs: InMemState)
 
   object VS {
@@ -102,7 +102,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       MonotonicSeq.toState[F](VS.seq),
       runFileSystem)
 
-  def traceViewFs(paths: Map[ADir, Set[PathSegment]]): ViewFileSystem ~> Traced =
+  def traceViewFs(paths: Map[ADir, Set[Node]]): ViewFileSystem ~> Traced =
     runViewFileSystem[Traced](
       liftMT[VST, ErrsT] compose
       liftMT[Trace, VSF] compose
@@ -110,16 +110,16 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   case class ViewInterpResultTrace[A](renderedTrees: Vector[RenderedTree], vs: VS, result: Errs \/ A)
 
-  def viewInterpTrace[A](views: Map[AFile, Fix[Sql]], paths: Map[ADir, Set[PathSegment]], t: Free[FileSystem, A])
+  def viewInterpTrace[A](views: Map[AFile, Fix[Sql]], paths: Map[ADir, Set[Node]], t: Free[FileSystem, A])
     : ViewInterpResultTrace[A] =
     viewInterpTrace(views, Map.empty[AFile, ViewCache], List.empty[AFile], paths, t)
 
   def viewInterpTrace[A](vcache: Map[AFile, ViewCache], t: Free[FileSystem, A])
       : ViewInterpResultTrace[A] =
-    viewInterpTrace(Map.empty[AFile, Fix[Sql]], vcache, List.empty[AFile], Map.empty[ADir, Set[PathSegment]], t)
+    viewInterpTrace(Map.empty[AFile, Fix[Sql]], vcache, List.empty[AFile], Map.empty[ADir, Set[Node]], t)
 
   def viewInterpTrace[A](
-    views: Map[AFile, Fix[Sql]], vcache: Map[AFile, ViewCache], files: List[AFile], paths: Map[ADir, Set[PathSegment]], t: Free[FileSystem, A])
+    views: Map[AFile, Fix[Sql]], vcache: Map[AFile, ViewCache], files: List[AFile], paths: Map[ADir, Set[Node]], t: Free[FileSystem, A])
     : ViewInterpResultTrace[A] = {
 
     val mountViews: Free[ViewFileSystem, Unit] =
@@ -166,7 +166,8 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     "translate simple read to query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = sqlE"select * from `/zips`"
-      val lp = queryPlan(expr, Variables.empty, rootDir, 0L, None).run.run._2.toOption.get
+      val lp = queryPlan(expr, Variables.empty, rootDir, 0L, None).run.run._2
+                 .valueOr(e => scala.sys.error("Unexpected semantic errors during compilation: " + e.shows))
 
       val views = Map(p -> expr)
 
@@ -177,11 +178,9 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       } yield ()).run
 
       val exp = (for {
-        h   <- query.unsafe.eval(lp.valueOr(_ => scala.sys.error("impossible constant plan")))
-        _   <- query.transforms.fsErrToExec(
-                query.unsafe.more(h))
-        _   <- query.transforms.fsErrToExec(
-                EitherT.right(query.unsafe.close(h)))
+        h   <- query.unsafe.eval(lp)
+        _   <- query.transforms.fsErrToExec(query.unsafe.more(h))
+        _   <- query.transforms.fsErrToExec(EitherT.right(query.unsafe.close(h)))
       } yield ()).run.run
 
       viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
@@ -238,23 +237,6 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         _   <- query.transforms.fsErrToExec(
                 EitherT.right(query.unsafe.close(h)))
       } yield ()).run.run
-
-      viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
-    }
-
-    "translate read with constant" in {
-      val p = rootDir[Sandboxed] </> dir("view") </> file("view0")
-
-      val views = Map(
-        p -> sqlE"1 + 2")
-
-      val f = (for {
-        h <- read.unsafe.open(p, 0L, None)
-        _ <- read.unsafe.read(h)
-        _ <- EitherT.right(read.unsafe.close(h))
-      } yield ()).run
-
-      val exp = ().point[Free[FileSystem, ?]]
 
       viewInterpTrace(views, Map(), f).renderedTrees must beTree(traceInterp(exp, Map())._1)
     }
@@ -504,7 +486,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   "QueryFile.ls" should {
     def twoNodes(aDir: ADir) =
-      Map(aDir -> Set[PathSegment](FileName("afile").right, DirName("adir").left))
+      Map(aDir -> Set[Node](Node.Data(FileName("afile")), Node.ImplicitDir(DirName("adir"))))
 
     "preserve files and dirs in the presence of non-conflicting views" >> prop { (aDir: ADir) =>
       val expr = sqlE"select * from zips"
@@ -519,10 +501,10 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         traceInterp(f, twoNodes(aDir))._1,
         VS.emptyWithViews(views),
         \/.right(\/.right(Set(
-          FileName("afile").right,
-          DirName("adir").left,
-          FileName("view1").right,
-          DirName("views").left))))
+          Node.Data(FileName("afile")),
+          Node.ImplicitDir(DirName("adir")),
+          Node.View(FileName("view1")),
+          Node.ImplicitDir(DirName("views"))))))
     }
 
     "overlay files and dirs with conflicting paths" >> prop { (aDir: ADir) =>
@@ -538,8 +520,9 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         traceInterp(f, twoNodes(aDir))._1,
         VS.emptyWithViews(views),
         \/.right(\/.right(Set(
-          FileName("afile").right, // hides the regular file
-          DirName("adir").left)))) // no conflict with same dir
+          Node.View(FileName("afile")),
+          Node.Data(FileName("afile")),
+          Node.ImplicitDir(DirName("adir")))))) // no conflict with same dir
     }
 
     "preserve empty dir result" >> prop { (aDir: ADir) =>
@@ -585,7 +568,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val ops = traceInterp(program, Map())._1
 
       val hasFile = {
-        val paths = Map(fileParent(file) -> Set(fileName(file).right[DirName]))
+        val paths = Map(fileParent(file) -> Set[Node](Node.Data(fileName(file))))
         viewInterpTrace(Map(), paths, program) must_=== ViewInterpResultTrace(ops, VS.empty, \/.right(true))
       }
       val noFile = {
@@ -760,8 +743,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       val qlp =
         quasar.queryPlan(q, Variables.empty, rootDir, 0L, None)
-          .run.value.toOption.get
-          .valueOr(_ => scala.sys.error("Expected a non-constant plan but received a constant plan"))
+          .run.value.valueOr(e => scala.sys.error("Unexpected error compiling sql query: " + e.shows))
 
       val vs = Map[AFile, Fix[Sql]](p -> q)
 

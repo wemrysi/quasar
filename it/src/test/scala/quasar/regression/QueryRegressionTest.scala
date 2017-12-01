@@ -291,7 +291,7 @@ abstract class QueryRegressionTest[S[_]](
       testData(dataLoc).chunk(500).translate(injectTask)
     ).translate[Task](throwFsError.compose[FsErr](runT(run)))
 
-    throwFsError(EitherT(load.take(1).runLast map (_ <\/ (())))) handleWith {
+    load.run handleWith {
       case err =>
         val msg = s"Failed loading test data '${posixCodec.printPath(dataLoc)}': ${err.getMessage}"
         Task.fail(new RuntimeException(msg, err))

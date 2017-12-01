@@ -132,7 +132,7 @@ object impl {
   ) = λ[QueryFile ~> F] {
     case QueryFile.ExecutePlan(lp, out) => execute(lp, out)
     case QueryFile.Explain(lp)          => explain(lp)
-    case QueryFile.ListContents(dir)    => listContents(dir)
+    case QueryFile.ListContents(dir)    => listContents(dir).map(_.map(set => set.map(Node.fromSegment)))
     case QueryFile.FileExists(file)     => fileExists(file)
 
     case QueryFile.EvaluatePlan(lp) =>

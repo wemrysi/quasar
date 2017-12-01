@@ -1,15 +1,27 @@
 {
     "name": "use subquery when there's a group by statement",
+    "backends": {
+        "couchbase":         "skip",
+        "marklogic_json":    "pendingIgnoreFieldOrder",
+        "marklogic_xml":     "pending",
+        "mimir":             "ignoreFieldOrder",
+        "mongodb_2_6":       "pending",
+        "mongodb_3_0":       "pending",
+        "mongodb_3_2":       "pending",
+        "mongodb_3_4":       "pending",
+        "mongodb_read_only": "pending"
+    },
+    "NB": "pending on mongo due to sorting issues",
+    "NB": "skipped on couchbase due to a lack of general join",
     "NB": "#1929",
     "data": "zips.data",
-    "query": "SELECT 100 * SUM(pop) / (SELECT SUM(pop) FROM zips), state FROM zips GROUP BY state ORDER BY state LIMIT 5",
+    "query": "SELECT round_scale(100 * SUM(pop) / (SELECT SUM(pop) FROM zips), 2), state FROM zips GROUP BY state ORDER BY state LIMIT 5",
     "predicate": "exactly",
-    "NB": "These results are incorrect; they will be rectified when #3184 is fixed",
     "expected": [
-        { "0": 100, "state": "AK" },
-        { "0": 100, "state": "AL" },
-        { "0": 100, "state": "AR" },
-        { "0": 100, "state": "AZ" },
-        { "0": 100, "state": "CA" }
+        { "0": 0.22, "state": "AK" },
+        { "0": 1.63, "state": "AL" },
+        { "0": 0.95, "state": "AR" },
+        { "0": 1.48, "state": "AZ" },
+        { "0": 11.98, "state": "CA" }
     ]
 }

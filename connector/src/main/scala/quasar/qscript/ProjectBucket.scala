@@ -105,34 +105,4 @@ object ProjectBucket {
             index.render))
       }
     }
-
-  implicit def mergeable[T[_[_]]: BirecursiveT: EqualT: RenderTreeT]:
-      Mergeable.Aux[T, ProjectBucket[T, ?]] =
-    new Mergeable[ProjectBucket[T, ?]] {
-      type IT[F[_]] = T[F]
-
-      def mergeSrcs(
-        left: Mergeable.MergeSide[IT, ProjectBucket[T, ?]],
-        right: Mergeable.MergeSide[IT, ProjectBucket[T, ?]]) =
-        (left.source, right.source) match {
-
-          case (BucketKey(s1, v1, n1), BucketKey(s2, v2, n2)) =>
-            val new1: ProjectBucket[T, ExternallyManaged] =
-              BucketKey(s1, v1 >> left.access, n1 >> left.access)
-            val new2: ProjectBucket[T, ExternallyManaged] =
-              BucketKey(s2, v2 >> right.access, n2 >> right.access)
-
-            (new1 ≟ new2).option(SrcMerge(new1, HoleF[IT], HoleF[IT]))
-
-          case (BucketIndex(s1, v1, n1), BucketIndex(s2, v2, n2)) =>
-            val new1: ProjectBucket[T, ExternallyManaged] =
-              BucketIndex(s1, v1 >> left.access, n1 >> left.access)
-            val new2: ProjectBucket[T, ExternallyManaged] =
-              BucketIndex(s2, v2 >> right.access, n2 >> right.access)
-
-            (new1 ≟ new2).option(SrcMerge(new1, HoleF[IT], HoleF[IT]))
-
-          case (_, _) => None
-      }
-    }
 }

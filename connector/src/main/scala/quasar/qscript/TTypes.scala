@@ -16,13 +16,8 @@
 
 package quasar.qscript
 
-import quasar.fp._
-
-import scalaz._
-
-/** Centralizes the knowledge of T[_[_]] as well as certain
- *  type classes required for many operations. This is for
- *  compilation performance.
+/** Centralizes the knowledge of T[_[_]].
+ *  This is for compilation performance.
  */
 
 trait TTypes[T[_[_]]] {
@@ -43,62 +38,5 @@ trait TTypes[T[_[_]]] {
   type CoEnvQS[A]        = quasar.qscript.CoEnvQS[T, A]
   type CoEnvMapA[A, B]   = quasar.qscript.CoEnvMapA[T, A, B]
   type CoEnvMap[A]       = quasar.qscript.CoEnvMap[T, A]
-  type CoEnvJoin[A]      = quasar.qscript.CoEnvJoin[T, A]
   type FreeQS            = quasar.qscript.FreeQS[T]
-  type Ann               = quasar.qscript.Ann[T]
-  type Target[F[_]]      = quasar.qscript.Target[T, F]
-}
-
-object TTypes {
-  def simplifiableProjection[T[_[_]]] = new SimplifiableProjectionT[T]
-}
-
-class SimplifiableProjectionT[T[_[_]]] extends TTypes[T] {
-  import SimplifyProjection._
-
-  private lazy val simplify: EndoK[QScriptTotal] = simplifyQScriptTotal[T].simplifyProjection
-  private def applyToBranch(branch: FreeQS): FreeQS = branch mapSuspension simplify
-
-  def ProjectBucket[G[_]](implicit QC: QScriptCore :<: G) = make(
-    λ[ProjectBucket ~> G] {
-      case BucketKey(src, value, key) => QC.inj(Map(src, Free.roll(MFC(MapFuncsCore.ProjectKey(value, key)))))
-      case BucketIndex(src, value, index) => QC.inj(Map(src, Free.roll(MFC(MapFuncsCore.ProjectIndex(value, index)))))
-    }
-  )
-
-  def QScriptCore[G[_]](implicit QC: QScriptCore :<: G) = make(
-    λ[QScriptCore ~> G](fa =>
-      QC inj (fa match {
-        case Union(src, lb, rb) =>
-          Union(src, applyToBranch(lb), applyToBranch(rb))
-        case Subset(src, lb, sel, rb) =>
-          Subset(src, applyToBranch(lb), sel, applyToBranch(rb))
-        case _ => fa
-      })
-    )
-  )
-  def ThetaJoin[G[_]](implicit TJ: ThetaJoin :<: G) = make(
-    λ[ThetaJoin ~> G](tj =>
-      TJ inj quasar.qscript.ThetaJoin(
-        tj.src,
-        applyToBranch(tj.lBranch),
-        applyToBranch(tj.rBranch),
-        tj.on,
-        tj.f,
-        tj.combine
-      )
-    )
-  )
-  def EquiJoin[G[_]](implicit EJ: EquiJoin :<: G) = make(
-    λ[EquiJoin ~> G](ej =>
-      EJ inj quasar.qscript.EquiJoin(
-        ej.src,
-        applyToBranch(ej.lBranch),
-        applyToBranch(ej.rBranch),
-        ej.key,
-        ej.f,
-        ej.combine
-      )
-    )
-  )
 }

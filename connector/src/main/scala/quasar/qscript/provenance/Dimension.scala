@@ -35,6 +35,9 @@ trait Dimension[D, I, P] {
   val empty: Dimensions[P] =
     IList[P]()
 
+  def canonicalize(ds: Dimensions[P])(implicit eqD: Equal[D], eqI: Equal[I]): Dimensions[P] =
+    ds.map(normalize)
+
   /** Updates the dimensional stack by sequencing a new dimension from value
     * space with the current head dimension.
     */
@@ -42,8 +45,8 @@ trait Dimension[D, I, P] {
     nest(lshift(id, ds))
 
   /** Joins two dimensions into a single dimension stack, starting from the base. */
-  def join(ls: Dimensions[P], rs: Dimensions[P]): Dimensions[P] =
-    alignRtoL(ls, rs)(ι, ι, both(_, _))
+  def join(ls: Dimensions[P], rs: Dimensions[P])(implicit eqD: Equal[D], eqI: Equal[I]): Dimensions[P] =
+    canonicalize(alignRtoL(ls, rs)(ι, ι, both(_, _)))
 
   /** Shifts the dimensional stack by pushing a new dimension from value space
     * onto the stack.
@@ -87,8 +90,8 @@ trait Dimension[D, I, P] {
   }
 
   /** Unions the two dimensions into a single dimensional stack, starting from the base. */
-  def union(ls: Dimensions[P], rs: Dimensions[P]): Dimensions[P] =
-    alignRtoL(ls, rs)(oneOf(_, nada()), oneOf(nada(), _), oneOf(_, _))
+  def union(ls: Dimensions[P], rs: Dimensions[P])(implicit eqD: Equal[D], eqI: Equal[I]): Dimensions[P] =
+    canonicalize(alignRtoL(ls, rs)(oneOf(_, nada()), oneOf(nada(), _), oneOf(_, _)))
 
   ////
 

@@ -29,7 +29,7 @@ import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path._
-import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.{Failure => _, Node => _, _}, Scalaz._
 
 object hierarchical {
   import QueryFile.ResultHandle
@@ -374,7 +374,7 @@ object hierarchical {
       _        <- F.put(some(mntA)).liftM[FileSystemErrT]
     } yield ()
 
-    out.cata(d => lookupMnt(d) map some, none.right) flatMap (initMnt =>
+    out.traverse(lookupMnt) flatMap (initMnt =>
       plan.cataM[M, Unit] {
         // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
         case lp.Read(p) => mountFor(mkAbsolute(rootDir, p))
@@ -389,14 +389,14 @@ object hierarchical {
       })
   }
 
-  private def lsMounts(mounts: Set[ADir], ls: ADir): Option[Set[PathSegment]] = {
+  private def lsMounts(mounts: Set[ADir], ls: ADir): Option[Set[Node]] = {
     def firstDir(rdir: RDir): Option[DirName] =
       firstSegmentName(rdir).flatMap(_.swap.toOption)
 
     if (mounts.isEmpty && ls === rootDir)
       Some(Set())
     else
-      mounts.foldMap(_ relativeTo ls flatMap firstDir map (d => Set(d.left)))
+      mounts.foldMap(_ relativeTo ls flatMap firstDir map (d => Set(Node.ImplicitDir(d))))
   }
 
   private object getMounted {
