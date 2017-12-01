@@ -21,12 +21,10 @@ import quasar.qscript.{SrcHole, LeftSide, MapFuncsCore, MFC, RightSide}
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import slamdata.Predef._
 
-import matryoshka.BirecursiveT
-import scalaz.{Monad, StateT}
-import scalaz.std.list._
-import scalaz.syntax.traverse._
+import matryoshka.{BirecursiveT, ShowT}
+import scalaz.{Monad, Scalaz, StateT}, Scalaz._
 
-final class RewriteGroupByArrays[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
+final class RewriteGroupByArrays[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[T] {
   import QSUGraph.withName
   import QSUGraph.Extractors._
 
@@ -37,7 +35,12 @@ final class RewriteGroupByArrays[T[_[_]]: BirecursiveT] private () extends QSUTT
     val back = qgraph rewriteM {
       case qgraph @ GroupBy(target, NAryArray(keys @ _*)) =>
         val nestedM = keys.toList.foldLeftM(target) { (inner, key) =>
-          withName[T, G](QSU.GroupBy[T, Symbol](inner.root, key.root)).map(_ :++ inner)
+          // this is a bizarre rewrite, because it generates invalid graphs along the way
+          // this happens because inner and target don't necessarily exist in key's vertices
+          for {
+            key2 <- key.replaceWithRename[G](target.root, inner.root)
+            replaced <- withName[T, G](QSU.GroupBy[T, Symbol](inner.root, key2.root))
+          } yield replaced :++ inner :++ key2
         }
 
         nestedM.map(nested => qgraph.overwriteAtRoot(nested.unfold.map(_.root)) :++ nested)
@@ -63,5 +66,5 @@ final class RewriteGroupByArrays[T[_[_]]: BirecursiveT] private () extends QSUTT
 }
 
 object RewriteGroupByArrays {
-  def apply[T[_[_]]: BirecursiveT]: RewriteGroupByArrays[T] = new RewriteGroupByArrays[T]
+  def apply[T[_[_]]: BirecursiveT: ShowT]: RewriteGroupByArrays[T] = new RewriteGroupByArrays[T]
 }

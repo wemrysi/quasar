@@ -21,6 +21,7 @@ import quasar.qscript.{Hole, LeftSide, MapFuncsCore, MFC, RightSide, SrcHole}
 import slamdata.Predef._
 
 import matryoshka.data.Fix
+import pathy.Path, Path.Sandboxed
 import scalaz.{Need, StateT}
 
 object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
@@ -30,6 +31,10 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
 
   val qsu = QScriptUniform.DslT[Fix]
   val rw = RewriteGroupByArrays[Fix]
+
+  val afile = Path.rootDir[Sandboxed] </> Path.file("afile")
+  val afile2 = Path.rootDir[Sandboxed] </> Path.file("afile2")
+  val afile3 = Path.rootDir[Sandboxed] </> Path.file("afile3")
 
   "re-nesting flat groupby structure" should {
     "leave a single groupby alone" in {
@@ -54,17 +59,17 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
     "rewrite a pair of group keys" in {
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.groupBy(
-          qsu.unreferenced(),
+          qsu.read(afile),
           qsu.autojoin2((
             qsu.unary(
               qsu.autojoin2((
-                qsu.unreferenced(),
+                qsu.read(afile),
                 qsu.cstr("foo"),
                 _(MapFuncsCore.ProjectKey(_, _)))),
               MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole))),
             qsu.unary(
               qsu.autojoin2((
-                qsu.unreferenced(),
+                qsu.read(afile),
                 qsu.cstr("bar"),
                 _(MapFuncsCore.ProjectKey(_, _)))),
               MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole))),
@@ -73,13 +78,18 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
       eval(rw[F](qgraph)) must beLike {
         case GroupBy(
           GroupBy(
-            Unreferenced(),
+            Read(`afile`),
             AutoJoin2C(
-              Unreferenced(),
+              Read(`afile`),
               DataConstantMapped(Data.Str("foo")),
               MapFuncsCore.ProjectKey(LeftSide, RightSide))),
           AutoJoin2C(
-            Unreferenced(),
+            GroupBy(
+              Read(`afile`),
+              AutoJoin2C(
+                Read(`afile`),
+                DataConstantMapped(Data.Str("foo")),
+                MapFuncsCore.ProjectKey(LeftSide, RightSide))),
             DataConstantMapped(Data.Str("bar")),
             MapFuncsCore.ProjectKey(LeftSide, RightSide))) => ok
       }
@@ -88,25 +98,25 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
     "rewrite a triple of group keys" in {
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.groupBy(
-          qsu.unreferenced(),
+          qsu.read(afile),
           qsu.autojoin2((
             qsu.autojoin2((
               qsu.unary(
                 qsu.autojoin2((
-                  qsu.unreferenced(),
+                  qsu.read(afile),
                   qsu.cstr("foo"),
                   _(MapFuncsCore.ProjectKey(_, _)))),
                 MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole))),
               qsu.unary(
                 qsu.autojoin2((
-                  qsu.unreferenced(),
+                  qsu.read(afile),
                   qsu.cstr("bar"),
                   _(MapFuncsCore.ProjectKey(_, _)))),
                 MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole))),
               _(MapFuncsCore.ConcatArrays(_, _)))),
             qsu.unary(
               qsu.autojoin2((
-                qsu.unreferenced(),
+                qsu.read(afile),
                 qsu.cstr("baz"),
                 _(MapFuncsCore.ProjectKey(_, _)))),
               MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole))),
@@ -114,19 +124,39 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
 
       eval(rw[F](qgraph)) must beLike {
         case GroupBy(
-          GroupBy(
-            GroupBy(
-              Unreferenced(),
+          GroupBy(    // s2
+            GroupBy(   // s1
+              Read(`afile`),
               AutoJoin2C(
-                Unreferenced(),
+                Read(`afile`),
                 DataConstantMapped(Data.Str("foo")),
                 MapFuncsCore.ProjectKey(LeftSide, RightSide))),
             AutoJoin2C(
-              Unreferenced(),
+              GroupBy(  // s1
+                Read(`afile`),
+                AutoJoin2C(
+                  Read(`afile`),
+                  DataConstantMapped(Data.Str("foo")),
+                  MapFuncsCore.ProjectKey(LeftSide, RightSide))),
               DataConstantMapped(Data.Str("bar")),
               MapFuncsCore.ProjectKey(LeftSide, RightSide))),
           AutoJoin2C(
-            Unreferenced(),
+            GroupBy(    // s2
+              GroupBy(
+                Read(`afile`),
+                AutoJoin2C(
+                  Read(`afile`),
+                  DataConstantMapped(Data.Str("foo")),
+                  MapFuncsCore.ProjectKey(LeftSide, RightSide))),
+              AutoJoin2C(
+                GroupBy(    // s1
+                  Read(`afile`),
+                  AutoJoin2C(
+                    Read(`afile`),
+                    DataConstantMapped(Data.Str("foo")),
+                    MapFuncsCore.ProjectKey(LeftSide, RightSide))),
+                DataConstantMapped(Data.Str("bar")),
+                MapFuncsCore.ProjectKey(LeftSide, RightSide))),
             DataConstantMapped(Data.Str("baz")),
             MapFuncsCore.ProjectKey(LeftSide, RightSide))) => ok
       }
