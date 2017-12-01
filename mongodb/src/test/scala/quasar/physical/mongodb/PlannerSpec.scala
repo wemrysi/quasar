@@ -57,11 +57,9 @@ class PlannerSpec extends
     name >> {
       lazy val plan0 = plan
 
-      // this is commented out, because making it NOT pendingUntilFixed breaks all the things
-      // but as it stands, the test "passes", meaning it's not pending anymore!
-      /*s"plan: $name" in {
+      s"plan: $name" in {
         plan0 must beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps))
-      }.pendingUntilFixed*/
+      }.pendingUntilFixed
 
       s"track: $name" in {
         plan0 must beRight.which(cwf => trackActual(cwf, testFile(s"plan $name")))
@@ -169,10 +167,10 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp)))
     }
 
-    trackPending(
-      "length of min (JS on top of reduce)",
-      plan3_2(sqlE"select state, length(min(city)) as shortest from zips group by state"),
-      IList(ReadOp, GroupOp, ProjectOp, SimpleMapOp, ProjectOp))
+    "length of min (JS on top of reduce)" in {
+      plan3_2(sqlE"select state, length(min(city)) as shortest from zips group by state") must
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp, SimpleMapOp, ProjectOp)))
+    }
 
     "plan js expr grouped by js expr" in {
       plan3_2(sqlE"select length(city) as len, count(*) as cnt from zips group by length(city)") must
