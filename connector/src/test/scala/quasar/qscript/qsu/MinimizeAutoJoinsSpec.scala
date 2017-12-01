@@ -57,6 +57,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
   val J = Fixed[Fix[EJson]]
 
   val afile = Path.rootDir[Sandboxed] </> Path.file("afile")
+  val afile2 = Path.rootDir[Sandboxed] </> Path.file("afile2")
 
   implicit val eqP: Equal[qprov.P] =
     qprov.prov.provenanceEqual(Equal[qprov.D], Equal[FreeMapA[Access[Symbol]]])
@@ -385,6 +386,30 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           QSReduce(Read(_), List(_), _, _),
           MapFuncsCore.Add(LeftSide, RightSide)) => ok
       }
+    }
+
+    "minimize an autojoin after prior source failure" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.autojoin2((
+            qsu.read(afile),
+            qsu.read(afile2),
+            _(MapFuncsCore.Subtract(_, _)))),
+          qsu.cint(42),
+          _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case Map(
+          AutoJoin2C(
+            Read(`afile`),
+            Read(`afile2`),
+            MapFuncsCore.Subtract(LeftSide, RightSide)),
+          fm) =>
+
+          fm must beTreeEqual(func.Add(HoleF, func.Constant(J.int(42))))
+      }
+
+      ok
     }
   }
 
