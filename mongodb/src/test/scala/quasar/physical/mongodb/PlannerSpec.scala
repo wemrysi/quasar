@@ -61,9 +61,9 @@ class PlannerSpec extends
         plan0 must beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps))
       }.pendingUntilFixed
 
-      s"track: $name" in {
-        plan0 must beRight.which(cwf => trackActual(cwf, testFile(s"plan $name")))
-      }
+      // s"track: $name" in {
+      //   plan0 must beRight.which(cwf => trackActual(cwf, testFile(s"plan $name")))
+      // }
     }
   }
 
