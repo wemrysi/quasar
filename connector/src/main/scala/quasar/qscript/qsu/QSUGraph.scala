@@ -103,16 +103,21 @@ final case class QSUGraph[T[_[_]]](
 
     if (src =/= target) {
 
-      // TODO handle JoinSideRef
       if (root === src) {
         refocus(target).point[F]
       } else {
-        for {
-          pattern <- unfold.traverse(_.replaceWithRename[F](src, target))
-          bare = pattern.map(_.root)
-          renamed <- QSUGraph.withName[T, F](bare)
-          verts2 = pattern.foldLeft(SMap[Symbol, QScriptUniform[T, Symbol]]())(_ ++ _.vertices)
-        } yield renamed.copy(vertices = verts2 ++ renamed.vertices)
+        unfold match {
+          case JoinSideRef(`src`) =>
+            QSUGraph.withName[T, F](JoinSideRef[T, Symbol](target)).map(_ :++ this)
+
+          case _ =>
+            for {
+              pattern <- unfold.traverse(_.replaceWithRename[F](src, target))
+              bare = pattern.map(_.root)
+              renamed <- QSUGraph.withName[T, F](bare)
+              verts2 = pattern.foldLeft(SMap[Symbol, QScriptUniform[T, Symbol]]())(_ ++ _.vertices)
+            } yield renamed.copy(vertices = verts2 ++ renamed.vertices)
+        }
       }
     } else {
       this.point[F]
