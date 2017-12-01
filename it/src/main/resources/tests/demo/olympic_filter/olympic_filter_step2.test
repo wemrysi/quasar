@@ -7,14 +7,11 @@
        "mimir":             "ignoreFieldOrder"
     },
     "query": "temp0 := SELECT * FROM olympics;
-          SELECT discipline, city, gender, country, type FROM (temp0) AS res WHERE res.type IN (\"Gold\") order by type desc limit 6",
+          SELECT discipline, city, gender, country, type FROM (temp0) AS res WHERE res.type IN (\"Gold\") order by type desc, country asc, gender asc, city asc limit 3",
     "predicate": "exactly",
     "expected": [
-         { "discipline": "Figure skating", "city": "Chamonix", "gender": "W", "country": "AUT", "type": "Gold" },
-         { "discipline": "Speed skating" , "city": "Chamonix", "gender": "M", "country": "FIN", "type": "Gold" },
-         { "discipline": "Speed skating" , "city": "Chamonix", "gender": "M", "country": "FIN", "type": "Gold" },
-         { "discipline": "Curling"       , "city": "Chamonix", "gender": "M", "country": "GBR", "type": "Gold" },
-         { "discipline": "Figure skating", "city": "Chamonix", "gender": "X", "country": "AUT", "type": "Gold" },
-         { "discipline": "Biathlon"      , "city": "Chamonix", "gender": "M", "country": "SUI", "type": "Gold" }
+          { "discipline": "Short Track S."  , "city": "Salt Lake City"  , "gender": "M", "country": "AUS", "type": "Gold"},
+          { "discipline": "Freestyle Ski."  , "city": "Turin"           , "gender": "M", "country": "AUS", "type": "Gold"},
+          { "discipline": "Freestyle Ski."  , "city": "Salt Lake City"  , "gender": "W", "country": "AUS", "type": "Gold"}
     ]
 }
