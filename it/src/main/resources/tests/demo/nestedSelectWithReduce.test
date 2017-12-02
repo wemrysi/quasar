@@ -3,16 +3,9 @@
     "backends": {
         "couchbase":         "skip",
         "marklogic_json":    "ignoreFieldOrder",
-        "mimir":             "pending",
-        "mongodb_2_6":       "pending",
-        "mongodb_3_0":       "pending",
-        "mongodb_3_2":       "pending",
-        "mongodb_3_4":       "pending",
-        "mongodb_read_only": "pending"
+        "mimir":             "pending"
 
     },
-    "NB": "pending on mongo due to oid issue",
-    "NB": "pending on mimir due to sorting issue (should be pendingIgnoreFieldOrder, but that breaks because the predicate is buggy)",
     "NB": "disabled on couchbase due to lack of general join",
     "data": "patients.data",
     "query": "SELECT AVG(cnt) as measure, state as category FROM
