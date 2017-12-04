@@ -1,0 +1,6 @@
+{ "field1": true, "field2": "parallel" }
+{ "field1": "true", "field2": "parallel" }
+{ "field2": false, "field3": 27.0 }
+{ "field2": "sequential", "field3": 39.0 }
+{ "field1": false, "field2": "sequential", "field3": false }
+{ "field1": null, "field2": null, "field3": true }
