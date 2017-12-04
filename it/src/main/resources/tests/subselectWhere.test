@@ -9,10 +9,15 @@
   "query": "SELECT first_name, last_name FROM `demo/patients` AS p where state in (SELECT state FROM extraSmallZips) ORDER BY last_name, first_name",
   "predicate": "initial",
   "expected": [
+    { "first_name": "Slyvia", "last_name": "Aguilar" },
     { "first_name": "Eddie", "last_name": "Ali" },
+    { "first_name": "Marinda", "last_name": "Arnold" },
+    { "first_name": "Latashia", "last_name": "Atkins" },
+    { "first_name": "Tynisha", "last_name": "Avila" },
     { "first_name": "Angila", "last_name": "Baird" },
-    { "first_name": "Deanne", "last_name": "Benjamin" },
-    { "first_name": "Greg", "last_name": "Blankenship" },
-    { "first_name": "Elenor", "last_name": "Bush" }
+    { "first_name": "Buddy", "last_name": "Ball" },
+    { "first_name": "Wade", "last_name": "Barajas" },
+    { "first_name": "Marjorie", "last_name": "Barker" },
+    { "first_name": "Terry", "last_name": "Beltran" }
   ]
 }

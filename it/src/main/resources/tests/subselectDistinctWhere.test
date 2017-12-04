@@ -9,10 +9,15 @@
   "query": "SELECT first_name, last_name FROM `demo/patients` AS p where state in (SELECT DISTINCT state FROM zips) ORDER BY last_name, first_name",
   "predicate": "initial",
   "expected": [
+    { "first_name": "Adelina", "last_name": "Abbott" },
     { "first_name": "Asha", "last_name": "Abbott" },
+    { "first_name": "Dora", "last_name": "Abbott" },
+    { "first_name": "Emmanuel", "last_name": "Abbott" },
+    { "first_name": "Melvin", "last_name": "Abbott" },
     { "first_name": "Milo", "last_name": "Abbott" },
+    { "first_name": "Renna", "last_name": "Abbott" },
     { "first_name": "Robert", "last_name": "Abbott" },
-    { "first_name": "Amee", "last_name": "Acevedo" },
-    { "first_name": "Antone", "last_name": "Acevedo" }
+    { "first_name": "Russ", "last_name": "Abbott" },
+    { "first_name": "Virgilio", "last_name": "Abbott" }
   ]
 }
