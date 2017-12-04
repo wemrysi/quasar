@@ -32,12 +32,11 @@ import quasar.fs.impl.{dataStreamClose, dataStreamRead}
 import quasar.physical.rdbms.model.DbDataStream
 import quasar.physical.rdbms.planner.RenderQuery
 import quasar.physical.rdbms.planner.sql.SqlExpr
+
+import doobie.syntax.process._
+import doobie.util.fragment.Fragment
 import matryoshka.data.Fix
 import pathy.Path
-import quasar.physical.rdbms.fs.postgres.mapping.ColumnCount
-import doobie.imports._
-import quasar.physical.rdbms.fs.postgres.mapping
-
 import scalaz._
 import Scalaz._
 import scalaz.stream.Process._
@@ -55,55 +54,35 @@ trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] {
 
   override def ManagedQueryFileModule: ManagedQueryFileModule = new ManagedQueryFileModule {
 
-    def resultColumnCount(repr: Fix[SqlExpr]): Backend[ColumnCount] = {
-      val queryLimit = renderQuery.singleRow(repr)
-
-      ME.unattempt(
-        queryLimit
-          .leftMap(QScriptPlanningFailed.apply)
-          .traverse { qStr =>
-            Fragment.const(qStr)
-              .query[ColumnCount](mapping.CountColsDataComposite)
-              .list
-              .map(ccs => ccs.headOption.getOrElse(ColumnCount(0)))
-              .liftB
-          }
-      )
-    }
-
     override def explain(repr: Fix[SqlExpr]): Backend[String] = ???
 
     override def executePlan(repr: Fix[SqlExpr], out: AFile): Backend[Unit] = {
-      resultColumnCount(repr).flatMap { colCount =>
-        ME.unattempt(renderQuery.asString(repr, colCount)
-          .leftMap(QScriptPlanningFailed.apply)
-          .traverse { q =>
-            val tablePath = TablePath.create(out)
-            val cmd = Fragment.const("CREATE TABLE") ++
-              Fragment.const(tablePath.shows) ++
-              Fragment.const("AS") ++
-              Fragment.const(q)
-            cmd.update.run.liftB
-          }).void
-      }
+      ME.unattempt(renderQuery.asString(repr)
+        .leftMap(QScriptPlanningFailed.apply)
+        .traverse { q =>
+          val tablePath = TablePath.create(out)
+          val cmd = Fragment.const("CREATE TABLE") ++
+            Fragment.const(tablePath.shows) ++
+            Fragment.const("AS") ++
+            Fragment.const(q)
+          cmd.update.run.liftB
+        }).void
     }
 
     override def resultsCursor(repr: Fix[SqlExpr]): Backend[DbDataStream] = {
-      resultColumnCount(repr).flatMap { colCount =>
-        ME.unattempt(renderQuery.asString(repr, colCount)
-          .leftMap(QScriptPlanningFailed.apply)
-          .traverse { qStr =>
-            MRT.ask.map { xa =>
-              DbDataStream(Fragment.const(qStr)
-                .query[Data]
-                .process
-                .chunk(chunkSize)
-                .attempt(ex =>
-                  emit(readFailed(qStr, ex.getLocalizedMessage)))
-                .transact(xa))
-            }.liftB
-          })
-      }
+      ME.unattempt(renderQuery.asString(repr)
+        .leftMap(QScriptPlanningFailed.apply)
+        .traverse { qStr =>
+          MRT.ask.map { xa =>
+            DbDataStream(Fragment.const(qStr)
+              .query[Data]
+              .process
+              .chunk(chunkSize)
+              .attempt(ex =>
+                emit(readFailed(qStr, ex.getLocalizedMessage)))
+              .transact(xa))
+          }.liftB
+        })
     }
 
     override def nextChunk(c: DbDataStream): Backend[(DbDataStream, Vector[Data])] =
@@ -121,15 +100,15 @@ trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] {
       val schema = TablePath.dirToSchema(dir)
       schemaExists(schema).liftB.flatMap(_.unlessM(ME.raiseError(pathErr(pathNotFound(dir))))) *>
         (for {
-        childSchemas <- findChildSchemas(schema)
-        childTables <- findChildTables(schema)
-        childDirs = childSchemas.filter(_.isDirectChildOf(schema)).map(d => -\/(d.lastDirName)).toSet
-        childFiles = childTables.map(t => \/-(Path.FileName(t.shows))).toSet
-      }
-        yield childDirs ++ childFiles).liftB
+          childSchemas <- findChildSchemas(schema)
+          childTables <- findChildTables(schema)
+          childDirs = childSchemas.filter(_.isDirectChildOf(schema)).map(d => -\/(d.lastDirName)).toSet
+          childFiles = childTables.map(t => \/-(Path.FileName(t.shows))).toSet
+        }
+          yield childDirs ++ childFiles).liftB
     }
 
     override def closeCursor(c: DbDataStream): Configured[Unit] =
       lift(dataStreamClose(c.stream)).into[Eff].liftM[ConfiguredT]
-  } 
+  }
 }

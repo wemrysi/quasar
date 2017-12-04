@@ -16,14 +16,10 @@
 
 package quasar.physical.rdbms.fs.postgres
 
-import slamdata.Predef._
-import java.sql.{PreparedStatement, ResultSet}
-import doobie.imports.Composite
-import doobie.util.kernel.Kernel
 import quasar.{Data, DataCodec}
+
 import doobie.util.meta.Meta
 import org.postgresql.util.PGobject
-
 import scalaz.syntax.show._
 
 package object mapping {
@@ -41,28 +37,4 @@ package object mapping {
         o
       }
     )
-
-  final case class ColumnCount(cols: Int)
-
-  val CountColsDataComposite: Composite[ColumnCount] = new Composite[ColumnCount] {
-
-    val kernel = new Kernel[ColumnCount] {
-      type I = ColumnCount
-      val ia = (i: I) => i
-      val ai = (a: I) => a
-      val get = (rs: ResultSet, _: Int)  => {
-        ColumnCount(rs.getMetaData.getColumnCount)
-      }
-
-      val set = (_: PreparedStatement, _: Int, _: I) => ()
-      val setNull = (_: PreparedStatement, _: Int) => ()
-      val update = (_: ResultSet, _: Int, _: I) => ()
-      val width = 0
-
-    }
-    val meta   = Nil
-    val toList = (c: ColumnCount) => List(c)
-
-  }
-
 }

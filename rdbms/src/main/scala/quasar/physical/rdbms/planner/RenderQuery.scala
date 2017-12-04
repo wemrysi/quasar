@@ -18,13 +18,11 @@ package quasar.physical.rdbms.planner
 
 import matryoshka._
 import quasar.Planner.PlannerError
-import quasar.physical.rdbms.fs.postgres.mapping.ColumnCount
 import quasar.physical.rdbms.planner.sql.SqlExpr
 import slamdata.Predef._
 
 import scalaz.\/
 
 trait RenderQuery {
-  def asString[T[_[_]]: BirecursiveT](a: T[SqlExpr], colCount: ColumnCount): PlannerError \/ String
-  def singleRow[T[_[_]]: BirecursiveT](a: T[SqlExpr]): PlannerError \/ String
+  def asString[T[_[_]]: BirecursiveT](a: T[SqlExpr]): PlannerError \/ String
 }
