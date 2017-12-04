@@ -1,0 +1,20 @@
+{
+    "name": "qolympic_search_step1",
+    "data": "olympics.data",
+    "backends": {
+       "couchbase":         "ignoreFieldOrder",
+       "marklogic_json":    "ignoreFieldOrder",
+       "mimir":             "ignoreFieldOrder"
+    },
+    "query": "temp0 := SELECT * FROM olympics;
+           SELECT DISTINCT * FROM (temp0) AS temp1 WHERE (((SEARCH(city, \"^.*NOR.*$\", true)) OR ((SEARCH(country, \"^.*NOR.*$\", true))) OR ((SEARCH(discipline, \"^.*NOR.*$\", true))) OR ((SEARCH(event, \"^.*NOR.*$\", true))) OR ((SEARCH(gender, \"^.*NOR.*$\", true))) OR ((SEARCH(sport, \"^.*NOR.*$\", true))) OR ((SEARCH(type, \"^.*NOR.*$\", true))) OR ((SEARCH(year, \"^.*NOR.*$\", true))))) ORDER BY year desc,discipline asc, city asc, country asc, type desc, event asc LIMIT 6",
+    "predicate": "exactly",
+    "expected": [
+         { "discipline": "Alpine Skiing" , "city": "Turin", "gender": "M", "country": "NOR", "year": 2006, "sport": "Skiing"  , "type": "Gold"   , "event":  "super-G"          },
+         { "discipline": "Biathlon"      , "city": "Turin", "gender": "M", "country": "NOR", "year": 2006, "sport": "Biathlon", "type": "Silver" , "event":  "10km"             },
+         { "discipline": "Biathlon"      , "city": "Turin", "gender": "M", "country": "NOR", "year": 2006, "sport": "Biathlon", "type": "Silver" , "event":  "12.5km pursuit"   },
+         { "discipline": "Biathlon"      , "city": "Turin", "gender": "M", "country": "NOR", "year": 2006, "sport": "Biathlon", "type": "Silver" , "event":  "20km"             },
+         { "discipline": "Biathlon"      , "city": "Turin", "gender": "M", "country": "NOR", "year": 2006, "sport": "Biathlon", "type": "Bronze" , "event":  "10km"             },
+         { "discipline": "Biathlon"      , "city": "Turin", "gender": "M", "country": "NOR", "year": 2006, "sport": "Biathlon", "type": "Bronze" , "event":  "15km mass start"  }
+    ]
+}
