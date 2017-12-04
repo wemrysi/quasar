@@ -6,8 +6,8 @@
     "marklogic_json": "ignoreFieldOrder",
     "mimir": "ignoreFieldOrder"
   },
-  "data": "patients.data",
-  "query": "select city, sum(cnt) as c from (select city, count(*) as cnt from patients where state = \"NY\" group by city order by count(*) desc) as meh group by city order by c desc, city desc",
+  "data": "otherpatients.data",
+  "query": "select city, sum(cnt) as c from (select city, count(*) as cnt from otherpatients where state = \"NY\" group by city order by count(*) desc) as meh group by city order by c desc, city desc",
   "predicate": "initial",
   "expected": [
     { "city": "NEW YORK", "c": 4 },
