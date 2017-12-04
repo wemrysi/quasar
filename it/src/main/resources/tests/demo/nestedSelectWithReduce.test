@@ -6,6 +6,7 @@
         "mimir":             "pending"
 
     },
+    "NB": "pending on mimir due to sorting issue (should be pendingIgnoreFieldOrder, but that breaks because the predicate is buggy)",
     "NB": "disabled on couchbase due to lack of general join",
     "data": "patients.data",
     "query": "SELECT AVG(cnt) as measure, state as category FROM

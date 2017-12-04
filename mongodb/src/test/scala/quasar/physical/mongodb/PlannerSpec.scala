@@ -40,7 +40,7 @@ class PlannerSpec extends
     PendingWithActualTracking {
 
   //to write the new actuals:
-  //override val mode = WriteMode
+  // override val mode = WriteMode
 
   import Grouped.grouped
   import Reshape.reshape
