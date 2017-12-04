@@ -7,7 +7,7 @@
        "mimir":             "ignoreFieldOrder"
     },
     "query": "temp0 := SELECT * FROM olympics;
-          SELECT discipline, city, gender, country, type FROM (temp0) AS res WHERE res.type IN (\"Gold\") order by type desc, country asc, gender asc, city asc limit 3",
+          SELECT discipline, city, gender, country, type FROM (temp0) AS res WHERE res.type IN (\"Gold\") order by type desc, country asc, gender asc, city asc, discipline asc limit 3",
     "predicate": "exactly",
     "expected": [
           { "discipline": "Short Track S."  , "city": "Salt Lake City"  , "gender": "M", "country": "AUS", "type": "Gold"},

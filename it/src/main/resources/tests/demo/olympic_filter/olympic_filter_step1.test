@@ -7,15 +7,15 @@
        "mimir":             "ignoreFieldOrder"
     },
     "query": "temp0 := SELECT * FROM olympics;
-         SELECT discipline, city, gender, country FROM (temp0) AS res WHERE res.country IN (\"AUT\") ORDER BY type DESC LIMIT 6   
+         SELECT discipline, city, gender, country FROM (temp0) AS res WHERE res.country IN (\"AUT\") ORDER BY type DESC, discipline asc, city asc, gender asc LIMIT 5
          ",
     "predicate": "exactly",
     "expected": [
-        { "discipline": "Figure skating", "city": "Chamonix"                , "gender": "M", "country": "AUT" },
-        { "discipline": "Figure skating", "city": "St. Moritz"              , "gender": "M", "country": "AUT" },
-        { "discipline": "Figure skating", "city": "Lake Placid"             , "gender": "W", "country": "AUT" },
-        { "discipline": "Figure skating", "city": "Garmisch-Partenkirchen"  , "gender": "X", "country": "AUT" },
-        { "discipline": "Figure skating", "city": "St. Moritz"              , "gender": "W", "country": "AUT" },
-        { "discipline": "Alpine Skiing", "city":  "Cortina d'Ampezzo"       , "gender": "W", "country": "AUT" }
+       { "discipline": "Alpine Skiing", "city": "Albertville" , "gender": "W", "country": "AUT" },
+       { "discipline": "Alpine Skiing", "city": "Albertville" , "gender": "W", "country": "AUT" },
+       { "discipline": "Alpine Skiing", "city": "Calgary"     , "gender": "M", "country": "AUT" },
+       { "discipline": "Alpine Skiing", "city": "Calgary"     , "gender": "M", "country": "AUT" },
+       { "discipline": "Alpine Skiing", "city": "Calgary"     , "gender": "M", "country": "AUT" }
     ]
 }
+
