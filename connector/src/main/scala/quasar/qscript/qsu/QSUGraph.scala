@@ -93,6 +93,37 @@ final case class QSUGraph[T[_[_]]](
       this
   }
 
+  // the same as replace, but whenever a node is modified, it changes the name
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def replaceWithRename[
+      F[_]: Monad: NameGenerator: MonadState_[?[_], QSUGraph.RevIdx[T]]](
+      src: Symbol, target: Symbol): F[QSUGraph[T]] = {
+
+    import QScriptUniform._
+
+    if (src =/= target) {
+
+      if (root === src) {
+        refocus(target).point[F]
+      } else {
+        unfold match {
+          case JoinSideRef(`src`) =>
+            QSUGraph.withName[T, F](JoinSideRef[T, Symbol](target)).map(_ :++ this)
+
+          case _ =>
+            for {
+              pattern <- unfold.traverse(_.replaceWithRename[F](src, target))
+              bare = pattern.map(_.root)
+              renamed <- QSUGraph.withName[T, F](bare)
+              verts2 = pattern.foldLeft(SMap[Symbol, QScriptUniform[T, Symbol]]())(_ ++ _.vertices)
+            } yield renamed.copy(vertices = verts2 ++ renamed.vertices)
+        }
+      }
+    } else {
+      this.point[F]
+    }
+  }
+
   def overwriteAtRoot(qsu: QScriptUniform[T, Symbol]): QSUGraph[T] =
     QSUGraph(root, vertices.updated(root, qsu))
 
@@ -224,10 +255,12 @@ object QSUGraph extends QSUGraphInstances {
   def refold[T[_[_]]](sym: Symbol, qsu: QScriptUniform[T, QSUGraph[T]]): QSUGraph[T] = {
     import scalaz.{Value, WriterT}
 
-    // left-Monoid, based on the assumption that all the vertices are the same
+    // left-Monoid, based on the assumption that all
+    // vertices changes are additive
     implicit val vm: Monoid[QSUVerts[T]] = new Monoid[QSUVerts[T]] {
       val zero = SMap[Symbol, QScriptUniform[T, Symbol]]()
-      def append(left: QSUVerts[T], right: => QSUVerts[T]) = left
+      def append(left: QSUVerts[T], right: => QSUVerts[T]) =
+        left ++ right
     }
 
     val collapse = qsu traverse { g =>

@@ -49,7 +49,7 @@ class PlannerSql2ExactSpec extends
     PendingWithActualTracking {
 
   //to write the new actuals:
-  //override val mode = WriteMode
+  // override val mode = WriteMode
 
   import Grouped.grouped
   import Reshape.reshape
@@ -1218,7 +1218,7 @@ class PlannerSql2ExactSpec extends
         $project(
           reshape(sigil.Quasar -> $field("f0")),
           ExcludeId)))
-    }
+    }.pendingUntilFixed
 
     "plan useless group by expression" in {
       plan(sqlE"select city from zips group by lower(city)") must
@@ -1247,7 +1247,7 @@ class PlannerSql2ExactSpec extends
                 sigil.Quasar -> $field("f0")),
               ExcludeId))
         }
-    }
+    }.pendingUntilFixed
 
     "plan sum grouped by single field with filter" in {
       plan(sqlE"""select sum(pop) as sm from zips where state="CO" group by city""") must
@@ -1269,7 +1269,7 @@ class PlannerSql2ExactSpec extends
               -\/(reshape("0" -> $arrayLit(List($field("city")))))),
             $project(reshape("sm" -> $field("f0"))))
         }
-    }
+    }.pendingUntilFixed
 
     "plan count and field when grouped" in {
       plan(sqlE"select count(*) as cnt, city from zips group by city") must
@@ -1288,7 +1288,7 @@ class PlannerSql2ExactSpec extends
                 "city" -> $field("f1")),
               ExcludeId))
         }
-    }
+    }.pendingUntilFixed
 
     "plan aggregation on grouped field" in {
       plan(sqlE"select city, count(city) from zips group by city") must
@@ -1307,7 +1307,7 @@ class PlannerSql2ExactSpec extends
                 "1"    -> $field("f1")),
               ExcludeId))
         }
-    }
+    }.pendingUntilFixed
 
     "plan simple having filter" in {
       val actual = plan(sqlE"select city from zips group by city having count(*) > 10")

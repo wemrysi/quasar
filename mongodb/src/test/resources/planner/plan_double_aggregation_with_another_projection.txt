@@ -17,7 +17,7 @@ Chain
 │  │  │  │          }
 │  │  │  │        })
 │  │  │  ╰─ By
-│  │  │     ╰─ Name("0" -> ["$state"])
+│  │  │     ╰─ Name("0" -> "$state")
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
 │  │  │  │  ╰─ Name("f0" -> { "$sum": "$f0" })
@@ -61,7 +61,7 @@ Chain
 │     │  │          }
 │     │  │        })
 │     │  ╰─ By
-│     │     ╰─ Name("0" -> ["$state"])
+│     │     ╰─ Name("0" -> "$state")
 │     ├─ $ProjectF
 │     │  ├─ Name("1" -> "$f0")
 │     │  ╰─ ExcludeId
