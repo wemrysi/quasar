@@ -10,8 +10,6 @@
         "mongodb_read_only": "ignoreFieldOrder"
     },
 
-    "NB": "pending on mongo due to #3152",
-
     "data": "extraSmallZips.data",
 
     "query": "select state, sum(pop) from extraSmallZips",
