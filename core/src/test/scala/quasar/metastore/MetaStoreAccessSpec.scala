@@ -35,7 +35,7 @@ import doobie.specs2.analysisspec.TaskChecker
 
 import scalaz.concurrent.Task
 
-abstract class MetaStoreAccessSpec extends Specification with TaskChecker {
+abstract class MetaStoreAccessSpec extends Specification with TaskChecker with MetaStoreFixture {
   val schema = Schema.schema
 
   def rawTransactor: Transactor[Task]
@@ -68,6 +68,18 @@ abstract class MetaStoreAccessSpec extends Specification with TaskChecker {
     check(Queries.staleCachedViews(instant))
     check(Queries.cacheRefreshAssigneStart(f, "α", instant, f))
     check(Queries.updatePerSuccesfulCacheRefresh(f, instant, 0, instant))
+  }
+
+  "fsMounts" should {
+    "not attempt to load views and modules" >> {
+      interpretIO(for {
+        _        <- MetaStoreAccess.insertMount(rootDir </> file("view"), MountConfig.viewConfig0(sqlB"1"))
+        _        <- MetaStoreAccess.insertMount(rootDir </> dir("module"), MountConfig.moduleConfig(sqlM"IMPORT `/f/`"))
+        fsMounts <- MetaStoreAccess.fsMounts
+      } yield {
+        fsMounts must_=== Map.empty
+      }).unsafePerformSync
+    }
   }
 }
 
