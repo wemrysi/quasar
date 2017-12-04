@@ -25,11 +25,11 @@ import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.qscript.{FreeMap, MapFunc, QScriptCore}
-
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
+
 import scalaz.Scalaz._
 import scalaz._
 
@@ -37,6 +37,8 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT,
 F[_]: Monad: NameGenerator: PlannerErrorME](
     mapFuncPlanner: Planner[T, F, MapFunc[T, ?]])
     extends Planner[T, F, QScriptCore[T, ?]] {
+
+  def * : T[SqlExpr] = AllCols[T[SqlExpr]]().embed
 
   def processFreeMap(f: FreeMap[T],
                      alias: SqlExpr.Id[T[SqlExpr]]): F[T[SqlExpr]] =
@@ -46,46 +48,43 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     case qscript.Map(src, f) =>
       for {
         fromAlias <- genId[T[SqlExpr], F]
-        selection <- processFreeMap(f, fromAlias)
+        selection <- {
+          val holeF = quasar.qscript.HoleF[T]
+          f match {
+            case `holeF` => *.η[F]
+            case _ => processFreeMap(f, fromAlias)
+          }
+        }
       } yield
         Select(
           Selection(selection, none),
           From(src, fromAlias),
-          filter = none
+          filter = none,
+          orderBy = nil
         ).embed
     case qscript.Sort(src, bucket, order) =>
-
-      def refsToRowRefs(in: T[SqlExpr]): T[SqlExpr] = {
-        (in.project match {
-          case Refs(elems) =>
-            RefsSelectRow(elems)
-          case other =>
-            other
-        }).embed
-      }
-
       def createOrderBy(id: SqlExpr.Id[T[SqlExpr]]):
       ((FreeMap[T], SortDir)) => F[OrderBy[T[SqlExpr]]] = {
         case (qs, dir) =>
           processFreeMap(qs, id).map { expr =>
-            val transformedExpr: T[SqlExpr] = expr.transCataT(refsToRowRefs)
-            OrderBy(transformedExpr, dir)
+            OrderBy(expr, dir)
           }
       }
 
-      def orderByPushdown(in: T[SqlExpr]): F[T[SqlExpr]] = {
-        in.project match {
-          case s @ SqlExpr.SelectRow(_, from, _) =>
-            for {
-              orderByExprs <- order.traverse(createOrderBy(from.alias))
-              bucketExprs <- bucket.map((_, orderByExprs.head.sortDir)).traverse(createOrderBy(from.alias))
-            }
-              yield s.copy(orderBy = bucketExprs ++ orderByExprs.toList).embed
-
-          case other => other.embed.η[F]
-        }
+      for {
+        fromAlias <- genId[T[SqlExpr], F]
+        orderByExprs <- order.traverse(createOrderBy(fromAlias))
+        bucketExprs <- bucket.map((_, orderByExprs.head.sortDir)).traverse(createOrderBy(fromAlias))
       }
-      src.transCataTM(orderByPushdown)
+        yield {
+          Select(
+            Selection(*, none),
+            From(src, fromAlias),
+            filter = none,
+            orderBy = bucketExprs ++ orderByExprs.toList
+          ).embed
+        }
+
     case other =>
       PlannerErrorME[F].raiseError(
         InternalError.fromMsg(s"unsupported QScriptCore: $other"))

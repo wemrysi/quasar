@@ -46,8 +46,8 @@ class ShiftedReadPlanner[
           alias = fromAlias)
         val fields: T[SqlExpr] = semantics.idStatus match {
           case IdOnly    => RowIds[R]().embed
-          case ExcludeId => AllCols[R](fromAlias.v).embed
-          case IncludeId => WithIds[R](AllCols[R](fromAlias.v).embed).embed
+          case ExcludeId => AllCols[R]().embed
+          case IncludeId => WithIds[R](AllCols[R]().embed).embed
         }
         SelectRow(Selection[R](fields, alias = rowAlias.some), from, orderBy = Nil).embed
       }

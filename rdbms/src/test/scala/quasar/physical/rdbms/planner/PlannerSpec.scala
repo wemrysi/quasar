@@ -58,6 +58,17 @@ class PlannerSpec extends Qspec with SqlExprSupport {
   //TODO: generalize to any backing renderer
   case class equalToSQL(expected: String) extends Matcher[\/[FileSystemError, Fix[QSM[Fix, ?]]]] {
     def apply[S <: \/[FileSystemError, Fix[QSM[Fix, ?]]]](s: Expectable[S]) = {
+
+
+      s.value.foreach{ qs =>
+        println(RenderTreeT[Fix].render(qs).shows)
+      }
+
+      s.value.map(qsToRepr[Fix]).foreach { sqlExpr =>
+        println(RenderTreeT[Fix].render(sqlExpr).shows)
+      }
+
+
       val leftSql = s.value.map(qsToRepr[Fix]).flatMap(PostgresRenderQuery.asString(_))
 
       val exp = expected.right[FileSystemError]
@@ -84,7 +95,7 @@ class PlannerSpec extends Qspec with SqlExprSupport {
 
   def id0Token: String = "_0"
   def id0 : Id[Fix[SqlExpr]] = Id(id0Token)
-  def * : Fix[SqlExpr] = Fix(AllCols(id0Token))
+  def * : Fix[SqlExpr] = Fix(AllCols())
 
   def fromTable(
       name: String,
@@ -94,7 +105,7 @@ class PlannerSpec extends Qspec with SqlExprSupport {
   def select[T](selection: Selection[T],
                 from: From[T],
                 filter: Option[Filter[T]] = None) =
-    Select(selection, from, filter)
+    Select(selection, from, filter, nil)
 
   "Shifted read" should {
     type SR[A] = Const[ShiftedRead[AFile], A]
@@ -115,6 +126,7 @@ class PlannerSpec extends Qspec with SqlExprSupport {
 
       val qs: Fix[SR] =
         Fix(Inject[SR, SR].inj(Const(ShiftedRead(path, forIdStatus))))
+      implicit val nameGen = taskNameGenerator
       val planner = Planner.constShiftedReadFilePlanner[Fix, Task]
       val repr = qs.cataM(planner.plan).map(_.convertTo[Fix[SqlExpr]]).unsafePerformSync
 
@@ -164,6 +176,12 @@ class PlannerSpec extends Qspec with SqlExprSupport {
     "represent simple ordering" in {
       qs(sqlE"select name, surname from foo order by name") must
         beSql("""(select _0->>'name' as "name", _0->>'surname' as "surname" from (select row_to_json(_0) _0 from db.foo _0 order by _0."name" asc) _0)""")
+    }
+
+    "SR test" in {
+        qs(sqlE"select nr as num, id as ajdi from divide") must
+        beSql("""TODO""")
+
     }
   }
 }

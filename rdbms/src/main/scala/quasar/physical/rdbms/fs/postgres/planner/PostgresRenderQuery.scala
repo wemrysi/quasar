@@ -27,9 +27,10 @@ import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.Planner.InternalError
 import quasar.Planner.{NonRepresentableData, PlannerError}
-
 import matryoshka._
 import matryoshka.implicits._
+import quasar.physical.rdbms.fs.postgres.mapping.ColumnCount
+
 import scalaz._
 import Scalaz._
 
@@ -38,14 +39,31 @@ object PostgresRenderQuery extends RenderQuery {
 
   implicit val codec: DataCodec = DataCodec.Precise
 
-  def asString[T[_[_]]: BirecursiveT](a: T[SqlExpr]): PlannerError \/ String = {
+  def asString[T[_[_]]: BirecursiveT](a: T[SqlExpr], colCount: ColumnCount): PlannerError \/ String = {
+
+    a.project match {
+      case s: Select[T[SqlExpr]] if colCount.cols > 1 =>
+        val q = a.cataM(alg)
+        q ∘ (s => s"select row_to_json(row) from $s row")
+      case s: Select[T[SqlExpr]] if colCount.cols <= 1 =>
+        val vToJson: T[SqlExpr] = ToJson[T[SqlExpr]](s.selection.v).embed
+        val newSelection: Selection[T[SqlExpr]] = s.selection.copy(v = vToJson)
+        s.copy(selection = newSelection).embed.cataM(alg) ∘ (s => s"$s")
+      case _                     =>
+        val q = a.cataM(alg)
+        q ∘ ("" ⊹ _)
+    }
+  }
+
+  def singleRow[T[_[_]]: BirecursiveT](a: T[SqlExpr]): PlannerError \/ String = {
     val q = a.cataM(alg)
 
     a.project match {
-      case s: Select[T[SqlExpr]] => q ∘ (s => s"select row_to_json(row) from $s row")
+      case s: Select[T[SqlExpr]]  => q ∘ (s => s"$s limit 1")
       case _                     => q ∘ ("" ⊹ _)
     }
   }
+
   def alias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" as ${i.v}"))
 
   def rowAlias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" ${i.v}"))
@@ -59,24 +77,9 @@ object PostgresRenderQuery extends RenderQuery {
       s"""$v""".right
     case Table(v) =>
       v.right
-    case AllCols(alias) =>
+    case AllCols() =>
       s"*".right
     case Refs(srcs) =>
-      srcs match {
-        case Vector(key, value) =>
-          val valueStripped = value.stripPrefix("'").stripSuffix("'")
-          s"""$key.$valueStripped""".right
-        case key +: mid :+ last =>
-          val firstValStripped = ~mid.headOption.map(_.stripPrefix("'").stripSuffix("'"))
-          val midTail = mid.drop(1)
-          val midStr = if (midTail.nonEmpty)
-            s"->${midTail.map(e => s"'$e'").intercalate("->")}"
-          else
-            ""
-          s"""$key.$firstValStripped$midStr->'$last'""".right
-        case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
-      }
-    case RefsSelectRow(srcs) =>
       srcs match {
         case Vector(key, value) =>
           val valueStripped = value.stripPrefix("'").stripSuffix("'")
@@ -99,6 +102,8 @@ object PostgresRenderQuery extends RenderQuery {
       s"($str ~ '$pattern')".right
     case IsNotNull(expr) =>
       s"($expr notnull)".right
+    case ToJson(v) =>
+      s"to_json($v)".right
     case IfNull(a) =>
       s"coalesce(${a.intercalate(", ")})".right
     case ExprWithAlias(expr: String, alias: String) =>
@@ -119,11 +124,24 @@ object PostgresRenderQuery extends RenderQuery {
     case Neg(str) => s"(-$str)".right
     case WithIds(str)    => s"(row_number() over(), $str)".right
     case RowIds()        => "row_number() over()".right
-    case Select(selection, from, filterOpt) =>
+    case Select(selection, from, filterOpt, order) =>
       val selectionStr = selection.v ⊹ alias(selection.alias)
       val filter = ~(filterOpt ∘ (f => s" where ${f.v}"))
+      val orderStr = order.map { o =>
+        val dirStr = o.sortDir match {
+          case Ascending => "asc"
+          case Descending => "desc"
+        }
+        s"${o.v} $dirStr"
+      }.mkString(", ")
+
+      val orderByStr = if (order.nonEmpty)
+        s" order by $orderStr"
+      else
+        ""
+
       val fromExpr = s" from ${from.v} ${from.alias.v}"
-      s"(select $selectionStr$fromExpr$filter)".right
+      s"(select $selectionStr$fromExpr$filter$orderByStr)".right
     case SelectRow(selection, from, order) =>
       val fromExpr = s" from ${from.v}"
 
