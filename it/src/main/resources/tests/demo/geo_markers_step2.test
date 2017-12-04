@@ -2,7 +2,7 @@
     "name": "geo_markers_step2",
     "data": "patients.data",
     "backends": {
-       "couchbase":         "pending",
+       "couchbase":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
