@@ -40,7 +40,7 @@ class PlannerSpec extends
     PendingWithActualTracking {
 
   //to write the new actuals:
-  // override val mode = WriteMode
+  //override val mode = WriteMode
 
   import Grouped.grouped
   import Reshape.reshape
@@ -108,18 +108,10 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp)))
     }
 
-    // Q3171
-    // FIXME errors with
-    // [error]     java.lang.IndexOutOfBoundsException: 1
-    // [error]     	at scala.collection.LinearSeqOptimized$class.apply(LinearSeqOptimized.scala:65)
-    // [error]     	at scala.collection.immutable.List.apply(List.scala:84)
-    // [error]     	at scala.collection.immutable.List.apply(List.scala:84)
-    // [error]     	at scalaz.$bslash$div.fold(Either.scala:57)
-    // [error]     	at quasar.qscript.analysis.OutlineInstances$$anon$3.quasar$qscript$analysis$OutlineInstances$$anon$3$$$anonfun$24(Outline.scala:263)
-    // trackPending(
-    //   "group by simple expression",
-    //   plan(sqlE"select city, sum(pop) from extraSmallZips group by lower(city)"),
-    //   IList(ReadOp, GroupOp, UnwindOp))
+    trackPending(
+      "group by simple expression",
+      plan(sqlE"select city, sum(pop) from extraSmallZips group by lower(city)"),
+      IList(ReadOp, GroupOp, UnwindOp, ProjectOp))
 
     "group by month" in {
       plan(sqlE"""select avg(epoch), date_part("month", `ts`) from days group by date_part("month", `ts`)""") must
