@@ -1,0 +1,19 @@
+{
+    "name": "revenue_step2",
+    "data": "revenue.data",
+    "backends": {
+       "couchbase":         "ignoreFieldOrder",
+       "marklogic_json":    "ignoreFieldOrder",
+       "mimir":             "ignoreFieldOrder"
+    },
+    "query": "SELECT DISTINCT value AS value, quarter AS dimension, region AS series, null AS parallel FROM revenue ORDER BY value DESC, region ASC, quarter ASC LIMIT 6",
+    "predicate": "exactly",
+    "expected": [
+       { "value": 55000, "dimension": "2015-Q2", "series": "east"  , "parallel": null },
+       { "value": 53000, "dimension": "2015-Q2", "series": "east"  , "parallel": null },
+       { "value": 53000, "dimension": "2015-Q2", "series": "north" , "parallel": null },
+       { "value": 45000, "dimension": "2015-Q1", "series": "east"  , "parallel": null },
+       { "value": 45000, "dimension": "2015-Q2", "series": "east"  , "parallel": null },
+       { "value": 45000, "dimension": "2015-Q1", "series": "north" , "parallel": null }
+    ]
+}
