@@ -167,10 +167,10 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp)))
     }
 
-    trackPending(
-      "length of min (JS on top of reduce)",
-      plan3_2(sqlE"select state, length(min(city)) as shortest from zips group by state"),
-      IList(ReadOp, GroupOp, ProjectOp, SimpleMapOp, ProjectOp))
+    "length of min (JS on top of reduce)" in {
+      plan3_2(sqlE"select state, length(min(city)) as shortest from zips group by state") must
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp, SimpleMapOp, ProjectOp)))
+    }
 
     "plan js expr grouped by js expr" in {
       plan3_2(sqlE"select length(city) as len, count(*) as cnt from zips group by length(city)") must

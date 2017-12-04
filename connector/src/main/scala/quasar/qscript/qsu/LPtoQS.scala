@@ -34,24 +34,26 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
       : F[T[QScriptEducated]] = {
 
     val lpToQs =
-      K(ReadLP[T].apply[F])          >=>
-      debugG("ReadLP: ")             >-
-      EliminateUnary[T].apply        >=>
-      debugG("EliminateUnary: ")     >-
-      RecognizeDistinct[T].apply     >=>
-      debugG("RecognizeDistinct: ")  >==>
-      ExtractFreeMap[T].apply[F]     >=>
-      debugG("ExtractFreeMap: ")     >==>
-      ApplyProvenance[T].apply[F]    >=>
-      debugAG("ApplyProv: ")         >==>
-      ReifyBuckets[T, F]             >=>
-      debugAG("ReifyBuckets: ")      >==>
-      MinimizeAutoJoins[T].apply[F]  >=>
-      debugAG("MinimizeAJ: ")        >==>
-      ReifyAutoJoins[T].apply[F]     >=>
-      debugAG("ReifyAutoJoins: ")    >-
-      (_.graph)                      >==>
-      ReifyIdentities[T].apply[F]    >==>
+      K(ReadLP[T].apply[F])            >=>
+      debugG("ReadLP: ")               >==>
+      RewriteGroupByArrays[T].apply[F] >=>
+      debugG("RewriteGBArrays: ")      >-
+      EliminateUnary[T].apply          >=>
+      debugG("EliminateUnary: ")       >-
+      RecognizeDistinct[T].apply       >=>
+      debugG("RecognizeDistinct: ")    >==>
+      ExtractFreeMap[T].apply[F]       >=>
+      debugG("ExtractFreeMap: ")       >==>
+      ApplyProvenance[T].apply[F]      >=>
+      debugAG("ApplyProv: ")           >==>
+      ReifyBuckets[T, F]               >=>
+      debugAG("ReifyBuckets: ")        >==>
+      MinimizeAutoJoins[T].apply[F]    >=>
+      debugAG("MinimizeAJ: ")          >==>
+      ReifyAutoJoins[T].apply[F]       >=>
+      debugAG("ReifyAutoJoins: ")      >-
+      (_.graph)                        >==>
+      ReifyIdentities[T].apply[F]      >==>
       Graduate[T].apply[F]
 
     lpToQs(lp)
