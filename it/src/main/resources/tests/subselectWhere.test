@@ -1,0 +1,18 @@
+{
+  "name": "subselect in where",
+  "backends": {
+    "couchbase":         "ignoreFieldOrder",
+    "marklogic_json":    "ignoreFieldOrder",
+    "mimir":             "ignoreFieldOrder"
+  },
+  "data": ["demo/patients.data", "extraSmallZips.data"],
+  "query": "SELECT first_name, last_name FROM `demo/patients` AS p where state in (SELECT state FROM extraSmallZips) ORDER BY last_name, first_name",
+  "predicate": "initial",
+  "expected": [
+    { "first_name": "Eddie", "last_name": "Ali" },
+    { "first_name": "Angila", "last_name": "Baird" },
+    { "first_name": "Deanne", "last_name": "Benjamin" },
+    { "first_name": "Greg", "last_name": "Blankenship" },
+    { "first_name": "Elenor", "last_name": "Bush" }
+  ]
+}
