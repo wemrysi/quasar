@@ -7,15 +7,15 @@
        "mimir":             "ignoreFieldOrder"
     },
     "query": "temp0 := SELECT * FROM olympics;
-         SELECT discipline, city, gender, country FROM (temp0) AS res WHERE res.country IN (\"AUT\") ORDER BY type DESC, discipline asc, city asc, gender asc LIMIT 5
+         SELECT discipline, city, gender, country, type FROM (temp0) AS res WHERE res.country IN (\"AUT\") ORDER BY type DESC, gender DESC, discipline asc, city asc LIMIT 5
          ",
     "predicate": "exactly",
     "expected": [
-       { "discipline": "Alpine Skiing", "city": "Albertville" , "gender": "W", "country": "AUT" },
-       { "discipline": "Alpine Skiing", "city": "Albertville" , "gender": "W", "country": "AUT" },
-       { "discipline": "Alpine Skiing", "city": "Calgary"     , "gender": "M", "country": "AUT" },
-       { "discipline": "Alpine Skiing", "city": "Calgary"     , "gender": "M", "country": "AUT" },
-       { "discipline": "Alpine Skiing", "city": "Calgary"     , "gender": "M", "country": "AUT" }
+       { "discipline": "Figure skating" , "city": "Garmisch-Partenkirchen" , "gender": "X", "country": "AUT", "type": "Silver"},
+       { "discipline": "Figure skating" , "city": "St. Moritz"             , "gender": "X", "country": "AUT", "type": "Silver"},
+       { "discipline": "Luge"           , "city": "Grenoble"               , "gender": "X", "country": "AUT", "type": "Silver"},
+       { "discipline": "Luge"           , "city": "Innsbruck"              , "gender": "X", "country": "AUT", "type": "Silver"},
+       { "discipline": "Alpine Skiing"  , "city": "Albertville"            , "gender": "W", "country": "AUT", "type": "Silver"}
     ]
 }
 
