@@ -33,8 +33,7 @@ import quasar.physical.rdbms.model.DbDataStream
 import quasar.physical.rdbms.planner.RenderQuery
 import quasar.physical.rdbms.planner.sql.SqlExpr
 
-import doobie.syntax.process._
-import doobie.util.fragment.Fragment
+import doobie.imports._
 import matryoshka.data.Fix
 import pathy.Path
 import scalaz._

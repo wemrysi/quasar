@@ -39,29 +39,11 @@ object PostgresRenderQuery extends RenderQuery {
   implicit val codec: DataCodec = DataCodec.Precise
 
   def asString[T[_[_]]: BirecursiveT](a: T[SqlExpr]): PlannerError \/ String = {
-
-    a.project match {
-      case s: Select[T[SqlExpr]] =>
-        val selectionExpr = s.selection.v
-        val colCount = selectionExpr.cata(colCountAlgebra)
-        if (colCount > 1)
-            a.cataM(alg) ∘ (s => s"select to_json(row) from $s row")
-        else {
-          val vToJson: T[SqlExpr] = ToJson[T[SqlExpr]](s.selection.v).embed
-          val newSelection: Selection[T[SqlExpr]] = s.selection.copy(v = vToJson)
-          s.copy(selection = newSelection).embed.cataM(alg) ∘ (s => s"$s")
-        }
-      case _ =>
-        a.cataM(alg) ∘ ("" ⊹ _)
-    }
-  }
-
-  def singleRow[T[_[_]]: BirecursiveT](a: T[SqlExpr]): PlannerError \/ String = {
     val q = a.cataM(alg)
 
     a.project match {
-      case s: Select[T[SqlExpr]]  => q ∘ (s => s"$s limit 1")
-      case _                     => q ∘ ("" ⊹ _)
+      case s: Select[T[SqlExpr]] => q ∘ (s => s"select row_to_json(row) from $s row")
+      case _ => q ∘ ("" ⊹ _)
     }
   }
 
@@ -71,13 +53,6 @@ object PostgresRenderQuery extends RenderQuery {
 
   def buildJson(str: String): String =
     s"json_build_object($str)#>>'{}'"
-
-  val colCountAlgebra: Algebra[SqlExpr, Int] = {
-    case ExprPair(c1, c2) => c1 + c2
-    case Case(wt, _) => wt.head.`then`
-    case IfNull(a) => a.head
-    case _ => 1
-  }
 
   val alg: AlgebraM[PlannerError \/ ?, SqlExpr, String] = {
     case Null() => "null".right

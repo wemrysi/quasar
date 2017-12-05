@@ -25,11 +25,11 @@ import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.qscript.{FreeMap, MapFunc, QScriptCore}
+
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-
 import scalaz.Scalaz._
 import scalaz._
 
