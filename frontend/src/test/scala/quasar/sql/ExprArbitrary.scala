@@ -76,7 +76,7 @@ trait ExprArbitrary {
     else Gen.frequency(
       5 -> simple,
       1 -> (genVari[Fix[Sql]] ⊛ Gen.option(genIdentString))(VariRelationAST(_, _)),
-      1 -> (selectGen(2) ⊛ genIdentString)(ExprRelationAST(_, _)),
+      1 -> (selectGen(2) ⊛ Gen.option(genIdentString))(ExprRelationAST(_, _)),
       1 -> (relationGen(depth-1) ⊛ relationGen(depth-1))(CrossRelation(_, _)),
       1 -> (relationGen(depth-1) ⊛ relationGen(depth-1) ⊛
         Gen.oneOf(LeftOuter, RightOuter, Inner, FullOuter) ⊛
