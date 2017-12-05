@@ -1,0 +1,22 @@
+{
+  "name": "single complex field read postgres",
+
+  "backends": {
+  },
+
+  "data": "basic.data",
+
+  "query": "select name from basic",
+
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
+
+  "ignoredFields": [],
+
+  "ignoreFieldOrder": false,
+
+  "expected": [
+  {"name": {"first": "John", "last": "Smith"}},
+  {"name": {"first": "Janina", "last": "Kowalska"}}
+  ]
+}

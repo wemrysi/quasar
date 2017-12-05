@@ -1,0 +1,19 @@
+{
+  "name": "single field read postgres",
+
+  "backends": {
+  },
+
+  "data": "basic.data",
+
+  "query": "select num from basic",
+
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
+
+  "ignoredFields": [],
+
+  "ignoreFieldOrder": false,
+
+  "expected": [{"num": 4},{"num": 42}]
+}
