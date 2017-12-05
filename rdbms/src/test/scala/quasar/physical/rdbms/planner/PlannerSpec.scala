@@ -58,17 +58,6 @@ class PlannerSpec extends Qspec with SqlExprSupport {
   //TODO: generalize to any backing renderer
   case class equalToSQL(expected: String) extends Matcher[\/[FileSystemError, Fix[QSM[Fix, ?]]]] {
     def apply[S <: \/[FileSystemError, Fix[QSM[Fix, ?]]]](s: Expectable[S]) = {
-
-
-      s.value.foreach{ qs =>
-        println(RenderTreeT[Fix].render(qs).shows)
-      }
-
-      s.value.map(qsToRepr[Fix]).foreach { sqlExpr =>
-        println(RenderTreeT[Fix].render(sqlExpr).shows)
-      }
-
-
       val leftSql = s.value.map(qsToRepr[Fix]).flatMap(PostgresRenderQuery.asString(_))
 
       val exp = expected.right[FileSystemError]
@@ -95,6 +84,7 @@ class PlannerSpec extends Qspec with SqlExprSupport {
 
   def id0Token: String = "_0"
   def id0 : Id[Fix[SqlExpr]] = Id(id0Token)
+  def id(n: Int) : Id[Fix[SqlExpr]] = Id(s"_$n")
   def * : Fix[SqlExpr] = Fix(AllCols())
 
   def fromTable(
@@ -114,9 +104,10 @@ class PlannerSpec extends Qspec with SqlExprSupport {
       plan(sqlE"select * from foo") must
         beRepr({
           select(
-            selection(Fix(id0), alias = None),
-            From(Fix(SelectRow(selection(*), fromTable("db.foo", id0), orderBy = Nil)),
-              alias = id0))
+            selection(*, alias = None),
+            From(Fix(SelectRow(selection(*, alias = Some(id(1))),
+              fromTable("db.foo", id0), orderBy = Nil)),
+              alias = id(2)))
         })
     }
 
@@ -126,7 +117,7 @@ class PlannerSpec extends Qspec with SqlExprSupport {
 
       val qs: Fix[SR] =
         Fix(Inject[SR, SR].inj(Const(ShiftedRead(path, forIdStatus))))
-      implicit val nameGen = taskNameGenerator
+      implicit val nameGen: NameGenerator[Task] = taskNameGenerator
       val planner = Planner.constShiftedReadFilePlanner[Fix, Task]
       val repr = qs.cataM(planner.plan).map(_.convertTo[Fix[SqlExpr]]).unsafePerformSync
 
@@ -136,19 +127,22 @@ class PlannerSpec extends Qspec with SqlExprSupport {
 
     "build plan including ids" in {
       expectShiftedReadRepr(forIdStatus = IncludeId, expectedRepr = {
-        SelectRow(selection(Fix(WithIds(*))), fromTable("db.foo", id0), orderBy = Nil)
+        SelectRow(selection(Fix(WithIds(*)), alias = Some(id(1))),
+          fromTable("db.foo", id0), orderBy = Nil)
       })
     }
 
     "build plan only for ids" in {
       expectShiftedReadRepr(forIdStatus = IdOnly, expectedRepr = {
-        SelectRow(selection(Fix(RowIds())), fromTable("db.foo", id0), orderBy = Nil)
+        SelectRow(selection(Fix(RowIds()), alias = Some(id(1))),
+          fromTable("db.foo", id0), orderBy = Nil)
       })
     }
 
     "build plan only for excluded ids" in {
       expectShiftedReadRepr(forIdStatus = ExcludeId, expectedRepr = {
-        SelectRow(selection(*), fromTable("db.foo", id0), orderBy = Nil)
+        SelectRow(selection(*, alias = Some(id(1))),
+          fromTable("db.foo", id0), orderBy = Nil)
       })
     }
   }
@@ -157,17 +151,17 @@ class PlannerSpec extends Qspec with SqlExprSupport {
 
     "represent addition" in {
       qs(sqlE"select a+b from foo") must
-        beSql("(select ((_0->>'a')::numeric + (_0->>'b')::numeric) from (select row_to_json(_0) _0 from db.foo _0) _0)")
+        beSql("select row_to_json(row) from (select ((_2.a)::text::numeric + (_2.b)::text::numeric) from (select * from db.foo) _2) row")
     }
 
     "represent single-level reference" in {
       qs(sqlE"select a from foo") must
-        beSql("(select _0->>'a' from (select row_to_json(_0) _0 from db.foo _0) _0)")
+        beSql("select row_to_json(row) from (select _2.a from (select * from db.foo) _2) row")
     }
 
     "represent nested refs" in {
       qs(sqlE"select aa.bb.c.d from foo") must
-        beSql("(select _0->'aa'->'bb'->'c'->>'d' from (select row_to_json(_0) _0 from db.foo _0) _0)")
+        beSql("select row_to_json(row) from (select _2.aa->'bb'->'c'->'d' from (select * from db.foo) _2) row")
     }
   }
 
@@ -175,13 +169,7 @@ class PlannerSpec extends Qspec with SqlExprSupport {
 
     "represent simple ordering" in {
       qs(sqlE"select name, surname from foo order by name") must
-        beSql("""(select _0->>'name' as "name", _0->>'surname' as "surname" from (select row_to_json(_0) _0 from db.foo _0 order by _0."name" asc) _0)""")
-    }
-
-    "SR test" in {
-        qs(sqlE"select nr as num, id as ajdi from divide") must
-        beSql("""TODO""")
-
+        beSql("""select row_to_json(row) from (select * from (select _2.name as "name", _2.surname as "surname" from (select * from db.foo) _2) _3 order by _3.name asc) row""")
     }
   }
 }
