@@ -1,0 +1,22 @@
+{
+  "name": "composite mathematical functions postgres",
+
+  "backends": {
+  },
+
+  "data": "math.data",
+
+  "query": "select (a + nums.b) % nums.c, (nums.c ^ nums.b) - a + nums.b from math",
+
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
+
+  "ignoredFields": [],
+
+  "ignoreFieldOrder": false,
+
+  "expected": [
+    {"0": 0, "1": -1},
+    {"0": 2, "1": 2151}
+  ]
+}
