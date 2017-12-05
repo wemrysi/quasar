@@ -14,21 +14,30 @@ Chain
 │  │  │  │         { "$literal": undefined }]
 │  │  │  │     })
 │  │  │  ╰─ ExcludeId
+│  │  ├─ $MatchF
+│  │  │  ╰─ Doc
+│  │  │     ╰─ Expr($city -> Type(Text))
+│  │  ├─ $ProjectF
+│  │  │  ├─ Name("0" -> {
+│  │  │  │       "$cond": [
+│  │  │  │         {
+│  │  │  │           "$and": [
+│  │  │  │             { "$lte": [{ "$literal": "" }, "$city"] },
+│  │  │  │             { "$lt": ["$city", { "$literal": {  } }] }]
+│  │  │  │         },
+│  │  │  │         { "$literal": true },
+│  │  │  │         { "$literal": false }]
+│  │  │  │     })
+│  │  │  ├─ Name("src" -> "$$ROOT")
+│  │  │  ╰─ ExcludeId
+│  │  ├─ $MatchF
+│  │  │  ╰─ Doc
+│  │  │     ╰─ Expr($0 -> Eq(Bool(true)))
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
-│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
+│  │  │  │  ╰─ Name("0" -> { "$push": "$src" })
 │  │  │  ╰─ By
-│  │  │     ╰─ Name("0" -> [
-│  │  │             {
-│  │  │               "$cond": [
-│  │  │                 {
-│  │  │                   "$and": [
-│  │  │                     { "$lte": [{ "$literal": "" }, "$city"] },
-│  │  │                     { "$lt": ["$city", { "$literal": {  } }] }]
-│  │  │                 },
-│  │  │                 { "$toLower": "$city" },
-│  │  │                 { "$literal": undefined }]
-│  │  │             }])
+│  │  │     ╰─ Name("0" -> { "$toLower": "$src.city" })
 │  │  ╰─ $ProjectF
 │  │     ├─ Name("_id" -> "$_id")
 │  │     ├─ Name("value")
@@ -88,52 +97,51 @@ Chain
 │     │  │          }
 │     │  │        })
 │     │  ╰─ By
-│     │     ╰─ Name("0" -> [
-│     │             {
-│     │               "$cond": [
-│     │                 {
-│     │                   "$and": [
-│     │                     {
-│     │                       "$lte": [
-│     │                         { "$literal": "" },
-│     │                         {
-│     │                           "$cond": [
-│     │                             {
-│     │                               "$and": [
-│     │                                 { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │                                 { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │                             },
-│     │                             "$city",
-│     │                             { "$literal": undefined }]
-│     │                         }]
-│     │                     },
-│     │                     {
-│     │                       "$lt": [
-│     │                         {
-│     │                           "$cond": [
-│     │                             {
-│     │                               "$and": [
-│     │                                 { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │                                 { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │                             },
-│     │                             "$city",
-│     │                             { "$literal": undefined }]
-│     │                         },
-│     │                         { "$literal": {  } }]
-│     │                     }]
-│     │                 },
-│     │                 {
-│     │                   "$cond": [
-│     │                     {
-│     │                       "$and": [
-│     │                         { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │                         { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │                     },
-│     │                     { "$toLower": "$city" },
-│     │                     { "$literal": undefined }]
-│     │                 },
-│     │                 { "$literal": undefined }]
-│     │             }])
+│     │     ╰─ Name("0" -> {
+│     │             "$cond": [
+│     │               {
+│     │                 "$and": [
+│     │                   {
+│     │                     "$lte": [
+│     │                       { "$literal": "" },
+│     │                       {
+│     │                         "$cond": [
+│     │                           {
+│     │                             "$and": [
+│     │                               { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│     │                               { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│     │                           },
+│     │                           "$city",
+│     │                           { "$literal": undefined }]
+│     │                       }]
+│     │                   },
+│     │                   {
+│     │                     "$lt": [
+│     │                       {
+│     │                         "$cond": [
+│     │                           {
+│     │                             "$and": [
+│     │                               { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│     │                               { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│     │                           },
+│     │                           "$city",
+│     │                           { "$literal": undefined }]
+│     │                       },
+│     │                       { "$literal": {  } }]
+│     │                   }]
+│     │               },
+│     │               {
+│     │                 "$cond": [
+│     │                   {
+│     │                     "$and": [
+│     │                       { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│     │                       { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│     │                   },
+│     │                   { "$toLower": "$city" },
+│     │                   { "$literal": undefined }]
+│     │               },
+│     │               { "$literal": undefined }]
+│     │           })
 │     ├─ $ProjectF
 │     │  ├─ Name("identities" -> { "qsu17_0": "$_id.0" })
 │     │  ├─ Name("value" -> { "1": "$f0" })
