@@ -91,9 +91,15 @@ Chain
 │     ├─ $MatchF
 │     │  ╰─ Doc
 │     │     ╰─ Expr($0 -> Eq(Bool(true)))
-│     ├─ $MapF
-│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value.src] }] })
-│     │  ╰─ Scope(Map())
+│     ├─ $GroupF
+│     │  ├─ Grouped
+│     │  │  ╰─ Name("0" -> { "$push": "$src" })
+│     │  ╰─ By({ "$literal": null })
+│     ├─ $ProjectF
+│     │  ├─ Name("right" -> "$0")
+│     │  ├─ Name("left" -> { "$literal": [] })
+│     │  ├─ Name("_id" -> true)
+│     │  ╰─ IncludeId
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
 │        │               var result = { "left": [], "right": [] };

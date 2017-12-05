@@ -31,7 +31,7 @@ import pathy.Path, Path._
   */
 trait Queries {
   val fsMounts: Query0[(APath, FileSystemConfig)] =
-    sql"SELECT path, type, connectionUri FROM Mounts WHERE type != 'view'".query[(APath, FileSystemConfig)]
+    sql"SELECT path, type, connectionUri FROM Mounts WHERE (type != 'view' AND type != 'module')".query[(APath, FileSystemConfig)]
 
   def mountsHavingPrefix(dir: ADir): Query0[(APath, MountType)] = {
     val patternChars = List("\\\\", "_", "%") // NB: Order is important here to avoid double-escaping

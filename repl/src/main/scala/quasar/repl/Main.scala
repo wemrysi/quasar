@@ -29,6 +29,8 @@ import quasar.fs._
 import quasar.fs.mount._
 import quasar.main._
 
+import eu.timepit.refined.refineMV
+import eu.timepit.refined.numeric.Positive
 import org.jboss.aesh.console.{AeshConsoleCallback, Console, ConsoleOperation, Prompt}
 import org.jboss.aesh.console.helper.InterruptHook
 import org.jboss.aesh.console.settings.SettingsBuilder
@@ -111,7 +113,7 @@ object Main {
     S4: ManageFile :<: S,
     S5: FileSystemFailure :<: S
   ): Task[Command => Free[DriverEff, Unit]] = {
-    TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, PhaseFormat.Tree, 10, OutputFormat.Table, Map())).map { ref =>
+    TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, PhaseFormat.Tree, refineMV[Positive](10).some, OutputFormat.Table, Map())).map { ref =>
       val i: ReplEff[S, ?] ~> DriverEffM =
         injectFT[Task, DriverEff].compose(AtomicRef.fromTaskRef(ref)) :+:
         injectFT[ConsoleIO, DriverEff]                                :+:
