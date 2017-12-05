@@ -1,10 +1,13 @@
 {
   "name": "subselect in where",
   "backends": {
-    "couchbase":         "ignoreFieldOrder",
-    "marklogic_json":    "ignoreFieldOrder",
+    "couchbase":         "skip",
+    "marklogic_json":    "skip",
+    "marklogic_xml":     "skip",
     "mimir":             "ignoreFieldOrder"
   },
+  "NB": "skipped on couchbase due to lack of general join",
+  "NB": "skipped on marklogic due to timeout",
   "data": ["demo/patients.data", "extraSmallZips.data"],
   "query": "SELECT first_name, last_name FROM `demo/patients` AS p where state in (SELECT state FROM extraSmallZips) ORDER BY last_name, first_name",
   "predicate": "initial",
