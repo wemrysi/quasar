@@ -21,6 +21,8 @@ import quasar.common.SortDir.{Ascending, Descending}
 import quasar.Data
 import quasar.DataCodec
 import quasar.DataCodec.Precise.TimeKey
+import quasar.physical.rdbms.model._
+import quasar.physical.rdbms.fs.postgres._
 import quasar.physical.rdbms.planner.RenderQuery
 import quasar.physical.rdbms.planner.sql.SqlExpr
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
@@ -149,5 +151,6 @@ object PostgresRenderQuery extends RenderQuery {
     case Case(wt, e) =>
       val wts = wt ∘ { case WhenThen(w, t) => s"when $w then $t" }
       s"(case ${wts.intercalate(" ")} else ${e.v} end)".right
+    case Coercion(t, e) => s"($e)::${t.mapToStringName}".right
   }
 }

@@ -19,6 +19,7 @@ package quasar.physical.rdbms.planner.sql
 import slamdata.Predef._
 import quasar.Data
 import quasar.common.SortDir
+import quasar.physical.rdbms.model.ColumnType
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case.{Else, WhenThen}
 
 import scalaz.{NonEmptyList, OneAnd}
@@ -65,6 +66,8 @@ object SqlExpr extends SqlExprInstances {
 
   final case class And[T](a1: T, a2: T) extends SqlExpr[T]
   final case class Or[T](a1: T, a2: T) extends SqlExpr[T]
+
+  final case class Coercion[T](t: ColumnType, e: T) extends SqlExpr[T]
 
   final case class Constant[T](data: Data) extends SqlExpr[T]
 

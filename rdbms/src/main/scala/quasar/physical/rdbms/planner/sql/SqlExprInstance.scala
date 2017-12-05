@@ -83,6 +83,9 @@ trait SqlExprTraverse {
           )((wt, e) =>
           Case(wt, Else(e))
         )
+
+      case Coercion(t, e) => f(e) ∘ (Coercion(t, _))
+
     }
   }
 }

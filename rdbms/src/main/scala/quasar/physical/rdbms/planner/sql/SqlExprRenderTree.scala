@@ -117,7 +117,8 @@ trait SqlExprRenderTree {
             NonTerminal("Case" :: Nil, none,
               (wt ∘ (i => nonTerminal("whenThen", i.when, i.`then`))).toList :+
                 nonTerminal("else", e.v))
-
+          case Coercion(t, e) =>
+            nonTerminal(s"Coercion: $t", e)
         }
       }
     }
