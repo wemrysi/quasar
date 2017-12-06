@@ -11,7 +11,7 @@
   "predicate": "exactly",
   "ignoreResultOrder": true,
 
-  "ignoredFields": [],
+  "ignoredFields": ["_id"],
 
   "ignoreFieldOrder": true,
 
