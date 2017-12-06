@@ -13,7 +13,7 @@
 
   "ignoredFields": [],
 
-  "ignoreFieldOrder": false,
+  "ignoreFieldOrder": true,
 
   "expected": [
     {"s2b": true,  "b2s": "true", "i2d": 4.0, "d2i":5, "s2n": null, "d2s": "4.5", "j2s": "{\"blah\": \"a\"}"},

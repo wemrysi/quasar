@@ -13,7 +13,7 @@
 
   "ignoredFields": [],
 
-  "ignoreFieldOrder": false,
+  "ignoreFieldOrder": true,
 
   "expected": [
     {"name": {"first": "John", "last": "Smith"}, "num": 4},
