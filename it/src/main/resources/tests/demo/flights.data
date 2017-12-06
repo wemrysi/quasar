@@ -1,0 +1,8 @@
+{ "source": "Los Angeles", "destination": "San Francisco", "fuel": 200 }
+{ "source": "Los Angeles", "destination": "Las Vegas", "fuel": 400 }
+{ "source": "Los Angeles", "destination": "Dallas", "fuel": 700 }
+{ "source": "Los Angeles", "destination": "New York", "fuel": 1300 }
+{ "source": "Las Vegas", "destination": "Dallas", "fuel": 400 }
+{ "source": "Las Vegas", "destination": "New York", "fuel": 900 }
+{ "source": "Dallas", "destination": "New York", "fuel": 800 }
+{ "source": "Dallas", "destination": "Orlando", "fuel": 600 }

@@ -1,0 +1,19 @@
+{
+    "name": "flights_step1",
+    "data": "flights.data",
+    "backends": {
+       "couchbase":         "ignoreFieldOrder",
+       "marklogic_json":    "ignoreFieldOrder",
+       "mimir":             "ignoreFieldOrder"
+    },
+    "query": "SELECT source AS Source, destination AS Destination, fuel AS Cost FROM flights ORDER BY Source ASC, Destination ASC, Cost ASC LIMIT 6",
+    "predicate": "exactly",
+    "expected": [
+         { "Source": "Dallas"     , "Destination": "New York" , "Cost": 800 },
+         { "Source": "Dallas"     , "Destination": "Orlando"  , "Cost": 600 },
+         { "Source": "Las Vegas"  , "Destination": "Dallas"   , "Cost": 400 },
+         { "Source": "Las Vegas"  , "Destination": "New York" , "Cost": 900 },
+         { "Source": "Los Angeles", "Destination": "Dallas"   , "Cost": 700 },
+         { "Source": "Los Angeles", "Destination": "Las Vegas", "Cost": 400 }
+    ]
+}
