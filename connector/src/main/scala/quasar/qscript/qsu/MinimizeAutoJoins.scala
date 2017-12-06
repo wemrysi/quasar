@@ -16,6 +16,7 @@
 
 package quasar.qscript.qsu
 
+import slamdata.Predef.{Map => SMap, _}
 import quasar.{NameGenerator, Planner}, Planner.PlannerErrorME
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz.MonadState_
@@ -36,22 +37,19 @@ import quasar.qscript.{
   SrcHole
 }
 import quasar.qscript.qsu.{QScriptUniform => QSU}
-import slamdata.Predef.{Map => SMap, _}
+import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
 import matryoshka.{delayEqual, BirecursiveT, EqualT}
 import matryoshka.data.free._
 import scalaz.{Equal, Free, Monad, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
 
 final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSUTTypes[T] {
-  import ApplyProvenance.AuthenticatedQSU
   import QSUGraph.Extractors._
 
   private val func = construction.Func[T]
   private val srcHole: Hole = SrcHole   // wtb smart constructor
 
   private val J = Fixed[T[EJson]]
-
-  private val AP = ApplyProvenance[T]
   private val QP = QProv[T]
 
   // needed to avoid bug in implicit search!  don't import QP.prov._
@@ -311,7 +309,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
       qgraph <- QSUGraph.withName[T, G](pat)
 
       state <- MonadState_[G, MinimizationState].get
-      computed <- AP.computeProvenanceƒ[G].apply(
+      computed <- ApplyProvenance.computeProvenanceƒ[T, G].apply(
         QSUGraph.QSUPattern(qgraph.root, pat.map(s => (s, state.dims(s)))))
 
       dims2 = state.dims + (qgraph.root -> computed._2)
@@ -323,6 +321,10 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
 }
 
 object MinimizeAutoJoins {
-  def apply[T[_[_]]: BirecursiveT: EqualT]: MinimizeAutoJoins[T] =
-    new MinimizeAutoJoins[T]
+  def apply[
+      T[_[_]]: BirecursiveT: EqualT,
+      F[_]: Monad: NameGenerator: PlannerErrorME]
+      (agraph: AuthenticatedQSU[T])
+      : F[AuthenticatedQSU[T]] =
+    taggedInternalError("MinimizeAutoJoins", new MinimizeAutoJoins[T].apply[F](agraph))
 }

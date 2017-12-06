@@ -30,7 +30,7 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
   type F[A] = StateT[Need, Long, A]
 
   val qsu = QScriptUniform.DslT[Fix]
-  val rw = RewriteGroupByArrays[Fix]
+  val rw = RewriteGroupByArrays[Fix, F] _
 
   val afile = Path.rootDir[Sandboxed] </> Path.file("afile")
   val afile2 = Path.rootDir[Sandboxed] </> Path.file("afile2")
@@ -46,7 +46,7 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
             qsu.cstr("foo"),
             _(MapFuncsCore.ProjectKey(_, _))))))
 
-      eval(rw[F](qgraph)) must beLike {
+      eval(rw(qgraph)) must beLike {
         case GroupBy(
           Unreferenced(),
           AutoJoin2C(
@@ -75,7 +75,7 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
               MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole))),
             _(MapFuncsCore.ConcatArrays(_, _))))))
 
-      eval(rw[F](qgraph)) must beLike {
+      eval(rw(qgraph)) must beLike {
         case GroupBy(
           GroupBy(
             Read(`afile`),
@@ -122,7 +122,7 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
               MFC(MapFuncsCore.MakeArray[Fix, Hole](SrcHole))),
             _(MapFuncsCore.ConcatArrays(_, _))))))
 
-      eval(rw[F](qgraph)) must beLike {
+      eval(rw(qgraph)) must beLike {
         case GroupBy(
           GroupBy(    // s2
             GroupBy(   // s1

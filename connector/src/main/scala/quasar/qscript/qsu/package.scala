@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import slamdata.Predef.{Map => SMap, _}
+import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.fp._
 import quasar.qscript.provenance.Dimensions
 
@@ -47,4 +48,10 @@ package object qsu {
         "\n]"
       }
   }
+
+  def taggedInternalError[F[_]: PlannerErrorME, A](tag: String, fa: F[A]): F[A] =
+    PlannerErrorME[F].handleError(fa)(e => PlannerErrorME[F].raiseError(e match {
+      case InternalError(msg, cause) => InternalError(s"[$tag] $msg", cause)
+      case other => other
+    }))
 }
