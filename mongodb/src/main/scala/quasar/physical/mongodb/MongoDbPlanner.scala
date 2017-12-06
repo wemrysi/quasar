@@ -1230,16 +1230,22 @@ object MongoDbPlanner {
     val O = new Optimize[T]
     val R = new Rewrite[T]
 
+    def normalize(mqs: T[MQS]): M[T[MQS]] =
+      for {
+        mqs0 <- Trans(assumeReadType[T, MQS, M](Type.AnyObject), mqs)
+        mqs1 =  mqs0.transCata[T[MQS]](R.normalizeEJ[MQS])
+        mqs2 =  BR.branches.modify(
+          _.transCata[FreeQS[T]](liftCo(R.normalizeEJCoEnv[QScriptTotal[T, ?]]))
+        )(mqs1.project).embed
+      } yield mqs2
+
     // TODO: All of these need to be applied through branches. We may also be able to compose
     //       them with normalization as the last step and run until fixpoint. Currently plans are
     //       too sensitive to the order in which these are applied.
     for {
-      mongoQS0 <- Trans(assumeReadType[T, MQS, M](Type.AnyObject), qs)
-      mongoQS1 <- mongoQS0.transCataM(elideQuasarSigil[T, MQS, M](anyDoc))
-      mongoQS2 =  mongoQS1.transCata[T[MQS]](R.normalizeEJ[MQS])
-      mongoQS3 =  BR.branches.modify(
-        _.transCata[FreeQS[T]](liftCo(R.normalizeEJCoEnv[QScriptTotal[T, ?]]))
-        )(mongoQS2.project).embed
+      mongoQS1 <- Trans(assumeReadType[T, MQS, M](Type.AnyObject), qs)
+      mongoQS2 <- mongoQS1.transCataM(elideQuasarSigil[T, MQS, M](anyDoc))
+      mongoQS3 <- fixpointM(normalize, mongoQS2)
       _ <- BackendModule.logPhase[M](PhaseResult.treeAndCode("QScript Mongo", mongoQS3))
 
       mongoQS4 =  mongoQS3.transCata[T[MQS]](
