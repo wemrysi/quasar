@@ -2,6 +2,17 @@
   "name": "single complex field read postgres",
 
   "backends": {
+          "couchbase":         "skip",
+          "marklogic_xml":     "skip",
+          "mimir":             "skip",
+          "mongodb_2_6":       "skip",
+          "mongodb_3_0":       "skip",
+          "mongodb_3_2":       "skip",
+          "mongodb_3_4":       "skip",
+          "mongodb_read_only": "skip",
+          "spark_hdfs":        "skip",
+          "spark_local":       "skip",
+          "spark_cassandra":   "skip"
   },
 
   "data": "basic.data",
