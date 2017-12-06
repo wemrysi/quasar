@@ -38,7 +38,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   val func = construction.Func[Fix]
 
   def reifyBuckets(qsu: Fix[QScriptUniform]): PlannerError \/ QSUGraph =
-    ApplyProvenance[Fix].apply[PlannerError \/ ?](QSUGraph.fromTree(qsu))
+    ApplyProvenance[Fix, PlannerError \/ ?](QSUGraph.fromTree(qsu))
       .flatMap(ReifyBuckets[Fix, PlannerError \/ ?])
       .map(_.graph)
 

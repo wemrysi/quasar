@@ -53,7 +53,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
   val qsu = QScriptUniform.AnnotatedDsl[Fix, Symbol]
   val func = construction.Func[Fix]
 
-  val app = ApplyProvenance[Fix]
+  val app = ApplyProvenance[Fix, F] _
   val qprov = QProv[Fix]
 
   val root = Path.rootDir[Sandboxed]
@@ -123,7 +123,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
             (renames(k), newP)
           }
 
-        val actual: PlannerError \/ AuthenticatedQSU[Fix] = app[F](inputGraph)
+        val actual: PlannerError \/ AuthenticatedQSU[Fix] = app(inputGraph)
 
         actual.bimap[MatchResult[S], MatchResult[S]](
         { err =>

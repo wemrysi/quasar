@@ -51,7 +51,6 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
-  val maj = MinimizeAutoJoins[Fix]
   val qprov = QProv[Fix]
 
   val J = Fixed[Fix[EJson]]
@@ -418,9 +417,9 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
   def runOn_(qgraph: QSUGraph): AuthenticatedQSU[Fix] = {
     val resultsF = for {
-      agraph0 <- ApplyProvenance[Fix].apply[F](qgraph)
+      agraph0 <- ApplyProvenance[Fix, F](qgraph)
       agraph <- ReifyBuckets[Fix, F](agraph0)
-      back <- maj[F](agraph)
+      back <- MinimizeAutoJoins[Fix, F](agraph)
     } yield back
 
     val results = resultsF.run.eval(0L).value.toEither

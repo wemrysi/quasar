@@ -32,6 +32,7 @@ import quasar.qscript.{
   LeftShift,
   Map,
   QCE,
+  QScriptEducated,
   Read,
   Reduce,
   ReduceFuncs,
@@ -44,6 +45,7 @@ import quasar.qscript.{
   Unreferenced}
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.QSUGraph.QSUPattern
+import quasar.qscript.qsu.ReifyIdentities.ResearchedQSU
 
 import matryoshka.{Corecursive, CorecursiveT, CoalgebraM, Recursive}
 import matryoshka.data.free._
@@ -51,8 +53,7 @@ import matryoshka.patterns.CoEnv
 import scalaz.{~>, -\/, \/-, Const, Inject, Monad, NaturalTransformation, ReaderT}
 import scalaz.Scalaz._
 
-final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
-  import ReifyIdentities.ResearchedQSU
+final class Graduate[T[_[_]]: CorecursiveT] private () extends QSUTTypes[T] {
 
   type QSE[A] = QScriptEducated[A]
 
@@ -253,6 +254,10 @@ final class Graduate[T[_[_]]: CorecursiveT] extends QSUTTypes[T] {
 }
 
 object Graduate {
-  def apply[T[_[_]]: CorecursiveT]: Graduate[T] =
-    new Graduate[T]
+  def apply[
+      T[_[_]]: CorecursiveT,
+      F[_]: Monad: PlannerErrorME: NameGenerator]
+      (rqsu: ResearchedQSU[T])
+      : F[T[QScriptEducated[T, ?]]] =
+    new Graduate[T].apply[F](rqsu)
 }

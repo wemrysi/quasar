@@ -32,7 +32,7 @@ import scalaz.{Applicative, Functor, Monad, Scalaz}, Scalaz._
   * to be a function of one or more sibling arguments and creating an
   * autojoin if not.
   */
-final class ExtractFreeMap[T[_[_]]: BirecursiveT] extends QSUTTypes[T] {
+final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
   import QScriptUniform._
   import QSUGraph.Extractors
 
@@ -132,6 +132,10 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] extends QSUTTypes[T] {
 }
 
 object ExtractFreeMap {
-  def apply[T[_[_]]: BirecursiveT]: ExtractFreeMap[T] =
-    new ExtractFreeMap[T]
+  def apply[
+      T[_[_]]: BirecursiveT,
+      F[_]: Monad: NameGenerator: PlannerErrorME]
+      (graph: QSUGraph[T])
+      : F[QSUGraph[T]] =
+    new ExtractFreeMap[T].apply[F](graph)
 }

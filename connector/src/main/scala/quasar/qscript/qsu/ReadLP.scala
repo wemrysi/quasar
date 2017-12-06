@@ -282,5 +282,10 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
 }
 
 object ReadLP {
-  def apply[T[_[_]]: BirecursiveT]: ReadLP[T] = new ReadLP[T]
+  def apply[
+      T[_[_]]: BirecursiveT,
+      F[_]: Monad: PlannerErrorME: NameGenerator]
+      (plan: T[lp.LogicalPlan])
+      : F[QSUGraph[T]] =
+    new ReadLP[T].apply[F](plan)
 }
