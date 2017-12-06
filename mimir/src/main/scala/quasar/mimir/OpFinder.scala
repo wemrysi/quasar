@@ -57,8 +57,6 @@ trait StdLibOpFinderModule[M[+ _]] extends Instructions with StdLibModule[M] wit
         case Gt                                                                                         => Some(Infix.Gt)
         case GtEq                                                                                       => Some(Infix.GtEq)
         case Eq | instructions.NotEq                                                                    => None
-        case Or                                                                                         => Some(Infix.Or)
-        case And                                                                                        => Some(Infix.And)
         case WrapObject | JoinObject | JoinArray | ArraySwap | DerefMetadata | DerefObject | DerefArray => None
         case _                                                                                          => sys.error(s"Unexpected op $op")
       }

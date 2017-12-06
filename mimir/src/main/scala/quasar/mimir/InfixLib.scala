@@ -236,8 +236,76 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         }
       }
 
-      val And = new BoolOp2("and", _ && _)
-      val Or  = new BoolOp2("or", _ || _)
+      // TODO find the commonalities and abstract these two
+      val And = new OpNFN(InfixNamespace, "and") {
+        val fn: FN = CFNP("builtin::infix::bool::and") {
+          case List(c: BoolColumn) =>
+            new BoolColumn {
+              def isDefinedAt(row: Int): Boolean = c.isDefinedAt(row) && !c(row)
+              def apply(row: Int): Boolean = c(row)
+            }
+
+          case List(c1: BoolColumn, c2: BoolColumn) =>
+            new BoolColumn {
+              def isDefinedAt(row: Int): Boolean = {
+                if (c1.isDefinedAt(row) && c2.isDefinedAt(row))
+                  true
+                else if (c1.isDefinedAt(row) && !c2.isDefinedAt(row))
+                  !c1(row)
+                else if (!c1.isDefinedAt(row) && c2.isDefinedAt(row))
+                  !c2(row)
+                else
+                  false
+              }
+
+              def apply(row: Int): Boolean = {
+                if (c1.isDefinedAt(row) && c2.isDefinedAt(row))
+                  c1(row) && c2(row)
+                else if (c1.isDefinedAt(row) && !c2.isDefinedAt(row))
+                  c1(row)
+                else if (!c1.isDefinedAt(row) && c2.isDefinedAt(row))
+                  c2(row)
+                else
+                  false
+              }
+            }
+        }
+      }
+
+      val Or = new OpNFN(InfixNamespace, "or") {
+        val fn: FN = CFNP("builtin::infix::bool::or") {
+          case List(c: BoolColumn) =>
+            new BoolColumn {
+              def isDefinedAt(row: Int): Boolean = c.isDefinedAt(row) && c(row)
+              def apply(row: Int): Boolean = c(row)
+            }
+
+          case List(c1: BoolColumn, c2: BoolColumn) =>
+            new BoolColumn {
+              def isDefinedAt(row: Int): Boolean = {
+                if (c1.isDefinedAt(row) && c2.isDefinedAt(row))
+                  true
+                else if (c1.isDefinedAt(row) && !c2.isDefinedAt(row))
+                  c1(row)
+                else if (!c1.isDefinedAt(row) && c2.isDefinedAt(row))
+                  c2(row)
+                else
+                  false
+              }
+
+              def apply(row: Int): Boolean = {
+                if (c1.isDefinedAt(row) && c2.isDefinedAt(row))
+                  c1(row) || c2(row)
+                else if (c1.isDefinedAt(row) && !c2.isDefinedAt(row))
+                  c1(row)
+                else if (!c1.isDefinedAt(row) && c2.isDefinedAt(row))
+                  c2(row)
+                else
+                  false
+              }
+            }
+        }
+      }
 
       val concatString = new Op2F2(InfixNamespace, "concatString") {
         //@deprecated, see the DEPRECATED comment in StringLib
