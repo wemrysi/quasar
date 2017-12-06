@@ -326,5 +326,5 @@ object MinimizeAutoJoins {
       F[_]: Monad: NameGenerator: PlannerErrorME]
       (agraph: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] =
-    new MinimizeAutoJoins[T].apply[F](agraph)
+    taggedInternalError("MinimizeAutoJoins", new MinimizeAutoJoins[T].apply[F](agraph))
 }

@@ -259,5 +259,5 @@ object Graduate {
       F[_]: Monad: PlannerErrorME: NameGenerator]
       (rqsu: ResearchedQSU[T])
       : F[T[QScriptEducated[T, ?]]] =
-    new Graduate[T].apply[F](rqsu)
+    taggedInternalError("Graduate", new Graduate[T].apply[F](rqsu))
 }

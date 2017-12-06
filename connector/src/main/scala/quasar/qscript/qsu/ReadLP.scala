@@ -287,5 +287,5 @@ object ReadLP {
       F[_]: Monad: PlannerErrorME: NameGenerator]
       (plan: T[lp.LogicalPlan])
       : F[QSUGraph[T]] =
-    new ReadLP[T].apply[F](plan)
+    taggedInternalError("ReadLP", new ReadLP[T].apply[F](plan))
 }

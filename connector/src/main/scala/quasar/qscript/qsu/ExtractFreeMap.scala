@@ -137,5 +137,5 @@ object ExtractFreeMap {
       F[_]: Monad: NameGenerator: PlannerErrorME]
       (graph: QSUGraph[T])
       : F[QSUGraph[T]] =
-    new ExtractFreeMap[T].apply[F](graph)
+    taggedInternalError("ExtractFreeMap", new ExtractFreeMap[T].apply[F](graph))
 }

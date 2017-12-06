@@ -157,8 +157,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] private () {
   }
 
   private def unexpectedError[F[_]: PlannerErrorME, A](nodeName: String, id: Symbol): F[A] =
-    PlannerErrorME[F].raiseError(
-      InternalError(s"ComputeProvenance: Encountered unexpected $nodeName[$id].", None))
+    PlannerErrorME[F].raiseError(InternalError(s"Encountered unexpected $nodeName[$id].", None))
 }
 
 object ApplyProvenance {
@@ -167,7 +166,7 @@ object ApplyProvenance {
       F[_]: Monad: PlannerErrorME]
       (graph: QSUGraph[T])
       : F[AuthenticatedQSU[T]] =
-    new ApplyProvenance[T].apply[F](graph)
+    taggedInternalError("ApplyProvenance", new ApplyProvenance[T].apply[F](graph))
 
   def computeProvenanceƒ[
       T[_[_]]: BirecursiveT: EqualT,
