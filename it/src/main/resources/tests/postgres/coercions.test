@@ -10,7 +10,8 @@
     "mongodb_2_6":       "skip",
     "mongodb_3_2":       "skip",
     "mongodb_3_4":       "skip",
-    "mongodb_read_only": "skip"
+    "mongodb_read_only": "skip",
+    "spark_hdfs"         "skip"
   },
 
   "data": "coercions.data",

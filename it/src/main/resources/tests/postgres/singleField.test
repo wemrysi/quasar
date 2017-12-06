@@ -4,6 +4,7 @@
   "backends": {
       "couchbase":         "skip",
       "marklogic_xml":     "skip",
+      "marklogic_json":    "skip",
       "mimir":             "skip",
       "mongodb_2_6":       "skip",
       "mongodb_3_0":       "skip",
