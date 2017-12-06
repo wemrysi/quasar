@@ -2,6 +2,7 @@
   "name": "basic mathematical functions postgres",
 
   "backends": {
+    "mongodb_read_only": "skip"
   },
 
   "data": "math.data",
