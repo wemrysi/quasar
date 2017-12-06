@@ -3,7 +3,7 @@
     "backends": {
         "couchbase":         "skip",
         "marklogic_json":    "pendingIgnoreFieldOrder",
-        "marklogic_xml":     "pending",
+        "marklogic_xml":     "timeout",
         "mimir":             "pendingIgnoreFieldOrder",
         "mongodb_2_6":       "pending",
         "mongodb_3_0":       "pending",

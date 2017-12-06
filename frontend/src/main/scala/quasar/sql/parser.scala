@@ -451,8 +451,8 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
         VariRelationAST[T[Sql]](vari, alias)
     } |
     op("(") ~> (
-      (expr ~ op(")") ~ keyword("as") ~ ident ^^ {
-        case expr ~ _ ~ _ ~ alias => ExprRelationAST(expr, alias)
+      (expr ~ op(")") ~ opt(keyword("as") ~> ident) ^^ {
+        case expr ~ _ ~ alias => ExprRelationAST[T[Sql]](expr, alias)
       }) |
       relation <~ op(")"))
 

@@ -83,8 +83,11 @@ sealed abstract class NamedRelation[A] extends SqlRelation[A] {
     extends NamedRelation[A] {
   def aliasName = alias.getOrElse(fileName(tablePath).value)
 }
-@Lenses final case class ExprRelationAST[A](expr: A, aliasName: String)
-    extends NamedRelation[A]
+@Lenses final case class ExprRelationAST[A](expr: A, alias: Option[String])
+    extends NamedRelation[A] {
+  // TODO: Come up with a better solution for this
+  def aliasName = alias.getOrElse("")
+}
 
 @Lenses final case class JoinRelation[A](left: SqlRelation[A], right: SqlRelation[A], tpe: JoinType, clause: A)
     extends SqlRelation[A]
@@ -128,7 +131,7 @@ object SqlRelation {
             val aliasString = alias.cata(" as " + _, "")
             Terminal("VariRelation" :: astType, Some(":" + vari.symbol + aliasString))
           case ExprRelationAST(select, alias) =>
-            NonTerminal("ExprRelation" :: astType, Some("Expr as " + alias), ra.render(select) :: Nil)
+            NonTerminal("ExprRelation" :: astType, Some("Expr" + alias.fold("")(alias => s" as $alias")), ra.render(select) :: Nil)
           case TableRelationAST(name, alias) =>
             val aliasString = alias.cata(" as " + _, "")
             Terminal("TableRelation" :: astType, Some(prettyPrint(name) + aliasString))

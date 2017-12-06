@@ -1,0 +1,26 @@
+{
+  "name": "subselect distinct in where",
+  "backends": {
+    "couchbase":         "skip",
+    "marklogic_json":    "skip",
+    "marklogic_xml":     "skip",
+    "mimir":             "ignoreFieldOrder"
+  },
+  "NB": "skipped on couchbase due to lack of general join",
+  "NB": "skipped on marklogic due to timeout",
+  "data": ["demo/patients.data", "zips.data"],
+  "query": "SELECT first_name, last_name FROM `demo/patients` AS p where state in (SELECT DISTINCT state FROM zips) ORDER BY last_name, first_name",
+  "predicate": "initial",
+  "expected": [
+    { "first_name": "Adelina", "last_name": "Abbott" },
+    { "first_name": "Asha", "last_name": "Abbott" },
+    { "first_name": "Dora", "last_name": "Abbott" },
+    { "first_name": "Emmanuel", "last_name": "Abbott" },
+    { "first_name": "Melvin", "last_name": "Abbott" },
+    { "first_name": "Milo", "last_name": "Abbott" },
+    { "first_name": "Renna", "last_name": "Abbott" },
+    { "first_name": "Robert", "last_name": "Abbott" },
+    { "first_name": "Russ", "last_name": "Abbott" },
+    { "first_name": "Virgilio", "last_name": "Abbott" }
+  ]
+}
