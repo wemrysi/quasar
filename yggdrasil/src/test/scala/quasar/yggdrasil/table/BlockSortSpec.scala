@@ -49,7 +49,8 @@ trait BlockSortSpec extends SpecificationLike with ScalaCheck {
     // order) to match real sort semantics for disambiguation of equal
     // values
     val sorted = original.zipWithIndex.map {
-      case (jv, i) => JValue.unsafeInsert(jv, globalIdPath, JNum(i))
+      case (jv, i) if sortOrder.isAscending  => JValue.unsafeInsert(jv, globalIdPath, JNum(i))
+      case (jv, i) if !sortOrder.isAscending => JValue.unsafeInsert(jv, globalIdPath, JNum(-i))
     }.sortBy { v =>
       JArray(sortKeys.map(_.extract(v \ "value")).toList ::: List(v \ "globalId")).asInstanceOf[JValue]
     }(desiredJValueOrder).map(_.delete(globalIdPath).get).toList

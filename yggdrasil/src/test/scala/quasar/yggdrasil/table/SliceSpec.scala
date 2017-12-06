@@ -17,18 +17,21 @@
 package quasar.yggdrasil.table
 
 import quasar.blueeyes._
+import quasar.blueeyes.json._
 import quasar.precog.BitSet
 import quasar.precog.TestSupport._
 import quasar.precog.common._
 import quasar.precog.util._
-
+import quasar.yggdrasil.TableModule.SortDescending
 import java.time.{Instant, ZoneOffset, ZonedDateTime}
+
 import scala.util.Random
-import org.scalacheck.{ Arbitrary, Gen }
+import org.scalacheck.{Arbitrary, Gen}
 import Gen.listOfN
-import ArbitrarySlice._
 
 class SliceSpec extends Specification with ScalaCheck {
+
+  import ArbitrarySlice._
 
   implicit def cValueOrdering: Ordering[CValue] = CValue.CValueOrder.toScalaOrdering
   implicit def listOrdering[A](implicit ord0: Ordering[A]) = new Ordering[List[A]] {
@@ -66,59 +69,108 @@ class SliceSpec extends Specification with ScalaCheck {
   def stripUndefineds(cvals: List[CValue]): Set[CValue] =
     (cvals filter (_ != CUndefined)).toSet
 
-  // Commented out for now. sortWith is correct semantically, but it ruins
-  // the semantics of sortBy (which uses sortWith). Need to add a global ID.
+  "sortBy" should {
+    "stably sort a slice by a projection" in {
+      val array = JParser.parseUnsafe("""[
+        { "city": "ANEHEIM", "state": "CA" },
+        { "city": "LOPEZ", "state": "WA" },
+        { "city": "SPOKANE", "state": "WA" },
+        { "city": "WASCO", "state": "CA" }
+        ]""".stripMargin)
 
-  //"sortBy" should {
-  //  "sort a trivial slice" in {
-  //    val slice = new Slice {
-  //      val size = 5
-  //      val columns = Map(
-  //        ColumnRef(CPath("a"), CLong) -> new LongColumn {
-  //          def isDefinedAt(row: Int) = true
-  //          def apply(row: Int) = -row.toLong
-  //        },
-  //        ColumnRef(CPath("b"), CLong) -> new LongColumn {
-  //          def isDefinedAt(row: Int) = true
-  //          def apply(row: Int) = row / 2
-  //        })
-  //    }
-  //    val sortKey = VectorCase(CPath("a"))
+      val data = array match {
+        case JArray(rows) => rows.toStream
+        case _ => ???
+      }
 
-  //    fakeSort(slice, sortKey) must_== toCValues(slice.sortBy(sortKey))
-  //  }
+      val target = Slice.fromJValues(data)
 
-  //  "sort arbitrary slices" in { check { badSize: Int =>
-  //    val path = Path("/")
-  //    val auth = Authorities(Set())
-  //    val paths = Vector(
-  //      CPath("0") -> CLong,
-  //      CPath("1") -> CBoolean,
-  //      CPath("2") -> CString,
-  //      CPath("3") -> CDouble,
-  //      CPath("4") -> CNum,
-  //      CPath("5") -> CEmptyObject,
-  //      CPath("6") -> CEmptyArray,
-  //      CPath("7") -> CNum)
-  //    val pd = ProjectionDescriptor(0, paths.toList map { case (cpath, ctype) =>
-  //      ColumnRef(path, cpath, ctype, auth)
-  //    })
+      // Note the monitonically decreasing sequence
+      // associated with the keys, due having repated
+      // states being sorted in descending order.
+      val keyArray = JParser.parseUnsafe("""[
+          [ "CA", 0 ],
+          [ "WA", -1 ],
+          [ "WA", -2 ],
+          [ "CA", -3 ]
+        ]""".stripMargin)
 
-  //    val size = scala.math.abs(badSize % 100).toInt
-  //    implicit def arbSlice = Arbitrary(genSlice(pd, size))
+      val keyData = keyArray match {
+        case JArray(rows) => rows.toStream
+        case _ => ???
+      }
 
-  //    check { slice: Slice =>
-  //      for (i <- 0 to 7; j <- 0 to 7) {
-  //        val sortKey = if (i == j) {
-  //          VectorCase(paths(i)._1)
-  //        } else {
-  //          VectorCase(paths(i)._1, paths(j)._1)
-  //        }
-  //        fakeSort(slice, sortKey) must_== toCValues(slice.sortBy(sortKey))
-  //      }
-  //    }
-  //  } }
-  //}
+      val key = Slice.fromJValues(keyData)
+
+      val result = target.sortWith(key, SortDescending)._1.toJsonElements.toVector
+      println(s"result: $result")
+
+      val expectedArray = JParser.parseUnsafe("""[
+        { "city": "LOPEZ", "state": "WA" },
+        { "city": "SPOKANE", "state": "WA" },
+        { "city": "ANEHEIM", "state": "CA" },
+        { "city": "WASCO", "state": "CA" }
+        ]""".stripMargin)
+
+      val expected = expectedArray match {
+        case JArray(rows) => rows.toVector
+        case _ => ???
+      }
+
+      result mustEqual expected
+    }
+
+      // Commented out for now. sortWith is correct semantically, but it ruins
+      // the semantics of sortBy (which uses sortWith). Need to add a global ID.
+//    "sort a trivial slice" in {
+//      val slice = new Slice {
+//        val size = 5
+//        val columns = Map(
+//          ColumnRef(CPath("a"), CLong) -> new LongColumn {
+//            def isDefinedAt(row: Int) = true
+//            def apply(row: Int) = -row.toLong
+//          },
+//          ColumnRef(CPath("b"), CLong) -> new LongColumn {
+//            def isDefinedAt(row: Int) = true
+//            def apply(row: Int) = row / 2
+//          })
+//      }
+//      val sortKey = VectorCase(CPath("a"))
+//
+//      fakeSort(slice, sortKey) must_== toCValues(slice.sortBy(sortKey))
+//    }
+
+//    "sort arbitrary slices" in { check { badSize: Int =>
+//      val path = Path("/")
+//      val auth = Authorities(Set())
+//      val paths = Vector(
+//        CPath("0") -> CLong,
+//        CPath("1") -> CBoolean,
+//        CPath("2") -> CString,
+//        CPath("3") -> CDouble,
+//        CPath("4") -> CNum,
+//        CPath("5") -> CEmptyObject,
+//        CPath("6") -> CEmptyArray,
+//        CPath("7") -> CNum)
+//      val pd = ProjectionDescriptor(0, paths.toList map { case (cpath, ctype) =>
+//        ColumnRef(path, cpath, ctype, auth)
+//      })
+
+//      val size = scala.math.abs(badSize % 100).toInt
+//      implicit def arbSlice = Arbitrary(genSlice(pd, size))
+//
+//      check { slice: Slice =>
+//        for (i <- 0 to 7; j <- 0 to 7) {
+//          val sortKey = if (i == j) {
+//            VectorCase(paths(i)._1)
+//          } else {
+//            VectorCase(paths(i)._1, paths(j)._1)
+//          }
+//          fakeSort(slice, sortKey) must_== toCValues(slice.sortBy(sortKey))
+//        }
+//      }
+//    } }
+  }
 
   private def concatProjDesc = Seq(
     ColumnRef(CPath("0"), CLong),
