@@ -48,13 +48,11 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     case qscript.Map(src, f) =>
       for {
         fromAlias <- genId[T[SqlExpr], F]
-        selection <- {
-          val holeF = quasar.qscript.HoleF[T]
-          f match {
-            case `holeF` => *.η[F]
-            case _ => processFreeMap(f, fromAlias)
-          }
-        }
+        selection <- processFreeMap(f, fromAlias)
+          .map(_.project match {
+            case SqlExpr.Id(_) => *
+            case other => other.embed
+          })
       } yield
         Select(
           Selection(selection, none),
