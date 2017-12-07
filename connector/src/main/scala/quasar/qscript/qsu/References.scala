@@ -16,13 +16,17 @@
 
 package quasar.qscript.qsu
 
-import slamdata.Predef.Symbol
+import slamdata.Predef.{StringContext, Symbol}
 import quasar.ejson.implicits._
-import quasar.fp.symbolOrder
+import quasar.fp.{coproductEqual, coproductShow, symbolOrder, symbolShow}
 import quasar.qscript.{FreeMap, FreeMapA}
 
-import scalaz.{IMap, ISet, Monoid, Order}
+import matryoshka.{delayShow, delayEqual, BirecursiveT, ShowT, EqualT}
+import matryoshka.data.free._
+import scalaz.{Equal, IMap, ISet, Monoid, Order, Show}
+import scalaz.std.list._
 import scalaz.std.option._
+import scalaz.std.tuple._
 import scalaz.syntax.applicative._
 import scalaz.syntax.semigroup._
 import scalaz.syntax.std.option._
@@ -82,10 +86,24 @@ object References {
   def noRefs[T[_[_]], D]: References[T, D] =
     References(IMap.empty, IMap.empty)
 
-  implicit def referencesMonoid[T[_[_]], D: Order]: Monoid[References[T, D]] =
+  implicit def monoid[T[_[_]], D: Order]: Monoid[References[T, D]] =
     Monoid.instance(
       (x, y) => References(
         x.accessing.unionWith(y.accessing)(_ union _),
         x.accessed |+| y.accessed),
       noRefs)
+
+  implicit def equal[T[_[_]]: BirecursiveT: EqualT, D: Equal]: Equal[References[T, D]] =
+    Equal.equalBy(r => (r.accessing, r.accessed))
+
+  implicit def show[T[_[_]]: ShowT, D: Show]: Show[References[T, D]] =
+    Show.shows {
+      case References(accessing, accessed) =>
+        s"References {\n\n" +
+        s"Accessing[\n" +
+        printMultiline(accessing.toList) +
+        s"]\n\nAccessed[\n" +
+        printMultiline(accessed.toList) +
+        "]\n}"
+    }
 }

@@ -40,9 +40,9 @@ import quasar.qscript.MapFuncCore.{EmptyMap, StaticMap}
 import quasar.qscript.provenance.JoinKeys.JoinKey
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 
-import matryoshka.BirecursiveT
+import matryoshka.{showTShow, BirecursiveT, ShowT}
 import monocle.Lens
-import scalaz.{Foldable, Free, Functor, IList, IMap, ISet, Monad, NonEmptyList, StateT, Traverse}
+import scalaz.{Foldable, Free, Functor, IList, IMap, ISet, Monad, NonEmptyList, Show, StateT, Traverse}
 import scalaz.Scalaz._
 
 final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
@@ -475,6 +475,13 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
 
 object ReifyIdentities {
   final case class ResearchedQSU[T[_[_]]](refs: References[T, T[EJson]], graph: QSUGraph[T])
+
+  object ResearchedQSU {
+    implicit def show[T[_[_]]: ShowT]: Show[ResearchedQSU[T]] =
+      Show.shows { rqsu =>
+        s"ResearchedQSU\n======\n${rqsu.graph.shows}\n\n${rqsu.refs.shows}\n======"
+      }
+  }
 
   def apply[T[_[_]]: BirecursiveT, F[_]: Monad: NameGenerator]
       (graph: QSUGraph[T])

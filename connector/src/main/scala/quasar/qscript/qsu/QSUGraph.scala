@@ -611,7 +611,7 @@ sealed abstract class QSUGraphInstances extends QSUGraphInstances0 {
       val assocs = g.foldMapUp(sg => DList((sg.root, sg.vertices(sg.root))))
 
       s"QSUGraph(${g.root.shows})[\n" +
-      printMultiline(assocs.toList.toMap) +
+      printMultiline(assocs.toList) +
       "\n]"
     }
 }

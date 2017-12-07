@@ -35,6 +35,7 @@ import pathy.Path, Path.{file, Sandboxed}
 import scalaz.{\/, Cofree, Equal, IList}
 import scalaz.syntax.equal._
 import scalaz.syntax.show._
+import scalaz.std.list._
 import scalaz.std.map._
 
 object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
@@ -130,7 +131,8 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           result(
             qauth.dims ≟ expectedDims,
             s"received expected authenticated QSU:\n${aqsu.shows}",
-            s"received unexpected authenticated QSU:\n${aqsu.shows}\nexpected:\n[\n${printMultiline(expected)}\n]",
+            s"received unexpected authenticated QSU:\n${aqsu.shows}\n" +
+            s"expected:\n[\n${printMultiline(expected.toList)}\n]",
             s)
         }).merge
       }

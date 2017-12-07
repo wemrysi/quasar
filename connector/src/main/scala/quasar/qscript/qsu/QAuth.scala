@@ -26,6 +26,7 @@ import matryoshka._
 import matryoshka.data.free._
 import scalaz.{Applicative, Equal, Monoid, Show}
 import scalaz.std.anyVal._
+import scalaz.std.list._
 import scalaz.std.map._
 import scalaz.std.tuple._
 import scalaz.syntax.equal._
@@ -100,8 +101,8 @@ sealed abstract class QAuthInstances {
     Show.shows { case QAuth(dims, keys) =>
       "QAuth\n" +
       "=====\n" +
-      "Dimensions[\n" + printMultiline(dims) + "\n]\n\n" +
-      "GroupKeys[\n" + printMultiline(keys) + "\n]\n" +
+      "Dimensions[\n" + printMultiline(dims.toList) + "\n]\n\n" +
+      "GroupKeys[\n" + printMultiline(keys.toList) + "\n]\n" +
       "====="
     }
 }
