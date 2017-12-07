@@ -1,0 +1,16 @@
+{
+    "name": "flights_step3",
+    "data": "flights.data",
+    "backends": {
+       "couchbase":         "ignoreFieldOrder",
+       "marklogic_json":    "ignoreFieldOrder",
+       "mimir":             "ignoreFieldOrder"
+    },
+    "query": "SELECT DISTINCT row.source AS Source, [row.destination...] AS Destination, [row.fuel...] AS Cost FROM flights AS row GROUP BY row.source ORDER BY row.source ASC",
+    "predicate": "exactly",
+    "expected": [
+        { "Source": "Dallas"     , "Destination": ["New York", "Orlando"]  , "Cost": [800, 600] },
+        { "Source": "Las Vegas"  , "Destination": ["Dallas", "New York"], "Cost": [400, 900] },
+        { "Source": "Los Angeles", "Destination": ["San Francisco", "Las Vegas", "Dallas", "New York"], "Cost": [200, 400, 700, 1300] }
+    ]
+}
