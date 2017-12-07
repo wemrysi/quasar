@@ -1,0 +1,4 @@
+{ "a": 1, "b": [true, true, true] }
+{ "a": 2, "b": [false, false] }
+{ "a": 3, "b": "string" }
+{ "a": 4, "b": null }

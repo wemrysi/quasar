@@ -1,0 +1,20 @@
+{
+    "name": "flatten or else field",
+    "backends": {
+        "mongodb_3_2": "pending",
+        "mongodb_3_4": "pending"
+    },
+    "data": "flattenable.data",
+    "query": "select t0.b[*] ?? t0.b from flattenable as t0",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+      true,
+      true,
+      true,
+      false,
+      false,
+      "string",
+      null
+    ]
+}
