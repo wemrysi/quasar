@@ -19,7 +19,7 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 import quasar._
 import quasar.contrib.specs2._
-import quasar.fs._
+import quasar.fs._, FileSystemError._
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
@@ -33,6 +33,7 @@ import eu.timepit.refined.auto._
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
+import org.specs2.matcher._
 import scalaz._, Scalaz._
 
 class PlannerSpec extends
@@ -53,7 +54,11 @@ class PlannerSpec extends
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     PlannerHelpers.plan(query)
 
-  def trackPending(name: String, plan: => Either[FileSystemError, Crystallized[WorkflowF]], expectedOps: IList[MongoOp]) = {
+  def trackPendingTemplate(
+    name: String,
+    plan: => Either[FileSystemError, Crystallized[WorkflowF]],
+    expectedOps: IList[MongoOp],
+    trackingMatcher: Matcher[Either[FileSystemError, Crystallized[WorkflowF]]]) = {
     name >> {
       lazy val plan0 = plan
 
@@ -62,10 +67,21 @@ class PlannerSpec extends
       }.pendingUntilFixed
 
       // s"track: $name" in {
-      //   plan0 must beRight.which(cwf => trackActual(cwf, testFile(s"plan $name")))
+      //   plan0 must trackingMatcher
       // }
     }
   }
+
+  def trackPending(name: String, plan: => Either[FileSystemError, Crystallized[WorkflowF]], expectedOps: IList[MongoOp]) =
+    trackPendingTemplate(name, plan, expectedOps, beRight.which(cwf => trackActual(cwf, testFile(s"plan $name"))))
+
+  def trackPendingErr(name: String, plan: => Either[FileSystemError, Crystallized[WorkflowF]],
+    expectedOps: IList[MongoOp], errPattern: PartialFunction[FileSystemError, MatchResult[_]]) =
+      trackPendingTemplate(name, plan, expectedOps, beLeft(beLike(errPattern)))
+
+  def trackPendingThrow(name: String, plan: => Either[FileSystemError, Crystallized[WorkflowF]],
+    expectedOps: IList[MongoOp]) =
+      trackPendingTemplate(name, plan, expectedOps, throwA[scala.NotImplementedError])
 
   "plan from query string" should {
 
@@ -74,14 +90,11 @@ class PlannerSpec extends
       plan(sqlE"""select count(parents[0].sha) as count from slamengine_commits where parents[0].sha = "56d1caf5d082d1a6840090986e277d36d03f1859" """),
       IList(ReadOp, MatchOp, SimpleMapOp, GroupOp))
 
-    "having with multiple projections" in {
-      plan(sqlE"select city, sum(pop) from extraSmallZips group by city having sum(pop) > 40000") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, MatchOp, ProjectOp)))
-        // Q3021
-        // FIXME Fails with:
-        // [error] x having with multiple projections (5 seconds, 908 ms)
-        // [error]  'Left(QScriptPlanningFailed(InternalError(Invalid filter predicate, 'qsu14, must be a mappable function of 'qsu8.,None)))' is not Right (PlannerSpec.scala:65)
-    }.pendingUntilFixed
+    trackPendingErr(
+      "having with multiple projections",
+      plan(sqlE"select city, sum(pop) from extraSmallZips group by city having sum(pop) > 40000"),
+      IList(ReadOp, GroupOp, MatchOp, ProjectOp),
+      { case QScriptPlanningFailed(_) => ok })
 
     "select partially-applied substring" in {
       plan3_2(sqlE"""select substring("abcdefghijklmnop", 5, trunc(pop / 10000)) from extraSmallZips""") must
@@ -119,12 +132,10 @@ class PlannerSpec extends
     }
 
     // FIXME: Needs an actual expectation and an IT
-    "expr3 with grouping" in {
-      plan(sqlE"select case when pop > 1000 then city else lower(city) end, count(*) from zips group by city") must
-        beRight
-        // Q3114
-        // FIXME fails with: an implementation is missing (ReifyIdentities.scala:358)
-    }.pendingUntilFixed
+    trackPendingThrow(
+      "expr3 with grouping",
+      plan(sqlE"select case when pop > 1000 then city else lower(city) end, count(*) from zips group by city"),
+      IList()) //TODO
 
     "plan count and sum grouped by single field" in {
       plan(sqlE"select count(*) as cnt, sum(pop) as sm from zips group by state") must
@@ -136,13 +147,19 @@ class PlannerSpec extends
       plan(sqlE"select city, state, sum(pop) from zips"),
       IList(ReadOp, ProjectOp, GroupOp, UnwindOp, ProjectOp))
 
-    "plan unaggregated field when grouping, second case" in {
-      plan(sqlE"select city, state, sum(pop) from zips") must
+    val unaggFieldWhenGrouping2ndCase = sqlE"select city, state, sum(pop) from zips"
+
+    "plan unaggregated field when grouping, second case - no root pushes" in {
+      plan(unaggFieldWhenGrouping2ndCase) must
         beRight.which { cwf =>
           rootPushes(cwf.op) must_== Nil
-          notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, UnwindOp, ProjectOp))
         }
-    }.pendingUntilFixed
+    }
+
+    trackPending(
+      "unaggregated field when grouping, second case",
+      plan(unaggFieldWhenGrouping2ndCase),
+      IList(ReadOp, GroupOp, UnwindOp, ProjectOp))
 
     trackPending(
       "double aggregation with another projection",
@@ -191,20 +208,17 @@ class PlannerSpec extends
       IList(ReadOp, ProjectOp, UnwindOp, ProjectOp))
 
     // Q3021
-    // FIXME fails with:
-    // 'Left(QScriptPlanningFailed(InternalError(Invalid filter predicate, 'qsu10, must be a mappable function of 'qsu4.,None)))' is not Right (PlannerSpec.scala:63)
-    // trackPending(
-    //   "unify flattened fields",
-    //   plan(sqlE"select loc[*] from zips where loc[*] < 0"),
-    //   IList(ReadOp, ProjectOp, UnwindOp, MatchOp, ProjectOp))
+    trackPending(
+      "unify flattened fields",
+      plan(sqlE"select loc[*] from zips where loc[*] < 0"),
+      IList(ReadOp, ProjectOp, UnwindOp, MatchOp, ProjectOp))
 
     // Q3021
-    // FIXME fails with:
-    // 'Left(QScriptPlanningFailed(InternalError(Invalid group key, 'qsu15, must be a mappable function of 'qsu4.,None)))' is not Right (PlannerSpec.scala:63)
-    // trackPending(
-    //   "group by flattened field",
-    //   plan(sqlE"select substring(parents[*].sha, 0, 1), count(*) from slamengine_commits group by substring(parents[*].sha, 0, 1)"),
-    //   IList(ReadOp, ProjectOp, UnwindOp, GroupOp, ProjectOp))
+    trackPendingErr(
+      "group by flattened field",
+      plan(sqlE"select substring(parents[*].sha, 0, 1), count(*) from slamengine_commits group by substring(parents[*].sha, 0, 1)"),
+      IList(ReadOp, ProjectOp, UnwindOp, GroupOp, ProjectOp),
+      { case QScriptPlanningFailed(_) => ok })
 
     trackPending(
       "unify flattened fields with unflattened field",
@@ -212,12 +226,10 @@ class PlannerSpec extends
       IList(ReadOp, ProjectOp, UnwindOp, SortOp))
 
     // Q3021
-    // FIXME fails with:
-    // 'Left(QScriptPlanningFailed(InternalError(Invalid filter predicate, 'qsu22, must be a mappable function of 'qsu4.,None)))' is not Right (PlannerSpec.scala:63)
-    // trackPending(
-    //   "unify flattened with double-flattened",
-    //   plan(sqlE"""select * from user_comments where (comments[*].id LIKE "%Dr%" OR comments[*].replyTo[*] LIKE "%Dr%")"""),
-    //   IList(ReadOp, ProjectOp, UnwindOp, ProjectOp, UnwindOp, MatchOp, ProjectOp))
+    trackPendingThrow(
+      "unify flattened with double-flattened",
+      plan(sqlE"""select * from user_comments where (comments[*].id LIKE "%Dr%" OR comments[*].replyTo[*] LIKE "%Dr%")"""),
+      IList(ReadOp, ProjectOp, UnwindOp, ProjectOp, UnwindOp, MatchOp, ProjectOp))
 
     "plan complex group by with sorting and limiting" in {
       plan(sqlE"SELECT city, SUM(pop) AS pop FROM zips GROUP BY city ORDER BY pop") must
@@ -830,73 +842,11 @@ class PlannerSpec extends
         false).op)
     }.pendingWithActual("#1560", testFile("plan join with multiple conditions"))
 
-    "plan join with non-JS-able condition" in {
-      plan(sqlE"select z1.city as city1, z1.loc, z2.city as city2, z2.pop from zips as z1 join zips as z2 on z1.loc[*] = z2.loc[*]") must
-      beWorkflow0(
-        joinStructure(
-          chain[Workflow](
-            $read(collection("db", "zips")),
-            $project(
-              reshape(
-                "__tmp0" -> $field("loc"),
-                "__tmp1" -> $$ROOT),
-              IgnoreId),
-            $unwind(DocField(BsonField.Name("__tmp0")))),
-          "__tmp2", $field("__tmp1"),
-          chain[Workflow](
-            $read(collection("db", "zips")),
-            $project(
-              reshape(
-                "__tmp3" -> $field("loc"),
-                "__tmp4" -> $$ROOT),
-              IgnoreId),
-            $unwind(DocField(BsonField.Name("__tmp3")))),
-          reshape("0" -> $field("__tmp0")),
-          ("__tmp5", $field("__tmp4"), reshape(
-            "0" -> $field("__tmp3")).left).left,
-          chain[Workflow](_,
-            $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
-              JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
-            $unwind(DocField(JoinHandler.LeftName)),
-            $unwind(DocField(JoinHandler.RightName)),
-            $project(
-              reshape(
-                "city1" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                      $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-                    $field(JoinDir.Left.name, "city"),
-                    $literal(Bson.Undefined)),
-                "loc" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                      $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-                    $field(JoinDir.Left.name, "loc"),
-                    $literal(Bson.Undefined)),
-                "city2" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                    $field(JoinDir.Right.name, "city"),
-                    $literal(Bson.Undefined)),
-                "pop" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                    $field(JoinDir.Right.name, "pop"),
-                    $literal(Bson.Undefined))),
-              IgnoreId)),
-          false).op)
-    // Q3021
-    // FIXME fails with:
-    // 'Left(QScriptPlanningFailed(InternalError(Invalid join condition, 'qsu21, must be a mappable function of 'qsu11 and 'qsu14.,None)))' is not Right (PendingWithActualTracking.scala:94)
-    // }.pendingWithActual(notOnPar, testFile("plan join with non-JS-able condition"))
-  }.pendingUntilFixed
+    trackPendingErr(
+      "plan join with non-JS-able condition",
+      plan(sqlE"select z1.city as city1, z1.loc, z2.city as city2, z2.pop from zips as z1 join zips as z2 on z1.loc[*] = z2.loc[*]"),
+      IList(), //TODO
+      { case QScriptPlanningFailed(_) => ok })
 
     "plan simple cross" in {
       plan(sqlE"select zips2.city from zips, zips2 where zips.pop < zips2.pop") must
