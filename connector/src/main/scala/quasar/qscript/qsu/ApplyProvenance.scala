@@ -36,7 +36,7 @@ import scalaz.syntax.foldable1._
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
 
-final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
+final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] private () {
   import ApplyProvenance._
   import QScriptUniform._
 
@@ -143,7 +143,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
         case Unreferenced() => dims.empty.point[F]
       }
 
-      computedDims.map(dims.canonicalize).strengthL(root)
+      computedDims strengthL root
   }
 
   ////
@@ -157,13 +157,22 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
   }
 
   private def unexpectedError[F[_]: PlannerErrorME, A](nodeName: String, id: Symbol): F[A] =
-    PlannerErrorME[F].raiseError(
-      InternalError(s"ComputeProvenance: Encountered unexpected $nodeName[$id].", None))
+    PlannerErrorME[F].raiseError(InternalError(s"Encountered unexpected $nodeName[$id].", None))
 }
 
 object ApplyProvenance {
-  def apply[T[_[_]]: BirecursiveT: EqualT]: ApplyProvenance[T] =
-    new ApplyProvenance[T]
+  def apply[
+      T[_[_]]: BirecursiveT: EqualT,
+      F[_]: Monad: PlannerErrorME]
+      (graph: QSUGraph[T])
+      : F[AuthenticatedQSU[T]] =
+    taggedInternalError("ApplyProvenance", new ApplyProvenance[T].apply[F](graph))
+
+  def computeProvenanceƒ[
+      T[_[_]]: BirecursiveT: EqualT,
+      F[_]: Monad: PlannerErrorME]
+      : AlgebraM[F, QSUGraph.QSUPattern[T, ?], (Symbol, Dimensions[QProv.P[T]])] =
+    new ApplyProvenance[T].computeProvenanceƒ[F]
 
   final case class AuthenticatedQSU[T[_[_]]](
       graph: QSUGraph[T],

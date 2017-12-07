@@ -106,7 +106,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
     val renameAccess =
       Access.symbols.modify(rename0) <<< Access.src.modify(rename0)
 
-    dims map (_.transCata[P](pfo.value modify (_ map renameAccess)))
+    canonicalize(dims map (_.transCata[P](pfo.value modify (_ map renameAccess))))
   }
 
   ////

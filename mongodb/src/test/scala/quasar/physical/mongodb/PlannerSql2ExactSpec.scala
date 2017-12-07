@@ -49,7 +49,7 @@ class PlannerSql2ExactSpec extends
     PendingWithActualTracking {
 
   //to write the new actuals:
-  //override val mode = WriteMode
+  // override val mode = WriteMode
 
   import Grouped.grouped
   import Reshape.reshape
@@ -594,27 +594,26 @@ class PlannerSql2ExactSpec extends
       plan(sqlE"select loc || [ 0, 1, 2 ] from zips") must beWorkflow0 {
         chain[Workflow](
           $read(collection("db", "zips")),
-          $simpleMap(NonEmptyList(
-            MapExpr(JsFn(Name("x"),
-              Obj(ListMap(
-                Name("__tmp4") ->
-                  If(
-                    BinOp(jscore.Or,
-                      Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), "loc"))),
-                      Call(ident("isString"), List(Select(ident("x"), "loc")))),
-                    SpliceArrays(List(
-                      Select(ident("x"), "loc"),
-                      Arr(List(
-                        jscore.Literal(Js.Num(0, false)),
-                        jscore.Literal(Js.Num(1, false)),
-                        jscore.Literal(Js.Num(2, false)))))),
-                    ident("undefined"))))))),
-            ListMap()),
           $project(
-            reshape(sigil.Quasar -> $field("__tmp4")),
+            reshape(
+              sigil.Quasar -> $cond(
+                $or(
+                  $and(
+                    $lte($literal(Bson.Arr(List())), $field("loc")),
+                    $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                  $and(
+                    $lte($literal(Bson.Text("")), $field("loc")),
+                    $lt($field("loc"), $literal(Bson.Doc())))),
+                $let(ListMap(
+                  DocVar.Name("a1") -> $field("loc"),
+                  DocVar.Name("a2") -> $literal(Bson.Arr(Bson.Int32(0), Bson.Int32(1), Bson.Int32(2)))),
+                  $cond($and($isArray($field("$a1")), $isArray($field("$a2"))),
+                    $concatArrays(List($field("$a1"), $field("$a2"))),
+                    $concat($field("$a1"), $field("$a2")))),
+                $literal(Bson.Undefined))),
             ExcludeId))
       }
-    }.pendingWithActual(notOnPar, testFile("plan array concat"))
+    }
 
     "plan sum in expression" in {
       plan(sqlE"select sum(pop) * 100 from zips") must
@@ -1212,11 +1211,10 @@ class PlannerSql2ExactSpec extends
       beWorkflow0(chain[Workflow](
         $read(collection("db", "zips")),
         $group(
-          grouped("f0" -> $first($field("city"))),
-          // FIXME: unnecessary but harmless $arrayLit
-          -\/(reshape("0" -> $arrayLit(List($field("city")))))),
+          grouped(),
+          -\/(reshape("0" -> $field("city")))),
         $project(
-          reshape(sigil.Quasar -> $field("f0")),
+          reshape(sigil.Quasar -> $field("_id", "0")),
           ExcludeId)))
     }
 
@@ -1241,7 +1239,7 @@ class PlannerSql2ExactSpec extends
             $read(collection("db", "zips")),
             $group(
               grouped("f0" -> $sum($literal(Bson.Int32(1)))),
-              -\/(reshape("0" -> $arrayLit(List($field("state")))))),
+              -\/(reshape("0" -> $field("state")))),
             $project(
               reshape(
                 sigil.Quasar -> $field("f0")),
@@ -1265,9 +1263,8 @@ class PlannerSql2ExactSpec extends
                       $lt($field("pop"), $literal(Bson.Text("")))),
                     $field("pop"),
                     $literal(Bson.Undefined)))),
-              // FIXME: unnecessary but harmless $arrayLit
-              -\/(reshape("0" -> $arrayLit(List($field("city")))))),
-            $project(reshape("sm" -> $field("f0"))))
+              -\/(reshape("0" -> $field("city")))),
+            $project(reshape("sm" -> $field("f0")), ExcludeId))
         }
     }
 
@@ -1278,14 +1275,12 @@ class PlannerSql2ExactSpec extends
             $read(collection("db", "zips")),
             $group(
               grouped(
-                "f0"  -> $sum($literal(Bson.Int32(1))),
-                "f1"  -> $first($field("city"))),
-              // FIXME: unnecessary but harmless $arrayLit
-              -\/(reshape("0" -> $arrayLit(List($field("city")))))),
+                "f0"  -> $sum($literal(Bson.Int32(1)))),
+              -\/(reshape("0" -> $field("city")))),
             $project(
               reshape(
                 "cnt" -> $field("f0"),
-                "city" -> $field("f1")),
+                "city" -> $field("_id", "0")),
               ExcludeId))
         }
     }
@@ -1297,13 +1292,11 @@ class PlannerSql2ExactSpec extends
             $read(collection("db", "zips")),
             $group(
               grouped(
-                "f0"  -> $first($field("city")),
                 "f1"  -> $sum($literal(Bson.Int32(1)))),
-              // FIXME: unnecessary but harmless $arrayLit
-              -\/(reshape("0" -> $arrayLit(List($field("city")))))),
+              -\/(reshape("0" -> $field("city")))),
             $project(
               reshape(
-                "city" -> $field("f0"),
+                "city" -> $field("_id", "0"),
                 "1"    -> $field("f1")),
               ExcludeId))
         }
@@ -1490,59 +1483,52 @@ class PlannerSql2ExactSpec extends
         beWorkflow0(chain[Workflow](
           $read(collection("db", "zips")),
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
-            obj(
-              "__tmp1" ->
-                Call(ident("remove"),
-                  List(ident("x"), jscore.Literal(Js.Str("_id")))))))),
+            Call(ident("remove"),
+              List(ident("x"), jscore.Literal(Js.Str("_id"))))))),
             ListMap()),
           $group(
             grouped(),
-            -\/(reshape("0" -> $field("__tmp1")))),
+            -\/(reshape("0" -> $$ROOT))),
           $project(
             reshape(sigil.Quasar -> $field("_id", "0")),
             ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan distinct of wildcard"))
+    }
 
     "plan distinct of wildcard as expression" in {
       plan(sqlE"select count(distinct *) from zips") must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "zips")),
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
-            obj(
-              "__tmp4" ->
-                Call(ident("remove"),
-                  List(ident("x"), jscore.Literal(Js.Str("_id")))))))),
+            Call(ident("remove"),
+              List(ident("x"), jscore.Literal(Js.Str("_id")))) ))),
             ListMap()),
           $group(
             grouped(),
-            -\/(reshape("0" -> $field("__tmp4")))),
+            -\/(reshape("0" -> $$ROOT))),
           $group(
-            grouped("__tmp6" -> $sum($literal(Bson.Int32(1)))),
+            grouped("f0" -> $sum($literal(Bson.Int32(1)))),
             \/-($literal(Bson.Null))),
           $project(
-            reshape(sigil.Quasar -> $field("__tmp6")),
+            reshape(sigil.Quasar -> $field("f0")),
             ExcludeId)))
-    }.pendingUntilFixed
+    }
 
     "plan distinct with simple order by" in {
       plan(sqlE"select distinct city from zips order by city") must
         beWorkflow0(
           chain[Workflow](
             $read(collection("db", "zips")),
-            $project(
-              reshape("city" -> $field("city")),
-              IgnoreId),
-            $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Ascending)),
             $group(
               grouped(),
               -\/(reshape("0" -> $field("city")))),
             $project(
-              reshape("city" -> $field("_id", "0")),
+              reshape("f0" -> $field("_id", "0")),
               IgnoreId),
-            $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Ascending))))
-      //at least on agg now, but there's an unnecessary array element selection
-      //Name("0" -> { "$arrayElemAt": [["$_id.0", "$f0"], { "$literal": NumberInt("1") }] })
-    }.pendingUntilFixed
+            $sort(NonEmptyList(BsonField.Name("f0") -> SortDir.Ascending)),
+            $project(
+              reshape(sigil.Quasar-> $field("f0")),
+              ExcludeId)))
+    }
 
     "plan distinct as function with group" in {
       plan(sqlE"select state, count(distinct(city)) from zips group by state") must
@@ -1821,7 +1807,7 @@ class PlannerSql2ExactSpec extends
       plan2_6(sqlE"select smallZips.city from zips join smallZips on zips.`_id` = smallZips.`_id`") must
         beWorkflow0(
           joinStructure(
-            $read(collection("db", "zips")), "__tmp0", $$ROOT,
+            $read(collection("db", "zips")), "0", $$ROOT,
             $read(collection("db", "smallZips")),
             reshape("0" -> $field("_id")),
             Obj(ListMap(Name("0") -> Select(ident("value"), "_id"))).right,
@@ -1829,13 +1815,13 @@ class PlannerSql2ExactSpec extends
               $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
                 JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
                 JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
-              $unwind(DocField(JoinHandler.LeftName)),
               $unwind(DocField(JoinHandler.RightName)),
+              $unwind(DocField(JoinHandler.LeftName)),
               $project(
                 reshape(sigil.Quasar -> $field(JoinDir.Right.name, "city")),
                 ExcludeId)),
             false).op)
-    }.pendingUntilFixed
+    }
 
     "plan simple join with sharded inputs" in {
       // NB: cannot use $lookup, so fall back to the old approach

@@ -36,7 +36,7 @@ object EliminateUnarySpec extends Qspec with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
 
   val qsu = QScriptUniform.DslT[Fix]
-  val elim = EliminateUnary[Fix]
+  val elim = EliminateUnary[Fix] _
 
   val IC = Inject[MapFuncCore, MapFunc]
 

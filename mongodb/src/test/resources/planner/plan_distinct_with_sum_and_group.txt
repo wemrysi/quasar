@@ -4,87 +4,77 @@ Chain
 │  │  ├─ $ReadF(db; zips)
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
-│  │  │  │  ├─ Name("f0" -> {
-│  │  │  │  │       "$sum": {
-│  │  │  │  │         "$cond": [
-│  │  │  │  │           {
-│  │  │  │  │             "$and": [
-│  │  │  │  │               {
-│  │  │  │  │                 "$lt": [
-│  │  │  │  │                   { "$literal": null },
-│  │  │  │  │                   {
-│  │  │  │  │                     "$cond": [
-│  │  │  │  │                       {
-│  │  │  │  │                         "$and": [
-│  │  │  │  │                           { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │  │  │  │                           { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│  │  │  │  │                       },
-│  │  │  │  │                       "$pop",
-│  │  │  │  │                       { "$literal": undefined }]
-│  │  │  │  │                   }]
-│  │  │  │  │               },
-│  │  │  │  │               {
-│  │  │  │  │                 "$lt": [
-│  │  │  │  │                   {
-│  │  │  │  │                     "$cond": [
-│  │  │  │  │                       {
-│  │  │  │  │                         "$and": [
-│  │  │  │  │                           { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │  │  │  │                           { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│  │  │  │  │                       },
-│  │  │  │  │                       "$pop",
-│  │  │  │  │                       { "$literal": undefined }]
-│  │  │  │  │                   },
-│  │  │  │  │                   { "$literal": "" }]
-│  │  │  │  │               }]
-│  │  │  │  │           },
-│  │  │  │  │           {
-│  │  │  │  │             "$cond": [
-│  │  │  │  │               {
-│  │  │  │  │                 "$and": [
-│  │  │  │  │                   { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │  │  │  │                   { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│  │  │  │  │               },
-│  │  │  │  │               "$pop",
-│  │  │  │  │               { "$literal": undefined }]
-│  │  │  │  │           },
-│  │  │  │  │           { "$literal": undefined }]
-│  │  │  │  │       }
-│  │  │  │  │     })
-│  │  │  │  ╰─ Name("f1" -> {
-│  │  │  │          "$first": {
+│  │  │  │  ╰─ Name("f0" -> {
+│  │  │  │          "$sum": {
 │  │  │  │            "$cond": [
 │  │  │  │              {
 │  │  │  │                "$and": [
-│  │  │  │                  { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │  │  │                  { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │  │  │                  {
+│  │  │  │                    "$lt": [
+│  │  │  │                      { "$literal": null },
+│  │  │  │                      {
+│  │  │  │                        "$cond": [
+│  │  │  │                          {
+│  │  │  │                            "$and": [
+│  │  │  │                              { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│  │  │  │                              { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │  │  │                          },
+│  │  │  │                          "$pop",
+│  │  │  │                          { "$literal": undefined }]
+│  │  │  │                      }]
+│  │  │  │                  },
+│  │  │  │                  {
+│  │  │  │                    "$lt": [
+│  │  │  │                      {
+│  │  │  │                        "$cond": [
+│  │  │  │                          {
+│  │  │  │                            "$and": [
+│  │  │  │                              { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│  │  │  │                              { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │  │  │                          },
+│  │  │  │                          "$pop",
+│  │  │  │                          { "$literal": undefined }]
+│  │  │  │                      },
+│  │  │  │                      { "$literal": "" }]
+│  │  │  │                  }]
 │  │  │  │              },
-│  │  │  │              "$city",
+│  │  │  │              {
+│  │  │  │                "$cond": [
+│  │  │  │                  {
+│  │  │  │                    "$and": [
+│  │  │  │                      { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│  │  │  │                      { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │  │  │                  },
+│  │  │  │                  "$pop",
+│  │  │  │                  { "$literal": undefined }]
+│  │  │  │              },
 │  │  │  │              { "$literal": undefined }]
 │  │  │  │          }
 │  │  │  │        })
 │  │  │  ╰─ By
-│  │  │     ╰─ Name("0" -> [
-│  │  │             {
-│  │  │               "$cond": [
-│  │  │                 {
-│  │  │                   "$and": [
-│  │  │                     { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │  │                     { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│  │  │                 },
-│  │  │                 "$city",
-│  │  │                 { "$literal": undefined }]
-│  │  │             }])
+│  │  │     ╰─ Name("0" -> {
+│  │  │             "$cond": [
+│  │  │               {
+│  │  │                 "$and": [
+│  │  │                   { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│  │  │                   { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │  │               },
+│  │  │               "$city",
+│  │  │               { "$literal": undefined }]
+│  │  │           })
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("totalPop" -> "$f0")
-│  │  │  ├─ Name("city" -> "$f1")
+│  │  │  ├─ Name("f0" -> true)
+│  │  │  ├─ Name("f1" -> "$_id.0")
+│  │  │  ╰─ IgnoreId
+│  │  ├─ $ProjectF
+│  │  │  ├─ Name("identities" -> { "qsu27_0": "$_id.0" })
+│  │  │  ├─ Name("value" -> { "totalPop": "$f0", "city": "$f1" })
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
 │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
 │  │  │  ╰─ By
-│  │  │     ├─ Name("0" -> "$identities.qsu18_0")
-│  │  │     ╰─ Name("1" -> "$identities.qsu18_0")
+│  │  │     ╰─ Name("0" -> "$identities.qsu27_0")
 │  │  ╰─ $ProjectF
 │  │     ├─ Name("_id" -> "$_id")
 │  │     ├─ Name("value")
@@ -107,11 +97,7 @@ Chain
 │     │  │     })
 │     │  ╰─ ExcludeId
 │     ├─ $MapF
-│     │  ├─ JavaScript(function (key, value) {
-│     │  │               return [
-│     │  │                 { "0": [value.city], "1": [value.city] },
-│     │  │                 { "left": [], "right": [value] }]
-│     │  │             })
+│     │  ├─ JavaScript(function (key, value) { return [{ "0": value.city }, { "left": [], "right": [value] }] })
 │     │  ╰─ Scope(Map())
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
@@ -138,13 +124,19 @@ Chain
 │  ├─ Map
 │  │  ╰─ Obj
 │  │     ├─ Key(f0)
-│  │     │  ╰─ SpliceObjects
-│  │     │     ├─ JsCore(_.left)
-│  │     │     ╰─ JsCore(_.right)
+│  │     │  ╰─ Obj
+│  │     │     ├─ Key(identities: _.left.identities)
+│  │     │     ╰─ Key(value)
+│  │     │        ╰─ SpliceObjects
+│  │     │           ├─ JsCore(_.left.value)
+│  │     │           ╰─ JsCore(_.right)
 │  │     ╰─ Key(b0)
-│  │        ╰─ SpliceObjects
-│  │           ├─ JsCore(_.left)
-│  │           ╰─ JsCore(_.right)
+│  │        ╰─ Obj
+│  │           ├─ Key(identities: _.left.identities)
+│  │           ╰─ Key(value)
+│  │              ╰─ SpliceObjects
+│  │                 ├─ JsCore(_.left.value)
+│  │                 ╰─ JsCore(_.right)
 │  ╰─ Scope(Map())
 ├─ $GroupF
 │  ├─ Grouped
@@ -152,5 +144,5 @@ Chain
 │  ╰─ By
 │     ╰─ Name("0" -> "$b0")
 ╰─ $ProjectF
-   ├─ Name("__quasar_mongodb_sigil" -> "$f0")
+   ├─ Name("__quasar_mongodb_sigil" -> "$f0.value")
    ╰─ ExcludeId

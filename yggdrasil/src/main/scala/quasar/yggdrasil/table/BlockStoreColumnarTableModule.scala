@@ -317,8 +317,21 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
       }
     }
 
-    def addGlobalId(spec: TransSpec1) = {
-      Scan(WrapArray(spec), addGlobalIdScanner)
+    // Note: invertedGlobalIdScanner is needed for cases where we sort by descending order.
+    // In that situation we need to tag items we are sorting with a monotonically decreasing
+    // sequence to allow the use of a stable sort. Without it, descendingly ordering repeated
+    // keys yields incorrect results.
+    object invertedGlobalIdScanner extends CScanner {
+      type A = Long
+      val init = 0l
+      def scan(a: Long, cols: Map[ColumnRef, Column], range: Range): (A, Map[ColumnRef, Column]) = {
+        val globalIdColumn = new RangeColumn(range) with LongColumn { def apply(row: Int) = a - row }
+        (a - range.end - 1, cols + (ColumnRef(CPath(CPathIndex(1)), CLong) -> globalIdColumn))
+      }
+    }
+
+    def addGlobalId(spec: TransSpec1, inverse: Boolean = false) = {
+      Scan(WrapArray(spec), if (inverse) invertedGlobalIdScanner else addGlobalIdScanner)
     }
 
     def apply(slices: StreamT[M, Slice], size: TableSize): Table = {
@@ -490,7 +503,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
             case MoreLeft(span, leq, ridx, req) =>
               def next(lbs: JDBMState, rbs: JDBMState): M[(JDBMState, JDBMState)] = ltail.uncons flatMap {
                 case Some((lhead0, ltail0)) =>
-                  ///println("Continuing on left; not emitting right.")
+                  //println("Continuing on left; not emitting right.")
                   val nextState = (span: @unchecked) match {
                     case NoSpan => FindEqualAdvancingLeft(ridx, rkey)
                     case LeftSpan =>
@@ -1152,7 +1165,11 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
       // in a distinct "row id" for each value to disambiguate it
       val (sourceTrans0, keyTrans0, valueTrans0) = if (!unique) {
         (
-          addGlobalId(Leaf(Source)),
+
+          // Note: Check sortOrder to determine if we use invertedGlobalIdScanner
+          // or not. Otherwise desc sorting of repeated keys with monotonically increasing
+          // tags fails.
+          addGlobalId(Leaf(Source), sortOrder == SortDescending),
           groupKeys map { kt =>
             OuterObjectConcat(WrapObject(deepMap(kt) { case Leaf(_) => TransSpec1.DerefArray0 }, "0"), WrapObject(TransSpec1.DerefArray1, "1"))
           },

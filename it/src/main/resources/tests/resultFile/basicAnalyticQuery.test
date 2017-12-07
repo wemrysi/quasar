@@ -11,7 +11,7 @@
         "mongodb_read_only": "skip",
         "spark_cassandra":   "pending"
     },
-    "NB": "Pending on mongo due to #3152 (actually skipped because it's REALLY flaky)",
+    "NB": "Pending on mongo due to #3176",
     "NB": "Pending on couchbase due to #3158",
     "data": "../zips.data",
     "query": "SELECT state, COUNT(*) AS count, SUM(pop) AS sum, AVG(pop) AS avg, MIN(pop) AS min, MAX(pop) AS max FROM `../zips` WHERE pop > 10000 GROUP BY state ORDER BY max DESC, state OFFSET 1 LIMIT 10",

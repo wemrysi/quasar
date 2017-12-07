@@ -30,7 +30,7 @@ import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.frontend.SemanticErrors
 import quasar.frontend.logicalplan.LogicalPlan
-import quasar.fp._, ski._, numeric._
+import quasar.fp._, ski._, numeric.widenPositive
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.main.{analysis, FilesystemQueries, Prettify}
@@ -39,11 +39,15 @@ import quasar.sql.Sql
 import quasar.sql
 
 import argonaut._, Argonaut._
+import eu.timepit.refined.refineV
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import matryoshka.data.Fix
 import pathy.Path, Path._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
+import shapeless.nat._0
 import spire.std.double._
 
 object Repl {
@@ -80,7 +84,7 @@ object Repl {
     cwd:          ADir,
     debugLevel:   DebugLevel,
     phaseFormat:  PhaseFormat,
-    summaryCount: Int,
+    summaryCount: Option[Int Refined Positive],
     format:       OutputFormat,
     variables:    Map[String, String]) {
 
@@ -178,8 +182,14 @@ object Repl {
           P.println(s"Set debug level: $level")
 
       case SummaryCount(rows) =>
-        RS.modify(_.copy(summaryCount = rows)) *>
-          P.println(s"Set rows to show in result: $rows")
+        val positive = refineV[Positive](rows).fold(
+          _ => DF.fail("Rows must be a positive integer or 0 to indicate no limit"),
+          _.some.point[Free[S, ?]])
+        for {
+          newCount <- if (rows === 0) none.point[Free[S, ?]] else positive
+          _        <- RS.modify(_.copy(summaryCount = newCount))
+          _        <- P.println(s"Set rows to show in result: $rows")
+        } yield ()
 
       case Format(fmt) =>
         RS.modify(_.copy(format = fmt)) *>
@@ -223,28 +233,24 @@ object Repl {
         } yield ()
 
       case Select(n, q) =>
-        n.cata(
-          name => {
-            for {
-              state <- RS.get
-              out   =  state.cwd </> file(name)
-              expr  <- DF.unattempt_(sql.fixParser.parse(q.value).leftMap(_.message))
-              block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
-              query =  fsQ.executeQuery(block, Variables.fromMap(state.variables), state.cwd, out)
-              _     <- runQuery(state, query)(κ(
-                         P.println("Wrote file: " + posixCodec.printPath(out))))
-            } yield ()
-          },
-          for {
-            state <- RS.get
-            expr  <- DF.unattempt_(sql.fixParser.parse(q.value).leftMap(_.message))
-            vars  =  Variables.fromMap(state.variables)
-            lim   =  (state.summaryCount > 0).option(state.summaryCount)
-            block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
-            query =  fsQ.queryResults(block, vars, state.cwd, 0L, lim >>= (l => Positive(l + 1L)))
+        for {
+          state <- RS.get
+          expr  <- DF.unattempt_(sql.fixParser.parse(q.value).leftMap(_.message))
+          block <- DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message))
+          vars  = Variables.fromMap(state.variables)
+          _     <- n.cata(name =>
+                   {
+                     val out = state.cwd </> file(name)
+                     val query = fsQ.executeQuery(block, Variables.fromMap(state.variables), state.cwd, out)
+                     runQuery(state, query)(κ(
+                       P.println("Wrote file: " + posixCodec.printPath(out))))
+                   },
+                   {
+                     val query = fsQ.queryResults(block, vars, state.cwd, 0L, state.summaryCount.map(widenPositive[Refined, _0]))
                        .map(_.toVector)
-            _     <- runQuery(state, query)(ds => summarize[S](lim, state.format)(ds))
-          } yield ())
+                     runQuery(state, query)(ds => summarize[S](state.summaryCount.map(_.value), state.format)(ds))
+                   })
+        } yield ()
 
       case Explain(q) =>
         for {

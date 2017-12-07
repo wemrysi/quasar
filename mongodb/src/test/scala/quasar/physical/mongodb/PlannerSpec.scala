@@ -40,7 +40,7 @@ class PlannerSpec extends
     PendingWithActualTracking {
 
   //to write the new actuals:
-  // override val mode = WriteMode
+  //override val mode = WriteMode
 
   import Grouped.grouped
   import Reshape.reshape
@@ -53,15 +53,17 @@ class PlannerSpec extends
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     PlannerHelpers.plan(query)
 
-  def trackPending(name: String, plan: Either[FileSystemError, Crystallized[WorkflowF]], expectedOps: IList[MongoOp]) = {
+  def trackPending(name: String, plan: => Either[FileSystemError, Crystallized[WorkflowF]], expectedOps: IList[MongoOp]) = {
     name >> {
+      lazy val plan0 = plan
+
       s"plan: $name" in {
-        plan must beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps))
+        plan0 must beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps))
       }.pendingUntilFixed
 
-      s"track: $name" in {
-        plan must beRight.which(cwf => trackActual(cwf, testFile(s"plan $name")))
-      }
+      // s"track: $name" in {
+      //   plan0 must beRight.which(cwf => trackActual(cwf, testFile(s"plan $name")))
+      // }
     }
   }
 
@@ -106,18 +108,10 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp)))
     }
 
-    // Q3171
-    // FIXME errors with
-    // [error]     java.lang.IndexOutOfBoundsException: 1
-    // [error]     	at scala.collection.LinearSeqOptimized$class.apply(LinearSeqOptimized.scala:65)
-    // [error]     	at scala.collection.immutable.List.apply(List.scala:84)
-    // [error]     	at scala.collection.immutable.List.apply(List.scala:84)
-    // [error]     	at scalaz.$bslash$div.fold(Either.scala:57)
-    // [error]     	at quasar.qscript.analysis.OutlineInstances$$anon$3.quasar$qscript$analysis$OutlineInstances$$anon$3$$$anonfun$24(Outline.scala:263)
-    // trackPending(
-    //   "group by simple expression",
-    //   plan(sqlE"select city, sum(pop) from extraSmallZips group by lower(city)"),
-    //   IList(ReadOp, GroupOp, UnwindOp))
+    trackPending(
+      "group by simple expression",
+      plan(sqlE"select city, sum(pop) from extraSmallZips group by lower(city)"),
+      IList(ReadOp, GroupOp, UnwindOp, ProjectOp))
 
     "group by month" in {
       plan(sqlE"""select avg(epoch), date_part("month", `ts`) from days group by date_part("month", `ts`)""") must
@@ -165,10 +159,10 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp)))
     }
 
-    trackPending(
-      "length of min (JS on top of reduce)",
-      plan3_2(sqlE"select state, length(min(city)) as shortest from zips group by state"),
-      IList(ReadOp, GroupOp, ProjectOp, SimpleMapOp, ProjectOp))
+    "length of min (JS on top of reduce)" in {
+      plan3_2(sqlE"select state, length(min(city)) as shortest from zips group by state") must
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, GroupOp, ProjectOp, SimpleMapOp, ProjectOp)))
+    }
 
     "plan js expr grouped by js expr" in {
       plan3_2(sqlE"select length(city) as len, count(*) as cnt from zips group by length(city)") must

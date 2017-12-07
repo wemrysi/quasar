@@ -1,0 +1,23 @@
+{
+    "name": "conditional_input_step2",
+    "data": "patients.data",
+    "backends": {
+       "couchbase":         "ignoreFieldOrder",
+       "marklogic_json":    "ignoreFieldOrder",
+       "mimir":             "ignoreFieldOrder"
+    },
+    "query": "SELECT first_name, last_name, gender FROM patients WHERE state = \"CO\" AND (CASE \"both\" WHEN \"male\" THEN gender = \"male\" WHEN \"female\" THEN gender = \"female\" WHEN \"both\" THEN gender IN (\"male\", \"female\") END) AND (CASE WHEN 40 > 0 THEN age >= 40 ELSE age > 0 END) AND (CASE WHEN 55 > 0 THEN age <= 55 ELSE age > 0 END) ORDER BY last_name LIMIT 10",
+    "predicate": "exactly",
+    "expected": [
+          { "first_name": "Valene", "last_name":   "Andrews"   , "gender": "female"  },
+          { "first_name": "Cleo", "last_name":     "Ashley"    , "gender": "male"    },
+          { "first_name": "Tomas", "last_name":    "Boyle"     , "gender": "male"    },
+          { "first_name": "Eustolia", "last_name": "Calhoun"   , "gender": "female"  },
+          { "first_name": "Lavern", "last_name":   "Campbell"  , "gender": "male"    },
+          { "first_name": "Rosia", "last_name":    "David"     , "gender": "female"  },
+          { "first_name": "Cristine", "last_name": "Davila"    , "gender": "female"  },
+          { "first_name": "Jewell", "last_name":   "Day"       , "gender": "male"    },
+          { "first_name": "Austin", "last_name":   "Gordon"    , "gender": "male"    },
+          { "first_name": "Angelo", "last_name":   "Harmon"    , "gender": "male"    }
+    ]
+}

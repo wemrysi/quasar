@@ -43,7 +43,7 @@ import monocle.Lens
 import scalaz.{Foldable, Free, Functor, IMap, ISet, Monad, NonEmptyList, StateT, Traverse}
 import scalaz.Scalaz._
 
-final class ReifyIdentities[T[_[_]]: BirecursiveT] extends QSUTTypes[T] {
+final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
   import ReifyIdentities.ResearchedQSU
 
   def apply[F[_]: Monad: NameGenerator](graph: QSUGraph): F[ResearchedQSU[T]] =
@@ -443,6 +443,8 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] extends QSUTTypes[T] {
 object ReifyIdentities {
   final case class ResearchedQSU[T[_[_]]](refs: References[T], graph: QSUGraph[T])
 
-  def apply[T[_[_]]: BirecursiveT]: ReifyIdentities[T] =
-    new ReifyIdentities[T]
+  def apply[T[_[_]]: BirecursiveT, F[_]: Monad: NameGenerator]
+      (graph: QSUGraph[T])
+      : F[ResearchedQSU[T]] =
+    new ReifyIdentities[T].apply[F](graph)
 }

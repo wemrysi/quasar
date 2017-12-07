@@ -20,6 +20,8 @@ import slamdata.Predef._
 
 import quasar.NameGenerator
 import quasar.common.JoinType
+import quasar.ejson.implicits._
+import quasar.fp.{coproductEqual, symbolOrder}
 import quasar.qscript.{
   construction,
   Center,
@@ -30,13 +32,14 @@ import quasar.qscript.{
   RightSideF}
 import quasar.qscript.provenance.Dimensions
 import quasar.qscript.MapFuncsCore.StrLit
+import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
 import matryoshka._
+import matryoshka.data.free._
 import scalaz.{Monad, WriterT}
 import scalaz.Scalaz._
 
-final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
-  import ApplyProvenance.AuthenticatedQSU
+final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSUTTypes[T] {
   import QSUGraph.Extractors._
 
   def apply[F[_]: Monad: NameGenerator](qsu: AuthenticatedQSU[T])
@@ -119,6 +122,10 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
 }
 
 object ReifyAutoJoins {
-  def apply[T[_[_]]: BirecursiveT: EqualT]: ReifyAutoJoins[T] =
-    new ReifyAutoJoins[T]
+  def apply[
+      T[_[_]]: BirecursiveT: EqualT,
+      F[_]: Monad: NameGenerator]
+      (qsu: AuthenticatedQSU[T])
+      : F[AuthenticatedQSU[T]] =
+    new ReifyAutoJoins[T].apply[F](qsu)
 }
