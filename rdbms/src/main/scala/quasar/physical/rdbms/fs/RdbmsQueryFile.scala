@@ -33,7 +33,8 @@ import quasar.physical.rdbms.model.DbDataStream
 import quasar.physical.rdbms.planner.RenderQuery
 import quasar.physical.rdbms.planner.sql.SqlExpr
 
-import doobie.imports._
+import doobie.syntax.process._
+import doobie.util.fragment.Fragment
 import matryoshka.data.Fix
 import pathy.Path
 import scalaz._
@@ -61,18 +62,18 @@ trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] {
         .traverse { q =>
           val tablePath = TablePath.create(out)
           val cmd = Fragment.const("CREATE TABLE") ++
-            Fragment.const(tablePath.shows) ++
-            Fragment.const("AS") ++
-            Fragment.const(q)
-          cmd.update.run.liftB
-        }).void
+          Fragment.const(tablePath.shows) ++
+          Fragment.const("AS") ++
+          Fragment.const(q)
+        cmd.update.run.liftB
+      }).void
     }
 
     override def resultsCursor(repr: Fix[SqlExpr]): Backend[DbDataStream] = {
       ME.unattempt(renderQuery.asString(repr)
         .leftMap(QScriptPlanningFailed.apply)
         .traverse { qStr =>
-          MRT.ask.map { xa =>
+        MRT.ask.map { xa =>
             DbDataStream(Fragment.const(qStr)
               .query[Data]
               .process
@@ -81,7 +82,7 @@ trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] {
                 emit(readFailed(qStr, ex.getLocalizedMessage)))
               .transact(xa))
           }.liftB
-        })
+     })
     }
 
     override def nextChunk(c: DbDataStream): Backend[(DbDataStream, Vector[Data])] =
@@ -99,12 +100,12 @@ trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] {
       val schema = TablePath.dirToSchema(dir)
       schemaExists(schema).liftB.flatMap(_.unlessM(ME.raiseError(pathErr(pathNotFound(dir))))) *>
         (for {
-          childSchemas <- findChildSchemas(schema)
-          childTables <- findChildTables(schema)
-          childDirs = childSchemas.filter(_.isDirectChildOf(schema)).map(d => -\/(d.lastDirName)).toSet
-          childFiles = childTables.map(t => \/-(Path.FileName(t.shows))).toSet
-        }
-          yield childDirs ++ childFiles).liftB
+        childSchemas <- findChildSchemas(schema)
+        childTables <- findChildTables(schema)
+        childDirs = childSchemas.filter(_.isDirectChildOf(schema)).map(d => -\/(d.lastDirName)).toSet
+        childFiles = childTables.map(t => \/-(Path.FileName(t.shows))).toSet
+      }
+        yield childDirs ++ childFiles).liftB
     }
 
     override def closeCursor(c: DbDataStream): Configured[Unit] =
