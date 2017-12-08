@@ -31,7 +31,9 @@ sealed trait ColumnType
 case object JsonCol extends ColumnType
 case object StringCol extends ColumnType
 case object IntCol extends ColumnType
+case object DecCol extends ColumnType
 case object NullCol extends ColumnType
+case object BoolCol extends ColumnType
 
 final case class ColumnDesc(name: String, tpe: ColumnType) {
 
@@ -149,10 +151,12 @@ object TableModel {
 
   def simpleColumnType(data: Data): ColumnType = {
     data match {
-      case Data.Null   => NullCol
-      case Data.Str(_) => StringCol
-      case Data.Int(_) => IntCol
-      case _           => NullCol // TODO support all types
+      case Data.Null    => NullCol
+      case Data.Str(_)  => StringCol
+      case Data.Int(_)  => IntCol
+      case Data.Bool(_) => BoolCol
+      case Data.Dec(_)  => DecCol
+      case _            => NullCol // TODO support all types
     }
   }
 

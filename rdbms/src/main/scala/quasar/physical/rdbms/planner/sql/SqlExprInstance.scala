@@ -45,28 +45,36 @@ trait SqlExprTraverse {
       case IsNotNull(v)        => f(v) ∘ IsNotNull.apply
       case IfNull(v)           => v.traverse(f) ∘ (IfNull(_))
       case RowIds()            => G.point(RowIds())
-      case AllCols(v)          => G.point(AllCols(v))
+      case AllCols()          =>  G.point(AllCols())
       case NumericOp(op, left, right) => (f(left) ⊛ f(right))(NumericOp(op, _, _))
       case Mod(a1, a2)         => (f(a1) ⊛ f(a2))(Mod.apply)
       case Pow(a1, a2)         => (f(a1) ⊛ f(a2))(Pow.apply)
       case And(a1, a2)         => (f(a1) ⊛ f(a2))(And(_, _))
       case Or(a1, a2)          => (f(a1) ⊛ f(a2))(Or(_, _))
       case Neg(v)              => f(v) ∘ Neg.apply
+      case ToJson(v)           => f(v) ∘ ToJson.apply
       case WithIds(v)          => f(v) ∘ WithIds.apply
 
-      case Select(selection, from, filterOpt) =>
+      case Select(selection, from, filterOpt, order) =>
+        val newOrder = order.traverse(o => f(o.v).map(newV => OrderBy(newV, o.sortDir)))
         val sel = f(selection.v) ∘ (i => Selection(i, selection.alias ∘ (a => Id[B](a.v))))
-        (sel ⊛
-          (f(from.v) ∘ (From(_, from.alias ∘ (a => Id[B](a.v))))) ⊛
-          filterOpt.traverse(i => f(i.v) ∘ Filter.apply))(
-          Select(_, _, _)
-        )
+        val alias = f(from.v).map(b => From(b, Id[B](from.alias.v)))
 
-      case SelectRow(selection, from) =>
-        val sel = f(selection.v) ∘ (i => Selection(i, selection.alias ∘ (a => Id[B](a.v))))
         (sel ⊛
-          (f(from.v) ∘ (From(_, from.alias ∘ (a => Id[B](a.v))))))(
-          SelectRow(_, _)
+          alias ⊛
+          filterOpt.traverse(i => f(i.v) ∘ Filter.apply) ⊛
+          newOrder)(
+          Select(_, _, _, _)
+        )
+      case SelectRow(selection, from, order) =>
+        val newOrder = order.traverse(o => f(o.v).map(newV => OrderBy(newV, o.sortDir)))
+        val sel = f(selection.v) ∘ (i => Selection(i, selection.alias ∘ (a => Id[B](a.v))))
+        val alias = f(from.v).map(b => From(b, Id[B](from.alias.v)))
+
+        (sel ⊛
+          alias ⊛
+          newOrder)(
+          SelectRow(_, _, _)
         )
 
       case Case(wt, Else(e)) =>
@@ -75,6 +83,9 @@ trait SqlExprTraverse {
           )((wt, e) =>
           Case(wt, Else(e))
         )
+
+      case Coercion(t, e) => f(e) ∘ (Coercion(t, _))
+
     }
   }
 }

@@ -18,6 +18,8 @@ package quasar.physical.rdbms.planner.sql
 
 import slamdata.Predef._
 import quasar.Data
+import quasar.common.SortDir
+import quasar.physical.rdbms.model.ColumnType
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case.{Else, WhenThen}
 
 import scalaz.{NonEmptyList, OneAnd}
@@ -35,7 +37,6 @@ object SqlExpr extends SqlExprInstances {
       Refs(other.elems ++ this.elems)
     }
   }
-
   final case class Null[T]() extends SqlExpr[T]
   final case class Obj[T](m: List[(T, T)]) extends SqlExpr[T]
   final case class IsNotNull[T](a1: T) extends SqlExpr[T]
@@ -44,15 +45,17 @@ object SqlExpr extends SqlExprInstances {
   final case class IfNull[T](a: OneAnd[NonEmptyList, T]) extends SqlExpr[T]
   final case class ExprWithAlias[T](expr: T, alias: String) extends SqlExpr[T]
   final case class ExprPair[T](a: T, b: T) extends SqlExpr[T]
+  final case class ToJson[T](a: T) extends SqlExpr[T]
 
-  final case class SelectRow[T](selection: Selection[T], from: From[T])
+  final case class SelectRow[T](selection: Selection[T], from: From[T], orderBy: List[OrderBy[T]])
       extends SqlExpr[T]
 
   final case class Select[T](selection: Selection[T],
                              from: From[T],
-                             filter: Option[Filter[T]])
+                             filter: Option[Filter[T]],
+                             orderBy: List[OrderBy[T]])
       extends SqlExpr[T]
-  final case class From[T](v: T, alias: Option[Id[T]])
+  final case class From[T](v: T, alias: Id[T])
   final case class Selection[T](v: T, alias: Option[Id[T]])
   final case class Table[T](name: String) extends SqlExpr[T]
 
@@ -64,14 +67,17 @@ object SqlExpr extends SqlExprInstances {
   final case class And[T](a1: T, a2: T) extends SqlExpr[T]
   final case class Or[T](a1: T, a2: T) extends SqlExpr[T]
 
+  final case class Coercion[T](t: ColumnType, e: T) extends SqlExpr[T]
+
   final case class Constant[T](data: Data) extends SqlExpr[T]
 
   final case class RegexMatches[T](a1: T, a2: T) extends SqlExpr[T]
   object Select {
     final case class Filter[T](v: T)
     final case class RowIds[T]() extends SqlExpr[T]
-    final case class AllCols[T](alias: String) extends SqlExpr[T]
+    final case class AllCols[T]() extends SqlExpr[T]
     final case class WithIds[T](v: T) extends SqlExpr[T]
+    final case class OrderBy[T](v: T, sortDir: SortDir)
   }
 
   object IfNull {

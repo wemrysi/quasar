@@ -64,12 +64,14 @@ trait SqlExprRenderTree {
             nonTerminal("Time", a1)
           case Id(v) =>
             Terminal("Id" :: Nil, v.some)
+          case ToJson(v) =>
+            nonTerminal("ToJson", v)
           case Table(v) =>
             Terminal("Table" :: Nil, v.some)
           case RowIds() =>
             Terminal("row ids" :: Nil, none)
-          case AllCols(alias) =>
-            Terminal(s"* ($alias)" :: Nil, none)
+          case AllCols() =>
+            Terminal(s"*" :: Nil, none)
           case WithIds(v) =>
             nonTerminal("With ids", v)
           case NumericOp(op, left, right) =>
@@ -86,28 +88,37 @@ trait SqlExprRenderTree {
             nonTerminal("Or", a1, a2)
           case Refs(srcs) =>
             nonTerminal("References", srcs:_*)
-          case Select(selection, from, filter) =>
+          case Select(selection, from, filter, order) =>
             NonTerminal(
               "Select" :: Nil,
               none,
               nt("selection", selection.alias ∘ (_.v), selection.v) ::
-                nt("from", from.alias ∘ (_.v), from.v) ::
-                (filter ∘ (f => nt("filter", none, f.v))).toList
+                nt("from", from.alias.v.some, from.v) ::
+                (filter ∘ (f => nt("filter", none, f.v))).toList ++
+                  order.map {
+                    o =>
+                      nt(s"OrderBy ${o.sortDir}", none, o.v)
+                  }
             )
-          case SelectRow(selection, from) =>
+          case SelectRow(selection, from, order) =>
 
             NonTerminal(
               "SelectRow" :: Nil,
               none,
               nt("selectionInRow", selection.alias ∘ (_.v), selection.v) ::
-                List(nt("fromInRow`", from.alias ∘ (_.v), from.v))
+                List(nt("fromInRow", from.alias.v.some, from.v)) ++
+                order.map {
+                  o =>
+                    nt(s"OrderBy ${o.sortDir}", none, o.v)
+                }
             )
 
           case Case(wt, e) =>
             NonTerminal("Case" :: Nil, none,
               (wt ∘ (i => nonTerminal("whenThen", i.when, i.`then`))).toList :+
                 nonTerminal("else", e.v))
-
+          case Coercion(t, e) =>
+            nonTerminal(s"Coercion: $t", e)
         }
       }
     }

@@ -17,11 +17,13 @@
 package quasar.physical.rdbms.planner
 
 import slamdata.Predef._
+import quasar.common.SortDir
 import quasar.fp.ski._
 import quasar.{NameGenerator, qscript}
 import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
+import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.qscript.{FreeMap, MapFunc, QScriptCore}
 
 import matryoshka._
@@ -31,27 +33,56 @@ import matryoshka.patterns._
 import scalaz.Scalaz._
 import scalaz._
 
-class QScriptCorePlanner[T[_[_]]: CorecursiveT,
+class QScriptCorePlanner[T[_[_]]: BirecursiveT,
 F[_]: Monad: NameGenerator: PlannerErrorME](
     mapFuncPlanner: Planner[T, F, MapFunc[T, ?]])
     extends Planner[T, F, QScriptCore[T, ?]] {
 
-  def processFreeMap(f: FreeMap[T], alias: SqlExpr.Id[T[SqlExpr]]): F[T[SqlExpr]] =
+  def * : T[SqlExpr] = AllCols[T[SqlExpr]]().embed
+
+  def processFreeMap(f: FreeMap[T],
+                     alias: SqlExpr.Id[T[SqlExpr]]): F[T[SqlExpr]] =
     f.cataM(interpretM(κ(alias.embed.η[F]), mapFuncPlanner.plan))
 
   def plan: AlgebraM[F, QScriptCore[T, ?], T[SqlExpr]] = {
     case qscript.Map(src, f) =>
       for {
-        generatedAlias <- genId[T[SqlExpr], F]
-        selection <- processFreeMap(f, generatedAlias)
+        fromAlias <- genId[T[SqlExpr], F]
+        selection <- processFreeMap(f, fromAlias)
+          .map(_.project match {
+            case SqlExpr.Id(_) => *
+            case other => other.embed
+          })
       } yield
         Select(
           Selection(selection, none),
-          From(src, generatedAlias.some),
-          filter = none
+          From(src, fromAlias),
+          filter = none,
+          orderBy = nil
         ).embed
     case qscript.Sort(src, bucket, order) =>
-      SqlExpr.Id[T[SqlExpr]]("TODO").embed.point[F]
+      def createOrderBy(id: SqlExpr.Id[T[SqlExpr]]):
+      ((FreeMap[T], SortDir)) => F[OrderBy[T[SqlExpr]]] = {
+        case (qs, dir) =>
+          processFreeMap(qs, id).map { expr =>
+            OrderBy(expr, dir)
+          }
+      }
+
+      for {
+        fromAlias <- genId[T[SqlExpr], F]
+        orderByExprs <- order.traverse(createOrderBy(fromAlias))
+        bucketExprs <- bucket.map((_, orderByExprs.head.sortDir)).traverse(createOrderBy(fromAlias))
+      }
+        yield {
+          Select(
+            Selection(*, none),
+            From(src, fromAlias),
+            filter = none,
+            orderBy = bucketExprs ++ orderByExprs.toList
+          ).embed
+        }
+
     case other =>
       PlannerErrorME[F].raiseError(
         InternalError.fromMsg(s"unsupported QScriptCore: $other"))
