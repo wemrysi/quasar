@@ -32,6 +32,7 @@ import matryoshka.data._
 import matryoshka.data.free._
 import pathy.Path
 import scalaz.{\/, \/-, EitherT, ICons, INil, Need, NonEmptyList => NEL, StateT}
+import scalaz.Scalaz._
 
 object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
   import QScriptUniform.{DTrans, Retain, Rotation}
@@ -134,8 +135,8 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
     }
 
     "convert mappable sort keys" >> {
-      val key1 = func.ProjectKey(func.Hole, func.Constant(ejs.str("foo")))
-      val key2 = func.ProjectKey(func.Hole, func.Constant(ejs.str("bar")))
+      val key1 = projectStrKey("foo")
+      val key2 = projectStrKey("foo")
 
       val graph: QSUGraph = QSUGraph.fromTree[Fix](
         qsu.lpSort(
@@ -150,6 +151,82 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
             Nil,
             NEL((fm1, SortDir.Ascending), ICons((fm2, SortDir.Descending), INil())))) =>
           (fm1 must_= key1) and (fm2 must_= key2)
+      }
+    }
+
+    "convert transposed sort key and mappable sort key" >> {
+      val key1 = projectStrKey("foo")
+      val key2 = projectStrKey("bar")
+
+      val graph: QSUGraph = QSUGraph.fromTree[Fix](
+        qsu.lpSort(
+          qsu.read(orders),
+          NEL[(Fix[QSU], SortDir)](
+            qsu.map(qsu.read(orders), key1) -> SortDir.Ascending,
+            qsu.transpose(qsu.map(qsu.read(orders), key2), Retain.Values, Rotation.ShiftMap) -> SortDir.Descending)))
+
+      evaluate(extractFM(graph)) must beLike {
+        case \/-(Map(
+            QSSort(
+              AutoJoin2(
+                Read(`orders`),
+                Transpose(Map(Read(`orders`), fm), Retain.Values, Rotation.ShiftMap),
+                autojoinCondition),
+              Nil,
+              NEL((fm1, SortDir.Ascending), ICons((fm2, SortDir.Descending), INil()))),
+            valueAccess)) =>   // FIXME don't explicitly test for generated names
+          (fm must_= key2) and
+          (fm1 must_= key1 >> projectStrKey("sort_source")) and
+          (fm2 must_= projectStrKey("__fromTree3")) and
+          (valueAccess must_= projectStrKey("sort_source")) and
+          (autojoinCondition must_= func.ConcatMaps(
+            func.MakeMap(func.Constant(ejs.str("sort_source")), func.LeftSide),
+            func.MakeMap(func.Constant(ejs.str("__fromTree3")), func.RightSide)))
+      }
+    }
+
+    "convert two transposed sort keys and two mappable sort keys" >> {
+      val key1 = projectStrKey("key1")
+      val key2 = projectStrKey("key2")
+      val key3 = projectStrKey("key3")
+      val key4 = projectStrKey("key4")
+
+      val graph: QSUGraph = QSUGraph.fromTree[Fix](
+        qsu.lpSort(
+          qsu.read(orders),
+          NEL[(Fix[QSU], SortDir)](
+            qsu.map(qsu.read(orders), key1) -> SortDir.Ascending,
+            qsu.transpose(qsu.map(qsu.read(orders), key2), Retain.Values, Rotation.ShiftMap) -> SortDir.Descending,
+            qsu.map(qsu.read(orders), key3) -> SortDir.Descending,
+            qsu.transpose(qsu.map(qsu.read(orders), key4), Retain.Identities, Rotation.ShiftArray) -> SortDir.Ascending)))
+
+      evaluate(extractFM(graph)) must beLike {
+        case \/-(Map(
+            QSSort(
+              AutoJoin2(
+                AutoJoin2(
+                  Read(`orders`),
+                  Transpose(Map(Read(`orders`), innerFM), Retain.Values, Rotation.ShiftMap),
+                  innerAutojoinCondition),
+                Transpose(Map(Read(`orders`), outerFM), Retain.Identities, Rotation.ShiftArray),
+                outerAutojoinCondition),
+              Nil,
+              NEL(
+                (fm1, SortDir.Ascending), ICons((fm2, SortDir.Descending), ICons((fm3, SortDir.Descending), ICons((fm4, SortDir.Ascending), INil()))))),
+            valueAccess)) =>  // FIXME don't explicitly test for generated names
+          (innerFM must_= key2) and
+          (outerFM must_= key4) and
+          (fm1 must_= key1 >> projectStrKey("sort_source")) and
+          (fm2 must_= projectStrKey("__fromTree3")) and
+          (fm3 must_= key3 >> projectStrKey("sort_source")) and
+          (fm4 must_= projectStrKey("__fromTree6")) and
+          (valueAccess must_= projectStrKey("sort_source")) and
+          (innerAutojoinCondition must_= func.ConcatMaps(
+            func.MakeMap(func.Constant(ejs.str("sort_source")), func.LeftSide),
+            func.MakeMap(func.Constant(ejs.str("__fromTree3")), func.RightSide))) and
+          (outerAutojoinCondition must_= func.ConcatMaps(
+            func.LeftSide,
+            func.MakeMap(func.Constant(ejs.str("__fromTree6")), func.RightSide)))
       }
     }
   }

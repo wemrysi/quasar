@@ -83,50 +83,58 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
         case ((\/-(sym), _)) => sym
       }
 
-      def autojoinVerts(initial: Symbol): F[(Symbol, QSUVerts[T])] =
-        nonmappable.foldLeftM((initial, graph.vertices)) {
-          case ((src, verts), sym) =>
-            freshName[F].map { joinRoot =>
-              val join: QSU[Symbol] =
-	            AutoJoin2(src, sym, func.ConcatMaps(func.LeftSide, func.MakeMapS(sym.name, func.RightSide)))
-	          (joinRoot, verts.updated(joinRoot, join))
-            }
-        }
+      def autojoinVerts(head: Symbol, tail: List[Symbol]): F[(Symbol, QSUVerts[T])] = {
+        freshName[F].flatMap { joinRoot =>
+          val join: QSU[Symbol] = AutoJoin2(src.root, head,
+            func.ConcatMaps(func.MakeMapS("sort_source", func.LeftSide), func.MakeMapS(head.name, func.RightSide)))
 
-      if (nonmappable.isEmpty) {
-        keys traverse { case (k, sortDir) =>
-          MappableRegion.unaryOf(src.root, graph refocus k.root).strengthR(sortDir) match {
-            case Some(pair) => pair.point[F]
-            case None =>
-              PlannerErrorME[F].raiseError[(FreeMap, SortDir)](
-                InternalError(s"Invalid sort key, $k, must be a mappable function of $src.", None))
+	      val updated: QSUVerts[T] = graph.vertices.updated(joinRoot, join)
+
+          tail.foldLeftM((joinRoot, updated)) {
+            case ((prev, verts), sym) =>
+              freshName[F].map { innerRoot =>
+                val join: QSU[Symbol] =
+	              AutoJoin2(prev, sym, func.ConcatMaps(func.LeftSide, func.MakeMapS(sym.name, func.RightSide)))
+
+	            (innerRoot, verts.updated(innerRoot, join))
+              }
           }
-        } map { nel => graph.overwriteAtRoot(QSSort(src.root, Nil, nel)) }
-      } else {
-        for {
-          sortRoot <- freshName[F]
-          interRoot <- freshName[F]
-          joined <- autojoinVerts(sortRoot)
-        } yield {
-          val (joinRoot, verts) = joined
-
-          val order: NEL[(FreeMap, SortDir)] =
-            access.map(_.leftMap {
-              case -\/(fm) => fm >> func.ProjectKey(func.Hole, StrLit("sort_source"))
-              case \/-(sym) => func.ProjectKey(func.Hole, StrLit(sym.name))
-            })
-
-          val sortSrc: QSU[Symbol] = Map(joinRoot, func.MakeMapS("sort_source", func.Hole))
-          val sort: QSU[Symbol] = QSSort(sortRoot, Nil, order)
-          val result: QSU[Symbol] = Map(interRoot, func.ProjectKey(func.Hole, StrLit("sort_source")))
-
-          val newVerts: QSUVerts[T] = verts
-            .updated(sortRoot, sortSrc)
-            .updated(interRoot, sort)
-            .updated(graph.root, result)
-
-          QSUGraph(graph.root, newVerts)
         }
+      }
+
+      nonmappable match {
+        case Nil =>
+          keys traverse { case (k, sortDir) =>
+            MappableRegion.unaryOf(src.root, graph refocus k.root).strengthR(sortDir) match {
+              case Some(pair) => pair.point[F]
+              case None =>
+                PlannerErrorME[F].raiseError[(FreeMap, SortDir)](
+                  InternalError(s"Invalid sort key, $k, must be a mappable function of $src.", None))
+            }
+          } map { nel => graph.overwriteAtRoot(QSSort(src.root, Nil, nel)) }
+
+        case head :: tail =>
+          for {
+            interRoot <- freshName[F]
+            joined <- autojoinVerts(head, tail)
+          } yield {
+            val (joinRoot, verts) = joined
+
+            val order: NEL[(FreeMap, SortDir)] =
+              access.map(_.leftMap {
+                case -\/(fm) => fm >> func.ProjectKey(func.Hole, StrLit("sort_source"))
+                case \/-(sym) => func.ProjectKey(func.Hole, StrLit(sym.name))
+              })
+
+            val sort: QSU[Symbol] = QSSort(joinRoot, Nil, order)
+            val result: QSU[Symbol] = Map(interRoot, func.ProjectKey(func.Hole, StrLit("sort_source")))
+
+            val newVerts: QSUVerts[T] = verts
+              .updated(interRoot, sort)
+              .updated(graph.root, result)
+
+            QSUGraph(graph.root, newVerts)
+          }
       }
     }
 
