@@ -111,9 +111,9 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
       else key.point[M]
 
     def elideQS(isRewrite: Boolean, fqs: FreeQS[T])
-      (implicit BRM: BranchesMap[T, CoEnv[Hole, QScriptTotal[T, ?], ?]])
+      (implicit UF: UnaryFunctions[T, CoEnv[Hole, QScriptTotal[T, ?], ?]])
         : M[FreeQS[T]] =
-      if (isRewrite) fqs.transCataM(BRM.branchesMap.modifyF(elide))
+      if (isRewrite) fqs.transCataM(UF.unaryFunctions.modifyF(elide))
       else fqs.point[M]
 
     override def trans[A, G[_]: Functor]

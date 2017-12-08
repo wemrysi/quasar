@@ -24,15 +24,15 @@ import scalaz._, Scalaz._
 
 // TODO look into traversing FreeQS as well to simplify rewrites like
 // assumeReadType
-trait BranchesMap[T[_[_]], IN[_]] {
-  def branchesMap[A]: Traversal[IN[A], FreeMap[T]]
+trait UnaryFunctions[T[_[_]], IN[_]] {
+  def unaryFunctions[A]: Traversal[IN[A], FreeMap[T]]
 }
 
-object BranchesMap {
+object UnaryFunctions {
 
-  implicit def const[T[_[_]], C]: BranchesMap[T, Const[C, ?]] =
-    new BranchesMap[T, Const[C, ?]] {
-      def branchesMap[A]: Traversal[Const[C, A], FreeMap[T]] =
+  implicit def const[T[_[_]], C]: UnaryFunctions[T, Const[C, ?]] =
+    new UnaryFunctions[T, Const[C, ?]] {
+      def unaryFunctions[A]: Traversal[Const[C, A], FreeMap[T]] =
         new Traversal[Const[C, A], FreeMap[T]] {
           def modifyF[F[_]: Applicative](f: FreeMap[T] => F[FreeMap[T]])(s: Const[C, A]): F[Const[C, A]] =
             Applicative[F].pure(s)
@@ -40,23 +40,23 @@ object BranchesMap {
     }
 
   implicit def coproduct[T[_[_]], G[_], H[_]]
-    (implicit G: BranchesMap[T, G], H: BranchesMap[T, H])
-      : BranchesMap[T, Coproduct[G, H, ?]] =
-    new BranchesMap[T, Coproduct[G, H, ?]] {
-      def branchesMap[A]: Traversal[Coproduct[G, H, A], FreeMap[T]] =
+    (implicit G: UnaryFunctions[T, G], H: UnaryFunctions[T, H])
+      : UnaryFunctions[T, Coproduct[G, H, ?]] =
+    new UnaryFunctions[T, Coproduct[G, H, ?]] {
+      def unaryFunctions[A]: Traversal[Coproduct[G, H, A], FreeMap[T]] =
         new Traversal[Coproduct[G, H, A], FreeMap[T]] {
           def modifyF[F[_]: Applicative](f: FreeMap[T] => F[FreeMap[T]])(s: Coproduct[G, H, A]): F[Coproduct[G, H, A]] = {
             s.run.bitraverse[F, G[A], H[A]](
-              G.branchesMap.modifyF(f),
-              H.branchesMap.modifyF(f)
+              G.unaryFunctions.modifyF(f),
+              H.unaryFunctions.modifyF(f)
             ).map(Coproduct(_))
           }
         }
     }
 
-  implicit def qscriptCore[T[_[_]]]: BranchesMap[T, QScriptCore[T, ?]] =
-    new BranchesMap[T, QScriptCore[T, ?]] {
-      def branchesMap[A]: Traversal[QScriptCore[T, A], FreeMap[T]] =
+  implicit def qscriptCore[T[_[_]]]: UnaryFunctions[T, QScriptCore[T, ?]] =
+    new UnaryFunctions[T, QScriptCore[T, ?]] {
+      def unaryFunctions[A]: Traversal[QScriptCore[T, A], FreeMap[T]] =
         new Traversal[QScriptCore[T, A], FreeMap[T]] {
           def modifyF[F[_]: Applicative](f: FreeMap[T] => F[FreeMap[T]])(s: QScriptCore[T, A]): F[QScriptCore[T, A]] =
             s match {
@@ -80,9 +80,9 @@ object BranchesMap {
         }
     }
 
-  implicit def projectBucket[T[_[_]]]: BranchesMap[T, ProjectBucket[T, ?]] =
-    new BranchesMap[T, ProjectBucket[T, ?]] {
-      def branchesMap[A]: Traversal[ProjectBucket[T, A], FreeMap[T]] =
+  implicit def projectBucket[T[_[_]]]: UnaryFunctions[T, ProjectBucket[T, ?]] =
+    new UnaryFunctions[T, ProjectBucket[T, ?]] {
+      def unaryFunctions[A]: Traversal[ProjectBucket[T, A], FreeMap[T]] =
         new Traversal[ProjectBucket[T, A], FreeMap[T]] {
           def modifyF[F[_]: Applicative](f: FreeMap[T] => F[FreeMap[T]])(s: ProjectBucket[T, A]): F[ProjectBucket[T, A]] =
             s match {
@@ -94,18 +94,18 @@ object BranchesMap {
         }
     }
 
-  implicit def shiftedRead[T[_[_]]]: BranchesMap[T, ShiftedRead] =
-    new BranchesMap[T,  ShiftedRead] {
-      def branchesMap[A]: Traversal[ShiftedRead[A], FreeMap[T]] =
+  implicit def shiftedRead[T[_[_]]]: UnaryFunctions[T, ShiftedRead] =
+    new UnaryFunctions[T,  ShiftedRead] {
+      def unaryFunctions[A]: Traversal[ShiftedRead[A], FreeMap[T]] =
         new Traversal[ShiftedRead[A], FreeMap[T]] {
           def modifyF[F[_]: Applicative](f: FreeMap[T] => F[FreeMap[T]])(s: ShiftedRead[A]): F[ShiftedRead[A]] =
             Applicative[F].pure(s)
         }
     }
 
-  implicit def thetaJoin[T[_[_]]]: BranchesMap[T, ThetaJoin[T, ?]] =
-    new BranchesMap[T, ThetaJoin[T, ?]] {
-      def branchesMap[A]:Traversal[ThetaJoin[T, A], FreeMap[T]] =
+  implicit def thetaJoin[T[_[_]]]: UnaryFunctions[T, ThetaJoin[T, ?]] =
+    new UnaryFunctions[T, ThetaJoin[T, ?]] {
+      def unaryFunctions[A]:Traversal[ThetaJoin[T, A], FreeMap[T]] =
         new Traversal[ThetaJoin[T, A], FreeMap[T]] {
           def modifyF[F[_]: Applicative](f: FreeMap[T] => F[FreeMap[T]])(s: ThetaJoin[T, A]): F[ThetaJoin[T, A]] =
             s match {
@@ -115,9 +115,9 @@ object BranchesMap {
         }
     }
 
-  implicit def equiJoin[T[_[_]]]: BranchesMap[T, EquiJoin[T, ?]] =
-    new BranchesMap[T, EquiJoin[T, ?]] {
-      def branchesMap[A]: Traversal[EquiJoin[T, A], FreeMap[T]] =
+  implicit def equiJoin[T[_[_]]]: UnaryFunctions[T, EquiJoin[T, ?]] =
+    new UnaryFunctions[T, EquiJoin[T, ?]] {
+      def unaryFunctions[A]: Traversal[EquiJoin[T, A], FreeMap[T]] =
         new Traversal[EquiJoin[T, A], FreeMap[T]] {
           def modifyF[F[_]: Applicative](f: FreeMap[T] => F[FreeMap[T]])(s: EquiJoin[T, A]): F[EquiJoin[T, A]] = {
             s match {
@@ -128,14 +128,14 @@ object BranchesMap {
         }
     }
 
-  implicit def coEnv[T[_[_]], E, G[_]](implicit G: BranchesMap[T, G]): BranchesMap[T, CoEnv[E, G, ?]] =
-    new BranchesMap[T, CoEnv[E, G, ?]] {
-      def branchesMap[A]: Traversal[CoEnv[E, G, A], FreeMap[T]] =
+  implicit def coEnv[T[_[_]], E, G[_]](implicit G: UnaryFunctions[T, G]): UnaryFunctions[T, CoEnv[E, G, ?]] =
+    new UnaryFunctions[T, CoEnv[E, G, ?]] {
+      def unaryFunctions[A]: Traversal[CoEnv[E, G, A], FreeMap[T]] =
         new Traversal[CoEnv[E, G, A], FreeMap[T]] {
           def modifyF[F[_]: Applicative](f: FreeMap[T] => F[FreeMap[T]])(s: CoEnv[E, G, A]): F[CoEnv[E, G, A]] =
-            s.run.traverse(G.branchesMap.modifyF(f)).map(CoEnv(_))
+            s.run.traverse(G.unaryFunctions.modifyF(f)).map(CoEnv(_))
         }
     }
 
-  def apply[T[_[_]], F[_]](implicit ev: BranchesMap[T, F]): BranchesMap[T, F] = ev
+  def apply[T[_[_]], F[_]](implicit ev: UnaryFunctions[T, F]): UnaryFunctions[T, F] = ev
 }
