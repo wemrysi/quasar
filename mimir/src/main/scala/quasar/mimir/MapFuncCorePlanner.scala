@@ -169,7 +169,7 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.Between(a1, a2, a3) =>
         (MapN(OuterArrayConcat(WrapArray(a1), WrapArray(a2), WrapArray(a3)), between): TransSpec[A]).point[F]
       case MapFuncsCore.Cond(a1, a2, a3) if a3 == undefined(id) =>
-        (Filter(a1, a2): TransSpec[A]).point[F]
+        (Filter(a2, a1): TransSpec[A]).point[F]
       case MapFuncsCore.Cond(a1, a2, a3) =>
         (Cond(a1, a2, a3): TransSpec[A]).point[F]
 
