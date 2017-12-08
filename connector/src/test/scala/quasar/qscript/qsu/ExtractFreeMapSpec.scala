@@ -19,6 +19,7 @@ package quasar.qscript.qsu
 import slamdata.Predef._
 import quasar.Qspec
 import quasar.Planner.PlannerError
+import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
@@ -30,7 +31,7 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.data.free._
 import pathy.Path
-import scalaz.{\/, \/-, EitherT, Need, StateT}
+import scalaz.{\/, \/-, EitherT, ICons, INil, Need, NonEmptyList => NEL, StateT}
 
 object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
   import QScriptUniform.DTrans
@@ -63,15 +64,35 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
     }
 
     "convert mappable group key" >> {
-      val predicate = func.ProjectKey(func.Hole, func.Constant(ejs.str("foo")))
+      val key = func.ProjectKey(func.Hole, func.Constant(ejs.str("foo")))
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.groupBy(
           qsu.read(orders),
-          qsu.map(qsu.read(orders), predicate)))
+          qsu.map(qsu.read(orders), key)))
 
       evaluate(extractFM(graph)) must beLike {
-        case \/-(DimEdit(Read(`orders`), DTrans.Group(fm))) => fm must_= predicate
+        case \/-(DimEdit(Read(`orders`), DTrans.Group(fm))) => fm must_= key
+      }
+    }
+
+    "convert mappable sort keys" >> {
+      val key1 = func.ProjectKey(func.Hole, func.Constant(ejs.str("foo")))
+      val key2 = func.ProjectKey(func.Hole, func.Constant(ejs.str("bar")))
+
+      val graph: QSUGraph = QSUGraph.fromTree[Fix](
+        qsu.lpSort(
+          qsu.read(orders),
+          NEL[(Fix[QSU], SortDir)](
+            qsu.map(qsu.read(orders), key1) -> SortDir.Ascending,
+            qsu.map(qsu.read(orders), key2) -> SortDir.Descending)))
+
+      evaluate(extractFM(graph)) must beLike {
+        case \/-(QSSort(
+            Read(`orders`),
+            Nil,
+            NEL((fm1, SortDir.Ascending), ICons((fm2, SortDir.Descending), INil())))) =>
+          (fm1 must_= key1) and (fm2 must_= key2)
       }
     }
   }
