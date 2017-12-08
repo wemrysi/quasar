@@ -34,7 +34,7 @@ import pathy.Path
 import scalaz.{\/, \/-, EitherT, ICons, INil, Need, NonEmptyList => NEL, StateT}
 
 object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
-  import QScriptUniform.DTrans
+  import QScriptUniform.{DTrans, Retain, Rotation}
   import QSUGraph.Extractors._
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
@@ -44,14 +44,17 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
 
+  def projectStrKey(key: String): FreeMap =
+    func.ProjectKey(func.Hole, func.Constant(ejs.str(key)))
+
   val orders: AFile = Path.rootDir </> Path.dir("client") </> Path.file("orders")
 
   def extractFM(graph: QSUGraph) = ExtractFreeMap[Fix, F](graph)
 
   "extracting mappable region" should {
 
-    "convert mappable filter" >> {
-      val predicate = func.ProjectKey(func.Hole, func.Constant(ejs.str("foo")))
+    "convert mappable filter predicate" >> {
+      val predicate = projectStrKey("foo")
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.lpFilter(
@@ -60,6 +63,33 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
 
       evaluate(extractFM(graph)) must beLike {
         case \/-(QSFilter(Read(`orders`), fm)) => fm must_= predicate
+      }
+    }
+
+    "convert transposed filter predicate" >> {
+      val predicate = projectStrKey("foo")
+
+      val graph = QSUGraph.fromTree[Fix](
+        qsu.lpFilter(
+          qsu.read(orders),
+          qsu.transpose(qsu.map(qsu.read(orders), predicate), Retain.Values, Rotation.ShiftMap)))
+
+      evaluate(extractFM(graph)) must beLike {
+        case \/-(Map(
+            QSFilter(
+              AutoJoin2(
+                Read(`orders`),
+                Transpose(Map(Read(`orders`), fm), Retain.Values, Rotation.ShiftMap),
+                autojoinCondition),
+              filterPredicate),
+            valueAccess)) =>
+          (fm must_= predicate) and
+            (filterPredicate must_= projectStrKey("filter_predicate")) and
+            (valueAccess must_= projectStrKey("filter_source")) and
+            (autojoinCondition must_= func.ConcatMaps(
+              func.MakeMap(func.Constant(ejs.str("filter_source")), func.LeftSide),
+              func.MakeMap(func.Constant(ejs.str("filter_predicate")), func.RightSide)))
+
       }
     }
 
