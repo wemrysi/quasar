@@ -2,10 +2,11 @@
     "name": "flights_step3",
     "data": "flights.data",
     "backends": {
-       "couchbase":         "ignoreFieldOrder",
+       "couchbase":         "pending",
        "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
+    "NB": "should be skipped on couchbase, since it doesn't have general join",
     "query": "SELECT DISTINCT row.source AS Source, [row.destination...] AS Destination, [row.fuel...] AS Cost FROM flights AS row GROUP BY row.source ORDER BY row.source ASC",
     "predicate": "exactly",
     "expected": [
