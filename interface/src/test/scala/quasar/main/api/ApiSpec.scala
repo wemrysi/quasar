@@ -72,9 +72,9 @@ class ApiSpec extends quasar.Qspec {
           for {
             _             <- mount.mountOrReplace(sampleMountPath, sampleMount, false)
             mountIsThere  <- mount.lookupConfig(sampleMountPath).run.run.map(_.isDefined)
-            _             <- MetaStoreLocation.Ops[CoreEff].set(otherMetaConf, initialize = true)
+            _             <- MetaStoreLocation.Ops[CoreEff].set(otherMetaConf, initialize = true, copy = false)
             noLongerThere <- mount.lookupConfig(sampleMountPath).run.run.map(_.empty)
-            _             <- MetaStoreLocation.Ops[CoreEff].set(firstMetaConf, initialize = true)
+            _             <- MetaStoreLocation.Ops[CoreEff].set(firstMetaConf, initialize = true, copy = false)
             thereAgain    <- mount.lookupConfig(sampleMountPath).run.run.map(_.isDefined)
           } yield {
             mountIsThere must_=== true
@@ -89,7 +89,7 @@ class ApiSpec extends quasar.Qspec {
       (for {
         metaConf <- MetaStoreFixture.createNewTestMetaStoreConfig
         result <- testProgram(metaConf.some) {
-          MetaStoreLocation.Ops[CoreEff].set(metaConf, initialize = true)
+          MetaStoreLocation.Ops[CoreEff].set(metaConf, initialize = true, copy = false)
         }
       } yield result must_= ().right).unsafePerformSync
     }

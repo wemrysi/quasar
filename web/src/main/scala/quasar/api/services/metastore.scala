@@ -38,13 +38,17 @@ object metastore {
         respond(meta.get.map(_.asJson(DbConnectionConfig.secureEncodeJson)))
       case req @ PUT -> Root =>
         val initialize = req.params.keys.toList.contains("initialize")
+        val copy = req.params.keys.toList.contains("copy")
         respondT((for {
           connConfigJson <- lift(req.as[Json]).into[S].liftM[MainErrT]
           connConfig     <- EitherT.fromEither(connConfigJson.as[DbConnectionConfig].result.leftMap(_._1).point[Free[S, ?]])
-          _              <- EitherT(meta.set(connConfig, initialize))
+          _              <- EitherT(meta.set(connConfig, initialize, copy))
           newUrl         =  DbConnectionConfig.connectionInfo(connConfig).url
           initializedStr =  if (initialize) "newly initialized " else ""
-        } yield s"Now using ${initializedStr}metastore located at $newUrl").leftMap(msg => ApiError.fromMsg_(BadRequest withReason "UninitializedMetastore", msg)))
+          copiedStr      =  if (copy) "Metastore copied." else ""
+        } yield {
+          s"$copiedStr Now using ${initializedStr}metastore located at $newUrl"}
+          ).leftMap(msg => ApiError.fromMsg_(BadRequest withReason "UninitializedMetastore", msg)))
     }
   }
 }

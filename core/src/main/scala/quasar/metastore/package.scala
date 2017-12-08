@@ -138,22 +138,22 @@ package object metastore {
   implicit val pathedViewCacheComposite: Composite[PathedViewCache] =
     Composite[(
       AFile, MountConfig.ViewConfig, Option[Instant], Option[Long], Int, Option[String],
-      Option[Instant], Long, Instant, ViewCache.Status, Option[String], AFile, Option[String]
-    )].xmap(
+        Option[Instant], Long, Instant, ViewCache.Status, Option[String], AFile, Option[String]
+      )].xmap(
       { case (path, viewConfig, lastUpdate, executionMillis, cacheReads, assignee,
-              assigneeStart, maxAge, refreshAfter, status, errorMsg, dataFile, tmpDataFile) =>
-          PathedViewCache(
-            path,
-            ViewCache(
-              viewConfig, lastUpdate, executionMillis, cacheReads, assignee,
-              assigneeStart, maxAge, refreshAfter, status, errorMsg, dataFile,
-              tmpDataFile ∘ (tf => unsafeSandboxAbs(
-                posixCodec.parseAbsFile(tf)
-                  .getOrElse(unexpectedValue("not an absolute file path: " + tf))))))
+      assigneeStart, maxAge, refreshAfter, status, errorMsg, dataFile, tmpDataFile) =>
+        PathedViewCache(
+          path,
+          ViewCache(
+            viewConfig, lastUpdate, executionMillis, cacheReads, assignee,
+            assigneeStart, maxAge, refreshAfter, status, errorMsg, dataFile,
+            tmpDataFile ∘ (tf => unsafeSandboxAbs(
+              posixCodec.parseAbsFile(tf)
+                .getOrElse(unexpectedValue("not an absolute file path: " + tf))))))
       },
       c => (c.path, c.vc.viewConfig, c.vc.lastUpdate, c.vc.executionMillis, c.vc.cacheReads, c.vc.assignee,
-             c.vc.assigneeStart, c.vc.maxAgeSeconds, c.vc.refreshAfter, c.vc.status, c.vc.errorMsg, c.vc.dataFile,
-             c.vc.tmpDataFile ∘ (posixCodec.printPath(_))))
+        c.vc.assigneeStart, c.vc.maxAgeSeconds, c.vc.refreshAfter, c.vc.status, c.vc.errorMsg, c.vc.dataFile,
+        c.vc.tmpDataFile ∘ (posixCodec.printPath(_))))
 
   // See comment above.
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))
