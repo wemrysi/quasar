@@ -44,7 +44,7 @@ object metastore {
           _              <- EitherT(meta.set(connConfig, initialize))
           newUrl         =  DbConnectionConfig.connectionInfo(connConfig).url
           initializedStr =  if (initialize) "newly initialized " else ""
-        } yield s"Now using ${initializedStr}metastore located at $newUrl").leftMap(msg => ApiError.fromMsg(BadRequest, msg)))
+        } yield s"Now using ${initializedStr}metastore located at $newUrl").leftMap(msg => ApiError.fromMsg_(BadRequest withReason "UninitializedMetastore", msg)))
     }
   }
 }
