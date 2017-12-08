@@ -94,7 +94,7 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
     }
 
     "convert mappable group key" >> {
-      val key = func.ProjectKey(func.Hole, func.Constant(ejs.str("foo")))
+      val key = projectStrKey("foo")
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.groupBy(
@@ -103,6 +103,33 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
 
       evaluate(extractFM(graph)) must beLike {
         case \/-(DimEdit(Read(`orders`), DTrans.Group(fm))) => fm must_= key
+      }
+    }
+
+    "convert transposed group key" >> {
+      val key = projectStrKey("foo")
+
+      val graph = QSUGraph.fromTree[Fix](
+        qsu.groupBy(
+          qsu.read(orders),
+          qsu.transpose(qsu.map(qsu.read(orders), key), Retain.Values, Rotation.ShiftMap)))
+
+      evaluate(extractFM(graph)) must beLike {
+        case \/-(Map(
+            DimEdit(
+              AutoJoin2(
+                Read(`orders`),
+                Transpose(Map(Read(`orders`), fm), Retain.Values, Rotation.ShiftMap),
+                autojoinCondition),
+              DTrans.Group(groupKey)),
+            valueAccess)) =>
+          (fm must_= key) and
+            (groupKey must_= projectStrKey("group_key")) and
+            (valueAccess must_= projectStrKey("group_source")) and
+            (autojoinCondition must_= func.ConcatMaps(
+              func.MakeMap(func.Constant(ejs.str("group_source")), func.LeftSide),
+              func.MakeMap(func.Constant(ejs.str("group_key")), func.RightSide)))
+
       }
     }
 
