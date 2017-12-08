@@ -280,7 +280,23 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                 HoleF[Fix],
                 func.Undefined)))
       }
-    }.pendingUntilFixed
+    }
+
+    "not rewrite filter acting as upstream source" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.qsFilter(
+            qsu.read(afile),
+            func.Eq(HoleF[Fix], func.Constant(J.str("foo")))),
+          qsu.cint(42),
+          _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case Map(QSFilter(_, _), fm) =>
+          fm must beTreeEqual(
+            func.Add(HoleF[Fix], func.Constant(J.int(42))))
+      }
+    }
 
     "coalesce two summed bucketing reductions, inlining functions into the buckets" in {
       val readAndThings =
