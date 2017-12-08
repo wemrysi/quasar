@@ -1,0 +1,19 @@
+{
+    "name": "flights_step2",
+    "data": "flights.data",
+    "backends": {
+       "couchbase":         "ignoreFieldOrder",
+       "marklogic_json":    "ignoreFieldOrder",
+       "mimir":             "ignoreFieldOrder"
+    },
+    "query": "SELECT source, destination, SUM(fuel) AS weight FROM flights GROUP BY source, destination ORDER BY source ASC, destination ASC, weight asc LIMIT 6",
+    "predicate": "exactly",
+    "expected": [
+         { "source": "Dallas"     , "destination": "New York" , "weight": 800 },
+         { "source": "Dallas"     , "destination": "Orlando"  , "weight": 600 },
+         { "source": "Las Vegas"  , "destination": "Dallas"   , "weight": 400 },
+         { "source": "Las Vegas"  , "destination": "New York" , "weight": 900 },
+         { "source": "Los Angeles", "destination": "Dallas"   , "weight": 700 },
+         { "source": "Los Angeles", "destination": "Las Vegas", "weight": 400 }
+    ]
+}
