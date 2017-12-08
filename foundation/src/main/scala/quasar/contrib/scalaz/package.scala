@@ -40,17 +40,6 @@ package object scalaz {
     }
   }
 
-  def nextM[M[_]: Monad, A, B, C](f: (A, B) => C, m: A => M[B], a: A): M[(B, C)] =
-    m(a).map(b => (b, f(a, b)))
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def fixpointM[M[_]: Monad, A: Equal](f: A => M[A], a: A): M[A] =
-    for {
-      a1Changed <- nextM[M, A, A, Boolean](_ ≠ _, f, a)
-      (a1, changed) = a1Changed
-      a2 <- if (changed) fixpointM(f, a1) else a1.point[M]
-    } yield a2
-
   implicit final class OptionTOps[F[_], A](val self: OptionT[F, A]) extends AnyVal {
     def covary[B >: A](implicit F: Functor[F]): OptionT[F, B] =
       OptionT(self.run.map(opt => opt: Option[B]))
