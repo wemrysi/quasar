@@ -72,6 +72,9 @@ object SqlExpr extends SqlExprInstances {
   final case class Constant[T](data: Data) extends SqlExpr[T]
 
   final case class RegexMatches[T](a1: T, a2: T) extends SqlExpr[T]
+
+  final case class Limit[T](from: T, count: T) extends SqlExpr[T]
+
   object Select {
     final case class Filter[T](v: T)
     final case class RowIds[T]() extends SqlExpr[T]

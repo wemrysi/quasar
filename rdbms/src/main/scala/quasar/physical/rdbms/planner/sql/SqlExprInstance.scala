@@ -85,6 +85,7 @@ trait SqlExprTraverse {
         )
 
       case Coercion(t, e) => f(e) ∘ (Coercion(t, _))
+      case Limit(from, count) => (f(from) ⊛ f(count))(Limit.apply)
 
     }
   }
