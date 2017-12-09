@@ -85,7 +85,7 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
     "respond with OK" >> {
       "and empty list for existing empty directory" >> {
         service(InMemState.empty, Map())(Request(uri = Uri(path = "/")))
-          .as[Json].unsafePerformSync must_== Json("children" := List[FsNode]())
+          .as[Json].unsafePerformSync must_== Json("children" -> jEmptyArray)
       }
 
       "and list of children for existing nonempty directory" >> prop { s: NonEmptyDir =>
@@ -108,13 +108,22 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
           directoryName ≠ fsMountName &&
           directoryName ≠ moduleName &&
           fsMountName ≠ moduleName) ==> {
-        val moduleConfig: List[Statement[Fix[Sql]]] = List(
-          FunctionDecl(CIName("FOO"), List(CIName("Bar")), Fix(boolLiteral(true))))
+        val moduleConfig = MountConfig.moduleConfig(List(
+          FunctionDecl(CIName("FOO"), List(CIName("Bar")), Fix(boolLiteral(true)))))
         val parent: ADir = rootDir </> dir("foo")
         val mnts = Map[APath, MountConfig](
           (parent </> file1(viewName), MountConfig.viewConfig(vcfg)),
           (parent </> dir1(fsMountName), MountConfig.fileSystemConfig(fsCfg)),
-          (parent </> dir1(moduleName), MountConfig.moduleConfig(moduleConfig)))
+          (parent </> dir1(moduleName), moduleConfig),
+          // This module is not expected to appear in the result as it is outside
+          // the target directory
+          (rootDir </> dir("outside"), moduleConfig),
+          // This module is not expected to appear in the result as it is not
+          // directly contained within this directory
+          (parent </> dir1(directoryName) </> dir("grand-child"), moduleConfig),
+          // This module is not expected to appear in the result but it's
+          // parent directory should
+          (parent </> dir("implicitDir") </> dir("grand-child"), moduleConfig))
         val mem = InMemState fromFiles Map(
           (parent </> file1(fileName), Vector()),
           (parent </> dir1(directoryName) </> file("quux"), Vector()),
@@ -127,7 +136,8 @@ class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4
             FsNode(directoryName.value, "directory", None, None),
             FsNode(viewName.value, "file", Some("view"), None),
             FsNode(fsMountName.value, "directory", Some(fsCfg._1.value), None),
-            FsNode(moduleName.value, "directory", Some("module"), None)
+            FsNode(moduleName.value, "directory", Some("module"), None),
+            FsNode("implicitDir", "directory", None, None)
           ).toIList.sorted)
       }}
 

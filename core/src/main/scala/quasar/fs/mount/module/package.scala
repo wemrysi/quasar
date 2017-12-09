@@ -77,9 +77,14 @@ package object module {
     val queryUnsafe = QueryFile.Unsafe[S]
     val mount = Mounting.Ops[S]
 
+    /* Returns any module contained within this directory as a `Node.Module`
+     * as well as a `Node.ImplicitDir` for any directory that contains a
+     * module somewhere within it
+     */
     def listModules(dir: ADir): Free[S, Set[Node]] =
       mount.modulesHavingPrefix_(dir).map(_.foldMap(d =>
-        dirName(d).map[Node](Node.Module(_)).toSet))
+        if (depth(d) ≟ 1) dirName(d).map[Node](Node.Module(_)).toSet
+        else firstSegmentName(d).flatMap(_.swap.toOption).map[Node](Node.ImplicitDir(_)).toSet))
 
     def moduleFiles(dir: ADir): OptionT[Free[S, ?], Set[Node]] =
       mount.lookupModuleConfigIgnoreError(dir).map(moduleConfig =>
@@ -103,7 +108,8 @@ package object module {
         query.explain(lp).run.run
 
       case ListContents(dir) =>
-        // If this directory is a module, return the "files" within it, or else add modules to the underlying call to ls
+        // If this directory is a module, return the "files" (functions) within it
+        // Otherwise add modules and directories containing modules to the underlying call to ls
         moduleFiles(dir).map(_.right[FileSystemError]).getOrElseF {
           (listModules(dir) |@| query.ls(dir).run) ((mls, qls) => qls match {
             case \/-(ps) =>
