@@ -84,13 +84,12 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
                 autojoinCondition),
               filterPredicate),
             valueAccess)) =>
-          (fm must_= predicate) and
-            (filterPredicate must_= projectStrKey("filter_predicate")) and
-            (valueAccess must_= projectStrKey("filter_source")) and
-            (autojoinCondition must_= func.ConcatMaps(
-              func.MakeMap(func.Constant(ejs.str("filter_source")), func.LeftSide),
-              func.MakeMap(func.Constant(ejs.str("filter_predicate")), func.RightSide)))
-
+          fm must_= predicate
+          filterPredicate must_= projectStrKey("filter_predicate")
+          valueAccess must_= projectStrKey("filter_source")
+          autojoinCondition must_= func.ConcatMaps(
+            func.MakeMap(func.Constant(ejs.str("filter_source")), func.LeftSide),
+            func.MakeMap(func.Constant(ejs.str("filter_predicate")), func.RightSide))
       }
     }
 
@@ -124,12 +123,12 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
                 autojoinCondition),
               DTrans.Group(groupKey)),
             valueAccess)) =>
-          (fm must_= key) and
-            (groupKey must_= projectStrKey("group_key")) and
-            (valueAccess must_= projectStrKey("group_source")) and
-            (autojoinCondition must_= func.ConcatMaps(
-              func.MakeMap(func.Constant(ejs.str("group_source")), func.LeftSide),
-              func.MakeMap(func.Constant(ejs.str("group_key")), func.RightSide)))
+          fm must_= key
+          groupKey must_= projectStrKey("group_key")
+          valueAccess must_= projectStrKey("group_source")
+          autojoinCondition must_= func.ConcatMaps(
+           func.MakeMap(func.Constant(ejs.str("group_source")), func.LeftSide),
+           func.MakeMap(func.Constant(ejs.str("group_key")), func.RightSide))
 
       }
     }
@@ -150,7 +149,8 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
             Read(`orders`),
             Nil,
             NEL((fm1, SortDir.Ascending), ICons((fm2, SortDir.Descending), INil())))) =>
-          (fm1 must_= key1) and (fm2 must_= key2)
+          fm1 must_= key1
+          fm2 must_= key2
       }
     }
 
@@ -175,13 +175,13 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
               Nil,
               NEL((fm1, SortDir.Ascending), ICons((fm2, SortDir.Descending), INil()))),
             valueAccess)) =>   // FIXME don't explicitly test for generated names
-          (fm must_= key2) and
-          (fm1 must_= key1 >> projectStrKey("sort_source")) and
-          (fm2 must_= projectStrKey("__fromTree3")) and
-          (valueAccess must_= projectStrKey("sort_source")) and
-          (autojoinCondition must_= func.ConcatMaps(
+          fm must_= key2
+          fm1 must_= key1 >> projectStrKey("sort_source")
+          fm2 must_= projectStrKey("__fromTree3")
+          valueAccess must_= projectStrKey("sort_source")
+          autojoinCondition must_= func.ConcatMaps(
             func.MakeMap(func.Constant(ejs.str("sort_source")), func.LeftSide),
-            func.MakeMap(func.Constant(ejs.str("__fromTree3")), func.RightSide)))
+            func.MakeMap(func.Constant(ejs.str("__fromTree3")), func.RightSide))
       }
     }
 
@@ -214,19 +214,19 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
               NEL(
                 (fm1, SortDir.Ascending), ICons((fm2, SortDir.Descending), ICons((fm3, SortDir.Descending), ICons((fm4, SortDir.Ascending), INil()))))),
             valueAccess)) =>  // FIXME don't explicitly test for generated names
-          (innerFM must_= key2) and
-          (outerFM must_= key4) and
-          (fm1 must_= key1 >> projectStrKey("sort_source")) and
-          (fm2 must_= projectStrKey("__fromTree3")) and
-          (fm3 must_= key3 >> projectStrKey("sort_source")) and
-          (fm4 must_= projectStrKey("__fromTree6")) and
-          (valueAccess must_= projectStrKey("sort_source")) and
-          (innerAutojoinCondition must_= func.ConcatMaps(
+          innerFM must_= key2
+          outerFM must_= key4
+          fm1 must_= key1 >> projectStrKey("sort_source")
+          fm2 must_= projectStrKey("__fromTree3")
+          fm3 must_= key3 >> projectStrKey("sort_source")
+          fm4 must_= projectStrKey("__fromTree6")
+          valueAccess must_= projectStrKey("sort_source")
+          innerAutojoinCondition must_= func.ConcatMaps(
             func.MakeMap(func.Constant(ejs.str("sort_source")), func.LeftSide),
-            func.MakeMap(func.Constant(ejs.str("__fromTree3")), func.RightSide))) and
-          (outerAutojoinCondition must_= func.ConcatMaps(
+            func.MakeMap(func.Constant(ejs.str("__fromTree3")), func.RightSide))
+          outerAutojoinCondition must_= func.ConcatMaps(
             func.LeftSide,
-            func.MakeMap(func.Constant(ejs.str("__fromTree6")), func.RightSide)))
+            func.MakeMap(func.Constant(ejs.str("__fromTree6")), func.RightSide))
       }
     }
   }
