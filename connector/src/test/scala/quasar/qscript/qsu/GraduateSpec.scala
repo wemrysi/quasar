@@ -40,6 +40,7 @@ import quasar.qscript.{
   Take
 }
 import quasar.qscript.MapFuncsCore.IntLit
+import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
 import matryoshka.EqualT
 import matryoshka.data.Fix, Fix._
@@ -213,8 +214,8 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
   def graduateAs(expected: Fix[QSE]): Matcher[Fix[QSU]] = {
     new Matcher[Fix[QSU]] {
       def apply[S <: Fix[QSU]](s: Expectable[S]): MatchResult[S] = {
-        val actual: PlannerError \/ Fix[QSE] =
-          evaluate(researched(QSUGraph.fromTree[Fix](s.value)) >>= grad)
+        val authd = AuthenticatedQSU[Fix](QSUGraph.fromTree[Fix](s.value), QAuth.empty)
+        val actual: PlannerError \/ Fix[QSE] = evaluate(researched(authd) >>= grad)
 
         actual.bimap[MatchResult[S], MatchResult[S]](
         { err =>
@@ -234,8 +235,8 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
   def notGraduate: Matcher[Fix[QSU]] = {
     new Matcher[Fix[QSU]] {
       def apply[S <: Fix[QSU]](s: Expectable[S]): MatchResult[S] = {
-        val actual: PlannerError \/ Fix[QSE] =
-          evaluate(researched(QSUGraph.fromTree[Fix](s.value)) >>= grad)
+        val authd = AuthenticatedQSU[Fix](QSUGraph.fromTree[Fix](s.value), QAuth.empty)
+        val actual: PlannerError \/ Fix[QSE] = evaluate(researched(authd) >>= grad)
 
         // TODO better equality checking for PlannerError
         actual.bimap[MatchResult[S], MatchResult[S]](

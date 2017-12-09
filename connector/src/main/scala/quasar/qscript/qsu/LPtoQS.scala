@@ -50,8 +50,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
       MinimizeAutoJoins[T, F]      >=>
       debug("MinimizeAJ: ")        >==>
       ReifyAutoJoins[T, F]         >=>
-      debug("ReifyAutoJoins: ")    >-
-      (_.graph)                    >==>
+      debug("ReifyAutoJoins: ")    >==>
       ReifyIdentities[T, F]        >=>
       debug("ReifyIdentities: ")   >==>
       Graduate[T, F]

@@ -19,6 +19,7 @@ package quasar.qscript.qsu
 import slamdata.Predef._
 
 import quasar.NameGenerator
+import quasar.Planner.PlannerErrorME
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
@@ -33,23 +34,29 @@ import quasar.qscript.{
   LeftSide,
   RightSide,
   MFC,
-  ReduceFunc,
-  ReduceIndex,
-  ReduceIndexF}
+  ReduceFunc}
 import quasar.qscript.MapFuncCore.{EmptyMap, StaticMap}
 import quasar.qscript.provenance.JoinKeys.JoinKey
 import quasar.qscript.qsu.{QScriptUniform => QSU}
+import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
 import matryoshka.{showTShow, BirecursiveT, ShowT}
-import monocle.Lens
+import monocle.{Lens, Optional}
+import monocle.syntax.fields._1
 import scalaz.{Foldable, Free, Functor, IList, IMap, ISet, Monad, NonEmptyList, Show, StateT, Traverse}
 import scalaz.Scalaz._
 
+/** TODO
+  * With smarter structural MapFunc simplification, we could just
+  * ConcatMaps(LeftSide, <value>) when preserving identities instead of reconstructing
+  * the identity key, however this currently defeats the mini structural evaluator
+  * that simplifies things like ProjectKey(MakeMap(foo, <bar>), foo) => bar.
+  */
 final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
   import ReifyIdentities.ResearchedQSU
 
-  def apply[F[_]: Monad: NameGenerator](graph: QSUGraph): F[ResearchedQSU[T]] =
-    reifyIdentities[F](gatherReferences(graph), graph)
+  def apply[F[_]: Monad: NameGenerator: PlannerErrorME](aqsu: AuthenticatedQSU[T]): F[ResearchedQSU[T]] =
+    reifyIdentities[F](gatherReferences(aqsu.graph), aqsu)
 
   ////
 
@@ -57,12 +64,13 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
   private type ReifiedStatus = IMap[Symbol, Boolean]
 
   private val LRF = Traverse[List].compose[ReduceFunc]
+  private val ONEL = Traverse[Option].compose[NonEmptyList]
 
   private val O = QSU.Optics[T]
   private val func = construction.Func[T]
 
-  private val Identities: T[EJson] = EJson.str("identities")
-  private val Value: T[EJson] = EJson.str("value")
+  private val IdentitiesK: String = "identities"
+  private val ValueK: String = "value"
 
   private def bucketSymbol(src: Symbol, idx: Int): Symbol =
     Symbol(s"${src.name}_b$idx")
@@ -71,13 +79,13 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
     Symbol(s"${src.name}_k$idx")
 
   private val lookupValue: FreeMap =
-    func.ProjectKey(func.Hole, func.Constant(Value))
+    func.ProjectKeyS(func.Hole, ValueK)
 
   private val lookupIdentities: FreeMap =
-    func.ProjectKey(func.Hole, func.Constant(Identities))
+    func.ProjectKeyS(func.Hole, IdentitiesK)
 
   private def lookupIdentity(src: Symbol): FreeMap =
-    func.ProjectKey(lookupIdentities, func.Constant(EJson.str(src.name)))
+    func.ProjectKeyS(lookupIdentities, src.name)
 
   private val defaultAccess: QAccess[Symbol] => FreeMap = {
     case Access.Id(idAccess, _) => idAccess match {
@@ -112,7 +120,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
   private val reifyRefs: Lens[ReifyState, References] =
     Lens((_: ReifyState).refs)(rs => _.copy(refs = rs))
 
-  private def gatherReferences(g: QSUGraph): References = {
+  private def gatherReferences(g: QSUGraph): References =
     g.foldMapUp(g => g.unfold.map(_.root) match {
       case QSU.QSReduce(source, buckets, reducers, _) =>
         recordAccesses(g.root, bucketIdAccess(source, buckets))
@@ -126,11 +134,10 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
 
       case other => References.noRefs
     })
-  }
 
-  private def reifyIdentities[F[_]: Monad: NameGenerator](
+  private def reifyIdentities[F[_]: Monad: NameGenerator: PlannerErrorME](
       refs: References,
-      graph: QSUGraph)
+      aqsu: AuthenticatedQSU[T])
       : F[ResearchedQSU[T]] = {
 
     import QSUGraph.{Extractors => E}
@@ -138,9 +145,6 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
     type ReifyT[X[_], A] = StateT[X, ReifyState, A]
     type G[A] = ReifyT[F, A]
     val G = MonadState_[G, ReifyState]
-
-    def bucketsI(buckets: NonEmptyList[IdAccess.Bucket[T[EJson]]]): FreeMapA[ReduceIndex] =
-      makeI(buckets map (ba => (bucketSymbol(ba.of, ba.idx), ReduceIndexF[T](ba.idx.left))))
 
     def emitsIVMap(g: QSUGraph): G[Boolean] =
       G.gets(_.status.lookup(g.root) getOrElse false)
@@ -165,36 +169,49 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
 
     def makeIV[A](initialI: FreeMapA[A], initialV: FreeMapA[A]): FreeMapA[A] =
       func.ConcatMaps(
-        func.MakeMap(func.Constant(Identities), initialI),
-        func.MakeMap(func.Constant(Value), initialV))
+        func.MakeMapS(IdentitiesK, initialI),
+        func.MakeMapS(ValueK, initialV))
 
     def modifyAccess(of: QAccess[Symbol])(f: FreeMap => FreeMap): G[Unit] =
       G.modify(reifyRefs.modify(_.modifyAccess(of)(f)))
 
-    /** Nests a graph in a Map vertex that wraps the original value in the value
-      * side of an IV Map, taking care of all required bookkeeping.
-      */
-    def nestBranchValue(branch: QSUGraph): G[QSUGraph] =
+    /** Returns a new graph that applies `func` to the result of `g`. */
+    def mapResultOf(g: QSUGraph, func: FreeMap): G[(Symbol, QSUGraph)] =
       for {
         nestedRoot <- freshName.liftM[ReifyT]
 
-        QSUGraph(origRoot, origVerts) = branch
+        QSUGraph(origRoot, origVerts) = g
 
         nestedVerts = origVerts.updated(nestedRoot, origVerts(origRoot))
 
-        newVert = O.map(nestedRoot, makeIV(Free.roll(MFC(EmptyMap[T, FreeMap])), func.Hole))
+        newVert = O.map(nestedRoot, func)
 
         newBranch = QSUGraph(origRoot, nestedVerts.updated(origRoot, newVert))
-
-        _ <- setStatus(nestedRoot, false)
-        _ <- setStatus(origRoot, true)
 
         replaceOldAccess = reifyRefs.modify(_.replaceAccess(origRoot, nestedRoot))
         nestedAccess = Access.value[T[EJson], Symbol](nestedRoot)
         recordNewAccess = reifyRefs.modify(_.recordAccess(origRoot, nestedAccess, defaultAccess(nestedAccess)))
-        modifyValueAccess = reifyRefs.modify(_.modifyAccess(Access.value(origRoot))(rebaseV))
 
-        _ <- G.modify(replaceOldAccess >>> recordNewAccess >>> modifyValueAccess)
+        _ <- G.modify(replaceOldAccess >>> recordNewAccess)
+      } yield (nestedRoot, newBranch)
+
+    /** Nests a graph in a Map vertex that wraps the original value in the value
+      * side of an IV Map.
+      */
+    def nestBranchValue(branch: QSUGraph): G[QSUGraph] =
+      for {
+        mapped <- mapResultOf(branch, makeIV(Free.roll(MFC(EmptyMap[T, FreeMap])), func.Hole))
+
+        (nestedRoot, newBranch) = mapped
+
+        mapRoot = newBranch.root
+
+        _ <- setStatus(nestedRoot, false)
+        _ <- setStatus(mapRoot, true)
+
+        modifyValueAccess = reifyRefs.modify(_.modifyAccess(Access.value(mapRoot))(rebaseV))
+
+        _ <- G.modify(modifyValueAccess)
       } yield newBranch
 
     def onNeedsIV(g: QSUGraph): G[Unit] =
@@ -223,7 +240,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
     def updateIV[A](srcIV: FreeMapA[A], ids: FreeMapA[A], v: FreeMapA[A]): FreeMapA[A] =
       makeIV(func.ConcatMaps(lookupIdentities >> srcIV, ids), v)
 
-    val reified = graph.rewriteM[G]({
+
+    // Reifies shift identity and reduce bucket access.
+    val reifyNonGroupKeys: PartialFunction[QSUGraph, G[QSUGraph]] = {
 
       case g @ E.Distinct(source) =>
         preserveIV(source, g) as g
@@ -363,8 +382,11 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
         newReducers.tuple(referencedBuckets) flatMap {
           case (reds, Some(refdBuckets)) =>
             onNeedsIV(g) as {
-              val newRepair = makeIV(bucketsI(refdBuckets), repair)
-              g.overwriteAtRoot(O.qsReduce(source.root, buckets, reds, newRepair))
+              val refdIds = makeI(refdBuckets map { ba =>
+                bucketSymbol(ba.of, ba.idx) -> func.ReduceIndex(ba.idx.left)
+              })
+
+              g.overwriteAtRoot(O.qsReduce(source.root, buckets, reds, makeIV(refdIds, repair)))
             }
 
           case (reds, None) =>
@@ -454,7 +476,68 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
       case g @ E.Unreferenced() =>
         setStatus(g.root, false) as g
 
-    }).run(ReifyState(IMap.empty, refs))
+    }
+
+    val groupKeyA: Optional[QAccess[Symbol], (Symbol, Int)] =
+      Access.id[T[EJson], Symbol] composePrism IdAccess.groupKey.first composeLens _1
+
+    // Reifies group key access.
+    def reifyGroupKeys(auth: QAuth, g: QSUGraph): G[QSUGraph] = {
+
+      def referencedAssocs(indices: IList[Int], valueAccess: FreeMap)
+          : G[Option[NonEmptyList[(Symbol, FreeMap)]]] =
+        ONEL.traverse(indices.toNel) { i =>
+          auth.lookupGroupKeyE[G](g.root, i) map { k =>
+            (groupKeySymbol(g.root, i), k >> valueAccess)
+          }
+        }
+
+      val referencedIndices =
+        G.gets(_.refs.accessed.foldlWithKey(IList[Int]()) { (indices, k, _) =>
+          val idx = groupKeyA.getOption(k) collect {
+            case (sym, idx) if sym === g.root => idx
+          }
+
+          idx.fold(indices)(_ :: indices)
+        })
+
+      for {
+        srcIV <- emitsIVMap(g)
+
+        indices <- referencedIndices
+
+        assocs <- referencedAssocs(indices, srcIV.fold(lookupValue, func.Hole))
+
+        resultG <- assocs.fold(g.point[G]) { as =>
+          val fm =
+            if (srcIV)
+              updateIV(func.Hole, makeI(as), lookupValue)
+            else
+              makeIV(makeI(as), func.Hole)
+
+          for {
+            mapped <- mapResultOf(g, fm)
+
+            (newVert, g2) = mapped
+
+            _ <- setStatus(newVert, srcIV)
+            _ <- setStatus(g2.root, true)
+
+            // If the original vertex emitted IV, then need to properly remap
+            // access to its new name
+            //
+            // else we need to remap access to the existing name as it now
+            // points to a vertex that emits IV.
+            vertexToModify = srcIV.fold(newVert, g2.root)
+            _ <- G.modify(reifyRefs.modify(_.modifyAccess(Access.value(vertexToModify))(rebaseV)))
+          } yield g2
+        }
+      } yield resultG
+    }
+
+    val reified =
+      aqsu.graph.rewriteM[G](reifyNonGroupKeys andThen (_.flatMap(reifyGroupKeys(aqsu.auth, _))))
+        .run(ReifyState(IMap.empty, refs))
 
     reified flatMap {
       case (ReifyState(status, reifiedRefs), reifiedGraph) =>
@@ -483,8 +566,8 @@ object ReifyIdentities {
       }
   }
 
-  def apply[T[_[_]]: BirecursiveT, F[_]: Monad: NameGenerator]
-      (graph: QSUGraph[T])
+  def apply[T[_[_]]: BirecursiveT, F[_]: Monad: NameGenerator: PlannerErrorME]
+      (aqsu: AuthenticatedQSU[T])
       : F[ResearchedQSU[T]] =
-    new ReifyIdentities[T].apply[F](graph)
+    new ReifyIdentities[T].apply[F](aqsu)
 }
