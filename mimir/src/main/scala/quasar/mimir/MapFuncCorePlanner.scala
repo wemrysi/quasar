@@ -163,9 +163,9 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
           CPathField("foo")): TransSpec[A]).point[F]
 
       case MapFuncsCore.And(a1, a2) =>
-        Infix.And.spec(a1, a2).point[F]
+        Infix.And.spec2(a1, a2).point[F]
       case MapFuncsCore.Or(a1, a2) =>
-        Infix.Or.spec(a1, a2).point[F]
+        Infix.Or.spec2(a1, a2).point[F]
       case MapFuncsCore.Between(a1, a2, a3) =>
         (MapN(OuterArrayConcat(WrapArray(a1), WrapArray(a2), WrapArray(a3)), between): TransSpec[A]).point[F]
       case MapFuncsCore.Cond(a1, a2, a3) if a3 == undefined(id) =>
@@ -214,7 +214,7 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
 
       case MapFuncsCore.ConcatArrays(a1, a2) =>
         (Cond(
-          Infix.And.spec[A](IsType(a1, StrAndDateT), IsType(a2, StrAndDateT)),
+          Infix.And.spec2[A](IsType(a1, StrAndDateT), IsType(a2, StrAndDateT)),
           concat.spec[A](a1, a2),
           OuterArrayConcat[A](a1, a2)): TransSpec[A]).point[F]
 
