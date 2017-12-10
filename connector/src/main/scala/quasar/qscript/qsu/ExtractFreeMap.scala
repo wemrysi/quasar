@@ -122,12 +122,12 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
 
             val order: NEL[(FreeMap, SortDir)] =
               access.map(_.leftMap {
-                case -\/(fm) => fm >> func.ProjectKey(func.Hole, StrLit("sort_source"))
-                case \/-(sym) => func.ProjectKey(func.Hole, StrLit(sym.name))
+                case -\/(fm) => fm >> func.ProjectKeyS(func.Hole, "sort_source")
+                case \/-(sym) => func.ProjectKeyS(func.Hole, sym.name)
               })
 
             val sort: QSU[Symbol] = QSSort(joinRoot, Nil, order)
-            val result: QSU[Symbol] = Map(interRoot, func.ProjectKey(func.Hole, StrLit("sort_source")))
+            val result: QSU[Symbol] = Map(interRoot, func.ProjectKeyS(func.Hole, "sort_source"))
 
             val newVerts: QSUVerts[T] = verts
               .updated(interRoot, sort)
@@ -161,8 +161,8 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
               func.MakeMap(StrLit(targetName), func.RightSide))
 
             val join: QSU[Symbol] = AutoJoin2(src, target, combine)
-            val inter: QSU[Symbol] = makeQSU(joinRoot, func.ProjectKey(func.Hole, StrLit(targetName)))
-            val result: QSU[Symbol] = Map(interRoot, func.ProjectKey(func.Hole, StrLit(srcName)))
+            val inter: QSU[Symbol] = makeQSU(joinRoot, func.ProjectKeyS(func.Hole, targetName))
+            val result: QSU[Symbol] = Map(interRoot, func.ProjectKeyS(func.Hole, srcName))
 
             val QSUGraph(origRoot, origVerts) = graph
 

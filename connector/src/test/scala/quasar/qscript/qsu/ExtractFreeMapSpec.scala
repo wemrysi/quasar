@@ -45,8 +45,7 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
 
-  def projectStrKey(key: String): FreeMap =
-    func.ProjectKey(func.Hole, func.Constant(ejs.str(key)))
+  def projectStrKey(key: String): FreeMap = func.ProjectKeyS(func.Hole, key)
 
   val orders: AFile = Path.rootDir </> Path.dir("client") </> Path.file("orders")
 
