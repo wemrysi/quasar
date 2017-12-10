@@ -66,7 +66,10 @@ object InMemory {
     rm: RM,
     wm: WM,
     queryResps: QueryResponses,
-    resultMap: ResultMap)
+    resultMap: ResultMap) {
+    def addFile(file: AFile, data: Vector[Data]) =
+      copy(contents = contents + (file -> data))
+  }
 
   object InMemState {
     val empty = InMemState(0, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
