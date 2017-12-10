@@ -47,6 +47,11 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
 
   def projectStrKey(key: String): FreeMap = func.ProjectKeyS(func.Hole, key)
 
+  def makeMap(left: String, right: String): JoinFunc =
+    func.ConcatMaps(
+      func.MakeMapS(left, func.LeftSide),
+      func.MakeMapS(right, func.RightSide))
+
   val orders: AFile = Path.rootDir </> Path.dir("client") </> Path.file("orders")
 
   def extractFM(graph: QSUGraph) = ExtractFreeMap[Fix, F](graph)
@@ -86,9 +91,7 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
           fm must_= predicate
           filterPredicate must_= projectStrKey("filter_predicate")
           valueAccess must_= projectStrKey("filter_source")
-          autojoinCondition must_= func.ConcatMaps(
-            func.MakeMap(func.Constant(ejs.str("filter_source")), func.LeftSide),
-            func.MakeMap(func.Constant(ejs.str("filter_predicate")), func.RightSide))
+          autojoinCondition must_= makeMap("filter_source", "filter_predicate")
       }
     }
 
@@ -125,10 +128,7 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
           fm must_= key
           groupKey must_= projectStrKey("group_key")
           valueAccess must_= projectStrKey("group_source")
-          autojoinCondition must_= func.ConcatMaps(
-           func.MakeMap(func.Constant(ejs.str("group_source")), func.LeftSide),
-           func.MakeMap(func.Constant(ejs.str("group_key")), func.RightSide))
-
+          autojoinCondition must_= makeMap("group_source", "group_key")
       }
     }
 
@@ -178,9 +178,7 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
           fm1 must_= key1 >> projectStrKey("sort_source")
           fm2 must_= projectStrKey("__fromTree3")
           valueAccess must_= projectStrKey("sort_source")
-          autojoinCondition must_= func.ConcatMaps(
-            func.MakeMap(func.Constant(ejs.str("sort_source")), func.LeftSide),
-            func.MakeMap(func.Constant(ejs.str("__fromTree3")), func.RightSide))
+          autojoinCondition must_= makeMap("sort_source", "__fromTree3")
       }
     }
 
@@ -220,9 +218,7 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
           fm3 must_= key3 >> projectStrKey("sort_source")
           fm4 must_= projectStrKey("__fromTree6")
           valueAccess must_= projectStrKey("sort_source")
-          innerAutojoinCondition must_= func.ConcatMaps(
-            func.MakeMap(func.Constant(ejs.str("sort_source")), func.LeftSide),
-            func.MakeMap(func.Constant(ejs.str("__fromTree3")), func.RightSide))
+          innerAutojoinCondition must_= makeMap("sort_source", "__fromTree3")
           outerAutojoinCondition must_= func.ConcatMaps(
             func.LeftSide,
             func.MakeMap(func.Constant(ejs.str("__fromTree6")), func.RightSide))
