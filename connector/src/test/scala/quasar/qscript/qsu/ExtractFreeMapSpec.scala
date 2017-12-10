@@ -26,12 +26,13 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.qscript.construction
+import quasar.qscript.{MapFuncsCore, MFC}
 
 import matryoshka._
 import matryoshka.data._
 import matryoshka.data.free._
 import pathy.Path
-import scalaz.{\/, \/-, EitherT, ICons, INil, Need, NonEmptyList => NEL, StateT}
+import scalaz.{\/, -\/, \/-, EitherT, ICons, INil, Need, NonEmptyList => NEL, StateT}
 import scalaz.Scalaz._
 
 object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
@@ -173,12 +174,19 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
                 autojoinCondition),
               Nil,
               NEL((fm1, SortDir.Ascending), ICons((fm2, SortDir.Descending), INil()))),
-            valueAccess)) =>   // FIXME don't explicitly test for generated names
+            valueAccess)) => {
+
+          val genName: String = (fm2.resume match {
+            case -\/(MFC(MapFuncsCore.ProjectKey(_, MapFuncsCore.StrLit(name)))) => name.some
+            case _ => None
+          }).get
+
           fm must_= key2
           fm1 must_= key1 >> projectStrKey("sort_source")
-          fm2 must_= projectStrKey("__fromTree3")
+          fm2 must_= projectStrKey(genName)
           valueAccess must_= projectStrKey("sort_source")
-          autojoinCondition must_= makeMap("sort_source", "__fromTree3")
+          autojoinCondition must_= makeMap("sort_source", genName)
+        }
       }
     }
 
@@ -210,18 +218,30 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
               Nil,
               NEL(
                 (fm1, SortDir.Ascending), ICons((fm2, SortDir.Descending), ICons((fm3, SortDir.Descending), ICons((fm4, SortDir.Ascending), INil()))))),
-            valueAccess)) =>  // FIXME don't explicitly test for generated names
+            valueAccess)) => {
+
+          val genName2: String = (fm2.resume match {
+            case -\/(MFC(MapFuncsCore.ProjectKey(_, MapFuncsCore.StrLit(name)))) => name.some
+            case _ => None
+          }).get
+
+          val genName4: String = (fm4.resume match {
+            case -\/(MFC(MapFuncsCore.ProjectKey(_, MapFuncsCore.StrLit(name)))) => name.some
+            case _ => None
+          }).get
+
           innerFM must_= key2
           outerFM must_= key4
           fm1 must_= key1 >> projectStrKey("sort_source")
-          fm2 must_= projectStrKey("__fromTree3")
+          fm2 must_= projectStrKey(genName2)
           fm3 must_= key3 >> projectStrKey("sort_source")
-          fm4 must_= projectStrKey("__fromTree6")
+          fm4 must_= projectStrKey(genName4)
           valueAccess must_= projectStrKey("sort_source")
-          innerAutojoinCondition must_= makeMap("sort_source", "__fromTree3")
+          innerAutojoinCondition must_= makeMap("sort_source", genName2)
           outerAutojoinCondition must_= func.ConcatMaps(
             func.LeftSide,
-            func.MakeMap(func.Constant(ejs.str("__fromTree6")), func.RightSide))
+            func.MakeMap(func.Constant(ejs.str(genName4)), func.RightSide))
+        }
       }
     }
   }
