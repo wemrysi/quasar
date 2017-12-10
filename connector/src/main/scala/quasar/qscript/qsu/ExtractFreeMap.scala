@@ -142,6 +142,8 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
       : F[QSUGraph] =
     graph.rewriteM[F](extract[F])
 
+  ////
+
   private def autojoinFreeMap[F[_]: Applicative: NameGenerator: PlannerErrorME]
     (graph: QSUGraph, src: Symbol, target: Symbol)
     (srcName: String, targetName: String)
