@@ -104,14 +104,14 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
 
       nonmappable match {
         case Nil =>
-          keys traverse { case (k, sortDir) =>
-            MappableRegion.unaryOf(src.root, graph refocus k.root).strengthR(sortDir) match {
-              case Some(pair) => pair.point[F]
-              case None =>
-                PlannerErrorME[F].raiseError[(FreeMap, SortDir)](
-                  InternalError(s"Invalid sort key, $k, must be a mappable function of $src.", None))
-            }
-          } map { nel => graph.overwriteAtRoot(QSSort(src.root, Nil, nel)) }
+          access.toList collect {
+            case ((-\/(fm), dir)) => (fm, dir)
+          } match {
+            case Nil =>
+              PlannerErrorME[F].raiseError[QSUGraph](InternalError(s"No sort keys found.", None))
+            case head :: tail =>
+              graph.overwriteAtRoot(QSSort(src.root, Nil, NEL(head, tail: _*))).point[F]
+          }
 
         case head :: tail =>
           for {
