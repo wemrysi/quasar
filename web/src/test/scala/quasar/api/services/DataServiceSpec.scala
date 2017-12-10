@@ -102,6 +102,13 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   object Unchanged extends StateChange
   case class Changed(data: FileMap = Map.empty, mounts: Map[APath, MountConfig] = Map.empty) extends StateChange
 
+  def isExpectedResponse(data: Vector[Data], response: Response, format: MessageFormat) = {
+    val expectedBody: Process[Task, String] = format.encode(Process.emitAll(data))
+    response.as[String].unsafePerformSync must_=== expectedBody.runLog.unsafePerformSync.mkString("")
+    response.status must_=== Status.Ok
+    response.contentType must_=== Some(`Content-Type`(format.mediaType, Charset.`UTF-8`))
+  }
+
   "Data Service" should {
     "GET" >> {
       "return 404 NotFound if file does not exist" >> prop { file: AFile =>
@@ -114,12 +121,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
               "path" := posixCodec.printPath(file))))
       }
       "respond with file data" >> {
-        def isExpectedResponse(data: Vector[Data], response: Response, format: MessageFormat) = {
-          val expectedBody: Process[Task, String] = format.encode(Process.emitAll(data))
-          response.as[String].unsafePerformSync must_=== expectedBody.runLog.unsafePerformSync.mkString("")
-          response.status must_=== Status.Ok
-          response.contentType must_=== Some(`Content-Type`(format.mediaType, Charset.`UTF-8`))
-        }
         "in correct format" >> {
           "readable and line delimited json by default" >> prop { filesystem: SingleFileMemState =>
             val response = service(filesystem.state)(Request(uri = pathUri(filesystem.file))).unsafePerformSync
@@ -348,6 +349,31 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
         }
       }
 
+      "if file is a view" >> {
+        "download data as if it were an ordinary file" >> prop { (viewFile: AFile, data: Vector[Data]) =>
+          val file0 = rootDir </> file("data")
+          val view = MountConfig.viewConfig0(sqlB"select * from `/data`")
+          val mounts = Map((viewFile: APath) -> view)
+          val service0 = service(InMemState.fromFiles(Map(file0 -> data)), MountingsConfig(mounts))
+          val response = service0(Request(uri = pathUri(viewFile))).unsafePerformSync
+          isExpectedResponse(data, response, MessageFormat.Default)
+        }
+        // Note: I don't think this is the ideal response but it's a little tricky to
+        // implement a different response and it's been behaving like this for quite some
+        // time so I think it's okay to keep it this way until a client argues otherwise
+        "if view points to non-existent file, respond with a 404 NotFound with the missing file" >> prop { viewFile: AFile =>
+          val view = MountConfig.viewConfig0(sqlB"select * from `/foo`")
+          val mounts = Map((viewFile: APath) -> view)
+          val response = service(emptyMem, MountingsConfig(mounts))(Request(uri = pathUri(viewFile))).unsafePerformSync
+          (response.as[Json].unsafePerformSync must_= Json(
+            "error" := Json(
+              "status" := "Path not found.",
+              "detail" := Json(
+                "path" := "/foo")))) and
+          (response.status must_=== Status.NotFound)
+        }
+      }
+
       "respond with view cache data" >> {
         "fresh" >> prop {
             (f: AFile, g: AFile, now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
@@ -441,6 +467,34 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           // even though we aren't actually checking the validity of the bytes
           response.as[ByteVector].void.unsafePerformSync must_=== (())
         }
+        "if directory contains views, they are downloaded as files" >> prop { (filesystem: NonEmptyDir, data: Vector[Data]) =>
+          val outsideFile = rootDir </> file("data")
+          val viewConfig = MountConfig.viewConfig0(sqlB"select * from `/data`")
+          val disposition = `Content-Disposition`("attachment", Map("filename" -> "foo.zip"))
+          val requestMediaType = MediaType.`text/csv`.withExtensions(Map("disposition" -> disposition.value))
+          val request = Request(
+            uri = pathUri(filesystem.dir),
+            headers = Headers(Accept(requestMediaType)))
+          val mounts = MountingsConfig(Map[APath, MountConfig]((filesystem.dir </> file("view")) -> viewConfig))
+          val response = service(filesystem.state.addFile(outsideFile, data), mounts)(request).unsafePerformSync
+          response.status must_=== Status.Ok
+          response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
+          response.headers.get(`Content-Disposition`) must_=== Some(disposition)
+          // Just want to make sure streaming of the zipped bytes doesn't fail
+          // even though we aren't actually checking the validity of the bytes
+          response.as[ByteVector].void.unsafePerformSync must_=== (())
+        }
+        "if directory contains views referencing missing files" >> prop { filesystem: NonEmptyDir =>
+          val viewConfig = MountConfig.viewConfig0(sqlB"select * from `/missing`")
+          val disposition = `Content-Disposition`("attachment", Map("filename" -> "foo.zip"))
+          val requestMediaType = MediaType.`text/csv`.withExtensions(Map("disposition" -> disposition.value))
+          val request = Request(
+            uri = pathUri(filesystem.dir),
+            headers = Headers(Accept(requestMediaType)))
+          val mounts = MountingsConfig(Map[APath, MountConfig]((filesystem.dir </> file("view")) -> viewConfig))
+          val response = service(filesystem.state, mounts)(request).unsafePerformSync
+          response.status must_=== Status.NotFound
+        }.pendingUntilFixed("Currently will only fail once streaming has started, but requires substantial change to `ReadFile` API to change behavior")
       }
       "what happens if user specifies a Path that is a directory but without the appropriate headers?" >> todo
       "description of the function if the file is a module function" in todo

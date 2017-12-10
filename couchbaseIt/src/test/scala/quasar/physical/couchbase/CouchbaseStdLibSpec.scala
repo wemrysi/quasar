@@ -66,6 +66,8 @@ class CouchbaseStdLibSpec extends StdLibSpec {
       case (ExtractFunc(MapFuncsCore.Gte(_,_)), QData.Date(_), QData.Timestamp(_)) => pending
       case (ExtractFunc(MapFuncsCore.IfUndefined(_,_)), _, _) => pending
       case (ExtractFunc(MapFuncsCore.ProjectKey(_,_)), _, _) => pending
+      case (ExtractFunc(MapFuncsCore.And(_,_)), _, _) => pending
+      case (ExtractFunc(MapFuncsCore.Or(_,_)), _, _) => pending
       case _ => run
     }
 

@@ -1718,6 +1718,14 @@ abstract class StdLibSpec extends Qspec {
         "true, true" >> {
           binary(And(_, _).embed, Data.Bool(true), Data.Bool(true), Data.Bool(true))
         }
+
+        "undefined, false" >> {
+          commute(And(_, _).embed, Data.NA, Data.Bool(false), Data.Bool(false))
+        }
+
+        "undefined, true" >> {
+          commute(And(_, _).embed, Data.NA, Data.Bool(true), Data.NA)
+        }
       }
 
       "Or" >> {
@@ -1731,6 +1739,14 @@ abstract class StdLibSpec extends Qspec {
 
         "true, true" >> {
           binary(Or(_, _).embed, Data.Bool(true), Data.Bool(true), Data.Bool(true))
+        }
+
+        "undefined, false" >> {
+          commute(Or(_, _).embed, Data.NA, Data.Bool(false), Data.NA)
+        }
+
+        "undefined, true" >> {
+          commute(Or(_, _).embed, Data.NA, Data.Bool(true), Data.Bool(true))
         }
       }
 
