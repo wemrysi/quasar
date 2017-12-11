@@ -76,11 +76,11 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] private () {
         _ <- RenameT[F].tell(DList(deId -> srcId))
       } yield (srcId, qdims + (srcId -> updDims))
 
-    case ((_, tdims), GPF(tid, Transpose((srcId, srcDims), retain, _))) =>
+    case ((_, tdims), GPF(tid, Transpose((srcId, srcDims), retain, rot))) =>
       GStateM[F].modify(
         QSUGraph.vertices.modify(_.updated(
           tid,
-          LeftShift(srcId, HoleF, retain.fold[IdStatus](IdOnly, ExcludeId), RightSideF))))
+          LeftShift(srcId, HoleF, retain.fold[IdStatus](IdOnly, ExcludeId), RightSideF, rot))))
         .as((tid, srcDims + (tid -> tdims)))
 
     case ((_, nodeDims), GPF(nodeId, node)) =>
@@ -105,7 +105,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] private () {
 
         case JoinSideRef(_) => unexpectedError("JoinSideRef", root)
 
-        case LeftShift(_, _, _, _) => unexpectedError("LeftShift", root)
+        case LeftShift(_, _, _, _, _) => unexpectedError("LeftShift", root)
 
         case LPFilter(_, _) => unexpectedError("LPFilter", root)
 

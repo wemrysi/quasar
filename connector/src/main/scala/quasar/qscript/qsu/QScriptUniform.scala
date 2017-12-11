@@ -91,8 +91,8 @@ object QScriptUniform {
       case Transpose(source, retain, rotations) =>
         f(source).map(Transpose(_, retain, rotations))
 
-      case LeftShift(source, struct, idStatus, repair) =>
-        f(source).map(LeftShift(_, struct, idStatus, repair))
+      case LeftShift(source, struct, idStatus, repair, rot) =>
+        f(source).map(LeftShift(_, struct, idStatus, repair, rot))
 
       case LPReduce(source, reduce) =>
         f(source).map(LPReduce(_, reduce))
@@ -167,8 +167,8 @@ object QScriptUniform {
           case Transpose(source, retain, rotations) =>
             s"Transpose(${source.shows}, ${retain.shows}, ${rotations.shows})"
 
-          case LeftShift(source, struct, idStatus, repair) =>
-            s"LeftShift(${source.shows}, ${struct.shows}, ${idStatus.shows}, ${repair.shows})"
+          case LeftShift(source, struct, idStatus, repair, rot) =>
+            s"LeftShift(${source.shows}, ${struct.shows}, ${idStatus.shows}, ${repair.shows}, ${rot.shows})"
 
           case LPReduce(source, reduce) =>
             s"LPReduce(${source.shows}, ${reduce.shows})"
@@ -375,7 +375,8 @@ object QScriptUniform {
       source: A,
       struct: FreeMap[T],
       idStatus: IdStatus,
-      repair: JoinFunc[T]) extends QScriptUniform[T, A]
+      repair: JoinFunc[T],
+      rot: Rotation) extends QScriptUniform[T, A]
 
   // LPish
   final case class LPReduce[T[_[_]], A](
@@ -454,10 +455,10 @@ object QScriptUniform {
         case JoinSideRef(s) => s
       } (JoinSideRef(_))
 
-    def leftShift[A]: Prism[QScriptUniform[A], (A, FreeMap, IdStatus, JoinFunc)] =
-      Prism.partial[QScriptUniform[A], (A, FreeMap, IdStatus, JoinFunc)] {
-        case LeftShift(s, fm, ids, jf) => (s, fm, ids, jf)
-      } { case (s, fm, ids, jf) => LeftShift(s, fm, ids, jf) }
+    def leftShift[A]: Prism[QScriptUniform[A], (A, FreeMap, IdStatus, JoinFunc, Rotation)] =
+      Prism.partial[QScriptUniform[A], (A, FreeMap, IdStatus, JoinFunc, Rotation)] {
+        case LeftShift(s, fm, ids, jf, rot) => (s, fm, ids, jf, rot)
+      } { case (s, fm, ids, jf, rot) => LeftShift(s, fm, ids, jf, rot) }
 
     def lpFilter[A]: Prism[QScriptUniform[A], (A, A)] =
       Prism.partial[QScriptUniform[A], (A, A)] {
@@ -543,8 +544,8 @@ object QScriptUniform {
             case DimEdit(a, DTrans.Group(x)) =>
               f(x) map (y => DimEdit(a, DTrans.Group(y)))
 
-            case LeftShift(a, x, ids, rep) =>
-              f(x) map (LeftShift(a, _, ids, rep))
+            case LeftShift(a, x, ids, rep, rot) =>
+              f(x) map (LeftShift(a, _, ids, rep, rot))
 
             case Map(a, x) =>
               f(x) map (Map(a, _))
@@ -630,8 +631,8 @@ object QScriptUniform {
       composeLifting[G](O.joinSideRef[A])
     }
 
-    def leftShift: Prism[A, F[(A, FreeMap, IdStatus, JoinFunc)]] = {
-      composeLifting[(?, FreeMap, IdStatus, JoinFunc)](O.leftShift[A])
+    def leftShift: Prism[A, F[(A, FreeMap, IdStatus, JoinFunc, Rotation)]] = {
+      composeLifting[(?, FreeMap, IdStatus, JoinFunc, Rotation)](O.leftShift[A])
     }
 
     def lpFilter: Prism[A, F[(A, A)]] = {

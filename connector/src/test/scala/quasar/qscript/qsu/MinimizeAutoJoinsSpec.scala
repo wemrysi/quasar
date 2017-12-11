@@ -48,7 +48,7 @@ import scalaz.syntax.std.option._
 object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
   import ApplyProvenance.AuthenticatedQSU
-  import QScriptUniform.DTrans
+  import QScriptUniform.{DTrans, Rotation}
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
@@ -437,7 +437,8 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             qsu.read(afile),
             HoleF[Fix],
             ExcludeId,
-            RightSideF[Fix]),
+            RightSideF[Fix],
+            Rotation.ShiftArray),
           qsu.read(afile),
           _(MapFuncsCore.Add(_, _)))))
 
@@ -446,7 +447,8 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           Read(`afile`),
           struct,
           ExcludeId,
-          repair) =>
+          repair,
+          _) =>
 
           struct must_=== HoleF[Fix]
 

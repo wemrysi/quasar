@@ -169,10 +169,10 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
           lazy val reducerCheck = reducerAttempt.lengthCompare(candidates.length) === 0
 
           lazy val leftShift12Extract = candidates match {
-            case (ls @ LeftShift(src1, _, _, _)) :: src2 :: Nil if src1.root === src2.root =>
+            case (ls @ LeftShift(src1, _, _, _, _)) :: src2 :: Nil if src1.root === src2.root =>
               Some((ls.unfold, true))
 
-            case src2 :: (ls @ LeftShift(src1, _, _, _)) :: Nil if src1.root === src2.root =>
+            case src2 :: (ls @ LeftShift(src1, _, _, _, _)) :: Nil if src1.root === src2.root =>
               Some((ls.unfold, false))
 
             case _ => None
@@ -275,7 +275,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
           } else {
             // this has to be @unchecked because otherwise scalac chokes
             (leftShift12Extract: @unchecked) match {
-              case Some((QSU.LeftShift(src, struct, idStatus, repair), leftToRight)) =>
+              case Some((QSU.LeftShift(src, struct, idStatus, repair, rot), leftToRight)) =>
                 val fm2 = if (leftToRight)
                   fm
                 else
@@ -289,7 +289,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
 
                 for {
                   back <- qgraph.overwriteAtRoot(
-                    QSU.LeftShift[T, Symbol](src.root, struct, idStatus, repair2)).point[G]
+                    QSU.LeftShift[T, Symbol](src.root, struct, idStatus, repair2, rot)).point[G]
 
                   _ <- updateForCoalesce[G](candidates, qgraph.root)
                 } yield back
