@@ -452,6 +452,32 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
           struct must_=== HoleF[Fix]
 
+          repair must beTreeEqual(func.Add(RightSideF, LeftSideF))
+      }
+    }
+
+    "coalesce an autojoin on a single leftshift on a shared source (RTL)" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.read(afile),
+          qsu.leftShift(
+            qsu.read(afile),
+            HoleF[Fix],
+            ExcludeId,
+            RightSideF[Fix],
+            Rotation.ShiftArray),
+          _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case LeftShift(
+          Read(`afile`),
+          struct,
+          ExcludeId,
+          repair,
+          _) =>
+
+          struct must_=== HoleF[Fix]
+
           repair must beTreeEqual(func.Add(LeftSideF, RightSideF))
       }
     }

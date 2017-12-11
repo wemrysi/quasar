@@ -27,7 +27,7 @@ import quasar.fp._
 import quasar.qscript.{ExcludeId, HoleF, IdOnly, IdStatus, RightSideF}
 import quasar.qscript.provenance._
 
-import matryoshka._
+import matryoshka.{Hole => _, _}
 import matryoshka.data.free._
 import matryoshka.implicits._
 import pathy.Path
@@ -105,7 +105,12 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] private () {
 
         case JoinSideRef(_) => unexpectedError("JoinSideRef", root)
 
-        case LeftShift(_, _, _, _, _) => unexpectedError("LeftShift", root)
+        case LeftShift((_, src), _, _, _, rot) =>
+          val tid: dims.I = Free.pure(Access.identity(root, root))
+          (rot match {
+            case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, src)
+            case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, src)
+          }).point[F]
 
         case LPFilter(_, _) => unexpectedError("LPFilter", root)
 
