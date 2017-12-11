@@ -42,6 +42,10 @@ import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
 import matryoshka.{delayEqual, BirecursiveT, EqualT, ShowT}
 import matryoshka.data.free._
+import monocle.Traversal
+import monocle.function.Each
+import monocle.std.option.{some => someP}
+import monocle.syntax.fields._1
 import scalaz.{Bind, Equal, Free, Monad, Scalaz, StateT, Tags}, Scalaz._   // sigh, monad/traverse conflict
 
 final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extends QSUTTypes[T] {
@@ -99,12 +103,25 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT] private () e
       branches: List[QSUGraph],
       combiner: FreeMapA[Int]): G[QSUGraph] = {
 
+    val groupKeyOf: Traversal[Option[QDims], Symbol] =
+      someP[QDims]           composeTraversal
+      Each.each[QDims, QP.P] composePrism
+      QP.prov.value          composePrism
+      IdAccess.groupKey      composeLens
+      _1
+
     for {
       state <- MinStateM[G].get
 
       fms = branches.zipWithIndex map {
         case (g, i) =>
-          MappableRegion[T](state.failed, g).map(g => (g, i))
+          // Halt coalescing if we previously failed to coalesce this graph or
+          // if this graph was grouped, to ensure joining on group keys works
+          MappableRegion[T](
+            s =>
+              state.failed(s) ||
+              groupKeyOf.exist(_ === s)(state.auth.lookupDims(s)),
+            g) strengthR i
       }
 
       (remap, candidates) = minimizeSources(fms.flatMap(_.toList))

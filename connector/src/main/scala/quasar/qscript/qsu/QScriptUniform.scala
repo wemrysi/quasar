@@ -738,6 +738,12 @@ object QScriptUniform {
     def tread1(name: String): T[QSU] =
       tread(Path.rootDir </> Path.file(name))
 
+    // undefined
+    val undefined: Prism[T[QSU], Unit] =
+      Prism[T[QSU], Unit](map.getOption(_) collect {
+        case (Unreferenced(), Embed(CoEnv(\/-(MFC(MapFuncsCore.Undefined()))))) => ()
+      })(_ => map(unreferenced(), Free.roll(mfc[FreeMap](MapFuncsCore.Undefined()))))
+
     // constants
     val constant: Prism[T[QSU], T[EJson]] =
       Prism[T[QSU], T[EJson]](map.getOption(_) collect {

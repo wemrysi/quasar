@@ -16,6 +16,7 @@
 
 package quasar.qscript.qsu
 
+import slamdata.Predef._
 import quasar.{Planner, Qspec, TreeMatchers, Type}, Planner.PlannerError
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
@@ -35,7 +36,6 @@ import quasar.qscript.{
   RightSideF,
   SrcHole
 }
-import slamdata.Predef._
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -91,9 +91,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         qsu.autojoin3((
           qsu.read(afile),
           qsu.read(afile),
-          qsu.map1((
-            qsu.unreferenced(),
-            MapFuncsCore.Undefined[Fix, Hole](): MapFuncCore[Hole])),
+          qsu.undefined(),
           _(MapFuncsCore.Guard(_, Type.AnyObject, _, _)))))
 
       runOn(qgraph) must beLike {
@@ -426,8 +424,66 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
           fm must beTreeEqual(func.Add(HoleF, func.Constant(J.int(42))))
       }
+    }
 
-      ok
+    "halt minimization at a grouped vertex" in {
+      val groupKey =
+        func.Lower(func.ProjectKeyS(func.Hole, "city"))
+
+      val groupedGuardedRead =
+        qsu.dimEdit(
+          qsu.autojoin3((
+            qsu.read(afile),
+            qsu.read(afile),
+            qsu.undefined(),
+            _(MapFuncsCore.Guard(_, Type.AnyObject, _, _)))),
+          DTrans.Group(groupKey))
+
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.autojoin2((
+            qsu.cstr("city"),
+            qsu.autojoin2((
+              groupedGuardedRead,
+              qsu.cstr("city"),
+              _(MapFuncsCore.ProjectKey(_, _)))),
+            _(MapFuncsCore.MakeMap(_, _)))),
+          qsu.autojoin2((
+            qsu.cstr("1"),
+            qsu.lpReduce(
+              qsu.autojoin2((
+                groupedGuardedRead,
+                qsu.cstr("pop"),
+                _(MapFuncsCore.ProjectKey(_, _)))),
+              ReduceFuncs.Sum(())),
+            _(MapFuncsCore.MakeMap(_, _)))),
+          _(MapFuncsCore.ConcatMaps(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case AutoJoin2C(
+          Map(
+            Map(Read(_), guardL),
+            minL),
+          Map(
+            QSReduce(
+              Map(Read(_), guardR),
+              bucket :: Nil,
+              ReduceFuncs.Sum(prjPop) :: Nil,
+              _),
+            minR),
+          MapFuncsCore.ConcatMaps(_, _)) =>
+
+          guardL must beTreeEqual(guardR)
+
+          minL must beTreeEqual(
+            func.MakeMapS(
+              "city",
+              func.ProjectKeyS(func.Hole, "city")))
+
+          minR must beTreeEqual(func.MakeMapS("1", func.Hole))
+
+          prjPop must beTreeEqual(func.ProjectKeyS(func.Hole, "pop"))
+      }
     }
 
     "coalesce an autojoin on a single leftshift on a shared source" in {
