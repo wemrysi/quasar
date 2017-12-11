@@ -168,12 +168,12 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
           // candidates.forall(_ ~= QSReduce)
           lazy val reducerCheck = reducerAttempt.lengthCompare(candidates.length) === 0
 
-          lazy val leftShift12Extract = candidates match {
-            case (ls @ LeftShift(src1, _, _, _, _)) :: src2 :: Nil if src1.root === src2.root =>
-              Some((ls.unfold, true))
+          lazy val leftShift12Extract: Option[(QSU.LeftShift[T, QSUGraph], Boolean)] = candidates match {
+            case (ls @ LeftShift(src1, struct, idStatus, repair, rot)) :: src2 :: Nil if src1.root === src2.root =>
+              Some((QSU.LeftShift(src1, struct, idStatus, repair, rot), true))
 
-            case src2 :: (ls @ LeftShift(src1, _, _, _, _)) :: Nil if src1.root === src2.root =>
-              Some((ls.unfold, false))
+            case src2 :: (ls @ LeftShift(src1, struct, idStatus, repair, rot)) :: Nil if src1.root === src2.root =>
+              Some((QSU.LeftShift(src1, struct, idStatus, repair, rot), false))
 
             case _ => None
           }
@@ -273,8 +273,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
               }
             } yield back
           } else {
-            // this has to be @unchecked because otherwise scalac chokes
-            (leftShift12Extract: @unchecked) match {
+            leftShift12Extract match {
               case Some((QSU.LeftShift(src, struct, idStatus, repair, rot), leftToRight)) =>
                 val fm2 = if (leftToRight)
                   fm
