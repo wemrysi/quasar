@@ -37,6 +37,7 @@ object SqlExpr extends SqlExprInstances {
       Refs(other.elems ++ this.elems)
     }
   }
+  final case class Unreferenced[T]() extends SqlExpr[T]
   final case class Null[T]() extends SqlExpr[T]
   final case class Obj[T](m: List[(T, T)]) extends SqlExpr[T]
   final case class IsNotNull[T](a1: T) extends SqlExpr[T]
@@ -55,6 +56,7 @@ object SqlExpr extends SqlExprInstances {
                              filter: Option[Filter[T]],
                              orderBy: List[OrderBy[T]])
       extends SqlExpr[T]
+
   final case class From[T](v: T, alias: Id[T])
   final case class Selection[T](v: T, alias: Option[Id[T]])
   final case class Table[T](name: String) extends SqlExpr[T]
