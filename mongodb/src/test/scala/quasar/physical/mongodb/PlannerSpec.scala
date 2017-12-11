@@ -144,6 +144,9 @@ class PlannerSpec extends
     }
 
     // FIXME: Needs an actual expectation and an IT
+    // This gives wrong results in old mongo: returns multiple rows in case
+    // count > 1. It should return 1 row per city.
+    // see https://gist.github.com/rintcius/bff5b740a1252cafc976a31fc13dd7cf
     trackPendingThrow(
       "expr3 with grouping",
       plan(sqlE"select case when pop > 1000 then city else lower(city) end, count(*) from zips group by city"),
@@ -280,7 +283,7 @@ class PlannerSpec extends
 
     "plan time_of_day (JS)" in {
       plan(sqlE"select time_of_day(ts) from days") must
-        beRight // NB: way too complicated to spell out here, and will change as JS generation improves
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp)))
     }
 
     trackPendingTree(
@@ -381,11 +384,15 @@ class PlannerSpec extends
       plan(sqlE"select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth from slamengine_commits as l join slamengine_commits as r on r.sha = l.parents[0].sha and l.author.login = r.author.login"),
       projectOp.node(unwindOp.node(unwindOp.node(matchOp.node(foldLeftJoinSubTree(simpleMapOp.node(readOp.leaf), readOp.leaf))))))
 
-    trackPendingErr(
-      "plan join with non-JS-able condition",
+    trackPendingTemplate(
+      "join with non-JS-able condition",
       plan(sqlE"select z1.city as city1, z1.loc, z2.city as city2, z2.pop from zips as z1 join zips as z2 on z1.loc[*] = z2.loc[*]"),
-      IList(), //TODO
-      { case QScriptPlanningFailed(_) => ok })
+      beRight.which(cwf => notBrokenWithOpsTree(cwf.op,
+        projectOp.node(unwindOp.node(unwindOp.node(matchOp.node(foldLeftOp.node(
+          projectOp.node(groupOp.node(unwindOp.node(projectOp.node(readOp.leaf)))),
+          reduceOp.node(projectOp.node(groupOp.node(unwindOp.node(projectOp.node(readOp.leaf)))))
+        ))))))),
+      beLeft(beLike({ case QScriptPlanningFailed(_) => ok }: PartialFunction[FileSystemError, MatchResult[_]])))
 
     trackPendingTree(
       "simple cross",
