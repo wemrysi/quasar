@@ -109,7 +109,10 @@ object PostgresRenderQuery extends RenderQuery {
     case IfNull(a) =>
       s"coalesce(${a.intercalate(", ")})".right
     case ExprWithAlias(expr: String, alias: String) =>
-      (if (expr === alias) s"$expr" else s"""$expr as "$alias"""").right
+      (if (expr === alias) s"$expr" else {
+        val aliasStr = \/.fromTryCatchNonFatal(alias.toLong).map(a => s""""$a"""").getOrElse(alias)
+        s"$expr as $aliasStr"
+      }).right
     case ExprPair(expr1, expr2) =>
       s"$expr1, $expr2".right
     case ConcatStr(str1, str2)  =>
