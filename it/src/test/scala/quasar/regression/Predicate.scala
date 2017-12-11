@@ -17,6 +17,8 @@
 package quasar.regression
 
 import slamdata.Predef._
+import quasar.RenderTree.ops._
+import quasar.contrib.argonaut._
 import quasar.fp._
 
 import scala.None
@@ -43,18 +45,22 @@ object Predicate {
   import StandardResults._
   import DecodeResult.{ok => jok, fail => jfail}
 
+  def doesntMatch[S <: Option[Json]](actual: Json, expected: Json): String = {
+    val diff = actual.render.diff(expected.render).shows
+    s"Actual result does not match expected value. \n\n Diff: \n $diff \n\n"
+  }
 
   def matchJson(expected: Option[Json]): Matcher[Option[Json]] = new Matcher[Option[Json]] {
     def apply[S <: Option[Json]](s: Expectable[S]) = {
       (expected, s.value) match {
         case (Some(expected), Some(actual)) =>
-          (actual.obj |@| expected.obj) { (actual, expected) =>
-            if (actual.toList == expected.toList)
+          (actual.obj |@| expected.obj) { (actualObj, expectedObj) =>
+            if (actualObj.toList == expectedObj.toList)
               success(s"matches $expected", s)
-            else if (actual == expected)
+            else if (actualObj == expectedObj)
               failure(s"$actual matches $expected, but order differs", s)
-            else failure(s"$actual does not match $expected", s)
-          } getOrElse result(actual == expected, s"matches $expected", s"$actual does not match $expected", s)
+            else failure(doesntMatch(actual, expected), s)
+          } getOrElse result(actual == expected, s"matches $expected", doesntMatch(actual, expected), s)
         case (Some(v), None)  => failure(s"ran out before expected; missing: ${v}", s)
         case (None, Some(v))  => failure(s"had more than expected: ${v}", s)
         case (None, None)     => success(s"matches (empty)", s)
@@ -147,7 +153,7 @@ object Predicate {
           .runLast
           .map {
             case Some((exp, wrongOrder, extra)) =>
-              (extra aka "unexpected value" must beNone) and
+              (extra must beNone.setMessage("unexpected value " + ~extra.map(_.toString))) and
                 (wrongOrder aka "matched but field order differs" must beEmpty)
                 .unless(fieldOrder ≟ OrderIgnored) and
                 (exp aka "unmatched expected values" must beEmpty): Result
