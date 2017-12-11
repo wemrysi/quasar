@@ -67,7 +67,15 @@ class PlannerSpec extends
     plan: => Either[FileSystemError, Crystallized[WorkflowF]],
     expectedOps: IList[MongoOp]) =
       trackPendingTemplate(name, plan,
-        beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps)),
+        beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps, checkDanglingRefs = true)),
+        beRight.which(cwf => trackActual(cwf, testFile(s"plan $name"))))
+
+  def trackPendingNoDanglingRefCheck(
+    name: String,
+    plan: => Either[FileSystemError, Crystallized[WorkflowF]],
+    expectedOps: IList[MongoOp]) =
+      trackPendingTemplate(name, plan,
+        beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps, checkDanglingRefs = false)),
         beRight.which(cwf => trackActual(cwf, testFile(s"plan $name"))))
 
   def trackPendingTree(
@@ -100,6 +108,7 @@ class PlannerSpec extends
     trackPending(
       "filter with both index and key projections",
       plan(sqlE"""select count(parents[0].sha) as count from slamengine_commits where parents[0].sha = "56d1caf5d082d1a6840090986e277d36d03f1859" """),
+      // actual [ReadOp,MatchOp,SimpleMapOp,MatchOp,SimpleMapOp,GroupOp,ProjectOp]
       IList(ReadOp, MatchOp, SimpleMapOp, GroupOp))
 
     trackPendingErr(
@@ -136,6 +145,8 @@ class PlannerSpec extends
     trackPending(
       "group by simple expression",
       plan(sqlE"select city, sum(pop) from extraSmallZips group by lower(city)"),
+      // should not use map-reduce and use much less pipeline ops
+      // actual: [ReadOp,GroupOp,ProjectOp,MapOp,ReduceOp,ReadOp,ProjectOp,MatchOp,ProjectOp,MatchOp,GroupOp,ProjectOp,FoldLeftOp,MatchOp,UnwindOp,UnwindOp,SimpleMapOp]
       IList(ReadOp, GroupOp, UnwindOp, ProjectOp))
 
     "group by month" in {
@@ -160,6 +171,8 @@ class PlannerSpec extends
     trackPending(
       "collect unaggregated fields into single doc when grouping",
       plan(sqlE"select city, state, sum(pop) from zips"),
+      // should not use map-reduce and use much less pipeline ops
+      // actual [ReadOp,GroupOp,ProjectOp,GroupOp,ProjectOp,ReduceOp,ReadOp,ProjectOp,GroupOp,ProjectOp,FoldLeftOp,MatchOp,UnwindOp,UnwindOp,SimpleMapOp]
       IList(ReadOp, ProjectOp, GroupOp, UnwindOp, ProjectOp))
 
     val unaggFieldWhenGrouping2ndCase = sqlE"select city, state, sum(pop) from zips"
@@ -174,16 +187,22 @@ class PlannerSpec extends
     trackPending(
       "unaggregated field when grouping, second case",
       plan(unaggFieldWhenGrouping2ndCase),
+      // should not use map-reduce and use much less pipeline ops
+      // actual [ReadOp,GroupOp,ProjectOp,GroupOp,ProjectOp,ReduceOp,ReadOp,ProjectOp,GroupOp,ProjectOp,FoldLeftOp,MatchOp,UnwindOp,UnwindOp,SimpleMapOp]
       IList(ReadOp, GroupOp, UnwindOp, ProjectOp))
 
     trackPending(
       "double aggregation with another projection",
       plan(sqlE"select sum(avg(pop)), min(city) from zips group by state"),
+      // should not use map-reduce and use much less pipeline ops
+      // actual [ReadOp,GroupOp,ProjectOp,GroupOp,ProjectOp,ReduceOp,ReadOp,GroupOp,GroupOp,ProjectOp,GroupOp,ProjectOp,FoldLeftOp,MatchOp,UnwindOp,UnwindOp,SimpleMapOp]
       IList(ReadOp, GroupOp, GroupOp, UnwindOp))
 
     trackPending(
       "multiple expressions using same field",
       plan(sqlE"select pop, sum(pop), pop/1000 from zips"),
+      // should not use map-reduce and use much less pipeline ops
+      // actual: occurrences of consecutive $project ops: '1'
       IList(ReadOp, ProjectOp, GroupOp, UnwindOp, ProjectOp))
 
     "plan sum of expression in expression with another projection when grouped" in {
@@ -209,6 +228,7 @@ class PlannerSpec extends
     trackPending(
       "object flatten",
       plan(sqlE"select geo{*} from usa_factbook"),
+      // actual [ReadOp,ProjectOp,SimpleMapOp,ProjectOp]
       IList(ReadOp, SimpleMapOp, ProjectOp))
 
 
@@ -220,12 +240,16 @@ class PlannerSpec extends
     trackPending(
       "array flatten with unflattened field",
       plan(sqlE"SELECT `_id` as zip, loc as loc, loc[*] as coord FROM zips"),
+      // should not use map-reduce
+      // actual: the occurrences of consecutive $project ops: '1'
       IList(ReadOp, ProjectOp, UnwindOp, ProjectOp))
 
     // Q3021
     trackPending(
       "unify flattened fields",
       plan(sqlE"select loc[*] from zips where loc[*] < 0"),
+      // should not use map-reduce
+      // actual: occurrences of consecutive $project ops: '1'
       IList(ReadOp, ProjectOp, UnwindOp, MatchOp, ProjectOp))
 
     // Q3021
@@ -238,6 +262,8 @@ class PlannerSpec extends
     trackPending(
       "unify flattened fields with unflattened field",
       plan(sqlE"select `_id` as zip, loc[*] from zips order by loc[*]"),
+      // should not use map-reduce
+      // actual: the occurrences of consecutive $project ops: '1'
       IList(ReadOp, ProjectOp, UnwindOp, SortOp))
 
     // Q3021
@@ -274,11 +300,15 @@ class PlannerSpec extends
     trackPending(
       "distinct with sum and group",
       plan(sqlE"SELECT DISTINCT SUM(pop) AS totalPop, city, state FROM zips GROUP BY city"),
+      // should not use map-reduce
+      // the occurrences of consecutive $project ops: '1'
       IList(ReadOp, GroupOp, ProjectOp, UnwindOp, GroupOp, ProjectOp))
 
     trackPending(
       "distinct with sum, group, and orderBy",
       plan(sqlE"SELECT DISTINCT SUM(pop) AS totalPop, city, state FROM zips GROUP BY city ORDER BY totalPop DESC"),
+      // should not use map-reduce
+      // actual: the occurrences of consecutive $project ops: '1'
       IList(ReadOp, GroupOp, ProjectOp, UnwindOp, SortOp, GroupOp, ProjectOp, SortOp))
 
     "plan time_of_day (JS)" in {
@@ -289,6 +319,7 @@ class PlannerSpec extends
     trackPendingTree(
       "non-equi join",
       plan(sqlE"select smallZips.city from zips join smallZips on zips.`_id` < smallZips.`_id`"),
+      // should use less pipeline ops (both on map-reduce)
       projectOp.node(matchOp.node(projectOp.node(unwindOp.node(unwindOp.node(matchOp.node(stdFoldLeftJoinSubTree)))))))
 
     "plan simple inner equi-join (map-reduce)" in {
@@ -298,23 +329,16 @@ class PlannerSpec extends
           projectOp.node(unwindOp.node(unwindOp.node(matchOp.node(stdFoldLeftJoinSubTree))))))
     }
 
-    trackPending(
+    trackPendingNoDanglingRefCheck(
       "simple inner equi-join with expression ($lookup)",
-      plan3_4(
-        sqlE"select zips.city, smallZips.state from zips join smallZips on lower(zips.`_id`) = smallZips.`_id`",
-        defaultStats,
-        defaultIndexes,
-        emptyDoc),
+      plan(sqlE"select zips.city, smallZips.state from zips join smallZips on lower(zips.`_id`) = smallZips.`_id`"),
+      //actual: [ReadOp,MatchOp,ProjectOp,MatchOp,ProjectOp,LookupOp,ProjectOp,UnwindOp,ProjectOp]
       IList(ReadOp, ProjectOp, LookupOp, ProjectOp, UnwindOp, ProjectOp))
 
-    trackPending(
-      "simple inner equi-join with pre-filtering ($lookup)",
-      plan3_4(
-        sqlE"select zips.city, smallZips.state from zips join smallZips on zips.`_id` = smallZips.`_id` where smallZips.pop >= 10000",
-        defaultStats,
-        defaultIndexes,
-        emptyDoc),
-      IList(ReadOp, MatchOp, ProjectOp, LookupOp, ProjectOp, UnwindOp, ProjectOp))
+    "plan simple inner equi-join with pre-filtering ($lookup)" in {
+      plan(sqlE"select zips.city, smallZips.state from zips join smallZips on zips.`_id` = smallZips.`_id` where smallZips.pop >= 10000") must
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, MatchOp, ProjectOp, LookupOp, ProjectOp, UnwindOp, ProjectOp), checkDanglingRefs = false))
+    }
 
     "plan simple outer equi-join with wildcard" in {
       plan(sqlE"select * from customers full join orders on customers.customer_key = orders.customer_key") must
@@ -331,7 +355,7 @@ class PlannerSpec extends
           projectOp.node(unwindOp.node(unwindOp.node(projectOp.node(matchOp.node(stdFoldLeftJoinSubTree)))))))
     }
 
-    trackPending(
+    trackPendingNoDanglingRefCheck(
       "simple left equi-join ($lookup)",
       plan3_4(
         sqlE"select foo.name, bar.address from foo left join bar on foo.id = bar.foo_id",
@@ -340,6 +364,7 @@ class PlannerSpec extends
         emptyDoc),
       // TODO: left/right joins in $lookup
       // $unwind(DocField(JoinHandler.RightName)),  // FIXME: need to preserve docs with no match
+      // actual [ReadOp,MatchOp,ProjectOp,LookupOp,ProjectOp,UnwindOp,ProjectOp]
       IList(ReadOp, ProjectOp, LookupOp, UnwindOp, ProjectOp))
 
     trackPending(
@@ -351,37 +376,45 @@ class PlannerSpec extends
         emptyDoc),
       // TODO: left/right joins in $lookup
       // $unwind(DocField(JoinHandler.RightName)),  // FIXME: need to preserve docs with no match
+      // should not use map-reduce
+      // actual [ReadOp,MapOp,ReduceOp,ReadOp,GroupOp,ProjectOp,FoldLeftOp,MatchOp,ProjectOp,UnwindOp,UnwindOp,ProjectOp]
       IList(ReadOp, ProjectOp, LookupOp, UnwindOp, ProjectOp))
 
     trackPendingTree(
       "3-way right equi-join (map-reduce)",
       plan(sqlE"select customers.last_name, orders.purchase_date, ordered_items.qty from customers join orders on customers.customer_key = orders.customer_key right join ordered_items on orders.order_key = ordered_items.order_key"),
+      // should use less pipeline ops
       projectOp.node(unwindOp.node(unwindOp.node(matchOp.node(
         foldLeftJoinSubTree(
           readOp.leaf,
           reduceOp.node(mapOp.node(unwindOp.node(unwindOp.node(stdFoldLeftJoinSubTree))))))))))
 
-    trackPending(
+    trackPendingNoDanglingRefCheck(
       "3-way equi-join ($lookup)",
       plan3_4(
         sqlE"select extraSmallZips.city, smallZips.state, zips.pop from extraSmallZips join smallZips on extraSmallZips.`_id` = smallZips.`_id` join zips on smallZips.`_id` = zips.`_id`",
         defaultStats,
         defaultIndexes,
         emptyDoc),
+      // should not use map-reduce
+      // actual [ReadOp,MatchOp,ProjectOp,LookupOp,UnwindOp,MatchOp,ProjectOp,MatchOp,ProjectOp,LookupOp,UnwindOp,SimpleMapOp,ProjectOp]
       IList(ReadOp, MatchOp, ProjectOp, LookupOp, UnwindOp, MatchOp, ProjectOp, LookupOp, UnwindOp, ProjectOp))
 
-    trackPending(
+    trackPendingNoDanglingRefCheck(
       "count of $lookup",
       plan3_4(
         sqlE"select tp.`_id`, count(*) from `zips` as tp join `largeZips` as ti on tp.`_id` = ti.TestProgramId group by tp.`_id`",
         defaultStats,
         indexes(),
         emptyDoc),
+      // should not use map-reduce
+      // actual [ReadOp,MatchOp,ProjectOp,LookupOp,UnwindOp,ProjectOp,SimpleMapOp,GroupOp]
       IList(ReadOp, MatchOp, ProjectOp, LookupOp, UnwindOp, GroupOp, ProjectOp))
 
     trackPendingTree(
       "join with multiple conditions",
       plan(sqlE"select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth from slamengine_commits as l join slamengine_commits as r on r.sha = l.parents[0].sha and l.author.login = r.author.login"),
+      // should use less pipeline ops
       projectOp.node(unwindOp.node(unwindOp.node(matchOp.node(foldLeftJoinSubTree(simpleMapOp.node(readOp.leaf), readOp.leaf))))))
 
     trackPendingTemplate(

@@ -298,20 +298,20 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
       case _ => Nil
     }) aka "dangling references"
 
-  def notBroken(wf: Workflow) = {
+  def notBroken(wf: Workflow, checkDanglingRefs: Boolean) = {
     noConsecutiveProjectOps(wf)
     noConsecutiveSimpleMapOps(wf)
-    danglingReferences(wf) must_== Nil
+    if (checkDanglingRefs) danglingReferences(wf) must_== Nil else ok
     brokenProjectOps(wf) must_== 0
   }
 
-  def notBrokenWithOps(wf: Workflow, expectedOps: IList[MongoOp]) = {
-    notBroken(wf)
+  def notBrokenWithOps(wf: Workflow, expectedOps: IList[MongoOp], checkDanglingRefs: Boolean = true) = {
+    notBroken(wf, checkDanglingRefs)
     ops(wf) must_== expectedOps
   }
 
-  def notBrokenWithOpsTree(wf: Workflow, expectedOps: Tree[MongoOp]) = {
-    notBroken(wf)
+  def notBrokenWithOpsTree(wf: Workflow, expectedOps: Tree[MongoOp], checkDanglingRefs: Boolean = true) = {
+    notBroken(wf, checkDanglingRefs)
     AsResult(Equal[Tree[MongoOp]].equal(opsTree(wf), expectedOps) must_=== true).updateMessage(s"Expected:\n${expectedOps.drawTree}\nActual:\n${opsTree(wf).drawTree}")
   }
 
