@@ -1,12 +1,12 @@
 Chain
 ├─ $FoldLeftF
 │  ├─ Chain
-│  │  ├─ $ReadF(db; baz)
+│  │  ├─ $ReadF(db; ordered_items)
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
 │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
 │  │  │  ╰─ By
-│  │  │     ╰─ Name("0" -> "$bar_id")
+│  │  │     ╰─ Name("0" -> "$order_key")
 │  │  ╰─ $ProjectF
 │  │     ├─ Name("_id" -> "$_id")
 │  │     ├─ Name("value")
@@ -17,12 +17,12 @@ Chain
 │  ╰─ Chain
 │     ├─ $FoldLeftF
 │     │  ├─ Chain
-│     │  │  ├─ $ReadF(db; foo)
+│     │  │  ├─ $ReadF(db; customers)
 │     │  │  ├─ $GroupF
 │     │  │  │  ├─ Grouped
 │     │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
 │     │  │  │  ╰─ By
-│     │  │  │     ╰─ Name("0" -> "$id")
+│     │  │  │     ╰─ Name("0" -> "$customer_key")
 │     │  │  ╰─ $ProjectF
 │     │  │     ├─ Name("_id" -> "$_id")
 │     │  │     ├─ Name("value")
@@ -31,9 +31,9 @@ Chain
 │     │  │     │  ╰─ Name("_id" -> "$_id")
 │     │  │     ╰─ IncludeId
 │     │  ╰─ Chain
-│     │     ├─ $ReadF(db; bar)
+│     │     ├─ $ReadF(db; orders)
 │     │     ├─ $MapF
-│     │     │  ├─ JavaScript(function (key, value) { return [{ "0": value.foo_id }, { "left": [], "right": [value] }] })
+│     │     │  ├─ JavaScript(function (key, value) { return [{ "0": value.customer_key }, { "left": [], "right": [value] }] })
 │     │     │  ╰─ Scope(Map())
 │     │     ╰─ $ReduceF
 │     │        ├─ JavaScript(function (key, values) {
@@ -75,7 +75,9 @@ Chain
 │     │     ╰─ Expr($0 -> Eq(Bool(true)))
 │     ├─ $MapF
 │     │  ├─ JavaScript(function (key, value) {
-│     │  │               return [{ "0": value.src.right.id }, { "right": [], "left": [value.src] }]
+│     │  │               return [
+│     │  │                 { "0": value.src.right.order_key },
+│     │  │                 { "right": [], "left": [value.src] }]
 │     │  │             })
 │     │  ╰─ Scope(Map())
 │     ╰─ $ReduceF
@@ -106,7 +108,7 @@ Chain
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
-│  │     ├─ Key(name)
+│  │     ├─ Key(last_name)
 │  │     │  ╰─ If
 │  │     │     ├─ BinOp(&&)
 │  │     │     │  ├─ Call
@@ -120,9 +122,9 @@ Chain
 │  │     │     │        ╰─ Obj
 │  │     │     │           ├─ Key(left: _.left.left)
 │  │     │     │           ╰─ Key(right: _.left.right)
-│  │     │     ├─ JsCore((isObject(_.left.left) && (! Array.isArray(_.left.left))) ? _.left.left.name : undefined)
+│  │     │     ├─ JsCore((isObject(_.left.left) && (! Array.isArray(_.left.left))) ? _.left.left.last_name : undefined)
 │  │     │     ╰─ Ident(undefined)
-│  │     ├─ Key(address)
+│  │     ├─ Key(purchase_date)
 │  │     │  ╰─ If
 │  │     │     ├─ BinOp(&&)
 │  │     │     │  ├─ Call
@@ -136,12 +138,12 @@ Chain
 │  │     │     │        ╰─ Obj
 │  │     │     │           ├─ Key(left: _.left.left)
 │  │     │     │           ╰─ Key(right: _.left.right)
-│  │     │     ├─ JsCore((isObject(_.left.right) && (! Array.isArray(_.left.right))) ? _.left.right.address : undefined)
+│  │     │     ├─ JsCore((isObject(_.left.right) && (! Array.isArray(_.left.right))) ? _.left.right.purchase_date : undefined)
 │  │     │     ╰─ Ident(undefined)
-│  │     ╰─ Key(zip: _.right.zip)
+│  │     ╰─ Key(qty: _.right.qty)
 │  ╰─ Scope(Map())
 ╰─ $ProjectF
-   ├─ Name("name" -> true)
-   ├─ Name("address" -> true)
-   ├─ Name("zip" -> true)
+   ├─ Name("last_name" -> true)
+   ├─ Name("purchase_date" -> true)
+   ├─ Name("qty" -> true)
    ╰─ ExcludeId

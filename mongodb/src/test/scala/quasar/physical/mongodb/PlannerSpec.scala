@@ -17,13 +17,8 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar._
 import quasar.contrib.specs2._
 import quasar.fs._, FileSystemError._
-import quasar.javascript._
-import quasar.physical.mongodb.accumulator._
-import quasar.physical.mongodb.expression._
-import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
 import quasar.sql._
 
@@ -43,12 +38,7 @@ class PlannerSpec extends
   //to write the new actuals:
   //override val mode = WriteMode
 
-  import Grouped.grouped
-  import Reshape.reshape
-  import jscore._
   import CollectionUtil._
-
-  import fixExprOp._
   import PlannerHelpers._
 
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
@@ -57,13 +47,13 @@ class PlannerSpec extends
   def trackPendingTemplate(
     name: String,
     plan: => Either[FileSystemError, Crystallized[WorkflowF]],
-    expectedOps: IList[MongoOp],
+    planningMatcher: Matcher[Either[FileSystemError, Crystallized[WorkflowF]]],
     trackingMatcher: Matcher[Either[FileSystemError, Crystallized[WorkflowF]]]) = {
     name >> {
       lazy val plan0 = plan
 
       s"plan: $name" in {
-        plan0 must beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps))
+        plan0 must planningMatcher
       }.pendingUntilFixed
 
       // s"track: $name" in {
@@ -72,16 +62,38 @@ class PlannerSpec extends
     }
   }
 
-  def trackPending(name: String, plan: => Either[FileSystemError, Crystallized[WorkflowF]], expectedOps: IList[MongoOp]) =
-    trackPendingTemplate(name, plan, expectedOps, beRight.which(cwf => trackActual(cwf, testFile(s"plan $name"))))
-
-  def trackPendingErr(name: String, plan: => Either[FileSystemError, Crystallized[WorkflowF]],
-    expectedOps: IList[MongoOp], errPattern: PartialFunction[FileSystemError, MatchResult[_]]) =
-      trackPendingTemplate(name, plan, expectedOps, beLeft(beLike(errPattern)))
-
-  def trackPendingThrow(name: String, plan: => Either[FileSystemError, Crystallized[WorkflowF]],
+  def trackPending(
+    name: String,
+    plan: => Either[FileSystemError, Crystallized[WorkflowF]],
     expectedOps: IList[MongoOp]) =
-      trackPendingTemplate(name, plan, expectedOps, throwA[scala.NotImplementedError])
+      trackPendingTemplate(name, plan,
+        beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps)),
+        beRight.which(cwf => trackActual(cwf, testFile(s"plan $name"))))
+
+  def trackPendingTree(
+    name: String,
+    plan: => Either[FileSystemError, Crystallized[WorkflowF]],
+    expectedOps: Tree[MongoOp]) =
+      trackPendingTemplate(name, plan,
+        beRight.which(cwf => notBrokenWithOpsTree(cwf.op, expectedOps)),
+        beRight.which(cwf => trackActual(cwf, testFile(s"plan $name"))))
+
+  def trackPendingErr(
+    name: String,
+    plan: => Either[FileSystemError, Crystallized[WorkflowF]],
+    expectedOps: IList[MongoOp],
+    errPattern: PartialFunction[FileSystemError, MatchResult[_]]) =
+      trackPendingTemplate(name, plan,
+        beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps)),
+        beLeft(beLike(errPattern)))
+
+  def trackPendingThrow(
+    name: String,
+    plan: => Either[FileSystemError, Crystallized[WorkflowF]],
+    expectedOps: IList[MongoOp]) =
+      trackPendingTemplate(name, plan,
+        beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps)),
+        throwA[scala.NotImplementedError])
 
   "plan from query string" should {
 
@@ -271,576 +283,103 @@ class PlannerSpec extends
         beRight // NB: way too complicated to spell out here, and will change as JS generation improves
     }
 
-    "plan non-equi join" in {
-      plan(sqlE"select zips2.city from zips join zips2 on zips.`_id` < zips2.`_id`") must
-      beWorkflow0(
-        joinStructure(
-          $read(collection("db", "zips")), "__tmp0", $$ROOT,
-          $read(collection("db", "zips2")),
-          $literal(Bson.Null),
-          jscore.Literal(Js.Null).right,
-          chain[Workflow](_,
-            $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
-              JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
-            $unwind(DocField(JoinHandler.LeftName)),
-            $unwind(DocField(JoinHandler.RightName)),
-            $project(
-              reshape(
-                "__tmp11"   ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                    $field(JoinDir.Right.name),
-                    $literal(Bson.Undefined)),
-                "__tmp12" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr(List())))),
-                    $cond(
-                      $or(
-                        $and(
-                          $lt($literal(Bson.Null), $field(JoinDir.Right.name, "_id")),
-                          $lt($field(JoinDir.Right.name, "_id"), $literal(Bson.Doc()))),
-                        $and(
-                          $lte($literal(Bson.Bool(false)), $field(JoinDir.Right.name, "_id")),
-                          $lt($field(JoinDir.Right.name, "_id"), $literal(Bson.Regex("", ""))))),
-                      $cond(
-                        $and(
-                          $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                          $lt($field(JoinDir.Left.name), $literal(Bson.Arr(List())))),
-                        $cond(
-                          $or(
-                            $and(
-                              $lt($literal(Bson.Null), $field(JoinDir.Left.name, "_id")),
-                              $lt($field(JoinDir.Left.name, "_id"), $literal(Bson.Doc()))),
-                            $and(
-                              $lte($literal(Bson.Bool(false)), $field(JoinDir.Left.name, "_id")),
-                              $lt($field(JoinDir.Left.name, "_id"), $literal(Bson.Regex("", ""))))),
-                          $lt($field(JoinDir.Left.name, "_id"), $field(JoinDir.Right.name, "_id")),
-                          $literal(Bson.Undefined)),
-                        $literal(Bson.Undefined)),
-                      $literal(Bson.Undefined)),
-                    $literal(Bson.Undefined))),
-              IgnoreId),
-            $match(
-              Selector.Doc(
-                BsonField.Name("__tmp12") -> Selector.Eq(Bson.Bool(true)))),
-            $project(
-              reshape(sigil.Quasar -> $field("__tmp11", "city")),
-              ExcludeId)),
-          false).op)
-    }.pendingWithActual(notOnPar, testFile("plan non-equi join"))
+    trackPendingTree(
+      "non-equi join",
+      plan(sqlE"select smallZips.city from zips join smallZips on zips.`_id` < smallZips.`_id`"),
+      projectOp.node(matchOp.node(projectOp.node(unwindOp.node(unwindOp.node(matchOp.node(stdFoldLeftJoinSubTree)))))))
 
     "plan simple inner equi-join (map-reduce)" in {
-      plan2_6(
-        sqlE"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id") must
-      beWorkflow0(
-        joinStructure(
-          $read(collection("db", "foo")), "__tmp0", $$ROOT,
-          $read(collection("db", "bar")),
-          reshape("0" -> $field("id")),
-          Obj(ListMap(Name("0") -> Select(ident(sigil.Quasar), "foo_id"))).right,
-          chain[Workflow](_,
-            $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
-              JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
-            $unwind(DocField(JoinHandler.LeftName)),
-            $unwind(DocField(JoinHandler.RightName)),
-            $project(
-              reshape(
-                "name"    ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                      $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-                    $field(JoinDir.Left.name, "name"),
-                    $literal(Bson.Undefined)),
-                "address" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                    $field(JoinDir.Right.name, "address"),
-                    $literal(Bson.Undefined))),
-              IgnoreId)),
-          false).op)
-    }.pendingWithActual(notOnPar, testFile("plan simple inner equi-join (map-reduce)"))
+      plan(
+        sqlE"select customers.last_name, orders.purchase_date from customers join orders on customers.customer_key = orders.customer_key") must
+        beRight.which(cwf => notBrokenWithOpsTree(cwf.op,
+          projectOp.node(unwindOp.node(unwindOp.node(matchOp.node(stdFoldLeftJoinSubTree))))))
+    }
 
-    "plan simple inner equi-join with expression ($lookup)" in {
+    trackPending(
+      "simple inner equi-join with expression ($lookup)",
       plan3_4(
         sqlE"select zips.city, smallZips.state from zips join smallZips on lower(zips.`_id`) = smallZips.`_id`",
         defaultStats,
         defaultIndexes,
-        emptyDoc) must
-      beWorkflow0(chain[Workflow](
-        $read(collection("db", "zips")),
-        $project(reshape(
-          JoinDir.Left.name -> $$ROOT,
-          "__tmp0" -> $toLower($field("_id"))),
-          IgnoreId),
-        $lookup(
-          CollectionName("smallZips"),
-          BsonField.Name("_id"),
-          BsonField.Name("__tmp0"),
-          JoinHandler.RightName),
-        $project(reshape(
-          JoinDir.Left.name -> $field(JoinDir.Left.name),
-          JoinDir.Right.name -> $field(JoinDir.Right.name))),
-        $unwind(DocField(JoinHandler.RightName)),
-        $project(reshape(
-          "city" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-              $field(JoinDir.Left.name, "city"),
-              $literal(Bson.Undefined)),
-          "state" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-              $field(JoinDir.Right.name, "state"),
-              $literal(Bson.Undefined))),
-          IgnoreId)))
-    }.pendingWithActual(notOnPar, testFile("plan simple inner equi-join with expression ($lookup)"))
+        emptyDoc),
+      IList(ReadOp, ProjectOp, LookupOp, ProjectOp, UnwindOp, ProjectOp))
 
-    "plan simple inner equi-join with pre-filtering ($lookup)" in {
+    trackPending(
+      "simple inner equi-join with pre-filtering ($lookup)",
       plan3_4(
         sqlE"select zips.city, smallZips.state from zips join smallZips on zips.`_id` = smallZips.`_id` where smallZips.pop >= 10000",
         defaultStats,
         defaultIndexes,
-        emptyDoc) must
-      beWorkflow0(chain[Workflow](
-        $read(collection("db", "smallZips")),
-        $match(
-          Selector.And(
-            isNumeric(BsonField.Name("pop")),
-            Selector.Doc(
-              BsonField.Name("pop") -> Selector.Gte(Bson.Int32(10000))))),
-        $project(reshape(
-          JoinDir.Right.name -> $$ROOT,
-          "__tmp2" -> $field("_id")),
-          ExcludeId),
-        $lookup(
-          CollectionName("zips"),
-          BsonField.Name("__tmp2"),
-          BsonField.Name("_id"),
-          JoinHandler.LeftName),
-        $project(reshape(
-          JoinDir.Right.name -> $field(JoinDir.Right.name),
-          JoinDir.Left.name -> $field(JoinDir.Left.name))),
-        $unwind(DocField(JoinHandler.LeftName)),
-        $project(reshape(
-          "city" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-              $field(JoinDir.Left.name, "city"),
-              $literal(Bson.Undefined)),
-          "state" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-              $field(JoinDir.Right.name, "state"),
-              $literal(Bson.Undefined))),
-          IgnoreId)))
-    }.pendingWithActual(notOnPar, testFile("plan simple inner equi-join with pre-filtering ($lookup)"))
+        emptyDoc),
+      IList(ReadOp, MatchOp, ProjectOp, LookupOp, ProjectOp, UnwindOp, ProjectOp))
 
     "plan simple outer equi-join with wildcard" in {
-      plan(sqlE"select * from foo full join bar on foo.id = bar.foo_id") must
-      beWorkflow0(
-        joinStructure(
-          $read(collection("db", "foo")), "__tmp0", $$ROOT,
-          $read(collection("db", "bar")),
-          reshape("0" -> $field("id")),
-          Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
-          chain[Workflow](_,
-            $project(
-              reshape(
-                JoinDir.Left.name ->
-                  $cond($eq($size($field(JoinDir.Left.name)), $literal(Bson.Int32(0))),
-                    $literal(Bson.Arr(List(Bson.Doc()))),
-                    $field(JoinDir.Left.name)),
-                JoinDir.Right.name ->
-                  $cond($eq($size($field(JoinDir.Right.name)), $literal(Bson.Int32(0))),
-                    $literal(Bson.Arr(List(Bson.Doc()))),
-                    $field(JoinDir.Right.name))),
-              IgnoreId),
-            $unwind(DocField(JoinHandler.LeftName)),
-            $unwind(DocField(JoinHandler.RightName)),
-            $simpleMap(
-              NonEmptyList(
-                MapExpr(JsFn(Name("x"),
-                  Obj(ListMap(
-                    Name("__tmp7") ->
-                      If(
-                        BinOp(jscore.And,
-                          Call(ident("isObject"), List(Select(ident("x"), JoinDir.Right.name))),
-                          UnOp(jscore.Not,
-                            Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), JoinDir.Right.name))))),
-                        If(
-                          BinOp(jscore.And,
-                            Call(ident("isObject"), List(Select(ident("x"), JoinDir.Left.name))),
-                            UnOp(jscore.Not,
-                              Call(Select(ident("Array"), "isArray"), List(Select(ident("x"), JoinDir.Left.name))))),
-                          SpliceObjects(List(
-                            Select(ident("x"), JoinDir.Left.name),
-                            Select(ident("x"), JoinDir.Right.name))),
-                          ident("undefined")),
-                        ident("undefined"))))))),
-              ListMap()),
-            $project(
-              reshape(sigil.Quasar -> $field("__tmp7")),
-              ExcludeId)),
-          false).op)
-    }.pendingWithActual(notOnPar, testFile("plan simple outer equi-join with wildcard"))
+      plan(sqlE"select * from customers full join orders on customers.customer_key = orders.customer_key") must
+        beRight.which(cwf => notBrokenWithOpsTree(cwf.op,
+          //old mongo:
+          //projectOp.node(simpleMapOp.node(unwindOp.node(unwindOp.node(projectOp.node(stdFoldLeftJoinSubTree)))))))
+          simpleMapOp.node(unwindOp.node(unwindOp.node(projectOp.node(stdFoldLeftJoinSubTree))))))
+    }
 
     "plan simple left equi-join (map-reduce)" in {
       plan(
-        sqlE"select foo.name, bar.address from foo left join bar on foo.id = bar.foo_id") must
-      beWorkflow0(
-        joinStructure(
-          $read(collection("db", "foo")), "__tmp0", $$ROOT,
-          $read(collection("db", "bar")),
-          reshape("0" -> $field("id")),
-          Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
-          chain[Workflow](_,
-            $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0))))),
-            $project(
-              reshape(
-                JoinDir.Left.name  -> $field(JoinDir.Left.name),
-                JoinDir.Right.name ->
-                  $cond($eq($size($field(JoinDir.Right.name)), $literal(Bson.Int32(0))),
-                    $literal(Bson.Arr(List(Bson.Doc()))),
-                    $field(JoinDir.Right.name))),
-              IgnoreId),
-            $unwind(DocField(JoinHandler.LeftName)),
-            $unwind(DocField(JoinHandler.RightName)),
-            $project(
-              reshape(
-                "name"    ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                      $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-                    $field(JoinDir.Left.name, "name"),
-                    $literal(Bson.Undefined)),
-                "address" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                    $field(JoinDir.Right.name, "address"),
-                    $literal(Bson.Undefined))),
-              IgnoreId)),
-          false).op)
-    }.pendingWithActual(notOnPar, testFile("plan simple left equi-join (map-reduce)"))
+        sqlE"select customers.last_name, orders.purchase_date from customers left join orders on customers.customer_key = orders.customer_key") must
+        beRight.which(cwf => notBrokenWithOpsTree(cwf.op,
+          projectOp.node(unwindOp.node(unwindOp.node(projectOp.node(matchOp.node(stdFoldLeftJoinSubTree)))))))
+    }
 
-    "plan simple left equi-join ($lookup)" in {
+    trackPending(
+      "simple left equi-join ($lookup)",
       plan3_4(
         sqlE"select foo.name, bar.address from foo left join bar on foo.id = bar.foo_id",
         defaultStats,
         indexes(collection("db", "bar") -> BsonField.Name("foo_id")),
-        emptyDoc) must
-      beWorkflow0(chain[Workflow](
-        $read(collection("db", "foo")),
-        $project(reshape(JoinDir.Left.name -> $$ROOT)),
-        $lookup(
-          CollectionName("bar"),
-          JoinHandler.LeftName \ BsonField.Name("id"),
-          BsonField.Name("foo_id"),
-          JoinHandler.RightName),
-        $unwind(DocField(JoinHandler.RightName)),  // FIXME: need to preserve docs with no match
-        $project(reshape(
-          "name" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-              $field(JoinDir.Left.name, "name"),
-              $literal(Bson.Undefined)),
-          "address" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-              $field(JoinDir.Right.name, "address"),
-              $literal(Bson.Undefined))),
-          IgnoreId)))
-    }.pendingWithActual("TODO: left/right joins in $lookup", testFile("plan simple left equi-join ($lookup)"))
+        emptyDoc),
+      // TODO: left/right joins in $lookup
+      // $unwind(DocField(JoinHandler.RightName)),  // FIXME: need to preserve docs with no match
+      IList(ReadOp, ProjectOp, LookupOp, UnwindOp, ProjectOp))
 
-    "plan simple right equi-join ($lookup)" in {
+    trackPending(
+      "simple right equi-join ($lookup)",
       plan3_4(
         sqlE"select foo.name, bar.address from foo right join bar on foo.id = bar.foo_id",
         defaultStats,
         indexes(collection("db", "bar") -> BsonField.Name("foo_id")),
-        emptyDoc) must
-      beWorkflow0(chain[Workflow](
-        $read(collection("db", "bar")),
-        $project(reshape(JoinDir.Right.name -> $$ROOT)),
-        $lookup(
-          CollectionName("foo"),
-          JoinHandler.RightName \ BsonField.Name("foo_id"),
-          BsonField.Name("id"),
-          JoinHandler.LeftName),
-        $unwind(DocField(JoinHandler.LeftName)),  // FIXME: need to preserve docs with no match
-        $project(reshape(
-          "name" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-              $field(JoinDir.Left.name, "name"),
-              $literal(Bson.Undefined)),
-          "address" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-              $field(JoinDir.Right.name, "address"),
-              $literal(Bson.Undefined))),
-          IgnoreId)))
-    }.pendingWithActual("TODO: left/right joins in $lookup", testFile("plan simple right equi-join ($lookup)"))
+        emptyDoc),
+      // TODO: left/right joins in $lookup
+      // $unwind(DocField(JoinHandler.RightName)),  // FIXME: need to preserve docs with no match
+      IList(ReadOp, ProjectOp, LookupOp, UnwindOp, ProjectOp))
 
-    "plan 3-way right equi-join (map-reduce)" in {
-      plan2_6(
-        sqlE"select foo.name, bar.address, baz.zip from foo join bar on foo.id = bar.foo_id right join baz on bar.id = baz.bar_id") must
-      beWorkflow0(
-        joinStructure(
-          $read(collection("db", "baz")), "__tmp1", $$ROOT,
-          joinStructure0(
-            $read(collection("db", "foo")), "__tmp0", $$ROOT,
-            $read(collection("db", "bar")),
-            reshape("0" -> $field("id")),
-            Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
-            chain[Workflow](_,
-              $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-                JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
-                JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
-              $unwind(DocField(JoinHandler.LeftName)),
-              $unwind(DocField(JoinHandler.RightName))),
-            false),
-          reshape("0" -> $field("bar_id")),
-          Obj(ListMap(Name("0") -> Select(Select(ident("value"), JoinDir.Right.name), "id"))).right,
-          chain[Workflow](_,
-            $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0))))),
-            $project(
-              reshape(
-                JoinDir.Right.name ->
-                  $cond($eq($size($field(JoinDir.Right.name)), $literal(Bson.Int32(0))),
-                    $literal(Bson.Arr(List(Bson.Doc()))),
-                    $field(JoinDir.Right.name)),
-                JoinDir.Left.name -> $field(JoinDir.Left.name)),
-              IgnoreId),
-            $unwind(DocField(JoinHandler.RightName)),
-            $unwind(DocField(JoinHandler.LeftName)),
-            $project(
-              reshape(
-                "name"    ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                      $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-                    $cond(
-                      $and(
-                        $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Left.name)),
-                        $lt($field(JoinDir.Left.name, JoinDir.Left.name), $literal(Bson.Arr()))),
-                      $field(JoinDir.Left.name, JoinDir.Left.name, "name"),
-                      $literal(Bson.Undefined)),
-                    $literal(Bson.Undefined)),
-                "address" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                      $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-                    $cond(
-                      $and(
-                        $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Right.name)),
-                        $lt($field(JoinDir.Left.name, JoinDir.Right.name), $literal(Bson.Arr()))),
-                      $field(JoinDir.Left.name, JoinDir.Right.name, "address"),
-                      $literal(Bson.Undefined)),
-                    $literal(Bson.Undefined)),
-                "zip"     ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                    $field(JoinDir.Right.name, "zip"),
-                    $literal(Bson.Undefined))),
-              IgnoreId)),
-          true).op)
-    }.pendingWithActual(notOnPar, testFile("plan 3-way right equi-join (map-reduce)"))
+    trackPendingTree(
+      "3-way right equi-join (map-reduce)",
+      plan(sqlE"select customers.last_name, orders.purchase_date, ordered_items.qty from customers join orders on customers.customer_key = orders.customer_key right join ordered_items on orders.order_key = ordered_items.order_key"),
+      projectOp.node(unwindOp.node(unwindOp.node(matchOp.node(
+        foldLeftJoinSubTree(
+          readOp.leaf,
+          reduceOp.node(mapOp.node(unwindOp.node(unwindOp.node(stdFoldLeftJoinSubTree))))))))))
 
-    "plan 3-way equi-join ($lookup)" in {
+    trackPending(
+      "3-way equi-join ($lookup)",
       plan3_4(
         sqlE"select extraSmallZips.city, smallZips.state, zips.pop from extraSmallZips join smallZips on extraSmallZips.`_id` = smallZips.`_id` join zips on smallZips.`_id` = zips.`_id`",
         defaultStats,
         defaultIndexes,
-        emptyDoc) must
-        beWorkflow0(chain[Workflow](
-          $read(collection("db", "extraSmallZips")),
-          $match(Selector.Doc(
-            BsonField.Name("_id") -> Selector.Exists(true))),
-          $project(reshape(JoinDir.Left.name -> $$ROOT)),
-          $lookup(
-            CollectionName("smallZips"),
-            JoinHandler.LeftName \ BsonField.Name("_id"),
-            BsonField.Name("_id"),
-            JoinHandler.RightName),
-          $unwind(DocField(JoinHandler.RightName)),
-          $match(Selector.Doc(
-            JoinHandler.RightName \ BsonField.Name("_id") -> Selector.Exists(true))),
-          $project(reshape(JoinDir.Left.name -> $$ROOT)),
-          $lookup(
-            CollectionName("zips"),
-            JoinHandler.LeftName \ JoinHandler.RightName \ BsonField.Name("_id"),
-            BsonField.Name("_id"),
-            JoinHandler.RightName),
-          $unwind(DocField(JoinHandler.RightName)),
-          $project(reshape(
-            "city" ->
-              $cond(
-                $and(
-                  $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                  $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-                $cond(
-                  $and(
-                    $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Left.name)),
-                    $lt($field(JoinDir.Left.name, JoinDir.Left.name), $literal(Bson.Arr()))),
-                  $field(JoinDir.Left.name, JoinDir.Left.name, "city"),
-                  $literal(Bson.Undefined)),
-                $literal(Bson.Undefined)),
-            "state" ->
-              $cond(
-                $and(
-                  $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                  $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-                $cond(
-                  $and(
-                    $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Right.name)),
-                    $lt($field(JoinDir.Left.name, JoinDir.Right.name), $literal(Bson.Arr()))),
-                  $field(JoinDir.Left.name, JoinDir.Right.name, "state"),
-                  $literal(Bson.Undefined)),
-                $literal(Bson.Undefined)),
-            "pop" ->
-              $cond(
-                $and(
-                  $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                  $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                $field(JoinDir.Right.name, "pop"),
-                $literal(Bson.Undefined))),
-            IgnoreId)))
-    }.pendingWithActual(notOnPar, testFile("plan 3-way equi-join ($lookup)"))
+        emptyDoc),
+      IList(ReadOp, MatchOp, ProjectOp, LookupOp, UnwindOp, MatchOp, ProjectOp, LookupOp, UnwindOp, ProjectOp))
 
-    "plan count of $lookup" in {
+    trackPending(
+      "count of $lookup",
       plan3_4(
         sqlE"select tp.`_id`, count(*) from `zips` as tp join `largeZips` as ti on tp.`_id` = ti.TestProgramId group by tp.`_id`",
         defaultStats,
         indexes(),
-        emptyDoc) must
-      beWorkflow0(chain[Workflow](
-        $read(collection("db", "largeZips")),
-        $match(Selector.Doc(
-          BsonField.Name("TestProgramId") -> Selector.Exists(true))),
-        $project(reshape("right" -> $$ROOT), IgnoreId),
-        $lookup(
-          CollectionName("zips"),
-          JoinHandler.RightName \ BsonField.Name("TestProgramId"),
-          BsonField.Name("_id"),
-          JoinHandler.LeftName),
-        $unwind(DocField(JoinHandler.LeftName)),
-        $group(
-          grouped("1" -> $sum($literal(Bson.Int32(1)))),
-          -\/(reshape("0" -> $cond(
-            $and(
-              $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-              $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-            $field(JoinDir.Left.name, "_id"),
-            $literal(Bson.Undefined))))),
-        $project(
-          reshape(
-            "_id" -> $field("_id", "0"),
-            "1"   -> $include),
-          IgnoreId)))
-    }.pendingWithActual(notOnPar, testFile("plan count of $lookup"))
+        emptyDoc),
+      IList(ReadOp, MatchOp, ProjectOp, LookupOp, UnwindOp, GroupOp, ProjectOp))
 
-    "plan join with multiple conditions" in {
-      plan(sqlE"select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth from slamengine_commits as l join slamengine_commits as r on r.sha = l.parents[0].sha and l.author.login = r.author.login") must
-      beWorkflow0(
-        joinStructure(
-          chain[Workflow](
-            $read(collection("db", "slamengine_commits")),
-            $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
-              obj(
-                "__tmp4" -> Select(Access(Select(ident("x"), "parents"), jscore.Literal(Js.Num(0, false))), "sha"),
-                "__tmp5" -> ident("x"),
-                "__tmp6" -> Select(Select(ident("x"), "author"), "login"))))),
-              ListMap())),
-          "__tmp7", $field("__tmp5"),
-          $read(collection("db", "slamengine_commits")),
-          reshape(
-            "0" -> $field("__tmp4"),
-            "1" -> $field("__tmp6")),
-          obj(
-            "0" -> Select(ident("value"), "sha"),
-            "1" -> Select(Select(ident("value"), "author"), "login")).right,
-          chain[Workflow](_,
-            $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
-              JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
-            $unwind(DocField(JoinHandler.LeftName)),
-            $unwind(DocField(JoinHandler.RightName)),
-            $project(
-              reshape(
-                "child"  ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                      $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-                    $field(JoinDir.Left.name, "sha"),
-                    $literal(Bson.Undefined)),
-                "c_auth" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                      $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
-                    $cond(
-                      $and(
-                        $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, "author")),
-                        $lt($field(JoinDir.Left.name, "author"), $literal(Bson.Arr()))),
-                      $field(JoinDir.Left.name, "author", "login"),
-                      $literal(Bson.Undefined)),
-                    $literal(Bson.Undefined)),
-                "parent" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                    $field(JoinDir.Right.name, "sha"),
-                    $literal(Bson.Undefined)),
-                "p_auth" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                    $cond(
-                      $and(
-                        $lte($literal(Bson.Doc()), $field(JoinDir.Right.name, "author")),
-                        $lt($field(JoinDir.Right.name, "author"), $literal(Bson.Arr()))),
-                      $field(JoinDir.Right.name, "author", "login"),
-                      $literal(Bson.Undefined)),
-                    $literal(Bson.Undefined))),
-              IgnoreId)),
-        false).op)
-    }.pendingWithActual("#1560", testFile("plan join with multiple conditions"))
+    trackPendingTree(
+      "join with multiple conditions",
+      plan(sqlE"select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth from slamengine_commits as l join slamengine_commits as r on r.sha = l.parents[0].sha and l.author.login = r.author.login"),
+      projectOp.node(unwindOp.node(unwindOp.node(matchOp.node(foldLeftJoinSubTree(simpleMapOp.node(readOp.leaf), readOp.leaf))))))
 
     trackPendingErr(
       "plan join with non-JS-able condition",
@@ -848,68 +387,10 @@ class PlannerSpec extends
       IList(), //TODO
       { case QScriptPlanningFailed(_) => ok })
 
-    "plan simple cross" in {
-      plan(sqlE"select zips2.city from zips, zips2 where zips.pop < zips2.pop") must
-      beWorkflow0(
-        joinStructure(
-          $read(collection("db", "zips")), "__tmp0", $$ROOT,
-          $read(collection("db", "zips2")),
-          $literal(Bson.Null),
-          jscore.Literal(Js.Null).right,
-          chain[Workflow](_,
-            $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
-              JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
-            $unwind(DocField(JoinHandler.LeftName)),
-            $unwind(DocField(JoinHandler.RightName)),
-            $project(
-              reshape(
-                "__tmp11"   ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-                    $field(JoinDir.Right.name),
-                    $literal(Bson.Undefined)),
-                "__tmp12" ->
-                  $cond(
-                    $and(
-                      $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                      $lt($field(JoinDir.Right.name), $literal(Bson.Arr(List())))),
-                    $cond(
-                      $or(
-                        $and(
-                          $lt($literal(Bson.Null), $field(JoinDir.Right.name, "pop")),
-                          $lt($field(JoinDir.Right.name, "pop"), $literal(Bson.Doc()))),
-                        $and(
-                          $lte($literal(Bson.Bool(false)), $field(JoinDir.Right.name, "pop")),
-                          $lt($field(JoinDir.Right.name, "pop"), $literal(Bson.Regex("", ""))))),
-                      $cond(
-                        $and(
-                          $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                          $lt($field(JoinDir.Left.name), $literal(Bson.Arr(List())))),
-                        $cond(
-                          $or(
-                            $and(
-                              $lt($literal(Bson.Null), $field(JoinDir.Left.name, "pop")),
-                              $lt($field(JoinDir.Left.name, "pop"), $literal(Bson.Doc()))),
-                            $and(
-                              $lte($literal(Bson.Bool(false)), $field(JoinDir.Left.name, "pop")),
-                              $lt($field(JoinDir.Left.name, "pop"), $literal(Bson.Regex("", ""))))),
-                          $lt($field(JoinDir.Left.name, "pop"), $field(JoinDir.Right.name, "pop")),
-                          $literal(Bson.Undefined)),
-                        $literal(Bson.Undefined)),
-                      $literal(Bson.Undefined)),
-                    $literal(Bson.Undefined))),
-              IgnoreId),
-            $match(
-              Selector.Doc(
-                BsonField.Name("__tmp12") -> Selector.Eq(Bson.Bool(true)))),
-            $project(
-              reshape(sigil.Quasar -> $field("__tmp11", "city")),
-              ExcludeId)),
-          false).op)
-    }.pendingWithActual(notOnPar, testFile("plan simple cross"))
+    trackPendingTree(
+      "simple cross",
+      plan(sqlE"select extraSmallZips.city from smallZips, extraSmallZips where smallZips.pop < extraSmallZips.pop"),
+      projectOp.node(matchOp.node(projectOp.node(unwindOp.node(unwindOp.node(matchOp.node(stdFoldLeftJoinSubTree)))))))
 
     "SD-1263 specific case of plan multiple reducing projections (all, distinct, orderBy)" in {
       val q = sqlE"select distinct loc || [pop - 1] as p1, pop - 1 as p2 from zips group by territory order by p2".project.asInstanceOf[Select[Fix[Sql]]]
