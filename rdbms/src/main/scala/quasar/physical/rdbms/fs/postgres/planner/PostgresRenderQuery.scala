@@ -167,7 +167,7 @@ object PostgresRenderQuery extends RenderQuery {
       s"$fName($a1, $a2)".right
     case TernaryFunction(fType, a1, a2, a3) => (fType match {
       case Search => s"(case when $a3 then $a1 ~* $a2 else $a1 ~ $a2 end)"
-      case Substring => s"substring($a1 from ($a2+1) for ($a3+1))"
+      case Substring => s"substring($a1 from ($a2+1) for $a3)"
     }).right
   }
 }
