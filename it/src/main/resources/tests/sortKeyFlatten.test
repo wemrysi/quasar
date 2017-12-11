@@ -1,0 +1,22 @@
+{
+    "name": "sort with a flattened key",
+
+     "backends": {
+         "couchbase": "ignoreFieldOrder",
+         "marklogic_json": "ignoreFieldOrder",
+         "mimir": "ignoreFieldOrder"
+     },
+
+    "data": "zips.data",
+
+    "query": "select city, state, loc from zips order by loc[*] desc",
+
+    "predicate": "initial",
+
+    "expected": [
+       { "city": "BARROW",      "state": "AK", "loc": [ -156.817409, 71.234637] },
+       { "city": "WAINWRIGHT",  "state": "AK", "loc": [ -160.012532, 70.620064] },
+       { "city": "NUIQSUT",     "state": "AK", "loc": [ -150.997119, 70.192737] },
+       { "city": "PRUDHOE BAY", "state": "AK", "loc": [ -148.559636, 70.070057] },
+       { "city": "KAKTOVIK",    "state": "AK", "loc": [ -143.631329, 70.042889] } ]
+}
