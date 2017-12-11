@@ -280,7 +280,7 @@ object QSUGraph extends QSUGraphInstances {
 
       back <- reverse.get(node) match {
         case Some(sym) =>
-          QSUGraph[T](root = sym, SMap()).point[F]
+          QSUGraph[T](root = sym, SMap(sym -> node)).point[F]
 
         case None =>
           for {
