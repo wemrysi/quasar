@@ -73,10 +73,10 @@ object PostgresRenderQuery extends RenderQuery {
           val firstValStripped = ~mid.headOption.map(_.stripPrefix("'").stripSuffix("'"))
           val midTail = mid.drop(1)
           val midStr = if (midTail.nonEmpty)
-            s"->${midTail.map(e => s"'$e'").intercalate("->")}"
+            s"->${midTail.map(e => s"$e").intercalate("->")}"
           else
             ""
-          s"""$key.$firstValStripped$midStr->'$last'""".right
+          s"""$key.$firstValStripped$midStr->$last""".right
         case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
       }
     case Obj(m) =>
@@ -145,7 +145,8 @@ object PostgresRenderQuery extends RenderQuery {
 
       s"(select ${selection.v}$fromExpr$orderByStr)".right
     case Constant(Data.Str(v)) =>
-      v.flatMap { case ''' => "''"; case iv => iv.toString }.self.right
+      val text = v.flatMap { case ''' => "''"; case iv => iv.toString }.self
+      s"'$text'".right
     case Constant(v) =>
       DataCodec.render(v) \/> NonRepresentableData(v)
     case Case(wt, e) =>
