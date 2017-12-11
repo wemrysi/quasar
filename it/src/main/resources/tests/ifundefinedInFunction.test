@@ -2,8 +2,8 @@
     "name": "if undefined in function",
 
     "backends": {
-        "couchbase": "pendingIgnoreFieldOrder",
-        "marklogic_json": "ignoreFieldOrder",
+        "couchbase": "ignoreFieldOrder",
+        "marklogic_json": "pendingIgnoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
 
