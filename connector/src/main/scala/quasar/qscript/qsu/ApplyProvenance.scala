@@ -55,7 +55,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
       case g @ Extractors.DimEdit(src, _) =>
         for {
           _ <- computeProvenance[X](g)
-          _ <- QAuthS[X].modify(_.rename(src.root, g.root))
+          _ <- QAuthS[X].modify(_.supplant(src.root, g.root))
         } yield g.overwriteAtRoot(src.unfold map (_.root))
 
       case g @ Extractors.Transpose(src, retain, rot) =>
@@ -97,13 +97,19 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
       case DimEdit(src, DTrans.Group(k)) =>
         handleMissingDims(dimsFor[F](src)) flatMap { sdims =>
-          val nextIdx = dims.nextGroupKeyIndex(src.root, sdims)
-          val idAccess = IdAccess.groupKey[dims.D](src.root, nextIdx)
-          val nextDims = dims.swap(0, 1, dims.lshift(idAccess, sdims))
+          val updated = dims.modifyIdentities(sdims)(IdAccess.groupKey modify {
+            case (s, i) if s === src.root => (g.root, i)
+            case other => other
+          })
+
+          val nextIdx = dims.nextGroupKeyIndex(g.root, updated)
+          val idAccess = IdAccess.groupKey[dims.D](g.root, nextIdx)
+          val nextDims = dims.swap(0, 1, dims.lshift(idAccess, updated))
 
           QAuthS[F].modify(
-            _.addDims(src.root, nextDims)
-              .addGroupKey(src.root, nextIdx, k))
+            _.addDims(g.root, nextDims)
+              .duplicateGroupKeys(src.root, g.root)
+              .addGroupKey(g.root, nextIdx, k))
             .as(nextDims)
         }
 

@@ -339,7 +339,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT] private () e
     MinStateM[G] modify { state =>
       val auth2 = candidates.foldLeft(state.auth) { (auth, c) =>
         if (c.root =/= newRoot)
-          auth.rename(c.root, newRoot)
+          auth.supplant(c.root, newRoot)
         else
           auth
       }

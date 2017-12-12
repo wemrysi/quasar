@@ -91,6 +91,10 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
     MaxVal.unsubst(dims foldMap maxIndex)
   }
 
+  /** Returns new dimensions where all identities have been modified by `f`. */
+  def modifyIdentities(dims: Dimensions[P])(f: I => I): Dimensions[P] =
+    canonicalize(dims map (_.transCata[P](pfo.value modify f)))
+
   /** The index of the next group key for `of`. */
   def nextGroupKeyIndex(of: Symbol, dims: Dimensions[P]): SInt =
     maxGroupKeyIndex(of, dims).fold(0)(_ + 1)
@@ -100,10 +104,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
     def rename0(sym: Symbol): Symbol =
       (sym === from) ? to | sym
 
-    val renameAccess =
-      IdAccess.symbols[D].modify(rename0)
-
-    canonicalize(dims map (_.transCata[P](pfo.value modify renameAccess)))
+    modifyIdentities(dims)(IdAccess.symbols[D].modify(rename0))
   }
 
   ////

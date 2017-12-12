@@ -41,7 +41,7 @@ import scalaz.std.map._
 object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
   import ApplyProvenance.AuthenticatedQSU
-  import QScriptUniform.DTrans
+  import QScriptUniform.{DTrans, Retain, Rotation}
 
   type F[A] = PlannerError \/ A
   type QSU[A] = QScriptUniform[A]
@@ -102,6 +102,32 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           qprov.prov.proj(J.str("foobar"))
         , qprov.prov.value(IdAccess.groupKey('n2, 1))
         , qprov.prov.value(IdAccess.groupKey('n2, 0)))
+      ))
+    }
+
+    "compute provenance for squash" >> {
+      val tree =
+        qsu.dimEdit('n0, (
+          qsu.map('n1, (
+            qsu.transpose('n2, (
+              qsu.read('n3, afile),
+              Retain.Values,
+              Rotation.ShiftMap)),
+            func.Add(
+              func.Constant(J.int(7)),
+              func.ProjectKeyS(func.Hole, "bar")))),
+          DTrans.Squash[Fix]()))
+
+      tree must haveDimensions(SMap(
+        'n0 -> IList(
+          qprov.prov.thenn(
+            qprov.prov.value(IdAccess.identity('n2))
+          , qprov.prov.proj(J.str("foobar"))))
+      , 'n2 -> IList(
+          qprov.prov.value(IdAccess.identity('n2))
+        , qprov.prov.proj(J.str("foobar")))
+      , 'n3 -> IList(
+          qprov.prov.proj(J.str("foobar")))
       ))
     }
   }

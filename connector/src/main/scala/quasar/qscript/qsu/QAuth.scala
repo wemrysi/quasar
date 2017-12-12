@@ -45,6 +45,14 @@ final case class QAuth[T[_[_]]](
   def addGroupKey(vertex: Symbol, idx: Int, key: FreeMap[T]): QAuth[T] =
     copy(groupKeys = groupKeys + ((vertex, idx) -> key))
 
+  /** Duplicates all group keys for `src` to `target`. */
+  def duplicateGroupKeys(src: Symbol, target: Symbol): QAuth[T] = {
+    val srcKeys = groupKeys filterKeys { case (s, _) => s === src }
+    val tgtKeys = srcKeys map { case ((_, i), v) => ((target, i), v) }
+
+    copy(groupKeys = groupKeys ++ tgtKeys)
+  }
+
   def lookupDims(vertex: Symbol): Option[QDims[T]] =
     dims get vertex
 
@@ -61,25 +69,19 @@ final case class QAuth[T[_[_]]](
       InternalError(s"GroupKey[$idx] for $vertex not found.", None)
     }
 
-  def rename
-      (from: Symbol, to: Symbol)
+  /** Supplants `target` with `replacement`, removing the former and replacing
+    * any references to it with the latter.
+    */
+  def supplant
+      (target: Symbol, replacement: Symbol)
       (implicit T0: BirecursiveT[T], T1: EqualT[T])
       : QAuth[T] = {
 
     val qp = QProv[T]
+    val supDims = (dims - target).mapValues(qp.rename(target, replacement, _))
+    val supKeys = groupKeys filterKeys { case (s, _) => s =/= target }
 
-    def rename0(sym: Symbol): Symbol =
-      if (sym === from) to else sym
-
-    val rnDims = dims map {
-      case (k, v) => rename0(k) -> qp.rename(from, to, v)
-    }
-
-    val rnKeys = groupKeys map {
-      case ((s, i), v) => ((rename0(s), i) -> v)
-    }
-
-    QAuth(rnDims, rnKeys)
+    QAuth(supDims, supKeys)
   }
 }
 
