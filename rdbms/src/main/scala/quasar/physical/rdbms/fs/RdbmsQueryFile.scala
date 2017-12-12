@@ -18,17 +18,17 @@ package quasar.physical.rdbms.fs
 
 import slamdata.Predef._
 import quasar.contrib.pathy.{ADir, AFile, PathSegment}
-import quasar.Data
+import quasar.{Data, RenderTreeT}
+import quasar.effect.Kvs
+import quasar.fp.free.lift
+import quasar.fs.impl.{dataStreamClose, dataStreamRead}
 import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
-import quasar.fs.QueryFile
+import quasar.fs.{FileSystemErrT, QueryFile}
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.common._
 import quasar.physical.rdbms.common.TablePath.showTableName
 import quasar.connector.ManagedQueryFile
-import quasar.effect.Kvs
-import quasar.fp.free.lift
-import quasar.fs.impl.{dataStreamClose, dataStreamRead}
 import quasar.physical.rdbms.model.DbDataStream
 import quasar.physical.rdbms.planner.RenderQuery
 import quasar.physical.rdbms.planner.sql.SqlExpr
@@ -54,7 +54,19 @@ trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] {
 
   override def ManagedQueryFileModule: ManagedQueryFileModule = new ManagedQueryFileModule {
 
-    override def explain(repr: Fix[SqlExpr]): Backend[String] = ???
+    override def explain(repr: Fix[SqlExpr]): Backend[String] = {
+      val sqlExprTreeString = RenderTreeT[Fix].render(repr).shows
+      ME.unattempt(renderQuery.asString(repr)
+        .leftMap(QScriptPlanningFailed.apply)
+        .traverse { q =>
+          val treeAndQueryStr = s"SqlExprTree:\n$sqlExprTreeString\n\nRaw query:\n$q"
+          (Fragment.const("EXPLAIN") ++ Fragment.const(q))
+            .query[String].list.map(~_.headOption).liftB
+            .valueOr(err => s"unavailable (${err.shows})").liftM[FileSystemErrT].map { dbOutput =>
+            s"$treeAndQueryStr\n\nDB EXPLAIN output:\n$dbOutput"
+          }
+        })
+    }
 
     override def executePlan(repr: Fix[SqlExpr], out: AFile): Backend[Unit] = {
       ME.unattempt(renderQuery.asString(repr)
