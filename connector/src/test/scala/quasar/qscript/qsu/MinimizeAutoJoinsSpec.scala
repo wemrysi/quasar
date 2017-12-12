@@ -376,7 +376,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         QSUGraph.fromAnnotatedTree(atree map (_.some))
 
       val expDims =
-        IList(qprov.prov.value(Access.bucket('qsu0, 0, 'qsu0).point[FreeMapA]))
+        IList(qprov.prov.value(Access.bucket('qsu2, 0, 'qsu2).point[FreeMapA]))
 
       val ds = runOn_(qgraph).dims
 
