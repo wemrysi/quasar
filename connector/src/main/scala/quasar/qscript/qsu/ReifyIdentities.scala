@@ -217,14 +217,14 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
       case g @ E.Distinct(source) =>
         preserveIV(source, g) as g
 
-      case g @ E.LeftShift(source, struct, IdOnly, repair) =>
+      case g @ E.LeftShift(source, struct, IdOnly, repair, rot) =>
         emitsIVMap(source).tuple(isReferenced(Access.identity(g.root, g.root))) flatMap {
           case (true, true) =>
             onNeedsIV(g) as {
               val newRepair =
                 updateIV(func.LeftSide, makeI1(g.root, func.RightSide), srcIVRepair(repair))
 
-              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), IdOnly, newRepair))
+              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), IdOnly, newRepair, rot))
             }
 
           case (true, false) =>
@@ -232,20 +232,20 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
               val newRepair =
                 makeIV(lookupIdentities >> func.LeftSide, srcIVRepair(repair))
 
-              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), IdOnly, newRepair))
+              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), IdOnly, newRepair, rot))
             }
 
           case (false, true) =>
             onNeedsIV(g) as {
               val newRepair = makeIV(makeI1(g.root, func.RightSide), repair)
-              g.overwriteAtRoot(O.leftShift(source.root, struct, IdOnly, newRepair))
+              g.overwriteAtRoot(O.leftShift(source.root, struct, IdOnly, newRepair, rot))
             }
 
           case (false, false) =>
             setStatus(g.root, false) as g
         }
 
-      case g @ E.LeftShift(source, struct, ExcludeId, repair) =>
+      case g @ E.LeftShift(source, struct, ExcludeId, repair, rot) =>
         emitsIVMap(source).tuple(isReferenced(Access.identity(g.root, g.root))) flatMap {
           case (true, true) =>
             onNeedsIV(g) as {
@@ -255,7 +255,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
                   makeI1(g.root, func.ProjectIndex(func.RightSide, func.Constant(EJson.int(0)))),
                   includeIdRepair(repair, rebaseV(func.LeftSide)))
 
-              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), IncludeId, newRepair))
+              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), IncludeId, newRepair, rot))
             }
 
           case (true, false) =>
@@ -263,7 +263,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
               val newRepair =
                 makeIV(lookupIdentities >> func.LeftSide, srcIVRepair(repair))
 
-              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), ExcludeId, newRepair))
+              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), ExcludeId, newRepair, rot))
             }
 
           case (false, true) =>
@@ -273,7 +273,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
                   makeI1(g.root, func.ProjectIndex(func.RightSide, func.Constant(EJson.int(0)))),
                   includeIdRepair(repair, func.LeftSide))
 
-              g.overwriteAtRoot(O.leftShift(source.root, struct, IncludeId, newRepair))
+              g.overwriteAtRoot(O.leftShift(source.root, struct, IncludeId, newRepair, rot))
             }
 
           case (false, false) =>

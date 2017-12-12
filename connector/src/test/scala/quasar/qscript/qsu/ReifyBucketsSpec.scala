@@ -63,7 +63,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       reifyBuckets(tree) must beLike {
         case \/-(QSReduce(
-            LeftShift(Read(_), _, ExcludeId, _),
+            LeftShift(Read(_), _, ExcludeId, _, _),
             List(b),
             List(ReduceFuncs.Sum(r)),
             _)) =>
@@ -88,7 +88,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       reifyBuckets(tree) must beLike {
         case \/-(
           QSReduce(
-            Map(LeftShift(Read(_), _, ExcludeId, _), fm),
+            Map(LeftShift(Read(_), _, ExcludeId, _, _), fm),
             Nil,
             List(ReduceFuncs.Sum(r)),
             _)) =>
@@ -118,7 +118,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       reifyBuckets(tree) must beLike {
         case \/-(
           QSReduce(
-            Map(LeftShift(Read(_), _, ExcludeId, _), fm),
+            Map(LeftShift(Read(_), _, ExcludeId, _, _), fm),
             List(b),
             List(ReduceFuncs.Sum(r)),
             _)) =>

@@ -22,14 +22,17 @@ import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.qscript.{
   construction,
+  ExcludeId,
   Hole,
   HoleF,
   LeftSide,
+  LeftSideF,
   MapFuncsCore,
   ReduceFuncs,
   ReduceIndex,
   ReduceIndexF,
   RightSide,
+  RightSideF,
   SrcHole
 }
 import slamdata.Predef._
@@ -45,7 +48,7 @@ import scalaz.syntax.std.option._
 object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
   import ApplyProvenance.AuthenticatedQSU
-  import QScriptUniform.DTrans
+  import QScriptUniform.{DTrans, Rotation}
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
@@ -425,6 +428,58 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       }
 
       ok
+    }
+
+    "coalesce an autojoin on a single leftshift on a shared source" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.leftShift(
+            qsu.read(afile),
+            HoleF[Fix],
+            ExcludeId,
+            RightSideF[Fix],
+            Rotation.ShiftArray),
+          qsu.read(afile),
+          _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case LeftShift(
+          Read(`afile`),
+          struct,
+          ExcludeId,
+          repair,
+          _) =>
+
+          struct must_=== HoleF[Fix]
+
+          repair must beTreeEqual(func.Add(RightSideF, LeftSideF))
+      }
+    }
+
+    "coalesce an autojoin on a single leftshift on a shared source (RTL)" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.read(afile),
+          qsu.leftShift(
+            qsu.read(afile),
+            HoleF[Fix],
+            ExcludeId,
+            RightSideF[Fix],
+            Rotation.ShiftArray),
+          _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case LeftShift(
+          Read(`afile`),
+          struct,
+          ExcludeId,
+          repair,
+          _) =>
+
+          struct must_=== HoleF[Fix]
+
+          repair must beTreeEqual(func.Add(LeftSideF, RightSideF))
+      }
     }
   }
 
