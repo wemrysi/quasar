@@ -221,7 +221,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
                           rebuiltFM).liftM[OptionT]
                     }
 
-                    back <- OptionT(minimizer[G](qgraph, candidates2, fm))
+                    back <- OptionT(minimizer[G](qgraph, simplifiedSource, candidates2, fm))
                   } yield back
 
                   backM.run

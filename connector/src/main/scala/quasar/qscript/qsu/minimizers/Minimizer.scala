@@ -36,5 +36,8 @@ trait Minimizer[T[_[_]]] extends QSUTTypes[T] {
   // the second component is the root of the resulting graph
   def apply[
       G[_]: Monad: NameGenerator: PlannerErrorME: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState[T]]](
-      qgraph: QSUGraph, candidates: List[QSUGraph], fm: FreeMapA[Int]): G[Option[(QSUGraph, QSUGraph)]]
+      qgraph: QSUGraph,
+      singleSource: QSUGraph,
+      candidates: List[QSUGraph],
+      fm: FreeMapA[Int]): G[Option[(QSUGraph, QSUGraph)]]
 }

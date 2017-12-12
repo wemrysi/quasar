@@ -74,14 +74,17 @@ final class MergeReductions[T[_[_]]: BirecursiveT: EqualT] private () extends Mi
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def apply[
       G[_]: Monad: NameGenerator: PlannerErrorME: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState[T]]](
-      qgraph: QSUGraph, candidates: List[QSUGraph], fm: FreeMapA[Int]): G[Option[(QSUGraph, QSUGraph)]] = {
+      qgraph: QSUGraph,
+      source: QSUGraph,
+      candidates: List[QSUGraph],
+      fm: FreeMapA[Int]): G[Option[(QSUGraph, QSUGraph)]] = {
 
     val reducerAttempt = candidates collect {
       case g @ QSReduce(source, buckets, reducers, repair) =>
         (source, buckets, reducers, repair)
     }
 
-    val (source, buckets, _, _) = reducerAttempt.head
+    val (_, buckets, _, _) = reducerAttempt.head
 
     val sourceCheck = reducerAttempt filter {
       case (cSrc, cBuckets, _, _) =>

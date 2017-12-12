@@ -86,7 +86,10 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT] private () extends 
 
   def apply[
       G[_]: Monad: NameGenerator: PlannerErrorME: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState[T]]](
-      qgraph: QSUGraph, candidates: List[QSUGraph], fm: FreeMapA[Int]): G[Option[(QSUGraph, QSUGraph)]] = {
+      qgraph: QSUGraph,
+      singleSource: QSUGraph,
+      candidates: List[QSUGraph],
+      fm: FreeMapA[Int]): G[Option[(QSUGraph, QSUGraph)]] = {
 
     val extraction = candidates match {
       case LeftShift(src1, struct, idStatus, repair, rot) :: src2 :: Nil if src1.root === src2.root =>
