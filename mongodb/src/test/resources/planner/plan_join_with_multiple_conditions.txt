@@ -69,19 +69,19 @@ Chain
 │  │  │     │  ╰─ Expr($1 -> Eq(Bool(true)))
 │  │  │     ╰─ Doc
 │  │  │        ╰─ Expr($2 -> Eq(Bool(true)))
-│  │  ├─ $SimpleMapF
-│  │  │  ├─ Map
-│  │  │  │  ╰─ Obj
-│  │  │  │     ├─ Key(0: _.src.parents[0].sha)
-│  │  │  │     ├─ Key(1: _.src.author.login)
-│  │  │  │     ╰─ Key(content: _.src)
-│  │  │  ╰─ Scope(Map())
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
-│  │  │  │  ╰─ Name("0" -> { "$push": "$content" })
+│  │  │  │  ╰─ Name("0" -> { "$push": "$src" })
 │  │  │  ╰─ By
-│  │  │     ├─ Name("0" -> "$0")
-│  │  │     ╰─ Name("1" -> "$1")
+│  │  │     ├─ Name("0" -> {
+│  │  │     │       "$let": {
+│  │  │     │         "vars": {
+│  │  │     │           "el": { "$arrayElemAt": ["$src.parents", { "$literal": NumberInt("0") }] }
+│  │  │     │         },
+│  │  │     │         "in": "$$el.sha"
+│  │  │     │       }
+│  │  │     │     })
+│  │  │     ╰─ Name("1" -> "$src.author.login")
 │  │  ╰─ $ProjectF
 │  │     ├─ Name("_id" -> "$_id")
 │  │     ├─ Name("value")

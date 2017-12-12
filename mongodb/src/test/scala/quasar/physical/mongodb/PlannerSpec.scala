@@ -105,11 +105,10 @@ class PlannerSpec extends
 
   "plan from query string" should {
 
-    trackPending(
-      "filter with both index and key projections",
-      plan(sqlE"""select count(parents[0].sha) as count from slamengine_commits where parents[0].sha = "56d1caf5d082d1a6840090986e277d36d03f1859" """),
-      // actual [ReadOp,MatchOp,SimpleMapOp,MatchOp,SimpleMapOp,GroupOp,ProjectOp]
-      IList(ReadOp, MatchOp, SimpleMapOp, GroupOp))
+    "filter with both index and key projections" in {
+      plan(sqlE"""select count(parents[0].sha) as count from slamengine_commits where parents[0].sha = "56d1caf5d082d1a6840090986e277d36d03f1859" """) must
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp,MatchOp,ProjectOp,MatchOp,GroupOp,ProjectOp)))
+    }
 
     trackPendingErr(
       "having with multiple projections",
