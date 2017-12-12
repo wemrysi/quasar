@@ -886,8 +886,22 @@ object MongoDbPlanner {
             getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, f)
           case LeftShift(src, struct, id, repair) =>
             if (repair.contains(LeftSideF))
-              struct match {
-                case Embed(CoEnv(\/-(MFC(Guard(exp, Type.FlexArr(_, _, _), exp0, _))))) if exp0 === exp => {
+              (src.unFix, struct) match {
+                case (_, Embed(CoEnv(\/-(MFC(Guard(exp, Type.FlexArr(_, _, _), exp0, _)))))) if exp0 === exp => {
+                  val struct0 = handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct)
+                  val merge = getExprMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(repair, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
+
+                  (struct0 |@| merge)((expr, merge0) =>
+                    ExprBuilder(
+                      FlatteningBuilder(
+                        DocBuilder(
+                          src,
+                          ListMap(
+                            BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                            BsonField.Name("f") -> expr)),
+                        Set(StructureType.Array(DocField(BsonField.Name("f")), id))), \&/-(merge0)))
+                }
+                case (ExprBuilderF(Embed(FlatteningBuilderF(_, _)), _), _) => {
                   val struct0 = handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct)
                   val merge = getExprMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(repair, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
 
