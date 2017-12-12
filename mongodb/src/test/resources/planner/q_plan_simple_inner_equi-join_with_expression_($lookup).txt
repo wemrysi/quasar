@@ -49,14 +49,5 @@ Chain
    │         "$left.city",
    │         { "$literal": undefined }]
    │     })
-   ├─ Name("state" -> {
-   │       "$cond": [
-   │         {
-   │           "$and": [
-   │             { "$lte": [{ "$literal": {  } }, "$right"] },
-   │             { "$lt": ["$right", { "$literal": [] }] }]
-   │         },
-   │         "$right.state",
-   │         { "$literal": undefined }]
-   │     })
+   ├─ Name("state" -> "$right.state")
    ╰─ ExcludeId

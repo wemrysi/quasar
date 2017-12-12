@@ -16,7 +16,7 @@
 
 package quasar.physical.mongodb.planner
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => _, _}
 import quasar._, Planner._, Type.{Const => _, _}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
@@ -110,11 +110,17 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
       if (isRewrite) key.traverse(t => elide(t._2).map(x => (t._1, x)))
       else key.point[M]
 
+    def elideQS(isRewrite: Boolean, fqs: FreeQS[T])
+      (implicit UF: UnaryFunctions[T, CoEnv[Hole, QScriptTotal[T, ?], ?]])
+        : M[FreeQS[T]] =
+      if (isRewrite) fqs.transCataM(UF.unaryFunctions.modifyF(elide))
+      else fqs.point[M]
+
     override def trans[A, G[_]: Functor]
       (GtoF: PrismNT[G, F])
       (implicit TC: Corecursive.Aux[A, G], TR: Recursive.Aux[A, G])
         : F[A] => M[G[A]] = {
-        case f @ QC(Filter(src, cond))
+        case QC(Filter(src, cond))
           if (isRewrite[T, F, G, A](GtoF, src.project)) =>
             ((MapFuncCore.flattenAnd(cond))
               .traverse(elide))
@@ -126,33 +132,35 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
                 case h :: t => GtoF.reverseGet(
                   QC(Filter(src, t.foldLeft[FreeMap[T]](h)((acc, e) => Free.roll(MFC(MapFuncsCore.And(acc, e)))))))
               })
-        case ls @ QC(LeftShift(src, struct, id, repair))
+        case QC(LeftShift(src, struct, id, repair))
           if (isRewrite[T, F, G, A](GtoF, src.project)) =>
             elide(struct) ∘
             (s => GtoF.reverseGet(QC(LeftShift(src, s, id, repair))))
-        case m @ QC(qscript.Map(src, mf))
+        case QC(qscript.Map(src, mf))
           if (isRewrite[T, F, G, A](GtoF, src.project)) =>
             elide(mf) ∘
             (mf0 => GtoF.reverseGet(QC(qscript.Map(src, mf0))))
-        case r @ QC(Reduce(src, b, red, rep))
+        case QC(Reduce(src, b, red, rep))
           if (isRewrite[T, F, G, A](GtoF, src.project)) =>
             (b.traverse(elide) ⊛
               red.traverse(_.traverse(elide)))(
               (b0, red0) => GtoF.reverseGet(QC(Reduce(src, b0, red0, rep))))
-        case s @ QC(Sort(src, b, order))
+        case QC(Sort(src, b, order))
           if (isRewrite[T, F, G, A](GtoF, src.project)) =>
             (b.traverse(elide) ⊛
               order.traverse(t => elide(t._1).map(x => (x, t._2))))(
               (b0, order0) => GtoF.reverseGet(QC(Sort(src, b0, order0))))
-        case ej @ EJ(EquiJoin(src, lBranch, rBranch, key, f, combine)) =>
+        case EJ(EquiJoin(src, lBranch, rBranch, key, f, combine)) =>
+          val isRewriteSrc = isRewrite[T, F, G, A](GtoF, src.project)
           val isRewriteL = isRewriteFree(lBranch)
           val isRewriteR = isRewriteFree(rBranch)
 
-          ((elideLeftJoinKey(isRewriteL, key) >>=
+          (elideQS(isRewriteSrc, lBranch) ⊛ elideQS(isRewriteSrc, rBranch) ⊛
+            (elideLeftJoinKey(isRewriteL, key) >>=
             (k => elideRightJoinKey(isRewriteR, k))) ⊛
             (elideJoinFunc(isRewriteL, LeftSide, combine) >>=
               (c => elideJoinFunc(isRewriteR, RightSide, c))))(
-              (k0, c0) => GtoF.reverseGet(EJ(EquiJoin(src, lBranch, rBranch, k0, f, c0))))
+              (l0, r0, k0, c0) => GtoF.reverseGet(EJ(EquiJoin(src, l0, r0, k0, f, c0))))
         case qc =>
           GtoF.reverseGet(qc).point[M]
       }

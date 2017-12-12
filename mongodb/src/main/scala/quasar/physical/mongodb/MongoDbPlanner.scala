@@ -1230,16 +1230,30 @@ object MongoDbPlanner {
     val O = new Optimize[T]
     val R = new Rewrite[T]
 
+    def normalize(mqs: T[MQS]): M[T[MQS]] = {
+      val mqs1 = mqs.transCata[T[MQS]](R.normalizeEJ[MQS])
+      val mqs2 = BR.branches.modify(
+          _.transCata[FreeQS[T]](liftCo(R.normalizeEJCoEnv[QScriptTotal[T, ?]]))
+        )(mqs1.project).embed
+      Trans(assumeReadType[T, MQS, M](Type.AnyObject), mqs2)
+    }
+
     // TODO: All of these need to be applied through branches. We may also be able to compose
     //       them with normalization as the last step and run until fixpoint. Currently plans are
     //       too sensitive to the order in which these are applied.
+    //       Some constraints:
+    //       - elideQuasarSigil should only be applied once
+    //       - elideQuasarSigil needs assumeReadType to be applied in order to
+    //         work properly in all cases
+    //       - R.normalizeEJ/R.normalizeEJCoEnv may change the structure such
+    //         that assumeReadType can elide more guards
+    //         E.g. Map(x, SrcHole) is normalized into x. assumeReadType does
+    //         not recognize any Map as shape preserving, but it may recognize
+    //         x being shape preserving (e.g. when x = ShiftedRead(y, ExcludeId))
     for {
-      mongoQS0 <- Trans(assumeReadType[T, MQS, M](Type.AnyObject), qs)
-      mongoQS1 <- mongoQS0.transCataM(elideQuasarSigil[T, MQS, M](anyDoc))
-      mongoQS2 =  mongoQS1.transCata[T[MQS]](R.normalizeEJ[MQS])
-      mongoQS3 =  BR.branches.modify(
-        _.transCata[FreeQS[T]](liftCo(R.normalizeEJCoEnv[QScriptTotal[T, ?]]))
-        )(mongoQS2.project).embed
+      mongoQS1 <- Trans(assumeReadType[T, MQS, M](Type.AnyObject), qs)
+      mongoQS2 <- mongoQS1.transCataM(elideQuasarSigil[T, MQS, M](anyDoc))
+      mongoQS3 <- normalize(mongoQS2)
       _ <- BackendModule.logPhase[M](PhaseResult.treeAndCode("QScript Mongo", mongoQS3))
 
       mongoQS4 =  mongoQS3.transCata[T[MQS]](

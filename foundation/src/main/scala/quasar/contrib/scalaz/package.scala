@@ -52,6 +52,14 @@ package object scalaz {
       OptionT(self.run.run.map(_.join))
   }
 
+  implicit final class EitherTOps[F[_], E, A](val self: EitherT[F, E, A]) extends AnyVal {
+    def leftMapF[E1](f: E => F[E1])(implicit F: Monad[F]): EitherT[F, E1, A] =
+      EitherT(self.run.flatMap {
+        case -\/(e) => f(e).map(_.left)
+        case \/-(a) => a.right.point[F]
+      })
+  }
+
   implicit def toMonadTell_Ops[F[_], W, A](fa: F[A])(implicit F: MonadTell_[F, W]): MonadTell_Ops[F, W, A] =
     new MonadTell_Ops[F, W, A](fa)
 

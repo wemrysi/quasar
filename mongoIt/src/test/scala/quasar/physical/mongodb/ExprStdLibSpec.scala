@@ -79,6 +79,12 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (relations.Lte, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
     case (relations.Gt, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
     case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
+
+    case (relations.And, List(Data.NA, _)) => Pending("TODO handle and/or with outer semantics").left
+    case (relations.And, List(_, Data.NA)) => Pending("TODO handle and/or with outer semantics").left
+    case (relations.Or, List(Data.NA, _)) => Pending("TODO handle and/or with outer semantics").left
+    case (relations.Or, List(_, Data.NA)) => Pending("TODO handle and/or with outer semantics").left
+
     case (relations.IfUndefined, _) => notHandled.left
 
     case (structural.ConcatOp, _) => notHandled.left

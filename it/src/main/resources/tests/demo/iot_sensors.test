@@ -1,0 +1,21 @@
+{
+    "name": "iot_sensors",
+    "data": "timeseries.data",
+    "backends": {
+       "couchbase":         "ignoreFieldOrder",
+       "marklogic_json":    "ignoreFieldOrder",
+       "mimir":             "ignoreFieldOrder"
+    },
+    "query": "temp0 := SELECT * FROM timeseries WHERE sensor IN (\"S0\", \"S1\", \"S2\", \"S3\", \"S4\");
+                      SELECT SUM(value) AS measure, dt AS dimension, sensor AS series FROM (temp0) AS temp1 GROUP BY sensor, dt ORDER BY sensor ASC, dt ASC LIMIT 6
+     ",
+    "predicate": "exactly",
+    "expected": [
+        { "measure": 46, "dimension": "2016-03-19T20:43:56.206Z", "series": "S0" },
+        { "measure": 45, "dimension": "2016-03-20T20:43:56.206Z", "series": "S0" },
+        { "measure": 48, "dimension": "2016-03-21T20:43:56.206Z", "series": "S0" },
+        { "measure": 53, "dimension": "2016-03-22T20:43:56.206Z", "series": "S0" },
+        { "measure": 55, "dimension": "2016-03-23T20:43:56.206Z", "series": "S0" },
+        { "measure": 57, "dimension": "2016-03-24T20:43:56.206Z", "series": "S0" }
+    ]
+}

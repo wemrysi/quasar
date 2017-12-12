@@ -61,6 +61,11 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => Pending("TODO").left
     case (relations.IfUndefined, _) => Pending("TODO").left
 
+    case (relations.And, List(Data.NA, _)) => Pending("TODO handle and/or with outer semantics").left
+    case (relations.And, List(_, Data.NA)) => Pending("TODO handle and/or with outer semantics").left
+    case (relations.Or, List(Data.NA, _)) => Pending("TODO handle and/or with outer semantics").left
+    case (relations.Or, List(_, Data.NA)) => Pending("TODO handle and/or with outer semantics").left
+
     case (date.ExtractDayOfYear, _)    => Skipped("TODO").left
     case (date.ExtractWeek, _)         => Skipped("TODO").left
 

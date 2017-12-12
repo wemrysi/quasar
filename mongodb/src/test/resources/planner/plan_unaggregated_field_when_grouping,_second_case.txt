@@ -2,76 +2,125 @@ Chain
 ├─ $FoldLeftF
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
+│  │  ├─ $ProjectF
+│  │  │  ├─ Name("city" -> {
+│  │  │  │       "$cond": [
+│  │  │  │         {
+│  │  │  │           "$and": [
+│  │  │  │             { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│  │  │  │             { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │  │  │         },
+│  │  │  │         "$city",
+│  │  │  │         { "$literal": undefined }]
+│  │  │  │     })
+│  │  │  ├─ Name("state" -> {
+│  │  │  │       "$cond": [
+│  │  │  │         {
+│  │  │  │           "$and": [
+│  │  │  │             { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│  │  │  │             { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │  │  │         },
+│  │  │  │         "$state",
+│  │  │  │         { "$literal": undefined }]
+│  │  │  │     })
+│  │  │  ╰─ ExcludeId
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
-│  │  │  │  ╰─ Name("0" -> {
-│  │  │  │          "$push": {
-│  │  │  │            "$let": {
-│  │  │  │              "vars": {
-│  │  │  │                "a": [
-│  │  │  │                  {
-│  │  │  │                    "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("0") }]
-│  │  │  │                  },
-│  │  │  │                  {
-│  │  │  │                    "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
-│  │  │  │                  }]
-│  │  │  │              },
-│  │  │  │              "in": "$$a"
-│  │  │  │            }
-│  │  │  │          }
-│  │  │  │        })
+│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
 │  │  │  ╰─ By({ "$literal": null })
 │  │  ╰─ $ProjectF
 │  │     ├─ Name("_id" -> "$_id")
 │  │     ├─ Name("value")
-│  │     │  ├─ Name("right" -> "$0")
-│  │     │  ├─ Name("left" -> { "$literal": [] })
+│  │     │  ├─ Name("left" -> "$0")
+│  │     │  ├─ Name("right" -> { "$literal": [] })
 │  │     │  ╰─ Name("_id" -> "$_id")
 │  │     ╰─ IncludeId
 │  ╰─ Chain
 │     ├─ $ReadF(db; zips)
-│     ├─ $ProjectF
-│     │  ├─ Name("0" -> [
-│     │  │       { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("0") }] },
-│     │  │       { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] }])
-│     │  ╰─ ExcludeId
-│     ├─ $SimpleMapF
-│     │  ├─ Map
-│     │  │  ╰─ Obj
-│     │  │     ╰─ Key(f0: ((isNumber(
-│     │  │            (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].pop : undefined) || ((((isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].pop : undefined) instanceof NumberInt) || (((isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].pop : undefined) instanceof NumberLong))) && (isObject(_["0"][1]) && (! Array.isArray(_["0"][1])))) ? _["0"][1].pop : undefined)
-│     │  ╰─ Scope(Map())
 │     ├─ $GroupF
 │     │  ├─ Grouped
-│     │  │  ╰─ Name("f0" -> { "$max": "$f0" })
+│     │  │  ╰─ Name("f0" -> {
+│     │  │          "$sum": {
+│     │  │            "$cond": [
+│     │  │              {
+│     │  │                "$and": [
+│     │  │                  {
+│     │  │                    "$lt": [
+│     │  │                      { "$literal": null },
+│     │  │                      {
+│     │  │                        "$cond": [
+│     │  │                          {
+│     │  │                            "$and": [
+│     │  │                              { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│     │  │                              { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│     │  │                          },
+│     │  │                          "$pop",
+│     │  │                          { "$literal": undefined }]
+│     │  │                      }]
+│     │  │                  },
+│     │  │                  {
+│     │  │                    "$lt": [
+│     │  │                      {
+│     │  │                        "$cond": [
+│     │  │                          {
+│     │  │                            "$and": [
+│     │  │                              { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│     │  │                              { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│     │  │                          },
+│     │  │                          "$pop",
+│     │  │                          { "$literal": undefined }]
+│     │  │                      },
+│     │  │                      { "$literal": "" }]
+│     │  │                  }]
+│     │  │              },
+│     │  │              {
+│     │  │                "$cond": [
+│     │  │                  {
+│     │  │                    "$and": [
+│     │  │                      { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│     │  │                      { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│     │  │                  },
+│     │  │                  "$pop",
+│     │  │                  { "$literal": undefined }]
+│     │  │              },
+│     │  │              { "$literal": undefined }]
+│     │  │          }
+│     │  │        })
 │     │  ╰─ By({ "$literal": null })
-│     ├─ $MapF
-│     │  ├─ JavaScript(function (key, value) { return [null, { "right": [], "left": [value.f0] }] })
-│     │  ╰─ Scope(Map())
+│     ├─ $ProjectF
+│     │  ├─ Name("2" -> "$f0")
+│     │  ╰─ ExcludeId
+│     ├─ $GroupF
+│     │  ├─ Grouped
+│     │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
+│     │  ╰─ By({ "$literal": null })
+│     ├─ $ProjectF
+│     │  ├─ Name("right" -> "$0")
+│     │  ├─ Name("left" -> { "$literal": [] })
+│     │  ├─ Name("_id" -> true)
+│     │  ╰─ IncludeId
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
-│        │               var result = { "right": [], "left": [] };
+│        │               var result = { "left": [], "right": [] };
 │        │               values.forEach(
 │        │                 function (value) {
-│        │                   result.right = result.right.concat(value.right);
-│        │                   result.left = result.left.concat(value.left)
+│        │                   result.left = result.left.concat(value.left);
+│        │                   result.right = result.right.concat(value.right)
 │        │                 });
 │        │               return result
 │        │             })
 │        ╰─ Scope(Map())
 ├─ $MatchF
 │  ╰─ Doc
-│     ├─ NotExpr($right -> Size(0))
-│     ╰─ NotExpr($left -> Size(0))
-├─ $UnwindF(DocField(BsonField.Name("left")))
+│     ├─ NotExpr($left -> Size(0))
+│     ╰─ NotExpr($right -> Size(0))
 ├─ $UnwindF(DocField(BsonField.Name("right")))
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(0: _.left / 1000)
-│  │     ╰─ Key(pop: (isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? _.right[1].pop : undefined)
-│  ╰─ Scope(Map())
-╰─ $ProjectF
-   ├─ Name("0" -> true)
-   ├─ Name("pop" -> true)
-   ╰─ ExcludeId
+├─ $UnwindF(DocField(BsonField.Name("left")))
+╰─ $SimpleMapF
+   ├─ Map
+   │  ╰─ Obj
+   │     ╰─ Key(__quasar_mongodb_sigil)
+   │        ╰─ SpliceObjects
+   │           ├─ JsCore(_.left)
+   │           ╰─ JsCore(_.right)
+   ╰─ Scope(Map())
