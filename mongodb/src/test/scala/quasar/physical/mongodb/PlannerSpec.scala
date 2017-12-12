@@ -107,7 +107,7 @@ class PlannerSpec extends
 
     "filter with both index and key projections" in {
       plan(sqlE"""select count(parents[0].sha) as count from slamengine_commits where parents[0].sha = "56d1caf5d082d1a6840090986e277d36d03f1859" """) must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp,MatchOp,ProjectOp,MatchOp,GroupOp,ProjectOp)))
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, MatchOp, ProjectOp, MatchOp, GroupOp, ProjectOp)))
     }
 
     trackPendingErr(
@@ -174,7 +174,7 @@ class PlannerSpec extends
       // actual [ReadOp,GroupOp,ProjectOp,GroupOp,ProjectOp,ReduceOp,ReadOp,ProjectOp,GroupOp,ProjectOp,FoldLeftOp,MatchOp,UnwindOp,UnwindOp,SimpleMapOp]
       IList(ReadOp, ProjectOp, GroupOp, UnwindOp, ProjectOp))
 
-    val unaggFieldWhenGrouping2ndCase = sqlE"select city, state, sum(pop) from zips"
+    val unaggFieldWhenGrouping2ndCase = sqlE"select max(pop)/1000, pop from zips"
 
     "plan unaggregated field when grouping, second case - no root pushes" in {
       plan(unaggFieldWhenGrouping2ndCase) must
