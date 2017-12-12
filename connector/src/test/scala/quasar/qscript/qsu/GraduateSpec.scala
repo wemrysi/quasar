@@ -51,6 +51,7 @@ import scalaz.{\/, \/-, EitherT, Free, Need, NonEmptyList => NEL, StateT}
 import scalaz.Scalaz._
 
 object GraduateSpec extends Qspec with QSUTTypes[Fix] {
+  import QScriptUniform.Rotation
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
@@ -114,7 +115,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
         val struct: FreeMap = func.Add(HoleF, IntLit(17))
         val repair: JoinFunc = func.ConcatArrays(func.MakeArray(LeftSideF), func.MakeArray(RightSideF))
 
-        val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile), struct, IncludeId, repair)
+        val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile), struct, IncludeId, repair, Rotation.ShiftArray)
         val qscript: Fix[QSE] = qse.LeftShift(qse.Read[AFile](afile), struct, IncludeId, repair)
 
         qgraph must graduateAs(qscript)
@@ -173,7 +174,8 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
               qsu.read(root </> file("zips")),
               HoleF[Fix],
               IncludeId,
-              concatArr),
+              concatArr,
+              Rotation.ShiftArray),
             qsu.cint(1),
             Free.roll[MapFunc, Access[JoinSide]](
               MFC(MapFuncsCore.Constant[Fix, FreeAccess[JoinSide]](

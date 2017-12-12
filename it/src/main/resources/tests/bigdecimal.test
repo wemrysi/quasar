@@ -5,8 +5,7 @@
       "marklogic_json": "pending",
       "mongodb_2_6": "pending",
       "mongodb_3_0": "pending",
-      "mongodb_3_2": "pending",
-      "mongodb_read_only": "pending"
+      "mongodb_3_2": "pending"
     },
     "data": "bigdecimal.data",
     "query": "select nr, val1 from bigdecimal",
