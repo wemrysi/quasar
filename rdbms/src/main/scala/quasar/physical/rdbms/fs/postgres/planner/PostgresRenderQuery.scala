@@ -55,18 +55,46 @@ object PostgresRenderQuery extends RenderQuery {
 
   def transformRelationalOp[T[_[_]]: BirecursiveT](in: T[SqlExpr]): T[SqlExpr] = {
 
+    object JsonRefs {
+      def unapply(expr: T[SqlExpr]): Boolean =
+        expr.project match {
+          case Refs(elems) => elems.length > 2
+          case _ => false
+        }
+    }
+
     def quotedStr(a: T[SqlExpr]): T[SqlExpr] =
       a.project match {
-        case c@Constant(Data.Str(v)) =>
+        case Constant(Data.Str(v)) =>
           Constant[T[SqlExpr]](Data.Str(s""""$v"""")).embed
         case other => other.embed
       }
 
     in.project match {
-      case Eq(a1, a2) =>
-        Eq[T[SqlExpr]](quotedStr(a1), quotedStr(a2)).embed
-      case Lt(a1, a2) =>
-        Lt[T[SqlExpr]](quotedStr(a1), quotedStr(a2)).embed
+      case e@Eq(JsonRefs(), a2) =>
+        e.copy(a2 = quotedStr(a2)).embed
+      case e@Eq(a1, JsonRefs()) =>
+        e.copy(a1 = quotedStr(a1)).embed
+
+      case e@Gt(JsonRefs(), a2) =>
+        e.copy(a2 = quotedStr(a2)).embed
+      case e@Gt(a1, JsonRefs()) =>
+        e.copy(a1 = quotedStr(a1)).embed
+
+      case e@Gte(JsonRefs(), a2) =>
+        e.copy(a2 = quotedStr(a2)).embed
+      case e@Gte(a1, JsonRefs()) =>
+        e.copy(a1 = quotedStr(a1)).embed
+
+      case e@Lt(JsonRefs(), a2) =>
+        e.copy(a2 = quotedStr(a2)).embed
+      case e@Lt(a1, JsonRefs()) =>
+        e.copy(a1 = quotedStr(a1)).embed
+
+      case e@Lte(JsonRefs(), a2) =>
+        e.copy(a2 = quotedStr(a2)).embed
+      case e@Lte(a1, JsonRefs()) =>
+        e.copy(a1 = quotedStr(a1)).embed
       case other =>
         other.embed
     }
@@ -129,6 +157,8 @@ object PostgresRenderQuery extends RenderQuery {
     case Neg(str) => s"(-$str)".right
     case Eq(a1, a2) =>
       s"(($a1)::text = ($a2)::text)".right
+    case Neq(a1, a2) =>
+      s"(($a1)::text != ($a2)::text)".right
     case Lt(a1, a2) =>
       s"(($a1)::text::numeric < ($a2)::text::numeric)".right
     case Lte(a1, a2) =>
