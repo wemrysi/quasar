@@ -42,7 +42,7 @@ object PostgresRenderQuery extends RenderQuery {
   implicit val codec: DataCodec = DataCodec.Precise
 
   def asString[T[_[_]]: BirecursiveT](a: T[SqlExpr]): PlannerError \/ String = {
-    val q = a.transCataT(transformRelationalOp).cataM(alg)
+    val q = a.transCataT(RelationalOperations.processQuotes).cataM(alg)
     q ∘ (s => s"select row_to_json(row) from ($s) as row")
   }
 
@@ -52,53 +52,6 @@ object PostgresRenderQuery extends RenderQuery {
 
   def buildJson(str: String): String =
     s"json_build_object($str)#>>'{}'"
-
-  def transformRelationalOp[T[_[_]]: BirecursiveT](in: T[SqlExpr]): T[SqlExpr] = {
-
-    object JsonRefs {
-      def unapply(expr: T[SqlExpr]): Boolean =
-        expr.project match {
-          case Refs(elems) => elems.length > 2
-          case _ => false
-        }
-    }
-
-    def quotedStr(a: T[SqlExpr]): T[SqlExpr] =
-      a.project match {
-        case Constant(Data.Str(v)) =>
-          Constant[T[SqlExpr]](Data.Str(s""""$v"""")).embed
-        case other => other.embed
-      }
-
-    in.project match {
-      case e@Eq(JsonRefs(), a2) =>
-        e.copy(a2 = quotedStr(a2)).embed
-      case e@Eq(a1, JsonRefs()) =>
-        e.copy(a1 = quotedStr(a1)).embed
-
-      case e@Gt(JsonRefs(), a2) =>
-        e.copy(a2 = quotedStr(a2)).embed
-      case e@Gt(a1, JsonRefs()) =>
-        e.copy(a1 = quotedStr(a1)).embed
-
-      case e@Gte(JsonRefs(), a2) =>
-        e.copy(a2 = quotedStr(a2)).embed
-      case e@Gte(a1, JsonRefs()) =>
-        e.copy(a1 = quotedStr(a1)).embed
-
-      case e@Lt(JsonRefs(), a2) =>
-        e.copy(a2 = quotedStr(a2)).embed
-      case e@Lt(a1, JsonRefs()) =>
-        e.copy(a1 = quotedStr(a1)).embed
-
-      case e@Lte(JsonRefs(), a2) =>
-        e.copy(a2 = quotedStr(a2)).embed
-      case e@Lte(a1, JsonRefs()) =>
-        e.copy(a1 = quotedStr(a1)).embed
-      case other =>
-        other.embed
-    }
-  }
 
   val alg: AlgebraM[PlannerError \/ ?, SqlExpr, String] = {
     case Unreferenced() => InternalError("Unexpected Unreferenced!", none).left
