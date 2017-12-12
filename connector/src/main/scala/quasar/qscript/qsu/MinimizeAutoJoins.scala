@@ -28,11 +28,8 @@ import quasar.qscript.{
   construction,
   Center,
   Hole,
-  HoleF,
   LeftSide,
   LeftSide3,
-  LeftSideF,
-  ReduceIndex,
   RightSide,
   RightSide3,
   SrcHole
@@ -42,10 +39,15 @@ import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
 import matryoshka.{delayEqual, BirecursiveT, EqualT}
 import matryoshka.data.free._
-import scalaz.{Bind, Equal, Free, Monad, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
+import scalaz.{Bind, Equal, Monad, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
 
 final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSUTTypes[T] {
+  import MinimizeAutoJoins._
   import QSUGraph.Extractors._
+
+  private val Minimizers = List(
+    minimizers.MergeReductions[T],
+    minimizers.ShiftProjectBelow[T])
 
   private val func = construction.Func[T]
   private val srcHole: Hole = SrcHole   // wtb smart constructor
@@ -58,7 +60,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
     QP.prov.provenanceEqual(scala.Predef.implicitly, Equal[FreeMapA[Access[Symbol]]])
 
   def apply[F[_]: Monad: NameGenerator: PlannerErrorME](agraph: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] = {
-    type G[A] = StateT[StateT[F, RevIdx, ?], MinimizationState, A]
+    type G[A] = StateT[StateT[F, RevIdx, ?], MinimizationState[T], A]
 
     val back = agraph.graph rewriteM {
       case qgraph @ AutoJoin2(left, right, combiner) =>
@@ -79,7 +81,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
         coalesceToMap[G](qgraph, List(left, center, right), combiner2)
     }
 
-    val lifted = back(MinimizationState(agraph.dims, Set())) map {
+    val lifted = back(MinimizationState[T](agraph.dims, Set())) map {
       case (MinimizationState(dims, _), graph) => AuthenticatedQSU[T](graph, dims)
     }
 
@@ -88,13 +90,13 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
 
   // the Ints are indices into branches
   private def coalesceToMap[
-      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState]: PlannerErrorME](
+      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState[T]]: PlannerErrorME](
       qgraph: QSUGraph,
       branches: List[QSUGraph],
       combiner: FreeMapA[Int]): G[QSUGraph] = {
 
     for {
-      state <- MonadState_[G, MinimizationState].get
+      state <- MonadState_[G, MinimizationState[T]].get
 
       fms = branches.zipWithIndex map {
         case (g, i) =>
@@ -137,13 +139,13 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
   // the Int indexes into the final number of distinct roots
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   private def coalesceRoots[
-      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState]: PlannerErrorME](
+      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState[T]]: PlannerErrorME](
       qgraph: QSUGraph,
       fm: => FreeMapA[Int],
       candidates: List[QSUGraph]): G[QSUGraph] = candidates match {
 
     case Nil =>
-      updateGraph[G](QSU.Unreferenced[T, Symbol]()) map { unref =>
+      updateGraph[T, G](QSU.Unreferenced[T, Symbol]()) map { unref =>
         qgraph.overwriteAtRoot(QSU.Map[T, Symbol](unref.root, fm.map(κ(srcHole)))) :++ unref
       }
 
@@ -160,161 +162,45 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
           coalesceToMap[G](qgraph, candidates, fm)
 
         case None =>
-          lazy val reducerAttempt = candidates collect {
-            case g @ QSReduce(source, buckets, reducers, repair) =>
-              (source, buckets, reducers, repair)
-          }
+          for {
+            resultM <- Minimizers.foldLeftM[G, Option[(QSUGraph, QSUGraph)]](None) {
+              case (Some(pair), _) =>
+                Option(pair).point[G]
 
-          // candidates.forall(_ ~= QSReduce)
-          lazy val reducerCheck = reducerAttempt.lengthCompare(candidates.length) === 0
-
-          lazy val leftShift12Extract: Option[(QSU.LeftShift[T, QSUGraph], Boolean)] = candidates match {
-            case (ls @ LeftShift(src1, struct, idStatus, repair, rot)) :: src2 :: Nil if src1.root === src2.root =>
-              Some((QSU.LeftShift(src1, struct, idStatus, repair, rot), true))
-
-            case src2 :: (ls @ LeftShift(src1, struct, idStatus, repair, rot)) :: Nil if src1.root === src2.root =>
-              Some((QSU.LeftShift(src1, struct, idStatus, repair, rot), false))
-
-            case _ => None
-          }
-
-          if (reducerCheck) {
-            for {
-              // apply coalescence recursively to our sources
-              extended <- reducerAttempt traverse {
-                case desc @ (source, buckets, reducers, repair) =>
-                  // TODO this is a weird use of the function, but it should work
-                  // we're just trying to run ourselves recursively to extend the sources
-                  // this isn't likely to be a common case
-                  coalesceToMap[G](source, List(source), Free.pure(0)) map {
-                    // coalesceToMap is always going to return... a Map, but
-                    // what we care about is the source and the fm, not the
-                    // node itself.  so we pull it apart (this is what's weird, btw)
-                    //
-                    // TODO short circuit this a bit if fm === Free.pure(Hole)
-                    // I'm pretty sure the fallthrough case will never be hit
-                    case Map(source2, fm) =>
-                      def rewriteBucket(bucket: Access[Hole]): FreeMapA[Access[Hole]] = bucket match {
-                        case v @ Access.Value(_) => fm.map(κ(v))
-                        case other => Free.pure[MapFunc, Access[Hole]](other)
-                      }
-
-                      (
-                        source2,
-                        buckets.map(_.flatMap(rewriteBucket)),
-                        reducers.map(_.map(_.flatMap(κ(fm)))),
-                        repair)
-
-                    case _ => desc
-                  }
-              }
-
-              // we know we're non-empty by structure of outer match
-              (source, buckets, _, _) = extended.head
-
-              state <- MonadState_[G, MinimizationState].get
-              dims = state.dims
-
-              // do we have the same provenance at our roots?
-              rootProvCheck = extended.forall(t => dims(t._1.root) === dims(source.root))
-
-              // we need a stricter check than just provenance, since we have to inline maps
-              back <- if (rootProvCheck
-                  && extended.forall(_._2 === buckets)
-                  && extended.forall(_._1.root === source.root)) {
-
-                val lifted = extended.zipWithIndex map {
-                  case ((_, buckets, reducers, repair), i) =>
-                    (
-                      buckets,
-                      reducers,
-                      // we use maps here to avoid definedness issues in reduction results
-                      func.MakeMap(func.Constant(J.str(i.toString)), repair))
-                }
-
-                // this is fine, because we can't be here if candidates is empty
-                // doing it this way avoids an extra (and useless) Option state in the fold
-                val (_, lhreducers, lhrepair) = lifted.head
-
-                // squish all the reducers down into lhead
-                val (_, (reducers, repair)) =
-                  lifted.tail.foldLeft((lhreducers.length, (lhreducers, lhrepair))) {
-                    case ((roffset, (lreducers, lrepair)), (_, rreducers, rrepair)) =>
-                      val reducers = lreducers ::: rreducers
-
-                      val roffset2 = roffset + rreducers.length
-
-                      val repair = func.ConcatMaps(
-                        lrepair,
-                        rrepair map {
-                          case ReduceIndex(e) =>
-                            ReduceIndex(e.rightMap(_ + roffset))
-                        })
-
-                      (roffset2, (reducers, repair))
-                  }
-
-                // 107.7, All chiropractors, all the time
-                val adjustedFM = fm flatMap { i =>
-                  // get the value back OUT of the map
-                  func.ProjectKey(HoleF[T], func.Constant(J.str(i.toString)))
-                }
-
-                val redPat = QSU.QSReduce[T, Symbol](source.root, buckets, reducers, repair)
-
-                for {
-                  red <- updateGraph[G](redPat)
-                  back = qgraph.overwriteAtRoot(QSU.Map[T, Symbol](red.root, adjustedFM)) :++ red
-
-                  _ <- updateForCoalesce[G](candidates, red.root)
-                } yield back
-              } else {
-                failure[G](qgraph)
-              }
-            } yield back
-          } else {
-            leftShift12Extract match {
-              case Some((QSU.LeftShift(src, struct, idStatus, repair, rot), leftToRight)) =>
-                val fm2 = if (leftToRight)
-                  fm
+              case (None, minimizer) =>
+                if (minimizer.couldApplyTo(candidates))
+                  minimizer[G](qgraph, candidates, fm)
                 else
-                  fm.map(1 - _)   // we know the domain is {0, 1}, so we invert the indices
+                  (None: Option[(QSUGraph, QSUGraph)]).point[G]
+            }
 
-                val repair2 = fm2 flatMap {
-                  case 0 => repair
-                  case 1 => LeftSideF[T]
-                }
+            back <- resultM match {
+              case Some((retarget, result)) =>
+                updateForCoalesce[G](candidates, retarget.root).map(_ => result)
 
-
-                for {
-                  back <- qgraph.overwriteAtRoot(
-                    QSU.LeftShift[T, Symbol](src.root, struct, idStatus, repair2, rot)).point[G]
-
-                  _ <- updateForCoalesce[G](candidates, qgraph.root)
-                } yield back
               case None =>
                 failure[G](qgraph)
             }
-          }
+          } yield back
       }
   }
 
   private def failure[
-      G[_]: Monad: MonadState_[?[_], MinimizationState]](
+      G[_]: Monad: MonadState_[?[_], MinimizationState[T]]](
       graph: QSUGraph): G[QSUGraph] = {
 
-    val change = MonadState_[G, MinimizationState] modify { state =>
+    val change = MonadState_[G, MinimizationState[T]] modify { state =>
       state.copy(failed = state.failed + graph.root)
     }
 
     change.map(_ => graph)
   }
 
-  private def updateForCoalesce[G[_]: Bind: MonadState_[?[_], MinimizationState]](
+  private def updateForCoalesce[G[_]: Bind: MonadState_[?[_], MinimizationState[T]]](
       candidates: List[QSUGraph],
       newRoot: Symbol): G[Unit] = {
 
-    MonadState_[G, MinimizationState] modify { state =>
+    MonadState_[G, MinimizationState[T]] modify { state =>
       val dims2 = state.dims map {
         case (key, value) =>
           val value2 = candidates.foldLeft(value) { (value, c) =>
@@ -351,31 +237,34 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
 
     (i => remap.getOrElse(i, -1), minimized.toList)
   }
-
-  private def updateGraph[
-      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState]: PlannerErrorME](
-      pat: QScriptUniform[Symbol]): G[QSUGraph] = {
-
-    for {
-      qgraph <- QSUGraph.withName[T, G](pat)
-
-      state <- MonadState_[G, MinimizationState].get
-      computed <- ApplyProvenance.computeProvenanceƒ[T, G].apply(
-        QSUGraph.QSUPattern(qgraph.root, pat.map(s => (s, state.dims(s)))))
-
-      dims2 = state.dims + (qgraph.root -> computed._2)
-      _ <- MonadState_[G, MinimizationState].put(state.copy(dims = dims2))
-    } yield qgraph
-  }
-
-  case class MinimizationState(dims: QSUDims[T], failed: Set[Symbol])
 }
 
 object MinimizeAutoJoins {
+  import QSUGraph.RevIdx
+
+  final case class MinimizationState[T[_[_]]](dims: QSUDims[T], failed: Set[Symbol])
+
   def apply[
       T[_[_]]: BirecursiveT: EqualT,
       F[_]: Monad: NameGenerator: PlannerErrorME]
       (agraph: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] =
     taggedInternalError("MinimizeAutoJoins", new MinimizeAutoJoins[T].apply[F](agraph))
+
+  def updateGraph[
+      T[_[_]]: BirecursiveT: EqualT,
+      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx[T]]: MonadState_[?[_], MinimizationState[T]]: PlannerErrorME](
+      pat: QScriptUniform[T, Symbol]): G[QSUGraph[T]] = {
+
+    for {
+      qgraph <- QSUGraph.withName[T, G](pat)
+
+      state <- MonadState_[G, MinimizationState[T]].get
+      computed <- ApplyProvenance.computeProvenanceƒ[T, G].apply(
+        QSUGraph.QSUPattern(qgraph.root, pat.map(s => (s, state.dims(s)))))
+
+      dims2 = state.dims + (qgraph.root -> computed._2)
+      _ <- MonadState_[G, MinimizationState[T]].put(state.copy(dims = dims2))
+    } yield qgraph
+  }
 }

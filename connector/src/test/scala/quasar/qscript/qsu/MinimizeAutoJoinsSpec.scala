@@ -262,7 +262,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               func.ProjectKey(HoleF, func.Constant(J.str("0"))),
               func.ProjectKey(HoleF, func.Constant(J.str("1")))))
       }
-    }
+    }.pendingUntilFixed
 
     "rewrite filter into cond only to avoid join" in {
       val qgraph = QSUGraph.fromTree[Fix](
@@ -350,7 +350,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               func.ProjectKey(HoleF, func.Constant(J.str("0"))),
               func.ProjectKey(HoleF, func.Constant(J.str("1")))))
       }
-    }
+    }.pendingUntilFixed
 
     "remap coalesced bucket references in dimensions" in {
       val aqsu = QScriptUniform.AnnotatedDsl[Fix, Symbol]
