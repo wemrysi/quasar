@@ -192,10 +192,21 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
                     upperFMReduced = upperFM.map(κ(srcHole))
 
+                    fakeAutoJoinM = exCandidates match {
+                      case left :: right :: _ =>
+                        updateGraph[T, G](QSU.AutoJoin2(left.root, right.root, func.Undefined)) map { back =>
+                          back :++ left
+                        }
+
+                      case _ => ???
+                    }
+
+                    fakeAutoJoin <- fakeAutoJoinM.liftM[OptionT]
+
                     singleSource <-
                       OptionT(
                         coalesceToMap[G](
-                          exCandidates.head,    // try to collapse everything to the left
+                          fakeAutoJoin,
                           exCandidates,
                           upperFM))
 
@@ -211,11 +222,11 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
                         rebuild(
                           simplifiedSource,
-                          normalized).liftM[OptionT]
+                          normalized).liftM[OptionT].map(simplifiedSource ++: _)
                     }
 
                     back <- OptionT(minimizer[G](qgraph, simplifiedSource, candidates2, fm))
-                  } yield back
+                  } yield back.bimap(simplifiedSource ++: _, simplifiedSource ++: _)
 
                   backM.run
                 } else {
