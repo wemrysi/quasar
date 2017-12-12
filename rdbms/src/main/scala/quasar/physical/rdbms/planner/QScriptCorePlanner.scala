@@ -24,7 +24,7 @@ import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
-import quasar.qscript.{FreeMap, MapFunc, QScriptCore, QScriptTotal}
+import quasar.qscript.{FreeMap, FreeQS, MapFunc, QScriptCore, QScriptTotal}
 
 import matryoshka._
 import matryoshka.data._
@@ -40,12 +40,21 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
 
   def * : T[SqlExpr] = AllCols[T[SqlExpr]]().embed
 
-  def processFreeMap(f: FreeMap[T],
+  private def processFreeMap(f: FreeMap[T],
                      alias: SqlExpr[T[SqlExpr]]): F[T[SqlExpr]] =
     f.cataM(interpretM(κ(alias.embed.η[F]), mapFuncPlanner.plan))
 
   private def unsupported: F[T[SqlExpr]] = PlannerErrorME[F].raiseError(
         InternalError.fromMsg(s"unsupported QScriptCore"))
+
+  private def take(src: T[SqlExpr], from: FreeQS[T], count: FreeQS[T]): F[T[SqlExpr]] = {
+    val compile = Planner[T, F, QScriptTotal[T, ?]].plan
+
+    val fromExp: F[T[SqlExpr]] = from.cataM(interpretM(κ(src.point[F]), compile))
+    val countExp: F[T[SqlExpr]] = count.cataM(interpretM(κ(src.point[F]), compile))
+
+    (fromExp |@| countExp)(Limit(_, _).embed)
+  }
 
   val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
 
@@ -91,15 +100,8 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         }
     case qscript.Subset(src, from, sel, count) => sel match {
       case qscript.Drop   => unsupported
-      case qscript.Take   =>
-        val compile = Planner[T, F, QScriptTotal[T, ?]].plan
-
-        val fromExp: F[T[SqlExpr]] = from.cataM(interpretM(κ(src.point[F]), compile))
-        val countExp: F[T[SqlExpr]] = count.cataM(interpretM(κ(src.point[F]), compile))
-
-        (fromExp |@| countExp)(Limit(_, _).embed)
-
-      case qscript.Sample => unsupported
+      case qscript.Take   => take(src, from, count)
+      case qscript.Sample => take(src, from, count) // TODO needs better sampling (which connectore doesnt?)
     }
 
     case qscript.Unreferenced() => unref.point[F]
