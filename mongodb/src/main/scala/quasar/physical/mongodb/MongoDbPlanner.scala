@@ -868,6 +868,7 @@ object MongoDbPlanner {
     implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT: ShowT]:
         Planner.Aux[T, QScriptCore[T, ?]] =
       new Planner[QScriptCore[T, ?]] {
+        import MapFuncsCore._
         type IT[G[_]] = T[G]
 
         @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -885,29 +886,66 @@ object MongoDbPlanner {
             getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, f)
           case LeftShift(src, struct, id, repair) =>
             if (repair.contains(LeftSideF))
-              (handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct) ⊛
-                getJsMerge[T, M](
-                  repair,
-                  jscore.Select(jscore.Ident(JsFn.defaultName), "s"),
-                  jscore.Select(jscore.Ident(JsFn.defaultName), "f")))((expr, j) =>
-              ExprBuilder(
-                FlatteningBuilder(
-                  DocBuilder(
-                    src,
-                    ListMap(
-                      BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                      BsonField.Name("f") -> expr)),
-                  // TODO: Handle arrays properly
-                  Set(StructureType.Object(DocField(BsonField.Name("f")), id))),
-                -\&/(j)))
+              struct match {
+                case Embed(CoEnv(\/-(MFC(Guard(exp, Type.FlexArr(_, _, _), exp0, _))))) if exp0 === exp => {
+                  val struct0 = handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct)
+                  val merge = getExprMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(repair, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
+
+                  (struct0 |@| merge)((expr, merge0) =>
+                    ExprBuilder(
+                      FlatteningBuilder(
+                        DocBuilder(
+                          src,
+                          ListMap(
+                            BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                            BsonField.Name("f") -> expr)),
+                        Set(StructureType.Array(DocField(BsonField.Name("f")), id))), \&/-(merge0)))
+                }
+                case _ =>
+                  (handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct) ⊛
+                    getJsMerge[T, M](
+                      repair,
+                      jscore.Select(jscore.Ident(JsFn.defaultName), "s"),
+                      jscore.Select(jscore.Ident(JsFn.defaultName), "f")))((expr, j) =>
+                    ExprBuilder(
+                      FlatteningBuilder(
+                        DocBuilder(
+                          src,
+                          ListMap(
+                            BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                            BsonField.Name("f") -> expr)),
+                        // TODO: Handle arrays properly
+                        Set(StructureType.Object(DocField(BsonField.Name("f")), id))),
+                      -\&/(j)))
+              }
             else
-              getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
-                getExprBuilder[T, M, WF, EX](
-                  cfg.funcHandler, cfg.staticHandler)(
-                  FlatteningBuilder(
-                    builder,
-                    Set(StructureType.Object(DocVar.ROOT(), id))),
-                    repair.as(SrcHole)))
+              (src.unFix, struct) match {
+                case (ExprBuilderF(Embed(FlatteningBuilderF(_, _)), _), _) =>
+                  getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
+                    getExprBuilder[T, M, WF, EX](
+                      cfg.funcHandler, cfg.staticHandler)(
+                      FlatteningBuilder(
+                        builder,
+                        Set(StructureType.Array(DocVar.ROOT(), id))),
+                        repair.as(SrcHole)))
+                case (_, Embed(CoEnv(\/-(MFC(Guard(exp, Type.FlexArr(_, _, _), exp0, _)))))) if exp === exp0 =>
+                  getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
+                    getExprBuilder[T, M, WF, EX](
+                      cfg.funcHandler, cfg.staticHandler)(
+                      FlatteningBuilder(
+                        builder,
+                        Set(StructureType.Array(DocVar.ROOT(), id))),
+                        repair.as(SrcHole)))
+                case _ =>
+                  getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
+                    getExprBuilder[T, M, WF, EX](
+                      cfg.funcHandler, cfg.staticHandler)(
+                      FlatteningBuilder(
+                        builder,
+                        Set(StructureType.Object(DocVar.ROOT(), id))),
+                        repair.as(SrcHole)))
+            }
+
           case Reduce(src, bucket, reducers, repair) =>
             (bucket.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _)) ⊛
               reducers.traverse(_.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _))))((b, red) => {
@@ -1125,6 +1163,17 @@ object MongoDbPlanner {
       case LeftSide => a1
       case RightSide => a2
     } ∘ (JsFn(JsFn.defaultName, _))
+
+  def getExprMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR, EX[_]: Traverse]
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], staticHandler: StaticHandler[T, EX])
+    (jf: JoinFunc[T], a1: DocVar, a2: DocVar)
+    (implicit inj: EX :<: ExprOp)
+      : M[Fix[ExprOp]] =
+    processMapFuncExpr[T, M, EX, JoinSide](funcHandler, staticHandler)(
+      jf) {
+      case LeftSide => $var(a1)
+      case RightSide => $var(a2)
+    }
 
   def exprOrJs[M[_]: Applicative: MonadFsErr, A]
     (a: A)
