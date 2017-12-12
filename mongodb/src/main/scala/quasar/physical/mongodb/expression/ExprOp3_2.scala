@@ -198,3 +198,18 @@ object $arrayLitF {
       case ExprOp3_2F.$arrayLitF(value) => value
     }
 }
+
+object $arrayElemAtF {
+  def apply[EX[_], A](array: A, idx: A)(implicit I: ExprOp3_2F :<: EX): EX[A] =
+    I.inj(ExprOp3_2F.$arrayElemAtF(array, idx))
+
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOp3_2F :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
+      case ExprOp3_2F.$arrayElemAtF(array, idx) => (array, idx)
+    }
+}
+
+object $arrayElemAt {
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOp3_2F :<: EX): Option[(T, T)] =
+    $arrayElemAtF.unapply(T.project(expr))
+}

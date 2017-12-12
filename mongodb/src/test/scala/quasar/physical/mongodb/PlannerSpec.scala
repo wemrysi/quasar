@@ -124,7 +124,7 @@ class PlannerSpec extends
 
     "sort wildcard on expression" in {
       plan(sqlE"select * from zips order by pop/10 desc") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, SimpleMapOp, SortOp, ProjectOp)))
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, SimpleMapOp, ProjectOp, SortOp, ProjectOp)))
     }
 
     "sort with expression and alias" in {
