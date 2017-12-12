@@ -31,7 +31,7 @@ import slamdata.Predef._
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix
 import pathy.Path._
-import scalaz._, Scalaz._
+import scalaz._
 
 class PlannerQScriptSpec extends
     PlannerHelpers with
@@ -402,26 +402,80 @@ class PlannerQScriptSpec extends
           $project(reshape(sigil.Quasar -> $field("src")))))
     }
 
-    "plan left shift with reference to LeftSide" in {
-      val rt = RenderTree[Crystallized[WorkflowF]]
+    "plan double LeftShift without reference to LeftSide" in {
+      qplan(
+        fix.LeftShift(
+          fix.LeftShift(
+            fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
+            func.Guard(
+              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              Type.FlexArr(0, None, Type.FlexArr(0, None, Type.Top)),
+              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              func.Undefined),
+            qscript.ExcludeId,
+            func.Guard(func.RightSide,
+              Type.FlexArr(0, None, Type.Top),
+              func.RightSide,
+              func.Undefined)),
+          func.Hole,
+          qscript.ExcludeId,
+          func.RightSide)) must beWorkflow0(
+        chain[Workflow](
+          $read(collection("db", "zips")),
+          $project(reshape(
+            "0" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Arr()), $field("loc")),
+                  $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $field("loc"),
+                $literal(Bson.Undefined)))),
+          $unwind(DocField("0")),
+          $project(reshape(
+            "0" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Arr()), $field("0")),
+                  $lt($field("0"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $field("0"),
+                $literal(Bson.Undefined)))),
+          $unwind(DocField("0")),
+          $project(reshape(
+            sigil.Quasar -> $field("0")))))
+    }
 
-      val plan = qplan(fix.LeftShift(
-        fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-        func.Guard(
-          func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
-          Type.FlexArr(0, None, Type.Top),
-          func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
-          func.Undefined),
-        qscript.ExcludeId,
-        func.ConcatMaps(
-          func.MakeMap(func.Constant(json.str("city")),
-            func.ProjectKey(func.LeftSide, func.Constant(json.str("city")))),
-          func.MakeMap(
-            func.Constant(json.str("loc")), func.RightSide))))
-
-      println(plan.map(p => rt.render(p).shows))
-
-      1 must_== 1
+    "plan LeftShift with reference to LeftSide" in {
+      qplan(
+        fix.LeftShift(
+          fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
+          func.Guard(
+            func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+            Type.FlexArr(0, None, Type.Top),
+            func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+            func.Undefined),
+          qscript.ExcludeId,
+          func.ConcatMaps(
+            func.MakeMap(func.Constant(json.str("city")),
+              func.ProjectKey(func.LeftSide, func.Constant(json.str("city")))),
+            func.MakeMap(
+              func.Constant(json.str("loc")), func.RightSide)))) must beWorkflow0(
+        chain[Workflow](
+          $read(collection("db", "zips")),
+          $project(reshape(
+            "s" -> $$ROOT,
+            "f" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Arr()), $field("loc")),
+                  $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $field("loc"),
+                $literal(Bson.Undefined)))),
+          $unwind(DocField("f")),
+          $project(reshape(
+            sigil.Quasar -> $objectLit(
+              ListMap(
+                BsonField.Name("city") -> $field("s", "city"),
+                BsonField.Name("loc") -> $field("f")))))))
     }
   }
 }
