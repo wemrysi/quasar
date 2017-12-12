@@ -17,6 +17,7 @@
 package quasar.contrib
 
 import quasar.ejson
+import quasar.RenderTree
 
 import scala.collection.immutable.ListMap
 
@@ -56,4 +57,6 @@ package object argonaut {
           case OJ(ejson.Obj(o))  => jObject(JsonObject.fromTraversableOnce(o))
         }
     }
+
+  implicit def jsonRenderTree: RenderTree[Json] = RenderTree.recursive[Json, ejson.Json]
 }

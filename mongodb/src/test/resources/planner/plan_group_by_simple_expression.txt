@@ -2,18 +2,6 @@ Chain
 ├─ $FoldLeftF
 │  ├─ Chain
 │  │  ├─ $ReadF(db; extraSmallZips)
-│  │  ├─ $ProjectF
-│  │  │  ├─ Name("city" -> {
-│  │  │  │       "$cond": [
-│  │  │  │         {
-│  │  │  │           "$and": [
-│  │  │  │             { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │  │  │             { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│  │  │  │         },
-│  │  │  │         "$city",
-│  │  │  │         { "$literal": undefined }]
-│  │  │  │     })
-│  │  │  ╰─ ExcludeId
 │  │  ├─ $MatchF
 │  │  │  ╰─ Doc
 │  │  │     ╰─ Expr($city -> Type(Text))
@@ -28,7 +16,8 @@ Chain
 │  │  │  │         { "$literal": true },
 │  │  │  │         { "$literal": false }]
 │  │  │  │     })
-│  │  │  ├─ Name("src" -> "$$ROOT")
+│  │  │  ├─ Name("src")
+│  │  │  │  ╰─ Name("city" -> "$city")
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $MatchF
 │  │  │  ╰─ Doc
@@ -54,45 +43,10 @@ Chain
 │     │  │            "$cond": [
 │     │  │              {
 │     │  │                "$and": [
-│     │  │                  {
-│     │  │                    "$lt": [
-│     │  │                      { "$literal": null },
-│     │  │                      {
-│     │  │                        "$cond": [
-│     │  │                          {
-│     │  │                            "$and": [
-│     │  │                              { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │  │                              { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │  │                          },
-│     │  │                          "$pop",
-│     │  │                          { "$literal": undefined }]
-│     │  │                      }]
-│     │  │                  },
-│     │  │                  {
-│     │  │                    "$lt": [
-│     │  │                      {
-│     │  │                        "$cond": [
-│     │  │                          {
-│     │  │                            "$and": [
-│     │  │                              { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │  │                              { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │  │                          },
-│     │  │                          "$pop",
-│     │  │                          { "$literal": undefined }]
-│     │  │                      },
-│     │  │                      { "$literal": "" }]
-│     │  │                  }]
+│     │  │                  { "$lt": [{ "$literal": null }, "$pop"] },
+│     │  │                  { "$lt": ["$pop", { "$literal": "" }] }]
 │     │  │              },
-│     │  │              {
-│     │  │                "$cond": [
-│     │  │                  {
-│     │  │                    "$and": [
-│     │  │                      { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │  │                      { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │  │                  },
-│     │  │                  "$pop",
-│     │  │                  { "$literal": undefined }]
-│     │  │              },
+│     │  │              "$pop",
 │     │  │              { "$literal": undefined }]
 │     │  │          }
 │     │  │        })
@@ -101,45 +55,10 @@ Chain
 │     │             "$cond": [
 │     │               {
 │     │                 "$and": [
-│     │                   {
-│     │                     "$lte": [
-│     │                       { "$literal": "" },
-│     │                       {
-│     │                         "$cond": [
-│     │                           {
-│     │                             "$and": [
-│     │                               { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │                               { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │                           },
-│     │                           "$city",
-│     │                           { "$literal": undefined }]
-│     │                       }]
-│     │                   },
-│     │                   {
-│     │                     "$lt": [
-│     │                       {
-│     │                         "$cond": [
-│     │                           {
-│     │                             "$and": [
-│     │                               { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │                               { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │                           },
-│     │                           "$city",
-│     │                           { "$literal": undefined }]
-│     │                       },
-│     │                       { "$literal": {  } }]
-│     │                   }]
+│     │                   { "$lte": [{ "$literal": "" }, "$city"] },
+│     │                   { "$lt": ["$city", { "$literal": {  } }] }]
 │     │               },
-│     │               {
-│     │                 "$cond": [
-│     │                   {
-│     │                     "$and": [
-│     │                       { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │                       { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │                   },
-│     │                   { "$toLower": "$city" },
-│     │                   { "$literal": undefined }]
-│     │               },
+│     │               { "$toLower": "$city" },
 │     │               { "$literal": undefined }]
 │     │           })
 │     ├─ $ProjectF
