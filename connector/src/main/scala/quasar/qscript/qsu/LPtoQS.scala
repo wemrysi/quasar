@@ -17,7 +17,7 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef._
-import quasar.NameGenerator
+import quasar.{NameGenerator, RenderTreeT}
 import quasar.Planner.PlannerErrorME
 import quasar.frontend.logicalplan.LogicalPlan
 
@@ -26,7 +26,7 @@ import scalaz.{Applicative, Functor, Kleisli => K, Monad}
 import scalaz.syntax.applicative._
 import scalaz.syntax.show._
 
-final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
+final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends QSUTTypes[T] {
   import LPtoQS.MapSyntax
   import ApplyProvenance.AuthenticatedQSU
 
@@ -80,7 +80,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
 }
 
 object LPtoQS {
-  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT]: LPtoQS[T] = new LPtoQS[T]
+  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: LPtoQS[T] = new LPtoQS[T]
 
   final implicit class MapSyntax[F[_], A](val self: F[A]) extends AnyVal {
     def >-[B](f: A => B)(implicit F: Functor[F]): F[B] =

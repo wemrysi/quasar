@@ -17,7 +17,7 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef.{Map => SMap, _}
-import quasar.{NameGenerator, Planner}, Planner.PlannerErrorME
+import quasar.{NameGenerator, Planner, RenderTreeT}, Planner.PlannerErrorME
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.{EJson, Fixed}
@@ -36,12 +36,13 @@ import quasar.qscript.{
 }
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
+import quasar.qscript.rewrites.NormalizableT
 
-import matryoshka.{delayEqual, BirecursiveT, EqualT}
+import matryoshka.{delayEqual, BirecursiveT, EqualT, ShowT}
 import matryoshka.data.free._
 import scalaz.{Bind, Equal, Monad, OptionT, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
 
-final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSUTTypes[T] {
+final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] private () extends QSUTTypes[T] {
   import MinimizeAutoJoins._
   import QSUGraph.Extractors._
 
@@ -54,6 +55,8 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
 
   private val J = Fixed[T[EJson]]
   private val QP = QProv[T]
+
+  private val N = new NormalizableT[T]
 
   // needed to avoid bug in implicit search!  don't import QP.prov._
   private implicit val QPEq: Equal[QP.P] =
@@ -201,24 +204,14 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
                       case _ => (singleSource, func.Hole)
                     }
 
-                    // this is mostly to get nicer graphs with less redundant structure
-                    // it's a fast-path to see if we happened to get a trivial coalesce
-                    // on our parent structure. if we did, then we can bypass the maps.
-                    // if we didn't have this check, we would do something like
-                    // ProjectKeyS(ConcatMaps(MakeMapS(Hole, "0"), ...), "0"),
-                    // which is dumb
-                    isReduced = simplifiedFM === upperFMReduced
-
                     candidates2 <- exRebuilds.zipWithIndex traverse {
                       case (rebuild, i) =>
-                        val rebuiltFM = if (isReduced)
-                          func.Hole
-                        else
-                          func.ProjectKeyS(simplifiedFM, i.toString)
+                        val rebuiltFM = func.ProjectKeyS(simplifiedFM, i.toString)
+                        val normalized = N.freeMF(rebuiltFM)
 
                         rebuild(
                           simplifiedSource,
-                          rebuiltFM).liftM[OptionT]
+                          normalized).liftM[OptionT]
                     }
 
                     back <- OptionT(minimizer[G](qgraph, simplifiedSource, candidates2, fm))
@@ -298,7 +291,7 @@ object MinimizeAutoJoins {
   final case class MinimizationState[T[_[_]]](dims: QSUDims[T], failed: Set[Symbol])
 
   def apply[
-      T[_[_]]: BirecursiveT: EqualT,
+      T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: Monad: NameGenerator: PlannerErrorME]
       (agraph: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] =
