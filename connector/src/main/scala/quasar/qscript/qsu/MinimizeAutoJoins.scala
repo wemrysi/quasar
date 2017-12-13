@@ -31,6 +31,7 @@ import quasar.qscript.{
   HoleF,
   LeftSide,
   LeftSide3,
+  LeftSideF,
   ReduceIndex,
   RightSide,
   RightSide3,
@@ -41,7 +42,7 @@ import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
 import matryoshka.{delayEqual, BirecursiveT, EqualT}
 import matryoshka.data.free._
-import scalaz.{Equal, Free, Monad, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
+import scalaz.{Bind, Equal, Free, Monad, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
 
 final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSUTTypes[T] {
   import QSUGraph.Extractors._
@@ -159,13 +160,25 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
           coalesceToMap[G](qgraph, candidates, fm)
 
         case None =>
-          val reducerAttempt = candidates collect {
+          lazy val reducerAttempt = candidates collect {
             case g @ QSReduce(source, buckets, reducers, repair) =>
               (source, buckets, reducers, repair)
           }
 
           // candidates.forall(_ ~= QSReduce)
-          if (reducerAttempt.lengthCompare(candidates.length) === 0) {
+          lazy val reducerCheck = reducerAttempt.lengthCompare(candidates.length) === 0
+
+          lazy val leftShift12Extract: Option[(QSU.LeftShift[T, QSUGraph], Boolean)] = candidates match {
+            case (ls @ LeftShift(src1, struct, idStatus, repair, rot)) :: src2 :: Nil if src1.root === src2.root =>
+              Some((QSU.LeftShift(src1, struct, idStatus, repair, rot), true))
+
+            case src2 :: (ls @ LeftShift(src1, struct, idStatus, repair, rot)) :: Nil if src1.root === src2.root =>
+              Some((QSU.LeftShift(src1, struct, idStatus, repair, rot), false))
+
+            case _ => None
+          }
+
+          if (reducerCheck) {
             for {
               // apply coalescence recursively to our sources
               extended <- reducerAttempt traverse {
@@ -253,28 +266,35 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
                   red <- updateGraph[G](redPat)
                   back = qgraph.overwriteAtRoot(QSU.Map[T, Symbol](red.root, adjustedFM)) :++ red
 
-                  _ <- MonadState_[G, MinimizationState] modify { state =>
-                    val dims2 = state.dims map {
-                      case (key, value) =>
-                        val value2 = candidates.foldLeft(value) { (value, c) =>
-                          if (c.root =/= red.root)
-                            QP.rename(c.root, red.root, value)
-                          else
-                            value
-                        }
-
-                        key -> value2
-                    }
-
-                    state.copy(dims = dims2)
-                  }
+                  _ <- updateForCoalesce[G](candidates, red.root)
                 } yield back
               } else {
                 failure[G](qgraph)
               }
             } yield back
           } else {
-            failure[G](qgraph)
+            leftShift12Extract match {
+              case Some((QSU.LeftShift(src, struct, idStatus, repair, rot), leftToRight)) =>
+                val fm2 = if (leftToRight)
+                  fm
+                else
+                  fm.map(1 - _)   // we know the domain is {0, 1}, so we invert the indices
+
+                val repair2 = fm2 flatMap {
+                  case 0 => repair
+                  case 1 => LeftSideF[T]
+                }
+
+
+                for {
+                  back <- qgraph.overwriteAtRoot(
+                    QSU.LeftShift[T, Symbol](src.root, struct, idStatus, repair2, rot)).point[G]
+
+                  _ <- updateForCoalesce[G](candidates, qgraph.root)
+                } yield back
+              case None =>
+                failure[G](qgraph)
+            }
           }
       }
   }
@@ -288,6 +308,27 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
     }
 
     change.map(_ => graph)
+  }
+
+  private def updateForCoalesce[G[_]: Bind: MonadState_[?[_], MinimizationState]](
+      candidates: List[QSUGraph],
+      newRoot: Symbol): G[Unit] = {
+
+    MonadState_[G, MinimizationState] modify { state =>
+      val dims2 = state.dims map {
+        case (key, value) =>
+          val value2 = candidates.foldLeft(value) { (value, c) =>
+            if (c.root =/= newRoot)
+              QP.rename(c.root, newRoot, value)
+            else
+              value
+          }
+
+          key -> value2
+      }
+
+      state.copy(dims = dims2)
+    }
   }
 
   // we return a remap function along with a minimized list
