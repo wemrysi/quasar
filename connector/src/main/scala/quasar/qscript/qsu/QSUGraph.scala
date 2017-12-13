@@ -216,7 +216,7 @@ final case class QSUGraph[T[_[_]]](
   }
 
   def rewrite(pf: PartialFunction[QSUGraph[T], QSUGraph[T]]): QSUGraph[T] =
-    rewriteM(pf.andThen(_.point[Id]))
+    rewriteM[Id](pf)
 
   // projects the root of the graph (which we assume exists)
   def unfold: QScriptUniform[T, QSUGraph[T]] =
@@ -426,6 +426,13 @@ object QSUGraph extends QSUGraphInstances {
     object LeftShift {
       def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
         case g: QSU.LeftShift[T, QSUGraph[T]] => QSU.LeftShift.unapply(g)
+        case _ => None
+      }
+    }
+
+    object MultiLeftShift {
+      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
+        case g: QSU.MultiLeftShift[T, QSUGraph[T]] => QSU.MultiLeftShift.unapply(g)
         case _ => None
       }
     }

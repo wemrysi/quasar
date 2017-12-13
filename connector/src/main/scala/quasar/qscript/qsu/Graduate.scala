@@ -29,6 +29,9 @@ import quasar.qscript.{
   Filter,
   Hole,
   HoleF,
+  JoinSide,
+  LeftSide,
+  RightSide,
   LeftShift,
   Map,
   QCE,
@@ -47,13 +50,14 @@ import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.QSUGraph.QSUPattern
 import quasar.qscript.qsu.ReifyIdentities.ResearchedQSU
 
-import matryoshka.{Corecursive, CorecursiveT, CoalgebraM, Recursive}
-import matryoshka.data.free._
+import matryoshka.{Corecursive, CorecursiveT, CoalgebraM, Recursive, ShowT}
+//import matryoshka.data.free._
+import matryoshka.data._
 import matryoshka.patterns.CoEnv
-import scalaz.{~>, -\/, \/-, Const, Inject, Monad, NaturalTransformation, ReaderT}
+import scalaz.{~>, -\/, \/-, \/, Const, Inject, Monad, NaturalTransformation, ReaderT}
 import scalaz.Scalaz._
 
-final class Graduate[T[_[_]]: CorecursiveT] private () extends QSUTTypes[T] {
+final class Graduate[T[_[_]]: CorecursiveT: ShowT] private () extends QSUTTypes[T] {
 
   type QSE[A] = QScriptEducated[A]
 
@@ -149,8 +153,8 @@ final class Graduate[T[_[_]]: CorecursiveT] private () extends QSUTTypes[T] {
       def holeAs(sym: Symbol): Hole => Symbol =
         κ(sym)
 
-      def resolveAccess[A](fa: FreeAccess[A])(f: A => Symbol): F[FreeMapA[A]] =
-        MR.asks(_.resolveAccess(name, fa)(f))
+      def resolveAccess[A, B](fa: FreeMapA[B])(ex: B => Access[A] \/ A)(f: A => Symbol): F[FreeMapA[A]] =
+        MR.asks(_.resolveAccess[A, B](name, fa)(ex, f))
 
       qsu match {
         case QSU.Read(path) =>
@@ -163,15 +167,24 @@ final class Graduate[T[_[_]]: CorecursiveT] private () extends QSUTTypes[T] {
           QCE(Filter[T, QSUGraph](source, fm)).point[F]
 
         case QSU.QSReduce(source, buckets, reducers, repair) =>
-          buckets traverse (resolveAccess(_)(holeAs(source.root))) map { bs =>
+          buckets traverse (resolveAccess(_)(_.left)(holeAs(source.root))) map { bs =>
             QCE(Reduce[T, QSUGraph](source, bs, reducers, repair))
           }
 
         case QSU.LeftShift(source, struct, idStatus, repair, _) =>
-          QCE(LeftShift[T, QSUGraph](source, struct, idStatus, repair)).point[F]
+          for {
+            // Access.value is already resolved, from ReifyIdentities.
+            // this would be nicer with a tri-state Access type.
+            resolvedRepair <-
+              resolveAccess(repair) {
+                case QSU.AccessLeftTarget(access) => access.map[JoinSide](_ => LeftSide).left
+                case QSU.LeftTarget => (LeftSide: JoinSide).right
+                case QSU.RightTarget => (RightSide: JoinSide).right
+              }(κ(source.root))
+          } yield QCE(LeftShift[T, QSUGraph](source, struct, idStatus, resolvedRepair))
 
         case QSU.QSSort(source, buckets, order) =>
-          buckets traverse (resolveAccess(_)(holeAs(source.root))) map { bs =>
+          buckets traverse (resolveAccess(_)(_.left)(holeAs(source.root))) map { bs =>
             QCE(Sort[T, QSUGraph](source, bs, order))
           }
 
@@ -189,7 +202,7 @@ final class Graduate[T[_[_]]: CorecursiveT] private () extends QSUTTypes[T] {
 
         // TODO distinct should be its own node in qscript proper
         case QSU.Distinct(source) =>
-          resolveAccess(HoleF map (Access.value(_)))(holeAs(source.root)) map { fm =>
+          resolveAccess(HoleF map (Access.value(_)))(_.left)(holeAs(source.root)) map { fm =>
             QCE(Reduce[T, QSUGraph](
               source,
               // Bucket by the value
@@ -203,7 +216,7 @@ final class Graduate[T[_[_]]: CorecursiveT] private () extends QSUTTypes[T] {
           QCE(Unreferenced[T, QSUGraph]()).point[F]
 
         case QSU.ThetaJoin(left, right, condition, joinType, combiner) =>
-          val qsCondition = resolveAccess(condition)(_.fold(left.root, right.root))
+          val qsCondition = resolveAccess(condition)(_.left)(_.fold(left.root, right.root))
 
           (mergeSources[F](left, right) |@| qsCondition) { (srcs, cond) =>
             val SrcMerge(source, lBranch, rBranch) = srcs
@@ -255,7 +268,7 @@ final class Graduate[T[_[_]]: CorecursiveT] private () extends QSUTTypes[T] {
 
 object Graduate {
   def apply[
-      T[_[_]]: CorecursiveT,
+      T[_[_]]: CorecursiveT: ShowT,
       F[_]: Monad: PlannerErrorME: NameGenerator]
       (rqsu: ResearchedQSU[T])
       : F[T[QScriptEducated[T, ?]]] =

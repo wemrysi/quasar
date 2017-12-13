@@ -17,14 +17,18 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef.Symbol
-import quasar.fp.symbolOrder
+import quasar.fp._
+import quasar.contrib.matryoshka._
 import quasar.qscript.{FreeMap, FreeMapA}
 
-import scalaz.{IMap, ISet, Monoid}
+import scalaz.{\/, Cord, IMap, ISet, Monoid, Show}
 import scalaz.std.option._
 import scalaz.syntax.applicative._
 import scalaz.syntax.semigroup._
 import scalaz.syntax.std.option._
+import scalaz.syntax.show._
+import matryoshka.{Hole => _, _}
+import matryoshka.data._
 
 final case class References[T[_[_]]](
     accessing: References.Accessing[T],
@@ -57,11 +61,16 @@ final case class References[T[_[_]]](
 
   // Resolves all `Access` made by `by` in the given `FreeAccess`, resulting in
   // a `FreeMap`.
-  def resolveAccess[A](by: Symbol, in: FreeAccess[T, A])(f: A => Symbol): FreeMapA[T, A] =
-    accessing.lookup(by).fold(in.map(Access.src.get(_))) { accesses =>
-      in flatMap { access =>
-        val a = Access.src.get(access)
-        accesses.lookup(access.symbolic(f)).cata(_.as(a), a.point[FreeMapA[T, ?]])
+  def resolveAccess[A, B](by: Symbol, in: FreeMapA[T, B])(ex: B => Access[A] \/ A, f: A => Symbol): FreeMapA[T, A] =
+    accessing.lookup(by).fold(in.map(b => ex(b).fold(Access.src.get(_), a => a))) { accesses =>
+      in flatMap { b =>
+        ex(b).fold({
+          access =>
+            val a = Access.src.get(access)
+            accesses.lookup(access.symbolic(f)).cata(_.as(a), a.point[FreeMapA[T, ?]])
+        }, {
+          _.point[FreeMapA[T, ?]]
+        })
       }
     }
 }
@@ -83,4 +92,13 @@ object References {
         x.accessing.unionWith(y.accessing)(_ union _),
         x.accessed |+| y.accessed),
       noRefs)
+
+  implicit def showReferences[T[_[_]]: ShowT]: Show[References[T]] =
+    Show.show { case References(accessing, accessed) =>
+      Cord("References: {\n") ++
+      accessing.show ++
+      Cord("\n\n") ++
+      accessed.show ++
+      Cord("\n}")
+    }
 }

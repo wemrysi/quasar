@@ -23,6 +23,7 @@ import quasar.Planner.PlannerError
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp.coproductEqual
 import quasar.qscript.{construction, ExcludeId, Hole, ReduceFuncs}
+import quasar.qscript.qsu.QScriptUniform.Rotation
 
 import matryoshka.delayEqual
 import matryoshka.data.Fix
@@ -63,7 +64,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       reifyBuckets(tree) must beLike {
         case \/-(QSReduce(
-            LeftShift(Read(_), _, ExcludeId, _, _),
+            LeftShift(Read(_), _, ExcludeId, _, Rotation.ShiftMap),
             List(b),
             List(ReduceFuncs.Sum(r)),
             _)) =>
@@ -88,7 +89,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       reifyBuckets(tree) must beLike {
         case \/-(
           QSReduce(
-            Map(LeftShift(Read(_), _, ExcludeId, _, _), fm),
+            Map(LeftShift(Read(_), _, ExcludeId, _, Rotation.ShiftMap), fm),
             Nil,
             List(ReduceFuncs.Sum(r)),
             _)) =>
@@ -118,7 +119,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       reifyBuckets(tree) must beLike {
         case \/-(
           QSReduce(
-            Map(LeftShift(Read(_), _, ExcludeId, _, _), fm),
+            Map(LeftShift(Read(_), _, ExcludeId, _, Rotation.ShiftMap), fm),
             List(b),
             List(ReduceFuncs.Sum(r)),
             _)) =>

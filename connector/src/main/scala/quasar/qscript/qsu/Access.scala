@@ -18,6 +18,7 @@ package quasar.qscript.qsu
 
 import slamdata.Predef._
 import quasar.RenderTree
+import quasar.qscript.{Hole, JoinSide}
 import quasar.fp.symbolOrder
 
 import monocle.{PLens, Prism, Traversal}
@@ -36,8 +37,8 @@ sealed abstract class Access[A] {
   def symbolic(value: A => Symbol): Access[Symbol] =
     this match {
       case Access.Bucket(s, i, _) => Access.bucket(s, i, s)
-      case Access.Identity(s, _)  => Access.identity(s, s)
-      case Access.Value(a)        => Access.value(value(a))
+      case Access.Identity(s, _)  => Access.identitySymbol(s, s)
+      case Access.Value(a)        => Access.valueSymbol(value(a))
     }
 }
 
@@ -55,6 +56,10 @@ object Access extends AccessInstances {
     Prism.partial[Access[A], (Symbol, A)] {
       case Identity(s, a) => (s, a)
     } { case (s, a) => Identity(s, a) }
+
+  def identityHole: Prism[Access[Hole], (Symbol, Hole)] = identity[Hole]
+  def identitySymbol: Prism[Access[Symbol], (Symbol, Symbol)] = identity[Symbol]
+  def identityJoinSide: Prism[Access[JoinSide], (Symbol, JoinSide)] = identity[JoinSide]
 
   def src[A, B]: PLens[Access[A], Access[B], A, B] =
     PLens[Access[A], Access[B], A, B] {
@@ -80,7 +85,11 @@ object Access extends AccessInstances {
   def value[A]: Prism[Access[A], A] =
     Prism.partial[Access[A], A] {
       case Value(a) => a
-    } (Value(_))
+    }(Value(_))
+
+  def valueHole: Prism[Access[Hole], Hole] = value[Hole]
+  def valueSymbol: Prism[Access[Symbol], Symbol] = value[Symbol]
+  def valueJoinSide: Prism[Access[JoinSide], JoinSide] = value[JoinSide]
 }
 
 sealed abstract class AccessInstances extends AccessInstances0 {

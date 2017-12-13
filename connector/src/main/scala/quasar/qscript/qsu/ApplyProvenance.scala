@@ -24,14 +24,14 @@ import quasar.ejson
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.qscript.{ExcludeId, HoleF, IdOnly, IdStatus, RightSideF}
+import quasar.qscript.{construction, ExcludeId, HoleF, IdOnly, IdStatus}
 import quasar.qscript.provenance._
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data.free._
 import matryoshka.implicits._
 import pathy.Path
-import scalaz.{DList, Free, IList, Monad, Show, StateT, WriterT}
+import scalaz.{Cord, DList, Free, IList, Monad, Show, StateT, WriterT}
 import scalaz.syntax.foldable1._
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
@@ -54,6 +54,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] private () {
   def RenameT[F[_]](implicit ev: RenameT[F]): RenameT[F] = ev
 
   val dims = QProv[T]
+  val func = construction.Func[T]
 
   def apply[F[_]: Monad: PlannerErrorME](graph: QSUGraph[T]): F[AuthenticatedQSU[T]] = {
     type X[A] = WriterT[StateT[F, QSUGraph[T], ?], DList[(Symbol, Symbol)], A]
@@ -76,11 +77,11 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] private () {
         _ <- RenameT[F].tell(DList(deId -> srcId))
       } yield (srcId, qdims + (srcId -> updDims))
 
-    case ((_, tdims), GPF(tid, Transpose((srcId, srcDims), retain, rot))) =>
+    case ((_, tdims), GPF(tid, Transpose((srcId, srcDims), retain, rotations))) =>
       GStateM[F].modify(
         QSUGraph.vertices.modify(_.updated(
           tid,
-          LeftShift(srcId, HoleF, retain.fold[IdStatus](IdOnly, ExcludeId), RightSideF, rot))))
+          LeftShift(srcId, HoleF, retain.fold[IdStatus](IdOnly, ExcludeId), func.RightTarget, rotations))))
         .as((tid, srcDims + (tid -> tdims)))
 
     case ((_, nodeDims), GPF(nodeId, node)) =>
@@ -97,7 +98,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] private () {
         case DimEdit((_, src), DTrans.Squash()) => dims.squash(src).point[F]
 
         case DimEdit((name, src), DTrans.Group(k)) =>
-          dims.swap(0, 1, dims.lshift(k as Access.value(name), src)).point[F]
+          dims.swap(0, 1, dims.lshift(k as Access.valueSymbol(name), src)).point[F]
 
         case Distinct((_, src)) => src.point[F]
 
@@ -105,14 +106,23 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] private () {
 
         case JoinSideRef(_) => unexpectedError("JoinSideRef", root)
 
+        case LPFilter(_, _) => unexpectedError("LPFilter", root)
+
         case LeftShift((_, src), _, _, _, rot) =>
-          val tid: dims.I = Free.pure(Access.identity(root, root))
+          val tid: dims.I = Free.pure(Access.identitySymbol((root, root)))
           (rot match {
             case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, src)
             case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, src)
           }).point[F]
 
-        case LPFilter(_, _) => unexpectedError("LPFilter", root)
+        case MultiLeftShift((_, src), shifts, _) =>
+          val tid: dims.I = Free.pure(Access.identitySymbol((root, root)))
+          shifts.foldRight(src) {
+            case (shift, prv) => shift._3 match {
+              case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, prv)
+              case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, prv)
+            }
+          }.point[F]
 
         case LPJoin(_, _, _, _, _, _) => unexpectedError("LPJoin", root)
 
@@ -137,7 +147,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] private () {
         case ThetaJoin((_, left), (_, right), _, _, _) => dims.join(left, right).point[F]
 
         case Transpose((_, src), _, rot) =>
-          val tid: dims.I = Free.pure(Access.identity(root, root))
+          val tid: dims.I = Free.pure(Access.identitySymbol((root, root)))
           (rot match {
             case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, src)
             case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, src)
@@ -185,12 +195,12 @@ object ApplyProvenance {
 
   object AuthenticatedQSU {
     implicit def show[T[_[_]]: ShowT]: Show[AuthenticatedQSU[T]] =
-      Show.shows { case AuthenticatedQSU(g, d) =>
-        s"AuthenticatedQSU {\n" +
-        g.shows +
-        "\n\n" +
-        QSUDims.show[T].shows(d) +
-        "\n}"
+      Show.show { case AuthenticatedQSU(g, d) =>
+        Cord("AuthenticatedQSU {\n") ++
+        g.show ++
+        Cord("\n\n") ++
+        QSUDims.show[T].show(d) ++
+        Cord("\n}")
       }
   }
 }

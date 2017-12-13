@@ -22,55 +22,63 @@ import quasar.Planner.PlannerErrorME
 import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka.{delayShow, showTShow, BirecursiveT, EqualT, ShowT}
-import scalaz.{Applicative, Functor, Kleisli => K, Monad}
+import scalaz.{Applicative, Functor, Kleisli => K, Monad, Show}
 import scalaz.syntax.applicative._
-import scalaz.syntax.show._
 
 final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends QSUTTypes[T] {
   import LPtoQS.MapSyntax
   import ApplyProvenance.AuthenticatedQSU
+  import ReifyIdentities.ResearchedQSU
 
   def apply[F[_]: Monad: PlannerErrorME: NameGenerator](lp: T[LogicalPlan])
       : F[T[QScriptEducated]] = {
 
     val lpToQs =
-      K(ReadLP[T, F])               >=>
-      debugG("ReadLP: ")            >==>
-      RewriteGroupByArrays[T, F]    >=>
-      debugG("RewriteGBArrays: ")   >-
-      EliminateUnary[T]             >=>
-      debugG("EliminateUnary: ")    >-
-      RecognizeDistinct[T]          >=>
-      debugG("RecognizeDistinct: ") >==>
-      ExtractFreeMap[T, F]          >=>
-      debugG("ExtractFreeMap: ")    >==>
-      ApplyProvenance[T, F]         >=>
-      debugAG("ApplyProv: ")        >==>
-      ReifyBuckets[T, F]            >=>
-      debugAG("ReifyBuckets: ")     >==>
-      MinimizeAutoJoins[T, F]       >=>
-      debugAG("MinimizeAJ: ")       >==>
-      ReifyAutoJoins[T, F]          >=>
-      debugAG("ReifyAutoJoins: ")   >-
-      (_.graph)                     >==>
-      ReifyIdentities[T, F]         >==>
+      K(ReadLP[T, F])                  >==>
+      debugG("ReadLP: ")               >==>
+      RewriteGroupByArrays[T, F]       >==>
+      debugG("RewriteGBArrays: ")      >-
+      EliminateUnary[T]                >==>
+      debugG("EliminateUnary: ")       >-
+      RecognizeDistinct[T]             >==>
+      debugG("RecognizeDistinct: ")    >==>
+      ExtractFreeMap[T, F]             >==>
+      debugG("ExtractFreeMap: ")       >==>
+      ApplyProvenance[T, F]            >==>
+      debugAG("ApplyProv: ")           >==>
+      ReifyBuckets[T, F]               >==>
+      debugAG("ReifyBuckets: ")        >==>
+      MinimizeAutoJoins[T, F]          >==>
+      debugAG("MinimizeAJ: ")          >==>
+      ReifyAutoJoins[T, F]             >==>
+      debugAG("ReifyAutoJoins: ")      >==>
+      ExpandShifts[T, F]               >==>
+      debugAG("ExpandShifts: ")        >-
+      (_.graph)                        >-
+      ResolveOwnIdentities[T]          >==>
+      debugG("ResolveOwnIdentities: ") >==>
+      ReifyIdentities[T, F]            >==>
+      debugRG("ReifyIdentities: ")     >==>
       Graduate[T, F]
 
     lpToQs(lp)
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  private def debugG[F[_]: Applicative](prefix: String): K[F, QSUGraph, QSUGraph] =
-    K { g =>
-      maybePrint("\n\n" + prefix + g.shows)    // uh... yeah do better
-      g.point[F]
-    }
+  def debugG[F[_]: Applicative](prefix: String): QSUGraph => F[QSUGraph] =
+    debug[F, QSUGraph](prefix)
+  def debugAG[F[_]: Applicative](prefix: String): AuthenticatedQSU[T] => F[AuthenticatedQSU[T]] =
+    debug[F, AuthenticatedQSU[T]](prefix)
+  def debugRG[F[_]: Applicative](prefix: String): ResearchedQSU[T] => F[ResearchedQSU[T]] =
+    debug[F, ResearchedQSU[T]](prefix)
 
-  private def debugAG[F[_]: Applicative](prefix: String): K[F, AuthenticatedQSU[T], AuthenticatedQSU[T]] =
-    K { aqsu =>
-      maybePrint("\n\n" + prefix + aqsu.shows)
-      aqsu.point[F]
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  private def debug[F[_]: Applicative, A: Show](prefix: String)(in: A): F[A] = {
+    // uh... yeah do better
+    in.point[F].map { i =>
+      maybePrint("\n\n" + prefix + Show[A].shows(in))
+      i
     }
+  }
 
   private def maybePrint(str: => String): Unit = {
     // println(str)

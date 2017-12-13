@@ -26,9 +26,7 @@ import quasar.fp.ski.κ
 import quasar.qscript.{
   construction,
   HoleF,
-  JoinSide,
-  LeftSide,
-  RightSide
+  SrcHole
 }
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.rewrites.NormalizableT
@@ -69,8 +67,10 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
         val struct2 = struct.flatMap(κ(fm))
 
         val repair2 = repair flatMap {
-          case LeftSide => fm.map(κ(LeftSide: JoinSide))
-          case RightSide => func.RightSide
+          case QSU.AccessLeftTarget(Access.valueHole(_)) => fm.map[QSU.ShiftTarget](κ(QSU.AccessLeftTarget(Access.valueHole(SrcHole))))
+          case access@QSU.AccessLeftTarget(_) => (access: QSU.ShiftTarget).pure[FreeMapA]
+          case QSU.LeftTarget => scala.sys.error("QSU.LeftTarget in CollapseShifts")
+          case QSU.RightTarget => func.RightTarget
         }
 
         for {
@@ -134,7 +134,7 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
         if (rest.isEmpty) {
           val repair2 = fm2 flatMap {
             case 0 => repair
-            case 1 => func.LeftSide
+            case 1 => func.AccessLeftTarget(Access.valueHole(_))
           }
 
           // TODO I'm pretty sure this messes up dimension names
@@ -145,7 +145,7 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
           }
         } else {
           val repair2 = func.ConcatMaps(
-            func.MakeMapS("original", func.LeftSide),
+            func.MakeMapS("original", func.AccessLeftTarget(Access.valueHole(_))),
             func.MakeMapS("results", repair))
 
           for {
@@ -157,14 +157,16 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
                 val struct2 = struct.flatMap(κ(func.ProjectKeyS(func.Hole, "results")))
 
                 val repair2 = repair flatMap {
-                  case LeftSide => func.ProjectKeyS(func.LeftSide, "results")
-                  case RightSide => func.RightSide
+                  case QSU.AccessLeftTarget(Access.valueHole(_)) =>
+                    func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "results")
+                  case QSU.LeftTarget => scala.sys.error("QSU.LeftTarget in ShiftProjectBelow")
+                  case QSU.RightTarget => func.RightTarget
                 }
 
                 // we use right-biased map concat to our advantage here and overwrite results
                 val repair3 = func.ConcatMaps(
-                  func.LeftSide,
-                  func.MakeMapS("results", func.RightSide))
+                  func.AccessLeftTarget(Access.valueHole(_)),
+                  func.MakeMapS("results", func.RightTarget))
 
                 updateGraph[T, G](QSU.LeftShift[T, Symbol](src.root, struct2, idStatus, repair3, rot)) map { rewritten =>
                   rewritten :++ src

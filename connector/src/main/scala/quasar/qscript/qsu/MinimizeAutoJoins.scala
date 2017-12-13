@@ -48,6 +48,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
   private val Minimizers = List(
     minimizers.MergeReductions[T],
+    minimizers.CollapseShifts[T],
     minimizers.ShiftProjectBelow[T])
 
   private val func = construction.Func[T]

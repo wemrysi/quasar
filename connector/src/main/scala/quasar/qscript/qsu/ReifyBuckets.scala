@@ -47,7 +47,7 @@ object ReifyBuckets {
     val bucketsReified = aqsu.graph rewriteM {
       case g @ LPReduce(source, reduce) =>
         val buckets = prov.buckets(prov.reduce(aqsu.dims(source.root)))
-        val srcs = LF.foldMap(buckets)(a => ISet.fromFoldable(Access.value.getOption(a))).toIList
+        val srcs = LF.foldMap(buckets)(a => ISet.fromFoldable(Access.valueSymbol.getOption(a))).toIList
 
         val discovered: F[(Symbol, FreeMap[T])] =
           srcs.toNel.fold((source.root, HoleF[T]).point[F]) { syms =>

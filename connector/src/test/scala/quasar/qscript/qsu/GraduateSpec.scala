@@ -17,37 +17,22 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef._
-
 import quasar.Qspec
 import quasar.Planner.{InternalError, PlannerError}
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
-import quasar.qscript.construction
-import quasar.qscript.{
-  Hole,
-  HoleF,
-  IncludeId,
-  JoinSide,
-  LeftSideF,
-  MapFuncsCore,
-  MFC,
-  ReduceFunc,
-  ReduceFuncs,
-  ReduceIndex,
-  ReduceIndexF,
-  RightSideF,
-  SrcHole,
-  Take
-}
+import quasar.qscript.{Hole, HoleF, IncludeId, JoinSide, LeftSideF, MFC, MapFuncsCore, ReduceFunc, ReduceFuncs, ReduceIndex, ReduceIndexF, RightSideF, SrcHole, Take, construction}
 import quasar.qscript.MapFuncsCore.IntLit
-
 import matryoshka.EqualT
-import matryoshka.data.Fix, Fix._
-import org.specs2.matcher.{Expectable, Matcher, MatchResult}
-import pathy.Path, Path.{file, Sandboxed}
-import scalaz.{\/, \/-, EitherT, Free, Need, NonEmptyList => NEL, StateT}
+import matryoshka.data.Fix
+import Fix._
+import org.specs2.matcher.{Expectable, MatchResult, Matcher}
+import pathy.Path
+import Path.{Sandboxed, file}
+
+import scalaz.{EitherT, Free, Need, StateT, \/, \/-, NonEmptyList => NEL}
 import scalaz.Scalaz._
 
 object GraduateSpec extends Qspec with QSUTTypes[Fix] {
@@ -113,9 +98,18 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
       "convert LeftShift" in {
         val struct: FreeMap = func.Add(HoleF, IntLit(17))
-        val repair: JoinFunc = func.ConcatArrays(func.MakeArray(LeftSideF), func.MakeArray(RightSideF))
+        val arepair: FreeMapA[QScriptUniform.ShiftTarget] = func.ConcatArrays(
+          func.MakeArray(func.AccessLeftTarget(Access.valueHole(_))),
+          func.ConcatArrays(
+            func.LeftTarget,
+            func.MakeArray(func.RightTarget)))
+        val repair: JoinFunc = func.ConcatArrays(
+          func.MakeArray(func.LeftSide),
+          func.ConcatArrays(
+            func.LeftSide,
+            func.MakeArray(func.RightSide)))
 
-        val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile), struct, IncludeId, repair, Rotation.ShiftArray)
+        val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile), struct, IncludeId, arepair, Rotation.ShiftArray)
         val qscript: Fix[QSE] = qse.LeftShift(qse.Read[AFile](afile), struct, IncludeId, repair)
 
         qgraph must graduateAs(qscript)
@@ -162,8 +156,14 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
     }
 
     "graduate naive `select * from zips`" in {
+      val aconcatArr =
+        func.ConcatArrays(
+          func.MakeArray(func.AccessLeftTarget(Access.valueHole(_))),
+          func.MakeArray(func.RightTarget))
       val concatArr =
-        func.ConcatArrays(func.MakeArray(LeftSideF), func.MakeArray(RightSideF))
+        func.ConcatArrays(
+          func.MakeArray(func.LeftSide),
+          func.MakeArray(func.RightSide))
 
       val projectIdx = func.ProjectIndex(LeftSideF, RightSideF)
 
@@ -174,8 +174,8 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
               qsu.read(root </> file("zips")),
               HoleF[Fix],
               IncludeId,
-              concatArr,
-              Rotation.ShiftArray),
+              aconcatArr,
+              Rotation.FlattenArray),
             qsu.cint(1),
             Free.roll[MapFunc, Access[JoinSide]](
               MFC(MapFuncsCore.Constant[Fix, FreeAccess[JoinSide]](
