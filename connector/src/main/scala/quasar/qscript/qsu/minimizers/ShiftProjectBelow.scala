@@ -43,8 +43,11 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT] private () extends 
   import QSUGraph.Extractors._
 
   def couldApplyTo(candidates: List[QSUGraph]): Boolean = candidates match {
+    case LeftShift(_, _, _, _, _) :: LeftShift(_, _, _, _, _) :: Nil => false
+
     case LeftShift(_, _, _, _, _) :: _ :: Nil => true
     case _ :: LeftShift(_, _, _, _, _) :: Nil => true
+
     case _ => false
   }
 
