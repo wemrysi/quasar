@@ -442,7 +442,7 @@ class PlannerQScriptSpec extends
           $unwind(DocField("0")),
           $project(reshape(
             sigil.Quasar -> $field("0")))))
-    }
+    }.pendingUntilFixed
 
     "plan LeftShift with reference to LeftSide" in {
       qplan(

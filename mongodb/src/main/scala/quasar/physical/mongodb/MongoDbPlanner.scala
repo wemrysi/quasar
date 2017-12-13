@@ -901,20 +901,6 @@ object MongoDbPlanner {
                             BsonField.Name("f") -> expr)),
                         Set(StructureType.Array(DocField(BsonField.Name("f")), id))), \&/-(merge0)))
                 }
-                case (ExprBuilderF(Embed(FlatteningBuilderF(_, _)), _), _) => {
-                  val struct0 = handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct)
-                  val merge = getExprMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(repair, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
-
-                  (struct0 |@| merge)((expr, merge0) =>
-                    ExprBuilder(
-                      FlatteningBuilder(
-                        DocBuilder(
-                          src,
-                          ListMap(
-                            BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                            BsonField.Name("f") -> expr)),
-                        Set(StructureType.Array(DocField(BsonField.Name("f")), id))), \&/-(merge0)))
-                }
                 case _ =>
                   (handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct) ⊛
                     getJsMerge[T, M](
@@ -934,14 +920,6 @@ object MongoDbPlanner {
               }
             else
               (src.unFix, struct) match {
-                case (ExprBuilderF(Embed(FlatteningBuilderF(_, _)), _), _) =>
-                  getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
-                    getExprBuilder[T, M, WF, EX](
-                      cfg.funcHandler, cfg.staticHandler)(
-                      FlatteningBuilder(
-                        builder,
-                        Set(StructureType.Array(DocVar.ROOT(), id))),
-                        repair.as(SrcHole)))
                 case (_, Embed(CoEnv(\/-(MFC(Guard(exp, Type.FlexArr(_, _, _), exp0, _)))))) if exp === exp0 =>
                   getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
                     getExprBuilder[T, M, WF, EX](
