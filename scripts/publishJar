@@ -27,6 +27,7 @@ if [[ "$TRAVIS" == "true"                                              &&
     web/githubRelease \
     couchbase/githubRelease \
     mongodb/githubRelease \
+    sparkcore/githubRelease \
     marklogic/githubRelease
 else
   echo "GITHUB_TOKEN defined, but Travis not running in quasar-analytics/quasar branches master or backport/*, so skipping publish"
