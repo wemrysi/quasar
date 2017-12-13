@@ -712,6 +712,77 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                 "original")))
       }
     }
+
+    // a[*][*][*] + b - c[*] / d[*][*]
+    "coalesce a thing that looks a lot like the search card" in {
+      // a[*][*][*] + b
+      val aplusb =
+        qsu.autojoin2((
+          qsu.leftShift(
+            qsu.leftShift(
+              qsu.leftShift(
+                qsu.read(afile),
+                func.ProjectKeyS(func.Hole, "a"),
+                ExcludeId,
+                func.RightTarget,
+                Rotation.ShiftArray),
+              func.Hole,
+              ExcludeId,
+              func.RightTarget,
+              Rotation.ShiftArray),
+            func.Hole,
+            ExcludeId,
+            func.RightTarget,
+            Rotation.ShiftArray),
+          qsu.map((qsu.read(afile), func.ProjectKeyS(func.Hole, "b"))),
+          _(MapFuncsCore.Add(_, _))))
+
+      // c[*] / d[*][*]
+      val cdivd =
+        qsu.autojoin2((
+          qsu.leftShift(
+            qsu.read(afile),
+            func.ProjectKeyS(func.Hole, "c"),
+            ExcludeId,
+            func.RightTarget,
+            Rotation.ShiftArray),
+          qsu.leftShift(
+            qsu.leftShift(
+              qsu.read(afile),
+              func.ProjectKeyS(func.Hole, "d"),
+              ExcludeId,
+              func.RightTarget,
+              Rotation.ShiftArray),
+            func.Hole,
+            ExcludeId,
+            func.RightTarget,
+            Rotation.ShiftArray),
+          _(MapFuncsCore.Divide(_, _))))
+
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((aplusb, cdivd, _(MapFuncsCore.Subtract(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case
+          MultiLeftShift(
+            MultiLeftShift(
+              LeftShift(
+                Read(`afile`),
+                innerSingleStruct,
+                _,
+                innerSingleRepair,
+                _),
+              List(
+                (innerAStruct, _, _),
+                (innerDStruct, _, _)),
+              innerMultiRepair),
+            List(
+              (astruct, _, _),
+              (bstruct, _, _),
+              (dstruct, _, _)),
+            repair) => ok     // TODO
+      }
+    }
   }
 
   def runOn(qgraph: QSUGraph): QSUGraph =
