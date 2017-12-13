@@ -169,12 +169,12 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               innermostRepair,
               Rotation.ShiftArray
             ),
-            projectBaz,
+            projectBar,
             ExcludeId,
             innerRepair,
             Rotation.ShiftArray
           ),
-          projectBar,
+          projectBaz,
           ExcludeId,
           outerRepair,
           Rotation.ShiftArray
@@ -214,7 +214,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               func.AccessLeftTarget(Access.identityHole('qsu1, _))),
             func.ConcatMaps(
               func.AccessLeftTarget(Access.valueHole(_)),
-              func.MakeMapS("2", func.RightTarget)),
+              func.MakeMapS("1", func.RightTarget)),
             func.Undefined))
         outerRepair must beTreeEqual(
           func.Cond(
@@ -223,7 +223,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               func.AccessLeftTarget(Access.identityHole('qsu2, _))),
             func.ConcatMaps(
               func.AccessLeftTarget(Access.valueHole(_)),
-              func.MakeMapS("1", func.RightTarget)),
+              func.MakeMapS("2", func.RightTarget)),
             func.Undefined
         ))
         ok

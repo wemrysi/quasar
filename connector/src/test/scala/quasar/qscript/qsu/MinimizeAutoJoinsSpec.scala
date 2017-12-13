@@ -33,7 +33,6 @@ import quasar.qscript.{
   ReduceIndex,
   ReduceIndexF,
   RightSide,
-  RightSideF,
   SrcHole
 }
 import slamdata.Predef._
@@ -638,7 +637,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
           repairOuter must beTreeEqual(
             func.Add(
-              func.RightSide,
+              func.RightTarget,
               func.ProjectKeyS(
                 func.ConcatMaps(
                   func.AccessLeftTarget(Access.valueHole(_)),
@@ -656,15 +655,15 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                 qsu.read(afile),
                 HoleF[Fix],
                 IncludeId,
-                RightSideF[Fix],
+                func.RightTarget,
                 Rotation.ShiftArray),
               HoleF[Fix],
               ExcludeId,
-              RightSideF[Fix],
+              func.RightTarget,
               Rotation.ShiftMap),
             HoleF[Fix],
             ExcludeId,
-            RightSideF[Fix],
+            func.RightTarget,
             Rotation.ShiftArray),
           qsu.read(afile),
           _(MapFuncsCore.Add(_, _)))))
@@ -691,25 +690,25 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
           repairInnerInner must beTreeEqual(
             func.ConcatMaps(
-              func.MakeMapS("original", func.LeftSide),
-              func.MakeMapS("results", func.RightSide)))
+              func.MakeMapS("original", func.AccessLeftTarget(Access.valueHole(_))),
+              func.MakeMapS("results", func.RightTarget)))
 
           structInner must beTreeEqual(func.ProjectKeyS(func.Hole, "results"))
 
           repairInner must beTreeEqual(
             func.ConcatMaps(
-              func.LeftSide,
-              func.MakeMapS("results", func.RightSide)))
+              func.AccessLeftTarget(Access.valueHole(_)),
+              func.MakeMapS("results", func.RightTarget)))
 
           structOuter must beTreeEqual(func.ProjectKeyS(func.Hole, "results"))
 
           repairOuter must beTreeEqual(
             func.Add(
-              func.RightSide,
+              func.RightTarget,
               func.ProjectKeyS(
                 func.ConcatMaps(
-                  func.LeftSide,
-                  func.MakeMapS("results", func.RightSide)),
+                  func.AccessLeftTarget(Access.valueHole(_)),
+                  func.MakeMapS("results", func.RightTarget)),
                 "original")))
       }
     }
