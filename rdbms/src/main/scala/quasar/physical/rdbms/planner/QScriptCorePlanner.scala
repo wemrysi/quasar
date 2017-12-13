@@ -50,6 +50,9 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
   private def take(fromExpr: F[T[SqlExpr]], countExpr: F[T[SqlExpr]]): F[T[SqlExpr]] = 
     (fromExpr |@| countExpr)(Limit(_, _).embed)
 
+  private def drop(fromExpr: F[T[SqlExpr]], countExpr: F[T[SqlExpr]]): F[T[SqlExpr]] = 
+    (fromExpr |@| countExpr)(Offset(_, _).embed)
+
   val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
 
   def plan: AlgebraM[F, QScriptCore[T, ?], T[SqlExpr]] = {
@@ -99,7 +102,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       val countExpr: F[T[SqlExpr]] = count.cataM(interpretM(κ(src.point[F]), compile))
 
       sel match {
-        case qscript.Drop   => unsupported
+        case qscript.Drop   => drop(fromExpr, countExpr)
         case qscript.Take   => take(fromExpr, countExpr)
         case qscript.Sample => take(fromExpr, countExpr) // TODO needs better sampling (which connectore doesnt?)
       }

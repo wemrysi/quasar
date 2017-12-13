@@ -108,6 +108,7 @@ object PostgresRenderQuery extends RenderQuery {
     case WithIds(str)    => s"(row_number() over(), $str)".right
     case RowIds()        => "row_number() over()".right
     case Limit(from, count) => s"$from LIMIT $count".right
+    case Offset(from, count) => s"$from OFFSET $count".right
     case Select(selection, from, filterOpt, order) =>
       val selectionStr = selection.v ⊹ alias(selection.alias)
       val filter = ~(filterOpt ∘ (f => s" where ${f.v}"))
