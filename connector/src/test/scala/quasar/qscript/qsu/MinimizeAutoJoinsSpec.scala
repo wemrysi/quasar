@@ -23,6 +23,7 @@ import quasar.fp._
 import quasar.qscript.{
   construction,
   ExcludeId,
+  IncludeId,
   Hole,
   HoleF,
   LeftSide,
@@ -545,7 +546,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             qsu.leftShift(
               qsu.read(afile),
               HoleF[Fix],
-              ExcludeId,
+              IncludeId,
               RightSideF[Fix],
               Rotation.ShiftArray),
             HoleF[Fix],
@@ -560,7 +561,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           LeftShift(
             Read(`afile`),
             structInner,
-            ExcludeId,
+            IncludeId,
             repairInner,
             _),
           structOuter,
@@ -596,13 +597,13 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               qsu.leftShift(
                 qsu.read(afile),
                 HoleF[Fix],
-                ExcludeId,
+                IncludeId,
                 RightSideF[Fix],
                 Rotation.ShiftArray),
               HoleF[Fix],
               ExcludeId,
               RightSideF[Fix],
-              Rotation.ShiftArray),
+              Rotation.ShiftMap),
             HoleF[Fix],
             ExcludeId,
             RightSideF[Fix],
@@ -616,17 +617,17 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             LeftShift(
               Read(`afile`),
               structInnerInner,
-              ExcludeId,
+              IncludeId,
               repairInnerInner,
-              _),
+              Rotation.ShiftArray),
             structInner,
             ExcludeId,
             repairInner,
-            _),
+            Rotation.ShiftMap),
           structOuter,
           ExcludeId,
           repairOuter,
-          _) =>
+          Rotation.ShiftArray) =>
 
           structInnerInner must beTreeEqual(func.Hole)
 
