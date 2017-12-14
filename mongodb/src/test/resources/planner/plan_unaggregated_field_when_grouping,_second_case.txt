@@ -2,26 +2,39 @@ Chain
 ├─ $FoldLeftF
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
+│  │  ├─ $GroupF
+│  │  │  ├─ Grouped
+│  │  │  │  ╰─ Name("f0" -> {
+│  │  │  │          "$max": {
+│  │  │  │            "$cond": [
+│  │  │  │              {
+│  │  │  │                "$and": [
+│  │  │  │                  { "$lt": [{ "$literal": null }, "$pop"] },
+│  │  │  │                  { "$lt": ["$pop", { "$literal": "" }] }]
+│  │  │  │              },
+│  │  │  │              "$pop",
+│  │  │  │              { "$literal": undefined }]
+│  │  │  │          }
+│  │  │  │        })
+│  │  │  ╰─ By({ "$literal": null })
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("city" -> {
+│  │  │  ├─ Name("0" -> {
 │  │  │  │       "$cond": [
 │  │  │  │         {
-│  │  │  │           "$and": [
-│  │  │  │             { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │  │  │             { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │  │  │           "$eq": [{ "$literal": NumberInt("1000") }, { "$literal": NumberInt("0") }]
 │  │  │  │         },
-│  │  │  │         "$city",
-│  │  │  │         { "$literal": undefined }]
-│  │  │  │     })
-│  │  │  ├─ Name("state" -> {
-│  │  │  │       "$cond": [
 │  │  │  │         {
-│  │  │  │           "$and": [
-│  │  │  │             { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │  │  │             { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │  │  │           "$cond": [
+│  │  │  │             { "$eq": ["$f0", { "$literal": NumberInt("0") }] },
+│  │  │  │             { "$literal": NaN },
+│  │  │  │             {
+│  │  │  │               "$cond": [
+│  │  │  │                 { "$gt": ["$f0", { "$literal": NumberInt("0") }] },
+│  │  │  │                 { "$literal": Infinity },
+│  │  │  │                 { "$literal": -Infinity }]
+│  │  │  │             }]
 │  │  │  │         },
-│  │  │  │         "$state",
-│  │  │  │         { "$literal": undefined }]
+│  │  │  │         { "$divide": ["$f0", { "$literal": NumberInt("1000") }] }]
 │  │  │  │     })
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $GroupF
@@ -37,58 +50,8 @@ Chain
 │  │     ╰─ IncludeId
 │  ╰─ Chain
 │     ├─ $ReadF(db; zips)
-│     ├─ $GroupF
-│     │  ├─ Grouped
-│     │  │  ╰─ Name("f0" -> {
-│     │  │          "$sum": {
-│     │  │            "$cond": [
-│     │  │              {
-│     │  │                "$and": [
-│     │  │                  {
-│     │  │                    "$lt": [
-│     │  │                      { "$literal": null },
-│     │  │                      {
-│     │  │                        "$cond": [
-│     │  │                          {
-│     │  │                            "$and": [
-│     │  │                              { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │  │                              { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │  │                          },
-│     │  │                          "$pop",
-│     │  │                          { "$literal": undefined }]
-│     │  │                      }]
-│     │  │                  },
-│     │  │                  {
-│     │  │                    "$lt": [
-│     │  │                      {
-│     │  │                        "$cond": [
-│     │  │                          {
-│     │  │                            "$and": [
-│     │  │                              { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │  │                              { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │  │                          },
-│     │  │                          "$pop",
-│     │  │                          { "$literal": undefined }]
-│     │  │                      },
-│     │  │                      { "$literal": "" }]
-│     │  │                  }]
-│     │  │              },
-│     │  │              {
-│     │  │                "$cond": [
-│     │  │                  {
-│     │  │                    "$and": [
-│     │  │                      { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │  │                      { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │  │                  },
-│     │  │                  "$pop",
-│     │  │                  { "$literal": undefined }]
-│     │  │              },
-│     │  │              { "$literal": undefined }]
-│     │  │          }
-│     │  │        })
-│     │  ╰─ By({ "$literal": null })
 │     ├─ $ProjectF
-│     │  ├─ Name("2" -> "$f0")
+│     │  ├─ Name("pop" -> "$pop")
 │     │  ╰─ ExcludeId
 │     ├─ $GroupF
 │     │  ├─ Grouped
