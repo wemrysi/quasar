@@ -286,11 +286,17 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
     def unapply(qgraph: QSUGraph)
         : Option[(QSUGraph, NEL[QSU.LeftShift[T, QSUGraph] \/ QSU.MultiLeftShift[T, QSUGraph]])] = qgraph match {
 
+      case LeftShift(parent @ LeftShift(Read(_), _, _, _, _), struct, idStatus, repair, rot) =>
+        Some((parent, NEL(-\/(QSU.LeftShift[T, QSUGraph](parent, struct, idStatus, repair, rot)))))
+
       case LeftShift(oparent @ ConsecutiveLeftShifts(parent, inners), struct, idStatus, repair, rot) =>
         Some((parent, -\/(QSU.LeftShift[T, QSUGraph](oparent, struct, idStatus, repair, rot)) <:: inners))
 
       case LeftShift(parent, struct, idStatus, repair, rot) =>
         Some((parent, NEL(-\/(QSU.LeftShift[T, QSUGraph](parent, struct, idStatus, repair, rot)))))
+
+      case MultiLeftShift(parent @ LeftShift(Read(_), _, _, _, _), shifts, rot) =>
+        Some((parent, NEL(\/-(QSU.MultiLeftShift[T, QSUGraph](parent, shifts, rot)))))
 
       case MultiLeftShift(oparent @ ConsecutiveLeftShifts(parent, inners), shifts, rot) =>
         Some((parent, \/-(QSU.MultiLeftShift[T, QSUGraph](oparent, shifts, rot)) <:: inners))
