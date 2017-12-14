@@ -233,15 +233,13 @@ class PlannerSpec extends
 
     "plan array concat with filter" in {
       plan(sqlE"""select loc || [ pop ] from zips where city = "BOULDER" """) must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, MatchOp, SimpleMapOp)))
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, MatchOp, ProjectOp)))
     }
 
-    trackPending(
-      "array flatten with unflattened field",
-      plan(sqlE"SELECT `_id` as zip, loc as loc, loc[*] as coord FROM zips"),
-      // should not use map-reduce
-      // actual: the occurrences of consecutive $project ops: '1'
-      IList(ReadOp, ProjectOp, UnwindOp, ProjectOp))
+    "plan array flatten with unflattened field" in {
+      plan(sqlE"SELECT `_id` as zip, loc as loc, loc[*] as coord FROM zips") must
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, UnwindOp, ProjectOp)))
+    }
 
     // Q3021
     trackPending(

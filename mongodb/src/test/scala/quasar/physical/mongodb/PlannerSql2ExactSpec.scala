@@ -581,8 +581,8 @@ class PlannerSql2ExactSpec extends
                       $lte($literal(Bson.Arr(List())), $field("loc")),
                       $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                     $field("loc"),
-                    $literal(Bson.Arr(List(Bson.Undefined))))),
-              IgnoreId),
+                    $arrayLit(List($literal(Bson.Undefined))))),
+              ExcludeId),
             $unwind(DocField(BsonField.Name("0"))),
             $project(
               reshape(sigil.Quasar -> $field("0")),

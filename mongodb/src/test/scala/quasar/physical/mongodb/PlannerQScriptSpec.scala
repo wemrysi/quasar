@@ -399,7 +399,7 @@ class PlannerQScriptSpec extends
                   $lte($literal(Bson.Arr()), $field("loc")),
                   $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("loc"),
-                $literal(Bson.Undefined)))),
+                $arrayLit(List($literal(Bson.Undefined)))))),
           $unwind(DocField("f")),
           $project(reshape(
             "0" -> $objectLit(
@@ -438,7 +438,7 @@ class PlannerQScriptSpec extends
           $match(Selector.Doc(
             BsonField.Name("0") -> Selector.Lt(Bson.Int32(-165)))),
           $project(reshape(sigil.Quasar -> $field("0")))))
-    }.pendingUntilFixed
+    }
 
     "plan typechecks with JS when unable to extract ExprOp" in {
       import fix.{Filter, ShiftedRead}, qscript.IncludeId
@@ -538,7 +538,7 @@ class PlannerQScriptSpec extends
                   $lte($literal(Bson.Arr()), $field("loc")),
                   $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("loc"),
-                $literal(Bson.Undefined)))),
+                $arrayLit(List($literal(Bson.Undefined)))))),
           $unwind(DocField("f")),
           $project(reshape(
             sigil.Quasar -> $objectLit(

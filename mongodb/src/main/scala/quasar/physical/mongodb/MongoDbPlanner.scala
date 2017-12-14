@@ -795,7 +795,10 @@ object MongoDbPlanner {
           case MFC(Not((_, v))) =>
             v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
 
-          case MFC(Guard(_, typ, (_, cont), (Embed(MFC(Undefined())), _))) => cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+          case MFC(Guard(_, typ, (_, cont), (Embed(MFC(Undefined())), _))) =>
+            cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+          case MFC(Guard(_, typ, (_, cont), (Embed(MFC(MakeArray(Embed(MFC(Undefined()))))), _))) =>
+            cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
 
           case _ => -\/(InternalError fromMsg node.map(_._1).shows)
         }
@@ -872,6 +875,8 @@ object MongoDbPlanner {
         Planner.Aux[T, QScriptCore[T, ?]] =
       new Planner[QScriptCore[T, ?]] {
         import MapFuncsCore._
+        import MapFuncCore._
+
         type IT[G[_]] = T[G]
 
         @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -887,7 +892,15 @@ object MongoDbPlanner {
             ev3: EX :<: ExprOp) = {
           case qscript.Map(src, f) =>
             getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, f)
-          case LeftShift(src, struct, id, repair) =>
+          case LeftShift(src, struct0, id, repair) => {
+            val rewriteUndefined: CoMapFuncR[T, Hole] => Option[CoMapFuncR[T, Hole]] = {
+              case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
+                rollMF[T, Hole](MFC(Guard(exp, tpe, exp0, Free.roll(MFC(MakeArray(Free.roll(MFC(Undefined())))))))).some
+              case _ => none
+            }
+
+            val struct = struct0.transCata[FreeMap[T]](orOriginal(rewriteUndefined))
+
             if (repair.contains(LeftSideF))
               (src.unFix, struct) match {
                 case (_, Embed(CoEnv(\/-(MFC(Guard(exp, Type.FlexArr(_, _, _), exp0, _)))))) if exp0 === exp => {
@@ -908,14 +921,14 @@ object MongoDbPlanner {
                           Set(StructureType.Object(DocField(BsonField.Name("f")), id))),
                         -\&/(jsMerge))
                     )( mrg =>
-                    ExprBuilder(
-                      FlatteningBuilder(
-                        DocBuilder(
-                          src,
-                          ListMap(
-                            BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                            BsonField.Name("f") -> expr)),
-                        Set(StructureType.Array(DocField(BsonField.Name("f")), id))), \&/-(mrg)))
+                      ExprBuilder(
+                        FlatteningBuilder(
+                          DocBuilder(
+                            src,
+                            ListMap(
+                              BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                              BsonField.Name("f") -> expr)),
+                          Set(StructureType.Array(DocField(BsonField.Name("f")), id))), \&/-(mrg)))
                   }
                 }
                 case _ =>
@@ -935,26 +948,27 @@ object MongoDbPlanner {
                         Set(StructureType.Object(DocField(BsonField.Name("f")), id))),
                       -\&/(j)))
               }
-            else
-              (src.unFix, struct) match {
-                case (_, Embed(CoEnv(\/-(MFC(Guard(exp, Type.FlexArr(_, _, _), exp0, _)))))) if exp === exp0 =>
-                  getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
-                    getExprBuilder[T, M, WF, EX](
-                      cfg.funcHandler, cfg.staticHandler)(
-                      FlatteningBuilder(
-                        builder,
-                        Set(StructureType.Array(DocVar.ROOT(), id))),
-                        repair.as(SrcHole)))
-                case _ =>
-                  getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
-                    getExprBuilder[T, M, WF, EX](
-                      cfg.funcHandler, cfg.staticHandler)(
-                      FlatteningBuilder(
-                        builder,
-                        Set(StructureType.Object(DocVar.ROOT(), id))),
-                        repair.as(SrcHole)))
-            }
+              else
+                (src.unFix, struct) match {
+                  case (_, Embed(CoEnv(\/-(MFC(Guard(exp, Type.FlexArr(_, _, _), exp0, _)))))) if exp === exp0 =>
+                    getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
+                      getExprBuilder[T, M, WF, EX](
+                        cfg.funcHandler, cfg.staticHandler)(
+                        FlatteningBuilder(
+                          builder,
+                          Set(StructureType.Array(DocVar.ROOT(), id))),
+                          repair.as(SrcHole)))
+                  case _ =>
+                    getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
+                      getExprBuilder[T, M, WF, EX](
+                        cfg.funcHandler, cfg.staticHandler)(
+                        FlatteningBuilder(
+                          builder,
+                          Set(StructureType.Object(DocVar.ROOT(), id))),
+                          repair.as(SrcHole)))
+                }
 
+          }
           case Reduce(src, bucket, reducers, repair) =>
             (bucket.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _)) ⊛
               reducers.traverse(_.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _))))((b, red) => {
