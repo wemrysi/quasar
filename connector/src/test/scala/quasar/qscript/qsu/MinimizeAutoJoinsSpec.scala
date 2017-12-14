@@ -42,7 +42,6 @@ import matryoshka.data.Fix
 import matryoshka.data.free._
 import pathy.Path, Path.Sandboxed
 import scalaz.{\/-, EitherT, Equal, Free, IList, Need, StateT}
-import scalaz.syntax.std.option._
 
 object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
@@ -244,7 +243,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               HoleF,
               func.Constant(J.str("hey"))))
 
-          h2 must beTreeEqual(HoleF[Fix])
+          h2 must beTreeEqual(func.Hole)
 
           repair must beTreeEqual(
             func.ConcatMaps(
@@ -351,34 +350,32 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
     }
 
     "remap coalesced bucket references in dimensions" in {
-      val aqsu = QScriptUniform.AnnotatedDsl[Fix, Symbol]
-
       val readAndThings =
-        aqsu.map('n1, (
-          aqsu.dimEdit('n5, (
-            aqsu.read('n0, afile),
+        qsu.map((
+          qsu.dimEdit((
+            qsu.read(afile),
             DTrans.Group(func.ProjectKeyS(func.Hole, "label")))),
           func.Negate(func.ProjectKeyS(func.Hole, "metric"))))
 
-      val atree =
-        aqsu.autojoin2(('n4, (
-          aqsu.lpReduce('n2, (
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2(((
+          qsu.lpReduce((
             readAndThings,
             ReduceFuncs.Count(()))),
-          aqsu.lpReduce('n3, (
+          qsu.lpReduce((
             readAndThings,
             ReduceFuncs.Sum(()))),
-          _(MapFuncsCore.Add(_, _)))))
+          _(MapFuncsCore.Add(_, _))))))
 
-      val (remap, qgraph) =
-        QSUGraph.fromAnnotatedTree(atree map (_.some))
+      val AuthenticatedQSU(agraph, auth) = runOn_(qgraph)
 
-      val expDims =
-        IList(qprov.prov.value(IdAccess.bucket('qsu0, 0)))
+      agraph must beLike {
+        case m @ Map(r @ QSReduce(_, _, _, _), _) =>
+          val expDims =
+            IList(qprov.prov.value(IdAccess.bucket(r.root, 0)))
 
-      val ds = runOn_(qgraph).auth.dims
-
-      (ds(remap('n4)) must_= expDims) and (ds('qsu0) must_= expDims)
+          auth.dims(m.root) must_= expDims
+      }
     }
 
     "leave uncoalesced reductions of different bucketing" in {
@@ -506,7 +503,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           repair,
           _) =>
 
-          struct must_=== HoleF[Fix]
+          struct must beTreeEqual(HoleF[Fix])
 
           repair must beTreeEqual(func.Add(RightSideF, LeftSideF))
       }
@@ -532,9 +529,65 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           repair,
           _) =>
 
-          struct must_=== HoleF[Fix]
-
+          struct must beTreeEqual(HoleF[Fix])
           repair must beTreeEqual(func.Add(LeftSideF, RightSideF))
+      }
+    }
+
+    "inductively coalesce reduces on coalesced shifts" in {
+      // count(a[*]) + sum(a)
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.qsReduce(
+            qsu.leftShift(
+              qsu.read(afile),
+              HoleF[Fix],
+              ExcludeId,
+              RightSideF[Fix],
+              Rotation.ShiftArray),
+            Nil,
+            List(ReduceFuncs.Count(HoleF[Fix])),
+            Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+          qsu.qsReduce(
+            qsu.read(afile),
+            Nil,
+            List(ReduceFuncs.Sum(HoleF[Fix])),
+            Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+          _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case Map(
+          QSReduce(
+            LeftShift(
+              Read(`afile`),
+              struct,
+              ExcludeId,
+              repairInner,
+              _),
+            Nil,
+            List(ReduceFuncs.Count(h1), ReduceFuncs.Sum(h2)),
+            repairOuter),
+          fm) =>
+
+        struct must beTreeEqual(HoleF[Fix])
+
+        repairInner must beTreeEqual(
+          func.ConcatMaps(
+            func.MakeMapS("0", func.RightSide),
+            func.MakeMapS("1", func.LeftSide)))
+
+        h1 must beTreeEqual(func.ProjectKeyS(func.Hole, "0"))
+        h2 must beTreeEqual(func.ProjectKeyS(func.Hole, "1"))
+
+        repairOuter must beTreeEqual(
+          func.ConcatMaps(
+            func.MakeMapS("0", Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+            func.MakeMapS("1", Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(1))))))
+
+        fm must beTreeEqual(
+          func.Add(
+            func.ProjectKeyS(HoleF, "0"),
+            func.ProjectKeyS(HoleF, "1")))
       }
     }
   }
