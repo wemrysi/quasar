@@ -19,7 +19,7 @@ package quasar.qscript.qsu
 import slamdata.Predef._
 
 import quasar.NameGenerator
-import quasar.Planner.PlannerErrorME
+import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
@@ -407,22 +407,31 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
 
       case g @ E.ThetaJoin(left, right, condition, joinType, combiner) =>
         (emitsIVMap(left) |@| emitsIVMap(right)).tupled flatMap {
-          // FIXME
-          case (true, true) => scala.Predef.???
-            // In this case, we need to nest the identities from each side in a new map
-            //   { i: {left: ids(left), right: ids(right)}, v: combiner }
-            //
-            // We then need to determine which ids could possibly exist in each of the sub maps.
-            //   + should be able to use the status map's keySet to help here, or we just grab
-            //     all the vertices in each branch. From these sets, we can see what possible
-            //     ids are related to those vertices.
-            //
-            // For each set of identity access, we need to update access by any
-            // vertices _not_ visited thus far, adding the appropriate projection
-            // into the L/R side of the identity map.
+          /** FIXME: https://github.com/quasar-analytics/quasar/issues/3114
+            *
+            * In this case, we need to nest the identities from each side in a new map
+            *   { i: {left: ids(left), right: ids(right)}, v: combiner }
+            *
+            * We then need to determine which ids could possibly exist in each of the sub maps.
+            *   + should be able to use the status map's keySet to help here, or we just grab
+            *     all the vertices in each branch. From these sets, we can see what possible
+            *     ids are related to those vertices.
+            *
+            * For each set of identity access, we need to update access by any
+            * vertices _not_ visited thus far, adding the appropriate projection
+            * into the L/R side of the identity map.
+            */
+          case (true, true) =>
+            PlannerErrorME[G].raiseError(InternalError(
+              s"ThetaJoin[${g.root}] where both branches carry identities is not " +
+              "yet supported, see https://github.com/quasar-analytics/quasar/issues/3114.",
+              None))
 
           case (true, false) =>
             onNeedsIV(g) as {
+              val newCondition =
+                condition flatMap (_.fold(rebaseV(func.LeftSide), func.RightSide))
+
               val newCombiner =
                 makeIV(
                   lookupIdentities >> func.LeftSide,
@@ -433,6 +442,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
 
           case (false, true) =>
             onNeedsIV(g) as {
+              val newCondition =
+                condition flatMap (_.fold(func.LeftSide, rebaseV(func.RightSide)))
+
               val newCombiner =
                 makeIV(
                   lookupIdentities >> func.RightSide,
