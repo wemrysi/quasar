@@ -25,25 +25,23 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.qscript.construction
-import quasar.qscript.provenance.Dimensions
 import quasar.qscript.{HoleF, ReduceFuncs}
 import quasar.qscript.MapFuncsCore.IntLit
 
 import matryoshka._
 import matryoshka.data.Fix
-import matryoshka.data.free._
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}
 import pathy.Path, Path.{file, Sandboxed}
 import scalaz.{\/, Cofree, Equal, IList}
-import scalaz.syntax.applicative._
 import scalaz.syntax.equal._
 import scalaz.syntax.show._
+import scalaz.std.list._
 import scalaz.std.map._
 
 object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
   import ApplyProvenance.AuthenticatedQSU
-  import QScriptUniform.DTrans
+  import QScriptUniform.{DTrans, Retain, Rotation}
 
   type F[A] = PlannerError \/ A
   type QSU[A] = QScriptUniform[A]
@@ -61,7 +59,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
   // FIXME: Figure out how to get this to resolve normally.
   implicit val eqP: Equal[qprov.P] =
-    qprov.prov.provenanceEqual(Equal[qprov.D], Equal[FreeMapA[Access[Symbol]]])
+    qprov.prov.provenanceEqual(Equal[qprov.D], Equal[QIdAccess])
 
   "provenance application" should {
 
@@ -73,7 +71,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
         qsu.map('name0,
           (qsu.read('name1, afile), fm))
 
-      val dims: SMap[Symbol, Dimensions[qprov.P]] = SMap(
+      val dims: SMap[Symbol, QDims] = SMap(
         'name0 -> IList(qprov.prov.proj(J.str("foobar"))),
         'name1 -> IList(qprov.prov.proj(J.str("foobar"))))
 
@@ -94,22 +92,48 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
       tree must haveDimensions(SMap(
         'n4 -> IList(
-          qprov.prov.value(Access.bucket('n4, 1, 'n4).point[FreeMapA])
-        , qprov.prov.value(Access.bucket('n4, 0, 'n4).point[FreeMapA]))
+          qprov.prov.value(IdAccess.bucket('n4, 1))
+        , qprov.prov.value(IdAccess.bucket('n4, 0)))
       , 'n3 -> IList(
           qprov.prov.proj(J.str("foobar"))
-        , qprov.prov.value(func.ProjectKeyS(Access.value('n0).point[FreeMapA], "y"))
-        , qprov.prov.value(func.ProjectKeyS(Access.value('n0).point[FreeMapA], "x")))
-      , 'n0 -> IList(
+        , qprov.prov.value(IdAccess.groupKey('n2, 1))
+        , qprov.prov.value(IdAccess.groupKey('n2, 0)))
+      , 'n2 -> IList(
           qprov.prov.proj(J.str("foobar"))
-        , qprov.prov.value(func.ProjectKeyS(Access.value('n0).point[FreeMapA], "y"))
-        , qprov.prov.value(func.ProjectKeyS(Access.value('n0).point[FreeMapA], "x")))
+        , qprov.prov.value(IdAccess.groupKey('n2, 1))
+        , qprov.prov.value(IdAccess.groupKey('n2, 0)))
+      ))
+    }
+
+    "compute provenance for squash" >> {
+      val tree =
+        qsu.dimEdit('n0, (
+          qsu.map('n1, (
+            qsu.transpose('n2, (
+              qsu.read('n3, afile),
+              Retain.Values,
+              Rotation.ShiftMap)),
+            func.Add(
+              func.Constant(J.int(7)),
+              func.ProjectKeyS(func.Hole, "bar")))),
+          DTrans.Squash[Fix]()))
+
+      tree must haveDimensions(SMap(
+        'n0 -> IList(
+          qprov.prov.thenn(
+            qprov.prov.value(IdAccess.identity('n2))
+          , qprov.prov.proj(J.str("foobar"))))
+      , 'n2 -> IList(
+          qprov.prov.value(IdAccess.identity('n2))
+        , qprov.prov.proj(J.str("foobar")))
+      , 'n3 -> IList(
+          qprov.prov.proj(J.str("foobar")))
       ))
     }
   }
 
   // checks the expected dimensions
-  def haveDimensions(expected: SMap[Symbol, Dimensions[qprov.P]])
+  def haveDimensions(expected: SMap[Symbol, QDims])
       : Matcher[Cofree[QSU, Symbol]] =
     new Matcher[Cofree[QSU, Symbol]] {
       def apply[S <: Cofree[QSU, Symbol]](s: Expectable[S]): MatchResult[S] = {
@@ -117,7 +141,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
         val (renames, inputGraph): (QSUGraph.Renames, QSUGraph) =
           QSUGraph.fromAnnotatedTree[Fix](s.value.map(Some(_)))
 
-        val expectedDims: QSUDims[Fix] =
+        val expectedDims: SMap[Symbol, QDims] =
           expected.map { case (k, v) =>
             val newP = renames.foldLeft(v)((p, t) => qprov.rename(t._1, t._2, p))
             (renames(k), newP)
@@ -129,11 +153,12 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
         { err =>
           failure(s"provenance application produced unexpected planner error: ${err}", s)
         },
-        { case auth @ AuthenticatedQSU(resultGraph, resultDims) =>
+        { case aqsu @ AuthenticatedQSU(resultGraph, qauth) =>
           result(
-            resultDims ≟ expectedDims,
-            s"received expected authenticated QSU:\n${auth.shows}",
-            s"received unexpected authenticated QSU:\n${auth.shows}\nexpected:\n${QSUDims.show[Fix].shows(expected)}",
+            qauth.dims ≟ expectedDims,
+            s"received expected authenticated QSU:\n${aqsu.shows}",
+            s"received unexpected authenticated QSU:\n${aqsu.shows}\n" +
+            s"expected:\n[\n${printMultiline(expected.toList)}\n]",
             s)
         }).merge
       }

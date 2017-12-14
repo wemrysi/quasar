@@ -280,7 +280,7 @@ object QSUGraph extends QSUGraphInstances {
 
       back <- reverse.get(node) match {
         case Some(sym) =>
-          QSUGraph[T](root = sym, SMap()).point[F]
+          QSUGraph[T](root = sym, SMap(sym -> node)).point[F]
 
         case None =>
           for {
@@ -363,6 +363,13 @@ object QSUGraph extends QSUGraphInstances {
     object AutoJoin3 {
       def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
         case g: QSU.AutoJoin3[T, QSUGraph[T]] => QSU.AutoJoin3.unapply(g)
+        case _ => None
+      }
+    }
+
+    object QSAutoJoin {
+      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
+        case g: QSU.QSAutoJoin[T, QSUGraph[T]] => QSU.QSAutoJoin.unapply(g)
         case _ => None
       }
     }
@@ -604,7 +611,7 @@ sealed abstract class QSUGraphInstances extends QSUGraphInstances0 {
       val assocs = g.foldMapUp(sg => DList((sg.root, sg.vertices(sg.root))))
 
       s"QSUGraph(${g.root.shows})[\n" +
-      assocs.toList.map({ case (k, v) => s"  ${k.shows} -> ${v.shows}" }).intercalate("\n") +
+      printMultiline(assocs.toList) +
       "\n]"
     }
 }
