@@ -16,114 +16,90 @@
 
 package quasar.qscript.qsu
 
-import slamdata.Predef._
+import slamdata.Predef.{StringContext, Symbol}
 import quasar.RenderTree
-import quasar.qscript.{Hole, JoinSide}
-import quasar.fp.symbolOrder
 
-import monocle.{PLens, Prism, Traversal}
-import scalaz.{Applicative, Apply, Equal, Order, Show, Traverse1}
-import scalaz.std.anyVal._
+import monocle.{Lens, PLens, Prism}
+import scalaz.{Apply, Equal, Order, Show, Traverse1}
+import scalaz.syntax.show._
 import scalaz.std.option._
 import scalaz.std.tuple._
-import scalaz.syntax.applicative._
-import scalaz.syntax.show._
+import quasar.qscript.{Hole, JoinSide}
 
-/** Describes access to the value and identity of `A`. */
-sealed abstract class Access[A] {
-  /** Surfaces symbols accessed, using the provided function in the `Value`
-    * case.
-    */
-  def symbolic(value: A => Symbol): Access[Symbol] =
+sealed abstract class Access[D, A] {
+  def symbolic(value: A => Symbol): Access[D, Symbol] =
     this match {
-      case Access.Bucket(s, i, _) => Access.bucket(s, i, s)
-      case Access.Identity(s, _)  => Access.identitySymbol(s, s)
-      case Access.Value(a)        => Access.valueSymbol(value(a))
+      case Access.Id(i, a) =>
+        IdAccess.symbols[D]
+          .headOption(i)
+          .fold(Access.id(i, value(a)))(Access.id(i, _))
+
+      case Access.Value(a) =>
+        Access.value(value(a))
     }
 }
 
 object Access extends AccessInstances {
-  final case class Bucket[A](of: Symbol, idx: Int, src: A) extends Access[A]
-  final case class Identity[A](of: Symbol, src: A) extends Access[A]
-  final case class Value[A](src: A) extends Access[A]
+  def identityHole[D]: Prism[Access[D, Hole], (IdAccess[D], Hole)] = id[D, Hole]
+  def identitySymbol[D]: Prism[Access[D, Symbol], (IdAccess[D], Symbol)] = id[D, Symbol]
+  def identityJoinSide[D]: Prism[Access[D, JoinSide], (IdAccess[D], JoinSide)] = id[D, JoinSide]
+  def valueHole[D]: Prism[Access[D, Hole], Hole] = value[D, Hole]
+  def valueSymbol[D]: Prism[Access[D, Symbol], Symbol] = value[D, Symbol]
+  def valueJoinSide[D]: Prism[Access[D, JoinSide], JoinSide] = value[D, JoinSide]
 
-  def bucket[A]: Prism[Access[A], (Symbol, Int, A)] =
-    Prism.partial[Access[A], (Symbol, Int, A)] {
-      case Bucket(s, i, a) => (s, i, a)
-    } { case (s, i, a) => Bucket(s, i, a) }
+  final case class Id[D, A](idAccess: IdAccess[D], src: A) extends Access[D, A]
+  final case class Value[D, A](src: A) extends Access[D, A]
 
-  def identity[A]: Prism[Access[A], (Symbol, A)] =
-    Prism.partial[Access[A], (Symbol, A)] {
-      case Identity(s, a) => (s, a)
-    } { case (s, a) => Identity(s, a) }
+  def id[D, A]: Prism[Access[D, A], (IdAccess[D], A)] =
+    Prism.partial[Access[D, A], (IdAccess[D], A)] {
+      case Id(i, a) => (i, a)
+    } { case (i, a) => Id(i, a) }
 
-  def identityHole: Prism[Access[Hole], (Symbol, Hole)] = identity[Hole]
-  def identitySymbol: Prism[Access[Symbol], (Symbol, Symbol)] = identity[Symbol]
-  def identityJoinSide: Prism[Access[JoinSide], (Symbol, JoinSide)] = identity[JoinSide]
-
-  def src[A, B]: PLens[Access[A], Access[B], A, B] =
-    PLens[Access[A], Access[B], A, B] {
-      case Bucket(_, _, a) => a
-      case Identity(_, a)  => a
-      case Value(a)        => a
-    } { b => {
-      case Bucket(s, i, _) => Bucket(s, i, b)
-      case Identity(s, _)  => Identity(s, b)
-      case Value(_)        => Value(b)
-    }}
-
-  def symbols[A]: Traversal[Access[A], Symbol] =
-    new Traversal[Access[A], Symbol] {
-      def modifyF[F[_]: Applicative](f: Symbol => F[Symbol])(a: Access[A]) =
-        a match {
-          case Bucket(s, i, a) => f(s) map (Bucket(_, i, a))
-          case Identity(s, a)  => f(s) map (Identity(_, a))
-          case Value(a)        => value(a).point[F]
-        }
-    }
-
-  def value[A]: Prism[Access[A], A] =
-    Prism.partial[Access[A], A] {
+  def value[D, A]: Prism[Access[D, A], A] =
+    Prism.partial[Access[D, A], A] {
       case Value(a) => a
-    }(Value(_))
+    } (Value(_))
 
-  def valueHole: Prism[Access[Hole], Hole] = value[Hole]
-  def valueSymbol: Prism[Access[Symbol], Symbol] = value[Symbol]
-  def valueJoinSide: Prism[Access[JoinSide], JoinSide] = value[JoinSide]
+  def src[D, A]: Lens[Access[D, A], A] =
+    srcP[D, A, A]
+
+  def srcP[D, A, B]: PLens[Access[D, A], Access[D, B], A, B] =
+    PLens[Access[D, A], Access[D, B], A, B] {
+      case Id(_, a) => a
+      case Value(a) => a
+    } { b => {
+      case Id(i, _) => id(i, b)
+      case Value(_) => value(b)
+    }}
 }
 
 sealed abstract class AccessInstances extends AccessInstances0 {
-  import Access._
+  implicit def traverse1[D]: Traverse1[Access[D, ?]] =
+    new Traverse1[Access[D, ?]] {
+      def traverse1Impl[G[_]: Apply, A, B](fa: Access[D, A])(f: A => G[B]) =
+        Access.srcP[D, A, B].modifyF(f)(fa)
 
-  implicit val traverse1: Traverse1[Access] =
-    new Traverse1[Access] {
-      def foldMapRight1[A, B](fa: Access[A])(z: A => B)(f: (A, => B) => B) =
-        z(src[A, B].get(fa))
-
-      def traverse1Impl[F[_]: Apply, A, B](fa: Access[A])(f: A => F[B]) =
-        src[A, B].modifyF(f)(fa)
+      def foldMapRight1[A, B](fa: Access[D, A])(z: A => B)(f: (A, => B) => B) =
+        z(Access.src[D, A] get fa)
     }
 
-  implicit def order[A: Order]: Order[Access[A]] =
-    Order.orderBy(generic(_))
+  implicit def order[D: Order, A: Order]: Order[Access[D, A]] =
+    Order.orderBy(generic)
 
-  implicit def renderTree[A: Show]: RenderTree[Access[A]] =
+  implicit def renderTree[D: Show, A: Show]: RenderTree[Access[D, A]] =
     RenderTree.fromShowAsType("Access")
 
-  implicit def show[A: Show]: Show[Access[A]] =
+  implicit def show[D: Show, A: Show]: Show[Access[D, A]] =
     Show.shows {
-      case Bucket(s, i, a) => s"Bucket($s[$i], ${a.shows})"
-      case Identity(s, a)  => s"Identity($s, ${a.shows})"
-      case Value(a)        => s"Value(${a.shows})"
+      case Access.Id(i, a) => s"Id(${i.shows}, ${a.shows})"
+      case Access.Value(a) => s"Value(${a.shows})"
     }
 }
 
 sealed abstract class AccessInstances0 {
-  import Access._
+  implicit def equal[D: Equal, A: Equal]: Equal[Access[D, A]] =
+    Equal.equalBy(generic)
 
-  implicit def equal[A: Equal]: Equal[Access[A]] =
-    Equal.equalBy(generic(_))
-
-  protected def generic[A](a: Access[A]) =
-    (bucket.getOption(a), identity.getOption(a), value.getOption(a))
+  protected def generic[D, A](a: Access[D, A]) =
+    (Access.id.getOption(a), Access.value.getOption(a))
 }

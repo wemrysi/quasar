@@ -16,8 +16,8 @@
 
 package quasar.qscript.qsu
 
-import quasar.{Planner, Qspec, TreeMatchers, Type}
-import Planner.PlannerError
+import slamdata.Predef._
+import quasar.{Planner, Qspec, TreeMatchers, Type}, Planner.PlannerError
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
@@ -35,7 +35,6 @@ import quasar.qscript.{
   RightSide,
   SrcHole
 }
-import slamdata.Predef._
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.data.free._
@@ -43,8 +42,6 @@ import pathy.Path
 import Path.Sandboxed
 
 import scalaz.{\/-, EitherT, Equal, Free, IList, Need, StateT}
-import scalaz.syntax.applicative._
-import scalaz.syntax.std.option._
 
 object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
@@ -57,13 +54,14 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
   val func = construction.Func[Fix]
   val qprov = QProv[Fix]
 
+  type J = Fix[EJson]
   val J = Fixed[Fix[EJson]]
 
   val afile = Path.rootDir[Sandboxed] </> Path.file("afile")
   val afile2 = Path.rootDir[Sandboxed] </> Path.file("afile2")
 
   implicit val eqP: Equal[qprov.P] =
-    qprov.prov.provenanceEqual(Equal[qprov.D], Equal[FreeMapA[Access[Symbol]]])
+    qprov.prov.provenanceEqual(Equal[qprov.D], Equal[QIdAccess])
 
   "autojoin minimization" should {
     "linearize .foo + .bar" in {
@@ -92,9 +90,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         qsu.autojoin3((
           qsu.read(afile),
           qsu.read(afile),
-          qsu.map1((
-            qsu.unreferenced(),
-            MapFuncsCore.Undefined[Fix, Hole](): MapFuncCore[Hole])),
+          qsu.undefined(),
           _(MapFuncsCore.Guard(_, Type.AnyObject, _, _)))))
 
       runOn(qgraph) must beLike {
@@ -312,12 +308,12 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         qsu.autojoin2((
           qsu.qsReduce(
             readAndThings,
-            List(HoleF[Fix].map(Access.value(_))),
+            List(HoleF[Fix].map(Access.value[J, Hole](_))),
             List(ReduceFuncs.Count(HoleF[Fix])),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
           qsu.qsReduce(
             readAndThings,
-            List(HoleF[Fix].map(Access.value(_))),
+            List(HoleF[Fix].map(Access.value[J, Hole](_))),
             List(ReduceFuncs.Sum(HoleF[Fix])),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
           _(MapFuncsCore.Add(_, _)))))
@@ -332,7 +328,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           fm) =>
 
           // must_=== doesn't work
-          bucket must beTreeEqual(func.Negate(HoleF.map(Access.value(_))))
+          bucket must beTreeEqual(func.Negate(HoleF.map(Access.value[J, Hole](_))))
 
           h1 must beTreeEqual(func.Negate(HoleF[Fix]))
           h2 must beTreeEqual(func.Negate(HoleF[Fix]))
@@ -354,34 +350,32 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
     }
 
     "remap coalesced bucket references in dimensions" in {
-      val aqsu = QScriptUniform.AnnotatedDsl[Fix, Symbol]
-
       val readAndThings =
-        aqsu.map('n1, (
-          aqsu.dimEdit('n5, (
-            aqsu.read('n0, afile),
+        qsu.map((
+          qsu.dimEdit((
+            qsu.read(afile),
             DTrans.Group(func.ProjectKeyS(func.Hole, "label")))),
           func.Negate(func.ProjectKeyS(func.Hole, "metric"))))
 
-      val atree =
-        aqsu.autojoin2(('n4, (
-          aqsu.lpReduce('n2, (
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2(((
+          qsu.lpReduce((
             readAndThings,
             ReduceFuncs.Count(()))),
-          aqsu.lpReduce('n3, (
+          qsu.lpReduce((
             readAndThings,
             ReduceFuncs.Sum(()))),
-          _(MapFuncsCore.Add(_, _)))))
+          _(MapFuncsCore.Add(_, _))))))
 
-      val (remap, qgraph) =
-        QSUGraph.fromAnnotatedTree(atree map (_.some))
+      val AuthenticatedQSU(agraph, auth) = runOn_(qgraph)
 
-      val expDims =
-        IList(qprov.prov.value(Access.bucket('qsu3, 0, 'qsu3).point[FreeMapA]))
+      agraph must beLike {
+        case m @ Map(r @ QSReduce(_, _, _, _), _) =>
+          val expDims =
+            IList(qprov.prov.value(IdAccess.bucket(r.root, 0)))
 
-      val ds = runOn_(qgraph).dims
-
-      (ds(remap('n2)) must_= expDims) and (ds(remap('n3)) must_= expDims)
+          auth.dims(m.root) must_= expDims
+      }
     }
 
     "leave uncoalesced reductions of different bucketing" in {
@@ -427,8 +421,66 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
           fm must beTreeEqual(func.Add(HoleF, func.Constant(J.int(42))))
       }
+    }
 
-      ok
+    "halt minimization at a grouped vertex" in {
+      val groupKey =
+        func.Lower(func.ProjectKeyS(func.Hole, "city"))
+
+      val groupedGuardedRead =
+        qsu.dimEdit(
+          qsu.autojoin3((
+            qsu.read(afile),
+            qsu.read(afile),
+            qsu.undefined(),
+            _(MapFuncsCore.Guard(_, Type.AnyObject, _, _)))),
+          DTrans.Group(groupKey))
+
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.autojoin2((
+            qsu.cstr("city"),
+            qsu.autojoin2((
+              groupedGuardedRead,
+              qsu.cstr("city"),
+              _(MapFuncsCore.ProjectKey(_, _)))),
+            _(MapFuncsCore.MakeMap(_, _)))),
+          qsu.autojoin2((
+            qsu.cstr("1"),
+            qsu.lpReduce(
+              qsu.autojoin2((
+                groupedGuardedRead,
+                qsu.cstr("pop"),
+                _(MapFuncsCore.ProjectKey(_, _)))),
+              ReduceFuncs.Sum(())),
+            _(MapFuncsCore.MakeMap(_, _)))),
+          _(MapFuncsCore.ConcatMaps(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case AutoJoin2C(
+          Map(
+            Map(Read(_), guardL),
+            minL),
+          Map(
+            QSReduce(
+              Map(Read(_), guardR),
+              bucket :: Nil,
+              ReduceFuncs.Sum(prjPop) :: Nil,
+              _),
+            minR),
+          MapFuncsCore.ConcatMaps(_, _)) =>
+
+          guardL must beTreeEqual(guardR)
+
+          minL must beTreeEqual(
+            func.MakeMapS(
+              "city",
+              func.ProjectKeyS(func.Hole, "city")))
+
+          minR must beTreeEqual(func.MakeMapS("1", func.Hole))
+
+          prjPop must beTreeEqual(func.ProjectKeyS(func.Hole, "pop"))
+      }
     }
 
     "coalesce an autojoin on a single leftshift on a shared source" in {

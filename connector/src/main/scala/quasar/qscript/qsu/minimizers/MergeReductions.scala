@@ -19,7 +19,6 @@ package minimizers
 
 import quasar.{NameGenerator, Planner}, Planner.PlannerErrorME
 import quasar.contrib.matryoshka._
-import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski.κ
@@ -32,11 +31,11 @@ import quasar.qscript.{
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import slamdata.Predef._
 
-import matryoshka.{delayEqual, BirecursiveT, EqualT}
+import matryoshka.{delayEqual, BirecursiveT, EqualT, ShowT}
 import matryoshka.data.free._
 import scalaz.{Free, Monad, Scalaz}, Scalaz._
 
-final class MergeReductions[T[_[_]]: BirecursiveT: EqualT] private () extends Minimizer[T] {
+final class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extends Minimizer[T] {
   import MinimizeAutoJoins._
   import QSUGraph.Extractors._
 
@@ -50,14 +49,14 @@ final class MergeReductions[T[_[_]]: BirecursiveT: EqualT] private () extends Mi
   }
 
   def extract[
-      G[_]: Monad: NameGenerator: PlannerErrorME: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState[T]]](
+      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]](
       qgraph: QSUGraph): Option[(QSUGraph, (QSUGraph, FreeMap) => G[QSUGraph])] = qgraph match {
 
     case qgraph @ QSReduce(src, buckets, reducers, repair) =>
       def rebuild(src: QSUGraph, fm: FreeMap): G[QSUGraph] = {
-        def rewriteBucket(bucket: Access[Hole]): FreeMapA[Access[Hole]] = bucket match {
+        def rewriteBucket(bucket: QAccess[Hole]): FreeMapA[QAccess[Hole]] = bucket match {
           case v @ Access.Value(_) => fm.map(κ(v))
-          case other => Free.pure[MapFunc, Access[Hole]](other)
+          case other => Free.pure[MapFunc, QAccess[Hole]](other)
         }
 
         val buckets2 = buckets.map(_.flatMap(rewriteBucket))
@@ -73,7 +72,7 @@ final class MergeReductions[T[_[_]]: BirecursiveT: EqualT] private () extends Mi
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def apply[
-      G[_]: Monad: NameGenerator: PlannerErrorME: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState[T]]](
+      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]](
       qgraph: QSUGraph,
       source: QSUGraph,
       candidates: List[QSUGraph],
@@ -143,6 +142,6 @@ final class MergeReductions[T[_[_]]: BirecursiveT: EqualT] private () extends Mi
 }
 
 object MergeReductions {
-  def apply[T[_[_]]: BirecursiveT: EqualT]: MergeReductions[T] =
+  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT]: MergeReductions[T] =
     new MergeReductions[T]
 }

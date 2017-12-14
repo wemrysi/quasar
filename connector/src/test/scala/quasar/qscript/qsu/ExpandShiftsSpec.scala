@@ -17,18 +17,12 @@
 package quasar.qscript.qsu
 
 import quasar.Planner.PlannerError
+import quasar.ejson.EJson
 import slamdata.Predef.{Map => _, _}
 import quasar.{Qspec, TreeMatchers}
 
 import scalaz.\/
-//import quasar.Planner.{InternalError, PlannerError}
-//import quasar.common.{JoinType, SortDir}
-//import quasar.contrib.pathy.AFile
-//import quasar.ejson.{EJson, Fixed}
-//import quasar.fp._
 import quasar.qscript.{construction, Hole, ExcludeId, SrcHole}
-//import quasar.qscript.MapFuncsCore.IntLit
-//import matryoshka.EqualT
 import matryoshka._
 import matryoshka.data._
 import quasar.fp._
@@ -53,8 +47,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
   val hole: Hole = SrcHole
-  def index(i: Int): FreeMapA[Access[Hole] \/ Int] =
-    i.right[Access[Hole]].pure[FreeMapA]
+  def index(i: Int): FreeMapA[QAccess[Hole] \/ Int] =
+    i.right[QAccess[Hole]].pure[FreeMapA]
 
   "convert singly nested LeftShift/ThetaJoin" in {
     val dataset = qsu.leftShift(
@@ -120,8 +114,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         outerRepair must beTreeEqual(
           func.Cond(
             func.Eq(
-              func.AccessLeftTarget(Access.identityHole('qsu0, _)),
-              func.AccessLeftTarget(Access.identityHole('qsu1, _))),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu0), _)),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu1), _))),
             func.ConcatMaps(
               func.AccessLeftTarget(Access.valueHole(_)),
               func.MakeMapS("1", func.RightTarget)),
@@ -210,8 +204,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         innerRepair must beTreeEqual(
           func.Cond(
             func.Eq(
-              func.AccessLeftTarget(Access.identityHole('qsu0, _)),
-              func.AccessLeftTarget(Access.identityHole('qsu1, _))),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu0), _)),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu1), _))),
             func.ConcatMaps(
               func.AccessLeftTarget(Access.valueHole(_)),
               func.MakeMapS("1", func.RightTarget)),
@@ -219,8 +213,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         outerRepair must beTreeEqual(
           func.Cond(
             func.Eq(
-              func.AccessLeftTarget(Access.identityHole('qsu1, _)),
-              func.AccessLeftTarget(Access.identityHole('qsu2, _))),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu1), _)),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu2), _))),
             func.ConcatMaps(
               func.AccessLeftTarget(Access.valueHole(_)),
               func.MakeMapS("2", func.RightTarget)),

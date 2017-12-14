@@ -21,11 +21,12 @@ import slamdata.Predef.{List, Nil}
 import quasar.{Qspec, TreeMatchers}
 import quasar.Planner.PlannerError
 import quasar.ejson.{EJson, Fixed}
-import quasar.fp.coproductEqual
+import quasar.ejson.implicits._
+import quasar.fp.{coproductEqual, coproductShow}
 import quasar.qscript.{construction, ExcludeId, Hole, ReduceFuncs}
 import quasar.qscript.qsu.QScriptUniform.Rotation
 
-import matryoshka.delayEqual
+import matryoshka.{delayEqual, delayShow, showTShow}
 import matryoshka.data.Fix
 import matryoshka.data.free._
 import scalaz.{\/, \/-}
@@ -57,7 +58,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           ReduceFuncs.Sum(()))
 
       val expBucket =
-        func.ProjectKeyS(func.Hole, "state") map (Access.value(_))
+        func.ProjectKeyS(func.Hole, "state") map (Access.value[Fix[EJson], Hole](_))
 
       val expReducer =
         func.ProjectKeyS(func.Hole, "pop")
@@ -70,6 +71,36 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
             _)) =>
 
           (b must beTreeEqual(expBucket)) and
+          (r must beTreeEqual(expReducer))
+      }
+    }
+
+    "extract func even when constant buckets" >> {
+      // select sum(pop) from zips group by 7
+      val tree =
+        qsu.lpReduce(
+          qsu.map(
+            qsu.dimEdit(
+              qsu.tread1("zips"),
+              DTrans.Group(func.Constant(J.int(7)))),
+            func.ProjectKeyS(func.Hole, "pop")),
+          ReduceFuncs.Sum(()))
+
+      val expB =
+        func.Constant[Access[Fix[EJson], Hole]](J.int(7))
+
+      val expReducer =
+        func.ProjectKeyS(func.Hole, "pop")
+
+      reifyBuckets(tree) must beLike {
+        case \/-(
+          QSReduce(
+            LeftShift(Read(_), _, ExcludeId, _, _),
+            List(b),
+            List(ReduceFuncs.Sum(r)),
+            _)) =>
+
+          (b must beTreeEqual(expB)) and
           (r must beTreeEqual(expReducer))
       }
     }
@@ -89,43 +120,12 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       reifyBuckets(tree) must beLike {
         case \/-(
           QSReduce(
-            Map(LeftShift(Read(_), _, ExcludeId, _, Rotation.ShiftMap), fm),
+            Map(LeftShift(Read(_), _, ExcludeId, _, _), fm),
             Nil,
             List(ReduceFuncs.Sum(r)),
             _)) =>
 
           (fm must beTreeEqual(expFm)) and
-          (r must beTreeEqual(func.Hole))
-      }
-    }
-
-    "leave source untouched when constant buckets" >> {
-      // select sum(pop) from zips group by 7
-      val tree =
-        qsu.lpReduce(
-          qsu.map(
-            qsu.dimEdit(
-              qsu.tread1("zips"),
-              DTrans.Group(func.Constant(J.int(7)))),
-            func.ProjectKeyS(func.Hole, "pop")),
-          ReduceFuncs.Sum(()))
-
-      val expFm =
-        func.ProjectKeyS(func.Hole, "pop")
-
-      val expB =
-        func.Constant[Access[Hole]](J.int(7))
-
-      reifyBuckets(tree) must beLike {
-        case \/-(
-          QSReduce(
-            Map(LeftShift(Read(_), _, ExcludeId, _, Rotation.ShiftMap), fm),
-            List(b),
-            List(ReduceFuncs.Sum(r)),
-            _)) =>
-
-          (fm must beTreeEqual(expFm)) and
-          (b must beTreeEqual(expB)) and
           (r must beTreeEqual(func.Hole))
       }
     }
