@@ -62,7 +62,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
           func.MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), func.RightSide))
 
       MappableRegion.funcOf(replaceRefs(graph, lref, rref), graph refocus cond.root)
-        .map(jf => ThetaJoin(left.root, right.root, jf map (Access.value(_)), jtype, combiner)) match {
+        .map(jf => ThetaJoin(left.root, right.root, jf, jtype, combiner)) match {
           case Some(qs) =>
             graph.overwriteAtRoot(qs).point[F]
           case None =>

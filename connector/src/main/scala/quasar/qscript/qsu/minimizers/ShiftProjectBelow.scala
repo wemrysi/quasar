@@ -19,7 +19,6 @@ package minimizers
 
 import quasar.{NameGenerator, Planner}, Planner.PlannerErrorME
 import quasar.contrib.matryoshka._
-import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski.κ
@@ -34,11 +33,11 @@ import quasar.qscript.{
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import slamdata.Predef._
 
-import matryoshka.{delayEqual, BirecursiveT, EqualT}
+import matryoshka.{delayEqual, BirecursiveT, EqualT, ShowT}
 import matryoshka.data.free._
 import scalaz.{Monad, Scalaz}, Scalaz._
 
-final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT] private () extends Minimizer[T] {
+final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extends Minimizer[T] {
   import MinimizeAutoJoins._
   import QSUGraph.Extractors._
 
@@ -49,7 +48,7 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT] private () extends 
   }
 
   def extract[
-      G[_]: Monad: NameGenerator: PlannerErrorME: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState[T]]](
+      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]](
       qgraph: QSUGraph): Option[(QSUGraph, (QSUGraph, FreeMap) => G[QSUGraph])] = qgraph match {
 
     case qgraph @ LeftShift(src, struct, idStatus, repair, rot) =>
@@ -85,7 +84,7 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT] private () extends 
   }
 
   def apply[
-      G[_]: Monad: NameGenerator: PlannerErrorME: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState[T]]](
+      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]](
       qgraph: QSUGraph,
       singleSource: QSUGraph,
       candidates: List[QSUGraph],
@@ -123,6 +122,6 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT] private () extends 
 }
 
 object ShiftProjectBelow {
-  def apply[T[_[_]]: BirecursiveT: EqualT]: ShiftProjectBelow[T] =
+  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT]: ShiftProjectBelow[T] =
     new ShiftProjectBelow[T]
 }
