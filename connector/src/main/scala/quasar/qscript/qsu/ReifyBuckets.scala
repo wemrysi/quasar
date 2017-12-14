@@ -19,67 +19,86 @@ package quasar.qscript.qsu
 import slamdata.Predef._
 
 import quasar.Planner.{InternalError, PlannerErrorME}
-import quasar.fp.ski.κ
 import quasar.fp.symbolOrder
-import quasar.qscript.{FreeMap, FreeMapA, Hole, HoleF, ReduceIndexF, SrcHole}
+import quasar.fp.ski.ι
+import quasar.qscript.{Hole, HoleF, ReduceIndexF, SrcHole}
+import ApplyProvenance.AuthenticatedQSU
 
 import matryoshka._
-import scalaz.{Id, ISet, Monad, Traverse}
-import scalaz.std.list._
-import scalaz.std.option._
-import scalaz.syntax.either._
-import scalaz.syntax.foldable._
-import scalaz.syntax.monad._
-import scalaz.syntax.std.option._
+import scalaz.{Id, ISet, Monad, Scalaz}, Scalaz._
 
-object ReifyBuckets {
+final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extends QSUTTypes[T] {
   import QSUGraph.Extractors._
-  import ApplyProvenance.AuthenticatedQSU
 
-  def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Monad: PlannerErrorME](aqsu: AuthenticatedQSU[T])
+  val prov = QProv[T]
+  val qsu  = QScriptUniform.Optics[T]
+
+  def apply[F[_]: Monad: PlannerErrorME](aqsu: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] = {
 
-    val prov = QProv[T]
-    val qsu  = QScriptUniform.Optics[T]
-    val LF   = Traverse[List].compose[FreeMapA[T, ?]]
-    val LFA  = LF.compose[Access]
-
-    val bucketsReified = aqsu.graph rewriteM {
+    val bucketsReified = aqsu.graph.rewriteM[F] {
       case g @ LPReduce(source, reduce) =>
-        val buckets = prov.buckets(prov.reduce(aqsu.dims(source.root)))
-        val srcs = LF.foldMap(buckets)(a => ISet.fromFoldable(Access.valueSymbol.getOption(a))).toIList
+        for {
+          res <- bucketsFor[F](aqsu.auth, source.root)
 
-        val discovered: F[(Symbol, FreeMap[T])] =
-          srcs.toNel.fold((source.root, HoleF[T]).point[F]) { syms =>
+          (srcs, buckets) = res
+
+          discovered <- srcs.toList.toNel.fold((source.root, HoleF[T]).point[F]) { syms =>
             val region =
-              syms.findMapM[Id.Id, (Symbol, FreeMap[T])](
+              syms.findMapM[Id.Id, (Symbol, FreeMap)](
                 s => MappableRegion.unaryOf(s, source) strengthL s)
 
-            region getOrElseF {
-              PlannerErrorME[F].raiseError(InternalError(
-                s"[ReifyBuckets] Expected to find a mappable region in ${source.root} based on one of ${syms}.",
+            region getOrElseF PlannerErrorME[F].raiseError(
+              InternalError(
+                s"Expected to find a mappable region in ${source.root} based on one of ${syms}.",
                 None))
-            }
           }
 
-        discovered map { case (newSrc, fm) =>
+          (newSrc, fm) = discovered
+
+        } yield {
           g.overwriteAtRoot(qsu.qsReduce(
             newSrc,
-            LFA.map(buckets)(κ(SrcHole : Hole)),
+            buckets,
             List(reduce as fm),
             ReduceIndexF[T](0.right)))
         }
 
       case g @ QSSort(source, Nil, keys) =>
         val src = source.root
-        val buckets = prov.buckets(prov.reduce(aqsu.dims(src)))
 
-        g.overwriteAtRoot(qsu.qsSort(
-          src,
-          LFA.map(buckets)(κ(SrcHole : Hole)),
-          keys)).point[F]
+        bucketsFor[F](aqsu.auth, src) map { case (_, buckets) =>
+          g.overwriteAtRoot(qsu.qsSort(src, buckets, keys))
+        }
     }
 
     bucketsReified map (g => aqsu.copy(graph = g))
   }
+
+  ////
+
+  private def bucketsFor[F[_]: Monad: PlannerErrorME]
+      (qauth: QAuth, vertex: Symbol)
+      : F[(ISet[Symbol], List[FreeAccess[Hole]])] =
+    for {
+      vdims <- qauth.lookupDimsE[F](vertex)
+
+      ids = prov.buckets(prov.reduce(vdims)).toList
+
+      res <- ids traverse {
+        case id @ IdAccess.GroupKey(s, i) =>
+          qauth.lookupGroupKeyE[F](s, i)
+            .map(fm => (ISet.singleton(s), fm as Access.value[prov.D, Hole](SrcHole)))
+
+        case other =>
+          (ISet.empty[Symbol], HoleF[T] as Access.id[prov.D, Hole](other, SrcHole)).point[F]
+      }
+    } yield res.unfzip leftMap (_.foldMap(ι))
+}
+
+object ReifyBuckets {
+  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad: PlannerErrorME]
+      (aqsu: AuthenticatedQSU[T])
+      : F[AuthenticatedQSU[T]] =
+    taggedInternalError("ReifyBuckets", new ReifyBuckets[T].apply[F](aqsu))
 }

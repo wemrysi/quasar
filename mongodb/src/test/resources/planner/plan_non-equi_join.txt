@@ -52,7 +52,7 @@ Chain
 │  │     │  ╰─ Name("_id" -> "$_id")
 │  │     ╰─ IncludeId
 │  ╰─ Chain
-│     ├─ $ReadF(db; zips2)
+│     ├─ $ReadF(db; smallZips)
 │     ├─ $MatchF
 │     │  ╰─ Or
 │     │     ├─ Doc

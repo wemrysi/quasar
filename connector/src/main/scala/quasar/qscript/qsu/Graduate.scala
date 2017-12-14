@@ -20,19 +20,23 @@ import slamdata.Predef._
 
 import quasar.NameGenerator
 import quasar.Planner.{InternalError, PlannerErrorME}
+import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.MonadReader_
+import quasar.ejson.EJson
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.qscript.{
+  construction,
   educatedToTotal,
   Filter,
   Hole,
   HoleF,
-  JoinSide,
   LeftSide,
   RightSide,
   LeftShift,
+  JoinSide,
   Map,
   QCE,
   QScriptEducated,
@@ -46,18 +50,19 @@ import quasar.qscript.{
   ThetaJoin,
   Union,
   Unreferenced}
+import quasar.qscript.provenance.JoinKeys
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.QSUGraph.QSUPattern
 import quasar.qscript.qsu.ReifyIdentities.ResearchedQSU
 
-import matryoshka.{Corecursive, CorecursiveT, CoalgebraM, Recursive, ShowT}
-//import matryoshka.data.free._
+import matryoshka.{Corecursive, BirecursiveT, CoalgebraM, Recursive, ShowT}
 import matryoshka.data._
+//import matryoshka.data.free._
 import matryoshka.patterns.CoEnv
 import scalaz.{~>, -\/, \/-, \/, Const, Inject, Monad, NaturalTransformation, ReaderT}
 import scalaz.Scalaz._
 
-final class Graduate[T[_[_]]: CorecursiveT: ShowT] private () extends QSUTTypes[T] {
+final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[T] {
 
   type QSE[A] = QScriptEducated[A]
 
@@ -77,6 +82,8 @@ final class Graduate[T[_[_]]: CorecursiveT: ShowT] private () extends QSUTTypes[
   private type RefsR[F[_]] = MonadReader_[F, References]
 
   private final case class SrcMerge[A, B](src: A, lval: B, rval: B)
+
+  private val func = construction.Func[T]
 
   private def mergeSources[F[_]: Monad: PlannerErrorME: NameGenerator: RefsR](
       left: QSUGraph,
@@ -153,8 +160,16 @@ final class Graduate[T[_[_]]: CorecursiveT: ShowT] private () extends QSUTTypes[
       def holeAs(sym: Symbol): Hole => Symbol =
         κ(sym)
 
-      def resolveAccess[A, B](fa: FreeMapA[B])(ex: B => Access[A] \/ A)(f: A => Symbol): F[FreeMapA[A]] =
-        MR.asks(_.resolveAccess[A, B](name, fa)(ex, f))
+      def resolveAccess[A, B](fa: FreeMapA[A])(ex: A => QAccess[B] \/ B)(f: B => Symbol): F[FreeMapA[B]] =
+        MR.asks(_.resolveAccess[A, B](name, fa)(f)(ex))
+
+      def eqCond(lroot: Symbol, rroot: Symbol): JoinKeys.JoinKey[QIdAccess] => F[JoinFunc] = {
+        case JoinKeys.JoinKey(l, r) =>
+          for {
+            lside <- resolveAccess(func.Hole as Access.id(l, lroot))(_.left)(κ(lroot))
+            rside <- resolveAccess(func.Hole as Access.id(r, rroot))(_.left)(κ(rroot))
+          } yield func.Eq(lside >> func.LeftSide, rside >> func.RightSide)
+      }
 
       qsu match {
         case QSU.Read(path) =>
@@ -178,8 +193,8 @@ final class Graduate[T[_[_]]: CorecursiveT: ShowT] private () extends QSUTTypes[
             resolvedRepair <-
               resolveAccess(repair) {
                 case QSU.AccessLeftTarget(access) => access.map[JoinSide](_ => LeftSide).left
-                case QSU.LeftTarget => (LeftSide: JoinSide).right
-                case QSU.RightTarget => (RightSide: JoinSide).right
+                case QSU.LeftTarget() => (LeftSide: JoinSide).right
+                case QSU.RightTarget() => (RightSide: JoinSide).right
               }(κ(source.root))
           } yield QCE(LeftShift[T, QSUGraph](source, struct, idStatus, resolvedRepair))
 
@@ -202,7 +217,7 @@ final class Graduate[T[_[_]]: CorecursiveT: ShowT] private () extends QSUTTypes[
 
         // TODO distinct should be its own node in qscript proper
         case QSU.Distinct(source) =>
-          resolveAccess(HoleF map (Access.value(_)))(_.left)(holeAs(source.root)) map { fm =>
+          resolveAccess(HoleF map (Access.value[T[EJson], Hole](_)))(_.left)(holeAs(source.root)) map { fm =>
             QCE(Reduce[T, QSUGraph](
               source,
               // Bucket by the value
@@ -215,13 +230,23 @@ final class Graduate[T[_[_]]: CorecursiveT: ShowT] private () extends QSUTTypes[
         case QSU.Unreferenced() =>
           QCE(Unreferenced[T, QSUGraph]()).point[F]
 
-        case QSU.ThetaJoin(left, right, condition, joinType, combiner) =>
-          val qsCondition = resolveAccess(condition)(_.left)(_.fold(left.root, right.root))
+        case QSU.QSAutoJoin(left, right, joinKeys, combiner) =>
+          val condition = joinKeys.keys.toNel.fold(func.Constant[JoinSide](EJson.bool(true)).point[F]) { jks =>
+            val (l, r) = (left.root, right.root)
+            jks.foldMapLeft1(eqCond(l, r))((fm, k) => (eqCond(l, r)(k) |@| fm)(func.And(_, _)))
+          }
 
-          (mergeSources[F](left, right) |@| qsCondition) { (srcs, cond) =>
-            val SrcMerge(source, lBranch, rBranch) = srcs
-            Inject[ThetaJoin, QSE].inj(
-              ThetaJoin[T, QSUGraph](source, lBranch, rBranch, cond, joinType, combiner))
+          (mergeSources[F](left, right) |@| condition) {
+            case (SrcMerge(source, lBranch, rBranch), cond) =>
+              Inject[ThetaJoin, QSE].inj(
+                ThetaJoin[T, QSUGraph](source, lBranch, rBranch, cond, JoinType.Inner, combiner))
+          }
+
+        case QSU.ThetaJoin(left, right, condition, joinType, combiner) =>
+          mergeSources[F](left, right) map {
+            case SrcMerge(source, lBranch, rBranch) =>
+              Inject[ThetaJoin, QSE].inj(
+                ThetaJoin[T, QSUGraph](source, lBranch, rBranch, condition, joinType, combiner))
           }
 
         case qsu =>
@@ -268,7 +293,7 @@ final class Graduate[T[_[_]]: CorecursiveT: ShowT] private () extends QSUTTypes[
 
 object Graduate {
   def apply[
-      T[_[_]]: CorecursiveT: ShowT,
+      T[_[_]]: BirecursiveT: ShowT,
       F[_]: Monad: PlannerErrorME: NameGenerator]
       (rqsu: ResearchedQSU[T])
       : F[T[QScriptEducated[T, ?]]] =

@@ -26,34 +26,33 @@ import quasar.qscript.{
   Hole,
   SrcHole
 }
-import quasar.qscript.provenance.Dimensions
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import QSU.Rotation
 import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 import quasar.contrib.scalaz._
+import quasar.ejson.EJson
 
 import matryoshka.{Hole => _, _}
 import scalaz._
 import scalaz.Scalaz._
-import WriterT.writerTMonadListen
+import StateT.stateTMonadState
 
-final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
+final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
   val func = construction.Func[T]
   val hole: Hole = SrcHole
 
   private val prov = new QProv[T]
   private type P = prov.P
-  private type DimsT[F[_], A] = WriterT[F, Dims, A]
-  private type Dims = List[(Symbol, Dimensions[P])]
+  private type AuthT[F[_], A] = StateT[F, QAuth, A]
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def apply[F[_]: Monad: NameGenerator: PlannerErrorME](aqsu: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] = {
-    type G[A] = DimsT[StateT[F, RevIdx, ?], A]
+    type G[A] = AuthT[StateT[F, RevIdx, ?], A]
 
     for {
-      pair <- aqsu.graph.rewriteM[G](expandShifts[G](aqsu.dims)).run.eval(aqsu.graph.generateRevIndex)
-      (dims, graph) = pair
-    } yield AuthenticatedQSU(graph, dims.foldLeft(aqsu.dims)((dims, dim) => dims + dim))
+      pair <- aqsu.graph.rewriteM[G](expandShifts[G]).run(aqsu.auth).eval(aqsu.graph.generateRevIndex)
+      (auth, graph) = pair
+    } yield AuthenticatedQSU(graph, auth)
   }
 
   val originalKey = "original"
@@ -66,8 +65,8 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
   }
 
   def expandShifts[
-    G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: PlannerErrorME: MonadTell_[?[_], Dims]
-    ](dims: QSUDims[T])
+    G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: PlannerErrorME: MonadState_[?[_], QAuth]
+    ]
       : PartialFunction[QSUGraph, G[QSUGraph]] = {
     case mls@MultiLeftShift(source, shifts, repair) =>
       val mapper = repair.flatMap {
@@ -77,7 +76,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
       val sortedShifts = IList.fromList(shifts).sortBy(_._3).toList
       val shiftedG = sortedShifts match {
         case (struct, idStatus, rotation) :: ss =>
-          val firstRepair: FreeMapA[QScriptUniform.ShiftTarget] =
+          val firstRepair: FreeMapA[QScriptUniform.ShiftTarget[T]] =
             func.ConcatMaps(
               func.MakeMapS("original", func.AccessLeftTarget(Access.valueHole(_))),
               func.MakeMapS("0", func.RightTarget)
@@ -86,26 +85,22 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
             QSU.LeftShift[T, Symbol](source.root, struct, idStatus, firstRepair, rotation)
           for {
             firstShift <- QSUGraph.withName[T, G](firstShiftPat)
-            firstShiftDim <- ApplyProvenance.computeProvenanceƒ[T, G].apply(
-              QSUGraph.QSUPattern(firstShift.root, firstShiftPat.map(s => (s, dims(s)))))
-            _ <- MonadTell_[G, Dims].tell(firstShiftDim :: Nil)
-            shiftAndDimAndRotation <- ss.zipWithIndex.foldLeftM[G, (QSUGraph, Dimensions[P], Rotation)]((firstShift :++ mls, firstShiftDim._2, rotation)) {
-              case ((shiftAbove, shiftAboveDim, rotationAbove), ((newStruct, newIdStatus, newRotation), idx)) =>
+            _ <- ApplyProvenance.computeProvenance[T, G](firstShift)
+            shiftAndRotation <- ss.zipWithIndex.foldLeftM[G, (QSUGraph, Rotation)]((firstShift :++ mls, rotation)) {
+              case ((shiftAbove, rotationAbove), ((newStruct, newIdStatus, newRotation), idx)) =>
                 val repair = func.ConcatMaps(func.AccessLeftTarget(Access.valueHole(_)), func.MakeMapS((idx + 1).toString, func.RightTarget))
                 val struct = newStruct >> func.ProjectKeyS(func.Hole, originalKey)
                 val newShiftPat =
                   QSU.LeftShift[T, Symbol](shiftAbove.root, struct, newIdStatus, repair, newRotation)
                 for {
                   newShift <- QSUGraph.withName[T, G](newShiftPat)
-                  newShiftDim <- ApplyProvenance.computeProvenanceƒ[T, G].apply(
-                    QSUGraph.QSUPattern(newShift.root, (newShiftPat: QScriptUniform[Symbol]).map(s => (s, shiftAboveDim)))
-                  )
+                  _ <- ApplyProvenance.computeProvenance[T, G](newShift)
                   identityCondition =
                   if (rotationsCompatible(rotationAbove, newRotation))
                     func.Cond(
                       func.Eq(
-                        func.AccessLeftTarget(Access.identityHole(shiftAbove.root, _)),
-                        func.AccessLeftTarget(Access.identityHole(newShift.root, _))),
+                        func.AccessLeftTarget(Access.id(IdAccess.identity[T[EJson]](shiftAbove.root), _)),
+                        func.AccessLeftTarget(Access.id(IdAccess.identity[T[EJson]](newShift.root), _))),
                       repair,
                       func.Undefined
                     )
@@ -113,10 +108,9 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
                   newShiftNewRepairPat =
                     newShiftPat.copy(repair = identityCondition)
                   newShiftNewRepair = newShift.overwriteAtRoot(newShiftNewRepairPat)
-                  _ <- MonadTell_[G, Dims].tell((newShiftNewRepair.root -> newShiftDim._2) :: Nil)
-                } yield (newShiftNewRepair :++ shiftAbove, newShiftDim._2, newRotation)
+                } yield (newShiftNewRepair :++ shiftAbove, newRotation)
             }
-            (nestedShifts, _, _) = shiftAndDimAndRotation
+            (nestedShifts, _) = shiftAndRotation
           } yield nestedShifts
         case Nil => source.pure[G]
       }
@@ -129,7 +123,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT] extends QSUTTypes[T] {
 
 object ExpandShifts {
   def apply[
-      T[_[_]]: BirecursiveT: EqualT,
+      T[_[_]]: BirecursiveT: EqualT: ShowT,
       F[_]: Monad: NameGenerator: PlannerErrorME](
       qgraph: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] =

@@ -5,14 +5,13 @@
         "marklogic_json":    "ignoreFieldOrder"
 
     },
-    "NB": "pending on mimir due to sorting issue (should be pendingIgnoreFieldOrder, but that breaks because the predicate is buggy)",
     "NB": "disabled on couchbase due to lack of general join",
     "data": "otherpatients.data",
     "query": "SELECT AVG(cnt) as measure, state as category FROM
                 (SELECT COUNT(*) as cnt, state, gender FROM otherpatients
                 WHERE codes[*].desc LIKE \"%flu%\"
                 GROUP BY state, gender
-                ORDER BY COUNT(*) DESC, state ASC) as meh",
+                ORDER BY COUNT(*) DESC, state ASC)",
     "predicate": "initial",
     "expected": [{ "measure": 1.238095238095, "category": "NE" },
                  { "measure": 1.238095238095, "category": "AL" },

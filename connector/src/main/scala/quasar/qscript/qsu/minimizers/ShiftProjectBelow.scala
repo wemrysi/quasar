@@ -19,7 +19,7 @@ package minimizers
 
 import quasar.{NameGenerator, Planner, RenderTreeT}, Planner.PlannerErrorME
 import quasar.contrib.matryoshka._
-import quasar.contrib.scalaz.MonadState_
+import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski.κ
@@ -45,7 +45,8 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
   private val N = new NormalizableT[T]
 
-  private val accessHoleLeftF = Access.valueHole(SrcHole).left[Int].point[FreeMapA]
+  private val accessHoleLeftF =
+    Access.valueHole[T[EJson]](SrcHole).left[Int].point[FreeMapA]
 
   // TODO ternary support
   def couldApplyTo(candidates: List[QSUGraph]): Boolean = candidates match {
@@ -63,7 +64,7 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
   }
 
   def extract[
-      G[_]: Monad: NameGenerator: PlannerErrorME: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState[T]]](
+      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]](
       qgraph: QSUGraph): Option[(QSUGraph, (QSUGraph, FreeMap) => G[QSUGraph])] = qgraph match {
 
     case ConsecutiveLeftShifts(src, shifts) =>
@@ -77,17 +78,10 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
             val struct2 = struct.flatMap(κ(fm))
 
             val repair2 = repair flatMap {
-              case QSU.AccessLeftTarget(Access.valueHole(_)) =>
-                fm.map[QSU.ShiftTarget](κ(QSU.AccessLeftTarget(Access.valueHole(SrcHole))))
-
-              case access @ QSU.AccessLeftTarget(_) =>
-                (access: QSU.ShiftTarget).pure[FreeMapA]
-
-              case QSU.LeftTarget =>
-                scala.sys.error("QSU.LeftTarget in ShiftProjectBelow")
-
-              case QSU.RightTarget =>
-                func.RightTarget
+              case QSU.AccessLeftTarget(Access.Value(_)) => fm.map[QSU.ShiftTarget[T]](κ(QSU.AccessLeftTarget[T](Access.valueHole(SrcHole))))
+              case access@QSU.AccessLeftTarget(_) => (access: QSU.ShiftTarget[T]).pure[FreeMapA]
+              case QSU.LeftTarget() => scala.sys.error("QSU.LeftTarget in CollapseShifts")
+              case QSU.RightTarget() => func.RightTarget
             }
 
             updateGraph[T, G](QSU.LeftShift(src.root, struct2, idStatus, repair2, rot)) map { rewritten =>
@@ -102,10 +96,10 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
             val repair2 = repair flatMap {
               case -\/(access) =>
-                fm.map[Access[Hole] \/ Int](κ(-\/(access)))
+                fm.map[QAccess[Hole] \/ Int](κ(-\/(access)))
 
               case \/-(idx) =>
-                idx.right[Access[Hole]].point[FreeMapA]
+                idx.right[QAccess[Hole]].point[FreeMapA]
             }
 
             updateGraph[T, G](QSU.MultiLeftShift(src.root, shifts2, repair2)) map { rewritten =>
@@ -149,7 +143,7 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
   }
 
   def apply[
-      G[_]: Monad: NameGenerator: PlannerErrorME: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState[T]]](
+      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]](
       qgraph: QSUGraph,
       src: QSUGraph,
       candidates: List[QSUGraph],
@@ -177,7 +171,7 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
             case -\/(QSU.LeftShift(_, struct, idStatus, repair, rot)) =>
               val repair2 = fm2 flatMap {
                 case 0 => repair
-                case 1 => func.AccessLeftTarget(Access.valueHole(_))
+                case 1 => func.AccessLeftTarget(Access.valueHole[T[EJson]](_))
               }
 
               QSU.LeftShift[T, Symbol](src.root, struct, idStatus, repair2, rot)
@@ -201,7 +195,7 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
           val initPattern = reversed.head match {
             case -\/(QSU.LeftShift(_, struct, idStatus, repair, rot)) =>
               val repair2 = func.ConcatMaps(
-                func.MakeMapS("original", func.AccessLeftTarget(Access.valueHole(_))),
+                func.MakeMapS("original", func.AccessLeftTarget(Access.valueHole[T[EJson]](_))),
                 func.MakeMapS("results", repair))
 
               QSU.LeftShift[T, Symbol](src.root, struct, idStatus, repair2, rot)
@@ -222,15 +216,17 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
                 val struct2 = struct.flatMap(κ(func.ProjectKeyS(func.Hole, "results")))
 
                 val repair2 = repair flatMap {
-                  case QSU.AccessLeftTarget(Access.valueHole(_)) =>
-                    func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "results")
-                  case QSU.LeftTarget => scala.sys.error("QSU.LeftTarget in ShiftProjectBelow")
-                  case QSU.RightTarget => func.RightTarget
+                  case QSU.AccessLeftTarget(Access.Value(_)) =>
+                    func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole[T[EJson]](_)), "results")
+                  case QSU.AccessLeftTarget(access) =>
+                    func.AccessLeftTarget(access.as(_))
+                  case QSU.LeftTarget() => scala.sys.error("QSU.LeftTarget in ShiftProjectBelow")
+                  case QSU.RightTarget() => func.RightTarget
                 }
 
                 // we use right-biased map concat to our advantage here and overwrite results
                 val repair3 = func.ConcatMaps(
-                  func.AccessLeftTarget(Access.valueHole(_)),
+                  func.AccessLeftTarget(Access.valueHole[T[EJson]](_)),
                   func.MakeMapS("results", repair2))
 
                 updateGraph[T, G](QSU.LeftShift[T, Symbol](src.root, struct2, idStatus, repair3, rot)) map { rewritten =>
@@ -249,7 +245,7 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
                   case -\/(access) =>
                     func.ProjectKeyS(access.left[Int].point[FreeMapA], "results")
 
-                  case \/-(idx) => idx.right[Access[Hole]].point[FreeMapA]
+                  case \/-(idx) => idx.right[QAccess[Hole]].point[FreeMapA]
                 }
 
                 // we use right-biased map concat to our advantage here and overwrite results

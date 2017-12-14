@@ -22,8 +22,9 @@ import quasar.Planner.PlannerErrorME
 import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka.{delayShow, showTShow, BirecursiveT, EqualT, ShowT}
-import scalaz.{Applicative, Functor, Kleisli => K, Monad, Show}
+import scalaz.{Applicative, Cord, Functor, Kleisli => K, Monad, Show}
 import scalaz.syntax.applicative._
+import scalaz.syntax.show._
 
 final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends QSUTTypes[T] {
   import LPtoQS.MapSyntax
@@ -54,9 +55,8 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends QS
       debugAG("ReifyAutoJoins: ")      >==>
       ExpandShifts[T, F]               >==>
       debugAG("ExpandShifts: ")        >-
-      (_.graph)                        >-
       ResolveOwnIdentities[T]          >==>
-      debugG("ResolveOwnIdentities: ") >==>
+      debugAG("ResolveOwnIdentities: ") >==>
       ReifyIdentities[T, F]            >==>
       debugRG("ReifyIdentities: ")     >==>
       Graduate[T, F]
@@ -75,7 +75,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends QS
   private def debug[F[_]: Applicative, A: Show](prefix: String)(in: A): F[A] = {
     // uh... yeah do better
     in.point[F].map { i =>
-      maybePrint("\n\n" + prefix + Show[A].shows(in))
+      maybePrint((Cord("\n\n") ++ Cord(prefix) ++ in.show).toString)
       i
     }
   }

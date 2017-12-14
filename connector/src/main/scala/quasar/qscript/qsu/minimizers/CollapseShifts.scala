@@ -58,11 +58,11 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] private () exte
       def rebuild(src: QSUGraph, fm: FreeMap): G[QSUGraph] = {
         val struct2 = struct.flatMap(κ(fm))
 
-        val repair2 = repair flatMap[QSU.ShiftTarget] {
-          case QSU.AccessLeftTarget(Access.valueHole(_)) => fm.map(κ(QSU.AccessLeftTarget(Access.valueHole(SrcHole))))
-          case access@QSU.AccessLeftTarget(_) => (access: QSU.ShiftTarget).pure[FreeMapA]
-          case QSU.LeftTarget => scala.sys.error("QSU.LeftTarget in CollapseShifts")
-          case QSU.RightTarget => func.RightTarget
+        val repair2 = repair flatMap[QSU.ShiftTarget[T]] {
+          case QSU.AccessLeftTarget(Access.Value(_)) => fm.map(κ(QSU.AccessLeftTarget(Access.valueHole(SrcHole))))
+          case QSU.AccessLeftTarget(access) => (QSU.AccessLeftTarget[T](access): QSU.ShiftTarget[T]).pure[FreeMapA]
+          case QSU.LeftTarget() => scala.sys.error("QSU.LeftTarget in CollapseShifts")
+          case QSU.RightTarget() => func.RightTarget
         }
 
         updateGraph[T, G](QSU.LeftShift(src.root, struct2, idStatus, repair2, rot)) map { rewritten =>
@@ -105,9 +105,9 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] private () exte
           case \/-(mls) => mls.shifts.length
         } {
           case (-\/(ls), idx) => ls.repair.map {
-            case QSU.LeftTarget => scala.sys.error("QSU.LeftTarget in CollapseShifts")
+            case QSU.LeftTarget() => scala.sys.error("QSU.LeftTarget in CollapseShifts")
             case QSU.AccessLeftTarget(access) => access.left[Int]
-            case QSU.RightTarget => idx.right[Access[Hole]]
+            case QSU.RightTarget() => idx.right[QAccess[Hole]]
           }
           case (\/-(mls), idx) => mls.repair.map(_.map(_ + idx))
         }
