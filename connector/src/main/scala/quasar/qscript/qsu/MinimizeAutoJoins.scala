@@ -92,7 +92,9 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       case (MinimizationState(auth, _), graph) => AuthenticatedQSU[T](graph, auth)
     }
 
-    lifted.eval(agraph.graph.generateRevIndex)
+    lifted.eval(agraph.graph.generateRevIndex) flatMap { aqsu =>
+      ApplyProvenance[T, F](aqsu.graph)
+    }
   }
 
   // the Ints are indices into branches
@@ -243,6 +245,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
                     }
 
                     back <- OptionT(minimizer[G](qgraph, simplifiedSource, candidates2, fm))
+                    _ <- updateProvenance[T, G](back._2).liftM[OptionT]
                   } yield back.bimap(simplifiedSource ++: _, simplifiedSource ++: _)
 
                   backM.run
@@ -271,7 +274,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
     MinStateM[T, G] modify { state =>
       val auth2 = candidates.foldLeft(state.auth) { (auth, c) =>
         if (c.root =/= newRoot)
-          auth.supplant(c.root, newRoot)
+          auth.renameRefs(c.root, newRoot)
         else
           auth
       }
@@ -327,12 +330,22 @@ object MinimizeAutoJoins {
 
     for {
       qgraph <- QSUGraph.withName[T, G](pat)
+      _ <- updateProvenance[T, G](qgraph)
+    } yield qgraph
+  }
 
+  def updateProvenance[
+      T[_[_]]: BirecursiveT: EqualT: ShowT,
+      G[_]: Monad: NameGenerator: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]: PlannerErrorME](
+      qgraph: QSUGraph[T]): G[Unit] = {
+
+    for {
       state <- MinStateM[T, G].get
 
-      computed <- ApplyProvenance.computeProvenance[T, StateT[G, QAuth[T], ?]](qgraph).exec(state.auth)
+      computed <-
+        ApplyProvenance.computeProvenance[T, StateT[G, QAuth[T], ?]](qgraph).exec(state.auth)
 
       _ <- MinStateM[T, G].put(state.copy(auth = computed))
-    } yield qgraph
+    } yield ()
   }
 }

@@ -83,6 +83,17 @@ final case class QAuth[T[_[_]]](
 
     QAuth(supDims, supKeys)
   }
+
+  def renameRefs
+      (target: Symbol, replacement: Symbol)
+      (implicit T0: BirecursiveT[T], T1: EqualT[T])
+      : QAuth[T] = {
+
+    val qp = QProv[T]
+    val supDims = dims.mapValues(qp.rename(target, replacement, _))
+
+    QAuth(supDims, groupKeys)
+  }
 }
 
 object QAuth extends QAuthInstances {

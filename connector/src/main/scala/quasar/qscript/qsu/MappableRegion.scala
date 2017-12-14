@@ -39,6 +39,7 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz.{Kleisli, Free, Traverse}
 import scalaz.std.option._
+import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 import scalaz.syntax.equal._
 import scalaz.syntax.plus._
@@ -70,6 +71,9 @@ object MappableRegion {
     g.project match {
       case QSUPattern(s, _) if halt(s) =>
         CoEnv(g.left[FreeMapA[T, QSUGraph[T]]])
+
+      case QSUPattern(_, DimEdit(srcG, _)) =>
+        CoEnv(srcG.point[FreeMapA[T, ?]].right[QSUGraph[T]])
 
       case QSUPattern(_, Map(srcG, fm)) =>
         CoEnv(fm.map(_ => srcG).right[QSUGraph[T]])

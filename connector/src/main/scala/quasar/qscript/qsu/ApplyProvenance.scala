@@ -54,10 +54,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
     val authGraph = graph.rewriteM[X] {
       case g @ Extractors.DimEdit(src, _) =>
-        for {
-          _ <- computeProvenance[X](g)
-          _ <- QAuthS[X].modify(_.supplant(src.root, g.root))
-        } yield g.overwriteAtRoot(src.unfold map (_.root))
+        computeProvenance[X](g).map(_ => g)
 
       case g @ Extractors.Transpose(src, retain, rot) =>
         computeProvenance[X](g) as g.overwriteAtRoot {

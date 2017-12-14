@@ -459,11 +459,11 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       runOn(qgraph) must beLike {
         case AutoJoin2C(
           Map(
-            Map(Read(_), guardL),
+            DimEdit(Map(Read(_), guardL), _),
             minL),
           Map(
             QSReduce(
-              Map(Read(_), guardR),
+              DimEdit(Map(Read(_), guardR), _),
               bucket :: Nil,
               ReduceFuncs.Sum(prjPop) :: Nil,
               _),
