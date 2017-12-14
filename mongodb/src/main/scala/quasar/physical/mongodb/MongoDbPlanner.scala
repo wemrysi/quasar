@@ -228,6 +228,9 @@ object MongoDbPlanner {
       case ConcatMaps(a1, a2) => unimplemented[M, Fix[ExprOp]]("ConcatMap expression")
       case ProjectKey($var(dv), $literal(Bson.Text(key))) =>
         $var(dv \ BsonField.Name(key)).point[M]
+      case ProjectKey(el @ $arrayElemAt($var(dv), _), $literal(Bson.Text(key))) =>
+        $let(ListMap(DocVar.Name("el") -> el),
+          $var(DocVar.ROOT(BsonField.Name("$el")) \ BsonField.Name(key))).point[M]
       case ProjectKey(a1, a2) => unimplemented[M, Fix[ExprOp]](s"ProjectKey expression")
       case ProjectIndex(a1, a2)  => unimplemented[M, Fix[ExprOp]]("ProjectIndex expression")
       case DeleteKey(a1, a2)  => unimplemented[M, Fix[ExprOp]]("DeleteKey expression")

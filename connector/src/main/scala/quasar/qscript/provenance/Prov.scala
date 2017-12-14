@@ -141,13 +141,13 @@ trait Prov[D, I, P] {
     })
   }
 
-  // eliminate duplicates within contiguous Both/OneOf and reassociate to the left
+  // eliminate duplicates within contiguous Both/OneOf and reassociate to the right
   def normalize(p: P)(implicit eqD: Equal[D], eqI: Equal[I]): P = {
     def normalize0(alternates: NEL[NEL[P]]): P =
       alternates
-        .map(_.distinctE1.foldLeft1(both(_, _)))
+        .map(_.distinctE1.foldRight1(both(_, _)))
         .distinctE1
-        .foldLeft1(oneOf(_, _))
+        .foldRight1(oneOf(_, _))
 
     val normalizeƒ: Algebra[PF, NEL[NEL[P]]] = {
       case Both(l, r)  => (l |@| r)(_ append _)

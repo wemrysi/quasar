@@ -442,16 +442,16 @@ class PlannerQScriptSpec extends
 
     "plan typechecks with JS when unable to extract ExprOp" in {
       import fix.{Filter, ShiftedRead}, qscript.IncludeId
-      import func.{Guard, Hole, ProjectKeyS, ProjectIndexI, Constant}
+      import func.{Constant, DeleteKey, Guard}
 
       qplan(
         Filter(
           ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), IncludeId),
           Guard(
-            ProjectKeyS(ProjectIndexI(Hole, 1), "parentid"),
+            DeleteKey(Constant(json.str("a")), Constant(json.str("b"))),
             Type.Str,
             Constant(json.bool(false)),
-            Constant(json.bool(true))))) must beWorkflow0(
+            Constant(json.bool(true))))) must beWorkflow(
         chain[Workflow](
           $read(collection("db", "zips")),
           $project(reshape("0" -> $arrayLit(List($field("_id"), $$ROOT)))),
@@ -459,12 +459,7 @@ class PlannerQScriptSpec extends
             NonEmptyList(MapExpr(JsFn(Name("x"), obj(
               "0" ->
                 If(Call(ident("isString"),
-                  List(
-                    Select(Access(
-                      Access(
-                        ident("x"),
-                        jscore.Literal(Js.Str("0"))),
-                      jscore.Literal(Js.Num(1, false))), "parentid"))),
+                    List(Call(ident("remove"), List(Literal(Js.Str("a")), Literal(Js.Str("b")))))),
                   jscore.Literal(Js.Bool(false)),
                   jscore.Literal(Js.Bool(true))),
               "src" -> Access(ident("x"), jscore.Literal(Js.Str("0")))
