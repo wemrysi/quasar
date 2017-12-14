@@ -889,9 +889,22 @@ object MongoDbPlanner {
               (src.unFix, struct) match {
                 case (_, Embed(CoEnv(\/-(MFC(Guard(exp, Type.FlexArr(_, _, _), exp0, _)))))) if exp0 === exp => {
                   val struct0 = handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct)
-                  val merge = getExprMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(repair, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
+                  val exprMerge0 = getMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(repair, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
+                  val jsMerge0 = getJsMerge[T, M](repair, jscore.Select(jscore.Ident(JsFn.defaultName), "s"), jscore.Select(jscore.Ident(JsFn.defaultName), "f"))
 
-                  (struct0 |@| merge)((expr, merge0) =>
+                  (struct0 |@| exprMerge0 |@| jsMerge0) { (expr, exprMerge, jsMerge) =>
+                    exprMerge.fold(
+                      ExprBuilder(
+                        FlatteningBuilder(
+                          DocBuilder(
+                            src,
+                            ListMap(
+                              BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                              BsonField.Name("f") -> expr)),
+                          // TODO: Handle arrays properly
+                          Set(StructureType.Object(DocField(BsonField.Name("f")), id))),
+                        -\&/(jsMerge))
+                    )( mrg =>
                     ExprBuilder(
                       FlatteningBuilder(
                         DocBuilder(
@@ -899,7 +912,8 @@ object MongoDbPlanner {
                           ListMap(
                             BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                             BsonField.Name("f") -> expr)),
-                        Set(StructureType.Array(DocField(BsonField.Name("f")), id))), \&/-(merge0)))
+                        Set(StructureType.Array(DocField(BsonField.Name("f")), id))), \&/-(mrg)))
+                  }
                 }
                 case _ =>
                   (handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct) ⊛
@@ -1155,6 +1169,13 @@ object MongoDbPlanner {
       case LeftSide => a1
       case RightSide => a2
     } ∘ (JsFn(JsFn.defaultName, _))
+
+  def getMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR, EX[_]: Traverse]
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], staticHandler: StaticHandler[T, EX])
+    (jf: JoinFunc[T], a1: DocVar, a2: DocVar)
+    (implicit inj: EX :<: ExprOp)
+      : M[Option[Fix[ExprOp]]] =
+    handleErr(getExprMerge[T, M, EX](funcHandler, staticHandler)(jf, a1, a2).map(_.some))(_ => none[Fix[ExprOp]].point[M])
 
   def getExprMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR, EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], staticHandler: StaticHandler[T, EX])
