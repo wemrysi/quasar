@@ -18,10 +18,9 @@ package quasar.qscript.qsu
 
 import slamdata.Predef._
 
-import quasar.NameGenerator
-import quasar.common.JoinType
+import quasar.{NameGenerator, Planner}, Planner.PlannerErrorME
 import quasar.ejson.implicits._
-import quasar.fp.{coproductEqual, symbolOrder}
+import quasar.fp.coproductEqual
 import quasar.qscript.{
   construction,
   Center,
@@ -30,61 +29,65 @@ import quasar.qscript.{
   LeftSideF,
   RightSide3,
   RightSideF}
-import quasar.qscript.provenance.Dimensions
+import quasar.qscript.provenance.JoinKeys
 import quasar.qscript.MapFuncsCore.StrLit
 import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
 import matryoshka._
-import matryoshka.data.free._
 import scalaz.{Monad, WriterT}
 import scalaz.Scalaz._
 
 final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSUTTypes[T] {
   import QSUGraph.Extractors._
 
-  def apply[F[_]: Monad: NameGenerator](qsu: AuthenticatedQSU[T])
+  def apply[F[_]: Monad: NameGenerator: PlannerErrorME](qsu: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] = {
 
-    qsu.graph.rewriteM(reifyAutoJoins[F](qsu.dims)).run map {
+    qsu.graph.rewriteM(reifyAutoJoins[F](qsu.auth)).run map {
       case (additionalDims, newGraph) =>
-        val newDims = additionalDims.foldLeft(qsu.dims)(_ + _)
-        AuthenticatedQSU(newGraph, newDims)
+        val newAuth = additionalDims.foldLeft(qsu.auth)((a, d) => a.addDims(d._1, d._2))
+        AuthenticatedQSU(newGraph, newAuth)
     }
   }
 
   ////
 
-  private val prov = new QProv[T]
+  private val prov = QProv[T]
   private val qsu  = QScriptUniform.Optics[T]
   private val func = construction.Func[T]
 
   private type QSU[A] = QScriptUniform[A]
-  private type P = prov.P
-  private type DimsT[F[_], A] = WriterT[F, List[(Symbol, Dimensions[P])], A]
+  private type DimsT[F[_], A] = WriterT[F, List[(Symbol, QDims)], A]
 
-  private def reifyAutoJoins[F[_]: Monad: NameGenerator](dims: QSUDims[T])
+  private def reifyAutoJoins[F[_]: Monad: NameGenerator: PlannerErrorME](auth: QAuth)
       : PartialFunction[QSUGraph, DimsT[F, QSUGraph]] = {
 
     case g @ AutoJoin2(left, right, combiner) =>
       val (l, r) = (left.root, right.root)
 
-      val condition: FreeAccess[JoinSide] =
-        prov.autojoinCondition(dims(l), dims(r))
+      val keys: F[JoinKeys[QIdAccess]] =
+        (auth.lookupDimsE[F](l) |@| auth.lookupDimsE[F](r))(prov.autojoinKeys(_, _))
 
-      g.overwriteAtRoot(qsu.thetaJoin(
-        l, r, condition, JoinType.Inner, combiner)).point[DimsT[F, ?]]
+      keys.map(ks =>
+        g.overwriteAtRoot(qsu.qsAutoJoin(
+          l, r, ks, combiner)))
+        .liftM[DimsT]
 
     case g @ AutoJoin3(left, center, right, combiner3) =>
       val (l, c, r) = (left.root, center.root, right.root)
 
-      WriterT((NameGenerator[F].prefixedName("autojoin") |@|
+      WriterT((
+        NameGenerator[F].prefixedName("autojoin") |@|
         NameGenerator[F].prefixedName("leftAccess") |@|
-        NameGenerator[F].prefixedName("centerAccess")) {
+        NameGenerator[F].prefixedName("centerAccess") |@|
+        auth.lookupDimsE[F](l) |@|
+        auth.lookupDimsE[F](c) |@|
+        auth.lookupDimsE[F](r)) {
 
-        case (joinName, lName, cName) =>
+        case (joinName, lName, cName, ldims, cdims, rdims) =>
 
-          val lcCondition: FreeAccess[JoinSide] =
-            prov.autojoinCondition(dims(l), dims(c))
+          val lcKeys: JoinKeys[QIdAccess] =
+            prov.autojoinKeys(ldims, cdims)
 
           def lcCombiner: JoinFunc =
             func.ConcatMaps(
@@ -92,7 +95,7 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
               func.MakeMap(StrLit(cName), RightSideF))
 
           def lcJoin: QSU[Symbol] =
-            qsu.thetaJoin(l, c, lcCondition, JoinType.Inner, lcCombiner)
+            qsu.qsAutoJoin(l, c, lcKeys, lcCombiner)
 
           def projLeft[A](hole: FreeMapA[A]): FreeMapA[A] =
             func.ProjectKey(StrLit(lName), hole)
@@ -106,15 +109,15 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
             case RightSide3 => RightSideF
           }
 
-          val lcDims: Dimensions[P] =
-            prov.join(dims(l), dims(c))
+          val lcDims: QDims =
+            prov.join(ldims, cdims)
 
-          val condition: FreeAccess[JoinSide] =
-            prov.autojoinCondition(lcDims, dims(r))
+          val keys: JoinKeys[QIdAccess] =
+            prov.autojoinKeys(lcDims, rdims)
 
           val lcName = Symbol(joinName)
           val lcG = QSUGraph.vertices[T].modify(_.updated(lcName, lcJoin))(g)
-          val lcrJoin = qsu.thetaJoin(lcName, r, condition, JoinType.Inner, combiner)
+          val lcrJoin = qsu.qsAutoJoin(lcName, r, keys, combiner)
 
           (List(lcName -> lcDims), lcG.overwriteAtRoot(lcrJoin))
       })
@@ -124,8 +127,8 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
 object ReifyAutoJoins {
   def apply[
       T[_[_]]: BirecursiveT: EqualT,
-      F[_]: Monad: NameGenerator]
+      F[_]: Monad: NameGenerator: PlannerErrorME]
       (qsu: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] =
-    new ReifyAutoJoins[T].apply[F](qsu)
+    taggedInternalError("ReifyAutoJoins", new ReifyAutoJoins[T].apply[F](qsu))
 }

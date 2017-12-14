@@ -17,59 +17,51 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef._
-import quasar.NameGenerator
+import quasar.{NameGenerator, RenderTreeT}
 import quasar.Planner.PlannerErrorME
 import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka.{delayShow, showTShow, BirecursiveT, EqualT, ShowT}
-import scalaz.{Applicative, Functor, Kleisli => K, Monad}
+import scalaz.{Applicative, Functor, Kleisli => K, Monad, Show}
 import scalaz.syntax.applicative._
 import scalaz.syntax.show._
 
-final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
+final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends QSUTTypes[T] {
   import LPtoQS.MapSyntax
-  import ApplyProvenance.AuthenticatedQSU
 
   def apply[F[_]: Monad: PlannerErrorME: NameGenerator](lp: T[LogicalPlan])
       : F[T[QScriptEducated]] = {
 
     val lpToQs =
-      K(ReadLP[T, F])               >=>
-      debugG("ReadLP: ")            >==>
-      RewriteGroupByArrays[T, F]    >=>
-      debugG("RewriteGBArrays: ")   >-
-      EliminateUnary[T]             >=>
-      debugG("EliminateUnary: ")    >-
-      RecognizeDistinct[T]          >=>
-      debugG("RecognizeDistinct: ") >==>
-      ExtractFreeMap[T, F]          >=>
-      debugG("ExtractFreeMap: ")    >==>
-      ApplyProvenance[T, F]         >=>
-      debugAG("ApplyProv: ")        >==>
-      ReifyBuckets[T, F]            >=>
-      debugAG("ReifyBuckets: ")     >==>
-      MinimizeAutoJoins[T, F]       >=>
-      debugAG("MinimizeAJ: ")       >==>
-      ReifyAutoJoins[T, F]          >=>
-      debugAG("ReifyAutoJoins: ")   >-
-      (_.graph)                     >==>
-      ReifyIdentities[T, F]         >==>
+      K(ReadLP[T, F])              >=>
+      debug("ReadLP: ")            >==>
+      RewriteGroupByArrays[T, F]   >=>
+      debug("RewriteGBArrays: ")   >-
+      EliminateUnary[T]            >=>
+      debug("EliminateUnary: ")    >-
+      RecognizeDistinct[T]         >=>
+      debug("RecognizeDistinct: ") >==>
+      ExtractFreeMap[T, F]         >=>
+      debug("ExtractFreeMap: ")    >==>
+      ApplyProvenance[T, F]        >=>
+      debug("ApplyProv: ")         >==>
+      ReifyBuckets[T, F]           >=>
+      debug("ReifyBuckets: ")      >==>
+      MinimizeAutoJoins[T, F]      >=>
+      debug("MinimizeAJ: ")        >==>
+      ReifyAutoJoins[T, F]         >=>
+      debug("ReifyAutoJoins: ")    >==>
+      ReifyIdentities[T, F]        >=>
+      debug("ReifyIdentities: ")   >==>
       Graduate[T, F]
 
     lpToQs(lp)
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  private def debugG[F[_]: Applicative](prefix: String): K[F, QSUGraph, QSUGraph] =
-    K { g =>
-      maybePrint("\n\n" + prefix + g.shows)    // uh... yeah do better
-      g.point[F]
-    }
-
-  private def debugAG[F[_]: Applicative](prefix: String): K[F, AuthenticatedQSU[T], AuthenticatedQSU[T]] =
-    K { aqsu =>
-      maybePrint("\n\n" + prefix + aqsu.shows)
-      aqsu.point[F]
+  private def debug[F[_]: Applicative, A: Show](prefix: String): K[F, A, A] =
+    K { a =>
+      maybePrint("\n\n" + prefix + a.shows)
+      a.point[F]
     }
 
   private def maybePrint(str: => String): Unit = {
@@ -80,7 +72,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
 }
 
 object LPtoQS {
-  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT]: LPtoQS[T] = new LPtoQS[T]
+  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: LPtoQS[T] = new LPtoQS[T]
 
   final implicit class MapSyntax[F[_], A](val self: F[A]) extends AnyVal {
     def >-[B](f: A => B)(implicit F: Functor[F]): F[B] =

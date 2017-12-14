@@ -68,7 +68,7 @@ trait Dimension[D, I, P] {
 
   /** Collapses all dimensions into a single one. */
   def squash(ds: Dimensions[P]): Dimensions[P] =
-    ds.toNel.fold(ds)(nel => IList(nel.foldLeft1(thenn(_, _))))
+    ds.toNel.fold(ds)(nel => IList(nel.foldRight1(thenn(_, _))))
 
   /** Swaps the dimensions at the nth and mth indices. */
   def swap(idxN: Int, idxM: Int, ds: Dimensions[P]): Dimensions[P] = {
