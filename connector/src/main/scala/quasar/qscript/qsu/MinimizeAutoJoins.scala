@@ -92,9 +92,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       case (MinimizationState(auth, _), graph) => AuthenticatedQSU[T](graph, auth)
     }
 
-    lifted.eval(agraph.graph.generateRevIndex) flatMap { aqsu =>
-      ApplyProvenance[T, F](aqsu.graph)
-    }
+    lifted.eval(agraph.graph.generateRevIndex)
   }
 
   // the Ints are indices into branches

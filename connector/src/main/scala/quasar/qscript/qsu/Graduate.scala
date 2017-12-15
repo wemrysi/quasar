@@ -71,17 +71,8 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
 
     val grad = graduateƒ[G, QSE](None)(NaturalTransformation.refl[QSE])
 
-    val eliminated = {
-      import QSUGraph.Extractors.DimEdit
-
-      rqsu.graph rewrite {
-        case qgraph @ DimEdit(src, _) =>
-          qgraph.overwriteAtRoot(src.vertices(src.root))
-      }
-    }
-
     Corecursive[T[QSE], QSE]
-      .anaM[G, QSUGraph](eliminated)(grad)
+      .anaM[G, QSUGraph](rqsu.graph)(grad)
       .run(rqsu.refs)
   }
 

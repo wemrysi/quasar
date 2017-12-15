@@ -102,11 +102,6 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           qprov.prov.proj(J.str("foobar"))
         , qprov.prov.value(IdAccess.groupKey('n2, 1))
         , qprov.prov.value(IdAccess.groupKey('n2, 0)))
-      , 'n1 -> IList(
-          qprov.prov.proj(J.str("foobar"))
-        , qprov.prov.value(IdAccess.groupKey('n1, 0)))
-      , 'n0 -> IList(
-          qprov.prov.proj(J.str("foobar")))
       ))
     }
 
@@ -128,9 +123,6 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           qprov.prov.thenn(
             qprov.prov.value(IdAccess.identity('n2))
           , qprov.prov.proj(J.str("foobar"))))
-      , 'n1 -> IList(
-          qprov.prov.value(IdAccess.identity('n2))
-        , qprov.prov.proj(J.str("foobar")))
       , 'n2 -> IList(
           qprov.prov.value(IdAccess.identity('n2))
         , qprov.prov.proj(J.str("foobar")))
