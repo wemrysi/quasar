@@ -101,7 +101,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     case qscript.Subset(src, from, sel, count) => sel match {
       case qscript.Drop   => unsupported
       case qscript.Take   => take(src, from, count)
-      case qscript.Sample => take(src, from, count) // TODO needs better sampling (which connectore doesnt?)
+      case qscript.Sample => take(src, from, count) // TODO needs better sampling (which connector doesn't?)
     }
 
     case qscript.Unreferenced() => unref.point[F]
