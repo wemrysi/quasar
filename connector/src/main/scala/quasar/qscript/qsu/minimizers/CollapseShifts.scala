@@ -19,14 +19,12 @@ package minimizers
 
 import quasar.{NameGenerator, Planner}
 import Planner.PlannerErrorME
-import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz.MonadState_
-import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.qscript.{construction, Hole, SrcHole}
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import slamdata.Predef._
-import matryoshka.{BirecursiveT, EqualT, ShowT, delayEqual}
+import matryoshka.{BirecursiveT, EqualT, ShowT}
 import slamdata.Predef
 
 import scalaz.{\/, -\/, \/-, Monad, Monoid, Scalaz}
@@ -47,8 +45,14 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] private () exte
         QSU.MultiLeftShift(source, shifts, repair).right
     }
 
-  def couldApplyTo(candidates: Predef.List[QSUGraph]): Predef.Boolean =
-    candidates.lengthCompare(extractShifts(candidates).length) === 0
+  def couldApplyTo(candidates: Predef.List[QSUGraph]): Predef.Boolean = {
+    candidates forall {
+      case LeftShift(Read(_), _, _, _, _) => false
+      case LeftShift(_, _, _, _, _) => true
+      case MultiLeftShift(_, _, _) => true
+      case _ => false
+    }
+  }
 
   def extract[
       G[_]: Monad: NameGenerator: PlannerErrorME: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState[T]]](

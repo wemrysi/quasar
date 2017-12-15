@@ -484,20 +484,23 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
     }
 
     "coalesce an autojoin on a single leftshift on a shared source" in {
+      val shiftedRead =
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((
           qsu.leftShift(
-            qsu.read(afile),
+            shiftedRead,
             HoleF[Fix],
             ExcludeId,
             func.RightTarget,
             Rotation.ShiftArray),
-          qsu.read(afile),
+          shiftedRead,
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
         case LeftShift(
-          Read(`afile`),
+          LeftShift(Read(`afile`), _, _, _, _),
           struct,
           ExcludeId,
           repair,
@@ -510,11 +513,14 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
     }
 
     "coalesce an autojoin on a single leftshift on a shared source (RTL)" in {
+      val shiftedRead =
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((
-          qsu.read(afile),
+          shiftedRead,
           qsu.leftShift(
-            qsu.read(afile),
+            shiftedRead,
             HoleF[Fix],
             ExcludeId,
             func.RightTarget,
@@ -523,7 +529,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
       runOn(qgraph) must beLike {
         case LeftShift(
-          Read(`afile`),
+          LeftShift(Read(`afile`), _, _, _, _),
           struct,
           ExcludeId,
           repair,
@@ -535,12 +541,15 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
     }
 
     "inductively coalesce reduces on coalesced shifts" in {
+      val shiftedRead =
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+
       // count(a[*]) + sum(a)
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((
           qsu.qsReduce(
             qsu.leftShift(
-              qsu.read(afile),
+              shiftedRead,
               HoleF[Fix],
               ExcludeId,
               func.RightTarget,
@@ -549,7 +558,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             List(ReduceFuncs.Count(HoleF[Fix])),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
           qsu.qsReduce(
-            qsu.read(afile),
+            shiftedRead,
             Nil,
             List(ReduceFuncs.Sum(HoleF[Fix])),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
@@ -559,7 +568,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         case Map(
           QSReduce(
             LeftShift(
-              Read(`afile`),
+              LeftShift(Read(`afile`), _, _, _, _),
               struct,
               ExcludeId,
               repairInner,
@@ -592,12 +601,15 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
     }
 
     "inductively coalesce reduces on coalesced shifts" in {
+      val shiftedRead =
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+
       // count(a[*]) + sum(a)
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((
           qsu.qsReduce(
             qsu.leftShift(
-              qsu.read(afile),
+              shiftedRead,
               HoleF[Fix],
               ExcludeId,
               func.RightTarget,
@@ -606,7 +618,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             List(ReduceFuncs.Count(HoleF[Fix])),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
           qsu.qsReduce(
-            qsu.read(afile),
+            shiftedRead,
             Nil,
             List(ReduceFuncs.Sum(HoleF[Fix])),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
@@ -616,7 +628,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         case Map(
           QSReduce(
             LeftShift(
-              Read(`afile`),
+              LeftShift(Read(`afile`), _, _, _, _),
               struct,
               ExcludeId,
               repairInner,
@@ -649,11 +661,14 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
     }
 
     "coalesce an autojoin on two leftshifts on a shared source" in {
+      val shiftedRead =
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((
           qsu.leftShift(
             qsu.leftShift(
-              qsu.read(afile),
+              shiftedRead,
               HoleF[Fix],
               IncludeId,
               func.RightTarget,
@@ -662,13 +677,13 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             ExcludeId,
             func.RightTarget,
             Rotation.ShiftArray),
-          qsu.read(afile),
+          shiftedRead,
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
         case LeftShift(
           LeftShift(
-            Read(`afile`),
+            LeftShift(Read(`afile`), _, _, _, _),
             structInner,
             IncludeId,
             repairInner,
@@ -699,12 +714,15 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
     }
 
     "coalesce an autojoin on three leftshifts on a shared source" in {
+      val shiftedRead =
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((
           qsu.leftShift(
             qsu.leftShift(
               qsu.leftShift(
-                qsu.read(afile),
+                shiftedRead,
                 HoleF[Fix],
                 IncludeId,
                 func.RightTarget,
@@ -717,14 +735,14 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             ExcludeId,
             func.RightTarget,
             Rotation.ShiftArray),
-          qsu.read(afile),
+          shiftedRead,
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
         case LeftShift(
           LeftShift(
             LeftShift(
-              Read(`afile`),
+              LeftShift(Read(`afile`), _, _, _, _),
               structInnerInner,
               IncludeId,
               repairInnerInner,
@@ -767,13 +785,16 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
     // a[*][*][*] + b - c[*] / d[*][*]
     "coalesce a thing that looks a lot like the search card" in {
+      val shiftedRead =
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+
       // a[*][*][*] + b
       val aplusb =
         qsu.autojoin2((
           qsu.leftShift(
             qsu.leftShift(
               qsu.leftShift(
-                qsu.read(afile),
+                shiftedRead,
                 func.ProjectKeyS(func.Hole, "a"),
                 ExcludeId,
                 func.RightTarget,
@@ -786,21 +807,21 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             ExcludeId,
             func.RightTarget,
             Rotation.ShiftArray),
-          qsu.map((qsu.read(afile), func.ProjectKeyS(func.Hole, "b"))),
+          qsu.map((shiftedRead, func.ProjectKeyS(func.Hole, "b"))),
           _(MapFuncsCore.Add(_, _))))
 
       // c[*] / d[*][*]
       val cdivd =
         qsu.autojoin2((
           qsu.leftShift(
-            qsu.read(afile),
+            shiftedRead,
             func.ProjectKeyS(func.Hole, "c"),
             ExcludeId,
             func.RightTarget,
             Rotation.ShiftArray),
           qsu.leftShift(
             qsu.leftShift(
-              qsu.read(afile),
+              shiftedRead,
               func.ProjectKeyS(func.Hole, "d"),
               ExcludeId,
               func.RightTarget,
@@ -819,7 +840,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           MultiLeftShift(
             MultiLeftShift(
               LeftShift(
-                Read(`afile`),
+                LeftShift(Read(`afile`), _, _, _, _),
                 innerSingleStruct,
                 _,
                 innerSingleRepair,

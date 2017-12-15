@@ -50,15 +50,8 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
   // TODO ternary support
   def couldApplyTo(candidates: List[QSUGraph]): Boolean = candidates match {
-    case LeftShift(_, _, _, _, _) :: LeftShift(_, _, _, _, _) :: Nil => false
-    case MultiLeftShift(_, _, _) :: LeftShift(_, _, _, _, _) :: Nil => false
-    case LeftShift(_, _, _, _, _) :: MultiLeftShift(_, _, _) :: Nil => false
-    case MultiLeftShift(_, _, _) :: MultiLeftShift(_, _, _) :: Nil => false
-
-    case LeftShift(_, _, _, _, _) :: _ :: Nil => true
-    case MultiLeftShift(_, _, _) :: _ :: Nil => true
-    case _ :: LeftShift(_, _, _, _, _) :: Nil => true
-    case _ :: MultiLeftShift(_, _, _) :: Nil => true
+    case ConsecutiveLeftShifts(_, _) :: _ :: Nil => true
+    case _ :: ConsecutiveLeftShifts(_, _) :: Nil => true
 
     case _ => false
   }
@@ -291,6 +284,9 @@ final class ShiftProjectBelow[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
       case LeftShift(oparent @ ConsecutiveLeftShifts(parent, inners), struct, idStatus, repair, rot) =>
         Some((parent, -\/(QSU.LeftShift[T, QSUGraph](oparent, struct, idStatus, repair, rot)) <:: inners))
+
+      case LeftShift(Read(_), _, _, _, _) =>
+        None
 
       case LeftShift(parent, struct, idStatus, repair, rot) =>
         Some((parent, NEL(-\/(QSU.LeftShift[T, QSUGraph](parent, struct, idStatus, repair, rot)))))
