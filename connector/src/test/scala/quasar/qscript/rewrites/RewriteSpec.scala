@@ -393,6 +393,31 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       includeToExcludeExpr(originalQScript) must_= expectedQScript
     }
 
+    "transform a ShiftedRead inside a LeftShift to ExcludeId when possible" in {
+      import qstdsl._
+      val sampleFile = rootDir </> file("bar")
+
+      val originalQScript =
+        fix.LeftShift(
+          fix.ShiftedRead[AFile](sampleFile, IncludeId),
+          func.ProjectKeyS(func.ProjectIndexI(func.Hole, 1), "foo"),
+          ExcludeId,
+          func.ConcatMaps(
+            func.MakeMapS("a", func.ProjectKeyS(func.ProjectIndexI(func.LeftSide, 1), "quux")),
+            func.MakeMapS("b", func.RightSide)))
+
+      val expectedQScript =
+        fix.LeftShift(
+          fix.ShiftedRead[AFile](sampleFile, ExcludeId),
+          func.ProjectKeyS(func.Hole, "foo"),
+          ExcludeId,
+          func.ConcatMaps(
+            func.MakeMapS("a", func.ProjectKeyS(func.LeftSide, "quux")),
+            func.MakeMapS("b", func.RightSide)))
+
+      includeToExcludeExpr(originalQScript) must_= expectedQScript
+    }
+
     "transform a left shift with a static array as the source" in {
       import qsdsl._
       val original: Fix[QS] =
