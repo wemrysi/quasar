@@ -4,8 +4,12 @@
     "backends": {
        "couchbase":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
-       "mimir":             "ignoreFieldOrder"
+       "mimir":             "ignoreFieldOrder",
+       "spark_hdfs":        "pending",
+       "spark_local":       "pending"
     },
+
+    "NB": "Pending for spark because QScript understand order (first Limit and then Offset) and spark folllows it. This query should either ignore order or not compile at all (requires change in qscript)",
 
     "data": "subset.data",
 
