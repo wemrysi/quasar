@@ -1,5 +1,5 @@
 {
-  "name": "bug2958",
+  "name": "reg_bug2958",
   "data": "bug2958.data",
   "backends": {
     "couchbase":         "pending",
