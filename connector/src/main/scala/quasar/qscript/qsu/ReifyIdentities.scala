@@ -19,7 +19,7 @@ package quasar.qscript.qsu
 import slamdata.Predef._
 
 import quasar.NameGenerator
-import quasar.Planner.PlannerErrorME
+import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
@@ -27,13 +27,11 @@ import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.qscript.{
   construction,
-  Hole,
-  IdStatus,
-  IdOnly,
-  IncludeId,
   ExcludeId,
-  LeftSide,
-  RightSide,
+  Hole,
+  IdOnly,
+  IdStatus,
+  IncludeId,
   MFC,
   ReduceFunc}
 import quasar.qscript.MapFuncCore.{EmptyMap, StaticMap}
@@ -44,7 +42,7 @@ import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 import matryoshka.{showTShow, BirecursiveT, ShowT}
 import monocle.{Lens, Optional}
 import monocle.syntax.fields._1
-import scalaz.{Foldable, Free, Functor, IList, IMap, ISet, Monad, NonEmptyList, Show, StateT, Traverse}
+import scalaz.{Cord, Foldable, Free, Functor, IList, IMap, ISet, Monad, NonEmptyList, Show, StateT, Traverse}
 import scalaz.Scalaz._
 
 /** TODO
@@ -53,7 +51,7 @@ import scalaz.Scalaz._
   * the identity key, however this currently defeats the mini structural evaluator
   * that simplifies things like ProjectKey(MakeMap(foo, <bar>), foo) => bar.
   */
-final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
+final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[T] {
   import ReifyIdentities.ResearchedQSU
 
   def apply[F[_]: Monad: NameGenerator: PlannerErrorME](aqsu: AuthenticatedQSU[T]): F[ResearchedQSU[T]] =
@@ -102,6 +100,12 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
       ISet.singleton(access.symbolic(κ(src)))
     }
 
+  private def shiftTargetAccess(src: Symbol, bucket: FreeMapA[QSU.ShiftTarget[T]]): ISet[QAccess[Symbol]] =
+    Foldable[FreeMapA].foldMap(bucket) { 
+      case QSU.AccessLeftTarget(access) => ISet.singleton(access.symbolic(κ(src)))
+      case _ => ISet.empty
+    }
+
   private def joinKeyAccess(src: Symbol, jk: JoinKey[QIdAccess]): IList[QAccess[Symbol]] =
     IList(jk.left, jk.right) map { idA =>
       Access.id(idA, IdAccess.symbols.headOption(idA) getOrElse src)
@@ -122,6 +126,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
 
   private def gatherReferences(g: QSUGraph): References =
     g.foldMapUp(g => g.unfold.map(_.root) match {
+      case QSU.LeftShift(source, _, _, repair, _) =>
+        recordAccesses(g.root, shiftTargetAccess(source, repair))
+
       case QSU.QSReduce(source, buckets, reducers, _) =>
         recordAccesses(g.root, bucketIdAccess(source, buckets))
 
@@ -155,11 +162,13 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
     def isReferenced(access: QAccess[Symbol]): G[Boolean] =
       G.gets(_.refs.accessed.member(access))
 
-    def includeIdRepair(oldRepair: JoinFunc, leftSide: JoinFunc): JoinFunc =
-      oldRepair flatMap {
-        case LeftSide => leftSide
-        case RightSide => func.ProjectIndexI(func.RightSide, 1)
-      }
+    def includeIdRepair(oldRepair: FreeMapA[QSU.ShiftTarget[T]], oldIdStatus: IdStatus): FreeMapA[QSU.ShiftTarget[T]] =
+      if (oldIdStatus === ExcludeId)
+        oldRepair >>= {
+          case QSU.RightTarget() => func.ProjectIndexI(func.RightTarget, 1)
+          case tgt => tgt.pure[FreeMapA]
+        }
+      else oldRepair
 
     def makeI[F[_]: Foldable, A](assocs: F[(Symbol, FreeMapA[A])]): FreeMapA[A] =
       StaticMap(assocs.toList.map(_.leftMap(s => EJson.str(s.name))))
@@ -216,7 +225,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
 
     /** Handle bookkeeping required when a vertex transitions to emitting IV. */
     def onNeedsIV(g: QSUGraph): G[Unit] =
-      setStatus(g.root, true) >> modifyAccess(Access.value(g.root))(rebaseV)
+      setStatus(g.root, true) >> modifyAccess(Access.valueSymbol(g.root))(rebaseV)
 
     /** Preserves any IV emitted by `src` in the output of `through`, returning
       * whether IV was emitted.
@@ -225,7 +234,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
       for {
         srcStatus <- emitsIVMap(src)
         _         <- setStatus(through.root, srcStatus)
-        _         <- srcStatus.whenM(modifyAccess(Access.value(through.root))(rebaseV))
+        _         <- srcStatus.whenM(modifyAccess(Access.valueSymbol(through.root))(rebaseV))
       } yield srcStatus
 
     /** Rebase the given `FreeMap` to access the value side of an IV map. */
@@ -234,9 +243,6 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
 
     def setStatus(root: Symbol, status: Boolean): G[Unit] =
       G.modify(reifyStatus.modify(_.insert(root, status)))
-
-    def srcIVRepair(oldRepair: JoinFunc): JoinFunc =
-      oldRepair >>= (_.fold(rebaseV(func.LeftSide), func.RightSide))
 
     def updateIV[A](srcIV: FreeMapA[A], ids: FreeMapA[A], v: FreeMapA[A]): FreeMapA[A] =
       makeIV(func.ConcatMaps(lookupIdentities >> srcIV, ids), v)
@@ -255,22 +261,22 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
           case (true, true) =>
             onNeedsIV(g) as {
               val (newStatus, newRepair) = idStatus match {
-                case IdOnly =>
+                case IdOnly | IncludeId =>
                   (
-                    IdOnly : IdStatus,
+                    idStatus,
                     updateIV(
-                      func.LeftSide,
-                      makeI1(g.root, func.RightSide),
-                      srcIVRepair(repair))
+                      func.LeftTarget,
+                      makeI1(g.root, func.RightTarget),
+                      includeIdRepair(repair, idStatus))
                   )
 
-                case ExcludeId | IncludeId =>
+                case ExcludeId =>
                   (
                     IncludeId : IdStatus,
                     updateIV(
-                      func.LeftSide,
-                      makeI1(g.root, func.ProjectIndexI(func.RightSide, 0)),
-                      includeIdRepair(repair, rebaseV(func.LeftSide)))
+                      func.LeftTarget,
+                      makeI1(g.root, func.ProjectIndexI(func.RightTarget, 0)),
+                      includeIdRepair(repair, idStatus))
                   )
               }
 
@@ -280,30 +286,21 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
           case (true, false) =>
             onNeedsIV(g) as {
               val newRepair =
-                makeIV(lookupIdentities >> func.LeftSide, srcIVRepair(repair))
+                makeIV(lookupIdentities >> func.LeftTarget, repair)
 
               g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), idStatus, newRepair, rot))
             }
 
           case (false, true) =>
             onNeedsIV(g) as {
-              val (newStatus, newRepair) = idStatus match {
-                case IdOnly =>
-                  (
-                    IdOnly : IdStatus,
-                    makeIV(
-                      makeI1(g.root, func.RightSide),
-                      repair)
-                  )
-
-                case ExcludeId | IncludeId =>
-                  (
-                    IncludeId : IdStatus,
-                    makeIV(
-                      makeI1(g.root, func.ProjectIndexI(func.RightSide, 0)),
-                      includeIdRepair(repair, func.LeftSide))
-                  )
-              }
+              val newStatus = 
+                if (idStatus === ExcludeId) IncludeId else idStatus
+              val getValue =
+                if (idStatus === ExcludeId) func.ProjectIndexI(func.RightTarget, 0) else func.RightTarget
+              val newRepair = makeIV(
+                makeI1(g.root, getValue),
+                includeIdRepair(repair, idStatus)
+              )
 
               g.overwriteAtRoot(O.leftShift(source.root, struct, newStatus, newRepair, rot))
             }
@@ -407,22 +404,31 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
 
       case g @ E.ThetaJoin(left, right, condition, joinType, combiner) =>
         (emitsIVMap(left) |@| emitsIVMap(right)).tupled flatMap {
-          // FIXME
-          case (true, true) => scala.Predef.???
-            // In this case, we need to nest the identities from each side in a new map
-            //   { i: {left: ids(left), right: ids(right)}, v: combiner }
-            //
-            // We then need to determine which ids could possibly exist in each of the sub maps.
-            //   + should be able to use the status map's keySet to help here, or we just grab
-            //     all the vertices in each branch. From these sets, we can see what possible
-            //     ids are related to those vertices.
-            //
-            // For each set of identity access, we need to update access by any
-            // vertices _not_ visited thus far, adding the appropriate projection
-            // into the L/R side of the identity map.
+          /** FIXME: https://github.com/quasar-analytics/quasar/issues/3114
+            *
+            * In this case, we need to nest the identities from each side in a new map
+            *   { i: {left: ids(left), right: ids(right)}, v: combiner }
+            *
+            * We then need to determine which ids could possibly exist in each of the sub maps.
+            *   + should be able to use the status map's keySet to help here, or we just grab
+            *     all the vertices in each branch. From these sets, we can see what possible
+            *     ids are related to those vertices.
+            *
+            * For each set of identity access, we need to update access by any
+            * vertices _not_ visited thus far, adding the appropriate projection
+            * into the L/R side of the identity map.
+            */
+          case (true, true) =>
+            PlannerErrorME[G].raiseError(InternalError(
+              s"ThetaJoin[${g.root}] where both branches carry identities is not " +
+              "yet supported, see https://github.com/quasar-analytics/quasar/issues/3114.",
+              None))
 
           case (true, false) =>
             onNeedsIV(g) as {
+              val newCondition =
+                condition flatMap (_.fold(rebaseV(func.LeftSide), func.RightSide))
+
               val newCombiner =
                 makeIV(
                   lookupIdentities >> func.LeftSide,
@@ -433,6 +439,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT] private () extends QSUTTypes[
 
           case (false, true) =>
             onNeedsIV(g) as {
+              val newCondition =
+                condition flatMap (_.fold(func.LeftSide, rebaseV(func.RightSide)))
+
               val newCombiner =
                 makeIV(
                   lookupIdentities >> func.RightSide,
@@ -563,12 +572,16 @@ object ReifyIdentities {
 
   object ResearchedQSU {
     implicit def show[T[_[_]]: ShowT]: Show[ResearchedQSU[T]] =
-      Show.shows { rqsu =>
-        s"ResearchedQSU\n======\n${rqsu.graph.shows}\n\n${rqsu.refs.shows}\n======"
+      Show.show { rqsu =>
+        Cord("ResearchedQSU\n======\n") ++ 
+        rqsu.graph.show ++ 
+        Cord("\n\n") ++ 
+        rqsu.refs.show ++ 
+        Cord("\n======")
       }
-  }
+}
 
-  def apply[T[_[_]]: BirecursiveT, F[_]: Monad: NameGenerator: PlannerErrorME]
+  def apply[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator: PlannerErrorME]
       (aqsu: AuthenticatedQSU[T])
       : F[ResearchedQSU[T]] =
     new ReifyIdentities[T].apply[F](aqsu)

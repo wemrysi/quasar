@@ -25,12 +25,12 @@ import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski.ι
-import quasar.qscript.{ExcludeId, HoleF, IdOnly, IdStatus, RightSideF}
+import quasar.qscript.{construction, ExcludeId, HoleF, IdOnly, IdStatus}
 
 import matryoshka._
 import matryoshka.implicits._
 import pathy.Path
-import scalaz.{Applicative, Functor, IList, Monad, Show, StateT, ValidationNel}
+import scalaz.{Applicative, Cord, Functor, IList, Monad, Show, StateT, ValidationNel}
 import scalaz.Scalaz._
 
 final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extends QSUTTypes[T] {
@@ -47,6 +47,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
   implicit def V[F[_]: Applicative] = Applicative[F].compose[ValidationNel[Symbol, ?]]
 
   val dims = QProv[T]
+  val func = construction.Func[T]
 
   def apply[F[_]: Monad: PlannerErrorME](graph: QSUGraph): F[AuthenticatedQSU[T]] = {
     type X[A] = StateT[F, QAuth, A]
@@ -60,7 +61,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
       case g @ Extractors.Transpose(src, retain, rot) =>
         computeProvenance[X](g) as g.overwriteAtRoot {
-          LeftShift(src.root, HoleF, retain.fold[IdStatus](IdOnly, ExcludeId), RightSideF, rot)
+          LeftShift(src.root, HoleF, retain.fold[IdStatus](IdOnly, ExcludeId), func.RightTarget, rot)
         }
 
       case other =>
@@ -128,6 +129,17 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
             case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, sdims)
           }
         }
+
+        case MultiLeftShift(src, shifts, _) =>
+          val tid = IdAccess.identity[dims.D](g.root)
+          compute1[F](g, src) { sdims =>
+            shifts.foldRight(sdims) {
+              case (shift, prv) => shift._3 match {
+                case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, prv)
+                case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, prv)
+              }
+            }
+          }
 
       case LPFilter(_, _) => unexpectedError
 
@@ -249,8 +261,12 @@ object ApplyProvenance {
 
   object AuthenticatedQSU {
     implicit def show[T[_[_]]: ShowT]: Show[AuthenticatedQSU[T]] =
-      Show.shows { case AuthenticatedQSU(g, a) =>
-        s"AuthenticatedQSU {\n${g.shows}\n\n${a.shows}\n}"
+      Show.show { case AuthenticatedQSU(g, d) =>
+        Cord("AuthenticatedQSU {\n") ++
+        g.show ++
+        Cord("\n\n") ++
+        d.show ++
+        Cord("\n}")
       }
   }
 }

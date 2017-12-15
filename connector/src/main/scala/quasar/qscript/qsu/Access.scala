@@ -24,6 +24,7 @@ import scalaz.{Apply, Equal, Order, Show, Traverse1}
 import scalaz.syntax.show._
 import scalaz.std.option._
 import scalaz.std.tuple._
+import quasar.qscript.{Hole, JoinSide}
 
 sealed abstract class Access[D, A] {
   def symbolic(value: A => Symbol): Access[D, Symbol] =
@@ -39,6 +40,13 @@ sealed abstract class Access[D, A] {
 }
 
 object Access extends AccessInstances {
+  def identityHole[D]: Prism[Access[D, Hole], (IdAccess[D], Hole)] = id[D, Hole]
+  def identitySymbol[D]: Prism[Access[D, Symbol], (IdAccess[D], Symbol)] = id[D, Symbol]
+  def identityJoinSide[D]: Prism[Access[D, JoinSide], (IdAccess[D], JoinSide)] = id[D, JoinSide]
+  def valueHole[D]: Prism[Access[D, Hole], Hole] = value[D, Hole]
+  def valueSymbol[D]: Prism[Access[D, Symbol], Symbol] = value[D, Symbol]
+  def valueJoinSide[D]: Prism[Access[D, JoinSide], JoinSide] = value[D, JoinSide]
+
   final case class Id[D, A](idAccess: IdAccess[D], src: A) extends Access[D, A]
   final case class Value[D, A](src: A) extends Access[D, A]
 

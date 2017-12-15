@@ -575,20 +575,20 @@ class PlannerSql2ExactSpec extends
             $read(collection("db", "zips")),
             $project(
               reshape(
-                "__tmp2" ->
+                "0" ->
                   $cond(
                     $and(
                       $lte($literal(Bson.Arr(List())), $field("loc")),
                       $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                     $field("loc"),
-                    $literal(Bson.Arr(List(Bson.Undefined))))),
-              IgnoreId),
-            $unwind(DocField(BsonField.Name("__tmp2"))),
+                    $arrayLit(List($literal(Bson.Undefined))))),
+              ExcludeId),
+            $unwind(DocField(BsonField.Name("0"))),
             $project(
-              reshape(sigil.Quasar -> $field("__tmp2")),
+              reshape(sigil.Quasar -> $field("0")),
               ExcludeId))
         }
-    }.pendingWithActual(notOnPar, testFile("plan array flatten"))
+    }
 
     "plan array concat" in {
       plan(sqlE"select loc || [ 0, 1, 2 ] from zips") must beWorkflow0 {

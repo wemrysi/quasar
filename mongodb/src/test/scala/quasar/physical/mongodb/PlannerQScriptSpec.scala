@@ -46,6 +46,12 @@ class PlannerQScriptSpec extends
 
   val dsl =
     quasar.qscript.construction.mkDefaults[Fix, fs.MongoQScript[Fix, ?]]
+
+  // Some useful debugging objects
+  val rt  = RenderTree[Crystallized[WorkflowF]]
+  val rtq = RenderTree[Fix[fs.MongoQScript[Fix, ?]]]
+  val toMetalPlan: Crystallized[WorkflowF] => Option[String] = WorkflowExecutor.toJS(_).toOption
+
   import dsl._
 
   val json = Fixed[Fix[EJson]]
@@ -366,6 +372,74 @@ class PlannerQScriptSpec extends
           // Not on agg
     }.pendingWithActual(notOnPar, qtestFile("plan 3-way equi-join ($lookup)"))
 
+    "plan with flatenning in filter predicate with reference to LeftSide" in {
+      qplan(
+        fix.Filter(
+          fix.LeftShift(
+            fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
+            func.Guard(
+              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              Type.FlexArr(0, None, Type.Top),
+              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              func.Undefined),
+            qscript.ExcludeId,
+            func.ConcatMaps(
+              func.MakeMap(func.Constant(json.str("city")),
+                func.ProjectKey(func.LeftSide, func.Constant(json.str("city")))),
+              func.MakeMap(
+                func.Constant(json.str("loc")), func.RightSide))),
+          func.Lt(func.ProjectKeyS(func.Hole, "loc"), func.Constant(json.int(-165))))) must beWorkflow0(
+        chain[Workflow](
+          $read(collection("db", "zips")),
+          $project(reshape(
+            "s" -> $$ROOT,
+            "f" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Arr()), $field("loc")),
+                  $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $field("loc"),
+                $arrayLit(List($literal(Bson.Undefined)))))),
+          $unwind(DocField("f")),
+          $project(reshape(
+            "0" -> $objectLit(
+              ListMap(
+                BsonField.Name("city") -> $field("s", "city"),
+                BsonField.Name("loc") -> $field("f"))))),
+          $match(Selector.Doc(
+            (BsonField.Name("0") \ BsonField.Name("loc")) -> Selector.Lt(Bson.Int32(-165)))),
+          $project(reshape(sigil.Quasar -> $field("0")))))
+    }
+
+    "plan with flatenning in filter predicate without reference to LeftSide" in {
+      qplan(
+        fix.Filter(
+          fix.LeftShift(
+            fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
+            func.Guard(
+              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              Type.FlexArr(0, None, Type.Top),
+              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              func.Undefined),
+            qscript.ExcludeId,
+            func.RightSide),
+          func.Lt(func.Hole, func.Constant(json.int(-165))))) must beWorkflow0(
+        chain[Workflow](
+          $read(collection("db", "zips")),
+          $project(reshape(
+            "0" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Arr()), $field("loc")),
+                  $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $field("loc"),
+                $literal(Bson.Undefined)))),
+          $unwind(DocField("0")),
+          $match(Selector.Doc(
+            BsonField.Name("0") -> Selector.Lt(Bson.Int32(-165)))),
+          $project(reshape(sigil.Quasar -> $field("0")))))
+    }.pendingUntilFixed
+
     "plan typechecks with JS when unable to extract ExprOp" in {
       import fix.{Filter, ShiftedRead}, qscript.IncludeId
       import func.{Constant, DeleteKey, Guard}
@@ -397,5 +471,80 @@ class PlannerQScriptSpec extends
           $project(reshape(sigil.Quasar -> $field("src")))))
     }
 
+    "plan double LeftShift without reference to LeftSide" in {
+      qplan(
+        fix.LeftShift(
+          fix.LeftShift(
+            fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
+            func.Guard(
+              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              Type.FlexArr(0, None, Type.FlexArr(0, None, Type.Top)),
+              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              func.Undefined),
+            qscript.ExcludeId,
+            func.Guard(func.RightSide,
+              Type.FlexArr(0, None, Type.Top),
+              func.RightSide,
+              func.Undefined)),
+          func.Hole,
+          qscript.ExcludeId,
+          func.RightSide)) must beWorkflow0(
+        chain[Workflow](
+          $read(collection("db", "zips")),
+          $project(reshape(
+            "0" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Arr()), $field("loc")),
+                  $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $field("loc"),
+                $literal(Bson.Undefined)))),
+          $unwind(DocField("0")),
+          $project(reshape(
+            "0" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Arr()), $field("0")),
+                  $lt($field("0"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $field("0"),
+                $literal(Bson.Undefined)))),
+          $unwind(DocField("0")),
+          $project(reshape(
+            sigil.Quasar -> $field("0")))))
+    }.pendingUntilFixed
+
+    "plan LeftShift with reference to LeftSide" in {
+      qplan(
+        fix.LeftShift(
+          fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
+          func.Guard(
+            func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+            Type.FlexArr(0, None, Type.Top),
+            func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+            func.Undefined),
+          qscript.ExcludeId,
+          func.ConcatMaps(
+            func.MakeMap(func.Constant(json.str("city")),
+              func.ProjectKey(func.LeftSide, func.Constant(json.str("city")))),
+            func.MakeMap(
+              func.Constant(json.str("loc")), func.RightSide)))) must beWorkflow0(
+        chain[Workflow](
+          $read(collection("db", "zips")),
+          $project(reshape(
+            "s" -> $$ROOT,
+            "f" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Arr()), $field("loc")),
+                  $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $field("loc"),
+                $arrayLit(List($literal(Bson.Undefined)))))),
+          $unwind(DocField("f")),
+          $project(reshape(
+            sigil.Quasar -> $objectLit(
+              ListMap(
+                BsonField.Name("city") -> $field("s", "city"),
+                BsonField.Name("loc") -> $field("f")))))))
+    }
   }
 }
