@@ -1,8 +1,5 @@
 {
-  "name": "single field order postgres",
-
-  "backends": {
-  },
+  "name": "s03_sort_single_field_order",
 
   "data": "sort.data",
 
@@ -10,8 +7,6 @@
 
   "predicate": "exactly",
   "ignoreResultOrder": true,
-
-  "ignoredFields": [],
 
   "ignoreFieldOrder": true,
 

@@ -1,5 +1,5 @@
 {
-  "name": "type coercions postgres",
+  "name": "s02_functions_coercions",
 
   "backends": {
     "spark_local":       "skip",

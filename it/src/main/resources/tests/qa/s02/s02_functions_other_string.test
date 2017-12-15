@@ -1,8 +1,5 @@
 {
-  "name": "other string functions postgres",
-
-  "backends": {
-  },
+  "name": "s02_functions_other_string",
 
   "data": "stringFunctionsOther.data",
 
@@ -14,8 +11,6 @@
 
   "predicate": "exactly",
   "ignoreResultOrder": false,
-
-  "ignoredFields": [],
 
   "ignoreFieldOrder": true,
 

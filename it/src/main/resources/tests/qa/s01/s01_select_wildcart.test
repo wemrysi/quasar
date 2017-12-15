@@ -1,8 +1,5 @@
 {
-  "name": "wildcard read postgres",
-
-  "backends": {
-  },
+  "name": "s01_select_wildcart",
 
   "data": "basic.data",
 

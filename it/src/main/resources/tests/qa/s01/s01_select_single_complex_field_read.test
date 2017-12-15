@@ -1,5 +1,5 @@
 {
-  "name": "single complex field read postgres",
+  "name": "s01_select_single_complex_field_read",
 
   "backends": {
           "couchbase":         "skip",
@@ -15,6 +15,8 @@
           "spark_local":       "skip",
           "spark_cassandra":   "skip"
   },
+
+  "NB": "fix thix, it is postgres that needs to be skipped, expected changes and other connectors unskipped",
 
   "data": "basic.data",
 
