@@ -54,6 +54,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] private () exte
       G[_]: Monad: NameGenerator: PlannerErrorME: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState[T]]](
       qgraph: QSUGraph): Option[(QSUGraph, (QSUGraph, FreeMap) => G[QSUGraph])] = qgraph match {
 
+    case LeftShift(Read(_), _, _, _, _) => None
+
     case qgraph@LeftShift(src, struct, idStatus, repair, rot) =>
       def rebuild(src: QSUGraph, fm: FreeMap): G[QSUGraph] = {
         val struct2 = struct.flatMap(κ(fm))
