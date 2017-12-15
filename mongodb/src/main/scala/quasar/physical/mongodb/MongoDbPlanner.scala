@@ -902,8 +902,8 @@ object MongoDbPlanner {
             val struct = struct0.transCata[FreeMap[T]](orOriginal(rewriteUndefined))
 
             if (repair.contains(LeftSideF))
-              (src.unFix, struct) match {
-                case (_, Embed(CoEnv(\/-(MFC(Guard(exp, Type.FlexArr(_, _, _), exp0, _)))))) if exp0 === exp => {
+              struct match {
+                case Embed(CoEnv(\/-(MFC(Guard(exp, Type.FlexArr(_, _, _), exp0, _))))) if exp0 === exp => {
                   val struct0 = handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct)
                   val exprMerge0 = getMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(repair, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
                   val jsMerge0 = getJsMerge[T, M](repair, jscore.Select(jscore.Ident(JsFn.defaultName), "s"), jscore.Select(jscore.Ident(JsFn.defaultName), "f"))
@@ -949,8 +949,8 @@ object MongoDbPlanner {
                       -\&/(j)))
               }
               else
-                (src.unFix, struct) match {
-                  case (_, Embed(CoEnv(\/-(MFC(Guard(exp, Type.FlexArr(_, _, _), exp0, _)))))) if exp === exp0 =>
+                struct match {
+                  case Embed(CoEnv(\/-(MFC(Guard(exp, Type.FlexArr(_, _, _), exp0, _))))) if exp === exp0 =>
                     getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
                       getExprBuilder[T, M, WF, EX](
                         cfg.funcHandler, cfg.staticHandler)(
