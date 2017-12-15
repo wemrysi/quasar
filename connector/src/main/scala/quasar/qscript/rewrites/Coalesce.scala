@@ -290,6 +290,11 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
         case _ => none
       }
 
+      def fmIsCondUndef(jf: JoinFunc): Boolean = jf.resumeTwice.fold(_.run.fold ({
+        case MapFuncsCore.Cond(_, _, -\/(Coproduct(-\/(MapFuncsCore.Undefined())))) => true
+        case _ => false
+      }, _ => false), _ => false)
+
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])
         (implicit QC: QScriptCore :<: OUT) = {
@@ -341,7 +346,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
         case LeftShift(Embed(src), struct, id, shiftRepair) =>
           FToOut.get(src) >>= QC.prj >>= {
             case LeftShift(innerSrc, innerStruct, innerId, innerRepair)
-                if !shiftRepair.element(LeftSide) && struct ≠ HoleF =>
+                if !shiftRepair.element(LeftSide) && !fmIsCondUndef(shiftRepair) && struct ≠ HoleF =>
               LeftShift(
                 FToOut.reverseGet(QC.inj(LeftShift(
                   innerSrc,

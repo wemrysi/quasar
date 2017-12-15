@@ -17,41 +17,29 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef._
-import quasar.{RenderTree, RenderTreeT}
+import quasar.{RenderTree, RenderTreeT, RenderedTree}
 import quasar.common.{JoinType, SortDir}
-import quasar.contrib.matryoshka.{birecursiveIso, envTIso}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
+import quasar.contrib.matryoshka._
 import quasar.fp.ski.{ι, κ}
-import quasar.fp.{coproductShow, symbolShow, PrismNT}
+import quasar.fp._
 import quasar.qscript._
 import quasar.qscript.provenance.JoinKeys
 
-import matryoshka.{delayShow, showTShow, BirecursiveT, Delay, Embed, EqualT, ShowT}
+import matryoshka.{Hole => _, birecursiveIso => _, _} // {delayEqual, equalTEqual, delayShow, showTShow, BirecursiveT, Delay, Embed, EqualT, ShowT}
 import matryoshka.data._
 import matryoshka.patterns.{CoEnv, EnvT}
-import monocle.{Iso, Prism, PTraversal, Traversal}
+import monocle.{Iso, PTraversal, Prism}
 import pathy.Path
-import scalaz.{
-  \/-,
-  Applicative,
-  Bitraverse,
-  Cofree,
-  Enum,
-  Equal,
-  Forall,
-  Free,
-  Functor,
-  Id,
-  NonEmptyList => NEL,
-  Order,
-  Scalaz,
-  Show,
-  Traverse}
+
+import scalaz.{Applicative, Bitraverse, Cofree, Enum, Equal, Forall, Free, Functor, Id, Order, Scalaz, Show, Traverse, \/, \/-, NonEmptyList => NEL}
 import scalaz.std.anyVal._
 import scalaz.std.list._
 import scalaz.std.tuple._
+import scalaz.syntax.equal._
 import scalaz.syntax.show._
+import scalaz.syntax.std.option._
 
 sealed trait QScriptUniform[T[_[_]], A] extends Product with Serializable
 
@@ -98,6 +86,9 @@ object QScriptUniform {
       case LeftShift(source, struct, idStatus, repair, rot) =>
         f(source).map(LeftShift(_, struct, idStatus, repair, rot))
 
+      case MultiLeftShift(source, shifts, mapper) =>
+        f(source).map(MultiLeftShift(_, shifts, mapper))
+
       case LPReduce(source, reduce) =>
         f(source).map(LPReduce(_, reduce))
 
@@ -136,6 +127,7 @@ object QScriptUniform {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def show[T[_[_]]: ShowT]: Delay[Show, QScriptUniform[T, ?]] =
     new Delay[Show, QScriptUniform[T, ?]] {
       def apply[A](a: Show[A]) = {
@@ -176,6 +168,9 @@ object QScriptUniform {
 
           case LeftShift(source, struct, idStatus, repair, rot) =>
             s"LeftShift(${source.shows}, ${struct.shows}, ${idStatus.shows}, ${repair.shows}, ${rot.shows})"
+
+          case MultiLeftShift(source, shifts, mapper) =>
+            s"MultiLeftShift(${source.shows}, ${shifts.shows}, ${mapper.shows})"
 
           case LPReduce(source, reduce) =>
             s"LPReduce(${source.shows}, ${reduce.shows})"
@@ -383,13 +378,50 @@ object QScriptUniform {
       Show.showFromToString
   }
 
+  sealed trait ShiftTarget[T[_[_]]]
+  final case class LeftTarget[T[_[_]]]() extends ShiftTarget[T]
+  final case class RightTarget[T[_[_]]]() extends ShiftTarget[T]
+  final case class AccessLeftTarget[T[_[_]]](access: QAccess[T, Hole]) extends ShiftTarget[T]
+
+  object ShiftTarget {
+    @SuppressWarnings(Array("org.wartremover.warts.Equals"))
+    implicit def equalShiftTarget[T[_[_]]: EqualT]: Equal[ShiftTarget[T]] = Equal.equal {
+      case (AccessLeftTarget(access1), AccessLeftTarget(access2)) => 
+        implicit val extEqual: Delay[Equal, quasar.ejson.Extension] = quasar.ejson.Extension.structuralEqual
+        access1 ≟ access2
+      case (LeftTarget(), LeftTarget()) => true
+      case (RightTarget(), RightTarget()) => true
+      case _ => false
+    }
+    implicit def showShiftTarget[T[_[_]]: ShowT]: Show[ShiftTarget[T]] = Show.shows {
+      case LeftTarget() => "LeftTarget"
+      case RightTarget() => "RightTarget"
+      case AccessLeftTarget(access) => s"AccessLeftTarget(${access.shows})"
+    }
+    implicit def renderShiftTarget[T[_[_]]: RecursiveT: RenderTreeT: ShowT]: RenderTree[ShiftTarget[T]] = RenderTree.make {
+      case LeftTarget() =>
+        RenderedTree("ShiftTarget" :: Nil, "LeftTarget".some, Nil)
+      case RightTarget() =>
+        RenderedTree("ShiftTarget" :: Nil, "RightTarget".some, Nil)
+      case AccessLeftTarget(access) =>
+        RenderedTree("ShiftTarget" :: Nil, "AccessLeftTarget".some, RenderTree[QAccess[T, Hole]].render(access) :: Nil)
+    }
+  }
+
   // QScriptish
   final case class LeftShift[T[_[_]], A](
       source: A,
       struct: FreeMap[T],
       idStatus: IdStatus,
-      repair: JoinFunc[T],
+      repair: FreeMapA[T, ShiftTarget[T]],
       rot: Rotation) extends QScriptUniform[T, A]
+
+  // shifting multiple structs on the same source;
+  // horizontal composition of LeftShifts
+  final case class MultiLeftShift[T[_[_]], A](
+      source: A,
+      shifts: List[(FreeMap[T], IdStatus, Rotation)],
+      repair: FreeMapA[T, QAccess[T, Hole] \/ Int]) extends QScriptUniform[T, A]
 
   // LPish
   final case class LPReduce[T[_[_]], A](
@@ -468,10 +500,15 @@ object QScriptUniform {
         case JoinSideRef(s) => s
       } (JoinSideRef(_))
 
-    def leftShift[A]: Prism[QScriptUniform[A], (A, FreeMap, IdStatus, JoinFunc, Rotation)] =
-      Prism.partial[QScriptUniform[A], (A, FreeMap, IdStatus, JoinFunc, Rotation)] {
+    def leftShift[A]: Prism[QScriptUniform[A], (A, FreeMap, IdStatus, FreeMapA[ShiftTarget[T]], Rotation)] =
+      Prism.partial[QScriptUniform[A], (A, FreeMap, IdStatus, FreeMapA[ShiftTarget[T]], Rotation)] {
         case LeftShift(s, fm, ids, jf, rot) => (s, fm, ids, jf, rot)
       } { case (s, fm, ids, jf, rot) => LeftShift(s, fm, ids, jf, rot) }
+
+    def multiLeftShift[A]: Prism[QScriptUniform[A], (A, List[(FreeMap, IdStatus, Rotation)], FreeMapA[QAccess[Hole] \/ Int])] =
+      Prism.partial[QScriptUniform[A], (A, List[(FreeMap, IdStatus, Rotation)], FreeMapA[QAccess[Hole] \/ Int])] {
+        case MultiLeftShift(s, ss, map) => (s, ss, map)
+      } { case (s, ss, map) => MultiLeftShift(s, ss, map) }
 
     def lpFilter[A]: Prism[QScriptUniform[A], (A, A)] =
       Prism.partial[QScriptUniform[A], (A, A)] {
@@ -553,38 +590,6 @@ object QScriptUniform {
         case Unreferenced() => ()
       } (κ(Unreferenced()))
 
-    def freeMaps[A]: Traversal[QScriptUniform[A], FreeMap] =
-      new Traversal[QScriptUniform[A], FreeMap] {
-        import Scalaz._
-
-        def modifyF[F[_]: Applicative](f: FreeMap => F[FreeMap])(qsu: QScriptUniform[A]) =
-          qsu match {
-            case DimEdit(a, DTrans.Group(x)) =>
-              f(x) map (y => DimEdit(a, DTrans.Group(y)))
-
-            case LeftShift(a, x, ids, rep, rot) =>
-              f(x) map (LeftShift(a, _, ids, rep, rot))
-
-            case Map(a, x) =>
-              f(x) map (Map(a, _))
-
-            case QSFilter(a, x) =>
-              f(x) map (QSFilter(a, _))
-
-            case QSReduce(a, bs, reds, rep) =>
-              Traverse[List].compose[ReduceFunc]
-                .traverse(reds)(f)
-                .map(QSReduce(a, bs, _, rep))
-
-            case QSSort(s, bs, keys) =>
-              keys.traverse {
-                case (x, d) => f(x) strengthR d
-              } map (QSSort(s, bs, _))
-
-            case other => other.point[F]
-          }
-      }
-
     def holes[A, B]: PTraversal[QScriptUniform[A], QScriptUniform[B], A, B] =
       PTraversal.fromTraverse[QScriptUniform, A, B]
   }
@@ -649,8 +654,12 @@ object QScriptUniform {
       composeLifting[G](O.joinSideRef[A])
     }
 
-    def leftShift: Prism[A, F[(A, FreeMap, IdStatus, JoinFunc, Rotation)]] = {
-      composeLifting[(?, FreeMap, IdStatus, JoinFunc, Rotation)](O.leftShift[A])
+    def leftShift: Prism[A, F[(A, FreeMap, IdStatus, FreeMapA[ShiftTarget[T]], Rotation)]] = {
+      composeLifting[(?, FreeMap, IdStatus, FreeMapA[ShiftTarget[T]], Rotation)](O.leftShift[A])
+    }
+
+    def multiLeftShift: Prism[A, F[(A, List[(FreeMap, IdStatus, Rotation)], FreeMapA[QAccess[Hole] \/ Int])]] = {
+      composeLifting[(?, List[(FreeMap, IdStatus, Rotation)], FreeMapA[QAccess[Hole] \/ Int])](O.multiLeftShift[A])
     }
 
     def lpFilter: Prism[A, F[(A, A)]] = {

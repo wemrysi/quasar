@@ -24,6 +24,7 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp.{coproductEqual, coproductShow}
 import quasar.qscript.{construction, ExcludeId, Hole, ReduceFuncs}
+import quasar.qscript.qsu.QScriptUniform.Rotation
 
 import matryoshka.{delayEqual, delayShow, showTShow}
 import matryoshka.data.Fix
@@ -64,7 +65,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       reifyBuckets(tree) must beLike {
         case \/-(QSReduce(
-            LeftShift(Read(_), _, ExcludeId, _, _),
+            LeftShift(Read(_), _, ExcludeId, _, Rotation.ShiftMap),
             List(b),
             List(ReduceFuncs.Sum(r)),
             _)) =>

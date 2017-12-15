@@ -16,6 +16,7 @@
 
 package quasar.qscript
 
+import qsu.{Access, QAccess, QScriptUniform => QSU}
 import slamdata.Predef._
 import matryoshka._
 import matryoshka.data.Fix
@@ -193,6 +194,14 @@ object construction {
     def Guard[A](a1: FreeMapA[T, A], tpe: quasar.Type, a2: FreeMapA[T, A], a3: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.Guard(a1, tpe, a2, a3))
     def Hole: FreeMap[T] = Free.pure(SrcHole)
+    def AccessHole: FreeMapA[T, QAccess[T, Hole]] =
+      Free.pure(Access.valueHole(SrcHole))
+    def LeftTarget: FreeMapA[T, QSU.ShiftTarget[T]] =
+      Free.pure(QSU.LeftTarget[T]())
+    def RightTarget: FreeMapA[T, QSU.ShiftTarget[T]] =
+      Free.pure(QSU.RightTarget[T]())
+    def AccessLeftTarget(f: Hole => QAccess[T, Hole]): FreeMapA[T, QSU.ShiftTarget[T]] =
+      Free.pure(QSU.AccessLeftTarget(f(SrcHole)))
     def LeftSide: JoinFunc[T] = Free.pure(qscript.LeftSide)
     def RightSide: JoinFunc[T] = Free.pure(qscript.RightSide)
     def ReduceIndex(i: Int \/ Int): FreeMapA[T, ReduceIndex] = Free.pure(qscript.ReduceIndex(i))

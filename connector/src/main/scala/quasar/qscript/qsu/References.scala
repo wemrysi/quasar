@@ -16,20 +16,24 @@
 
 package quasar.qscript.qsu
 
-import slamdata.Predef.{StringContext, Symbol}
+import slamdata.Predef.Symbol
 import quasar.ejson.implicits._
-import quasar.fp.{coproductEqual, coproductShow, symbolOrder, symbolShow}
+import quasar.fp._
+import quasar.contrib.matryoshka._
 import quasar.qscript.{FreeMap, FreeMapA}
 
-import matryoshka.{delayShow, delayEqual, BirecursiveT, ShowT, EqualT}
-import matryoshka.data.free._
-import scalaz.{Equal, IMap, ISet, Monoid, Order, Show}
+import matryoshka.{delayShow, delayEqual, equalTEqual, showTShow, BirecursiveT, ShowT, EqualT}
+import matryoshka.data._
+// import matryoshka.data.free._
+import scalaz.{\/, Cord, Equal, IMap, ISet, Monoid, Order, Show}
 import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.std.tuple._
 import scalaz.syntax.applicative._
 import scalaz.syntax.semigroup._
 import scalaz.syntax.std.option._
+import matryoshka.{Hole => _, _}
+import matryoshka.data._
 
 final case class References[T[_[_]], D](
     accessing: References.Accessing[T, D],
@@ -62,17 +66,22 @@ final case class References[T[_[_]], D](
 
   // Resolves all `Access` made by `by` in the given `FreeAccess`, resulting in
   // a `FreeMap`.
-  def resolveAccess[A]
-      (by: Symbol, in: FreeMapA[T, Access[D, A]])
-      (f: A => Symbol)
-      (implicit D: Order[D])
-      : FreeMapA[T, A] =
-    accessing.lookup(by).fold(in.map(Access.src.get(_))) { accesses =>
-      in flatMap { access =>
-        val a = Access.src.get(access)
-        accesses.lookup(access.symbolic(f)).cata(_.as(a), a.point[FreeMapA[T, ?]])
+  def resolveAccess[A, B]
+    (by: Symbol, in: FreeMapA[T, A])
+    (f: B => Symbol)
+    (ex: A => Access[D, B] \/ B)
+    (implicit D: Order[D])
+    : FreeMapA[T, B] =
+      accessing.lookup(by).fold(in.map(a => ex(a).fold(Access.src.get(_), b => b))) { accesses =>
+        in flatMap { a =>
+          ex(a).fold({ access =>
+            val b = Access.src.get(access)
+            accesses.lookup(access.symbolic(f)).cata(_.as(b), b.point[FreeMapA[T, ?]])
+          }, {
+            _.point[FreeMapA[T, ?]]
+          })
+        }
       }
-    }
 }
 
 object References {
@@ -93,17 +102,18 @@ object References {
         x.accessed |+| y.accessed),
       noRefs)
 
-  implicit def equal[T[_[_]]: BirecursiveT: EqualT, D: Equal]: Equal[References[T, D]] =
+  implicit def equal[T[_[_]]: BirecursiveT: EqualT, D: Equal]: Equal[References[T, D]] = {
     Equal.equalBy(r => (r.accessing, r.accessed))
+  }
 
   implicit def show[T[_[_]]: ShowT, D: Show]: Show[References[T, D]] =
-    Show.shows {
+    Show.show {
       case References(accessing, accessed) =>
-        s"References {\n\n" +
-        s"Accessing[\n" +
-        printMultiline(accessing.toList) +
-        s"]\n\nAccessed[\n" +
-        printMultiline(accessed.toList) +
-        "]\n}"
+        Cord("References {\n\n") ++
+        Cord("Accessing[\n") ++
+        Cord(printMultiline(accessing.toList)) ++
+        Cord("]\n\nAccessed[\n") ++
+        Cord(printMultiline(accessed.toList)) ++
+        Cord("]\n}")
     }
 }
