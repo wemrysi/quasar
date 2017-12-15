@@ -8,9 +8,7 @@
   "predicate": "exactly",
   "ignoreResultOrder": true,
 
-  "ignoredFields": [],
-
   "ignoreFieldOrder": false,
 
-  "expected": [{"num": 4},{"num": 42}]
+  "expected": [4, 42]
 }
