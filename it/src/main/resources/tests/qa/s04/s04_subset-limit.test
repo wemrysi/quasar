@@ -1,5 +1,5 @@
 {
-    "name": "qa_subset-simple-limit",
+    "name": "s04_subset-limit",
 
     "backends": {
        "couchbase":         "ignoreFieldOrder",
