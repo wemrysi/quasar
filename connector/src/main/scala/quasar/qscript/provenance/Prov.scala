@@ -18,7 +18,7 @@ package quasar.qscript.provenance
 
 import slamdata.Predef._
 import quasar.contrib.matryoshka.birecursiveIso
-import quasar.fp.ski.κ
+import quasar.fp.ski.{ι, κ}
 
 import matryoshka._
 import matryoshka.implicits._
@@ -71,20 +71,20 @@ trait Prov[D, I, P] {
     implicit val ignoreI: Equal[I] = Equal.equalBy(κ(()))
 
     def joinBoths(l0: P, r0: P): JoinKeys[I] =
-      JoinKeys(for {
+      JoinKeys((for {
         l <- flattenBoth(l0).join
         r <- flattenBoth(r0).join
         if l ≟ r
         k <- joinKeys(l, r).keys
-      } yield k)
+      } yield k).foldMap1Opt(ι).toIList)
 
     def joinOneOfs(l0: P, r0: P): JoinKeys[I] =
-      JoinKeys(for {
+      JoinKeys((for {
         l <- flattenOneOf(l0)
         r <- flattenOneOf(r0)
         if l ≟ r
         k <- joinKeys(l, r).keys
-      } yield k)
+      } yield k).foldMap1Opt(ι).toIList)
 
     def joinThens(l0: P, r0: P): JoinKeys[I] =
       JoinKeys(for {
@@ -101,12 +101,12 @@ trait Prov[D, I, P] {
       case (Value(l), Value(r)) => JoinKeys.singleton(l, r)
       case (Value(l), Proj(r))  => JoinKeys.singleton(l, dataId(r))
       case (Proj(l), Value(r))  => JoinKeys.singleton(dataId(l), r)
+      case (Then(_, _), _)      => joinThens(left, right)
+      case (_, Then(_, _))      => joinThens(left, right)
       case (Both(_, _), _)      => joinBoths(left, right)
       case (_, Both(_, _))      => joinBoths(left, right)
       case (OneOf(_, _), _)     => joinOneOfs(left, right)
       case (_, OneOf(_, _))     => joinOneOfs(left, right)
-      case (Then(_, _), _)      => joinThens(left, right)
-      case (_, Then(_, _))      => joinThens(left, right)
     }
   }
 

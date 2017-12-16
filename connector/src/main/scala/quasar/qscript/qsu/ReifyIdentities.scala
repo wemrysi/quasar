@@ -35,7 +35,7 @@ import quasar.qscript.{
   MFC,
   ReduceFunc}
 import quasar.qscript.MapFuncCore.{EmptyMap, StaticMap}
-import quasar.qscript.provenance.JoinKeys.JoinKey
+import quasar.qscript.provenance.JoinKey
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
@@ -101,7 +101,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
     }
 
   private def shiftTargetAccess(src: Symbol, bucket: FreeMapA[QSU.ShiftTarget[T]]): ISet[QAccess[Symbol]] =
-    Foldable[FreeMapA].foldMap(bucket) { 
+    Foldable[FreeMapA].foldMap(bucket) {
       case QSU.AccessLeftTarget(access) => ISet.singleton(access.symbolic(κ(src)))
       case _ => ISet.empty
     }
@@ -136,7 +136,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
         recordAccesses(g.root, bucketIdAccess(source, buckets))
 
       case QSU.QSAutoJoin(left, right, joinKeys, combiner) =>
-        val keysAccess = joinKeys.keys >>= (joinKeyAccess(g.root, _))
+        val keysAccess = joinKeys.keys >>= (_.list) >>= (joinKeyAccess(g.root, _))
         recordAccesses(g.root, keysAccess)
 
       case other => References.noRefs
