@@ -40,7 +40,7 @@ final class FilterPlannerSpec extends quasar.Qspec {
   val comparisons = List(ComparisonOp.EQ , ComparisonOp.NE , ComparisonOp.LT , ComparisonOp.LE , ComparisonOp.GT , ComparisonOp.GE)
 
   def projectField(src: FreeMap[Fix], str: String): FreeMap[Fix] =
-    Free.roll(MFC(MFCore.ProjectField(src, MFCore.StrLit(str))))
+    Free.roll(MFC(MFCore.ProjectKey(src, MFCore.StrLit(str))))
 
   def makeComp(op: ComparisonOp, src: FreeMap[Fix], str: String): FreeMap[Fix] = {
     val searchExpr = MFCore.StrLit[Fix, Hole](str)

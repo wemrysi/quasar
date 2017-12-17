@@ -206,10 +206,10 @@ object LogicalPlan {
           def render(v: LogicalPlan[A]) = v match {
             // NB: a couple of special cases for readability
             case Constant(Data.Str(str)) => Terminal("Str" :: "Constant" :: nodeType, Some(str.shows))
-            case InvokeUnapply(func @ structural.ObjectProject, Sized(expr, name)) =>
+            case InvokeUnapply(func @ structural.MapProject, Sized(expr, name)) =>
               (ra.render(expr), ra.render(name)) match {
                 case (exprR @ RenderedTree(_, Some(_), Nil), RenderedTree(_, Some(n), Nil)) =>
-                  Terminal("ObjectProject" :: nodeType, Some(exprR.shows + "{" + n + "}"))
+                  Terminal("MapProject" :: nodeType, Some(exprR.shows + "{" + n + "}"))
                 case (x, n) => NonTerminal("Invoke" :: nodeType, Some(func.shows), x :: n :: Nil)
             }
 

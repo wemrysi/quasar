@@ -1832,10 +1832,10 @@ abstract class StdLibSpec extends Qspec {
         }
       }
 
-      "ObjectProject" >> {
+      "MapProject" >> {
         """({"a":1}).a""" >> {
           binary(
-            ObjectProject(_, _).embed,
+            MapProject(_, _).embed,
             Data.Obj("a" -> Data.Int(1)),
             Data.Str("a"),
             Data.Int(1))
@@ -1843,7 +1843,7 @@ abstract class StdLibSpec extends Qspec {
 
         """({"a":1, "b":2}).b""" >> {
           binary(
-            ObjectProject(_, _).embed,
+            MapProject(_, _).embed,
             Data.Obj("a" -> Data.Int(1), "b" -> Data.Int(2)),
             Data.Str("b"),
             Data.Int(2))
@@ -1851,7 +1851,7 @@ abstract class StdLibSpec extends Qspec {
 
         """({"a":1, "b":2}).c""" >> {
           binary(
-            ObjectProject(_, _).embed,
+            MapProject(_, _).embed,
             Data.Obj("a" -> Data.Int(1), "b" -> Data.Int(2)),
             Data.Str("c"),
             Data.NA)
@@ -1859,17 +1859,17 @@ abstract class StdLibSpec extends Qspec {
 
         """({}).c""" >> {
           binary(
-            ObjectProject(_, _).embed,
+            MapProject(_, _).embed,
             Data.Obj(),
             Data.Str("c"),
             Data.NA)
         }
       }
 
-      "DeleteField" >> {
+      "DeleteKey" >> {
         "{a:1, b:2} delete .a" >> {
           binary(
-            DeleteField(_, _).embed,
+            DeleteKey(_, _).embed,
             Data.Obj("a" -> Data.Int(1), "b" -> Data.Int(2)),
             Data.Str("a"),
             Data.Obj("b" -> Data.Int(2)))
@@ -1877,7 +1877,7 @@ abstract class StdLibSpec extends Qspec {
 
         "{a:1, b:2} delete .b" >> {
           binary(
-            DeleteField(_, _).embed,
+            DeleteKey(_, _).embed,
             Data.Obj("a" -> Data.Int(1), "b" -> Data.Int(2)),
             Data.Str("b"),
             Data.Obj("a" -> Data.Int(1)))
@@ -1885,7 +1885,7 @@ abstract class StdLibSpec extends Qspec {
 
         "{a:1, b:2} delete .c" >> {
           binary(
-            DeleteField(_, _).embed,
+            DeleteKey(_, _).embed,
             Data.Obj("a" -> Data.Int(1), "b" -> Data.Int(2)),
             Data.Str("c"),
             Data.Obj("a" -> Data.Int(1), "b" -> Data.Int(2)))

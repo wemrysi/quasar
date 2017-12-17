@@ -172,11 +172,13 @@ trait RelationsLib extends Library {
     noSimplification,
     partialTyper[nat._2] {
       case Sized(Type.Const(Data.NA), fallback) => fallback
-      case Sized(ty@Type.Const(_), _) => ty
       case Sized(Type.Bottom,         fallback) => fallback
-      case Sized(value,               fallback) => value ⨿ fallback
+      case Sized(value,               fallback) => 
+        if (value.contains(Type.Top)) fallback 
+        else if (fallback.contains(Type.Top)) value 
+        else value ⨿ fallback
     },
-    partialUntyper[nat._2] { case t => Func.Input2(t, t) })
+    basicUntyper)
 
   val And = BinaryFunc(
     Mapping,

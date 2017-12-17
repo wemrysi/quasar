@@ -145,9 +145,6 @@ class StructuralSpecs extends quasar.Qspec with ValidationMatchers {
         beSuccessful(List(FlexArr(0, None, Top)))
     }
 
-    "only untype from ints" >> prop { (nonInt: Type) =>
-      FlattenArrayIndices.untpe(nonInt).map(_.unsized) must beFailing
-    }.setArbitrary(arbStrType)
   }
 
   "ShiftMap" should {
@@ -206,9 +203,6 @@ class StructuralSpecs extends quasar.Qspec with ValidationMatchers {
         beSuccessful(List(FlexArr(0, None, Top)))
     }
 
-    "only untype from ints" >> prop { (nonInt: Type) =>
-      ShiftArrayIndices.untpe(nonInt).map(_.unsized) must beFailing
-    }.setArbitrary(arbStrType)
   }
 
   "UnshiftMap" should {

@@ -43,7 +43,7 @@ final case class TableContext[T]
   def ++(that: TableContext[T]): TableContext[T] =
     TableContext(
       None,
-      () => structural.ObjectConcat(this.full(), that.full()).embed,
+      () => structural.MapConcat(this.full(), that.full()).embed,
       this.subtables ++ that.subtables)
 }
 
@@ -251,11 +251,11 @@ final class Compiler[M[_], T: Equal]
       CIName("decimal")                 -> string.Decimal,
       CIName("null")                    -> string.Null,
       CIName("to_string")               -> string.ToString,
-      CIName("make_object")             -> structural.MakeObject,
+      CIName("make_map")                -> structural.MakeMap,
       CIName("make_array")              -> structural.MakeArray,
-      CIName("object_concat")           -> structural.ObjectConcat,
+      CIName("map_concat")              -> structural.MapConcat,
       CIName("array_concat")            -> structural.ArrayConcat,
-      CIName("delete_field")            -> structural.DeleteField,
+      CIName("delete_key")              -> structural.DeleteKey,
       CIName("flatten_map")             -> structural.FlattenMap,
       CIName("flatten_array")           -> structural.FlattenArray,
       CIName("shift_map")               -> structural.ShiftMap,
@@ -279,7 +279,7 @@ final class Compiler[M[_], T: Equal]
         T = relations match {
       case _: NamedRelation[_]             => term
       case JoinRelation(left, right, _, _) =>
-        structural.ObjectConcat(
+        structural.MapConcat(
           flattenJoins(Left.projectFrom(term), left),
           flattenJoins(Right.projectFrom(term), right)).embed
     }
@@ -355,11 +355,11 @@ final class Compiler[M[_], T: Equal]
         T = {
       val fields = names.zip(values).map {
         case (Some(name), value) =>
-          structural.MakeObject(lpr.constant(Data.Str(name)), value).embed
+          structural.MakeMap(lpr.constant(Data.Str(name)), value).embed
         case (None, value) => value
       }
 
-      fields.reduceOption(structural.ObjectConcat(_, _).embed)
+      fields.reduceOption(structural.MapConcat(_, _).embed)
         .getOrElse(lpr.constant(Data.Obj()))
     }
 
@@ -548,7 +548,7 @@ final class Compiler[M[_], T: Equal]
                               lpr.let(name, t,
                                 (syntheticNames.nonEmpty).fold(
                                   aggregation(set.GroupBy(fvar, syntheticNames.foldLeft(fvar)((acc, field) =>
-                                    structural.DeleteField(acc, lpr.constant(Data.Str(field))).embed)).embed),
+                                    structural.DeleteKey(acc, lpr.constant(Data.Str(field))).embed)).embed),
                                   agg.Arbitrary(set.GroupBy(fvar, fvar).embed)).embed)
                             }
 
@@ -565,7 +565,7 @@ final class Compiler[M[_], T: Equal]
                               val pruned =
                                 CompilerState.rootTableReq[M, T].map(
                                   syntheticNames.foldLeft(_)((acc, field) =>
-                                    structural.DeleteField(acc,
+                                    structural.DeleteKey(acc,
                                       lpr.constant(Data.Str(field))).embed))
 
                               pruned
@@ -593,7 +593,7 @@ final class Compiler[M[_], T: Equal]
 
       case MapLiteral(exprs) =>
         exprs.traverse(_.bitraverse(compile0, compile0)) ∘
-        (structural.MakeObjectN(_: _*).embed)
+        (structural.MakeMapN(_: _*).embed)
 
       case Splice(expr) =>
         expr.fold(
@@ -620,7 +620,7 @@ final class Compiler[M[_], T: Equal]
           case Mod           => math.Modulo.left
           case Pow           => math.Power.left
           case In            => set.In.left
-          case FieldDeref    => structural.ObjectProject.left
+          case KeyDeref      => structural.MapProject.left
           case IndexDeref    => structural.ArrayProject.left
           case Limit         => set.Take.left
           case Offset        => set.Drop.left
@@ -660,14 +660,14 @@ final class Compiler[M[_], T: Equal]
         CompilerState.fields.flatMap(fields =>
           if (fields.any(_ ≟ name))
             CompilerState.rootTableReq[M, T] ∘
-            (structural.ObjectProject(_, lpr.constant(Data.Str(name))).embed)
+            (structural.MapProject(_, lpr.constant(Data.Str(name))).embed)
           else
             for {
               rName <- relationName(node).fold(fail, emit)
               table <- CompilerState.subtableReq[M, T](rName)
             } yield
               if ((rName: String) ≟ name) table
-              else structural.ObjectProject(table, lpr.constant(Data.Str(name))).embed)
+              else structural.MapProject(table, lpr.constant(Data.Str(name))).embed)
 
       case InvokeFunction(name, args) if
           name ≟ CIName("date_part")  || name ≟ CIName("temporal_part") =>

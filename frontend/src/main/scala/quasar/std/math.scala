@@ -17,8 +17,7 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar.{Data, DateTimeInterval, Func, UnaryFunc, BinaryFunc, Type, Mapping, SemanticError},
-  SemanticError._
+import quasar.{Data, DateTimeInterval, Func, UnaryFunc, BinaryFunc, Type, Mapping, SemanticError}
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
@@ -27,17 +26,19 @@ import quasar.DataDateTimeExtractors._
 import scala.math.BigDecimal.RoundingMode
 
 import matryoshka._
-import scalaz._, Scalaz._, Validation.{success, failure}
+import scalaz._, Scalaz._, Validation.{failure, success}
 import shapeless._
 
 trait MathLib extends Library {
   private val MathRel = Type.Numeric ⨿ Type.Interval
   private val MathAbs = Type.Numeric ⨿ Type.Interval ⨿ Type.Temporal
+  private val LocalTemporal = Type.LocalDate ⨿ Type.LocalDateTime ⨿ Type.LocalTime
 
   // TODO[monocle]: Unit unapply needs to do Boolean instead of Option[Unit]
   // val Zero = Prism.partial[Data, Unit] {
   //   case Data.Number(v) if v ≟ 0 => ()
   // } (κ(Data.Int(0)))
+  // Be careful when using this. Zero() creates an Int(0), but it *matches* Dec(0) too.
   object Zero {
     def apply() = Data.Int(0)
     def unapply(obj: Data): Boolean = obj match {
@@ -83,11 +84,6 @@ trait MathLib extends Library {
     }
   }
 
-  private val biReflexiveUnapply: Func.Untyper[nat._2] = partialUntyperV[nat._2] {
-    case Type.Const(d) => success(Func.Input2(d.dataType, d.dataType))
-    case t             => success(Func.Input2(t, t))
-  }
-
   /** Adds two numeric values, promoting to decimal if either operand is
     * decimal.
     */
@@ -131,17 +127,24 @@ trait MathLib extends Library {
         failure(NonEmptyList(SemanticError.GenericError("Intervals containing time information can't be added to dates")))
       case Sized(Type.Const(Data.Interval(_)), Type.Const(CanLensTime(_))) =>
         failure(NonEmptyList(SemanticError.GenericError("Intervals containing date information can't be added to times")))
-      case Sized(t@(Type.OffsetDateTime | Type.OffsetTime | Type.OffsetDate |
-                    Type.LocalDateTime | Type.LocalDate | Type.LocalTime | Type.Interval), Type.Interval) =>
-        success(t)
+      case Sized(t1, t2)
+        if (Type.OffsetDateTime ⨿ Type.OffsetTime ⨿ Type.OffsetDate ⨿
+                    Type.LocalDateTime ⨿ Type.LocalDate ⨿ Type.LocalTime ⨿ Type.Interval).contains(t1) &&
+            Type.Interval.contains(t2) =>
+        success(t1.widenConst)
+      case Sized(t1, t2)
+        if (Type.OffsetDateTime ⨿ Type.OffsetTime ⨿ Type.OffsetDate ⨿
+                    Type.LocalDateTime ⨿ Type.LocalDate ⨿ Type.LocalTime ⨿ Type.Interval).contains(t2) &&
+            Type.Interval.contains(t1) =>
+        success(t2.widenConst)
     } ||| numericWidening,
-    untyper[nat._2](t => Type.typecheck(Type.Interval, t).fold(
-      κ(t match {
-        case Type.Const(d) => success(Func.Input2(d.dataType,  d.dataType))
-        case Type.Int      => success(Func.Input2(Type.Int, Type.Int))
-        case _             => success(Func.Input2(Type.Numeric, Type.Numeric))
-      }),
-      κ(success(Func.Input2(t, Type.Interval))))))
+    partialUntyperOV[nat._2](t => 
+      Type.typecheck(Type.Interval, t).fold(κ(t match {
+        case Type.Int                      => Some(success(Func.Input2(Type.Int, Type.Int)))
+        case t if Type.Numeric.contains(t) => Some(success(Func.Input2(Type.Numeric, Type.Numeric)))
+        case _                             => None
+        }),
+      κ(Some(success(Func.Input2(t, Type.Interval)))))))
 
   /**
    * Multiplies two numeric values, promoting to decimal if either operand is decimal.
@@ -162,8 +165,8 @@ trait MathLib extends Library {
         }
     },
     (partialTyper[nat._2] {
-      case Sized(TZero(), t) if Type.Numeric contains t => TZero()
-      case Sized(t, TZero()) if Type.Numeric contains t => TZero()
+      case Sized(TZero(), t) if Type.Numeric.contains(t) => Type.Const(Data.Dec(0))
+      case Sized(t, TZero()) if Type.Numeric.contains(t) => Type.Const(Data.Dec(0))
 
       case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))       => Type.Const(Data.Int(v1 * v2))
       case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => Type.Const(Data.Dec(v1 * v2))
@@ -173,10 +176,15 @@ trait MathLib extends Library {
       // fractional units down to smaller units most of the time.
       case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Int(v2))) => Type.Const(Data.Interval(v1.multiply(v2.intValue)))
       case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Interval(v2))) => Type.Const(Data.Interval(v2.multiply(v1.intValue)))
-      case Sized(t1, t2) if (t2 contains Type.Int) && (t1 contains Type.Interval) => Type.Interval
-      case Sized(t1, t2) if (t1 contains Type.Int) && (t2 contains Type.Interval) => Type.Interval
+      case Sized(t1, t2) if (Type.Int contains t2) && (Type.Interval contains t1) => Type.Interval
+      case Sized(t1, t2) if (Type.Int contains t1) && (Type.Interval contains t2) => Type.Interval
     }) ||| numericWidening,
-    biReflexiveUnapply)
+    partialUntyper[nat._2] {
+      case Type.Interval => Func.Input2(Type.Int ⨿ Type.Interval, Type.Int ⨿ Type.Interval)
+      case Type.Int => Func.Input2(Type.Int, Type.Int)
+      case Type.Dec => Func.Input2(Type.Numeric, Type.Numeric)
+      case _        => Func.Input2(MathRel, MathRel)
+    })
 
   val Power = BinaryFunc(
     Mapping,
@@ -200,7 +208,10 @@ trait MathLib extends Library {
       case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2))) if v2.isValidInt    => Type.Const(Data.Int(v1.pow(v2.toInt)))
       case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Int(v2))) if v2.isValidInt => Type.Const(Data.Dec(v1.pow(v2.toInt)))
     } ||| numericWidening,
-    biReflexiveUnapply)
+    partialUntyper[nat._2] {
+      case Type.Int => Func.Input2(Type.Int, Type.Int)
+      case Type.Dec => Func.Input2(Type.Numeric, Type.Numeric)
+    })
 
   /** Subtracts one value from another, promoting to decimal if either operand
     * is decimal.
@@ -256,25 +267,28 @@ trait MathLib extends Library {
         val s = v1.getSecond - v2.getSecond
         val n = v1.getNano - v2.getNano
         Type.Const(Data.Interval(DateTimeInterval(0, 0, 0, h * 3600L + m * 60L + s, n.toLong)))
-      case Sized(Type.LocalDateTime, Type.LocalDateTime) => Type.Interval
-      case Sized(Type.OffsetDateTime, Type.Interval) => Type.OffsetDateTime
-      case Sized(Type.OffsetDate, Type.Interval) => Type.OffsetDate
-      case Sized(Type.OffsetTime, Type.Interval) => Type.OffsetTime
-      case Sized(Type.LocalDate, Type.LocalDate) => Type.Interval
-      case Sized(Type.LocalDate, Type.Interval) => Type.LocalDate
-      case Sized(Type.LocalTime, Type.Interval) => Type.LocalTime
-      case Sized(Type.LocalTime, Type.LocalTime) => Type.Interval
-      case Sized(Type.Interval, Type.Interval) => Type.Interval
+      case Sized(Type.LocalDateTime.superOf(_), Type.LocalDateTime.superOf(_)) => Type.Interval
+      case Sized(Type.OffsetDateTime.superOf(_), Type.Interval.superOf(_)) => Type.OffsetDateTime
+      case Sized(Type.OffsetDate.superOf(_), Type.Interval.superOf(_)) => Type.OffsetDate
+      case Sized(Type.OffsetTime.superOf(_), Type.Interval.superOf(_)) => Type.OffsetTime
+      case Sized(Type.LocalDate.superOf(_), Type.LocalDate.superOf(_)) => Type.Interval
+      case Sized(Type.LocalDate.superOf(_), Type.Interval.superOf(_))  => Type.LocalDate
+      case Sized(Type.LocalTime.superOf(_), Type.Interval.superOf(_))  => Type.LocalTime
+      case Sized(Type.LocalTime.superOf(_), Type.LocalTime.superOf(_)) => Type.Interval
+      case Sized(Type.Interval.superOf(_), Type.Interval.superOf(_))   => Type.Interval
+      case Sized(Type.Temporal.superOf(ty), Type.Interval.superOf(_))  => ty.widenConst
+      case Sized(Type.Temporal.superOf(t1), Type.Temporal.superOf(t2))
+        if (t1.contains(t2) || t2.contains(t1)) => Type.Interval
     } ||| numericWidening,
-    untyper[nat._2](t => Type.typecheck(Type.Temporal, t).fold(
+    partialUntyperOV[nat._2] { t => Type.typecheck(Type.Temporal, t).fold(
       κ(Type.typecheck(Type.Interval, t).fold(
         κ(t match {
-          case Type.Const(d) => success(Func.Input2(d.dataType  , d.dataType  ))
-          case Type.Int      => success(Func.Input2(Type.Int    , Type.Int    ))
-          case _             => success(Func.Input2(Type.Numeric, Type.Numeric))
+          case Type.Int                      => Some(success(Func.Input2(Type.Int    , Type.Int    )))
+          case t if Type.Numeric.contains(t) => Some(success(Func.Input2(Type.Numeric, Type.Numeric)))
+          case _                             => None
         }),
-        κ(success(Func.Input2(Type.Temporal ⨿ Type.Interval, Type.Temporal ⨿ Type.Interval))))),
-      κ(success(Func.Input2(t, Type.Interval))))))
+        κ(Some(success(Func.Input2(Type.Temporal ⨿ Type.Interval, Type.Temporal ⨿ Type.Interval)))))),
+      κ(Some(success(Func.Input2(t, Type.Interval)))))})
 
   /**
    * Divides one value by another, promoting to decimal if either operand is decimal.
@@ -283,7 +297,7 @@ trait MathLib extends Library {
     Mapping,
     "Divides one numeric or interval value by another (non-zero) numeric value",
     Type.Numeric,
-    Func.Input2(Type.Numeric, Type.Numeric),
+    Func.Input2(MathRel, Type.Numeric),
     new Func.Simplifier {
       def apply[T]
         (orig: LP[T])
@@ -293,19 +307,28 @@ trait MathLib extends Library {
           case _                                         => None
         }
     },
-    (partialTyperV[nat._2] {
-      case Sized(v1, TOne() ) => success(v1)
-      case Sized(v1, TZero()) => failure(NonEmptyList(GenericError("Division by zero")))
+    partialTyperV[nat._2] {
+      case Sized(v1, TOne())  => success(v1)
 
-      case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))       => success(Type.Const(Data.Dec(BigDecimal(v1) / BigDecimal(v2))))
-      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => success(Type.Const(Data.Dec(v1 / v2)))
-    }) ||| numericWidening,
+      case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))
+        if v2 != BigInt(0)                                                => success(Type.Const(Data.Dec(BigDecimal(v1) / BigDecimal(v2))))
+      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2)))
+        if v2 != BigDecimal(0)                                            => success(Type.Const(Data.Dec(v1 / v2)))
+
+      // TODO: handle interval divided by Dec (not provided by threeten). See SD-582.
+      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Int(v2))) => success(Type.Const(Data.Interval(DateTimeInterval.divideBy(v1, v2.intValue))))
+
+      case Sized(t1, t2)
+        if Type.Interval.contains(t1) && Type.Int.contains(t2)            => success(Type.Interval)
+      case Sized(t1, t2)
+        if Type.Interval.contains(t1) && Type.Interval.contains(t2)       => success(Type.Dec)
+      case Sized(t1, t2)
+        if Type.Numeric.contains(t1) && Type.Numeric.contains(t2)         => success(Type.Dec)
+
+    } ||| numericWidening,
     untyper[nat._2](t => Type.typecheck(Type.Interval, t).fold(
-      κ(t match {
-        case Type.Int      => success(Func.Input2(Type.Int, Type.Int))
-        case _             => success(Func.Input2(MathRel, MathRel))
-      }),
-      κ(success(Func.Input2((Type.Temporal ⨿ Type.Interval), MathRel))))))
+      κ(success(Func.Input2(MathRel, Type.Numeric))),
+      κ(success(Func.Input2(Type.Interval, Type.Int))))))
 
   /**
    * Aka "unary minus".
@@ -350,13 +373,10 @@ trait MathLib extends Library {
       Func.Input1(Type.Numeric),
       noSimplification,
       partialTyperV[nat._1] {
-        case Sized(Type.Const(Data.Int(v)))      => success(Type.Const(Data.Int(v)))
-        case Sized(Type.Const(Data.Dec(v)))      => success(Type.Const(Data.Dec(v.setScale(0, RoundingMode.CEILING))))
-        case Sized(t) if Type.Numeric.contains(t) => success(t)
+        case Sized(Type.Const(Data.Int(v))) => success(Type.Const(Data.Int(v)))
+        case Sized(Type.Const(Data.Dec(v))) => success(Type.Const(Data.Int(v.setScale(0, RoundingMode.CEILING).toBigInt())))
       },
-      untyper[nat._1] {
-        case t             => success(Func.Input1(t))
-      })
+      basicUntyper)
 
     val Floor = UnaryFunc(
       Mapping,
@@ -365,14 +385,10 @@ trait MathLib extends Library {
       Func.Input1(Type.Numeric),
       noSimplification,
       partialTyperV[nat._1] {
-        case Sized(Type.Const(Data.Int(v)))      => success(Type.Const(Data.Int(v)))
-        case Sized(Type.Const(Data.Dec(v)))      => success(Type.Const(Data.Dec(v.setScale(0, RoundingMode.FLOOR))))
-        case Sized(t) if Type.Numeric.contains(t) => success(t)
+        case Sized(Type.Const(Data.Int(v))) => success(Type.Const(Data.Int(v)))
+        case Sized(Type.Const(Data.Dec(v))) => success(Type.Const(Data.Int(v.setScale(0, RoundingMode.FLOOR).toBigInt)))
       },
-      untyper[nat._1] {
-        case Type.Const(d) => success(Func.Input1(d.dataType))
-        case t             => success(Func.Input1(t))
-      })
+      basicUntyper)
 
     val Trunc = UnaryFunc(
       Mapping,
@@ -383,12 +399,8 @@ trait MathLib extends Library {
       partialTyperV[nat._1] {
         case Sized(Type.Const(Data.Int(v)))      => success(Type.Const(Data.Int(v)))
         case Sized(Type.Const(Data.Dec(v)))      => success(Type.Const(Data.Int(v.toBigInt)))
-        case Sized(t) if Type.Numeric.contains(t) => success(t)
       },
-      untyper[nat._1] {
-        case Type.Const(d) => success(Func.Input1(d.dataType))
-        case t             => success(Func.Input1(t))
-      })
+      basicUntyper)
 
     val Round = UnaryFunc(
       Mapping,
@@ -398,12 +410,9 @@ trait MathLib extends Library {
       noSimplification,
       partialTyperV[nat._1] {
         case Sized(Type.Const(Data.Int(v))) => success(Type.Const(Data.Int(v)))
-        case Sized(Type.Const(Data.Dec(v))) => success(Type.Const(Data.Dec(v.setScale(0, RoundingMode.HALF_EVEN))))
-        case Sized(t) if Type.Numeric.contains(t) => success(t)
+        case Sized(Type.Const(Data.Dec(v))) => success(Type.Const(Data.Int(v.setScale(0, RoundingMode.HALF_EVEN).toBigInt)))
       },
-      untyper[nat._1] {
-        case t             => success(Func.Input1(t))
-      })
+      basicUntyper)
 
     val FloorScale = BinaryFunc(
       Mapping,
@@ -418,7 +427,9 @@ trait MathLib extends Library {
 
         case Sized(t1, t2) if Type.Numeric.contains(t1) && Type.Numeric.contains(t2) => success(t1)
       }),
-      biReflexiveUnapply)
+      partialUntyper[nat._2] {
+        case t => Func.Input2(t, Type.Int)
+      })
 
     val CeilScale = BinaryFunc(
       Mapping,
@@ -433,7 +444,9 @@ trait MathLib extends Library {
 
         case Sized(t1, t2) if Type.Numeric.contains(t1) && Type.Numeric.contains(t2) => success(t1)
       }),
-      biReflexiveUnapply)
+      partialUntyper[nat._2] {
+        case t => Func.Input2(t, Type.Int)
+      })
 
     val RoundScale = BinaryFunc(
       Mapping,
@@ -448,7 +461,9 @@ trait MathLib extends Library {
 
         case Sized(t1, t2) if Type.Numeric.contains(t1) && Type.Numeric.contains(t2) => success(t1)
       }),
-      biReflexiveUnapply)
+      partialUntyper[nat._2] {
+        case t => Func.Input2(t, Type.Int)
+      })
 
   // TODO: Come back to this, Modulo docs need to stop including Interval.
   // Note: there are 2 interpretations of `%` which return different values for negative numbers.
@@ -464,13 +479,24 @@ trait MathLib extends Library {
     Func.Input2(Type.Numeric, Type.Numeric),
     noSimplification,
     (partialTyperV[nat._2] {
-      case Sized(v1, TZero()) => failure(NonEmptyList(GenericError("Division by zero")))
-
-      case Sized(v1 @ Type.Const(Data.Int(_)), TOne())                     => success(TZero())
-      case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))       => success(Type.Const(Data.Int(v1 % v2)))
-      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => success(Type.Const(Data.Dec(v1 % v2)))
-    }) ||| numericWidening,
-    biReflexiveUnapply)
+      case Sized(v1, TOne()) if Type.Int.contains(v1)                      => success(TZero())
+      case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))
+        if v2 != BigInt(0)                                                 => success(Type.Const(Data.Int(v1 % v2)))
+      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2)))
+        if v2 != BigDecimal(0)                                             => success(Type.Const(Data.Dec(v1 % v2)))
+      case Sized(Type.Interval, t) if Type.Numeric.contains(t)             => success(Type.Interval)
+      case Sized(t1, t2)
+        if Type.Int.contains(t1) && Type.Int.contains(t2)                  => success(Type.Int)
+      case Sized(t1, t2)
+        if Type.Dec.contains(t1) && Type.Dec.contains(t2)                  => success(Type.Dec)
+      case Sized(t1, t2)
+        if Type.Numeric.contains(t1) && Type.Numeric.contains(t2)          => success(Type.Numeric)
+    }),
+    partialUntyper[nat._2] {
+      case Type.Int => Func.Input2(Type.Int, Type.Int)
+      case t if Type.Numeric.contains(t) => Func.Input2(Type.Numeric, Type.Numeric)
+      case Type.Interval => Func.Input2(Type.Interval, Type.Numeric)
+    })
 }
 
 object MathLib extends MathLib

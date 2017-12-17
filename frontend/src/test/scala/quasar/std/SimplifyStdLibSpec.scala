@@ -45,7 +45,7 @@ class SimplifyStdLibSpec extends StdLibSpec {
 
     case (date.Now, _) => notHandled
 
-    case (structural.ObjectProject, List(Data.Obj(fields), Data.Str(field))) if !fields.contains(field) => notHandled
+    case (structural.MapProject, List(Data.Obj(fields), Data.Str(field))) if !fields.contains(field) => notHandled
 
     case _ => ().right
   }

@@ -226,7 +226,7 @@ trait DateLib extends Library with Serializable {
   val NowTime = NullaryFunc(
     Mapping,
     "Returns the current time in the current time zone – this must always return the same value within the same execution of a query.",
-    Type.OffsetDateTime,
+    Type.OffsetTime,
     noSimplification)
 
   val NowDate = NullaryFunc(

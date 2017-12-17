@@ -71,14 +71,20 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
   import PathError._
   import Precog.startTask
 
-  // pessimistically equal to couchbase's
   type QS[T[_[_]]] =
-    QScriptCore[T, ?] :\:
-    EquiJoin[T, ?] :/:
-    Const[ShiftedRead[AFile], ?]
+    MimirQScriptCP[T]
 
   implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
+    mimir.qScriptToQScriptTotal[T]
+
+  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable.Aux[QScriptCore[T, ?], QSM[T, ?]] =
+    Injectable.inject[QScriptCore[T, ?], QSM[T, ?]]
+
+  implicit def equiJoinToQScript[T[_[_]]]: Injectable.Aux[EquiJoin[T, ?], QSM[T, ?]] =
+    Injectable.inject[EquiJoin[T, ?], QSM[T, ?]]
+
+  implicit def shiftedReadToQScript[T[_[_]]]: Injectable.Aux[Const[ShiftedRead[AFile], ?], QSM[T, ?]] =
+    Injectable.inject[Const[ShiftedRead[AFile], ?], QSM[T, ?]]
 
   private type Cake = Precog with Singleton
 

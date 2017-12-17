@@ -59,7 +59,7 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case (date.ExtractWeek, _)         => Skipped("TODO").left
 
     case (structural.ConcatOp, _)      => Pending("TODO").left
-    case (structural.ObjectProject, _) => Pending("TODO").left
+    case (structural.MapProject, _) => Pending("TODO").left
 
     case _                             => ().right
   }

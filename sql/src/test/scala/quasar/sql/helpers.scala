@@ -87,6 +87,9 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
   def testLogicalPlanCompile(query: Fix[Sql], expected: Fix[LP]) =
     compile(query).map(optimizer.optimize).toEither must beRight(equalToPlan(expected))
 
+  def testLogicalPlanDoesNotTypeCheck(query: Fix[Sql]) =
+    compile(query).map(lpr.ensureCorrectTypes(_).toEither must beLeft).toEither must beRight
+
   def testTypedLogicalPlanCompile(query: Fix[Sql], expected: Fix[LP]) =
     fullCompile(query).toEither must beRight(equalToPlan(expected))
 
@@ -112,5 +115,5 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
     lpf.read(sandboxCurrent(posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(file).get).get)
 
   def makeObj(ts: (String, Fix[LP])*): Fix[LP] =
-    MakeObjectN(ts.map(t => lpf.constant(Data.Str(t._1)) -> t._2): _*).embed
+    MakeMapN(ts.map(t => lpf.constant(Data.Str(t._1)) -> t._2): _*).embed
 }

@@ -73,25 +73,25 @@ class LogicalPlanSpecs extends Spec with ScalazMatchers {
       lpf.normalizeTempNames(
         lpf.let('foo, lpf.read(file("foo")),
           lpf.let('bar, lpf.read(file("bar")),
-            Fix(MakeObjectN(
-              lpf.constant(Data.Str("x")) -> Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))),
-              lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("y"))))))))) must equal(
+            Fix(MakeMapN(
+              lpf.constant(Data.Str("x")) -> Fix(MapProject(lpf.free('foo), lpf.constant(Data.Str("x")))),
+              lpf.constant(Data.Str("y")) -> Fix(MapProject(lpf.free('bar), lpf.constant(Data.Str("y"))))))))) must equal(
         lpf.let('__tmp0, lpf.read(file("foo")),
           lpf.let('__tmp1, lpf.read(file("bar")),
-            Fix(MakeObjectN(
-              lpf.constant(Data.Str("x")) -> Fix(ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("x")))),
-              lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('__tmp1), lpf.constant(Data.Str("y")))))))))
+            Fix(MakeMapN(
+              lpf.constant(Data.Str("x")) -> Fix(MapProject(lpf.free('__tmp0), lpf.constant(Data.Str("x")))),
+              lpf.constant(Data.Str("y")) -> Fix(MapProject(lpf.free('__tmp1), lpf.constant(Data.Str("y")))))))))
     }
 
     "rename shadowed name" in {
       lpf.normalizeTempNames(
         lpf.let('x, lpf.read(file("foo")),
-          lpf.let('x, Fix(MakeObjectN(
-              lpf.constant(Data.Str("x")) -> Fix(ObjectProject(lpf.free('x), lpf.constant(Data.Str("x")))))),
+          lpf.let('x, Fix(MakeMapN(
+              lpf.constant(Data.Str("x")) -> Fix(MapProject(lpf.free('x), lpf.constant(Data.Str("x")))))),
             lpf.free('x)))) must equal(
         lpf.let('__tmp0, lpf.read(file("foo")),
-          lpf.let('__tmp1, Fix(MakeObjectN(
-              lpf.constant(Data.Str("x")) -> Fix(ObjectProject(lpf.free('__tmp0), lpf.constant(Data.Str("x")))))),
+          lpf.let('__tmp1, Fix(MakeMapN(
+              lpf.constant(Data.Str("x")) -> Fix(MapProject(lpf.free('__tmp0), lpf.constant(Data.Str("x")))))),
             lpf.free('__tmp1))))
     }
   }
@@ -102,15 +102,15 @@ class LogicalPlanSpecs extends Spec with ScalazMatchers {
         lpf.let('bar,
           lpf.let('foo,
             lpf.read(file("foo")),
-            Fix(Filter(lpf.free('foo), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Str("z"))))))),
-          Fix(MakeObjectN(
-            lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("y")))))))) must equal(
+            Fix(Filter(lpf.free('foo), Fix(Eq(Fix(MapProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Str("z"))))))),
+          Fix(MakeMapN(
+            lpf.constant(Data.Str("y")) -> Fix(MapProject(lpf.free('bar), lpf.constant(Data.Str("y")))))))) must equal(
         lpf.let('foo,
           lpf.read(file("foo")),
           lpf.let('bar,
-            Fix(Filter(lpf.free('foo), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Str("z")))))),
-            Fix(MakeObjectN(
-              lpf.constant(Data.Str("y")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("y")))))))))
+            Fix(Filter(lpf.free('foo), Fix(Eq(Fix(MapProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Str("z")))))),
+            Fix(MakeMapN(
+              lpf.constant(Data.Str("y")) -> Fix(MapProject(lpf.free('bar), lpf.constant(Data.Str("y")))))))))
     }
 
     "re-nest deep" in {
@@ -119,18 +119,18 @@ class LogicalPlanSpecs extends Spec with ScalazMatchers {
           lpf.let('bar,
             lpf.let('foo,
               lpf.read(file("foo")),
-              Fix(Filter(lpf.free('foo), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Int(0))))))),
-            Fix(Filter(lpf.free('bar), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("y")))), lpf.constant(Data.Int(1))))))),
-          Fix(MakeObjectN(
-            lpf.constant(Data.Str("z")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("z")))))))) must equal(
+              Fix(Filter(lpf.free('foo), Fix(Eq(Fix(MapProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Int(0))))))),
+            Fix(Filter(lpf.free('bar), Fix(Eq(Fix(MapProject(lpf.free('foo), lpf.constant(Data.Str("y")))), lpf.constant(Data.Int(1))))))),
+          Fix(MakeMapN(
+            lpf.constant(Data.Str("z")) -> Fix(MapProject(lpf.free('bar), lpf.constant(Data.Str("z")))))))) must equal(
         lpf.let('foo,
           lpf.read(file("foo")),
           lpf.let('bar,
-            Fix(Filter(lpf.free('foo), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Int(0)))))),
+            Fix(Filter(lpf.free('foo), Fix(Eq(Fix(MapProject(lpf.free('foo), lpf.constant(Data.Str("x")))), lpf.constant(Data.Int(0)))))),
             lpf.let('baz,
-              Fix(Filter(lpf.free('bar), Fix(Eq(Fix(ObjectProject(lpf.free('foo), lpf.constant(Data.Str("y")))), lpf.constant(Data.Int(1)))))),
-              Fix(MakeObjectN(
-                lpf.constant(Data.Str("z")) -> Fix(ObjectProject(lpf.free('bar), lpf.constant(Data.Str("z"))))))))))
+              Fix(Filter(lpf.free('bar), Fix(Eq(Fix(MapProject(lpf.free('foo), lpf.constant(Data.Str("y")))), lpf.constant(Data.Int(1)))))),
+              Fix(MakeMapN(
+                lpf.constant(Data.Str("z")) -> Fix(MapProject(lpf.free('bar), lpf.constant(Data.Str("z"))))))))))
     }
 
     "hoist multiple Lets" in {

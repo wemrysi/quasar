@@ -357,17 +357,17 @@ object MapFuncCore {
         rollMF[T, A](
           MFC(Constant(EJson.fromCommon(ejson.Bool[T[EJson]](v1 ≟ v2))))).some
 
-      case DeleteField(
+      case DeleteKey(
         Embed(StaticMap(map)),
-        ExtractFunc(Constant(field))) =>
-        StaticMap(map.filter(_._1 ≠ field)).project.some
+        ExtractFunc(Constant(key))) =>
+        StaticMap(map.filter(_._1 ≠ key)).project.some
 
       // TODO: Generalize this to `StaticMapSuffix`.
-      case DeleteField(
+      case DeleteKey(
         Embed(CoEnv(\/-(MFC(ConcatMaps(m, Embed(CoEnv(\/-(MFC(MakeMap(k, _)))))))))),
         f)
           if k ≟ f =>
-        rollMF[T, A](MFC(DeleteField(m, f))).some
+        rollMF[T, A](MFC(DeleteKey(m, f))).some
 
       case ProjectIndex(
         Embed(StaticArrayPrefix(as)),
@@ -375,16 +375,16 @@ object MapFuncCore {
           if index.isValidInt =>
         as.lift(index.intValue).map(_.project)
 
-      case ProjectField(
+      case ProjectKey(
         Embed(StaticMap(map)),
-        ExtractFunc(Constant(field))) =>
-        map.reverse.find(_._1 ≟ field) ∘ (_._2.project)
+        ExtractFunc(Constant(key))) =>
+        map.reverse.find(_._1 ≟ key) ∘ (_._2.project)
 
       // TODO: Generalize these to `StaticMapSuffix`
-      case ProjectField(Embed(CoEnv(\/-(MFC(MakeMap(k, Embed(v)))))), f) if k ≟ f =>
+      case ProjectKey(Embed(CoEnv(\/-(MFC(MakeMap(k, Embed(v)))))), f) if k ≟ f =>
         v.some
 
-      case ProjectField(
+      case ProjectKey(
         Embed(CoEnv(\/-(MFC(ConcatMaps(_, Embed(CoEnv(\/-(MFC(MakeMap(k, Embed(v))))))))))),
         f)
           if k ≟ f =>
@@ -484,8 +484,8 @@ object MapFuncCore {
         case MakeMap(a1, a2) => (f(a1) ⊛ f(a2))(MakeMap(_, _))
         case ConcatMaps(a1, a2) => (f(a1) ⊛ f(a2))(ConcatMaps(_, _))
         case ProjectIndex(a1, a2) => (f(a1) ⊛ f(a2))(ProjectIndex(_, _))
-        case ProjectField(a1, a2) => (f(a1) ⊛ f(a2))(ProjectField(_, _))
-        case DeleteField(a1, a2) => (f(a1) ⊛ f(a2))(DeleteField(_, _))
+        case ProjectKey(a1, a2) => (f(a1) ⊛ f(a2))(ProjectKey(_, _))
+        case DeleteKey(a1, a2) => (f(a1) ⊛ f(a2))(DeleteKey(_, _))
         case ConcatArrays(a1, a2) => (f(a1) ⊛ f(a2))(ConcatArrays(_, _))
         case Range(a1, a2) => (f(a1) ⊛ f(a2))(Range(_, _))
         case Split(a1, a2) => (f(a1) ⊛ f(a2))(Split(_, _))
@@ -580,8 +580,8 @@ object MapFuncCore {
         case (MakeMap(a1, a2), MakeMap(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (ConcatMaps(a1, a2), ConcatMaps(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (ProjectIndex(a1, a2), ProjectIndex(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
-        case (ProjectField(a1, a2), ProjectField(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
-        case (DeleteField(a1, a2), DeleteField(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (ProjectKey(a1, a2), ProjectKey(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (DeleteKey(a1, a2), DeleteKey(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (ConcatArrays(a1, a2), ConcatArrays(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Range(a1, a2), Range(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Split(a1, a2), Split(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
@@ -677,8 +677,8 @@ object MapFuncCore {
           case MakeMap(a1, a2) => shz("MakeMap", a1, a2)
           case ConcatMaps(a1, a2) => shz("ConcatMaps", a1, a2)
           case ProjectIndex(a1, a2) => shz("ProjectIndex", a1, a2)
-          case ProjectField(a1, a2) => shz("ProjectField", a1, a2)
-          case DeleteField(a1, a2) => shz("DeleteField", a1, a2)
+          case ProjectKey(a1, a2) => shz("ProjectKey", a1, a2)
+          case DeleteKey(a1, a2) => shz("DeleteKey", a1, a2)
           case ConcatArrays(a1, a2) => shz("ConcatArrays", a1, a2)
           case Range(a1, a2) => shz("Range", a1, a2)
           case SetTimezone(a1, a2) => shz("SetTimezone", a1, a2)
@@ -786,8 +786,8 @@ object MapFuncCore {
           case MakeMap(a1, a2) => nAry("MakeMap", a1, a2)
           case ConcatMaps(a1, a2) => nAry("ConcatMaps", a1, a2)
           case ProjectIndex(a1, a2) => nAry("ProjectIndex", a1, a2)
-          case ProjectField(a1, a2) => nAry("ProjectField", a1, a2)
-          case DeleteField(a1, a2) => nAry("DeleteField", a1, a2)
+          case ProjectKey(a1, a2) => nAry("ProjectKey", a1, a2)
+          case DeleteKey(a1, a2) => nAry("DeleteKey", a1, a2)
           case ConcatArrays(a1, a2) => nAry("ConcatArrays", a1, a2)
           case Range(a1, a2) => nAry("Range", a1, a2)
           case SetTimezone(a1, a2) => nAry("SetTimezone", a1, a2)
@@ -941,13 +941,13 @@ object MapFuncsCore {
     def a1 = src
     def a2 = index
   }
-  @Lenses final case class ProjectField[T[_[_]], A](src: A, field: A) extends Binary[T, A] {
+  @Lenses final case class ProjectKey[T[_[_]], A](src: A, key: A) extends Binary[T, A] {
     def a1 = src
-    def a2 = field
+    def a2 = key
   }
-  @Lenses final case class DeleteField[T[_[_]], A](src: A, field: A) extends Binary[T, A] {
+  @Lenses final case class DeleteKey[T[_[_]], A](src: A, key: A) extends Binary[T, A] {
     def a1 = src
-    def a2 = field
+    def a2 = key
   }
   @Lenses final case class Meta[T[_[_]], A](a1: A) extends Unary[T, A]
 

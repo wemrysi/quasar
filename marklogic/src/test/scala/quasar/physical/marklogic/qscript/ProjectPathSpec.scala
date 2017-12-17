@@ -30,10 +30,10 @@ import pathy._, Path._
 import scalaz._, Scalaz._
 
 final class ProjectPathSpec extends quasar.Qspec {
-  def projectField[S[_]: Functor](src: Free[MapFunc[Fix, ?], Hole], str: String)(
+  def projectKey[S[_]: Functor](src: Free[MapFunc[Fix, ?], Hole], str: String)(
     implicit I: MapFunc[Fix, ?] :<: S
   ): Free[S, Hole] =
-    Free.roll[MapFunc[Fix, ?], Hole](MFC(ProjectField(src, StrLit(str)))).mapSuspension(injectNT[MapFunc[Fix, ?], S])
+    Free.roll[MapFunc[Fix, ?], Hole](MFC(ProjectKey(src, StrLit(str)))).mapSuspension(injectNT[MapFunc[Fix, ?], S])
 
   def makeMap[S[_]: Functor](key: String, values: Free[MapFunc[Fix, ?], Hole])(
     implicit I: MapFunc[Fix, ?] :<: S
@@ -50,24 +50,24 @@ final class ProjectPathSpec extends quasar.Qspec {
 
   val root = rootDir[Sandboxed]
 
-  "foldProjectField" should {
-    "squash nested ProjectField of strings into a single ProjectPath" in {
-      val nestedProjects = projectField[MapFunc[Fix, ?]](projectField(hole, "info"), "location")
+  "foldProjectKey" should {
+    "squash nested ProjectKey of strings into a single ProjectPath" in {
+      val nestedProjects = projectKey[MapFunc[Fix, ?]](projectKey(hole, "info"), "location")
 
-      ProjectPath.foldProjectField(nestedProjects) must
+      ProjectPath.foldProjectKey(nestedProjects) must
         equal(projectPath(hole, root </> dir("info") </> dir("location")))
     }
 
-    "fold a single ProjectField into a single ProjectPath" in {
-      ProjectPath.foldProjectField(projectField[MapFunc[Fix, ?]](hole, "location")) must
+    "fold a single ProjectKey into a single ProjectPath" in {
+      ProjectPath.foldProjectKey(projectKey[MapFunc[Fix, ?]](hole, "location")) must
         equal(projectPath(hole, root </> dir("location")))
     }
 
-    "preserve an unrelated node inside a nesting of ProjectField" in {
-      val inclUnrelatedNode = projectField[MapFunc[Fix, ?]](makeMap("k", projectField(hole, "info")), "location")
+    "preserve an unrelated node inside a nesting of ProjectKey" in {
+      val inclUnrelatedNode = projectKey[MapFunc[Fix, ?]](makeMap("k", projectKey(hole, "info")), "location")
 
-      ProjectPath.foldProjectField(inclUnrelatedNode) must
-        equal(projectPath(makeMap("k", projectField(hole, "info")), root </> dir("location")))
+      ProjectPath.foldProjectKey(inclUnrelatedNode) must
+        equal(projectPath(makeMap("k", projectKey(hole, "info")), root </> dir("location")))
     }
   }
 }

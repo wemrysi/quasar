@@ -242,16 +242,16 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.ProjectIndex(src, index) =>
         (DerefArrayDynamic[A](src, index): TransSpec[A]).point[F]
 
-      case MapFuncsCore.ProjectField(src, ConstLiteral(CString(field), _)) =>
+      case MapFuncsCore.ProjectKey(src, ConstLiteral(CString(field), _)) =>
         (DerefObjectStatic[A](src, CPathField(field)): TransSpec[A]).point[F]
-      case MapFuncsCore.ProjectField(src, field) =>
+      case MapFuncsCore.ProjectKey(src, field) =>
         (DerefObjectDynamic[A](src, field): TransSpec[A]).point[F]
 
-      case MapFuncsCore.DeleteField(src, ConstLiteral(CString(key), _)) =>
+      case MapFuncsCore.DeleteKey(src, ConstLiteral(CString(key), _)) =>
         (ObjectDelete[A](src, Set(CPathField(key))): TransSpec[A]).point[F]
 
       // mimir doesn't have a way to implement this
-      case MapFuncsCore.DeleteField(src, field) => ???
+      case MapFuncsCore.DeleteKey(src, field) => ???
 
       case MapFuncsCore.Meta(a1) => ???
 

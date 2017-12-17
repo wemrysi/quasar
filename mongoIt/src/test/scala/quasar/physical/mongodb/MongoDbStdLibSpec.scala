@@ -127,7 +127,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
             lp = prg(
               (0 until args.length).toList.map(idx =>
-                Fix(StructuralLib.ObjectProject(
+                Fix(StructuralLib.MapProject(
                   lpf.free('hole),
                   lpf.constant(Data.Str("arg" + idx))))))
             t  <- compile(qm, coll, translate[Hole](lp, _ => SrcHole)).point[Task].unattemptRuntime

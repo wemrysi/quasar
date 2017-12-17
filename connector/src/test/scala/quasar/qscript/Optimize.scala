@@ -34,7 +34,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with QScriptHelpers {
       val from: QS[FreeQS] =
         QC.inj(Map(
           Free.roll(QST[QS].inject(QC.inj(Filter(HoleQS, BoolLit(true))))),
-          ProjectFieldR(HoleF, StrLit("foo"))))
+          ProjectKeyR(HoleF, StrLit("foo"))))
 
       val count: QS[FreeQS] =
         QC.inj(Map(HoleQS, ProjectIndexR(HoleF, IntLit(2))))
@@ -53,14 +53,14 @@ class QScriptOptimizeSpec extends quasar.Qspec with QScriptHelpers {
             Free.roll(QST[QS].inject(QC.inj(Filter(HoleQS, BoolLit(true))))),
             Take,
             Free.roll(QST[QS].inject(count)))).embed,
-          ProjectFieldR(HoleF, StrLit("foo"))))
+          ProjectKeyR(HoleF, StrLit("foo"))))
 
       optimizeExpr(input.embed) must equal(output.embed)
     }
 
     "move filter before union" in {
       val lBranch: QS[FreeQS] =
-        QC.inj(Map(HoleQS, ProjectFieldR(HoleF, StrLit("foo"))))
+        QC.inj(Map(HoleQS, ProjectKeyR(HoleF, StrLit("foo"))))
 
       val rBranch: QS[FreeQS] =
         QC.inj(Map(HoleQS, ProjectIndexR(HoleF, IntLit(2))))

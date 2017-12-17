@@ -351,45 +351,5 @@ object RawHandlerSpecs extends Specification with ScalaCheck {
       a3REmpty.toSet must_== Set()
     }
 
-    val tmp10 = tempfile()
-    "detect date, time, and duration types from strings" in new cleanup(tmp10) {
-      val h = RawHandler.empty(blockid, tmp10)
-      val cpa = CPath(".a")
-      val cpb = CPath(".b")
-      val cpc = CPath(".c")
-      val cpd = CPath(".d")
-      val cpe = CPath(".e")
-      val cpf = CPath(".f")
-      val cpg = CPath(".g")
-
-      h.write(16, json("""{"a": "2010-02-02"}"""))
-      val snap = h.snapshot(Some(Set(cpa))).segments
-      snap.toSet must_== Set(ArraySegment(blockid, cpa, CLocalDate, bitset(0),
-        Array(LocalDate.of(2010, 2, 2))))
-      h.write(17, json("""{"b": "2010-02-02+02:02:02"}"""))
-      val snap2 = h.snapshot(Some(Set(cpb))).segments
-      snap2.toSet must_== Set(ArraySegment(blockid, cpb, COffsetDate, bitset(1),
-        Array(null, OffsetDate(LocalDate.of(2010, 2, 2), ZoneOffset.ofHoursMinutesSeconds(2, 2, 2)))))
-      h.write(18, json("""{"c": "03:03:03.03"}"""))
-      val snap3 = h.snapshot(Some(Set(cpc))).segments
-      snap3.toSet must_== Set(ArraySegment(blockid, cpc, CLocalTime, bitset(2),
-        Array(null, null, LocalTime.of(3, 3, 3, 30000000))))
-      h.write(19, json("""{"d": "03:03:03.03+02:02:02"}"""))
-      val snap4 = h.snapshot(Some(Set(cpd))).segments
-      snap4.toSet must_== Set(ArraySegment(blockid, cpd, COffsetTime, bitset(3),
-        Array(null, null, null, OffsetTime.of(LocalTime.of(3, 3, 3, 30000000), ZoneOffset.ofHoursMinutesSeconds(2, 2, 2)))))
-      h.write(20, json("""{"e": "2010-02-02T03:03:03.03"}"""))
-      val snap5 = h.snapshot(Some(Set(cpe))).segments
-      snap5.toSet must_== Set(ArraySegment(blockid, cpe, CLocalDateTime, bitset(4),
-        Array(null, null, null, null, LocalDateTime.of(2010, 2, 2, 3, 3, 3, 30000000))))
-      h.write(21, json("""{"f": "2010-02-02T03:03:03.03+02:02:02"}"""))
-      val snap6 = h.snapshot(Some(Set(cpf))).segments
-      snap6.toSet must_== Set(ArraySegment(blockid, cpf, COffsetDateTime, bitset(5),
-        Array(null, null, null, null, null, OffsetDateTime.of(LocalDateTime.of(2010, 2, 2, 3, 3, 3, 30000000), ZoneOffset.ofHoursMinutesSeconds(2, 2, 2)))))
-      h.write(22, json("""{"g": "P1Y2M3W4DT5H6M7.8S"}"""))
-      val snap7 = h.snapshot(Some(Set(cpg))).segments
-      snap7.toSet must_== Set(ArraySegment(blockid, cpg, CDuration, bitset(6),
-        Array(null, null, null, null, null, null, DateTimeInterval(1, 2, 25, 18367L, 800000000))))
-    }
   }
 }

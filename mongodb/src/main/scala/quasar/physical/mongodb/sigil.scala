@@ -99,5 +99,5 @@ object sigil {
     v => bsonvalue.document.getOption(v).flatMap(d => Option(d.get(name)))
 
   private def projectField[T[_[_]]: CorecursiveT](f: String): FreeMap[T] =
-    Free.roll(MFC(ProjectField(HoleF, StrLit(f))))
+    Free.roll(MFC(ProjectKey(HoleF, StrLit(f))))
 }

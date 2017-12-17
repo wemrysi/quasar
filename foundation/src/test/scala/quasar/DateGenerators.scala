@@ -24,8 +24,12 @@ import java.time.temporal.ChronoField
 trait DateGenerators {
   implicit val arbDuration: Arbitrary[DateTimeInterval] = genInterval
   implicit val arbInstant: Arbitrary[Instant] = Arbitrary((genEpochSeconds, genNanos) >> Instant.ofEpochSecond _)
-  implicit val arbDate: Arbitrary[LocalDate]            = genLocalDate
-  implicit val arbTime: Arbitrary[LocalTime]            = genLocalTime
+  implicit val arbDate: Arbitrary[LocalDate]         = genLocalDate
+  implicit val arbTime: Arbitrary[LocalTime]         = genLocalTime
+  implicit val arbDateTime: Arbitrary[LocalDateTime] = genLocalDateTime
+  implicit val arbOffsetDate: Arbitrary[OffsetDate]         = genOffsetDate
+  implicit val arbOffsetTime: Arbitrary[OffsetTime]         = genOffsetTime
+  implicit val arbOffsetDateTime: Arbitrary[OffsetDateTime] = genOffsetDateTime
 
   private def genSeconds: Gen[Long]     = genInt ^^ (_.toLong)
   private def genSecondOfDay: Gen[Long] = choose(0L, 24L * 60 * 60 - 1)
@@ -35,7 +39,7 @@ trait DateGenerators {
   private def genMonths: Gen[Int]       = choose(-100, 100)
   private def genDays: Gen[Int]         = choose(-1000, 1000)
   private def genEpochSeconds: Gen[Long] =
-    choose(ChronoField.INSTANT_SECONDS.range().getLargestMinimum, ChronoField.INSTANT_SECONDS.range().getSmallestMaximum)
+    choose(ChronoField.INSTANT_SECONDS.range().getLargestMinimum + 1, ChronoField.INSTANT_SECONDS.range().getSmallestMaximum - 1)
 
   // these are adjusted so that LocalDate.ofEpochDay(minLocalEpochDay) - genYears can't go below the
   // minimum year of LocalDate, vice versa for maxLocalEpochDay

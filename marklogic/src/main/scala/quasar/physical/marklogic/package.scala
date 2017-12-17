@@ -17,9 +17,11 @@
 package quasar.physical
 
 import slamdata.Predef.String
+import quasar.qscript._
 import quasar.contrib.scalaz.MonadError_
+import quasar.contrib.pathy.{ADir, AFile}
 
-import scalaz.{NonEmptyList, MonadError}
+import scalaz.{Const, NonEmptyList, MonadError}
 
 package object marklogic {
   type ErrorMessages = NonEmptyList[String]
@@ -35,4 +37,21 @@ package object marklogic {
   object MonadErrMsgs_ {
     def apply[F[_]](implicit F: MonadErrMsgs_[F]): MonadErrMsgs_[F] = F
   }
+
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[fs.MLQScriptCP[T]#M, QScriptTotal[T, ?]] =
+    ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[Read[AFile], ?]]))
+  
+  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable.Aux[QScriptCore[T, ?], fs.MLQScriptCP[T]#M] =
+    Injectable.inject[QScriptCore[T, ?], fs.MLQScriptCP[T]#M]
+
+  implicit def thetaJoinToQScript[T[_[_]]]: Injectable.Aux[ThetaJoin[T, ?], fs.MLQScriptCP[T]#M] =
+    Injectable.inject[ThetaJoin[T, ?], fs.MLQScriptCP[T]#M]
+
+  implicit def readToQScript[T[_[_]]]: Injectable.Aux[Const[Read[AFile], ?], fs.MLQScriptCP[T]#M] =
+    Injectable.inject[Const[Read[AFile], ?], fs.MLQScriptCP[T]#M]
+
+  implicit def shiftedReadToQScript[T[_[_]]]: Injectable.Aux[Const[ShiftedRead[ADir], ?], fs.MLQScriptCP[T]#M] =
+    Injectable.inject[Const[ShiftedRead[ADir], ?], fs.MLQScriptCP[T]#M]
+
+
 }

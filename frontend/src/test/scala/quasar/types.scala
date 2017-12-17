@@ -161,66 +161,66 @@ class TypesSpec extends quasar.Qspec {
     }
   }
 
-  "objectField" should {
+  "mapKey" should {
     "reject arbitrary simple type" >> prop { (t: Type) =>
-      t.objectField(const("a")).toOption should beNone
+      t.mapKey(const("a")).toOption should beNone
     }.setArbitrary(arbitrarySimpleType)
 
     "reject simple type" in {
-      Int.objectField(const("a")).toOption should beNone
+      Int.mapKey(const("a")).toOption should beNone
     }
 
     "descend into singleton type" in {
       val obj = const("foo" -> Data.Str("bar"))
-      obj.objectField(const("foo")).toOption should beSome(const("bar"))
+      obj.mapKey(const("foo")).toOption should beSome(const("bar"))
     }
 
     "descend into singleton type with missing field" in {
       val obj = const("foo" -> Data.Str("bar"))
-      obj.objectField(const("baz")).toOption should beNone
+      obj.mapKey(const("baz")).toOption should beNone
     }
 
     "descend into singleton type with Str field and return type of field value" in {
       val obj = const("foo" -> Data.Str("bar"))
-      obj.objectField(Str).toOption should beSome(const("bar"))
+      obj.mapKey(Str).toOption should beSome(const("bar"))
     }
 
     "descend into singleton type with multiple fields and return coproduct of field values" in {
       val obj = const("foo" -> Data.Str("abc"), "bar" -> Data.Int(0))
-      obj.objectField(Str).toOption should
+      obj.mapKey(Str).toOption should
         beSome(Coproduct(Const(Data.Str("abc")), Const(Data.Int(0))))
     }
 
     "descend into obj field type with const field" in {
       val field = Obj(Map("foo" -> Str), None)
-      field.objectField(const("foo")).toOption should beSome(Str)
+      field.mapKey(const("foo")).toOption should beSome(Str)
     }
 
     "descend into obj field type with missing field" in {
       val field = Obj(Map("foo" -> Str), None)
-      field.objectField(const("bar")).toOption should beNone
+      field.mapKey(const("bar")).toOption should beNone
     }
 
     "descend into product with const field" in {
       val obj = Obj(Map("foo" -> Str, "bar" -> Int), None)
-      obj.objectField(const("bar")).toOption should beSome(Int)
+      obj.mapKey(const("bar")).toOption should beSome(Int)
     }
 
     "descend into product with Str" in {
       val obj = Obj(Map("foo" -> Str, "bar" -> Int), None)
       // TODO: result needs simplification? That would just produce Top at the moment
-      obj.objectField(Str).toOption should beSome(Str ⨿ Int)
+      obj.mapKey(Str).toOption should beSome(Str ⨿ Int)
     }
 
     // JAD: Decide if this is correct or not
     "descend into coproduct with const field" in {
       val obj = Obj(Map("foo" -> Str), None) ⨿ Obj(Map("bar" -> Int), None)
-      obj.objectField(Const(Data.Str("foo"))).toOption should beSome(Str)
+      obj.mapKey(Const(Data.Str("foo"))).toOption should beSome(Str)
     }
 
     "descend into coproduct with Str" in {
       val obj = Obj(Map("foo" -> Str), None) ⨿ Obj(Map("bar" -> Int), None)
-      obj.objectField(Str).toOption should beSome(Str ⨿ Int)
+      obj.mapKey(Str).toOption should beSome(Str ⨿ Int)
     }
   }
 

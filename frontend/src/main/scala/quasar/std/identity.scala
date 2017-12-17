@@ -16,6 +16,7 @@
 
 package quasar.std
 
+import slamdata.Predef._
 import quasar._
 import quasar.common.PrimaryType
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
@@ -66,7 +67,7 @@ trait IdentityLib extends Library {
     noSimplification,
     {
       case Sized(typ) =>
-        success(typ.toPrimaryType.fold(
+        Some(success(typ.toPrimaryType.fold(
           if      (Type.Bottom.contains(typ))    Type.Bottom
           // NB: These cases should be identified via metadata
           else if (Type.OffsetDateTime.contains(typ)) Type.Const(Data.Str("offsetdatetime"))
@@ -77,7 +78,7 @@ trait IdentityLib extends Library {
           else if (Type.LocalTime.contains(typ)) Type.Const(Data.Str("localtime"))
           else if (Type.Interval.contains(typ))  Type.Const(Data.Str("interval"))
           else                                   Type.Str)(
-          t => Type.Const(Data.Str(PrimaryType.name.reverseGet(t)))))
+          t => Type.Const(Data.Str(PrimaryType.name.reverseGet(t))))))
     },
     partialUntyper[nat._1] {
       case Type.Bottom => Func.Input1(Type.Bottom)

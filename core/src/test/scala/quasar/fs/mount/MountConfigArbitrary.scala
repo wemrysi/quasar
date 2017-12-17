@@ -16,10 +16,11 @@
 
 package quasar.fs.mount
 
+import slamdata.Predef._
 import quasar.Variables
 import quasar.VariablesGenerators._
 import quasar.fs._, FileSystemTypeArbitrary._
-import quasar.sql._, ScopedExprArbitrary._
+import quasar.sql._, ScopedExprArbitrary._, ExprArbitrary._
 
 import matryoshka.data.Fix
 import org.scalacheck.{Arbitrary, Gen}
@@ -28,7 +29,13 @@ trait MountConfigArbitrary {
   import MountConfig._, ConnectionUriArbitrary._
 
   implicit val mountConfigArbitrary: Arbitrary[MountConfig] =
-    Arbitrary(Gen.oneOf(genFileSystemConfig, genViewConfig))
+    Arbitrary(Gen.oneOf(genFileSystemConfig, genViewConfig, genModuleConfig))
+
+  implicit val viewConfigArbitrary: Arbitrary[ViewConfig] =
+    Arbitrary(genViewConfig)
+
+  implicit val moduleConfigArbitrary: Arbitrary[ModuleConfig] =
+    Arbitrary(genModuleConfig)
 
   private[mount] def genFileSystemConfig: Gen[MountConfig] =
     for {
@@ -41,6 +48,11 @@ trait MountConfigArbitrary {
       scopedExpr <- Arbitrary.arbitrary[ScopedExpr[Fix[Sql]]]
       vars <- Arbitrary.arbitrary[Variables]
     } yield ViewConfig(scopedExpr, vars)
+
+  private[fs] def genModuleConfig: Gen[ModuleConfig] =
+    for {
+      scopedExpr <- Arbitrary.arbitrary[Fix[Sql]]
+    } yield ModuleConfig(List(FunctionDecl(CIName("foo"), Nil, scopedExpr)))
 }
 
 object MountConfigArbitrary extends MountConfigArbitrary

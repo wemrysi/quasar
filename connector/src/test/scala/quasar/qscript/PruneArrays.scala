@@ -454,9 +454,9 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
       initial.embed.pruneArraysF must equal(expected.embed)
     }
 
-    "rewrite bucket field with unused array elements" in {
+    "rewrite bucket key with unused array elements" in {
       val initial: Fix[QST] =
-        PBT.inj(BucketField(
+        PBT.inj(BucketKey(
           QCT.inj(LeftShift(
             UnreferencedRT.embed,
             HoleF,
@@ -470,7 +470,7 @@ class PruneArraysSpec extends quasar.Qspec with CompilerHelpers with QScriptHelp
           ProjectIndexR(HoleF, IntLit(0)))).embed
 
       val expected: Fix[QST] =
-        PBT.inj(BucketField(
+        PBT.inj(BucketKey(
           QCT.inj(LeftShift(
             UnreferencedRT.embed,
             HoleF,

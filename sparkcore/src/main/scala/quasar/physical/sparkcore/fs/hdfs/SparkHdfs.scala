@@ -30,7 +30,6 @@ import quasar.fs._,
   QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.physical.sparkcore.fs._, SparkConnectorDetails._
 import quasar.physical.sparkcore.fs.hdfs.parquet.ParquetRDD
-import quasar.qscript.{QScriptTotal, Injectable, QScriptCore, EquiJoin, ShiftedRead, ::/::, ::\::}
 
 import java.io.BufferedWriter
 import java.net.{URLDecoder, URI}
@@ -68,9 +67,6 @@ object SparkHdfs extends SparkCore with ChrootedInterpreter {
   type Eff6[A]  = Coproduct[MonotonicSeq, Eff5, A]
   type Eff7[A]  = Coproduct[SparkConnectorDetails, Eff6, A]
   type Eff[A]   = Coproduct[Read[HdfsFileSystem, ?], Eff7, A]
-
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
-        ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
 
   def ReadSparkContextInj = Inject[Read[SparkContext, ?], Eff]
   def RFKeyValueStoreInj = Inject[KeyValueStore[ReadFile.ReadHandle, SparkCursor, ?], Eff]

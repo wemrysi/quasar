@@ -22,11 +22,10 @@ Chain
 │  │  ╰─ Let(__val)
 │  │     ├─ Arr
 │  │     │  ├─ Obj
-│  │     │  │  ╰─ Key(popInK: ((isNumber(_.pop) || ((_.pop instanceof NumberInt) || (_.pop instanceof NumberLong))) || (_.pop instanceof Date)) ? _.pop / 1000 : undefined)
+│  │     │  │  ╰─ Key(popInK: (isNumber(_.pop) || ((_.pop instanceof NumberInt) || (_.pop instanceof NumberLong))) ? _.pop / 1000 : undefined)
 │  │     │  ╰─ Ident(_)
 │  │     ╰─ Obj
-│  │        ├─ Key(0: (((isNumber(
-│  │        │      (isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) || ((((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) instanceof NumberInt) || (((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) instanceof NumberLong))) || (((isObject(__val[1]) && (! Array.isArray(__val[1]))) ? __val[1].pop : undefined) instanceof Date)) && (isObject(__val[1]) && (! Array.isArray(__val[1])))) ? __val[1].pop / 1000 : undefined)
+│  │        ├─ Key(0: (isNumber(__val[1].pop) || ((__val[1].pop instanceof NumberInt) || (__val[1].pop instanceof NumberLong))) ? __val[1].pop / 1000 : undefined)
 │  │        ╰─ Key(src: __val)
 │  ╰─ Scope(Map())
 ├─ $SortF

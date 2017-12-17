@@ -308,12 +308,12 @@ object CoreMap extends Serializable {
         if(index >= 0 && index < list.size) list(index.toInt) else undefined
       case _ => undefined
     }).right
-    case ProjectField(fSrc, fField) => ((x: A) => (fSrc(x), fField(x)) match {
-      case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => m(field)
+    case ProjectKey(fSrc, fKey) => ((x: A) => (fSrc(x), fKey(x)) match {
+      case (Data.Obj(m), Data.Str(key)) if m.isDefinedAt(key) => m(key)
       case _ => undefined
     }).right
-    case DeleteField(fSrc, fField) =>  ((x: A) => (fSrc(x), fField(x)) match {
-      case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => Data.Obj(m - field)
+    case DeleteKey(fSrc, fField) =>  ((x: A) => (fSrc(x), fField(x)) match {
+      case (Data.Obj(m), Data.Str(key)) if m.isDefinedAt(key) => Data.Obj(m - key)
       case (obj @ Data.Obj(_), _) => obj
       case _ => undefined
     }).right
