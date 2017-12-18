@@ -26,6 +26,7 @@ import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.WriteFile.WriteHandle
 import quasar.physical.rdbms.fs.WriteCursor
 import quasar.physical.rdbms.model.DbDataStream
+import quasar.fs.QueryFile.ResultHandle
 
 import doobie.imports.Transactor
 import scalaz.concurrent.Task

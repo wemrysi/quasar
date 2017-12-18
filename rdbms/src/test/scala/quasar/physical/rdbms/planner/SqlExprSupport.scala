@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar.Planner.PlannerError
 import quasar.common.{PhaseResult, PhaseResultT, PhaseResultTell, PhaseResults}
 import quasar.contrib.scalaz.MonadError_
-import quasar.fp.ski.ι
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fs.{FileSystemError, MonadFsErr}
 import quasar.physical.rdbms.fs.postgres.Postgres
@@ -42,8 +41,8 @@ import scalaz.concurrent.Task
 trait SqlExprSupport {
 
   type LP[A] = LogicalPlan[A]
-  type QS[T[_[_]]] = quasar.physical.rdbms.model.QS[T]
-  type QSM[T[_[_]], A] = QS[T]#M[A]
+  type RQS[T[_[_]]] = quasar.physical.rdbms.model.QS[T]
+  type QSM[T[_[_]], A] = RQS[T]#M[A]
 
   val basePath
   : Path[Path.Abs, Path.Dir, Sandboxed] = rootDir[Sandboxed] </> dir("db")
@@ -59,17 +58,14 @@ trait SqlExprSupport {
   def compileSqlToLP[M[_]: Monad: MonadFsErr: PhaseResultTell](
                                                                 sql: Fix[Sql]): M[Fix[LP]] = {
     val (_, s) = queryPlan(sql, Variables.empty, basePath, 0L, None).run.run
-    val lp = s.fold(
-      e => scala.sys.error(e.shows),
-      d => d.fold(e => scala.sys.error(e.shows), ι)
-    )
+    val lp = s valueOr (e => scala.sys.error(e.shows))
     lp.point[M]
   }
 
   type EitherWriter[A] =
     EitherT[Writer[Vector[PhaseResult], ?], FileSystemError, A]
 
-  val listContents: DiscoverPath.ListContents[EitherWriter] =
+  val rdbmsLs: DiscoverPath.ListContents[EitherWriter] =
     dir =>
       (if (dir ≟ rootDir)
         Set(DirName("db").left[FileName],
@@ -83,9 +79,13 @@ trait SqlExprSupport {
           FileName("bar2").right
         )).point[EitherWriter]
 
-  def plan(sql: Fix[Sql]) = {
+  def qs(sql: Fix[Sql]) = {
     (compileSqlToLP[EitherWriter](sql) >>= (lp =>
-      Postgres.lpToQScript(lp, listContents))).run.run._2.map(qsToRepr[Fix])
+      Postgres.lpToQScript(lp, rdbmsLs))).run.run._2
+  }
+
+  def plan(sql: Fix[Sql]) = {
+    qs(sql).map(qsToRepr[Fix])
   }
 
   implicit def idNameGenerator: NameGenerator[Id] =

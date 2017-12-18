@@ -31,10 +31,13 @@ import quasar.fs.mount.ConnectionUri
 import quasar.physical.rdbms.fs._
 import quasar.physical.rdbms.common.Config
 import quasar.Planner.PlannerError
+import quasar.qscript.{ExtractPath, Injectable, Optimize, QScriptCore, QScriptTotal, Unicoalesce, Unirewrite}
+import quasar.Planner.PlannerError
+import quasar.physical.rdbms.planner.Planner
+import quasar.physical.rdbms.planner.sql.SqlExpr
 import quasar.physical.rdbms.common._
 import quasar.physical.rdbms.planner.Planner
 import quasar.physical.rdbms.planner.sql.SqlExpr
-import quasar.qscript.{ExtractPath, Injectable, Optimize, QScriptCore, QScriptTotal, Unicoalesce, Unirewrite}
 import quasar.qscript.analysis._
 import quasar.physical.rdbms.jdbc.JdbcConnectionInfo
 import quasar.{RenderTree, RenderTreeT, fp}

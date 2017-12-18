@@ -106,6 +106,10 @@ object ManageFile {
     def delete(path: APath): M[Unit] =
       EitherT(lift(Delete(path)))
 
+    /** Delete the given file system path without failing if the path does not exist. */
+    def deleteOrIgnore(path: APath): FreeS[Unit] =
+      delete(path).run.void
+
     /** Returns the path to a new temporary file as physically close to the
       * supplied path as possible.
       */

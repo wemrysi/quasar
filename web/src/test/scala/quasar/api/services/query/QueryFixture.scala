@@ -17,15 +17,14 @@
 package quasar.api.services.query
 
 import slamdata.Predef._
-import quasar.api._
 import quasar.api.PathUtils._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.catchable._
 import quasar.fp._
-import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._, mount._
-import quasar.main.Fixture.mountingInter
+import quasar.main.CoreEffIO
+import quasar.api.services.Fixture
 import quasar.sql._
 import quasar.sql.fixpoint._
 
@@ -34,12 +33,8 @@ import org.http4s.syntax.service._
 import org.specs2.matcher._, MustMatchers._
 import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
 object queryFixture {
-  type Eff0[A] = Coproduct[FileSystemFailure, FileSystem, A]
-  type Eff1[A] = Coproduct[Mounting, Eff0, A]
-  type Eff[A]  = Coproduct[Task, Eff1, A]
 
   case class Query(
     q: String,
@@ -68,18 +63,13 @@ object queryFixture {
     actualResponse.status must_== status
   }
 
-  def serviceInter(state: InMemState, mounts: Map[APath, MountConfig]): Task[Eff ~> ResponseOr] =
-    (runFs(state) |@| mountingInter(mounts))(effRespOr)
-
   def compileService(state: InMemState, mounts: Map[APath, MountConfig] = Map.empty): Service[Request, Response] =
-    HttpService.lift(req => serviceInter(state, mounts).flatMap { inter =>
-      compile.service[Eff].toHttpService(inter).apply(req)
-    }).orNotFound
+    Fixture.inMemFSWeb(state, MountingsConfig(mounts)).map(inter =>
+      compile.service[CoreEffIO].toHttpService(inter).orNotFound).unsafePerformSync
 
   def executeService(state: InMemState, mounts: Map[APath, MountConfig] = Map.empty): Service[Request, Response] =
-    HttpService.lift(req => serviceInter(state, mounts).flatMap { inter =>
-      execute.service[Eff].toHttpService(inter).apply(req)
-    }).orNotFound
+    Fixture.inMemFSWeb(state, MountingsConfig(mounts)).map(inter =>
+      execute.service[CoreEffIO].toHttpService(inter).orNotFound).unsafePerformSync
 
   def selectAll(from: FPath) = {
     val ast = SelectR(
@@ -89,19 +79,11 @@ object queryFixture {
       None, None, None)
     pprint(ast)
   }
-  def selectAllWithVar(from: FPath, varName: String) = {
-    val ast = SelectR(
+  def selectAllWithVar(from: FPath, varName: String) =
+    SelectR(
       SelectAll,
       List(Proj(SpliceR(None), None)),
       Some(TableRelationAST(unsandbox(from), None)),
       Some(BinopR(IdentR("pop"), VariR(varName), Gt)),
       None, None)
-    pprint(ast)
-  }
-
-  def effRespOr(fs: FileSystem ~> Task, m: Mounting ~> Task): Eff ~> ResponseOr =
-    liftMT[Task, ResponseT]             :+:
-    liftMT[Task, ResponseT].compose(m)  :+:
-    failureResponseOr[FileSystemError]  :+:
-    liftMT[Task, ResponseT].compose(fs)
 }

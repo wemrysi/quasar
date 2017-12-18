@@ -152,7 +152,7 @@ Chain
 │  ╰─ By
 │     ╰─ Name("0" -> "$b0")
 ├─ $SortF
-│  ╰─ SortKey(totalPop -> Descending)
+│  ╰─ SortKey(f0.totalPop -> Descending)
 ╰─ $ProjectF
    ├─ Name("__quasar_mongodb_sigil" -> "$f0")
    ╰─ ExcludeId

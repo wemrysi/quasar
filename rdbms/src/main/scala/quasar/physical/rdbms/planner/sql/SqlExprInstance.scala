@@ -21,7 +21,7 @@ import scalaz._, Scalaz._
 trait SqlExprInstances extends SqlExprTraverse with SqlExprRenderTree
 
 trait SqlExprTraverse {
-  import SqlExpr._, Select._
+  import SqlExpr._, Select._, Case._
 
   implicit val traverse: Traverse[SqlExpr] = new Traverse[SqlExpr] {
     def traverseImpl[G[_], A, B](
@@ -31,10 +31,27 @@ trait SqlExprTraverse {
     )(
         implicit G: Applicative[G]
     ): G[SqlExpr[B]] = fa match {
+      case Null()              => G.point(Null())
+      case Obj(m)              => m.traverse(_.bitraverse(f, f)) ∘ (l => Obj(l))
+      case Constant(d)         => G.point(Constant(d))
       case Id(str)             => G.point(Id(str))
+      case RegexMatches(a1, a2) => (f(a1) ⊛ f(a2))(RegexMatches(_, _))
+      case ExprWithAlias(e, a) => (f(e) ⊛ G.point(a))(ExprWithAlias.apply)
+      case ExprPair(e1, e2)    => (f(e1) ⊛ f(e2))(ExprPair.apply)
+      case ConcatStr(a1, a2)   => (f(a1) ⊛ f(a2))(ConcatStr(_, _))
+      case Time(a1)            => f(a1) ∘ Time.apply
+      case Refs(srcs)          =>  srcs.traverse(f) ∘ Refs.apply
       case Table(name)         => G.point(Table(name))
+      case IsNotNull(v)        => f(v) ∘ IsNotNull.apply
+      case IfNull(v)           => v.traverse(f) ∘ (IfNull(_))
       case RowIds()            => G.point(RowIds())
-      case AllCols(v)           => G.point(AllCols(v))
+      case AllCols(v)          => G.point(AllCols(v))
+      case NumericOp(op, left, right) => (f(left) ⊛ f(right))(NumericOp(op, _, _))
+      case Mod(a1, a2)         => (f(a1) ⊛ f(a2))(Mod.apply)
+      case Pow(a1, a2)         => (f(a1) ⊛ f(a2))(Pow.apply)
+      case And(a1, a2)         => (f(a1) ⊛ f(a2))(And(_, _))
+      case Or(a1, a2)          => (f(a1) ⊛ f(a2))(Or(_, _))
+      case Neg(v)              => f(v) ∘ Neg.apply
       case WithIds(v)          => f(v) ∘ WithIds.apply
 
       case Select(selection, from, filterOpt) =>
@@ -52,6 +69,12 @@ trait SqlExprTraverse {
           SelectRow(_, _)
         )
 
+      case Case(wt, Else(e)) =>
+        (wt.traverse { case WhenThen(w, t) => (f(w) ⊛ f(t))(WhenThen(_, _)) } ⊛
+          f(e)
+          )((wt, e) =>
+          Case(wt, Else(e))
+        )
     }
   }
 }
