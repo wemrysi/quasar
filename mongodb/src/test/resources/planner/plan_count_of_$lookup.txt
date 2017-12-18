@@ -51,22 +51,33 @@ Chain
 │     ╰─ NotExpr($right -> Size(0))
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
+├─ $ProjectF
+│  ├─ Name("left" -> {
+│  │       "$cond": [
+│  │         {
+│  │           "$and": [
+│  │             { "$lte": [{ "$literal": {  } }, "$left"] },
+│  │             { "$lt": ["$left", { "$literal": [] }] }]
+│  │         },
+│  │         "$left",
+│  │         { "$literal": undefined }]
+│  │     })
+│  ├─ Name("right" -> {
+│  │       "$cond": [
+│  │         {
+│  │           "$and": [
+│  │             { "$lte": [{ "$literal": {  } }, "$right"] },
+│  │             { "$lt": ["$right", { "$literal": [] }] }]
+│  │         },
+│  │         "$right",
+│  │         { "$literal": undefined }]
+│  │     })
+│  ╰─ ExcludeId
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
-│  │     ├─ Key(f0: (function (__val) {
-│  │     │      return (isObject(__val[0]) && (! Array.isArray(__val[0]))) ? __val[0]._id : undefined
-│  │     │    })(
-│  │     │      [
-│  │     │        (isObject(_.left) && (! Array.isArray(_.left))) ? _.left : undefined,
-│  │     │        (isObject(_.right) && (! Array.isArray(_.right))) ? _.right : undefined]))
-│  │     ╰─ Key(b0: (function (__val) {
-│  │            return [
-│  │              (isObject(__val[0]) && (! Array.isArray(__val[0]))) ? __val[0]._id : undefined]
-│  │          })(
-│  │            [
-│  │              (isObject(_.left) && (! Array.isArray(_.left))) ? _.left : undefined,
-│  │              (isObject(_.right) && (! Array.isArray(_.right))) ? _.right : undefined]))
+│  │     ├─ Key(f0: (isObject(_.left) && (! Array.isArray(_.left))) ? _.left._id : undefined)
+│  │     ╰─ Key(b0: [(isObject(_.left) && (! Array.isArray(_.left))) ? _.left._id : undefined])
 │  ╰─ Scope(Map())
 ╰─ $GroupF
    ├─ Grouped
