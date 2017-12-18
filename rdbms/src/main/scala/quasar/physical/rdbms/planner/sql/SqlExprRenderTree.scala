@@ -103,6 +103,7 @@ trait SqlExprRenderTree {
                   }
             )
           case Limit(from, count) => nonTerminal("Limit", from, count)
+          case Offset(from, count) => nonTerminal("Offset", from, count)
           case SelectRow(selection, from, order) =>
 
             NonTerminal(

@@ -80,6 +80,7 @@ object SqlExpr extends SqlExprInstances {
   final case class RegexMatches[T](a1: T, a2: T) extends SqlExpr[T]
 
   final case class Limit[T](from: T, count: T) extends SqlExpr[T]
+  final case class Offset[T](from: T, count: T) extends SqlExpr[T]
 
   object Select {
     final case class Filter[T](v: T)
