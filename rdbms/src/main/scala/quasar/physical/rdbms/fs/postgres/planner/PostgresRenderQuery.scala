@@ -89,7 +89,7 @@ object PostgresRenderQuery extends RenderQuery {
     expr.project match {
       case Refs(_) =>
         val pos = str.lastIndexOf(toReplace)
-        if (pos > 0)
+        if (pos > 0 && !str.contains(replacement))
           str.substring(0, pos) + replacement + str.substring(pos + toReplace.length, replacement.length)
         else
           str
