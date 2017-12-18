@@ -42,8 +42,7 @@ object PostgresRenderQuery extends RenderQuery {
   implicit val codec: DataCodec = DataCodec.Precise
 
   def asString[T[_[_]]: BirecursiveT](a: T[SqlExpr]): PlannerError \/ String = {
-    val q = a.transCataT(RelationalOperations.processQuotes).paraM(galg)
-    q ∘ (s => s"select row_to_json(row) from ($s) as row")
+    a.paraM(galg) ∘ (s => s"select row_to_json(row) from ($s) as row")
   }
 
   def alias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" as ${i.v}"))
@@ -65,23 +64,41 @@ object PostgresRenderQuery extends RenderQuery {
     override def arrow: String = "->"
   }
 
-  def renderRefs[T[_[_]]: BirecursiveT](refs: Refs[(T[SqlExpr], String)], refType: JsonRefType)
+  def renderRefs[T[_[_]]: BirecursiveT](elems: Vector[String], refType: JsonRefType)
   : PlannerError \/ String = {
-    refs.elems match {
-      case Vector((_, key), (_, value)) =>
+    elems match {
+      case Vector(key, value) =>
         val valueStripped = value.stripPrefix("'").stripSuffix("'")
         s"""$key.$valueStripped""".right
       case key +: mid :+ last =>
-        val firstValStripped = ~mid.headOption.map(_._2.stripPrefix("'").stripSuffix("'"))
+        val firstValStripped = ~mid.headOption.map(_.stripPrefix("'").stripSuffix("'"))
         val midTail = mid.drop(1)
         val midStr = if (midTail.nonEmpty)
           s"->${midTail.map(e => s"$e").intercalate("->")}"
         else
           ""
-        s"""${key._2}.$firstValStripped$midStr${refType.arrow}${last._2}""".right
-      case _ => InternalError.fromMsg(s"Cannot process $refs").left
+        s"""$key.$firstValStripped$midStr${refType.arrow}$last""".right
+      case _ => InternalError.fromMsg(s"Cannot process refs: $elems").left
     }
   }
+
+  def text[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): String = {
+    val (expr, str) = pair
+    val toReplace = "->"
+    val replacement = "->>"
+    expr.project match {
+      case Refs(_) =>
+        val pos = str.lastIndexOf(toReplace)
+        if (pos > 0)
+          str.substring(0, pos) + replacement + str.substring(pos + toReplace.length, replacement.length)
+        else
+          str
+      case _ =>
+        str
+    }
+  }
+
+  def num[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): String = s"(${text(pair)})::numeric"
 
   def galg[T[_[_]]: BirecursiveT]: GAlgebraM[(T[SqlExpr], ?), PlannerError \/ ?, SqlExpr, String] = {
     case Unreferenced() =>
@@ -93,14 +110,14 @@ object PostgresRenderQuery extends RenderQuery {
       v.right
     case AllCols() =>
       s"*".right
-    case r@Refs(srcs) =>
-      renderRefs(r, JsonRef)
+    case Refs(elems) =>
+      renderRefs(elems.map(_._2), JsonRef)
     case Obj(m) =>
       buildJson(m.map {
         case ((_, k), (_, v)) => s"'$k', $v"
       }.mkString(",")).right
-    case RegexMatches((_, str), (_, pattern)) =>
-      s"($str ~ '$pattern')".right
+    case RegexMatches(expr, (_, pattern)) =>
+      s"(${text(expr)} ~ '$pattern')".right
     case IsNotNull(expr) =>
       s"($expr notnull)".right
     case IfNull(a) =>
@@ -112,34 +129,34 @@ object PostgresRenderQuery extends RenderQuery {
       }).right
     case ExprPair((_, expr1), (_, expr2)) =>
       s"$expr1, $expr2".right
-    case ConcatStr((_, str1), (_, str2))  =>
-      s"$str1 || $str2".right
+    case ConcatStr(e1, e2)  =>
+      s"${text(e1)} || ${text(e2)}".right
     case Time((_, expr)) =>
       buildJson(s"""{ "$TimeKey": $expr }""").right
-    case NumericOp(sym, (_, left), (_, right)) =>
-      s"(($left)::text::numeric $sym ($right)::text::numeric)".right
-    case Mod((_, a1), (_, a2)) =>
-      s"mod(($a1)::text::numeric, ($a2)::text::numeric)".right
-    case Pow((_, a1), (_, a2)) =>
-      s"power(($a1)::text::numeric, ($a2)::text::numeric)".right
+    case NumericOp(sym, left, right) =>
+      s"(${num(left)} $sym ${num(right)})".right
+    case Mod(a1, a2) =>
+      s"mod(${num(a1)}, ${num(a2)})".right
+    case Pow(a1, a2) =>
+      s"power(${num(a1)}, ${num(a2)})".right
     case And((_, a1), (_, a2)) =>
       s"($a1 and $a2)".right
     case Or((_, a1), (_, a2)) =>
       s"($a1 or $a2)".right
-    case Neg((_, str)) =>
-      s"(-$str)".right
-    case Eq((_, a1), (_, a2)) =>
-      s"(($a1)::text = ($a2)::text)".right
-    case Neq((_, a1), (_, a2)) =>
-      s"(($a1)::text != ($a2)::text)".right
-    case Lt((_, a1), (_, a2)) =>
-      s"(($a1)::text::numeric < ($a2)::text::numeric)".right
-    case Lte((_, a1), (_, a2)) =>
-      s"(($a1)::text::numeric <= ($a2)::text::numeric)".right
-    case Gt((_, a1), (_, a2)) =>
-      s"(($a1)::text::numeric > ($a2)::text::numeric)".right
-    case Gte((_, a1), (_, a2)) =>
-      s"(($a1)::text::numeric >= ($a2)::text::numeric)".right
+    case Neg(e) =>
+      s"(-${num(e)})".right
+    case Eq(a1, a2) =>
+      s"(${text(a1)} = ${text(a2)})".right
+    case Neq(a1, a2) =>
+      s"(${text(a1)} != ${text(a2)})".right
+    case Lt(a1, a2) =>
+      s"(${num(a1)} < ${num(a2)})".right
+    case Lte(a1, a2) =>
+      s"(${num(a1)} <= ${num(a2)})".right
+    case Gt(a1, a2) =>
+      s"(${num(a1)} > ${num(a2)})".right
+    case Gte(a1, a2) =>
+      s"(${num(a1)} >= ${num(a2)})".right
     case WithIds((_, str))    => s"(row_number() over(), $str)".right
     case RowIds()        => "row_number() over()".right
     case Offset((_, from), (_, count)) => s"$from OFFSET $count".right
