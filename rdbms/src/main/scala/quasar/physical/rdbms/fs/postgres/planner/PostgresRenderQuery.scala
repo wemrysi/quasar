@@ -42,7 +42,7 @@ object PostgresRenderQuery extends RenderQuery {
   implicit val codec: DataCodec = DataCodec.Precise
 
   def asString[T[_[_]]: BirecursiveT](a: T[SqlExpr]): PlannerError \/ String = {
-    val q = a.transCataT(RelationalOperations.processQuotes).cataM(alg)
+    val q = a.transCataT(RelationalOperations.processQuotes).paraM(galg)
     q ∘ (s => s"select row_to_json(row) from ($s) as row")
   }
 
@@ -53,8 +53,9 @@ object PostgresRenderQuery extends RenderQuery {
   def buildJson(str: String): String =
     s"json_build_object($str)#>>'{}'"
 
-  val alg: AlgebraM[PlannerError \/ ?, SqlExpr, String] = {
-    case Unreferenced() => InternalError("Unexpected Unreferenced!", none).left
+  def galg[T[_[_]]: BirecursiveT]: GAlgebraM[(T[SqlExpr], ?), PlannerError \/ ?, SqlExpr, String] = {
+    case Unreferenced() =>
+    InternalError("Unexpected Unreferenced!", none).left
     case Null() => "null".right
     case SqlExpr.Id(v) =>
       s"""$v""".right
@@ -64,66 +65,70 @@ object PostgresRenderQuery extends RenderQuery {
       s"*".right
     case Refs(srcs) =>
       srcs match {
-        case Vector(key, value) =>
+        case Vector((_, key), (_, value)) =>
           val valueStripped = value.stripPrefix("'").stripSuffix("'")
           s"""$key.$valueStripped""".right
         case key +: mid :+ last =>
-          val firstValStripped = ~mid.headOption.map(_.stripPrefix("'").stripSuffix("'"))
+          val firstValStripped = ~mid.headOption.map(_._2.stripPrefix("'").stripSuffix("'"))
           val midTail = mid.drop(1)
           val midStr = if (midTail.nonEmpty)
             s"->${midTail.map(e => s"$e").intercalate("->")}"
           else
             ""
-          s"""$key.$firstValStripped$midStr->$last""".right
+          s"""${key._2}.$firstValStripped$midStr->${last._2}""".right
         case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
       }
     case Obj(m) =>
       buildJson(m.map {
-        case (k, v) => s"'$k', $v"
+        case ((_, k), (_, v)) => s"'$k', $v"
       }.mkString(",")).right
-    case RegexMatches(str, pattern) =>
+    case RegexMatches((_, str), (_, pattern)) =>
       s"($str ~ '$pattern')".right
     case IsNotNull(expr) =>
       s"($expr notnull)".right
-    case ToJson(v) =>
-      s"to_json($v)".right
     case IfNull(a) =>
-      s"coalesce(${a.intercalate(", ")})".right
-    case ExprWithAlias(expr: String, alias: String) =>
+      s"coalesce(${a.map(_._2).intercalate(", ")})".right
+    case ExprWithAlias((_, expr), alias) =>
       (if (expr === alias) s"$expr" else {
         val aliasStr = \/.fromTryCatchNonFatal(alias.toLong).map(a => s""""$a"""").getOrElse(alias)
         s"$expr as $aliasStr"
       }).right
-    case ExprPair(expr1, expr2) =>
+    case ExprPair((_, expr1), (_, expr2)) =>
       s"$expr1, $expr2".right
-    case ConcatStr(str1, str2)  =>
+    case ConcatStr((_, str1), (_, str2))  =>
       s"$str1 || $str2".right
-    case Time(expr) =>
+    case Time((_, expr)) =>
       buildJson(s"""{ "$TimeKey": $expr }""").right
-    case NumericOp(sym, left, right) => s"(($left)::text::numeric $sym ($right)::text::numeric)".right
-    case Mod(a1, a2) => s"mod(($a1)::text::numeric, ($a2)::text::numeric)".right
-    case Pow(a1, a2) => s"power(($a1)::text::numeric, ($a2)::text::numeric)".right
-    case And(a1, a2) =>
+    case NumericOp(sym, (_, left), (_, right)) =>
+      s"(($left)::text::numeric $sym ($right)::text::numeric)".right
+    case Mod((_, a1), (_, a2)) =>
+      s"mod(($a1)::text::numeric, ($a2)::text::numeric)".right
+    case Pow((_, a1), (_, a2)) =>
+      s"power(($a1)::text::numeric, ($a2)::text::numeric)".right
+    case And((_, a1), (_, a2)) =>
       s"($a1 and $a2)".right
-    case Or(a1, a2) =>
+    case Or((_, a1), (_, a2)) =>
       s"($a1 or $a2)".right
-    case Neg(str) => s"(-$str)".right
-    case Eq(a1, a2) =>
+    case ToJson(_) =>
+      s"TODO REMOVE".right
+    case Neg((_, str)) =>
+      s"(-$str)".right
+    case Eq((_, a1), (_, a2)) =>
       s"(($a1)::text = ($a2)::text)".right
-    case Neq(a1, a2) =>
+    case Neq((_, a1), (_, a2)) =>
       s"(($a1)::text != ($a2)::text)".right
-    case Lt(a1, a2) =>
+    case Lt((_, a1), (_, a2)) =>
       s"(($a1)::text::numeric < ($a2)::text::numeric)".right
-    case Lte(a1, a2) =>
+    case Lte((_, a1), (_, a2)) =>
       s"(($a1)::text::numeric <= ($a2)::text::numeric)".right
-    case Gt(a1, a2) =>
+    case Gt((_, a1), (_, a2)) =>
       s"(($a1)::text::numeric > ($a2)::text::numeric)".right
-    case Gte(a1, a2) =>
+    case Gte((_, a1), (_, a2)) =>
       s"(($a1)::text::numeric >= ($a2)::text::numeric)".right
-    case WithIds(str)    => s"(row_number() over(), $str)".right
+    case WithIds((_, str))    => s"(row_number() over(), $str)".right
     case RowIds()        => "row_number() over()".right
-    case Limit(from, count) => s"$from LIMIT $count".right
-    case Offset(from, count) => s"$from OFFSET $count".right
+    case Offset((_, from), (_, count)) => s"$from OFFSET $count".right
+    case Limit((_, from), (_, count)) => s"$from LIMIT $count".right
     case Select(selection, from, filterOpt, order) =>
       val filter = ~(filterOpt ∘ (f => s" where ${f.v}"))
       val orderStr = order.map { o =>
@@ -147,21 +152,21 @@ object PostgresRenderQuery extends RenderQuery {
     case Constant(v) =>
       DataCodec.render(v) \/> NonRepresentableData(v)
     case Case(wt, e) =>
-      val wts = wt ∘ { case WhenThen(w, t) => s"when $w then $t" }
+      val wts = wt ∘ { case WhenThen((_, w), (_, t)) => s"when $w then $t" }
       s"(case ${wts.intercalate(" ")} else ${e.v} end)".right
     case Coercion(t, e) => s"($e)::${t.mapToStringName}".right
-    case UnaryFunction(fType, e) =>
+    case UnaryFunction(fType, (_, e)) =>
       val fName = fType match {
         case StrLower => "lower"
         case StrUpper => "upper"
       }
       s"$fName($e)".right
-    case BinaryFunction(fType, a1, a2) =>
+    case BinaryFunction(fType, (_, a1), (_, a2)) =>
       val fName = fType match {
         case SplitStr => "regexp_split_to_array"
       }
       s"$fName($a1, $a2)".right
-    case TernaryFunction(fType, a1, a2, a3) => (fType match {
+    case TernaryFunction(fType, (_, a1), (_, a2), (_, a3)) => (fType match {
       case Search => s"(case when $a3 then $a1 ~* $a2 else $a1 ~ $a2 end)"
       case Substring => s"substring($a1 from ($a2+1) for $a3)"
     }).right
