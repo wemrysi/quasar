@@ -89,8 +89,8 @@ object PostgresRenderQuery extends RenderQuery {
     expr.project match {
       case Refs(_) =>
         val pos = str.lastIndexOf(toReplace)
-        if (pos > 0 && !str.contains(replacement))
-          str.substring(0, pos) + replacement + str.substring(pos + toReplace.length, replacement.length)
+        if (pos > -1 && !str.contains(replacement))
+          s"${str.substring(0, pos)}$replacement${str.substring(pos + toReplace.length, str.length)}"
         else
           str
       case _ =>
@@ -99,6 +99,8 @@ object PostgresRenderQuery extends RenderQuery {
   }
 
   def num[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): String = s"(${text(pair)})::numeric"
+
+  def bool[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): String = s"(${text(pair)})::boolean"
 
   def galg[T[_[_]]: BirecursiveT]: GAlgebraM[(T[SqlExpr], ?), PlannerError \/ ?, SqlExpr, String] = {
     case Unreferenced() =>
@@ -118,17 +120,17 @@ object PostgresRenderQuery extends RenderQuery {
       }.mkString(",")).right
     case RegexMatches(expr, (_, pattern)) =>
       s"(${text(expr)} ~ '$pattern')".right
-    case IsNotNull(expr) =>
+    case IsNotNull((_, expr)) =>
       s"($expr notnull)".right
-    case IfNull(a) =>
-      s"coalesce(${a.map(_._2).intercalate(", ")})".right
+    case IfNull(exprs) =>
+      s"coalesce(${exprs.map(e => text(e)).intercalate(", ")})".right
     case ExprWithAlias((_, expr), alias) =>
       (if (expr === alias) s"$expr" else {
         val aliasStr = \/.fromTryCatchNonFatal(alias.toLong).map(a => s""""$a"""").getOrElse(alias)
         s"$expr as $aliasStr"
       }).right
-    case ExprPair((_, expr1), (_, expr2)) =>
-      s"$expr1, $expr2".right
+    case ExprPair((_, s1), (_, s2)) =>
+      s"$s1, $s2".right
     case ConcatStr(e1, e2)  =>
       s"${text(e1)} || ${text(e2)}".right
     case Time((_, expr)) =>
@@ -139,10 +141,10 @@ object PostgresRenderQuery extends RenderQuery {
       s"mod(${num(a1)}, ${num(a2)})".right
     case Pow(a1, a2) =>
       s"power(${num(a1)}, ${num(a2)})".right
-    case And((_, a1), (_, a2)) =>
-      s"($a1 and $a2)".right
-    case Or((_, a1), (_, a2)) =>
-      s"($a1 or $a2)".right
+    case And(a1, a2) =>
+      s"(${bool(a1)} and ${bool(a2)})".right
+    case Or(a1, a2) =>
+      s"(${bool(a1)} or ${bool(a2)})".right
     case Neg(e) =>
       s"(-${num(e)})".right
     case Eq(a1, a2) =>
@@ -162,13 +164,13 @@ object PostgresRenderQuery extends RenderQuery {
     case Offset((_, from), (_, count)) => s"$from OFFSET $count".right
     case Limit((_, from), (_, count)) => s"$from LIMIT $count".right
     case Select(selection, from, filterOpt, order) =>
-      val filter = ~(filterOpt ∘ (f => s" where ${f.v}"))
+      val filter = ~(filterOpt ∘ (f => s" where ${f.v._2}"))
       val orderStr = order.map { o =>
         val dirStr = o.sortDir match {
           case Ascending => "asc"
           case Descending => "desc"
         }
-        s"${o.v} $dirStr"
+        s"${o.v._2} $dirStr"
       }.mkString(", ")
 
       val orderByStr = if (order.nonEmpty)
@@ -176,17 +178,17 @@ object PostgresRenderQuery extends RenderQuery {
       else
         ""
 
-      val fromExpr = s" from ${from.v} ${from.alias.v}"
-      s"(select ${selection.v}$fromExpr$filter$orderByStr)".right
+      val fromExpr = s" from ${from.v._2} ${from.alias.v}"
+      s"(select ${selection.v._2}$fromExpr$filter$orderByStr)".right
     case Constant(Data.Str(v)) =>
       val text = v.flatMap { case ''' => "''"; case iv => iv.toString }.self
       s"'$text'".right
     case Constant(v) =>
       DataCodec.render(v) \/> NonRepresentableData(v)
     case Case(wt, e) =>
-      val wts = wt ∘ { case WhenThen((_, w), (_, t)) => s"when $w then $t" }
-      s"(case ${wts.intercalate(" ")} else ${e.v} end)".right
-    case Coercion(t, e) => s"($e)::${t.mapToStringName}".right
+      val wts = wt ∘ { case WhenThen(w, t) => s"when (${text(w)})::boolean then ${text(t)}" }
+      s"(case ${wts.intercalate(" ")} else ${text(e.v)} end)".right
+    case Coercion(t, (_, e)) => s"($e)::${t.mapToStringName}".right
     case UnaryFunction(fType, (_, e)) =>
       val fName = fType match {
         case StrLower => "lower"
