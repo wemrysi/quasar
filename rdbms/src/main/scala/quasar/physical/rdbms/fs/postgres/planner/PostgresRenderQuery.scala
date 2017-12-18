@@ -53,6 +53,36 @@ object PostgresRenderQuery extends RenderQuery {
   def buildJson(str: String): String =
     s"json_build_object($str)#>>'{}'"
 
+  sealed trait JsonRefType {
+    def arrow: String
+  }
+
+  case object TextRef extends JsonRefType {
+    override def arrow: String = "->>"
+  }
+
+  case object JsonRef extends JsonRefType {
+    override def arrow: String = "->"
+  }
+
+  def renderRefs[T[_[_]]: BirecursiveT](refs: Refs[(T[SqlExpr], String)], refType: JsonRefType)
+  : PlannerError \/ String = {
+    refs.elems match {
+      case Vector((_, key), (_, value)) =>
+        val valueStripped = value.stripPrefix("'").stripSuffix("'")
+        s"""$key.$valueStripped""".right
+      case key +: mid :+ last =>
+        val firstValStripped = ~mid.headOption.map(_._2.stripPrefix("'").stripSuffix("'"))
+        val midTail = mid.drop(1)
+        val midStr = if (midTail.nonEmpty)
+          s"->${midTail.map(e => s"$e").intercalate("->")}"
+        else
+          ""
+        s"""${key._2}.$firstValStripped$midStr${refType.arrow}${last._2}""".right
+      case _ => InternalError.fromMsg(s"Cannot process $refs").left
+    }
+  }
+
   def galg[T[_[_]]: BirecursiveT]: GAlgebraM[(T[SqlExpr], ?), PlannerError \/ ?, SqlExpr, String] = {
     case Unreferenced() =>
     InternalError("Unexpected Unreferenced!", none).left
@@ -63,21 +93,8 @@ object PostgresRenderQuery extends RenderQuery {
       v.right
     case AllCols() =>
       s"*".right
-    case Refs(srcs) =>
-      srcs match {
-        case Vector((_, key), (_, value)) =>
-          val valueStripped = value.stripPrefix("'").stripSuffix("'")
-          s"""$key.$valueStripped""".right
-        case key +: mid :+ last =>
-          val firstValStripped = ~mid.headOption.map(_._2.stripPrefix("'").stripSuffix("'"))
-          val midTail = mid.drop(1)
-          val midStr = if (midTail.nonEmpty)
-            s"->${midTail.map(e => s"$e").intercalate("->")}"
-          else
-            ""
-          s"""${key._2}.$firstValStripped$midStr->${last._2}""".right
-        case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
-      }
+    case r@Refs(srcs) =>
+      renderRefs(r, JsonRef)
     case Obj(m) =>
       buildJson(m.map {
         case ((_, k), (_, v)) => s"'$k', $v"
