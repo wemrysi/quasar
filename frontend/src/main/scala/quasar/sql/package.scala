@@ -271,8 +271,8 @@ package object sql {
         pprintƒ.apply(vari) :: alias.map(ppalias).toList
       case TableRelationAST(path, alias) =>
         escape("`", prettyPrint(path)) :: alias.map(ppalias).toList
-      case ExprRelationAST(expr, aliasName) =>
-        List(expr._2, ppalias(aliasName))
+      case ExprRelationAST(expr, alias) =>
+        expr._2 :: alias.map(ppalias).toList
       case JoinRelation(left, right, tpe, clause) =>
         (tpe, clause._1) match {
           case (JoinType.Inner, Embed(BoolLiteral(true))) =>

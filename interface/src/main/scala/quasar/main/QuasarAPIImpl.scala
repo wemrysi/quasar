@@ -31,7 +31,7 @@ import scalaz._, Scalaz._
 import scalaz.stream.{Process, Process0}
 
 /**
-  * The top level Quasar programmatic API. Not yet complete, but will be added made
+  * The top level Quasar programmatic API. Not yet complete, but will be made
   * more exhaustive over time.
   */
 final case class QuasarAPIImpl[F[_]: Monad](inter: CoreEff ~> F) {

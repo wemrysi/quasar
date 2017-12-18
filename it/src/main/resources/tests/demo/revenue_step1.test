@@ -1,0 +1,21 @@
+{
+    "name": "revenue_step1",
+    "data": "revenue.data",
+    "backends": {
+       "couchbase":         "ignoreFieldOrder",
+       "marklogic_json":    "ignoreFieldOrder",
+       "mimir":             "ignoreFieldOrder"
+    },
+    "query": "SELECT SUM(value) AS value, region, quarter FROM revenue GROUP BY region, quarter ORDER BY quarter ASC, value ASC, region ASC",
+    "predicate": "exactly",
+    "expected": [
+      { "value":   94500, "region": "south", "quarter": "2015-Q1" },
+      { "value":   94500, "region": "west" , "quarter": "2015-Q1" },
+      { "value":  267000, "region": "north", "quarter": "2015-Q1" },
+      { "value":  275000, "region": "east" , "quarter": "2015-Q1" },
+      { "value":  107500, "region": "west" , "quarter": "2015-Q2" },
+      { "value":  186800, "region": "south", "quarter": "2015-Q2" },
+      { "value":  300000, "region": "north", "quarter": "2015-Q2" },
+      { "value":  317000, "region": "east" , "quarter": "2015-Q2" }
+    ]
+}

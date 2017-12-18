@@ -153,6 +153,27 @@ class SQLParserSpec extends quasar.Qspec {
             None, None, None))
     }
 
+    "parse expression relation" >> {
+      "with no alias" >> {
+        parse("select * from (1+1)") must
+          beRightDisjunction(
+            SelectR(
+              SelectAll,
+              List(Proj(SpliceR(None), None)),
+              Some(ExprRelationAST(sqlE"1+1", None)),
+              None, None, None))
+      }
+      "with alias" >> {
+        parse("select * from (1+1) as t0") must
+          beRightDisjunction(
+            SelectR(
+              SelectAll,
+              List(Proj(SpliceR(None), None)),
+              Some(ExprRelationAST(sqlE"1+1", Some("t0"))),
+              None, None, None))
+      }
+    }
+
     "parse keywords as identifiers" in {
       parse("select as as as from from as from where where group by group order by order") should
         beRightDisjOrDiff(
@@ -486,7 +507,7 @@ class SQLParserSpec extends quasar.Qspec {
     }
 
     "parse let inside select" in {
-      parse("""select foo from (bar := 12; baz) as quag""") must
+      parse("select foo from (bar := 12; baz)") must
         beRightDisjunction(
           SelectR(
             SelectAll,
@@ -496,7 +517,7 @@ class SQLParserSpec extends quasar.Qspec {
                 CIName("bar"),
                 IntLiteralR(12),
                 IdentR("baz")),
-              "quag")),
+              None)),
             None,
             None,
             None))

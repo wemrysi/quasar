@@ -5,13 +5,13 @@
         "couchbase": "ignoreFieldOrder"
     },
     "NB": "Pending for mimir due to Q#2692.",
-    "data": "patients.data",
+    "data": "otherpatients.data",
     "query": "SELECT
                 COUNT(*) as cnt,
                 TO_STRING(DATE_PART(\"year\",TIMESTAMP(last_visit)))
                     || \"-\" || \"Q\" ||
                     TO_STRING(DATE_PART(\"quarter\",TIMESTAMP(last_visit))) AS Q
-              FROM patients
+              FROM otherpatients
               WHERE SUBSTRING(TO_STRING(last_visit),0,4) IN \"2016\"
               GROUP BY
                 TO_STRING(DATE_PART(\"year\",TIMESTAMP(last_visit)))

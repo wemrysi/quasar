@@ -155,8 +155,8 @@ object SemanticAnalysis {
               failure((UnboundVariable(VarName(vari.symbol)): SemanticError).wrapNel)
             case TableRelationAST(file, aliasOpt) =>
               success(Map(aliasOpt.getOrElse(prettyPrint(file)) -> TableRelationAST(file, aliasOpt)))
-            case ExprRelationAST(_, alias) =>
-              success(Map(alias -> ExprRelationAST((), alias)))
+            case ExprRelationAST(expr, aliasOpt) =>
+              success(Map(aliasOpt.getOrElse(pprint(expr)) -> ExprRelationAST((), aliasOpt)))
             case JoinRelation(l, r, _, _) => for {
               rels <- findRelations(l) tuple findRelations(r)
               (left, right) = rels
@@ -173,7 +173,7 @@ object SemanticAnalysis {
 
       case Let(name, form, body) => {
         val bs2: BindingScope =
-          BindingScope(bs.scope ++ Map(name.value -> ExprRelationAST((), name.value)))
+          BindingScope(bs.scope ++ Map(name.value -> ExprRelationAST((), name.value.some)))
 
         success(Let(name, (Scope(ts, bs), form), (Scope(ts, bs2), body)))
       }

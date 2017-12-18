@@ -279,7 +279,7 @@ object JoinHandler {
         _ => ι)
 
     val (left, right, leftField, rightField) =
-      (left0.keys.map(HasThis.unapply).sequence, right0.keys.map(HasThis.unapply).sequence) match {
+      (left0.keys.map(HasThis.unapply).sequence.filter(_.nonEmpty), right0.keys.map(HasThis.unapply).sequence.filter(_.nonEmpty)) match {
         case (Some(js), _)
             if preferMapReduce(left0.src) && !preferMapReduce(right0.src) =>
           (wbReduce(right0.src, right0.keys, rightField0, leftField0),

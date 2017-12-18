@@ -323,7 +323,7 @@ final class Compiler[M[_], T: Equal]
           stepName <- CompilerState.freshName("tmp")
           current  <- current
           bc        = relations match {
-            case ExprRelationAST(_, name)        => BindingContext(Map(name -> lpr.free(stepName)))
+            case ExprRelationAST(_, Some(name))        => BindingContext(Map(name -> lpr.free(stepName)))
             case TableRelationAST(_, Some(name)) => BindingContext(Map(name -> lpr.free(stepName)))
             case id @ IdentRelationAST(_, _)     => BindingContext(Map(id.aliasName -> lpr.free(stepName)))
             case r                               => BindingContext[T](Map())
@@ -581,7 +581,7 @@ final class Compiler[M[_], T: Equal]
           })
 
       case Let(name, form, body) => {
-        val rel = ExprRelationAST(form, name.value)
+        val rel = ExprRelationAST(form, name.value.some)
         step(rel)(compile0(form).some)(compile0(body))
       }
 
