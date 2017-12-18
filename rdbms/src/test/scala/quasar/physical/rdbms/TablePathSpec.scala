@@ -16,7 +16,7 @@
 
 package quasar.physical.rdbms
 
-import quasar.physical.rdbms.common.{CustomSchema, DefaultSchema, TableName, TablePath}
+import quasar.physical.rdbms.common.{Schema, TableName, TablePath}
 import quasar.Qspec
 import quasar.contrib.pathy.AFile
 import quasar.contrib.pathy._
@@ -41,7 +41,7 @@ class TablePathSpec extends Qspec {
     "extract empty schema name" in {
       prop { (fileName: FileName) =>
         {
-          create(rootDir </> file1(fileName)).schema must_=== DefaultSchema
+          create(rootDir </> file1(fileName)).schema.isRoot must beTrue
         }
       }
     }
@@ -50,7 +50,7 @@ class TablePathSpec extends Qspec {
       prop { (parentDirName: DirName, fileName: FileName) =>
         {
           val file = rootDir </> dir1(parentDirName) </> file1(fileName)
-          create(file).schema must_=== CustomSchema(parentDirName.value)
+          create(file).schema must_=== Schema(parentDirName.value)
         }
       }.setGens(alphaNumDirGen, alphaNumFileGen)
     }
@@ -60,13 +60,12 @@ class TablePathSpec extends Qspec {
         {
           val file = rootDir </> dir1(dirName1) </> dir1(dirName2) </> file1(
             fileName)
-          create(file).schema must_=== CustomSchema(dirName1.value + Separator + dirName2.value)
+          create(file).schema must_=== Schema(dirName1.value + Separator + dirName2.value)
         }
       }.setGens(alphaNumDirGen, alphaNumDirGen, alphaNumFileGen)
     }
 
     "extract some schema name for 3 levels of depth" in {
-
       prop {
         (
             dirName1: DirName,
@@ -77,7 +76,7 @@ class TablePathSpec extends Qspec {
             val path = rootDir </> dir1(dirName1) </> dir1(dirName2) </> dir1(
               dirName3) </> file1(fileName)
             create(path).schema must_===
-              CustomSchema(
+              Schema(
                 dirName1.value + Separator + dirName2.value + Separator + dirName3.value)
           }
       }.setGens(alphaNumDirGen, alphaNumDirGen, alphaNumDirGen, alphaNumFileGen)

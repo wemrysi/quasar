@@ -44,6 +44,7 @@ import java.time.{Duration, Instant}
 
 import argonaut.{Json, EncodeJson}
 import argonaut.Argonaut._
+import argonaut.ArgonautScalaz._
 import eu.timepit.refined.numeric.{NonNegative, Negative, Positive => RPositive}
 import eu.timepit.refined.auto._
 import eu.timepit.refined.scalacheck.numeric._
@@ -103,12 +104,14 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
 
   "Data Service" should {
     "GET" >> {
-      "respond with empty response" >> {
-        "if file does not exist" >> prop { file: AFile =>
-          val response = service(InMemState.empty)(Request(uri = pathUri(file))).unsafePerformSync
-          response.status must_= Status.Ok
-          response.as[String].unsafePerformSync must_= ""
-        }
+      "return 404 NotFound if file does not exist" >> prop { file: AFile =>
+        val response = service(InMemState.empty)(Request(uri = pathUri(file))).unsafePerformSync
+        response.status must_= Status.NotFound
+        response.as[Json].unsafePerformSync must_= Json(
+          "error" := Json(
+            "status" := "Path not found.",
+            "detail" := Json(
+              "path" := posixCodec.printPath(file))))
       }
       "respond with file data" >> {
         def isExpectedResponse(data: Vector[Data], response: Response, format: MessageFormat) = {
@@ -276,7 +279,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           }
           "zipped json" >> {
             val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.zip"))
-            val sampleFile = rootDir[Sandboxed] </> file("foo")
             val data = Vector(Data.Obj("a" -> Data.Str("bar"), "b" -> Data.Bool(true)))
             val request = Request(
               uri = pathUri(sampleFile),
@@ -285,11 +287,11 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             val zipfile = response.as[ByteVector].unsafePerformSync
             val zipMagicByte: ByteVector = hex"504b" // zip file magic byte
 
-            response.headers.get(`Content-Disposition`.name) must_=== Some(disposition)
-            response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
-            response.status must_=== Status.Ok
-            zipfile.take(2) must_=== zipMagicByte
-            Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </> file("foo.json")))
+            (response.headers.get(`Content-Disposition`.name) must_=== Some(disposition)) and
+              (response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))) and
+              (response.status must_=== Status.Ok) and
+              (zipfile.take(2) must_=== zipMagicByte) and
+              (Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </>file("bar.json"))))
 
           }
           "download single zipped file and then re-upload zipped file" >> {
@@ -316,7 +318,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           }
           "zipped csv" >> {
             val disposition = `Content-Disposition`("attachment", Map("filename*" -> "UTF-8''foo.zip"))
-            val sampleFile = rootDir[Sandboxed] </> file("foo")
             val data = Vector(Data.Str("a,b\n1,2"))
             val request = Request(
               uri = pathUri(sampleFile),
@@ -330,10 +331,9 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
             response.status must_=== Status.Ok
             zipfile.take(2) must_=== zipMagicByte
-            Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </> file("foo.csv")))
+            Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </>file("bar.csv")))
           }
           "zipped via request headers" >> {
-            val sampleFile = rootDir[Sandboxed] </> file("foo")
             val data = Vector(Data.Obj("a" -> Data.Str("bar"), "b" -> Data.Bool(true)))
             val request = Request(uri = pathUri(sampleFile).+?("request-headers", s"""{"Accept-Encoding":"gzip","Accept":"application/zip,application/json"}"""))
             val response = service(fileSystemWithSampleFile(data))(request).unsafePerformSync
@@ -343,7 +343,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
             response.status must_=== Status.Ok
             zipfile.take(2) must_=== zipMagicByte
-            Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </> file("foo.json")))
+            Zip.unzipFiles(Process.emit(zipfile)).run.unsafePerformSync.map(_.keys) must_=== \/-(Set(currentDir </> file(".quasar-metadata.json"), currentDir </>file("bar.json")))
           }
         }
       }
@@ -834,7 +834,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           mounts = Map.empty,
           status = Status.BadRequest,
           body = { err: ApiError =>
-            (err.status.reason must_=== "Path exists.") and
+            (err.status.reason must_=== "Destination is same path as source") and
             (err.detail("path") must beSome)
           },
           newState = Unchanged)
@@ -981,7 +981,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
           mounts = Map.empty,
           status = Status.BadRequest,
           body = { err: ApiError =>
-            (err.status.reason must_=== "Path exists.") and
+            (err.status.reason must_=== "Destination is same path as source") and
               (err.detail("path") must beSome)
           },
           newState = Unchanged)

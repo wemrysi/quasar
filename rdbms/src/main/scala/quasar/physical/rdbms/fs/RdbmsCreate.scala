@@ -16,13 +16,13 @@
 
 package quasar.physical.rdbms.fs
 
-import quasar.physical.rdbms.common.{CustomSchema, TablePath}
-import slamdata.Predef.Unit
+import slamdata.Predef._
+import quasar.physical.rdbms.common.{Schema, TablePath}
 
 import doobie.free.connection.ConnectionIO
 
 trait RdbmsCreate {
 
-  def createSchema(schema: CustomSchema): ConnectionIO[Unit]
+  def createSchema(schema: Schema): ConnectionIO[Unit]
   def createTable(tablePath: TablePath): ConnectionIO[Unit]
 }

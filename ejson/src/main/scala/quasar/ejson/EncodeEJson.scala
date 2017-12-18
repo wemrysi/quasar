@@ -53,7 +53,7 @@ sealed abstract class EncodeEJsonInstances extends EncodeEJsonInstances0 {
   implicit val bigIntEncodeEJson: EncodeEJson[BigInt] =
     new EncodeEJson[BigInt] {
       def encode[J](i: BigInt)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
-        ExtEJson(int[J](i)).embed
+        Fixed[J].int(i)
     }
 
   implicit val intEncodeEJson: EncodeEJson[SInt] =
@@ -68,19 +68,19 @@ sealed abstract class EncodeEJsonInstances extends EncodeEJsonInstances0 {
   implicit val byteEncodeEJson: EncodeEJson[SByte] =
     new EncodeEJson[SByte] {
       def encode[J](b: SByte)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
-        ExtEJson(byte[J](b)).embed
+        Fixed[J].byte(b)
     }
 
   implicit val charEncodeEJson: EncodeEJson[SChar] =
     new EncodeEJson[SChar] {
       def encode[J](c: SChar)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
-        ExtEJson(char[J](c)).embed
+        Fixed[J].char(c)
     }
 
   implicit def optionEncodeEJson[A](implicit A: EncodeEJson[A]): EncodeEJson[Option[A]] =
     new EncodeEJson[Option[A]] {
       def encode[J](oa: Option[A])(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
-        oa.fold(CommonEJson(nul[J]()).embed)(A.encode[J](_))
+        oa.fold(Fixed[J].nul())(A.encode[J](_))
     }
 
   implicit def encodeJsonT[T[_[_]]: RecursiveT, F[_]: Functor: EncodeEJsonK]: EncodeEJson[T[F]] =
@@ -90,9 +90,7 @@ sealed abstract class EncodeEJsonInstances extends EncodeEJsonInstances0 {
 sealed abstract class EncodeEJsonInstances0 {
   implicit def encodeJsonEJson[A: EncodeJson]: EncodeEJson[A] =
     new EncodeEJson[A] {
-      def encode[J](a: A)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J = {
-        val mkKey: String => J = s => CommonEJson(str[J](s)).embed
-        EncodeJson.of[A].encode(a).transCata[J](EJson.fromJson(mkKey))
-      }
+      def encode[J](a: A)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
+        EncodeJson.of[A].encode(a).transCata[J](EJson.fromJson(Fixed[J].str(_)))
     }
 }

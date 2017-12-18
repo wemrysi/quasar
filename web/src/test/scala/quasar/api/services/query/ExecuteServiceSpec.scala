@@ -25,7 +25,7 @@ import quasar.api.services.Fixture._
 import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.contrib.scalaz.catchable._
-import quasar.DateArbitrary._
+import quasar.DateGenerators._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fp.numeric._
@@ -33,6 +33,7 @@ import quasar.fs._, InMemory._, mount._
 import quasar.fs.mount.cache.ViewCache
 import quasar.fs.mount.MountConfig.viewConfig0
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
+import quasar.main.Fixture.mountingInter
 import quasar.sql.{Positive => _, _}
 
 import java.time.{Instant, Duration}

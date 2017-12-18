@@ -296,7 +296,7 @@ trait MathLib extends Library {
   val Divide = BinaryFunc(
     Mapping,
     "Divides one numeric or interval value by another (non-zero) numeric value",
-    Type.Numeric,
+    Type.Dec ⨿ Type.Interval,
     Func.Input2(MathRel, Type.Numeric),
     new Func.Simplifier {
       def apply[T]
@@ -318,16 +318,11 @@ trait MathLib extends Library {
       // TODO: handle interval divided by Dec (not provided by threeten). See SD-582.
       case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Int(v2))) => success(Type.Const(Data.Interval(DateTimeInterval.divideBy(v1, v2.intValue))))
 
-      case Sized(t1, t2)
-        if Type.Interval.contains(t1) && Type.Int.contains(t2)            => success(Type.Interval)
-      case Sized(t1, t2)
-        if Type.Interval.contains(t1) && Type.Interval.contains(t2)       => success(Type.Dec)
-      case Sized(t1, t2)
-        if Type.Numeric.contains(t1) && Type.Numeric.contains(t2)         => success(Type.Dec)
-
-    } ||| numericWidening,
+      case Sized(Type.Interval.superOf(_), Type.Int.superOf(_))           => success(Type.Interval)
+      case Sized(Type.Numeric.superOf(_), Type.Numeric.superOf(_))        => success(Type.Dec)
+    },
     untyper[nat._2](t => Type.typecheck(Type.Interval, t).fold(
-      κ(success(Func.Input2(MathRel, Type.Numeric))),
+      κ(success(Func.Input2(Type.Numeric, Type.Numeric))),
       κ(success(Func.Input2(Type.Interval, Type.Int))))))
 
   /**

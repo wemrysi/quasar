@@ -35,6 +35,11 @@ package object matryoshka {
       first)(
       (prev, next) => x => prev(x).fold(next(x))(orOriginal(next)(_).some))
 
+  def birecursiveIso[T, F[_]: Functor]
+      (implicit TC: Corecursive.Aux[T, F], TR: Recursive.Aux[T, F])
+      : Iso[T, F[T]] =
+    Iso[T, F[T]](TR.project(_))(TC.embed(_))
+
   object convertToFree {
     def apply[F[_], A] = new PartiallyApplied[F, A]
     final class PartiallyApplied[F[_], A] {
@@ -114,4 +119,15 @@ package object matryoshka {
     (implicit T: Recursive.Aux[T, F], U: Corecursive.Aux[U, H], BF: Traverse[F])
   : M[U] =
     T.traverseR(t)(ψ(_) >>= (_.traverse(transHyloM(_)(φ, ψ))) >>= φ)
+
+  implicit def freeEqualT[A: Equal]: EqualT[Free[?[_], A]] = new EqualT[Free[?[_], A]] {
+    def equal[F[_]: Functor]
+    (tf1: Free[F, A], tf2: Free[F, A])
+    (implicit del: Delay[Equal, F]) =
+      (tf1.resume, tf2.resume) match {
+        case (-\/(l1), -\/(l2)) => del(equalT[F](del)).equal(l1, l2)
+        case (\/-(r1), \/-(r2)) => r1 ≟ r2
+        case _ => false
+      }
+  }
 }

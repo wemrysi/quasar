@@ -344,6 +344,7 @@ trait StringLib extends Library {
         case Data.LocalTime(t)      => success(t.toString)
         case Data.LocalDate(d)      => success(d.toString)
         case Data.Interval(i)       => success(i.toString)
+        case Data.Id(i)        => success(i.toString)
         // NB: Should not be able to hit this case, because of the domain.
         case other                  =>
           failureNel(
@@ -366,8 +367,9 @@ trait StringLib extends Library {
           DateLib.LocalDateTime.tpe(Func.Input1(x)) <+>
           DateLib.LocalTime.tpe(Func.Input1(x)) <+>
           DateLib.LocalDate.tpe(Func.Input1(x)) <+>
-          DateLib.Interval.tpe(Func.Input1(x)))
-          .map(Func.Input1(_))
+          DateLib.Interval.tpe(Func.Input1(x)) <+>
+          IdentityLib.ToId.tpe(Func.Input1(x))
+        ).map(Func.Input1(_))
     })
 }
 

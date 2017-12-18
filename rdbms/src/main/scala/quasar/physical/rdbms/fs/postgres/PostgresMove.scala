@@ -17,7 +17,7 @@
 package quasar.physical.rdbms.fs.postgres
 
 import slamdata.Predef._
-import quasar.physical.rdbms.common.{CustomSchema, Schema, TableName, TablePath}
+import quasar.physical.rdbms.common.{Schema, TableName, TablePath}
 import quasar.physical.rdbms.fs.RdbmsMove
 import quasar.physical.rdbms.common.TablePath._
 
@@ -40,9 +40,7 @@ trait PostgresMove extends RdbmsMove {
     (fr"ALTER TABLE" ++ Fragment.const(table.shows) ++ fr"RENAME TO" ++ Fragment.const(newName.shows))
       .update.run.map(_ => table.copy(table = newName))
 
-
-  override def renameSchema(schema: CustomSchema, newName: CustomSchema): ConnectionIO[Unit] =
+  override def renameSchema(schema: Schema, newName: Schema): ConnectionIO[Unit] =
     (fr"ALTER SCHEMA" ++ Fragment.const(schema.shows) ++ fr"RENAME TO" ++ Fragment.const(newName.shows))
       .update.run.void
-
 }

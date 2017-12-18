@@ -266,6 +266,8 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
       Timestamp(MillisToUTC(a1, none).embed).embed.η[F]
     case MF.TypeOf(a1) =>
       unimplemented("TypeOf")
+    case MF.ToId(a1) =>
+      unimplemented("ToId")
     case MF.ExtractCentury(a1) =>
       Ceil(Div(extract(a1, year), int(100)).embed).embed.η[F]
     case MF.ExtractDayOfMonth(a1) =>

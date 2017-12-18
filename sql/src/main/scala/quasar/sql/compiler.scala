@@ -202,7 +202,9 @@ final class Compiler[M[_], T: Equal]
       CIName("arbitrary")               -> agg.Arbitrary,
       CIName("array_length")            -> array.ArrayLength,
       CIName("localdatetime")           -> date.LocalDateTime,
+      CIName("date")                    -> date.LocalDate,
       CIName("localdate")               -> date.LocalDate,
+      CIName("time")                    -> date.LocalTime,
       CIName("localtime")               -> date.LocalTime,
       CIName("offsetdatetime")          -> date.OffsetDateTime,
       CIName("offsetdate")              -> date.OffsetDate,
@@ -216,7 +218,6 @@ final class Compiler[M[_], T: Equal]
       CIName("now")                     -> date.Now, // MySQL, Postgres (trans start)
       CIName("statement_timestamp")     -> date.Now, // Postgres (statement start)
       CIName("transaction_timestamp")   -> date.Now, // Postgres (trans start)
-      CIName("time")                    -> date.OffsetTime,
       CIName("timestamp")               -> date.OffsetDateTime,
       CIName("interval")                -> date.Interval,
       CIName("start_of_day")            -> date.StartOfDay,

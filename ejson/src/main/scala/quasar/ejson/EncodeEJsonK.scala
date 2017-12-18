@@ -47,11 +47,11 @@ object EncodeEJsonK extends EncodeEJsonKInstances {
     new EncodeEJsonK[EnvT[E, F, ?]] {
       def encodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Algebra[EnvT[E, F, ?], J] = {
         case EnvT((ask, lower)) =>
+          val j = Fixed[J]
           val fAlg = EncodeEJsonK[F].encodeK[J]
-          ExtEJson(map[J](List(
-            CommonEJson(str[J](askLabel)).embed   -> ask.asEJson[J],
-            CommonEJson(str[J](lowerLabel)).embed -> fAlg(lower)
-          ))).embed
+          j.map(List(
+            j.str(askLabel)   -> ask.asEJson[J],
+            j.str(lowerLabel) -> fAlg(lower)))
       }
     }
 }

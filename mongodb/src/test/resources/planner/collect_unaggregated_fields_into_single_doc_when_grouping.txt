@@ -72,9 +72,8 @@ Chain
    │  ╰─ Obj
    │     ╰─ Key(__quasar_mongodb_sigil)
    │        ╰─ SpliceObjects
-   │           ├─ SpliceObjects
-   │           │  ├─ JsCore(_.left[1])
-   │           │  ╰─ JsCore(_.left[2])
+   │           ├─ JsCore(_.left[1])
+   │           ├─ JsCore(_.left[2])
    │           ╰─ Obj
    │              ╰─ Key(2: _.right)
    ╰─ Scope(Map())
