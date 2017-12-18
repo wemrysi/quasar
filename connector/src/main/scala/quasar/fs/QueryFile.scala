@@ -99,7 +99,7 @@ object QueryFile {
     *       https://github.com/quasar-analytics/quasar/pull/986#discussion-diff-45081757
     */
   final case class ListContents(dir: ADir)
-    extends QueryFile[FileSystemError \/ Set[PathSegment]]
+    extends QueryFile[FileSystemError \/ Set[Node]]
 
   /** This operation should return whether a file exists in the filesystem.*/
   final case class FileExists(file: AFile)
@@ -180,26 +180,27 @@ object QueryFile {
     /** Returns the names of the immediate children of the given directory,
       * fails if the directory does not exist.
       */
-    def ls(dir: ADir): M[Set[PathSegment]] =
+    def ls(dir: ADir): M[Set[Node]] =
       listContents(dir)
 
-    /** Returns all files in this directory and all of it's sub-directories
+    /** Returns a Map of all files in this directory and all of it's sub-directories
+      * along with it's `Node.Type`
       * Fails if the directory does not exist.
       */
-    def descendantFiles(dir: ADir): M[Set[RFile]] = {
+    def descendantFiles(dir: ADir): M[Map[RFile, Node.Type]] = {
       type S[A] = StreamT[M, A]
 
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-      def lsR(desc: RDir): StreamT[M, RFile] =
-        StreamT.fromStream[M, PathSegment](ls(dir </> desc) map (_.toStream))
-          .flatMap(_.fold(
-            d => lsR(desc </> dir1(d)),
-            f => (desc </> file1(f)).point[S]))
+      def lsR(current1: RDir): StreamT[M, (RFile, Node.Type)] =
+        StreamT.fromStream[M, Node](ls(dir </> current1) map (_.toStream)) flatMap {
+          case f: FileNode => ((current1 </> file1(f.name)) -> f.`type`).point[S]
+          case d: DirNode  => lsR(current1 </> dir1(d.name))
+        }
 
-      lsR(currentDir).foldLeft(Set.empty[RFile])(_ + _)
+      lsR(currentDir).foldLeft(Set.empty[(RFile, Node.Type)])(_ + _).map(_.toMap)
     }
 
-    def listContents(dir: ADir): M[Set[PathSegment]] =
+    def listContents(dir: ADir): M[Set[Node]] =
       EitherT(lift(ListContents(dir)))
 
     /** Returns whether the given file exists. */

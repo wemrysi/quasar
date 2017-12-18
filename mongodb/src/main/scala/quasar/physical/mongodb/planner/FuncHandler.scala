@@ -19,7 +19,8 @@ package quasar.physical.mongodb.planner
 import slamdata.Predef._
 import quasar.physical.mongodb.{Bson, BsonCodec, BsonVersion}
 import quasar.physical.mongodb.expression._
-import quasar.qscript.{Coalesce => _, MapFuncsDerived => D,  _}, MapFuncsCore._
+import quasar.qscript.{MapFuncsDerived => D,  _}, MapFuncsCore._
+import quasar.qscript.rewrites.{Coalesce => _}
 
 import matryoshka._
 import matryoshka.data._

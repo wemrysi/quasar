@@ -14,18 +14,19 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qscript.rewrites
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => _, _}
 import quasar.Planner.NoFilesFound
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
+import quasar.qscript._
 import quasar.qscript.MapFuncsCore._
 
-import matryoshka._
+import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
 import pathy.Path.{dir1, file1}

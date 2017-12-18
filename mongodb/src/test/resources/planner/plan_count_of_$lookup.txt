@@ -1,83 +1,22 @@
 Chain
-├─ $FoldLeftF
-│  ├─ Chain
-│  │  ├─ $ReadF(db; zips)
-│  │  ├─ $GroupF
-│  │  │  ├─ Grouped
-│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
-│  │  │  ╰─ By
-│  │  │     ╰─ Name("0" -> {
-│  │  │             "$cond": [
-│  │  │               {
-│  │  │                 "$and": [
-│  │  │                   { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │  │                   { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│  │  │               },
-│  │  │               "$_id",
-│  │  │               { "$literal": undefined }]
-│  │  │           })
-│  │  ╰─ $ProjectF
-│  │     ├─ Name("_id" -> "$_id")
-│  │     ├─ Name("value")
-│  │     │  ├─ Name("left" -> "$0")
-│  │     │  ├─ Name("right" -> { "$literal": [] })
-│  │     │  ╰─ Name("_id" -> "$_id")
-│  │     ╰─ IncludeId
-│  ╰─ Chain
-│     ├─ $ReadF(db; largeZips)
-│     ├─ $MapF
-│     │  ├─ JavaScript(function (key, value) {
-│     │  │               return [
-│     │  │                 {
-│     │  │                   "0": (isObject(value) && (! Array.isArray(value))) ? value.TestProgramId : undefined
-│     │  │                 },
-│     │  │                 { "left": [], "right": [value] }]
-│     │  │             })
-│     │  ╰─ Scope(Map())
-│     ╰─ $ReduceF
-│        ├─ JavaScript(function (key, values) {
-│        │               var result = { "left": [], "right": [] };
-│        │               values.forEach(
-│        │                 function (value) {
-│        │                   result.left = result.left.concat(value.left);
-│        │                   result.right = result.right.concat(value.right)
-│        │                 });
-│        │               return result
-│        │             })
-│        ╰─ Scope(Map())
+├─ $ReadF(db; largeZips)
 ├─ $MatchF
 │  ╰─ Doc
-│     ├─ NotExpr($left -> Size(0))
-│     ╰─ NotExpr($right -> Size(0))
-├─ $UnwindF(DocField(BsonField.Name("right")))
+│     ╰─ Expr($TestProgramId -> Exists(true))
+├─ $ProjectF
+│  ├─ Name("right" -> "$$ROOT")
+│  ╰─ ExcludeId
+├─ $LookupF(from zips with (this).right.TestProgramId = (that)._id as left)
 ├─ $UnwindF(DocField(BsonField.Name("left")))
 ├─ $ProjectF
-│  ├─ Name("left" -> {
-│  │       "$cond": [
-│  │         {
-│  │           "$and": [
-│  │             { "$lte": [{ "$literal": {  } }, "$left"] },
-│  │             { "$lt": ["$left", { "$literal": [] }] }]
-│  │         },
-│  │         "$left",
-│  │         { "$literal": undefined }]
-│  │     })
-│  ├─ Name("right" -> {
-│  │       "$cond": [
-│  │         {
-│  │           "$and": [
-│  │             { "$lte": [{ "$literal": {  } }, "$right"] },
-│  │             { "$lt": ["$right", { "$literal": [] }] }]
-│  │         },
-│  │         "$right",
-│  │         { "$literal": undefined }]
-│  │     })
+│  ├─ Name("left" -> "$left")
+│  ├─ Name("right" -> "$right")
 │  ╰─ ExcludeId
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
 │  │     ├─ Key(f0: (isObject(_.left) && (! Array.isArray(_.left))) ? _.left._id : undefined)
-│  │     ╰─ Key(b0: [(isObject(_.left) && (! Array.isArray(_.left))) ? _.left._id : undefined])
+│  │     ╰─ Key(b0: (isObject(_.left) && (! Array.isArray(_.left))) ? _.left._id : undefined)
 │  ╰─ Scope(Map())
 ╰─ $GroupF
    ├─ Grouped

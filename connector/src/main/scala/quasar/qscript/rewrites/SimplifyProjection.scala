@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qscript.rewrites
+
+import quasar.fp.EndoK
+import quasar.qscript._
 
 import scalaz._
-import TTypes.simplifiableProjection
 
 /** This optional transformation changes the semantics of [[Read]]. The default
   * semantics return a single value, whereas the transformed version has an
@@ -33,7 +35,7 @@ trait SimplifyProjection[F[_]] {
 object SimplifyProjection {
   type Aux[F[_], G[_]] = SimplifyProjection[F] { type H[A] = G[A] }
 
-  def apply[F[_], G[_]](implicit ev: Aux[F, G]): Aux[F, G]          = ev
+  def apply[F[_], G[_]](implicit ev: Aux[F, G]): Aux[F, G] = ev
   def default[F[_]: Traverse, G[_]](implicit F: F :<: G): Aux[F, G] = make[F, G](F)
 
   def make[F[_], G[_]](f: F ~> G): Aux[F, G] = new SimplifyProjection[F] {
@@ -43,13 +45,13 @@ object SimplifyProjection {
 
   // FIXME: if these are only used implicitly they should have names less likely to collide.
   implicit def projectBucket[T[_[_]], G[_]](implicit QC: QScriptCore[T, ?] :<: G): Aux[ProjectBucket[T, ?], G] =
-    simplifiableProjection[T].ProjectBucket[G]
+    SimplifiableProjection[T].ProjectBucket[G]
   implicit def qscriptCore[T[_[_]], G[_]](implicit QC: QScriptCore[T, ?] :<: G): Aux[QScriptCore[T, ?], G] =
-    simplifiableProjection[T].QScriptCore[G]
+    SimplifiableProjection[T].QScriptCore[G]
   implicit def thetaJoin[T[_[_]], G[_]](implicit QC: ThetaJoin[T, ?] :<: G): Aux[ThetaJoin[T, ?], G] =
-    simplifiableProjection[T].ThetaJoin[G]
+    SimplifiableProjection[T].ThetaJoin[G]
   implicit def equiJoin[T[_[_]], G[_]](implicit QC: EquiJoin[T, ?] :<: G): Aux[EquiJoin[T, ?], G] =
-    simplifiableProjection[T].EquiJoin[G]
+    SimplifiableProjection[T].EquiJoin[G]
   implicit def deadEnd[F[_]](implicit DE: Const[DeadEnd, ?] :<: F): Aux[Const[DeadEnd, ?], F] =
     default[Const[DeadEnd, ?], F]
   implicit def read[F[_], A](implicit R: Const[Read[A], ?] :<: F): Aux[Const[Read[A], ?], F] =
@@ -62,4 +64,52 @@ object SimplifyProjection {
 
   // This assembles the coproduct out of the individual implicits.
   def simplifyQScriptTotal[T[_[_]]]: Aux[QScriptTotal[T, ?], QScriptTotal[T, ?]] = apply
+}
+
+
+class SimplifiableProjectionT[T[_[_]]] extends TTypes[T] {
+  import SimplifyProjection._
+
+  private lazy val simplify: EndoK[QScriptTotal] = simplifyQScriptTotal[T].simplifyProjection
+  private def applyToBranch(branch: FreeQS): FreeQS = branch mapSuspension simplify
+
+  def ProjectBucket[G[_]](implicit QC: QScriptCore :<: G) = make(
+    λ[ProjectBucket ~> G] {
+      case BucketKey(src, value, key) => QC.inj(Map(src, Free.roll(MFC(MapFuncsCore.ProjectKey(value, key)))))
+      case BucketIndex(src, value, index) => QC.inj(Map(src, Free.roll(MFC(MapFuncsCore.ProjectIndex(value, index)))))
+    })
+
+  def QScriptCore[G[_]](implicit QC: QScriptCore :<: G) = make(
+    λ[QScriptCore ~> G](fa =>
+      QC inj (fa match {
+        case Union(src, lb, rb) =>
+          Union(src, applyToBranch(lb), applyToBranch(rb))
+        case Subset(src, lb, sel, rb) =>
+          Subset(src, applyToBranch(lb), sel, applyToBranch(rb))
+        case _ => fa
+      })))
+
+  def ThetaJoin[G[_]](implicit TJ: ThetaJoin :<: G) = make(
+    λ[ThetaJoin ~> G](tj =>
+      TJ inj quasar.qscript.ThetaJoin(
+        tj.src,
+        applyToBranch(tj.lBranch),
+        applyToBranch(tj.rBranch),
+        tj.on,
+        tj.f,
+        tj.combine)))
+
+  def EquiJoin[G[_]](implicit EJ: EquiJoin :<: G) = make(
+    λ[EquiJoin ~> G](ej =>
+      EJ inj quasar.qscript.EquiJoin(
+        ej.src,
+        applyToBranch(ej.lBranch),
+        applyToBranch(ej.rBranch),
+        ej.key,
+        ej.f,
+        ej.combine)))
+}
+
+object SimplifiableProjection {
+  def apply[T[_[_]]] = new SimplifiableProjectionT[T]
 }

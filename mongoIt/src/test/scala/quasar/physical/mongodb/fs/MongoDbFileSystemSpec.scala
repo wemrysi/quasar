@@ -44,7 +44,7 @@ import monocle.std.{disjunction => D}
 import org.specs2.execute.SkipException
 import org.specs2.specification.core._
 import pathy.Path._
-import scalaz.{Optional => _, _}, Scalaz._
+import scalaz.{Optional => _, Node => _, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream._
 
@@ -154,7 +154,7 @@ class MongoDbFileSystemSpec
               manage.delete(d).liftM[Process]            |@|
               query.ls(rootDir).liftM[Process]
             ) { (before, _, create, _, delete) =>
-              val pn = d.relativeTo(rootDir).flatMap(firstSegmentName).toSet
+              val pn = d.relativeTo(rootDir).flatMap(firstSegmentName).toSet.map(Node.fromSegment)
               (before.intersect(pn) must beEmpty) and
               (create.intersect(pn) must_== pn) and
               (delete must_== before)
@@ -183,11 +183,11 @@ class MongoDbFileSystemSpec
               manage.delete(rootDir).liftM[Process]       |@|
               query.ls(rootDir).liftM[Process]
             ) { (_, _, before, _, after) =>
-              val dA = d1.relativeTo(rootDir).flatMap(firstSegmentName).toSet
-              val dB = d2.relativeTo(rootDir).flatMap(firstSegmentName).toSet
+              val dA = d1.relativeTo(rootDir).flatMap(firstSegmentName).toSet.map(Node.fromSegment)
+              val dB = d2.relativeTo(rootDir).flatMap(firstSegmentName).toSet.map(Node.fromSegment)
 
-              (before.intersect(dA) must_== dA) and
-              (before.intersect(dB) must_== dB) and
+              (before.intersect(dA) must_=== dA) and
+              (before.intersect(dB) must_=== dB) and
               (after must beEmpty)
             }
           }
@@ -279,12 +279,10 @@ class MongoDbFileSystemSpec
           val tdir = rootDir </> dir("__topdir__")
           val tfile = tdir </> file("foobar")
 
-          val p = write.save(tfile, oneDoc.toProcess).drain ++
-                  query.ls(tdir).liftM[Process]
-                    .flatMap(ns => Process.emitAll(ns.toVector))
+          val r = write.saveThese(tfile, oneDoc) >> query.ls(tdir)
 
-          (runLogT(run, p) <* runT(run)(manage.delete(tdir)))
-            .runEither must beRight(contain(FileName("foobar").right[DirName]))
+          run((r <* manage.delete(tdir)).run).unsafePerformSync.toEither must
+            beRight(contain(Node.Data(FileName("foobar")):Node))
         }
       }
 
@@ -294,7 +292,7 @@ class MongoDbFileSystemSpec
 
           val p = query.fileExists(tfile)
 
-          run(p).unsafePerformSync must_== false
+          run(p).unsafePerformSync must_= false
         }
 
         "for missing file not at the root (i.e. a collection path) should succeed" >> {
@@ -302,7 +300,7 @@ class MongoDbFileSystemSpec
 
           val p = query.fileExists(tfile)
 
-          run(p).unsafePerformSync must_== false
+          run(p).unsafePerformSync must_= false
         }
       }
 
@@ -320,7 +318,7 @@ class MongoDbFileSystemSpec
               manage.moveDir(src, dst, ovr).liftM[Process] |@|
               query.ls(dst).liftM[Process]
             ) { (_, _, create, _, moved) =>
-              val pn: Set[PathSegment] = Set(FileName("movdb1").right, FileName("movdb2").right)
+              val pn: Set[Node] = Set(Node.Data(FileName("movdb1")), Node.Data(FileName("movdb2")))
               (create must contain(allOf(pn))) and (moved must contain(allOf(pn)))
             }
           }
@@ -341,11 +339,11 @@ class MongoDbFileSystemSpec
           s"be in the same database when db name contains '$esc'" >> {
             val pdir = rootDir </> dir(s"db${esc}name")
 
-            runT(run)(for {
+            run((for {
               tfile  <- manage.tempFile(pdir)
               dbName <- EitherT.fromDisjunction[manage.FreeS](
                           Collection.dbNameFromPath(tfile).leftMap(pathErr(_)))
-            } yield dbName).runEither must_== Collection.dbNameFromPath(pdir).toEither
+            } yield dbName).run).unsafePerformSync must_=== Collection.dbNameFromPath(pdir).leftMap(pathErr(_))
           })
         }
         ok

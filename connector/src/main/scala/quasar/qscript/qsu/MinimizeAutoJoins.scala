@@ -59,7 +59,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
     QP.prov.provenanceEqual(scala.Predef.implicitly, Equal[FreeMapA[Access[Symbol]]])
 
   def apply[F[_]: Monad: NameGenerator: PlannerErrorME](agraph: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] = {
-    type G[A] = StateT[StateT[F, RevIdx, ?], QSUDims[T], A]
+    type G[A] = StateT[StateT[F, RevIdx, ?], MinimizationState, A]
 
     val back = agraph.graph rewriteM {
       case qgraph @ AutoJoin2(left, right, combiner) =>
@@ -80,8 +80,8 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
         coalesceToMap[G](qgraph, List(left, center, right), combiner2)
     }
 
-    val lifted = back(agraph.dims) map {
-      case (dims, graph) => AuthenticatedQSU[T](graph, dims)
+    val lifted = back(MinimizationState(agraph.dims, Set())) map {
+      case (MinimizationState(dims, _), graph) => AuthenticatedQSU[T](graph, dims)
     }
 
     lifted.eval(agraph.graph.generateRevIndex)
@@ -89,21 +89,25 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
 
   // the Ints are indices into branches
   private def coalesceToMap[
-      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], QSUDims[T]]: PlannerErrorME](
+      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState]: PlannerErrorME](
       qgraph: QSUGraph,
       branches: List[QSUGraph],
       combiner: FreeMapA[Int]): G[QSUGraph] = {
 
-    val fms = branches.zipWithIndex map {
-      case (g, i) =>
-        expandSecondOrder(MappableRegion.maximal(g)).map(g => (g, i))
-    }
+    for {
+      state <- MonadState_[G, MinimizationState].get
 
-    val (remap, candidates) = minimizeSources(fms.flatMap(_.toList))
+      fms = branches.zipWithIndex map {
+        case (g, i) =>
+          expandSecondOrder(MappableRegion[T](state.failed, g)).map(g => (g, i))
+      }
 
-    lazy val fm = combiner.flatMap(i => fms(i).map(κ(remap(i))))
+      (remap, candidates) = minimizeSources(fms.flatMap(_.toList))
 
-    coalesceRoots[G](qgraph, fm, candidates)
+      fm = combiner.flatMap(i => fms(i).map(κ(remap(i))))
+
+      back <- coalesceRoots[G](qgraph, fm, candidates)
+    } yield back
   }
 
   // attempt to extend by seeing through constructs like filter (mostly just filter)
@@ -131,7 +135,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
   // the Int indexes into the final number of distinct roots
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   private def coalesceRoots[
-      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], QSUDims[T]]: PlannerErrorME](
+      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState]: PlannerErrorME](
       qgraph: QSUGraph,
       fm: => FreeMapA[Int],
       candidates: List[QSUGraph]): G[QSUGraph] = candidates match {
@@ -188,13 +192,17 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
           // we know we're non-empty by structure of outer match
           (source, buckets, _, _) = extended.head
 
-          dims <- MonadState_[G, QSUDims[T]].get
+          state <- MonadState_[G, MinimizationState].get
+          dims = state.dims
 
           // do we have the same provenance at our roots?
           rootProvCheck = extended.forall(t => dims(t._1.root) === dims(source.root))
 
           // we need a stricter check than just provenance, since we have to inline maps
-          back <- if (rootProvCheck && extended.forall(_._1.root === source.root)) {
+          back <- if (rootProvCheck
+              && extended.forall(_._2 === buckets)
+              && extended.forall(_._1.root === source.root)) {
+
             val lifted = extended.zipWithIndex map {
               case ((_, buckets, reducers, repair), i) =>
                 (
@@ -238,27 +246,40 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
               red <- updateGraph[G](redPat)
               back = qgraph.overwriteAtRoot(QSU.Map[T, Symbol](red.root, adjustedFM)) :++ red
 
-              _ <- MonadState_[G, QSUDims[T]] modify { dims =>
-                dims map {
+              _ <- MonadState_[G, MinimizationState] modify { state =>
+                val dims2 = state.dims map {
                   case (key, value) =>
                     val value2 = candidates.foldLeft(value) { (value, c) =>
-                      if (c.root =/= back.root)
-                        QP.rename(c.root, back.root, value)
+                      if (c.root =/= red.root)
+                        QP.rename(c.root, red.root, value)
                       else
                         value
                     }
 
                     key -> value2
                 }
+
+                state.copy(dims = dims2)
               }
             } yield back
           } else {
-            qgraph.point[G]
+            failure[G](qgraph)
           }
         } yield back
       } else {
-        qgraph.point[G]
+        failure[G](qgraph)
       }
+  }
+
+  private def failure[
+      G[_]: Monad: MonadState_[?[_], MinimizationState]](
+      graph: QSUGraph): G[QSUGraph] = {
+
+    val change = MonadState_[G, MinimizationState] modify { state =>
+      state.copy(failed = state.failed + graph.root)
+    }
+
+    change.map(_ => graph)
   }
 
   // we return a remap function along with a minimized list
@@ -283,18 +304,22 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
   }
 
   private def updateGraph[
-      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], QSUDims[T]]: PlannerErrorME](
+      G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadState_[?[_], MinimizationState]: PlannerErrorME](
       pat: QScriptUniform[Symbol]): G[QSUGraph] = {
 
     for {
       qgraph <- QSUGraph.withName[T, G](pat)
 
-      dims <- MonadState_[G, QSUDims[T]].get
-      computed <- AP.computeProvenanceƒ[G].apply(QSUGraph.QSUPattern(qgraph.root, pat.map(s => (s, dims(s)))))
-      dims2 = dims + (qgraph.root -> computed._2)
-      _ <- MonadState_[G, QSUDims[T]].put(dims2)
+      state <- MonadState_[G, MinimizationState].get
+      computed <- AP.computeProvenanceƒ[G].apply(
+        QSUGraph.QSUPattern(qgraph.root, pat.map(s => (s, state.dims(s)))))
+
+      dims2 = state.dims + (qgraph.root -> computed._2)
+      _ <- MonadState_[G, MinimizationState].put(state.copy(dims = dims2))
     } yield qgraph
   }
+
+  case class MinimizationState(dims: QSUDims[T], failed: Set[Symbol])
 }
 
 object MinimizeAutoJoins {

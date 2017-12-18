@@ -14,19 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qscript.rewrites
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => _, _}
 import quasar.RenderTreeT
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.matryoshka._
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.qscript._
 import quasar.qscript.MapFuncCore._
 import quasar.qscript.MapFuncsCore._
 
-import matryoshka._
+import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._

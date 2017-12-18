@@ -411,17 +411,37 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
         }
       }
 
-      "download as zipped directory" >> prop { filesystem: NonEmptyDir =>
-        val disposition = `Content-Disposition`("attachment", Map("filename" -> "foo.zip"))
-        val requestMediaType = MediaType.`text/csv`.withExtensions(Map("disposition" -> disposition.value))
-        val request = Request(
-          uri = pathUri(filesystem.dir),
-          headers = Headers(Accept(requestMediaType)))
-        val response = service(filesystem.state)(request).unsafePerformSync
-        response.status must_=== Status.Ok
-        response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
-        response.headers.get(`Content-Disposition`) must_=== Some(disposition)
-      }.set(minTestsOk = 10).flakyTest("scalacheck: Gave up after only 2 passed tests. 12 tests were discarded.")  // NB: this test is slow because NonEmptyDir instances are still relatively large
+      "download directory as zip archive" >> {
+        "if directory contains only data files" >> prop { filesystem: NonEmptyDir =>
+          val disposition = `Content-Disposition`("attachment", Map("filename" -> "foo.zip"))
+          val requestMediaType = MediaType.`text/csv`.withExtensions(Map("disposition" -> disposition.value))
+          val request = Request(
+            uri = pathUri(filesystem.dir),
+            headers = Headers(Accept(requestMediaType)))
+          val response = service(filesystem.state)(request).unsafePerformSync
+          response.status must_=== Status.Ok
+          response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
+          response.headers.get(`Content-Disposition`) must_=== Some(disposition)
+          // Just want to make sure streaming of the zipped bytes doesn't fail
+          // even though we aren't actually checking the validity of the bytes
+          response.as[ByteVector].void.unsafePerformSync must_=== (())
+        }.set(minTestsOk = 10).flakyTest("scalacheck: Gave up after only 2 passed tests. 12 tests were discarded.")  // NB: this test is slow because NonEmptyDir instances are still relatively large
+        "if directory contains modules, they are simply ignored" >> prop { (filesystem: NonEmptyDir, moduleConfig: MountConfig.ModuleConfig) =>
+          val disposition = `Content-Disposition`("attachment", Map("filename" -> "foo.zip"))
+          val requestMediaType = MediaType.`text/csv`.withExtensions(Map("disposition" -> disposition.value))
+          val request = Request(
+            uri = pathUri(filesystem.dir),
+            headers = Headers(Accept(requestMediaType)))
+          val mounts = MountingsConfig(Map[APath, MountConfig]((filesystem.dir </> dir("module")) -> moduleConfig))
+          val response = service(filesystem.state, mounts)(request).unsafePerformSync
+          response.status must_=== Status.Ok
+          response.contentType must_=== Some(`Content-Type`(MediaType.`application/zip`))
+          response.headers.get(`Content-Disposition`) must_=== Some(disposition)
+          // Just want to make sure streaming of the zipped bytes doesn't fail
+          // even though we aren't actually checking the validity of the bytes
+          response.as[ByteVector].void.unsafePerformSync must_=== (())
+        }
+      }
       "what happens if user specifies a Path that is a directory but without the appropriate headers?" >> todo
       "description of the function if the file is a module function" in todo
       "description of the module if the directory is a module" in todo
@@ -678,8 +698,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             p -> fmt.encode[Task](Process.emitAll(content))
                   .flatMap(str => utf8Bytes(str))
           })
-
-        val contentMap = files.map { case (p, _) => (baseDir </> p) -> content }
 
         val (service, ref) = serviceRef(InMemState.empty)
         (for {

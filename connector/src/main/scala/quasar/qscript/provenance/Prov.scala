@@ -23,7 +23,7 @@ import quasar.fp.ski.κ
 import matryoshka._
 import matryoshka.implicits._
 import monocle.Prism
-import scalaz._, Scalaz._
+import scalaz.{NonEmptyList => NEL, _}, Scalaz._
 
 /**
   * @tparam D type of data
@@ -139,6 +139,26 @@ trait Prov[D, I, P] {
       case (_, Then(_, _))      => thenEq(x, y)
       case _                    => false
     })
+  }
+
+  // eliminate duplicates within contiguous Both/OneOf and reassociate to the left
+  def normalize(p: P)(implicit eqD: Equal[D], eqI: Equal[I]): P = {
+    def normalize0(alternates: NEL[NEL[P]]): P =
+      alternates
+        .map(_.distinctE1.foldLeft1(both(_, _)))
+        .distinctE1
+        .foldLeft1(oneOf(_, _))
+
+    val normalizeƒ: Algebra[PF, NEL[NEL[P]]] = {
+      case Both(l, r)  => (l |@| r)(_ append _)
+      case OneOf(l, r) => l append r
+      case Then(l, r)  => NEL(NEL(thenn(normalize0(l), normalize0(r))))
+      case Value(i)    => NEL(NEL(value(i)))
+      case Proj(d)     => NEL(NEL(proj(d)))
+      case Nada()      => NEL(NEL(nada()))
+    }
+
+    normalize0(p.cata(normalizeƒ))
   }
 
   ////

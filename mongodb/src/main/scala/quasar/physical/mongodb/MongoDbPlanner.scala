@@ -37,7 +37,8 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.planner.common._
 import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
-import quasar.qscript.{Coalesce => _, _}, RenderQScriptDSL._
+import quasar.qscript._, RenderQScriptDSL._
+import quasar.qscript.rewrites.{Coalesce => _, Optimize, PreferProjection, Rewrite}
 import quasar.std.StdLib._ // TODO: remove this
 
 import java.time.Instant
@@ -959,7 +960,7 @@ object MongoDbPlanner {
               .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
           case Filter(src0, cond0) => {
             // TODO: Apply elideMoreGeneralGuards to all FreeMap's in the plan, not only here
-            cond0.transCataM(assumeReadType.elideMoreGeneralGuards[M, T](Type.AnyObject)) >>= { cond =>
+            cond0.transCataM(assumeReadType.elideMoreGeneralGuards[T, M, Hole](SrcHole, Type.AnyObject)) >>= { cond =>
               val selectors = getSelector[T, M, EX](cond, selector[T](cfg.bsonVersion))
               val typeSelectors = getSelector[T, M, EX](cond, typeSelector[T])
 

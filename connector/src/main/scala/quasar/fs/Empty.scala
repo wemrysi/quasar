@@ -78,7 +78,7 @@ object Empty {
 
         case QueryFile.ListContents(d) =>
           if (d === rootDir)
-            \/.right[FileSystemError, Set[PathSegment]](Set()).point[F]
+            Set().right.point[F]
           else
             fsPathNotFound(d)
 

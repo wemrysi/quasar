@@ -30,6 +30,7 @@ import quasar.fs._
 import quasar.fs.mount._
 import quasar.qscript._
 import quasar.qscript.analysis._
+import quasar.qscript.rewrites.{Optimize, Unicoalesce, Unirewrite}
 
 import quasar.blueeyes.json.JValue
 import quasar.precog.common.{ColumnRef, CNumericValue, CPath, CPathField, CPathIndex, Path}

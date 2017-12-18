@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.qscript.rewrites
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => _, _}
 
 import quasar.ejson
 import quasar.ejson.{EJson, ExtEJson}
 import quasar.fp.PrismNT
 import quasar.fp.ski.κ
+import quasar.qscript._
 import quasar.qscript.analysis.Outline
 
 import matryoshka._
