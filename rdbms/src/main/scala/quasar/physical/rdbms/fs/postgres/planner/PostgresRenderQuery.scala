@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar.common.SortDir.{Ascending, Descending}
 import quasar.Data
 import quasar.DataCodec
-import quasar.DataCodec.Precise.TimeKey
 import quasar.physical.rdbms.model._
 import quasar.physical.rdbms.fs.postgres._
 import quasar.physical.rdbms.planner.RenderQuery
@@ -96,7 +95,8 @@ object PostgresRenderQuery extends RenderQuery {
     case ConcatStr(str1, str2)  =>
       s"$str1 || $str2".right
     case Time(expr) =>
-      buildJson(s"""{ "$TimeKey": $expr }""").right
+      ???
+      // buildJson(s"""{ "$TimeKey": $expr }""").right
     case NumericOp(sym, left, right) => s"(($left)::text::numeric $sym ($right)::text::numeric)".right
     case Mod(a1, a2) => s"mod(($a1)::text::numeric, ($a2)::text::numeric)".right
     case Pow(a1, a2) => s"power(($a1)::text::numeric, ($a2)::text::numeric)".right

@@ -105,7 +105,7 @@ class PlannerQScriptSpec extends
           func.Guard(func.Hole, Type.AnyObject,
             func.ProjectKeyS(func.Hole, "pop"),
             func.Undefined),
-          Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Int, Type.Dec), Type.Interval), Type.Str), Type.Coproduct(Type.Coproduct(Type.Timestamp, Type.Date), Type.Time)), Type.Bool),
+          Type.Comparable,
           func.Guard(func.Hole, Type.AnyObject,
             func.Gte(
               func.ProjectKeyS(func.Hole, "pop"),

@@ -19,14 +19,11 @@ package quasar.physical.rdbms.planner
 import slamdata.Predef._
 import slamdata.Predef.{Eq => _}
 import quasar.Data
-import quasar.DataCodec
-import DataCodec.Precise.{DateKey, IntervalKey, TimeKey, TimestampKey}
 import quasar.Planner._
 import quasar.physical.rdbms.planner.sql.{Search, StrLower, StrUpper, Substring, SplitStr, SqlExpr => SQL}
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.qscript.{MapFuncsCore => MFC, _}
-import quasar.std.StdLib.string.{dateRegex, timeRegex, timestampRegex}
 import matryoshka._
 import matryoshka.implicits._
 import quasar.physical.rdbms.model.{BoolCol, DecCol, IntCol, StringCol}
@@ -70,20 +67,22 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.Undefined() =>  undefined.η[F]
     case MFC.JoinSideName(n) =>  notImplemented("JoinSideName", this)
     case MFC.Length(f) => notImplemented("Length", this)
-    case MFC.Date(f) => datetime(f, DateKey, dateRegex.r).η[F]
-    case MFC.Time(f) =>  datetime(f, TimeKey, timeRegex.r).η[F]
-    case MFC.Timestamp(f) => datetime(f, TimestampKey, timestampRegex.r).η[F]
+    case MFC.LocalDateTime(f) => notImplemented("LocalDateTime", this)
+    case MFC.LocalDate(f) => notImplemented("LocalDate", this)
+    case MFC.LocalTime(f) => notImplemented("LocalTime", this)
+    case MFC.OffsetDateTime(f) => notImplemented("OffsetDateTime", this)
+    case MFC.OffsetDate(f) => notImplemented("OffsetDate", this)
+    case MFC.OffsetTime(f) => notImplemented("OffsetTime", this)
     case MFC.Interval(f) =>
-      Case.build(
-        WhenThen(IsNotNull(toKeyValue(f, IntervalKey)).embed, f)
-      )(
-        Else(SQL.Null[T[SQL]].embed)
-      ).embed.η[F]
+        notImplemented("Interval", this)
 
     case MFC.StartOfDay(f) =>  notImplemented("StartOfDay", this)
     case MFC.TemporalTrunc(p, f) =>  notImplemented("TemporalTrunc", this)
     case MFC.TimeOfDay(f) =>  notImplemented("TimeOfDay", this)
     case MFC.ToTimestamp(f) =>  notImplemented("ToTimestamp", this)
+    case MFC.SetTimezone(f1, f2) =>  notImplemented("SetTimezone", this)
+    case MFC.SetTimezoneMinute(f1, f2) =>  notImplemented("SetTimezoneMinute", this)
+    case MFC.SetTimezoneHour(f1, f2) =>  notImplemented("SetTimezoneHour", this)
     case MFC.ExtractCentury(f) =>  notImplemented("ExtractCentury", this)
     case MFC.ExtractDayOfMonth(f) =>  notImplemented("ExtractDayOfMonth", this)
     case MFC.ExtractDecade(f) =>  notImplemented("ExtractDecade", this)
@@ -93,9 +92,9 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.ExtractHour(f) =>  notImplemented("ExtractHour", this)
     case MFC.ExtractIsoDayOfWeek(f) =>  notImplemented("ExtractIsoDayOfWeek", this)
     case MFC.ExtractIsoYear(f) =>  notImplemented("ExtractIsoYear", this)
-    case MFC.ExtractMicroseconds(f) => notImplemented("ExtractMicroseconds", this)
+    case MFC.ExtractMicrosecond(f) => notImplemented("ExtractMicrosecond", this)
     case MFC.ExtractMillennium(f) =>  notImplemented("ExtractMillennium", this)
-    case MFC.ExtractMilliseconds(f) =>  notImplemented("ExtractMilliseconds", this)
+    case MFC.ExtractMillisecond(f) =>  notImplemented("ExtractMillisecond", this)
     case MFC.ExtractMinute(f) =>  notImplemented("ExtractMinute", this)
     case MFC.ExtractMonth(f) =>  notImplemented("ExtractMonth", this)
     case MFC.ExtractQuarter(f) =>  notImplemented("ExtractQuarter", this)

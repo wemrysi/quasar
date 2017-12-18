@@ -17,6 +17,7 @@
 package quasar.yggdrasil.table
 
 import quasar.blueeyes._
+import quasar.blueeyes.json._
 import quasar.RCValueGenerators
 import quasar.DateGenerators
 import quasar.precog.BitSet
