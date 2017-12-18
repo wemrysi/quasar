@@ -72,6 +72,21 @@ object PostgresRenderQuery extends RenderQuery {
 
   def bool[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): String = s"(${text(pair)})::boolean"
 
+  object TextExpr {
+    def unapply[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): Option[String] =
+      text(pair).some
+  }
+
+  object NumExpr {
+    def unapply[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): Option[String] =
+      TextExpr.unapply(pair).map(t => s"($t)::numeric")
+  }
+
+  object BoolExpr {
+    def unapply[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): Option[String] =
+      TextExpr.unapply(pair).map(t => s"($t)::boolean")
+  }
+
   def galg[T[_[_]]: BirecursiveT]: GAlgebraM[(T[SqlExpr], ?), PlannerError \/ ?, SqlExpr, String] = {
     case Unreferenced() =>
     InternalError("Unexpected Unreferenced!", none).left
@@ -101,8 +116,8 @@ object PostgresRenderQuery extends RenderQuery {
       buildJson(m.map {
         case ((_, k), (_, v)) => s"'$k', $v"
       }.mkString(",")).right
-    case RegexMatches(expr, (_, pattern)) =>
-      s"(${text(expr)} ~ '$pattern')".right
+    case RegexMatches(TextExpr(e), (_, pattern)) =>
+      s"($e ~ '$pattern')".right
     case IsNotNull((_, expr)) =>
       s"($expr notnull)".right
     case IfNull(exprs) =>
@@ -114,34 +129,34 @@ object PostgresRenderQuery extends RenderQuery {
       }).right
     case ExprPair((_, s1), (_, s2)) =>
       s"$s1, $s2".right
-    case ConcatStr(e1, e2)  =>
-      s"${text(e1)} || ${text(e2)}".right
+    case ConcatStr(TextExpr(e1), TextExpr(e2))  =>
+      s"$e1 || $e2".right
     case Time((_, expr)) =>
       buildJson(s"""{ "$TimeKey": $expr }""").right
-    case NumericOp(sym, left, right) =>
-      s"(${num(left)} $sym ${num(right)})".right
-    case Mod(a1, a2) =>
-      s"mod(${num(a1)}, ${num(a2)})".right
-    case Pow(a1, a2) =>
-      s"power(${num(a1)}, ${num(a2)})".right
-    case And(a1, a2) =>
-      s"(${bool(a1)} and ${bool(a2)})".right
-    case Or(a1, a2) =>
-      s"(${bool(a1)} or ${bool(a2)})".right
-    case Neg(e) =>
-      s"(-${num(e)})".right
-    case Eq(a1, a2) =>
-      s"(${text(a1)} = ${text(a2)})".right
-    case Neq(a1, a2) =>
-      s"(${text(a1)} != ${text(a2)})".right
-    case Lt(a1, a2) =>
-      s"(${num(a1)} < ${num(a2)})".right
-    case Lte(a1, a2) =>
-      s"(${num(a1)} <= ${num(a2)})".right
-    case Gt(a1, a2) =>
-      s"(${num(a1)} > ${num(a2)})".right
-    case Gte(a1, a2) =>
-      s"(${num(a1)} >= ${num(a2)})".right
+    case NumericOp(sym, NumExpr(left), NumExpr(right)) =>
+      s"($left $sym $right)".right
+    case Mod(NumExpr(a1), NumExpr(a2)) =>
+      s"mod($a1, $a2)".right
+    case Pow(NumExpr(a1), NumExpr(a2)) =>
+      s"power($a1, $a2)".right
+    case And(BoolExpr(a1), BoolExpr(a2)) =>
+      s"($a1 and $a2)".right
+    case Or(BoolExpr(a1), BoolExpr(a2)) =>
+      s"($a1 or $a2)".right
+    case Neg(NumExpr(e)) =>
+      s"(-$e)".right
+    case Eq(TextExpr(a1), TextExpr(a2)) =>
+      s"($a1 = $a2)".right
+    case Neq(TextExpr(a1), TextExpr(a2)) =>
+      s"($a1 != $a2)".right
+    case Lt(NumExpr(a1), NumExpr(a2)) =>
+      s"($a1 < $a2)".right
+    case Lte(NumExpr(a1), NumExpr(a2)) =>
+      s"($a1 <= $a2)".right
+    case Gt(NumExpr(a1), NumExpr(a2)) =>
+      s"($a1 > $a2)".right
+    case Gte(NumExpr(a1), NumExpr(a2)) =>
+      s"($a1 >= $a2)".right
     case WithIds((_, str))    => s"(row_number() over(), $str)".right
     case RowIds()        => "row_number() over()".right
     case Offset((_, from), (_, count)) => s"$from OFFSET $count".right
@@ -169,15 +184,15 @@ object PostgresRenderQuery extends RenderQuery {
     case Constant(v) =>
       DataCodec.render(v) \/> NonRepresentableData(v)
     case Case(wt, e) =>
-      val wts = wt ∘ { case WhenThen(w, t) => s"when (${text(w)})::boolean then ${text(t)}" }
+      val wts = wt ∘ { case WhenThen(TextExpr(w), TextExpr(t)) => s"when ($w)::boolean then $t" }
       s"(case ${wts.intercalate(" ")} else ${text(e.v)} end)".right
     case Coercion(t, (_, e)) => s"($e)::${t.mapToStringName}".right
-    case UnaryFunction(fType, e) =>
+    case UnaryFunction(fType, TextExpr(e)) =>
       val fName = fType match {
         case StrLower => "lower"
         case StrUpper => "upper"
       }
-      s"$fName(${text(e)})".right
+      s"$fName($e)".right
     case BinaryFunction(fType, a1, a2) =>
       val fName = fType match {
         case SplitStr => "regexp_split_to_array"
