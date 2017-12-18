@@ -52,36 +52,6 @@ object PostgresRenderQuery extends RenderQuery {
   def buildJson(str: String): String =
     s"json_build_object($str)#>>'{}'"
 
-  sealed trait JsonRefType {
-    def arrow: String
-  }
-
-  case object TextRef extends JsonRefType {
-    override def arrow: String = "->>"
-  }
-
-  case object JsonRef extends JsonRefType {
-    override def arrow: String = "->"
-  }
-
-  def renderRefs[T[_[_]]: BirecursiveT](elems: Vector[String], refType: JsonRefType)
-  : PlannerError \/ String = {
-    elems match {
-      case Vector(key, value) =>
-        val valueStripped = value.stripPrefix("'").stripSuffix("'")
-        s"""$key.$valueStripped""".right
-      case key +: mid :+ last =>
-        val firstValStripped = ~mid.headOption.map(_.stripPrefix("'").stripSuffix("'"))
-        val midTail = mid.drop(1)
-        val midStr = if (midTail.nonEmpty)
-          s"->${midTail.map(e => s"$e").intercalate("->")}"
-        else
-          ""
-        s"""$key.$firstValStripped$midStr${refType.arrow}$last""".right
-      case _ => InternalError.fromMsg(s"Cannot process refs: $elems").left
-    }
-  }
-
   def text[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): String = {
     val (expr, str) = pair
     val toReplace = "->"
@@ -112,8 +82,21 @@ object PostgresRenderQuery extends RenderQuery {
       v.right
     case AllCols() =>
       s"*".right
-    case Refs(elems) =>
-      renderRefs(elems.map(_._2), JsonRef)
+    case Refs(srcs) =>
+      srcs.map(_._2) match {
+        case Vector(key, value) =>
+          val valueStripped = value.stripPrefix("'").stripSuffix("'")
+          s"""$key.$valueStripped""".right
+        case key +: mid :+ last =>
+          val firstValStripped = ~mid.headOption.map(_.stripPrefix("'").stripSuffix("'"))
+          val midTail = mid.drop(1)
+          val midStr = if (midTail.nonEmpty)
+            s"->${midTail.map(e => s"$e").intercalate("->")}"
+          else
+            ""
+          s"""$key.$firstValStripped$midStr->$last""".right
+        case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
+      }
     case Obj(m) =>
       buildJson(m.map {
         case ((_, k), (_, v)) => s"'$k', $v"
