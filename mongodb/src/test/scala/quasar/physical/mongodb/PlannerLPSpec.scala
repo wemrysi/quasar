@@ -44,7 +44,7 @@ class PlannerLPSpec extends
   import fixExprOp._
   import PlannerHelpers._
 
-  //TODO the LP's be translated to QScript
+  //TODO the LP's should be translated to QScript
   //Then these tests can move to PlannerQScriptSpec
   "plan from LogicalPlan" should {
     import StdLib._
@@ -67,7 +67,7 @@ class PlannerLPSpec extends
         $project(
           reshape("bar" -> $field("bar")),
           ExcludeId)))
-    }
+    }.pendingUntilFixed
 
     "plan Sort with expression" in {
       val lp =
@@ -139,7 +139,7 @@ class PlannerLPSpec extends
         $project(
           reshape("bar" -> $field("bar")),
           ExcludeId)))
-    }.pendingWithActual(notOnPar, testFile("plan Sort expression (and extra project)"))
+    }.pendingUntilFixed
 
     "plan with extra squash and flattening" in {
       // NB: this case occurs when a view's LP is embedded in a larger query
@@ -221,6 +221,6 @@ class PlannerLPSpec extends
         $project(
           reshape("city" -> $field("_id", "0")),
           IgnoreId)))
-    }.pendingWithActual(notOnPar, testFile("plan with extra squash and flattening"))
+    }.pendingUntilFixed
   }
 }

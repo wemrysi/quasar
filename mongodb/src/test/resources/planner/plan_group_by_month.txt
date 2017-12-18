@@ -1,5 +1,5 @@
 Chain
-├─ $ReadF(db; caloriesBurnedData)
+├─ $ReadF(db; days)
 ├─ $GroupF
 │  ├─ Grouped
 │  │  ├─ Name("f0" -> {
@@ -7,10 +7,10 @@ Chain
 │  │  │         "$cond": [
 │  │  │           {
 │  │  │             "$and": [
-│  │  │               { "$lt": [{ "$literal": null }, "$score"] },
-│  │  │               { "$lt": ["$score", { "$literal": "" }] }]
+│  │  │               { "$lt": [{ "$literal": null }, "$epoch"] },
+│  │  │               { "$lt": ["$epoch", { "$literal": "" }] }]
 │  │  │           },
-│  │  │           "$score",
+│  │  │           "$epoch",
 │  │  │           { "$literal": undefined }]
 │  │  │       }
 │  │  │     })
@@ -22,11 +22,11 @@ Chain
 │  │                  {
 │  │                    "$lte": [
 │  │                      { "$literal": ISODate("-292275055-05-16T16:47:04.192Z") },
-│  │                      "$date"]
+│  │                      "$ts"]
 │  │                  },
-│  │                  { "$lt": ["$date", { "$literal": new RegExp("", "") }] }]
+│  │                  { "$lt": ["$ts", { "$literal": new RegExp("", "") }] }]
 │  │              },
-│  │              { "$month": "$date" },
+│  │              { "$month": "$ts" },
 │  │              { "$literal": undefined }]
 │  │          }
 │  │        })
@@ -39,14 +39,14 @@ Chain
 │                     {
 │                       "$lte": [
 │                         { "$literal": ISODate("-292275055-05-16T16:47:04.192Z") },
-│                         "$date"]
+│                         "$ts"]
 │                     },
-│                     { "$lt": ["$date", { "$literal": new RegExp("", "") }] }]
+│                     { "$lt": ["$ts", { "$literal": new RegExp("", "") }] }]
 │                 },
-│                 { "$month": "$date" },
+│                 { "$month": "$ts" },
 │                 { "$literal": undefined }]
 │             }])
 ╰─ $ProjectF
-   ├─ Name("a" -> "$f0")
-   ├─ Name("m" -> "$f1")
+   ├─ Name("0" -> "$f0")
+   ├─ Name("1" -> "$f1")
    ╰─ ExcludeId

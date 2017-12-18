@@ -2,24 +2,21 @@ Chain
 ├─ $FoldLeftF
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
+│  │  ├─ $ProjectF
+│  │  │  ├─ Name("city" -> {
+│  │  │  │       "$cond": [
+│  │  │  │         {
+│  │  │  │           "$and": [
+│  │  │  │             { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│  │  │  │             { "$lt": ["$$ROOT", { "$literal": [] }] }]
+│  │  │  │         },
+│  │  │  │         "$city",
+│  │  │  │         { "$literal": undefined }]
+│  │  │  │     })
+│  │  │  ╰─ ExcludeId
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
-│  │  │  │  ╰─ Name("0" -> {
-│  │  │  │          "$push": {
-│  │  │  │            "$let": {
-│  │  │  │              "vars": {
-│  │  │  │                "a": [
-│  │  │  │                  {
-│  │  │  │                    "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("0") }]
-│  │  │  │                  },
-│  │  │  │                  {
-│  │  │  │                    "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
-│  │  │  │                  }]
-│  │  │  │              },
-│  │  │  │              "in": "$$a"
-│  │  │  │            }
-│  │  │  │          }
-│  │  │  │        })
+│  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
 │  │  │  ╰─ By({ "$literal": null })
 │  │  ╰─ $ProjectF
 │  │     ├─ Name("_id" -> "$_id")
@@ -34,8 +31,11 @@ Chain
 │     │  ├─ Grouped
 │     │  │  ╰─ Name("f0" -> { "$sum": { "$literal": NumberInt("1") } })
 │     │  ╰─ By({ "$literal": null })
+│     ├─ $ProjectF
+│     │  ├─ Name("cnt" -> "$f0")
+│     │  ╰─ ExcludeId
 │     ├─ $MapF
-│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value.f0] }] })
+│     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value] }] })
 │     │  ╰─ Scope(Map())
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
@@ -56,24 +56,9 @@ Chain
 ├─ $UnwindF(DocField(BsonField.Name("left")))
 ├─ $SimpleMapF
 │  ├─ Map
-│  │  ╰─ Let(__val)
-│  │     ├─ JsCore([_.left, _.right])
-│  │     ╰─ Arr
-│  │        ├─ Obj
-│  │        │  ├─ Key(city: (isObject(__val[0][1]) && (! Array.isArray(__val[0][1]))) ? __val[0][1].city : undefined)
-│  │        │  ╰─ Key(cnt: __val[1])
-│  │        ╰─ Ident(__val)
+│  │  ╰─ SpliceObjects
+│  │     ├─ JsCore(_.left)
+│  │     ╰─ JsCore(_.right)
 │  ╰─ Scope(Map())
-├─ $ProjectF
-│  ├─ Name("0" -> {
-│  │       "$arrayElemAt": [
-│  │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-│  │         { "$literal": NumberInt("1") }]
-│  │     })
-│  ├─ Name("src" -> "$$ROOT")
-│  ╰─ ExcludeId
-├─ $SortF
-│  ╰─ SortKey(0 -> Descending)
-╰─ $ProjectF
-   ├─ Name("__quasar_mongodb_sigil" -> { "$arrayElemAt": ["$src", { "$literal": NumberInt("0") }] })
-   ╰─ ExcludeId
+╰─ $SortF
+   ╰─ SortKey(cnt -> Descending)

@@ -22,7 +22,7 @@ import quasar.fp._
 import matryoshka.Delay
 import matryoshka.data.Fix
 import org.specs2.execute.Result
-import quasar.ejson.{EJson, Extension, Fixed}
+import quasar.ejson.{EJson, Extension}
 import quasar.TemporalPart
 import quasar.qscript.RenderQScriptDSL.RenderQScriptDSL
 import quasar.common.{JoinType, SortDir}
@@ -72,8 +72,9 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
       |implicit def SRTD = Injectable.inject[SRTD, QT](QScriptHelpers.SRTD)
       |implicit def SRTF = Injectable.inject[SRTF, QT](QScriptHelpers.SRTF)
       |implicit def DET = Injectable.inject[DET, QT](QScriptHelpers.DET)
-      |val (func, free, fix) = construction.mkDefaults[Fix, QT]
+      |val dsl = construction.mkDefaults[Fix, QT]
       |val json = Fixed[Fix[EJson]]
+      |import dsl._
     """.stripMargin
 
   def testDSL[A: Equal: Show](in: List[A], rend: RenderQScriptDSL[A]): Result = {
@@ -81,8 +82,7 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
     (tb.eval(tb.parse(prefix + combined)).asInstanceOf[List[A]] must equal(in)).toResult
   }
 
-  val (func, free, fix) = construction.mkDefaults[Fix, QScriptTotal]
-  val json: Fixed[Fix[EJson]] = Fixed[Fix[EJson]]
+  import qstdsl._
 
   def freeMaps: List[FreeMap] = {
     val h = func.Hole

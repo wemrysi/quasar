@@ -20,7 +20,13 @@ import quasar.RenderTree
 
 import scalaz._
 
-sealed abstract class JoinSide
+sealed abstract class JoinSide {
+  def fold[A](left: => A, right: => A): A =
+    this match {
+      case LeftSide => left
+      case RightSide => right
+    }
+}
 final case object LeftSide extends JoinSide
 final case object RightSide extends JoinSide
 
@@ -28,4 +34,22 @@ object JoinSide {
   implicit val equal: Equal[JoinSide] = Equal.equalRef
   implicit val show: Show[JoinSide] = Show.showFromToString
   implicit val renderTree: RenderTree[JoinSide] = RenderTree.fromShowAsType("JoinSide")
+}
+
+sealed abstract class JoinSide3 {
+  def fold[A](left: => A, center: => A, right: => A): A =
+    this match {
+      case LeftSide3 => left
+      case Center => center
+      case RightSide3 => right
+    }
+}
+final case object LeftSide3 extends JoinSide3
+final case object Center extends JoinSide3
+final case object RightSide3 extends JoinSide3
+
+object JoinSide3 {
+  implicit val equal: Equal[JoinSide3] = Equal.equalRef
+  implicit val show: Show[JoinSide3] = Show.showFromToString
+  implicit val renderTree: RenderTree[JoinSide3] = RenderTree.fromShowAsType("JoinSide3")
 }
