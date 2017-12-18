@@ -16,7 +16,8 @@
 
 package quasar.qscript.qsu
 
-import quasar.{Data, Qspec, RenderTree}, RenderTree.ops._
+import quasar.{Data, Qspec, RenderTree}
+import RenderTree.ops._
 import quasar.Planner.PlannerError
 import quasar.contrib.matryoshka._
 import quasar.ejson.{EJson, Fixed}
@@ -27,13 +28,14 @@ import quasar.qscript.{ExcludeId, HoleF, ReduceFuncs, ReduceIndex, RightSideF}
 import quasar.sql.CompilerHelpers
 import quasar.std.{AggLib, IdentityLib}
 import slamdata.Predef._
-
 import matryoshka._
 import matryoshka.data.Fix
 import org.specs2.matcher.Matcher
 import org.specs2.matcher.MatchersImplicits._
-import pathy.Path, Path.{file, Sandboxed}
-import scalaz.{-\/, \/-, EitherT, Equal, Free, Need, StateT}
+import pathy.Path
+import Path.{Sandboxed, file}
+
+import scalaz.{-\/, EitherT, Equal, Free, Need, StateT, \/-}
 import scalaz.syntax.show._
 
 object LPtoQSSpec extends Qspec with CompilerHelpers with QSUTTypes[Fix] {

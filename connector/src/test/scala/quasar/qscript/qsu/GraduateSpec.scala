@@ -17,37 +17,35 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef._
-
 import quasar.Qspec
 import quasar.Planner.{InternalError, PlannerError}
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
-import quasar.qscript.construction
 import quasar.qscript.{
-  Hole,
-  HoleF,
-  IncludeId,
-  JoinSide,
-  LeftSideF,
-  MapFuncsCore,
-  MFC,
-  ReduceFunc,
-  ReduceFuncs,
-  ReduceIndex,
-  ReduceIndexF,
-  RightSideF,
-  SrcHole,
+  construction,
+  Hole, 
+  HoleF, 
+  IncludeId, 
+  JoinSide, 
+  ReduceFunc, 
+  ReduceFuncs, 
+  ReduceIndex, 
+  ReduceIndexF, 
+  SrcHole, 
   Take
 }
 import quasar.qscript.MapFuncsCore.IntLit
-
+import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 import matryoshka.EqualT
-import matryoshka.data.Fix, Fix._
-import org.specs2.matcher.{Expectable, Matcher, MatchResult}
-import pathy.Path, Path.{file, Sandboxed}
-import scalaz.{\/, \/-, EitherT, Free, Need, NonEmptyList => NEL, StateT}
+import matryoshka.data.Fix
+import Fix._
+import org.specs2.matcher.{Expectable, MatchResult, Matcher}
+import pathy.Path
+import Path.{Sandboxed, file}
+
+import scalaz.{EitherT, Free, Need, StateT, \/, \/-, NonEmptyList => NEL}
 import scalaz.Scalaz._
 
 object GraduateSpec extends Qspec with QSUTTypes[Fix] {
@@ -101,7 +99,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
       "convert QSReduce" in {
         val buckets: List[FreeMap] = List(func.Add(HoleF, IntLit(17)))
-        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value(_)))
+        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value[Fix[EJson], Hole](_)))
         val reducers: List[ReduceFunc[FreeMap]] = List(ReduceFuncs.Count(HoleF))
         val repair: FreeMapA[ReduceIndex] = ReduceIndexF(\/-(0))
 
@@ -113,9 +111,18 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
       "convert LeftShift" in {
         val struct: FreeMap = func.Add(HoleF, IntLit(17))
-        val repair: JoinFunc = func.ConcatArrays(func.MakeArray(LeftSideF), func.MakeArray(RightSideF))
+        val arepair: FreeMapA[QScriptUniform.ShiftTarget[Fix]] = func.ConcatArrays(
+          func.MakeArray(func.AccessLeftTarget(Access.valueHole(_))),
+          func.ConcatArrays(
+            func.LeftTarget,
+            func.MakeArray(func.RightTarget)))
+        val repair: JoinFunc = func.ConcatArrays(
+          func.MakeArray(func.LeftSide),
+          func.ConcatArrays(
+            func.LeftSide,
+            func.MakeArray(func.RightSide)))
 
-        val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile), struct, IncludeId, repair, Rotation.ShiftArray)
+        val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile), struct, IncludeId, arepair, Rotation.ShiftArray)
         val qscript: Fix[QSE] = qse.LeftShift(qse.Read[AFile](afile), struct, IncludeId, repair)
 
         qgraph must graduateAs(qscript)
@@ -123,7 +130,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
       "convert QSSort" in {
         val buckets: List[FreeMap] = List(func.Add(HoleF, IntLit(17)))
-        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value(_)))
+        val abuckets: List[FreeAccess[Hole]] = buckets.map(_.map(Access.value[Fix[EJson], Hole](_)))
         val order: NEL[(FreeMap, SortDir)] = NEL(HoleF -> SortDir.Descending)
 
         val qgraph: Fix[QSU] = qsu.qsSort(qsu.read(afile), abuckets, order)
@@ -162,10 +169,16 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
     }
 
     "graduate naive `select * from zips`" in {
+      val aconcatArr =
+        func.ConcatArrays(
+          func.MakeArray(func.AccessLeftTarget(Access.valueHole(_))),
+          func.MakeArray(func.RightTarget))
       val concatArr =
-        func.ConcatArrays(func.MakeArray(LeftSideF), func.MakeArray(RightSideF))
+        func.ConcatArrays(
+          func.MakeArray(func.LeftSide),
+          func.MakeArray(func.RightSide))
 
-      val projectIdx = func.ProjectIndex(LeftSideF, RightSideF)
+      val projectIdx = func.ProjectIndex(func.LeftSide, func.RightSide)
 
       val qgraph =
         qsu.subset(
@@ -174,12 +187,10 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
               qsu.read(root </> file("zips")),
               HoleF[Fix],
               IncludeId,
-              concatArr,
-              Rotation.ShiftArray),
+              aconcatArr,
+              Rotation.FlattenArray),
             qsu.cint(1),
-            Free.roll[MapFunc, Access[JoinSide]](
-              MFC(MapFuncsCore.Constant[Fix, FreeAccess[JoinSide]](
-                Fixed[Fix[EJson]].bool(true)))),
+            func.Constant[JoinSide](Fixed[Fix[EJson]].bool(true)),
             JoinType.Inner,
             projectIdx),
           Take,
@@ -217,8 +228,8 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
   def graduateAs(expected: Fix[QSE]): Matcher[Fix[QSU]] = {
     new Matcher[Fix[QSU]] {
       def apply[S <: Fix[QSU]](s: Expectable[S]): MatchResult[S] = {
-        val actual: PlannerError \/ Fix[QSE] =
-          evaluate(researched(QSUGraph.fromTree[Fix](s.value)) >>= grad)
+        val authd = AuthenticatedQSU[Fix](QSUGraph.fromTree[Fix](s.value), QAuth.empty)
+        val actual: PlannerError \/ Fix[QSE] = evaluate(researched(authd) >>= grad)
 
         actual.bimap[MatchResult[S], MatchResult[S]](
         { err =>
@@ -238,8 +249,8 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
   def notGraduate: Matcher[Fix[QSU]] = {
     new Matcher[Fix[QSU]] {
       def apply[S <: Fix[QSU]](s: Expectable[S]): MatchResult[S] = {
-        val actual: PlannerError \/ Fix[QSE] =
-          evaluate(researched(QSUGraph.fromTree[Fix](s.value)) >>= grad)
+        val authd = AuthenticatedQSU[Fix](QSUGraph.fromTree[Fix](s.value), QAuth.empty)
+        val actual: PlannerError \/ Fix[QSE] = evaluate(researched(authd) >>= grad)
 
         // TODO better equality checking for PlannerError
         actual.bimap[MatchResult[S], MatchResult[S]](

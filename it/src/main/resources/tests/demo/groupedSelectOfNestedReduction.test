@@ -1,0 +1,23 @@
+{
+    "name": "select unreduced grouped values from nested select with reduction",
+    "backends": {
+        "couchbase":         "skip",
+        "marklogic_json":    "pending"
+    },
+    "NB": "disabled on couchbase due to lack of general join",
+    "data": "patients.data",
+    "query": "select city, cnt as c from (select city, count(*) as cnt from patients where state = \"NY\" group by city order by count(*) desc, city limit 10) group by city order by c desc, city",
+    "predicate": "exactly",
+    "expected": [
+      { "city": "NEW YORK",     "c": 9 }
+    , { "city": "ROCHESTER",    "c": 8 }
+    , { "city": "ALBANY",       "c": 6 }
+    , { "city": "BRONX",        "c": 2 }
+    , { "city": "BROOKLYN",     "c": 2 }
+    , { "city": "BROWNVILLE",   "c": 2 }
+    , { "city": "BUFFALO",      "c": 2 }
+    , { "city": "GARDEN CITY",  "c": 2 }
+    , { "city": "MOUNT VERNON", "c": 2 }
+    , { "city": "OLD BETHPAGE", "c": 2 }
+    ]
+}

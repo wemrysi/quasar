@@ -263,6 +263,7 @@ object FuncHandler {
               mfc.some collect {
                 case Power(a1, a2) => $pow(a1, a2)
                 case ProjectIndex(a1, a2) => $arrayElemAt(a1, a2)
+                case MakeArray(a1) => $arrayLit(List(a1))
                 case ConcatArrays(a1, a2) =>
                   $let(ListMap(DocVar.Name("a1") -> a1, DocVar.Name("a2") -> a2),
                     $cond($and($isArray($field("$a1")), $isArray($field("$a2"))),

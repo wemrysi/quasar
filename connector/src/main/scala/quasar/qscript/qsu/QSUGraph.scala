@@ -216,7 +216,7 @@ final case class QSUGraph[T[_[_]]](
   }
 
   def rewrite(pf: PartialFunction[QSUGraph[T], QSUGraph[T]]): QSUGraph[T] =
-    rewriteM(pf.andThen(_.point[Id]))
+    rewriteM[Id](pf)
 
   // projects the root of the graph (which we assume exists)
   def unfold: QScriptUniform[T, QSUGraph[T]] =
@@ -367,6 +367,13 @@ object QSUGraph extends QSUGraphInstances {
       }
     }
 
+    object QSAutoJoin {
+      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
+        case g: QSU.QSAutoJoin[T, QSUGraph[T]] => QSU.QSAutoJoin.unapply(g)
+        case _ => None
+      }
+    }
+
     object GroupBy {
       def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
         case g: QSU.GroupBy[T, QSUGraph[T]] => QSU.GroupBy.unapply(g)
@@ -426,6 +433,13 @@ object QSUGraph extends QSUGraphInstances {
     object LeftShift {
       def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
         case g: QSU.LeftShift[T, QSUGraph[T]] => QSU.LeftShift.unapply(g)
+        case _ => None
+      }
+    }
+
+    object MultiLeftShift {
+      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
+        case g: QSU.MultiLeftShift[T, QSUGraph[T]] => QSU.MultiLeftShift.unapply(g)
         case _ => None
       }
     }
@@ -604,7 +618,7 @@ sealed abstract class QSUGraphInstances extends QSUGraphInstances0 {
       val assocs = g.foldMapUp(sg => DList((sg.root, sg.vertices(sg.root))))
 
       s"QSUGraph(${g.root.shows})[\n" +
-      assocs.toList.map({ case (k, v) => s"  ${k.shows} -> ${v.shows}" }).intercalate("\n") +
+      printMultiline(assocs.toList) +
       "\n]"
     }
 }

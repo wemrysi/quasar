@@ -575,20 +575,20 @@ class PlannerSql2ExactSpec extends
             $read(collection("db", "zips")),
             $project(
               reshape(
-                "__tmp2" ->
+                "0" ->
                   $cond(
                     $and(
                       $lte($literal(Bson.Arr(List())), $field("loc")),
                       $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                     $field("loc"),
-                    $literal(Bson.Arr(List(Bson.Undefined))))),
-              IgnoreId),
-            $unwind(DocField(BsonField.Name("__tmp2"))),
+                    $arrayLit(List($literal(Bson.Undefined))))),
+              ExcludeId),
+            $unwind(DocField(BsonField.Name("0"))),
             $project(
-              reshape(sigil.Quasar -> $field("__tmp2")),
+              reshape(sigil.Quasar -> $field("0")),
               ExcludeId))
         }
-    }.pendingWithActual(notOnPar, testFile("plan array flatten"))
+    }
 
     "plan array concat" in {
       plan(sqlE"select loc || [ 0, 1, 2 ] from zips") must beWorkflow0 {
@@ -1548,17 +1548,21 @@ class PlannerSql2ExactSpec extends
       plan3_2(sqlE"select length(city) from zips order by city") must
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
-          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), Let(Name("__val"),
-            Arr(List(
+          $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), Arr(List(
               obj("0" -> If(
                 Call(ident("isString"), List(Select(ident("x"), "city"))),
                 Call(ident("NumberLong"),
                   List(Select(Select(ident("x"), "city"), "length"))),
                 ident("undefined"))),
-              ident("x"))),
-            obj("0" -> Select(Access(ident("__val"), jscore.Literal(Js.Num(1, false))), "city"),
-                "src" -> ident("__val")))))),
+              ident("x")))))),
             ListMap()),
+          $project(
+            reshape(
+              "0" -> $let(ListMap(
+                DocVar.Name("el") -> $arrayElemAt($$ROOT, $literal(Bson.Int32(1)))),
+                $field("$el", "city")),
+              "src" -> $$ROOT),
+            ExcludeId),
           $sort(NonEmptyList(BsonField.Name("0") -> SortDir.Ascending)),
           $project(
             reshape(sigil.Quasar -> $arrayElemAt($field("src"), $literal(Bson.Int32(0)))),

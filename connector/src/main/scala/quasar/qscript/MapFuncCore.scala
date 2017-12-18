@@ -398,6 +398,8 @@ object MapFuncCore {
 
       case ConcatMaps(Embed(lhs), Embed(StaticMap(Nil))) => lhs.some
 
+      case ConcatMaps(Embed(lhs), Embed(rhs)) if lhs ≟ rhs => lhs.some
+
       case _ => none
     }
 

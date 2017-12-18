@@ -16,13 +16,18 @@
 
 package quasar.qscript.qsu
 
+import quasar.ejson.EJson
 import quasar.qscript.TTypes
 
 trait QSUTTypes[T[_[_]]] extends TTypes[T] {
+  type QAuth = quasar.qscript.qsu.QAuth[T]
+  type QDims = quasar.qscript.qsu.QDims[T]
+  type QIdAccess = quasar.qscript.qsu.QIdAccess[T]
+  type QAccess[A] = quasar.qscript.qsu.QAccess[T, A]
   type FreeAccess[A] = quasar.qscript.qsu.FreeAccess[T, A]
   type QSUGraph = quasar.qscript.qsu.QSUGraph[T]
   type RevIdx = quasar.qscript.qsu.QSUGraph.RevIdx[T]
-  type References = quasar.qscript.qsu.References[T]
+  type References = quasar.qscript.qsu.References[T, T[EJson]]
   type QScriptUniform[A] = quasar.qscript.qsu.QScriptUniform[T, A]
   type QScriptEducated[A] = quasar.qscript.QScriptEducated[T, A]
 }

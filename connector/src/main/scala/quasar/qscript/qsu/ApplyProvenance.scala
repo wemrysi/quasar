@@ -16,181 +16,257 @@
 
 package quasar.qscript.qsu
 
-import slamdata.Predef.{Map => SMap, _}
+import slamdata.Predef._
 
 import quasar.Planner.{PlannerErrorME, InternalError}
-import quasar.contrib.scalaz.{MonadState_, MonadTell_}
+import quasar.contrib.scalaz.MonadState_
 import quasar.ejson
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.qscript.{ExcludeId, HoleF, IdOnly, IdStatus, RightSideF}
-import quasar.qscript.provenance._
+import quasar.fp.ski.ι
+import quasar.qscript.{construction, ExcludeId, HoleF, IdOnly, IdStatus}
 
-import matryoshka.{Hole => _, _}
-import matryoshka.data.free._
+import matryoshka._
 import matryoshka.implicits._
 import pathy.Path
-import scalaz.{DList, Free, IList, Monad, Show, StateT, WriterT}
-import scalaz.syntax.foldable1._
-import scalaz.syntax.monad._
-import scalaz.syntax.show._
+import scalaz.{Applicative, Cord, Functor, IList, Monad, Show, StateT, ValidationNel}
+import scalaz.Scalaz._
 
-final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] private () {
+final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extends QSUTTypes[T] {
   import ApplyProvenance._
   import QScriptUniform._
+  import QSUGraph.Extractors
 
-  type P = QProv.P[T]
-  type Dims = Dimensions[P]
-  type QSU[A] = QScriptUniform[T, A]
+  type QSU[A] = QScriptUniform[A]
 
-  type GPF[A] = QSUGraph.QSUPattern[T, A]
-  val GPF = QSUGraph.QSUPattern
+  type QAuthS[F[_]] = MonadState_[F, QAuth]
+  def QAuthS[F[_]](implicit ev: QAuthS[F]): QAuthS[F] = ev
 
-  type GStateM[F[_]] = MonadState_[F, QSUGraph[T]]
-  def GStateM[F[_]](implicit ev: GStateM[F]): GStateM[F] = ev
-
-  type RenameT[F[_]] = MonadTell_[F, DList[(Symbol, Symbol)]]
-  def RenameT[F[_]](implicit ev: RenameT[F]): RenameT[F] = ev
+  private type V[F[_], A] = F[ValidationNel[Symbol, A]]
+  implicit def V[F[_]: Applicative] = Applicative[F].compose[ValidationNel[Symbol, ?]]
 
   val dims = QProv[T]
+  val func = construction.Func[T]
 
-  def apply[F[_]: Monad: PlannerErrorME](graph: QSUGraph[T]): F[AuthenticatedQSU[T]] = {
-    type X[A] = WriterT[StateT[F, QSUGraph[T], ?], DList[(Symbol, Symbol)], A]
+  def apply[F[_]: Monad: PlannerErrorME](graph: QSUGraph): F[AuthenticatedQSU[T]] = {
+    type X[A] = StateT[F, QAuth, A]
 
-    def applyRenames(renames: IList[(Symbol, Symbol)], ds: Dimensions[P]): Dimensions[P] =
-      renames.foldLeft(ds)((ds0, t) => dims.rename(t._1, t._2, ds0))
+    val authGraph = graph.rewriteM[X] {
+      case g @ Extractors.DimEdit(src, _) =>
+        for {
+          _ <- computeProvenance[X](g)
+          _ <- QAuthS[X].modify(_.supplant(src.root, g.root))
+        } yield g.overwriteAtRoot(src.unfold map (_.root))
 
-    graph.elgotZygoM(computeProvenanceƒ[X], applyProvenanceƒ[X])
-      .run
-      .run(graph)
-      .map { case (g, (renames, (_, ds))) =>
-        AuthenticatedQSU(g, ds mapValues (applyRenames(renames.toIList, _)))
-      }
+      case g @ Extractors.Transpose(src, retain, rot) =>
+        computeProvenance[X](g) as g.overwriteAtRoot {
+          LeftShift(src.root, HoleF, retain.fold[IdStatus](IdOnly, ExcludeId), func.RightTarget, rot)
+        }
+
+      case other =>
+        computeProvenance[X](other) as other
+    }
+
+    authGraph.run(QAuth.empty[T]) map {
+      case (qauth, graph) => AuthenticatedQSU(graph, qauth)
+    }
   }
 
-  def applyProvenanceƒ[F[_]: Monad: GStateM: RenameT]: ElgotAlgebraM[((Symbol, Dims), ?), F, GPF, (Symbol, QSUDims[T])] = {
-    case ((_, updDims), GPF(deId, DimEdit((srcId, qdims), _))) =>
-      for {
-        _ <- GStateM[F].modify(_.replace(deId, srcId))
-        _ <- RenameT[F].tell(DList(deId -> srcId))
-      } yield (srcId, qdims + (srcId -> updDims))
+  def computeProvenance[F[_]: Monad: PlannerErrorME: QAuthS](g: QSUGraph): F[QDims] = {
+    def flattened =
+      s"${g.root} @ ${g.unfold.map(_.root).shows}"
 
-    case ((_, tdims), GPF(tid, Transpose((srcId, srcDims), retain, rot))) =>
-      GStateM[F].modify(
-        QSUGraph.vertices.modify(_.updated(
-          tid,
-          LeftShift(srcId, HoleF, retain.fold[IdStatus](IdOnly, ExcludeId), RightSideF, rot))))
-        .as((tid, srcDims + (tid -> tdims)))
+    def unexpectedError: F[QDims] =
+      PlannerErrorME[F].raiseError(
+        InternalError(s"Encountered unexpected $flattened.", None))
 
-    case ((_, nodeDims), GPF(nodeId, node)) =>
-      (nodeId, node.foldRight[QSUDims[T]](SMap(nodeId -> nodeDims))(_._2 ++ _)).point[F]
-  }
+    g.unfold match {
+      case AutoJoin2(left, right, _) =>
+        compute2[F](g, left, right)(dims.join(_, _))
 
-  def computeProvenanceƒ[F[_]: Monad: PlannerErrorME]: AlgebraM[F, GPF, (Symbol, Dims)] = {
-    case GPF(root, qsu) =>
-      val computedDims: F[Dims] = qsu match {
-        case AutoJoin2((_, left), (_, right), _) => dims.join(left, right).point[F]
+      case AutoJoin3(left, center, right, _) =>
+        compute3[F](g, left, center, right) { (l, c, r) =>
+          dims.join(dims.join(l, c), r)
+        }
 
-        case AutoJoin3((_, left), (_, center), (_, right), _) => dims.join(dims.join(left, center), right).point[F]
+      case QSAutoJoin(left, right, _, _) =>
+        compute2[F](g, left, right)(dims.join(_, _))
 
-        case DimEdit((_, src), DTrans.Squash()) => dims.squash(src).point[F]
+      case DimEdit(src, DTrans.Squash()) =>
+        compute1[F](g, src)(dims.squash)
 
-        case DimEdit((name, src), DTrans.Group(k)) =>
-          dims.swap(0, 1, dims.lshift(k as Access.value(name), src)).point[F]
+      case DimEdit(src, DTrans.Group(k)) =>
+        handleMissingDims(dimsFor[F](src)) flatMap { sdims =>
+          val updated = dims.modifyIdentities(sdims)(IdAccess.groupKey modify {
+            case (s, i) if s === src.root => (g.root, i)
+            case other => other
+          })
 
-        case Distinct((_, src)) => src.point[F]
+          val nextIdx = dims.nextGroupKeyIndex(g.root, updated)
+          val idAccess = IdAccess.groupKey[dims.D](g.root, nextIdx)
+          val nextDims = dims.swap(0, 1, dims.lshift(idAccess, updated))
 
-        case GroupBy(_, _) => unexpectedError("GroupBy", root)
+          QAuthS[F].modify(
+            _.addDims(g.root, nextDims)
+              .duplicateGroupKeys(src.root, g.root)
+              .addGroupKey(g.root, nextIdx, k))
+            .as(nextDims)
+        }
 
-        case JoinSideRef(_) => unexpectedError("JoinSideRef", root)
+      case Distinct(src) =>
+        compute1[F](g, src)(ι)
 
-        case LeftShift((_, src), _, _, _, rot) =>
-          val tid: dims.I = Free.pure(Access.identity(root, root))
-          (rot match {
-            case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, src)
-            case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, src)
-          }).point[F]
+      case GroupBy(_, _) => unexpectedError
 
-        case LPFilter(_, _) => unexpectedError("LPFilter", root)
+      case JoinSideRef(_) => unexpectedError
 
-        case LPJoin(_, _, _, _, _, _) => unexpectedError("LPJoin", root)
+      case LeftShift(src, _, _, _, rot) =>
+        val tid = IdAccess.identity[dims.D](g.root)
+        compute1[F](g, src) { sdims =>
+          rot match {
+            case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, sdims)
+            case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, sdims)
+          }
+        }
 
-        case LPReduce((_, src), _) => dims.bucketAccess(root, dims.reduce(src)).point[F]
+        case MultiLeftShift(src, shifts, _) =>
+          val tid = IdAccess.identity[dims.D](g.root)
+          compute1[F](g, src) { sdims =>
+            shifts.foldRight(sdims) {
+              case (shift, prv) => shift._3 match {
+                case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, prv)
+                case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, prv)
+              }
+            }
+          }
 
-        case LPSort(_, _) => unexpectedError("LPSort", root)
+      case LPFilter(_, _) => unexpectedError
 
-        case QSFilter((_, src), _) => src.point[F]
+      case LPJoin(_, _, _, _, _, _) => unexpectedError
 
-        case QSReduce((_, src), _, _, _) => dims.bucketAccess(root, dims.reduce(src)).point[F]
+      case LPReduce(src, _) =>
+        compute1[F](g, src) { sdims =>
+          dims.bucketAccess(g.root, dims.reduce(sdims))
+        }
 
-        case QSSort((_, src), _, _) => src.point[F]
+      case LPSort(_, _) => unexpectedError
 
-        case Unary(_, _) => unexpectedError("Unary", root)
+      case QSFilter(src, _) =>
+        compute1[F](g, src)(ι)
 
-        case Map((_, src), _) => src.point[F]
+      case QSReduce(src, _, _, _) =>
+        compute1[F](g, src) { sdims =>
+          dims.bucketAccess(g.root, dims.reduce(sdims))
+        }
 
-        case Read(file) => dims.squash(segments(file).map(projStr).reverse).point[F]
+      case QSSort(src, _, _) =>
+        compute1[F](g, src)(ι)
 
-        case Subset((_, from), _, (_, count)) => dims.join(from, count).point[F]
+      case Unary(_, _) => unexpectedError
 
-        case ThetaJoin((_, left), (_, right), _, _, _) => dims.join(left, right).point[F]
+      case Map(src, _) =>
+        compute1[F](g, src)(ι)
 
-        case Transpose((_, src), _, rot) =>
-          val tid: dims.I = Free.pure(Access.identity(root, root))
-          (rot match {
-            case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, src)
-            case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, src)
-          }).point[F]
+      case Read(file) =>
+        val rdims = dims.squash(segments(file).map(projStr).reverse)
+        QAuthS[F].modify(_.addDims(g.root, rdims)) as rdims
 
-        case Union((_, left), (_, right)) => dims.union(left, right).point[F]
+      case Subset(from, _, count) =>
+        compute2[F](g, from, count)(dims.join(_, _))
 
-        case Unreferenced() => dims.empty.point[F]
-      }
+      case ThetaJoin(left, right, _, _, _) =>
+        compute2[F](g, left, right)(dims.join(_, _))
 
-      computedDims strengthL root
+      case Transpose(src, _, rot) =>
+        val tid = IdAccess.identity[dims.D](g.root)
+        compute1[F](g, src) { sdims =>
+          rot match {
+            case Rotation.ShiftMap   | Rotation.ShiftArray   => dims.lshift(tid, sdims)
+            case Rotation.FlattenMap | Rotation.FlattenArray => dims.flatten(tid, sdims)
+          }
+        }
+
+      case Union(left, right) =>
+        compute2[F](g, left, right)(dims.union(_, _))
+
+      case Unreferenced() =>
+        QAuthS[F].modify(_.addDims(g.root, dims.empty)) as dims.empty
+    }
   }
 
   ////
 
-  private def projStr(s: String): P =
+  private def compute1[F[_]: Monad: PlannerErrorME: QAuthS]
+      (g: QSUGraph, src: QSUGraph)
+      (f: QDims => QDims)
+      : F[QDims] =
+    handleMissingDims(dimsFor[F](src)) flatMap { sdims =>
+      val gdims = f(sdims)
+      QAuthS.modify(_.addDims(g.root, gdims)) as gdims
+    }
+
+  private def compute2[F[_]: Monad: PlannerErrorME: QAuthS]
+      (g: QSUGraph, l: QSUGraph, r: QSUGraph)
+      (f: (QDims, QDims) => QDims)
+      : F[QDims] =
+    handleMissingDims((dimsFor[F](l) |@| dimsFor(r))(f)) flatMap { ds =>
+      QAuthS.modify(_.addDims(g.root, ds)) as ds
+    }
+
+  private def compute3[F[_]: Monad: PlannerErrorME: QAuthS]
+      (g: QSUGraph, l: QSUGraph, c: QSUGraph, r: QSUGraph)
+      (f: (QDims, QDims, QDims) => QDims)
+      : F[QDims] =
+    handleMissingDims((dimsFor[F](l) |@| dimsFor[F](c) |@| dimsFor[F](r))(f)) flatMap { ds =>
+      QAuthS.modify(_.addDims(g.root, ds)) as ds
+    }
+
+  private def dimsFor[F[_]: Functor: QAuthS](g: QSUGraph): V[F, QDims] =
+    QAuthS[F].gets(_ lookupDims g.root toSuccessNel g.root)
+
+  private def handleMissingDims[F[_]: Monad: PlannerErrorME, A](v: V[F, A]): F[A] =
+    (v: F[ValidationNel[Symbol, A]]).flatMap { v0 =>
+      v0.map(_.point[F]) valueOr { syms =>
+        PlannerErrorME[F].raiseError[A](
+          InternalError(s"Dependent dimensions not found: ${syms.show}.", None))
+      }
+    }
+
+  private def projStr(s: String): QProv.P[T] =
     dims.prov.proj(ejson.CommonEJson(ejson.Str[T[EJson]](s)).embed)
 
   private def segments(p: Path[_, _, _]): IList[String] = {
     val segs = Path.flatten[IList[String]](IList(), IList(), IList(), IList(_), IList(_), p)
     (segs.head :: segs.tail).join
   }
-
-  private def unexpectedError[F[_]: PlannerErrorME, A](nodeName: String, id: Symbol): F[A] =
-    PlannerErrorME[F].raiseError(InternalError(s"Encountered unexpected $nodeName[$id].", None))
 }
 
 object ApplyProvenance {
   def apply[
-      T[_[_]]: BirecursiveT: EqualT,
+      T[_[_]]: BirecursiveT: EqualT: ShowT,
       F[_]: Monad: PlannerErrorME]
       (graph: QSUGraph[T])
       : F[AuthenticatedQSU[T]] =
     taggedInternalError("ApplyProvenance", new ApplyProvenance[T].apply[F](graph))
 
-  def computeProvenanceƒ[
-      T[_[_]]: BirecursiveT: EqualT,
-      F[_]: Monad: PlannerErrorME]
-      : AlgebraM[F, QSUGraph.QSUPattern[T, ?], (Symbol, Dimensions[QProv.P[T]])] =
-    new ApplyProvenance[T].computeProvenanceƒ[F]
+  def computeProvenance[
+      T[_[_]]: BirecursiveT: EqualT: ShowT,
+      F[_]: Monad: PlannerErrorME: MonadState_[?[_], QAuth[T]]]
+      (graph: QSUGraph[T])
+      : F[QDims[T]] =
+    new ApplyProvenance[T].computeProvenance[F](graph)
 
-  final case class AuthenticatedQSU[T[_[_]]](
-      graph: QSUGraph[T],
-      dims: QSUDims[T])
+  final case class AuthenticatedQSU[T[_[_]]](graph: QSUGraph[T], auth: QAuth[T])
 
   object AuthenticatedQSU {
     implicit def show[T[_[_]]: ShowT]: Show[AuthenticatedQSU[T]] =
-      Show.shows { case AuthenticatedQSU(g, d) =>
-        s"AuthenticatedQSU {\n" +
-        g.shows +
-        "\n\n" +
-        QSUDims.show[T].shows(d) +
-        "\n}"
+      Show.show { case AuthenticatedQSU(g, d) =>
+        Cord("AuthenticatedQSU {\n") ++
+        g.show ++
+        Cord("\n\n") ++
+        d.show ++
+        Cord("\n}")
       }
   }
 }
