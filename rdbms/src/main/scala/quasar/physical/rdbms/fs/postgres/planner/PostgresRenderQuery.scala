@@ -172,20 +172,20 @@ object PostgresRenderQuery extends RenderQuery {
       val wts = wt ∘ { case WhenThen(w, t) => s"when (${text(w)})::boolean then ${text(t)}" }
       s"(case ${wts.intercalate(" ")} else ${text(e.v)} end)".right
     case Coercion(t, (_, e)) => s"($e)::${t.mapToStringName}".right
-    case UnaryFunction(fType, (_, e)) =>
+    case UnaryFunction(fType, e) =>
       val fName = fType match {
         case StrLower => "lower"
         case StrUpper => "upper"
       }
-      s"$fName($e)".right
-    case BinaryFunction(fType, (_, a1), (_, a2)) =>
+      s"$fName(${text(e)})".right
+    case BinaryFunction(fType, a1, a2) =>
       val fName = fType match {
         case SplitStr => "regexp_split_to_array"
       }
-      s"$fName($a1, $a2)".right
-    case TernaryFunction(fType, (_, a1), (_, a2), (_, a3)) => (fType match {
-      case Search => s"(case when $a3 then $a1 ~* $a2 else $a1 ~ $a2 end)"
-      case Substring => s"substring($a1 from ($a2+1) for $a3)"
+      s"$fName(${text(a1)}, ${text(a2)})".right
+    case TernaryFunction(fType, a1, a2, a3) => (fType match {
+      case Search => s"(case when ${bool(a3)} then ${text(a1)} ~* ${text(a2)} else ${text(a1)} ~ ${text(a2)} end)"
+      case Substring => s"substring(${text(a1)} from ((${text(a2)})::integer + 1) for (${text(a3)})::integer)"
     }).right
   }
 }
