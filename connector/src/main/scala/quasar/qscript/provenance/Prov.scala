@@ -110,6 +110,27 @@ trait Prov[D, I, P] {
     }
   }
 
+  // eliminate duplicates within contiguous Both/OneOf and reassociate to the right
+  def normalize(p: P)(implicit eqD: Equal[D], eqI: Equal[I]): P = {
+    def normalize0(alternates: NEL[NEL[P]]): P =
+      alternates
+        .map(_.distinctE1.foldRight1(both(_, _)))
+        .distinctE1
+        .foldRight1(oneOf(_, _))
+
+    val normalizeƒ: Algebra[PF, NEL[NEL[P]]] = {
+      case Both(l, r)  => (l |@| r)(_ append _)
+      case OneOf(l, r) => l append r
+      case Then(l, r)  => NEL(NEL(thenn(normalize0(l), normalize0(r))))
+      case Value(i)    => NEL(NEL(value(i)))
+      case Proj(d)     => NEL(NEL(proj(d)))
+      case Nada()      => NEL(NEL(nada()))
+    }
+
+    normalize0(p.cata(normalizeƒ))
+  }
+
+
   // Instances
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -141,28 +162,11 @@ trait Prov[D, I, P] {
     })
   }
 
-  // eliminate duplicates within contiguous Both/OneOf and reassociate to the right
-  def normalize(p: P)(implicit eqD: Equal[D], eqI: Equal[I]): P = {
-    def normalize0(alternates: NEL[NEL[P]]): P =
-      alternates
-        .map(_.distinctE1.foldRight1(both(_, _)))
-        .distinctE1
-        .foldRight1(oneOf(_, _))
-
-    val normalizeƒ: Algebra[PF, NEL[NEL[P]]] = {
-      case Both(l, r)  => (l |@| r)(_ append _)
-      case OneOf(l, r) => l append r
-      case Then(l, r)  => NEL(NEL(thenn(normalize0(l), normalize0(r))))
-      case Value(i)    => NEL(NEL(value(i)))
-      case Proj(d)     => NEL(NEL(proj(d)))
-      case Nada()      => NEL(NEL(nada()))
-    }
-
-    normalize0(p.cata(normalizeƒ))
-  }
-
   ////
 
+  /** The disjunction of sets arising from distributing `OneOf` over trees
+    * of `Both`.
+    */
   private def flattenBoth(p: P): IList[IList[P]] =
     p.elgotPara(flattenBothƒ)
 
@@ -172,6 +176,7 @@ trait Prov[D, I, P] {
     case (other, _)       => IList(IList(other))
   }
 
+  /** The disjunction described by a tree of `OneOf`. */
   private def flattenOneOf(p: P): IList[P] =
     p.elgotPara(flattenOneOfƒ)
 
@@ -182,6 +187,9 @@ trait Prov[D, I, P] {
     case (other, _)       => IList(other)
   }
 
+  /** The disjunction of sequences arising from distributing `OneOf` over trees
+    * of `Then`.
+    */
   private def flattenThen(p: P): IList[IList[P]] =
     p.elgotPara(flattenThenƒ)
 
