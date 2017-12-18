@@ -143,7 +143,7 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
       unmountAll(mntA, trickyD, trickyF).unsafePerformSync
 
       rez.keySet must_=== Set(mntA)
-    }
+    }.flakyTest   // #3245
 
     "handle '\\\\'" >> prop { parent: ADir =>
       val prefix = parent </> dir("tric\\ky")

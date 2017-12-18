@@ -39,7 +39,7 @@ object ReifyBuckets {
   def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Monad: PlannerErrorME](aqsu: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] = {
 
-    val prov = new QProv[T]
+    val prov = QProv[T]
     val qsu  = QScriptUniform.Optics[T]
     val LF   = Traverse[List].compose[FreeMapA[T, ?]]
     val LFA  = LF.compose[Access]
@@ -57,7 +57,7 @@ object ReifyBuckets {
 
             region getOrElseF {
               PlannerErrorME[F].raiseError(InternalError(
-                s"ReifyBuckets: Expected to find a mappable region in ${source.root} based on one of ${syms}.",
+                s"[ReifyBuckets] Expected to find a mappable region in ${source.root} based on one of ${syms}.",
                 None))
             }
           }

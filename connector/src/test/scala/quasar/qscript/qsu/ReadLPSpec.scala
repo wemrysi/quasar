@@ -59,7 +59,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataGenerators with QS
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
-  val reader = ReadLP[Fix]
+  val reader = ReadLP[Fix, F] _
   val root = Path.rootDir[Sandboxed]
 
   val IC = Inject[MapFuncCore, MapFunc]
@@ -282,7 +282,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataGenerators with QS
     }
 
     "compress redundant first- and second-order nodes" in {
-      val qgraphM = reader[F](lpf.invoke2(SetLib.Filter, read("foo"), read("foo")))
+      val qgraphM = reader(lpf.invoke2(SetLib.Filter, read("foo"), read("foo")))
       val result = evaluate(qgraphM).toOption
 
       result must beSome
@@ -394,7 +394,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataGenerators with QS
   def readQsuAs(pf: PartialFunction[QSUGraph, MatchResult[_]]): Matcher[Fix[LogicalPlan]] = {
     new Matcher[Fix[LogicalPlan]] {
       def apply[S <: Fix[LogicalPlan]](s: Expectable[S]): MatchResult[S] = {
-        val resulted = evaluate(reader[F](s.value)) leftMap { err =>
+        val resulted = evaluate(reader(s.value)) leftMap { err =>
           failure(s"reading produced planner error: ${err.shows}", s)
         }
 

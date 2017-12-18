@@ -16,11 +16,11 @@
 
 package quasar.physical.rdbms.planner
 
-import matryoshka._
+import slamdata.Predef._
 import quasar.Planner.PlannerError
 import quasar.physical.rdbms.planner.sql.SqlExpr
-import slamdata.Predef._
 
+import matryoshka._
 import scalaz.\/
 
 trait RenderQuery {

@@ -76,11 +76,11 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (math.RoundScale, _) if lt3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
 
 //    TODO: Come back to this
-//    case (relations.Eq, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
-//    case (relations.Lt, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
-//    case (relations.Lte, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
-//    case (relations.Gt, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
-//    case (relations.Gte, List(Data.Date(_), Data.Timestamp(_))) => notHandled.left
+    case (relations.And, List(Data.NA, _)) => Pending("TODO handle and/or with outer semantics").left
+    case (relations.And, List(_, Data.NA)) => Pending("TODO handle and/or with outer semantics").left
+    case (relations.Or, List(Data.NA, _)) => Pending("TODO handle and/or with outer semantics").left
+    case (relations.Or, List(_, Data.NA)) => Pending("TODO handle and/or with outer semantics").left
+
     case (relations.IfUndefined, _) => notHandled.left
 
     case (structural.ConcatOp, _) => notHandled.left

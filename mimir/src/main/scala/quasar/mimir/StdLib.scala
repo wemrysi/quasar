@@ -138,6 +138,17 @@ trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
       override def fold[A](op2: Op2 => A, op2F2: Op2F2 => A): A = op2F2(this)
     }
 
+    // TODO remove a ton of the boilerplate in the other F*s that I just omitted here
+    abstract class OpNFN(namespace: Vector[String], name: String) {
+      def spec2[A <: SourceType](left: TransSpec[A], right: TransSpec[A]): TransSpec[A] =
+        spec(trans.OuterArrayConcat(trans.WrapArray(left), trans.WrapArray(right)))
+
+      def spec[A <: SourceType](source: TransSpec[A]): TransSpec[A] =
+        trans.MapN(source, fn)
+
+      def fn: FN
+    }
+
     abstract class Reduction(val namespace: Vector[String], val name: String)(implicit M: Monad[M]) extends ReductionLike with Morph1Apply {
       val opcode: Int       = defaultReductionOpcode.getAndIncrement
       val rowLevel: Boolean = false

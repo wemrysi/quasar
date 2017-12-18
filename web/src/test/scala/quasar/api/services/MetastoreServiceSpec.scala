@@ -88,14 +88,20 @@ class MetastoreServiceSpec extends quasar.Qspec {
     "fail to change metastore with invalid configuration" in {
       val req = Request(method = PUT).withBody(Json("hello" := "there")).unsafePerformSync
       val resp = service()(req).unsafePerformSync
-      resp.as[String].unsafePerformSync must_=== """{ "error": { "status": "Bad Request", "detail": { "message": "unrecognized metastore type: hello; expected 'h2' or 'postgresql'" } } }"""
+      resp.as[Json].unsafePerformSync must_===
+        Json("error" := Json(
+          "status" := "UninitializedMetastore",
+          "detail" := Json("message" := "unrecognized metastore type: hello; expected 'h2' or 'postgresql'" )))
       resp.status must_=== BadRequest
     }
     "fail to change metastore if metastore is not already initialized (or updated) and initialize parameter was not used" in {
       val newConn = MetaStoreFixture.createNewTestMetaStoreConfig.unsafePerformSync
       val req = Request(method = PUT).withBody(newConn.asJson).unsafePerformSync
       val resp = service()(req).unsafePerformSync
-      resp.as[String].unsafePerformSync must_=== """{ "error": { "status": "Bad Request", "detail": { "message": "MetaStore requires initialization, try running the 'initUpdateMetaStore' command." } } }"""
+      resp.as[Json].unsafePerformSync must_===
+        Json("error" := Json(
+          "status" := "UninitializedMetastore",
+          "detail" := Json("message" := "MetaStore requires initialization, try running the 'initUpdateMetaStore' command.")))
       resp.status must_=== BadRequest
     }
   }

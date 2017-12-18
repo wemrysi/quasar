@@ -66,5 +66,10 @@ final class RewriteGroupByArrays[T[_[_]]: BirecursiveT: ShowT] private () extend
 }
 
 object RewriteGroupByArrays {
-  def apply[T[_[_]]: BirecursiveT: ShowT]: RewriteGroupByArrays[T] = new RewriteGroupByArrays[T]
+  def apply[
+      T[_[_]]: BirecursiveT: ShowT,
+      F[_]: Monad: NameGenerator](
+      qgraph: QSUGraph[T])
+      : F[QSUGraph[T]] =
+    new RewriteGroupByArrays[T].apply[F](qgraph)
 }

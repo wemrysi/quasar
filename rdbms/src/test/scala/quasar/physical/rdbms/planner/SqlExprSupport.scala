@@ -98,7 +98,7 @@ trait SqlExprSupport {
       }
     }
 
-  implicit def taskNameGenerator: NameGenerator[Task] =
+  def taskNameGenerator: NameGenerator[Task] =
     new NameGenerator[Task] {
       var counter = 0L
       def freshName = {
@@ -117,6 +117,7 @@ trait SqlExprSupport {
 
   def qsToRepr[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
                                                                    cp: T[QSM[T, ?]]): Fix[SqlExpr] = {
+    implicit val nameGen = taskNameGenerator
     val planner = Planner[T, Task, QSM[T, ?]]
     cp.cataM(planner.plan).map(_.convertTo[Fix[SqlExpr]]).unsafePerformSync
   }

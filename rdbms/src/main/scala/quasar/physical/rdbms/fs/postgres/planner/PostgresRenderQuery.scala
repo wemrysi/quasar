@@ -17,9 +17,12 @@
 package quasar.physical.rdbms.fs.postgres.planner
 
 import slamdata.Predef._
+import quasar.common.SortDir.{Ascending, Descending}
 import quasar.Data
 import quasar.DataCodec
 import quasar.DataCodec.Precise.TimeKey
+import quasar.physical.rdbms.model._
+import quasar.physical.rdbms.fs.postgres._
 import quasar.physical.rdbms.planner.RenderQuery
 import quasar.physical.rdbms.planner.sql.SqlExpr
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
@@ -41,10 +44,11 @@ object PostgresRenderQuery extends RenderQuery {
     val q = a.cataM(alg)
 
     a.project match {
-      case s: Select[T[SqlExpr]] => q ∘ (s => s"$s")
-      case _                     => q ∘ ("" ⊹ _)
+      case s: Select[T[SqlExpr]] => q ∘ (s => s"select row_to_json(row) from $s row")
+      case _ => q ∘ ("" ⊹ _)
     }
   }
+
   def alias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" as ${i.v}"))
 
   def rowAlias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" ${i.v}"))
@@ -58,13 +62,21 @@ object PostgresRenderQuery extends RenderQuery {
       s"""$v""".right
     case Table(v) =>
       v.right
-    case AllCols(alias) =>
-      s"row_to_json($alias)".right
+    case AllCols() =>
+      s"*".right
     case Refs(srcs) =>
       srcs match {
-        case Vector(first, second) => s"$first->>'$second'".right
-        case first +: mid :+ last =>
-          s"""$first->${mid.map(e => s"'$e'").intercalate("->")}->>'$last'""".right
+        case Vector(key, value) =>
+          val valueStripped = value.stripPrefix("'").stripSuffix("'")
+          s"""$key.$valueStripped""".right
+        case key +: mid :+ last =>
+          val firstValStripped = ~mid.headOption.map(_.stripPrefix("'").stripSuffix("'"))
+          val midTail = mid.drop(1)
+          val midStr = if (midTail.nonEmpty)
+            s"->${midTail.map(e => s"'$e'").intercalate("->")}"
+          else
+            ""
+          s"""$key.$firstValStripped$midStr->'$last'""".right
         case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
       }
     case Obj(m) =>
@@ -75,6 +87,8 @@ object PostgresRenderQuery extends RenderQuery {
       s"($str ~ '$pattern')".right
     case IsNotNull(expr) =>
       s"($expr notnull)".right
+    case ToJson(v) =>
+      s"to_json($v)".right
     case IfNull(a) =>
       s"coalesce(${a.intercalate(", ")})".right
     case ExprWithAlias(expr: String, alias: String) =>
@@ -85,9 +99,9 @@ object PostgresRenderQuery extends RenderQuery {
       s"$str1 || $str2".right
     case Time(expr) =>
       buildJson(s"""{ "$TimeKey": $expr }""").right
-    case NumericOp(sym, left, right) => s"(($left)::numeric $sym ($right)::numeric)".right
-    case Mod(a1, a2) => s"mod(($a1)::numeric, ($a2)::numeric)".right
-    case Pow(a1, a2) => s"power(($a1)::numeric, ($a2)::numeric)".right
+    case NumericOp(sym, left, right) => s"(($left)::text::numeric $sym ($right)::text::numeric)".right
+    case Mod(a1, a2) => s"mod(($a1)::text::numeric, ($a2)::text::numeric)".right
+    case Pow(a1, a2) => s"power(($a1)::text::numeric, ($a2)::text::numeric)".right
     case And(a1, a2) =>
       s"($a1 and $a2)".right
     case Or(a1, a2) =>
@@ -95,14 +109,41 @@ object PostgresRenderQuery extends RenderQuery {
     case Neg(str) => s"(-$str)".right
     case WithIds(str)    => s"(row_number() over(), $str)".right
     case RowIds()        => "row_number() over()".right
-    case Select(selection, from, filterOpt) =>
+    case Select(selection, from, filterOpt, order) =>
       val selectionStr = selection.v ⊹ alias(selection.alias)
       val filter = ~(filterOpt ∘ (f => s" where ${f.v}"))
-      val fromExpr = s" from ${from.v}" ⊹ alias(from.alias)
-      s"(select $selectionStr$fromExpr$filter)".right
-    case SelectRow(selection, from) =>
+      val orderStr = order.map { o =>
+        val dirStr = o.sortDir match {
+          case Ascending => "asc"
+          case Descending => "desc"
+        }
+        s"${o.v} $dirStr"
+      }.mkString(", ")
+
+      val orderByStr = if (order.nonEmpty)
+        s" order by $orderStr"
+      else
+        ""
+
+      val fromExpr = s" from ${from.v} ${from.alias.v}"
+      s"(select $selectionStr$fromExpr$filter$orderByStr)".right
+    case SelectRow(selection, from, order) =>
       val fromExpr = s" from ${from.v}"
-      s"(select ${selection.v}${rowAlias(selection.alias)}$fromExpr${rowAlias(selection.alias)})".right
+
+      val orderStr = order.map { o =>
+        val dirStr = o.sortDir match {
+          case Ascending => "asc"
+          case Descending => "desc"
+        }
+        s"${o.v} $dirStr"
+      }.mkString(", ")
+
+      val orderByStr = if (order.nonEmpty)
+        s" order by $orderStr"
+      else
+       ""
+
+      s"(select ${selection.v}$fromExpr$orderByStr)".right
     case Constant(Data.Str(v)) =>
       v.flatMap { case ''' => "''"; case iv => iv.toString }.self.right
     case Constant(v) =>
@@ -110,5 +151,6 @@ object PostgresRenderQuery extends RenderQuery {
     case Case(wt, e) =>
       val wts = wt ∘ { case WhenThen(w, t) => s"when $w then $t" }
       s"(case ${wts.intercalate(" ")} else ${e.v} end)".right
+    case Coercion(t, e) => s"($e)::${t.mapToStringName}".right
   }
 }

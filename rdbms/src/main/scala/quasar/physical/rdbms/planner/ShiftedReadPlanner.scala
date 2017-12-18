@@ -16,6 +16,7 @@
 
 package quasar.physical.rdbms.planner
 
+import slamdata.Predef._
 import quasar.contrib.pathy.AFile
 import quasar.qscript._
 import quasar.physical.rdbms.common.TablePath
@@ -34,22 +35,21 @@ class ShiftedReadPlanner[
     extends Planner[T, F, Const[ShiftedRead[AFile], ?]] {
 
   type R = T[SqlExpr]
-  val rowAlias = "row"
 
   def plan: AlgebraM[F, Const[ShiftedRead[AFile], ?], R] = {
     case Const(semantics) =>
-      for {
-        rowAlias <- genId[T[SqlExpr], F]
-      } yield {
+      (genId[T[SqlExpr], F] |@|
+       genId[T[SqlExpr], F]) {
+        case (fromAlias, rowAlias) =>
         val from: From[R] = From(
           Table[R](TablePath.create(semantics.path).shows).embed,
-          alias = none)
+          alias = fromAlias)
         val fields: T[SqlExpr] = semantics.idStatus match {
           case IdOnly    => RowIds[R]().embed
-          case ExcludeId => AllCols[R](rowAlias.v).embed
-          case IncludeId => WithIds[R](AllCols[R](rowAlias.v).embed).embed
+          case ExcludeId => AllCols[R]().embed
+          case IncludeId => WithIds[R](AllCols[R]().embed).embed
         }
-        SelectRow(Selection[R](fields, alias = rowAlias.some), from).embed
+        SelectRow(Selection[R](fields, alias = rowAlias.some), from, orderBy = Nil).embed
       }
   }
 

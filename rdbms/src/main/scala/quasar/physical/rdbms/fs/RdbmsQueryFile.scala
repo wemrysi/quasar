@@ -53,7 +53,7 @@ trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] {
   import EitherT.eitherTMonad
 
   override def ManagedQueryFileModule: ManagedQueryFileModule = new ManagedQueryFileModule {
-    
+
     override def explain(repr: Fix[SqlExpr]): Backend[String] = ???
 
     override def executePlan(repr: Fix[SqlExpr], out: AFile): Backend[Unit] = {
@@ -110,5 +110,5 @@ trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] {
 
     override def closeCursor(c: DbDataStream): Configured[Unit] =
       lift(dataStreamClose(c.stream)).into[Eff].liftM[ConfiguredT]
-  } 
+  }
 }

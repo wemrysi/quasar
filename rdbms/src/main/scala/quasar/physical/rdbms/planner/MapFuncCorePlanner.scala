@@ -19,16 +19,18 @@ package quasar.physical.rdbms.planner
 import slamdata.Predef._
 import slamdata.Predef.{Eq => _}
 import quasar.Data
-import quasar.DataCodec, DataCodec.Precise.{DateKey, TimeKey, TimestampKey, IntervalKey}
+import quasar.DataCodec
+import DataCodec.Precise.{DateKey, IntervalKey, TimeKey, TimestampKey}
 import quasar.Planner._
 import quasar.physical.rdbms.planner.sql.{SqlExpr => SQL}
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.qscript.{MapFuncsCore => MFC, _}
 import quasar.std.StdLib.string.{dateRegex, timeRegex, timestampRegex}
-
 import matryoshka._
 import matryoshka.implicits._
+import quasar.physical.rdbms.model.{BoolCol, IntCol, DecCol, StringCol}
+
 import scalaz._
 import Scalaz._
 
@@ -123,11 +125,11 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.Within(f1, f2) =>  notImplemented("Within", this)
     case MFC.Lower(f) =>  notImplemented("Lower", this)
     case MFC.Upper(f) =>  notImplemented("Upper", this)
-    case MFC.Bool(f) =>  notImplemented("Bool", this)
-    case MFC.Integer(f) =>  notImplemented("Integer", this)
-    case MFC.Decimal(f) =>  notImplemented("Decimal", this)
-    case MFC.Null(f) =>  notImplemented("Null", this)
-    case MFC.ToString(f) =>  notImplemented("ToString", this)
+    case MFC.Bool(f) =>  SQL.Coercion(BoolCol, f).embed.η[F]
+    case MFC.Integer(f) =>  SQL.Coercion(IntCol, f).embed.η[F]
+    case MFC.Decimal(f) =>  SQL.Coercion(DecCol, f).embed.η[F]
+    case MFC.Null(f) =>  SQL.Null[T[SQL]].embed.η[F]
+    case MFC.ToString(f) =>  SQL.Coercion(StringCol, f).embed.η[F]
     case MFC.Search(fStr, fPattern, fInsen) => notImplemented("Search", this)
     case MFC.Substring(fStr, fFrom, fCount) => notImplemented("Substring", this)
     case MFC.Split(fStr, fDelim) => notImplemented("Split", this)

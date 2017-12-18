@@ -20,7 +20,7 @@ stages:
 # this all goes in the test stage
 env:
   matrix:
-    - CONNECTOR=couchbase
+    # - CONNECTOR=couchbase
     - CONNECTOR=marklogic_json
     - CONNECTOR=marklogic_xml
     - CONNECTOR=mimir
