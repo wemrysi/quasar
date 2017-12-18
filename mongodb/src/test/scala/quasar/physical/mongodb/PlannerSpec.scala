@@ -157,7 +157,7 @@ class PlannerSpec extends
     // This gives wrong results in old mongo: returns multiple rows in case
     // count > 1. It should return 1 row per city.
     // see https://gist.github.com/rintcius/bff5b740a1252cafc976a31fc13dd7cf
-    trackPendingThrow(
+    trackPending(
       "expr3 with grouping",
       plan(sqlE"select case when pop > 1000 then city else lower(city) end, count(*) from zips group by city"),
       IList()) //TODO
@@ -263,10 +263,11 @@ class PlannerSpec extends
       // actual: the occurrences of consecutive $project ops: '1'
       IList(ReadOp, ProjectOp, UnwindOp, SortOp))
 
-    // Q3021
-    trackPendingThrow(
+    trackPending(
       "unify flattened with double-flattened",
       plan(sqlE"""select * from user_comments where (comments[*].id LIKE "%Dr%" OR comments[*].replyTo[*] LIKE "%Dr%")"""),
+      // should not use map-reduce
+      // actual: IList(ReadOp, ProjectOp, SimpleMapOp, MatchOp, ProjectOp)
       IList(ReadOp, ProjectOp, UnwindOp, ProjectOp, UnwindOp, MatchOp, ProjectOp))
 
     "plan complex group by with sorting and limiting" in {
