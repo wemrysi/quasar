@@ -46,7 +46,6 @@ object SqlExpr extends SqlExprInstances {
   final case class IfNull[T](a: OneAnd[NonEmptyList, T]) extends SqlExpr[T]
   final case class ExprWithAlias[T](expr: T, alias: String) extends SqlExpr[T]
   final case class ExprPair[T](a: T, b: T) extends SqlExpr[T]
-  final case class ToJson[T](a: T) extends SqlExpr[T]
 
   final case class Select[T](selection: Selection[T],
                              from: From[T],

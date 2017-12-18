@@ -66,8 +66,6 @@ trait SqlExprRenderTree {
             nonTerminal("Time", a1)
           case Id(v) =>
             Terminal("Id" :: Nil, v.some)
-          case ToJson(v) =>
-            nonTerminal("ToJson", v)
           case Table(v) =>
             Terminal("Table" :: Nil, v.some)
           case RowIds() =>

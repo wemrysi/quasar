@@ -59,7 +59,6 @@ trait SqlExprTraverse {
       case Gte(a1, a2)         => (f(a1) ⊛ f(a2))(Gte(_, _))
       case Or(a1, a2)          => (f(a1) ⊛ f(a2))(Or(_, _))
       case Neg(v)              => f(v) ∘ Neg.apply
-      case ToJson(v)           => f(v) ∘ ToJson.apply
       case WithIds(v)          => f(v) ∘ WithIds.apply
 
       case Select(selection, from, filterOpt, order) =>

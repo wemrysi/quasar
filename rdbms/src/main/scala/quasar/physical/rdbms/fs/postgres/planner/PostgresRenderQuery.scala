@@ -109,8 +109,6 @@ object PostgresRenderQuery extends RenderQuery {
       s"($a1 and $a2)".right
     case Or((_, a1), (_, a2)) =>
       s"($a1 or $a2)".right
-    case ToJson(_) =>
-      s"TODO REMOVE".right
     case Neg((_, str)) =>
       s"(-$str)".right
     case Eq((_, a1), (_, a2)) =>
