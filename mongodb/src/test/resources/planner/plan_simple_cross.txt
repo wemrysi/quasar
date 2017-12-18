@@ -2,22 +2,44 @@ Chain
 ├─ $FoldLeftF
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
-│  │  ├─ $ProjectF
-│  │  │  ├─ Name("0" -> ["$_id", "$$ROOT"])
-│  │  │  ╰─ ExcludeId
-│  │  ├─ $SimpleMapF
-│  │  │  ├─ Map
-│  │  │  │  ╰─ Obj
-│  │  │  │     ├─ Key(0: (((isNumber(_["0"][1].pop) || ((_["0"][1].pop instanceof NumberInt) || (_["0"][1].pop instanceof NumberLong))) || isString(_["0"][1].pop)) || ((_["0"][1].pop instanceof Date) || ((typeof _["0"][1].pop) === "boolean"))) ? true : false)
-│  │  │  │     ├─ Key(1: (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? true : false)
-│  │  │  │     ╰─ Key(src: _["0"])
-│  │  │  ╰─ Scope(Map())
 │  │  ├─ $MatchF
-│  │  │  ╰─ And
+│  │  │  ╰─ Or
 │  │  │     ├─ Doc
-│  │  │     │  ╰─ Expr($0 -> Eq(Bool(true)))
+│  │  │     │  ╰─ Expr($pop -> Type(Int32))
+│  │  │     ├─ Doc
+│  │  │     │  ╰─ Expr($pop -> Type(Int64))
+│  │  │     ├─ Doc
+│  │  │     │  ╰─ Expr($pop -> Type(Dec))
+│  │  │     ├─ Doc
+│  │  │     │  ╰─ Expr($pop -> Type(Text))
+│  │  │     ├─ Doc
+│  │  │     │  ╰─ Expr($pop -> Type(Date))
 │  │  │     ╰─ Doc
-│  │  │        ╰─ Expr($1 -> Eq(Bool(true)))
+│  │  │        ╰─ Expr($pop -> Type(Bool))
+│  │  ├─ $ProjectF
+│  │  │  ├─ Name("0" -> {
+│  │  │  │       "$cond": [
+│  │  │  │         {
+│  │  │  │           "$or": [
+│  │  │  │             {
+│  │  │  │               "$and": [
+│  │  │  │                 { "$lt": [{ "$literal": null }, "$pop"] },
+│  │  │  │                 { "$lt": ["$pop", { "$literal": {  } }] }]
+│  │  │  │             },
+│  │  │  │             {
+│  │  │  │               "$and": [
+│  │  │  │                 { "$lte": [{ "$literal": false }, "$pop"] },
+│  │  │  │                 { "$lt": ["$pop", { "$literal": new RegExp("", "") }] }]
+│  │  │  │             }]
+│  │  │  │         },
+│  │  │  │         { "$literal": true },
+│  │  │  │         { "$literal": false }]
+│  │  │  │     })
+│  │  │  ├─ Name("src" -> "$$ROOT")
+│  │  │  ╰─ ExcludeId
+│  │  ├─ $MatchF
+│  │  │  ╰─ Doc
+│  │  │     ╰─ Expr($0 -> Eq(Bool(true)))
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
 │  │  │  │  ╰─ Name("0" -> { "$push": "$src" })
@@ -31,22 +53,44 @@ Chain
 │  │     ╰─ IncludeId
 │  ╰─ Chain
 │     ├─ $ReadF(db; zips2)
-│     ├─ $ProjectF
-│     │  ├─ Name("0" -> ["$_id", "$$ROOT"])
-│     │  ╰─ ExcludeId
-│     ├─ $SimpleMapF
-│     │  ├─ Map
-│     │  │  ╰─ Obj
-│     │  │     ├─ Key(0: (((isNumber(_["0"][1].pop) || ((_["0"][1].pop instanceof NumberInt) || (_["0"][1].pop instanceof NumberLong))) || isString(_["0"][1].pop)) || ((_["0"][1].pop instanceof Date) || ((typeof _["0"][1].pop) === "boolean"))) ? true : false)
-│     │  │     ├─ Key(1: (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? true : false)
-│     │  │     ╰─ Key(src: _["0"])
-│     │  ╰─ Scope(Map())
 │     ├─ $MatchF
-│     │  ╰─ And
+│     │  ╰─ Or
 │     │     ├─ Doc
-│     │     │  ╰─ Expr($0 -> Eq(Bool(true)))
+│     │     │  ╰─ Expr($pop -> Type(Int32))
+│     │     ├─ Doc
+│     │     │  ╰─ Expr($pop -> Type(Int64))
+│     │     ├─ Doc
+│     │     │  ╰─ Expr($pop -> Type(Dec))
+│     │     ├─ Doc
+│     │     │  ╰─ Expr($pop -> Type(Text))
+│     │     ├─ Doc
+│     │     │  ╰─ Expr($pop -> Type(Date))
 │     │     ╰─ Doc
-│     │        ╰─ Expr($1 -> Eq(Bool(true)))
+│     │        ╰─ Expr($pop -> Type(Bool))
+│     ├─ $ProjectF
+│     │  ├─ Name("0" -> {
+│     │  │       "$cond": [
+│     │  │         {
+│     │  │           "$or": [
+│     │  │             {
+│     │  │               "$and": [
+│     │  │                 { "$lt": [{ "$literal": null }, "$pop"] },
+│     │  │                 { "$lt": ["$pop", { "$literal": {  } }] }]
+│     │  │             },
+│     │  │             {
+│     │  │               "$and": [
+│     │  │                 { "$lte": [{ "$literal": false }, "$pop"] },
+│     │  │                 { "$lt": ["$pop", { "$literal": new RegExp("", "") }] }]
+│     │  │             }]
+│     │  │         },
+│     │  │         { "$literal": true },
+│     │  │         { "$literal": false }]
+│     │  │     })
+│     │  ├─ Name("src" -> "$$ROOT")
+│     │  ╰─ ExcludeId
+│     ├─ $MatchF
+│     │  ╰─ Doc
+│     │     ╰─ Expr($0 -> Eq(Bool(true)))
 │     ├─ $MapF
 │     │  ├─ JavaScript(function (key, value) { return [null, { "left": [], "right": [value.src] }] })
 │     │  ╰─ Scope(Map())
@@ -67,24 +111,15 @@ Chain
 │     ╰─ NotExpr($right -> Size(0))
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
+├─ $ProjectF
+│  ├─ Name("0" -> ["$left", "$right"])
+│  ╰─ ExcludeId
 ├─ $SimpleMapF
 │  ├─ Map
-│  │  ╰─ Let(__val)
-│  │     ├─ JsCore([
-│  │     │         [
-│  │     │           _.left[0],
-│  │     │           [_.left[0]],
-│  │     │           _.left[1],
-│  │     │           ((((isNumber(_.left[1].pop) || ((_.left[1].pop instanceof NumberInt) || (_.left[1].pop instanceof NumberLong))) || isString(_.left[1].pop)) || ((_.left[1].pop instanceof Date) || ((typeof _.left[1].pop) === "boolean"))) ? true : false) && ((isObject(_.left[1]) && (! Array.isArray(_.left[1]))) ? true : false)],
-│  │     │         [
-│  │     │           _.right[0],
-│  │     │           [_.right[0]],
-│  │     │           _.right[1],
-│  │     │           ((((isNumber(_.right[1].pop) || ((_.right[1].pop instanceof NumberInt) || (_.right[1].pop instanceof NumberLong))) || isString(_.right[1].pop)) || ((_.right[1].pop instanceof Date) || ((typeof _.right[1].pop) === "boolean"))) ? true : false) && ((isObject(_.right[1]) && (! Array.isArray(_.right[1]))) ? true : false)]])
-│  │     ╰─ Obj
-│  │        ├─ Key(0: true)
-│  │        ├─ Key(1: __val[0][2].pop < __val[1][2].pop)
-│  │        ╰─ Key(src: __val)
+│  │  ╰─ Obj
+│  │     ├─ Key(0: true)
+│  │     ├─ Key(1: _["0"][0].pop < _["0"][1].pop)
+│  │     ╰─ Key(src: _["0"])
 │  ╰─ Scope(Map())
 ├─ $MatchF
 │  ╰─ And
@@ -95,5 +130,5 @@ Chain
 ╰─ $SimpleMapF
    ├─ Map
    │  ╰─ Obj
-   │     ╰─ Key(__quasar_mongodb_sigil: (isObject(_.src[1][2]) && (! Array.isArray(_.src[1][2]))) ? _.src[1][2].city : undefined)
+   │     ╰─ Key(__quasar_mongodb_sigil: (isObject(_.src[1]) && (! Array.isArray(_.src[1]))) ? _.src[1].city : undefined)
    ╰─ Scope(Map())

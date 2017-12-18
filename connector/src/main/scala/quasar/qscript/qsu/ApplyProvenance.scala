@@ -19,7 +19,7 @@ package quasar.qscript.qsu
 import slamdata.Predef.{Map => SMap, _}
 
 import quasar.Planner.{PlannerErrorME, InternalError}
-import quasar.contrib.scalaz.MonadState_
+import quasar.contrib.scalaz.{MonadState_, MonadTell_}
 import quasar.ejson
 import quasar.ejson.EJson
 import quasar.qscript.{ExcludeId, HoleF, IdOnly, IdStatus, RightSideF}
@@ -28,9 +28,10 @@ import quasar.qscript.provenance._
 import matryoshka._
 import matryoshka.implicits._
 import pathy.Path
-import scalaz.{Free, IList, Monad, StateT}
+import scalaz.{DList, Free, IList, Monad, Show, StateT, WriterT}
 import scalaz.syntax.foldable1._
 import scalaz.syntax.monad._
+import scalaz.syntax.show._
 
 final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
   import ApplyProvenance._
@@ -46,21 +47,31 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT] {
   type GStateM[F[_]] = MonadState_[F, QSUGraph[T]]
   def GStateM[F[_]](implicit ev: GStateM[F]): GStateM[F] = ev
 
+  type RenameT[F[_]] = MonadTell_[F, DList[(Symbol, Symbol)]]
+  def RenameT[F[_]](implicit ev: RenameT[F]): RenameT[F] = ev
+
   val dims = QProv[T]
 
   def apply[F[_]: Monad: PlannerErrorME](graph: QSUGraph[T]): F[AuthenticatedQSU[T]] = {
-    type X[A] = StateT[F, QSUGraph[T], A]
+    type X[A] = WriterT[StateT[F, QSUGraph[T], ?], DList[(Symbol, Symbol)], A]
+
+    def applyRenames(renames: IList[(Symbol, Symbol)], ds: Dimensions[P]): Dimensions[P] =
+      renames.foldLeft(ds)((ds0, t) => dims.rename(t._1, t._2, ds0))
 
     graph.elgotZygoM(computeProvenanceƒ[X], applyProvenanceƒ[X])
+      .run
       .run(graph)
-      .map { case (g, (_, d)) => AuthenticatedQSU(g, d) }
+      .map { case (g, (renames, (_, ds))) =>
+        AuthenticatedQSU(g, ds mapValues (applyRenames(renames.toIList, _)))
+      }
   }
 
-  def applyProvenanceƒ[F[_]: Monad: GStateM]: ElgotAlgebraM[((Symbol, Dims), ?), F, GPF, (Symbol, QSUDims[T])] = {
+  def applyProvenanceƒ[F[_]: Monad: GStateM: RenameT]: ElgotAlgebraM[((Symbol, Dims), ?), F, GPF, (Symbol, QSUDims[T])] = {
     case ((_, updDims), GPF(deId, DimEdit((srcId, qdims), _))) =>
-      val srcDims = dims.rename(deId, srcId, updDims)
-      GStateM[F].modify(_.replace(deId, srcId))
-        .as((srcId, qdims + (srcId -> srcDims)))
+      for {
+        _ <- GStateM[F].modify(_.replace(deId, srcId))
+        _ <- RenameT[F].tell(DList(deId -> srcId))
+      } yield (srcId, qdims + (srcId -> updDims))
 
     case ((_, tdims), GPF(tid, Transpose((srcId, srcDims), retain, _))) =>
       GStateM[F].modify(
@@ -154,4 +165,15 @@ object ApplyProvenance {
   final case class AuthenticatedQSU[T[_[_]]](
       graph: QSUGraph[T],
       dims: QSUDims[T])
+
+  object AuthenticatedQSU {
+    implicit def show[T[_[_]]: ShowT]: Show[AuthenticatedQSU[T]] =
+      Show.shows { case AuthenticatedQSU(g, d) =>
+        s"AuthenticatedQSU {\n" +
+        g.shows +
+        "\n\n" +
+        QSUDims.show[T].shows(d) +
+        "\n}"
+      }
+  }
 }

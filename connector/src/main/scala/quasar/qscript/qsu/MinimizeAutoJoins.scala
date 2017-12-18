@@ -170,9 +170,14 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends 
                 // TODO short circuit this a bit if fm === Free.pure(Hole)
                 // I'm pretty sure the fallthrough case will never be hit
                 case Map(source2, fm) =>
+                  def rewriteBucket(bucket: Access[Hole]): FreeMapA[Access[Hole]] = bucket match {
+                    case v @ Access.Value(_) => fm.map(κ(v))
+                    case other => Free.pure[MapFunc, Access[Hole]](other)
+                  }
+
                   (
                     source2,
-                    buckets,    // buckets are based on access, so we don't need to modify here
+                    buckets.map(_.flatMap(rewriteBucket)),
                     reducers.map(_.map(_.flatMap(κ(fm)))),
                     repair)
 
