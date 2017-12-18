@@ -159,8 +159,8 @@ object PostgresRenderQuery extends RenderQuery {
       s"($a1 >= $a2)".right
     case WithIds((_, str))    => s"(row_number() over(), $str)".right
     case RowIds()        => "row_number() over()".right
-    case Offset((_, from), (_, count)) => s"$from OFFSET $count".right
-    case Limit((_, from), (_, count)) => s"$from LIMIT $count".right
+    case Offset((_, from), NumExpr(count)) => s"$from OFFSET $count".right
+    case Limit((_, from), NumExpr(count)) => s"$from LIMIT $count".right
     case Select(selection, from, filterOpt, order) =>
       val filter = ~(filterOpt ∘ (f => s" where ${f.v._2}"))
       val orderStr = order.map { o =>
