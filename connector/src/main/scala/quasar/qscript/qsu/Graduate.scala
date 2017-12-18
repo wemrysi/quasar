@@ -167,7 +167,7 @@ final class Graduate[T[_[_]]: CorecursiveT] private () extends QSUTTypes[T] {
             QCE(Reduce[T, QSUGraph](source, bs, reducers, repair))
           }
 
-        case QSU.LeftShift(source, struct, idStatus, repair) =>
+        case QSU.LeftShift(source, struct, idStatus, repair, _) =>
           QCE(LeftShift[T, QSUGraph](source, struct, idStatus, repair)).point[F]
 
         case QSU.QSSort(source, buckets, order) =>

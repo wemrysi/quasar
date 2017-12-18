@@ -4,8 +4,7 @@
         "couchbase":  "ignoreFieldOrder",
         "mimir":"ignoreFieldOrder",
         "mongodb_2_6": "pending",
-        "mongodb_3_0": "pending",
-        "mongodb_read_only": "pending"
+        "mongodb_3_0": "pending"
     },
     "data": "usa_factbook.data",
     "query": "select geo{*} from usa_factbook",

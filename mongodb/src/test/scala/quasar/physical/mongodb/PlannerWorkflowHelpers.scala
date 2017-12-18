@@ -31,6 +31,8 @@ import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import org.scalacheck._
+import org.specs2.execute._
+import org.specs2.matcher.{Matcher, Expectable}
 import pathy.Path._
 import scalaz._, Scalaz._
 
@@ -183,6 +185,29 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
   case object SimpleMapOp extends MongoOp(MapReduce)
   case object ReduceOp extends MongoOp(MapReduce)
 
+  implicit val showMongoOp = Show.showFromToString[MongoOp]
+  implicit val equalMongoOp = Equal.equalRef[MongoOp]
+
+  val pureOp: MongoOp = PureOp
+  val readOp: MongoOp = ReadOp
+  val matchOp: MongoOp = MatchOp
+  val projectOp: MongoOp = ProjectOp
+  val redactOp: MongoOp = RedactOp
+  val limitOp: MongoOp = LimitOp
+  val skipOp: MongoOp = SkipOp
+  val unwindOp: MongoOp = UnwindOp
+  val groupOp: MongoOp = GroupOp
+  val sortOp: MongoOp = SortOp
+  val geoNearOp: MongoOp = GeoNearOp
+  val outOp: MongoOp = OutOp
+  val lookupOp: MongoOp = LookupOp
+  val sampleOp: MongoOp = SampleOp
+  val foldLeftOp: MongoOp = FoldLeftOp
+  val mapOp: MongoOp = MapOp
+  val flatMapOp: MongoOp = FlatMapOp
+  val simpleMapOp: MongoOp = SimpleMapOp
+  val reduceOp: MongoOp = ReduceOp
+
   def opAlg: Algebra[WorkflowF, IList[MongoOp]] = {
     case WC($PureF(_)) => IList(PureOp)
     case WC($ReadF(_)) => IList(ReadOp)
@@ -196,7 +221,7 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
     case WC($SortF(s, _)) => SortOp :: s
     case WC($GeoNearF(s, _, _, _, _, _, _, _, _, _)) => GeoNearOp :: s
     case WC($OutF(s, _)) => OutOp :: s
-    case WC($FoldLeftF(s1, s2)) => (FoldLeftOp :: s1) ::: s2.list.flatten
+    case WC($FoldLeftF(s1, s2)) => (FoldLeftOp :: s1) ++ s2.list.flatten
     case WC32($LookupF(s, _, _, _, _)) => LookupOp :: s
     case WC32($SampleF(s, _)) => SampleOp :: s
     case WC($MapF(s, _, _)) => MapOp :: s
@@ -205,7 +230,48 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
     case WC($ReduceF(s, _, _)) => ReduceOp :: s
   }
 
+  def opTreeAlg: Algebra[WorkflowF, Tree[MongoOp]] = {
+    case WC($PureF(_)) => pureOp.leaf
+    case WC($ReadF(_)) => readOp.leaf
+    case WC($MatchF(s, _)) => matchOp.node(s)
+    case WC($ProjectF(s, _, _)) => projectOp.node(s)
+    case WC($RedactF(s, _)) => redactOp.node(s)
+    case WC($LimitF(s, _)) => limitOp.node(s)
+    case WC($SkipF(s, _)) => skipOp.node(s)
+    case WC($UnwindF(s, _)) => unwindOp.node(s)
+    case WC($GroupF(s, _, _)) => groupOp.node(s)
+    case WC($SortF(s, _)) => sortOp.node(s)
+    case WC($GeoNearF(s, _, _, _, _, _, _, _, _, _)) => geoNearOp.node(s)
+    case WC($OutF(s, _)) => outOp.node(s)
+    case WC($FoldLeftF(s1, s2)) => foldLeftOp.node((s1 :: s2.list).toList : _*)
+    case WC32($LookupF(s, _, _, _, _)) => lookupOp.node(s)
+    case WC32($SampleF(s, _)) => sampleOp.node(s)
+    case WC($MapF(s, _, _)) => mapOp.node(s)
+    case WC($FlatMapF(s, _, _)) => flatMapOp.node(s)
+    case WC($SimpleMapF(s, _, _)) => simpleMapOp.node(s)
+    case WC($ReduceF(s, _, _)) => reduceOp.node(s)
+  }
+
   def ops(wf: Workflow): IList[MongoOp] = wf.cata(opAlg).reverse
+
+  def opsTree(wf: Workflow): Tree[MongoOp] = wf.cata(opTreeAlg)
+
+  def foldLeftJoinSubTree(fst: Tree[MongoOp], snd: Tree[MongoOp]): Tree[MongoOp] =
+    foldLeftOp.node(
+      projectOp.node(groupOp.node(fst)),
+      reduceOp.node(mapOp.node(snd)))
+
+  val stdFoldLeftJoinSubTree: Tree[MongoOp] = foldLeftJoinSubTree(readOp.leaf, readOp.leaf)
+
+  case class beOpsTree(expected: Tree[MongoOp]) extends Matcher[Tree[MongoOp]] {
+    def apply[S <: Tree[MongoOp]](actual: Expectable[S]) = {
+      result(expected === actual.value,
+             "\ntrees are equal:\n" + expected.drawTree,
+             "\ntrees are not equal:\nexpected\n" + expected.drawTree + "\nactual:\n" + actual.value.drawTree,
+             actual,
+             FailureDetails(actual.value.drawTree, expected.drawTree))
+    }
+  }
 
   def noConsecutiveProjectOps(wf: Workflow) =
     countOps(wf, { case WC($ProjectF(Embed(WC($ProjectF(_, _, _))), _, _)) => true }) aka "the occurrences of consecutive $project ops:" must_== 0
@@ -232,16 +298,21 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
       case _ => Nil
     }) aka "dangling references"
 
-  def notBroken(wf: Workflow) = {
+  def notBroken(wf: Workflow, checkDanglingRefs: Boolean) = {
     noConsecutiveProjectOps(wf)
     noConsecutiveSimpleMapOps(wf)
-    danglingReferences(wf) must_== Nil
+    if (checkDanglingRefs) danglingReferences(wf) must_== Nil else ok
     brokenProjectOps(wf) must_== 0
   }
 
-  def notBrokenWithOps(wf: Workflow, expectedOps: IList[MongoOp]) = {
-    notBroken(wf)
+  def notBrokenWithOps(wf: Workflow, expectedOps: IList[MongoOp], checkDanglingRefs: Boolean = true) = {
+    notBroken(wf, checkDanglingRefs)
     ops(wf) must_== expectedOps
+  }
+
+  def notBrokenWithOpsTree(wf: Workflow, expectedOps: Tree[MongoOp], checkDanglingRefs: Boolean = true) = {
+    notBroken(wf, checkDanglingRefs)
+    AsResult(Equal[Tree[MongoOp]].equal(opsTree(wf), expectedOps) must_=== true).updateMessage(s"Expected:\n${expectedOps.drawTree}\nActual:\n${opsTree(wf).drawTree}")
   }
 
   def rootPushes(wf: Workflow) =

@@ -60,16 +60,7 @@ Chain
 ├─ $UnwindF(DocField(BsonField.Name("right")))
 ├─ $UnwindF(DocField(BsonField.Name("left")))
 ╰─ $ProjectF
-   ├─ Name("city" -> {
-   │       "$cond": [
-   │         {
-   │           "$and": [
-   │             { "$lte": [{ "$literal": {  } }, "$left"] },
-   │             { "$lt": ["$left", { "$literal": [] }] }]
-   │         },
-   │         "$left.city",
-   │         { "$literal": undefined }]
-   │     })
+   ├─ Name("city" -> "$left.city")
    ├─ Name("state" -> {
    │       "$cond": [
    │         {

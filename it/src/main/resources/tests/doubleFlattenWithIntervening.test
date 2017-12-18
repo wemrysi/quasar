@@ -2,8 +2,7 @@
     "name": "double flatten with intervening field",
     "backends": {
         "mongodb_2_6": "pending",
-        "mongodb_3_0": "pending",
-        "mongodb_read_only": "pending"
+        "mongodb_3_0": "pending"
     },
     "data": "nested.data",
     "query": "select topObj{*}.botObj{*} from nested",

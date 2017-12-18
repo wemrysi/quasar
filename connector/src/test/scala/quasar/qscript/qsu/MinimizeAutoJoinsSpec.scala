@@ -22,14 +22,17 @@ import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.qscript.{
   construction,
+  ExcludeId,
   Hole,
   HoleF,
   LeftSide,
+  LeftSideF,
   MapFuncsCore,
   ReduceFuncs,
   ReduceIndex,
   ReduceIndexF,
   RightSide,
+  RightSideF,
   SrcHole
 }
 import slamdata.Predef._
@@ -45,7 +48,7 @@ import scalaz.syntax.std.option._
 object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
   import ApplyProvenance.AuthenticatedQSU
-  import QScriptUniform.DTrans
+  import QScriptUniform.{DTrans, Rotation}
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
@@ -243,7 +246,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               HoleF,
               func.Constant(J.str("hey"))))
 
-          h2 must beTreeEqual(HoleF[Fix])
+          h2 must beTreeEqual(func.Hole)
 
           repair must beTreeEqual(
             func.ConcatMaps(
@@ -373,7 +376,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         QSUGraph.fromAnnotatedTree(atree map (_.some))
 
       val expDims =
-        IList(qprov.prov.value(Access.bucket('qsu0, 0, 'qsu0).point[FreeMapA]))
+        IList(qprov.prov.value(Access.bucket('qsu3, 0, 'qsu3).point[FreeMapA]))
 
       val ds = runOn_(qgraph).dims
 
@@ -425,6 +428,114 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       }
 
       ok
+    }
+
+    "coalesce an autojoin on a single leftshift on a shared source" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.leftShift(
+            qsu.read(afile),
+            HoleF[Fix],
+            ExcludeId,
+            RightSideF[Fix],
+            Rotation.ShiftArray),
+          qsu.read(afile),
+          _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case LeftShift(
+          Read(`afile`),
+          struct,
+          ExcludeId,
+          repair,
+          _) =>
+
+          struct must beTreeEqual(HoleF[Fix])
+
+          repair must beTreeEqual(func.Add(RightSideF, LeftSideF))
+      }
+    }
+
+    "coalesce an autojoin on a single leftshift on a shared source (RTL)" in {
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.read(afile),
+          qsu.leftShift(
+            qsu.read(afile),
+            HoleF[Fix],
+            ExcludeId,
+            RightSideF[Fix],
+            Rotation.ShiftArray),
+          _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case LeftShift(
+          Read(`afile`),
+          struct,
+          ExcludeId,
+          repair,
+          _) =>
+
+          struct must beTreeEqual(HoleF[Fix])
+          repair must beTreeEqual(func.Add(LeftSideF, RightSideF))
+      }
+    }
+
+    "inductively coalesce reduces on coalesced shifts" in {
+      // count(a[*]) + sum(a)
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.qsReduce(
+            qsu.leftShift(
+              qsu.read(afile),
+              HoleF[Fix],
+              ExcludeId,
+              RightSideF[Fix],
+              Rotation.ShiftArray),
+            Nil,
+            List(ReduceFuncs.Count(HoleF[Fix])),
+            Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+          qsu.qsReduce(
+            qsu.read(afile),
+            Nil,
+            List(ReduceFuncs.Sum(HoleF[Fix])),
+            Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+          _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case Map(
+          QSReduce(
+            LeftShift(
+              Read(`afile`),
+              struct,
+              ExcludeId,
+              repairInner,
+              _),
+            Nil,
+            List(ReduceFuncs.Count(h1), ReduceFuncs.Sum(h2)),
+            repairOuter),
+          fm) =>
+
+        struct must beTreeEqual(HoleF[Fix])
+
+        repairInner must beTreeEqual(
+          func.ConcatMaps(
+            func.MakeMapS("0", func.RightSide),
+            func.MakeMapS("1", func.LeftSide)))
+
+        h1 must beTreeEqual(func.ProjectKeyS(func.Hole, "0"))
+        h2 must beTreeEqual(func.ProjectKeyS(func.Hole, "1"))
+
+        repairOuter must beTreeEqual(
+          func.ConcatMaps(
+            func.MakeMapS("0", Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+            func.MakeMapS("1", Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(1))))))
+
+        fm must beTreeEqual(
+          func.Add(
+            func.ProjectKeyS(HoleF, "0"),
+            func.ProjectKeyS(HoleF, "1")))
+      }
     }
   }
 

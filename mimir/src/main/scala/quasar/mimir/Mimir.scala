@@ -284,7 +284,7 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
       if (specs.isEmpty)
         TransSpec1.Id
       else if (specs.lengthCompare(1) == 0)
-        specs.head
+        WrapArray(specs.head)
       else
         OuterArrayConcat(specs.map(WrapArray(_): TransSpec1) : _*)
     }
@@ -405,6 +405,7 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
               for {
                 // ok this isn't working right now because we throw away the key when we reduce; need to fold in a First reducer to carry along the key
                 red <- megaReduction(bucketed)(table.transform(megaSpec(bucketed)))
+
                 trans <- repair.cataM[Future, TransSpec1](
                   // note that .0 is the partition key
                   // and .1 is the value (if bucketed)

@@ -3,16 +3,7 @@ Chain
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("city" -> {
-│  │  │  │       "$cond": [
-│  │  │  │         {
-│  │  │  │           "$and": [
-│  │  │  │             { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │  │  │             { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│  │  │  │         },
-│  │  │  │         "$city",
-│  │  │  │         { "$literal": undefined }]
-│  │  │  │     })
+│  │  │  ├─ Name("city" -> "$city")
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped

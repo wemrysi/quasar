@@ -3,26 +3,8 @@ Chain
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("city" -> {
-│  │  │  │       "$cond": [
-│  │  │  │         {
-│  │  │  │           "$and": [
-│  │  │  │             { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │  │  │             { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│  │  │  │         },
-│  │  │  │         "$city",
-│  │  │  │         { "$literal": undefined }]
-│  │  │  │     })
-│  │  │  ├─ Name("state" -> {
-│  │  │  │       "$cond": [
-│  │  │  │         {
-│  │  │  │           "$and": [
-│  │  │  │             { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│  │  │  │             { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│  │  │  │         },
-│  │  │  │         "$state",
-│  │  │  │         { "$literal": undefined }]
-│  │  │  │     })
+│  │  │  ├─ Name("city" -> "$city")
+│  │  │  ├─ Name("state" -> "$state")
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
@@ -44,45 +26,10 @@ Chain
 │     │  │            "$cond": [
 │     │  │              {
 │     │  │                "$and": [
-│     │  │                  {
-│     │  │                    "$lt": [
-│     │  │                      { "$literal": null },
-│     │  │                      {
-│     │  │                        "$cond": [
-│     │  │                          {
-│     │  │                            "$and": [
-│     │  │                              { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │  │                              { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │  │                          },
-│     │  │                          "$pop",
-│     │  │                          { "$literal": undefined }]
-│     │  │                      }]
-│     │  │                  },
-│     │  │                  {
-│     │  │                    "$lt": [
-│     │  │                      {
-│     │  │                        "$cond": [
-│     │  │                          {
-│     │  │                            "$and": [
-│     │  │                              { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │  │                              { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │  │                          },
-│     │  │                          "$pop",
-│     │  │                          { "$literal": undefined }]
-│     │  │                      },
-│     │  │                      { "$literal": "" }]
-│     │  │                  }]
+│     │  │                  { "$lt": [{ "$literal": null }, "$pop"] },
+│     │  │                  { "$lt": ["$pop", { "$literal": "" }] }]
 │     │  │              },
-│     │  │              {
-│     │  │                "$cond": [
-│     │  │                  {
-│     │  │                    "$and": [
-│     │  │                      { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
-│     │  │                      { "$lt": ["$$ROOT", { "$literal": [] }] }]
-│     │  │                  },
-│     │  │                  "$pop",
-│     │  │                  { "$literal": undefined }]
-│     │  │              },
+│     │  │              "$pop",
 │     │  │              { "$literal": undefined }]
 │     │  │          }
 │     │  │        })
