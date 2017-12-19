@@ -383,6 +383,7 @@ class PlannerQScriptSpec extends
               func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
               func.Undefined),
             qscript.ExcludeId,
+            qscript.ShiftType.Array,
             func.ConcatMaps(
               func.MakeMap(func.Constant(json.str("city")),
                 func.ProjectKey(func.LeftSide, func.Constant(json.str("city")))),
@@ -422,6 +423,7 @@ class PlannerQScriptSpec extends
               func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
               func.Undefined),
             qscript.ExcludeId,
+            qscript.ShiftType.Array,
             func.RightSide),
           func.Lt(func.Hole, func.Constant(json.int(-165))))) must beWorkflow0(
         chain[Workflow](
@@ -482,12 +484,14 @@ class PlannerQScriptSpec extends
               func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
               func.Undefined),
             qscript.ExcludeId,
+            qscript.ShiftType.Array,
             func.Guard(func.RightSide,
               Type.FlexArr(0, None, Type.Top),
               func.RightSide,
               func.Undefined)),
           func.Hole,
           qscript.ExcludeId,
+          qscript.ShiftType.Array,
           func.RightSide)) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "zips")),
@@ -523,6 +527,7 @@ class PlannerQScriptSpec extends
             func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
             func.Undefined),
           qscript.ExcludeId,
+          qscript.ShiftType.Array,
           func.ConcatMaps(
             func.MakeMap(func.Constant(json.str("city")),
               func.ProjectKey(func.LeftSide, func.Constant(json.str("city")))),

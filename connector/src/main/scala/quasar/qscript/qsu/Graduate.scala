@@ -44,6 +44,7 @@ import quasar.qscript.{
   Reduce,
   ReduceFuncs,
   ReduceIndexF,
+  ShiftType,
   Sort,
   SrcHole,
   Subset,
@@ -196,7 +197,10 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
                 case QSU.LeftTarget() => (LeftSide: JoinSide).right
                 case QSU.RightTarget() => (RightSide: JoinSide).right
               }(κ(source.root))
-          } yield QCE(LeftShift[T, QSUGraph](source, struct, idStatus, resolvedRepair))
+
+            // TODO
+            shiftType = ShiftType.Array
+          } yield QCE(LeftShift[T, QSUGraph](source, struct, idStatus, shiftType, resolvedRepair))
 
         case QSU.QSSort(source, buckets, order) =>
           buckets traverse (resolveAccess(_)(_.left)(holeAs(source.root))) map { bs =>
