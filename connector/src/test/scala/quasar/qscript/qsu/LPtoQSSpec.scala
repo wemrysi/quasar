@@ -70,7 +70,7 @@ object LPtoQSSpec extends Qspec with CompilerHelpers with QSUTTypes[Fix] {
         qs.Read(afoo),
         HoleF[Fix],
         ExcludeId,
-        ShiftType.Array,
+        ShiftType.Map,
         RightSideF[Fix])
 
       lp must compileTo(expected)
@@ -88,7 +88,7 @@ object LPtoQSSpec extends Qspec with CompilerHelpers with QSUTTypes[Fix] {
           qs.Read(afoo),
           HoleF[Fix],
           ExcludeId,
-          ShiftType.Array,
+          ShiftType.Map,
           RightSideF[Fix]),
         Nil,
         List(ReduceFuncs.Count(HoleF[Fix])),
@@ -108,8 +108,8 @@ object LPtoQSSpec extends Qspec with CompilerHelpers with QSUTTypes[Fix] {
       case \/-(compiled) =>
         (
           Equal[Fix[QScriptEducated]].equal(compiled, qs),
-          s"\n${lp.render.shows}\n\n compiled to:\n\n ${qs.render.shows}",
-          s"\n${lp.render.shows}\n\n compiled to:\n\n ${qs.render.shows}\n\n expected:\n\n ${qs.render.shows}")
+          s"\n${lp.render.shows}\n\n compiled to:\n\n ${compiled.render.shows}",
+          s"\n${lp.render.shows}\n\n compiled to:\n\n ${compiled.render.shows}\n\n expected:\n\n ${qs.render.shows}")
     }
   }
 }

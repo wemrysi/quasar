@@ -50,7 +50,8 @@ import quasar.qscript.{
   Subset,
   ThetaJoin,
   Union,
-  Unreferenced}
+  Unreferenced
+}
 import quasar.qscript.provenance.JoinKeys
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.QSUGraph.QSUPattern
@@ -187,7 +188,7 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
             QCE(Reduce[T, QSUGraph](source, bs, reducers, repair))
           }
 
-        case QSU.LeftShift(source, struct, idStatus, repair, _) =>
+        case QSU.LeftShift(source, struct, idStatus, repair, rot) =>
           for {
             // Access.value is already resolved, from ReifyIdentities.
             // this would be nicer with a tri-state Access type.
@@ -198,8 +199,13 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
                 case QSU.RightTarget() => (RightSide: JoinSide).right
               }(κ(source.root))
 
-            // TODO
-            shiftType = ShiftType.Array
+            shiftType = rot match {
+              case QSU.Rotation.FlattenArray | QSU.Rotation.ShiftArray =>
+                ShiftType.Array
+
+              case QSU.Rotation.FlattenMap | QSU.Rotation.ShiftMap =>
+                ShiftType.Map
+            }
           } yield QCE(LeftShift[T, QSUGraph](source, struct, idStatus, shiftType, resolvedRepair))
 
         case QSU.QSSort(source, buckets, order) =>
