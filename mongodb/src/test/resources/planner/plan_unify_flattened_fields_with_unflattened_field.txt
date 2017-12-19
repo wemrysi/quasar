@@ -1,75 +1,36 @@
 Chain
 ├─ $ReadF(db; zips)
 ├─ $ProjectF
-│  ├─ Name("identities" -> {
-│  │       "qsu1": { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("0") }] }
-│  │     })
-│  ├─ Name("value" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
-│  ╰─ ExcludeId
-├─ $ProjectF
 │  ├─ Name("s" -> "$$ROOT")
 │  ├─ Name("f" -> {
 │  │       "$cond": [
 │  │         {
 │  │           "$and": [
-│  │             {
-│  │               "$lte": [
-│  │                 { "$literal": [] },
-│  │                 {
-│  │                   "$cond": [
-│  │                     {
-│  │                       "$and": [
-│  │                         { "$lte": [{ "$literal": {  } }, "$value"] },
-│  │                         { "$lt": ["$value", { "$literal": [] }] }]
-│  │                     },
-│  │                     "$value.loc",
-│  │                     { "$literal": undefined }]
-│  │                 }]
-│  │             },
-│  │             {
-│  │               "$lt": [
-│  │                 {
-│  │                   "$cond": [
-│  │                     {
-│  │                       "$and": [
-│  │                         { "$lte": [{ "$literal": {  } }, "$value"] },
-│  │                         { "$lt": ["$value", { "$literal": [] }] }]
-│  │                     },
-│  │                     "$value.loc",
-│  │                     { "$literal": undefined }]
-│  │                 },
-│  │                 { "$literal": BinData(0, "") }]
-│  │             }]
+│  │             { "$lte": [{ "$literal": [] }, "$loc"] },
+│  │             { "$lt": ["$loc", { "$literal": BinData(0, "") }] }]
 │  │         },
-│  │         {
-│  │           "$cond": [
-│  │             {
-│  │               "$and": [
-│  │                 { "$lte": [{ "$literal": {  } }, "$value"] },
-│  │                 { "$lt": ["$value", { "$literal": [] }] }]
-│  │             },
-│  │             "$value.loc",
-│  │             { "$literal": undefined }]
-│  │         },
-│  │         { "$literal": undefined }]
+│  │         "$loc",
+│  │         [{ "$literal": undefined }]]
 │  │     })
 │  ╰─ ExcludeId
-├─ $SimpleMapF
-│  ├─ Flatten
-│  │  ╰─ JsCore(_.f)
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(identities)
-│  │     │  ╰─ SpliceObjects
-│  │     │     ├─ JsCore(_.s.identities)
-│  │     │     ╰─ JsCore(_.s.identities)
-│  │     ╰─ Key(value)
-│  │        ╰─ Obj
-│  │           ├─ Key(zip: (isObject(_.s.value) && (! Array.isArray(_.s.value))) ? _.s.value._id : undefined)
-│  │           ╰─ Key(loc: _.f)
-│  ╰─ Scope(Map())
+├─ $UnwindF(DocField(BsonField.Name("f")))
+├─ $ProjectF
+│  ├─ Name("0" -> {
+│  │       "zip": {
+│  │         "$cond": [
+│  │           {
+│  │             "$and": [
+│  │               { "$lte": [{ "$literal": {  } }, "$s"] },
+│  │               { "$lt": ["$s", { "$literal": [] }] }]
+│  │           },
+│  │           "$s._id",
+│  │           { "$literal": undefined }]
+│  │       },
+│  │       "loc": "$f"
+│  │     })
+│  ╰─ ExcludeId
 ├─ $SortF
-│  ╰─ SortKey(value.loc -> Ascending)
+│  ╰─ SortKey(0.loc -> Ascending)
 ╰─ $ProjectF
-   ├─ Name("__quasar_mongodb_sigil" -> "$value")
+   ├─ Name("__quasar_mongodb_sigil" -> "$0")
    ╰─ ExcludeId
