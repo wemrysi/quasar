@@ -188,7 +188,7 @@ object PostgresRenderQuery extends RenderQuery {
     case Case(wt, e) =>
       val wts = wt ∘ { case WhenThen(TextExpr(w), TextExpr(t)) => s"when ($w)::boolean then $t" }
       s"(case ${wts.intercalate(" ")} else ${text(e.v)} end)".right
-    case Coercion(t, (_, e)) => s"($e)::${t.mapToStringName}".right
+    case Coercion(t, TextExpr(e)) => s"($e)::${t.mapToStringName}".right
     case UnaryFunction(fType, TextExpr(e)) =>
       val fName = fType match {
         case StrLower => "lower"
