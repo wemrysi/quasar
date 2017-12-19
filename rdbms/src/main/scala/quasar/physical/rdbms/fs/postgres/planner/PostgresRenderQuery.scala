@@ -53,6 +53,8 @@ object PostgresRenderQuery extends RenderQuery {
     s"json_build_object($str)#>>'{}'"
 
   def text[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): String = {
+    // The -> operator returns jsonb type, while ->> returns text. We need to choose one
+    // depending on context, hence this function called in certain cases (see functionsNested.test)
     val (expr, str) = pair
     val toReplace = "->"
     val replacement = "->>"
