@@ -2,6 +2,7 @@
   "name": "string and num functions on nested fields postgres",
 
   "backends": {
+    "marklogic_xml": "pending"
   },
 
   "data": "functionsNested.data",
