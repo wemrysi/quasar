@@ -114,7 +114,7 @@ case object StrLower extends UnaryFunctionType
 case object StrUpper extends UnaryFunctionType
 
 sealed trait BinaryFunctionType
-case object SplitStr extends BinaryFunctionType //TODO: change naming
+case object StrSplit extends BinaryFunctionType
 case object ArrayConcat extends BinaryFunctionType
 
 sealed trait TernaryFunctionType

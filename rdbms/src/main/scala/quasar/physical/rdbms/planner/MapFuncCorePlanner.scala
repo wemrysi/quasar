@@ -22,7 +22,7 @@ import quasar.Data
 import quasar.DataCodec
 import DataCodec.Precise.{DateKey, IntervalKey, TimeKey, TimestampKey}
 import quasar.Planner._
-import quasar.physical.rdbms.planner.sql.{StrLower, StrUpper, Substring, Search, SplitStr, ArrayConcat, SqlExpr => SQL}
+import quasar.physical.rdbms.planner.sql.{StrLower, StrUpper, Substring, Search, StrSplit, ArrayConcat, SqlExpr => SQL}
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.qscript.{MapFuncsCore => MFC, _}
@@ -132,7 +132,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.ToString(f) =>  SQL.Coercion(StringCol, f).embed.η[F]
     case MFC.Search(fStr, fPattern, fIsCaseInsensitive) => SQL.TernaryFunction(Search, fStr, fPattern, fIsCaseInsensitive).embed.η[F]
     case MFC.Substring(fStr, fFrom, fCount) => SQL.TernaryFunction(Substring, fStr, fFrom, fCount).embed.η[F]
-    case MFC.Split(fStr, fDelim) => SQL.BinaryFunction(SplitStr, fStr, fDelim).embed.η[F]
+    case MFC.Split(fStr, fDelim) => SQL.BinaryFunction(StrSplit, fStr, fDelim).embed.η[F]
     case MFC.MakeArray(f) =>  SQL.ToArray(f).embed.η[F]
     case MFC.MakeMap(key, value) =>
       key.project match {

@@ -161,7 +161,7 @@ object PostgresRenderQuery extends RenderQuery {
       s"$fName($e)".right
     case BinaryFunction(fType, a1, a2) =>
       val fName = fType match {
-        case SplitStr => "regexp_split_to_array"
+        case StrSplit => "regexp_split_to_array"
         case ArrayConcat => "array_cat"
       }
       s"$fName($a1, $a2)".right
