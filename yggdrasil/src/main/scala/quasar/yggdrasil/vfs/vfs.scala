@@ -214,7 +214,12 @@ object FreeVFS {
 
   def exists[F[_]: Monad](path: APath): StateT[F, VFS, Boolean] = {
     Path.refineType(path).fold(
-      dir => StateTContrib.get[F, VFS].map(_.index.contains(dir)),
+      dir =>
+        if (dir ≟ Path.rootDir)
+          true.point[StateT[F, VFS, ?]] // root directory always exists
+        else {
+          StateTContrib.get[F, VFS].map(_.index.contains(dir))
+        },
       file => StateTContrib.get[F, VFS].map(_.paths.contains(file)))
   }
 
