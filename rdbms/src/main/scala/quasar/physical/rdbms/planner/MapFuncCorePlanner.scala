@@ -22,7 +22,7 @@ import quasar.Data
 import quasar.DataCodec
 import DataCodec.Precise.{DateKey, IntervalKey, TimeKey, TimestampKey}
 import quasar.Planner._
-import quasar.physical.rdbms.planner.sql.{Search, StrLower, StrUpper, Substring, SplitStr, SqlExpr => SQL}
+import quasar.physical.rdbms.planner.sql.{StrLower, StrUpper, Substring, Search, SplitStr, ArrayConcat, SqlExpr => SQL}
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.qscript.{MapFuncsCore => MFC, _}
@@ -133,7 +133,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.Search(fStr, fPattern, fIsCaseInsensitive) => SQL.TernaryFunction(Search, fStr, fPattern, fIsCaseInsensitive).embed.η[F]
     case MFC.Substring(fStr, fFrom, fCount) => SQL.TernaryFunction(Substring, fStr, fFrom, fCount).embed.η[F]
     case MFC.Split(fStr, fDelim) => SQL.BinaryFunction(SplitStr, fStr, fDelim).embed.η[F]
-    case MFC.MakeArray(f) =>  notImplemented("MakeArray", this)
+    case MFC.MakeArray(f) =>  SQL.ToArray(f).embed.η[F]
     case MFC.MakeMap(key, value) =>
       key.project match {
               case Constant(Data.Str(keyStr)) =>
@@ -141,7 +141,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
               case other =>
                 notImplemented(s"MakeMap with key = $other", this)
             }
-    case MFC.ConcatArrays(f1, f2) =>  notImplemented("ConcatArrays", this)
+    case MFC.ConcatArrays(f1, f2) =>  SQL.BinaryFunction(ArrayConcat, f1, f2).embed.η[F]
     case MFC.ConcatMaps(f1, f2) => ExprPair[T[SQL]](f1, f2).embed.η[F]
     case MFC.ProjectIndex(f1, f2) =>  notImplemented("ProjectIndex", this)
     case MFC.ProjectKey(fSrc, fKey) =>

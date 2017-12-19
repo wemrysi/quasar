@@ -152,6 +152,7 @@ object PostgresRenderQuery extends RenderQuery {
       val wts = wt ∘ { case WhenThen(w, t) => s"when $w then $t" }
       s"(case ${wts.intercalate(" ")} else ${e.v} end)".right
     case Coercion(t, e) => s"($e)::${t.mapToStringName}".right
+    case ToArray(v) => s"ARRAY[$v]".right
     case UnaryFunction(fType, e) =>
       val fName = fType match {
         case StrLower => "lower"
@@ -161,6 +162,7 @@ object PostgresRenderQuery extends RenderQuery {
     case BinaryFunction(fType, a1, a2) =>
       val fName = fType match {
         case SplitStr => "regexp_split_to_array"
+        case ArrayConcat => "array_cat"
       }
       s"$fName($a1, $a2)".right
     case TernaryFunction(fType, a1, a2, a3) => (fType match {

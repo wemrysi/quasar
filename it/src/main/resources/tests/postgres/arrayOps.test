@@ -1,0 +1,25 @@
+{
+  "name": "postgres array manipulation tests",
+
+  "backends": {
+      "mongodb_read_only": "skip"
+  },
+
+  "data": "basic.data",
+
+  "query": "select
+  array_concat(array_concat(make_array(name.last),make_array(name)),make_array(name.first))
+   as res from basic",
+
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
+
+  "ignoredFields": [],
+
+  "ignoreFieldOrder": true,
+
+  "expected": [
+    {"res": ["Smith",  {"first": "John", "last": "Smith"}, "John"]},
+    {"res": ["Kowalska", {"first": "Janina", "last": "Kowalska"}, "Janina"]}
+  ]
+}
