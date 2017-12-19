@@ -486,13 +486,14 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
               newRed,
               repair))
 
-        case LeftShift(Embed(src), struct, idStatus, repair) =>
+        case LeftShift(Embed(src), struct, idStatus, shiftType, repair) =>
           ((FToOut.get(src) >>= SR.prj) ⊛ eliminateRightSideProjUnary(struct) ⊛ eliminateRightSideProj(repair, LeftSide))(
             (sr, newStruct, newRepair) =>
             LeftShift(
               FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(sr.getConst.path, ExcludeId)))).embed,
               newStruct,
               idStatus,
+              shiftType,
               newRepair))
 
         case Subset(src, from, sel, count) =>

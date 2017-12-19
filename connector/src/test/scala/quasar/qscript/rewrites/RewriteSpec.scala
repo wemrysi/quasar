@@ -408,6 +408,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           fix.ShiftedRead[AFile](sampleFile, IncludeId),
           func.ProjectKeyS(func.ProjectIndexI(func.Hole, 1), "foo"),
           ExcludeId,
+          ShiftType.Map,
           func.ConcatMaps(
             func.MakeMapS("a", func.ProjectKeyS(func.ProjectIndexI(func.LeftSide, 1), "quux")),
             func.MakeMapS("b", func.RightSide)))
@@ -417,6 +418,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           fix.ShiftedRead[AFile](sampleFile, ExcludeId),
           func.ProjectKeyS(func.Hole, "foo"),
           ExcludeId,
+          ShiftType.Map,
           func.ConcatMaps(
             func.MakeMapS("a", func.ProjectKeyS(func.LeftSide, "quux")),
             func.MakeMapS("b", func.RightSide)))
