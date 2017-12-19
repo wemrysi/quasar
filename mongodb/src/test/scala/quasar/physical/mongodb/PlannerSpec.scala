@@ -157,7 +157,8 @@ class PlannerSpec extends
     // This gives wrong results in old mongo: returns multiple rows in case
     // count > 1. It should return 1 row per city.
     // see https://gist.github.com/rintcius/bff5b740a1252cafc976a31fc13dd7cf
-    trackPendingThrow(
+    // Gives wrong results now as well: result of the case field is unexpected
+    trackPending(
       "expr3 with grouping",
       plan(sqlE"select case when pop > 1000 then city else lower(city) end, count(*) from zips group by city"),
       IList()) //TODO
@@ -241,15 +242,12 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, UnwindOp, ProjectOp)))
     }
 
-    // Q3021
     trackPending(
       "unify flattened fields",
       plan(sqlE"select loc[*] from zips where loc[*] < 0"),
-      // should not use map-reduce
-      // actual: occurrences of consecutive $project ops: '1'
+      // actual: IList(ReadOp, ProjectOp, UnwindOp, ProjectOp, MatchOp, ProjectOp, UnwindOp, ProjectOp))
       IList(ReadOp, ProjectOp, UnwindOp, MatchOp, ProjectOp))
 
-    // Q3021
     trackPendingErr(
       "group by flattened field",
       plan(sqlE"select substring(parents[*].sha, 0, 1), count(*) from slamengine_commits group by substring(parents[*].sha, 0, 1)"),
@@ -259,14 +257,15 @@ class PlannerSpec extends
     trackPending(
       "unify flattened fields with unflattened field",
       plan(sqlE"select `_id` as zip, loc[*] from zips order by loc[*]"),
-      // should not use map-reduce
-      // actual: the occurrences of consecutive $project ops: '1'
+      // actual: IList(ReadOp, ProjectOp, UnwindOp, ProjectOp, SortOp, ProjectOp))
       IList(ReadOp, ProjectOp, UnwindOp, SortOp))
 
-    // Q3021
-    trackPendingThrow(
+    trackPending(
       "unify flattened with double-flattened",
       plan(sqlE"""select * from user_comments where (comments[*].id LIKE "%Dr%" OR comments[*].replyTo[*] LIKE "%Dr%")"""),
+      // Gives server-error, see https://gist.github.com/rintcius/b6c8292fc1d83d09abc69a482e9a04e2
+      // should not use map-reduce
+      // actual: IList(ReadOp, ProjectOp, SimpleMapOp, MatchOp, ProjectOp)
       IList(ReadOp, ProjectOp, UnwindOp, ProjectOp, UnwindOp, MatchOp, ProjectOp))
 
     "plan complex group by with sorting and limiting" in {
