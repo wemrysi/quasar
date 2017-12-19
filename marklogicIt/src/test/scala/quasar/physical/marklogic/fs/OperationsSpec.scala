@@ -40,6 +40,11 @@ import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 final class OperationsSpec extends quasar.Qspec {
+
+  private implicit val a: Xcc[Op] = ???
+  private implicit val b: quasar.effect.uuid.UuidReader[Op] = ???
+  private implicit def c[T]: StructuralPlanner[Op, T] = ???
+
   def markLogicOpsShould(f: Op ~> Id): Unit = {
     "Appending to files consisting of a single Map" >> {
       def appendToMapTest[T: SearchOptions: AsContent[?, Data]: StructuralPlanner[Op, ?]](
