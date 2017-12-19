@@ -246,6 +246,8 @@ class PlannerSpec extends
       "unify flattened fields",
       plan(sqlE"select loc[*] from zips where loc[*] < 0"),
       // actual: IList(ReadOp, ProjectOp, UnwindOp, ProjectOp, MatchOp, ProjectOp, UnwindOp, ProjectOp))
+      //         The QScript contains two LeftShift (i.e flattens) which are not unified as they should,
+      //         hence the two `UnwindOp`s
       IList(ReadOp, ProjectOp, UnwindOp, MatchOp, ProjectOp))
 
     trackPendingErr(
@@ -254,11 +256,10 @@ class PlannerSpec extends
       IList(ReadOp, ProjectOp, UnwindOp, GroupOp, ProjectOp),
       { case QScriptPlanningFailed(_) => ok })
 
-    trackPending(
-      "unify flattened fields with unflattened field",
-      plan(sqlE"select `_id` as zip, loc[*] from zips order by loc[*]"),
-      // actual: IList(ReadOp, ProjectOp, UnwindOp, ProjectOp, SortOp, ProjectOp))
-      IList(ReadOp, ProjectOp, UnwindOp, SortOp))
+    "unify flattened fields with unflattened field" in {
+      plan(sqlE"select `_id` as zip, loc[*] from zips order by loc[*]") must
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, UnwindOp, ProjectOp, SortOp)))
+    }
 
     trackPending(
       "unify flattened with double-flattened",
