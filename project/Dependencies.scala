@@ -26,7 +26,7 @@ object Dependencies {
   private val simulacrumVersion   = "0.10.0"
   // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
   // leads to a ParquetRDDE failure under a full test run
-  private val specsVersion        = "3.8.6"
+  private val specsVersion        = "3.9.1"
   private val spireVersion        = "0.14.1"
 
   def foundation = Seq(
@@ -51,6 +51,7 @@ object Dependencies {
     "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,
     "org.typelevel"              %% "spire-laws"                % spireVersion                         % Test,
     "org.specs2"                 %% "specs2-core"               % specsVersion                         % Test,
+    "org.specs2"                 %% "specs2-scalacheck"         % specsVersion                         % Test,
     "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.13") % Test,
     "org.typelevel"              %% "shapeless-scalacheck"      % "0.6.1"                                % Test,
     "org.typelevel"              %% "scalaz-specs2"             % "0.5.0"                              % Test
@@ -79,8 +80,8 @@ object Dependencies {
     // Removing this will not cause any compile time errors, but will cause a runtime error once
     // Quasar attempts to connect to an h2 database to use as a metastore
     "com.h2database"              % "h2"                        % "1.4.196",
-    ("org.tpolecat"               %% "doobie-specs2"             % doobieVersion % Test)
-      .exclude("org.specs2", "specs2-core_2.11") // conflicting version
+    ("org.tpolecat"               %% "doobie-specs2"            % doobieVersion % Test)
+      .exclude("org.specs2", "specs2-core_2.12") // conflicting version
   )
   def interface = Seq(
     "com.github.scopt" %% "scopt" % "3.5.0",
@@ -107,7 +108,7 @@ object Dependencies {
       "org.tpolecat" %% "doobie-h2"         % doobieVersion,
       "com.github.alexarchambault" %% "scalacheck-shapeless_1.13" % "1.1.6" % Test,
       ("org.tpolecat" %% "doobie-specs2"     % doobieVersion % Test)
-        .exclude("org.specs2", "specs2-core_2.11") // conflicting version
+        .exclude("org.specs2", "specs2-core_2.12") // conflicting version
     )
   }
 
