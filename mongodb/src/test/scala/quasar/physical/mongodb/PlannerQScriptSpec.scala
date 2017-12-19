@@ -401,14 +401,10 @@ class PlannerQScriptSpec extends
                 $field("loc"),
                 $arrayLit(List($literal(Bson.Undefined)))))),
           $unwind(DocField("f")),
+          $match(Selector.Doc((BsonField.Name("f")) -> Selector.Lt(Bson.Int32(-165)))),
           $project(reshape(
-            "0" -> $objectLit(
-              ListMap(
-                BsonField.Name("city") -> $field("s", "city"),
-                BsonField.Name("loc") -> $field("f"))))),
-          $match(Selector.Doc(
-            (BsonField.Name("0") \ BsonField.Name("loc")) -> Selector.Lt(Bson.Int32(-165)))),
-          $project(reshape(sigil.Quasar -> $field("0")))))
+            "city" -> $field("s", "city"),
+            "loc" -> $field("f")))))
     }
 
     "plan with flatenning in filter predicate without reference to LeftSide" in {
@@ -541,10 +537,8 @@ class PlannerQScriptSpec extends
                 $arrayLit(List($literal(Bson.Undefined)))))),
           $unwind(DocField("f")),
           $project(reshape(
-            sigil.Quasar -> $objectLit(
-              ListMap(
-                BsonField.Name("city") -> $field("s", "city"),
-                BsonField.Name("loc") -> $field("f")))))))
+            "city" -> $field("s", "city"),
+            "loc" -> $field("f")))))
     }
   }
 }
