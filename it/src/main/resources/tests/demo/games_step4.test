@@ -7,19 +7,14 @@
        "mimir":             "ignoreFieldOrder"
     },
     "query": "temp0 := SELECT A_Name AS Game, B_Released AS ReleaseDate, C_Recommendations AS Reviews, D_Metacritic AS Score, PriceInitial AS Price FROM steamgames WHERE (IsAction = \"TRUE\") AND (A_Name <> \"\") AND (D_Metacritic >= 0) AND (C_Recommendations >= 0) ORDER BY D_Metacritic DESC, PriceInitial DESC, A_Name ASC;
-     SELECT Game AS dimension, SUM(Score) AS measure1, null AS size, SUM(Price) AS measure2, null AS series FROM (temp0) AS temp1 GROUP BY Game ORDER BY Game ASC LIMIT 10
+     SELECT Game AS dimension, SUM(Score) AS measure1, null AS size, SUM(Price) AS measure2, null AS series FROM (temp0) AS temp1 GROUP BY Game ORDER BY measure1 desc, measure2 asc LIMIT 5
     ",
     "predicate": "exactly",
     "expected": [
- { "dimension": "! That Bastard Is Trying To Steal Our Gold !"              , "measure1":  0, "size": null, "measure2":  2.99, "series": null},
- { "dimension": "#KILLALLZOMBIES"                                           , "measure1":  0, "size": null, "measure2": 11.99, "series": null},
- { "dimension": "$1 Ride"                                                   , "measure1":  0, "size": null, "measure2":  0.99, "series": null},
- { "dimension": ".EXE"                                                      , "measure1":  0, "size": null, "measure2":  5.99, "series": null},
- { "dimension": "//N.P.P.D. RUSH//- The milk of Ultraviolet"                , "measure1":  0, "size": null, "measure2":  3.99, "series": null},
- { "dimension": "//SNOWFLAKE TATTOO//"                                      , "measure1":  0, "size": null, "measure2":  4.99, "series": null},
- { "dimension": "1... 2... 3... KICK IT! (Drop That Beat Like an Ugly Baby)", "measure1":  0, "size": null, "measure2":  9.99, "series": null},
- { "dimension": "10 Second Ninja"                                           , "measure1": 72, "size": null, "measure2":  9.99, "series": null},
- { "dimension": "10 Second Ninja X"                                         , "measure1":  0, "size": null, "measure2":  9.99, "series": null},
- { "dimension": "10 Years After"                                            , "measure1":  0, "size": null, "measure2":  5.99, "series": null}
+      { "dimension": "F.E.A.R."                             , "measure1":  440, "size": null, "measure2":  49.95, "series": null},
+      { "dimension": "SiN Episodes: Emergence"              , "measure1":  375, "size": null, "measure2":  49.95, "series": null},
+      { "dimension": "BRINK"                                , "measure1":  350, "size": null, "measure2":  39.95, "series": null},
+      { "dimension": "Call of Duty(r): Modern Warfare(r) 2" , "measure1":  258, "size": null, "measure2":  59.97, "series": null},
+      { "dimension": "Fallout: New Vegas"                   , "measure1":  252, "size": null, "measure2":  29.97, "series": null}
     ]
 }

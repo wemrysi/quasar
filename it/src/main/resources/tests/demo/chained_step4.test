@@ -6,7 +6,7 @@
        "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
     },
-    "query": "SELECT COUNT(*) AS cnt, gender FROM patients WHERE state = \"CO\" AND city = \"DENVER\" GROUP BY gender",
+    "query": "SELECT COUNT(*) AS cnt, gender FROM patients WHERE state = \"CO\" AND city = \"DENVER\" GROUP BY gender ORDER BY gender DESC",
     "predicate": "exactly",
     "expected": [
           { "cnt": 13, "gender": "male"   },
