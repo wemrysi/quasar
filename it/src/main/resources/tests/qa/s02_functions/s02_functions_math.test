@@ -1,5 +1,5 @@
 {
-  "name": "s02_functions_math2",
+  "name": "[qa_s02] mathematical functions 1",
 
   "backends": {
     "mongodb_read_only": "skip"

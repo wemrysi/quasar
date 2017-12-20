@@ -1,5 +1,5 @@
 {
-  "name": "s02_functions_coercions",
+  "name": "[qa_s02] coercions",
 
   "backends": {
     "spark_local":       "skip",

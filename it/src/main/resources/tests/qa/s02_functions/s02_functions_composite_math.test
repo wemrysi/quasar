@@ -1,5 +1,5 @@
 {
-  "name": "s02_functions_composite_math",
+  "name": "[qa_s02] composite math functions",
 
   "backends": {
       "mongodb_read_only": "skip"
