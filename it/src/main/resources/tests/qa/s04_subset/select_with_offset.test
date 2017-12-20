@@ -1,5 +1,5 @@
 {
-    "name": "qa_subset-simple-offset",
+    "name": "[qa_s04] select with offset",
 
     "backends": {
        "couchbase":         "ignoreFieldOrder",

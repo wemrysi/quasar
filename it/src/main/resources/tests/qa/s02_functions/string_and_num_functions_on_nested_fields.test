@@ -1,5 +1,5 @@
 {
-  "name": "string and num functions on nested fields postgres",
+  "name": "[qa_s02] string and num functions on nested fields",
 
   "backends": {
     "marklogic_json": "pending"

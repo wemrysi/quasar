@@ -1,5 +1,5 @@
 {
-  "name": "filter on simple field equality postgres",
+  "name": "[qa_s05] filter on simple field equality",
 
   "backends": {
   },

@@ -1,8 +1,5 @@
 {
-  "name": "filter on two levels of selection postgres",
-
-  "backends": {
-  },
+  "name": "[qa_s05] filter on two levels of selection",
 
   "data": "filter.data",
 
@@ -11,8 +8,6 @@
 
   "predicate": "exactly",
   "ignoreResultOrder": true,
-
-  "ignoredFields": [],
 
   "ignoreFieldOrder": true,
 
