@@ -73,6 +73,7 @@ object SqlExpr extends SqlExprInstances {
   final case class Gte[T](a1: T, a2: T) extends SqlExpr[T]
 
   final case class Coercion[T](t: ColumnType, e: T) extends SqlExpr[T]
+  final case class ToArray[T](v: T) extends SqlExpr[T]
 
   final case class Constant[T](data: Data) extends SqlExpr[T]
 
@@ -117,7 +118,8 @@ case object StrLower extends UnaryFunctionType
 case object StrUpper extends UnaryFunctionType
 
 sealed trait BinaryFunctionType
-case object SplitStr extends BinaryFunctionType
+case object StrSplit extends BinaryFunctionType
+case object ArrayConcat extends BinaryFunctionType
 
 sealed trait TernaryFunctionType
 case object Substring extends TernaryFunctionType

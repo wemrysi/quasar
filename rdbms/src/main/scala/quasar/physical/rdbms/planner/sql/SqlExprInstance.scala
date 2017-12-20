@@ -80,6 +80,7 @@ trait SqlExprTraverse {
         )
 
       case Coercion(t, e) => f(e) ∘ (Coercion(t, _))
+      case ToArray(v) => f(v) ∘ ToArray.apply
       case UnaryFunction(t, e) => f(e) ∘ (UnaryFunction(t, _))
       case BinaryFunction(t, a1, a2) => (f(a1) ⊛ f(a2))(BinaryFunction(t, _, _))
       case TernaryFunction(t, a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(TernaryFunction(t, _, _, _))

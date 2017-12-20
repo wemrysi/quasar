@@ -17,9 +17,9 @@
 package quasar.physical.rdbms.fs.postgres.planner
 
 import slamdata.Predef._
+import scala.Predef.implicitly
 import quasar.common.SortDir.{Ascending, Descending}
-import quasar.Data
-import quasar.DataCodec
+import quasar.{Data, DataCodec}
 import quasar.DataCodec.Precise.TimeKey
 import quasar.physical.rdbms.model._
 import quasar.physical.rdbms.fs.postgres._
@@ -29,7 +29,6 @@ import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.Planner.InternalError
 import quasar.Planner.{NonRepresentableData, PlannerError}
-
 import matryoshka._
 import matryoshka.implicits._
 
@@ -184,11 +183,17 @@ object PostgresRenderQuery extends RenderQuery {
       val text = v.flatMap { case ''' => "''"; case iv => iv.toString }.self
       s"'$text'".right
     case Constant(v) =>
-      DataCodec.render(v) \/> NonRepresentableData(v)
+      DataCodec.render(v).map{ rendered => v match {
+        case a: Data.Arr =>
+          val arrType = implicitly[TypeMapper].map(TableModel.columnType(a.dataType.arrayType.map(_.lub).getOrElse(quasar.Type.Null)))
+          s"ARRAY$rendered::$arrType[]"
+        case _ => rendered
+      }} \/> NonRepresentableData(v)
     case Case(wt, e) =>
       val wts = wt ∘ { case WhenThen(TextExpr(w), TextExpr(t)) => s"when ($w)::boolean then $t" }
       s"(case ${wts.intercalate(" ")} else ${text(e.v)} end)".right
     case Coercion(t, TextExpr(e)) => s"($e)::${t.mapToStringName}".right
+    case ToArray(TextExpr(v)) => s"ARRAY[$v]".right
     case UnaryFunction(fType, TextExpr(e)) =>
       val fName = fType match {
         case StrLower => "lower"
@@ -197,7 +202,8 @@ object PostgresRenderQuery extends RenderQuery {
       s"$fName($e)".right
     case BinaryFunction(fType, a1, a2) =>
       val fName = fType match {
-        case SplitStr => "regexp_split_to_array"
+        case StrSplit => "regexp_split_to_array"
+        case ArrayConcat => "array_cat"
       }
       s"$fName(${text(a1)}, ${text(a2)})".right
     case TernaryFunction(fType, a1, a2, a3) => (fType match {
