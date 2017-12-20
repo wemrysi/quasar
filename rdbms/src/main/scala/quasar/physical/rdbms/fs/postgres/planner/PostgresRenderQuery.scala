@@ -17,9 +17,9 @@
 package quasar.physical.rdbms.fs.postgres.planner
 
 import slamdata.Predef._
+import scala.Predef.implicitly
 import quasar.common.SortDir.{Ascending, Descending}
-import quasar.Data
-import quasar.DataCodec
+import quasar.{Data, DataCodec}
 import quasar.DataCodec.Precise.TimeKey
 import quasar.physical.rdbms.model._
 import quasar.physical.rdbms.fs.postgres._
@@ -29,7 +29,6 @@ import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.Planner.InternalError
 import quasar.Planner.{NonRepresentableData, PlannerError}
-
 import matryoshka._
 import matryoshka.implicits._
 
@@ -147,7 +146,12 @@ object PostgresRenderQuery extends RenderQuery {
       val text = v.flatMap { case ''' => "''"; case iv => iv.toString }.self
       s"'$text'".right
     case Constant(v) =>
-      DataCodec.render(v) \/> NonRepresentableData(v)
+      DataCodec.render(v).map{ rendered => v match {
+        case a: Data.Arr =>
+          val arrType = implicitly[TypeMapper].map(TableModel.columnType(a.dataType.arrayType.map(_.lub).getOrElse(quasar.Type.Null)))
+          s"ARRAY$rendered::$arrType[]"
+        case _ => rendered
+      }} \/> NonRepresentableData(v)
     case Case(wt, e) =>
       val wts = wt ∘ { case WhenThen(w, t) => s"when $w then $t" }
       s"(case ${wts.intercalate(" ")} else ${e.v} end)".right
