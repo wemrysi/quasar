@@ -52,16 +52,15 @@ import quasar.qscript.{
   Union,
   Unreferenced
 }
-import quasar.qscript.provenance.JoinKeys
+import quasar.qscript.provenance.JoinKey
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.QSUGraph.QSUPattern
 import quasar.qscript.qsu.ReifyIdentities.ResearchedQSU
 
 import matryoshka.{Corecursive, BirecursiveT, CoalgebraM, Recursive, ShowT}
 import matryoshka.data._
-//import matryoshka.data.free._
 import matryoshka.patterns.CoEnv
-import scalaz.{~>, -\/, \/-, \/, Const, Inject, Monad, NaturalTransformation, ReaderT}
+import scalaz.{~>, -\/, \/-, \/, Const, Inject, Monad, NonEmptyList, NaturalTransformation, ReaderT}
 import scalaz.Scalaz._
 
 final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[T] {
@@ -165,8 +164,8 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
       def resolveAccess[A, B](fa: FreeMapA[A])(ex: A => QAccess[B] \/ B)(f: B => Symbol): F[FreeMapA[B]] =
         MR.asks(_.resolveAccess[A, B](name, fa)(f)(ex))
 
-      def eqCond(lroot: Symbol, rroot: Symbol): JoinKeys.JoinKey[QIdAccess] => F[JoinFunc] = {
-        case JoinKeys.JoinKey(l, r) =>
+      def eqCond(lroot: Symbol, rroot: Symbol): JoinKey[QIdAccess] => F[JoinFunc] = {
+        case JoinKey(l, r) =>
           for {
             lside <- resolveAccess(func.Hole as Access.id(l, lroot))(_.left)(κ(lroot))
             rside <- resolveAccess(func.Hole as Access.id(r, rroot))(_.left)(κ(rroot))
@@ -242,8 +241,13 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
 
         case QSU.QSAutoJoin(left, right, joinKeys, combiner) =>
           val condition = joinKeys.keys.toNel.fold(func.Constant[JoinSide](EJson.bool(true)).point[F]) { jks =>
-            val (l, r) = (left.root, right.root)
-            jks.foldMapLeft1(eqCond(l, r))((fm, k) => (eqCond(l, r)(k) |@| fm)(func.And(_, _)))
+            val mkEq = eqCond(left.root, right.root)
+
+            val mkDisj = (_: NonEmptyList[JoinKey[QIdAccess]]).foldMapLeft1(mkEq) { (disj, k) =>
+              (mkEq(k) |@| disj)(func.Or(_, _))
+            }
+
+            jks.foldMapLeft1(mkDisj)((conj, ks) => (mkDisj(ks) |@| conj)(func.And(_, _)))
           }
 
           (mergeSources[F](left, right) |@| condition) {
