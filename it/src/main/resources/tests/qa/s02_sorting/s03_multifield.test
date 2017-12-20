@@ -1,5 +1,5 @@
 {
-  "name": "s03_sort_multifield",
+  "name": "[qa_s03] multifield sort with the same sort direction",
 
   "data": "sort.data",
 
