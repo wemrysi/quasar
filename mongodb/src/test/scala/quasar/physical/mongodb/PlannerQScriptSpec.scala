@@ -383,6 +383,7 @@ class PlannerQScriptSpec extends
               func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
               func.Undefined),
             qscript.ExcludeId,
+            qscript.ShiftType.Array,
             func.ConcatMaps(
               func.MakeMap(func.Constant(json.str("city")),
                 func.ProjectKey(func.LeftSide, func.Constant(json.str("city")))),
@@ -401,14 +402,10 @@ class PlannerQScriptSpec extends
                 $field("loc"),
                 $arrayLit(List($literal(Bson.Undefined)))))),
           $unwind(DocField("f")),
+          $match(Selector.Doc((BsonField.Name("f")) -> Selector.Lt(Bson.Int32(-165)))),
           $project(reshape(
-            "0" -> $objectLit(
-              ListMap(
-                BsonField.Name("city") -> $field("s", "city"),
-                BsonField.Name("loc") -> $field("f"))))),
-          $match(Selector.Doc(
-            (BsonField.Name("0") \ BsonField.Name("loc")) -> Selector.Lt(Bson.Int32(-165)))),
-          $project(reshape(sigil.Quasar -> $field("0")))))
+            "city" -> $field("s", "city"),
+            "loc" -> $field("f")))))
     }
 
     "plan with flatenning in filter predicate without reference to LeftSide" in {
@@ -422,6 +419,7 @@ class PlannerQScriptSpec extends
               func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
               func.Undefined),
             qscript.ExcludeId,
+            qscript.ShiftType.Array,
             func.RightSide),
           func.Lt(func.Hole, func.Constant(json.int(-165))))) must beWorkflow0(
         chain[Workflow](
@@ -482,12 +480,14 @@ class PlannerQScriptSpec extends
               func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
               func.Undefined),
             qscript.ExcludeId,
+            qscript.ShiftType.Array,
             func.Guard(func.RightSide,
               Type.FlexArr(0, None, Type.Top),
               func.RightSide,
               func.Undefined)),
           func.Hole,
           qscript.ExcludeId,
+          qscript.ShiftType.Array,
           func.RightSide)) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "zips")),
@@ -523,6 +523,7 @@ class PlannerQScriptSpec extends
             func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
             func.Undefined),
           qscript.ExcludeId,
+          qscript.ShiftType.Array,
           func.ConcatMaps(
             func.MakeMap(func.Constant(json.str("city")),
               func.ProjectKey(func.LeftSide, func.Constant(json.str("city")))),
@@ -541,10 +542,8 @@ class PlannerQScriptSpec extends
                 $arrayLit(List($literal(Bson.Undefined)))))),
           $unwind(DocField("f")),
           $project(reshape(
-            sigil.Quasar -> $objectLit(
-              ListMap(
-                BsonField.Name("city") -> $field("s", "city"),
-                BsonField.Name("loc") -> $field("f")))))))
+            "city" -> $field("s", "city"),
+            "loc" -> $field("f")))))
     }
   }
 }

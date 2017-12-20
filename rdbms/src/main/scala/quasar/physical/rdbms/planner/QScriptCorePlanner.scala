@@ -24,7 +24,7 @@ import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
-import quasar.qscript.{FreeMap, FreeQS, MapFunc, QScriptCore, QScriptTotal}
+import quasar.qscript.{FreeMap, MapFunc, QScriptCore, QScriptTotal}
 
 import matryoshka._
 import matryoshka.data._
@@ -47,14 +47,11 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
   private def unsupported: F[T[SqlExpr]] = PlannerErrorME[F].raiseError(
         InternalError.fromMsg(s"unsupported QScriptCore"))
 
-  private def take(src: T[SqlExpr], from: FreeQS[T], count: FreeQS[T]): F[T[SqlExpr]] = {
-    val compile = Planner[T, F, QScriptTotal[T, ?]].plan
+  private def take(fromExpr: F[T[SqlExpr]], countExpr: F[T[SqlExpr]]): F[T[SqlExpr]] = 
+    (fromExpr |@| countExpr)(Limit(_, _).embed)
 
-    val fromExp: F[T[SqlExpr]] = from.cataM(interpretM(κ(src.point[F]), compile))
-    val countExp: F[T[SqlExpr]] = count.cataM(interpretM(κ(src.point[F]), compile))
-
-    (fromExp |@| countExp)(Limit(_, _).embed)
-  }
+  private def drop(fromExpr: F[T[SqlExpr]], countExpr: F[T[SqlExpr]]): F[T[SqlExpr]] = 
+    (fromExpr |@| countExpr)(Offset(_, _).embed)
 
   val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
 
@@ -98,15 +95,44 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
             orderBy = bucketExprs ++ orderByExprs.toList
           ).embed
         }
-    case qscript.Subset(src, from, sel, count) => sel match {
-      case qscript.Drop   => unsupported
-      case qscript.Take   => take(src, from, count)
-      case qscript.Sample => take(src, from, count) // TODO needs better sampling (which connector doesn't?)
-    }
+    case qscript.Subset(src, from, sel, count) =>
+      val compile = Planner[T, F, QScriptTotal[T, ?]].plan
+
+      val fromExpr: F[T[SqlExpr]] = from.cataM(interpretM(κ(src.point[F]), compile))
+      val countExpr: F[T[SqlExpr]] = count.cataM(interpretM(κ(src.point[F]), compile))
+
+      sel match {
+        case qscript.Drop   => drop(fromExpr, countExpr)
+        case qscript.Take   => take(fromExpr, countExpr)
+        case qscript.Sample => take(fromExpr, countExpr) // TODO needs better sampling (which connector doesn't?)
+      }
 
     case qscript.Unreferenced() => unref.point[F]
 
-    case other =>     PlannerErrorME[F].raiseError(
+    case qscript.Filter(src, f) =>
+      src.project match {
+        case s@Select(_, From(_, initialFromAlias), initialFilter, _) =>
+          val injectedFilterExpr = processFreeMap(f, initialFromAlias)
+          injectedFilterExpr.map { fe =>
+            val finalFilterExpr = initialFilter.map(i => And[T[SqlExpr]](i.v, fe).embed).getOrElse(fe)
+            s.copy(filter = Some(Filter[T[SqlExpr]](finalFilterExpr))).embed
+          }
+        case other =>
+          for {
+            fromAlias <- genId[T[SqlExpr], F]
+            filterExp <- processFreeMap(f, fromAlias)
+          } yield {
+          Select(
+            Selection(*, none),
+            From(src, fromAlias),
+            Some(Filter(filterExp)),
+            orderBy = nil
+          ).embed
+      }
+    }
+
+    case other =>
+      PlannerErrorME[F].raiseError(
         InternalError.fromMsg(s"unsupported QScriptCore: $other"))
 
       
