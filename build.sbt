@@ -39,10 +39,7 @@ lazy val buildSettings = commonBuildSettings ++ Seq(
 
   ScoverageKeys.coverageHighlighting := true,
 
-  scalacOptions ++= Seq(
-    "-target:jvm-1.8"//,
-    //"-Ybackend:GenBCode"
-  ),
+  scalacOptions += "-target:jvm-1.8",
 
   // NB: -Xlint triggers issues that need to be fixed
   scalacOptions --= Seq(
