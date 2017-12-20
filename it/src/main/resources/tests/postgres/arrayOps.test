@@ -8,7 +8,7 @@
   "data": "basic.data",
 
   "query": "select
-  array_concat(array_concat(make_array(name.last),make_array(name)),make_array(name.first))
+  array_concat(array_concat(make_array(to_string(num)),make_array(name.last)),make_array(name.first))
    as res from basic",
 
   "predicate": "exactly",
@@ -19,7 +19,7 @@
   "ignoreFieldOrder": true,
 
   "expected": [
-    {"res": ["Smith",  {"first": "John", "last": "Smith"}, "John"]},
-    {"res": ["Kowalska", {"first": "Janina", "last": "Kowalska"}, "Janina"]}
+    {"res": ["4",  "Smith",    "John"]},
+    {"res": ["42", "Kowalska", "Janina"]}
   ]
 }
