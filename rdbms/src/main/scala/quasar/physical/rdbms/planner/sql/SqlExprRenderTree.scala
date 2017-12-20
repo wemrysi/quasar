@@ -66,8 +66,6 @@ trait SqlExprRenderTree {
             nonTerminal("Time", a1)
           case Id(v) =>
             Terminal("Id" :: Nil, v.some)
-          case ToJson(v) =>
-            nonTerminal("ToJson", v)
           case Table(v) =>
             Terminal("Table" :: Nil, v.some)
           case RowIds() =>
@@ -86,6 +84,18 @@ trait SqlExprRenderTree {
             nonTerminal("Neg", a1)
           case And(a1, a2) =>
             nonTerminal("And", a1, a2)
+          case Eq(a1, a2) =>
+            nonTerminal("Equal", a1, a2)
+          case Neq(a1, a2) =>
+            nonTerminal("Not Equal", a1, a2)
+          case Lt(a1, a2) =>
+            nonTerminal("<", a1, a2)
+          case Lte(a1, a2) =>
+            nonTerminal("<=", a1, a2)
+          case Gt(a1, a2) =>
+            nonTerminal(">", a1, a2)
+          case Gte(a1, a2) =>
+            nonTerminal(">=", a1, a2)
           case Or(a1, a2) =>
             nonTerminal("Or", a1, a2)
           case Refs(srcs) =>
@@ -104,25 +114,14 @@ trait SqlExprRenderTree {
             )
           case Limit(from, count) => nonTerminal("Limit", from, count)
           case Offset(from, count) => nonTerminal("Offset", from, count)
-          case SelectRow(selection, from, order) =>
-
-            NonTerminal(
-              "SelectRow" :: Nil,
-              none,
-              nt("selectionInRow", selection.alias ∘ (_.v), selection.v) ::
-                List(nt("fromInRow", from.alias.v.some, from.v)) ++
-                order.map {
-                  o =>
-                    nt(s"OrderBy ${o.sortDir}", none, o.v)
-                }
-            )
-
           case Case(wt, e) =>
             NonTerminal("Case" :: Nil, none,
               (wt ∘ (i => nonTerminal("whenThen", i.when, i.`then`))).toList :+
                 nonTerminal("else", e.v))
           case Coercion(t, e) =>
             nonTerminal(s"Coercion: $t", e)
+          case ToArray(v) =>
+            nonTerminal("ARRAY", v)
           case UnaryFunction(t, e) =>
             nonTerminal(s"Function call: $t", e)
           case BinaryFunction(t, a1, a2) =>

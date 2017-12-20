@@ -109,7 +109,30 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
 
     case qscript.Unreferenced() => unref.point[F]
 
-    case other =>     PlannerErrorME[F].raiseError(
+    case qscript.Filter(src, f) =>
+      src.project match {
+        case s@Select(_, From(_, initialFromAlias), initialFilter, _) =>
+          val injectedFilterExpr = processFreeMap(f, initialFromAlias)
+          injectedFilterExpr.map { fe =>
+            val finalFilterExpr = initialFilter.map(i => And[T[SqlExpr]](i.v, fe).embed).getOrElse(fe)
+            s.copy(filter = Some(Filter[T[SqlExpr]](finalFilterExpr))).embed
+          }
+        case other =>
+          for {
+            fromAlias <- genId[T[SqlExpr], F]
+            filterExp <- processFreeMap(f, fromAlias)
+          } yield {
+          Select(
+            Selection(*, none),
+            From(src, fromAlias),
+            Some(Filter(filterExp)),
+            orderBy = nil
+          ).embed
+      }
+    }
+
+    case other =>
+      PlannerErrorME[F].raiseError(
         InternalError.fromMsg(s"unsupported QScriptCore: $other"))
 
       

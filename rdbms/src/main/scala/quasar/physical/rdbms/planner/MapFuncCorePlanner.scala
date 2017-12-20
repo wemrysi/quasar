@@ -22,7 +22,7 @@ import quasar.Data
 import quasar.DataCodec
 import DataCodec.Precise.{DateKey, IntervalKey, TimeKey, TimestampKey}
 import quasar.Planner._
-import quasar.physical.rdbms.planner.sql.{Search, StrLower, StrUpper, Substring, SplitStr, SqlExpr => SQL}
+import quasar.physical.rdbms.planner.sql.{StrLower, StrUpper, Substring, Search, StrSplit, ArrayConcat, SqlExpr => SQL}
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.qscript.{MapFuncsCore => MFC, _}
@@ -111,12 +111,12 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.Modulo(f1, f2) => SQL.Mod[T[SQL]](f1, f2).embed.η[F]
     case MFC.Power(f1, f2) =>  SQL.Pow[T[SQL]](f1, f2).embed.η[F]
     case MFC.Not(f) =>  notImplemented("Not", this)
-    case MFC.Eq(f1, f2) =>  notImplemented("Eq", this)
-    case MFC.Neq(f1, f2) =>  notImplemented("Neq", this)
-    case MFC.Lt(f1, f2) =>  notImplemented("Lt", this)
-    case MFC.Lte(f1, f2) => notImplemented("Lte", this)
-    case MFC.Gt(f1, f2) =>  notImplemented("Gt", this)
-    case MFC.Gte(f1, f2) => notImplemented("Gte", this)
+    case MFC.Eq(f1, f2) => SQL.Eq[T[SQL]](f1, f2).embed.η[F]
+    case MFC.Neq(f1, f2) => SQL.Neq[T[SQL]](f1, f2).embed.η[F]
+    case MFC.Lt(f1, f2) =>  SQL.Lt[T[SQL]](f1, f2).embed.η[F]
+    case MFC.Lte(f1, f2) => SQL.Lte[T[SQL]](f1, f2).embed.η[F]
+    case MFC.Gt(f1, f2) =>  SQL.Gt[T[SQL]](f1, f2).embed.η[F]
+    case MFC.Gte(f1, f2) => SQL.Gte[T[SQL]](f1, f2).embed.η[F]
     case MFC.IfUndefined(f1, f2) => notImplemented("IfUndefined", this)
     case MFC.And(f1, f2) =>  SQL.And[T[SQL]](f1, f2).embed.η[F]
     case MFC.Or(f1, f2) =>  SQL.Or[T[SQL]](f1, f2).embed.η[F]
@@ -132,8 +132,8 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.ToString(f) =>  SQL.Coercion(StringCol, f).embed.η[F]
     case MFC.Search(fStr, fPattern, fIsCaseInsensitive) => SQL.TernaryFunction(Search, fStr, fPattern, fIsCaseInsensitive).embed.η[F]
     case MFC.Substring(fStr, fFrom, fCount) => SQL.TernaryFunction(Substring, fStr, fFrom, fCount).embed.η[F]
-    case MFC.Split(fStr, fDelim) => SQL.BinaryFunction(SplitStr, fStr, fDelim).embed.η[F]
-    case MFC.MakeArray(f) =>  notImplemented("MakeArray", this)
+    case MFC.Split(fStr, fDelim) => SQL.BinaryFunction(StrSplit, fStr, fDelim).embed.η[F]
+    case MFC.MakeArray(f) =>  SQL.ToArray(f).embed.η[F]
     case MFC.MakeMap(key, value) =>
       key.project match {
               case Constant(Data.Str(keyStr)) =>
@@ -141,7 +141,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
               case other =>
                 notImplemented(s"MakeMap with key = $other", this)
             }
-    case MFC.ConcatArrays(f1, f2) =>  notImplemented("ConcatArrays", this)
+    case MFC.ConcatArrays(f1, f2) =>  SQL.BinaryFunction(ArrayConcat, f1, f2).embed.η[F]
     case MFC.ConcatMaps(f1, f2) => ExprPair[T[SQL]](f1, f2).embed.η[F]
     case MFC.ProjectIndex(f1, f2) =>  notImplemented("ProjectIndex", this)
     case MFC.ProjectKey(fSrc, fKey) =>
