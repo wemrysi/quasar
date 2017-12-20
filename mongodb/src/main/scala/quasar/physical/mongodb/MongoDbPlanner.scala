@@ -892,7 +892,7 @@ object MongoDbPlanner {
             ev3: EX :<: ExprOp) = {
           case qscript.Map(src, f) =>
             getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, f)
-          case LeftShift(src, struct0, id, _, repair) => {
+          case LeftShift(src, struct0, id, shiftType, repair) => {
             val rewriteUndefined: CoMapFuncR[T, Hole] => Option[CoMapFuncR[T, Hole]] = {
               case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
                 rollMF[T, Hole](MFC(Guard(exp, tpe, exp0, Free.roll(MFC(MakeArray(Free.roll(MFC(Undefined())))))))).some
@@ -902,18 +902,16 @@ object MongoDbPlanner {
             val struct = struct0.transCata[FreeMap[T]](orOriginal(rewriteUndefined))
 
             if (repair.contains(LeftSideF))
-              struct match {
-                case Embed(CoEnv(\/-(MFC(Guard(exp, Type.FlexArr(_, _, _), exp0, _))))) if exp0 === exp => {
+              shiftType match {
+                case ShiftType.Array => {
                   val struct0 = handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct)
                   val exprMerge: JoinFunc[T] => M[Fix[ExprOp]] =
                     getExprMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(_, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
                   val jsMerge: JoinFunc[T] => M[JsFn] =
                     getJsMerge[T, M](_, jscore.Select(jscore.Ident(JsFn.defaultName), "s"), jscore.Select(jscore.Ident(JsFn.defaultName), "f"))
 
-                  val planMerge: JoinFunc[T] => M[Expr] = exprOrJs(_)(exprMerge, jsMerge)
-
                   struct0 >>= (expr =>
-                    getBuilder[T, M, WF, EX, JoinSide](planMerge(_))(
+                    getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
                       FlatteningBuilder(
                         DocBuilder(
                           src,
@@ -940,8 +938,8 @@ object MongoDbPlanner {
                       -\&/(j)))
               }
               else
-                struct match {
-                  case Embed(CoEnv(\/-(MFC(Guard(exp, Type.FlexArr(_, _, _), exp0, _))))) if exp === exp0 =>
+                shiftType match {
+                  case ShiftType.Array =>
                     getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
                       getExprBuilder[T, M, WF, EX](
                         cfg.funcHandler, cfg.staticHandler)(
