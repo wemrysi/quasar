@@ -1,4 +1,4 @@
-// For now scalaz-specs2 sources are included in foundation tests code since we missing release for specs 2.9.1
+// For now scalaz-specs2 sources are included in foundation tests code since we missing release for specs 3.9.1
 
 package org.specs2.scalaz
 
