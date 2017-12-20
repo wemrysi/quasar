@@ -120,6 +120,8 @@ trait SqlExprRenderTree {
                 nonTerminal("else", e.v))
           case Coercion(t, e) =>
             nonTerminal(s"Coercion: $t", e)
+          case ToArray(v) =>
+            nonTerminal("ARRAY", v)
           case UnaryFunction(t, e) =>
             nonTerminal(s"Function call: $t", e)
           case BinaryFunction(t, a1, a2) =>
