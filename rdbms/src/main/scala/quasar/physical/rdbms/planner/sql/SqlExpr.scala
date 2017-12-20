@@ -46,10 +46,6 @@ object SqlExpr extends SqlExprInstances {
   final case class IfNull[T](a: OneAnd[NonEmptyList, T]) extends SqlExpr[T]
   final case class ExprWithAlias[T](expr: T, alias: String) extends SqlExpr[T]
   final case class ExprPair[T](a: T, b: T) extends SqlExpr[T]
-  final case class ToJson[T](a: T) extends SqlExpr[T]
-
-  final case class SelectRow[T](selection: Selection[T], from: From[T], orderBy: List[OrderBy[T]])
-      extends SqlExpr[T]
 
   final case class Select[T](selection: Selection[T],
                              from: From[T],
@@ -68,6 +64,13 @@ object SqlExpr extends SqlExprInstances {
 
   final case class And[T](a1: T, a2: T) extends SqlExpr[T]
   final case class Or[T](a1: T, a2: T) extends SqlExpr[T]
+
+  final case class Eq[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class Neq[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class Lt[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class Lte[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class Gt[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class Gte[T](a1: T, a2: T) extends SqlExpr[T]
 
   final case class Coercion[T](t: ColumnType, e: T) extends SqlExpr[T]
 
