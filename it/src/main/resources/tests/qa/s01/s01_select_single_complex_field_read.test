@@ -1,5 +1,5 @@
 {
-  "name": "s01_select_single_complex_field_read",
+  "name": "[qa_s01] select single complex field",
 
   "backends": {
           "couchbase":         "skip",
@@ -25,12 +25,10 @@
   "predicate": "exactly",
   "ignoreResultOrder": true,
 
-  "ignoredFields": [],
-
   "ignoreFieldOrder": false,
 
   "expected": [
-  {"name": {"first": "John", "last": "Smith"}},
-  {"name": {"first": "Janina", "last": "Kowalska"}}
+      {"name": {"first": "John", "last": "Smith"}},
+      {"name": {"first": "Janina", "last": "Kowalska"}}
   ]
 }
