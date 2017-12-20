@@ -3,7 +3,7 @@
     "data": ["../customers.data", "../orders.data", "../ordered_items.data", "../inventory_items.data"],
     "backends": {
         "couchbase":         "skip",
-        "marklogic_json":    "ignoreFieldOrder",
+        "marklogic_json":    "pendingIgnoreFieldOrder",
         "mimir":             "pendingIgnoreFieldOrder",
         "mongodb_3_2":       "skip",
         "mongodb_3_4":       "skip",
