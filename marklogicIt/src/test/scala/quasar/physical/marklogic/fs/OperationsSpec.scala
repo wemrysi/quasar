@@ -30,6 +30,7 @@ import quasar.physical.marklogic._
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery._
+import quasar.effect.uuid.UuidReader
 
 import java.util.UUID
 
@@ -40,21 +41,6 @@ import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 final class OperationsSpec extends quasar.Qspec {
-
-  private implicit lazy val sessionReaderOp: SessionReader[Op] = {
-    quasar.contrib.scalaz.MonadReader_.writerTMonadReader_(Free.freeMonad, ISet.setMonoid(Prolog.order), xccSessionR)
-  }
-  private implicit lazy val csourceReaderOp: CSourceReader[Op] = {
-    quasar.contrib.scalaz.MonadReader_.writerTMonadReader_(Free.freeMonad, ISet.setMonoid(Prolog.order), xccSourceR)
-  }
-
-  private implicit lazy val uuidReaderOp: quasar.effect.uuid.UuidReader[Op] = {
-    quasar.contrib.scalaz.MonadReader_.writerTMonadReader_(Free.freeMonad, ISet.setMonoid(Prolog.order), uuidR)
-  }
-
-  private implicit lazy val monadPlanErrOp: MonadPlanErr[Op] = {
-    quasar.contrib.scalaz.MonadError_.writerTMonadError_(Free.freeMonad, ISet.setMonoid(Prolog.order), mlPlanE)
-  }
 
   def markLogicOpsShould(f: Op ~> Id): Unit = {
     "Appending to files consisting of a single Map" >> {
@@ -127,10 +113,10 @@ final class OperationsSpec extends quasar.Qspec {
 
   type Op[A] = PrologT[Free[OpF, ?], A]
 
-  private implicit val xccSessionR = Read.monadReader_[Session, OpF]
-  private implicit val xccSourceR  = Read.monadReader_[ContentSource, OpF]
-  private implicit val uuidR       = Read.monadReader_[UUID, OpF]
-  private implicit val mlPlanE     = Failure.monadError_[MarkLogicPlannerError, OpF]
+  private implicit val xccSessionR: SessionReader[Free[OpF, ?]] = Read.monadReader_[Session, OpF]
+  private implicit val xccSourceR: CSourceReader[Free[OpF, ?]] = Read.monadReader_[ContentSource, OpF]
+  private implicit val uuidR: UuidReader[Free[OpF, ?]] = Read.monadReader_[UUID, OpF]
+  private implicit val mlPlanE: MonadPlanErr[Free[OpF, ?]] = Failure.monadError_[MarkLogicPlannerError, OpF]
   private implicit val listMapShow = Show[Map[String, Data]].contramap[ListMap[String, Data]](x => x)
 
   // Wraps the program in a transaction and forces a rollback, leaving the db untouched.
