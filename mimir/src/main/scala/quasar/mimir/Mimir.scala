@@ -453,7 +453,7 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
           }
         } yield Repr(src.P)(table)
 
-      case qscript.LeftShift(src, struct, idStatus, repair) =>
+      case qscript.LeftShift(src, struct, idStatus, _, repair) =>
         import src.P.trans._
 
         for {
