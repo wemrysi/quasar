@@ -41,9 +41,20 @@ import scalaz.concurrent.Task
 
 final class OperationsSpec extends quasar.Qspec {
 
-  private implicit val a: Xcc[Op] = ???
-  private implicit val b: quasar.effect.uuid.UuidReader[Op] = ???
-  private implicit def c[T]: StructuralPlanner[Op, T] = ???
+  private implicit lazy val sessionReaderOp: SessionReader[Op] = {
+    quasar.contrib.scalaz.MonadReader_.writerTMonadReader_(Free.freeMonad, ISet.setMonoid(Prolog.order), xccSessionR)
+  }
+  private implicit lazy val csourceReaderOp: CSourceReader[Op] = {
+    quasar.contrib.scalaz.MonadReader_.writerTMonadReader_(Free.freeMonad, ISet.setMonoid(Prolog.order), xccSourceR)
+  }
+
+  private implicit lazy val uuidReaderOp: quasar.effect.uuid.UuidReader[Op] = {
+    quasar.contrib.scalaz.MonadReader_.writerTMonadReader_(Free.freeMonad, ISet.setMonoid(Prolog.order), uuidR)
+  }
+
+  private implicit lazy val monadPlanErrOp: MonadPlanErr[Op] = {
+    quasar.contrib.scalaz.MonadError_.writerTMonadError_(Free.freeMonad, ISet.setMonoid(Prolog.order), mlPlanE)
+  }
 
   def markLogicOpsShould(f: Op ~> Id): Unit = {
     "Appending to files consisting of a single Map" >> {
