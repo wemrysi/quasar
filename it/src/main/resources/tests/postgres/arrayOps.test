@@ -1,10 +1,7 @@
 {
   "name": "postgres array manipulation tests",
 
-  "backends": {
-      "mongodb_read_only": "skip"
-  },
-
+  "backends": {},
   "data": "basic.data",
 
   "query": "select
@@ -13,8 +10,6 @@
 
   "predicate": "exactly",
   "ignoreResultOrder": true,
-
-  "ignoredFields": [],
 
   "ignoreFieldOrder": true,
 
