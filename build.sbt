@@ -28,7 +28,14 @@ def exclusiveTasks(tasks: Scoped*) =
 lazy val buildSettings = commonBuildSettings ++ Seq(
   organization := "org.quasar-analytics",
   scalaOrganization := "org.scala-lang",
-  scalacOptions --= Seq("-Yliteral-types", "-Xstrict-patmat-analysis", "-Yinduction-heuristics", "-Ykind-polymorphism", "-Ybackend:GenBCode"),
+  scalacOptions --= Seq(
+    "-Yliteral-types",
+    "-Xstrict-patmat-analysis",
+    "-Yinduction-heuristics",
+    "-Ykind-polymorphism",
+    "-Ybackend:GenBCode",
+    "-Ypartial-unification"
+  ),
   scalacOptions -= "-Xfatal-warnings", // Just for now
   initialize := {
     val version = sys.props("java.specification.version")
@@ -454,7 +461,7 @@ lazy val rdbms = project
 
 /** Implementation of the Spark connector.
   */
-lazy val sparkcore = project
+/*lazy val sparkcore = project
   .settings(name := "quasar-sparkcore-internal")
   .dependsOn(
     connector % BothScopes
@@ -476,7 +483,7 @@ lazy val sparkcore = project
       "quasar.physical.sparkcore.fs.elastic.SparkElastic$",
       "quasar.physical.sparkcore.fs.hdfs.SparkHdfs$",
       "quasar.physical.sparkcore.fs.local.SparkLocal$"))
-  .enablePlugins(AutomateHeaderPlugin)
+  .enablePlugins(AutomateHeaderPlugin)*/
 
 // interfaces
 
@@ -602,7 +609,7 @@ lazy val couchbaseIt = project
   .settings(parallelExecution in Test := false)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val sparkcoreIt = project
+/*lazy val sparkcoreIt = project
   .configs(ExclusiveTests)
   .dependsOn(it % BothScopes, sparkcore)
   .settings(commonSettings)
@@ -612,7 +619,7 @@ lazy val sparkcoreIt = project
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
-  .enablePlugins(AutomateHeaderPlugin)
+  .enablePlugins(AutomateHeaderPlugin)*/
 
 lazy val rdbmsIt = project
   .configs(ExclusiveTests)
@@ -655,7 +662,6 @@ lazy val blueeyes = project.setup
 lazy val mimir = project.setup
   .settings(name := "quasar-mimir-internal")
   .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector)
-  .scalacArgs("-Ypartial-unification")
   .withWarnings
   .settings(
     libraryDependencies ++= Seq(
@@ -672,7 +678,6 @@ lazy val mimir = project.setup
 lazy val niflheim = project.setup
   .settings(name := "quasar-niflheim-internal")
   .dependsOn(blueeyes % BothScopes, precog % BothScopes)
-  .scalacArgs("-Ypartial-unification")
   .withWarnings
   .settings(
     libraryDependencies ++= Seq(
