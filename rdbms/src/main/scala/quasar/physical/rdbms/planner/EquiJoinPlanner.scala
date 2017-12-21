@@ -21,7 +21,7 @@ import quasar.fp.ski._
 import quasar.{NameGenerator}
 import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.physical.rdbms.planner.sql.{SqlExpr}, SqlExpr._
-import quasar.qscript.{MapFunc, EquiJoin, QScriptTotal}
+import quasar.qscript.{MapFunc, JoinFunc, EquiJoin, QScriptTotal, LeftSide, RightSide}
 
 import matryoshka._
 import matryoshka.data._
@@ -34,9 +34,15 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     mapFuncPlanner: Planner[T, F, MapFunc[T, ?]])
     extends Planner[T, F, EquiJoin[T, ?]] {
 
-  // private def processFreeMap(f: FreeMap[T],
-                     // alias: SqlExpr[T[SqlExpr]]): F[T[SqlExpr]] =
-    // f.cataM(interpretM(κ(alias.embed.η[F]), mapFuncPlanner.plan))
+  private def processJoinFunc(
+    f: JoinFunc[T],
+    leftAlias: SqlExpr[T[SqlExpr]],
+    rightAlias: SqlExpr[T[SqlExpr]]
+  ): F[T[SqlExpr]] =
+    f.cataM(interpretM({
+      case LeftSide  => leftAlias.embed.η[F]
+      case RightSide => rightAlias.embed.η[F]
+    }, mapFuncPlanner.plan))
 
   private def unsupported: F[T[SqlExpr]] = PlannerErrorME[F].raiseError(
         InternalError.fromMsg(s"unsupported EquiJoin"))
@@ -44,7 +50,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
   val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
 
   def plan: AlgebraM[F, EquiJoin[T, ?], T[SqlExpr]] = {
-    case EquiJoin(src, lBranch, rBranch, key, f, combine) =>
+    case EquiJoin(src, lBranch, rBranch, key, joinType, combine) =>
       val compile = Planner[T, F, QScriptTotal[T, ?]].plan
       val left: F[T[SqlExpr]] = lBranch.cataM(interpretM(κ(src.point[F]), compile))
       val right: F[T[SqlExpr]] = rBranch.cataM(interpretM(κ(src.point[F]), compile))
