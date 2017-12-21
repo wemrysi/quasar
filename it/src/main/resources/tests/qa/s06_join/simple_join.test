@@ -1,0 +1,24 @@
+{
+    "name": "[qa_s06] simple join",
+
+    "backends": {
+        "couchbase":      "timeout",
+        "marklogic_json": "timeout",
+        "marklogic_xml":  "timeout",
+        "mimir":          "ignoreFieldOrder",
+	"postgres":       "ignoreFieldOrder"
+    },
+
+    "data": ["left.data", "right.data"],
+
+    "query": "select * from left as l join right as r on l.a = r.a",
+
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+       {"c": 2, "a": 1, "b": 10, "login": "mike" },
+       {"c": 2, "a": 1, "b": 20, "login": "john" },
+       {"c": 4, "a": 2, "b": 20, "login": "kate" },
+       {"c": 4, "a": 2, "b": 30, "login": "paul" }
+    ]
+}
