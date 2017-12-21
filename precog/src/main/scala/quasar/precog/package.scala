@@ -16,15 +16,6 @@
 
 package quasar
 
-import java.nio.file.{Files, Paths}
-
 package object precog {
-  type jPath       = java.nio.file.Path
   type =?>[-A, +B] = scala.PartialFunction[A, B]
-
-  def jPath(path: String): jPath = Paths get path
-
-  implicit class jPathOps(private val p: jPath) {
-    def slurpBytes(): Array[Byte] = Files readAllBytes p
-  }
 }
