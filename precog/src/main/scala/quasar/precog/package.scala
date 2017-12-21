@@ -21,9 +21,6 @@ import java.nio.file.{Files, Paths}
 package object precog {
   type jPath       = java.nio.file.Path
   type =?>[-A, +B] = scala.PartialFunction[A, B]
-  type CTag[A]     = scala.reflect.ClassTag[A]
-
-  def ctag[A](implicit z: CTag[A]): CTag[A] = z
 
   def jPath(path: String): jPath = Paths get path
 
