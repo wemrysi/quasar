@@ -18,16 +18,18 @@ package quasar.physical.rdbms.planner
 
 import slamdata.Predef._
 import quasar.fp.ski._
-import quasar.{NameGenerator}
-import quasar.Planner.{InternalError, PlannerErrorME}
-import quasar.physical.rdbms.planner.sql.{SqlExpr}, SqlExpr._
-import quasar.qscript.{MapFunc, JoinFunc, EquiJoin, QScriptTotal, LeftSide, RightSide}
+import quasar.NameGenerator
+import quasar.Planner.PlannerErrorME
+import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}, SqlExpr._
+import quasar.qscript.{EquiJoin, FreeMap, JoinFunc, LeftSide, MapFunc, QScriptTotal, RightSide}
+import quasar.physical.rdbms.planner.sql.SqlExpr.Select.AllCols
 
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-import scalaz._, Scalaz._
+import scalaz._
+import Scalaz._
 
 class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT,
 F[_]: Monad: NameGenerator: PlannerErrorME](
@@ -35,26 +37,48 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     extends Planner[T, F, EquiJoin[T, ?]] {
 
   private def processJoinFunc(
-    f: JoinFunc[T],
-    leftAlias: SqlExpr[T[SqlExpr]],
-    rightAlias: SqlExpr[T[SqlExpr]]
+      f: JoinFunc[T],
+      leftAlias: SqlExpr[T[SqlExpr]],
+      rightAlias: SqlExpr[T[SqlExpr]]
   ): F[T[SqlExpr]] =
     f.cataM(interpretM({
       case LeftSide  => leftAlias.embed.η[F]
       case RightSide => rightAlias.embed.η[F]
     }, mapFuncPlanner.plan))
 
-  private def unsupported: F[T[SqlExpr]] = PlannerErrorME[F].raiseError(
-        InternalError.fromMsg(s"unsupported EquiJoin"))
+  private def processFreeMap(f: FreeMap[T],
+                             alias: SqlExpr[T[SqlExpr]]): F[T[SqlExpr]] =
+    f.cataM(interpretM(κ(alias.embed.η[F]), mapFuncPlanner.plan))
+
+  def * : T[SqlExpr] = AllCols[T[SqlExpr]]().embed
 
   val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
 
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps")) // TODO
   def plan: AlgebraM[F, EquiJoin[T, ?], T[SqlExpr]] = {
-    case EquiJoin(src, lBranch, rBranch, key, joinType, combine) =>
+    case EquiJoin(src, lBranch, rBranch, key, joinType, combine) => // TODO handle joinType
       val compile = Planner[T, F, QScriptTotal[T, ?]].plan
-      val left: F[T[SqlExpr]] = lBranch.cataM(interpretM(κ(src.point[F]), compile))
-      val right: F[T[SqlExpr]] = rBranch.cataM(interpretM(κ(src.point[F]), compile))
 
-      unsupported
+      for {
+        leftAlias <- genId[T[SqlExpr], F]
+        rightAlias <- genId[T[SqlExpr], F]
+        left <- lBranch.cataM(interpretM(κ(src.point[F]), compile))
+        right <- rBranch.cataM(interpretM(κ(src.point[F]), compile))
+        combined <- processJoinFunc(combine, leftAlias, rightAlias)
+        tupl <- {
+          val (lFm, rFm) = key.head // TODO handle all key pairs
+          (processFreeMap(lFm, leftAlias) |@| processFreeMap(rFm, rightAlias))(
+            scala.Tuple2.apply)
+        }
+        (leftKey, rightKey) = tupl
+      } yield {
+        Select(
+          selection = Selection(*, none), // TODO use "combined"
+          from = From(left, leftAlias),
+          join = Join(right, (leftKey, rightKey), rightAlias).some,
+          filter = none,
+          orderBy = nil
+        ).embed
+      }
   }
 }

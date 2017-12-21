@@ -162,8 +162,9 @@ object PostgresRenderQuery extends RenderQuery {
     case RowIds()        => "row_number() over()".right
     case Offset((_, from), NumExpr(count)) => s"$from OFFSET $count".right
     case Limit((_, from), NumExpr(count)) => s"$from LIMIT $count".right
-    case Select(selection, from, filterOpt, order) =>
+    case Select(selection, from, joinOpt, filterOpt, order) =>
       val filter = ~(filterOpt ∘ (f => s" where ${f.v._2}"))
+      val join = ~(joinOpt ∘ (j => s" join ${j.v._2} ${j.alias.v} on ${j.keys._1._2} = ${j.keys._2._2}"))
       val orderStr = order.map { o =>
         val dirStr = o.sortDir match {
           case Ascending => "asc"
@@ -178,7 +179,7 @@ object PostgresRenderQuery extends RenderQuery {
         ""
 
       val fromExpr = s" from ${from.v._2} ${from.alias.v}"
-      s"(select ${selection.v._2}$fromExpr$filter$orderByStr)".right
+      s"(select ${selection.v._2}$fromExpr$join$filter$orderByStr)".right
     case Constant(Data.Str(v)) =>
       val text = v.flatMap { case ''' => "''"; case iv => iv.toString }.self
       s"'$text'".right

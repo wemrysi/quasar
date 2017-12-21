@@ -100,7 +100,7 @@ trait SqlExprRenderTree {
             nonTerminal("Or", a1, a2)
           case Refs(srcs) =>
             nonTerminal("References", srcs:_*)
-          case Select(selection, from, filter, order) =>
+          case Select(selection, from, _, filter, order) => // TODO join
             NonTerminal(
               "Select" :: Nil,
               none,
