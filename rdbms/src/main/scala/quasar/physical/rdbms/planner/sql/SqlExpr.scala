@@ -47,13 +47,16 @@ object SqlExpr extends SqlExprInstances {
   final case class ExprWithAlias[T](expr: T, alias: String) extends SqlExpr[T]
   final case class ExprPair[T](a: T, b: T) extends SqlExpr[T]
 
-  final case class Select[T](selection: Selection[T],
-                             from: From[T],
-                             filter: Option[Filter[T]],
-                             orderBy: List[OrderBy[T]])
+  final case class Select[T](
+    selection: Selection[T],
+    from: From[T],
+    // join: Option[Join[T]],
+    filter: Option[Filter[T]],
+    orderBy: List[OrderBy[T]])
       extends SqlExpr[T]
 
   final case class From[T](v: T, alias: Id[T])
+  final case class Join[T](v: T)
   final case class Selection[T](v: T, alias: Option[Id[T]])
   final case class Table[T](name: String) extends SqlExpr[T]
 
