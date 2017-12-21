@@ -20,14 +20,15 @@ import slamdata.Predef._
 import quasar.fp.ski._
 import quasar.NameGenerator
 import quasar.Planner.PlannerErrorME
-import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}, SqlExpr._
+import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
+import SqlExpr._
 import quasar.qscript.{EquiJoin, FreeMap, JoinFunc, LeftSide, MapFunc, QScriptTotal, RightSide}
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select.AllCols
-
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
+
 import scalaz._
 import Scalaz._
 
@@ -72,8 +73,14 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         }
         (leftKey, rightKey) = tupl
       } yield {
+
+        val selectionExpr = combined.project match {
+          case ExprPair(SqlExpr.Id(_), SqlExpr.Id(_)) => *
+          case other => other.embed
+        }
+
         Select(
-          selection = Selection(*, none), // TODO use "combined"
+          selection = Selection(selectionExpr, none),
           from = From(left, leftAlias),
           join = Join(right, (leftKey, rightKey), rightAlias).some,
           filter = none,
