@@ -33,8 +33,7 @@ lazy val buildSettings = commonBuildSettings ++ Seq(
     "-Xstrict-patmat-analysis",
     "-Yinduction-heuristics",
     "-Ykind-polymorphism",
-    "-Ybackend:GenBCode",
-    "-Ypartial-unification"
+    "-Ybackend:GenBCode"
   ),
   scalacOptions -= "-Xfatal-warnings", // Just for now
   initialize := {
@@ -662,6 +661,7 @@ lazy val blueeyes = project.setup
 lazy val mimir = project.setup
   .settings(name := "quasar-mimir-internal")
   .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector)
+  .scalacArgs("-Ypartial-unification")
   .withWarnings
   .settings(
     libraryDependencies ++= Seq(
@@ -678,6 +678,7 @@ lazy val mimir = project.setup
 lazy val niflheim = project.setup
   .settings(name := "quasar-niflheim-internal")
   .dependsOn(blueeyes % BothScopes, precog % BothScopes)
+  .scalacArgs("-Ypartial-unification")
   .withWarnings
   .settings(
     libraryDependencies ++= Seq(
