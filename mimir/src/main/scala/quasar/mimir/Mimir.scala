@@ -716,14 +716,13 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
         val loaded: EitherT[M, FileSystemError, Repr] =
           for {
             precog <- cake[EitherT[M, FileSystemError, ?]]
-            apiKey <- precog.RootAPIKey.toTask.liftM[MT].liftM[EitherT[?[_], FileSystemError, ?]]
 
             repr <-
               Repr.meld[EitherT[M, FileSystemError, ?]](
                 new DepFn1[Cake, λ[`P <: Cake` => EitherT[M, FileSystemError, P#Table]]] {
                   def apply(P: Cake): EitherT[M, FileSystemError, P.Table] = {
                     val et =
-                      P.Table.constString(Set(pathStr)).load(apiKey, JType.JUniverseT).mapT(_.toTask)
+                      P.Table.constString(Set(pathStr)).load(JType.JUniverseT).mapT(_.toTask)
 
                     et.mapT(_.liftM[MT]) leftMap { err =>
                       val msg = err.messages.toList.reduce(_ + ";" + _)

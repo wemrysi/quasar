@@ -21,8 +21,6 @@ import quasar.contrib.pathy.{firstSegmentName, ADir, AFile, APath, PathSegment}
 import quasar.fs.MoveSemantics
 import quasar.niflheim.NIHDB
 import quasar.precog.common.{Path => PrecogPath}
-import quasar.precog.common.accounts.AccountFinder
-import quasar.precog.common.security._
 import quasar.yggdrasil.{ExactSize, Schema}
 import quasar.yggdrasil.bytecode.JType
 import quasar.yggdrasil.nihdb.NIHDBProjection
@@ -142,7 +140,6 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
       validation <- Task delay {
         NIHDB.create(
           masterChef,
-          Authorities(AccountFinder.DefaultId),
           dir,
           CookThreshold,
           StorageTimeout,
@@ -322,8 +319,5 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
         Table(stream, ExactSize(length))
       }
     }
-
-    def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[Future, ResourceError, Table] =
-      load(table, tpe)
   }
 }

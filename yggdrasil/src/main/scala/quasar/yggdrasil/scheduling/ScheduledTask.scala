@@ -24,7 +24,6 @@ import quasar.blueeyes.json.serialization.Versioned._
 import quasar.blueeyes.json.serialization.DefaultSerialization._
 
 import quasar.precog.common.Path
-import quasar.precog.common.security.{APIKey, Authorities}
 
 import quasar.yggdrasil.execution.EvaluationContext
 
@@ -50,7 +49,7 @@ object CronExpressionSerialization {
   }
 }
 
-case class ScheduledTask(id: UUID, repeat: Option[CronExpression], apiKey: APIKey, authorities: Authorities, context: EvaluationContext, source: Path, sink: Path, timeoutMillis: Option[Long]) {
+case class ScheduledTask(id: UUID, repeat: Option[CronExpression], context: EvaluationContext, source: Path, sink: Path, timeoutMillis: Option[Long]) {
   def taskName = "Scheduled %s -> %s".format(source, sink)
   def timeout = timeoutMillis map { to => Duration(to, TimeUnit.MILLISECONDS) }
 }
@@ -58,7 +57,7 @@ case class ScheduledTask(id: UUID, repeat: Option[CronExpression], apiKey: APIKe
 object ScheduledTask {
   import CronExpressionSerialization._
 
-  val schemaV1 = "id" :: "repeat" :: "apiKey" :: "authorities" :: "prefix" :: "source" :: "sink" :: "timeout" :: HNil
+  val schemaV1 = "id" :: "repeat" :: "prefix" :: "source" :: "sink" :: "timeout" :: HNil
 
   implicit val decomposer: Decomposer[ScheduledTask] = decomposerV(schemaV1, Some("1.0".v))
   implicit val extractor:  Extractor[ScheduledTask]  = extractorV(schemaV1, Some("1.0".v))
