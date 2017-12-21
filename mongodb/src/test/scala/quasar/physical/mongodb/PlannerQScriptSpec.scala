@@ -498,7 +498,7 @@ class PlannerQScriptSpec extends
                   $lte($literal(Bson.Arr()), $field("loc")),
                   $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("loc"),
-                $literal(Bson.Undefined)))),
+                $arrayLit(List($literal(Bson.Undefined)))))),
           $unwind(DocField("0")),
           $project(reshape(
             "0" ->
@@ -507,11 +507,11 @@ class PlannerQScriptSpec extends
                   $lte($literal(Bson.Arr()), $field("0")),
                   $lt($field("0"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("0"),
-                $literal(Bson.Undefined)))),
+                $arrayLit(List($literal(Bson.Undefined)))))),
           $unwind(DocField("0")),
           $project(reshape(
             sigil.Quasar -> $field("0")))))
-    }.pendingUntilFixed
+    }
 
     "plan LeftShift with reference to LeftSide" in {
       qplan(

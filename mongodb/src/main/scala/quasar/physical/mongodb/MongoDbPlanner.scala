@@ -892,25 +892,28 @@ object MongoDbPlanner {
             ev3: EX :<: ExprOp) = {
           case qscript.Map(src, f) =>
             getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, f)
-          case LeftShift(src, struct0, id, shiftType, repair) => {
-            val rewriteUndefined: CoMapFuncR[T, Hole] => Option[CoMapFuncR[T, Hole]] = {
+          case LeftShift(src, struct, id, shiftType, repair) => {
+            def rewriteUndefined[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
               case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
-                rollMF[T, Hole](MFC(Guard(exp, tpe, exp0, Free.roll(MFC(MakeArray(Free.roll(MFC(Undefined())))))))).some
+                rollMF[T, A](MFC(Guard(exp, tpe, exp0, Free.roll(MFC(MakeArray(Free.roll(MFC(Undefined())))))))).some
               case _ => none
             }
-
-            val struct = struct0.transCata[FreeMap[T]](orOriginal(rewriteUndefined))
 
             if (repair.contains(LeftSideF))
               shiftType match {
                 case ShiftType.Array => {
-                  val struct0 = handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct)
+                  val target =
+                    handleFreeMap[T, M, EX](
+                      cfg.funcHandler,
+                      cfg.staticHandler,
+                      struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole])))
+
                   val exprMerge: JoinFunc[T] => M[Fix[ExprOp]] =
                     getExprMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(_, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
                   val jsMerge: JoinFunc[T] => M[JsFn] =
                     getJsMerge[T, M](_, jscore.Select(jscore.Ident(JsFn.defaultName), "s"), jscore.Select(jscore.Ident(JsFn.defaultName), "f"))
 
-                  struct0 >>= (expr =>
+                  target >>= (expr =>
                     getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
                       FlatteningBuilder(
                         DocBuilder(
@@ -918,7 +921,8 @@ object MongoDbPlanner {
                           ListMap(
                             BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                             BsonField.Name("f") -> expr)),
-                        Set(StructureType.Array(DocField(BsonField.Name("f")), id))), repair))
+                        Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                      repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide]))))
                 }
                 case _ =>
                   (handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct) ⊛
@@ -939,14 +943,18 @@ object MongoDbPlanner {
               }
               else
                 shiftType match {
-                  case ShiftType.Array =>
-                    getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
+                  case ShiftType.Array => {
+                    val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
+                    val repair0 = repair.as[Hole](SrcHole).transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
+
+                    getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct0) >>= (builder =>
                       getExprBuilder[T, M, WF, EX](
                         cfg.funcHandler, cfg.staticHandler)(
                         FlatteningBuilder(
                           builder,
                           Set(StructureType.Array(DocVar.ROOT(), id))),
-                          repair.as(SrcHole)))
+                          repair0))
+                  }
                   case _ =>
                     getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
                       getExprBuilder[T, M, WF, EX](
