@@ -53,9 +53,8 @@ object Dependencies {
     "org.specs2"                 %% "specs2-core"               % specsVersion                         % Test,
     "org.specs2"                 %% "specs2-scalacheck"         % specsVersion                         % Test,
     "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.13") % Test,
-    "org.typelevel"              %% "shapeless-scalacheck"      % "0.6.1"                              % Test
-    // For now scalaz-specs2 sources are included in foundation tests code since we missing release for specs 3.9.1
-    // "org.typelevel"              %% "scalaz-specs2"            % "0.5.1-SNAPSHOT"                     % Test
+    "org.typelevel"              %% "shapeless-scalacheck"      % "0.6.1"                              % Test,
+    "org.typelevel"              %% "scalaz-specs2"             % "0.5.1"                              % Test
   )
 
   def frontend = Seq(
