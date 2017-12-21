@@ -33,7 +33,7 @@ import java.lang.Double.isInfinite
   */
 sealed trait JValue extends Product with Ordered[JValue] {
   def compare(that: JValue): Int = this.typeIndex compare that.typeIndex
-  def to_s = this.renderPretty
+  override def toString = this.renderPretty
 }
 
 sealed trait JContainer extends JValue {
