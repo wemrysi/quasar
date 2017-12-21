@@ -9,9 +9,9 @@
 	"postgres":       "ignoreFieldOrder"
     },
 
-    "data": ["leftData.data", "rightData.data"],
+    "data": ["leftData2.data", "rightData.data"],
 
-    "query": "select * from leftData as l inner join rightData as r on l.a = r.a",
+    "query": "select * from leftData2 as l inner join rightData as r on l.a = r.a",
 
     "predicate": "exactly",
     "ignoreResultOrder": true,

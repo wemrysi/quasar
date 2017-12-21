@@ -64,9 +64,11 @@ trait SqlExprTraverse {
       case Select(selection, from, joinOpt, filterOpt, order) =>
         val newOrder = order.traverse(o => f(o.v).map(newV => OrderBy(newV, o.sortDir)))
         val sel = f(selection.v) ∘ (i => Selection(i, selection.alias ∘ (a => Id[B](a.v))))
-        val join = joinOpt.traverse(j => (f(j.v) ⊛ f(j.keys._1) ⊛ f(j.keys._2)) {
-          case (v, lk, rk) => Join(v, (lk, rk), Id[B](j.alias.v))
+
+        val join = joinOpt.traverse(j => (f(j.v) ⊛ j.keys.traverse { case (a, b) => (f(a) ⊛ f(b))(scala.Tuple2.apply)}) {
+          case (v, ks) => Join(v, ks, Id[B](j.alias.v))
         })
+
         val alias = f(from.v).map(b => From(b, Id[B](from.alias.v)))
 
         (sel ⊛

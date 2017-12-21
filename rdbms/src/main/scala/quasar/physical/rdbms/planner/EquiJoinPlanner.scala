@@ -16,7 +16,6 @@
 
 package quasar.physical.rdbms.planner
 
-import slamdata.Predef._
 import quasar.fp.ski._
 import quasar.NameGenerator
 import quasar.Planner.PlannerErrorME
@@ -55,9 +54,8 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
 
   val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps")) // TODO
   def plan: AlgebraM[F, EquiJoin[T, ?], T[SqlExpr]] = {
-    case EquiJoin(src, lBranch, rBranch, key, joinType, combine) => // TODO handle joinType
+    case EquiJoin(src, lBranch, rBranch, keys, joinType, combine) => // TODO handle joinType
       val compile = Planner[T, F, QScriptTotal[T, ?]].plan
 
       for {
@@ -66,23 +64,27 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         left <- lBranch.cataM(interpretM(κ(src.point[F]), compile))
         right <- rBranch.cataM(interpretM(κ(src.point[F]), compile))
         combined <- processJoinFunc(combine, leftAlias, rightAlias)
-        tupl <- {
-          val (lFm, rFm) = key.head // TODO handle all key pairs
-          (processFreeMap(lFm, leftAlias) |@| processFreeMap(rFm, rightAlias))(
-            scala.Tuple2.apply)
-        }
-        (leftKey, rightKey) = tupl
+        keyExprs <-
+          keys.traverse {
+            case (lFm, rFm) =>
+              (processFreeMap(lFm, leftAlias) |@| processFreeMap(rFm, rightAlias))(scala.Tuple2.apply)
+          }
       } yield {
 
         val selectionExpr = combined.project match {
-          case ExprPair(SqlExpr.Id(_), SqlExpr.Id(_)) => *
-          case other => other.embed
+          case e@ExprPair(a, b) =>
+            (a.project, b.project) match {
+              case (SqlExpr.Id(_), SqlExpr.Id(_)) => *
+              case _ => e.embed
+            }
+          case other =>
+            other.embed
         }
 
         Select(
           selection = Selection(selectionExpr, none),
           from = From(left, leftAlias),
-          join = Join(right, (leftKey, rightKey), rightAlias).some,
+          join = Join(right, keyExprs, rightAlias).some,
           filter = none,
           orderBy = nil
         ).embed

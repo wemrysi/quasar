@@ -56,7 +56,7 @@ object SqlExpr extends SqlExprInstances {
       extends SqlExpr[T]
 
   final case class From[T](v: T, alias: Id[T])
-  final case class Join[T](v: T, keys: (T, T), alias: Id[T])
+  final case class Join[T](v: T, keys: List[(T, T)], alias: Id[T])
   final case class Selection[T](v: T, alias: Option[Id[T]])
   final case class Table[T](name: String) extends SqlExpr[T]
 

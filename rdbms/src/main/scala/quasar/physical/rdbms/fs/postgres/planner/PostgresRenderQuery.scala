@@ -164,7 +164,14 @@ object PostgresRenderQuery extends RenderQuery {
     case Limit((_, from), NumExpr(count)) => s"$from LIMIT $count".right
     case Select(selection, from, joinOpt, filterOpt, order) =>
       val filter = ~(filterOpt ∘ (f => s" where ${f.v._2}"))
-      val join = ~(joinOpt ∘ (j => s" join ${j.v._2} ${j.alias.v} on ${j.keys._1._2} = ${j.keys._2._2}"))
+      val join = ~(joinOpt ∘ (j => {
+
+        val joinKeyStr = j.keys.map {
+          case (TextExpr(lK), TextExpr(rK)) => s"$lK = $rK"
+        }.intercalate(" and ")
+
+        s" join ${j.v._2} ${j.alias.v} on $joinKeyStr"
+      }))
       val orderStr = order.map { o =>
         val dirStr = o.sortDir match {
           case Ascending => "asc"
