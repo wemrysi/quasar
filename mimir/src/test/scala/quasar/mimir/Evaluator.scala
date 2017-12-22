@@ -34,7 +34,6 @@ import scala.collection.immutable.Queue
 
 trait EvaluatorModule[M[+ _]]
     extends Memoizer
-    with TypeInferencer
     with OpFinderModule[M]
     with ReductionFinderModule[M]
     with TransSpecableModule[M]
@@ -82,11 +81,10 @@ trait EvaluatorModule[M[+ _]]
         composeOptimizations(
           optimize,
           List[DepGraph => DepGraph](
-            inferTypes(JType.JUniverseT), { g =>
+            { g =>
               megaReduce(g, findReductions(g, ctx))
             },
-            memoize
-          ))
+            memoize))
     }
 
     /**
