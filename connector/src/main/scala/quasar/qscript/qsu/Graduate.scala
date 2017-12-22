@@ -82,7 +82,7 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
   private type QSU[A] = QScriptUniform[A]
   private type RefsR[F[_]] = MonadReader_[F, References]
 
-  private final case class SrcMerge[A, B](src: A, lval: B, rval: B)
+  private case class SrcMerge[A, B](src: A, lval: B, rval: B)
 
   private val func = construction.Func[T]
 

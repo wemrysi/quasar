@@ -230,7 +230,7 @@ object StructuralType extends StructuralTypeInstances {
 sealed abstract class StructuralTypeInstances extends StructuralTypeInstances0 {
   import StructuralType.{ST, STF, TypeST, TagST}
 
-  private final case class TTags[L, A](tags: List[TypeTag], tpe: TypeF[L, A])
+  private case class TTags[L, A](tags: List[TypeTag], tpe: TypeF[L, A])
 
   private object TTags {
     def collectTags[V, L]: Transform[Cofree[TTags[L, ?], V], STF[L, V, ?], EnvT[V, TTags[L, ?], ?]] = {

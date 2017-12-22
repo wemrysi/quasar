@@ -185,7 +185,7 @@ object PostgresRenderQuery extends RenderQuery {
       s"(select ${selection.v._2}$fromExpr$filter$orderByStr)".right
     case Union((_, left), (_, right)) => s"($left UNION $right)".right
     case Constant(Data.Str(v)) =>
-      val text = v.flatMap { case ''' => "''"; case iv => iv.toString }.self
+      val text = v.flatMap { case '\'' => "''"; case iv => iv.toString }.self
       s"'$text'".right
     case Constant(v) =>
       DataCodec.render(v).map{ rendered => v match {

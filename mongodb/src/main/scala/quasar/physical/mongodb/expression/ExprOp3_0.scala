@@ -38,6 +38,7 @@ object ExprOp3_0F {
         Equal.equal {
           case ($dateToStringF(fmt1, x1), $dateToStringF(fmt2, x2)) =>
             fmt1 ≟ fmt2 && x1 ≟ x2
+          case _ => false
         }
       }
     }

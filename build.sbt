@@ -48,8 +48,7 @@ lazy val buildSettings = commonBuildSettings ++ Seq(
   scalacOptions += "-target:jvm-1.8",
 
   // NB: -Xlint triggers issues that need to be fixed
-  scalacOptions --= Seq(
-    "-Xlint"),
+  scalacOptions --= Seq("-Xlint"),
   // NB: Some warts are disabled in specific projects. Here’s why:
   //   • AsInstanceOf   – wartremover/wartremover#266
   //   • others         – simply need to be reviewed & fixed
