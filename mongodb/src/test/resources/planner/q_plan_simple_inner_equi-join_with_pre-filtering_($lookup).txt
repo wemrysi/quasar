@@ -34,13 +34,7 @@ Chain
 │     │     ╰─ Doc
 │     │        ╰─ Expr($pop -> Gte(Int32(10000)))
 │     ├─ $MapF
-│     │  ├─ JavaScript(function (key, value) {
-│     │  │               return [
-│     │  │                 {
-│     │  │                   "0": (isObject(value) && (! Array.isArray(value))) ? value._id : undefined
-│     │  │                 },
-│     │  │                 { "left": [], "right": [value] }]
-│     │  │             })
+│     │  ├─ JavaScript(function (key, value) { return [{ "0": value._id }, { "left": [], "right": [value] }] })
 │     │  ╰─ Scope(Map())
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
@@ -61,49 +55,5 @@ Chain
 ├─ $UnwindF(DocField(BsonField.Name("left")))
 ╰─ $ProjectF
    ├─ Name("city" -> "$left.city")
-   ├─ Name("state" -> {
-   │       "$cond": [
-   │         {
-   │           "$and": [
-   │             {
-   │               "$lte": [
-   │                 { "$literal": {  } },
-   │                 {
-   │                   "$cond": [
-   │                     {
-   │                       "$and": [
-   │                         { "$lte": [{ "$literal": {  } }, "$right"] },
-   │                         { "$lt": ["$right", { "$literal": [] }] }]
-   │                     },
-   │                     "$right",
-   │                     { "$literal": undefined }]
-   │                 }]
-   │             },
-   │             {
-   │               "$lt": [
-   │                 {
-   │                   "$cond": [
-   │                     {
-   │                       "$and": [
-   │                         { "$lte": [{ "$literal": {  } }, "$right"] },
-   │                         { "$lt": ["$right", { "$literal": [] }] }]
-   │                     },
-   │                     "$right",
-   │                     { "$literal": undefined }]
-   │                 },
-   │                 { "$literal": [] }]
-   │             }]
-   │         },
-   │         {
-   │           "$cond": [
-   │             {
-   │               "$and": [
-   │                 { "$lte": [{ "$literal": {  } }, "$right"] },
-   │                 { "$lt": ["$right", { "$literal": [] }] }]
-   │             },
-   │             "$right.state",
-   │             { "$literal": undefined }]
-   │         },
-   │         { "$literal": undefined }]
-   │     })
+   ├─ Name("state" -> "$right.state")
    ╰─ ExcludeId
