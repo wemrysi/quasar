@@ -58,32 +58,6 @@ object JsonASTSpec extends quasar.Qspec {
     prop(idempotencyProp)
   }
 
-  "Diff identity" in {
-    val identityProp = (json: JValue) =>
-      (json diff JUndefined) == Diff(JUndefined, JUndefined, json) &&
-        (JUndefined diff json) == Diff(JUndefined, json, JUndefined)
-
-    prop(identityProp)
-  }
-
-  "Diff with self is empty" in {
-    val emptyProp = (x: JValue) => (x diff x) == Diff(JUndefined, JUndefined, JUndefined)
-    prop(emptyProp)
-  }
-
-  "Diff is subset of originals" in {
-    val subsetProp = (x: JObject, y: JObject) => {
-      val Diff(c, a, d) = x diff y
-      y == (y merge (c merge a))
-    }
-    prop(subsetProp)
-  }
-
-  "Diff result is same when fields are reordered" in {
-    val reorderProp = (x: JObject) => (x diff reorderFields(x)) == Diff(JUndefined, JUndefined, JUndefined)
-    prop(reorderProp)
-  }
-
   "delete" in {
     JParser.parseUnsafe("""{ "foo": { "bar": 1, "baz": 2 } }""").delete(JPath("foo.bar")) must beSome(JParser.parseUnsafe("""{ "foo": { "baz": 2 } }"""))
   }

@@ -222,7 +222,6 @@ package object json {
   implicit class JValueOps(private val self: JValue) {
     import Validation._
 
-    def diff(other: JValue)          = Diff.diff(self, other)
     def merge(other: JValue): JValue = Merge.merge(self, other)
 
     def typeIndex: Int = self match {
