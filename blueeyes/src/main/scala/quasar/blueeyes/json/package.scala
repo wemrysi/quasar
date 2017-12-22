@@ -66,7 +66,7 @@ package object json {
     def apply(index: Int): JPathNode = nodes(index)
     def head: Option[JPathNode]      = nodes.headOption
     def tail: JPath                  = JPath(nodes.tail)
-    def path: String                 = x.to_s
+    def path: String                 = x.toString
 
     def ancestors: List[JPath] = {
       def loop(path: JPath, acc: List[JPath]): List[JPath] = path.parent.fold(acc)(p => loop(p, p :: acc))
