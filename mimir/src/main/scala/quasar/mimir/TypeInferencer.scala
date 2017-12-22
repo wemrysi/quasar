@@ -161,10 +161,10 @@ trait TypeInferencer extends DAG {
       graph mapDown { recurse =>
         {
           case ld @ AbsoluteLoad(parent, _) =>
-            AbsoluteLoad(recurse(parent), typing(ld))(ld.loc)
+            AbsoluteLoad(recurse(parent), typing(ld))
 
           case ld @ RelativeLoad(parent, _) =>
-            RelativeLoad(recurse(parent), typing(ld))(ld.loc)
+            RelativeLoad(recurse(parent), typing(ld))
         }
       }
     }

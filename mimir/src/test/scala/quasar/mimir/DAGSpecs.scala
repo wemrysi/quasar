@@ -23,7 +23,6 @@ import quasar.yggdrasil._
 import quasar.precog.TestSupport._
 
 object DAGSpecs extends Specification with DAG with FNDummyModule {
-  import instructions._
   import dag._
 
   type Lib = RandomLibrary
@@ -31,18 +30,17 @@ object DAGSpecs extends Specification with DAG with FNDummyModule {
 
   "mapDown" should {
     "rewrite a AbsoluteLoad shared across Split branches to the same object" in {
-      val line = Line(1, 1, "")
-      val load = dag.AbsoluteLoad(Const(CString("/clicks"))(line))(line)
+      val load = dag.AbsoluteLoad(Const(CString("/clicks")))
 
       val id = new Identifier
 
       val input = dag.Split(
         dag.Group(1, load, UnfixedSolution(0, load)),
-        SplitParam(0, id)(line), id)(line)
+        SplitParam(0, id), id)
 
       val result = input.mapDown { recurse => {
         case graph @ dag.AbsoluteLoad(Const(CString(path)), tpe) =>
-          dag.AbsoluteLoad(Const(CString("/foo" + path))(graph.loc), tpe)(graph.loc)
+          dag.AbsoluteLoad(Const(CString("/foo" + path)), tpe)
       }}
 
       result must beLike {
@@ -54,14 +52,13 @@ object DAGSpecs extends Specification with DAG with FNDummyModule {
 
   "foldDown" should {
     "look within a Split branch" in {
-      val line = Line(1, 1, "")
-      val load = dag.AbsoluteLoad(Const(CString("/clicks"))(line))(line)
+      val load = dag.AbsoluteLoad(Const(CString("/clicks")))
 
       val id = new Identifier
 
       val input = dag.Split(
         dag.Group(1, load, UnfixedSolution(0, load)),
-        SplitParam(0, id)(line), id)(line)
+        SplitParam(0, id), id)
 
       import scalaz.std.anyVal._
       val result = input.foldDown[Int](true) {

@@ -109,8 +109,8 @@ trait ReductionFinderModule[M[+ _]] extends DAG with EvaluatorMethodsModule[M] w
             dag.Join(
               DerefArray,
               Cross(Some(CrossLeft)),
-              dag.Join(DerefArray, Cross(Some(CrossLeft)), left, Const(CLong(firstIndex))(graph.loc))(graph.loc),
-              Const(CLong(secondIndex))(graph.loc))(graph.loc)
+              dag.Join(DerefArray, Cross(Some(CrossLeft)), left, Const(CLong(firstIndex))),
+              Const(CLong(secondIndex)))
           }
         }
       }

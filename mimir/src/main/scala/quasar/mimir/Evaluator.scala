@@ -61,7 +61,7 @@ trait EvaluatorModule[M[+ _]]
     private val transState = StateMonadTrans[EvaluatorState]
     private val monadState = stateTMonadState[EvaluatorState, N]
 
-    def report: QueryLogger[N, instructions.Line]
+    def report: QueryLogger[N, Unit]
 
     def freshIdScanner: Scanner
 
@@ -484,9 +484,9 @@ trait EvaluatorModule[M[+ _]]
                 .load(jtpe)
                 .fold(
                   {
-                    case ResourceError.NotFound(message)         => report.warn(graph.loc, message) >> Table.empty.point[N]
-                    case ResourceError.PermissionsError(message) => report.warn(graph.loc, message) >> Table.empty.point[N]
-                    case fatal                                   => report.error(graph.loc, "Fatal error while loading dataset") >> report.die() >> Table.empty.point[N]
+                    case ResourceError.NotFound(message)         => report.warn((), message) >> Table.empty.point[N]
+                    case ResourceError.PermissionsError(message) => report.warn((), message) >> Table.empty.point[N]
+                    case fatal                                   => report.error((), "Fatal error while loading dataset") >> report.die() >> Table.empty.point[N]
                   },
                   table => table.point[N]
                 )
@@ -508,9 +508,9 @@ trait EvaluatorModule[M[+ _]]
                 .load(jtpe)
                 .fold(
                   {
-                    case ResourceError.NotFound(message)         => report.warn(graph.loc, message) >> Table.empty.point[N]
-                    case ResourceError.PermissionsError(message) => report.warn(graph.loc, message) >> Table.empty.point[N]
-                    case fatal                                   => report.error(graph.loc, "Fatal error while loading dataset") >> report.die() >> Table.empty.point[N]
+                    case ResourceError.NotFound(message)         => report.warn((), message) >> Table.empty.point[N]
+                    case ResourceError.PermissionsError(message) => report.warn((), message) >> Table.empty.point[N]
+                    case fatal                                   => report.error((), "Fatal error while loading dataset") >> report.die() >> Table.empty.point[N]
                   },
                   table => table.point[N]
                 )
@@ -666,7 +666,7 @@ trait EvaluatorModule[M[+ _]]
                          val rewritten = params.foldLeft(child) {
                            case (child, param) =>
                              val subKey = key \ param.id.toString
-                             replaceNode(child, param, Const(subKey)(param.loc))
+                             replaceNode(child, param, Const(subKey))
                          }
 
                          val back = fullEval(rewritten, splits2, id :: splits.keys.toList)
@@ -692,7 +692,7 @@ trait EvaluatorModule[M[+ _]]
                 N.point(())
               } else {
                 for {
-                  _ <- report.error(graph.loc, "Assertion failed")
+                  _ <- report.error((), "Assertion failed")
                   _ <- report.die() // Arrrrrrrgggghhhhhhhhhhhhhh........ *gurgle*
                 } yield ()
               }
@@ -799,7 +799,7 @@ trait EvaluatorModule[M[+ _]]
         val back    = memoized(graph, evalTransSpecable)
         val endTime = System.nanoTime
 
-        val timingM = transState liftM report.timing(graph.loc, endTime - startTime)
+        val timingM = transState liftM report.timing((), endTime - startTime)
 
         timingM >> back
       }
@@ -867,7 +867,7 @@ trait EvaluatorModule[M[+ _]]
     def inlineNodeValue(graph: DepGraph, from: DepGraph, result: RValue) = {
       val replacements = graph.foldDown(true) {
         case join @ Join(DerefArray, Cross(_), Join(DerefArray, Cross(_), `from`, Const(CLong(index1))), Const(CLong(index2))) =>
-          List((join, Const(result)(from.loc)))
+          List((join, Const(result)))
       }
 
       replacements.foldLeft(graph) {
