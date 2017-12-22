@@ -1,5 +1,5 @@
 {
-    "name": "qa_subset-simple-limit-and-offset",
+    "name": "[qa_s04] select wiith limit and then offset",
 
     "backends": {
        "couchbase":         "pending",

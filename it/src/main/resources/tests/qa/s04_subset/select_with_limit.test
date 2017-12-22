@@ -1,5 +1,5 @@
 {
-    "name": "qa_subset-simple-offset",
+    "name": "[qa_s04] select with limit",
 
     "backends": {
        "couchbase":         "ignoreFieldOrder",
@@ -9,14 +9,13 @@
 
     "data": "subset.data",
 
-    "query": "select a, b from subset order by a offset 3",
+    "query": "select a, b from subset order by a limit 3",
 
     "predicate": "exactly",
     
     "expected": [
-       {"a": 4, "b": 3},
-       {"a": 5, "b": 4},
-       {"a": 6, "b": 5},
-       {"a": 7, "b": 6}
+       {"a": 1, "b": 0},
+       {"a": 2, "b": 1},
+       {"a": 3, "b": 2}
     ]
 }

@@ -1,8 +1,5 @@
 {
-  "name": "complex filter postgres",
-
-  "backends": {
-  },
+  "name": "[qa_s05] complex filter",
 
   "data": "filter.data",
 
@@ -10,8 +7,6 @@
 
   "predicate": "exactly",
   "ignoreResultOrder": true,
-
-  "ignoredFields": [],
 
   "ignoreFieldOrder": true,
 
