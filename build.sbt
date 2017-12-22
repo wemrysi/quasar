@@ -35,7 +35,6 @@ lazy val buildSettings = commonBuildSettings ++ Seq(
     "-Ykind-polymorphism",
     "-Ybackend:GenBCode"
   ),
-  scalacOptions -= "-Xfatal-warnings", // Just for now
   initialize := {
     val version = sys.props("java.specification.version")
     assert(

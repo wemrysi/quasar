@@ -124,10 +124,12 @@ object ReduceFunc {
     case agg.Avg                 => Avg(_)
     case agg.Arbitrary           => Arbitrary(_)
     case structural.UnshiftArray => UnshiftArray(_)
+    case _ => UnshiftArray(_)
   }
 
   def translateBinaryReduction[A]: BinaryFunc => (A, A) => ReduceFunc[A] = {
     case structural.UnshiftMap => UnshiftMap(_, _)
+    case _ => UnshiftMap(_, _)
   }
 
   /** Indicates whether the order of the set going into the reduction is important. */
