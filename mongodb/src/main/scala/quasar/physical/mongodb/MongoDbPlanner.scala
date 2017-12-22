@@ -522,6 +522,22 @@ object MongoDbPlanner {
   //       (naturally `BsonField`), and `B` is the recursive parameter.
   type PartialSelector[T[_[_]]] = Partial[T, BsonField, Selector]
 
+  object IsDefaultSelector {
+    def unapply[T[_[_]]](v: PartialSelector[T]): Option[PartialSelector[T]] =
+      equalsSelector(v, defaultSelector[T]).option(v)
+
+    private def equalsSelector[T[_[_]]](left: PartialSelector[T], right: PartialSelector[T]): Boolean =
+      (left, right) match {
+        case ((leftFn, leftFinder), (rightFn, rightFinder)) => {
+          val dummyName = BsonField.Name("0") // we need to evaluate the PartialFunction to compare it
+          val leftDoc   = leftFn.lift(List.fill(leftFinder.length)(dummyName)).map(_.bson.value)
+          val rightDoc  = rightFn.lift(List.fill(rightFinder.length)(dummyName)).map(_.bson.value)
+
+          leftDoc === rightDoc
+        }
+      }
+  }
+
   def defaultSelector[T[_[_]]]: PartialSelector[T] = (
     { case List(field) =>
       Selector.Doc(ListMap(
@@ -546,10 +562,17 @@ object MongoDbPlanner {
     def invoke2Rel[T[_[_]]](x: OutputM[PartialSelector[T]], y: OutputM[PartialSelector[T]])(f: (Selector, Selector) => Selector):
         OutputM[PartialSelector[T]] =
       (x.toOption, y.toOption) match {
-        case (Some((f1, p1)), Some((f2, p2))) => invoke2Nel(x, y)(f)
-        case (Some((f1, p1)), None)           => (f1, p1.map(There(0, _))).right
-        case (None, Some((f2, p2)))           => (f2, p2.map(There(1, _))).right
-        case (None, None)                     => InternalError.fromMsg(node.map(_._1).shows).left
+        case (Some((f1, p1)), Some((f2, p2)))=>
+          invoke2Nel(x, y)(f)
+        case (Some(IsDefaultSelector(_, _)), None) =>
+          InternalError.fromMsg(node.map(_._1).shows).left
+        case (None, Some(IsDefaultSelector(_, _))) =>
+          InternalError.fromMsg(node.map(_._1).shows).left
+        case (Some((f1, p1)), None) =>
+          (f1, p1.map(There(0, _))).right
+        case (None, Some((f2, p2))) =>
+          (f2, p2.map(There(1, _))).right
+        case _ => InternalError.fromMsg(node.map(_._1).shows).left
       }
 
     node match {
@@ -994,36 +1017,33 @@ object MongoDbPlanner {
             val (keys, dirs) = (bucket.toIList.map((_, SortDir.asc)) <::: order).unzip
             keys.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _))
               .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
-          case Filter(src0, cond0) => {
-            // TODO: Apply elideMoreGeneralGuards to all FreeMap's in the plan, not only here
-            cond0.transCataM(assumeReadType.elideMoreGeneralGuards[T, M, Hole](SrcHole, Type.AnyObject)) >>= { cond =>
-              val selectors = getSelector[T, M, EX](cond, selector[T](cfg.bsonVersion))
-              val typeSelectors = getSelector[T, M, EX](cond, typeSelector[T])
+          case Filter(src0, cond) => {
+            val selectors = getSelector[T, M, EX](cond, selector[T](cfg.bsonVersion))
+            val typeSelectors = getSelector[T, M, EX](cond, typeSelector[T])
 
-              def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
-                  M[WorkflowBuilder[WF]] = {
-                val (sel, inputs) = partialSel
+            def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
+                M[WorkflowBuilder[WF]] = {
+              val (sel, inputs) = partialSel
 
-                inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
-                  .map(WB.filter(src, _, sel))
-              }
+              inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
+                .map(WB.filter(src, _, sel))
+            }
 
-              (selectors.toOption, typeSelectors.toOption) match {
-                case (None, Some(typeSel)) => filterBuilder(src0, typeSel)
-                case (Some(sel), None) => filterBuilder(src0, sel)
-                case (Some(sel), Some(typeSel)) => filterBuilder(src0, typeSel) >>= (filterBuilder(_, sel))
-                case _ =>
-                  handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, cond).map {
-                    // TODO: Postpone decision until we know whether we are going to
-                    //       need mapReduce anyway.
-                    case cond @ HasThat(_) => WB.filter(src0, List(cond), {
-                      case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
-                    })
-                    case \&/.This(js) => WB.filter(src0, Nil, {
-                      case Nil => Selector.Where(js(jscore.ident("this")).toJs)
-                    })
-                  }
-              }
+            (selectors.toOption, typeSelectors.toOption) match {
+              case (None, Some(typeSel)) => filterBuilder(src0, typeSel)
+              case (Some(sel), None) => filterBuilder(src0, sel)
+              case (Some(sel), Some(typeSel)) => filterBuilder(src0, typeSel) >>= (filterBuilder(_, sel))
+              case _ =>
+                handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, cond).map {
+                  // TODO: Postpone decision until we know whether we are going to
+                  //       need mapReduce anyway.
+                  case cond @ HasThat(_) => WB.filter(src0, List(cond), {
+                    case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
+                  })
+                  case \&/.This(js) => WB.filter(src0, Nil, {
+                    case Nil => Selector.Where(js(jscore.ident("this")).toJs)
+                  })
+                }
             }
           }
           case Union(src, lBranch, rBranch) =>
