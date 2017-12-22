@@ -125,8 +125,7 @@ object PostgresRenderQuery extends RenderQuery {
       s"coalesce(${exprs.map(e => text(e)).intercalate(", ")})".right
     case ExprWithAlias((_, expr), alias) =>
       (if (expr === alias) s"$expr" else {
-        val aliasStr = \/.fromTryCatchNonFatal(alias.toLong).map(a => s""""$a"""").getOrElse(alias)
-        s"$expr as $aliasStr"
+        s"""$expr as "$alias""""
       }).right
     case ExprPair((_, s1), (_, s2)) =>
       s"$s1, $s2".right
