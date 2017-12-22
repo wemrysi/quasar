@@ -117,7 +117,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.Lte(f1, f2) => SQL.Lte[T[SQL]](f1, f2).embed.η[F]
     case MFC.Gt(f1, f2) =>  SQL.Gt[T[SQL]](f1, f2).embed.η[F]
     case MFC.Gte(f1, f2) => SQL.Gte[T[SQL]](f1, f2).embed.η[F]
-    case MFC.IfUndefined(f1, f2) => notImplemented("IfUndefined", this)
+    case MFC.IfUndefined(f1, f2) => SQL.IfNull.build(f1, f2).embed.η[F]
     case MFC.And(f1, f2) =>  SQL.And[T[SQL]](f1, f2).embed.η[F]
     case MFC.Or(f1, f2) =>  SQL.Or[T[SQL]](f1, f2).embed.η[F]
     case MFC.Between(f1, f2, f3) =>  notImplemented("Between", this)
