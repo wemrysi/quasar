@@ -334,7 +334,7 @@ class PlannerSpec extends
 
     "plan simple inner equi-join with pre-filtering ($lookup)" in {
       plan(sqlE"select zips.city, smallZips.state from zips join smallZips on zips.`_id` = smallZips.`_id` where smallZips.pop >= 10000") must
-        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, MatchOp, ProjectOp, LookupOp, ProjectOp, UnwindOp, ProjectOp), checkDanglingRefs = false))
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, MatchOp, ProjectOp, LookupOp, UnwindOp, ProjectOp), checkDanglingRefs = false))
     }
 
     "plan simple outer equi-join with wildcard" in {

@@ -13,31 +13,72 @@ Chain
 │  │         [{ "$literal": undefined }]]
 │  │     })
 │  ╰─ ExcludeId
+├─ $UnwindF(DocField(BsonField.Name("f")))
+├─ $ProjectF
+│  ├─ Name("original" -> "$s")
+│  ├─ Name("results" -> {
+│  │       "0": {
+│  │         "$cond": [
+│  │           {
+│  │             "$and": [
+│  │               {
+│  │                 "$lte": [
+│  │                   { "$literal": [] },
+│  │                   {
+│  │                     "$cond": [
+│  │                       {
+│  │                         "$and": [
+│  │                           { "$lte": [{ "$literal": {  } }, "$s"] },
+│  │                           { "$lt": ["$s", { "$literal": [] }] }]
+│  │                       },
+│  │                       "$s.comments",
+│  │                       { "$literal": undefined }]
+│  │                   }]
+│  │               },
+│  │               {
+│  │                 "$lt": [
+│  │                   {
+│  │                     "$cond": [
+│  │                       {
+│  │                         "$and": [
+│  │                           { "$lte": [{ "$literal": {  } }, "$s"] },
+│  │                           { "$lt": ["$s", { "$literal": [] }] }]
+│  │                       },
+│  │                       "$s.comments",
+│  │                       { "$literal": undefined }]
+│  │                   },
+│  │                   { "$literal": BinData(0, "") }]
+│  │               }]
+│  │           },
+│  │           {
+│  │             "$cond": [
+│  │               {
+│  │                 "$and": [
+│  │                   { "$lte": [{ "$literal": {  } }, "$s"] },
+│  │                   { "$lt": ["$s", { "$literal": [] }] }]
+│  │               },
+│  │               "$s.comments",
+│  │               { "$literal": undefined }]
+│  │           },
+│  │           { "$literal": undefined }]
+│  │       },
+│  │       "1": {
+│  │         "$cond": [
+│  │           {
+│  │             "$and": [
+│  │               { "$lte": [{ "$literal": [] }, "$f.replyTo"] },
+│  │               { "$lt": ["$f.replyTo", { "$literal": BinData(0, "") }] }]
+│  │           },
+│  │           "$f.replyTo",
+│  │           { "$literal": undefined }]
+│  │       }
+│  │     })
+│  ╰─ ExcludeId
+├─ $ProjectF
+│  ├─ Name("s" -> "$$ROOT")
+│  ├─ Name("f" -> "$results.0")
+│  ╰─ ExcludeId
 ├─ $SimpleMapF
-│  ├─ Flatten
-│  │  ╰─ JsCore(_.f)
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(s)
-│  │     │  ╰─ Obj
-│  │     │     ├─ Key(original: _.s)
-│  │     │     ╰─ Key(results)
-│  │     │        ╰─ Obj
-│  │     │           ├─ Key(0: (Array.isArray(
-│  │     │           │      (isObject(_.s) && (! Array.isArray(_.s))) ? _.s.comments : undefined) && (isObject(_.s) && (! Array.isArray(_.s)))) ? _.s.comments : undefined)
-│  │     │           ╰─ Key(1: Array.isArray(_.f.replyTo) ? _.f.replyTo : undefined)
-│  │     ╰─ Key(f)
-│  │        ╰─ Access
-│  │           ├─ Access
-│  │           │  ├─ Obj
-│  │           │  │  ├─ Key(original: _.s)
-│  │           │  │  ╰─ Key(results)
-│  │           │  │     ╰─ Obj
-│  │           │  │        ├─ Key(0: (Array.isArray(
-│  │           │  │        │      (isObject(_.s) && (! Array.isArray(_.s))) ? _.s.comments : undefined) && (isObject(_.s) && (! Array.isArray(_.s)))) ? _.s.comments : undefined)
-│  │           │  │        ╰─ Key(1: Array.isArray(_.f.replyTo) ? _.f.replyTo : undefined)
-│  │           │  ╰─ Literal("results")
-│  │           ╰─ Literal("0")
 │  ├─ SubMap
 │  │  ├─ JsCore(_.f)
 │  │  ╰─ Let(m)
