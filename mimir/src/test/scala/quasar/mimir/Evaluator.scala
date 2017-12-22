@@ -33,8 +33,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.Queue
 
 trait EvaluatorModule[M[+ _]]
-    extends Memoizer
-    with OpFinderModule[M]
+    extends OpFinderModule[M]
     with ReductionFinderModule[M]
     with TransSpecableModule[M]
     with TableModule[M] // Remove this explicit dep!
@@ -83,8 +82,7 @@ trait EvaluatorModule[M[+ _]]
           List[DepGraph => DepGraph](
             { g =>
               megaReduce(g, findReductions(g, ctx))
-            },
-            memoize))
+            }))
     }
 
     /**
