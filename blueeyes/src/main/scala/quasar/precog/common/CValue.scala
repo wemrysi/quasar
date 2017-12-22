@@ -256,7 +256,7 @@ sealed trait CType extends Serializable {
     case CLocalTime      => 13
     case CLocalDate      => 14
     case CDuration       => 15
-    case CArrayType(t)   => 16 + t.typeIndex
+    case CArrayType(t)   => 100 + t.typeIndex
   }
 }
 
