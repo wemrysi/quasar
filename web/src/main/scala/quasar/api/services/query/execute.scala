@@ -18,6 +18,7 @@ package quasar.api.services.query
 
 import slamdata.Predef.{ -> => _, _ }
 import quasar._
+import quasar.effect.{ExecutionId, ScopeExecution}
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
 import quasar.contrib.pathy._
@@ -42,14 +43,15 @@ object execute {
 
   // QScriptCore :<: F ===> ThetaJoin :+: F => EquiJoin :+: F
 
-  def service[S[_]](
+  def service[S[_], T](executionIdRef: TaskRef[Long])(
     implicit
     W: WriteFile :<: S,
     Q: QueryFile.Ops[S],
     M: ManageFile :<: S,
     S1: Task :<: S,
     S2: FileSystemFailure :<: S,
-    S3: Mounting :<: S
+    S3: Mounting :<: S,
+    SE: ScopeExecution[Free[S, ?], T]
   ): QHttpService[S] = {
     val fsQ = new FilesystemQueries[S]
     val xform = QueryFile.Transforms[Free[S, ?]]
@@ -66,16 +68,26 @@ object execute {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
         respond(parsedQueryRequest(req, offset, limit) traverse { case (xpr, basePath, off, lim) =>
           // FIXME: use fsQ.evaluateQuery here
-          resolveImports[S](xpr, basePath).run.flatMap { block =>
-            val lpOrSemanticErr =
-              block.leftMap(_.wrapNel).flatMap(block =>
-                queryPlan(block, requestVars(req), basePath, off, lim)
-                .run.value)
-            lpOrSemanticErr traverse (lp => formattedDataResponse(
-                MessageFormat.fromAccept(req.headers.get(Accept)),
-                Q.evaluate(lp).translate(xform.dropPhases)))
-          }
-        })
+          Free.roll(S1(ExecutionId.ofRef(executionIdRef).map(SE.newExecution(_, ST =>
+            for {
+              result <- ST.newScope("total query pipeline (GET)",
+                for {
+                  block <- ST.newScope("resolve imports", resolveImports[S](xpr, basePath).run)
+                  lpOrSemanticErr <-
+                    ST.newScope("planning query", Free.pure(()).flatMap(_ =>
+                      Free.pure(
+                        block.leftMap(_.wrapNel).flatMap(block =>
+                        queryPlan(block, requestVars(req), basePath, off, lim)
+                        .run.value))
+                    ))
+                  evaluated <- ST.newScope("evaluating query",
+                    lpOrSemanticErr traverse (lp => formattedDataResponse(
+                      MessageFormat.fromAccept(req.headers.get(Accept)),
+                      Q.evaluate(lp).translate(xform.dropPhases))))
+                } yield evaluated)
+            } yield result
+          ))))
+      })
 
       case req @ POST -> AsDirPath(path) =>
         free.lift(EntityDecoder.decodeString(req)).into[S] flatMap { query =>
