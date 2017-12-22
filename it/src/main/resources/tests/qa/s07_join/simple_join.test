@@ -1,5 +1,5 @@
 {
-    "name": "[qa_s06] simple join",
+    "name": "[qa_s07] simple join",
 
     "backends": {
         "couchbase":      "timeout",
