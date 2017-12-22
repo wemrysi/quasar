@@ -25,7 +25,6 @@ trait ArrayLibSpecs[M[+_]] extends EvaluatorSpecification[M]
 
   import dag._
   import instructions._
-
   import library._
 
   def testEval(graph: DepGraph): Set[SEvent] = {

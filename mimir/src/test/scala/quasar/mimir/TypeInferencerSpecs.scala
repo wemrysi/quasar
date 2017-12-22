@@ -27,7 +27,6 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
 
   import dag._
   import instructions.{
-    Line,
     BuiltInFunction2Op,
     Add, Neg,
     DerefArray, DerefObject,
