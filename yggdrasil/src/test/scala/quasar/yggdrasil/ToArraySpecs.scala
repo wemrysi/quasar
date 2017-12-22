@@ -18,7 +18,6 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes.json._
-import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
 
 trait ToArraySpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike {
@@ -59,5 +58,3 @@ trait ToArraySpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
     results.getJValues must_== expected
   }
 }
-
-

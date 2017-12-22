@@ -21,7 +21,6 @@ import quasar.yggdrasil.bytecode.JType
 import quasar.precog.common._
 import quasar.precog.common.security._
 
-import quasar.blueeyes.json._
 import quasar.{DateTimeInterval, OffsetDate}
 
 import scala.collection.Set

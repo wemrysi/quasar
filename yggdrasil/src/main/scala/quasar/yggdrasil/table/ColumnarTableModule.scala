@@ -17,7 +17,7 @@
 package quasar.yggdrasil
 package table
 
-import quasar.blueeyes._, json._
+import quasar.blueeyes._
 import quasar.precog.{BitSet, MimeType, MimeTypes}
 import quasar.precog.common._
 import quasar.precog.common.ingest.FileContent

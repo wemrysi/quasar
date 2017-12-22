@@ -17,8 +17,8 @@
 package quasar.yggdrasil.util
 
 import quasar.yggdrasil.table._
-import quasar.{datetime, OffsetDate}
-import scalaz.Store
+import quasar.OffsetDate
+
 import java.time._
 
 object ColumnDateTimeExtractors {

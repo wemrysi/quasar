@@ -16,12 +16,8 @@
 
 package quasar
 
-import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.pkg.tests._, Gen._
-import quasar.{DateTimeInterval, OffsetDate}
-import java.time._
-import java.time.temporal.ChronoField
 import quasar.DateGenerators._
 
 trait RCValueGenerators {

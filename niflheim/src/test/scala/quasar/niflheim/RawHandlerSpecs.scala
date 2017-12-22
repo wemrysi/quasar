@@ -21,11 +21,9 @@ import java.io._
 import quasar.blueeyes.json._
 import quasar.precog.common._
 import quasar.precog.BitSet
+
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
-import java.time._
-
-import quasar.{DateTimeInterval, OffsetDate}
 
 abstract class cleanup(f: File) extends After {
   def after = {
