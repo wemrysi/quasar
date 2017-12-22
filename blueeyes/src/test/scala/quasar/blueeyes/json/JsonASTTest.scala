@@ -25,19 +25,6 @@ object JsonASTSpec extends quasar.Qspec {
     prop(identityProp)
   }
 
-  /*"Functor composition" in {
-    // Works in scalacheck 1.12.5
-    // Fails in ScalaCheck 1.13.0
-    //
-    // [error] /l/w/platform/blueeyes/src/test/scala/blueeyes/json/JsonASTTest.scala:33: could not find implicit value for parameter arbitrary2: org.scalacheck.Arbitrary[blueeyes.json.JValue => blueeyes.json.JValue]
-    // [error]     prop(compositionProp)
-    // [error]         ^
-    // [error] one error found
-    val compositionProp = (json: JValue, fa: JValue => JValue, fb: JValue => JValue) => json.mapUp(fb).mapUp(fa) == json.mapUp(fa compose fb)
-
-    prop(compositionProp)
-  }*/
-
   "Monoid identity" in {
     val identityProp = (json: JValue) => (json ++ JUndefined == json) && (JUndefined ++ json == json)
     prop(identityProp)
@@ -46,16 +33,6 @@ object JsonASTSpec extends quasar.Qspec {
   "Monoid associativity" in {
     val assocProp = (x: JValue, y: JValue, z: JValue) => x ++ (y ++ z) == (x ++ y) ++ z
     prop(assocProp)
-  }
-
-  "Merge identity" in {
-    val identityProp = (json: JValue) => (json merge JUndefined) == json && (JUndefined merge json) == json
-    prop(identityProp)
-  }
-
-  "Merge idempotency" in {
-    val idempotencyProp = (x: JValue) => (x merge x) == x
-    prop(idempotencyProp)
   }
 
   "delete" in {

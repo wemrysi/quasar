@@ -39,12 +39,6 @@ package object json {
   implicit val JPathOrder: Order[JPath]         = Order orderBy (_.nodes)
   implicit val JPathOrdering                    = JPathOrder.toScalaOrdering
 
-  implicit val JObjectMergeMonoid = new Monoid[JObject] {
-    val zero = JObject(Nil)
-
-    def append(v1: JObject, v2: => JObject): JObject = v1.merge(v2).asInstanceOf[JObject]
-  }
-
   val NoJPath     = JPath()
   type JPath      = quasar.precog.JPath
   type JPathNode  = quasar.precog.JPathNode
@@ -221,8 +215,6 @@ package object json {
 
   implicit class JValueOps(private val self: JValue) {
     import Validation._
-
-    def merge(other: JValue): JValue = Merge.merge(self, other)
 
     def typeIndex: Int = self match {
       case JUndefined => -1
