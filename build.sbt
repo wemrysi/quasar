@@ -353,8 +353,6 @@ lazy val core = project
 /** Types and operations needed by query language implementations.
   */
 lazy val frontend = project
-  .settings(test := {}) // for now as tests seem to hang
-  .settings(testOnly := {}) // for now as tests seem to hang
   .settings(name := "quasar-frontend-internal")
   .dependsOn(common % BothScopes)
   .settings(commonSettings)
@@ -709,7 +707,7 @@ lazy val yggdrasil = project.setup
       "co.fs2" %% "fs2-io"     % "0.9.6",
       "co.fs2" %% "fs2-scalaz" % "0.2.0",
 
-      "com.codecommit" %% "smock" % "0.3-specs2-3.9.1" % "test"))
+      "com.codecommit" %% "smock" % "0.3-specs2-3.8.6-48a3325-SNAPSHOT" % "test")) // need to get actual released version here
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)

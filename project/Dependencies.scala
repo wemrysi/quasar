@@ -26,7 +26,7 @@ object Dependencies {
   private val simulacrumVersion   = "0.10.0"
   // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
   // leads to a ParquetRDDE failure under a full test run
-  private val specsVersion        = "3.9.1"
+  private val specsVersion        = "3.8.6"
   private val spireVersion        = "0.14.1"
 
   def foundation = Seq(
@@ -54,7 +54,7 @@ object Dependencies {
     "org.specs2"                 %% "specs2-scalacheck"         % specsVersion                         % Test,
     "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.13") % Test,
     "org.typelevel"              %% "shapeless-scalacheck"      % "0.6.1"                              % Test,
-    "org.typelevel"              %% "scalaz-specs2"             % "0.5.1"                              % Test
+    "org.typelevel"              %% "scalaz-specs2"             % "0.5.0"                              % Test
   )
 
   def frontend = Seq(
