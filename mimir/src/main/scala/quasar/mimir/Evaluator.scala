@@ -481,7 +481,7 @@ trait EvaluatorModule[M[+ _]]
               trans2 = trans.Map1(trans.DerefObjectStatic(pendingTable.trans, paths.Value), f1)
               loaded = pendingTable.table
                 .transform(trans2)
-                .load(ctx.apiKey, jtpe)
+                .load(jtpe)
                 .fold(
                   {
                     case ResourceError.NotFound(message)         => report.warn(graph.loc, message) >> Table.empty.point[N]
@@ -505,7 +505,7 @@ trait EvaluatorModule[M[+ _]]
               trans2 = trans.Map1(trans.DerefObjectStatic(pendingTable.trans, paths.Value), f1)
               loaded = pendingTable.table
                 .transform(trans2)
-                .load(ctx.apiKey, jtpe)
+                .load(jtpe)
                 .fold(
                   {
                     case ResourceError.NotFound(message)         => report.warn(graph.loc, message) >> Table.empty.point[N]
