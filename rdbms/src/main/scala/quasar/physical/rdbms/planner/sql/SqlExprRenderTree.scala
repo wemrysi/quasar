@@ -112,6 +112,8 @@ trait SqlExprRenderTree {
                       nt(s"OrderBy ${o.sortDir}", none, o.v)
                   }
             )
+          case Union(left, right) =>
+            nonTerminal("UNION", left, right)
           case Limit(from, count) => nonTerminal("Limit", from, count)
           case Offset(from, count) => nonTerminal("Offset", from, count)
           case Case(wt, e) =>

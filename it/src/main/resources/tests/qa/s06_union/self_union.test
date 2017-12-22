@@ -1,0 +1,14 @@
+{
+  "name": "self union",
+
+  "backends": {},
+
+  "data": "simple_union.data",
+
+  "query": "select * from simple_union union select * from simple_union",
+
+  "predicate": "exactly",
+
+  "expected": [{"a": "1", "b": 1},
+               {"a": "2", "b": 2}]
+}
