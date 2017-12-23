@@ -482,7 +482,71 @@ class PlannerQScriptSpec extends
           $project(reshape(sigil.Quasar -> $field("0")))))
     }
 
-    "plan double LeftShift without reference to LeftSide" in {
+    "plan double flatten with reference to LeftSide" in {
+      qplan(
+        fix.LeftShift(
+          fix.LeftShift(
+            fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
+            func.Guard(
+              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              Type.FlexArr(0, None, Type.FlexArr(0, None, Type.Top)),
+              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              func.Undefined),
+            qscript.ExcludeId,
+            qscript.ShiftType.Array,
+            func.ConcatMaps(
+              func.MakeMap(
+                func.Constant(json.str("results")),
+                func.Guard(
+                  func.RightSide,
+                  Type.FlexArr(0, None, Type.Top),
+                  func.RightSide,
+                  func.Undefined)),
+              func.MakeMap(
+                func.Constant(json.str("original")),
+                func.LeftSide))),
+          func.ProjectKey(func.Hole, func.Constant(json.str("results"))),
+          qscript.ExcludeId,
+          qscript.ShiftType.Array,
+          func.ConcatMaps(
+            func.MakeMap(
+              func.Constant(json.str("0")),
+              func.ProjectKey(
+                func.ProjectKey(
+                  func.LeftSide,
+                  func.Constant(json.str("original"))),
+                func.Constant(json.str("city")))),
+            func.MakeMap(
+              func.Constant(json.str("1")),
+              func.RightSide)))) must beWorkflow0(
+        chain[Workflow](
+          $read(collection("db", "zips")),
+          $project(reshape(
+            "s" -> $$ROOT,
+            "f" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Arr()), $field("loc")),
+                  $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $field("loc"),
+                $arrayLit(List($literal(Bson.Undefined)))))),
+          $unwind(DocField("f")),
+          $project(reshape(
+            "s" -> reshape("original" -> $field("s")),
+            "f" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Arr()), $field("f")),
+                  $lt($field("f"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $field("f"),
+                $arrayLit(List($literal(Bson.Undefined)))))),
+          $unwind(DocField("f")),
+          $project(reshape(
+            "0" -> $field("s", "original", "city"),
+            "1" -> $field("f")))))
+    }
+
+    "plan double flatten without reference to LeftSide" in {
       qplan(
         fix.LeftShift(
           fix.LeftShift(
@@ -526,7 +590,7 @@ class PlannerQScriptSpec extends
             sigil.Quasar -> $field("0")))))
     }
 
-    "plan LeftShift with reference to LeftSide" in {
+    "plan flatten with reference to LeftSide" in {
       qplan(
         fix.LeftShift(
           fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
