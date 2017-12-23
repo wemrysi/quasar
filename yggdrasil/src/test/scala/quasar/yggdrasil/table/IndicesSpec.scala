@@ -149,50 +149,50 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
 
     "efficiently combine to produce unions" in {
 
-      def tryit(tpls: (TableIndex, Seq[Int], Seq[RValue])*)(expected: JValue*) = {
+      def tryit(tpls: (TableIndex, Seq[Int], Seq[RValue])*)(expected: RValue*) = {
         val table = TableIndex.joinSubTables(tpls.toList)
         table.toJson.copoint.toSet must_== expected.toSet
       }
 
       // both disjunctions have data
       tryit(
-        (index1, Seq(0), Seq(CLong(1))),
-        (index2, Seq(0), Seq(CLong(2)))
+        (index1, Seq(0), Seq(CNum(1))),
+        (index2, Seq(0), Seq(CNum(2)))
       )(
-        JNum(3),
-        JNum(999),
-        JNum(9876),
-        JString("cat"),
-        JNum(13),
-        JArray(JNum(1), JNum(2), JNum(3), JNum(4)),
-        JArray(JNum(666)),
-        JObject(Map("cat" -> JNum(13), "dog" -> JNum(12)))
+        CNum(3),
+        CNum(999),
+        CNum(9876),
+        CString("cat"),
+        CNum(13),
+        RArray(List(CNum(1), CNum(2), CNum(3), CNum(4))),
+        RArray(List(CNum(666))),
+        RObject(Map("cat" -> CNum(13), "dog" -> CNum(12)))
       )
 
       // only first disjunction has data
       tryit(
-        (index1, Seq(0), Seq(CLong(1))),
-        (index2, Seq(0), Seq(CLong(1234567)))
+        (index1, Seq(0), Seq(CNum(1))),
+        (index2, Seq(0), Seq(CNum(1234567)))
       )(
-        JNum(3),
-        JNum(999),
-        JString("cat"),
-        JArray(JNum(666)),
-        JObject(Map("cat" -> JNum(13), "dog" -> JNum(12)))
+        CNum(3),
+        CNum(999),
+        CString("cat"),
+        RArray(List(CNum(666))),
+        RObject(Map("cat" -> CNum(13), "dog" -> CNum(12)))
       )
 
       // only second disjunction has data
       tryit(
-        (index1, Seq(0), Seq(CLong(-8000))),
-        (index2, Seq(0), Seq(CLong(2)))
+        (index1, Seq(0), Seq(CNum(-8000))),
+        (index2, Seq(0), Seq(CNum(2)))
       )(
-        JNum(3),
-        JNum(999),
-        JNum(9876),
-        JString("cat"),
-        JNum(13),
-        JArray(JNum(1), JNum(2), JNum(3), JNum(4)),
-        JObject(Map("cat" -> JNum(13), "dog" -> JNum(12)))
+        CNum(3),
+        CNum(999),
+        CNum(9876),
+        CString("cat"),
+        CNum(13),
+        RArray(List(CNum(1), CNum(2), CNum(3), CNum(4))),
+        RObject(Map("cat" -> CNum(13), "dog" -> CNum(12)))
       )
 
       // neither disjunction has data
