@@ -31,11 +31,69 @@ import scalaz.concurrent.Task
 trait ScopeExecution[F[_], T] {
   def newExecution[A](executionId: ExecutionId, action: ScopeTiming[F, T] => F[A]): F[A]
 }
+object ScopeExecution {
+  def ignore[F[_], T]: ScopeExecution[F, T] = new ScopeExecution[F, T] {
+    def newExecution[A](executionId: ExecutionId, action: ScopeTiming[F, T] => F[A]): F[A] =
+      action(ScopeTiming.ignore[F, T])
+  }
+  def forTask[T](repo: TimingRepository, print: String => Task[Unit]): ScopeExecution[Task, T] =
+    new ScopeExecution[Task, T] {
+      def newExecution[A](executionId: ExecutionId, action: ScopeTiming[Task, T] => Task[A]): Task[A] = {
+        for {
+          a <- action(ScopeTiming.forTask(executionId, repo))
+          repository <- repo.repo.read
+          shownTimings <- repository.get(executionId).fold(().point[Task])(timings => print(s"${executionId.shows}\n${timings.shows}"))
+        } yield a
+      }
+    }
+
+  def forFreeTask[F[_], T](repo: TimingRepository, print: String => Free[F, Unit])
+                          (implicit task: Task :<: F): ScopeExecution[Free[F, ?], T] =
+    new ScopeExecution[Free[F, ?], T] {
+      def newExecution[A](executionId: ExecutionId, action: ScopeTiming[Free[F, ?], T] => Free[F, A]): Free[F, A] = {
+        for {
+          a <- action(ScopeTiming.forFreeTask(executionId, repo))
+          repository <- Free.liftF(task(repo.repo.read))
+          shownTimings <- repository.get(executionId).fold(().point[Free[F, ?]])(timings => print(s"${executionId.shows}\n${timings.shows}"))
+        } yield a
+      }
+    }
+}
 
 /** Represents the ability to create a timing scope.
   */
 trait ScopeTiming[F[_], T] {
   def newScope[A](scopeId: String, fa: => F[A]): F[A]
+}
+
+object ScopeTiming {
+  def ignore[F[_], T]: ScopeTiming[F, T] = new ScopeTiming[F, T] {
+    def newScope[A](scopeId: String, fa: => F[A]): F[A] = fa
+  }
+  def forTask[T](executionId: ExecutionId, repo: TimingRepository): ScopeTiming[Task, T] =
+    new ScopeTiming[Task, T] {
+      def newScope[A](scopeId: String, f: => Task[A]): Task[A] = {
+        for {
+          start <- Task.delay(Instant.now())
+          result <- f
+          end <- Task.delay(Instant.now())
+          _ <- repo.addScope(executionId, scopeId, start, end)
+        } yield result
+      }
+    }
+
+  def forFreeTask[F[_], T](executionId: ExecutionId, repo: TimingRepository)
+                          (implicit task: Task :<: F): ScopeTiming[Free[F, ?], T] =
+  new ScopeTiming[Free[F, ?], T] {
+    def newScope[A](scopeId: String, f: => Free[F, A]): Free[F, A] = {
+      for {
+        start <- Free.liftF(task(Task.delay(Instant.now())))
+        result <- f
+        end <- Free.liftF(task(Task.delay(Instant.now())))
+        _ <- Free.liftF(task(repo.addScope(executionId, scopeId, start, end)))
+      } yield result
+    }
+  }
 }
 
 final case class ExecutionId(index: Long, startTime: Instant)
@@ -67,6 +125,7 @@ object ExecutionTimings {
       }.mkString("\n")
   }
 }
+
 final case class TimingRepository(recordedExecutions: Natural, repo: TaskRef[TreeMap[ExecutionId, ExecutionTimings]]) {
   def addScope(executionId: ExecutionId, scopeId: String, start: Instant, end: Instant): Task[Unit] = {
     repo.modify { executions =>
@@ -84,57 +143,5 @@ object TimingRepository {
   def empty(recordedExecutions: Natural): Task[TimingRepository] = {
     TaskRef(TreeMap.empty[ExecutionId, ExecutionTimings])
       .map(TimingRepository(recordedExecutions, _))
-  }
-}
-
-object ScopeExecution {
-  def forTask[T](repo: TimingRepository, print: String => Task[Unit]): ScopeExecution[Task, T] =
-    new ScopeExecution[Task, T] {
-      def newExecution[A](executionId: ExecutionId, action: ScopeTiming[Task, T] => Task[A]): Task[A] = {
-        for {
-          a <- action(ScopeTiming.forTask(executionId, repo))
-          repository <- repo.repo.read
-          shownTimings <- repository.get(executionId).fold(().point[Task])(timings => print(s"${executionId.shows}\n${timings.shows}"))
-        } yield a
-      }
-    }
-
-  def forFreeTask[F[_], T](repo: TimingRepository, print: String => Free[F, Unit])
-                          (implicit task: Task :<: F): ScopeExecution[Free[F, ?], T] =
-    new ScopeExecution[Free[F, ?], T] {
-      def newExecution[A](executionId: ExecutionId, action: ScopeTiming[Free[F, ?], T] => Free[F, A]): Free[F, A] = {
-        for {
-          a <- action(ScopeTiming.forFreeTask(executionId, repo))
-          repository <- Free.liftF(task(repo.repo.read))
-          shownTimings <- repository.get(executionId).fold(().point[Free[F, ?]])(timings => print(s"${executionId.shows}\n${timings.shows}"))
-        } yield a
-      }
-    }
-}
-
-object ScopeTiming {
-  def forTask[T](executionId: ExecutionId, repo: TimingRepository): ScopeTiming[Task, T] =
-    new ScopeTiming[Task, T] {
-      def newScope[A](scopeId: String, f: => Task[A]): Task[A] = {
-        for {
-          start <- Task.delay(Instant.now())
-          result <- f
-          end <- Task.delay(Instant.now())
-          _ <- repo.addScope(executionId, scopeId, start, end)
-        } yield result
-      }
-    }
-
-  def forFreeTask[F[_], T](executionId: ExecutionId, repo: TimingRepository)
-                          (implicit task: Task :<: F): ScopeTiming[Free[F, ?], T] =
-  new ScopeTiming[Free[F, ?], T] {
-    def newScope[A](scopeId: String, f: => Free[F, A]): Free[F, A] = {
-      for {
-        start <- Free.liftF(task(Task.delay(Instant.now())))
-        result <- f
-        end <- Free.liftF(task(Task.delay(Instant.now())))
-        _ <- Free.liftF(task(repo.addScope(executionId, scopeId, start, end)))
-      } yield result
-    }
   }
 }
