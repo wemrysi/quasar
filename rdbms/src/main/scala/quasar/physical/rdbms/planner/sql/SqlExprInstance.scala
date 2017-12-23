@@ -46,14 +46,19 @@ trait SqlExprTraverse {
       case IsNotNull(v)        => f(v) ∘ IsNotNull.apply
       case IfNull(v)           => v.traverse(f) ∘ (IfNull(_))
       case RowIds()            => G.point(RowIds())
-      case AllCols()          =>  G.point(AllCols())
+      case AllCols()           =>  G.point(AllCols())
       case NumericOp(op, left, right) => (f(left) ⊛ f(right))(NumericOp(op, _, _))
       case Mod(a1, a2)         => (f(a1) ⊛ f(a2))(Mod.apply)
       case Pow(a1, a2)         => (f(a1) ⊛ f(a2))(Pow.apply)
       case And(a1, a2)         => (f(a1) ⊛ f(a2))(And(_, _))
+      case Eq(a1, a2)          => (f(a1) ⊛ f(a2))(Eq(_, _))
+      case Neq(a1, a2)         => (f(a1) ⊛ f(a2))(Neq(_, _))
+      case Lt(a1, a2)          => (f(a1) ⊛ f(a2))(Lt(_, _))
+      case Lte(a1, a2)         => (f(a1) ⊛ f(a2))(Lte(_, _))
+      case Gt(a1, a2)          => (f(a1) ⊛ f(a2))(Gt(_, _))
+      case Gte(a1, a2)         => (f(a1) ⊛ f(a2))(Gte(_, _))
       case Or(a1, a2)          => (f(a1) ⊛ f(a2))(Or(_, _))
       case Neg(v)              => f(v) ∘ Neg.apply
-      case ToJson(v)           => f(v) ∘ ToJson.apply
       case WithIds(v)          => f(v) ∘ WithIds.apply
 
       case Select(selection, from, filterOpt, order) =>
@@ -67,17 +72,6 @@ trait SqlExprTraverse {
           newOrder)(
           Select(_, _, _, _)
         )
-      case SelectRow(selection, from, order) =>
-        val newOrder = order.traverse(o => f(o.v).map(newV => OrderBy(newV, o.sortDir)))
-        val sel = f(selection.v) ∘ (i => Selection(i, selection.alias ∘ (a => Id[B](a.v))))
-        val alias = f(from.v).map(b => From(b, Id[B](from.alias.v)))
-
-        (sel ⊛
-          alias ⊛
-          newOrder)(
-          SelectRow(_, _, _)
-        )
-
       case Case(wt, Else(e)) =>
         (wt.traverse { case WhenThen(w, t) => (f(w) ⊛ f(t))(WhenThen(_, _)) } ⊛
           f(e)
@@ -86,10 +80,12 @@ trait SqlExprTraverse {
         )
 
       case Coercion(t, e) => f(e) ∘ (Coercion(t, _))
+      case ToArray(v) => f(v) ∘ ToArray.apply
       case UnaryFunction(t, e) => f(e) ∘ (UnaryFunction(t, _))
       case BinaryFunction(t, a1, a2) => (f(a1) ⊛ f(a2))(BinaryFunction(t, _, _))
       case TernaryFunction(t, a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(TernaryFunction(t, _, _, _))
       case Limit(from, count) => (f(from) ⊛ f(count))(Limit.apply)
+      case Offset(from, count) => (f(from) ⊛ f(count))(Offset.apply)
 
     }
   }

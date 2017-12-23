@@ -24,6 +24,7 @@ import quasar.OffsetDate
 
 import java.time._
 
+import scala.reflect.ClassTag
 import scala.specialized
 
 class CPathTraversalSpec extends Specification {
@@ -70,7 +71,7 @@ class CPathTraversalSpec extends Specification {
       )))
     }
   }
-  def col[@specialized(Boolean, Long, Double) A](defined: Int*)(values: A*)(implicit builder: ColBuilder[A], m: CTag[A]) = {
+  def col[@specialized(Boolean, Long, Double) A](defined: Int*)(values: A*)(implicit builder: ColBuilder[A], m: ClassTag[A]) = {
     val max = defined.max + 1
     val column = m.newArray(max)
     (defined zip values) foreach { case (i, x) =>

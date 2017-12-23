@@ -1,0 +1,180 @@
+Chain
+├─ $ReadF(db; user_comments)
+├─ $ProjectF
+│  ├─ Name("s" -> "$$ROOT")
+│  ├─ Name("f" -> {
+│  │       "$cond": [
+│  │         {
+│  │           "$and": [
+│  │             { "$lte": [{ "$literal": [] }, "$comments"] },
+│  │             { "$lt": ["$comments", { "$literal": BinData(0, "") }] }]
+│  │         },
+│  │         "$comments",
+│  │         [{ "$literal": undefined }]]
+│  │     })
+│  ╰─ ExcludeId
+├─ $UnwindF(DocField(BsonField.Name("f")))
+├─ $ProjectF
+│  ├─ Name("original" -> "$s")
+│  ├─ Name("results" -> {
+│  │       "0": {
+│  │         "$cond": [
+│  │           {
+│  │             "$and": [
+│  │               {
+│  │                 "$lte": [
+│  │                   { "$literal": [] },
+│  │                   {
+│  │                     "$cond": [
+│  │                       {
+│  │                         "$and": [
+│  │                           { "$lte": [{ "$literal": {  } }, "$s"] },
+│  │                           { "$lt": ["$s", { "$literal": [] }] }]
+│  │                       },
+│  │                       "$s.comments",
+│  │                       { "$literal": undefined }]
+│  │                   }]
+│  │               },
+│  │               {
+│  │                 "$lt": [
+│  │                   {
+│  │                     "$cond": [
+│  │                       {
+│  │                         "$and": [
+│  │                           { "$lte": [{ "$literal": {  } }, "$s"] },
+│  │                           { "$lt": ["$s", { "$literal": [] }] }]
+│  │                       },
+│  │                       "$s.comments",
+│  │                       { "$literal": undefined }]
+│  │                   },
+│  │                   { "$literal": BinData(0, "") }]
+│  │               }]
+│  │           },
+│  │           {
+│  │             "$cond": [
+│  │               {
+│  │                 "$and": [
+│  │                   { "$lte": [{ "$literal": {  } }, "$s"] },
+│  │                   { "$lt": ["$s", { "$literal": [] }] }]
+│  │               },
+│  │               "$s.comments",
+│  │               { "$literal": undefined }]
+│  │           },
+│  │           { "$literal": undefined }]
+│  │       },
+│  │       "1": {
+│  │         "$cond": [
+│  │           {
+│  │             "$and": [
+│  │               { "$lte": [{ "$literal": [] }, "$f.replyTo"] },
+│  │               { "$lt": ["$f.replyTo", { "$literal": BinData(0, "") }] }]
+│  │           },
+│  │           "$f.replyTo",
+│  │           { "$literal": undefined }]
+│  │       }
+│  │     })
+│  ╰─ ExcludeId
+├─ $ProjectF
+│  ├─ Name("s" -> "$$ROOT")
+│  ├─ Name("f" -> "$results.0")
+│  ╰─ ExcludeId
+├─ $SimpleMapF
+│  ├─ SubMap
+│  │  ├─ JsCore(_.f)
+│  │  ╰─ Let(m)
+│  │     ├─ JsCore(_.f)
+│  │     ╰─ Call
+│  │        ├─ JsCore(Object.keys(m).map)
+│  │        ╰─ Fun(Name(k))
+│  │           ╰─ JsCore([k, m[k]])
+│  ├─ Flatten
+│  │  ╰─ JsCore(_.f)
+│  ├─ Map
+│  │  ╰─ Obj
+│  │     ├─ Key(s)
+│  │     │  ╰─ Obj
+│  │     │     ├─ Key(identities)
+│  │     │     │  ╰─ Obj
+│  │     │     │     ╰─ Key(qsu39: _.f[0])
+│  │     │     ╰─ Key(value)
+│  │     │        ╰─ Obj
+│  │     │           ├─ Key(original: _.s)
+│  │     │           ╰─ Key(0: _.f[1])
+│  │     ╰─ Key(f)
+│  │        ╰─ Access
+│  │           ├─ Access
+│  │           │  ├─ Access
+│  │           │  │  ├─ Access
+│  │           │  │  │  ├─ Obj
+│  │           │  │  │  │  ├─ Key(identities)
+│  │           │  │  │  │  │  ╰─ Obj
+│  │           │  │  │  │  │     ╰─ Key(qsu39: _.f[0])
+│  │           │  │  │  │  ╰─ Key(value)
+│  │           │  │  │  │     ╰─ Obj
+│  │           │  │  │  │        ├─ Key(original: _.s)
+│  │           │  │  │  │        ╰─ Key(0: _.f[1])
+│  │           │  │  │  ╰─ Literal("value")
+│  │           │  │  ╰─ Literal("original")
+│  │           │  ╰─ Literal("results")
+│  │           ╰─ Literal("1")
+│  ├─ SubMap
+│  │  ├─ JsCore(_.f)
+│  │  ╰─ Let(m)
+│  │     ├─ JsCore(_.f)
+│  │     ╰─ Call
+│  │        ├─ JsCore(Object.keys(m).map)
+│  │        ╰─ Fun(Name(k))
+│  │           ╰─ JsCore([k, m[k]])
+│  ├─ Flatten
+│  │  ╰─ JsCore(_.f)
+│  ├─ Map
+│  │  ╰─ Obj
+│  │     ├─ Key(identities: _.s.identities)
+│  │     ╰─ Key(value)
+│  │        ╰─ BinOp(||)
+│  │           ├─ If
+│  │           │  ├─ Call
+│  │           │  │  ├─ Ident(isString)
+│  │           │  │  ╰─ Access
+│  │           │  │     ├─ Access
+│  │           │  │     │  ├─ If
+│  │           │  │     │  │  ├─ JsCore(_.s.identities.qsu39 === _.f[0])
+│  │           │  │     │  │  ├─ SpliceObjects
+│  │           │  │     │  │  │  ├─ JsCore(_.s.value)
+│  │           │  │     │  │  │  ╰─ Obj
+│  │           │  │     │  │  │     ╰─ Key(1: _.f[1])
+│  │           │  │     │  │  ╰─ Ident(undefined)
+│  │           │  │     │  ╰─ Literal("0")
+│  │           │  │     ╰─ Literal("id")
+│  │           │  ├─ Call
+│  │           │  │  ├─ JsCore((new RegExp("^.*Dr.*$", "m")).test)
+│  │           │  │  ╰─ Access
+│  │           │  │     ├─ Access
+│  │           │  │     │  ├─ If
+│  │           │  │     │  │  ├─ JsCore(_.s.identities.qsu39 === _.f[0])
+│  │           │  │     │  │  ├─ SpliceObjects
+│  │           │  │     │  │  │  ├─ JsCore(_.s.value)
+│  │           │  │     │  │  │  ╰─ Obj
+│  │           │  │     │  │  │     ╰─ Key(1: _.f[1])
+│  │           │  │     │  │  ╰─ Ident(undefined)
+│  │           │  │     │  ╰─ Literal("0")
+│  │           │  │     ╰─ Literal("id")
+│  │           │  ╰─ Ident(undefined)
+│  │           ╰─ Call
+│  │              ├─ JsCore((new RegExp("^.*Dr.*$", "m")).test)
+│  │              ╰─ Access
+│  │                 ├─ If
+│  │                 │  ├─ JsCore(_.s.identities.qsu39 === _.f[0])
+│  │                 │  ├─ SpliceObjects
+│  │                 │  │  ├─ JsCore(_.s.value)
+│  │                 │  │  ╰─ Obj
+│  │                 │  │     ╰─ Key(1: _.f[1])
+│  │                 │  ╰─ Ident(undefined)
+│  │                 ╰─ Literal("1")
+│  ╰─ Scope(Map())
+├─ $MatchF
+│  ╰─ Doc
+│     ╰─ Expr($value.filter_predicate -> Eq(Bool(true)))
+╰─ $ProjectF
+   ├─ Name("__quasar_mongodb_sigil" -> "$value.filter_source")
+   ╰─ ExcludeId

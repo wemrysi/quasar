@@ -17,20 +17,16 @@
 package quasar.precog
 package common
 
-import quasar.precog._
-import quasar.blueeyes._
-import quasar.DateTimeInterval
-import json._
-import serialization._
+import quasar.{DateTimeInterval, OffsetDate}
+import quasar.blueeyes._, json._, serialization._
 import DefaultSerialization._
 
-import scalaz._
-import Scalaz._
-import Ordering._
+import scalaz._, Scalaz._, Ordering._
+
 import java.math.MathContext.UNLIMITED
 import java.time._
 
-import quasar.OffsetDate
+import scala.reflect.ClassTag
 
 sealed trait RValue { self =>
   def toJValue: JValue
@@ -263,7 +259,7 @@ sealed trait CType extends Serializable {
 sealed trait CNullType extends CType with CNullValue
 
 sealed trait CValueType[A] extends CType { self =>
-  def classTag: CTag[A]
+  def classTag: ClassTag[A]
   def readResolve(): CValueType[A]
   def apply(a: A): CWrappedValue[A]
   def order(a: A, b: A): scalaz.Ordering
@@ -537,7 +533,7 @@ case object CArray {
 
 case class CArrayType[A](elemType: CValueType[A]) extends CValueType[Array[A]] {
   // Spec. bug: Leave lazy here.
-  lazy val classTag: CTag[Array[A]] = elemType.classTag.wrap //elemType.classTag.arrayCTag
+  lazy val classTag: ClassTag[Array[A]] = elemType.classTag.wrap //elemType.classTag.arrayClassTag
 
   type tpe = A
 
@@ -563,7 +559,7 @@ case class CString(value: String) extends CWrappedValue[String] {
 }
 
 case object CString extends CValueType[String] {
-  val classTag: CTag[String] = implicitly[CTag[String]]
+  val classTag: ClassTag[String] = implicitly[ClassTag[String]]
   def readResolve()                 = CString
   def order(s1: String, s2: String) = stringInstance.order(s1, s2)
   def jValueFor(s: String)          = JString(s)
@@ -582,7 +578,7 @@ case object CFalse extends CBoolean(false)
 case object CBoolean extends CValueType[Boolean] {
   def apply(value: Boolean)    = if (value) CTrue else CFalse
   def unapply(cbool: CBoolean) = Some(cbool.value)
-  val classTag: CTag[Boolean] = implicitly[CTag[Boolean]]
+  val classTag: ClassTag[Boolean] = implicitly[ClassTag[Boolean]]
   def readResolve()                   = CBoolean
   def order(v1: Boolean, v2: Boolean) = booleanInstance.order(v1, v2)
   def jValueFor(v: Boolean)           = JBool(v)
@@ -596,7 +592,7 @@ case class CLong(value: Long) extends CNumericValue[Long] {
 }
 
 case object CLong extends CNumericType[Long] {
-  val classTag: CTag[Long] = implicitly[CTag[Long]]
+  val classTag: ClassTag[Long] = implicitly[ClassTag[Long]]
   def readResolve()                          = CLong
   def order(v1: Long, v2: Long)              = longInstance.order(v1, v2)
   def jValueFor(v: Long): JValue             = JNum(bigDecimalFor(v))
@@ -609,7 +605,7 @@ case class CDouble(value: Double) extends CNumericValue[Double] {
 }
 
 case object CDouble extends CNumericType[Double] {
-  val classTag: CTag[Double] = implicitly[CTag[Double]]
+  val classTag: ClassTag[Double] = implicitly[ClassTag[Double]]
   def readResolve()                    = CDouble
   def order(v1: Double, v2: Double)    = doubleInstance.order(v1, v2)
   def jValueFor(v: Double)             = JNum(BigDecimal(v.toString, UNLIMITED))
@@ -622,7 +618,7 @@ case class CNum(value: BigDecimal) extends CNumericValue[BigDecimal] {
 }
 
 case object CNum extends CNumericType[BigDecimal] {
-  val classTag: CTag[BigDecimal] = implicitly[CTag[BigDecimal]]
+  val classTag: ClassTag[BigDecimal] = implicitly[ClassTag[BigDecimal]]
   def readResolve()                         = CNum
   def order(v1: BigDecimal, v2: BigDecimal) = bigDecimalOrder.order(v1, v2)
   def jValueFor(v: BigDecimal)              = JNum(v)
@@ -639,7 +635,7 @@ case class COffsetDateTime(value: OffsetDateTime) extends CWrappedValue[OffsetDa
 }
 
 case object COffsetDateTime extends CValueType[OffsetDateTime] {
-  val classTag: CTag[OffsetDateTime]                = implicitly[CTag[OffsetDateTime]]
+  val classTag: ClassTag[OffsetDateTime]                = implicitly[ClassTag[OffsetDateTime]]
   def readResolve()                                 = COffsetDateTime
   def order(v1: OffsetDateTime, v2: OffsetDateTime) = sys.error("todo")
   def jValueFor(v: OffsetDateTime)                  = JString(v.toString)
@@ -650,7 +646,7 @@ case class COffsetDate(value: OffsetDate) extends CWrappedValue[OffsetDate] {
 }
 
 case object COffsetDate extends CValueType[OffsetDate] {
-  val classTag: CTag[OffsetDate]            = implicitly[CTag[OffsetDate]]
+  val classTag: ClassTag[OffsetDate]            = implicitly[ClassTag[OffsetDate]]
   def readResolve()                         = COffsetDate
   def order(v1: OffsetDate, v2: OffsetDate) = sys.error("todo")
   def jValueFor(v: OffsetDate)              = JString(v.toString)
@@ -661,7 +657,7 @@ case class COffsetTime(value: OffsetTime) extends CWrappedValue[OffsetTime] {
 }
 
 case object COffsetTime extends CValueType[OffsetTime] {
-  val classTag: CTag[OffsetTime]            = implicitly[CTag[OffsetTime]]
+  val classTag: ClassTag[OffsetTime]            = implicitly[ClassTag[OffsetTime]]
   def readResolve()                         = COffsetTime
   def order(v1: OffsetTime, v2: OffsetTime) = sys.error("todo")
   def jValueFor(v: OffsetTime)              = JString(v.toString)
@@ -672,7 +668,7 @@ case class CLocalDateTime(value: LocalDateTime) extends CWrappedValue[LocalDateT
 }
 
 case object CLocalDateTime extends CValueType[LocalDateTime] {
-  val classTag: CTag[LocalDateTime]           = implicitly[CTag[LocalDateTime]]
+  val classTag: ClassTag[LocalDateTime]           = implicitly[ClassTag[LocalDateTime]]
   def readResolve()                       = CLocalDateTime
   def order(v1: LocalDateTime, v2: LocalDateTime) = sys.error("todo")
   def jValueFor(v: LocalDateTime)             = JString(v.toString)
@@ -683,7 +679,7 @@ case class CLocalTime(value: LocalTime) extends CWrappedValue[LocalTime] {
 }
 
 case object CLocalTime extends CValueType[LocalTime] {
-  val classTag: CTag[LocalTime]           = implicitly[CTag[LocalTime]]
+  val classTag: ClassTag[LocalTime]           = implicitly[ClassTag[LocalTime]]
   def readResolve()                       = CLocalTime
   def order(v1: LocalTime, v2: LocalTime) = sys.error("todo")
   def jValueFor(v: LocalTime)             = JString(v.toString)
@@ -694,10 +690,10 @@ case class CLocalDate(value: LocalDate) extends CWrappedValue[LocalDate] {
 }
 
 case object CLocalDate extends CValueType[LocalDate] {
-  val classTag: CTag[LocalDate]         = implicitly[CTag[LocalDate]]
-  def readResolve()                   = CLocalDate
+  val classTag: ClassTag[LocalDate]       = implicitly[ClassTag[LocalDate]]
+  def readResolve()                       = CLocalDate
   def order(v1: LocalDate, v2: LocalDate) = sys.error("todo")
-  def jValueFor(v: LocalDate)           = JString(v.toString)
+  def jValueFor(v: LocalDate)             = JString(v.toString)
 }
 
 case class CDuration(value: DateTimeInterval) extends CWrappedValue[DateTimeInterval] {
@@ -705,7 +701,7 @@ case class CDuration(value: DateTimeInterval) extends CWrappedValue[DateTimeInte
 }
 
 case object CDuration extends CValueType[DateTimeInterval] {
-  val classTag: CTag[DateTimeInterval]                  = implicitly[CTag[DateTimeInterval]]
+  val classTag: ClassTag[DateTimeInterval]              = implicitly[ClassTag[DateTimeInterval]]
   def readResolve()                                     = CDuration
   def order(v1: DateTimeInterval, v2: DateTimeInterval) = sys.error("todo")
   def jValueFor(v: DateTimeInterval)                    = JString(v.toString)

@@ -16,13 +16,12 @@
 
 package quasar.precog.util
 
+import quasar.OffsetDate
 import quasar.blueeyes._
 import quasar.blueeyes.json.JValue
 import quasar.blueeyes.json.serialization.{Decomposer, Extractor}
 import quasar.blueeyes.json.serialization.DefaultSerialization._
 import quasar.blueeyes.json.serialization.Extractor._
-import quasar.precog._
-import quasar.OffsetDate
 
 import org.slf4s.Logging
 
@@ -35,6 +34,7 @@ import scala.collection.JavaConverters._
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable.Builder
 import scala.{ collection => sc }
+import scala.reflect.ClassTag
 
 import java.io.{File, FileReader, IOException}
 import java.io.RandomAccessFile
@@ -542,7 +542,7 @@ object RawBitSet {
   *
   * No objects were allocated in the making of this film.
   */
-final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: CTag](_bound: Int) {
+final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: ClassTag](_bound: Int) {
   val bound = _bound + 1
 
   private val ring = new Array[A](bound)

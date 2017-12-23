@@ -23,6 +23,8 @@ import quasar.{DateTimeInterval, OffsetDate}
 import quasar.precog._
 import quasar.precog.common._
 
+import scala.reflect.ClassTag
+
 /**
   * Defines a base set of codecs that are often used in `RowFormat`s.
   */
@@ -42,7 +44,7 @@ trait StdCodecs {
   implicit def BitSetCodec: Codec[BitSet]
   implicit def RawBitSetCodec: Codec[Array[Int]]
   implicit def IndexedSeqCodec[A](implicit elemCodec: Codec[A]): Codec[IndexedSeq[A]]
-  implicit def ArrayCodec[A](implicit elemCodec: Codec[A], m: CTag[A]): Codec[Array[A]]
+  implicit def ArrayCodec[A](implicit elemCodec: Codec[A], m: ClassTag[A]): Codec[Array[A]]
 
   def codecForCValueType[A](cType: CValueType[A]): Codec[A] = cType match {
     case CBoolean             => BooleanCodec
@@ -79,5 +81,5 @@ trait RowFormatCodecs extends StdCodecs { self: RowFormat =>
   @transient implicit lazy val BitSetCodec: Codec[BitSet]       = Codec.SparseBitSetCodec(columnRefs.size)
   @transient implicit lazy val RawBitSetCodec: Codec[Array[Int]] = Codec.SparseRawBitSetCodec(columnRefs.size)
   implicit def IndexedSeqCodec[A](implicit elemCodec: Codec[A]): Codec[IndexedSeq[A]]       = Codec.IndexedSeqCodec(elemCodec)
-  implicit def ArrayCodec[A](implicit elemCodec: Codec[A], m: CTag[A]): Codec[Array[A]] = Codec.ArrayCodec(elemCodec)(m)
+  implicit def ArrayCodec[A](implicit elemCodec: Codec[A], m: ClassTag[A]): Codec[Array[A]] = Codec.ArrayCodec(elemCodec)(m)
 }

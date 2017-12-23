@@ -18,7 +18,6 @@ package quasar.precog.common
 package ingest
 
 import quasar.blueeyes._
-import security._
 
 import quasar.blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._, Extractor._
@@ -29,7 +28,6 @@ import scalaz._, Scalaz._, Validation._
 import java.time.Instant
 
 sealed trait EventMessage {
-  def apiKey: APIKey
   def path: Path
   def jobId: Option[JobId]
   def timestamp: Instant
@@ -37,7 +35,7 @@ sealed trait EventMessage {
 }
 
 object EventMessage {
-  type EventMessageExtraction = (APIKey, Path, Authorities => EventMessage) \/ EventMessage
+  type EventMessageExtraction = (Path, EventMessage) \/ EventMessage
 
   // an instant that's close enough to the start of timestamping for our purposes
   val defaultTimestamp = instant fromMillis 1362465101979L
@@ -76,9 +74,7 @@ object IngestRecord {
   * ownerAccountId must be determined before the message is sent to the central queue; we have to
   * accept records for processing in the local queue.
   */
-case class IngestMessage(apiKey: APIKey,
-                         path: Path,
-                         writeAs: Authorities,
+case class IngestMessage(path: Path,
                          data: Seq[IngestRecord],
                          jobId: Option[JobId],
                          timestamp: Instant,
@@ -95,13 +91,13 @@ case class IngestMessage(apiKey: APIKey,
     }
   }
 
-  override def toString = "IngestMessage(%s, %s, %s, (%d records), %s, %s, %s)".format(apiKey, path, writeAs, data.size, jobId, timestamp, streamRef)
+  override def toString = "IngestMessage(%s, %s, %s, (%d records), %s, %s, %s)".format(path, data.size, jobId, timestamp, streamRef)
 }
 
 object IngestMessage {
   import EventMessage._
 
-  val schemaV1 = "apiKey" :: "path" :: "writeAs" :: "data" :: "jobId" :: "timestamp" :: ("streamRef" ||| StreamRef.Append.asInstanceOf[StreamRef]) :: HNil
+  val schemaV1 = "path" :: "data" :: "jobId" :: "timestamp" :: ("streamRef" ||| StreamRef.Append.asInstanceOf[StreamRef]) :: HNil
   implicit def seqExtractor[A: Extractor]: Extractor[Seq[A]] = implicitly[Extractor[List[A]]].map(_.toSeq)
 
   val decomposerV1: Decomposer[IngestMessage] = decomposerV[IngestMessage](schemaV1, Some("1.1".v))
@@ -118,17 +114,9 @@ object IngestMessage {
           val eventRecords = ingest.data map { jv =>
             IngestRecord(EventId(producerId, sequenceId), jv)
           }
-          ingest.writeAs map { authorities =>
-            assert(ingest.data.size == 1)
-            \/.right(IngestMessage(ingest.apiKey, ingest.path, authorities, eventRecords, ingest.jobId, defaultTimestamp, StreamRef.Append))
-          } getOrElse {
-            \/.left(
-              (ingest.apiKey,
-               ingest.path,
-               (authorities: Authorities) =>
-                 IngestMessage(ingest.apiKey, ingest.path, authorities, eventRecords, ingest.jobId, defaultTimestamp, StreamRef.Append))
-            )
-          }
+          \/.left(
+            (ingest.path,
+             IngestMessage(ingest.path, eventRecords, ingest.jobId, defaultTimestamp, StreamRef.Append)))
         }
       }
   }
@@ -137,13 +125,13 @@ object IngestMessage {
   implicit val Extractor: Extractor[EventMessageExtraction] = extractorV1 <+> extractorV0
 }
 
-case class ArchiveMessage(apiKey: APIKey, path: Path, jobId: Option[JobId], eventId: EventId, timestamp: Instant) extends EventMessage {
+case class ArchiveMessage(path: Path, jobId: Option[JobId], eventId: EventId, timestamp: Instant) extends EventMessage {
   def fold[A](im: IngestMessage => A, am: ArchiveMessage => A, sf: StoreFileMessage => A): A = am(this)
 }
 
 object ArchiveMessage {
   import EventMessage._
-  val schemaV1 = "apiKey" :: "path" :: "jobId" :: "eventId" :: "timestamp" :: HNil
+  val schemaV1 = "path" :: "jobId" :: "eventId" :: "timestamp" :: HNil
 
   val decomposerV1: Decomposer[ArchiveMessage] = decomposerV[ArchiveMessage](schemaV1, Some("1.0".v))
   val extractorV1: Extractor[ArchiveMessage]   = extractorV[ArchiveMessage](schemaV1, Some("1.0".v))
@@ -152,7 +140,7 @@ object ArchiveMessage {
       (obj.validated[Int]("producerId") |@|
             obj.validated[Int]("deletionId") |@|
             obj.validated[Archive]("deletion")) { (producerId, sequenceId, archive) =>
-        ArchiveMessage(archive.apiKey, archive.path, archive.jobId, EventId(producerId, sequenceId), defaultTimestamp)
+        ArchiveMessage(archive.path, archive.jobId, EventId(producerId, sequenceId), defaultTimestamp)
       }
     }
   }
@@ -161,9 +149,7 @@ object ArchiveMessage {
   implicit val Extractor: Extractor[ArchiveMessage]   = extractorV1 <+> extractorV0
 }
 
-case class StoreFileMessage(apiKey: APIKey,
-                            path: Path,
-                            writeAs: Authorities,
+case class StoreFileMessage(path: Path,
                             jobId: Option[JobId],
                             eventId: EventId,
                             content: FileContent,
@@ -174,7 +160,7 @@ case class StoreFileMessage(apiKey: APIKey,
 }
 
 object StoreFileMessage {
-  val schemaV1 = "apiKey" :: "path" :: "writeAs" :: "jobId" :: "eventId" :: "content" :: "timestamp" :: "streamRef" :: HNil
+  val schemaV1 = "path" :: "jobId" :: "eventId" :: "content" :: "timestamp" :: "streamRef" :: HNil
 
   implicit val Decomposer: Decomposer[StoreFileMessage] = decomposerV[StoreFileMessage](schemaV1, Some("1.0".v))
 

@@ -914,7 +914,7 @@ object MongoDbPlanner {
             ev3: EX :<: ExprOp) = {
           case qscript.Map(src, f) =>
             getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, f)
-          case LeftShift(src, struct0, id, repair) => {
+          case LeftShift(src, struct0, id, _, repair) => {
             val rewriteUndefined: CoMapFuncR[T, Hole] => Option[CoMapFuncR[T, Hole]] = {
               case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
                 rollMF[T, Hole](MFC(Guard(exp, tpe, exp0, Free.roll(MFC(MakeArray(Free.roll(MFC(Undefined())))))))).some
@@ -927,31 +927,22 @@ object MongoDbPlanner {
               struct match {
                 case Embed(CoEnv(\/-(MFC(Guard(exp, Type.FlexArr(_, _, _), exp0, _))))) if exp0 === exp => {
                   val struct0 = handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct)
-                  val exprMerge0 = getMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(repair, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
-                  val jsMerge0 = getJsMerge[T, M](repair, jscore.Select(jscore.Ident(JsFn.defaultName), "s"), jscore.Select(jscore.Ident(JsFn.defaultName), "f"))
+                  val exprMerge: JoinFunc[T] => M[Fix[ExprOp]] =
+                    getExprMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(_, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
+                  val jsMerge: JoinFunc[T] => M[JsFn] =
+                    getJsMerge[T, M](_, jscore.Select(jscore.Ident(JsFn.defaultName), "s"), jscore.Select(jscore.Ident(JsFn.defaultName), "f"))
 
-                  (struct0 |@| exprMerge0 |@| jsMerge0) { (expr, exprMerge, jsMerge) =>
-                    exprMerge.fold(
-                      ExprBuilder(
-                        FlatteningBuilder(
-                          DocBuilder(
-                            src,
-                            ListMap(
-                              BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                              BsonField.Name("f") -> expr)),
-                          // TODO: Handle arrays properly
-                          Set(StructureType.Object(DocField(BsonField.Name("f")), id))),
-                        -\&/(jsMerge))
-                    )( mrg =>
-                      ExprBuilder(
-                        FlatteningBuilder(
-                          DocBuilder(
-                            src,
-                            ListMap(
-                              BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                              BsonField.Name("f") -> expr)),
-                          Set(StructureType.Array(DocField(BsonField.Name("f")), id))), \&/-(mrg)))
-                  }
+                  val planMerge: JoinFunc[T] => M[Expr] = exprOrJs(_)(exprMerge, jsMerge)
+
+                  struct0 >>= (expr =>
+                    getBuilder[T, M, WF, EX, JoinSide](planMerge(_))(
+                      FlatteningBuilder(
+                        DocBuilder(
+                          src,
+                          ListMap(
+                            BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                            BsonField.Name("f") -> expr)),
+                        Set(StructureType.Array(DocField(BsonField.Name("f")), id))), repair))
                 }
                 case _ =>
                   (handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct) ⊛
@@ -1208,13 +1199,6 @@ object MongoDbPlanner {
       case LeftSide => a1
       case RightSide => a2
     } ∘ (JsFn(JsFn.defaultName, _))
-
-  def getMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR, EX[_]: Traverse]
-    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], staticHandler: StaticHandler[T, EX])
-    (jf: JoinFunc[T], a1: DocVar, a2: DocVar)
-    (implicit inj: EX :<: ExprOp)
-      : M[Option[Fix[ExprOp]]] =
-    handleErr(getExprMerge[T, M, EX](funcHandler, staticHandler)(jf, a1, a2).map(_.some))(_ => none[Fix[ExprOp]].point[M])
 
   def getExprMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR, EX[_]: Traverse]
     (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], staticHandler: StaticHandler[T, EX])
