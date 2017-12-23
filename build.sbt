@@ -58,7 +58,7 @@ lazy val buildSettings = commonBuildSettings ++ Seq(
     Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
     Wart.Nothing),              // - see wartremover/wartremover#263
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
-  testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive", "showtimes")),
+  testOptions in Test := Seq(Tests.Argument(Specs2, "showtimes")),
   // Exclusive tests include only those tagged with 'exclusive'.
   testOptions in ExclusiveTests := Seq(Tests.Argument(Specs2, "include", "exclusive", "showtimes")),
 
@@ -705,7 +705,7 @@ lazy val yggdrasil = project.setup
       "co.fs2" %% "fs2-io"     % "0.9.6",
       "co.fs2" %% "fs2-scalaz" % "0.2.0",
 
-      "com.codecommit" %% "smock" % "0.3-specs2-3.8.6-48a3325-SNAPSHOT" % "test")) // need to get actual released version here
+      "com.codecommit" %% "smock" % "0.3-specs2-3.9.1" % "test")) // need to get actual released version here
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
