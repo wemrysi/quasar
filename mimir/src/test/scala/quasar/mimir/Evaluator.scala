@@ -33,9 +33,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.Queue
 
 trait EvaluatorModule[M[+ _]]
-    extends Memoizer
-    with TypeInferencer
-    with OpFinderModule[M]
+    extends OpFinderModule[M]
     with ReductionFinderModule[M]
     with TransSpecableModule[M]
     with TableModule[M] // Remove this explicit dep!
@@ -61,7 +59,7 @@ trait EvaluatorModule[M[+ _]]
     private val transState = StateMonadTrans[EvaluatorState]
     private val monadState = stateTMonadState[EvaluatorState, N]
 
-    def report: QueryLogger[N, instructions.Line]
+    def report: QueryLogger[N, Unit]
 
     def freshIdScanner: Scanner
 
@@ -82,11 +80,9 @@ trait EvaluatorModule[M[+ _]]
         composeOptimizations(
           optimize,
           List[DepGraph => DepGraph](
-            inferTypes(JType.JUniverseT), { g =>
+            { g =>
               megaReduce(g, findReductions(g, ctx))
-            },
-            memoize
-          ))
+            }))
     }
 
     /**
@@ -98,101 +94,6 @@ trait EvaluatorModule[M[+ _]]
       // evalLogger.debug("Eval for {} = {}", ctx.account.apiKey.toString, graph)
 
       val rewrittenDAG = fullRewriteDAG(optimize, ctx)(graph)
-
-      def resolveTopLevelGroup(spec: BucketSpec, splits: Map[Identifier, Int => N[Table]]): StateT[N, EvaluatorState, N[GroupingSpec]] = spec match {
-        case UnionBucketSpec(left, right) =>
-          for {
-            leftSpec <- resolveTopLevelGroup(left, splits)
-            rightSpec <- resolveTopLevelGroup(right, splits)
-
-            val commonIds = findCommonIds(left, right)
-            val keySpec = buildKeySpec(commonIds)
-          } yield {
-            for {
-              leftRes <- leftSpec
-              rightRes <- rightSpec
-            } yield GroupingAlignment(keySpec, keySpec, leftRes, rightRes, GroupingSpec.Union)
-          }
-
-        case IntersectBucketSpec(left, right) =>
-          for {
-            leftSpec <- resolveTopLevelGroup(left, splits)
-            rightSpec <- resolveTopLevelGroup(right, splits)
-
-            val commonIds = findCommonIds(left, right)
-            val keySpec = buildKeySpec(commonIds)
-          } yield {
-            for {
-              leftRes <- leftSpec
-              rightRes <- rightSpec
-            } yield GroupingAlignment(keySpec, keySpec, leftRes, rightRes, GroupingSpec.Intersection)
-          }
-
-        case dag.Group(id, target, forest) =>
-          val common = findCommonality(enumerateGraphs(forest) + target)
-
-          common match {
-            case Some(reducedTarget) =>
-              for {
-                pendingTarget <- prepareEval(reducedTarget, splits)
-                resultTargetTable = pendingTarget.table.transform { liftToValues(pendingTarget.trans) }
-                _ <- monadState.gets(identity)
-                subSpec <- resolveLowLevelGroup(resultTargetTable, reducedTarget, forest, splits)
-              } yield {
-                // TODO FIXME if the target has forcing points, targetTrans is insufficient
-                val Some(trans) = mkTransSpec(target, reducedTarget, ctx)
-                N.point(GroupingSource(resultTargetTable, SourceKey.Single, Some(liftToValues(trans)), id, subSpec))
-              }
-
-            case None =>
-              sys.error("Attempted to evaluate bucket spec without transspecable commonality.")
-          }
-
-        case UnfixedSolution(_, _) | dag.Extra(_) =>
-          sys.error("assertion error")
-      }
-
-      //** only used in resolveTopLevelGroup **/
-      def resolveLowLevelGroup(commonTable: Table,
-                               commonGraph: DepGraph,
-                               forest: BucketSpec,
-                               splits: Map[Identifier, Int => N[Table]]): StateT[N, EvaluatorState, GroupKeySpec] = forest match {
-        case UnionBucketSpec(left, right) =>
-          for {
-            leftRes <- resolveLowLevelGroup(commonTable, commonGraph, left, splits)
-            rightRes <- resolveLowLevelGroup(commonTable, commonGraph, right, splits)
-          } yield GroupKeySpecOr(leftRes, rightRes)
-
-        case IntersectBucketSpec(left, right) =>
-          for {
-            leftRes <- resolveLowLevelGroup(commonTable, commonGraph, left, splits)
-            rightRes <- resolveLowLevelGroup(commonTable, commonGraph, right, splits)
-          } yield GroupKeySpecAnd(leftRes, rightRes)
-
-        case UnfixedSolution(id, solution) =>
-          val Some(spec) = mkTransSpec(solution, commonGraph, ctx)
-          for {
-            _ <- monadState.gets(identity)
-            liftedTrans = TransSpec.deepMap(spec) {
-              case Leaf(_) => DerefObjectStatic(Leaf(Source), paths.Value)
-            }
-          } yield GroupKeySpecSource(CPathField(id.toString), liftedTrans)
-
-        case dag.Extra(graph) =>
-          val Some(spec) = mkTransSpec(graph, commonGraph, ctx)
-          for {
-            state <- monadState.gets(identity)
-            extraId = state.extraCount
-            _ <- monadState.modify { _.copy(extraCount = extraId + 1) }
-
-            liftedTrans = TransSpec.deepMap(spec) {
-              case Leaf(_) => DerefObjectStatic(Leaf(Source), paths.Value)
-            }
-          } yield GroupKeySpecSource(CPathField("extra" + extraId), trans.Filter(liftedTrans, liftedTrans))
-
-        case dag.Group(_, _, _) =>
-          sys.error("assertion error")
-      }
 
       def prepareEval(graph: DepGraph, splits: Map[Identifier, Int => N[Table]]): StateT[N, EvaluatorState, PendingTable] = {
         evalLogger.trace("Loop on %s".format(graph))
@@ -392,47 +293,8 @@ trait EvaluatorModule[M[+ _]]
         }
 
         def evalNotTransSpecable(graph: DepGraph): StateT[N, EvaluatorState, PendingTable] = graph match {
-          case dag.Observe(data, samples) =>
-            for {
-              pendingTableData <- prepareEval(data, splits)
-              pendingTableSamples <- prepareEval(samples, splits)
-
-              tableData = pendingTableData.table
-              tableSamples = pendingTableSamples.table
-
-              result <- {
-                //idea: make `samples` table an infinite sample table with replacement
-                //then don't need to kick out non-infinite sample sets in the compiler
-                //also can make solution more general by accepting discrete random variable
-                val keySpec   = trans.WrapObject(trans.DerefObjectStatic(TransSpec1.Id, paths.Key), paths.Key.name)
-                val valueSpec = trans.WrapObject(trans.DerefObjectStatic(TransSpec1.Id, paths.Value), paths.Value.name)
-
-                val keyTable   = tableData.transform(keySpec).canonicalize(yggConfig.maxSliceSize)
-                val valueTable = tableSamples.transform(valueSpec).canonicalize(yggConfig.maxSliceSize)
-
-                transState liftM mn(keyTable.zip(valueTable))
-              }
-            } yield {
-              val sort = pendingTableData.sort match {
-                case ValueOrder(_) => IdentityOrder.empty
-                case identityOrder => identityOrder
-              }
-              PendingTable(result, graph, TransSpec1.Id, sort)
-            }
-
           case Join(op, joinSort @ (IdentitySort | ValueSort(_)), left, right) =>
             join(graph, left, right, joinSort)(transFromBinOp(op))
-
-          case dag.Filter(joinSort @ (IdentitySort | ValueSort(_)), target, boolean) =>
-            join(graph, target, boolean, joinSort)(trans.Filter(_, _))
-
-          case s: SplitParam =>
-            sys.error("Inlining of SplitParam failed")
-
-          // not using extractors due to bug
-          case s: SplitGroup =>
-            val f = splits(s.parentId)
-            transState liftM f(s.id) map { PendingTable(_, graph, TransSpec1.Id, IdentityOrder(s)) }
 
           case Const(value) =>
             val table = value match {
@@ -464,14 +326,6 @@ trait EvaluatorModule[M[+ _]]
           case Undefined() =>
             monadState point PendingTable(Table.empty, graph, TransSpec1.Id, IdentityOrder.empty)
 
-          // TODO technically, we can do this without forcing by pre-lifting PendingTable#trans
-          case dag.New(parent) =>
-            for {
-              pendingTable <- prepareEval(parent, splits)
-              idSpec = makeTableTrans(Map(paths.Key -> trans.WrapArray(Scan(Leaf(Source), freshIdScanner))))
-              tableM2 = pendingTable.table.transform(liftToValues(pendingTable.trans)).transform(idSpec)
-            } yield PendingTable(tableM2, graph, TransSpec1.Id, IdentityOrder(graph))
-
           // TODO abstract over absolute/relative load
           case dag.AbsoluteLoad(parent, jtpe) =>
             for {
@@ -484,33 +338,9 @@ trait EvaluatorModule[M[+ _]]
                 .load(jtpe)
                 .fold(
                   {
-                    case ResourceError.NotFound(message)         => report.warn(graph.loc, message) >> Table.empty.point[N]
-                    case ResourceError.PermissionsError(message) => report.warn(graph.loc, message) >> Table.empty.point[N]
-                    case fatal                                   => report.error(graph.loc, "Fatal error while loading dataset") >> report.die() >> Table.empty.point[N]
-                  },
-                  table => table.point[N]
-                )
-              back <- transState liftM mn(loaded).join
-            } yield PendingTable(back, graph, TransSpec1.Id, IdentityOrder(graph))
-
-          case dag.RelativeLoad(parent, jtpe) =>
-            for {
-              pendingTable <- prepareEval(parent, splits)
-
-              Path(prefixStr) = ctx.basePath
-              Path(midStr) = ctx.scriptPath
-              fullPrefix = prefixStr.replaceAll("([^/])$", "$1/") + midStr.replaceAll("([^/])$", "$1/")
-
-              f1 = concatString.applyl(CString(fullPrefix))
-              trans2 = trans.Map1(trans.DerefObjectStatic(pendingTable.trans, paths.Value), f1)
-              loaded = pendingTable.table
-                .transform(trans2)
-                .load(jtpe)
-                .fold(
-                  {
-                    case ResourceError.NotFound(message)         => report.warn(graph.loc, message) >> Table.empty.point[N]
-                    case ResourceError.PermissionsError(message) => report.warn(graph.loc, message) >> Table.empty.point[N]
-                    case fatal                                   => report.error(graph.loc, "Fatal error while loading dataset") >> report.die() >> Table.empty.point[N]
+                    case ResourceError.NotFound(message)         => report.warn((), message) >> Table.empty.point[N]
+                    case ResourceError.PermissionsError(message) => report.warn((), message) >> Table.empty.point[N]
+                    case fatal                                   => report.error((), "Fatal error while loading dataset") >> report.die() >> Table.empty.point[N]
                   },
                   table => table.point[N]
                 )
@@ -577,20 +407,6 @@ trait EvaluatorModule[M[+ _]]
                 }
             }
 
-          case dag.Distinct(parent) =>
-            val idSpec = makeTableTrans(Map(paths.Key -> trans.WrapArray(Scan(Leaf(Source), freshIdScanner))))
-
-            for {
-              pending <- prepareEval(parent, splits)
-
-              valueSpec = DerefObjectStatic(Leaf(Source), paths.Value)
-              table = pending.table.transform(liftToValues(pending.trans))
-              distinct = table.distinct(valueSpec)
-              result = distinct.transform(idSpec)
-            } yield {
-              PendingTable(result, graph, TransSpec1.Id, IdentityOrder(graph))
-            }
-
           /**
           returns an array (to be dereferenced later) containing the result of each reduction
             */
@@ -650,60 +466,6 @@ trait EvaluatorModule[M[+ _]]
               wrapped = result transform buildConstantWrapSpec(Leaf(Source))
             } yield PendingTable(wrapped, graph, TransSpec1.Id, IdentityOrder(graph))
 
-          case s @ dag.Split(spec, child, id) =>
-            val idSpec = makeTableTrans(Map(paths.Key -> trans.WrapArray(Scan(Leaf(Source), freshIdScanner))))
-
-            val params = child.foldDown(true) {
-              case param: dag.SplitParam if param.parentId == id => Set(param)
-            }
-
-            val table = for {
-              grouping <- resolveTopLevelGroup(spec, splits)
-              state <- monadState.gets(identity)
-              grouping2 <- transState liftM grouping
-              result <- transState liftM mn(Table.merge(grouping2) { (key, map) =>
-                         val splits2 = splits + (id -> (map andThen mn))
-                         val rewritten = params.foldLeft(child) {
-                           case (child, param) =>
-                             val subKey = key \ param.id.toString
-                             replaceNode(child, param, Const(subKey)(param.loc))
-                         }
-
-                         val back = fullEval(rewritten, splits2, id :: splits.keys.toList)
-                         back.eval(state)
-                       })
-            } yield {
-              result.transform(idSpec)
-            }
-
-            table map { PendingTable(_, graph, TransSpec1.Id, IdentityOrder(graph)) }
-
-          case dag.Assert(pred, child) =>
-            for {
-              predPending <- prepareEval(pred, splits)
-              childPending <- prepareEval(child, splits)
-
-              liftedTrans = liftToValues(predPending.trans)
-              predTable = predPending.table transform DerefObjectStatic(liftedTrans, paths.Value)
-
-              truthiness <- transState liftM mn(predTable.reduce(Forall.reducer)(Forall.monoid))
-
-              assertion = if (truthiness getOrElse false) {
-                N.point(())
-              } else {
-                for {
-                  _ <- report.error(graph.loc, "Assertion failed")
-                  _ <- report.die() // Arrrrrrrgggghhhhhhhhhhhhhh........ *gurgle*
-                } yield ()
-              }
-              _ <- transState liftM assertion
-
-              result = childPending.table transform liftToValues(childPending.trans)
-            } yield PendingTable(result, graph, TransSpec1.Id, childPending.sort)
-
-          case c @ dag.Cond(pred, left, _, right, _) =>
-            evalNotTransSpecable(c.peer)
-
           case IUI(union, left, right) =>
             // TODO: Get rid of ValueSorts.
             for {
@@ -730,76 +492,16 @@ trait EvaluatorModule[M[+ _]]
               PendingTable(result, graph, TransSpec1.Id, IdentityOrder(graph))
             }
 
-          // TODO unify with IUI
-          case Diff(left, right) =>
-            for {
-              pair <- zip(prepareEval(left, splits), prepareEval(right, splits))
-              (leftPending, rightPending) = pair
-
-              leftTable = leftPending.table.transform(liftToValues(leftPending.trans))
-              rightTable = rightPending.table.transform(liftToValues(rightPending.trans))
-
-              // this transspec prunes everything that is not a key or a value.
-              keyValueSpec = TransSpec1.PruneToKeyValue
-
-              leftSortedM = transState liftM mn(leftTable.sort(keyValueSpec, SortAscending))
-              rightSortedM = transState liftM mn(rightTable.sort(keyValueSpec, SortAscending))
-
-              pair <- zip(leftSortedM, rightSortedM)
-              (leftSorted, rightSorted) = pair
-
-              result = leftSorted.cogroup(keyValueSpec, keyValueSpec, rightSorted)(TransSpec1.Id, TransSpec1.DeleteKeyValue, TransSpec2.DeleteKeyValueLeft)
-            } yield {
-              PendingTable(result, graph, TransSpec1.Id, IdentityOrder(graph))
-            }
-
           case j @ Join(op, Cross(hint), left, right) =>
             cross(graph, left, right, hint)(transFromBinOp(op))
 
-          case f @ dag.Filter(Cross(hint), target, boolean) =>
-            cross(graph, target, boolean, hint)(trans.Filter(_, _))
-
-          case s @ AddSortKey(parent, sortField, valueField, id) =>
-            val sortSpec  = DerefObjectStatic(DerefObjectStatic(Leaf(Source), paths.Value), CPathField(sortField))
-            val valueSpec = DerefObjectStatic(DerefObjectStatic(Leaf(Source), paths.Value), CPathField(valueField))
-            if (parent.valueKeys contains id) {
-              prepareEval(parent, splits)
-            } else {
-              for {
-                pending <- prepareEval(parent, splits)
-                table = pending.table.transform(liftToValues(pending.trans))
-                result = {
-                  val wrappedSort  = trans.WrapObject(sortSpec, "sort-" + id)
-                  val wrappedValue = trans.WrapObject(valueSpec, paths.Value.name)
-                  val oldSortFields = parent.valueKeys map { id0 =>
-                    CPathField("sort-" + id0)
-                  }
-                  val spec = InnerObjectConcat(
-                    InnerObjectConcat(ObjectDelete(Leaf(Source), Set(CPathField("sort-" + id), paths.Value) ++ oldSortFields), wrappedSort),
-                    wrappedValue)
-
-                  table.transform(spec)
-                }
-              } yield {
-                PendingTable(result, graph, TransSpec1.Id, pending.sort)
-              }
-            }
-
-          case Memoize(parent, _) =>
-            for {
-              pending <- prepareEval(parent, splits)
-              table = pending.table.transform(liftToValues(pending.trans))
-
-              result <- transState liftM mn(table.force)
-            } yield {
-              PendingTable(result, graph, TransSpec1.Id, pending.sort)
-            }
+          case _ => sys.error("not implemented for testing")
         }
 
         val back    = memoized(graph, evalTransSpecable)
         val endTime = System.nanoTime
 
-        val timingM = transState liftM report.timing(graph.loc, endTime - startTime)
+        val timingM = transState liftM report.timing((), endTime - startTime)
 
         timingM >> back
       }
@@ -867,7 +569,7 @@ trait EvaluatorModule[M[+ _]]
     def inlineNodeValue(graph: DepGraph, from: DepGraph, result: RValue) = {
       val replacements = graph.foldDown(true) {
         case join @ Join(DerefArray, Cross(_), Join(DerefArray, Cross(_), `from`, Const(CLong(index1))), Const(CLong(index2))) =>
-          List((join, Const(result)(from.loc)))
+          List((join, Const(result)))
       }
 
       replacements.foldLeft(graph) {
@@ -965,133 +667,8 @@ trait EvaluatorModule[M[+ _]]
       currentIsReferenced && (referencedSplits -- parentSplits).isEmpty
     }
 
-    private def findCommonality(nodes: Set[DepGraph]): Option[DepGraph] = {
-      case class Kernel(nodes: Set[DepGraph], seen: Set[DepGraph])
-
-      @tailrec
-      def bfs(kernels: Set[Kernel]): Set[DepGraph] = {
-        // check for convergence
-        val results = kernels flatMap { k =>
-          val results = kernels.foldLeft(k.nodes) { _ & _.seen }
-
-          // TODO if the below isEmpty, then can drop results from all kernels
-          nodes.foldLeft(results) { (results, node) =>
-            results filter { isTransSpecable(node, _) }
-          }
-        }
-
-        // iterate
-        if (results.isEmpty) {
-          val kernels2 = kernels map { k =>
-            val nodes2 = k.nodes flatMap enumerateParents
-            val nodes3 = nodes2 &~ k.seen
-
-            Kernel(nodes3, k.seen ++ nodes3)
-          }
-
-          if (kernels2 forall { _.nodes.isEmpty }) {
-            Set()
-          } else {
-            bfs(kernels2)
-          }
-        } else {
-          results
-        }
-      }
-
-      if (nodes.size == 1) {
-        nodes.headOption
-      } else {
-        val kernels = nodes map { n =>
-          Kernel(Set(n), Set(n))
-        }
-        val results = bfs(kernels)
-
-        if (results.size == 1)
-          results.headOption
-        else
-          None
-      }
-    }
-
-    private def enumerateParents(node: DepGraph): Set[DepGraph] = node match {
-      case _: SplitParam | _: SplitGroup | _: Root => Set()
-      case dag.New(parent)                         => Set(parent)
-      case dag.Morph1(_, parent)                   => Set(parent)
-      case dag.Morph2(_, left, right)              => Set(left, right)
-      case dag.Assert(pred, child)                 => Set(pred, child)
-      case dag.Cond(pred, left, _, right, _)       => Set(pred, left, right)
-      case dag.Distinct(parent)                    => Set(parent)
-      case dag.AbsoluteLoad(parent, _)             => Set(parent)
-      case dag.RelativeLoad(parent, _)             => Set(parent)
-      case Operate(_, parent)                      => Set(parent)
-      case dag.Reduce(_, parent)                   => Set(parent)
-      case MegaReduce(_, parent)                   => Set(parent)
-      case dag.Split(spec, _, _)                   => enumerateSpecParents(spec).toSet
-      case IUI(_, left, right)                     => Set(left, right)
-      case Diff(left, right)                       => Set(left, right)
-      case Join(_, _, left, right)                 => Set(left, right)
-      case dag.Filter(_, target, boolean)          => Set(target, boolean)
-      case AddSortKey(parent, _, _, _)             => Set(parent)
-      case Memoize(parent, _)                      => Set(parent)
-      case x                                       => sys.error(s"Unexpected arg $x")
-    }
-
-    private def enumerateSpecParents(spec: BucketSpec): Set[DepGraph] = spec match {
-      case UnionBucketSpec(left, right)     => enumerateSpecParents(left) ++ enumerateSpecParents(right)
-      case IntersectBucketSpec(left, right) => enumerateSpecParents(left) ++ enumerateSpecParents(right)
-
-      case dag.Group(_, target, child) => enumerateSpecParents(child) + target
-
-      case UnfixedSolution(_, target) => Set(target)
-      case dag.Extra(target)          => Set(target)
-    }
-
-    private def findCommonIds(left: BucketSpec, right: BucketSpec): Set[Int] =
-      enumerateSolutionIds(left) & enumerateSolutionIds(right)
-
-    private def enumerateSolutionIds(spec: BucketSpec): Set[Int] = spec match {
-      case UnionBucketSpec(left, right) =>
-        enumerateSolutionIds(left) ++ enumerateSolutionIds(right)
-
-      case IntersectBucketSpec(left, right) =>
-        enumerateSolutionIds(left) ++ enumerateSolutionIds(right)
-
-      case dag.Group(_, _, forest) => enumerateSolutionIds(forest)
-
-      case UnfixedSolution(id, _) => Set(id)
-      case dag.Extra(_)           => Set()
-    }
-
-    private def buildKeySpec(commonIds: Set[Int]): TransSpec1 = {
-      val parts: Set[TransSpec1] = commonIds map { id =>
-        trans.WrapObject(DerefObjectStatic(Leaf(Source), CPathField(id.toString)), id.toString)
-      }
-
-      parts reduceOption { (left, right) =>
-        trans.InnerObjectConcat(left, right)
-      } getOrElse ConstLiteral(CEmptyArray, Leaf(Source))
-    }
-
-    private def disjunctiveEquals(specs: (IdentitySpec, IdentitySpec)): Boolean = specs match {
-      case (CoproductIds(left, right), b) => disjunctiveEquals(b, left) || disjunctiveEquals(b, right)
-      case (a, CoproductIds(left, right)) => disjunctiveEquals(a, left) || disjunctiveEquals(a, right)
-      case (a, b)                         => a == b
-    }
-
     private def areJoinable(left: DepGraph, right: DepGraph): Boolean =
       IdentityMatch(left, right).sharedIndices.size > 0
-
-    private def enumerateGraphs(forest: BucketSpec): Set[DepGraph] = forest match {
-      case UnionBucketSpec(left, right)     => enumerateGraphs(left) ++ enumerateGraphs(right)
-      case IntersectBucketSpec(left, right) => enumerateGraphs(left) ++ enumerateGraphs(right)
-
-      case dag.Group(_, target, subForest) =>
-        enumerateGraphs(subForest) + target
-
-      case UnfixedSolution(_, graph) => Set(graph)
-      case dag.Extra(graph)          => Set(graph)
-    }
 
     private def simpleJoin(left: Table, right: Table)(leftKey: TransSpec1, rightKey: TransSpec1, spec: TransSpec2): Table = {
       val emptySpec = trans.ConstLiteral(CEmptyArray, Leaf(Source))
@@ -1115,8 +692,6 @@ trait EvaluatorModule[M[+ _]]
       }
       IdentityOrder(rec(policy))
     }
-
-    private def flip[A, B, C](f: (A, B) => C)(b: B, a: A): C = f(a, b) // is this in scalaz?
 
     private def zip[A](table1: StateT[N, EvaluatorState, A], table2: StateT[N, EvaluatorState, A]): StateT[N, EvaluatorState, (A, A)] =
       monadState.apply2(table1, table2) { (_, _) }

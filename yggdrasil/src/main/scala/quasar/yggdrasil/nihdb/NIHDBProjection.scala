@@ -50,18 +50,6 @@ final class NIHDBProjection(snapshot: NIHDBSnapshot, projectionId: Int) extends 
     }
   }
 
-  def reduce[A](reduction: Reduction[A], path: CPath): Map[CType, A] = {
-    readers.foldLeft(Map.empty[CType, A]) { (acc, reader) =>
-      reader.snapshot(Some(Set(path))).segments.foldLeft(acc) { (acc, segment) =>
-        reduction.reduce(segment, None) map { a =>
-          val key = segment.ctype
-          val value = acc.get(key).map(reduction.semigroup.append(_, a)).getOrElse(a)
-          acc + (key -> value)
-        } getOrElse acc
-      }
-    }
-  }
-
   private def getSnapshotBlock(id: Option[Long], columns: Option[Set[CPath]]): Option[Block] = {
     try {
       // We're limiting ourselves to 2 billion blocks total here

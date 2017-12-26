@@ -44,7 +44,7 @@ trait EvaluatorTestSupport[M[+_]] extends StdLibEvaluatorStack[M]
 
   def Evaluator[N[+_]](N0: Monad[N])(implicit mn: M ~> N, nm: N ~> M) =
     new Evaluator[N](N0)(mn,nm) {
-      val report = new LoggingQueryLogger[N, instructions.Line] with ExceptionQueryLogger[N, instructions.Line] with TimingQueryLogger[N, instructions.Line] {
+      val report = new LoggingQueryLogger[N, Unit] with ExceptionQueryLogger[N, Unit] with TimingQueryLogger[N, Unit] {
         val M = N0
       }
       def freshIdScanner = outer.freshIdScanner
