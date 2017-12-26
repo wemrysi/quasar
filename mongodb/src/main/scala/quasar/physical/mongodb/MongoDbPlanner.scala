@@ -118,7 +118,7 @@ object MongoDbPlanner {
 
   def getSelector
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, EX[_]: Traverse]
-    (fm: FreeMap[T], galg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]])
+    (fm: FreeMap[T], default: OutputM[PartialSelector[T]], galg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]])
     (implicit inj: EX :<: ExprOp)
       : OutputM[PartialSelector[T]] =
     fm.zygo(
@@ -126,7 +126,7 @@ object MongoDbPlanner {
         κ(MFC(MapFuncsCore.Undefined[T, T[MapFunc[T, ?]]]()).embed),
         _.embed),
       ginterpret[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], Hole, OutputM[PartialSelector[T]]](
-        κ(defaultSelector[T].point[OutputM]), galg))
+        κ(default), galg))
 
   def processMapFunc[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR, A]
     (fm: FreeMapA[T, A])(recovery: A => JsCore)
@@ -522,22 +522,6 @@ object MongoDbPlanner {
   //       (naturally `BsonField`), and `B` is the recursive parameter.
   type PartialSelector[T[_[_]]] = Partial[T, BsonField, Selector]
 
-  object IsDefaultSelector {
-    def unapply[T[_[_]]](v: PartialSelector[T]): Option[PartialSelector[T]] =
-      equalsSelector(v, defaultSelector[T]).option(v)
-
-    private def equalsSelector[T[_[_]]](left: PartialSelector[T], right: PartialSelector[T]): Boolean =
-      (left, right) match {
-        case ((leftFn, leftFinder), (rightFn, rightFinder)) => {
-          val dummyName = BsonField.Name("0") // we need to evaluate the PartialFunction to compare it
-          val leftDoc   = leftFn.lift(List.fill(leftFinder.length)(dummyName)).map(_.bson.value)
-          val rightDoc  = rightFn.lift(List.fill(rightFinder.length)(dummyName)).map(_.bson.value)
-
-          leftDoc === rightDoc
-        }
-      }
-  }
-
   def defaultSelector[T[_[_]]]: PartialSelector[T] = (
     { case List(field) =>
       Selector.Doc(ListMap(
@@ -564,10 +548,6 @@ object MongoDbPlanner {
       (x.toOption, y.toOption) match {
         case (Some((f1, p1)), Some((f2, p2)))=>
           invoke2Nel(x, y)(f)
-        case (Some(IsDefaultSelector(_, _)), None) =>
-          InternalError.fromMsg(node.map(_._1).shows).left
-        case (None, Some(IsDefaultSelector(_, _))) =>
-          InternalError.fromMsg(node.map(_._1).shows).left
         case (Some((f1, p1)), None) =>
           (f1, p1.map(There(0, _))).right
         case (None, Some((f2, p2))) =>
@@ -1018,8 +998,8 @@ object MongoDbPlanner {
             keys.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _))
               .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
           case Filter(src0, cond) => {
-            val selectors = getSelector[T, M, EX](cond, selector[T](cfg.bsonVersion))
-            val typeSelectors = getSelector[T, M, EX](cond, typeSelector[T])
+            val selectors = getSelector[T, M, EX](cond, defaultSelector[T].point[OutputM[?]], selector[T](cfg.bsonVersion))
+            val typeSelectors = getSelector[T, M, EX](cond, InternalError.fromMsg(s"not a typecheck").left , typeSelector[T])
 
             def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
                 M[WorkflowBuilder[WF]] = {
