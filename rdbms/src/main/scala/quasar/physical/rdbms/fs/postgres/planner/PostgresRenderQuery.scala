@@ -170,7 +170,9 @@ object PostgresRenderQuery extends RenderQuery {
           case (TextExpr(lK), TextExpr(rK)) => s"$lK = $rK"
         }.intercalate(" and ")
 
-        s" join ${j.v._2} ${j.alias.v} on $joinKeyStr"
+        val joinKeyExpr = if (j.keys.nonEmpty) s"on $joinKeyStr" else ""
+        val joinTypeStr = if (j.keys.nonEmpty) s"inner" else "cross" // TODO support all types
+        s" $joinTypeStr join ${j.v._2} ${j.alias.v} $joinKeyExpr"
       }))
       val orderStr = order.map { o =>
         val dirStr = o.sortDir match {
