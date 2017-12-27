@@ -703,9 +703,7 @@ lazy val yggdrasil = project.setup
 
       "co.fs2" %% "fs2-core"   % "0.9.6",
       "co.fs2" %% "fs2-io"     % "0.9.6",
-      "co.fs2" %% "fs2-scalaz" % "0.2.0",
-
-      "com.codecommit" %% "smock" % "0.3-specs2-4.0.2-48a3325-SNAPSHOT" % "test")) // need to get actual released version here
+      "co.fs2" %% "fs2-scalaz" % "0.2.0"))
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
