@@ -18,6 +18,7 @@ package quasar.physical.rdbms.fs.postgres.planner
 
 import slamdata.Predef._
 import scala.Predef.implicitly
+import quasar.common.JoinType._
 import quasar.common.SortDir.{Ascending, Descending}
 import quasar.{Data, DataCodec}
 import quasar.DataCodec.Precise.TimeKey
@@ -171,7 +172,14 @@ object PostgresRenderQuery extends RenderQuery {
         }.intercalate(" and ")
 
         val joinKeyExpr = if (j.keys.nonEmpty) s"on $joinKeyStr" else ""
-        val joinTypeStr = if (j.keys.nonEmpty) s"inner" else "cross" // TODO support all types
+        val joinTypeStr = if (j.keys.nonEmpty) {
+          j.jType match {
+            case Inner => "inner"
+            case FullOuter => "full outer"
+            case LeftOuter => "left outer"
+            case RightOuter => "right outer"
+          }
+        } else "cross"
         s" $joinTypeStr join ${j.v._2} ${j.alias.v} $joinKeyExpr"
       }))
       val orderStr = order.map { o =>

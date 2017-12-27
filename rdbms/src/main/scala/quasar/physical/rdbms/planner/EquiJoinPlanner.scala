@@ -55,7 +55,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
   val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
 
   def plan: AlgebraM[F, EquiJoin[T, ?], T[SqlExpr]] = {
-    case EquiJoin(src, lBranch, rBranch, keys, joinType, combine) => // TODO handle joinType
+    case EquiJoin(src, lBranch, rBranch, keys, joinType, combine) =>
       val compile = Planner[T, F, QScriptTotal[T, ?]].plan
 
       for {
@@ -84,7 +84,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         Select(
           selection = Selection(selectionExpr, none),
           from = From(left, leftAlias),
-          join = Join(right, keyExprs, rightAlias).some,
+          join = Join(right, keyExprs, joinType, rightAlias).some,
           filter = none,
           orderBy = nil
         ).embed

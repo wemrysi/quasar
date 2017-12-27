@@ -66,7 +66,7 @@ trait SqlExprTraverse {
         val sel = f(selection.v) ∘ (i => Selection(i, selection.alias ∘ (a => Id[B](a.v))))
 
         val join = joinOpt.traverse(j => (f(j.v) ⊛ j.keys.traverse { case (a, b) => (f(a) ⊛ f(b))(scala.Tuple2.apply)}) {
-          case (v, ks) => Join(v, ks, Id[B](j.alias.v))
+          case (v, ks) => Join(v, ks, j.jType, Id[B](j.alias.v))
         })
 
         val alias = f(from.v).map(b => From(b, Id[B](from.alias.v)))
