@@ -49,6 +49,11 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
   private def drop(fromExpr: F[T[SqlExpr]], countExpr: F[T[SqlExpr]]): F[T[SqlExpr]] = 
     (fromExpr |@| countExpr)(Offset(_, _).embed)
 
+  private def compile(expr: qscript.FreeQS[T], src: T[SqlExpr]): F[T[SqlExpr]] = {
+    val compiler = Planner[T, F, QScriptTotal[T, ?]].plan
+    expr.cataM(interpretM(κ(src.point[F]), compiler))
+  }
+
   val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
 
   def plan: AlgebraM[F, QScriptCore[T, ?], T[SqlExpr]] = {
@@ -92,10 +97,8 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           ).embed
         }
     case qscript.Subset(src, from, sel, count) =>
-      val compile = Planner[T, F, QScriptTotal[T, ?]].plan
-
-      val fromExpr: F[T[SqlExpr]] = from.cataM(interpretM(κ(src.point[F]), compile))
-      val countExpr: F[T[SqlExpr]] = count.cataM(interpretM(κ(src.point[F]), compile))
+      val fromExpr: F[T[SqlExpr]]  = compile(from, src)
+      val countExpr: F[T[SqlExpr]] = compile(count, src)
 
       sel match {
         case qscript.Drop   => drop(fromExpr, countExpr)
@@ -133,12 +136,6 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         case (_: Select[_], `hole`, `hole`) => src.point[F]
         case (_: Select[_], _, _) => unexpected(s"$qUnion", this)
         case _ =>
-
-          def compile(expr:  qscript.FreeQS[T], src: T[SqlExpr]): F[T[SqlExpr]] = {
-            val compiler = Planner[T, F, QScriptTotal[T, ?]].plan
-            expr.cataM(interpretM(κ(src.point[F]), compiler))
-          }
-
           (compile(left, src) |@| compile(right, src))(Union(_,_).embed)
       }
 
