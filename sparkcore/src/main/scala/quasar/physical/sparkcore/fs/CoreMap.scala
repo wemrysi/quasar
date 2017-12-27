@@ -114,6 +114,7 @@ object CoreMap extends Serializable {
     case TemporalTrunc(p, f) => (f >>> (temporalTrunc(p, _))).right
     case TimeOfDay(f) => (f >>> {
       case Data.LocalDateTime(v) => Data.LocalTime(v.toLocalTime)
+      case Data.OffsetDateTime(v) => Data.OffsetTime(v.toOffsetTime)
       case _ => undefined
     }).right
     case ToTimestamp(f) => (f >>> {
