@@ -332,6 +332,9 @@ object CoreMap extends Serializable {
     case (Data.Dec(a), Data.Int(b)) => Data.Dec(a + BigDecimal(b))
     case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a + b)
     case (Data.Interval(a), Data.Interval(b)) => Data.Interval(a.plus(b))
+    case (Data.Interval(b), CanLensDateTime(a)) => a.peeks(b.addTo)
+    case (Data.Interval(DateTimeInterval.DateLike(b)), CanLensDate(a)) => a.peeks(_.plus(b))
+    case (Data.Interval(DateTimeInterval.TimeLike(b)), CanLensTime(a)) => a.peeks(_.plus(b))
     case (CanLensDateTime(a), Data.Interval(b)) => a.peeks(b.addTo)
     case (CanLensDate(a), Data.Interval(DateTimeInterval.DateLike(b))) => a.peeks(_.plus(b))
     case (CanLensTime(a), Data.Interval(DateTimeInterval.TimeLike(b))) => a.peeks(_.plus(b))
@@ -357,6 +360,8 @@ object CoreMap extends Serializable {
     case (Data.Int(a), Data.Int(b)) => Data.Int(a * b)
     case (Data.Interval(a), Data.Dec(b)) => Data.Interval(a.multiply(b.toInt))
     case (Data.Interval(a), Data.Int(b)) => Data.Interval(a.multiply(b.toInt))
+    case (Data.Dec(a), Data.Interval(b)) => Data.Interval(b.multiply(a.toInt))
+    case (Data.Int(a), Data.Interval(b)) => Data.Interval(b.multiply(a.toInt))
     case _ => undefined
   }
 
