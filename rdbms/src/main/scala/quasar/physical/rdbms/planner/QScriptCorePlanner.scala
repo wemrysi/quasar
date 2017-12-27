@@ -134,7 +134,6 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       val hole = qscript.HoleQS[T]
       (src.project, left, right) match {
         case (_: Select[_], `hole`, `hole`) => src.point[F]
-        case (_: Select[_], _, _) => unexpected(s"$qUnion", this)
         case _ =>
           (compile(left, src) |@| compile(right, src))(Union(_,_).embed)
       }
