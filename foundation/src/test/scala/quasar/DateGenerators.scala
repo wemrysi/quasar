@@ -39,7 +39,7 @@ trait DateGenerators {
   private def genMonths: Gen[Int]       = choose(-100, 100)
   private def genDays: Gen[Int]         = choose(-1000, 1000)
   private def genEpochSeconds: Gen[Long] =
-    choose(ChronoField.INSTANT_SECONDS.range().getLargestMinimum + 1, ChronoField.INSTANT_SECONDS.range().getSmallestMaximum - 1)
+    choose(Instant.MIN.getEpochSecond() + 1, Instant.MAX.getEpochSecond - 1)
 
   // these are adjusted so that LocalDate.ofEpochDay(minLocalEpochDay) - genYears can't go below the
   // minimum year of LocalDate, vice versa for maxLocalEpochDay
