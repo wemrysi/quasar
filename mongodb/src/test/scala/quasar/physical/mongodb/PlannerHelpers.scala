@@ -363,6 +363,7 @@ object PlannerHelpers {
 
 trait PlannerHelpers extends
     org.specs2.mutable.Specification with
+    ScalazSpecs2Instances with
     org.specs2.ScalaCheck with
     CompilerHelpers with
     TreeMatchers with

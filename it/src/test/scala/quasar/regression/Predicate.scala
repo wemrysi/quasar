@@ -30,6 +30,7 @@ import org.specs2.execute._
 import org.specs2.matcher._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.stream._
+import quasar.ScalazSpecs2Instances
 
 sealed abstract class Predicate {
   def apply[F[_]: Catchable: Monad](
@@ -40,7 +41,7 @@ sealed abstract class Predicate {
   ): F[Result]
 }
 
-object Predicate {
+object Predicate extends ScalazSpecs2Instances {
   import MustMatchers._
   import StandardResults._
   import DecodeResult.{ok => jok, fail => jfail}
@@ -91,7 +92,7 @@ object Predicate {
             case (a, e) =>
               Process.emit(a must matchJson(e) : Result)
           }
-          .runLog.map(_.foldMap()(Result.ResultMonoid))
+          .runLog.map(_.foldMap()(ScalazResultMonoid))
       case OrderIgnored =>
         actual0.scan((expected0.toSet, Set.empty[Json])) {
           case ((expected, wrongOrder), e) =>
@@ -137,7 +138,7 @@ object Predicate {
             case (a, e) =>
               Process.emit(a must matchJson(e) : Result)
           }
-          .runLog.map(_.foldMap()(Result.ResultMonoid))
+          .runLog.map(_.foldMap()(ScalazResultMonoid))
       case OrderIgnored =>
         actual0.scan((expected0, Vector.empty[Json], None: Option[Json])) {
           case ((expected, wrongOrder, extra), e) =>
@@ -190,7 +191,7 @@ object Predicate {
             case (a, e) =>
               Process.emit(a must matchJson(e) : Result)
           }
-          .runLog.map(_.foldMap()(Result.ResultMonoid))
+          .runLog.map(_.foldMap()(ScalazResultMonoid))
       case OrderIgnored =>
         AtLeast(expected0, actual0, fieldOrder, resultOrder)
     }
