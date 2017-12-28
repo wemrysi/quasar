@@ -20,19 +20,17 @@ import quasar._
 import quasar.qscript.{MapFuncsCore => C, MapFuncsDerived => D}
 import quasar.std.StdLib._
 import scalaz._
-import scala.Predef.???
 
 object MapFunc {
   def translateNullaryMapping[T[_[_]], MF[_], A]
       (implicit MFC: MapFuncCore[T, ?] :<: MF)
-      : NullaryFunc => MF[A] = {
+      : scala.PartialFunction[NullaryFunc, MF[A]] = {
     case date.Now => MFC(C.Now())
-    case _ => ??? : MF[A]
   }
 
   def translateUnaryMapping[T[_[_]], MF[_], A]
       (implicit MFC: MapFuncCore[T, ?] :<: MF, MFD: MapFuncDerived[T, ?] :<: MF)
-      : UnaryFunc => A => MF[A] = {
+      : scala.PartialFunction[UnaryFunc, A => MF[A]] = {
     case date.ExtractCentury => a => MFC(C.ExtractCentury(a))
     case date.ExtractDayOfMonth => a => MFC(C.ExtractDayOfMonth(a))
     case date.ExtractDecade => a => MFC(C.ExtractDecade(a))
@@ -80,12 +78,11 @@ object MapFunc {
     case string.ToString => a => MFC(C.ToString(a))
     case structural.MakeArray => a => MFC(C.MakeArray(a))
     case structural.Meta => a => MFC(C.Meta(a))
-    case _ => a => ??? : MF[A]
   }
 
   def translateBinaryMapping[T[_[_]], MF[_], A]
       (implicit MFC: MapFuncCore[T, ?] :<: MF, MFD: MapFuncDerived[T, ?] :<: MF)
-      : BinaryFunc => (A, A) => MF[A] = {
+      : scala.PartialFunction[BinaryFunc, (A, A) => MF[A]] = {
     // NB: ArrayLength takes 2 params because of SQL, but we really don’t care
     //     about the second. And it shouldn’t even have two in LP.
     case array.ArrayLength => (a1, a2) => MFC(C.Length(a1))
@@ -117,16 +114,14 @@ object MapFunc {
     case string.Concat
        | structural.ArrayConcat
        | structural.ConcatOp => (a1, a2) => MFC(C.ConcatArrays(a1, a2))
-    case _ => (a1, a2) => ??? : MF[A]
   }
 
   def translateTernaryMapping[T[_[_]], MF[_], A]
       (implicit MFC: MapFuncCore[T, ?] :<: MF)
-      : TernaryFunc => (A, A, A) => MF[A] = {
+      : scala.PartialFunction[TernaryFunc, (A, A, A) => MF[A]] = {
     case relations.Between => (a1, a2, a3) => MFC(C.Between(a1, a2, a3))
     case relations.Cond    => (a1, a2, a3) => MFC(C.Cond(a1, a2, a3))
     case string.Search     => (a1, a2, a3) => MFC(C.Search(a1, a2, a3))
     case string.Substring  => (a1, a2, a3) => MFC(C.Substring(a1, a2, a3))
-    case _ => (a1, a2, a3) => ??? : MF[A]
   }
 }
