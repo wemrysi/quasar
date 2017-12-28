@@ -89,6 +89,31 @@ private[mongodb] object execution {
     }
   }
 
+  object SingleListMap {
+    def unapply[A, B](lm: ListMap[A, B]): Option[(A, B)] =
+      if (lm.size <= 1) lm.headOption else None
+  }
+
+  object SimpleRedirect {
+    def unapply(op: PipelineOp): Option[(BsonField.Name, BsonField)] = op match {
+      case PipelineOpCore(proj @ $ProjectF((), Reshape(SingleListMap(bn @ BsonField.Name(_), \/-($var(DocField(bf))))), IgnoreId | ExcludeId)) =>
+        (bn, bf).some
+      case _ => None
+    }
+  }
+
+  object CountableRedirect {
+    def unapply(pipeline: workflowtask.Pipeline): Option[BsonField.Name] =
+      pipeline match {
+        case List(Countable(field)) =>
+          field.some
+        case List(Countable(field), SimpleRedirect(name, f))
+            if (field: BsonField) ≟ f =>
+          name.some
+        case _ => None
+      }
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def extractRange(pipeline: workflowtask.Pipeline):
       ((workflowtask.Pipeline, workflowtask.Pipeline),

@@ -199,12 +199,19 @@ final class QueryFileInterpreter(execMongo: WorkflowExecutor[MongoDbIO, BsonCurs
       PhaseResult.detail("MongoDB", Js.Stmts(prog.toList).pprint(0))))
 
   private def moreResults(h: ResultHandle): OptionT[MQ, Vector[Data]] = {
+    val toData: Bson => Data =
+      // TODO the input Bson may contain quasar sigils and must be elided
+      // Currently, sigil.elideQuasarSigil works on BsonValue instead of Bson though,
+      // so we do extra conversiona Bson => BsonValue anv v.v. in order to
+      // be able to elide the sigils
+      (BsonCodec.toData _) <<< Bson.fromRepr <<< sigil.elideQuasarSigil <<< (_.repr)
+
     def pureNextChunk(bsons: List[Bson]) =
       if (bsons.isEmpty)
         Vector.empty[Data].point[MQ]
       else
         MongoQuery(resultsL(h) := some(List().left))
-          .as(bsons.map(BsonCodec.toData).toVector)
+          .as(bsons.map(toData).toVector)
 
     lookupCursor(h) flatMapF (_.fold(pureNextChunk, wc =>
       DataCursor[MongoDbIO, WorkflowCursor[C]]
