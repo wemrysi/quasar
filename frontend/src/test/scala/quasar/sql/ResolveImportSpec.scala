@@ -26,6 +26,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 class ResolveImportSpec extends quasar.Qspec {
+
   "Import resolution" >> {
     "simple case" >> {
       val scopedExpr = sqlB"import `/mymodule/`; TRIVIAL(`/foo`)"

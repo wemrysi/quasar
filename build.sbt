@@ -111,7 +111,7 @@ lazy val backendRewrittenRunSettings = Seq(
       def trace(t: => Throwable): Unit = delegate.trace(t)
     }
 
-    toError(r.run(main, (fullClasspath in Compile).value.files, args ++ backends, filtered))
+    r.run(main, (fullClasspath in Compile).value.files, args ++ backends, filtered) foreach sys.error
   })
 
 // In Travis, the processor count is reported as 32, but only ~2 cores are
@@ -703,7 +703,9 @@ lazy val yggdrasil = project.setup
 
       "co.fs2" %% "fs2-core"   % "0.9.6",
       "co.fs2" %% "fs2-io"     % "0.9.6",
-      "co.fs2" %% "fs2-scalaz" % "0.2.0"))
+      "co.fs2" %% "fs2-scalaz" % "0.2.0",
+
+      "com.codecommit" %% "smock" % "0.3-specs2-4.0.2-48a3325-SNAPSHOT" % "test"))
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
