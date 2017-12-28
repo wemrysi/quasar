@@ -1,0 +1,17 @@
+{
+  "name": "[qa_s01] select with string escapes",
+
+  "backends": {
+    "postgres": "ignoreFieldOrder"
+  },
+
+  "data": "escapy_strings.data",
+
+  "query": "select * from escapy_strings",
+
+  "predicate": "exactly",
+
+  "expected": [
+    {"musketeer": "d'Artagnan", "favorite_passtime": {"n'ame": "d'arts"}, "equipped": ["cloak", "d'agger"]}
+  ]
+}
