@@ -30,7 +30,11 @@ trait ScalazSpecs2Instances extends org.specs2.scalacheck.GenInstances {
     def bind[A, B](fa: F[A])(f: A => F[B]): F[B] = specsMonad.bind(fa)(f)
   }
 
-  implicit def specs2ToScalazMonoid[A](implicit specsMonoid: org.specs2.fp.Monoid[A]): Monoid[A] = new Monoid[A] {
+  implicit def specs2ToScalazMonoid[A](implicit specsMonoid: org.specs2.fp.Monoid[A]): Monoid[A] = {
+    specs2ToScalazMonoidExplicit(specsMonoid)
+  }
+
+  implicit def specs2ToScalazMonoidExplicit[A](specsMonoid: org.specs2.fp.Monoid[A]): Monoid[A] = new Monoid[A] {
     override def zero: A = specsMonoid.zero
     override def append(f1: A, f2: => A): A = specsMonoid.append(f1, f2)
   }

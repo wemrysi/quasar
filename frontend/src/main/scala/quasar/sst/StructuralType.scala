@@ -230,6 +230,7 @@ object StructuralType extends StructuralTypeInstances {
 sealed abstract class StructuralTypeInstances extends StructuralTypeInstances0 {
   import StructuralType.{ST, STF, TypeST, TagST}
 
+  // We can't use final here due to SI-4440 - it results in warning
   private case class TTags[L, A](tags: List[TypeTag], tpe: TypeF[L, A])
 
   private object TTags {

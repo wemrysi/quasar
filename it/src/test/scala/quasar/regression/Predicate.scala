@@ -92,7 +92,7 @@ object Predicate extends ScalazSpecs2Instances {
             case (a, e) =>
               Process.emit(a must matchJson(e) : Result)
           }
-          .runLog.map(_.foldMap()(ScalazResultMonoid))
+          .runLog.map(_.foldMap()(Result.ResultMonoid))
       case OrderIgnored =>
         actual0.scan((expected0.toSet, Set.empty[Json])) {
           case ((expected, wrongOrder), e) =>
@@ -138,7 +138,7 @@ object Predicate extends ScalazSpecs2Instances {
             case (a, e) =>
               Process.emit(a must matchJson(e) : Result)
           }
-          .runLog.map(_.foldMap()(ScalazResultMonoid))
+          .runLog.map(_.foldMap()(Result.ResultMonoid))
       case OrderIgnored =>
         actual0.scan((expected0, Vector.empty[Json], None: Option[Json])) {
           case ((expected, wrongOrder, extra), e) =>
@@ -191,7 +191,7 @@ object Predicate extends ScalazSpecs2Instances {
             case (a, e) =>
               Process.emit(a must matchJson(e) : Result)
           }
-          .runLog.map(_.foldMap()(ScalazResultMonoid))
+          .runLog.map(_.foldMap()(Result.ResultMonoid))
       case OrderIgnored =>
         AtLeast(expected0, actual0, fieldOrder, resultOrder)
     }

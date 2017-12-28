@@ -418,8 +418,6 @@ lazy val marklogic = project
 /** Implementation of the MongoDB connector.
   */
 lazy val mongodb = project
-  .settings(test := {}) // for now as tests seem to hang
-  .settings(testOnly := {}) // for now as tests seem to hang
   .settings(name := "quasar-mongodb-internal")
   .dependsOn(
     connector % BothScopes,
@@ -705,7 +703,7 @@ lazy val yggdrasil = project.setup
       "co.fs2" %% "fs2-io"     % "0.9.6",
       "co.fs2" %% "fs2-scalaz" % "0.2.0",
 
-      "com.codecommit" %% "smock" % "0.3-specs2-4.0.2-176eef1" % "test"))
+      "com.codecommit" %% "smock" % "0.3-specs2-4.0.2-48a3325-SNAPSHOT" % "test"))
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
