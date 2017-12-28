@@ -63,7 +63,10 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     ).embed
   }
 
-
+  private def project(fSrc: T[SQL], fKey: T[SQL]) = fSrc.project match {
+    case SQL.Refs(list) => SQL.Refs(list :+ fKey).embed.η[F]
+    case _ => SQL.Refs(Vector(fSrc, fKey)).embed.η[F]
+  }
 
   def plan: AlgebraM[F, MapFuncCore[T, ?], T[SQL]] = {
     case MFC.Constant(ejson) => SQL.Constant[T[SQL]](ejson.cata(Data.fromEJson)).embed.η[F]
@@ -143,12 +146,8 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
             }
     case MFC.ConcatArrays(f1, f2) =>  SQL.BinaryFunction(ArrayConcat, f1, f2).embed.η[F]
     case MFC.ConcatMaps(f1, f2) => ExprPair[T[SQL]](f1, f2).embed.η[F]
-    case MFC.ProjectIndex(f1, f2) =>  notImplemented("ProjectIndex", this)
-    case MFC.ProjectKey(fSrc, fKey) =>
-      fSrc.project match {
-        case SQL.Refs(list) => SQL.Refs(list :+ fKey).embed.η[F]
-        case _ => SQL.Refs(Vector(fSrc, fKey)).embed.η[F]
-      }
+    case MFC.ProjectIndex(fSrc, fKey) => project(fSrc, fKey)
+    case MFC.ProjectKey(fSrc, fKey) => project(fSrc, fKey)
     case MFC.DeleteKey(fSrc, fField) =>   notImplemented("DeleteKey", this)
     case MFC.Range(fFrom, fTo) =>  notImplemented("Range", this)
     case MFC.Guard(f1, fPattern, f2, ff3) => f2.η[F]
