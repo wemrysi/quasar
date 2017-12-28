@@ -1,11 +1,15 @@
 {
-  "name": "[qa_s06] select columns self union",
+  "name": "[qa_s06] select columns self union aaa",
 
-  "backends": {},
+  "backends": {
+    "mongodb_3_2": "ignoreResultOrder",
+    "mongodb_3_4": "ignoreResultOrder",
+    "mongodb_read_only": "ignoreResultOrder"
+  },
 
   "data": "simple_union.data",
 
-  "query": "select a from simple_union union select to_string(b) as a from simple_union",
+  "query": "select a as a from simple_union union select to_string(b) as a from simple_union",
 
   "predicate": "exactly",
 
