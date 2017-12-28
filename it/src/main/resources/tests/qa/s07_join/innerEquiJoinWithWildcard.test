@@ -1,5 +1,5 @@
 {
-    "name": "perform inner equi-join with wildcard",
+    "name": "[qa_s07] perform inner equi-join with wildcard",
 
     "backends": {
         "couchbase":         "pending",

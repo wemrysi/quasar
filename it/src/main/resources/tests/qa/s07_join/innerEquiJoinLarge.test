@@ -1,5 +1,5 @@
 {
-    "name": "perform large inner equi-join",
+    "name": "[qa_s07] perform large inner equi-join",
 
     "backends": {
         "couchbase":         "pending",
