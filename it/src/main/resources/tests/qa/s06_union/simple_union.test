@@ -1,7 +1,10 @@
 {
   "name": "[qa_s06] simple union",
 
-  "backends": {},
+  "backends": {
+    "marklogic_json": "ignoreResultOrder",
+    "marklogic_xml": "ignoreResultOrder"
+  },
 
   "data": ["simple_union.data", "simple_union2.data"],
 

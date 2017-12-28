@@ -1,7 +1,11 @@
 {
   "name": "[qa_s06] select all self union",
 
-  "backends": {},
+  "backends": {
+    "mimir": "ignoreResultOrder",
+    "marklogic_json": "ignoreResultOrder",
+    "marklogic_xml": "ignoreResultOrder"
+  },
 
   "data": "simple_union.data",
 

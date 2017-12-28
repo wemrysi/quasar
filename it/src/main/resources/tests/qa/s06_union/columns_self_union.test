@@ -1,7 +1,8 @@
 {
-  "name": "[qa_s06] select columns self union aaa",
+  "name": "[qa_s06] select columns self union",
 
   "backends": {
+    "mimir": "ignoreResultOrder",
     "mongodb_3_2": "ignoreResultOrder",
     "mongodb_3_4": "ignoreResultOrder",
     "mongodb_read_only": "ignoreResultOrder"
