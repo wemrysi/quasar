@@ -19,15 +19,15 @@ package quasar.qscript
 import quasar._
 import quasar.qscript.{MapFuncsCore => C, MapFuncsDerived => D}
 import quasar.std.StdLib._
-
 import scalaz._
+import scala.Predef.???
 
 object MapFunc {
   def translateNullaryMapping[T[_[_]], MF[_], A]
       (implicit MFC: MapFuncCore[T, ?] :<: MF)
       : NullaryFunc => MF[A] = {
     case date.Now => MFC(C.Now())
-    case _ => MFC(C.Now())
+    case _ => ??? : MF[A]
   }
 
   def translateUnaryMapping[T[_[_]], MF[_], A]
@@ -80,7 +80,7 @@ object MapFunc {
     case string.ToString => a => MFC(C.ToString(a))
     case structural.MakeArray => a => MFC(C.MakeArray(a))
     case structural.Meta => a => MFC(C.Meta(a))
-    case _ => a => MFC(C.Meta(a))
+    case _ => a => ??? : MF[A]
   }
 
   def translateBinaryMapping[T[_[_]], MF[_], A]
@@ -117,7 +117,7 @@ object MapFunc {
     case string.Concat
        | structural.ArrayConcat
        | structural.ConcatOp => (a1, a2) => MFC(C.ConcatArrays(a1, a2))
-    case _ => (a1, a2) => MFC(C.ConcatArrays(a1, a2))
+    case _ => (a1, a2) => ??? : MF[A]
   }
 
   def translateTernaryMapping[T[_[_]], MF[_], A]
@@ -127,6 +127,6 @@ object MapFunc {
     case relations.Cond    => (a1, a2, a3) => MFC(C.Cond(a1, a2, a3))
     case string.Search     => (a1, a2, a3) => MFC(C.Search(a1, a2, a3))
     case string.Substring  => (a1, a2, a3) => MFC(C.Substring(a1, a2, a3))
-    case _ => (a1, a2, a3) => MFC(C.Substring(a1, a2, a3))
+    case _ => (a1, a2, a3) => ??? : MF[A]
   }
 }
