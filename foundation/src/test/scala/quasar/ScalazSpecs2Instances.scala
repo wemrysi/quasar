@@ -17,30 +17,21 @@
 package quasar
 
 import org.scalacheck.Gen
-import org.specs2.specification.core.Fragments
+import scalaz.Monad
+import scalaz.Monoid
 
 trait ScalazSpecs2Instances extends org.specs2.scalacheck.GenInstances {
 
-  import org.specs2.execute.Result
-
-  import scalaz.{ Monad, Monoid }
-
   implicit def scalazGenMonad: Monad[Gen] = specs2ToScalazMonad(genMonad)
 
-  implicit val ScalazResultFailureMonoid: Monoid[Result] = specs2ToScalazMonoid(Result.ResultFailureMonoid)
-
-  val ScalazResultMonoid: Monoid[Result] = specs2ToScalazMonoid(Result.ResultMonoid)
-
-  implicit def FragmentsMonoid: Monoid[Fragments] = specs2ToScalazMonoid[Fragments](Fragments.FragmentsMonoid)
-
-  def specs2ToScalazMonad[F[_]](implicit specsMonad: org.specs2.fp.Monad[F]): Monad[F] = new Monad[F] {
+  // We cannot make this public implicit function since then it will conflict with e.g. `scalaz.idInstance`
+  private def specs2ToScalazMonad[F[_]](specsMonad: org.specs2.fp.Monad[F]): Monad[F] = new Monad[F] {
     def point[A](a: => A): F[A] = specsMonad.point(a)
     def bind[A, B](fa: F[A])(f: A => F[B]): F[B] = specsMonad.bind(fa)(f)
   }
 
-  def specs2ToScalazMonoid[A](implicit specsMonoid: org.specs2.fp.Monoid[A]): Monoid[A] = new Monoid[A] {
+  implicit def specs2ToScalazMonoid[A](implicit specsMonoid: org.specs2.fp.Monoid[A]): Monoid[A] = new Monoid[A] {
     override def zero: A = specsMonoid.zero
     override def append(f1: A, f2: => A): A = specsMonoid.append(f1, f2)
   }
-
 }
