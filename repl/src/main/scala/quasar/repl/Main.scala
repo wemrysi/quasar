@@ -114,7 +114,7 @@ object Main {
     S5: FileSystemFailure :<: S
   ): Task[Command => Free[DriverEff, Unit]] = {
     for {
-      stateRef <- TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, PhaseFormat.Tree, refineMV[Positive](10).some, OutputFormat.Table, Map(), false))
+      stateRef <- TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, PhaseFormat.Tree, refineMV[Positive](10).some, OutputFormat.Table, Map(), TimingFormat.Total))
       executionIdRef <- TaskRef(0L)
       timingRepository <- TimingRepository.empty(refineMV(1))
       i =
@@ -125,10 +125,22 @@ object Main {
         injectFT[Task, DriverEff]                                     :+:
         fs
     } yield {
-      val timingPrint = (in: String) => for {
+      val timingPrint = (id: ExecutionId, timings: ExecutionTimings) => for {
         state <- Free.liftF(Inject[Task, ReplEff[S, ?]].inj(stateRef.read))
-        _ <- if (state.printTiming) Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(in)))
-             else ().point[Free[ReplEff[S, ?], ?]]
+        _ <- state.timingFormat match {
+          case TimingFormat.Nothing | TimingFormat.Total =>
+            ().point[Free[ReplEff[S, ?], ?]]
+          case TimingFormat.Readable =>
+            val flameGraph =
+              ExecutionTimings.toLabelledIntervalTree(id, timings)
+                .cata(ExecutionTimings.render(_).shows, "timing information not available")
+            Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(flameGraph)))
+          case TimingFormat.Json =>
+            val renderedJson =
+              ExecutionTimings.toLabelledIntervalTree(id, timings)
+                .cata(ExecutionTimings.asJson(id, _).nospaces, "timing information not available")
+            Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(renderedJson)))
+        }
       } yield ()
       implicit val SE = ScopeExecution.forFreeTask[ReplEff[S, ?], Nothing](timingRepository, timingPrint)
       (cmd => Repl.command[ReplEff[S, ?], Nothing](cmd, executionIdRef).foldMap(i))

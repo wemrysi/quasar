@@ -60,7 +60,7 @@ object execute {
           // FIXME: use fsQ.evaluateQuery here
           Free.roll(S1(ExecutionId.ofRef(executionIdRef).map(SE.newExecution(_, ST =>
             for {
-              result <- ST.newScope("total query pipeline (GET)",
+              result <- ST.newScope("total (GET)",
                 for {
                   block <- ST.newScope("resolve imports", resolveImports[S](xpr, basePath).run)
                   lpOrSemanticErr <-
@@ -92,25 +92,27 @@ object execute {
             respond_(bodyMustContainQuery)
           } else {
              respond(Free.roll(S1(ExecutionId.ofRef(executionIdRef).map(SE.newExecution(_, ST =>
-              (for {
-                destination <- EitherT(requiredHeader(Destination, req).pure[Free[S, ?]])
-                parsed <- EitherT(ST.newScope("parse SQL", sql.fixParser.parse(query).leftMap(_.toApiError).pure[Free[S, ?]]))
-                out <- EitherT(destinationFile(destination.value).pure[Free[S, ?]])
-                basePath <- EitherT(decodedDir(req.uri.path).pure[Free[S, ?]])
-                resolved <- EitherT(ST.newScope("resolve imports", resolveImports(parsed, basePath).leftMap(_.toApiError).run))
-                executed <- EitherT(ST.newScope("execute query", fsQ.executeQuery(resolved, requestVars(req), basePath, out).run.run.run map {
-                  case (phases, result) =>
-                    result
-                    .leftMap(_.toApiError)
-                    .flatMap(_.leftMap(_.toApiError))
-                    .bimap(
-                      _ :+ ("phases" := phases),
-                      κ(Json(
-                      "out"   := posixCodec.printPath(out),
-                      "phases" := phases)))
-                }))
-              } yield executed).run
-            )))))
+              ST.newScope("total (POST)",
+                (for {
+                  destination <- EitherT(requiredHeader(Destination, req).pure[Free[S, ?]])
+                  parsed <- EitherT(ST.newScope("parse SQL", sql.fixParser.parse(query).leftMap(_.toApiError).pure[Free[S, ?]]))
+                  out <- EitherT(destinationFile(destination.value).pure[Free[S, ?]])
+                  basePath <- EitherT(decodedDir(req.uri.path).pure[Free[S, ?]])
+                  resolved <- EitherT(ST.newScope("resolve imports", resolveImports(parsed, basePath).leftMap(_.toApiError).run))
+                  executed <- EitherT(ST.newScope("execute query", fsQ.executeQuery(resolved, requestVars(req), basePath, out).run.run.run map {
+                    case (phases, result) =>
+                      result
+                      .leftMap(_.toApiError)
+                      .flatMap(_.leftMap(_.toApiError))
+                      .bimap(
+                        _ :+ ("phases" := phases),
+                        κ(Json(
+                        "out"   := posixCodec.printPath(out),
+                        "phases" := phases)))
+                  }))
+                } yield executed).run)
+            )
+            ))))
           }
         }
     }

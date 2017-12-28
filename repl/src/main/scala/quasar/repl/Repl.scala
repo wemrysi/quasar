@@ -74,9 +74,9 @@ object Repl {
       |  rm [path]
       |  set debug = 0 | 1 | 2
       |  set phaseFormat = tree | code
-      |  set printTiming = true | false
+      |  set timingFormat = json | readable | total | nothing
       |  set summaryCount = [rows]
-      |  set format = table | precise | readable | csv
+      |  set format = table | precise | readable | csv | nothing
       |  set [var] = [value]
       |  env""".stripMargin
 
@@ -88,7 +88,7 @@ object Repl {
     summaryCount: Option[Int Refined Positive],
     format:       OutputFormat,
     variables:    Map[String, String],
-    printTiming:  Boolean) {
+    timingFormat: TimingFormat) {
 
   def targetDir(path: Option[XDir]): ADir =
     path match {
@@ -154,8 +154,10 @@ object Repl {
           case -\/ (semErr)      => DF.fail(semErr.list.map(_.shows).toList.mkString("; "))
           case  \/-(-\/ (fsErr)) => DF.fail(fsErr.shows)
           case  \/-( \/-(a))     =>
-            P.println(f"Query time: ${elapsed.toMillis/1000.0}%.1fs") *>
-              f(a)
+            (state.timingFormat match {
+              case TimingFormat.Total => P.println(f"Query time: ${elapsed.toMillis/1000.0}%.1fs")
+              case _ => ().point[Free[S, ?]]
+            }) *> f(a)
         }
       } yield ()
 
@@ -202,9 +204,9 @@ object Repl {
         RS.modify(_.copy(phaseFormat = fmt)) *>
           P.println(s"Set phase format: $fmt")
 
-      case PrintTiming(print) =>
-        RS.modify(_.copy(printTiming = print)) *>
-          P.println(s"Set print timing: $print")
+      case SetTimingFormat(fmt) =>
+        RS.modify(_.copy(timingFormat = fmt)) *>
+          P.println(s"Set timing format: $fmt")
 
       case SetVar(n, v) =>
         RS.modify(state => state.copy(variables = state.variables + (n -> v))).void
@@ -242,7 +244,7 @@ object Repl {
       case Select(n, q) =>
         Free.liftF(S3(ExecutionId.ofRef(executionIdRef))).flatMap(id => SE.newExecution[Unit](id, { ST =>
           ST.newScope(
-            "total query pipeline (REPL)",
+            "total (REPL)",
             for {
               state <- RS.get
               expr  <- ST.newScope("parse SQL", DF.unattempt_(sql.fixParser.parse(q.value).leftMap(_.message)))
@@ -252,18 +254,18 @@ object Repl {
                          {
                            val out = state.cwd </> file(name)
                            for {
-                             query <- ST.newScope("plan query",
+                             query <- ST.newScope("plan",
                                fsQ.executeQuery(block, Variables.fromMap(state.variables), state.cwd, out).pure[Free[S, ?]])
-                             results <- ST.newScope("evaluate query",
+                             results <- ST.newScope("evaluate",
                               runQuery(state, query)(κ(P.println("Wrote file: " + posixCodec.printPath(out)))))
                            } yield results
                          },
                          {
                            for {
-                             query <- ST.newScope("plan query",
+                             query <- ST.newScope("plan",
                                fsQ.queryResults(block, vars, state.cwd, 0L, state.summaryCount.map(widenPositive[Refined, _0]))
                                  .map(_.toVector).pure[Free[S, ?]])
-                             results <- ST.newScope("evaluate query",
+                             results <- ST.newScope("evaluate",
                               runQuery(state, query)(ds => summarize[S](state.summaryCount.map(_.value), state.format)(ds)))
                            } yield results
                          })
@@ -381,6 +383,8 @@ object Repl {
           prefix.map(formatJson(DataCodec.Readable)).unite
         case OutputFormat.Csv =>
           Prettify.renderValues(prefix).map(CsvWriter(none)(_).trim)
+        case OutputFormat.Nothing =>
+          Nil
       }).foldMap(P.println) *>
         (if (max.fold(false)(rows.lengthCompare(_) > 0)) P.println("...")
         else ().point[Free[S, ?]])

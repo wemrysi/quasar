@@ -25,7 +25,7 @@ import quasar.console.{logErrors, stdout}
 import quasar.contrib.scalaz._
 import quasar.contrib.scopt._
 import quasar.db.DbConnectionConfig
-import quasar.effect.{Read, ScopeExecution, TimingRepository, Write}
+import quasar.effect.{ExecutionId, ExecutionTimings, Read, ScopeExecution, TimingRepository, Write}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric.Natural
@@ -125,8 +125,16 @@ object Server {
           injectFT[Task, QErrs_CRW_Task]       :+:
           eval))
 
-    val printAction = (s: String) =>
-      Free.liftF(Inject[Task, CoreEffIORW].inj(if (printExecutions) Task.delay(println(s)) else ().point[Task]))
+    val printAction = { (id: ExecutionId, timings: ExecutionTimings) =>
+      if (printExecutions) {
+        Free.liftF(Inject[Task, CoreEffIORW].inj(Task.delay(println(
+          ExecutionTimings.toLabelledIntervalTree(id, timings)
+            .cata(ExecutionTimings.render(_).shows, "timing information not available")
+        ))))
+      } else {
+        ().point[Free[CoreEffIORW, ?]]
+      }
+    }
     for {
       scopeExecution <- TimingRepository.empty(recordedExecutions).map(
         ScopeExecution.forFreeTask[CoreEffIORW, Nothing](_, printAction)

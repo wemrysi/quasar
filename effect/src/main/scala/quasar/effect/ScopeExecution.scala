@@ -20,6 +20,7 @@ import slamdata.Predef._
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.collection.immutable.TreeMap
+import quasar.RenderedTree
 import quasar.fp._
 import quasar.fp.numeric.Natural
 
@@ -31,31 +32,26 @@ import scalaz.concurrent.Task
 trait ScopeExecution[F[_], T] {
   def newExecution[A](executionId: ExecutionId, action: ScopeTiming[F, T] => F[A]): F[A]
 }
+
 object ScopeExecution {
   def ignore[F[_], T]: ScopeExecution[F, T] = new ScopeExecution[F, T] {
     def newExecution[A](executionId: ExecutionId, action: ScopeTiming[F, T] => F[A]): F[A] =
       action(ScopeTiming.ignore[F, T])
   }
-  def forTask[T](repo: TimingRepository, print: String => Task[Unit]): ScopeExecution[Task, T] =
+  def forTask[T](repo: TimingRepository, print: (ExecutionId, ExecutionTimings) => Task[Unit]): ScopeExecution[Task, T] =
     new ScopeExecution[Task, T] {
       def newExecution[A](executionId: ExecutionId, action: ScopeTiming[Task, T] => Task[A]): Task[A] = {
-        for {
-          a <- action(ScopeTiming.forTask(executionId, repo))
-          repository <- repo.repo.read
-          shownTimings <- repository.get(executionId).fold(().point[Task])(timings => print(s"${executionId.shows}\n${timings.shows}"))
-        } yield a
+        action(ScopeTiming.forTask(executionId, repo)) <* 
+          (repo.repo.read >>= (_.get(executionId).fold(().point[Task])(print(executionId, _))))
       }
     }
 
-  def forFreeTask[F[_], T](repo: TimingRepository, print: String => Free[F, Unit])
+  def forFreeTask[F[_], T](repo: TimingRepository, print: (ExecutionId, ExecutionTimings) => Free[F, Unit])
                           (implicit task: Task :<: F): ScopeExecution[Free[F, ?], T] =
     new ScopeExecution[Free[F, ?], T] {
       def newExecution[A](executionId: ExecutionId, action: ScopeTiming[Free[F, ?], T] => Free[F, A]): Free[F, A] = {
-        for {
-          a <- action(ScopeTiming.forFreeTask(executionId, repo))
-          repository <- Free.liftF(task(repo.repo.read))
-          shownTimings <- repository.get(executionId).fold(().point[Free[F, ?]])(timings => print(s"${executionId.shows}\n${timings.shows}"))
-        } yield a
+        action(ScopeTiming.forFreeTask(executionId, repo)) <*
+          (Free.liftF(task(repo.repo.read)) >>= (_.get(executionId).fold(().point[Free[F, ?]])(print(executionId, _))))
       }
     }
 }
@@ -96,10 +92,10 @@ object ScopeTiming {
   }
 }
 
-final case class ExecutionId(index: Long, startTime: Instant)
+final case class ExecutionId(index: Long, start: Instant)
 object ExecutionId {
   import scala.Ordering
-  implicit val executionIdOrdering: Ordering[ExecutionId] = Ordering.ordered[Instant](x => x).on(_.startTime)
+  implicit val executionIdOrdering: Ordering[ExecutionId] = Ordering.ordered[Instant](x => x).on(_.start)
   implicit val executionIdShow: Show[ExecutionId] = Show.shows {
     case ExecutionId(index, start) => s"Query execution $index began at $start"
   }
@@ -111,18 +107,70 @@ object ExecutionId {
 }
 
 final case class ExecutionTimings(timings: Map[String, (Instant, Instant)])
+final case class LabelledInterval(label: String, start: Long, size: Long) {
+  def contains(other: LabelledInterval) = start < other.start && (start + size) > (other.start + size)
+}
 object ExecutionTimings {
-  implicit val executionTimingsShow: Show[ExecutionTimings] = Show.show {
-    executionTimings =>
-      executionTimings.timings.map {
-        case (identifier, (start, end)) =>
-          val millisBetween = start.until(end, ChronoUnit.MILLIS)
-          Cord("phase ") ++
-          Cord(identifier) ++
-          Cord(": ") ++
-          millisBetween.show ++
-          Cord(" ms")
-      }.mkString("\n")
+  // Flame graph tree
+  type LabelledIntervalTree = Cofree[List, LabelledInterval]
+  def LabelledIntervalTree[A](head: LabelledInterval, tail: List[LabelledIntervalTree]): LabelledIntervalTree = Cofree(head, tail)
+  def toLabelledIntervalTree(executionId: ExecutionId, timings: ExecutionTimings): Option[LabelledIntervalTree] = {
+    def constructIntervalTree(newLabelledInterval: LabelledInterval, tree: LabelledIntervalTree): LabelledIntervalTree = {
+      if (newLabelledInterval.contains(tree.head)) {
+        LabelledIntervalTree(newLabelledInterval, List(tree))
+      } else if (tree.tail.isEmpty) {
+        LabelledIntervalTree(tree.head, List(LabelledIntervalTree(newLabelledInterval, Nil)))
+      } else {
+        @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+        def findInsert(list: List[Cofree[List, LabelledInterval]]): List[Cofree[List, LabelledInterval]] = list match {
+          case Nil =>
+            LabelledIntervalTree(newLabelledInterval, Nil) :: Nil
+          case Cofree(interval@LabelledInterval(id, _, _), tail) :: xs
+            if interval.contains(newLabelledInterval) =>
+            LabelledIntervalTree(interval, findInsert(tail)) :: xs
+          case c :: xs =>
+            c :: findInsert(xs)
+        }
+        LabelledIntervalTree(tree.head, findInsert(tree.tail))
+      }
+    }
+    val asIntervalsFromStart: List[LabelledInterval] = timings.timings.map {
+      case (label, (start, end)) =>
+        LabelledInterval(label, 
+          executionId.start.until(start, ChronoUnit.MILLIS), start.until(end, ChronoUnit.MILLIS))
+    }.toList
+    val sortedBySize =
+      asIntervalsFromStart.sortBy(-_.size)
+    sortedBySize.toNel.map {
+      case NonEmptyList(head, tail) =>
+        val initTree = Cofree[List, LabelledInterval](head, Nil)
+        val intervalTree = tail.foldRight(initTree)(constructIntervalTree)
+        intervalTree
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def render(tree: LabelledIntervalTree): RenderedTree = {
+    val LabelledInterval(label, start, size) = tree.head
+    RenderedTree((label + " ") :: Nil, (size.shows + " ms").some, tree.tail.sortBy(_.head.start).map(render))
+  }
+
+  import argonaut.Json
+  def asJson(executionId: ExecutionId, tree: LabelledIntervalTree): Json = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def treeToJson(in: LabelledIntervalTree): Json =
+      Json.jObjectFields(
+        "id" -> Json.jString(in.head.label),
+        "start" -> Json.jNumber(in.head.start),
+        "size" -> Json.jNumber(in.head.size),
+        "children" -> Json.jArray(in.tail.map(treeToJson))
+      )
+    Json.jObjectFields(
+      "id" -> Json.jObjectFields(
+        "index" -> Json.jNumber(executionId.index),
+        "start" -> Json.jString(executionId.start.toString)),
+      "timings" -> treeToJson(tree)
+    )
   }
 }
 
