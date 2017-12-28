@@ -119,6 +119,7 @@ object SqlExpr extends SqlExprInstances {
 sealed trait UnaryFunctionType
 case object StrLower extends UnaryFunctionType
 case object StrUpper extends UnaryFunctionType
+case object ToJson extends UnaryFunctionType
 
 sealed trait BinaryFunctionType
 case object StrSplit extends BinaryFunctionType
