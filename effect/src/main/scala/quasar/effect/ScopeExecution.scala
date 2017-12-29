@@ -143,7 +143,7 @@ object ExecutionTimings {
       asIntervalsFromStart.sortBy(-_.size)
     sortedBySize.toNel.map {
       case NonEmptyList(head, tail) =>
-        val initTree = Cofree[List, LabelledInterval](head, Nil)
+        val initTree = LabelledIntervalTree(head, Nil)
         val intervalTree = tail.foldRight(initTree)(constructIntervalTree)
         intervalTree
     }
