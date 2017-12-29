@@ -102,7 +102,7 @@ object PostgresRenderQuery extends RenderQuery {
       srcs.map(_._2) match {
         case Vector(key, value) =>
           val valueStripped = value.stripPrefix("'").stripSuffix("'")
-          s"""$key.$valueStripped""".right
+          s"""$key."$valueStripped"""".right
         case key +: mid :+ last =>
           val firstValStripped = ~mid.headOption.map(_.stripPrefix("'").stripSuffix("'"))
           val midTail = mid.drop(1)
@@ -110,7 +110,7 @@ object PostgresRenderQuery extends RenderQuery {
             s"->${midTail.map(e => s"$e").intercalate("->")}"
           else
             ""
-          s"""$key.$firstValStripped$midStr->$last""".right
+          s"""$key."$firstValStripped"$midStr->$last""".right
         case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
       }
     case Obj(m) =>
@@ -124,10 +124,7 @@ object PostgresRenderQuery extends RenderQuery {
     case IfNull(exprs) =>
       s"coalesce(${exprs.map(e => text(e)).intercalate(", ")})".right
     case ExprWithAlias((_, expr), alias) =>
-      (if (expr === alias) s"$expr" else {
-        val aliasStr = \/.fromTryCatchNonFatal(alias.toLong).map(a => s""""$a"""").getOrElse(alias)
-        s"$expr as $aliasStr"
-      }).right
+        s"""$expr as "$alias"""".right
     case ExprPair((_, s1), (_, s2)) =>
       s"$s1, $s2".right
     case ConcatStr(TextExpr(e1), TextExpr(e2))  =>
