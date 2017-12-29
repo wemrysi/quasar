@@ -1,0 +1,14 @@
+{
+  "name": "[qa_s02] postgres array wildcard",
+
+  "backends": {},
+  "data": "arrayProcessing.data",
+
+  "query": "select * from arrayProcessing where \"1\" in a[_]",
+
+  "predicate": "exactly",
+
+  "expected": [
+    {"a": ["1", "2", "3"]}
+  ]
+}
