@@ -798,6 +798,12 @@ object MongoDbPlanner {
           case MFC(Not((_, v))) =>
             v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
 
+          case MFC(ProjectKey((_, obj), _)) =>
+            obj.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
+
+          case MFC(Cond((_, cond), _, _)) =>
+            cond.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+
           case MFC(Guard(_, typ, (_, cont), (Embed(MFC(Undefined())), _))) =>
             cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
           case MFC(Guard(_, typ, (_, cont), (Embed(MFC(MakeArray(Embed(MFC(Undefined()))))), _))) =>
@@ -901,6 +907,17 @@ object MongoDbPlanner {
                 rollMF[T, A](MFC(Guard(exp, tpe, exp0, Free.roll(MFC(MakeArray(Free.roll(MFC(Undefined())))))))).some
               case _ => none
             }
+
+            def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
+                M[WorkflowBuilder[WF]] = {
+              val (sel, inputs) = partialSel
+
+              inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(struct)))
+                .map(WB.filter(src, _, sel))
+            }
+
+            val selectors = getSelector[T, M, EX](
+              struct, defaultSelector[T].point[OutputM[?]], selector[T](cfg.bsonVersion)).toOption
 
             if (repair.contains(LeftSideF))
               shiftType match {
