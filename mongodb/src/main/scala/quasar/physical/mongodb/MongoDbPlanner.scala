@@ -935,13 +935,16 @@ object MongoDbPlanner {
                 case ShiftType.Array => {
                   selectors.toOption match {
                     case Some(sel) => {
+                      def transform[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
+                        applyTransforms(elideCond[A], rewriteUndefined[A])
+
                       val struct0 =
-                        handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler,
-                          struct.transCata[FreeMap[T]](orOriginal(elideCond[Hole]))
-                            .transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole])))
-                      val repair0 =
-                        repair.transCata[JoinFunc[T]](orOriginal(elideCond[JoinSide]))
-                          .transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide]))
+                        handleFreeMap[T, M, EX](
+                          cfg.funcHandler,
+                          cfg.staticHandler,
+                          struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
+
+                      val repair0 = repair.transCata[JoinFunc[T]](orOriginal(transform[JoinSide]))
 
                       (struct0 |@| filterBuilder(src, sel))((struct1, src0) =>
                         getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
