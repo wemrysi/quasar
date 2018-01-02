@@ -54,8 +54,8 @@ trait SqlExprRenderTree {
             nonTerminal("NotNull", a1)
           case IfNull(a) =>
             nonTerminal("IfNull", a.toList: _*)
-          case RegexMatches(a1, a2) =>
-            nonTerminal("RegexMatches", a1, a2)
+          case RegexMatches(a1, a2, caseInsensitive) =>
+            nonTerminal(s"RegexMatches (insensitive = $caseInsensitive)", a1, a2)
           case ExprWithAlias(e, a) =>
             nonTerminal(s"ExprWithAlias($a)", e)
           case ExprPair(expr1, expr2) =>

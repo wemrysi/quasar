@@ -81,7 +81,7 @@ object SqlExpr extends SqlExprInstances {
   final case class BinaryFunction[T](t: BinaryFunctionType, a1: T, a2: T) extends SqlExpr[T]
   final case class TernaryFunction[T](t: TernaryFunctionType, a1: T, a2: T, a3: T) extends SqlExpr[T]
 
-  final case class RegexMatches[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class RegexMatches[T](a1: T, a2: T, caseInsensitive: Boolean) extends SqlExpr[T]
 
   final case class Limit[T](from: T, count: T) extends SqlExpr[T]
   final case class Offset[T](from: T, count: T) extends SqlExpr[T]
