@@ -117,8 +117,9 @@ object PostgresRenderQuery extends RenderQuery {
       buildJson(m.map {
         case ((_, k), (_, v)) => s"'$k', $v"
       }.mkString(",")).right
-    case RegexMatches(TextExpr(e), (_, pattern)) =>
-      s"($e ~ '$pattern')".right
+    case RegexMatches(TextExpr(e), TextExpr(pattern), caseInsensitive: Boolean) =>
+      val op = if (caseInsensitive) "~*" else "~"
+      s"($e $op $pattern)".right
     case IsNotNull((_, expr)) =>
       s"($expr notnull)".right
     case IfNull(exprs) =>
