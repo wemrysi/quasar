@@ -78,6 +78,7 @@ trait SqlExprTraverse {
           newOrder)(
           Select(_, _, _, _, _)
         )
+      case Union(left, right) => (f(left) ⊛ f(right))(Union.apply)
       case Case(wt, Else(e)) =>
         (wt.traverse { case WhenThen(w, t) => (f(w) ⊛ f(t))(WhenThen(_, _)) } ⊛
           f(e)

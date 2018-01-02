@@ -20,11 +20,12 @@ import quasar._
 import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._
 import quasar.contrib.specs2.PendingWithActualTracking
-import quasar.javascript._
 import quasar.ejson.{EJson, Fixed}
+import quasar.javascript._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
+import quasar.qscript.ShiftType
 import quasar.sql.JoinDir
 import slamdata.Predef._
 
@@ -46,11 +47,6 @@ class PlannerQScriptSpec extends
 
   val dsl =
     quasar.qscript.construction.mkDefaults[Fix, fs.MongoQScript[Fix, ?]]
-
-  // Some useful debugging objects
-  val rt  = RenderTree[Crystallized[WorkflowF]]
-  val rtq = RenderTree[Fix[fs.MongoQScript[Fix, ?]]]
-  val toMetalPlan: Crystallized[WorkflowF] => Option[String] = WorkflowExecutor.toJS(_).toOption
 
   import dsl._
 
@@ -372,6 +368,49 @@ class PlannerQScriptSpec extends
           // Not on agg
     }.pendingWithActual(notOnPar, qtestFile("plan 3-way equi-join ($lookup)"))
 
+
+    "plan filtered flatten" in {
+      qplan(
+        fix.LeftShift(
+          fix.Filter(
+            fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("patients"), qscript.ExcludeId),
+            func.Eq(func.ProjectKeyS(func.Hole, "state"), func.Constant(json.str("CO")))),
+          func.Guard(
+            func.ProjectKey(func.Hole, func.Constant(json.str("codes"))),
+            Type.FlexArr(0, None, Type.Top),
+            func.ProjectKey(func.Hole, func.Constant(json.str("codes"))),
+            func.Undefined),
+          qscript.ExcludeId,
+          ShiftType.Array,
+          func.ConcatMaps(
+            func.MakeMap(
+              func.Constant(json.str("codes")),
+              func.RightSide),
+            func.MakeMap(
+              func.Constant(json.str("first_name")),
+              func.ProjectKey(
+                func.LeftSide,
+                func.Constant(json.str("first_name"))))))) must beWorkflow0(
+        chain[Workflow](
+          $read(collection("db", "patients")),
+          $match(Selector.Doc(
+            BsonField.Name("state") -> Selector.Eq(Bson.Text("CO")))),
+          $project(reshape(
+            "s" -> $$ROOT,
+            "f" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Arr()), $field("codes")),
+                  $lt($field("codes"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $field("codes"),
+                $arrayLit(List($literal(Bson.Undefined)))))),
+          $unwind(DocField("f")),
+          $project(reshape(
+            "codes"      -> $field("f"),
+            "first_name" -> $field("s", "first_name")))))
+
+    }
+
     "plan with flatenning in filter predicate with reference to LeftSide" in {
       qplan(
         fix.Filter(
@@ -431,45 +470,78 @@ class PlannerQScriptSpec extends
                   $lte($literal(Bson.Arr()), $field("loc")),
                   $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("loc"),
-                $literal(Bson.Undefined)))),
+                $arrayLit(List($literal(Bson.Undefined)))))),
           $unwind(DocField("0")),
           $match(Selector.Doc(
             BsonField.Name("0") -> Selector.Lt(Bson.Int32(-165)))),
           $project(reshape(sigil.Quasar -> $field("0")))))
-    }.pendingUntilFixed
-
-    "plan typechecks with JS when unable to extract ExprOp" in {
-      import fix.{Filter, ShiftedRead}, qscript.IncludeId
-      import func.{Constant, DeleteKey, Guard}
-
-      qplan(
-        Filter(
-          ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), IncludeId),
-          Guard(
-            DeleteKey(Constant(json.str("a")), Constant(json.str("b"))),
-            Type.Str,
-            Constant(json.bool(false)),
-            Constant(json.bool(true))))) must beWorkflow(
-        chain[Workflow](
-          $read(collection("db", "zips")),
-          $project(reshape("0" -> $arrayLit(List($field("_id"), $$ROOT)))),
-          $simpleMap(
-            NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-              "0" ->
-                If(Call(ident("isString"),
-                    List(Call(ident("remove"), List(Literal(Js.Str("a")), Literal(Js.Str("b")))))),
-                  jscore.Literal(Js.Bool(false)),
-                  jscore.Literal(Js.Bool(true))),
-              "src" -> Access(ident("x"), jscore.Literal(Js.Str("0")))
-            )))),
-            ListMap()),
-          $match(Selector.Doc(
-            BsonField.Name("0") -> Selector.Eq(Bson.Bool(true))
-          )),
-          $project(reshape(sigil.Quasar -> $field("src")))))
     }
 
-    "plan double LeftShift without reference to LeftSide" in {
+    "plan double flatten with reference to LeftSide" in {
+      qplan(
+        fix.LeftShift(
+          fix.LeftShift(
+            fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
+            func.Guard(
+              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              Type.FlexArr(0, None, Type.FlexArr(0, None, Type.Top)),
+              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              func.Undefined),
+            qscript.ExcludeId,
+            qscript.ShiftType.Array,
+            func.ConcatMaps(
+              func.MakeMap(
+                func.Constant(json.str("results")),
+                func.Guard(
+                  func.RightSide,
+                  Type.FlexArr(0, None, Type.Top),
+                  func.RightSide,
+                  func.Undefined)),
+              func.MakeMap(
+                func.Constant(json.str("original")),
+                func.LeftSide))),
+          func.ProjectKey(func.Hole, func.Constant(json.str("results"))),
+          qscript.ExcludeId,
+          qscript.ShiftType.Array,
+          func.ConcatMaps(
+            func.MakeMap(
+              func.Constant(json.str("0")),
+              func.ProjectKey(
+                func.ProjectKey(
+                  func.LeftSide,
+                  func.Constant(json.str("original"))),
+                func.Constant(json.str("city")))),
+            func.MakeMap(
+              func.Constant(json.str("1")),
+              func.RightSide)))) must beWorkflow0(
+        chain[Workflow](
+          $read(collection("db", "zips")),
+          $project(reshape(
+            "s" -> $$ROOT,
+            "f" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Arr()), $field("loc")),
+                  $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $field("loc"),
+                $arrayLit(List($literal(Bson.Undefined)))))),
+          $unwind(DocField("f")),
+          $project(reshape(
+            "s" -> reshape("original" -> $field("s")),
+            "f" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Arr()), $field("f")),
+                  $lt($field("f"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $field("f"),
+                $arrayLit(List($literal(Bson.Undefined)))))),
+          $unwind(DocField("f")),
+          $project(reshape(
+            "0" -> $field("s", "original", "city"),
+            "1" -> $field("f")))))
+    }
+
+    "plan double flatten without reference to LeftSide" in {
       qplan(
         fix.LeftShift(
           fix.LeftShift(
@@ -498,7 +570,7 @@ class PlannerQScriptSpec extends
                   $lte($literal(Bson.Arr()), $field("loc")),
                   $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("loc"),
-                $literal(Bson.Undefined)))),
+                $arrayLit(List($literal(Bson.Undefined)))))),
           $unwind(DocField("0")),
           $project(reshape(
             "0" ->
@@ -507,13 +579,13 @@ class PlannerQScriptSpec extends
                   $lte($literal(Bson.Arr()), $field("0")),
                   $lt($field("0"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("0"),
-                $literal(Bson.Undefined)))),
+                $arrayLit(List($literal(Bson.Undefined)))))),
           $unwind(DocField("0")),
           $project(reshape(
             sigil.Quasar -> $field("0")))))
-    }.pendingUntilFixed
+    }
 
-    "plan LeftShift with reference to LeftSide" in {
+    "plan flatten with reference to LeftSide" in {
       qplan(
         fix.LeftShift(
           fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
@@ -544,6 +616,34 @@ class PlannerQScriptSpec extends
           $project(reshape(
             "city" -> $field("s", "city"),
             "loc" -> $field("f")))))
+    }
+
+    "plan typechecks with JS when unable to extract ExprOp" in {
+      qplan(
+        fix.Filter(
+          fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.IncludeId),
+          func.Guard(
+            func.DeleteKey(func.Constant(json.str("a")), func.Constant(json.str("b"))),
+            Type.Str,
+            func.Constant(json.bool(false)),
+            func.Constant(json.bool(true))))) must beWorkflow(
+        chain[Workflow](
+          $read(collection("db", "zips")),
+          $project(reshape("0" -> $arrayLit(List($field("_id"), $$ROOT)))),
+          $simpleMap(
+            NonEmptyList(MapExpr(JsFn(Name("x"), obj(
+              "0" ->
+                If(Call(ident("isString"),
+                    List(Call(ident("remove"), List(Literal(Js.Str("a")), Literal(Js.Str("b")))))),
+                  jscore.Literal(Js.Bool(false)),
+                  jscore.Literal(Js.Bool(true))),
+              "src" -> Access(ident("x"), jscore.Literal(Js.Str("0")))
+            )))),
+            ListMap()),
+          $match(Selector.Doc(
+            BsonField.Name("0") -> Selector.Eq(Bson.Bool(true))
+          )),
+          $project(reshape(sigil.Quasar -> $field("src")))))
     }
   }
 }
