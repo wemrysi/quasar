@@ -118,10 +118,12 @@ class MetastoreServiceSpec extends quasar.Qspec {
         resp  <- svc(req)
         mnts  <- MetaStoreAccess.mounts.transact(dstTrans)
         vmnts <- MetaStoreAccess.viewCaches.transact(dstTrans)
+        expectedUrl <- DbConnectionConfig.connectionInfo(dstConn).url.point[Task]
       } yield {
         resp.status must_=== Ok
         mnts  must_=== List(pathedMountConfig)
         vmnts must_=== List(pvc)
+        resp.as[String].unsafePerformSync must_=== s"Metastore copied. Now using newly initialized metastore located at $expectedUrl"
       }).unsafePerformSync
     }
     "persist change to metastore" in {
