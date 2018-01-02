@@ -922,6 +922,9 @@ object MongoDbPlanner {
                 .map(WB.filter(src, _, sel))
             }
 
+            def transform[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
+              applyTransforms(elideCond[A], rewriteUndefined[A])
+
             val selectors = getSelector[T, M, EX](
               struct, InternalError.fromMsg("Not a selector").left, selector[T](cfg.bsonVersion))
 
@@ -933,32 +936,7 @@ object MongoDbPlanner {
 
               shiftType match {
                 case ShiftType.Array => {
-                  selectors.toOption match {
-                    case Some(sel) => {
-                      def transform[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
-                        applyTransforms(elideCond[A], rewriteUndefined[A])
-
-                      val struct0 =
-                        handleFreeMap[T, M, EX](
-                          cfg.funcHandler,
-                          cfg.staticHandler,
-                          struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
-
-                      val repair0 = repair.transCata[JoinFunc[T]](orOriginal(transform[JoinSide]))
-
-                      (struct0 |@| filterBuilder(src, sel))((struct1, src0) =>
-                        getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
-                          FlatteningBuilder(
-                            DocBuilder(
-                              src0,
-                              ListMap(
-                                BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                                BsonField.Name("f") -> struct1)),
-                            Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
-                          repair0)).join
-                    }
-                    case None =>
-                      handleFreeMap[T, M, EX](
+                  selectors.fold(_ => handleFreeMap[T, M, EX](
                         cfg.funcHandler,
                         cfg.staticHandler,
                         struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))) >>= (target =>
@@ -971,7 +949,25 @@ object MongoDbPlanner {
                                 BsonField.Name("f") -> target)),
                             Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
                           repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide]))))
-                  }
+                  , { sel =>
+                      val struct0 =
+                        handleFreeMap[T, M, EX](
+                          cfg.funcHandler,
+                          cfg.staticHandler,
+                          struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
+                      val repair0 = repair.transCata[JoinFunc[T]](orOriginal(transform[JoinSide]))
+
+                      (struct0 ⊛ filterBuilder(src, sel))((struct1, src0) =>
+                        getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
+                          FlatteningBuilder(
+                            DocBuilder(
+                              src0,
+                              ListMap(
+                                BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                                BsonField.Name("f") -> struct1)),
+                            Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                          repair0)).join
+                  })
                 }
                 case _ =>
                   (handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct) ⊛
