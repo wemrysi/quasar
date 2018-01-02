@@ -90,7 +90,7 @@ object sigil {
   object Sigil {
     implicit val sigilBson: Sigil[Bson] = new Sigil[Bson] {
       def fieldValue(name: String): Bson => Option[Bson] =
-        b => Bson._listMap.getOption(b).flatMap(m => m.get(name))
+        b => Bson._doc.getOption(b).flatMap(m => m.get(name))
     }
 
     implicit val sigilBsonValue: Sigil[BsonValue] = new Sigil[BsonValue] {

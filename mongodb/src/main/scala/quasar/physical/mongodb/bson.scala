@@ -119,7 +119,7 @@ object Bson {
     def fromArray(array: Array[Byte]): Binary = Binary(ImmutableArray.fromArray(array))
   }
 
-  val _listMap =
+  val _doc =
     Prism.partial[Bson, ListMap[String, Bson]] { case Bson.Doc(v) => v } (Bson.Doc(_))
 
   final case class Doc(value: ListMap[String, Bson])
