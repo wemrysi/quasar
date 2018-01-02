@@ -177,6 +177,7 @@ object PostgresRenderQuery extends RenderQuery {
 
       val fromExpr = s" from ${from.v._2} ${from.alias.v}"
       s"(select ${selection.v._2}$fromExpr$filter$orderByStr)".right
+    case Union((_, left), (_, right)) => s"($left) UNION ($right)".right
     case Constant(Data.Str(v)) =>
       val text = v.flatMap { case ''' => "''"; case iv => iv.toString }.self
       s"'$text'".right
