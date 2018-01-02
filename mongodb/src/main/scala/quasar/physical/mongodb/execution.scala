@@ -94,7 +94,7 @@ private[mongodb] object execution {
       if (lm.size <= 1) lm.headOption else None
   }
 
-  object SimpleRedirect {
+  object SimpleRename {
     def unapply(op: PipelineOp): Option[(BsonField.Name, BsonField)] = op match {
       case PipelineOpCore(proj @ $ProjectF((), Reshape(SingleListMap(bn @ BsonField.Name(_), \/-($var(DocField(bf))))), IgnoreId | ExcludeId)) =>
         (bn, bf).some
@@ -102,12 +102,12 @@ private[mongodb] object execution {
     }
   }
 
-  object CountableRedirect {
+  object CountableRename {
     def unapply(pipeline: workflowtask.Pipeline): Option[BsonField.Name] =
       pipeline match {
         case List(Countable(field)) =>
           field.some
-        case List(Countable(field), SimpleRedirect(name, f))
+        case List(Countable(field), SimpleRename(name, f))
             if (field: BsonField) ≟ f =>
           name.some
         case _ => None

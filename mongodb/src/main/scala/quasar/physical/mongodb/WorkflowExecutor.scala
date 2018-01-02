@@ -299,21 +299,21 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
         find(src, Find(None, bson.some, keys.some, skip, limit)) map (_.right)
       case (List(PipelineOpCore($MatchF((), sel)), Projectable(bson), PipelineOpCore($SortF((), keys))), Nil) =>
         find(src, Find(sel.some, bson.some, keys.some, skip, limit)) map (_.right)
-      case (CountableRedirect(field), Nil)
+      case (CountableRename(field), Nil)
           if skip.getOrElse(0L) ≟ 0L && limit.cata(_ >= 1L, true) =>
         labeledCount(src, Count(None, None, None), field) map (_.left)
-      case (List(Countable(field)), List(SimpleRedirect(name, f)))
+      case (List(Countable(field)), List(SimpleRename(name, f)))
           if skip.getOrElse(0L) ≟ 0L && limit.cata(_ >= 1L, true) && (field: BsonField) ≟ f =>
         labeledCount(src, Count(None, None, None), name) map (_.left)
-      case (Nil, CountableRedirect(field)) =>
+      case (Nil, CountableRename(field)) =>
         labeledCount(src, Count(None, skip, limit), field) map (_.left)
-      case (PipelineOpCore($MatchF((), sel)) :: CountableRedirect(field), Nil)
+      case (PipelineOpCore($MatchF((), sel)) :: CountableRename(field), Nil)
           if skip.getOrElse(0L) ≟ 0L && limit.cata(_ >= 1L, true) =>
         labeledCount(src, Count(sel.some, None, None), field) map (_.left)
-      case (List(PipelineOpCore($MatchF((), sel)), Countable(field)), List(SimpleRedirect(name, f)))
+      case (List(PipelineOpCore($MatchF((), sel)), Countable(field)), List(SimpleRename(name, f)))
           if skip.getOrElse(0L) ≟ 0L && limit.cata(_ >= 1L, true) && (field: BsonField) ≟ f =>
         labeledCount(src, Count(sel.some, None, None), name) map (_.left)
-      case (List(PipelineOpCore($MatchF((), sel))), CountableRedirect(field)) =>
+      case (List(PipelineOpCore($MatchF((), sel))), CountableRename(field)) =>
         labeledCount(src, Count(sel.some, skip, limit), field) map (_.left)
       case (Distinctable(origField, newField), Nil)
           if skip ≟ None && limit ≟ None =>
