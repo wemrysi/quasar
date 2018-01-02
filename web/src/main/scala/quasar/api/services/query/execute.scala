@@ -18,7 +18,7 @@ package quasar.api.services.query
 
 import slamdata.Predef.{ -> => _, _ }
 import quasar._
-import quasar.effect.{ExecutionId, ScopeExecution}
+import quasar.effect.ScopeExecution
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
 import quasar.contrib.pathy._
@@ -58,24 +58,23 @@ object execute {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
         respond(parsedQueryRequest(req, offset, limit) traverse { case (xpr, basePath, off, lim) =>
           // FIXME: use fsQ.evaluateQuery here
-          Free.roll(S1(ExecutionId.ofRef(executionIdRef).map(SE.newExecution(_, ST =>
-            for {
-              result <- ST.newScope("total (GET)",
-                for {
-                  block <- ST.newScope("resolve imports", resolveImports[S](xpr, basePath).run)
-                  lpOrSemanticErr <-
-                    ST.newScope("plan query",
-                        block.leftMap(_.wrapNel).flatMap(block =>
-                        queryPlan(block, requestVars(req), basePath, off, lim)
-                        .run.value).point[Free[S, ?]]
-                    )
-                  evaluated <- ST.newScope("evaluate query",
+          for {
+            newExecutionIndex <- Free.liftF(S1(executionIdRef.modify(_ + 1)))
+            result <- SE.newExecution(newExecutionIndex, ST =>
+              for {
+                block <- ST.newScope("resolve imports", resolveImports[S](xpr, basePath).run)
+                lpOrSemanticErr <-
+                  ST.newScope("plan query",
+                    block.leftMap(_.wrapNel).flatMap(block =>
+                      queryPlan(block, requestVars(req), basePath, off, lim)
+                    .run.value).point[Free[S, ?]])
+                evaluated <-
+                  ST.newScope("evaluate query",
                     lpOrSemanticErr traverse (lp => formattedDataResponse(
                       MessageFormat.fromAccept(req.headers.get(Accept)),
                       Q.evaluate(lp).translate(xform.dropPhases))))
-                } yield evaluated)
-            } yield result
-          ))))
+            } yield evaluated)
+          } yield result
       })
 
       case req @ POST -> AsDirPath(path) =>
@@ -91,8 +90,9 @@ object execute {
           if (query.isEmpty) {
             respond_(bodyMustContainQuery)
           } else {
-             respond(Free.roll(S1(ExecutionId.ofRef(executionIdRef).map(SE.newExecution(_, ST =>
-              ST.newScope("total (POST)",
+            respond(for {
+              newExecutionIndex <- Free.liftF(S1(executionIdRef.modify(_ + 1)))
+              result <- SE.newExecution(newExecutionIndex, ST =>
                 (for {
                   destination <- EitherT(requiredHeader(Destination, req).pure[Free[S, ?]])
                   parsed <- EitherT(ST.newScope("parse SQL", sql.fixParser.parse(query).leftMap(_.toApiError).pure[Free[S, ?]]))
@@ -110,9 +110,9 @@ object execute {
                         "out"   := posixCodec.printPath(out),
                         "phases" := phases)))
                   }))
-                } yield executed).run)
-            )
-            ))))
+                } yield executed).run
+              )
+            } yield result)
           }
         }
     }

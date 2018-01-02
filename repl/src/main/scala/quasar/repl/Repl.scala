@@ -242,9 +242,9 @@ object Repl {
         } yield ()
 
       case Select(n, q) =>
-        Free.liftF(S3(ExecutionId.ofRef(executionIdRef))).flatMap(id => SE.newExecution[Unit](id, { ST =>
-          ST.newScope(
-            "total (REPL)",
+        for {
+          newExecutionIndex <- Free.liftF(S3(executionIdRef.modify(_ + 1)))
+          result <- SE.newExecution[Unit](newExecutionIndex, { ST =>
             for {
               state <- RS.get
               expr  <- ST.newScope("parse SQL", DF.unattempt_(sql.fixParser.parse(q.value).leftMap(_.message)))
@@ -269,8 +269,9 @@ object Repl {
                               runQuery(state, query)(ds => summarize[S](state.summaryCount.map(_.value), state.format)(ds)))
                            } yield results
                          })
-            } yield ())
-        }))
+            } yield ()
+        })
+        } yield result
 
       case Explain(q) =>
         for {

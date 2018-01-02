@@ -131,14 +131,12 @@ object Main {
           case TimingFormat.Nothing | TimingFormat.Total =>
             ().point[Free[ReplEff[S, ?], ?]]
           case TimingFormat.Readable =>
-            val flameGraph =
-              ExecutionTimings.toLabelledIntervalTree(id, timings)
-                .cata(ExecutionTimings.render(_).shows, "timing information not available")
-            Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(flameGraph)))
+            val timingTree =
+              ExecutionTimings.render(ExecutionTimings.toLabelledIntervalTree(id, timings)).shows
+            Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(timingTree)))
           case TimingFormat.Json =>
             val renderedJson =
-              ExecutionTimings.toLabelledIntervalTree(id, timings)
-                .cata(ExecutionTimings.asJson(id, _).nospaces, "timing information not available")
+              ExecutionTimings.asJson(id, ExecutionTimings.toLabelledIntervalTree(id, timings)).nospaces
             Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(renderedJson)))
         }
       } yield ()

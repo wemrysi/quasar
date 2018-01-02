@@ -128,8 +128,7 @@ object Server {
     val printAction = { (id: ExecutionId, timings: ExecutionTimings) =>
       if (printExecutions) {
         Free.liftF(Inject[Task, CoreEffIORW].inj(Task.delay(println(
-          ExecutionTimings.toLabelledIntervalTree(id, timings)
-            .cata(ExecutionTimings.render(_).shows, "timing information not available")
+          ExecutionTimings.render(ExecutionTimings.toLabelledIntervalTree(id, timings)).shows
         ))))
       } else {
         ().point[Free[CoreEffIORW, ?]]
