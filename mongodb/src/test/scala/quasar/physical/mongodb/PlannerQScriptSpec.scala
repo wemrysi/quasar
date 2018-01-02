@@ -709,8 +709,7 @@ class PlannerQScriptSpec extends
           $project(reshape(
             "codes" -> $field("f"),
             "first_name" -> $field("s", "first_name"),
-            "city" -> $field("s", "city"))))
-      )
+            "city" -> $field("s", "city")))))
     }
 
     "plan typechecks with JS when unable to extract ExprOp" in {
