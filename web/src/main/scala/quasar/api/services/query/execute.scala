@@ -94,10 +94,10 @@ object execute {
               newExecutionIndex <- Free.liftF(S1(executionIdRef.modify(_ + 1)))
               result <- SE.newExecution(newExecutionIndex, ST =>
                 (for {
-                  destination <- EitherT(requiredHeader(Destination, req).pure[Free[S, ?]])
+                  destination <- EitherT.fromDisjunction[Free[S, ?]](requiredHeader(Destination, req))
                   parsed <- EitherT(ST.newScope("parse SQL", sql.fixParser.parse(query).leftMap(_.toApiError).pure[Free[S, ?]]))
-                  out <- EitherT(destinationFile(destination.value).pure[Free[S, ?]])
-                  basePath <- EitherT(decodedDir(req.uri.path).pure[Free[S, ?]])
+                  out <- EitherT.fromDisjunction[Free[S, ?]](destinationFile(destination.value))
+                  basePath <- EitherT.fromDisjunction[Free[S, ?]](decodedDir(req.uri.path))
                   resolved <- EitherT(ST.newScope("resolve imports", resolveImports(parsed, basePath).leftMap(_.toApiError).run))
                   executed <- EitherT(ST.newScope("execute query", fsQ.executeQuery(resolved, requestVars(req), basePath, out).run.run.run map {
                     case (phases, result) =>
