@@ -21,12 +21,12 @@ import quasar.api._
 import quasar.db.DbConnectionConfig
 import quasar.fp.free._
 import quasar.main.{MainErrT, MetaStoreLocation}
-import org.http4s.dsl._
-import org.http4s.argonaut._
-import argonaut.Json
-import argonaut.Argonaut._
 import quasar.metastore.MetaStore.{ShouldCopy, ShouldInitialize}
 
+import argonaut.Json
+import argonaut.Argonaut._
+import org.http4s.dsl._
+import org.http4s.argonaut._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
