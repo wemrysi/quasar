@@ -21,26 +21,29 @@ import quasar.api._
 import quasar.db.DbConnectionConfig
 import quasar.fp._
 import quasar.fp.free._
+import quasar.fs.FileSystemType
+import quasar.fs.mount.{ConnectionUri, MountConfig, MountType}
+import quasar.fs.mount.cache.ViewCache
 import quasar.main._
 import quasar.metastore.{MetaStore, MetaStoreAccess, MetaStoreFixture, PathedMountConfig, PathedViewCache, Schema}
+import quasar.metastore.MetaStore.ShouldInitialize
 import quasar.sql._
+import quasar.Variables
+import java.time.Instant
+
 import argonaut._
 import Argonaut._
+import doobie.imports._
 import org.http4s._
 import Status._
 import org.http4s.Method.PUT
 import org.http4s.syntax.service._
 import org.http4s.argonaut._
 import pathy.Path.{file, rootDir}
-import quasar.fs.FileSystemType
-import quasar.fs.mount.{ConnectionUri, MountConfig, MountType}
-import doobie.imports._
-import quasar.Variables
-import quasar.fs.mount.cache.ViewCache
-import java.time.Instant
+
 
 import scalaz._, Scalaz._
-import concurrent.Task
+import scalaz.concurrent.Task
 
 class MetastoreServiceSpec extends quasar.Qspec {
 
@@ -75,7 +78,7 @@ class MetastoreServiceSpec extends quasar.Qspec {
     "succeed in changing metastore without initialize parameter if metastore is already initialized" in {
       val newConn = MetaStoreFixture.createNewTestMetaStoreConfig.unsafePerformSync
       // Connect to it beforehand to initialize it
-      val meta = MetaStore.connect(newConn, initializeOrUpdate = true, List(Schema.schema), Nil)
+      val meta = MetaStore.connect(newConn, initializeOrUpdate = ShouldInitialize(true), List(Schema.schema), Nil)
                    .run.unsafePerformSync.valueOr(e => scala.sys.error("Failed to initialize test metastore because: " + e.message))
       meta.shutdown.unsafePerformSync
       val req = Request(method = PUT).withBody(newConn.asJson).unsafePerformSync
@@ -108,13 +111,13 @@ class MetastoreServiceSpec extends quasar.Qspec {
 
       (for {
         dstConn <- MetaStoreFixture.createNewTestMetaStoreConfig
-        dstMeta <- MetaStore.connect(dstConn, initializeOrUpdate = true, List(Schema.schema), Nil)
+        dstMeta <- MetaStore.connect(dstConn, initializeOrUpdate = ShouldInitialize(true), List(Schema.schema), Nil)
                   .run.map(_.valueOr(e => scala.sys.error("Failed to initialize test metastore because: " + e.message)))
         srcTrans = srcMeta.transactor
         dstTrans = dstMeta.transactor
         _     <- MetaStoreAccess.insertPathedMountConfig(pathedMountConfig).transact(srcTrans)
         _     <- MetaStoreAccess.insertViewCache(pvc).transact(srcTrans)
-        req   <- Request(method = PUT, uri = Uri().+?("initialize").+?("copy")).withBody(dstConn.asJson)
+        req   <- Request(method = PUT, uri = Uri() +? ("initialize") +? ("copy")).withBody(dstConn.asJson)
         resp  <- svc(req)
         mnts  <- MetaStoreAccess.mounts.transact(dstTrans)
         vmnts <- MetaStoreAccess.viewCaches.transact(dstTrans)

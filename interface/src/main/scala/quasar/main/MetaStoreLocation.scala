@@ -21,6 +21,7 @@ import quasar.fp._
 import quasar.db.DbConnectionConfig
 import quasar.effect.LiftedOps
 import quasar.metastore.MetaStore
+import quasar.metastore.MetaStore.{ShouldCopy, ShouldInitialize}
 
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -31,8 +32,7 @@ object MetaStoreLocation {
 
   final case object Get extends MetaStoreLocation[DbConnectionConfig]
 
-  // TODO: get rid of booleans
-  final case class Set(conn: DbConnectionConfig, initialize: Boolean, copy: Boolean)
+  final case class Set(conn: DbConnectionConfig, initialize: ShouldInitialize, copy: ShouldCopy)
     extends MetaStoreLocation[String \/ Unit]
 
   final class Ops[S[_]](implicit val ev: MetaStoreLocation :<: S) extends LiftedOps[MetaStoreLocation, S] {
@@ -40,8 +40,7 @@ object MetaStoreLocation {
     def get: Free[S, DbConnectionConfig] =
       lift(Get)
 
-    // TODO: get rid of booleans
-    def set(conn: DbConnectionConfig, initialize: Boolean, copy: Boolean): Free[S, String \/ Unit] =
+    def set(conn: DbConnectionConfig, initialize: ShouldInitialize, copy: ShouldCopy): Free[S, String \/ Unit] =
       lift(Set(conn, initialize, copy))
   }
 
@@ -64,7 +63,7 @@ object MetaStoreLocation {
             // Try connecting to the new metastore location
             m  <- MetaStore.connect(conn, initialize, currentSchemas, currentMetastore.copyFromTo).leftMap(_.message)
             // Copy metastore if requested
-            _ <- copy.whenM(currentMetastore.copyFromTo.traverse(_(currentMetastore.transactor)(m.transactor)).liftM[MainErrT])
+            _ <- copy.v.whenM(currentMetastore.copyFromTo.traverse(_(currentMetastore.transactor)(m.transactor)).liftM[MainErrT])
             // Persist the change, if persisting fails, shutdown the new metastore connection and fail the change
             _ <- EitherT(persist(m.connectionInfo).foldM(persistFailure => m.shutdown.as(persistFailure.left), _ => ().right.point[Task]))
             // We successfully connected to the new metastore and persisted the change to the config file

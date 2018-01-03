@@ -23,7 +23,6 @@ import quasar.db._
 import scala.util.Random.nextInt
 import doobie.imports._
 import doobie.util.transactor.Transactor
-
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import org.specs2.mutable.SpecificationLike

@@ -31,8 +31,6 @@ import scalaz._, Scalaz._
 /** Operations that access the meta-store via doobie, all wrapped in ConnectionIO
   */
 trait MetaStoreAccess {
-  // NB: New tables added to the metastore schema should include copy queries
-
   //--- Mounts ---
   val fsMounts: ConnectionIO[Map[APath, FileSystemConfig]] =
     Queries.fsMounts.list.map(_.toMap)

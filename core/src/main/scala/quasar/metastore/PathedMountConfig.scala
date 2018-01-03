@@ -19,7 +19,6 @@ package quasar.metastore
 import quasar.contrib.pathy.APath
 import quasar.fs.mount.{ConnectionUri, MountType}
 
-// TODO: add arbitraries for each arg
 final case class PathedMountConfig(path: APath, mt: MountType, uri: ConnectionUri)
 
 

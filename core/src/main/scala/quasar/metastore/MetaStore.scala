@@ -16,16 +16,17 @@
 
 package quasar.metastore
 
+import argonaut.{DecodeJson, Json}
 import slamdata.Predef._
 import quasar.console.stdout
 import quasar.db._
 import quasar.fs.mount.MountingsConfig
-
-import argonaut._
 import doobie.util.transactor.Transactor
 import doobie.free.connection.ConnectionIO
 import doobie.syntax.connectionio._
-import scalaz._, Scalaz._
+
+import scalaz._
+import Scalaz._
 import scalaz.concurrent.Task
 
 final case class MetaStore private (
@@ -37,6 +38,10 @@ final case class MetaStore private (
 }
 
 object MetaStore {
+
+  final case class ShouldInitialize(v: Boolean)
+  final case class ShouldCopy(v: Boolean)
+
   /**
     * Attempts to connect to a Quasar MetaStore. Will make sure the schema matches the expected Schema and print
     * a line to the console to inform the user that we just connected to a given MetaStore location once the
@@ -55,12 +60,12 @@ object MetaStore {
     *         well as it's location and expected Schema
     */
   def connect(
-    dbConfig: DbConnectionConfig, initializeOrUpdate: Boolean,
+    dbConfig: DbConnectionConfig, initializeOrUpdate: ShouldInitialize,
     schemas: List[Schema[Int]], copyFromTo: List[Transactor[Task] => Transactor[Task] => Task[Unit]]
   ): EitherT[Task, MetastoreFailure, MetaStore] =
     for {
       tx <- poolingTransactor(DbConnectionConfig.connectionInfo(dbConfig), DefaultConfig).leftMap(f => f:MetastoreFailure)
-      _  <- onFailOrLeft(initializeOrUpdate.whenM(schemas.traverse(this.initializeOrUpdate(_, tx.transactor, None))) >>
+      _  <- onFailOrLeft(initializeOrUpdate.v.whenM(schemas.traverse(this.initializeOrUpdate(_, tx.transactor, None))) >>
             schemas.traverse(verifySchema(_, tx.transactor)) >>
             stdout(s"Using metastore: ${DbConnectionConfig.connectionInfo(dbConfig).url}").liftM[EitherT[?[_], MetastoreFailure, ?]])(tx.shutdown)
     } yield MetaStore(dbConfig, tx, schemas, copyFromTo)
