@@ -21,6 +21,7 @@ import quasar.fp.free.foldMapNT
 import quasar.db._
 
 import scala.util.Random.nextInt
+
 import doobie.imports._
 import doobie.util.transactor.Transactor
 import scalaz._, Scalaz._
