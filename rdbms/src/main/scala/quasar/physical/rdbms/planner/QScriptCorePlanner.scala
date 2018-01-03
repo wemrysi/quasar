@@ -135,25 +135,26 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     }
 
     case qUnion@qscript.Union(src, left, right) =>
-      val hole = qscript.HoleQS[T]
-      (src.project, left, right) match {
-        case (_: Select[_], `hole`, `hole`) => src.point[F]
-        case _ =>
-          (compile(left, src) |@| compile(right, src))(Union(_,_).embed)
-      }
+      (compile(left, src) |@| compile(right, src))(Union(_,_).embed)
 
-    case reduce@qscript.Reduce(src, bucket, reducers, repair) => for {
-      alias <- genId[T[SqlExpr], F]
-      gbs       <- bucket.traverse(processFreeMap(_, alias))
-    } yield {
-        Select(
-          Selection(gbs.head, none),
-          From(src, alias),
-          none,
-          groupBy = GroupBy(gbs).some,
-          orderBy = nil
-        ).embed
-    }
+
+    case reduce@qscript.Reduce(src, bucket, reducers, repair) =>
+      src.project match {
+        case _: Union[_] => src.point[F]
+        case _ => for {
+          alias <- genId[T[SqlExpr], F]
+          gbs       <- bucket.traverse(processFreeMap(_, alias))
+        } yield {
+          Select(
+            Selection(gbs.head, none),
+            From(src, alias),
+            none,
+            groupBy = GroupBy(gbs).some,
+            orderBy = nil
+          ).embed
+        }
+      }
+     
 
 
     case other =>
