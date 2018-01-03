@@ -1,5 +1,5 @@
 {
-    "name": "order join by alias",
+    "name": "[qa_s07] order join by alias",
 
     "backends": {
         "couchbase":         "pending",

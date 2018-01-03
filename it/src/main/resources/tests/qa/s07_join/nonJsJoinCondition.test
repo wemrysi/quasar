@@ -13,10 +13,12 @@
         "mongodb_read_only": "pending",
         "spark_hdfs":        "pending",
         "spark_local":       "pending",
-        "spark_cassandra":   "pending"
+        "spark_cassandra":   "pending",
+        "postgres":          "pending"
     },
 
     "NB": "#2110: Disabled in all qscript-based connectors due to qscript bug.",
+    "NB2": "Skipping for postgres until there's support for ProjectIndex",
 
     "data": "../zips.data",
 

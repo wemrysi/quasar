@@ -1,13 +1,15 @@
 {
-    "name": "select over fields with same name and condition with AND",
+    "name": "[qa_s07] select over fields with same name and condition with AND",
 
     "backends": {
         "couchbase": "pending",
-        "marklogic_json": "ignoreFieldOrder"
+        "marklogic_json": "ignoreFieldOrder",
+        "postgres": "pending"
     },
 
     "NB": "#1587: Disabled in couchbase due to lack of general join.
            Mimir not on par with master",
+    "NB2": "Skipping for postgres until there's support for ProjectIndex",
 
     "data": ["../owners.data", "../cars.data"],
 

@@ -1,5 +1,5 @@
 {
-    "name": "select tests that have changed status",
+    "name": "[qa_s07] select tests that have changed status",
     "NB": "This is currently disabled on all connectors due to #2110.",
     "backends": {
         "couchbase":         "pending",
@@ -13,14 +13,15 @@
         "mongodb_read_only": "pendingIgnoreFieldOrder",
         "spark_hdfs":        "pending",
         "spark_local":       "pending",
-        "spark_cassandra":   "pending"
+        "spark_cassandra":   "pending",
+        "postgres":          "pending"
     },
-    "data": ["oldTests.data", "newTests.data"],
+    "data": ["../oldTests.data", "../newTests.data"],
     "query": "select old.name ?? new.name as name,
                      old.backends{_:} ?? new.backends{_:} as backend,
                      old.backends{:_} ?? \"success\" as prevStatus,
                      new.backends{:_} ?? \"success\" as currStatus
-                from oldTests as old full outer join newTests as new
+                from `../oldTests` as old full outer join `../newTests` as new
                   on old.name = new.name and
                      old.backends{_:} = new.backends{_:} and
                      old.backends{_:} <> \"mongodb_q_3_2\" and

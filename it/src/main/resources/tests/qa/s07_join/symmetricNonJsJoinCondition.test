@@ -1,5 +1,5 @@
 {
-    "name": "flattening both sides of a join condition",
+    "name": "[qa_s07] flattening both sides of a join condition",
 
     "backends": {
         "couchbase":         "pending",
@@ -13,8 +13,11 @@
         "mongodb_read_only": "pending",
         "spark_hdfs":        "pending",
         "spark_local":       "pending",
-        "spark_cassandra":   "pending"
+        "spark_cassandra":   "pending",
+        "postgres":          "pending"
     },
+
+    "NB": "Skipping for postgres until there's support for ProjectIndex",
 
     "data": ["../zips.data", "../largeZips.data"],
 
