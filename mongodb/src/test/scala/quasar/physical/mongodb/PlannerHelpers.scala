@@ -269,10 +269,7 @@ object PlannerHelpers {
     plan3_4(query, defaultStats, defaultIndexes, emptyDoc)
 
   def planMetal(query: Fix[Sql]): Option[String] =
-    plan(query) match {
-      case Left(_) => None
-      case Right(wf) => toMetalPlan(wf)
-    }
+    plan(query).disjunction.toOption >>= toMetalPlan
 
   def planAt(time: Instant, query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     queryPlanner(query, basePathDb, MongoQueryModel.`3.4`, defaultStats, defaultIndexes, listContents, emptyDoc, time).run.value.toEither
