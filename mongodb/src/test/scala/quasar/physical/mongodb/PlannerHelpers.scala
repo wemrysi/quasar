@@ -77,10 +77,6 @@ object PlannerHelpers {
 
   import fixExprOp._
 
-  val expr3_0Fp: ExprOp3_0F.fixpoint[Fix[ExprOp], ExprOp] =
-    new ExprOp3_0F.fixpoint[Fix[ExprOp], ExprOp](_.embed)
-  val expr3_2Fp: ExprOp3_2F.fixpoint[Fix[ExprOp], ExprOp] =
-    new ExprOp3_2F.fixpoint[Fix[ExprOp], ExprOp](_.embed)
   val expr3_4Fp: ExprOp3_4F.fixpoint[Fix[ExprOp], ExprOp] =
     new ExprOp3_4F.fixpoint[Fix[ExprOp], ExprOp](_.embed)
 
@@ -242,12 +238,6 @@ object PlannerHelpers {
     anyDoc: Collection => OptionT[EitherWriter, BsonDocument]
   ): Either[FileSystemError, Crystallized[WorkflowF]] =
     queryPlanner(query, basePath, model, stats, indexes, listContents, anyDoc, Instant.now).run.value.toEither
-
-  def plan2_6(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, basePathDb, MongoQueryModel.`2.6`, κ(None), κ(None), emptyDoc)
-
-  def plan3_0(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan0(query, basePathDb, MongoQueryModel.`3.0`, κ(None), κ(None), emptyDoc)
 
   def plan3_2(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan0(query, basePathDb, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, emptyDoc)

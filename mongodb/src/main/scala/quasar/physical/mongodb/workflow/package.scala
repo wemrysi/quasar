@@ -593,7 +593,7 @@ package object workflow {
 
   private def wrapArrayLit[EX[_]: Functor]
     (accum: AccumOp[Fix[EX]])
-    (implicit ev: ExprOpCoreF :<: EX, ev32: ExprOp3_2F :<: EX)
+    (implicit ev: ExprOpCoreF :<: EX)
       : AccumOp[Fix[EX]] = {
 
     def wrap(expr: Fix[EX]): Fix[EX] = (wrapArrayInLet[Fix, EX](expr.unFix)).embed
@@ -603,7 +603,7 @@ package object workflow {
 
   private def wrapArrayLitExprInLet[EX[_]: Functor]
     (grouped: Grouped[EX])
-    (implicit ev: ExprOpCoreF :<: EX, ev32: ExprOp3_2F :<: EX, ev2: ExprOpOps.Uni[ExprOp])
+    (implicit ev: ExprOpCoreF :<: EX, ev2: ExprOpOps.Uni[ExprOp])
       : Grouped[EX] =
     Grouped(ListMap(grouped.value.mapValues(wrapArrayLit[EX]).toSeq: _*))
 
