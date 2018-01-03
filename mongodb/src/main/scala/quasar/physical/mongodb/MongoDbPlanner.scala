@@ -908,6 +908,7 @@ object MongoDbPlanner {
               case _ => none
             }
 
+            // FIXME: Remove the `Cond`s extracted by the selector phase, not every `Cond(_, _, Undefined)` as here.
             def elideCond[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
               case CoEnv(\/-(MFC(Cond(if_, then_, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
                 CoEnv(then_.resume.swap).some
@@ -937,36 +938,35 @@ object MongoDbPlanner {
               shiftType match {
                 case ShiftType.Array => {
                   selectors.fold(_ => handleFreeMap[T, M, EX](
+                    cfg.funcHandler,
+                    cfg.staticHandler,
+                    struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))) >>= (target =>
+                    getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
+                      FlatteningBuilder(
+                        DocBuilder(
+                          src,
+                          ListMap(
+                            BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                            BsonField.Name("f") -> target)),
+                        Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                      repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide])))), { sel =>
+                    val struct0 =
+                      handleFreeMap[T, M, EX](
                         cfg.funcHandler,
                         cfg.staticHandler,
-                        struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))) >>= (target =>
-                        getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
-                          FlatteningBuilder(
-                            DocBuilder(
-                              src,
-                              ListMap(
-                                BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                                BsonField.Name("f") -> target)),
-                            Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
-                          repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide]))))
-                  , { sel =>
-                      val struct0 =
-                        handleFreeMap[T, M, EX](
-                          cfg.funcHandler,
-                          cfg.staticHandler,
-                          struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
-                      val repair0 = repair.transCata[JoinFunc[T]](orOriginal(transform[JoinSide]))
+                        struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
+                    val repair0 = repair.transCata[JoinFunc[T]](orOriginal(transform[JoinSide]))
 
-                      (struct0 ⊛ filterBuilder(src, sel))((struct1, src0) =>
-                        getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
-                          FlatteningBuilder(
-                            DocBuilder(
-                              src0,
-                              ListMap(
-                                BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                                BsonField.Name("f") -> struct1)),
-                            Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
-                          repair0)).join
+                    (struct0 ⊛ filterBuilder(src, sel))((struct1, src0) =>
+                      getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
+                        FlatteningBuilder(
+                          DocBuilder(
+                            src0,
+                            ListMap(
+                              BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                              BsonField.Name("f") -> struct1)),
+                          Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                        repair0)).join
                   })
                 }
                 case _ =>
