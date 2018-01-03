@@ -52,186 +52,136 @@ class PlannerQScriptSpec extends
 
   val json = Fixed[Fix[EJson]]
 
+  // missing indexes
   val simpleInnerEquiJoinWithExpression =
     fix.EquiJoin(
       fix.Unreferenced,
+      free.ShiftedRead[AFile](rootDir </> dir("db") </> file("cars"), qscript.ExcludeId),
       free.Filter(
-        free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
+        free.ShiftedRead[AFile](rootDir </> dir("db") </> file("cars2"), qscript.ExcludeId),
         func.Guard(
-          func.Guard(func.Hole, Type.AnyObject, func.ProjectKeyS(func.Hole, "_id"), func.Undefined),
+          func.ProjectKey(func.Hole, func.Constant(json.str("_id"))),
           Type.Str,
           func.Constant(json.bool(true)),
           func.Constant(json.bool(false)))),
-      free.Filter(
-        free.ShiftedRead[AFile](rootDir </> dir("db") </> file("smallZips"), qscript.ExcludeId),
-        func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
       List(
-        (
-          func.Guard(
-            func.Hole,
-            Type.AnyObject,
-            func.Lower(
-              func.ProjectKeyS(func.Hole, "_id")),
-            func.Undefined),
-          func.ProjectKeyS(func.Hole, "_id"))),
+        (func.ProjectKey(func.Hole, func.Constant(json.str("_id"))),
+          func.Lower(func.ProjectKey(func.Hole, func.Constant(json.str("_id")))))),
       JoinType.Inner,
       func.ConcatMaps(
         func.MakeMap(
-          func.Constant(json.str("city")),
-          // qscript is generated with 3 guards here:
-          // func.Guard(
-          //   func.Guard(func.LeftSide, Type.AnyObject, func.LeftSide, func.Undefined),
-          //   Type.AnyObject,
-          //   func.Guard(func.LeftSide, Type.AnyObject, func.ProjectKeyS(func.LeftSide, "city"), func.Undefined),
-          //   func.Undefined)),
-          func.Guard(func.LeftSide, Type.AnyObject, func.ProjectKeyS(func.LeftSide, "city"), func.Undefined)),
+          func.Constant(json.str("c1")),
+          func.ProjectKey(
+            func.LeftSide,
+            func.Constant(json.str("name")))),
         func.MakeMap(
-          func.Constant(json.str("state")),
-          func.Guard(func.RightSide, Type.AnyObject, func.ProjectKeyS(func.RightSide, "state"), func.Undefined))))
+          func.Constant(json.str("c2")),
+          func.ProjectKey(
+            func.RightSide,
+            func.Constant(json.str("name"))))))
 
+  // missing indexes
   val simpleInnerEquiJoinWithPrefiltering =
     fix.EquiJoin(
       fix.Unreferenced,
+      free.ShiftedRead[AFile](rootDir </> dir("jps") </> file("zips"), qscript.ExcludeId),
       free.Filter(
-        free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-        func.Guard(func.Hole, Type.AnyObject, func.Constant(json.bool(true)), func.Constant(json.bool(false)))),
-      free.Filter(
-        free.ShiftedRead[AFile](rootDir </> dir("test") </> file("smallZips"), qscript.ExcludeId),
+        free.ShiftedRead[AFile](rootDir </> dir("jps") </> file("zips2"), qscript.ExcludeId),
         func.Guard(
-          func.Guard(func.Hole, Type.AnyObject,
-            func.ProjectKeyS(func.Hole, "pop"),
-            func.Undefined),
-          Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Coproduct(Type.Int, Type.Dec), Type.Interval), Type.Str), Type.Coproduct(Type.Coproduct(Type.Timestamp, Type.Date), Type.Time)), Type.Bool),
-          func.Guard(func.Hole, Type.AnyObject,
-            func.Gte(
-              func.ProjectKeyS(func.Hole, "pop"),
-              func.Constant(json.int(10000))),
-            func.Undefined),
+          func.ProjectKey(func.Hole, func.Constant(json.str("rating"))),
+          Type.Comparable,
+          func.Gte(func.ProjectKey(func.Hole, func.Constant(json.str("rating"))),
+            func.Constant(json.int(4))),
           func.Undefined)),
       List(
-        (
-          func.ProjectKeyS(func.Hole, "_id"),
-          func.Guard(func.Hole, Type.AnyObject,
-            func.ProjectKeyS(func.Hole, "_id"),
-            func.Undefined))),
+        (func.ProjectKey(func.Hole, func.Constant(json.str("id"))),
+          func.ProjectKey(func.Hole, func.Constant(json.str("foo_id"))))),
       JoinType.Inner,
       func.ConcatMaps(
-        func.MakeMap(
-          func.Constant(json.str("city")),
-          func.Guard(
+        func.MakeMap(func.Constant(json.str("name")),
+          func.ProjectKey(
             func.LeftSide,
-            Type.AnyObject,
-            func.ProjectKeyS(func.LeftSide, "city"),
-            func.Undefined)),
+            func.Constant(json.str("name")))),
         func.MakeMap(
-          func.Constant(json.str("state")),
-          func.Guard(
-            func.Guard(
-              func.RightSide,
-              Type.AnyObject,
-              func.RightSide,
-              func.Undefined),
-            Type.AnyObject,
-            func.Guard(
-              func.RightSide,
-              Type.AnyObject,
-              func.ProjectKeyS(func.RightSide, "state"),
-              func.Undefined),
-            func.Undefined))))
+          func.Constant(json.str("address")),
+          func.ProjectKey(
+            func.RightSide,
+            func.Constant(json.str("address"))))))
 
+  // needs simplification
   val threeWayEquiJoin =
     fix.EquiJoin(
       fix.Unreferenced,
       free.Filter(
         free.EquiJoin(
           free.Unreferenced,
-          free.Filter(
-            free.ShiftedRead[AFile](
-              rootDir </> dir("db") </> file("extraSmallZips"),
-              qscript.ExcludeId),
-            func.Guard(
-              func.Hole,
-              Type.AnyObject,
-              func.Constant(json.bool(true)),
-              func.Constant(json.bool(false)))),
-          free.Filter(
-            free.ShiftedRead[AFile](
-              rootDir </> dir("db") </> file("smallZips"),
-              qscript.ExcludeId),
-            func.Guard(
-              func.Hole,
-              Type.AnyObject,
-              func.Constant(json.bool(true)),
-              func.Constant(json.bool(false)))),
+          free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
+          free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips2"), qscript.ExcludeId),
           List(
-            (
-              func.ProjectKeyS(func.Hole, "_id"),
-              func.ProjectKeyS(func.Hole, "_id"))),
+            (func.ProjectKey(func.Hole, func.Constant(json.str("id"))),
+              func.ProjectKey(func.Hole, func.Constant(json.str("foo_id"))))),
           JoinType.Inner,
-          func.ConcatArrays(
-            func.MakeArray(func.LeftSide),
-            func.MakeArray(func.RightSide))),
+          func.ConcatMaps(
+            func.MakeMap(
+              func.Constant(json.str("left")),
+              func.LeftSide),
+            func.MakeMap(
+              func.Constant(json.str("right")),
+              func.RightSide))),
         func.Guard(
-          func.ProjectIndexI(func.Hole, 1),
-          Type.AnyObject,
+          func.ProjectKey(func.Hole, func.Constant(json.str("right"))),
+          Type.Obj(Map(), Some(Type.Top)),
           func.Constant(json.bool(true)),
           func.Constant(json.bool(false)))),
-      free.Filter(
-        free.ShiftedRead[AFile](
-          rootDir </> dir("db") </> file("zips"),
-          qscript.ExcludeId),
-        func.Guard(
-          func.Hole,
-          Type.AnyObject,
-          func.Constant(json.bool(true)),
-          func.Constant(json.bool(false)))),
+      free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips3"), qscript.ExcludeId),
       List(
-        (
-          func.ProjectKeyS(func.ProjectIndexI(func.Hole, 1), "_id"),
-          func.ProjectKeyS(func.Hole, "_id"))),
+        (func.ProjectKey(
+            func.ProjectKey(func.Hole, func.Constant(json.str("right"))),
+            func.Constant(json.str("id"))),
+          func.ProjectKey(func.Hole, func.Constant(json.str("bar_id"))))),
       JoinType.Inner,
       func.ConcatMaps(
         func.ConcatMaps(
           func.MakeMap(
-            func.Constant(json.str("city")),
+            func.Constant(json.str("name")),
             func.Guard(
               func.ConcatMaps(
                 func.MakeMap(
                   func.Constant(json.str("left")),
-                  func.ProjectIndexI(func.LeftSide, 0)),
+                  func.ProjectKey(func.LeftSide, func.Constant(json.str("left")))),
                 func.MakeMap(
                   func.Constant(json.str("right")),
-                  func.ProjectIndexI(func.LeftSide, 1))),
-              Type.AnyObject,
+                  func.ProjectKey(func.LeftSide, func.Constant(json.str("right"))))),
+              Type.Obj(Map(), Some(Type.Top)),
               func.Guard(
-                func.ProjectIndexI(func.LeftSide, 0),
-                Type.AnyObject,
-                func.ProjectKeyS(func.ProjectIndexI(func.LeftSide, 0), "city"),
+                func.ProjectKey(func.LeftSide, func.Constant(json.str("left"))),
+                Type.Obj(Map(), Some(Type.Top)),
+                func.ProjectKey(
+                  func.ProjectKey(func.LeftSide, func.Constant(json.str("left"))),
+                  func.Constant(json.str("name"))),
                 func.Undefined),
               func.Undefined)),
           func.MakeMap(
-            func.Constant(json.str("state")),
+            func.Constant(json.str("address")),
             func.Guard(
               func.ConcatMaps(
-                func.MakeMap(func.Constant(json.str("left")),
-                  func.ProjectIndexI(func.LeftSide, 0)),
                 func.MakeMap(
-                  func.Constant(json.str("right")),
-                  func.ProjectIndexI(func.LeftSide, 1))),
-              Type.AnyObject,
+                  func.Constant(json.str("left")),
+                  func.ProjectKey(func.LeftSide, func.Constant(json.str("left")))),
+                func.MakeMap(
+                  func.Constant(json.str("right")), func.ProjectKey(func.LeftSide, func.Constant(json.str("right"))))),
+              Type.Obj(Map(), Some(Type.Top)),
               func.Guard(
-                func.ProjectIndexI(func.LeftSide, 1),
-                Type.AnyObject,
-                func.ProjectKeyS(func.ProjectIndexI(func.LeftSide, 1), "state"),
+                func.ProjectKey(func.LeftSide, func.Constant(json.str("right"))),
+                Type.Obj(Map(), Some(Type.Top)),
+                func.ProjectKey(
+                  func.ProjectKey(func.LeftSide, func.Constant(json.str("right"))),
+                  func.Constant(json.str("address"))),
                 func.Undefined),
               func.Undefined))),
         func.MakeMap(
-          func.Constant(json.str("pop")),
-          func.Guard(
-            func.RightSide,
-            Type.AnyObject,
-            func.ProjectKeyS(func.RightSide, "pop"),
-            func.Undefined))))
+          func.Constant(json.str("zip")),
+          func.ProjectKey(func.RightSide, func.Constant(json.str("zip"))))))
 
   "plan from qscript" should {
 
@@ -267,9 +217,7 @@ class PlannerQScriptSpec extends
               $field(JoinDir.Right.name, "state"),
               $literal(Bson.Undefined))),
           IgnoreId)))
-          // There are unnecessary stages and there's a $match that is a NOP
-          // but at least it's on agg
-    }.pendingWithActual(notOnPar, qtestFile("plan simple inner equi-join with expression ($lookup)"))
+    }
 
     "plan simple inner equi-join with pre-filtering ($lookup)" in {
       qplan(simpleInnerEquiJoinWithPrefiltering) must beWorkflow0(chain[Workflow](
