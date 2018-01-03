@@ -20,11 +20,11 @@ import slamdata.Predef._
 import quasar.console.stdout
 import quasar.db._
 import quasar.fs.mount.MountingsConfig
+
+import argonaut.{DecodeJson, Json}
 import doobie.util.transactor.Transactor
 import doobie.free.connection.ConnectionIO
 import doobie.syntax.connectionio._
-
-import argonaut.{DecodeJson, Json}
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
