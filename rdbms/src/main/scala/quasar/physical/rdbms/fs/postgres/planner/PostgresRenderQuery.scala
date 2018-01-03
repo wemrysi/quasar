@@ -110,7 +110,7 @@ object PostgresRenderQuery extends RenderQuery {
             s"->${midTail.map(e => s"$e").intercalate("->")}"
           else
             ""
-          s"""$key."$firstValStripped"$midStr->$last""".right
+          s"""$key."$firstValStripped from"$midStr->$last""".right
         case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
       }
     case Obj(m) =>
@@ -177,7 +177,7 @@ object PostgresRenderQuery extends RenderQuery {
 
       val fromExpr = s" from ${from.v._2} ${from.alias.v}"
       s"(select ${selection.v._2}$fromExpr$filter$orderByStr)".right
-    case Union((_, left), (_, right)) => s"($left) UNION ($right)".right
+    case Union((_, left), (_, right)) => s"($left UNION $right)".right
     case Constant(Data.Str(v)) =>
       val text = v.flatMap { case ''' => "''"; case iv => iv.toString }.self
       s"'$text'".right
