@@ -2,14 +2,11 @@
   "name": "[qa_s06] select all self union",
 
   "backends": {
-    "mimir": "ignoreResultOrder",
-    "marklogic_json": "ignoreResultOrder",
-    "marklogic_xml": "ignoreResultOrder"
   },
 
   "data": "simple_union.data",
 
-  "query": "select * from simple_union union select * from simple_union",
+  "query": "select * from (select * from simple_union union select * from simple_union) order by a",
 
   "predicate": "exactly",
 
