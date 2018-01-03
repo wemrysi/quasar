@@ -100,7 +100,8 @@ trait SqlExprRenderTree {
             nonTerminal("Or", a1, a2)
           case Refs(srcs) =>
             nonTerminal("References", srcs:_*)
-          case Select(selection, from, filter, order) =>
+            // TODO add group by
+          case Select(selection, from, filter, groupBy, order) =>
             NonTerminal(
               "Select" :: Nil,
               none,
@@ -110,7 +111,7 @@ trait SqlExprRenderTree {
                   order.map {
                     o =>
                       nt(s"OrderBy ${o.sortDir}", none, o.v)
-                  }
+                  } 
             )
           case Union(left, right) =>
             nonTerminal("UNION", left, right)

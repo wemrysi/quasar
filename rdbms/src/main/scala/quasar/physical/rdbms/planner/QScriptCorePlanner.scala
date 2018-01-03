@@ -56,6 +56,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
 
   val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
 
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def plan: AlgebraM[F, QScriptCore[T, ?], T[SqlExpr]] = {
     case qscript.Map(`unref`, f) =>
       processFreeMap(f, SqlExpr.Null[T[SqlExpr]])
@@ -72,6 +73,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           Selection(selection, none),
           From(src, fromAlias),
           filter = none,
+          groupBy = none,
           orderBy = nil
         ).embed
       }
@@ -93,6 +95,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
             Selection(*, none),
             From(src, fromAlias),
             filter = none,
+            groupBy = none,
             orderBy = bucketExprs ++ orderByExprs.toList
           ).embed
         }
@@ -110,7 +113,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
 
     case qscript.Filter(src, f) =>
       src.project match {
-        case s@Select(_, From(_, initialFromAlias), initialFilter, _) =>
+        case s@Select(_, From(_, initialFromAlias), initialFilter, _,  _) =>
           val injectedFilterExpr = processFreeMap(f, initialFromAlias)
           injectedFilterExpr.map { fe =>
             val finalFilterExpr = initialFilter.map(i => And[T[SqlExpr]](i.v, fe).embed).getOrElse(fe)
@@ -125,6 +128,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
             Selection(*, none),
             From(src, fromAlias),
             Some(Filter(filterExp)),
+            groupBy = none,
             orderBy = nil
           ).embed
       }
@@ -138,11 +142,19 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           (compile(left, src) |@| compile(right, src))(Union(_,_).embed)
       }
 
-    case reduce@qscript.Reduce(reduceSrc, _, _, _) =>
-      reduceSrc.project match {
-        case _: Union[_] | _: Select[_] => reduceSrc.point[F]
-        case _ =>                          notImplemented(s"$reduce", this)
-      }
+    case reduce@qscript.Reduce(src, bucket, reducers, repair) => for {
+      alias <- genId[T[SqlExpr], F]
+      gbs       <- bucket.traverse(processFreeMap(_, alias))
+    } yield {
+        Select(
+          Selection(gbs.head, none),
+          From(src, alias),
+          none,
+          groupBy = GroupBy(gbs).some,
+          orderBy = nil
+        ).embed
+    }
+
 
     case other =>
       notImplemented(s"QScriptCore: $other", this)

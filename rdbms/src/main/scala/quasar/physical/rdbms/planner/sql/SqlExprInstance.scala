@@ -61,7 +61,7 @@ trait SqlExprTraverse {
       case Neg(v)              => f(v) ∘ Neg.apply
       case WithIds(v)          => f(v) ∘ WithIds.apply
 
-      case Select(selection, from, filterOpt, order) =>
+      case Select(selection, from, filterOpt, groupBy, order) =>
         val newOrder = order.traverse(o => f(o.v).map(newV => OrderBy(newV, o.sortDir)))
         val sel = f(selection.v) ∘ (i => Selection(i, selection.alias ∘ (a => Id[B](a.v))))
         val alias = f(from.v).map(b => From(b, Id[B](from.alias.v)))
@@ -69,8 +69,9 @@ trait SqlExprTraverse {
         (sel ⊛
           alias ⊛
           filterOpt.traverse(i => f(i.v) ∘ Filter.apply) ⊛
+          groupBy.traverse(i => i.v.traverse(f) ∘ GroupBy.apply) ⊛
           newOrder)(
-          Select(_, _, _, _)
+          Select(_, _, _, _, _)
         )
       case Union(left, right) => (f(left) ⊛ f(right))(Union.apply)
       case Case(wt, Else(e)) =>

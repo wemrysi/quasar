@@ -50,6 +50,7 @@ object SqlExpr extends SqlExprInstances {
   final case class Select[T](selection: Selection[T],
                              from: From[T],
                              filter: Option[Filter[T]],
+                             groupBy: Option[GroupBy[T]],
                              orderBy: List[OrderBy[T]])
       extends SqlExpr[T]
 
@@ -91,6 +92,7 @@ object SqlExpr extends SqlExprInstances {
     final case class RowIds[T]() extends SqlExpr[T]
     final case class AllCols[T]() extends SqlExpr[T]
     final case class WithIds[T](v: T) extends SqlExpr[T]
+    final case class GroupBy[T](v: List[T])
     final case class OrderBy[T](v: T, sortDir: SortDir)
   }
 
