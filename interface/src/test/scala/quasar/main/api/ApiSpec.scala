@@ -28,15 +28,11 @@ import quasar.fp.ski._
 import quasar.main._
 import quasar.metastore.MetaStore.{ShouldCopy, ShouldInitialize}
 import quasar.metastore.MetaStoreFixture
-
 import quasar.sql._
 
 import scala.StringContext
 import pathy.Path._
-
-
-import scalaz._
-import Scalaz._
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 class ApiSpec extends quasar.Qspec {

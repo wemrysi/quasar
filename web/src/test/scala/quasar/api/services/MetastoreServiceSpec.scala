@@ -29,19 +29,16 @@ import quasar.metastore.{MetaStore, MetaStoreAccess, MetaStoreFixture, PathedMou
 import quasar.metastore.MetaStore.ShouldInitialize
 import quasar.sql._
 import quasar.Variables
+
 import java.time.Instant
 
-import argonaut._
-import Argonaut._
+import argonaut._, Argonaut._
 import doobie.imports._
-import org.http4s._
-import Status._
+import org.http4s._, Status._
 import org.http4s.Method.PUT
 import org.http4s.syntax.service._
 import org.http4s.argonaut._
 import pathy.Path.{file, rootDir}
-
-
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -96,7 +93,6 @@ class MetastoreServiceSpec extends quasar.Qspec {
       resp.status must_=== Ok
     }
     "copy metastore" in {
-      // TODO: Use arbitraries
       val f = rootDir </> file("a")
       val pathedMountConfig = PathedMountConfig(
         rootDir </> file("mimir"),

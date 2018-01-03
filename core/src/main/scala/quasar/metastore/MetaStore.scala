@@ -16,7 +16,6 @@
 
 package quasar.metastore
 
-import argonaut.{DecodeJson, Json}
 import slamdata.Predef._
 import quasar.console.stdout
 import quasar.db._
@@ -25,8 +24,8 @@ import doobie.util.transactor.Transactor
 import doobie.free.connection.ConnectionIO
 import doobie.syntax.connectionio._
 
-import scalaz._
-import Scalaz._
+import argonaut.{DecodeJson, Json}
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 final case class MetaStore private (

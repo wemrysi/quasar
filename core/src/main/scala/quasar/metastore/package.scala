@@ -138,8 +138,8 @@ package object metastore {
   implicit val pathedViewCacheComposite: Composite[PathedViewCache] =
     Composite[(
       AFile, MountConfig.ViewConfig, Option[Instant], Option[Long], Int, Option[String],
-        Option[Instant], Long, Instant, ViewCache.Status, Option[String], AFile, Option[String]
-      )].xmap(
+      Option[Instant], Long, Instant, ViewCache.Status, Option[String], AFile, Option[String]
+    )].xmap(
       { case (path, viewConfig, lastUpdate, executionMillis, cacheReads, assignee,
               assigneeStart, maxAge, refreshAfter, status, errorMsg, dataFile, tmpDataFile) =>
           PathedViewCache(
