@@ -23,7 +23,7 @@ import quasar.fp.ski.κ
 import quasar.fs.mount.cache.ViewCache
 import quasar.fs.mount.{MountConfig, MountType, MountingError}, MountConfig.FileSystemConfig
 
-import java.time.Instant
+import java.sql.Timestamp
 
 import doobie.imports._
 import scalaz._, Scalaz._
@@ -52,7 +52,8 @@ trait MetaStoreAccess {
     runOneRowUpdateOpt(Queries.deleteMount(path)) toRight NotFound
 
   //--- View Cache ---
-  def staleCachedViews(now: Instant): ConnectionIO[List[PathedViewCache]] = Queries.staleCachedViews(now).list
+  def staleCachedViews(now: Timestamp): ConnectionIO[List[PathedViewCache]] =
+    Queries.staleCachedViews(now).list
 
   def lookupViewCache(path: AFile): ConnectionIO[Option[ViewCache]] =
     (Queries.lookupViewCache(path) ∘ (_.vc)).option

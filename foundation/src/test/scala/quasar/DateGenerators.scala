@@ -18,12 +18,14 @@ package quasar
 
 import slamdata.Predef._
 import quasar.pkg.tests._
+
 import java.time._
 import java.time.temporal.ChronoField
 
 trait DateGenerators {
   implicit val arbDuration: Arbitrary[DateTimeInterval] = genInterval
-  implicit val arbInstant: Arbitrary[Instant] = Arbitrary((genEpochSeconds, genNanos) >> Instant.ofEpochSecond _)
+  implicit val arbInstant: Arbitrary[Instant] =
+    Arbitrary((genEpochSeconds, genNanos) >> Instant.ofEpochSecond _)
   implicit val arbDate: Arbitrary[LocalDate]         = genLocalDate
   implicit val arbTime: Arbitrary[LocalTime]         = genLocalTime
   implicit val arbDateTime: Arbitrary[LocalDateTime] = genLocalDateTime

@@ -32,12 +32,13 @@ import quasar.fp.free.{foldMapNT, injectNT, liftFT}
 import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._, mount._
-import quasar.fs.mount.cache.ViewCache
+import quasar.fs.mount.cache.{ViewCache, ViewCacheArbitrary}
 import quasar.fs.mount.MountConfig.viewConfig0
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.main.CoreEffIO
 import quasar.sql.{Positive => _, _}
 
+import java.sql.Timestamp
 import java.time.{Instant, Duration}
 
 import argonaut.{Json => AJson, _}, Argonaut._
@@ -68,6 +69,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
   import posixCodec.printPath
   import FileSystemError.executionFailed_
   import VCacheFixture.{Eff => _, _}
+  import ViewCacheArbitrary._
 
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
@@ -156,16 +158,17 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
     }
     "response with view cache headers" >> {
       "fresh" >> prop {
-          (now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
+          (now: Instant, lastUpdate: Timestamp, maxAgeSecs: Int @@ RPositive) => {
           val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
-          lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isBefore(lastUpdate.plus(maxAge))
+          val last = lastUpdate.toInstant
+          last.isBefore(Instant.MAX.minus(maxAge)) && now.isBefore(last.plus(maxAge))
         } ==> {
           val f = rootDir </> file("f")
           val g = rootDir </> file("g")
           val expr = sqlB"""select { "α": 7 }"""
           val viewCache = ViewCache(
             MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
-            maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
+            maxAgeSecs.toLong, new Timestamp(0), ViewCache.Status.Pending, None, g, None)
           val mounts = Map[APath, MountConfig](f -> viewConfig0(expr))
 
           val (resp, vc) = evalViewTest(now, mounts, InMemState.empty) { (it, ir) =>
@@ -179,24 +182,27 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
             } yield (a.toHttpResponse(ir), c)).foldMap(it)
           }.unsafePerformSync
 
+          val expiration = VCacheMiddleware.validDate(
+            lastUpdate.toInstant.plus(Duration.ofSeconds(maxAgeSecs.toLong)))
+
           resp.status must_= Status.Ok
-          resp.headers.get(Expires.name) ∘ (_.value) must_=
-            Renderer.renderString(lastUpdate.plus(Duration.ofSeconds(maxAgeSecs.toLong))).some
+          resp.headers.get(Expires.name) ∘ (_.value) must_= Renderer.renderString(expiration).some
           vc ∘ (_.cacheReads) must_= (viewCache.cacheReads ⊹ 1).some
         }
       }
 
       "stale" >> prop {
-          (now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
+          (now: Instant, lastUpdate: Timestamp, maxAgeSecs: Int @@ RPositive) => {
           val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
-            lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isAfter(lastUpdate.plus(maxAge))
+          val last = lastUpdate.toInstant
+          last.isBefore(Instant.MAX.minus(maxAge)) && now.isAfter(last.plus(maxAge))
         } ==> {
           val f = rootDir </> file("f")
           val g = rootDir </> file("g")
           val expr = sqlB"""select { "α": 7 }"""
           val viewCache = ViewCache(
             MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
-            maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
+            maxAgeSecs.toLong, new Timestamp(0), ViewCache.Status.Pending, None, g, None)
           val mounts = Map[APath, MountConfig](f -> viewConfig0(expr))
 
           val (resp, vc) = evalViewTest(now, mounts, InMemState.empty) { (it, ir) =>
@@ -210,10 +216,12 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
             } yield (a.toHttpResponse(ir), c)).foldMap(it)
           }.unsafePerformSync
 
+          val expiration = VCacheMiddleware.validDate(
+            lastUpdate.toInstant.plus(Duration.ofSeconds(maxAgeSecs.toLong)))
+
           resp.status must_= Status.Ok
           resp.headers.get(Warning) ∘ (_.value) must_= StaleHeader.value.some
-          resp.headers.get(Expires) ∘ (_.value) must_=
-            Renderer.renderString(lastUpdate.plus(Duration.ofSeconds(maxAgeSecs.toLong))).some
+          resp.headers.get(Expires) ∘ (_.value) must_= Renderer.renderString(expiration).some
           vc ∘ (_.cacheReads) must_= (viewCache.cacheReads ⊹ 1).some
          }
       }

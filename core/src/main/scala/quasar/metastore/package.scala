@@ -24,7 +24,7 @@ import quasar.fs.mount.cache.ViewCache
 import quasar.fs.mount.{ConnectionUri, MountType, MountConfig}
 
 import java.sql.Timestamp
-import java.time.Instant
+import java.time.LocalDateTime
 
 import doobie.imports._
 import pathy.Path, Path._
@@ -47,6 +47,13 @@ import scalaz.concurrent.Task
   the database.
   */
 package object metastore {
+
+  // postgres defines the Timestamp range to be 4713 BC to 294276 AD
+  val minTimestamp: Timestamp =
+    Timestamp.valueOf(LocalDateTime.of(-4713, 1, 1, 0, 0, 0))
+
+  val maxTimestamp: Timestamp =
+    Timestamp.valueOf(LocalDateTime.of(294276, 12, 31, 23, 59, 59))
 
   sealed trait MetastoreFailure {
     def message: String
@@ -108,8 +115,6 @@ package object metastore {
         posixCodec.parseAbsDir(str).getOrElse(unexpectedValue("not an absolute dir path: " + str))),
       posixCodec.printPath(_))
 
-  implicit val instantMeta: Meta[Instant] = Meta[Timestamp].xmap(_.toInstant, Timestamp.from)
-
   implicit val viewCacheStatusMeta: Meta[ViewCache.Status] = Meta[String].xmap(
     {
       case "pending"    => ViewCache.Status.Pending
@@ -137,8 +142,8 @@ package object metastore {
 
   implicit val pathedViewCacheComposite: Composite[PathedViewCache] =
     Composite[(
-      AFile, MountConfig.ViewConfig, Option[Instant], Option[Long], Int, Option[String],
-      Option[Instant], Long, Instant, ViewCache.Status, Option[String], AFile, Option[String]
+      AFile, MountConfig.ViewConfig, Option[Timestamp], Option[Long], Int, Option[String],
+      Option[Timestamp], Long, Timestamp, ViewCache.Status, Option[String], AFile, Option[String]
     )].xmap(
       { case (path, viewConfig, lastUpdate, executionMillis, cacheReads, assignee,
               assigneeStart, maxAge, refreshAfter, status, errorMsg, dataFile, tmpDataFile) =>

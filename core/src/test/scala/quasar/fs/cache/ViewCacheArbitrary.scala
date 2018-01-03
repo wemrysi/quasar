@@ -16,11 +16,12 @@
 
 package quasar.fs.mount.cache
 
-import quasar.contrib.pathy._
-import quasar.DateGenerators._
-import quasar.fs.mount._
 import slamdata.Predef._
+import quasar.contrib.pathy._
+import quasar.fs.mount._
+import quasar.metastore.{maxTimestamp, minTimestamp}
 
+import java.sql.Timestamp
 import java.time.Instant
 
 import org.scalacheck.Arbitrary.{arbitrary => arb}
@@ -36,10 +37,17 @@ trait ViewCacheArbitrary {
       ViewCache.Status.Successful,
       ViewCache.Status.Failed))
 
+  implicit val arbTimestamp: Arbitrary[Timestamp] = {
+    val time: Gen[Long] =
+      Gen.choose(minTimestamp.toInstant.getEpochSecond, maxTimestamp.toInstant.getEpochSecond)
+
+    Arbitrary(time.map(t => Timestamp.from(Instant.ofEpochSecond(t))))
+  }
+
   implicit val arbViewCache: Arbitrary[ViewCache] =
     Arbitrary(
-      (MountConfigArbitrary.genViewConfig ⊛ arb[Option[Instant]] ⊛ arb[Option[Long]] ⊛
-       arb[Int] ⊛ arb[Option[String]] ⊛ arb[Option[Instant]] ⊛ arb[Long] ⊛ arb[Instant] ⊛
+      (MountConfigArbitrary.genViewConfig ⊛ arb[Option[Timestamp]] ⊛ arb[Option[Long]] ⊛
+       arb[Int] ⊛ arb[Option[String]] ⊛ arb[Option[Timestamp]] ⊛ arb[Long] ⊛ arb[Timestamp] ⊛
        arb[ViewCache.Status] ⊛ arb[Option[String]] ⊛ arb[AFile] ⊛ arb[Option[AFile]])(
         ViewCache.apply))
 }

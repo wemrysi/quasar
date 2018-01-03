@@ -20,13 +20,23 @@ import slamdata.Predef._
 import quasar.effect.Timing
 import quasar.fs.mount.cache.VCache, VCache.VCacheExpR
 
-import org.http4s.Header
+import java.time.Instant
+import org.http4s.{Header, HttpDate}
 import org.http4s.headers.Expires
-import org.http4s.util.Renderer
 import scalaz._, Scalaz._
 import scalaz.syntax.tag._
 
 object VCacheMiddleware {
+  private val minHttpDate: Instant = HttpDate.MinValue.toInstant
+  private val maxHttpDate: Instant = HttpDate.MaxValue.toInstant
+
+  def validDate(date: Instant) =
+    if (date.isBefore(minHttpDate))
+      minHttpDate
+    else if (date.isAfter(maxHttpDate))
+      maxHttpDate
+    else date
+
   def apply[S[_]](
     service: QHttpService[S]
   )(implicit
@@ -36,9 +46,12 @@ object VCacheMiddleware {
   ): QHttpService[S] =
     QHttpService { case req =>
       (service(req) ⊛ R.ask ⊛ T.timestamp) { case (resp, ex, ts) =>
-        val cacheHeaders = ex.unwrap.foldMap(e =>
-          Header(Expires.name.value, Renderer.renderString(e.v)) ::
-          ts.isAfter(e.v).fold(List(StaleHeader), Nil))
+        val cacheHeaders = ex.unwrap.foldMap[List[Header]] { e =>
+          val date = e.v.toInstant
+
+          (Expires(HttpDate.unsafeFromInstant(validDate(date))): Header) ::
+            ts.isAfter(date).fold(List(StaleHeader), Nil)
+        }
 
         resp.modifyHeaders(_ ++ cacheHeaders)
       }
