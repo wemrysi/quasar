@@ -31,6 +31,7 @@ import quasar.metastore.MetaStoreFixture.createNewTestMetaStoreConfig
 import quasar.sql._
 import quasar.Variables
 
+import java.sql.Timestamp
 import java.time.Instant
 import scala.concurrent.duration._
 
@@ -48,6 +49,8 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
   type MountingFileSystem[A] = Coproduct[Mounting, FileSystem, A]
 
   val mount = λ[Mounting ~> Task](_ => Task.fail(new RuntimeException("unimplemented")))
+
+  val i = new Timestamp(1000)
 
   def timingInterp(i: Instant) = λ[Timing ~> Task] {
     case Timing.Timestamp => Task.now(i)
@@ -93,13 +96,12 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
 
       val expr = sqlB"""select {"α": 42}"""
 
-      val i = Instant.parse("1970-01-01T01:00:00Z")
-
       val viewCache = ViewCache(
         MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
-        600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
+        600L, new Timestamp(0), ViewCache.Status.Pending, None, g, None)
 
-      def eval: Task[Free[Eff, ?] ~> Task] = eff(i) ∘ (foldMapNT(_))
+      def eval: Task[Free[Eff, ?] ~> Task] =
+        eff(i.toInstant) ∘ (foldMapNT(_))
 
       val vcache = VCacheKVS.Ops[Eff]
 
@@ -123,7 +125,7 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
           lastUpdate = i.some,
           executionMillis = 0L.some,
           assigneeStart = i.some,
-          refreshAfter = ViewCache.expireAt(i, viewCache.maxAgeSeconds.seconds) | i,
+          refreshAfter = ViewCache.expireAt(i.toInstant, viewCache.maxAgeSeconds.seconds) | i,
           status = ViewCache.Status.Successful).some,
         Vector(Data.Obj(ListMap("α" -> Data.Int(42)))).right[FileSystemError]
       ))

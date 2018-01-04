@@ -29,6 +29,7 @@ import quasar.frontend.logicalplan.{Free => _, free => _, _}
 import quasar.sql._, ExprArbitrary._
 import quasar.std._, IdentityLib.Squash, StdLib._, set._
 
+import java.sql.Timestamp
 import java.time.Instant
 import scala.concurrent.duration._
 
@@ -370,7 +371,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val expr = sqlB"α"
       val viewCache = ViewCache(
         MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
-        600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, f1, None)
+        600L, new Timestamp(0), ViewCache.Status.Pending, None, f1, None)
 
       val vc = Map(f1 -> viewCache)
 
@@ -414,7 +415,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val expr = sqlB"α"
       val viewCache = ViewCache(
         MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
-        600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, p, None)
+        600L, new Timestamp(0), ViewCache.Status.Pending, None, p, None)
 
       val vc = Map(p -> viewCache)
 
@@ -604,7 +605,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     def resolvedRefs[A](views: Map[AFile, Fix[Sql]], lp: Fix[LogicalPlan]): FileSystemError \/ Fix[LogicalPlan] =
       resolvedRefsVC(views, Map.empty, lp)
 
-    val nineteenSixty = Instant.parse("1960-01-01T00:00:00.00Z")
+    val nineteenSixty = Timestamp.from(Instant.parse("1960-01-01T00:00:00.00Z"))
 
     "no match" >> {
       resolvedRefs(Map(), lpf.read(rootDir </> file("zips"))) must
