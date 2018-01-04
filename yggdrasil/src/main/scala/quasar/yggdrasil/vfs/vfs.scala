@@ -18,6 +18,8 @@ package quasar.yggdrasil.vfs
 
 import quasar.contrib.pathy.{unsafeSandboxAbs, ADir, AFile, APath, RPath}
 import quasar.contrib.scalaz.stateT, stateT._
+import quasar.fp.ski.ι
+import quasar.fp.free._
 import quasar.fs.MoveSemantics
 
 import argonaut.{Argonaut, Parse}
@@ -27,10 +29,11 @@ import fs2.async, async.mutable
 import fs2.interop.scalaz._
 import fs2.util.Async
 
-import pathy.Path
+import pathy.Path, Path.file
 
-import scalaz.{~>, :<:, Coproduct, Free, Monad, NaturalTransformation, StateT}
+import scalaz.{~>, :<:, Coproduct, Equal, Free, Monad, NaturalTransformation, StateT}
 import scalaz.concurrent.Task
+import scalaz.std.anyVal._
 import scalaz.std.list._
 import scalaz.std.map._
 import scalaz.std.string._
@@ -39,14 +42,17 @@ import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 import scalaz.syntax.monoid._
 import scalaz.syntax.traverse._
+import scalaz.syntax.std.boolean._
 
 import scodec.bits.ByteVector
+import scodec.interop.scalaz.ByteVectorMonoidInstance
 
 import java.io.File
 import java.util.UUID
 
 final case class VFS(
     baseDir: ADir,
+    vfsVersion: FreeVFS.VFSVersion,
     metaLog: VersionLog,
     paths: Map[AFile, Blob],
     index: Map[ADir, Vector[RPath]],
@@ -64,8 +70,43 @@ object FreeVFS {
 
   private type ST[F[_], A] = StateT[F, VFS, A]
 
+  val currentVFSVersion = VFSVersion(0)
+
+  final case class VFSVersion(v: Int)
+
+  object VFSVersion {
+    implicit val equal: Equal[VFSVersion] = Equal.equalBy(_.v)
+  }
+
+  def handleVersion[S[_]](path: AFile)(implicit S0: POSIXOp :<: S, S1: Task :<: S): Free[S, Unit] = {
+    val writeVersion: Free[S, Unit] =
+      for {
+        verSink <- POSIX.openW[S](path)
+        verWriter = Stream.emit(ByteVector.fromInt(currentVFSVersion.v)).to(verSink).run
+        _ <- POSIXWithTask.generalize(verWriter)
+      } yield ()
+
+    def checkAndUpdateVersion: Free[S, Unit] =
+      for {
+        verStream <- POSIX.openR[S](path)
+        verBV <- verStream.runFoldMap(ι).mapSuspension(injectNT[POSIXOp, S] :+: injectNT[Task, S])
+        ver <- lift(Task.delay(VFSVersion(verBV.toInt())).handleWith { case e =>
+          Task.fail(
+            new RuntimeException("Unexpected VFS VERSION format", e)
+          )}).into[S]
+        _ <- (ver ≠ currentVFSVersion).whenM(
+          lift(Task.fail(new RuntimeException(
+            s"Unexpected VFS VERSION. Found ${ver.v}, current is ${currentVFSVersion.v}"
+          ))).into[S])
+      } yield ()
+
+    POSIX.exists[S](path).ifM(checkAndUpdateVersion, writeVersion)
+  }
+
   def init[S[_]](baseDir: ADir)(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, VFS] = {
     for {
+      _ <- handleVersion(baseDir </> file("VERSION"))
+
       exists <- POSIX.exists[S](baseDir </> MetaDir)
 
       triple <- if (!exists) {
@@ -117,7 +158,7 @@ object FreeVFS {
           case _: IllegalArgumentException => Nil
         }
       }
-    } yield VFS(baseDir, metaLog, paths, index, Map(), blobs.toSet)
+    } yield VFS(baseDir, currentVFSVersion, metaLog, paths, index, Map(), blobs.toSet)
   }
 
   private def persistMeta[S[_]](paths: Map[AFile, Blob], index: Map[ADir, Vector[RPath]])(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
