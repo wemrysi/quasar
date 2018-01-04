@@ -277,7 +277,7 @@ object PlannerHelpers {
   def planLog(query: Fix[Sql]): Vector[PhaseResult] =
     queryPlanner(query, basePathDb, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents, emptyDoc, Instant.now).run.written
 
-  def qplan0(
+  def qscriptPlan(
     qs: Fix[fs.MongoQScript[Fix, ?]],
     model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
@@ -286,8 +286,15 @@ object PlannerHelpers {
   ): Either[FileSystemError, Crystallized[WorkflowF]] =
     MongoDb.doPlan(qs, fs.QueryContext(stats, indexes), model, anyDoc, Instant.now).run.value.toEither
 
+  def qplan0(
+    qs: Fix[fs.MongoQScript[Fix, ?]],
+    stats: Collection => Option[CollectionStatistics],
+    indexes: Collection => Option[Set[Index]]
+  ): Either[FileSystemError, Crystallized[WorkflowF]] =
+    qscriptPlan(qs, MongoQueryModel.`3.4`, stats, indexes, emptyDoc)
+
   def qplan(qs: Fix[fs.MongoQScript[Fix, ?]]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    qplan0(qs, MongoQueryModel.`3.4`, defaultStats, defaultIndexes, emptyDoc)
+    qscriptPlan(qs, MongoQueryModel.`3.4`, defaultStats, defaultIndexes, emptyDoc)
 
   def qtestFile(testName: String): JFile = jFile(toRFile("q " + testName))
 
