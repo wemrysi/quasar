@@ -953,7 +953,7 @@ and the new metastore has not been initialized, the request will fail with a mes
 new metastore has not been initialized.
 
 An optional `copy` query parameter can be supplied to instruct Quasar to copy the current
-metastore to the new metastore.
+metastore to a new empty metastore.
 
 An example request body:
 
