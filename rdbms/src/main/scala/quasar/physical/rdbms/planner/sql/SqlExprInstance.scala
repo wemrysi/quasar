@@ -41,6 +41,10 @@ trait SqlExprTraverse {
       case ExprPair(e1, e2)    => (f(e1) ⊛ f(e2))(ExprPair.apply)
       case ConcatStr(a1, a2)   => (f(a1) ⊛ f(a2))(ConcatStr(_, _))
       case Avg(a1)             => f(a1) ∘ (Avg(_))
+      case Count(a1)           => f(a1) ∘ (Count(_))
+      case Max(a1)             => f(a1) ∘ (Max(_))
+      case Min(a1)             => f(a1) ∘ (Min(_))
+      case Sum(a1)             => f(a1) ∘ (Sum(_))
       case Time(a1)            => f(a1) ∘ Time.apply
       case Refs(srcs)          =>  srcs.traverse(f) ∘ Refs.apply
       case Table(name)         => G.point(Table(name))

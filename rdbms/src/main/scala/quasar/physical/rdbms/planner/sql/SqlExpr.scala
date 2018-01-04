@@ -97,6 +97,10 @@ object SqlExpr extends SqlExprInstances {
   }
 
   final case class Avg[T](v: T) extends SqlExpr[T]
+  final case class Count[T](v: T) extends SqlExpr[T]
+  final case class Max[T](v: T) extends SqlExpr[T]
+  final case class Min[T](v: T) extends SqlExpr[T]
+  final case class Sum[T](v: T) extends SqlExpr[T]
 
   final case class Union[T](left: T, right: T) extends SqlExpr[T]
 

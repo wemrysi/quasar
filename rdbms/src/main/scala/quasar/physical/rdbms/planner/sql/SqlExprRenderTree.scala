@@ -64,6 +64,14 @@ trait SqlExprRenderTree {
             nonTerminal("ConcatStr", a1, a2)
           case Avg(a1) =>
             nonTerminal("Avg", a1)
+          case Count(a1) =>
+            nonTerminal("Count", a1)
+          case Max(a1) =>
+            nonTerminal("Max", a1)
+          case Min(a1) =>
+            nonTerminal("Min", a1)
+          case Sum(a1) =>
+            nonTerminal("Sum", a1)
           case Time(a1) =>
             nonTerminal("Time", a1)
           case Id(v) =>

@@ -132,6 +132,14 @@ object PostgresRenderQuery extends RenderQuery {
       s"$e1 || $e2".right
     case Avg((_, e)) =>
       s"avg($e)".right
+    case Count((_, e)) =>
+      s"count($e)".right
+    case Max((_, e)) =>
+      s"max($e)".right
+    case Min((_, e)) =>
+      s"min($e)".right
+    case Sum((_, e)) =>
+      s"sum($e)".right
     case Time((_, expr)) =>
       buildJson(s"""{ "$TimeKey": $expr }""").right
     case NumericOp(sym, NumExpr(left), NumExpr(right)) =>
