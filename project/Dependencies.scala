@@ -80,8 +80,7 @@ object Dependencies {
     // Removing this will not cause any compile time errors, but will cause a runtime error once
     // Quasar attempts to connect to an h2 database to use as a metastore
     "com.h2database"              % "h2"                        % "1.4.196",
-    ("org.tpolecat"               %% "doobie-specs2"            % doobieVersion % Test)
-      .exclude("org.specs2", "specs2-core_2.12") // conflicting version
+    "org.tpolecat"               %% "doobie-specs2"             % doobieVersion % Test
   )
   def interface = Seq(
     "com.github.scopt" %% "scopt" % "3.5.0",
@@ -107,8 +106,7 @@ object Dependencies {
       "org.tpolecat" %% "doobie-hikari"     % doobieVersion,
       "org.tpolecat" %% "doobie-h2"         % doobieVersion,
       "com.github.alexarchambault" %% "scalacheck-shapeless_1.13" % "1.1.6" % Test,
-      ("org.tpolecat" %% "doobie-specs2"     % doobieVersion % Test)
-        .exclude("org.specs2", "specs2-core_2.12") // conflicting version
+      "org.tpolecat" %% "doobie-specs2"     % doobieVersion % Test
     )
   }
 
