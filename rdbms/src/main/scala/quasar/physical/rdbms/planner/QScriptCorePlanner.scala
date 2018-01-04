@@ -21,9 +21,10 @@ import quasar.common.SortDir
 import quasar.fp.ski._
 import quasar.{NameGenerator, qscript}
 import quasar.Planner.PlannerErrorME
-import quasar.physical.rdbms.planner.sql.SqlExpr._
-import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
-import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
+import Planner._
+import sql.SqlExpr._
+import sql.{SqlExpr, genId}
+import sql.SqlExpr.Select._
 import quasar.qscript.{FreeMap, MapFunc, QScriptCore, QScriptTotal}
 import matryoshka._
 import matryoshka.data._
@@ -143,10 +144,15 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         case _: Union[_] => src.point[F]
         case _ => for {
           alias <- genId[T[SqlExpr], F]
-          gbs       <- bucket.traverse(processFreeMap(_, alias))
+          gbs   <- bucket.traverse(processFreeMap(_, alias))
+          rds   <- reducers.traverse(_.traverse(processFreeMap(_, alias)) >>=
+            reduceFuncPlanner[T, F].plan)
+          rep <- repair.cataM(interpretM(
+            _ => rds.head.point[F], // TODO
+            Planner.mapFuncPlanner[T, F].plan))
         } yield {
           Select(
-            Selection(gbs.head, none),
+            Selection(rep, none),
             From(src, alias),
             none,
             groupBy = GroupBy(gbs).some,
@@ -154,12 +160,8 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           ).embed
         }
       }
-     
-
 
     case other =>
       notImplemented(s"QScriptCore: $other", this)
-
-      
   }
 }
