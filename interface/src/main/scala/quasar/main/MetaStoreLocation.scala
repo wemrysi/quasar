@@ -63,7 +63,9 @@ object MetaStoreLocation {
             // Try connecting to the new metastore location
             m  <- MetaStore.connect(conn, initialize, currentSchemas, currentMetastore.copyFromTo).leftMap(_.message)
             // Copy metastore if requested
-            _ <- copy.v.whenM(currentMetastore.copyFromTo.traverse(_(currentMetastore.transactor)(m.transactor)).liftM[MainErrT])
+            _ <- EitherT[Task, Throwable, Unit](
+              copy.v.whenM(currentMetastore.copyFromTo.traverse(_(currentMetastore.transactor)(m.transactor))).attempt)
+                .leftMap(e => s"Unable to copy metastore, ${e.getMessage}")
             // Persist the change, if persisting fails, shutdown the new metastore connection and fail the change
             _ <- EitherT(persist(m.connectionInfo).foldM(persistFailure => m.shutdown.as(persistFailure.left), _ => ().right.point[Task]))
             // We successfully connected to the new metastore and persisted the change to the config file
