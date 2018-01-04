@@ -69,7 +69,11 @@ object Planner {
     val derived = new MapFuncDerivedPlanner(core)
     coproduct(core, derived)
   }
-  
+
+  def reduceFuncPlanner[T[_[_]] : BirecursiveT, F[_] : Applicative]
+  : Planner[T, F, ReduceFunc] =
+    new ReduceFuncPlanner[T, F]
+
   implicit def qScriptCorePlanner[
   T[_[_]]: BirecursiveT: ShowT,
   F[_]: Monad: NameGenerator: PlannerErrorME]

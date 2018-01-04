@@ -96,6 +96,8 @@ object SqlExpr extends SqlExprInstances {
     final case class OrderBy[T](v: T, sortDir: SortDir)
   }
 
+  final case class Avg[T](v: T) extends SqlExpr[T]
+
   final case class Union[T](left: T, right: T) extends SqlExpr[T]
 
   object IfNull {

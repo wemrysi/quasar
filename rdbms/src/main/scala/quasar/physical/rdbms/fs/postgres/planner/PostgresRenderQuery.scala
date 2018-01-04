@@ -130,6 +130,8 @@ object PostgresRenderQuery extends RenderQuery {
       s"$s1, $s2".right
     case ConcatStr(TextExpr(e1), TextExpr(e2))  =>
       s"$e1 || $e2".right
+    case Avg((_, e)) =>
+      s"avg($e)".right
     case Time((_, expr)) =>
       buildJson(s"""{ "$TimeKey": $expr }""").right
     case NumericOp(sym, NumExpr(left), NumExpr(right)) =>

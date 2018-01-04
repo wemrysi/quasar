@@ -62,6 +62,8 @@ trait SqlExprRenderTree {
             NonTerminal("Pair" :: Nil, none, List(expr1, expr2) ∘ r.render)
           case ConcatStr(a1, a2) =>
             nonTerminal("ConcatStr", a1, a2)
+          case Avg(a1) =>
+            nonTerminal("Avg", a1)
           case Time(a1) =>
             nonTerminal("Time", a1)
           case Id(v) =>
