@@ -162,19 +162,6 @@ lazy val assemblySettings = Seq(
     case s if s.endsWith("libjansi.so")                       => MergeStrategy.last
 
     case other => (assemblyMergeStrategy in assembly).value apply other
-  },
-
-  assemblyExcludedJars in assembly := {
-    val cp = (fullClasspath in assembly).value
-
-    cp filter { af =>
-      val file = af.data
-
-      val excludeByName: Boolean = file.getName.matches("""scala-library-2\.12\.\d+\.jar""")
-      val excludeByPath: Boolean = file.getPath.contains("org/scala-lang")
-
-      excludeByName && excludeByPath
-    }
   }
 )
 
