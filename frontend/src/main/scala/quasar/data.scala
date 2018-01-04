@@ -16,18 +16,33 @@
 
 package quasar
 
-import quasar.ejson.{Common, EJson, Extension, Type => EType, TypeTag, SizedType}
 import slamdata.Predef._
+import quasar.ejson.{
+  Common,
+  EJson,
+  Extension,
+  SizedType,
+  Type => EType,
+  TypeTag
+}
 import quasar.fp._
 import quasar.javascript.Js
 
+import java.time.{
+  LocalDate => JLocalDate,
+  LocalDateTime => JLocalDateTime,
+  LocalTime => JLocalTime,
+  OffsetDateTime => JOffsetDateTime,
+  OffsetTime => JOffsetTime,
+  ZoneOffset
+}
+import java.time.format.DateTimeFormatter
 import scala.Any
 
 import jawn._
 import matryoshka._
 import matryoshka.patterns._
 import monocle.{Iso, Optional, Prism}
-import java.time.{ZoneOffset, LocalDate => JLocalDate, LocalDateTime => JLocalDateTime, LocalTime => JLocalTime, OffsetDateTime => JOffsetDateTime, OffsetTime => JOffsetTime}
 import scalaz.{Lens => _, Optional=>_, _}, Scalaz._
 import scodec.bits.ByteVector
 
@@ -120,12 +135,11 @@ object Data {
     def toJs = None
   }
 
-//    def toJs = jscore.Call(jscore.ident("ISODate"), List(jscore.Literal(Js.Str(value.toString)))).some
-
   final case class OffsetDateTime(value: JOffsetDateTime) extends Data {
     def dataType = Type.OffsetDateTime
-    // TODO
-    def toJs = ???
+    def toJs = jscore.Call(
+      jscore.ident("ISODate"),
+      List(jscore.Literal(Js.Str(value.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))))).some
   }
 
   val _offsetDateTime =
@@ -133,8 +147,9 @@ object Data {
 
   final case class OffsetTime(value: JOffsetTime) extends Data {
     def dataType = Type.OffsetTime
-    // TODO
-    def toJs = ???
+    def toJs = jscore.Call(
+      jscore.ident("ISODate"),
+      List(jscore.Literal(Js.Str(value.format(DateTimeFormatter.ISO_OFFSET_TIME))))).some
   }
 
   val _offsetTime =
@@ -142,8 +157,9 @@ object Data {
 
   final case class OffsetDate(value: quasar.OffsetDate) extends Data {
     def dataType = Type.OffsetDate
-    // TODO
-    def toJs = ???
+    def toJs = jscore.Call(
+      jscore.ident("ISODate"),
+      List(jscore.Literal(Js.Str(value.date.atStartOfDay(value.offset).format(DateTimeFormatter.ISO_OFFSET_DATE))))).some
   }
 
   val _offsetDate =
@@ -151,8 +167,9 @@ object Data {
 
   final case class LocalDateTime(value: JLocalDateTime) extends Data {
     def dataType = Type.LocalDateTime
-    // Does this make sense?
-    def toJs = jscore.Call(jscore.ident("ISODate"), List(jscore.Literal(Js.Str(value.toString)))).some
+    def toJs = jscore.Call(
+      jscore.ident("ISODate"),
+      List(jscore.Literal(Js.Str(value.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))))).some
   }
 
   val _localDateTimeOptional = Optional[Data, JLocalDateTime] { case LocalDateTime(k) => Some(k); case _ => None }(ldt => _ => LocalDateTime(ldt))
@@ -161,7 +178,9 @@ object Data {
 
   final case class LocalTime(value: JLocalTime) extends Data {
     def dataType = Type.LocalTime
-    def toJs = jscore.Literal(Js.Str(value.toString)).some
+    def toJs = jscore.Call(
+      jscore.ident("ISODate"),
+      List(jscore.Literal(Js.Str(value.format(DateTimeFormatter.ISO_LOCAL_TIME))))).some
   }
 
   val _localTimeIso = Iso[LocalTime, JLocalTime](_.value)(LocalTime(_))
@@ -170,7 +189,9 @@ object Data {
 
   final case class LocalDate(value: JLocalDate) extends Data {
     def dataType = Type.LocalDate
-    def toJs = jscore.Call(jscore.ident("ISODate"), List(jscore.Literal(Js.Str(value.toString)))).some
+    def toJs = jscore.Call(
+      jscore.ident("ISODate"),
+      List(jscore.Literal(Js.Str(value.format(DateTimeFormatter.ISO_LOCAL_DATE))))).some
   }
 
   val _localDate =
@@ -178,8 +199,11 @@ object Data {
 
   final case class Interval(value: DateTimeInterval) extends Data {
     def dataType = Type.Interval
-    // TODO: Format with ISO8601
-    def toJs = ??? // jscore.Literal(Js.Num(value.getSeconds*1000 + value.getNano*1e-6, true)).some
+    def toJs = jscore.Call(
+      jscore.ident("ISODate"),
+      List(jscore.Literal(Js.Str(
+        //TODO seconds conversion toInt is lossy
+        JLocalDateTime.of(value.years, value.months, value.days, 0, 0, value.seconds.toInt, value.nanos).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))))).some
   }
 
   val _interval =
@@ -296,6 +320,17 @@ object Data {
         }
     }
 
+  object DateTimeConstants {
+    val year: String = "year"
+    val month: String = "month"
+    val day: String = "day" // day of month
+    val hour: String = "hour"
+    val minute: String = "minute"
+    val second: String = "second"
+    val nanosecond: String = "nanosecond"
+    val offset: String = "offset"
+  }
+
   object EJsonType {
     def apply(tag: TypeTag): Data =
       Data.Obj(ListMap(EType.TypeKey -> Data.Str(tag.value)))
@@ -349,59 +384,70 @@ object Data {
             bv => Binary(ImmutableArray.fromArray(bv.take(size.toLong).toArray)))
         else NA
       case (EJsonType(TypeTag.OffsetDateTime), Obj(map)) =>
-        (extract(map.get("years"), _int)(_.toInt) ⊛
-          extract(map.get("months"), _int)(_.toInt) ⊛
-          extract(map.get("days"), _int)(_.toInt) ⊛
-          extract(map.get("hours"), _int)(_.toInt) ⊛
-          extract(map.get("minutes"), _int)(_.toInt) ⊛
-          extract(map.get("second"), _int)(_.toInt) ⊛
-          extract(map.get("tz_offset"), _int)(_.toInt) ⊛
-          extract(map.get("nanosecond"), _int)(_.toInt))((years, months, days, hours, minutes, seconds, nanos, offset) =>
-          OffsetDateTime(JOffsetDateTime.of(years, months, days, hours, minutes, seconds, nanos,
-            ZoneOffset.ofTotalSeconds(offset)))).getOrElse(NA)
+        (extract(map.get(DateTimeConstants.year), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.month), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.day), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.hour), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.minute), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.second), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.nanosecond), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.offset), _int)(_.toInt)) {
+            (y, mo, d, h, mi, s, n, o) =>
+              OffsetDateTime(JOffsetDateTime.of(y, mo, d, h, mi, s, n,
+                ZoneOffset.ofTotalSeconds(o)))
+          }.getOrElse(NA)
       case (EJsonType(TypeTag.OffsetTime), Obj(map)) =>
-        (extract(map.get("hour"), _int)(_.toInt) ⊛
-          extract(map.get("minute"), _int)(_.toInt) ⊛
-          extract(map.get("second"), _int)(_.toInt) ⊛
-          extract(map.get("nanos"), _int)(_.toInt) ⊛
-          extract(map.get("tz_offset"), _int)(_.toInt)) { (h, m, s, n, o) =>
-          OffsetTime(JOffsetTime.of(h, m, s, n, ZoneOffset.ofTotalSeconds(o)))
-        }.getOrElse(NA)
+        (extract(map.get(DateTimeConstants.hour), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.minute), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.second), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.nanosecond), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.offset), _int)(_.toInt)) {
+            (h, m, s, n, o) =>
+              OffsetTime(JOffsetTime.of(h, m, s, n, ZoneOffset.ofTotalSeconds(o)))
+          }.getOrElse(NA)
       case (EJsonType(TypeTag.OffsetDate), Obj(map)) =>
-        (extract(map.get("year"), _int)(_.toInt) ⊛
-          extract(map.get("day_of_year"), _int)(_.toInt) ⊛
-          extract(map.get("tz_offset"), _int)(_.toInt)){ (y, d, o) =>
-          OffsetDate(quasar.OffsetDate(JLocalDate.ofYearDay(y, d), ZoneOffset.ofTotalSeconds(o)))
-        }.getOrElse(NA)
+        (extract(map.get(DateTimeConstants.year), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.month), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.day), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.offset), _int)(_.toInt)) {
+            (y, m, d, o) =>
+              OffsetDate(quasar.OffsetDate(JLocalDate.of(y, m, d), ZoneOffset.ofTotalSeconds(o)))
+          }.getOrElse(NA)
       case (EJsonType(TypeTag.LocalDateTime), Obj(map)) =>
-        (extract(map.get("years"), _int)(_.toInt) ⊛
-          extract(map.get("months"), _int)(_.toInt) ⊛
-          extract(map.get("day_of_year"), _int)(_.toInt) ⊛
-          extract(map.get("hours"), _int)(_.toInt) ⊛
-          extract(map.get("minutes"), _int)(_.toInt) ⊛
-          extract(map.get("second"), _int)(_.toInt) ⊛
-          extract(map.get("nanosecond"), _int)(_.toInt))((years, months, days, hours, minutes, seconds, nanos) =>
-          LocalDateTime(JLocalDateTime.of(years, months, days, hours, minutes, seconds, nanos))).getOrElse(NA)
+        (extract(map.get(DateTimeConstants.year), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.month), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.day), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.hour), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.minute), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.second), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.nanosecond), _int)(_.toInt)) {
+            (y, mo, d, h, mi, s, n) =>
+              LocalDateTime(JLocalDateTime.of(y, mo, d, h, mi, s, n))
+          }.getOrElse(NA)
       case (EJsonType(TypeTag.LocalTime), Obj(map)) =>
-        (extract(map.get("hour"), _int)(_.toInt) ⊛
-          extract(map.get("minute"), _int)(_.toInt) ⊛
-          extract(map.get("second"), _int)(_.toInt) ⊛
-          extract(map.get("nanosecond"), _int)(_.toInt)) { (h, m, s, n) =>
-          LocalTime(JLocalTime.of(h, m, s, n))
-        }.getOrElse(NA)
+        (extract(map.get(DateTimeConstants.hour), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.minute), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.second), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.nanosecond), _int)(_.toInt)) {
+            (h, m, s, n) =>
+              LocalTime(JLocalTime.of(h, m, s, n))
+          }.getOrElse(NA)
       case (EJsonType(TypeTag.LocalDate), Obj(map)) =>
-        (extract(map.get("year"), _int)(_.toInt) ⊛
-          extract(map.get("day_of_year"), _int)(_.toInt))((y, d) =>
-          JLocalDate.ofYearDay(y, d))
-          .map(LocalDate)
-          .getOrElse(NA)
+        (extract(map.get(DateTimeConstants.year), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.month), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.day), _int)(_.toInt)) {
+            (y, m, d) =>
+              LocalDate(JLocalDate.of(y, m, d))
+          }.getOrElse(NA)
       case (EJsonType(TypeTag.Interval), Obj(map)) =>
-        (extract(map.get("years"), _int)(_.toInt) ⊛
-          extract(map.get("months"), _int)(_.toInt) ⊛
-          extract(map.get("days"), _int)(_.toInt) ⊛
-          extract(map.get("seconds"), _int)(_.toLong) ⊛
-          extract(map.get("nanoseconds"), _int)(_.toLong))((y, m, d, s, n) =>
-          Interval(DateTimeInterval(y, m, d, s, n))).getOrElse(NA)
+        (extract(map.get(DateTimeConstants.year), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.month), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.day), _int)(_.toInt) ⊛
+          extract(map.get(DateTimeConstants.second), _int)(_.toLong) ⊛
+          extract(map.get(DateTimeConstants.nanosecond), _int)(_.toLong)) {
+            (y, m, d, s, n) =>
+              Interval(DateTimeInterval(y, m, d, s, n))
+          }.getOrElse(NA)
       case (_, _) => value
     }
     case ejson.Map(value)       =>
@@ -435,61 +481,61 @@ object Data {
       case Int(value)       => E.inj(ejson.Int(value)).right
       case OffsetDateTime(value) => E.inj(ejson.Meta(
         Obj(ListMap(
-          "year"         -> Int(value.getYear),
-          "month"        -> Int(value.getMonth.getValue),
-          "day_of_month" -> Int(value.getDayOfMonth),
-          "hour"         -> Int(value.getHour),
-          "minute"       -> Int(value.getMinute),
-          "second"       -> Int(value.getSecond),
-          "nanosecond"   -> Int(value.getNano),
-          "tz_offset"    -> Int(value.getOffset.getTotalSeconds))),
+          DateTimeConstants.year       -> Int(value.getYear),
+          DateTimeConstants.month      -> Int(value.getMonth.getValue),
+          DateTimeConstants.day        -> Int(value.getDayOfMonth),
+          DateTimeConstants.hour       -> Int(value.getHour),
+          DateTimeConstants.minute     -> Int(value.getMinute),
+          DateTimeConstants.second     -> Int(value.getSecond),
+          DateTimeConstants.nanosecond -> Int(value.getNano),
+          DateTimeConstants.offset     -> Int(value.getOffset.getTotalSeconds))),
         EJsonType(TypeTag.OffsetDateTime))).right
       case OffsetTime(value) => E.inj(ejson.Meta(
         Obj(ListMap(
-          "hour"       -> Int(value.getHour),
-          "minute"     -> Int(value.getMinute),
-          "second"     -> Int(value.getSecond),
-          "nanosecond" -> Int(value.getNano),
-          "tz_offset"    -> Int(value.getOffset.getTotalSeconds))),
+          DateTimeConstants.hour       -> Int(value.getHour),
+          DateTimeConstants.minute     -> Int(value.getMinute),
+          DateTimeConstants.second     -> Int(value.getSecond),
+          DateTimeConstants.nanosecond -> Int(value.getNano),
+          DateTimeConstants.offset     -> Int(value.getOffset.getTotalSeconds))),
         EJsonType(TypeTag.OffsetTime))).right
       case OffsetDate(value) => E.inj(ejson.Meta(
         Obj(ListMap(
-          "year"         -> Int(value.date.getYear),
-          "month"        -> Int(value.date.getMonth.getValue),
-          "day_of_month" -> Int(value.date.getDayOfMonth),
-          "tz_offset"    -> Int(value.offset.getTotalSeconds))),
+          DateTimeConstants.year   -> Int(value.date.getYear),
+          DateTimeConstants.month  -> Int(value.date.getMonth.getValue),
+          DateTimeConstants.day    -> Int(value.date.getDayOfMonth),
+          DateTimeConstants.offset -> Int(value.offset.getTotalSeconds))),
         EJsonType(TypeTag.OffsetDate))).right
       case LocalDateTime(value) => E.inj(ejson.Meta(
         Obj(ListMap(
-          "year"         -> Int(value.getYear),
-          "month"        -> Int(value.getMonth.getValue),
-          "day_of_month" -> Int(value.getDayOfMonth),
-          "hour"         -> Int(value.getHour),
-          "minute"       -> Int(value.getMinute),
-          "second"       -> Int(value.getSecond),
-          "nanosecond"   -> Int(value.getNano))),
+          DateTimeConstants.year       -> Int(value.getYear),
+          DateTimeConstants.month      -> Int(value.getMonth.getValue),
+          DateTimeConstants.day        -> Int(value.getDayOfMonth),
+          DateTimeConstants.hour       -> Int(value.getHour),
+          DateTimeConstants.minute     -> Int(value.getMinute),
+          DateTimeConstants.second     -> Int(value.getSecond),
+          DateTimeConstants.nanosecond -> Int(value.getNano))),
         EJsonType(TypeTag.LocalDateTime))).right
       case LocalTime(value)      => E.inj(ejson.Meta(
         Obj(ListMap(
-          "hour"       -> Int(value.getHour),
-          "minute"     -> Int(value.getMinute),
-          "second"     -> Int(value.getSecond),
-          "nanosecond" -> Int(value.getNano))),
+          DateTimeConstants.hour       -> Int(value.getHour),
+          DateTimeConstants.minute     -> Int(value.getMinute),
+          DateTimeConstants.second     -> Int(value.getSecond),
+          DateTimeConstants.nanosecond -> Int(value.getNano))),
         EJsonType(TypeTag.LocalTime))).right
       case LocalDate(value) => E.inj(ejson.Meta(
         Obj(ListMap(
-          "year"         -> Int(value.getYear),
-          "month"        -> Int(value.getMonth.getValue),
-          "day_of_month" -> Int(value.getDayOfMonth))),
+          DateTimeConstants.year  -> Int(value.getYear),
+          DateTimeConstants.month -> Int(value.getMonth.getValue),
+          DateTimeConstants.day   -> Int(value.getDayOfMonth))),
         EJsonType(TypeTag.LocalDate))).right
       case Interval(value)  =>
         E.inj(ejson.Meta(
           Obj(ListMap(
-            "years" -> Int(value.years),
-            "months" -> Int(value.months),
-            "days" -> Int(value.days),
-            "seconds" -> Int(value.seconds),
-            "nanoseconds" -> Int(value.nanos))),
+            DateTimeConstants.year       -> Int(value.years),
+            DateTimeConstants.month      -> Int(value.months),
+            DateTimeConstants.day        -> Int(value.days),
+            DateTimeConstants.second     -> Int(value.seconds),
+            DateTimeConstants.nanosecond -> Int(value.nanos))),
           EJsonType(TypeTag.Interval))).right
       case Binary(value)    =>
         E.inj(ejson.Meta(
