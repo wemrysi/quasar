@@ -1,5 +1,5 @@
 {
-    "name": "[qa_s08] simple group by",
+    "name": "[qa_s08] group by with single arbitrary",
 
     "backends": {
        "couchbase":         "ignoreFieldOrder",
