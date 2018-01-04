@@ -148,7 +148,10 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           rds   <- reducers.traverse(_.traverse(processFreeMap(_, alias)) >>=
             reduceFuncPlanner[T, F].plan)
           rep <- repair.cataM(interpretM(
-            _ => rds.head.point[F], // TODO
+            _.idx.fold(
+              idx => notImplemented("Reduce repair with left index, waiting for a test case", this): F[T[SqlExpr]],
+              idx => rds(idx).point[F]
+            ),
             Planner.mapFuncPlanner[T, F].plan))
         } yield {
           Select(
