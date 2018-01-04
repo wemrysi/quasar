@@ -216,7 +216,7 @@ class PlannerSql2ExactSpec extends
                      $lt($field("val1"), $literal(Bson.Text("")))),
                    $and(
                      $lte($literal(Check.minDate), $field("val1")),
-                     $lt($field("val1"), $literal(Bson.Regex("", ""))))),
+                     $lt($field("val1"), $literal(Check.minTimestamp)))),
                  $add($field("val1"), $field("val2")),
                  $literal(Bson.Undefined)),
                $literal(Bson.Undefined))),
@@ -404,7 +404,7 @@ class PlannerSql2ExactSpec extends
              $cond(
                $and(
                  $lte($literal(Check.minDate), $field("ts")),
-                 $lt($field("ts"), $literal(Bson.Regex("", "")))),
+                 $lt($field("ts"), $literal(Check.minTimestamp))),
                $dayOfMonth($field("ts")),
                $literal(Bson.Undefined))),
            ExcludeId)))
@@ -420,7 +420,7 @@ class PlannerSql2ExactSpec extends
                $cond(
                  $and(
                    $lte($literal(Check.minDate), $field("ts")),
-                   $lt($field("ts"), $literal(Bson.Regex("", "")))),
+                   $lt($field("ts"), $literal(Check.minTimestamp))),
                  $trunc(
                    $add(
                      $divide(
@@ -441,7 +441,7 @@ class PlannerSql2ExactSpec extends
                $cond(
                  $and(
                    $lte($literal(Check.minDate), $field("ts")),
-                   $lt($field("ts"), $literal(Bson.Regex("", "")))),
+                   $lt($field("ts"), $literal(Check.minTimestamp))),
                  $subtract($dayOfWeek($field("ts")), $literal(Bson.Int32(1))),
                  $literal(Bson.Undefined))),
            ExcludeId)))
@@ -457,7 +457,7 @@ class PlannerSql2ExactSpec extends
                $cond(
                  $and(
                    $lte($literal(Check.minDate), $field("ts")),
-                   $lt($field("ts"), $literal(Bson.Regex("", "")))),
+                   $lt($field("ts"), $literal(Check.minTimestamp))),
                  $cond($eq($dayOfWeek($field("ts")), $literal(Bson.Int32(1))),
                    $literal(Bson.Int32(7)),
                    $subtract($dayOfWeek($field("ts")), $literal(Bson.Int32(1)))),
@@ -684,7 +684,7 @@ class PlannerSql2ExactSpec extends
                      $lt($field("val1"), $literal(Bson.Text("")))),
                    $and(
                      $lte($literal(Check.minDate), $field("val1")),
-                     $lt($field("val1"), $literal(Bson.Regex("", ""))))),
+                     $lt($field("val1"), $literal(Check.minTimestamp)))),
                  $add($field("val1"), $field("val3")),
                  $literal(Bson.Undefined)),
                $literal(Bson.Undefined))),
@@ -1642,7 +1642,7 @@ class PlannerSql2ExactSpec extends
               $cond(
                 $and(
                   $lte($literal(Check.minDate), $field("ts")),
-                  $lt($field("ts"), $literal(Bson.Regex("", "")))),
+                  $lt($field("ts"), $literal(Check.minTimestamp))),
                 $dateToString(Hour :: ":" :: Minute :: ":" :: Second :: "." :: Millisecond :: FormatString.empty, $field("ts")),
                 $literal(Bson.Undefined))),
             ExcludeId)))
