@@ -820,6 +820,12 @@ object MongoDbPlanner {
           case MFC(Not((_, v))) =>
             v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
 
+          case MFC(Cond((_, v), _, _)) =>
+            v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
+
+          case MFC(ProjectKey((Embed(MFC(Cond(_, _, _))), v), _)) =>
+            v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
+
           case MFC(Guard(_, typ, (_, cont), (Embed(MFC(Undefined())), _))) =>
             cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
           case MFC(Guard(_, typ, (_, cont), (Embed(MFC(MakeArray(Embed(MFC(Undefined()))))), _))) =>
@@ -830,7 +836,7 @@ object MongoDbPlanner {
       }
     }
 
-    invoke(node) <+> \/-(default)
+    invoke(node)
   }
 
   /** Brings a [[WBM]] into our `M`. */
@@ -924,30 +930,66 @@ object MongoDbPlanner {
               case _ => none
             }
 
-            if (repair.contains(LeftSideF))
+            // FIXME: Remove the `Cond`s extracted by the selector phase, not every `Cond(_, _, Undefined)` as here.
+            def elideCond[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
+              case CoEnv(\/-(MFC(Cond(if_, then_, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
+                CoEnv(then_.resume.swap).some
+              case _ => none
+            }
+
+            def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
+                M[WorkflowBuilder[WF]] = {
+              val (sel, inputs) = partialSel
+
+              inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(struct)))
+                .map(WB.filter(src, _, sel))
+            }
+
+            def transform[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
+              applyTransforms(elideCond[A], rewriteUndefined[A])
+
+            val selectors = getSelector[T, M, EX](
+              struct, InternalError.fromMsg("Not a selector").left, selector[T](cfg.bsonVersion))
+
+            if (repair.contains(LeftSideF)) {
+              val exprMerge: JoinFunc[T] => M[Fix[ExprOp]] =
+                getExprMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(_, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
+              val jsMerge: JoinFunc[T] => M[JsFn] =
+                getJsMerge[T, M](_, jscore.Select(jscore.Ident(JsFn.defaultName), "s"), jscore.Select(jscore.Ident(JsFn.defaultName), "f"))
+
               shiftType match {
                 case ShiftType.Array => {
-                  val target =
-                    handleFreeMap[T, M, EX](
-                      cfg.funcHandler,
-                      cfg.staticHandler,
-                      struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole])))
-
-                  val exprMerge: JoinFunc[T] => M[Fix[ExprOp]] =
-                    getExprMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(_, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
-                  val jsMerge: JoinFunc[T] => M[JsFn] =
-                    getJsMerge[T, M](_, jscore.Select(jscore.Ident(JsFn.defaultName), "s"), jscore.Select(jscore.Ident(JsFn.defaultName), "f"))
-
-                  target >>= (expr =>
+                  selectors.fold(_ => handleFreeMap[T, M, EX](
+                    cfg.funcHandler,
+                    cfg.staticHandler,
+                    struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))) >>= (target =>
                     getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
                       FlatteningBuilder(
                         DocBuilder(
                           src,
                           ListMap(
                             BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                            BsonField.Name("f") -> expr)),
+                            BsonField.Name("f") -> target)),
                         Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
-                      repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide]))))
+                      repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide])))), { sel =>
+                    val struct0 =
+                      handleFreeMap[T, M, EX](
+                        cfg.funcHandler,
+                        cfg.staticHandler,
+                        struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
+                    val repair0 = repair.transCata[JoinFunc[T]](orOriginal(transform[JoinSide]))
+
+                    (struct0 ⊛ filterBuilder(src, sel))((struct1, src0) =>
+                      getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
+                        FlatteningBuilder(
+                          DocBuilder(
+                            src0,
+                            ListMap(
+                              BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                              BsonField.Name("f") -> struct1)),
+                          Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                        repair0)).join
+                  })
                 }
                 case _ =>
                   (handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct) ⊛
@@ -966,29 +1008,30 @@ object MongoDbPlanner {
                         Set(StructureType.Object(DocField(BsonField.Name("f")), id))),
                       -\&/(j)))
               }
-              else
-                shiftType match {
-                  case ShiftType.Array => {
-                    val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
-                    val repair0 = repair.as[Hole](SrcHole).transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
+            }
+            else
+              shiftType match {
+                case ShiftType.Array => {
+                  val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
+                  val repair0 = repair.as[Hole](SrcHole).transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
 
-                    getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct0) >>= (builder =>
-                      getExprBuilder[T, M, WF, EX](
-                        cfg.funcHandler, cfg.staticHandler)(
-                        FlatteningBuilder(
-                          builder,
-                          Set(StructureType.Array(DocVar.ROOT(), id))),
-                          repair0))
-                  }
-                  case _ =>
-                    getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
-                      getExprBuilder[T, M, WF, EX](
-                        cfg.funcHandler, cfg.staticHandler)(
-                        FlatteningBuilder(
-                          builder,
-                          Set(StructureType.Object(DocVar.ROOT(), id))),
-                          repair.as(SrcHole)))
+                  getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct0) >>= (builder =>
+                    getExprBuilder[T, M, WF, EX](
+                      cfg.funcHandler, cfg.staticHandler)(
+                      FlatteningBuilder(
+                        builder,
+                        Set(StructureType.Array(DocVar.ROOT(), id))),
+                        repair0))
                 }
+                case _ =>
+                  getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
+                    getExprBuilder[T, M, WF, EX](
+                      cfg.funcHandler, cfg.staticHandler)(
+                      FlatteningBuilder(
+                        builder,
+                        Set(StructureType.Object(DocVar.ROOT(), id))),
+                        repair.as(SrcHole)))
+              }
 
           }
           case Reduce(src, bucket, reducers, repair) =>
@@ -1020,8 +1063,10 @@ object MongoDbPlanner {
             keys.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _))
               .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
           case Filter(src0, cond) => {
-            val selectors = getSelector[T, M, EX](cond, defaultSelector[T].point[OutputM[?]], selector[T](cfg.bsonVersion))
-            val typeSelectors = getSelector[T, M, EX](cond, InternalError.fromMsg(s"not a typecheck").left , typeSelector[T])
+            val selectors = getSelector[T, M, EX](
+              cond, defaultSelector[T].right, selector[T](cfg.bsonVersion) ∘ (_ <+> defaultSelector[T].right))
+            val typeSelectors = getSelector[T, M, EX](
+              cond, InternalError.fromMsg(s"not a typecheck").left , typeSelector[T])
 
             def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
                 M[WorkflowBuilder[WF]] = {

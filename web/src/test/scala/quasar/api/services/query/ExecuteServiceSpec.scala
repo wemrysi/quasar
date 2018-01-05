@@ -18,6 +18,7 @@ package quasar.api.services.query
 
 import slamdata.Predef._
 import quasar._
+import quasar.DateGenerators._
 import quasar.Fixture.unsafeToLP
 import quasar.api._, ApiErrorEntityDecoder._, ToApiError.ops._
 import quasar.api.matchers._
@@ -26,7 +27,7 @@ import quasar.api.services.Fixture._
 import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.contrib.scalaz.catchable._
-import quasar.DateGenerators._
+import quasar.effect.ScopeExecution
 import quasar.fp._
 import quasar.fp.free.{foldMapNT, injectNT, liftFT}
 import quasar.fp.ski._
@@ -73,6 +74,9 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
 
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
+  implicit val scopeExecutionViewEff: ScopeExecution[Free[ViewEff, ?], Nothing] =
+    ScopeExecution.ignore[Free[ViewEff, ?], Nothing]
+
   def executeServiceRef(
     mem: InMemState,
     f: QueryFile ~> Free[QueryFile, ?],
@@ -80,7 +84,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
   ): (Service[Request, Response], Task[InMemState]) = {
     val (inter, ref) = inMemFSWebInspect(mem, MountingsConfig(mounts)).unsafePerformSync
     val finalInter = free.transformIn(f andThen foldMapNT(injectNT[QueryFile, CoreEffIO] andThen inter), inter)
-    val svc = execute.service[CoreEffIO].toHttpService(finalInter).orNotFound
+    val svc = execute.service[CoreEffIO, Nothing](executionIdRef).toHttpService(finalInter).orNotFound
 
     (svc, ref.map{ case (mem, _) => mem })
   }
@@ -174,7 +178,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
           val (resp, vc) = evalViewTest(now, mounts, InMemState.empty) { (it, ir) =>
             (for {
               _ <- vcache.put(f, viewCache)
-              a <- VCacheMiddleware(execute.service[ViewEff]).apply(
+              a <- VCacheMiddleware(execute.service[ViewEff, Nothing](executionIdRef)).apply(
                      Request(uri = (pathUri(f) / "").copy(query =
                        http4s.Query.fromPairs(
                          "q" -> s"select * from `../${fileName(f).value}`"))))
@@ -208,7 +212,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
           val (resp, vc) = evalViewTest(now, mounts, InMemState.empty) { (it, ir) =>
             (for {
               _ <- vcache.put(f, viewCache)
-              a <- VCacheMiddleware(execute.service[ViewEff]).apply(
+              a <- VCacheMiddleware(execute.service[ViewEff, Nothing](executionIdRef)).apply(
                 Request(uri = (pathUri(f) / "").copy(query =
                   http4s.Query.fromPairs(
                     "q" -> s"select * from `../${fileName(f).value}`"))))
