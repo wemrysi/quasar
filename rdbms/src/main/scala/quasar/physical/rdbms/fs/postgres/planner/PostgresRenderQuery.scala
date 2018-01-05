@@ -116,7 +116,7 @@ object PostgresRenderQuery extends RenderQuery {
             s"->${midTail.map(e => s"$e").intercalate("->")}"
           else
             ""
-          s"""$key."$firstValStripped from"$midStr->$last""".right
+          s"""$key."$firstValStripped"$midStr->$last""".right
         case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
       }
     case Obj(m) =>
@@ -204,7 +204,7 @@ object PostgresRenderQuery extends RenderQuery {
       }
       s"$fName($e)".right
     case BinaryFunction(fType, TextExpr(a1), TextExpr(a2)) => (fType match {
-        case StrSplit => s"regexp_split_to_array($a1}, $a2})"
+        case StrSplit => s"regexp_split_to_array($a1, $a2)"
         case ArrayConcat => s"(to_jsonb($a1) || to_jsonb($a2))"
         case Contains => s"($a1::text IN (SELECT jsonb_array_elements_text(to_jsonb($a2))))"
       }).right
