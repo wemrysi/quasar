@@ -79,7 +79,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
         val initM = reversed.head match {
           case -\/(QSU.LeftShift(_, struct, idStatus, repair, rot)) =>
-            val struct2 = struct.flatMap(κ(fm))
+            val struct2 = struct >> fm
 
             val repair2 = repair flatMap {
               case QSU.AccessLeftTarget(Access.Value(_)) => fm.map[QSU.ShiftTarget[T]](κ(QSU.AccessLeftTarget[T](Access.valueHole(SrcHole))))
@@ -95,7 +95,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           case \/-(QSU.MultiLeftShift(_, shifts, repair)) =>
             val shifts2 = shifts map {
               case (struct, idStatus, rot) =>
-                (struct.flatMap(κ(fm)), idStatus, rot)
+                (struct >> fm, idStatus, rot)
             }
 
             val repair2 = repair flatMap {
@@ -209,7 +209,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
         reconstructed <- reversed.tail.foldLeftM[G, QSUGraph](init2) {
           case (src, -\/(QSU.LeftShift(_, struct, idStatus, repair, rot))) =>
-            val struct2 = struct.flatMap(κ(func.ProjectKeyS(func.Hole, ResultsField)))
+            val struct2 = struct >> func.ProjectKeyS(func.Hole, ResultsField)
 
             val repair2 = repair flatMap {
               case QSU.AccessLeftTarget(Access.Value(_)) =>
@@ -235,7 +235,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           case (src, \/-(QSU.MultiLeftShift(_, shifts, repair))) =>
             val shifts2 = shifts map {
               case (struct, idStatus, rot) =>
-                val struct2 = struct.flatMap(κ(func.ProjectKeyS(func.Hole, ResultsField)))
+                val struct2 = struct >> func.ProjectKeyS(func.Hole, ResultsField)
 
                 (struct2, idStatus, rot)
             }
@@ -260,14 +260,14 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
         rewritten = reconstructed match {
           case reconstructed @ LeftShift(src, struct, idStatus, repair, rot) =>
-            val origLifted = origFM.flatMap(κ(func.ProjectKeyS(repair, OriginalField)))
+            val origLifted = origFM >> func.ProjectKeyS(repair, OriginalField)
             val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted)
 
             reconstructed.overwriteAtRoot(
               QSU.LeftShift(src.root, struct, idStatus, N.freeMF(repair2), rot))
 
           case reconstructed @ MultiLeftShift(src, shifts, repair) =>
-            val origLifted = origFM.flatMap(κ(func.ProjectKeyS(repair, OriginalField)))
+            val origLifted = origFM >> func.ProjectKeyS(repair, OriginalField)
             val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted)
 
             reconstructed.overwriteAtRoot(
@@ -300,7 +300,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
       def fixSingleStruct(struct: FreeMap, isLeft: Boolean): FreeMap = {
         if (hasParent)
-          struct.flatMap(κ(func.ProjectKeyS(func.Hole, name(isLeft))))
+          struct >> func.ProjectKeyS(func.Hole, name(isLeft))
         else
           struct
       }
@@ -352,7 +352,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         shifts map {
           case (struct, idStatus, rot) =>
             val struct2 = if (hasParent)
-              struct.flatMap(κ(func.ProjectKeyS(func.Hole, name(isLeft))))
+              struct >> func.ProjectKeyS(func.Hole, name(isLeft))
             else
               struct
 
