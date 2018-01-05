@@ -2,13 +2,11 @@
   "name": "[qa_s06] simple union",
 
   "backends": {
-    "marklogic_json": "ignoreResultOrder",
-    "marklogic_xml": "ignoreResultOrder"
   },
 
   "data": ["simple_union.data", "simple_union2.data"],
 
-  "query": "select * from simple_union union select * from simple_union2",
+  "query": "select * from (select * from simple_union union select * from simple_union2) order by b",
 
   "predicate": "exactly",
 
