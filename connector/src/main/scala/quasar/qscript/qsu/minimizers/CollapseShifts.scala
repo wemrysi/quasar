@@ -55,6 +55,12 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
   private val func = construction.Func[T]
   private val N = new NormalizableT[T]
 
+  private val ResultsField = "results"
+  private val OriginalField = "original"
+
+  private val LeftField = "left"
+  private val RightField = "right"
+
   private val accessHoleLeftF =
     Access.valueHole[T[EJson]](SrcHole).left[Int].point[FreeMapA]
 
@@ -185,15 +191,15 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       val initPattern = reversed.head match {
         case -\/(QSU.LeftShift(_, struct, idStatus, repair, rot)) =>
           val repair2 = func.ConcatMaps(
-            func.MakeMapS("original", func.AccessLeftTarget(Access.valueHole[T[EJson]](_))),
-            func.MakeMapS("results", repair))
+            func.MakeMapS(OriginalField, func.AccessLeftTarget(Access.valueHole[T[EJson]](_))),
+            func.MakeMapS(ResultsField, repair))
 
           QSU.LeftShift[T, Symbol](src.root, struct, idStatus, repair2, rot)
 
         case \/-(QSU.MultiLeftShift(_, shifts, repair)) =>
           val repair2 = func.ConcatMaps(
-            func.MakeMapS("original", accessHoleLeftF),
-            func.MakeMapS("results", repair))
+            func.MakeMapS(OriginalField, accessHoleLeftF),
+            func.MakeMapS(ResultsField, repair))
 
           QSU.MultiLeftShift[T, Symbol](src.root, shifts, repair2)
       }
@@ -203,11 +209,11 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
         reconstructed <- reversed.tail.foldLeftM[G, QSUGraph](init2) {
           case (src, -\/(QSU.LeftShift(_, struct, idStatus, repair, rot))) =>
-            val struct2 = struct.flatMap(κ(func.ProjectKeyS(func.Hole, "results")))
+            val struct2 = struct.flatMap(κ(func.ProjectKeyS(func.Hole, ResultsField)))
 
             val repair2 = repair flatMap {
               case QSU.AccessLeftTarget(Access.Value(_)) =>
-                func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole[T[EJson]](_)), "results")
+                func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole[T[EJson]](_)), ResultsField)
               case QSU.AccessLeftTarget(access) =>
                 func.AccessLeftTarget(access.as(_))
               case QSU.LeftTarget() => scala.sys.error("QSU.LeftTarget in CollapseShifts")
@@ -216,11 +222,11 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
             val repair3 = func.ConcatMaps(
               func.MakeMapS(
-                "original",
+                OriginalField,
                 func.ProjectKeyS(
                   func.AccessLeftTarget(Access.valueHole[T[EJson]](_)),
-                  "original")),
-              func.MakeMapS("results", repair2))
+                  OriginalField)),
+              func.MakeMapS(ResultsField, repair2))
 
             updateGraph[T, G](QSU.LeftShift[T, Symbol](src.root, struct2, idStatus, repair3, rot)) map { rewritten =>
               rewritten :++ src
@@ -229,23 +235,23 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           case (src, \/-(QSU.MultiLeftShift(_, shifts, repair))) =>
             val shifts2 = shifts map {
               case (struct, idStatus, rot) =>
-                val struct2 = struct.flatMap(κ(func.ProjectKeyS(func.Hole, "results")))
+                val struct2 = struct.flatMap(κ(func.ProjectKeyS(func.Hole, ResultsField)))
 
                 (struct2, idStatus, rot)
             }
 
             val repair2 = repair flatMap {
               case -\/(access) =>
-                func.ProjectKeyS(access.left[Int].point[FreeMapA], "results")
+                func.ProjectKeyS(access.left[Int].point[FreeMapA], ResultsField)
 
               case \/-(idx) => idx.right[QAccess[Hole]].point[FreeMapA]
             }
 
             val repair3 = func.ConcatMaps(
               func.MakeMapS(
-                "original",
-                func.ProjectKeyS(accessHoleLeftF, "original")),
-              func.MakeMapS("results", repair2))
+                OriginalField,
+                func.ProjectKeyS(accessHoleLeftF, OriginalField)),
+              func.MakeMapS(ResultsField, repair2))
 
             updateGraph[T, G](QSU.MultiLeftShift[T, Symbol](src.root, shifts2, repair2)) map { rewritten =>
               rewritten :++ src
@@ -254,15 +260,15 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
         rewritten = reconstructed match {
           case reconstructed @ LeftShift(src, struct, idStatus, repair, rot) =>
-            val origLifted = origFM.flatMap(κ(func.ProjectKeyS(repair, "original")))
-            val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, "results"), origLifted)
+            val origLifted = origFM.flatMap(κ(func.ProjectKeyS(repair, OriginalField)))
+            val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted)
 
             reconstructed.overwriteAtRoot(
               QSU.LeftShift(src.root, struct, idStatus, N.freeMF(repair2), rot))
 
           case reconstructed @ MultiLeftShift(src, shifts, repair) =>
-            val origLifted = origFM.flatMap(κ(func.ProjectKeyS(repair, "original")))
-            val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, "results"), origLifted)
+            val origLifted = origFM.flatMap(κ(func.ProjectKeyS(repair, OriginalField)))
+            val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted)
 
             reconstructed.overwriteAtRoot(
               QSU.MultiLeftShift(src.root, shifts, repair2 /*N.freeMF(repair2)*/))
@@ -290,7 +296,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         cont.flatMap(coalesceZip(tailL, tailR, _))
       }
 
-      def name(isLeft: Boolean) = if (isLeft) "left" else "right"
+      def name(isLeft: Boolean) = if (isLeft) LeftField else RightField
 
       def fixSingleStruct(struct: FreeMap, isLeft: Boolean): FreeMap = {
         if (hasParent)
@@ -385,8 +391,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val repair =
             func.ConcatMaps(
-              func.MakeMapS("left", repairLAdj),
-              func.MakeMapS("right", repairRAdj))
+              func.MakeMapS(LeftField, repairLAdj),
+              func.MakeMapS(RightField, repairRAdj))
 
           continue(fakeParent, tailL, tailR) { sym =>
             QSU.MultiLeftShift[T, Symbol](
@@ -410,8 +416,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val repair =
             func.ConcatMaps(
-              func.MakeMapS("left", repairLAdj),
-              func.MakeMapS("right", repairRAdj))
+              func.MakeMapS(LeftField, repairLAdj),
+              func.MakeMapS(RightField, repairRAdj))
 
           continue(fakeParent, tailL, tailR) { sym =>
             QSU.MultiLeftShift[T, Symbol](
@@ -433,8 +439,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val repair =
             func.ConcatMaps(
-              func.MakeMapS("left", repairLAdj),
-              func.MakeMapS("right", repairRAdj))
+              func.MakeMapS(LeftField, repairLAdj),
+              func.MakeMapS(RightField, repairRAdj))
 
           continue(fakeParent, tailL, tailR) { sym =>
             QSU.MultiLeftShift[T, Symbol](
@@ -458,8 +464,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val repair =
             func.ConcatMaps(
-              func.MakeMapS("left", repairLAdj),
-              func.MakeMapS("right", repairRAdj))
+              func.MakeMapS(LeftField, repairLAdj),
+              func.MakeMapS(RightField, repairRAdj))
 
           continue(fakeParent, tailL, tailR) { sym =>
             QSU.MultiLeftShift[T, Symbol](
@@ -477,11 +483,11 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           val repairLAdj = fixSingleRepairForSingle(repairL, true)
 
           val repair = func.ConcatMaps(
-            func.MakeMapS("left", repairLAdj),
+            func.MakeMapS(LeftField, repairLAdj),
             func.MakeMapS(
-              "right",
+              RightField,
               if (hasParent)
-                func.ProjectKeyS(func.AccessLeftTarget(Access.value(_)), "right")
+                func.ProjectKeyS(func.AccessLeftTarget(Access.value(_)), RightField)
               else
                 func.AccessLeftTarget(Access.value(_))))
 
@@ -503,11 +509,11 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           val repairLAdj = fixMultiRepair(repairL, 0, true)
 
           val repair = func.ConcatMaps(
-            func.MakeMapS("left", repairLAdj),
+            func.MakeMapS(LeftField, repairLAdj),
             func.MakeMapS(
-              "right",
+              RightField,
               if (hasParent)
-                func.ProjectKeyS(func.AccessHole.map(_.left[Int]), "right")
+                func.ProjectKeyS(func.AccessHole.map(_.left[Int]), RightField)
               else
                 func.AccessHole.map(_.left[Int])))
 
@@ -528,12 +534,12 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val repair = func.ConcatMaps(
             func.MakeMapS(
-              "left",
+              LeftField,
               if (hasParent)
-                func.ProjectKeyS(func.AccessLeftTarget(Access.value(_)), "left")
+                func.ProjectKeyS(func.AccessLeftTarget(Access.value(_)), LeftField)
               else
                 func.AccessLeftTarget(Access.value(_))),
-            func.MakeMapS("right", repairRAdj))
+            func.MakeMapS(RightField, repairRAdj))
 
           continue(fakeParent, Nil, tailR) { sym =>
             QSU.LeftShift[T, Symbol](
@@ -554,12 +560,12 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val repair = func.ConcatMaps(
             func.MakeMapS(
-              "left",
+              LeftField,
               if (hasParent)
-                func.ProjectKeyS(func.AccessHole.map(_.left[Int]), "left")
+                func.ProjectKeyS(func.AccessHole.map(_.left[Int]), LeftField)
               else
                 func.AccessHole.map(_.left[Int])),
-            func.MakeMapS("right", repairRAdj))
+            func.MakeMapS(RightField, repairRAdj))
 
           continue(fakeParent, Nil, tailR) { sym =>
             QSU.MultiLeftShift[T, Symbol](
@@ -574,8 +580,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           // we know that the contents are maps like { "0": ... }, etc
           val fm = func.ConcatMaps(
-            func.ProjectKeyS(func.Hole, "left"),
-            func.ProjectKeyS(func.Hole, "right"))
+            func.ProjectKeyS(func.Hole, LeftField),
+            func.ProjectKeyS(func.Hole, RightField))
 
           updateGraph[T, G](QSU.Map(realParent.root, fm)) map { rewritten =>
             rewritten :++ realParent
