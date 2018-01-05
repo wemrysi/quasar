@@ -207,7 +207,7 @@ object PostgresRenderQuery extends RenderQuery {
     case BinaryFunction(fType, TextExpr(a1), TextExpr(a2)) => (fType match {
         case StrSplit => s"regexp_split_to_array($a1}, $a2})"
         case ArrayConcat => s"(to_jsonb($a1) || to_jsonb($a2))"
-        case Contains => s"(to_jsonb($a2) ?? $a1::text)"
+        case Contains => s"($a1::text IN (SELECT jsonb_array_elements_text(to_jsonb($a2))))"
       }).right
     case TernaryFunction(fType, a1, a2, a3) => (fType match {
       case Search => s"(case when ${bool(a3)} then ${text(a1)} ~* ${text(a2)} else ${text(a1)} ~ ${text(a2)} end)"
