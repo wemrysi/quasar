@@ -214,7 +214,6 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               case QSU.RightTarget() => func.RightTarget
             }
 
-            // we use right-biased map concat to our advantage here and overwrite results
             val repair3 = func.ConcatMaps(
               func.MakeMapS(
                 "original",
@@ -242,7 +241,6 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               case \/-(idx) => idx.right[QAccess[Hole]].point[FreeMapA]
             }
 
-            // we use right-biased map concat to our advantage here and overwrite results
             val repair3 = func.ConcatMaps(
               func.MakeMapS(
                 "original",
