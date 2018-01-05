@@ -1,5 +1,5 @@
 {
-  "name": "[qa_s02] postgres array index reference",
+  "name": "[qa_s02] array index reference",
 
   "backends": {},
   "data": "arrayProcessing.data",

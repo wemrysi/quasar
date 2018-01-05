@@ -1,5 +1,5 @@
 {
-  "name": "[qa_s02] postgres array wildcard",
+  "name": "[qa_s02] array wildcard search",
 
   "backends": {},
   "data": "arrayProcessing.data",
