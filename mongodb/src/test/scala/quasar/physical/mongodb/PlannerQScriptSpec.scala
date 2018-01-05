@@ -52,61 +52,6 @@ class PlannerQScriptSpec extends
 
   val json = Fixed[Fix[EJson]]
 
-  val threeWayEquiJoin =
-    fix.EquiJoin(
-      fix.Unreferenced,
-      free.Filter(
-        free.EquiJoin(
-          free.Unreferenced,
-          free.ShiftedRead[AFile](rootDir </> dir("db") </> file("foo"), qscript.ExcludeId),
-          free.ShiftedRead[AFile](rootDir </> dir("db") </> file("bar"), qscript.ExcludeId),
-          List(
-            (func.ProjectKey(func.Hole, func.Constant(json.str("id"))),
-              func.ProjectKey(func.Hole, func.Constant(json.str("foo_id"))))),
-          JoinType.Inner,
-          func.ConcatMaps(
-            func.MakeMap(
-              func.Constant(json.str("left")),
-              func.LeftSide),
-            func.MakeMap(
-              func.Constant(json.str("right")),
-              func.RightSide))),
-        func.Guard(
-          func.ProjectKey(func.Hole, func.Constant(json.str("right"))),
-          Type.Obj(Map(), Some(Type.Top)),
-          func.Constant(json.bool(true)),
-          func.Constant(json.bool(false)))),
-      free.ShiftedRead[AFile](rootDir </> dir("db") </> file("baz"), qscript.ExcludeId),
-      List(
-        (func.ProjectKey(
-            func.ProjectKey(func.Hole, func.Constant(json.str("right"))),
-            func.Constant(json.str("id"))),
-          func.ProjectKey(func.Hole, func.Constant(json.str("bar_id"))))),
-      JoinType.Inner,
-      func.ConcatMaps(
-        func.ConcatMaps(
-          func.MakeMap(
-            func.Constant(json.str("name")),
-            func.Guard(
-              func.ProjectKey(func.LeftSide, func.Constant(json.str("left"))),
-              Type.Obj(Map(), Some(Type.Top)),
-              func.ProjectKey(
-                func.ProjectKey(func.LeftSide, func.Constant(json.str("left"))),
-                func.Constant(json.str("name"))),
-              func.Undefined)),
-            func.MakeMap(
-              func.Constant(json.str("address")),
-              func.Guard(
-                func.ProjectKey(func.LeftSide, func.Constant(json.str("right"))),
-                Type.Obj(Map(), Some(Type.Top)),
-                func.ProjectKey(
-                  func.ProjectKey(func.LeftSide, func.Constant(json.str("right"))),
-                  func.Constant(json.str("address"))),
-                func.Undefined))),
-        func.MakeMap(
-          func.Constant(json.str("zip")),
-          func.ProjectKey(func.RightSide, func.Constant(json.str("zip"))))))
-
   "plan from qscript" should {
     "plan simple inner equi-join with expression ($lookup)" in {
       qplan(
@@ -134,29 +79,29 @@ class PlannerQScriptSpec extends
               func.Constant(json.str("c2")),
               func.ProjectKey(
                 func.RightSide,
-                func.Constant(json.str("name"))))))) must
-      beWorkflow0(chain[Workflow](
-        $read(collection("db", "zips")),
-        $match(Selector.Doc(BsonField.Name("_id") -> Selector.Type(BsonType.Text))),
-        $project(reshape(
-          JoinDir.Left.name -> $$ROOT,
-          "0" -> $toLower($field("_id"))),
-          ExcludeId),
-        $lookup(
-          CollectionName("smallZips"),
-          BsonField.Name("0"),
-          BsonField.Name("_id"),
-          JoinHandler.RightName),
-        $project(reshape(
-          JoinDir.Left.name -> $include(),
-          JoinDir.Right.name -> $include()),
-        ExcludeId),
-        $unwind(DocField(JoinHandler.RightName)),
-        $project(reshape(
-          "city" -> $field("left", "city"),
-          "state" -> $field("right", "state")
-        ), IgnoreId)))
-    }.pendingWithActual("issue number here", qtestFile("plan simple inner equi-join with expression ($lookup)"))
+                func.Constant(json.str("name"))))))) must beWorkflow0(
+        chain[Workflow](
+          $read(collection("db", "zips")),
+          $match(Selector.Doc(BsonField.Name("_id") -> Selector.Type(BsonType.Text))),
+          $project(reshape(
+            JoinDir.Left.name -> $$ROOT,
+            "0" -> $toLower($field("_id"))),
+            ExcludeId),
+          $lookup(
+            CollectionName("smallZips"),
+            BsonField.Name("0"),
+            BsonField.Name("_id"),
+            JoinHandler.RightName),
+          $project(reshape(
+            JoinDir.Left.name -> $include(),
+            JoinDir.Right.name -> $include()),
+            ExcludeId),
+          $unwind(DocField(JoinHandler.RightName)),
+          $project(reshape(
+            "city" -> $field("left", "city"),
+            "state" -> $field("right", "state")
+          ), IgnoreId)))
+    }.pendingWithActual("qz-3571", qtestFile("plan simple inner equi-join with expression ($lookup)"))
 
     "plan simple inner equi-join with pre-filtering ($lookup)" in {
       qplan0(
@@ -185,89 +130,143 @@ class PlannerQScriptSpec extends
               func.ProjectKey(
                 func.RightSide,
                 func.Constant(json.str("address")))))),
-        defaultStats, indexes(collection("db", "foo") -> BsonField.Name("id"))) must
-      beWorkflow0(chain[Workflow](
-        $read(collection("db", "bar")),
-        $match(
-          Selector.And(
-            isNumeric(BsonField.Name("rating")),
-            Selector.Doc(
-              BsonField.Name("rating") -> Selector.Gte(Bson.Int32(4))),
-            Selector.Doc(
-              BsonField.Name("foo_id") -> Selector.Exists(true)))),
-        $project(reshape(
-          JoinDir.Right.name -> $$ROOT),
-          ExcludeId),
-        $lookup(
-          CollectionName("foo"),
-          BsonField.Name("right") \ BsonField.Name("foo_id"),
-          BsonField.Name("id"),
-          JoinHandler.LeftName),
-        $unwind(DocField(JoinHandler.LeftName)),
-        $project(reshape(
-          "name" -> $field("left", "name"),
-          "address" -> $field("right", "address")),
-          ExcludeId)))
+        defaultStats, indexes(collection("db", "foo") -> BsonField.Name("id"))) must beWorkflow0(
+        chain[Workflow](
+          $read(collection("db", "bar")),
+          $match(
+            Selector.And(
+              isNumeric(BsonField.Name("rating")),
+              Selector.Doc(
+                BsonField.Name("rating") -> Selector.Gte(Bson.Int32(4))),
+              Selector.Doc(
+                BsonField.Name("foo_id") -> Selector.Exists(true)))),
+          $project(reshape(
+            JoinDir.Right.name -> $$ROOT),
+            ExcludeId),
+          $lookup(
+            CollectionName("foo"),
+            BsonField.Name("right") \ BsonField.Name("foo_id"),
+            BsonField.Name("id"),
+            JoinHandler.LeftName),
+          $unwind(DocField(JoinHandler.LeftName)),
+          $project(reshape(
+            "name" -> $field("left", "name"),
+            "address" -> $field("right", "address")),
+            ExcludeId)))
     }
 
     "plan 3-way equi-join ($lookup)" in {
-      qplan0(threeWayEquiJoin, defaultStats, indexes(
-        collection("db", "bar") -> BsonField.Name("foo_id"),
-        collection("db", "baz") -> BsonField.Name("bar_id")
-      )) must beWorkflow0(chain[Workflow](
-        $read(collection("db", "foo")),
-        $match(Selector.Doc(
-          BsonField.Name("id") -> Selector.Exists(true))),
-        $project(reshape(JoinDir.Left.name -> $$ROOT), ExcludeId),
-        $lookup(
-          CollectionName("bar"),
-          JoinHandler.LeftName \ BsonField.Name("id"),
-          BsonField.Name("foo_id"),
-          JoinHandler.RightName),
-        $unwind(DocField(JoinHandler.RightName)),
-        $match(Selector.Doc(
-          JoinHandler.RightName \ BsonField.Name("id") -> Selector.Exists(true))),
-        $project(reshape(JoinDir.Left.name -> $$ROOT)),
-        $lookup(
-          CollectionName("baz"),
-          JoinHandler.LeftName \ JoinHandler.RightName \ BsonField.Name("id"),
-          BsonField.Name("bar_id"),
-          JoinHandler.RightName),
-        $unwind(DocField(JoinHandler.RightName)),
-        $project(reshape(
-          "city" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+      qplan0(
+        fix.EquiJoin(
+          fix.Unreferenced,
+          free.Filter(
+            free.EquiJoin(
+              free.Unreferenced,
+              free.ShiftedRead[AFile](rootDir </> dir("db") </> file("foo"), qscript.ExcludeId),
+              free.ShiftedRead[AFile](rootDir </> dir("db") </> file("bar"), qscript.ExcludeId),
+              List(
+                (func.ProjectKey(func.Hole, func.Constant(json.str("id"))),
+                  func.ProjectKey(func.Hole, func.Constant(json.str("foo_id"))))),
+              JoinType.Inner,
+              func.ConcatMaps(
+                func.MakeMap(
+                  func.Constant(json.str("left")),
+                  func.LeftSide),
+                func.MakeMap(
+                  func.Constant(json.str("right")),
+                  func.RightSide))),
+            func.Guard(
+              func.ProjectKey(func.Hole, func.Constant(json.str("right"))),
+              Type.Obj(Map(), Some(Type.Top)),
+              func.Constant(json.bool(true)),
+              func.Constant(json.bool(false)))),
+          free.ShiftedRead[AFile](rootDir </> dir("db") </> file("baz"), qscript.ExcludeId),
+          List(
+            (func.ProjectKey(
+              func.ProjectKey(func.Hole, func.Constant(json.str("right"))),
+              func.Constant(json.str("id"))),
+              func.ProjectKey(func.Hole, func.Constant(json.str("bar_id"))))),
+          JoinType.Inner,
+          func.ConcatMaps(
+            func.ConcatMaps(
+              func.MakeMap(
+                func.Constant(json.str("name")),
+                func.Guard(
+                  func.ProjectKey(func.LeftSide, func.Constant(json.str("left"))),
+                  Type.Obj(Map(), Some(Type.Top)),
+                  func.ProjectKey(
+                    func.ProjectKey(func.LeftSide, func.Constant(json.str("left"))),
+                    func.Constant(json.str("name"))),
+                  func.Undefined)),
+              func.MakeMap(
+                func.Constant(json.str("address")),
+                func.Guard(
+                  func.ProjectKey(func.LeftSide, func.Constant(json.str("right"))),
+                  Type.Obj(Map(), Some(Type.Top)),
+                  func.ProjectKey(
+                    func.ProjectKey(func.LeftSide, func.Constant(json.str("right"))),
+                    func.Constant(json.str("address"))),
+                  func.Undefined))),
+            func.MakeMap(
+              func.Constant(json.str("zip")),
+              func.ProjectKey(func.RightSide, func.Constant(json.str("zip")))))) , defaultStats,
+        indexes(
+          collection("db", "bar") -> BsonField.Name("foo_id"),
+          collection("db", "baz") -> BsonField.Name("bar_id"))) must beWorkflow0(
+        chain[Workflow](
+          $read(collection("db", "foo")),
+          $match(Selector.Doc(
+            BsonField.Name("id") -> Selector.Exists(true))),
+          $project(reshape(JoinDir.Left.name -> $$ROOT), ExcludeId),
+          $lookup(
+            CollectionName("bar"),
+            JoinHandler.LeftName \ BsonField.Name("id"),
+            BsonField.Name("foo_id"),
+            JoinHandler.RightName),
+          $unwind(DocField(JoinHandler.RightName)),
+          $match(Selector.Doc(
+            JoinHandler.RightName \ BsonField.Name("id") -> Selector.Exists(true))),
+          $project(reshape(JoinDir.Left.name -> $$ROOT)),
+          $lookup(
+            CollectionName("baz"),
+            JoinHandler.LeftName \ JoinHandler.RightName \ BsonField.Name("id"),
+            BsonField.Name("bar_id"),
+            JoinHandler.RightName),
+          $unwind(DocField(JoinHandler.RightName)),
+          $project(reshape(
+            "name" ->
               $cond(
                 $and(
-                  $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Left.name)),
-                  $lt($field(JoinDir.Left.name, JoinDir.Left.name), $literal(Bson.Arr()))),
-                $field(JoinDir.Left.name, JoinDir.Left.name, "city"),
+                  $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                  $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+                $cond(
+                  $and(
+                    $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Left.name)),
+                    $lt($field(JoinDir.Left.name, JoinDir.Left.name), $literal(Bson.Arr()))),
+                  $field(JoinDir.Left.name, JoinDir.Left.name, "city"),
+                  $literal(Bson.Undefined)),
                 $literal(Bson.Undefined)),
-              $literal(Bson.Undefined)),
-          "state" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
-                $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+            "address" ->
               $cond(
                 $and(
-                  $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Right.name)),
-                  $lt($field(JoinDir.Left.name, JoinDir.Right.name), $literal(Bson.Arr()))),
-                $field(JoinDir.Left.name, JoinDir.Right.name, "state"),
+                  $lte($literal(Bson.Doc()), $field(JoinDir.Left.name)),
+                  $lt($field(JoinDir.Left.name), $literal(Bson.Arr()))),
+                $cond(
+                  $and(
+                    $lte($literal(Bson.Doc()), $field(JoinDir.Left.name, JoinDir.Right.name)),
+                    $lt($field(JoinDir.Left.name, JoinDir.Right.name), $literal(Bson.Arr()))),
+                  $field(JoinDir.Left.name, JoinDir.Right.name, "state"),
+                  $literal(Bson.Undefined)),
                 $literal(Bson.Undefined)),
-              $literal(Bson.Undefined)),
-          "pop" ->
-            $cond(
-              $and(
-                $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
-                $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
-              $field(JoinDir.Right.name, "pop"),
-              $literal(Bson.Undefined))),
-          IgnoreId)))
-    }.pendingWithActual("issue number here", qtestFile("plan 3-way equi-join ($lookup)"))
+            "zip" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Doc()), $field(JoinDir.Right.name)),
+                  $lt($field(JoinDir.Right.name), $literal(Bson.Arr()))),
+                $field(JoinDir.Right.name, "pop"),
+                $literal(Bson.Undefined))),
+            IgnoreId)))
+    }.pendingWithActual("qz-3571", qtestFile("plan 3-way equi-join ($lookup)"))
 
     "plan filtered flatten" in {
       qplan(
