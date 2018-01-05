@@ -18,16 +18,18 @@ package quasar.physical.mongodb
 
 import slamdata.Predef._
 
-import scalaz._, Scalaz._, Ordering._
+import scalaz._, Scalaz._
 
 sealed abstract class MongoQueryModel(val s: String)
 
 object MongoQueryModel {
   case object `3.2` extends MongoQueryModel("3.2")
   case object `3.4` extends MongoQueryModel("3.4")
+  case object `3.4.4` extends MongoQueryModel("3.4.4")
 
   def apply(version: ServerVersion): MongoQueryModel =
-    if (version >= ServerVersion.MongoDb3_4)      MongoQueryModel.`3.4`
+    if (version >= ServerVersion.MongoDb3_4_4)    MongoQueryModel.`3.4.4`
+    else if (version >= ServerVersion.MongoDb3_4) MongoQueryModel.`3.4`
     else                                          MongoQueryModel.`3.2`
 
   def toBsonVersion(v: MongoQueryModel): BsonVersion =
@@ -38,12 +40,14 @@ object MongoQueryModel {
     override def shows(v: MongoQueryModel) = v.s
   }
 
+  private def toInt(m: MongoQueryModel): Int = m match {
+    case `3.2` => 0
+    case `3.4` => 1
+    case `3.4.4` => 2
+  }
+
   implicit val orderMongoQueryModel: Order[MongoQueryModel] = new Order[MongoQueryModel] {
-    def order(x: MongoQueryModel, y: MongoQueryModel): Ordering = (x, y) match {
-      case (`3.2`, `3.2`) => EQ
-      case (`3.4`, `3.4`) => EQ
-      case (`3.2`, `3.4`) => LT
-      case (`3.4`, `3.2`) => GT
-    }
+    def order(x: MongoQueryModel, y: MongoQueryModel): Ordering =
+      Order[Int].order(toInt(x), toInt(y))
   }
 }
