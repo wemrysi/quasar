@@ -25,7 +25,7 @@ import Planner._
 import sql.SqlExpr._
 import sql.{SqlExpr, genId}
 import sql.SqlExpr.Select._
-import quasar.qscript.{FreeMap, MapFunc, QScriptCore, QScriptTotal}
+import quasar.qscript.{FreeMap, MapFunc, QScriptCore, QScriptTotal, ReduceFunc, ReduceFuncs}, ReduceFuncs.Arbitrary
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
@@ -60,7 +60,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def plan: AlgebraM[F, QScriptCore[T, ?], T[SqlExpr]] = {
     case qscript.Map(`unref`, f) =>
-      processFreeMap(f, SqlExpr.Null[T[SqlExpr]])
+     processFreeMap(f, SqlExpr.Null[T[SqlExpr]])
     case qscript.Map(src, f) =>
       for {
         fromAlias <- genId[T[SqlExpr], F]
@@ -138,33 +138,61 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     case qUnion@qscript.Union(src, left, right) =>
       (compile(left, src) |@| compile(right, src))(Union(_,_).embed)
 
-
-    case reduce@qscript.Reduce(src, bucket, reducers, repair) =>
-      src.project match {
-        case _: Union[_] => src.point[F]
-        case _ => for {
-          alias <- genId[T[SqlExpr], F]
-          gbs   <- bucket.traverse(processFreeMap(_, alias))
-          rds   <- reducers.traverse(_.traverse(processFreeMap(_, alias)) >>=
-            reduceFuncPlanner[T, F].plan)
-          rep <- repair.cataM(interpretM(
-            _.idx.fold(
-              idx => notImplemented("Reduce repair with left index, waiting for a test case", this): F[T[SqlExpr]],
-              idx => rds(idx).point[F]
-            ),
-            Planner.mapFuncPlanner[T, F].plan))
-        } yield {
-          Select(
-            Selection(rep, none),
-            From(src, alias),
-            none,
-            groupBy = GroupBy(gbs).some,
-            orderBy = nil
-          ).embed
-        }
-      }
+    case DisctinctPattern(qscript.Reduce(src, _, _, _)) => for {
+      alias <- genId[T[SqlExpr], F]
+    } yield Select(
+      Selection(Distinct[T[SqlExpr]](*).embed, none),
+      From(src, alias),
+      none,
+      groupBy = none,
+      orderBy = nil
+    ).embed
+    
+    case reduce@qscript.Reduce(src, bucket, reducers, repair) => for {
+      alias <- genId[T[SqlExpr], F]
+      gbs   <- bucket.traverse(processFreeMap(_, alias))
+      rds   <- reducers.traverse(_.traverse(processFreeMap(_, alias)) >>=
+        reduceFuncPlanner[T, F].plan)
+      rep <- repair.cataM(interpretM(
+        _.idx.fold(
+          idx => notImplemented("Reduce repair with left index, waiting for a test case", this): F[T[SqlExpr]],
+          idx => rds(idx).point[F]
+        ),
+        Planner.mapFuncPlanner[T, F].plan)
+      )
+    } yield Select(
+      Selection(rep, none),
+      From(src, alias),
+      none,
+      groupBy = GroupBy(gbs).some,
+      orderBy = nil
+    ).embed
 
     case other =>
       notImplemented(s"QScriptCore: $other", this)
   }
+
+  object DisctinctPattern {
+
+    object BucketWithSingleHole {
+      def unapply(fms: List[FreeMap[T]]): Boolean =
+        fms.headOption.exists(_.cata(interpret(κ(true), (x:MapFunc[T, Boolean]) => false)))
+    }
+
+    object ReducersWithSingleArbitraryHole {
+      def unapply(fms: List[ReduceFunc[FreeMap[T]]]): Boolean =
+        fms.headOption.exists {
+          case Arbitrary(fm) => fm.cata(interpret(κ(true), (x:MapFunc[T, Boolean]) => false))
+          case _ => false
+        }
+    }
+
+    def unapply[A](qs: QScriptCore[T, A]): Option[qscript.Reduce[T, A]] = qs match {
+      case reduce@qscript.Reduce(_, BucketWithSingleHole(), ReducersWithSingleArbitraryHole(), _) => reduce.some
+      case _ => none
+    }
+
+  }
+
+
 }

@@ -72,6 +72,8 @@ trait SqlExprRenderTree {
             nonTerminal("Min", a1)
           case Sum(a1) =>
             nonTerminal("Sum", a1)
+          case Distinct(a1) =>
+            nonTerminal("Distinct", a1)
           case Time(a1) =>
             nonTerminal("Time", a1)
           case Id(v) =>

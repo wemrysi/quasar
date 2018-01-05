@@ -140,6 +140,8 @@ object PostgresRenderQuery extends RenderQuery {
       s"min($e)".right
     case Sum((_, e)) =>
       s"sum($e)".right
+    case Distinct((_, e)) =>
+      s"distinct $e".right
     case Time((_, expr)) =>
       buildJson(s"""{ "$TimeKey": $expr }""").right
     case NumericOp(sym, NumExpr(left), NumExpr(right)) =>

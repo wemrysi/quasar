@@ -45,6 +45,7 @@ trait SqlExprTraverse {
       case Max(a1)             => f(a1) ∘ (Max(_))
       case Min(a1)             => f(a1) ∘ (Min(_))
       case Sum(a1)             => f(a1) ∘ (Sum(_))
+      case Distinct(a1)        => f(a1) ∘ (Distinct(_))
       case Time(a1)            => f(a1) ∘ Time.apply
       case Refs(srcs)          =>  srcs.traverse(f) ∘ Refs.apply
       case Table(name)         => G.point(Table(name))
