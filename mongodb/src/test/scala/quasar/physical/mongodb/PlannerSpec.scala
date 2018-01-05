@@ -35,8 +35,8 @@ class PlannerSpec extends
     PlannerWorkflowHelpers with
     PendingWithActualTracking {
 
-  //to write the new actuals:
-  //override val mode = WriteMode
+  // to write the new actuals:
+  // override val mode = WriteMode
 
   import CollectionUtil._
   import PlannerHelpers._
@@ -70,20 +70,12 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps, checkDanglingRefs = true)),
         beRight.which(cwf => trackActual(cwf, testFile(s"plan $name"))))
 
-  def trackPendingNoDanglingRefCheck(
-    name: String,
-    plan: => Either[FileSystemError, Crystallized[WorkflowF]],
-    expectedOps: IList[MongoOp]) =
-      trackPendingTemplate(name, plan,
-        beRight.which(cwf => notBrokenWithOps(cwf.op, expectedOps, checkDanglingRefs = false)),
-        beRight.which(cwf => trackActual(cwf, testFile(s"plan $name"))))
-
   def trackPendingTree(
     name: String,
     plan: => Either[FileSystemError, Crystallized[WorkflowF]],
     expectedOps: Tree[MongoOp]) =
       trackPendingTemplate(name, plan,
-        beRight.which(cwf => notBrokenWithOpsTree(cwf.op, expectedOps)),
+       beRight.which(cwf => notBrokenWithOpsTree(cwf.op, expectedOps)),
         beRight.which(cwf => trackActual(cwf, testFile(s"plan $name"))))
 
   def trackPendingErr(
@@ -316,7 +308,7 @@ class PlannerSpec extends
     trackPendingTree(
       "non-equi join",
       plan(sqlE"select smallZips.city from zips join smallZips on zips.`_id` < smallZips.`_id`"),
-      // should use less pipeline ops (both on map-reduce)
+      // duplicate typechecks. qz-3571
       projectOp.node(matchOp.node(projectOp.node(unwindOp.node(unwindOp.node(matchOp.node(stdFoldLeftJoinSubTree)))))))
 
     "plan simple inner equi-join (map-reduce)" in {
@@ -326,10 +318,10 @@ class PlannerSpec extends
           projectOp.node(unwindOp.node(unwindOp.node(matchOp.node(stdFoldLeftJoinSubTree))))))
     }
 
-    trackPendingNoDanglingRefCheck(
+    trackPending(
       "simple inner equi-join with expression ($lookup)",
       plan(sqlE"select zips.city, smallZips.state from zips join smallZips on lower(zips.`_id`) = smallZips.`_id`"),
-      //actual: [ReadOp,MatchOp,ProjectOp,MatchOp,ProjectOp,LookupOp,ProjectOp,UnwindOp,ProjectOp]
+      // duplicate typechecks. qz-3571
       IList(ReadOp, ProjectOp, LookupOp, ProjectOp, UnwindOp, ProjectOp))
 
     "plan simple inner equi-join with pre-filtering ($lookup)" in {
@@ -352,15 +344,13 @@ class PlannerSpec extends
           projectOp.node(unwindOp.node(unwindOp.node(projectOp.node(matchOp.node(stdFoldLeftJoinSubTree)))))))
     }
 
-    trackPendingNoDanglingRefCheck(
+    trackPending(
       "simple left equi-join ($lookup)",
       plan3_4(
         sqlE"select foo.name, bar.address from foo left join bar on foo.id = bar.foo_id",
         defaultStats,
         indexes(collection("db", "bar") -> BsonField.Name("foo_id")),
         emptyDoc),
-      // TODO: left/right joins in $lookup
-      // $unwind(DocField(JoinHandler.RightName)),  // FIXME: need to preserve docs with no match
       // actual [ReadOp,MatchOp,ProjectOp,LookupOp,ProjectOp,UnwindOp,ProjectOp]
       IList(ReadOp, ProjectOp, LookupOp, UnwindOp, ProjectOp))
 
@@ -371,10 +361,6 @@ class PlannerSpec extends
         defaultStats,
         indexes(collection("db", "bar") -> BsonField.Name("foo_id")),
         emptyDoc),
-      // TODO: left/right joins in $lookup
-      // $unwind(DocField(JoinHandler.RightName)),  // FIXME: need to preserve docs with no match
-      // should not use map-reduce
-      // actual [ReadOp,MapOp,ReduceOp,ReadOp,GroupOp,ProjectOp,FoldLeftOp,MatchOp,ProjectOp,UnwindOp,UnwindOp,ProjectOp]
       IList(ReadOp, ProjectOp, LookupOp, UnwindOp, ProjectOp))
 
     trackPendingTree(
@@ -386,7 +372,7 @@ class PlannerSpec extends
           readOp.leaf,
           reduceOp.node(mapOp.node(unwindOp.node(unwindOp.node(stdFoldLeftJoinSubTree))))))))))
 
-    trackPendingNoDanglingRefCheck(
+    trackPending(
       "3-way equi-join ($lookup)",
       plan3_4(
         sqlE"select extraSmallZips.city, smallZips.state, zips.pop from extraSmallZips join smallZips on extraSmallZips.`_id` = smallZips.`_id` join zips on smallZips.`_id` = zips.`_id`",
@@ -397,12 +383,12 @@ class PlannerSpec extends
       // actual [ReadOp,MatchOp,ProjectOp,LookupOp,UnwindOp,MatchOp,ProjectOp,MatchOp,ProjectOp,LookupOp,UnwindOp,SimpleMapOp,ProjectOp]
       IList(ReadOp, MatchOp, ProjectOp, LookupOp, UnwindOp, MatchOp, ProjectOp, LookupOp, UnwindOp, ProjectOp))
 
-    trackPendingNoDanglingRefCheck(
+    trackPending(
       "count of $lookup",
       plan3_4(
         sqlE"select tp.`_id`, count(*) from `zips` as tp join `largeZips` as ti on tp.`_id` = ti.TestProgramId group by tp.`_id`",
         defaultStats,
-        indexes(),
+        defaultIndexes,
         emptyDoc),
       // should not use map-reduce
       // actual [ReadOp,MatchOp,ProjectOp,LookupOp,UnwindOp,ProjectOp,SimpleMapOp,GroupOp]
