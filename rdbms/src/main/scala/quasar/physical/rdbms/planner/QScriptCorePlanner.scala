@@ -25,11 +25,13 @@ import Planner._
 import sql.SqlExpr._
 import sql.{SqlExpr, genId}
 import sql.SqlExpr.Select._
-import quasar.qscript.{FreeMap, MapFunc, QScriptCore, QScriptTotal, ReduceFunc, ReduceFuncs}, ReduceFuncs.Arbitrary
+import quasar.qscript.{FreeMap, MapFunc, MapFuncsCore, QScriptCore, QScriptTotal, ReduceFunc, ReduceFuncs}
+import ReduceFuncs.Arbitrary
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
+
 import scalaz._
 import Scalaz._
 
@@ -147,7 +149,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       groupBy = none,
       orderBy = nil
     ).embed
-    
+
     case reduce@qscript.Reduce(src, bucket, reducers, repair) => for {
       alias <- genId[T[SqlExpr], F]
       gbs   <- bucket.traverse(processFreeMap(_, alias))
@@ -172,17 +174,49 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       notImplemented(s"QScriptCore: $other", this)
   }
 
+  import quasar.qscript.{MapFuncCore => MFC}
+  import quasar.qscript.{MapFuncDerived => MFD}
+
   object DisctinctPattern {
 
     object BucketWithSingleHole {
       def unapply(fms: List[FreeMap[T]]): Boolean =
-        fms.headOption.exists(_.cata(interpret(κ(true), (x:MapFunc[T, Boolean]) => false)))
+          fms.headOption.exists(_.cata(interpret(κ(true), (copro: MapFunc[T, Boolean]) =>
+            copro.fold(
+              new ~>[MFC[T, ?], Option] {
+              def apply[A](fa: MFC[T, A]): Option[A] = {
+                fa match {
+                  case MapFuncsCore.Guard(_, _, a, _) => a.some
+                  case _ => none
+                }
+              }
+            },
+              new ~>[MFD[T, ?], Option] {
+                def apply[A](fa: MFD[T, A]): Option[A] = none
+              }
+            ).exists(ι)
+          )))
     }
 
     object ReducersWithSingleArbitraryHole {
       def unapply(fms: List[ReduceFunc[FreeMap[T]]]): Boolean =
         fms.headOption.exists {
-          case Arbitrary(fm) => fm.cata(interpret(κ(true), (x:MapFunc[T, Boolean]) => false))
+          case Arbitrary(fm) =>
+            fm.cata(interpret(κ(true), (copro: MapFunc[T, Boolean]) =>
+              copro.fold(
+                new ~>[MFC[T, ?], Option] {
+                  def apply[A](fa: MFC[T, A]): Option[A] = {
+                    fa match {
+                      case MapFuncsCore.Guard(_, _, a, _) => a.some
+                      case _ => none
+                    }
+                  }
+                },
+                new ~>[MFD[T, ?], Option] {
+                  def apply[A](fa: MFD[T, A]): Option[A] = none
+                }
+              ).exists(ι)
+            ))
           case _ => false
         }
     }
