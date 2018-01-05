@@ -1203,6 +1203,158 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               func.MakeArray(func.ProjectKeyS(func.Hole, "1"))))
       }
     }
+
+    // select [a, foo[*][*]] from afile
+    "properly coalesce a more realistic double-shift example" in {
+      val qsu0 = qsu.read(afile)
+      val qsu2 = qsu.unreferenced()
+
+      val qsu3 = qsu.map(qsu2, func.Undefined[Hole])
+
+      val qsu1 =
+        qsu.leftShift(
+          qsu0,
+          func.Hole,
+          ExcludeId,
+          func.RightTarget,
+          Rotation.ShiftMap)
+
+      val qsu9 =
+        qsu.map(qsu1, func.ProjectKeyS(func.Hole, "foo"))
+
+      val qsu11 =
+        qsu.leftShift(
+          qsu9,
+          func.Hole,
+          ExcludeId,
+          func.RightTarget,
+          Rotation.FlattenArray)
+
+      // this is the problematic node here
+      // it forces the inductive minimization, since the
+      // shifts are not directly consecutive, only merged by
+      // a mappable region
+      val qsu12 =
+        qsu.autojoin3((
+          qsu11,
+          qsu11,
+          qsu3,
+          _(MapFuncsCore.Guard(_, Type.AnyArray, _, _))))
+
+      val qsu6 =
+        qsu.map(qsu1, func.ProjectKeyS(func.Hole, "a"))
+
+      val qsu13 =
+        qsu.leftShift(
+          qsu12,
+          func.Hole,
+          ExcludeId,
+          func.RightTarget,
+          Rotation.FlattenArray)
+
+      val qsu7 =
+        qsu.map(qsu6, func.MakeArray(func.Hole))
+
+      val qsu14 =
+        qsu.map(qsu13, func.MakeArray(func.Hole))
+
+      val qsu16 =
+        qsu.autojoin2((
+          qsu7,
+          qsu14,
+          _(MapFuncsCore.ConcatArrays(_, _))))
+
+      val qgraph = QSUGraph.fromTree[Fix](qsu16)
+
+      runOn(qgraph) must beLike {
+        case
+          Map(
+            LeftShift(
+              LeftShift(
+                LeftShift(Read(_), _, _, _, _),
+                innerStruct,
+                _,
+                innerRepair,
+                _),
+              outerStruct,
+              _,
+              outerRepair,
+              _),
+            fm) => ok
+      }
+    }
+
+    // a + b[*].c[*]
+    "coalesce uneven shifts with an intervening map" in {
+      val shiftedRead =
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+
+      val qgraph =
+        QSUGraph.fromTree[Fix](
+          qsu.autojoin2((
+            qsu.map(shiftedRead, func.ProjectKeyS(func.Hole, "a")),
+            qsu.leftShift(
+              qsu.map(
+                qsu.leftShift(
+                  qsu.map(shiftedRead, func.ProjectKeyS(func.Hole, "b")),
+                  func.Hole,
+                  ExcludeId,
+                  func.RightTarget,
+                  Rotation.FlattenArray),
+                func.ProjectKeyS(func.Hole, "c")),
+              func.Hole,
+              ExcludeId,
+              func.RightTarget,
+              Rotation.FlattenArray),
+            _(MapFuncsCore.Add(_, _)))))
+
+      runOn(qgraph) must beLike {
+        case
+          Map(
+            LeftShift(
+              LeftShift(
+                LeftShift(Read(_), _, _, _, _),
+                innerStruct,
+                _,
+                innerRepair,
+                _),
+              outerStruct,
+              _,
+              outerRepair,
+              _),
+            fm) =>
+
+          innerStruct must beTreeEqual(func.ProjectKeyS(func.Hole, "b"))
+
+          innerRepair must beTreeEqual(
+            func.ConcatMaps(
+              func.MakeMapS(
+                "1",
+                func.RightTarget),
+              func.MakeMapS(
+                "0",
+                func.AccessLeftTarget(Access.valueHole(_)))))
+
+          outerStruct must beTreeEqual(
+            func.ProjectKeyS(func.ProjectKeyS(func.Hole, "1"), "c"))
+
+          outerRepair must beTreeEqual(
+            func.ConcatMaps(
+              func.MakeMapS(
+                "1",
+                func.RightTarget),
+              func.MakeMapS(
+                "0",
+                func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "0"))))
+
+          fm must beTreeEqual(
+            func.Add(
+              func.ProjectKeyS(
+                func.ProjectKeyS(func.Hole, "0"),
+                "a"),
+              func.ProjectKeyS(func.Hole, "1")))
+      }
+    }
   }
 
   def runOn(qgraph: QSUGraph): QSUGraph =
