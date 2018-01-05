@@ -110,7 +110,7 @@ object PostgresRenderQuery extends RenderQuery {
             s"->${midTail.map(e => s"$e").intercalate("->")}"
           else
             ""
-          s"""$key."$firstValStripped from"$midStr->$last""".right
+          s"""$key."$firstValStripped"$midStr->$last""".right
         case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
       }
     case Obj(m) =>
