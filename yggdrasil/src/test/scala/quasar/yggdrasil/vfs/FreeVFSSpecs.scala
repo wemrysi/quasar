@@ -30,6 +30,7 @@ import scalaz.{Coproduct, Need}
 import scalaz.concurrent.Task
 import scalaz.syntax.monad._
 
+import scodec.Codec
 import scodec.bits.ByteVector
 
 import smock._
@@ -65,6 +66,10 @@ object FreeVFSSpecs extends Specification {
 
               (_ => Stream.empty)
             }
+        }
+
+        _ <- H.pattern[FreeVFS.VFSVersion] {
+          case CPR(i) => i
         }
 
         _ <- H.pattern[Boolean] {
@@ -117,6 +122,13 @@ object FreeVFSSpecs extends Specification {
     }
 
     "initialize from an empty state with pre-existing expected VERSION" in {
+      val currentVFSVersionBV =
+        Codec.encode(FreeVFS.currentVFSVersion)
+          .fold(
+            e => Task.fail(new RuntimeException(e.message)),
+            _.toByteVector.η[Task])
+          .unsafePerformSync
+
       val interp = for {
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
@@ -132,7 +144,7 @@ object FreeVFSSpecs extends Specification {
             Task delay {
               target mustEqual (BaseDir </> Path.file("VERSION"))
 
-              Stream.emit(ByteVector.fromInt(FreeVFS.currentVFSVersion.v))
+              Stream.emit(currentVFSVersionBV)
             }
         }
 
@@ -238,7 +250,7 @@ object FreeVFSSpecs extends Specification {
 
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSyncAttempt
 
-      vfs.leftMap(_.getMessage.startsWith("Unexpected VFS VERSION")) must beLeftDisjunction(true)
+      vfs.leftMap(_.getMessage.startsWith("Unrecognized VFS VERSION")) must beLeftDisjunction(true)
     }
 
     "initialize from an empty state with pre-existing directory" in {
@@ -259,6 +271,10 @@ object FreeVFSSpecs extends Specification {
 
               (_ => Stream.empty)
             }
+        }
+
+        _ <- H.pattern[FreeVFS.VFSVersion] {
+          case CPR(i) => i
         }
 
         _ <- H.pattern[Boolean] {
@@ -322,6 +338,10 @@ object FreeVFSSpecs extends Specification {
 
               (_ => Stream.empty)
             }
+        }
+
+        _ <- H.pattern[FreeVFS.VFSVersion] {
+          case CPR(i) => i
         }
 
         _ <- H.pattern[Boolean] {
@@ -401,6 +421,10 @@ object FreeVFSSpecs extends Specification {
 
               (_ => Stream.empty)
             }
+        }
+
+        _ <- H.pattern[FreeVFS.VFSVersion] {
+          case CPR(i) => i
         }
 
         _ <- H.pattern[Boolean] {
@@ -494,6 +518,10 @@ object FreeVFSSpecs extends Specification {
 
               (_ => Stream.empty)
             }
+        }
+
+        _ <- H.pattern[FreeVFS.VFSVersion] {
+          case CPR(i) => i
         }
 
         _ <- H.pattern[Boolean] {

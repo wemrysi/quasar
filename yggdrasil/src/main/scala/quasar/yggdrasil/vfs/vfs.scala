@@ -31,9 +31,8 @@ import fs2.util.Async
 
 import pathy.Path, Path.file
 
-import scalaz.{~>, :<:, Coproduct, Equal, Free, Monad, NaturalTransformation, StateT}
+import scalaz.{~>, :<:, Coproduct, Equal, Free, Monad, NaturalTransformation, Show, StateT}
 import scalaz.concurrent.Task
-import scalaz.std.anyVal._
 import scalaz.std.list._
 import scalaz.std.map._
 import scalaz.std.string._
@@ -41,11 +40,13 @@ import scalaz.std.vector._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 import scalaz.syntax.monoid._
+import scalaz.syntax.show._
 import scalaz.syntax.traverse._
 import scalaz.syntax.std.boolean._
 
-import scodec.bits.ByteVector
-import scodec.interop.scalaz.ByteVectorMonoidInstance
+import scodec.{Attempt, Codec, DecodeResult, Err, SizeBound}
+import scodec.bits.{BitVector, ByteVector}
+import scodec.interop.scalaz.{BitVectorEqualInstance, ByteVectorMonoidInstance}
 
 import java.io.File
 import java.util.UUID
@@ -70,19 +71,41 @@ object FreeVFS {
 
   private type ST[F[_], A] = StateT[F, VFS, A]
 
-  val currentVFSVersion = VFSVersion(0)
+  val currentVFSVersion: VFSVersion = VFSVersion._0
 
-  final case class VFSVersion(v: Int)
+  sealed abstract class VFSVersion
 
   object VFSVersion {
-    implicit val equal: Equal[VFSVersion] = Equal.equalBy(_.v)
+    final case object _0 extends VFSVersion
+
+    implicit val codec: Codec[VFSVersion] = new Codec[VFSVersion] {
+      val _0BV = ByteVector(0, 0, 0, 0).toBitVector
+
+      def decode(bits: BitVector): Attempt[DecodeResult[VFSVersion]] = bits match {
+        case b if b ≟ _0BV => Attempt.successful(DecodeResult(_0, BitVector.empty))
+        case _ => Attempt.failure(Err("Unrecognized VFS VERSION"))
+      }
+
+      def encode(value: VFSVersion): Attempt[BitVector] = value match {
+        case `_0` => Attempt.successful(_0BV)
+      }
+
+      def sizeBound: SizeBound = SizeBound.exact(32)
+    }
+
+    implicit val show: Show[VFSVersion] = Show.showFromToString
+
+    implicit val equal: Equal[VFSVersion] = Equal.equalA
   }
 
   def handleVersion[S[_]](path: AFile)(implicit S0: POSIXOp :<: S, S1: Task :<: S): Free[S, Unit] = {
     val writeVersion: Free[S, Unit] =
       for {
         verSink <- POSIX.openW[S](path)
-        verWriter = Stream.emit(ByteVector.fromInt(currentVFSVersion.v)).to(verSink).run
+        v <- lift(Codec.encode(currentVFSVersion).fold(
+          e => Task.fail(new RuntimeException(e.message)),
+          _.toByteVector.η[Task]): Task[ByteVector]).into
+        verWriter = Stream.emit(v).to(verSink).run
         _ <- POSIXWithTask.generalize(verWriter)
       } yield ()
 
@@ -90,13 +113,16 @@ object FreeVFS {
       for {
         verStream <- POSIX.openR[S](path)
         verBV <- verStream.runFoldMap(ι).mapSuspension(injectNT[POSIXOp, S] :+: injectNT[Task, S])
-        ver <- lift(Task.delay(VFSVersion(verBV.toInt())).handleWith { case e =>
-          Task.fail(
-            new RuntimeException("Unexpected VFS VERSION format", e)
-          )}).into[S]
+        ver <- lift(
+          Codec.decode[VFSVersion](verBV.toBitVector).fold(
+            e => Task.fail(new RuntimeException(e.message)),
+            r => r.remainder.isEmpty.fold(
+              r.value.η[Task],
+              Task.fail(new RuntimeException(
+                s"Unexpected VFS VERSION format, additional errant bytes"))))).into
         _ <- (ver ≠ currentVFSVersion).whenM(
           lift(Task.fail(new RuntimeException(
-            s"Unexpected VFS VERSION. Found ${ver.v}, current is ${currentVFSVersion.v}"
+            s"Unexpected VFS VERSION. Found ${ver.shows}, current is ${currentVFSVersion.shows}"
           ))).into[S])
       } yield ()
 
