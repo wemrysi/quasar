@@ -68,13 +68,13 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
     Access.valueHole[T[EJson]](SrcHole).left[Int].point[FreeMapA]
 
   def couldApplyTo(candidates: List[QSUGraph]): Boolean =
-    candidates exists { case ConsecutiveLeftShifts(_, _) => true; case _ => false }
+    candidates exists { case ConsecutiveUnbounded(_, _) => true; case _ => false }
 
   def extract[
       G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]](
       qgraph: QSUGraph): Option[(QSUGraph, (QSUGraph, FreeMap) => G[QSUGraph])] = qgraph match {
 
-    case ConsecutiveLeftShifts(src, shifts) =>
+    case ConsecutiveUnbounded(src, shifts) =>
       def rebuild(src: QSUGraph, fm: FreeMap): G[QSUGraph] = {
         val reversed = shifts.reverse
 
@@ -182,6 +182,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       src: QSUGraph,
       candidates: List[QSUGraph],
       fm: FreeMapA[Int]): G[Option[(QSUGraph, QSUGraph)]] = {
+
+    val ConsecutiveBounded = ConsecutiveLeftShifts(_.root === src.root)
 
     def coalesceUneven(shifts: NEL[ShiftGraph], qgraph: QSUGraph): G[QSUGraph] = {
       val origFM = qgraph match {
@@ -595,7 +597,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
     for {
       // converts all candidates to produce final results wrapped in their relevant indices
       wrapped <- candidates.zipWithIndex traverse {
-        case (qgraph @ ConsecutiveLeftShifts(_, shifts), i) =>
+        case (qgraph @ ConsecutiveBounded(_, shifts), i) =>
           // qgraph must beLike(shifts.head)
 
           // shifts.head is the LAST shift in the chain
@@ -629,13 +631,13 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       }
 
       coalesced <- wrapped.tail.foldLeftM[G, QSUGraph](wrapped.head) {
-        case (ConsecutiveLeftShifts(_, shifts1), ConsecutiveLeftShifts(_, shifts2)) =>
+        case (ConsecutiveBounded(_, shifts1), ConsecutiveBounded(_, shifts2)) =>
           coalesceZip(shifts1.toList.reverse, shifts2.toList.reverse, None)
 
-        case (qgraph, ConsecutiveLeftShifts(_, shifts)) =>
+        case (qgraph, ConsecutiveBounded(_, shifts)) =>
           coalesceUneven(shifts, qgraph)
 
-        case (ConsecutiveLeftShifts(_, shifts), qgraph) =>
+        case (ConsecutiveBounded(_, shifts), qgraph) =>
           coalesceUneven(shifts, qgraph)
 
         // these two graphs have to be maps on the same thing
@@ -656,23 +658,30 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
     } yield Some((coalesced, back))
   }
 
+  private val ConsecutiveUnbounded = ConsecutiveLeftShifts(κ(false))
+
   // TODO support freemappable and Cond-able regions between shifts
-  object ConsecutiveLeftShifts {
+  private def ConsecutiveLeftShifts(stop: QSUGraph => Boolean): Extractor = new Extractor {
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    lazy val Self = ConsecutiveLeftShifts(stop)
+
     def unapply(qgraph: QSUGraph)
         : Option[(QSUGraph, NEL[ShiftGraph])] = qgraph match {
+
+      case qgraph if stop(qgraph) =>
+        None
 
       case LeftShift(Read(_), _, _, _, _) =>
         None
 
-      case LeftShift(oparent @ ConsecutiveLeftShifts(parent, inners), struct, idStatus, repair, rot) =>
+      case LeftShift(oparent @ Self(parent, inners), struct, idStatus, repair, rot) =>
         Some((parent, -\/(QSU.LeftShift[T, QSUGraph](oparent, struct, idStatus, repair, rot)) <:: inners))
 
       case LeftShift(parent, struct, idStatus, repair, rot) =>
         Some((parent, NEL(-\/(QSU.LeftShift[T, QSUGraph](parent, struct, idStatus, repair, rot)))))
 
-      case MultiLeftShift(oparent @ ConsecutiveLeftShifts(parent, inners), shifts, rot) =>
+      case MultiLeftShift(oparent @ Self(parent, inners), shifts, rot) =>
         Some((parent, \/-(QSU.MultiLeftShift[T, QSUGraph](oparent, shifts, rot)) <:: inners))
 
       case MultiLeftShift(parent, shifts, rot) =>
@@ -681,6 +690,10 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       case _ =>
         None
     }
+  }
+
+  private trait Extractor {
+    def unapply(qgraph: QSUGraph) : Option[(QSUGraph, NEL[ShiftGraph])]
   }
 }
 
