@@ -47,6 +47,20 @@ object FreeVFSSpecs extends Specification {
 
   val BaseDir = Path.rootDir </> Path.dir("foo")
 
+  val currentVFSVersionBV =
+    Codec.encode(FreeVFS.currentVFSVersion)
+      .fold(
+        e => Task.fail(new RuntimeException(e.message)),
+        _.toByteVector.η[Task])
+      .unsafePerformSync
+
+  val currentMetaVersionBV =
+    Codec.encode(FreeVFS.currentMetaVersion)
+      .fold(
+        e => Task.fail(new RuntimeException(e.message)),
+        _.toByteVector.η[Task])
+      .unsafePerformSync
+
   "vfs layer" should {
     "initialize from an empty state" in {
       val interp = for {
@@ -68,8 +82,8 @@ object FreeVFSSpecs extends Specification {
             }
         }
 
-        _ <- H.pattern[FreeVFS.VFSVersion] {
-          case CPR(i) => i
+        _ <- H.pattern[Unit] {
+          case CPR(ta) => ta
         }
 
         _ <- H.pattern[Boolean] {
@@ -122,13 +136,6 @@ object FreeVFSSpecs extends Specification {
     }
 
     "initialize from an empty state with pre-existing expected VERSION" in {
-      val currentVFSVersionBV =
-        Codec.encode(FreeVFS.currentVFSVersion)
-          .fold(
-            e => Task.fail(new RuntimeException(e.message)),
-            _.toByteVector.η[Task])
-          .unsafePerformSync
-
       val interp = for {
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
@@ -148,8 +155,8 @@ object FreeVFSSpecs extends Specification {
             }
         }
 
-        _ <- H.pattern[FreeVFS.VFSVersion] {
-          case CPR(i) => i
+        _ <- H.pattern[Unit] {
+          case CPR(ta) => ta
         }
 
         _ <- H.pattern[Boolean] {
@@ -214,12 +221,12 @@ object FreeVFSSpecs extends Specification {
             }
         }
 
-        _ <- H.pattern[FreeVFS.VFSVersion] {
-          case CPR(i) => i
+        _ <- H.pattern[Unit] {
+          case CPR(ta) => ta
         }
 
         _ <- H.pattern[Unit] {
-          case CPR(i) => i
+          case CPR(ta) => ta
         }
 
         _ <- H.pattern[Boolean] {
@@ -273,8 +280,8 @@ object FreeVFSSpecs extends Specification {
             }
         }
 
-        _ <- H.pattern[FreeVFS.VFSVersion] {
-          case CPR(i) => i
+        _ <- H.pattern[Unit] {
+          case CPR(ta) => ta
         }
 
         _ <- H.pattern[Boolean] {
@@ -340,8 +347,8 @@ object FreeVFSSpecs extends Specification {
             }
         }
 
-        _ <- H.pattern[FreeVFS.VFSVersion] {
-          case CPR(i) => i
+        _ <- H.pattern[Unit] {
+          case CPR(ta) => ta
         }
 
         _ <- H.pattern[Boolean] {
@@ -423,8 +430,8 @@ object FreeVFSSpecs extends Specification {
             }
         }
 
-        _ <- H.pattern[FreeVFS.VFSVersion] {
-          case CPR(i) => i
+        _ <- H.pattern[Unit] {
+          case CPR(ta) => ta
         }
 
         _ <- H.pattern[Boolean] {
@@ -520,8 +527,8 @@ object FreeVFSSpecs extends Specification {
             }
         }
 
-        _ <- H.pattern[FreeVFS.VFSVersion] {
-          case CPR(i) => i
+        _ <- H.pattern[Unit] {
+          case CPR(ta) => ta
         }
 
         _ <- H.pattern[Boolean] {
@@ -1223,6 +1230,22 @@ object FreeVFSSpecs extends Specification {
           Task delay {
             target mustEqual (baseDir </> Path.dir(uuid.toString))
           }
+      }
+
+      _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
+        case CPL(OpenW(target)) =>
+          Task delay {
+            target mustEqual (baseDir </> Path.dir(uuid.toString) </> Path.file("VERSION"))
+            assertionSinkBV(_ mustEqual currentMetaVersionBV)
+          }
+      }
+
+      _ <- H.pattern[Unit] {
+        case CPR(ta) => ta
+      }
+
+      _ <- H.pattern[Unit] {
+        case CPR(ta) => ta
       }
 
       _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
