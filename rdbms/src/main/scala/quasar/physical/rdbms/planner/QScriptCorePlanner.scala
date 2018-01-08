@@ -179,44 +179,33 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
 
   object DisctinctPattern {
 
+    def isHoleOrGuardedHole(fm: FreeMap[T]): Boolean =
+      fm.cata(interpret(κ(true), (copro: MapFunc[T, Boolean]) =>
+        copro.fold(
+          new ~>[MFC[T, ?], Option] {
+            def apply[A](fa: MFC[T, A]): Option[A] = {
+              fa match {
+                case MapFuncsCore.Guard(_, _, a, _) => a.some
+                case _ => none
+              }
+            }
+          },
+          new ~>[MFD[T, ?], Option] {
+            def apply[A](fa: MFD[T, A]): Option[A] = none
+          }
+        ).exists(ι)
+      ))
+
     object BucketWithSingleHole {
       def unapply(fms: List[FreeMap[T]]): Boolean =
-          fms.headOption.exists(_.cata(interpret(κ(true), (copro: MapFunc[T, Boolean]) =>
-            copro.fold(
-              new ~>[MFC[T, ?], Option] {
-              def apply[A](fa: MFC[T, A]): Option[A] = {
-                fa match {
-                  case MapFuncsCore.Guard(_, _, a, _) => a.some
-                  case _ => none
-                }
-              }
-            },
-              new ~>[MFD[T, ?], Option] {
-                def apply[A](fa: MFD[T, A]): Option[A] = none
-              }
-            ).exists(ι)
-          )))
+          fms.headOption.exists(isHoleOrGuardedHole)
     }
 
     object ReducersWithSingleArbitraryHole {
       def unapply(fms: List[ReduceFunc[FreeMap[T]]]): Boolean =
         fms.headOption.exists {
           case Arbitrary(fm) =>
-            fm.cata(interpret(κ(true), (copro: MapFunc[T, Boolean]) =>
-              copro.fold(
-                new ~>[MFC[T, ?], Option] {
-                  def apply[A](fa: MFC[T, A]): Option[A] = {
-                    fa match {
-                      case MapFuncsCore.Guard(_, _, a, _) => a.some
-                      case _ => none
-                    }
-                  }
-                },
-                new ~>[MFD[T, ?], Option] {
-                  def apply[A](fa: MFD[T, A]): Option[A] = none
-                }
-              ).exists(ι)
-            ))
+            isHoleOrGuardedHole(fm)
           case _ => false
         }
     }
