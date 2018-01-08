@@ -1,0 +1,26 @@
+{
+    "name": "[qa_s08] distinct single field aaa",
+
+    "backends": {
+       "couchbase":         "ignoreFieldOrder",
+       "marklogic_json":    "ignoreFieldOrder",
+       "mimir":             "ignoreFieldOrder"
+    },
+    "data": "../basic2.data",
+    "query": "select distinct b as Boo from `../basic2`",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+        {"Boo": 100},
+        {"Boo": 90},
+        {"Boo": 80},
+        {"Boo": 70},
+        {"Boo": 60},
+        {"Boo": 50},
+        {"Boo": 40},
+        {"Boo": 30},
+        {"Boo": 20},
+        {"Boo": 10},
+        {"Boo": 0}
+    ]
+}
