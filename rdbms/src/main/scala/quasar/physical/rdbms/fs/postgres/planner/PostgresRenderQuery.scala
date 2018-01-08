@@ -32,8 +32,6 @@ import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.Planner.InternalError
 import quasar.Planner.{NonRepresentableData, PlannerError}
 
-import scala.Predef.implicitly
-
 import matryoshka._
 import matryoshka.implicits._
 import scalaz._
