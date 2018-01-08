@@ -22,28 +22,33 @@ import quasar.sql.{Query}
 
 import pathy.Path, Path._
 import scalaz._, Scalaz._
+import eu.timepit.refined.api.{Refined, RefType}
+import eu.timepit.refined.numeric.{NonNegative, Positive}
 
 sealed abstract class Command
 object Command {
-  private val ExitPattern            = "(?i)(?:exit)|(?:quit)".r
-  private val HelpPattern            = "(?i)(?:help)|(?:commands)|\\?".r
-  private val CdPattern              = "(?i)cd(?: +(.+))?".r
-  private val NamedExprPattern       = "(?i)([^ :]+) *<- *(.+)".r
-  private val ExplainPattern         = "(?i)explain +(.+)".r
-  private val CompilePattern         = "(?i)compile +(.+)".r
-  private val SchemaPattern          = "(?i)schema +(.+)".r
-  private val LsPattern              = "(?i)ls(?: +(.+))?".r
-  private val SavePattern            = "(?i)save +([\\S]+) (.+)".r
-  private val AppendPattern          = "(?i)append +([\\S]+) (.+)".r
-  private val DeletePattern          = "(?i)rm +([\\S]+)".r
-  private val SetPhaseFormatPattern  = "(?i)(?:set +)?phaseFormat *= *(tree|code)".r
-  private val SetTimingFormatPattern = "(?i)(?:set +)?timingFormat *= *(readable|total|json|nothing)".r
-  private val DebugPattern           = "(?i)(?:set +)?debug *= *(0|1|2)".r
-  private val SummaryCountPattern    = "(?i)(?:set +)?summaryCount *= *(\\d+)".r
-  private val FormatPattern          = "(?i)(?:set +)?format *= *((?:table)|(?:precise)|(?:readable)|(?:csv)|(?:nothing))".r
-  private val SetVarPattern          = "(?i)(?:set +)?(\\w+) *= *(.*\\S)".r
-  private val UnsetVarPattern        = "(?i)unset +(\\w+)".r
-  private val ListVarPattern         = "(?i)env".r
+  private val ExitPattern                  = "(?i)(?:exit)|(?:quit)".r
+  private val HelpPattern                  = "(?i)(?:help)|(?:commands)|\\?".r
+  private val CdPattern                    = "(?i)cd(?: +(.+))?".r
+  private val NamedExprPattern             = "(?i)([^ :]+) *<- *(.+)".r
+  private val ExplainPattern               = "(?i)explain +(.+)".r
+  private val CompilePattern               = "(?i)compile +(.+)".r
+  private val SchemaPattern                = "(?i)schema +(.+)".r
+  private val LsPattern                    = "(?i)ls(?: +(.+))?".r
+  private val SavePattern                  = "(?i)save +([\\S]+) (.+)".r
+  private val AppendPattern                = "(?i)append +([\\S]+) (.+)".r
+  private val DeletePattern                = "(?i)rm +([\\S]+)".r
+  private val SetPhaseFormatPattern        = "(?i)(?:set +)?phaseFormat *= *(tree|code)".r
+  private val SetTimingFormatPattern       = "(?i)(?:set +)?timingFormat *= *(readable|total|json|nothing)".r
+  private val SetQueryNamePattern          = "(?i)(?:set +)?queryName *= *(\\w*)".r
+  private val SetWarmupIterationsPattern   = "(?i)(?:set +)?warmupIterations *= *(\\d+)".r
+  private val SetMeasuredIterationsPattern = "(?i)(?:set +)?measuredIterations *= *([123456789]\\d+)".r
+  private val DebugPattern                 = "(?i)(?:set +)?debug *= *(0|1|2)".r
+  private val SummaryCountPattern          = "(?i)(?:set +)?summaryCount *= *(\\d+)".r
+  private val FormatPattern                = "(?i)(?:set +)?format *= *((?:table)|(?:precise)|(?:readable)|(?:csv)|(?:nothing))".r
+  private val SetVarPattern                = "(?i)(?:set +)?(\\w+) *= *(.*\\S)".r
+  private val UnsetVarPattern              = "(?i)unset +(\\w+)".r
+  private val ListVarPattern               = "(?i)env".r
 
   final case object Exit extends Command
   final case object Help extends Command
@@ -62,33 +67,39 @@ object Command {
   final case class Format(format: OutputFormat) extends Command
   final case class SetPhaseFormat(format: PhaseFormat) extends Command
   final case class SetTimingFormat(format: TimingFormat) extends Command
+  final case class SetQueryName(name: Option[String]) extends Command
+  final case class SetMeasuredIterations(iterations: Int Refined Positive) extends Command
+  final case class SetWarmupIterations(iterations: Int Refined NonNegative) extends Command
   final case class SetVar(name: String, value: String) extends Command
   final case class UnsetVar(name: String) extends Command
 
   def parse(input: String): Command =
     input match {
-      case ExitPattern()                  => Exit
-      case CdPattern(XDir(d))             => Cd(d)
-      case CdPattern(_)                   => Cd(rootDir.right)
-      case NamedExprPattern(name, query)  => Select(Some(name), Query(query))
-      case ExplainPattern(query)          => Explain(Query(query))
-      case CompilePattern(query)          => Compile(Query(query))
-      case SchemaPattern(query)           => Schema(Query(query))
-      case LsPattern(XDir(d))             => Ls(d.some)
-      case LsPattern(_)                   => Ls(none)
-      case SavePattern(XFile(f), value)   => Save(f, value)
-      case AppendPattern(XFile(f), value) => Append(f, value)
-      case DeletePattern(XFile(f))        => Delete(f)
-      case DebugPattern(code)             => Debug(DebugLevel.int.unapply(code.toInt) | DebugLevel.Normal)
-      case SetPhaseFormatPattern(format)  => SetPhaseFormat(PhaseFormat.fromString(format) | PhaseFormat.Tree)
-      case SetTimingFormatPattern(format) => SetTimingFormat(TimingFormat.fromString(format) | TimingFormat.Total)
-      case SummaryCountPattern(rows)      => SummaryCount(rows.toInt)
-      case FormatPattern(format)          => Format(OutputFormat.fromString(format) | OutputFormat.Table)
-      case HelpPattern()                  => Help
-      case SetVarPattern(name, value)     => SetVar(name, value)
-      case UnsetVarPattern(name)          => UnsetVar(name)
-      case ListVarPattern()               => ListVars
-      case _                              => Select(None, Query(input))
+      case ExitPattern()                            => Exit
+      case CdPattern(XDir(d))                       => Cd(d)
+      case CdPattern(_)                             => Cd(rootDir.right)
+      case NamedExprPattern(name, query)            => Select(Some(name), Query(query))
+      case ExplainPattern(query)                    => Explain(Query(query))
+      case CompilePattern(query)                    => Compile(Query(query))
+      case SchemaPattern(query)                     => Schema(Query(query))
+      case LsPattern(XDir(d))                       => Ls(d.some)
+      case LsPattern(_)                             => Ls(none)
+      case SavePattern(XFile(f), value)             => Save(f, value)
+      case AppendPattern(XFile(f), value)           => Append(f, value)
+      case DeletePattern(XFile(f))                  => Delete(f)
+      case DebugPattern(code)                       => Debug(DebugLevel.int.unapply(code.toInt) | DebugLevel.Normal)
+      case SetPhaseFormatPattern(format)            => SetPhaseFormat(PhaseFormat.fromString(format) | PhaseFormat.Tree)
+      case SetTimingFormatPattern(format)           => SetTimingFormat(TimingFormat.fromString(format) | TimingFormat.Total)
+      case SetQueryNamePattern(name)                => SetQueryName(name.some.filter(_.nonEmpty))
+      case SetMeasuredIterationsPattern(iterations) => SetMeasuredIterations(RefType[Refined].unsafeWrap(iterations.toInt))
+      case SetWarmupIterationsPattern(iterations)   => SetWarmupIterations(RefType[Refined].unsafeWrap(iterations.toInt))
+      case SummaryCountPattern(rows)                => SummaryCount(rows.toInt)
+      case FormatPattern(format)                    => Format(OutputFormat.fromString(format) | OutputFormat.Table)
+      case HelpPattern()                            => Help
+      case SetVarPattern(name, value)               => SetVar(name, value)
+      case UnsetVarPattern(name)                    => UnsetVar(name)
+      case ListVarPattern()                         => ListVars
+      case _                                        => Select(None, Query(input))
     }
 
   type XDir = RelDir[Unsandboxed] \/ ADir

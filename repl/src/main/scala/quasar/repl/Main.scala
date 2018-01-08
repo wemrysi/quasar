@@ -30,7 +30,7 @@ import quasar.fs.mount._
 import quasar.main._
 
 import eu.timepit.refined.refineMV
-import eu.timepit.refined.numeric.Positive
+import eu.timepit.refined.numeric.{NonNegative, Positive}
 import org.jboss.aesh.console.{AeshConsoleCallback, Console, ConsoleOperation, Prompt}
 import org.jboss.aesh.console.helper.InterruptHook
 import org.jboss.aesh.console.settings.SettingsBuilder
@@ -114,7 +114,11 @@ object Main {
     S5: FileSystemFailure :<: S
   ): Task[Command => Free[DriverEff, Unit]] = {
     for {
-      stateRef <- TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, PhaseFormat.Tree, refineMV[Positive](10).some, OutputFormat.Table, Map(), TimingFormat.Total))
+      stateRef <- TaskRef(
+        Repl.RunState(rootDir, DebugLevel.Normal, PhaseFormat.Tree,
+          refineMV[Positive](10).some, OutputFormat.Table, Map(), TimingFormat.Total,
+          none, refineMV[NonNegative](0), refineMV[Positive](1))
+      )
       executionIdRef <- TaskRef(0L)
       timingRepository <- TimingRepository.empty(refineMV(1))
       i =
@@ -140,8 +144,11 @@ object Main {
             Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(renderedJson)))
         }
       } yield ()
-      implicit val SE = ScopeExecution.forFreeTask[ReplEff[S, ?], Nothing](timingRepository, timingPrint)
-      (cmd => Repl.command[ReplEff[S, ?], Nothing](cmd, executionIdRef).foldMap(i))
+      implicit val SEM: ScopeExecution[Free[ReplEff[S, ?], ?], Measured] =
+       ScopeExecution.forFreeTask[ReplEff[S, ?], Measured](timingRepository, timingPrint)
+      implicit val SEW: ScopeExecution[Free[ReplEff[S, ?], ?], Warmup] =
+        ScopeExecution.ignore[Free[ReplEff[S, ?], ?], Warmup]
+      (cmd => Repl.command[ReplEff[S, ?], Warmup, Measured](cmd, executionIdRef).foldMap(i))
     }
   }
 

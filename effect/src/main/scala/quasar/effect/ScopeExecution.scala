@@ -33,18 +33,18 @@ import scalaz.concurrent.Task
 /** Represents the ability to create an execution scope, within which timing scopes can be created.
   */
 trait ScopeExecution[F[_], T] {
-  def newExecution[A](index: Long, action: ScopeTiming[F, T] => F[A]): F[A]
+  def newExecution[A](index: Long \/ String, action: ScopeTiming[F, T] => F[A]): F[A]
 }
 
 object ScopeExecution {
   def ignore[F[_], T]: ScopeExecution[F, T] = new ScopeExecution[F, T] {
-    def newExecution[A](index: Long, action: ScopeTiming[F, T] => F[A]): F[A] =
+    def newExecution[A](index: Long \/ String, action: ScopeTiming[F, T] => F[A]): F[A] =
       action(ScopeTiming.ignore[F, T])
   }
   def forTask[T](repo: TimingRepository,
                  print: (ExecutionId, ExecutionTimings) => Task[Unit]): ScopeExecution[Task, T] =
     new ScopeExecution[Task, T] {
-      def newExecution[A](index: Long, action: ScopeTiming[Task, T] => Task[A]): Task[A] = {
+      def newExecution[A](index: Long \/ String, action: ScopeTiming[Task, T] => Task[A]): Task[A] = {
         for {
           newExecutionRef <- SingleExecutionRef.empty
           start <- Task.delay(Instant.now())
@@ -61,7 +61,7 @@ object ScopeExecution {
   def forFreeTask[F[_], T](repo: TimingRepository, print: (ExecutionId, ExecutionTimings) => Free[F, Unit])
                           (implicit task: Task :<: F): ScopeExecution[Free[F, ?], T] =
     new ScopeExecution[Free[F, ?], T] {
-      def newExecution[A](index: Long, action: ScopeTiming[Free[F, ?], T] => Free[F, A]): Free[F, A] = {
+      def newExecution[A](index: Long \/ String, action: ScopeTiming[Free[F, ?], T] => Free[F, A]): Free[F, A] = {
         for {
           newExecutionRef <- Free.liftF(task(SingleExecutionRef.empty))
           start <- Free.liftF(task(Task.delay(Instant.now())))
@@ -112,12 +112,12 @@ object ScopeTiming {
   }
 }
 
-final case class ExecutionId(index: Long, start: Instant, end: Instant)
+final case class ExecutionId(identifier: Long \/ String, start: Instant, end: Instant)
 object ExecutionId {
   import scala.Ordering
   implicit val executionIdOrdering: Ordering[ExecutionId] = Ordering.ordered[Instant](x => x).on(_.end)
   implicit val executionIdShow: Show[ExecutionId] = Show.shows {
-    case ExecutionId(index, start, end) => s"Query execution $index began at $start and ended at $end"
+    case ExecutionId(identifier, start, end) => s"Query execution $identifier began at $start and ended at $end"
   }
 }
 
@@ -183,8 +183,8 @@ object ExecutionTimings {
       Recursive[LabelledIntervalTree, PF].zygo[Json, String](tree)(_.ask.label, treeToJson)
     Json.jObjectFields(
       "id" -> Json.jObjectFields(
-        "index" -> Json.jNumber(executionId.index),
-        "start" -> Json.jString(executionId.start.toString)),
+        "identifier" -> executionId.identifier.fold(i => Json.jString(s"Unnamed query $i"), Json.jString),
+        "start"      -> Json.jString(executionId.start.toString)),
       "timings" -> subtrees
     )
   }
@@ -220,3 +220,7 @@ object TimingRepository {
       .map(TimingRepository(recordedExecutions, _))
   }
 }
+
+// Marker classes for tagging instances
+sealed abstract class Warmup
+sealed abstract class Measured
