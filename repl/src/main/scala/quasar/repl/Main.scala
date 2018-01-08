@@ -17,7 +17,6 @@
 package quasar.repl
 
 import slamdata.Predef._
-import java.time.Instant
 import quasar.build.BuildInfo
 import quasar.config._
 import quasar.console._
@@ -130,18 +129,18 @@ object Main {
         injectFT[Task, DriverEff]                                     :+:
         fs
     } yield {
-      val timingPrint = (id: ExecutionId, start: Instant, timings: ExecutionTimings) => for {
+      val timingPrint = (execution: Execution) => for {
         state <- Free.liftF(Inject[Task, ReplEff[S, ?]].inj(stateRef.read))
         _ <- state.timingFormat match {
           case TimingFormat.Nothing | TimingFormat.Total =>
             ().point[Free[ReplEff[S, ?], ?]]
           case TimingFormat.Readable =>
             val timingTree =
-              ExecutionTimings.render(ExecutionTimings.toLabelledIntervalTree(id, timings)).shows
+              ExecutionTimings.render(ExecutionTimings.toLabelledIntervalTree(execution.id, execution.timings)).shows
             Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(timingTree)))
           case TimingFormat.Json =>
             val renderedJson =
-              ExecutionTimings.asJson(id, start, ExecutionTimings.toLabelledIntervalTree(id, timings)).nospaces
+              ExecutionTimings.asJson(execution.id, ExecutionTimings.toLabelledIntervalTree(execution.id, execution.timings)).nospaces
             Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(renderedJson)))
         }
       } yield ()

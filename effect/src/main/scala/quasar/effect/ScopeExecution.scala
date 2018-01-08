@@ -17,9 +17,10 @@
 package quasar.effect
 
 import slamdata.Predef._
+import scala.{Ordering => SOrdering}
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import scala.collection.immutable.TreeMap
+import scala.collection.immutable.TreeSet
 import quasar.RenderedTree
 import quasar.fp._
 import quasar.fp.numeric.Natural
@@ -42,7 +43,7 @@ object ScopeExecution {
       action(ScopeTiming.ignore[F, T])
   }
   def forTask[T](repo: TimingRepository,
-                 print: (ExecutionId, Instant, ExecutionTimings) => Task[Unit]): ScopeExecution[Task, T] =
+                 print: Execution => Task[Unit]): ScopeExecution[Task, T] =
     new ScopeExecution[Task, T] {
       def newExecution[A](index: Long \/ String, action: ScopeTiming[Task, T] => Task[A]): Task[A] = {
         for {
@@ -52,14 +53,15 @@ object ScopeExecution {
           end <- Task.delay(Instant.now())
           executionId = ExecutionId(index)
           newScope <- newExecutionRef.under.read
-          timings = ExecutionTimings(newScope, start, end)
-          _ <- repo.addExecution(executionId, timings)
-          _ <- print(executionId, repo.start, timings)
+          execution = Execution(executionId, ExecutionTimings(newScope, start, end))
+          _ <- repo.addExecution(execution)
+          _ <- print(execution)
         } yield result
       }
     }
 
-  def forFreeTask[F[_], T](repo: TimingRepository, print: (ExecutionId, Instant, ExecutionTimings) => Free[F, Unit])
+  def forFreeTask[F[_], T](repo: TimingRepository,
+                           print: Execution => Free[F, Unit])
                           (implicit task: Task :<: F): ScopeExecution[Free[F, ?], T] =
     new ScopeExecution[Free[F, ?], T] {
       def newExecution[A](index: Long \/ String, action: ScopeTiming[Free[F, ?], T] => Free[F, A]): Free[F, A] = {
@@ -70,9 +72,9 @@ object ScopeExecution {
           end <- Free.liftF(task(Task.delay(Instant.now())))
           executionId = ExecutionId(index)
           newScope <- Free.liftF(task(newExecutionRef.under.read))
-          timings = ExecutionTimings(newScope, start, end)
-          _ <- Free.liftF(task(repo.addExecution(executionId, timings)))
-          _ <- print(executionId, repo.start, timings)
+          execution = Execution(executionId, ExecutionTimings(newScope, start, end))
+          _ <- Free.liftF(task(repo.addExecution(execution)))
+          _ <- print(execution)
         } yield result
       }
     }
@@ -116,8 +118,6 @@ object ScopeTiming {
 
 final case class ExecutionId(identifier: Long \/ String)
 object ExecutionId {
-  import scala.Ordering
-  implicit val executionIdOrdering: Ordering[ExecutionId] = Order[Long \/ String].toScalaOrdering.on(_.identifier)
   implicit val executionIdShow: Show[ExecutionId] = Show.shows {
     case ExecutionId(identifier) => s"Query execution: $identifier"
   }
@@ -128,6 +128,12 @@ final case class LabelledInterval(label: String, start: Long, size: Long) {
 }
 
 final case class ExecutionTimings(timings: Map[String, (Instant, Instant)], start: Instant, end: Instant)
+
+final case class Execution(id: ExecutionId, timings: ExecutionTimings)
+
+object Execution {
+  implicit val executionOrdering: SOrdering[Execution] = SOrdering.ordered[Instant](x => x).on(_.timings.end)
+}
 
 object ExecutionTimings {
   // Flame graph tree
@@ -172,7 +178,7 @@ object ExecutionTimings {
   }
 
   import argonaut.Json
-  def asJson(executionId: ExecutionId, start: Instant, tree: LabelledIntervalTree): Json = {
+  def asJson(executionId: ExecutionId, tree: LabelledIntervalTree): Json = {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     type PF[A] = EnvT[LabelledInterval, List, A]
     def treeToJson(in: PF[(String, Json)]): Json =
@@ -184,9 +190,7 @@ object ExecutionTimings {
     val subtrees =
       Recursive[LabelledIntervalTree, PF].zygo[Json, String](tree)(_.ask.label, treeToJson)
     Json.jObjectFields(
-      "id" -> Json.jObjectFields(
-        "identifier" -> executionId.identifier.fold(i => Json.jString(s"Unnamed query $i"), Json.jString),
-        "start"      -> Json.jString(start.toString)),
+      "id" -> executionId.identifier.fold(i => Json.jString(s"Unnamed query $i"), Json.jString),
       "timings" -> subtrees
     )
   }
@@ -207,10 +211,10 @@ object SingleExecutionRef {
 
 final case class TimingRepository(recordedExecutions: Natural, 
                                   start: Instant,
-                                  under: TaskRef[TreeMap[ExecutionId, ExecutionTimings]]) {
-  def addExecution(executionId: ExecutionId, timings: ExecutionTimings): Task[Unit] = {
+                                  under: TaskRef[TreeSet[Execution]]) {
+  def addExecution(execution: Execution): Task[Unit] = {
     under.modify { executions =>
-      val newExecutions = executions + ((executionId, timings))
+      val newExecutions = executions + execution
       val excessExecutions = java.lang.Math.max(newExecutions.size - recordedExecutions.value.toInt, 0)
       newExecutions.drop(excessExecutions)
     }.void
@@ -220,7 +224,7 @@ final case class TimingRepository(recordedExecutions: Natural,
 object TimingRepository {
   def empty(recordedExecutions: Natural): Task[TimingRepository] = {
     for {
-      ref <- TaskRef(TreeMap.empty[ExecutionId, ExecutionTimings])
+      ref <- TaskRef(TreeSet.empty[Execution])
       now <- Task.delay(Instant.now())
     } yield TimingRepository(recordedExecutions, now, ref)
   }
