@@ -23,15 +23,15 @@ import scalaz._, Scalaz._
 sealed abstract class TimingFormat
 object TimingFormat {
   case object Json extends TimingFormat
-  case object Readable extends TimingFormat
-  case object Total extends TimingFormat
+  case object Tree extends TimingFormat
+  case object OnlyTotal extends TimingFormat
   case object Nothing extends TimingFormat
 
   def fromString(str: String): Option[TimingFormat] = str.toLowerCase match {
-    case "json"     => Json.some
-    case "readable" => Readable.some
-    case "total"    => Total.some
-    case "nothing"  => Nothing.some
-    case _          => none
+    case "json"      => Json.some
+    case "tree"      => Tree.some
+    case "onlytotal" => OnlyTotal.some
+    case "nothing"   => Nothing.some
+    case _           => none
   }
 }

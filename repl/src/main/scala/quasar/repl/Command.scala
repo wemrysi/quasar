@@ -37,7 +37,7 @@ object Command {
   private val AppendPattern          = "(?i)append +([\\S]+) (.+)".r
   private val DeletePattern          = "(?i)rm +([\\S]+)".r
   private val SetPhaseFormatPattern  = "(?i)(?:set +)?phaseFormat *= *(tree|code)".r
-  private val SetTimingFormatPattern = "(?i)(?:set +)?timingFormat *= *(readable|total|json|nothing)".r
+  private val SetTimingFormatPattern = "(?i)(?:set +)?timingFormat *= *(tree|onlytotal|json|nothing)".r
   private val DebugPattern           = "(?i)(?:set +)?debug *= *(0|1|2)".r
   private val SummaryCountPattern    = "(?i)(?:set +)?summaryCount *= *(\\d+)".r
   private val FormatPattern          = "(?i)(?:set +)?format *= *((?:table)|(?:precise)|(?:readable)|(?:csv)|(?:nothing))".r
@@ -81,7 +81,7 @@ object Command {
       case DeletePattern(XFile(f))        => Delete(f)
       case DebugPattern(code)             => Debug(DebugLevel.int.unapply(code.toInt) | DebugLevel.Normal)
       case SetPhaseFormatPattern(format)  => SetPhaseFormat(PhaseFormat.fromString(format) | PhaseFormat.Tree)
-      case SetTimingFormatPattern(format) => SetTimingFormat(TimingFormat.fromString(format) | TimingFormat.Total)
+      case SetTimingFormatPattern(format) => SetTimingFormat(TimingFormat.fromString(format) | TimingFormat.OnlyTotal)
       case SummaryCountPattern(rows)      => SummaryCount(rows.toInt)
       case FormatPattern(format)          => Format(OutputFormat.fromString(format) | OutputFormat.Table)
       case HelpPattern()                  => Help

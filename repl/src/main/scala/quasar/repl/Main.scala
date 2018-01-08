@@ -114,7 +114,7 @@ object Main {
     S5: FileSystemFailure :<: S
   ): Task[Command => Free[DriverEff, Unit]] = {
     for {
-      stateRef <- TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, PhaseFormat.Tree, refineMV[Positive](10).some, OutputFormat.Table, Map(), TimingFormat.Total))
+      stateRef <- TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, PhaseFormat.Tree, refineMV[Positive](10).some, OutputFormat.Table, Map(), TimingFormat.OnlyTotal))
       executionIdRef <- TaskRef(0L)
       timingRepository <- TimingRepository.empty(refineMV(1))
       i =
@@ -128,9 +128,9 @@ object Main {
       val timingPrint = (id: ExecutionId, timings: ExecutionTimings) => for {
         state <- Free.liftF(Inject[Task, ReplEff[S, ?]].inj(stateRef.read))
         _ <- state.timingFormat match {
-          case TimingFormat.Nothing | TimingFormat.Total =>
+          case TimingFormat.Nothing | TimingFormat.OnlyTotal =>
             ().point[Free[ReplEff[S, ?], ?]]
-          case TimingFormat.Readable =>
+          case TimingFormat.Tree =>
             val timingTree =
               ExecutionTimings.render(ExecutionTimings.toLabelledIntervalTree(id, timings)).shows
             Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(timingTree)))
