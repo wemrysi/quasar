@@ -25,7 +25,7 @@ import quasar.console.{logErrors, stdout}
 import quasar.contrib.scalaz._
 import quasar.contrib.scopt._
 import quasar.db.DbConnectionConfig
-import quasar.effect.{ExecutionId, ExecutionTimings, Read, ScopeExecution, TimingRepository, Write}
+import quasar.effect.{Execution, Read, ScopeExecution, TimingRepository, Write}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric.Natural
@@ -125,10 +125,10 @@ object Server {
           injectFT[Task, QErrs_CRW_Task]       :+:
           eval))
 
-    val printAction = { (id: ExecutionId, timings: ExecutionTimings) =>
+    val printAction = { (execution: Execution) =>
       if (printExecutions) {
         Free.liftF(Inject[Task, CoreEffIORW].inj(Task.delay(println(
-          ExecutionTimings.render(ExecutionTimings.toLabelledIntervalTree(id, timings)).shows
+          execution.timings.toRenderedTree.shows
         ))))
       } else {
         ().point[Free[CoreEffIORW, ?]]
@@ -140,7 +140,7 @@ object Server {
       )
       executionIdRef <- TaskRef(0L)
     } yield {
-      implicit val _ = scopeExecution
+      implicit val SE = scopeExecution
       (reload: Int => Task[String \/ Unit]) =>
         finalizeServices(
           toHttpServicesF[CoreEffIORW](

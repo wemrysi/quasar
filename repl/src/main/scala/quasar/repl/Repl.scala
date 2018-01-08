@@ -262,7 +262,7 @@ object Repl {
         } yield ()
 
       case Select(n, q) =>
-        def select[T](identifier: Long \/ String, state: RunState)
+        def select[T](identifier: ExecutionId, state: RunState)
                      (implicit SE: ScopeExecution[Free[S, ?], T]): Free[S, Unit] =
           SE.newExecution[Unit](identifier, { ST =>
             for {
@@ -293,7 +293,7 @@ object Repl {
         for {
           newExecutionIndex <- Free.liftF(S3(executionIdRef.modify(_ + 1)))
           state <- RS.get
-          identifier = state.queryName.map(_.right[Long]).getOrElse(newExecutionIndex.left)
+          identifier = ExecutionId(state.queryName.map(_.right[Long]).getOrElse(newExecutionIndex.left))
           _ <- Monad[Free[S, ?]].replicateM_(state.warmupIterations, select[W](identifier, state))
           _ <- Monad[Free[S, ?]].replicateM_(state.measuredIterations, select[M](identifier, state))
         } yield ()

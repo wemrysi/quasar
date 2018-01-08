@@ -136,11 +136,11 @@ object Main {
             ().point[Free[ReplEff[S, ?], ?]]
           case TimingFormat.Readable =>
             val timingTree =
-              ExecutionTimings.render(ExecutionTimings.toLabelledIntervalTree(execution.id, execution.timings)).shows
+              execution.timings.toRenderedTree.shows
             Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(timingTree)))
           case TimingFormat.Json =>
             val renderedJson =
-              ExecutionTimings.asJson(execution.id, ExecutionTimings.toLabelledIntervalTree(execution.id, execution.timings)).nospaces
+              Execution.asJson(execution).nospaces
             Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(renderedJson)))
         }
       } yield ()
