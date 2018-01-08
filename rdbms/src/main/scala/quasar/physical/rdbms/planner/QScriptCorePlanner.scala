@@ -26,12 +26,14 @@ import sql.SqlExpr._
 import sql.{SqlExpr, genId}
 import sql.SqlExpr.Select._
 import quasar.qscript.{FreeMap, MapFunc, MapFuncsCore, QScriptCore, QScriptTotal, ReduceFunc, ReduceFuncs}
+import quasar.qscript.{MapFuncCore => MFC}
+import quasar.qscript.{MapFuncDerived => MFD}
 import ReduceFuncs.Arbitrary
+
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-
 import scalaz._
 import Scalaz._
 
@@ -49,7 +51,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
   private def take(fromExpr: F[T[SqlExpr]], countExpr: F[T[SqlExpr]]): F[T[SqlExpr]] =
     (fromExpr |@| countExpr)(Limit(_, _).embed)
 
-  private def drop(fromExpr: F[T[SqlExpr]], countExpr: F[T[SqlExpr]]): F[T[SqlExpr]] = 
+  private def drop(fromExpr: F[T[SqlExpr]], countExpr: F[T[SqlExpr]]): F[T[SqlExpr]] =
     (fromExpr |@| countExpr)(Offset(_, _).embed)
 
   private def compile(expr: qscript.FreeQS[T], src: T[SqlExpr]): F[T[SqlExpr]] = {
@@ -62,7 +64,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def plan: AlgebraM[F, QScriptCore[T, ?], T[SqlExpr]] = {
     case qscript.Map(`unref`, f) =>
-     processFreeMap(f, SqlExpr.Null[T[SqlExpr]])
+      processFreeMap(f, SqlExpr.Null[T[SqlExpr]])
     case qscript.Map(src, f) =>
       for {
         fromAlias <- genId[T[SqlExpr], F]
@@ -174,9 +176,6 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       notImplemented(s"QScriptCore: $other", this)
   }
 
-  import quasar.qscript.{MapFuncCore => MFC}
-  import quasar.qscript.{MapFuncDerived => MFD}
-
   object DisctinctPattern {
 
     def isHoleOrGuardedHole(fm: FreeMap[T]): Boolean =
@@ -198,14 +197,13 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
 
     object BucketWithSingleHole {
       def unapply(fms: List[FreeMap[T]]): Boolean =
-          fms.headOption.exists(isHoleOrGuardedHole)
+        fms.headOption.exists(isHoleOrGuardedHole)
     }
 
     object ReducersWithSingleArbitraryHole {
       def unapply(fms: List[ReduceFunc[FreeMap[T]]]): Boolean =
         fms.headOption.exists {
-          case Arbitrary(fm) =>
-            isHoleOrGuardedHole(fm)
+          case Arbitrary(fm) => isHoleOrGuardedHole(fm)
           case _ => false
         }
     }
@@ -214,8 +212,5 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       case reduce@qscript.Reduce(_, BucketWithSingleHole(), ReducersWithSingleArbitraryHole(), _) => reduce.some
       case _ => none
     }
-
   }
-
-
 }
