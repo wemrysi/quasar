@@ -2,9 +2,9 @@
   "name": "[qa_s02] array wildcard search",
 
   "backends": {},
-  "data": "arrayProcessing.data",
+  "data": "../arrayProcessing.data",
 
-  "query": "select * from arrayProcessing where \"1\" in a[_]",
+  "query": "select * from `../arrayProcessing` where \"1\" in a[_]",
 
   "predicate": "exactly",
 
