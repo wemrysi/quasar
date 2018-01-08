@@ -906,8 +906,16 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
           innerFM must beTreeEqual(
             func.ConcatMaps(
-              func.ProjectKeyS(func.Hole, "left"),
-              func.ProjectKeyS(func.Hole, "right")))
+              func.MakeMapS(
+                "0",
+                func.ProjectKeyS(
+                  func.ProjectKeyS(func.Hole, "left"),
+                  "0")),
+              func.MakeMapS(
+                "1",
+                func.ProjectKeyS(
+                  func.ProjectKeyS(func.Hole, "right"),
+                  "1"))))
 
           fm must beTreeEqual(
             func.Divide(
@@ -1076,8 +1084,16 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
         innerFM must beTreeEqual(
           func.ConcatMaps(
-            func.ProjectKeyS(func.Hole, "left"),
-            func.ProjectKeyS(func.Hole, "right")))
+            func.MakeMapS(
+              "0",
+              func.ProjectKeyS(
+                func.ProjectKeyS(func.Hole, "left"),
+                "0")),
+            func.MakeMapS(
+              "1",
+              func.ProjectKeyS(
+                func.ProjectKeyS(func.Hole, "right"),
+                "1"))))
 
         fm must beTreeEqual(
           func.Subtract(
@@ -1089,21 +1105,37 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             func.Divide(
               func.ProjectKeyS(
                 func.ConcatMaps(
-                  func.ProjectKeyS(
-                    func.ProjectKeyS(func.Hole, "1"),
-                    "left"),
-                  func.ProjectKeyS(
-                    func.ProjectKeyS(func.Hole, "1"),
-                    "right")),
+                  func.MakeMapS(
+                    "0",
+                    func.ProjectKeyS(
+                      func.ProjectKeyS(
+                        func.ProjectKeyS(func.Hole, "1"),
+                        "left"),
+                      "0")),
+                  func.MakeMapS(
+                    "1",
+                    func.ProjectKeyS(
+                      func.ProjectKeyS(
+                        func.ProjectKeyS(func.Hole, "1"),
+                        "right"),
+                      "1"))),
                 "0"),
               func.ProjectKeyS(
                 func.ConcatMaps(
-                  func.ProjectKeyS(
-                    func.ProjectKeyS(func.Hole, "1"),
-                    "left"),
-                  func.ProjectKeyS(
-                    func.ProjectKeyS(func.Hole, "1"),
-                    "right")),
+                  func.MakeMapS(
+                    "0",
+                    func.ProjectKeyS(
+                      func.ProjectKeyS(
+                        func.ProjectKeyS(func.Hole, "1"),
+                        "left"),
+                      "0")),
+                  func.MakeMapS(
+                    "1",
+                    func.ProjectKeyS(
+                      func.ProjectKeyS(
+                        func.ProjectKeyS(func.Hole, "1"),
+                        "right"),
+                      "1"))),
                 "1"))))
       }
     }
