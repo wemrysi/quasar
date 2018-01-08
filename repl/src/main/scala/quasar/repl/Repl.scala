@@ -74,7 +74,7 @@ object Repl {
       |  rm [path]
       |  set debug = 0 | 1 | 2
       |  set phaseFormat = tree | code
-      |  set timingFormat = json | readable | total | nothing
+      |  set timingFormat = json | tree | onlytotal | nothing
       |  set summaryCount = [rows]
       |  set format = table | precise | readable | csv | nothing
       |  set warmupIterations = [integer]
@@ -163,7 +163,7 @@ object Repl {
           case  \/-(-\/ (fsErr)) => DF.fail(fsErr.shows)
           case  \/-( \/-(a))     =>
             (state.timingFormat match {
-              case TimingFormat.Total => P.println(f"Query time: ${elapsed.toMillis/1000.0}%.1fs")
+              case TimingFormat.OnlyTotal => P.println(f"Query time: ${elapsed.toMillis/1000.0}%.1fs")
               case _ => ().point[Free[S, ?]]
             }) *> f(a)
         }

@@ -116,7 +116,7 @@ object Main {
     for {
       stateRef <- TaskRef(
         Repl.RunState(rootDir, DebugLevel.Normal, PhaseFormat.Tree,
-          refineMV[Positive](10).some, OutputFormat.Table, Map(), TimingFormat.Total,
+          refineMV[Positive](10).some, OutputFormat.Table, Map(), TimingFormat.OnlyTotal,
           none, refineMV[NonNegative](0), refineMV[Positive](1))
       )
       executionIdRef <- TaskRef(0L)
@@ -132,9 +132,9 @@ object Main {
       val timingPrint = (execution: Execution) => for {
         state <- Free.liftF(Inject[Task, ReplEff[S, ?]].inj(stateRef.read))
         _ <- state.timingFormat match {
-          case TimingFormat.Nothing | TimingFormat.Total =>
+          case TimingFormat.Nothing | TimingFormat.OnlyTotal =>
             ().point[Free[ReplEff[S, ?], ?]]
-          case TimingFormat.Readable =>
+          case TimingFormat.Tree =>
             val timingTree =
               execution.timings.toRenderedTree.shows
             Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(timingTree)))

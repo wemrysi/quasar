@@ -39,7 +39,7 @@ object Command {
   private val AppendPattern                = "(?i)append +([\\S]+) (.+)".r
   private val DeletePattern                = "(?i)rm +([\\S]+)".r
   private val SetPhaseFormatPattern        = "(?i)(?:set +)?phaseFormat *= *(tree|code)".r
-  private val SetTimingFormatPattern       = "(?i)(?:set +)?timingFormat *= *(readable|total|json|nothing)".r
+  private val SetTimingFormatPattern       = "(?i)(?:set +)?timingFormat *= *(tree|onlytotal|json|nothing)".r
   private val SetQueryNamePattern          = "(?i)(?:set +)?queryName *= *(\\w*)".r
   private val SetWarmupIterationsPattern   = "(?i)(?:set +)?warmupIterations *= *(\\d+)".r
   private val SetMeasuredIterationsPattern = "(?i)(?:set +)?measuredIterations *= *([123456789]\\d+)".r
@@ -89,7 +89,7 @@ object Command {
       case DeletePattern(XFile(f))                  => Delete(f)
       case DebugPattern(code)                       => Debug(DebugLevel.int.unapply(code.toInt) | DebugLevel.Normal)
       case SetPhaseFormatPattern(format)            => SetPhaseFormat(PhaseFormat.fromString(format) | PhaseFormat.Tree)
-      case SetTimingFormatPattern(format)           => SetTimingFormat(TimingFormat.fromString(format) | TimingFormat.Total)
+      case SetTimingFormatPattern(format)           => SetTimingFormat(TimingFormat.fromString(format) | TimingFormat.OnlyTotal)
       case SetQueryNamePattern(name)                => SetQueryName(name.some.filter(_.nonEmpty))
       case SetMeasuredIterationsPattern(iterations) => SetMeasuredIterations(RefType[Refined].unsafeWrap(iterations.toInt))
       case SetWarmupIterationsPattern(iterations)   => SetWarmupIterations(RefType[Refined].unsafeWrap(iterations.toInt))
