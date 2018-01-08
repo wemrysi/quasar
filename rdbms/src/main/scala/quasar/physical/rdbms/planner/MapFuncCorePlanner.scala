@@ -20,7 +20,7 @@ import slamdata.Predef._
 import slamdata.Predef.{Eq => _}
 import quasar.Data
 import quasar.Planner._
-import quasar.physical.rdbms.planner.sql.{StrLower, StrUpper, Substring, Search, StrSplit, ArrayConcat, SqlExpr => SQL}
+import quasar.physical.rdbms.planner.sql.{Contains, StrLower, StrUpper, Substring, Search, StrSplit, ArrayConcat, SqlExpr => SQL}
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.qscript.{MapFuncsCore => MFC, _}
@@ -60,7 +60,10 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     ).embed
   }
 
-
+  private def project(fSrc: T[SQL], fKey: T[SQL]) = fSrc.project match {
+    case SQL.Refs(list) => SQL.Refs(list :+ fKey).embed.η[F]
+    case _ => SQL.Refs(Vector(fSrc, fKey)).embed.η[F]
+  }
 
   def plan: AlgebraM[F, MapFuncCore[T, ?], T[SQL]] = {
     case MFC.Constant(ejson) => SQL.Constant[T[SQL]](ejson.cata(Data.fromEJson)).embed.η[F]
@@ -121,7 +124,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.Or(f1, f2) =>  SQL.Or[T[SQL]](f1, f2).embed.η[F]
     case MFC.Between(f1, f2, f3) =>  notImplemented("Between", this)
     case MFC.Cond(fCond, fThen, fElse) =>  notImplemented("Cond", this)
-    case MFC.Within(f1, f2) =>  notImplemented("Within", this)
+    case MFC.Within(f1, f2) =>  SQL.BinaryFunction(Contains, f1, f2).embed.η[F]
     case MFC.Lower(f) =>  SQL.UnaryFunction(StrLower, f).embed.η[F]
     case MFC.Upper(f) =>  SQL.UnaryFunction(StrUpper, f).embed.η[F]
     case MFC.Bool(f) =>  SQL.Coercion(BoolCol, f).embed.η[F]
@@ -148,12 +151,8 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
             }
     case MFC.ConcatArrays(f1, f2) =>  SQL.BinaryFunction(ArrayConcat, f1, f2).embed.η[F]
     case MFC.ConcatMaps(f1, f2) => ExprPair[T[SQL]](f1, f2).embed.η[F]
-    case MFC.ProjectIndex(f1, f2) =>  notImplemented("ProjectIndex", this)
-    case MFC.ProjectKey(fSrc, fKey) =>
-      fSrc.project match {
-        case SQL.Refs(list) => SQL.Refs(list :+ fKey).embed.η[F]
-        case _ => SQL.Refs(Vector(fSrc, fKey)).embed.η[F]
-      }
+    case MFC.ProjectIndex(fSrc, fKey) => project(fSrc, fKey)
+    case MFC.ProjectKey(fSrc, fKey) => project(fSrc, fKey)
     case MFC.DeleteKey(fSrc, fField) =>   notImplemented("DeleteKey", this)
     case MFC.Range(fFrom, fTo) =>  notImplemented("Range", this)
     case MFC.Guard(f1, fPattern, f2, ff3) => f2.η[F]
