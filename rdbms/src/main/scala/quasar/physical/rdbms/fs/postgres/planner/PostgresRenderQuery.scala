@@ -201,6 +201,7 @@ object PostgresRenderQuery extends RenderQuery {
       val fName = fType match {
         case StrLower => "lower"
         case StrUpper => "upper"
+        case ArrayUnwind => "jsonb_array_elements_text"
       }
       s"$fName($e)".right
     case BinaryFunction(fType, TextExpr(a1), TextExpr(a2)) => (fType match {

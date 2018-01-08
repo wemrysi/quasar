@@ -22,13 +22,14 @@ import quasar.fp.ski._
 import quasar.{NameGenerator, qscript}
 import quasar.Planner.PlannerErrorME
 import quasar.physical.rdbms.planner.sql.SqlExpr._
-import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
+import quasar.physical.rdbms.planner.sql.{ArrayUnwind, SqlExpr, genId}
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
-import quasar.qscript.{FreeMap, MapFunc, QScriptCore, QScriptTotal}
+import quasar.qscript.{ExcludeId, FreeMap, MapFunc, QScriptCore, QScriptTotal, ShiftType}
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
+
 import scalaz._
 import Scalaz._
 
@@ -55,6 +56,17 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
   }
 
   val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
+
+  //TODO: merge with corresponding func from join
+  private def processJoinFunc(
+                               f: qscript.JoinFunc[T],
+                               leftAlias: SqlExpr[T[SqlExpr]],
+                               rightAlias: SqlExpr[T[SqlExpr]]
+                             ): F[T[SqlExpr]] =
+    f.cataM(interpretM({
+      case qscript.LeftSide  => leftAlias.embed.η[F]
+      case qscript.RightSide => rightAlias.embed.η[F]
+    }, mapFuncPlanner.plan))
 
   def plan: AlgebraM[F, QScriptCore[T, ?], T[SqlExpr]] = {
     case qscript.Map(`unref`, f) =>
@@ -142,6 +154,19 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       reduceSrc.project match {
         case _: Union[_] | _: Select[_] => reduceSrc.point[F]
         case _ =>                          notImplemented(s"$reduce", this)
+      }
+
+    case qscript.LeftShift(src, struct, ExcludeId, ShiftType.Array, repair) =>
+      for {
+        structAlias <- genId[T[SqlExpr], F]
+        structExpr  <- processFreeMap(struct, structAlias)
+        left = src.project
+        right = UnaryFunction(ArrayUnwind, structExpr)
+        repaired <- processJoinFunc(repair, left, right)
+        result = Select[T[SqlExpr]](
+          Selection(repaired, None), From(src, structAlias), none, Nil)
+      } yield {
+        result.embed
       }
 
     case other =>

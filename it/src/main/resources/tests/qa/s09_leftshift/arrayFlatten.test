@@ -1,0 +1,23 @@
+{
+  "name": "[qa_s09] array flatten simple",
+
+  "backends": {
+    "postgres": "ignoreResultOrder"
+  },
+  "data": "../arrayProcessing.data",
+
+  "query": "select a[*] as b from `../arrayProcessing`",
+
+  "predicate": "exactly",
+
+  "ignoredFields": ["_id"],
+
+  "expected": [
+    {"b": "1"},
+    {"b": "2"},
+    {"b": "3"},
+    {"b": "a"},
+    {"b": "b"},
+    {"b": "c"}
+  ]
+}
