@@ -79,7 +79,7 @@ object PostgresRenderQuery extends RenderQuery {
         if (pos > -1 && !str.contains(replacement))
           s"${str.substring(0, pos)}$replacement${str.substring(pos + toReplace.length, str.length)}"
         else
-          str
+          s"($str)::text"
       case _ =>
         str
     }
