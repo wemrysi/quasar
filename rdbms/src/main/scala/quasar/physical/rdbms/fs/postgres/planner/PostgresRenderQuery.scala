@@ -18,10 +18,10 @@ package quasar.physical.rdbms.fs.postgres.planner
 
 import slamdata.Predef._
 
-import scala.Predef.implicitly
 import quasar.common.JoinType._
 import quasar.common.SortDir.{Ascending, Descending}
 import quasar.{Data, DataCodec}
+import quasar.fp.ski._
 import quasar.DataCodec.Precise.TimeKey
 import quasar.physical.rdbms.model._
 import quasar.physical.rdbms.fs.postgres._
@@ -31,9 +31,11 @@ import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.Planner.InternalError
 import quasar.Planner.{NonRepresentableData, PlannerError}
+
+import scala.Predef.implicitly
+
 import matryoshka._
 import matryoshka.implicits._
-
 import scalaz._
 import Scalaz._
 
@@ -105,6 +107,8 @@ object PostgresRenderQuery extends RenderQuery {
       TextExpr.unapply(pair).map(t => s"($t)::boolean")
   }
 
+  private def postgresArray(jsonArrayRepr: String) = s"array_to_json(ARRAY$jsonArrayRepr)"
+
   def galg[T[_[_]]: BirecursiveT]: GAlgebraM[(T[SqlExpr], ?), PlannerError \/ ?, SqlExpr, String] = {
     case Unreferenced() =>
     InternalError("Unexpected Unreferenced!", none).left
@@ -116,18 +120,22 @@ object PostgresRenderQuery extends RenderQuery {
     case AllCols() =>
       s"*".right
     case Refs(srcs) =>
-      srcs.map(_._2) match {
-        case Vector(key, value) =>
-          val valueStripped = value.stripPrefix("'").stripSuffix("'")
-          s"""$key."$valueStripped"""".right
-        case key +: mid :+ last =>
+      srcs.unzip(ι) match {
+        case (Vector(_, last), Vector(key, value)) =>
+          last.project match {
+            case Constant(Data.Int(index)) => s"""$key->${index+1}""".right
+            case _ =>
+              val valueStripped = value.stripPrefix("'").stripSuffix("'")
+              s"""$key."$valueStripped"""".right
+          }
+        case (_, key +: mid :+ last) =>
           val firstValStripped = ~mid.headOption.map(_.stripPrefix("'").stripSuffix("'"))
           val midTail = mid.drop(1)
           val midStr = if (midTail.nonEmpty)
             s"->${midTail.map(e => s"$e").intercalate("->")}"
           else
             ""
-          s"""$key."$firstValStripped from"$midStr->$last""".right
+          s"""$key."$firstValStripped"$midStr->$last""".right
         case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
       }
     case Obj(m) =>
@@ -217,16 +225,14 @@ object PostgresRenderQuery extends RenderQuery {
       s"'$text'".right
     case Constant(v) =>
       DataCodec.render(v).map{ rendered => v match {
-        case a: Data.Arr =>
-          val arrType = implicitly[TypeMapper].map(TableModel.columnType(a.dataType.arrayType.map(_.lub).getOrElse(quasar.Type.Null)))
-          s"ARRAY$rendered::$arrType[]"
+        case _: Data.Arr => postgresArray(rendered)
         case _ => rendered
       }} \/> NonRepresentableData(v)
     case Case(wt, e) =>
       val wts = wt ∘ { case WhenThen(TextExpr(w), TextExpr(t)) => s"when ($w)::boolean then $t" }
       s"(case ${wts.intercalate(" ")} else ${text(e.v)} end)".right
     case Coercion(t, TextExpr(e)) => s"($e)::${t.mapToStringName}".right
-    case ToArray(TextExpr(v)) => s"ARRAY[$v]".right
+    case ToArray(TextExpr(v)) => postgresArray(s"[$v]").right
     case UnaryFunction(fType, TextExpr(e)) =>
       val fName = fType match {
         case StrLower => "lower"
@@ -234,12 +240,11 @@ object PostgresRenderQuery extends RenderQuery {
         case ToJson => "row_to_json"
       }
       s"$fName($e)".right
-    case BinaryFunction(fType, a1, a2) =>
-      val fName = fType match {
-        case StrSplit => "regexp_split_to_array"
-        case ArrayConcat => "array_cat"
-      }
-      s"$fName(${text(a1)}, ${text(a2)})".right
+    case BinaryFunction(fType, TextExpr(a1), TextExpr(a2)) => (fType match {
+        case StrSplit => s"regexp_split_to_array($a1, $a2)"
+        case ArrayConcat => s"(to_jsonb($a1) || to_jsonb($a2))"
+        case Contains => s"($a1::text IN (SELECT jsonb_array_elements_text(to_jsonb($a2))))"
+      }).right
     case TernaryFunction(fType, a1, a2, a3) => (fType match {
       case Search => s"(case when ${bool(a3)} then ${text(a1)} ~* ${text(a2)} else ${text(a1)} ~ ${text(a2)} end)"
       case Substring => s"substring(${text(a1)} from ((${text(a2)})::integer + 1) for (${text(a3)})::integer)"

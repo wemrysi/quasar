@@ -126,6 +126,7 @@ case object ToJson extends UnaryFunctionType
 sealed trait BinaryFunctionType
 case object StrSplit extends BinaryFunctionType
 case object ArrayConcat extends BinaryFunctionType
+case object Contains extends BinaryFunctionType
 
 sealed trait TernaryFunctionType
 case object Substring extends TernaryFunctionType
