@@ -18,7 +18,6 @@
     },
 
     "NB": "#2110: Disabled in all qscript-based connectors due to qscript bug.",
-    "NB2": "Skipping for postgres until there's support for ProjectIndex",
 
     "data": "../zips.data",
 

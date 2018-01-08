@@ -17,8 +17,6 @@
         "postgres":          "pending"
     },
 
-    "NB": "Skipping for postgres until there's support for ProjectIndex",
-
     "data": ["../zips.data", "../largeZips.data"],
 
     "query": "select z1.city as city1, z1.loc as loc1, z2.city as city2, z2.loc as loc2

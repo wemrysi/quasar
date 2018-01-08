@@ -11,7 +11,7 @@
         "mongodb_3_4":       "ignoreFieldOrder",
         "mongodb_read_only": "ignoreFieldOrder",
         "mimir":             "ignoreFieldOrder",
-	    "postgres":          "ignoreFieldOrder"
+        "postgres":          "pending"
     },
 
     "data": ["leftData2.data", "rightData.data"],
