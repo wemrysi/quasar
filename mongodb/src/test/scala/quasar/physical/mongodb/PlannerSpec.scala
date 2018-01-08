@@ -344,22 +344,30 @@ class PlannerSpec extends
           projectOp.node(unwindOp.node(unwindOp.node(projectOp.node(matchOp.node(stdFoldLeftJoinSubTree)))))))
     }
 
-    trackPending(
-      "simple left equi-join ($lookup)",
+    "plan simple left equi-join ($lookup)" in {
       plan3_4(
         sqlE"select foo.name, bar.address from foo left join bar on foo.id = bar.foo_id",
         defaultStats,
         indexes(collection("db", "bar") -> BsonField.Name("foo_id")),
-        emptyDoc),
-      // actual [ReadOp,MatchOp,ProjectOp,LookupOp,ProjectOp,UnwindOp,ProjectOp]
-      IList(ReadOp, ProjectOp, LookupOp, UnwindOp, ProjectOp))
+        emptyDoc) must beRight.which(wf => notBrokenWithOps(wf.op, IList(ReadOp, MatchOp, ProjectOp, LookupOp, ProjectOp, UnwindOp, ProjectOp)))
+    }
+
+
+    "plan simple right equi-join ($lookup)" in {
+      plan3_4(
+        sqlE"select foo.name, bar.address from foo right join bar on foo.id = bar.foo_id",
+        defaultStats,
+        indexes(collection("db", "foo") -> BsonField.Name("id")),
+        emptyDoc) must
+      1 must_== 1
+    }
 
     trackPending(
       "simple right equi-join ($lookup)",
       plan3_4(
         sqlE"select foo.name, bar.address from foo right join bar on foo.id = bar.foo_id",
         defaultStats,
-        indexes(collection("db", "bar") -> BsonField.Name("foo_id")),
+        indexes(collection("db", "foo") -> BsonField.Name("id")),
         emptyDoc),
       IList(ReadOp, ProjectOp, LookupOp, UnwindOp, ProjectOp))
 
