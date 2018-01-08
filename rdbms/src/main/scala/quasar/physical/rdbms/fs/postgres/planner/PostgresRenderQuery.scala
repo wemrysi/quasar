@@ -91,7 +91,7 @@ object PostgresRenderQuery extends RenderQuery {
 
   object TextExpr {
     def unapply[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): Option[String] =
-      s"(${text(pair)})::text".some
+      text(pair).some
   }
 
   object NumExpr {
