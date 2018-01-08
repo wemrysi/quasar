@@ -13,7 +13,10 @@ Chain
 │  │         [{ "$literal": undefined }]]
 │  │     })
 │  ╰─ ExcludeId
-├─ $UnwindF(DocField(BsonField.Name("f")))
+├─ $UnwindF
+│  ├─ Path(DocField(BsonField.Name("f")))
+│  ├─ IncludeArrayIndex
+│  ╰─ PreserveNullAndEmptyArrays
 ├─ $ProjectF
 │  ├─ Name("filter_source" -> "$s")
 │  ├─ Name("filter_predicate" -> { "$lt": ["$f", { "$literal": NumberInt("0") }] })
@@ -33,7 +36,10 @@ Chain
 │  │         [{ "$literal": undefined }]]
 │  │     })
 │  ╰─ ExcludeId
-├─ $UnwindF(DocField(BsonField.Name("0")))
+├─ $UnwindF
+│  ├─ Path(DocField(BsonField.Name("0")))
+│  ├─ IncludeArrayIndex
+│  ╰─ PreserveNullAndEmptyArrays
 ╰─ $ProjectF
    ├─ Name("__quasar_mongodb_sigil" -> "$0")
    ╰─ ExcludeId

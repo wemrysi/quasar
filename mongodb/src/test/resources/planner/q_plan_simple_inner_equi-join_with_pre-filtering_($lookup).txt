@@ -51,8 +51,14 @@ Chain
 │  ╰─ Doc
 │     ├─ NotExpr($left -> Size(0))
 │     ╰─ NotExpr($right -> Size(0))
-├─ $UnwindF(DocField(BsonField.Name("right")))
-├─ $UnwindF(DocField(BsonField.Name("left")))
+├─ $UnwindF
+│  ├─ Path(DocField(BsonField.Name("right")))
+│  ├─ IncludeArrayIndex
+│  ╰─ PreserveNullAndEmptyArrays
+├─ $UnwindF
+│  ├─ Path(DocField(BsonField.Name("left")))
+│  ├─ IncludeArrayIndex
+│  ╰─ PreserveNullAndEmptyArrays
 ╰─ $ProjectF
    ├─ Name("city" -> "$left.city")
    ├─ Name("state" -> "$right.state")

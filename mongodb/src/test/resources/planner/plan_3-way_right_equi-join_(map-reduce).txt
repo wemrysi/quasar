@@ -50,8 +50,14 @@ Chain
 │     │  ╰─ Doc
 │     │     ├─ NotExpr($left -> Size(0))
 │     │     ╰─ NotExpr($right -> Size(0))
-│     ├─ $UnwindF(DocField(BsonField.Name("right")))
-│     ├─ $UnwindF(DocField(BsonField.Name("left")))
+│     ├─ $UnwindF
+│     │  ├─ Path(DocField(BsonField.Name("right")))
+│     │  ├─ IncludeArrayIndex
+│     │  ╰─ PreserveNullAndEmptyArrays
+│     ├─ $UnwindF
+│     │  ├─ Path(DocField(BsonField.Name("left")))
+│     │  ├─ IncludeArrayIndex
+│     │  ╰─ PreserveNullAndEmptyArrays
 │     ├─ $MatchF
 │     │  ╰─ Doc
 │     │     ╰─ Expr($right -> Type(Doc))
@@ -103,8 +109,14 @@ Chain
 │  │     })
 │  ├─ Name("left" -> "$left")
 │  ╰─ ExcludeId
-├─ $UnwindF(DocField(BsonField.Name("left")))
-├─ $UnwindF(DocField(BsonField.Name("right")))
+├─ $UnwindF
+│  ├─ Path(DocField(BsonField.Name("left")))
+│  ├─ IncludeArrayIndex
+│  ╰─ PreserveNullAndEmptyArrays
+├─ $UnwindF
+│  ├─ Path(DocField(BsonField.Name("right")))
+│  ├─ IncludeArrayIndex
+│  ╰─ PreserveNullAndEmptyArrays
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
