@@ -18,7 +18,7 @@ package quasar.physical.rdbms.planner.sql
 
 import slamdata.Predef._
 import quasar.Data
-import quasar.common.SortDir
+import quasar.common.{JoinType, SortDir}
 import quasar.physical.rdbms.model.ColumnType
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case.{Else, WhenThen}
 
@@ -49,12 +49,14 @@ object SqlExpr extends SqlExprInstances {
 
   final case class Select[T](selection: Selection[T],
                              from: From[T],
+                             join: Option[Join[T]],
                              filter: Option[Filter[T]],
                              groupBy: Option[GroupBy[T]],
                              orderBy: List[OrderBy[T]])
       extends SqlExpr[T]
 
   final case class From[T](v: T, alias: Id[T])
+  final case class Join[T](v: T, keys: List[(T, T)], jType: JoinType, alias: Id[T])
   final case class Selection[T](v: T, alias: Option[Id[T]])
   final case class Table[T](name: String) extends SqlExpr[T]
 
@@ -127,6 +129,7 @@ object SqlExpr extends SqlExprInstances {
 sealed trait UnaryFunctionType
 case object StrLower extends UnaryFunctionType
 case object StrUpper extends UnaryFunctionType
+case object ToJson extends UnaryFunctionType
 
 sealed trait BinaryFunctionType
 case object StrSplit extends BinaryFunctionType
