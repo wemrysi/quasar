@@ -126,6 +126,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
   private def gatherReferences(g: QSUGraph): References =
     g.foldMapUp(g => g.unfold.map(_.root) match {
+      case QSU.Distinct(source) =>
+        recordAccesses[Id](g.root, Access.value(source))
+
       case QSU.LeftShift(source, _, _, repair, _) =>
         recordAccesses(g.root, shiftTargetAccess(source, repair))
 
@@ -157,7 +160,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       G.gets(_.status.lookup(g.root) getOrElse false)
 
     def freshName: F[Symbol] =
-      NameGenerator[F].prefixedName("reify") map (Symbol(_))
+      freshSymbol("reifyids")
 
     def isReferenced(access: QAccess[Symbol]): G[Boolean] =
       G.gets(_.refs.accessed.member(access))
