@@ -253,6 +253,44 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
           IgnoreId))
     }
 
+    "inline $project $group" in {
+      chain[Workflow](
+        $read(collection("db", "zips")),
+        $group(
+          Grouped(ListMap(
+            BsonField.Name("g") -> $last($field("city")))),
+          \/-($literal(Bson.Int32(1)))),
+        $project(Reshape(ListMap(
+          BsonField.Name("a") -> \/-($var(DocField(BsonField.Name("g")))))),
+          IncludeId)
+      ) must beTree(chain[Workflow](
+        $read(collection("db", "zips")),
+        $group(
+          Grouped(ListMap(
+            BsonField.Name("a") -> $last($field("city")))),
+          \/-($literal(Bson.Int32(1))))))
+    }
+
+    "inline $project $unwind $group" in {
+      chain[Workflow](
+        $read(collection("db", "zips")),
+        $group(
+          Grouped(ListMap(
+            BsonField.Name("g") -> $last($field("city")))),
+          \/-($literal(Bson.Int32(1)))),
+        $unwind(DocField(BsonField.Name("g")), None, None),
+        $project(Reshape(ListMap(
+          BsonField.Name("a") -> \/-($var(DocField(BsonField.Name("g")))))),
+          IncludeId)
+      ) must beTree(chain[Workflow](
+        $read(collection("db", "zips")),
+        $group(
+          Grouped(ListMap(
+            BsonField.Name("a") -> $last($field("city")))),
+          \/-($literal(Bson.Int32(1)))),
+        $unwind(DocField(BsonField.Name("a")), None, None)))
+    }
+
     val WC = Inject[WorkflowOpCoreF, WorkflowF]
 
     "not inline $projects with nesting" in {

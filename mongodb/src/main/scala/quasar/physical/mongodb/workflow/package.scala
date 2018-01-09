@@ -127,11 +127,10 @@ package object workflow {
         //         flatten, scope)))
         case I($GroupF(src, grouped, by)) if id != ExcludeId =>
           inlineProjectGroup(shape, grouped).map(gr => I.inj($GroupF(src, gr, by)))
-        case I($UnwindF(Embed(I($GroupF(src, grouped, by))), unwound, includeArrayIndex, preserveNullAndEmptyArrays))
+        case I($UnwindF(Embed(I($GroupF(src, grouped, by))), unwound, None, preserveNullAndEmptyArrays))
             if id != ExcludeId =>
-            //TODO verify if this is correct
           inlineProjectUnwindGroup(shape, unwound, grouped).map { case (unwound, grouped) =>
-            I.inj($UnwindF(I.inj($GroupF(src, grouped, by)).embed, unwound, includeArrayIndex, preserveNullAndEmptyArrays))
+            I.inj($UnwindF(I.inj($GroupF(src, grouped, by)).embed, unwound, None, preserveNullAndEmptyArrays))
           }
         case _ => None
       }
