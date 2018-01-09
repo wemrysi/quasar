@@ -44,16 +44,16 @@ import scalaz.syntax.show._
 import scalaz.syntax.traverse._
 import scalaz.syntax.std.boolean._
 
-import scodec.{Attempt, Codec, DecodeResult, Err, SizeBound}
-import scodec.bits.{BitVector, ByteVector}
-import scodec.interop.scalaz.{BitVectorEqualInstance, ByteVectorMonoidInstance}
+import scodec.Codec
+import scodec.bits.ByteVector
+import scodec.codecs, codecs.uint16
+import scodec.interop.scalaz.ByteVectorMonoidInstance
 
 import java.io.File
 import java.util.UUID
 
 final case class VFS(
     baseDir: ADir,
-    vfsVersion: FreeVFS.VFSVersion,
     metaLog: VersionLog,
     paths: Map[AFile, Blob],
     index: Map[ADir, Vector[RPath]],
@@ -71,67 +71,79 @@ object FreeVFS {
 
   private type ST[F[_], A] = StateT[F, VFS, A]
 
-  val currentVFSVersion: VFSVersion = VFSVersion._0
+  val currentVFSVersion: VFSVersion = VFSVersion.VFSVersion0
+  val currentMetaVersion: MetaVersion = MetaVersion.MetaVersion0
 
   sealed abstract class VFSVersion
 
   object VFSVersion {
-    final case object _0 extends VFSVersion
+    final case object VFSVersion0 extends VFSVersion
 
-    implicit val codec: Codec[VFSVersion] = new Codec[VFSVersion] {
-      val _0BV = ByteVector(0, 0, 0, 0).toBitVector
-
-      def decode(bits: BitVector): Attempt[DecodeResult[VFSVersion]] = bits match {
-        case b if b ≟ _0BV => Attempt.successful(DecodeResult(_0, BitVector.empty))
-        case _ => Attempt.failure(Err("Unrecognized VFS VERSION"))
-      }
-
-      def encode(value: VFSVersion): Attempt[BitVector] = value match {
-        case `_0` => Attempt.successful(_0BV)
-      }
-
-      def sizeBound: SizeBound = SizeBound.exact(32)
-    }
+    implicit val codec: Codec[VFSVersion] =
+      codecs.discriminated[VFSVersion].by(uint16)
+        .typecase(0, codecs.provide(VFSVersion0))
 
     implicit val show: Show[VFSVersion] = Show.showFromToString
 
     implicit val equal: Equal[VFSVersion] = Equal.equalA
   }
 
-  def handleVersion[S[_]](path: AFile)(implicit S0: POSIXOp :<: S, S1: Task :<: S): Free[S, Unit] = {
-    val writeVersion: Free[S, Unit] =
-      for {
-        verSink <- POSIX.openW[S](path)
-        v <- lift(Codec.encode(currentVFSVersion).fold(
-          e => Task.fail(new RuntimeException(e.message)),
-          _.toByteVector.η[Task]): Task[ByteVector]).into
-        verWriter = Stream.emit(v).to(verSink).run
-        _ <- POSIXWithTask.generalize(verWriter)
-      } yield ()
+  sealed abstract class MetaVersion
 
+  object MetaVersion {
+    final case object MetaVersion0 extends MetaVersion
+
+    implicit val codec: Codec[MetaVersion] =
+      codecs.discriminated[MetaVersion].by(uint16)
+        .typecase(0, codecs.provide(MetaVersion0))
+
+    implicit val show: Show[MetaVersion] = Show.showFromToString
+
+    implicit val equal: Equal[MetaVersion] = Equal.equalA
+  }
+
+  def writeVersion[S[_], A](
+    path: AFile, currentVersion: A
+  )(implicit
+    S0: POSIXOp :<: S, S1: Task :<: S, C: Codec[A]
+  ): Free[S, Unit] =
+    for {
+      verSink <- POSIX.openW[S](path)
+      v <- lift(C.encode(currentVersion).fold(
+        e => Task.fail(new RuntimeException(e.message)),
+        _.toByteVector.η[Task]): Task[ByteVector]).into
+      verWriter = Stream.emit(v).to(verSink).run
+      _ <- POSIXWithTask.generalize(verWriter)
+    } yield ()
+
+  def initVersion[S[_], A: Equal: Show](
+    path: AFile, currentVersion: A
+  )(implicit
+    S0: POSIXOp :<: S, S1: Task :<: S, C: Codec[A]
+  ): Free[S, Unit] = {
     def checkAndUpdateVersion: Free[S, Unit] =
       for {
         verStream <- POSIX.openR[S](path)
         verBV <- verStream.runFoldMap(ι).mapSuspension(injectNT[POSIXOp, S] :+: injectNT[Task, S])
         ver <- lift(
-          Codec.decode[VFSVersion](verBV.toBitVector).fold(
+          C.decode(verBV.toBitVector).fold(
             e => Task.fail(new RuntimeException(e.message)),
             r => r.remainder.isEmpty.fold(
               r.value.η[Task],
               Task.fail(new RuntimeException(
-                s"Unexpected VFS VERSION format, additional errant bytes"))))).into
-        _ <- (ver ≠ currentVFSVersion).whenM(
+                s"Unexpected VERSION, ${r.remainder.toBin}"))))).into
+        _ <- (ver ≠ currentVersion).whenM(
           lift(Task.fail(new RuntimeException(
-            s"Unexpected VFS VERSION. Found ${ver.shows}, current is ${currentVFSVersion.shows}"
+            s"Unexpected VERSION. Found ${ver.shows}, current is ${currentVersion.shows}"
           ))).into[S])
       } yield ()
 
-    POSIX.exists[S](path).ifM(checkAndUpdateVersion, writeVersion)
+    POSIX.exists[S](path).ifM(checkAndUpdateVersion, writeVersion(path, currentVersion))
   }
 
   def init[S[_]](baseDir: ADir)(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, VFS] = {
     for {
-      _ <- handleVersion(baseDir </> file("VERSION"))
+      _ <- initVersion(baseDir </> file("VFSVERSION"), currentVFSVersion)
 
       exists <- POSIX.exists[S](baseDir </> MetaDir)
 
@@ -184,13 +196,15 @@ object FreeVFS {
           case _: IllegalArgumentException => Nil
         }
       }
-    } yield VFS(baseDir, currentVFSVersion, metaLog, paths, index, Map(), blobs.toSet)
+    } yield VFS(baseDir, metaLog, paths, index, Map(), blobs.toSet)
   }
 
   private def persistMeta[S[_]](paths: Map[AFile, Blob], index: Map[ADir, Vector[RPath]])(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
     for {
       v <- VersionLog.fresh[S]
       target <- VersionLog.underlyingDir[Free[S, ?]](v)
+
+      _ <- writeVersion(target </> file("METAVERSION"), currentMetaVersion).liftM[StateT[?[_], VersionLog, ?]]
 
       pathsSink <- POSIX.openW[S](target </> PathsFile).liftM[StateT[?[_], VersionLog, ?]]
 
