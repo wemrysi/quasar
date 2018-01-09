@@ -18,6 +18,8 @@ package quasar.yggdrasil.vfs
 
 import quasar.contrib.pathy.{unsafeSandboxAbs, ADir, AFile, APath, RPath}
 import quasar.contrib.scalaz.stateT, stateT._
+import quasar.fp.ski.ι
+import quasar.fp.free._
 import quasar.fs.MoveSemantics
 
 import argonaut.{Argonaut, Parse}
@@ -27,9 +29,9 @@ import fs2.async, async.mutable
 import fs2.interop.scalaz._
 import fs2.util.Async
 
-import pathy.Path
+import pathy.Path, Path.file
 
-import scalaz.{~>, :<:, Coproduct, Free, Monad, NaturalTransformation, StateT}
+import scalaz.{~>, :<:, Coproduct, Equal, Free, Monad, NaturalTransformation, Show, StateT}
 import scalaz.concurrent.Task
 import scalaz.std.list._
 import scalaz.std.map._
@@ -38,15 +40,20 @@ import scalaz.std.vector._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 import scalaz.syntax.monoid._
+import scalaz.syntax.show._
 import scalaz.syntax.traverse._
+import scalaz.syntax.std.boolean._
 
-import scodec.bits.ByteVector
+import scodec.{Attempt, Codec, DecodeResult, Err, SizeBound}
+import scodec.bits.{BitVector, ByteVector}
+import scodec.interop.scalaz.{BitVectorEqualInstance, ByteVectorMonoidInstance}
 
 import java.io.File
 import java.util.UUID
 
 final case class VFS(
     baseDir: ADir,
+    vfsVersion: FreeVFS.VFSVersion,
     metaLog: VersionLog,
     paths: Map[AFile, Blob],
     index: Map[ADir, Vector[RPath]],
@@ -64,8 +71,68 @@ object FreeVFS {
 
   private type ST[F[_], A] = StateT[F, VFS, A]
 
+  val currentVFSVersion: VFSVersion = VFSVersion._0
+
+  sealed abstract class VFSVersion
+
+  object VFSVersion {
+    final case object _0 extends VFSVersion
+
+    implicit val codec: Codec[VFSVersion] = new Codec[VFSVersion] {
+      val _0BV = ByteVector(0, 0, 0, 0).toBitVector
+
+      def decode(bits: BitVector): Attempt[DecodeResult[VFSVersion]] = bits match {
+        case b if b ≟ _0BV => Attempt.successful(DecodeResult(_0, BitVector.empty))
+        case _ => Attempt.failure(Err("Unrecognized VFS VERSION"))
+      }
+
+      def encode(value: VFSVersion): Attempt[BitVector] = value match {
+        case `_0` => Attempt.successful(_0BV)
+      }
+
+      def sizeBound: SizeBound = SizeBound.exact(32)
+    }
+
+    implicit val show: Show[VFSVersion] = Show.showFromToString
+
+    implicit val equal: Equal[VFSVersion] = Equal.equalA
+  }
+
+  def handleVersion[S[_]](path: AFile)(implicit S0: POSIXOp :<: S, S1: Task :<: S): Free[S, Unit] = {
+    val writeVersion: Free[S, Unit] =
+      for {
+        verSink <- POSIX.openW[S](path)
+        v <- lift(Codec.encode(currentVFSVersion).fold(
+          e => Task.fail(new RuntimeException(e.message)),
+          _.toByteVector.η[Task]): Task[ByteVector]).into
+        verWriter = Stream.emit(v).to(verSink).run
+        _ <- POSIXWithTask.generalize(verWriter)
+      } yield ()
+
+    def checkAndUpdateVersion: Free[S, Unit] =
+      for {
+        verStream <- POSIX.openR[S](path)
+        verBV <- verStream.runFoldMap(ι).mapSuspension(injectNT[POSIXOp, S] :+: injectNT[Task, S])
+        ver <- lift(
+          Codec.decode[VFSVersion](verBV.toBitVector).fold(
+            e => Task.fail(new RuntimeException(e.message)),
+            r => r.remainder.isEmpty.fold(
+              r.value.η[Task],
+              Task.fail(new RuntimeException(
+                s"Unexpected VFS VERSION format, additional errant bytes"))))).into
+        _ <- (ver ≠ currentVFSVersion).whenM(
+          lift(Task.fail(new RuntimeException(
+            s"Unexpected VFS VERSION. Found ${ver.shows}, current is ${currentVFSVersion.shows}"
+          ))).into[S])
+      } yield ()
+
+    POSIX.exists[S](path).ifM(checkAndUpdateVersion, writeVersion)
+  }
+
   def init[S[_]](baseDir: ADir)(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, VFS] = {
     for {
+      _ <- handleVersion(baseDir </> file("VERSION"))
+
       exists <- POSIX.exists[S](baseDir </> MetaDir)
 
       triple <- if (!exists) {
@@ -117,7 +184,7 @@ object FreeVFS {
           case _: IllegalArgumentException => Nil
         }
       }
-    } yield VFS(baseDir, metaLog, paths, index, Map(), blobs.toSet)
+    } yield VFS(baseDir, currentVFSVersion, metaLog, paths, index, Map(), blobs.toSet)
   }
 
   private def persistMeta[S[_]](paths: Map[AFile, Blob], index: Map[ADir, Vector[RPath]])(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
