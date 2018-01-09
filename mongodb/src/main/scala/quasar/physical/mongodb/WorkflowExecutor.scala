@@ -375,7 +375,7 @@ object WorkflowExecutor {
     type WFExec  = WorkflowExecutor[MongoDbIO, BsonCursor]
 
     liftEnvErr(MongoDbIO.serverVersion) flatMap { v =>
-      if (v >= ServerVersion.MongoDb2_6)
+      if (v >= ServerVersion.MongoDb3_2)
         (new MongoDbIOWorkflowExecutor: WFExec).point[M]
       else
         unsupportedVersion("MongoDB", v.shows).raiseError[M, WFExec]

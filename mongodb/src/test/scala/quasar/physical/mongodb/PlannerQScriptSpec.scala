@@ -43,7 +43,6 @@ class PlannerQScriptSpec extends
 
   import fixExprOp._
   import PlannerHelpers._
-  import expr3_2Fp._
   import jscore._
   import CollectionUtil._
   import Reshape.reshape
