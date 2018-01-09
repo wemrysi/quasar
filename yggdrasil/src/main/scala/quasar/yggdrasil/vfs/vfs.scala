@@ -116,7 +116,7 @@ object FreeVFS {
       _ <- POSIXWithTask.generalize(verWriter)
     } yield ()
 
-  def handleVersion[S[_], A: Equal: Show](
+  def initVersion[S[_], A: Equal: Show](
     path: AFile, currentVersion: A
   )(implicit
     S0: POSIXOp :<: S, S1: Task :<: S, C: Codec[A]
@@ -143,7 +143,7 @@ object FreeVFS {
 
   def init[S[_]](baseDir: ADir)(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, VFS] = {
     for {
-      _ <- handleVersion(baseDir </> file("VERSION"), currentVFSVersion)
+      _ <- initVersion(baseDir </> file("VERSION"), currentVFSVersion)
 
       exists <- POSIX.exists[S](baseDir </> MetaDir)
 
