@@ -199,11 +199,7 @@ object Data {
 
   final case class Interval(value: DateTimeInterval) extends Data {
     def dataType = Type.Interval
-    def toJs = jscore.Call(
-      jscore.ident("ISODate"),
-      List(jscore.Literal(Js.Str(
-        //TODO seconds conversion toInt is lossy
-        JLocalDateTime.of(value.years, value.months, value.days, 0, 0, value.seconds.toInt, value.nanos).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))))).some
+    def toJs = ??? // TODO
   }
 
   val _interval =
