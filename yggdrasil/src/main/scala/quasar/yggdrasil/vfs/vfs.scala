@@ -53,7 +53,6 @@ import java.util.UUID
 
 final case class VFS(
     baseDir: ADir,
-    vfsVersion: FreeVFS.VFSVersion,
     metaLog: VersionLog,
     paths: Map[AFile, Blob],
     index: Map[ADir, Vector[RPath]],
@@ -218,7 +217,7 @@ object FreeVFS {
           case _: IllegalArgumentException => Nil
         }
       }
-    } yield VFS(baseDir, currentVFSVersion, metaLog, paths, index, Map(), blobs.toSet)
+    } yield VFS(baseDir, metaLog, paths, index, Map(), blobs.toSet)
   }
 
   private def persistMeta[S[_]](paths: Map[AFile, Blob], index: Map[ADir, Vector[RPath]])(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VersionLog, Unit] = {

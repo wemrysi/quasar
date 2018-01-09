@@ -77,9 +77,12 @@ object FreeVFSSpecs extends Specification {
           case CPL(OpenW(target)) =>
             Task delay {
               target mustEqual (BaseDir </> Path.file("VERSION"))
-
-              (_ => Stream.empty)
+              assertionSinkBV(_ mustEqual currentMetaVersionBV)
             }
+        }
+
+        _ <- H.pattern[Unit] {
+          case CPR(ta) => ta
         }
 
         _ <- H.pattern[Unit] {
@@ -122,13 +125,12 @@ object FreeVFSSpecs extends Specification {
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
 
       vfs must beLike {
-        case VFS(BaseDir, ver, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
+        case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
           paths must beEmpty
           index must beEmpty
           vlogs must beEmpty
           blobs must beEmpty
 
-          ver mustEqual FreeVFS.currentVFSVersion
           vlogBase mustEqual (BaseDir </> Path.dir("META"))
           committed must haveSize(1)
           versions mustEqual committed.toSet
@@ -155,8 +157,13 @@ object FreeVFSSpecs extends Specification {
             }
         }
 
-        _ <- H.pattern[Unit] {
-          case CPR(ta) => ta
+        _ <- H.pattern[FreeVFS.VFSVersion] {
+          case CPR(ta) =>
+            ta.map { a =>
+              a mustEqual FreeVFS.currentVFSVersion
+
+              a
+            }
         }
 
         _ <- H.pattern[Boolean] {
@@ -188,13 +195,12 @@ object FreeVFSSpecs extends Specification {
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
 
       vfs must beLike {
-        case VFS(BaseDir, ver, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
+        case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
           paths must beEmpty
           index must beEmpty
           vlogs must beEmpty
           blobs must beEmpty
 
-          ver mustEqual FreeVFS.currentVFSVersion
           vlogBase mustEqual (BaseDir </> Path.dir("META"))
           committed must haveSize(1)
           versions mustEqual committed.toSet
@@ -313,7 +319,7 @@ object FreeVFSSpecs extends Specification {
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
 
       vfs must beLike {
-        case VFS(BaseDir, _, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
+        case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
           paths must beEmpty
           index must beEmpty
           vlogs must beEmpty
@@ -395,7 +401,7 @@ object FreeVFSSpecs extends Specification {
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
 
       vfs must beLike {
-        case VFS(BaseDir, _, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
+        case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
           paths must beEmpty
           index must beEmpty
           vlogs must beEmpty
@@ -478,7 +484,7 @@ object FreeVFSSpecs extends Specification {
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
 
       vfs must beLike {
-        case VFS(BaseDir, _, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
+        case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
           val foobar = Path.rootDir </> Path.dir("foo") </> Path.file("bar")
 
           paths must haveSize(1)
@@ -575,7 +581,7 @@ object FreeVFSSpecs extends Specification {
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
 
       vfs must beLike {
-        case VFS(BaseDir, _, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
+        case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
           val foobar = Path.rootDir </> Path.dir("foo") </> Path.file("bar")
 
           paths must haveSize(1)
@@ -603,7 +609,6 @@ object FreeVFSSpecs extends Specification {
     val BlankVFS =
       VFS(
         BaseDir,
-        FreeVFS.currentVFSVersion,
         VersionLog(
           BaseDir </> Path.dir("META"),
           Nil,
