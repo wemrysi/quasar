@@ -50,7 +50,8 @@ object PostgresRenderQuery extends RenderQuery {
         case ea@ExprWithAlias(expr, alias) =>
           expr.project match {
             case Id(txt) =>
-              ExprWithAlias(UnaryFunction(ToJson, Id[T[SqlExpr]](txt).embed).embed, alias)
+              ea
+              //ExprWithAlias(UnaryFunction(ToJson, Id[T[SqlExpr]](txt).embed).embed, alias)
             case _ => ea
           }
         case other => other

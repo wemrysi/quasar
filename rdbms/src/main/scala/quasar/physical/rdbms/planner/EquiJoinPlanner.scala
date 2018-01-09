@@ -71,18 +71,18 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           }
       } yield {
 
-        val selectionExpr = combined.project match {
-          case e@ExprPair(a, b) =>
-            (a.project, b.project) match {
-              case (SqlExpr.Id(_), SqlExpr.Id(_)) => *
-              case _ => e.embed
-            }
-          case other =>
-            other.embed
-        }
+//        val selectionExpr = combined.project match {
+//          case e@ExprPair(a, b) =>
+//            (a.project, b.project) match {
+//              case (SqlExpr.Id(_), SqlExpr.Id(_)) => *
+//              case _ => e.embed
+//            }
+//          case other =>
+//            other.embed
+//        }
 
         Select(
-          selection = Selection(selectionExpr, none),
+          selection = Selection(combined, none),
           from = From(left, leftAlias),
           join = Join(right, keyExprs, joinType, rightAlias).some,
           filter = none,
