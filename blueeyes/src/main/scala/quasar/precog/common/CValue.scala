@@ -627,15 +627,14 @@ case object CNum extends CNumericType[BigDecimal] {
 }
 
 //
-// Dates, Times and Periods
-// TODO: format correctly
+// Dates, Times, and Periods
 //
 case class COffsetDateTime(value: OffsetDateTime) extends CWrappedValue[OffsetDateTime] {
   val cType = COffsetDateTime
 }
 
 case object COffsetDateTime extends CValueType[OffsetDateTime] {
-  val classTag: ClassTag[OffsetDateTime]                = implicitly[ClassTag[OffsetDateTime]]
+  val classTag: ClassTag[OffsetDateTime]            = implicitly[ClassTag[OffsetDateTime]]
   def readResolve()                                 = COffsetDateTime
   def order(v1: OffsetDateTime, v2: OffsetDateTime) = sys.error("todo")
   def jValueFor(v: OffsetDateTime)                  = JString(v.toString)
@@ -646,7 +645,7 @@ case class COffsetDate(value: OffsetDate) extends CWrappedValue[OffsetDate] {
 }
 
 case object COffsetDate extends CValueType[OffsetDate] {
-  val classTag: ClassTag[OffsetDate]            = implicitly[ClassTag[OffsetDate]]
+  val classTag: ClassTag[OffsetDate]        = implicitly[ClassTag[OffsetDate]]
   def readResolve()                         = COffsetDate
   def order(v1: OffsetDate, v2: OffsetDate) = sys.error("todo")
   def jValueFor(v: OffsetDate)              = JString(v.toString)
@@ -657,7 +656,7 @@ case class COffsetTime(value: OffsetTime) extends CWrappedValue[OffsetTime] {
 }
 
 case object COffsetTime extends CValueType[OffsetTime] {
-  val classTag: ClassTag[OffsetTime]            = implicitly[ClassTag[OffsetTime]]
+  val classTag: ClassTag[OffsetTime]        = implicitly[ClassTag[OffsetTime]]
   def readResolve()                         = COffsetTime
   def order(v1: OffsetTime, v2: OffsetTime) = sys.error("todo")
   def jValueFor(v: OffsetTime)              = JString(v.toString)
@@ -669,9 +668,9 @@ case class CLocalDateTime(value: LocalDateTime) extends CWrappedValue[LocalDateT
 
 case object CLocalDateTime extends CValueType[LocalDateTime] {
   val classTag: ClassTag[LocalDateTime]           = implicitly[ClassTag[LocalDateTime]]
-  def readResolve()                       = CLocalDateTime
+  def readResolve()                               = CLocalDateTime
   def order(v1: LocalDateTime, v2: LocalDateTime) = sys.error("todo")
-  def jValueFor(v: LocalDateTime)             = JString(v.toString)
+  def jValueFor(v: LocalDateTime)                 = JString(v.toString)
 }
 
 case class CLocalTime(value: LocalTime) extends CWrappedValue[LocalTime] {
@@ -679,7 +678,7 @@ case class CLocalTime(value: LocalTime) extends CWrappedValue[LocalTime] {
 }
 
 case object CLocalTime extends CValueType[LocalTime] {
-  val classTag: ClassTag[LocalTime]           = implicitly[ClassTag[LocalTime]]
+  val classTag: ClassTag[LocalTime]       = implicitly[ClassTag[LocalTime]]
   def readResolve()                       = CLocalTime
   def order(v1: LocalTime, v2: LocalTime) = sys.error("todo")
   def jValueFor(v: LocalTime)             = JString(v.toString)
