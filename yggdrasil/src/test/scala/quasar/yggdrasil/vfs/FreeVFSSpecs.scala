@@ -223,7 +223,7 @@ object FreeVFSSpecs extends Specification {
             Task delay {
               target mustEqual (BaseDir </> Path.file("VERSION"))
 
-              Stream.emit(ByteVector.fromInt(-1))
+              Stream.emit(ByteVector.fromInt(16384))
             }
         }
 
@@ -263,7 +263,7 @@ object FreeVFSSpecs extends Specification {
 
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSyncAttempt
 
-      vfs.leftMap(_.getMessage.startsWith("Unrecognized VFS VERSION")) must beLeftDisjunction(true)
+      vfs.leftMap(_.getMessage) must beLeftDisjunction("Unexpected VERSION, 0100000000000000")
     }
 
     "initialize from an empty state with pre-existing directory" in {

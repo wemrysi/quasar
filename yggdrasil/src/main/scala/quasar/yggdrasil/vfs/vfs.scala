@@ -44,9 +44,10 @@ import scalaz.syntax.show._
 import scalaz.syntax.traverse._
 import scalaz.syntax.std.boolean._
 
-import scodec.{Attempt, Codec, DecodeResult, Err, SizeBound}
-import scodec.bits.{BitVector, ByteVector}
-import scodec.interop.scalaz.{BitVectorEqualInstance, ByteVectorMonoidInstance}
+import scodec.Codec
+import scodec.bits.ByteVector
+import scodec.codecs, codecs.uint16
+import scodec.interop.scalaz.ByteVectorMonoidInstance
 
 import java.io.File
 import java.util.UUID
@@ -78,20 +79,9 @@ object FreeVFS {
   object VFSVersion {
     final case object VFSVersion0 extends VFSVersion
 
-    implicit val codec: Codec[VFSVersion] = new Codec[VFSVersion] {
-      val VFSVersion0BV = ByteVector(0, 0, 0, 0).toBitVector
-
-      def decode(bits: BitVector): Attempt[DecodeResult[VFSVersion]] = bits match {
-        case b if b ≟ VFSVersion0BV => Attempt.successful(DecodeResult(VFSVersion0, BitVector.empty))
-        case _ => Attempt.failure(Err("Unrecognized VFS VERSION"))
-      }
-
-      def encode(value: VFSVersion): Attempt[BitVector] = value match {
-        case VFSVersion0 => Attempt.successful(VFSVersion0BV)
-      }
-
-      def sizeBound: SizeBound = SizeBound.exact(32)
-    }
+    implicit val codec: Codec[VFSVersion] =
+      codecs.discriminated[VFSVersion].by(uint16)
+        .typecase(0, codecs.provide(VFSVersion0))
 
     implicit val show: Show[VFSVersion] = Show.showFromToString
 
@@ -103,20 +93,9 @@ object FreeVFS {
   object MetaVersion {
     final case object MetaVersion0 extends MetaVersion
 
-    implicit val codec: Codec[MetaVersion] = new Codec[MetaVersion] {
-      val MetaVersion0BV = ByteVector(0, 0, 0, 0).toBitVector
-
-      def decode(bits: BitVector): Attempt[DecodeResult[MetaVersion]] = bits match {
-        case b if b ≟ MetaVersion0BV => Attempt.successful(DecodeResult(MetaVersion0, BitVector.empty))
-        case _ => Attempt.failure(Err("Unrecognized META VERSION"))
-      }
-
-      def encode(value: MetaVersion): Attempt[BitVector] = value match {
-        case MetaVersion0 => Attempt.successful(MetaVersion0BV)
-      }
-
-      def sizeBound: SizeBound = SizeBound.exact(32)
-    }
+    implicit val codec: Codec[MetaVersion] =
+      codecs.discriminated[MetaVersion].by(uint16)
+        .typecase(0, codecs.provide(MetaVersion0))
 
     implicit val show: Show[MetaVersion] = Show.showFromToString
 
@@ -152,7 +131,7 @@ object FreeVFS {
             r => r.remainder.isEmpty.fold(
               r.value.η[Task],
               Task.fail(new RuntimeException(
-                s"Unexpected VERSION format, additional errant bytes"))))).into
+                s"Unexpected VERSION, ${r.remainder.toBin}"))))).into
         _ <- (ver ≠ currentVersion).whenM(
           lift(Task.fail(new RuntimeException(
             s"Unexpected VERSION. Found ${ver.shows}, current is ${currentVersion.shows}"
