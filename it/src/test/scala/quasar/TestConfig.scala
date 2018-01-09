@@ -52,8 +52,6 @@ object TestConfig {
   val MARKLOGIC_JSON  = ExternalBackendRef(BackendRef(BackendName("marklogic_json")   , BackendCapability.All), FileSystemType("marklogic"))
   val MARKLOGIC_XML   = ExternalBackendRef(BackendRef(BackendName("marklogic_xml")    , BackendCapability.All), FileSystemType("marklogic"))
   val MIMIR           = ExternalBackendRef(BackendRef(BackendName("mimir")            , BackendCapability.All), mimir.Mimir.Type)
-  val MONGO_2_6       = ExternalBackendRef(BackendRef(BackendName("mongodb_2_6")      , BackendCapability.All), FileSystemType("mongodb"))
-  val MONGO_3_0       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_0")      , BackendCapability.All), FileSystemType("mongodb"))
   val MONGO_3_2       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_2")      , BackendCapability.All), FileSystemType("mongodb"))
   val MONGO_3_4       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_4")      , BackendCapability.All), FileSystemType("mongodb"))
   val MONGO_READ_ONLY = ExternalBackendRef(BackendRef(BackendName("mongodb_read_only"), ISet singleton BackendCapability.query()), FileSystemType("mongodb"))
@@ -67,7 +65,7 @@ object TestConfig {
     COUCHBASE,
     MARKLOGIC_JSON, MARKLOGIC_XML,
     MIMIR,
-    MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_3_4, MONGO_READ_ONLY,
+    MONGO_3_2, MONGO_3_4, MONGO_READ_ONLY,
     SPARK_HDFS, SPARK_LOCAL, SPARK_ELASTIC, SPARK_CASSANDRA, POSTGRES)
 
   final case class UnsupportedFileSystemConfig(c: MountConfig)
