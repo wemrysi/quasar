@@ -1,5 +1,5 @@
 {
-  "name": "postgres array manipulation tests",
+  "name": "[qa_s02] array manipulation tests",
 
   "backends": {},
   "data": "basic.data",
