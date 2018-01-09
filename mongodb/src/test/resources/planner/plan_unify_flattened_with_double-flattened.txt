@@ -136,10 +136,10 @@ Chain
 │  │           │     │  │     │        │        ╰─ Access
 │  │           │     │  │     │        │           ├─ If
 │  │           │     │  │     │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │           │     │  │     │        │           │  ├─ SpliceObjects
-│  │           │     │  │     │        │           │  │  ├─ JsCore(_.s.value)
-│  │           │     │  │     │        │           │  │  ╰─ Obj
-│  │           │     │  │     │        │           │  │     ╰─ Key(1: _.f[1])
+│  │           │     │  │     │        │           │  ├─ Obj
+│  │           │     │  │     │        │           │  │  ├─ Key(original: _.s.value.original)
+│  │           │     │  │     │        │           │  │  ├─ Key(0: _.s.value["0"])
+│  │           │     │  │     │        │           │  │  ╰─ Key(1: _.f[1])
 │  │           │     │  │     │        │           │  ╰─ Ident(undefined)
 │  │           │     │  │     │        │           ╰─ Literal("0")
 │  │           │     │  │     │        ╰─ Key(right)
@@ -148,10 +148,10 @@ Chain
 │  │           │     │  │     │                 ╰─ Access
 │  │           │     │  │     │                    ├─ If
 │  │           │     │  │     │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │           │     │  │     │                    │  ├─ SpliceObjects
-│  │           │     │  │     │                    │  │  ├─ JsCore(_.s.value)
-│  │           │     │  │     │                    │  │  ╰─ Obj
-│  │           │     │  │     │                    │  │     ╰─ Key(1: _.f[1])
+│  │           │     │  │     │                    │  ├─ Obj
+│  │           │     │  │     │                    │  │  ├─ Key(original: _.s.value.original)
+│  │           │     │  │     │                    │  │  ├─ Key(0: _.s.value["0"])
+│  │           │     │  │     │                    │  │  ╰─ Key(1: _.f[1])
 │  │           │     │  │     │                    │  ╰─ Ident(undefined)
 │  │           │     │  │     │                    ╰─ Literal("1")
 │  │           │     │  │     ╰─ Literal("original")
@@ -168,10 +168,10 @@ Chain
 │  │           │     │           │        │        ╰─ Access
 │  │           │     │           │        │           ├─ If
 │  │           │     │           │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │           │     │           │        │           │  ├─ SpliceObjects
-│  │           │     │           │        │           │  │  ├─ JsCore(_.s.value)
-│  │           │     │           │        │           │  │  ╰─ Obj
-│  │           │     │           │        │           │  │     ╰─ Key(1: _.f[1])
+│  │           │     │           │        │           │  ├─ Obj
+│  │           │     │           │        │           │  │  ├─ Key(original: _.s.value.original)
+│  │           │     │           │        │           │  │  ├─ Key(0: _.s.value["0"])
+│  │           │     │           │        │           │  │  ╰─ Key(1: _.f[1])
 │  │           │     │           │        │           │  ╰─ Ident(undefined)
 │  │           │     │           │        │           ╰─ Literal("0")
 │  │           │     │           │        ╰─ Key(right)
@@ -180,10 +180,10 @@ Chain
 │  │           │     │           │                 ╰─ Access
 │  │           │     │           │                    ├─ If
 │  │           │     │           │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │           │     │           │                    │  ├─ SpliceObjects
-│  │           │     │           │                    │  │  ├─ JsCore(_.s.value)
-│  │           │     │           │                    │  │  ╰─ Obj
-│  │           │     │           │                    │  │     ╰─ Key(1: _.f[1])
+│  │           │     │           │                    │  ├─ Obj
+│  │           │     │           │                    │  │  ├─ Key(original: _.s.value.original)
+│  │           │     │           │                    │  │  ├─ Key(0: _.s.value["0"])
+│  │           │     │           │                    │  │  ╰─ Key(1: _.f[1])
 │  │           │     │           │                    │  ╰─ Ident(undefined)
 │  │           │     │           │                    ╰─ Literal("1")
 │  │           │     │           ╰─ Literal("original")
@@ -197,10 +197,10 @@ Chain
 │  │           │     │  │        │        ╰─ Access
 │  │           │     │  │        │           ├─ If
 │  │           │     │  │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │           │     │  │        │           │  ├─ SpliceObjects
-│  │           │     │  │        │           │  │  ├─ JsCore(_.s.value)
-│  │           │     │  │        │           │  │  ╰─ Obj
-│  │           │     │  │        │           │  │     ╰─ Key(1: _.f[1])
+│  │           │     │  │        │           │  ├─ Obj
+│  │           │     │  │        │           │  │  ├─ Key(original: _.s.value.original)
+│  │           │     │  │        │           │  │  ├─ Key(0: _.s.value["0"])
+│  │           │     │  │        │           │  │  ╰─ Key(1: _.f[1])
 │  │           │     │  │        │           │  ╰─ Ident(undefined)
 │  │           │     │  │        │           ╰─ Literal("0")
 │  │           │     │  │        ╰─ Key(right)
@@ -209,10 +209,10 @@ Chain
 │  │           │     │  │                 ╰─ Access
 │  │           │     │  │                    ├─ If
 │  │           │     │  │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │           │     │  │                    │  ├─ SpliceObjects
-│  │           │     │  │                    │  │  ├─ JsCore(_.s.value)
-│  │           │     │  │                    │  │  ╰─ Obj
-│  │           │     │  │                    │  │     ╰─ Key(1: _.f[1])
+│  │           │     │  │                    │  ├─ Obj
+│  │           │     │  │                    │  │  ├─ Key(original: _.s.value.original)
+│  │           │     │  │                    │  │  ├─ Key(0: _.s.value["0"])
+│  │           │     │  │                    │  │  ╰─ Key(1: _.f[1])
 │  │           │     │  │                    │  ╰─ Ident(undefined)
 │  │           │     │  │                    ╰─ Literal("1")
 │  │           │     │  ╰─ Literal("original")
@@ -224,411 +224,213 @@ Chain
 │  │                 │  │  ├─ Ident(isString)
 │  │                 │  │  ╰─ Access
 │  │                 │  │     ├─ Access
-│  │                 │  │     │  ├─ SpliceObjects
+│  │                 │  │     │  ├─ Access
 │  │                 │  │     │  │  ├─ Access
-│  │                 │  │     │  │  │  ├─ Access
-│  │                 │  │     │  │  │  │  ├─ SpliceObjects
-│  │                 │  │     │  │  │  │  │  ├─ Access
-│  │                 │  │     │  │  │  │  │  │  ├─ Obj
-│  │                 │  │     │  │  │  │  │  │  │  ╰─ Key(1)
-│  │                 │  │     │  │  │  │  │  │  │     ╰─ Obj
-│  │                 │  │     │  │  │  │  │  │  │        ├─ Key(left)
-│  │                 │  │     │  │  │  │  │  │  │        │  ╰─ Obj
-│  │                 │  │     │  │  │  │  │  │  │        │     ╰─ Key(0)
-│  │                 │  │     │  │  │  │  │  │  │        │        ╰─ Access
-│  │                 │  │     │  │  │  │  │  │  │        │           ├─ If
-│  │                 │  │     │  │  │  │  │  │  │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                 │  │     │  │  │  │  │  │  │        │           │  ├─ SpliceObjects
-│  │                 │  │     │  │  │  │  │  │  │        │           │  │  ├─ JsCore(_.s.value)
-│  │                 │  │     │  │  │  │  │  │  │        │           │  │  ╰─ Obj
-│  │                 │  │     │  │  │  │  │  │  │        │           │  │     ╰─ Key(1: _.f[1])
-│  │                 │  │     │  │  │  │  │  │  │        │           │  ╰─ Ident(undefined)
-│  │                 │  │     │  │  │  │  │  │  │        │           ╰─ Literal("0")
-│  │                 │  │     │  │  │  │  │  │  │        ╰─ Key(right)
-│  │                 │  │     │  │  │  │  │  │  │           ╰─ Obj
-│  │                 │  │     │  │  │  │  │  │  │              ╰─ Key(1)
-│  │                 │  │     │  │  │  │  │  │  │                 ╰─ Access
-│  │                 │  │     │  │  │  │  │  │  │                    ├─ If
-│  │                 │  │     │  │  │  │  │  │  │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                 │  │     │  │  │  │  │  │  │                    │  ├─ SpliceObjects
-│  │                 │  │     │  │  │  │  │  │  │                    │  │  ├─ JsCore(_.s.value)
-│  │                 │  │     │  │  │  │  │  │  │                    │  │  ╰─ Obj
-│  │                 │  │     │  │  │  │  │  │  │                    │  │     ╰─ Key(1: _.f[1])
-│  │                 │  │     │  │  │  │  │  │  │                    │  ╰─ Ident(undefined)
-│  │                 │  │     │  │  │  │  │  │  │                    ╰─ Literal("1")
-│  │                 │  │     │  │  │  │  │  │  ╰─ Literal("results")
-│  │                 │  │     │  │  │  │  │  ╰─ Obj
-│  │                 │  │     │  │  │  │  │     ╰─ Key(0)
-│  │                 │  │     │  │  │  │  │        ╰─ Access
-│  │                 │  │     │  │  │  │  │           ├─ Obj
-│  │                 │  │     │  │  │  │  │           │  ╰─ Key(1)
-│  │                 │  │     │  │  │  │  │           │     ╰─ Obj
-│  │                 │  │     │  │  │  │  │           │        ├─ Key(left)
-│  │                 │  │     │  │  │  │  │           │        │  ╰─ Obj
-│  │                 │  │     │  │  │  │  │           │        │     ╰─ Key(0)
-│  │                 │  │     │  │  │  │  │           │        │        ╰─ Access
-│  │                 │  │     │  │  │  │  │           │        │           ├─ If
-│  │                 │  │     │  │  │  │  │           │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                 │  │     │  │  │  │  │           │        │           │  ├─ SpliceObjects
-│  │                 │  │     │  │  │  │  │           │        │           │  │  ├─ JsCore(_.s.value)
-│  │                 │  │     │  │  │  │  │           │        │           │  │  ╰─ Obj
-│  │                 │  │     │  │  │  │  │           │        │           │  │     ╰─ Key(1: _.f[1])
-│  │                 │  │     │  │  │  │  │           │        │           │  ╰─ Ident(undefined)
-│  │                 │  │     │  │  │  │  │           │        │           ╰─ Literal("0")
-│  │                 │  │     │  │  │  │  │           │        ╰─ Key(right)
-│  │                 │  │     │  │  │  │  │           │           ╰─ Obj
-│  │                 │  │     │  │  │  │  │           │              ╰─ Key(1)
-│  │                 │  │     │  │  │  │  │           │                 ╰─ Access
-│  │                 │  │     │  │  │  │  │           │                    ├─ If
-│  │                 │  │     │  │  │  │  │           │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                 │  │     │  │  │  │  │           │                    │  ├─ SpliceObjects
-│  │                 │  │     │  │  │  │  │           │                    │  │  ├─ JsCore(_.s.value)
-│  │                 │  │     │  │  │  │  │           │                    │  │  ╰─ Obj
-│  │                 │  │     │  │  │  │  │           │                    │  │     ╰─ Key(1: _.f[1])
-│  │                 │  │     │  │  │  │  │           │                    │  ╰─ Ident(undefined)
-│  │                 │  │     │  │  │  │  │           │                    ╰─ Literal("1")
-│  │                 │  │     │  │  │  │  │           ╰─ Literal("original")
-│  │                 │  │     │  │  │  │  ╰─ Literal("1")
-│  │                 │  │     │  │  │  ╰─ Literal("left")
-│  │                 │  │     │  │  ╰─ Access
-│  │                 │  │     │  │     ├─ Access
-│  │                 │  │     │  │     │  ├─ SpliceObjects
-│  │                 │  │     │  │     │  │  ├─ Access
-│  │                 │  │     │  │     │  │  │  ├─ Obj
-│  │                 │  │     │  │     │  │  │  │  ╰─ Key(1)
-│  │                 │  │     │  │     │  │  │  │     ╰─ Obj
-│  │                 │  │     │  │     │  │  │  │        ├─ Key(left)
-│  │                 │  │     │  │     │  │  │  │        │  ╰─ Obj
-│  │                 │  │     │  │     │  │  │  │        │     ╰─ Key(0)
-│  │                 │  │     │  │     │  │  │  │        │        ╰─ Access
-│  │                 │  │     │  │     │  │  │  │        │           ├─ If
-│  │                 │  │     │  │     │  │  │  │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                 │  │     │  │     │  │  │  │        │           │  ├─ SpliceObjects
-│  │                 │  │     │  │     │  │  │  │        │           │  │  ├─ JsCore(_.s.value)
-│  │                 │  │     │  │     │  │  │  │        │           │  │  ╰─ Obj
-│  │                 │  │     │  │     │  │  │  │        │           │  │     ╰─ Key(1: _.f[1])
-│  │                 │  │     │  │     │  │  │  │        │           │  ╰─ Ident(undefined)
-│  │                 │  │     │  │     │  │  │  │        │           ╰─ Literal("0")
-│  │                 │  │     │  │     │  │  │  │        ╰─ Key(right)
-│  │                 │  │     │  │     │  │  │  │           ╰─ Obj
-│  │                 │  │     │  │     │  │  │  │              ╰─ Key(1)
-│  │                 │  │     │  │     │  │  │  │                 ╰─ Access
-│  │                 │  │     │  │     │  │  │  │                    ├─ If
-│  │                 │  │     │  │     │  │  │  │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                 │  │     │  │     │  │  │  │                    │  ├─ SpliceObjects
-│  │                 │  │     │  │     │  │  │  │                    │  │  ├─ JsCore(_.s.value)
-│  │                 │  │     │  │     │  │  │  │                    │  │  ╰─ Obj
-│  │                 │  │     │  │     │  │  │  │                    │  │     ╰─ Key(1: _.f[1])
-│  │                 │  │     │  │     │  │  │  │                    │  ╰─ Ident(undefined)
-│  │                 │  │     │  │     │  │  │  │                    ╰─ Literal("1")
-│  │                 │  │     │  │     │  │  │  ╰─ Literal("results")
-│  │                 │  │     │  │     │  │  ╰─ Obj
-│  │                 │  │     │  │     │  │     ╰─ Key(0)
-│  │                 │  │     │  │     │  │        ╰─ Access
-│  │                 │  │     │  │     │  │           ├─ Obj
-│  │                 │  │     │  │     │  │           │  ╰─ Key(1)
-│  │                 │  │     │  │     │  │           │     ╰─ Obj
-│  │                 │  │     │  │     │  │           │        ├─ Key(left)
-│  │                 │  │     │  │     │  │           │        │  ╰─ Obj
-│  │                 │  │     │  │     │  │           │        │     ╰─ Key(0)
-│  │                 │  │     │  │     │  │           │        │        ╰─ Access
-│  │                 │  │     │  │     │  │           │        │           ├─ If
-│  │                 │  │     │  │     │  │           │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                 │  │     │  │     │  │           │        │           │  ├─ SpliceObjects
-│  │                 │  │     │  │     │  │           │        │           │  │  ├─ JsCore(_.s.value)
-│  │                 │  │     │  │     │  │           │        │           │  │  ╰─ Obj
-│  │                 │  │     │  │     │  │           │        │           │  │     ╰─ Key(1: _.f[1])
-│  │                 │  │     │  │     │  │           │        │           │  ╰─ Ident(undefined)
-│  │                 │  │     │  │     │  │           │        │           ╰─ Literal("0")
-│  │                 │  │     │  │     │  │           │        ╰─ Key(right)
-│  │                 │  │     │  │     │  │           │           ╰─ Obj
-│  │                 │  │     │  │     │  │           │              ╰─ Key(1)
-│  │                 │  │     │  │     │  │           │                 ╰─ Access
-│  │                 │  │     │  │     │  │           │                    ├─ If
-│  │                 │  │     │  │     │  │           │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                 │  │     │  │     │  │           │                    │  ├─ SpliceObjects
-│  │                 │  │     │  │     │  │           │                    │  │  ├─ JsCore(_.s.value)
-│  │                 │  │     │  │     │  │           │                    │  │  ╰─ Obj
-│  │                 │  │     │  │     │  │           │                    │  │     ╰─ Key(1: _.f[1])
-│  │                 │  │     │  │     │  │           │                    │  ╰─ Ident(undefined)
-│  │                 │  │     │  │     │  │           │                    ╰─ Literal("1")
-│  │                 │  │     │  │     │  │           ╰─ Literal("original")
-│  │                 │  │     │  │     │  ╰─ Literal("1")
-│  │                 │  │     │  │     ╰─ Literal("right")
+│  │                 │  │     │  │  │  ├─ SpliceObjects
+│  │                 │  │     │  │  │  │  ├─ Access
+│  │                 │  │     │  │  │  │  │  ├─ Obj
+│  │                 │  │     │  │  │  │  │  │  ╰─ Key(1)
+│  │                 │  │     │  │  │  │  │  │     ╰─ Obj
+│  │                 │  │     │  │  │  │  │  │        ├─ Key(left)
+│  │                 │  │     │  │  │  │  │  │        │  ╰─ Obj
+│  │                 │  │     │  │  │  │  │  │        │     ╰─ Key(0)
+│  │                 │  │     │  │  │  │  │  │        │        ╰─ Access
+│  │                 │  │     │  │  │  │  │  │        │           ├─ If
+│  │                 │  │     │  │  │  │  │  │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
+│  │                 │  │     │  │  │  │  │  │        │           │  ├─ Obj
+│  │                 │  │     │  │  │  │  │  │        │           │  │  ├─ Key(original: _.s.value.original)
+│  │                 │  │     │  │  │  │  │  │        │           │  │  ├─ Key(0: _.s.value["0"])
+│  │                 │  │     │  │  │  │  │  │        │           │  │  ╰─ Key(1: _.f[1])
+│  │                 │  │     │  │  │  │  │  │        │           │  ╰─ Ident(undefined)
+│  │                 │  │     │  │  │  │  │  │        │           ╰─ Literal("0")
+│  │                 │  │     │  │  │  │  │  │        ╰─ Key(right)
+│  │                 │  │     │  │  │  │  │  │           ╰─ Obj
+│  │                 │  │     │  │  │  │  │  │              ╰─ Key(1)
+│  │                 │  │     │  │  │  │  │  │                 ╰─ Access
+│  │                 │  │     │  │  │  │  │  │                    ├─ If
+│  │                 │  │     │  │  │  │  │  │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
+│  │                 │  │     │  │  │  │  │  │                    │  ├─ Obj
+│  │                 │  │     │  │  │  │  │  │                    │  │  ├─ Key(original: _.s.value.original)
+│  │                 │  │     │  │  │  │  │  │                    │  │  ├─ Key(0: _.s.value["0"])
+│  │                 │  │     │  │  │  │  │  │                    │  │  ╰─ Key(1: _.f[1])
+│  │                 │  │     │  │  │  │  │  │                    │  ╰─ Ident(undefined)
+│  │                 │  │     │  │  │  │  │  │                    ╰─ Literal("1")
+│  │                 │  │     │  │  │  │  │  ╰─ Literal("results")
+│  │                 │  │     │  │  │  │  ╰─ Obj
+│  │                 │  │     │  │  │  │     ╰─ Key(0)
+│  │                 │  │     │  │  │  │        ╰─ Access
+│  │                 │  │     │  │  │  │           ├─ Obj
+│  │                 │  │     │  │  │  │           │  ╰─ Key(1)
+│  │                 │  │     │  │  │  │           │     ╰─ Obj
+│  │                 │  │     │  │  │  │           │        ├─ Key(left)
+│  │                 │  │     │  │  │  │           │        │  ╰─ Obj
+│  │                 │  │     │  │  │  │           │        │     ╰─ Key(0)
+│  │                 │  │     │  │  │  │           │        │        ╰─ Access
+│  │                 │  │     │  │  │  │           │        │           ├─ If
+│  │                 │  │     │  │  │  │           │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
+│  │                 │  │     │  │  │  │           │        │           │  ├─ Obj
+│  │                 │  │     │  │  │  │           │        │           │  │  ├─ Key(original: _.s.value.original)
+│  │                 │  │     │  │  │  │           │        │           │  │  ├─ Key(0: _.s.value["0"])
+│  │                 │  │     │  │  │  │           │        │           │  │  ╰─ Key(1: _.f[1])
+│  │                 │  │     │  │  │  │           │        │           │  ╰─ Ident(undefined)
+│  │                 │  │     │  │  │  │           │        │           ╰─ Literal("0")
+│  │                 │  │     │  │  │  │           │        ╰─ Key(right)
+│  │                 │  │     │  │  │  │           │           ╰─ Obj
+│  │                 │  │     │  │  │  │           │              ╰─ Key(1)
+│  │                 │  │     │  │  │  │           │                 ╰─ Access
+│  │                 │  │     │  │  │  │           │                    ├─ If
+│  │                 │  │     │  │  │  │           │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
+│  │                 │  │     │  │  │  │           │                    │  ├─ Obj
+│  │                 │  │     │  │  │  │           │                    │  │  ├─ Key(original: _.s.value.original)
+│  │                 │  │     │  │  │  │           │                    │  │  ├─ Key(0: _.s.value["0"])
+│  │                 │  │     │  │  │  │           │                    │  │  ╰─ Key(1: _.f[1])
+│  │                 │  │     │  │  │  │           │                    │  ╰─ Ident(undefined)
+│  │                 │  │     │  │  │  │           │                    ╰─ Literal("1")
+│  │                 │  │     │  │  │  │           ╰─ Literal("original")
+│  │                 │  │     │  │  │  ╰─ Literal("1")
+│  │                 │  │     │  │  ╰─ Literal("left")
 │  │                 │  │     │  ╰─ Literal("0")
 │  │                 │  │     ╰─ Literal("id")
 │  │                 │  ├─ Call
 │  │                 │  │  ├─ JsCore((new RegExp("^.*Dr.*$", "m")).test)
 │  │                 │  │  ╰─ Access
 │  │                 │  │     ├─ Access
-│  │                 │  │     │  ├─ SpliceObjects
+│  │                 │  │     │  ├─ Access
 │  │                 │  │     │  │  ├─ Access
-│  │                 │  │     │  │  │  ├─ Access
-│  │                 │  │     │  │  │  │  ├─ SpliceObjects
-│  │                 │  │     │  │  │  │  │  ├─ Access
-│  │                 │  │     │  │  │  │  │  │  ├─ Obj
-│  │                 │  │     │  │  │  │  │  │  │  ╰─ Key(1)
-│  │                 │  │     │  │  │  │  │  │  │     ╰─ Obj
-│  │                 │  │     │  │  │  │  │  │  │        ├─ Key(left)
-│  │                 │  │     │  │  │  │  │  │  │        │  ╰─ Obj
-│  │                 │  │     │  │  │  │  │  │  │        │     ╰─ Key(0)
-│  │                 │  │     │  │  │  │  │  │  │        │        ╰─ Access
-│  │                 │  │     │  │  │  │  │  │  │        │           ├─ If
-│  │                 │  │     │  │  │  │  │  │  │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                 │  │     │  │  │  │  │  │  │        │           │  ├─ SpliceObjects
-│  │                 │  │     │  │  │  │  │  │  │        │           │  │  ├─ JsCore(_.s.value)
-│  │                 │  │     │  │  │  │  │  │  │        │           │  │  ╰─ Obj
-│  │                 │  │     │  │  │  │  │  │  │        │           │  │     ╰─ Key(1: _.f[1])
-│  │                 │  │     │  │  │  │  │  │  │        │           │  ╰─ Ident(undefined)
-│  │                 │  │     │  │  │  │  │  │  │        │           ╰─ Literal("0")
-│  │                 │  │     │  │  │  │  │  │  │        ╰─ Key(right)
-│  │                 │  │     │  │  │  │  │  │  │           ╰─ Obj
-│  │                 │  │     │  │  │  │  │  │  │              ╰─ Key(1)
-│  │                 │  │     │  │  │  │  │  │  │                 ╰─ Access
-│  │                 │  │     │  │  │  │  │  │  │                    ├─ If
-│  │                 │  │     │  │  │  │  │  │  │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                 │  │     │  │  │  │  │  │  │                    │  ├─ SpliceObjects
-│  │                 │  │     │  │  │  │  │  │  │                    │  │  ├─ JsCore(_.s.value)
-│  │                 │  │     │  │  │  │  │  │  │                    │  │  ╰─ Obj
-│  │                 │  │     │  │  │  │  │  │  │                    │  │     ╰─ Key(1: _.f[1])
-│  │                 │  │     │  │  │  │  │  │  │                    │  ╰─ Ident(undefined)
-│  │                 │  │     │  │  │  │  │  │  │                    ╰─ Literal("1")
-│  │                 │  │     │  │  │  │  │  │  ╰─ Literal("results")
-│  │                 │  │     │  │  │  │  │  ╰─ Obj
-│  │                 │  │     │  │  │  │  │     ╰─ Key(0)
-│  │                 │  │     │  │  │  │  │        ╰─ Access
-│  │                 │  │     │  │  │  │  │           ├─ Obj
-│  │                 │  │     │  │  │  │  │           │  ╰─ Key(1)
-│  │                 │  │     │  │  │  │  │           │     ╰─ Obj
-│  │                 │  │     │  │  │  │  │           │        ├─ Key(left)
-│  │                 │  │     │  │  │  │  │           │        │  ╰─ Obj
-│  │                 │  │     │  │  │  │  │           │        │     ╰─ Key(0)
-│  │                 │  │     │  │  │  │  │           │        │        ╰─ Access
-│  │                 │  │     │  │  │  │  │           │        │           ├─ If
-│  │                 │  │     │  │  │  │  │           │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                 │  │     │  │  │  │  │           │        │           │  ├─ SpliceObjects
-│  │                 │  │     │  │  │  │  │           │        │           │  │  ├─ JsCore(_.s.value)
-│  │                 │  │     │  │  │  │  │           │        │           │  │  ╰─ Obj
-│  │                 │  │     │  │  │  │  │           │        │           │  │     ╰─ Key(1: _.f[1])
-│  │                 │  │     │  │  │  │  │           │        │           │  ╰─ Ident(undefined)
-│  │                 │  │     │  │  │  │  │           │        │           ╰─ Literal("0")
-│  │                 │  │     │  │  │  │  │           │        ╰─ Key(right)
-│  │                 │  │     │  │  │  │  │           │           ╰─ Obj
-│  │                 │  │     │  │  │  │  │           │              ╰─ Key(1)
-│  │                 │  │     │  │  │  │  │           │                 ╰─ Access
-│  │                 │  │     │  │  │  │  │           │                    ├─ If
-│  │                 │  │     │  │  │  │  │           │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                 │  │     │  │  │  │  │           │                    │  ├─ SpliceObjects
-│  │                 │  │     │  │  │  │  │           │                    │  │  ├─ JsCore(_.s.value)
-│  │                 │  │     │  │  │  │  │           │                    │  │  ╰─ Obj
-│  │                 │  │     │  │  │  │  │           │                    │  │     ╰─ Key(1: _.f[1])
-│  │                 │  │     │  │  │  │  │           │                    │  ╰─ Ident(undefined)
-│  │                 │  │     │  │  │  │  │           │                    ╰─ Literal("1")
-│  │                 │  │     │  │  │  │  │           ╰─ Literal("original")
-│  │                 │  │     │  │  │  │  ╰─ Literal("1")
-│  │                 │  │     │  │  │  ╰─ Literal("left")
-│  │                 │  │     │  │  ╰─ Access
-│  │                 │  │     │  │     ├─ Access
-│  │                 │  │     │  │     │  ├─ SpliceObjects
-│  │                 │  │     │  │     │  │  ├─ Access
-│  │                 │  │     │  │     │  │  │  ├─ Obj
-│  │                 │  │     │  │     │  │  │  │  ╰─ Key(1)
-│  │                 │  │     │  │     │  │  │  │     ╰─ Obj
-│  │                 │  │     │  │     │  │  │  │        ├─ Key(left)
-│  │                 │  │     │  │     │  │  │  │        │  ╰─ Obj
-│  │                 │  │     │  │     │  │  │  │        │     ╰─ Key(0)
-│  │                 │  │     │  │     │  │  │  │        │        ╰─ Access
-│  │                 │  │     │  │     │  │  │  │        │           ├─ If
-│  │                 │  │     │  │     │  │  │  │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                 │  │     │  │     │  │  │  │        │           │  ├─ SpliceObjects
-│  │                 │  │     │  │     │  │  │  │        │           │  │  ├─ JsCore(_.s.value)
-│  │                 │  │     │  │     │  │  │  │        │           │  │  ╰─ Obj
-│  │                 │  │     │  │     │  │  │  │        │           │  │     ╰─ Key(1: _.f[1])
-│  │                 │  │     │  │     │  │  │  │        │           │  ╰─ Ident(undefined)
-│  │                 │  │     │  │     │  │  │  │        │           ╰─ Literal("0")
-│  │                 │  │     │  │     │  │  │  │        ╰─ Key(right)
-│  │                 │  │     │  │     │  │  │  │           ╰─ Obj
-│  │                 │  │     │  │     │  │  │  │              ╰─ Key(1)
-│  │                 │  │     │  │     │  │  │  │                 ╰─ Access
-│  │                 │  │     │  │     │  │  │  │                    ├─ If
-│  │                 │  │     │  │     │  │  │  │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                 │  │     │  │     │  │  │  │                    │  ├─ SpliceObjects
-│  │                 │  │     │  │     │  │  │  │                    │  │  ├─ JsCore(_.s.value)
-│  │                 │  │     │  │     │  │  │  │                    │  │  ╰─ Obj
-│  │                 │  │     │  │     │  │  │  │                    │  │     ╰─ Key(1: _.f[1])
-│  │                 │  │     │  │     │  │  │  │                    │  ╰─ Ident(undefined)
-│  │                 │  │     │  │     │  │  │  │                    ╰─ Literal("1")
-│  │                 │  │     │  │     │  │  │  ╰─ Literal("results")
-│  │                 │  │     │  │     │  │  ╰─ Obj
-│  │                 │  │     │  │     │  │     ╰─ Key(0)
-│  │                 │  │     │  │     │  │        ╰─ Access
-│  │                 │  │     │  │     │  │           ├─ Obj
-│  │                 │  │     │  │     │  │           │  ╰─ Key(1)
-│  │                 │  │     │  │     │  │           │     ╰─ Obj
-│  │                 │  │     │  │     │  │           │        ├─ Key(left)
-│  │                 │  │     │  │     │  │           │        │  ╰─ Obj
-│  │                 │  │     │  │     │  │           │        │     ╰─ Key(0)
-│  │                 │  │     │  │     │  │           │        │        ╰─ Access
-│  │                 │  │     │  │     │  │           │        │           ├─ If
-│  │                 │  │     │  │     │  │           │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                 │  │     │  │     │  │           │        │           │  ├─ SpliceObjects
-│  │                 │  │     │  │     │  │           │        │           │  │  ├─ JsCore(_.s.value)
-│  │                 │  │     │  │     │  │           │        │           │  │  ╰─ Obj
-│  │                 │  │     │  │     │  │           │        │           │  │     ╰─ Key(1: _.f[1])
-│  │                 │  │     │  │     │  │           │        │           │  ╰─ Ident(undefined)
-│  │                 │  │     │  │     │  │           │        │           ╰─ Literal("0")
-│  │                 │  │     │  │     │  │           │        ╰─ Key(right)
-│  │                 │  │     │  │     │  │           │           ╰─ Obj
-│  │                 │  │     │  │     │  │           │              ╰─ Key(1)
-│  │                 │  │     │  │     │  │           │                 ╰─ Access
-│  │                 │  │     │  │     │  │           │                    ├─ If
-│  │                 │  │     │  │     │  │           │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                 │  │     │  │     │  │           │                    │  ├─ SpliceObjects
-│  │                 │  │     │  │     │  │           │                    │  │  ├─ JsCore(_.s.value)
-│  │                 │  │     │  │     │  │           │                    │  │  ╰─ Obj
-│  │                 │  │     │  │     │  │           │                    │  │     ╰─ Key(1: _.f[1])
-│  │                 │  │     │  │     │  │           │                    │  ╰─ Ident(undefined)
-│  │                 │  │     │  │     │  │           │                    ╰─ Literal("1")
-│  │                 │  │     │  │     │  │           ╰─ Literal("original")
-│  │                 │  │     │  │     │  ╰─ Literal("1")
-│  │                 │  │     │  │     ╰─ Literal("right")
+│  │                 │  │     │  │  │  ├─ SpliceObjects
+│  │                 │  │     │  │  │  │  ├─ Access
+│  │                 │  │     │  │  │  │  │  ├─ Obj
+│  │                 │  │     │  │  │  │  │  │  ╰─ Key(1)
+│  │                 │  │     │  │  │  │  │  │     ╰─ Obj
+│  │                 │  │     │  │  │  │  │  │        ├─ Key(left)
+│  │                 │  │     │  │  │  │  │  │        │  ╰─ Obj
+│  │                 │  │     │  │  │  │  │  │        │     ╰─ Key(0)
+│  │                 │  │     │  │  │  │  │  │        │        ╰─ Access
+│  │                 │  │     │  │  │  │  │  │        │           ├─ If
+│  │                 │  │     │  │  │  │  │  │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
+│  │                 │  │     │  │  │  │  │  │        │           │  ├─ Obj
+│  │                 │  │     │  │  │  │  │  │        │           │  │  ├─ Key(original: _.s.value.original)
+│  │                 │  │     │  │  │  │  │  │        │           │  │  ├─ Key(0: _.s.value["0"])
+│  │                 │  │     │  │  │  │  │  │        │           │  │  ╰─ Key(1: _.f[1])
+│  │                 │  │     │  │  │  │  │  │        │           │  ╰─ Ident(undefined)
+│  │                 │  │     │  │  │  │  │  │        │           ╰─ Literal("0")
+│  │                 │  │     │  │  │  │  │  │        ╰─ Key(right)
+│  │                 │  │     │  │  │  │  │  │           ╰─ Obj
+│  │                 │  │     │  │  │  │  │  │              ╰─ Key(1)
+│  │                 │  │     │  │  │  │  │  │                 ╰─ Access
+│  │                 │  │     │  │  │  │  │  │                    ├─ If
+│  │                 │  │     │  │  │  │  │  │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
+│  │                 │  │     │  │  │  │  │  │                    │  ├─ Obj
+│  │                 │  │     │  │  │  │  │  │                    │  │  ├─ Key(original: _.s.value.original)
+│  │                 │  │     │  │  │  │  │  │                    │  │  ├─ Key(0: _.s.value["0"])
+│  │                 │  │     │  │  │  │  │  │                    │  │  ╰─ Key(1: _.f[1])
+│  │                 │  │     │  │  │  │  │  │                    │  ╰─ Ident(undefined)
+│  │                 │  │     │  │  │  │  │  │                    ╰─ Literal("1")
+│  │                 │  │     │  │  │  │  │  ╰─ Literal("results")
+│  │                 │  │     │  │  │  │  ╰─ Obj
+│  │                 │  │     │  │  │  │     ╰─ Key(0)
+│  │                 │  │     │  │  │  │        ╰─ Access
+│  │                 │  │     │  │  │  │           ├─ Obj
+│  │                 │  │     │  │  │  │           │  ╰─ Key(1)
+│  │                 │  │     │  │  │  │           │     ╰─ Obj
+│  │                 │  │     │  │  │  │           │        ├─ Key(left)
+│  │                 │  │     │  │  │  │           │        │  ╰─ Obj
+│  │                 │  │     │  │  │  │           │        │     ╰─ Key(0)
+│  │                 │  │     │  │  │  │           │        │        ╰─ Access
+│  │                 │  │     │  │  │  │           │        │           ├─ If
+│  │                 │  │     │  │  │  │           │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
+│  │                 │  │     │  │  │  │           │        │           │  ├─ Obj
+│  │                 │  │     │  │  │  │           │        │           │  │  ├─ Key(original: _.s.value.original)
+│  │                 │  │     │  │  │  │           │        │           │  │  ├─ Key(0: _.s.value["0"])
+│  │                 │  │     │  │  │  │           │        │           │  │  ╰─ Key(1: _.f[1])
+│  │                 │  │     │  │  │  │           │        │           │  ╰─ Ident(undefined)
+│  │                 │  │     │  │  │  │           │        │           ╰─ Literal("0")
+│  │                 │  │     │  │  │  │           │        ╰─ Key(right)
+│  │                 │  │     │  │  │  │           │           ╰─ Obj
+│  │                 │  │     │  │  │  │           │              ╰─ Key(1)
+│  │                 │  │     │  │  │  │           │                 ╰─ Access
+│  │                 │  │     │  │  │  │           │                    ├─ If
+│  │                 │  │     │  │  │  │           │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
+│  │                 │  │     │  │  │  │           │                    │  ├─ Obj
+│  │                 │  │     │  │  │  │           │                    │  │  ├─ Key(original: _.s.value.original)
+│  │                 │  │     │  │  │  │           │                    │  │  ├─ Key(0: _.s.value["0"])
+│  │                 │  │     │  │  │  │           │                    │  │  ╰─ Key(1: _.f[1])
+│  │                 │  │     │  │  │  │           │                    │  ╰─ Ident(undefined)
+│  │                 │  │     │  │  │  │           │                    ╰─ Literal("1")
+│  │                 │  │     │  │  │  │           ╰─ Literal("original")
+│  │                 │  │     │  │  │  ╰─ Literal("1")
+│  │                 │  │     │  │  ╰─ Literal("left")
 │  │                 │  │     │  ╰─ Literal("0")
 │  │                 │  │     ╰─ Literal("id")
 │  │                 │  ╰─ Ident(undefined)
 │  │                 ╰─ Call
 │  │                    ├─ JsCore((new RegExp("^.*Dr.*$", "m")).test)
 │  │                    ╰─ Access
-│  │                       ├─ SpliceObjects
+│  │                       ├─ Access
 │  │                       │  ├─ Access
-│  │                       │  │  ├─ Access
-│  │                       │  │  │  ├─ SpliceObjects
-│  │                       │  │  │  │  ├─ Access
-│  │                       │  │  │  │  │  ├─ Obj
-│  │                       │  │  │  │  │  │  ╰─ Key(1)
-│  │                       │  │  │  │  │  │     ╰─ Obj
-│  │                       │  │  │  │  │  │        ├─ Key(left)
-│  │                       │  │  │  │  │  │        │  ╰─ Obj
-│  │                       │  │  │  │  │  │        │     ╰─ Key(0)
-│  │                       │  │  │  │  │  │        │        ╰─ Access
-│  │                       │  │  │  │  │  │        │           ├─ If
-│  │                       │  │  │  │  │  │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                       │  │  │  │  │  │        │           │  ├─ SpliceObjects
-│  │                       │  │  │  │  │  │        │           │  │  ├─ JsCore(_.s.value)
-│  │                       │  │  │  │  │  │        │           │  │  ╰─ Obj
-│  │                       │  │  │  │  │  │        │           │  │     ╰─ Key(1: _.f[1])
-│  │                       │  │  │  │  │  │        │           │  ╰─ Ident(undefined)
-│  │                       │  │  │  │  │  │        │           ╰─ Literal("0")
-│  │                       │  │  │  │  │  │        ╰─ Key(right)
-│  │                       │  │  │  │  │  │           ╰─ Obj
-│  │                       │  │  │  │  │  │              ╰─ Key(1)
-│  │                       │  │  │  │  │  │                 ╰─ Access
-│  │                       │  │  │  │  │  │                    ├─ If
-│  │                       │  │  │  │  │  │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                       │  │  │  │  │  │                    │  ├─ SpliceObjects
-│  │                       │  │  │  │  │  │                    │  │  ├─ JsCore(_.s.value)
-│  │                       │  │  │  │  │  │                    │  │  ╰─ Obj
-│  │                       │  │  │  │  │  │                    │  │     ╰─ Key(1: _.f[1])
-│  │                       │  │  │  │  │  │                    │  ╰─ Ident(undefined)
-│  │                       │  │  │  │  │  │                    ╰─ Literal("1")
-│  │                       │  │  │  │  │  ╰─ Literal("results")
-│  │                       │  │  │  │  ╰─ Obj
-│  │                       │  │  │  │     ╰─ Key(0)
-│  │                       │  │  │  │        ╰─ Access
-│  │                       │  │  │  │           ├─ Obj
-│  │                       │  │  │  │           │  ╰─ Key(1)
-│  │                       │  │  │  │           │     ╰─ Obj
-│  │                       │  │  │  │           │        ├─ Key(left)
-│  │                       │  │  │  │           │        │  ╰─ Obj
-│  │                       │  │  │  │           │        │     ╰─ Key(0)
-│  │                       │  │  │  │           │        │        ╰─ Access
-│  │                       │  │  │  │           │        │           ├─ If
-│  │                       │  │  │  │           │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                       │  │  │  │           │        │           │  ├─ SpliceObjects
-│  │                       │  │  │  │           │        │           │  │  ├─ JsCore(_.s.value)
-│  │                       │  │  │  │           │        │           │  │  ╰─ Obj
-│  │                       │  │  │  │           │        │           │  │     ╰─ Key(1: _.f[1])
-│  │                       │  │  │  │           │        │           │  ╰─ Ident(undefined)
-│  │                       │  │  │  │           │        │           ╰─ Literal("0")
-│  │                       │  │  │  │           │        ╰─ Key(right)
-│  │                       │  │  │  │           │           ╰─ Obj
-│  │                       │  │  │  │           │              ╰─ Key(1)
-│  │                       │  │  │  │           │                 ╰─ Access
-│  │                       │  │  │  │           │                    ├─ If
-│  │                       │  │  │  │           │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                       │  │  │  │           │                    │  ├─ SpliceObjects
-│  │                       │  │  │  │           │                    │  │  ├─ JsCore(_.s.value)
-│  │                       │  │  │  │           │                    │  │  ╰─ Obj
-│  │                       │  │  │  │           │                    │  │     ╰─ Key(1: _.f[1])
-│  │                       │  │  │  │           │                    │  ╰─ Ident(undefined)
-│  │                       │  │  │  │           │                    ╰─ Literal("1")
-│  │                       │  │  │  │           ╰─ Literal("original")
-│  │                       │  │  │  ╰─ Literal("1")
-│  │                       │  │  ╰─ Literal("left")
-│  │                       │  ╰─ Access
-│  │                       │     ├─ Access
-│  │                       │     │  ├─ SpliceObjects
-│  │                       │     │  │  ├─ Access
-│  │                       │     │  │  │  ├─ Obj
-│  │                       │     │  │  │  │  ╰─ Key(1)
-│  │                       │     │  │  │  │     ╰─ Obj
-│  │                       │     │  │  │  │        ├─ Key(left)
-│  │                       │     │  │  │  │        │  ╰─ Obj
-│  │                       │     │  │  │  │        │     ╰─ Key(0)
-│  │                       │     │  │  │  │        │        ╰─ Access
-│  │                       │     │  │  │  │        │           ├─ If
-│  │                       │     │  │  │  │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                       │     │  │  │  │        │           │  ├─ SpliceObjects
-│  │                       │     │  │  │  │        │           │  │  ├─ JsCore(_.s.value)
-│  │                       │     │  │  │  │        │           │  │  ╰─ Obj
-│  │                       │     │  │  │  │        │           │  │     ╰─ Key(1: _.f[1])
-│  │                       │     │  │  │  │        │           │  ╰─ Ident(undefined)
-│  │                       │     │  │  │  │        │           ╰─ Literal("0")
-│  │                       │     │  │  │  │        ╰─ Key(right)
-│  │                       │     │  │  │  │           ╰─ Obj
-│  │                       │     │  │  │  │              ╰─ Key(1)
-│  │                       │     │  │  │  │                 ╰─ Access
-│  │                       │     │  │  │  │                    ├─ If
-│  │                       │     │  │  │  │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                       │     │  │  │  │                    │  ├─ SpliceObjects
-│  │                       │     │  │  │  │                    │  │  ├─ JsCore(_.s.value)
-│  │                       │     │  │  │  │                    │  │  ╰─ Obj
-│  │                       │     │  │  │  │                    │  │     ╰─ Key(1: _.f[1])
-│  │                       │     │  │  │  │                    │  ╰─ Ident(undefined)
-│  │                       │     │  │  │  │                    ╰─ Literal("1")
-│  │                       │     │  │  │  ╰─ Literal("results")
-│  │                       │     │  │  ╰─ Obj
-│  │                       │     │  │     ╰─ Key(0)
-│  │                       │     │  │        ╰─ Access
-│  │                       │     │  │           ├─ Obj
-│  │                       │     │  │           │  ╰─ Key(1)
-│  │                       │     │  │           │     ╰─ Obj
-│  │                       │     │  │           │        ├─ Key(left)
-│  │                       │     │  │           │        │  ╰─ Obj
-│  │                       │     │  │           │        │     ╰─ Key(0)
-│  │                       │     │  │           │        │        ╰─ Access
-│  │                       │     │  │           │        │           ├─ If
-│  │                       │     │  │           │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                       │     │  │           │        │           │  ├─ SpliceObjects
-│  │                       │     │  │           │        │           │  │  ├─ JsCore(_.s.value)
-│  │                       │     │  │           │        │           │  │  ╰─ Obj
-│  │                       │     │  │           │        │           │  │     ╰─ Key(1: _.f[1])
-│  │                       │     │  │           │        │           │  ╰─ Ident(undefined)
-│  │                       │     │  │           │        │           ╰─ Literal("0")
-│  │                       │     │  │           │        ╰─ Key(right)
-│  │                       │     │  │           │           ╰─ Obj
-│  │                       │     │  │           │              ╰─ Key(1)
-│  │                       │     │  │           │                 ╰─ Access
-│  │                       │     │  │           │                    ├─ If
-│  │                       │     │  │           │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
-│  │                       │     │  │           │                    │  ├─ SpliceObjects
-│  │                       │     │  │           │                    │  │  ├─ JsCore(_.s.value)
-│  │                       │     │  │           │                    │  │  ╰─ Obj
-│  │                       │     │  │           │                    │  │     ╰─ Key(1: _.f[1])
-│  │                       │     │  │           │                    │  ╰─ Ident(undefined)
-│  │                       │     │  │           │                    ╰─ Literal("1")
-│  │                       │     │  │           ╰─ Literal("original")
-│  │                       │     │  ╰─ Literal("1")
-│  │                       │     ╰─ Literal("right")
+│  │                       │  │  ├─ SpliceObjects
+│  │                       │  │  │  ├─ Access
+│  │                       │  │  │  │  ├─ Obj
+│  │                       │  │  │  │  │  ╰─ Key(1)
+│  │                       │  │  │  │  │     ╰─ Obj
+│  │                       │  │  │  │  │        ├─ Key(left)
+│  │                       │  │  │  │  │        │  ╰─ Obj
+│  │                       │  │  │  │  │        │     ╰─ Key(0)
+│  │                       │  │  │  │  │        │        ╰─ Access
+│  │                       │  │  │  │  │        │           ├─ If
+│  │                       │  │  │  │  │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
+│  │                       │  │  │  │  │        │           │  ├─ Obj
+│  │                       │  │  │  │  │        │           │  │  ├─ Key(original: _.s.value.original)
+│  │                       │  │  │  │  │        │           │  │  ├─ Key(0: _.s.value["0"])
+│  │                       │  │  │  │  │        │           │  │  ╰─ Key(1: _.f[1])
+│  │                       │  │  │  │  │        │           │  ╰─ Ident(undefined)
+│  │                       │  │  │  │  │        │           ╰─ Literal("0")
+│  │                       │  │  │  │  │        ╰─ Key(right)
+│  │                       │  │  │  │  │           ╰─ Obj
+│  │                       │  │  │  │  │              ╰─ Key(1)
+│  │                       │  │  │  │  │                 ╰─ Access
+│  │                       │  │  │  │  │                    ├─ If
+│  │                       │  │  │  │  │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
+│  │                       │  │  │  │  │                    │  ├─ Obj
+│  │                       │  │  │  │  │                    │  │  ├─ Key(original: _.s.value.original)
+│  │                       │  │  │  │  │                    │  │  ├─ Key(0: _.s.value["0"])
+│  │                       │  │  │  │  │                    │  │  ╰─ Key(1: _.f[1])
+│  │                       │  │  │  │  │                    │  ╰─ Ident(undefined)
+│  │                       │  │  │  │  │                    ╰─ Literal("1")
+│  │                       │  │  │  │  ╰─ Literal("results")
+│  │                       │  │  │  ╰─ Obj
+│  │                       │  │  │     ╰─ Key(0)
+│  │                       │  │  │        ╰─ Access
+│  │                       │  │  │           ├─ Obj
+│  │                       │  │  │           │  ╰─ Key(1)
+│  │                       │  │  │           │     ╰─ Obj
+│  │                       │  │  │           │        ├─ Key(left)
+│  │                       │  │  │           │        │  ╰─ Obj
+│  │                       │  │  │           │        │     ╰─ Key(0)
+│  │                       │  │  │           │        │        ╰─ Access
+│  │                       │  │  │           │        │           ├─ If
+│  │                       │  │  │           │        │           │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
+│  │                       │  │  │           │        │           │  ├─ Obj
+│  │                       │  │  │           │        │           │  │  ├─ Key(original: _.s.value.original)
+│  │                       │  │  │           │        │           │  │  ├─ Key(0: _.s.value["0"])
+│  │                       │  │  │           │        │           │  │  ╰─ Key(1: _.f[1])
+│  │                       │  │  │           │        │           │  ╰─ Ident(undefined)
+│  │                       │  │  │           │        │           ╰─ Literal("0")
+│  │                       │  │  │           │        ╰─ Key(right)
+│  │                       │  │  │           │           ╰─ Obj
+│  │                       │  │  │           │              ╰─ Key(1)
+│  │                       │  │  │           │                 ╰─ Access
+│  │                       │  │  │           │                    ├─ If
+│  │                       │  │  │           │                    │  ├─ JsCore(_.s.identities.qsu42 === _.f[0])
+│  │                       │  │  │           │                    │  ├─ Obj
+│  │                       │  │  │           │                    │  │  ├─ Key(original: _.s.value.original)
+│  │                       │  │  │           │                    │  │  ├─ Key(0: _.s.value["0"])
+│  │                       │  │  │           │                    │  │  ╰─ Key(1: _.f[1])
+│  │                       │  │  │           │                    │  ╰─ Ident(undefined)
+│  │                       │  │  │           │                    ╰─ Literal("1")
+│  │                       │  │  │           ╰─ Literal("original")
+│  │                       │  │  ╰─ Literal("1")
+│  │                       │  ╰─ Literal("right")
 │  │                       ╰─ Literal("1")
 │  ╰─ Scope(Map())
 ├─ $MatchF
