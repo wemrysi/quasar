@@ -143,7 +143,7 @@ object FreeVFS {
 
   def init[S[_]](baseDir: ADir)(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, VFS] = {
     for {
-      _ <- initVersion(baseDir </> file("VERSION"), currentVFSVersion)
+      _ <- initVersion(baseDir </> file("VFSVERSION"), currentVFSVersion)
 
       exists <- POSIX.exists[S](baseDir </> MetaDir)
 
@@ -204,7 +204,7 @@ object FreeVFS {
       v <- VersionLog.fresh[S]
       target <- VersionLog.underlyingDir[Free[S, ?]](v)
 
-      _ <- writeVersion(target </> file("VERSION"), currentMetaVersion).liftM[StateT[?[_], VersionLog, ?]]
+      _ <- writeVersion(target </> file("METAVERSION"), currentMetaVersion).liftM[StateT[?[_], VersionLog, ?]]
 
       pathsSink <- POSIX.openW[S](target </> PathsFile).liftM[StateT[?[_], VersionLog, ?]]
 

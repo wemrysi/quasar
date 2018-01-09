@@ -67,7 +67,7 @@ object FreeVFSSpecs extends Specification {
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
             Task delay {
-              target mustEqual (BaseDir </> Path.file("VERSION"))
+              target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               false
             }
@@ -76,7 +76,7 @@ object FreeVFSSpecs extends Specification {
         _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
           case CPL(OpenW(target)) =>
             Task delay {
-              target mustEqual (BaseDir </> Path.file("VERSION"))
+              target mustEqual (BaseDir </> Path.file("VFSVERSION"))
               assertionSinkBV(_ mustEqual currentMetaVersionBV)
             }
         }
@@ -137,12 +137,12 @@ object FreeVFSSpecs extends Specification {
       }
     }
 
-    "initialize from an empty state with pre-existing expected VERSION" in {
+    "initialize from an empty state with pre-existing expected VFSVERSION" in {
       val interp = for {
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
             Task delay {
-              target mustEqual (BaseDir </> Path.file("VERSION"))
+              target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               true
             }
@@ -151,7 +151,7 @@ object FreeVFSSpecs extends Specification {
         _ <- H.pattern[Stream[POSIXWithTask, ByteVector]] {
           case CPL(OpenR(target)) =>
             Task delay {
-              target mustEqual (BaseDir </> Path.file("VERSION"))
+              target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               Stream.emit(currentVFSVersionBV)
             }
@@ -207,12 +207,12 @@ object FreeVFSSpecs extends Specification {
       }
     }
 
-    "initialize from an empty state with pre-existing unexpected VERSION" in {
+    "initialize from an empty state with pre-existing unexpected VFSVERSION" in {
       val interp = for {
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
             Task delay {
-              target mustEqual (BaseDir </> Path.file("VERSION"))
+              target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               true
             }
@@ -221,7 +221,7 @@ object FreeVFSSpecs extends Specification {
         _ <- H.pattern[Stream[POSIXWithTask, ByteVector]] {
           case CPL(OpenR(target)) =>
             Task delay {
-              target mustEqual (BaseDir </> Path.file("VERSION"))
+              target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               Stream.emit(ByteVector.fromInt(16384))
             }
@@ -271,7 +271,7 @@ object FreeVFSSpecs extends Specification {
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
             Task delay {
-              target mustEqual (BaseDir </> Path.file("VERSION"))
+              target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               false
             }
@@ -280,10 +280,14 @@ object FreeVFSSpecs extends Specification {
         _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
           case CPL(OpenW(target)) =>
             Task delay {
-              target mustEqual (BaseDir </> Path.file("VERSION"))
+              target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
-              (_ => Stream.empty)
+              assertionSinkBV(_ mustEqual currentVFSVersionBV)
             }
+        }
+
+        _ <- H.pattern[Unit] {
+          case CPR(ta) => ta
         }
 
         _ <- H.pattern[Unit] {
@@ -338,7 +342,7 @@ object FreeVFSSpecs extends Specification {
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
             Task delay {
-              target mustEqual (BaseDir </> Path.file("VERSION"))
+              target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               false
             }
@@ -347,7 +351,7 @@ object FreeVFSSpecs extends Specification {
         _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
           case CPL(OpenW(target)) =>
             Task delay {
-              target mustEqual (BaseDir </> Path.file("VERSION"))
+              target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               (_ => Stream.empty)
             }
@@ -421,7 +425,7 @@ object FreeVFSSpecs extends Specification {
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
             Task delay {
-              target mustEqual (BaseDir </> Path.file("VERSION"))
+              target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               false
             }
@@ -430,7 +434,7 @@ object FreeVFSSpecs extends Specification {
         _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
           case CPL(OpenW(target)) =>
             Task delay {
-              target mustEqual (BaseDir </> Path.file("VERSION"))
+              target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               (_ => Stream.empty)
             }
@@ -518,7 +522,7 @@ object FreeVFSSpecs extends Specification {
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
             Task delay {
-              target mustEqual (BaseDir </> Path.file("VERSION"))
+              target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               false
             }
@@ -527,7 +531,7 @@ object FreeVFSSpecs extends Specification {
         _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
           case CPL(OpenW(target)) =>
             Task delay {
-              target mustEqual (BaseDir </> Path.file("VERSION"))
+              target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               (_ => Stream.empty)
             }
@@ -1240,7 +1244,7 @@ object FreeVFSSpecs extends Specification {
       _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
         case CPL(OpenW(target)) =>
           Task delay {
-            target mustEqual (baseDir </> Path.dir(uuid.toString) </> Path.file("VERSION"))
+            target mustEqual (baseDir </> Path.dir(uuid.toString) </> Path.file("METAVERSION"))
             assertionSinkBV(_ mustEqual currentMetaVersionBV)
           }
       }
