@@ -22,9 +22,13 @@ import scalaz._, Scalaz._
 
 sealed abstract class TimingFormat
 object TimingFormat {
+  // Print timing data as JSON
   case object Json extends TimingFormat
+  // Print timing data as a RenderedTree
   case object Tree extends TimingFormat
+  // Only include the total time
   case object OnlyTotal extends TimingFormat
+  // Print no timing data
   case object Nothing extends TimingFormat
 
   def fromString(str: String): Option[TimingFormat] = str.toLowerCase match {
