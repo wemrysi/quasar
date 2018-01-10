@@ -20,20 +20,22 @@ import slamdata.Predef._
 
 import scalaz._, Scalaz._
 
-sealed abstract class OutputFormat
-object OutputFormat {
-  case object Table extends OutputFormat
-  case object Precise extends OutputFormat
-  case object Readable extends OutputFormat
-  case object Csv extends OutputFormat
-  case object Nothing extends OutputFormat
+sealed abstract class TimingFormat
+object TimingFormat {
+  // Print timing data as JSON
+  case object Json extends TimingFormat
+  // Print timing data as a RenderedTree
+  case object Tree extends TimingFormat
+  // Only include the total time
+  case object OnlyTotal extends TimingFormat
+  // Print no timing data
+  case object Nothing extends TimingFormat
 
-  def fromString(str: String): Option[OutputFormat] = str.toLowerCase match {
-    case "table"    => Table.some
-    case "precise"  => Precise.some
-    case "readable" => Readable.some
-    case "csv"      => Csv.some
-    case "nothing"  => Nothing.some
-    case _          => none
+  def fromString(str: String): Option[TimingFormat] = str.toLowerCase match {
+    case "json"      => Json.some
+    case "tree"      => Tree.some
+    case "onlytotal" => OnlyTotal.some
+    case "nothing"   => Nothing.some
+    case _           => none
   }
 }

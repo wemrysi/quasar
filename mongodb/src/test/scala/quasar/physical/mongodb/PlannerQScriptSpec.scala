@@ -38,6 +38,9 @@ class PlannerQScriptSpec extends
     PlannerHelpers with
     PendingWithActualTracking {
 
+  //to write the new actuals:
+  //override val mode = WriteMode
+
   import fixExprOp._
   import PlannerHelpers._
   import jscore._
@@ -46,11 +49,6 @@ class PlannerQScriptSpec extends
 
   val dsl =
     quasar.qscript.construction.mkDefaults[Fix, fs.MongoQScript[Fix, ?]]
-
-  // Some useful debugging objects
-  val rt  = RenderTree[Crystallized[WorkflowF]]
-  val rtq = RenderTree[Fix[fs.MongoQScript[Fix, ?]]]
-  val toMetalPlan: Crystallized[WorkflowF] => Option[String] = WorkflowExecutor.toJS(_).toOption
 
   import dsl._
 
@@ -316,7 +314,7 @@ class PlannerQScriptSpec extends
     }.pendingWithActual(notOnPar, qtestFile("plan simple inner equi-join with pre-filtering ($lookup)"))
 
     "plan 3-way equi-join ($lookup)" in {
-      qplan(simpleInnerEquiJoinWithPrefiltering) must beWorkflow0(chain[Workflow](
+      qplan(threeWayEquiJoin) must beWorkflow0(chain[Workflow](
         $read(collection("db", "extraSmallZips")),
         $match(Selector.Doc(
           BsonField.Name("_id") -> Selector.Exists(true))),
@@ -371,7 +369,6 @@ class PlannerQScriptSpec extends
           IgnoreId)))
           // Not on agg
     }.pendingWithActual(notOnPar, qtestFile("plan 3-way equi-join ($lookup)"))
-
 
     "plan filtered flatten" in {
       qplan(
@@ -622,6 +619,95 @@ class PlannerQScriptSpec extends
             "loc" -> $field("f")))))
     }
 
+    "plan flatten with Cond in struct and repair" in {
+      qplan(
+        fix.LeftShift(fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("patients"), qscript.ExcludeId),
+          func.Guard(
+            func.ProjectKey(
+              func.Cond(
+                func.And(
+                  func.Eq(
+                    func.ProjectKey(func.Hole, func.Constant(json.str("state"))),
+                    func.Constant(json.str("CO"))),
+                  func.Within(
+                    func.ProjectKey(func.Hole, func.Constant(json.str("city"))),
+                    func.Constant(json.arr(List(json.str("BOULDER"), json.str("AURORA")))))),
+                func.Hole,
+                func.Undefined),
+              func.Constant(json.str("codes"))),
+            Type.FlexArr(0, None, Type.Top),
+            func.ProjectKey(
+              func.Cond(
+                func.And(
+                  func.Eq(
+                    func.ProjectKey(func.Hole, func.Constant(json.str("state"))),
+                    func.Constant(json.str("CO"))),
+                  func.Within(
+                    func.ProjectKey(func.Hole, func.Constant(json.str("city"))),
+                    func.Constant(json.arr(List(json.str("BOULDER"), json.str("AURORA")))))),
+                func.Hole, func.Undefined), func.Constant(json.str("codes"))),
+            func.Undefined),
+          qscript.ExcludeId,
+          ShiftType.Array,
+          func.ConcatMaps(
+            func.ConcatMaps(
+              func.MakeMap(
+                func.Constant(json.str("codes")),
+                func.RightSide),
+              func.MakeMap(
+                func.Constant(json.str("first_name")),
+                func.ProjectKey(
+                  func.Cond(
+                    func.And(
+                      func.Eq(
+                        func.ProjectKey(func.LeftSide, func.Constant(json.str("state"))),
+                        func.Constant(json.str("CO"))),
+                      func.Within(
+                        func.ProjectKey(func.LeftSide, func.Constant(json.str("city"))),
+                        func.Constant(json.arr(List(json.str("BOULDER"), json.str("AURORA")))))),
+                    func.LeftSide,
+                    func.Undefined),
+                  func.Constant(json.str("first_name"))))),
+            func.MakeMap(
+              func.Constant(json.str("city")),
+              func.ProjectKey(
+                func.Cond(
+                  func.And(
+                    func.Eq(
+                      func.ProjectKey(func.LeftSide, func.Constant(json.str("state"))),
+                      func.Constant(json.str("CO"))),
+                    func.Within(
+                      func.ProjectKey(func.LeftSide, func.Constant(json.str("city"))),
+                      func.Constant(json.arr(List(json.str("BOULDER"), json.str("AURORA")))))),
+                  func.LeftSide,
+                  func.Undefined),
+                func.Constant(json.str("city"))))))) must beWorkflow0(
+        chain[Workflow](
+          $read(collection("db", "patients")),
+          $match(
+            Selector.And(
+              Selector.Doc(
+                BsonField.Name("state") ->
+                  Selector.Eq(Bson.Text("CO"))),
+              Selector.Doc(
+                BsonField.Name("city") ->
+                  Selector.In(Bson.Arr(List(Bson.Text("BOULDER"), Bson.Text("AURORA"))))))),
+          $project(reshape(
+            "s" -> $$ROOT,
+            "f" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Arr()), $field("codes")),
+                  $lt($field("codes"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $field("codes"),
+                $arrayLit(List($literal(Bson.Undefined)))))),
+          $unwind(DocField("f")),
+          $project(reshape(
+            "codes" -> $field("f"),
+            "first_name" -> $field("s", "first_name"),
+            "city" -> $field("s", "city")))))
+    }
+
     "plan typechecks with JS when unable to extract ExprOp" in {
       qplan(
         fix.Filter(
@@ -645,8 +731,7 @@ class PlannerQScriptSpec extends
             )))),
             ListMap()),
           $match(Selector.Doc(
-            BsonField.Name("0") -> Selector.Eq(Bson.Bool(true))
-          )),
+            BsonField.Name("0") -> Selector.Eq(Bson.Bool(true)))),
           $project(reshape(sigil.Quasar -> $field("src")))))
     }
   }

@@ -94,6 +94,8 @@ object SqlExpr extends SqlExprInstances {
     final case class OrderBy[T](v: T, sortDir: SortDir)
   }
 
+  final case class Union[T](left: T, right: T) extends SqlExpr[T]
+
   object IfNull {
     def build[T](a1: T, a2: T, a3: T*): IfNull[T] = IfNull(oneAnd(a1, nels(a2, a3: _*)))
   }
@@ -120,6 +122,7 @@ case object StrUpper extends UnaryFunctionType
 sealed trait BinaryFunctionType
 case object StrSplit extends BinaryFunctionType
 case object ArrayConcat extends BinaryFunctionType
+case object Contains extends BinaryFunctionType
 
 sealed trait TernaryFunctionType
 case object Substring extends TernaryFunctionType
