@@ -381,9 +381,14 @@ object MapFuncCore {
         map.reverse.find(_._1 ≟ key) ∘ (_._2.project)
 
       case ProjectKey(
-        Embed(CoEnv(\/-(MFC(Cond(cond, Embed(StaticMap(map)), u @ Embed(CoEnv(\/-(MFC(Undefined()))))))))),
+        Embed(CoEnv(\/-(MFC(Cond(cond, Embed(StaticMap(map)), alt))))),
         ExtractFunc(Constant(key))) =>
-        map.reverse.find(_._1 ≟ key) ∘ (_._2) >>= (v => rollMF[T, A](MFC(Cond(cond, v, u))).some)
+        map.reverse.find(_._1 ≟ key) ∘ (_._2) >>= (v => rollMF[T, A](MFC(Cond(cond, v, alt))).some)
+
+      case ProjectKey(
+        Embed(CoEnv(\/-(MFC(Cond(cond, cons, Embed(StaticMap(map))))))),
+        ExtractFunc(Constant(key))) =>
+        map.reverse.find(_._1 ≟ key) ∘ (_._2) >>= (v => rollMF[T, A](MFC(Cond(cond, cons, v))).some)
 
       // TODO: Generalize these to `StaticMapSuffix`
       case ProjectKey(Embed(CoEnv(\/-(MFC(MakeMap(k, Embed(v)))))), f) if k ≟ f =>
