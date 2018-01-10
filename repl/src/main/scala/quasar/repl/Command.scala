@@ -22,8 +22,6 @@ import quasar.sql.{Query}
 
 import pathy.Path, Path._
 import scalaz._, Scalaz._
-import eu.timepit.refined.api.{Refined, RefType}
-import eu.timepit.refined.numeric.{NonNegative, Positive}
 
 sealed abstract class Command
 object Command {
@@ -39,10 +37,7 @@ object Command {
   private val AppendPattern                = "(?i)append +([\\S]+) (.+)".r
   private val DeletePattern                = "(?i)rm +([\\S]+)".r
   private val SetPhaseFormatPattern        = "(?i)(?:set +)?phaseFormat *= *(tree|code)".r
-  private val SetTimingFormatPattern       = "(?i)(?:set +)?timingFormat *= *(tree|onlytotal|json|nothing)".r
-  private val SetQueryNamePattern          = "(?i)(?:set +)?queryName *= *(\\w*)".r
-  private val SetWarmupIterationsPattern   = "(?i)(?:set +)?warmupIterations *= *(\\d+)".r
-  private val SetMeasuredIterationsPattern = "(?i)(?:set +)?measuredIterations *= *([123456789]\\d+)".r
+  private val SetTimingFormatPattern       = "(?i)(?:set +)?timingFormat *= *(tree|onlytotal|nothing)".r
   private val DebugPattern                 = "(?i)(?:set +)?debug *= *(0|1|2)".r
   private val SummaryCountPattern          = "(?i)(?:set +)?summaryCount *= *(\\d+)".r
   private val FormatPattern                = "(?i)(?:set +)?format *= *((?:table)|(?:precise)|(?:readable)|(?:csv)|(?:nothing))".r
@@ -67,9 +62,6 @@ object Command {
   final case class Format(format: OutputFormat) extends Command
   final case class SetPhaseFormat(format: PhaseFormat) extends Command
   final case class SetTimingFormat(format: TimingFormat) extends Command
-  final case class SetQueryName(name: Option[String]) extends Command
-  final case class SetMeasuredIterations(iterations: Int Refined Positive) extends Command
-  final case class SetWarmupIterations(iterations: Int Refined NonNegative) extends Command
   final case class SetVar(name: String, value: String) extends Command
   final case class UnsetVar(name: String) extends Command
 
@@ -90,9 +82,6 @@ object Command {
       case DebugPattern(code)                       => Debug(DebugLevel.int.unapply(code.toInt) | DebugLevel.Normal)
       case SetPhaseFormatPattern(format)            => SetPhaseFormat(PhaseFormat.fromString(format) | PhaseFormat.Tree)
       case SetTimingFormatPattern(format)           => SetTimingFormat(TimingFormat.fromString(format) | TimingFormat.OnlyTotal)
-      case SetQueryNamePattern(name)                => SetQueryName(name.some.filter(_.nonEmpty))
-      case SetMeasuredIterationsPattern(iterations) => SetMeasuredIterations(RefType[Refined].unsafeWrap(iterations.toInt))
-      case SetWarmupIterationsPattern(iterations)   => SetWarmupIterations(RefType[Refined].unsafeWrap(iterations.toInt))
       case SummaryCountPattern(rows)                => SummaryCount(rows.toInt)
       case FormatPattern(format)                    => Format(OutputFormat.fromString(format) | OutputFormat.Table)
       case HelpPattern()                            => Help

@@ -42,7 +42,7 @@ import argonaut._, Argonaut._
 import eu.timepit.refined.refineV
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.{NonNegative, Positive}
+import eu.timepit.refined.numeric.Positive
 import matryoshka.data.Fix
 import pathy.Path, Path._
 import scalaz.{Failure => _, _}, Scalaz._
@@ -74,12 +74,9 @@ object Repl {
       |  rm [path]
       |  set debug = 0 | 1 | 2
       |  set phaseFormat = tree | code
-      |  set timingFormat = json | tree | onlytotal | nothing
+      |  set timingFormat = tree | onlytotal | nothing
       |  set summaryCount = [rows]
       |  set format = table | precise | readable | csv | nothing
-      |  set warmupIterations = [integer]
-      |  set measuredIterations = [non-zero integer]
-      |  set queryName = [name]
       |  set [var] = [value]
       |  env""".stripMargin
 
@@ -91,10 +88,7 @@ object Repl {
     summaryCount:       Option[Int Refined Positive],
     format:             OutputFormat,
     variables:          Map[String, String],
-    timingFormat:       TimingFormat,
-    queryName:          Option[String],
-    warmupIterations:   Int Refined NonNegative,
-    measuredIterations: Int Refined Positive
+    timingFormat:       TimingFormat
   ) {
 
   def targetDir(path: Option[XDir]): ADir =
@@ -119,7 +113,7 @@ object Repl {
 
   type RunStateT[A] = AtomicRef[RunState, A]
 
-  def command[S[_], W, M](cmd: Command, executionIdRef: TaskRef[Long])(
+  def command[S[_], T](cmd: Command, executionIdRef: TaskRef[Long])(
     implicit
     Q:  QueryFile.Ops[S],
     M:  ManageFile.Ops[S],
@@ -131,8 +125,7 @@ object Repl {
     S2: ReplFail :<: S,
     S3: Task :<: S,
     S4: FileSystemFailure :<: S,
-    SEW: ScopeExecution[Free[S, ?], W],
-    SEM: ScopeExecution[Free[S, ?], M]
+    SE: ScopeExecution[Free[S, ?], T]
   ): Free[S, Unit] = {
     import Command._
 
@@ -216,18 +209,6 @@ object Repl {
         RS.modify(_.copy(timingFormat = fmt)) *>
           P.println(s"Set timing format: $fmt")
 
-      case SetQueryName(name) =>
-        RS.modify(_.copy(queryName = name)) *>
-          P.println(name.cata(n => s"Set query name: $n", "Unset query name"))
-
-      case SetMeasuredIterations(iterations) =>
-        RS.modify(_.copy(measuredIterations = iterations)) *>
-          P.println(s"Set measured iterations: $iterations")
-
-      case SetWarmupIterations(iterations) =>
-        RS.modify(_.copy(warmupIterations = iterations)) *>
-          P.println(s"Set warmup iterations: $iterations")
-
       case SetVar(n, v) =>
         RS.modify(state => state.copy(variables = state.variables + (n -> v))).void
 
@@ -293,9 +274,8 @@ object Repl {
         for {
           newExecutionIndex <- Free.liftF(S3(executionIdRef.modify(_ + 1)))
           state <- RS.get
-          identifier = ExecutionId(state.queryName.map(_.right[Long]).getOrElse(newExecutionIndex.left))
-          _ <- Monad[Free[S, ?]].replicateM_(state.warmupIterations, select[W](identifier, state))
-          _ <- Monad[Free[S, ?]].replicateM_(state.measuredIterations, select[M](identifier, state))
+          identifier = ExecutionId(newExecutionIndex)
+          _ <- select[T](identifier, state)
         } yield ()
 
       case Explain(q) =>

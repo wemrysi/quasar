@@ -60,7 +60,7 @@ object execute {
           // FIXME: use fsQ.evaluateQuery here
           for {
             newExecutionIndex <- Free.liftF(S1(executionIdRef.modify(_ + 1)))
-            result <- SE.newExecution(ExecutionId(newExecutionIndex.left), ST =>
+            result <- SE.newExecution(ExecutionId(newExecutionIndex), ST =>
               for {
                 block <- ST.newScope("resolve imports", resolveImports[S](xpr, basePath).run)
                 lpOrSemanticErr <-
@@ -92,7 +92,7 @@ object execute {
           } else {
             respond(for {
               newExecutionIndex <- Free.liftF(S1(executionIdRef.modify(_ + 1)))
-              result <- SE.newExecution(ExecutionId(newExecutionIndex.left), ST =>
+              result <- SE.newExecution(ExecutionId(newExecutionIndex), ST =>
                 (for {
                   destination <- EitherT.fromDisjunction[Free[S, ?]](requiredHeader(Destination, req))
                   parsed <- EitherT(ST.newScope("parse SQL", sql.fixParser.parse(query).leftMap(_.toApiError).pure[Free[S, ?]]))

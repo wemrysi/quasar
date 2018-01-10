@@ -115,7 +115,7 @@ object ScopeTiming {
   }
 }
 
-final case class ExecutionId(identifier: Long \/ String)
+final case class ExecutionId(identifier: Long)
 object ExecutionId {
   implicit val executionIdShow: Show[ExecutionId] = Show.shows {
     case ExecutionId(identifier) => s"Query execution: $identifier"
@@ -139,7 +139,6 @@ object Execution {
   implicit val executionOrdering: SOrdering[Execution] = SOrdering.ordered[Instant](x => x).on(_.timings.end)
 
   def asJson(execution: Execution): Json = {
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     type PF[A] = EnvT[LabelledInterval, List, A]
     def treeToJson(in: PF[(String, Json)]): Json =
       Json.jObjectFields(
@@ -151,7 +150,7 @@ object Execution {
       Recursive[LabelledIntervalTree, PF]
         .zygo[Json, String](execution.timings.toIntervalTree)(_.ask.label, treeToJson)
     Json.jObjectFields(
-      "id" -> execution.id.identifier.fold(i => Json.jString(s"Unnamed query $i"), Json.jString),
+      "id" -> Json.jNumber(execution.id.identifier),
       "timings" -> subtrees
     )
   }
@@ -214,7 +213,7 @@ object SingleExecutionRef {
    TaskRef(Map.empty[String, (Instant, Instant)]).map(SingleExecutionRef(_))
 }
 
-final case class TimingRepository(recordedExecutions: Natural, 
+final case class TimingRepository(recordedExecutions: Natural,
                                   start: Instant,
                                   under: TaskRef[TreeSet[Execution]]) {
   def addExecution(execution: Execution): Task[Unit] = {
@@ -234,7 +233,3 @@ object TimingRepository {
     } yield TimingRepository(recordedExecutions, now, ref)
   }
 }
-
-// Marker classes for tagging instances
-sealed abstract class Warmup
-sealed abstract class Measured
