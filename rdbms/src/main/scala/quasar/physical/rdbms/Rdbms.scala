@@ -119,6 +119,7 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
                                                                cp: T[QSM[T, ?]]): Backend[Repr] = {
     val planner = Planner[T, EitherT[Free[Eff, ?], PlannerError, ?], QSM[T, ?]]
+    println(RenderTreeT[T].render(cp).shows)
     for {
       plan <- ME.unattempt(
         cp.cataM(planner.plan)
@@ -127,7 +128,7 @@ trait Rdbms extends BackendModule with RdbmsReadFile with RdbmsWriteFile with Rd
           .liftB)
       _ <- MT.tell(
         {
-          println(RenderTreeT[T].render(cp).shows)
+          println(RenderTreeT[Fix].render(plan).shows)
         Vector(detail("SQL AST", RenderTreeT[Fix].render(plan).shows))
         })
     } yield plan

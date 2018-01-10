@@ -23,11 +23,12 @@ import quasar.{NameGenerator, qscript}
 import quasar.Planner.PlannerErrorME
 import Planner._
 import sql.SqlExpr._
-import sql.{SqlExpr, genId}
+import sql.{SqlExpr, _}
 import sql.SqlExpr.Select._
 import quasar.qscript.{FreeMap, MapFunc, MapFuncsCore, QScriptCore, QScriptTotal, ReduceFunc, ReduceFuncs}
 import quasar.qscript.{MapFuncCore => MFC}
 import quasar.qscript.{MapFuncDerived => MFD}
+import quasar.physical.rdbms.planner.sql.Metas._
 import ReduceFuncs.Arbitrary
 
 import matryoshka._
@@ -67,15 +68,15 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       processFreeMap(f, SqlExpr.Null[T[SqlExpr]])
     case qscript.Map(src, f) =>
       for {
-        fromAlias <- genId[T[SqlExpr], F]
+        fromAlias <- genIdWithMeta[T[SqlExpr], F](deriveMeta(src))
         selection <- processFreeMap(f, fromAlias)
           .map(_.project match {
-            case SqlExpr.Id(_) => *
+            case SqlExpr.Id(_, _) => *
             case other => other.embed
           })
       } yield {
         Select(
-          Selection(selection, none),
+          Selection(selection, none, deriveMeta(src)),
           From(src, fromAlias),
           join = none,
           filter = none,
@@ -128,11 +129,11 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           }
         case other =>
           for {
-            fromAlias <- genId[T[SqlExpr], F]
+            fromAlias <- genIdWithMeta[T[SqlExpr], F](deriveMeta(src))
             filterExp <- processFreeMap(f, fromAlias)
           } yield {
           Select(
-            Selection(*, none),
+            Selection(*, none, deriveMeta(src)),
             From(src, fromAlias),
             join = none,
             Some(Filter(filterExp)),
@@ -157,7 +158,8 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     ).embed
 
     case reduce@qscript.Reduce(src, bucket, reducers, repair) => for {
-      alias <- genId[T[SqlExpr], F]
+      alias <- genIdWithMeta[T[SqlExpr], F](Branch(
+        (_: String) => (Dot, deriveMeta(src)), s"(Dot, ${deriveMeta(src).shows})"))
       gbs   <- bucket.traverse(processFreeMap(_, alias))
       rds   <- reducers.traverse(_.traverse(processFreeMap(_, alias)) >>=
         reduceFuncPlanner[T, F].plan)

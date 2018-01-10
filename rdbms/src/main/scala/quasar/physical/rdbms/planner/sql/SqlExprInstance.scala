@@ -35,10 +35,10 @@ trait SqlExprTraverse {
       case Null()              => G.point(Null())
       case Obj(m)              => m.traverse(_.bitraverse(f, f)) ∘ (l => Obj(l))
       case Constant(d)         => G.point(Constant(d))
-      case Id(str)             => G.point(Id(str))
+      case Id(str, m)             => G.point(Id(str, m))
       case RegexMatches(a1, a2, i) => (f(a1) ⊛ f(a2))(RegexMatches(_, _, i))
       case ExprWithAlias(e, a) => (f(e) ⊛ G.point(a))(ExprWithAlias.apply)
-      case ExprPair(e1, e2)    => (f(e1) ⊛ f(e2))(ExprPair.apply)
+      case ExprPair(e1, e2,m )    => (f(e1) ⊛ f(e2) ⊛ G.point(m))(ExprPair.apply)
       case ConcatStr(a1, a2)   => (f(a1) ⊛ f(a2))(ConcatStr(_, _))
       case Avg(a1)             => f(a1) ∘ (Avg(_))
       case Count(a1)           => f(a1) ∘ (Count(_))
@@ -47,7 +47,7 @@ trait SqlExprTraverse {
       case Sum(a1)             => f(a1) ∘ (Sum(_))
       case Distinct(a1)        => f(a1) ∘ (Distinct(_))
       case Time(a1)            => f(a1) ∘ Time.apply
-      case Refs(srcs)          =>  srcs.traverse(f) ∘ Refs.apply
+      case Refs(srcs, m)       =>  (srcs.traverse(f) ⊛ G.point(m))(Refs.apply)
       case Table(name)         => G.point(Table(name))
       case IsNotNull(v)        => f(v) ∘ IsNotNull.apply
       case IfNull(v)           => v.traverse(f) ∘ (IfNull(_))

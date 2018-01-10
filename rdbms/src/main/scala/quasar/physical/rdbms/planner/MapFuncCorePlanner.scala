@@ -33,6 +33,7 @@ import quasar.physical.rdbms.model.{BoolCol, DecCol, IntCol, StringCol}
 
 import scalaz._
 import Scalaz._
+import quasar.physical.rdbms.planner.sql.Metas._
 
 
 class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerErrorME]
@@ -42,10 +43,11 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
 
   def str(s: String): T[SQL] = SQL.Constant[T[SQL]](Data.Str(s)).embed
 
+  // TODO consider reusing "project()"
   def toKeyValue(expr: T[SQL], key: String): T[SQL] = {
     val nr: Refs[T[SQL]] = expr.project match {
-      case Refs(elems) => Refs(elems :+ str(key))
-      case _ => Refs(Vector(expr, str(key)))
+      case Refs(elems, m) => Refs(elems :+ str(key), m)
+      case _ => Refs(Vector(expr, str(key)), deriveMeta(expr))
     }
     nr.embed
   }
@@ -64,8 +66,8 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
   }
 
   private def project(fSrc: T[SQL], fKey: T[SQL]) = fSrc.project match {
-    case SQL.Refs(list) => SQL.Refs(list :+ fKey).embed.η[F]
-    case _ => SQL.Refs(Vector(fSrc, fKey)).embed.η[F]
+    case SQL.Refs(list, m) => SQL.Refs(list :+ fKey, m).embed.η[F]
+    case _ => SQL.Refs(Vector(fSrc, fKey), deriveMeta(fSrc)).embed.η[F] // _12
   }
 
   def plan: AlgebraM[F, MapFuncCore[T, ?], T[SQL]] = {
@@ -151,7 +153,30 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
                 notImplemented(s"MakeMap with key = $other", this)
             }
     case MFC.ConcatArrays(f1, f2) =>  SQL.BinaryFunction(ArrayConcat, f1, f2).embed.η[F]
-    case MFC.ConcatMaps(f1, f2) => ExprPair[T[SQL]](f1, f2).embed.η[F]
+    case MFC.ConcatMaps(f1, f2) =>
+      (f1.project, f2.project) match {
+        case (ExprWithAlias(e1, a1), ExprWithAlias(e2, a2)) =>
+
+          val patmat: PartialFunction[String, (MetaType, Meta)] = {
+            case `a1` => (Dot, deriveMeta(e1))
+            case `a2` => (Dot, deriveMeta(e2))
+          }
+
+          val meta = Branch(patmat.orElse {
+            s => Default match { // TODO yuck, refactor!
+              case Branch(m, _) => {
+                println(s">>>>>>>>>>>>> orElse $s")
+                m(s)
+              }
+            }
+          }, s"$a1 -> (Dot, ${deriveMeta(e1).shows}), $a2 -> (Dot, ${deriveMeta(e2).shows})")
+
+          ExprPair[T[SQL]](f1, f2, meta).embed.η[F]
+
+        case (o1, o2) =>
+          ExprPair[T[SQL]](f1, f2, Default).embed.η[F]
+      }
+
     case MFC.ProjectIndex(fSrc, fKey) => project(fSrc, fKey)
     case MFC.ProjectKey(fSrc, fKey) => project(fSrc, fKey)
     case MFC.DeleteKey(fSrc, fField) =>   notImplemented("DeleteKey", this)

@@ -1,9 +1,9 @@
 {
-  "name": "[qa_s01] select fields",
+  "name": "[qa_s01] select fields dupa",
 
   "data": "basic.data",
 
-  "query": "select num, name from basic",
+  "query": "select upper(name.foo.bar) as ff from basic",
 
   "predicate": "exactly",
   

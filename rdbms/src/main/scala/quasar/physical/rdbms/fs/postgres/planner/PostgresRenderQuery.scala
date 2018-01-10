@@ -35,6 +35,7 @@ import matryoshka.implicits._
 
 import scalaz._
 import Scalaz._
+import quasar.physical.rdbms.planner.sql.Metas._
 
 object PostgresRenderQuery extends RenderQuery {
   import SqlExpr._
@@ -49,7 +50,7 @@ object PostgresRenderQuery extends RenderQuery {
       (e.project match {
         case ea@ExprWithAlias(expr, alias) =>
           expr.project match {
-            case Id(txt) =>
+            case Id(txt, _) =>
               ea
               //ExprWithAlias(UnaryFunction(ToJson, Id[T[SqlExpr]](txt).embed).embed, alias)
             case _ => ea
@@ -58,7 +59,10 @@ object PostgresRenderQuery extends RenderQuery {
       }).embed
     }
 
-    a.transCataT(aliasSelectionToJson).paraM(galg) ∘ (s => s"select row_to_json(row) from ($s) as row")
+    a.transCataT(aliasSelectionToJson).paraM(galg) ∘ (s => {
+      println(s)
+      s"select row_to_json(row) from ($s) as row"
+    })
   }
 
   def alias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" as ${i.v}"))
@@ -75,7 +79,7 @@ object PostgresRenderQuery extends RenderQuery {
     val toReplace = "->"
     val replacement = "->>"
     expr.project match {
-      case Refs(_) =>
+      case Refs(_, _) =>
         val pos = str.lastIndexOf(toReplace)
         if (pos > -1 && !str.contains(replacement))
           s"${str.substring(0, pos)}$replacement${str.substring(pos + toReplace.length, str.length)}"
@@ -107,34 +111,37 @@ object PostgresRenderQuery extends RenderQuery {
 
   private def postgresArray(jsonArrayRepr: String) = s"array_to_json(ARRAY$jsonArrayRepr)"
 
+  final case class Acc(s: String, m: Metas.Meta)
+
   def galg[T[_[_]]: BirecursiveT]: GAlgebraM[(T[SqlExpr], ?), PlannerError \/ ?, SqlExpr, String] = {
     case Unreferenced() =>
     InternalError("Unexpected Unreferenced!", none).left
     case Null() => "null".right
-    case SqlExpr.Id(v) =>
+    case SqlExpr.Id(v, _) =>
       s"""$v""".right
     case Table(v) =>
       v.right
     case AllCols() =>
       s"*".right
-    case Refs(srcs) =>
+    case Refs(srcs, m) =>
       srcs.unzip(ι) match {
-        case (Vector(_, last), Vector(key, value)) =>
-          last.project match {
-            case Constant(Data.Int(index)) => s"""$key->${index+1}""".right
-            case _ =>
-              val valueStripped = value.stripPrefix("'").stripSuffix("'")
-              s"""$key."$valueStripped"""".right
-          }
-        case (_, key +: mid :+ last) =>
-          val firstValStripped = ~mid.headOption.map(_.stripPrefix("'").stripSuffix("'"))
-          val midTail = mid.drop(1)
-          val midStr = if (midTail.nonEmpty)
-            s"->${midTail.map(e => s"$e").intercalate("->")}"
-          else
-            ""
-          s"""$key."$firstValStripped"$midStr->$last""".right
-        case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
+        case (_, firstStr +: tail) =>
+          println(s">>>>> fold for $srcs")
+          tail.foldLeft(Acc(firstStr, m)) {
+            case (acc@Acc(accStr, Branch(mFunc, _)), nextStr) =>
+              println(s">>>>> Acc = $acc")
+              println(s">>>>> nextStr = $nextStr")
+              val nextStrStripped = nextStr.stripPrefix("'").stripSuffix("'")
+              val (metaType, nextMeta) = mFunc(nextStrStripped)
+              val str = metaType match {
+                case Dot =>
+                  s"""($accStr."$nextStrStripped")"""
+                case Arr => s"$accStr->$nextStr"
+              }
+              Acc(str, nextMeta)
+          }.s.right
+        case _ =>
+          InternalError("Refs with empty vector!", none).left // TODO refs should carry a Nel
       }
     case Obj(m) =>
       buildJson(m.map {
@@ -149,7 +156,7 @@ object PostgresRenderQuery extends RenderQuery {
       s"coalesce(${exprs.map(e => text(e)).intercalate(", ")})".right
     case ExprWithAlias((_, expr), alias) =>
         s"""$expr as "$alias"""".right
-    case ExprPair((_, s1), (_, s2)) =>
+    case ExprPair((_, s1), (_, s2), _) =>
       s"$s1, $s2".right
     case ConcatStr(TextExpr(e1), TextExpr(e2))  =>
       s"$e1 || $e2".right

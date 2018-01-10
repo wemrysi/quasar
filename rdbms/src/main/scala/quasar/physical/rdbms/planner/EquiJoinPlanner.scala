@@ -19,7 +19,7 @@ package quasar.physical.rdbms.planner
 import quasar.fp.ski._
 import quasar.NameGenerator
 import quasar.Planner.PlannerErrorME
-import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
+import quasar.physical.rdbms.planner.sql.{SqlExpr, genIdWithMeta}
 import SqlExpr._
 import quasar.qscript.{EquiJoin, FreeMap, JoinFunc, LeftSide, MapFunc, QScriptTotal, RightSide}
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select.AllCols
@@ -30,6 +30,7 @@ import matryoshka.patterns._
 
 import scalaz._
 import Scalaz._
+import quasar.physical.rdbms.planner.sql.Metas._
 
 class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT,
 F[_]: Monad: NameGenerator: PlannerErrorME](
@@ -59,10 +60,12 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       val compile = Planner[T, F, QScriptTotal[T, ?]].plan
 
       for {
-        leftAlias <- genId[T[SqlExpr], F]
-        rightAlias <- genId[T[SqlExpr], F]
         left <- lBranch.cataM(interpretM(κ(src.point[F]), compile))
         right <- rBranch.cataM(interpretM(κ(src.point[F]), compile))
+        lMeta = deriveMeta(left)
+        rMeta = deriveMeta(right)
+        leftAlias <- genIdWithMeta[T[SqlExpr], F](lMeta)
+        rightAlias <- genIdWithMeta[T[SqlExpr], F](rMeta)
         combined <- processJoinFunc(combine, leftAlias, rightAlias)
         keyExprs <-
           keys.traverse {
@@ -71,18 +74,19 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           }
       } yield {
 
-//        val selectionExpr = combined.project match {
-//          case e@ExprPair(a, b) =>
-//            (a.project, b.project) match {
-//              case (SqlExpr.Id(_), SqlExpr.Id(_)) => *
-//              case _ => e.embed
-//            }
-//          case other =>
-//            other.embed
-//        }
+
+        val selectionExpr = combined.project match {
+          case e@ExprPair(a, b, _) =>
+            (a.project, b.project) match {
+              case (SqlExpr.Id(_, _), SqlExpr.Id(_, _)) => *
+              case _ => e.embed
+            }
+          case other =>
+            other.embed
+        }
 
         Select(
-          selection = Selection(combined, none),
+          selection = Selection(selectionExpr, none, deriveMeta(combined)),
           from = From(left, leftAlias),
           join = Join(right, keyExprs, joinType, rightAlias).some,
           filter = none,

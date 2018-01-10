@@ -7,7 +7,6 @@
         "mimir": "ignoreFieldOrder"
     },
 
-    "NB": "Skipping for postgres until there's support for COUNT",
     "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
 
     "query": "SELECT p.author.login, COUNT(*) as count

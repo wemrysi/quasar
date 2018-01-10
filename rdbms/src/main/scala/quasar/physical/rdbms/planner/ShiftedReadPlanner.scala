@@ -53,5 +53,4 @@ class ShiftedReadPlanner[
             filter = none).embed
       }
   }
-
 }
