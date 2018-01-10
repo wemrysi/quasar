@@ -87,11 +87,9 @@ class DataCodecSpecs extends quasar.Qspec {
 
     "parse" should {
       // These types get lost on the way through rendering and re-parsing:
-
       "re-parse very large Int value as Dec" in {
         roundTrip(Data.Int(LargeInt)) must beSome(Data.Dec(new java.math.BigDecimal(LargeInt.underlying)).right[DataEncodingError])
       }
-
 
       // Some invalid inputs:
 
@@ -99,13 +97,13 @@ class DataCodecSpecs extends quasar.Qspec {
         DataCodec.parse("""{ "$a": 1 }""") must beLeftDisjunction(UnescapedKeyError(jSingleObject("$a", jNumber(1))))
       }
 
-//      "fail with bad timestamp value" in {
-//        DataCodec.parse("""{ "$timestamp": 123456 }""") must beLeftDisjunction
-//      }
+      "fail with invalid offset date time value" in {
+        DataCodec.parse("""{ "$offsetdatetime": 123456 }""") must beLeftDisjunction
+      }
 
-//      "fail with bad timestamp string" in {
-//        DataCodec.parse("""{ "$timestamp": "10 o'clock this morning" }""") must beLeftDisjunction
-//      }
+      "fail with invalid offset date time string" in {
+        DataCodec.parse("""{ "$offsetdatetime": "10 o'clock this morning" }""") must beLeftDisjunction
+      }
     }
   }
 
