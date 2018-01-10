@@ -89,9 +89,12 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.constant(Data.Obj("total" -> Data.Int(1))))
     }
 
-    // TODO: Come back to this
     "compile expression with datetime, date, time, and interval" in {
-      import java.time.{LocalDate => JLocalDate, OffsetDateTime => JOffsetDateTime, LocalTime => JLocalTime}
+      import java.time.{
+        LocalDate => JLocalDate,
+        LocalTime => JLocalTime,
+        OffsetDateTime => JOffsetDateTime
+      }
 
       testTypedLogicalPlanCompile(
         sqlE"""select timestamp("2014-11-17T22:00:00Z") + interval("PT43M40S"), date("2015-01-19"), time("14:21")""",
