@@ -30,7 +30,7 @@ import quasar.fs.mount._
 import quasar.main._
 
 import eu.timepit.refined.refineMV
-import eu.timepit.refined.numeric.Positive
+import eu.timepit.refined.numeric.{NonNegative, Positive}
 import org.jboss.aesh.console.{AeshConsoleCallback, Console, ConsoleOperation, Prompt}
 import org.jboss.aesh.console.helper.InterruptHook
 import org.jboss.aesh.console.settings.SettingsBuilder
@@ -114,9 +114,9 @@ object Main {
     S5: FileSystemFailure :<: S
   ): Task[Command => Free[DriverEff, Unit]] = {
     for {
-      stateRef <- TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, PhaseFormat.Tree, refineMV[Positive](10).some, OutputFormat.Table, Map(), false))
+      stateRef <- TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, PhaseFormat.Tree, refineMV[Positive](10).some, OutputFormat.Table, Map(), TimingFormat.OnlyTotal))
       executionIdRef <- TaskRef(0L)
-      timingRepository <- TimingRepository.empty(refineMV(1))
+      timingRepository <- TimingRepository.empty(refineMV[NonNegative](1L))
       i =
         injectFT[Task, DriverEff].compose(AtomicRef.fromTaskRef(stateRef)) :+:
         injectFT[ConsoleIO, DriverEff]                                :+:
@@ -125,10 +125,20 @@ object Main {
         injectFT[Task, DriverEff]                                     :+:
         fs
     } yield {
-      val timingPrint = (in: String) => for {
+      val timingPrint = (id: ExecutionId, timings: ExecutionTimings) => for {
         state <- Free.liftF(Inject[Task, ReplEff[S, ?]].inj(stateRef.read))
-        _ <- if (state.printTiming) Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(in)))
-             else ().point[Free[ReplEff[S, ?], ?]]
+        _ <- state.timingFormat match {
+          case TimingFormat.Nothing | TimingFormat.OnlyTotal =>
+            ().point[Free[ReplEff[S, ?], ?]]
+          case TimingFormat.Tree =>
+            val timingTree =
+              ExecutionTimings.render(ExecutionTimings.toLabelledIntervalTree(id, timings)).shows
+            Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(timingTree)))
+          case TimingFormat.Json =>
+            val renderedJson =
+              ExecutionTimings.asJson(id, ExecutionTimings.toLabelledIntervalTree(id, timings)).nospaces
+            Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(renderedJson)))
+        }
       } yield ()
       implicit val SE = ScopeExecution.forFreeTask[ReplEff[S, ?], Nothing](timingRepository, timingPrint)
       (cmd => Repl.command[ReplEff[S, ?], Nothing](cmd, executionIdRef).foldMap(i))

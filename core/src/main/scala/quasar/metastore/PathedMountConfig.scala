@@ -14,25 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.physical.mongodb.expression.transform
+package quasar.metastore
 
-import slamdata.Predef._
+import quasar.contrib.pathy.APath
+import quasar.fs.mount.{ConnectionUri, MountType}
 
-import quasar.physical.mongodb.BsonField
-import quasar.physical.mongodb.expression._
+final case class PathedMountConfig(path: APath, mt: MountType, uri: ConnectionUri)
 
-import matryoshka._
-import matryoshka.implicits._
-import scalaz._
 
-object wrapArrayInLet {
-  def apply[T[_[_]]: CorecursiveT, EX[_]: Functor]
-    (expr: EX[T[EX]])
-    (implicit ev: ExprOpCoreF :<: EX)
-      : EX[T[EX]] = expr match {
-    case a @ $arrayLitF(_) =>
-      $letF(ListMap(DocVar.Name("a") -> a.embed),
-        $varF[EX, T[EX]](DocVar.ROOT(BsonField.Name("$a"))).embed)
-    case x => x
-  }
-}
