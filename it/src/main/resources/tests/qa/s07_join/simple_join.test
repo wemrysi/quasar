@@ -5,8 +5,6 @@
         "couchbase":         "timeout",
         "marklogic_json":    "timeout",
         "marklogic_xml":     "timeout",
-        "mongodb_2_6":       "ignoreFieldOrder",
-        "mongodb_3_0":       "ignoreFieldOrder",
         "mongodb_3_2":       "ignoreFieldOrder",
         "mongodb_3_4":       "ignoreFieldOrder",
         "mongodb_read_only": "ignoreFieldOrder",
