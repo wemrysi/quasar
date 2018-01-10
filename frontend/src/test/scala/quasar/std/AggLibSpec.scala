@@ -51,13 +51,12 @@ class AggLibSpec extends quasar.Qspec {
       Avg.tpe(Func.Input1(Type.Const(s))) must beSuccessful(Type.Const(Data.Dec(n * 0.75)))
     }
 
-    // TODO DATETIME: What do we do about this?
-//    "type a constant Interval set to the constant average of values" >> prop { n: Int =>
-//      val dur = DateTimeInterval.ofSeconds(n.toLong)
-//      val durPlusTwo = DateTimeInterval.ofSeconds(n.toLong + 2)
-//      val s = Data.Set(List(Data.Interval(dur), Data.Interval(durPlusTwo)))
-//      Avg.tpe(Func.Input1(Type.Const(s))) must beSuccessful(Type.Const(Data.Dec(n.toLong + 1)))
-//    }
+    "error when applied to a set of Intervals" >> {
+      val dur5 = DateTimeInterval.ofSeconds(5)
+      val dur7 = DateTimeInterval.ofSeconds(7)
+      val s = Data.Set(List(Data.Interval(dur5), Data.Interval(dur7)))
+      Avg.tpe(Func.Input1(Type.Const(s))) must beFailing
+    }
 
     "error when applied to an empty constant set" >> {
       Avg.tpe(Func.Input1(Type.Const(Data.Set(Nil)))) must beFailing

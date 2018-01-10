@@ -133,8 +133,8 @@ trait AggLib extends Library {
   val Avg = UnaryFunc(
     Reduction,
     "Finds the average in a set of numeric values",
-    Type.Numeric ⨿ Type.Interval,
-    Func.Input1(Type.Numeric ⨿ Type.Interval),
+    Type.Numeric,
+    Func.Input1(Type.Numeric),
     noSimplification,
     partialTyperV[nat._1] {
       case Sized(Type.Const(Data.Set(Nil))) =>
