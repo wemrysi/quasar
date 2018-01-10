@@ -137,6 +137,7 @@ object PostgresRenderQuery extends RenderQuery {
       s"$e1 || $e2".right
     case Time((_, expr)) =>
       ???
+      // TODO reimplement this
       // buildJson(s"""{ "$TimeKey": $expr }""").right
     case NumericOp(sym, NumExpr(left), NumExpr(right)) =>
       s"($left $sym $right)".right

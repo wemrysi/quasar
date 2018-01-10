@@ -373,9 +373,6 @@ object CoreMap extends Serializable {
     case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a) / b)
     case (Data.Dec(a), Data.Int(b)) => Data.Dec(a(BigDecimal.defaultMathContext) / BigDecimal(b))
     case (Data.Int(a), Data.Int(b)) => Data.Dec(BigDecimal(a) / BigDecimal(b))
-//    case (Data.Interval(a), Data.Dec(b)) => Data.Interval(a.multiply(b.toInt))
-      // TODO: Come back to this. How is division implemented as multiplication?
-    case (Data.Interval(a), Data.Int(b)) => Data.Interval(a.multiply(b.toInt))
     case _ => undefined
   }
 

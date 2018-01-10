@@ -39,15 +39,13 @@ class SparkStdLibSpec extends StdLibSpec {
 
   def ignoreSome(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data)(run: => Result): Result =
     (prg, arg1, arg2) match {
-//      TODO: Come back to this
-//      case (ExtractFunc(MapFuncsCore.Eq(_,_)), Data.Date(_), Data.Timestamp(_)) => Skipped("TODO")
       case _ => run
     }
 
   /** Identify constructs that are expected not to be implemented. */
   val shortCircuit: AlgebraM[Result \/ ?, MapFunc[Fix, ?], Unit] = {
-//    case MFC(ExtractIsoYear(_))  => TODO
-//    case MFC(ExtractWeek(_))     => TODO
+    case MFC(ExtractIsoYear(_))  => TODO
+    case MFC(ExtractWeek(_))     => TODO
     case MFD(Trunc(_))           => TODO
     case MFC(Power(_, _))        => Pending("TODO: handle large value").left
     case MFC(ConcatArrays(_, _)) => Pending("TODO: handle mixed string/array").left
