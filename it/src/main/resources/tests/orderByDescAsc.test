@@ -1,7 +1,8 @@
 {
     "name": "order by desc and asc",
     "backends": {
-        "mimir":       "pending"
+        "mimir": "ignoreFieldOrder",
+        "couchbase": "ignoreFieldOrder"
     },
     "data": "zips.data",
     "query": "select city, state from zips order by state desc, city asc",
