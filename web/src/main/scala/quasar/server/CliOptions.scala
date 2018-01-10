@@ -118,7 +118,7 @@ object CliOptions {
     } text("the port to run Quasar on")
 
     opt[Int]('x', "recorded-executions") validate { x =>
-      if (x < 0) Left(s"Recorded executions must be negative, but are set to $x")
+      if (x < 0) Left(s"Recorded executions must not be negative, but is set to $x")
       else Right(())
     } action { (x, c) =>
       (l composeLens recordedExecutions).set(RefType[Refined].unsafeWrap(x.toLong))(c)
