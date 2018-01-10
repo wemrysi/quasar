@@ -1479,12 +1479,21 @@ object MongoDbPlanner {
 
     val bsonVersion = toBsonVersion(queryModel)
 
+    val joinHandler: JoinHandler[Workflow3_2F, WBM] =
+      JoinHandler.fallback[Workflow3_2F, WBM](
+        JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
+        JoinHandler.mapReduce)
+
     queryModel match {
+      case `3.4.4` =>
+        val cfg = PlannerConfig[T, Expr3_4_4, Workflow3_2F](
+          joinHandler,
+          FuncHandler.handle3_4_4(bsonVersion),
+          StaticHandler.handle,
+          bsonVersion)
+        plan0[T, M, Workflow3_2F, Expr3_4_4](anyDoc, cfg)(qs)
+
       case `3.4` =>
-        val joinHandler: JoinHandler[Workflow3_2F, WBM] =
-          JoinHandler.fallback[Workflow3_2F, WBM](
-            JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
-            JoinHandler.mapReduce)
         val cfg = PlannerConfig[T, Expr3_4, Workflow3_2F](
           joinHandler,
           FuncHandler.handle3_4(bsonVersion),
@@ -1493,10 +1502,6 @@ object MongoDbPlanner {
         plan0[T, M, Workflow3_2F, Expr3_4](anyDoc, cfg)(qs)
 
       case `3.2` =>
-        val joinHandler: JoinHandler[Workflow3_2F, WBM] =
-          JoinHandler.fallback[Workflow3_2F, WBM](
-            JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
-            JoinHandler.mapReduce)
         val cfg = PlannerConfig[T, Expr3_2, Workflow3_2F](
           joinHandler,
           FuncHandler.handle3_2(bsonVersion),
