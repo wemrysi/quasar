@@ -48,6 +48,7 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
     val genKey = Gen.alphaNumChar flatMap (c => Gen.alphaNumStr map (c.toString + _))
     val genDbl = Gen.choose(-1000.0, 1000.0)
 
+    // TODO: Use existing datetime generators where possible
     val secondsInDay: Long        = 24L * 60 * 60
     //  TODO: Many negative years parse fine, but some don't, randomly
     //  1600-01-01 to 9999-12-31
@@ -67,11 +68,11 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
       arbitrary[Boolean]     map Data.Bool,
       genDbl                 map (d => Data.Dec(BigDecimal(d, MathContext.DECIMAL32))),
       arbitrary[Int]         map (i => Data.Int(BigInt(i))),
-      // TODO: Come back to this
-//      genInstant             map Data.Timestamp,
-//      genDate                map Data.Date,
-//      genTime                map Data.Time,
-//      genDuration            map Data.Interval,
+      // TODO: Use existing Data generators where possible
+      // genInstant             map Data.Timestamp,
+      // genDate                map Data.Date,
+      // genTime                map Data.Time,
+      // genDuration            map Data.Interval,
       arbitrary[Array[Byte]] map Data.Binary.fromArray)
 
     Arbitrary(DataGenerators.genNested(genKey, genAtomic))

@@ -47,12 +47,6 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
 
   def ignoreSome(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data)(run: => Result): Result =
     (prg, arg1, arg2) match {
-//      TODO: Come back to this
-//      case (ExtractFunc(MapFuncsCore.Eq(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
-//      case (ExtractFunc(MapFuncsCore.Lt(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
-//      case (ExtractFunc(MapFuncsCore.Lte(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
-//      case (ExtractFunc(MapFuncsCore.Gt(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
-//      case (ExtractFunc(MapFuncsCore.Gte(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
       case (ExtractFunc(MapFuncsCore.Split(_,_)), _, _) => pending
       case (ExtractFunc(MapFuncsCore.Within(_,_)), _, _) => pending
       case (ExtractFunc(MapFuncsCore.IfUndefined(_,_)), _, _) => pending

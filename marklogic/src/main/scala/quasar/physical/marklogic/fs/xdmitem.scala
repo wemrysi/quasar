@@ -83,7 +83,6 @@ object xdmitem {
     case item: XSBase64Binary           => bytesToData[F](item.asBinaryData)
     case item: XSBoolean                => Data._bool(item.asPrimitiveBoolean).point[F]
     case item: XSDate                   => parseLocalDate[F](item.asString) map (Data._localDate(_))
-    // TODO: Come back to this
     case item: XSDateTime               => Data._localDateTime(LocalDateTime.parse(item.asString)).point[F]
     case item: XSDecimal                => Data._dec(item.asBigDecimal).point[F]
     case item: XSDouble                 => Data._dec(item.asBigDecimal).point[F]
@@ -115,7 +114,6 @@ object xdmitem {
   private def jsonToData[F[_]: MonadErrMsgs](jsonString: String): F[Data] =
     Parse.decodeWithMessage(jsonString, data.decodeJson[F], _.wrapNel.raiseError[F, Data])
 
-  // TODO: ASK FOR REVIEW
   private def convertDuration(xsd: XSDuration): DateTimeInterval = {
     val xdd   = xsd.asDuration
     val days  = (xdd.getYears * 365L) + (xdd.getMonths * 30) + xdd.getDays

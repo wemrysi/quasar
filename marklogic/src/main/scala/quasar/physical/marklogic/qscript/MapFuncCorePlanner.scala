@@ -91,10 +91,10 @@ private[qscript] final class MapFuncCorePlanner[
                                            fn.minutesFromDuration(fn.timezoneFromDateTime(dt)))
     case ExtractWeek(time)            => asDate(time) map (xdmp.weekFromDate)
     case ExtractYear(time)            => asDateTime(time) map fn.yearFromDateTime
-      // TODO: Come back to this
-    case SetTimezone(s, t)            => ???
-    case SetTimezoneMinute(m, t)      => ???
-    case SetTimezoneHour(h, t)        => ???
+
+    case SetTimezone(s, t)            => ??? // TODO
+    case SetTimezoneMinute(m, t)      => ??? // TODO
+    case SetTimezoneHour(h, t)        => ??? // TODO
 
     // math
     case Negate(x)                    => SP.castIfNode(x) map (-_)
