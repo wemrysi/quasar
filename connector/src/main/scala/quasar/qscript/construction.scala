@@ -137,6 +137,13 @@ object construction {
       rollCore(MapFuncsCore.MakeMap(key, src))
     def MakeMapS[A](key: String, src: FreeMapA[T, A]): FreeMapA[T, A] =
       MakeMap(Constant(json.str(key)), src)
+    def StaticMap[A](pairs: (String, FreeMapA[T, A])*): FreeMapA[T, A] =
+      IList(pairs: _*).toNel.fold(Constant[A](json.map(Nil))) {
+        case NonEmptyList((hk, hv), t) =>
+          t.reverse.foldRight(MakeMapS(hk, hv)) { case ((k, v), b) => ConcatMaps(b, MakeMapS(k, v)) }
+      }
+    def StaticMapF[A, K](keys: K*)(f: K => FreeMapA[T, A], fk: K => String): FreeMapA[T, A] =
+      StaticMap(keys.map { k => (fk(k), f(k)) }: _*)
     def ProjectIndex[A](src: FreeMapA[T, A], index: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.ProjectIndex(src, index))
     def ProjectIndexI[A](src: FreeMapA[T, A], index: Int): FreeMapA[T, A] =

@@ -47,9 +47,9 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
   val rollS = Free.roll[EJson, Figure] _
 
   val joinFunc =
-    func.ConcatMaps(
-      func.MakeMap(func.Constant(Fix(CommonEJson(ejson.Str("left")))), LeftSideF),
-      func.MakeMap(func.Constant(Fix(CommonEJson(ejson.Str("right")))), RightSideF))
+    func.StaticMap(
+      ("left", func.LeftSide),
+      ("right", func.RightSide))
 
   val modSides: (Shape, Shape) => Shape =
     (l, r) => rollS(ExtEJson(ejson.Map(List(

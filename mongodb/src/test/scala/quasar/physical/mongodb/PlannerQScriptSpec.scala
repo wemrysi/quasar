@@ -78,9 +78,8 @@ class PlannerQScriptSpec extends
             func.Undefined),
           func.ProjectKeyS(func.Hole, "_id"))),
       JoinType.Inner,
-      func.ConcatMaps(
-        func.MakeMap(
-          func.Constant(json.str("city")),
+      func.StaticMap(
+        ("city",
           // qscript is generated with 3 guards here:
           // func.Guard(
           //   func.Guard(func.LeftSide, Type.AnyObject, func.LeftSide, func.Undefined),
@@ -88,8 +87,7 @@ class PlannerQScriptSpec extends
           //   func.Guard(func.LeftSide, Type.AnyObject, func.ProjectKeyS(func.LeftSide, "city"), func.Undefined),
           //   func.Undefined)),
           func.Guard(func.LeftSide, Type.AnyObject, func.ProjectKeyS(func.LeftSide, "city"), func.Undefined)),
-        func.MakeMap(
-          func.Constant(json.str("state")),
+        ("state",
           func.Guard(func.RightSide, Type.AnyObject, func.ProjectKeyS(func.RightSide, "state"), func.Undefined))))
 
   val simpleInnerEquiJoinWithPrefiltering =
@@ -118,16 +116,14 @@ class PlannerQScriptSpec extends
             func.ProjectKeyS(func.Hole, "_id"),
             func.Undefined))),
       JoinType.Inner,
-      func.ConcatMaps(
-        func.MakeMap(
-          func.Constant(json.str("city")),
+      func.StaticMap(
+        ("city",
           func.Guard(
             func.LeftSide,
             Type.AnyObject,
             func.ProjectKeyS(func.LeftSide, "city"),
             func.Undefined)),
-        func.MakeMap(
-          func.Constant(json.str("state")),
+        ("state",
           func.Guard(
             func.Guard(
               func.RightSide,
@@ -193,17 +189,13 @@ class PlannerQScriptSpec extends
           func.ProjectKeyS(func.ProjectIndexI(func.Hole, 1), "_id"),
           func.ProjectKeyS(func.Hole, "_id"))),
       JoinType.Inner,
-      func.ConcatMaps(
-        func.ConcatMaps(
-          func.MakeMap(
-            func.Constant(json.str("city")),
+      func.StaticMap(
+        ("city",
             func.Guard(
-              func.ConcatMaps(
-                func.MakeMap(
-                  func.Constant(json.str("left")),
+              func.StaticMap(
+                ("left",
                   func.ProjectIndexI(func.LeftSide, 0)),
-                func.MakeMap(
-                  func.Constant(json.str("right")),
+                ("right",
                   func.ProjectIndexI(func.LeftSide, 1))),
               Type.AnyObject,
               func.Guard(
@@ -212,14 +204,12 @@ class PlannerQScriptSpec extends
                 func.ProjectKeyS(func.ProjectIndexI(func.LeftSide, 0), "city"),
                 func.Undefined),
               func.Undefined)),
-          func.MakeMap(
-            func.Constant(json.str("state")),
+        ("state",
             func.Guard(
-              func.ConcatMaps(
-                func.MakeMap(func.Constant(json.str("left")),
+              func.StaticMap(
+                ("left",
                   func.ProjectIndexI(func.LeftSide, 0)),
-                func.MakeMap(
-                  func.Constant(json.str("right")),
+                ("right",
                   func.ProjectIndexI(func.LeftSide, 1))),
               Type.AnyObject,
               func.Guard(
@@ -227,9 +217,8 @@ class PlannerQScriptSpec extends
                 Type.AnyObject,
                 func.ProjectKeyS(func.ProjectIndexI(func.LeftSide, 1), "state"),
                 func.Undefined),
-              func.Undefined))),
-        func.MakeMap(
-          func.Constant(json.str("pop")),
+              func.Undefined)),
+        ("pop",
           func.Guard(
             func.RightSide,
             Type.AnyObject,
@@ -378,21 +367,19 @@ class PlannerQScriptSpec extends
             fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("patients"), qscript.ExcludeId),
             func.Eq(func.ProjectKeyS(func.Hole, "state"), func.Constant(json.str("CO")))),
           func.Guard(
-            func.ProjectKey(func.Hole, func.Constant(json.str("codes"))),
+            func.ProjectKeyS(func.Hole, "codes"),
             Type.FlexArr(0, None, Type.Top),
-            func.ProjectKey(func.Hole, func.Constant(json.str("codes"))),
+            func.ProjectKeyS(func.Hole, "codes"),
             func.Undefined),
           qscript.ExcludeId,
           ShiftType.Array,
-          func.ConcatMaps(
-            func.MakeMap(
-              func.Constant(json.str("codes")),
+          func.StaticMap(
+            ("codes",
               func.RightSide),
-            func.MakeMap(
-              func.Constant(json.str("first_name")),
-              func.ProjectKey(
+            ("first_name",
+              func.ProjectKeyS(
                 func.LeftSide,
-                func.Constant(json.str("first_name"))))))) must beWorkflow0(
+                "first_name"))))) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "patients")),
           $match(Selector.Doc(
@@ -419,17 +406,16 @@ class PlannerQScriptSpec extends
           fix.LeftShift(
             fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
             func.Guard(
-              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              func.ProjectKeyS(func.Hole, "loc"),
               Type.FlexArr(0, None, Type.Top),
-              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              func.ProjectKeyS(func.Hole, "loc"),
               func.Undefined),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
-            func.ConcatMaps(
-              func.MakeMap(func.Constant(json.str("city")),
-                func.ProjectKey(func.LeftSide, func.Constant(json.str("city")))),
-              func.MakeMap(
-                func.Constant(json.str("loc")), func.RightSide))),
+            func.StaticMap(
+              ("city",
+                func.ProjectKeyS(func.LeftSide, "city")),
+              ("loc", func.RightSide))),
           func.Lt(func.ProjectKeyS(func.Hole, "loc"), func.Constant(json.int(-165))))) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "zips")),
@@ -455,9 +441,9 @@ class PlannerQScriptSpec extends
           fix.LeftShift(
             fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
             func.Guard(
-              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              func.ProjectKeyS(func.Hole, "loc"),
               Type.FlexArr(0, None, Type.Top),
-              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              func.ProjectKeyS(func.Hole, "loc"),
               func.Undefined),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
@@ -485,36 +471,32 @@ class PlannerQScriptSpec extends
           fix.LeftShift(
             fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
             func.Guard(
-              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              func.ProjectKeyS(func.Hole, "loc"),
               Type.FlexArr(0, None, Type.FlexArr(0, None, Type.Top)),
-              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              func.ProjectKeyS(func.Hole, "loc"),
               func.Undefined),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
-            func.ConcatMaps(
-              func.MakeMap(
-                func.Constant(json.str("results")),
+            func.StaticMap(
+              ("results",
                 func.Guard(
                   func.RightSide,
                   Type.FlexArr(0, None, Type.Top),
                   func.RightSide,
                   func.Undefined)),
-              func.MakeMap(
-                func.Constant(json.str("original")),
+              ("original",
                 func.LeftSide))),
-          func.ProjectKey(func.Hole, func.Constant(json.str("results"))),
+          func.ProjectKeyS(func.Hole, "results"),
           qscript.ExcludeId,
           qscript.ShiftType.Array,
-          func.ConcatMaps(
-            func.MakeMap(
-              func.Constant(json.str("0")),
-              func.ProjectKey(
-                func.ProjectKey(
+          func.StaticMap(
+            ("0",
+              func.ProjectKeyS(
+                func.ProjectKeyS(
                   func.LeftSide,
-                  func.Constant(json.str("original"))),
-                func.Constant(json.str("city")))),
-            func.MakeMap(
-              func.Constant(json.str("1")),
+                  "original"),
+                "city")),
+            ("1",
               func.RightSide)))) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "zips")),
@@ -549,9 +531,9 @@ class PlannerQScriptSpec extends
           fix.LeftShift(
             fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
             func.Guard(
-              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              func.ProjectKeyS(func.Hole, "loc"),
               Type.FlexArr(0, None, Type.FlexArr(0, None, Type.Top)),
-              func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+              func.ProjectKeyS(func.Hole, "loc"),
               func.Undefined),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
@@ -592,17 +574,17 @@ class PlannerQScriptSpec extends
         fix.LeftShift(
           fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
           func.Guard(
-            func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+            func.ProjectKeyS(func.Hole, "loc"),
             Type.FlexArr(0, None, Type.Top),
-            func.ProjectKey(func.Hole, func.Constant(json.str("loc"))),
+            func.ProjectKeyS(func.Hole, "loc"),
             func.Undefined),
           qscript.ExcludeId,
           qscript.ShiftType.Array,
-          func.ConcatMaps(
-            func.MakeMap(func.Constant(json.str("city")),
-              func.ProjectKey(func.LeftSide, func.Constant(json.str("city")))),
-            func.MakeMap(
-              func.Constant(json.str("loc")), func.RightSide)))) must beWorkflow0(
+          func.StaticMap(
+            ("city",
+              func.ProjectKeyS(func.LeftSide, "city")),
+            ("loc",
+              func.RightSide)))) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "zips")),
           $project(reshape(
@@ -624,7 +606,7 @@ class PlannerQScriptSpec extends
       qplan(
         fix.LeftShift(fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("patients"), qscript.ExcludeId),
           func.Guard(
-            func.ProjectKey(
+            func.ProjectKeyS(
               func.Cond(
                 func.And(
                   func.Eq(
@@ -635,43 +617,26 @@ class PlannerQScriptSpec extends
                     func.Constant(json.arr(List(json.str("BOULDER"), json.str("AURORA")))))),
                 func.Hole,
                 func.Undefined),
-              func.Constant(json.str("codes"))),
+              "codes"),
             Type.FlexArr(0, None, Type.Top),
-            func.ProjectKey(
+            func.ProjectKeyS(
               func.Cond(
                 func.And(
                   func.Eq(
-                    func.ProjectKey(func.Hole, func.Constant(json.str("state"))),
+                    func.ProjectKeyS(func.Hole, "state"),
                     func.Constant(json.str("CO"))),
                   func.Within(
-                    func.ProjectKey(func.Hole, func.Constant(json.str("city"))),
+                    func.ProjectKeyS(func.Hole, "city"),
                     func.Constant(json.arr(List(json.str("BOULDER"), json.str("AURORA")))))),
-                func.Hole, func.Undefined), func.Constant(json.str("codes"))),
+                func.Hole, func.Undefined), "codes"),
             func.Undefined),
           qscript.ExcludeId,
           ShiftType.Array,
-          func.ConcatMaps(
-            func.ConcatMaps(
-              func.MakeMap(
-                func.Constant(json.str("codes")),
-                func.RightSide),
-              func.MakeMap(
-                func.Constant(json.str("first_name")),
-                func.ProjectKey(
-                  func.Cond(
-                    func.And(
-                      func.Eq(
-                        func.ProjectKey(func.LeftSide, func.Constant(json.str("state"))),
-                        func.Constant(json.str("CO"))),
-                      func.Within(
-                        func.ProjectKey(func.LeftSide, func.Constant(json.str("city"))),
-                        func.Constant(json.arr(List(json.str("BOULDER"), json.str("AURORA")))))),
-                    func.LeftSide,
-                    func.Undefined),
-                  func.Constant(json.str("first_name"))))),
-            func.MakeMap(
-              func.Constant(json.str("city")),
-              func.ProjectKey(
+          func.StaticMap(
+            ("codes",
+              func.RightSide),
+            ("first_name",
+              func.ProjectKeyS(
                 func.Cond(
                   func.And(
                     func.Eq(
@@ -682,7 +647,20 @@ class PlannerQScriptSpec extends
                       func.Constant(json.arr(List(json.str("BOULDER"), json.str("AURORA")))))),
                   func.LeftSide,
                   func.Undefined),
-                func.Constant(json.str("city"))))))) must beWorkflow0(
+                "first_name")),
+            ("city",
+              func.ProjectKeyS(
+                func.Cond(
+                  func.And(
+                    func.Eq(
+                      func.ProjectKey(func.LeftSide, func.Constant(json.str("state"))),
+                      func.Constant(json.str("CO"))),
+                    func.Within(
+                      func.ProjectKey(func.LeftSide, func.Constant(json.str("city"))),
+                      func.Constant(json.arr(List(json.str("BOULDER"), json.str("AURORA")))))),
+                  func.LeftSide,
+                  func.Undefined),
+                "city"))))) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "patients")),
           $match(

@@ -92,12 +92,12 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         val from: FreeQS =
           free.Map(
             free.Hole,
-            func.ProjectKey(func.Hole, func.Constant(json.str("foo"))))
+            func.ProjectKeyS(func.Hole, "foo"))
 
         val count: FreeQS =
           free.Map(
             free.Hole,
-            func.ProjectKey(func.Hole, func.Constant(json.str("bar"))))
+            func.ProjectKeyS(func.Hole, "bar"))
 
         val qs = Subset(shape, from, Take, count)
 
