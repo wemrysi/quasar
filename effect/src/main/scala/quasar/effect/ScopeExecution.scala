@@ -17,7 +17,6 @@
 package quasar.effect
 
 import slamdata.Predef._
-import scala.{Ordering => SOrdering}
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.collection.immutable.Queue
@@ -133,11 +132,6 @@ final case class ExecutionTimings(timings: Map[String, (Instant, Instant)], star
 }
 
 final case class Execution(id: ExecutionId, timings: ExecutionTimings)
-
-object Execution {
-  implicit val executionOrdering: SOrdering[Execution] =
-    SOrdering.ordered[Instant](x => x).on(_.timings.end)
-}
 
 object ExecutionTimings {
   // Flame graph tree
