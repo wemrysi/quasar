@@ -23,6 +23,7 @@ import quasar.fp._
 import quasar.{NameGenerator, qscript}
 import quasar.Planner.PlannerErrorME
 import Planner._
+import sql._
 import sql.SqlExpr._
 import sql.{SqlExpr, genId}
 import sql.SqlExpr.Select._
@@ -44,8 +45,6 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT: EqualT,
 F[_]: Monad: NameGenerator: PlannerErrorME](
     mapFuncPlanner: Planner[T, F, MapFunc[T, ?]])
     extends Planner[T, F, QScriptCore[T, ?]] {
-
-  def * : T[SqlExpr] = AllCols[T[SqlExpr]]().embed
 
   private def processFreeMap(f: FreeMap[T],
                      alias: SqlExpr[T[SqlExpr]]): F[T[SqlExpr]] =
@@ -72,10 +71,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       for {
         fromAlias <- genId[T[SqlExpr], F]
         selection <- processFreeMap(f, fromAlias)
-          .map(_.project match {
-            case SqlExpr.Id(_) => *
-            case other => other.embed
-          })
+          .map(idToWildcard[T])
       } yield {
         Select(
           Selection(selection, none),
@@ -156,10 +152,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           idx => rds(idx).point[F]
         ),
         Planner.mapFuncPlanner[T, F].plan)
-      ).map(_.project match {
-        case SqlExpr.Id(_) => *
-        case other => other.embed
-      })
+      ).map(idToWildcard[T])
     } yield {
       val (selection, groupBy) = reduce match {
         case DistinctPattern() =>

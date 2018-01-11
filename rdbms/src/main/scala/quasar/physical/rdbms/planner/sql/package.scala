@@ -20,7 +20,11 @@ import slamdata.Predef._
 import quasar.NameGenerator
 import quasar.physical.rdbms.planner.sql.SqlExpr.Id
 import quasar.Planner.{InternalError, PlannerErrorME}
+import sql.SqlExpr._
+import Select._
 
+import matryoshka._
+import matryoshka.implicits._
 import scalaz.Functor
 import scalaz.syntax.functor._
 
@@ -34,4 +38,16 @@ package object sql {
   def unsupported[F[_]: PlannerErrorME, A](name: String): F[A] =
     PlannerErrorME[F].raiseError(InternalError.fromMsg(s"Unsupported $name"))
 
+  def *[T[_[_]]: BirecursiveT] : T[SqlExpr] = AllCols[T[SqlExpr]]().embed
+  /**
+    * Use to convert expressions like (select _id from (select ....) _id) is effectively equal to
+    * (select * from (select ....) _id) to avoid problems with record types.
+    */
+  def idToWildcard[T[_[_]]: BirecursiveT](e: T[SqlExpr]): T[SqlExpr] = {
+    e.project match {
+      case Id(_) => *[T]
+      case ExprPair(Id(_), Id(_)) => *[T]
+      case _ => e
+    }
+  }
 }
