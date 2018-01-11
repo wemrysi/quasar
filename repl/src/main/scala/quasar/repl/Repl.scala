@@ -74,9 +74,9 @@ object Repl {
       |  rm [path]
       |  set debug = 0 | 1 | 2
       |  set phaseFormat = tree | code
-      |  set timingFormat = tree | onlytotal | nothing
+      |  set timingFormat = tree | onlytotal
       |  set summaryCount = [rows]
-      |  set format = table | precise | readable | csv | nothing
+      |  set format = table | precise | readable | csv
       |  set [var] = [value]
       |  env""".stripMargin
 
@@ -157,7 +157,7 @@ object Repl {
           case  \/-( \/-(a))     =>
             (state.timingFormat match {
               case TimingFormat.OnlyTotal => P.println(f"Query time: ${elapsed.toMillis/1000.0}%.1fs")
-              case _ => ().point[Free[S, ?]]
+              case TimingFormat.Tree      => ().point[Free[S, ?]]
             }) *> f(a)
         }
       } yield ()
@@ -389,8 +389,6 @@ object Repl {
           prefix.map(formatJson(DataCodec.Readable)).unite
         case OutputFormat.Csv =>
           Prettify.renderValues(prefix).map(CsvWriter(none)(_).trim)
-        case OutputFormat.Nothing =>
-          Nil
       }).foldMap(P.println) *>
         (if (max.fold(false)(rows.lengthCompare(_) > 0)) P.println("...")
         else ().point[Free[S, ?]])

@@ -131,7 +131,7 @@ object Main {
       val timingPrint = (execution: Execution) => for {
         state <- Free.liftF(Inject[Task, ReplEff[S, ?]].inj(stateRef.read))
         _ <- state.timingFormat match {
-          case TimingFormat.Nothing | TimingFormat.OnlyTotal =>
+          case TimingFormat.OnlyTotal =>
             ().point[Free[ReplEff[S, ?], ?]]
           case TimingFormat.Tree =>
             val timingTree =
