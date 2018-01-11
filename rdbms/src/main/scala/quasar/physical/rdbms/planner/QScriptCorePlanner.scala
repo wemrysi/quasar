@@ -19,6 +19,7 @@ package quasar.physical.rdbms.planner
 import slamdata.Predef._
 import quasar.common.SortDir
 import quasar.fp.ski._
+import quasar.fp._
 import quasar.{NameGenerator, qscript}
 import quasar.Planner.PlannerErrorME
 import Planner._
@@ -28,16 +29,19 @@ import sql.SqlExpr.Select._
 import quasar.qscript.{FreeMap, MapFunc, MapFuncsCore, QScriptCore, QScriptTotal, ReduceFunc, ReduceFuncs}
 import quasar.qscript.{MapFuncCore => MFC}
 import quasar.qscript.{MapFuncDerived => MFD}
+import MFC._
+import MFD._
 import ReduceFuncs.Arbitrary
 
 import matryoshka._
 import matryoshka.data._
+import matryoshka.data.free.freeEqual
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._
 import Scalaz._
 
-class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT,
+class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT: EqualT,
 F[_]: Monad: NameGenerator: PlannerErrorME](
     mapFuncPlanner: Planner[T, F, MapFunc[T, ?]])
     extends Planner[T, F, QScriptCore[T, ?]] {
@@ -142,10 +146,24 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     case qUnion@qscript.Union(src, left, right) =>
       (compile(left, src) |@| compile(right, src))(Union(_,_).embed)
 
-    case DisctinctPattern(qscript.Reduce(src, _, _, _)) => for {
+    case DisctinctPattern(qscript.Reduce(src, bucket, reducers, repair)) => for {
       alias <- genId[T[SqlExpr], F]
+      gbs   <- bucket.traverse(processFreeMap(_, alias))
+      rds   <- reducers.traverse(_.traverse(processFreeMap(_, alias)) >>=
+        reduceFuncPlanner[T, F].plan)
+      rep <- repair.cataM(interpretM(
+        _.idx.fold(
+          idx => notImplemented("Reduce repair with left index, waiting for a test case", this): F[T[SqlExpr]],
+          idx => rds(idx).point[F]
+        ),
+        Planner.mapFuncPlanner[T, F].plan)
+      ).map(_.project match {
+        case SqlExpr.Id(_) => *
+        case other => other.embed
+      })
+
     } yield Select(
-      Selection(Distinct[T[SqlExpr]](*).embed, none),
+      Selection(Distinct[T[SqlExpr]](rep).embed, none),
       From(src, alias),
       none,
       groupBy = none,
@@ -208,8 +226,8 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         }
     }
 
-    def unapply[A](qs: QScriptCore[T, A]): Option[qscript.Reduce[T, A]] = qs match {
-      case reduce@qscript.Reduce(_, BucketWithSingleHole(), ReducersWithSingleArbitraryHole(), _) => reduce.some
+    def unapply[A:Equal](qs: QScriptCore[T, A]): Option[qscript.Reduce[T, A]] = qs match {
+      case reduce@qscript.Reduce(src, bucket :: Nil, ReduceFuncs.Arbitrary(arb) :: Nil, repair) if bucket === arb  => reduce.some
       case _ => none
     }
   }

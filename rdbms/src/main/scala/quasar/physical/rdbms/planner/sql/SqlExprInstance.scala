@@ -17,8 +17,16 @@
 package quasar.physical.rdbms.planner.sql
 
 import scalaz._, Scalaz._
+import matryoshka._
 
-trait SqlExprInstances extends SqlExprTraverse with SqlExprRenderTree
+trait SqlExprInstances extends SqlExprTraverse with SqlExprRenderTree with SqlExprDelayEqual
+
+trait SqlExprDelayEqual {
+
+  implicit def delayEqSqlExpr = new Delay[Equal, SqlExpr] {
+    def apply[A](fa: Equal[A]): Equal[SqlExpr[A]] = Equal.equalA
+  }
+}
 
 trait SqlExprTraverse {
   import SqlExpr._, Select._, Case._
