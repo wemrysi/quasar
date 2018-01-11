@@ -59,9 +59,7 @@ object RenderQuery {
     case Time(a1) =>
       s"""{ "$LocalTimeKey": $a1 }""".right
     case Timestamp(a1) =>
-//    TODO: Come back to this
-      ???
-//    s"""{ "$TimestampKey": $a1 }""".right
+      ??? // TODO
     case Null() =>
       s"null".right
     case Unreferenced() =>

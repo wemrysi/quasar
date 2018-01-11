@@ -120,37 +120,7 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
       DateTruncStr(dt, temporalPart(part)).embed
   }
 
-  // TODO: Come back to it
-  def temporalTrunc(part: TemporalPart, a: T[N1QL]): T[N1QL] =
-    ???
-//    Case(
-//      WhenThen(
-//        SelectField(a, str(LocalDateKey)).embed,
-//        Date(SelectElem(
-//          Split(
-//            trunc(part, ConcatStr(SelectField(a, str(LocalDateKey)).embed, zeroTimeSuffix).embed), dateTimeDelim).embed,
-//          int(0)).embed).embed),
-//      WhenThen(
-//        SelectField(a, str(LocalTimeKey)).embed,
-//        Time((part === Week).fold(
-//          zeroTime,
-//          SelectElem(
-//            Split(
-//              SelectElem(
-//                Split(
-//                  trunc(part, ConcatStr(
-//                    ConcatStr(dateFillPrefix, SelectField(a, str(LocalTimeKey)).embed).embed,
-//                    zeroUTC).embed),
-//                  dateTimeDelim).embed,
-//                int(1)).embed,
-//              zeroUTC).embed,
-//            int(0)).embed)).embed),
-//      WhenThen(
-//        SelectField(a, str(TimestampKey)).embed,
-//        Timestamp(trunc(part, SelectField(a, str(TimestampKey)).embed)).embed)
-//    )(
-//      Else(DateTruncStr(a, temporalPart(part)).embed)
-//    ).embed
+  def temporalTrunc(part: TemporalPart, a: T[N1QL]): T[N1QL] = ???
 
   def fracZero(a1: T[N1QL]): T[N1QL] =
     Case(
@@ -226,8 +196,6 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
       ???
     case MF.OffsetDateTime(a1) =>
       ???
-//      TODO: Come back to this
-//      datetime(a1, TimestampKey, dateTimeRegex.r).η[F]
     case MF.Interval(a1) =>
       Case(
         WhenThen(IsNotNull(SelectField(a1, str(IntervalKey)).embed).embed, a1)
@@ -235,32 +203,6 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
         Else(Null[T[N1QL]].embed)
       ).embed.η[F]
     case MF.TimeOfDay(a1) =>
-//      TODO: Come back to this
-//      def fracZeroTime(a1: T[N1QL]): T[N1QL] = {
-//        val fz = fracZero(a1)
-//        Case(
-//          WhenThen(IsNotNull(fz).embed, Time(fz).embed)
-//        )(
-//          Else(undefined)
-//        ).embed
-//      }
-
-//      def timeFromTS(a1: T[N1QL]): T[N1QL] =
-//        Time(SelectElem(
-//          Split(
-//            SelectElem(
-//              Split(SelectField(a1, str(TimestampKey)).embed,  dateTimeDelim).embed,
-//              int(1)).embed,
-//            zeroUTC).embed,
-//          int(0)).embed).embed
-//
-//      Case(
-//        WhenThen(SelectField(a1, str(LocalDateKey)).embed, undefined),
-//        WhenThen(SelectField(a1, str(LocalTimeKey)).embed, a1),
-//        WhenThen(SelectField(a1, str(TimestampKey)).embed, timeFromTS(a1))
-//      )(
-//        Else(fracZeroTime(MillisToUTC(Millis(a1).embed, zeroTime.some).embed))
-//      ).embed.η[F]
       ???
     case MF.ToTimestamp(a1) =>
       Timestamp(MillisToUTC(a1, none).embed).embed.η[F]
@@ -279,27 +221,7 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
     case MF.ExtractDayOfYear(a1)      =>
       extract(a1, dayOfYear).η[F]
     case MF.ExtractEpoch(a1) =>
-      // TODO: Come back to it
       ???
-//      Div(
-//        Millis(
-//          Case(
-//            WhenThen(
-//              SelectField(a1, str(LocalDateKey)).embed,
-//              ConcatStr(
-//                SelectField(a1, str(LocalDateKey)).embed,
-//                zeroTimeSuffix).embed),
-//            WhenThen(
-//              SelectField(a1, str(LocalTimeKey)).embed,
-//              undefined)
-//          )(
-//            Else(IfMissing(
-//              SelectField(a1, str(TimestampKey)).embed,
-//              a1).embed)
-//          ).embed
-//        ).embed,
-//        int(1000)
-//      ).embed.η[F]
     case MF.ExtractHour(a1) =>
       extract(a1, hour).η[F]
     case MF.ExtractIsoDayOfWeek(a1) =>
@@ -341,19 +263,8 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
       extract(a1, isoWeek).η[F]
     case MF.ExtractYear(a1) =>
       extract(a1, year).η[F]
-//    TODO: Come back to it
     case MF.StartOfDay(a1) =>
       ???
-//        Case(
-//          WhenThen(
-//            SelectField(a1, str(TimestampKey)).embed,
-//            Timestamp(trunc(Day, SelectField(a1, str(TimestampKey)).embed)).embed),
-//          WhenThen(
-//            SelectField(a1, str(LocalDateKey)).embed,
-//            Timestamp(trunc(Day, ConcatStr(SelectField(a1, str(LocalDateKey)).embed, zeroTimeSuffix).embed)).embed)
-//        )(
-//          Else(undefined)
-//        ).embed.η[F]
     case MF.TemporalTrunc(Microsecond | Millisecond, a2) =>
       a2.η[F]
     case MF.TemporalTrunc(a1, a2) =>
