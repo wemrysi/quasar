@@ -26,12 +26,11 @@ import Planner._
 import sql.SqlExpr._
 import sql.{SqlExpr, genId}
 import sql.SqlExpr.Select._
-import quasar.qscript.{FreeMap, MapFunc, MapFuncsCore, QScriptCore, QScriptTotal, ReduceFunc, ReduceFuncs}
+import quasar.qscript.{FreeMap, MapFunc, QScriptCore, QScriptTotal, Reduce, ReduceFuncs}
 import quasar.qscript.{MapFuncCore => MFC}
 import quasar.qscript.{MapFuncDerived => MFD}
 import MFC._
 import MFD._
-import ReduceFuncs.Arbitrary
 
 import matryoshka._
 import matryoshka.data._
@@ -146,7 +145,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     case qUnion@qscript.Union(src, left, right) =>
       (compile(left, src) |@| compile(right, src))(Union(_,_).embed)
 
-    case DisctinctPattern(qscript.Reduce(src, bucket, reducers, repair)) => for {
+    case reduce@qscript.Reduce(src, bucket, reducers, repair) => for {
       alias <- genId[T[SqlExpr], F]
       gbs   <- bucket.traverse(processFreeMap(_, alias))
       rds   <- reducers.traverse(_.traverse(processFreeMap(_, alias)) >>=
@@ -161,74 +160,31 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         case SqlExpr.Id(_) => *
         case other => other.embed
       })
+    } yield {
+      val (selection, groupBy) = reduce match {
+        case DistinctPattern() =>
+          (Distinct[T[SqlExpr]](rep).embed, none)
+        case _ => (rep, GroupBy(gbs).some)
+      }
 
-    } yield Select(
-      Selection(Distinct[T[SqlExpr]](rep).embed, none),
-      From(src, alias),
-      none,
-      groupBy = none,
-      orderBy = nil
-    ).embed
-
-    case reduce@qscript.Reduce(src, bucket, reducers, repair) => for {
-      alias <- genId[T[SqlExpr], F]
-      gbs   <- bucket.traverse(processFreeMap(_, alias))
-      rds   <- reducers.traverse(_.traverse(processFreeMap(_, alias)) >>=
-        reduceFuncPlanner[T, F].plan)
-      rep <- repair.cataM(interpretM(
-        _.idx.fold(
-          idx => notImplemented("Reduce repair with left index, waiting for a test case", this): F[T[SqlExpr]],
-          idx => rds(idx).point[F]
-        ),
-        Planner.mapFuncPlanner[T, F].plan)
-      )
-    } yield Select(
-      Selection(rep, none),
-      From(src, alias),
-      none,
-      groupBy = GroupBy(gbs).some,
-      orderBy = nil
-    ).embed
+      Select(
+        Selection(selection, none),
+        From(src, alias),
+        none,
+        groupBy,
+        orderBy = nil
+      ).embed
+    }
 
     case other =>
       notImplemented(s"QScriptCore: $other", this)
   }
 
-  object DisctinctPattern {
+  object DistinctPattern {
 
-    def isHoleOrGuardedHole(fm: FreeMap[T]): Boolean =
-      fm.cata(interpret(κ(true), (copro: MapFunc[T, Boolean]) =>
-        copro.fold(
-          new ~>[MFC[T, ?], Option] {
-            def apply[A](fa: MFC[T, A]): Option[A] = {
-              fa match {
-                case MapFuncsCore.Guard(_, _, a, _) => a.some
-                case _ => none
-              }
-            }
-          },
-          new ~>[MFD[T, ?], Option] {
-            def apply[A](fa: MFD[T, A]): Option[A] = none
-          }
-        ).exists(ι)
-      ))
-
-    object BucketWithSingleHole {
-      def unapply(fms: List[FreeMap[T]]): Boolean =
-        fms.headOption.exists(isHoleOrGuardedHole)
-    }
-
-    object ReducersWithSingleArbitraryHole {
-      def unapply(fms: List[ReduceFunc[FreeMap[T]]]): Boolean =
-        fms.headOption.exists {
-          case Arbitrary(fm) => isHoleOrGuardedHole(fm)
-          case _ => false
-        }
-    }
-
-    def unapply[A:Equal](qs: QScriptCore[T, A]): Option[qscript.Reduce[T, A]] = qs match {
-      case reduce@qscript.Reduce(src, bucket :: Nil, ReduceFuncs.Arbitrary(arb) :: Nil, repair) if bucket === arb  => reduce.some
-      case _ => none
+    def unapply[A:Equal](qs: QScriptCore[T, A]): Boolean = qs match {
+      case Reduce(_, bucket :: Nil, ReduceFuncs.Arbitrary(arb) :: Nil, _) if bucket === arb  => true
+      case _ => false
     }
   }
 }
