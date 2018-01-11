@@ -15,16 +15,7 @@ Chain
 │  ╰─ ExcludeId
 ├─ $UnwindF(DocField(BsonField.Name("f")))
 ├─ $ProjectF
-│  ├─ Name("filter_source" -> {
-│  │       "$cond": [
-│  │         {
-│  │           "$and": [
-│  │             { "$lte": [{ "$literal": {  } }, "$s"] },
-│  │             { "$lt": ["$s", { "$literal": [] }] }]
-│  │         },
-│  │         "$s",
-│  │         { "$literal": undefined }]
-│  │     })
+│  ├─ Name("filter_source" -> "$s")
 │  ├─ Name("filter_predicate" -> { "$lt": ["$f", { "$literal": NumberInt("0") }] })
 │  ╰─ ExcludeId
 ├─ $MatchF

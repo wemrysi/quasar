@@ -38,9 +38,11 @@ class PlannerQScriptSpec extends
     PlannerHelpers with
     PendingWithActualTracking {
 
+  //to write the new actuals:
+  //override val mode = WriteMode
+
   import fixExprOp._
   import PlannerHelpers._
-  import expr3_2Fp._
   import jscore._
   import CollectionUtil._
   import Reshape.reshape
@@ -312,7 +314,7 @@ class PlannerQScriptSpec extends
     }.pendingWithActual(notOnPar, qtestFile("plan simple inner equi-join with pre-filtering ($lookup)"))
 
     "plan 3-way equi-join ($lookup)" in {
-      qplan(simpleInnerEquiJoinWithPrefiltering) must beWorkflow0(chain[Workflow](
+      qplan(threeWayEquiJoin) must beWorkflow0(chain[Workflow](
         $read(collection("db", "extraSmallZips")),
         $match(Selector.Doc(
           BsonField.Name("_id") -> Selector.Exists(true))),
@@ -367,7 +369,6 @@ class PlannerQScriptSpec extends
           IgnoreId)))
           // Not on agg
     }.pendingWithActual(notOnPar, qtestFile("plan 3-way equi-join ($lookup)"))
-
 
     "plan filtered flatten" in {
       qplan(

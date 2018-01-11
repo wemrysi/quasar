@@ -100,12 +100,17 @@ trait SqlExprRenderTree {
             nonTerminal("Or", a1, a2)
           case Refs(srcs) =>
             nonTerminal("References", srcs:_*)
-          case Select(selection, from, filter, order) =>
+          case Select(selection, from, join, filter, order) =>
             NonTerminal(
               "Select" :: Nil,
               none,
               nt("selection", selection.alias ∘ (_.v), selection.v) ::
-                nt("from", from.alias.v.some, from.v) ::
+                nt("from", from.alias.v.some, from.v)               ::
+                (join ∘ (j => NonTerminal(
+                  "join" :: Nil, j.alias.v.some,
+                    r.render(j.v) :: j.keys.flatMap {
+                    case (lk, rk) => List(r.render(lk), r.render(rk))
+                  }))).toList                                      :::
                 (filter ∘ (f => nt("filter", none, f.v))).toList ++
                   order.map {
                     o =>

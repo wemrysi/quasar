@@ -185,6 +185,34 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
     val ConsecutiveBounded = ConsecutiveLeftShifts(_.root === src.root)
 
+    def mergeIndexMaps(
+        parent: QSUGraph,
+        leftHole: FreeMap,
+        leftIndices: Set[Int],
+        rightHole: FreeMap,
+        rightIndices: Set[Int]): G[QSUGraph] = {
+
+      val leftMaps = leftIndices.toList map { i =>
+        func.MakeMapS(i.toString, func.ProjectKeyS(leftHole, i.toString))
+      }
+
+      val leftFM = leftMaps reduceOption { (left, right) =>
+        func.ConcatMaps(left, right)
+      } getOrElse leftHole
+
+      val rightMaps = rightIndices.toList map { i =>
+        func.MakeMapS(i.toString, func.ProjectKeyS(rightHole, i.toString))
+      }
+
+      val rightFM = rightMaps reduceOption { (left, right) =>
+        func.ConcatMaps(left, right)
+      } getOrElse rightHole
+
+      updateGraph[T, G](QSU.Map(parent.root, func.ConcatMaps(leftFM, rightFM))) map { rewritten =>
+        rewritten :++ parent
+      }
+    }
+
     def coalesceUneven(shifts: NEL[ShiftGraph], qgraph: QSUGraph): G[QSUGraph] = {
       val origFM = qgraph match {
         case Map(_, fm) => fm
@@ -258,7 +286,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
                 func.ProjectKeyS(accessHoleLeftF, OriginalField)),
               func.MakeMapS(ResultsField, repair2))
 
-            updateGraph[T, G](QSU.MultiLeftShift[T, Symbol](src.root, shifts2, repair2)) map { rewritten =>
+            updateGraph[T, G](QSU.MultiLeftShift[T, Symbol](src.root, shifts2, repair3)) map { rewritten =>
               rewritten :++ src
             }
         }
@@ -283,7 +311,13 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       } yield qgraph.overwriteAtRoot(rewritten.vertices(rewritten.root)) :++ rewritten
     }
 
-    def coalesceZip(left: List[ShiftGraph], right: List[ShiftGraph], parent: Option[QSUGraph]): G[QSUGraph] = {
+    def coalesceZip(
+        left: List[ShiftGraph],
+        leftIndices: Set[Int],
+        right: List[ShiftGraph],
+        rightIndices: Set[Int],
+        parent: Option[QSUGraph]): G[QSUGraph] = {
+
       val hasParent = parent.isDefined
 
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -298,7 +332,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           Some(rewritten :++ realParent)
         }
 
-        cont.flatMap(coalesceZip(tailL, tailR, _))
+        cont.flatMap(coalesceZip(tailL, leftIndices, tailR, rightIndices, _))
       }
 
       def name(side: JoinSide) = side.fold(LeftField, RightField)
@@ -581,16 +615,12 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
         case (Nil, Nil) =>
           // if parent is None here, it means we invoked on empty lists
-          val realParent = parent.getOrElse(???)
-
-          // we know that the contents are maps like { "0": ... }, etc
-          val fm = func.ConcatMaps(
-            func.ProjectKeyS(func.Hole, LeftField),
-            func.ProjectKeyS(func.Hole, RightField))
-
-          updateGraph[T, G](QSU.Map(realParent.root, fm)) map { rewritten =>
-            rewritten :++ realParent
-          }
+          mergeIndexMaps(
+            parent.getOrElse(???),
+            func.ProjectKeyS(func.Hole, "left"),
+            leftIndices,
+            func.ProjectKeyS(func.Hole, "right"),
+            rightIndices)
       }
     }
 
@@ -601,7 +631,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           // qgraph must beLike(shifts.head)
 
           // shifts.head is the LAST shift in the chain
-          shifts.head match {
+          val back = shifts.head match {
             case -\/(QSU.LeftShift(parent, struct, idStatus, repair, rotation)) =>
               val pat = QSU.LeftShift(
                 parent.root,
@@ -621,34 +651,49 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               qgraph.overwriteAtRoot(pat).point[G]
           }
 
+          back.map(g => (g, Set(i)))
+
         case (qgraph @ Map(parent, fm), i) =>
-          qgraph.overwriteAtRoot(QSU.Map(parent.root, func.MakeMapS(i.toString, fm))).point[G]
+          val back = qgraph.overwriteAtRoot(QSU.Map(parent.root, func.MakeMapS(i.toString, fm))).point[G]
+          back.map(g => (g, Set(i)))
 
         case (qgraph, i) =>
-          updateGraph[T, G](QSU.Map(qgraph.root, func.MakeMapS(i.toString, func.Hole))) map { rewritten =>
+          val back = updateGraph[T, G](QSU.Map(qgraph.root, func.MakeMapS(i.toString, func.Hole))) map { rewritten =>
             rewritten :++ qgraph
           }
+
+          back.map(g => (g, Set(i)))
       }
 
-      coalesced <- wrapped.tail.foldLeftM[G, QSUGraph](wrapped.head) {
-        case (ConsecutiveBounded(_, shifts1), ConsecutiveBounded(_, shifts2)) =>
-          coalesceZip(shifts1.toList.reverse, shifts2.toList.reverse, None)
+      coalescedPair <- wrapped.tail.foldLeftM[G, (QSUGraph, Set[Int])](wrapped.head) {
+        case ((ConsecutiveBounded(_, shifts1), leftIndices), (ConsecutiveBounded(_, shifts2), rightIndices)) =>
+          val back = coalesceZip(shifts1.toList.reverse, leftIndices, shifts2.toList.reverse, rightIndices, None)
+          back.map(g => (g, leftIndices ++ rightIndices))
 
-        case (qgraph, ConsecutiveBounded(_, shifts)) =>
-          coalesceUneven(shifts, qgraph)
+        case ((qgraph, leftIndices), (ConsecutiveBounded(_, shifts), rightIndices)) =>
+          val back = coalesceUneven(shifts, qgraph)
+          back.map(g => (g, leftIndices ++ rightIndices))
 
-        case (ConsecutiveBounded(_, shifts), qgraph) =>
-          coalesceUneven(shifts, qgraph)
+        case ((ConsecutiveBounded(_, shifts), leftIndices), (qgraph, rightIndices)) =>
+          val back = coalesceUneven(shifts, qgraph)
+          back.map(g => (g, leftIndices ++ rightIndices))
 
         // these two graphs have to be maps on the same thing
         // if they aren't, we're in trouble
-        case (Map(parent1, left), Map(parent2, right)) =>
+        case ((Map(parent1, left), leftIndices), (Map(parent2, right), rightIndices)) =>
           scala.Predef.assert(parent1.root === parent2.root)
 
-          updateGraph[T, G](QSU.Map(parent1.root, func.ConcatMaps(left, right))) map { rewritten =>
-            rewritten :++ parent1
-          }
+          val back = mergeIndexMaps(
+            parent1,
+            left,
+            leftIndices,
+            right,
+            rightIndices)
+
+          back.map(g => (g, leftIndices ++ rightIndices))
       }
+
+      (coalesced, _) = coalescedPair
 
       // we build the map node to overwrite the original autojoin (qgraph)
       back = qgraph.overwriteAtRoot(
