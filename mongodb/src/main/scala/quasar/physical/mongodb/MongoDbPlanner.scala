@@ -38,7 +38,6 @@ import quasar.physical.mongodb.planner.common._
 import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
 import quasar.qscript._, RenderQScriptDSL._
 import quasar.qscript.rewrites.{Coalesce => _, Optimize, PreferProjection, Rewrite}
-import quasar.std.StdLib._ // TODO: remove this
 
 import java.time.Instant
 import matryoshka.{Hole => _, _}
@@ -74,18 +73,21 @@ object MongoDbPlanner {
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
       Type => Option[In => Out] =
-        typ => f.lift(typ).fold(
-          typ match {
-//            TODO: Come back to this
-            case Type.OffsetDateTime | Type.OffsetTime | Type.OffsetDate |
-                 Type.LocalDateTime | Type.LocalTime | Type.LocalDate | Type.Interval => generateTypeCheck(or)(f)(Type.Str)
-            case Type.Arr(_) => generateTypeCheck(or)(f)(Type.AnyArray)
-            case a ⨿ b =>
-              (generateTypeCheck(or)(f)(a) ⊛ generateTypeCheck(or)(f)(b))(
-                (a, b) => ((expr: In) => or(a(expr), b(expr))))
-            case _ => None
-          })(
-          Some(_))
+    typ => f.lift(typ).fold(
+      typ match {
+        case Type.Temporal =>
+          generateTypeCheck(or)(f)(Type.OffsetDateTime)
+        case Type.LocalDateTime ⨿ OffsetDateTime =>  // time_of_day
+          generateTypeCheck(or)(f)(Type.OffsetDateTime)
+        case Type.OffsetDateTime ⨿ Type.OffsetDate ⨿
+            Type.LocalDateTime ⨿ Type.LocalDate =>  // date_part
+          generateTypeCheck(or)(f)(Type.OffsetDateTime)
+        case Type.Arr(_) => generateTypeCheck(or)(f)(Type.AnyArray)
+        case a ⨿ b =>
+          (generateTypeCheck(or)(f)(a) ⊛ generateTypeCheck(or)(f)(b))(
+            (a, b) => ((expr: In) => or(a(expr), b(expr))))
+        case _ => None
+      })(Some(_))
 
   def processMapFuncExpr
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, EX[_]: Traverse, A]
@@ -279,8 +281,8 @@ object MongoDbPlanner {
             case Type.Binary => check.isBinary
             case Type.Id => check.isId
             case Type.Bool => check.isBoolean
-            // TODO other datetime types
-            case Type.LocalDate => check.isDate
+            case Type.OffsetDateTime | Type.OffsetDate | Type.OffsetTime |
+                Type.LocalDateTime | Type.LocalDate | Type.LocalTime => check.isDate
             // NB: Some explicit coproducts for adjacent types.
             case Type.Int ⨿ Type.Dec ⨿ Type.Str => check.isNumberOrString
             case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str => check.isNumberOrString
@@ -346,17 +348,6 @@ object MongoDbPlanner {
       case JoinSideName(n) =>
         raiseErr[M, JsCore](qscriptPlanningFailed(UnexpectedJoinSide(n)))
       case Now() => execTime map (ts => New(Name("ISODate"), List(ts)))
-      case Length(a1) =>
-        Call(ident("NumberLong"), List(Select(a1, "length"))).point[M]
-//        TODO: Come back to this
-//      case LocalDate(a1) =>
-//        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.dateRegex + "$")))), "test"), List(a1)),
-//          Call(ident("ISODate"), List(a1)),
-//          ident("undefined")).point[M]
-      case LocalTime(a1) =>
-        If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + string.timeRegex + "$")))), "test"), List(a1)),
-          a1,
-          ident("undefined")).point[M]
       case Interval(a1) => unimplemented[M, JsCore]("Interval JS")
 
       // TODO: De-duplicate and move these to JsFuncHandler
@@ -494,13 +485,9 @@ object MongoDbPlanner {
             case Type.Binary           => isBinary
             case Type.Id               => isObjectId
             case Type.Bool             => isBoolean
-//            TODO: Come back to it
-//            case Type.OffsetDateTime   => isOffsetDateTime
-//            case Type.OffsetDate       => isOffsetDate
-//            case Type.OffsetTime       => isOffsetTime
-//            case Type.LocalDateTime    => isLocalDateTime
-//            case Type.LocalDate        => isLocalDate
-//            case Type.LocalTime        => isLocalTime
+            case Type.OffsetDateTime | Type.OffsetDate | Type.OffsetTime |
+                Type.LocalDateTime | Type.LocalDate | Type.LocalTime
+                => isDate
             case Type.Syntaxed         => isSyntaxed
           }
         jsCheck(typ).fold[M[JsCore]](
@@ -613,19 +600,11 @@ object MongoDbPlanner {
               ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Binary)))
             case Type.Id =>
               ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.ObjectId)))
-            case Type.Bool => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Bool)))
-            case Type.LocalDate =>
-              ???
-            case Type.LocalDateTime =>
-              ???
-            case Type.LocalTime =>
-              ???
-            case Type.OffsetDate =>
-              ???
-            case Type.OffsetDateTime =>
-              ???
-            case Type.OffsetTime =>
-              ???
+            case Type.Bool =>
+              ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Bool)))
+            case Type.OffsetDateTime | Type.OffsetDate | Type.OffsetTime |
+                Type.LocalDateTime | Type.LocalDate | Type.LocalTime =>
+              ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Date)))
           }
         selCheck(typ).fold[OutputM[PartialSelector[T]]](
           -\/(InternalError.fromMsg(node.map(_._1).shows)))(
