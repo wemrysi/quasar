@@ -17,7 +17,7 @@
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [
-        { "day": "Tuesday",   "tod": { "$time": "08:00:00.000" } },
-        { "day": "Wednesday", "tod": { "$time": "09:00:00.000" } },
-        { "day": "Thursday",  "tod": { "$time": "10:00:00.000" } }]
+        { "day": "Tuesday",   "tod": { "$offsettime": "08:00Z" } },
+        { "day": "Wednesday", "tod": { "$offsettime": "09:00Z" } },
+        { "day": "Thursday",  "tod": { "$offsettime": "10:00Z" } }]
 }

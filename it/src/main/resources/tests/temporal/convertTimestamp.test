@@ -13,7 +13,7 @@
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [
-        { "day": "Sunday", "ts": { "$timestamp": "2014-08-17T06:00:00.000Z" }, "converted": { "$timestamp": "2014-08-17T06:00:00.000Z" } },
-        { "day": "Monday", "ts": { "$timestamp": "2014-08-18T07:00:00.000Z" }, "converted": { "$timestamp": "2014-08-18T07:00:00.000Z" } }
+        { "day": "Sunday", "ts": { "$offsetdatetime": "2014-08-17T06:00Z" }, "converted": { "$offsetdatetime": "2014-08-17T06:00Z" } },
+        { "day": "Monday", "ts": { "$offsetdatetime": "2014-08-18T07:00Z" }, "converted": { "$offsetdatetime": "2014-08-18T07:00Z" } }
     ]
 }
