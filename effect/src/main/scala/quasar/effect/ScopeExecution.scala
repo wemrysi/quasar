@@ -20,7 +20,7 @@ import slamdata.Predef._
 import scala.{Ordering => SOrdering}
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import scala.collection.immutable.TreeSet
+import scala.collection.immutable.Queue
 import quasar.RenderedTree
 import quasar.fp._
 import quasar.fp.numeric.Natural
@@ -215,12 +215,17 @@ object SingleExecutionRef {
 
 final case class TimingRepository(recordedExecutions: Natural,
                                   start: Instant,
-                                  under: TaskRef[TreeSet[Execution]]) {
+                                  under: TaskRef[Queue[Execution]]) {
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def dequeueN[A](n: Int, queue: Queue[A]): Queue[A] =
+    if (n <= 0) queue
+    else dequeueN(n - 1, queue.dequeue._2)
+
   def addExecution(execution: Execution): Task[Unit] = {
     under.modify { executions =>
-      val newExecutions = executions + execution
-      val excessExecutions = java.lang.Math.max(newExecutions.size - recordedExecutions.value.toInt, 0)
-      newExecutions.drop(excessExecutions)
+      val newExecutions = executions.enqueue(execution)
+      val excessExecutions = newExecutions.size - recordedExecutions.value.toInt
+      dequeueN(excessExecutions, newExecutions)
     }.void
   }
 }
@@ -228,7 +233,7 @@ final case class TimingRepository(recordedExecutions: Natural,
 object TimingRepository {
   def empty(recordedExecutions: Natural): Task[TimingRepository] = {
     for {
-      ref <- TaskRef(TreeSet.empty[Execution])
+      ref <- TaskRef(Queue.empty[Execution])
       now <- Task.delay(Instant.now())
     } yield TimingRepository(recordedExecutions, now, ref)
   }
