@@ -222,10 +222,10 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               _),
             _)) =>
 
-          (arbBucket must beTreeEqual(expArbBucket)) and
-          (arbExpr must beTreeEqual(expArbExpr)) and
-          (sumBucket must beTreeEqual(expSumBucket)) and
-          (sumExpr must beTreeEqual(expSumExpr))
+          arbBucket must beTreeEqual(expArbBucket)
+          arbExpr must beTreeEqual(expArbExpr)
+          sumBucket must beTreeEqual(expSumBucket)
+          sumExpr must beTreeEqual(expSumExpr)
       }
     }
 
