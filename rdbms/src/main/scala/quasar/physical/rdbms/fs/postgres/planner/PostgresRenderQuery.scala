@@ -201,7 +201,6 @@ object PostgresRenderQuery extends RenderQuery {
       val fName = fType match {
         case StrLower => "lower"
         case StrUpper => "upper"
-        case ArrayUnwind => "jsonb_array_elements_text"
       }
       s"$fName($e)".right
     case BinaryFunction(fType, TextExpr(a1), TextExpr(a2)) => (fType match {
@@ -213,5 +212,7 @@ object PostgresRenderQuery extends RenderQuery {
       case Search => s"(case when ${bool(a3)} then ${text(a1)} ~* ${text(a2)} else ${text(a1)} ~ ${text(a2)} end)"
       case Substring => s"substring(${text(a1)} from ((${text(a2)})::integer + 1) for (${text(a3)})::integer)"
     }).right
+
+    case ArrayUnwind(TextExpr(toUnwind)) => s"jsonb_array_elements_text($toUnwind)".right
   }
 }

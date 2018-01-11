@@ -22,7 +22,7 @@ import quasar.fp.ski._
 import quasar.{NameGenerator, qscript}
 import quasar.Planner.PlannerErrorME
 import quasar.physical.rdbms.planner.sql.SqlExpr._
-import quasar.physical.rdbms.planner.sql.{ArrayUnwind, SqlExpr, genId}
+import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.qscript.{ExcludeId, FreeMap, MapFunc, QScriptCore, QScriptTotal, ShiftType}
 import matryoshka._
@@ -161,7 +161,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         structAlias <- genId[T[SqlExpr], F]
         structExpr  <- processFreeMap(struct, structAlias)
         left = src.project
-        right = UnaryFunction(ArrayUnwind, structExpr)
+        right = ArrayUnwind(structExpr)
         repaired <- processJoinFunc(repair, left, right)
         result = Select[T[SqlExpr]](
           Selection(repaired, None), From(src, structAlias), none, Nil)
