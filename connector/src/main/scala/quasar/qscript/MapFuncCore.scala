@@ -331,7 +331,7 @@ object MapFuncCore {
 
       // TODO: Generalize this to `StaticMapSuffix`.
       case DeleteKey(
-        Embed(CoEnv(\/-(MFC(ConcatMaps(m, Embed(CoEnv(\/-(MFC(MakeMap(k, _)))))))))),
+        ExtractFunc(ConcatMaps(m, ExtractFunc(MakeMap(k, _)))),
         f)
           if k ≟ f =>
         rollMF[T, A](MFC(DeleteKey(m, f))).some
@@ -348,28 +348,18 @@ object MapFuncCore {
         map.reverse.find(_._1 ≟ key) ∘ (_._2.project)
 
       case ProjectKey(
-        Embed(CoEnv(\/-(MFC(Cond(cond, Embed(StaticMap(consMap)), Embed(StaticMap(altMap))))))),
+        ExtractFunc(Cond(cond, Embed(StaticMap(consMap)), Embed(StaticMap(altMap)))),
         ExtractFunc(Constant(key))) =>
-        (consMap.reverse.find(_._1 ≟ key) ∘ (_._2) |@| altMap.reverse.find(_._1 ≟ key) ∘ (_._2)) {
-          case (cons, alt) => rollMF[T, A](MFC(Cond(cond, cons, alt)))
+        (consMap.reverse.find(_._1 ≟ key) |@| altMap.reverse.find(_._1 ≟ key)) {
+          case ((_, cons), (_, alt)) => rollMF[T, A](MFC(Cond(cond, cons, alt)))
         }
 
-      case ProjectKey(
-        Embed(CoEnv(\/-(MFC(Cond(cond, Embed(StaticMap(map)), alt))))),
-        ExtractFunc(Constant(key))) =>
-        map.reverse.find(_._1 ≟ key) ∘ (_._2) ∘ (v => rollMF[T, A](MFC(Cond(cond, v, alt))))
-
-      case ProjectKey(
-        Embed(CoEnv(\/-(MFC(Cond(cond, cons, Embed(StaticMap(map))))))),
-        ExtractFunc(Constant(key))) =>
-        map.reverse.find(_._1 ≟ key) ∘ (_._2) ∘ (v => rollMF[T, A](MFC(Cond(cond, cons, v))))
-
       // TODO: Generalize these to `StaticMapSuffix`
-      case ProjectKey(Embed(CoEnv(\/-(MFC(MakeMap(k, Embed(v)))))), f) if k ≟ f =>
+      case ProjectKey(ExtractFunc(MakeMap(k, Embed(v))), f) if k ≟ f =>
         v.some
 
       case ProjectKey(
-        Embed(CoEnv(\/-(MFC(ConcatMaps(_, Embed(CoEnv(\/-(MFC(MakeMap(k, Embed(v))))))))))),
+        ExtractFunc(ConcatMaps(_, ExtractFunc(MakeMap(k, Embed(v))))),
         f)
           if k ≟ f =>
         v.some
