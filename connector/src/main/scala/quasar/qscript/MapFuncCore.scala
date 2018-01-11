@@ -342,6 +342,14 @@ object MapFuncCore {
           if index.isValidInt =>
         as.lift(index.intValue).map(_.project)
 
+      case ProjectIndex(
+        ExtractFunc(Cond(cond, Embed(StaticArrayPrefix(consArr)), Embed(StaticArrayPrefix(altArr)))),
+        ExtractFunc(Constant(Embed(EX(ejson.Int(index))))))
+          if index.isValidInt =>
+        (consArr.lift(index.intValue) |@| altArr.lift(index.intValue)) {
+          case (cons, alt) => rollMF[T, A](MFC(Cond(cond, cons, alt)))
+        }
+
       case ProjectKey(
         Embed(StaticMap(map)),
         ExtractFunc(Constant(key))) =>
