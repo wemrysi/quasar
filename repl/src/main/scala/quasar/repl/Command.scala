@@ -37,10 +37,10 @@ object Command {
   private val AppendPattern                = "(?i)append +([\\S]+) (.+)".r
   private val DeletePattern                = "(?i)rm +([\\S]+)".r
   private val SetPhaseFormatPattern        = "(?i)(?:set +)?phaseFormat *= *(tree|code)".r
-  private val SetTimingFormatPattern       = "(?i)(?:set +)?timingFormat *= *(tree|onlytotal|nothing)".r
+  private val SetTimingFormatPattern       = "(?i)(?:set +)?timingFormat *= *(tree|onlytotal)".r
   private val DebugPattern                 = "(?i)(?:set +)?debug *= *(0|1|2)".r
   private val SummaryCountPattern          = "(?i)(?:set +)?summaryCount *= *(\\d+)".r
-  private val FormatPattern                = "(?i)(?:set +)?format *= *((?:table)|(?:precise)|(?:readable)|(?:csv)|(?:nothing))".r
+  private val FormatPattern                = "(?i)(?:set +)?format *= *((?:table)|(?:precise)|(?:readable)|(?:csv))".r
   private val SetVarPattern                = "(?i)(?:set +)?(\\w+) *= *(.*\\S)".r
   private val UnsetVarPattern              = "(?i)unset +(\\w+)".r
   private val ListVarPattern               = "(?i)env".r

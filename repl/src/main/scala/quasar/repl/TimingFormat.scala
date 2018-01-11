@@ -26,13 +26,10 @@ object TimingFormat {
   case object Tree extends TimingFormat
   // Only include the total time
   case object OnlyTotal extends TimingFormat
-  // Print no timing data
-  case object Nothing extends TimingFormat
 
   def fromString(str: String): Option[TimingFormat] = str.toLowerCase match {
     case "tree"      => Tree.some
     case "onlytotal" => OnlyTotal.some
-    case "nothing"   => Nothing.some
     case _           => none
   }
 }
