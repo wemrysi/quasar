@@ -2,6 +2,7 @@
     "name": "group by month",
 
     "backends": {
+      "mimir": "pendingIgnoreFieldOrder"
     },
 
     "data": "../days.data",
