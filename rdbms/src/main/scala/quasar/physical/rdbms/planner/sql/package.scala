@@ -46,7 +46,11 @@ package object sql {
   def idToWildcard[T[_[_]]: BirecursiveT](e: T[SqlExpr]): T[SqlExpr] = {
     e.project match {
       case Id(_) => *[T]
-      case ExprPair(Id(_), Id(_)) => *[T]
+      case ExprPair(a, b) =>
+        (a.project, b.project) match {
+          case (Id(_), Id(_)) => *[T]
+          case _ => e
+        }
       case _ => e
     }
   }
