@@ -2,6 +2,8 @@
     "name": "time series aggregation",
     "backends": {
         "couchbase": "ignoreFieldOrder",
+        "marklogic_json": "pendingIgnoreFieldOrder",
+        "marklogic_xml": "pending",
         "mimir":"pendingIgnoreFieldOrder"
     },
     "data": "smalltimeseries.data",

@@ -2,7 +2,8 @@
     "name": "dow and isodow",
 
     "backends": {
-        "marklogic_json": "ignoreFieldOrder",
+        "marklogic_json": "pendingIgnoreFieldOrder",
+        "marklogic_xml": "pending",
         "mimir":"pendingIgnoreFieldOrder"
     },
 
