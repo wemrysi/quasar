@@ -8,9 +8,7 @@ Chain
 │  ╰─ ExcludeId
 ├─ $LookupF(from smallZips with (this).left._id = (that)._id as right)
 ├─ $UnwindF
-│  ├─ Path(DocField(BsonField.Name("right")))
-│  ├─ IncludeArrayIndex
-│  ╰─ PreserveNullAndEmptyArrays
+│  ╰─ Path(DocField(BsonField.Name("right")))
 ├─ $MatchF
 │  ╰─ Doc
 │     ╰─ Expr($right -> Type(Doc))
@@ -38,9 +36,7 @@ Chain
 │  ╰─ ExcludeId
 ├─ $LookupF(from zips with (this).left.right._id = (that)._id as right)
 ├─ $UnwindF
-│  ├─ Path(DocField(BsonField.Name("right")))
-│  ├─ IncludeArrayIndex
-│  ╰─ PreserveNullAndEmptyArrays
+│  ╰─ Path(DocField(BsonField.Name("right")))
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj

@@ -78,13 +78,9 @@ Chain
 │     ├─ NotExpr($left -> Size(0))
 │     ╰─ NotExpr($right -> Size(0))
 ├─ $UnwindF
-│  ├─ Path(DocField(BsonField.Name("right")))
-│  ├─ IncludeArrayIndex
-│  ╰─ PreserveNullAndEmptyArrays
+│  ╰─ Path(DocField(BsonField.Name("right")))
 ├─ $UnwindF
-│  ├─ Path(DocField(BsonField.Name("left")))
-│  ├─ IncludeArrayIndex
-│  ╰─ PreserveNullAndEmptyArrays
+│  ╰─ Path(DocField(BsonField.Name("left")))
 ╰─ $SimpleMapF
    ├─ Map
    │  ╰─ Obj

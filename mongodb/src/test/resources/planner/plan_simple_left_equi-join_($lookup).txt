@@ -17,9 +17,7 @@ Chain
 │  │     })
 │  ╰─ ExcludeId
 ├─ $UnwindF
-│  ├─ Path(DocField(BsonField.Name("right")))
-│  ├─ IncludeArrayIndex
-│  ╰─ PreserveNullAndEmptyArrays
+│  ╰─ Path(DocField(BsonField.Name("right")))
 ╰─ $ProjectF
    ├─ Name("name" -> "$left.name")
    ├─ Name("address" -> "$right.address")

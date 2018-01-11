@@ -43,13 +43,9 @@ Chain
 │  ├─ Name("right" -> "$right")
 │  ╰─ ExcludeId
 ├─ $UnwindF
-│  ├─ Path(DocField(BsonField.Name("right")))
-│  ├─ IncludeArrayIndex
-│  ╰─ PreserveNullAndEmptyArrays
+│  ╰─ Path(DocField(BsonField.Name("right")))
 ├─ $UnwindF
-│  ├─ Path(DocField(BsonField.Name("left")))
-│  ├─ IncludeArrayIndex
-│  ╰─ PreserveNullAndEmptyArrays
+│  ╰─ Path(DocField(BsonField.Name("left")))
 ╰─ $ProjectF
    ├─ Name("name" -> "$left.name")
    ├─ Name("address" -> "$right.address")

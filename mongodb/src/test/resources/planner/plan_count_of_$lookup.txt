@@ -8,9 +8,7 @@ Chain
 │  ╰─ ExcludeId
 ├─ $LookupF(from zips with (this).right.TestProgramId = (that)._id as left)
 ├─ $UnwindF
-│  ├─ Path(DocField(BsonField.Name("left")))
-│  ├─ IncludeArrayIndex
-│  ╰─ PreserveNullAndEmptyArrays
+│  ╰─ Path(DocField(BsonField.Name("left")))
 ├─ $ProjectF
 │  ├─ Name("left" -> "$left")
 │  ├─ Name("right" -> "$right")

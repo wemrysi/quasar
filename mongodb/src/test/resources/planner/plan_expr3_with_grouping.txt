@@ -194,13 +194,9 @@ Chain
 │  │  │     │  │  │     ├─ NotExpr($left -> Size(0))
 │  │  │     │  │  │     ╰─ NotExpr($right -> Size(0))
 │  │  │     │  │  ├─ $UnwindF
-│  │  │     │  │  │  ├─ Path(DocField(BsonField.Name("right")))
-│  │  │     │  │  │  ├─ IncludeArrayIndex
-│  │  │     │  │  │  ╰─ PreserveNullAndEmptyArrays
+│  │  │     │  │  │  ╰─ Path(DocField(BsonField.Name("right")))
 │  │  │     │  │  ├─ $UnwindF
-│  │  │     │  │  │  ├─ Path(DocField(BsonField.Name("left")))
-│  │  │     │  │  │  ├─ IncludeArrayIndex
-│  │  │     │  │  │  ╰─ PreserveNullAndEmptyArrays
+│  │  │     │  │  │  ╰─ Path(DocField(BsonField.Name("left")))
 │  │  │     │  │  ├─ $ProjectF
 │  │  │     │  │  │  ├─ Name("left" -> "$left")
 │  │  │     │  │  │  ├─ Name("right" -> "$right")
@@ -299,13 +295,9 @@ Chain
 │  │  │     │     ├─ NotExpr($left -> Size(0))
 │  │  │     │     ╰─ NotExpr($right -> Size(0))
 │  │  │     ├─ $UnwindF
-│  │  │     │  ├─ Path(DocField(BsonField.Name("right")))
-│  │  │     │  ├─ IncludeArrayIndex
-│  │  │     │  ╰─ PreserveNullAndEmptyArrays
+│  │  │     │  ╰─ Path(DocField(BsonField.Name("right")))
 │  │  │     ├─ $UnwindF
-│  │  │     │  ├─ Path(DocField(BsonField.Name("left")))
-│  │  │     │  ├─ IncludeArrayIndex
-│  │  │     │  ╰─ PreserveNullAndEmptyArrays
+│  │  │     │  ╰─ Path(DocField(BsonField.Name("left")))
 │  │  │     ├─ $ProjectF
 │  │  │     │  ├─ Name("0" -> { "$eq": ["$left.identities.qsu15_b0", "$right.identities.qsu17_b0"] })
 │  │  │     │  ├─ Name("1" -> { "$eq": ["$left.identities.qsu8_k0", "$right.identities.qsu17_b0"] })
@@ -349,13 +341,9 @@ Chain
 │  │  │     ├─ NotExpr($left -> Size(0))
 │  │  │     ╰─ NotExpr($right -> Size(0))
 │  │  ├─ $UnwindF
-│  │  │  ├─ Path(DocField(BsonField.Name("right")))
-│  │  │  ├─ IncludeArrayIndex
-│  │  │  ╰─ PreserveNullAndEmptyArrays
+│  │  │  ╰─ Path(DocField(BsonField.Name("right")))
 │  │  ├─ $UnwindF
-│  │  │  ├─ Path(DocField(BsonField.Name("left")))
-│  │  │  ├─ IncludeArrayIndex
-│  │  │  ╰─ PreserveNullAndEmptyArrays
+│  │  │  ╰─ Path(DocField(BsonField.Name("left")))
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
 │  │  │  │  ╰─ Obj
@@ -522,13 +510,9 @@ Chain
 │     ├─ NotExpr($left -> Size(0))
 │     ╰─ NotExpr($right -> Size(0))
 ├─ $UnwindF
-│  ├─ Path(DocField(BsonField.Name("right")))
-│  ├─ IncludeArrayIndex
-│  ╰─ PreserveNullAndEmptyArrays
+│  ╰─ Path(DocField(BsonField.Name("right")))
 ├─ $UnwindF
-│  ├─ Path(DocField(BsonField.Name("left")))
-│  ├─ IncludeArrayIndex
-│  ╰─ PreserveNullAndEmptyArrays
+│  ╰─ Path(DocField(BsonField.Name("left")))
 ├─ $ProjectF
 │  ├─ Name("0" -> { "$eq": ["$left.identities.qsu17_b0", "$right.identities.qsu23_b0"] })
 │  ├─ Name("1" -> { "$eq": ["$left.identities.qsu15_b0", "$right.identities.qsu23_b0"] })

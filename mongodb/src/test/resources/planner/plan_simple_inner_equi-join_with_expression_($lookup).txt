@@ -29,9 +29,7 @@ Chain
 │  ├─ Name("right" -> "$right")
 │  ╰─ ExcludeId
 ├─ $UnwindF
-│  ├─ Path(DocField(BsonField.Name("right")))
-│  ├─ IncludeArrayIndex
-│  ╰─ PreserveNullAndEmptyArrays
+│  ╰─ Path(DocField(BsonField.Name("right")))
 ╰─ $ProjectF
    ├─ Name("city" -> "$left.city")
    ├─ Name("state" -> "$right.state")

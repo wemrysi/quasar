@@ -18,7 +18,7 @@ package quasar.physical.mongodb.workflow
 
 import scala.Predef.$conforms
 import slamdata.Predef._
-import quasar.{RenderTree, NonTerminal, Terminal}, RenderTree.ops._
+import quasar.{RenderTree, RenderedTree, NonTerminal, Terminal}, RenderTree.ops._
 import quasar.common.SortDir
 import quasar.fp._
 import quasar.fp.ski._
@@ -929,11 +929,12 @@ object WorkflowOpCoreF {
         case $SkipF(_, count)   => Terminal("$SkipF" :: wfType, Some(count.shows))
         case $UnwindF(_, field, includeArrayIndex, preserveNullAndEmptyArrays) =>
           val nt = "$UnwindF" :: wfType
+          val opts: List[Option[RenderedTree]] =
+            Terminal.opt("IncludeArrayIndex" :: nt, includeArrayIndex.map(_.shows)) ::
+              Terminal.opt("PreserveNullAndEmptyArrays" :: nt, preserveNullAndEmptyArrays.map(_.shows)) ::
+              Nil
           NonTerminal(nt, None,
-            Terminal("Path" :: nt, Some(field.shows)) ::
-              Terminal("IncludeArrayIndex" :: nt, includeArrayIndex ∘ (_.shows)) ::
-              Terminal("PreserveNullAndEmptyArrays" :: nt, preserveNullAndEmptyArrays ∘ (_.shows)) ::
-              Nil)
+            Terminal("Path" :: nt, Some(field.shows)) :: opts.map(_.toList).flatten)
         case $GroupF(_, grouped, -\/(by)) =>
           val nt = "$GroupF" :: wfType
           NonTerminal(nt, None,
