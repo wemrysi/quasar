@@ -50,7 +50,7 @@ final case class CliOptions(
 
 object CliOptions {
   val default: CliOptions =
-    CliOptions(Cmd.Start, None, \/-(Nil), None, None, false, false, None, refineMV(0L))
+    CliOptions(Cmd.Start, None, \/-(Nil), None, None, false, false, None, refineMV(64L))
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val parser = new CliOptionsParser(Lens.id[CliOptions], "quasar") {
