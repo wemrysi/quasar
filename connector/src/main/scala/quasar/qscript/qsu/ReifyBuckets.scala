@@ -69,16 +69,16 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
                 for {
                   joinRoot <- freshSymbol[G]("reifybuckets")
 
-                  autojoined = qsu.autojoin2(sym, source.root, combine)
-                  autojoinedG = QSUGraph(joinRoot, g.vertices.updated(joinRoot, autojoined))
+                  autojoined = qsu.autojoin2(source.refocus(sym), source, combine)
+                  autojoinedG = QSUGraph.refold(joinRoot, autojoined)
 
                   qauth0 <- MonadState_[G, QAuth].get
                   qauth1 <- ApplyProvenance.computeProvenance[T, G](autojoinedG)
                                .exec(qauth0).liftM[StateT[?[_], QAuth, ?]]
 
                   reduceExpr = func.ProjectKeyS(func.Hole, ReduceExprKey)
-                  newReduce = mkReduce(joinRoot, buckets, reduce as reduceExpr)
-                  newGraph = QSUGraph(g.root, autojoinedG.vertices.updated(g.root, newReduce))
+                  newReduce = mkReduce(autojoinedG, buckets, reduce as reduceExpr)
+                  newGraph = QSUGraph.refold(g.root, newReduce)
 
                   qauth2 <- ApplyProvenance.computeProvenance[T, G](newGraph)
                                .exec(qauth1).liftM[StateT[?[_], QAuth, ?]]
@@ -133,11 +133,11 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
   private def freshName[F[_]: Functor: NameGenerator]: F[Symbol] =
     freshSymbol("reifybuckets")
 
-  private def mkReduce(
-      src: Symbol,
+  private def mkReduce[A](
+      src: A,
       buckets: List[FreeAccess[Hole]],
       reducer: ReduceFunc[FreeMap])
-      : QScriptUniform[Symbol] =
+      : QScriptUniform[A] =
     qsu.qsReduce(
       src,
       buckets,
