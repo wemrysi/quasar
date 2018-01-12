@@ -30,7 +30,6 @@ import quasar.fp.ski._
 import quasar.fs.{FileSystemError, FileSystemErrT, MonadFsErr}, FileSystemError.qscriptPlanningFailed
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
-import quasar.namegen._
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
@@ -286,7 +285,7 @@ object MongoDbPlanner {
             case Type.Binary => check.isBinary
             case Type.Id => check.isId
             case Type.Bool => check.isBoolean
-            case Type.Date => check.isDateOrTimestamp // FIXME: use isDate here when >= 3.0
+            case Type.Date => check.isDate
             // NB: Some explicit coproducts for adjacent types.
             case Type.Int ⨿ Type.Dec ⨿ Type.Str => check.isNumberOrString
             case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str => check.isNumberOrString
@@ -1480,46 +1479,36 @@ object MongoDbPlanner {
 
     val bsonVersion = toBsonVersion(queryModel)
 
+    val joinHandler: JoinHandler[Workflow3_2F, WBM] =
+      JoinHandler.fallback[Workflow3_2F, WBM](
+        JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
+        JoinHandler.mapReduce)
+
     queryModel match {
+      case `3.4.4` =>
+        val cfg = PlannerConfig[T, Expr3_4_4, Workflow3_2F](
+          joinHandler,
+          FuncHandler.handle3_4_4(bsonVersion),
+          StaticHandler.handle,
+          bsonVersion)
+        plan0[T, M, Workflow3_2F, Expr3_4_4](anyDoc, cfg)(qs)
+
       case `3.4` =>
-        val joinHandler: JoinHandler[Workflow3_2F, WBM] =
-          JoinHandler.fallback[Workflow3_2F, WBM](
-            JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
-            JoinHandler.mapReduce)
         val cfg = PlannerConfig[T, Expr3_4, Workflow3_2F](
           joinHandler,
           FuncHandler.handle3_4(bsonVersion),
-          StaticHandler.v3_2,
+          StaticHandler.handle,
           bsonVersion)
         plan0[T, M, Workflow3_2F, Expr3_4](anyDoc, cfg)(qs)
 
       case `3.2` =>
-        val joinHandler: JoinHandler[Workflow3_2F, WBM] =
-          JoinHandler.fallback[Workflow3_2F, WBM](
-            JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
-            JoinHandler.mapReduce)
         val cfg = PlannerConfig[T, Expr3_2, Workflow3_2F](
           joinHandler,
           FuncHandler.handle3_2(bsonVersion),
-          StaticHandler.v3_2,
+          StaticHandler.handle,
           bsonVersion)
         plan0[T, M, Workflow3_2F, Expr3_2](anyDoc, cfg)(qs)
 
-      case `3.0` =>
-        val cfg = PlannerConfig[T, Expr3_0, Workflow2_6F](
-          JoinHandler.mapReduce[WBM, Workflow2_6F],
-          FuncHandler.handle3_0(bsonVersion),
-          StaticHandler.v2_6,
-          bsonVersion)
-        plan0[T, M, Workflow2_6F, Expr3_0](anyDoc, cfg)(qs).map(_.inject[WorkflowF])
-
-      case _ =>
-        val cfg = PlannerConfig[T, Expr2_6, Workflow2_6F](
-          JoinHandler.mapReduce[WBM, Workflow2_6F],
-          FuncHandler.handle2_6(bsonVersion),
-          StaticHandler.v2_6,
-          bsonVersion)
-        plan0[T, M, Workflow2_6F, Expr2_6](anyDoc, cfg)(qs).map(_.inject[WorkflowF])
     }
   }
 }

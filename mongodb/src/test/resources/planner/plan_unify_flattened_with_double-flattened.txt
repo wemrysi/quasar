@@ -21,46 +21,11 @@ Chain
 │  │         "$cond": [
 │  │           {
 │  │             "$and": [
-│  │               {
-│  │                 "$lte": [
-│  │                   { "$literal": [] },
-│  │                   {
-│  │                     "$cond": [
-│  │                       {
-│  │                         "$and": [
-│  │                           { "$lte": [{ "$literal": {  } }, "$s"] },
-│  │                           { "$lt": ["$s", { "$literal": [] }] }]
-│  │                       },
-│  │                       "$s.comments",
-│  │                       { "$literal": undefined }]
-│  │                   }]
-│  │               },
-│  │               {
-│  │                 "$lt": [
-│  │                   {
-│  │                     "$cond": [
-│  │                       {
-│  │                         "$and": [
-│  │                           { "$lte": [{ "$literal": {  } }, "$s"] },
-│  │                           { "$lt": ["$s", { "$literal": [] }] }]
-│  │                       },
-│  │                       "$s.comments",
-│  │                       { "$literal": undefined }]
-│  │                   },
-│  │                   { "$literal": BinData(0, "") }]
-│  │               }]
+│  │               { "$lte": [{ "$literal": [] }, "$s.comments"] },
+│  │               { "$lt": ["$s.comments", { "$literal": BinData(0, "") }] }]
 │  │           },
-│  │           {
-│  │             "$cond": [
-│  │               {
-│  │                 "$and": [
-│  │                   { "$lte": [{ "$literal": {  } }, "$s"] },
-│  │                   { "$lt": ["$s", { "$literal": [] }] }]
-│  │               },
-│  │               "$s.comments",
-│  │               { "$literal": undefined }]
-│  │           },
-│  │           { "$literal": undefined }]
+│  │           "$s.comments",
+│  │           [{ "$literal": undefined }]]
 │  │       },
 │  │       "1": {
 │  │         "$cond": [
@@ -70,7 +35,7 @@ Chain
 │  │               { "$lt": ["$f.replyTo", { "$literal": BinData(0, "") }] }]
 │  │           },
 │  │           "$f.replyTo",
-│  │           { "$literal": undefined }]
+│  │           [{ "$literal": undefined }]]
 │  │       }
 │  │     })
 │  ╰─ ExcludeId
@@ -89,34 +54,19 @@ Chain
 │  │           ╰─ JsCore([k, m[k]])
 │  ├─ Flatten
 │  │  ╰─ JsCore(_.f)
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(s)
-│  │     │  ╰─ Obj
-│  │     │     ├─ Key(identities)
-│  │     │     │  ╰─ Obj
-│  │     │     │     ╰─ Key(qsu39: _.f[0])
-│  │     │     ╰─ Key(value)
-│  │     │        ╰─ Obj
-│  │     │           ├─ Key(original: _.s)
-│  │     │           ╰─ Key(0: _.f[1])
-│  │     ╰─ Key(f)
-│  │        ╰─ Access
-│  │           ├─ Access
-│  │           │  ├─ Access
-│  │           │  │  ├─ Access
-│  │           │  │  │  ├─ Obj
-│  │           │  │  │  │  ├─ Key(identities)
-│  │           │  │  │  │  │  ╰─ Obj
-│  │           │  │  │  │  │     ╰─ Key(qsu39: _.f[0])
-│  │           │  │  │  │  ╰─ Key(value)
-│  │           │  │  │  │     ╰─ Obj
-│  │           │  │  │  │        ├─ Key(original: _.s)
-│  │           │  │  │  │        ╰─ Key(0: _.f[1])
-│  │           │  │  │  ╰─ Literal("value")
-│  │           │  │  ╰─ Literal("original")
-│  │           │  ╰─ Literal("results")
-│  │           ╰─ Literal("1")
+│  ╰─ Scope(Map())
+├─ $ProjectF
+│  ├─ Name("identities" -> { "qsu39": { "$arrayElemAt": ["$f", { "$literal": NumberInt("0") }] } })
+│  ├─ Name("value" -> {
+│  │       "original": "$s",
+│  │       "0": { "$arrayElemAt": ["$f", { "$literal": NumberInt("1") }] }
+│  │     })
+│  ╰─ ExcludeId
+├─ $ProjectF
+│  ├─ Name("s" -> "$$ROOT")
+│  ├─ Name("f" -> "$value.original.results.1")
+│  ╰─ ExcludeId
+├─ $SimpleMapF
 │  ├─ SubMap
 │  │  ├─ JsCore(_.f)
 │  │  ╰─ Let(m)
