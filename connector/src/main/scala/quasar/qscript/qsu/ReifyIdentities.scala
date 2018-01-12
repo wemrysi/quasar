@@ -114,7 +114,8 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
   private def recordAccesses[F[_]: Foldable](by: Symbol, fa: F[QAccess[Symbol]]): References =
     fa.foldLeft(References.noRefs[T, T[EJson]])((r, a) => r.recordAccess(by, a, defaultAccess(a)))
 
-  private final case class ReifyState(status: ReifiedStatus, refs: References) {
+  // We can't use final here due to SI-4440 - it results in warning
+  private case class ReifyState(status: ReifiedStatus, refs: References) {
     lazy val seen: ISet[Symbol] = status.keySet
   }
 
