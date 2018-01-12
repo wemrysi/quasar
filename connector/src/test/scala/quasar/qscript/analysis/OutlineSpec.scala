@@ -48,8 +48,8 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
 
   val joinFunc =
     func.StaticMap(
-      ("left", func.LeftSide),
-      ("right", func.RightSide))
+      "left" -> func.LeftSide,
+      "right" -> func.RightSide)
 
   val modSides: (Shape, Shape) => Shape =
     (l, r) => rollS(ExtEJson(ejson.Map(List(

@@ -79,8 +79,8 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
         case (struct, idStatus, rotation) :: ss =>
           val firstRepair: FreeMapA[QScriptUniform.ShiftTarget[T]] =
             func.StaticMap(
-              ("original", func.AccessLeftTarget(Access.valueHole(_))),
-              ("0", func.RightTarget)
+              "original" -> func.AccessLeftTarget(Access.valueHole(_)),
+              "0" -> func.RightTarget
             )
           val firstShiftPat: QScriptUniform[Symbol] =
             QSU.LeftShift[T, Symbol](source.root, struct, idStatus, firstRepair, rotation)

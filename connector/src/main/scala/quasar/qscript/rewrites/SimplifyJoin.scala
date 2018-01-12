@@ -117,8 +117,8 @@ object SimplifyJoin {
               keys.map(k => (k.left, k.right)),
               tj.f,
               func.StaticMap(
-                (LeftK, func.LeftSide),
-                (RightK, func.RightSide))))).embed)(
+                LeftK -> func.LeftSide,
+                RightK -> func.RightSide)))).embed)(
             (ej, filt) => GtoH(QC.inj(Filter(ej, mergeSides(filt)))).embed),
             mergeSides(tj.combine))))
         }

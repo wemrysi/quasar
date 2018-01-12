@@ -79,16 +79,16 @@ class PlannerQScriptSpec extends
           func.ProjectKeyS(func.Hole, "_id"))),
       JoinType.Inner,
       func.StaticMap(
-        ("city",
+        "city" ->
           // qscript is generated with 3 guards here:
           // func.Guard(
           //   func.Guard(func.LeftSide, Type.AnyObject, func.LeftSide, func.Undefined),
           //   Type.AnyObject,
           //   func.Guard(func.LeftSide, Type.AnyObject, func.ProjectKeyS(func.LeftSide, "city"), func.Undefined),
           //   func.Undefined)),
-          func.Guard(func.LeftSide, Type.AnyObject, func.ProjectKeyS(func.LeftSide, "city"), func.Undefined)),
-        ("state",
-          func.Guard(func.RightSide, Type.AnyObject, func.ProjectKeyS(func.RightSide, "state"), func.Undefined))))
+          func.Guard(func.LeftSide, Type.AnyObject, func.ProjectKeyS(func.LeftSide, "city"), func.Undefined),
+        "state" ->
+          func.Guard(func.RightSide, Type.AnyObject, func.ProjectKeyS(func.RightSide, "state"), func.Undefined)))
 
   val simpleInnerEquiJoinWithPrefiltering =
     fix.EquiJoin(
@@ -117,13 +117,13 @@ class PlannerQScriptSpec extends
             func.Undefined))),
       JoinType.Inner,
       func.StaticMap(
-        ("city",
+        "city" ->
           func.Guard(
             func.LeftSide,
             Type.AnyObject,
             func.ProjectKeyS(func.LeftSide, "city"),
-            func.Undefined)),
-        ("state",
+            func.Undefined),
+        "state" ->
           func.Guard(
             func.Guard(
               func.RightSide,
@@ -136,7 +136,7 @@ class PlannerQScriptSpec extends
               Type.AnyObject,
               func.ProjectKeyS(func.RightSide, "state"),
               func.Undefined),
-            func.Undefined))))
+            func.Undefined)))
 
   val threeWayEquiJoin =
     fix.EquiJoin(
@@ -190,7 +190,7 @@ class PlannerQScriptSpec extends
           func.ProjectKeyS(func.Hole, "_id"))),
       JoinType.Inner,
       func.StaticMap(
-        ("city",
+        "city" ->
             func.Guard(
               func.StaticMap(
                 ("left",
@@ -203,8 +203,8 @@ class PlannerQScriptSpec extends
                 Type.AnyObject,
                 func.ProjectKeyS(func.ProjectIndexI(func.LeftSide, 0), "city"),
                 func.Undefined),
-              func.Undefined)),
-        ("state",
+              func.Undefined),
+        "state" ->
             func.Guard(
               func.StaticMap(
                 ("left",
@@ -217,13 +217,13 @@ class PlannerQScriptSpec extends
                 Type.AnyObject,
                 func.ProjectKeyS(func.ProjectIndexI(func.LeftSide, 1), "state"),
                 func.Undefined),
-              func.Undefined)),
-        ("pop",
+              func.Undefined),
+        "pop" ->
           func.Guard(
             func.RightSide,
             Type.AnyObject,
             func.ProjectKeyS(func.RightSide, "pop"),
-            func.Undefined))))
+            func.Undefined)))
 
   "plan from qscript" should {
 
@@ -374,12 +374,12 @@ class PlannerQScriptSpec extends
           qscript.ExcludeId,
           ShiftType.Array,
           func.StaticMap(
-            ("codes",
-              func.RightSide),
-            ("first_name",
+            "codes" ->
+              func.RightSide,
+            "first_name" ->
               func.ProjectKeyS(
                 func.LeftSide,
-                "first_name"))))) must beWorkflow0(
+                "first_name")))) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "patients")),
           $match(Selector.Doc(
@@ -413,9 +413,9 @@ class PlannerQScriptSpec extends
             qscript.ExcludeId,
             qscript.ShiftType.Array,
             func.StaticMap(
-              ("city",
-                func.ProjectKeyS(func.LeftSide, "city")),
-              ("loc", func.RightSide))),
+              "city" ->
+                func.ProjectKeyS(func.LeftSide, "city"),
+              "loc" -> func.RightSide)),
           func.Lt(func.ProjectKeyS(func.Hole, "loc"), func.Constant(json.int(-165))))) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "zips")),
@@ -478,26 +478,26 @@ class PlannerQScriptSpec extends
             qscript.ExcludeId,
             qscript.ShiftType.Array,
             func.StaticMap(
-              ("results",
+              "results" ->
                 func.Guard(
                   func.RightSide,
                   Type.FlexArr(0, None, Type.Top),
                   func.RightSide,
-                  func.Undefined)),
-              ("original",
-                func.LeftSide))),
+                  func.Undefined),
+              "original" ->
+                func.LeftSide)),
           func.ProjectKeyS(func.Hole, "results"),
           qscript.ExcludeId,
           qscript.ShiftType.Array,
           func.StaticMap(
-            ("0",
+            "0" ->
               func.ProjectKeyS(
                 func.ProjectKeyS(
                   func.LeftSide,
                   "original"),
-                "city")),
-            ("1",
-              func.RightSide)))) must beWorkflow0(
+                "city"),
+            "1" ->
+              func.RightSide))) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "zips")),
           $project(reshape(
@@ -581,10 +581,10 @@ class PlannerQScriptSpec extends
           qscript.ExcludeId,
           qscript.ShiftType.Array,
           func.StaticMap(
-            ("city",
-              func.ProjectKeyS(func.LeftSide, "city")),
-            ("loc",
-              func.RightSide)))) must beWorkflow0(
+            "city" ->
+              func.ProjectKeyS(func.LeftSide, "city"),
+            "loc" ->
+              func.RightSide))) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "zips")),
           $project(reshape(
@@ -633,9 +633,9 @@ class PlannerQScriptSpec extends
           qscript.ExcludeId,
           ShiftType.Array,
           func.StaticMap(
-            ("codes",
-              func.RightSide),
-            ("first_name",
+            "codes" ->
+              func.RightSide,
+            "first_name" ->
               func.ProjectKeyS(
                 func.Cond(
                   func.And(
@@ -647,7 +647,7 @@ class PlannerQScriptSpec extends
                       func.Constant(json.arr(List(json.str("BOULDER"), json.str("AURORA")))))),
                   func.LeftSide,
                   func.Undefined),
-                "first_name")),
+                "first_name"),
             ("city",
               func.ProjectKeyS(
                 func.Cond(

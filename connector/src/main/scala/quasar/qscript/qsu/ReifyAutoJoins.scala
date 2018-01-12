@@ -91,8 +91,8 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
 
           def lcCombiner: JoinFunc =
             func.StaticMap(
-              (lName, LeftSideF),
-              (cName, RightSideF))
+              lName -> LeftSideF,
+              cName -> RightSideF)
 
           def lcJoin: QSU[Symbol] =
             qsu.qsAutoJoin(l, c, lcKeys, lcCombiner)

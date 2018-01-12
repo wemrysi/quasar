@@ -178,8 +178,8 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
     def makeIV[A](initialI: FreeMapA[A], initialV: FreeMapA[A]): FreeMapA[A] =
       func.StaticMap(
-        (IdentitiesK, initialI),
-        (ValueK, initialV))
+        IdentitiesK -> initialI,
+        ValueK -> initialV)
 
     def modifyAccess(of: QAccess[Symbol])(f: FreeMap => FreeMap): G[Unit] =
       G.modify(reifyRefs.modify(_.modifyAccess(of)(f)))

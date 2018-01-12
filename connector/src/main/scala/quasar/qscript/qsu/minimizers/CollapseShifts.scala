@@ -224,15 +224,15 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       val initPattern = reversed.head match {
         case -\/(QSU.LeftShift(_, struct, idStatus, repair, rot)) =>
           val repair2 = func.StaticMap(
-            (OriginalField, func.AccessLeftTarget(Access.valueHole[T[EJson]](_))),
-            (ResultsField, repair))
+            OriginalField -> func.AccessLeftTarget(Access.valueHole[T[EJson]](_)),
+            ResultsField -> repair)
 
           QSU.LeftShift[T, Symbol](src.root, struct, idStatus, repair2, rot)
 
         case \/-(QSU.MultiLeftShift(_, shifts, repair)) =>
           val repair2 = func.StaticMap(
-            (OriginalField, accessHoleLeftF),
-            (ResultsField, repair))
+            OriginalField -> accessHoleLeftF,
+            ResultsField -> repair)
 
           QSU.MultiLeftShift[T, Symbol](src.root, shifts, repair2)
       }
@@ -254,11 +254,11 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             }
 
             val repair3 = func.StaticMap(
-              (OriginalField,
+              OriginalField ->
                 func.ProjectKeyS(
                   func.AccessLeftTarget(Access.valueHole[T[EJson]](_)),
-                  OriginalField)),
-              (ResultsField, repair2))
+                  OriginalField),
+              ResultsField -> repair2)
 
             updateGraph[T, G](QSU.LeftShift[T, Symbol](src.root, struct2, idStatus, repair3, rot)) map { rewritten =>
               rewritten :++ src
@@ -280,9 +280,9 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             }
 
             val repair3 = func.StaticMap(
-              (OriginalField,
-                func.ProjectKeyS(accessHoleLeftF, OriginalField)),
-              (ResultsField, repair2))
+              OriginalField ->
+                func.ProjectKeyS(accessHoleLeftF, OriginalField),
+              ResultsField -> repair2)
 
             updateGraph[T, G](QSU.MultiLeftShift[T, Symbol](src.root, shifts2, repair2)) map { rewritten =>
               rewritten :++ src
@@ -428,8 +428,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val repair =
             func.StaticMap(
-              (LeftField, repairLAdj),
-              (RightField, repairRAdj))
+              LeftField -> repairLAdj,
+              RightField -> repairRAdj)
 
           continue(fakeParent, tailL, tailR) { sym =>
             QSU.MultiLeftShift[T, Symbol](
@@ -453,8 +453,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val repair =
             func.StaticMap(
-              (LeftField, repairLAdj),
-              (RightField, repairRAdj))
+              LeftField -> repairLAdj,
+              RightField -> repairRAdj)
 
           continue(fakeParent, tailL, tailR) { sym =>
             QSU.MultiLeftShift[T, Symbol](
@@ -476,8 +476,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val repair =
             func.StaticMap(
-              (LeftField, repairLAdj),
-              (RightField, repairRAdj))
+              LeftField -> repairLAdj,
+              RightField -> repairRAdj)
 
           continue(fakeParent, tailL, tailR) { sym =>
             QSU.MultiLeftShift[T, Symbol](
@@ -501,8 +501,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val repair =
             func.StaticMap(
-              (LeftField, repairLAdj),
-              (RightField, repairRAdj))
+              LeftField -> repairLAdj,
+              RightField -> repairRAdj)
 
           continue(fakeParent, tailL, tailR) { sym =>
             QSU.MultiLeftShift[T, Symbol](
@@ -520,9 +520,9 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           val repairLAdj = fixSingleRepairForSingle(repairL, LeftSide)
 
           val repair = func.StaticMap(
-            (LeftField, repairLAdj),
-            (RightField,
-              if (hasParent)
+            LeftField -> repairLAdj,
+            RightField ->
+              (if (hasParent)
                 func.ProjectKeyS(func.AccessLeftTarget(Access.value(_)), RightField)
               else
                 func.AccessLeftTarget(Access.value(_))))
@@ -545,9 +545,9 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           val repairLAdj = fixMultiRepair(repairL, 0, LeftSide)
 
           val repair = func.StaticMap(
-            (LeftField, repairLAdj),
-            (RightField,
-              if (hasParent)
+            LeftField -> repairLAdj,
+            RightField ->
+              (if (hasParent)
                 func.ProjectKeyS(func.AccessHole.map(_.left[Int]), RightField)
               else
                 func.AccessHole.map(_.left[Int])))
@@ -568,12 +568,12 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           val repairRAdj = fixSingleRepairForSingle(repairR, RightSide)
 
           val repair = func.StaticMap(
-            (LeftField,
-              if (hasParent)
+            LeftField ->
+              (if (hasParent)
                 func.ProjectKeyS(func.AccessLeftTarget(Access.value(_)), LeftField)
               else
                 func.AccessLeftTarget(Access.value(_))),
-            (RightField, repairRAdj))
+            RightField -> repairRAdj)
 
           continue(fakeParent, Nil, tailR) { sym =>
             QSU.LeftShift[T, Symbol](
@@ -593,12 +593,12 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           val repairRAdj = fixMultiRepair(repairR, 0, LeftSide)
 
           val repair = func.StaticMap(
-            (LeftField,
-              if (hasParent)
+            LeftField ->
+              (if (hasParent)
                 func.ProjectKeyS(func.AccessHole.map(_.left[Int]), LeftField)
               else
                 func.AccessHole.map(_.left[Int])),
-            (RightField, repairRAdj))
+            RightField -> repairRAdj)
 
           continue(fakeParent, Nil, tailR) { sym =>
             QSU.MultiLeftShift[T, Symbol](

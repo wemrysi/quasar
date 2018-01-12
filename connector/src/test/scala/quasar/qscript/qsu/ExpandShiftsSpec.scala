@@ -108,8 +108,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         )
         innerRepair must beTreeEqual(
           func.StaticMap(
-            ("original", func.AccessLeftTarget(Access.valueHole(_))),
-            ("0", func.RightTarget))
+            "original" -> func.AccessLeftTarget(Access.valueHole(_)),
+            "0" -> func.RightTarget)
         )
         outerRepair must beTreeEqual(
           func.Cond(
@@ -117,11 +117,11 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu0), _)),
               func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu1), _))),
             func.StaticMap(
-                ("original",
-                  func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original")),
-                ("0",
-                  func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "0")),
-                ("1", func.RightTarget)),
+                "original" ->
+                  func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),
+                "0" ->
+                  func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "0"),
+                "1" -> func.RightTarget),
             func.Undefined
           )
         )
@@ -201,8 +201,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         )
         innermostRepair must beTreeEqual(
           func.StaticMap(
-            ("original", func.AccessLeftTarget(Access.valueHole(_))),
-            ("0", func.RightTarget))
+            "original" -> func.AccessLeftTarget(Access.valueHole(_)),
+            "0" -> func.RightTarget)
         )
         innerRepair must beTreeEqual(
           func.Cond(
@@ -210,11 +210,11 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu0), _)),
               func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu1), _))),
             func.StaticMap(
-                ("original",
-                  func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original")),
-                ("0",
-                  func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "0")),
-                ("1", func.RightTarget)),
+              "original" ->
+                func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),
+              "0" ->
+                func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "0"),
+              "1" -> func.RightTarget),
             func.Undefined))
         outerRepair must beTreeEqual(
           func.Cond(
@@ -222,13 +222,13 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu1), _)),
               func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu2), _))),
             func.StaticMap(
-              ("original",
-                func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original")),
-              ("0",
-                func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "0")),
-              ("1",
-                func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "1")),
-              ("2", func.RightTarget)),
+              "original" ->
+                func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),
+              "0" ->
+                func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "0"),
+              "1" ->
+                func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "1"),
+              "2" -> func.RightTarget),
             func.Undefined
         ))
         ok

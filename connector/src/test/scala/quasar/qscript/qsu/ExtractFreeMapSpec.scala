@@ -50,8 +50,8 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
 
   def makeMap(left: String, right: String): JoinFunc =
     func.StaticMap(
-      (left, func.LeftSide),
-      (right, func.RightSide))
+      left -> func.LeftSide,
+      right -> func.RightSide)
 
   val orders: AFile = Path.rootDir </> Path.dir("client") </> Path.file("orders")
 

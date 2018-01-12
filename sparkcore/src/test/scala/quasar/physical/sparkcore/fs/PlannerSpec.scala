@@ -470,8 +470,8 @@ class PlannerSpec
           def right: FreeQS = free.Filter(free.Hole, fun("US"))
           def key: FreeMap = func.ProjectKeyS(func.Hole, "age")
           def combine: JoinFunc = func.StaticMap(
-            (JoinDir.Left.name, func.LeftSide),
-            (JoinDir.Right.name, func.RightSide))
+            JoinDir.Left.name -> func.LeftSide,
+            JoinDir.Right.name -> func.RightSide)
 
           val equiJoin = quasar.qscript.EquiJoin(src, left, right, List((key, key)), JoinType.Inner, combine)
 
@@ -500,8 +500,8 @@ class PlannerSpec
           def right: FreeQS = free.Filter(free.Hole, fun("US"))
           def key: FreeMap = func.ProjectKeyS(func.Hole, "age")
           def combine: JoinFunc = func.StaticMap(
-            (JoinDir.Left.name, func.LeftSide),
-            (JoinDir.Right.name, func.RightSide))
+            JoinDir.Left.name -> func.LeftSide,
+            JoinDir.Right.name -> func.RightSide)
 
           val equiJoin = quasar.qscript.EquiJoin(src, left, right, List((key, key)), JoinType.LeftOuter, combine)
 
@@ -536,8 +536,8 @@ class PlannerSpec
           def right: FreeQS = free.Filter(free.Hole, fun("US"))
           def key: FreeMap = func.ProjectKeyS(func.Hole, "age")
           def combine: JoinFunc = func.StaticMap(
-            (JoinDir.Left.name, func.LeftSide),
-            (JoinDir.Right.name, func.RightSide))
+            JoinDir.Left.name -> func.LeftSide,
+            JoinDir.Right.name -> func.RightSide)
 
           val equiJoin = quasar.qscript.EquiJoin(src, left, right, List((key, key)), JoinType.RightOuter, combine)
 

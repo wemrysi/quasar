@@ -57,8 +57,8 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
     case graph @ Extractors.LPJoin(left, right, cond, jtype, lref, rref) =>
       val combiner: JoinFunc =
         func.StaticMap(
-          (JoinDir.Left.name, func.LeftSide),
-          (JoinDir.Right.name, func.RightSide))
+          JoinDir.Left.name -> func.LeftSide,
+          JoinDir.Right.name -> func.RightSide)
 
       MappableRegion.funcOf(replaceRefs(graph, lref, rref), graph refocus cond.root)
         .map(jf => ThetaJoin(left.root, right.root, jf, jtype, combiner)) match {
@@ -85,7 +85,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
       def autojoinVerts(head: Symbol, tail: List[Symbol]): F[(Symbol, QSUVerts[T])] = {
         freshName[F].flatMap { joinRoot =>
           val join: QSU[Symbol] = AutoJoin2(src.root, head,
-            func.StaticMap(("sort_source", func.LeftSide), (head.name, func.RightSide)))
+            func.StaticMap("sort_source" -> func.LeftSide, head.name -> func.RightSide))
 
 	      val updated: QSUVerts[T] = graph.vertices.updated(joinRoot, join)
 
@@ -156,8 +156,8 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
         case None => (freshName[F] |@| freshName[F]) {
           case (joinRoot, interRoot) =>
             val combine: JoinFunc = func.StaticMap(
-              (srcName, func.LeftSide),
-              (targetName, func.RightSide))
+              srcName -> func.LeftSide,
+              targetName -> func.RightSide)
 
             val join: QSU[Symbol] = AutoJoin2(src, target, combine)
             val inter: QSU[Symbol] = makeQSU(joinRoot, func.ProjectKeyS(func.Hole, targetName))
