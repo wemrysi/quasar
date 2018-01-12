@@ -24,6 +24,7 @@ final case class ServerVersion(major: Int, minor: Int, revision: Option[Int], ex
 object ServerVersion {
   val MongoDb3_2 = ServerVersion(3, 2, None, "")
   val MongoDb3_4 = ServerVersion(3, 4, None, "")
+  val MongoDb3_4_4 = ServerVersion(3, 4, Some(4), "")
 
   private val Pattern = """(?s)(\d+)\.(\d+)(?:\.(\d+))?[-. _]?(.*)""".r
 
