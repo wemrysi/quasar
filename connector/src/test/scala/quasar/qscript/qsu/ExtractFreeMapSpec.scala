@@ -49,7 +49,7 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] {
   def projectStrKey(key: String): FreeMap = func.ProjectKeyS(func.Hole, key)
 
   def makeMap(left: String, right: String): JoinFunc =
-    func.StaticMap(
+    func.StaticMapS(
       left -> func.LeftSide,
       right -> func.RightSide)
 

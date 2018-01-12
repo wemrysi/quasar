@@ -136,7 +136,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                   func.ProjectKeyS(func.RightSide, "l_max"),
                   func.ProjectKeyS(func.RightSide, "l_min")))),
             JoinType.Inner,
-            func.StaticMap(
+            func.StaticMapS(
               "l" -> func.LeftSide,
               "r" -> func.RightSide)),
           func.Lt(
@@ -167,7 +167,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               func.ProjectKeyS(func.LeftSide, "lat"),
               func.ProjectKeyS(func.LeftSide, "lon"))),
           JoinType.Inner,
-          func.StaticMap(
+          func.StaticMapS(
             "l" -> func.LeftSide,
             "r" -> func.RightSide)).unFix.some)
 
@@ -364,7 +364,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                     func.ProjectKeyS(func.Hole, "l_max"),
                     func.ProjectKeyS(func.Hole, "l_min")))),
               JoinType.Inner,
-              func.StaticMap(
+              func.StaticMapS(
                 SimplifyJoin.LeftK -> func.LeftSide,
                 SimplifyJoin.RightK -> func.RightSide)),
             func.Lt(
@@ -409,7 +409,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           func.ProjectKeyS(func.ProjectIndexI(func.Hole, 1), "foo"),
           ExcludeId,
           ShiftType.Map,
-          func.StaticMap(
+          func.StaticMapS(
             "a" -> func.ProjectKeyS(func.ProjectIndexI(func.LeftSide, 1), "quux"),
             "b" -> func.RightSide))
 
@@ -419,7 +419,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           func.ProjectKeyS(func.Hole, "foo"),
           ExcludeId,
           ShiftType.Map,
-          func.StaticMap(
+          func.StaticMapS(
             "a" -> func.ProjectKeyS(func.LeftSide, "quux"),
             "b" -> func.RightSide))
 
@@ -436,14 +436,14 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           func.Hole,
           ExcludeId,
           ShiftType.Array,
-          func.StaticMap(
+          func.StaticMapS(
             "right" -> func.RightSide,
             "left" -> func.LeftSide))
 
       val expected: Fix[QS] =
         fix.Map(
           fix.Root,
-          func.StaticMap(
+          func.StaticMapS(
             "right" -> func.Add(func.Hole, func.Constant(json.int(3))),
             "left" -> func.MakeArray(func.Add(func.Hole, func.Constant(json.int(3))))))
 
@@ -460,7 +460,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           func.MakeArray(func.Subtract(func.Hole, func.Constant(json.int(5)))),
           ExcludeId,
           ShiftType.Array,
-          func.StaticMap(
+          func.StaticMapS(
             "right" -> func.RightSide,
             "left" -> func.LeftSide))
 
@@ -469,7 +469,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           fix.Map(
             fix.Root,
             func.Add(func.Hole, func.Constant(json.int(3)))),
-          func.StaticMap(
+          func.StaticMapS(
             "right" -> func.Subtract(func.Hole, func.Constant(json.int(5))),
             "left" -> func.Hole))
 

@@ -107,7 +107,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           func.RightTarget
         )
         innerRepair must beTreeEqual(
-          func.StaticMap(
+          func.StaticMapS(
             "original" -> func.AccessLeftTarget(Access.valueHole(_)),
             "0" -> func.RightTarget)
         )
@@ -116,7 +116,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
             func.Eq(
               func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu0), _)),
               func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu1), _))),
-            func.StaticMap(
+            func.StaticMapS(
                 "original" ->
                   func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),
                 "0" ->
@@ -200,7 +200,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           func.RightTarget
         )
         innermostRepair must beTreeEqual(
-          func.StaticMap(
+          func.StaticMapS(
             "original" -> func.AccessLeftTarget(Access.valueHole(_)),
             "0" -> func.RightTarget)
         )
@@ -209,7 +209,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
             func.Eq(
               func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu0), _)),
               func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu1), _))),
-            func.StaticMap(
+            func.StaticMapS(
               "original" ->
                 func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),
               "0" ->
@@ -221,7 +221,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
             func.Eq(
               func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu1), _)),
               func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu2), _))),
-            func.StaticMap(
+            func.StaticMapS(
               "original" ->
                 func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),
               "0" ->

@@ -78,7 +78,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
       val shiftedG = sortedShifts match {
         case (struct, idStatus, rotation) :: ss =>
           val firstRepair: FreeMapA[QScriptUniform.ShiftTarget[T]] =
-            func.StaticMap(
+            func.StaticMapS(
               "original" -> func.AccessLeftTarget(Access.valueHole(_)),
               "0" -> func.RightTarget
             )
@@ -90,7 +90,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
             shiftAndRotation <- ss.zipWithIndex.foldLeftM[G, (QSUGraph, Rotation)]((firstShift :++ mls, rotation)) {
               case ((shiftAbove, rotationAbove), ((newStruct, newIdStatus, newRotation), idx)) =>
                 val keysAbove = ("original" :: (0 to idx).map(_.toString).toList)
-                val staticAbove = func.StaticMapF(keysAbove: _*)(func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), _), s => s)
+                val staticAbove = func.StaticMapFS(keysAbove: _*)(func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), _), s => s)
 
                 val repair = func.ConcatMaps(staticAbove, func.MakeMapS((idx + 1).toString, func.RightTarget))
                 val struct = newStruct >> func.ProjectKeyS(func.Hole, originalKey)

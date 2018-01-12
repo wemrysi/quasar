@@ -90,7 +90,7 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
             prov.autojoinKeys(ldims, cdims)
 
           def lcCombiner: JoinFunc =
-            func.StaticMap(
+            func.StaticMapS(
               lName -> LeftSideF,
               cName -> RightSideF)
 

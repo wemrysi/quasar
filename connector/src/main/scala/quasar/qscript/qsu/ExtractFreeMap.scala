@@ -56,7 +56,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
 
     case graph @ Extractors.LPJoin(left, right, cond, jtype, lref, rref) =>
       val combiner: JoinFunc =
-        func.StaticMap(
+        func.StaticMapS(
           JoinDir.Left.name -> func.LeftSide,
           JoinDir.Right.name -> func.RightSide)
 
@@ -85,7 +85,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
       def autojoinVerts(head: Symbol, tail: List[Symbol]): F[(Symbol, QSUVerts[T])] = {
         freshName[F].flatMap { joinRoot =>
           val join: QSU[Symbol] = AutoJoin2(src.root, head,
-            func.StaticMap("sort_source" -> func.LeftSide, head.name -> func.RightSide))
+            func.StaticMapS("sort_source" -> func.LeftSide, head.name -> func.RightSide))
 
 	      val updated: QSUVerts[T] = graph.vertices.updated(joinRoot, join)
 
@@ -155,7 +155,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
 
         case None => (freshName[F] |@| freshName[F]) {
           case (joinRoot, interRoot) =>
-            val combine: JoinFunc = func.StaticMap(
+            val combine: JoinFunc = func.StaticMapS(
               srcName -> func.LeftSide,
               targetName -> func.RightSide)
 

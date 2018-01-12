@@ -47,7 +47,7 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
   val rollS = Free.roll[EJson, Figure] _
 
   val joinFunc =
-    func.StaticMap(
+    func.StaticMapS(
       "left" -> func.LeftSide,
       "right" -> func.RightSide)
 

@@ -469,7 +469,7 @@ class PlannerSpec
           def left: FreeQS = free.Filter(free.Hole, fun("Poland"))
           def right: FreeQS = free.Filter(free.Hole, fun("US"))
           def key: FreeMap = func.ProjectKeyS(func.Hole, "age")
-          def combine: JoinFunc = func.StaticMap(
+          def combine: JoinFunc = func.StaticMapS(
             JoinDir.Left.name -> func.LeftSide,
             JoinDir.Right.name -> func.RightSide)
 
@@ -499,7 +499,7 @@ class PlannerSpec
           def left: FreeQS = free.Filter(free.Hole, fun("Poland"))
           def right: FreeQS = free.Filter(free.Hole, fun("US"))
           def key: FreeMap = func.ProjectKeyS(func.Hole, "age")
-          def combine: JoinFunc = func.StaticMap(
+          def combine: JoinFunc = func.StaticMapS(
             JoinDir.Left.name -> func.LeftSide,
             JoinDir.Right.name -> func.RightSide)
 
@@ -535,7 +535,7 @@ class PlannerSpec
           def left: FreeQS = free.Filter(free.Hole, fun("Poland"))
           def right: FreeQS = free.Filter(free.Hole, fun("US"))
           def key: FreeMap = func.ProjectKeyS(func.Hole, "age")
-          def combine: JoinFunc = func.StaticMap(
+          def combine: JoinFunc = func.StaticMapS(
             JoinDir.Left.name -> func.LeftSide,
             JoinDir.Right.name -> func.RightSide)
 
@@ -570,7 +570,7 @@ class PlannerSpec
           def left: FreeQS = free.Filter(free.Hole, fun("Poland"))
           def right: FreeQS = free.Filter(free.Hole, fun("US"))
           def key: FreeMap = func.ProjectKeyS(func.Hole, "age")
-          def combine: JoinFunc = func.StaticMap(
+          def combine: JoinFunc = func.StaticMapS(
             (JoinDir.Left.name, func.LeftSide),
             (JoinDir.Right.name, func.RightSide))
 

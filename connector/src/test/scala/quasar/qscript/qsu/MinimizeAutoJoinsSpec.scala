@@ -130,7 +130,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           h2 must beTreeEqual(func.Hole)
 
           repair must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "0" ->
                 func.ReduceIndex(\/-(0)),
               "1" ->
@@ -180,9 +180,9 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           h3 must beTreeEqual(func.Hole)
 
           repair must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "0" ->
-                func.StaticMap(
+                func.StaticMapS(
                   "0" ->
                     func.ReduceIndex(\/-(0)),
                   "1" ->
@@ -241,7 +241,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           h2 must beTreeEqual(func.Hole)
 
           repair must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "0" ->
                 func.ReduceIndex(\/-(0)),
               "1" ->
@@ -327,7 +327,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           h2 must beTreeEqual(func.Negate(func.Hole))
 
           repair must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "0" ->
                 func.ReduceIndex(\/-(0)),
               "1" ->
@@ -503,7 +503,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           struct must beTreeEqual(func.Hole)
 
           repair must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "0" -> func.RightTarget,
               "1" -> func.AccessLeftTarget(Access.valueHole(_))))
 
@@ -543,7 +543,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           struct must beTreeEqual(func.Hole)
 
           repair must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "1" -> func.RightTarget,
               "0" -> func.AccessLeftTarget(Access.valueHole(_))))
 
@@ -595,7 +595,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         struct must beTreeEqual(func.Hole)
 
         repairInner must beTreeEqual(
-          func.StaticMap(
+          func.StaticMapS(
             "0" -> func.RightTarget,
             "1" -> func.AccessLeftTarget(Access.valueHole(_))))
 
@@ -603,7 +603,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         h2 must beTreeEqual(func.ProjectKeyS(func.Hole, "1"))
 
         repairOuter must beTreeEqual(
-          func.StaticMap(
+          func.StaticMapS(
             "0" -> func.ReduceIndex(\/-(0)),
             "1" -> func.ReduceIndex(\/-(1))))
 
@@ -655,7 +655,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         struct must beTreeEqual(func.Hole)
 
         repairInner must beTreeEqual(
-          func.StaticMap(
+          func.StaticMapS(
             "0" -> func.RightTarget,
             "1" -> func.AccessLeftTarget(Access.valueHole(_))))
 
@@ -663,7 +663,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         h2 must beTreeEqual(func.ProjectKeyS(func.Hole, "1"))
 
         repairOuter must beTreeEqual(
-          func.StaticMap(
+          func.StaticMapS(
             "0" -> func.ReduceIndex(\/-(0)),
             "1" -> func.ReduceIndex(\/-(1))))
 
@@ -714,7 +714,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           structInner must beTreeEqual(func.Hole)
 
           repairInner must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "original" -> func.AccessLeftTarget(Access.valueHole(_)),
               "results" -> func.RightTarget))
 
@@ -722,7 +722,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             func.ProjectKeyS(func.Hole, "results"))
 
           repairOuter must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "0" ->
                 func.RightTarget,
               "1" ->
@@ -787,14 +787,14 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           structInnerInner must beTreeEqual(func.Hole)
 
           repairInnerInner must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "original" -> func.AccessLeftTarget(Access.valueHole(_)),
               "results" -> func.RightTarget))
 
           structInner must beTreeEqual(func.ProjectKeyS(func.Hole, "results"))
 
           repairInner must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "original" ->
                 func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),
               "results" -> func.RightTarget))
@@ -802,7 +802,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           structOuter must beTreeEqual(func.ProjectKeyS(func.Hole, "results"))
 
           repairOuter must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "0" ->
                 func.RightTarget,
               "1" ->
@@ -867,7 +867,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           dstruct must beTreeEqual(func.ProjectKeyS(func.Hole, "d"))
 
           innerRepair must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "left" ->
                 func.MakeMapS("0", Free.pure[MapFunc, QAccess[Hole] \/ Int](0.right)),
               "right" ->
@@ -877,14 +877,14 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             func.ProjectKeyS(func.Hole, "right"))
 
           outerRepair must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "left" ->
                 func.ProjectKeyS(func.AccessLeftTarget(Access.value(_)), "left"),
               "right" ->
                 func.MakeMapS("1", func.RightTarget)))
 
           innerFM must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "0" ->
                 func.ProjectKeyS(
                   func.ProjectKeyS(func.Hole, "left"),
@@ -982,15 +982,15 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         innerdstruct must beTreeEqual(func.ProjectKeyS(func.Hole, "d"))
 
         innerMultiRepair must beTreeEqual(
-          func.StaticMap(
+          func.StaticMapS(
             "left" ->
-              func.StaticMap(
+              func.StaticMapS(
                 "original" ->
                   func.AccessHole.map(_.left[Int]),
                 "results" ->
                   Free.pure[MapFunc, QAccess[Hole] \/ Int](0.right)),
             "right" ->
-              func.StaticMap(
+              func.StaticMapS(
                 "left" ->
                   func.MakeMapS("0", Free.pure(1.right[QAccess[Hole]])),
                 "right" ->
@@ -1005,9 +1005,9 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           func.ProjectKeyS(func.ProjectKeyS(func.Hole, "right"), "right"))
 
         outerMultiRepair must beTreeEqual(
-          func.StaticMap(
+          func.StaticMapS(
             "left" ->
-              func.StaticMap(
+              func.StaticMapS(
                 "original" ->
                   func.ProjectKeyS(
                     func.ProjectKeyS(func.AccessHole.map(_.left[Int]), "left"),
@@ -1017,7 +1017,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             "right" ->
               func.MakeMapS(
                 "1",
-                func.StaticMap(
+                func.StaticMapS(
                   "left" ->
                     func.ProjectKeyS(
                       func.ProjectKeyS(func.AccessHole.map(_.left[Int]), "right"),
@@ -1029,11 +1029,11 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           func.ProjectKeyS(func.ProjectKeyS(func.Hole, "left"), "results"))
 
         singleRepair must beTreeEqual(
-          func.StaticMap(
+          func.StaticMapS(
             ("left",
               func.MakeMapS(
                 "0",
-                func.StaticMap(
+                func.StaticMapS(
                   "0" -> func.RightTarget,
                   "1" ->
                     func.ProjectKeyS(
@@ -1045,7 +1045,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               func.ProjectKeyS(func.AccessLeftTarget(Access.value(_)), "right")))
 
         innerFM must beTreeEqual(
-          func.StaticMap(
+          func.StaticMapS(
             "0" ->
               func.ProjectKeyS(
                 func.ProjectKeyS(func.Hole, "left"),
@@ -1064,7 +1064,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                 "b")),
             func.Divide(
               func.ProjectKeyS(
-                func.StaticMap(
+                func.StaticMapS(
                   "0" ->
                     func.ProjectKeyS(
                       func.ProjectKeyS(
@@ -1079,7 +1079,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                       "1")),
                 "0"),
               func.ProjectKeyS(
-                func.StaticMap(
+                func.StaticMapS(
                   "0" ->
                     func.ProjectKeyS(
                       func.ProjectKeyS(
@@ -1157,7 +1157,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               func.Undefined))
 
           innerRepair must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "original" ->
                 func.AccessLeftTarget(Access.value(_)),
               "results" ->
@@ -1166,7 +1166,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           outerStruct must beTreeEqual(func.ProjectKeyS(func.Hole, "results"))
 
           outerRepair must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "1" ->
                 func.RightTarget,
               "0" ->
@@ -1311,7 +1311,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           innerStruct must beTreeEqual(func.ProjectKeyS(func.Hole, "b"))
 
           innerRepair must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "1" ->
                 func.RightTarget,
               "0" ->
@@ -1321,7 +1321,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             func.ProjectKeyS(func.ProjectKeyS(func.Hole, "1"), "c"))
 
           outerRepair must beTreeEqual(
-            func.StaticMap(
+            func.StaticMapS(
               "1" ->
                 func.RightTarget,
               "0" ->

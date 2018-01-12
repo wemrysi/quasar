@@ -78,7 +78,7 @@ class PlannerQScriptSpec extends
             func.Undefined),
           func.ProjectKeyS(func.Hole, "_id"))),
       JoinType.Inner,
-      func.StaticMap(
+      func.StaticMapS(
         "city" ->
           // qscript is generated with 3 guards here:
           // func.Guard(
@@ -116,7 +116,7 @@ class PlannerQScriptSpec extends
             func.ProjectKeyS(func.Hole, "_id"),
             func.Undefined))),
       JoinType.Inner,
-      func.StaticMap(
+      func.StaticMapS(
         "city" ->
           func.Guard(
             func.LeftSide,
@@ -189,10 +189,10 @@ class PlannerQScriptSpec extends
           func.ProjectKeyS(func.ProjectIndexI(func.Hole, 1), "_id"),
           func.ProjectKeyS(func.Hole, "_id"))),
       JoinType.Inner,
-      func.StaticMap(
+      func.StaticMapS(
         "city" ->
             func.Guard(
-              func.StaticMap(
+              func.StaticMapS(
                 ("left",
                   func.ProjectIndexI(func.LeftSide, 0)),
                 ("right",
@@ -206,7 +206,7 @@ class PlannerQScriptSpec extends
               func.Undefined),
         "state" ->
             func.Guard(
-              func.StaticMap(
+              func.StaticMapS(
                 ("left",
                   func.ProjectIndexI(func.LeftSide, 0)),
                 ("right",
@@ -373,7 +373,7 @@ class PlannerQScriptSpec extends
             func.Undefined),
           qscript.ExcludeId,
           ShiftType.Array,
-          func.StaticMap(
+          func.StaticMapS(
             "codes" ->
               func.RightSide,
             "first_name" ->
@@ -412,7 +412,7 @@ class PlannerQScriptSpec extends
               func.Undefined),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
-            func.StaticMap(
+            func.StaticMapS(
               "city" ->
                 func.ProjectKeyS(func.LeftSide, "city"),
               "loc" -> func.RightSide)),
@@ -477,7 +477,7 @@ class PlannerQScriptSpec extends
               func.Undefined),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
-            func.StaticMap(
+            func.StaticMapS(
               "results" ->
                 func.Guard(
                   func.RightSide,
@@ -489,7 +489,7 @@ class PlannerQScriptSpec extends
           func.ProjectKeyS(func.Hole, "results"),
           qscript.ExcludeId,
           qscript.ShiftType.Array,
-          func.StaticMap(
+          func.StaticMapS(
             "0" ->
               func.ProjectKeyS(
                 func.ProjectKeyS(
@@ -580,7 +580,7 @@ class PlannerQScriptSpec extends
             func.Undefined),
           qscript.ExcludeId,
           qscript.ShiftType.Array,
-          func.StaticMap(
+          func.StaticMapS(
             "city" ->
               func.ProjectKeyS(func.LeftSide, "city"),
             "loc" ->
@@ -632,7 +632,7 @@ class PlannerQScriptSpec extends
             func.Undefined),
           qscript.ExcludeId,
           ShiftType.Array,
-          func.StaticMap(
+          func.StaticMapS(
             "codes" ->
               func.RightSide,
             "first_name" ->

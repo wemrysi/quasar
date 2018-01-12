@@ -177,7 +177,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       makeI[Id, A](sym -> id)
 
     def makeIV[A](initialI: FreeMapA[A], initialV: FreeMapA[A]): FreeMapA[A] =
-      func.StaticMap(
+      func.StaticMapS(
         IdentitiesK -> initialI,
         ValueK -> initialV)
 
