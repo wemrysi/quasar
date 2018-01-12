@@ -17,16 +17,18 @@
 package quasar.std
 
 import slamdata.Predef._
+import quasar._
+import quasar.fp.ski.κ
+
+import scala.Predef.locally
+
+import org.scalacheck._
 import org.scalacheck.Arbitrary
 import org.specs2.execute.Result
 import org.specs2.specification.core.Fragment
-import quasar._
-import shapeless.{Nat, Sized}
-
 import scalaz.syntax.traverse._
 import scalaz.std.list._
-import scala.Predef.locally
-import org.scalacheck._
+import shapeless.{Nat, Sized}
 
 class StdLibTypeCoherenceSpec extends quasar.Qspec with quasar.TypeArbitrary {
   def testInputCoherence[N <: Nat](func: GenericFunc[N])(input: Func.Input[Type, N]): Result = {
@@ -51,7 +53,7 @@ class StdLibTypeCoherenceSpec extends quasar.Qspec with quasar.TypeArbitrary {
             failure
           case Right(is) =>
             input.zip(is.unsized).map { case (exp, res) =>
-              Type.typecheck(res, exp).toEither.fold[Result](_ => failure, _ => success)
+              Type.typecheck(res, exp).toEither.fold[Result](κ(failure), κ(success))
             }.suml
         }
       }
