@@ -69,7 +69,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
     G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: PlannerErrorME: MonadState_[?[_], QAuth]
     ]
       : PartialFunction[QSUGraph, G[QSUGraph]] = {
-    case mls@MultiLeftShift(source, shifts, repair) =>
+    case mls @ MultiLeftShift(source, shifts, repair, _) =>   // TODO
       val mapper = repair.flatMap {
         case -\/(_) => func.ProjectKeyS(func.Hole, originalKey)
         case \/-(i) => func.ProjectKeyS(func.Hole, i.toString)
@@ -83,7 +83,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
               "0" -> func.RightTarget
             )
           val firstShiftPat: QScriptUniform[Symbol] =
-            QSU.LeftShift[T, Symbol](source.root, struct, idStatus, firstRepair, rotation)
+            QSU.LeftShift[T, Symbol](source.root, struct, idStatus, firstRepair, None, rotation)
           for {
             firstShift <- QSUGraph.withName[T, G](firstShiftPat)
             _ <- ApplyProvenance.computeProvenance[T, G](firstShift)
@@ -95,7 +95,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
                 val repair = func.ConcatMaps(staticAbove, func.MakeMapS((idx + 1).toString, func.RightTarget))
                 val struct = newStruct >> func.ProjectKeyS(func.Hole, originalKey)
                 val newShiftPat =
-                  QSU.LeftShift[T, Symbol](shiftAbove.root, struct, newIdStatus, repair, newRotation)
+                  QSU.LeftShift[T, Symbol](shiftAbove.root, struct, newIdStatus, repair, None, newRotation)
                 for {
                   newShift <- QSUGraph.withName[T, G](newShiftPat)
                   _ <- ApplyProvenance.computeProvenance[T, G](newShift)

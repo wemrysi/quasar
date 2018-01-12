@@ -124,7 +124,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
             func.LeftSide,
             func.MakeArray(func.RightSide)))
 
-        val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile), struct, IncludeId, arepair, Rotation.ShiftArray)
+        val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile), struct, IncludeId, arepair, None, Rotation.ShiftArray)
         val qscript: Fix[QSE] = qse.LeftShift(qse.Read[AFile](afile), struct, IncludeId, ShiftType.Array, OnUndefined.Omit, repair)
 
         qgraph must graduateAs(qscript)
@@ -190,6 +190,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
               HoleF[Fix],
               IncludeId,
               aconcatArr,
+              None,
               Rotation.FlattenArray),
             qsu.cint(1),
             func.Constant[JoinSide](Fixed[Fix[EJson]].bool(true)),

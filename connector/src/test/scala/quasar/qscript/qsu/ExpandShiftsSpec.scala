@@ -56,6 +56,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       func.Hole,
       ExcludeId,
       func.RightTarget,
+      None,
       Rotation.ShiftArray)
 
     val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
@@ -64,7 +65,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         (func.ProjectKeyS(func.Hole, "foo"), ExcludeId, Rotation.ShiftArray),
         (func.ProjectKeyS(func.Hole, "bar"), ExcludeId, Rotation.ShiftArray)
       ),
-      func.Add(index(0), index(1))
+      func.Add(index(0), index(1)),
+      None
     ))
 
     multiShift must expandTo {
@@ -76,16 +78,19 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               shiftedReadStruct,
               ExcludeId,
               shiftedReadRepair,
+              _,
               Rotation.ShiftArray
             ),
             projectFoo,
             ExcludeId,
             innerRepair,
+            _,
             Rotation.ShiftArray
           ),
           projectBar,
           ExcludeId,
           outerRepair,
+          _,
           Rotation.ShiftArray
         ),
         fm
@@ -137,6 +142,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       func.Hole,
       ExcludeId,
       func.RightTarget,
+      None,
       Rotation.ShiftArray)
 
     val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
@@ -146,7 +152,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         (func.ProjectKeyS(func.Hole, "bar"), ExcludeId, Rotation.ShiftArray),
         (func.ProjectKeyS(func.Hole, "baz"), ExcludeId, Rotation.ShiftArray)
       ),
-      func.Subtract(func.Add(index(0), index(1)), index(2))
+      func.Subtract(func.Add(index(0), index(1)), index(2)),
+      None
     ))
 
     multiShift must expandTo {
@@ -159,21 +166,25 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
                 shiftedReadStruct,
                 ExcludeId,
                 shiftedReadRepair,
+                _,
                 Rotation.ShiftArray
               ),
               projectFoo,
               ExcludeId,
               innermostRepair,
+              _,
               Rotation.ShiftArray
             ),
             projectBar,
             ExcludeId,
             innerRepair,
+            _,
             Rotation.ShiftArray
           ),
           projectBaz,
           ExcludeId,
           outerRepair,
+          _,
           Rotation.ShiftArray
         ),
         fm

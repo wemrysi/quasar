@@ -189,7 +189,7 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
             QCE(Reduce[T, QSUGraph](source, bs, reducers, repair))
           }
 
-        case QSU.LeftShift(source, struct, idStatus, repair, rot) =>
+        case QSU.LeftShift(source, struct, idStatus, repair, repairIfUndefined, rot) =>
           for {
             // Access.value is already resolved, from ReifyIdentities.
             // this would be nicer with a tri-state Access type.
