@@ -21,7 +21,7 @@ import quasar.{Data, Func, Type, Mapping, UnaryFunc, BinaryFunc, TernaryFunc, Ge
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import matryoshka._
-import scalaz._, Scalaz._, Validation.success
+import scalaz._, Scalaz._
 import shapeless._
 
 // TODO: Cleanup duplication in case statements!
@@ -217,7 +217,7 @@ trait RelationsLib extends Library {
   val Cond = TernaryFunc(
     Mapping,
     "Chooses between one of two cases based on the value of a boolean expression",
-    Type.Bottom,
+    Type.Top,
     Func.Input3(Type.Bool, Type.Top, Type.Top),
     new Func.Simplifier {
       def apply[T]
@@ -230,11 +230,11 @@ trait RelationsLib extends Library {
         }
     },
     partialTyper[nat._3] {
-      case Sized(Type.Const(Data.Bool(true)), ifTrue, ifFalse) => ifTrue
-      case Sized(Type.Const(Data.Bool(false)), ifTrue, ifFalse) => ifFalse
+      case Sized(Type.Const(Data.Bool(true)), ifTrue, _) => ifTrue
+      case Sized(Type.Const(Data.Bool(false)), _, ifFalse) => ifFalse
       case Sized(Type.Bool, ifTrue, ifFalse) => Type.lub(ifTrue, ifFalse)
     },
-    untyper[nat._3](t => success(Func.Input3(Type.Bool, t, t))))
+    basicUntyper[nat._3])
 
   def flip(f: GenericFunc[nat._2]): Option[GenericFunc[nat._2]] = f match {
     case Eq  => Some(Eq)
