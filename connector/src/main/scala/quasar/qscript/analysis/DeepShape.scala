@@ -148,11 +148,11 @@ sealed abstract class DeepShapeInstances {
 
         case Map(shape, fm) => fm >> shape
 
-        case LeftShift(shape, struct, id, stpe, repair) =>
+        case LeftShift(shape, struct, id, _, _, repair) =>
           repair >>= {
             case LeftSide => shape
             case RightSide => freeShape[T](Shifting[T](id, struct >> shape))
-	  }
+          }
 
         case Reduce(shape, bucket, reducers, repair) =>
           repair >>= {

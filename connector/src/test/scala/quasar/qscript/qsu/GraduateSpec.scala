@@ -29,6 +29,7 @@ import quasar.qscript.{
   HoleF,
   IncludeId,
   JoinSide,
+  OnUndefined,
   ReduceFunc,
   ReduceFuncs,
   ReduceIndex,
@@ -124,7 +125,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
             func.MakeArray(func.RightSide)))
 
         val qgraph: Fix[QSU] = qsu.leftShift(qsu.read(afile), struct, IncludeId, arepair, Rotation.ShiftArray)
-        val qscript: Fix[QSE] = qse.LeftShift(qse.Read[AFile](afile), struct, IncludeId, ShiftType.Array, repair)
+        val qscript: Fix[QSE] = qse.LeftShift(qse.Read[AFile](afile), struct, IncludeId, ShiftType.Array, OnUndefined.Omit, repair)
 
         qgraph must graduateAs(qscript)
       }
@@ -203,6 +204,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
           HoleF[Fix],
           IncludeId,
           ShiftType.Array,
+          OnUndefined.Omit,
           concatArr)
 
       val rhs: Free[QSE, Hole] =
