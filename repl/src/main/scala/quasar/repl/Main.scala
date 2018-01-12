@@ -30,7 +30,7 @@ import quasar.fs.mount._
 import quasar.main._
 
 import eu.timepit.refined.refineMV
-import eu.timepit.refined.numeric.Positive
+import eu.timepit.refined.numeric.{NonNegative, Positive}
 import org.jboss.aesh.console.{AeshConsoleCallback, Console, ConsoleOperation, Prompt}
 import org.jboss.aesh.console.helper.InterruptHook
 import org.jboss.aesh.console.settings.SettingsBuilder
@@ -119,7 +119,7 @@ object Main {
           refineMV[Positive](10).some, OutputFormat.Table, Map(), TimingFormat.OnlyTotal)
       )
       executionIdRef <- TaskRef(0L)
-      timingRepository <- TimingRepository.empty(refineMV(1))
+      timingRepository <- TimingRepository.empty(refineMV[NonNegative](1L))
       i =
         injectFT[Task, DriverEff].compose(AtomicRef.fromTaskRef(stateRef)) :+:
         injectFT[ConsoleIO, DriverEff]                                :+:

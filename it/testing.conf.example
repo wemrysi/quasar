@@ -9,3 +9,4 @@
 #spark_cassandra   ="spark://<spark_host>:<spark_port>?cassandraHost=<host>t&cassandraPort=<port>&rootPath=<rootPath>"
 #marklogic         ="xcc://<username>:<password>@<host>:<port>/<database>"
 #couchbase         ="couchbase://<host>[:<port>]/<bucket-name>?password=<password>&docTypeKey=<type>[&queryTimeoutSeconds=<seconds>]"
+#mimir              ="<path_to_folder>"

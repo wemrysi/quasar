@@ -46,10 +46,6 @@ object SqlExpr extends SqlExprInstances {
   final case class IfNull[T](a: OneAnd[NonEmptyList, T]) extends SqlExpr[T]
   final case class ExprWithAlias[T](expr: T, alias: String) extends SqlExpr[T]
   final case class ExprPair[T](a: T, b: T) extends SqlExpr[T]
-  final case class ToJson[T](a: T) extends SqlExpr[T]
-
-  final case class SelectRow[T](selection: Selection[T], from: From[T], orderBy: List[OrderBy[T]])
-      extends SqlExpr[T]
 
   final case class Select[T](selection: Selection[T],
                              from: From[T],
@@ -69,7 +65,15 @@ object SqlExpr extends SqlExprInstances {
   final case class And[T](a1: T, a2: T) extends SqlExpr[T]
   final case class Or[T](a1: T, a2: T) extends SqlExpr[T]
 
+  final case class Eq[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class Neq[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class Lt[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class Lte[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class Gt[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class Gte[T](a1: T, a2: T) extends SqlExpr[T]
+
   final case class Coercion[T](t: ColumnType, e: T) extends SqlExpr[T]
+  final case class ToArray[T](v: T) extends SqlExpr[T]
 
   final case class Constant[T](data: Data) extends SqlExpr[T]
 
@@ -77,7 +81,7 @@ object SqlExpr extends SqlExprInstances {
   final case class BinaryFunction[T](t: BinaryFunctionType, a1: T, a2: T) extends SqlExpr[T]
   final case class TernaryFunction[T](t: TernaryFunctionType, a1: T, a2: T, a3: T) extends SqlExpr[T]
 
-  final case class RegexMatches[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class RegexMatches[T](a1: T, a2: T, caseInsensitive: Boolean) extends SqlExpr[T]
 
   final case class Limit[T](from: T, count: T) extends SqlExpr[T]
   final case class Offset[T](from: T, count: T) extends SqlExpr[T]
@@ -89,6 +93,8 @@ object SqlExpr extends SqlExprInstances {
     final case class WithIds[T](v: T) extends SqlExpr[T]
     final case class OrderBy[T](v: T, sortDir: SortDir)
   }
+
+  final case class Union[T](left: T, right: T) extends SqlExpr[T]
 
   object IfNull {
     def build[T](a1: T, a2: T, a3: T*): IfNull[T] = IfNull(oneAnd(a1, nels(a2, a3: _*)))
@@ -114,7 +120,9 @@ case object StrLower extends UnaryFunctionType
 case object StrUpper extends UnaryFunctionType
 
 sealed trait BinaryFunctionType
-case object SplitStr extends BinaryFunctionType
+case object StrSplit extends BinaryFunctionType
+case object ArrayConcat extends BinaryFunctionType
+case object Contains extends BinaryFunctionType
 
 sealed trait TernaryFunctionType
 case object Substring extends TernaryFunctionType

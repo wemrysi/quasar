@@ -130,7 +130,7 @@ object TestConfig {
 
     TestConfig.testDataPrefix flatMap { prefix =>
       TestConfig.backendRefs.toIList
-        .traverse(r => lookupFileSystem(r, prefix).run.map(SupportedFs(r.ref,_)))
+        .traverse(r => lookupFileSystem(r, prefix).run.map(fsUT => SupportedFs(r.ref,fsUT, fsUT.map(_.copy(testDir = rootDir)))))
     }
   }
 
@@ -192,11 +192,15 @@ object TestConfig {
     confStrM flatMap { confStr =>
       import java.io.File
 
-      val backends = IList(confStr.split(";"): _*) map { backend =>
-        val List(name, classpath) = backend.split("=").toList
+      val backends =
+        if (confStr.isEmpty) IList.empty[(scala.Predef.String, scala.collection.Seq[java.io.File])]
+        else {
+          IList(confStr.split(";"): _*) map { backend =>
+            val List(name, classpath) = backend.split("=").toList
 
-        name -> classpath.split(":").map(new File(_)).toSeq
-      }
+            name -> classpath.split(":").map(new File(_)).toSeq
+          }
+        }
 
       BackendConfig.fromBackends(backends)
     }
