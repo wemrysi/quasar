@@ -18,11 +18,10 @@ package quasar.std
 
 import slamdata.Predef._
 import quasar.{Data, Func, Type, Mapping, UnaryFunc, BinaryFunc, TernaryFunc, GenericFunc}
-import quasar.fp.ski.κ
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import matryoshka._
-import scalaz._, Scalaz._, Validation.success
+import scalaz._, Scalaz._
 import shapeless._
 
 // TODO: Cleanup duplication in case statements!
@@ -235,7 +234,7 @@ trait RelationsLib extends Library {
       case Sized(Type.Const(Data.Bool(false)), _, ifFalse) => ifFalse
       case Sized(Type.Bool, ifTrue, ifFalse) => Type.lub(ifTrue, ifFalse)
     },
-    untyper[nat._3](κ(success(Func.Input3(Type.Bool, Type.Top, Type.Top)))))
+    basicUntyper[nat._3])
 
   def flip(f: GenericFunc[nat._2]): Option[GenericFunc[nat._2]] = f match {
     case Eq  => Some(Eq)
