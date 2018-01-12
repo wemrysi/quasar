@@ -50,16 +50,16 @@ import scalaz._, Scalaz.{ToIdOps => _, _}
 
 // TODO: This is generalizable to an arbitrary `Recursive` type, I think.
 sealed abstract class InputFinder[T[_[_]]] {
-  def apply[A](t: FreeMap[T]): FreeMap[T]
+  def apply[A](t: FreeMapA[T, A]): FreeMapA[T, A]
 }
 
 final case class Here[T[_[_]]]() extends InputFinder[T] {
-  def apply[A](a: FreeMap[T]): FreeMap[T] = a
+  def apply[A](a: FreeMapA[T, A]): FreeMapA[T, A] = a
 }
 
 final case class There[T[_[_]]](index: Int, next: InputFinder[T])
     extends InputFinder[T] {
-  def apply[A](a: FreeMap[T]): FreeMap[T] =
+  def apply[A](a: FreeMapA[T, A]): FreeMapA[T, A] =
     a.resume.fold(fa => next(fa.toList.apply(index)), κ(a))
 }
 
@@ -116,15 +116,15 @@ object MongoDbPlanner {
   }
 
   def getSelector
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, EX[_]: Traverse]
-    (fm: FreeMap[T], default: OutputM[PartialSelector[T]], galg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]])
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, EX[_]: Traverse, A]
+    (fm: FreeMapA[T, A], default: OutputM[PartialSelector[T]], galg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]])
     (implicit inj: EX :<: ExprOp)
       : OutputM[PartialSelector[T]] =
     fm.zygo(
-      interpret[MapFunc[T, ?], Hole, T[MapFunc[T, ?]]](
+      interpret[MapFunc[T, ?], A, T[MapFunc[T, ?]]](
         κ(MFC(MapFuncsCore.Undefined[T, T[MapFunc[T, ?]]]()).embed),
         _.embed),
-      ginterpret[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], Hole, OutputM[PartialSelector[T]]](
+      ginterpret[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], A, OutputM[PartialSelector[T]]](
         κ(default), galg))
 
   def processMapFunc[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR, A]
@@ -925,7 +925,7 @@ object MongoDbPlanner {
             def transform[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
               applyTransforms(elideCond[A], rewriteUndefined[A])
 
-            val selectors = getSelector[T, M, EX](
+            val selectors = getSelector[T, M, EX, Hole](
               struct, InternalError.fromMsg("Not a selector").left, selector[T](cfg.bsonVersion))
 
             if (repair.contains(LeftSideF)) {
@@ -1040,9 +1040,9 @@ object MongoDbPlanner {
             keys.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _))
               .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
           case Filter(src0, cond) => {
-            val selectors = getSelector[T, M, EX](
+            val selectors = getSelector[T, M, EX, Hole](
               cond, defaultSelector[T].right, selector[T](cfg.bsonVersion) ∘ (_ <+> defaultSelector[T].right))
-            val typeSelectors = getSelector[T, M, EX](
+            val typeSelectors = getSelector[T, M, EX, Hole](
               cond, InternalError.fromMsg(s"not a typecheck").left , typeSelector[T])
 
             def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
