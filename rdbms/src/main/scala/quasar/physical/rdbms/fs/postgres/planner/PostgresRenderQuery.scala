@@ -17,6 +17,8 @@
 package quasar.physical.rdbms.fs.postgres.planner
 
 import slamdata.Predef._
+
+import quasar.common.JoinType._
 import quasar.common.SortDir.{Ascending, Descending}
 import quasar.{Data, DataCodec}
 import quasar.fp.ski._
@@ -28,9 +30,9 @@ import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.Planner.InternalError
 import quasar.Planner.{NonRepresentableData, PlannerError}
+
 import matryoshka._
 import matryoshka.implicits._
-
 import scalaz._
 import Scalaz._
 
@@ -40,7 +42,22 @@ object PostgresRenderQuery extends RenderQuery {
   implicit val codec: DataCodec = DataCodec.Precise
 
   def asString[T[_[_]]: BirecursiveT](a: T[SqlExpr]): PlannerError \/ String = {
-    a.paraM(galg) ∘ (s => s"select row_to_json(row) from ($s) as row")
+
+    // This is a workaround to transform "select _4 as some_alias" to "select row_to_json(_4) as some_alias" in order
+    // to avoid working with record types.
+    def aliasSelectionToJson(e: T[SqlExpr]): T[SqlExpr] = {
+      (e.project match {
+        case ea@ExprWithAlias(expr, alias) =>
+          expr.project match {
+            case Id(txt) =>
+              ExprWithAlias(UnaryFunction(ToJson, Id[T[SqlExpr]](txt).embed).embed, alias)
+            case _ => ea
+          }
+        case other => other
+      }).embed
+    }
+
+    a.transCataT(aliasSelectionToJson).paraM(galg) ∘ (s => s"select row_to_json(row) from ($s) as row")
   }
 
   def alias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" as ${i.v}"))
@@ -167,8 +184,25 @@ object PostgresRenderQuery extends RenderQuery {
     case RowIds()        => "row_number() over()".right
     case Offset((_, from), NumExpr(count)) => s"$from OFFSET $count".right
     case Limit((_, from), NumExpr(count)) => s"$from LIMIT $count".right
-    case Select(selection, from, filterOpt, order) =>
+    case Select(selection, from, joinOpt, filterOpt, order) =>
       val filter = ~(filterOpt ∘ (f => s" where ${f.v._2}"))
+      val join = ~(joinOpt ∘ (j => {
+
+        val joinKeyStr = j.keys.map {
+          case (TextExpr(lK), TextExpr(rK)) => s"$lK = $rK"
+        }.intercalate(" and ")
+
+        val joinKeyExpr = if (j.keys.nonEmpty) s"on $joinKeyStr" else ""
+        val joinTypeStr = if (j.keys.nonEmpty) {
+          j.jType match {
+            case Inner => "inner"
+            case FullOuter => "full outer"
+            case LeftOuter => "left outer"
+            case RightOuter => "right outer"
+          }
+        } else "cross"
+        s" $joinTypeStr join ${j.v._2} ${j.alias.v} $joinKeyExpr"
+      }))
       val orderStr = order.map { o =>
         val dirStr = o.sortDir match {
           case Ascending => "asc"
@@ -183,10 +217,10 @@ object PostgresRenderQuery extends RenderQuery {
         ""
 
       val fromExpr = s" from ${from.v._2} ${from.alias.v}"
-      s"(select ${selection.v._2}$fromExpr$filter$orderByStr)".right
+      s"(select ${selection.v._2}$fromExpr$join$filter$orderByStr)".right
     case Union((_, left), (_, right)) => s"($left UNION $right)".right
     case Constant(Data.Str(v)) =>
-      val text = v.flatMap { case ''' => "''"; case iv => iv.toString }.self
+      val text = v.flatMap { case '\'' => "''"; case iv => iv.toString }.self
       s"'$text'".right
     case Constant(v) =>
       DataCodec.render(v).map{ rendered => v match {
@@ -202,6 +236,7 @@ object PostgresRenderQuery extends RenderQuery {
       val fName = fType match {
         case StrLower => "lower"
         case StrUpper => "upper"
+        case ToJson => "row_to_json"
       }
       s"$fName($e)".right
     case BinaryFunction(fType, TextExpr(a1), TextExpr(a2)) => (fType match {

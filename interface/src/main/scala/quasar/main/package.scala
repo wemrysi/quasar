@@ -39,7 +39,7 @@ import quasar.metastore._
 import java.io.File
 import scala.util.control.NonFatal
 
-import doobie.imports._
+import doobie.imports.{ConnectionIO, Transactor}
 import eu.timepit.refined.auto._
 import monocle.Lens
 import org.slf4s.Logging
@@ -499,10 +499,11 @@ package object main extends Logging {
 
   /** Either initialize the metastore or execute the start depending
     * on what command is provided by the user in the command line arguments
+    * @param start The body of logic, should return true whether to shutdown quasar or not
     */
   def initMetaStoreOrStart[C: argonaut.DecodeJson](
     config: CmdLineConfig,
-    start: (C, CoreEff ~> QErrs_CRW_TaskM) => MainTask[Unit],
+    start: (C, CoreEff ~> QErrs_CRW_TaskM) => MainTask[Boolean],
     persist: DbConnectionConfig => MainTask[Unit]
   )(implicit
     configOps: ConfigOps[C]
@@ -517,7 +518,8 @@ package object main extends Logging {
               configOps.metaStoreConfig.get(cfg),
               persist)
 
-            _ <- start(cfg, quasarFs.interp).ensuring(κ(quasarFs.shutdown.liftM[MainErrT]))
+            shouldShutdown <- start(cfg, quasarFs.interp).ensuring(maybeError => maybeError.isDefined.whenM(quasarFs.shutdown.liftM[MainErrT]))
+            _              <- shouldShutdown.whenM(quasarFs.shutdown.liftM[MainErrT])
           } yield ()
 
         case Cmd.InitUpdateMetaStore =>
@@ -540,6 +542,6 @@ package object main extends Logging {
               e => ConfigError.fileNotFound.getOption(e).cata(κ(none.right), e.shows.left),
               _.some.right))
       jʹ <- MetaStore.initializeOrUpdate(schema, tx, j).leftMap(_.message)
-      _  <- EitherT.right(jʹ.traverse_(ConfigOps.jsonToFile(_, cfgFile)))
+      _  <- EitherT.rightT(jʹ.traverse_(ConfigOps.jsonToFile(_, cfgFile)))
     } yield ()
 }

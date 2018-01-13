@@ -17,13 +17,14 @@
 package quasar.qscript
 
 import slamdata.Predef.{Map => SMap, _}
+import quasar.NameGenerator
 import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript.provenance.Dimensions
 
 import matryoshka._
-import scalaz.{Free, Show, Traverse}
+import scalaz.{Free, Functor, Show, Traverse}
 import scalaz.std.string._
 import scalaz.syntax.traverse._
 import scalaz.syntax.show._
@@ -40,6 +41,9 @@ package object qsu {
 
   def AccessValueHoleF[T[_[_]]]: FreeAccess[T, Hole] =
     AccessValueF[T, Hole](SrcHole)
+
+  def freshSymbol[F[_]: NameGenerator: Functor](prefix: String): F[Symbol] =
+    NameGenerator[F].prefixedName(prefix) map (Symbol(_))
 
   def printMultiline[F[_]: Traverse, K: Show, V: Show](fkv: F[(K, V)]): String =
     fkv map { case (k, v) => s"  ${k.shows} -> ${v.shows}" } intercalate "\n"

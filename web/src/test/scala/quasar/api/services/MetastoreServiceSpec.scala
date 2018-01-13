@@ -128,7 +128,7 @@ class MetastoreServiceSpec extends quasar.Qspec {
       val newConn = MetaStoreFixture.createNewTestMetaStoreConfig.unsafePerformSync
       val req = Request(method = PUT, uri = Uri().+?("initialize")).withBody(newConn.asJson).unsafePerformSync
       var persisted: DbConnectionConfig = null
-      def persist(db: DbConnectionConfig): MainTask[Unit] = Task.delay(persisted = db).liftM[MainErrT]
+      def persist(db: DbConnectionConfig): MainTask[Unit] = Task.delay{persisted = db}.liftM[MainErrT]
       val resp = service(persist)(req).unsafePerformSync
       "Config was persisted" ==> (persisted must_=== newConn)
     }
