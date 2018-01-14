@@ -18,7 +18,7 @@ Chain
 │  │  ╰─ Obj
 │  │     ├─ Key(f0: (isObject(_.left) && (! Array.isArray(_.left))) ? _.left._id : undefined)
 │  │     ╰─ Key(b0: (isObject(_.left) && (! Array.isArray(_.left))) ? _.left._id : undefined)
-│  ╰─ Scope(Map())
+│  ╰─ Scope(ListMap())
 ╰─ $GroupF
    ├─ Grouped
    │  ├─ Name("_id" -> { "$first": "$f0" })

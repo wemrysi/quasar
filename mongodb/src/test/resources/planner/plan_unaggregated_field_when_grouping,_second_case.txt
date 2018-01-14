@@ -72,7 +72,7 @@ Chain
 │        │                 });
 │        │               return result
 │        │             })
-│        ╰─ Scope(Map())
+│        ╰─ Scope(ListMap())
 ├─ $MatchF
 │  ╰─ Doc
 │     ├─ NotExpr($left -> Size(0))
@@ -88,4 +88,4 @@ Chain
    │        ╰─ SpliceObjects
    │           ├─ JsCore(_.left)
    │           ╰─ JsCore(_.right)
-   ╰─ Scope(Map())
+   ╰─ Scope(ListMap())

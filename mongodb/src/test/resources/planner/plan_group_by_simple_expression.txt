@@ -64,7 +64,7 @@ Chain
 │     │  ├─ JavaScript(function (key, value) {
 │     │  │               return [{ "0": value.identities.qsu17_b0 }, { "left": [], "right": [value] }]
 │     │  │             })
-│     │  ╰─ Scope(Map())
+│     │  ╰─ Scope(ListMap())
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
 │        │               var result = { "left": [], "right": [] };
@@ -75,7 +75,7 @@ Chain
 │        │                 });
 │        │               return result
 │        │             })
-│        ╰─ Scope(Map())
+│        ╰─ Scope(ListMap())
 ├─ $MatchF
 │  ╰─ Doc
 │     ├─ NotExpr($left -> Size(0))
@@ -91,4 +91,4 @@ Chain
    │        ╰─ SpliceObjects
    │           ├─ JsCore(_.left.value)
    │           ╰─ JsCore(_.right.value)
-   ╰─ Scope(Map())
+   ╰─ Scope(ListMap())

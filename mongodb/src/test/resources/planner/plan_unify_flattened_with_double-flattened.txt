@@ -15,120 +15,15 @@ Chain
 │  ╰─ ExcludeId
 ├─ $UnwindF
 │  ╰─ Path(DocField(BsonField.Name("f")))
-├─ $ProjectF
-│  ├─ Name("original" -> "$s")
-│  ├─ Name("results" -> { "1": "$f", "0": "$s" })
-│  ╰─ ExcludeId
-├─ $ProjectF
-│  ├─ Name("s" -> "$$ROOT")
-│  ├─ Name("f" -> {
-│  │       "$cond": [
-│  │         {
-│  │           "$and": [
-│  │             {
-│  │               "$lte": [
-│  │                 { "$literal": [] },
-│  │                 {
-│  │                   "$cond": [
-│  │                     {
-│  │                       "$and": [
-│  │                         { "$lte": [{ "$literal": {  } }, "$results.0"] },
-│  │                         { "$lt": ["$results.0", { "$literal": [] }] }]
-│  │                     },
-│  │                     "$results.0.comments",
-│  │                     { "$literal": undefined }]
-│  │                 }]
-│  │             },
-│  │             {
-│  │               "$lt": [
-│  │                 {
-│  │                   "$cond": [
-│  │                     {
-│  │                       "$and": [
-│  │                         { "$lte": [{ "$literal": {  } }, "$results.0"] },
-│  │                         { "$lt": ["$results.0", { "$literal": [] }] }]
-│  │                     },
-│  │                     "$results.0.comments",
-│  │                     { "$literal": undefined }]
-│  │                 },
-│  │                 { "$literal": BinData(0, "") }]
-│  │             }]
-│  │         },
-│  │         {
-│  │           "$cond": [
-│  │             {
-│  │               "$and": [
-│  │                 { "$lte": [{ "$literal": {  } }, "$results.0"] },
-│  │                 { "$lt": ["$results.0", { "$literal": [] }] }]
-│  │             },
-│  │             "$results.0.comments",
-│  │             { "$literal": undefined }]
-│  │         },
-│  │         [{ "$literal": undefined }]]
-│  │     })
-│  ╰─ ExcludeId
 ├─ $SimpleMapF
-│  ├─ SubMap
-│  │  ├─ JsCore(_.f)
-│  │  ╰─ Let(m)
-│  │     ├─ JsCore(_.f)
-│  │     ╰─ Call
-│  │        ├─ JsCore(Object.keys(m).map)
-│  │        ╰─ Fun(Name(k))
-│  │           ╰─ JsCore([k, m[k]])
-│  ├─ Flatten
-│  │  ╰─ JsCore(_.f)
-│  ╰─ Scope(Map())
-├─ $ProjectF
-│  ├─ Name("identities" -> { "qsu42": { "$arrayElemAt": ["$f", { "$literal": NumberInt("0") }] } })
-│  ├─ Name("value" -> {
-│  │       "original": "$s",
-│  │       "0": { "$arrayElemAt": ["$f", { "$literal": NumberInt("1") }] }
-│  │     })
-│  ╰─ ExcludeId
-├─ $ProjectF
-│  ├─ Name("s" -> "$$ROOT")
-│  ├─ Name("f" -> {
-│  │       "$cond": [
-│  │         {
-│  │           "$and": [
-│  │             { "$lte": [{ "$literal": [] }, "$value.original.results.1.replyTo"] },
-│  │             {
-│  │               "$lt": [
-│  │                 "$value.original.results.1.replyTo",
-│  │                 { "$literal": BinData(0, "") }]
-│  │             }]
-│  │         },
-│  │         "$value.original.results.1.replyTo",
-│  │         [{ "$literal": undefined }]]
-│  │     })
-│  ╰─ ExcludeId
-├─ $SimpleMapF
-│  ├─ SubMap
-│  │  ├─ JsCore(_.f)
-│  │  ╰─ Let(m)
-│  │     ├─ JsCore(_.f)
-│  │     ╰─ Call
-│  │        ├─ JsCore(Object.keys(m).map)
-│  │        ╰─ Fun(Name(k))
-│  │           ╰─ JsCore([k, m[k]])
-│  ├─ Flatten
-│  │  ╰─ JsCore(_.f)
 │  ├─ Map
 │  │  ╰─ Obj
-│  │     ├─ Key(identities: _.s.identities)
-│  │     ╰─ Key(value)
-│  │        ╰─ Obj
-│  │           ├─ Key(filter_source: (isObject(
-│  │           │      ((_.s.identities.qsu42 === _.f[0]) ? _.s.value.original : undefined).original) && (! Array.isArray(
-│  │           │      ((_.s.identities.qsu42 === _.f[0]) ? _.s.value.original : undefined).original))) ? ((_.s.identities.qsu42 === _.f[0]) ? _.s.value.original : undefined).original : undefined)
-│  │           ╰─ Key(filter_predicate: (isString(((_.s.identities.qsu42 === _.f[0]) ? _.s.value["0"] : undefined).id) ? (new RegExp("^.*Dr.*$", "m")).test(
-│  │                  ((_.s.identities.qsu42 === _.f[0]) ? _.s.value["0"] : undefined).id) : undefined) || (new RegExp("^.*Dr.*$", "m")).test(
-│  │                  (_.s.identities.qsu42 === _.f[0]) ? _.f[1] : undefined))
-│  ╰─ Scope(Map())
+│  │     ├─ Key(filter_source: _.s)
+│  │     ╰─ Key(filter_predicate: (isString(_.f.left["0"].id) ? (new RegExp("^.*Dr.*$", "m")).test(_.f.left["0"].id) : undefined) || (new RegExp("^.*Dr.*$", "m")).test(_.f.right["1"]))
+│  ╰─ Scope(ListMap())
 ├─ $MatchF
 │  ╰─ Doc
-│     ╰─ Expr($value.filter_predicate -> Eq(Bool(true)))
+│     ╰─ Expr($filter_predicate -> Eq(Bool(true)))
 ╰─ $ProjectF
-   ├─ Name("__quasar_mongodb_sigil" -> "$value.filter_source")
+   ├─ Name("__quasar_mongodb_sigil" -> "$filter_source")
    ╰─ ExcludeId

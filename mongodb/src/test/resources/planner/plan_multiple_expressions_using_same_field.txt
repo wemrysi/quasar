@@ -133,7 +133,7 @@ Chain
 │     │        │                 });
 │     │        │               return result
 │     │        │             })
-│     │        ╰─ Scope(Map())
+│     │        ╰─ Scope(ListMap())
 │     ├─ $MatchF
 │     │  ╰─ Doc
 │     │     ├─ NotExpr($left -> Size(0))
@@ -150,7 +150,7 @@ Chain
 │     │  ├─ JavaScript(function (key, value) {
 │     │  │               return [{ "0": value.left.identities.qsu1 }, { "right": [], "left": [value] }]
 │     │  │             })
-│     │  ╰─ Scope(Map())
+│     │  ╰─ Scope(ListMap())
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
 │        │               var result = { "right": [], "left": [] };
@@ -161,7 +161,7 @@ Chain
 │        │                 });
 │        │               return result
 │        │             })
-│        ╰─ Scope(Map())
+│        ╰─ Scope(ListMap())
 ├─ $MatchF
 │  ╰─ Doc
 │     ├─ NotExpr($right -> Size(0))
@@ -180,4 +180,4 @@ Chain
    │           ╰─ Obj
    │              ╰─ Key(2: ((isNumber(
    │                     (isObject(_.right.value) && (! Array.isArray(_.right.value))) ? _.right.value.pop : undefined) || ((((isObject(_.right.value) && (! Array.isArray(_.right.value))) ? _.right.value.pop : undefined) instanceof NumberInt) || (((isObject(_.right.value) && (! Array.isArray(_.right.value))) ? _.right.value.pop : undefined) instanceof NumberLong))) && (isObject(_.right.value) && (! Array.isArray(_.right.value)))) ? _.right.value.pop / 1000 : undefined)
-   ╰─ Scope(Map())
+   ╰─ Scope(ListMap())

@@ -259,10 +259,7 @@ object PlannerHelpers {
     plan3_4(query, defaultStats, defaultIndexes, emptyDoc)
 
   def planMetal(query: Fix[Sql]): Option[String] =
-    plan(query) match {
-      case Left(_) => None
-      case Right(wf) => toMetalPlan(wf)
-    }
+    plan(query).disjunction.toOption >>= toMetalPlan
 
   def planAt(time: Instant, query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     queryPlanner(query, basePathDb, MongoQueryModel.`3.4`, defaultStats, defaultIndexes, listContents, emptyDoc, time).run.value.toEither
@@ -270,7 +267,7 @@ object PlannerHelpers {
   def planLog(query: Fix[Sql]): Vector[PhaseResult] =
     queryPlanner(query, basePathDb, MongoQueryModel.`3.2`, defaultStats, defaultIndexes, listContents, emptyDoc, Instant.now).run.written
 
-  def qplan0(
+  def qscriptPlan(
     qs: Fix[fs.MongoQScript[Fix, ?]],
     model: MongoQueryModel,
     stats: Collection => Option[CollectionStatistics],
@@ -279,8 +276,15 @@ object PlannerHelpers {
   ): Either[FileSystemError, Crystallized[WorkflowF]] =
     MongoDb.doPlan(qs, fs.QueryContext(stats, indexes), model, anyDoc, Instant.now).run.value.toEither
 
+  def qplan0(
+    qs: Fix[fs.MongoQScript[Fix, ?]],
+    stats: Collection => Option[CollectionStatistics],
+    indexes: Collection => Option[Set[Index]]
+  ): Either[FileSystemError, Crystallized[WorkflowF]] =
+    qscriptPlan(qs, MongoQueryModel.`3.4`, stats, indexes, emptyDoc)
+
   def qplan(qs: Fix[fs.MongoQScript[Fix, ?]]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    qplan0(qs, MongoQueryModel.`3.4`, defaultStats, defaultIndexes, emptyDoc)
+    qscriptPlan(qs, MongoQueryModel.`3.4`, defaultStats, defaultIndexes, emptyDoc)
 
   def qtestFile(testName: String): JFile = jFile(toRFile("q " + testName))
 
@@ -353,6 +357,7 @@ object PlannerHelpers {
 
 trait PlannerHelpers extends
     org.specs2.mutable.Specification with
+    ScalazSpecs2Instances with
     org.specs2.ScalaCheck with
     CompilerHelpers with
     TreeMatchers with
@@ -360,7 +365,7 @@ trait PlannerHelpers extends
 
   import PlannerHelpers._
 
-  val mode: Mode = TestMode
+  val mode: Mode = WriteMode
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf, addDetails = false))
   def beWorkflow0(wf: Workflow) = beRight(equalToWorkflow(wf, addDetails = true))

@@ -48,7 +48,7 @@ Chain
 │     │  ├─ JavaScript(function (key, value) {
 │     │  │               return [{ "0": value.identities.qsu8_k0 }, { "left": [], "right": [value] }]
 │     │  │             })
-│     │  ╰─ Scope(Map())
+│     │  ╰─ Scope(ListMap())
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
 │        │               var result = { "left": [], "right": [] };
@@ -59,7 +59,7 @@ Chain
 │        │                 });
 │        │               return result
 │        │             })
-│        ╰─ Scope(Map())
+│        ╰─ Scope(ListMap())
 ├─ $MatchF
 │  ╰─ Doc
 │     ├─ NotExpr($left -> Size(0))
@@ -86,16 +86,10 @@ Chain
 │  │     │           ├─ JsCore(_.left.value)
 │  │     │           ╰─ JsCore(_.right.value)
 │  │     ╰─ Key(b0)
-│  │        ╰─ Obj
-│  │           ├─ Key(identities)
-│  │           │  ╰─ SpliceObjects
-│  │           │     ├─ JsCore(_.left.identities)
-│  │           │     ╰─ JsCore(_.right.identities)
-│  │           ╰─ Key(value)
-│  │              ╰─ SpliceObjects
-│  │                 ├─ JsCore(_.left.value)
-│  │                 ╰─ JsCore(_.right.value)
-│  ╰─ Scope(Map())
+│  │        ╰─ SpliceObjects
+│  │           ├─ JsCore(_.left.value)
+│  │           ╰─ JsCore(_.right.value)
+│  ╰─ Scope(ListMap())
 ├─ $GroupF
 │  ├─ Grouped
 │  │  ╰─ Name("f0" -> { "$first": "$f0" })

@@ -34,7 +34,7 @@ Chain
 │     │     ├─ $ReadF(db; orders)
 │     │     ├─ $MapF
 │     │     │  ├─ JavaScript(function (key, value) { return [{ "0": value.customer_key }, { "left": [], "right": [value] }] })
-│     │     │  ╰─ Scope(Map())
+│     │     │  ╰─ Scope(ListMap())
 │     │     ╰─ $ReduceF
 │     │        ├─ JavaScript(function (key, values) {
 │     │        │               var result = { "left": [], "right": [] };
@@ -45,7 +45,7 @@ Chain
 │     │        │                 });
 │     │        │               return result
 │     │        │             })
-│     │        ╰─ Scope(Map())
+│     │        ╰─ Scope(ListMap())
 │     ├─ $MatchF
 │     │  ╰─ Doc
 │     │     ├─ NotExpr($left -> Size(0))
@@ -81,7 +81,7 @@ Chain
 │     │  │                 { "0": value.src.right.order_key },
 │     │  │                 { "right": [], "left": [value.src] }]
 │     │  │             })
-│     │  ╰─ Scope(Map())
+│     │  ╰─ Scope(ListMap())
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
 │        │               var result = { "right": [], "left": [] };
@@ -92,7 +92,7 @@ Chain
 │        │                 });
 │        │               return result
 │        │             })
-│        ╰─ Scope(Map())
+│        ╰─ Scope(ListMap())
 ├─ $MatchF
 │  ╰─ Doc
 │     ╰─ NotExpr($left -> Size(0))
@@ -145,7 +145,7 @@ Chain
 │  │     │     ├─ JsCore((isObject(_.left.right) && (! Array.isArray(_.left.right))) ? _.left.right.purchase_date : undefined)
 │  │     │     ╰─ Ident(undefined)
 │  │     ╰─ Key(qty: _.right.qty)
-│  ╰─ Scope(Map())
+│  ╰─ Scope(ListMap())
 ╰─ $ProjectF
    ├─ Name("last_name" -> true)
    ├─ Name("purchase_date" -> true)

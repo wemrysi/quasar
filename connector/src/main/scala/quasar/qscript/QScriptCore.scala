@@ -118,7 +118,7 @@ object ReduceIndex {
     extends QScriptCore[T, A]
 
 /** Creates a new dataset that contains the elements from the datasets created
-  * by each branch. Duplicate values should be eliminated.
+  * by each branch. Duplicate values should not be eliminated.
   */
 @Lenses final case class Union[T[_[_]], A](
   src: A,

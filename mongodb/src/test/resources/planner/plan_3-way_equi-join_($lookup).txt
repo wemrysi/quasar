@@ -73,7 +73,7 @@ Chain
 │  │     │     ├─ JsCore((isObject(_.left.right) && (! Array.isArray(_.left.right))) ? _.left.right.state : undefined)
 │  │     │     ╰─ Ident(undefined)
 │  │     ╰─ Key(pop: _.right.pop)
-│  ╰─ Scope(Map())
+│  ╰─ Scope(ListMap())
 ╰─ $ProjectF
    ├─ Name("city" -> true)
    ├─ Name("state" -> true)

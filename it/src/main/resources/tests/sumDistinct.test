@@ -1,0 +1,69 @@
+{
+    "name": "grouped sum of distinct values",
+    "backends": {
+        "couchbase":         "pending",
+        "marklogic_json":    "pending",
+        "marklogic_xml":     "pending",
+        "mongodb_3_2":       "ignoreFieldOrder",
+        "mongodb_3_4":       "ignoreFieldOrder",
+        "mongodb_read_only": "pending",
+        "spark_cassandra":   "pending"
+    },
+    "data": "zips.data",
+    "query": "select state, sum(distinct(pop)) from zips group by state",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+      { "state": "AK", "1": 332925 }
+    , { "state": "AL", "1": 3108888 }
+    , { "state": "AR", "1": 1530924 }
+    , { "state": "AZ", "1": 2794475 }
+    , { "state": "CA", "1": 25716501 }
+    , { "state": "CO", "1": 2482934 }
+    , { "state": "CT", "1": 3250284 }
+    , { "state": "DC", "1": 600589 }
+    , { "state": "DE", "1": 572644 }
+    , { "state": "FL", "1": 11429131 }
+    , { "state": "GA", "1": 5624700 }
+    , { "state": "HI", "1": 885721 }
+    , { "state": "IA", "1": 1592960 }
+    , { "state": "ID", "1": 546544 }
+    , { "state": "IL", "1": 9262251 }
+    , { "state": "IN", "1": 4386631 }
+    , { "state": "KS", "1": 1539404 }
+    , { "state": "KY", "1": 2575688 }
+    , { "state": "LA", "1": 3348757 }
+    , { "state": "MA", "1": 5971018 }
+    , { "state": "MD", "1": 4377053 }
+    , { "state": "ME", "1": 1142537 }
+    , { "state": "MI", "1": 7685743 }
+    , { "state": "MN", "1": 3003407 }
+    , { "state": "MO", "1": 3575461 }
+    , { "state": "MS", "1": 2016080 }
+    , { "state": "MT", "1": 410018 }
+    , { "state": "NC", "1": 5848194 }
+    , { "state": "ND", "1": 331416 }
+    , { "state": "NE", "1": 823431 }
+    , { "state": "NH", "1": 1089246 }
+    , { "state": "NJ", "1": 7546783 }
+    , { "state": "NM", "1": 1139575 }
+    , { "state": "NV", "1": 987257 }
+    , { "state": "NY", "1": 17261229 }
+    , { "state": "OH", "1": 8983192 }
+    , { "state": "OK", "1": 2076307 }
+    , { "state": "OR", "1": 1974305 }
+    , { "state": "PA", "1": 10805876 }
+    , { "state": "RI", "1": 995182 }
+    , { "state": "SC", "1": 2958390 }
+    , { "state": "SD", "1": 349279 }
+    , { "state": "TN", "1": 4032734 }
+    , { "state": "TX", "1": 13508235 }
+    , { "state": "UT", "1": 1394573 }
+    , { "state": "VA", "1": 5501537 }
+    , { "state": "VT", "1": 514959 }
+    , { "state": "WA", "1": 3714238 }
+    , { "state": "WI", "1": 3577491 }
+    , { "state": "WV", "1": 1355452 }
+    , { "state": "WY", "1": 217665 }
+    ]
+}
