@@ -947,7 +947,8 @@ object MongoDbPlanner {
                           ListMap(
                             BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                             BsonField.Name("f") -> target)),
-                        Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                        Set(StructureType.Array(DocField(BsonField.Name("f")), id)),
+                        List(BsonField.Name("s")).some),
                       repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide])))), { sel =>
                     val struct0 =
                       handleFreeMap[T, M, EX](
@@ -964,7 +965,8 @@ object MongoDbPlanner {
                             ListMap(
                               BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                               BsonField.Name("f") -> struct1)),
-                          Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                          Set(StructureType.Array(DocField(BsonField.Name("f")), id)),
+                          List(BsonField.Name("s")).some),
                         repair0)).join
                   })
                 }
@@ -982,7 +984,8 @@ object MongoDbPlanner {
                             BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                             BsonField.Name("f") -> expr)),
                         // TODO: Handle arrays properly
-                        Set(StructureType.Object(DocField(BsonField.Name("f")), id))),
+                        Set(StructureType.Object(DocField(BsonField.Name("f")), id)),
+                        List(BsonField.Name("s")).some),
                       -\&/(j)))
               }
             }
@@ -997,7 +1000,8 @@ object MongoDbPlanner {
                       cfg.funcHandler, cfg.staticHandler)(
                       FlatteningBuilder(
                         builder,
-                        Set(StructureType.Array(DocVar.ROOT(), id))),
+                        Set(StructureType.Array(DocVar.ROOT(), id)),
+                        List().some),
                         repair0))
                 }
                 case _ =>
@@ -1006,7 +1010,8 @@ object MongoDbPlanner {
                       cfg.funcHandler, cfg.staticHandler)(
                       FlatteningBuilder(
                         builder,
-                        Set(StructureType.Object(DocVar.ROOT(), id))),
+                        Set(StructureType.Object(DocVar.ROOT(), id)),
+                        List().some),
                         repair.as(SrcHole)))
               }
 

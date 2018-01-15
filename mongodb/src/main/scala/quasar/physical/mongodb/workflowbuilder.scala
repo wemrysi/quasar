@@ -58,8 +58,8 @@ object WorkflowBuilderF {
             eq.equal(s1, s2) && e1 == e2
           case (GroupBuilderF(s1, k1, c1), GroupBuilderF(s2, k2, c2)) =>
             eq.equal(s1, s2) && k1 ≟ k2 && c1 == c2
-          case (FlatteningBuilderF(s1, f1), FlatteningBuilderF(s2, f2)) =>
-            eq.equal(s1, s2) && f1 == f2
+          case (FlatteningBuilderF(s1, f1, r1), FlatteningBuilderF(s2, f2, r2)) =>
+            eq.equal(s1, s2) && f1 == f2 && r1 ≟ r2
           case (UnionBuilderF(ls1, rs1), UnionBuilderF(ls2, rs2)) =>
             eq.equal(ls1, ls2) && eq.equal(rs1, rs2)
           case _ => false
@@ -82,8 +82,8 @@ object WorkflowBuilderF {
           case DocBuilderF(src, shape) => f(src).map(DocBuilderF(_, shape))
           case GroupBuilderF(src, keys, contents) =>
             f(src).map(GroupBuilderF(_, keys, contents))
-          case FlatteningBuilderF(src, fields) =>
-            f(src).map(FlatteningBuilderF(_, fields))
+          case FlatteningBuilderF(src, fields, rest) =>
+            f(src).map(FlatteningBuilderF(_, fields, rest))
           case UnionBuilderF(lSrc, rSrc) =>
             (f(lSrc) ⊛ f(rSrc))(UnionBuilderF(_, _))
         }
@@ -126,16 +126,17 @@ object WorkflowBuilderF {
               NonTerminal("By" :: nt, None, keys.map(_.render)) ::
               RG.render(content).copy(nodeType = "Content" :: nt) ::
               Nil)
-        case FlatteningBuilderF(src, fields) =>
+        case FlatteningBuilderF(src, fields, rest) =>
           val nt = "FlatteningBuilder" :: nodeType
-          NonTerminal(nt, None,
-            rt.render(src) ::
-              fields.toList.map {
-                case StructureType.Array(field, id) =>
-                  NonTerminal("Array" :: nt, field.shows.some, List(id.render))
-                case StructureType.Object(field, id) =>
-                  NonTerminal("Object" :: nt, field.shows.some, List(id.render))
-              })
+          val flds = NonTerminal("Fields" :: nt, None,
+            fields.toList.map {
+              case StructureType.Array(field, id) =>
+                NonTerminal("Array" :: nt, field.shows.some, List(id.render))
+              case StructureType.Object(field, id) =>
+                NonTerminal("Object" :: nt, field.shows.some, List(id.render))
+            })
+          val rst = Terminal.opt("Rest" :: nt, rest.map(_.shows))
+          NonTerminal(nt, None, rt.render(src) :: flds :: rst.toList)
         case UnionBuilderF(lSrc, rSrc) =>
           val nt = "UnionBuilder" :: nodeType
           NonTerminal(nt, None, List(rt.render(lSrc), rt.render(rSrc)))
@@ -307,11 +308,15 @@ object WorkflowBuilder {
       }
   }
 
-  final case class FlatteningBuilderF[F[_], A](src: A, fields: Set[StructureType[DocVar]])
+  /**
+   * fields - the fields to flatten
+   * rest - the other fields of the structure or `None` if unknown
+   */
+  final case class FlatteningBuilderF[F[_], A](src: A, fields: Set[StructureType[DocVar]], rest: Option[List[BsonField.Name]])
       extends WorkflowBuilderF[F, A]
   object FlatteningBuilder {
-    def apply[F[_]](src: WorkflowBuilder[F], fields: Set[StructureType[DocVar]]) =
-      Fix[WorkflowBuilderF[F, ?]](new FlatteningBuilderF(src, fields))
+    def apply[F[_]](src: WorkflowBuilder[F], fields: Set[StructureType[DocVar]], rest: Option[List[BsonField.Name]]) =
+      Fix[WorkflowBuilderF[F, ?]](new FlatteningBuilderF(src, fields, rest))
   }
 
   final case class UnionBuilderF[F[_], A](lSrc: A, rSrc: A) extends WorkflowBuilderF[F, A]
@@ -367,7 +372,7 @@ object WorkflowBuilder {
     case ExprBuilderF(_, _)                 => none
     case DocBuilderF(_, shape)              => shape.keys.toList.toNel
     case GroupBuilderF(_, _, shape)         => shape.keys.toList.toNel
-    case FlatteningBuilderF(src, _)         => src
+    case FlatteningBuilderF(src, _, _)      => src
     case UnionBuilderF(lSrc, rSrc)          => if (lSrc ≟ rSrc) lSrc else none
 
   }
@@ -451,7 +456,7 @@ object WorkflowBuilder {
           (chain(g, $group[WF](Grouped(content).rewriteRefs(prefixBase0(c)), key)),
             Root(): Base).point[M]
       }
-    case FlatteningBuilderF((graph, base), fields) =>
+    case FlatteningBuilderF((graph, base), fields, rest) =>
       (
         // TODO: Organize this to put all the $maps and all the $unwinds adjacent.
         fields.foldRight(graph) {
@@ -638,7 +643,7 @@ object WorkflowBuilder {
     wb.unFix match {
       case CollectionBuilderF(_, _, s2)       => s2.map(s => Subset(s.toSet))
       case DocBuilderF(_, shape)              => Subset(shape.keySet).some
-      case FlatteningBuilderF(src, _)         => findKeys(src)
+      case FlatteningBuilderF(src, _, _)      => findKeys(src)
       case GroupBuilderF(_, _, obj)           => Subset(obj.keySet).some
       case ShapePreservingBuilderF(src, _, _) => findKeys(src)
       case ExprBuilderF(_, _)                 => Root().some

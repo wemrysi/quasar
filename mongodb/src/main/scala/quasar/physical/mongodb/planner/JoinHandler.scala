@@ -118,7 +118,7 @@ object JoinHandler {
       case CollectionBuilderF(op, _, _)       => op.cata(wfSourceDb)
       case DocBuilderF(src, _)                => src
       case ExprBuilderF(src, _)               => src
-      case FlatteningBuilderF(src, _)         => src
+      case FlatteningBuilderF(src, _, _)      => src
       case GroupBuilderF(src, _, _)           => src
       case ShapePreservingBuilderF(src, _, _) => src
       case UnionBuilderF(lSrc, rSrc)          => if (lSrc ≟ rSrc) lSrc else none
@@ -176,7 +176,7 @@ object JoinHandler {
         lookup(
           src, key, LeftName,
           coll.collection, field, RightName).liftM[OptionT] ∘
-          (FlatteningBuilder(_, Set(StructureType.Array(DocField(RightName), ExcludeId))))
+          (FlatteningBuilder(_, Set(StructureType.Array(DocField(RightName), ExcludeId)), None))
 
       case (JoinType.LeftOuter, JoinSource(src, List(key)), IsLookupFrom(coll, field))
             if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
@@ -186,14 +186,15 @@ object JoinHandler {
           (look =>
             FlatteningBuilder(
               buildProjection(look, LeftName, n => $var(DocField(n)), RightName, padEmpty),
-              Set(StructureType.Array(DocField(RightName), ExcludeId))))
+              Set(StructureType.Array(DocField(RightName), ExcludeId)),
+              None))
 
       case (JoinType.Inner, IsLookupFrom(coll, field), JoinSource(src, List(key)))
             if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
         lookup(
           src, key, RightName,
           coll.collection, field, LeftName).liftM[OptionT] ∘
-          (FlatteningBuilder(_, Set(StructureType.Array(DocField(LeftName), ExcludeId))))
+          (FlatteningBuilder(_, Set(StructureType.Array(DocField(LeftName), ExcludeId)), None))
 
       case (JoinType.RightOuter, IsLookupFrom(coll, field), JoinSource(src, List(key)))
             if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
@@ -203,7 +204,8 @@ object JoinHandler {
           (look =>
             FlatteningBuilder(
               buildProjection(look, LeftName, padEmpty, RightName, n => $var(DocField(n))),
-              Set(StructureType.Array(DocField(LeftName), ExcludeId))))
+              Set(StructureType.Array(DocField(LeftName), ExcludeId)),
+              None))
 
       case _ => OptionT.none
     }
@@ -309,7 +311,8 @@ object JoinHandler {
             buildProjection(src, leftField, padEmpty, rightField, padEmpty),
             Set(
               StructureType.Array(DocField(leftField), ExcludeId),
-              StructureType.Array(DocField(rightField), ExcludeId)))
+              StructureType.Array(DocField(rightField), ExcludeId)),
+            None)
         case JoinType.LeftOuter =>
           FlatteningBuilder(
             buildProjection(
@@ -320,7 +323,8 @@ object JoinHandler {
               rightField, padEmpty),
             Set(
               StructureType.Array(DocField(leftField), ExcludeId),
-              StructureType.Array(DocField(rightField), ExcludeId)))
+              StructureType.Array(DocField(rightField), ExcludeId)),
+            None)
         case JoinType.RightOuter =>
           FlatteningBuilder(
             buildProjection(
@@ -332,7 +336,8 @@ object JoinHandler {
               rightField, n => $var(DocField(n))),
             Set(
               StructureType.Array(DocField(leftField), ExcludeId),
-              StructureType.Array(DocField(rightField), ExcludeId)))
+              StructureType.Array(DocField(rightField), ExcludeId)),
+            None)
         case JoinType.Inner =>
           FlatteningBuilder(
             WB.filter(
@@ -346,7 +351,8 @@ object JoinHandler {
               }),
             Set(
               StructureType.Array(DocField(leftField), ExcludeId),
-              StructureType.Array(DocField(rightField), ExcludeId)))
+              StructureType.Array(DocField(rightField), ExcludeId)),
+            None)
       }
 
     val rightReduce = {
