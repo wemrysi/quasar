@@ -83,11 +83,11 @@ object QScriptUniform {
       case Transpose(source, retain, rotations) =>
         f(source).map(Transpose(_, retain, rotations))
 
-      case LeftShift(source, struct, idStatus, repair, repairIfUndefined, rot) =>
-        f(source).map(LeftShift(_, struct, idStatus, repair, repairIfUndefined, rot))
+      case LeftShift(source, struct, idStatus, repair, onUndefined, rot) =>
+        f(source).map(LeftShift(_, struct, idStatus, repair, onUndefined, rot))
 
-      case MultiLeftShift(source, shifts, repair, repairIfUndefined) =>
-        f(source).map(MultiLeftShift(_, shifts, repair, repairIfUndefined))
+      case MultiLeftShift(source, shifts, repair, onUndefined) =>
+        f(source).map(MultiLeftShift(_, shifts, repair, onUndefined))
 
       case LPReduce(source, reduce) =>
         f(source).map(LPReduce(_, reduce))
@@ -166,11 +166,11 @@ object QScriptUniform {
           case Transpose(source, retain, rotations) =>
             s"Transpose(${source.shows}, ${retain.shows}, ${rotations.shows})"
 
-          case LeftShift(source, struct, idStatus, repair, repairIfUndefined, rot) =>
-            s"LeftShift(${source.shows}, ${struct.shows}, ${idStatus.shows}, ${repair.shows}, ${repairIfUndefined.shows}, ${rot.shows})"
+          case LeftShift(source, struct, idStatus, repair, onUndefined, rot) =>
+            s"LeftShift(${source.shows}, ${struct.shows}, ${idStatus.shows}, ${repair.shows}, ${onUndefined.shows}, ${rot.shows})"
 
-          case MultiLeftShift(source, shifts, repair, repairIfUndefined) =>
-            s"MultiLeftShift(${source.shows}, ${shifts.shows}, ${repair.shows}, ${repairIfUndefined.shows})"
+          case MultiLeftShift(source, shifts, repair, onUndefined) =>
+            s"MultiLeftShift(${source.shows}, ${shifts.shows}, ${repair.shows}, ${onUndefined.shows})"
 
           case LPReduce(source, reduce) =>
             s"LPReduce(${source.shows}, ${reduce.shows})"
@@ -414,7 +414,7 @@ object QScriptUniform {
       struct: FreeMap[T],
       idStatus: IdStatus,
       repair: FreeMapA[T, ShiftTarget[T]],
-      repairIfUndefined: Boolean,
+      onUndefined: Boolean,
       rot: Rotation) extends QScriptUniform[T, A]
 
   // shifting multiple structs on the same source;
@@ -423,7 +423,7 @@ object QScriptUniform {
       source: A,
       shifts: List[(FreeMap[T], IdStatus, Rotation)],
       repair: FreeMapA[T, QAccess[T, Hole] \/ Int],
-      repairIfUndefined: Boolean) extends QScriptUniform[T, A]
+      onUndefined: Boolean) extends QScriptUniform[T, A]
 
   // LPish
   final case class LPReduce[T[_[_]], A](
