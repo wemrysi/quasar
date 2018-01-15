@@ -158,8 +158,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     ).embed
 
     case reduce@qscript.Reduce(src, bucket, reducers, repair) => for {
-      alias <- genIdWithMeta[T[SqlExpr], F](Branch(
-        (_: String) => (Field, deriveIndirection(src)), s"(Dot, ${deriveIndirection(src).shows})"))
+      alias <- genIdWithMeta[T[SqlExpr], F](deriveIndirection(src))
       gbs   <- bucket.traverse(processFreeMap(_, alias))
       rds   <- reducers.traverse(_.traverse(processFreeMap(_, alias)) >>=
         reduceFuncPlanner[T, F].plan)
