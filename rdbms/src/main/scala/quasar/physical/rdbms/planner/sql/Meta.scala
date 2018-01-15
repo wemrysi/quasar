@@ -23,30 +23,30 @@ import matryoshka.implicits._
 import scalaz._
 import Scalaz._
 
-object Metas {
+object Indirections {
 
-  sealed trait MetaType
-  final case object Field extends MetaType
-  final case object InnerField extends MetaType
+  sealed trait IndirectionType
+  final case object Field extends IndirectionType
+  final case object InnerField extends IndirectionType
 
-  sealed trait Meta
+  sealed trait Indirection
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  final case class Branch(m: String => (MetaType, Meta), debug: String) extends Meta
+  final case class Branch(m: String => (IndirectionType, Indirection), debug: String) extends Indirection
 
-  implicit val metaShow: Show[Meta] = {
-    Show.shows[Meta] {
+  implicit val metaShow: Show[Indirection] = {
+    Show.shows[Indirection] {
       case Branch(_, debug) => debug
     }
   }
 
-  val mArrow: Meta = Branch((_: String) => (InnerField, mArrow), "mArr")
-  val Default = Branch((_: String) => (Field, mArrow), "Default")
+  val InnerRef: Indirection = Branch((_: String) => (InnerField, InnerRef), "mArr")
+  val Default = Branch((_: String) => (Field, InnerRef), "Default")
 
   import SqlExpr._
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def deriveMeta[T[_[_]]: BirecursiveT](expr: T[SqlExpr]): Meta = {
+    def deriveIndirection[T[_[_]]: BirecursiveT](expr: T[SqlExpr]): Indirection = {
       println(s"deriveMeta for ${expr.project}")
       val meta = expr.project match {
         case SqlExpr.Id(_, m) =>
@@ -57,7 +57,7 @@ object Metas {
           m
         case ExprWithAlias(v, _) =>
           println(s"meta for ExprWithAlias")
-          deriveMeta(v)
+          deriveIndirection(v)
         case Select(Selection(_, _, m), _, _, _, _, _) =>
           println(s"meta for Select")
           m

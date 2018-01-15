@@ -33,7 +33,7 @@ import quasar.physical.rdbms.model.{BoolCol, DecCol, IntCol, StringCol}
 
 import scalaz._
 import Scalaz._
-import quasar.physical.rdbms.planner.sql.Metas._
+import quasar.physical.rdbms.planner.sql.Indirections._
 
 
 class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerErrorME]
@@ -47,7 +47,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
   def toKeyValue(expr: T[SQL], key: String): T[SQL] = {
     val nr: Refs[T[SQL]] = expr.project match {
       case Refs(elems, m) => Refs(elems :+ str(key), m)
-      case _ => Refs(Vector(expr, str(key)), deriveMeta(expr))
+      case _ => Refs(Vector(expr, str(key)), deriveIndirection(expr))
     }
     nr.embed
   }
@@ -67,7 +67,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
 
   private def project(fSrc: T[SQL], fKey: T[SQL]) = fSrc.project match {
     case SQL.Refs(list, m) => SQL.Refs(list :+ fKey, m).embed.η[F]
-    case _ => SQL.Refs(Vector(fSrc, fKey), deriveMeta(fSrc)).embed.η[F] // _12
+    case _ => SQL.Refs(Vector(fSrc, fKey), deriveIndirection(fSrc)).embed.η[F] // _12
   }
 
   def plan: AlgebraM[F, MapFuncCore[T, ?], T[SQL]] = {
@@ -84,7 +84,6 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
       )(
         Else(SQL.Null[T[SQL]].embed)
       ).embed.η[F]
-
     case MFC.StartOfDay(f) =>  notImplemented("StartOfDay", this)
     case MFC.TemporalTrunc(p, f) =>  notImplemented("TemporalTrunc", this)
     case MFC.TimeOfDay(f) =>  notImplemented("TimeOfDay", this)
@@ -157,9 +156,9 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
       (f1.project, f2.project) match {
         case (ExprWithAlias(e1, a1), ExprWithAlias(e2, a2)) =>
 
-          val patmat: PartialFunction[String, (MetaType, Meta)] = {
-            case `a1` => (Field, deriveMeta(e1))
-            case `a2` => (Field, deriveMeta(e2))
+          val patmat: PartialFunction[String, (IndirectionType, Indirection)] = {
+            case `a1` => (Field, deriveIndirection(e1))
+            case `a2` => (Field, deriveIndirection(e2))
           }
 
           val meta = Branch(patmat.orElse {
@@ -169,7 +168,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
                 m(s)
               }
             }
-          }, s"$a1 -> (Dot, ${deriveMeta(e1).shows}), $a2 -> (Dot, ${deriveMeta(e2).shows})")
+          }, s"$a1 -> (Dot, ${deriveIndirection(e1).shows}), $a2 -> (Dot, ${deriveIndirection(e2).shows})")
 
           ExprPair[T[SQL]](f1, f2, meta).embed.η[F]
 

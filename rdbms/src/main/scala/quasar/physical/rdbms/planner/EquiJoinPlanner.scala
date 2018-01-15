@@ -30,7 +30,7 @@ import matryoshka.patterns._
 
 import scalaz._
 import Scalaz._
-import quasar.physical.rdbms.planner.sql.Metas._
+import quasar.physical.rdbms.planner.sql.Indirections._
 
 class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT,
 F[_]: Monad: NameGenerator: PlannerErrorME](
@@ -62,8 +62,8 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       for {
         left <- lBranch.cataM(interpretM(κ(src.point[F]), compile))
         right <- rBranch.cataM(interpretM(κ(src.point[F]), compile))
-        lMeta = deriveMeta(left)
-        rMeta = deriveMeta(right)
+        lMeta = deriveIndirection(left)
+        rMeta = deriveIndirection(right)
         leftAlias <- genIdWithMeta[T[SqlExpr], F](lMeta)
         rightAlias <- genIdWithMeta[T[SqlExpr], F](rMeta)
         combined <- processJoinFunc(combine, leftAlias, rightAlias)
@@ -86,7 +86,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         }
 
         Select(
-          selection = Selection(selectionExpr, none, deriveMeta(combined)),
+          selection = Selection(selectionExpr, none, deriveIndirection(combined)),
           from = From(left, leftAlias),
           join = Join(right, keyExprs, joinType, rightAlias).some,
           filter = none,

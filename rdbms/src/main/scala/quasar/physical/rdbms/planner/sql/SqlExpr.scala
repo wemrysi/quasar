@@ -30,14 +30,14 @@ sealed abstract class SqlExpr[T]
 
 object SqlExpr extends SqlExprInstances {
 
-  import Metas._
+  import Indirections._
   import Select._
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  final case class Id[T](v: String, meta: Meta = Default) extends SqlExpr[T]
+  final case class Id[T](v: String, meta: Indirection = Default) extends SqlExpr[T]
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  final case class Refs[T](elems: Vector[T], m: Meta = Default) extends SqlExpr[T] {
+  final case class Refs[T](elems: Vector[T], m: Indirection = Default) extends SqlExpr[T] {
     def +(other: Refs[T]): Refs[T] = {
       Refs(other.elems ++ this.elems)
     }
@@ -53,7 +53,7 @@ object SqlExpr extends SqlExprInstances {
   final case class ExprWithAlias[T](expr: T, alias: String) extends SqlExpr[T]
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  final case class ExprPair[T](a: T, b: T, m: Meta = Default) extends SqlExpr[T]
+  final case class ExprPair[T](a: T, b: T, m: Indirection = Default) extends SqlExpr[T]
 
   final case class Select[T](selection: Selection[T],
                              from: From[T],
@@ -67,7 +67,7 @@ object SqlExpr extends SqlExprInstances {
   final case class Join[T](v: T, keys: List[(T, T)], jType: JoinType, alias: Id[T])
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  final case class Selection[T](v: T, alias: Option[Id[T]], meta: Meta = Default)
+  final case class Selection[T](v: T, alias: Option[Id[T]], meta: Indirection = Default)
   final case class Table[T](name: String) extends SqlExpr[T]
 
   final case class NumericOp[T](op: String, left: T, right: T) extends SqlExpr[T]

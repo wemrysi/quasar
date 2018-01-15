@@ -35,7 +35,7 @@ import matryoshka.implicits._
 
 import scalaz._
 import Scalaz._
-import quasar.physical.rdbms.planner.sql.Metas._
+import quasar.physical.rdbms.planner.sql.Indirections._
 
 object PostgresRenderQuery extends RenderQuery {
   import SqlExpr._
@@ -60,7 +60,7 @@ object PostgresRenderQuery extends RenderQuery {
     }
 
     a.transCataT(aliasSelectionToJson).paraM(galg) ∘ (s => {
-      println(s)
+      println(s">>>>>>>>>>>>>>>>>>>>>> $s")
       s"select row_to_json(row) from ($s) as row"
     })
   }
@@ -111,7 +111,7 @@ object PostgresRenderQuery extends RenderQuery {
 
   private def postgresArray(jsonArrayRepr: String) = s"array_to_json(ARRAY$jsonArrayRepr)"
 
-  final case class Acc(s: String, m: Metas.Meta)
+  final case class Acc(s: String, m: Indirections.Indirection)
 
   def galg[T[_[_]]: BirecursiveT]: GAlgebraM[(T[SqlExpr], ?), PlannerError \/ ?, SqlExpr, String] = {
     case Unreferenced() =>

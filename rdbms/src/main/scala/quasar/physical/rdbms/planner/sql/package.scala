@@ -27,9 +27,9 @@ import scalaz.syntax.functor._
 package object sql {
 
   def genId[T, F[_]: Functor: NameGenerator]: F[Id[T]] = // TODO
-    NameGenerator[F].prefixedName("_") ∘ (Id(_, Metas.Default))
+    NameGenerator[F].prefixedName("_") ∘ (Id(_, Indirections.Default))
 
-  def genIdWithMeta[T, F[_]: Functor: NameGenerator](m: Metas.Meta): F[Id[T]] =
+  def genIdWithMeta[T, F[_]: Functor: NameGenerator](m: Indirections.Indirection): F[Id[T]] =
     NameGenerator[F].prefixedName("_") ∘ (Id(_, m))
 
   def unexpected[F[_]: PlannerErrorME, A](name: String): F[A] =
