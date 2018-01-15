@@ -283,9 +283,9 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
         (FToOut: OUT ~> F)
         (implicit QC: QScriptCore :<: OUT)
           : QScriptCore[IT[F]] => Option[QScriptCore[IT[F]]] = {
-        case LeftShift(src, struct, id, stpe, repair) =>
+        case LeftShift(src, struct, id, stpe, undef, repair) =>
           MapFuncCore.extractFilter(struct)(_.some) ∘ { case (f, m, _) =>
-            LeftShift(FToOut(QC.inj(Filter(src, f))).embed, m, id, stpe, repair)
+            LeftShift(FToOut(QC.inj(Filter(src, f))).embed, m, id, stpe, undef, repair)
           }
         case Map(src, mf) =>
           MapFuncCore.extractFilter(mf)(_.some) ∘ { case (f, m, _) =>
@@ -310,8 +310,8 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
           else s match {
             case Map(srcInner, mfInner) =>
               Map(srcInner, mf >> mfInner).some
-            case LeftShift(srcInner, struct, id, stpe, repair) =>
-              LeftShift(srcInner, struct, id, stpe, mf >> repair).some
+            case LeftShift(srcInner, struct, id, stpe, undef, repair) =>
+              LeftShift(srcInner, struct, id, stpe, undef, mf >> repair).some
             case Reduce(srcInner, bucket, funcs, repair) =>
               Reduce(srcInner, bucket, funcs, mf >> repair).some
             case Subset(innerSrc, lb, sel, rb) =>
@@ -347,9 +347,9 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
 */
             case _ => None
           })
-        case LeftShift(Embed(src), struct, id, stpe, shiftRepair) =>
+        case LeftShift(Embed(src), struct, id, stpe, undef, shiftRepair) =>
           FToOut.get(src) >>= QC.prj >>= {
-            case LeftShift(innerSrc, innerStruct, innerId, innerStpe, innerRepair)
+            case LeftShift(innerSrc, innerStruct, innerId, innerStpe, innerUndef, innerRepair)
                 if !shiftRepair.element(LeftSide) && !fmIsCondUndef(shiftRepair) && struct ≠ HoleF =>
               LeftShift(
                 FToOut.reverseGet(QC.inj(LeftShift(
@@ -357,15 +357,17 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
                   innerStruct,
                   innerId,
                   innerStpe,
+                  innerUndef,
                   struct >> innerRepair))).embed,
                 HoleF,
                 id,
                 stpe,
+                OnUndefined.omit,
                 shiftRepair).some
             // TODO: Should be able to apply this where there _is_ a `LeftSide`
             //       reference, but currently that breaks merging.
             case Map(innerSrc, mf) if !shiftRepair.element(LeftSide) =>
-              LeftShift(innerSrc, struct >> mf, id, stpe, shiftRepair).some
+              LeftShift(innerSrc, struct >> mf, id, stpe, OnUndefined.omit, shiftRepair).some
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftArray(elem)), redRepair)
                 if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0.right)) =>
               rightOnly(elem)(shiftRepair) ∘ (Map(srcInner, _))
@@ -380,16 +382,16 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
           }
         case Reduce(Embed(src), bucket, reducers, redRepair) =>
           FToOut.get(src) >>= QC.prj >>= {
-            case LeftShift(innerSrc, struct, id, stpe, shiftRepair)
+            case LeftShift(innerSrc, struct, id, stpe, _, shiftRepair)
                 if shiftRepair =/= RightSideF =>
               (bucket.traverse(b => rightOnly(HoleF)(nm.freeMF(b >> shiftRepair))) ⊛
                 reducers.traverse(_.traverse(mf => rightOnly(HoleF)(nm.freeMF(mf >> shiftRepair)))))((sb, sr) =>
                 Reduce(
-                  FToOut.reverseGet(QC.inj(LeftShift(innerSrc, struct, id, stpe, RightSideF))).embed,
+                  FToOut.reverseGet(QC.inj(LeftShift(innerSrc, struct, id, stpe, OnUndefined.omit, RightSideF))).embed,
                   sb,
                   sr,
                   redRepair))
-            case LeftShift(innerSrc, struct, id, stpe, shiftRepair) =>
+            case LeftShift(innerSrc, struct, id, stpe, _, shiftRepair) =>
               (bucket.traverse(b => rewrite.rewriteShift(id, nm.freeMF(b >> shiftRepair))).flatMap(sequenceBucket[IdStatus, JoinFunc]) ⊛
                 reducers.traverse(_.traverse(mf =>
                   rewrite.rewriteShift(id, nm.freeMF(mf >> shiftRepair)))).flatMap(_.traverse(sequenceReduce[IdStatus, JoinFunc]) >>= sequenceBucket[IdStatus, ReduceFunc[JoinFunc]])) {
@@ -401,7 +403,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
                   (bucket.traverse(rightOnly(HoleF)) ⊛
                     (reducers.traverse(_.traverse(rightOnly(HoleF)))))((sb, sr) =>
                     Reduce(
-                      FToOut.reverseGet(QC.inj(LeftShift(innerSrc, struct, newId, stpe, RightSideF))).embed,
+                      FToOut.reverseGet(QC.inj(LeftShift(innerSrc, struct, newId, stpe, OnUndefined.omit, RightSideF))).embed,
                       sb,
                       sr,
                       redRepair))
@@ -486,7 +488,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
               newRed,
               repair))
 
-        case LeftShift(Embed(src), struct, idStatus, shiftType, repair) =>
+        case LeftShift(Embed(src), struct, idStatus, shiftType, undef, repair) =>
           ((FToOut.get(src) >>= SR.prj) ⊛ eliminateRightSideProjUnary(struct) ⊛ eliminateRightSideProj(repair, LeftSide))(
             (sr, newStruct, newRepair) =>
             LeftShift(
@@ -494,6 +496,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
               newStruct,
               idStatus,
               shiftType,
+              undef,
               newRepair))
 
         case Subset(src, from, sel, count) =>
