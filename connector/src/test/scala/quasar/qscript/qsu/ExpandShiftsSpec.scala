@@ -56,7 +56,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       func.Hole,
       ExcludeId,
       func.RightTarget,
-      None,
+      false,
       Rotation.ShiftArray)
 
     val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
@@ -66,7 +66,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         (func.ProjectKeyS(func.Hole, "bar"), ExcludeId, Rotation.ShiftArray)
       ),
       func.Add(index(0), index(1)),
-      None
+      false
     ))
 
     multiShift must expandTo {
@@ -142,7 +142,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       func.Hole,
       ExcludeId,
       func.RightTarget,
-      None,
+      false,
       Rotation.ShiftArray)
 
     val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
@@ -153,7 +153,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         (func.ProjectKeyS(func.Hole, "baz"), ExcludeId, Rotation.ShiftArray)
       ),
       func.Subtract(func.Add(index(0), index(1)), index(2)),
-      None
+      false
     ))
 
     multiShift must expandTo {

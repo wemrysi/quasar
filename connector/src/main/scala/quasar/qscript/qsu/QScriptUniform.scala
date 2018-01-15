@@ -36,7 +36,6 @@ import pathy.Path
 import scalaz.{Applicative, Bitraverse, Cofree, Enum, Equal, Forall, Free, Functor, Id, Order, Scalaz, Show, Traverse, \/, \/-, NonEmptyList => NEL}
 import scalaz.std.anyVal._
 import scalaz.std.list._
-import scalaz.std.option._
 import scalaz.std.tuple._
 import scalaz.syntax.equal._
 import scalaz.syntax.show._
@@ -168,12 +167,10 @@ object QScriptUniform {
             s"Transpose(${source.shows}, ${retain.shows}, ${rotations.shows})"
 
           case LeftShift(source, struct, idStatus, repair, repairIfUndefined, rot) =>
-            val riu: Option[Free[MapFunc[T, ?], QAccess[T, Hole]]] = repairIfUndefined
-            s"LeftShift(${source.shows}, ${struct.shows}, ${idStatus.shows}, ${repair.shows}, ${riu.shows}, ${rot.shows})"
+            s"LeftShift(${source.shows}, ${struct.shows}, ${idStatus.shows}, ${repair.shows}, ${repairIfUndefined.shows}, ${rot.shows})"
 
           case MultiLeftShift(source, shifts, repair, repairIfUndefined) =>
-            val riu: Option[Free[MapFunc[T, ?], QAccess[T, Hole]]] = repairIfUndefined
-            s"MultiLeftShift(${source.shows}, ${shifts.shows}, ${repair.shows}, ${riu.shows})"
+            s"MultiLeftShift(${source.shows}, ${shifts.shows}, ${repair.shows}, ${repairIfUndefined.shows})"
 
           case LPReduce(source, reduce) =>
             s"LPReduce(${source.shows}, ${reduce.shows})"
@@ -417,7 +414,7 @@ object QScriptUniform {
       struct: FreeMap[T],
       idStatus: IdStatus,
       repair: FreeMapA[T, ShiftTarget[T]],
-      repairIfUndefined: Option[FreeAccess[T, Hole]],
+      repairIfUndefined: Boolean,
       rot: Rotation) extends QScriptUniform[T, A]
 
   // shifting multiple structs on the same source;
@@ -426,7 +423,7 @@ object QScriptUniform {
       source: A,
       shifts: List[(FreeMap[T], IdStatus, Rotation)],
       repair: FreeMapA[T, QAccess[T, Hole] \/ Int],
-      repairIfUndefined: Option[FreeAccess[T, Hole]]) extends QScriptUniform[T, A]
+      repairIfUndefined: Boolean) extends QScriptUniform[T, A]
 
   // LPish
   final case class LPReduce[T[_[_]], A](
@@ -505,13 +502,13 @@ object QScriptUniform {
         case JoinSideRef(s) => s
       } (JoinSideRef(_))
 
-    def leftShift[A]: Prism[QScriptUniform[A], (A, FreeMap, IdStatus, FreeMapA[ShiftTarget[T]], Option[FreeAccess[Hole]], Rotation)] =
-      Prism.partial[QScriptUniform[A], (A, FreeMap, IdStatus, FreeMapA[ShiftTarget[T]], Option[FreeAccess[Hole]], Rotation)] {
+    def leftShift[A]: Prism[QScriptUniform[A], (A, FreeMap, IdStatus, FreeMapA[ShiftTarget[T]], Boolean, Rotation)] =
+      Prism.partial[QScriptUniform[A], (A, FreeMap, IdStatus, FreeMapA[ShiftTarget[T]], Boolean, Rotation)] {
         case LeftShift(s, fm, ids, jf, riu, rot) => (s, fm, ids, jf, riu, rot)
       } { case (s, fm, ids, jf, riu, rot) => LeftShift(s, fm, ids, jf, riu, rot) }
 
-    def multiLeftShift[A]: Prism[QScriptUniform[A], (A, List[(FreeMap, IdStatus, Rotation)], FreeMapA[QAccess[Hole] \/ Int], Option[FreeAccess[Hole]])] =
-      Prism.partial[QScriptUniform[A], (A, List[(FreeMap, IdStatus, Rotation)], FreeMapA[QAccess[Hole] \/ Int], Option[FreeAccess[Hole]])] {
+    def multiLeftShift[A]: Prism[QScriptUniform[A], (A, List[(FreeMap, IdStatus, Rotation)], FreeMapA[QAccess[Hole] \/ Int], Boolean)] =
+      Prism.partial[QScriptUniform[A], (A, List[(FreeMap, IdStatus, Rotation)], FreeMapA[QAccess[Hole] \/ Int], Boolean)] {
         case MultiLeftShift(s, ss, map, riu) => (s, ss, map, riu)
       } { case (s, ss, map, riu) => MultiLeftShift(s, ss, map, riu) }
 
@@ -659,12 +656,12 @@ object QScriptUniform {
       composeLifting[G](O.joinSideRef[A])
     }
 
-    def leftShift: Prism[A, F[(A, FreeMap, IdStatus, FreeMapA[ShiftTarget[T]], Option[FreeAccess[Hole]], Rotation)]] = {
-      composeLifting[(?, FreeMap, IdStatus, FreeMapA[ShiftTarget[T]], Option[FreeAccess[Hole]], Rotation)](O.leftShift[A])
+    def leftShift: Prism[A, F[(A, FreeMap, IdStatus, FreeMapA[ShiftTarget[T]], Boolean, Rotation)]] = {
+      composeLifting[(?, FreeMap, IdStatus, FreeMapA[ShiftTarget[T]], Boolean, Rotation)](O.leftShift[A])
     }
 
-    def multiLeftShift: Prism[A, F[(A, List[(FreeMap, IdStatus, Rotation)], FreeMapA[QAccess[Hole] \/ Int], Option[FreeAccess[Hole]])]] = {
-      composeLifting[(?, List[(FreeMap, IdStatus, Rotation)], FreeMapA[QAccess[Hole] \/ Int], Option[FreeAccess[Hole]])](O.multiLeftShift[A])
+    def multiLeftShift: Prism[A, F[(A, List[(FreeMap, IdStatus, Rotation)], FreeMapA[QAccess[Hole] \/ Int], Boolean)]] = {
+      composeLifting[(?, List[(FreeMap, IdStatus, Rotation)], FreeMapA[QAccess[Hole] \/ Int], Boolean)](O.multiLeftShift[A])
     }
 
     def lpFilter: Prism[A, F[(A, A)]] = {

@@ -432,14 +432,14 @@ object QSUGraph extends QSUGraphInstances {
     }
 
     object LeftShift {
-      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], FreeMap[T], IdStatus, FreeMapA[T, QSU.ShiftTarget[T]], Option[FreeAccess[T, Hole]], QSU.Rotation)] = g.unfold match {
+      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], FreeMap[T], IdStatus, FreeMapA[T, QSU.ShiftTarget[T]], Boolean, QSU.Rotation)] = g.unfold match {
         case g: QSU.LeftShift[T, QSUGraph[T]] => QSU.LeftShift.unapply(g)
         case _ => None
       }
     }
 
     object MultiLeftShift {
-      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], List[(FreeMap[T], IdStatus, QSU.Rotation)], FreeMapA[T, QAccess[T, Hole] \/ Int], Option[FreeAccess[T, Hole]])] = g.unfold match {
+      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], List[(FreeMap[T], IdStatus, QSU.Rotation)], FreeMapA[T, QAccess[T, Hole] \/ Int], Boolean)] = g.unfold match {
         case g: QSU.MultiLeftShift[T, QSUGraph[T]] => QSU.MultiLeftShift.unapply(g)
         case _ => None
       }

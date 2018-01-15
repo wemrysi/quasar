@@ -61,7 +61,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
       case g @ Extractors.Transpose(src, retain, rot) =>
         computeProvenance[X](g) as g.overwriteAtRoot {
-          LeftShift(src.root, HoleF, retain.fold[IdStatus](IdOnly, ExcludeId), func.RightTarget, None, rot)
+          LeftShift(src.root, HoleF, retain.fold[IdStatus](IdOnly, ExcludeId), func.RightTarget, false, rot)
         }
 
       case other =>
