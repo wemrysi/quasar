@@ -365,7 +365,7 @@ trait PlannerHelpers extends
 
   import PlannerHelpers._
 
-  val mode: Mode = WriteMode
+  val mode: Mode = TestMode
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf, addDetails = false))
   def beWorkflow0(wf: Workflow) = beRight(equalToWorkflow(wf, addDetails = true))
