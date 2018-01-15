@@ -266,7 +266,7 @@ object PostgresRenderQuery extends RenderQuery {
       s"'$text'".right
     case Constant(v) =>
       DataCodec.render(v).map{ rendered => v match {
-        case _: Data.Arr => postgresArray(rendered)
+        case _: Data.Arr => postgresArray(rendered) // TODO fix [ "xxx", "yyy" ] to [ 'xxx', 'yyy' ]
         case _ => rendered
       }} \/> NonRepresentableData(v)
     case Case(wt, e) =>
