@@ -80,16 +80,11 @@ object PostgresRenderQuery extends RenderQuery {
     val replacement = "->>"
     expr.project match {
       case Refs(elems, _) =>
-        elems.lastOption.map(_.project) match {
-          case Some(Constant(Data.Int(_)))  =>
-            s"($str)::text"
-          case _ =>
-            val pos = str.lastIndexOf(toReplace)
-            if (pos > -1 && !str.contains(replacement))
-              s"${str.substring(0, pos)}$replacement${str.substring(pos + toReplace.length, str.length)}"
-            else
-              str
-        }
+        val pos = str.lastIndexOf(toReplace)
+        if (pos > -1 && !str.contains(replacement))
+          s"${str.substring(0, pos)}$replacement${str.substring(pos + toReplace.length, str.length)}"
+        else
+          str
       case _ =>
         str
     }
@@ -117,7 +112,7 @@ object PostgresRenderQuery extends RenderQuery {
 
   object TextExpr {
     def unapply[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): Option[String] =
-      s"${text(pair)}".some
+      s"(${text(pair)})::text".some
   }
 
   object NumExpr {
@@ -277,7 +272,7 @@ object PostgresRenderQuery extends RenderQuery {
     case Case(wt, e) =>
       val wts = wt ∘ { case WhenThen(TextExpr(w), TextExpr(t)) => s"when ($w)::boolean then $t" }
       s"(case ${wts.intercalate(" ")} else ${text(e.v)} end)".right
-    case Coercion(t, TextExpr(e)) => s"($e)::${t.mapToStringName}".right
+    case Coercion(t, (_, e)) => s"($e)::${t.mapToStringName}".right
     case ToArray(TextExpr(v)) => postgresArray(s"[$v]").right
     case UnaryFunction(fType, TextExpr(e)) =>
       val fName = fType match {
