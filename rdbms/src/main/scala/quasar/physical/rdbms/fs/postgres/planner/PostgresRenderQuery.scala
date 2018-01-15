@@ -79,34 +79,55 @@ object PostgresRenderQuery extends RenderQuery {
     val toReplace = "->"
     val replacement = "->>"
     expr.project match {
-      case Refs(_, _) =>
-        val pos = str.lastIndexOf(toReplace)
-        if (pos > -1 && !str.contains(replacement))
-          s"${str.substring(0, pos)}$replacement${str.substring(pos + toReplace.length, str.length)}"
-        else
-          s"($str)::text"
+      case Refs(elems, _) =>
+        elems.lastOption.map(_.project) match {
+          case Some(Constant(Data.Int(_)))  =>
+            s"($str)::text"
+          case _ =>
+            val pos = str.lastIndexOf(toReplace)
+            if (pos > -1 && !str.contains(replacement))
+              s"${str.substring(0, pos)}$replacement${str.substring(pos + toReplace.length, str.length)}"
+            else
+              str
+        }
       case _ =>
         str
     }
   }
 
-  def num[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): String = s"(${text(pair)})::numeric"
+  def num[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): String = {
+    val (expr, str) = pair
+    expr.project match {
+      case Constant(Data.Int(_)) =>
+        str
+      case _ =>
+        s"(${text(pair)})::numeric"
+    }
+  }
 
-  def bool[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): String = s"(${text(pair)})::boolean"
+  def bool[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): String = {
+      val (expr, str) = pair
+      expr.project match {
+        case Constant(Data.Bool(_)) =>
+          str
+        case _ =>
+          s"(${text(pair)})::boolean"
+      }
+    }
 
   object TextExpr {
     def unapply[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): Option[String] =
-      text(pair).some
+      s"${text(pair)}".some
   }
 
   object NumExpr {
     def unapply[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): Option[String] =
-      TextExpr.unapply(pair).map(t => s"($t)::numeric")
+      num(pair).some
   }
 
   object BoolExpr {
     def unapply[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): Option[String] =
-      TextExpr.unapply(pair).map(t => s"($t)::boolean")
+      bool(pair).some
   }
 
   private def postgresArray(jsonArrayRepr: String) = s"array_to_json(ARRAY$jsonArrayRepr)"
@@ -265,10 +286,10 @@ object PostgresRenderQuery extends RenderQuery {
         case ToJson => "row_to_json"
       }
       s"$fName($e)".right
-    case BinaryFunction(fType, TextExpr(a1), TextExpr(a2)) => (fType match {
-        case StrSplit => s"regexp_split_to_array($a1, $a2)"
+    case BinaryFunction(fType, (_, a1), (a2Src, a2)) => (fType match {
+        case StrSplit => s"regexp_split_to_array($a1, ${text((a2Src, a2))})"
         case ArrayConcat => s"(to_jsonb($a1) || to_jsonb($a2))"
-        case Contains => s"($a1::text IN (SELECT jsonb_array_elements_text(to_jsonb($a2))))"
+        case Contains => s"($a1 IN (SELECT jsonb_array_elements_text(to_jsonb($a2))))"
       }).right
     case TernaryFunction(fType, a1, a2, a3) => (fType match {
       case Search => s"(case when ${bool(a3)} then ${text(a1)} ~* ${text(a2)} else ${text(a1)} ~ ${text(a2)} end)"
