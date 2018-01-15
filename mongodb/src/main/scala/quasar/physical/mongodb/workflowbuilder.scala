@@ -480,82 +480,85 @@ object WorkflowBuilder {
             Field(BsonField.Name("0"))))
   }
 
+  // TODO: Organize this to put all the $maps and all the $unwinds adjacent.
   def flattenField[WF[_]: Coalesce]
     (base: Base, rest: Option[List[BsonField.Name]])
     (implicit ev0: WorkflowOpCoreF :<: WF)
-      : (StructureType[DocVar], Fix[WF]) => Fix[WF] = {
-    // TODO: Organize this to put all the $maps and all the $unwinds adjacent.
-    case (StructureType.Array(field, quasar.qscript.ExcludeId), acc) =>
-      $unwind[WF](base.toDocVar \\ field, None, None).apply(acc)
-    case (StructureType.Array(field, includeIndex), acc) =>
-      $simpleMap[WF](
-        includeIndex match {
-          case quasar.qscript.ExcludeId =>
-            NonEmptyList(FlatExpr((base.toDocVar \\ field).toJs))
-          case quasar.qscript.IncludeId =>
-            NonEmptyList(
-              SubExpr(
-                (base.toDocVar \\ field).toJs,
-                JsFn(jsBase,
-                  jscore.Let(
-                    jscore.Name("m"),
-                    (base.toDocVar \\ field).toJs(jscore.Ident(jsBase)),
-                    jscore.Call(
-                      jscore.Select(
+      : (StructureType[DocVar], Fix[WF]) => Fix[WF] =
+    (field, acc) => {
+      (field, rest) match {
+        case (StructureType.Array(field, quasar.qscript.ExcludeId), _) =>
+          $unwind[WF](base.toDocVar \\ field, None, None).apply(acc)
+        case (StructureType.Array(field, includeIndex), _) =>
+          $simpleMap[WF](
+            includeIndex match {
+              case quasar.qscript.ExcludeId =>
+                NonEmptyList(FlatExpr((base.toDocVar \\ field).toJs))
+              case quasar.qscript.IncludeId =>
+                NonEmptyList(
+                  SubExpr(
+                    (base.toDocVar \\ field).toJs,
+                    JsFn(jsBase,
+                      jscore.Let(
+                        jscore.Name("m"),
+                        (base.toDocVar \\ field).toJs(jscore.Ident(jsBase)),
                         jscore.Call(
-                          jscore.Select(jscore.ident("Object"), "keys"),
-                          List(jscore.ident("m"))),
-                        "map"),
-                      List(jscore.Fun(List(jscore.Name("k")), jscore.Arr(List(
-                        jscore.ident("k"),
-                        jscore.Access(jscore.ident("m"), jscore.ident("k")))))))))),
-              FlatExpr((base.toDocVar \\ field).toJs))
-          case quasar.qscript.IdOnly =>
-            NonEmptyList(
-              SubExpr(
-                (base.toDocVar \\ field).toJs,
-                JsFn(jsBase,
-                  jscore.Call(
-                    jscore.Select(jscore.ident("Object"), "keys"),
-                    List((base.toDocVar \\ field).toJs(jscore.Ident(jsBase)))))),
-              FlatExpr((base.toDocVar \\ field).toJs))
-        },
-        ListMap()).apply(acc)
-    case (StructureType.Object(field, includeKey), acc) =>
-      $simpleMap[WF](
-        includeKey match {
-          case quasar.qscript.ExcludeId =>
-            NonEmptyList(FlatExpr((base.toDocVar \\ field).toJs))
-          case quasar.qscript.IncludeId =>
-            NonEmptyList(
-              SubExpr(
-                (base.toDocVar \\ field).toJs,
-                JsFn(jsBase,
-                  jscore.Let(
-                    jscore.Name("m"),
-                    (base.toDocVar \\ field).toJs(jscore.Ident(jsBase)),
-                    jscore.Call(
-                      jscore.Select(
+                          jscore.Select(
+                            jscore.Call(
+                              jscore.Select(jscore.ident("Object"), "keys"),
+                              List(jscore.ident("m"))),
+                            "map"),
+                          List(jscore.Fun(List(jscore.Name("k")), jscore.Arr(List(
+                            jscore.ident("k"),
+                            jscore.Access(jscore.ident("m"), jscore.ident("k")))))))))),
+                  FlatExpr((base.toDocVar \\ field).toJs))
+              case quasar.qscript.IdOnly =>
+                NonEmptyList(
+                  SubExpr(
+                    (base.toDocVar \\ field).toJs,
+                    JsFn(jsBase,
+                      jscore.Call(
+                        jscore.Select(jscore.ident("Object"), "keys"),
+                        List((base.toDocVar \\ field).toJs(jscore.Ident(jsBase)))))),
+                  FlatExpr((base.toDocVar \\ field).toJs))
+            },
+            ListMap()).apply(acc)
+        case (StructureType.Object(field, includeKey), _) =>
+          $simpleMap[WF](
+            includeKey match {
+              case quasar.qscript.ExcludeId =>
+                NonEmptyList(FlatExpr((base.toDocVar \\ field).toJs))
+              case quasar.qscript.IncludeId =>
+                NonEmptyList(
+                  SubExpr(
+                    (base.toDocVar \\ field).toJs,
+                    JsFn(jsBase,
+                      jscore.Let(
+                        jscore.Name("m"),
+                        (base.toDocVar \\ field).toJs(jscore.Ident(jsBase)),
                         jscore.Call(
-                          jscore.Select(jscore.ident("Object"), "keys"),
-                          List(jscore.ident("m"))),
-                        "map"),
-                      List(jscore.Fun(List(jscore.Name("k")), jscore.Arr(List(
-                        jscore.ident("k"),
-                        jscore.Access(jscore.ident("m"), jscore.ident("k")))))))))),
-              FlatExpr((base.toDocVar \\ field).toJs))
-          case quasar.qscript.IdOnly =>
-            NonEmptyList(
-              SubExpr(
-                (base.toDocVar \\ field).toJs,
-                JsFn(jsBase,
-                  jscore.Call(
-                    jscore.Select(jscore.ident("Object"), "keys"),
-                    List((base.toDocVar \\ field).toJs(jscore.Ident(jsBase)))))),
-              FlatExpr((base.toDocVar \\ field).toJs))
-        },
-        ListMap()).apply(acc)
-  }
+                          jscore.Select(
+                            jscore.Call(
+                              jscore.Select(jscore.ident("Object"), "keys"),
+                              List(jscore.ident("m"))),
+                            "map"),
+                          List(jscore.Fun(List(jscore.Name("k")), jscore.Arr(List(
+                            jscore.ident("k"),
+                            jscore.Access(jscore.ident("m"), jscore.ident("k")))))))))),
+                  FlatExpr((base.toDocVar \\ field).toJs))
+              case quasar.qscript.IdOnly =>
+                NonEmptyList(
+                  SubExpr(
+                    (base.toDocVar \\ field).toJs,
+                    JsFn(jsBase,
+                      jscore.Call(
+                        jscore.Select(jscore.ident("Object"), "keys"),
+                        List((base.toDocVar \\ field).toJs(jscore.Ident(jsBase)))))),
+                  FlatExpr((base.toDocVar \\ field).toJs))
+            },
+            ListMap()).apply(acc)
+      }
+    }
 
   def generateWorkflow[M[_]: Monad, F[_]: Coalesce](wb: WorkflowBuilder[F])
     (implicit M: MonadError_[M, PlannerError], ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
