@@ -78,19 +78,19 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               shiftedReadStruct,
               ExcludeId,
               shiftedReadRepair,
-              _,
+              false,
               Rotation.ShiftArray
             ),
             projectFoo,
             ExcludeId,
             innerRepair,
-            _,
+            true,
             Rotation.ShiftArray
           ),
           projectBar,
           ExcludeId,
           outerRepair,
-          _,
+          false,
           Rotation.ShiftArray
         ),
         fm
@@ -136,6 +136,58 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
     ok
   }
 
+
+
+  "convert singly nested LeftShift/ThetaJoin with onUndefined = true" in {
+    val dataset = qsu.leftShift(
+      qsu.read(rootDir </> file("dataset")),
+      func.Hole,
+      ExcludeId,
+      func.RightTarget,
+      false,
+      Rotation.ShiftArray)
+
+    val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
+      dataset,
+      List(
+        (func.ProjectKeyS(func.Hole, "foo"), ExcludeId, Rotation.ShiftArray),
+        (func.ProjectKeyS(func.Hole, "bar"), ExcludeId, Rotation.ShiftArray)
+      ),
+      func.Add(index(0), index(1)),
+      true
+    ))
+
+    multiShift must expandTo {
+      case qg@Map(
+        LeftShift(
+          LeftShift(
+            LeftShift(
+              Read(afile),
+              shiftedReadStruct,
+              ExcludeId,
+              shiftedReadRepair,
+              false,
+              Rotation.ShiftArray
+            ),
+            projectFoo,
+            ExcludeId,
+            innerRepair,
+            true,
+            Rotation.ShiftArray
+          ),
+          projectBar,
+          ExcludeId,
+          outerRepair,
+          true,
+          Rotation.ShiftArray
+        ),
+        fm
+      ) => ok
+    }
+
+    ok
+  }
+
   "convert doubly nested LeftShift/ThetaJoin" in {
     val dataset = qsu.leftShift(
       qsu.read(rootDir </> file("dataset")),
@@ -166,25 +218,25 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
                 shiftedReadStruct,
                 ExcludeId,
                 shiftedReadRepair,
-                _,
+                false,
                 Rotation.ShiftArray
               ),
               projectFoo,
               ExcludeId,
               innermostRepair,
-              _,
+              true,
               Rotation.ShiftArray
             ),
             projectBar,
             ExcludeId,
             innerRepair,
-            _,
+            true,
             Rotation.ShiftArray
           ),
           projectBaz,
           ExcludeId,
           outerRepair,
-          _,
+          false,
           Rotation.ShiftArray
         ),
         fm
