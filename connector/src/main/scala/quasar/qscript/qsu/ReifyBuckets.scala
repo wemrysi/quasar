@@ -27,7 +27,7 @@ import quasar.qscript.{construction, Hole, HoleF, ReduceFunc, ReduceIndexF, SrcH
 import ApplyProvenance.AuthenticatedQSU
 
 import matryoshka._
-import scalaz.{Functor, ISet, Monad, Scalaz, StateT}, Scalaz._
+import scalaz.{ISet, Monad, Scalaz, StateT}, Scalaz._
 
 final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extends QSUTTypes[T] {
   import QSUGraph.Extractors._
@@ -39,7 +39,7 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
   def apply[F[_]: Monad: NameGenerator: PlannerErrorME](aqsu: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] = {
 
-    type G[A] = StateT[F, QAuth, A]
+    type G[A] = StateT[StateT[F, RevIdx, ?], QAuth, A]
 
     val bucketsReified = aqsu.graph.rewriteM[G] {
       case g @ LPReduce(source, reduce) =>
@@ -67,23 +67,20 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
                   })
 
                 for {
-                  joinRoot <- freshSymbol[G]("reifybuckets")
-
-                  autojoined = qsu.autojoin2(source.refocus(sym), source, combine)
-                  autojoinedG = QSUGraph.refold(joinRoot, autojoined)
+                  autojoined <- QSUGraph.withName[T, G]("reifybuckets")(
+                    qsu.autojoin2(sym, source.root, combine))
 
                   qauth0 <- MonadState_[G, QAuth].get
-                  qauth1 <- ApplyProvenance.computeProvenance[T, G](autojoinedG)
+                  qauth1 <- ApplyProvenance.computeProvenance[T, G](autojoined)
                                .exec(qauth0).liftM[StateT[?[_], QAuth, ?]]
 
                   reduceExpr = func.ProjectKeyS(func.Hole, ReduceExprKey)
-                  newReduce = mkReduce(autojoinedG, buckets, reduce as reduceExpr)
-                  newGraph = QSUGraph.refold(g.root, newReduce)
+                  reduced = g.overwriteAtRoot(mkReduce(autojoined.root, buckets, reduce as reduceExpr))
 
-                  qauth2 <- ApplyProvenance.computeProvenance[T, G](newGraph)
+                  qauth2 <- ApplyProvenance.computeProvenance[T, G](reduced)
                                .exec(qauth1).liftM[StateT[?[_], QAuth, ?]]
                   _ <- MonadState_[G, QAuth].put(qauth2)
-                } yield newGraph
+                } yield reduced :++ autojoined
               }
 
             case None =>
@@ -100,7 +97,7 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
         }
     }
 
-    bucketsReified.run(aqsu.auth) map {
+    bucketsReified.run(aqsu.auth).eval(aqsu.graph.generateRevIndex) map {
       case (auth, graph) => ApplyProvenance.AuthenticatedQSU(graph, auth)
     }
   }
@@ -129,9 +126,6 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
           (ISet.empty[Symbol], HoleF[T] as Access.id[prov.D, Hole](other, SrcHole)).point[F]
       }
     } yield res.unfzip leftMap (_.foldMap(ι))
-
-  private def freshName[F[_]: Functor: NameGenerator]: F[Symbol] =
-    freshSymbol("reifybuckets")
 
   private def mkReduce[A](
       src: A,
