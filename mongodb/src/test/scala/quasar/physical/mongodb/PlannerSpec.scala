@@ -248,6 +248,11 @@ class PlannerSpec extends
       plan(sqlE"select substring(parents[*].sha, 0, 1), count(*) from slamengine_commits group by substring(parents[*].sha, 0, 1)"),
       IList(ReadOp, ProjectOp, UnwindOp, GroupOp, ProjectOp))
 
+    trackPending(
+      "sum flattened int arrays",
+      plan(sqlE"select b[*] + c[*] from intArrays"),
+      IList(ReadOp, ProjectOp, UnwindOp, ProjectOp, ProjectOp, UnwindOp, MatchOp, ProjectOp))
+
     "unify flattened fields with unflattened field" in {
       plan(sqlE"select `_id` as zip, loc[*] from zips order by loc[*]") must
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, UnwindOp, ProjectOp, SortOp)))

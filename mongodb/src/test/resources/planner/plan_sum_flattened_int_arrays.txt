@@ -1,0 +1,103 @@
+Chain
+├─ $ReadF(db; intArrays)
+├─ $ProjectF
+│  ├─ Name("s" -> "$$ROOT")
+│  ├─ Name("f" -> {
+│  │       "$cond": [
+│  │         {
+│  │           "$and": [
+│  │             { "$lte": [{ "$literal": [] }, "$b"] },
+│  │             { "$lt": ["$b", { "$literal": BinData(0, "") }] }]
+│  │         },
+│  │         "$b",
+│  │         [{ "$literal": undefined }]]
+│  │     })
+│  ╰─ ExcludeId
+├─ $UnwindF
+│  ├─ Path(DocField(BsonField.Name("f")))
+│  ╰─ IncludeArrayIndex(BsonField.Name("ix"))
+├─ $ProjectF
+│  ├─ Name("identities" -> {
+│  │       "qsu20": { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }
+│  │     })
+│  ├─ Name("value" -> {
+│  │       "original": "$s",
+│  │       "0": { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("1") }] }
+│  │     })
+│  ╰─ ExcludeId
+├─ $ProjectF
+│  ├─ Name("s" -> "$$ROOT")
+│  ├─ Name("f" -> {
+│  │       "$cond": [
+│  │         {
+│  │           "$and": [
+│  │             {
+│  │               "$lte": [
+│  │                 { "$literal": [] },
+│  │                 {
+│  │                   "$cond": [
+│  │                     {
+│  │                       "$and": [
+│  │                         { "$lte": [{ "$literal": {  } }, "$value.original"] },
+│  │                         { "$lt": ["$value.original", { "$literal": [] }] }]
+│  │                     },
+│  │                     "$value.original.c",
+│  │                     { "$literal": undefined }]
+│  │                 }]
+│  │             },
+│  │             {
+│  │               "$lt": [
+│  │                 {
+│  │                   "$cond": [
+│  │                     {
+│  │                       "$and": [
+│  │                         { "$lte": [{ "$literal": {  } }, "$value.original"] },
+│  │                         { "$lt": ["$value.original", { "$literal": [] }] }]
+│  │                     },
+│  │                     "$value.original.c",
+│  │                     { "$literal": undefined }]
+│  │                 },
+│  │                 { "$literal": BinData(0, "") }]
+│  │             }]
+│  │         },
+│  │         {
+│  │           "$cond": [
+│  │             {
+│  │               "$and": [
+│  │                 { "$lte": [{ "$literal": {  } }, "$value.original"] },
+│  │                 { "$lt": ["$value.original", { "$literal": [] }] }]
+│  │             },
+│  │             "$value.original.c",
+│  │             { "$literal": undefined }]
+│  │         },
+│  │         [{ "$literal": undefined }]]
+│  │     })
+│  ╰─ ExcludeId
+├─ $UnwindF
+│  ├─ Path(DocField(BsonField.Name("f")))
+│  ╰─ IncludeArrayIndex(BsonField.Name("ix"))
+╰─ $ProjectF
+   ├─ Name("__quasar_mongodb_sigil" -> {
+   │       "$add": [
+   │         {
+   │           "$cond": [
+   │             {
+   │               "$eq": [
+   │                 "$s.identities.qsu20",
+   │                 { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
+   │             },
+   │             "$s.value.0",
+   │             { "$literal": undefined }]
+   │         },
+   │         {
+   │           "$cond": [
+   │             {
+   │               "$eq": [
+   │                 "$s.identities.qsu20",
+   │                 { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
+   │             },
+   │             { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("1") }] },
+   │             { "$literal": undefined }]
+   │         }]
+   │     })
+   ╰─ ExcludeId

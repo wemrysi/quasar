@@ -147,23 +147,16 @@ Chain
 │     │  │         [{ "$literal": undefined }]]
 │     │  │     })
 │     │  ╰─ ExcludeId
-│     ├─ $SimpleMapF
-│     │  ├─ SubMap
-│     │  │  ├─ JsCore(_.f)
-│     │  │  ╰─ Let(m)
-│     │  │     ├─ JsCore(_.f)
-│     │  │     ╰─ Call
-│     │  │        ├─ JsCore(Object.keys(m).map)
-│     │  │        ╰─ Fun(Name(k))
-│     │  │           ╰─ JsCore([k, m[k]])
-│     │  ├─ Flatten
-│     │  │  ╰─ JsCore(_.f)
-│     │  ╰─ Scope(ListMap())
+│     ├─ $UnwindF
+│     │  ├─ Path(DocField(BsonField.Name("f")))
+│     │  ╰─ IncludeArrayIndex(BsonField.Name("ix"))
 │     ├─ $ProjectF
-│     │  ├─ Name("identities" -> { "qsu56": { "$arrayElemAt": ["$f", { "$literal": NumberInt("0") }] } })
+│     │  ├─ Name("identities" -> {
+│     │  │       "qsu56": { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }
+│     │  │     })
 │     │  ├─ Name("value" -> {
 │     │  │       "original": "$s",
-│     │  │       "0": { "$arrayElemAt": ["$f", { "$literal": NumberInt("1") }] }
+│     │  │       "0": { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("1") }] }
 │     │  │     })
 │     │  ╰─ ExcludeId
 │     ├─ $ProjectF
@@ -214,27 +207,20 @@ Chain
 │     │  │         [{ "$literal": undefined }]]
 │     │  │     })
 │     │  ╰─ ExcludeId
+│     ├─ $UnwindF
+│     │  ├─ Path(DocField(BsonField.Name("f")))
+│     │  ╰─ IncludeArrayIndex(BsonField.Name("ix"))
+│     ├─ $ProjectF
+│     │  ├─ Name("s" -> "$s")
+│     │  ├─ Name("f" -> ["$ix", "$f"])
+│     │  ╰─ ExcludeId
 │     ├─ $SimpleMapF
-│     │  ├─ SubMap
-│     │  │  ├─ JsCore(_.f)
-│     │  │  ╰─ Let(m)
-│     │  │     ├─ JsCore(_.f)
-│     │  │     ╰─ Call
-│     │  │        ├─ JsCore(Object.keys(m).map)
-│     │  │        ╰─ Fun(Name(k))
-│     │  │           ╰─ JsCore([k, m[k]])
-│     │  ├─ Flatten
-│     │  │  ╰─ JsCore(_.f)
 │     │  ├─ Map
 │     │  │  ╰─ Obj
-│     │  │     ├─ Key(identities: _.s.identities)
 │     │  │     ╰─ Key(value)
 │     │  │        ╰─ Obj
 │     │  │           ├─ Key(grouped)
 │     │  │           │  ╰─ Obj
-│     │  │           │     ├─ Key(group_source: (isObject(
-│     │  │           │     │      ((_.s.identities.qsu56 === _.f[0]) ? _.s.value.original : undefined)["0"]) && (! Array.isArray(
-│     │  │           │     │      ((_.s.identities.qsu56 === _.f[0]) ? _.s.value.original : undefined)["0"]))) ? ((_.s.identities.qsu56 === _.f[0]) ? _.s.value.original : undefined)["0"] : undefined)
 │     │  │           │     ╰─ Key(group_key: isString(
 │     │  │           │            ((_.s.identities.qsu56 === _.f[0]) ? _.s.value["0"] : undefined).sha) ? (0 < 0) ? "" : (1 < 0) ? ((_.s.identities.qsu56 === _.f[0]) ? _.s.value["0"] : undefined).sha.substr(
 │     │  │           │            0,

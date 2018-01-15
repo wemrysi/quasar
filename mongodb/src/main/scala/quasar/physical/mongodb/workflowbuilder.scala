@@ -489,6 +489,20 @@ object WorkflowBuilder {
       (field, rest) match {
         case (StructureType.Array(field, quasar.qscript.ExcludeId), _) =>
           $unwind[WF](base.toDocVar \\ field, None, None).apply(acc)
+        case (StructureType.Array(field, quasar.qscript.IncludeId), Some(r)) =>
+          val rst = ListMap(r.map(f => f -> \/-($var(DocVar.ROOT(f)))) : _*)
+          chain(acc,
+            $unwind[WF](base.toDocVar \\ field, Some(BsonField.Name("ix")), None),
+            $project[WF](Reshape(rst ++
+              // TODO: mongo >= 3.4 has $addFields - should be able to plan without `rest` being known
+              // { $unwind: {path: "$f", includeArrayIndex: "ix"} } ,
+              // { $addFields: { "f": ["$ix", "$f"] } },
+              // { $project: { "ix": false } },
+              (base.toDocVar \\ field).deref.map(f => ListMap(f.flatten.head ->
+                \/-($arrayLit(List(
+                  $var(base.toDocVar \ BsonField.Name("ix")),
+                  $var(base.toDocVar \\ field)))))).getOrElse(ListMap())),
+              ExcludeId))
         case (StructureType.Array(field, includeIndex), _) =>
           flattenFieldMapReduce(base, field, includeIndex).apply(acc)
         case (StructureType.Object(field, includeKey), _) =>
