@@ -114,8 +114,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         outerRepair must beTreeEqual(
           func.Cond(
             func.Eq(
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu0), _)),
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu1), _))),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('expandshifts0), _)),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('expandshifts1), _))),
             func.StaticMapS(
                 "original" ->
                   func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),
@@ -207,8 +207,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         innerRepair must beTreeEqual(
           func.Cond(
             func.Eq(
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu0), _)),
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu1), _))),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('expandshifts0), _)),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('expandshifts1), _))),
             func.StaticMapS(
               "original" ->
                 func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),
@@ -219,8 +219,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         outerRepair must beTreeEqual(
           func.Cond(
             func.Eq(
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu1), _)),
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu2), _))),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('expandshifts1), _)),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('expandshifts2), _))),
             func.StaticMapS(
               "original" ->
                 func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),

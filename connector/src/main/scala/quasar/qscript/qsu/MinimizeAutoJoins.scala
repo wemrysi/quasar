@@ -96,7 +96,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
   // the Ints are indices into branches
   private def coalesceToMap[
-      G[_]: Monad: NameGenerator: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]: PlannerErrorME](
+      G[_]: Monad: NameGenerator: RevIdxM: MinStateM[T, ?[_]]: PlannerErrorME](
       qgraph: QSUGraph,
       branches: List[QSUGraph],
       combiner: FreeMapA[Int]): G[Option[QSUGraph]] = {
@@ -158,7 +158,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
   // the Int indexes into the final number of distinct roots
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   private def coalesceRoots[
-      G[_]: Monad: NameGenerator: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]: PlannerErrorME](
+      G[_]: Monad: NameGenerator: RevIdxM: MinStateM[T, ?[_]]: PlannerErrorME](
       qgraph: QSUGraph,
       fm: => FreeMapA[Int],
       candidates: List[QSUGraph]): G[Option[QSUGraph]] = candidates match {
@@ -299,15 +299,10 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 }
 
 object MinimizeAutoJoins {
-  import QSUGraph.RevIdx
-
   final case class MinimizationState[T[_[_]]](auth: QAuth[T], failed: Set[Symbol])
 
   type MinStateM[T[_[_]], F[_]] = MonadState_[F, MinimizationState[T]]
   def MinStateM[T[_[_]], F[_]](implicit ev: MinStateM[T, F]): MinStateM[T, F] = ev
-
-  type RevIdxM[T[_[_]], F[_]] = MonadState_[F, RevIdx[T]]
-  def RevIdxM[T[_[_]], F[_]](implicit ev: RevIdxM[T, F]): RevIdxM[T, F] = ev
 
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
@@ -322,7 +317,7 @@ object MinimizeAutoJoins {
       pat: QScriptUniform[T, Symbol]): G[QSUGraph[T]] = {
 
     for {
-      qgraph <- QSUGraph.withName[T, G](pat)
+      qgraph <- QSUGraph.withName[T, G]("expandajs")(pat)
       _ <- updateProvenance[T, G](qgraph)
     } yield qgraph
   }
