@@ -200,11 +200,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
                       case (c, r) => (c, r)
                     }
 
-                    upperMapFragments = (0 until exCandidates.length) map { i =>
-                      func.MakeMapS(i.toString, i.point[FreeMapA])
-                    }
-
-                    upperFM = upperMapFragments.reduceLeft(func.ConcatMaps(_, _))
+                    upperFM = func.StaticMapFS((0 until exCandidates.length): _*)(_.point[FreeMapA], _.toString)
 
                     upperFMReduced = upperFM.map(κ(srcHole))
 

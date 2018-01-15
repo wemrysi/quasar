@@ -111,11 +111,9 @@ object MapFuncCore {
   }
 
   object StaticMap {
-    def apply[T[_[_]]: CorecursiveT, A](elems: List[(T[EJson], FreeMapA[T, A])]): FreeMapA[T, A] =
-      elems.map(e => Free.roll(MFC(MakeMap[T, FreeMapA[T, A]](Free.roll(MFC(Constant(e._1))), e._2)))) match {
-        case Nil    => Free.roll(MFC(EmptyMap[T, FreeMapA[T, A]]))
-        case h :: t => t.foldLeft(h)((a, e) => Free.roll(MFC(ConcatMaps(a, e))))
-      }
+    def apply[T[_[_]]: BirecursiveT, A](elems: List[(T[EJson], FreeMapA[T, A])]): FreeMapA[T, A] = {
+      construction.Func[T].StaticMap(elems: _*)
+    }
 
     def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A]):
         Option[List[(T[EJson], FreeMapA[T, A])]] =
