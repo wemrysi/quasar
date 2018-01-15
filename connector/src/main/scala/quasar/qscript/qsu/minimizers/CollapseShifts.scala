@@ -30,6 +30,7 @@ import quasar.qscript.{
   IdStatus,
   JoinSide,
   LeftSide,
+  OnUndefined,
   RightSide,
   SrcHole
 }
@@ -81,7 +82,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         val rest = reversed.tail
 
         val initM = reversed.head match {
-          case -\/(QSU.LeftShift(_, struct, idStatus, repair, onUndefined, rot)) =>
+          case -\/(QSU.LeftShift(_, struct, idStatus, onUndefined, repair, rot)) =>
             val struct2 = struct >> fm
 
             val repair2 = repair flatMap {
@@ -91,11 +92,11 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               case QSU.RightTarget() => func.RightTarget
             }
 
-            updateGraph[T, G](QSU.LeftShift(src.root, struct2, idStatus, repair2, onUndefined, rot)) map { rewritten =>
+            updateGraph[T, G](QSU.LeftShift(src.root, struct2, idStatus, onUndefined, repair2, rot)) map { rewritten =>
               rewritten :++ src
             }
 
-          case \/-(QSU.MultiLeftShift(_, shifts, repair, onUndefined)) =>
+          case \/-(QSU.MultiLeftShift(_, shifts, onUndefined, repair)) =>
             val shifts2 = shifts map {
               case (struct, idStatus, rot) =>
                 (struct >> fm, idStatus, rot)
@@ -109,7 +110,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
                 idx.right[QAccess[Hole]].point[FreeMapA]
             }
 
-            updateGraph[T, G](QSU.MultiLeftShift(src.root, shifts2, repair2, onUndefined)) map { rewritten =>
+            updateGraph[T, G](QSU.MultiLeftShift(src.root, shifts2, onUndefined, repair2)) map { rewritten =>
               rewritten :++ src
             }
         }
@@ -118,13 +119,13 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           init <- initM
 
           back <- rest.foldLeftM[G, QSUGraph](init) {
-            case (src, -\/(QSU.LeftShift(_, struct, idStatus, repair, onUndefined, rot))) =>
-              updateGraph[T, G](QSU.LeftShift(src.root, struct, idStatus, repair, onUndefined, rot)) map { rewritten =>
+            case (src, -\/(QSU.LeftShift(_, struct, idStatus, onUndefined, repair, rot))) =>
+              updateGraph[T, G](QSU.LeftShift(src.root, struct, idStatus, onUndefined, repair, rot)) map { rewritten =>
                 rewritten :++ src
               }
 
-            case (src, \/-(QSU.MultiLeftShift(_, shifts, repair, onUndefined))) =>
-              updateGraph[T, G](QSU.MultiLeftShift(src.root, shifts, repair, onUndefined)) map { rewritten =>
+            case (src, \/-(QSU.MultiLeftShift(_, shifts, onUndefined, repair))) =>
+              updateGraph[T, G](QSU.MultiLeftShift(src.root, shifts, onUndefined, repair)) map { rewritten =>
                 rewritten :++ src
               }
           }
@@ -222,26 +223,26 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       val reversed = shifts.reverse
 
       val initPattern = reversed.head match {
-        case -\/(QSU.LeftShift(_, struct, idStatus, repair, _, rot)) =>
+        case -\/(QSU.LeftShift(_, struct, idStatus, _, repair, rot)) =>
           val repair2 = func.StaticMapS(
             OriginalField -> func.AccessLeftTarget(Access.valueHole[T[EJson]](_)),
             ResultsField -> repair)
 
-          QSU.LeftShift[T, Symbol](src.root, struct, idStatus, repair2, true, rot)
+          QSU.LeftShift[T, Symbol](src.root, struct, idStatus, OnUndefined.Emit, repair2, rot)
 
-        case \/-(QSU.MultiLeftShift(_, shifts, repair, _)) =>
+        case \/-(QSU.MultiLeftShift(_, shifts, _, repair)) =>
           val repair2 = func.StaticMapS(
             OriginalField -> accessHoleLeftF,
             ResultsField -> repair)
 
-          QSU.MultiLeftShift[T, Symbol](src.root, shifts, repair2, true)
+          QSU.MultiLeftShift[T, Symbol](src.root, shifts, OnUndefined.Emit, repair2)
       }
 
       for {
         init2 <- updateGraph[T, G](initPattern)
 
         reconstructed <- reversed.tail.foldLeftM[G, QSUGraph](init2) {
-          case (src, -\/(QSU.LeftShift(_, struct, idStatus, repair, _, rot))) =>
+          case (src, -\/(QSU.LeftShift(_, struct, idStatus, _, repair, rot))) =>
             val struct2 = struct >> func.ProjectKeyS(func.Hole, ResultsField)
 
             val repair2 = repair flatMap {
@@ -260,11 +261,11 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
                   OriginalField),
               ResultsField -> repair2)
 
-            updateGraph[T, G](QSU.LeftShift[T, Symbol](src.root, struct2, idStatus, repair3, true, rot)) map { rewritten =>
+            updateGraph[T, G](QSU.LeftShift[T, Symbol](src.root, struct2, idStatus, OnUndefined.Emit, repair3, rot)) map { rewritten =>
               rewritten :++ src
             }
 
-          case (src, \/-(QSU.MultiLeftShift(_, shifts, repair, _))) =>
+          case (src, \/-(QSU.MultiLeftShift(_, shifts, _, repair))) =>
             val shifts2 = shifts map {
               case (struct, idStatus, rot) =>
                 val struct2 = struct >> func.ProjectKeyS(func.Hole, ResultsField)
@@ -284,25 +285,25 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
                 func.ProjectKeyS(accessHoleLeftF, OriginalField),
               ResultsField -> repair2)
 
-            updateGraph[T, G](QSU.MultiLeftShift[T, Symbol](src.root, shifts2, repair3, true)) map { rewritten =>
+            updateGraph[T, G](QSU.MultiLeftShift[T, Symbol](src.root, shifts2, OnUndefined.Emit, repair3)) map { rewritten =>
               rewritten :++ src
             }
         }
 
         rewritten = reconstructed match {
-          case reconstructed @ LeftShift(src, struct, idStatus, repair, onUndefined, rot) =>
+          case reconstructed @ LeftShift(src, struct, idStatus, onUndefined, repair, rot) =>
             val origLifted = origFM >> func.ProjectKeyS(repair, OriginalField)
             val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted)
 
             reconstructed.overwriteAtRoot(
-              QSU.LeftShift(src.root, struct, idStatus, N.freeMF(repair2), onUndefined, rot))
+              QSU.LeftShift(src.root, struct, idStatus, onUndefined, N.freeMF(repair2), rot))
 
-          case reconstructed @ MultiLeftShift(src, shifts, repair, onUndefined) =>
+          case reconstructed @ MultiLeftShift(src, shifts, onUndefined, repair) =>
             val origLifted = origFM >> func.ProjectKeyS(repair, OriginalField)
             val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted)
 
             reconstructed.overwriteAtRoot(
-              QSU.MultiLeftShift(src.root, shifts, repair2 /*N.freeMF(repair2)*/, onUndefined))
+              QSU.MultiLeftShift(src.root, shifts, onUndefined, repair2 /*N.freeMF(repair2)*/))
 
           case reconstructed => reconstructed
         }
@@ -417,8 +418,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       (left, right) match {
         case
           (
-            -\/(QSU.LeftShift(fakeParent, structL, idStatusL, repairL, _, rotL)) :: tailL,
-            -\/(QSU.LeftShift(_, structR, idStatusR, repairR, _, rotR)) :: tailR) =>
+            -\/(QSU.LeftShift(fakeParent, structL, idStatusL, _, repairL, rotL)) :: tailL,
+            -\/(QSU.LeftShift(_, structR, idStatusR, _, repairR, rotR)) :: tailR) =>
 
           val structLAdj = fixSingleStruct(structL, LeftSide)
           val repairLAdj = fixSingleRepairForMulti(repairL, 0, LeftSide)
@@ -435,14 +436,14 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             QSU.MultiLeftShift[T, Symbol](
               sym,
               (structLAdj, idStatusL, rotL) :: (structRAdj, idStatusR, rotR) :: Nil,
-              repair,
-              true)
+              OnUndefined.Emit,
+              repair)
           }
 
         case
           (
-            \/-(QSU.MultiLeftShift(fakeParent, shiftsL, repairL, _)) :: tailL,
-            -\/(QSU.LeftShift(_, structR, idStatusR, repairR, _, rotR)) :: tailR) =>
+            \/-(QSU.MultiLeftShift(fakeParent, shiftsL, _, repairL)) :: tailL,
+            -\/(QSU.LeftShift(_, structR, idStatusR, _, repairR, rotR)) :: tailR) =>
 
           val offset = shiftsL.length
 
@@ -461,14 +462,14 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             QSU.MultiLeftShift[T, Symbol](
               sym,
               shiftsLAdj ::: (structRAdj, idStatusR, rotR) :: Nil,
-              repair,
-              true)
+              OnUndefined.Emit,
+              repair)
           }
 
         case
           (
-            -\/(QSU.LeftShift(fakeParent, structL, idStatusL, repairL, _, rotL)) :: tailL,
-            \/-(QSU.MultiLeftShift(_, shiftsR, repairR, _)) :: tailR) =>
+            -\/(QSU.LeftShift(fakeParent, structL, idStatusL, _, repairL, rotL)) :: tailL,
+            \/-(QSU.MultiLeftShift(_, shiftsR, _, repairR)) :: tailR) =>
 
           val structLAdj = fixSingleStruct(structL, LeftSide)
           val repairLAdj = fixSingleRepairForMulti(repairL, 0, LeftSide)
@@ -485,14 +486,14 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             QSU.MultiLeftShift[T, Symbol](
               sym,
               (structL, idStatusL, rotL) :: shiftsRAdj,
-              repair,
-              true)
+              OnUndefined.Emit,
+              repair)
           }
 
         case
           (
-            \/-(QSU.MultiLeftShift(fakeParent, shiftsL, repairL, _)) :: tailL,
-            \/-(QSU.MultiLeftShift(_, shiftsR, repairR, _)) :: tailR) =>
+            \/-(QSU.MultiLeftShift(fakeParent, shiftsL, _, repairL)) :: tailL,
+            \/-(QSU.MultiLeftShift(_, shiftsR, _, repairR)) :: tailR) =>
 
           val offset = shiftsL.length
 
@@ -511,13 +512,13 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             QSU.MultiLeftShift[T, Symbol](
               sym,
               shiftsLAdj ::: shiftsRAdj,
-              repair,
-              true)
+              OnUndefined.Emit,
+              repair)
           }
 
         case
           (
-            -\/(QSU.LeftShift(fakeParent, structL, idStatusL, repairL, _, rotL)) :: tailL,
+            -\/(QSU.LeftShift(fakeParent, structL, idStatusL, _, repairL, rotL)) :: tailL,
             Nil) =>
 
           val structLAdj = fixSingleStruct(structL, LeftSide)
@@ -536,14 +537,14 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               structLAdj,
               idStatusL,
+              OnUndefined.Emit,
               repair,
-              true,
               rotL)
           }
 
         case
           (
-            \/-(QSU.MultiLeftShift(fakeParent, shiftsL, repairL, _)) :: tailL,
+            \/-(QSU.MultiLeftShift(fakeParent, shiftsL, _, repairL)) :: tailL,
             Nil) =>
 
           val shiftsLAdj = fixMultiShifts(shiftsL, LeftSide)
@@ -561,14 +562,14 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             QSU.MultiLeftShift[T, Symbol](
               sym,
               shiftsLAdj,
-              repair,
-              true)
+              OnUndefined.Emit,
+              repair)
           }
 
         case
           (
             Nil,
-            -\/(QSU.LeftShift(fakeParent, structR, idStatusR, repairR, _, rotR)) :: tailR) =>
+            -\/(QSU.LeftShift(fakeParent, structR, idStatusR, _, repairR, rotR)) :: tailR) =>
 
           val structRAdj = fixSingleStruct(structR, RightSide)
           val repairRAdj = fixSingleRepairForSingle(repairR, RightSide)
@@ -586,15 +587,15 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
               sym,
               structRAdj,
               idStatusR,
+              OnUndefined.Emit,
               repair,
-              true,
               rotR)
           }
 
         case
           (
             Nil,
-            \/-(QSU.MultiLeftShift(fakeParent, shiftsR, repairR, _)) :: tailR) =>
+            \/-(QSU.MultiLeftShift(fakeParent, shiftsR, _, repairR)) :: tailR) =>
 
           val shiftsRAdj = fixMultiShifts(shiftsR, LeftSide)
           val repairRAdj = fixMultiRepair(repairR, 0, LeftSide)
@@ -611,8 +612,8 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             QSU.MultiLeftShift[T, Symbol](
               sym,
               shiftsRAdj,
-              repair,
-              true)
+              OnUndefined.Emit,
+              repair)
           }
 
         case (Nil, Nil) =>
@@ -634,23 +635,23 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           // shifts.head is the LAST shift in the chain
           val back = shifts.head match {
-            case -\/(QSU.LeftShift(parent, struct, idStatus, repair, onUndefined, rotation)) =>
+            case -\/(QSU.LeftShift(parent, struct, idStatus, onUndefined, repair, rotation)) =>
               val pat = QSU.LeftShift(
                 parent.root,
                 struct,
                 idStatus,
-                func.MakeMapS(i.toString, repair),
                 onUndefined,
+                func.MakeMapS(i.toString, repair),
                 rotation)
 
               qgraph.overwriteAtRoot(pat).point[G]
 
-            case \/-(QSU.MultiLeftShift(parent, shifts, repair, onUndefined)) =>
+            case \/-(QSU.MultiLeftShift(parent, shifts, onUndefined, repair)) =>
               val pat = QSU.MultiLeftShift(
                 parent.root,
                 shifts,
-                func.MakeMapS(i.toString, repair),
-                onUndefined)
+                onUndefined,
+                func.MakeMapS(i.toString, repair))
 
               qgraph.overwriteAtRoot(pat).point[G]
           }
@@ -724,17 +725,17 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       case LeftShift(Read(_), _, _, _, _, _) =>
         None
 
-      case LeftShift(oparent @ Self(parent, inners), struct, idStatus, repair, onUndefined, rot) =>
-        Some((parent, -\/(QSU.LeftShift[T, QSUGraph](oparent, struct, idStatus, repair, onUndefined, rot)) <:: inners))
+      case LeftShift(oparent @ Self(parent, inners), struct, idStatus, onUndefined, repair, rot) =>
+        Some((parent, -\/(QSU.LeftShift[T, QSUGraph](oparent, struct, idStatus, onUndefined, repair, rot)) <:: inners))
 
-      case LeftShift(parent, struct, idStatus, repair, onUndefined, rot) =>
-        Some((parent, NEL(-\/(QSU.LeftShift[T, QSUGraph](parent, struct, idStatus, repair, onUndefined, rot)))))
+      case LeftShift(parent, struct, idStatus, onUndefined, repair, rot) =>
+        Some((parent, NEL(-\/(QSU.LeftShift[T, QSUGraph](parent, struct, idStatus, onUndefined, repair, rot)))))
 
-      case MultiLeftShift(oparent @ Self(parent, inners), shifts, repair, onUndefined) =>
-        Some((parent, \/-(QSU.MultiLeftShift[T, QSUGraph](oparent, shifts, repair, onUndefined)) <:: inners))
+      case MultiLeftShift(oparent @ Self(parent, inners), shifts, onUndefined, repair) =>
+        Some((parent, \/-(QSU.MultiLeftShift[T, QSUGraph](oparent, shifts, onUndefined, repair)) <:: inners))
 
-      case MultiLeftShift(parent, shifts, repair, onUndefined) =>
-        Some((parent, NEL(\/-(QSU.MultiLeftShift[T, QSUGraph](parent, shifts, repair, onUndefined)))))
+      case MultiLeftShift(parent, shifts, onUndefined, repair) =>
+        Some((parent, NEL(\/-(QSU.MultiLeftShift[T, QSUGraph](parent, shifts, onUndefined, repair)))))
 
       case _ =>
         None

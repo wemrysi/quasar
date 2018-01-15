@@ -17,24 +17,23 @@
 package quasar.qscript.qsu
 
 import quasar.Planner.PlannerError
-import quasar.ejson.EJson
-import slamdata.Predef.{Map => _, _}
 import quasar.{Qspec, TreeMatchers}
+import quasar.ejson.EJson
+import quasar.fp._
+import quasar.qscript.{construction, Hole, ExcludeId, OnUndefined, SrcHole}
+import quasar.qscript.qsu.{QScriptUniform => QSU}
+import slamdata.Predef.{Map => _, _}
 
-import scalaz.\/
-import quasar.qscript.{construction, Hole, ExcludeId, SrcHole}
 import matryoshka._
 import matryoshka.data._
-import quasar.fp._
-import Fix._
 import org.specs2.matcher.{Expectable, MatchResult, Matcher}
 import pathy.Path._
-
-import scalaz.{EitherT, Need, StateT}
+import scalaz.{\/, EitherT, Need, StateT}
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 import scalaz.syntax.show._
-import quasar.qscript.qsu.{QScriptUniform => QSU}
+
+import Fix._
 import QSU.Rotation
 import QSUGraph.Extractors._
 
@@ -55,8 +54,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       qsu.read(rootDir </> file("dataset")),
       func.Hole,
       ExcludeId,
+      OnUndefined.Omit,
       func.RightTarget,
-      false,
       Rotation.ShiftArray)
 
     val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
@@ -65,8 +64,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         (func.ProjectKeyS(func.Hole, "foo"), ExcludeId, Rotation.ShiftArray),
         (func.ProjectKeyS(func.Hole, "bar"), ExcludeId, Rotation.ShiftArray)
       ),
-      func.Add(index(0), index(1)),
-      false
+      OnUndefined.Omit,
+      func.Add(index(0), index(1))
     ))
 
     multiShift must expandTo {
@@ -77,20 +76,20 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               Read(afile),
               shiftedReadStruct,
               ExcludeId,
+              OnUndefined.Omit,
               shiftedReadRepair,
-              false,
               Rotation.ShiftArray
             ),
             projectFoo,
             ExcludeId,
+            OnUndefined.Emit,
             innerRepair,
-            true,
             Rotation.ShiftArray
           ),
           projectBar,
           ExcludeId,
+          OnUndefined.Emit,
           outerRepair,
-          false,
           Rotation.ShiftArray
         ),
         fm
@@ -138,13 +137,13 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
 
 
-  "convert singly nested LeftShift/ThetaJoin with onUndefined = true" in {
+  "convert singly nested LeftShift/ThetaJoin with onUndefined = OnUndefined.Emit" in {
     val dataset = qsu.leftShift(
       qsu.read(rootDir </> file("dataset")),
       func.Hole,
       ExcludeId,
+      OnUndefined.Omit,
       func.RightTarget,
-      false,
       Rotation.ShiftArray)
 
     val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
@@ -153,8 +152,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         (func.ProjectKeyS(func.Hole, "foo"), ExcludeId, Rotation.ShiftArray),
         (func.ProjectKeyS(func.Hole, "bar"), ExcludeId, Rotation.ShiftArray)
       ),
-      func.Add(index(0), index(1)),
-      true
+      OnUndefined.Emit,
+      func.Add(index(0), index(1))
     ))
 
     multiShift must expandTo {
@@ -165,20 +164,20 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               Read(afile),
               shiftedReadStruct,
               ExcludeId,
+              OnUndefined.Omit,
               shiftedReadRepair,
-              false,
               Rotation.ShiftArray
             ),
             projectFoo,
             ExcludeId,
+            OnUndefined.Emit,
             innerRepair,
-            true,
             Rotation.ShiftArray
           ),
           projectBar,
           ExcludeId,
+          OnUndefined.Emit,
           outerRepair,
-          true,
           Rotation.ShiftArray
         ),
         fm
@@ -193,8 +192,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       qsu.read(rootDir </> file("dataset")),
       func.Hole,
       ExcludeId,
+      OnUndefined.Omit,
       func.RightTarget,
-      false,
       Rotation.ShiftArray)
 
     val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
@@ -204,8 +203,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         (func.ProjectKeyS(func.Hole, "bar"), ExcludeId, Rotation.ShiftArray),
         (func.ProjectKeyS(func.Hole, "baz"), ExcludeId, Rotation.ShiftArray)
       ),
-      func.Subtract(func.Add(index(0), index(1)), index(2)),
-      false
+      OnUndefined.Omit,
+      func.Subtract(func.Add(index(0), index(1)), index(2))
     ))
 
     multiShift must expandTo {
@@ -217,26 +216,26 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
                 Read(afile),
                 shiftedReadStruct,
                 ExcludeId,
+                OnUndefined.Omit,
                 shiftedReadRepair,
-                false,
                 Rotation.ShiftArray
               ),
               projectFoo,
               ExcludeId,
+              OnUndefined.Emit,
               innermostRepair,
-              true,
               Rotation.ShiftArray
             ),
             projectBar,
             ExcludeId,
+            OnUndefined.Emit,
             innerRepair,
-            true,
             Rotation.ShiftArray
           ),
           projectBaz,
           ExcludeId,
+          OnUndefined.Emit,
           outerRepair,
-          false,
           Rotation.ShiftArray
         ),
         fm

@@ -24,6 +24,7 @@ import quasar.qscript.qsu.QSUGraph.Extractors._
 import quasar.qscript.{
   construction,
   Hole,
+  OnUndefined,
   SrcHole
 }
 import quasar.qscript.qsu.{QScriptUniform => QSU}
@@ -69,7 +70,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
     G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: PlannerErrorME: MonadState_[?[_], QAuth]
     ]
       : PartialFunction[QSUGraph, G[QSUGraph]] = {
-    case mls @ MultiLeftShift(source, shifts, repair, onUndefined) =>   // TODO
+    case mls @ MultiLeftShift(source, shifts, _, repair) =>
       val mapper = repair.flatMap {
         case -\/(_) => func.ProjectKeyS(func.Hole, originalKey)
         case \/-(i) => func.ProjectKeyS(func.Hole, i.toString)
@@ -83,24 +84,20 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
               "0" -> func.RightTarget
             )
           val firstShiftPat: QScriptUniform[Symbol] =
-            QSU.LeftShift[T, Symbol](source.root, struct, idStatus, firstRepair, true, rotation)
+            QSU.LeftShift[T, Symbol](source.root, struct, idStatus, OnUndefined.Emit, firstRepair, rotation)
           for {
             firstShift <- QSUGraph.withName[T, G](firstShiftPat)
             _ <- ApplyProvenance.computeProvenance[T, G](firstShift)
 
-            // this is a bit of a hack, but we need to identify the LAST LeftShift we create
-            lastIndex = ss.length - 1
-
             shiftAndRotation <- ss.zipWithIndex.foldLeftM[G, (QSUGraph, Rotation)]((firstShift :++ mls, rotation)) {
               case ((shiftAbove, rotationAbove), ((newStruct, newIdStatus, newRotation), idx)) =>
-                val isLast = idx === lastIndex
                 val keysAbove = ("original" :: (0 to idx).map(_.toString).toList)
                 val staticAbove = func.StaticMapFS(keysAbove: _*)(func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), _), s => s)
 
                 val repair = func.ConcatMaps(staticAbove, func.MakeMapS((idx + 1).toString, func.RightTarget))
                 val struct = newStruct >> func.ProjectKeyS(func.Hole, originalKey)
                 val newShiftPat =
-                  QSU.LeftShift[T, Symbol](shiftAbove.root, struct, newIdStatus, repair, onUndefined || !isLast, newRotation)
+                  QSU.LeftShift[T, Symbol](shiftAbove.root, struct, newIdStatus, OnUndefined.Emit, repair, newRotation)
                 for {
                   newShift <- QSUGraph.withName[T, G](newShiftPat)
                   _ <- ApplyProvenance.computeProvenance[T, G](newShift)

@@ -22,7 +22,7 @@ import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.MonadState_
 import quasar.fp._
 import quasar.fp.ski.κ
-import quasar.qscript.{FreeMapA, IdStatus}
+import quasar.qscript.{FreeMapA, IdStatus, OnUndefined}
 
 import monocle.macros.Lenses
 import matryoshka._
@@ -432,14 +432,14 @@ object QSUGraph extends QSUGraphInstances {
     }
 
     object LeftShift {
-      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], FreeMap[T], IdStatus, FreeMapA[T, QSU.ShiftTarget[T]], Boolean, QSU.Rotation)] = g.unfold match {
+      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], FreeMap[T], IdStatus, OnUndefined, FreeMapA[T, QSU.ShiftTarget[T]], QSU.Rotation)] = g.unfold match {
         case g: QSU.LeftShift[T, QSUGraph[T]] => QSU.LeftShift.unapply(g)
         case _ => None
       }
     }
 
     object MultiLeftShift {
-      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], List[(FreeMap[T], IdStatus, QSU.Rotation)], FreeMapA[T, QAccess[T, Hole] \/ Int], Boolean)] = g.unfold match {
+      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], List[(FreeMap[T], IdStatus, QSU.Rotation)], OnUndefined, FreeMapA[T, QAccess[T, Hole] \/ Int])] = g.unfold match {
         case g: QSU.MultiLeftShift[T, QSUGraph[T]] => QSU.MultiLeftShift.unapply(g)
         case _ => None
       }
