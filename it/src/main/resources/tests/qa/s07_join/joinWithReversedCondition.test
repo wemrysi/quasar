@@ -8,7 +8,6 @@
     },
 
     "NB": "#1587: Disabled in couchbase due to lack of general join.",
-    "NB2": "Skipping for postgres until there's support for ProjectIndex",
 
     "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
 

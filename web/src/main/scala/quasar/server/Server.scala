@@ -25,7 +25,7 @@ import quasar.console.{logErrors, stdout}
 import quasar.contrib.scalaz._
 import quasar.contrib.scopt._
 import quasar.db.DbConnectionConfig
-import quasar.effect.{Read, ScopeExecution, TimingRepository, Write}
+import quasar.effect.{ExecutionId, ExecutionTimings, Read, ScopeExecution, TimingRepository, Write}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric.Natural
@@ -125,8 +125,15 @@ object Server {
           injectFT[Task, QErrs_CRW_Task]       :+:
           eval))
 
-    val printAction = (s: String) =>
-      Free.liftF(Inject[Task, CoreEffIORW].inj(if (printExecutions) Task.delay(println(s)) else ().point[Task]))
+    val printAction = { (id: ExecutionId, timings: ExecutionTimings) =>
+      if (printExecutions) {
+        Free.liftF(Inject[Task, CoreEffIORW].inj(Task.delay(println(
+          ExecutionTimings.render(ExecutionTimings.toLabelledIntervalTree(id, timings)).shows
+        ))))
+      } else {
+        ().point[Free[CoreEffIORW, ?]]
+      }
+    }
     for {
       scopeExecution <- TimingRepository.empty(recordedExecutions).map(
         ScopeExecution.forFreeTask[CoreEffIORW, Nothing](_, printAction)
@@ -214,8 +221,9 @@ object Server {
                  // TODO: Figure out why it's necessary to use a `Task` that never completes to keep the main thread
                  // from completing instead of simply relying on the fact that the server is using a pool of
                  // non-daemon threads to ensure the application doesn't shutdown
-                 _        <- waitForUserEnter.ifM(shutdown, Task.async[Unit](_ => ()))
-               } yield ()).liftM[MainErrT]
+                 waited   <- waitForUserEnter
+                 _        <- waited.whenM(shutdown)
+               } yield waited).liftM[MainErrT]
              },
              persistMetaStore(webCmdLineCfg.configPath))
     } yield ())

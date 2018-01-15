@@ -6,7 +6,7 @@
         "marklogic_json": "timeout",
         "marklogic_xml":  "timeout",
         "mimir":          "ignoreFieldOrder",
-	    "postgres":       "ignoreFieldOrder"
+	"postgres":       "ignoreFieldOrder"
     },
 
     "data": ["leftData.data", "rightData.data"],

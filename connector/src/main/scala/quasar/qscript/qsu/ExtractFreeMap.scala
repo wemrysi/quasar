@@ -36,6 +36,12 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
   import QScriptUniform._
   import QSUGraph.Extractors
 
+  def apply[F[_]: Monad: NameGenerator: PlannerErrorME](graph: QSUGraph)
+      : F[QSUGraph] =
+    graph.rewriteM[F](extract[F])
+
+  ////
+
   private type QSU[A] = QScriptUniform[A]
 
   private val func = construction.Func[T]
@@ -138,12 +144,6 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
       }
     }
 
-  def apply[F[_]: Monad: NameGenerator: PlannerErrorME](graph: QSUGraph)
-      : F[QSUGraph] =
-    graph.rewriteM[F](extract[F])
-
-  ////
-
   private def autojoinFreeMap[F[_]: Applicative: NameGenerator: PlannerErrorME]
     (graph: QSUGraph, src: Symbol, target: Symbol)
     (srcName: String, targetName: String)
@@ -183,7 +183,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
     }
 
   private def freshName[F[_]: Functor: NameGenerator]: F[Symbol] =
-    NameGenerator[F].prefixedName("extract") map (Symbol(_))
+    freshSymbol("extract")
 }
 
 object ExtractFreeMap {

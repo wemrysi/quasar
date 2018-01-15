@@ -30,9 +30,9 @@ import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.Planner.InternalError
 import quasar.Planner.{NonRepresentableData, PlannerError}
+
 import matryoshka._
 import matryoshka.implicits._
-
 import scalaz._
 import Scalaz._
 import quasar.physical.rdbms.planner.sql.Indirections._
@@ -246,7 +246,7 @@ object PostgresRenderQuery extends RenderQuery {
       s"(select ${selection.v._2}$fromExpr$join$filter$groupByStr$orderByStr)".right
     case Union((_, left), (_, right)) => s"($left UNION $right)".right
     case Constant(Data.Str(v)) =>
-      val text = v.flatMap { case ''' => "''"; case iv => iv.toString }.self
+      val text = v.flatMap { case '\'' => "''"; case iv => iv.toString }.self
       s"'$text'".right
     case Constant(v) =>
       DataCodec.render(v).map{ rendered => v match {
