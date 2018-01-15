@@ -158,8 +158,8 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
         case (ExprWithAlias(e1, a1), ExprWithAlias(e2, a2)) =>
 
           val patmat: PartialFunction[String, (MetaType, Meta)] = {
-            case `a1` => (Dot, deriveMeta(e1))
-            case `a2` => (Dot, deriveMeta(e2))
+            case `a1` => (Field, deriveMeta(e1))
+            case `a2` => (Field, deriveMeta(e2))
           }
 
           val meta = Branch(patmat.orElse {

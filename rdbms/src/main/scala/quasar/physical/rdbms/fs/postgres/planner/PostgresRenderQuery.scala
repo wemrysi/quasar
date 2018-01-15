@@ -134,9 +134,9 @@ object PostgresRenderQuery extends RenderQuery {
               val nextStrStripped = nextStr.stripPrefix("'").stripSuffix("'")
               val (metaType, nextMeta) = mFunc(nextStrStripped)
               val str = metaType match {
-                case Dot =>
+                case Field =>
                   s"""($accStr."$nextStrStripped")"""
-                case Arr => s"$accStr->$nextStr"
+                case InnerField => s"$accStr->$nextStr"
               }
               Acc(str, nextMeta)
           }.s.right

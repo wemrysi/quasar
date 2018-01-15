@@ -26,8 +26,8 @@ import Scalaz._
 object Metas {
 
   sealed trait MetaType
-  final case object Dot extends MetaType
-  final case object Arr extends MetaType
+  final case object Field extends MetaType
+  final case object InnerField extends MetaType
 
   sealed trait Meta
 
@@ -40,8 +40,8 @@ object Metas {
     }
   }
 
-  val mArr: Meta = Branch((_: String) => (Arr, mArr), "mArr")
-  val Default = Branch((_: String) => (Dot, mArr), "Default")
+  val mArrow: Meta = Branch((_: String) => (InnerField, mArrow), "mArr")
+  val Default = Branch((_: String) => (Field, mArrow), "Default")
 
   import SqlExpr._
 
