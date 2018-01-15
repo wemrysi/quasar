@@ -3,7 +3,7 @@
 
     "backends": {
         "couchbase": "skip",
-        "marklogic_json": "ignoreFieldOrder",
+        "marklogic_json": "timeout",
         "mimir": "ignoreFieldOrder"
     },
 
