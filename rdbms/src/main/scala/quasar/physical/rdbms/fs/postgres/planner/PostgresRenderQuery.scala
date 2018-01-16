@@ -44,22 +44,7 @@ object PostgresRenderQuery extends RenderQuery {
 
   def asString[T[_[_]]: BirecursiveT](a: T[SqlExpr]): PlannerError \/ String = {
 
-    // This is a workaround to transform "select _4 as some_alias" to "select row_to_json(_4) as some_alias" in order
-    // to avoid working with record types.
-    def aliasSelectionToJson(e: T[SqlExpr]): T[SqlExpr] = {
-      (e.project match {
-        case ea@ExprWithAlias(expr, alias) =>
-          expr.project match {
-            case Id(txt, _) =>
-              ea
-              //ExprWithAlias(UnaryFunction(ToJson, Id[T[SqlExpr]](txt).embed).embed, alias)
-            case _ => ea
-          }
-        case other => other
-      }).embed
-    }
-
-    a.transCataT(aliasSelectionToJson).paraM(galg) ∘ (s => s"select row_to_json(row) from ($s) as row")
+    a.paraM(galg) ∘ (s => s"select row_to_json(row) from ($s) as row")
   }
 
   def alias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" as ${i.v}"))
