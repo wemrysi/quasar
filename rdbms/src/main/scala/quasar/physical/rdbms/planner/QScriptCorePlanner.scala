@@ -163,9 +163,8 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       for {
         structAlias <- genId[T[SqlExpr], F]
         structExpr  <- processFreeMap(struct, structAlias)
-        left = src.project
         right = ArrayUnwind(structExpr)
-        repaired <- processJoinFunc(repair, left, right)
+        repaired <- processJoinFunc(repair, structAlias, right)
         result = Select[T[SqlExpr]](
           Selection(repaired, None), From(src, structAlias), none, none, Nil)
       } yield {
