@@ -381,7 +381,7 @@ object WorkflowBuilder {
   // FIXME: There are a few recursive references to this function. We need to
   //        eliminate those.
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def toWorkflow[M[_]: Monad, WF[_]: Coalesce]
+  def toWorkflow[M[_]: Monad, WF[_]: Coalesce](queryModel: MongoQueryModel)
     (implicit M: MonadError_[M, PlannerError], ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], exprOps: ExprOpOps.Uni[ExprOp])
       : AlgebraM[M, WorkflowBuilderF[WF, ?], (Fix[WF], Base)] = {
     case CollectionBuilderF(graph, base, _) => (graph, base).point[M]
@@ -397,7 +397,7 @@ object WorkflowBuilder {
             val srcName = BsonField.Name("src")
             op.lift(pairs.map(_._1)).fold(
               M.raiseError[(Fix[WF], Base)](UnsupportedFunction(set.Filter, Some("failed to build operation"))))(
-              op => toWorkflow[M, WF].apply(DocBuilderF((g, b), pairs.toListMap + (srcName -> docVarToExpr(DocVar.ROOT())))) ∘ {
+              op => toWorkflow[M, WF](queryModel).apply(DocBuilderF((g, b), pairs.toListMap + (srcName -> docVarToExpr(DocVar.ROOT())))) ∘ {
                 case (graph, _) => (chain(graph, op), Field(srcName))
               })
           } (
@@ -438,7 +438,7 @@ object WorkflowBuilder {
       semiAlignExpr(keys).fold {
         val ks = keys.zipWithIndex.map(_.map(i => BsonField.Name(i.shows)).swap)
 
-        toWorkflow[M, WF].apply(DocBuilderF((gʹ, Root()), ks.toListMap + (BsonField.Name("content") -> docVarToExpr(bʹ.toDocVar)))) strengthR
+        toWorkflow[M, WF](queryModel).apply(DocBuilderF((gʹ, Root()), ks.toListMap + (BsonField.Name("content") -> docVarToExpr(bʹ.toDocVar)))) strengthR
           ((Field(BsonField.Name("content")): Base, ks.map(key => $var(DocField(key._1)))))
       }(
         ks => ((gʹ, bʹ), (bʹ, ks)).point[M]) >>= { case ((g, b), (c, keys)) =>
@@ -467,9 +467,9 @@ object WorkflowBuilder {
             $reduce($ReduceF.reduceNOP, ListMap()))),
           lBase).point[M]
       else
-        (toWorkflow[M, WF].apply(DocBuilderF((lGraph, Root()), ListMap(
+        (toWorkflow[M, WF](queryModel).apply(DocBuilderF((lGraph, Root()), ListMap(
           BsonField.Name("0") -> docVarToExpr(lBase.toDocVar)))) ⊛
-          toWorkflow[M, WF].apply(DocBuilderF((rGraph, Root()), ListMap(
+          toWorkflow[M, WF](queryModel).apply(DocBuilderF((rGraph, Root()), ListMap(
             BsonField.Name("0") -> docVarToExpr(rBase.toDocVar)))))((l, r) =>
           ($foldLeft(
             l._1,
@@ -560,10 +560,10 @@ object WorkflowBuilder {
       },
       ListMap())
 
-  def generateWorkflow[M[_]: Monad, F[_]: Coalesce](wb: WorkflowBuilder[F])
+  def generateWorkflow[M[_]: Monad, F[_]: Coalesce](wb: WorkflowBuilder[F], queryModel: MongoQueryModel)
     (implicit M: MonadError_[M, PlannerError], ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
       : M[(Fix[F], Base)] =
-    (wb: Fix[WorkflowBuilderF[F, ?]]).cataM(toWorkflow[M, F])
+    (wb: Fix[WorkflowBuilderF[F, ?]]).cataM(toWorkflow[M, F](queryModel))
 
   def shift[F[_]: Coalesce](base: Base, struct: Schema, graph: Fix[F])
     (implicit ev: WorkflowOpCoreF :<: F)
@@ -588,10 +588,10 @@ object WorkflowBuilder {
     }
   }
 
-  def build[M[_]: Monad, F[_]: Coalesce](wb: WorkflowBuilder[F])
+  def build[M[_]: Monad, F[_]: Coalesce](wb: WorkflowBuilder[F], queryModel: MongoQueryModel)
     (implicit M: MonadError_[M, PlannerError], ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
       : M[Fix[F]] =
-    (wb: Fix[WorkflowBuilderF[F, ?]]).cataM(AlgebraMZip[M, WorkflowBuilderF[F, ?]].zip(toWorkflow[M, F], schema.generalizeM[M])) ∘ {
+    (wb: Fix[WorkflowBuilderF[F, ?]]).cataM(AlgebraMZip[M, WorkflowBuilderF[F, ?]].zip(toWorkflow[M, F](queryModel), schema.generalizeM[M])) ∘ {
       case ((graph, Root()), _)      => graph
       case ((graph, base),   struct) => shift(base, struct, graph)._1
     }

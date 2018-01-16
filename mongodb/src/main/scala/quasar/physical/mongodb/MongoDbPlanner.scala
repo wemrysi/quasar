@@ -1406,7 +1406,7 @@ object MongoDbPlanner {
         qs.cataM[M, WorkflowBuilder[WF]](
           Planner[T, fs.MongoQScript[T, ?]].plan[M, WF, EX](cfg).apply(_) ∘
             (_.transCata[Fix[WorkflowBuilderF[WF, ?]]](repeatedly(WorkflowBuilder.normalize[WF, Fix[WorkflowBuilderF[WF, ?]]])))))
-      wf <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb)))
+      wf <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb, cfg.queryModel)))
     } yield wf
 
   def plan0
@@ -1486,8 +1486,8 @@ object MongoDbPlanner {
 
     val joinHandler: JoinHandler[Workflow3_2F, WBM] =
       JoinHandler.fallback[Workflow3_2F, WBM](
-        JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
-        JoinHandler.mapReduce)
+        JoinHandler.pipeline(queryModel, queryContext.statistics, queryContext.indexes),
+        JoinHandler.mapReduce(queryModel))
 
     queryModel match {
       case `3.4.4` =>
@@ -1495,6 +1495,7 @@ object MongoDbPlanner {
           joinHandler,
           FuncHandler.handle3_4_4(bsonVersion),
           StaticHandler.handle,
+          queryModel,
           bsonVersion)
         plan0[T, M, Workflow3_2F, Expr3_4_4](anyDoc, cfg)(qs)
 
@@ -1503,6 +1504,7 @@ object MongoDbPlanner {
           joinHandler,
           FuncHandler.handle3_4(bsonVersion),
           StaticHandler.handle,
+          queryModel,
           bsonVersion)
         plan0[T, M, Workflow3_2F, Expr3_4](anyDoc, cfg)(qs)
 
@@ -1511,6 +1513,7 @@ object MongoDbPlanner {
           joinHandler,
           FuncHandler.handle3_2(bsonVersion),
           StaticHandler.handle,
+          queryModel,
           bsonVersion)
         plan0[T, M, Workflow3_2F, Expr3_2](anyDoc, cfg)(qs)
 

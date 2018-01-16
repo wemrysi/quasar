@@ -83,7 +83,8 @@ object JoinHandler {
     * the aggregation pipeline.
     */
   def pipeline[M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize]
-    (stats: Collection => Option[CollectionStatistics],
+    (queryModel: MongoQueryModel,
+      stats: Collection => Option[CollectionStatistics],
       indexes: Collection => Option[Set[Index]])
     (implicit
       M: MonadError_[M, PlannerError],
@@ -140,7 +141,7 @@ object JoinHandler {
         case HasThat($var(DocVar(_, Some(lField)))) =>
           val left = WB.makeObject(lSrc, lName.asText)
           val filtered = filterExists(left, lName \ lField)
-          generateWorkflow[M, WF](filtered).map { case (left, _) =>
+          generateWorkflow[M, WF](filtered, queryModel).map { case (left, _) =>
             CollectionBuilder(
               chain[Fix[WF]](
                 left,
@@ -154,7 +155,7 @@ object JoinHandler {
             t <- generateWorkflow[M, WF](
               DocBuilder(lSrc, ListMap(
                 lName               -> docVarToExpr(DocVar.ROOT()),
-                BsonField.Name("0") -> lKey)))
+                BsonField.Name("0") -> lKey)), queryModel)
             (src, _) = t
           } yield
               DocBuilder(
@@ -233,6 +234,7 @@ object JoinHandler {
     * map-reduce.
     */
   def mapReduce[M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize]
+    (queryModel: MongoQueryModel)
     (implicit M: MonadError[M, PlannerError], ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], ev2: ExprOpOps.Uni[ExprOp])
     : JoinHandler[WF, M] = JoinHandler({ (tpe, left0, right0) =>
 
@@ -282,7 +284,7 @@ object JoinHandler {
     val (left, right, leftField, rightField) =
       (left0.keys.map(HasThis.unapply).sequence.filter(_.nonEmpty), right0.keys.map(HasThis.unapply).sequence.filter(_.nonEmpty)) match {
         case (Some(js), _)
-            if preferMapReduce(left0.src) && !preferMapReduce(right0.src) =>
+            if preferMapReduce(left0.src, queryModel) && !preferMapReduce(right0.src, queryModel) =>
           (wbReduce(right0.src, right0.keys, rightField0, leftField0),
             jsReduce(left0.src, js, leftField0, rightField0),
             rightField0, leftField0)
@@ -380,7 +382,7 @@ object JoinHandler {
           Return(Ident("result"))))
     }
 
-    (generateWorkflow[M, WF](left._1) |@| generateWorkflow[M, WF](right._1)) {
+    (generateWorkflow[M, WF](left._1, queryModel) |@| generateWorkflow[M, WF](right._1, queryModel)) {
       case ((l, lb), (r, rb)) =>
         buildJoin(
           CollectionBuilder(
@@ -396,7 +398,8 @@ object JoinHandler {
   // TODO: This is an approximation. If we could postpone this decision until
   //      `Workflow.crush`, when we actually have a task (whether aggregation or
   //       mapReduce) in hand, we would know for sure.
-  private def preferMapReduce[WF[_]: Coalesce: Crush: Crystallize: Functor](wb: WorkflowBuilder[WF])
+  private def preferMapReduce[WF[_]: Coalesce: Crush: Crystallize: Functor]
+    (wb: WorkflowBuilder[WF], queryModel: MongoQueryModel)
     (implicit ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], ev2: ExprOpOps.Uni[ExprOp])
     : Boolean = {
     // TODO: Get rid of this when we functorize WorkflowTask
@@ -408,7 +411,7 @@ object JoinHandler {
       case _                                   => false
     }
 
-    generateWorkflow[PlannerError \/ ?, WF](wb).fold(
+    generateWorkflow[PlannerError \/ ?, WF](wb, queryModel).fold(
       κ(false),
       wf => checkTask(task(Crystallize[WF].crystallize(wf._1))))
   }
