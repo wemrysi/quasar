@@ -24,7 +24,7 @@ import quasar.Planner.PlannerErrorME
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
-import quasar.qscript.{ExcludeId, FreeMap, MapFunc, QScriptCore, QScriptTotal, ShiftType}
+import quasar.qscript.{ExcludeId, FreeMap, MapFunc, OnUndefined, QScriptCore, QScriptTotal, ShiftType}
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
@@ -159,7 +159,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         case _ =>                          notImplemented(s"$reduce", this)
       }
 
-    case qscript.LeftShift(src, struct, ExcludeId, ShiftType.Array, repair) =>
+    case qscript.LeftShift(src, struct, ExcludeId, ShiftType.Array, OnUndefined.Omit, repair) =>
       for {
         structAlias <- genId[T[SqlExpr], F]
         structExpr  <- processFreeMap(struct, structAlias)
