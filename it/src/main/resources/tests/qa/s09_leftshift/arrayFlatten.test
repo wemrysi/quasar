@@ -2,7 +2,8 @@
   "name": "[qa_s09] array flatten simple",
 
   "backends": {
-    "postgres": "ignoreResultOrder"
+    "postgres":       "ignoreResultOrder",
+    "marklogic_xml":  "skip"
   },
   "data": "../arrayProcessing.data",
 
