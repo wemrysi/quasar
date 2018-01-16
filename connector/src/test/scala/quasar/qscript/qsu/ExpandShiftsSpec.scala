@@ -38,7 +38,7 @@ import quasar.qscript.qsu.{QScriptUniform => QSU}
 import QSU.Rotation
 import QSUGraph.Extractors._
 
-object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
+object eshSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   type QSU[A] = QScriptUniform[A]
 
   val qsu = QScriptUniform.DslT[Fix]
@@ -114,8 +114,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         outerRepair must beTreeEqual(
           func.Cond(
             func.Eq(
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('expandshifts0), _)),
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('expandshifts1), _))),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('esh0), _)),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('esh1), _))),
             func.StaticMapS(
                 "original" ->
                   func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),
@@ -207,8 +207,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         innerRepair must beTreeEqual(
           func.Cond(
             func.Eq(
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('expandshifts0), _)),
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('expandshifts1), _))),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('esh0), _)),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('esh1), _))),
             func.StaticMapS(
               "original" ->
                 func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),
@@ -219,8 +219,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         outerRepair must beTreeEqual(
           func.Cond(
             func.Eq(
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('expandshifts1), _)),
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('expandshifts2), _))),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('esh1), _)),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('esh2), _))),
             func.StaticMapS(
               "original" ->
                 func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),

@@ -317,7 +317,7 @@ object MinimizeAutoJoins {
       pat: QScriptUniform[T, Symbol]): G[QSUGraph[T]] = {
 
     for {
-      qgraph <- QSUGraph.withName[T, G]("expandajs")(pat)
+      qgraph <- QSUGraph.withName[T, G]("maj")(pat)
       _ <- updateProvenance[T, G](qgraph)
     } yield qgraph
   }

@@ -67,7 +67,7 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
                   })
 
                 for {
-                  autojoined <- QSUGraph.withName[T, G]("reifybuckets")(
+                  autojoined <- QSUGraph.withName[T, G]("rbu")(
                     qsu.autojoin2(sym, source.root, combine))
 
                   qauth0 <- MonadState_[G, QAuth].get

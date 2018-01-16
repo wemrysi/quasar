@@ -173,7 +173,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
     }
 
   private def withName[F[_]: Monad: NameGenerator: RevIdxM](node: QScriptUniform[Symbol]): F[QSUGraph] =
-    QSUGraph.withName[T, F]("extractfm")(node)
+    QSUGraph.withName[T, F]("efm")(node)
 }
 
 object ExtractFreeMap {

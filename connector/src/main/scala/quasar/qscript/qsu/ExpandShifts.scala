@@ -56,7 +56,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
   }
 
   val originalKey = "original"
-  val namePrefix = "expandshifts"
+  val namePrefix = "esh"
 
   def rotationsCompatible(rotation1: Rotation, rotation2: Rotation): Boolean = rotation1 match {
     case Rotation.FlattenArray | Rotation.ShiftArray =>
