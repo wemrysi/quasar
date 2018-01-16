@@ -23,6 +23,7 @@ import quasar.physical.rdbms.common.TablePath
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
+import sql.Indirections._
 
 import matryoshka._
 import matryoshka.implicits._
@@ -49,7 +50,7 @@ class ShiftedReadPlanner[
           case ExcludeId => AllCols[R]().embed
           case IncludeId => WithIds[R](AllCols[R]().embed).embed
         }
-          Select(Selection[R](fields, alias = rowAlias.some), from, join = none, orderBy = Nil, groupBy = none,
+          Select(Selection[R](fields, alias = rowAlias.some, Default), from, join = none, orderBy = Nil, groupBy = none,
             filter = none).embed
       }
   }

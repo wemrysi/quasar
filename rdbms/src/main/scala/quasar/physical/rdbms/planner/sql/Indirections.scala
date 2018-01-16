@@ -30,7 +30,6 @@ object Indirections {
 
   sealed trait Indirection
 
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class Branch(m: String => (IndirectionType, Indirection), debug: String) extends Indirection
 
   implicit val metaShow: Show[Indirection] = {
@@ -44,21 +43,21 @@ object Indirections {
 
   import SqlExpr._
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def deriveIndirection[T[_[_]]: BirecursiveT](expr: T[SqlExpr]): Indirection = {
-      expr.project match {
-        case SqlExpr.Id(_, m) =>
-          m
-        case ExprPair(_, _, m) =>
-          m
-        case ExprWithAlias(v, _) =>
-          deriveIndirection(v)
-        case Select(Selection(_, _, m), _, _, _, _, _) =>
-          m
-        case _ =>
-          Default
-      }
+  @tailrec
+  def deriveIndirection[T[_[_]]: BirecursiveT](expr: T[SqlExpr]): Indirection = {
+    expr.project match {
+      case SqlExpr.Id(_, m) =>
+        m
+      case ExprPair(_, _, m) =>
+        m
+      case ExprWithAlias(v, _) =>
+        deriveIndirection(v)
+      case Select(Selection(_, _, m), _, _, _, _, _) =>
+        m
+      case _ =>
+        Default
     }
+  }
 }
 
 

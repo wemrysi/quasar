@@ -62,7 +62,6 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
 
   val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def plan: AlgebraM[F, QScriptCore[T, ?], T[SqlExpr]] = {
     case qscript.Map(`unref`, f) =>
       processFreeMap(f, SqlExpr.Null[T[SqlExpr]])
@@ -93,13 +92,13 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           }
       }
       for {
-        fromAlias <- genId[T[SqlExpr], F]
+        fromAlias <- genIdWithMeta[T[SqlExpr], F](deriveIndirection(src))
         orderByExprs <- order.traverse(createOrderBy(fromAlias))
         bucketExprs <- bucket.map((_, orderByExprs.head.sortDir)).traverse(createOrderBy(fromAlias))
       }
         yield {
           Select(
-            Selection(*, none),
+            Selection(*, none, deriveIndirection(src)),
             From(src, fromAlias),
             join = none,
             filter = none,
@@ -140,7 +139,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     case DisctinctPattern(qscript.Reduce(src, _, _, _)) => for {
       alias <- genId[T[SqlExpr], F]
     } yield Select(
-      Selection(Distinct[T[SqlExpr]](*).embed, none),
+      Selection(Distinct[T[SqlExpr]](*).embed, none, Indirections.Default),
       From(src, alias),
       filter = none,
       join = none,
@@ -161,7 +160,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         Planner.mapFuncPlanner[T, F].plan)
       )
     } yield Select(
-      Selection(rep, none),
+      Selection(rep, none, Indirections.Default),
       From(src, alias),
       join = none,
       filter = none,

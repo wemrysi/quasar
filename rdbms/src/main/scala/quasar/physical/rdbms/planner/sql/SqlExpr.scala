@@ -33,15 +33,9 @@ object SqlExpr extends SqlExprInstances {
   import Indirections._
   import Select._
 
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  final case class Id[T](v: String, meta: Indirection = Default) extends SqlExpr[T]
+  final case class Id[T](v: String, meta: Indirection) extends SqlExpr[T]
 
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  final case class Refs[T](elems: Vector[T], m: Indirection = Default) extends SqlExpr[T] {
-    def +(other: Refs[T]): Refs[T] = {
-      Refs(other.elems ++ this.elems)
-    }
-  }
+  final case class Refs[T](elems: Vector[T], m: Indirection) extends SqlExpr[T]
   final case class Unreferenced[T]() extends SqlExpr[T]
   final case class Null[T]() extends SqlExpr[T]
   final case class Obj[T](m: List[(T, T)]) extends SqlExpr[T]
@@ -52,8 +46,7 @@ object SqlExpr extends SqlExprInstances {
 
   final case class ExprWithAlias[T](expr: T, alias: String) extends SqlExpr[T]
 
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  final case class ExprPair[T](a: T, b: T, m: Indirection = Default) extends SqlExpr[T]
+  final case class ExprPair[T](a: T, b: T, m: Indirection) extends SqlExpr[T]
 
   final case class Select[T](selection: Selection[T],
                              from: From[T],
@@ -66,8 +59,7 @@ object SqlExpr extends SqlExprInstances {
   final case class From[T](v: T, alias: Id[T])
   final case class Join[T](v: T, keys: List[(T, T)], jType: JoinType, alias: Id[T])
 
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  final case class Selection[T](v: T, alias: Option[Id[T]], meta: Indirection = Default)
+  final case class Selection[T](v: T, alias: Option[Id[T]], meta: Indirection)
   final case class Table[T](name: String) extends SqlExpr[T]
 
   final case class NumericOp[T](op: String, left: T, right: T) extends SqlExpr[T]
