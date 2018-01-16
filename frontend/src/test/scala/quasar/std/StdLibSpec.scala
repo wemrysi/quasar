@@ -313,13 +313,6 @@ abstract class StdLibSpec extends Qspec {
           unary(prg, b.f(input), expected)
         }
 
-      def unaryBE[I](
-          prg: Fix[LogicalPlan] => Fix[LogicalPlan],
-          input: I, expected: I)(implicit arbF: Arbitrary[Builder[I, Data]]): Prop =
-        prop { (b: Builder[I, Data]) =>
-          unary(prg, b.f(input), b.f(expected))
-        }
-
       "ExtractCentury" >> {
         "0001-01-01" >> {
           unaryB(ExtractCentury(_).embed, JLocalDate.parse("0001-01-01"), Data.Int(1))
