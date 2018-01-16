@@ -57,17 +57,6 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
 
   val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
 
-  //TODO: merge with corresponding func from join
-  private def processJoinFunc(
-                               f: qscript.JoinFunc[T],
-                               leftAlias: SqlExpr[T[SqlExpr]],
-                               rightAlias: SqlExpr[T[SqlExpr]]
-                             ): F[T[SqlExpr]] =
-    f.cataM(interpretM({
-      case qscript.LeftSide  => leftAlias.embed.η[F]
-      case qscript.RightSide => rightAlias.embed.η[F]
-    }, mapFuncPlanner.plan))
-
   def plan: AlgebraM[F, QScriptCore[T, ?], T[SqlExpr]] = {
     case qscript.Map(`unref`, f) =>
       processFreeMap(f, SqlExpr.Null[T[SqlExpr]])
@@ -164,7 +153,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         structAlias <- genId[T[SqlExpr], F]
         structExpr  <- processFreeMap(struct, structAlias)
         right = ArrayUnwind(structExpr)
-        repaired <- processJoinFunc(repair, structAlias, right)
+        repaired <- processJoinFunc(mapFuncPlanner)(repair, structAlias, right)
         result = Select[T[SqlExpr]](
           Selection(repaired, None), From(src, structAlias), none, none, Nil)
       } yield {
