@@ -3,7 +3,8 @@
 
   "backends": {
     "postgres":      "ignoreResultOrder",
-    "marklogic_xml": "skip"
+    "marklogic_xml": "skip",
+    "mimir":         "skip"
   },
   "data": "../arrayProcessing.data",
 

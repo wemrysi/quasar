@@ -2,8 +2,9 @@
   "name": "[qa_s09] array flatten simple with integer conversion",
 
   "backends": {
-    "postgres":       "ignoreResultOrder",
-     "marklogic_xml": "skip"
+    "postgres":      "ignoreResultOrder",
+    "marklogic_xml": "skip",
+    "mimir":         "skip"
   },
   "data": "../arrayProcessingInts.data",
 
