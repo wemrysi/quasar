@@ -147,6 +147,8 @@ object WorkflowBuilderF {
 object WorkflowBuilder {
   import fixExprOp._
 
+  val fixExprOp344 = new ExprOp3_4_4F.fixpoint[Fix[ExprOp], ExprOp](_.embed)
+
   /** A partial description of a query that can be run on an instance of MongoDB */
   type WorkflowBuilder[F[_]] = Fix[WorkflowBuilderF[F, ?]]
   /** If we know what the shape is, represents the list of Fields. */
@@ -457,7 +459,7 @@ object WorkflowBuilder {
             Root(): Base).point[M]
       }
     case FlatteningBuilderF((graph, base), fields, rest) =>
-      (fields.foldRight(graph)(flattenField(base, rest)), base).point[M]
+      (fields.foldRight(graph)(flattenField(queryModel, base, rest)), base).point[M]
     case UnionBuilderF((lGraph, lBase), (rGraph, rBase)) =>
       if (lBase == rBase)
         ($foldLeft(
@@ -482,21 +484,40 @@ object WorkflowBuilder {
 
   // TODO: Organize this to put all the $maps and all the $unwinds adjacent.
   private def flattenField[WF[_]: Coalesce]
-    (base: Base, rest: Option[List[BsonField.Name]])
+    (queryModel: MongoQueryModel, base: Base, rest: Option[List[BsonField.Name]])
     (implicit ev0: WorkflowOpCoreF :<: WF)
       : (StructureType[DocVar], Fix[WF]) => Fix[WF] =
     (field, acc) => {
-      (field, rest) match {
-        case (StructureType.Array(field, quasar.qscript.ExcludeId), _) =>
+      (field, rest, queryModel) match {
+        case (StructureType.Array(field, quasar.qscript.ExcludeId), _, _) =>
           $unwind[WF](base.toDocVar \\ field, None, None).apply(acc)
-        case (StructureType.Array(field, idStatus), Some(r)) =>
+        case (StructureType.Array(field, idStatus), Some(r), _) =>
           flattenFieldArrayUnwindProject(base, field, idStatus, r, acc)
-        case (StructureType.Array(field, idStatus), _) =>
+        case (StructureType.Array(field, idStatus), _, _) =>
           flattenFieldMapReduce(base, field, idStatus).apply(acc)
-        case (StructureType.Object(field, idStatus), _) =>
+        case (StructureType.Object(field, quasar.qscript.ExcludeId), Some(r), MongoQueryModel.`3.4.4`) =>
+          flattenFieldObject344(base, field, r, acc)
+        case (StructureType.Object(field, idStatus), _, _) =>
           flattenFieldMapReduce(base, field, idStatus).apply(acc)
       }
     }
+
+  private def flattenFieldObject344[WF[_]: Coalesce]
+    (base: Base, field: DocVar, rest: List[BsonField.Name], wf: Fix[WF])
+    (implicit ev0: WorkflowOpCoreF :<: WF)
+      : Fix[WF] = {
+    val rst = ListMap(rest.map(f => f -> \/-($var(DocVar.ROOT(f)))) : _*)
+
+    chain(wf,
+      $project[WF](Reshape(rst ++ ListMap(
+        BsonField.Name("o") -> \/-(fixExprOp344.$objectToArray($var(base.toDocVar \\ field))))),
+        ExcludeId),
+      $unwind[WF](DocVar.ROOT(BsonField.Name("o")), None, None),
+      $project[WF](Reshape(rst ++
+        (base.toDocVar \\ field).deref.map(f =>
+          ListMap(f.flatten.head -> \/-($var(DocVar.ROOT(BsonField.Name("o")) \ BsonField.Name("v"))))).getOrElse(ListMap())),
+        ExcludeId))
+  }
 
   private def flattenFieldArrayUnwindProject[WF[_]: Coalesce]
     (base: Base, field: DocVar, idStatus: IdStatus, rest: List[BsonField.Name], wf: Fix[WF])
