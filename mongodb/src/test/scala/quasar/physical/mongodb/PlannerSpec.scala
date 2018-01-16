@@ -253,6 +253,11 @@ class PlannerSpec extends
       plan(sqlE"select b[*] + c[*] from intArrays"),
       IList(ReadOp, ProjectOp, UnwindOp, ProjectOp, ProjectOp, UnwindOp, MatchOp, ProjectOp))
 
+    "flatten array index" in {
+      plan(sqlE"""select loc[_:] from extraSmallZips where city like "A%" """) must
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, MatchOp, ProjectOp, UnwindOp, ProjectOp)))
+    }
+
     "unify flattened fields with unflattened field" in {
       plan(sqlE"select `_id` as zip, loc[*] from zips order by loc[*]") must
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, UnwindOp, ProjectOp, SortOp)))

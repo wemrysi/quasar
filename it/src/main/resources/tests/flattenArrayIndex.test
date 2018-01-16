@@ -1,0 +1,9 @@
+{
+    "name": "flatten array index",
+    "backends": {},
+    "data": "extraSmallZips.data",
+    "query": "select loc[_:] from extraSmallZips where city like \"A%\"",
+    "predicate": "exactly",
+    "ignoreResultOrder": false,
+    "expected": [0, 1, 0, 1, 0, 1]
+}

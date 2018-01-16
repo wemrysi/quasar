@@ -489,28 +489,40 @@ object WorkflowBuilder {
       (field, rest) match {
         case (StructureType.Array(field, quasar.qscript.ExcludeId), _) =>
           $unwind[WF](base.toDocVar \\ field, None, None).apply(acc)
-        case (StructureType.Array(field, quasar.qscript.IncludeId), Some(r)) =>
-          val rst = ListMap(r.map(f => f -> \/-($var(DocVar.ROOT(f)))) : _*)
-          chain(acc,
-            $unwind[WF](base.toDocVar \\ field, Some(BsonField.Name("ix")), None),
-            $project[WF](Reshape(rst ++
-              // TODO: mongo >= 3.4 has $addFields - should be able to plan without `rest` being known
-              // { $unwind: {path: "$f", includeArrayIndex: "ix"} } ,
-              // { $addFields: { "f": ["$ix", "$f"] } },
-              // { $project: { "ix": false } },
-              (base.toDocVar \\ field).deref.map(f => ListMap(f.flatten.head ->
-                \/-($arrayLit(List(
-                  $var(base.toDocVar \ BsonField.Name("ix")),
-                  $var(base.toDocVar \\ field)))))).getOrElse(ListMap())),
-              ExcludeId))
-        case (StructureType.Array(field, includeIndex), _) =>
-          flattenFieldMapReduce(base, field, includeIndex).apply(acc)
-        case (StructureType.Object(field, includeKey), _) =>
-          flattenFieldMapReduce(base, field, includeKey).apply(acc)
+        case (StructureType.Array(field, idStatus), Some(r)) =>
+          flattenFieldArrayUnwindProject(base, field, idStatus, r, acc)
+        case (StructureType.Array(field, idStatus), _) =>
+          flattenFieldMapReduce(base, field, idStatus).apply(acc)
+        case (StructureType.Object(field, idStatus), _) =>
+          flattenFieldMapReduce(base, field, idStatus).apply(acc)
       }
     }
 
-  private def flattenFieldMapReduce[WF[_]:Coalesce]
+  private def flattenFieldArrayUnwindProject[WF[_]: Coalesce]
+    (base: Base, field: DocVar, idStatus: IdStatus, rest: List[BsonField.Name], wf: Fix[WF])
+    (implicit ev0: WorkflowOpCoreF :<: WF)
+      : Fix[WF] = {
+    val rst = ListMap(rest.map(f => f -> \/-($var(DocVar.ROOT(f)))) : _*)
+    val prj = idStatus match {
+      case quasar.qscript.ExcludeId => $var(base.toDocVar \\ field)
+      case quasar.qscript.IdOnly => $var(DocField(BsonField.Name("ix")))
+      case quasar.qscript.IncludeId => $arrayLit(List(
+        $var(DocField(BsonField.Name("ix"))),
+        $var(base.toDocVar \\ field)))
+    }
+    chain(wf,
+      $unwind[WF](base.toDocVar \\ field, Some(BsonField.Name("ix")), None),
+      $project[WF](Reshape(rst ++
+        // TODO: mongo >= 3.4 has $addFields - should be able to plan without `rest` being known
+        // { $unwind: {path: "$f", includeArrayIndex: "ix"} } ,
+        // { $addFields: { "f": ["$ix", "$f"] } },
+        // { $project: { "ix": false } },
+        (base.toDocVar \\ field).deref.map(f => ListMap(f.flatten.head ->
+          \/-(prj))).getOrElse(ListMap())),
+        ExcludeId))
+  }
+
+  private def flattenFieldMapReduce[WF[_]: Coalesce]
     (base: Base, field: DocVar, idStatus: IdStatus)
     (implicit ev0: WorkflowOpCoreF :<: WF)
       : FixOp[WF] =
