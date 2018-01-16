@@ -22,13 +22,13 @@ import quasar.fp.ski._
 import quasar.{NameGenerator, qscript}
 import quasar.Planner.PlannerErrorME
 import Planner._
+import sql.Indirections._
 import sql.SqlExpr._
 import sql.{SqlExpr, _}
 import sql.SqlExpr.Select._
 import quasar.qscript.{FreeMap, MapFunc, MapFuncsCore, QScriptCore, QScriptTotal, ReduceFunc, ReduceFuncs}
 import quasar.qscript.{MapFuncCore => MFC}
 import quasar.qscript.{MapFuncDerived => MFD}
-import quasar.physical.rdbms.planner.sql.Indirections._
 import ReduceFuncs.Arbitrary
 
 import matryoshka._
@@ -67,7 +67,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       processFreeMap(f, SqlExpr.Null[T[SqlExpr]])
     case qscript.Map(src, f) =>
       for {
-        fromAlias <- genIdWithMeta[T[SqlExpr], F](deriveIndirection(src))
+        fromAlias <- genId[T[SqlExpr], F](deriveIndirection(src))
         selection <- processFreeMap(f, fromAlias)
           .map(_.project match {
             case SqlExpr.Id(_, _) => *
@@ -92,7 +92,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           }
       }
       for {
-        fromAlias <- genIdWithMeta[T[SqlExpr], F](deriveIndirection(src))
+        fromAlias <- genId[T[SqlExpr], F](deriveIndirection(src))
         orderByExprs <- order.traverse(createOrderBy(fromAlias))
         bucketExprs <- bucket.map((_, orderByExprs.head.sortDir)).traverse(createOrderBy(fromAlias))
       }
@@ -120,7 +120,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
 
     case qscript.Filter(src, f) =>
       for {
-        fromAlias <- genIdWithMeta[T[SqlExpr], F](deriveIndirection(src))
+        fromAlias <- genId[T[SqlExpr], F](deriveIndirection(src))
         filterExp <- processFreeMap(f, fromAlias)
       } yield {
       Select(
@@ -137,9 +137,9 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       (compile(left, src) |@| compile(right, src))(Union(_,_).embed)
 
     case DisctinctPattern(qscript.Reduce(src, _, _, _)) => for {
-      alias <- genId[T[SqlExpr], F]
+      alias <- genId[T[SqlExpr], F](Default)
     } yield Select(
-      Selection(Distinct[T[SqlExpr]](*).embed, none, Indirections.Default),
+      Selection(Distinct[T[SqlExpr]](*).embed, none, Default),
       From(src, alias),
       filter = none,
       join = none,
@@ -148,7 +148,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     ).embed
 
     case reduce@qscript.Reduce(src, bucket, reducers, repair) => for {
-      alias <- genIdWithMeta[T[SqlExpr], F](deriveIndirection(src))
+      alias <- genId[T[SqlExpr], F](deriveIndirection(src))
       gbs   <- bucket.traverse(processFreeMap(_, alias))
       rds   <- reducers.traverse(_.traverse(processFreeMap(_, alias)) >>=
         reduceFuncPlanner[T, F].plan)
@@ -160,7 +160,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         Planner.mapFuncPlanner[T, F].plan)
       )
     } yield Select(
-      Selection(rep, none, Indirections.Default),
+      Selection(rep, none, Default),
       From(src, alias),
       join = none,
       filter = none,

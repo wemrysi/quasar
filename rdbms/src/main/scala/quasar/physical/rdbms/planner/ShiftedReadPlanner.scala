@@ -39,8 +39,8 @@ class ShiftedReadPlanner[
 
   def plan: AlgebraM[F, Const[ShiftedRead[AFile], ?], R] = {
     case Const(semantics) =>
-      (genId[T[SqlExpr], F] |@|
-       genId[T[SqlExpr], F]) {
+      (genId[T[SqlExpr], F](Default) |@|
+        genId[T[SqlExpr], F](Default)) {
         case (fromAlias, rowAlias) =>
         val from: From[R] = From(
           Table[R](TablePath.create(semantics.path).shows).embed,

@@ -19,7 +19,7 @@ package quasar.physical.rdbms.planner
 import quasar.fp.ski._
 import quasar.NameGenerator
 import quasar.Planner.PlannerErrorME
-import quasar.physical.rdbms.planner.sql.{SqlExpr, genIdWithMeta}
+import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
 import SqlExpr._
 import quasar.qscript.{EquiJoin, FreeMap, JoinFunc, LeftSide, MapFunc, QScriptTotal, RightSide}
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select.AllCols
@@ -64,8 +64,8 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         right <- rBranch.cataM(interpretM(κ(src.point[F]), compile))
         lMeta = deriveIndirection(left)
         rMeta = deriveIndirection(right)
-        leftAlias <- genIdWithMeta[T[SqlExpr], F](lMeta)
-        rightAlias <- genIdWithMeta[T[SqlExpr], F](rMeta)
+        leftAlias <- genId[T[SqlExpr], F](lMeta)
+        rightAlias <- genId[T[SqlExpr], F](rMeta)
         combined <- processJoinFunc(combine, leftAlias, rightAlias)
         keyExprs <-
           keys.traverse {
