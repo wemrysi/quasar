@@ -30,12 +30,7 @@ object timedump {
 
   def service[S[_]](repo: TimingRepository)(
     implicit
-    R: ReadFile.Ops[S],
-    W: WriteFile.Ops[S],
-    M: ManageFile.Ops[S],
-    Q: QueryFile.Ops[S],
-    S0: Task :<: S,
-    S1: FileSystemFailure :<: S
+    S0: Task :<: S
   ): QHttpService[S] = QHttpService {
       case req @ GET -> _ =>
         respond(Free.liftF(S0(for {
