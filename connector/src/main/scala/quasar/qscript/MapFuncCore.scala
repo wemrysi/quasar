@@ -111,11 +111,9 @@ object MapFuncCore {
   }
 
   object StaticMap {
-    def apply[T[_[_]]: CorecursiveT, A](elems: List[(T[EJson], FreeMapA[T, A])]): FreeMapA[T, A] =
-      elems.map(e => Free.roll(MFC(MakeMap[T, FreeMapA[T, A]](Free.roll(MFC(Constant(e._1))), e._2)))) match {
-        case Nil    => Free.roll(MFC(EmptyMap[T, FreeMapA[T, A]]))
-        case h :: t => t.foldLeft(h)((a, e) => Free.roll(MFC(ConcatMaps(a, e))))
-      }
+    def apply[T[_[_]]: BirecursiveT, A](elems: List[(T[EJson], FreeMapA[T, A])]): FreeMapA[T, A] = {
+      construction.Func[T].StaticMap(elems: _*)
+    }
 
     def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A]):
         Option[List[(T[EJson], FreeMapA[T, A])]] =
@@ -245,39 +243,6 @@ object MapFuncCore {
       case _                   => NonEmptyList(fm)
     }
 
-  // NB: This _could_ be combined with `rewrite`, but it causes rewriting to
-  //     take way too long, so instead we apply it separately afterward.
-  /** Pulls conditional `Undefined`s as far up an expression as possible. */
-  def extractGuards[T[_[_]]: BirecursiveT: EqualT, A: Equal]
-      : CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
-    _.run.toOption >>= (MFC.unapply) >>= {
-      // NB: The last case pulls guards into a wider scope, and we want to avoid
-      //     doing that for certain MapFuncs, so we add explicit `none`s.
-      case Guard(_, _, _, _)
-         | IfUndefined(_, _)
-         | MakeArray(_)
-         | MakeMap(_, _)
-         | Or(_, _) => none
-      // TODO: This should be able to extract a guard where _either_ side is
-      //       `Undefined`, and should also extract `Cond` with `Undefined` on a
-      //       branch.
-      case func =>
-        val writer =
-          func.traverse[Writer[List[(FreeMapA[T, A], Type)], ?], FreeMapA[T, A]] {
-            case Embed(CoEnv(\/-(MFC(Guard(e, t, s, ExtractFunc(Undefined())))))) =>
-              Writer(List((e, t)), s)
-            case arg => Writer(Nil, arg)
-          }
-        writer.written match {
-          case Nil    => none
-          case guards =>
-            rollMF[T, A](guards.distinctE.foldRight(MFC(writer.value)) {
-              case ((e, t), s) =>
-                MFC(Guard(e, t, Free.roll(s), Free.roll(MFC(Undefined[T, FreeMapA[T, A]]()))))
-            }).some
-        }
-    }
-
   /** Converts conditional `Undefined`s into conditions that can be used in a
     * `Filter`.
     *
@@ -364,7 +329,7 @@ object MapFuncCore {
 
       // TODO: Generalize this to `StaticMapSuffix`.
       case DeleteKey(
-        Embed(CoEnv(\/-(MFC(ConcatMaps(m, Embed(CoEnv(\/-(MFC(MakeMap(k, _)))))))))),
+        ExtractFunc(ConcatMaps(m, ExtractFunc(MakeMap(k, _)))),
         f)
           if k ≟ f =>
         rollMF[T, A](MFC(DeleteKey(m, f))).some
@@ -375,34 +340,32 @@ object MapFuncCore {
           if index.isValidInt =>
         as.lift(index.intValue).map(_.project)
 
+      case ProjectIndex(
+        ExtractFunc(Cond(cond, Embed(StaticArrayPrefix(consArr)), Embed(StaticArrayPrefix(altArr)))),
+        ExtractFunc(Constant(Embed(EX(ejson.Int(index))))))
+          if index.isValidInt =>
+        (consArr.lift(index.intValue) |@| altArr.lift(index.intValue)) {
+          case (cons, alt) => rollMF[T, A](MFC(Cond(cond, cons, alt)))
+        }
+
       case ProjectKey(
         Embed(StaticMap(map)),
         ExtractFunc(Constant(key))) =>
         map.reverse.find(_._1 ≟ key) ∘ (_._2.project)
 
       case ProjectKey(
-        Embed(CoEnv(\/-(MFC(Cond(cond, Embed(StaticMap(consMap)), Embed(StaticMap(altMap))))))),
+        ExtractFunc(Cond(cond, Embed(StaticMap(consMap)), Embed(StaticMap(altMap)))),
         ExtractFunc(Constant(key))) =>
-        (consMap.reverse.find(_._1 ≟ key) ∘ (_._2) |@| altMap.reverse.find(_._1 ≟ key) ∘ (_._2)) {
-          case (cons, alt) => rollMF[T, A](MFC(Cond(cond, cons, alt)))
+        (consMap.reverse.find(_._1 ≟ key) |@| altMap.reverse.find(_._1 ≟ key)) {
+          case ((_, cons), (_, alt)) => rollMF[T, A](MFC(Cond(cond, cons, alt)))
         }
 
-      case ProjectKey(
-        Embed(CoEnv(\/-(MFC(Cond(cond, Embed(StaticMap(map)), alt))))),
-        ExtractFunc(Constant(key))) =>
-        map.reverse.find(_._1 ≟ key) ∘ (_._2) ∘ (v => rollMF[T, A](MFC(Cond(cond, v, alt))))
-
-      case ProjectKey(
-        Embed(CoEnv(\/-(MFC(Cond(cond, cons, Embed(StaticMap(map))))))),
-        ExtractFunc(Constant(key))) =>
-        map.reverse.find(_._1 ≟ key) ∘ (_._2) ∘ (v => rollMF[T, A](MFC(Cond(cond, cons, v))))
-
       // TODO: Generalize these to `StaticMapSuffix`
-      case ProjectKey(Embed(CoEnv(\/-(MFC(MakeMap(k, Embed(v)))))), f) if k ≟ f =>
+      case ProjectKey(ExtractFunc(MakeMap(k, Embed(v))), f) if k ≟ f =>
         v.some
 
       case ProjectKey(
-        Embed(CoEnv(\/-(MFC(ConcatMaps(_, Embed(CoEnv(\/-(MFC(MakeMap(k, Embed(v))))))))))),
+        ExtractFunc(ConcatMaps(_, ExtractFunc(MakeMap(k, Embed(v))))),
         f)
           if k ≟ f =>
         v.some

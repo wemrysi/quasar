@@ -221,8 +221,9 @@ object Server {
                  // TODO: Figure out why it's necessary to use a `Task` that never completes to keep the main thread
                  // from completing instead of simply relying on the fact that the server is using a pool of
                  // non-daemon threads to ensure the application doesn't shutdown
-                 _        <- waitForUserEnter.ifM(shutdown, Task.async[Unit](_ => ()))
-               } yield ()).liftM[MainErrT]
+                 waited   <- waitForUserEnter
+                 _        <- waited.whenM(shutdown)
+               } yield waited).liftM[MainErrT]
              },
              persistMetaStore(webCmdLineCfg.configPath))
     } yield ())

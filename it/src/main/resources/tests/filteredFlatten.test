@@ -2,8 +2,6 @@
     "name": "filter flattened field",
 
     "backends": {
-      "marklogic_json": "pending",
-      "marklogic_xml": "pending"
     },
 
     "data": "demo/patients.data",

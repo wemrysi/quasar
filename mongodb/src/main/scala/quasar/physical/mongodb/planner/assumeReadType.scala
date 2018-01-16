@@ -138,10 +138,10 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
                 case h :: t => GtoF.reverseGet(
                   QC(Filter(src, t.foldLeft[FreeMap[T]](h)((acc, e) => Free.roll(MFC(MapFuncsCore.And(acc, e)))))))
               })
-        case QC(LeftShift(src, struct, id, stpe, repair))
+        case QC(LeftShift(src, struct, id, stpe, onUndef, repair))
           if (isRewrite[T, F, G, A](GtoF, src.project)) =>
             (elide(struct) ⊛
-              elideJoinFunc(true, LeftSide, repair))((s, r) => GtoF.reverseGet(QC(LeftShift(src, s, id, stpe, r))))
+              elideJoinFunc(true, LeftSide, repair))((s, r) => GtoF.reverseGet(QC(LeftShift(src, s, id, stpe, onUndef, r))))
         case QC(qscript.Map(src, mf))
           if (isRewrite[T, F, G, A](GtoF, src.project)) =>
             elide(mf) ∘
