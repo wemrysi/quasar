@@ -120,27 +120,18 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     case qscript.Unreferenced() => unref.point[F]
 
     case qscript.Filter(src, f) =>
-      src.project match {
-        case s@Select(_, From(_, initialFromAlias), _, initialFilter, _,  _) =>
-          val injectedFilterExpr = processFreeMap(f, initialFromAlias)
-          injectedFilterExpr.map { fe =>
-            val finalFilterExpr = initialFilter.map(i => And[T[SqlExpr]](i.v, fe).embed).getOrElse(fe)
-            s.copy(filter = Some(Filter[T[SqlExpr]](finalFilterExpr))).embed
-          }
-        case other =>
-          for {
-            fromAlias <- genIdWithMeta[T[SqlExpr], F](deriveIndirection(src))
-            filterExp <- processFreeMap(f, fromAlias)
-          } yield {
-          Select(
-            Selection(*, none, deriveIndirection(src)),
-            From(src, fromAlias),
-            join = none,
-            Some(Filter(filterExp)),
-            groupBy = none,
-            orderBy = nil
-          ).embed
-      }
+      for {
+        fromAlias <- genIdWithMeta[T[SqlExpr], F](deriveIndirection(src))
+        filterExp <- processFreeMap(f, fromAlias)
+      } yield {
+      Select(
+        Selection(*, none, deriveIndirection(src)),
+        From(src, fromAlias),
+        join = none,
+        Some(Filter(filterExp)),
+        groupBy = none,
+        orderBy = nil
+      ).embed
     }
 
     case qUnion@qscript.Union(src, left, right) =>
