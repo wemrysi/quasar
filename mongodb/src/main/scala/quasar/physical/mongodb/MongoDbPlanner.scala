@@ -638,6 +638,18 @@ object MongoDbPlanner {
 
     type Output = OutputM[PartialSelector[T]]
 
+    def invoke2Rel[T[_[_]]](x: OutputM[PartialSelector[T]], y: OutputM[PartialSelector[T]])(f: (Selector, Selector) => Selector):
+        OutputM[PartialSelector[T]] =
+      (x.toOption, y.toOption) match {
+        case (Some((f1, p1)), Some((f2, p2)))=>
+          invoke2Nel(x, y)(f)
+        case (Some((f1, p1)), None) =>
+          (f1, p1.map(There(0, _))).right
+        case (None, Some((f2, p2))) =>
+          (f2, p2.map(There(1, _))).right
+        case _ => InternalError.fromMsg(node.map(_._1).shows).left
+      }
+
     object IsBson {
       def unapply(x: (T[MapFunc[T, ?]], Output)): Option[Bson] =
         x._1.project match {
@@ -794,13 +806,15 @@ object MongoDbPlanner {
             },
               List(There(0, Here[T]()))))
 
+          case MFC(MakeMap((_, _), (_, v))) =>
+            v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+
+          case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
+
           case MFC(Not((_, v))) =>
             v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
 
           case MFC(Cond((_, v), _, _)) =>
-            v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-
-          case MFC(ProjectKey((Embed(MFC(Cond(_, _, _))), v), _)) =>
             v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
 
           case MFC(Guard(_, typ, (_, cont), (Embed(MFC(Undefined())), _))) =>
@@ -927,6 +941,9 @@ object MongoDbPlanner {
 
             val selectors = getSelector[T, M, EX, Hole](
               struct, InternalError.fromMsg("Not a selector").left, selector[T](cfg.bsonVersion))
+
+            val repairSelectors = getSelector[T, M, EX, JoinSide](
+              repair, InternalError.fromMsg("Not a selector").left, selector[T](cfg.bsonVersion) map (_ <+> defaultSelector[T].right))
 
             if (repair.contains(LeftSideF)) {
               val exprMerge: JoinFunc[T] => M[Fix[ExprOp]] =
