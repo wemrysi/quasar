@@ -114,7 +114,8 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
   private def recordAccesses[F[_]: Foldable](by: Symbol, fa: F[QAccess[Symbol]]): References =
     fa.foldLeft(References.noRefs[T, T[EJson]])((r, a) => r.recordAccess(by, a, defaultAccess(a)))
 
-  private final case class ReifyState(status: ReifiedStatus, refs: References) {
+  // We can't use final here due to SI-4440 - it results in warning
+  private case class ReifyState(status: ReifiedStatus, refs: References) {
     lazy val seen: ISet[Symbol] = status.keySet
   }
 
@@ -126,6 +127,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
   private def gatherReferences(g: QSUGraph): References =
     g.foldMapUp(g => g.unfold.map(_.root) match {
+      case QSU.Distinct(source) =>
+        recordAccesses[Id](g.root, Access.value(source))
+
       case QSU.LeftShift(source, _, _, repair, _) =>
         recordAccesses(g.root, shiftTargetAccess(source, repair))
 
@@ -157,7 +161,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       G.gets(_.status.lookup(g.root) getOrElse false)
 
     def freshName: F[Symbol] =
-      NameGenerator[F].prefixedName("reify") map (Symbol(_))
+      freshSymbol("reifyids")
 
     def isReferenced(access: QAccess[Symbol]): G[Boolean] =
       G.gets(_.refs.accessed.member(access))
@@ -177,9 +181,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       makeI[Id, A](sym -> id)
 
     def makeIV[A](initialI: FreeMapA[A], initialV: FreeMapA[A]): FreeMapA[A] =
-      func.ConcatMaps(
-        func.MakeMapS(IdentitiesK, initialI),
-        func.MakeMapS(ValueK, initialV))
+      func.StaticMapS(
+        IdentitiesK -> initialI,
+        ValueK -> initialV)
 
     def modifyAccess(of: QAccess[Symbol])(f: FreeMap => FreeMap): G[Unit] =
       G.modify(reifyRefs.modify(_.modifyAccess(of)(f)))
