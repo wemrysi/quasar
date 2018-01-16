@@ -254,7 +254,7 @@ class PlannerSpec extends
       IList(ReadOp, ProjectOp, UnwindOp, ProjectOp, ProjectOp, UnwindOp, MatchOp, ProjectOp))
 
     "flatten array index" in {
-      plan(sqlE"""select loc[_:] from extraSmallZips where city like "A%" """) must
+      plan(sqlE"""select loc[*:] from extraSmallZips where city like "A%" """) must
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, MatchOp, ProjectOp, UnwindOp, ProjectOp)))
     }
 
