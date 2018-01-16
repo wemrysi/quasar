@@ -307,15 +307,15 @@ abstract class StdLibSpec extends Qspec {
     "DateLib" >> {
       import DateLib._
       def unaryB[I](
-                 prg: Fix[LogicalPlan] => Fix[LogicalPlan],
-                 input: I, expected: Data)(implicit arbF: Arbitrary[Builder[I, Data]]): Prop =
+          prg: Fix[LogicalPlan] => Fix[LogicalPlan],
+          input: I, expected: Data)(implicit arbF: Arbitrary[Builder[I, Data]]): Prop =
         prop { (b: Builder[I, Data]) =>
           unary(prg, b.f(input), expected)
         }
 
       def unaryBE[I](
-                     prg: Fix[LogicalPlan] => Fix[LogicalPlan],
-                     input: I, expected: I)(implicit arbF: Arbitrary[Builder[I, Data]]): Prop =
+          prg: Fix[LogicalPlan] => Fix[LogicalPlan],
+          input: I, expected: I)(implicit arbF: Arbitrary[Builder[I, Data]]): Prop =
         prop { (b: Builder[I, Data]) =>
           unary(prg, b.f(input), b.f(expected))
         }

@@ -37,9 +37,7 @@ trait DataGenerators {
       genNested(genKey, simpleData),
       // Tricky cases: (TODO: These belong in MongoDB tests somewhere.)
       const(Obj("$date" -> Str("Jan 1"))),
-      SafeInt ^^ (x => Obj("$obj" -> Obj("$obj" -> Data.Int(x))))
-    )
-  )
+      SafeInt ^^ (x => Obj("$obj" -> Obj("$obj" -> Data.Int(x))))))
 
   implicit def dataShrink(implicit l: Shrink[List[Data]], m: Shrink[ListMap[String, Data]]): Shrink[Data] = Shrink {
     case Data.Arr(value) => l.shrink(value).map(Data.Arr(_))
@@ -74,8 +72,7 @@ object DataGenerators extends DataGenerators {
 
   def genNested(genKey: Gen[String], genAtomicData: Gen[Data]): Gen[Data] = Gen.oneOf[Data](
     (genKey, genAtomicData).zip.list ^^ (xs => Data.Obj(xs: _*)),
-    genAtomicData.list ^^ Data.Arr
-  )
+    genAtomicData.list ^^ Data.Arr)
 
   /** Generator of atomic Data (everything but Obj and Arr). */
   def genAtomicData(strSrc: Gen[String], intSrc: Gen[BigInt], decSrc: Gen[BigDecimal], idSrc: Gen[String]): Gen[Data] = {
@@ -95,8 +92,7 @@ object DataGenerators extends DataGenerators {
       genLocalDate      ^^ LocalDate,
       genLocalTime      ^^ LocalTime,
       arrayOf(genByte)  ^^ Binary.fromArray,
-      idSrc             ^^ Id
-    )
+      idSrc             ^^ Id)
   }
 
   import TemporalPart._
@@ -111,20 +107,17 @@ object DataGenerators extends DataGenerators {
     genOffsetDate.map(datetime.lensDateOffsetDate(_).map[Data](DOffsetDate)),
     genLocalDate.map(datetime.lensDateLocalDate(_).map[Data](LocalDate)),
     genLocalDateTime.map(datetime.lensDateLocalDateTime(_).map[Data](LocalDateTime)),
-    genOffsetDateTime.map(datetime.lensDateOffsetDateTime(_).map[Data](OffsetDateTime))
-  )
+    genOffsetDateTime.map(datetime.lensDateOffsetDateTime(_).map[Data](OffsetDateTime)))
 
   implicit val genTimeStore: Arbitrary[Store[JLocalTime, Data]] = Gen.oneOf[Store[JLocalTime, Data]](
     genOffsetTime.map(datetime.lensTimeOffsetTime(_).map[Data](OffsetTime)),
     genLocalTime.map(datetime.lensTimeLocalTime(_).map[Data](LocalTime)),
     genLocalDateTime.map(datetime.lensTimeLocalDateTime(_).map[Data](LocalDateTime)),
-    genOffsetDateTime.map(datetime.lensTimeOffsetDateTime(_).map[Data](OffsetDateTime))
-  )
+    genOffsetDateTime.map(datetime.lensTimeOffsetDateTime(_).map[Data](OffsetDateTime)))
 
   implicit val genDateTimeStore: Arbitrary[Store[JLocalDateTime, Data]] = Gen.oneOf[Store[JLocalDateTime, Data]](
     genLocalDateTime.map(datetime.lensDateTimeLocalDateTime(_).map[Data](LocalDateTime)),
-    genOffsetDateTime.map(datetime.lensDateTimeOffsetDateTime(_).map[Data](OffsetDateTime))
-  )
+    genOffsetDateTime.map(datetime.lensDateTimeOffsetDateTime(_).map[Data](OffsetDateTime)))
 
   final case class Builder[-I, +O](f: I => O)
 
@@ -132,19 +125,15 @@ object DataGenerators extends DataGenerators {
     Builder[JLocalDate, Data](ld => DOffsetDate(OffsetDate(ld, ZoneOffset.UTC))),
     Builder[JLocalDate, Data](LocalDate),
     Builder[JLocalDate, Data](ld => LocalDateTime(JLocalDateTime.of(ld, JLocalTime.MIN))),
-    Builder[JLocalDate, Data](ld => OffsetDateTime(JOffsetDateTime.of(ld, JLocalTime.MIN, ZoneOffset.UTC)))
-  )
+    Builder[JLocalDate, Data](ld => OffsetDateTime(JOffsetDateTime.of(ld, JLocalTime.MIN, ZoneOffset.UTC))))
 
   implicit val genTimeBuilder: Arbitrary[Builder[JLocalTime, Data]] = Gen.oneOf[Builder[JLocalTime, Data]](
     Builder[JLocalTime, Data](lt => OffsetTime(JOffsetTime.of(lt, ZoneOffset.UTC))),
     Builder[JLocalTime, Data](LocalTime),
     Builder[JLocalTime, Data](lt => LocalDateTime(JLocalDateTime.of(JLocalDate.MIN, lt))),
-    Builder[JLocalTime, Data](lt => OffsetDateTime(JOffsetDateTime.of(JLocalDate.MIN, lt, ZoneOffset.UTC)))
-  )
+    Builder[JLocalTime, Data](lt => OffsetDateTime(JOffsetDateTime.of(JLocalDate.MIN, lt, ZoneOffset.UTC))))
 
   implicit val genDateTimeBuilder: Arbitrary[Builder[JLocalDateTime, Data]] = Gen.oneOf[Builder[JLocalDateTime, Data]](
     Builder[JLocalDateTime, Data](LocalDateTime),
-    Builder[JLocalDateTime, Data](ldt => OffsetDateTime(JOffsetDateTime.of(ldt, ZoneOffset.UTC)))
-  )
-
+    Builder[JLocalDateTime, Data](ldt => OffsetDateTime(JOffsetDateTime.of(ldt, ZoneOffset.UTC))))
 }
