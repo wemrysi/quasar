@@ -47,9 +47,9 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
   val rollS = Free.roll[EJson, Figure] _
 
   val joinFunc =
-    func.ConcatMaps(
-      func.MakeMap(func.Constant(Fix(CommonEJson(ejson.Str("left")))), LeftSideF),
-      func.MakeMap(func.Constant(Fix(CommonEJson(ejson.Str("right")))), RightSideF))
+    func.StaticMapS(
+      "left" -> func.LeftSide,
+      "right" -> func.RightSide)
 
   val modSides: (Shape, Shape) => Shape =
     (l, r) => rollS(ExtEJson(ejson.Map(List(
@@ -228,11 +228,11 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
 
     "LeftShift(IncludeId) results in shape of repair applied to static array" >> prop { srcShape: Shape =>
       val r = rollS(CommonEJson(ejson.Arr(List(unknownF, unknownF))))
-      outlineQC(LeftShift(srcShape, func.Hole, IncludeId, ShiftType.Array, joinFunc)) must_= modSides(srcShape, r)
+      outlineQC(LeftShift(srcShape, func.Hole, IncludeId, ShiftType.Array, OnUndefined.Omit, joinFunc)) must_= modSides(srcShape, r)
     }
 
     "RightSide of repair is unknown when not IncludeId" >> prop { srcShape: Shape =>
-      outlineQC(LeftShift(srcShape, func.Hole, ExcludeId, ShiftType.Array, joinFunc)) must_= modSides(srcShape, unknownF)
+      outlineQC(LeftShift(srcShape, func.Hole, ExcludeId, ShiftType.Array, OnUndefined.Omit, joinFunc)) must_= modSides(srcShape, unknownF)
     }
 
     "Reduce tracks static input shape through buckets" >> prop { srcShape: Shape =>

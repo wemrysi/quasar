@@ -22,7 +22,6 @@ import quasar.NameGenerator
 import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.common.SortDir
 import quasar.qscript.{construction, JoinSide, LeftSide, RightSide}
-import quasar.qscript.MapFuncsCore.StrLit
 import quasar.sql.JoinDir
 
 import matryoshka.BirecursiveT
@@ -63,9 +62,9 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
 
     case graph @ Extractors.LPJoin(left, right, cond, jtype, lref, rref) =>
       val combiner: JoinFunc =
-        func.ConcatMaps(
-          func.MakeMap(StrLit[T, JoinSide](JoinDir.Left.name), func.LeftSide),
-          func.MakeMap(StrLit[T, JoinSide](JoinDir.Right.name), func.RightSide))
+        func.StaticMapS(
+          JoinDir.Left.name -> func.LeftSide,
+          JoinDir.Right.name -> func.RightSide)
 
       MappableRegion.funcOf(replaceRefs(graph, lref, rref), graph refocus cond.root)
         .map(jf => ThetaJoin(left.root, right.root, jf, jtype, combiner)) match {
@@ -92,7 +91,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
       def autojoinVerts(head: Symbol, tail: List[Symbol]): F[(Symbol, QSUVerts[T])] = {
         freshName[F].flatMap { joinRoot =>
           val join: QSU[Symbol] = AutoJoin2(src.root, head,
-            func.ConcatMaps(func.MakeMapS("sort_source", func.LeftSide), func.MakeMapS(head.name, func.RightSide)))
+            func.StaticMapS("sort_source" -> func.LeftSide, head.name -> func.RightSide))
 
 	      val updated: QSUVerts[T] = graph.vertices.updated(joinRoot, join)
 
@@ -156,9 +155,9 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
 
         case None => (freshName[F] |@| freshName[F]) {
           case (joinRoot, interRoot) =>
-            val combine: JoinFunc = func.ConcatMaps(
-              func.MakeMap(StrLit(srcName), func.LeftSide),
-              func.MakeMap(StrLit(targetName), func.RightSide))
+            val combine: JoinFunc = func.StaticMapS(
+              srcName -> func.LeftSide,
+              targetName -> func.RightSide)
 
             val join: QSU[Symbol] = AutoJoin2(src, target, combine)
             val inter: QSU[Symbol] = makeQSU(joinRoot, func.ProjectKeyS(func.Hole, targetName))
