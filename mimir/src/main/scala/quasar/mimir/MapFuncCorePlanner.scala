@@ -87,12 +87,12 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         (Map1[A](a1, cake.Library.ExtractQuarter.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractSecond(a1) =>
         (Map1[A](a1, cake.Library.ExtractSecond.f1): TransSpec[A]).point[F]
-      case MapFuncsCore.ExtractTimezone(a1) =>
-        (Map1[A](a1, cake.Library.ExtractTimezone.f1): TransSpec[A]).point[F]
-      case MapFuncsCore.ExtractTimezoneHour(a1) =>
-        (Map1[A](a1, cake.Library.ExtractTimezoneHour.f1): TransSpec[A]).point[F]
-      case MapFuncsCore.ExtractTimezoneMinute(a1) =>
-        (Map1[A](a1, cake.Library.ExtractTimezoneMinute.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractTimeZone(a1) =>
+        (Map1[A](a1, cake.Library.ExtractTimeZone.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractTimeZoneHour(a1) =>
+        (Map1[A](a1, cake.Library.ExtractTimeZoneHour.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractTimeZoneMinute(a1) =>
+        (Map1[A](a1, cake.Library.ExtractTimeZoneMinute.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractWeek(a1) =>
         (Map1[A](a1, cake.Library.ExtractWeek.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractYear(a1) =>
@@ -119,12 +119,12 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         (Map1[A](a1, cake.Library.TimeOfDay.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ToTimestamp(a1) => ???
       case MapFuncsCore.Now() => ???
-      case MapFuncsCore.SetTimezone(a1, v) =>
-        (Map2[A](a1, v, cake.Library.SetTimezone.f2): TransSpec[A]).point[F]
-      case MapFuncsCore.SetTimezoneHour(a1, v) =>
-        (Map2[A](a1, v, cake.Library.SetTimezoneHour.f2): TransSpec[A]).point[F]
-      case MapFuncsCore.SetTimezoneMinute(a1, v) =>
-        (Map2[A](a1, v, cake.Library.SetTimezoneMinute.f2): TransSpec[A]).point[F]
+      case MapFuncsCore.SetTimeZone(a1, v) =>
+        (Map2[A](a1, v, cake.Library.SetTimeZone.f2): TransSpec[A]).point[F]
+      case MapFuncsCore.SetTimeZoneHour(a1, v) =>
+        (Map2[A](a1, v, cake.Library.SetTimeZoneHour.f2): TransSpec[A]).point[F]
+      case MapFuncsCore.SetTimeZoneMinute(a1, v) =>
+        (Map2[A](a1, v, cake.Library.SetTimeZoneMinute.f2): TransSpec[A]).point[F]
 
       case MapFuncsCore.TypeOf(a1) => ???
       case MapFuncsCore.ToId(a1) => ???

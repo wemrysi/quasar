@@ -236,9 +236,9 @@ class StdLibTypeCoherenceSpec extends quasar.Qspec with quasar.TypeGenerators {
   }
 
   "DateLib" >> {
-    testCoherence("SetTimezone", DateLib.SetTimezone)  
-    testCoherence("SetTimezoneMinute", DateLib.SetTimezoneMinute)  
-    testCoherence("SetTimezoneHour", DateLib.SetTimezoneHour)  
+    testCoherence("SetTimeZone", DateLib.SetTimeZone)  
+    testCoherence("SetTimeZoneMinute", DateLib.SetTimeZoneMinute)  
+    testCoherence("SetTimeZoneHour", DateLib.SetTimeZoneHour)  
     testCoherence("ExtractCentury", DateLib.ExtractCentury)
     testCoherence("ExtractDayOfMonth", DateLib.ExtractDayOfMonth)
     testCoherence("ExtractDecade", DateLib.ExtractDecade)
@@ -255,9 +255,9 @@ class StdLibTypeCoherenceSpec extends quasar.Qspec with quasar.TypeGenerators {
     testCoherence("ExtractMonth", DateLib.ExtractMonth)
     testCoherence("ExtractQuarter", DateLib.ExtractQuarter)
     testCoherence("ExtractSecond", DateLib.ExtractSecond)
-    testCoherence("ExtractTimezone", DateLib.ExtractTimezone)
-    testCoherence("ExtractTimezoneHour", DateLib.ExtractTimezoneHour)
-    testCoherence("ExtractTimezoneMinute", DateLib.ExtractTimezoneMinute)
+    testCoherence("ExtractTimeZone", DateLib.ExtractTimeZone)
+    testCoherence("ExtractTimeZoneHour", DateLib.ExtractTimeZoneHour)
+    testCoherence("ExtractTimeZoneMinute", DateLib.ExtractTimeZoneMinute)
     testCoherence("ExtractWeek", DateLib.ExtractWeek)
     testCoherence("ExtractYear", DateLib.ExtractYear)
 

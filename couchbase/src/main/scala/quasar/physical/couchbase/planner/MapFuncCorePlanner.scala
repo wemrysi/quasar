@@ -253,11 +253,11 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
         extract(a1, second),
         Div(extract(a1, millisecond), int(1000)).embed
       ).embed.η[F]
-    case MF.ExtractTimezone(a1) =>
+    case MF.ExtractTimeZone(a1) =>
       extract(a1, timezone).η[F]
-    case MF.ExtractTimezoneHour(a1) =>
+    case MF.ExtractTimeZoneHour(a1) =>
       extract(a1, timezoneHour).η[F]
-    case MF.ExtractTimezoneMinute(a1) =>
+    case MF.ExtractTimeZoneMinute(a1) =>
       extract(a1, timezoneMinute).η[F]
     case MF.ExtractWeek(a1) =>
       extract(a1, isoWeek).η[F]
@@ -383,11 +383,11 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
       )(
         Else(RegexContains(a1, ConcatStr(str("(?s)"), a2).embed).embed)
       ).embed.η[F]
-    case MF.SetTimezone(a1, a2)   =>
+    case MF.SetTimeZone(a1, a2)   =>
       ???
-    case MF.SetTimezoneMinute(a1, a2)   =>
+    case MF.SetTimeZoneMinute(a1, a2)   =>
       ???
-    case MF.SetTimezoneHour(a1, a2)   =>
+    case MF.SetTimeZoneHour(a1, a2)   =>
       ???
     case MF.Split(a1, a2)         =>
       Split(a1, a2).embed.η[F]

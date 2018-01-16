@@ -596,39 +596,39 @@ abstract class StdLibSpec extends Qspec {
         }
       }
 
-      "ExtractTimezone" >> {
+      "ExtractTimeZone" >> {
         "2016-01-01+01:01:01" >> {
-          unary(ExtractTimezone(_).embed, Data.OffsetDate(quasar.OffsetDate.parse("2016-01-01+01:01:01")), Data.Int(3661))
+          unary(ExtractTimeZone(_).embed, Data.OffsetDate(quasar.OffsetDate.parse("2016-01-01+01:01:01")), Data.Int(3661))
         }
         "01:02:03+01:01:01" >> {
-          unary(ExtractTimezone(_).embed, Data.OffsetTime(JOffsetTime.parse("01:02:03+01:01:01")), Data.Int(3661))
+          unary(ExtractTimeZone(_).embed, Data.OffsetTime(JOffsetTime.parse("01:02:03+01:01:01")), Data.Int(3661))
         }
         "2016-01-01T01:02:03+01:01:01" >> {
-          unary(ExtractTimezone(_).embed, Data.OffsetDateTime(JOffsetDateTime.parse("2016-01-01T01:02:03+01:01:01")), Data.Int(3661))
+          unary(ExtractTimeZone(_).embed, Data.OffsetDateTime(JOffsetDateTime.parse("2016-01-01T01:02:03+01:01:01")), Data.Int(3661))
         }
       }
 
-      "ExtractTimezoneMinute" >> {
+      "ExtractTimeZoneMinute" >> {
         "2016-01-01+01:01:01" >> {
-          unary(ExtractTimezoneMinute(_).embed, Data.OffsetDate(quasar.OffsetDate.parse("2016-01-01+01:01:01")), Data.Int(1))
+          unary(ExtractTimeZoneMinute(_).embed, Data.OffsetDate(quasar.OffsetDate.parse("2016-01-01+01:01:01")), Data.Int(1))
         }
         "01:02:03+01:01:01" >> {
-          unary(ExtractTimezoneMinute(_).embed, Data.OffsetTime(JOffsetTime.parse("01:02:03+01:01:01")), Data.Int(1))
+          unary(ExtractTimeZoneMinute(_).embed, Data.OffsetTime(JOffsetTime.parse("01:02:03+01:01:01")), Data.Int(1))
         }
         "2016-01-01T01:02:03+01:01:01" >> {
-          unary(ExtractTimezoneMinute(_).embed, Data.OffsetDateTime(JOffsetDateTime.parse("2016-01-01T01:02:03+01:01:01")), Data.Int(1))
+          unary(ExtractTimeZoneMinute(_).embed, Data.OffsetDateTime(JOffsetDateTime.parse("2016-01-01T01:02:03+01:01:01")), Data.Int(1))
         }
       }
 
-      "ExtractTimezoneHour" >> {
+      "ExtractTimeZoneHour" >> {
         "2016-01-01+01:01:01" >> {
-          unary(ExtractTimezoneHour(_).embed, Data.OffsetDate(quasar.OffsetDate.parse("2016-01-01+01:01:01")), Data.Int(1))
+          unary(ExtractTimeZoneHour(_).embed, Data.OffsetDate(quasar.OffsetDate.parse("2016-01-01+01:01:01")), Data.Int(1))
         }
         "01:02:03+01:01:01" >> {
-          unary(ExtractTimezoneHour(_).embed, Data.OffsetTime(JOffsetTime.parse("01:02:03+01:01:01")), Data.Int(1))
+          unary(ExtractTimeZoneHour(_).embed, Data.OffsetTime(JOffsetTime.parse("01:02:03+01:01:01")), Data.Int(1))
         }
         "2016-01-01T01:02:03+01:01:01" >> {
-          unary(ExtractTimezoneHour(_).embed, Data.OffsetDateTime(JOffsetDateTime.parse("2016-01-01T01:02:03+01:01:01")), Data.Int(1))
+          unary(ExtractTimeZoneHour(_).embed, Data.OffsetDateTime(JOffsetDateTime.parse("2016-01-01T01:02:03+01:01:01")), Data.Int(1))
         }
       }
 

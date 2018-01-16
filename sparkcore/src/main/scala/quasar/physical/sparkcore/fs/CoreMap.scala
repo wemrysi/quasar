@@ -194,16 +194,16 @@ object CoreMap extends Serializable {
       case CanLensDate(i) => Data.Int(datetime.extractYear(i.pos))
       case _ => undefined
     }).right
-    case ExtractTimezone(f) => (f >>> {
-      case CanLensTimezone(i) => Data.Int(datetime.extractTimezone(i.pos))
+    case ExtractTimeZone(f) => (f >>> {
+      case CanLensTimeZone(i) => Data.Int(datetime.extractTimeZone(i.pos))
       case _ => undefined
     }).right
-    case ExtractTimezoneMinute(f) => (f >>> {
-      case CanLensTimezone(i) => Data.Int(datetime.extractTimezoneMinute(i.pos))
+    case ExtractTimeZoneMinute(f) => (f >>> {
+      case CanLensTimeZone(i) => Data.Int(datetime.extractTimeZoneMinute(i.pos))
       case _ => undefined
     }).right
-    case ExtractTimezoneHour(f) => (f >>> {
-      case CanLensTimezone(i) => Data.Int(datetime.extractTimezoneHour(i.pos))
+    case ExtractTimeZoneHour(f) => (f >>> {
+      case CanLensTimeZone(i) => Data.Int(datetime.extractTimeZoneHour(i.pos))
       case _ => undefined
     }).right
 

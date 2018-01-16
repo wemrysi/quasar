@@ -89,7 +89,7 @@ object ColumnDateTimeExtractors {
     }
   }
 
-  object CanSetTimezone {
+  object CanSetTimeZone {
     def unapply(col: Column): Option[ZoneOffset => Column] = col match {
       case c: OffsetDateTimeColumn => Some(zo => new OffsetDateTimeColumn {
         def apply(row: Int): OffsetDateTime = OffsetDateTime.of(c(row).toLocalDateTime, zo)

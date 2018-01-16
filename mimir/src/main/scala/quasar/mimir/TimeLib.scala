@@ -63,9 +63,9 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       ExtractMonth,
       ExtractQuarter,
       ExtractSecond,
-      ExtractTimezone,
-      ExtractTimezoneMinute,
-      ExtractTimezoneHour,
+      ExtractTimeZone,
+      ExtractTimeZoneMinute,
+      ExtractTimeZoneHour,
       ExtractWeek,
       ExtractYear,
 
@@ -348,18 +348,18 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       }
     }
 
-    val ExtractTimezone = new OffsetIntExtractor("Timezone", datetime.extractTimezone)
-    val ExtractTimezoneMinute = new OffsetIntExtractor("TimezoneMinute", datetime.extractTimezoneMinute)
-    val ExtractTimezoneHour = new OffsetIntExtractor("TimezoneHour", datetime.extractTimezoneHour)
+    val ExtractTimeZone = new OffsetIntExtractor("TimeZone", datetime.extractTimeZone)
+    val ExtractTimeZoneMinute = new OffsetIntExtractor("TimeZoneMinute", datetime.extractTimeZoneMinute)
+    val ExtractTimeZoneHour = new OffsetIntExtractor("TimeZoneHour", datetime.extractTimeZoneHour)
 
-    val SetTimezone = new OffsetIntSetter("Timezone", ZoneOffset.ofTotalSeconds, (i, _) => ZoneOffset.ofTotalSeconds(i))
-    val SetTimezoneMinute = new OffsetIntSetter("TimezoneMinute",
+    val SetTimeZone = new OffsetIntSetter("TimeZone", ZoneOffset.ofTotalSeconds, (i, _) => ZoneOffset.ofTotalSeconds(i))
+    val SetTimeZoneMinute = new OffsetIntSetter("TimeZoneMinute",
       ZoneOffset.ofHoursMinutes(0, _),
       { (i, zo) =>
         val sec = zo.getTotalSeconds
         ZoneOffset.ofTotalSeconds(i * 60 + (sec % 3600) * 3600 + sec / 60)
       })
-    val SetTimezoneHour = new OffsetIntSetter("TimezoneHour",
+    val SetTimeZoneHour = new OffsetIntSetter("TimeZoneHour",
       ZoneOffset.ofHours,
       (i, zo) => ZoneOffset.ofTotalSeconds(i * 3600 + zo.getTotalSeconds % 3600))
 

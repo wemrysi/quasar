@@ -86,7 +86,7 @@ trait DateLib extends Library with Serializable {
   //     separated arguments. `date_part` is Postgres’ name for the same thing
   //     with commas.
 
-  private def extractDate(help: String, outputType: Type, f: JLocalDate => Data) =
+  private def dateFunc(help: String, outputType: Type, f: JLocalDate => Data) =
     UnaryFunc(
       Mapping, help,
       outputType,
@@ -98,7 +98,7 @@ trait DateLib extends Library with Serializable {
       },
       basicUntyper)
 
-  private def extractTime(help: String, outputType: Type, f: JLocalTime => Data) =
+  private def timeFunc(help: String, outputType: Type, f: JLocalTime => Data) =
     UnaryFunc(
       Mapping, help,
       outputType,
@@ -110,28 +110,28 @@ trait DateLib extends Library with Serializable {
       },
       basicUntyper)
 
-  private def extractTimeZone(help: String, f: ZoneOffset => Data) =
+  private def timeZoneFunc(help: String, f: ZoneOffset => Data) =
     UnaryFunc(
       Mapping, help,
       Type.Int,
       Func.Input1(Type.HasOffset),
       noSimplification,
       partialTyper[nat._1] {
-        case Sized(Type.Const(DataDateTimeExtractors.CanLensTimezone(i))) => Type.Const(f(i.pos))
+        case Sized(Type.Const(DataDateTimeExtractors.CanLensTimeZone(i))) => Type.Const(f(i.pos))
         case Sized(t) if Type.HasOffset contains t => Type.Numeric
       },
       basicUntyper)
 
-  val ExtractCentury      = extractDate(
+  val ExtractCentury      = dateFunc(
     "Pulls out the century subfield from a date/time value (currently (year - 1)/100 + 1).", Type.Int, (extractCentury _).andThen(Data.Int(_)))
-  val ExtractDayOfMonth   = extractDate(
+  val ExtractDayOfMonth   = dateFunc(
     "Pulls out the day of month (`day`) subfield from a date/time value (1-31).", Type.Int, (extractDayOfMonth _).andThen(Data.Int(_)))
-  val ExtractDecade       = extractDate(
+  val ExtractDecade       = dateFunc(
     "Pulls out the decade subfield from a date/time value (year/10).", Type.Int, (extractDecade _).andThen(Data.Int(_)))
-  val ExtractDayOfWeek    = extractDate(
+  val ExtractDayOfWeek    = dateFunc(
     "Pulls out the day of week (`dow`) subfield from a date/time value " +
     "(Sunday: 0 to Saturday: 7).", Type.Int, (extractDayOfWeek  _).andThen(Data.Int(_)))
-  val ExtractDayOfYear    = extractDate(
+  val ExtractDayOfYear    = dateFunc(
     "Pulls out the day of year (`doy`) subfield from a date/time value (1-365 or -366).", Type.Int, (extractDayOfYear  _).andThen(Data.Int(_)))
   val ExtractEpoch        = UnaryFunc(
     Mapping,
@@ -145,45 +145,45 @@ trait DateLib extends Library with Serializable {
       case Sized(Type.OffsetDateTime) => Type.Dec
     },
     basicUntyper)
-  val ExtractHour         = extractTime(
+  val ExtractHour = timeFunc(
     "Pulls out the hour subfield from a date/time value (0-23).", Type.Int, (extractHour _).andThen(Data.Int(_)))
-  val ExtractIsoDayOfWeek       = extractDate(
+  val ExtractIsoDayOfWeek = dateFunc(
     "Pulls out the ISO day of week (`isodow`) subfield from a date/time value " +
     "(Monday: 1 to Sunday: 7).", Type.Int, (extractIsoDayOfWeek   _).andThen(Data.Int(_)))
   // TODO: Come back to this, test it with Jan 4
-  val ExtractIsoYear      = extractDate(
+  val ExtractIsoYear = dateFunc(
     "Pulls out the ISO year (`isoyear`) subfield from a date/time value (based " +
     "on the first week containing Jan. 4).", Type.Int, (extractIsoYear _).andThen(Data.Int(_)))
-  val ExtractMicrosecond = extractTime(
+  val ExtractMicrosecond = timeFunc(
     "Pulls out the microseconds subfield from a date/time value (including seconds).",
     Type.Int, (extractMicrosecond _).andThen(Data.Int(_)))
-  val ExtractMillennium    = extractDate(
+  val ExtractMillennium    = dateFunc(
     "Pulls out the millennium subfield from a date/time value (currently (year - 1)/1000 + 1).", Type.Int, (extractMillennium _).andThen(Data.Int(_)))
-  val ExtractMillisecond = extractTime(
+  val ExtractMillisecond = timeFunc(
     "Pulls out the milliseconds subfield from a date/time value (including seconds).",
     Type.Int, (extractMillisecond _).andThen(Data.Int(_)))
-  val ExtractMinute       = extractTime(
+  val ExtractMinute       = timeFunc(
     "Pulls out the minute subfield from a date/time value (0-59).",
     Type.Int, (extractMinute _).andThen(Data.Int(_)))
-  val ExtractMonth        = extractDate(
+  val ExtractMonth        = dateFunc(
     "Pulls out the month subfield from a date/time value (1-12).", Type.Int, (extractMonth _).andThen(Data.Int(_)))
-  val ExtractQuarter      = extractDate(
+  val ExtractQuarter      = dateFunc(
     "Pulls out the quarter subfield from a date/time value (1-4).", Type.Int, (extractQuarter _).andThen(Data.Int(_)))
-  val ExtractSecond = extractTime(
+  val ExtractSecond = timeFunc(
     "Pulls out the second subfield from a date/time value (0-59, with fractional parts).", Type.Dec, (extractSecond _).andThen(Data.Dec(_)))
-  val ExtractTimezone = extractTimeZone(
+  val ExtractTimeZone = timeZoneFunc(
     "Pulls out the timezone subfield from a date/time value (in seconds east of UTC).",
-    (extractTimezone _).andThen(Data.Int(_)))
-  val ExtractTimezoneHour = extractTimeZone(
+    (extractTimeZone _).andThen(Data.Int(_)))
+  val ExtractTimeZoneHour = timeZoneFunc(
     "Pulls out the hour component of the timezone subfield from a date/time value.",
-    (extractTimezoneHour _).andThen(Data.Int(_)))
-  val ExtractTimezoneMinute = extractTimeZone(
+    (extractTimeZoneHour _).andThen(Data.Int(_)))
+  val ExtractTimeZoneMinute = timeZoneFunc(
     "Pulls out the minute component of the timezone subfield from a date/time value.",
-    (extractTimezoneMinute _).andThen(Data.Int(_))
+    (extractTimeZoneMinute _).andThen(Data.Int(_))
   )
-  val ExtractWeek = extractDate(
+  val ExtractWeek = dateFunc(
     "Pulls out the week subfield from a date/time value (1-53).", Type.Int, (extractWeek _).andThen(Data.Int(_)))
-  val ExtractYear = extractDate(
+  val ExtractYear = dateFunc(
     "Pulls out the year subfield from a date/time value.", Type.Int, (extractYear _).andThen(Data.Int(_)))
 
   private def setTimeZone(help: String, out: Int => ZoneOffset, outTimeZone: (Int, ZoneOffset) => ZoneOffset) =
@@ -194,25 +194,25 @@ trait DateLib extends Library with Serializable {
       noSimplification,
       partialTyper[nat._2] {
         case Sized(Type.Numeric, Type.OffsetDate | Type.OffsetDateTime | Type.OffsetTime) => Type.Numeric
-        case Sized(Type.Const(Data.Int(input)), Type.Const(DataDateTimeExtractors.CanLensTimezone(i))) =>
+        case Sized(Type.Const(Data.Int(input)), Type.Const(DataDateTimeExtractors.CanLensTimeZone(i))) =>
           Type.Const(i.peeks(outTimeZone(input.toInt, _)))
-        case Sized(Type.Const(Data.Int(input)), Type.Const(DataDateTimeExtractors.CanSetTimezone(k))) =>
+        case Sized(Type.Const(Data.Int(input)), Type.Const(DataDateTimeExtractors.CanSetTimeZone(k))) =>
           Type.Const(k(out(input.toInt)))
       },
       basicUntyper)
 
-  val SetTimezone = setTimeZone(
+  val SetTimeZone = setTimeZone(
     "Sets the timezone subfield in a date/time value (in seconds east of UTC).",
     ZoneOffset.ofTotalSeconds,
     (i, _) => ZoneOffset.ofTotalSeconds(i))
-  val SetTimezoneMinute = setTimeZone(
+  val SetTimeZoneMinute = setTimeZone(
     "Sets the minute component of the timezone subfield in a date/time value.",
     ZoneOffset.ofHoursMinutes(0, _),
     { (i, zo) =>
       val sec = zo.getTotalSeconds
       ZoneOffset.ofTotalSeconds(i * 60 + (sec % 3600) * 3600 + sec / 60)
     })
-  val SetTimezoneHour = setTimeZone(
+  val SetTimeZoneHour = setTimeZone(
     "Sets the hour component of the timezone subfield in a date/time value.",
     ZoneOffset.ofHours,
     (i, zo) => ZoneOffset.ofTotalSeconds(i * 3600 + zo.getTotalSeconds % 3600))

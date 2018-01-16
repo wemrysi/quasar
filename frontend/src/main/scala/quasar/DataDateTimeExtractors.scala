@@ -66,7 +66,7 @@ object DataDateTimeExtractors {
     }
   }
 
-  object CanLensTimezone {
+  object CanLensTimeZone {
     def unapply(data: Data): Option[Store[ZoneOffset, Data]] = data match {
       case d@OffsetDateTime(_) => Some(datetime.lensTimeZoneOffsetDateTime(d.value).map(OffsetDateTime))
       case d@DOffsetDate(_) => Some(datetime.lensTimeZoneOffsetDate(d.value).map(DOffsetDate))
@@ -75,7 +75,7 @@ object DataDateTimeExtractors {
     }
   }
 
-  object CanSetTimezone {
+  object CanSetTimeZone {
     def unapply(data: Data): Option[ZoneOffset => Data] = data match {
       case d@OffsetDateTime(_) => Some(zo => OffsetDateTime(JOffsetDateTime.of(d.value.toLocalDateTime, zo)))
       case d@DOffsetDate(_) => Some(zo => DOffsetDate(OffsetDate(d.value.date, zo)))

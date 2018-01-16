@@ -84,17 +84,17 @@ private[qscript] final class MapFuncCorePlanner[
     case ExtractMonth(time)           => asDateTime(time) map fn.monthFromDateTime
     case ExtractQuarter(time)         => asDate(time) map (xdmp.quarterFromDate)
     case ExtractSecond(time)          => asDateTime(time) map fn.secondsFromDateTime
-    case ExtractTimezone(time)        => asDateTime(time) flatMap (lib.timezoneOffsetSeconds[F].apply(_))
-    case ExtractTimezoneHour(time)    => asDateTime(time) map (dt =>
+    case ExtractTimeZone(time)        => asDateTime(time) flatMap (lib.timezoneOffsetSeconds[F].apply(_))
+    case ExtractTimeZoneHour(time)    => asDateTime(time) map (dt =>
                                            fn.hoursFromDuration(fn.timezoneFromDateTime(dt)))
-    case ExtractTimezoneMinute(time)  => asDateTime(time) map (dt =>
+    case ExtractTimeZoneMinute(time)  => asDateTime(time) map (dt =>
                                            fn.minutesFromDuration(fn.timezoneFromDateTime(dt)))
     case ExtractWeek(time)            => asDate(time) map (xdmp.weekFromDate)
     case ExtractYear(time)            => asDateTime(time) map fn.yearFromDateTime
 
-    case SetTimezone(s, t)            => ??? // TODO
-    case SetTimezoneMinute(m, t)      => ??? // TODO
-    case SetTimezoneHour(h, t)        => ??? // TODO
+    case SetTimeZone(s, t)            => ??? // TODO
+    case SetTimeZoneMinute(m, t)      => ??? // TODO
+    case SetTimeZoneHour(h, t)        => ??? // TODO
 
     // math
     case Negate(x)                    => SP.castIfNode(x) map (-_)

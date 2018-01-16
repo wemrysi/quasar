@@ -191,12 +191,10 @@ object datetime {
     lt.getLong(ChronoField.MINUTE_OF_HOUR)
   def extractSecond(lt: LocalTime): BigDecimal =
     BigDecimal(lt.getNano) / 1000000000.0 + lt.getSecond
-  def extractTimezone(zo: ZoneOffset): Int =
+  def extractTimeZone(zo: ZoneOffset): Int =
     zo.getTotalSeconds
-  def extractTimezoneHour(zo: ZoneOffset): Int =
+  def extractTimeZoneHour(zo: ZoneOffset): Int =
     zo.getTotalSeconds / 3600
-  def extractTimezoneMinute(zo: ZoneOffset): Int =
+  def extractTimeZoneMinute(zo: ZoneOffset): Int =
     (zo.getTotalSeconds / 60) % 60
-
-
 }

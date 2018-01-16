@@ -41,12 +41,12 @@ object construction {
       rollCore(MapFuncsCore.Now())
     def JoinSideName[A](sym: Symbol): FreeMapA[T, A] =
       rollCore(MapFuncsCore.JoinSideName(sym))
-    def SetTimezone[A](a1: FreeMapA[T, A], a2: FreeMapA[T, A]): FreeMapA[T, A] =
-      rollCore(MapFuncsCore.SetTimezone(a1, a2))
-    def SetTimezoneHour[A](a1: FreeMapA[T, A], a2: FreeMapA[T, A]): FreeMapA[T, A] =
-      rollCore(MapFuncsCore.SetTimezoneHour(a1, a2))
-    def SetTimezoneMinute[A](a1: FreeMapA[T, A], a2: FreeMapA[T, A]): FreeMapA[T, A] =
-      rollCore(MapFuncsCore.SetTimezoneMinute(a1, a2))
+    def SetTimeZone[A](a1: FreeMapA[T, A], a2: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.SetTimeZone(a1, a2))
+    def SetTimeZoneHour[A](a1: FreeMapA[T, A], a2: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.SetTimeZoneHour(a1, a2))
+    def SetTimeZoneMinute[A](a1: FreeMapA[T, A], a2: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.SetTimeZoneMinute(a1, a2))
     def ExtractCentury[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.ExtractCentury(a1))
     def ExtractDayOfMonth[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
@@ -79,12 +79,12 @@ object construction {
       rollCore(MapFuncsCore.ExtractQuarter(a1))
     def ExtractSecond[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.ExtractSecond(a1))
-    def ExtractTimezone[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
-      rollCore(MapFuncsCore.ExtractTimezone(a1))
-    def ExtractTimezoneHour[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
-      rollCore(MapFuncsCore.ExtractTimezoneHour(a1))
-    def ExtractTimezoneMinute[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
-      rollCore(MapFuncsCore.ExtractTimezoneMinute(a1))
+    def ExtractTimeZone[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.ExtractTimeZone(a1))
+    def ExtractTimeZoneHour[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.ExtractTimeZoneHour(a1))
+    def ExtractTimeZoneMinute[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.ExtractTimeZoneMinute(a1))
     def ExtractWeek[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.ExtractWeek(a1))
     def ExtractYear[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
