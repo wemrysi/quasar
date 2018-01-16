@@ -162,9 +162,8 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
           }
 
           val meta = Branch(patmat.orElse {
-            s => Default match { // TODO yuck, refactor!
+            s => Default match {
               case Branch(m, _) => {
-                println(s">>>>>>>>>>>>> orElse $s")
                 m(s)
               }
             }

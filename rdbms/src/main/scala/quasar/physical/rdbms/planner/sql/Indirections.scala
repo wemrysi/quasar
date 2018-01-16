@@ -16,12 +16,11 @@
 
 package quasar.physical.rdbms.planner.sql
 
-import matryoshka.BirecursiveT
 import slamdata.Predef._
-import matryoshka.implicits._
 
+import matryoshka.BirecursiveT
+import matryoshka.implicits._
 import scalaz._
-import Scalaz._
 
 object Indirections {
 
@@ -40,33 +39,25 @@ object Indirections {
     }
   }
 
-  val InnerRef: Indirection = Branch((_: String) => (InnerField, InnerRef), "mArr")
+  val InnerRef: Indirection = Branch((_: String) => (InnerField, InnerRef), "InnerRef")
   val Default = Branch((_: String) => (Field, InnerRef), "Default")
 
   import SqlExpr._
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def deriveIndirection[T[_[_]]: BirecursiveT](expr: T[SqlExpr]): Indirection = {
-      println(s"deriveMeta for ${expr.project}")
-      val meta = expr.project match {
+      expr.project match {
         case SqlExpr.Id(_, m) =>
-          println(s"meta for id")
           m
         case ExprPair(_, _, m) =>
-          println(s"meta for ExprPair")
           m
         case ExprWithAlias(v, _) =>
-          println(s"meta for ExprWithAlias")
           deriveIndirection(v)
         case Select(Selection(_, _, m), _, _, _, _, _) =>
-          println(s"meta for Select")
           m
         case _ =>
-          println(s"Default meta")
           Default
       }
-      println(meta.shows)
-      meta
     }
 }
 

@@ -59,10 +59,7 @@ object PostgresRenderQuery extends RenderQuery {
       }).embed
     }
 
-    a.transCataT(aliasSelectionToJson).paraM(galg) ∘ (s => {
-      println(s">>>>>>>>>>>>>>>>>>>>>> $s")
-      s"select row_to_json(row) from ($s) as row"
-    })
+    a.transCataT(aliasSelectionToJson).paraM(galg) ∘ (s => s"select row_to_json(row) from ($s) as row")
   }
 
   def alias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" as ${i.v}"))
@@ -142,11 +139,8 @@ object PostgresRenderQuery extends RenderQuery {
     case Refs(srcs, m) =>
       srcs.unzip(ι) match {
         case (_, firstStr +: tail) =>
-          println(s">>>>> fold for $srcs")
           tail.foldLeft(Acc(firstStr, m)) {
             case (acc@Acc(accStr, Branch(mFunc, _)), nextStr) =>
-              println(s">>>>> Acc = $acc")
-              println(s">>>>> nextStr = $nextStr")
               val nextStrStripped = nextStr.stripPrefix("'").stripSuffix("'")
               val (metaType, nextMeta) = mFunc(nextStrStripped)
               val str = metaType match {
