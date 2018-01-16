@@ -256,7 +256,8 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
           case Sample => (i: Index, c: Count) => i < c
         })
 
-    case LeftShift(src, struct, id, _, repair) =>
+    // FIXME: Handle `onUndef`
+    case LeftShift(src, struct, id, _, onUndef, repair) =>
 
       val structFunc: PlannerError \/ (Data => Data) =
         CoreMap.changeFreeMap(struct)
