@@ -19,7 +19,6 @@ package quasar.api.services
 import java.lang.String
 import quasar.api._
 import quasar.effect.{Execution, ExecutionTimings, TimingRepository}
-import quasar.fs._
 
 import org.http4s.dsl._
 import scalaz.{Zip => _, _}, Scalaz._
