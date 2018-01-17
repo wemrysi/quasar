@@ -1,0 +1,26 @@
+{
+  "name": "[qa_s09] array flatten simple",
+
+  "backends": {
+    "postgres":       "ignoreResultOrder",
+    "marklogic_json": "skip",
+    "marklogic_xml":  "skip",
+    "mimir":          "skip"
+  },
+  "data": "../arrayProcessing.data",
+
+  "query": "select a[*] as b from `../arrayProcessing`",
+
+  "predicate": "exactly",
+
+  "ignoredFields": ["_id"],
+
+  "expected": [
+    {"b": "a"},
+    {"b": "b"},
+    {"b": "c"},
+    {"b": "1"},
+    {"b": "2"},
+    {"b": "3"}
+  ]
+}

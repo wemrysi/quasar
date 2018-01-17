@@ -125,6 +125,8 @@ object SqlExpr extends SqlExprInstances {
       Case(nels(a1, a: _*), `else`)
   }
 
+  final case class ArrayUnwind[T](toUnwind: T) extends SqlExpr[T]
+
 }
 
 sealed trait UnaryFunctionType

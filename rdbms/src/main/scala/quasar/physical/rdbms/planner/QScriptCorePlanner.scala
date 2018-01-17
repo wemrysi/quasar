@@ -28,7 +28,7 @@ import sql.Indirections._
 import sql.SqlExpr._
 import sql.{SqlExpr, _}
 import sql.SqlExpr.Select._
-import quasar.qscript.{FreeMap, MapFunc, QScriptCore, QScriptTotal, Reduce, ReduceFuncs}
+import quasar.qscript.{ExcludeId, FreeMap, MapFunc, OnUndefined, QScriptCore, QScriptTotal, Reduce, ReduceFuncs, ShiftType}
 import quasar.qscript.{MapFuncCore => MFC}
 import quasar.qscript.{MapFuncDerived => MFD}
 import MFC._
@@ -39,6 +39,7 @@ import matryoshka.data._
 import matryoshka.data.free.freeEqual
 import matryoshka.implicits._
 import matryoshka.patterns._
+
 import scalaz._
 import Scalaz._
 
@@ -162,6 +163,18 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         orderBy = nil
        ).embed
     }
+
+    case qscript.LeftShift(src, struct, ExcludeId, ShiftType.Array, OnUndefined.Omit, repair) =>
+      for {
+        structAlias <- genId[T[SqlExpr], F](deriveIndirection(src))
+        structExpr  <- processFreeMap(struct, structAlias)
+        right = ArrayUnwind(structExpr)
+        repaired <- processJoinFunc(mapFuncPlanner)(repair, structAlias, right)
+        result = Select[T[SqlExpr]](
+          Selection(repaired, None, Default), From(src, structAlias), none, none, none, Nil)
+      } yield {
+        result.embed
+      }
 
     case other =>
       notImplemented(s"QScriptCore: $other", this)
