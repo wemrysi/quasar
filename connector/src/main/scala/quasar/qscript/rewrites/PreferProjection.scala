@@ -157,16 +157,16 @@ sealed abstract class PreferProjectionInstances {
         case Map((srcShape, u), f) =>
           BtoF(Map(u, prjFreeMap(srcShape, f)))
 
-        case LeftShift((srcShape, u), struct, idStatus, shiftType, repair) =>
+        case LeftShift((srcShape, u), struct, idStatus, shiftType, undef, repair) =>
           // NB: This is necessary as srcShape gives us the input shape to the
           //     LeftShift, which is what we need to rewrite `struct`, however
           //     to rewrite `repair` we need any modifications that `LeftShift`
           //     makes to the shape, excluding `repair`'s own modifications.
           val prjRepair = projectComplement(repair) { joinSide =>
-            O.outlineƒ(LeftShift(srcShape, struct, idStatus, shiftType, Free.point(joinSide)))
+            O.outlineƒ(LeftShift(srcShape, struct, idStatus, shiftType, undef, Free.point(joinSide)))
           }
 
-          BtoF(LeftShift(u, prjFreeMap(srcShape, struct), idStatus, shiftType, prjRepair))
+          BtoF(LeftShift(u, prjFreeMap(srcShape, struct), idStatus, shiftType, undef, prjRepair))
 
         case Reduce((srcShape, u), buckets, reducers, repair) =>
           val prjBuckets = buckets map (prjFreeMap(srcShape, _))

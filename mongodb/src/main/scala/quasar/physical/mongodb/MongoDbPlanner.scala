@@ -914,7 +914,8 @@ object MongoDbPlanner {
             ev3: EX :<: ExprOp) = {
           case qscript.Map(src, f) =>
             getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, f)
-          case LeftShift(src, struct, id, shiftType, repair) => {
+          // FIXME: Handle `onUndef`
+          case LeftShift(src, struct, id, shiftType, onUndef, repair) => {
             val exprMerge: JoinFunc[T] => M[Fix[ExprOp]] =
               getExprMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(_, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
             val jsMerge: JoinFunc[T] => M[JsFn] =

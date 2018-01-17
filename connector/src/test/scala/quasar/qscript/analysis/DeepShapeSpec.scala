@@ -60,7 +60,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
             func.MakeArray(func.Add(func.LeftSide, IntLit(9))),
             func.MakeArray(func.Subtract(func.RightSide, IntLit(10))))
 
-        val qs = LeftShift(shape, struct, IdOnly, ShiftType.Array, repair)
+        val qs = LeftShift(shape, struct, IdOnly, ShiftType.Array, OnUndefined.Omit, repair)
 
         val expected: FreeShape[Fix] =
           func.ConcatArrays(
@@ -206,6 +206,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
           func.Hole,
           IncludeId,
           ShiftType.Array,
+          OnUndefined.Omit,
           func.RightSide)
 
       val rBranch: FreeQS =
@@ -216,6 +217,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
           func.Hole,
           IncludeId,
           ShiftType.Array,
+          OnUndefined.Omit,
           func.LeftSide)
 
       val combine: JoinFunc =

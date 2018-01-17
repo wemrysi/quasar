@@ -251,8 +251,9 @@ object construction {
                   struct: FreeMap[T],
                   idStatus: IdStatus,
                   shiftType: ShiftType,
+                  onUndefined: OnUndefined,
                   repair: JoinFunc[T]): R =
-      core(qscript.LeftShift(src, struct, idStatus, shiftType, repair))
+      core(qscript.LeftShift(src, struct, idStatus, shiftType, onUndefined, repair))
     def Reduce(src: R,
                bucket: List[FreeMap[T]],
                reducers: List[ReduceFunc[FreeMap[T]]],

@@ -94,7 +94,7 @@ object ShapePreserving {
     new ShapePreserving[QScriptCore[T, ?]] {
       def shapePreservingƒ: Algebra[QScriptCore[T, ?], Option[IdStatus]] = {
         case Map(_, _) => none
-        case LeftShift(_, _, _, _, _) => none
+        case LeftShift(_, _, _, _, _, _) => none
         case Reduce(_, _, _, _) => none
         case Sort(src, _, _) => src
         case Union(src, l, r) =>

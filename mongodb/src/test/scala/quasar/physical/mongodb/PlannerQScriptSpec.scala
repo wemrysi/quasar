@@ -25,7 +25,7 @@ import quasar.javascript._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript.ShiftType
+import quasar.qscript.{OnUndefined, ShiftType}
 import quasar.sql.JoinDir
 import slamdata.Predef._
 
@@ -271,6 +271,7 @@ class PlannerQScriptSpec extends
             func.Undefined),
           qscript.ExcludeId,
           ShiftType.Array,
+          OnUndefined.Omit,
           func.StaticMapS(
             "codes" ->
               func.RightSide,
@@ -310,6 +311,7 @@ class PlannerQScriptSpec extends
               func.Undefined),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
+            OnUndefined.Omit,
             func.StaticMapS(
               "city" ->
                 func.ProjectKeyS(func.LeftSide, "city"),
@@ -345,6 +347,7 @@ class PlannerQScriptSpec extends
               func.Undefined),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
+            OnUndefined.Omit,
             func.RightSide),
           func.Lt(func.Hole, func.Constant(json.int(-165))))) must beWorkflow0(
         chain[Workflow](
@@ -375,6 +378,7 @@ class PlannerQScriptSpec extends
               func.Undefined),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
+            OnUndefined.Omit,
             func.StaticMapS(
               "results" ->
                 func.Guard(
@@ -387,6 +391,7 @@ class PlannerQScriptSpec extends
           func.ProjectKeyS(func.Hole, "results"),
           qscript.ExcludeId,
           qscript.ShiftType.Array,
+          OnUndefined.Omit,
           func.StaticMapS(
             "0" ->
               func.ProjectKeyS(
@@ -435,6 +440,7 @@ class PlannerQScriptSpec extends
               func.Undefined),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
+            OnUndefined.Omit,
             func.Guard(func.RightSide,
               Type.FlexArr(0, None, Type.Top),
               func.RightSide,
@@ -442,6 +448,7 @@ class PlannerQScriptSpec extends
           func.Hole,
           qscript.ExcludeId,
           qscript.ShiftType.Array,
+          OnUndefined.Omit,
           func.RightSide)) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "zips")),
@@ -478,6 +485,7 @@ class PlannerQScriptSpec extends
             func.Undefined),
           qscript.ExcludeId,
           qscript.ShiftType.Array,
+          OnUndefined.Omit,
           func.StaticMapS(
             "city" ->
               func.ProjectKeyS(func.LeftSide, "city"),
@@ -530,6 +538,7 @@ class PlannerQScriptSpec extends
             func.Undefined),
           qscript.ExcludeId,
           ShiftType.Array,
+          OnUndefined.Omit,
           func.StaticMapS(
             "codes" ->
               func.RightSide,
