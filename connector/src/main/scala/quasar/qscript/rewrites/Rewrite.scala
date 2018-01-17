@@ -157,6 +157,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       struct: FreeMap,
       status: IdStatus,
       shiftType: ShiftType,
+      onUndefined: OnUndefined,
       repair: JoinFunc,
       shiftSrc: FreeMap,
       mapFn: FreeMap
@@ -169,13 +170,14 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
             case RightSide => RightSideF
           }
         }).some
-      } (func => QC.inj(LeftShift(src, struct >> shiftSrc, status, shiftType, func)).some)
+      } (func => QC.inj(LeftShift(src, struct >> shiftSrc, status, shiftType, onUndefined, func)).some)
 
     // Unify (LeftShift, Map)
     def unifyMapLeftSideShift(
       struct: FreeMap,
       status: IdStatus,
       shiftType: ShiftType,
+      onUndefined: OnUndefined,
       repair: JoinFunc,
       shiftSrc: FreeMap,
       mapFn: FreeMap
@@ -188,19 +190,19 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
           }
           case RightSide => mapFn >> LeftSideF  // references `src`
         }).some
-      } (func => QC.inj(LeftShift(src, struct >> shiftSrc, status, shiftType, func)).some)
+      } (func => QC.inj(LeftShift(src, struct >> shiftSrc, status, shiftType, onUndefined, func)).some)
 
     (left.resumeTwice, right.resumeTwice) match {
       // left side is the data while the right side shifts the same data
       case (\/-(SrcHole), -\/(r)) => FI.project(r) >>= QC.prj match {
-        case Some(LeftShift(lshiftSrc, struct, status, shiftType, repair)) =>
+        case Some(LeftShift(lshiftSrc, struct, status, shiftType, undef, repair)) =>
           lshiftSrc match {
             case \/-(SrcHole) =>
-              unifyMapRightSideShift(struct, status, shiftType, repair, HoleF, HoleF)
+              unifyMapRightSideShift(struct, status, shiftType, undef, repair, HoleF, HoleF)
 
             case -\/(values) => FI.project(values) >>= QC.prj match {
               case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
-                unifyMapRightSideShift(struct, status, shiftType, repair, srcFn, HoleF)
+                unifyMapRightSideShift(struct, status, shiftType, undef, repair, srcFn, HoleF)
 
               case _ => NoneBranch[F, JoinSide, A]
             }
@@ -210,14 +212,14 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
 
       // right side is the data while the left side shifts the same data
       case (-\/(l), \/-(SrcHole)) => FI.project(l) >>= QC.prj match {
-        case Some(LeftShift(lshiftSrc, struct, status, shiftType, repair)) =>
+        case Some(LeftShift(lshiftSrc, struct, status, shiftType, undef, repair)) =>
           lshiftSrc match {
             case \/-(SrcHole) =>
-              unifyMapLeftSideShift(struct, status, shiftType, repair, HoleF, HoleF)
+              unifyMapLeftSideShift(struct, status, shiftType, undef, repair, HoleF, HoleF)
 
             case -\/(values) => FI.project(values) >>= QC.prj match {
               case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
-                unifyMapLeftSideShift(struct, status, shiftType, repair, srcFn, HoleF)
+                unifyMapLeftSideShift(struct, status, shiftType, undef, repair, srcFn, HoleF)
 
               case _ => NoneBranch[F, JoinSide, A]
             }
@@ -227,28 +229,28 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
 
       case (-\/(l), -\/(r)) => (l, r).uTraverse(m => FI.project(m) >>= QC.prj) collect {
         // left side maps over the data while the right side shifts the same data
-        case (Map(\/-(SrcHole), mapFn), LeftShift(lshiftSrc, struct, status, stpe, repair)) =>
+        case (Map(\/-(SrcHole), mapFn), LeftShift(lshiftSrc, struct, status, stpe, undef, repair)) =>
           lshiftSrc match {
             case \/-(SrcHole) =>
-              unifyMapRightSideShift(struct, status, stpe, repair, HoleF, mapFn)
+              unifyMapRightSideShift(struct, status, stpe, undef, repair, HoleF, mapFn)
 
             case -\/(values) => FI.project(values) >>= QC.prj match {
               case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
-                unifyMapRightSideShift(struct, status, stpe, repair, srcFn, mapFn)
+                unifyMapRightSideShift(struct, status, stpe, undef, repair, srcFn, mapFn)
 
               case _ => NoneBranch[F, JoinSide, A]
             }
           }
 
         // right side maps over the data while the left side shifts the same data
-        case (LeftShift(lshiftSrc, struct, status, shiftType, repair), Map(\/-(SrcHole), mapFn)) =>
+        case (LeftShift(lshiftSrc, struct, status, shiftType, undef, repair), Map(\/-(SrcHole), mapFn)) =>
           lshiftSrc match {
             case \/-(SrcHole) =>
-              unifyMapLeftSideShift(struct, status, shiftType, repair, HoleF, mapFn)
+              unifyMapLeftSideShift(struct, status, shiftType, undef, repair, HoleF, mapFn)
 
             case -\/(values) => FI.project(values) >>= QC.prj match {
               case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
-                unifyMapLeftSideShift(struct, status, shiftType, repair, srcFn, mapFn)
+                unifyMapLeftSideShift(struct, status, shiftType, undef, repair, srcFn, mapFn)
 
               case _ => NoneBranch[F, JoinSide, A]
             }
@@ -404,7 +406,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
   def compactLeftShift[F[_]: Functor]
       (QCToF: PrismNT[F, QScriptCore])
       : QScriptCore[T[F]] => Option[F[T[F]]] = {
-    case qs @ LeftShift(Embed(src), struct, ExcludeId, shiftType, joinFunc) =>
+    case qs @ LeftShift(Embed(src), struct, ExcludeId, shiftType, OnUndefined.Emit, joinFunc) =>
       (QCToF.get(src), struct.resume) match {
         // LeftShift(Map(_, MakeArray(_)), Hole, ExcludeId, _)
         case (Some(Map(innerSrc, fm)), \/-(SrcHole)) =>
@@ -428,8 +430,8 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
   }
 
   val compactQC = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
-    case LeftShift(src, struct, id, stpe, repair) =>
-      rewriteShift(id, repair) ∘ (xy => LeftShift(src, struct, xy._1, stpe, xy._2))
+    case LeftShift(src, struct, id, stpe, undef, repair) =>
+      rewriteShift(id, repair) ∘ (xy => LeftShift(src, struct, xy._1, stpe, undef, xy._2))
 
     case Reduce(src, bucket, reducers, repair0) =>
       // `indices`: the indices into `reducers` that are used
