@@ -270,6 +270,6 @@ object PostgresRenderQuery extends RenderQuery {
       case Substring => s"substring(${text(a1)} from ((${text(a2)})::integer + 1) for (${text(a3)})::integer)"
     }).right
 
-    case ArrayUnwind(TextExpr(toUnwind)) => s"jsonb_array_elements_text($toUnwind)".right
+    case ArrayUnwind(toUnwind) => s"jsonb_array_elements_text(${text(toUnwind)})".right
   }
 }
