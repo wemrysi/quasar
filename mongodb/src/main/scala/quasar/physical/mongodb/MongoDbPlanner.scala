@@ -934,19 +934,11 @@ object MongoDbPlanner {
               case _ => none
             }
 
-            def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T], fm: FreeMap[T]):
+            def filterBuilder[A](handler: FreeMapA[T, A] => M[Expr])(src: WorkflowBuilder[WF], partialSel: PartialSelector[T], fm: FreeMapA[T, A]):
                 M[WorkflowBuilder[WF]] = {
               val (sel, inputs) = partialSel
 
-              inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(fm)))
-                .map(WB.filter(src, _, sel))
-            }
-
-            def filterBuilderJf(src: WorkflowBuilder[WF], partialSel: PartialSelector[T], jf: JoinFunc[T]):
-                M[WorkflowBuilder[WF]] = {
-              val (sel, inputs) = partialSel
-
-              inputs.traverse(f => exprOrJs[M, JoinFunc[T]](f(jf))(exprMerge, jsMerge))
+              inputs.traverse(f => handler(f(fm)))
                 .map(WB.filter(src, _, sel))
             }
 
@@ -984,7 +976,9 @@ object MongoDbPlanner {
                           cfg.staticHandler,
                           struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
 
-                      val flatten = (struct0 ⊛ filterBuilder(src, structSel, struct))((struct1, src0) =>
+                      val flatten = (struct0 ⊛ filterBuilder[Hole](
+                        handleFreeMap[T, M, EX](
+                          cfg.funcHandler, cfg.staticHandler, _))(src, structSel, struct))((struct1, src0) =>
                         FlatteningBuilder(
                           DocBuilder(
                             src0,
@@ -993,7 +987,8 @@ object MongoDbPlanner {
                               BsonField.Name("f") -> struct1)),
                           Set(StructureType.Array(DocField(BsonField.Name("f")), id))))
 
-                      (flatten >>= (s => filterBuilderJf(s, repairSel, repair))) >>= (src0 =>
+                      (flatten >>= (s =>
+                        filterBuilder[JoinSide](exprOrJs(_)(exprMerge, jsMerge))(s, repairSel, repair))) >>= (src0 =>
                         getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
                           src0,
                           repair.transCata[JoinFunc[T]](orOriginal(elideCond[JoinSide]))))
@@ -1005,7 +1000,9 @@ object MongoDbPlanner {
                           cfg.staticHandler,
                           struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
 
-                      (struct0 ⊛ filterBuilder(src, structSel, struct))((struct1, src0) =>
+                      (struct0 ⊛ filterBuilder[Hole](
+                        handleFreeMap[T, M, EX](
+                          cfg.funcHandler, cfg.staticHandler, _))(src, structSel, struct))((struct1, src0) =>
                         getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
                           FlatteningBuilder(
                             DocBuilder(
@@ -1027,7 +1024,7 @@ object MongoDbPlanner {
                                 BsonField.Name("f") -> struct0)),
                             Set(StructureType.Array(DocField(BsonField.Name("f")), id))))
 
-                      (flatten >>= (s => filterBuilderJf(s, repairSel, repair))) >>= (src0 =>
+                      (flatten >>= (s => filterBuilder[JoinSide](exprOrJs(_)(exprMerge, jsMerge))(s, repairSel, repair))) >>= (src0 =>
                         getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
                           src0, repair.transCata[JoinFunc[T]](orOriginal(elideCond[JoinSide]))))
                     }
