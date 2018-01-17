@@ -977,25 +977,25 @@ object MongoDbPlanner {
                 case ShiftType.Array => {
                   (structSelectors.toOption, repairSelectors.toOption) match {
                     case (Some(structSel), Some(repairSel)) => {
-                      println("This case")
                       val struct0 =
                         handleFreeMap[T, M, EX](
                           cfg.funcHandler,
                           cfg.staticHandler,
                           struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
 
-                      val src1 = (struct0 ⊛ filterBuilder(src, structSel, struct))((struct1, src0) =>
-                        getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
-                          FlatteningBuilder(
-                            DocBuilder(
-                              src0,
-                              ListMap(
-                                BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                                BsonField.Name("f") -> struct1)),
-                            Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
-                          repair.transCata[JoinFunc[T]](orOriginal(elideCond[JoinSide])))).join
+                      val flatten = (struct0 ⊛ filterBuilder(src, structSel, struct))((struct1, src0) =>
+                        FlatteningBuilder(
+                          DocBuilder(
+                            src0,
+                            ListMap(
+                              BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                              BsonField.Name("f") -> struct1)),
+                          Set(StructureType.Array(DocField(BsonField.Name("f")), id))))
 
-                      src1 >>= (s => filterBuilderJf(s, repairSel, repair))
+                      (flatten >>= (s => filterBuilderJf(s, repairSel, repair))) >>= (src0 =>
+                        getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
+                          src0,
+                          repair.transCata[JoinFunc[T]](orOriginal(elideCond[JoinSide]))))
                     }
                     case (Some(structSel), None) => {
                       val struct0 =
@@ -1016,19 +1016,19 @@ object MongoDbPlanner {
                           repair)).join
                     }
                     case (None, Some(repairSel)) => {
-                      val struct0 = handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct)
-                      val src0 = struct0 >>= (struct1 =>
-                        getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
+                      val flatten =
+                        handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct) ∘ (struct0 =>
                           FlatteningBuilder(
                             DocBuilder(
                               src,
                               ListMap(
                                 BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                                BsonField.Name("f") -> struct1)),
-                            Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
-                          repair.transCata[JoinFunc[T]](orOriginal(elideCond[JoinSide]))))
+                                BsonField.Name("f") -> struct0)),
+                            Set(StructureType.Array(DocField(BsonField.Name("f")), id))))
 
-                      src0 >>= (s => filterBuilderJf(s, repairSel, repair))
+                      (flatten >>= (s => filterBuilderJf(s, repairSel, repair))) >>= (src0 =>
+                        getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
+                          src0, repair.transCata[JoinFunc[T]](orOriginal(elideCond[JoinSide]))))
                     }
                     case _ =>
                       handleFreeMap[T, M, EX](
