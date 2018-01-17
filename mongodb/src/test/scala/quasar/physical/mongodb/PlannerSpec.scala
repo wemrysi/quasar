@@ -219,11 +219,16 @@ class PlannerSpec extends
 
 
     trackPending(
-      "object flatten",
-      plan(sqlE"select geo{*} from usa_factbook"),
+      "object flatten v34",
+      plan3_4(sqlE"select geo{*} from usa_factbook", defaultStats, defaultIndexes, emptyDoc),
       // Actual: [ReadOp,ProjectOp,SimpleMapOp,ProjectOp]
       // FIXME: Inline the ProjectOp inside the SimpleMapOp as a SubMap
       IList(ReadOp, SimpleMapOp, ProjectOp))
+
+    "object flatten" in {
+      plan(sqlE"select geo{*} from usa_factbook") must
+        beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, ProjectOp, UnwindOp, ProjectOp)))
+    }
 
     "plan array concat with filter" in {
       plan(sqlE"""select loc || [ pop ] from zips where city = "BOULDER" """) must
