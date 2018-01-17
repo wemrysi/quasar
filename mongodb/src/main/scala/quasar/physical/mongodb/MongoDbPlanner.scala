@@ -939,11 +939,25 @@ object MongoDbPlanner {
             def transform[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
               applyTransforms(elideCond[A], rewriteUndefined[A])
 
+            def condSelector(v: BsonVersion)
+                : GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = {
+              case MFC(Eq(_, _))
+                 | MFC(Neq(_, _))
+                 | MFC(Lt(_, _))
+                 | MFC(Lte(_, _))
+                 | MFC(Gt(_, _))
+                 | MFC(Gte(_, _)) => defaultSelector[T].right
+              case otherwise => selector[T](v).apply(otherwise)
+              // The `selector` algebra requires one side of a
+              // comparison to be a Constant. The `Cond`s present here
+              // do not have this shape, hence the condSelector decorator
+            }
+
             val selectors = getSelector[T, M, EX, Hole](
               struct, InternalError.fromMsg("Not a selector").left, selector[T](cfg.bsonVersion))
 
             val repairSelectors = getSelector[T, M, EX, JoinSide](
-              repair, InternalError.fromMsg("Not a selector").left, selector[T](cfg.bsonVersion) map (_ <+> defaultSelector[T].right))
+              repair, InternalError.fromMsg("Not a selector").left, condSelector(cfg.bsonVersion))
 
             if (repair.contains(LeftSideF)) {
               val exprMerge: JoinFunc[T] => M[Fix[ExprOp]] =
