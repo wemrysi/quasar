@@ -306,12 +306,69 @@ abstract class StdLibSpec extends Qspec {
 
     "DateLib" >> {
       import DateLib._
+
       def unaryB[I](
           prg: Fix[LogicalPlan] => Fix[LogicalPlan],
           input: I, expected: Data)(implicit arbF: Arbitrary[Builder[I, Data]]): Prop =
         prop { (b: Builder[I, Data]) =>
           unary(prg, b.f(input), expected)
         }
+
+      "SetTimeZone" >> {
+        "LocalDateTime" >> prop { (offset: Int, dt: JLocalDateTime)  =>
+            (offset >= -64800 && offset <= 64800) ==>
+          binary(
+            SetTimeZone(_, _).embed,
+            Data.Int(offset),
+            Data.LocalDateTime(dt),
+            Data.OffsetDateTime(dt.atOffset(ZoneOffset.ofTotalSeconds(offset))))
+        }
+
+        "LocalDate" >> prop { (offset: Int, dt: JLocalDate)  =>
+            (offset >= -64800 && offset <= 64800) ==>
+          binary(
+            SetTimeZone(_, _).embed,
+            Data.Int(offset),
+            Data.LocalDate(dt),
+            Data.OffsetDate(quasar.OffsetDate(dt, ZoneOffset.ofTotalSeconds(offset))))
+        }
+
+        "LocalTime" >> prop { (offset: Int, dt: JLocalTime)  =>
+            (offset >= -64800 && offset <= 64800) ==>
+          binary(
+            SetTimeZone(_, _).embed,
+            Data.Int(offset),
+            Data.LocalTime(dt),
+            Data.OffsetTime(dt.atOffset(ZoneOffset.ofTotalSeconds(offset))))
+        }
+
+        "OffsetDateTime" >> prop { (offset: Int, dt: JOffsetDateTime)  =>
+            (offset >= -64800 && offset <= 64800) ==>
+          binary(
+            SetTimeZone(_, _).embed,
+            Data.Int(offset),
+            Data.OffsetDateTime(dt),
+            Data.OffsetDateTime(dt.withOffsetSameLocal(ZoneOffset.ofTotalSeconds(offset))))
+        }
+
+        "OffsetDate" >> prop { (offset: Int, dt: quasar.OffsetDate)  =>
+            (offset >= -64800 && offset <= 64800) ==>
+          binary(
+            SetTimeZone(_, _).embed,
+            Data.Int(offset),
+            Data.OffsetDate(dt),
+            Data.OffsetDate(dt.copy(offset = ZoneOffset.ofTotalSeconds(offset))))
+        }
+
+        "OffsetTime" >> prop { (offset: Int, dt: JOffsetTime)  =>
+            (offset >= -64800 && offset <= 64800) ==>
+          binary(
+            SetTimeZone(_, _).embed,
+            Data.Int(offset),
+            Data.OffsetTime(dt),
+            Data.OffsetTime(dt.withOffsetSameLocal(ZoneOffset.ofTotalSeconds(offset))))
+        }
+      }
 
       "ExtractCentury" >> {
         "0001-01-01" >> {

@@ -220,6 +220,8 @@ trait DateLib extends Library with Serializable {
       },
       basicUntyper)
 
+  // FIXME `ZoneOffset.ofTotalSeconds` throws an exception if the integer
+  // input is not in the range [-64800, 64800]
   val SetTimeZone = setTimeZone(
     "Sets the timezone subfield in a date/time value (in seconds east of UTC).",
     ZoneOffset.ofTotalSeconds,
