@@ -915,6 +915,11 @@ object MongoDbPlanner {
           case qscript.Map(src, f) =>
             getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, f)
           case LeftShift(src, struct, id, shiftType, repair) => {
+            val exprMerge: JoinFunc[T] => M[Fix[ExprOp]] =
+              getExprMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(_, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
+            val jsMerge: JoinFunc[T] => M[JsFn] =
+              getJsMerge[T, M](_, jscore.Select(jscore.Ident(JsFn.defaultName), "s"), jscore.Select(jscore.Ident(JsFn.defaultName), "f"))
+
             def rewriteUndefined[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
               case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
                 rollMF[T, A](MFC(Guard(exp, tpe, exp0, Free.roll(MFC(MakeArray(Free.roll(MFC(Undefined())))))))).some
@@ -928,11 +933,19 @@ object MongoDbPlanner {
               case _ => none
             }
 
-            def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
+            def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T], fm: FreeMap[T]):
                 M[WorkflowBuilder[WF]] = {
               val (sel, inputs) = partialSel
 
-              inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(struct)))
+              inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(fm)))
+                .map(WB.filter(src, _, sel))
+            }
+
+            def filterBuilderJf(src: WorkflowBuilder[WF], partialSel: PartialSelector[T], jf: JoinFunc[T]):
+                M[WorkflowBuilder[WF]] = {
+              val (sel, inputs) = partialSel
+
+              inputs.traverse(f => exprOrJs[M, JoinFunc[T]](f(jf))(exprMerge, jsMerge))
                 .map(WB.filter(src, _, sel))
             }
 
@@ -953,51 +966,85 @@ object MongoDbPlanner {
               // do not have this shape, hence the condSelector decorator
             }
 
-            val selectors = getSelector[T, M, EX, Hole](
-              struct, InternalError.fromMsg("Not a selector").left, selector[T](cfg.bsonVersion))
+            val structSelectors = getSelector[T, M, EX, Hole](
+              struct, InternalError.fromMsg("Not a selector").left, condSelector(cfg.bsonVersion))
 
             val repairSelectors = getSelector[T, M, EX, JoinSide](
               repair, InternalError.fromMsg("Not a selector").left, condSelector(cfg.bsonVersion))
 
             if (repair.contains(LeftSideF)) {
-              val exprMerge: JoinFunc[T] => M[Fix[ExprOp]] =
-                getExprMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(_, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
-              val jsMerge: JoinFunc[T] => M[JsFn] =
-                getJsMerge[T, M](_, jscore.Select(jscore.Ident(JsFn.defaultName), "s"), jscore.Select(jscore.Ident(JsFn.defaultName), "f"))
-
               shiftType match {
                 case ShiftType.Array => {
-                  selectors.fold(_ => handleFreeMap[T, M, EX](
-                    cfg.funcHandler,
-                    cfg.staticHandler,
-                    struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))) >>= (target =>
-                    getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
-                      FlatteningBuilder(
-                        DocBuilder(
-                          src,
-                          ListMap(
-                            BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                            BsonField.Name("f") -> target)),
-                        Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
-                      repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide])))), { sel =>
-                    val struct0 =
+                  (structSelectors.toOption, repairSelectors.toOption) match {
+                    case (Some(structSel), Some(repairSel)) => {
+                      println("This case")
+                      val struct0 =
+                        handleFreeMap[T, M, EX](
+                          cfg.funcHandler,
+                          cfg.staticHandler,
+                          struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
+
+                      val src1 = (struct0 ⊛ filterBuilder(src, structSel, struct))((struct1, src0) =>
+                        getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
+                          FlatteningBuilder(
+                            DocBuilder(
+                              src0,
+                              ListMap(
+                                BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                                BsonField.Name("f") -> struct1)),
+                            Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                          repair.transCata[JoinFunc[T]](orOriginal(elideCond[JoinSide])))).join
+
+                      src1 >>= (s => filterBuilderJf(s, repairSel, repair))
+                    }
+                    case (Some(structSel), None) => {
+                      val struct0 =
+                        handleFreeMap[T, M, EX](
+                          cfg.funcHandler,
+                          cfg.staticHandler,
+                          struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
+
+                      (struct0 ⊛ filterBuilder(src, structSel, struct))((struct1, src0) =>
+                        getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
+                          FlatteningBuilder(
+                            DocBuilder(
+                              src0,
+                              ListMap(
+                                BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                                BsonField.Name("f") -> struct1)),
+                            Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                          repair)).join
+                    }
+                    case (None, Some(repairSel)) => {
+                      val struct0 = handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct)
+                      val src0 = struct0 >>= (struct1 =>
+                        getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
+                          FlatteningBuilder(
+                            DocBuilder(
+                              src,
+                              ListMap(
+                                BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                                BsonField.Name("f") -> struct1)),
+                            Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                          repair.transCata[JoinFunc[T]](orOriginal(elideCond[JoinSide]))))
+
+                      src0 >>= (s => filterBuilderJf(s, repairSel, repair))
+                    }
+                    case _ =>
                       handleFreeMap[T, M, EX](
                         cfg.funcHandler,
                         cfg.staticHandler,
-                        struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
-                    val repair0 = repair.transCata[JoinFunc[T]](orOriginal(transform[JoinSide]))
-
-                    (struct0 ⊛ filterBuilder(src, sel))((struct1, src0) =>
-                      getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
-                        FlatteningBuilder(
-                          DocBuilder(
-                            src0,
-                            ListMap(
-                              BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                              BsonField.Name("f") -> struct1)),
-                          Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
-                        repair0)).join
-                  })
+                        struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))) >>= (target =>
+                        getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
+                          FlatteningBuilder(
+                            DocBuilder(
+                              src,
+                              ListMap(
+                                BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                                BsonField.Name("f") -> target)),
+                            Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                          repair))
+                  }
                 }
                 case _ =>
                   (handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct) ⊛
@@ -1012,7 +1059,6 @@ object MongoDbPlanner {
                           ListMap(
                             BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                             BsonField.Name("f") -> expr)),
-                        // TODO: Handle arrays properly
                         Set(StructureType.Object(DocField(BsonField.Name("f")), id))),
                       -\&/(j)))
               }
