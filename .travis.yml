@@ -129,11 +129,12 @@ jobs:
         - scripts/quasarPublishAndTag
 
         # recreate sparkcore.jar, which is just going to hang out
-        - |-
-          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-            'set every assemblyJarName in assembly := "sparkcore.jar"' \
-            'set every sparkDependencyProvided := true' \
-            sparkcore/assembly
+        # sparkcore currently disabled
+        # - |-
+        #   ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
+        #     'set every assemblyJarName in assembly := "sparkcore.jar"' \
+        #     'set every sparkDependencyProvided := true' \
+        #     sparkcore/assembly
 
         # release to github
         - scripts/publishJar
