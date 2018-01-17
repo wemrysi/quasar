@@ -29,6 +29,7 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._
 import Scalaz._
+import quasar.physical.rdbms.planner.sql.Indirections._
 
 class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT: EqualT,
 F[_]: Monad: NameGenerator: PlannerErrorME](
@@ -54,10 +55,12 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       val compile = Planner[T, F, QScriptTotal[T, ?]].plan
 
       for {
-        leftAlias <- genId[T[SqlExpr], F]
-        rightAlias <- genId[T[SqlExpr], F]
         left <- lBranch.cataM(interpretM(κ(src.point[F]), compile))
         right <- rBranch.cataM(interpretM(κ(src.point[F]), compile))
+        lMeta = deriveIndirection(left)
+        rMeta = deriveIndirection(right)
+        leftAlias <- genId[T[SqlExpr], F](lMeta)
+        rightAlias <- genId[T[SqlExpr], F](rMeta)
         combined <- processJoinFunc(combine, leftAlias, rightAlias)
         keyExprs <-
           keys.traverse {
@@ -66,8 +69,19 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           }
       } yield {
 
+
+        val selectionExpr = combined.project match {
+          case e@ExprPair(a, b, _) =>
+            (a.project, b.project) match {
+              case (SqlExpr.Id(_, _), SqlExpr.Id(_, _)) => *
+              case _ => e.embed
+            }
+          case other =>
+            other.embed
+        }
+
         Select(
-          selection = Selection(idToWildcard(combined), none),
+          selection = Selection(idToWildcard(combined), none, deriveIndirection(combined)),
           from = From(left, leftAlias),
           join = Join(right, keyExprs, joinType, rightAlias).some,
           filter = none,

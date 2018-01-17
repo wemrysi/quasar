@@ -24,8 +24,9 @@ import quasar.{NameGenerator, qscript}
 import quasar.Planner.PlannerErrorME
 import Planner._
 import sql._
+import sql.Indirections._
 import sql.SqlExpr._
-import sql.{SqlExpr, genId}
+import sql.{SqlExpr, _}
 import sql.SqlExpr.Select._
 import quasar.qscript.{FreeMap, MapFunc, QScriptCore, QScriptTotal, Reduce, ReduceFuncs}
 import quasar.qscript.{MapFuncCore => MFC}
@@ -63,18 +64,17 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
 
   val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def plan: AlgebraM[F, QScriptCore[T, ?], T[SqlExpr]] = {
     case qscript.Map(`unref`, f) =>
       processFreeMap(f, SqlExpr.Null[T[SqlExpr]])
     case qscript.Map(src, f) =>
       for {
-        fromAlias <- genId[T[SqlExpr], F]
+        fromAlias <- genId[T[SqlExpr], F](deriveIndirection(src))
         selection <- processFreeMap(f, fromAlias)
           .map(idToWildcard[T])
       } yield {
         Select(
-          Selection(selection, none),
+          Selection(selection, none, deriveIndirection(src)),
           From(src, fromAlias),
           join = none,
           filter = none,
@@ -91,13 +91,13 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           }
       }
       for {
-        fromAlias <- genId[T[SqlExpr], F]
+        fromAlias <- genId[T[SqlExpr], F](deriveIndirection(src))
         orderByExprs <- order.traverse(createOrderBy(fromAlias))
         bucketExprs <- bucket.map((_, orderByExprs.head.sortDir)).traverse(createOrderBy(fromAlias))
       }
         yield {
           Select(
-            Selection(*, none),
+            Selection(*, none, deriveIndirection(src)),
             From(src, fromAlias),
             join = none,
             filter = none,
@@ -118,34 +118,25 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     case qscript.Unreferenced() => unref.point[F]
 
     case qscript.Filter(src, f) =>
-      src.project match {
-        case s@Select(_, From(_, initialFromAlias), _, initialFilter, _, _) =>
-          val injectedFilterExpr = processFreeMap(f, initialFromAlias)
-          injectedFilterExpr.map { fe =>
-            val finalFilterExpr = initialFilter.map(i => And[T[SqlExpr]](i.v, fe).embed).getOrElse(fe)
-            s.copy(filter = Some(Filter[T[SqlExpr]](finalFilterExpr))).embed
-          }
-        case other =>
-          for {
-            fromAlias <- genId[T[SqlExpr], F]
-            filterExp <- processFreeMap(f, fromAlias)
-          } yield {
-          Select(
-            Selection(*, none),
-            From(src, fromAlias),
-            join = none,
-            Some(Filter(filterExp)),
-            groupBy = none,
-            orderBy = nil
-          ).embed
-      }
+      for {
+        fromAlias <- genId[T[SqlExpr], F](deriveIndirection(src))
+        filterExp <- processFreeMap(f, fromAlias)
+      } yield {
+      Select(
+        Selection(*, none, deriveIndirection(src)),
+        From(src, fromAlias),
+        join = none,
+        Some(Filter(filterExp)),
+        groupBy = none,
+        orderBy = nil
+      ).embed
     }
 
     case qUnion@qscript.Union(src, left, right) =>
       (compile(left, src) |@| compile(right, src))(Union(_,_).embed)
 
     case reduce@qscript.Reduce(src, bucket, reducers, repair) => for {
-      alias <- genId[T[SqlExpr], F]
+      alias <- genId[T[SqlExpr], F](deriveIndirection(src))
       gbs   <- bucket.traverse(processFreeMap(_, alias))
       rds   <- reducers.traverse(_.traverse(processFreeMap(_, alias)) >>=
         reduceFuncPlanner[T, F].plan)
@@ -162,15 +153,14 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           (Distinct[T[SqlExpr]](rep).embed, none)
         case _ => (rep, GroupBy(gbs).some)
       }
-
       Select(
-        Selection(selection, none),
+        Selection(selection, none, Default),
         From(src, alias),
         join = none,
         filter = none,
         groupBy = groupBy,
         orderBy = nil
-      ).embed
+       ).embed
     }
 
     case other =>

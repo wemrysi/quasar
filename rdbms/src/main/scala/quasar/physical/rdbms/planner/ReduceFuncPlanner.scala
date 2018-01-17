@@ -31,11 +31,18 @@ final class ReduceFuncPlanner[T[_[_]]: BirecursiveT, F[_]: Applicative] extends 
 
   def plan: AlgebraM[F, ReduceFunc, T[SqlExpr]] = planʹ >>> (_.embed.η[F])
 
+
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val planʹ: Transform[T[SqlExpr], ReduceFunc, SqlExpr] = {
     case RF.Arbitrary(a1)      => a1.project
     case RF.Avg(a1)            => Avg(a1)
-    case RF.Count(a1)          => Count(a1)
+    case RF.Count(a1)          =>
+      val expr = a1.project match {
+          // A workaround to avoid count(x, y) generated from ConcatMaps
+        case ExprPair(_, _, _) => Select.AllCols[T[SqlExpr]]().embed
+        case _ => a1
+      }
+      Count(expr)
     case RF.First(a1)          => ???
     case RF.Last(a1)           => ???
     case RF.Max(a1)            => Max(a1)
