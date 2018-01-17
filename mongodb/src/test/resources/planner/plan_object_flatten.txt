@@ -1,21 +1,21 @@
 Chain
 ├─ $ReadF(db; usa_factbook)
 ├─ $ProjectF
-│  ├─ Name("0" -> {
-│  │       "$cond": [
-│  │         {
-│  │           "$and": [
-│  │             { "$lte": [{ "$literal": {  } }, "$geo"] },
-│  │             { "$lt": ["$geo", { "$literal": [] }] }]
-│  │         },
-│  │         "$geo",
-│  │         { "$literal": undefined }]
+│  ├─ Name("o" -> {
+│  │       "$objectToArray": {
+│  │         "$cond": [
+│  │           {
+│  │             "$and": [
+│  │               { "$lte": [{ "$literal": {  } }, "$geo"] },
+│  │               { "$lt": ["$geo", { "$literal": [] }] }]
+│  │           },
+│  │           "$geo",
+│  │           { "$literal": undefined }]
+│  │       }
 │  │     })
 │  ╰─ ExcludeId
-├─ $SimpleMapF
-│  ├─ Flatten
-│  │  ╰─ JsCore(_["0"])
-│  ╰─ Scope(ListMap())
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("o")))
 ╰─ $ProjectF
-   ├─ Name("__quasar_mongodb_sigil" -> "$0")
+   ├─ Name("__quasar_mongodb_sigil" -> "$o.v")
    ╰─ ExcludeId

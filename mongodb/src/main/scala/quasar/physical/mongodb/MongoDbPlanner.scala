@@ -904,7 +904,7 @@ object MongoDbPlanner {
           // FIXME: Handle `onUndef`
           case LeftShift(src, struct, id, shiftType, onUndef, repair) => {
             def rewriteUndefined[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
-              case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
+              case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined())))))))) if (onUndef === OnUndefined.Emit) =>
                 rollMF[T, A](MFC(Guard(exp, tpe, exp0, Free.roll(MFC(MakeArray(Free.roll(MFC(Undefined())))))))).some
               case _ => none
             }
