@@ -101,6 +101,8 @@ final case class QSUGraph[T[_[_]]](
 
     import QScriptUniform._
 
+    val withName = QSUGraph.withName[T, F]("qsu")_
+
     if (src =/= target) {
 
       if (root === src) {
@@ -108,13 +110,13 @@ final case class QSUGraph[T[_[_]]](
       } else {
         unfold match {
           case JoinSideRef(`src`) =>
-            QSUGraph.withName[T, F](JoinSideRef[T, Symbol](target)).map(_ :++ this)
+            withName(JoinSideRef[T, Symbol](target)).map(_ :++ this)
 
           case _ =>
             for {
               pattern <- unfold.traverse(_.replaceWithRename[F](src, target))
               bare = pattern.map(_.root)
-              renamed <- QSUGraph.withName[T, F](bare)
+              renamed <- withName(bare)
               verts2 = pattern.foldLeft(SMap[Symbol, QScriptUniform[T, Symbol]]())(_ ++ _.vertices)
             } yield renamed.copy(vertices = verts2 ++ renamed.vertices)
         }
@@ -272,6 +274,7 @@ object QSUGraph extends QSUGraphInstances {
   }
 
   def withName[T[_[_]], F[_]: Monad: NameGenerator](
+      prefix: String)(
       node: QScriptUniform[T, Symbol])(
       implicit MS: MonadState_[F, RevIdx[T]]): F[QSUGraph[T]] = {
 
@@ -284,8 +287,7 @@ object QSUGraph extends QSUGraphInstances {
 
         case None =>
           for {
-            name <- NameGenerator[F].prefixedName("qsu")
-            sym = Symbol(name)
+            sym <- freshSymbol[F](prefix)
             _ <- MS.put(reverse + (node -> sym))
           } yield QSUGraph[T](root = sym, SMap(sym -> node))
       }

@@ -161,7 +161,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       G.gets(_.status.lookup(g.root) getOrElse false)
 
     def freshName: F[Symbol] =
-      freshSymbol("reifyids")
+      freshSymbol("rid")
 
     def isReferenced(access: QAccess[Symbol]): G[Boolean] =
       G.gets(_.refs.accessed.member(access))
