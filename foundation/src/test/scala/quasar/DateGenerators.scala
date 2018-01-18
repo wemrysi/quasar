@@ -102,7 +102,6 @@ trait DateGenerators {
       time <- genLocalTime
       date <- genLocalDate
     } yield LocalDateTime.of(date, time)
-
 }
 
 object DateGenerators extends DateGenerators

@@ -231,8 +231,9 @@ trait DateLib extends Library with Serializable {
     "Sets the minute component of the timezone subfield in a date/time value.",
     ZoneOffset.ofHoursMinutes(0, _),
     { (i, zo) =>
-      val sec = zo.getTotalSeconds
-      ZoneOffset.ofTotalSeconds(i * 60 + (sec % 3600) * 3600 + sec / 60)
+      val totalSeconds: Int = zo.getTotalSeconds
+      val minuteField: Int = (totalSeconds % 3600) / 60
+      ZoneOffset.ofTotalSeconds(totalSeconds - (minuteField * 60) + (i * 60))
     })
 
   val SetTimeZoneHour = setTimeZone(
