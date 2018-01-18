@@ -23,7 +23,6 @@ import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.fp.ski.κ
 import quasar.qscript.{
   construction,
   Center,
@@ -43,7 +42,7 @@ import monocle.Traversal
 import monocle.function.Each
 import monocle.std.option.{some => someP}
 import monocle.syntax.fields._1
-import scalaz.{Bind, Equal, Monad, OptionT, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
+import scalaz.{Bind, Monad, OptionT, Scalaz, StateT}, Scalaz._   // sigh, monad/traverse conflict
 
 final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] private () extends QSUTTypes[T] {
   import MinimizeAutoJoins._
@@ -60,10 +59,6 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
   private val QP = QProv[T]
 
   private val N = new NormalizableT[T]
-
-  // needed to avoid bug in implicit search!  don't import QP.prov._
-  private implicit val QPEq: Equal[QP.P] =
-    QP.prov.provenanceEqual(scala.Predef.implicitly, Equal[QIdAccess])
 
   def apply[F[_]: Monad: NameGenerator: PlannerErrorME](agraph: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] = {
     type G[A] = StateT[StateT[F, RevIdx, ?], MinimizationState[T], A]
@@ -124,7 +119,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
       (remap, candidates) = minimizeSources(fms.flatMap(_.toList))
 
-      fm = combiner.flatMap(i => fms(i).map(κ(remap(i))))
+      fm = combiner.flatMap(i => fms(i) as remap(i))
 
       back <- coalesceRoots[G](qgraph, fm, candidates)
     } yield back
@@ -137,7 +132,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       case ((QSFilter(source, predicate), i), (fm, candidates, _)) =>
         val fm2 = fm flatMap { i2 =>
           if (i2 === i)
-            func.Cond(predicate.map(κ(i)), i.point[FreeMapA], func.Undefined[Int])
+            func.Cond(predicate as i, i.point[FreeMapA], func.Undefined[Int])
           else
             i2.point[FreeMapA]
         }
@@ -148,10 +143,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
         (fm, node :: candidates, changed)
     }
 
-    if (changed)
-      Some((fm2, candidates2))
-    else
-      None
+    changed.option((fm2, candidates2))
   }
 
   // attempts to reduce the set of candidates to a single Map node, given a FreeMap[Int]
@@ -165,17 +157,14 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
     case Nil =>
       updateGraph[T, G](QSU.Unreferenced[T, Symbol]()) map { unref =>
-        val back = qgraph.overwriteAtRoot(QSU.Map[T, Symbol](unref.root, fm.map(κ(srcHole)))) :++ unref
-        Some(back)
+        some(qgraph.overwriteAtRoot(QSU.Map[T, Symbol](unref.root, fm as srcHole)) :++ unref)
       }
 
     case single :: Nil =>
       // if this is false, it's an assertion error
       // lazy val sanityCheck = fm.toList.forall(0 ==)
 
-      qgraph.overwriteAtRoot(QSU.Map[T, Symbol](single.root, fm.map(κ(srcHole)))).point[G] map { back =>
-        Some(back)
-      }
+      some(qgraph.overwriteAtRoot(QSU.Map[T, Symbol](single.root, fm as srcHole))).point[G]
 
     case candidates =>
       expandSecondOrder(fm, candidates) match {
@@ -201,8 +190,6 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
                     }
 
                     upperFM = func.StaticMapFS((0 until exCandidates.length): _*)(_.point[FreeMapA], _.toString)
-
-                    upperFMReduced = upperFM.map(κ(srcHole))
 
                     fakeAutoJoinM = exCandidates match {
                       case left :: right :: _ =>
@@ -249,7 +236,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
             back <- resultM traverse {
               case (retarget, result) =>
-                updateForCoalesce[G](candidates, retarget.root).map(_ => result)
+                updateForCoalesce[G](candidates, retarget.root) as result
             }
           } yield back
       }
