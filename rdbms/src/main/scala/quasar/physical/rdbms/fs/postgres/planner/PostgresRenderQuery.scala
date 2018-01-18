@@ -244,6 +244,7 @@ object PostgresRenderQuery extends RenderQuery {
       val text = v.flatMap { case '\'' => "''"; case iv => iv.toString }.self
       s"'$text'".right
     case Constant(a @ Data.Arr(_)) =>  s"${dataFormatter("", a)}::jsonb".right
+    case Constant(a @ Data.Obj(_)) =>  s"${dataFormatter("", a)}::jsonb".right
     case Constant(v) =>
       DataCodec.render(v) \/> NonRepresentableData(v)
     case Case(wt, e) =>
