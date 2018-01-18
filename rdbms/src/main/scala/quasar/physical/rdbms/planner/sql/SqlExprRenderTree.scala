@@ -147,6 +147,8 @@ trait SqlExprRenderTree {
             nonTerminal(s"Function call: $t", a1, a2)
           case TernaryFunction(t, a1, a2, a3) =>
             nonTerminal(s"Function call: $t", a1, a2, a3)
+          case ArrayUnwind(u) =>
+            nonTerminal("ArrayUnwind", u)
         }
       }
     }

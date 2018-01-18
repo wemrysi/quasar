@@ -108,7 +108,7 @@ trait SqlExprTraverse {
       case TernaryFunction(t, a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(TernaryFunction(t, _, _, _))
       case Limit(from, count) => (f(from) ⊛ f(count))(Limit.apply)
       case Offset(from, count) => (f(from) ⊛ f(count))(Offset.apply)
-
+      case ArrayUnwind(u) => f(u) ∘ ArrayUnwind.apply
     }
   }
 }

@@ -19,9 +19,10 @@ package quasar.physical.rdbms.planner
 import quasar.fp.ski._
 import quasar.NameGenerator
 import quasar.Planner.PlannerErrorME
-import quasar.physical.rdbms.planner.sql._
-import quasar.qscript.{EquiJoin, FreeMap, JoinFunc, LeftSide, MapFunc, QScriptTotal, RightSide}
+import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
 import SqlExpr._
+import quasar.physical.rdbms.planner.sql._
+import quasar.qscript.{EquiJoin, FreeMap, MapFunc, QScriptTotal}
 
 import matryoshka._
 import matryoshka.data._
@@ -34,16 +35,6 @@ class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT: EqualT,
 F[_]: Monad: NameGenerator: PlannerErrorME](
     mapFuncPlanner: Planner[T, F, MapFunc[T, ?]])
     extends Planner[T, F, EquiJoin[T, ?]] {
-
-  private def processJoinFunc(
-      f: JoinFunc[T],
-      leftAlias: SqlExpr[T[SqlExpr]],
-      rightAlias: SqlExpr[T[SqlExpr]]
-  ): F[T[SqlExpr]] =
-    f.cataM(interpretM({
-      case LeftSide  => leftAlias.embed.η[F]
-      case RightSide => rightAlias.embed.η[F]
-    }, mapFuncPlanner.plan))
 
   private def processFreeMap(f: FreeMap[T],
                              alias: SqlExpr[T[SqlExpr]]): F[T[SqlExpr]] =
@@ -58,7 +49,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         rightAlias <- genId[T[SqlExpr], F]
         left <- lBranch.cataM(interpretM(κ(src.point[F]), compile))
         right <- rBranch.cataM(interpretM(κ(src.point[F]), compile))
-        combined <- processJoinFunc(combine, leftAlias, rightAlias)
+        combined <- processJoinFunc(mapFuncPlanner)(combine, leftAlias, rightAlias)
         keyExprs <-
           keys.traverse {
             case (lFm, rFm) =>
