@@ -395,6 +395,8 @@ object MapFuncCore {
         case Undefined() => G.point(Undefined[T, B]())
         case JoinSideName(n) => G.point(JoinSideName[T, B](n))
         case Now() => G.point(Now[T, B]())
+        case NowTime() => G.point(NowTime[T, B]())
+        case NowDate() => G.point(NowDate[T, B]())
 
         // unary
         case ExtractCentury(a1) => f(a1) ∘ (ExtractCentury(_))
@@ -493,6 +495,8 @@ object MapFuncCore {
         case (JoinSideName(n1), JoinSideName(n2)) => n1 ≟ n2
         case (Undefined(), Undefined()) => true
         case (Now(), Now()) => true
+        case (NowTime(), NowTime()) => true
+        case (NowDate(), NowDate()) => true
         // unary
         case (ExtractCentury(a1), ExtractCentury(a2)) => in.equal(a1, a2)
         case (ExtractDayOfMonth(a1), ExtractDayOfMonth(a2)) => in.equal(a1, a2)
@@ -593,6 +597,8 @@ object MapFuncCore {
           case Undefined() => Cord("Undefined()")
           case JoinSideName(n) => Cord("JoinSideName(") ++ n.show ++ Cord(")")
           case Now() => Cord("Now()")
+          case NowTime() => Cord("NowTime()")
+          case NowDate() => Cord("NowDate()")
 
           // unary
           case ExtractCentury(a1) => shz("ExtractCentury", a1)
@@ -703,6 +709,8 @@ object MapFuncCore {
           case Undefined() => Terminal("Undefined" :: nt, None)
           case JoinSideName(n) => Terminal("JoinSideName(" ::nt, n.shows.some)
           case Now() => Terminal("Now" :: nt, None)
+          case NowTime() => Terminal("NowTime" :: nt, None)
+          case NowDate() => Terminal("NowDate" :: nt, None)
 
           // unary
           case ExtractCentury(a1) => nAry("ExtractCentury", a1)
@@ -854,6 +862,10 @@ object MapFuncsCore {
   @Lenses final case class ToTimestamp[T[_[_]], A](a1: A) extends Unary[T, A]
   /** Fetches the [[quasar.Type.OffsetDateTime]] for the current instant in time, in UTC. */
   @Lenses final case class Now[T[_[_]], A]() extends Nullary[T, A]
+  /** Fetches the [[quasar.Type.OffsetTime]] for the current instant in time, in UTC. */
+  @Lenses final case class NowTime[T[_[_]], A]() extends Nullary[T, A]
+  /** Fetches the [[quasar.Type.OffsetDate]] for the current instant in time, in UTC. */
+  @Lenses final case class NowDate[T[_[_]], A]() extends Nullary[T, A]
 
   // identity
   /** Returns a string describing the type of the value. If the value has a

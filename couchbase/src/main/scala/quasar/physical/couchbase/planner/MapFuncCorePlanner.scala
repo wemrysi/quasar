@@ -269,8 +269,13 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
       a2.η[F]
     case MF.TemporalTrunc(a1, a2) =>
       temporalTrunc(a1, a2).η[F]
+
     case MF.Now() =>
       NowStr[T[N1QL]].embed.η[F]
+    case MF.NowTime() =>
+      ???
+    case MF.NowDate() =>
+      ???
 
     // math
     case MF.Negate(a1) =>

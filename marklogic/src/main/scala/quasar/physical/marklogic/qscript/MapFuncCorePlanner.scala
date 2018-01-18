@@ -61,7 +61,10 @@ private[qscript] final class MapFuncCorePlanner[
     case TimeOfDay(dt)                => asDateTime(dt) map xs.time
     case ToTimestamp(millis)          => SP.castIfNode(millis) >>= (lib.timestampToDateTime[F] apply _)
     case TypeOf(x)                    => lib.typeOf[F, FMT] apply x
+
     case Now()                        => fn.currentDateTime.point[F]
+    case NowDate()                    => fn.currentDate.point[F]
+    case NowTime()                    => fn.currentTime.point[F]
 
     case ExtractCentury(time)         => asDateTime(time) map (dt =>
                                            fn.ceiling(fn.yearFromDateTime(dt) div 100.xqy))
