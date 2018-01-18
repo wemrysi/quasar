@@ -193,7 +193,7 @@ object PostgresRenderQuery extends RenderQuery {
       s"($a1 > $a2)".right
     case Gte(NumExpr(a1), NumExpr(a2)) =>
       s"($a1 >= $a2)".right
-    case WithIds((_, str))    => s"(row_number() over(), $str)".right
+    case WithIds((_, str))    => s"row_number() over(), $str".right
     case RowIds()        => "row_number() over()".right
     case Offset((_, from), NumExpr(count)) => s"($from OFFSET $count)".right
     case Limit((_, from), NumExpr(count)) => s"($from LIMIT $count)".right
