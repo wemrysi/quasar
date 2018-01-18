@@ -306,7 +306,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           case reconstructed => reconstructed
         }
-      } yield qgraph.overwriteAtRoot(rewritten.vertices(rewritten.root)) :++ rewritten
+      } yield rewritten
     }
 
     def coalesceZip(
