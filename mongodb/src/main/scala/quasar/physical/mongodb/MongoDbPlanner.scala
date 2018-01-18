@@ -927,7 +927,8 @@ object MongoDbPlanner {
               case _ => none
             }
 
-            // FIXME: Remove the `Cond`s extracted by the selector phase, not every `Cond(_, _, Undefined)` as here.
+            // FIXME: Remove the `Cond`s extracted by the selector
+            // phase, not every `Cond(_, _, Undefined)` as here.
             def elideCond[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
               case CoEnv(\/-(MFC(Cond(if_, then_, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
                 CoEnv(then_.resume.swap).some

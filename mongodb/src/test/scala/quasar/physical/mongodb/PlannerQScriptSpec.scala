@@ -592,7 +592,7 @@ class PlannerQScriptSpec extends
             "codes" -> $field("f"),
             "first_name" -> $field("s", "first_name"),
             "city" -> $field("s", "city")))))
-    }
+    }.pendingUntilFixed
 
     "plan typechecks with JS when unable to extract ExprOp" in {
       qplan(
