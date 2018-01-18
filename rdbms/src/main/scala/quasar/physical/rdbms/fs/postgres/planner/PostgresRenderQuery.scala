@@ -229,14 +229,9 @@ object PostgresRenderQuery extends RenderQuery {
 
       val groupByStr = ~(groupBy.flatMap{
         case GroupBy(Nil) => none
-        case GroupBy(v) => v.map {
-          case (srcExpr, str) =>
-            srcExpr.project match {
-              case ExprWithAlias(e, _) => str.substring(0, str.indexOf("as"))
-              case _ => str
-            }
-        }.intercalate(", ").some
+        case GroupBy(v) => v.map(_._2).intercalate(", ").some
       }.map(v => s" GROUP BY $v"))
+
 
       val fromExpr = s" from ${from.v._2} ${from.alias.v}"
       s"(select ${selection.v._2}$fromExpr$join$filter$groupByStr$orderByStr)".right
