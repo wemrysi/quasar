@@ -2,8 +2,10 @@
     "name": "time series aggregation",
     "backends": {
         "couchbase": "ignoreFieldOrder",
-        "mimir":"pendingIgnoreFieldOrder"
+        "mimir":"pendingIgnoreFieldOrder",
+        "postgres": "pending"
     },
+    "NB": "Postgres connector doesn't support date/time functions yet",
     "data": "smalltimeseries.data",
     "query": "
         SELECT SUM(value) AS measure, timestamp(dt) AS dimension, sensor AS series

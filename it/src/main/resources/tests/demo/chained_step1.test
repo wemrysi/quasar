@@ -4,8 +4,10 @@
     "backends": {
        "couchbase":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
-       "mimir":             "ignoreFieldOrder"
+       "mimir":             "ignoreFieldOrder",
+       "postgres":          "pending"
     },
+    "NB": "Postgres connector doesn't support DeleteKey yet",
     "query": "SELECT DISTINCT (state) as State FROM patients ORDER BY state ASC LIMIT 5",
     "predicate": "exactly",
     "expected": [

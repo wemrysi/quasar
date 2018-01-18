@@ -4,11 +4,12 @@
     "backends": {
        "couchbase":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
-       "mimir":             "ignoreFieldOrder"
+       "mimir":             "ignoreFieldOrder",
+       "postgres":          "pending"
     },
+    "NB": "Postgres connector doesn't support DeleteKey yet",
     "query": "temp0 := SELECT COUNT(*) AS cnt, gender FROM patients WHERE state = \"CO\" AND city = \"DENVER\" GROUP BY gender;
-   SELECT COUNT(*) AS count FROM (temp0) AS temp1
-",
+                       SELECT COUNT(*) AS count FROM (temp0) AS temp1",
     "predicate": "exactly",
     "expected": [
           { "count": 2  }
