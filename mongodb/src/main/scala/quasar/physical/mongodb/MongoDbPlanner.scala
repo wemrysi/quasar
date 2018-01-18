@@ -616,6 +616,45 @@ object MongoDbPlanner {
     }
   }
 
+  def condSelector[T[_[_]]: RecursiveT: ShowT](v: BsonVersion):
+      GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = { node =>
+    import MapFuncsCore._
+
+    def invoke2Rel[T[_[_]]]
+      (x: OutputM[PartialSelector[T]], y: OutputM[PartialSelector[T]])
+      (f: (Selector, Selector) => Selector):
+        OutputM[PartialSelector[T]] =
+      (x.toOption, y.toOption) match {
+        case (Some((f1, p1)), Some((f2, p2)))=>
+          invoke2Nel(x, y)(f)
+        case (Some((f1, p1)), None) =>
+          (f1, p1.map(There(0, _))).right
+        case (None, Some((f2, p2))) =>
+          (f2, p2.map(There(1, _))).right
+        case _ => InternalError.fromMsg(node.map(_._1).shows).left
+      }
+
+    // The `selector` algebra requires one side of a
+    // comparison to be a Constant. The `Cond`s present here
+    // do not have this shape, hence the condSelector decorator
+    val alg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = {
+      case MFC(Eq(_, _))
+         | MFC(Neq(_, _))
+         | MFC(Lt(_, _))
+         | MFC(Lte(_, _))
+         | MFC(Gt(_, _))
+         | MFC(Gte(_, _)) => defaultSelector[T].right
+      case MFC(Cond((_, v), _, _)) =>
+        v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
+      case MFC(MakeMap((_, _), (_, v))) =>
+        v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+      case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
+
+      case otherwise => InternalError.fromMsg(node.map(_._1).shows).left
+    }
+
+    selector[T](v).apply(node) <+> alg(node)
+  }
 
   /** The selector phase tries to turn expressions into MongoDB selectors – i.e.
     * Mongo query expressions. Selectors are only used for the filtering
@@ -637,18 +676,6 @@ object MongoDbPlanner {
     import MapFuncsCore._
 
     type Output = OutputM[PartialSelector[T]]
-
-    def invoke2Rel[T[_[_]]](x: OutputM[PartialSelector[T]], y: OutputM[PartialSelector[T]])(f: (Selector, Selector) => Selector):
-        OutputM[PartialSelector[T]] =
-      (x.toOption, y.toOption) match {
-        case (Some((f1, p1)), Some((f2, p2)))=>
-          invoke2Nel(x, y)(f)
-        case (Some((f1, p1)), None) =>
-          (f1, p1.map(There(0, _))).right
-        case (None, Some((f2, p2))) =>
-          (f2, p2.map(There(1, _))).right
-        case _ => InternalError.fromMsg(node.map(_._1).shows).left
-      }
 
     object IsBson {
       def unapply(x: (T[MapFunc[T, ?]], Output)): Option[Bson] =
@@ -806,16 +833,8 @@ object MongoDbPlanner {
             },
               List(There(0, Here[T]()))))
 
-          case MFC(MakeMap((_, _), (_, v))) =>
-            v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
-
-          case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
-
           case MFC(Not((_, v))) =>
             v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
-
-          case MFC(Cond((_, v), _, _)) =>
-            v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
 
           case MFC(Guard(_, typ, (_, cont), (Embed(MFC(Undefined())), _))) =>
             cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
@@ -946,25 +965,11 @@ object MongoDbPlanner {
             def transform[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
               applyTransforms(elideCond[A], rewriteUndefined[A])
 
-            def condSelector(v: BsonVersion)
-                : GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = {
-              case MFC(Eq(_, _))
-                 | MFC(Neq(_, _))
-                 | MFC(Lt(_, _))
-                 | MFC(Lte(_, _))
-                 | MFC(Gt(_, _))
-                 | MFC(Gte(_, _)) => defaultSelector[T].right
-              case otherwise => selector[T](v).apply(otherwise)
-              // The `selector` algebra requires one side of a
-              // comparison to be a Constant. The `Cond`s present here
-              // do not have this shape, hence the condSelector decorator
-            }
-
             val structSelectors = getSelector[T, M, EX, Hole](
-              struct, InternalError.fromMsg("Not a selector").left, condSelector(cfg.bsonVersion))
+              struct, InternalError.fromMsg("Not a selector").left, condSelector[T](cfg.bsonVersion))
 
             val repairSelectors = getSelector[T, M, EX, JoinSide](
-              repair, InternalError.fromMsg("Not a selector").left, condSelector(cfg.bsonVersion))
+              repair, InternalError.fromMsg("Not a selector").left, condSelector[T](cfg.bsonVersion))
 
             if (repair.contains(LeftSideF)) {
               shiftType match {
