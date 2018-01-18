@@ -29,8 +29,9 @@ import scalaz.Functor
 import scalaz.syntax.functor._
 
 package object sql {
-  def genId[T, F[_]: Functor: NameGenerator]: F[Id[T]] =
-    NameGenerator[F].prefixedName("_") ∘ (Id(_))
+
+  def genId[T, F[_]: Functor: NameGenerator](m: Indirections.Indirection): F[Id[T]] =
+    NameGenerator[F].prefixedName("_") ∘ (Id(_, m))
 
   def unexpected[F[_]: PlannerErrorME, A](name: String): F[A] =
     PlannerErrorME[F].raiseError(InternalError.fromMsg(s"unexpected $name"))
@@ -45,10 +46,10 @@ package object sql {
     */
   def idToWildcard[T[_[_]]: BirecursiveT](e: T[SqlExpr]): T[SqlExpr] = {
     e.project match {
-      case Id(_) => *[T]
-      case ExprPair(a, b) =>
+      case Id(_, _) => *[T]
+      case ExprPair(a, b, _) =>
         (a.project, b.project) match {
-          case (Id(_), Id(_)) => *[T]
+          case (Id(_, _), Id(_, _)) => *[T]
           case _ => e
         }
       case _ => e

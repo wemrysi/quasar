@@ -43,10 +43,10 @@ trait SqlExprTraverse {
       case Null()              => G.point(Null())
       case Obj(m)              => m.traverse(_.bitraverse(f, f)) ∘ (l => Obj(l))
       case Constant(d)         => G.point(Constant(d))
-      case Id(str)             => G.point(Id(str))
+      case Id(str, m)             => G.point(Id(str, m))
       case RegexMatches(a1, a2, i) => (f(a1) ⊛ f(a2))(RegexMatches(_, _, i))
       case ExprWithAlias(e, a) => (f(e) ⊛ G.point(a))(ExprWithAlias.apply)
-      case ExprPair(e1, e2)    => (f(e1) ⊛ f(e2))(ExprPair.apply)
+      case ExprPair(e1, e2,m )    => (f(e1) ⊛ f(e2) ⊛ G.point(m))(ExprPair.apply)
       case ConcatStr(a1, a2)   => (f(a1) ⊛ f(a2))(ConcatStr(_, _))
       case Avg(a1)             => f(a1) ∘ (Avg(_))
       case Count(a1)           => f(a1) ∘ (Count(_))
@@ -55,7 +55,7 @@ trait SqlExprTraverse {
       case Sum(a1)             => f(a1) ∘ (Sum(_))
       case Distinct(a1)        => f(a1) ∘ (Distinct(_))
       case Time(a1)            => f(a1) ∘ Time.apply
-      case Refs(srcs)          =>  srcs.traverse(f) ∘ Refs.apply
+      case Refs(srcs, m)       =>  (srcs.traverse(f) ⊛ G.point(m))(Refs.apply)
       case Table(name)         => G.point(Table(name))
       case IsNotNull(v)        => f(v) ∘ IsNotNull.apply
       case IfNull(v)           => v.traverse(f) ∘ (IfNull(_))
@@ -77,13 +77,13 @@ trait SqlExprTraverse {
 
       case Select(selection, from, joinOpt, filterOpt, groupBy, order) =>
         val newOrder = order.traverse(o => f(o.v).map(newV => OrderBy(newV, o.sortDir)))
-        val sel = f(selection.v) ∘ (i => Selection(i, selection.alias ∘ (a => Id[B](a.v))))
+        val sel = f(selection.v) ∘ (i => Selection(i, selection.alias ∘ (a => Id[B](a.v, a.meta)), selection.meta))
 
         val join = joinOpt.traverse(j => (f(j.v) ⊛ j.keys.traverse { case (a, b) => (f(a) ⊛ f(b))(scala.Tuple2.apply)}) {
-          case (v, ks) => Join(v, ks, j.jType, Id[B](j.alias.v))
+          case (v, ks) => Join(v, ks, j.jType, Id[B](j.alias.v, j.alias.meta))
         })
 
-        val alias = f(from.v).map(b => From(b, Id[B](from.alias.v)))
+        val alias = f(from.v).map(b => From(b, Id[B](from.alias.v, from.alias.meta)))
 
         (sel ⊛
           alias ⊛

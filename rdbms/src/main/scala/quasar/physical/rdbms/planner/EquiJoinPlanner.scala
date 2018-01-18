@@ -23,6 +23,7 @@ import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
 import SqlExpr._
 import quasar.physical.rdbms.planner.sql._
 import quasar.qscript.{EquiJoin, FreeMap, MapFunc, QScriptTotal}
+import quasar.physical.rdbms.planner.sql.Indirections._
 
 import matryoshka._
 import matryoshka.data._
@@ -45,10 +46,12 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       val compile = Planner[T, F, QScriptTotal[T, ?]].plan
 
       for {
-        leftAlias <- genId[T[SqlExpr], F]
-        rightAlias <- genId[T[SqlExpr], F]
         left <- lBranch.cataM(interpretM(κ(src.point[F]), compile))
         right <- rBranch.cataM(interpretM(κ(src.point[F]), compile))
+        lMeta = deriveIndirection(left)
+        rMeta = deriveIndirection(right)
+        leftAlias <- genId[T[SqlExpr], F](lMeta)
+        rightAlias <- genId[T[SqlExpr], F](rMeta)
         combined <- processJoinFunc(mapFuncPlanner)(combine, leftAlias, rightAlias)
         keyExprs <-
           keys.traverse {
@@ -58,7 +61,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       } yield {
 
         Select(
-          selection = Selection(idToWildcard(combined), none),
+          selection = Selection(idToWildcard(combined), none, deriveIndirection(combined)),
           from = From(left, leftAlias),
           join = Join(right, keyExprs, joinType, rightAlias).some,
           filter = none,

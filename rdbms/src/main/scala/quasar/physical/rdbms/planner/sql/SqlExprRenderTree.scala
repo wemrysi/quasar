@@ -58,8 +58,8 @@ trait SqlExprRenderTree {
             nonTerminal(s"RegexMatches (insensitive = $caseInsensitive)", a1, a2)
           case ExprWithAlias(e, a) =>
             nonTerminal(s"ExprWithAlias($a)", e)
-          case ExprPair(expr1, expr2) =>
-            NonTerminal("Pair" :: Nil, none, List(expr1, expr2) ∘ r.render)
+          case ExprPair(expr1, expr2, m) =>
+            NonTerminal(s"Pair (m = ${m.shows})" :: Nil, none, List(expr1, expr2) ∘ r.render)
           case ConcatStr(a1, a2) =>
             nonTerminal("ConcatStr", a1, a2)
           case Avg(a1) =>
@@ -76,8 +76,8 @@ trait SqlExprRenderTree {
             nonTerminal("Distinct", a1)
           case Time(a1) =>
             nonTerminal("Time", a1)
-          case Id(v) =>
-            Terminal("Id" :: Nil, v.some)
+          case Id(v, m) =>
+            Terminal(s"Id (m = ${m.shows})" :: Nil, v.some)
           case Table(v) =>
             Terminal("Table" :: Nil, v.some)
           case RowIds() =>
@@ -110,11 +110,11 @@ trait SqlExprRenderTree {
             nonTerminal(">=", a1, a2)
           case Or(a1, a2) =>
             nonTerminal("Or", a1, a2)
-          case Refs(srcs) =>
-            nonTerminal("References", srcs:_*)
+          case Refs(srcs, m) =>
+            nonTerminal(s"References (m = ${m.shows})", srcs:_*)
           case Select(selection, from, join, filter, groupBy, order) =>
             NonTerminal(
-              "Select" :: Nil,
+              s"Select (m = ${selection.meta.shows})" :: Nil,
               none,
               nt("selection", selection.alias ∘ (_.v), selection.v) ::
                 nt("from", from.alias.v.some, from.v)               ::
