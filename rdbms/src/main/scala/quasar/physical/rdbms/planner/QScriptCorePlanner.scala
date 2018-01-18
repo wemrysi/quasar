@@ -23,15 +23,15 @@ import quasar.fp._
 import quasar.{NameGenerator, qscript}
 import quasar.Planner.PlannerErrorME
 import Planner._
-import sql._
-import sql.SqlExpr._
-import sql.{SqlExpr, genId}
-import sql.SqlExpr.Select._
-import quasar.qscript.{FreeMap, MapFunc, QScriptCore, QScriptTotal, Reduce, ReduceFuncs}
+import quasar.qscript.{ExcludeId, FreeMap, MapFunc, OnUndefined, QScriptCore, QScriptTotal, ShiftType, Reduce, ReduceFuncs}
 import quasar.qscript.{MapFuncCore => MFC}
 import quasar.qscript.{MapFuncDerived => MFD}
 import MFC._
 import MFD._
+import sql._
+import sql.SqlExpr._
+import sql.{SqlExpr, genId}
+import sql.SqlExpr.Select._
 
 import matryoshka._
 import matryoshka.data._
@@ -172,6 +172,18 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         orderBy = nil
       ).embed
     }
+
+    case qscript.LeftShift(src, struct, ExcludeId, ShiftType.Array, OnUndefined.Omit, repair) =>
+      for {
+        structAlias <- genId[T[SqlExpr], F]
+        structExpr  <- processFreeMap(struct, structAlias)
+        right = ArrayUnwind(structExpr)
+        repaired <- processJoinFunc(mapFuncPlanner)(repair, structAlias, right)
+        result = Select[T[SqlExpr]](
+          Selection(repaired, None), From(src, structAlias), none, none, none, Nil)
+      } yield {
+        result.embed
+      }
 
     case other =>
       notImplemented(s"QScriptCore: $other", this)
