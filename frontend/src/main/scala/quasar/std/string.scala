@@ -116,8 +116,13 @@ trait StringLib extends Library {
     constTyper(Type.Bool),
     basicUntyper)
 
+  import java.util.regex.Pattern
+
   def matchAnywhere(str: String, pattern: String, insen: Boolean) =
-    java.util.regex.Pattern.compile(if (insen) "(?i)" ⊹ pattern else pattern).matcher(str).find()
+    Pattern.compile(if (insen) "(?i)" ⊹ pattern else pattern).matcher(str).find()
+
+  def isValidRegex(pattern: String): Boolean =
+    Try(Pattern.compile(pattern)).isSuccess
 
   val Search = TernaryFunc(
     Mapping,
@@ -126,12 +131,9 @@ trait StringLib extends Library {
     Func.Input3(Type.Str, Type.Str, Type.Bool),
     noSimplification,
     partialTyperV[nat._3] {
-      case Sized(Type.Const(Data.Str(str)), Type.Const(Data.Str(pattern)), Type.Const(Data.Bool(insen))) =>
+      case Sized(Type.Const(Data.Str(str)), Type.Const(Data.Str(pattern)), Type.Const(Data.Bool(insen)))
+        if isValidRegex(pattern) =>
         success(Type.Const(Data.Bool(matchAnywhere(str, pattern, insen))))
-      case Sized(strT, patternT, insenT) =>
-        (Type.typecheck(Type.Str, strT).leftMap(nel => nel.map(ι[SemanticError])) |@|
-         Type.typecheck(Type.Str, patternT).leftMap(nel => nel.map(ι[SemanticError])) |@|
-         Type.typecheck(Type.Bool, insenT).leftMap(nel => nel.map(ι[SemanticError])))((_, _, _) => Type.Bool)
     },
     basicUntyper)
 
