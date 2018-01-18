@@ -241,14 +241,12 @@ object PostgresRenderQuery extends RenderQuery {
       val fromExpr = s" from ${from.v._2} ${from.alias.v}"
       s"(select ${selection.v._2}$fromExpr$join$filter$groupByStr$orderByStr)".right
     case Union((_, left), (_, right)) => s"($left UNION $right)".right
+    case Constant(a @ Data.Arr(_)) =>  s"${dataFormatter("", a)}::jsonb".right
     case Constant(Data.Str(v)) =>
       val text = v.flatMap { case '\'' => "''"; case iv => iv.toString }.self
       s"'$text'".right
     case Constant(v) =>
-      DataCodec.render(v).map{ rendered => v match {
-        case _: Data.Arr => postgresArray(rendered) // TODO fix [ "xxx", "yyy" ] to [ 'xxx', 'yyy' ]
-        case _ => rendered
-      }} \/> NonRepresentableData(v)
+      DataCodec.render(v) \/> NonRepresentableData(v)
     case Case(wt, e) =>
       val wts = wt ∘ { case WhenThen(TextExpr(w), TextExpr(t)) => s"when ($w)::boolean then $t" }
       s"(case ${wts.intercalate(" ")} else ${text(e.v)} end)".right
@@ -271,6 +269,6 @@ object PostgresRenderQuery extends RenderQuery {
       case Substring => s"substring(${text(a1)} from ((${text(a2)})::integer + 1) for (${text(a3)})::integer)"
     }).right
 
-    case ArrayUnwind(TextExpr(toUnwind)) => s"jsonb_array_elements_text($toUnwind)".right
+    case ArrayUnwind(toUnwind) => s"jsonb_array_elements_text(${text(toUnwind)})".right
   }
 }
