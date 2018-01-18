@@ -118,11 +118,11 @@ trait StringLib extends Library {
 
   import java.util.regex.Pattern
 
-  def matchAnywhere(str: String, pattern: String, insen: Boolean) =
-    Pattern.compile(if (insen) "(?i)" ⊹ pattern else pattern).matcher(str).find()
+  def patternInsensitive(pattern: String, insen: Boolean): String =
+    if (insen) "(?i)" ⊹ pattern else pattern
 
-  def isValidRegex(pattern: String): Boolean =
-    Try(Pattern.compile(pattern)).isSuccess
+  def matchAnywhere(str: String, pattern: Pattern, insen: Boolean) =
+    pattern.matcher(str).find()
 
   val Search = TernaryFunc(
     Mapping,
@@ -130,10 +130,11 @@ trait StringLib extends Library {
     Type.Bool,
     Func.Input3(Type.Str, Type.Str, Type.Bool),
     noSimplification,
-    partialTyperV[nat._3] {
-      case Sized(Type.Const(Data.Str(str)), Type.Const(Data.Str(pattern)), Type.Const(Data.Bool(insen)))
-        if isValidRegex(pattern) =>
-        success(Type.Const(Data.Bool(matchAnywhere(str, pattern, insen))))
+    partialTyperOV[nat._3] {
+      case Sized(Type.Const(Data.Str(str)), Type.Const(Data.Str(pattern)), Type.Const(Data.Bool(insen))) =>
+        val compiledPattern = Try(Pattern.compile(patternInsensitive(pattern, insen))).toOption
+        compiledPattern.map(p => success(Type.Const(Data.Bool(matchAnywhere(str, p, insen)))))
+      case _ => None
     },
     basicUntyper)
 
