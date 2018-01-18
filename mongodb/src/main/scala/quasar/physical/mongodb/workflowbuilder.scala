@@ -58,8 +58,8 @@ object WorkflowBuilderF {
             eq.equal(s1, s2) && e1 == e2
           case (GroupBuilderF(s1, k1, c1), GroupBuilderF(s2, k2, c2)) =>
             eq.equal(s1, s2) && k1 ≟ k2 && c1 == c2
-          case (FlatteningBuilderF(s1, f1), FlatteningBuilderF(s2, f2)) =>
-            eq.equal(s1, s2) && f1 == f2
+          case (FlatteningBuilderF(s1, f1, r1), FlatteningBuilderF(s2, f2, r2)) =>
+            eq.equal(s1, s2) && f1 == f2 && r1 ≟ r2
           case (UnionBuilderF(ls1, rs1), UnionBuilderF(ls2, rs2)) =>
             eq.equal(ls1, ls2) && eq.equal(rs1, rs2)
           case _ => false
@@ -82,8 +82,8 @@ object WorkflowBuilderF {
           case DocBuilderF(src, shape) => f(src).map(DocBuilderF(_, shape))
           case GroupBuilderF(src, keys, contents) =>
             f(src).map(GroupBuilderF(_, keys, contents))
-          case FlatteningBuilderF(src, fields) =>
-            f(src).map(FlatteningBuilderF(_, fields))
+          case FlatteningBuilderF(src, fields, rest) =>
+            f(src).map(FlatteningBuilderF(_, fields, rest))
           case UnionBuilderF(lSrc, rSrc) =>
             (f(lSrc) ⊛ f(rSrc))(UnionBuilderF(_, _))
         }
@@ -126,16 +126,17 @@ object WorkflowBuilderF {
               NonTerminal("By" :: nt, None, keys.map(_.render)) ::
               RG.render(content).copy(nodeType = "Content" :: nt) ::
               Nil)
-        case FlatteningBuilderF(src, fields) =>
+        case FlatteningBuilderF(src, fields, rest) =>
           val nt = "FlatteningBuilder" :: nodeType
-          NonTerminal(nt, None,
-            rt.render(src) ::
-              fields.toList.map {
-                case StructureType.Array(field, id) =>
-                  NonTerminal("Array" :: nt, field.shows.some, List(id.render))
-                case StructureType.Object(field, id) =>
-                  NonTerminal("Object" :: nt, field.shows.some, List(id.render))
-              })
+          val flds = NonTerminal("Fields" :: nt, None,
+            fields.toList.map {
+              case StructureType.Array(field, id) =>
+                NonTerminal("Array" :: nt, field.shows.some, List(id.render))
+              case StructureType.Object(field, id) =>
+                NonTerminal("Object" :: nt, field.shows.some, List(id.render))
+            })
+          val rst = Terminal.opt("Rest" :: nt, rest.map(_.shows))
+          NonTerminal(nt, None, rt.render(src) :: flds :: rst.toList)
         case UnionBuilderF(lSrc, rSrc) =>
           val nt = "UnionBuilder" :: nodeType
           NonTerminal(nt, None, List(rt.render(lSrc), rt.render(rSrc)))
@@ -145,6 +146,8 @@ object WorkflowBuilderF {
 
 object WorkflowBuilder {
   import fixExprOp._
+
+  val fixExprOp344 = new ExprOp3_4_4F.fixpoint[Fix[ExprOp], ExprOp](_.embed)
 
   /** A partial description of a query that can be run on an instance of MongoDB */
   type WorkflowBuilder[F[_]] = Fix[WorkflowBuilderF[F, ?]]
@@ -307,11 +310,15 @@ object WorkflowBuilder {
       }
   }
 
-  final case class FlatteningBuilderF[F[_], A](src: A, fields: Set[StructureType[DocVar]])
+  /**
+   * fields - the fields to flatten
+   * rest - the other fields of the structure or `None` if unknown
+   */
+  final case class FlatteningBuilderF[F[_], A](src: A, fields: Set[StructureType[DocVar]], rest: Option[List[BsonField.Name]])
       extends WorkflowBuilderF[F, A]
   object FlatteningBuilder {
-    def apply[F[_]](src: WorkflowBuilder[F], fields: Set[StructureType[DocVar]]) =
-      Fix[WorkflowBuilderF[F, ?]](new FlatteningBuilderF(src, fields))
+    def apply[F[_]](src: WorkflowBuilder[F], fields: Set[StructureType[DocVar]], rest: Option[List[BsonField.Name]]) =
+      Fix[WorkflowBuilderF[F, ?]](new FlatteningBuilderF(src, fields, rest))
   }
 
   final case class UnionBuilderF[F[_], A](lSrc: A, rSrc: A) extends WorkflowBuilderF[F, A]
@@ -367,7 +374,7 @@ object WorkflowBuilder {
     case ExprBuilderF(_, _)                 => none
     case DocBuilderF(_, shape)              => shape.keys.toList.toNel
     case GroupBuilderF(_, _, shape)         => shape.keys.toList.toNel
-    case FlatteningBuilderF(src, _)         => src
+    case FlatteningBuilderF(src, _, _)      => src
     case UnionBuilderF(lSrc, rSrc)          => if (lSrc ≟ rSrc) lSrc else none
 
   }
@@ -376,7 +383,7 @@ object WorkflowBuilder {
   // FIXME: There are a few recursive references to this function. We need to
   //        eliminate those.
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def toWorkflow[M[_]: Monad, WF[_]: Coalesce]
+  def toWorkflow[M[_]: Monad, WF[_]: Coalesce](queryModel: MongoQueryModel)
     (implicit M: MonadError_[M, PlannerError], ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], exprOps: ExprOpOps.Uni[ExprOp])
       : AlgebraM[M, WorkflowBuilderF[WF, ?], (Fix[WF], Base)] = {
     case CollectionBuilderF(graph, base, _) => (graph, base).point[M]
@@ -392,7 +399,7 @@ object WorkflowBuilder {
             val srcName = BsonField.Name("src")
             op.lift(pairs.map(_._1)).fold(
               M.raiseError[(Fix[WF], Base)](UnsupportedFunction(set.Filter, Some("failed to build operation"))))(
-              op => toWorkflow[M, WF].apply(DocBuilderF((g, b), pairs.toListMap + (srcName -> docVarToExpr(DocVar.ROOT())))) ∘ {
+              op => toWorkflow[M, WF](queryModel).apply(DocBuilderF((g, b), pairs.toListMap + (srcName -> docVarToExpr(DocVar.ROOT())))) ∘ {
                 case (graph, _) => (chain(graph, op), Field(srcName))
               })
           } (
@@ -433,7 +440,7 @@ object WorkflowBuilder {
       semiAlignExpr(keys).fold {
         val ks = keys.zipWithIndex.map(_.map(i => BsonField.Name(i.shows)).swap)
 
-        toWorkflow[M, WF].apply(DocBuilderF((gʹ, Root()), ks.toListMap + (BsonField.Name("content") -> docVarToExpr(bʹ.toDocVar)))) strengthR
+        toWorkflow[M, WF](queryModel).apply(DocBuilderF((gʹ, Root()), ks.toListMap + (BsonField.Name("content") -> docVarToExpr(bʹ.toDocVar)))) strengthR
           ((Field(BsonField.Name("content")): Base, ks.map(key => $var(DocField(key._1)))))
       }(
         ks => ((gʹ, bʹ), (bʹ, ks)).point[M]) >>= { case ((g, b), (c, keys)) =>
@@ -451,82 +458,8 @@ object WorkflowBuilder {
           (chain(g, $group[WF](Grouped(content).rewriteRefs(prefixBase0(c)), key)),
             Root(): Base).point[M]
       }
-    case FlatteningBuilderF((graph, base), fields) =>
-      (
-        // TODO: Organize this to put all the $maps and all the $unwinds adjacent.
-        fields.foldRight(graph) {
-          case (StructureType.Array(field, quasar.qscript.ExcludeId), acc) =>
-            $unwind[WF](base.toDocVar \\ field).apply(acc)
-          case (StructureType.Array(field, includeIndex), acc) =>
-            $simpleMap[WF](
-              includeIndex match {
-                case quasar.qscript.ExcludeId =>
-                  NonEmptyList(FlatExpr((base.toDocVar \\ field).toJs))
-                case quasar.qscript.IncludeId =>
-                  NonEmptyList(
-                    SubExpr(
-                      (base.toDocVar \\ field).toJs,
-                      JsFn(jsBase,
-                        jscore.Let(
-                          jscore.Name("m"),
-                          (base.toDocVar \\ field).toJs(jscore.Ident(jsBase)),
-                          jscore.Call(
-                            jscore.Select(
-                              jscore.Call(
-                                jscore.Select(jscore.ident("Object"), "keys"),
-                                List(jscore.ident("m"))),
-                              "map"),
-                            List(jscore.Fun(List(jscore.Name("k")), jscore.Arr(List(
-                              jscore.ident("k"),
-                              jscore.Access(jscore.ident("m"), jscore.ident("k")))))))))),
-                    FlatExpr((base.toDocVar \\ field).toJs))
-                case quasar.qscript.IdOnly =>
-                  NonEmptyList(
-                    SubExpr(
-                      (base.toDocVar \\ field).toJs,
-                      JsFn(jsBase,
-                        jscore.Call(
-                          jscore.Select(jscore.ident("Object"), "keys"),
-                          List((base.toDocVar \\ field).toJs(jscore.Ident(jsBase)))))),
-                    FlatExpr((base.toDocVar \\ field).toJs))
-              },
-              ListMap()).apply(acc)
-          case (StructureType.Object(field, includeKey), acc) =>
-            $simpleMap[WF](
-              includeKey match {
-                case quasar.qscript.ExcludeId =>
-                  NonEmptyList(FlatExpr((base.toDocVar \\ field).toJs))
-                case quasar.qscript.IncludeId =>
-                  NonEmptyList(
-                    SubExpr(
-                      (base.toDocVar \\ field).toJs,
-                      JsFn(jsBase,
-                        jscore.Let(
-                          jscore.Name("m"),
-                          (base.toDocVar \\ field).toJs(jscore.Ident(jsBase)),
-                          jscore.Call(
-                            jscore.Select(
-                              jscore.Call(
-                                jscore.Select(jscore.ident("Object"), "keys"),
-                                List(jscore.ident("m"))),
-                              "map"),
-                            List(jscore.Fun(List(jscore.Name("k")), jscore.Arr(List(
-                              jscore.ident("k"),
-                              jscore.Access(jscore.ident("m"), jscore.ident("k")))))))))),
-                    FlatExpr((base.toDocVar \\ field).toJs))
-                case quasar.qscript.IdOnly =>
-                  NonEmptyList(
-                    SubExpr(
-                      (base.toDocVar \\ field).toJs,
-                      JsFn(jsBase,
-                        jscore.Call(
-                          jscore.Select(jscore.ident("Object"), "keys"),
-                          List((base.toDocVar \\ field).toJs(jscore.Ident(jsBase)))))),
-                    FlatExpr((base.toDocVar \\ field).toJs))
-              },
-              ListMap()).apply(acc)
-        },
-        base).point[M]
+    case FlatteningBuilderF((graph, base), fields, rest) =>
+      (fields.foldRight(graph)(flattenField(queryModel, base, rest)), base).point[M]
     case UnionBuilderF((lGraph, lBase), (rGraph, rBase)) =>
       if (lBase == rBase)
         ($foldLeft(
@@ -536,9 +469,9 @@ object WorkflowBuilder {
             $reduce($ReduceF.reduceNOP, ListMap()))),
           lBase).point[M]
       else
-        (toWorkflow[M, WF].apply(DocBuilderF((lGraph, Root()), ListMap(
+        (toWorkflow[M, WF](queryModel).apply(DocBuilderF((lGraph, Root()), ListMap(
           BsonField.Name("0") -> docVarToExpr(lBase.toDocVar)))) ⊛
-          toWorkflow[M, WF].apply(DocBuilderF((rGraph, Root()), ListMap(
+          toWorkflow[M, WF](queryModel).apply(DocBuilderF((rGraph, Root()), ListMap(
             BsonField.Name("0") -> docVarToExpr(rBase.toDocVar)))))((l, r) =>
           ($foldLeft(
             l._1,
@@ -549,10 +482,116 @@ object WorkflowBuilder {
             Field(BsonField.Name("0"))))
   }
 
-  def generateWorkflow[M[_]: Monad, F[_]: Coalesce](wb: WorkflowBuilder[F])
+  // TODO: Organize this to put all the $maps and all the $unwinds adjacent.
+  private def flattenField[WF[_]: Coalesce]
+    (queryModel: MongoQueryModel, base: Base, rest: Option[List[BsonField.Name]])
+    (implicit ev0: WorkflowOpCoreF :<: WF)
+      : (StructureType[DocVar], Fix[WF]) => Fix[WF] =
+    (field, acc) => {
+      (field, rest, queryModel) match {
+        case (StructureType.Array(field, quasar.qscript.ExcludeId), _, _) =>
+          $unwind[WF](base.toDocVar \\ field, None, None).apply(acc)
+        case (StructureType.Array(field, idStatus), Some(r), _) =>
+          flattenFieldArrayUnwindProject(base, field, idStatus, r, acc)
+        case (StructureType.Array(field, idStatus), _, _) =>
+          flattenFieldMapReduce(base, field, idStatus).apply(acc)
+        case (StructureType.Object(field, idStatus), Some(r), MongoQueryModel.`3.4.4`) =>
+          flattenFieldObject344(base, field, idStatus, r, acc)
+        case (StructureType.Object(field, idStatus), _, _) =>
+          flattenFieldMapReduce(base, field, idStatus).apply(acc)
+      }
+    }
+
+  private def flattenFieldObject344[WF[_]: Coalesce]
+    (base: Base, field: DocVar, idStatus: IdStatus, rest: List[BsonField.Name], wf: Fix[WF])
+    (implicit ev0: WorkflowOpCoreF :<: WF)
+      : Fix[WF] = {
+    val rst = ListMap(rest.map(f => f -> \/-($var(DocVar.ROOT(f)))) : _*)
+    val oKey = $var(DocVar.ROOT(BsonField.Name("o")) \ BsonField.Name("k"))
+    val oValue = $var(DocVar.ROOT(BsonField.Name("o")) \ BsonField.Name("v"))
+    val prj = idStatus match {
+      case quasar.qscript.ExcludeId => oValue
+      case quasar.qscript.IdOnly => oKey
+      case quasar.qscript.IncludeId => $arrayLit(List(oKey, oValue))
+    }
+
+    chain(wf,
+      $project[WF](Reshape(rst ++ ListMap(
+        BsonField.Name("o") -> \/-(fixExprOp344.$objectToArray($var(base.toDocVar \\ field))))),
+        ExcludeId),
+      $unwind[WF](DocVar.ROOT(BsonField.Name("o")), None, None),
+      $project[WF](Reshape(rst ++
+        (base.toDocVar \\ field).deref.map(f =>
+          ListMap(f.flatten.head -> \/-(prj))).getOrElse(ListMap())),
+        ExcludeId))
+  }
+
+  private def flattenFieldArrayUnwindProject[WF[_]: Coalesce]
+    (base: Base, field: DocVar, idStatus: IdStatus, rest: List[BsonField.Name], wf: Fix[WF])
+    (implicit ev0: WorkflowOpCoreF :<: WF)
+      : Fix[WF] = {
+    val rst = ListMap(rest.map(f => f -> \/-($var(DocVar.ROOT(f)))) : _*)
+    val prj = idStatus match {
+      case quasar.qscript.ExcludeId => $var(base.toDocVar \\ field)
+      case quasar.qscript.IdOnly => $var(DocField(BsonField.Name("ix")))
+      case quasar.qscript.IncludeId => $arrayLit(List(
+        $var(DocField(BsonField.Name("ix"))),
+        $var(base.toDocVar \\ field)))
+    }
+    chain(wf,
+      $unwind[WF](base.toDocVar \\ field, Some(BsonField.Name("ix")), None),
+      $project[WF](Reshape(rst ++
+        // TODO: mongo >= 3.4 has $addFields - should be able to plan without `rest` being known
+        // { $unwind: {path: "$f", includeArrayIndex: "ix"} } ,
+        // { $addFields: { "f": ["$ix", "$f"] } },
+        // { $project: { "ix": false } },
+        (base.toDocVar \\ field).deref.map(f => ListMap(f.flatten.head ->
+          \/-(prj))).getOrElse(ListMap())),
+        ExcludeId))
+  }
+
+  private def flattenFieldMapReduce[WF[_]: Coalesce]
+    (base: Base, field: DocVar, idStatus: IdStatus)
+    (implicit ev0: WorkflowOpCoreF :<: WF)
+      : FixOp[WF] =
+    $simpleMap[WF](
+      idStatus match {
+        case quasar.qscript.ExcludeId =>
+          NonEmptyList(FlatExpr((base.toDocVar \\ field).toJs))
+        case quasar.qscript.IncludeId =>
+          NonEmptyList(
+            SubExpr(
+              (base.toDocVar \\ field).toJs,
+              JsFn(jsBase,
+                jscore.Let(
+                  jscore.Name("m"),
+                  (base.toDocVar \\ field).toJs(jscore.Ident(jsBase)),
+                  jscore.Call(
+                    jscore.Select(
+                      jscore.Call(
+                        jscore.Select(jscore.ident("Object"), "keys"),
+                        List(jscore.ident("m"))),
+                      "map"),
+                    List(jscore.Fun(List(jscore.Name("k")), jscore.Arr(List(
+                      jscore.ident("k"),
+                      jscore.Access(jscore.ident("m"), jscore.ident("k")))))))))),
+            FlatExpr((base.toDocVar \\ field).toJs))
+        case quasar.qscript.IdOnly =>
+          NonEmptyList(
+            SubExpr(
+              (base.toDocVar \\ field).toJs,
+              JsFn(jsBase,
+                jscore.Call(
+                  jscore.Select(jscore.ident("Object"), "keys"),
+                  List((base.toDocVar \\ field).toJs(jscore.Ident(jsBase)))))),
+            FlatExpr((base.toDocVar \\ field).toJs))
+      },
+      ListMap())
+
+  def generateWorkflow[M[_]: Monad, F[_]: Coalesce](wb: WorkflowBuilder[F], queryModel: MongoQueryModel)
     (implicit M: MonadError_[M, PlannerError], ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
       : M[(Fix[F], Base)] =
-    (wb: Fix[WorkflowBuilderF[F, ?]]).cataM(toWorkflow[M, F])
+    (wb: Fix[WorkflowBuilderF[F, ?]]).cataM(toWorkflow[M, F](queryModel))
 
   def shift[F[_]: Coalesce](base: Base, struct: Schema, graph: Fix[F])
     (implicit ev: WorkflowOpCoreF :<: F)
@@ -577,10 +616,10 @@ object WorkflowBuilder {
     }
   }
 
-  def build[M[_]: Monad, F[_]: Coalesce](wb: WorkflowBuilder[F])
+  def build[M[_]: Monad, F[_]: Coalesce](wb: WorkflowBuilder[F], queryModel: MongoQueryModel)
     (implicit M: MonadError_[M, PlannerError], ev0: WorkflowOpCoreF :<: F, ev1: RenderTree[WorkflowBuilder[F]], ev2: ExprOpOps.Uni[ExprOp])
       : M[Fix[F]] =
-    (wb: Fix[WorkflowBuilderF[F, ?]]).cataM(AlgebraMZip[M, WorkflowBuilderF[F, ?]].zip(toWorkflow[M, F], schema.generalizeM[M])) ∘ {
+    (wb: Fix[WorkflowBuilderF[F, ?]]).cataM(AlgebraMZip[M, WorkflowBuilderF[F, ?]].zip(toWorkflow[M, F](queryModel), schema.generalizeM[M])) ∘ {
       case ((graph, Root()), _)      => graph
       case ((graph, base),   struct) => shift(base, struct, graph)._1
     }
@@ -638,7 +677,7 @@ object WorkflowBuilder {
     wb.unFix match {
       case CollectionBuilderF(_, _, s2)       => s2.map(s => Subset(s.toSet))
       case DocBuilderF(_, shape)              => Subset(shape.keySet).some
-      case FlatteningBuilderF(src, _)         => findKeys(src)
+      case FlatteningBuilderF(src, _, _)      => findKeys(src)
       case GroupBuilderF(_, _, obj)           => Subset(obj.keySet).some
       case ShapePreservingBuilderF(src, _, _) => findKeys(src)
       case ExprBuilderF(_, _)                 => Root().some

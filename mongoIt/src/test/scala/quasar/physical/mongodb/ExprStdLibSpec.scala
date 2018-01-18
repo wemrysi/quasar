@@ -91,12 +91,12 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
   def shortCircuitTC(args: List[Data]): Result \/ Unit = notHandled.left
 
   def build[WF[_]: Coalesce: Inject[WorkflowOpCoreF, ?[_]]](
-    expr: Fix[ExprOp], coll: Collection)(
+    expr: Fix[ExprOp], queryModel: MongoQueryModel, coll: Collection)(
     implicit RT: RenderTree[WorkflowBuilder[WF]]
   ) =
     WorkflowBuilder.build[PlannerError \/ ?, WF](
       WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[WF].read(coll),
-        ListMap(QuasarSigilName -> \&/-(expr))))
+        ListMap(QuasarSigilName -> \&/-(expr))), queryModel)
       .leftMap(qscriptPlanningFailed.reverseGet(_))
 
   def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix]
@@ -107,17 +107,17 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     queryModel match {
       case MongoQueryModel.`3.4.4` =>
         (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_4_4](
-          FuncHandler.handle3_4_4(bsonVersion), StaticHandler.handle)(mf).run(runAt) >>= (build[Workflow3_2F](_, coll)))
+          FuncHandler.handle3_4_4(bsonVersion), StaticHandler.handle)(mf).run(runAt) >>= (build[Workflow3_2F](_, queryModel, coll)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], QuasarSigilName))
 
       case MongoQueryModel.`3.4` =>
         (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_4](
-          FuncHandler.handle3_4(bsonVersion), StaticHandler.handle)(mf).run(runAt) >>= (build[Workflow3_2F](_, coll)))
+          FuncHandler.handle3_4(bsonVersion), StaticHandler.handle)(mf).run(runAt) >>= (build[Workflow3_2F](_, queryModel, coll)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], QuasarSigilName))
 
       case MongoQueryModel.`3.2` =>
         (MongoDbPlanner.getExpr[Fix, PlanStdT, Expr3_2](
-          FuncHandler.handle3_2(bsonVersion), StaticHandler.handle)(mf).run(runAt) >>= (build[Workflow3_2F](_, coll)))
+          FuncHandler.handle3_2(bsonVersion), StaticHandler.handle)(mf).run(runAt) >>= (build[Workflow3_2F](_, queryModel, coll)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], QuasarSigilName))
     }
   }

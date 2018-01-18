@@ -949,7 +949,8 @@ object MongoDbPlanner {
                           ListMap(
                             BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                             BsonField.Name("f") -> target)),
-                        Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                        Set(StructureType.Array(DocField(BsonField.Name("f")), id)),
+                        List(BsonField.Name("s")).some),
                       repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide])))), { sel =>
                     val struct0 =
                       handleFreeMap[T, M, EX](
@@ -966,7 +967,8 @@ object MongoDbPlanner {
                             ListMap(
                               BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                               BsonField.Name("f") -> struct1)),
-                          Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                          Set(StructureType.Array(DocField(BsonField.Name("f")), id)),
+                          List(BsonField.Name("s")).some),
                         repair0)).join
                   })
                 }
@@ -984,7 +986,8 @@ object MongoDbPlanner {
                             BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                             BsonField.Name("f") -> expr)),
                         // TODO: Handle arrays properly
-                        Set(StructureType.Object(DocField(BsonField.Name("f")), id))),
+                        Set(StructureType.Object(DocField(BsonField.Name("f")), id)),
+                        List(BsonField.Name("s")).some),
                       -\&/(j)))
               }
             }
@@ -999,7 +1002,8 @@ object MongoDbPlanner {
                       cfg.funcHandler, cfg.staticHandler)(
                       FlatteningBuilder(
                         builder,
-                        Set(StructureType.Array(DocVar.ROOT(), id))),
+                        Set(StructureType.Array(DocVar.ROOT(), id)),
+                        List().some),
                         repair0))
                 }
                 case _ =>
@@ -1008,7 +1012,8 @@ object MongoDbPlanner {
                       cfg.funcHandler, cfg.staticHandler)(
                       FlatteningBuilder(
                         builder,
-                        Set(StructureType.Object(DocVar.ROOT(), id))),
+                        Set(StructureType.Object(DocVar.ROOT(), id)),
+                        List().some),
                         repair.as(SrcHole)))
               }
 
@@ -1403,7 +1408,7 @@ object MongoDbPlanner {
         qs.cataM[M, WorkflowBuilder[WF]](
           Planner[T, fs.MongoQScript[T, ?]].plan[M, WF, EX](cfg).apply(_) ∘
             (_.transCata[Fix[WorkflowBuilderF[WF, ?]]](repeatedly(WorkflowBuilder.normalize[WF, Fix[WorkflowBuilderF[WF, ?]]])))))
-      wf <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb)))
+      wf <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb, cfg.queryModel)))
     } yield wf
 
   def plan0
@@ -1483,8 +1488,8 @@ object MongoDbPlanner {
 
     val joinHandler: JoinHandler[Workflow3_2F, WBM] =
       JoinHandler.fallback[Workflow3_2F, WBM](
-        JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
-        JoinHandler.mapReduce)
+        JoinHandler.pipeline(queryModel, queryContext.statistics, queryContext.indexes),
+        JoinHandler.mapReduce(queryModel))
 
     queryModel match {
       case `3.4.4` =>
@@ -1492,6 +1497,7 @@ object MongoDbPlanner {
           joinHandler,
           FuncHandler.handle3_4_4(bsonVersion),
           StaticHandler.handle,
+          queryModel,
           bsonVersion)
         plan0[T, M, Workflow3_2F, Expr3_4_4](anyDoc, cfg)(qs)
 
@@ -1500,6 +1506,7 @@ object MongoDbPlanner {
           joinHandler,
           FuncHandler.handle3_4(bsonVersion),
           StaticHandler.handle,
+          queryModel,
           bsonVersion)
         plan0[T, M, Workflow3_2F, Expr3_4](anyDoc, cfg)(qs)
 
@@ -1508,6 +1515,7 @@ object MongoDbPlanner {
           joinHandler,
           FuncHandler.handle3_2(bsonVersion),
           StaticHandler.handle,
+          queryModel,
           bsonVersion)
         plan0[T, M, Workflow3_2F, Expr3_2](anyDoc, cfg)(qs)
 

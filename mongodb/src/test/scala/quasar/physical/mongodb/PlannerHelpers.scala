@@ -255,8 +255,16 @@ object PlannerHelpers {
   ): Either[FileSystemError, Crystallized[WorkflowF]] =
     plan0(query, basePathDb, MongoQueryModel.`3.4`, stats, indexes, anyDoc)
 
+  def plan3_4_4(
+    query: Fix[Sql],
+    stats: Collection => Option[CollectionStatistics],
+    indexes: Collection => Option[Set[Index]],
+    anyDoc: Collection => OptionT[EitherWriter, BsonDocument]
+  ): Either[FileSystemError, Crystallized[WorkflowF]] =
+    plan0(query, basePathDb, MongoQueryModel.`3.4.4`, stats, indexes, anyDoc)
+
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    plan3_4(query, defaultStats, defaultIndexes, emptyDoc)
+    plan3_4_4(query, defaultStats, defaultIndexes, emptyDoc)
 
   def planMetal(query: Fix[Sql]): Option[String] =
     plan(query).disjunction.toOption >>= toMetalPlan
@@ -281,10 +289,10 @@ object PlannerHelpers {
     stats: Collection => Option[CollectionStatistics],
     indexes: Collection => Option[Set[Index]]
   ): Either[FileSystemError, Crystallized[WorkflowF]] =
-    qscriptPlan(qs, MongoQueryModel.`3.4`, stats, indexes, emptyDoc)
+    qscriptPlan(qs, MongoQueryModel.`3.4.4`, stats, indexes, emptyDoc)
 
   def qplan(qs: Fix[fs.MongoQScript[Fix, ?]]): Either[FileSystemError, Crystallized[WorkflowF]] =
-    qscriptPlan(qs, MongoQueryModel.`3.4`, defaultStats, defaultIndexes, emptyDoc)
+    qscriptPlan(qs, MongoQueryModel.`3.4.4`, defaultStats, defaultIndexes, emptyDoc)
 
   def qtestFile(testName: String): JFile = jFile(toRFile("q " + testName))
 

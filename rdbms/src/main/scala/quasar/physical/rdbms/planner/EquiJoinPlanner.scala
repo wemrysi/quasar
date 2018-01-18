@@ -21,17 +21,17 @@ import quasar.NameGenerator
 import quasar.Planner.PlannerErrorME
 import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
 import SqlExpr._
+import quasar.physical.rdbms.planner.sql._
 import quasar.qscript.{EquiJoin, FreeMap, MapFunc, QScriptTotal}
-import quasar.physical.rdbms.planner.sql.SqlExpr.Select.AllCols
+
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-
 import scalaz._
 import Scalaz._
 
-class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT,
+class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT: EqualT,
 F[_]: Monad: NameGenerator: PlannerErrorME](
     mapFuncPlanner: Planner[T, F, MapFunc[T, ?]])
     extends Planner[T, F, EquiJoin[T, ?]] {
@@ -39,10 +39,6 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
   private def processFreeMap(f: FreeMap[T],
                              alias: SqlExpr[T[SqlExpr]]): F[T[SqlExpr]] =
     f.cataM(interpretM(κ(alias.embed.η[F]), mapFuncPlanner.plan))
-
-  def * : T[SqlExpr] = AllCols[T[SqlExpr]]().embed
-
-  val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
 
   def plan: AlgebraM[F, EquiJoin[T, ?], T[SqlExpr]] = {
     case EquiJoin(src, lBranch, rBranch, keys, joinType, combine) =>
@@ -61,21 +57,12 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           }
       } yield {
 
-        val selectionExpr = combined.project match {
-          case e@ExprPair(a, b) =>
-            (a.project, b.project) match {
-              case (SqlExpr.Id(_), SqlExpr.Id(_)) => *
-              case _ => e.embed
-            }
-          case other =>
-            other.embed
-        }
-
         Select(
-          selection = Selection(selectionExpr, none),
+          selection = Selection(idToWildcard(combined), none),
           from = From(left, leftAlias),
           join = Join(right, keyExprs, joinType, rightAlias).some,
           filter = none,
+          groupBy = none,
           orderBy = nil
         ).embed
       }

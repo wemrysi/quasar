@@ -47,7 +47,7 @@ import scalaz.syntax.either._
 object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
   import ApplyProvenance.AuthenticatedQSU
-  import QScriptUniform.{DTrans, Rotation}
+  import QScriptUniform.{DTrans, Retain, Rotation}
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
@@ -1334,6 +1334,76 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                 "a"),
               func.ProjectKeyS(func.Hole, "1")))
       }
+    }
+
+    // b[*] or b[*][*]
+    "correctly coalesce uneven shifts of the same source" in {
+      val shiftedRead =
+        qsu.tread(afile)
+
+      val guardedRead =
+        qsu.autojoin3((
+          shiftedRead,
+          shiftedRead,
+          qsu.undefined(),
+          _(MapFuncsCore.Guard(_, Type.AnyObject, _, _))))
+
+      val projectB =
+        qsu.autojoin2((
+          guardedRead,
+          qsu.cstr("b"),
+          _(MapFuncsCore.ProjectKey(_, _))))
+
+      val innerShift =
+        qsu.transpose(
+          qsu.autojoin3((
+            projectB,
+            projectB,
+            qsu.undefined(),
+            _(MapFuncsCore.Guard(_, Type.FlexArr(0, None, Type.FlexArr(0, None, Type.Bool)), _, _)))),
+          Retain.Values,
+          Rotation.FlattenArray)
+
+      val qgraph =
+        QSUGraph.fromTree[Fix](
+          qsu.map(
+            qsu.qsFilter(
+              qsu._autojoin2((
+                guardedRead,
+                qsu.autojoin2((
+                  qsu.transpose(
+                    qsu.autojoin3((
+                      projectB,
+                      projectB,
+                      qsu.undefined(),
+                      _(MapFuncsCore.Guard(_, Type.FlexArr(0, None, Type.Bool), _, _)))),
+                    Retain.Values,
+                    Rotation.FlattenArray),
+                  qsu.transpose(
+                    qsu.autojoin3((
+                      innerShift,
+                      innerShift,
+                      qsu.undefined(),
+                      _(MapFuncsCore.Guard(_, Type.FlexArr(0, None, Type.Bool), _, _)))),
+                    Retain.Values,
+                    Rotation.FlattenArray),
+                  _(MapFuncsCore.Or(_, _)))),
+                func.StaticMapS(
+                  "filter_source" -> func.LeftSide,
+                  "filter_predicate" -> func.RightSide))),
+              func.ProjectKeyS(func.Hole, "filter_predicate")),
+            func.ProjectKeyS(func.Hole, "filter_source")))
+
+      val leftShiftCount =
+        runOn(qgraph).foldMapUp {
+          case LeftShift(_, _, _, _, _) => 1
+          case MultiLeftShift(_, ss, _) => ss.length
+          case _                        => 0
+        }
+
+      // TODO: Should really be 3, but another bug is duplicating the inner
+      //       shift common to both sides of the `Or`
+      leftShiftCount must_= 4
     }
   }
 
