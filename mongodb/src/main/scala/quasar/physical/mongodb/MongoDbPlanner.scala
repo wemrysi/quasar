@@ -537,22 +537,22 @@ object MongoDbPlanner {
         p1.map(There(0, _)) ++ p2.map(There(1, _)))
     }
 
+  def invoke2Rel[T[_[_]]](x: OutputM[PartialSelector[T]], y: OutputM[PartialSelector[T]])(f: (Selector, Selector) => Selector):
+      OutputM[PartialSelector[T]] =
+    (x.toOption, y.toOption) match {
+      case (Some((f1, p1)), Some((f2, p2)))=>
+        invoke2Nel(x, y)(f)
+      case (Some((f1, p1)), None) =>
+        (f1, p1.map(There(0, _))).right
+      case (None, Some((f2, p2))) =>
+        (f2, p2.map(There(1, _))).right
+      case _ => InternalError.fromMsg("No selectors in either side of a binary MapFunc").left
+    }
+
   def typeSelector[T[_[_]]: RecursiveT: ShowT]:
       GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = { node =>
 
     import MapFuncsCore._
-
-    def invoke2Rel[T[_[_]]](x: OutputM[PartialSelector[T]], y: OutputM[PartialSelector[T]])(f: (Selector, Selector) => Selector):
-        OutputM[PartialSelector[T]] =
-      (x.toOption, y.toOption) match {
-        case (Some((f1, p1)), Some((f2, p2)))=>
-          invoke2Nel(x, y)(f)
-        case (Some((f1, p1)), None) =>
-          (f1, p1.map(There(0, _))).right
-        case (None, Some((f2, p2))) =>
-          (f2, p2.map(There(1, _))).right
-        case _ => InternalError.fromMsg(node.map(_._1).shows).left
-      }
 
     node match {
       // NB: the pick of Selector for these two cases determine how restrictive the
@@ -619,20 +619,6 @@ object MongoDbPlanner {
   def condSelector[T[_[_]]: RecursiveT: ShowT](v: BsonVersion):
       GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = { node =>
     import MapFuncsCore._
-
-    def invoke2Rel[T[_[_]]]
-      (x: OutputM[PartialSelector[T]], y: OutputM[PartialSelector[T]])
-      (f: (Selector, Selector) => Selector):
-        OutputM[PartialSelector[T]] =
-      (x.toOption, y.toOption) match {
-        case (Some((f1, p1)), Some((f2, p2)))=>
-          invoke2Nel(x, y)(f)
-        case (Some((f1, p1)), None) =>
-          (f1, p1.map(There(0, _))).right
-        case (None, Some((f2, p2))) =>
-          (f2, p2.map(There(1, _))).right
-        case _ => InternalError.fromMsg(node.map(_._1).shows).left
-      }
 
     // The `selector` algebra requires one side of a
     // comparison to be a Constant. The `Cond`s present here
