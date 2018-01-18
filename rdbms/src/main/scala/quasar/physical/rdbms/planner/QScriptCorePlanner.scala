@@ -19,25 +19,32 @@ package quasar.physical.rdbms.planner
 import slamdata.Predef._
 import quasar.common.SortDir
 import quasar.fp.ski._
+import quasar.fp._
 import quasar.{NameGenerator, qscript}
 import quasar.Planner.PlannerErrorME
-import quasar.physical.rdbms.planner.sql.SqlExpr._
-import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
-import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
-import quasar.qscript.{FreeMap, MapFunc, QScriptCore, QScriptTotal}
+import Planner._
+import quasar.qscript.{ExcludeId, FreeMap, MapFunc, OnUndefined, QScriptCore, QScriptTotal, ShiftType, Reduce, ReduceFuncs}
+import quasar.qscript.{MapFuncCore => MFC}
+import quasar.qscript.{MapFuncDerived => MFD}
+import MFC._
+import MFD._
+import sql._
+import sql.SqlExpr._
+import sql.{SqlExpr, genId}
+import sql.SqlExpr.Select._
+
 import matryoshka._
 import matryoshka.data._
+import matryoshka.data.free.freeEqual
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._
 import Scalaz._
 
-class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT,
+class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT: EqualT,
 F[_]: Monad: NameGenerator: PlannerErrorME](
     mapFuncPlanner: Planner[T, F, MapFunc[T, ?]])
     extends Planner[T, F, QScriptCore[T, ?]] {
-
-  def * : T[SqlExpr] = AllCols[T[SqlExpr]]().embed
 
   private def processFreeMap(f: FreeMap[T],
                      alias: SqlExpr[T[SqlExpr]]): F[T[SqlExpr]] =
@@ -46,7 +53,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
   private def take(fromExpr: F[T[SqlExpr]], countExpr: F[T[SqlExpr]]): F[T[SqlExpr]] =
     (fromExpr |@| countExpr)(Limit(_, _).embed)
 
-  private def drop(fromExpr: F[T[SqlExpr]], countExpr: F[T[SqlExpr]]): F[T[SqlExpr]] = 
+  private def drop(fromExpr: F[T[SqlExpr]], countExpr: F[T[SqlExpr]]): F[T[SqlExpr]] =
     (fromExpr |@| countExpr)(Offset(_, _).embed)
 
   private def compile(expr: qscript.FreeQS[T], src: T[SqlExpr]): F[T[SqlExpr]] = {
@@ -56,6 +63,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
 
   val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
 
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def plan: AlgebraM[F, QScriptCore[T, ?], T[SqlExpr]] = {
     case qscript.Map(`unref`, f) =>
       processFreeMap(f, SqlExpr.Null[T[SqlExpr]])
@@ -63,16 +71,14 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
       for {
         fromAlias <- genId[T[SqlExpr], F]
         selection <- processFreeMap(f, fromAlias)
-          .map(_.project match {
-            case SqlExpr.Id(_) => *
-            case other => other.embed
-          })
+          .map(idToWildcard[T])
       } yield {
         Select(
           Selection(selection, none),
           From(src, fromAlias),
           join = none,
           filter = none,
+          groupBy = none,
           orderBy = nil
         ).embed
       }
@@ -95,6 +101,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
             From(src, fromAlias),
             join = none,
             filter = none,
+            groupBy = none,
             orderBy = bucketExprs ++ orderByExprs.toList
           ).embed
         }
@@ -112,7 +119,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
 
     case qscript.Filter(src, f) =>
       src.project match {
-        case s@Select(_, From(_, initialFromAlias), _, initialFilter, _) =>
+        case s@Select(_, From(_, initialFromAlias), _, initialFilter, _, _) =>
           val injectedFilterExpr = processFreeMap(f, initialFromAlias)
           injectedFilterExpr.map { fe =>
             val finalFilterExpr = initialFilter.map(i => And[T[SqlExpr]](i.v, fe).embed).getOrElse(fe)
@@ -128,28 +135,65 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
             From(src, fromAlias),
             join = none,
             Some(Filter(filterExp)),
+            groupBy = none,
             orderBy = nil
           ).embed
       }
     }
 
     case qUnion@qscript.Union(src, left, right) =>
-      val hole = qscript.HoleQS[T]
-      (src.project, left, right) match {
-        case (_: Select[_], `hole`, `hole`) => src.point[F]
-        case _ =>
-          (compile(left, src) |@| compile(right, src))(Union(_,_).embed)
+      (compile(left, src) |@| compile(right, src))(Union(_,_).embed)
+
+    case reduce@qscript.Reduce(src, bucket, reducers, repair) => for {
+      alias <- genId[T[SqlExpr], F]
+      gbs   <- bucket.traverse(processFreeMap(_, alias))
+      rds   <- reducers.traverse(_.traverse(processFreeMap(_, alias)) >>=
+        reduceFuncPlanner[T, F].plan)
+      rep <- repair.cataM(interpretM(
+        _.idx.fold(
+          idx => notImplemented("Reduce repair with left index, waiting for a test case", this): F[T[SqlExpr]],
+          idx => rds(idx).point[F]
+        ),
+        Planner.mapFuncPlanner[T, F].plan)
+      ).map(idToWildcard[T])
+    } yield {
+      val (selection, groupBy) = reduce match {
+        case DistinctPattern() =>
+          (Distinct[T[SqlExpr]](rep).embed, none)
+        case _ => (rep, GroupBy(gbs).some)
       }
 
-    case reduce@qscript.Reduce(reduceSrc, _, _, _) =>
-      reduceSrc.project match {
-        case _: Union[_] | _: Select[_] => reduceSrc.point[F]
-        case _ =>                          notImplemented(s"$reduce", this)
+      Select(
+        Selection(selection, none),
+        From(src, alias),
+        join = none,
+        filter = none,
+        groupBy = groupBy,
+        orderBy = nil
+      ).embed
+    }
+
+    case qscript.LeftShift(src, struct, ExcludeId, ShiftType.Array, OnUndefined.Omit, repair) =>
+      for {
+        structAlias <- genId[T[SqlExpr], F]
+        structExpr  <- processFreeMap(struct, structAlias)
+        right = ArrayUnwind(structExpr)
+        repaired <- processJoinFunc(mapFuncPlanner)(repair, structAlias, right)
+        result = Select[T[SqlExpr]](
+          Selection(repaired, None), From(src, structAlias), none, none, none, Nil)
+      } yield {
+        result.embed
       }
 
     case other =>
       notImplemented(s"QScriptCore: $other", this)
+  }
 
-      
+  object DistinctPattern {
+
+    def unapply[A:Equal](qs: QScriptCore[T, A]): Boolean = qs match {
+      case Reduce(_, bucket :: Nil, ReduceFuncs.Arbitrary(arb) :: Nil, _) if bucket === arb  => true
+      case _ => false
+    }
   }
 }

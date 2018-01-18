@@ -153,6 +153,18 @@ object PostgresRenderQuery extends RenderQuery {
       s"$s1, $s2".right
     case ConcatStr(TextExpr(e1), TextExpr(e2))  =>
       s"$e1 || $e2".right
+    case Avg((_, e)) =>
+      s"avg($e)".right
+    case Count((_, e)) =>
+      s"count($e)".right
+    case Max((_, e)) =>
+      s"max($e)".right
+    case Min((_, e)) =>
+      s"min($e)".right
+    case Sum((_, e)) =>
+      s"sum($e)".right
+    case Distinct((_, e)) =>
+      s"distinct $e".right
     case Time((_, expr)) =>
       buildJson(s"""{ "$TimeKey": $expr }""").right
     case NumericOp(sym, NumExpr(left), NumExpr(right)) =>
@@ -183,7 +195,8 @@ object PostgresRenderQuery extends RenderQuery {
     case RowIds()        => "row_number() over()".right
     case Offset((_, from), NumExpr(count)) => s"$from OFFSET $count".right
     case Limit((_, from), NumExpr(count)) => s"$from LIMIT $count".right
-    case Select(selection, from, joinOpt, filterOpt, order) =>
+
+    case Select(selection, from, joinOpt, filterOpt, groupBy, order) =>
       val filter = ~(filterOpt ∘ (f => s" where ${f.v._2}"))
       val join = ~(joinOpt ∘ (j => {
 
@@ -210,13 +223,15 @@ object PostgresRenderQuery extends RenderQuery {
         s"${o.v._2} $dirStr"
       }.mkString(", ")
 
-      val orderByStr = if (order.nonEmpty)
-        s" order by $orderStr"
-      else
-        ""
+      val orderByStr = if (order.nonEmpty) s" order by $orderStr" else ""
+
+      val groupByStr = ~(groupBy.flatMap{
+        case GroupBy(Nil) => none
+        case GroupBy(v) => v.map(_._2).intercalate(", ").some
+      }.map(v => s" GROUP BY $v"))
 
       val fromExpr = s" from ${from.v._2} ${from.alias.v}"
-      s"(select ${selection.v._2}$fromExpr$join$filter$orderByStr)".right
+      s"(select ${selection.v._2}$fromExpr$join$filter$groupByStr$orderByStr)".right
     case Union((_, left), (_, right)) => s"($left UNION $right)".right
     case Constant(Data.Str(v)) =>
       val text = v.flatMap { case '\'' => "''"; case iv => iv.toString }.self
@@ -247,5 +262,7 @@ object PostgresRenderQuery extends RenderQuery {
       case Search => s"(case when ${bool(a3)} then ${text(a1)} ~* ${text(a2)} else ${text(a1)} ~ ${text(a2)} end)"
       case Substring => s"substring(${text(a1)} from ((${text(a2)})::integer + 1) for (${text(a3)})::integer)"
     }).right
+
+    case ArrayUnwind(TextExpr(toUnwind)) => s"jsonb_array_elements_text($toUnwind)".right
   }
 }

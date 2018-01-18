@@ -27,6 +27,7 @@ trait QSUTTypes[T[_[_]]] extends TTypes[T] {
   type FreeAccess[A] = quasar.qscript.qsu.FreeAccess[T, A]
   type QSUGraph = quasar.qscript.qsu.QSUGraph[T]
   type RevIdx = quasar.qscript.qsu.QSUGraph.RevIdx[T]
+  type RevIdxM[F[_]] = quasar.qscript.qsu.RevIdxM[T, F]
   type References = quasar.qscript.qsu.References[T, T[EJson]]
   type QScriptUniform[A] = quasar.qscript.qsu.QScriptUniform[T, A]
   type QScriptEducated[A] = quasar.qscript.QScriptEducated[T, A]

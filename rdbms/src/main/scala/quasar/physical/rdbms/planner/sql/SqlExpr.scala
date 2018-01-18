@@ -47,12 +47,12 @@ object SqlExpr extends SqlExprInstances {
   final case class ExprWithAlias[T](expr: T, alias: String) extends SqlExpr[T]
   final case class ExprPair[T](a: T, b: T) extends SqlExpr[T]
 
-  final case class Select[T](
-    selection: Selection[T],
-    from: From[T],
-    join: Option[Join[T]],
-    filter: Option[Filter[T]],
-    orderBy: List[OrderBy[T]])
+  final case class Select[T](selection: Selection[T],
+                             from: From[T],
+                             join: Option[Join[T]],
+                             filter: Option[Filter[T]],
+                             groupBy: Option[GroupBy[T]],
+                             orderBy: List[OrderBy[T]])
       extends SqlExpr[T]
 
   final case class From[T](v: T, alias: Id[T])
@@ -94,8 +94,16 @@ object SqlExpr extends SqlExprInstances {
     final case class RowIds[T]() extends SqlExpr[T]
     final case class AllCols[T]() extends SqlExpr[T]
     final case class WithIds[T](v: T) extends SqlExpr[T]
+    final case class GroupBy[T](v: List[T])
     final case class OrderBy[T](v: T, sortDir: SortDir)
   }
+
+  final case class Avg[T](v: T) extends SqlExpr[T]
+  final case class Count[T](v: T) extends SqlExpr[T]
+  final case class Max[T](v: T) extends SqlExpr[T]
+  final case class Min[T](v: T) extends SqlExpr[T]
+  final case class Sum[T](v: T) extends SqlExpr[T]
+  final case class Distinct[T](v: T) extends SqlExpr[T]
 
   final case class Union[T](left: T, right: T) extends SqlExpr[T]
 
@@ -115,6 +123,8 @@ object SqlExpr extends SqlExprInstances {
     def build[T](a1: WhenThen[T], a: WhenThen[T]*)(`else`: Else[T]): Case[T] =
       Case(nels(a1, a: _*), `else`)
   }
+
+  final case class ArrayUnwind[T](toUnwind: T) extends SqlExpr[T]
 
 }
 

@@ -65,7 +65,7 @@ quasar_marklogic_xml
 quasar_marklogic_json
 quasar_couchbase
 quasar_spark_hdfs
-quasar_saprk_cluster
+quasar_spark_cluster
 ```
 
 Knowing which backend datastores are supported you can create and configure docker containers using `setupContainers`. For example

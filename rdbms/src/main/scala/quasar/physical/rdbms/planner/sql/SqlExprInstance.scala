@@ -17,8 +17,16 @@
 package quasar.physical.rdbms.planner.sql
 
 import scalaz._, Scalaz._
+import matryoshka._
 
-trait SqlExprInstances extends SqlExprTraverse with SqlExprRenderTree
+trait SqlExprInstances extends SqlExprTraverse with SqlExprRenderTree with SqlExprDelayEqual
+
+trait SqlExprDelayEqual {
+
+  implicit def delayEqSqlExpr = new Delay[Equal, SqlExpr] {
+    def apply[A](fa: Equal[A]): Equal[SqlExpr[A]] = Equal.equalA
+  }
+}
 
 trait SqlExprTraverse {
   import SqlExpr._, Select._, Case._
@@ -40,6 +48,12 @@ trait SqlExprTraverse {
       case ExprWithAlias(e, a) => (f(e) ⊛ G.point(a))(ExprWithAlias.apply)
       case ExprPair(e1, e2)    => (f(e1) ⊛ f(e2))(ExprPair.apply)
       case ConcatStr(a1, a2)   => (f(a1) ⊛ f(a2))(ConcatStr(_, _))
+      case Avg(a1)             => f(a1) ∘ (Avg(_))
+      case Count(a1)           => f(a1) ∘ (Count(_))
+      case Max(a1)             => f(a1) ∘ (Max(_))
+      case Min(a1)             => f(a1) ∘ (Min(_))
+      case Sum(a1)             => f(a1) ∘ (Sum(_))
+      case Distinct(a1)        => f(a1) ∘ (Distinct(_))
       case Time(a1)            => f(a1) ∘ Time.apply
       case Refs(srcs)          =>  srcs.traverse(f) ∘ Refs.apply
       case Table(name)         => G.point(Table(name))
@@ -61,7 +75,7 @@ trait SqlExprTraverse {
       case Neg(v)              => f(v) ∘ Neg.apply
       case WithIds(v)          => f(v) ∘ WithIds.apply
 
-      case Select(selection, from, joinOpt, filterOpt, order) =>
+      case Select(selection, from, joinOpt, filterOpt, groupBy, order) =>
         val newOrder = order.traverse(o => f(o.v).map(newV => OrderBy(newV, o.sortDir)))
         val sel = f(selection.v) ∘ (i => Selection(i, selection.alias ∘ (a => Id[B](a.v))))
 
@@ -75,8 +89,9 @@ trait SqlExprTraverse {
           alias ⊛
           join ⊛
           filterOpt.traverse(i => f(i.v) ∘ Filter.apply) ⊛
+          groupBy.traverse(i => i.v.traverse(f) ∘ GroupBy.apply) ⊛
           newOrder)(
-          Select(_, _, _, _, _)
+          Select(_, _, _, _, _, _)
         )
       case Union(left, right) => (f(left) ⊛ f(right))(Union.apply)
       case Case(wt, Else(e)) =>
@@ -93,7 +108,7 @@ trait SqlExprTraverse {
       case TernaryFunction(t, a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(TernaryFunction(t, _, _, _))
       case Limit(from, count) => (f(from) ⊛ f(count))(Limit.apply)
       case Offset(from, count) => (f(from) ⊛ f(count))(Offset.apply)
-
+      case ArrayUnwind(u) => f(u) ∘ ArrayUnwind.apply
     }
   }
 }

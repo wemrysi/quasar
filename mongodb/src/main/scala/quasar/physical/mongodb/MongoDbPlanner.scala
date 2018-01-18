@@ -985,7 +985,8 @@ object MongoDbPlanner {
                             ListMap(
                               BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                               BsonField.Name("f") -> struct1)),
-                          Set(StructureType.Array(DocField(BsonField.Name("f")), id))))
+                          Set(StructureType.Array(DocField(BsonField.Name("f")), id)),
+                          List(BsonField.Name("s")).some))
 
                       (flatten >>= (s =>
                         filterBuilder[JoinSide](exprOrJs(_)(exprMerge, jsMerge))(s, repairSel, repair))) >>= (src0 =>
@@ -1010,7 +1011,8 @@ object MongoDbPlanner {
                               ListMap(
                                 BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                                 BsonField.Name("f") -> struct1)),
-                            Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                            Set(StructureType.Array(DocField(BsonField.Name("f")), id)),
+                            List(BsonField.Name("s")).some),
                           repair)).join
                     }
                     case (None, Some(repairSel)) => {
@@ -1022,7 +1024,8 @@ object MongoDbPlanner {
                               ListMap(
                                 BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                                 BsonField.Name("f") -> struct0)),
-                            Set(StructureType.Array(DocField(BsonField.Name("f")), id))))
+                            Set(StructureType.Array(DocField(BsonField.Name("f")), id)),
+                          List(BsonField.Name("s")).some))
 
                       (flatten >>= (s => filterBuilder[JoinSide](exprOrJs(_)(exprMerge, jsMerge))(s, repairSel, repair))) >>= (src0 =>
                         getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
@@ -1040,7 +1043,8 @@ object MongoDbPlanner {
                               ListMap(
                                 BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                                 BsonField.Name("f") -> target)),
-                            Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                            Set(StructureType.Array(DocField(BsonField.Name("f")), id)),
+                          List(BsonField.Name("s")).some),
                           repair))
                   }
                 }
@@ -1057,7 +1061,8 @@ object MongoDbPlanner {
                           ListMap(
                             BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                             BsonField.Name("f") -> expr)),
-                        Set(StructureType.Object(DocField(BsonField.Name("f")), id))),
+                        Set(StructureType.Object(DocField(BsonField.Name("f")), id)),
+                        List(BsonField.Name("s")).some),
                       -\&/(j)))
               }
             }
@@ -1072,7 +1077,8 @@ object MongoDbPlanner {
                       cfg.funcHandler, cfg.staticHandler)(
                       FlatteningBuilder(
                         builder,
-                        Set(StructureType.Array(DocVar.ROOT(), id))),
+                        Set(StructureType.Array(DocVar.ROOT(), id)),
+                        List().some),
                         repair0))
                 }
                 case _ =>
@@ -1081,7 +1087,8 @@ object MongoDbPlanner {
                       cfg.funcHandler, cfg.staticHandler)(
                       FlatteningBuilder(
                         builder,
-                        Set(StructureType.Object(DocVar.ROOT(), id))),
+                        Set(StructureType.Object(DocVar.ROOT(), id)),
+                        List().some),
                         repair.as(SrcHole)))
               }
 
@@ -1476,7 +1483,7 @@ object MongoDbPlanner {
         qs.cataM[M, WorkflowBuilder[WF]](
           Planner[T, fs.MongoQScript[T, ?]].plan[M, WF, EX](cfg).apply(_) ∘
             (_.transCata[Fix[WorkflowBuilderF[WF, ?]]](repeatedly(WorkflowBuilder.normalize[WF, Fix[WorkflowBuilderF[WF, ?]]])))))
-      wf <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb)))
+      wf <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb, cfg.queryModel)))
     } yield wf
 
   def plan0
@@ -1556,8 +1563,8 @@ object MongoDbPlanner {
 
     val joinHandler: JoinHandler[Workflow3_2F, WBM] =
       JoinHandler.fallback[Workflow3_2F, WBM](
-        JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
-        JoinHandler.mapReduce)
+        JoinHandler.pipeline(queryModel, queryContext.statistics, queryContext.indexes),
+        JoinHandler.mapReduce(queryModel))
 
     queryModel match {
       case `3.4.4` =>
@@ -1565,6 +1572,7 @@ object MongoDbPlanner {
           joinHandler,
           FuncHandler.handle3_4_4(bsonVersion),
           StaticHandler.handle,
+          queryModel,
           bsonVersion)
         plan0[T, M, Workflow3_2F, Expr3_4_4](anyDoc, cfg)(qs)
 
@@ -1573,6 +1581,7 @@ object MongoDbPlanner {
           joinHandler,
           FuncHandler.handle3_4(bsonVersion),
           StaticHandler.handle,
+          queryModel,
           bsonVersion)
         plan0[T, M, Workflow3_2F, Expr3_4](anyDoc, cfg)(qs)
 
@@ -1581,6 +1590,7 @@ object MongoDbPlanner {
           joinHandler,
           FuncHandler.handle3_2(bsonVersion),
           StaticHandler.handle,
+          queryModel,
           bsonVersion)
         plan0[T, M, Workflow3_2F, Expr3_2](anyDoc, cfg)(qs)
 
