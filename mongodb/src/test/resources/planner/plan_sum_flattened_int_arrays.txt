@@ -78,26 +78,17 @@ Chain
 │  ╰─ IncludeArrayIndex(BsonField.Name("ix"))
 ╰─ $ProjectF
    ├─ Name("__quasar_mongodb_sigil" -> {
-   │       "$add": [
+   │       "$cond": [
    │         {
-   │           "$cond": [
-   │             {
-   │               "$eq": [
-   │                 "$s.identities.qsu20",
-   │                 { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
-   │             },
-   │             "$s.value.0",
-   │             { "$literal": undefined }]
+   │           "$eq": [
+   │             "$s.identities.qsu20",
+   │             { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
    │         },
    │         {
-   │           "$cond": [
-   │             {
-   │               "$eq": [
-   │                 "$s.identities.qsu20",
-   │                 { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
-   │             },
-   │             { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("1") }] },
-   │             { "$literal": undefined }]
-   │         }]
+   │           "$add": [
+   │             "$s.value.0",
+   │             { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("1") }] }]
+   │         },
+   │         { "$literal": undefined }]
    │     })
    ╰─ ExcludeId

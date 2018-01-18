@@ -914,7 +914,6 @@ object MongoDbPlanner {
             ev3: EX :<: ExprOp) = {
           case qscript.Map(src, f) =>
             getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, f)
-          // FIXME: Handle `onUndef`
           case LeftShift(src, struct, id, shiftType, onUndef, repair) => {
             val exprMerge: JoinFunc[T] => M[Fix[ExprOp]] =
               getExprMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(_, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
@@ -922,7 +921,8 @@ object MongoDbPlanner {
               getJsMerge[T, M](_, jscore.Select(jscore.Ident(JsFn.defaultName), "s"), jscore.Select(jscore.Ident(JsFn.defaultName), "f"))
 
             def rewriteUndefined[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
-              case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
+              case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined()))))))))
+                  if (onUndef === OnUndefined.Emit) =>
                 rollMF[T, A](MFC(Guard(exp, tpe, exp0, Free.roll(MFC(MakeArray(Free.roll(MFC(Undefined())))))))).some
               case _ => none
             }

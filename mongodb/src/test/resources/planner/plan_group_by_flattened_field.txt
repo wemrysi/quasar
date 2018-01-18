@@ -221,15 +221,8 @@ Chain
 │     │  │        ╰─ Obj
 │     │  │           ├─ Key(grouped)
 │     │  │           │  ╰─ Obj
-│     │  │           │     ╰─ Key(group_key: isString(
-│     │  │           │            ((_.s.identities.qsu56 === _.f[0]) ? _.s.value["0"] : undefined).sha) ? (0 < 0) ? "" : (1 < 0) ? ((_.s.identities.qsu56 === _.f[0]) ? _.s.value["0"] : undefined).sha.substr(
-│     │  │           │            0,
-│     │  │           │            ((_.s.identities.qsu56 === _.f[0]) ? _.s.value["0"] : undefined).sha.length) : ((_.s.identities.qsu56 === _.f[0]) ? _.s.value["0"] : undefined).sha.substr(
-│     │  │           │            0,
-│     │  │           │            1) : undefined)
-│     │  │           ╰─ Key(reduce_expr: isString(((_.s.identities.qsu56 === _.f[0]) ? _.f[1] : undefined).sha) ? (0 < 0) ? "" : (1 < 0) ? ((_.s.identities.qsu56 === _.f[0]) ? _.f[1] : undefined).sha.substr(
-│     │  │                  0,
-│     │  │                  ((_.s.identities.qsu56 === _.f[0]) ? _.f[1] : undefined).sha.length) : ((_.s.identities.qsu56 === _.f[0]) ? _.f[1] : undefined).sha.substr(0, 1) : undefined)
+│     │  │           │     ╰─ Key(group_key: (isString((_.s.identities.qsu56 === _.f[0]) ? _.s.value["0"].sha : undefined) && (_.s.identities.qsu56 === _.f[0])) ? (0 < 0) ? "" : (1 < 0) ? _.s.value["0"].sha.substr(0, _.s.value["0"].sha.length) : _.s.value["0"].sha.substr(0, 1) : undefined)
+│     │  │           ╰─ Key(reduce_expr: (isString((_.s.identities.qsu56 === _.f[0]) ? _.f[1].sha : undefined) && (_.s.identities.qsu56 === _.f[0])) ? (0 < 0) ? "" : (1 < 0) ? _.f[1].sha.substr(0, _.f[1].sha.length) : _.f[1].sha.substr(0, 1) : undefined)
 │     │  ╰─ Scope(ListMap())
 │     ├─ $GroupF
 │     │  ├─ Grouped

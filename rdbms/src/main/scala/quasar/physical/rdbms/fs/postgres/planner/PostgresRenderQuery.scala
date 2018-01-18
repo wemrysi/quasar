@@ -31,6 +31,7 @@ import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.Planner.InternalError
 import quasar.Planner.{NonRepresentableData, PlannerError}
+import quasar.physical.rdbms.planner.sql.Indirections._
 
 import matryoshka._
 import matryoshka.implicits._
@@ -44,21 +45,7 @@ object PostgresRenderQuery extends RenderQuery {
 
   def asString[T[_[_]]: BirecursiveT](a: T[SqlExpr]): PlannerError \/ String = {
 
-    // This is a workaround to transform "select _4 as some_alias" to "select row_to_json(_4) as some_alias" in order
-    // to avoid working with record types.
-    def aliasSelectionToJson(e: T[SqlExpr]): T[SqlExpr] = {
-      (e.project match {
-        case ea@ExprWithAlias(expr, alias) =>
-          expr.project match {
-            case Id(txt) =>
-              ExprWithAlias(UnaryFunction(ToJson, Id[T[SqlExpr]](txt).embed).embed, alias)
-            case _ => ea
-          }
-        case other => other
-      }).embed
-    }
-
-    a.transCataT(aliasSelectionToJson).paraM(galg) ∘ (s => s"select row_to_json(row) from ($s) as row")
+    a.paraM(galg) ∘ (s => s"select row_to_json(row) from ($s) as row")
   }
 
   def alias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" as ${i.v}"))
@@ -75,7 +62,7 @@ object PostgresRenderQuery extends RenderQuery {
     val toReplace = "->"
     val replacement = "->>"
     expr.project match {
-      case Refs(_) =>
+      case Refs(elems, _) =>
         val pos = str.lastIndexOf(toReplace)
         if (pos > -1 && !str.contains(replacement))
           s"${str.substring(0, pos)}$replacement${str.substring(pos + toReplace.length, str.length)}"
@@ -86,55 +73,71 @@ object PostgresRenderQuery extends RenderQuery {
     }
   }
 
-  def num[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): String = s"(${text(pair)})::numeric"
+  def num[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): String = {
+    val (expr, str) = pair
+    expr.project match {
+      case Constant(Data.Int(_)) =>
+        str
+      case _ =>
+        s"(${text(pair)})::numeric"
+    }
+  }
 
-  def bool[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): String = s"(${text(pair)})::boolean"
+  def bool[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): String = {
+      val (expr, str) = pair
+      expr.project match {
+        case Constant(Data.Bool(_)) =>
+          str
+        case _ =>
+          s"(${text(pair)})::boolean"
+      }
+    }
 
   object TextExpr {
     def unapply[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): Option[String] =
-      text(pair).some
+      s"(${text(pair)})::text".some
   }
 
   object NumExpr {
     def unapply[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): Option[String] =
-      TextExpr.unapply(pair).map(t => s"($t)::numeric")
+      num(pair).some
   }
 
   object BoolExpr {
     def unapply[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): Option[String] =
-      TextExpr.unapply(pair).map(t => s"($t)::boolean")
+      bool(pair).some
   }
 
   private def postgresArray(jsonArrayRepr: String) = s"array_to_json(ARRAY$jsonArrayRepr)"
+
+  final case class Acc(s: String, m: Indirections.Indirection)
 
   def galg[T[_[_]]: BirecursiveT]: GAlgebraM[(T[SqlExpr], ?), PlannerError \/ ?, SqlExpr, String] = {
     case Unreferenced() =>
     InternalError("Unexpected Unreferenced!", none).left
     case Null() => "null".right
-    case SqlExpr.Id(v) =>
+    case SqlExpr.Id(v, _) =>
       s"""$v""".right
     case Table(v) =>
       v.right
     case AllCols() =>
       s"*".right
-    case Refs(srcs) =>
+    case Refs(srcs, m) =>
       srcs.unzip(ι) match {
-        case (Vector(_, last), Vector(key, value)) =>
-          last.project match {
-            case Constant(Data.Int(index)) => s"""$key->${index+1}""".right
-            case _ =>
-              val valueStripped = value.stripPrefix("'").stripSuffix("'")
-              s"""$key."$valueStripped"""".right
-          }
-        case (_, key +: mid :+ last) =>
-          val firstValStripped = ~mid.headOption.map(_.stripPrefix("'").stripSuffix("'"))
-          val midTail = mid.drop(1)
-          val midStr = if (midTail.nonEmpty)
-            s"->${midTail.map(e => s"$e").intercalate("->")}"
-          else
-            ""
-          s"""$key."$firstValStripped"$midStr->$last""".right
-        case _ => InternalError.fromMsg(s"Cannot process Refs($srcs)").left
+        case (_, firstStr +: tail) =>
+          tail.foldLeft(Acc(firstStr, m)) {
+            case (acc@Acc(accStr, Branch(mFunc, _)), nextStr) =>
+              val nextStrStripped = nextStr.stripPrefix("'").stripSuffix("'")
+              val (metaType, nextMeta) = mFunc(nextStrStripped)
+              val str = metaType match {
+                case Field =>
+                  s"""($accStr."$nextStrStripped")"""
+                case InnerField => s"$accStr->$nextStr"
+              }
+              Acc(str, nextMeta)
+          }.s.right
+        case _ =>
+          InternalError("Refs with empty vector!", none).left // TODO refs should carry a Nel
       }
     case Obj(m) =>
       buildJson(m.map {
@@ -149,7 +152,7 @@ object PostgresRenderQuery extends RenderQuery {
       s"coalesce(${exprs.map(e => text(e)).intercalate(", ")})".right
     case ExprWithAlias((_, expr), alias) =>
         s"""$expr as "$alias"""".right
-    case ExprPair((_, s1), (_, s2)) =>
+    case ExprPair((_, s1), (_, s2), _) =>
       s"$s1, $s2".right
     case ConcatStr(TextExpr(e1), TextExpr(e2))  =>
       s"$e1 || $e2".right
@@ -193,9 +196,8 @@ object PostgresRenderQuery extends RenderQuery {
       s"($a1 >= $a2)".right
     case WithIds((_, str))    => s"(row_number() over(), $str)".right
     case RowIds()        => "row_number() over()".right
-    case Offset((_, from), NumExpr(count)) => s"$from OFFSET $count".right
-    case Limit((_, from), NumExpr(count)) => s"$from LIMIT $count".right
-
+    case Offset((_, from), NumExpr(count)) => s"($from OFFSET $count)".right
+    case Limit((_, from), NumExpr(count)) => s"($from LIMIT $count)".right
     case Select(selection, from, joinOpt, filterOpt, groupBy, order) =>
       val filter = ~(filterOpt ∘ (f => s" where ${f.v._2}"))
       val join = ~(joinOpt ∘ (j => {
@@ -230,21 +232,20 @@ object PostgresRenderQuery extends RenderQuery {
         case GroupBy(v) => v.map(_._2).intercalate(", ").some
       }.map(v => s" GROUP BY $v"))
 
+
       val fromExpr = s" from ${from.v._2} ${from.alias.v}"
       s"(select ${selection.v._2}$fromExpr$join$filter$groupByStr$orderByStr)".right
     case Union((_, left), (_, right)) => s"($left UNION $right)".right
+    case Constant(a @ Data.Arr(_)) =>  s"${dataFormatter("", a)}::jsonb".right
     case Constant(Data.Str(v)) =>
       val text = v.flatMap { case '\'' => "''"; case iv => iv.toString }.self
       s"'$text'".right
     case Constant(v) =>
-      DataCodec.render(v).map{ rendered => v match {
-        case _: Data.Arr => postgresArray(rendered)
-        case _ => rendered
-      }} \/> NonRepresentableData(v)
+      DataCodec.render(v) \/> NonRepresentableData(v)
     case Case(wt, e) =>
       val wts = wt ∘ { case WhenThen(TextExpr(w), TextExpr(t)) => s"when ($w)::boolean then $t" }
       s"(case ${wts.intercalate(" ")} else ${text(e.v)} end)".right
-    case Coercion(t, TextExpr(e)) => s"($e)::${t.mapToStringName}".right
+    case Coercion(t, (_, e)) => s"($e)::${t.mapToStringName}".right
     case ToArray(TextExpr(v)) => postgresArray(s"[$v]").right
     case UnaryFunction(fType, TextExpr(e)) =>
       val fName = fType match {
@@ -253,16 +254,16 @@ object PostgresRenderQuery extends RenderQuery {
         case ToJson => "row_to_json"
       }
       s"$fName($e)".right
-    case BinaryFunction(fType, TextExpr(a1), TextExpr(a2)) => (fType match {
-        case StrSplit => s"regexp_split_to_array($a1, $a2)"
+    case BinaryFunction(fType, (_, a1), (a2Src, a2)) => (fType match {
+        case StrSplit => s"regexp_split_to_array($a1, ${text((a2Src, a2))})"
         case ArrayConcat => s"(to_jsonb($a1) || to_jsonb($a2))"
-        case Contains => s"($a1::text IN (SELECT jsonb_array_elements_text(to_jsonb($a2))))"
+        case Contains => s"($a1 IN (SELECT jsonb_array_elements_text(to_jsonb($a2))))"
       }).right
     case TernaryFunction(fType, a1, a2, a3) => (fType match {
       case Search => s"(case when ${bool(a3)} then ${text(a1)} ~* ${text(a2)} else ${text(a1)} ~ ${text(a2)} end)"
       case Substring => s"substring(${text(a1)} from ((${text(a2)})::integer + 1) for (${text(a3)})::integer)"
     }).right
 
-    case ArrayUnwind(TextExpr(toUnwind)) => s"jsonb_array_elements_text($toUnwind)".right
+    case ArrayUnwind(toUnwind) => s"jsonb_array_elements_text(${text(toUnwind)})".right
   }
 }
