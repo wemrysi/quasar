@@ -268,9 +268,8 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
       constr: (Symbol, Symbol, Symbol) => QSU[Symbol]): G[QSUGraph] =
     withName[G](constr(parent1.root, parent2.root, parent3.root)).map(_ :++ parent1 :++ parent2 :++ parent3)
 
-  private def withName[G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]](
-      node: QSU[Symbol]): G[QSUGraph] =
-    QSUGraph.withName[T, G](node)
+  private def withName[G[_]: Monad: NameGenerator: RevIdxM](node: QScriptUniform[Symbol]): G[QSUGraph] =
+    QSUGraph.withName[T, G]("rlp")(node)
 
   private def fromData(data: Data): Data \/ T[EJson] = {
     data.hyloM[Data \/ ?, CoEnv[Data, EJson, ?], T[EJson]](
