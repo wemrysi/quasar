@@ -19,6 +19,7 @@ package quasar.qscript
 import slamdata.Predef.{Map => SMap, _}
 import quasar.NameGenerator
 import quasar.Planner.{InternalError, PlannerErrorME}
+import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript.provenance.Dimensions
@@ -35,6 +36,9 @@ package object qsu {
   type FreeAccess[T[_[_]], A] = FreeMapA[T, QAccess[T, A]]
   type QDims[T[_[_]]] = Dimensions[QProv.P[T]]
   type QSUVerts[T[_[_]]] = SMap[Symbol, QScriptUniform[T, Symbol]]
+
+  type RevIdxM[T[_[_]], F[_]] = MonadState_[F, QSUGraph.RevIdx[T]]
+  def RevIdxM[T[_[_]], F[_]](implicit ev: RevIdxM[T, F]): RevIdxM[T, F] = ev
 
   def AccessValueF[T[_[_]], A](a: A): FreeAccess[T, A] =
     Free.pure[MapFunc[T, ?], QAccess[T, A]](Access.Value(a))

@@ -112,7 +112,6 @@ trait SqlExprRenderTree {
             nonTerminal("Or", a1, a2)
           case Refs(srcs, m) =>
             nonTerminal(s"References (m = ${m.shows})", srcs:_*)
-            // TODO add group by
           case Select(selection, from, join, filter, groupBy, order) =>
             NonTerminal(
               s"Select (m = ${selection.meta.shows})" :: Nil,
@@ -148,6 +147,8 @@ trait SqlExprRenderTree {
             nonTerminal(s"Function call: $t", a1, a2)
           case TernaryFunction(t, a1, a2, a3) =>
             nonTerminal(s"Function call: $t", a1, a2, a3)
+          case ArrayUnwind(u) =>
+            nonTerminal("ArrayUnwind", u)
         }
       }
     }

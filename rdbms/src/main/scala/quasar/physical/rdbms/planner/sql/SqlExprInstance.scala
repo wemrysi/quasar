@@ -17,8 +17,16 @@
 package quasar.physical.rdbms.planner.sql
 
 import scalaz._, Scalaz._
+import matryoshka._
 
-trait SqlExprInstances extends SqlExprTraverse with SqlExprRenderTree
+trait SqlExprInstances extends SqlExprTraverse with SqlExprRenderTree with SqlExprDelayEqual
+
+trait SqlExprDelayEqual {
+
+  implicit def delayEqSqlExpr = new Delay[Equal, SqlExpr] {
+    def apply[A](fa: Equal[A]): Equal[SqlExpr[A]] = Equal.equalA
+  }
+}
 
 trait SqlExprTraverse {
   import SqlExpr._, Select._, Case._
@@ -100,7 +108,7 @@ trait SqlExprTraverse {
       case TernaryFunction(t, a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(TernaryFunction(t, _, _, _))
       case Limit(from, count) => (f(from) ⊛ f(count))(Limit.apply)
       case Offset(from, count) => (f(from) ⊛ f(count))(Offset.apply)
-
+      case ArrayUnwind(u) => f(u) ∘ ArrayUnwind.apply
     }
   }
 }

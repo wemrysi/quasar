@@ -34,23 +34,6 @@ sealed abstract class QScriptCore[T[_[_]], A] extends Product with Serializable
 @Lenses final case class Map[T[_[_]], A](src: A, f: FreeMap[T])
     extends QScriptCore[T, A]
 
-/** Left indexes into the bucket. Right indexes into the reducers.
-  */
-@Lenses final case class ReduceIndex(idx: Int \/ Int) {
-  def shift(mapping: ScalaMap[Int, Int]): ReduceIndex =
-    ReduceIndex(idx ∘ (x => x + mapping.get(x).getOrElse(0)))
-}
-
-object ReduceIndex {
-
-  implicit val equal: Equal[ReduceIndex] =
-    Equal.equalBy(_.idx)
-
-  implicit val renderTree: RenderTree[ReduceIndex] =
-    RenderTree.simple(List("ReduceIndex"), _.idx.shows.some)
-  implicit val show: Show[ReduceIndex] = RenderTree.toShow
-}
-
 /** Flattens nested structure, converting each value into a data set, which are
   * then unioned.
   *
@@ -60,6 +43,11 @@ object ReduceIndex {
   * (i.e., the key or index), or a 2-element array of key and value). `repair`
   * is applied across the new set, integrating the exploded values into the
   * original set.
+  *
+  * `onUndefined` specifies how evaluation should proceeed when `struct`
+  * evaluates to `Undefined`. When `Emit` then the `repair` expression
+  * must be invoked once with `RightSide` set to `Undefined`,
+  * when `Omit` then the `repair` must not be invoked.
   *
   * E.g., in:
   *     LeftShift(x,
@@ -80,8 +68,26 @@ object ReduceIndex {
   struct: FreeMap[T],
   idStatus: IdStatus,
   shiftType: ShiftType,
+  onUndefined: OnUndefined,
   repair: JoinFunc[T])
     extends QScriptCore[T, A]
+
+/** Left indexes into the bucket. Right indexes into the reducers.
+  */
+@Lenses final case class ReduceIndex(idx: Int \/ Int) {
+  def shift(mapping: ScalaMap[Int, Int]): ReduceIndex =
+    ReduceIndex(idx ∘ (x => x + mapping.get(x).getOrElse(0)))
+}
+
+object ReduceIndex {
+
+  implicit val equal: Equal[ReduceIndex] =
+    Equal.equalBy(_.idx)
+
+  implicit val renderTree: RenderTree[ReduceIndex] =
+    RenderTree.simple(List("ReduceIndex"), _.idx.shows.some)
+  implicit val show: Show[ReduceIndex] = RenderTree.toShow
+}
 
 /** Performs a reduction over a dataset, with the dataset partitioned by the
   * result of the bucket MapFuncCore. So, rather than many-to-one, this is many-to-fewer.
@@ -157,8 +163,8 @@ object QScriptCore {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
           case (Map(a1, f1), Map(a2, f2)) => f1 ≟ f2 && eq.equal(a1, a2)
-          case (LeftShift(a1, s1, i1, t1, r1), LeftShift(a2, s2, i2, t2, r2)) =>
-            eq.equal(a1, a2) && s1 ≟ s2 && i1 ≟ i2 && t1 ≟ t2 && r1 ≟ r2
+          case (LeftShift(a1, s1, i1, t1, u1, r1), LeftShift(a2, s2, i2, t2, u2, r2)) =>
+            eq.equal(a1, a2) && s1 ≟ s2 && i1 ≟ i2 && t1 ≟ t2 && u1 ≟ u2 && r1 ≟ r2
           case (Reduce(a1, b1, f1, r1), Reduce(a2, b2, f2, r2)) =>
             b1 ≟ b2 && f1 ≟ f2 && r1 ≟ r2 && eq.equal(a1, a2)
           case (Sort(a1, b1, o1), Sort(a2, b2, o2)) =>
@@ -178,14 +184,14 @@ object QScriptCore {
         fa: QScriptCore[T, A])(
         f: A => G[B]) =
         fa match {
-          case Map(a, func)               => f(a) ∘ (Map[T, B](_, func))
-          case LeftShift(a, s, i, t, r)   => f(a) ∘ (LeftShift(_, s, i, t, r))
-          case Reduce(a, b, func, repair) => f(a) ∘ (Reduce(_, b, func, repair))
-          case Sort(a, b, o)              => f(a) ∘ (Sort(_, b, o))
-          case Union(a, l, r)             => f(a) ∘ (Union(_, l, r))
-          case Filter(a, func)            => f(a) ∘ (Filter(_, func))
-          case Subset(a, from, sel, c)    => f(a) ∘ (Subset(_, from, sel, c))
-          case Unreferenced()             => (Unreferenced[T, B](): QScriptCore[T, B]).point[G]
+          case Map(a, func)                => f(a) ∘ (Map[T, B](_, func))
+          case LeftShift(a, s, i, t, u, r) => f(a) ∘ (LeftShift(_, s, i, t, u, r))
+          case Reduce(a, b, func, repair)  => f(a) ∘ (Reduce(_, b, func, repair))
+          case Sort(a, b, o)               => f(a) ∘ (Sort(_, b, o))
+          case Union(a, l, r)              => f(a) ∘ (Union(_, l, r))
+          case Filter(a, func)             => f(a) ∘ (Filter(_, func))
+          case Subset(a, from, sel, c)     => f(a) ∘ (Subset(_, from, sel, c))
+          case Unreferenced()              => (Unreferenced[T, B](): QScriptCore[T, B]).point[G]
         }
     }
 
@@ -197,11 +203,12 @@ object QScriptCore {
           case Map(src, mf) => Cord("Map(") ++
             s.show(src) ++ Cord(", ") ++
             mf.show ++ Cord(")")
-          case LeftShift(src, struct, id, stpe, repair) => Cord("LeftShift(") ++
+          case LeftShift(src, struct, id, stpe, undef, repair) => Cord("LeftShift(") ++
             s.show(src) ++ Cord(", ") ++
             struct.show ++ Cord(", ") ++
             id.show ++ Cord(", ") ++
             stpe.show ++ Cord(", ") ++
+            undef.show ++ Cord(", ") ++
             repair.show ++ Cord(")")
           case Reduce(a, b, red, rep) => Cord("Reduce(") ++
             s.show(a) ++ Cord(", ") ++
@@ -244,12 +251,13 @@ object QScriptCore {
               case Map(src, f) =>
                 NonTerminal("Map" :: nt, None,
                   RA.render(src) :: f.render :: Nil)
-              case LeftShift(src, struct, id, stpe, repair) =>
+              case LeftShift(src, struct, id, stpe, undef, repair) =>
                 NonTerminal("LeftShift" :: nt, None,
                   RA.render(src) ::
                     nested("Struct", struct) ::
                     nested("IdStatus", id) ::
                     nested("ShiftType", stpe) ::
+                    nested("OnUndefined", undef) ::
                     nested("Repair", repair) ::
                     Nil)
               case Reduce(src, bucket, reducers, repair) =>

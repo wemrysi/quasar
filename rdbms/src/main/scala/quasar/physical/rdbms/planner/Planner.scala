@@ -75,12 +75,12 @@ object Planner {
     new ReduceFuncPlanner[T, F]
 
   implicit def qScriptCorePlanner[
-  T[_[_]]: BirecursiveT: ShowT,
+  T[_[_]]: BirecursiveT: ShowT: EqualT,
   F[_]: Monad: NameGenerator: PlannerErrorME]
 : Planner[T, F, QScriptCore[T, ?]] = new QScriptCorePlanner[T, F](mapFuncPlanner)
 
   implicit def equiJoinPlanner[
-  T[_[_]]: BirecursiveT: ShowT,
+  T[_[_]]: BirecursiveT: ShowT: EqualT,
   F[_]: Monad: NameGenerator: PlannerErrorME]
   : Planner[T, F, EquiJoin[T, ?]] = new EquiJoinPlanner[T, F](mapFuncPlanner)
 
@@ -102,4 +102,3 @@ object Planner {
     }
 
 }
-

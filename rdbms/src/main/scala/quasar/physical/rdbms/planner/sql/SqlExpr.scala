@@ -43,10 +43,9 @@ object SqlExpr extends SqlExprInstances {
   final case class ConcatStr[T](a1: T, a2: T) extends SqlExpr[T]
   final case class Time[T](a1: T) extends SqlExpr[T]
   final case class IfNull[T](a: OneAnd[NonEmptyList, T]) extends SqlExpr[T]
+  final case class ExprPair[T](a: T, b: T, m: Indirection) extends SqlExpr[T]
 
   final case class ExprWithAlias[T](expr: T, alias: String) extends SqlExpr[T]
-
-  final case class ExprPair[T](a: T, b: T, m: Indirection) extends SqlExpr[T]
 
   final case class Select[T](selection: Selection[T],
                              from: From[T],
@@ -125,6 +124,8 @@ object SqlExpr extends SqlExprInstances {
     def build[T](a1: WhenThen[T], a: WhenThen[T]*)(`else`: Else[T]): Case[T] =
       Case(nels(a1, a: _*), `else`)
   }
+
+  final case class ArrayUnwind[T](toUnwind: T) extends SqlExpr[T]
 
 }
 

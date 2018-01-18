@@ -64,9 +64,9 @@ private[qscript] final class QScriptCorePlanner[
           for_(x in src) return_ g
       }).right
 
-    // TODO: Use type information from `Guard` when available to determine
-    //       if `ext` is being treated as an array or an object.
-    case LeftShift(src0, struct, id, _, repair) =>
+    // FIXME: Handle `onUndef`
+    // TODO: Leverage `ShiftType`
+    case LeftShift(src0, struct, id, _, onUndef, repair) =>
       for {
         l       <- freshName[F]
         ext     <- freshName[F]
