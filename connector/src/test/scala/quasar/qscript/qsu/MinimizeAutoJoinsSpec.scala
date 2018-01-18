@@ -1442,9 +1442,9 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
       val leftShiftCount =
         runOn(qgraph).foldMapUp {
-          case LeftShift(_, _, _, _, _) => 1
-          case MultiLeftShift(_, ss, _) => ss.length
-          case _                        => 0
+          case LeftShift(_, _, _, _, _, _) => 1
+          case MultiLeftShift(_, ss, _, _) => ss.length
+          case _                           => 0
         }
 
       // TODO: Should really be 3, but another bug is duplicating the inner
