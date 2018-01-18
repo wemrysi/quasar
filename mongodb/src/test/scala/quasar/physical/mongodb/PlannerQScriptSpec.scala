@@ -291,7 +291,7 @@ class PlannerQScriptSpec extends
                   $lte($literal(Bson.Arr()), $field("codes")),
                   $lt($field("codes"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("codes"),
-                $arrayLit(List($literal(Bson.Undefined)))))),
+                $literal(Bson.Undefined)))),
           $unwind(DocField("f"), None, None),
           $project(reshape(
             "codes"      -> $field("f"),
@@ -327,7 +327,7 @@ class PlannerQScriptSpec extends
                   $lte($literal(Bson.Arr()), $field("loc")),
                   $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("loc"),
-                $arrayLit(List($literal(Bson.Undefined)))))),
+                $literal(Bson.Undefined)))),
           $unwind(DocField("f"), None, None),
           $match(Selector.Doc((BsonField.Name("f")) -> Selector.Lt(Bson.Int32(-165)))),
           $project(reshape(
@@ -359,7 +359,7 @@ class PlannerQScriptSpec extends
                   $lte($literal(Bson.Arr()), $field("loc")),
                   $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("loc"),
-                $arrayLit(List($literal(Bson.Undefined)))))),
+                $literal(Bson.Undefined)))),
           $unwind(DocField("0"), None, None),
           $match(Selector.Doc(
             BsonField.Name("0") -> Selector.Lt(Bson.Int32(-165)))),
@@ -411,7 +411,7 @@ class PlannerQScriptSpec extends
                   $lte($literal(Bson.Arr()), $field("loc")),
                   $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("loc"),
-                $arrayLit(List($literal(Bson.Undefined)))))),
+                $literal(Bson.Undefined)))),
           $unwind(DocField("f"), None, None),
           $project(reshape(
             "s" -> reshape("original" -> $field("s")),
@@ -421,7 +421,7 @@ class PlannerQScriptSpec extends
                   $lte($literal(Bson.Arr()), $field("f")),
                   $lt($field("f"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("f"),
-                $arrayLit(List($literal(Bson.Undefined)))))),
+                $literal(Bson.Undefined)))),
           $unwind(DocField("f"), None, None),
           $project(reshape(
             "0" -> $field("s", "original", "city"),
@@ -459,7 +459,7 @@ class PlannerQScriptSpec extends
                   $lte($literal(Bson.Arr()), $field("loc")),
                   $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("loc"),
-                $arrayLit(List($literal(Bson.Undefined)))))),
+                $literal(Bson.Undefined)))),
           $unwind(DocField("0"), None, None),
           $project(reshape(
             "0" ->
@@ -468,7 +468,7 @@ class PlannerQScriptSpec extends
                   $lte($literal(Bson.Arr()), $field("0")),
                   $lt($field("0"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("0"),
-                $arrayLit(List($literal(Bson.Undefined)))))),
+                $literal(Bson.Undefined)))),
           $unwind(DocField("0"), None, None),
           $project(reshape(
             sigil.Quasar -> $field("0")))))
@@ -501,7 +501,7 @@ class PlannerQScriptSpec extends
                   $lte($literal(Bson.Arr()), $field("loc")),
                   $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("loc"),
-                $arrayLit(List($literal(Bson.Undefined)))))),
+                $literal(Bson.Undefined)))),
           $unwind(DocField("f"), None, None),
           $project(reshape(
             "city" -> $field("s", "city"),
@@ -586,7 +586,7 @@ class PlannerQScriptSpec extends
                   $lte($literal(Bson.Arr()), $field("codes")),
                   $lt($field("codes"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("codes"),
-                $arrayLit(List($literal(Bson.Undefined)))))),
+                $literal(Bson.Undefined)))),
           $unwind(DocField("f"), None, None),
           $project(reshape(
             "codes" -> $field("f"),
