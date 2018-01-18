@@ -317,6 +317,8 @@ abstract class StdLibSpec extends Qspec {
       val genOffset = Gen.choose(-64800, 64800)
       val genOffsetMinute = Gen.choose(-59, 59)
       val genOffsetPositiveMinute = Gen.choose(0, 59)
+      val genOffsetHour = Gen.choose(-18, 18)
+      val genOffsetPositiveHour = Gen.choose(0, 17) // max is +18:00:00
 
       "SetTimeZone" >> {
         "LocalDateTime" >> prop { (offset: Int, dt: JLocalDateTime) =>
@@ -417,6 +419,56 @@ abstract class StdLibSpec extends Qspec {
             Data.OffsetTime(dt.atOffset(ZoneOffset.ofHoursMinutesSeconds(5, 17, 23))),
             Data.OffsetTime(dt.atOffset(ZoneOffset.ofHoursMinutesSeconds(5, offset, 23))))
         }.setGens(genOffsetPositiveMinute, DateGenerators.genLocalTime)
+      }
+
+      "SetTimeZoneHour" >> {
+        "LocalDateTime" >> prop { (offset: Int, dt: JLocalDateTime) =>
+          binary(
+            SetTimeZoneHour(_, _).embed,
+            Data.Int(offset),
+            Data.LocalDateTime(dt),
+            Data.OffsetDateTime(dt.atOffset(ZoneOffset.ofHoursMinutes(offset, 0))))
+        }.setGens(genOffsetHour, DateGenerators.genLocalDateTime)
+
+        "LocalDate" >> prop { (offset: Int, dt: JLocalDate) =>
+          binary(
+            SetTimeZoneHour(_, _).embed,
+            Data.Int(offset),
+            Data.LocalDate(dt),
+            Data.OffsetDate(quasar.OffsetDate(dt, ZoneOffset.ofHoursMinutes(offset, 0))))
+        }.setGens(genOffsetHour, DateGenerators.genLocalDate)
+
+        "LocalTime" >> prop { (offset: Int, dt: JLocalTime) =>
+          binary(
+            SetTimeZoneHour(_, _).embed,
+            Data.Int(offset),
+            Data.LocalTime(dt),
+            Data.OffsetTime(dt.atOffset(ZoneOffset.ofHoursMinutes(offset, 0))))
+        }.setGens(genOffsetHour, DateGenerators.genLocalTime)
+
+        "OffsetDateTime" >> prop { (offset: Int, dt: JLocalDateTime) =>
+          binary(
+            SetTimeZoneHour(_, _).embed,
+            Data.Int(offset),
+            Data.OffsetDateTime(dt.atOffset(ZoneOffset.ofHoursMinutesSeconds(5, 17, 23))),
+            Data.OffsetDateTime(dt.atOffset(ZoneOffset.ofHoursMinutesSeconds(offset, 17, 23))))
+        }.setGens(genOffsetPositiveHour, DateGenerators.genLocalDateTime)
+
+        "OffsetDate" >> prop { (offset: Int, dt: JLocalDate) =>
+          binary(
+            SetTimeZoneHour(_, _).embed,
+            Data.Int(offset),
+            Data.OffsetDate(quasar.OffsetDate(dt, ZoneOffset.ofHoursMinutesSeconds(5, 17, 23))),
+            Data.OffsetDate(quasar.OffsetDate(dt, ZoneOffset.ofHoursMinutesSeconds(offset, 17, 23))))
+        }.setGens(genOffsetPositiveHour, DateGenerators.genLocalDate)
+
+        "OffsetTime" >> prop { (offset: Int, dt: JLocalTime) =>
+          binary(
+            SetTimeZoneHour(_, _).embed,
+            Data.Int(offset),
+            Data.OffsetTime(dt.atOffset(ZoneOffset.ofHoursMinutesSeconds(5, 17, 23))),
+            Data.OffsetTime(dt.atOffset(ZoneOffset.ofHoursMinutesSeconds(offset, 17, 23))))
+        }.setGens(genOffsetPositiveHour, DateGenerators.genLocalTime)
       }
 
       "ExtractCentury" >> {
