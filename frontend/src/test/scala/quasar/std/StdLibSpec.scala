@@ -819,6 +819,13 @@ abstract class StdLibSpec extends Qspec {
         }
       }
 
+      "Interval" >> {
+        unary(
+          Interval(_).embed,
+          Data.Str("1999-12-31T01:22:33.789"),
+          Data.Interval(quasar.DateTimeInterval(1999, 12, 31, (22*60)+33, 789)))
+      }
+
       "StartOfDay" >> {
         "datetime" >> prop { (x: JLocalDateTime) =>
           unary(

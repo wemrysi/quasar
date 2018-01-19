@@ -57,6 +57,7 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
       case (ExtractFunc(MapFuncsCore.LocalDate(_)), _) => pending
       case (ExtractFunc(MapFuncsCore.LocalDateTime(_)), _) => pending
       case (ExtractFunc(MapFuncsCore.LocalTime(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.Interval(_)), _) => pending
       case (_, _) => run
     }
 
