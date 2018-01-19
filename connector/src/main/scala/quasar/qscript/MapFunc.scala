@@ -65,6 +65,7 @@ object MapFunc {
     case date.StartOfDay => a => MFC(C.StartOfDay(a))
     case date.TimeOfDay => a => MFC(C.TimeOfDay(a))
     case date.ToTimestamp => a => MFC(C.ToTimestamp(a))
+    case date.ToLocal => a => MFC(C.ToLocal(a))
     case identity.TypeOf => a => MFC(C.TypeOf(a))
     case identity.ToId => a => MFC(C.ToId(a))
     case math.Abs => a => MFD(D.Abs(a))

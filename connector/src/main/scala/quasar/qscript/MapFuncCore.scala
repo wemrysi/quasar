@@ -432,6 +432,7 @@ object MapFuncCore {
         case TemporalTrunc(a1, a2) => f(a2) ∘ (TemporalTrunc(a1, _))
         case TimeOfDay(a1) => f(a1) ∘ (TimeOfDay(_))
         case ToTimestamp(a1) => f(a1) ∘ (ToTimestamp(_))
+        case ToLocal(a1) => f(a1) ∘ (ToLocal(_))
         case TypeOf(a1) => f(a1) ∘ (TypeOf(_))
         case ToId(a1) => f(a1) ∘ (ToId(_))
         case Negate(a1) => f(a1) ∘ (Negate(_))
@@ -532,6 +533,7 @@ object MapFuncCore {
         case (TemporalTrunc(a1, a2), TemporalTrunc(b1, b2)) => a1 ≟ b1 && in.equal(a2, b2)
         case (TimeOfDay(a1), TimeOfDay(b1)) => in.equal(a1, b1)
         case (ToTimestamp(a1), ToTimestamp(b1)) => in.equal(a1, b1)
+        case (ToLocal(a1), ToLocal(b1)) => in.equal(a1, b1)
         case (TypeOf(a1), TypeOf(b1)) => in.equal(a1, b1)
         case (ToId(a1), ToId(b1)) => in.equal(a1, b1)
         case (Negate(a1), Negate(b1)) => in.equal(a1, b1)
@@ -636,6 +638,7 @@ object MapFuncCore {
           case TemporalTrunc(a1, a2) => Cord("TemporalTrunc(", a1.show, ", ", sh.show(a2), ")")
           case TimeOfDay(a1) => shz("TimeOfDay", a1)
           case ToTimestamp(a1) => shz("ToTimestamp", a1)
+          case ToLocal(a1) => shz("ToLocal", a1)
           case TypeOf(a1) => shz("TypeOf", a1)
           case ToId(a1) => shz("ToId", a1)
           case Negate(a1) => shz("Negate", a1)
@@ -749,6 +752,7 @@ object MapFuncCore {
           case TemporalTrunc(a1, a2) => NonTerminal("TemporalTrunc" :: nt, a1.shows.some, List(r.render(a2)))
           case TimeOfDay(a1) => nAry("TimeOfDay", a1)
           case ToTimestamp(a1) => nAry("ToTimestamp", a1)
+          case ToLocal(a1) => nAry("ToLocal", a1)
           case TypeOf(a1) => nAry("TypeOf", a1)
           case ToId(a1) => nAry("ToId", a1)
           case Negate(a1) => nAry("Negate", a1)
@@ -864,6 +868,7 @@ object MapFuncsCore {
   @Lenses final case class TemporalTrunc[T[_[_]], A](part: TemporalPart, a1: A) extends Unary[T, A]
   @Lenses final case class TimeOfDay[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ToTimestamp[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ToLocal[T[_[_]], A](a1: A) extends Unary[T, A]
   /** Fetches the [[quasar.Type.OffsetDateTime]] for the current instant in time, in UTC. */
   @Lenses final case class Now[T[_[_]], A]() extends Nullary[T, A]
   /** Fetches the [[quasar.Type.OffsetTime]] for the current instant in time, in UTC. */

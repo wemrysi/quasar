@@ -47,6 +47,7 @@ private[qscript] final class MapFuncCorePlanner[
     case JoinSideName(n)              => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unreachable(s"JoinSideName(${Show[Symbol].shows(n)})"))
 
     case Length(arrOrstr)             => lib.length[F] apply arrOrstr
+    case TypeOf(x)                    => lib.typeOf[F, FMT] apply x
 
     // time
     case OffsetDateTime(s)            => xs.dateTime(s).point[F]
@@ -60,7 +61,7 @@ private[qscript] final class MapFuncCorePlanner[
     case TemporalTrunc(part, src)     => lib.temporalTrunc[F](part) apply src
     case TimeOfDay(dt)                => asDateTime(dt) map xs.time
     case ToTimestamp(millis)          => SP.castIfNode(millis) >>= (lib.timestampToDateTime[F] apply _)
-    case TypeOf(x)                    => lib.typeOf[F, FMT] apply x
+    case ToLocal(millis)              => ??? // TODO
 
     case Now()                        => fn.currentDateTime.point[F]
     case NowDate()                    => fn.currentDate.point[F]

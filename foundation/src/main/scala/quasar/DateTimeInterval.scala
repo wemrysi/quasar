@@ -296,5 +296,4 @@ object DateTimeInterval {
       interval.seconds / divisor.round,
       interval.nanos / divisor.round)
   }
-
 }

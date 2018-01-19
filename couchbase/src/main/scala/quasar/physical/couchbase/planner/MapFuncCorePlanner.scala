@@ -206,6 +206,8 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
       ???
     case MF.ToTimestamp(a1) =>
       Timestamp(MillisToUTC(a1, none).embed).embed.η[F]
+    case MF.ToLocal(a1) =>
+      ???
     case MF.TypeOf(a1) =>
       unimplemented("TypeOf")
     case MF.ToId(a1) =>

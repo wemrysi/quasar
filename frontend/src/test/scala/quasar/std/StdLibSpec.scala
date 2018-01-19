@@ -858,6 +858,29 @@ abstract class StdLibSpec extends Qspec {
         }
       }
 
+      "ToLocal" >> {
+        "OffsetDateTime" >> {
+          unary(
+            ToLocal(_).embed,
+            Data.OffsetDateTime(JOffsetDateTime.parse("2009-02-13T23:31:30.011+12:15:18")),
+            Data.LocalDateTime(JLocalDateTime.parse("2009-02-13T23:31:30.011")))
+        }
+
+        "OffsetDate" >> {
+          unary(
+            ToLocal(_).embed,
+            Data.OffsetDate(quasar.OffsetDate.parse("2009-02-13+12:15:18")),
+            Data.LocalDate(JLocalDate.parse("2009-02-13")))
+        }
+
+        "OffsetTime" >> {
+          unary(
+            ToLocal(_).embed,
+            Data.OffsetTime(JOffsetTime.parse("23:31:30.011+12:15:18")),
+            Data.LocalTime(JLocalTime.parse("23:31:30.011")))
+        }
+      }
+
       "Now" >> {
         import MathLib.Subtract
 

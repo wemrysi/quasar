@@ -187,6 +187,7 @@ object RenderQScriptDSL {
             case TemporalTrunc(a1, a2)     => ("TemporalTrunc", (DSLTree("TemporalPart", a1.shows, none).right :: fa(base, a2).right :: Nil).some)
             case TimeOfDay(a1)             => ("TimeOfDay", (fa(base, a1).right :: Nil).some)
             case ToTimestamp(a1)           => ("ToTimestamp", (fa(base, a1).right :: Nil).some)
+            case ToLocal(a1)               => ("ToLocal", (fa(base, a1).right :: Nil).some)
             case TypeOf(a1)                => ("TypeOf", (fa(base, a1).right :: Nil).some)
             case ToId(a1)                  => ("ToId", (fa(base, a1).right :: Nil).some)
             case Negate(a1)                => ("Negate", (fa(base, a1).right :: Nil).some)
