@@ -186,6 +186,8 @@ object PostgresRenderQuery extends RenderQuery {
       s"($a1 and $a2)".right
     case Or(BoolExpr(a1), BoolExpr(a2)) =>
       s"($a1 or $a2)".right
+    case Not(BoolExpr(e)) =>
+      s"not ($e)".right
     case Neg(NumExpr(e)) =>
       s"(-$e)".right
     case Eq(TextExpr(a1), TextExpr(a2)) =>

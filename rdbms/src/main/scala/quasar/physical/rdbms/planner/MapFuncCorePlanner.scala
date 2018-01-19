@@ -114,7 +114,6 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.Divide(f1, f2) => SQL.NumericOp[T[SQL]]("/", f1, f2).embed.η[F]
     case MFC.Modulo(f1, f2) => SQL.Mod[T[SQL]](f1, f2).embed.η[F]
     case MFC.Power(f1, f2) =>  SQL.Pow[T[SQL]](f1, f2).embed.η[F]
-    case MFC.Not(f) =>  notImplemented("Not", this)
     case MFC.Eq(f1, f2) => SQL.Eq[T[SQL]](f1, f2).embed.η[F]
     case MFC.Neq(f1, f2) => SQL.Neq[T[SQL]](f1, f2).embed.η[F]
     case MFC.Lt(f1, f2) =>  SQL.Lt[T[SQL]](f1, f2).embed.η[F]
@@ -124,6 +123,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.IfUndefined(f1, f2) => SQL.IfNull.build(f1, f2).embed.η[F]
     case MFC.And(f1, f2) =>  SQL.And[T[SQL]](f1, f2).embed.η[F]
     case MFC.Or(f1, f2) =>  SQL.Or[T[SQL]](f1, f2).embed.η[F]
+    case MFC.Not(f) =>  SQL.Not[T[SQL]](f).embed.η[F]
     case MFC.Between(f1, f2, f3) =>  notImplemented("Between", this)
     case MFC.Cond(fCond, fThen, fElse) =>  notImplemented("Cond", this)
     case MFC.Within(f1, f2) =>  SQL.BinaryFunction(Contains, f1, f2).embed.η[F]

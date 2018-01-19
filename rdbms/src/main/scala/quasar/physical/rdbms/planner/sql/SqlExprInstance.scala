@@ -65,6 +65,7 @@ trait SqlExprTraverse {
       case Mod(a1, a2)         => (f(a1) ⊛ f(a2))(Mod.apply)
       case Pow(a1, a2)         => (f(a1) ⊛ f(a2))(Pow.apply)
       case And(a1, a2)         => (f(a1) ⊛ f(a2))(And(_, _))
+      case Not(v)              => f(v) ∘ Not.apply
       case Eq(a1, a2)          => (f(a1) ⊛ f(a2))(Eq(_, _))
       case Neq(a1, a2)         => (f(a1) ⊛ f(a2))(Neq(_, _))
       case Lt(a1, a2)          => (f(a1) ⊛ f(a2))(Lt(_, _))

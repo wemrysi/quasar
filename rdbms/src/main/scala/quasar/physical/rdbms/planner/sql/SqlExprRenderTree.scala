@@ -96,6 +96,8 @@ trait SqlExprRenderTree {
             nonTerminal("Neg", a1)
           case And(a1, a2) =>
             nonTerminal("And", a1, a2)
+          case Not(e) =>
+            nonTerminal("Not", e)
           case Eq(a1, a2) =>
             nonTerminal("Equal", a1, a2)
           case Neq(a1, a2) =>

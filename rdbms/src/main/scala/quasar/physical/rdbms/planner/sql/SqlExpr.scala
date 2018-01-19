@@ -68,6 +68,7 @@ object SqlExpr extends SqlExprInstances {
 
   final case class And[T](a1: T, a2: T) extends SqlExpr[T]
   final case class Or[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class Not[T](a1: T) extends SqlExpr[T]
 
   final case class Eq[T](a1: T, a2: T) extends SqlExpr[T]
   final case class Neq[T](a1: T, a2: T) extends SqlExpr[T]
