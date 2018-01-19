@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.api._, ToApiError.ops._, ToQResponse.ops._
 import quasar.api.{Destination, HeaderParam, VCacheMiddleware}
 import quasar.contrib.scalaz.catchable._
-import quasar.effect.{ScopeExecution, Timing}
+import quasar.effect.{ScopeExecution, Timing, TimingRepository}
 import quasar.fp.{TaskRef, liftMT}
 import quasar.fp.free.foldMapNT
 import quasar.fs._
@@ -42,7 +42,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object RestApi {
-  def coreServices[S[_], T](executionIdRef: TaskRef[Long])
+  def coreServices[S[_], T](executionIdRef: TaskRef[Long], timingRepo: TimingRepository)
       (implicit
         S0: Task :<: S,
         S1: ReadFile :<: S,
@@ -71,7 +71,8 @@ object RestApi {
       "/query/fs"     -> query.execute.service[S, T](executionIdRef),
       "/invoke/fs"    -> invoke.service[S],
       "/schema/fs"    -> analyze.schema.service[S],
-      "/metastore"    -> metastore.service[S]
+      "/metastore"    -> metastore.service[S],
+      "/timings"      -> timings.service[S](timingRepo)
     ).mapValues(VCacheMiddleware[S](_))
 
   val additionalServices: Map[String, HttpService] =

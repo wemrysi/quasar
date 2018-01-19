@@ -25,7 +25,7 @@ import quasar.console.{logErrors, stdout}
 import quasar.contrib.scalaz._
 import quasar.contrib.scopt._
 import quasar.db.DbConnectionConfig
-import quasar.effect.{Execution, Read, ScopeExecution, TimingRepository, Write}
+import quasar.effect.{Read, ScopeExecution, TimingRepository, Write}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric.Natural
@@ -50,8 +50,7 @@ object Server {
       configPath: Option[FsFile],
       loadConfig: BackendConfig,
       openClient: Boolean,
-      recordedExecutions: Natural,
-      printExecutions: Boolean) {
+      recordedExecutions: Natural) {
 
     def toCmdLineConfig: CmdLineConfig = CmdLineConfig(configPath, loadConfig, cmd)
   }
@@ -79,7 +78,7 @@ object Server {
             .map(some)) ⊛
         loadConfigM.liftM[MainErrT]) ((content, cfgPath, loadConfig) =>
         WebCmdLineConfig(
-          opts.cmd, content.toList, content.map(_.loc), opts.port, cfgPath, loadConfig, opts.openClient, opts.recordedExecutions, true))
+          opts.cmd, content.toList, content.map(_.loc), opts.port, cfgPath, loadConfig, opts.openClient, opts.recordedExecutions))
     }
   }
 
@@ -107,8 +106,7 @@ object Server {
     redirect: Option[String],
     eval: CoreEff ~> QErrs_CRW_TaskM,
     persistPortChange: Int => MainTask[Unit],
-    recordedExecutions: Natural,
-    printExecutions: Boolean
+    recordedExecutions: Natural
   ): Task[PortChangingServer.ServiceStarter] = {
     import RestApi._
 
@@ -125,29 +123,18 @@ object Server {
           injectFT[Task, QErrs_CRW_Task]       :+:
           eval))
 
-    val printAction = { (execution: Execution) =>
-      if (printExecutions) {
-        Free.liftF(Inject[Task, CoreEffIORW].inj(Task.delay(println(
-          execution.timings.toRenderedTree.shows
-        ))))
-      } else {
-        ().point[Free[CoreEffIORW, ?]]
-      }
-    }
     for {
-      scopeExecution <- TimingRepository.empty(recordedExecutions).map(
-        ScopeExecution.forFreeTask[CoreEffIORW, Nothing](_, printAction)
-      )
+      timingRepo <- TimingRepository.empty(recordedExecutions)
       executionIdRef <- TaskRef(0L)
     } yield {
-      implicit val SE = scopeExecution
+      implicit val SE = ScopeExecution.forFreeTask[CoreEffIORW, Nothing](timingRepo, _ => ().point[Free[CoreEffIORW, ?]])
       (reload: Int => Task[String \/ Unit]) =>
         finalizeServices(
           toHttpServicesF[CoreEffIORW](
             λ[Free[CoreEffIORW, ?] ~> ResponseOr] { fa =>
               interp.liftM[ResponseT] >>= (fa foldMap _)
             },
-            coreServices[CoreEffIORW, Nothing](executionIdRef)
+            coreServices[CoreEffIORW, Nothing](executionIdRef, timingRepo)
           ) ++ additionalServices
         ) orElse nonApiService(defaultPort, Kleisli(persistPortChange andThen (a => a.run)) >> Kleisli(reload), staticContent, redirect)
     }
@@ -163,11 +150,10 @@ object Server {
     staticContent: List[StaticContent],
     redirect: Option[String],
     persistPortChange: Int => MainTask[Unit],
-    recordedExecutions: Natural,
-    printExecutions: Boolean
+    recordedExecutions: Natural
   ): Task[Task[Unit]] =
     for {
-      starter <- serviceStarter(defaultPort = port, staticContent, redirect, quasarInter, persistPortChange, recordedExecutions, printExecutions)
+      starter <- serviceStarter(defaultPort = port, staticContent, redirect, quasarInter, persistPortChange, recordedExecutions)
       shutdown <- PortChangingServer.start(initialPort = port, starter)
     } yield shutdown
 
@@ -210,8 +196,7 @@ object Server {
                   webCmdLineCfg.staticContent,
                   webCmdLineCfg.redirect,
                   persistPort,
-                  webCmdLineCfg.recordedExecutions,
-                  webCmdLineCfg.printExecutions)
+                  webCmdLineCfg.recordedExecutions)
                  _        <- openBrowser(port).whenM(webCmdLineCfg.openClient)
                  _        <- stdout("Press Enter to stop.")
                  // If user pressed enter (after this main thread has been blocked on it),

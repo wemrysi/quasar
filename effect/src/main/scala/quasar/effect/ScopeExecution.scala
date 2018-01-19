@@ -17,7 +17,6 @@
 package quasar.effect
 
 import slamdata.Predef._
-import scala.{Ordering => SOrdering}
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.collection.immutable.Queue
@@ -134,29 +133,6 @@ final case class ExecutionTimings(timings: Map[String, (Instant, Instant)], star
 
 final case class Execution(id: ExecutionId, timings: ExecutionTimings)
 
-object Execution {
-  import ExecutionTimings.LabelledIntervalTree
-  implicit val executionOrdering: SOrdering[Execution] = SOrdering.ordered[Instant](x => x).on(_.timings.end)
-
-  def asJson(execution: Execution): Json = {
-    type PF[A] = EnvT[LabelledInterval, List, A]
-    def treeToJson(in: PF[(String, Json)]): Json =
-      Json.jObjectFields(
-        "start" -> Json.jNumber(in.ask.start),
-        "size" -> Json.jNumber(in.ask.size),
-        "children" -> Json.jObjectFields(in.lower: _*)
-      )
-    val subtrees =
-      Recursive[LabelledIntervalTree, PF]
-        .zygo[Json, String](execution.timings.toIntervalTree)(_.ask.label, treeToJson)
-    Json.jObjectFields(
-      "id" -> Json.jNumber(execution.id.identifier),
-      "timings" -> subtrees
-    )
-  }
-
-}
-
 object ExecutionTimings {
   // Flame graph tree
   type LabelledIntervalTree = Cofree[List, LabelledInterval]
@@ -198,6 +174,19 @@ object ExecutionTimings {
     val LabelledInterval(label, start, size) = tree.head
     RenderedTree((label + " ") :: Nil, (size.shows + " ms").some, tree.tail.sortBy(_.head.start).map(renderTree))
   }
+
+  def asJson(timings: ExecutionTimings): Json = {
+    type PF[A] = EnvT[LabelledInterval, List, A]
+    def treeToJson(in: PF[(String, Json)]): Json =
+      Json.jObjectFields(
+        "start" -> Json.jNumber(in.ask.start),
+        "size" -> Json.jNumber(in.ask.size),
+        "children" -> Json.jObjectFields(in.lower: _*)
+      )
+    Recursive[LabelledIntervalTree, PF]
+      .zygo[Json, String](timings.toIntervalTree)(_.ask.label, treeToJson)
+  }
+
 }
 
 final case class SingleExecutionRef(under: TaskRef[Map[String, (Instant, Instant)]]) {
