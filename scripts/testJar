@@ -29,7 +29,7 @@ QUASAR_PID=$!
 
 echo "Quasar PID: $QUASAR_PID"
 
-sleep 10s
+sleep 10
 
 cat $QUASAR_LOG_FILE
 

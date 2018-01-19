@@ -18,7 +18,7 @@ package quasar.api.services
 
 import slamdata.Predef._
 import quasar.api._
-import quasar.effect.{Read, ScopeExecution, Write}
+import quasar.effect.{Read, ScopeExecution, TimingRepository, Write}
 import quasar.fp._, free._
 import quasar.main._
 import quasar.fs.mount.cache.VCache
@@ -29,12 +29,14 @@ import org.http4s.headers._
 import org.specs2.matcher.TraversableMatchers._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
+import eu.timepit.refined.refineMV
 
 class RestApiSpecs extends quasar.Qspec {
 
   implicit val scopeExecution: ScopeExecution[Free[CoreEffIORW, ?], Nothing] =
     ScopeExecution.ignore[Free[CoreEffIORW, ?], Nothing]
   val executionIdRef: TaskRef[Long] = TaskRef(0L).unsafePerformSync
+  val timingRepo = TimingRepository.empty(refineMV(0L)).unsafePerformSync
 
   val service =
     (Fixture.inMemFSWeb() ⊛ TaskRef(Tags.Min(Option.empty[VCache.Expiration])))((runEff, r) =>
@@ -42,7 +44,7 @@ class RestApiSpecs extends quasar.Qspec {
         (liftMT[Task, ResponseT] compose Read.fromTaskRef(r))  :+:
         (liftMT[Task, ResponseT] compose Write.fromTaskRef(r)) :+:
         runEff,
-        RestApi.coreServices[CoreEffIORW, Nothing](executionIdRef)
+        RestApi.coreServices[CoreEffIORW, Nothing](executionIdRef, timingRepo)
       )).orNotFound)
 
   "OPTIONS" should {

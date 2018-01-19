@@ -6,13 +6,13 @@
         "marklogic_json": "timeout",
         "marklogic_xml": "timeout",
         "mimir":       "ignoreFieldOrder",
-        "postgres": "pending"
+        "postgres":    "pending"
     },
 
     "NB": "#1587: Disabled in couchbase due to lack of general join.
            Mongo backends succeed, but timeout sporadically on travis.",
 
-    "NB2": "Skipping for postgres until there's support for ProjectIndex",
+    "NB2": "Skipping for postgres: incorrenctly rendered 'where' clause",
 
     "data": "../slamengine_commits.data",
 

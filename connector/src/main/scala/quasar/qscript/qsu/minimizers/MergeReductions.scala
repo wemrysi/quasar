@@ -49,7 +49,7 @@ final class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
   }
 
   def extract[
-      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]](
+      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM: MinStateM[T, ?[_]]](
       qgraph: QSUGraph): Option[(QSUGraph, (QSUGraph, FreeMap) => G[QSUGraph])] = qgraph match {
 
     case qgraph @ QSReduce(src, buckets, reducers, repair) =>
@@ -72,7 +72,7 @@ final class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def apply[
-      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]](
+      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM: MinStateM[T, ?[_]]](
       qgraph: QSUGraph,
       source: QSUGraph,
       candidates: List[QSUGraph],
