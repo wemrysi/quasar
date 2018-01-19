@@ -951,6 +951,29 @@ object MongoDbPlanner {
             def transform[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
               applyTransforms(elideCond[A], rewriteUndefined[A])
 
+            def flattening(src: WorkflowBuilder[WF], target: Expr, st: ShiftType, i: IdStatus)
+                : WorkflowBuilder[WF] =
+              shiftType match {
+                case ShiftType.Array =>
+                  FlatteningBuilder(
+                    DocBuilder(
+                      src,
+                      ListMap(
+                        BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                        BsonField.Name("f") -> target)),
+                    Set(StructureType.Array(DocField(BsonField.Name("f")), i)),
+                    List(BsonField.Name("s")).some)
+                case ShiftType.Map =>
+                  FlatteningBuilder(
+                    DocBuilder(
+                      src,
+                      ListMap(
+                        BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                        BsonField.Name("f") -> target)),
+                    Set(StructureType.Object(DocField(BsonField.Name("f")), i)),
+                    List(BsonField.Name("s")).some)
+              }
+
             val structSelectors = getSelector[T, M, EX, Hole](
               struct, InternalError.fromMsg("Not a selector").left, condSelector[T](cfg.bsonVersion))
 
@@ -958,104 +981,56 @@ object MongoDbPlanner {
               repair, InternalError.fromMsg("Not a selector").left, condSelector[T](cfg.bsonVersion))
 
             if (repair.contains(LeftSideF)) {
-              shiftType match {
-                case ShiftType.Array => {
-                  (structSelectors.toOption, repairSelectors.toOption) match {
-                    case (Some(structSel), Some(repairSel)) => {
-                      val struct0 =
-                        handleFreeMap[T, M, EX](
-                          cfg.funcHandler,
-                          cfg.staticHandler,
-                          struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
+              (structSelectors.toOption, repairSelectors.toOption) match {
+                case (Some(structSel), Some(repairSel)) => {
+                  val struct0 =
+                    handleFreeMap[T, M, EX](
+                      cfg.funcHandler,
+                      cfg.staticHandler,
+                      struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
 
-                      val flatten = (struct0 ⊛ filterBuilder[Hole](
-                        handleFreeMap[T, M, EX](
-                          cfg.funcHandler, cfg.staticHandler, _))(src, structSel, struct))((struct1, src0) =>
-                        FlatteningBuilder(
-                          DocBuilder(
-                            src0,
-                            ListMap(
-                              BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                              BsonField.Name("f") -> struct1)),
-                          Set(StructureType.Array(DocField(BsonField.Name("f")), id)),
-                          List(BsonField.Name("s")).some))
+                  val flatten = (struct0 ⊛ filterBuilder[Hole](
+                    handleFreeMap[T, M, EX](
+                      cfg.funcHandler, cfg.staticHandler, _))(src, structSel, struct))((struct1, src0) =>
+                    flattening(src0, struct1, shiftType, id))
 
-                      (flatten >>= (s =>
-                        filterBuilder[JoinSide](exprOrJs(_)(exprMerge, jsMerge))(s, repairSel, repair))) >>= (src0 =>
-                        getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
-                          src0,
-                          repair.transCata[JoinFunc[T]](orOriginal(elideCond[JoinSide]))))
-                    }
-                    case (Some(structSel), None) => {
-                      val struct0 =
-                        handleFreeMap[T, M, EX](
-                          cfg.funcHandler,
-                          cfg.staticHandler,
-                          struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
+                  (flatten >>= (s =>
+                    filterBuilder[JoinSide](exprOrJs(_)(exprMerge, jsMerge))(s, repairSel, repair))) >>= (src0 =>
+                    getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
+                      src0,
+                      repair.transCata[JoinFunc[T]](orOriginal(elideCond[JoinSide]))))
+                }
+                case (Some(structSel), None) => {
+                  val struct0 =
+                    handleFreeMap[T, M, EX](
+                      cfg.funcHandler,
+                      cfg.staticHandler,
+                      struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
 
-                      (struct0 ⊛ filterBuilder[Hole](
-                        handleFreeMap[T, M, EX](
-                          cfg.funcHandler, cfg.staticHandler, _))(src, structSel, struct))((struct1, src0) =>
-                        getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
-                          FlatteningBuilder(
-                            DocBuilder(
-                              src0,
-                              ListMap(
-                                BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                                BsonField.Name("f") -> struct1)),
-                            Set(StructureType.Array(DocField(BsonField.Name("f")), id)),
-                            List(BsonField.Name("s")).some),
-                          repair)).join
-                    }
-                    case (None, Some(repairSel)) => {
-                      val flatten =
-                        handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct) ∘ (struct0 =>
-                          FlatteningBuilder(
-                            DocBuilder(
-                              src,
-                              ListMap(
-                                BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                                BsonField.Name("f") -> struct0)),
-                            Set(StructureType.Array(DocField(BsonField.Name("f")), id)),
-                          List(BsonField.Name("s")).some))
+                  (struct0 ⊛ filterBuilder[Hole](
+                    handleFreeMap[T, M, EX](
+                      cfg.funcHandler, cfg.staticHandler, _))(src, structSel, struct))((struct1, src0) =>
+                    getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
+                      flattening(src0, struct1, shiftType, id),
+                      repair)).join
+                }
+                case (None, Some(repairSel)) => {
+                  val flatten =
+                    handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct) ∘ (struct0 =>
+                      flattening(src, struct0, shiftType, id))
 
-                      (flatten >>= (s => filterBuilder[JoinSide](exprOrJs(_)(exprMerge, jsMerge))(s, repairSel, repair))) >>= (src0 =>
-                        getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
-                          src0, repair.transCata[JoinFunc[T]](orOriginal(elideCond[JoinSide]))))
-                    }
-                    case _ =>
-                      handleFreeMap[T, M, EX](
-                        cfg.funcHandler,
-                        cfg.staticHandler,
-                        struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))) >>= (target =>
-                        getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
-                          FlatteningBuilder(
-                            DocBuilder(
-                              src,
-                              ListMap(
-                                BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                                BsonField.Name("f") -> target)),
-                            Set(StructureType.Array(DocField(BsonField.Name("f")), id)),
-                          List(BsonField.Name("s")).some),
-                          repair))
-                  }
+                  (flatten >>= (s => filterBuilder[JoinSide](exprOrJs(_)(exprMerge, jsMerge))(s, repairSel, repair))) >>= (src0 =>
+                    getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
+                      src0, repair.transCata[JoinFunc[T]](orOriginal(elideCond[JoinSide]))))
                 }
                 case _ =>
-                  (handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct) ⊛
-                    getJsMerge[T, M](
-                      repair,
-                      jscore.Select(jscore.Ident(JsFn.defaultName), "s"),
-                      jscore.Select(jscore.Ident(JsFn.defaultName), "f")))((expr, j) =>
-                    ExprBuilder(
-                      FlatteningBuilder(
-                        DocBuilder(
-                          src,
-                          ListMap(
-                            BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                            BsonField.Name("f") -> expr)),
-                        Set(StructureType.Object(DocField(BsonField.Name("f")), id)),
-                        List(BsonField.Name("s")).some),
-                      -\&/(j)))
+                  handleFreeMap[T, M, EX](
+                    cfg.funcHandler,
+                    cfg.staticHandler,
+                    struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))) >>= (target =>
+                    getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
+                      flattening(src, target, shiftType, id),
+                      repair))
               }
             }
             else
