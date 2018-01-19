@@ -166,80 +166,83 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
       some(qgraph.overwriteAtRoot(QSU.Map[T, Symbol](single.root, fm as srcHole))).point[G]
 
-    case candidates =>
-      expandSecondOrder(fm, candidates) match {
-        case Some((fm, candidates)) =>
+    case multiple if Minimizers.all(m => !m.couldApplyTo(multiple)) =>
+      expandSecondOrder(fm, multiple) match {
+        case Some((fm2, candidates2)) =>
           // we need to re-expand and re-minimize, and we might end up doing additional second-order expansions
-          coalesceToMap[G](qgraph, candidates, fm)
+          coalesceToMap[G](qgraph, candidates2, fm2)
 
         case None =>
-          for {
-            resultM <- Minimizers.foldLeftM[G, Option[(QSUGraph, QSUGraph)]](None) {
-              case (Some(pair), _) =>
-                Option(pair).point[G]
-
-              case (None, minimizer) =>
-                if (minimizer.couldApplyTo(candidates)) {
-                  val backM = for {
-                    extractions <- candidates traverse { c =>
-                      OptionT(minimizer.extract[G](c).point[G])
-                    }
-
-                    (exCandidates, exRebuilds) = extractions unzip {
-                      case (c, r) => (c, r)
-                    }
-
-                    upperFM = func.StaticMapFS((0 until exCandidates.length): _*)(_.point[FreeMapA], _.toString)
-
-                    fakeAutoJoinM = exCandidates match {
-                      case left :: right :: _ =>
-                        updateGraph[T, G](QSU.AutoJoin2(left.root, right.root, func.Undefined)) map { back =>
-                          back :++ left
-                        }
-
-                      case _ => ???
-                    }
-
-                    fakeAutoJoin <- fakeAutoJoinM.liftM[OptionT]
-
-                    singleSource <-
-                      OptionT(
-                        coalesceToMap[G](
-                          fakeAutoJoin,
-                          exCandidates,
-                          upperFM))
-
-                    (simplifiedSource, simplifiedFM) = singleSource match {
-                      case Map(src, fm) => (src, fm)
-                      case _ => (singleSource, func.Hole)
-                    }
-
-                    candidates2 <- exRebuilds.zipWithIndex traverse {
-                      case (rebuild, i) =>
-                        val rebuiltFM = func.ProjectKeyS(simplifiedFM, i.toString)
-                        val normalized = N.freeMF(rebuiltFM)
-
-                        rebuild(
-                          simplifiedSource,
-                          normalized).liftM[OptionT].map(simplifiedSource ++: _)
-                    }
-
-                    back <- OptionT(minimizer[G](qgraph, simplifiedSource, candidates2, fm))
-                    _ <- updateProvenance[T, G](back._2).liftM[OptionT]
-                  } yield back.bimap(simplifiedSource ++: _, simplifiedSource ++: _)
-
-                  backM.run
-                } else {
-                  (None: Option[(QSUGraph, QSUGraph)]).point[G]
-                }
-            }
-
-            back <- resultM traverse {
-              case (retarget, result) =>
-                updateForCoalesce[G](candidates, retarget.root) as result
-            }
-          } yield back
+          none[QSUGraph].point[G]
       }
+
+    case multiple =>
+      for {
+        resultM <- Minimizers.foldLeftM[G, Option[(QSUGraph, QSUGraph)]](None) {
+          case (Some(pair), _) =>
+            Option(pair).point[G]
+
+          case (None, minimizer) =>
+            if (minimizer.couldApplyTo(multiple)) {
+              val backM = for {
+                extractions <- multiple traverse { c =>
+                  OptionT(minimizer.extract[G](c).point[G])
+                }
+
+                (exCandidates, exRebuilds) = extractions unzip {
+                  case (c, r) => (c, r)
+                }
+
+                upperFM = func.StaticMapFS((0 until exCandidates.length): _*)(_.point[FreeMapA], _.toString)
+
+                fakeAutoJoinM = exCandidates match {
+                  case left :: right :: _ =>
+                    updateGraph[T, G](QSU.AutoJoin2(left.root, right.root, func.Undefined)) map { back =>
+                      back :++ left
+                    }
+
+                  case _ => ???
+                }
+
+                fakeAutoJoin <- fakeAutoJoinM.liftM[OptionT]
+
+                singleSource <-
+                  OptionT(
+                    coalesceToMap[G](
+                      fakeAutoJoin,
+                      exCandidates,
+                      upperFM))
+
+                (simplifiedSource, simplifiedFM) = singleSource match {
+                  case Map(src, fm) => (src, fm)
+                  case _ => (singleSource, func.Hole)
+                }
+
+                candidates2 <- exRebuilds.zipWithIndex traverse {
+                  case (rebuild, i) =>
+                    val rebuiltFM = func.ProjectKeyS(simplifiedFM, i.toString)
+                    val normalized = N.freeMF(rebuiltFM)
+
+                    rebuild(
+                      simplifiedSource,
+                      normalized).liftM[OptionT].map(simplifiedSource ++: _)
+                }
+
+                back <- OptionT(minimizer[G](qgraph, simplifiedSource, candidates2, fm))
+                _ <- updateProvenance[T, G](back._2).liftM[OptionT]
+              } yield back.bimap(simplifiedSource ++: _, simplifiedSource ++: _)
+
+              backM.run
+            } else {
+              (None: Option[(QSUGraph, QSUGraph)]).point[G]
+            }
+        }
+
+        back <- resultM traverse {
+          case (retarget, result) =>
+            updateForCoalesce[G](multiple, retarget.root) as result
+        }
+      } yield back
   }
 
   private def failure[G[_]: Monad: MinStateM[T, ?[_]]](graph: QSUGraph): G[QSUGraph] =
