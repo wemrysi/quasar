@@ -111,7 +111,7 @@ lazy val backendRewrittenRunSettings = Seq(
       def trace(t: => Throwable): Unit = delegate.trace(t)
     }
 
-    r.run(main, (fullClasspath in Compile).value.files, args ++ backends, filtered) foreach sys.error
+    r.run(main, (fullClasspath in Compile).value.files, args ++ backends, filtered)
   })
 
 // In Travis, the processor count is reported as 32, but only ~2 cores are
@@ -148,7 +148,7 @@ lazy val assemblySettings = Seq(
     case PathList("org", "objectweb", "asm", xs @ _*)         => MergeStrategy.last // TODO remove this
     case PathList("javax", "ws", "rs", xs @ _*)               => MergeStrategy.last // and this
     case PathList("javax", "servlet", xs @ _*)                => MergeStrategy.last // and this
-    case PathList("com", "sun", "research", "ws", xs @ _*)    => MergeStrategy.last // and this 
+    case PathList("com", "sun", "research", "ws", xs @ _*)    => MergeStrategy.last // and this
     case PathList("mime.types", xs @ _*)                      => MergeStrategy.last // and this once each spark based connector has its own subproject
     case PathList("com", "google", "common", "base", xs @ _*) => MergeStrategy.last
     case "log4j.properties"                                   => MergeStrategy.discard
