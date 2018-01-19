@@ -43,6 +43,8 @@ import Path.Sandboxed
 import scalaz.{\/, \/-, EitherT, Equal, Free, IList, Need, StateT}
 import scalaz.std.anyVal._
 import scalaz.syntax.either._
+import scalaz.syntax.tag._
+import scalaz.syntax.std.boolean._
 // import scalaz.syntax.show._
 
 object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
@@ -290,6 +292,55 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           fm must beTreeEqual(
             func.Add(func.Hole, func.Constant(J.int(42))))
       }
+    }
+
+    "not unnecessarily rewrite filter" in {
+      val tread =
+        qsu.tread(afile)
+
+      val filter =
+        qsu.qsFilter(
+          qsu.autojoin3((
+            tread,
+            tread,
+            qsu.undefined(),
+            _(MapFuncsCore.Guard(_, Type.AnyObject, _, _)))),
+          func.Eq(
+            func.ProjectKeyS(func.Hole, "city"),
+            func.ProjectKeyS(func.Hole, "state")))
+
+      val projLoc =
+        qsu.autojoin2((
+          filter,
+          qsu.cstr("loc"),
+          _(MapFuncsCore.ProjectKey(_, _))))
+
+      val qgraph = QSUGraph.fromTree[Fix](
+        qsu.autojoin2((
+          qsu.autojoin2((
+            qsu.cstr("city"),
+            qsu.autojoin2((
+              filter,
+              qsu.cstr("city"),
+              _(MapFuncsCore.ProjectKey(_, _)))),
+            _(MapFuncsCore.MakeMap(_, _)))),
+          qsu.autojoin2((
+            qsu.cstr("loc"),
+            qsu.transpose(
+              qsu.autojoin3((
+                projLoc,
+                projLoc,
+                qsu.undefined(),
+                _(MapFuncsCore.Guard(_, Type.AnyArray, _, _)))),
+              Retain.Values,
+              Rotation.FlattenArray),
+            _(MapFuncsCore.MakeMap(_, _)))),
+        _(MapFuncsCore.ConcatMaps(_, _)))))
+
+      runOn(qgraph).foldMapUp {
+        case QSFilter(_, _) => true.disjunction
+        case _              => false.disjunction
+      }.unwrap must beTrue
     }
 
     "coalesce two summed bucketing reductions, inlining functions into the buckets" in {
