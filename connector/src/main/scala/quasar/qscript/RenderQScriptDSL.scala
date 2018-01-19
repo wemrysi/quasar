@@ -151,6 +151,7 @@ object RenderQScriptDSL {
             case Now()           => ("Now", none)
             case NowTime()       => ("NowTime", none)
             case NowDate()       => ("NowDate", none)
+            case CurrentTimeZone() => ("CurrentTimeZone", none)
             case SetTimeZone(a1, a2) => ("SetTimeZone", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
             case SetTimeZoneMinute(a1, a2) => ("SetTimeZoneMinute", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
             case SetTimeZoneHour(a1, a2) => ("SetTimeZoneHour", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)

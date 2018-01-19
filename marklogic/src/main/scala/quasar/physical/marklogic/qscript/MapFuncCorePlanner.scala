@@ -65,6 +65,7 @@ private[qscript] final class MapFuncCorePlanner[
     case Now()                        => fn.currentDateTime.point[F]
     case NowDate()                    => fn.currentDate.point[F]
     case NowTime()                    => fn.currentTime.point[F]
+    case CurrentTimeZone()            => fn.implicitTimeZone.point[F]
 
     case ExtractCentury(time)         => asDateTime(time) map (dt =>
                                            fn.ceiling(fn.yearFromDateTime(dt) div 100.xqy))

@@ -60,6 +60,9 @@ object fn {
   val currentTime: XQuery =
     XQuery("fn:current-time()")
 
+  val implicitTimeZone: XQuery =
+    XQuery("fn:implicit-timezone()")
+
   def dayFromDateTime(dt: XQuery): XQuery =
     XQuery(s"fn:day-from-dateTime($dt)")
 

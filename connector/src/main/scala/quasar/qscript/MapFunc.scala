@@ -28,6 +28,7 @@ object MapFunc {
     case date.Now => MFC(C.Now())
     case date.NowTime => MFC(C.NowTime())
     case date.NowDate => MFC(C.NowDate())
+    case date.CurrentTimeZone => MFC(C.CurrentTimeZone())
   }
 
   def translateUnaryMapping[T[_[_]], MF[_], A]

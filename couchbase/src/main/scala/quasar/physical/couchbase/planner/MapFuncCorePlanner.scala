@@ -276,6 +276,8 @@ final class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: 
       ???
     case MF.NowDate() =>
       ???
+    case MF.CurrentTimeZone() =>
+      ???
 
     // math
     case MF.Negate(a1) =>

@@ -265,8 +265,7 @@ trait DateLib extends Library with Serializable {
     Mapping,
     "Returns the current time zone offset in total seconds - this must always return the same value within the same execution of a query.",
     Type.Int,
-    noSimplification
-  )
+    noSimplification)
 
   val OffsetDateTime = UnaryFunc(
     Mapping,

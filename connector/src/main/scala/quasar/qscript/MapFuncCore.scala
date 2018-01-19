@@ -397,6 +397,7 @@ object MapFuncCore {
         case Now() => G.point(Now[T, B]())
         case NowTime() => G.point(NowTime[T, B]())
         case NowDate() => G.point(NowDate[T, B]())
+        case CurrentTimeZone() => G.point(CurrentTimeZone[T, B]())
 
         // unary
         case ExtractCentury(a1) => f(a1) ∘ (ExtractCentury(_))
@@ -497,6 +498,7 @@ object MapFuncCore {
         case (Now(), Now()) => true
         case (NowTime(), NowTime()) => true
         case (NowDate(), NowDate()) => true
+        case (CurrentTimeZone(), CurrentTimeZone()) => true
         // unary
         case (ExtractCentury(a1), ExtractCentury(a2)) => in.equal(a1, a2)
         case (ExtractDayOfMonth(a1), ExtractDayOfMonth(a2)) => in.equal(a1, a2)
@@ -599,6 +601,7 @@ object MapFuncCore {
           case Now() => Cord("Now()")
           case NowTime() => Cord("NowTime()")
           case NowDate() => Cord("NowDate()")
+          case CurrentTimeZone() => Cord("CurrentTimeZone()")
 
           // unary
           case ExtractCentury(a1) => shz("ExtractCentury", a1)
@@ -711,6 +714,7 @@ object MapFuncCore {
           case Now() => Terminal("Now" :: nt, None)
           case NowTime() => Terminal("NowTime" :: nt, None)
           case NowDate() => Terminal("NowDate" :: nt, None)
+          case CurrentTimeZone() => Terminal("CurrentTimeZone" :: nt, None)
 
           // unary
           case ExtractCentury(a1) => nAry("ExtractCentury", a1)
@@ -866,6 +870,7 @@ object MapFuncsCore {
   @Lenses final case class NowTime[T[_[_]], A]() extends Nullary[T, A]
   /** Fetches the [[quasar.Type.OffsetDate]] for the current instant in time, in UTC. */
   @Lenses final case class NowDate[T[_[_]], A]() extends Nullary[T, A]
+  @Lenses final case class CurrentTimeZone[T[_[_]], A]() extends Nullary[T, A]
 
   // identity
   /** Returns a string describing the type of the value. If the value has a
