@@ -115,7 +115,9 @@ object TableModel {
       Set[ColumnType](IntCol, DecCol) -> DecCol,
       Set[ColumnType](DecCol, StringCol) -> StringCol,
       Set[ColumnType](IntCol, StringCol) -> StringCol,
-      Set[ColumnType](BoolCol, StringCol) -> StringCol
+      Set[ColumnType](BoolCol, StringCol) -> StringCol,
+      Set[ColumnType](BoolCol, DecCol) -> StringCol,
+      Set[ColumnType](BoolCol, IntCol) -> StringCol
     )
 
     override def append(s1: TableModel, s2: => TableModel): TableModel = {
