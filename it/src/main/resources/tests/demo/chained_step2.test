@@ -4,8 +4,11 @@
     "backends": {
        "couchbase":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
-       "mimir":             "ignoreFieldOrder"
+       "mimir":             "ignoreFieldOrder",
+       "postgres":          "pending"
     },
+    "NB": "Postgres connector can't handle references to results of IncludeIds. Also, this
+           whole IncludeId element seems to be redundant here.",
     "query": "SELECT DISTINCT (city) FROM patients WHERE state = \"CO\" ORDER BY city ASC LIMIT 5",
     "predicate": "exactly",
     "expected": [
