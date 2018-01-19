@@ -180,7 +180,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.DeleteKey(fSrc, fField) =>   notImplemented("DeleteKey", this)
     case MFC.Range(fFrom, fTo) =>  notImplemented("Range", this)
     case MFC.Guard(f1, fPattern, f2, ff3) => f2.η[F]
-    case MFC.TypeOf(f) => notImplemented("TypeOf", this)
+    case MFC.TypeOf(f) => SQL.TypeOf(f).embed.η[F]
     case other => unexpected(other.getClass.getName, this)
   }
 }

@@ -101,6 +101,7 @@ trait SqlExprTraverse {
           Case(wt, Else(e))
         )
 
+      case TypeOf(e) => f(e) ∘ TypeOf.apply
       case Coercion(t, e) => f(e) ∘ (Coercion(t, _))
       case ToArray(v) => f(v) ∘ ToArray.apply
       case UnaryFunction(t, e) => f(e) ∘ (UnaryFunction(t, _))

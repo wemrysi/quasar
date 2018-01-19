@@ -30,9 +30,9 @@ import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.Planner.InternalError
 import quasar.Planner.{NonRepresentableData, PlannerError}
-
 import matryoshka._
 import matryoshka.implicits._
+
 import scalaz._
 import Scalaz._
 import quasar.physical.rdbms.planner.sql.Indirections._
@@ -44,7 +44,14 @@ object PostgresRenderQuery extends RenderQuery {
 
   def asString[T[_[_]]: BirecursiveT](a: T[SqlExpr]): PlannerError \/ String = {
 
-    a.paraM(galg) ∘ (s => s"select row_to_json(row) from ($s) as row")
+    type SqlTransform = T[SqlExpr] => T[SqlExpr]
+
+    val stringifyTypeOf: SqlTransform = s => s.project match {
+      case TypeOf(_) => Coercion[T[SqlExpr]](StringCol, s).embed
+      case other => s
+    }
+
+    a.transCataT(stringifyTypeOf).paraM(galg) ∘ (s => s"select row_to_json(row) from ($s) as row")
   }
 
   def alias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" as ${i.v}"))
@@ -256,6 +263,7 @@ object PostgresRenderQuery extends RenderQuery {
     case Case(wt, e) =>
       val wts = wt ∘ { case WhenThen(TextExpr(w), TextExpr(t)) => s"when ($w)::boolean then $t" }
       s"(case ${wts.intercalate(" ")} else ${text(e.v)} end)".right
+    case TypeOf(e) => s"pg_typeof($e)".right
     case Coercion(t, (_, e)) => s"($e)::${t.mapToStringName}".right
     case ToArray(TextExpr(v)) => postgresArray(s"[$v]").right
     case UnaryFunction(fType, TextExpr(e)) =>
