@@ -143,8 +143,8 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         reduceFuncPlanner[T, F].plan)
       rep <- repair.cataM(interpretM(
         _.idx.fold(
-          idx => notImplemented("Reduce repair with left index, waiting for a test case", this): F[T[SqlExpr]],
-          idx => rds(idx).point[F]
+          leftIdx => gbs(leftIdx).point[F],
+          rightIdx => rds(rightIdx).point[F]
         ),
         Planner.mapFuncPlanner[T, F].plan)
       ).map(idToWildcard[T])
