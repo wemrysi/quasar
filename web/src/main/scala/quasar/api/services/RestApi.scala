@@ -72,7 +72,7 @@ object RestApi {
       "/invoke/fs"    -> invoke.service[S],
       "/schema/fs"    -> analyze.schema.service[S],
       "/metastore"    -> metastore.service[S],
-      "/timedump"     -> timedump.service[S](timingRepo)
+      "/timings"      -> timings.service[S](timingRepo)
     ).mapValues(VCacheMiddleware[S](_))
 
   val additionalServices: Map[String, HttpService] =

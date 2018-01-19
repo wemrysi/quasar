@@ -25,7 +25,7 @@ import scalaz.{Zip => _, _}, Scalaz._
 import scalaz.concurrent.Task
 import argonaut.Json
 
-object timedump {
+object timings {
 
   def service[S[_]](repo: TimingRepository)(
     implicit
