@@ -13,18 +13,10 @@ Chain
 │  │         [{ "$literal": undefined }]]
 │  │     })
 │  ╰─ ExcludeId
-├─ $UnwindF(DocField(BsonField.Name("f")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("f")))
 ├─ $ProjectF
-│  ├─ Name("filter_source" -> {
-│  │       "$cond": [
-│  │         {
-│  │           "$and": [
-│  │             { "$lte": [{ "$literal": {  } }, "$s"] },
-│  │             { "$lt": ["$s", { "$literal": [] }] }]
-│  │         },
-│  │         "$s",
-│  │         { "$literal": undefined }]
-│  │     })
+│  ├─ Name("filter_source" -> "$s")
 │  ├─ Name("filter_predicate" -> { "$lt": ["$f", { "$literal": NumberInt("0") }] })
 │  ╰─ ExcludeId
 ├─ $MatchF
@@ -39,10 +31,11 @@ Chain
 │  │             { "$lt": ["$filter_source.loc", { "$literal": BinData(0, "") }] }]
 │  │         },
 │  │         "$filter_source.loc",
-│  │         [{ "$literal": undefined }]]
+│  │         { "$literal": undefined }]
 │  │     })
 │  ╰─ ExcludeId
-├─ $UnwindF(DocField(BsonField.Name("0")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("0")))
 ╰─ $ProjectF
    ├─ Name("__quasar_mongodb_sigil" -> "$0")
    ╰─ ExcludeId

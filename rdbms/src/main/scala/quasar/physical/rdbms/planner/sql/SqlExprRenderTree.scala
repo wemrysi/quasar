@@ -58,14 +58,26 @@ trait SqlExprRenderTree {
             nonTerminal(s"RegexMatches (insensitive = $caseInsensitive)", a1, a2)
           case ExprWithAlias(e, a) =>
             nonTerminal(s"ExprWithAlias($a)", e)
-          case ExprPair(expr1, expr2) =>
-            NonTerminal("Pair" :: Nil, none, List(expr1, expr2) ∘ r.render)
+          case ExprPair(expr1, expr2, m) =>
+            NonTerminal(s"Pair (m = ${m.shows})" :: Nil, none, List(expr1, expr2) ∘ r.render)
           case ConcatStr(a1, a2) =>
             nonTerminal("ConcatStr", a1, a2)
+          case Avg(a1) =>
+            nonTerminal("Avg", a1)
+          case Count(a1) =>
+            nonTerminal("Count", a1)
+          case Max(a1) =>
+            nonTerminal("Max", a1)
+          case Min(a1) =>
+            nonTerminal("Min", a1)
+          case Sum(a1) =>
+            nonTerminal("Sum", a1)
+          case Distinct(a1) =>
+            nonTerminal("Distinct", a1)
           case Time(a1) =>
             nonTerminal("Time", a1)
-          case Id(v) =>
-            Terminal("Id" :: Nil, v.some)
+          case Id(v, m) =>
+            Terminal(s"Id (m = ${m.shows})" :: Nil, v.some)
           case Table(v) =>
             Terminal("Table" :: Nil, v.some)
           case RowIds() =>
@@ -98,19 +110,24 @@ trait SqlExprRenderTree {
             nonTerminal(">=", a1, a2)
           case Or(a1, a2) =>
             nonTerminal("Or", a1, a2)
-          case Refs(srcs) =>
-            nonTerminal("References", srcs:_*)
-          case Select(selection, from, filter, order) =>
+          case Refs(srcs, m) =>
+            nonTerminal(s"References (m = ${m.shows})", srcs:_*)
+          case Select(selection, from, join, filter, groupBy, order) =>
             NonTerminal(
-              "Select" :: Nil,
+              s"Select (m = ${selection.meta.shows})" :: Nil,
               none,
               nt("selection", selection.alias ∘ (_.v), selection.v) ::
-                nt("from", from.alias.v.some, from.v) ::
+                nt("from", from.alias.v.some, from.v)               ::
+                (join ∘ (j => NonTerminal(
+                  "join" :: Nil, j.alias.v.some,
+                    r.render(j.v) :: j.keys.flatMap {
+                    case (lk, rk) => List(r.render(lk), r.render(rk))
+                  }))).toList                                      :::
                 (filter ∘ (f => nt("filter", none, f.v))).toList ++
                   order.map {
                     o =>
                       nt(s"OrderBy ${o.sortDir}", none, o.v)
-                  }
+                  } 
             )
           case Union(left, right) =>
             nonTerminal("UNION", left, right)
@@ -130,6 +147,8 @@ trait SqlExprRenderTree {
             nonTerminal(s"Function call: $t", a1, a2)
           case TernaryFunction(t, a1, a2, a3) =>
             nonTerminal(s"Function call: $t", a1, a2, a3)
+          case ArrayUnwind(u) =>
+            nonTerminal("ArrayUnwind", u)
         }
       }
     }

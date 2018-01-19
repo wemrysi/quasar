@@ -49,7 +49,7 @@ object MappableRegionSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
     mr(tree) map κ(hole)
 
   def projectStrKey(key: String): FreeMap =
-    func.ProjectKey(func.Hole, func.Constant(ejs.str(key)))
+    func.ProjectKeyS(func.Hole, key)
 
   "finding mappable region" should {
     "convert autojoin2" >> {

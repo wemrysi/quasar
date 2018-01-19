@@ -30,7 +30,6 @@ import quasar.fp.ski._
 import quasar.fs.{FileSystemError, FileSystemErrT, MonadFsErr}, FileSystemError.qscriptPlanningFailed
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
-import quasar.namegen._
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
@@ -286,7 +285,7 @@ object MongoDbPlanner {
             case Type.Binary => check.isBinary
             case Type.Id => check.isId
             case Type.Bool => check.isBoolean
-            case Type.Date => check.isDateOrTimestamp // FIXME: use isDate here when >= 3.0
+            case Type.Date => check.isDate
             // NB: Some explicit coproducts for adjacent types.
             case Type.Int ⨿ Type.Dec ⨿ Type.Str => check.isNumberOrString
             case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str => check.isNumberOrString
@@ -901,9 +900,11 @@ object MongoDbPlanner {
             ev3: EX :<: ExprOp) = {
           case qscript.Map(src, f) =>
             getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, f)
-          case LeftShift(src, struct, id, shiftType, repair) => {
+
+          case LeftShift(src, struct, id, shiftType, onUndef, repair) => {
             def rewriteUndefined[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
-              case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
+              case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined()))))))))
+                  if (onUndef === OnUndefined.Emit) =>
                 rollMF[T, A](MFC(Guard(exp, tpe, exp0, Free.roll(MFC(MakeArray(Free.roll(MFC(Undefined())))))))).some
               case _ => none
             }
@@ -948,7 +949,8 @@ object MongoDbPlanner {
                           ListMap(
                             BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                             BsonField.Name("f") -> target)),
-                        Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                        Set(StructureType.Array(DocField(BsonField.Name("f")), id)),
+                        List(BsonField.Name("s")).some),
                       repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide])))), { sel =>
                     val struct0 =
                       handleFreeMap[T, M, EX](
@@ -965,7 +967,8 @@ object MongoDbPlanner {
                             ListMap(
                               BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                               BsonField.Name("f") -> struct1)),
-                          Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
+                          Set(StructureType.Array(DocField(BsonField.Name("f")), id)),
+                          List(BsonField.Name("s")).some),
                         repair0)).join
                   })
                 }
@@ -983,7 +986,8 @@ object MongoDbPlanner {
                             BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
                             BsonField.Name("f") -> expr)),
                         // TODO: Handle arrays properly
-                        Set(StructureType.Object(DocField(BsonField.Name("f")), id))),
+                        Set(StructureType.Object(DocField(BsonField.Name("f")), id)),
+                        List(BsonField.Name("s")).some),
                       -\&/(j)))
               }
             }
@@ -998,7 +1002,8 @@ object MongoDbPlanner {
                       cfg.funcHandler, cfg.staticHandler)(
                       FlatteningBuilder(
                         builder,
-                        Set(StructureType.Array(DocVar.ROOT(), id))),
+                        Set(StructureType.Array(DocVar.ROOT(), id)),
+                        List().some),
                         repair0))
                 }
                 case _ =>
@@ -1007,7 +1012,8 @@ object MongoDbPlanner {
                       cfg.funcHandler, cfg.staticHandler)(
                       FlatteningBuilder(
                         builder,
-                        Set(StructureType.Object(DocVar.ROOT(), id))),
+                        Set(StructureType.Object(DocVar.ROOT(), id)),
+                        List().some),
                         repair.as(SrcHole)))
               }
 
@@ -1402,7 +1408,7 @@ object MongoDbPlanner {
         qs.cataM[M, WorkflowBuilder[WF]](
           Planner[T, fs.MongoQScript[T, ?]].plan[M, WF, EX](cfg).apply(_) ∘
             (_.transCata[Fix[WorkflowBuilderF[WF, ?]]](repeatedly(WorkflowBuilder.normalize[WF, Fix[WorkflowBuilderF[WF, ?]]])))))
-      wf <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb)))
+      wf <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb, cfg.queryModel)))
     } yield wf
 
   def plan0
@@ -1480,46 +1486,39 @@ object MongoDbPlanner {
 
     val bsonVersion = toBsonVersion(queryModel)
 
+    val joinHandler: JoinHandler[Workflow3_2F, WBM] =
+      JoinHandler.fallback[Workflow3_2F, WBM](
+        JoinHandler.pipeline(queryModel, queryContext.statistics, queryContext.indexes),
+        JoinHandler.mapReduce(queryModel))
+
     queryModel match {
+      case `3.4.4` =>
+        val cfg = PlannerConfig[T, Expr3_4_4, Workflow3_2F](
+          joinHandler,
+          FuncHandler.handle3_4_4(bsonVersion),
+          StaticHandler.handle,
+          queryModel,
+          bsonVersion)
+        plan0[T, M, Workflow3_2F, Expr3_4_4](anyDoc, cfg)(qs)
+
       case `3.4` =>
-        val joinHandler: JoinHandler[Workflow3_2F, WBM] =
-          JoinHandler.fallback[Workflow3_2F, WBM](
-            JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
-            JoinHandler.mapReduce)
         val cfg = PlannerConfig[T, Expr3_4, Workflow3_2F](
           joinHandler,
           FuncHandler.handle3_4(bsonVersion),
-          StaticHandler.v3_2,
+          StaticHandler.handle,
+          queryModel,
           bsonVersion)
         plan0[T, M, Workflow3_2F, Expr3_4](anyDoc, cfg)(qs)
 
       case `3.2` =>
-        val joinHandler: JoinHandler[Workflow3_2F, WBM] =
-          JoinHandler.fallback[Workflow3_2F, WBM](
-            JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
-            JoinHandler.mapReduce)
         val cfg = PlannerConfig[T, Expr3_2, Workflow3_2F](
           joinHandler,
           FuncHandler.handle3_2(bsonVersion),
-          StaticHandler.v3_2,
+          StaticHandler.handle,
+          queryModel,
           bsonVersion)
         plan0[T, M, Workflow3_2F, Expr3_2](anyDoc, cfg)(qs)
 
-      case `3.0` =>
-        val cfg = PlannerConfig[T, Expr3_0, Workflow2_6F](
-          JoinHandler.mapReduce[WBM, Workflow2_6F],
-          FuncHandler.handle3_0(bsonVersion),
-          StaticHandler.v2_6,
-          bsonVersion)
-        plan0[T, M, Workflow2_6F, Expr3_0](anyDoc, cfg)(qs).map(_.inject[WorkflowF])
-
-      case _ =>
-        val cfg = PlannerConfig[T, Expr2_6, Workflow2_6F](
-          JoinHandler.mapReduce[WBM, Workflow2_6F],
-          FuncHandler.handle2_6(bsonVersion),
-          StaticHandler.v2_6,
-          bsonVersion)
-        plan0[T, M, Workflow2_6F, Expr2_6](anyDoc, cfg)(qs).map(_.inject[WorkflowF])
     }
   }
 }

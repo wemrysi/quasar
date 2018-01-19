@@ -82,7 +82,8 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
   private type QSU[A] = QScriptUniform[A]
   private type RefsR[F[_]] = MonadReader_[F, References]
 
-  private final case class SrcMerge[A, B](src: A, lval: B, rval: B)
+  // We can't use final here due to SI-4440 - it results in warning
+  private case class SrcMerge[A, B](src: A, lval: B, rval: B)
 
   private val func = construction.Func[T]
 
@@ -187,7 +188,7 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
             QCE(Reduce[T, QSUGraph](source, bs, reducers, repair))
           }
 
-        case QSU.LeftShift(source, struct, idStatus, repair, rot) =>
+        case QSU.LeftShift(source, struct, idStatus, onUndefined, repair, rot) =>
           for {
             // Access.value is already resolved, from ReifyIdentities.
             // this would be nicer with a tri-state Access type.
@@ -205,7 +206,7 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
               case QSU.Rotation.FlattenMap | QSU.Rotation.ShiftMap =>
                 ShiftType.Map
             }
-          } yield QCE(LeftShift[T, QSUGraph](source, struct, idStatus, shiftType, resolvedRepair))
+          } yield QCE(LeftShift[T, QSUGraph](source, struct, idStatus, shiftType, onUndefined, resolvedRepair))
 
         case QSU.QSSort(source, buckets, order) =>
           buckets traverse (resolveAccess(_)(_.left)(holeAs(source.root))) map { bs =>

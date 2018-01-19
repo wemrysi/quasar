@@ -26,12 +26,11 @@ import quasar.qscript.{
   ExcludeId,
   IncludeId,
   Hole,
-  HoleF,
   LeftSide,
   MapFuncsCore,
+  OnUndefined,
   ReduceFuncs,
   ReduceIndex,
-  ReduceIndexF,
   RightSide,
   SrcHole
 }
@@ -41,7 +40,7 @@ import matryoshka.data.free._
 import pathy.Path
 import Path.Sandboxed
 
-import scalaz.{\/-, EitherT, Equal, Free, IList, Need, StateT}
+import scalaz.{\/, \/-, EitherT, Equal, Free, IList, Need, StateT}
 import scalaz.std.anyVal._
 import scalaz.syntax.either._
 // import scalaz.syntax.show._
@@ -49,7 +48,7 @@ import scalaz.syntax.either._
 object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
   import ApplyProvenance.AuthenticatedQSU
-  import QScriptUniform.{DTrans, Rotation}
+  import QScriptUniform.{DTrans, Retain, Rotation}
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
@@ -72,10 +71,10 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         qsu.autojoin2((
           qsu.map(
             qsu.read(afile),
-            func.ProjectKey(HoleF, func.Constant(J.str("foo")))),
+            func.ProjectKeyS(func.Hole, "foo")),
           qsu.map(
             qsu.read(afile),
-            func.ProjectKey(HoleF, func.Constant(J.str("bar")))),
+            func.ProjectKeyS(func.Hole, "bar")),
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
@@ -83,8 +82,8 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           // must_=== doesn't work
           fm must beTreeEqual(
             func.Add(
-              func.ProjectKey(HoleF, func.Constant(J.str("foo"))),
-              func.ProjectKey(HoleF, func.Constant(J.str("bar")))))
+              func.ProjectKeyS(func.Hole, "foo"),
+              func.ProjectKeyS(func.Hole, "bar")))
       }
     }
 
@@ -99,7 +98,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       runOn(qgraph) must beLike {
         case Map(Read(_), fm) =>
           // must_=== doesn't work
-          fm must beTreeEqual(func.Guard(HoleF, Type.AnyObject, HoleF, func.Undefined))
+          fm must beTreeEqual(func.Guard(func.Hole, Type.AnyObject, func.Hole, func.Undefined))
       }
     }
 
@@ -109,13 +108,13 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           qsu.qsReduce(
             qsu.read(afile),
             Nil,
-            List(ReduceFuncs.Count(HoleF[Fix])),
-            Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+            List(ReduceFuncs.Count(func.Hole)),
+            func.ReduceIndex(\/-(0))),
           qsu.qsReduce(
             qsu.read(afile),
             Nil,
-            List(ReduceFuncs.Sum(HoleF[Fix])),
-            Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+            List(ReduceFuncs.Sum(func.Hole)),
+            func.ReduceIndex(\/-(0))),
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
@@ -128,22 +127,20 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           fm) =>
 
           // must_=== doesn't work
-          h1 must beTreeEqual(HoleF[Fix])
-          h2 must beTreeEqual(HoleF[Fix])
+          h1 must beTreeEqual(func.Hole)
+          h2 must beTreeEqual(func.Hole)
 
           repair must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMap(
-                func.Constant(J.str("0")),
-                func.ReduceIndex(\/-(0))),
-              func.MakeMap(
-                func.Constant(J.str("1")),
-                func.ReduceIndex(\/-(1)))))
+            func.StaticMapS(
+              "0" ->
+                func.ReduceIndex(\/-(0)),
+              "1" ->
+                func.ReduceIndex(\/-(1))))
 
           fm must beTreeEqual(
             func.Add(
-              func.ProjectKey(HoleF, func.Constant(J.str("0"))),
-              func.ProjectKey(HoleF, func.Constant(J.str("1")))))
+              func.ProjectKeyS(func.Hole, "0"),
+              func.ProjectKeyS(func.Hole, "1")))
       }
     }
 
@@ -154,19 +151,19 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             qsu.qsReduce(
               qsu.read(afile),
               Nil,
-              List(ReduceFuncs.Count(HoleF[Fix])),
-              Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+              List(ReduceFuncs.Count(func.Hole)),
+              func.ReduceIndex(\/-(0))),
             qsu.qsReduce(
               qsu.read(afile),
               Nil,
-              List(ReduceFuncs.Sum(HoleF[Fix])),
-              Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+              List(ReduceFuncs.Sum(func.Hole)),
+              func.ReduceIndex(\/-(0))),
             _(MapFuncsCore.Add(_, _)))),
           qsu.qsReduce(
             qsu.read(afile),
             Nil,
-            List(ReduceFuncs.Max(HoleF[Fix])),
-            Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+            List(ReduceFuncs.Max(func.Hole)),
+            func.ReduceIndex(\/-(0))),
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
@@ -179,35 +176,31 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           fm) =>
 
           // must_=== doesn't work
-          h1 must beTreeEqual(HoleF[Fix])
-          h2 must beTreeEqual(HoleF[Fix])
-          h3 must beTreeEqual(HoleF[Fix])
+          h1 must beTreeEqual(func.Hole)
+          h2 must beTreeEqual(func.Hole)
+          h3 must beTreeEqual(func.Hole)
 
           repair must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMap(
-                func.Constant(J.str("0")),
-                func.ConcatMaps(
-                  func.MakeMap(
-                    func.Constant(J.str("0")),
-                    func.ReduceIndex(\/-(0))),
-                  func.MakeMap(
-                    func.Constant(J.str("1")),
-                    func.ReduceIndex(\/-(1))))),
-              func.MakeMap(
-                func.Constant(J.str("1")),
-                func.ReduceIndex(\/-(2)))))
+            func.StaticMapS(
+              "0" ->
+                func.StaticMapS(
+                  "0" ->
+                    func.ReduceIndex(\/-(0)),
+                  "1" ->
+                    func.ReduceIndex(\/-(1))),
+              "1" ->
+                func.ReduceIndex(\/-(2))))
 
           fm must beTreeEqual(
             func.Add(
               func.Add(
-                func.ProjectKey(
-                  func.ProjectKey(HoleF, func.Constant(J.str("0"))),
-                  func.Constant(J.str("0"))),
-                func.ProjectKey(
-                  func.ProjectKey(HoleF, func.Constant(J.str("0"))),
-                  func.Constant(J.str("1")))),
-              func.ProjectKey(HoleF, func.Constant(J.str("1")))))
+                func.ProjectKeyS(
+                  func.ProjectKeyS(func.Hole, "0"),
+                  "0"),
+                func.ProjectKeyS(
+                  func.ProjectKeyS(func.Hole, "0"),
+                  "1")),
+              func.ProjectKeyS(func.Hole, "1")))
       }
     }
 
@@ -222,12 +215,12 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                 MapFuncsCore.Constant[Fix, Hole](J.str("hey")))),
               _(MapFuncsCore.ConcatArrays(_, _)))),
             Nil,
-            List(ReduceFuncs.Count(HoleF[Fix])),
+            List(ReduceFuncs.Count(func.Hole)),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
           qsu.qsReduce(
             qsu.read(afile),
             Nil,
-            List(ReduceFuncs.Sum(HoleF[Fix])),
+            List(ReduceFuncs.Sum(func.Hole)),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
           _(MapFuncsCore.Add(_, _)))))
 
@@ -243,24 +236,22 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           // must_=== doesn't work
           h1 must beTreeEqual(
             func.ConcatArrays(
-              HoleF,
+              func.Hole,
               func.Constant(J.str("hey"))))
 
           h2 must beTreeEqual(func.Hole)
 
           repair must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMap(
-                func.Constant(J.str("0")),
-                func.ReduceIndex(\/-(0))),
-              func.MakeMap(
-                func.Constant(J.str("1")),
-                func.ReduceIndex(\/-(1)))))
+            func.StaticMapS(
+              "0" ->
+                func.ReduceIndex(\/-(0)),
+              "1" ->
+                func.ReduceIndex(\/-(1))))
 
           fm must beTreeEqual(
             func.Add(
-              func.ProjectKey(HoleF, func.Constant(J.str("0"))),
-              func.ProjectKey(HoleF, func.Constant(J.str("1")))))
+              func.ProjectKeyS(func.Hole, "0"),
+              func.ProjectKeyS(func.Hole, "1")))
       }
     }
 
@@ -277,10 +268,10 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         case Map(Read(_), fm) =>
           fm must beTreeEqual(
             func.Add(
-              HoleF[Fix],
+              func.Hole,
               func.Cond(
-                func.Eq(HoleF[Fix], func.Constant(J.str("foo"))),
-                HoleF[Fix],
+                func.Eq(func.Hole, func.Constant(J.str("foo"))),
+                func.Hole,
                 func.Undefined)))
       }
     }
@@ -290,14 +281,14 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         qsu.autojoin2((
           qsu.qsFilter(
             qsu.read(afile),
-            func.Eq(HoleF[Fix], func.Constant(J.str("foo")))),
+            func.Eq(func.Hole, func.Constant(J.str("foo")))),
           qsu.cint(42),
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
         case Map(QSFilter(_, _), fm) =>
           fm must beTreeEqual(
-            func.Add(HoleF[Fix], func.Constant(J.int(42))))
+            func.Add(func.Hole, func.Constant(J.int(42))))
       }
     }
 
@@ -311,14 +302,14 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         qsu.autojoin2((
           qsu.qsReduce(
             readAndThings,
-            List(HoleF[Fix].map(Access.value[J, Hole](_))),
-            List(ReduceFuncs.Count(HoleF[Fix])),
-            Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+            List(func.AccessHole),
+            List(ReduceFuncs.Count(func.Hole)),
+            func.ReduceIndex(\/-(0))),
           qsu.qsReduce(
             readAndThings,
-            List(HoleF[Fix].map(Access.value[J, Hole](_))),
-            List(ReduceFuncs.Sum(HoleF[Fix])),
-            Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+            List(func.AccessHole),
+            List(ReduceFuncs.Sum(func.Hole)),
+            func.ReduceIndex(\/-(0))),
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
@@ -331,24 +322,22 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           fm) =>
 
           // must_=== doesn't work
-          bucket must beTreeEqual(func.Negate(HoleF.map(Access.value[J, Hole](_))))
+          bucket must beTreeEqual(func.Negate(func.AccessHole))
 
-          h1 must beTreeEqual(func.Negate(HoleF[Fix]))
-          h2 must beTreeEqual(func.Negate(HoleF[Fix]))
+          h1 must beTreeEqual(func.Negate(func.Hole))
+          h2 must beTreeEqual(func.Negate(func.Hole))
 
           repair must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMap(
-                func.Constant(J.str("0")),
-                func.ReduceIndex(\/-(0))),
-              func.MakeMap(
-                func.Constant(J.str("1")),
-                func.ReduceIndex(\/-(1)))))
+            func.StaticMapS(
+              "0" ->
+                func.ReduceIndex(\/-(0)),
+              "1" ->
+                func.ReduceIndex(\/-(1))))
 
           fm must beTreeEqual(
             func.Add(
-              func.ProjectKey(HoleF, func.Constant(J.str("0"))),
-              func.ProjectKey(HoleF, func.Constant(J.str("1")))))
+              func.ProjectKeyS(func.Hole, "0"),
+              func.ProjectKeyS(func.Hole, "1")))
       }
     }
 
@@ -387,13 +376,13 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           qsu.qsReduce(
             qsu.read(afile),
             Nil,
-            List(ReduceFuncs.Sum(HoleF[Fix])),
-            ReduceIndexF[Fix](\/-(0))),
+            List(ReduceFuncs.Sum(func.Hole)),
+            func.ReduceIndex(\/-(0))),
           qsu.qsReduce(
             qsu.read(afile),
-            List(func.ProjectKey(AccessValueHoleF[Fix], func.Constant(J.str("state")))),
-            List(ReduceFuncs.Sum(HoleF[Fix])),
-            ReduceIndexF[Fix](\/-(0))),
+            List(func.ProjectKeyS(func.AccessHole, "state")),
+            List(ReduceFuncs.Sum(func.Hole)),
+            func.ReduceIndex(\/-(0))),
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
@@ -422,7 +411,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             MapFuncsCore.Subtract(LeftSide, RightSide)),
           fm) =>
 
-          fm must beTreeEqual(func.Add(HoleF, func.Constant(J.int(42))))
+          fm must beTreeEqual(func.Add(func.Hole, func.Constant(J.int(42))))
       }
     }
 
@@ -488,14 +477,15 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
     "coalesce an autojoin on a single leftshift on a shared source" in {
       val shiftedRead =
-        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, OnUndefined.Omit, func.RightTarget, Rotation.ShiftMap)
 
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((
           qsu.leftShift(
             shiftedRead,
-            HoleF[Fix],
+            func.Hole,
             ExcludeId,
+            OnUndefined.Omit,
             func.RightTarget,
             Rotation.ShiftArray),
           shiftedRead,
@@ -505,19 +495,20 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         case
           Map(
             LeftShift(
-              LeftShift(Read(`afile`), _, _, _, _),
+              LeftShift(Read(`afile`), _, _, _, _, _),
               struct,
               ExcludeId,
+              _,
               repair,
               _),
             fm) =>
 
-          struct must beTreeEqual(HoleF[Fix])
+          struct must beTreeEqual(func.Hole)
 
           repair must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMapS("0", func.RightTarget),
-              func.MakeMapS("1", func.AccessLeftTarget(Access.valueHole(_)))))
+            func.StaticMapS(
+              "0" -> func.RightTarget,
+              "1" -> func.AccessLeftTarget(Access.valueHole(_))))
 
           fm must beTreeEqual(
             func.Add(
@@ -528,15 +519,16 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
     "coalesce an autojoin on a single leftshift on a shared source (RTL)" in {
       val shiftedRead =
-        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, OnUndefined.Omit, func.RightTarget, Rotation.ShiftMap)
 
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((
           shiftedRead,
           qsu.leftShift(
             shiftedRead,
-            HoleF[Fix],
+            func.Hole,
             ExcludeId,
+            OnUndefined.Omit,
             func.RightTarget,
             Rotation.ShiftArray),
           _(MapFuncsCore.Add(_, _)))))
@@ -545,19 +537,20 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         case
           Map(
             LeftShift(
-              LeftShift(Read(`afile`), _, _, _, _),
+              LeftShift(Read(`afile`), _, _, _, _, _),
               struct,
               ExcludeId,
+              OnUndefined.Emit,
               repair,
               _),
             fm) =>
 
-          struct must beTreeEqual(HoleF[Fix])
+          struct must beTreeEqual(func.Hole)
 
           repair must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMapS("1", func.RightTarget),
-              func.MakeMapS("0", func.AccessLeftTarget(Access.valueHole(_)))))
+            func.StaticMapS(
+              "1" -> func.RightTarget,
+              "0" -> func.AccessLeftTarget(Access.valueHole(_))))
 
           fm must beTreeEqual(
             func.Add(
@@ -568,7 +561,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
     "inductively coalesce reduces on coalesced shifts" in {
       val shiftedRead =
-        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, OnUndefined.Omit, func.RightTarget, Rotation.ShiftMap)
 
       // count(a[*]) + sum(a)
       val qgraph = QSUGraph.fromTree[Fix](
@@ -576,17 +569,18 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           qsu.qsReduce(
             qsu.leftShift(
               shiftedRead,
-              HoleF[Fix],
+              func.Hole,
               ExcludeId,
+              OnUndefined.Omit,
               func.RightTarget,
               Rotation.ShiftArray),
             Nil,
-            List(ReduceFuncs.Count(HoleF[Fix])),
+            List(ReduceFuncs.Count(func.Hole)),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
           qsu.qsReduce(
             shiftedRead,
             Nil,
-            List(ReduceFuncs.Sum(HoleF[Fix])),
+            List(ReduceFuncs.Sum(func.Hole)),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
           _(MapFuncsCore.Add(_, _)))))
 
@@ -594,9 +588,10 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         case Map(
           QSReduce(
             LeftShift(
-              LeftShift(Read(`afile`), _, _, _, _),
+              LeftShift(Read(`afile`), _, _, _, _, _),
               struct,
               ExcludeId,
+              OnUndefined.Emit,
               repairInner,
               _),
             Nil,
@@ -604,31 +599,31 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             repairOuter),
           fm) =>
 
-        struct must beTreeEqual(HoleF[Fix])
+        struct must beTreeEqual(func.Hole)
 
         repairInner must beTreeEqual(
-          func.ConcatMaps(
-            func.MakeMapS("0", func.RightTarget),
-            func.MakeMapS("1", func.AccessLeftTarget(Access.valueHole(_)))))
+          func.StaticMapS(
+            "0" -> func.RightTarget,
+            "1" -> func.AccessLeftTarget(Access.valueHole(_))))
 
         h1 must beTreeEqual(func.ProjectKeyS(func.Hole, "0"))
         h2 must beTreeEqual(func.ProjectKeyS(func.Hole, "1"))
 
         repairOuter must beTreeEqual(
-          func.ConcatMaps(
-            func.MakeMapS("0", Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
-            func.MakeMapS("1", Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(1))))))
+          func.StaticMapS(
+            "0" -> func.ReduceIndex(\/-(0)),
+            "1" -> func.ReduceIndex(\/-(1))))
 
         fm must beTreeEqual(
           func.Add(
-            func.ProjectKeyS(HoleF, "0"),
-            func.ProjectKeyS(HoleF, "1")))
+            func.ProjectKeyS(func.Hole, "0"),
+            func.ProjectKeyS(func.Hole, "1")))
       }
     }
 
     "inductively coalesce reduces on coalesced shifts" in {
       val shiftedRead =
-        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, OnUndefined.Omit, func.RightTarget, Rotation.ShiftMap)
 
       // count(a[*]) + sum(a)
       val qgraph = QSUGraph.fromTree[Fix](
@@ -636,27 +631,29 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           qsu.qsReduce(
             qsu.leftShift(
               shiftedRead,
-              HoleF[Fix],
+              func.Hole,
               ExcludeId,
+              OnUndefined.Omit,
               func.RightTarget,
               Rotation.ShiftArray),
             Nil,
-            List(ReduceFuncs.Count(HoleF[Fix])),
-            Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+            List(ReduceFuncs.Count(func.Hole)),
+            func.ReduceIndex(\/-(0))),
           qsu.qsReduce(
             shiftedRead,
             Nil,
-            List(ReduceFuncs.Sum(HoleF[Fix])),
-            Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
+            List(ReduceFuncs.Sum(func.Hole)),
+            func.ReduceIndex(\/-(0))),
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
         case Map(
           QSReduce(
             LeftShift(
-              LeftShift(Read(`afile`), _, _, _, _),
+              LeftShift(Read(`afile`), _, _, _, _, _),
               struct,
               ExcludeId,
+              OnUndefined.Emit,
               repairInner,
               _),
             Nil,
@@ -664,31 +661,31 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             repairOuter),
           fm) =>
 
-        struct must beTreeEqual(HoleF[Fix])
+        struct must beTreeEqual(func.Hole)
 
         repairInner must beTreeEqual(
-          func.ConcatMaps(
-            func.MakeMapS("0", func.RightTarget),
-            func.MakeMapS("1", func.AccessLeftTarget(Access.valueHole(_)))))
+          func.StaticMapS(
+            "0" -> func.RightTarget,
+            "1" -> func.AccessLeftTarget(Access.valueHole(_))))
 
         h1 must beTreeEqual(func.ProjectKeyS(func.Hole, "0"))
         h2 must beTreeEqual(func.ProjectKeyS(func.Hole, "1"))
 
         repairOuter must beTreeEqual(
-          func.ConcatMaps(
-            func.MakeMapS("0", Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
-            func.MakeMapS("1", Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(1))))))
+          func.StaticMapS(
+            "0" -> func.ReduceIndex(\/-(0)),
+            "1" -> func.ReduceIndex(\/-(1))))
 
         fm must beTreeEqual(
           func.Add(
-            func.ProjectKeyS(HoleF, "0"),
-            func.ProjectKeyS(HoleF, "1")))
+            func.ProjectKeyS(func.Hole, "0"),
+            func.ProjectKeyS(func.Hole, "1")))
       }
     }
 
     "coalesce an autojoin on two leftshifts on a shared source" in {
       val shiftedRead =
-        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, OnUndefined.Omit, func.RightTarget, Rotation.ShiftMap)
 
       // a[*][*] + a
       val qgraph = QSUGraph.fromTree[Fix](
@@ -696,12 +693,14 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           qsu.leftShift(
             qsu.leftShift(
               shiftedRead,
-              HoleF[Fix],
+              func.Hole,
               IncludeId,
+              OnUndefined.Omit,
               func.RightTarget,
               Rotation.ShiftArray),
-            HoleF[Fix],
+            func.Hole,
             ExcludeId,
+            OnUndefined.Omit,
             func.RightTarget,
             Rotation.ShiftArray),
           shiftedRead,
@@ -712,13 +711,15 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           Map(
             LeftShift(
               LeftShift(
-                LeftShift(Read(`afile`), _, _, _, _),
+                LeftShift(Read(`afile`), _, _, _, _, _),
                 structInner,
                 IncludeId,
+                OnUndefined.Emit,
                 repairInner,
                 _),
               structOuter,
               ExcludeId,
+              OnUndefined.Emit,
               repairOuter,
               _),
             fm) =>
@@ -726,23 +727,21 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           structInner must beTreeEqual(func.Hole)
 
           repairInner must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMapS("original", func.AccessLeftTarget(Access.valueHole(_))),
-              func.MakeMapS("results", func.RightTarget)))
+            func.StaticMapS(
+              "original" -> func.AccessLeftTarget(Access.valueHole(_)),
+              "results" -> func.RightTarget))
 
           structOuter must beTreeEqual(
             func.ProjectKeyS(func.Hole, "results"))
 
           repairOuter must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMapS(
-                "0",
-                func.RightTarget),
-              func.MakeMapS(
-                "1",
+            func.StaticMapS(
+              "0" ->
+                func.RightTarget,
+              "1" ->
                 func.ProjectKeyS(
                   func.AccessLeftTarget(Access.valueHole(_)),
-                  "original"))))
+                  "original")))
 
           fm must beTreeEqual(
             func.Add(
@@ -753,7 +752,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
     "coalesce an autojoin on three leftshifts on a shared source" in {
       val shiftedRead =
-        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, OnUndefined.Omit, func.RightTarget, Rotation.ShiftMap)
 
       // a[*][*][*] + a
       val qgraph = QSUGraph.fromTree[Fix](
@@ -762,16 +761,19 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             qsu.leftShift(
               qsu.leftShift(
                 shiftedRead,
-                HoleF[Fix],
+                func.Hole,
                 IncludeId,
+                OnUndefined.Omit,
                 func.RightTarget,
                 Rotation.ShiftArray),
-              HoleF[Fix],
+              func.Hole,
               ExcludeId,
+              OnUndefined.Omit,
               func.RightTarget,
               Rotation.ShiftMap),
-            HoleF[Fix],
+            func.Hole,
             ExcludeId,
+            OnUndefined.Omit,
             func.RightTarget,
             Rotation.ShiftArray),
           shiftedRead,
@@ -783,17 +785,20 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             LeftShift(
               LeftShift(
                 LeftShift(
-                  LeftShift(Read(`afile`), _, _, _, _),
+                  LeftShift(Read(`afile`), _, _, _, _, _),
                   structInnerInner,
                   IncludeId,
+                  OnUndefined.Emit,
                   repairInnerInner,
                   Rotation.ShiftArray),
                 structInner,
                 ExcludeId,
+                OnUndefined.Emit,
                 repairInner,
                 Rotation.ShiftMap),
               structOuter,
               ExcludeId,
+              OnUndefined.Emit,
               repairOuter,
               Rotation.ShiftArray),
             fm) =>
@@ -801,31 +806,28 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           structInnerInner must beTreeEqual(func.Hole)
 
           repairInnerInner must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMapS("original", func.AccessLeftTarget(Access.valueHole(_))),
-              func.MakeMapS("results", func.RightTarget)))
+            func.StaticMapS(
+              "original" -> func.AccessLeftTarget(Access.valueHole(_)),
+              "results" -> func.RightTarget))
 
           structInner must beTreeEqual(func.ProjectKeyS(func.Hole, "results"))
 
           repairInner must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMapS(
-                "original",
-                func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original")),
-              func.MakeMapS("results", func.RightTarget)))
+            func.StaticMapS(
+              "original" ->
+                func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),
+              "results" -> func.RightTarget))
 
           structOuter must beTreeEqual(func.ProjectKeyS(func.Hole, "results"))
 
           repairOuter must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMapS(
-                "0",
-                func.RightTarget),
-              func.MakeMapS(
-                "1",
+            func.StaticMapS(
+              "0" ->
+                func.RightTarget,
+              "1" ->
                 func.ProjectKeyS(
                   func.AccessLeftTarget(Access.valueHole(_)),
-                  "original"))))
+                  "original")))
 
           fm must beTreeEqual(
             func.Add(
@@ -837,7 +839,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
     // c[*] / d[*][*]
     "coalesce uneven shifts" in {
       val shiftedRead =
-        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, OnUndefined.Omit, func.RightTarget, Rotation.ShiftMap)
 
       val cdivd =
         qsu.autojoin2((
@@ -845,6 +847,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             shiftedRead,
             func.ProjectKeyS(func.Hole, "c"),
             ExcludeId,
+            OnUndefined.Omit,
             func.RightTarget,
             Rotation.ShiftArray),
           qsu.leftShift(
@@ -852,10 +855,12 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               shiftedRead,
               func.ProjectKeyS(func.Hole, "d"),
               ExcludeId,
+              OnUndefined.Omit,
               func.RightTarget,
               Rotation.ShiftArray),
             func.Hole,
             ExcludeId,
+            OnUndefined.Omit,
             func.RightTarget,
             Rotation.ShiftArray),
           _(MapFuncsCore.Divide(_, _))))
@@ -868,13 +873,15 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             Map(
               LeftShift(
                 MultiLeftShift(
-                  LeftShift(Read(_), _, _, _, _),
+                  LeftShift(Read(_), _, _, _, _, _),
                   List(
                     (cstruct, _, _),
                     (dstruct, _, _)),
+                  OnUndefined.Emit,
                   innerRepair),
                 outerStruct,
                 _,
+                OnUndefined.Emit,
                 outerRepair,
                 _),
               innerFM),
@@ -884,38 +891,32 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           dstruct must beTreeEqual(func.ProjectKeyS(func.Hole, "d"))
 
           innerRepair must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMapS(
-                "left",
-                func.MakeMapS("0", Free.pure(0.right[QAccess[Hole]]))),
-              func.MakeMapS(
-                "right",
-                Free.pure(1.right[QAccess[Hole]]))))
+            func.StaticMapS(
+              "left" ->
+                func.MakeMapS("0", Free.pure[MapFunc, QAccess[Hole] \/ Int](0.right)),
+              "right" ->
+                Free.pure[MapFunc, QAccess[Hole] \/ Int](1.right)))
 
           outerStruct must beTreeEqual(
             func.ProjectKeyS(func.Hole, "right"))
 
           outerRepair must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMapS(
-                "left",
-                func.ProjectKeyS(func.AccessLeftTarget(Access.value(_)), "left")),
-              func.MakeMapS(
-                "right",
-                func.MakeMapS("1", func.RightTarget))))
+            func.StaticMapS(
+              "left" ->
+                func.ProjectKeyS(func.AccessLeftTarget(Access.value(_)), "left"),
+              "right" ->
+                func.MakeMapS("1", func.RightTarget)))
 
           innerFM must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMapS(
-                "0",
+            func.StaticMapS(
+              "0" ->
                 func.ProjectKeyS(
                   func.ProjectKeyS(func.Hole, "left"),
-                  "0")),
-              func.MakeMapS(
-                "1",
+                  "0"),
+              "1" ->
                 func.ProjectKeyS(
                   func.ProjectKeyS(func.Hole, "right"),
-                  "1"))))
+                  "1")))
 
           fm must beTreeEqual(
             func.Divide(
@@ -927,7 +928,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
     // a[*][*][*] + b - c[*] / d[*][*]
     "coalesce a thing that looks a lot like the search card" in {
       val shiftedRead =
-        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, OnUndefined.Omit, func.RightTarget, Rotation.ShiftMap)
 
       // a[*][*][*] + b
       val aplusb =
@@ -938,14 +939,17 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                 shiftedRead,
                 func.ProjectKeyS(func.Hole, "a"),
                 ExcludeId,
+                OnUndefined.Omit,
                 func.RightTarget,
                 Rotation.ShiftArray),
               func.Hole,
               ExcludeId,
+              OnUndefined.Omit,
               func.RightTarget,
               Rotation.ShiftArray),
             func.Hole,
             ExcludeId,
+            OnUndefined.Omit,
             func.RightTarget,
             Rotation.ShiftArray),
           qsu.map((shiftedRead, func.ProjectKeyS(func.Hole, "b"))),
@@ -958,6 +962,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             shiftedRead,
             func.ProjectKeyS(func.Hole, "c"),
             ExcludeId,
+            OnUndefined.Omit,
             func.RightTarget,
             Rotation.ShiftArray),
           qsu.leftShift(
@@ -965,10 +970,12 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               shiftedRead,
               func.ProjectKeyS(func.Hole, "d"),
               ExcludeId,
+              OnUndefined.Omit,
               func.RightTarget,
               Rotation.ShiftArray),
             func.Hole,
             ExcludeId,
+            OnUndefined.Omit,
             func.RightTarget,
             Rotation.ShiftArray),
           _(MapFuncsCore.Divide(_, _))))
@@ -983,18 +990,21 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               LeftShift(
                 MultiLeftShift(
                   MultiLeftShift(
-                    LeftShift(Read(`afile`), _, _, _, _),
+                    LeftShift(Read(`afile`), _, _, _, _, _),
                     List(
                       (innerastruct, _, _),
                       (innercstruct, _, _),
                       (innerdstruct, _, _)),
+                    OnUndefined.Emit,
                     innerMultiRepair),
                   List(
                     (outerastruct, _, _),
                     (outerdstruct, _, _)),
+                  OnUndefined.Emit,
                   outerMultiRepair),
                 singleStruct,
                 _,
+                OnUndefined.Emit,
                 singleRepair,
                 _),
               innerFM),
@@ -1005,25 +1015,19 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         innerdstruct must beTreeEqual(func.ProjectKeyS(func.Hole, "d"))
 
         innerMultiRepair must beTreeEqual(
-          func.ConcatMaps(
-            func.MakeMapS(
-              "left",
-              func.ConcatMaps(
-                func.MakeMapS(
-                  "original",
-                  func.AccessHole.map(_.left[Int])),
-                func.MakeMapS(
-                  "results",
-                  Free.pure(0.right[QAccess[Hole]])))),
-            func.MakeMapS(
-              "right",
-              func.ConcatMaps(
-                func.MakeMapS(
-                  "left",
-                  func.MakeMapS("0", Free.pure(1.right[QAccess[Hole]]))),
-                func.MakeMapS(
-                  "right",
-                  Free.pure(2.right[QAccess[Hole]]))))))
+          func.StaticMapS(
+            "left" ->
+              func.StaticMapS(
+                "original" ->
+                  func.AccessHole.map(_.left[Int]),
+                "results" ->
+                  Free.pure[MapFunc, QAccess[Hole] \/ Int](0.right)),
+            "right" ->
+              func.StaticMapS(
+                "left" ->
+                  func.MakeMapS("0", Free.pure(1.right[QAccess[Hole]])),
+                "right" ->
+                  Free.pure[MapFunc, QAccess[Hole] \/ Int](2.right))))
 
         outerastruct must beTreeEqual(
           func.ProjectKeyS(
@@ -1034,66 +1038,55 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           func.ProjectKeyS(func.ProjectKeyS(func.Hole, "right"), "right"))
 
         outerMultiRepair must beTreeEqual(
-          func.ConcatMaps(
-            func.MakeMapS(
-              "left",
-              func.ConcatMaps(
-                func.MakeMapS(
-                  "original",
+          func.StaticMapS(
+            "left" ->
+              func.StaticMapS(
+                "original" ->
                   func.ProjectKeyS(
                     func.ProjectKeyS(func.AccessHole.map(_.left[Int]), "left"),
-                    "original")),
-                func.MakeMapS(
-                  "results",
-                  Free.pure(0.right[QAccess[Hole]])))),
-            func.MakeMapS(
-              "right",
+                    "original"),
+                "results" ->
+                  Free.pure[MapFunc, QAccess[Hole] \/ Int](0.right)),
+            "right" ->
               func.MakeMapS(
                 "1",
-                func.ConcatMaps(
-                  func.MakeMapS(
-                    "left",
+                func.StaticMapS(
+                  "left" ->
                     func.ProjectKeyS(
                       func.ProjectKeyS(func.AccessHole.map(_.left[Int]), "right"),
-                      "left")),
-                  func.MakeMapS(
-                    "right",
-                    func.MakeMapS("1", Free.pure(1.right[QAccess[Hole]]))))))))
+                      "left"),
+                  "right" ->
+                    func.MakeMapS("1", Free.pure[MapFunc, QAccess[Hole] \/ Int](1.right))))))
 
         singleStruct must beTreeEqual(
           func.ProjectKeyS(func.ProjectKeyS(func.Hole, "left"), "results"))
 
         singleRepair must beTreeEqual(
-          func.ConcatMaps(
-            func.MakeMapS(
-              "left",
+          func.StaticMapS(
+            ("left",
               func.MakeMapS(
                 "0",
-                func.ConcatMaps(
-                  func.MakeMapS("0", func.RightTarget),
-                  func.MakeMapS(
-                    "1",
+                func.StaticMapS(
+                  "0" -> func.RightTarget,
+                  "1" ->
                     func.ProjectKeyS(
                       func.ProjectKeyS(
                         func.AccessLeftTarget(Access.value(_)),
                         "left"),
-                      "original"))))),
-            func.MakeMapS(
-              "right",
-              func.ProjectKeyS(func.AccessLeftTarget(Access.value(_)), "right"))))
+                      "original")))),
+            "right" ->
+              func.ProjectKeyS(func.AccessLeftTarget(Access.value(_)), "right")))
 
         innerFM must beTreeEqual(
-          func.ConcatMaps(
-            func.MakeMapS(
-              "0",
+          func.StaticMapS(
+            "0" ->
               func.ProjectKeyS(
                 func.ProjectKeyS(func.Hole, "left"),
-                "0")),
-            func.MakeMapS(
-              "1",
+                "0"),
+            "1" ->
               func.ProjectKeyS(
                 func.ProjectKeyS(func.Hole, "right"),
-                "1"))))
+                "1")))
 
         fm must beTreeEqual(
           func.Subtract(
@@ -1104,38 +1097,34 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                 "b")),
             func.Divide(
               func.ProjectKeyS(
-                func.ConcatMaps(
-                  func.MakeMapS(
-                    "0",
+                func.StaticMapS(
+                  "0" ->
                     func.ProjectKeyS(
                       func.ProjectKeyS(
                         func.ProjectKeyS(func.Hole, "1"),
                         "left"),
-                      "0")),
-                  func.MakeMapS(
-                    "1",
+                      "0"),
+                  "1" ->
                     func.ProjectKeyS(
                       func.ProjectKeyS(
                         func.ProjectKeyS(func.Hole, "1"),
                         "right"),
-                      "1"))),
+                      "1")),
                 "0"),
               func.ProjectKeyS(
-                func.ConcatMaps(
-                  func.MakeMapS(
-                    "0",
+                func.StaticMapS(
+                  "0" ->
                     func.ProjectKeyS(
                       func.ProjectKeyS(
                         func.ProjectKeyS(func.Hole, "1"),
                         "left"),
-                      "0")),
-                  func.MakeMapS(
-                    "1",
+                      "0"),
+                  "1" ->
                     func.ProjectKeyS(
                       func.ProjectKeyS(
                         func.ProjectKeyS(func.Hole, "1"),
                         "right"),
-                      "1"))),
+                      "1")),
                 "1"))))
       }
     }
@@ -1143,7 +1132,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
     // [a, b[*][*]]]
     "coalesce with proper struct a contextual shift autojoin" in {
       val shiftedRead =
-        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, OnUndefined.Omit, func.RightTarget, Rotation.ShiftMap)
 
       val qgraph =
         QSUGraph.fromTree[Fix](
@@ -1168,10 +1157,12 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                       func.Undefined)),
                   func.Hole,
                   ExcludeId,
+                  OnUndefined.Omit,
                   func.RightTarget,
                   Rotation.ShiftArray),
                 func.Hole,
                 ExcludeId,
+                OnUndefined.Omit,
                 func.RightTarget,
                 Rotation.ShiftArray),
               func.MakeArray(func.Hole)),
@@ -1182,13 +1173,15 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           Map(
             LeftShift(
               LeftShift(
-                LeftShift(Read(_), _, _, _, _),
+                LeftShift(Read(_), _, _, _, _, _),
                 innerStruct,
                 _,
+                OnUndefined.Emit,
                 innerRepair,
                 _),
               outerStruct,
               _,
+              OnUndefined.Emit,
               outerRepair,
               _),
             fm) =>
@@ -1201,26 +1194,22 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               func.Undefined))
 
           innerRepair must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMapS(
-                "original",
-                func.AccessLeftTarget(Access.value(_))),
-              func.MakeMapS(
-                "results",
-                func.RightTarget)))
+            func.StaticMapS(
+              "original" ->
+                func.AccessLeftTarget(Access.value(_)),
+              "results" ->
+                func.RightTarget))
 
           outerStruct must beTreeEqual(func.ProjectKeyS(func.Hole, "results"))
 
           outerRepair must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMapS(
-                "1",
-                func.RightTarget),
-              func.MakeMapS(
-                "0",
+            func.StaticMapS(
+              "1" ->
+                func.RightTarget,
+              "0" ->
                 func.ProjectKeyS(
                   func.AccessLeftTarget(Access.value(_)),
-                  "original"))))
+                  "original")))
 
           fm must beTreeEqual(
             func.ConcatArrays(
@@ -1248,6 +1237,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           qsu0,
           func.Hole,
           ExcludeId,
+          OnUndefined.Omit,
           func.RightTarget,
           Rotation.ShiftMap)
 
@@ -1259,6 +1249,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           qsu9,
           func.Hole,
           ExcludeId,
+          OnUndefined.Omit,
           func.RightTarget,
           Rotation.FlattenArray)
 
@@ -1281,6 +1272,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           qsu12,
           func.Hole,
           ExcludeId,
+          OnUndefined.Omit,
           func.RightTarget,
           Rotation.FlattenArray)
 
@@ -1303,13 +1295,15 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           Map(
             LeftShift(
               LeftShift(
-                LeftShift(Read(_), _, _, _, _),
+                LeftShift(Read(_), _, _, _, _, _),
                 innerStruct,
                 _,
+                OnUndefined.Emit,
                 innerRepair,
                 _),
               outerStruct,
               _,
+              OnUndefined.Emit,
               outerRepair,
               _),
             fm) => ok
@@ -1319,7 +1313,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
     // a + b[*].c[*]
     "coalesce uneven shifts with an intervening map" in {
       val shiftedRead =
-        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, func.RightTarget, Rotation.ShiftMap)
+        qsu.leftShift(qsu.read(afile), func.Hole, ExcludeId, OnUndefined.Omit, func.RightTarget, Rotation.ShiftMap)
 
       val qgraph =
         QSUGraph.fromTree[Fix](
@@ -1331,11 +1325,13 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                   qsu.map(shiftedRead, func.ProjectKeyS(func.Hole, "b")),
                   func.Hole,
                   ExcludeId,
+                  OnUndefined.Omit,
                   func.RightTarget,
                   Rotation.FlattenArray),
                 func.ProjectKeyS(func.Hole, "c")),
               func.Hole,
               ExcludeId,
+              OnUndefined.Omit,
               func.RightTarget,
               Rotation.FlattenArray),
             _(MapFuncsCore.Add(_, _)))))
@@ -1345,12 +1341,14 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           Map(
             LeftShift(
               LeftShift(
-                LeftShift(Read(_), _, _, _, _),
+                LeftShift(Read(_), _, _, _, _, _),
                 innerStruct,
+                _,
                 _,
                 innerRepair,
                 _),
               outerStruct,
+              _,
               _,
               outerRepair,
               _),
@@ -1359,25 +1357,21 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           innerStruct must beTreeEqual(func.ProjectKeyS(func.Hole, "b"))
 
           innerRepair must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMapS(
-                "1",
-                func.RightTarget),
-              func.MakeMapS(
-                "0",
-                func.AccessLeftTarget(Access.valueHole(_)))))
+            func.StaticMapS(
+              "1" ->
+                func.RightTarget,
+              "0" ->
+                func.AccessLeftTarget(Access.valueHole(_))))
 
           outerStruct must beTreeEqual(
             func.ProjectKeyS(func.ProjectKeyS(func.Hole, "1"), "c"))
 
           outerRepair must beTreeEqual(
-            func.ConcatMaps(
-              func.MakeMapS(
-                "1",
-                func.RightTarget),
-              func.MakeMapS(
-                "0",
-                func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "0"))))
+            func.StaticMapS(
+              "1" ->
+                func.RightTarget,
+              "0" ->
+                func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "0")))
 
           fm must beTreeEqual(
             func.Add(
@@ -1386,6 +1380,76 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                 "a"),
               func.ProjectKeyS(func.Hole, "1")))
       }
+    }
+
+    // b[*] or b[*][*]
+    "correctly coalesce uneven shifts of the same source" in {
+      val shiftedRead =
+        qsu.tread(afile)
+
+      val guardedRead =
+        qsu.autojoin3((
+          shiftedRead,
+          shiftedRead,
+          qsu.undefined(),
+          _(MapFuncsCore.Guard(_, Type.AnyObject, _, _))))
+
+      val projectB =
+        qsu.autojoin2((
+          guardedRead,
+          qsu.cstr("b"),
+          _(MapFuncsCore.ProjectKey(_, _))))
+
+      val innerShift =
+        qsu.transpose(
+          qsu.autojoin3((
+            projectB,
+            projectB,
+            qsu.undefined(),
+            _(MapFuncsCore.Guard(_, Type.FlexArr(0, None, Type.FlexArr(0, None, Type.Bool)), _, _)))),
+          Retain.Values,
+          Rotation.FlattenArray)
+
+      val qgraph =
+        QSUGraph.fromTree[Fix](
+          qsu.map(
+            qsu.qsFilter(
+              qsu._autojoin2((
+                guardedRead,
+                qsu.autojoin2((
+                  qsu.transpose(
+                    qsu.autojoin3((
+                      projectB,
+                      projectB,
+                      qsu.undefined(),
+                      _(MapFuncsCore.Guard(_, Type.FlexArr(0, None, Type.Bool), _, _)))),
+                    Retain.Values,
+                    Rotation.FlattenArray),
+                  qsu.transpose(
+                    qsu.autojoin3((
+                      innerShift,
+                      innerShift,
+                      qsu.undefined(),
+                      _(MapFuncsCore.Guard(_, Type.FlexArr(0, None, Type.Bool), _, _)))),
+                    Retain.Values,
+                    Rotation.FlattenArray),
+                  _(MapFuncsCore.Or(_, _)))),
+                func.StaticMapS(
+                  "filter_source" -> func.LeftSide,
+                  "filter_predicate" -> func.RightSide))),
+              func.ProjectKeyS(func.Hole, "filter_predicate")),
+            func.ProjectKeyS(func.Hole, "filter_source")))
+
+      val leftShiftCount =
+        runOn(qgraph).foldMapUp {
+          case LeftShift(_, _, _, _, _, _) => 1
+          case MultiLeftShift(_, ss, _, _) => ss.length
+          case _                           => 0
+        }
+
+      // TODO: Should really be 3, but another bug is duplicating the inner
+      //       shift common to both sides of the `Or`
+      leftShiftCount must_= 4
     }
   }
 

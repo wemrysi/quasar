@@ -229,7 +229,7 @@ sealed abstract class OutlineInstances {
         case Map(inShape, fm) =>
           outlineF(fm)(κ(inShape))
 
-        case LeftShift(inShape, _, idStatus, shiftType, repair) =>
+        case LeftShift(inShape, _, idStatus, _, _, repair) =>
           outlineF(repair) {
             case LeftSide => inShape
             case RightSide => idStatus match {

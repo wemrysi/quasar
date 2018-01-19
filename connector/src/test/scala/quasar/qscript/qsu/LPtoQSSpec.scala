@@ -24,7 +24,7 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.qscript.construction
-import quasar.qscript.{ExcludeId, HoleF, ReduceFuncs, ReduceIndex, RightSideF, ShiftType}
+import quasar.qscript.{ExcludeId, HoleF, OnUndefined, ReduceFuncs, ReduceIndex, RightSideF, ShiftType}
 import quasar.sql.CompilerHelpers
 import quasar.std.{AggLib, IdentityLib}
 import slamdata.Predef._
@@ -71,6 +71,7 @@ object LPtoQSSpec extends Qspec with CompilerHelpers with QSUTTypes[Fix] {
         HoleF[Fix],
         ExcludeId,
         ShiftType.Map,
+        OnUndefined.Omit,
         RightSideF[Fix])
 
       lp must compileTo(expected)
@@ -89,6 +90,7 @@ object LPtoQSSpec extends Qspec with CompilerHelpers with QSUTTypes[Fix] {
           HoleF[Fix],
           ExcludeId,
           ShiftType.Map,
+          OnUndefined.Omit,
           RightSideF[Fix]),
         Nil,
         List(ReduceFuncs.Count(HoleF[Fix])),

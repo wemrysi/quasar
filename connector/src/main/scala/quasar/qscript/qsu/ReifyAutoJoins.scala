@@ -90,9 +90,9 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
             prov.autojoinKeys(ldims, cdims)
 
           def lcCombiner: JoinFunc =
-            func.ConcatMaps(
-              func.MakeMap(StrLit(lName), LeftSideF),
-              func.MakeMap(StrLit(cName), RightSideF))
+            func.StaticMapS(
+              lName -> LeftSideF,
+              cName -> RightSideF)
 
           def lcJoin: QSU[Symbol] =
             qsu.qsAutoJoin(l, c, lcKeys, lcCombiner)

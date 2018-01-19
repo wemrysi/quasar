@@ -1,5 +1,5 @@
 language: scala
-scala: 2.11.8
+scala: 2.12.4 # this needs to be in sync with Scala version used in .appveyor.yml
 jdk: oraclejdk8
 dist: trusty
 sudo: required
@@ -27,8 +27,8 @@ env:
     - CONNECTOR=mongodb_3_2
     - CONNECTOR=mongodb_3_4
     - CONNECTOR=mongodb_read_only
-    - CONNECTOR=spark_local_test
-    - CONNECTOR=spark_hdfs
+    # - CONNECTOR=spark_local_test # no spark for 2.12
+    # - CONNECTOR=spark_hdfs # no spark for 2.12
   global:
     - COURSIER_PROGRESS=0
 
@@ -76,6 +76,7 @@ script:
     esac
 
   # workaround for the fact that travis caching isn't working. when it starts working again, remove this
+  - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION foundation/test:compile
   - travis_wait 40 ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
 
   # then run the tests (note that this re-runs some tests; we can get rid of that once we have polyrepo)
@@ -120,17 +121,19 @@ jobs:
       script:
         - set -e
         - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc web/assembly'
+
         - scripts/testJar
 
         # release to sonatype
         - scripts/quasarPublishAndTag
 
         # recreate sparkcore.jar, which is just going to hang out
-        - |-
-          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-            'set every assemblyJarName in assembly := "sparkcore.jar"' \
-            'set every sparkDependencyProvided := true' \
-            sparkcore/assembly
+        # sparkcore currently disabled
+        # - |-
+        #   ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
+        #     'set every assemblyJarName in assembly := "sparkcore.jar"' \
+        #     'set every sparkDependencyProvided := true' \
+        #     sparkcore/assembly
 
         # release to github
         - scripts/publishJar

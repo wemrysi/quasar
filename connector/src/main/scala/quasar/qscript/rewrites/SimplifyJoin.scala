@@ -116,9 +116,9 @@ object SimplifyJoin {
               applyToBranch(tj.rBranch),
               keys.map(k => (k.left, k.right)),
               tj.f,
-              func.ConcatMaps(
-                func.MakeMapS(LeftK, func.LeftSide),
-                func.MakeMapS(RightK, func.RightSide))))).embed)(
+              func.StaticMapS(
+                LeftK -> func.LeftSide,
+                RightK -> func.RightSide)))).embed)(
             (ej, filt) => GtoH(QC.inj(Filter(ej, mergeSides(filt)))).embed),
             mergeSides(tj.combine))))
         }
