@@ -969,6 +969,40 @@ An example request body:
 
 Returns `200 OK` if the change was performed successfully otherwise returns a `400` with a message body explaining what went wrong.
 
+### GET /timings
+
+Dumps timing information collected from a few of the last queries; all units are milliseconds
+
+An example of the data returned:
+```json
+{
+    "start": 0,
+    "size": 4500,
+    "children": {
+      "parse SQL": {
+        "start": 0,
+        "size": 2,
+        "children": {}
+      },
+      "resolve imports": {
+        "start": 2,
+        "size": 1,
+        "children": {}
+      },
+      "plan": {
+        "start": 3,
+        "size": 4,
+        "children": {}
+      },
+      "evaluate": {
+        "start": 7,
+        "size": 500,
+        "children": {}
+      }
+    }
+}
+```
+
 ## Error Responses
 
 Error responses from the REST api have the following form
