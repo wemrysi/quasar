@@ -678,7 +678,7 @@ lazy val niflheim = project.setup
   .withWarnings
   .settings(
     libraryDependencies ++= Seq(
-      "com.typesafe.akka"  %% "akka-actor" % "2.4.12",
+      "com.typesafe.akka"  %% "akka-actor" % "2.5.1",
       "org.typelevel"      %% "spire"      % "0.14.1", // TODO use spireVersion from project/Dependencies.scala
       "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
   .settings(headerLicenseSettings)
