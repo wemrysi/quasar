@@ -49,6 +49,7 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
       : Result =
     (prg, arg1) match {
       case (_, _) if isTemporal(arg1.dataType) => pending
+      case (ExtractFunc(MapFuncsCore.ToTimestamp(_)), _) => pending
       case (ExtractFunc(MapFuncsCore.OffsetDate(_)), _) => pending
       case (ExtractFunc(MapFuncsCore.OffsetDateTime(_)), _) => pending
       case (ExtractFunc(MapFuncsCore.OffsetTime(_)), _) => pending

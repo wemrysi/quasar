@@ -821,7 +821,10 @@ abstract class StdLibSpec extends Qspec {
 
       "StartOfDay" >> {
         "datetime" >> prop { (x: JLocalDateTime) =>
-          unary(StartOfDay(_).embed, Data.LocalDateTime(x), Data.LocalDateTime(truncDateTime(TemporalPart.Day, x)))
+          unary(
+            StartOfDay(_).embed,
+            Data.LocalDateTime(x),
+            Data.LocalDateTime(truncDateTime(TemporalPart.Day, x)))
         }
 
         "date" >> prop { (x: JLocalDate) =>
@@ -829,6 +832,29 @@ abstract class StdLibSpec extends Qspec {
             StartOfDay(_).embed,
             Data.LocalDate(x),
             Data.LocalDateTime(JLocalDateTime.of(x, JLocalTime.MIN)))
+        }
+      }
+
+      "ToTimestamp" >> {
+        "epoch time" >> {
+          unary(
+            ToTimestamp(_).embed,
+            Data.Int(0),
+            Data.OffsetDateTime(JOffsetDateTime.parse("1970-01-01T00:00:00Z")))
+        }
+
+        "pre epoch" >> {
+          unary(
+            ToTimestamp(_).embed,
+            Data.Int(BigInt(-1234567890011L)),
+            Data.OffsetDateTime(JOffsetDateTime.parse("1930-11-18T00:28:29.989Z")))
+        }
+
+        "post epoch" >> {
+          unary(
+            ToTimestamp(_).embed,
+            Data.Int(BigInt(1234567890011L)),
+            Data.OffsetDateTime(JOffsetDateTime.parse("2009-02-13T23:31:30.011Z")))
         }
       }
 
