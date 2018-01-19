@@ -122,8 +122,7 @@ jobs:
         - set -e
         - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc web/assembly'
 
-        # TODO restore this in a way that actually, you know, works
-        # - scripts/testJar
+        - scripts/testJar
 
         # release to sonatype
         - scripts/quasarPublishAndTag
