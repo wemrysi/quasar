@@ -111,9 +111,8 @@ object MapFuncCore {
   }
 
   object StaticMap {
-    def apply[T[_[_]]: BirecursiveT, A](elems: List[(T[EJson], FreeMapA[T, A])]): FreeMapA[T, A] = {
-      construction.Func[T].StaticMap(elems: _*)
-    }
+    def apply[T[_[_]]: BirecursiveT, A](elems: List[(T[EJson], FreeMapA[T, A])]): FreeMapA[T, A] =
+      StaticMapSuffix(None, elems)
 
     def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A]):
         Option[List[(T[EJson], FreeMapA[T, A])]] =
@@ -123,6 +122,33 @@ object MapFuncCore {
   }
 
   object StaticMapSuffix {
+    def apply[T[_[_]]: BirecursiveT, A](
+        dyn: Option[FreeMapA[T, A]],
+        static: List[(T[EJson], FreeMapA[T, A])])
+        : FreeMapA[T, A] = {
+
+      val func = construction.Func[T]
+
+      def makeMap[F[_]: Foldable](z: FreeMapA[T, A], ss: F[(T[EJson], FreeMapA[T, A])]) =
+        ss.foldLeft(z) {
+          case (m, (k, v)) => func.ConcatMaps(m, func.MakeMapJ(k, v))
+        }
+
+      (dyn, static.toNel) match {
+        case (Some(d), Some(ss)) =>
+          makeMap(d, ss)
+
+        case (None, Some(NonEmptyList((k, v), ss))) =>
+          makeMap(func.MakeMapJ(k, v), ss)
+
+        case (Some(d), None) =>
+          d
+
+        case (None, None) =>
+          Free.roll(MFC(EmptyMap[T, FreeMapA[T, A]]))
+      }
+    }
+
     def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A])
         : Option[(Option[FreeMapA[T, A]], List[(T[EJson], FreeMapA[T, A])])] = {
 
@@ -349,12 +375,14 @@ object MapFuncCore {
         ExtractFunc(Constant(key))) =>
         StaticMap(map.filter(_._1 ≠ key)).project.some
 
-      // TODO: Generalize this to `StaticMapSuffix`.
+      // TODO: This could be generalized to any key, not just constant ones.
       case DeleteKey(
-        ExtractFunc(ConcatMaps(m, ExtractFunc(MakeMap(k, _)))),
-        f)
-          if k ≟ f =>
-        rollMF[T, A](MFC(DeleteKey(m, f))).some
+        Embed(StaticMapSuffix(Some(d), ss)),
+        ExtractFunc(Constant(k)))
+          if ss.any(_._1 ≟ k) =>
+        some(rollMF[T, A](MFC(DeleteKey(
+          StaticMapSuffix(Some(d), ss.filterNot(_._1 ≟ k)),
+          Free.roll(MFC(Constant(k)))))))
 
       case ProjectIndex(
         Embed(StaticArrayPrefix(as)),
@@ -371,26 +399,18 @@ object MapFuncCore {
         }
 
       case ProjectKey(
-        Embed(StaticMap(map)),
-        ExtractFunc(Constant(key))) =>
-        map.reverse.find(_._1 ≟ key) ∘ (_._2.project)
+        Embed(StaticMapSuffix(d, ss @ _ :: _)),
+        kfm @ ExtractFunc(Constant(k))) =>
+        ss.reverse.find(_._1 ≟ k).cata(
+          assoc => some(assoc._2.project),
+          d.map(fm => rollMF[T, A](MFC(ProjectKey(fm, kfm)))))
 
       case ProjectKey(
-        ExtractFunc(Cond(cond, Embed(StaticMap(consMap)), Embed(StaticMap(altMap)))),
-        ExtractFunc(Constant(key))) =>
-        (consMap.reverse.find(_._1 ≟ key) |@| altMap.reverse.find(_._1 ≟ key)) {
+        ExtractFunc(Cond(cond, Embed(StaticMapSuffix(_, cs)), Embed(StaticMapSuffix(_, as)))),
+        ExtractFunc(Constant(k))) =>
+        (cs.reverse.find(_._1 ≟ k) |@| as.reverse.find(_._1 ≟ k)) {
           case ((_, cons), (_, alt)) => rollMF[T, A](MFC(Cond(cond, cons, alt)))
         }
-
-      // TODO: Generalize these to `StaticMapSuffix`
-      case ProjectKey(ExtractFunc(MakeMap(k, Embed(v))), f) if k ≟ f =>
-        v.some
-
-      case ProjectKey(
-        ExtractFunc(ConcatMaps(_, ExtractFunc(MakeMap(k, Embed(v))))),
-        f)
-          if k ≟ f =>
-        v.some
 
       case ConcatArrays(Embed(StaticArray(Nil)), Embed(rhs)) => rhs.some
 

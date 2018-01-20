@@ -133,4 +133,101 @@ final class MapFuncCoreSpec extends Qspec with TTypes[Fix] with TreeMatchers {
       StaticMapSuffix.unapply(mixed.project) must_= Some((Some(dynMap), staticAssocs))
     }
   }
+
+  "normalization" >> {
+    def normalize(fm: FreeMap): FreeMap =
+      fm.transCata[FreeMap](MapFuncCore.normalize)
+
+    "delete key in a static map" >> {
+      val expr =
+        func.DeleteKeyS(
+          func.ConcatMaps(
+            func.ConcatMaps(
+              func.MakeMapS("foo", func.Hole),
+              func.MakeMapS("baz", func.Hole)),
+            func.MakeMapS("quux", func.Hole)),
+          "baz")
+
+      val expect =
+          func.ConcatMaps(
+            func.MakeMapS("foo", func.Hole),
+            func.MakeMapS("quux", func.Hole))
+
+      normalize(expr) must beTreeEqual(expect)
+    }
+
+    "delete keys in static suffix of a map" >> {
+      val expr =
+        func.DeleteKeyS(
+          func.ConcatMaps(
+            func.ConcatMaps(
+              func.ConcatMaps(
+                func.MakeMapS("foo", func.Hole),
+                func.ProjectKeyS(func.Hole, "bar")),
+              func.MakeMapS("baz", func.Hole)),
+            func.MakeMapS("quux", func.Hole)),
+          "baz")
+
+      val expect =
+        func.DeleteKeyS(
+          func.ConcatMaps(
+            func.ConcatMaps(
+              func.MakeMapS("foo", func.Hole),
+              func.ProjectKeyS(func.Hole, "bar")),
+            func.MakeMapS("quux", func.Hole)),
+          "baz")
+
+      normalize(expr) must beTreeEqual(expect)
+    }
+
+    "statically project key in static map" >> {
+      val expr =
+        func.ProjectKeyS(
+          func.ConcatMaps(
+            func.ConcatMaps(
+              func.MakeMapS("foo", func.Constant[Hole](ejs.char('a'))),
+              func.MakeMapS("baz", func.Constant(ejs.char('b')))),
+            func.MakeMapS("quux", func.Constant(ejs.char('c')))),
+          "baz")
+
+      normalize(expr) must beTreeEqual(func.Constant[Hole](ejs.char('b')))
+    }
+
+    "statically project a key appearing in the suffix" >> {
+      val expr =
+        func.ProjectKeyS(
+          func.ConcatMaps(
+            func.ConcatMaps(
+              func.ConcatMaps(
+                func.MakeMapS("foo", func.Constant[Hole](ejs.char('a'))),
+                func.ProjectKeyS(func.Hole, "bar")),
+              func.MakeMapS("baz", func.Constant(ejs.char('b')))),
+            func.MakeMapS("quux", func.Constant(ejs.char('c')))),
+          "baz")
+
+      normalize(expr) must beTreeEqual(func.Constant[Hole](ejs.char('b')))
+    }
+
+    "elide static part when projecting key not present" >> {
+      val expr =
+        func.ProjectKeyS(
+          func.ConcatMaps(
+            func.ConcatMaps(
+              func.ConcatMaps(
+                func.MakeMapS("foo", func.Hole),
+                func.ProjectKeyS(func.Hole, "bar")),
+              func.MakeMapS("baz", func.Hole)),
+            func.MakeMapS("quux", func.Hole)),
+          "baat")
+
+      val expect =
+        func.ProjectKeyS(
+          func.ConcatMaps(
+            func.MakeMapS("foo", func.Hole),
+            func.ProjectKeyS(func.Hole, "bar")),
+          "baat")
+
+      normalize(expr) must beTreeEqual(expect)
+    }
+  }
 }
