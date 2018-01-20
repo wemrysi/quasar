@@ -117,19 +117,41 @@ object MapFuncCore {
 
     def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A]):
         Option[List[(T[EJson], FreeMapA[T, A])]] =
-      mf match {
-        case ConcatMapsN(as) =>
-          as.foldRightM[Option, List[(T[EJson], FreeMapA[T, A])]](
-            Nil)(
-            (mf, acc) => (mf.project.run.toOption >>=
-              {
-                case MFC(MakeMap(ExtractFunc(Constant(k)), v)) => ((k, v) :: acc).some
-                case MFC(Constant(Embed(EX(ejson.Map(kvs))))) =>
-                  (kvs.map(_.map(v => rollMF[T, A](MFC(Constant(v))).embed)) ++ acc).some
-                case _ => None
-              }))
-        case _ => None
+      StaticMapSuffix.unapply(mf) collect {
+        case (None, ss) => ss
       }
+  }
+
+  object StaticMapSuffix {
+    def unapply[T[_[_]]: BirecursiveT, A](mf: CoMapFuncR[T, A])
+        : Option[(Option[FreeMapA[T, A]], List[(T[EJson], FreeMapA[T, A])])] = {
+
+      type D = List[FreeMapA[T, A]]
+      type S = List[(T[EJson], FreeMapA[T, A])]
+
+      ConcatMapsN.unapply(mf) map { assocs =>
+        val partitioned = assocs.foldRight((none[D], List(): S)) {
+          case (mf, (Some(ds), ss)) =>
+            (some(mf :: ds), ss)
+
+          case (mf, (None, ss)) => mf match {
+            case ExtractFunc(MakeMap(ExtractFunc(Constant(k)), v)) =>
+              (none, (k, v) :: ss)
+
+            case ExtractFunc(Constant(Embed(EX(ejson.Map(kvs))))) =>
+              val as = Functor[List].compose[(T[EJson], ?)].map(kvs) { v =>
+                Free.roll(MFC(Constant[T, FreeMapA[T, A]](v)))
+              }
+              (none, as ::: ss)
+
+            case dyn =>
+              (some(List(dyn)), ss)
+          }
+        }
+
+        partitioned.leftMap(_.map(ConcatMapsN(_).embed))
+      }
+    }
   }
 
   object EmptyArray {
