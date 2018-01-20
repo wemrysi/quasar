@@ -927,8 +927,8 @@ object MongoDbPlanner {
 
             def rewriteUndefined[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
               case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined()))))))))
-                  if (onUndef === OnUndefined.Emit) =>
-                rollMF[T, A](MFC(Guard(exp, tpe, exp0, Free.roll(MFC(MakeArray(Free.roll(MFC(Undefined())))))))).some
+                if (onUndef === OnUndefined.Emit) =>
+                  rollMF[T, A](MFC(Guard(exp, tpe, exp0, Free.roll(MFC(MakeArray(Free.roll(MFC(Undefined())))))))).some
               case _ => none
             }
 
@@ -940,8 +940,10 @@ object MongoDbPlanner {
               case _ => none
             }
 
-            def filterBuilder[A](handler: FreeMapA[T, A] => M[Expr])(src: WorkflowBuilder[WF], partialSel: PartialSelector[T], fm: FreeMapA[T, A]):
-                M[WorkflowBuilder[WF]] = {
+            def filterBuilder[A]
+              (handler: FreeMapA[T, A] => M[Expr])
+              (src: WorkflowBuilder[WF], partialSel: PartialSelector[T], fm: FreeMapA[T, A])
+                : M[WorkflowBuilder[WF]] = {
               val (sel, inputs) = partialSel
 
               inputs.traverse(f => handler(f(fm)))
@@ -1015,11 +1017,13 @@ object MongoDbPlanner {
                       repair)).join
                 }
                 case (None, Some(repairSel)) => {
+                  val struct0 = struct.transCata[FreeMap[T]](orOriginal(transform[Hole]))
                   val flatten =
-                    handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct) ∘ (struct0 =>
-                      flattening(src, struct0, shiftType, id))
+                    handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct0) ∘ (struct1 =>
+                      flattening(src, struct1, shiftType, id))
 
-                  (flatten >>= (s => filterBuilder[JoinSide](exprOrJs(_)(exprMerge, jsMerge))(s, repairSel, repair))) >>= (src0 =>
+                  (flatten >>= (s => filterBuilder[JoinSide](
+                    exprOrJs(_)(exprMerge, jsMerge))(s, repairSel, repair))) >>= (src0 =>
                     getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
                       src0, repair.transCata[JoinFunc[T]](orOriginal(elideCond[JoinSide]))))
                 }
@@ -1033,31 +1037,21 @@ object MongoDbPlanner {
                       repair))
               }
             }
-            else
-              shiftType match {
-                case ShiftType.Array => {
-                  val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
-                  val repair0 = repair.as[Hole](SrcHole).transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
+            else {
+              val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
+              val repair0 = repair.as[Hole](SrcHole).transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
 
-                  getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct0) >>= (builder =>
-                    getExprBuilder[T, M, WF, EX](
-                      cfg.funcHandler, cfg.staticHandler)(
-                      FlatteningBuilder(
-                        builder,
-                        Set(StructureType.Array(DocVar.ROOT(), id)),
-                        List().some),
-                        repair0))
-                }
-                case _ =>
-                  getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
-                    getExprBuilder[T, M, WF, EX](
-                      cfg.funcHandler, cfg.staticHandler)(
-                      FlatteningBuilder(
-                        builder,
-                        Set(StructureType.Object(DocVar.ROOT(), id)),
-                        List().some),
-                        repair.as(SrcHole)))
-              }
+              getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct0) >>= (builder =>
+                getExprBuilder[T, M, WF, EX](
+                  cfg.funcHandler, cfg.staticHandler)(
+                  FlatteningBuilder(
+                    builder,
+                    shiftType match {
+                      case ShiftType.Array => Set(StructureType.Array(DocVar.ROOT(), id))
+                      case ShiftType.Map => Set(StructureType.Object(DocVar.ROOT(), id))
+                    }, List().some),
+                    repair0))
+            }
 
           }
           case Reduce(src, bucket, reducers, repair) =>
