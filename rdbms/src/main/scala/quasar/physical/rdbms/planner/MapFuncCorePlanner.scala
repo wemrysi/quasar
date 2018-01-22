@@ -23,6 +23,7 @@ import quasar.DataCodec
 import DataCodec.Precise.{DateKey, IntervalKey, TimeKey, TimestampKey}
 import quasar.Planner._
 import quasar.physical.rdbms.planner.sql.{Contains, StrLower, StrUpper, Substring, Search, StrSplit, ArrayConcat, SqlExpr => SQL}
+import quasar.physical.rdbms.planner.sql._
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.qscript.{MapFuncsCore => MFC, _}
@@ -36,7 +37,7 @@ import Scalaz._
 import quasar.physical.rdbms.planner.sql.Indirections._
 
 
-class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerErrorME]
+class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_] : Applicative : PlannerErrorME]
     extends Planner[T, F, MapFuncCore[T, ?]] {
 
   val undefined: T[SQL] = SQL.Null[T[SQL]]().embed
@@ -177,7 +178,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
 
     case MFC.ProjectIndex(fSrc, fKey) => project(fSrc, fKey)
     case MFC.ProjectKey(fSrc, fKey) => project(fSrc, fKey)
-    case MFC.DeleteKey(fSrc, fField) =>   notImplemented("DeleteKey", this)
+    case MFC.DeleteKey(fSrc, fField) => DeleteKey(fSrc, fField).embed.η[F]
     case MFC.Range(fFrom, fTo) =>  notImplemented("Range", this)
     case MFC.Guard(f1, fPattern, f2, ff3) => f2.η[F]
     case MFC.TypeOf(f) => SQL.TypeOf(f).embed.η[F]

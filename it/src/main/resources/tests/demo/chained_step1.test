@@ -7,7 +7,7 @@
        "mimir":             "ignoreFieldOrder",
        "postgres":          "pending"
     },
-    "NB": "Postgres connector doesn't support DeleteKey yet",
+    "NB": "Postgres connector fails due to a DeleteKey element in the reduce bucket",
     "query": "SELECT DISTINCT (state) as State FROM patients ORDER BY state ASC LIMIT 5",
     "predicate": "exactly",
     "expected": [

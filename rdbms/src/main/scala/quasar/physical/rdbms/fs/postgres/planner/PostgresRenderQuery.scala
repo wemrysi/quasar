@@ -42,16 +42,31 @@ object PostgresRenderQuery extends RenderQuery {
 
   implicit val codec: DataCodec = DataCodec.Precise
 
+  def rowToJson(q: String): String =
+    s"select row_to_json(row) from ($q) as row"
+
   def asString[T[_[_]]: BirecursiveT](a: T[SqlExpr]): PlannerError \/ String = {
 
     type SqlTransform = T[SqlExpr] => T[SqlExpr]
 
     val stringifyTypeOf: SqlTransform = s => s.project match {
       case TypeOf(_) => Coercion[T[SqlExpr]](StringCol, s).embed
-      case other => s
+      case _ => s
     }
 
-    a.transCataT(stringifyTypeOf).paraM(galg) ∘ (s => s"select row_to_json(row) from ($s) as row")
+    val innerSelect = a.transCataT(stringifyTypeOf).paraM(galg)
+
+  a.project match {
+    case Select(Selection(sel, _, _), _, _, _, _, _) =>
+      sel.project match {
+        case DeleteKey(_, _) =>
+          innerSelect
+        case _ =>
+            innerSelect.map(rowToJson)
+      }
+    case _ =>
+      innerSelect.map(rowToJson)
+  }
   }
 
   def alias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" as ${i.v}"))
@@ -188,6 +203,13 @@ object PostgresRenderQuery extends RenderQuery {
       s"($a1 or $a2)".right
     case Not(BoolExpr(e)) =>
       s"not ($e)".right
+    case DeleteKey((srcExp, src), (_, field)) =>
+      (srcExp.project match {
+        case Id(v, _) =>
+          s"(row_to_json($v)::jsonb - $field)"
+        case _ =>
+          s"($src - $field)"
+      }).right
     case Neg(NumExpr(e)) =>
       s"(-$e)".right
     case Eq(TextExpr(a1), TextExpr(a2)) =>

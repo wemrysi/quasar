@@ -77,6 +77,7 @@ object SqlExpr extends SqlExprInstances {
   final case class Gt[T](a1: T, a2: T) extends SqlExpr[T]
   final case class Gte[T](a1: T, a2: T) extends SqlExpr[T]
 
+  final case class DeleteKey[T](src: T, field: T) extends SqlExpr[T]
   final case class TypeOf[T](e: T) extends SqlExpr[T]
   final case class Coercion[T](t: ColumnType, e: T) extends SqlExpr[T]
   final case class ToArray[T](v: T) extends SqlExpr[T]

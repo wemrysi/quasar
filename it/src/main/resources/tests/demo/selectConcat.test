@@ -6,7 +6,7 @@
         "postgres": "pending"
     },
     "NB": "Pending for mimir due to Q#2692.",
-    "NB2": "Postgres connector doesn't support DeleteKey yet",
+    "NB2": "Postgres connector doesn't support date/time functions yet",
     "data": "otherpatients.data",
     "query": "SELECT
                 COUNT(*) as cnt,
