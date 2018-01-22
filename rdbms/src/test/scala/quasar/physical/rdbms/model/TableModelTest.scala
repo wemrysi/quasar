@@ -185,7 +185,7 @@ class TableModelTest extends Spec  with ScalazMatchers {
     }
 
     "devise json schema on encountering incompatible data types" >> {
-      val row1 = data("""{"age": 25,"id":"748abf","keys": [4, 5, 6, 7]}""")
+      val row1 = data("""{"age": [1, 2],"id":"748abf","keys": [4, 5, 6, 7]}""")
       val row2 = data("""{"age": "25","id":"648abf","keys": [4, 5, 6, 7]}""")
 
       forAll(permutations(Vector(row1, row2, row2, row2, row1))) { rows =>
