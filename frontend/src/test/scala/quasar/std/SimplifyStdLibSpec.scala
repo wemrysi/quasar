@@ -44,6 +44,9 @@ class SimplifyStdLibSpec extends StdLibSpec {
     case (relations.IfUndefined, _) => notHandled
 
     case (date.Now, _) => notHandled
+    case (date.NowTime, _) => notHandled
+    case (date.NowDate, _) => notHandled
+    case (date.CurrentTimeZone, _) => notHandled
 
     case (structural.MapProject, List(Data.Obj(fields), Data.Str(field))) if !fields.contains(field) => notHandled
 
