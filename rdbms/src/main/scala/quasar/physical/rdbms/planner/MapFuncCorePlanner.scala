@@ -75,7 +75,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_] : Applicative : Plan
     case MFC.Constant(ejson) => SQL.Constant[T[SQL]](ejson.cata(Data.fromEJson)).embed.η[F]
     case MFC.Undefined() =>  undefined.η[F]
     case MFC.JoinSideName(n) =>  notImplemented("JoinSideName", this)
-    case MFC.Length(f) => notImplemented("Length", this)
+    case MFC.Length(f) => SQL.Length(f).embed.η[F]
     case MFC.Date(f) => datetime(f, DateKey, dateRegex.r).η[F]
     case MFC.Time(f) =>  datetime(f, TimeKey, timeRegex.r).η[F]
     case MFC.Timestamp(f) => datetime(f, TimestampKey, timestampRegex.r).η[F]

@@ -191,6 +191,8 @@ object PostgresRenderQuery extends RenderQuery {
       s"sum($e)".right
     case Distinct((_, e)) =>
       s"distinct $e".right
+    case Length((_, e)) =>
+      s"(case when (pg_typeof($e)::regtype::text ~ 'jsonb?') then jsonb_array_length(to_jsonb($e)) else length($e::text) end)".right
     case Time((_, expr)) =>
       buildJson(s"""{ "$TimeKey": $expr }""").right
     case NumericOp(sym, NumExpr(left), NumExpr(right)) =>

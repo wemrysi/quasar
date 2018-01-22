@@ -53,6 +53,7 @@ trait SqlExprTraverse {
       case Max(a1)             => f(a1) ∘ (Max(_))
       case Min(a1)             => f(a1) ∘ (Min(_))
       case Sum(a1)             => f(a1) ∘ (Sum(_))
+      case Length(a1)          => f(a1) ∘ (Length(_))
       case DeleteKey(a1, a2)   => (f(a1) ⊛ f(a2))(DeleteKey(_, _))
       case Distinct(a1)        => f(a1) ∘ (Distinct(_))
       case Time(a1)            => f(a1) ∘ Time.apply

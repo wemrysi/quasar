@@ -50,6 +50,8 @@ trait SqlExprRenderTree {
               NonTerminal("K → V" :: Nil, none,
                 List(r.render(k), r.render(v)))
             })
+          case Length(a1) =>
+            nonTerminal("Length", a1)
           case IsNotNull(a1) =>
             nonTerminal("NotNull", a1)
           case IfNull(a) =>
