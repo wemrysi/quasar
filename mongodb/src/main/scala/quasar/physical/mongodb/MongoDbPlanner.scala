@@ -946,8 +946,7 @@ object MongoDbPlanner {
                 : M[WorkflowBuilder[WF]] = {
               val (sel, inputs) = partialSel
 
-              inputs.traverse(f => handler(f(fm)))
-                .map(WB.filter(src, _, sel))
+              inputs.traverse(f => handler(f(fm))) ∘ (WB.filter(src, _, sel))
             }
 
             def transform[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
@@ -955,7 +954,7 @@ object MongoDbPlanner {
 
             def flattening(src: WorkflowBuilder[WF], target: Expr, st: ShiftType, i: IdStatus)
                 : WorkflowBuilder[WF] =
-              shiftType match {
+              st match {
                 case ShiftType.Array =>
                   FlatteningBuilder(
                     DocBuilder(
