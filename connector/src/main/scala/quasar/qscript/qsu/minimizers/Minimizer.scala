@@ -23,18 +23,18 @@ import slamdata.Predef._
 import scalaz.Monad
 
 trait Minimizer[T[_[_]]] extends QSUTTypes[T] {
-  import MinimizeAutoJoins.{MinStateM, RevIdxM}
+  import MinimizeAutoJoins.MinStateM
 
   def couldApplyTo(candidates: List[QSUGraph]): Boolean
 
   def extract[
-      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]](
+      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM: MinStateM[T, ?[_]]](
       qgraph: QSUGraph): Option[(QSUGraph, (QSUGraph, FreeMap) => G[QSUGraph])]
 
   // the first component of the tuple is the rewrite target on any provenance association
   // the second component is the root of the resulting graph
   def apply[
-      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]](
+      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM: MinStateM[T, ?[_]]](
       qgraph: QSUGraph,
       singleSource: QSUGraph,
       candidates: List[QSUGraph],

@@ -19,16 +19,18 @@ package quasar.physical.rdbms.planner
 import quasar.fp.ski._
 import quasar.NameGenerator
 import quasar.Planner.PlannerErrorME
+import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
+import SqlExpr._
 import quasar.physical.rdbms.planner.sql._
 import quasar.qscript.{EquiJoin, FreeMap, MapFunc, QScriptTotal}
-import SqlExpr._
+import quasar.physical.rdbms.planner.sql.Indirections._
+
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._
 import Scalaz._
-import quasar.physical.rdbms.planner.sql.Indirections._
 
 class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT: EqualT,
 F[_]: Monad: NameGenerator: PlannerErrorME](
@@ -57,17 +59,6 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
               (processFreeMap(lFm, leftAlias) |@| processFreeMap(rFm, rightAlias))(scala.Tuple2.apply)
           }
       } yield {
-
-
-        val selectionExpr = combined.project match {
-          case e@ExprPair(a, b, _) =>
-            (a.project, b.project) match {
-              case (SqlExpr.Id(_, _), SqlExpr.Id(_, _)) => *
-              case _ => e.embed
-            }
-          case other =>
-            other.embed
-        }
 
         Select(
           selection = Selection(idToWildcard(combined), none, deriveIndirection(combined)),

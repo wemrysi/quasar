@@ -39,7 +39,6 @@ import matryoshka.data._
 import matryoshka.data.free.freeEqual
 import matryoshka.implicits._
 import matryoshka.patterns._
-
 import scalaz._
 import Scalaz._
 
@@ -154,6 +153,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           (Distinct[T[SqlExpr]](rep).embed, none)
         case _ => (rep, GroupBy(gbs).some)
       }
+
       Select(
         Selection(selection, none, Default),
         From(src, alias),
@@ -171,7 +171,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         right = ArrayUnwind(structExpr)
         repaired <- processJoinFunc(mapFuncPlanner)(repair, structAlias, right)
         result = Select[T[SqlExpr]](
-          Selection(repaired, None, Default), From(src, structAlias), none, none, none, Nil)
+          Selection(repaired, None, deriveIndirection(src)), From(src, structAlias), none, none, none, Nil)
       } yield {
         result.embed
       }

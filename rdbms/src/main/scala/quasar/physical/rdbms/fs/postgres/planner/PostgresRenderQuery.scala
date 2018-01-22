@@ -17,6 +17,7 @@
 package quasar.physical.rdbms.fs.postgres.planner
 
 import slamdata.Predef._
+
 import quasar.common.JoinType._
 import quasar.common.SortDir.{Ascending, Descending}
 import quasar.{Data, DataCodec}
@@ -30,12 +31,13 @@ import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.Planner.InternalError
 import quasar.Planner.{NonRepresentableData, PlannerError}
+import quasar.physical.rdbms.planner.sql.Indirections._
+
 import matryoshka._
 import matryoshka.implicits._
 
 import scalaz._
 import Scalaz._
-import quasar.physical.rdbms.planner.sql.Indirections._
 
 object PostgresRenderQuery extends RenderQuery {
   import SqlExpr._
@@ -259,22 +261,17 @@ object PostgresRenderQuery extends RenderQuery {
 
       val groupByStr = ~(groupBy.flatMap{
         case GroupBy(Nil) => none
-        case GroupBy(v) => v.map {
-          case (srcExpr, str) =>
-            srcExpr.project match {
-              case ExprWithAlias(e, _) => str.substring(0, str.indexOf("as"))
-              case _ => str
-            }
-        }.intercalate(", ").some
+        case GroupBy(v) => v.map(_._2).intercalate(", ").some
       }.map(v => s" GROUP BY $v"))
+
 
       val fromExpr = s" from ${from.v._2} ${from.alias.v}"
       s"(select ${selection.v._2}$fromExpr$join$filter$groupByStr$orderByStr)".right
     case Union((_, left), (_, right)) => s"($left UNION $right)".right
+    case Constant(a @ Data.Arr(_)) =>  s"${dataFormatter("", a)}::jsonb".right
     case Constant(Data.Str(v)) =>
       val text = v.flatMap { case '\'' => "''"; case iv => iv.toString }.self
       s"'$text'".right
-    case Constant(a @ Data.Arr(_)) =>  s"${dataFormatter("", a)}::jsonb".right
     case Constant(a @ Data.Obj(lm)) =>
       lm.toList match {
         case ((k, Data.Null) :: Nil) =>

@@ -18,6 +18,7 @@ object Dependencies {
   private val raptureVersion      = "2.0.0-M9"
   private val refinedVersion      = "0.8.3"
   private val scodecBitsVersion   = "1.1.2"
+  private val scodecScalazVersion = "1.4.1a"
   private val http4sVersion       = "0.16.6a"
   private val scalacheckVersion   = "1.13.4"
   private val scalazVersion       = "7.2.17"
@@ -28,6 +29,10 @@ object Dependencies {
   // leads to a ParquetRDDE failure under a full test run
   private val specsVersion        = "4.0.2"
   private val spireVersion        = "0.14.1"
+  private val akkaVersion         = "2.5.1"
+  private val deloreanVersion     = "1.2.42-scalaz-7.2"
+  private val fs2Version          = "0.9.6"
+  private val fs2ScalazVersion    = "0.2.0"
 
   def foundation = Seq(
     "com.slamdata"               %% "slamdata-predef"           % "0.0.4",
@@ -146,7 +151,7 @@ object Dependencies {
     "org.elasticsearch"      %% "elasticsearch-spark-20" % "5.4.1",
     ("com.sksamuel.elastic4s" %% "elastic4s-http"         % "5.4.6")
       .exclude("commons-logging", "commons-logging"),
-    "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2",
+    "io.verizon.delorean" %% "core" % deloreanVersion,
     // Please note that elastic4s-jackson and elastic4s-testkit DON'T contain
     // dependency to io.netty:netty-all in the elastic4s build.sbt. For the
     // unknown reasons however netty-all is a deriviative dependency (@daniel suspects
@@ -182,7 +187,7 @@ object Dependencies {
     "org.http4s"     %% "http4s-server"       % http4sVersion,
     "org.http4s"     %% "http4s-blaze-server" % http4sVersion,
     "org.http4s"     %% "http4s-blaze-client" % http4sVersion,
-    "org.scodec"     %% "scodec-scalaz"       % "1.4.1a",
+    "org.scodec"     %% "scodec-scalaz"       % scodecScalazVersion,
     "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
     "com.propensive" %% "rapture-json"        % raptureVersion     % Test,
     "com.propensive" %% "rapture-json-json4s" % raptureVersion     % Test,
@@ -192,17 +197,38 @@ object Dependencies {
     "org.slf4s"            %% "slf4s-api"       % "1.7.25",
     "org.slf4j"            %  "slf4j-log4j12"   % "1.7.16",
     "org.typelevel"        %% "spire"           % spireVersion,
-    "org.scodec"           %% "scodec-scalaz"   % "1.4.1a",
+    "org.scodec"           %% "scodec-scalaz"   % scodecScalazVersion,
+    "org.scodec"           %% "scodec-bits"     % scodecBitsVersion,
     "org.apache.jdbm"      %  "jdbm"            % "3.0-alpha5",
-    "com.typesafe.akka"    %%  "akka-actor"     % "2.5.1",
+    "com.typesafe.akka"    %%  "akka-actor"     % akkaVersion,
     ("org.quartz-scheduler" %  "quartz"         % "2.3.0")
       .exclude("com.zaxxer", "HikariCP-java6"), // conflict with Doobie
-    "commons-io"           %  "commons-io"      % "2.5",
-    "org.scodec"           %% "scodec-bits"     % scodecBitsVersion
+    "commons-io"           %  "commons-io"      % "2.5"
+  )
+  def blueeyes = Seq(
+    "com.google.guava" %  "guava" % "13.0"
+  )
+  def mimir = Seq(
+    "io.verizon.delorean" %% "core" % deloreanVersion,
+    "co.fs2" %% "fs2-core"   % fs2Version,
+    "co.fs2" %% "fs2-scalaz" % fs2ScalazVersion
+  )
+  def yggdrasil = Seq(
+    "io.verizon.delorean" %% "core" % deloreanVersion,
+    "co.fs2" %% "fs2-core"   % fs2Version,
+    "co.fs2" %% "fs2-io"     % fs2Version,
+    "co.fs2" %% "fs2-scalaz" % fs2ScalazVersion,
+    "com.codecommit" %% "smock" % "0.3.1-specs2-4.0.2" % "test"
+  )
+  def niflheim = Seq(
+    "com.typesafe.akka"  %% "akka-actor" % akkaVersion,
+    "org.typelevel"      %% "spire"      % spireVersion,
+    "org.objectweb.howl" %  "howl"       % "1.0.1-1"
   )
   def it = Seq(
     "io.argonaut"      %% "argonaut-monocle"    % argonautVersion     % Test,
     "org.http4s"       %% "http4s-blaze-client" % http4sVersion       % Test,
     "eu.timepit"       %% "refined-scalacheck"  % refinedVersion      % Test,
-    "io.verizon.knobs" %% "core"                % "4.0.30-scalaz-7.2" % Test)
+    "io.verizon.knobs" %% "core"                % "4.0.30-scalaz-7.2" % Test
+  )
 }

@@ -636,7 +636,7 @@ lazy val precog = project.setup
   .settings(name := "quasar-precog-internal")
   .dependsOn(common % BothScopes)
   .withWarnings
-  .deps(Dependencies.precog: _*)
+  .settings(libraryDependencies ++= Dependencies.precog)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
@@ -647,7 +647,7 @@ lazy val blueeyes = project.setup
   .settings(name := "quasar-blueeyes-internal")
   .dependsOn(precog % BothScopes, frontend)
   .withWarnings
-  .settings(libraryDependencies += "com.google.guava" %  "guava" % "13.0")
+  .settings(libraryDependencies ++= Dependencies.blueeyes)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
@@ -659,12 +659,7 @@ lazy val mimir = project.setup
   .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector)
   .scalacArgs("-Ypartial-unification")
   .withWarnings
-  .settings(
-    libraryDependencies ++= Seq(
-      "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2",
-
-      "co.fs2" %% "fs2-core"   % "0.9.6",
-      "co.fs2" %% "fs2-scalaz" % "0.2.0"))
+  .settings(libraryDependencies ++= Dependencies.mimir)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
@@ -676,11 +671,7 @@ lazy val niflheim = project.setup
   .dependsOn(blueeyes % BothScopes, precog % BothScopes)
   .scalacArgs("-Ypartial-unification")
   .withWarnings
-  .settings(
-    libraryDependencies ++= Seq(
-      "com.typesafe.akka"  %% "akka-actor" % "2.4.12",
-      "org.typelevel"      %% "spire"      % "0.14.1", // TODO use spireVersion from project/Dependencies.scala
-      "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
+  .settings(libraryDependencies ++= Dependencies.niflheim)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
@@ -693,15 +684,7 @@ lazy val yggdrasil = project.setup
   .withWarnings
   .settings(
     resolvers += "bintray-djspiewak-maven" at "https://dl.bintray.com/djspiewak/maven",
-
-    libraryDependencies ++= Seq(
-      "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2",
-
-      "co.fs2" %% "fs2-core"   % "0.9.6",
-      "co.fs2" %% "fs2-io"     % "0.9.6",
-      "co.fs2" %% "fs2-scalaz" % "0.2.0",
-
-      "com.codecommit" %% "smock" % "0.3.1-specs2-4.0.2" % "test"))
+    libraryDependencies ++= Dependencies.yggdrasil)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)

@@ -39,7 +39,7 @@ trait Library {
   protected def constTyper[N <: Nat](codomain: Codomain): Typer[N] =
     _ => Some(success(codomain))
 
-  private def partialTyperOV[N <: Nat](f: Domain[N] => Option[VCodomain]): Typer[N] = f
+  def partialTyperOV[N <: Nat](f: Domain[N] => Option[VCodomain]): Typer[N] = f
 
   def partialTyperV[N <: Nat](f: PartialFunction[Domain[N], VCodomain]): Typer[N] =
     partialTyperOV[N](f.lift)

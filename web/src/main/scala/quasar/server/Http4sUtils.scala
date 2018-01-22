@@ -100,26 +100,12 @@ object Http4sUtils {
       exec.allowCoreThreadTimeOut(timeout)
       exec
     }
-    val pool = newPool("http4s-pool", 4, 3.0, false)
     BlazeBuilder
       .enableHttp2(true)
       .withIdleTimeout(blueprint.idleTimeout)
       .bindHttp(blueprint.port, "0.0.0.0")
       .mountService(blueprint.svc)
-      .withServiceExecutor(pool)
+      .withServiceExecutor(newPool("http4s-pool", 4, 3.0, false))
       .start
-      .map { server =>
-        // I do not understand why `http4s` deprecated `onShutdown` forcing us to do
-        // this verbose non-sense. Of course, it should use `Task` but a replacement
-        // function would have been nice
-        new Http4sServer {
-          def shutdown = server.shutdown >> Task.delay(pool.shutdown())
-          // We can't call `server.onShutdown` since it's deprecated and we have
-          // fatal warnings enabled but since it's deprecated there isn't too
-          // much concern that it will be called
-          def onShutdown(f: => Unit) = this
-          def address = server.address
-        }
-      }
   }
 }
