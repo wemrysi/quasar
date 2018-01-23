@@ -114,6 +114,7 @@ trait SqlExprTraverse {
       case ArrayUnwind(u) => f(u) ∘ ArrayUnwind.apply
       case Time(a1)       => f(a1) ∘ Time.apply
       case Timestamp(a1)  => f(a1) ∘ Timestamp.apply
+      case DatePart(part, e) => (f(part) ⊛ f(e))(DatePart(_, _))
     }
   }
 }

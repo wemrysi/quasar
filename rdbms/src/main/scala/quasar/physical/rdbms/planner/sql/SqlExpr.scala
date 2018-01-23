@@ -133,6 +133,8 @@ object SqlExpr extends SqlExprInstances {
   final case class Time[T](d: T) extends SqlExpr[T]
   final case class Timestamp[T](d: T) extends SqlExpr[T]
 
+  final case class DatePart[T](part: T, e: T) extends SqlExpr[T]
+
 }
 
 sealed trait UnaryFunctionType

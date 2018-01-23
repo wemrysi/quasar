@@ -57,6 +57,8 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_] : Applicative : Plan
     case _ => SQL.Refs(Vector(fSrc, fKey), deriveIndirection(fSrc)).embed.η[F] // _12
   }
 
+  private def datePart(part: String, f: T[SQL]) = SQL.DatePart(SQL.Constant[T[SQL]](Data.Str(part)).embed, f).embed.η[F]
+
   def plan: AlgebraM[F, MapFuncCore[T, ?], T[SQL]] = {
     case MFC.Constant(ejson) => SQL.Constant[T[SQL]](ejson.cata(Data.fromEJson)).embed.η[F]
     case MFC.Undefined() =>  undefined.η[F]
@@ -75,24 +77,24 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_] : Applicative : Plan
     case MFC.TemporalTrunc(p, f) =>  notImplemented("TemporalTrunc", this)
     case MFC.TimeOfDay(f) =>  notImplemented("TimeOfDay", this)
     case MFC.ToTimestamp(f) =>  notImplemented("ToTimestamp", this)
-    case MFC.ExtractCentury(f) =>  notImplemented("ExtractCentury", this)
-    case MFC.ExtractDayOfMonth(f) =>  notImplemented("ExtractDayOfMonth", this)
-    case MFC.ExtractDecade(f) =>  notImplemented("ExtractDecade", this)
-    case MFC.ExtractDayOfWeek(f) =>  notImplemented("ExtractDayOfWeek", this)
-    case MFC.ExtractDayOfYear(f) =>  notImplemented("ExtractDayOfYear", this)
-    case MFC.ExtractEpoch(f) =>  notImplemented("ExtractEpoch", this)
-    case MFC.ExtractHour(f) =>  notImplemented("ExtractHour", this)
-    case MFC.ExtractIsoDayOfWeek(f) =>  notImplemented("ExtractIsoDayOfWeek", this)
-    case MFC.ExtractIsoYear(f) =>  notImplemented("ExtractIsoYear", this)
-    case MFC.ExtractMicroseconds(f) => notImplemented("ExtractMicroseconds", this)
-    case MFC.ExtractMillennium(f) =>  notImplemented("ExtractMillennium", this)
-    case MFC.ExtractMilliseconds(f) =>  notImplemented("ExtractMilliseconds", this)
-    case MFC.ExtractMinute(f) =>  notImplemented("ExtractMinute", this)
-    case MFC.ExtractMonth(f) =>  notImplemented("ExtractMonth", this)
-    case MFC.ExtractQuarter(f) =>  notImplemented("ExtractQuarter", this)
-    case MFC.ExtractSecond(f) =>  notImplemented("ExtractSecond", this)
-    case MFC.ExtractWeek(f) =>  notImplemented("ExtractWeek", this)
-    case MFC.ExtractYear(f) =>  notImplemented("ExtractYear", this)
+    case MFC.ExtractCentury(f) =>   datePart("century", f)
+    case MFC.ExtractDayOfMonth(f) =>   datePart("day", f)
+    case MFC.ExtractDecade(f) =>   datePart("decade", f)
+    case MFC.ExtractDayOfWeek(f) =>   datePart("dow", f)
+    case MFC.ExtractDayOfYear(f) =>   datePart("doy", f)
+    case MFC.ExtractEpoch(f) =>   datePart("epoch", f)
+    case MFC.ExtractHour(f) =>   datePart("hour", f)
+    case MFC.ExtractIsoDayOfWeek(f) =>   datePart("isodow", f)
+    case MFC.ExtractIsoYear(f) =>   datePart("isoyear", f)
+    case MFC.ExtractMicroseconds(f) =>  datePart("microseconds", f)
+    case MFC.ExtractMillennium(f) =>   datePart("millennium", f)
+    case MFC.ExtractMilliseconds(f) =>   datePart("milliseconds", f)
+    case MFC.ExtractMinute(f) =>   datePart("minute", f)
+    case MFC.ExtractMonth(f) =>   datePart("month", f)
+    case MFC.ExtractQuarter(f) =>   datePart("quarter", f)
+    case MFC.ExtractSecond(f) =>   datePart("second", f)
+    case MFC.ExtractWeek(f) =>  datePart("week", f)
+    case MFC.ExtractYear(f) =>  datePart("year", f)
     case MFC.Now() =>  notImplemented("Now", this)
     case MFC.Negate(f) =>  SQL.Neg[T[SQL]](f).embed.η[F]
     case MFC.Add(f1, f2) =>  SQL.NumericOp[T[SQL]]("+", f1, f2).embed.η[F]

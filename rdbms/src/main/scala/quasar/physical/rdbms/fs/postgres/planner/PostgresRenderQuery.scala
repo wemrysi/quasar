@@ -17,7 +17,6 @@
 package quasar.physical.rdbms.fs.postgres.planner
 
 import slamdata.Predef._
-
 import quasar.common.JoinType._
 import quasar.common.SortDir.{Ascending, Descending}
 import quasar.{Data, DataCodec}
@@ -32,7 +31,6 @@ import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.Planner.InternalError
 import quasar.Planner.{NonRepresentableData, PlannerError}
 import quasar.physical.rdbms.planner.sql.Indirections._
-
 import matryoshka._
 import matryoshka.implicits._
 
@@ -317,5 +315,7 @@ object PostgresRenderQuery extends RenderQuery {
       buildJson((TimeKey, expr)).right
     case Timestamp((_, expr)) =>
       buildJson((TimestampKey, expr)).right
+    case DatePart(TextExpr(part), (_, expr)) =>
+      s"date_part($part, to_timestamp($expr->>'$TimestampKey', 'YYYY-MM-DD HH24:MI:SSZ'))::text".right
   }
 }

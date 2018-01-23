@@ -160,6 +160,8 @@ trait SqlExprRenderTree {
             nonTerminal("Time", a1)
           case Timestamp(a1) =>
             nonTerminal("Timestamp", a1)
+          case DatePart(part, e) =>
+            nonTerminal("DatePart", part, e)
         }
       }
     }
