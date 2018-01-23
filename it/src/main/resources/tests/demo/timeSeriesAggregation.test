@@ -5,7 +5,6 @@
         "mimir":     "pendingIgnoreFieldOrder",
         "postgres":  "ignoreFieldOrder"
     },
-    "NB": "Postgres connector doesn't support date/time functions yet",
     "data": "smalltimeseries.data",
     "query": "
         SELECT SUM(value) AS measure, timestamp(dt) AS dimension, sensor AS series
