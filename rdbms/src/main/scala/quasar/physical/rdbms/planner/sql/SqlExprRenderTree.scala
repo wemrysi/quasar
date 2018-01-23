@@ -78,8 +78,6 @@ trait SqlExprRenderTree {
             NonTerminal(s"Delete Key" :: Nil, none, List(expr1, expr2) ∘ r.render)
           case Distinct(a1) =>
             nonTerminal("Distinct", a1)
-          case Time(a1) =>
-            nonTerminal("Time", a1)
           case Id(v, m) =>
             Terminal(s"Id (m = ${m.shows})" :: Nil, v.some)
           case Table(v) =>
@@ -158,6 +156,10 @@ trait SqlExprRenderTree {
             nonTerminal(s"Function call: $t", a1, a2, a3)
           case ArrayUnwind(u) =>
             nonTerminal("ArrayUnwind", u)
+          case Time(a1) =>
+            nonTerminal("Time", a1)
+          case Timestamp(a1) =>
+            nonTerminal("Timestamp", a1)
         }
       }
     }

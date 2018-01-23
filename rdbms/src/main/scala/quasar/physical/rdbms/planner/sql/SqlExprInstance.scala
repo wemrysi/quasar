@@ -56,7 +56,6 @@ trait SqlExprTraverse {
       case Length(a1)          => f(a1) ∘ (Length(_))
       case DeleteKey(a1, a2)   => (f(a1) ⊛ f(a2))(DeleteKey(_, _))
       case Distinct(a1)        => f(a1) ∘ (Distinct(_))
-      case Time(a1)            => f(a1) ∘ Time.apply
       case Refs(srcs, m)       =>  (srcs.traverse(f) ⊛ G.point(m))(Refs.apply)
       case Table(name)         => G.point(Table(name))
       case IsNotNull(v)        => f(v) ∘ IsNotNull.apply
@@ -113,6 +112,8 @@ trait SqlExprTraverse {
       case Limit(from, count) => (f(from) ⊛ f(count))(Limit.apply)
       case Offset(from, count) => (f(from) ⊛ f(count))(Offset.apply)
       case ArrayUnwind(u) => f(u) ∘ ArrayUnwind.apply
+      case Time(a1)       => f(a1) ∘ Time.apply
+      case Timestamp(a1)  => f(a1) ∘ Timestamp.apply
     }
   }
 }

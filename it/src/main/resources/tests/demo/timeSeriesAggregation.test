@@ -2,8 +2,8 @@
     "name": "time series aggregation",
     "backends": {
         "couchbase": "ignoreFieldOrder",
-        "mimir":"pendingIgnoreFieldOrder",
-        "postgres": "pending"
+        "mimir":     "pendingIgnoreFieldOrder",
+        "postgres":  "ignoreFieldOrder"
     },
     "NB": "Postgres connector doesn't support date/time functions yet",
     "data": "smalltimeseries.data",

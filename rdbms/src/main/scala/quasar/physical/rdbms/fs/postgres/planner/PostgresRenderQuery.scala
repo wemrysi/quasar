@@ -22,7 +22,7 @@ import quasar.common.JoinType._
 import quasar.common.SortDir.{Ascending, Descending}
 import quasar.{Data, DataCodec}
 import quasar.fp.ski._
-import quasar.DataCodec.Precise.TimeKey
+import quasar.DataCodec.Precise.{TimeKey, TimestampKey}
 import quasar.physical.rdbms.model._
 import quasar.physical.rdbms.fs.postgres._
 import quasar.physical.rdbms.planner.RenderQuery
@@ -75,8 +75,11 @@ object PostgresRenderQuery extends RenderQuery {
 
   def rowAlias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" ${i.v}"))
 
-  def buildJson(str: String): String =
-    s"json_build_object($str)#>>'{}'"
+  def buildJsonSingleton(str: String): String =
+    s"json_build_object('$str')#>>'{}'"
+
+  def buildJson(str: (String, String)*): String =
+    s"""json_build_object(${str.map {case (k, v) => s"'$k', $v"} .mkString(", ")})"""
 
   def text[T[_[_]]: BirecursiveT](pair: (T[SqlExpr], String)): String = {
     // The -> operator returns jsonb type, while ->> returns text. We need to choose one
@@ -163,7 +166,7 @@ object PostgresRenderQuery extends RenderQuery {
           InternalError("Refs with empty vector!", none).left // TODO refs should carry a Nel
       }
     case Obj(m) =>
-      buildJson(m.map {
+      buildJsonSingleton(m.map {
         case ((_, k), (_, v)) => s"'$k', $v"
       }.mkString(",")).right
     case RegexMatches(TextExpr(e), TextExpr(pattern), caseInsensitive: Boolean) =>
@@ -197,8 +200,6 @@ object PostgresRenderQuery extends RenderQuery {
       //This necessesites that all branch subexpressions have compatible types, even when their evaluated values
       //make no sens for the given argument, hence the apparent convolution of the exoression below
       s"(case when (pg_typeof($e)::regtype::text ~ 'jsonb?') then jsonb_array_length(to_jsonb($e)) else length($e::text) end)".right
-    case Time((_, expr)) =>
-      buildJson(s"""{ "$TimeKey": $expr }""").right
     case NumericOp(sym, NumExpr(left), NumExpr(right)) =>
       s"($left $sym $right)".right
     case Mod(NumExpr(a1), NumExpr(a2)) =>
@@ -311,5 +312,10 @@ object PostgresRenderQuery extends RenderQuery {
     }).right
 
     case ArrayUnwind(toUnwind) => s"jsonb_array_elements_text(${text(toUnwind)})".right
+
+    case Time((_, expr)) =>
+      buildJson((TimeKey, expr)).right
+    case Timestamp((_, expr)) =>
+      buildJson((TimestampKey, expr)).right
   }
 }

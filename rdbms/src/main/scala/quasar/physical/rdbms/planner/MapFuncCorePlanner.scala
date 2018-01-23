@@ -20,14 +20,13 @@ import slamdata.Predef._
 import slamdata.Predef.{Eq => _}
 import quasar.Data
 import quasar.DataCodec
-import DataCodec.Precise.{DateKey, IntervalKey, TimeKey, TimestampKey}
+import DataCodec.Precise.IntervalKey
 import quasar.Planner._
 import quasar.physical.rdbms.planner.sql.{Contains, StrLower, StrUpper, Substring, Search, StrSplit, ArrayConcat, SqlExpr => SQL}
 import quasar.physical.rdbms.planner.sql._
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.qscript.{MapFuncsCore => MFC, _}
-import quasar.std.StdLib.string.{dateRegex, timeRegex, timestampRegex}
 import matryoshka._
 import matryoshka.implicits._
 import quasar.physical.rdbms.model.{BoolCol, DecCol, IntCol, StringCol}
@@ -53,19 +52,6 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_] : Applicative : Plan
     nr.embed
   }
 
-  def datetime(a1: T[SQL], key: String, regex: Regex): T[SQL] = {
-    Case.build(
-      WhenThen(
-        IsNotNull(toKeyValue(a1, key)).embed,
-        a1),
-      WhenThen(
-        RegexMatches(a1, str(regex.regex), caseInsensitive = false).embed,
-        Obj(List(str(key) -> a1)).embed)
-    )(
-      Else(SQL.Null[T[SQL]].embed)
-    ).embed
-  }
-
   private def project(fSrc: T[SQL], fKey: T[SQL]) = fSrc.project match {
     case SQL.Refs(list, m) => SQL.Refs(list :+ fKey, m).embed.η[F]
     case _ => SQL.Refs(Vector(fSrc, fKey), deriveIndirection(fSrc)).embed.η[F] // _12
@@ -76,9 +62,9 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_] : Applicative : Plan
     case MFC.Undefined() =>  undefined.η[F]
     case MFC.JoinSideName(n) =>  notImplemented("JoinSideName", this)
     case MFC.Length(f) => SQL.Length(f).embed.η[F]
-    case MFC.Date(f) => datetime(f, DateKey, dateRegex.r).η[F]
-    case MFC.Time(f) =>  datetime(f, TimeKey, timeRegex.r).η[F]
-    case MFC.Timestamp(f) => datetime(f, TimestampKey, timestampRegex.r).η[F]
+    case MFC.Date(f) => notImplemented("Date", this)
+    case MFC.Time(f) =>  Time(f).embed.η[F]
+    case MFC.Timestamp(f) => Timestamp(f).embed.η[F]
     case MFC.Interval(f) =>
       Case.build(
         WhenThen(IsNotNull(toKeyValue(f, IntervalKey)).embed, f)

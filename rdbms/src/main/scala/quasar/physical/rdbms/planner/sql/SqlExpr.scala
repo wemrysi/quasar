@@ -41,7 +41,6 @@ object SqlExpr extends SqlExprInstances {
   final case class Obj[T](m: List[(T, T)]) extends SqlExpr[T]
   final case class IsNotNull[T](a1: T) extends SqlExpr[T]
   final case class ConcatStr[T](a1: T, a2: T) extends SqlExpr[T]
-  final case class Time[T](a1: T) extends SqlExpr[T]
   final case class Length[T](a1: T) extends SqlExpr[T]
   final case class IfNull[T](a: OneAnd[NonEmptyList, T]) extends SqlExpr[T]
 
@@ -130,6 +129,9 @@ object SqlExpr extends SqlExprInstances {
   }
 
   final case class ArrayUnwind[T](toUnwind: T) extends SqlExpr[T]
+
+  final case class Time[T](d: T) extends SqlExpr[T]
+  final case class Timestamp[T](d: T) extends SqlExpr[T]
 
 }
 
