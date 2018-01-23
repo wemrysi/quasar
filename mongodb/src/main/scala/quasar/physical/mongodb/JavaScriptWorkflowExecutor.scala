@@ -25,6 +25,7 @@ import scalaz._
 import scalaz.std.list._
 import scalaz.std.vector._
 import scalaz.std.option._
+import scalaz.syntax.equal._
 import scalaz.syntax.foldable._
 import scalaz.syntax.functor._
 
@@ -45,15 +46,15 @@ private[mongodb] final class JavaScriptWorkflowExecutor
   private def foldExpr[F[_]: Foldable, A](fa: F[A])(f: (A, Expr) => Expr): ExprS[Unit] =
     fa.traverse_[ExprS](a => MonadState[ExprS, Expr].modify(f(a, _)))
 
-  protected def aggregate(src: Collection, pipeline: Pipeline) =
+  protected def aggregate(src: Collection, pipeline: Pipeline, outColl: Option[Collection]) =
     tell(Call(
-      Select(toJsRef(src), "aggregate"),
+      Select(toJsRef0(src, outColl.map(_.database)), "aggregate"),
       List(
         AnonElem(pipeline map (_.bson.toJs)),
         AnonObjDecl(List("allowDiskUse" -> Bool(true))))))
 
   protected def aggregateCursor(src: Collection, pipeline: Pipeline) =
-    aggregate(src, pipeline)
+    aggregate(src, pipeline, None)
 
   protected def count(src: Collection, cfg: Count) = {
     val count0 = List(
@@ -121,5 +122,23 @@ private[mongodb] object JavaScriptWorkflowExecutor {
 
     case name =>
       Call(Select(Ident("db"), "getCollection"), List(Str(name)))
+  }
+
+  def toJsRef0(col: Collection, outDb: Option[DatabaseName]) = {
+    outDb match {
+      // if out.db != col.db
+      // then execute from out.db and use getSiblingDb(col.db) to access `col`
+      case Some(out) if out ≠ col.database =>
+        val sibDb = Call(Select(Ident("db"), "getSiblingDB"), List(Str(col.database.value)))
+        val execDb = out.value
+        col.collection.value match {
+          case name @ SimpleCollectionNamePattern() =>
+            Select(sibDb, name)
+
+          case name =>
+            Call(Select(sibDb, "getCollection"), List(Str(name)))
+        }
+      case _ => toJsRef(col)
+    }
   }
 }

@@ -42,8 +42,15 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
 
   /** Execute the given aggregation pipeline with the given collection as
     * input.
+    * FIXME use of `outColl` is a hack but necessary to be able to write
+    * results to another database than the source database
+    * ($out can only write to a collection in `src.database`).
+    * At the moment, the strategy for writing to another db is also different per implementation:
+    * - in `JavaScriptWorkflowExecutor` this is done by using `getSiblingDB`
+    * - in `MongoDbIOWorkflowExecutor` this is done by performing a `renameCollection`
+    *   after doing the aggregation
     */
-  protected def aggregate(src: Collection, pipeline: Pipeline): F[Unit]
+  protected def aggregate(src: Collection, pipeline: Pipeline, outColl: Option[Collection]): F[Unit]
 
   /** Returns a cursor to the results of evaluating the given aggregation
     * pipeline on the provided collection.
@@ -133,7 +140,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
   def execute(workflow: Crystallized[WorkflowF], dst: Collection): M[Unit] =
     execute0(task(workflow), dst)
       .flatMap(coll =>
-        asM(aggregate(coll, List(PipelineOp($OutF((), dst.collection).shapePreserving)))
+        asM(aggregate(coll, List(PipelineOp($OutF((), dst.collection).shapePreserving)), dst.some)
           .whenM(coll ≠ dst)).liftM[TempsT])
       .run(Set())
       .flatMap { case (tmps, _) => tmps traverse_ (c => asM(drop(c))) }
@@ -232,7 +239,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
         for {
           tmp <- tempColl(out.database)
           src <- execute0(source, tmp)
-          _   <- asM(aggregate(src, pipeline ::: List(PipelineOp($OutF((), out.collection).shapePreserving))))
+          _   <- asM(aggregate(src, pipeline ::: List(PipelineOp($OutF((), out.collection).shapePreserving)), out.some))
                    .liftM[TempsT]
         } yield out
 

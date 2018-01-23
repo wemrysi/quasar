@@ -41,8 +41,14 @@ private[mongodb] final class MongoDbIOWorkflowExecutor
   private def foldS[F[_]: Foldable, S, A](fa: F[A])(f: (A, S) => S): State[S, Unit] =
     fa.traverseS_[S, Unit](a => MonadState[State[S,?], S].modify(f(a, _)))
 
-  protected def aggregate(src: Collection, pipeline: Pipeline) =
-    MongoDbIO.aggregate(src, pipeline map (_.bson), true)
+  protected def aggregate(src: Collection, pipeline: Pipeline, outColl: Option[Collection]) = {
+    MongoDbIO.aggregate(src, pipeline map (_.bson), true) *>
+      (outColl match {
+        case Some(out) if (src.database =/= out.database) =>
+          MongoDbIO.rename(src.copy(collection = out.collection), out, RenameSemantics.FailIfExists)
+        case _ => ().point[MongoDbIO]
+      })
+  }
 
   protected def aggregateCursor(src: Collection, pipeline: Pipeline) =
     toCursor(
