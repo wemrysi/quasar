@@ -620,19 +620,27 @@ object MongoDbPlanner {
       GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = { node =>
     import MapFuncsCore._
 
-    val insideCond: OutputM[PartialSelector[T]] =
-      defaultSelector[T].right.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-
     // The `selector` algebra requires one side of a
     // comparison to be a Constant. The `Cond`s present here
     // do not have this shape, hence the condSelector decorator
     val alg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = {
-      case MFC(Cond((Embed(MFC(Eq(_, _))), _), _, ((Embed(MFC((Undefined())))), _)))
-         | MFC(Cond((Embed(MFC(Neq(_, _))), _), _, ((Embed(MFC((Undefined())))), _)))
-         | MFC(Cond((Embed(MFC(Lt(_, _))), _), _, ((Embed(MFC((Undefined())))), _)))
-         | MFC(Cond((Embed(MFC(Lte(_, _))), _), _, ((Embed(MFC((Undefined())))), _)))
-         | MFC(Cond((Embed(MFC(Gt(_, _))), _), _, ((Embed(MFC((Undefined())))), _)))
-         | MFC(Cond((Embed(MFC(Gte(_, _))), _), _, ((Embed(MFC((Undefined())))), _))) => insideCond
+      case MFC(Cond((cond, condSel), _, (Embed(MFC(Undefined())),_))) => cond.project match {
+        case MFC(Eq(_, _))
+           | MFC(Neq(_, _))
+           | MFC(Lt(_, _))
+           | MFC(Lte(_, _))
+           | MFC(Gt(_, _))
+           | MFC(Gte(_, _)) => defaultSelector[T].right.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
+        case _ => selector[T](v).apply(cond.project.map(l => (l, condSel))).map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
+      }
+
+    /**  The cases here don't readily imply selectors, but still need
+      *  to be handled in case a `Cond` is nested inside one of these.
+      *  For instance, if ConcatMaps includes filtering `Cond`s in BOTH maps,
+      *  these are extracted and `Or`ed using Selector.Or. In the case of
+      *  unary `MapFunc`s, we simply need to fix the InputFinder to look in
+      *  the right place.
+      */
       case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
       case MFC(ProjectKey((_, v), _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
       case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
