@@ -979,9 +979,12 @@ object MongoDbPlanner {
               val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
               val repair0 = repair.as[Hole](SrcHole).transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
 
-              getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler, cfg.bsonVersion)(src, struct0) >>= (builder =>
-                getExprBuilder[T, M, WF, EX](
-                  cfg.funcHandler, cfg.staticHandler, cfg.bsonVersion)(
+              getBuilder[T, M, WF, EX, Hole](
+                handleFreeMap[T, M, EX](
+                  cfg.funcHandler, cfg.staticHandler, _), cfg.bsonVersion)(src, struct0) >>= (builder =>
+                getBuilder[T, M, WF, EX, Hole](
+                  handleFreeMap[T, M, EX](
+                    cfg.funcHandler, cfg.staticHandler, _), cfg.bsonVersion)(
                   FlatteningBuilder(
                     builder,
                     shiftType match {
