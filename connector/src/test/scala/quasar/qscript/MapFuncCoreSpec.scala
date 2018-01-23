@@ -29,6 +29,7 @@ import matryoshka.implicits._
 import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.std.tuple._
+import scalaz.syntax.either._
 
 final class MapFuncCoreSpec extends Qspec with TTypes[Fix] with TreeMatchers {
   import MapFuncCore.{ConcatMapsN, StaticMap, StaticMapSuffix}
@@ -115,12 +116,15 @@ final class MapFuncCoreSpec extends Qspec with TTypes[Fix] with TreeMatchers {
   "StaticMapSuffix" >> {
     "equals StaticMap when expression is a static map" >> {
       val x = staticMapExpr.project
-      StaticMapSuffix.unapply(x) must_= StaticMap.unapply(x).map((None, _))
+      StaticMapSuffix.unapply(x) must_= StaticMap.unapply(x).map((Nil, _))
     }
 
     "emits no static part when map is completely dynamic" >> {
-      val x = func.ConcatMaps(func.Hole, func.ProjectKeyS(func.Hole, "baz"))
-      StaticMapSuffix.unapply(x.project) must_= Some((Some(x), List()))
+      val x = func.Hole
+      val y = func.ProjectKeyS(func.Hole, "baz")
+
+      StaticMapSuffix.unapply(func.ConcatMaps(x, y).project) must_=
+        Some((List(x.right, y.right), List()))
     }
 
     "emit static suffix when present" >> {
@@ -130,7 +134,7 @@ final class MapFuncCoreSpec extends Qspec with TTypes[Fix] with TreeMatchers {
       val mixed =
         func.ConcatMaps(dynMap, staticMapExpr)
 
-      StaticMapSuffix.unapply(mixed.project) must_= Some((Some(dynMap), staticAssocs))
+      StaticMapSuffix.unapply(mixed.project) must_= Some((List(dynMap.right), staticAssocs))
     }
   }
 
@@ -221,11 +225,7 @@ final class MapFuncCoreSpec extends Qspec with TTypes[Fix] with TreeMatchers {
           "baat")
 
       val expect =
-        func.ProjectKeyS(
-          func.ConcatMaps(
-            func.MakeMapS("foo", func.Hole),
-            func.ProjectKeyS(func.Hole, "bar")),
-          "baat")
+        func.ProjectKeyS(func.ProjectKeyS(func.Hole, "bar"), "baat")
 
       normalize(expr) must beTreeEqual(expect)
     }
