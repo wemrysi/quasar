@@ -111,7 +111,7 @@ lazy val backendRewrittenRunSettings = Seq(
       def trace(t: => Throwable): Unit = delegate.trace(t)
     }
 
-    r.run(main, (fullClasspath in Compile).value.files, args ++ backends, filtered) foreach sys.error
+    r.run(main, (fullClasspath in Compile).value.files, args ++ backends, filtered)
   })
 
 // In Travis, the processor count is reported as 32, but only ~2 cores are
@@ -148,7 +148,7 @@ lazy val assemblySettings = Seq(
     case PathList("org", "objectweb", "asm", xs @ _*)         => MergeStrategy.last // TODO remove this
     case PathList("javax", "ws", "rs", xs @ _*)               => MergeStrategy.last // and this
     case PathList("javax", "servlet", xs @ _*)                => MergeStrategy.last // and this
-    case PathList("com", "sun", "research", "ws", xs @ _*)    => MergeStrategy.last // and this 
+    case PathList("com", "sun", "research", "ws", xs @ _*)    => MergeStrategy.last // and this
     case PathList("mime.types", xs @ _*)                      => MergeStrategy.last // and this once each spark based connector has its own subproject
     case PathList("com", "google", "common", "base", xs @ _*) => MergeStrategy.last
     case "log4j.properties"                                   => MergeStrategy.discard
@@ -178,6 +178,10 @@ lazy val assemblySettings = Seq(
 
 // Build and publish a project, excluding its tests.
 lazy val commonSettings = buildSettings ++ publishSettings ++ assemblySettings
+
+// not doing this causes NoSuchMethodErrors when using coursier
+lazy val excludeTypelevelScalaLibrary = 
+  Seq(excludeDependencies += "org.typelevel" % "scala-library")
 
 // Include to also publish a project's tests
 lazy val publishTestsSettings = Seq(
@@ -227,6 +231,7 @@ lazy val root = project.in(file("."))
   .settings(noPublishSettings)
   .settings(transferPublishAndTagResources)
   .settings(aggregate in assembly := false)
+  .settings(excludeTypelevelScalaLibrary)
   .aggregate(
 // NB: need to get dependencies to look like:
 //         ┌ common ┐
@@ -286,6 +291,7 @@ lazy val foundation = project
     isCIBuild := isTravisBuild.value,
     isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
     libraryDependencies ++= Dependencies.foundation)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 /** A fixed-point implementation of the EJson spec. This should probably become
@@ -297,6 +303,7 @@ lazy val ejson = project
   .settings(libraryDependencies ++= Dependencies.ejson)
   .settings(commonSettings)
   .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val effect = project
@@ -305,6 +312,7 @@ lazy val effect = project
   .settings(libraryDependencies ++= Dependencies.effect)
   .settings(commonSettings)
   .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Somewhat Quasar- and MongoDB-specific JavaScript implementations.
@@ -314,6 +322,7 @@ lazy val js = project
   .dependsOn(foundation % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Quasar components shared by both frontend and connector. This includes
@@ -327,6 +336,7 @@ lazy val common = project
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** The compiler from `LogicalPlan` to `QScript` – this is the bulk of
@@ -342,6 +352,7 @@ lazy val core = project
     libraryDependencies ++= Dependencies.core,
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 // frontends
@@ -358,6 +369,7 @@ lazy val frontend = project
     libraryDependencies ++= Dependencies.frontend,
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the SQL² query language.
@@ -367,6 +379,7 @@ lazy val sql = project
   .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 // connectors
@@ -386,6 +399,7 @@ lazy val connector = project
   .settings(
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the Couchbase connector.
@@ -398,6 +412,7 @@ lazy val couchbase = project
   .settings(libraryDependencies ++= Dependencies.couchbase)
   .settings(githubReleaseSettings)
   .settings(isolatedBackendSettings("quasar.physical.couchbase.Couchbase$"))
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the MarkLogic connector.
@@ -411,6 +426,7 @@ lazy val marklogic = project
   .settings(libraryDependencies ++= Dependencies.marklogic)
   .settings(githubReleaseSettings)
   .settings(isolatedBackendSettings("quasar.physical.marklogic.MarkLogic$"))
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the MongoDB connector.
@@ -431,6 +447,7 @@ lazy val mongodb = project
       Wart.Overloading))
   .settings(githubReleaseSettings)
   .settings(isolatedBackendSettings("quasar.physical.mongodb.MongoDb$"))
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** A connector outline, meant to be copied and incrementally filled in while
@@ -441,6 +458,7 @@ lazy val skeleton = project
   .dependsOn(connector % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val rdbms = project
@@ -452,6 +470,7 @@ lazy val rdbms = project
   .settings(githubReleaseSettings)
   .settings(libraryDependencies ++= Dependencies.rdbmscore)
   .settings(isolatedBackendSettings("quasar.physical.rdbms.fs.postgres.Postgres$"))
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Implementation of the Spark connector.
@@ -478,6 +497,7 @@ lazy val rdbms = project
       "quasar.physical.sparkcore.fs.elastic.SparkElastic$",
       "quasar.physical.sparkcore.fs.hdfs.SparkHdfs$",
       "quasar.physical.sparkcore.fs.local.SparkLocal$"))
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)*/
 
 // interfaces
@@ -494,6 +514,7 @@ lazy val interface = project
   .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.interface)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** An interactive REPL application for Quasar.
@@ -509,6 +530,7 @@ lazy val repl = project
     fork in run := true,
     connectInput in run := true,
     outputStrategy := Some(StdoutOutput))
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** An HTTP interface to Quasar.
@@ -524,6 +546,7 @@ lazy val web = project
   .settings(
     mainClass in Compile := Some("quasar.server.Server"),
     libraryDependencies ++= Dependencies.web)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Integration tests that have some dependency on a running connector.
@@ -566,6 +589,7 @@ lazy val it = project
 
       test in Test
     }.value)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val marklogicIt = project
@@ -578,6 +602,7 @@ lazy val marklogicIt = project
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val mongoIt = project
@@ -590,6 +615,7 @@ lazy val mongoIt = project
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val couchbaseIt = project
@@ -602,6 +628,7 @@ lazy val couchbaseIt = project
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /*lazy val sparkcoreIt = project
@@ -614,6 +641,7 @@ lazy val couchbaseIt = project
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)*/
 
 lazy val rdbmsIt = project
@@ -626,6 +654,7 @@ lazy val rdbmsIt = project
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 /***** PRECOG *****/
@@ -636,22 +665,24 @@ lazy val precog = project.setup
   .settings(name := "quasar-precog-internal")
   .dependsOn(common % BothScopes)
   .withWarnings
-  .deps(Dependencies.precog: _*)
+  .settings(libraryDependencies ++= Dependencies.precog)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val blueeyes = project.setup
   .settings(name := "quasar-blueeyes-internal")
   .dependsOn(precog % BothScopes, frontend)
   .withWarnings
-  .settings(libraryDependencies += "com.google.guava" %  "guava" % "13.0")
+  .settings(libraryDependencies ++= Dependencies.blueeyes)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val mimir = project.setup
@@ -659,16 +690,12 @@ lazy val mimir = project.setup
   .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector)
   .scalacArgs("-Ypartial-unification")
   .withWarnings
-  .settings(
-    libraryDependencies ++= Seq(
-      "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2",
-
-      "co.fs2" %% "fs2-core"   % "0.9.6",
-      "co.fs2" %% "fs2-scalaz" % "0.2.0"))
+  .settings(libraryDependencies ++= Dependencies.mimir)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val niflheim = project.setup
@@ -676,15 +703,12 @@ lazy val niflheim = project.setup
   .dependsOn(blueeyes % BothScopes, precog % BothScopes)
   .scalacArgs("-Ypartial-unification")
   .withWarnings
-  .settings(
-    libraryDependencies ++= Seq(
-      "com.typesafe.akka"  %% "akka-actor" % "2.4.12",
-      "org.typelevel"      %% "spire"      % "0.14.1", // TODO use spireVersion from project/Dependencies.scala
-      "org.objectweb.howl" %  "howl"       % "1.0.1-1"))
+  .settings(libraryDependencies ++= Dependencies.niflheim)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val yggdrasil = project.setup
@@ -693,17 +717,11 @@ lazy val yggdrasil = project.setup
   .withWarnings
   .settings(
     resolvers += "bintray-djspiewak-maven" at "https://dl.bintray.com/djspiewak/maven",
-
-    libraryDependencies ++= Seq(
-      "io.verizon.delorean" %% "core" % "1.2.42-scalaz-7.2",
-
-      "co.fs2" %% "fs2-core"   % "0.9.6",
-      "co.fs2" %% "fs2-io"     % "0.9.6",
-      "co.fs2" %% "fs2-scalaz" % "0.2.0",
-
-      "com.codecommit" %% "smock" % "0.3.1-specs2-4.0.2" % "test"))
+    libraryDependencies ++= Dependencies.yggdrasil)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)
   .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
+
