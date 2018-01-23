@@ -42,15 +42,8 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
 
   /** Execute the given aggregation pipeline with the given collection as
     * input.
-    * FIXME use of `outColl` is a hack but necessary to be able to write
-    * results to another database than the source database
-    * ($out can only write to a collection in `src.database`).
-    * At the moment, the strategy for writing to another db is also different per implementation:
-    * - in `JavaScriptWorkflowExecutor` this is done by using `getSiblingDB`
-    * - in `MongoDbIOWorkflowExecutor` this is done by performing a `renameCollection`
-    *   after doing the aggregation
     */
-  protected def aggregate(src: Collection, pipeline: Pipeline, outColl: Option[Collection]): F[Unit]
+  protected def aggregate(src: Collection, pipeline: Pipeline): F[Unit]
 
   /** Returns a cursor to the results of evaluating the given aggregation
     * pipeline on the provided collection.
@@ -88,6 +81,8 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
     * the provided collection.
     */
   protected def mapReduceCursor(src: Collection, mr: MapReduce): F[C]
+
+  protected def renameCollection(src: Collection, dst: Collection): F[Unit]
 
   //--- Derived Methods ---
 
@@ -140,7 +135,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
   def execute(workflow: Crystallized[WorkflowF], dst: Collection): M[Unit] =
     execute0(task(workflow), dst)
       .flatMap(coll =>
-        asM(aggregate(coll, List(PipelineOp($OutF((), dst.collection).shapePreserving)), dst.some)
+        asM(aggregateOut(coll, Nil, dst)
           .whenM(coll ≠ dst)).liftM[TempsT])
       .run(Set())
       .flatMap { case (tmps, _) => tmps traverse_ (c => asM(drop(c))) }
@@ -203,6 +198,16 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
     }
   }
 
+  /**
+   * An extension of aggregate that allows writing to `outColl` of which the
+   * database is different than the `src.database`
+   */
+  def aggregateOut(src: Collection, pipeline: Pipeline, out: Collection): F[Unit] =
+    aggregate(src, pipeline ::: List(PipelineOp($OutF((), out.collection).shapePreserving))) *>
+      (if (src.database ≠ out.database)
+         renameCollection(src.copy(collection = out.collection), out)
+       else ().point[F])
+
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def execute0(wt: WorkflowTask, out: Collection)
     (implicit ev: WorkflowOpCoreF :<: WorkflowF)
@@ -239,8 +244,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
         for {
           tmp <- tempColl(out.database)
           src <- execute0(source, tmp)
-          _   <- asM(aggregate(src, pipeline ::: List(PipelineOp($OutF((), out.collection).shapePreserving)), out.some))
-                   .liftM[TempsT]
+          _   <- asM(aggregateOut(src, pipeline, out)).liftM[TempsT]
         } yield out
 
       case MapReduceTask(source, mr, oa) =>
