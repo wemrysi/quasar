@@ -61,7 +61,7 @@ final class MapFuncCoreSpec extends Qspec with TTypes[Fix] with TreeMatchers {
       StaticMap(staticAssocs) must beTreeEqual(staticMapExpr)
     }
 
-    "extractor should returns static key/value pairs" >> {
+    "extractor should return static key/value pairs" >> {
       StaticMap.unapply(staticMapExpr.project) must beSome(equal(staticAssocs))
     }
 
@@ -212,7 +212,7 @@ final class MapFuncCoreSpec extends Qspec with TTypes[Fix] with TreeMatchers {
       normalize(expr) must beTreeEqual(func.Constant[Hole](ejs.char('b')))
     }
 
-    "elide static part when projecting key not present" >> {
+    "elide all static parts when requested key not present" >> {
       val expr =
         func.ProjectKeyS(
           func.ConcatMaps(
@@ -226,6 +226,60 @@ final class MapFuncCoreSpec extends Qspec with TTypes[Fix] with TreeMatchers {
 
       val expect =
         func.ProjectKeyS(func.ProjectKeyS(func.Hole, "bar"), "baat")
+
+      normalize(expr) must beTreeEqual(expect)
+    }
+
+    "elide static suffix when requested key in prefix" >> {
+      val expr =
+        func.ProjectKeyS(
+          func.ConcatMaps(
+            func.ConcatMaps(
+              func.ConcatMaps(
+                func.MakeMapS("foo", func.Hole),
+                func.ProjectKeyS(func.Hole, "bar")),
+              func.MakeMapS("baz", func.Hole)),
+            func.MakeMapS("quux", func.Hole)),
+          "foo")
+
+      val expect =
+        func.ProjectKeyS(
+          func.ConcatMaps(
+            func.MakeMapS("foo", func.Hole),
+            func.ProjectKeyS(func.Hole, "bar")),
+          "foo")
+
+      normalize(expr) must beTreeEqual(expect)
+    }
+
+    "simplify projecting from a Cond with static suffix in both branches" >> {
+      val c =
+        StaticMap(List(
+          ejs.char('a') -> func.ProjectKeyS(func.Hole, "bar")
+        , ejs.char('b') -> func.Constant[Hole](ejs.dec(42.42))))
+
+      val a =
+        StaticMapSuffix(
+          List(
+            (ejs.int(1), func.Constant[Hole](ejs.str("blah"))).left
+          , func.ProjectIndexI(func.Hole, 3).right),
+          List(
+            ejs.char('b') -> func.ProjectKeyS(func.Hole, "baz"),
+            ejs.int(7) -> func.Constant[Hole](ejs.str("meh"))))
+
+      val expr =
+        func.ProjectKey(
+          func.Cond(
+            func.ProjectKeyS(func.Hole, "test"),
+            c,
+            a),
+          func.Constant[Hole](ejs.char('b')))
+
+      val expect =
+        func.Cond(
+          func.ProjectKeyS(func.Hole, "test"),
+          func.Constant[Hole](ejs.dec(42.42)),
+          func.ProjectKeyS(func.Hole, "baz"))
 
       normalize(expr) must beTreeEqual(expect)
     }
