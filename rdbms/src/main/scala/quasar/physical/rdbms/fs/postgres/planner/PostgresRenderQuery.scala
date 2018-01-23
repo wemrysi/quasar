@@ -192,6 +192,10 @@ object PostgresRenderQuery extends RenderQuery {
     case Distinct((_, e)) =>
       s"distinct $e".right
     case Length((_, e)) =>
+      //conditional expressions in Postgres have no defined lazyness guarantees and are effectively eager in a lot
+      //of situations, see https://www.postgresql.org/docs/9.6/static/sql-expressions.html#SYNTAX-EXPRESS-EVAL
+      //This necessesites that all branch subexpressions have compatible types, even when their evaluated values
+      //make no sens for the given argument, hence the apparent convolution of the exoression below
       s"(case when (pg_typeof($e)::regtype::text ~ 'jsonb?') then jsonb_array_length(to_jsonb($e)) else length($e::text) end)".right
     case Time((_, expr)) =>
       buildJson(s"""{ "$TimeKey": $expr }""").right
