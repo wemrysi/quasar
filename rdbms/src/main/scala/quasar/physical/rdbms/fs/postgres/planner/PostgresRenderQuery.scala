@@ -316,6 +316,6 @@ object PostgresRenderQuery extends RenderQuery {
     case Timestamp((_, expr)) =>
       buildJson((TimestampKey, expr)).right
     case DatePart(TextExpr(part), (_, expr)) =>
-      s"date_part($part, to_timestamp($expr->>'$TimestampKey', 'YYYY-MM-DD HH24:MI:SSZ'))::text".right
+      s"date_part($part, to_timestamp($expr->>'$TimestampKey', 'YYYY-MM-DD HH24:MI:SSZ'))".right
   }
 }
