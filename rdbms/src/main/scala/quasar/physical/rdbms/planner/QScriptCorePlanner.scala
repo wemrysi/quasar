@@ -28,7 +28,7 @@ import sql.Indirections._
 import sql.SqlExpr._
 import sql.{SqlExpr, _}
 import sql.SqlExpr.Select._
-import quasar.qscript.{ExcludeId, FreeMap, MapFunc, OnUndefined, QScriptCore, QScriptTotal, Reduce, ReduceFuncs, ShiftType}
+import quasar.qscript.{ExcludeId, FreeMap, MapFunc, QScriptCore, QScriptTotal, Reduce, ReduceFuncs, ShiftType}
 import quasar.qscript.{MapFuncCore => MFC}
 import quasar.qscript.{MapFuncDerived => MFD}
 import MFC._
@@ -164,7 +164,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
        ).embed
     }
 
-    case qscript.LeftShift(src, struct, ExcludeId, ShiftType.Array, OnUndefined.Omit, repair) =>
+    case qscript.LeftShift(src, struct, ExcludeId, ShiftType.Array, _, repair) =>
       for {
         structAlias <- genId[T[SqlExpr], F](deriveIndirection(src))
         structExpr  <- processFreeMap(struct, structAlias)
