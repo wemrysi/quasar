@@ -47,7 +47,7 @@ import scala.concurrent.Future
 final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
     liftF: Task ~> F, liftFCake: CakeM ~> F) {
 
-  def mapFuncPlanner[F[_]: Monad] = MapFuncPlanner[T, F, MapFunc[T, ?]]
+  def mapFuncPlanner[G[_]: Monad] = MapFuncPlanner[T, G, MapFunc[T, ?]]
 
   def plan(planQST: AlgebraM[F, QScriptTotal[T, ?], MimirRepr])
       : AlgebraM[F, QScriptCore[T, ?], MimirRepr] = {

@@ -139,6 +139,9 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
       λ[Task ~> Backend](_.liftM[MT].liftB),
       λ[M ~> Backend](_.liftB))
 
+    def equiJoinPlanner = new EquiJoinPlanner[T, Backend](
+      λ[Task ~> Backend](_.liftM[MT].liftB))
+
     lazy val planQST: AlgebraM[Backend, QScriptTotal[T, ?], Repr] =
       _.run.fold(
         qScriptCorePlanner.plan(planQST),
@@ -147,7 +150,7 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
           _.run.fold(
             _ => ???,   // ThetaJoin
             _.run.fold(
-              planEquiJoin,
+              equiJoinPlanner.plan(planQST),
               _.run.fold(
                 _ => ???,    // ShiftedRead[ADir]
                 _.run.fold(
@@ -157,104 +160,6 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
                     _.run.fold(
                       _ => ???,   // Read[AFile]
                       _ => ???))))))))    // DeadEnd
-
-    lazy val planEquiJoin: AlgebraM[Backend, EquiJoin[T, ?], Repr] = {
-      case qscript.EquiJoin(src, lbranch, rbranch, keys, tpe, combine) =>
-        import src.P.trans._, scalaz.syntax.std.option._
-
-        def rephrase2(projection: TransSpec2, rootL: TransSpec1, rootR: TransSpec1): Option[SortOrdering[TransSpec1]] = {
-          val leftRephrase = TransSpec.rephrase(projection, SourceLeft, rootL).fold(Set.empty[TransSpec1])(Set(_))
-          val rightRephrase = TransSpec.rephrase(projection, SourceRight, rootR).fold(Set.empty[TransSpec1])(Set(_))
-          val bothRephrased = leftRephrase ++ rightRephrase
-
-          if (bothRephrased.isEmpty)
-            None
-          else
-            SortOrdering(bothRephrased, SortAscending, unique = false).some
-        }
-
-        val (lkeys, rkeys) = keys.unfzip
-
-        for {
-          leftRepr <- lbranch.cataM(interpretM(κ(src.point[Backend]), planQST))
-          rightRepr <- rbranch.cataM(interpretM(κ(src.point[Backend]), planQST))
-
-          lmerged = src.unsafeMerge(leftRepr)
-          ltable = lmerged.table
-
-          rmerged = src.unsafeMerge(rightRepr)
-          rtable = rmerged.table
-
-          transLKeys <- lkeys traverse interpretMapFunc[T, Backend](src.P, mapFuncPlanner)
-          transLKey = combineTransSpecs(src.P)(transLKeys)
-          transRKeys <- rkeys traverse interpretMapFunc[T, Backend](src.P, mapFuncPlanner)
-          transRKey = combineTransSpecs(src.P)(transRKeys)
-
-          transMiddle <- combine.cataM[Backend, TransSpec2](
-            interpretM(
-              {
-                case qscript.LeftSide => TransSpec2.LeftId.point[Backend]
-                case qscript.RightSide => TransSpec2.RightId.point[Backend]
-              },
-              mapFuncPlanner[Backend].plan(src.P)[Source2](TransSpec2.LeftId)
-            )
-          ) // TODO weirdly left-biases things like constants
-
-          // identify full-cross and avoid cogroup
-          resultAndSort <- {
-            if (keys.isEmpty) {
-              log.trace("EQUIJOIN: full-cross detected!")
-
-              (ltable.cross(rtable)(transMiddle), src.unsafeMerge(leftRepr).lastSort).point[Backend]
-            } else {
-              log.trace("EQUIJOIN: not a full-cross; sorting and cogrouping")
-
-              for {
-                lsorted <- sortT[leftRepr.P.type](MimirRepr.single[leftRepr.P](leftRepr))(leftRepr.table, leftRepr.mergeTS1(transLKey))
-                  .liftM[MT].liftB.map(r => src.unsafeMergeTable(r.table))
-                rsorted <- sortT[rightRepr.P.type](MimirRepr.single[rightRepr.P](rightRepr))(rightRepr.table, rightRepr.mergeTS1(transRKey))
-                  .liftM[MT].liftB.map(r => src.unsafeMergeTable(r.table))
-
-                transLeft <- tpe match {
-                  case JoinType.LeftOuter | JoinType.FullOuter =>
-                    combine.cataM[Backend, TransSpec1](
-                      interpretM(
-                        {
-                          case qscript.LeftSide => TransSpec1.Id.point[Backend]
-                          case qscript.RightSide => TransSpec1.Undef.point[Backend]
-                        },
-                        mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)
-                      )
-                    )
-
-                  case JoinType.Inner | JoinType.RightOuter =>
-                    TransSpec1.Undef.point[Backend]
-                }
-
-                transRight <- tpe match {
-                  case JoinType.RightOuter | JoinType.FullOuter =>
-                    combine.cataM[Backend, TransSpec1](
-                      interpretM(
-                        {
-                          case qscript.LeftSide => TransSpec1.Undef.point[Backend]
-                          case qscript.RightSide => TransSpec1.Id.point[Backend]
-                        },
-                        mapFuncPlanner[Backend].plan(src.P)[Source1](TransSpec1.Id)
-                      )
-                    )
-
-                  case JoinType.Inner | JoinType.LeftOuter =>
-                    TransSpec1.Undef.point[Backend]
-                }
-                newSortOrder = rephrase2(transMiddle, transLKey, transRKey)
-              } yield (lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle),
-                  newSortOrder.map(order => SortState(None, order :: Nil)))
-            }
-          }
-
-          (result, newSort) = resultAndSort
-        } yield MimirRepr.withSort(src.P)(result)(newSort)
-    }
 
     lazy val planShiftedRead: AlgebraM[Backend, Const[ShiftedRead[AFile], ?], Repr] = {
       case Const(ShiftedRead(path, status)) => {
@@ -306,7 +211,9 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
     }
 
     def planQSM(in: QSM[T, Repr]): Backend[Repr] =
-      in.run.fold(qScriptCorePlanner.plan(planQST), _.run.fold(planEquiJoin, planShiftedRead))
+      in.run.fold(qScriptCorePlanner.plan(planQST), _.run.fold(
+        equiJoinPlanner.plan(planQST),
+	planShiftedRead))
 
     cp.cataM(planQSM _)
   }
