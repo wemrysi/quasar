@@ -2,8 +2,7 @@
     "name": "select string concatenation",
     "backends": {
         "mimir":"pendingIgnoreFieldOrder",
-        "couchbase": "ignoreFieldOrder",
-        "postgres": "pending"
+        "couchbase": "ignoreFieldOrder"
     },
     "NB": "Pending for mimir due to Q#2692.",
     "NB2": "Skipping for postgres: incorrenctly rendered 'where' clause ('could not determine polymorphic type...')",

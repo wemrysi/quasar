@@ -132,7 +132,7 @@ object PostgresRenderQuery extends RenderQuery {
       bool(pair).some
   }
 
-  private def postgresArray(jsonArrayRepr: String) = s"array_to_json(ARRAY$jsonArrayRepr)"
+  private def postgresArray(jsonArrayRepr: String) = s"to_jsonb(array_to_json(ARRAY$jsonArrayRepr))"
 
   final case class Acc(s: String, m: Indirections.Indirection)
 
@@ -290,7 +290,14 @@ object PostgresRenderQuery extends RenderQuery {
       val wts = wt ∘ { case WhenThen(TextExpr(w), TextExpr(t)) => s"when ($w)::boolean then $t" }
       s"(case ${wts.intercalate(" ")} else ${text(e.v)} end)".right
     case TypeOf(e) => s"pg_typeof($e)".right
-    case Coercion(t, (_, e)) => s"($e)::${t.mapToStringName}".right
+    case Coercion(t, (eSrc, e)) =>
+      val inner = t match {
+        //these have to be converted raw, because otherwise we in e.g. 4.5::text::bigint,
+        //which is an invalid conversion according to Postgres (unlike 4.5::bigint)
+        case IntCol | DecCol => e
+        case _ => text((eSrc, e))
+      }
+      s"($inner)::${t.mapToStringName}".right
     case ToArray(TextExpr(v)) => postgresArray(s"[$v]").right
     case UnaryFunction(fType, TextExpr(e)) =>
       val fName = fType match {
@@ -301,7 +308,11 @@ object PostgresRenderQuery extends RenderQuery {
       s"$fName($e)".right
     case BinaryFunction(fType, (_, a1), (a2Src, a2)) => (fType match {
         case StrSplit => s"regexp_split_to_array($a1, ${text((a2Src, a2))})"
-        case ArrayConcat => s"(to_jsonb($a1) || to_jsonb($a2))"
+        //QScripts ConcatArray is emitted both for strings and JSONs, using || here
+        //since the same operator is used in Postgres for both.
+        //May cause issues with mixed-typed (e.g. JSON/String) operands,
+        //and necessitate explicit type casts.
+        case ArrayConcat => s"($a1 || $a2)"
         case Contains => s"($a1 IN (SELECT jsonb_array_elements_text(to_jsonb($a2))))"
       }).right
     case TernaryFunction(fType, a1, a2, a3) => (fType match {
