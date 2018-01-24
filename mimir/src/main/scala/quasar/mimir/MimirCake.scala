@@ -16,6 +16,7 @@
 
 package quasar.mimir
 
+import quasar.contrib.scalaz._
 import quasar.fp.ski.κ
 import quasar.qscript._
 import quasar.yggdrasil.TableModule.{DesiredSortOrder, SortAscending}
@@ -38,6 +39,8 @@ object MimirCake {
 
   type MT[F[_], A] = Kleisli[F, Cake, A]
   type CakeM[A] = MT[Task, A]
+
+  def cake[F[_]](implicit F: MonadReader_[F, Cake]): F[Cake] = F.ask
 
   // EquiJoin results are sorted by both keys at the same time, so we need to keep track of both
   final case class SortOrdering[TS1](sortKeys: Set[TS1], sortOrder: DesiredSortOrder, unique: Boolean) {

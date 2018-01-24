@@ -25,7 +25,6 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
 import quasar.fp.numeric._
-import quasar.fp.ski.κ
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.mimir.MimirCake._
@@ -35,7 +34,6 @@ import quasar.qscript.rewrites.{Optimize, Unicoalesce, Unirewrite}
 
 import quasar.blueeyes.json.JValue
 import quasar.precog.common.Path
-import quasar.yggdrasil.TableModule.SortAscending
 import quasar.yggdrasil.bytecode.JType
 
 import delorean._
@@ -47,7 +45,6 @@ import fs2.interop.scalaz._
 import matryoshka._
 import matryoshka.implicits._
 import matryoshka.data._
-import matryoshka.patterns._
 
 import org.slf4s.Logging
 
@@ -85,8 +82,6 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
 
   type Repr = MimirRepr
   type M[A] = CakeM[A]
-
-  def cake[F[_]](implicit F: MonadReader_[F, Cake]): F[Cake] = F.ask
 
   import Cost._
   import Cardinality._
@@ -142,6 +137,13 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
     def equiJoinPlanner = new EquiJoinPlanner[T, Backend](
       λ[Task ~> Backend](_.liftM[MT].liftB))
 
+    val liftErr: FileSystemErrT[M, ?] ~> Backend =
+      Hoist[FileSystemErrT].hoist[M, PhaseResultT[Configured, ?]](
+        λ[Configured ~> PhaseResultT[Configured, ?]](_.liftM[PhaseResultT])
+          compose λ[M ~> Configured](_.liftM[ConfiguredT]))
+
+    def shiftedReadPlanner = new ShiftedReadPlanner[T, Backend](liftErr)
+
     lazy val planQST: AlgebraM[Backend, QScriptTotal[T, ?], Repr] =
       _.run.fold(
         qScriptCorePlanner.plan(planQST),
@@ -154,66 +156,17 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
               _.run.fold(
                 _ => ???,    // ShiftedRead[ADir]
                 _.run.fold(
-                  planShiftedRead,
+                  shiftedReadPlanner.plan,
                   _.run.fold(
                     _ => ???,   // Read[ADir]
                     _.run.fold(
                       _ => ???,   // Read[AFile]
                       _ => ???))))))))    // DeadEnd
 
-    lazy val planShiftedRead: AlgebraM[Backend, Const[ShiftedRead[AFile], ?], Repr] = {
-      case Const(ShiftedRead(path, status)) => {
-        val pathStr: String = pathy.Path.posixCodec.printPath(path)
-
-        val loaded: EitherT[M, FileSystemError, Repr] =
-          for {
-            precog <- cake[EitherT[M, FileSystemError, ?]]
-
-            repr <-
-              MimirRepr.meld[EitherT[M, FileSystemError, ?]](
-                new DepFn1[Cake, λ[`P <: Cake` => EitherT[M, FileSystemError, P#Table]]] {
-                  def apply(P: Cake): EitherT[M, FileSystemError, P.Table] = {
-                    val et =
-                      P.Table.constString(Set(pathStr)).load(JType.JUniverseT).mapT(_.toTask)
-
-                    et.mapT(_.liftM[MT]) leftMap { err =>
-                      val msg = err.messages.toList.reduce(_ + ";" + _)
-                      readFailed(posixCodec.printPath(path), msg)
-                    }
-                  }
-                })
-          } yield {
-            import repr.P.trans._
-
-            status match {
-              case IdOnly =>
-                repr.map(_.transform(constants.SourceKey.Single))
-
-              case IncludeId =>
-                val ids = constants.SourceKey.Single
-                val values = constants.SourceValue.Single
-
-                // note that ids are already an array
-                repr.map(_.transform(InnerArrayConcat(ids, WrapArray(values))))
-
-              case ExcludeId =>
-                repr.map(_.transform(constants.SourceValue.Single))
-            }
-          }
-
-        val result: FileSystemErrT[M, ?] ~> Backend =
-          Hoist[FileSystemErrT].hoist[M, PhaseResultT[Configured, ?]](
-            λ[Configured ~> PhaseResultT[Configured, ?]](_.liftM[PhaseResultT])
-              compose λ[M ~> Configured](_.liftM[ConfiguredT]))
-
-        result(loaded)
-      }
-    }
-
     def planQSM(in: QSM[T, Repr]): Backend[Repr] =
       in.run.fold(qScriptCorePlanner.plan(planQST), _.run.fold(
         equiJoinPlanner.plan(planQST),
-	planShiftedRead))
+	shiftedReadPlanner.plan))
 
     cp.cataM(planQSM _)
   }
