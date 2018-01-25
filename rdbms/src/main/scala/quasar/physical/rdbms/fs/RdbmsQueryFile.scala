@@ -39,7 +39,6 @@ import matryoshka.data.Fix
 import pathy.Path
 import scalaz._
 import Scalaz._
-import scalaz.stream.Process._
 
 trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] {
   self: Rdbms =>
@@ -90,8 +89,7 @@ trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] {
               .query[Data]
               .process
               .chunk(chunkSize)
-              .attempt(ex =>
-                emit(readFailed(qStr, ex.getLocalizedMessage)))
+              .map(_.right[quasar.fs.FileSystemError])
               .transact(xa))
           }.liftB
      })
