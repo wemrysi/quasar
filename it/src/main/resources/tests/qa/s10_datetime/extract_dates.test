@@ -3,7 +3,8 @@
 
   "backends": {
     "marklogic_json":       "ignoreFieldOrder",
-    "postgres":             "ignoreResultOrder"
+    "postgres":             "ignoreResultOrder",
+    "mimir":                "skip"
   },
   "data": "../dates.data",
 
