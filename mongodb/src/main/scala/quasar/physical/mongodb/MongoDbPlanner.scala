@@ -1180,6 +1180,15 @@ object MongoDbPlanner {
     import MapFuncCore._
     import MapFuncsCore._
 
+    val corec = Corecursive[Cofree[MapFunc[T, ?], Boolean], EnvT[Boolean, MapFunc[T, ?], ?]]
+    //
+    // type GCoalgebra[N[_], F[_], A]        = A => F[N[A]] // GCoalgebraM[N, Id, F, A]
+    val coalg: FreeMapA[T, A] => EnvT[Boolean, MapFunc[T, ?], Cofree[MapFunc[T, ?], Boolean] \/ FreeMapA[T, A]] = {
+      case node @ MFC(Cond(_, _, _)) => envT(true, node.right)
+    }
+    // val coalg: GCoalgebra[Cofree[MapFunc[T, ?], Boolean] \/ ?, EnvT[Boolean, MapFunc[T, ?], ?], FreeMapA[T, A]] = ???
+    val ann: Cofree[MapFunc[T, ?], Boolean] = corec.apo[FreeMapA[T, A]](fm)(coalg)
+
     def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
         M[WorkflowBuilder[WF]] = {
       val (sel, inputs) = partialSel
