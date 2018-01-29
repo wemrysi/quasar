@@ -156,6 +156,10 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
             (b.traverse(elide) ⊛
               order.traverse(t => elide(t._1).map(x => (x, t._2))))(
               (b0, order0) => GtoF.reverseGet(QC(Sort(src, b0, order0))))
+        case QC(Subset(src, from, op, count))
+          if (isRewrite[T, F, G, A](GtoF, src.project)) =>
+            (elideQS(isRewrite = true, from) ⊛ elideQS(isRewrite = true, count))(
+              (from0, count0) => GtoF.reverseGet(QC(Subset(src, from0, op, count0))))
         case QC(Union(src, lBranch, rBranch))
           if (isRewrite[T, F, G, A](GtoF, src.project)) =>
             (elideQS(isRewrite = true, lBranch) ⊛ elideQS(isRewrite = true, rBranch))(
