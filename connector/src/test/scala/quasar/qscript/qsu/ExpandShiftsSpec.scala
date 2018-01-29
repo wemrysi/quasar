@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,28 +17,27 @@
 package quasar.qscript.qsu
 
 import quasar.Planner.PlannerError
-import quasar.ejson.EJson
-import slamdata.Predef.{Map => _, _}
 import quasar.{Qspec, TreeMatchers}
+import quasar.ejson.EJson
+import quasar.fp._
+import quasar.qscript.{construction, Hole, ExcludeId, OnUndefined, SrcHole}
+import quasar.qscript.qsu.{QScriptUniform => QSU}
+import slamdata.Predef.{Map => _, _}
 
-import scalaz.\/
-import quasar.qscript.{construction, Hole, ExcludeId, SrcHole}
 import matryoshka._
 import matryoshka.data._
-import quasar.fp._
-import Fix._
 import org.specs2.matcher.{Expectable, MatchResult, Matcher}
 import pathy.Path._
-
-import scalaz.{EitherT, Need, StateT}
+import scalaz.{\/, EitherT, Need, StateT}
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 import scalaz.syntax.show._
-import quasar.qscript.qsu.{QScriptUniform => QSU}
+
+import Fix._
 import QSU.Rotation
 import QSUGraph.Extractors._
 
-object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
+object eshSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   type QSU[A] = QScriptUniform[A]
 
   val qsu = QScriptUniform.DslT[Fix]
@@ -55,6 +54,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       qsu.read(rootDir </> file("dataset")),
       func.Hole,
       ExcludeId,
+      OnUndefined.Omit,
       func.RightTarget,
       Rotation.ShiftArray)
 
@@ -64,6 +64,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         (func.ProjectKeyS(func.Hole, "foo"), ExcludeId, Rotation.ShiftArray),
         (func.ProjectKeyS(func.Hole, "bar"), ExcludeId, Rotation.ShiftArray)
       ),
+      OnUndefined.Omit,
       func.Add(index(0), index(1))
     ))
 
@@ -75,16 +76,19 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               Read(afile),
               shiftedReadStruct,
               ExcludeId,
+              OnUndefined.Omit,
               shiftedReadRepair,
               Rotation.ShiftArray
             ),
             projectFoo,
             ExcludeId,
+            OnUndefined.Emit,
             innerRepair,
             Rotation.ShiftArray
           ),
           projectBar,
           ExcludeId,
+          OnUndefined.Emit,
           outerRepair,
           Rotation.ShiftArray
         ),
@@ -114,8 +118,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         outerRepair must beTreeEqual(
           func.Cond(
             func.Eq(
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu0), _)),
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu1), _))),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('esh0), _)),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('esh1), _))),
             func.StaticMapS(
                 "original" ->
                   func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),
@@ -131,11 +135,64 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
     ok
   }
 
+
+
+  "convert singly nested LeftShift/ThetaJoin with onUndefined = OnUndefined.Emit" in {
+    val dataset = qsu.leftShift(
+      qsu.read(rootDir </> file("dataset")),
+      func.Hole,
+      ExcludeId,
+      OnUndefined.Omit,
+      func.RightTarget,
+      Rotation.ShiftArray)
+
+    val multiShift = QSUGraph.fromTree(qsu.multiLeftShift(
+      dataset,
+      List(
+        (func.ProjectKeyS(func.Hole, "foo"), ExcludeId, Rotation.ShiftArray),
+        (func.ProjectKeyS(func.Hole, "bar"), ExcludeId, Rotation.ShiftArray)
+      ),
+      OnUndefined.Emit,
+      func.Add(index(0), index(1))
+    ))
+
+    multiShift must expandTo {
+      case qg@Map(
+        LeftShift(
+          LeftShift(
+            LeftShift(
+              Read(afile),
+              shiftedReadStruct,
+              ExcludeId,
+              OnUndefined.Omit,
+              shiftedReadRepair,
+              Rotation.ShiftArray
+            ),
+            projectFoo,
+            ExcludeId,
+            OnUndefined.Emit,
+            innerRepair,
+            Rotation.ShiftArray
+          ),
+          projectBar,
+          ExcludeId,
+          OnUndefined.Emit,
+          outerRepair,
+          Rotation.ShiftArray
+        ),
+        fm
+      ) => ok
+    }
+
+    ok
+  }
+
   "convert doubly nested LeftShift/ThetaJoin" in {
     val dataset = qsu.leftShift(
       qsu.read(rootDir </> file("dataset")),
       func.Hole,
       ExcludeId,
+      OnUndefined.Omit,
       func.RightTarget,
       Rotation.ShiftArray)
 
@@ -146,6 +203,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         (func.ProjectKeyS(func.Hole, "bar"), ExcludeId, Rotation.ShiftArray),
         (func.ProjectKeyS(func.Hole, "baz"), ExcludeId, Rotation.ShiftArray)
       ),
+      OnUndefined.Omit,
       func.Subtract(func.Add(index(0), index(1)), index(2))
     ))
 
@@ -158,21 +216,25 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
                 Read(afile),
                 shiftedReadStruct,
                 ExcludeId,
+                OnUndefined.Omit,
                 shiftedReadRepair,
                 Rotation.ShiftArray
               ),
               projectFoo,
               ExcludeId,
+              OnUndefined.Emit,
               innermostRepair,
               Rotation.ShiftArray
             ),
             projectBar,
             ExcludeId,
+            OnUndefined.Emit,
             innerRepair,
             Rotation.ShiftArray
           ),
           projectBaz,
           ExcludeId,
+          OnUndefined.Emit,
           outerRepair,
           Rotation.ShiftArray
         ),
@@ -207,8 +269,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         innerRepair must beTreeEqual(
           func.Cond(
             func.Eq(
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu0), _)),
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu1), _))),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('esh0), _)),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('esh1), _))),
             func.StaticMapS(
               "original" ->
                 func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),
@@ -219,8 +281,8 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         outerRepair must beTreeEqual(
           func.Cond(
             func.Eq(
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu1), _)),
-              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('qsu2), _))),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('esh1), _)),
+              func.AccessLeftTarget(Access.id(IdAccess.identity[Fix[EJson]]('esh2), _))),
             func.StaticMapS(
               "original" ->
                 func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole(_)), "original"),

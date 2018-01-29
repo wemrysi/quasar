@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,49 +21,38 @@ import quasar.NameGenerator
 import quasar.Planner.PlannerErrorME
 import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
 import SqlExpr._
-import quasar.qscript.{EquiJoin, FreeMap, JoinFunc, LeftSide, MapFunc, QScriptTotal, RightSide}
-import quasar.physical.rdbms.planner.sql.SqlExpr.Select.AllCols
+import quasar.physical.rdbms.planner.sql._
+import quasar.qscript.{EquiJoin, FreeMap, MapFunc, QScriptTotal}
+import quasar.physical.rdbms.planner.sql.Indirections._
+
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-
 import scalaz._
 import Scalaz._
 
-class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT,
+class EquiJoinPlanner[T[_[_]]: BirecursiveT: ShowT: EqualT,
 F[_]: Monad: NameGenerator: PlannerErrorME](
     mapFuncPlanner: Planner[T, F, MapFunc[T, ?]])
     extends Planner[T, F, EquiJoin[T, ?]] {
 
-  private def processJoinFunc(
-      f: JoinFunc[T],
-      leftAlias: SqlExpr[T[SqlExpr]],
-      rightAlias: SqlExpr[T[SqlExpr]]
-  ): F[T[SqlExpr]] =
-    f.cataM(interpretM({
-      case LeftSide  => leftAlias.embed.η[F]
-      case RightSide => rightAlias.embed.η[F]
-    }, mapFuncPlanner.plan))
-
   private def processFreeMap(f: FreeMap[T],
                              alias: SqlExpr[T[SqlExpr]]): F[T[SqlExpr]] =
     f.cataM(interpretM(κ(alias.embed.η[F]), mapFuncPlanner.plan))
-
-  def * : T[SqlExpr] = AllCols[T[SqlExpr]]().embed
-
-  val unref: T[SqlExpr] = SqlExpr.Unreferenced[T[SqlExpr]]().embed
 
   def plan: AlgebraM[F, EquiJoin[T, ?], T[SqlExpr]] = {
     case EquiJoin(src, lBranch, rBranch, keys, joinType, combine) =>
       val compile = Planner[T, F, QScriptTotal[T, ?]].plan
 
       for {
-        leftAlias <- genId[T[SqlExpr], F]
-        rightAlias <- genId[T[SqlExpr], F]
         left <- lBranch.cataM(interpretM(κ(src.point[F]), compile))
         right <- rBranch.cataM(interpretM(κ(src.point[F]), compile))
-        combined <- processJoinFunc(combine, leftAlias, rightAlias)
+        lMeta = deriveIndirection(left)
+        rMeta = deriveIndirection(right)
+        leftAlias <- genId[T[SqlExpr], F](lMeta)
+        rightAlias <- genId[T[SqlExpr], F](rMeta)
+        combined <- processJoinFunc(mapFuncPlanner)(combine, leftAlias, rightAlias)
         keyExprs <-
           keys.traverse {
             case (lFm, rFm) =>
@@ -71,21 +60,12 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
           }
       } yield {
 
-        val selectionExpr = combined.project match {
-          case e@ExprPair(a, b) =>
-            (a.project, b.project) match {
-              case (SqlExpr.Id(_), SqlExpr.Id(_)) => *
-              case _ => e.embed
-            }
-          case other =>
-            other.embed
-        }
-
         Select(
-          selection = Selection(selectionExpr, none),
+          selection = Selection(idToWildcard(combined), none, deriveIndirection(combined)),
           from = From(left, leftAlias),
           join = Join(right, keyExprs, joinType, rightAlias).some,
           filter = none,
+          groupBy = none,
           orderBy = nil
         ).embed
       }

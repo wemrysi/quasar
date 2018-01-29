@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ class ServiceSpec extends quasar.Qspec {
       _          <- metastoreInit.transact(transactor).liftM[MainErrT]
       metaRef    <- TaskRef(metastore).liftM[MainErrT]
       quasarFs   <- Quasar.initWithMeta(BackendConfig.Empty, metaRef, _ => ().point[MainTask])
-      shutdown   <- Server.startServer(quasarFs.interp, port, Nil, None, _ => ().point[MainTask], refineMV(0L), false).liftM[MainErrT]
+      shutdown   <- Server.startServer(quasarFs.interp, port, Nil, None, _ => ().point[MainTask], refineMV(0L)).liftM[MainErrT]
       r          <- f(uri).onFinish(κ(shutdown.onFinish(κ(quasarFs.shutdown)))).liftM[MainErrT]
     } yield r).run.unsafePerformSync
   }

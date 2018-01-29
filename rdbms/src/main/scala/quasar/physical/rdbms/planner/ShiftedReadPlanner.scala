@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import quasar.physical.rdbms.common.TablePath
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.{SqlExpr, genId}
+import sql.Indirections._
 
 import matryoshka._
 import matryoshka.implicits._
@@ -38,8 +39,8 @@ class ShiftedReadPlanner[
 
   def plan: AlgebraM[F, Const[ShiftedRead[AFile], ?], R] = {
     case Const(semantics) =>
-      (genId[T[SqlExpr], F] |@|
-       genId[T[SqlExpr], F]) {
+      (genId[T[SqlExpr], F](Default) |@|
+        genId[T[SqlExpr], F](Default)) {
         case (fromAlias, rowAlias) =>
         val from: From[R] = From(
           Table[R](TablePath.create(semantics.path).shows).embed,
@@ -49,8 +50,8 @@ class ShiftedReadPlanner[
           case ExcludeId => AllCols[R]().embed
           case IncludeId => WithIds[R](AllCols[R]().embed).embed
         }
-        Select(Selection[R](fields, alias = rowAlias.some), from, join = none, orderBy = Nil, filter = none).embed
+          Select(Selection[R](fields, alias = rowAlias.some, Default), from, join = none, groupBy = none,
+            filter = none, orderBy = Nil).embed
       }
   }
-
 }

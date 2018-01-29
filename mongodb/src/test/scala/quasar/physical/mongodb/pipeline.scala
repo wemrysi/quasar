@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,7 +61,7 @@ class PipelineSpec extends quasar.Qspec with ArbBsonField {
 
   def unwindGen = for {
     c <- Gen.alphaChar
-  } yield $UnwindF((), DocField(BsonField.Name(c.toString)))
+  } yield $UnwindF((), DocField(BsonField.Name(c.toString)), None, None)
 
   def genGroup = for {
     i <- Gen.chooseNum(1, 10)

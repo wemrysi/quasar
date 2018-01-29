@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,6 +50,8 @@ trait SqlExprRenderTree {
               NonTerminal("K → V" :: Nil, none,
                 List(r.render(k), r.render(v)))
             })
+          case Length(a1) =>
+            nonTerminal("Length", a1)
           case IsNotNull(a1) =>
             nonTerminal("NotNull", a1)
           case IfNull(a) =>
@@ -58,14 +60,26 @@ trait SqlExprRenderTree {
             nonTerminal(s"RegexMatches (insensitive = $caseInsensitive)", a1, a2)
           case ExprWithAlias(e, a) =>
             nonTerminal(s"ExprWithAlias($a)", e)
-          case ExprPair(expr1, expr2) =>
-            NonTerminal("Pair" :: Nil, none, List(expr1, expr2) ∘ r.render)
+          case ExprPair(expr1, expr2, m) =>
+            NonTerminal(s"Pair (m = ${m.shows})" :: Nil, none, List(expr1, expr2) ∘ r.render)
           case ConcatStr(a1, a2) =>
             nonTerminal("ConcatStr", a1, a2)
-          case Time(a1) =>
-            nonTerminal("Time", a1)
-          case Id(v) =>
-            Terminal("Id" :: Nil, v.some)
+          case Avg(a1) =>
+            nonTerminal("Avg", a1)
+          case Count(a1) =>
+            nonTerminal("Count", a1)
+          case Max(a1) =>
+            nonTerminal("Max", a1)
+          case Min(a1) =>
+            nonTerminal("Min", a1)
+          case Sum(a1) =>
+            nonTerminal("Sum", a1)
+          case DeleteKey(expr1, expr2) =>
+            NonTerminal(s"Delete Key" :: Nil, none, List(expr1, expr2) ∘ r.render)
+          case Distinct(a1) =>
+            nonTerminal("Distinct", a1)
+          case Id(v, m) =>
+            Terminal(s"Id (m = ${m.shows})" :: Nil, v.some)
           case Table(v) =>
             Terminal("Table" :: Nil, v.some)
           case RowIds() =>
@@ -84,6 +98,8 @@ trait SqlExprRenderTree {
             nonTerminal("Neg", a1)
           case And(a1, a2) =>
             nonTerminal("And", a1, a2)
+          case Not(e) =>
+            nonTerminal("Not", e)
           case Eq(a1, a2) =>
             nonTerminal("Equal", a1, a2)
           case Neq(a1, a2) =>
@@ -98,11 +114,12 @@ trait SqlExprRenderTree {
             nonTerminal(">=", a1, a2)
           case Or(a1, a2) =>
             nonTerminal("Or", a1, a2)
-          case Refs(srcs) =>
-            nonTerminal("References", srcs:_*)
-          case Select(selection, from, join, filter, order) =>
+            // TODO add group by
+          case Refs(srcs, m) =>
+            nonTerminal(s"References (m = ${m.shows})", srcs:_*)
+          case Select(selection, from, join, filter, groupBy, order) =>
             NonTerminal(
-              "Select" :: Nil,
+              s"Select (m = ${selection.meta.shows})" :: Nil,
               none,
               nt("selection", selection.alias ∘ (_.v), selection.v) ::
                 nt("from", from.alias.v.some, from.v)               ::
@@ -125,6 +142,8 @@ trait SqlExprRenderTree {
             NonTerminal("Case" :: Nil, none,
               (wt ∘ (i => nonTerminal("whenThen", i.when, i.`then`))).toList :+
                 nonTerminal("else", e.v))
+          case TypeOf(e) =>
+            nonTerminal(s"TypeOf", e)
           case Coercion(t, e) =>
             nonTerminal(s"Coercion: $t", e)
           case ToArray(v) =>
@@ -135,6 +154,14 @@ trait SqlExprRenderTree {
             nonTerminal(s"Function call: $t", a1, a2)
           case TernaryFunction(t, a1, a2, a3) =>
             nonTerminal(s"Function call: $t", a1, a2, a3)
+          case ArrayUnwind(u) =>
+            nonTerminal("ArrayUnwind", u)
+          case Time(a1) =>
+            nonTerminal("Time", a1)
+          case Timestamp(a1) =>
+            nonTerminal("Timestamp", a1)
+          case DatePart(part, e) =>
+            nonTerminal("DatePart", part, e)
         }
       }
     }

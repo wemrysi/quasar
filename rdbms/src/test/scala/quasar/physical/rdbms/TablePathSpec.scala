@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,12 +29,13 @@ import pathy.scalacheck.PathyArbitrary._
 class TablePathSpec extends Qspec {
 
   import TablePath._
+  import common._
 
   "TablePath" should {
     "extract table name" in {
       prop { (file: AFile) =>
         TablePath.create(file).table must_=== TableName(
-          Path.fileName(file).value)
+          escapeFileName(Path.fileName(file).value))
       }
     }
 

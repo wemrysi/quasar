@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,21 +74,22 @@ object Repl {
       |  rm [path]
       |  set debug = 0 | 1 | 2
       |  set phaseFormat = tree | code
-      |  set timingFormat = json | tree | onlytotal | nothing
+      |  set timingFormat = tree | onlytotal
       |  set summaryCount = [rows]
-      |  set format = table | precise | readable | csv | nothing
+      |  set format = table | precise | readable | csv
       |  set [var] = [value]
       |  env""".stripMargin
 
 
  final case class RunState(
-    cwd:          ADir,
-    debugLevel:   DebugLevel,
-    phaseFormat:  PhaseFormat,
-    summaryCount: Option[Int Refined Positive],
-    format:       OutputFormat,
-    variables:    Map[String, String],
-    timingFormat: TimingFormat) {
+    cwd:                ADir,
+    debugLevel:         DebugLevel,
+    phaseFormat:        PhaseFormat,
+    summaryCount:       Option[Int Refined Positive],
+    format:             OutputFormat,
+    variables:          Map[String, String],
+    timingFormat:       TimingFormat
+  ) {
 
   def targetDir(path: Option[XDir]): ADir =
     path match {
@@ -156,7 +157,7 @@ object Repl {
           case  \/-( \/-(a))     =>
             (state.timingFormat match {
               case TimingFormat.OnlyTotal => P.println(f"Query time: ${elapsed.toMillis/1000.0}%.1fs")
-              case _ => ().point[Free[S, ?]]
+              case TimingFormat.Tree      => ().point[Free[S, ?]]
             }) *> f(a)
         }
       } yield ()
@@ -242,11 +243,10 @@ object Repl {
         } yield ()
 
       case Select(n, q) =>
-        for {
-          newExecutionIndex <- Free.liftF(S3(executionIdRef.modify(_ + 1)))
-          result <- SE.newExecution[Unit](newExecutionIndex, { ST =>
+        def select[T](identifier: ExecutionId, state: RunState)
+                     (implicit SE: ScopeExecution[Free[S, ?], T]): Free[S, Unit] =
+          SE.newExecution[Unit](identifier, { ST =>
             for {
-              state <- RS.get
               expr  <- ST.newScope("parse SQL", DF.unattempt_(sql.fixParser.parse(q.value).leftMap(_.message)))
               block <- ST.newScope("resolve imports", DF.unattemptT(resolveImports(expr, state.cwd).leftMap(_.message)))
               vars  = Variables.fromMap(state.variables)
@@ -271,7 +271,12 @@ object Repl {
                          })
             } yield ()
         })
-        } yield result
+        for {
+          newExecutionIndex <- Free.liftF(S3(executionIdRef.modify(_ + 1)))
+          state <- RS.get
+          identifier = ExecutionId(newExecutionIndex)
+          _ <- select[T](identifier, state)
+        } yield ()
 
       case Explain(q) =>
         for {
@@ -384,8 +389,6 @@ object Repl {
           prefix.map(formatJson(DataCodec.Readable)).unite
         case OutputFormat.Csv =>
           Prettify.renderValues(prefix).map(CsvWriter(none)(_).trim)
-        case OutputFormat.Nothing =>
-          Nil
       }).foldMap(P.println) *>
         (if (max.fold(false)(rows.lengthCompare(_) > 0)) P.println("...")
         else ().point[Free[S, ?]])

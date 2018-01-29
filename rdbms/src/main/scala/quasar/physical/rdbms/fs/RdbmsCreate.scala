@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import doobie.free.connection.ConnectionIO
 
 trait RdbmsCreate {
 
+  def ensureSchemaParents(schema: Schema): ConnectionIO[Unit]
   def createSchema(schema: Schema): ConnectionIO[Unit]
   def createTable(tablePath: TablePath, model: TableModel): ConnectionIO[Unit]
   def alterTable(tablePath: TablePath, cols: Set[AlterColumn]): ConnectionIO[Unit]

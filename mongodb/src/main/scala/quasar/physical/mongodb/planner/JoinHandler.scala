@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -83,7 +83,8 @@ object JoinHandler {
     * the aggregation pipeline.
     */
   def pipeline[M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize]
-    (stats: Collection => Option[CollectionStatistics],
+    (queryModel: MongoQueryModel,
+      stats: Collection => Option[CollectionStatistics],
       indexes: Collection => Option[Set[Index]])
     (implicit
       M: MonadError_[M, PlannerError],
@@ -118,7 +119,7 @@ object JoinHandler {
       case CollectionBuilderF(op, _, _)       => op.cata(wfSourceDb)
       case DocBuilderF(src, _)                => src
       case ExprBuilderF(src, _)               => src
-      case FlatteningBuilderF(src, _)         => src
+      case FlatteningBuilderF(src, _, _)      => src
       case GroupBuilderF(src, _, _)           => src
       case ShapePreservingBuilderF(src, _, _) => src
       case UnionBuilderF(lSrc, rSrc)          => if (lSrc ≟ rSrc) lSrc else none
@@ -140,7 +141,7 @@ object JoinHandler {
         case HasThat($var(DocVar(_, Some(lField)))) =>
           val left = WB.makeObject(lSrc, lName.asText)
           val filtered = filterExists(left, lName \ lField)
-          generateWorkflow[M, WF](filtered).map { case (left, _) =>
+          generateWorkflow[M, WF](filtered, queryModel).map { case (left, _) =>
             CollectionBuilder(
               chain[Fix[WF]](
                 left,
@@ -154,7 +155,7 @@ object JoinHandler {
             t <- generateWorkflow[M, WF](
               DocBuilder(lSrc, ListMap(
                 lName               -> docVarToExpr(DocVar.ROOT()),
-                BsonField.Name("0") -> lKey)))
+                BsonField.Name("0") -> lKey)), queryModel)
             (src, _) = t
           } yield
               DocBuilder(
@@ -176,7 +177,7 @@ object JoinHandler {
         lookup(
           src, key, LeftName,
           coll.collection, field, RightName).liftM[OptionT] ∘
-          (FlatteningBuilder(_, Set(StructureType.Array(DocField(RightName), ExcludeId))))
+          (FlatteningBuilder(_, Set(StructureType.Array(DocField(RightName), ExcludeId)), None))
 
       case (JoinType.LeftOuter, JoinSource(src, List(key)), IsLookupFrom(coll, field))
             if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
@@ -186,14 +187,15 @@ object JoinHandler {
           (look =>
             FlatteningBuilder(
               buildProjection(look, LeftName, n => $var(DocField(n)), RightName, padEmpty),
-              Set(StructureType.Array(DocField(RightName), ExcludeId))))
+              Set(StructureType.Array(DocField(RightName), ExcludeId)),
+              None))
 
       case (JoinType.Inner, IsLookupFrom(coll, field), JoinSource(src, List(key)))
             if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
         lookup(
           src, key, RightName,
           coll.collection, field, LeftName).liftM[OptionT] ∘
-          (FlatteningBuilder(_, Set(StructureType.Array(DocField(LeftName), ExcludeId))))
+          (FlatteningBuilder(_, Set(StructureType.Array(DocField(LeftName), ExcludeId)), None))
 
       case (JoinType.RightOuter, IsLookupFrom(coll, field), JoinSource(src, List(key)))
             if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
@@ -203,7 +205,8 @@ object JoinHandler {
           (look =>
             FlatteningBuilder(
               buildProjection(look, LeftName, padEmpty, RightName, n => $var(DocField(n))),
-              Set(StructureType.Array(DocField(LeftName), ExcludeId))))
+              Set(StructureType.Array(DocField(LeftName), ExcludeId)),
+              None))
 
       case _ => OptionT.none
     }
@@ -231,6 +234,7 @@ object JoinHandler {
     * map-reduce.
     */
   def mapReduce[M[_]: Monad, WF[_]: Functor: Coalesce: Crush: Crystallize]
+    (queryModel: MongoQueryModel)
     (implicit M: MonadError[M, PlannerError], ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], ev2: ExprOpOps.Uni[ExprOp])
     : JoinHandler[WF, M] = JoinHandler({ (tpe, left0, right0) =>
 
@@ -280,7 +284,7 @@ object JoinHandler {
     val (left, right, leftField, rightField) =
       (left0.keys.map(HasThis.unapply).sequence.filter(_.nonEmpty), right0.keys.map(HasThis.unapply).sequence.filter(_.nonEmpty)) match {
         case (Some(js), _)
-            if preferMapReduce(left0.src) && !preferMapReduce(right0.src) =>
+            if preferMapReduce(left0.src, queryModel) && !preferMapReduce(right0.src, queryModel) =>
           (wbReduce(right0.src, right0.keys, rightField0, leftField0),
             jsReduce(left0.src, js, leftField0, rightField0),
             rightField0, leftField0)
@@ -309,7 +313,8 @@ object JoinHandler {
             buildProjection(src, leftField, padEmpty, rightField, padEmpty),
             Set(
               StructureType.Array(DocField(leftField), ExcludeId),
-              StructureType.Array(DocField(rightField), ExcludeId)))
+              StructureType.Array(DocField(rightField), ExcludeId)),
+            None)
         case JoinType.LeftOuter =>
           FlatteningBuilder(
             buildProjection(
@@ -320,7 +325,8 @@ object JoinHandler {
               rightField, padEmpty),
             Set(
               StructureType.Array(DocField(leftField), ExcludeId),
-              StructureType.Array(DocField(rightField), ExcludeId)))
+              StructureType.Array(DocField(rightField), ExcludeId)),
+            None)
         case JoinType.RightOuter =>
           FlatteningBuilder(
             buildProjection(
@@ -332,7 +338,8 @@ object JoinHandler {
               rightField, n => $var(DocField(n))),
             Set(
               StructureType.Array(DocField(leftField), ExcludeId),
-              StructureType.Array(DocField(rightField), ExcludeId)))
+              StructureType.Array(DocField(rightField), ExcludeId)),
+            None)
         case JoinType.Inner =>
           FlatteningBuilder(
             WB.filter(
@@ -346,7 +353,8 @@ object JoinHandler {
               }),
             Set(
               StructureType.Array(DocField(leftField), ExcludeId),
-              StructureType.Array(DocField(rightField), ExcludeId)))
+              StructureType.Array(DocField(rightField), ExcludeId)),
+            None)
       }
 
     val rightReduce = {
@@ -374,7 +382,7 @@ object JoinHandler {
           Return(Ident("result"))))
     }
 
-    (generateWorkflow[M, WF](left._1) |@| generateWorkflow[M, WF](right._1)) {
+    (generateWorkflow[M, WF](left._1, queryModel) |@| generateWorkflow[M, WF](right._1, queryModel)) {
       case ((l, lb), (r, rb)) =>
         buildJoin(
           CollectionBuilder(
@@ -390,7 +398,8 @@ object JoinHandler {
   // TODO: This is an approximation. If we could postpone this decision until
   //      `Workflow.crush`, when we actually have a task (whether aggregation or
   //       mapReduce) in hand, we would know for sure.
-  private def preferMapReduce[WF[_]: Coalesce: Crush: Crystallize: Functor](wb: WorkflowBuilder[WF])
+  private def preferMapReduce[WF[_]: Coalesce: Crush: Crystallize: Functor]
+    (wb: WorkflowBuilder[WF], queryModel: MongoQueryModel)
     (implicit ev0: WorkflowOpCoreF :<: WF, ev1: RenderTree[WorkflowBuilder[WF]], ev2: ExprOpOps.Uni[ExprOp])
     : Boolean = {
     // TODO: Get rid of this when we functorize WorkflowTask
@@ -402,7 +411,7 @@ object JoinHandler {
       case _                                   => false
     }
 
-    generateWorkflow[PlannerError \/ ?, WF](wb).fold(
+    generateWorkflow[PlannerError \/ ?, WF](wb, queryModel).fold(
       κ(false),
       wf => checkTask(task(Crystallize[WF].crystallize(wf._1))))
   }

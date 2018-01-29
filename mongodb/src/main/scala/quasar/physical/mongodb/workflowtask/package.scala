@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,7 +61,7 @@ package object workflowtask {
     case PipelineTask(src, pipeline) =>
       // possibly toss duplicate `_id`s created by `Unwind`s
       val uwIdx = pipeline.map(_.op).lastIndexWhere {
-        case $UnwindF(_, _) => true
+        case $UnwindF(_, _, _, _) => true
         case _ => false
       }
       // we’re fine if there’s no `Unwind`, or some existing op fixes the `_id`s
@@ -106,7 +106,7 @@ package object workflowtask {
 
       case WC($ProjectF((), Reshape(shape), _))         => Some(shape.keys.toList)
       case WC($GroupF((), Grouped(shape), _))           => Some(shape.keys.toList)
-      case WC($UnwindF((), _))                          => src
+      case WC($UnwindF((), _, name, _))                 => src.map(l => l ::: name.toList)
       case WC($RedactF((), _))                          => None
       case WC($GeoNearF((), _, _, _, _, _, _, _, _, _)) => src.map(_ :+ BsonField.Name("dist"))
 

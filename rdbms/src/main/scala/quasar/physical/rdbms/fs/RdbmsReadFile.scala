@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import quasar.effect.Kvs
 import quasar.effect.Kvs._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._
-import quasar.fs.FileSystemError._
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.common.TablePath
 import quasar.connector.ManagedReadFile
@@ -36,7 +35,6 @@ import doobie.util.meta.Meta
 import doobie.syntax.process._
 import scalaz._
 import Scalaz._
-import scalaz.stream.Process._
 import scalaz.concurrent.Task
 
 trait RdbmsReadFile
@@ -76,8 +74,7 @@ trait RdbmsReadFile
             .query[Data]
             .process
             .chunk(chunkSize)
-            .attempt(ex =>
-              emit(readFailed(dbPath.shows, ex.getLocalizedMessage)))
+            .map(_.right[quasar.fs.FileSystemError])
             .transact(xa))
       }.liftB
     }

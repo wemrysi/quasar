@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import quasar.qscript.qsu.QSUGraph.Extractors._
 import quasar.qscript.{
   construction,
   Hole,
+  OnUndefined,
   SrcHole
 }
 import quasar.qscript.qsu.{QScriptUniform => QSU}
@@ -56,6 +57,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
   }
 
   val originalKey = "original"
+  val namePrefix = "esh"
 
   def rotationsCompatible(rotation1: Rotation, rotation2: Rotation): Boolean = rotation1 match {
     case Rotation.FlattenArray | Rotation.ShiftArray =>
@@ -69,7 +71,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
     G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: PlannerErrorME: MonadState_[?[_], QAuth]
     ]
       : PartialFunction[QSUGraph, G[QSUGraph]] = {
-    case mls@MultiLeftShift(source, shifts, repair) =>
+    case mls @ MultiLeftShift(source, shifts, _, repair) =>
       val mapper = repair.flatMap {
         case -\/(_) => func.ProjectKeyS(func.Hole, originalKey)
         case \/-(i) => func.ProjectKeyS(func.Hole, i.toString)
@@ -83,10 +85,11 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
               "0" -> func.RightTarget
             )
           val firstShiftPat: QScriptUniform[Symbol] =
-            QSU.LeftShift[T, Symbol](source.root, struct, idStatus, firstRepair, rotation)
+            QSU.LeftShift[T, Symbol](source.root, struct, idStatus, OnUndefined.Emit, firstRepair, rotation)
           for {
-            firstShift <- QSUGraph.withName[T, G](firstShiftPat)
+            firstShift <- QSUGraph.withName[T, G](namePrefix)(firstShiftPat)
             _ <- ApplyProvenance.computeProvenance[T, G](firstShift)
+
             shiftAndRotation <- ss.zipWithIndex.foldLeftM[G, (QSUGraph, Rotation)]((firstShift :++ mls, rotation)) {
               case ((shiftAbove, rotationAbove), ((newStruct, newIdStatus, newRotation), idx)) =>
                 val keysAbove = ("original" :: (0 to idx).map(_.toString).toList)
@@ -95,9 +98,9 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
                 val repair = func.ConcatMaps(staticAbove, func.MakeMapS((idx + 1).toString, func.RightTarget))
                 val struct = newStruct >> func.ProjectKeyS(func.Hole, originalKey)
                 val newShiftPat =
-                  QSU.LeftShift[T, Symbol](shiftAbove.root, struct, newIdStatus, repair, newRotation)
+                  QSU.LeftShift[T, Symbol](shiftAbove.root, struct, newIdStatus, OnUndefined.Emit, repair, newRotation)
                 for {
-                  newShift <- QSUGraph.withName[T, G](newShiftPat)
+                  newShift <- QSUGraph.withName[T, G](namePrefix)(newShiftPat)
                   _ <- ApplyProvenance.computeProvenance[T, G](newShift)
                   identityCondition =
                   if (rotationsCompatible(rotationAbove, newRotation))

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -172,6 +172,30 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
         (runT(run)(query.ls(trash)).runEither must beRight(containTheSameElementsAs(expectedTrash))) and
         (runT(run)(query.ls(trash_d2)).runEither must beRight(containTheSameElementsAs(expectedFiles))) and
         (runT(run)(query.ls(d2)).runEither must beLeft(pathErr(pathNotFound(d2))))
+      }
+
+      "files and directories with spaces/dots in names should be supported" >> {
+        val root = managePrefix </> dir("rt")
+        val d1 = root </> dir("Some Directory")
+        val folder1 = d1 </> dir(".folder1")
+        val folder2 = d1 </> dir(".folder2")
+        val fDot = folder1 </> file(".patients")
+        val fSpace = folder2 </> file("all patients")
+
+        val expectedRoot = List[Node](Node.ImplicitDir(DirName("Some Directory")))
+        val expectedD1 = List[Node](Node.ImplicitDir(DirName(".folder1")), Node.ImplicitDir(DirName(".folder2")))
+        val expectedFDot = List[Node](Node.Data(FileName(".patients")))
+        val expectedFSpace = List[Node](Node.Data(FileName("all patients")))
+
+        val p =
+          write.save(fDot, oneDoc.toProcess).drain ++
+                write.save(fSpace, oneDoc.toProcess).drain
+
+        (execT(run, p).runOption must beNone) and
+          (runT(run)(query.ls(root)).runEither must beRight(containTheSameElementsAs(expectedRoot))) and
+          (runT(run)(query.ls(d1)).runEither must beRight(containTheSameElementsAs(expectedD1))) and
+          (runT(run)(query.ls(folder1)).runEither must beRight(containTheSameElementsAs(expectedFDot))) and
+          (runT(run)(query.ls(folder2)).runEither must beRight(containTheSameElementsAs(expectedFSpace)))
       }
 
       "moving a nonexistent dir to another nonexistent dir fails with src NotFound" >> {

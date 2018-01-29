@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ final case class CliOptions(
 
 object CliOptions {
   val default: CliOptions =
-    CliOptions(Cmd.Start, None, \/-(Nil), None, None, false, false, None, refineMV(0L))
+    CliOptions(Cmd.Start, None, \/-(Nil), None, None, false, false, None, refineMV(64L))
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val parser = new CliOptionsParser(Lens.id[CliOptions], "quasar") {

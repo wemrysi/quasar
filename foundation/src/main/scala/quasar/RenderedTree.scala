@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -146,6 +146,10 @@ object Terminal {
   def apply(nodeType: List[String], label: Option[String])
       : RenderedTree =
     RenderedTree(nodeType, label, Nil)
+
+  def opt(nodeType: List[String], label: Option[String])
+      : Option[RenderedTree] =
+    label.map(l => Terminal(nodeType, Some(l)))
 }
 
 object NonTerminal {

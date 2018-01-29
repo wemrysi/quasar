@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,13 +19,14 @@ package quasar.effect
 import slamdata.Predef._
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import scala.collection.immutable.TreeMap
+import scala.collection.immutable.Queue
 import quasar.RenderedTree
 import quasar.fp._
 import quasar.fp.numeric.Natural
 import matryoshka._
 import matryoshka.patterns.EnvT
 import matryoshka.data.cofree._
+import argonaut.Json
 
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -33,44 +34,45 @@ import scalaz.concurrent.Task
 /** Represents the ability to create an execution scope, within which timing scopes can be created.
   */
 trait ScopeExecution[F[_], T] {
-  def newExecution[A](index: Long, action: ScopeTiming[F, T] => F[A]): F[A]
+  def newExecution[A](executionId: ExecutionId, action: ScopeTiming[F, T] => F[A]): F[A]
 }
 
 object ScopeExecution {
   def ignore[F[_], T]: ScopeExecution[F, T] = new ScopeExecution[F, T] {
-    def newExecution[A](index: Long, action: ScopeTiming[F, T] => F[A]): F[A] =
+    def newExecution[A](executionId: ExecutionId, action: ScopeTiming[F, T] => F[A]): F[A] =
       action(ScopeTiming.ignore[F, T])
   }
   def forTask[T](repo: TimingRepository,
-                 print: (ExecutionId, ExecutionTimings) => Task[Unit]): ScopeExecution[Task, T] =
+                 print: Execution => Task[Unit]): ScopeExecution[Task, T] =
     new ScopeExecution[Task, T] {
-      def newExecution[A](index: Long, action: ScopeTiming[Task, T] => Task[A]): Task[A] = {
+      def newExecution[A](executionId: ExecutionId, action: ScopeTiming[Task, T] => Task[A]): Task[A] = {
         for {
           newExecutionRef <- SingleExecutionRef.empty
           start <- Task.delay(Instant.now())
           result <- action(ScopeTiming.forTask(newExecutionRef))
           end <- Task.delay(Instant.now())
-          executionId = ExecutionId(index, start, end)
           newScope <- newExecutionRef.under.read
-          _ <- repo.addExecution(executionId, newScope)
-          _ <- print(executionId, newScope)
+          execution = Execution(executionId, ExecutionTimings(newScope, start, end))
+          _ <- repo.addExecution(execution)
+          _ <- print(execution)
         } yield result
       }
     }
 
-  def forFreeTask[F[_], T](repo: TimingRepository, print: (ExecutionId, ExecutionTimings) => Free[F, Unit])
+  def forFreeTask[F[_], T](repo: TimingRepository,
+                           print: Execution => Free[F, Unit])
                           (implicit task: Task :<: F): ScopeExecution[Free[F, ?], T] =
     new ScopeExecution[Free[F, ?], T] {
-      def newExecution[A](index: Long, action: ScopeTiming[Free[F, ?], T] => Free[F, A]): Free[F, A] = {
+      def newExecution[A](executionId: ExecutionId, action: ScopeTiming[Free[F, ?], T] => Free[F, A]): Free[F, A] = {
         for {
           newExecutionRef <- Free.liftF(task(SingleExecutionRef.empty))
           start <- Free.liftF(task(Task.delay(Instant.now())))
           result <- action(ScopeTiming.forFreeTask(newExecutionRef))
           end <- Free.liftF(task(Task.delay(Instant.now())))
-          executionId = ExecutionId(index, start, end)
           newScope <- Free.liftF(task(newExecutionRef.under.read))
-          _ <- Free.liftF(task(repo.addExecution(executionId, newScope)))
-          _ <- print(executionId, newScope)
+          execution = Execution(executionId, ExecutionTimings(newScope, start, end))
+          _ <- Free.liftF(task(repo.addExecution(execution)))
+          _ <- print(execution)
         } yield result
       }
     }
@@ -112,12 +114,10 @@ object ScopeTiming {
   }
 }
 
-final case class ExecutionId(index: Long, start: Instant, end: Instant)
+final case class ExecutionId(identifier: Long)
 object ExecutionId {
-  import scala.Ordering
-  implicit val executionIdOrdering: Ordering[ExecutionId] = Ordering.ordered[Instant](x => x).on(_.end)
   implicit val executionIdShow: Show[ExecutionId] = Show.shows {
-    case ExecutionId(index, start, end) => s"Query execution $index began at $start and ended at $end"
+    case ExecutionId(identifier) => s"Query execution: $identifier"
   }
 }
 
@@ -125,13 +125,19 @@ final case class LabelledInterval(label: String, start: Long, size: Long) {
   def contains(other: LabelledInterval) = start < other.start && (start + size) > (other.start + size)
 }
 
-final case class ExecutionTimings(timings: Map[String, (Instant, Instant)])
+final case class ExecutionTimings(timings: Map[String, (Instant, Instant)], start: Instant, end: Instant) {
+  import ExecutionTimings._
+  def toIntervalTree: LabelledIntervalTree = toLabelledIntervalTree(this)
+  def toRenderedTree: RenderedTree = renderTree(toIntervalTree)
+}
+
+final case class Execution(id: ExecutionId, timings: ExecutionTimings)
 
 object ExecutionTimings {
   // Flame graph tree
   type LabelledIntervalTree = Cofree[List, LabelledInterval]
   def LabelledIntervalTree[A](head: LabelledInterval, tail: List[LabelledIntervalTree]): LabelledIntervalTree = Cofree(head, tail)
-  def toLabelledIntervalTree(executionId: ExecutionId, timings: ExecutionTimings): LabelledIntervalTree = {
+  def toLabelledIntervalTree(timings: ExecutionTimings): LabelledIntervalTree = {
     def constructIntervalTree(newLabelledInterval: LabelledInterval, tree: LabelledIntervalTree): LabelledIntervalTree = {
       if (newLabelledInterval.contains(tree.head)) {
         LabelledIntervalTree(newLabelledInterval, List(tree))
@@ -142,7 +148,7 @@ object ExecutionTimings {
         def findInsert(list: List[Cofree[List, LabelledInterval]]): List[Cofree[List, LabelledInterval]] = list match {
           case Nil =>
             LabelledIntervalTree(newLabelledInterval, Nil) :: Nil
-          case Cofree(interval@LabelledInterval(id, _, _), tail) :: xs
+          case Cofree(interval@LabelledInterval(_, _, _), tail) :: xs
             if interval.contains(newLabelledInterval) =>
             LabelledIntervalTree(interval, findInsert(tail)) :: xs
           case c :: xs =>
@@ -154,24 +160,22 @@ object ExecutionTimings {
     val asIntervalsFromStart: List[LabelledInterval] = timings.timings.map {
       case (label, (start, end)) =>
         LabelledInterval(label, 
-          executionId.start.until(start, ChronoUnit.MILLIS), start.until(end, ChronoUnit.MILLIS))
+          timings.start.until(start, ChronoUnit.MILLIS), start.until(end, ChronoUnit.MILLIS))
     }.toList
     val sortedBySize =
       asIntervalsFromStart.sortBy(-_.size)
-    val totalInterval = LabelledInterval("total", 0L, executionId.start.until(executionId.end, ChronoUnit.MILLIS))
+    val totalInterval = LabelledInterval("total", 0L, timings.start.until(timings.end, ChronoUnit.MILLIS))
     val initTree = LabelledIntervalTree(totalInterval, Nil)
     sortedBySize.foldRight(initTree)(constructIntervalTree)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def render(tree: LabelledIntervalTree): RenderedTree = {
+  def renderTree(tree: LabelledIntervalTree): RenderedTree = {
     val LabelledInterval(label, start, size) = tree.head
-    RenderedTree((label + " ") :: Nil, (size.shows + " ms").some, tree.tail.sortBy(_.head.start).map(render))
+    RenderedTree((label + " ") :: Nil, (size.shows + " ms").some, tree.tail.sortBy(_.head.start).map(renderTree))
   }
 
-  import argonaut.Json
-  def asJson(executionId: ExecutionId, tree: LabelledIntervalTree): Json = {
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def asJson(timings: ExecutionTimings): Json = {
     type PF[A] = EnvT[LabelledInterval, List, A]
     def treeToJson(in: PF[(String, Json)]): Json =
       Json.jObjectFields(
@@ -179,44 +183,47 @@ object ExecutionTimings {
         "size" -> Json.jNumber(in.ask.size),
         "children" -> Json.jObjectFields(in.lower: _*)
       )
-    val subtrees =
-      Recursive[LabelledIntervalTree, PF].zygo[Json, String](tree)(_.ask.label, treeToJson)
-    Json.jObjectFields(
-      "id" -> Json.jObjectFields(
-        "index" -> Json.jNumber(executionId.index),
-        "start" -> Json.jString(executionId.start.toString)),
-      "timings" -> subtrees
-    )
+    Recursive[LabelledIntervalTree, PF]
+      .zygo[Json, String](timings.toIntervalTree)(_.ask.label, treeToJson)
   }
+
 }
 
-final case class SingleExecutionRef(under: TaskRef[ExecutionTimings]) {
+final case class SingleExecutionRef(under: TaskRef[Map[String, (Instant, Instant)]]) {
   def addScope(scopeId: String, start: Instant, end: Instant): Task[Unit] = {
     under.modify {
-      case ExecutionTimings(scopes) =>
-        ExecutionTimings(scopes + ((scopeId, (start, end))))
+      _ + ((scopeId, (start, end)))
     }.void
   }
 }
 
 object SingleExecutionRef {
   def empty: Task[SingleExecutionRef] =
-   TaskRef(ExecutionTimings(Map.empty)).map(SingleExecutionRef(_))
+   TaskRef(Map.empty[String, (Instant, Instant)]).map(SingleExecutionRef(_))
 }
 
-final case class TimingRepository(recordedExecutions: Natural, under: TaskRef[TreeMap[ExecutionId, ExecutionTimings]]) {
-  def addExecution(executionId: ExecutionId, timings: ExecutionTimings): Task[Unit] = {
+final case class TimingRepository(recordedExecutions: Natural,
+                                  start: Instant,
+                                  under: TaskRef[Queue[Execution]]) {
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def dequeueN[A](n: Int, queue: Queue[A]): Queue[A] =
+    if (n <= 0) queue
+    else dequeueN(n - 1, queue.dequeue._2)
+
+  def addExecution(execution: Execution): Task[Unit] = {
     under.modify { executions =>
-      val newExecutions = executions + ((executionId, timings))
-      val excessExecutions = java.lang.Math.max(newExecutions.size - recordedExecutions.value.toInt, 0)
-      newExecutions.drop(excessExecutions)
+      val newExecutions = executions.enqueue(execution)
+      val excessExecutions = newExecutions.size - recordedExecutions.value.toInt
+      dequeueN(excessExecutions, newExecutions)
     }.void
   }
 }
 
 object TimingRepository {
   def empty(recordedExecutions: Natural): Task[TimingRepository] = {
-    TaskRef(TreeMap.empty[ExecutionId, ExecutionTimings])
-      .map(TimingRepository(recordedExecutions, _))
+    for {
+      ref <- TaskRef(Queue.empty[Execution])
+      now <- Task.delay(Instant.now())
+    } yield TimingRepository(recordedExecutions, now, ref)
   }
 }

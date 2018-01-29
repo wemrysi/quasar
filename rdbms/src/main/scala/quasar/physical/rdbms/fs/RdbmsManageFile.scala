@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ trait RdbmsManageFile
   }
 
   def dropSchema(schema: Schema): ConnectionIO[Unit] = {
-    (fr"DROP SCHEMA" ++ Fragment.const(schema.shows) ++ fr"CASCADE").update.run.void
+    (fr"DROP SCHEMA" ++ Fragment.const(s""""${schema.shows}"""") ++ fr"CASCADE").update.run.void
   }
 
   override def ManageFileModule = new ManageFileModule {
@@ -94,6 +94,7 @@ trait RdbmsManageFile
         val dbCalls = for {
           dstSchemaExists <- schemaExists(dstSchema)
           _ <- dstSchemaExists.whenM(dropSchema(dstSchema))
+          _ <- ensureSchemaParents(dstSchema)
           _ <- renameSchema(srcSchema, dstSchema)
         } yield ()
 

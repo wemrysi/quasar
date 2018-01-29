@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import quasar.qscript.MapFunc
-import quasar.physical.mongodb.BsonVersion
+import quasar.physical.mongodb.{BsonVersion, MongoQueryModel}
 
 import scalaz._
 
@@ -25,4 +25,5 @@ final case class PlannerConfig[T[_[_]], EX[_], WF[_]](
   joinHandler: JoinHandler[WF, WBM],
   funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?],
   staticHandler: StaticHandler[T, EX],
+  queryModel: MongoQueryModel,
   bsonVersion: BsonVersion)

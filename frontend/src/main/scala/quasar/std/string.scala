@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -115,8 +115,13 @@ trait StringLib extends Library {
     constTyper(Type.Bool),
     basicUntyper)
 
-  def matchAnywhere(str: String, pattern: String, insen: Boolean) =
-    java.util.regex.Pattern.compile(if (insen) "(?i)" ⊹ pattern else pattern).matcher(str).find()
+  import java.util.regex.Pattern
+
+  def patternInsensitive(pattern: String, insen: Boolean): String =
+    if (insen) "(?i)" ⊹ pattern else pattern
+
+  def matchAnywhere(str: String, pattern: Pattern, insen: Boolean) =
+    pattern.matcher(str).find()
 
   val Search = TernaryFunc(
     Mapping,
@@ -124,13 +129,11 @@ trait StringLib extends Library {
     Type.Bool,
     Func.Input3(Type.Str, Type.Str, Type.Bool),
     noSimplification,
-    partialTyperV[nat._3] {
+    partialTyperOV[nat._3] {
       case Sized(Type.Const(Data.Str(str)), Type.Const(Data.Str(pattern)), Type.Const(Data.Bool(insen))) =>
-        success(Type.Const(Data.Bool(matchAnywhere(str, pattern, insen))))
-      case Sized(strT, patternT, insenT) =>
-        (Type.typecheck(Type.Str, strT).leftMap(nel => nel.map(ι[SemanticError])) |@|
-         Type.typecheck(Type.Str, patternT).leftMap(nel => nel.map(ι[SemanticError])) |@|
-         Type.typecheck(Type.Bool, insenT).leftMap(nel => nel.map(ι[SemanticError])))((_, _, _) => Type.Bool)
+        val compiledPattern = Try(Pattern.compile(patternInsensitive(pattern, insen))).toOption
+        compiledPattern.map(p => success(Type.Const(Data.Bool(matchAnywhere(str, p, insen)))))
+      case _ => None
     },
     basicUntyper)
 

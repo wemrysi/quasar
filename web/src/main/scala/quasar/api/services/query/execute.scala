@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package quasar.api.services.query
 
 import slamdata.Predef.{ -> => _, _ }
 import quasar._
-import quasar.effect.ScopeExecution
+import quasar.effect.{ExecutionId, ScopeExecution}
 import quasar.api._, ToApiError.ops._
 import quasar.api.services._
 import quasar.contrib.pathy._
@@ -60,7 +60,7 @@ object execute {
           // FIXME: use fsQ.evaluateQuery here
           for {
             newExecutionIndex <- Free.liftF(S1(executionIdRef.modify(_ + 1)))
-            result <- SE.newExecution(newExecutionIndex, ST =>
+            result <- SE.newExecution(ExecutionId(newExecutionIndex), ST =>
               for {
                 block <- ST.newScope("resolve imports", resolveImports[S](xpr, basePath).run)
                 lpOrSemanticErr <-
@@ -92,7 +92,7 @@ object execute {
           } else {
             respond(for {
               newExecutionIndex <- Free.liftF(S1(executionIdRef.modify(_ + 1)))
-              result <- SE.newExecution(newExecutionIndex, ST =>
+              result <- SE.newExecution(ExecutionId(newExecutionIndex), ST =>
                 (for {
                   destination <- EitherT.fromDisjunction[Free[S, ?]](requiredHeader(Destination, req))
                   parsed <- EitherT(ST.newScope("parse SQL", sql.fixParser.parse(query).leftMap(_.toApiError).pure[Free[S, ?]]))
