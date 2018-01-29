@@ -17,6 +17,7 @@
 package quasar.sql
 
 import slamdata.Predef._
+import quasar.common.JoinType
 import quasar.fp._
 import quasar.RenderTree.ops._
 import quasar.specs2.QuasarMatchers._
@@ -433,6 +434,34 @@ class SQLParserSpec extends quasar.Qspec {
       "should not allow single limit" in {
         val q = "limit 6"
         parse(q) must beLeftDisjunction
+      }
+
+      "limited join" in {
+        val q = "select * from a inner join b on a.id = b.id limit 10"
+
+        parse(q) must beRightDisjunction(
+          Limit(
+            SelectR(
+              SelectAll,
+              List(Proj(SpliceR(None), None)),
+              Some(JoinRelation(
+                TableRelationAST(file("a"), None),
+                TableRelationAST(file("b"), None),
+                JoinType.Inner,
+                BinopR(
+                  BinopR(
+                    IdentR("a"),
+                    StringLiteralR("id"),
+                    KeyDeref),
+                  BinopR(
+                    IdentR("b"),
+                    StringLiteralR("id"),
+                    KeyDeref),
+                  Eq))),
+              None,
+              None,
+              None),
+            IntLiteralR(10)).embed)
       }
     }
 
