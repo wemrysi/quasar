@@ -51,7 +51,7 @@ trait RdbmsManageFile
   }
 
   def dropSchema(schema: Schema): ConnectionIO[Unit] = {
-    (fr"DROP SCHEMA" ++ Fragment.const(schema.shows) ++ fr"CASCADE").update.run.void
+    (fr"DROP SCHEMA" ++ Fragment.const(s""""${schema.shows}"""") ++ fr"CASCADE").update.run.void
   }
 
   override def ManageFileModule = new ManageFileModule {
@@ -94,6 +94,7 @@ trait RdbmsManageFile
         val dbCalls = for {
           dstSchemaExists <- schemaExists(dstSchema)
           _ <- dstSchemaExists.whenM(dropSchema(dstSchema))
+          _ <- ensureSchemaParents(dstSchema)
           _ <- renameSchema(srcSchema, dstSchema)
         } yield ()
 
