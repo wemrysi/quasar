@@ -99,11 +99,14 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
     : Trans[F, M] =
   new Trans[F, M] {
 
+    def elideA[A: Eq](fm: FreeMapA[T, A], hole: A): M[FreeMapA[T, A]] =
+      fm.transCataM(elideMoreGeneralGuards[T, M, A](hole, typ))
+
     def elide(fm: FreeMap[T]): M[FreeMap[T]] =
-      fm.transCataM(elideMoreGeneralGuards[T, M, Hole](SrcHole, typ))
+      elideA(fm, SrcHole)
 
     def elideJoinFunc(isRewrite: Boolean, joinSide: JoinSide, fm: JoinFunc[T]): M[JoinFunc[T]] =
-      if (isRewrite) fm.transCataM(elideMoreGeneralGuards[T, M, JoinSide](joinSide, typ))
+      if (isRewrite) elideA(fm, joinSide)
       else fm.point[M]
 
     def elideLeftJoinKey(isRewrite: Boolean, key: List[(FreeMap[T], FreeMap[T])])
