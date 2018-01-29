@@ -156,6 +156,15 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
             (b.traverse(elide) ⊛
               order.traverse(t => elide(t._1).map(x => (x, t._2))))(
               (b0, order0) => GtoF.reverseGet(QC(Sort(src, b0, order0))))
+        case QC(Union(src, lBranch, rBranch))
+          if (isRewrite[T, F, G, A](GtoF, src.project)) =>
+            val spSrc = ShapePreserving.shapePreservingP(src, GtoF)
+            val isRewriteL = isRewriteFree(lBranch, spSrc)
+            val isRewriteR = isRewriteFree(rBranch, spSrc)
+
+            val isRewriteSrc = isRewrite[T, F, G, A](GtoF, src.project)
+            (elideQS(isRewriteSrc, lBranch) ⊛ elideQS(isRewriteSrc, rBranch))(
+              (l0, r0) => GtoF.reverseGet(QC(Union(src, l0, r0))))
         case EJ(EquiJoin(src, lBranch, rBranch, key, f, combine)) =>
           val spSrc = ShapePreserving.shapePreservingP(src, GtoF)
           val isRewriteL = isRewriteFree(lBranch, spSrc)
