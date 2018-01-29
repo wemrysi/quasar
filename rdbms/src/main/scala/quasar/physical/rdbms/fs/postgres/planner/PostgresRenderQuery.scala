@@ -299,7 +299,7 @@ object PostgresRenderQuery extends RenderQuery {
       val fromExpr = s" from ${from.v._2} ${from.alias.v}"
       s"(select ${selection.v._2}$fromExpr$join$filter$groupByStr$orderByStr)".right
     case Union((_, left), (_, right)) => s"($left UNION $right)".right
-    case Constant(a @ Data.Arr(_)) =>  s"${dataFormatter("", a)}::jsonb".right
+    case Constant(a @ Data.Arr(_)) =>  s"${dataFormatter("", a, JsonCol)}::jsonb".right
     case Constant(Data.Str(v)) =>
       val text = v.flatMap { case '\'' => "''"; case iv => iv.toString }.self
       s"'$text'".right
@@ -308,7 +308,7 @@ object PostgresRenderQuery extends RenderQuery {
         case ((k, Data.Null) :: Nil) =>
           s"null as $k".right
         case _ =>
-          s"${dataFormatter("", a)}::jsonb".right
+          s"${dataFormatter("", a, JsonCol)}::jsonb".right
       }
     case Constant(Data.Id(str)) =>
       DataCodec.render(Data.Id(str)).map(i => s"""'$i'""") \/> NonRepresentableData(Data.Id(str))
