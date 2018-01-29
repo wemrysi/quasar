@@ -29,12 +29,13 @@ import pathy.scalacheck.PathyArbitrary._
 class TablePathSpec extends Qspec {
 
   import TablePath._
+  import common._
 
   "TablePath" should {
     "extract table name" in {
       prop { (file: AFile) =>
         TablePath.create(file).table must_=== TableName(
-          Path.fileName(file).value)
+          escapeFileName(Path.fileName(file).value))
       }
     }
 
