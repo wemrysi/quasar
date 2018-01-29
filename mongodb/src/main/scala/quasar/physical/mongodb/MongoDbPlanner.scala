@@ -1181,18 +1181,19 @@ object MongoDbPlanner {
     import MapFuncsCore._
 
     val corec = Corecursive[Cofree[MapFunc[T, ?], Boolean], EnvT[Boolean, MapFunc[T, ?], ?]]
-    //
-    // // type GCoalgebra[N[_], F[_], A]        = A => F[N[A]] // GCoalgebraM[N, Id, F, A]
-    // val coalg: FreeMapA[T, A] => EnvT[Boolean, MapFunc[T, ?], Cofree[MapFunc[T, ?], Boolean] \/ FreeMapA[T, A]] = {
-    //   case cond @ Embed(MFC(Cond(_, _, _))) => envT(true, convertToCofree[CoEnv[A, MapFunc[T, ?], ?], Boolean](cond, true).left)
-    //   case otherwise => envT(false, otherwise.right[Cofree[MapFunc[T, ?], Boolean]])
+    val coalg: ElgotCoalgebra[Cofree[MapFunc[T, ?], Boolean] \/ ?, EnvT[Boolean, MapFunc[T, ?], ?], FreeMapA[T, A]] =
+      _.fold(κ(envT[Boolean, MapFunc[T, ?], FreeMapA[T, A]](false, MFC(Undefined())).right), {
+        case cond0 @ MFC(Cond(_, _, _)) => {
+          Free.roll(cond0).cata[Cofree[MapFunc[T, ?], Boolean]](
+            interpret(
+              κ(Cofree(true, MFC(Undefined()))),
+              attributeAlgebra[MapFunc[T, ?], Boolean](κ(true)))).left
+        }
+        case otherwise =>
+          envT[Boolean, MapFunc[T, ?], FreeMapA[T, A]](false, otherwise).right
+      })
 
-    // }
-    val undefinedF: MapFunc[T, Cofree[MapFunc[T, ?], Boolean] \/ FreeMapA[T, A]] = MFC(Undefined())
-    val coalg: GCoalgebra[Cofree[MapFunc[T, ?], Boolean] \/ ?, EnvT[Boolean, MapFunc[T, ?], ?], FreeMapA[T, A]] =
-      _.fold(_ => ???, κ(envT[Boolean, MapFunc[T, ?], Cofree[MapFunc[T, ?], Boolean] \/ FreeMapA[T, A]](false, undefinedF)))
-
-    val ann: Cofree[MapFunc[T, ?], Boolean] = corec.apo[FreeMapA[T, A]](fm)(coalg)
+    val ann: Cofree[MapFunc[T, ?], Boolean] = corec.elgotApo[FreeMapA[T, A]](fm)(coalg)
 
     def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
         M[WorkflowBuilder[WF]] = {
