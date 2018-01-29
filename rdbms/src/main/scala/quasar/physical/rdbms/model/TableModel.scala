@@ -111,6 +111,15 @@ object TableModel {
     override def zero: TableModel = ColumnarTable(TreeSet.empty)
     def empty: TableModel = zero
 
+    val widenings = Map[Set[ColumnType], ColumnType](
+      Set[ColumnType](IntCol, DecCol) -> DecCol,
+      Set[ColumnType](DecCol, StringCol) -> StringCol,
+      Set[ColumnType](IntCol, StringCol) -> StringCol,
+      Set[ColumnType](BoolCol, StringCol) -> StringCol,
+      Set[ColumnType](BoolCol, DecCol) -> StringCol,
+      Set[ColumnType](BoolCol, IntCol) -> StringCol
+    )
+
     override def append(s1: TableModel, s2: => TableModel): TableModel = {
 
       def updateCols(cols: Set[ColumnDesc],
@@ -125,7 +134,7 @@ object TableModel {
                 else if (c.tpe === newC.tpe || newC.tpe === NullCol)
                   c.some
                 else
-                  none
+                  widenings.get(Set(c.tpe, newC.tpe)).map(ColumnDesc(c.name, _))
               }
               .getOrElse(c.some)
           }
@@ -156,6 +165,10 @@ object TableModel {
       case t.Int     => IntCol
       case t.Bool    => BoolCol
       case t.Dec     => DecCol
+      case t.Timestamp => JsonCol
+      case t.Date => JsonCol
+      case t.Time => JsonCol
+      case t.Id      => JsonCol
       case _         => NullCol // TODO support all types
     }
   }

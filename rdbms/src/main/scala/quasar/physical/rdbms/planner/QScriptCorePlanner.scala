@@ -23,16 +23,16 @@ import quasar.fp._
 import quasar.{NameGenerator, qscript}
 import quasar.Planner.PlannerErrorME
 import Planner._
-
-import quasar.qscript.{ExcludeId, FreeMap, MapFunc, OnUndefined, QScriptCore, QScriptTotal, ShiftType, Reduce, ReduceFuncs}
+import sql._
+import sql.Indirections._
+import sql.SqlExpr._
+import sql.{SqlExpr, _}
+import sql.SqlExpr.Select._
+import quasar.qscript.{ExcludeId, FreeMap, MapFunc, QScriptCore, QScriptTotal, Reduce, ReduceFuncs, ShiftType}
 import quasar.qscript.{MapFuncCore => MFC}
 import quasar.qscript.{MapFuncDerived => MFD}
 import MFC._
 import MFD._
-import sql._
-import sql.Indirections._
-import sql.SqlExpr._
-import sql.SqlExpr.Select._
 
 import matryoshka._
 import matryoshka.data._
@@ -142,29 +142,29 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
         reduceFuncPlanner[T, F].plan)
       rep <- repair.cataM(interpretM(
         _.idx.fold(
-          idx => notImplemented("Reduce repair with left index, waiting for a test case", this): F[T[SqlExpr]],
-          idx => rds(idx).point[F]
+          leftIdx => gbs(leftIdx).point[F],
+          rightIdx => rds(rightIdx).point[F]
         ),
         Planner.mapFuncPlanner[T, F].plan)
       ).map(idToWildcard[T])
     } yield {
-        val (selection, groupBy) = reduce match {
-          case DistinctPattern() =>
-            (Distinct[T[SqlExpr]](rep).embed, none)
-          case _ => (rep, GroupBy(gbs).some)
-        }
-
-        Select(
-          Selection(selection, none, Default),
-          From(src, alias),
-          join = none,
-          filter = none,
-          groupBy = groupBy,
-          orderBy = nil
-        ).embed
+      val (selection, groupBy) = reduce match {
+        case DistinctPattern() =>
+          (Distinct[T[SqlExpr]](rep).embed, none)
+        case _ => (rep, GroupBy(gbs).some)
       }
 
-    case qscript.LeftShift(src, struct, ExcludeId, ShiftType.Array, OnUndefined.Omit, repair) =>
+      Select(
+        Selection(selection, none, Default),
+        From(src, alias),
+        join = none,
+        filter = none,
+        groupBy = groupBy,
+        orderBy = nil
+       ).embed
+    }
+
+    case qscript.LeftShift(src, struct, ExcludeId, ShiftType.Array, _, repair) =>
       for {
         structAlias <- genId[T[SqlExpr], F](deriveIndirection(src))
         structExpr  <- processFreeMap(struct, structAlias)

@@ -65,7 +65,7 @@ trait PostgresCreate extends RdbmsCreate {
       (fr"ALTER TABLE" ++ Fragment.const(tablePath.shows) ++
         cols.map {
           case AddColumn(name, tpe) => Fragment.const(s"ADD COLUMN $name ${tpe.mapToStringName}")
-          case ModifyColumn(name, tpe) => Fragment.const(s"MODIFY COLUMN $name ${tpe.mapToStringName}")
+          case ModifyColumn(name, tpe) => Fragment.const(s"MODIFY COLUMN $name type ${tpe.mapToStringName}")
         }.toList.intercalate(fr",")).update.run.void
     }
   }

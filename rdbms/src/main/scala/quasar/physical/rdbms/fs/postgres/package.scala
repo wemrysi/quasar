@@ -16,6 +16,8 @@
 
 package quasar.physical.rdbms.fs
 
+import java.time.format.DateTimeFormatter
+
 import slamdata.Predef._
 import quasar.{Data, DataCodec}
 import quasar.physical.rdbms.model._
@@ -23,6 +25,7 @@ import quasar.physical.rdbms.model._
 package object postgres {
   
   implicit val codec: DataCodec = DataCodec.Precise
+  import DataCodec.Precise._
 
   implicit val typeMapper: TypeMapper = TypeMapper(
     {
@@ -53,6 +56,8 @@ package object postgres {
     case _ => d
   }
 
+  val tsFormatter: DateTimeFormatter = DateTimeFormatter.ISO_INSTANT
+
   implicit val dataFormatter: DataFormatter = DataFormatter((n, v) =>
     v match {
       case Data.Obj(_) | Data.Arr(_) =>
@@ -61,6 +66,11 @@ package object postgres {
       case Data.Str(txt) => s"'${escapeStr(txt)}'"
       case Data.Dec(num) => s"$num"
       case Data.Bool(bool) => s"$bool"
-      case _             => s"""'{"$n": "unsupported""}'""" // TODO
+      case Data.Timestamp(i) => s"""'{"$TimestampKey": "${tsFormatter.format(i)}"}'"""
+      case Data.Date(dt) => s"""'{"$DateKey": "${tsFormatter.format(dt)}"}'"""
+      case Data.Time(t) => s"""'{"$TimeKey": "${DataCodec.timeFormatter.format(t)}"}'"""
+      case Data.Id(oid) => s"""'{"$IdKey": "$oid"}'"""
+      case other => s"""'{"$n": "unsupported ($other)"}'""" // TODO
     })
+
 }
