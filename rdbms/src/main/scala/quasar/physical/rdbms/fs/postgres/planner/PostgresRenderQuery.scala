@@ -235,6 +235,8 @@ object PostgresRenderQuery extends RenderQuery {
       s"sum($e)".right
     case Distinct((_, e)) =>
       s"distinct $e".right
+    case ArrayAgg((_, e)) =>
+      s"array_agg($e)".right
     case Length((_, e)) =>
       //conditional expressions in Postgres have no defined lazyness guarantees and are effectively eager in a lot
       //of situations, see https://www.postgresql.org/docs/9.6/static/sql-expressions.html#SYNTAX-EXPRESS-EVAL
