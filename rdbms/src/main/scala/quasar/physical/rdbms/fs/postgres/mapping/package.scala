@@ -29,6 +29,12 @@ package object mapping {
 
   val SingleFieldKey = "__p_single_"
 
+  /**
+    * Postgres always returns columns with names, so converting them to JSON results
+    * in objects which always have keys. For queries that should return single values,
+    * we try to detect that in the planner and then return the value wrapped in a special
+    * key, which we strip here to achieve the single-value effect.
+    */
   def stripSingleValue(d: Data): Data = {
     d match {
       case Data.Obj(lm) =>

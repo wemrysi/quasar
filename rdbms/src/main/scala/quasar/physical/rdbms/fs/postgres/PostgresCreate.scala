@@ -34,6 +34,7 @@ trait PostgresCreate extends RdbmsCreate {
       if (s.isRoot)
         ().point[ConnectionIO]
       else
+      // lock required to avoid conflicts when creating schemas concurrently in tests
         fr"LOCK TABLE pg_catalog.pg_namespace".update.run *>
           (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(s""""${s.shows}"""")).update.run.void).void
   }
@@ -68,6 +69,8 @@ trait PostgresCreate extends RdbmsCreate {
             (fr"ALTER TABLE" ++ dbPath ++
             Fragment.const(s"ADD COLUMN $name ${tpe.mapToStringName}")).update.run.void
           case ModifyColumn(name, JsonCol) =>
+            // Widening to jsonb column requires creating a new temp column and rewriting content.
+            // Postgres doesn't support automatic conversion to jsonb type.
             val tmpCol = "tmp___"
             (fr"ALTER TABLE" ++ dbPath ++
               Fragment.const(s"ADD COLUMN $tmpCol jsonb")).update.run *>

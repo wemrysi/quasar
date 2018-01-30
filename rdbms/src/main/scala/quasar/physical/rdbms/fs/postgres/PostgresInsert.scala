@@ -74,6 +74,7 @@ trait PostgresInsert extends RdbmsInsert {
     }
   }
 
+  // Untested, indended for single-json-column data which we don't support yet.
   def batchInsert(
       dbPath: TablePath,
       chunk: Vector[Data],

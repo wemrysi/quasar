@@ -46,7 +46,7 @@ trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] with RdbmsMove {
   import QueryFile._
   implicit def MonadM: Monad[M]
   override def ResultKvsM: Kvs[M, ResultHandle, DbDataStream] = Kvs[M, ResultHandle, DbDataStream]
-  def renderQuery: RenderQuery // TODO this should be chosen based on schema
+  def renderQuery: RenderQuery // TODO this should be chosen based on schema, currently only one impl for multi-column tables.
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad

@@ -50,6 +50,8 @@ object PostgresRenderQuery extends RenderQuery {
 
     type SqlTransform = T[SqlExpr] => T[SqlExpr]
 
+    // Postgres represents record types with a special data structure, so
+    // an additional wrapping with coercion is required to get the string name instead of a numeric representation.
     val stringifyTypeOf: SqlTransform = s => s.project match {
       case TypeOf(_) => Coercion[T[SqlExpr]](StringCol, s).embed
       case _ => s
@@ -75,6 +77,8 @@ object PostgresRenderQuery extends RenderQuery {
       .transCataT(stringifyTypeOf)
       .paraM(galg)
 
+    // Wrap the whole SQL query in a "select row_to_json..." unless it's a query which
+    // already uses this function. We don't want to double the row_to_json call.
     a.project match {
       case Select(Selection(sel, _, _), _, _, _, _, _) =>
         sel.project match {
@@ -161,6 +165,7 @@ object PostgresRenderQuery extends RenderQuery {
       bool(pair).some
   }
 
+  // Tries to reconcile types left and right side of != and = operators by doing the best possible casting.
   def findComparisonSideCasts[T[_[_]]: BirecursiveT](lSrc: T[SqlExpr], left: String, rSrc: T[SqlExpr], right: String): (String, String) = {
 
     def castSide(oppositeSideSrc: T[SqlExpr], src: T[SqlExpr], thisStr: String) =
@@ -189,6 +194,9 @@ object PostgresRenderQuery extends RenderQuery {
       v.right
     case AllCols() =>
       s"*".right
+    // The Refs element represents a field/column reference which is rendered in various ways.
+    // We are using additional metadata of type Indirections, which carries information on
+    // what kind of references we are using for each element. (If we want to render a.b.c, a.b->'c', etc.)
     case Refs(srcs, m) =>
       srcs.unzip(ι) match {
         case (_, firstStr +: tail) =>
