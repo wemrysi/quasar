@@ -1238,8 +1238,7 @@ object MongoDbPlanner {
       case _ => none
     }
 
-    val selectors = getSelector[T, M, EX, A](
-      fm, InternalError.fromMsg("Not a selector").left, condSelector[T](v))
+    val selectors = sels
 
     def plan(src: WorkflowBuilder[WF], freemap: FreeMapA[T, A]): M[WorkflowBuilder[WF]] =
       freemap.project match {
