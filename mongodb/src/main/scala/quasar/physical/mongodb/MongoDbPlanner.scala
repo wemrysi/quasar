@@ -1207,9 +1207,9 @@ object MongoDbPlanner {
                | MFC(Gte(_, _))
                | MFC(Undefined()) => defaultSelector[T].right
             case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
-            case MFC(ProjectKey((_, v), _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
             case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
             case MFC(Guard((_, if_), _, (_, then_), _)) => invoke2Rel(if_, then_)(Selector.Or(_, _))
+            case MFC(Cond((_, v), _, _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
             case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
           })
 
