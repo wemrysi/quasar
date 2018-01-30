@@ -943,37 +943,37 @@ object MongoDbPlanner {
               case _ => none
             }
 
-            def flattening(src: WorkflowBuilder[WF], target: Expr, st: ShiftType, i: IdStatus)
-                : WorkflowBuilder[WF] =
-              st match {
-                case ShiftType.Array =>
-                  FlatteningBuilder(
-                    DocBuilder(
-                      src,
-                      ListMap(
-                        BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                        BsonField.Name("f") -> target)),
-                    Set(StructureType.Array(DocField(BsonField.Name("f")), i)),
-                    List(BsonField.Name("s")).some)
-                case ShiftType.Map =>
-                  FlatteningBuilder(
-                    DocBuilder(
-                      src,
-                      ListMap(
-                        BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                        BsonField.Name("f") -> target)),
-                    Set(StructureType.Object(DocField(BsonField.Name("f")), i)),
-                    List(BsonField.Name("s")).some)
-              }
+            def elideCond[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
+              case CoEnv(\/-(MFC(Cond(if_, then_, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
+                CoEnv(then_.resume.swap).some
+              case _ => none
+            }
 
             if (repair.contains(LeftSideF)) {
-              handleFreeMap[T, M, EX](
-                cfg.funcHandler,
-                cfg.staticHandler,
-                struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))) >>= (target =>
+              val struct0: M[Expr] =
+                handleFreeMap[T, M, EX](
+                  cfg.funcHandler,
+                  cfg.staticHandler,
+                  struct.transCata[FreeMap[T]](orOriginal(elideCond[Hole])))
+
+              val src0: M[WorkflowBuilder[WF]] =
+                struct0 >>= (struct1 =>
+                  getBuilder[T, M, WF, EX, Hole](
+                    handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _), cfg.bsonVersion)(
+                    DocBuilder(
+                      src,
+                      ListMap(
+                        BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
+                        BsonField.Name("f") -> struct1)), struct))
+
+              src0 >>= (src1 =>
                 getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge), cfg.bsonVersion)(
-                  flattening(src, target, shiftType, id),
-                  repair))
+                  FlatteningBuilder(
+                    src1,
+                    shiftType match {
+                      case ShiftType.Array => Set(StructureType.Array(DocField(BsonField.Name("f")), id))
+                      case ShiftType.Map => Set(StructureType.Object(DocField(BsonField.Name("f")), id))
+                    }, List(BsonField.Name("s")).some), repair))
             }
             else {
               val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
@@ -984,7 +984,8 @@ object MongoDbPlanner {
                   cfg.funcHandler, cfg.staticHandler, _), cfg.bsonVersion)(src, struct0) >>= (builder =>
                 getBuilder[T, M, WF, EX, Hole](
                   handleFreeMap[T, M, EX](
-                    cfg.funcHandler, cfg.staticHandler, _), cfg.bsonVersion)(
+                    cfg.funcHandler, cfg.staticHandler, _),
+                  cfg.bsonVersion)(
                   FlatteningBuilder(
                     builder,
                     shiftType match {
@@ -1217,7 +1218,7 @@ object MongoDbPlanner {
           case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
           case MFC(ProjectKey((_, v), _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
           case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
-          case MFC(Guard((_, if_), _, (_, then_), _)) => invoke2Rel(if_, then_)(Selector.Or(_, _))
+          case MFC(Guard((_, _), _, (_, v), _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
           case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
         }
       }
