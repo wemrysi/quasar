@@ -1183,17 +1183,47 @@ object MongoDbPlanner {
     val corec = Corecursive[Cofree[MapFunc[T, ?], Boolean], EnvT[Boolean, MapFunc[T, ?], ?]]
     val coalg: ElgotCoalgebra[Cofree[MapFunc[T, ?], Boolean] \/ ?, EnvT[Boolean, MapFunc[T, ?], ?], FreeMapA[T, A]] =
       _.fold(κ(envT[Boolean, MapFunc[T, ?], FreeMapA[T, A]](false, MFC(Undefined())).right), {
-        case cond0 @ MFC(Cond(_, _, _)) => {
+        case cond0 @ MFC(Cond(_, _, _)) =>
           Free.roll(cond0).cata[Cofree[MapFunc[T, ?], Boolean]](
             interpret(
               κ(Cofree(true, MFC(Undefined()))),
               attributeAlgebra[MapFunc[T, ?], Boolean](κ(true)))).left
-        }
-        case otherwise =>
-          envT[Boolean, MapFunc[T, ?], FreeMapA[T, A]](false, otherwise).right
+        case otherwise => envT(false, otherwise).right
       })
 
     val ann: Cofree[MapFunc[T, ?], Boolean] = corec.elgotApo[FreeMapA[T, A]](fm)(coalg)
+
+    val galg: GAlgebra[(Cofree[MapFunc[T, ?], Boolean], ?), EnvT[Boolean, MapFunc[T, ?], ?], OutputM[PartialSelector[T]]] = { node =>
+      def forgetAnn: Cofree[MapFunc[T, ?], Boolean] => T[MapFunc[T, ?]] = _.transCata[T[MapFunc[T, ?]]](_.lower)
+
+      node.runEnvT match {
+        case (true, wa) =>
+          selector[T](v).apply(wa.map(c => (forgetAnn(c._1), c._2))) <+> (wa match {
+            case MFC(Eq(_, _))
+               | MFC(Neq(_, _))
+               | MFC(Lt(_, _))
+               | MFC(Lte(_, _))
+               | MFC(Gt(_, _))
+               | MFC(Gte(_, _))
+               | MFC(Undefined()) => defaultSelector[T].right
+            case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+            case MFC(ProjectKey((_, v), _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
+            case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
+            case MFC(Guard((_, if_), _, (_, then_), _)) => invoke2Rel(if_, then_)(Selector.Or(_, _))
+            case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
+          })
+
+        case (false, wa) => wa match {
+          case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+          case MFC(ProjectKey((_, v), _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
+          case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
+          case MFC(Guard((_, if_), _, (_, then_), _)) => invoke2Rel(if_, then_)(Selector.Or(_, _))
+          case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
+        }
+      }
+    }
+
+    val sels: OutputM[PartialSelector[T]] = ann.para[OutputM[PartialSelector[T]]](galg)
 
     def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
         M[WorkflowBuilder[WF]] = {
