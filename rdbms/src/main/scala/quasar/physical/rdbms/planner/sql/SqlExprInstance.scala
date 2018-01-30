@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,8 +53,9 @@ trait SqlExprTraverse {
       case Max(a1)             => f(a1) ∘ (Max(_))
       case Min(a1)             => f(a1) ∘ (Min(_))
       case Sum(a1)             => f(a1) ∘ (Sum(_))
+      case Length(a1)          => f(a1) ∘ (Length(_))
+      case DeleteKey(a1, a2)   => (f(a1) ⊛ f(a2))(DeleteKey(_, _))
       case Distinct(a1)        => f(a1) ∘ (Distinct(_))
-      case Time(a1)            => f(a1) ∘ Time.apply
       case Refs(srcs, m)       =>  (srcs.traverse(f) ⊛ G.point(m))(Refs.apply)
       case Table(name)         => G.point(Table(name))
       case IsNotNull(v)        => f(v) ∘ IsNotNull.apply
@@ -65,6 +66,7 @@ trait SqlExprTraverse {
       case Mod(a1, a2)         => (f(a1) ⊛ f(a2))(Mod.apply)
       case Pow(a1, a2)         => (f(a1) ⊛ f(a2))(Pow.apply)
       case And(a1, a2)         => (f(a1) ⊛ f(a2))(And(_, _))
+      case Not(v)              => f(v) ∘ Not.apply
       case Eq(a1, a2)          => (f(a1) ⊛ f(a2))(Eq(_, _))
       case Neq(a1, a2)         => (f(a1) ⊛ f(a2))(Neq(_, _))
       case Lt(a1, a2)          => (f(a1) ⊛ f(a2))(Lt(_, _))
@@ -101,6 +103,7 @@ trait SqlExprTraverse {
           Case(wt, Else(e))
         )
 
+      case TypeOf(e) => f(e) ∘ TypeOf.apply
       case Coercion(t, e) => f(e) ∘ (Coercion(t, _))
       case ToArray(v) => f(v) ∘ ToArray.apply
       case UnaryFunction(t, e) => f(e) ∘ (UnaryFunction(t, _))
@@ -109,6 +112,9 @@ trait SqlExprTraverse {
       case Limit(from, count) => (f(from) ⊛ f(count))(Limit.apply)
       case Offset(from, count) => (f(from) ⊛ f(count))(Offset.apply)
       case ArrayUnwind(u) => f(u) ∘ ArrayUnwind.apply
+      case Time(a1)       => f(a1) ∘ Time.apply
+      case Timestamp(a1)  => f(a1) ∘ Timestamp.apply
+      case DatePart(part, e) => (f(part) ⊛ f(e))(DatePart(_, _))
     }
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,13 +20,13 @@ import slamdata.Predef._
 import slamdata.Predef.{Eq => _}
 import quasar.Data
 import quasar.DataCodec
-import DataCodec.Precise.{DateKey, IntervalKey, TimeKey, TimestampKey}
+import DataCodec.Precise.IntervalKey
 import quasar.Planner._
 import quasar.physical.rdbms.planner.sql.{Contains, StrLower, StrUpper, Substring, Search, StrSplit, ArrayConcat, SqlExpr => SQL}
+import quasar.physical.rdbms.planner.sql._
 import quasar.physical.rdbms.planner.sql.SqlExpr._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Case._
 import quasar.qscript.{MapFuncsCore => MFC, _}
-import quasar.std.StdLib.string.{dateRegex, timeRegex, timestampRegex}
 import matryoshka._
 import matryoshka.implicits._
 import quasar.physical.rdbms.model.{BoolCol, DecCol, IntCol, StringCol}
@@ -36,7 +36,7 @@ import Scalaz._
 import quasar.physical.rdbms.planner.sql.Indirections._
 
 
-class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerErrorME]
+class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_] : Applicative : PlannerErrorME]
     extends Planner[T, F, MapFuncCore[T, ?]] {
 
   val undefined: T[SQL] = SQL.Null[T[SQL]]().embed
@@ -52,32 +52,21 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     nr.embed
   }
 
-  def datetime(a1: T[SQL], key: String, regex: Regex): T[SQL] = {
-    Case.build(
-      WhenThen(
-        IsNotNull(toKeyValue(a1, key)).embed,
-        a1),
-      WhenThen(
-        RegexMatches(a1, str(regex.regex), caseInsensitive = false).embed,
-        Obj(List(str(key) -> a1)).embed)
-    )(
-      Else(SQL.Null[T[SQL]].embed)
-    ).embed
-  }
-
   private def project(fSrc: T[SQL], fKey: T[SQL]) = fSrc.project match {
     case SQL.Refs(list, m) => SQL.Refs(list :+ fKey, m).embed.η[F]
     case _ => SQL.Refs(Vector(fSrc, fKey), deriveIndirection(fSrc)).embed.η[F] // _12
   }
 
+  private def datePart(part: String, f: T[SQL]) = SQL.DatePart(SQL.Constant[T[SQL]](Data.Str(part)).embed, f).embed.η[F]
+
   def plan: AlgebraM[F, MapFuncCore[T, ?], T[SQL]] = {
     case MFC.Constant(ejson) => SQL.Constant[T[SQL]](ejson.cata(Data.fromEJson)).embed.η[F]
     case MFC.Undefined() =>  undefined.η[F]
     case MFC.JoinSideName(n) =>  notImplemented("JoinSideName", this)
-    case MFC.Length(f) => notImplemented("Length", this)
-    case MFC.Date(f) => datetime(f, DateKey, dateRegex.r).η[F]
-    case MFC.Time(f) =>  datetime(f, TimeKey, timeRegex.r).η[F]
-    case MFC.Timestamp(f) => datetime(f, TimestampKey, timestampRegex.r).η[F]
+    case MFC.Length(f) => SQL.Length(f).embed.η[F]
+    case MFC.Date(f) => notImplemented("Date", this)
+    case MFC.Time(f) =>  Time(f).embed.η[F]
+    case MFC.Timestamp(f) => Timestamp(f).embed.η[F]
     case MFC.Interval(f) =>
       Case.build(
         WhenThen(IsNotNull(toKeyValue(f, IntervalKey)).embed, f)
@@ -88,24 +77,24 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.TemporalTrunc(p, f) =>  notImplemented("TemporalTrunc", this)
     case MFC.TimeOfDay(f) =>  notImplemented("TimeOfDay", this)
     case MFC.ToTimestamp(f) =>  notImplemented("ToTimestamp", this)
-    case MFC.ExtractCentury(f) =>  notImplemented("ExtractCentury", this)
-    case MFC.ExtractDayOfMonth(f) =>  notImplemented("ExtractDayOfMonth", this)
-    case MFC.ExtractDecade(f) =>  notImplemented("ExtractDecade", this)
-    case MFC.ExtractDayOfWeek(f) =>  notImplemented("ExtractDayOfWeek", this)
-    case MFC.ExtractDayOfYear(f) =>  notImplemented("ExtractDayOfYear", this)
-    case MFC.ExtractEpoch(f) =>  notImplemented("ExtractEpoch", this)
-    case MFC.ExtractHour(f) =>  notImplemented("ExtractHour", this)
-    case MFC.ExtractIsoDayOfWeek(f) =>  notImplemented("ExtractIsoDayOfWeek", this)
-    case MFC.ExtractIsoYear(f) =>  notImplemented("ExtractIsoYear", this)
-    case MFC.ExtractMicroseconds(f) => notImplemented("ExtractMicroseconds", this)
-    case MFC.ExtractMillennium(f) =>  notImplemented("ExtractMillennium", this)
-    case MFC.ExtractMilliseconds(f) =>  notImplemented("ExtractMilliseconds", this)
-    case MFC.ExtractMinute(f) =>  notImplemented("ExtractMinute", this)
-    case MFC.ExtractMonth(f) =>  notImplemented("ExtractMonth", this)
-    case MFC.ExtractQuarter(f) =>  notImplemented("ExtractQuarter", this)
-    case MFC.ExtractSecond(f) =>  notImplemented("ExtractSecond", this)
-    case MFC.ExtractWeek(f) =>  notImplemented("ExtractWeek", this)
-    case MFC.ExtractYear(f) =>  notImplemented("ExtractYear", this)
+    case MFC.ExtractCentury(f) =>   datePart("century", f)
+    case MFC.ExtractDayOfMonth(f) =>   datePart("day", f)
+    case MFC.ExtractDecade(f) =>   datePart("decade", f)
+    case MFC.ExtractDayOfWeek(f) =>   datePart("dow", f)
+    case MFC.ExtractDayOfYear(f) =>   datePart("doy", f)
+    case MFC.ExtractEpoch(f) =>   datePart("epoch", f)
+    case MFC.ExtractHour(f) =>   datePart("hour", f)
+    case MFC.ExtractIsoDayOfWeek(f) =>   datePart("isodow", f)
+    case MFC.ExtractIsoYear(f) =>   datePart("isoyear", f)
+    case MFC.ExtractMicroseconds(f) =>  datePart("microseconds", f)
+    case MFC.ExtractMillennium(f) =>   datePart("millennium", f)
+    case MFC.ExtractMilliseconds(f) =>   datePart("milliseconds", f)
+    case MFC.ExtractMinute(f) =>   datePart("minute", f)
+    case MFC.ExtractMonth(f) =>   datePart("month", f)
+    case MFC.ExtractQuarter(f) =>   datePart("quarter", f)
+    case MFC.ExtractSecond(f) =>   datePart("second", f)
+    case MFC.ExtractWeek(f) =>  datePart("week", f)
+    case MFC.ExtractYear(f) =>  datePart("year", f)
     case MFC.Now() =>  notImplemented("Now", this)
     case MFC.Negate(f) =>  SQL.Neg[T[SQL]](f).embed.η[F]
     case MFC.Add(f1, f2) =>  SQL.NumericOp[T[SQL]]("+", f1, f2).embed.η[F]
@@ -114,7 +103,6 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.Divide(f1, f2) => SQL.NumericOp[T[SQL]]("/", f1, f2).embed.η[F]
     case MFC.Modulo(f1, f2) => SQL.Mod[T[SQL]](f1, f2).embed.η[F]
     case MFC.Power(f1, f2) =>  SQL.Pow[T[SQL]](f1, f2).embed.η[F]
-    case MFC.Not(f) =>  notImplemented("Not", this)
     case MFC.Eq(f1, f2) => SQL.Eq[T[SQL]](f1, f2).embed.η[F]
     case MFC.Neq(f1, f2) => SQL.Neq[T[SQL]](f1, f2).embed.η[F]
     case MFC.Lt(f1, f2) =>  SQL.Lt[T[SQL]](f1, f2).embed.η[F]
@@ -124,6 +112,7 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
     case MFC.IfUndefined(f1, f2) => SQL.IfNull.build(f1, f2).embed.η[F]
     case MFC.And(f1, f2) =>  SQL.And[T[SQL]](f1, f2).embed.η[F]
     case MFC.Or(f1, f2) =>  SQL.Or[T[SQL]](f1, f2).embed.η[F]
+    case MFC.Not(f) =>  SQL.Not[T[SQL]](f).embed.η[F]
     case MFC.Between(f1, f2, f3) =>  notImplemented("Between", this)
     case MFC.Cond(fCond, fThen, fElse) =>  notImplemented("Cond", this)
     case MFC.Within(f1, f2) =>  SQL.BinaryFunction(Contains, f1, f2).embed.η[F]
@@ -177,10 +166,10 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_]:Applicative:PlannerE
 
     case MFC.ProjectIndex(fSrc, fKey) => project(fSrc, fKey)
     case MFC.ProjectKey(fSrc, fKey) => project(fSrc, fKey)
-    case MFC.DeleteKey(fSrc, fField) =>   notImplemented("DeleteKey", this)
+    case MFC.DeleteKey(fSrc, fField) => DeleteKey(fSrc, fField).embed.η[F]
     case MFC.Range(fFrom, fTo) =>  notImplemented("Range", this)
     case MFC.Guard(f1, fPattern, f2, ff3) => f2.η[F]
-    case MFC.TypeOf(f) => notImplemented("TypeOf", this)
+    case MFC.TypeOf(f) => SQL.TypeOf(f).embed.η[F]
     case other => unexpected(other.getClass.getName, this)
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,6 +50,8 @@ trait SqlExprRenderTree {
               NonTerminal("K → V" :: Nil, none,
                 List(r.render(k), r.render(v)))
             })
+          case Length(a1) =>
+            nonTerminal("Length", a1)
           case IsNotNull(a1) =>
             nonTerminal("NotNull", a1)
           case IfNull(a) =>
@@ -72,10 +74,10 @@ trait SqlExprRenderTree {
             nonTerminal("Min", a1)
           case Sum(a1) =>
             nonTerminal("Sum", a1)
+          case DeleteKey(expr1, expr2) =>
+            NonTerminal(s"Delete Key" :: Nil, none, List(expr1, expr2) ∘ r.render)
           case Distinct(a1) =>
             nonTerminal("Distinct", a1)
-          case Time(a1) =>
-            nonTerminal("Time", a1)
           case Id(v, m) =>
             Terminal(s"Id (m = ${m.shows})" :: Nil, v.some)
           case Table(v) =>
@@ -96,6 +98,8 @@ trait SqlExprRenderTree {
             nonTerminal("Neg", a1)
           case And(a1, a2) =>
             nonTerminal("And", a1, a2)
+          case Not(e) =>
+            nonTerminal("Not", e)
           case Eq(a1, a2) =>
             nonTerminal("Equal", a1, a2)
           case Neq(a1, a2) =>
@@ -110,6 +114,7 @@ trait SqlExprRenderTree {
             nonTerminal(">=", a1, a2)
           case Or(a1, a2) =>
             nonTerminal("Or", a1, a2)
+            // TODO add group by
           case Refs(srcs, m) =>
             nonTerminal(s"References (m = ${m.shows})", srcs:_*)
           case Select(selection, from, join, filter, groupBy, order) =>
@@ -127,7 +132,7 @@ trait SqlExprRenderTree {
                   order.map {
                     o =>
                       nt(s"OrderBy ${o.sortDir}", none, o.v)
-                  } 
+                  }
             )
           case Union(left, right) =>
             nonTerminal("UNION", left, right)
@@ -137,6 +142,8 @@ trait SqlExprRenderTree {
             NonTerminal("Case" :: Nil, none,
               (wt ∘ (i => nonTerminal("whenThen", i.when, i.`then`))).toList :+
                 nonTerminal("else", e.v))
+          case TypeOf(e) =>
+            nonTerminal(s"TypeOf", e)
           case Coercion(t, e) =>
             nonTerminal(s"Coercion: $t", e)
           case ToArray(v) =>
@@ -149,6 +156,12 @@ trait SqlExprRenderTree {
             nonTerminal(s"Function call: $t", a1, a2, a3)
           case ArrayUnwind(u) =>
             nonTerminal("ArrayUnwind", u)
+          case Time(a1) =>
+            nonTerminal("Time", a1)
+          case Timestamp(a1) =>
+            nonTerminal("Timestamp", a1)
+          case DatePart(part, e) =>
+            nonTerminal("DatePart", part, e)
         }
       }
     }

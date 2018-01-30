@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,8 +50,8 @@ class ShiftedReadPlanner[
           case ExcludeId => AllCols[R]().embed
           case IncludeId => WithIds[R](AllCols[R]().embed).embed
         }
-          Select(Selection[R](fields, alias = rowAlias.some, Default), from, join = none, orderBy = Nil, groupBy = none,
-            filter = none).embed
+          Select(Selection[R](fields, alias = rowAlias.some, Default), from, join = none, groupBy = none,
+            filter = none, orderBy = Nil).embed
       }
   }
 }

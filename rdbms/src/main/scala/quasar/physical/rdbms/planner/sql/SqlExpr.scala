@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,12 +41,12 @@ object SqlExpr extends SqlExprInstances {
   final case class Obj[T](m: List[(T, T)]) extends SqlExpr[T]
   final case class IsNotNull[T](a1: T) extends SqlExpr[T]
   final case class ConcatStr[T](a1: T, a2: T) extends SqlExpr[T]
-  final case class Time[T](a1: T) extends SqlExpr[T]
+  final case class Length[T](a1: T) extends SqlExpr[T]
   final case class IfNull[T](a: OneAnd[NonEmptyList, T]) extends SqlExpr[T]
-  final case class ExprPair[T](a: T, b: T, m: Indirection) extends SqlExpr[T]
 
   final case class ExprWithAlias[T](expr: T, alias: String) extends SqlExpr[T]
 
+  final case class ExprPair[T](a: T, b: T, m: Indirection) extends SqlExpr[T]
   final case class Select[T](selection: Selection[T],
                              from: From[T],
                              join: Option[Join[T]],
@@ -68,6 +68,7 @@ object SqlExpr extends SqlExprInstances {
 
   final case class And[T](a1: T, a2: T) extends SqlExpr[T]
   final case class Or[T](a1: T, a2: T) extends SqlExpr[T]
+  final case class Not[T](a1: T) extends SqlExpr[T]
 
   final case class Eq[T](a1: T, a2: T) extends SqlExpr[T]
   final case class Neq[T](a1: T, a2: T) extends SqlExpr[T]
@@ -76,6 +77,8 @@ object SqlExpr extends SqlExprInstances {
   final case class Gt[T](a1: T, a2: T) extends SqlExpr[T]
   final case class Gte[T](a1: T, a2: T) extends SqlExpr[T]
 
+  final case class DeleteKey[T](src: T, field: T) extends SqlExpr[T]
+  final case class TypeOf[T](e: T) extends SqlExpr[T]
   final case class Coercion[T](t: ColumnType, e: T) extends SqlExpr[T]
   final case class ToArray[T](v: T) extends SqlExpr[T]
 
@@ -126,6 +129,11 @@ object SqlExpr extends SqlExprInstances {
   }
 
   final case class ArrayUnwind[T](toUnwind: T) extends SqlExpr[T]
+
+  final case class Time[T](d: T) extends SqlExpr[T]
+  final case class Timestamp[T](d: T) extends SqlExpr[T]
+
+  final case class DatePart[T](part: T, e: T) extends SqlExpr[T]
 
 }
 

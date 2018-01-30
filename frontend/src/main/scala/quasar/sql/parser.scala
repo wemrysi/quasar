@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -422,7 +422,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     })
 
   def std_join_relation: Parser[SqlRelation[T[Sql]] => SqlRelation[T[Sql]]] =
-    opt(join_type) ~ keyword("join") ~ simple_relation ~ keyword("on") ~ expr ^^
+    opt(join_type) ~ keyword("join") ~ simple_relation ~ keyword("on") ~ defined_expr ^^
       { case tpe ~ _ ~ r2 ~ _ ~ e => r1 => JoinRelation(r1, r2, tpe.getOrElse(JoinType.Inner), e) }
 
   def cross_join_relation: Parser[SqlRelation[T[Sql]] => SqlRelation[T[Sql]]] =
