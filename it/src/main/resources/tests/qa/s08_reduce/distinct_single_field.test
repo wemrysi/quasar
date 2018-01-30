@@ -1,5 +1,5 @@
 {
-    "name": "[qa_s08] distinct single field aaa",
+    "name": "[qa_s08] distinct single field",
 
     "backends": {
        "couchbase":         "ignoreFieldOrder",
