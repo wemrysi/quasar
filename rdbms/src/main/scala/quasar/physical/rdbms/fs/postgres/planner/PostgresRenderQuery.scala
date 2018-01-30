@@ -24,6 +24,7 @@ import quasar.fp.ski._
 import quasar.DataCodec.Precise.{TimeKey, TimestampKey}
 import quasar.physical.rdbms.model._
 import quasar.physical.rdbms.fs.postgres._
+import quasar.physical.rdbms.fs.postgres.mapping._
 import quasar.physical.rdbms.planner.RenderQuery
 import quasar.physical.rdbms.planner.sql._
 import quasar.physical.rdbms.planner.sql.SqlExpr.Select._
@@ -54,7 +55,25 @@ object PostgresRenderQuery extends RenderQuery {
       case _ => s
     }
 
-    val selectStr = a.transCataT(stringifyTypeOf).paraM(galg)
+    // This is a rudimentary solution to selects where selection yields a single field without
+    // any alias, so that queries like "select field from db" return just "[val]" instead
+    // of {"field": "val"}. A proper, generic solution should be incorporated.
+    def markSingleFieldResult(s: T[SqlExpr]): T[SqlExpr] = s.project match {
+      case select@Select(Selection(sel, _, _), _, _, _, _, _) =>
+        sel.project match {
+          case NumericOp(_, _, _) | Refs(_, _) =>
+            val newSelection = ExprWithAlias(sel, SingleFieldKey).embed
+            select.copy(selection = select.selection.copy(v = newSelection)).embed
+          case _=>
+            s
+        }
+      case _ =>
+        s
+    }
+
+    val selectStr = markSingleFieldResult(a)
+      .transCataT(stringifyTypeOf)
+      .paraM(galg)
 
     a.project match {
       case Select(Selection(sel, _, _), _, _, _, _, _) =>
