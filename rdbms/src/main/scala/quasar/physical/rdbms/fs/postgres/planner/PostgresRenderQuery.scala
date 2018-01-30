@@ -54,19 +54,19 @@ object PostgresRenderQuery extends RenderQuery {
       case _ => s
     }
 
-    val innerSelect = a.transCataT(stringifyTypeOf).paraM(galg)
+    val selectStr = a.transCataT(stringifyTypeOf).paraM(galg)
 
-  a.project match {
-    case Select(Selection(sel, _, _), _, _, _, _, _) =>
-      sel.project match {
-        case DeleteKey(_, _) =>
-          innerSelect
-        case _ =>
-            innerSelect.map(rowToJson)
-      }
-    case _ =>
-      innerSelect.map(rowToJson)
-  }
+    a.project match {
+      case Select(Selection(sel, _, _), _, _, _, _, _) =>
+        sel.project match {
+          case DeleteKey(_, _) =>
+            selectStr
+          case _ =>
+              selectStr.map(rowToJson)
+        }
+      case _ =>
+        selectStr.map(rowToJson)
+    }
   }
 
   def alias(a: Option[SqlExpr.Id[String]]) = ~(a ∘ (i => s" as ${i.v}"))
