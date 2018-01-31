@@ -20,7 +20,7 @@ import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.qscript.{construction, ExcludeId, IdOnly, IdStatus, IncludeId, SrcHole}
-import quasar.qscript.qsu.{QScriptUniform => QSU}
+import quasar.qscript.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
 import ApplyProvenance.AuthenticatedQSU
 import QSUGraph.Extractors._
 
@@ -35,20 +35,20 @@ final class ResolveOwnIdentities[T[_[_]]: BirecursiveT: ShowT: EqualT] private (
   def apply(aqsu: AuthenticatedQSU[T]): AuthenticatedQSU[T] = {
     aqsu.copy(graph = aqsu.graph.rewrite {
       case qg @ LeftShift(source, struct, idStatus, onUndefined, repair, rotation)
-        if repair.element(QSU.AccessLeftTarget(Access.Id(IdAccess.Identity(source.root), SrcHole))) =>
+        if repair.element(ShiftTarget.AccessLeftTarget(Access.Id(IdAccess.Identity(source.root), SrcHole))) =>
 
         val newRepair = repair.flatMap {
-          case QSU.AccessLeftTarget(Access.Id(IdAccess.Identity(symbol), _)) if symbol == qg.root =>
+          case ShiftTarget.AccessLeftTarget(Access.Id(IdAccess.Identity(symbol), _)) if symbol == qg.root =>
             func.ProjectIndexI(func.RightTarget, 0)
-          case QSU.AccessLeftTarget(access) =>
+          case ShiftTarget.AccessLeftTarget(access) =>
             func.AccessLeftTarget(κ(access))
-          case QSU.RightTarget() =>
+          case ShiftTarget.RightTarget() =>
             if (idStatus === ExcludeId)
               func.ProjectIndexI(func.RightTarget, 1)
             else
               func.RightTarget
-          case QSU.LeftTarget() =>
-            scala.sys.error("QSU.LeftTarget in ResolveOwnIdentities")
+          case ShiftTarget.LeftTarget() =>
+            scala.sys.error("ShiftTarget.LeftTarget in ResolveOwnIdentities")
         }
 
         val newIdStatus: IdStatus =
