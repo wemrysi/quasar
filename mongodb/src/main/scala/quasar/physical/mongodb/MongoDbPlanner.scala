@@ -950,26 +950,16 @@ object MongoDbPlanner {
             }
 
             if (repair.contains(LeftSideF)) {
-              val struct0: M[Expr] =
-                handleFreeMap[T, M, EX](
-                  cfg.funcHandler,
-                  cfg.staticHandler,
-                  struct.transCata[FreeMap[T]](orOriginal(elideCond[Hole])))
-
               val src0: M[WorkflowBuilder[WF]] =
-                struct0 >>= (struct1 =>
-                  getBuilder[T, M, WF, EX, Hole](
-                    handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _), cfg.bsonVersion)(
-                    DocBuilder(
-                      src,
-                      ListMap(
-                        BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                        BsonField.Name("f") -> struct1)), struct))
+                getBuilder[T, M, WF, EX, Hole](
+                  handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _), cfg.bsonVersion)(
+                  src, struct)
 
               src0 >>= (src1 =>
-                getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge), cfg.bsonVersion)(
+                getBuilder[T, M, WF, EX, JoinSide](
+                  exprOrJs(_)(exprMerge, jsMerge), cfg.bsonVersion)(
                   FlatteningBuilder(
-                    src1,
+                    DocBuilder(src1, ListMap(BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()))),
                     shiftType match {
                       case ShiftType.Array => Set(StructureType.Array(DocField(BsonField.Name("f")), id))
                       case ShiftType.Map => Set(StructureType.Object(DocField(BsonField.Name("f")), id))
@@ -1226,11 +1216,11 @@ object MongoDbPlanner {
 
     val sels: OutputM[PartialSelector[T]] = ann.para[OutputM[PartialSelector[T]]](galg)
 
-    def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
+    def filterBuilder(src0: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
         M[WorkflowBuilder[WF]] = {
       val (sel, inputs) = partialSel
 
-      inputs.traverse(f => handler(f(fm))) ∘ (WB.filter(src, _, sel))
+      inputs.traverse(f => handler(f(fm))) ∘ (WB.filter(src0, _, sel))
     }
 
     def elideCond: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
@@ -1241,15 +1231,15 @@ object MongoDbPlanner {
 
     val selectors = sels
 
-    def plan(src: WorkflowBuilder[WF], freemap: FreeMapA[T, A]): M[WorkflowBuilder[WF]] =
+    def plan(src0: WorkflowBuilder[WF], freemap: FreeMapA[T, A]): M[WorkflowBuilder[WF]] =
       freemap.project match {
         case MapFuncCore.StaticMap(elems) =>
           elems.traverse(_.bitraverse({
             case Embed(MapFuncCore.EC(ejson.Str(key))) => BsonField.Name(key).point[M]
             case key => raiseErr[M, BsonField.Name](qscriptPlanningFailed(InternalError.fromMsg(s"Unsupported object key: ${key.shows}")))
           }, handler)) ∘
-          (es => DocBuilder(src, es.toListMap))
-        case _ => handler(freemap) ∘ (ExprBuilder(src, _))
+          (es => DocBuilder(src0, es.toListMap))
+        case _ => handler(freemap) ∘ (ex => DocBuilder(src0, ListMap(BsonField.Name("f") -> ex)))
       }
 
     val elidedFM: FreeMapA[T, A] = fm.transCata[FreeMapA[T, A]](orOriginal(elideCond))
