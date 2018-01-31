@@ -184,13 +184,19 @@ class TableModelTest extends Spec  with ScalazMatchers {
       }
     }
 
-    "devise json schema on encountering incompatible data types" >> {
+    "put both arrays and strings into the same (jsonb) column" >> {
       val row1 = data("""{"age": [1, 2],"id":"748abf","keys": [4, 5, 6, 7]}""")
       val row2 = data("""{"age": "25","id":"648abf","keys": [4, 5, 6, 7]}""")
 
       forAll(permutations(Vector(row1, row2, row2, row2, row1))) { rows =>
 
-        TableModel.fromData(rows) must beRightDisjunction(JsonTable)
+        TableModel.fromData(rows) must beRightDisjunction(
+          ColumnarTable(
+            TreeSet(ColumnDesc("age", JsonCol),
+              ColumnDesc("id", StringCol),
+              ColumnDesc("keys", JsonCol))
+          )
+        )
       }
     }
 
