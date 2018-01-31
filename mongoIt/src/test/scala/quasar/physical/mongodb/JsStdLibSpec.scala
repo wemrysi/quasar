@@ -23,11 +23,11 @@ import quasar.std.StdLib._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 
-import java.time.Instant
+import java.time.{Instant, LocalDate => JLocalDate, LocalDateTime => JLocalDateTime}
 import matryoshka._
 import matryoshka.data.Fix
-import org.specs2.execute._
-import scalaz.{Name => _, _}, Scalaz._
+import org.specs2.execute.{Pending, Result, Skipped, Success}
+import scalaz.{Name => _, Success => _, _}, Scalaz._
 import shapeless.Nat
 
 /** Test the implementation of the standard library for MongoDb's map-reduce
@@ -35,45 +35,93 @@ import shapeless.Nat
   */
 class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
   /** Identify constructs that are expected not to be implemented in JS. */
-  // TODO: Come back to this
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
-    case (string.Lower, _)              => Pending("TODO").left
-    case (string.Upper, _)              => Pending("TODO").left
-    case (quasar.std.SetLib.Within, _)  => Pending("TODO").left
+    /* DATE */
+    case (date.ExtractCentury, _) => Skipped("TODO").left
+    case (date.ExtractDayOfMonth, _) => Skipped("TODO").left
+    case (date.ExtractDecade, _) => Skipped("TODO").left
+    case (date.ExtractDayOfWeek, _) => Skipped("TODO").left
+    case (date.ExtractDayOfYear, _) => Skipped("TODO").left
+    case (date.ExtractEpoch, _) => Skipped("TODO").left
+    case (date.ExtractHour, _) => Skipped("TODO").left
+    case (date.ExtractIsoDayOfWeek, _) => Skipped("TODO").left
+    case (date.ExtractIsoYear, _) => Skipped("TODO").left
+    case (date.ExtractMicrosecond, _) => Skipped("TODO").left
+    case (date.ExtractMillennium, _) => Skipped("TODO").left
+    case (date.ExtractMillisecond, _) => Skipped("TODO").left
+    case (date.ExtractMinute, _) => Skipped("TODO").left
+    case (date.ExtractMonth, _) => Skipped("TODO").left
+    case (date.ExtractQuarter, _) => Skipped("TODO").left
+    case (date.ExtractSecond, _) => Skipped("TODO").left
+    case (date.ExtractWeek, _) => Skipped("TODO").left
+    case (date.ExtractYear, _) => Skipped("TODO").left
 
-    case (string.ToString, Data.Dec(_) :: Nil) =>
-      Pending("Dec printing doesn't match precisely").left
-    case (string.ToString, Data.Interval(_) :: Nil) =>
-      Pending("Interval prints numeric representation").left
+    case (date.StartOfDay, Data.LocalLike(_) :: Nil) => Pending("TODO").left
 
+    case (date.Now, _) => Skipped("TODO").left
+    case (date.NowDate, _) => Skipped("TODO").left
+    case (date.NowTime, _) => Skipped("TODO").left
+    case (date.CurrentTimeZone, _) => noTimeZoneSupport.left
+
+    case (date.SetTimeZone, _) => noTimeZoneSupport.left
+    case (date.SetTimeZoneHour, _) => noTimeZoneSupport.left
+    case (date.SetTimeZoneMinute, _) => noTimeZoneSupport.left
+
+    case (date.OffsetDate, _) => noTimeZoneSupport.left
+    case (date.OffsetDateTime, _) => noTimeZoneSupport.left
+    case (date.OffsetTime, _) => noTimeZoneSupport.left
+
+    // https://jira.mongodb.org/browse/SERVER-8164
+    // mongo 3.5.13 fixes this issue
+    // we Success these so the property tests don't abort early
+    case (date.LocalDate, Data.Str(date) :: Nil) if JLocalDate.parse(date).getYear < 100 && (is3_2(backend) || is3_4(backend)) =>
+      Success().updateExpected("Actually skipped due to mongo bug SERVER-8164 (Fixed in 3.5.13).").left
+    case (date.LocalDateTime, Data.Str(date) :: Nil) if JLocalDateTime.parse(date).getYear < 100 && (is3_2(backend) || is3_4(backend)) =>
+      Success().updateExpected("Actually skipped due to mongo bug SERVER-8164 (Fixed in 3.5.13).").left
+
+    case (date.Interval, _) => Skipped("TODO").left
+    case (date.TimeOfDay, _) => Skipped("TODO").left
+
+    /* MATH */
     case (math.Power, Data.Number(x) :: Data.Number(y) :: Nil)
         if x == 0 && y < 0 =>
       Pending("Infinity is not translated properly?").left
 
-    case (date.ExtractIsoYear, _)      => Skipped("Returns incorrect year at beginning and end.").left
-    case (date.Now, _)                 => Skipped("Returns correct result, but wrapped into Data.Dec instead of Data.Interval").left
+    case (math.Add, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Skipped("TODO").left
+    case (math.Subtract, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Skipped("TODO").left
 
+    /* RELATIONS */
     case (relations.IfUndefined, _) => Pending("TODO").left
+
+    case (relations.Between, List(Data.Interval(_), Data.Interval(_), Data.Interval(_))) =>
+      Pending("TODO").left
 
     case (relations.And, List(Data.NA, _)) => Pending("TODO handle and/or with outer semantics").left
     case (relations.And, List(_, Data.NA)) => Pending("TODO handle and/or with outer semantics").left
     case (relations.Or, List(Data.NA, _)) => Pending("TODO handle and/or with outer semantics").left
     case (relations.Or, List(_, Data.NA)) => Pending("TODO handle and/or with outer semantics").left
 
-    case (date.ExtractDayOfYear, _)    => Skipped("TODO").left
-    case (date.ExtractWeek, _)         => Skipped("TODO").left
+    /* SET */
+    case (quasar.std.SetLib.Within, _) => Pending("TODO").left
 
-    case (structural.ConcatOp, _)      => Pending("TODO").left
+    /* STRING */
+    case (string.Lower, _) => Pending("TODO").left
+    case (string.Upper, _) => Pending("TODO").left
+
+    case (string.ToString, Data.Dec(_) :: Nil) =>
+      Pending("Dec printing doesn't match precisely").left
+
+    case (string.ToString, List(Data.DateTimeLike(_))) =>
+      Pending("Works but isn't formatted as expected.").left
+
+    /* STRUCTURAL */
+    case (structural.ConcatOp, _) => Pending("TODO").left
     case (structural.MapProject, _) => Pending("TODO").left
 
-    case _                             => ().right
+    case _ => ().right
   }
 
-  def shortCircuitTC(args: List[Data]): Result \/ Unit = args match {
-//    case Data.Date(_) :: Nil => Skipped("TODO").left
-//    case Data.Time(_) :: Nil => Skipped("TODO").left
-    case _                   => ().right
-  }
+  def skipTemporalTrunc: Boolean = false
 
   def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix])
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {

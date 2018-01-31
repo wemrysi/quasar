@@ -231,7 +231,6 @@ object JsFuncHandler {
               // TODO: case Interval(str) =>
 
               case ToString(value) =>
-                // TODO: Come back to this
                 If(isInt(value),
                   // NB: This is a terrible way to turn an int into a string, but the
                   //     only one that doesn’t involve converting to a decimal and
@@ -298,7 +297,6 @@ object JsFuncHandler {
                 BinOp(jscore.Add,
                   second(date),
                   BinOp(jscore.Div, millisecond(date), litNum(1000)))
-              // TODO: case ExtractWeek(date) =>
               case ExtractYear(date) => year(date)
 
               case StartOfDay(date) =>
@@ -399,9 +397,9 @@ object JsFuncHandler {
             }
 
             partial(mfc) orElse (mfc match {
-              case Constant(v1)     =>
+              case Constant(v1) =>
                 v1.cata(Data.fromEJson).toJs.map(_.transCata[Free[JsCoreF, A]](js => CoEnv(js.right[A])))
-              case _                => None
+              case _  => None
             })
           }
         }

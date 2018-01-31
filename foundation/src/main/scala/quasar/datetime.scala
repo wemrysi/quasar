@@ -159,8 +159,7 @@ object datetime {
       case Quarter    => truncQuarter(date)
       case Week       => truncWeek(date)
       case Year       => truncYear(date)
-      case _          =>
-        date
+      case _          => date
     }
 
   def extractCentury(ld: LocalDate): Long = (ld.getLong(ChronoField.YEAR_OF_ERA) - 1) / 100 + 1

@@ -32,7 +32,7 @@ import quasar.std._
 
 import scala.sys
 
-import java.time.Instant
+import java.time.{Instant, ZoneOffset}
 import matryoshka.{Hole => _, _}
 import matryoshka.data.Fix
 import matryoshka.implicits._
@@ -47,17 +47,18 @@ import shapeless.{Nat}
 /** Test the implementation of the standard library for one of MongoDb's
   * evaluators.
   */
-// TODO: Come back to this
 abstract class MongoDbStdLibSpec extends StdLibSpec {
   val lpf = new lp.LogicalPlanR[Fix[LP]]
 
   val runAt = Instant.parse("2015-01-26T00:00:00Z")
 
+  val noTimeZoneSupport = Skipped("Mongo does not support time zones.")
+
   args.report(showtimes = ArgProperty(true))
 
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit
 
-  def shortCircuitTC(args: List[Data]): Result \/ Unit
+  def skipTemporalTrunc: Boolean
 
   def compile(queryModel: MongoQueryModel, coll: Collection, lp: FreeMap[Fix])
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name)
@@ -71,16 +72,30 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
     /** Intercept and transform expected values into the form that's actually
       * produced by the MongoDB backend, in cases where MongoDB cannot represent
       * the type natively. */
-    def massage(expected: Data): Data = expected match {
-//      case Data.Time(time) => Data.Str(time.format(DataCodec.timeFormatter))
-      case _               => expected
+    def massageExpected(expected: Data): Data = expected match {
+      case Data.LocalDate(time) => Data.LocalDateTime(time.atStartOfDay)
+      case Data.LocalTime(time) => Data.Str(time.toString)
+      case Data.LocalDateTime(time) =>
+        Data.LocalDateTime(
+          time.withNano(scala.math.round(time.getNano.toDouble / 1000000).toInt * 1000000)) // round to millis
+      case Data.OffsetDateTime(time) if time.getOffset == ZoneOffset.UTC =>
+        Data.LocalDateTime(time.toLocalDateTime)
+      case _ => expected
     }
+
+    def containsOffset(args: List[Data]): Boolean =
+      args.filter {
+        case Data.OffsetLike(_) => true
+        case _ => false
+      }.nonEmpty
 
     /** Identify constructs that are expected not to be implemented. */
     def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LP, Unit] = {
-      case lp.Invoke(func, _)     => shortCircuit(backend, func, args)
-      case lp.TemporalTrunc(_, _) => shortCircuitTC(args)
-      case _                      => ().right
+      case lp.Invoke(_, _) if containsOffset(args) => noTimeZoneSupport.left
+      case lp.Invoke(func, _) => shortCircuit(backend, func, args)
+      case lp.TemporalTrunc(_, _) if skipTemporalTrunc => Pending("TemporalTrunc not implemented.").left
+      case lp.TemporalTrunc(_, _) if containsOffset(args) => noTimeZoneSupport.left
+      case _ => ().right
     }
 
     def evaluate(wf: Crystallized[WorkflowF], tmp: Collection): MongoDbIO[List[Data]] =
@@ -133,7 +148,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
             _     <- dropCollection(coll).run(setupClient)
           } yield {
-            rez must beSingleResult(beCloseTo(massage(expected)))
+            rez must beSingleResult(beCloseTo(massageExpected(expected)))
           }).timed(5.seconds)(Strategy.DefaultTimeoutScheduler).unsafePerformSync.toResult)
 
       // TODO: Currently still using the old MapFuncStdLibSpec API. The new one

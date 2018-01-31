@@ -93,7 +93,7 @@ object FuncHandler {
               case Multiply(a1, a2)      => $multiply(a1, a2)
               case Subtract(a1, a2)      => $subtract(a1, a2)
               case Divide(a1, a2)        =>
-                // NB: It’s apparently intential that division by zero crashes
+                // NB: It’s apparently intentional that division by zero crashes
                 //     the query in MongoDB. See
                 //     https://jira.mongodb.org/browse/SERVER-29410
                 // TODO: It would be nice if we would be able to generate simply
@@ -108,7 +108,7 @@ object FuncHandler {
                   $divide(a1, a2))
               case Modulo(a1, a2)        => $mod(a1, a2)
               case Negate(a1)            => $multiply($literal(Bson.Int32(-1)), a1)
-              case MapFuncsCore.Eq(a1, a2)   => $eq(a1, a2)
+              case MapFuncsCore.Eq(a1, a2) => $eq(a1, a2)
               case Neq(a1, a2)           => $neq(a1, a2)
               case Lt(a1, a2)            => $lt(a1, a2)
               case Lte(a1, a2)           => $lte(a1, a2)

@@ -233,9 +233,8 @@ object BsonCodec {
           DateTimeConstants.hour       -> Bson.Int32(ldt.getHour),
           DateTimeConstants.minute     -> Bson.Int32(ldt.getMinute),
           DateTimeConstants.second     -> Bson.Int32(ldt.getSecond),
-          DateTimeConstants.nanosecond -> Bson.Int32(ldt.getNano),
-          DateTimeConstants.offset     -> Bson.Int32(0))),
-        EJsonType(TypeTag.OffsetDateTime.value))).right
+          DateTimeConstants.nanosecond -> Bson.Int32(ldt.getNano))),
+        EJsonType(TypeTag.LocalDateTime.value))).right
     case Bson.Binary(value)    =>
       E.inj(ejson.Meta(
         Bson.Text(ejson.z85.encode(ByteVector.view(value.toArray))),

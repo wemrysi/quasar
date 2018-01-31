@@ -43,24 +43,51 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
-    case (string.Length, _) if !is3_4(backend) => Skipped("not implemented in aggregation on MongoDB < 3.4").left
-    case (string.Integer, _)  => notHandled.left
-    case (string.Decimal, _)  => notHandled.left
-
-    case (string.Search, _) => Skipped("compiles to a map/reduce, so can't be run in tests").left
-    case (string.Split, _) if (!is3_4(backend)) => Skipped("not implemented in aggregation on MongoDB < 3.4").left
-    case (string.Substring, List(Data.Str(s), _, _)) if (!is3_4(backend) && !isPrintableAscii(s)) =>
-      Skipped("only printable ascii supported on MongoDB < 3.4").left
-//    TODO: Come back to this
-//    case (string.ToString, List(Data.Timestamp(_) | Data.Date(_))) => Skipped("Implemented, but formatted incorrectly").left
-
-    case (quasar.std.SetLib.Within, _)      => notHandled.left
-
+    /* DATE */
+    case (date.ExtractCentury, _) => notHandled.left
+    case (date.ExtractDayOfMonth, _) => notHandled.left
+    case (date.ExtractDecade, _) => notHandled.left
+    case (date.ExtractDayOfWeek, _) => notHandled.left
+    case (date.ExtractDayOfYear, _) => notHandled.left
+    case (date.ExtractEpoch, _) => notHandled.left
+    case (date.ExtractHour, _) => notHandled.left
+    case (date.ExtractIsoDayOfWeek, _) => notHandled.left
     case (date.ExtractIsoYear, _) => notHandled.left
-    case (date.ExtractWeek, _)    => Skipped("Implemented, but not ISO compliant").left
-    case (date.Now, _)            => Skipped("Returns correct result, but wrapped into Data.Dec instead of Data.Interval").left
+    case (date.ExtractMicrosecond, _) => notHandled.left
+    case (date.ExtractMillennium, _) => notHandled.left
+    case (date.ExtractMillisecond, _) => notHandled.left
+    case (date.ExtractMinute, _) => notHandled.left
+    case (date.ExtractMonth, _) => notHandled.left
+    case (date.ExtractQuarter, _) => notHandled.left
+    case (date.ExtractSecond, _) => notHandled.left
+    case (date.ExtractWeek, _) => notHandled.left
+    case (date.ExtractYear, _) => notHandled.left
 
-    case (date.StartOfDay, _) => notHandled.left
+    case (date.StartOfDay, Data.LocalLike(_) :: Nil) => Pending("TODO").left
+
+    case (date.Now, _) => notHandled.left
+    case (date.NowDate, _) => notHandled.left
+    case (date.NowTime, _) => notHandled.left
+    case (date.CurrentTimeZone, _) => noTimeZoneSupport.left
+
+    case (date.SetTimeZone, _) => noTimeZoneSupport.left
+    case (date.SetTimeZoneHour, _) => noTimeZoneSupport.left
+    case (date.SetTimeZoneMinute, _) => noTimeZoneSupport.left
+
+    case (date.OffsetDate, _) => noTimeZoneSupport.left
+    case (date.OffsetDateTime, _) => noTimeZoneSupport.left
+    case (date.OffsetTime, _) => noTimeZoneSupport.left
+
+    case (date.LocalDate, _) => notHandled.left
+    case (date.LocalDateTime, _) => notHandled.left
+    case (date.LocalTime, _) => notHandled.left
+
+    case (date.Interval, _) => notHandled.left
+    case (date.TimeOfDay, _) => notHandled.left
+
+    /* MATH */
+    case (math.Add, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Skipped("TODO").left
+    case (math.Subtract, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Skipped("TODO").left
 
     //FIXME modulo and trunc (which is defined in terms of modulo) cause the
     //mongo docker container to crash (with quite high frequency but not always).
@@ -69,7 +96,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (math.Modulo, _) => Skipped("sometimes causes mongo container crash").left
     case (math.Trunc, _) => Skipped("sometimes causes mongo container crash").left
 
-//    TODO: Come back to this
+    /* RELATIONS */
     case (relations.And, List(Data.NA, _)) => Pending("TODO handle and/or with outer semantics").left
     case (relations.And, List(_, Data.NA)) => Pending("TODO handle and/or with outer semantics").left
     case (relations.Or, List(Data.NA, _)) => Pending("TODO handle and/or with outer semantics").left
@@ -77,26 +104,45 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
     case (relations.IfUndefined, _) => notHandled.left
 
+    case (relations.Between, List(Data.Interval(_), Data.Interval(_), Data.Interval(_))) =>
+      Pending("TODO").left
+
+    /* SET */
+    case (quasar.std.SetLib.Within, _) => notHandled.left
+
+    /* STRING */
+    case (string.Length, _) if !is3_4(backend) => Skipped("not implemented in aggregation on MongoDB < 3.4").left
+    case (string.Integer, _) => notHandled.left
+    case (string.Decimal, _) => notHandled.left
+
+    case (string.ToString, List(Data.DateTimeLike(_))) =>
+      Pending("Works but isn't formatted as expected.").left
+
+    case (string.Search, _) => Skipped("compiles to a map/reduce, so can't be run in tests").left
+    case (string.Split, _) if (!is3_4(backend)) => Skipped("not implemented in aggregation on MongoDB < 3.4").left
+    case (string.Substring, List(Data.Str(s), _, _)) if (!is3_4(backend) && !isPrintableAscii(s)) =>
+      Skipped("only printable ascii supported on MongoDB < 3.4").left
+
+    /* STRUCTURAL */
     case (structural.ConcatOp, _) => notHandled.left
     case (structural.DeleteKey, _) => notHandled.left
     case (structural.MapProject, _) => notHandled.left
 
-    case _                  => ().right
+    case _ => ().right
   }
 
-  def shortCircuitTC(args: List[Data]): Result \/ Unit = notHandled.left
+  def skipTemporalTrunc: Boolean = true
 
   def build[WF[_]: Coalesce: Inject[WorkflowOpCoreF, ?[_]]](
-    expr: Fix[ExprOp], queryModel: MongoQueryModel, coll: Collection)(
-    implicit RT: RenderTree[WorkflowBuilder[WF]]
-  ) =
+      expr: Fix[ExprOp], queryModel: MongoQueryModel, coll: Collection)(
+      implicit RT: RenderTree[WorkflowBuilder[WF]]) =
     WorkflowBuilder.build[PlannerError \/ ?, WF](
       WorkflowBuilder.DocBuilder(WorkflowBuilder.Ops[WF].read(coll),
         ListMap(QuasarSigilName -> \&/-(expr))), queryModel)
       .leftMap(qscriptPlanningFailed.reverseGet(_))
 
-  def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix]
-  ) : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
+  def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix])
+      : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
     type PlanStdT[A] = ReaderT[FileSystemError \/ ?, Instant, A]
 
     val bsonVersion = MongoQueryModel.toBsonVersion(queryModel)

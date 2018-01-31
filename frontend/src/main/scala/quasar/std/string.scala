@@ -279,7 +279,7 @@ trait StringLib extends Library {
   val intRegex = "[+-]?\\d+"
   val floatRegex = intRegex + "(?:.\\d+)?(?:[eE]" + intRegex + ")?"
   val dateRegex = "(?:\\d{4}-\\d{2}-\\d{2}|\\d{8})"
-  val timeRegex = "\\d{2}(?::?\\d{2}(?::?\\d{2}(?:\\.\\d{3})?)?)?Z?"
+  val timeRegex = "\\d{2}(?::?\\d{2}(?::?\\d{2}(?:\\.\\d{1,9})?)?)?Z?"
   val timestampRegex = dateRegex + "T" + timeRegex
 
   val Integer = UnaryFunc(

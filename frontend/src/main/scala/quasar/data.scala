@@ -252,6 +252,37 @@ object Data {
     def toJs = jscore.ident(Js.Undefined.ident).some
   }
 
+  object DateTimeLike {
+    def unapply(data: Data): Option[Data] = data match {
+      case d @ Data.OffsetDateTime(_) => d.some
+      case d @ Data.OffsetDate(_) => d.some
+      case d @ Data.OffsetTime(_) => d.some
+      case d @ Data.LocalDateTime(_) => d.some
+      case d @ Data.LocalDate(_) => d.some
+      case d @ Data.LocalTime(_) => d.some
+      case d @ Data.Interval(_) => d.some
+      case _ => none
+    }
+  }
+
+  object OffsetLike {
+    def unapply(data: Data): Option[Data] = data match {
+      case d @ Data.OffsetDateTime(_) => d.some
+      case d @ Data.OffsetDate(_) => d.some
+      case d @ Data.OffsetTime(_) => d.some
+      case _ => none
+    }
+  }
+
+  object LocalLike {
+    def unapply(data: Data): Option[Data] = data match {
+      case d @ Data.LocalDateTime(_) => d.some
+      case d @ Data.LocalDate(_) => d.some
+      case d @ Data.LocalTime(_) => d.some
+      case _ => none
+    }
+  }
+
   final class Comparable private (val value: Data) extends scala.AnyVal
 
   object Comparable {

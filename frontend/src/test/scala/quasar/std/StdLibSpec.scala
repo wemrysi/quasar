@@ -20,11 +20,24 @@ import slamdata.Predef._, BigDecimal.RoundingMode
 import quasar.{Data, Qspec, Type}
 import quasar.DataGenerators.{dataArbitrary => _, _}
 import quasar.frontend.logicalplan._
-import quasar.{DateGenerators, DateTimeInterval, OffsetDate => JOffsetDate, TemporalPart}
+import quasar.{
+  DateGenerators,
+  DateTimeInterval,
+  OffsetDate => JOffsetDate,
+  TemporalPart
+}
 import quasar.datetime.{truncDateTime, truncDate, truncTime}
 
-import java.time.{Instant, LocalDate => JLocalDate, LocalDateTime => JLocalDateTime, LocalTime => JLocalTime, ZoneOffset}
-import java.time.{OffsetDateTime => JOffsetDateTime, OffsetTime => JOffsetTime}
+import java.time.{
+  Instant,
+  LocalDate => JLocalDate,
+  LocalDateTime => JLocalDateTime,
+  LocalTime => JLocalTime,
+  OffsetDateTime => JOffsetDateTime,
+  OffsetTime => JOffsetTime,
+  ZoneOffset
+}
+import java.time.format.DateTimeFormatter
 import quasar.pkg.tests._
 import scala.collection.Traversable
 import scala.math.abs
@@ -271,26 +284,29 @@ abstract class StdLibSpec extends Qspec {
         //   unary(ToString(_).embed, Data.Dec(x), Data.Str(x.toString))
         // }
 
-        "datetime" >> {
+        "OffsetDateTime" >> {
           def test(x: JOffsetDateTime) = unary(
             ToString(_).embed,
             Data.OffsetDateTime(x),
-            Data.Str(x.toString))
+            Data.Str(x.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.nnnnnnnnnXXX"))))
 
           "zero fractional seconds" >> test(Instant.EPOCH.atOffset(ZoneOffset.UTC))
 
           "any" >> prop (test(_: JOffsetDateTime))
         }
 
-        "date" >> prop { (x: JLocalDate) =>
-          unary(ToString(_).embed, Data.LocalDate(x), Data.Str(x.toString))
+        "LocalDate" >> prop { (x: JLocalDate) =>
+          unary(
+            ToString(_).embed,
+            Data.LocalDate(x),
+            Data.Str(x.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))))
         }
 
-        "time" >> {
+        "LocalTime" >> {
           def test(x: JLocalTime) = unary(
             ToString(_).embed,
             Data.LocalTime(x),
-            Data.Str(x.toString))
+            Data.Str(x.format(DateTimeFormatter.ofPattern("HH:mm:ss.nnnnnnnnn"))))
 
           "zero fractional seconds" >> test(JLocalTime.NOON)
 
@@ -336,7 +352,6 @@ abstract class StdLibSpec extends Qspec {
             Data.LocalDate(dt),
             Data.OffsetDate(quasar.OffsetDate(dt, ZoneOffset.ofTotalSeconds(offset))))
         }.setGens(genOffset, DateGenerators.genLocalDate)
-
 
         "LocalTime" >> prop { (offset: Int, dt: JLocalTime) =>
           binary(
@@ -827,18 +842,32 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "StartOfDay" >> {
-        "datetime" >> prop { (x: JLocalDateTime) =>
+        "LocalDateTime" >> prop { (x: JLocalDateTime) =>
           unary(
             StartOfDay(_).embed,
             Data.LocalDateTime(x),
             Data.LocalDateTime(truncDateTime(TemporalPart.Day, x)))
         }
 
-        "date" >> prop { (x: JLocalDate) =>
+        "OffsetDateTime" >> prop { (x: JOffsetDateTime) =>
+          unary(
+            StartOfDay(_).embed,
+            Data.OffsetDateTime(x),
+            Data.OffsetDateTime(JOffsetDateTime.of(truncDateTime(TemporalPart.Day, x.toLocalDateTime), x.getOffset)))
+        }
+
+        "LocalDate" >> prop { (x: JLocalDate) =>
           unary(
             StartOfDay(_).embed,
             Data.LocalDate(x),
             Data.LocalDateTime(JLocalDateTime.of(x, JLocalTime.MIN)))
+        }
+
+        "OffsetDate" >> prop { (x: JOffsetDate) =>
+          unary(
+            StartOfDay(_).embed,
+            Data.OffsetDate(x),
+            Data.OffsetDateTime(JOffsetDateTime.of(JLocalDateTime.of(x.date, JLocalTime.MIN), x.offset)))
         }
       }
 
@@ -924,16 +953,32 @@ abstract class StdLibSpec extends Qspec {
         unary(OffsetTime(_).embed, Data.Str(v.toString), Data.OffsetTime(v))
       }
 
-      "LocalDate" >> prop { (v: JLocalDate) =>
-        unary(LocalDate(_).embed, Data.Str(v.toString), Data.LocalDate(v))
+      "LocalDate" >> {
+        "0053-04-02" >> {
+          unary(LocalDate(_).embed, Data.Str("0053-04-02"), Data.LocalDate(JLocalDate.of(53, 4, 2)))
+        }
+
+        "arbitrary string" >> prop { (v: JLocalDate) =>
+          unary(LocalDate(_).embed, Data.Str(v.toString), Data.LocalDate(v))
+        }
       }
 
       "LocalDateTime" >> prop { (v: JLocalDateTime) =>
         unary(LocalDateTime(_).embed, Data.Str(v.toString), Data.LocalDateTime(v))
       }
 
-      "LocalTime" >> prop { (v: JLocalTime) =>
-        unary(LocalTime(_).embed, Data.Str(v.toString), Data.LocalTime(v))
+      "LocalTime" >> {
+        "07:47:18" >> {
+          unary(LocalTime(_).embed, Data.Str("07:47:18"), Data.LocalTime(JLocalTime.parse("07:47:18")))
+        }
+
+        "07:47:18.041593" >> {
+          unary(LocalTime(_).embed, Data.Str("07:47:18.041593"), Data.LocalTime(JLocalTime.parse("07:47:18.041593")))
+        }
+
+        "arbitrary string" >> prop { (v: JLocalTime) =>
+          unary(LocalTime(_).embed, Data.Str(v.toString), Data.LocalTime(v))
+        }
       }
 
       "TemporalTrunc" >> {
@@ -1180,10 +1225,6 @@ abstract class StdLibSpec extends Qspec {
         // "mixed int/double" >> prop { (x: Int, y: Double) =>
         //   commute(Multiply(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x * y))
         // }
-
-        "int/Interval" >> prop { (x: Int, i: DateTimeInterval) =>
-          commute(Multiply(_, _).embed, Data.Int(x), Data.Interval(i), Data.Interval(i.multiply(x)))
-        }
       }
 
       "Power" >> {
@@ -1301,10 +1342,6 @@ abstract class StdLibSpec extends Qspec {
 
         "any Dec" >> prop { (x: BigDecimal) =>
           unary(Negate(_).embed, Data.Dec(x), Data.Dec(-x))
-        }
-
-        "any Interval" >> prop { (x: DateTimeInterval) =>
-          unary(Negate(_).embed, Data.Interval(x), Data.Interval(x.multiply(-1)))
         }
       }
 
@@ -1765,7 +1802,6 @@ abstract class StdLibSpec extends Qspec {
               (Type.Numeric contains y.dataType))) ==>
             binary(Eq(_, _).embed, x, y, Data.Bool(false))
         }
-
       }
 
       "Neq" >> {
