@@ -2,8 +2,16 @@
     "name": "group by flattened field",
     "backends": {
         "couchbase":         "pending",
+        "marklogic_xml":     "pending",
         "marklogic_json":    "pendingIgnoreFieldOrder",
-        "mimir":             "ignoreFieldOrder",
+        "mimir":             "pendingIgnoreFieldOrder",
+        "mongodb_3_2":       "pending",
+        "mongodb_3_4":       "pending",
+        "mongodb_read_only": "pending",
+        "postgres":          "pending",
+        "spark_hdfs":        "pending",
+        "spark_local":       "pending",
+        "spark_elastic":     "pending",
         "spark_cassandra":   "pending"
     },
     "data": "slamengine_commits.data",
