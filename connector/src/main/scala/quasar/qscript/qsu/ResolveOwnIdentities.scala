@@ -16,15 +16,15 @@
 
 package quasar.qscript.qsu
 
-import matryoshka.{Hole => _, _}
-import quasar.qscript.{construction, ExcludeId, IdOnly, IdStatus, IncludeId, SrcHole}
+import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.contrib.matryoshka._
-import ApplyProvenance.AuthenticatedQSU
+import quasar.qscript.{construction, ExcludeId, IdOnly, IdStatus, IncludeId, SrcHole}
 import quasar.qscript.qsu.{QScriptUniform => QSU}
+import ApplyProvenance.AuthenticatedQSU
 import QSUGraph.Extractors._
-import scalaz.Equal
+
+import matryoshka.{Hole => _, _}
 import scalaz.syntax.equal._
 import scalaz.syntax.foldable._
 
@@ -33,11 +33,10 @@ final class ResolveOwnIdentities[T[_[_]]: BirecursiveT: ShowT: EqualT] private (
   val func = construction.Func[T]
 
   def apply(aqsu: AuthenticatedQSU[T]): AuthenticatedQSU[T] = {
-    implicit val extEqual: Delay[Equal, quasar.ejson.Extension] = quasar.ejson.Extension.structuralEqual
     aqsu.copy(graph = aqsu.graph.rewrite {
-      // TODO
       case qg @ LeftShift(source, struct, idStatus, onUndefined, repair, rotation)
         if repair.element(QSU.AccessLeftTarget(Access.Id(IdAccess.Identity(source.root), SrcHole))) =>
+
         val newRepair = repair.flatMap {
           case QSU.AccessLeftTarget(Access.Id(IdAccess.Identity(symbol), _)) if symbol == qg.root =>
             func.ProjectIndexI(func.RightTarget, 0)
@@ -51,14 +50,16 @@ final class ResolveOwnIdentities[T[_[_]]: BirecursiveT: ShowT: EqualT] private (
           case QSU.LeftTarget() =>
             scala.sys.error("QSU.LeftTarget in ResolveOwnIdentities")
         }
+
         val newIdStatus: IdStatus =
           if (idStatus === IdOnly) IdOnly else IncludeId
+
         qg.overwriteAtRoot(QSU.LeftShift(source.root, struct, newIdStatus, onUndefined, newRepair, rotation))
     })
   }
 }
 
 object ResolveOwnIdentities {
-  import ApplyProvenance.AuthenticatedQSU
-  def apply[T[_[_]]: BirecursiveT: ShowT: EqualT](aqsu: AuthenticatedQSU[T]): AuthenticatedQSU[T] = new ResolveOwnIdentities[T].apply(aqsu)
+  def apply[T[_[_]]: BirecursiveT: ShowT: EqualT](aqsu: AuthenticatedQSU[T]): AuthenticatedQSU[T] =
+    new ResolveOwnIdentities[T].apply(aqsu)
 }
