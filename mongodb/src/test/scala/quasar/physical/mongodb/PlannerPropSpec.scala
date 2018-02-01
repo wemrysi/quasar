@@ -29,8 +29,6 @@ import org.scalacheck._
 
 class PlannerPropSpec extends PlannerWorkflowHelpers {
 
-  import PlannerHelpers._
-
   def plan(query: Fix[Sql]): Either[FileSystemError, Crystallized[WorkflowF]] =
     PlannerHelpers.plan(query)
 
