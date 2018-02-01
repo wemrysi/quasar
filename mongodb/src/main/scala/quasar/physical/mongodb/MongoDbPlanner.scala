@@ -1239,7 +1239,7 @@ object MongoDbPlanner {
             case key => raiseErr[M, BsonField.Name](qscriptPlanningFailed(InternalError.fromMsg(s"Unsupported object key: ${key.shows}")))
           }, handler)) ∘
           (es => DocBuilder(src0, es.toListMap))
-        case _ => handler(freemap) ∘ (ex => DocBuilder(src0, ListMap(BsonField.Name("f") -> ex)))
+        case _ => handler(freemap) ∘ (ExprBuilder(src0, _))
       }
 
     val elidedFM: FreeMapA[T, A] = fm.transCata[FreeMapA[T, A]](orOriginal(elideCond))
