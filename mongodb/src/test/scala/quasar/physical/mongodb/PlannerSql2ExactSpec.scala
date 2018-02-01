@@ -1637,6 +1637,48 @@ class PlannerSql2ExactSpec extends
           $read(collection("db", "zips")))
     }.pendingWithActual(notOnPar, testFile("plan combination of two distinct sets"))
 
+    "plan simple union" in {
+      plan(sqlE"select name, year from cars union select year, name from cars") must
+        beWorkflow(
+          chain[Workflow](
+            $foldLeft(
+              chain[Workflow](
+                $read(collection("db", "cars")),
+                $project(
+                  reshape(
+                    "value" -> -\/(reshape(
+                      "name" -> $field("name"),
+                      "year" -> $field("year")))),
+                  IncludeId)),
+              chain[Workflow](
+                $read(collection("db", "cars")),
+                $project(
+                  reshape(
+                    "year" -> $field("year"),
+                    "name" -> $field("name")),
+                  ExcludeId),
+                $map(
+                  Js.AnonFunDecl(List("key", "value"),
+                    List(Js.Return(Js.AnonElem(List(
+                      Js.Call(Js.Ident("ObjectId"), Nil),
+                      Js.Ident("value")))))),
+                  ListMap()),
+                $reduce(
+                  Js.AnonFunDecl(List("key", "values"), List(
+                    Js.Return(Access(ident("values"), Literal(Js.Num(0, false))).toJs))),
+                  ListMap()))),
+            $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
+              Call(ident("remove"),
+                List(ident("x"), jscore.Literal(Js.Str("_id")))) ))),
+              ListMap()),
+            $group(
+              grouped(),
+              -\/(reshape("0" -> $$ROOT))),
+            $project(
+              reshape(sigil.Quasar -> $field("_id", "0")),
+              ExcludeId)))
+    }
+
     "plan filter with timestamp and interval" in {
       val date0 = Bson.Date.fromInstant(Instant.parse("2014-11-17T00:00:00Z")).get
       val date22 = Bson.Date.fromInstant(Instant.parse("2014-11-17T22:00:00Z")).get

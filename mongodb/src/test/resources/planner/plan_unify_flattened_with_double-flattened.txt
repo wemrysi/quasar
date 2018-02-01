@@ -15,15 +15,136 @@ Chain
 │  ╰─ ExcludeId
 ├─ $UnwindF
 │  ╰─ Path(DocField(BsonField.Name("f")))
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(filter_source: _.s)
-│  │     ╰─ Key(filter_predicate: (isString(_.f.left["0"].id) ? (new RegExp("^.*Dr.*$", "m")).test(_.f.left["0"].id) : undefined) || (new RegExp("^.*Dr.*$", "m")).test(_.f.right["1"]))
-│  ╰─ Scope(ListMap())
+├─ $ProjectF
+│  ├─ Name("s")
+│  │  ├─ Name("1" -> "$f")
+│  │  ╰─ Name("0" -> "$s")
+│  ├─ Name("f" -> {
+│  │       "$cond": [
+│  │         {
+│  │           "$and": [
+│  │             {
+│  │               "$lte": [
+│  │                 { "$literal": [] },
+│  │                 {
+│  │                   "$cond": [
+│  │                     {
+│  │                       "$and": [
+│  │                         { "$lte": [{ "$literal": {  } }, "$s"] },
+│  │                         { "$lt": ["$s", { "$literal": [] }] }]
+│  │                     },
+│  │                     "$s.comments",
+│  │                     { "$literal": undefined }]
+│  │                 }]
+│  │             },
+│  │             {
+│  │               "$lt": [
+│  │                 {
+│  │                   "$cond": [
+│  │                     {
+│  │                       "$and": [
+│  │                         { "$lte": [{ "$literal": {  } }, "$s"] },
+│  │                         { "$lt": ["$s", { "$literal": [] }] }]
+│  │                     },
+│  │                     "$s.comments",
+│  │                     { "$literal": undefined }]
+│  │                 },
+│  │                 { "$literal": BinData(0, "") }]
+│  │             }]
+│  │         },
+│  │         {
+│  │           "$cond": [
+│  │             {
+│  │               "$and": [
+│  │                 { "$lte": [{ "$literal": {  } }, "$s"] },
+│  │                 { "$lt": ["$s", { "$literal": [] }] }]
+│  │             },
+│  │             "$s.comments",
+│  │             { "$literal": undefined }]
+│  │         },
+│  │         [{ "$literal": undefined }]]
+│  │     })
+│  ╰─ ExcludeId
+├─ $UnwindF
+│  ├─ Path(DocField(BsonField.Name("f")))
+│  ╰─ IncludeArrayIndex(BsonField.Name("ix"))
+├─ $ProjectF
+│  ├─ Name("identities" -> {
+│  │       "esh40": { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }
+│  │     })
+│  ├─ Name("value" -> {
+│  │       "original": "$s",
+│  │       "0": { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("1") }] }
+│  │     })
+│  ╰─ ExcludeId
+├─ $ProjectF
+│  ├─ Name("s" -> "$$ROOT")
+│  ├─ Name("f" -> {
+│  │       "$cond": [
+│  │         {
+│  │           "$and": [
+│  │             { "$lte": [{ "$literal": [] }, "$value.original.1.replyTo"] },
+│  │             {
+│  │               "$lt": ["$value.original.1.replyTo", { "$literal": BinData(0, "") }]
+│  │             }]
+│  │         },
+│  │         "$value.original.1.replyTo",
+│  │         [{ "$literal": undefined }]]
+│  │     })
+│  ╰─ ExcludeId
+├─ $UnwindF
+│  ├─ Path(DocField(BsonField.Name("f")))
+│  ╰─ IncludeArrayIndex(BsonField.Name("ix"))
+├─ $ProjectF
+│  ├─ Name("0" -> {
+│  │       "$eq": [
+│  │         "$s.identities.esh40",
+│  │         { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
+│  │     })
+│  ├─ Name("1" -> {
+│  │       "$eq": [
+│  │         "$s.identities.esh40",
+│  │         { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
+│  │     })
+│  ├─ Name("2" -> {
+│  │       "$eq": [
+│  │         "$s.identities.esh40",
+│  │         { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
+│  │     })
+│  ├─ Name("src")
+│  │  ├─ Name("s" -> "$s")
+│  │  ╰─ Name("f" -> ["$ix", "$f"])
+│  ╰─ ExcludeId
 ├─ $MatchF
-│  ╰─ Doc
-│     ╰─ Expr($filter_predicate -> Eq(Bool(true)))
+│  ╰─ Or
+│     ├─ Doc
+│     │  ╰─ Expr($0 -> Eq(Bool(true)))
+│     ├─ Doc
+│     │  ╰─ Expr($1 -> Eq(Bool(true)))
+│     ╰─ Doc
+│        ╰─ Expr($2 -> Eq(Bool(true)))
+├─ $ProjectF
+│  ├─ Name("value" -> {
+│  │       "filter_source": {
+│  │         "$cond": [
+│  │           {
+│  │             "$and": [
+│  │               { "$lte": [{ "$literal": {  } }, "$src.s.value.original.0"] },
+│  │               { "$lt": ["$src.s.value.original.0", { "$literal": [] }] }]
+│  │           },
+│  │           "$src.s.value.original.0",
+│  │           { "$literal": undefined }]
+│  │       },
+│  │       "filter_predicate_0": "$src.s.value.0",
+│  │       "filter_predicate_1": { "$arrayElemAt": ["$src.f", { "$literal": NumberInt("1") }] }
+│  │     })
+│  ╰─ ExcludeId
+├─ $MatchF
+│  ╰─ Or
+│     ├─ Doc
+│     │  ╰─ Expr($value.filter_predicate_0.id -> Regex(^.*Dr.*$,false,true,false,false))
+│     ╰─ Doc
+│        ╰─ Expr($value.filter_predicate_1 -> Regex(^.*Dr.*$,false,true,false,false))
 ╰─ $ProjectF
-   ├─ Name("__quasar_mongodb_sigil" -> "$filter_source")
+   ├─ Name("__quasar_mongodb_sigil" -> "$value.filter_source")
    ╰─ ExcludeId
