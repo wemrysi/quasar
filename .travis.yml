@@ -175,7 +175,7 @@ cache:
     - $HOME/.sbt
     - target
     - .targets
-    - .hoarder-cache
+    - '.hoarder-cache'
     - project/project/target
     - project/target
 
