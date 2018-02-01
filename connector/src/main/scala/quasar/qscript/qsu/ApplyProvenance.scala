@@ -29,6 +29,7 @@ import quasar.qscript.{construction, ExcludeId, HoleF, IdOnly, IdStatus, OnUndef
 
 import matryoshka._
 import matryoshka.implicits._
+import monocle.macros.Lenses
 import pathy.Path
 import scalaz.{Applicative, Cord, Functor, IList, Monad, Show, StateT, ValidationNel}
 import scalaz.Scalaz._
@@ -257,6 +258,7 @@ object ApplyProvenance {
       : F[QDims[T]] =
     new ApplyProvenance[T].computeProvenance[F](graph)
 
+  @Lenses
   final case class AuthenticatedQSU[T[_[_]]](graph: QSUGraph[T], auth: QAuth[T])
 
   object AuthenticatedQSU {

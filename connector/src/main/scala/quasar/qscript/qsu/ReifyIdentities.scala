@@ -265,16 +265,16 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
           case (true, true) =>
             onNeedsIV(g) as {
               val (newStatus, newRepair) = idStatus match {
-                case IdOnly | IncludeId =>
+                case IdOnly =>
                   (
                     idStatus,
                     updateIV(
                       func.LeftTarget,
                       makeI1(g.root, func.RightTarget),
-                      includeIdRepair(repair, idStatus))
+                      repair)
                   )
 
-                case ExcludeId =>
+                case ExcludeId | IncludeId =>
                   (
                     IncludeId : IdStatus,
                     updateIV(
@@ -300,11 +300,11 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
               val newStatus =
                 if (idStatus === ExcludeId) IncludeId else idStatus
 
-              val getValue =
+              val getId =
                 if (idStatus === ExcludeId) func.ProjectIndexI(func.RightTarget, 0) else func.RightTarget
 
               val newRepair = makeIV(
-                makeI1(g.root, getValue),
+                makeI1(g.root, getId),
                 includeIdRepair(repair, idStatus))
 
               g.overwriteAtRoot(O.leftShift(source.root, struct, newStatus, onUndefined, newRepair, rot))
