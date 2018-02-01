@@ -1195,7 +1195,7 @@ class PlannerSql2ExactSpec extends
             $unwind(DocField("city"), None, None),
             $sort(NonEmptyList(BsonField.Name("cnt") -> SortDir.Descending)))
         }
-    }.pendingWithActual(notOnPar, testFile("plan efficient count and field ref"))
+    }.pendingWithActual("qz-3332", testFile("plan efficient count and field ref"))
 
     "plan count and js expr" in {
       plan(sqlE"SELECT COUNT(*) as cnt, LENGTH(city) FROM zips") must
@@ -1764,7 +1764,7 @@ class PlannerSql2ExactSpec extends
                 BsonField.Name("ts") -> Selector.Gte(date29)),
               Selector.Doc(
                 BsonField.Name("ts") -> Selector.Lt(date30)))))))
-    }.pendingWithActual(notOnPar, testFile("plan filter on date"))
+    }.pendingWithActual("qz-3232", testFile("plan filter on date"))
 
     "plan js and filter with id" in {
       Bson.ObjectId.fromString("0123456789abcdef01234567").fold[Result](
