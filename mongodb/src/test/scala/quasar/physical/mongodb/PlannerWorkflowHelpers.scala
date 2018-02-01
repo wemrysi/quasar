@@ -152,8 +152,6 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
     wf.foldMap(op => if (p.lift(op.unFix).getOrElse(false)) 1 else 0)
   }
 
-  val WC = Inject[WorkflowOpCoreF, WorkflowF]
-
   def countAccumOps(wf: Workflow) = countOps(wf, { case WC($GroupF(_, _, _)) => true })
   def countUnwindOps(wf: Workflow) = countOps(wf, { case WC($UnwindF(_, _, _, _)) => true })
   def countMatchOps(wf: Workflow) = countOps(wf, { case WC($MatchF(_, _)) => true })
@@ -178,6 +176,7 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
   case object LookupOp extends MongoOp(Agg)
   case object SampleOp extends MongoOp(Agg)
   case object FoldLeftOp extends MongoOp(Agg)
+  case object AddFieldsOp extends MongoOp(Agg)
 
   case object MapOp extends MongoOp(MapReduce)
   case object FlatMapOp extends MongoOp(MapReduce)
@@ -202,6 +201,7 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
   val lookupOp: MongoOp = LookupOp
   val sampleOp: MongoOp = SampleOp
   val foldLeftOp: MongoOp = FoldLeftOp
+  val addFieldsOp: MongoOp = AddFieldsOp
   val mapOp: MongoOp = MapOp
   val flatMapOp: MongoOp = FlatMapOp
   val simpleMapOp: MongoOp = SimpleMapOp
@@ -227,6 +227,7 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
     case WC($FlatMapF(s, _, _)) => FlatMapOp :: s
     case WC($SimpleMapF(s, _, _)) => SimpleMapOp :: s
     case WC($ReduceF(s, _, _)) => ReduceOp :: s
+    case W34($AddFieldsF(s, _)) => AddFieldsOp :: s
   }
 
   def opTreeAlg: Algebra[WorkflowF, Tree[MongoOp]] = {
@@ -249,6 +250,7 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
     case WC($FlatMapF(s, _, _)) => flatMapOp.node(s)
     case WC($SimpleMapF(s, _, _)) => simpleMapOp.node(s)
     case WC($ReduceF(s, _, _)) => reduceOp.node(s)
+    case W34($AddFieldsF(s, _)) => addFieldsOp.node(s)
   }
 
   def ops(wf: Workflow): IList[MongoOp] = wf.cata(opAlg).reverse
