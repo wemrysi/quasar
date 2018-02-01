@@ -48,7 +48,7 @@ class PlannerPropSpec extends PlannerWorkflowHelpers {
         appropriateColumns(wf, q)
         rootPushes(wf) must_== Nil
       }
-    }.set(maxSize = 3).pendingUntilFixed(notOnPar)  // FIXME: with more then a few keys in the order by, the planner gets *very* slow (see SD-658)
+    }.set(maxSize = 3).pendingUntilFixed("qz-3660")  // FIXME: with more then a few keys in the order by, the planner gets *very* slow (see SD-658)
 
     "plan multiple reducing projections (all, distinct)" >> Prop.forAll(select(distinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), noOrderBy)) { q =>
       plan(q.embed) must beRight.which { fop =>
@@ -63,7 +63,7 @@ class PlannerPropSpec extends PlannerWorkflowHelpers {
         appropriateColumns(wf, q)
         rootPushes(wf) must_== Nil
       }
-    }.set(maxSize = 10).pendingUntilFixed(notOnPar)
+    }.set(maxSize = 10).pendingUntilFixed("qz-3660")
 
     "plan multiple reducing projections (all)" >> Prop.forAll(select(notDistinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), noOrderBy)) { q =>
       plan(q.embed) must beRight.which { fop =>
@@ -78,7 +78,7 @@ class PlannerPropSpec extends PlannerWorkflowHelpers {
         appropriateColumns0(wf, q)
         rootPushes(wf) must_== Nil
       }
-    }.set(maxSize = 10).pendingUntilFixed(notOnPar)
+    }.set(maxSize = 10).pendingUntilFixed("qz-3660")
 
     // NB: tighter constraint because we know there's no filter.
     "plan multiple reducing projections (no filter)" >> Prop.forAll(select(notDistinct, maybeReducingExpr, noFilter, Gen.option(groupBySeveral), noOrderBy)) { q =>
@@ -94,7 +94,7 @@ class PlannerPropSpec extends PlannerWorkflowHelpers {
         appropriateColumns0(wf, q)
         rootPushes(wf) must_== Nil
       }
-    }.set(maxSize = 10).pendingUntilFixed(notOnPar)
+    }.set(maxSize = 10).pendingUntilFixed("qz-3660")
   }
 
 }
