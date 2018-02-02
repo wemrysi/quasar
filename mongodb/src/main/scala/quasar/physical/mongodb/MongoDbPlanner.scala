@@ -1161,6 +1161,87 @@ object MongoDbPlanner {
     processMapFunc[T, M, Hole](fm)(κ(jscore.Ident(JsFn.defaultName))) ∘
       (JsFn(JsFn.defaultName, _))
 
+
+  /* Given a handler of type FreeMapA[T, A] => Expr, a FreeMapA[T, A]
+   *  and a source WorkflowBuilder, return a new WorkflowBuilder
+   *  filtered according to the `Cond`s found in the FreeMapA[T, A].
+   *  The result is tupled with whatever remains to be planned out
+   *  of the FreeMapA[T, A]
+   */
+  def getFilterBuilder
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_], EX[_]: Traverse, A]
+    (handler: FreeMapA[T, A] => M[Expr], v: BsonVersion)
+    (src: WorkflowBuilder[WF], fm: FreeMapA[T, A])
+    (implicit ev: EX :<: ExprOp, WB: WorkflowBuilder.Ops[WF])
+     : M[(WorkflowBuilder[WF], FreeMapA[T, A])] = {
+
+    import MapFuncCore._
+    import MapFuncsCore._
+
+    def filterBuilder(src0: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
+        M[WorkflowBuilder[WF]] = {
+      val (sel, inputs) = partialSel
+
+      inputs.traverse(f => handler(f(fm))) ∘ (WB.filter(src0, _, sel))
+    }
+
+    def elideCond: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
+      case CoEnv(\/-(MFC(Cond(if_, then_, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
+        CoEnv(then_.resume.swap).some
+      case _ => none
+    }
+
+    val undefinedF: MapFunc[T, Cofree[MapFunc[T, ?], Boolean] \/ FreeMapA[T, A]] = MFC(Undefined())
+    val coalg: GCoalgebra[Cofree[MapFunc[T, ?], Boolean] \/ ?, EnvT[Boolean, MapFunc[T, ?], ?], FreeMapA[T, A]] =
+      _.fold(κ(envT[Boolean, MapFunc[T, ?], Cofree[MapFunc[T, ?], Boolean] \/ FreeMapA[T, A]](false, undefinedF)), {
+        case cond0 @ MFC(Cond(_, _, _)) =>
+          envT(
+            true,
+            Free.roll(cond0).cata[Cofree[MapFunc[T, ?], Boolean]](
+              interpret(
+                κ(Cofree(true, MFC(Undefined()))),
+                attributeAlgebra[MapFunc[T, ?], Boolean](κ(true)))).tail ∘ (_.left[FreeMapA[T, A]]))
+
+        case otherwise => envT(false, otherwise ∘ (_.right))
+      })
+
+    val ann: Cofree[MapFunc[T, ?], Boolean] = fm.apo[Cofree[MapFunc[T, ?], Boolean]](coalg)
+
+    val galg: GAlgebra[(Cofree[MapFunc[T, ?], Boolean], ?), EnvT[Boolean, MapFunc[T, ?], ?], OutputM[PartialSelector[T]]] = { node =>
+      def forgetAnn: Cofree[MapFunc[T, ?], Boolean] => T[MapFunc[T, ?]] = _.transCata[T[MapFunc[T, ?]]](_.lower)
+
+      node.runEnvT match {
+        case (true, wa) =>
+          selector[T](v).apply(wa.map(c => (forgetAnn(c._1), c._2))) <+> (wa match {
+            case MFC(Eq(_, _))
+               | MFC(Neq(_, _))
+               | MFC(Lt(_, _))
+               | MFC(Lte(_, _))
+               | MFC(Gt(_, _))
+               | MFC(Gte(_, _))
+               | MFC(Undefined()) => defaultSelector[T].right
+            case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+            case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
+            case MFC(Guard((_, if_), _, (_, then_), _)) => invoke2Rel(if_, then_)(Selector.Or(_, _))
+            case MFC(Cond((_, v), _, _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
+            case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
+          })
+
+        case (false, wa) => wa match {
+          case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+          case MFC(ProjectKey((_, v), _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
+          case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
+          case MFC(Guard((_, _), _, (_, v), _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+          case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
+        }
+      }
+    }
+    val sels: Option[PartialSelector[T]] = ann.para[OutputM[PartialSelector[T]]](galg).toOption
+    val elidedFM: FreeMapA[T, A] = fm.transCata[FreeMapA[T, A]](orOriginal(elideCond))
+
+    (sels ∘ (filterBuilder(src, _))).cata(_ strengthR elidedFM, (src, fm).point[M])
+  }
+
   def getBuilder
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_], EX[_]: Traverse, A]
     (handler: FreeMapA[T, A] => M[Expr], v: BsonVersion)
