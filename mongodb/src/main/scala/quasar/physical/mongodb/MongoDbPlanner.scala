@@ -1192,7 +1192,7 @@ object MongoDbPlanner {
     }
 
     val undefinedF: MapFunc[T, Cofree[MapFunc[T, ?], Boolean] \/ FreeMapA[T, A]] = MFC(Undefined())
-    val coalg: GCoalgebra[Cofree[MapFunc[T, ?], Boolean] \/ ?, EnvT[Boolean, MapFunc[T, ?], ?], FreeMapA[T, A]] =
+    val gcoalg: GCoalgebra[Cofree[MapFunc[T, ?], Boolean] \/ ?, EnvT[Boolean, MapFunc[T, ?], ?], FreeMapA[T, A]] =
       _.fold(κ(envT[Boolean, MapFunc[T, ?], Cofree[MapFunc[T, ?], Boolean] \/ FreeMapA[T, A]](false, undefinedF)), {
         case cond0 @ MFC(Cond(_, _, _)) =>
           envT(
@@ -1200,12 +1200,10 @@ object MongoDbPlanner {
             Free.roll(cond0).cata[Cofree[MapFunc[T, ?], Boolean]](
               interpret(
                 κ(Cofree(true, MFC(Undefined()))),
-                attributeAlgebra[MapFunc[T, ?], Boolean](κ(true)))).tail ∘ (_.left[FreeMapA[T, A]]))
+                attributeAlgebra[MapFunc[T, ?], Boolean](κ(true)))).tail ∘ (_.left))
 
         case otherwise => envT(false, otherwise ∘ (_.right))
       })
-
-    val ann: Cofree[MapFunc[T, ?], Boolean] = fm.apo[Cofree[MapFunc[T, ?], Boolean]](coalg)
 
     val galg: GAlgebra[(Cofree[MapFunc[T, ?], Boolean], ?), EnvT[Boolean, MapFunc[T, ?], ?], OutputM[PartialSelector[T]]] = { node =>
       def forgetAnn: Cofree[MapFunc[T, ?], Boolean] => T[MapFunc[T, ?]] = _.transCata[T[MapFunc[T, ?]]](_.lower)
@@ -1236,10 +1234,14 @@ object MongoDbPlanner {
         }
       }
     }
-    val sels: Option[PartialSelector[T]] = ann.para[OutputM[PartialSelector[T]]](galg).toOption
-    val elidedFM: FreeMapA[T, A] = fm.transCata[FreeMapA[T, A]](orOriginal(elideCond))
 
-    (sels ∘ (filterBuilder(src, _))).cata(_ strengthR elidedFM, (src, fm).point[M])
+    val sels: Option[PartialSelector[T]] =
+      fm.ghylo[(Cofree[MapFunc[T, ?], Boolean], ?), Cofree[MapFunc[T, ?], Boolean] \/ ?]
+        [EnvT[Boolean, MapFunc[T, ?], ?], OutputM[PartialSelector[T]]](distPara, distApo, galg, gcoalg).toOption
+
+    (sels ∘ (filterBuilder(src, _))).cata(
+      _ strengthR fm.transCata[FreeMapA[T, A]](orOriginal(elideCond)),
+      (src, fm).point[M])
   }
 
   def getBuilder
@@ -1249,83 +1251,17 @@ object MongoDbPlanner {
     (implicit ev: EX :<: ExprOp, WB: WorkflowBuilder.Ops[WF])
      : M[WorkflowBuilder[WF]] = {
 
-    import MapFuncCore._
-    import MapFuncsCore._
-
-    val corec = Corecursive[Cofree[MapFunc[T, ?], Boolean], EnvT[Boolean, MapFunc[T, ?], ?]]
-    val coalg: ElgotCoalgebra[Cofree[MapFunc[T, ?], Boolean] \/ ?, EnvT[Boolean, MapFunc[T, ?], ?], FreeMapA[T, A]] =
-      _.fold(κ(envT[Boolean, MapFunc[T, ?], FreeMapA[T, A]](false, MFC(Undefined())).right), {
-        case cond0 @ MFC(Cond(_, _, _)) =>
-          Free.roll(cond0).cata[Cofree[MapFunc[T, ?], Boolean]](
-            interpret(
-              κ(Cofree(true, MFC(Undefined()))),
-              attributeAlgebra[MapFunc[T, ?], Boolean](κ(true)))).left
-        case otherwise => envT(false, otherwise).right
-      })
-
-    val ann: Cofree[MapFunc[T, ?], Boolean] = corec.elgotApo[FreeMapA[T, A]](fm)(coalg)
-
-    val galg: GAlgebra[(Cofree[MapFunc[T, ?], Boolean], ?), EnvT[Boolean, MapFunc[T, ?], ?], OutputM[PartialSelector[T]]] = { node =>
-      def forgetAnn: Cofree[MapFunc[T, ?], Boolean] => T[MapFunc[T, ?]] = _.transCata[T[MapFunc[T, ?]]](_.lower)
-
-      node.runEnvT match {
-        case (true, wa) =>
-          selector[T](v).apply(wa.map(c => (forgetAnn(c._1), c._2))) <+> (wa match {
-            case MFC(Eq(_, _))
-               | MFC(Neq(_, _))
-               | MFC(Lt(_, _))
-               | MFC(Lte(_, _))
-               | MFC(Gt(_, _))
-               | MFC(Gte(_, _))
-               | MFC(Undefined()) => defaultSelector[T].right
-            case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
-            case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
-            case MFC(Guard((_, if_), _, (_, then_), _)) => invoke2Rel(if_, then_)(Selector.Or(_, _))
-            case MFC(Cond((_, v), _, _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-            case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
-          })
-
-        case (false, wa) => wa match {
-          case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
-          case MFC(ProjectKey((_, v), _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-          case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
-          case MFC(Guard((_, _), _, (_, v), _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
-          case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
-        }
-      }
-    }
-
-    val sels: OutputM[PartialSelector[T]] = ann.para[OutputM[PartialSelector[T]]](galg)
-
-    def filterBuilder(src0: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
-        M[WorkflowBuilder[WF]] = {
-      val (sel, inputs) = partialSel
-
-      inputs.traverse(f => handler(f(fm))) ∘ (WB.filter(src0, _, sel))
-    }
-
-    def elideCond: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
-      case CoEnv(\/-(MFC(Cond(if_, then_, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
-        CoEnv(then_.resume.swap).some
-      case _ => none
-    }
-
-    val selectors = sels
-
     def plan(src0: WorkflowBuilder[WF], freemap: FreeMapA[T, A]): M[WorkflowBuilder[WF]] =
       freemap.project match {
         case MapFuncCore.StaticMap(elems) =>
           elems.traverse(_.bitraverse({
             case Embed(MapFuncCore.EC(ejson.Str(key))) => BsonField.Name(key).point[M]
             case key => raiseErr[M, BsonField.Name](qscriptPlanningFailed(InternalError.fromMsg(s"Unsupported object key: ${key.shows}")))
-          }, handler)) ∘
-          (es => DocBuilder(src0, es.toListMap))
+          }, handler)) ∘ (es => DocBuilder(src0, es.toListMap))
         case _ => handler(freemap) ∘ (ExprBuilder(src0, _))
       }
 
-    val elidedFM: FreeMapA[T, A] = fm.transCata[FreeMapA[T, A]](orOriginal(elideCond))
-
-    selectors.toOption.fold(plan(src, fm))(sel => filterBuilder(src, sel) >>= (plan(_, elidedFM)))
+    getFilterBuilder[T, M, WF, EX, A](handler, v)(src, fm) >>= { case (source, f) => plan(source, f) }
   }
 
   def getExprBuilder
