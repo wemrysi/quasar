@@ -912,10 +912,13 @@ object MongoDbPlanner {
                 getJsMerge[T, M](
                   _, jscore.Select(jscore.Ident(JsFn.defaultName), rootKey.value), jscore.Select(jscore.Ident(JsFn.defaultName), structKey.value))
 
+              val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
+              val repair0 = repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide]))
+
               val src0: M[WorkflowBuilder[WF]] =
                 getStructBuilder[T, M, WF, EX](
                   handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _), cfg.bsonVersion)(
-                  src, struct, rootKey, structKey)
+                  src, struct0, rootKey, structKey)
 
               src0 >>= (src1 =>
                 getBuilder[T, M, WF, EX, JoinSide](
@@ -925,7 +928,7 @@ object MongoDbPlanner {
                     shiftType match {
                       case ShiftType.Array => Set(StructureType.Array(DocField(structKey), id))
                       case ShiftType.Map   => Set(StructureType.Object(DocField(structKey), id))
-                    }, List(rootKey).some), repair))
+                    }, List(rootKey).some), repair0))
             }
 
             else {
