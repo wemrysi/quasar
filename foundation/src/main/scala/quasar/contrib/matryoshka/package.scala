@@ -21,7 +21,6 @@ import slamdata.Predef._
 import _root_.monocle.{Getter, Iso}
 import _root_.matryoshka._
 import _root_.matryoshka.data.free._
-import _root_.matryoshka.data.cofree._
 import _root_.matryoshka.implicits._
 import _root_.matryoshka.patterns._
 import _root_.scalaz._, Scalaz._
@@ -48,13 +47,7 @@ package object matryoshka {
         t.ana[Free[F, A]](x => CoEnv(x.project.right[A]))
     }
   }
-  object convertToCofree {
-    def apply[F[_], A] = new PartiallyApplied[F, A]
-    final class PartiallyApplied[F[_], A] {
-      def apply[T](t: T, ann: A)(implicit T: Recursive.Aux[T, F], F: Functor[F]): Cofree[F, A] =
-        t.ana[Cofree[F, A]](x => envT(ann, x.project))
-    }
-  }
+
   def envT[E, W[_], A](e: E, wa: W[A]): EnvT[E, W, A] =
     EnvT((e, wa))
 

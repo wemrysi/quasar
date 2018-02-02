@@ -616,41 +616,6 @@ object MongoDbPlanner {
     }
   }
 
-  def condSelector[T[_[_]]: BirecursiveT: ShowT](v: BsonVersion):
-      GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = { node =>
-    import MapFuncsCore._
-
-    // The `selector` algebra requires one side of a
-    // comparison to be a Constant. The `Cond`s present here
-    // do not have this shape, hence the condSelector decorator
-    val alg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = {
-      case MFC(Cond((cond, condSel), _, (Embed(MFC(Undefined())),_))) => cond.project match {
-        case MFC(Eq(_, _))
-           | MFC(Neq(_, _))
-           | MFC(Lt(_, _))
-           | MFC(Lte(_, _))
-           | MFC(Gt(_, _))
-           | MFC(Gte(_, _)) => defaultSelector[T].right.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-        case _ => selector[T](v).apply(cond.project.map(l => (l, condSel))).map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-      }
-
-    /**  The cases here don't readily imply selectors, but still need
-      *  to be handled in case a `Cond` is nested inside one of these.
-      *  For instance, if ConcatMaps includes filtering `Cond`s in BOTH maps,
-      *  these are extracted and `Or`ed using Selector.Or. In the case of
-      *  unary `MapFunc`s, we simply need to fix the InputFinder to look in
-      *  the right place.
-      */
-      case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
-      case MFC(ProjectKey((_, v), _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-      case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
-      case MFC(Guard((_, if_), _, (_, then_), (Embed(MFC(Undefined())), _))) => invoke2Rel(if_, then_)(Selector.Or(_, _))
-      case otherwise => InternalError.fromMsg(node.map(_._1).shows).left
-    }
-
-    alg(node)
-  }
-
   /** The selector phase tries to turn expressions into MongoDB selectors – i.e.
     * Mongo query expressions. Selectors are only used for the filtering
     * pipeline op, so it's quite possible we build more stuff than is needed
@@ -1210,6 +1175,10 @@ object MongoDbPlanner {
 
       node.runEnvT match {
         case (true, wa) =>
+          /* The `selector` algebra requires one side of a comparison
+           * to be a Constant. The comparisons present inside Cond do
+           * not necessarily have this shape, hence the decorator
+           */
           selector[T](v).apply(wa.map { case (tree, sl) => (forgetAnn(tree), sl) }) <+> (wa match {
             case MFC(Eq(_, _))
                | MFC(Neq(_, _))
@@ -1218,6 +1187,14 @@ object MongoDbPlanner {
                | MFC(Gt(_, _))
                | MFC(Gte(_, _))
                | MFC(Undefined()) => defaultSelector[T].right
+            /** The cases here don't readily imply selectors, but
+              *  still need to be handled in case a `Cond` is nested
+              *  inside one of these.  For instance, if ConcatMaps
+              *  includes `Cond`s in BOTH maps, these are extracted
+              *  and `Or`ed using Selector.Or. In the case of unary
+              *  `MapFunc`s, we simply need to fix the InputFinder to
+              *  look in the right place.
+              */
             case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
             case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
             case MFC(Guard((_, if_), _, (_, then_), _)) => invoke2Rel(if_, then_)(Selector.Or(_, _))
