@@ -556,14 +556,14 @@ object MongoDbPlanner {
 
     node match {
       // NB: the pick of Selector for these two cases determine how restrictive the
-      //     extracted typechecks are. See #2883 for more details
+      //     extracted typechecks are. See qz-3500 for more details
       case MFC(And(a, b)) => invoke2Rel(a._2, b._2)(Selector.And(_, _))
       case MFC(Or(a, b))  => invoke2Rel(a._2, b._2)(Selector.Or(_, _))
 
       // NB: we want to extract typechecks from both sides of a comparison operator
       //     Typechecks extracted from both sides are ANDed. Similarly to the `And`
       //     and `Or` case above, the selector choice can be tweaked depending on how
-      //     strict we want to be with extracted typechecks. See #2883
+      //     strict we want to be with extracted typechecks. See qz-3500
       case MFC(Eq(a, b))  => invoke2Rel(a._2, b._2)(Selector.And(_, _))
       case MFC(Neq(a, b)) => invoke2Rel(a._2, b._2)(Selector.And(_, _))
       case MFC(Lt(a, b))  => invoke2Rel(a._2, b._2)(Selector.And(_, _))
