@@ -725,14 +725,49 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       case LeftShift(Read(_), _, _, _, _, _) =>
         None
 
-      case LeftShift(oparent @ Self(parent, inners), struct, idStatus, onUndefined, repair, rot) =>
-        Some((parent, -\/(QSU.LeftShift[T, QSUGraph](oparent, struct, idStatus, onUndefined, repair, rot)) <:: inners))
+      case
+        LeftShift(
+          MappableRegion.MaximalUnary(oparent @ Self(parent, inners), fm),
+          struct,
+          idStatus,
+          onUndefined,
+          repair,
+          rot) =>
+
+        val struct2 = struct >> fm
+
+        val repair2 = repair flatMap {
+          case alt @ QSU.AccessLeftTarget(Access.Value(_)) =>
+            fm.map(_ => alt: QSU.ShiftTarget[T])
+
+          case t => Free.pure[MapFunc, QSU.ShiftTarget[T]](t)
+        }
+
+        Some((parent, -\/(QSU.LeftShift[T, QSUGraph](oparent, struct2, idStatus, onUndefined, repair2, rot)) <:: inners))
 
       case LeftShift(parent, struct, idStatus, onUndefined, repair, rot) =>
         Some((parent, NEL(-\/(QSU.LeftShift[T, QSUGraph](parent, struct, idStatus, onUndefined, repair, rot)))))
 
-      case MultiLeftShift(oparent @ Self(parent, inners), shifts, onUndefined, repair) =>
-        Some((parent, \/-(QSU.MultiLeftShift[T, QSUGraph](oparent, shifts, onUndefined, repair)) <:: inners))
+      case
+        MultiLeftShift(
+          MappableRegion.MaximalUnary(oparent @ Self(parent, inners), fm),
+          shifts,
+          onUndefined,
+          repair) =>
+
+        val shifts2 = shifts map {
+          case (struct, idStatus, rot) =>
+            (struct >> fm, idStatus, rot)
+        }
+
+        val repair2 = repair flatMap {
+          case l @ -\/(Access.Value(_)) =>
+            fm.map(_ => l: (QAccess[Hole] \/ Int))
+
+          case r => Free.pure[MapFunc, QAccess[Hole] \/ Int](r)
+        }
+
+        Some((parent, \/-(QSU.MultiLeftShift[T, QSUGraph](oparent, shifts2, onUndefined, repair2)) <:: inners))
 
       case MultiLeftShift(parent, shifts, onUndefined, repair) =>
         Some((parent, NEL(\/-(QSU.MultiLeftShift[T, QSUGraph](parent, shifts, onUndefined, repair)))))
