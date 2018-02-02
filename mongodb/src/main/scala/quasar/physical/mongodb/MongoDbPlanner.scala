@@ -894,13 +894,6 @@ object MongoDbPlanner {
           case qscript.Map(src, f) =>
             getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler, cfg.bsonVersion)(src, f)
           case LeftShift(src, struct, id, shiftType, onUndef, repair) => {
-            val exprMerge: JoinFunc[T] => M[Fix[ExprOp]] =
-              getExprMerge[T, M, EX](
-                cfg.funcHandler, cfg.staticHandler)(_, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
-            val jsMerge: JoinFunc[T] => M[JsFn] =
-              getJsMerge[T, M](
-                _, jscore.Select(jscore.Ident(JsFn.defaultName), "s"), jscore.Select(jscore.Ident(JsFn.defaultName), "f"))
-
             def rewriteUndefined[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
               case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined()))))))))
                 if (onUndef === OnUndefined.Emit) =>
@@ -908,28 +901,33 @@ object MongoDbPlanner {
               case _ => none
             }
 
-            def elideCond[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
-              case CoEnv(\/-(MFC(Cond(if_, then_, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
-                CoEnv(then_.resume.swap).some
-              case _ => none
-            }
-
             if (repair.contains(LeftSideF)) {
+              val rootKey = BsonField.Name("s")
+              val structKey = BsonField.Name("f")
+
+              val exprMerge: JoinFunc[T] => M[Fix[ExprOp]] =
+                getExprMerge[T, M, EX](
+                  cfg.funcHandler, cfg.staticHandler)(_, DocField(rootKey), DocField(structKey))
+              val jsMerge: JoinFunc[T] => M[JsFn] =
+                getJsMerge[T, M](
+                  _, jscore.Select(jscore.Ident(JsFn.defaultName), rootKey.value), jscore.Select(jscore.Ident(JsFn.defaultName), structKey.value))
+
               val src0: M[WorkflowBuilder[WF]] =
-                getBuilder[T, M, WF, EX, Hole](
+                getStructBuilder[T, M, WF, EX](
                   handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _), cfg.bsonVersion)(
-                  src, struct)
+                  src, struct, rootKey, structKey)
 
               src0 >>= (src1 =>
                 getBuilder[T, M, WF, EX, JoinSide](
                   exprOrJs(_)(exprMerge, jsMerge), cfg.bsonVersion)(
                   FlatteningBuilder(
-                    DocBuilder(src1, ListMap(BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()))),
+                    src1,
                     shiftType match {
-                      case ShiftType.Array => Set(StructureType.Array(DocField(BsonField.Name("f")), id))
-                      case ShiftType.Map => Set(StructureType.Object(DocField(BsonField.Name("f")), id))
-                    }, List(BsonField.Name("s")).some), repair))
+                      case ShiftType.Array => Set(StructureType.Array(DocField(structKey), id))
+                      case ShiftType.Map   => Set(StructureType.Object(DocField(structKey), id))
+                    }, List(rootKey).some), repair))
             }
+
             else {
               val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
               val repair0 = repair.as[Hole](SrcHole).transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
@@ -1221,11 +1219,20 @@ object MongoDbPlanner {
       (src, fm).point[M])
   }
 
+  def getStructBuilder
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_]: WorkflowBuilder.Ops[?[_]], EX[_]: Traverse]
+    (handler: FreeMap[T] => M[Expr], v: BsonVersion)
+    (src: WorkflowBuilder[WF], struct: FreeMap[T], rootKey: BsonField.Name, structKey: BsonField.Name)
+    (implicit ev: EX :<: ExprOp): M[WorkflowBuilder[WF]] =
+    getFilterBuilder[T, M, WF, EX, Hole](handler, v)(src, struct) >>= { case (source, f) =>
+      handler(f) ∘ (fm => DocBuilder(source, ListMap(rootKey -> docVarToExpr(DocVar.ROOT()), structKey -> fm)))
+    }
+
   def getBuilder
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_], EX[_]: Traverse, A]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_]: WorkflowBuilder.Ops[?[_]], EX[_]: Traverse, A]
     (handler: FreeMapA[T, A] => M[Expr], v: BsonVersion)
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, A])
-    (implicit ev: EX :<: ExprOp, WB: WorkflowBuilder.Ops[WF])
+    (implicit ev: EX :<: ExprOp)
      : M[WorkflowBuilder[WF]] = {
 
     def plan(src0: WorkflowBuilder[WF], freemap: FreeMapA[T, A]): M[WorkflowBuilder[WF]] =
