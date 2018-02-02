@@ -1212,7 +1212,7 @@ object MongoDbPlanner {
 
       node.runEnvT match {
         case (true, wa) =>
-          selector[T](v).apply(wa.map(c => (forgetAnn(c._1), c._2))) <+> (wa match {
+          selector[T](v).apply(wa.map { case (tree, sl) => (forgetAnn(tree), sl) }) <+> (wa match {
             case MFC(Eq(_, _))
                | MFC(Neq(_, _))
                | MFC(Lt(_, _))
