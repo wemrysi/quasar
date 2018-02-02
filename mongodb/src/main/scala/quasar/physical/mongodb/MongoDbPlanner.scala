@@ -1157,7 +1157,7 @@ object MongoDbPlanner {
     val undefinedF: MapFunc[T, Cofree[MapFunc[T, ?], Boolean] \/ FreeMapA[T, A]] = MFC(Undefined())
     val gcoalg: GCoalgebra[Cofree[MapFunc[T, ?], Boolean] \/ ?, EnvT[Boolean, MapFunc[T, ?], ?], FreeMapA[T, A]] =
       _.fold(κ(envT[Boolean, MapFunc[T, ?], Cofree[MapFunc[T, ?], Boolean] \/ FreeMapA[T, A]](false, undefinedF)), {
-        case cond0 @ MFC(Cond(_, _, _)) =>
+        case cond0 @ MFC(Cond(_, _, Embed(CoEnv(\/-(MFC(Undefined())))))) =>
           envT(
             true,
             Free.roll(cond0).cata[Cofree[MapFunc[T, ?], Boolean]](
