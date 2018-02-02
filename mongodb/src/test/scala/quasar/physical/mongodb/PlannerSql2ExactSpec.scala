@@ -49,7 +49,7 @@ class PlannerSql2ExactSpec extends
     PendingWithActualTracking {
 
   //to write the new actuals:
-  // override val mode = WriteMode
+  //override val mode = WriteMode
 
   import Grouped.grouped
   import Reshape.reshape
@@ -121,14 +121,14 @@ class PlannerSql2ExactSpec extends
               func.Guard(
                 func.Guard(func.LeftSide, Type.AnyObject, func.LeftSide, func.Undefined),
                 Type.AnyObject,
-                func.Guard(func.LeftSide, Type.AnyObject, func.ProjectKeyS(func.LeftSide, "name"), func.Undefined),
+                func.ProjectKeyS(func.LeftSide, "name"),
                 func.Undefined)),
             func.MakeMap(
               func.Constant(json.str("year")),
               func.Guard(
                 func.Guard(func.RightSide, Type.AnyObject, func.RightSide, func.Undefined),
                 Type.AnyObject,
-                func.Guard(func.RightSide, Type.AnyObject, func.ProjectKeyS(func.RightSide, "year"), func.Undefined),
+                func.ProjectKeyS(func.RightSide, "year"),
                 func.Undefined))))).some,
       chain[Workflow](
         $read(collection("db", "cars")),
@@ -969,15 +969,12 @@ class PlannerSql2ExactSpec extends
          $read(collection("db", "zips")),
          $match(
            Selector.And(
-             // TODO: eliminate duplication
              isNumeric(BsonField.Name("pop")),
-             Selector.And(
-               isNumeric(BsonField.Name("pop")),
-               Selector.Or(
-                 Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-                   BsonField.Name("pop") -> Selector.NotExpr(Selector.Gt(Bson.Int32(0))))),
-                 Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-                   BsonField.Name("pop") -> Selector.NotExpr(Selector.Lt(Bson.Int32(1000)))))))))))
+             Selector.Or(
+               Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
+                 BsonField.Name("pop") -> Selector.NotExpr(Selector.Gt(Bson.Int32(0))))),
+               Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
+                 BsonField.Name("pop") -> Selector.NotExpr(Selector.Lt(Bson.Int32(1000))))))))))
     }
 
     "plan filter with not and equality" in {
