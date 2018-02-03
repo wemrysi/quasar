@@ -1236,20 +1236,17 @@ object MongoDbPlanner {
     (handler: FreeMapA[T, A] => M[Expr], v: BsonVersion)
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, A])
     (implicit ev: EX :<: ExprOp)
-     : M[WorkflowBuilder[WF]] = {
-
-    def plan(src0: WorkflowBuilder[WF], freemap: FreeMapA[T, A]): M[WorkflowBuilder[WF]] =
-      freemap.project match {
+     : M[WorkflowBuilder[WF]] =
+    getFilterBuilder[T, M, WF, EX, A](handler, v)(src, fm) >>= { case (src0, fm0) =>
+      fm0.project match {
         case MapFuncCore.StaticMap(elems) =>
           elems.traverse(_.bitraverse({
             case Embed(MapFuncCore.EC(ejson.Str(key))) => BsonField.Name(key).point[M]
             case key => raiseErr[M, BsonField.Name](qscriptPlanningFailed(InternalError.fromMsg(s"Unsupported object key: ${key.shows}")))
           }, handler)) ∘ (es => DocBuilder(src0, es.toListMap))
-        case _ => handler(freemap) ∘ (ExprBuilder(src0, _))
+        case _ => handler(fm0) ∘ (ExprBuilder(src0, _))
       }
-
-    getFilterBuilder[T, M, WF, EX, A](handler, v)(src, fm) >>= { case (source, f) => plan(source, f) }
-  }
+    }
 
   def getExprBuilder
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, WF[_], EX[_]: Traverse]
