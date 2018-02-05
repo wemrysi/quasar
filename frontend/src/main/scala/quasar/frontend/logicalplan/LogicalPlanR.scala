@@ -83,6 +83,26 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
   def temporalTrunc(part: TemporalPart, src: T) =
     lp.temporalTrunc(part, src).embed
 
+  object ArrayInflation {
+    def unapply[N <: Nat](func: GenericFunc[N]): Option[UnaryFunc] =
+      some(func) collect {
+        case structural.FlattenArray => structural.FlattenArray
+        case structural.FlattenArrayIndices => structural.FlattenArrayIndices
+        case structural.ShiftArray => structural.ShiftArray
+        case structural.ShiftArrayIndices => structural.ShiftArrayIndices
+      }
+  }
+
+  object MapInflation {
+    def unapply[N <: Nat](func: GenericFunc[N]): Option[UnaryFunc] =
+      some(func) collect {
+        case structural.FlattenMap => structural.FlattenMap
+        case structural.FlattenMapKeys => structural.FlattenMapKeys
+        case structural.ShiftMap => structural.ShiftMap
+        case structural.ShiftMapKeys => structural.ShiftMapKeys
+      }
+  }
+
   // NB: this can't currently be generalized to Binder, because the key type
   //     isn't exposed there.
   def renameƒ[M[_]: Monad](f: Symbol => M[Symbol])
@@ -355,17 +375,17 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
           lift(relations.Or.tpe(Func.Input2(left, right).map(_.inferred)).disjunction).flatMap(
             unifyOrCheck(inf, _, relations.Or(left, right).map(appConst(_, constant(Data.NA))).embed))
 
-        case InvokeUnapply(structural.FlattenArray, Sized(arg)) =>
+        case InvokeUnapply(ArrayInflation(f), Sized(arg)) =>
           for {
-            types <- lift(structural.FlattenArray.tpe(Func.Input1(arg).map(_.inferred)).disjunction)
+            types <- lift(f.tpe(Func.Input1(arg).map(_.inferred)).disjunction)
             consts <- emitName[SemDisj, Func.Input[T, nat._1]](Func.Input1(arg).traverse(ensureConstraint(_, constant(Data.Arr(List(Data.NA))))))
-            plan  <- unifyOrCheck(inf, types, invoke[nat._1](structural.FlattenArray, consts))
+            plan  <- unifyOrCheck(inf, types, invoke[nat._1](f, consts))
           } yield plan
 
-        case InvokeUnapply(structural.FlattenMap, Sized(arg)) => for {
-          types <- lift(structural.FlattenMap.tpe(Func.Input1(arg).map(_.inferred)).disjunction)
+        case InvokeUnapply(MapInflation(f), Sized(arg)) => for {
+          types <- lift(f.tpe(Func.Input1(arg).map(_.inferred)).disjunction)
           consts <- emitName[SemDisj, Func.Input[T, nat._1]](Func.Input1(arg).traverse(ensureConstraint(_, constant(Data.Obj(ListMap("" -> Data.NA))))))
-          plan  <- unifyOrCheck(inf, types, invoke(structural.FlattenMap, consts))
+          plan  <- unifyOrCheck(inf, types, invoke(f, consts))
         } yield plan
 
         case InvokeUnapply(relations.IfUndefined, Sized(condition, fallback)) =>
