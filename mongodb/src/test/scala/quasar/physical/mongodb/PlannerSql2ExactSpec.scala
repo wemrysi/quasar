@@ -29,6 +29,7 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
+import quasar.qscript.{OnUndefined, ShiftType}
 import quasar.sql._
 
 import java.time.Instant
@@ -144,8 +145,67 @@ class PlannerSql2ExactSpec extends
         $project(reshape(
           "name" -> $field(JoinDir.Left.name, "name"),
           "year" -> $field(JoinDir.Right.name, "year")),
-          ExcludeId)))
-  )
+          ExcludeId))),
+
+    PlanSpec(
+      "$match before $unwind",
+      sqlToWf = Ok,
+      sqlE"SELECT measureEnrollments[*].measureKey FROM zips WHERE year=2017 and memberNumber=123456",
+      QsSpec(
+        sqlToQs = Ok,
+        qsToWf = Ok,
+        fix.LeftShift(
+          fix.Filter(fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
+            func.Guard(
+              func.Hole,
+              Type.Obj(Map(), Some(Type.Top)),
+              func.And(
+                func.Eq(
+                  func.ProjectKey(func.Hole, func.Constant(json.str("year"))),
+                  func.Constant(json.int(2017))),
+                func.Eq(
+                  func.ProjectKey(func.Hole, func.Constant(json.str("memberNumber"))),
+                  func.Constant(json.int(123456)))),
+              func.Undefined)),
+          func.Guard(
+            func.Guard(
+              func.Hole,
+              Type.Obj(Map(), Some(Type.Top)),
+              func.ProjectKey(
+                func.Hole,
+                func.Constant(json.str("measureEnrollments"))),
+              func.Undefined),
+            Type.FlexArr(0, None, Type.Obj(Map(), Some(Type.Top))),
+            func.Guard(
+              func.Hole,
+              Type.Obj(Map(), Some(Type.Top)),
+              func.ProjectKey(func.Hole, func.Constant(json.str("measureEnrollments"))),
+              func.Undefined),
+            func.Undefined),
+          qscript.ExcludeId,
+          ShiftType.Array,
+          OnUndefined.Omit,
+          func.ProjectKey(
+            func.RightSide, func.Constant(json.str("measureKey"))))
+      ).some,
+      chain[Workflow](
+        $read(collection("db", "zips")),
+        $match(Selector.And(
+          Selector.Doc(BsonField.Name("year") -> Selector.Eq(Bson.Int32(2017))),
+          Selector.Doc(BsonField.Name("memberNumber") -> Selector.Eq(Bson.Int32(123456))))),
+        $project(reshape(
+          "0" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Arr()), $field("measureEnrollments")),
+                $lt($field("measureEnrollments"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+              $field("measureEnrollments"),
+              $literal(Bson.Undefined))),
+          ExcludeId),
+        $unwind(DocField(BsonField.Name("0")), None, None),
+        $project(reshape(
+          sigil.Quasar -> $field("0", "measureKey")),
+          ExcludeId))))
 
   for (s <- specs) {
     testPlanSpec(s)
