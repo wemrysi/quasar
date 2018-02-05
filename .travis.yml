@@ -94,7 +94,6 @@ jobs:
       env:
       script:
         - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
-        - rm -rf .hoarder-cache
 
     - stage: compile
       env:
