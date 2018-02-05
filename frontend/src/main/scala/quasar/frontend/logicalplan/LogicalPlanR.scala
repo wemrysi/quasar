@@ -469,40 +469,6 @@ final class LogicalPlanR[T]
       _.cataM(liftTM(checkTypesƒ)).map(appConst(_, constant(Data.NA))).evalZero.validation)
   }
 
-  // TODO: Generalize this to Binder
-  def lpParaZygoHistoM[M[_]: Monad, A, B](
-    t: T)(
-    f: LP[(T, B)] => B,
-      g: LP[Cofree[LP, (B, A)]] => M[A]):
-      M[A] = {
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def loop(t: T, bind: Map[Symbol, Cofree[LP, (B, A)]]):
-        M[Cofree[LP, (B, A)]] = {
-      lazy val default: M[Cofree[LP, (B, A)]] = for {
-        lp <- t.project.traverse(x => for {
-          co <- loop(x, bind)
-        } yield ((x, co.head._1), co))
-        (xb, co) = lp.unfzip
-        b = f(xb)
-        a <- g(co)
-      } yield Cofree((b, a), co)
-
-      t.project match {
-        case Free(name)            => bind.get(name).fold(default)(_.point[M])
-        case Let(name, form, body) =>
-          loop(form, bind) >>= (form1 => loop(body, bind + (name -> form1)))
-        case _                     => default
-      }
-    }
-
-    for {
-      rez <- loop(t, Map())
-    } yield rez.head._2
-  }
-
-  def lpParaZygoHistoS[S, A, B] = lpParaZygoHistoM[State[S, ?], A, B] _
-  def lpParaZygoHisto[A, B] = lpParaZygoHistoM[Id, A, B] _
-
   /** The set of paths referenced in the given plan. */
   def paths(lp: T): ISet[FPath] =
     lp.foldMap(_.cata[ISet[FPath]] {
