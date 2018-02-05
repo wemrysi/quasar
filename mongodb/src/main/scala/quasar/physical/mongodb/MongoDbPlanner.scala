@@ -1522,38 +1522,40 @@ object MongoDbPlanner {
 
     val bsonVersion = toBsonVersion(queryModel)
 
-    val joinHandler: JoinHandler[Workflow3_2F, WBM] =
-      JoinHandler.fallback[Workflow3_2F, WBM](
-        JoinHandler.pipeline(queryModel, queryContext.statistics, queryContext.indexes),
-        JoinHandler.mapReduce(queryModel))
+    def joinHandler[WF[_]: Functor: Coalesce: Crush: Crystallize]
+      (implicit ev0: Classify[WF], ev1: WorkflowOpCoreF :<: WF, ev2: RenderTree[WorkflowBuilder[WF]])
+        : JoinHandler[WF, WBM] =
+      JoinHandler.fallback[WF, WBM](
+        JoinHandler.pipeline[WBM, WF](queryModel, queryContext.statistics, queryContext.indexes),
+        JoinHandler.mapReduce[WBM, WF](queryModel))
 
     queryModel match {
       case `3.4.4` =>
-        val cfg = PlannerConfig[T, Expr3_4_4, Workflow3_2F](
-          joinHandler,
+        val cfg = PlannerConfig[T, Expr3_4_4, Workflow3_4F](
+          joinHandler[Workflow3_4F],
           FuncHandler.handle3_4_4(bsonVersion),
           StaticHandler.handle,
           queryModel,
           bsonVersion)
-        plan0[T, M, Workflow3_2F, Expr3_4_4](anyDoc, cfg)(qs)
+        plan0[T, M, Workflow3_4F, Expr3_4_4](anyDoc, cfg)(qs)
 
       case `3.4` =>
-        val cfg = PlannerConfig[T, Expr3_4, Workflow3_2F](
-          joinHandler,
+        val cfg = PlannerConfig[T, Expr3_4, Workflow3_4F](
+          joinHandler[Workflow3_4F],
           FuncHandler.handle3_4(bsonVersion),
           StaticHandler.handle,
           queryModel,
           bsonVersion)
-        plan0[T, M, Workflow3_2F, Expr3_4](anyDoc, cfg)(qs)
+        plan0[T, M, Workflow3_4F, Expr3_4](anyDoc, cfg)(qs)
 
       case `3.2` =>
         val cfg = PlannerConfig[T, Expr3_2, Workflow3_2F](
-          joinHandler,
+          joinHandler[Workflow3_2F],
           FuncHandler.handle3_2(bsonVersion),
           StaticHandler.handle,
           queryModel,
           bsonVersion)
-        plan0[T, M, Workflow3_2F, Expr3_2](anyDoc, cfg)(qs)
+        plan0[T, M, Workflow3_2F, Expr3_2](anyDoc, cfg)(qs).map(_.inject[WorkflowF])
 
     }
   }

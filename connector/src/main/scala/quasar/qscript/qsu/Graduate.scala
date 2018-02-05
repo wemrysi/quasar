@@ -194,9 +194,9 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
             // this would be nicer with a tri-state Access type.
             resolvedRepair <-
               resolveAccess(repair) {
-                case QSU.AccessLeftTarget(access) => access.map[JoinSide](_ => LeftSide).left
-                case QSU.LeftTarget() => (LeftSide: JoinSide).right
-                case QSU.RightTarget() => (RightSide: JoinSide).right
+                case QSU.ShiftTarget.AccessLeftTarget(access) => access.map[JoinSide](_ => LeftSide).left
+                case QSU.ShiftTarget.LeftTarget() => (LeftSide: JoinSide).right
+                case QSU.ShiftTarget.RightTarget() => (RightSide: JoinSide).right
               }(κ(source.root))
 
             shiftType = rot match {

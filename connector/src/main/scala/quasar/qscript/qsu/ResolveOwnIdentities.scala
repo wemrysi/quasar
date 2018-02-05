@@ -16,49 +16,66 @@
 
 package quasar.qscript.qsu
 
-import matryoshka.{Hole => _, _}
-import quasar.qscript.{construction, ExcludeId, IdOnly, IdStatus, IncludeId, SrcHole}
-import quasar.fp._
-import quasar.fp.ski._
+import slamdata.Predef.{Boolean, Option, Symbol}
+
 import quasar.contrib.matryoshka._
-import ApplyProvenance.AuthenticatedQSU
-import quasar.qscript.qsu.{QScriptUniform => QSU}
+import quasar.ejson.EJson
+import quasar.fp._
+import quasar.qscript.{construction, Hole, IdOnly, IdStatus, IncludeId}
+import quasar.qscript.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
 import QSUGraph.Extractors._
-import scalaz.Equal
+
+import matryoshka.{Hole => _, _}
+import monocle.syntax.fields._1
 import scalaz.syntax.equal._
 import scalaz.syntax.foldable._
+import scalaz.syntax.functor._
 
-final class ResolveOwnIdentities[T[_[_]]: BirecursiveT: ShowT: EqualT] private () extends QSUTTypes[T] {
+final class ResolveOwnIdentities[T[_[_]]: BirecursiveT: EqualT] private () extends QSUTTypes[T] {
 
   val func = construction.Func[T]
 
-  def apply(aqsu: AuthenticatedQSU[T]): AuthenticatedQSU[T] = {
-    implicit val extEqual: Delay[Equal, quasar.ejson.Extension] = quasar.ejson.Extension.structuralEqual
-    aqsu.copy(graph = aqsu.graph.rewrite {
-      // TODO
+  object ShiftId {
+    def unapply(qa: QAccess[Hole]): Option[Symbol] =
+      Access.identityHole[T[EJson]]
+        .composeLens(_1)
+        .composePrism(IdAccess.identity[T[EJson]])
+        .getOption(qa)
+  }
+
+  def accessesShiftIdOf(node: Symbol): ShiftTarget[T] => Boolean = {
+    case ShiftTarget.AccessLeftTarget(ShiftId(sym)) => sym === node
+    case _ => false
+  }
+
+  def apply(qgraph: QSUGraph): QSUGraph =
+    qgraph rewrite {
       case qg @ LeftShift(source, struct, idStatus, onUndefined, repair, rotation)
-        if repair.element(QSU.AccessLeftTarget(Access.Id(IdAccess.Identity(source.root), SrcHole))) =>
-        val newRepair = repair.flatMap {
-          case QSU.AccessLeftTarget(Access.Id(IdAccess.Identity(symbol), _)) if symbol == qg.root =>
-            func.ProjectIndexI(func.RightTarget, 0)
-          case QSU.AccessLeftTarget(access) =>
-            func.AccessLeftTarget(κ(access))
-          case QSU.RightTarget() =>
-            if (idStatus === ExcludeId)
-              func.ProjectIndexI(func.RightTarget, 1)
-            else
+          if repair.any(accessesShiftIdOf(qg.root)) =>
+        val newRepair = repair flatMap {
+          case ShiftTarget.AccessLeftTarget(ShiftId(sym)) if sym === qg.root =>
+            if (idStatus === IdOnly)
               func.RightTarget
-          case QSU.LeftTarget() =>
-            scala.sys.error("QSU.LeftTarget in ResolveOwnIdentities")
+            else
+              func.ProjectIndexI(func.RightTarget, 0)
+
+          case ShiftTarget.RightTarget() =>
+            if (idStatus === IdOnly)
+              func.RightTarget
+            else
+              func.ProjectIndexI(func.RightTarget, 1)
+
+          case other => func.Hole as other
         }
+
         val newIdStatus: IdStatus =
           if (idStatus === IdOnly) IdOnly else IncludeId
+
         qg.overwriteAtRoot(QSU.LeftShift(source.root, struct, newIdStatus, onUndefined, newRepair, rotation))
-    })
-  }
+    }
 }
 
 object ResolveOwnIdentities {
-  import ApplyProvenance.AuthenticatedQSU
-  def apply[T[_[_]]: BirecursiveT: ShowT: EqualT](aqsu: AuthenticatedQSU[T]): AuthenticatedQSU[T] = new ResolveOwnIdentities[T].apply(aqsu)
+  def apply[T[_[_]]: BirecursiveT: EqualT](qgraph: QSUGraph[T]): QSUGraph[T] =
+    new ResolveOwnIdentities[T].apply(qgraph)
 }

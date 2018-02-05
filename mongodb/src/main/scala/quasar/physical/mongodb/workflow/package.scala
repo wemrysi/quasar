@@ -48,12 +48,17 @@ import scalaz._, Scalaz._
 package object workflow {
   /** The type for workflows targeting MongoDB 3.2 specifically. */
   type Workflow3_2F[A] = WorkflowOpCoreF[A]
+  /** The type for workflows targeting MongoDB 3.4 specifically. */
+  type Workflow3_4F[A] = Coproduct[WorkflowOp3_4F, WorkflowOpCoreF, A]
 
   /** The type for workflows supporting the most advanced capabilities. */
-  type WorkflowF[A] = Workflow3_2F[A]
+  type WorkflowF[A] = Workflow3_4F[A]
   type Workflow = Fix[WorkflowF]
 
   type FixOp[F[_]] = Fix[F] => Fix[F]
+
+  val WC = Inject[WorkflowOpCoreF, WorkflowF]
+  val W34 = Inject[WorkflowOp3_4F, WorkflowF]
 
   /** A "newtype" for ops that appear in pipelines, for use mostly after a
     * workflow is constructed, with fixed type that can represent any workflow.
@@ -92,7 +97,7 @@ package object workflow {
     (finish(_, _)).tupled(fop.op.para(C.crush[Fix]))._2.transAna[WorkflowTask](normalize)
 
   // NB: no need for a typeclass if implementing this way, but will be needed as
-  //     soon as we need to coalesce anything _into_ a type that isn't 2.6.
+  //     soon as we need to coalesce anything _into_ a type that isn't 3.2.
   //     Furthermore, if this implementation is made implicit, then lots of
   //     functions that require it are able to resolve it from other evidence.
   //     Since that seems likely to be a short-lived phenomenon, instead for now
@@ -191,11 +196,13 @@ package object workflow {
     }
   }
 
-  def toPipelineOp[A](op: PipelineF[WorkflowF, A], base: DocVar): PipelineOp = {
+  def toPipelineOp[F[_]: Functor, A](op: PipelineF[F, A], base: DocVar)
+    (implicit I: F :<: WorkflowF)
+      : PipelineOp = {
     val prefix = prefixBase(base)
 
-    def rewrite(wf: WorkflowOpCoreF[Unit]) =
-      wf match {
+    def rewriteCore(w: WorkflowOpCoreF[Unit]): PipelineF[WorkflowOpCoreF, Unit] =
+      w match {
         case wf @ $MatchF(_, _)           => rewriteRefs3_2(prefix).apply(wf).shapePreserving
         case wf @ $ProjectF(_, _, _)      => rewriteRefs3_2(prefix).apply(wf).pipeline
         case wf @ $RedactF(_, _)          => rewriteRefs3_2(prefix).apply(wf).pipeline
@@ -210,6 +217,15 @@ package object workflow {
         case wf @ $SampleF(_, _)          => rewriteRefs3_2(prefix).apply(wf).shapePreserving
         case _ => scala.sys.error("unexpected WorkflowOp")
       }
+
+    def rewrite3_4(w: WorkflowOp3_4F[Unit]): PipelineF[WorkflowOp3_4F, Unit] =
+      w match {
+        case wf @ $AddFieldsF(_, _) => rewriteRefs3_4(prefix).apply(wf).pipeline
+      }
+
+    def rewrite(w: F[Unit]): PipelineF[WorkflowF, Unit] = I.inj(w).run.fold(
+      wf => rewrite3_4(wf).fmap(ι, W34),
+      wf => rewriteCore(wf).fmap(ι, WC))
 
     PipelineOp(rewrite(op.wf.void))
   }
@@ -263,11 +279,25 @@ package object workflow {
     }
   }
 
+  private [workflow] def rewriteRefs3_4(f: PartialFunction[DocVar, DocVar])
+        (implicit exprOps: ExprOpOps.Uni[ExprOp]) = new RewriteRefs[WorkflowOp3_4F](f) {
+    def apply[A <: WorkflowOp3_4F[_]](op: A) = {
+      (op match {
+        case $AddFieldsF(src, shape) =>
+          $AddFieldsF(src, shape.rewriteRefs(applyVar0))
+      }).asInstanceOf[A]
+    }
+  }
+
+
   def simpleShape[F[_]](op: Fix[F])(implicit I: F :<: WorkflowF): Option[List[BsonField.Name]] =
-    simpleShape32(I.inj(op.unFix))
+    I.inj(op.unFix).run.fold[Option[List[BsonField.Name]]](
+      simpleShape34, simpleShape32)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def simpleShape32[F[_]](wf: WorkflowF[Fix[F]])(implicit I: F :<: WorkflowF): Option[List[BsonField.Name]] = {
+  def simpleShape32[F[_]](wf: WorkflowOpCoreF[Fix[F]])
+    (implicit I: F :<: WorkflowF)
+      : Option[List[BsonField.Name]] = {
     wf match {
         case $PureF(Bson.Doc(value))          =>
           value.keys.toList.map(BsonField.Name(_)).some
@@ -289,6 +319,16 @@ package object workflow {
         case $LookupF(_, _, _, _, _)          => ???
         case $SampleF(_, _)                   => ???
         case _                                => None
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def simpleShape34[F[_]](wf: WorkflowOp3_4F[Fix[F]])
+    (implicit I: F :<: WorkflowF)
+      : Option[List[BsonField.Name]] = {
+    wf match {
+        case $AddFieldsF(src, Reshape(value)) =>
+          simpleShape(src).map(l => l ::: value.keys.toList)
     }
   }
 
