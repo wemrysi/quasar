@@ -1157,16 +1157,14 @@ object MongoDbPlanner {
       case _ => none
     }
 
+    def toCofree[B](ann: B): Algebra[CoEnv[A, MapFunc[T, ?], ?], Cofree[MapFunc[T, ?], B]] =
+      interpret(κ(Cofree(ann, MFC(Undefined()))), attributeAlgebra[MapFunc[T, ?], B](κ(ann)))
+
     val undefinedF: MapFunc[T, Cofree[MapFunc[T, ?], Boolean] \/ FreeMapA[T, A]] = MFC(Undefined())
     val gcoalg: GCoalgebra[Cofree[MapFunc[T, ?], Boolean] \/ ?, EnvT[Boolean, MapFunc[T, ?], ?], FreeMapA[T, A]] =
       _.fold(κ(envT(false, undefinedF)), {
-        case cond0 @ MFC(Cond(_, _, Embed(CoEnv(\/-(MFC(Undefined())))))) =>
-          envT(
-            true,
-            Free.roll(cond0).cata[Cofree[MapFunc[T, ?], Boolean]](
-              interpret(
-                κ(Cofree(true, MFC(Undefined()))),
-                attributeAlgebra[MapFunc[T, ?], Boolean](κ(true)))).tail ∘ (_.left))
+        case MFC(Cond(if_, then_, undef @ Embed(CoEnv(\/-(MFC(Undefined())))))) =>
+          envT(false, MFC(Cond(if_.cata(toCofree(true)).left, then_.cata(toCofree(false)).left, undef.cata(toCofree(false)).left)))
 
         case otherwise => envT(false, otherwise ∘ (_.right))
       })
@@ -1198,8 +1196,7 @@ object MongoDbPlanner {
               */
             case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
             case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
-            case MFC(Guard((_, if_), _, (_, then_), _)) => invoke2Rel(if_, then_)(Selector.Or(_, _))
-            case MFC(Cond((_, v), _, _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
+            case MFC(Guard((_, if_), _, _, _)) => if_.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
             case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
           })
 
@@ -1207,7 +1204,8 @@ object MongoDbPlanner {
           case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
           case MFC(ProjectKey((_, v), _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
           case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
-          case MFC(Guard((_, _), _, (_, v), _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+          case MFC(Guard((_, if_), _, _, _)) => if_.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
+          case MFC(Cond((_, pred), _, _)) => pred.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
           case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
         }
       }
