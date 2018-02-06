@@ -176,11 +176,7 @@ class PlannerSql2ExactSpec extends
                 func.Constant(json.str("measureEnrollments"))),
               func.Undefined),
             Type.FlexArr(0, None, Type.Obj(Map(), Some(Type.Top))),
-            func.Guard(
-              func.Hole,
-              Type.Obj(Map(), Some(Type.Top)),
-              func.ProjectKey(func.Hole, func.Constant(json.str("measureEnrollments"))),
-              func.Undefined),
+            func.ProjectKey(func.Hole, func.Constant(json.str("measureEnrollments"))),
             func.Undefined),
           qscript.ExcludeId,
           ShiftType.Array,
