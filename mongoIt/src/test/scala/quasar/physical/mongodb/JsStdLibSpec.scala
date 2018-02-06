@@ -56,8 +56,6 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case (date.ExtractWeek, _) => Skipped("TODO").left
     case (date.ExtractYear, _) => Skipped("TODO").left
 
-    case (date.StartOfDay, Data.LocalLike(_) :: Nil) => Pending("TODO").left
-
     case (date.Now, _) => Skipped("TODO").left
     case (date.NowDate, _) => Skipped("TODO").left
     case (date.NowTime, _) => Skipped("TODO").left

@@ -63,7 +63,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (date.ExtractWeek, _) => notHandled.left
     case (date.ExtractYear, _) => notHandled.left
 
-    case (date.StartOfDay, Data.LocalLike(_) :: Nil) => Pending("TODO").left
+    case (date.StartOfDay, Data.LocalLike(_) :: Nil) => notHandled.left
 
     case (date.Now, _) => notHandled.left
     case (date.NowDate, _) => notHandled.left
