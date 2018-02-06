@@ -104,5 +104,5 @@ object ExtractFiltering {
     */
   def apply[T[_[_]]: BirecursiveT: EqualT, A: Equal]
       : CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
-    new ExtractFiltering[T].apply[A](_)
+    new ExtractFiltering[T].apply[A] _
 }
