@@ -19,27 +19,37 @@ package quasar
 import slamdata.Predef._
 import quasar.pkg.tests._
 
-import java.time._
+import java.time.{
+  Instant,
+  LocalDate => JLocalDate,
+  LocalDateTime => JLocalDateTime,
+  LocalTime => JLocalTime,
+  OffsetDateTime => JOffsetDateTime,
+  OffsetTime => JOffsetTime,
+  ZoneOffset
+}
 import java.time.temporal.ChronoField
 
 trait DateGenerators {
-  implicit val arbDuration: Arbitrary[DateTimeInterval] = genInterval
+  implicit val arbDateTimeInterval: Arbitrary[DateTimeInterval] = genInterval
   implicit val arbInstant: Arbitrary[Instant] =
     Arbitrary((genEpochSeconds, genNanos) >> Instant.ofEpochSecond _)
-  implicit val arbDate: Arbitrary[LocalDate]         = genLocalDate
-  implicit val arbTime: Arbitrary[LocalTime]         = genLocalTime
-  implicit val arbDateTime: Arbitrary[LocalDateTime] = genLocalDateTime
-  implicit val arbOffsetDate: Arbitrary[OffsetDate]         = genOffsetDate
-  implicit val arbOffsetTime: Arbitrary[OffsetTime]         = genOffsetTime
-  implicit val arbOffsetDateTime: Arbitrary[OffsetDateTime] = genOffsetDateTime
+  implicit val arbLocalDate: Arbitrary[JLocalDate] = genLocalDate
+  implicit val arbLocalTime: Arbitrary[JLocalTime] = genLocalTime
+  implicit val arbLocalDateTime: Arbitrary[JLocalDateTime] = genLocalDateTime
+  implicit val arbOffsetDate: Arbitrary[OffsetDate] = genOffsetDate
+  implicit val arbOffsetTime: Arbitrary[JOffsetTime] = genOffsetTime
+  implicit val arbOffsetDateTime: Arbitrary[JOffsetDateTime] = genOffsetDateTime
+  implicit val arbZoneOffset: Arbitrary[ZoneOffset] = genZoneOffset
+  implicit val arbTemporalPart: Arbitrary[TemporalPart] = genTemporalPart
 
-  private def genSeconds: Gen[Long]     = genInt ^^ (_.toLong)
+  private def genSeconds: Gen[Long] = genInt ^^ (_.toLong)
   private def genSecondOfDay: Gen[Long] = choose(0L, 24L * 60 * 60 - 1)
-  private def genMillis: Gen[Long]      = choose(0L, 999L)
-  private def genNanos: Gen[Long]       = choose(0L, 999999999L)
-  private def genYears: Gen[Int]        = choose(-9999999, 9999999)
-  private def genMonths: Gen[Int]       = choose(-100, 100)
-  private def genDays: Gen[Int]         = choose(-1000, 1000)
+  private def genMillis: Gen[Long] = choose(0L, 999L)
+  private def genNanos: Gen[Long] = choose(0L, 999999999L)
+  private def genYears: Gen[Int] = choose(-9999999, 9999999)
+  private def genMonths: Gen[Int] = choose(-100, 100)
+  private def genDays: Gen[Int] = choose(-1000, 1000)
   private def genEpochSeconds: Gen[Long] =
     choose(Instant.MIN.getEpochSecond() + 1, Instant.MAX.getEpochSecond - 1)
 
@@ -51,21 +61,21 @@ trait DateGenerators {
   def genZoneOffset: Gen[ZoneOffset] =
     Gen.choose[Int](ZoneOffset.MIN.getTotalSeconds, ZoneOffset.MAX.getTotalSeconds).map(ZoneOffset.ofTotalSeconds)
 
-  def genLocalTime: Gen[LocalTime] =
-    Gen.choose[Long](ChronoField.NANO_OF_DAY.range().getLargestMinimum, ChronoField.NANO_OF_DAY.range().getMaximum).map(LocalTime.ofNanoOfDay)
+  def genLocalTime: Gen[JLocalTime] =
+    Gen.choose[Long](ChronoField.NANO_OF_DAY.range().getLargestMinimum, ChronoField.NANO_OF_DAY.range().getMaximum).map(JLocalTime.ofNanoOfDay)
 
-  def genLocalDate: Gen[LocalDate] =
-    Gen.choose[Long](minLocalEpochDay, maxLocalEpochDay).map(LocalDate.ofEpochDay)
+  def genLocalDate: Gen[JLocalDate] =
+    Gen.choose[Long](minLocalEpochDay, maxLocalEpochDay).map(JLocalDate.ofEpochDay)
 
-  def genOffsetDateTime: Gen[OffsetDateTime] = for {
+  def genOffsetDateTime: Gen[JOffsetDateTime] = for {
     datetime <- genLocalDateTime
     zo <- genZoneOffset
-  } yield OffsetDateTime.of(datetime, zo)
+  } yield JOffsetDateTime.of(datetime, zo)
 
-  def genOffsetTime: Gen[OffsetTime] = for {
+  def genOffsetTime: Gen[JOffsetTime] = for {
     time <- genLocalTime
     zo <- genZoneOffset
-  } yield OffsetTime.of(time, zo)
+  } yield JOffsetTime.of(time, zo)
 
   def genOffsetDate: Gen[OffsetDate] = for {
     date <- genLocalDate
@@ -97,11 +107,19 @@ trait DateGenerators {
       nanos <- Gen.choose(0L, 999999999L)
     } yield DateTimeInterval(0, 0, 0, seconds.toLong, nanos)
 
-  def genLocalDateTime: Gen[LocalDateTime] =
+  def genLocalDateTime: Gen[JLocalDateTime] =
     for {
       time <- genLocalTime
       date <- genLocalDate
-    } yield LocalDateTime.of(date, time)
+    } yield JLocalDateTime.of(date, time)
+
+  def genTemporalPart: Gen[TemporalPart] = {
+    import TemporalPart._
+
+    Gen.oneOf(
+      Century, Day, Decade, Hour, Microsecond, Millennium,
+      Millisecond, Minute, Month, Quarter, Second, Week, Year)
+  }
 }
 
 object DateGenerators extends DateGenerators

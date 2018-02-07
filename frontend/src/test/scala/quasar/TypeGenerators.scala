@@ -19,9 +19,9 @@ package quasar
 import java.time._
 
 import slamdata.Predef.{Set => _, _}
-import quasar.DataGenerators._
+import quasar.DateGenerators._
 import org.scalacheck._
-import Gen._
+import org.scalacheck.Gen._
 
 import scalaz.ImmutableArray
 import scalaz.scalacheck.ScalaCheckBinding._
@@ -29,7 +29,6 @@ import scalaz.syntax.traverse._
 import scalaz.std.list._
 import scalaz.std.option._
 import scala.Predef.implicitly
-import DateGenerators._
 
 trait TypeGenerators {
   implicit def arbitraryType: Arbitrary[Type] = Arbitrary { Gen.sized(depth => typeGen(depth/25)) }
@@ -108,11 +107,13 @@ trait TypeGenerators {
 
   def simpleGen: Gen[Type] = Gen.oneOf(terminalGen, simpleConstGen)
 
-  def terminalGen: Gen[Type] = Gen.oneOf(Type.Null, Type.Str, Type.Int, Type.Dec, Type.Bool, Type.Binary,
-      Type.OffsetDateTime, Type.OffsetDate, Type.OffsetTime, Type.LocalDateTime, Type.LocalDate, Type.LocalTime, Type.Interval)
+  def terminalGen: Gen[Type] = Gen.oneOf(
+    Type.Null, Type.Str, Type.Int, Type.Dec, Type.Bool, Type.Binary,
+    Type.OffsetDateTime, Type.OffsetDate, Type.OffsetTime,
+    Type.LocalDateTime, Type.LocalDate, Type.LocalTime, Type.Interval)
 
   def simpleConstGen: Gen[Type] = DataGenerators.simpleData.map(Type.Const(_))
-  def constGen: Gen[Type] = Arbitrary.arbitrary[Data].map(Type.Const(_))
+  def constGen: Gen[Type] = DataGenerators.data.map(Type.Const(_))
 
   def fieldGen: Gen[(String, Type)] = for {
     c <- Gen.alphaChar

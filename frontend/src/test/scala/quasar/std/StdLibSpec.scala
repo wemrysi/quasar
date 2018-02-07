@@ -83,21 +83,44 @@ abstract class StdLibSpec extends Qspec {
     implicit val arbBigInt = Arbitrary[BigInt] { runner.intDomain }
     implicit val arbBigDecimal = Arbitrary[BigDecimal] { runner.decDomain }
     implicit val arbString = Arbitrary[String] { runner.stringDomain }
-    implicit val arbDate = Arbitrary[JLocalDate] { runner.dateDomain }
-    implicit val arbTime = Arbitrary[JLocalTime] { runner.timeDomain }
-    implicit val arbDateTime = Arbitrary[JLocalDateTime] { (runner.dateDomain, runner.timeDomain) >> JLocalDateTime.of }
+
     implicit val arbData = Arbitrary[Data] {
       Gen.oneOf(
         runner.intDomain.map(Data.Int(_)),
         runner.decDomain.map(Data.Dec(_)),
         runner.stringDomain.map(Data.Str(_)))
     }
-    implicit val arbOffsetDateTime = Arbitrary[JOffsetDateTime] { (arbDateTime.gen, runner.timezoneDomain) >> JOffsetDateTime.of }
-    implicit val arbOffsetDate =
-      Arbitrary[JOffsetDate] { (runner.dateDomain, runner.timezoneDomain) >> (JOffsetDate(_, _)) }
-    implicit val arbOffsetTime =
-      Arbitrary[JOffsetTime] { (runner.timeDomain, runner.timezoneDomain) >> JOffsetTime.of }
-    implicit val arbInterval = Arbitrary[DateTimeInterval] { runner.intervalDomain }
+
+    implicit val arbLocalDate: Arbitrary[JLocalDate] = Arbitrary[JLocalDate](runner.dateDomain)
+    implicit val arbDataLocalDate: Arbitrary[Data.LocalDate] = arbLocalDate ^^ Data.LocalDate
+
+    implicit val arbLocalTime: Arbitrary[JLocalTime] = Arbitrary[JLocalTime](runner.timeDomain)
+    implicit val arbDataLocalTime: Arbitrary[Data.LocalTime] = arbLocalTime ^^ Data.LocalTime
+
+    implicit val arbLocalDateTime: Arbitrary[JLocalDateTime] =
+      Arbitrary[JLocalDateTime]((runner.dateDomain, runner.timeDomain) >> JLocalDateTime.of)
+    implicit val arbDataLocalDateTime: Arbitrary[Data.LocalDateTime] =
+      arbLocalDateTime ^^ Data.LocalDateTime
+
+    implicit val arbOffsetDate: Arbitrary[JOffsetDate] =
+      Arbitrary[JOffsetDate]((runner.dateDomain, runner.timezoneDomain) >> (JOffsetDate(_, _)))
+    implicit val arbDataOffsetDate: Arbitrary[Data.OffsetDate] =
+      arbOffsetDate ^^ Data.OffsetDate
+
+    implicit val arbOffsetTime: Arbitrary[JOffsetTime] =
+      Arbitrary[JOffsetTime]((runner.timeDomain, runner.timezoneDomain) >> JOffsetTime.of)
+    implicit val arbDataOffsetTime: Arbitrary[Data.OffsetTime] =
+      arbOffsetTime ^^ Data.OffsetTime
+
+    implicit val arbOffsetDateTime: Arbitrary[JOffsetDateTime] =
+      Arbitrary[JOffsetDateTime]((arbLocalDateTime.gen, runner.timezoneDomain) >> JOffsetDateTime.of)
+    implicit val arbDataOffsetDateTime: Arbitrary[Data.OffsetDateTime] =
+      arbOffsetDateTime ^^ Data.OffsetDateTime
+
+    implicit val arbInterval: Arbitrary[DateTimeInterval] =
+      Arbitrary[DateTimeInterval](runner.intervalDomain)
+    implicit val arbDataInterval: Arbitrary[Data.Interval] =
+      arbInterval ^^ Data.Interval
 
     def commute(
         prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],

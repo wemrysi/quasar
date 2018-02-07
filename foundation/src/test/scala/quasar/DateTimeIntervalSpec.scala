@@ -20,15 +20,8 @@ import java.time._
 
 import slamdata.Predef._
 import DateGenerators._
-import org.scalacheck.Arbitrary
-import quasar.pkg.tests._
 
 class DateTimeIntervalSpec extends quasar.Qspec {
-
-  implicit val arbDateTime: Arbitrary[LocalDateTime] = Arbitrary(for {
-    d <- DateGenerators.genLocalDate
-    t <- DateGenerators.genLocalTime
-  } yield LocalDateTime.of(d, t))
 
   "parsing" should {
     "not parse just a P" in {
@@ -165,5 +158,4 @@ class DateTimeIntervalSpec extends quasar.Qspec {
       }
     }
   }
-
 }
