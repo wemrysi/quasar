@@ -852,7 +852,7 @@ object WorkflowOpCoreF {
 
   implicit val refs: Refs[WorkflowOpCoreF] = Refs.fromRewrite[WorkflowOpCoreF](rewriteRefs3_2)
 
-  implicit val crush: Crush[WorkflowOpCoreF] = workflowFCrush //Crush.injected[WorkflowOpCoreF, WorkflowF]
+  implicit val crush: Crush[WorkflowOpCoreF] = Crush.injected[WorkflowOpCoreF, WorkflowF]
 
   implicit val coalesce: Coalesce[WorkflowOpCoreF] = coalesceAll[WorkflowOpCoreF]
   implicit val classify: Classify[WorkflowOpCoreF] =

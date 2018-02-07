@@ -99,11 +99,14 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
     : Trans[F, M] =
   new Trans[F, M] {
 
+    def elideA[A: Eq](fm: FreeMapA[T, A], hole: A): M[FreeMapA[T, A]] =
+      fm.transCataM(elideMoreGeneralGuards[T, M, A](hole, typ))
+
     def elide(fm: FreeMap[T]): M[FreeMap[T]] =
-      fm.transCataM(elideMoreGeneralGuards[T, M, Hole](SrcHole, typ))
+      elideA(fm, SrcHole)
 
     def elideJoinFunc(isRewrite: Boolean, joinSide: JoinSide, fm: JoinFunc[T]): M[JoinFunc[T]] =
-      if (isRewrite) fm.transCataM(elideMoreGeneralGuards[T, M, JoinSide](joinSide, typ))
+      if (isRewrite) elideA(fm, joinSide)
       else fm.point[M]
 
     def elideLeftJoinKey(isRewrite: Boolean, key: List[(FreeMap[T], FreeMap[T])])
@@ -156,6 +159,14 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
             (b.traverse(elide) ⊛
               order.traverse(t => elide(t._1).map(x => (x, t._2))))(
               (b0, order0) => GtoF.reverseGet(QC(Sort(src, b0, order0))))
+        case QC(Subset(src, from, op, count))
+          if (isRewrite[T, F, G, A](GtoF, src.project)) =>
+            (elideQS(isRewrite = true, from) ⊛ elideQS(isRewrite = true, count))(
+              (from0, count0) => GtoF.reverseGet(QC(Subset(src, from0, op, count0))))
+        case QC(Union(src, lBranch, rBranch))
+          if (isRewrite[T, F, G, A](GtoF, src.project)) =>
+            (elideQS(isRewrite = true, lBranch) ⊛ elideQS(isRewrite = true, rBranch))(
+              (l0, r0) => GtoF.reverseGet(QC(Union(src, l0, r0))))
         case EJ(EquiJoin(src, lBranch, rBranch, key, f, combine)) =>
           val spSrc = ShapePreserving.shapePreservingP(src, GtoF)
           val isRewriteL = isRewriteFree(lBranch, spSrc)

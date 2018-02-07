@@ -16,19 +16,20 @@
 
 package quasar.qscript
 
-import qsu.{Access, QAccess, QScriptUniform => QSU}
 import slamdata.Predef._
+import quasar.common.{JoinType, SortDir}
+import quasar.{ejson, qscript}
+import quasar.ejson.EJson
+import quasar.qscript.qsu.{Access, QAccess}
+import quasar.qscript.qsu.QScriptUniform.ShiftTarget
+import quasar.std.TemporalPart
+
 import matryoshka._
 import matryoshka.data.Fix
-
 import scalaz._
 import scalaz.Leibniz.===
 import scalaz.std.tuple._
 import scalaz.syntax.bifunctor._
-import quasar.{ejson, qscript}
-import quasar.common.{JoinType, SortDir}
-import quasar.std.TemporalPart
-import quasar.ejson.EJson
 
 object construction {
   final case class Func[T[_[_]]]()(implicit birec: BirecursiveT[T]) {
@@ -208,12 +209,12 @@ object construction {
     def Hole: FreeMap[T] = Free.pure(SrcHole)
     def AccessHole: FreeMapA[T, QAccess[T, Hole]] =
       Free.pure(Access.valueHole(SrcHole))
-    def LeftTarget: FreeMapA[T, QSU.ShiftTarget[T]] =
-      Free.pure(QSU.LeftTarget[T]())
-    def RightTarget: FreeMapA[T, QSU.ShiftTarget[T]] =
-      Free.pure(QSU.RightTarget[T]())
-    def AccessLeftTarget(f: Hole => QAccess[T, Hole]): FreeMapA[T, QSU.ShiftTarget[T]] =
-      Free.pure(QSU.AccessLeftTarget(f(SrcHole)))
+    def LeftTarget: FreeMapA[T, ShiftTarget[T]] =
+      Free.pure(ShiftTarget.LeftTarget[T]())
+    def RightTarget: FreeMapA[T, ShiftTarget[T]] =
+      Free.pure(ShiftTarget.RightTarget[T]())
+    def AccessLeftTarget(f: Hole => QAccess[T, Hole]): FreeMapA[T, ShiftTarget[T]] =
+      Free.pure(ShiftTarget.AccessLeftTarget(f(SrcHole)))
     def LeftSide: JoinFunc[T] = Free.pure(qscript.LeftSide)
     def RightSide: JoinFunc[T] = Free.pure(qscript.RightSide)
     def ReduceIndex(i: Int \/ Int): FreeMapA[T, ReduceIndex] = Free.pure(qscript.ReduceIndex(i))

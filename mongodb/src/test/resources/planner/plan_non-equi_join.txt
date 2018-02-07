@@ -120,17 +120,13 @@ Chain
 ├─ $UnwindF
 │  ╰─ Path(DocField(BsonField.Name("left")))
 ├─ $ProjectF
-│  ├─ Name("0" -> { "$literal": true })
-│  ├─ Name("1" -> { "$lt": ["$left._id", "$right._id"] })
+│  ├─ Name("0" -> { "$lt": ["$left._id", "$right._id"] })
 │  ├─ Name("src")
 │  │  ╰─ Name("right" -> "$right")
 │  ╰─ ExcludeId
 ├─ $MatchF
-│  ╰─ And
-│     ├─ Doc
-│     │  ╰─ Expr($0 -> Eq(Bool(true)))
-│     ╰─ Doc
-│        ╰─ Expr($1 -> Eq(Bool(true)))
+│  ╰─ Doc
+│     ╰─ Expr($0 -> Eq(Bool(true)))
 ╰─ $ProjectF
    ├─ Name("__quasar_mongodb_sigil" -> {
    │       "$cond": [
