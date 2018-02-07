@@ -21,6 +21,7 @@ import quasar.{RenderTree, RenderTreeT, RenderedTree}
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
+import quasar.ejson.implicits._
 import quasar.contrib.matryoshka._
 import quasar.fp.ski.{ι, κ}
 import quasar.fp._
@@ -378,26 +379,26 @@ object QScriptUniform {
       Show.showFromToString
   }
 
-  sealed trait ShiftTarget[T[_[_]]]
-  final case class LeftTarget[T[_[_]]]() extends ShiftTarget[T]
-  final case class RightTarget[T[_[_]]]() extends ShiftTarget[T]
-  final case class AccessLeftTarget[T[_[_]]](access: QAccess[T, Hole]) extends ShiftTarget[T]
+  sealed trait ShiftTarget[T[_[_]]] extends Product with Serializable
 
   object ShiftTarget {
-    @SuppressWarnings(Array("org.wartremover.warts.Equals"))
-    implicit def equalShiftTarget[T[_[_]]: EqualT]: Equal[ShiftTarget[T]] = Equal.equal {
-      case (AccessLeftTarget(access1), AccessLeftTarget(access2)) =>
-        implicit val extEqual: Delay[Equal, quasar.ejson.Extension] = quasar.ejson.Extension.structuralEqual
-        access1 ≟ access2
+    final case class LeftTarget[T[_[_]]]() extends ShiftTarget[T]
+    final case class RightTarget[T[_[_]]]() extends ShiftTarget[T]
+    final case class AccessLeftTarget[T[_[_]]](access: QAccess[T, Hole]) extends ShiftTarget[T]
+
+    implicit def equalShiftTarget[T[_[_]]: BirecursiveT: EqualT]: Equal[ShiftTarget[T]] = Equal.equal {
+      case (AccessLeftTarget(access1), AccessLeftTarget(access2)) => access1 ≟ access2
       case (LeftTarget(), LeftTarget()) => true
       case (RightTarget(), RightTarget()) => true
       case _ => false
     }
+
     implicit def showShiftTarget[T[_[_]]: ShowT]: Show[ShiftTarget[T]] = Show.shows {
       case LeftTarget() => "LeftTarget"
       case RightTarget() => "RightTarget"
       case AccessLeftTarget(access) => s"AccessLeftTarget(${access.shows})"
     }
+
     implicit def renderShiftTarget[T[_[_]]: RecursiveT: RenderTreeT: ShowT]: RenderTree[ShiftTarget[T]] = RenderTree.make {
       case LeftTarget() =>
         RenderedTree("ShiftTarget" :: Nil, "LeftTarget".some, Nil)
