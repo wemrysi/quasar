@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,17 +46,19 @@ import scalaz._, Scalaz._
   * non-pipelines around pipelines, etc.).
   */
 package object workflow {
-  /** The type for workflows targeting MongoDB 2.6 specifically. */
-  type Workflow2_6F[A] = WorkflowOpCoreF[A]
-
   /** The type for workflows targeting MongoDB 3.2 specifically. */
-  type Workflow3_2F[A] = Coproduct[WorkflowOp3_2F, WorkflowOpCoreF, A]
+  type Workflow3_2F[A] = WorkflowOpCoreF[A]
+  /** The type for workflows targeting MongoDB 3.4 specifically. */
+  type Workflow3_4F[A] = Coproduct[WorkflowOp3_4F, WorkflowOpCoreF, A]
 
   /** The type for workflows supporting the most advanced capabilities. */
-  type WorkflowF[A] = Workflow3_2F[A]
+  type WorkflowF[A] = Workflow3_4F[A]
   type Workflow = Fix[WorkflowF]
 
   type FixOp[F[_]] = Fix[F] => Fix[F]
+
+  val WC = Inject[WorkflowOpCoreF, WorkflowF]
+  val W34 = Inject[WorkflowOp3_4F, WorkflowF]
 
   /** A "newtype" for ops that appear in pipelines, for use mostly after a
     * workflow is constructed, with fixed type that can represent any workflow.
@@ -95,7 +97,7 @@ package object workflow {
     (finish(_, _)).tupled(fop.op.para(C.crush[Fix]))._2.transAna[WorkflowTask](normalize)
 
   // NB: no need for a typeclass if implementing this way, but will be needed as
-  //     soon as we need to coalesce anything _into_ a type that isn't 2.6.
+  //     soon as we need to coalesce anything _into_ a type that isn't 3.2.
   //     Furthermore, if this implementation is made implicit, then lots of
   //     functions that require it are able to resolve it from other evidence.
   //     Since that seems likely to be a short-lived phenomenon, instead for now
@@ -130,10 +132,10 @@ package object workflow {
         //         flatten, scope)))
         case I($GroupF(src, grouped, by)) if id != ExcludeId =>
           inlineProjectGroup(shape, grouped).map(gr => I.inj($GroupF(src, gr, by)))
-        case I($UnwindF(Embed(I($GroupF(src, grouped, by))), unwound))
+        case I($UnwindF(Embed(I($GroupF(src, grouped, by))), unwound, None, preserveNullAndEmptyArrays))
             if id != ExcludeId =>
           inlineProjectUnwindGroup(shape, unwound, grouped).map { case (unwound, grouped) =>
-            I.inj($UnwindF(I.inj($GroupF(src, grouped, by)).embed, unwound))
+            I.inj($UnwindF(I.inj($GroupF(src, grouped, by)).embed, unwound, None, preserveNullAndEmptyArrays))
           }
         case _ => None
       }
@@ -194,26 +196,38 @@ package object workflow {
     }
   }
 
-  def toPipelineOp[F[_]: Functor, A](op: PipelineF[F, A], base: DocVar)(implicit I: F :<: WorkflowF): PipelineOp = {
+  def toPipelineOp[F[_]: Functor, A](op: PipelineF[F, A], base: DocVar)
+    (implicit I: F :<: WorkflowF)
+      : PipelineOp = {
     val prefix = prefixBase(base)
-    PipelineOp(I.inj(op.wf.void).run.fold(
-      op => (op match {
-        case op @ $LookupF(_, _, _, _, _) => rewriteRefs3_2(prefix).apply(op).pipeline
-        case op @ $SampleF(_, _)          => rewriteRefs3_2(prefix).apply(op).shapePreserving
-      }).fmap(ι, Inject[WorkflowOp3_2F, WorkflowF]),
-      op => (op match {
-        case op @ $MatchF(_, _)           => rewriteRefs2_6(prefix).apply(op).shapePreserving
-        case op @ $ProjectF(_, _, _)      => rewriteRefs2_6(prefix).apply(op).pipeline
-        case op @ $RedactF(_, _)          => rewriteRefs2_6(prefix).apply(op).pipeline
-        case op @ $SkipF(_, _)            => rewriteRefs2_6(prefix).apply(op).shapePreserving
-        case op @ $LimitF(_, _)           => rewriteRefs2_6(prefix).apply(op).shapePreserving
-        case op @ $UnwindF(_, _)          => rewriteRefs2_6(prefix).apply(op).pipeline
-        case op @ $GroupF(_, _, _)        => rewriteRefs2_6(prefix).apply(op).pipeline
-        case op @ $SortF(_, _)            => rewriteRefs2_6(prefix).apply(op).shapePreserving
-        case op @ $GeoNearF(_, _, _, _, _, _, _, _, _, _) => rewriteRefs2_6(prefix).apply(op).pipeline
-        case op @ $OutF(_, _)             => rewriteRefs2_6(prefix).apply(op).shapePreserving
-        case _ => scala.sys.error("never happens")
-      }).fmap(ι, Inject[WorkflowOpCoreF, WorkflowF])))
+
+    def rewriteCore(w: WorkflowOpCoreF[Unit]): PipelineF[WorkflowOpCoreF, Unit] =
+      w match {
+        case wf @ $MatchF(_, _)           => rewriteRefs3_2(prefix).apply(wf).shapePreserving
+        case wf @ $ProjectF(_, _, _)      => rewriteRefs3_2(prefix).apply(wf).pipeline
+        case wf @ $RedactF(_, _)          => rewriteRefs3_2(prefix).apply(wf).pipeline
+        case wf @ $SkipF(_, _)            => rewriteRefs3_2(prefix).apply(wf).shapePreserving
+        case wf @ $LimitF(_, _)           => rewriteRefs3_2(prefix).apply(wf).shapePreserving
+        case wf @ $UnwindF(_, _, _, _)    => rewriteRefs3_2(prefix).apply(wf).pipeline
+        case wf @ $GroupF(_, _, _)        => rewriteRefs3_2(prefix).apply(wf).pipeline
+        case wf @ $SortF(_, _)            => rewriteRefs3_2(prefix).apply(wf).shapePreserving
+        case wf @ $GeoNearF(_, _, _, _, _, _, _, _, _, _) => rewriteRefs3_2(prefix).apply(wf).pipeline
+        case wf @ $OutF(_, _)             => rewriteRefs3_2(prefix).apply(wf).shapePreserving
+        case wf @ $LookupF(_, _, _, _, _) => rewriteRefs3_2(prefix).apply(wf).pipeline
+        case wf @ $SampleF(_, _)          => rewriteRefs3_2(prefix).apply(wf).shapePreserving
+        case _ => scala.sys.error("unexpected WorkflowOp")
+      }
+
+    def rewrite3_4(w: WorkflowOp3_4F[Unit]): PipelineF[WorkflowOp3_4F, Unit] =
+      w match {
+        case wf @ $AddFieldsF(_, _) => rewriteRefs3_4(prefix).apply(wf).pipeline
+      }
+
+    def rewrite(w: F[Unit]): PipelineF[WorkflowF, Unit] = I.inj(w).run.fold(
+      wf => rewrite3_4(wf).fmap(ι, W34),
+      wf => rewriteCore(wf).fmap(ι, WC))
+
+    PipelineOp(rewrite(op.wf.void))
   }
 
   // helper for rewriteRefs
@@ -238,8 +252,8 @@ package object workflow {
   // explicitly implemented for each version's trait.
   // TODO: Make this a trait, and implement it for actual types, rather than all
   //       in here (already done for ExprOp and Reshape). (#438)
-  private [workflow] def rewriteRefs2_6(f: PartialFunction[DocVar, DocVar])
-      (implicit exprOps: ExprOpOps.Uni[ExprOp]) = new RewriteRefs[WorkflowOpCoreF](f) {
+  private [workflow] def rewriteRefs3_2(f: PartialFunction[DocVar, DocVar])
+        (implicit exprOps: ExprOpOps.Uni[ExprOp]) = new RewriteRefs[WorkflowOpCoreF](f) {
     def apply[A <: WorkflowOpCoreF[_]](op: A) = {
       (op match {
         case $ProjectF(src, shape, xId) =>
@@ -250,20 +264,12 @@ package object workflow {
             by.bimap(_.rewriteRefs(applyVar0), _.cata(exprOps.rewriteRefs(applyVar0))))
         case $MatchF(src, s)            => $MatchF(src, applySelector(s))
         case $RedactF(src, e)           => $RedactF(src, e.cata(exprOps.rewriteRefs(applyVar0)))
-        case $UnwindF(src, f)           => $UnwindF(src, applyVar(f))
+        case $UnwindF(src, f, i, p)     => $UnwindF(src, applyVar(f), i, p)
         case $SortF(src, l)             => $SortF(src, applyNel(l))
         case g: $GeoNearF[_]            =>
           g.copy(
             distanceField = applyFieldName(g.distanceField),
             query = g.query.map(applySelector))
-        case _                          => op
-      }).asInstanceOf[A]
-    }
-  }
-
-  private [workflow] def rewriteRefs3_2(f: PartialFunction[DocVar, DocVar]) = new RewriteRefs[WorkflowOp3_2F](f) {
-    def apply[A <: WorkflowOp3_2F[_]](op: A) = {
-      (op match {
         case $LookupF(src, from, lf, ff, as) =>
           // NB: rewrite only the source reference; the foreignField is not part
           // of the workflow at this point
@@ -273,14 +279,26 @@ package object workflow {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def simpleShape[F[_]](op: Fix[F])(implicit I: F :<: Workflow3_2F): Option[List[BsonField.Name]] = {
+  private [workflow] def rewriteRefs3_4(f: PartialFunction[DocVar, DocVar])
+        (implicit exprOps: ExprOpOps.Uni[ExprOp]) = new RewriteRefs[WorkflowOp3_4F](f) {
+    def apply[A <: WorkflowOp3_4F[_]](op: A) = {
+      (op match {
+        case $AddFieldsF(src, shape) =>
+          $AddFieldsF(src, shape.rewriteRefs(applyVar0))
+      }).asInstanceOf[A]
+    }
+  }
+
+
+  def simpleShape[F[_]](op: Fix[F])(implicit I: F :<: WorkflowF): Option[List[BsonField.Name]] =
     I.inj(op.unFix).run.fold[Option[List[BsonField.Name]]](
-      {
-        case $LookupF(_, _, _, _, _) => ???
-        case $SampleF(_, _)          => ???
-      },
-      {
+      simpleShape34, simpleShape32)
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def simpleShape32[F[_]](wf: WorkflowOpCoreF[Fix[F]])
+    (implicit I: F :<: WorkflowF)
+      : Option[List[BsonField.Name]] = {
+    wf match {
         case $PureF(Bson.Doc(value))          =>
           value.keys.toList.map(BsonField.Name(_)).some
         case $ProjectF(_, Reshape(value), id) =>
@@ -296,10 +314,22 @@ package object workflow {
             }
           loop(sm.simpleExpr.expr).map(_.map(n => BsonField.Name(n.value)))
         case $GroupF(_, Grouped(value), _)    => (IdName :: value.keys.toList).some
-        case $UnwindF(src, _)                 => simpleShape(src)
+        case $UnwindF(src, _, name, _)        => simpleShape(src).map(l => l ::: name.toList)
         case IsShapePreserving(sp)            => simpleShape(sp.src)
+        case $LookupF(_, _, _, _, _)          => ???
+        case $SampleF(_, _)                   => ???
         case _                                => None
-      })
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def simpleShape34[F[_]](wf: WorkflowOp3_4F[Fix[F]])
+    (implicit I: F :<: WorkflowF)
+      : Option[List[BsonField.Name]] = {
+    wf match {
+        case $AddFieldsF(src, Reshape(value)) =>
+          simpleShape(src).map(l => l ::: value.keys.toList)
+    }
   }
 
   /** Newtype for source ops (that is, ops that are themselves sources). */
@@ -444,7 +474,7 @@ package object workflow {
                   }),
                   $ReduceF.reduceNOP,
                   // TODO: Get rid of this asInstanceOf!
-                  selection = Some(rewriteRefs2_6(prefixBase(base)).apply(Functor[WorkflowOpCoreF].void(op).asInstanceOf[$MatchF[T[WorkflowOpCoreF]]]).selector)),
+                  selection = Some(rewriteRefs3_2(prefixBase(base)).apply(Functor[WorkflowOpCoreF].void(op).asInstanceOf[$MatchF[T[WorkflowOpCoreF]]]).selector)),
                 None))
           }
           pipeline($MatchF[T[WorkflowF]](src, selector).shapePreserving.fmap(ι, I)) match {
@@ -593,7 +623,7 @@ package object workflow {
 
   private def wrapArrayLit[EX[_]: Functor]
     (accum: AccumOp[Fix[EX]])
-    (implicit ev: ExprOpCoreF :<: EX, ev32: ExprOp3_2F :<: EX)
+    (implicit ev: ExprOpCoreF :<: EX)
       : AccumOp[Fix[EX]] = {
 
     def wrap(expr: Fix[EX]): Fix[EX] = (wrapArrayInLet[Fix, EX](expr.unFix)).embed
@@ -603,7 +633,7 @@ package object workflow {
 
   private def wrapArrayLitExprInLet[EX[_]: Functor]
     (grouped: Grouped[EX])
-    (implicit ev: ExprOpCoreF :<: EX, ev32: ExprOp3_2F :<: EX, ev2: ExprOpOps.Uni[ExprOp])
+    (implicit ev: ExprOpCoreF :<: EX, ev2: ExprOpOps.Uni[ExprOp])
       : Grouped[EX] =
     Grouped(ListMap(grouped.value.mapValues(wrapArrayLit[EX]).toSeq: _*))
 
@@ -646,7 +676,7 @@ package object workflow {
 
       val crystallizeƒ: F[Fix[F]] => F[Fix[F]] = {
         case I(mr: MapReduceF[Fix[F]]) => mr.singleSource.src.project match {
-          case I(uw @ $UnwindF(_, _)) if IsPipeline.unapply(unwindSrc(uw)).isEmpty =>
+          case I(uw @ $UnwindF(_, _, _, _)) if IsPipeline.unapply(unwindSrc(uw)).isEmpty =>
             mr.singleSource.fmap(ι, I).reparentW(I.inj(uw.flatmapop).embed).project
           case _                        => I.inj(mr)
         }
@@ -672,7 +702,7 @@ package object workflow {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def unwindSrc(uw: $UnwindF[Fix[F]]): F[Fix[F]] =
         uw.src.project match {
-          case I(uw1 @ $UnwindF(_, _)) => unwindSrc(uw1)
+          case I(uw1 @ $UnwindF(_, _, _, _)) => unwindSrc(uw1)
           case src => src
         }
 

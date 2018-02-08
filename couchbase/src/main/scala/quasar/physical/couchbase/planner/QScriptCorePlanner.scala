@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -79,7 +79,8 @@ final class QScriptCorePlanner[
         groupBy = none,
         orderBy = nil).embed
 
-    case LeftShift(src, struct, id, _, repair) =>
+    // FIXME: Handle `onUndef`
+    case LeftShift(src, struct, id, _, onUndef, repair) =>
       for {
         id1 <- genId[T[N1QL], F]
         id2 <- genId[T[N1QL], F]

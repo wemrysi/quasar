@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,12 +25,11 @@ import matryoshka.{BirecursiveT, ShowT}
 import scalaz.{Monad, Scalaz, StateT}, Scalaz._
 
 final class RewriteGroupByArrays[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[T] {
-  import QSUGraph.withName
   import QSUGraph.Extractors._
 
   // recognize the pattern generated in LP of squishing groupbys together
   def apply[F[_]: Monad: NameGenerator](qgraph: QSUGraph): F[QSUGraph] = {
-    type G[A] = StateT[F, QSUGraph.RevIdx[T], A]
+    type G[A] = StateT[F, RevIdx, A]
 
     val back = qgraph rewriteM {
       case qgraph @ GroupBy(target, NAryArray(keys @ _*)) =>
@@ -39,7 +38,7 @@ final class RewriteGroupByArrays[T[_[_]]: BirecursiveT: ShowT] private () extend
           // this happens because inner and target don't necessarily exist in key's vertices
           for {
             key2 <- key.replaceWithRename[G](target.root, inner.root)
-            replaced <- withName[T, G](QSU.GroupBy[T, Symbol](inner.root, key2.root))
+            replaced <- QSUGraph.withName[T, G]("rga")(QSU.GroupBy[T, Symbol](inner.root, key2.root))
           } yield replaced :++ inner :++ key2
         }
 

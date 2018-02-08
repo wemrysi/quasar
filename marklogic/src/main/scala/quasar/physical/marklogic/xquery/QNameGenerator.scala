@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ sealed abstract class QNameGeneratorInstances extends QNameGeneratorInstances0 {
 sealed abstract class QNameGeneratorInstances0 {
   implicit def eitherTQNameGenerator[F[_]: QNameGenerator : Functor, A]: QNameGenerator[EitherT[F, A, ?]] =
     new QNameGenerator[EitherT[F, A, ?]] {
-      def freshQName = EitherT.right(QNameGenerator[F].freshQName)
+      def freshQName = EitherT.rightT(QNameGenerator[F].freshQName)
     }
 
   implicit def readerTQNameGenerator[F[_]: QNameGenerator, A]: QNameGenerator[ReaderT[F, A, ?]] =

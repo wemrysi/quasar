@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -152,11 +152,8 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
     wf.foldMap(op => if (p.lift(op.unFix).getOrElse(false)) 1 else 0)
   }
 
-  val WC = Inject[WorkflowOpCoreF, WorkflowF]
-  val WC32 = Inject[WorkflowOp3_2F, WorkflowF]
-
   def countAccumOps(wf: Workflow) = countOps(wf, { case WC($GroupF(_, _, _)) => true })
-  def countUnwindOps(wf: Workflow) = countOps(wf, { case WC($UnwindF(_, _)) => true })
+  def countUnwindOps(wf: Workflow) = countOps(wf, { case WC($UnwindF(_, _, _, _)) => true })
   def countMatchOps(wf: Workflow) = countOps(wf, { case WC($MatchF(_, _)) => true })
 
   sealed trait OpType
@@ -179,6 +176,7 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
   case object LookupOp extends MongoOp(Agg)
   case object SampleOp extends MongoOp(Agg)
   case object FoldLeftOp extends MongoOp(Agg)
+  case object AddFieldsOp extends MongoOp(Agg)
 
   case object MapOp extends MongoOp(MapReduce)
   case object FlatMapOp extends MongoOp(MapReduce)
@@ -203,6 +201,7 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
   val lookupOp: MongoOp = LookupOp
   val sampleOp: MongoOp = SampleOp
   val foldLeftOp: MongoOp = FoldLeftOp
+  val addFieldsOp: MongoOp = AddFieldsOp
   val mapOp: MongoOp = MapOp
   val flatMapOp: MongoOp = FlatMapOp
   val simpleMapOp: MongoOp = SimpleMapOp
@@ -216,18 +215,19 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
     case WC($RedactF(s, _)) => RedactOp :: s
     case WC($LimitF(s, _)) => LimitOp :: s
     case WC($SkipF(s, _)) => SkipOp :: s
-    case WC($UnwindF(s, _)) => UnwindOp :: s
+    case WC($UnwindF(s, _, _, _)) => UnwindOp :: s
     case WC($GroupF(s, _, _)) => GroupOp :: s
     case WC($SortF(s, _)) => SortOp :: s
     case WC($GeoNearF(s, _, _, _, _, _, _, _, _, _)) => GeoNearOp :: s
     case WC($OutF(s, _)) => OutOp :: s
     case WC($FoldLeftF(s1, s2)) => (FoldLeftOp :: s1) ++ s2.list.flatten
-    case WC32($LookupF(s, _, _, _, _)) => LookupOp :: s
-    case WC32($SampleF(s, _)) => SampleOp :: s
+    case WC($LookupF(s, _, _, _, _)) => LookupOp :: s
+    case WC($SampleF(s, _)) => SampleOp :: s
     case WC($MapF(s, _, _)) => MapOp :: s
     case WC($FlatMapF(s, _, _)) => FlatMapOp :: s
     case WC($SimpleMapF(s, _, _)) => SimpleMapOp :: s
     case WC($ReduceF(s, _, _)) => ReduceOp :: s
+    case W34($AddFieldsF(s, _)) => AddFieldsOp :: s
   }
 
   def opTreeAlg: Algebra[WorkflowF, Tree[MongoOp]] = {
@@ -238,18 +238,19 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
     case WC($RedactF(s, _)) => redactOp.node(s)
     case WC($LimitF(s, _)) => limitOp.node(s)
     case WC($SkipF(s, _)) => skipOp.node(s)
-    case WC($UnwindF(s, _)) => unwindOp.node(s)
+    case WC($UnwindF(s, _, _, _)) => unwindOp.node(s)
     case WC($GroupF(s, _, _)) => groupOp.node(s)
     case WC($SortF(s, _)) => sortOp.node(s)
     case WC($GeoNearF(s, _, _, _, _, _, _, _, _, _)) => geoNearOp.node(s)
     case WC($OutF(s, _)) => outOp.node(s)
     case WC($FoldLeftF(s1, s2)) => foldLeftOp.node((s1 :: s2.list).toList : _*)
-    case WC32($LookupF(s, _, _, _, _)) => lookupOp.node(s)
-    case WC32($SampleF(s, _)) => sampleOp.node(s)
+    case WC($LookupF(s, _, _, _, _)) => lookupOp.node(s)
+    case WC($SampleF(s, _)) => sampleOp.node(s)
     case WC($MapF(s, _, _)) => mapOp.node(s)
     case WC($FlatMapF(s, _, _)) => flatMapOp.node(s)
     case WC($SimpleMapF(s, _, _)) => simpleMapOp.node(s)
     case WC($ReduceF(s, _, _)) => reduceOp.node(s)
+    case W34($AddFieldsF(s, _)) => addFieldsOp.node(s)
   }
 
   def ops(wf: Workflow): IList[MongoOp] = wf.cata(opAlg).reverse

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -111,14 +111,14 @@ object Mounting {
 
     def lookupViewConfig(path: AFile): EitherT[OptionT[FreeS, ?], MountingError, ViewConfig] =
       lookupConfig(path).flatMap(config =>
-        EitherT.right(OptionT(viewConfig.getOption(config).map(ViewConfig.tupled).point[FreeS])))
+        EitherT.rightT(OptionT(viewConfig.getOption(config).map(ViewConfig.tupled).point[FreeS])))
 
     def lookupViewConfigIgnoreError(path: AFile): OptionT[FreeS, ViewConfig] =
       lookupViewConfig(path).toOption.squash
 
     def lookupModuleConfig(path: ADir): EitherT[OptionT[FreeS, ?], MountingError, ModuleConfig] =
       lookupConfig(path).flatMap(config =>
-        EitherT.right(OptionT(moduleConfig.getOption(config).map(ModuleConfig(_)).point[FreeS])))
+        EitherT.rightT(OptionT(moduleConfig.getOption(config).map(ModuleConfig(_)).point[FreeS])))
 
     def lookupModuleConfigIgnoreError(path: ADir): OptionT[FreeS, ModuleConfig] =
       lookupModuleConfig(path).run

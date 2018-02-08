@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,17 @@
 package quasar.physical.rdbms
 
 import slamdata.Predef._
+import quasar.{NameGenerator, qscript}
 import quasar.Planner.{InternalError, PlannerErrorME}
+import quasar.physical.rdbms.planner.sql.SqlExpr
+import matryoshka._
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns._
+import quasar.qscript.MapFunc
+
+import scalaz._
+import Scalaz._
 
 package object planner {
 
@@ -26,5 +36,17 @@ package object planner {
 
   def notImplemented[F[_]: PlannerErrorME, A](name: String, src: AnyRef): F[A] =
     PlannerErrorME[F].raiseError(InternalError.fromMsg(s"unimplemented $name in planner $src"))
+
+  def processJoinFunc[T[_[_]]: BirecursiveT: ShowT,
+    F[_]: Monad: NameGenerator: PlannerErrorME]
+    (mapFuncPlanner: Planner[T, F, MapFunc[T, ?]])(
+                       f: qscript.JoinFunc[T],
+                       leftAlias: SqlExpr[T[SqlExpr]],
+                       rightAlias: SqlExpr[T[SqlExpr]]
+                     ): F[T[SqlExpr]] =
+    f.cataM(interpretM({
+      case qscript.LeftSide  => leftAlias.embed.η[F]
+      case qscript.RightSide => rightAlias.embed.η[F]
+    }, mapFuncPlanner.plan))
 
 }

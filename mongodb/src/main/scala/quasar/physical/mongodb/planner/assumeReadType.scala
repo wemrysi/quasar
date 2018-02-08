@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -99,11 +99,14 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
     : Trans[F, M] =
   new Trans[F, M] {
 
+    def elideA[A: Eq](fm: FreeMapA[T, A], hole: A): M[FreeMapA[T, A]] =
+      fm.transCataM(elideMoreGeneralGuards[T, M, A](hole, typ))
+
     def elide(fm: FreeMap[T]): M[FreeMap[T]] =
-      fm.transCataM(elideMoreGeneralGuards[T, M, Hole](SrcHole, typ))
+      elideA(fm, SrcHole)
 
     def elideJoinFunc(isRewrite: Boolean, joinSide: JoinSide, fm: JoinFunc[T]): M[JoinFunc[T]] =
-      if (isRewrite) fm.transCataM(elideMoreGeneralGuards[T, M, JoinSide](joinSide, typ))
+      if (isRewrite) elideA(fm, joinSide)
       else fm.point[M]
 
     def elideLeftJoinKey(isRewrite: Boolean, key: List[(FreeMap[T], FreeMap[T])])
@@ -138,10 +141,10 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
                 case h :: t => GtoF.reverseGet(
                   QC(Filter(src, t.foldLeft[FreeMap[T]](h)((acc, e) => Free.roll(MFC(MapFuncsCore.And(acc, e)))))))
               })
-        case QC(LeftShift(src, struct, id, stpe, repair))
+        case QC(LeftShift(src, struct, id, stpe, onUndef, repair))
           if (isRewrite[T, F, G, A](GtoF, src.project)) =>
             (elide(struct) ⊛
-              elideJoinFunc(true, LeftSide, repair))((s, r) => GtoF.reverseGet(QC(LeftShift(src, s, id, stpe, r))))
+              elideJoinFunc(true, LeftSide, repair))((s, r) => GtoF.reverseGet(QC(LeftShift(src, s, id, stpe, onUndef, r))))
         case QC(qscript.Map(src, mf))
           if (isRewrite[T, F, G, A](GtoF, src.project)) =>
             elide(mf) ∘
@@ -156,6 +159,14 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
             (b.traverse(elide) ⊛
               order.traverse(t => elide(t._1).map(x => (x, t._2))))(
               (b0, order0) => GtoF.reverseGet(QC(Sort(src, b0, order0))))
+        case QC(Subset(src, from, op, count))
+          if (isRewrite[T, F, G, A](GtoF, src.project)) =>
+            (elideQS(isRewrite = true, from) ⊛ elideQS(isRewrite = true, count))(
+              (from0, count0) => GtoF.reverseGet(QC(Subset(src, from0, op, count0))))
+        case QC(Union(src, lBranch, rBranch))
+          if (isRewrite[T, F, G, A](GtoF, src.project)) =>
+            (elideQS(isRewrite = true, lBranch) ⊛ elideQS(isRewrite = true, rBranch))(
+              (l0, r0) => GtoF.reverseGet(QC(Union(src, l0, r0))))
         case EJ(EquiJoin(src, lBranch, rBranch, key, f, combine)) =>
           val spSrc = ShapePreserving.shapePreservingP(src, GtoF)
           val isRewriteL = isRewriteFree(lBranch, spSrc)

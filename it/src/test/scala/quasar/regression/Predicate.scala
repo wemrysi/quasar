@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import org.specs2.execute._
 import org.specs2.matcher._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.stream._
+import quasar.ScalazSpecs2Instances
 
 sealed abstract class Predicate {
   def apply[F[_]: Catchable: Monad](
@@ -40,7 +41,7 @@ sealed abstract class Predicate {
   ): F[Result]
 }
 
-object Predicate {
+object Predicate extends ScalazSpecs2Instances {
   import MustMatchers._
   import StandardResults._
   import DecodeResult.{ok => jok, fail => jfail}

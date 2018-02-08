@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,13 @@
 package quasar.yggdrasil
 
 import org.specs2.execute.Result
+import quasar.ScalazSpecs2Instances
 import quasar.precog.common._
 import quasar.precog.TestSupport._
 import quasar.yggdrasil.bytecode.JNumberT
 import quasar.yggdrasil.table.{CF1, CF2, CFN}
 
-trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with SpecificationLike {
+trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with SpecificationLike with ScalazSpecs2Instances {
   import trans._
   import CPath._
 

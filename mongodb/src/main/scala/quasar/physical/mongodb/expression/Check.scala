@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,17 +50,11 @@ final class Check[T, EX[_]]
   def isBinary(expr: T)     = between    (Bson.Binary(minBinary), expr, Bson.ObjectId(minOid))
   def isId(expr: T)         = between    (Bson.ObjectId(minOid),  expr, Bson.Bool(false))
   def isBoolean(expr: T)    = betweenIncl(Bson.Bool(false),       expr, Bson.Bool(true))
-  /** As of MongoDB 3.0, dates sort before timestamps. The type constraint here
-    * ensures that this check is used only when it's safe, although we don't
-    * actually use any new op here.
-    */
-  def isDate(expr: T)(implicit ev: ExprOp3_0F :<: EX) =
+  /** As of MongoDB 3.0, dates sort before timestamps */
+  def isDate(expr: T) =
     between(minDate, expr, minTimestamp)
-  /** As of MongoDB 3.0, dates sort before timestamps. The type constraint here
-    * ensures that this check is used only when it's safe, although we don't
-    * actually use any new op here.
-    */
-  def isTimestamp(expr: T)(implicit ev: ExprOp3_0F :<: EX) =
+  /** As of MongoDB 3.0, dates sort before timestamps */
+  def isTimestamp(expr: T) =
     between(minTimestamp, expr, minRegex)
 
   def isDateOrTimestamp(expr: T) = between(minDate, expr, minRegex)

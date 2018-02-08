@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -69,16 +69,20 @@ object Planner {
     val derived = new MapFuncDerivedPlanner(core)
     coproduct(core, derived)
   }
-  
+
+  def reduceFuncPlanner[T[_[_]] : BirecursiveT, F[_] : Applicative]
+  : Planner[T, F, ReduceFunc] =
+    new ReduceFuncPlanner[T, F]
+
   implicit def qScriptCorePlanner[
-  T[_[_]]: BirecursiveT: ShowT,
+  T[_[_]]: BirecursiveT: ShowT: EqualT,
   F[_]: Monad: NameGenerator: PlannerErrorME]
 : Planner[T, F, QScriptCore[T, ?]] = new QScriptCorePlanner[T, F](mapFuncPlanner)
 
   implicit def equiJoinPlanner[
-  T[_[_]]: BirecursiveT: ShowT,
+  T[_[_]]: BirecursiveT: ShowT: EqualT,
   F[_]: Monad: NameGenerator: PlannerErrorME]
-  : Planner[T, F, EquiJoin[T, ?]] = unreachable("equijoin")
+  : Planner[T, F, EquiJoin[T, ?]] = new EquiJoinPlanner[T, F](mapFuncPlanner)
 
   implicit def coproduct[T[_[_]], N[_], F[_], G[_]](
                                                      implicit F: Planner[T, N, F], G: Planner[T, N, G]

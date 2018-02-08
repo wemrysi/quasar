@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,9 +90,9 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
             prov.autojoinKeys(ldims, cdims)
 
           def lcCombiner: JoinFunc =
-            func.ConcatMaps(
-              func.MakeMap(StrLit(lName), LeftSideF),
-              func.MakeMap(StrLit(cName), RightSideF))
+            func.StaticMapS(
+              lName -> LeftSideF,
+              cName -> RightSideF)
 
           def lcJoin: QSU[Symbol] =
             qsu.qsAutoJoin(l, c, lcKeys, lcCombiner)

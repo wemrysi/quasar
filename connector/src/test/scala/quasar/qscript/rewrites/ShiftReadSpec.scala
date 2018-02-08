@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
       val qScript: Fix[QS] =
         chainQS(
           qsdsl.fix.Read[AFile](sampleFile),
-          qsdsl.fix.LeftShift(_, qsdsl.func.Hole, ExcludeId, ShiftType.Array, qsdsl.func.RightSide))
+          qsdsl.fix.LeftShift(_, qsdsl.func.Hole, ExcludeId, ShiftType.Array, OnUndefined.Omit, qsdsl.func.RightSide))
 
       val newQScript: Fix[QST] =
         qScript.codyna(
@@ -60,6 +60,7 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
           qsdsl.func.Hole,
           ExcludeId,
           ShiftType.Array,
+          OnUndefined.Omit,
           qsdsl.func.RightSide),
         Nil,
         List(ReduceFuncs.Count(qsdsl.func.Hole)),

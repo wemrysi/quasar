@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,14 +77,14 @@ sealed abstract class ExtractPathInstances extends ExtractPathInstances0 {
   ): ExtractPath[QScriptCore[T, ?], P] =
     new ExtractPath[QScriptCore[T, ?], P] {
       def extractPath[G[_]: ApplicativePlus] = {
-        case Filter(paths, _)             => paths
-        case LeftShift(paths, _, _, _, _) => paths
-        case Map(paths, _)                => paths
-        case Reduce(paths, _, _, _)       => paths
-        case Sort(paths, _, _)            => paths
-        case Subset(paths, fm, _, ct)     => extractBranch[T, G, P](fm) <+> extractBranch[T, G, P](ct) <+> paths
-        case Union(paths, l, r)           => extractBranch[T, G, P](l)  <+> extractBranch[T, G, P](r)  <+> paths
-        case Unreferenced()               => mempty[G, P]
+        case Filter(paths, _)                => paths
+        case LeftShift(paths, _, _, _, _, _) => paths
+        case Map(paths, _)                   => paths
+        case Reduce(paths, _, _, _)          => paths
+        case Sort(paths, _, _)               => paths
+        case Subset(paths, fm, _, ct)        => extractBranch[T, G, P](fm) <+> extractBranch[T, G, P](ct) <+> paths
+        case Union(paths, l, r)              => extractBranch[T, G, P](l)  <+> extractBranch[T, G, P](r)  <+> paths
+        case Unreferenced()                  => mempty[G, P]
       }
     }
 

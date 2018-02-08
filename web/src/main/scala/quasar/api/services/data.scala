@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -247,7 +247,7 @@ object data {
           // Seperate metadata file from all others
           tuple <- filesToContent.get(ArchiveMetadata.HiddenFile).cata(
             meta => decodeUtf8(meta).strengthR(filesToContent - ArchiveMetadata.HiddenFile),
-            EitherT.left[FreeS, QResponse[S], (String, Map[RelFile[Sandboxed], ByteVector])](InvalidMessageBodyFailure("metadata not found: " + posixCodec.printPath(ArchiveMetadata.HiddenFile)).toResponse[S].point[FreeS]))
+            EitherT.leftT[FreeS, QResponse[S], (String, Map[RelFile[Sandboxed], ByteVector])](InvalidMessageBodyFailure("metadata not found: " + posixCodec.printPath(ArchiveMetadata.HiddenFile)).toResponse[S].point[FreeS]))
           (metaString, restOfFilesToContent) = tuple
            meta <- EitherT((Parse.decodeOption[ArchiveMetadata](metaString) \/> (InvalidMessageBodyFailure("metadata file has incorrect format").toResponse[S])).point[FreeS])
           // Write each file if we can determine a format

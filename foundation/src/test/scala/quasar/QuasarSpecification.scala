@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ trait QuasarSpecification extends AnyRef
         with org.specs2.execute.PendingUntilFixed
         with org.specs2.ScalaCheck
         with org.specs2.scalaz.ScalazMatchers
+        with ScalazSpecs2Instances
 {
   outer =>
 

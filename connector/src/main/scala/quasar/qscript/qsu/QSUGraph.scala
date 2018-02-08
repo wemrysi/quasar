@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,13 +22,14 @@ import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.MonadState_
 import quasar.fp._
 import quasar.fp.ski.κ
+import quasar.qscript.{FreeMapA, IdStatus, OnUndefined}
 
 import monocle.macros.Lenses
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns.EnvT
-import scalaz.{\/-, -\/, Cofree, DList, Id, Monad, Monoid, MonadState, Scalaz, Show, State, StateT}, Scalaz._
+import scalaz.{\/-, -\/, \/, Cofree, DList, Id, Monad, Monoid, MonadState, Scalaz, Show, State, StateT}, Scalaz._
 
 @Lenses
 final case class QSUGraph[T[_[_]]](
@@ -101,6 +102,8 @@ final case class QSUGraph[T[_[_]]](
 
     import QScriptUniform._
 
+    val withName = QSUGraph.withName[T, F]("qsu")_
+
     if (src =/= target) {
 
       if (root === src) {
@@ -108,13 +111,13 @@ final case class QSUGraph[T[_[_]]](
       } else {
         unfold match {
           case JoinSideRef(`src`) =>
-            QSUGraph.withName[T, F](JoinSideRef[T, Symbol](target)).map(_ :++ this)
+            withName(JoinSideRef[T, Symbol](target)).map(_ :++ this)
 
           case _ =>
             for {
               pattern <- unfold.traverse(_.replaceWithRename[F](src, target))
               bare = pattern.map(_.root)
-              renamed <- QSUGraph.withName[T, F](bare)
+              renamed <- withName(bare)
               verts2 = pattern.foldLeft(SMap[Symbol, QScriptUniform[T, Symbol]]())(_ ++ _.vertices)
             } yield renamed.copy(vertices = verts2 ++ renamed.vertices)
         }
@@ -272,6 +275,7 @@ object QSUGraph extends QSUGraphInstances {
   }
 
   def withName[T[_[_]], F[_]: Monad: NameGenerator](
+      prefix: String)(
       node: QScriptUniform[T, Symbol])(
       implicit MS: MonadState_[F, RevIdx[T]]): F[QSUGraph[T]] = {
 
@@ -284,8 +288,7 @@ object QSUGraph extends QSUGraphInstances {
 
         case None =>
           for {
-            name <- NameGenerator[F].prefixedName("qsu")
-            sym = Symbol(name)
+            sym <- freshSymbol[F](prefix)
             _ <- MS.put(reverse + (node -> sym))
           } yield QSUGraph[T](root = sym, SMap(sym -> node))
       }
@@ -431,14 +434,14 @@ object QSUGraph extends QSUGraphInstances {
     }
 
     object LeftShift {
-      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
+      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], FreeMap[T], IdStatus, OnUndefined, FreeMapA[T, QSU.ShiftTarget[T]], QSU.Rotation)] = g.unfold match {
         case g: QSU.LeftShift[T, QSUGraph[T]] => QSU.LeftShift.unapply(g)
         case _ => None
       }
     }
 
     object MultiLeftShift {
-      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
+      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], List[(FreeMap[T], IdStatus, QSU.Rotation)], OnUndefined, FreeMapA[T, QAccess[T, Hole] \/ Int])] = g.unfold match {
         case g: QSU.MultiLeftShift[T, QSUGraph[T]] => QSU.MultiLeftShift.unapply(g)
         case _ => None
       }

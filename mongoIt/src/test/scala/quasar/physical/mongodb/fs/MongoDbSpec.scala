@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-object MongoDbSpec {
+object MongoDbSpec extends ScalazSpecs2Instances {
   def connect(uri: ConnectionUri): Task[MongoClient] =
     asyncClientDef[Task](uri).run.foldMap(NaturalTransformation.refl).flatMap(_.fold(
       err => Task.fail(new RuntimeException(err.toString)),

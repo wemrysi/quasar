@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -540,6 +540,6 @@ package object main extends Logging {
               e => ConfigError.fileNotFound.getOption(e).cata(κ(none.right), e.shows.left),
               _.some.right))
       jʹ <- MetaStore.initializeOrUpdate(schema, tx, j).leftMap(_.message)
-      _  <- EitherT.right(jʹ.traverse_(ConfigOps.jsonToFile(_, cfgFile)))
+      _  <- EitherT.rightT(jʹ.traverse_(ConfigOps.jsonToFile(_, cfgFile)))
     } yield ()
 }

@@ -44,18 +44,20 @@ Chain
 │        │                 });
 │        │               return result
 │        │             })
-│        ╰─ Scope(Map())
+│        ╰─ Scope(ListMap())
 ├─ $MatchF
 │  ╰─ Doc
 │     ├─ NotExpr($left -> Size(0))
 │     ╰─ NotExpr($right -> Size(0))
-├─ $UnwindF(DocField(BsonField.Name("right")))
-├─ $UnwindF(DocField(BsonField.Name("left")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("right")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("left")))
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ SpliceObjects
 │  │     ├─ JsCore(_.left)
 │  │     ╰─ JsCore(_.right)
-│  ╰─ Scope(Map())
+│  ╰─ Scope(ListMap())
 ╰─ $SortF
    ╰─ SortKey(cnt -> Descending)

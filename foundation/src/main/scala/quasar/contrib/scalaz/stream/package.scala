@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ package object stream {
 
   implicit class AugmentedProcess[M[_], A](p: Process[M, A]) {
     def runLogCatch(implicit monad: Monad[M]): M[Throwable \/ Vector[A]] = {
-      val right = λ[M ~> EitherT[M, Throwable, ?]](EitherT.right(_))
+      val right = λ[M ~> EitherT[M, Throwable, ?]](EitherT.rightT(_))
       p.translate(right).runLog.run
     }
   }

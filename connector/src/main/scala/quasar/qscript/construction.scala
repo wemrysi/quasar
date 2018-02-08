@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,17 +16,20 @@
 
 package quasar.qscript
 
-import qsu.{Access, QAccess, QScriptUniform => QSU}
 import slamdata.Predef._
+import quasar.common.{JoinType, SortDir}
+import quasar.{ejson, qscript}
+import quasar.ejson.EJson
+import quasar.qscript.qsu.{Access, QAccess}
+import quasar.qscript.qsu.QScriptUniform.ShiftTarget
+import quasar.std.TemporalPart
+
 import matryoshka._
 import matryoshka.data.Fix
-
 import scalaz._
 import scalaz.Leibniz.===
-import quasar.{ejson, qscript}
-import quasar.common.{JoinType, SortDir}
-import quasar.std.TemporalPart
-import quasar.ejson.EJson
+import scalaz.std.tuple._
+import scalaz.syntax.bifunctor._
 
 object construction {
   final case class Func[T[_[_]]]()(implicit birec: BirecursiveT[T]) {
@@ -135,8 +138,18 @@ object construction {
       DeleteKey(src, Constant(json.str(key)))
     def MakeMap[A](key: FreeMapA[T, A], src: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.MakeMap(key, src))
+    def MakeMapJ[A](key: T[EJson], src: FreeMapA[T, A]): FreeMapA[T, A] =
+      MakeMap(Constant(key), src)
     def MakeMapS[A](key: String, src: FreeMapA[T, A]): FreeMapA[T, A] =
-      MakeMap(Constant(json.str(key)), src)
+      MakeMapJ(json.str(key), src)
+    def StaticMap[A](pairs: (T[EJson], FreeMapA[T, A])*): FreeMapA[T, A] =
+      MapFuncCore.StaticMap(pairs.toList)
+    def StaticMapS[A](pairs: (String, FreeMapA[T, A])*): FreeMapA[T, A] =
+      StaticMap(pairs.map(_.leftMap(json.str(_))): _*)
+    def StaticMapF[A, K](keys: K*)(f: K => FreeMapA[T, A], fk: K => T[EJson]): FreeMapA[T, A] =
+      StaticMap(keys.map { k => (fk(k), f(k)) }: _*)
+    def StaticMapFS[A, K](keys: K*)(f: K => FreeMapA[T, A], fk: K => String): FreeMapA[T, A] =
+      StaticMapF(keys: _*)(f, s => json.str(fk(s)))
     def ProjectIndex[A](src: FreeMapA[T, A], index: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.ProjectIndex(src, index))
     def ProjectIndexI[A](src: FreeMapA[T, A], index: Int): FreeMapA[T, A] =
@@ -196,12 +209,12 @@ object construction {
     def Hole: FreeMap[T] = Free.pure(SrcHole)
     def AccessHole: FreeMapA[T, QAccess[T, Hole]] =
       Free.pure(Access.valueHole(SrcHole))
-    def LeftTarget: FreeMapA[T, QSU.ShiftTarget[T]] =
-      Free.pure(QSU.LeftTarget[T]())
-    def RightTarget: FreeMapA[T, QSU.ShiftTarget[T]] =
-      Free.pure(QSU.RightTarget[T]())
-    def AccessLeftTarget(f: Hole => QAccess[T, Hole]): FreeMapA[T, QSU.ShiftTarget[T]] =
-      Free.pure(QSU.AccessLeftTarget(f(SrcHole)))
+    def LeftTarget: FreeMapA[T, ShiftTarget[T]] =
+      Free.pure(ShiftTarget.LeftTarget[T]())
+    def RightTarget: FreeMapA[T, ShiftTarget[T]] =
+      Free.pure(ShiftTarget.RightTarget[T]())
+    def AccessLeftTarget(f: Hole => QAccess[T, Hole]): FreeMapA[T, ShiftTarget[T]] =
+      Free.pure(ShiftTarget.AccessLeftTarget(f(SrcHole)))
     def LeftSide: JoinFunc[T] = Free.pure(qscript.LeftSide)
     def RightSide: JoinFunc[T] = Free.pure(qscript.RightSide)
     def ReduceIndex(i: Int \/ Int): FreeMapA[T, ReduceIndex] = Free.pure(qscript.ReduceIndex(i))
@@ -236,8 +249,9 @@ object construction {
                   struct: FreeMap[T],
                   idStatus: IdStatus,
                   shiftType: ShiftType,
+                  onUndefined: OnUndefined,
                   repair: JoinFunc[T]): R =
-      core(qscript.LeftShift(src, struct, idStatus, shiftType, repair))
+      core(qscript.LeftShift(src, struct, idStatus, shiftType, onUndefined, repair))
     def Reduce(src: R,
                bucket: List[FreeMap[T]],
                reducers: List[ReduceFunc[FreeMap[T]]],

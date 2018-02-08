@@ -15,19 +15,6 @@ Chain
       │  │  ╰─ Expr($ts -> Type(Date))
       │  ╰─ Doc
       │     ╰─ Expr($ts -> Type(Bool))
-      ├─ Or
-      │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Int32))
-      │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Int64))
-      │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Dec))
-      │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Text))
-      │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Date))
-      │  ╰─ Doc
-      │     ╰─ Expr($ts -> Type(Bool))
       ╰─ Or
          ├─ And
          │  ├─ Doc

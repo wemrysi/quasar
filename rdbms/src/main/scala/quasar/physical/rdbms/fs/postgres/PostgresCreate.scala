@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,14 +29,21 @@ import Scalaz._
 
 trait PostgresCreate extends RdbmsCreate {
 
-  override def createSchema(schema: Schema): ConnectionIO[Unit] = {
-    (schema :: schema.parents).traverse { s =>
+  private def createSchemas(schemas: List[Schema]): ConnectionIO[Unit] = {
+    schemas.traverse( s =>
       if (s.isRoot)
         ().point[ConnectionIO]
       else
         fr"LOCK TABLE pg_catalog.pg_namespace".update.run *>
-        (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(s.shows)).update.run.void
-    }.void
+          (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(s""""${s.shows}"""")).update.run.void).void
+  }
+
+  override def ensureSchemaParents(schema: Schema): ConnectionIO[Unit] = {
+    createSchemas(schema.parents)
+  }
+
+  override def createSchema(schema: Schema): ConnectionIO[Unit] = {
+    createSchemas(schema :: schema.parents)
   }
 
   override def createTable(tablePath: TablePath, model: TableModel): ConnectionIO[Unit] =
@@ -58,7 +65,7 @@ trait PostgresCreate extends RdbmsCreate {
       (fr"ALTER TABLE" ++ Fragment.const(tablePath.shows) ++
         cols.map {
           case AddColumn(name, tpe) => Fragment.const(s"ADD COLUMN $name ${tpe.mapToStringName}")
-          case ModifyColumn(name, tpe) => Fragment.const(s"MODIFY COLUMN $name ${tpe.mapToStringName}")
+          case ModifyColumn(name, tpe) => Fragment.const(s"MODIFY COLUMN $name type ${tpe.mapToStringName}")
         }.toList.intercalate(fr",")).update.run.void
     }
   }

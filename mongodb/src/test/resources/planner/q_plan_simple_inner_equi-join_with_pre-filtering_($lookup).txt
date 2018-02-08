@@ -35,7 +35,7 @@ Chain
 │     │        ╰─ Expr($pop -> Gte(Int32(10000)))
 │     ├─ $MapF
 │     │  ├─ JavaScript(function (key, value) { return [{ "0": value._id }, { "left": [], "right": [value] }] })
-│     │  ╰─ Scope(Map())
+│     │  ╰─ Scope(ListMap())
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
 │        │               var result = { "left": [], "right": [] };
@@ -46,13 +46,15 @@ Chain
 │        │                 });
 │        │               return result
 │        │             })
-│        ╰─ Scope(Map())
+│        ╰─ Scope(ListMap())
 ├─ $MatchF
 │  ╰─ Doc
 │     ├─ NotExpr($left -> Size(0))
 │     ╰─ NotExpr($right -> Size(0))
-├─ $UnwindF(DocField(BsonField.Name("right")))
-├─ $UnwindF(DocField(BsonField.Name("left")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("right")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("left")))
 ╰─ $ProjectF
    ├─ Name("city" -> "$left.city")
    ├─ Name("state" -> "$right.state")

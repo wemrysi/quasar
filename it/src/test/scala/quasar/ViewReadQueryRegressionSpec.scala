@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ class ViewReadQueryRegressionSpec
           val u: ReadFile ~> Free[BackendEffectIO, ?] =
             mapSNT(interp) compose view.readFile[ViewFS]
 
-          EitherT(EitherT.right(WriterT.put(fa.run.flatMapSuspension(u))(Vector.empty)))
+          EitherT(EitherT.rightT(WriterT.put(fa.run.flatMapSuspension(u))(Vector.empty)))
         }
       }
 

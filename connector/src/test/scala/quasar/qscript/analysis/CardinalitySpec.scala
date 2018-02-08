@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -178,7 +178,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
           val fun: FreeMap =
             func.Eq(func.ProjectKeyS(func.Hole, "key"), func.Constant(json.str("value")))
           val joinFunc: JoinFunc = func.LeftSide
-          val leftShift = LeftShift(cardinality, fun, IdOnly, ShiftType.Array, joinFunc)
+          val leftShift = LeftShift(cardinality, fun, IdOnly, ShiftType.Array, OnUndefined.Omit, joinFunc)
           compile(leftShift) must_== cardinality * 10
         }
       }

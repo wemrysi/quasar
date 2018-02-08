@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -151,8 +151,8 @@ package object qscript {
   type CoEnvMap[T[_[_]], A]     = CoEnvMapA[T, Hole, A]
 
   object ExtractFunc {
-    def unapply[T[_[_]], A](fma: FreeMapA[T, A]): Option[MapFuncCore[T, _]] = fma match {
-      case Embed(CoEnv(\/-(MFC(func: MapFuncCore[T, _])))) => Some(func)
+    def unapply[T[_[_]], A](fma: FreeMapA[T, A]): Option[MapFuncCore[T, FreeMapA[T, A]]] = fma match {
+      case Embed(CoEnv(\/-(MFC(func)))) => Some(func)
       case _ => None
     }
   }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ object Cost {
         case Sort((card, cost), bucket, orders) => (card + cost).point[M]
         case Filter((card, cost), f) => (card + cost).point[M]
         case Subset((card, cost), from, sel, count) => (card + cost).point[M]
-        case LeftShift((card, cost), struct, id, stpe, repair) => (card + cost).point[M]
+        case LeftShift((card, cost), _, _, _, _, _) => (card + cost).point[M]
         case Union((card, cost), lBranch, rBranch) => {
           val compileCardinality = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
           val compileCost = Cost[QScriptTotal[T, ?]].evaluate(pathCard)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,12 +25,13 @@ import scala.util.parsing.combinator._
 import scala.util.parsing.combinator.lexical._
 import scala.util.parsing.combinator.syntactical._
 import scala.util.parsing.input.CharArrayReader.EofCh
-
 import matryoshka._
 import matryoshka.implicits._
 import pathy.Path
 import pathy.Path._
-import scalaz._, Scalaz._
+
+import scalaz._
+import Scalaz._
 
 sealed abstract class DerefType[T[_[_]]] extends Product with Serializable
 final case class MapDeref[T[_[_]]](expr: T[Sql])         extends DerefType[T]
@@ -421,7 +422,7 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
     })
 
   def std_join_relation: Parser[SqlRelation[T[Sql]] => SqlRelation[T[Sql]]] =
-    opt(join_type) ~ keyword("join") ~ simple_relation ~ keyword("on") ~ expr ^^
+    opt(join_type) ~ keyword("join") ~ simple_relation ~ keyword("on") ~ defined_expr ^^
       { case tpe ~ _ ~ r2 ~ _ ~ e => r1 => JoinRelation(r1, r2, tpe.getOrElse(JoinType.Inner), e) }
 
   def cross_join_relation: Parser[SqlRelation[T[Sql]] => SqlRelation[T[Sql]]] =
@@ -463,11 +464,15 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
       case k ~ h => GroupBy(k, h)
     }
 
-  def order_by: Parser[OrderBy[T[Sql]]] =
-    keyword("order") ~> keyword("by") ~> rep1sep(defined_expr ~ opt(keyword("asc") | keyword("desc")) ^^ {
+  def order_by: Parser[OrderBy[T[Sql]]] = {
+    def asOrdering[I]: PartialFunction[I ~ Option[String], (OrderType, I)] = {
       case i ~ (Some("asc") | None) => (ASC, i)
       case i ~ Some("desc") => (DESC, i)
-    }, op(",")) ^? { case o :: os => OrderBy(NonEmptyList(o, os: _*)) }
+    }
+    keyword("order") ~> keyword("by") ~> rep1sep(
+      defined_expr ~ opt(keyword("asc") | keyword("desc")) ^^ asOrdering,
+      op(",")) ^? { case o :: os => OrderBy(NonEmptyList(o, os: _*)) }
+  }
 
   def expr: Parser[T[Sql]] = let_expr
 

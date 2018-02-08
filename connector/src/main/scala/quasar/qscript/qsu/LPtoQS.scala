@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,31 +32,34 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends QS
   def apply[F[_]: Monad: PlannerErrorME: NameGenerator](lp: T[LogicalPlan])
       : F[T[QScriptEducated]] = {
 
+    val agraph =
+      ApplyProvenance.AuthenticatedQSU.graph[T]
+
     val lpToQs =
-      K(ReadLP[T, F])                 >==>
-      debug("ReadLP: ")               >==>
-      RewriteGroupByArrays[T, F]      >==>
-      debug("RewriteGBArrays: ")      >-
-      EliminateUnary[T]               >==>
-      debug("EliminateUnary: ")       >-
-      RecognizeDistinct[T]            >==>
-      debug("RecognizeDistinct: ")    >==>
-      ExtractFreeMap[T, F]            >==>
-      debug("ExtractFreeMap: ")       >==>
-      ApplyProvenance[T, F]           >==>
-      debug("ApplyProv: ")            >==>
-      ReifyBuckets[T, F]              >==>
-      debug("ReifyBuckets: ")         >==>
-      MinimizeAutoJoins[T, F]         >==>
-      debug("MinimizeAJ: ")           >==>
-      ReifyAutoJoins[T, F]            >==>
-      debug("ReifyAutoJoins: ")       >==>
-      ExpandShifts[T, F]              >==>
-      debug("ExpandShifts: ")         >-
-      ResolveOwnIdentities[T]         >==>
-      debug("ResolveOwnIdentities: ") >==>
-      ReifyIdentities[T, F]           >==>
-      debug("ReifyIdentities: ")      >==>
+      K(ReadLP[T, F])                        >==>
+      debug("ReadLP: ")                      >==>
+      RewriteGroupByArrays[T, F]             >==>
+      debug("RewriteGBArrays: ")             >-
+      EliminateUnary[T]                      >==>
+      debug("EliminateUnary: ")              >-
+      RecognizeDistinct[T]                   >==>
+      debug("RecognizeDistinct: ")           >==>
+      ExtractFreeMap[T, F]                   >==>
+      debug("ExtractFreeMap: ")              >==>
+      ApplyProvenance[T, F]                  >==>
+      debug("ApplyProv: ")                   >==>
+      ReifyBuckets[T, F]                     >==>
+      debug("ReifyBuckets: ")                >==>
+      MinimizeAutoJoins[T, F]                >==>
+      debug("MinimizeAJ: ")                  >==>
+      ReifyAutoJoins[T, F]                   >==>
+      debug("ReifyAutoJoins: ")              >==>
+      ExpandShifts[T, F]                     >==>
+      debug("ExpandShifts: ")                >-
+      agraph.modify(ResolveOwnIdentities[T]) >==>
+      debug("ResolveOwnIdentities: ")        >==>
+      ReifyIdentities[T, F]                  >==>
+      debug("ReifyIdentities: ")             >==>
       Graduate[T, F]
 
     lpToQs(lp)

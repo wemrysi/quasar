@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -229,7 +229,7 @@ sealed abstract class OutlineInstances {
         case Map(inShape, fm) =>
           outlineF(fm)(κ(inShape))
 
-        case LeftShift(inShape, _, idStatus, shiftType, repair) =>
+        case LeftShift(inShape, _, idStatus, _, _, repair) =>
           outlineF(repair) {
             case LeftSide => inShape
             case RightSide => idStatus match {

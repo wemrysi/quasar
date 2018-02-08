@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ object RenderQuery {
 
   val alg: AlgebraM[PlannerError \/ ?, N1QL, String] = {
     case Data(QData.Str(v)) =>
-      ("'" ⊹ v.flatMap { case ''' => "''"; case v   => v.toString } ⊹ "'").right
+      ("'" ⊹ v.flatMap { case '\'' => "''"; case v   => v.toString } ⊹ "'").right
     case Data(v) =>
       DataCodec.render(v) \/> NonRepresentableData(v)
     case Id(v) =>

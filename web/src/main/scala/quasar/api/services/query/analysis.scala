@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,7 +54,7 @@ object analysis {
     ): Free[S, ApiError \/ Json] =
       quasar.resolveImports(scopedExpr, basePath).run.flatMap(block =>
         block.fold(
-          semErr => semErr.toApiError.left.point[Free[S, ?]],
+          semErr => semErr.toApiError.left[Json].point[Free[S, ?]],
           block => queryPlan(block, vars, basePath, offset, limit)
                     .run.value
                     .traverse(lp => A.queryCost(lp).bimap(_.toApiError, _.asJson).run)

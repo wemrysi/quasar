@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ final case class CliOptions(
 
 object CliOptions {
   val default: CliOptions =
-    CliOptions(Cmd.Start, None, \/-(Nil), None, None, false, false, None, refineMV(0L))
+    CliOptions(Cmd.Start, None, \/-(Nil), None, None, false, false, None, refineMV(64L))
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val parser = new CliOptionsParser(Lens.id[CliOptions], "quasar") {
@@ -118,7 +118,7 @@ object CliOptions {
     } text("the port to run Quasar on")
 
     opt[Int]('x', "recorded-executions") validate { x =>
-      if (x < 0) Left(s"Recorded executions must be negative, but are set to $x")
+      if (x < 0) Left(s"Recorded executions must not be negative, but is set to $x")
       else Right(())
     } action { (x, c) =>
       (l composeLens recordedExecutions).set(RefType[Refined].unsafeWrap(x.toLong))(c)

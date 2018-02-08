@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -199,7 +199,7 @@ class PlannerLPSpec extends
               $literal(Bson.Arr(List(Bson.Undefined)))),
             "__tmp7" -> $field("__tmp5")),
           IgnoreId),
-        $unwind(DocField("__tmp6")),
+        $unwind(DocField("__tmp6"), None, None),
         $match(
           Selector.Doc(
             BsonField.Name("__tmp6") -> Selector.Regex("^.*MONT.*$", false, true, false, false))),

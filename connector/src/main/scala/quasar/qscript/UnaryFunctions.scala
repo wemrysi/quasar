@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,8 +62,8 @@ object UnaryFunctions {
             s match {
               case Map(src, fm) =>
                 (f(fm)).map(Map(src, _))
-              case LeftShift(src, struct, id, stpe, repair) =>
-                (f(struct)).map(LeftShift(src, _, id, stpe, repair))
+              case LeftShift(src, struct, id, stpe, undef, repair) =>
+                (f(struct)).map(LeftShift(src, _, id, stpe, undef, repair))
               case Reduce(src, bucket, red, repair) =>
                 (bucket.traverse(f) |@| red.traverse(_.traverse(f)))(Reduce(src, _, _, repair))
               case Sort(src, bucket, order) =>

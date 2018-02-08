@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,69 +18,80 @@ package quasar.qscript.qsu
 
 import slamdata.Predef._
 
-import quasar.Planner.{InternalError, PlannerErrorME}
+import quasar.NameGenerator
+import quasar.Planner.PlannerErrorME
+import quasar.contrib.scalaz.MonadState_
 import quasar.fp.symbolOrder
 import quasar.fp.ski.ι
-import quasar.qscript.{Hole, HoleF, ReduceIndexF, SrcHole}
+import quasar.qscript.{construction, Hole, HoleF, ReduceFunc, ReduceIndexF, SrcHole}
 import ApplyProvenance.AuthenticatedQSU
 
 import matryoshka._
-import scalaz.{Id, ISet, Monad, Scalaz}, Scalaz._
+import scalaz.{ISet, Monad, NonEmptyList, Scalaz, StateT}, Scalaz._
 
 final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extends QSUTTypes[T] {
   import QSUGraph.Extractors._
 
   val prov = QProv[T]
   val qsu  = QScriptUniform.Optics[T]
+  val func = construction.Func[T]
 
-  def apply[F[_]: Monad: PlannerErrorME](aqsu: AuthenticatedQSU[T])
+  def apply[F[_]: Monad: NameGenerator: PlannerErrorME](aqsu: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] = {
 
-    val bucketsReified = aqsu.graph.rewriteM[F] {
+    type G[A] = StateT[StateT[F, RevIdx, ?], QAuth, A]
+
+    val bucketsReified = aqsu.graph.rewriteM[G] {
       case g @ LPReduce(source, reduce) =>
         for {
-          res <- bucketsFor[F](aqsu.auth, source.root)
+          res <- bucketsFor[G](source.root)
 
-          (srcs, buckets) = res
+          (srcs, buckets0) = res
 
-          discovered <- srcs.toList.toNel.fold((source.root, HoleF[T]).point[F]) { syms =>
-            val region =
-              syms.findMapM[Id.Id, (Symbol, FreeMap)](
-                s => MappableRegion.unaryOf(s, source) strengthL s)
+          reifiedG <- srcs.findMin match {
+            case Some(sym) =>
+              UnifyTargets[T, G](buildGraph[G](_))(g, sym, NonEmptyList(source.root))(GroupedKey, ReduceExprKey) map {
+                case (newSrc, original, reduceExpr) =>
+                  val buckets =
+                    buckets0.map(_ flatMap { access =>
+                      if (Access.valueHole.isEmpty(access))
+                        func.Hole as access
+                      else
+                        original as access
+                    })
 
-            region getOrElseF PlannerErrorME[F].raiseError(
-              InternalError(
-                s"Expected to find a mappable region in ${source.root} based on one of ${syms}.",
-                None))
+                  g.overwriteAtRoot(mkReduce(newSrc.root, buckets, reduce as reduceExpr.head)) :++ newSrc
+              }
+
+            case None =>
+              g.overwriteAtRoot(mkReduce(source.root, buckets0, reduce as HoleF)).point[G]
           }
-
-          (newSrc, fm) = discovered
-
-        } yield {
-          g.overwriteAtRoot(qsu.qsReduce(
-            newSrc,
-            buckets,
-            List(reduce as fm),
-            ReduceIndexF[T](0.right)))
-        }
+        } yield reifiedG
 
       case g @ QSSort(source, Nil, keys) =>
         val src = source.root
 
-        bucketsFor[F](aqsu.auth, src) map { case (_, buckets) =>
+        bucketsFor[G](src) map { case (_, buckets) =>
           g.overwriteAtRoot(qsu.qsSort(src, buckets, keys))
         }
     }
 
-    bucketsReified map (g => aqsu.copy(graph = g))
+    bucketsReified.run(aqsu.auth).eval(aqsu.graph.generateRevIndex) map {
+      case (auth, graph) => ApplyProvenance.AuthenticatedQSU(graph, auth)
+    }
   }
 
   ////
 
-  private def bucketsFor[F[_]: Monad: PlannerErrorME]
-      (qauth: QAuth, vertex: Symbol)
+  private val GroupedKey = "grouped"
+  private val ReduceExprKey = "reduce_expr"
+
+  private def bucketsFor[F[_]: Monad: PlannerErrorME: MonadState_[?[_], QAuth]]
+      (vertex: Symbol)
       : F[(ISet[Symbol], List[FreeAccess[Hole]])] =
     for {
+      qauth <- MonadState_[F, QAuth].get
+
       vdims <- qauth.lookupDimsE[F](vertex)
 
       ids = prov.buckets(prov.reduce(vdims)).toList
@@ -94,10 +105,29 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
           (ISet.empty[Symbol], HoleF[T] as Access.id[prov.D, Hole](other, SrcHole)).point[F]
       }
     } yield res.unfzip leftMap (_.foldMap(ι))
+
+  private def buildGraph[F[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM: MonadState_[?[_], QAuth]](
+      node: QScriptUniform[Symbol])
+      : F[QSUGraph] =
+    for {
+      newGraph <- QSUGraph.withName[T, F]("rbu")(node)
+      _        <- ApplyProvenance.computeProvenance[T, F](newGraph)
+    } yield newGraph
+
+  private def mkReduce[A](
+      src: A,
+      buckets: List[FreeAccess[Hole]],
+      reducer: ReduceFunc[FreeMap])
+      : QScriptUniform[A] =
+    qsu.qsReduce(
+      src,
+      buckets,
+      List(reducer),
+      ReduceIndexF[T](0.right))
 }
 
 object ReifyBuckets {
-  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad: PlannerErrorME]
+  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad: NameGenerator: PlannerErrorME]
       (aqsu: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] =
     taggedInternalError("ReifyBuckets", new ReifyBuckets[T].apply[F](aqsu))

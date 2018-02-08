@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ object ApiErrorEntityDecoder {
         }
 
       case Request(_, _, _, _, _, _) =>
-        EitherT.left(MalformedMessageBodyFailure("ApiError is only decodable from a Response.").point[Task])
+        EitherT.leftT(MalformedMessageBodyFailure("ApiError is only decodable from a Response.").point[Task])
     }
 
   private def fromJson(status: Status, hc: HCursor): DecodeResult[ApiError] =

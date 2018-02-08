@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -106,6 +106,7 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
         func.Hole,
         ExcludeId,
         ShiftType.Array,
+        OnUndefined.Omit,
         MapFuncCore.StaticMap(List(
           json.str("a") -> func.ProjectIndex(func.RightSide, func.Constant(json.int(0))),
           json.str("b") -> func.ProjectIndex(func.RightSide, func.Constant(json.int(2))),
@@ -137,6 +138,7 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
           func.DeleteKeyS(func.Hole, "c"),
           IncludeId,
           ShiftType.Array,
+          OnUndefined.Omit,
           MapFuncCore.StaticArray(List(
             func.DeleteKeyS(func.DeleteKeyS(func.LeftSide, "a"), "b"),
             func.RightSide)))
@@ -147,6 +149,7 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
           prjFrom(func.Hole, "a", "b"),
           IncludeId,
           ShiftType.Array,
+          OnUndefined.Omit,
           MapFuncCore.StaticArray(List(
             prjFrom(func.LeftSide, "c"),
             func.RightSide)))

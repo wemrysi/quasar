@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -114,7 +114,10 @@ object Main {
     S5: FileSystemFailure :<: S
   ): Task[Command => Free[DriverEff, Unit]] = {
     for {
-      stateRef <- TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, PhaseFormat.Tree, refineMV[Positive](10).some, OutputFormat.Table, Map(), false))
+      stateRef <- TaskRef(
+        Repl.RunState(rootDir, DebugLevel.Normal, PhaseFormat.Tree,
+          refineMV[Positive](10).some, OutputFormat.Table, Map(), TimingFormat.OnlyTotal)
+      )
       executionIdRef <- TaskRef(0L)
       timingRepository <- TimingRepository.empty(refineMV[NonNegative](1L))
       i =
@@ -125,12 +128,19 @@ object Main {
         injectFT[Task, DriverEff]                                     :+:
         fs
     } yield {
-      val timingPrint = (in: String) => for {
+      val timingPrint = (execution: Execution) => for {
         state <- Free.liftF(Inject[Task, ReplEff[S, ?]].inj(stateRef.read))
-        _ <- if (state.printTiming) Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(in)))
-             else ().point[Free[ReplEff[S, ?], ?]]
+        _ <- state.timingFormat match {
+          case TimingFormat.OnlyTotal =>
+            ().point[Free[ReplEff[S, ?], ?]]
+          case TimingFormat.Tree =>
+            val timingTree =
+              execution.timings.toRenderedTree.shows
+            Free.liftF(Inject[ConsoleIO, ReplEff[S, ?]].inj(ConsoleIO.PrintLn(timingTree)))
+        }
       } yield ()
-      implicit val SE = ScopeExecution.forFreeTask[ReplEff[S, ?], Nothing](timingRepository, timingPrint)
+      implicit val SE: ScopeExecution[Free[ReplEff[S, ?], ?], Nothing] =
+       ScopeExecution.forFreeTask[ReplEff[S, ?], Nothing](timingRepository, timingPrint)
       (cmd => Repl.command[ReplEff[S, ?], Nothing](cmd, executionIdRef).foldMap(i))
     }
   }

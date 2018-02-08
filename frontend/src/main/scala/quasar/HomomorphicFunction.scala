@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 trait HomomorphicFunction[-A, +B] { self =>
   def arity: Int
-  def apply(args: List[A]): Option[B]
+  def apply(args: List[A]): scala.Option[B]
   def andThen[C](f: B => C) = new HomomorphicFunction[A, C] {
     def arity = self.arity
     def apply(args: List[A]) = self.apply(args).map(f)

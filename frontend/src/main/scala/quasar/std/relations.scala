@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import quasar.{Data, Func, Type, Mapping, UnaryFunc, BinaryFunc, TernaryFunc, Ge
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import matryoshka._
-import scalaz._, Scalaz._, Validation.success
+import scalaz._, Scalaz._
 import shapeless._
 
 // TODO: Cleanup duplication in case statements!
@@ -146,9 +146,7 @@ trait RelationsLib extends Library {
     Func.Input2(Type.Top, Type.Top),
     noSimplification,
     partialTyper {
-      case Sized(Type.Bottom, fallback)                                    => fallback
-      case Sized(t1, t2) if t1.contains(Type.Top) || t2.contains(Type.Top) => Type.Top
-      case Sized(value, fallback)                                    => value ⨿ fallback
+      case Sized(value, fallback) => Type.TypeOrMonoid.append(value, fallback)
     },
     partialUntyper[nat._2] { case t => Func.Input2(t, t) })
 
@@ -217,7 +215,7 @@ trait RelationsLib extends Library {
   val Cond = TernaryFunc(
     Mapping,
     "Chooses between one of two cases based on the value of a boolean expression",
-    Type.Bottom,
+    Type.Top,
     Func.Input3(Type.Bool, Type.Top, Type.Top),
     new Func.Simplifier {
       def apply[T]
@@ -230,11 +228,11 @@ trait RelationsLib extends Library {
         }
     },
     partialTyper[nat._3] {
-      case Sized(Type.Const(Data.Bool(true)), ifTrue, ifFalse) => ifTrue
-      case Sized(Type.Const(Data.Bool(false)), ifTrue, ifFalse) => ifFalse
+      case Sized(Type.Const(Data.Bool(true)), ifTrue, _) => ifTrue
+      case Sized(Type.Const(Data.Bool(false)), _, ifFalse) => ifFalse
       case Sized(Type.Bool, ifTrue, ifFalse) => Type.lub(ifTrue, ifFalse)
     },
-    untyper[nat._3](t => success(Func.Input3(Type.Bool, t, t))))
+    basicUntyper[nat._3])
 
   def flip(f: GenericFunc[nat._2]): Option[GenericFunc[nat._2]] = f match {
     case Eq  => Some(Eq)

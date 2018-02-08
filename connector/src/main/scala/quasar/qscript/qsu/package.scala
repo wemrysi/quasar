@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,15 @@
 package quasar.qscript
 
 import slamdata.Predef.{Map => SMap, _}
+import quasar.NameGenerator
 import quasar.Planner.{InternalError, PlannerErrorME}
+import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript.provenance.Dimensions
 
 import matryoshka._
-import scalaz.{Free, Show, Traverse}
+import scalaz.{Free, Functor, Show, Traverse}
 import scalaz.std.string._
 import scalaz.syntax.traverse._
 import scalaz.syntax.show._
@@ -35,11 +37,17 @@ package object qsu {
   type QDims[T[_[_]]] = Dimensions[QProv.P[T]]
   type QSUVerts[T[_[_]]] = SMap[Symbol, QScriptUniform[T, Symbol]]
 
+  type RevIdxM[T[_[_]], F[_]] = MonadState_[F, QSUGraph.RevIdx[T]]
+  def RevIdxM[T[_[_]], F[_]](implicit ev: RevIdxM[T, F]): RevIdxM[T, F] = ev
+
   def AccessValueF[T[_[_]], A](a: A): FreeAccess[T, A] =
     Free.pure[MapFunc[T, ?], QAccess[T, A]](Access.Value(a))
 
   def AccessValueHoleF[T[_[_]]]: FreeAccess[T, Hole] =
     AccessValueF[T, Hole](SrcHole)
+
+  def freshSymbol[F[_]: NameGenerator: Functor](prefix: String): F[Symbol] =
+    NameGenerator[F].prefixedName(prefix) map (Symbol(_))
 
   def printMultiline[F[_]: Traverse, K: Show, V: Show](fkv: F[(K, V)]): String =
     fkv map { case (k, v) => s"  ${k.shows} -> ${v.shows}" } intercalate "\n"

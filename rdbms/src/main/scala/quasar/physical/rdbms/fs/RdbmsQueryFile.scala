@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import quasar.fs.PathError._
 import quasar.fs.{FileSystemErrT, QueryFile}
 import quasar.physical.rdbms.Rdbms
 import quasar.physical.rdbms.common._
-import quasar.physical.rdbms.common.TablePath.showTableName
+//import quasar.physical.rdbms.common.TablePath.showTableName
 import quasar.connector.ManagedQueryFile
 import quasar.physical.rdbms.model.DbDataStream
 import quasar.physical.rdbms.planner.RenderQuery
@@ -39,9 +39,8 @@ import matryoshka.data.Fix
 import pathy.Path
 import scalaz._
 import Scalaz._
-import scalaz.stream.Process._
 
-trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] {
+trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] with RdbmsMove {
   self: Rdbms =>
 
   import QueryFile._
@@ -69,15 +68,15 @@ trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] {
     }
 
     override def executePlan(repr: Fix[SqlExpr], out: AFile): Backend[Unit] = {
+      val tablePath = TablePath.create(out)
       ME.unattempt(renderQuery.asString(repr)
         .leftMap(QScriptPlanningFailed.apply)
         .traverse { q =>
-          val tablePath = TablePath.create(out)
           val cmd = Fragment.const("CREATE TABLE") ++
           Fragment.const(tablePath.shows) ++
           Fragment.const("AS") ++
           Fragment.const(q)
-        cmd.update.run.liftB
+          (dropTableIfExists(tablePath) *> cmd.update.run).liftB
       }).void
     }
 
@@ -90,8 +89,7 @@ trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] {
               .query[Data]
               .process
               .chunk(chunkSize)
-              .attempt(ex =>
-                emit(readFailed(qStr, ex.getLocalizedMessage)))
+              .map(_.right[quasar.fs.FileSystemError])
               .transact(xa))
           }.liftB
      })
@@ -115,7 +113,7 @@ trait RdbmsQueryFile extends ManagedQueryFile[DbDataStream] {
         childSchemas <- findChildSchemas(schema)
         childTables <- findChildTables(schema)
         childDirs = childSchemas.filter(_.isDirectChildOf(schema)).map(d => -\/(d.lastDirName)).toSet
-        childFiles = childTables.map(t => \/-(Path.FileName(t.shows))).toSet
+        childFiles = childTables.map(t => \/-(Path.FileName(t.displayName))).toSet
       }
         yield childDirs ++ childFiles).liftB
     }

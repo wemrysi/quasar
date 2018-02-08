@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import quasar.qscript.{
   ReduceFunc}
 import quasar.qscript.MapFuncCore.{EmptyMap, StaticMap}
 import quasar.qscript.provenance.JoinKey
-import quasar.qscript.qsu.{QScriptUniform => QSU}
+import quasar.qscript.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
 import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
 import matryoshka.{showTShow, BirecursiveT, ShowT}
@@ -100,9 +100,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       ISet.singleton(access.symbolic(κ(src)))
     }
 
-  private def shiftTargetAccess(src: Symbol, bucket: FreeMapA[QSU.ShiftTarget[T]]): ISet[QAccess[Symbol]] =
+  private def shiftTargetAccess(src: Symbol, bucket: FreeMapA[ShiftTarget[T]]): ISet[QAccess[Symbol]] =
     Foldable[FreeMapA].foldMap(bucket) {
-      case QSU.AccessLeftTarget(access) => ISet.singleton(access.symbolic(κ(src)))
+      case ShiftTarget.AccessLeftTarget(access) => ISet.singleton(access.symbolic(κ(src)))
       case _ => ISet.empty
     }
 
@@ -114,7 +114,8 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
   private def recordAccesses[F[_]: Foldable](by: Symbol, fa: F[QAccess[Symbol]]): References =
     fa.foldLeft(References.noRefs[T, T[EJson]])((r, a) => r.recordAccess(by, a, defaultAccess(a)))
 
-  private final case class ReifyState(status: ReifiedStatus, refs: References) {
+  // We can't use final here due to SI-4440 - it results in warning
+  private case class ReifyState(status: ReifiedStatus, refs: References) {
     lazy val seen: ISet[Symbol] = status.keySet
   }
 
@@ -126,7 +127,10 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
   private def gatherReferences(g: QSUGraph): References =
     g.foldMapUp(g => g.unfold.map(_.root) match {
-      case QSU.LeftShift(source, _, _, repair, _) =>
+      case QSU.Distinct(source) =>
+        recordAccesses[Id](g.root, Access.value(source))
+
+      case QSU.LeftShift(source, _, _, _, repair, _) =>
         recordAccesses(g.root, shiftTargetAccess(source, repair))
 
       case QSU.QSReduce(source, buckets, reducers, _) =>
@@ -157,15 +161,15 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       G.gets(_.status.lookup(g.root) getOrElse false)
 
     def freshName: F[Symbol] =
-      NameGenerator[F].prefixedName("reify") map (Symbol(_))
+      freshSymbol("rid")
 
     def isReferenced(access: QAccess[Symbol]): G[Boolean] =
       G.gets(_.refs.accessed.member(access))
 
-    def includeIdRepair(oldRepair: FreeMapA[QSU.ShiftTarget[T]], oldIdStatus: IdStatus): FreeMapA[QSU.ShiftTarget[T]] =
+    def includeIdRepair(oldRepair: FreeMapA[ShiftTarget[T]], oldIdStatus: IdStatus): FreeMapA[ShiftTarget[T]] =
       if (oldIdStatus === ExcludeId)
         oldRepair >>= {
-          case QSU.RightTarget() => func.ProjectIndexI(func.RightTarget, 1)
+          case ShiftTarget.RightTarget() => func.ProjectIndexI(func.RightTarget, 1)
           case tgt => tgt.pure[FreeMapA]
         }
       else oldRepair
@@ -177,9 +181,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       makeI[Id, A](sym -> id)
 
     def makeIV[A](initialI: FreeMapA[A], initialV: FreeMapA[A]): FreeMapA[A] =
-      func.ConcatMaps(
-        func.MakeMapS(IdentitiesK, initialI),
-        func.MakeMapS(ValueK, initialV))
+      func.StaticMapS(
+        IdentitiesK -> initialI,
+        ValueK -> initialV)
 
     def modifyAccess(of: QAccess[Symbol])(f: FreeMap => FreeMap): G[Unit] =
       G.modify(reifyRefs.modify(_.modifyAccess(of)(f)))
@@ -254,23 +258,23 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       case g @ E.Distinct(source) =>
         preserveIV(source, g) as g
 
-      case g @ E.LeftShift(source, struct, idStatus, repair, rot) =>
+      case g @ E.LeftShift(source, struct, idStatus, onUndefined, repair, rot) =>
         val idA = Access.id(IdAccess.identity[T[EJson]](g.root), g.root)
 
         (emitsIVMap(source) |@| isReferenced(idA)).tupled flatMap {
           case (true, true) =>
             onNeedsIV(g) as {
               val (newStatus, newRepair) = idStatus match {
-                case IdOnly | IncludeId =>
+                case IdOnly =>
                   (
                     idStatus,
                     updateIV(
                       func.LeftTarget,
                       makeI1(g.root, func.RightTarget),
-                      includeIdRepair(repair, idStatus))
+                      repair)
                   )
 
-                case ExcludeId =>
+                case ExcludeId | IncludeId =>
                   (
                     IncludeId : IdStatus,
                     updateIV(
@@ -280,7 +284,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
                   )
               }
 
-              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), newStatus, newRepair, rot))
+              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), newStatus, onUndefined, newRepair, rot))
             }
 
           case (true, false) =>
@@ -288,21 +292,22 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
               val newRepair =
                 makeIV(lookupIdentities >> func.LeftTarget, repair)
 
-              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), idStatus, newRepair, rot))
+              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), idStatus, onUndefined, newRepair, rot))
             }
 
           case (false, true) =>
             onNeedsIV(g) as {
-              val newStatus = 
+              val newStatus =
                 if (idStatus === ExcludeId) IncludeId else idStatus
-              val getValue =
-                if (idStatus === ExcludeId) func.ProjectIndexI(func.RightTarget, 0) else func.RightTarget
-              val newRepair = makeIV(
-                makeI1(g.root, getValue),
-                includeIdRepair(repair, idStatus)
-              )
 
-              g.overwriteAtRoot(O.leftShift(source.root, struct, newStatus, newRepair, rot))
+              val getId =
+                if (idStatus === ExcludeId) func.ProjectIndexI(func.RightTarget, 0) else func.RightTarget
+
+              val newRepair = makeIV(
+                makeI1(g.root, getId),
+                includeIdRepair(repair, idStatus))
+
+              g.overwriteAtRoot(O.leftShift(source.root, struct, newStatus, onUndefined, newRepair, rot))
             }
 
           case (false, false) =>
@@ -574,10 +579,10 @@ object ReifyIdentities {
   object ResearchedQSU {
     implicit def show[T[_[_]]: ShowT]: Show[ResearchedQSU[T]] =
       Show.show { rqsu =>
-        Cord("ResearchedQSU\n======\n") ++ 
-        rqsu.graph.show ++ 
-        Cord("\n\n") ++ 
-        rqsu.refs.show ++ 
+        Cord("ResearchedQSU\n======\n") ++
+        rqsu.graph.show ++
+        Cord("\n\n") ++
+        rqsu.refs.show ++
         Cord("\n======")
       }
 }

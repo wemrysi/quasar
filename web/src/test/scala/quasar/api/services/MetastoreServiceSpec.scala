@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -129,7 +129,7 @@ class MetastoreServiceSpec extends quasar.Qspec {
       val newConn = MetaStoreFixture.createNewTestMetaStoreConfig.unsafePerformSync
       val req = Request(method = PUT, uri = Uri().+?("initialize")).withBody(newConn.asJson).unsafePerformSync
       var persisted: DbConnectionConfig = null
-      def persist(db: DbConnectionConfig): MainTask[Unit] = Task.delay(persisted = db).liftM[MainErrT]
+      def persist(db: DbConnectionConfig): MainTask[Unit] = Task.delay{persisted = db}.liftM[MainErrT]
       val resp = service(persist)(req).unsafePerformSync
       "Config was persisted" ==> (persisted must_=== newConn)
     }

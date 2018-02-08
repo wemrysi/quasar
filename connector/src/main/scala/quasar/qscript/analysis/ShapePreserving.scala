@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -94,7 +94,7 @@ object ShapePreserving {
     new ShapePreserving[QScriptCore[T, ?]] {
       def shapePreservingƒ: Algebra[QScriptCore[T, ?], Option[IdStatus]] = {
         case Map(_, _) => none
-        case LeftShift(_, _, _, _, _) => none
+        case LeftShift(_, _, _, _, _, _) => none
         case Reduce(_, _, _, _) => none
         case Sort(src, _, _) => src
         case Union(src, l, r) =>

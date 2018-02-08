@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,16 +60,16 @@ package object workflowtask {
       (DocVar, WorkflowTask) = task match {
     case PipelineTask(src, pipeline) =>
       // possibly toss duplicate `_id`s created by `Unwind`s
-      val uwIdx = pipeline.map(_.op.run).lastIndexWhere {
-        case \/-($UnwindF(_, _)) => true
+      val uwIdx = pipeline.map(_.op).lastIndexWhere {
+        case WC($UnwindF(_, _, _, _)) => true
         case _ => false
       }
       // we’re fine if there’s no `Unwind`, or some existing op fixes the `_id`s
       if (uwIdx == -1 ||
-        pipeline.map(_.op.run).indexWhere(
-          { case \/-($GroupF(_, _, _))           => true
-            case \/-($ProjectF(_, _, ExcludeId)) => true
-            case _                              => false
+        pipeline.map(_.op).indexWhere(
+          { case WC($GroupF(_, _, _)) => true
+            case WC($ProjectF(_, _, ExcludeId)) => true
+            case _ => false
           },
           uwIdx) != -1)
         (base, task)
@@ -99,19 +99,18 @@ package object workflowtask {
   private def shape(p: Pipeline): Option[List[BsonField.Name]] = {
     def src = shape(p.dropRight(1))
 
-    val WC = Inject[WorkflowOpCoreF, WorkflowF]
-    val W32 = Inject[WorkflowOp3_2F, WorkflowF]
-
     p.lastOption.flatMap(_.op match {
       case IsShapePreserving(_)                        => src
 
       case WC($ProjectF((), Reshape(shape), _))         => Some(shape.keys.toList)
       case WC($GroupF((), Grouped(shape), _))           => Some(shape.keys.toList)
-      case WC($UnwindF((), _))                          => src
+      case WC($UnwindF((), _, name, _))                 => src.map(l => l ::: name.toList)
       case WC($RedactF((), _))                          => None
       case WC($GeoNearF((), _, _, _, _, _, _, _, _, _)) => src.map(_ :+ BsonField.Name("dist"))
 
-      case W32($LookupF((), _, _, _, as))               => src.map(_ :+ as.flatten.head)
+      case WC($LookupF((), _, _, _, as))               => src.map(_ :+ as.flatten.head)
+
+      case W34($AddFieldsF((), Reshape(shape))) => src.map(l => l ::: shape.keys.toList)
     })
   }
 }

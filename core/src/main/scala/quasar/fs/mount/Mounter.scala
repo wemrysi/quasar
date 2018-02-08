@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -168,7 +168,7 @@ object Mounter {
       req => free.lift(unmount(req)).into[S],
       new PathStore[Free[S, ?], MountConfig] {
         def get(path: APath) =
-          EitherT.right(mountConfigs.get(path))
+          EitherT.rightT(mountConfigs.get(path))
         def descendants(dir: ADir) =
           mountConfigs.keys.map(_
             .filter(p => (dir: APath) ≠ p && p.relativeTo(dir).isDefined)

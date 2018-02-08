@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@ import quasar.fp.ski._
 import quasar.fs.{FileSystemError, FileSystemErrT, MonadFsErr}, FileSystemError.qscriptPlanningFailed
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
-import quasar.namegen._
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
@@ -51,16 +50,16 @@ import scalaz._, Scalaz.{ToIdOps => _, _}
 
 // TODO: This is generalizable to an arbitrary `Recursive` type, I think.
 sealed abstract class InputFinder[T[_[_]]] {
-  def apply[A](t: FreeMap[T]): FreeMap[T]
+  def apply[A](t: FreeMapA[T, A]): FreeMapA[T, A]
 }
 
 final case class Here[T[_[_]]]() extends InputFinder[T] {
-  def apply[A](a: FreeMap[T]): FreeMap[T] = a
+  def apply[A](a: FreeMapA[T, A]): FreeMapA[T, A] = a
 }
 
 final case class There[T[_[_]]](index: Int, next: InputFinder[T])
     extends InputFinder[T] {
-  def apply[A](a: FreeMap[T]): FreeMap[T] =
+  def apply[A](a: FreeMapA[T, A]): FreeMapA[T, A] =
     a.resume.fold(fa => next(fa.toList.apply(index)), κ(a))
 }
 
@@ -117,15 +116,15 @@ object MongoDbPlanner {
   }
 
   def getSelector
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, EX[_]: Traverse]
-    (fm: FreeMap[T], default: OutputM[PartialSelector[T]], galg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]])
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, EX[_]: Traverse, A]
+    (fm: FreeMapA[T, A], default: OutputM[PartialSelector[T]], galg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]])
     (implicit inj: EX :<: ExprOp)
       : OutputM[PartialSelector[T]] =
     fm.zygo(
-      interpret[MapFunc[T, ?], Hole, T[MapFunc[T, ?]]](
+      interpret[MapFunc[T, ?], A, T[MapFunc[T, ?]]](
         κ(MFC(MapFuncsCore.Undefined[T, T[MapFunc[T, ?]]]()).embed),
         _.embed),
-      ginterpret[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], Hole, OutputM[PartialSelector[T]]](
+      ginterpret[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], A, OutputM[PartialSelector[T]]](
         κ(default), galg))
 
   def processMapFunc[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR, A]
@@ -286,7 +285,7 @@ object MongoDbPlanner {
             case Type.Binary => check.isBinary
             case Type.Id => check.isId
             case Type.Bool => check.isBoolean
-            case Type.Date => check.isDateOrTimestamp // FIXME: use isDate here when >= 3.0
+            case Type.Date => check.isDate
             // NB: Some explicit coproducts for adjacent types.
             case Type.Int ⨿ Type.Dec ⨿ Type.Str => check.isNumberOrString
             case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str => check.isNumberOrString
@@ -538,33 +537,33 @@ object MongoDbPlanner {
         p1.map(There(0, _)) ++ p2.map(There(1, _)))
     }
 
+  def invoke2Rel[T[_[_]]](x: OutputM[PartialSelector[T]], y: OutputM[PartialSelector[T]])(f: (Selector, Selector) => Selector):
+      OutputM[PartialSelector[T]] =
+    (x.toOption, y.toOption) match {
+      case (Some((f1, p1)), Some((f2, p2)))=>
+        invoke2Nel(x, y)(f)
+      case (Some((f1, p1)), None) =>
+        (f1, p1.map(There(0, _))).right
+      case (None, Some((f2, p2))) =>
+        (f2, p2.map(There(1, _))).right
+      case _ => InternalError.fromMsg("No selectors in either side of a binary MapFunc").left
+    }
+
   def typeSelector[T[_[_]]: RecursiveT: ShowT]:
       GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]] = { node =>
 
     import MapFuncsCore._
 
-    def invoke2Rel[T[_[_]]](x: OutputM[PartialSelector[T]], y: OutputM[PartialSelector[T]])(f: (Selector, Selector) => Selector):
-        OutputM[PartialSelector[T]] =
-      (x.toOption, y.toOption) match {
-        case (Some((f1, p1)), Some((f2, p2)))=>
-          invoke2Nel(x, y)(f)
-        case (Some((f1, p1)), None) =>
-          (f1, p1.map(There(0, _))).right
-        case (None, Some((f2, p2))) =>
-          (f2, p2.map(There(1, _))).right
-        case _ => InternalError.fromMsg(node.map(_._1).shows).left
-      }
-
     node match {
       // NB: the pick of Selector for these two cases determine how restrictive the
-      //     extracted typechecks are. See #2883 for more details
+      //     extracted typechecks are. See qz-3500 for more details
       case MFC(And(a, b)) => invoke2Rel(a._2, b._2)(Selector.And(_, _))
       case MFC(Or(a, b))  => invoke2Rel(a._2, b._2)(Selector.Or(_, _))
 
       // NB: we want to extract typechecks from both sides of a comparison operator
       //     Typechecks extracted from both sides are ANDed. Similarly to the `And`
       //     and `Or` case above, the selector choice can be tweaked depending on how
-      //     strict we want to be with extracted typechecks. See #2883
+      //     strict we want to be with extracted typechecks. See qz-3500
       case MFC(Eq(a, b))  => invoke2Rel(a._2, b._2)(Selector.And(_, _))
       case MFC(Neq(a, b)) => invoke2Rel(a._2, b._2)(Selector.And(_, _))
       case MFC(Lt(a, b))  => invoke2Rel(a._2, b._2)(Selector.And(_, _))
@@ -616,7 +615,6 @@ object MongoDbPlanner {
       case _ => -\/(InternalError fromMsg node.map(_._1).shows)
     }
   }
-
 
   /** The selector phase tries to turn expressions into MongoDB selectors – i.e.
     * Mongo query expressions. Selectors are only used for the filtering
@@ -798,12 +796,6 @@ object MongoDbPlanner {
           case MFC(Not((_, v))) =>
             v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
 
-          case MFC(Cond((_, v), _, _)) =>
-            v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-
-          case MFC(ProjectKey((Embed(MFC(Cond(_, _, _))), v), _)) =>
-            v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-
           case MFC(Guard(_, typ, (_, cont), (Embed(MFC(Undefined())), _))) =>
             cont.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
           case MFC(Guard(_, typ, (_, cont), (Embed(MFC(MakeArray(Embed(MFC(Undefined()))))), _))) =>
@@ -865,12 +857,12 @@ object MongoDbPlanner {
                 qs.getConst.idStatus match {
                   case IdOnly    =>
                     getExprBuilder[T, M, WF, EX](
-                      cfg.funcHandler, cfg.staticHandler)(
+                      cfg.funcHandler, cfg.staticHandler, cfg.bsonVersion)(
                       dataset,
                         Free.roll(MFC(MapFuncsCore.ProjectKey[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))))
                   case IncludeId =>
                     getExprBuilder[T, M, WF, EX](
-                      cfg.funcHandler, cfg.staticHandler)(
+                      cfg.funcHandler, cfg.staticHandler, cfg.bsonVersion)(
                       dataset,
                         MapFuncCore.StaticArray(List(
                           Free.roll(MFC(MapFuncsCore.ProjectKey[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))),
@@ -900,123 +892,71 @@ object MongoDbPlanner {
             WB: WorkflowBuilder.Ops[WF],
             ev3: EX :<: ExprOp) = {
           case qscript.Map(src, f) =>
-            getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, f)
-          case LeftShift(src, struct, id, shiftType, repair) => {
+            getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler, cfg.bsonVersion)(src, f)
+          case LeftShift(src, struct, id, shiftType, onUndef, repair) => {
             def rewriteUndefined[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
-              case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
-                rollMF[T, A](MFC(Guard(exp, tpe, exp0, Free.roll(MFC(MakeArray(Free.roll(MFC(Undefined())))))))).some
+              case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined()))))))))
+                if (onUndef === OnUndefined.Emit) =>
+                  rollMF[T, A](MFC(Guard(exp, tpe, exp0, Free.roll(MFC(MakeArray(Free.roll(MFC(Undefined())))))))).some
               case _ => none
             }
-
-            // FIXME: Remove the `Cond`s extracted by the selector phase, not every `Cond(_, _, Undefined)` as here.
-            def elideCond[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
-              case CoEnv(\/-(MFC(Cond(if_, then_, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
-                CoEnv(then_.resume.swap).some
-              case _ => none
-            }
-
-            def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
-                M[WorkflowBuilder[WF]] = {
-              val (sel, inputs) = partialSel
-
-              inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(struct)))
-                .map(WB.filter(src, _, sel))
-            }
-
-            def transform[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
-              applyTransforms(elideCond[A], rewriteUndefined[A])
-
-            val selectors = getSelector[T, M, EX](
-              struct, InternalError.fromMsg("Not a selector").left, selector[T](cfg.bsonVersion))
 
             if (repair.contains(LeftSideF)) {
+              val rootKey = BsonField.Name("s")
+              val structKey = BsonField.Name("f")
+
               val exprMerge: JoinFunc[T] => M[Fix[ExprOp]] =
-                getExprMerge[T, M, EX](cfg.funcHandler, cfg.staticHandler)(_, DocField(BsonField.Name("s")), DocField(BsonField.Name("f")))
+                getExprMerge[T, M, EX](
+                  cfg.funcHandler, cfg.staticHandler)(_, DocField(rootKey), DocField(structKey))
               val jsMerge: JoinFunc[T] => M[JsFn] =
-                getJsMerge[T, M](_, jscore.Select(jscore.Ident(JsFn.defaultName), "s"), jscore.Select(jscore.Ident(JsFn.defaultName), "f"))
+                getJsMerge[T, M](
+                  _, jscore.Select(jscore.Ident(JsFn.defaultName), rootKey.value), jscore.Select(jscore.Ident(JsFn.defaultName), structKey.value))
 
-              shiftType match {
-                case ShiftType.Array => {
-                  selectors.fold(_ => handleFreeMap[T, M, EX](
-                    cfg.funcHandler,
-                    cfg.staticHandler,
-                    struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))) >>= (target =>
-                    getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
-                      FlatteningBuilder(
-                        DocBuilder(
-                          src,
-                          ListMap(
-                            BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                            BsonField.Name("f") -> target)),
-                        Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
-                      repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide])))), { sel =>
-                    val struct0 =
-                      handleFreeMap[T, M, EX](
-                        cfg.funcHandler,
-                        cfg.staticHandler,
-                        struct.transCata[FreeMap[T]](orOriginal(transform[Hole])))
-                    val repair0 = repair.transCata[JoinFunc[T]](orOriginal(transform[JoinSide]))
+              val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
+              val repair0 = repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide]))
 
-                    (struct0 ⊛ filterBuilder(src, sel))((struct1, src0) =>
-                      getBuilder[T, M, WF, EX, JoinSide](exprOrJs(_)(exprMerge, jsMerge))(
-                        FlatteningBuilder(
-                          DocBuilder(
-                            src0,
-                            ListMap(
-                              BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                              BsonField.Name("f") -> struct1)),
-                          Set(StructureType.Array(DocField(BsonField.Name("f")), id))),
-                        repair0)).join
-                  })
-                }
-                case _ =>
-                  (handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, struct) ⊛
-                    getJsMerge[T, M](
-                      repair,
-                      jscore.Select(jscore.Ident(JsFn.defaultName), "s"),
-                      jscore.Select(jscore.Ident(JsFn.defaultName), "f")))((expr, j) =>
-                    ExprBuilder(
-                      FlatteningBuilder(
-                        DocBuilder(
-                          src,
-                          ListMap(
-                            BsonField.Name("s") -> docVarToExpr(DocVar.ROOT()),
-                            BsonField.Name("f") -> expr)),
-                        // TODO: Handle arrays properly
-                        Set(StructureType.Object(DocField(BsonField.Name("f")), id))),
-                      -\&/(j)))
-              }
+              val src0: M[WorkflowBuilder[WF]] =
+                getStructBuilder[T, M, WF, EX](
+                  handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _), cfg.bsonVersion)(
+                  src, struct0, rootKey, structKey)
+
+              src0 >>= (src1 =>
+                getBuilder[T, M, WF, EX, JoinSide](
+                  exprOrJs(_)(exprMerge, jsMerge), cfg.bsonVersion)(
+                  FlatteningBuilder(
+                    src1,
+                    shiftType match {
+                      case ShiftType.Array => Set(StructureType.Array(DocField(structKey), id))
+                      case ShiftType.Map   => Set(StructureType.Object(DocField(structKey), id))
+                    }, List(rootKey).some), repair0))
             }
-            else
-              shiftType match {
-                case ShiftType.Array => {
-                  val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
-                  val repair0 = repair.as[Hole](SrcHole).transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
 
-                  getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct0) >>= (builder =>
-                    getExprBuilder[T, M, WF, EX](
-                      cfg.funcHandler, cfg.staticHandler)(
-                      FlatteningBuilder(
-                        builder,
-                        Set(StructureType.Array(DocVar.ROOT(), id))),
-                        repair0))
-                }
-                case _ =>
-                  getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(src, struct) >>= (builder =>
-                    getExprBuilder[T, M, WF, EX](
-                      cfg.funcHandler, cfg.staticHandler)(
-                      FlatteningBuilder(
-                        builder,
-                        Set(StructureType.Object(DocVar.ROOT(), id))),
-                        repair.as(SrcHole)))
-              }
+            else {
+              val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
+              val repair0 = repair.as[Hole](SrcHole).transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
+
+              getBuilder[T, M, WF, EX, Hole](
+                handleFreeMap[T, M, EX](
+                  cfg.funcHandler, cfg.staticHandler, _), cfg.bsonVersion)(src, struct0) >>= (builder =>
+                getBuilder[T, M, WF, EX, Hole](
+                  handleFreeMap[T, M, EX](
+                    cfg.funcHandler, cfg.staticHandler, _),
+                  cfg.bsonVersion)(
+                  FlatteningBuilder(
+                    builder,
+                    shiftType match {
+                      case ShiftType.Array => Set(StructureType.Array(DocVar.ROOT(), id))
+                      case ShiftType.Map => Set(StructureType.Object(DocVar.ROOT(), id))
+                    }, List().some),
+                    repair0))
+            }
 
           }
           case Reduce(src, bucket, reducers, repair) =>
             (bucket.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _)) ⊛
               reducers.traverse(_.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _))))((b, red) => {
                 getReduceBuilder[T, M, WF, EX](
-                  cfg.funcHandler, cfg.staticHandler)(
+                  cfg.funcHandler, cfg.staticHandler, cfg.bsonVersion)(
                   // TODO: This work should probably be done in `toWorkflow`.
                   semiAlignExpr[λ[α => List[ReduceFunc[α]]]](red)(Traverse[List].compose).fold(
                     WB.groupBy(
@@ -1041,9 +981,9 @@ object MongoDbPlanner {
             keys.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _))
               .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
           case Filter(src0, cond) => {
-            val selectors = getSelector[T, M, EX](
+            val selectors = getSelector[T, M, EX, Hole](
               cond, defaultSelector[T].right, selector[T](cfg.bsonVersion) ∘ (_ <+> defaultSelector[T].right))
-            val typeSelectors = getSelector[T, M, EX](
+            val typeSelectors = getSelector[T, M, EX, Hole](
               cond, InternalError.fromMsg(s"not a typecheck").left , typeSelector[T])
 
             def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
@@ -1115,7 +1055,7 @@ object MongoDbPlanner {
                 qs.f,
                 JoinSource(lb, lk),
                 JoinSource(rb, rk))) >>=
-                (getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler)(_, qs.combine >>= {
+                (getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler, cfg.bsonVersion)(_, qs.combine >>= {
                   case LeftSide => Free.roll(MFC(MapFuncsCore.ProjectKey(HoleF, MapFuncsCore.StrLit("left"))))
                   case RightSide => Free.roll(MFC(MapFuncsCore.ProjectKey(HoleF, MapFuncsCore.StrLit("right"))))
                 }))).join
@@ -1187,38 +1127,140 @@ object MongoDbPlanner {
     processMapFunc[T, M, Hole](fm)(κ(jscore.Ident(JsFn.defaultName))) ∘
       (JsFn(JsFn.defaultName, _))
 
-  def getBuilder
+
+  /* Given a handler of type FreeMapA[T, A] => Expr, a FreeMapA[T, A]
+   *  and a source WorkflowBuilder, return a new WorkflowBuilder
+   *  filtered according to the `Cond`s found in the FreeMapA[T, A].
+   *  The result is tupled with whatever remains to be planned out
+   *  of the FreeMapA[T, A]
+   */
+  def getFilterBuilder
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_], EX[_]: Traverse, A]
-    (handler: FreeMapA[T, A] => M[Expr])
+    (handler: FreeMapA[T, A] => M[Expr], v: BsonVersion)
+    (src: WorkflowBuilder[WF], fm: FreeMapA[T, A])
+    (implicit ev: EX :<: ExprOp, WB: WorkflowBuilder.Ops[WF])
+     : M[(WorkflowBuilder[WF], FreeMapA[T, A])] = {
+
+    import MapFuncCore._
+    import MapFuncsCore._
+
+    def filterBuilder(src0: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
+        M[WorkflowBuilder[WF]] = {
+      val (sel, inputs) = partialSel
+
+      inputs.traverse(f => handler(f(fm))) ∘ (WB.filter(src0, _, sel))
+    }
+
+    def elideCond: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
+      case CoEnv(\/-(MFC(Cond(if_, then_, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
+        CoEnv(then_.resume.swap).some
+      case _ => none
+    }
+
+    def toCofree[B](ann: B): Algebra[CoEnv[A, MapFunc[T, ?], ?], Cofree[MapFunc[T, ?], B]] =
+      interpret(κ(Cofree(ann, MFC(Undefined()))), attributeAlgebra[MapFunc[T, ?], B](κ(ann)))
+
+    val undefinedF: MapFunc[T, Cofree[MapFunc[T, ?], Boolean] \/ FreeMapA[T, A]] = MFC(Undefined())
+    val gcoalg: GCoalgebra[Cofree[MapFunc[T, ?], Boolean] \/ ?, EnvT[Boolean, MapFunc[T, ?], ?], FreeMapA[T, A]] =
+      _.fold(κ(envT(false, undefinedF)), {
+        case MFC(Cond(if_, then_, undef @ Embed(CoEnv(\/-(MFC(Undefined())))))) =>
+          envT(false, MFC(Cond(if_.cata(toCofree(true)).left, then_.cata(toCofree(false)).left, undef.cata(toCofree(false)).left)))
+
+        case otherwise => envT(false, otherwise ∘ (_.right))
+      })
+
+    val galg: GAlgebra[(Cofree[MapFunc[T, ?], Boolean], ?), EnvT[Boolean, MapFunc[T, ?], ?], OutputM[PartialSelector[T]]] = { node =>
+      def forgetAnn: Cofree[MapFunc[T, ?], Boolean] => T[MapFunc[T, ?]] = _.transCata[T[MapFunc[T, ?]]](_.lower)
+
+      node.runEnvT match {
+        case (true, wa) =>
+          /* The `selector` algebra requires one side of a comparison
+           * to be a Constant. The comparisons present inside Cond do
+           * not necessarily have this shape, hence the decorator
+           */
+          selector[T](v).apply(wa.map { case (tree, sl) => (forgetAnn(tree), sl) }) <+> (wa match {
+            case MFC(Eq(_, _))
+               | MFC(Neq(_, _))
+               | MFC(Lt(_, _))
+               | MFC(Lte(_, _))
+               | MFC(Gt(_, _))
+               | MFC(Gte(_, _))
+               | MFC(Undefined()) => defaultSelector[T].right
+            /** The cases here don't readily imply selectors, but
+              *  still need to be handled in case a `Cond` is nested
+              *  inside one of these.  For instance, if ConcatMaps
+              *  includes `Cond`s in BOTH maps, these are extracted
+              *  and `Or`ed using Selector.Or. In the case of unary
+              *  `MapFunc`s, we simply need to fix the InputFinder to
+              *  look in the right place.
+              */
+            case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+            case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
+            case MFC(Guard((_, if_), _, _, _)) => if_.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
+            case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
+          })
+
+        case (false, wa) => wa match {
+          case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
+          case MFC(ProjectKey((_, v), _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
+          case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
+          case MFC(Guard((_, if_), _, _, _)) => if_.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
+          case MFC(Cond((_, pred), _, _)) => pred.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
+          case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
+        }
+      }
+    }
+
+    val sels: Option[PartialSelector[T]] =
+      fm.ghylo[(Cofree[MapFunc[T, ?], Boolean], ?), Cofree[MapFunc[T, ?], Boolean] \/ ?]
+        [EnvT[Boolean, MapFunc[T, ?], ?], OutputM[PartialSelector[T]]](distPara, distApo, galg, gcoalg).toOption
+
+    (sels ∘ (filterBuilder(src, _))).cata(
+      _ strengthR fm.transCata[FreeMapA[T, A]](orOriginal(elideCond)),
+      (src, fm).point[M])
+  }
+
+  def getStructBuilder
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_]: WorkflowBuilder.Ops[?[_]], EX[_]: Traverse]
+    (handler: FreeMap[T] => M[Expr], v: BsonVersion)
+    (src: WorkflowBuilder[WF], struct: FreeMap[T], rootKey: BsonField.Name, structKey: BsonField.Name)
+    (implicit ev: EX :<: ExprOp): M[WorkflowBuilder[WF]] =
+    getFilterBuilder[T, M, WF, EX, Hole](handler, v)(src, struct) >>= { case (source, f) =>
+      handler(f) ∘ (fm => DocBuilder(source, ListMap(rootKey -> docVarToExpr(DocVar.ROOT()), structKey -> fm)))
+    }
+
+  def getBuilder
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_]: WorkflowBuilder.Ops[?[_]], EX[_]: Traverse, A]
+    (handler: FreeMapA[T, A] => M[Expr], v: BsonVersion)
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, A])
     (implicit ev: EX :<: ExprOp)
-      : M[WorkflowBuilder[WF]] =
-    fm.project match {
-      case MapFuncCore.StaticMap(elems) =>
-        elems.traverse(_.bitraverse({
-          case Embed(MapFuncCore.EC(ejson.Str(key))) => BsonField.Name(key).point[M]
-          case key => raiseErr[M, BsonField.Name](qscriptPlanningFailed(InternalError.fromMsg(s"Unsupported object key: ${key.shows}")))
-        },
-          handler)) ∘
-        (es => DocBuilder(src, es.toListMap))
-      case _ => handler(fm) ∘ (ExprBuilder(src, _))
+     : M[WorkflowBuilder[WF]] =
+    getFilterBuilder[T, M, WF, EX, A](handler, v)(src, fm) >>= { case (src0, fm0) =>
+      fm0.project match {
+        case MapFuncCore.StaticMap(elems) =>
+          elems.traverse(_.bitraverse({
+            case Embed(MapFuncCore.EC(ejson.Str(key))) => BsonField.Name(key).point[M]
+            case key => raiseErr[M, BsonField.Name](qscriptPlanningFailed(InternalError.fromMsg(s"Unsupported object key: ${key.shows}")))
+          }, handler)) ∘ (es => DocBuilder(src0, es.toListMap))
+        case _ => handler(fm0) ∘ (ExprBuilder(src0, _))
+      }
     }
 
   def getExprBuilder
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, WF[_], EX[_]: Traverse]
-    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], staticHandler: StaticHandler[T, EX])
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], staticHandler: StaticHandler[T, EX], v: BsonVersion)
     (src: WorkflowBuilder[WF], fm: FreeMap[T])
-    (implicit ev: EX :<: ExprOp)
+    (implicit ev: EX :<: ExprOp, WF: WorkflowBuilder.Ops[WF])
       : M[WorkflowBuilder[WF]] =
-    getBuilder[T, M, WF, EX, Hole](handleFreeMap[T, M, EX](funcHandler, staticHandler, _))(src, fm)
+    getBuilder[T, M, WF, EX, Hole](handleFreeMap[T, M, EX](funcHandler, staticHandler, _), v)(src, fm)
 
   def getReduceBuilder
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, WF[_], EX[_]: Traverse]
-    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], staticHandler: StaticHandler[T, EX])
+    (funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?], staticHandler: StaticHandler[T, EX], v: BsonVersion)
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, ReduceIndex])
-    (implicit ev: EX :<: ExprOp)
+    (implicit ev: EX :<: ExprOp, WF: WorkflowBuilder.Ops[WF])
       : M[WorkflowBuilder[WF]] =
-    getBuilder[T, M, WF, EX, ReduceIndex](handleRedRepair[T, M, EX](funcHandler, staticHandler, _))(src, fm)
+    getBuilder[T, M, WF, EX, ReduceIndex](handleRedRepair[T, M, EX](funcHandler, staticHandler, _), v)(src, fm)
 
   def getJsMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
     (jf: JoinFunc[T], a1: JsCore, a2: JsCore)
@@ -1402,7 +1444,7 @@ object MongoDbPlanner {
         qs.cataM[M, WorkflowBuilder[WF]](
           Planner[T, fs.MongoQScript[T, ?]].plan[M, WF, EX](cfg).apply(_) ∘
             (_.transCata[Fix[WorkflowBuilderF[WF, ?]]](repeatedly(WorkflowBuilder.normalize[WF, Fix[WorkflowBuilderF[WF, ?]]])))))
-      wf <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb)))
+      wf <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb, cfg.queryModel)))
     } yield wf
 
   def plan0
@@ -1480,46 +1522,41 @@ object MongoDbPlanner {
 
     val bsonVersion = toBsonVersion(queryModel)
 
+    def joinHandler[WF[_]: Functor: Coalesce: Crush: Crystallize]
+      (implicit ev0: Classify[WF], ev1: WorkflowOpCoreF :<: WF, ev2: RenderTree[WorkflowBuilder[WF]])
+        : JoinHandler[WF, WBM] =
+      JoinHandler.fallback[WF, WBM](
+        JoinHandler.pipeline[WBM, WF](queryModel, queryContext.statistics, queryContext.indexes),
+        JoinHandler.mapReduce[WBM, WF](queryModel))
+
     queryModel match {
-      case `3.4` =>
-        val joinHandler: JoinHandler[Workflow3_2F, WBM] =
-          JoinHandler.fallback[Workflow3_2F, WBM](
-            JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
-            JoinHandler.mapReduce)
-        val cfg = PlannerConfig[T, Expr3_4, Workflow3_2F](
-          joinHandler,
-          FuncHandler.handle3_4(bsonVersion),
-          StaticHandler.v3_2,
+      case `3.4.4` =>
+        val cfg = PlannerConfig[T, Expr3_4_4, Workflow3_4F](
+          joinHandler[Workflow3_4F],
+          FuncHandler.handle3_4_4(bsonVersion),
+          StaticHandler.handle,
+          queryModel,
           bsonVersion)
-        plan0[T, M, Workflow3_2F, Expr3_4](anyDoc, cfg)(qs)
+        plan0[T, M, Workflow3_4F, Expr3_4_4](anyDoc, cfg)(qs)
+
+      case `3.4` =>
+        val cfg = PlannerConfig[T, Expr3_4, Workflow3_4F](
+          joinHandler[Workflow3_4F],
+          FuncHandler.handle3_4(bsonVersion),
+          StaticHandler.handle,
+          queryModel,
+          bsonVersion)
+        plan0[T, M, Workflow3_4F, Expr3_4](anyDoc, cfg)(qs)
 
       case `3.2` =>
-        val joinHandler: JoinHandler[Workflow3_2F, WBM] =
-          JoinHandler.fallback[Workflow3_2F, WBM](
-            JoinHandler.pipeline(queryContext.statistics, queryContext.indexes),
-            JoinHandler.mapReduce)
         val cfg = PlannerConfig[T, Expr3_2, Workflow3_2F](
-          joinHandler,
+          joinHandler[Workflow3_2F],
           FuncHandler.handle3_2(bsonVersion),
-          StaticHandler.v3_2,
+          StaticHandler.handle,
+          queryModel,
           bsonVersion)
-        plan0[T, M, Workflow3_2F, Expr3_2](anyDoc, cfg)(qs)
+        plan0[T, M, Workflow3_2F, Expr3_2](anyDoc, cfg)(qs).map(_.inject[WorkflowF])
 
-      case `3.0` =>
-        val cfg = PlannerConfig[T, Expr3_0, Workflow2_6F](
-          JoinHandler.mapReduce[WBM, Workflow2_6F],
-          FuncHandler.handle3_0(bsonVersion),
-          StaticHandler.v2_6,
-          bsonVersion)
-        plan0[T, M, Workflow2_6F, Expr3_0](anyDoc, cfg)(qs).map(_.inject[WorkflowF])
-
-      case _ =>
-        val cfg = PlannerConfig[T, Expr2_6, Workflow2_6F](
-          JoinHandler.mapReduce[WBM, Workflow2_6F],
-          FuncHandler.handle2_6(bsonVersion),
-          StaticHandler.v2_6,
-          bsonVersion)
-        plan0[T, M, Workflow2_6F, Expr2_6](anyDoc, cfg)(qs).map(_.inject[WorkflowF])
     }
   }
 }

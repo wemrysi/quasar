@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,24 +58,23 @@ object execute {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
         respond(parsedQueryRequest(req, offset, limit) traverse { case (xpr, basePath, off, lim) =>
           // FIXME: use fsQ.evaluateQuery here
-          Free.roll(S1(ExecutionId.ofRef(executionIdRef).map(SE.newExecution(_, ST =>
-            for {
-              result <- ST.newScope("total query pipeline (GET)",
-                for {
-                  block <- ST.newScope("resolve imports", resolveImports[S](xpr, basePath).run)
-                  lpOrSemanticErr <-
-                    ST.newScope("plan query",
-                        block.leftMap(_.wrapNel).flatMap(block =>
-                        queryPlan(block, requestVars(req), basePath, off, lim)
-                        .run.value).point[Free[S, ?]]
-                    )
-                  evaluated <- ST.newScope("evaluate query",
+          for {
+            newExecutionIndex <- Free.liftF(S1(executionIdRef.modify(_ + 1)))
+            result <- SE.newExecution(ExecutionId(newExecutionIndex), ST =>
+              for {
+                block <- ST.newScope("resolve imports", resolveImports[S](xpr, basePath).run)
+                lpOrSemanticErr <-
+                  ST.newScope("plan query",
+                    block.leftMap(_.wrapNel).flatMap(block =>
+                      queryPlan(block, requestVars(req), basePath, off, lim)
+                    .run.value).point[Free[S, ?]])
+                evaluated <-
+                  ST.newScope("evaluate query",
                     lpOrSemanticErr traverse (lp => formattedDataResponse(
                       MessageFormat.fromAccept(req.headers.get(Accept)),
                       Q.evaluate(lp).translate(xform.dropPhases))))
-                } yield evaluated)
-            } yield result
-          ))))
+            } yield evaluated)
+          } yield result
       })
 
       case req @ POST -> AsDirPath(path) =>
@@ -91,26 +90,29 @@ object execute {
           if (query.isEmpty) {
             respond_(bodyMustContainQuery)
           } else {
-             respond(Free.roll(S1(ExecutionId.ofRef(executionIdRef).map(SE.newExecution(_, ST =>
-              (for {
-                destination <- EitherT(requiredHeader(Destination, req).pure[Free[S, ?]])
-                parsed <- EitherT(ST.newScope("parse SQL", sql.fixParser.parse(query).leftMap(_.toApiError).pure[Free[S, ?]]))
-                out <- EitherT(destinationFile(destination.value).pure[Free[S, ?]])
-                basePath <- EitherT(decodedDir(req.uri.path).pure[Free[S, ?]])
-                resolved <- EitherT(ST.newScope("resolve imports", resolveImports(parsed, basePath).leftMap(_.toApiError).run))
-                executed <- EitherT(ST.newScope("execute query", fsQ.executeQuery(resolved, requestVars(req), basePath, out).run.run.run map {
-                  case (phases, result) =>
-                    result
-                    .leftMap(_.toApiError)
-                    .flatMap(_.leftMap(_.toApiError))
-                    .bimap(
-                      _ :+ ("phases" := phases),
-                      κ(Json(
-                      "out"   := posixCodec.printPath(out),
-                      "phases" := phases)))
-                }))
-              } yield executed).run
-            )))))
+            respond(for {
+              newExecutionIndex <- Free.liftF(S1(executionIdRef.modify(_ + 1)))
+              result <- SE.newExecution(ExecutionId(newExecutionIndex), ST =>
+                (for {
+                  destination <- EitherT.fromDisjunction[Free[S, ?]](requiredHeader(Destination, req))
+                  parsed <- EitherT(ST.newScope("parse SQL", sql.fixParser.parse(query).leftMap(_.toApiError).pure[Free[S, ?]]))
+                  out <- EitherT.fromDisjunction[Free[S, ?]](destinationFile(destination.value))
+                  basePath <- EitherT.fromDisjunction[Free[S, ?]](decodedDir(req.uri.path))
+                  resolved <- EitherT(ST.newScope("resolve imports", resolveImports(parsed, basePath).leftMap(_.toApiError).run))
+                  executed <- EitherT(ST.newScope("execute query", fsQ.executeQuery(resolved, requestVars(req), basePath, out).run.run.run map {
+                    case (phases, result) =>
+                      result
+                      .leftMap(_.toApiError)
+                      .flatMap(_.leftMap(_.toApiError))
+                      .bimap(
+                        _ :+ ("phases" := phases),
+                        κ(Json(
+                        "out"   := posixCodec.printPath(out),
+                        "phases" := phases)))
+                  }))
+                } yield executed).run
+              )
+            } yield result)
           }
         }
     }

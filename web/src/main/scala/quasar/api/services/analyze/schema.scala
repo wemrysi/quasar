@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -93,7 +93,7 @@ object schema {
                            blob, requestVars(req), dir, DefaultSampleSize, settings
                          ).leftMap(_.toApiError)
           schema      <- r.liftT[Free[S, ?]].leftMap(_.toApiError)
-          response    <- EitherT.right(formattedDataResponse(
+          response    <- EitherT.rightT(formattedDataResponse(
                            MessageFormat.fromAccept(req.headers.get(Accept)),
                            schema.map(analysis.schemaToData(_)).toProcess))
         } yield response)

@@ -20,16 +20,17 @@ Chain
 │  ╰─ Doc
 │     ╰─ Expr($0 -> Eq(Bool(true)))
 ├─ $ProjectF
-│  ├─ Name("left" -> "$src")
+│  ├─ Name("right" -> "$src")
 │  ├─ Name("0" -> { "$toLower": "$src._id" })
 │  ╰─ ExcludeId
-├─ $LookupF(from smallZips with (this).0 = (that)._id as right)
+├─ $LookupF(from smallZips with (this).0 = (that)._id as left)
 ├─ $ProjectF
-│  ├─ Name("left" -> "$left")
 │  ├─ Name("right" -> "$right")
+│  ├─ Name("left" -> "$left")
 │  ╰─ ExcludeId
-├─ $UnwindF(DocField(BsonField.Name("right")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("left")))
 ╰─ $ProjectF
-   ├─ Name("city" -> "$left.city")
-   ├─ Name("state" -> "$right.state")
+   ├─ Name("c1" -> "$left.name")
+   ├─ Name("c2" -> "$right.name")
    ╰─ ExcludeId

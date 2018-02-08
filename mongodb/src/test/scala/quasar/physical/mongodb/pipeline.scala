@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,10 +45,10 @@ class PipelineSpec extends quasar.Qspec with ArbBsonField {
 
       field = c.toString + cs
 
-      value <- if (size <= 0) genExpr3_4.map(\/-(_))
+      value <- if (size <= 0) genExpr3_4_4.map(\/-(_))
       else Gen.oneOf(
         genProject(size - 1).map(p => -\/(p.shape)),
-        genExpr3_4.map(\/-(_)))
+        genExpr3_4_4.map(\/-(_)))
     } yield BsonField.Name(field) -> value)
     id <- Gen.oneOf(ExcludeId, IncludeId)
   } yield $ProjectF((), Reshape[ExprOp](ListMap(fields: _*)), id)
@@ -61,7 +61,7 @@ class PipelineSpec extends quasar.Qspec with ArbBsonField {
 
   def unwindGen = for {
     c <- Gen.alphaChar
-  } yield $UnwindF((), DocField(BsonField.Name(c.toString)))
+  } yield $UnwindF((), DocField(BsonField.Name(c.toString)), None, None)
 
   def genGroup = for {
     i <- Gen.chooseNum(1, 10)

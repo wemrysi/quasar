@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -193,7 +193,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
       driver = actions.drain ++ Stream.eval(commitDB(blob, version, nihdb))
 
-      _ <- EitherT.right[Task, ResourceError, Unit](driver.run)
+      _ <- EitherT.rightT[Task, ResourceError, Unit](driver.run)
     } yield ()
   }
 
@@ -270,10 +270,10 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
   private def pathToAFileET[F[_]: Monad](path: PrecogPath): EitherT[F, ResourceError, AFile] = {
     pathToAFile(path) match {
       case Some(afile) =>
-        EitherT.right[F, ResourceError, AFile](afile.point[F])
+        EitherT.rightT[F, ResourceError, AFile](afile.point[F])
 
       case None =>
-        EitherT.left[F, ResourceError, AFile] {
+        EitherT.leftT[F, ResourceError, AFile] {
           val err: ResourceError = ResourceError.notFound(
             s"invalid path does not contain file element: $path")
 
@@ -286,8 +286,8 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
     def load(table: Table, tpe: JType): EitherT[Future, ResourceError, Table] = {
       for {
-        _ <- EitherT.right(table.toJson.map(json => log.trace("Starting load from " + json.toList.map(_.renderCompact))))
-        paths <- EitherT.right(pathsM(table))
+        _ <- EitherT.rightT(table.toJson.map(json => log.trace("Starting load from " + json.toList.map(_.renderCompact))))
+        paths <- EitherT.rightT(pathsM(table))
 
         projections <- paths.toList traverse { path =>
           val etask = for {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -107,6 +107,16 @@ private[mongodb] final class JavaScriptWorkflowExecutor
     tell(Call(
       Select(toJsRef(src), "mapReduce"),
       List(mr.map, mr.reduce, mr.inlineBson.toJs)))
+
+  private def toNamespaceBsonText(c: Collection) =
+    Bson.Text(s"${c.database.value}.${c.collection.value}")
+
+  protected def renameCollection(src: Collection, dst: Collection) =
+    tell(Call(
+      Select(Ident("db"), "adminCommand"),
+      List(Bson.Doc(ListMap(
+        "renameCollection" -> toNamespaceBsonText(src),
+        "to" -> toNamespaceBsonText(dst))).toJs)))
 }
 
 private[mongodb] object JavaScriptWorkflowExecutor {

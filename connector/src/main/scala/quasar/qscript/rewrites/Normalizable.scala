@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -91,7 +91,6 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
 
   def freeMF[A: Equal: Show](fm: Free[MapFunc, A]): Free[MapFunc, A] =
     fm.transCata[Free[MapFunc, A]](MapFuncCore.normalize[T, A])
-      .transCata[Free[MapFunc, A]](repeatedly(MapFuncCore.extractGuards[T, A]))
 
   def makeNorm[A, B, C](
     lOrig: A, rOrig: B)(
@@ -228,12 +227,12 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
 
         makeNorm(bucket, order)(rebucket, _ => orderNormOpt)(Sort(src, _, _))
 
-      case Map(src, f)                => freeMFEq(f).map(Map(src, _))
-      case LeftShift(src, s, i, t, r) => makeNorm(s, r)(freeMFEq(_), freeMFEq(_))(LeftShift(src, _, i, t, _))
-      case Union(src, l, r)           => makeNorm(l, r)(freeTCEq(_), freeTCEq(_))(Union(src, _, _))
-      case Filter(src, f)             => freeMFEq(f).map(Filter(src, _))
+      case Map(src, f)                   => freeMFEq(f).map(Map(src, _))
+      case LeftShift(src, s, i, t, u, r) => makeNorm(s, r)(freeMFEq(_), freeMFEq(_))(LeftShift(src, _, i, t, u, _))
+      case Union(src, l, r)              => makeNorm(l, r)(freeTCEq(_), freeTCEq(_))(Union(src, _, _))
+      case Filter(src, f)                => freeMFEq(f).map(Filter(src, _))
       case Subset(src, from, sel, count) => makeNorm(from, count)(freeTCEq(_), freeTCEq(_))(Subset(src, _, sel, _))
-      case Unreferenced()          => None
+      case Unreferenced()                => None
     })
   }
 

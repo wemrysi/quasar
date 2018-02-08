@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ class MongoDbIOSpec extends Qspec {
       "get mongo version" in {
         implicit val ord: scala.math.Ordering[ServerVersion] = Order[ServerVersion].toScalaOrdering
 
-        serverVersion.run(testClient).unsafePerformSync must beGreaterThan(ServerVersion(2, 6, None, ""))
+        serverVersion.run(testClient).unsafePerformSync must beGreaterThanOrEqualTo(ServerVersion(3, 2, None, ""))
       }
 
       "get stats" in {

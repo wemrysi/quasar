@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import quasar.physical.marklogic._
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery._
+import quasar.effect.uuid.UuidReader
 
 import java.util.UUID
 
@@ -111,10 +112,10 @@ final class OperationsSpec extends quasar.Qspec {
 
   type Op[A] = PrologT[Free[OpF, ?], A]
 
-  private implicit val xccSessionR = Read.monadReader_[Session, OpF]
-  private implicit val xccSourceR  = Read.monadReader_[ContentSource, OpF]
-  private implicit val uuidR       = Read.monadReader_[UUID, OpF]
-  private implicit val mlPlanE     = Failure.monadError_[MarkLogicPlannerError, OpF]
+  private implicit val xccSessionR: SessionReader[Free[OpF, ?]] = Read.monadReader_[Session, OpF]
+  private implicit val xccSourceR: CSourceReader[Free[OpF, ?]] = Read.monadReader_[ContentSource, OpF]
+  private implicit val uuidR: UuidReader[Free[OpF, ?]] = Read.monadReader_[UUID, OpF]
+  private implicit val mlPlanE: MonadPlanErr[Free[OpF, ?]] = Failure.monadError_[MarkLogicPlannerError, OpF]
   private implicit val listMapShow = Show[Map[String, Data]].contramap[ListMap[String, Data]](x => x)
 
   // Wraps the program in a transaction and forces a rollback, leaving the db untouched.

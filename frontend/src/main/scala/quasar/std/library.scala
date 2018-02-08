@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ trait Library {
   protected def constTyper[N <: Nat](codomain: Codomain): Typer[N] =
     _ => Some(success(codomain))
 
-  private def partialTyperOV[N <: Nat](f: Domain[N] => Option[VCodomain]): Typer[N] = f
+  def partialTyperOV[N <: Nat](f: Domain[N] => Option[VCodomain]): Typer[N] = f
 
   def partialTyperV[N <: Nat](f: PartialFunction[Domain[N], VCodomain]): Typer[N] =
     partialTyperOV[N](f.lift)

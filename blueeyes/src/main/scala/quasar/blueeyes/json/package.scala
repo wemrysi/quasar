@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2017 SlamData Inc.
+ * Copyright 2014–2018 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -637,6 +637,8 @@ package object json {
       */
     def filter(p: JValue => Boolean): List[JValue] =
       foldDown(List.empty[JValue])((acc, e) => if (p(e)) e :: acc else acc).reverse
+
+    def withFilter(p: JValue => Boolean): List[JValue] = filter(p)
 
     def flatten: List[JValue] =
       foldDown(List.empty[JValue])((acc, e) => e :: acc).reverse
