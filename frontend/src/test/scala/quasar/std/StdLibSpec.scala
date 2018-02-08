@@ -25,6 +25,7 @@ import quasar.{
   OffsetDate => QOffsetDate,
   TemporalPart
 }
+import quasar.DateGenerators.arbZoneOffset
 import quasar.datetime.{truncDateTime, truncDate, truncTime}
 
 import java.time.{
@@ -775,84 +776,193 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ExtractSecond" >> {
-        "midnight 2016-09-29" >> {
-          unaryB(ExtractSecond(_).embed, JLocalDateTime.parse("2016-03-01T00:00:00.000"), Data.Dec(0))
+        "LocalTime 0" >> prop { (x: JLocalTime) =>
+          unary(ExtractSecond(_).embed, Data.LocalTime(x.withSecond(0).withNano(0)), Data.Dec(0))
         }
 
-        "2016-09-29 12:34:56.789" >> {
-          unaryB(ExtractSecond(_).embed, JLocalDateTime.parse("2016-03-01T12:34:56.789"), Data.Dec(56.789))
+        "LocalDateTime 0" >> prop { (x: JLocalDateTime) =>
+          unary(ExtractSecond(_).embed, Data.LocalDateTime(x.withSecond(0).withNano(0)), Data.Dec(0))
+        }
+
+        "OffsetTime 0" >> prop { (x: JOffsetTime) =>
+          unary(ExtractSecond(_).embed, Data.OffsetTime(x.withSecond(0).withNano(0)), Data.Dec(0))
+        }
+
+        "OffsetDateTime 0" >> prop { (x: JOffsetDateTime) =>
+          unary(ExtractSecond(_).embed, Data.OffsetDateTime(x.withSecond(0).withNano(0)), Data.Dec(0))
+        }
+
+        "LocalTime 56.789" >> prop { (x: JLocalTime) =>
+          unary(
+            ExtractSecond(_).embed,
+            Data.LocalTime(x.withSecond(56).withNano(789000000)),
+            Data.Dec(56.789))
+        }
+
+        "LocalDateTime 56.789" >> prop { (x: JLocalDateTime) =>
+          unary(
+            ExtractSecond(_).embed,
+            Data.LocalDateTime(x.withSecond(56).withNano(789000000)),
+            Data.Dec(56.789))
+        }
+
+        "OffsetTime 56.789" >> prop { (x: JOffsetTime) =>
+          unary(
+            ExtractSecond(_).embed,
+            Data.OffsetTime(x.withSecond(56).withNano(789000000)),
+            Data.Dec(56.789))
+        }
+
+        "OffsetDateTime 56.789" >> prop { (x: JOffsetDateTime) =>
+          unary(
+            ExtractSecond(_).embed,
+            Data.OffsetDateTime(x.withSecond(56).withNano(789000000)),
+            Data.Dec(56.789))
         }
       }
 
       "ExtractTimeZone" >> {
-        "2016-01-01+01:01:01" >> {
-          unary(ExtractTimeZone(_).embed, Data.OffsetDate(quasar.OffsetDate.parse("2016-01-01+01:01:01")), Data.Int(3661))
+        "OffsetDate" >> prop { (x: JLocalDate) =>
+          unary(
+            ExtractTimeZone(_).embed,
+            Data.OffsetDate(QOffsetDate(x, ZoneOffset.ofHoursMinutesSeconds(3, 13, 17))),
+            Data.Int(11597))
         }
-        "01:02:03+01:01:01" >> {
-          unary(ExtractTimeZone(_).embed, Data.OffsetTime(JOffsetTime.parse("01:02:03+01:01:01")), Data.Int(3661))
+
+        "OffsetTime" >> prop { (x: JLocalTime) =>
+          unary(
+            ExtractTimeZone(_).embed,
+            Data.OffsetTime(JOffsetTime.of(x, ZoneOffset.ofHoursMinutesSeconds(3, 13, 17))),
+            Data.Int(11597))
         }
-        "2016-01-01T01:02:03+01:01:01" >> {
-          unary(ExtractTimeZone(_).embed, Data.OffsetDateTime(JOffsetDateTime.parse("2016-01-01T01:02:03+01:01:01")), Data.Int(3661))
+
+        "OffsetDateTime" >> prop { (x: JLocalDateTime) =>
+          unary(
+            ExtractTimeZone(_).embed,
+            Data.OffsetDateTime(JOffsetDateTime.of(x, ZoneOffset.ofHoursMinutesSeconds(3, 13, 17))),
+            Data.Int(11597))
         }
       }
 
       "ExtractTimeZoneMinute" >> {
-        "2016-01-01+01:01:01" >> {
-          unary(ExtractTimeZoneMinute(_).embed, Data.OffsetDate(quasar.OffsetDate.parse("2016-01-01+01:01:01")), Data.Int(1))
+        "OffsetDate" >> prop { (x: JLocalDate) =>
+          unary(
+            ExtractTimeZoneMinute(_).embed,
+            Data.OffsetDate(QOffsetDate(x, ZoneOffset.ofHoursMinutesSeconds(3, 13, 17))),
+            Data.Int(13))
         }
-        "01:02:03+01:01:01" >> {
-          unary(ExtractTimeZoneMinute(_).embed, Data.OffsetTime(JOffsetTime.parse("01:02:03+01:01:01")), Data.Int(1))
+
+        "OffsetTime" >> prop { (x: JLocalTime) =>
+          unary(
+            ExtractTimeZoneMinute(_).embed,
+            Data.OffsetTime(JOffsetTime.of(x, ZoneOffset.ofHoursMinutesSeconds(3, 13, 17))),
+            Data.Int(13))
         }
-        "2016-01-01T01:02:03+01:01:01" >> {
-          unary(ExtractTimeZoneMinute(_).embed, Data.OffsetDateTime(JOffsetDateTime.parse("2016-01-01T01:02:03+01:01:01")), Data.Int(1))
+
+        "OffsetDateTime" >> prop { (x: JLocalDateTime) =>
+          unary(
+            ExtractTimeZoneMinute(_).embed,
+            Data.OffsetDateTime(JOffsetDateTime.of(x, ZoneOffset.ofHoursMinutesSeconds(3, 13, 17))),
+            Data.Int(13))
         }
       }
 
       "ExtractTimeZoneHour" >> {
-        "2016-01-01+01:01:01" >> {
-          unary(ExtractTimeZoneHour(_).embed, Data.OffsetDate(quasar.OffsetDate.parse("2016-01-01+01:01:01")), Data.Int(1))
+        "OffsetDate" >> prop { (x: JLocalDate) =>
+          unary(
+            ExtractTimeZoneHour(_).embed,
+            Data.OffsetDate(QOffsetDate(x, ZoneOffset.ofHoursMinutesSeconds(3, 13, 17))),
+            Data.Int(3))
         }
-        "01:02:03+01:01:01" >> {
-          unary(ExtractTimeZoneHour(_).embed, Data.OffsetTime(JOffsetTime.parse("01:02:03+01:01:01")), Data.Int(1))
+
+        "OffsetTime" >> prop { (x: JLocalTime) =>
+          unary(
+            ExtractTimeZoneHour(_).embed,
+            Data.OffsetTime(JOffsetTime.of(x, ZoneOffset.ofHoursMinutesSeconds(3, 13, 17))),
+            Data.Int(3))
         }
-        "2016-01-01T01:02:03+01:01:01" >> {
-          unary(ExtractTimeZoneHour(_).embed, Data.OffsetDateTime(JOffsetDateTime.parse("2016-01-01T01:02:03+01:01:01")), Data.Int(1))
+
+        "OffsetDateTime" >> prop { (x: JLocalDateTime) =>
+          unary(
+            ExtractTimeZoneHour(_).embed,
+            Data.OffsetDateTime(JOffsetDateTime.of(x, ZoneOffset.ofHoursMinutesSeconds(3, 13, 17))),
+            Data.Int(3))
         }
       }
 
       "ExtractWeek" >> {
-        "2016-01-01" >> {
-          unaryB(ExtractWeek(_).embed, JLocalDate.parse("2016-01-01"), Data.Int(53))
+        val week7: JLocalDate = JLocalDate.parse("2001-02-16")
+        val week53: JLocalDate = JLocalDate.parse("2016-01-01")
+
+        "LocalDate week 7" >> {
+          unary(ExtractWeek(_).embed, Data.LocalDate(week7), Data.Int(7))
         }
 
-        "midnight 2016-01-01" >> {
-          unaryB(ExtractWeek(_).embed, JLocalDateTime.parse("2016-01-01T00:00:00.000"), Data.Int(53))
+        "OffsetDate week 7" >> prop { (offset: ZoneOffset) =>
+          unary(
+            ExtractWeek(_).embed,
+            Data.OffsetDate(QOffsetDate(week7, offset)),
+            Data.Int(7))
         }
 
-        "2001-02-16" >> {
-          unaryB(ExtractWeek(_).embed, JLocalDate.parse("2001-02-16"), Data.Int(7))
+        "LocalDateTime week 7" >> prop { (time: JLocalTime) =>
+          unary(
+            ExtractWeek(_).embed,
+            Data.LocalDateTime(JLocalDateTime.of(week7, time)),
+            Data.Int(7))
         }
 
-        "midnight 2016-10-03" >> {
-          unaryB(ExtractWeek(_).embed, JLocalDateTime.parse("2001-02-16T00:00:00.000"), Data.Int(7))
+        "OffsetDateTime week 7" >> prop { (time: JLocalTime, offset: ZoneOffset) =>
+          unary(
+            ExtractWeek(_).embed,
+            Data.OffsetDateTime(JOffsetDateTime.of(week7, time, offset)),
+            Data.Int(7))
         }
 
-        "2005-01-01" >> {
-          unaryB(ExtractWeek(_).embed, JLocalDate.parse("2005-01-01"), Data.Int(53))
+        "LocalDate week 53" >> {
+          unary(ExtractWeek(_).embed, Data.LocalDate(week53), Data.Int(53))
         }
 
-        "midnight 2005-01-01" >> {
-          unaryB(ExtractWeek(_).embed, JLocalDateTime.parse("2005-01-01T00:00:00.000"), Data.Int(53))
+        "OffsetDate week 53" >> prop { (offset: ZoneOffset) =>
+          unary(
+            ExtractWeek(_).embed,
+            Data.OffsetDate(QOffsetDate(week53, offset)),
+            Data.Int(53))
+        }
+
+        "LocalDateTime week 53" >> prop { (time: JLocalTime) =>
+          unary(
+            ExtractWeek(_).embed,
+            Data.LocalDateTime(JLocalDateTime.of(week53, time)),
+            Data.Int(53))
+        }
+
+        "OffsetDateTime week 53" >> prop { (time: JLocalTime, offset: ZoneOffset) =>
+          unary(
+            ExtractWeek(_).embed,
+            Data.OffsetDateTime(JOffsetDateTime.of(week53, time, offset)),
+            Data.Int(53))
         }
       }
 
       "ExtractYear" >> {
-        "1999-12-31" >> {
-          unaryB(ExtractYear(_).embed, JLocalDate.parse("1999-12-31"), Data.Int(1999))
+        "LocalDate" >> prop { (x: JLocalDate) =>
+          unary(ExtractYear(_).embed, Data.LocalDate(x.withYear(1999)), Data.Int(1999))
         }
 
-        "midnight 1999-12-31" >> {
-          unaryB(ExtractYear(_).embed, JLocalDateTime.parse("1999-12-31T00:00:00.000"), Data.Int(1999))
+        "LocalDateTime" >> prop { (x: JLocalDateTime) =>
+          unary(ExtractYear(_).embed, Data.LocalDateTime(x.withYear(1999)), Data.Int(1999))
+        }
+
+        "OffsetDate" >> prop { (x: JLocalDate, offset: ZoneOffset) =>
+          unary(
+            ExtractYear(_).embed,
+            Data.OffsetDate(QOffsetDate(x.withYear(1999), offset)),
+            Data.Int(1999))
+        }
+
+        "OffsetDateTime" >> prop { (x: JOffsetDateTime) =>
+          unary(ExtractYear(_).embed, Data.OffsetDateTime(x.withYear(1999)), Data.Int(1999))
         }
       }
 
