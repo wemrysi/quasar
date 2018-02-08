@@ -93,10 +93,10 @@ object Dependencies {
   )
 
   def mongodb = {
-    val nettyVersion = "4.1.17.Final"
+    val nettyVersion = "4.1.21.Final"
 
     Seq(
-      "org.mongodb" % "mongodb-driver-async" %   "3.6.1",
+      "org.mongodb" % "mongodb-driver-async" %   "3.6.2",
       // These are optional dependencies of the mongo asynchronous driver.
       // They are needed to connect to mongodb vis SSL which we do under certain configurations
       "io.netty"    % "netty-buffer"         % nettyVersion,
