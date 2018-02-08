@@ -22,7 +22,7 @@ import quasar.DataGenerators.{dataArbitrary => _, _}
 import quasar.frontend.logicalplan._
 import quasar.{
   DateTimeInterval,
-  OffsetDate => JOffsetDate,
+  OffsetDate => QOffsetDate,
   TemporalPart
 }
 import quasar.datetime.{truncDateTime, truncDate, truncTime}
@@ -101,8 +101,8 @@ abstract class StdLibSpec extends Qspec {
     implicit val arbDataLocalDateTime: Arbitrary[Data.LocalDateTime] =
       arbLocalDateTime ^^ Data.LocalDateTime
 
-    implicit val arbOffsetDate: Arbitrary[JOffsetDate] =
-      Arbitrary[JOffsetDate]((runner.dateDomain, runner.timezoneDomain) >> (JOffsetDate(_, _)))
+    implicit val arbOffsetDate: Arbitrary[QOffsetDate] =
+      Arbitrary[QOffsetDate]((runner.dateDomain, runner.timezoneDomain) >> (QOffsetDate(_, _)))
     implicit val arbDataOffsetDate: Arbitrary[Data.OffsetDate] =
       arbOffsetDate ^^ Data.OffsetDate
 
@@ -885,7 +885,7 @@ abstract class StdLibSpec extends Qspec {
             Data.LocalDateTime(JLocalDateTime.of(x, JLocalTime.MIN)))
         }
 
-        "OffsetDate" >> prop { (x: JOffsetDate) =>
+        "OffsetDate" >> prop { (x: QOffsetDate) =>
           unary(
             StartOfDay(_).embed,
             Data.OffsetDate(x),
@@ -963,7 +963,7 @@ abstract class StdLibSpec extends Qspec {
         nullary(MathLib.Subtract(tz.embed, tz.embed).embed, Data.Interval(DateTimeInterval.zero))
       }
 
-      "OffsetDate" >> prop { (v: JOffsetDate) =>
+      "OffsetDate" >> prop { (v: QOffsetDate) =>
         unary(OffsetDate(_).embed, Data.Str(v.toString), Data.OffsetDate(v))
       }
 
@@ -1183,7 +1183,7 @@ abstract class StdLibSpec extends Qspec {
           commute(Add(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x + y))
         }
 
-        "OffsetDate/Interval" >> prop { (x: JOffsetDate, i: DateTimeInterval) =>
+        "OffsetDate/Interval" >> prop { (x: QOffsetDate, i: DateTimeInterval) =>
           val dateInterval = (i.seconds == 0) && (i.nanos == 0)
           dateInterval ==> {
             val result = x.date.plusYears(i.years.toLong).plusMonths(i.months.toLong).plusDays(i.days.toLong)
@@ -1303,7 +1303,7 @@ abstract class StdLibSpec extends Qspec {
           binary(Subtract(_, _).embed, Data.OffsetDateTime(x), Data.Interval(y), Data.OffsetDateTime(y.subtractFromOffset(x)))
         }
 
-        "OffsetDate/Interval" >> prop { (x: quasar.OffsetDate, y: DateTimeInterval) =>
+        "OffsetDate/Interval" >> prop { (x: QOffsetDate, y: DateTimeInterval) =>
           binary(Subtract(_, _).embed, Data.OffsetDate(x), Data.Interval(y), Data.OffsetDate(x.minus(y.toPeriod)))
         }
 
@@ -1935,7 +1935,7 @@ abstract class StdLibSpec extends Qspec {
           ternary(Between(_, _, _).embed, Data.OffsetDateTime(mid), Data.OffsetDateTime(lo), Data.OffsetDateTime(hi), Data.Bool(result))
         }
 
-        "any three OffsetDates" >> prop { (lo: JOffsetDate, mid: JOffsetDate, hi: JOffsetDate) =>
+        "any three OffsetDates" >> prop { (lo: QOffsetDate, mid: QOffsetDate, hi: QOffsetDate) =>
           val result = lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0
           ternary(Between(_, _, _).embed, Data.OffsetDate(mid), Data.OffsetDate(lo), Data.OffsetDate(hi), Data.Bool(result))
         }
