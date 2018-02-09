@@ -536,20 +536,51 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ExtractDayOfMonth" >> {
-        "2016-01-01" >> {
-          unaryB(ExtractDayOfMonth(_).embed, JLocalDate.parse("2016-01-01"), Data.Int(1))
+        "LocalDate" >> prop { (x: JLocalDate) =>
+          unary(ExtractDayOfMonth(_).embed, Data.LocalDate(x.withDayOfMonth(7)), Data.Int(7))
         }
 
-        "midnight 2016-01-01" >> {
-          unaryB(ExtractDayOfMonth(_).embed, JLocalDateTime.parse("2016-01-01T00:00:00.000"), Data.Int(1))
+        "LocalDateTime" >> prop { (x: JLocalDateTime) =>
+          unary(ExtractDayOfMonth(_).embed, Data.LocalDateTime(x.withDayOfMonth(7)), Data.Int(7))
         }
 
-        "2016-02-29" >> {
-          unaryB(ExtractDayOfMonth(_).embed, JLocalDate.parse("2016-02-29"), Data.Int(29))
+        "OffsetDate" >> prop { (x: JLocalDate, offset: ZoneOffset) =>
+          unary(
+            ExtractDayOfMonth(_).embed,
+            Data.OffsetDate(QOffsetDate(x.withDayOfMonth(7), offset)),
+            Data.Int(7))
         }
 
-        "midnight 2016-02-29" >> {
-          unaryB(ExtractDayOfMonth(_).embed, JLocalDateTime.parse("2016-02-29T00:00:00.000"), Data.Int(29))
+        "OffsetDateTime" >> prop { (x: JOffsetDateTime) =>
+          unary(ExtractDayOfMonth(_).embed, Data.OffsetDateTime(x.withDayOfMonth(7)), Data.Int(7))
+        }
+
+        "LocalDate (leap year)" >> {
+          unary(
+            ExtractDayOfMonth(_).embed,
+            Data.LocalDate(JLocalDate.of(2016, 2, 29)),
+            Data.Int(29))
+        }
+
+        "LocalDateTime (leap year)" >> prop { (time: JLocalTime) =>
+          unary(
+            ExtractDayOfMonth(_).embed,
+            Data.LocalDateTime(JLocalDateTime.of(JLocalDate.of(2016, 2, 29), time)),
+            Data.Int(29))
+        }
+
+        "OffsetDate (leap year)" >> prop { (offset: ZoneOffset) =>
+          unary(
+            ExtractDayOfMonth(_).embed,
+            Data.OffsetDate(QOffsetDate(JLocalDate.of(2016, 2, 29), offset)),
+            Data.Int(29))
+        }
+
+        "OffsetDateTime (leap year)" >> prop { (time: JLocalTime, offset: ZoneOffset) =>
+          unary(
+            ExtractDayOfMonth(_).embed,
+            Data.OffsetDateTime(JOffsetDateTime.of(JLocalDate.of(2016, 2, 29), time, offset)),
+            Data.Int(29))
         }
       }
 
@@ -614,12 +645,20 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ExtractHour" >> {
-        "midnight 2016-09-29" >> {
-          unaryB(ExtractHour(_).embed, JLocalDateTime.parse("2016-03-01T00:00:00.000"), Data.Int(0))
+        "LocalTime" >> prop { (x: JLocalTime) =>
+          unary(ExtractHour(_).embed, Data.LocalTime(x.withHour(7)), Data.Int(7))
         }
 
-        "2016-09-29 12:34:56.789" >> {
-          unaryB(ExtractHour(_).embed, JLocalDateTime.parse("2016-03-01T12:34:56.789"), Data.Int(12))
+        "LocalDateTime" >> prop { (x: JLocalDateTime) =>
+          unary(ExtractHour(_).embed, Data.LocalDateTime(x.withHour(7)), Data.Int(7))
+        }
+
+        "OffsetTime" >> prop { (x: JOffsetTime) =>
+          unary(ExtractHour(_).embed, Data.OffsetTime(x.withHour(7)), Data.Int(7))
+        }
+
+        "OffsetDateTime" >> prop { (x: JOffsetDateTime) =>
+          unary(ExtractHour(_).embed, Data.OffsetDateTime(x.withHour(7)), Data.Int(7))
         }
       }
 
@@ -660,12 +699,60 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ExtractMicrosecond" >> {
-        "midnight 2016-09-29" >> {
-          unaryB(ExtractMicrosecond(_).embed, JLocalDateTime.parse("2016-03-01T00:00:00.000"), Data.Dec(0))
+        "LocalTime 0" >> prop { (x: JLocalTime) =>
+          unary(
+            ExtractMicrosecond(_).embed,
+            Data.LocalTime(x.withSecond(0).withNano(0)),
+            Data.Dec(0))
         }
 
-        "2016-09-29 12:34:56.789" >> {
-          unaryB(ExtractMicrosecond(_).embed, JLocalDateTime.parse("2016-03-01T12:34:56.789"), Data.Dec(56.789e6))
+        "LocalDateTime 0" >> prop { (x: JLocalDateTime) =>
+          unary(
+            ExtractMicrosecond(_).embed,
+            Data.LocalDateTime(x.withSecond(0).withNano(0)),
+            Data.Dec(0))
+        }
+
+        "OffsetTime 0" >> prop { (x: JOffsetTime) =>
+          unary(
+            ExtractMicrosecond(_).embed,
+            Data.OffsetTime(x.withSecond(0).withNano(0)),
+            Data.Dec(0))
+        }
+
+        "OffsetDateTime 0" >> prop { (x: JOffsetDateTime) =>
+          unary(
+            ExtractMicrosecond(_).embed,
+            Data.OffsetDateTime(x.withSecond(0).withNano(0)),
+            Data.Dec(0))
+        }
+
+        "LocalTime 56789000" >> prop { (x: JLocalTime) =>
+          unary(
+            ExtractMicrosecond(_).embed,
+            Data.LocalTime(x.withSecond(56).withNano(789000000)),
+            Data.Dec(56789000))
+        }
+
+        "LocalDateTime 56789000" >> prop { (x: JLocalDateTime) =>
+          unary(
+            ExtractMicrosecond(_).embed,
+            Data.LocalDateTime(x.withSecond(56).withNano(789000000)),
+            Data.Dec(56789000))
+        }
+
+        "OffsetTime 56789000" >> prop { (x: JOffsetTime) =>
+          unary(
+            ExtractMicrosecond(_).embed,
+            Data.OffsetTime(x.withSecond(56).withNano(789000000)),
+            Data.Dec(56789000))
+        }
+
+        "OffsetDateTime 56789000" >> prop { (x: JOffsetDateTime) =>
+          unary(
+            ExtractMicrosecond(_).embed,
+            Data.OffsetDateTime(x.withSecond(56).withNano(789000000)),
+            Data.Dec(56789000))
         }
       }
 
@@ -696,82 +783,145 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ExtractMillisecond" >> {
-        "midnight 2016-09-29" >> {
-          unaryB(ExtractMillisecond(_).embed, JLocalDateTime.parse("2016-03-01T00:00:00.000"), Data.Dec(0))
+        "LocalTime 0" >> prop { (x: JLocalTime) =>
+          unary(ExtractMillisecond(_).embed, Data.LocalTime(x.withSecond(0).withNano(0)), Data.Dec(0))
         }
 
-        "2016-09-29 12:34:56.789" >> {
-          unaryB(ExtractMillisecond(_).embed, JLocalDateTime.parse("2016-03-01T12:34:56.789"), Data.Dec(56.789e3))
+        "LocalDateTime 0" >> prop { (x: JLocalDateTime) =>
+          unary(ExtractMillisecond(_).embed, Data.LocalDateTime(x.withSecond(0).withNano(0)), Data.Dec(0))
+        }
+
+        "OffsetTime 0" >> prop { (x: JOffsetTime) =>
+          unary(ExtractMillisecond(_).embed, Data.OffsetTime(x.withSecond(0).withNano(0)), Data.Dec(0))
+        }
+
+        "OffsetDateTime 0" >> prop { (x: JOffsetDateTime) =>
+          unary(ExtractMillisecond(_).embed, Data.OffsetDateTime(x.withSecond(0).withNano(0)), Data.Dec(0))
+        }
+
+        "LocalTime 56789" >> prop { (x: JLocalTime) =>
+          unary(
+            ExtractMillisecond(_).embed,
+            Data.LocalTime(x.withSecond(56).withNano(789000000)),
+            Data.Dec(56789))
+        }
+
+        "LocalDateTime 56789" >> prop { (x: JLocalDateTime) =>
+          unary(
+            ExtractMillisecond(_).embed,
+            Data.LocalDateTime(x.withSecond(56).withNano(789000000)),
+            Data.Dec(56789))
+        }
+
+        "OffsetTime 56789" >> prop { (x: JOffsetTime) =>
+          unary(
+            ExtractMillisecond(_).embed,
+            Data.OffsetTime(x.withSecond(56).withNano(789000000)),
+            Data.Dec(56789))
+        }
+
+        "OffsetDateTime 56789" >> prop { (x: JOffsetDateTime) =>
+          unary(
+            ExtractMillisecond(_).embed,
+            Data.OffsetDateTime(x.withSecond(56).withNano(789000000)),
+            Data.Dec(56789))
         }
       }
 
       "ExtractMinute" >> {
-        "midnight 2016-09-29" >> {
-          unaryB(ExtractMinute(_).embed, JLocalDateTime.parse("2016-03-01T00:00:00.000"), Data.Int(0))
+        "LocalTime" >> prop { (x: JLocalTime) =>
+          unary(ExtractMinute(_).embed, Data.LocalTime(x.withMinute(7)), Data.Int(7))
         }
 
-        "2016-09-29 12:34:56.789" >> {
-          unaryB(ExtractMinute(_).embed, JLocalDateTime.parse("2016-03-01T12:34:56.789"), Data.Int(34))
+        "LocalDateTime" >> prop { (x: JLocalDateTime) =>
+          unary(ExtractMinute(_).embed, Data.LocalDateTime(x.withMinute(7)), Data.Int(7))
+        }
+
+        "OffsetTime" >> prop { (x: JOffsetTime) =>
+          unary(ExtractMinute(_).embed, Data.OffsetTime(x.withMinute(7)), Data.Int(7))
+        }
+
+        "OffsetDateTime" >> prop { (x: JOffsetDateTime) =>
+          unary(ExtractMinute(_).embed, Data.OffsetDateTime(x.withMinute(7)), Data.Int(7))
         }
       }
 
       "ExtractMonth" >> {
-        "2016-01-01" >> {
-          unaryB(ExtractMonth(_).embed, JLocalDate.parse("2016-01-01"), Data.Int(1))
+        "LocalDate" >> prop { (x: JLocalDate) =>
+          unary(ExtractMonth(_).embed, Data.LocalDate(x.withMonth(7)), Data.Int(7))
         }
 
-        "midnight 2016-01-01" >> {
-          unaryB(ExtractMonth(_).embed, JLocalDateTime.parse("2016-01-01T00:00:00.000"), Data.Int(1))
+        "LocalDateTime" >> prop { (x: JLocalDateTime) =>
+          unary(ExtractMonth(_).embed, Data.LocalDateTime(x.withMonth(7)), Data.Int(7))
         }
 
-        "2016-02-29" >> {
-          unaryB(ExtractMonth(_).embed, JLocalDate.parse("2016-02-29"), Data.Int(2))
+        "OffsetDate" >> prop { (x: JLocalDate, offset: ZoneOffset) =>
+          unary(
+            ExtractMonth(_).embed,
+            Data.OffsetDate(QOffsetDate(x.withMonth(7), offset)),
+            Data.Int(7))
         }
 
-        "midnight 2016-02-29" >> {
-          unaryB(ExtractMonth(_).embed, JLocalDateTime.parse("2016-02-29T00:00:00.000"), Data.Int(2))
+        "OffsetDateTime" >> prop { (x: JOffsetDateTime) =>
+          unary(ExtractMonth(_).embed, Data.OffsetDateTime(x.withMonth(7)), Data.Int(7))
         }
       }
 
       "ExtractQuarter" >> {
-        "2016-10-03" >> {
-          unaryB(ExtractQuarter(_).embed, JLocalDate.parse("2016-10-03"), Data.Int(4))
+        "LocalDate Q1" >> prop { (x: JLocalDate) =>
+          unary(
+            ExtractQuarter(_).embed,
+            Data.LocalDate(x.withMonth(3).withDayOfMonth(31)),
+            Data.Int(1))
         }
 
-        "midnight 2016-10-03" >> {
-          unaryB(ExtractQuarter(_).embed, JLocalDateTime.parse("2016-10-03T00:00:00.000"), Data.Int(4))
+        "OffsetDate Q2" >> prop { (x: JLocalDate, offset: ZoneOffset) =>
+          unary(
+            ExtractQuarter(_).embed,
+            Data.OffsetDate(QOffsetDate(x.withMonth(6).withDayOfMonth(30), offset)),
+            Data.Int(2))
         }
 
-        "2016-03-31 (leap year)" >> {
-          unaryB(ExtractQuarter(_).embed, JLocalDate.parse("2016-03-31"), Data.Int(1))
+        "LocalDateTime Q3" >> prop { (x: JLocalDateTime) =>
+          unary(
+            ExtractQuarter(_).embed,
+            Data.LocalDateTime(x.withMonth(9).withDayOfMonth(30)),
+            Data.Int(3))
         }
 
-        "midnight 2016-03-31 (leap year)" >> {
-          unaryB(ExtractQuarter(_).embed, JLocalDateTime.parse("2016-03-31T00:00:00.000"), Data.Int(1))
+        "OffsetDateTime Q4" >> prop { (x: JOffsetDateTime) =>
+          unary(
+            ExtractQuarter(_).embed,
+            Data.OffsetDateTime(x.withMonth(12).withDayOfMonth(31)),
+            Data.Int(4))
         }
 
-        "2016-04-01 (leap year)" >> {
-          unaryB(ExtractQuarter(_).embed, JLocalDate.parse("2016-04-01"), Data.Int(2))
+        "LocalDate Q1 (leap year)" >> {
+          unary(
+            ExtractQuarter(_).embed,
+            Data.LocalDate(JLocalDate.of(2016, 2, 29)),
+            Data.Int(1))
         }
 
-        "midnight 2016-04-01 (leap year)" >> {
-          unaryB(ExtractQuarter(_).embed, JLocalDateTime.parse("2016-04-01T00:00:00.000"), Data.Int(2))
+        "OffsetDate Q1 (leap year)" >> prop { (offset: ZoneOffset) =>
+          unary(
+            ExtractQuarter(_).embed,
+            Data.OffsetDate(QOffsetDate(JLocalDate.of(2016, 2, 29), offset)),
+            Data.Int(1))
         }
 
-        "2017-03-31" >> {
-          unaryB(ExtractQuarter(_).embed, JLocalDate.parse("2017-03-31"), Data.Int(1))
+        "LocalDateTime Q1 (leap year)" >> prop { (time: JLocalTime) =>
+          unary(
+            ExtractQuarter(_).embed,
+            Data.LocalDateTime(JLocalDateTime.of(JLocalDate.of(2016, 2, 29), time)),
+            Data.Int(1))
         }
 
-        "midnight 2017-03-31" >> {
-          unaryB(ExtractQuarter(_).embed, JLocalDateTime.parse("2017-03-31T00:00:00.000"), Data.Int(1))
-        }
-
-        "2017-04-01" >> {
-          unaryB(ExtractQuarter(_).embed, JLocalDate.parse("2017-04-01"), Data.Int(2))
-        }
-
-        "midnight 2017-04-01" >> {
-          unaryB(ExtractQuarter(_).embed, JLocalDateTime.parse("2017-04-01T00:00:00.000"), Data.Int(2))
+        "OffsetDateTime Q1 (leap year)" >> prop { (time: JLocalTime, offset: ZoneOffset) =>
+          unary(
+            ExtractQuarter(_).embed,
+            Data.OffsetDateTime(JOffsetDateTime.of(JLocalDate.of(2016, 2, 29), time, offset)),
+            Data.Int(1))
         }
       }
 
