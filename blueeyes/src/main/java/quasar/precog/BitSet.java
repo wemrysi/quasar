@@ -505,7 +505,7 @@ public class BitSet {
      * @param newLength the new length of the table.
      */
     private final void setLength(final int newLength) {
-        int arrayLength = (int)Math.pow(2, 32 - Integer.numberOfLeadingZeros(newLength));
+        int arrayLength = 1 << (32 - Integer.numberOfLeadingZeros(newLength));
         if (arrayLength < 0 || arrayLength > (1 << 27)) {
             throw new RuntimeException(newLength + " is too large for a BitSet length");
         }
