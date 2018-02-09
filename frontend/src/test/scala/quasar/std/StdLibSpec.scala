@@ -346,13 +346,6 @@ abstract class StdLibSpec extends Qspec {
     "DateLib" >> {
       import DateLib._
 
-      def unaryB[I](
-          prg: Fix[LogicalPlan] => Fix[LogicalPlan],
-          input: I, expected: Data)(implicit arbF: Arbitrary[Builder[I, Data]]): Prop =
-        prop { (b: Builder[I, Data]) =>
-          unary(prg, b.f(input), expected)
-        }
-
       val genOffset = Gen.choose(-64800, 64800)
       val genOffsetMinute = Gen.choose(-59, 59)
       val genOffsetPositiveMinute = Gen.choose(0, 59)
@@ -828,20 +821,57 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ExtractIsoYear" >> {
-        "2006-01-01" >> {
-          unaryB(ExtractIsoYear(_).embed, JLocalDate.parse("2006-01-01"), Data.Int(2005))
+        val year2016: JLocalDate = JLocalDate.parse("2017-01-01")
+        val year2017: JLocalDate = JLocalDate.parse("2017-01-02") // first week containing Jan. 4
+
+        "LocalDate year 2016" >> {
+          unary(ExtractIsoYear(_).embed, Data.LocalDate(year2016), Data.Int(2016))
         }
 
-        "midnight 2006-01-01" >> {
-          unaryB(ExtractIsoYear(_).embed, JLocalDateTime.parse("2006-01-01T00:00:00.000"), Data.Int(2005))
+        "OffsetDate year 2016" >> prop { (offset: ZoneOffset) =>
+          unary(
+            ExtractIsoYear(_).embed,
+            Data.OffsetDate(QOffsetDate(year2016, offset)),
+            Data.Int(2016))
         }
 
-        "2006-01-02" >> {
-          unaryB(ExtractIsoYear(_).embed, JLocalDate.parse("2006-01-02"), Data.Int(2006))
+        "LocalDateTime year 2016" >> prop { (time: JLocalTime) =>
+          unary(
+            ExtractIsoYear(_).embed,
+            Data.LocalDateTime(JLocalDateTime.of(year2016, time)),
+            Data.Int(2016))
         }
 
-        "midnight 2006-01-02" >> {
-          unaryB(ExtractIsoYear(_).embed, JLocalDateTime.parse("2006-01-02T00:00:00.000"), Data.Int(2006))
+        "OffsetDateTime year 2016" >> prop { (time: JLocalTime, offset: ZoneOffset) =>
+          unary(
+            ExtractIsoYear(_).embed,
+            Data.OffsetDateTime(JOffsetDateTime.of(year2016, time, offset)),
+            Data.Int(2016))
+        }
+
+        "LocalDate year 2017" >> {
+          unary(ExtractIsoYear(_).embed, Data.LocalDate(year2017), Data.Int(2017))
+        }
+
+        "OffsetDate year 2017" >> prop { (offset: ZoneOffset) =>
+          unary(
+            ExtractIsoYear(_).embed,
+            Data.OffsetDate(QOffsetDate(year2017, offset)),
+            Data.Int(2017))
+        }
+
+        "LocalDateTime year 2017" >> prop { (time: JLocalTime) =>
+          unary(
+            ExtractIsoYear(_).embed,
+            Data.LocalDateTime(JLocalDateTime.of(year2017, time)),
+            Data.Int(2017))
+        }
+
+        "OffsetDateTime year 2017" >> prop { (time: JLocalTime, offset: ZoneOffset) =>
+          unary(
+            ExtractIsoYear(_).embed,
+            Data.OffsetDateTime(JOffsetDateTime.of(year2017, time, offset)),
+            Data.Int(2017))
         }
       }
 
