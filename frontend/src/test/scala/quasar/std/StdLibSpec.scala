@@ -1653,12 +1653,10 @@ abstract class StdLibSpec extends Qspec {
           commute(Add(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x + y))
         }
 
-        "OffsetDate/Interval" >> prop { (x: QOffsetDate, i: DateTimeInterval) =>
-          val dateInterval = (i.seconds == 0) && (i.nanos == 0)
-          dateInterval ==> {
-            val result = x.date.plusYears(i.years.toLong).plusMonths(i.months.toLong).plusDays(i.days.toLong)
-            commute(Add(_, _).embed, Data.OffsetDate(x), Data.Interval(i), Data.OffsetDate(quasar.OffsetDate(result, x.offset)))
-          }
+        "OffsetDate/Interval" >> prop { (x: QOffsetDate, i0: DateTimeInterval) =>
+          val i = DateTimeInterval.makeUnsafe(i0.years, i0.months, i0.days, 0, 0)
+          val result = x.date.plusYears(i.years.toLong).plusMonths(i.months.toLong).plusDays(i.days.toLong)
+          commute(Add(_, _).embed, Data.OffsetDate(x), Data.Interval(i), Data.OffsetDate(quasar.OffsetDate(result, x.offset)))
         }
 
         "OffsetTime/Interval" >> prop { (x: JOffsetTime, i: DateTimeInterval) =>
