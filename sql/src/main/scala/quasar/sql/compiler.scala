@@ -17,24 +17,27 @@
 package quasar.sql
 
 import slamdata.Predef._
-import quasar.{Data, Func, GenericFunc, HomomorphicFunction, Reduction, SemanticError, Sifting, UnaryFunc, VarName},
-  SemanticError._
+import quasar.{Data, Func, GenericFunc, HomomorphicFunction, Reduction, SemanticError, Sifting, UnaryFunc, VarName}
+import SemanticError._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.contrib.shapeless._
 import quasar.common.SortDir
 import quasar.fp._
-import quasar.fp.binder._
-import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
-import quasar.std.StdLib, StdLib._
+import quasar.frontend.logicalplan.{LogicalPlan => LP, Let => LPLet, _}
+import quasar.std.StdLib
+import StdLib._
 import quasar.std.TemporalPart
-import quasar.sql.{SemanticAnalysis => SA}, SA._
+import quasar.sql.{SemanticAnalysis => SA}
+import SA._
+import quasar.RenderTree
 
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
+import matryoshka.patterns._
 import pathy.Path._
-import scalaz.{Tree => _, _}, Scalaz._
+import scalaz.{Tree => _, Free => ZFree, _}, Scalaz._
 import shapeless.{Annotations => _, Data => _, :: => _, _}
 
 final case class TableContext[T]
@@ -254,56 +257,76 @@ final class Compiler[M[_], T: Equal]
       CIName("shift_array")             -> structural.ShiftArray,
       CIName("meta")                    -> structural.Meta)
 
-    def compileDistinct(t: T) =
+    def compileDistinct(t: T) = {
       CompilerState.freshName("distinct") ∘ (name =>
         lpr.let(name, t, agg.Arbitrary(set.GroupBy(lpr.free(name), lpr.free(name)).embed).embed))
+    }
 
     def compileCases
       (cases: List[Case[CoExpr]], default: T)
-      (f: Case[CoExpr] => M[(T, T)]) =
+      (f: Case[CoExpr] => M[(T, T)]) = {
       cases.traverse(f).map(_.foldRight(default) {
         case ((cond, expr), default) =>
           relations.Cond(cond, expr, default).embed
       })
+    }
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def flattenJoins(term: T, relations: SqlRelation[CoExpr]):
-        T = relations match {
-      case _: NamedRelation[_]             => term
-      case JoinRelation(left, right, _, _) =>
-        structural.MapConcat(
-          flattenJoins(Left.projectFrom(term), left),
-          flattenJoins(Right.projectFrom(term), right)).embed
+        T = {
+      relations match {
+        case _: NamedRelation[_]             => term
+        case JoinRelation(left, right, _, _) =>
+          structural.MapConcat(
+            flattenJoins(Left.projectFrom(term), left),
+            flattenJoins(Right.projectFrom(term), right)).embed
+      }
     }
+
+    // TODO: Customer Orders starting point
+    // TODO: flight recorder attch a profiler yourkit
+    // TODO: a node is probably beind compared too many times
+    // TODO: matryoska that compares eq to eq
+    // TODO: equals in logical plan is broken
 
     def buildJoinDirectionMap(relations: SqlRelation[CoExpr]):
         Map[String, List[JoinDir]] = {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def loop(rel: SqlRelation[CoExpr], acc: List[JoinDir]):
-          Map[String, List[JoinDir]] = rel match {
-        case t: NamedRelation[_] => Map(t.aliasName -> acc)
-        case JoinRelation(left, right, tpe, clause) =>
-          loop(left, Left :: acc) ++ loop(right, Right :: acc)
+          Map[String, List[JoinDir]] = {
+        rel match {
+          case t: NamedRelation[_] => {
+            val x = Map(t.aliasName -> acc)
+            x
+          }
+          case JoinRelation(left, right, tpe, clause) => {
+            loop(left, Left :: acc) ++ loop(right, Right :: acc)
+          }
+        }
       }
 
       loop(relations, Nil)
     }
 
     def compileTableRefs(joined: T, relations: SqlRelation[CoExpr]):
-        Map[String, T] =
-      buildJoinDirectionMap(relations).map {
-        case (name, dirs) =>
+        Map[String, T] = {
+      val x = buildJoinDirectionMap(relations).map {
+        case (name, dirs) => {
           name -> dirs.foldRight(
             joined)(
             (dir, acc) => dir.projectFrom(acc))
+        }
       }
+      x
+    }
 
     def tableContext(joined: T, relations: SqlRelation[CoExpr]):
-        TableContext[T] =
+        TableContext[T] = {
       TableContext(
         Some(joined),
         () => flattenJoins(joined, relations),
         compileTableRefs(joined, relations))
+    }
 
     def step(relations: SqlRelation[CoExpr])
         : (Option[M[T]] => M[T] => M[T]) = {
@@ -314,13 +337,13 @@ final class Compiler[M[_], T: Equal]
           stepName <- CompilerState.freshName("tmp")
           current  <- current
           bc        = relations match {
-            case ExprRelationAST(_, Some(name))        => BindingContext(Map(name -> lpr.free(stepName)))
+            case ExprRelationAST(_, Some(name))  => BindingContext(Map(name -> lpr.free(stepName)))
             case TableRelationAST(_, Some(name)) => BindingContext(Map(name -> lpr.free(stepName)))
             case id @ IdentRelationAST(_, _)     => BindingContext(Map(id.aliasName -> lpr.free(stepName)))
             case r                               => BindingContext[T](Map())
           }
           next2    <- CompilerState.contextual(bc, tableContext(lpr.free(stepName), relations))(next)
-        } yield lpr.let(stepName, current, next2)
+        } yield {lpr.let(stepName, current, next2)}
       }.getOrElse(next)
     }
 
@@ -340,8 +363,9 @@ final class Compiler[M[_], T: Equal]
     }
 
     def compileFunction[N <: Nat](func: GenericFunc[N], args: Func.Input[CoExpr, N]):
-        M[T] =
+        M[T] = {
       args.traverse(compile0).map(func.applyGeneric(_).embed)
+    }
 
     def buildRecord(names: List[Option[String]], values: List[T]):
         T = {
@@ -356,7 +380,7 @@ final class Compiler[M[_], T: Equal]
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def compileRelation(r: SqlRelation[CoExpr]): M[T] =
+    def compileRelation(r: SqlRelation[CoExpr]): M[T] = {
       r match {
         case IdentRelationAST(name, _) =>
           CompilerState.subtableReq[M, T](name)
@@ -371,8 +395,8 @@ final class Compiler[M[_], T: Equal]
 
         case ExprRelationAST(expr, _) => compile0(expr)
 
-        case JoinRelation(left, right, tpe, clause) =>
-          (CompilerState.freshName("left") ⊛ CompilerState.freshName("right"))((leftName, rightName) => {
+        case JoinRelation(left, right, tpe, clause) => {
+          (CompilerState.freshName("left") ⊛ CompilerState.freshName("right")) ((leftName, rightName) => {
             val leftFree: T = lpr.joinSideName(leftName)
             val rightFree: T = lpr.joinSideName(rightName)
 
@@ -381,36 +405,38 @@ final class Compiler[M[_], T: Equal]
               CompilerState.contextual(
                 BindingContext(Map()),
                 tableContext(leftFree, left) ++ tableContext(rightFree, right))
-              (compile0(clause)))((left0, right0, clause0) =>
-                lpr.join(left0, right0, tpe, JoinCondition(leftName, rightName, clause0)))
+              (compile0(clause))) ((left0, right0, clause0) =>
+              lpr.join(left0, right0, tpe, JoinCondition(leftName, rightName, clause0)))
           }).join
+        }
       }
+    }
 
-    def extractFunc(part: String): Option[UnaryFunc] =
+    def extractFunc(part: String): Option[UnaryFunc] = {
       part.some collect {
-        case "century"      => date.ExtractCentury
-        case "day"          => date.ExtractDayOfMonth
-        case "decade"       => date.ExtractDecade
-        case "dow"          => date.ExtractDayOfWeek
-        case "doy"          => date.ExtractDayOfYear
-        case "epoch"        => date.ExtractEpoch
-        case "hour"         => date.ExtractHour
-        case "isodow"       => date.ExtractIsoDayOfWeek
-        case "isoyear"      => date.ExtractIsoYear
+        case "century" => date.ExtractCentury
+        case "day" => date.ExtractDayOfMonth
+        case "decade" => date.ExtractDecade
+        case "dow" => date.ExtractDayOfWeek
+        case "doy" => date.ExtractDayOfYear
+        case "epoch" => date.ExtractEpoch
+        case "hour" => date.ExtractHour
+        case "isodow" => date.ExtractIsoDayOfWeek
+        case "isoyear" => date.ExtractIsoYear
         case "microseconds" => date.ExtractMicroseconds
-        case "millennium"   => date.ExtractMillennium
+        case "millennium" => date.ExtractMillennium
         case "milliseconds" => date.ExtractMilliseconds
-        case "minute"       => date.ExtractMinute
-        case "month"        => date.ExtractMonth
-        case "quarter"      => date.ExtractQuarter
-        case "second"       => date.ExtractSecond
-        case "week"         => date.ExtractWeek
-        case "year"         => date.ExtractYear
+        case "minute" => date.ExtractMinute
+        case "month" => date.ExtractMonth
+        case "quarter" => date.ExtractQuarter
+        case "second" => date.ExtractSecond
+        case "week" => date.ExtractWeek
+        case "year" => date.ExtractYear
       }
+    }
 
     def temporalPart(part: String): Option[TemporalPart] = {
       import TemporalPart._
-
       part.some collect {
         case "century"         => Century
         case "day"             => Day
@@ -430,7 +456,7 @@ final class Compiler[M[_], T: Equal]
 
     def temporalPartFunc[A](
       name: CIName, args: List[CoExpr], f1: String => Option[A], f2: (A, T) => M[T]
-    ): M[T] =
+    ): M[T] = {
       args.traverse(compile0).flatMap {
         case Embed(Constant(Data.Str(part))) :: expr :: Nil =>
           f1(part).cata(
@@ -441,6 +467,7 @@ final class Compiler[M[_], T: Equal]
         case _ =>
           fail(WrongArgumentCount(name, 2, args.length))
       }
+    }
 
     node.tail match {
       case s @ Select(isDistinct, projections, relations, filter, groupBy, orderBy) =>
@@ -726,9 +753,10 @@ final class Compiler[M[_], T: Equal]
     (tree: Cofree[Sql, SA.Annotations])
     (implicit
       MErr: MonadError_[M, SemanticError],
-      MState: MonadState[M, CompilerState[T]])
-      : M[T] =
+      MState: MonadState[M, CompilerState[T]]) //, S: Show[T], R: RenderTree[T])
+      : M[T] = {
     compile0(tree).map(Compiler.reduceGroupKeys[T])
+  }
 }
 
 object Compiler {
@@ -740,44 +768,71 @@ object Compiler {
     (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
     apply[StateT[EitherT[scalaz.Free.Trampoline, SemanticError, ?], CompilerState[T], ?], T]
 
-  def compile[T: Equal]
+  def compile[T: Equal: RenderTree]
     (tree: Cofree[Sql, SA.Annotations])
-    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
-      : SemanticError \/ T =
+    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) //, S: Show[T])
+      : SemanticError \/ T = {
     trampoline[T].compile(tree).eval(CompilerState(Nil, Context(Nil, Nil), 0)).run.run
+  }
 
   /** Emulate SQL semantics by reducing any projection which trivially
     * matches a key in the "group by".
     */
   def reduceGroupKeys[T: Equal]
     (tree: T)
-    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
+    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) //, S: Show[T], R: RenderTree[T])
       : T = {
     // Step 0: identify key expressions, and rewrite them by replacing the
     // group source with the source at the point where they might appear.
-    def keysƒ(t: LP[(T, List[T])]):
-        (T, List[T]) =
-    {
+    def keysƒ(t: LP[(T, List[(T, ZFree[LP, Unit])])]): (T, List[(T, ZFree[LP, Unit])]) = {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-      def groupedKeys(t: LP[T], newSrc: T): Option[List[T]] = {
+      @tailrec
+      def groupedKeys(t: LP[T], newSrc: T): Option[List[(T, ZFree[LP, Unit])]] = {
         t match {
           case InvokeUnapply(set.GroupBy, Sized(src, structural.MakeArrayN(keys))) =>
-            Some(keys.map(_.transCataT(t => if (t ≟ src) newSrc else t)))
+            Some(keys.map(_.transAna[ZFree[LP, Unit]]{ lp =>
+              if (lp.embed ≟ src) CoEnv[Unit, LP, T](-\/(()))
+              else CoEnv[Unit, LP, T](\/-(lp))
+            }) strengthL newSrc)
+
           case InvokeUnapply(func, Sized(src, _)) if func.effect ≟ Sifting =>
             groupedKeys(src.project, newSrc)
+
           case _ => None
         }
       }
 
-      (t.map(_._1).embed,
-        groupedKeys(t.map(_._1), t.map(_._1).embed).getOrElse(t.foldMap(_._2)))
+      val tf = t.map(_._1)
+      (tf.embed, groupedKeys(tf, tf.embed).getOrElse(t.foldMap(_._2).distinctE.toList))
     }
 
-    // use `scalaz.IList` so we can use `scalaz.Equal[LP]`
-    val keys: IList[T] = IList.fromList(boundCata(tree)(keysƒ)._2)
+    val sources: List[(T, ZFree[LP, Unit])] = tree.cata(keysƒ)._2
+
+    type KeyState = (List[(T, ZFree[LP, Unit])], List[T])
+
+    val KS = MonadState_[State[KeyState, ?], KeyState]
+
+    def flpCata(tree: T, flp: ZFree[LP, Unit]) = flp.cata(interpret[LP, Unit, T](_ => tree, _.embed))
 
     // Step 1: annotate nodes containing the keys.
-    val ann: Cofree[LP, Boolean] = boundAttribute(tree)(keys.element)
+    val ann: State[KeyState, Cofree[LP, Boolean]] = tree.transAnaM {
+      case let @ LPLet(name, expr, body) =>
+        for {
+          ks <- KS.get
+          (srcs, keys) = ks
+          srcs2 = srcs.map { case (t, flp) =>
+            val l = if (t ≟ expr) Free[T](name).embed else t
+            (l, flp)
+          }
+          keys2 = srcs2.map { case (t, flp) => flpCata(t,flp) }
+          _ <- KS.put((srcs2, keys2))
+        } yield EnvT((keys.element(let.embed), let: LP[T]))
+
+      case other =>
+        KS.gets { case (_, k) =>
+          EnvT((k.element(other.embed), other))
+        }
+    }
 
     // Step 2: transform from the top, inserting Arbitrary where a key is not
     // otherwise reduced.
@@ -793,6 +848,9 @@ object Compiler {
           else t.tail
       }
     }
-    ann.ana[T](rewriteƒ)
+
+    ann.eval((sources, sources.map { case (t, flp) => flpCata(t,flp) })).ana[T](rewriteƒ)
+
   }
+
 }
