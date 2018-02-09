@@ -138,7 +138,7 @@ trait DateLib extends Library with Serializable {
     (extractDecade _).andThen(Data.Int(_)))
 
   val ExtractDayOfWeek = dateFunc(
-    "Pulls out the day of week (`dow`) subfield from a date/time value " + "(Sunday: 0 to Saturday: 7).",
+    "Pulls out the day of week (`dow`) subfield from a date/time value " + "(Sunday: 0 to Saturday: 6).",
     Type.Int,
     (extractDayOfWeek  _).andThen(Data.Int(_)))
 

@@ -639,28 +639,57 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ExtractDayOfWeek" >> {
-        "2016-09-28" >> {
-          unaryB(ExtractDayOfWeek(_).embed, JLocalDate.parse("2016-09-28"), Data.Int(3))
+        val day0: JLocalDate = JLocalDate.parse("2016-10-02") // Sunday
+        val day6: JLocalDate = JLocalDate.parse("2016-10-08") // Saturday
+
+        "LocalDate day 0" >> {
+          unary(ExtractDayOfWeek(_).embed, Data.LocalDate(day0), Data.Int(0))
         }
 
-        "midnight 2016-09-28" >> {
-          unaryB(ExtractDayOfWeek(_).embed, JLocalDateTime.parse("2016-09-28T00:00:00.000"), Data.Int(3))
+        "OffsetDate day 0" >> prop { (offset: ZoneOffset) =>
+          unary(
+            ExtractDayOfWeek(_).embed,
+            Data.OffsetDate(QOffsetDate(day0, offset)),
+            Data.Int(0))
         }
 
-        "2016-10-02" >> {
-          unaryB(ExtractDayOfWeek(_).embed, JLocalDate.parse("2016-10-02"), Data.Int(0))
+        "LocalDateTime day 0" >> prop { (time: JLocalTime) =>
+          unary(
+            ExtractDayOfWeek(_).embed,
+            Data.LocalDateTime(JLocalDateTime.of(day0, time)),
+            Data.Int(0))
         }
 
-        "midnight 2016-10-02" >> {
-          unaryB(ExtractDayOfWeek(_).embed, JLocalDateTime.parse("2016-10-02T00:00:00.000"), Data.Int(0))
+        "OffsetDateTime day 0" >> prop { (time: JLocalTime, offset: ZoneOffset) =>
+          unary(
+            ExtractDayOfWeek(_).embed,
+            Data.OffsetDateTime(JOffsetDateTime.of(day0, time, offset)),
+            Data.Int(0))
         }
 
-        "2016-10-08" >> {
-          unaryB(ExtractDayOfWeek(_).embed, JLocalDate.parse("2016-10-08"), Data.Int(6))
+        "LocalDate day 6" >> {
+          unary(ExtractDayOfWeek(_).embed, Data.LocalDate(day6), Data.Int(6))
         }
 
-        "noon 2016-10-08" >> {
-          unaryB(ExtractDayOfWeek(_).embed, JLocalDateTime.parse("2016-10-08T12:00:00.000"), Data.Int(6))
+        "OffsetDate day 6" >> prop { (offset: ZoneOffset) =>
+          unary(
+            ExtractDayOfWeek(_).embed,
+            Data.OffsetDate(QOffsetDate(day6, offset)),
+            Data.Int(6))
+        }
+
+        "LocalDateTime day 6" >> prop { (time: JLocalTime) =>
+          unary(
+            ExtractDayOfWeek(_).embed,
+            Data.LocalDateTime(JLocalDateTime.of(day6, time)),
+            Data.Int(6))
+        }
+
+        "OffsetDateTime day 6" >> prop { (time: JLocalTime, offset: ZoneOffset) =>
+          unary(
+            ExtractDayOfWeek(_).embed,
+            Data.OffsetDateTime(JOffsetDateTime.of(day6, time, offset)),
+            Data.Int(6))
         }
       }
 
@@ -744,20 +773,57 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ExtractIsoDayOfWeek" >> {
-        "2016-09-28" >> {
-          unaryB(ExtractIsoDayOfWeek(_).embed, JLocalDate.parse("2016-09-28"), Data.Int(3))
+        val day1: JLocalDate = JLocalDate.parse("2016-09-26") // Monday
+        val day7: JLocalDate = JLocalDate.parse("2016-10-02") // Sunday
+
+        "LocalDate day 1" >> {
+          unary(ExtractIsoDayOfWeek(_).embed, Data.LocalDate(day1), Data.Int(1))
         }
 
-        "midnight 2016-09-28" >> {
-          unaryB(ExtractIsoDayOfWeek(_).embed, JLocalDateTime.parse("2016-09-28T00:00:00.000"), Data.Int(3))
+        "OffsetDate day 1" >> prop { (offset: ZoneOffset) =>
+          unary(
+            ExtractIsoDayOfWeek(_).embed,
+            Data.OffsetDate(QOffsetDate(day1, offset)),
+            Data.Int(1))
         }
 
-        "2016-10-02" >> {
-          unaryB(ExtractIsoDayOfWeek(_).embed, JLocalDate.parse("2016-10-02"), Data.Int(7))
+        "LocalDateTime day 1" >> prop { (time: JLocalTime) =>
+          unary(
+            ExtractIsoDayOfWeek(_).embed,
+            Data.LocalDateTime(JLocalDateTime.of(day1, time)),
+            Data.Int(1))
         }
 
-        "midnight 2016-10-02" >> {
-          unaryB(ExtractIsoDayOfWeek(_).embed, JLocalDateTime.parse("2016-10-02T00:00:00.000"), Data.Int(7))
+        "OffsetDateTime day 1" >> prop { (time: JLocalTime, offset: ZoneOffset) =>
+          unary(
+            ExtractIsoDayOfWeek(_).embed,
+            Data.OffsetDateTime(JOffsetDateTime.of(day1, time, offset)),
+            Data.Int(1))
+        }
+
+        "LocalDate day 7" >> {
+          unary(ExtractIsoDayOfWeek(_).embed, Data.LocalDate(day7), Data.Int(7))
+        }
+
+        "OffsetDate day 7" >> prop { (offset: ZoneOffset) =>
+          unary(
+            ExtractIsoDayOfWeek(_).embed,
+            Data.OffsetDate(QOffsetDate(day7, offset)),
+            Data.Int(7))
+        }
+
+        "LocalDateTime day 7" >> prop { (time: JLocalTime) =>
+          unary(
+            ExtractIsoDayOfWeek(_).embed,
+            Data.LocalDateTime(JLocalDateTime.of(day7, time)),
+            Data.Int(7))
+        }
+
+        "OffsetDateTime day 7" >> prop { (time: JLocalTime, offset: ZoneOffset) =>
+          unary(
+            ExtractIsoDayOfWeek(_).embed,
+            Data.OffsetDateTime(JOffsetDateTime.of(day7, time, offset)),
+            Data.Int(7))
         }
       }
 
