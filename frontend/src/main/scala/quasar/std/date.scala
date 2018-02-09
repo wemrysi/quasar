@@ -166,13 +166,13 @@ trait DateLib extends Library with Serializable {
     (extractHour _).andThen(Data.Int(_)))
 
   val ExtractIsoDayOfWeek = dateFunc(
-    "Pulls out the ISO day of week (`isodow`) subfield from a date/time value " + "(Monday: 1 to Sunday: 7).",
+    "Pulls out the ISO day of week (`isodow`) subfield from a date/time value (Monday: 1 to Sunday: 7).",
     Type.Int,
     (extractIsoDayOfWeek _).andThen(Data.Int(_)))
 
   // TODO: Come back to this, test it with Jan 4
   val ExtractIsoYear = dateFunc(
-    "Pulls out the ISO year (`isoyear`) subfield from a date/time value (based " + "on the first week containing Jan. 4).",
+    "Pulls out the ISO year (`isoyear`) subfield from a date/time value (based on the first week containing Jan. 4).",
     Type.Int,
     (extractIsoYear _).andThen(Data.Int(_)))
 

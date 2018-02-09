@@ -510,28 +510,61 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ExtractCentury" >> {
-        "0001-01-01" >> {
-          unaryB(ExtractCentury(_).embed, JLocalDate.parse("0001-01-01"), Data.Int(1))
+        "LocalDate 1" >> prop { (x: JLocalDate) =>
+          unary(ExtractCentury(_).embed, Data.LocalDate(x.withYear(1)), Data.Int(1))
         }
 
-        "2000-01-01" >> {
-          unaryB(ExtractCentury(_).embed, JLocalDate.parse("2000-01-01"), Data.Int(20))
+        "LocalDateTime 1" >> prop { (x: JLocalDateTime) =>
+          unary(ExtractCentury(_).embed, Data.LocalDateTime(x.withYear(1)), Data.Int(1))
         }
 
-        "2001-01-01" >> {
-          unaryB(ExtractCentury(_).embed, JLocalDate.parse("2001-01-01"), Data.Int(21))
+        "OffsetDate 1" >> prop { (x: JLocalDate, offset: ZoneOffset) =>
+          unary(
+            ExtractCentury(_).embed,
+            Data.OffsetDate(QOffsetDate(x.withYear(1), offset)),
+            Data.Int(1))
         }
 
-        "midnight 0001-01-01" >> {
-          unaryB(ExtractCentury(_).embed, JLocalDateTime.parse("0001-01-01T00:00:00.000"), Data.Int(1))
+        "OffsetDateTime 1" >> prop { (x: JOffsetDateTime) =>
+          unary(ExtractCentury(_).embed, Data.OffsetDateTime(x.withYear(1)), Data.Int(1))
         }
 
-        "midnight 2000-01-01" >> {
-          unaryB(ExtractCentury(_).embed, JLocalDateTime.parse("2000-01-01T00:00:00.000"), Data.Int(20))
+        "LocalDate 20" >> prop { (x: JLocalDate) =>
+          unary(ExtractCentury(_).embed, Data.LocalDate(x.withYear(2000)), Data.Int(20))
         }
 
-        "midnight 2001-01-01" >> {
-          unaryB(ExtractCentury(_).embed, JLocalDateTime.parse("2001-01-01T00:00:00.000"), Data.Int(21))
+        "LocalDateTime 20" >> prop { (x: JLocalDateTime) =>
+          unary(ExtractCentury(_).embed, Data.LocalDateTime(x.withYear(2000)), Data.Int(20))
+        }
+
+        "OffsetDate 20" >> prop { (x: JLocalDate, offset: ZoneOffset) =>
+          unary(
+            ExtractCentury(_).embed,
+            Data.OffsetDate(QOffsetDate(x.withYear(2000), offset)),
+            Data.Int(20))
+        }
+
+        "OffsetDateTime 20" >> prop { (x: JOffsetDateTime) =>
+          unary(ExtractCentury(_).embed, Data.OffsetDateTime(x.withYear(2000)), Data.Int(20))
+        }
+
+        "LocalDate 21" >> prop { (x: JLocalDate) =>
+          unary(ExtractCentury(_).embed, Data.LocalDate(x.withYear(2001)), Data.Int(21))
+        }
+
+        "LocalDateTime 21" >> prop { (x: JLocalDateTime) =>
+          unary(ExtractCentury(_).embed, Data.LocalDateTime(x.withYear(2001)), Data.Int(21))
+        }
+
+        "OffsetDate 21" >> prop { (x: JLocalDate, offset: ZoneOffset) =>
+          unary(
+            ExtractCentury(_).embed,
+            Data.OffsetDate(QOffsetDate(x.withYear(2001), offset)),
+            Data.Int(21))
+        }
+
+        "OffsetDateTime 21" >> prop { (x: JOffsetDateTime) =>
+          unary(ExtractCentury(_).embed, Data.OffsetDateTime(x.withYear(2001)), Data.Int(21))
         }
       }
 
@@ -585,12 +618,23 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ExtractDecade" >> {
-        "1999-12-31" >> {
-          unaryB(ExtractDecade(_).embed, JLocalDate.parse("1999-12-31"), Data.Int(199))
+        "LocalDate" >> prop { (x: JLocalDate) =>
+          unary(ExtractDecade(_).embed, Data.LocalDate(x.withYear(1999)), Data.Int(199))
         }
 
-        "midnight 1999-12-31" >> {
-          unaryB(ExtractDecade(_).embed, JLocalDateTime.parse("1999-12-31T00:00:00.000"), Data.Int(199))
+        "LocalDateTime" >> prop { (x: JLocalDateTime) =>
+          unary(ExtractDecade(_).embed, Data.LocalDateTime(x.withYear(1999)), Data.Int(199))
+        }
+
+        "OffsetDate" >> prop { (x: JLocalDate, offset: ZoneOffset) =>
+          unary(
+            ExtractDecade(_).embed,
+            Data.OffsetDate(QOffsetDate(x.withYear(1999), offset)),
+            Data.Int(199))
+        }
+
+        "OffsetDateTime" >> prop { (x: JOffsetDateTime) =>
+          unary(ExtractDecade(_).embed, Data.OffsetDateTime(x.withYear(1999)), Data.Int(199))
         }
       }
 
@@ -621,20 +665,57 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ExtractDayOfYear" >> {
-        "2016-03-01" >> {
-          unaryB(ExtractDayOfYear(_).embed, JLocalDate.parse("2016-03-01"), Data.Int(61))
+        val day60: JLocalDate = JLocalDate.parse("2017-03-01") // non leap year
+        val day61: JLocalDate = JLocalDate.parse("2016-03-01") // leap year
+
+        "LocalDate day 60" >> {
+          unary(ExtractWeek(_).embed, Data.LocalDate(day60), Data.Int(60))
         }
 
-        "midnight 2016-03-01" >> {
-          unaryB(ExtractDayOfYear(_).embed, JLocalDateTime.parse("2016-03-01T00:00:00.000"), Data.Int(61))
+        "OffsetDate day 60" >> prop { (offset: ZoneOffset) =>
+          unary(
+            ExtractWeek(_).embed,
+            Data.OffsetDate(QOffsetDate(day60, offset)),
+            Data.Int(60))
         }
 
-        "2017-03-01" >> {
-          unaryB(ExtractDayOfYear(_).embed, JLocalDate.parse("2017-03-01"), Data.Int(60))
+        "LocalDateTime day 60" >> prop { (time: JLocalTime) =>
+          unary(
+            ExtractWeek(_).embed,
+            Data.LocalDateTime(JLocalDateTime.of(day60, time)),
+            Data.Int(60))
         }
 
-        "midnight 2017-03-01" >> {
-          unaryB(ExtractDayOfYear(_).embed, JLocalDateTime.parse("2017-03-01T00:00:00.000"), Data.Int(60))
+        "OffsetDateTime day 60" >> prop { (time: JLocalTime, offset: ZoneOffset) =>
+          unary(
+            ExtractWeek(_).embed,
+            Data.OffsetDateTime(JOffsetDateTime.of(day60, time, offset)),
+            Data.Int(60))
+        }
+
+        "LocalDate day 61" >> {
+          unary(ExtractWeek(_).embed, Data.LocalDate(day61), Data.Int(61))
+        }
+
+        "OffsetDate day 61" >> prop { (offset: ZoneOffset) =>
+          unary(
+            ExtractWeek(_).embed,
+            Data.OffsetDate(QOffsetDate(day61, offset)),
+            Data.Int(61))
+        }
+
+        "LocalDateTime day 61" >> prop { (time: JLocalTime) =>
+          unary(
+            ExtractWeek(_).embed,
+            Data.LocalDateTime(JLocalDateTime.of(day61, time)),
+            Data.Int(61))
+        }
+
+        "OffsetDateTime day 61" >> prop { (time: JLocalTime, offset: ZoneOffset) =>
+          unary(
+            ExtractWeek(_).embed,
+            Data.OffsetDateTime(JOffsetDateTime.of(day61, time, offset)),
+            Data.Int(61))
         }
       }
 
@@ -757,28 +838,61 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ExtractMillennium" >> {
-        "0001-01-01" >> {
-          unaryB(ExtractMillennium(_).embed, JLocalDate.parse("0001-01-01"), Data.Int(1))
+        "LocalDate 1" >> prop { (x: JLocalDate) =>
+          unary(ExtractMillennium(_).embed, Data.LocalDate(x.withYear(1)), Data.Int(1))
         }
 
-        "2000-01-01" >> {
-          unaryB(ExtractMillennium(_).embed, JLocalDate.parse("2000-01-01"), Data.Int(2))
+        "LocalDateTime 1" >> prop { (x: JLocalDateTime) =>
+          unary(ExtractMillennium(_).embed, Data.LocalDateTime(x.withYear(1)), Data.Int(1))
         }
 
-        "2001-01-01" >> {
-          unaryB(ExtractMillennium(_).embed, JLocalDate.parse("2001-01-01"), Data.Int(3))
+        "OffsetDate 1" >> prop { (x: JLocalDate, offset: ZoneOffset) =>
+          unary(
+            ExtractMillennium(_).embed,
+            Data.OffsetDate(QOffsetDate(x.withYear(1), offset)),
+            Data.Int(1))
         }
 
-        "midnight 0001-01-01" >> {
-          unaryB(ExtractMillennium(_).embed, JLocalDateTime.parse("0001-01-01T00:00:00.000"), Data.Int(1))
+        "OffsetDateTime 1" >> prop { (x: JOffsetDateTime) =>
+          unary(ExtractMillennium(_).embed, Data.OffsetDateTime(x.withYear(1)), Data.Int(1))
         }
 
-        "midnight 2000-01-01" >> {
-          unaryB(ExtractMillennium(_).embed, JLocalDateTime.parse("2000-01-01T00:00:00.000"), Data.Int(2))
+        "LocalDate 2" >> prop { (x: JLocalDate) =>
+          unary(ExtractMillennium(_).embed, Data.LocalDate(x.withYear(2000)), Data.Int(2))
         }
 
-        "midnight 2001-01-01" >> {
-          unaryB(ExtractMillennium(_).embed, JLocalDateTime.parse("2001-01-01T00:00:00.000"), Data.Int(3))
+        "LocalDateTime 2" >> prop { (x: JLocalDateTime) =>
+          unary(ExtractMillennium(_).embed, Data.LocalDateTime(x.withYear(2000)), Data.Int(2))
+        }
+
+        "OffsetDate 2" >> prop { (x: JLocalDate, offset: ZoneOffset) =>
+          unary(
+            ExtractMillennium(_).embed,
+            Data.OffsetDate(QOffsetDate(x.withYear(2000), offset)),
+            Data.Int(2))
+        }
+
+        "OffsetDateTime 2" >> prop { (x: JOffsetDateTime) =>
+          unary(ExtractMillennium(_).embed, Data.OffsetDateTime(x.withYear(2000)), Data.Int(2))
+        }
+
+        "LocalDate 3" >> prop { (x: JLocalDate) =>
+          unary(ExtractMillennium(_).embed, Data.LocalDate(x.withYear(2001)), Data.Int(3))
+        }
+
+        "LocalDateTime 3" >> prop { (x: JLocalDateTime) =>
+          unary(ExtractMillennium(_).embed, Data.LocalDateTime(x.withYear(2001)), Data.Int(3))
+        }
+
+        "OffsetDate 3" >> prop { (x: JLocalDate, offset: ZoneOffset) =>
+          unary(
+            ExtractMillennium(_).embed,
+            Data.OffsetDate(QOffsetDate(x.withYear(2001), offset)),
+            Data.Int(3))
+        }
+
+        "OffsetDateTime 3" >> prop { (x: JOffsetDateTime) =>
+          unary(ExtractMillennium(_).embed, Data.OffsetDateTime(x.withYear(2001)), Data.Int(3))
         }
       }
 
