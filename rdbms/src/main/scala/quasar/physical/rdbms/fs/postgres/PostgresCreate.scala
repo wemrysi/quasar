@@ -34,6 +34,7 @@ trait PostgresCreate extends RdbmsCreate {
       if (s.isRoot)
         ().point[ConnectionIO]
       else
+      // lock required to avoid conflicts when creating schemas concurrently in tests
         fr"LOCK TABLE pg_catalog.pg_namespace".update.run *>
           (fr"CREATE SCHEMA IF NOT EXISTS" ++ Fragment.const(s""""${s.shows}"""")).update.run.void).void
   }
@@ -62,11 +63,27 @@ trait PostgresCreate extends RdbmsCreate {
     if (cols.isEmpty)
       ().point[ConnectionIO]
     else {
-      (fr"ALTER TABLE" ++ Fragment.const(tablePath.shows) ++
-        cols.map {
-          case AddColumn(name, tpe) => Fragment.const(s"ADD COLUMN $name ${tpe.mapToStringName}")
-          case ModifyColumn(name, tpe) => Fragment.const(s"MODIFY COLUMN $name type ${tpe.mapToStringName}")
-        }.toList.intercalate(fr",")).update.run.void
+        val dbPath = Fragment.const(tablePath.shows)
+        cols.foldMap {
+          case AddColumn(name, tpe) =>
+            (fr"ALTER TABLE" ++ dbPath ++
+            Fragment.const(s"ADD COLUMN $name ${tpe.mapToStringName}")).update.run.void
+          case ModifyColumn(name, JsonCol) =>
+            // Widening to jsonb column requires creating a new temp column and rewriting content.
+            // Postgres doesn't support automatic conversion to jsonb type.
+            val tmpCol = "tmp___"
+            (fr"ALTER TABLE" ++ dbPath ++
+              Fragment.const(s"ADD COLUMN $tmpCol jsonb")).update.run *>
+            (fr"UPDATE" ++ dbPath ++
+              Fragment.const(s"$tmpCol = ('[' || $name || ']')::jsonb")).update.run *>
+            (fr"ALTER TABLE" ++ dbPath ++ fr"DROP COLUMN" ++
+              Fragment.const(name)).update.run *>
+            (fr"ALTER TABLE" ++ dbPath ++ fr"RENAME COLUMN" ++
+              Fragment.const(tmpCol) ++ fr"TO" ++ Fragment.const(name)).update.run.void
+          case ModifyColumn(name, tpe) =>
+            (fr"ALTER TABLE" ++ dbPath ++
+            Fragment.const(s"ALTER COLUMN $name type ${tpe.mapToStringName}")).update.run.void
+        }
     }
   }
 }
