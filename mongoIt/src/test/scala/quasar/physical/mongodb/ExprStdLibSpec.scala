@@ -39,24 +39,24 @@ import shapeless.Nat
   * pipeline (aka ExprOp).
   */
 class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
-  val notHandled = Skipped("not implemented in aggregation")
+  val notHandled = Skipped("Not implemented in aggregation.")
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     /* DATE */
-    case (date.ExtractHour, _) => notHandled.left
-    case (date.ExtractIsoYear, _) => notHandled.left
-    case (date.ExtractMicrosecond, _) => notHandled.left
-    case (date.ExtractMillisecond, _) => notHandled.left
-    case (date.ExtractMinute, _) => notHandled.left
-    case (date.ExtractSecond, _) => notHandled.left
-    case (date.ExtractWeek, _) => notHandled.left
+    case (date.ExtractHour, _) => Pending("TODO").left
+    case (date.ExtractIsoYear, _) => Pending("TODO").left
+    case (date.ExtractMicrosecond, _) => Pending("TODO").left
+    case (date.ExtractMillisecond, _) => Pending("TODO").left
+    case (date.ExtractMinute, _) => Pending("TODO").left
+    case (date.ExtractSecond, _) => Pending("TODO").left
+    case (date.ExtractWeek, _) => Pending("TODO").left
 
     case (date.StartOfDay, Data.LocalLike(_) :: Nil) => notHandled.left
 
-    case (date.Now, _) => notHandled.left
-    case (date.NowDate, _) => notHandled.left
-    case (date.NowTime, _) => notHandled.left
+    case (date.Now, _) => Pending("TODO").left
+    case (date.NowDate, _) => Pending("TODO").left
+    case (date.NowTime, _) => Pending("TODO").left
     case (date.CurrentTimeZone, _) => noTimeZoneSupport.left
 
     case (date.SetTimeZone, _) => noTimeZoneSupport.left
@@ -75,8 +75,8 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (date.TimeOfDay, _) => notHandled.left
 
     /* MATH */
-    case (math.Add, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Skipped("TODO").left
-    case (math.Subtract, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Skipped("TODO").left
+    case (math.Add, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Pending("TODO").left
+    case (math.Subtract, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Pending("TODO").left
 
     //FIXME modulo and trunc (which is defined in terms of modulo) cause the
     //mongo docker container to crash (with quite high frequency but not always).

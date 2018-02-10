@@ -26,7 +26,7 @@ import quasar.qscript._
 import java.time.{Instant, LocalDate => JLocalDate, LocalDateTime => JLocalDateTime}
 import matryoshka._
 import matryoshka.data.Fix
-import org.specs2.execute.{Pending, Result, Skipped, Success}
+import org.specs2.execute.{Pending, Result, Success}
 import scalaz.{Name => _, Success => _, _}, Scalaz._
 import shapeless.Nat
 
@@ -37,17 +37,18 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
   /** Identify constructs that are expected not to be implemented in JS. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     /* DATE */
-    case (date.ExtractDayOfYear, _) => Skipped("TODO").left
-    case (date.ExtractHour, _) => Skipped("TODO").left
-    case (date.ExtractIsoYear, _) => Skipped("TODO").left
-    case (date.ExtractMicrosecond, _) => Skipped("TODO").left
-    case (date.ExtractMillisecond, _) => Skipped("TODO").left
-    case (date.ExtractMinute, _) => Skipped("TODO").left
-    case (date.ExtractSecond, _) => Skipped("TODO").left
+    case (date.ExtractDayOfYear, _) => Pending("TODO").left
+    case (date.ExtractHour, _) => Pending("TODO").left
+    case (date.ExtractIsoYear, _) => Pending("TODO").left
+    case (date.ExtractMicrosecond, _) => Pending("TODO").left
+    case (date.ExtractMillisecond, _) => Pending("TODO").left
+    case (date.ExtractMinute, _) => Pending("TODO").left
+    case (date.ExtractSecond, _) => Pending("TODO").left
+    case (date.ExtractWeek, _) => Pending("TODO").left
 
-    case (date.Now, _) => Skipped("TODO").left
-    case (date.NowDate, _) => Skipped("TODO").left
-    case (date.NowTime, _) => Skipped("TODO").left
+    case (date.Now, _) => Pending("TODO").left
+    case (date.NowDate, _) => Pending("TODO").left
+    case (date.NowTime, _) => Pending("TODO").left
     case (date.CurrentTimeZone, _) => noTimeZoneSupport.left
 
     case (date.SetTimeZone, _) => noTimeZoneSupport.left
@@ -66,16 +67,16 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case (date.LocalDateTime, Data.Str(date) :: Nil) if JLocalDateTime.parse(date).getYear < 100 && (is3_2(backend) || is3_4(backend)) =>
       Success().updateExpected("Actually skipped due to mongo bug SERVER-8164 (Fixed in 3.5.13).").left
 
-    case (date.Interval, _) => Skipped("TODO").left
-    case (date.TimeOfDay, _) => Skipped("TODO").left
+    case (date.Interval, _) => Pending("TODO").left
+    case (date.TimeOfDay, _) => Pending("TODO").left
 
     /* MATH */
     case (math.Power, Data.Number(x) :: Data.Number(y) :: Nil)
         if x == 0 && y < 0 =>
       Pending("Infinity is not translated properly?").left
 
-    case (math.Add, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Skipped("TODO").left
-    case (math.Subtract, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Skipped("TODO").left
+    case (math.Add, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Pending("TODO").left
+    case (math.Subtract, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Pending("TODO").left
 
     /* RELATIONS */
     case (relations.IfUndefined, _) => Pending("TODO").left
