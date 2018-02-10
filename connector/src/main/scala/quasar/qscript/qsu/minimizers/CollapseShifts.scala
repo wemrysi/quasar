@@ -34,7 +34,7 @@ import quasar.qscript.{
   RightSide,
   SrcHole
 }
-import quasar.qscript.qsu.{QScriptUniform => QSU}
+import quasar.qscript.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
 import quasar.qscript.rewrites.NormalizableT
 import slamdata.Predef._
 
@@ -86,10 +86,10 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             val struct2 = struct >> fm
 
             val repair2 = repair flatMap {
-              case QSU.AccessLeftTarget(Access.Value(_)) => fm.map[QSU.ShiftTarget[T]](κ(QSU.AccessLeftTarget[T](Access.valueHole(SrcHole))))
-              case access @ QSU.AccessLeftTarget(_) => (access: QSU.ShiftTarget[T]).pure[FreeMapA]
-              case QSU.LeftTarget() => scala.sys.error("QSU.LeftTarget in CollapseShifts")
-              case QSU.RightTarget() => func.RightTarget
+              case ShiftTarget.AccessLeftTarget(Access.Value(_)) => fm.map[ShiftTarget[T]](κ(ShiftTarget.AccessLeftTarget[T](Access.valueHole(SrcHole))))
+              case access @ ShiftTarget.AccessLeftTarget(_) => (access: ShiftTarget[T]).pure[FreeMapA]
+              case ShiftTarget.LeftTarget() => scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
+              case ShiftTarget.RightTarget() => func.RightTarget
             }
 
             updateGraph[T, G](QSU.LeftShift(src.root, struct2, idStatus, onUndefined, repair2, rot)) map { rewritten =>
@@ -246,12 +246,12 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             val struct2 = struct >> func.ProjectKeyS(func.Hole, ResultsField)
 
             val repair2 = repair flatMap {
-              case QSU.AccessLeftTarget(Access.Value(_)) =>
+              case ShiftTarget.AccessLeftTarget(Access.Value(_)) =>
                 func.ProjectKeyS(func.AccessLeftTarget(Access.valueHole[T[EJson]](_)), ResultsField)
-              case QSU.AccessLeftTarget(access) =>
+              case ShiftTarget.AccessLeftTarget(access) =>
                 func.AccessLeftTarget(access.as(_))
-              case QSU.LeftTarget() => scala.sys.error("QSU.LeftTarget in CollapseShifts")
-              case QSU.RightTarget() => func.RightTarget
+              case ShiftTarget.LeftTarget() => scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
+              case ShiftTarget.RightTarget() => func.RightTarget
             }
 
             val repair3 = func.StaticMapS(
@@ -344,15 +344,15 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       }
 
       def fixSingleRepairForMulti(
-          repair: FreeMapA[QSU.ShiftTarget[T]],
+          repair: FreeMapA[ShiftTarget[T]],
           offset: Int,
           side: JoinSide): FreeMapA[QAccess[Hole] \/ Int] = {
 
         repair flatMap {
-          case QSU.LeftTarget() =>
-            scala.sys.error("QSU.LeftTarget in CollapseShifts")
+          case ShiftTarget.LeftTarget() =>
+            scala.sys.error("ShiftTarget.LeftTarget in CollapseShifts")
 
-          case QSU.AccessLeftTarget(access) =>
+          case ShiftTarget.AccessLeftTarget(access) =>
             val hole = Free.pure[MapFunc, QAccess[Hole] \/ Int](access.left[Int])
 
             if (hasParent)
@@ -360,21 +360,21 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             else
               hole
 
-          case QSU.RightTarget() =>
+          case ShiftTarget.RightTarget() =>
             Free.pure(offset.right[QAccess[Hole]])
         }
       }
 
       def fixSingleRepairForSingle(
-          repair: FreeMapA[QSU.ShiftTarget[T]],
-          side: JoinSide): FreeMapA[QSU.ShiftTarget[T]] = {
+          repair: FreeMapA[ShiftTarget[T]],
+          side: JoinSide): FreeMapA[ShiftTarget[T]] = {
 
         repair flatMap {
-          case target @ (QSU.LeftTarget() | QSU.RightTarget()) =>
+          case target @ (ShiftTarget.LeftTarget() | ShiftTarget.RightTarget()) =>
             Free.pure(target)
 
-          case access @ QSU.AccessLeftTarget(_) =>
-            val hole = Free.pure[MapFunc, QSU.ShiftTarget[T]](access)
+          case access @ ShiftTarget.AccessLeftTarget(_) =>
+            val hole = Free.pure[MapFunc, ShiftTarget[T]](access)
 
             if (hasParent)
               func.ProjectKeyS(hole, name(side))
@@ -725,14 +725,49 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       case LeftShift(Read(_), _, _, _, _, _) =>
         None
 
-      case LeftShift(oparent @ Self(parent, inners), struct, idStatus, onUndefined, repair, rot) =>
-        Some((parent, -\/(QSU.LeftShift[T, QSUGraph](oparent, struct, idStatus, onUndefined, repair, rot)) <:: inners))
+      case
+        LeftShift(
+          MappableRegion.MaximalUnary(oparent @ Self(parent, inners), fm),
+          struct,
+          idStatus,
+          onUndefined,
+          repair,
+          rot) =>
+
+        val struct2 = struct >> fm
+
+        val repair2 = repair flatMap {
+          case alt @ ShiftTarget.AccessLeftTarget(Access.Value(_)) =>
+            fm.map(_ => alt: ShiftTarget[T])
+
+          case t => Free.pure[MapFunc, ShiftTarget[T]](t)
+        }
+
+        Some((parent, -\/(QSU.LeftShift[T, QSUGraph](oparent, struct2, idStatus, onUndefined, repair2, rot)) <:: inners))
 
       case LeftShift(parent, struct, idStatus, onUndefined, repair, rot) =>
         Some((parent, NEL(-\/(QSU.LeftShift[T, QSUGraph](parent, struct, idStatus, onUndefined, repair, rot)))))
 
-      case MultiLeftShift(oparent @ Self(parent, inners), shifts, onUndefined, repair) =>
-        Some((parent, \/-(QSU.MultiLeftShift[T, QSUGraph](oparent, shifts, onUndefined, repair)) <:: inners))
+      case
+        MultiLeftShift(
+          MappableRegion.MaximalUnary(oparent @ Self(parent, inners), fm),
+          shifts,
+          onUndefined,
+          repair) =>
+
+        val shifts2 = shifts map {
+          case (struct, idStatus, rot) =>
+            (struct >> fm, idStatus, rot)
+        }
+
+        val repair2 = repair flatMap {
+          case l @ -\/(Access.Value(_)) =>
+            fm.map(_ => l: (QAccess[Hole] \/ Int))
+
+          case r => Free.pure[MapFunc, QAccess[Hole] \/ Int](r)
+        }
+
+        Some((parent, \/-(QSU.MultiLeftShift[T, QSUGraph](oparent, shifts2, onUndefined, repair2)) <:: inners))
 
       case MultiLeftShift(parent, shifts, onUndefined, repair) =>
         Some((parent, NEL(\/-(QSU.MultiLeftShift[T, QSUGraph](parent, shifts, onUndefined, repair)))))

@@ -143,6 +143,10 @@ class MapFuncCorePlanner[T[_[_]]: BirecursiveT: ShowT, F[_] : Applicative : Plan
       (f1.project, f2.project) match {
         case (ExprWithAlias(e1, a1), ExprWithAlias(e2, a2)) =>
 
+          // This builds information about indirections for pairs of expressions with aliases
+          // The alias becomes a part of information about indirection, so that we know that
+          // further references to this alias have the same type of indirection (dot or arrow)
+          // that referenced expression.
           val patmat: PartialFunction[String, (IndirectionType, Indirection)] = {
             case `a1` => (Field, deriveIndirection(e1))
             case `a2` => (Field, deriveIndirection(e2))

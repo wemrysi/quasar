@@ -22,6 +22,12 @@ import matryoshka.BirecursiveT
 import matryoshka.implicits._
 import scalaz._
 
+/**
+  * Indirections represents metadata about how we should reference SQL elements. Some kind of
+  * expressions represent rows, then we referece them like "expr.field". Some represent inner
+  * json fields, then they may look like "expr->'field'". We need to add such metadata to some
+  * expressions to be able to know how to render a full, complex set of references, like a.b.c->'d'.
+  */
 object Indirections {
 
   sealed trait IndirectionType

@@ -16,20 +16,42 @@
 
 package quasar.physical.rdbms.fs.postgres
 
+import slamdata.Predef._
 import quasar.{Data, DataCodec}
-
 import doobie.util.meta.Meta
 import org.postgresql.util.PGobject
+
 import scalaz.syntax.show._
 
 package object mapping {
 
   implicit val codec = DataCodec.Precise
 
+  val SingleFieldKey = "__p_single_"
+
+  /**
+    * Postgres always returns columns with names, so converting them to JSON results
+    * in objects which always have keys. For queries that should return single values,
+    * we try to detect that in the planner and then return the value wrapped in a special
+    * key, which we strip here to achieve the single-value effect.
+    */
+  def stripSingleValue(d: Data): Data = {
+    d match {
+      case Data.Obj(lm) =>
+        lm.toList match {
+          case (`SingleFieldKey`, v) :: Nil => v
+          case _ => d
+        }
+      case _ => d
+    }
+  }
+
   implicit val JsonDataMeta: Meta[Data] =
     Meta.other[PGobject]("json").xmap[Data](
       pGobject =>
-        DataCodec.parse(pGobject.getValue).valueOr(err => scala.sys.error(err.shows)), // failure raises an exception
+        DataCodec.parse(pGobject.getValue)
+          .map(stripSingleValue)
+          .valueOr(err => scala.sys.error(err.shows)), // failure raises an exception
       data => {
         val o = new PGobject
         o.setType("json")

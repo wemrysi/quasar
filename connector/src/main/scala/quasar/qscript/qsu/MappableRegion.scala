@@ -16,13 +16,14 @@
 
 package quasar.qscript.qsu
 
-import slamdata.Predef.{Boolean, Option, Symbol}
+import slamdata.Predef.{Boolean, Option, None, Symbol}
 import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.qscript.{
   Center,
   FreeMap,
   FreeMapA,
+  Hole,
   JoinFunc,
   JoinSide,
   LeftSide,
@@ -33,16 +34,11 @@ import quasar.qscript.{
   SrcHole
 }
 
-import matryoshka._
+import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-import scalaz.{Kleisli, Free, Traverse}
-import scalaz.std.option._
-import scalaz.syntax.either._
-import scalaz.syntax.equal._
-import scalaz.syntax.plus._
-import scalaz.syntax.std.boolean._
+import scalaz.{Kleisli, Free, Scalaz, Traverse}, Scalaz._
 
 /** The maximal "mappable" (expressable via MapFunc) region of a graph. */
 object MappableRegion {
@@ -90,6 +86,34 @@ object MappableRegion {
       case _ =>
         CoEnv(g.left[FreeMapA[T, QSUGraph[T]]])
     }
+
+  /**
+   * An extractor for pulling out the a unique unary root of a
+   * mappable region (if it exists) and the associated FreeMap.
+   * If the unique unary root is Unreferenced(), then this extractor
+   * will fail (produce None).  Note that this is less robust than
+   * the analogous behavior in MinimizeAutoJoins#coalesceRoots, and
+   * will not attempt things such as rewriting Filter into Cond.
+   */
+  object MaximalUnary {
+    import QSUGraph.Extractors._
+
+    def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], FreeMap[T])] = {
+      val fm = maximal[T](g)
+
+      val roots = fm.toList filter {
+        case Unreferenced() => false
+        case _ => true
+      }
+
+      val deduped = roots.map(_.root).distinct
+
+      if (deduped.lengthCompare(1) === 0)
+        deduped.headOption.map(sym => (g.refocus(sym), fm.map(κ(SrcHole: Hole))))
+      else
+        None
+    }
+  }
 
   ////
 

@@ -36,7 +36,7 @@ import quasar.qscript.{
   ReduceFunc}
 import quasar.qscript.MapFuncCore.{EmptyMap, StaticMap}
 import quasar.qscript.provenance.JoinKey
-import quasar.qscript.qsu.{QScriptUniform => QSU}
+import quasar.qscript.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
 import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 
 import matryoshka.{showTShow, BirecursiveT, ShowT}
@@ -100,9 +100,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       ISet.singleton(access.symbolic(κ(src)))
     }
 
-  private def shiftTargetAccess(src: Symbol, bucket: FreeMapA[QSU.ShiftTarget[T]]): ISet[QAccess[Symbol]] =
+  private def shiftTargetAccess(src: Symbol, bucket: FreeMapA[ShiftTarget[T]]): ISet[QAccess[Symbol]] =
     Foldable[FreeMapA].foldMap(bucket) {
-      case QSU.AccessLeftTarget(access) => ISet.singleton(access.symbolic(κ(src)))
+      case ShiftTarget.AccessLeftTarget(access) => ISet.singleton(access.symbolic(κ(src)))
       case _ => ISet.empty
     }
 
@@ -166,10 +166,10 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
     def isReferenced(access: QAccess[Symbol]): G[Boolean] =
       G.gets(_.refs.accessed.member(access))
 
-    def includeIdRepair(oldRepair: FreeMapA[QSU.ShiftTarget[T]], oldIdStatus: IdStatus): FreeMapA[QSU.ShiftTarget[T]] =
+    def includeIdRepair(oldRepair: FreeMapA[ShiftTarget[T]], oldIdStatus: IdStatus): FreeMapA[ShiftTarget[T]] =
       if (oldIdStatus === ExcludeId)
         oldRepair >>= {
-          case QSU.RightTarget() => func.ProjectIndexI(func.RightTarget, 1)
+          case ShiftTarget.RightTarget() => func.ProjectIndexI(func.RightTarget, 1)
           case tgt => tgt.pure[FreeMapA]
         }
       else oldRepair
@@ -265,16 +265,16 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
           case (true, true) =>
             onNeedsIV(g) as {
               val (newStatus, newRepair) = idStatus match {
-                case IdOnly | IncludeId =>
+                case IdOnly =>
                   (
                     idStatus,
                     updateIV(
                       func.LeftTarget,
                       makeI1(g.root, func.RightTarget),
-                      includeIdRepair(repair, idStatus))
+                      repair)
                   )
 
-                case ExcludeId =>
+                case ExcludeId | IncludeId =>
                   (
                     IncludeId : IdStatus,
                     updateIV(
@@ -299,12 +299,13 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
             onNeedsIV(g) as {
               val newStatus =
                 if (idStatus === ExcludeId) IncludeId else idStatus
-              val getValue =
+
+              val getId =
                 if (idStatus === ExcludeId) func.ProjectIndexI(func.RightTarget, 0) else func.RightTarget
+
               val newRepair = makeIV(
-                makeI1(g.root, getValue),
-                includeIdRepair(repair, idStatus)
-              )
+                makeI1(g.root, getId),
+                includeIdRepair(repair, idStatus))
 
               g.overwriteAtRoot(O.leftShift(source.root, struct, newStatus, onUndefined, newRepair, rot))
             }

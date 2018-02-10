@@ -18,7 +18,7 @@ Chain
 │  ╰─ IncludeArrayIndex(BsonField.Name("ix"))
 ├─ $ProjectF
 │  ├─ Name("identities" -> {
-│  │       "qsu20": { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }
+│  │       "esh20": { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }
 │  │     })
 │  ├─ Name("value" -> {
 │  │       "original": "$s",
@@ -76,19 +76,23 @@ Chain
 ├─ $UnwindF
 │  ├─ Path(DocField(BsonField.Name("f")))
 │  ╰─ IncludeArrayIndex(BsonField.Name("ix"))
+├─ $ProjectF
+│  ├─ Name("0" -> {
+│  │       "$eq": [
+│  │         "$s.identities.esh20",
+│  │         { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
+│  │     })
+│  ├─ Name("src")
+│  │  ├─ Name("s" -> "$s")
+│  │  ╰─ Name("f" -> ["$ix", "$f"])
+│  ╰─ ExcludeId
+├─ $MatchF
+│  ╰─ Doc
+│     ╰─ Expr($0 -> Eq(Bool(true)))
 ╰─ $ProjectF
    ├─ Name("__quasar_mongodb_sigil" -> {
-   │       "$cond": [
-   │         {
-   │           "$eq": [
-   │             "$s.identities.qsu20",
-   │             { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
-   │         },
-   │         {
-   │           "$add": [
-   │             "$s.value.0",
-   │             { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("1") }] }]
-   │         },
-   │         { "$literal": undefined }]
+   │       "$add": [
+   │         "$src.s.value.0",
+   │         { "$arrayElemAt": ["$src.f", { "$literal": NumberInt("1") }] }]
    │     })
    ╰─ ExcludeId
