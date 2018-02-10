@@ -58,7 +58,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit
 
-  def skipTemporalTrunc: Boolean
+  def skipTemporalTrunc(part: TemporalPart): Boolean
 
   def compile(queryModel: MongoQueryModel, coll: Collection, lp: FreeMap[Fix])
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name)
@@ -93,7 +93,8 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
     def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LP, Unit] = {
       case lp.Invoke(_, _) if containsOffset(args) => noTimeZoneSupport.left
       case lp.Invoke(func, _) => shortCircuit(backend, func, args)
-      case lp.TemporalTrunc(_, _) if skipTemporalTrunc => Pending("TemporalTrunc not implemented.").left
+      case lp.TemporalTrunc(part, _) if skipTemporalTrunc(part) =>
+        Pending(s"TemporalTrunc for $part not implemented.").left
       case lp.TemporalTrunc(_, _) if containsOffset(args) => noTimeZoneSupport.left
       case _ => ().right
     }

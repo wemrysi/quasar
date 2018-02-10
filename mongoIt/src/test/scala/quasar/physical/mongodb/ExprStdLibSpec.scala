@@ -131,7 +131,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case _ => ().right
   }
 
-  def skipTemporalTrunc: Boolean = true
+  def skipTemporalTrunc(part: TemporalPart): Boolean = true
 
   def build[WF[_]: Coalesce: Inject[WorkflowOpCoreF, ?[_]]](
       expr: Fix[ExprOp], queryModel: MongoQueryModel, coll: Collection)(
