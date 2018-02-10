@@ -691,51 +691,51 @@ abstract class StdLibSpec extends Qspec {
         val day61: JLocalDate = JLocalDate.parse("2016-03-01") // leap year
 
         "LocalDate day 60" >> {
-          unary(ExtractWeek(_).embed, Data.LocalDate(day60), Data.Int(60))
+          unary(ExtractDayOfYear(_).embed, Data.LocalDate(day60), Data.Int(60))
         }
 
         "OffsetDate day 60" >> prop { (offset: ZoneOffset) =>
           unary(
-            ExtractWeek(_).embed,
+            ExtractDayOfYear(_).embed,
             Data.OffsetDate(QOffsetDate(day60, offset)),
             Data.Int(60))
         }
 
         "LocalDateTime day 60" >> prop { (time: JLocalTime) =>
           unary(
-            ExtractWeek(_).embed,
+            ExtractDayOfYear(_).embed,
             Data.LocalDateTime(JLocalDateTime.of(day60, time)),
             Data.Int(60))
         }
 
         "OffsetDateTime day 60" >> prop { (time: JLocalTime, offset: ZoneOffset) =>
           unary(
-            ExtractWeek(_).embed,
+            ExtractDayOfYear(_).embed,
             Data.OffsetDateTime(JOffsetDateTime.of(day60, time, offset)),
             Data.Int(60))
         }
 
         "LocalDate day 61" >> {
-          unary(ExtractWeek(_).embed, Data.LocalDate(day61), Data.Int(61))
+          unary(ExtractDayOfYear(_).embed, Data.LocalDate(day61), Data.Int(61))
         }
 
         "OffsetDate day 61" >> prop { (offset: ZoneOffset) =>
           unary(
-            ExtractWeek(_).embed,
+            ExtractDayOfYear(_).embed,
             Data.OffsetDate(QOffsetDate(day61, offset)),
             Data.Int(61))
         }
 
         "LocalDateTime day 61" >> prop { (time: JLocalTime) =>
           unary(
-            ExtractWeek(_).embed,
+            ExtractDayOfYear(_).embed,
             Data.LocalDateTime(JLocalDateTime.of(day61, time)),
             Data.Int(61))
         }
 
         "OffsetDateTime day 61" >> prop { (time: JLocalTime, offset: ZoneOffset) =>
           unary(
-            ExtractWeek(_).embed,
+            ExtractDayOfYear(_).embed,
             Data.OffsetDateTime(JOffsetDateTime.of(day61, time, offset)),
             Data.Int(61))
         }

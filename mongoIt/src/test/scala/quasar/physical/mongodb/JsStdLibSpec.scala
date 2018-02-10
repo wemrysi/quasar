@@ -37,24 +37,13 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
   /** Identify constructs that are expected not to be implemented in JS. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     /* DATE */
-    case (date.ExtractCentury, _) => Skipped("TODO").left
-    case (date.ExtractDayOfMonth, _) => Skipped("TODO").left
-    case (date.ExtractDecade, _) => Skipped("TODO").left
-    case (date.ExtractDayOfWeek, _) => Skipped("TODO").left
     case (date.ExtractDayOfYear, _) => Skipped("TODO").left
-    case (date.ExtractEpoch, _) => Skipped("TODO").left
     case (date.ExtractHour, _) => Skipped("TODO").left
-    case (date.ExtractIsoDayOfWeek, _) => Skipped("TODO").left
     case (date.ExtractIsoYear, _) => Skipped("TODO").left
     case (date.ExtractMicrosecond, _) => Skipped("TODO").left
-    case (date.ExtractMillennium, _) => Skipped("TODO").left
     case (date.ExtractMillisecond, _) => Skipped("TODO").left
     case (date.ExtractMinute, _) => Skipped("TODO").left
-    case (date.ExtractMonth, _) => Skipped("TODO").left
-    case (date.ExtractQuarter, _) => Skipped("TODO").left
     case (date.ExtractSecond, _) => Skipped("TODO").left
-    case (date.ExtractWeek, _) => Skipped("TODO").left
-    case (date.ExtractYear, _) => Skipped("TODO").left
 
     case (date.Now, _) => Skipped("TODO").left
     case (date.NowDate, _) => Skipped("TODO").left

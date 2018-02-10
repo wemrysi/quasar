@@ -44,24 +44,13 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
   /** Identify constructs that are expected not to be implemented in the pipeline. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     /* DATE */
-    case (date.ExtractCentury, _) => notHandled.left
-    case (date.ExtractDayOfMonth, _) => notHandled.left
-    case (date.ExtractDecade, _) => notHandled.left
-    case (date.ExtractDayOfWeek, _) => notHandled.left
-    case (date.ExtractDayOfYear, _) => notHandled.left
-    case (date.ExtractEpoch, _) => notHandled.left
     case (date.ExtractHour, _) => notHandled.left
-    case (date.ExtractIsoDayOfWeek, _) => notHandled.left
     case (date.ExtractIsoYear, _) => notHandled.left
     case (date.ExtractMicrosecond, _) => notHandled.left
-    case (date.ExtractMillennium, _) => notHandled.left
     case (date.ExtractMillisecond, _) => notHandled.left
     case (date.ExtractMinute, _) => notHandled.left
-    case (date.ExtractMonth, _) => notHandled.left
-    case (date.ExtractQuarter, _) => notHandled.left
     case (date.ExtractSecond, _) => notHandled.left
     case (date.ExtractWeek, _) => notHandled.left
-    case (date.ExtractYear, _) => notHandled.left
 
     case (date.StartOfDay, Data.LocalLike(_) :: Nil) => notHandled.left
 
