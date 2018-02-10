@@ -19,6 +19,7 @@ package quasar.std
 import slamdata.Predef._, BigDecimal.RoundingMode
 import quasar.{Data, Qspec, Type}
 import quasar.DataGenerators.{dataArbitrary => _, _}
+import quasar.DateGenerators
 import quasar.frontend.logicalplan._
 import quasar.{
   DateTimeInterval,
@@ -1657,12 +1658,12 @@ abstract class StdLibSpec extends Qspec {
           val i = DateTimeInterval.makeUnsafe(i0.years, i0.months, i0.days, 0, 0)
           val result = x.date.plusYears(i.years.toLong).plusMonths(i.months.toLong).plusDays(i.days.toLong)
           commute(Add(_, _).embed, Data.OffsetDate(x), Data.Interval(i), Data.OffsetDate(quasar.OffsetDate(result, x.offset)))
-        }
+        }.setGens(DateGenerators.genOffsetDate, DateGenerators.genDateInterval)
 
         "OffsetTime/Interval" >> prop { (x: JOffsetTime, i: DateTimeInterval) =>
           val result = x.plusSeconds(i.seconds).plusNanos(i.nanos.toLong)
           commute(Add(_, _).embed, Data.OffsetTime(x), Data.Interval(i), Data.OffsetTime(result))
-        }
+        }.setGens(DateGenerators.genOffsetTime, DateGenerators.genTimeInterval)
 
         "OffsetDateTime/Interval" >> prop { (x: JOffsetDateTime, i: DateTimeInterval) =>
           val result = x
@@ -1674,12 +1675,12 @@ abstract class StdLibSpec extends Qspec {
         "LocalDate/Interval" >> prop { (x: JLocalDate, i: DateTimeInterval) =>
           val result = x.plusYears(i.years.toLong).plusMonths(i.months.toLong).plusDays(i.days.toLong)
           commute(Add(_, _).embed, Data.LocalDate(x), Data.Interval(i), Data.LocalDate(result))
-        }
+        }.setGens(DateGenerators.genLocalDate, DateGenerators.genDateInterval)
 
         "LocalTime/Interval" >> prop { (x: JLocalTime, i: DateTimeInterval) =>
           val result = x.plusSeconds(i.seconds).plusNanos(i.nanos.toLong)
           commute(Add(_, _).embed, Data.LocalTime(x), Data.Interval(i), Data.LocalTime(result))
-        }
+        }.setGens(DateGenerators.genLocalTime, DateGenerators.genTimeInterval)
 
         "LocalDateTime/Interval" >> prop { (x: JLocalDateTime, i: DateTimeInterval) =>
           val result = x
@@ -1761,11 +1762,11 @@ abstract class StdLibSpec extends Qspec {
 
         "LocalDate/Interval" >> prop { (x: JLocalDate, y: DateTimeInterval) =>
           binary(Subtract(_, _).embed, Data.LocalDate(x), Data.Interval(y), Data.LocalDate(x.minus(y.toPeriod)))
-        }
+        }.setGens(DateGenerators.genLocalDate, DateGenerators.genDateInterval)
 
         "LocalTime/Interval" >> prop { (x: JLocalTime, y: DateTimeInterval) =>
           binary(Subtract(_, _).embed, Data.LocalTime(x), Data.Interval(y), Data.LocalTime(x.minus(y.toDuration)))
-        }
+        }.setGens(DateGenerators.genLocalTime, DateGenerators.genTimeInterval)
 
         "OffsetDateTime/Interval" >> prop { (x: JOffsetDateTime, y: DateTimeInterval) =>
           binary(Subtract(_, _).embed, Data.OffsetDateTime(x), Data.Interval(y), Data.OffsetDateTime(y.subtractFromOffset(x)))
@@ -1773,11 +1774,11 @@ abstract class StdLibSpec extends Qspec {
 
         "OffsetDate/Interval" >> prop { (x: QOffsetDate, y: DateTimeInterval) =>
           binary(Subtract(_, _).embed, Data.OffsetDate(x), Data.Interval(y), Data.OffsetDate(x.minus(y.toPeriod)))
-        }
+        }.setGens(DateGenerators.genOffsetDate, DateGenerators.genDateInterval)
 
         "OffsetTime/Interval" >> prop { (x: JOffsetTime, y: DateTimeInterval) =>
           binary(Subtract(_, _).embed, Data.OffsetTime(x), Data.Interval(y), Data.OffsetTime(x.minus(y.toDuration)))
-        }
+        }.setGens(DateGenerators.genOffsetTime, DateGenerators.genTimeInterval)
 
         // TODO: LocalDateTime/LocalDateTime, LocalDate, LocalTime/LocalTime
       }
