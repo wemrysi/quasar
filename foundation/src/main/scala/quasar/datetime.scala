@@ -109,31 +109,34 @@ object datetime {
   def truncMillisecond(i: LocalTime): LocalTime = i.truncatedTo(ChronoUnit.MILLIS)
   def truncMinute(i: LocalTime): LocalTime = i.truncatedTo(ChronoUnit.MINUTES)
   def truncSecond(i: LocalTime): LocalTime = i.truncatedTo(ChronoUnit.SECONDS)
+
   def truncCentury(i: LocalDate): LocalDate =
     i.withDayOfMonth(1)
       .withMonth(1)
       .withYear((i.getYear / 100) * 100)
+
   def truncDecade(i: LocalDate): LocalDate =
     i.withDayOfMonth(1)
       .withMonth(1)
-      .withYear((i.getYear / 10) * 100)
+      .withYear((i.getYear / 10) * 10)
+
   def truncMillennium(i: LocalDate): LocalDate =
     i.withDayOfMonth(1)
       .withMonth(1)
-      .withYear((i.getYear / 10) * 100)
+      .withYear((i.getYear / 1000) * 1000)
+
   def truncMonth(i: LocalDate): LocalDate =
-    i
-      .withDayOfMonth(1)
+    i.withDayOfMonth(1)
+
   def truncQuarter(i: LocalDate): LocalDate =
-    i
-      .withDayOfMonth(1)
+    i.withDayOfMonth(1)
       .withMonth(i.getMonth.firstMonthOfQuarter().getValue)
+
   def truncWeek(i: LocalDate): LocalDate =
-    i
-      .`with`(java.time.DayOfWeek.MONDAY)
+    i.`with`(java.time.DayOfWeek.MONDAY)
+
   def truncYear(i: LocalDate): LocalDate =
-    i
-      .withDayOfMonth(1)
+    i.withDayOfMonth(1)
       .withMonth(1)
 
   def truncTime(part: TemporalPart, i: LocalTime): LocalTime =
