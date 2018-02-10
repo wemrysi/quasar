@@ -61,6 +61,8 @@ class CouchbaseStdLibSpec extends StdLibSpec {
       case (ExtractFunc(MapFuncsCore.LocalDate(_)), _) => pending
       case (ExtractFunc(MapFuncsCore.LocalDateTime(_)), _) => pending
       case (ExtractFunc(MapFuncsCore.LocalTime(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.ToTimestamp(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.Interval(_)), _) => pending
       case (ExtractFunc(MapFuncsCore.Length(_)), QData.Str(s)) if !isPrintableAscii(s) =>
         Pending("only printable ascii supported")
       case _ => run
