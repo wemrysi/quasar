@@ -505,19 +505,19 @@ public class BitSet {
      * @param newLength the new length of the table.
      */
     private final void setLength(final int newLength) {
-        if (bits.length < newLength) { // Resizes array.
-            int arrayLength = bits.length;
-            while (arrayLength < newLength) {
-                arrayLength <<= 1;
-            }
+        int arrayLength = 1 << (32 - Integer.numberOfLeadingZeros(newLength));
+        if (arrayLength < 0 || arrayLength > (1 << 27)) {
+            throw new RuntimeException(newLength + " is too large for a BitSet length");
+        }
+        if (bits.length < arrayLength) { // Resizes array.
             long[] tmp = new long[arrayLength];
             System.arraycopy(bits, 0, tmp, 0, _length);
             bits = tmp;
         }
-        for (int i = _length; i < newLength; i++) {
+        for (int i = _length; i < arrayLength; i++) {
             bits[i] = 0;
         }
-        _length = newLength;
+        _length = arrayLength;
     }
 
     private static final long serialVersionUID = 1L;
