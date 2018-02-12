@@ -17,7 +17,7 @@
 package quasar.sql
 
 import slamdata.Predef._
-import quasar.{Data, Func, GenericFunc, HomomorphicFunction, Reduction, SemanticError, Sifting, UnaryFunc, VarName}
+import quasar.{Data, Func, GenericFunc, HomomorphicFunction, Reduction, SemanticError, UnaryFunc, VarName}
 import SemanticError._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
@@ -785,25 +785,18 @@ object Compiler {
     // Step 0: identify key expressions, and rewrite them by replacing the
     // group source with the source at the point where they might appear.
     def keysƒ(t: LP[(T, List[(T, ZFree[LP, Unit])])]): (T, List[(T, ZFree[LP, Unit])]) = {
-      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-      @tailrec
       def groupedKeys(t: LP[T], newSrc: T): Option[List[(T, ZFree[LP, Unit])]] = {
-        t match {
+        Some(t) collect {
           case InvokeUnapply(set.GroupBy, Sized(src, structural.MakeArrayN(keys))) =>
-            Some(keys.map(_.transAna[ZFree[LP, Unit]]{ lp =>
+            keys.map(_.transAna[ZFree[LP, Unit]]{ lp =>
               if (lp.embed ≟ src) CoEnv[Unit, LP, T](-\/(()))
               else CoEnv[Unit, LP, T](\/-(lp))
-            }) strengthL newSrc)
-
-          case InvokeUnapply(func, Sized(src, _)) if func.effect ≟ Sifting =>
-            groupedKeys(src.project, newSrc)
-
-          case _ => None
+            }) strengthL newSrc
         }
       }
 
       val tf = t.map(_._1)
-      (tf.embed, groupedKeys(tf, tf.embed).getOrElse(t.foldMap(_._2).distinctE.toList))
+      (tf.embed, groupedKeys(tf, tf.embed).getOrElse(t.foldMap(_._2)))
     }
 
     val sources: List[(T, ZFree[LP, Unit])] = tree.cata(keysƒ)._2
@@ -812,7 +805,7 @@ object Compiler {
 
     val KS = MonadState_[State[KeyState, ?], KeyState]
 
-    def flpCata(tree: T, flp: ZFree[LP, Unit]) = flp.cata(interpret[LP, Unit, T](_ => tree, _.embed))
+    def makeKey(tree: T, flp: ZFree[LP, Unit]): T = flp.cata(interpret[LP, Unit, T](_ => tree, _.embed))
 
     // Step 1: annotate nodes containing the keys.
     val ann: State[KeyState, Cofree[LP, Boolean]] = tree.transAnaM {
@@ -824,7 +817,7 @@ object Compiler {
             val l = if (t ≟ expr) Free[T](name).embed else t
             (l, flp)
           }
-          keys2 = srcs2.map { case (t, flp) => flpCata(t,flp) }
+          keys2 = srcs2.map { case (t, flp) => makeKey(t,flp) }
           _ <- KS.put((srcs2, keys2))
         } yield EnvT((keys.element(let.embed), let: LP[T]))
 
@@ -849,7 +842,7 @@ object Compiler {
       }
     }
 
-    ann.eval((sources, sources.map { case (t, flp) => flpCata(t,flp) })).ana[T](rewriteƒ)
+    ann.eval((sources, sources.map { case (t, flp) => makeKey(t,flp) })).ana[T](rewriteƒ)
 
   }
 
