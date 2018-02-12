@@ -153,7 +153,6 @@ object FuncHandler {
                 $cond($eq($dayOfWeek(a1), $literal(Bson.Int32(1))),
                   $literal(Bson.Int32(7)),
                   $subtract($dayOfWeek(a1), $literal(Bson.Int32(1))))
-              // TODO: case ExtractIsoYear(a1) =>
               case ExtractMicrosecond(a1) =>
                 $multiply(
                   $add(

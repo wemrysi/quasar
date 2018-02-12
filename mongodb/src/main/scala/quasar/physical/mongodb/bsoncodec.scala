@@ -30,6 +30,7 @@ import java.time.{
   LocalTime => JLocalTime,
   OffsetDateTime => JOffsetDateTime,
   OffsetTime => JOffsetTime,
+  ZoneId,
   ZoneOffset
 }
 import java.time.format.DateTimeFormatter
@@ -224,17 +225,19 @@ object BsonCodec {
     case Bson.Int32(value)     => E.inj(ejson.Int(value)).right
     case Bson.Int64(value)     => E.inj(ejson.Int(value)).right
     case Bson.Date(value)      =>
-      val ldt = JLocalDateTime.ofInstant(Instant.ofEpochMilli(value), ZoneOffset.UTC)
+      // Bson dates are stored in UTC
+      val dt = JLocalDateTime.ofInstant(Instant.ofEpochMilli(value), ZoneId.of("Z"))
       E.inj(ejson.Meta(
         Bson.Doc(ListMap(
-          DateTimeConstants.year       -> Bson.Int32(ldt.getYear),
-          DateTimeConstants.month      -> Bson.Int32(ldt.getMonth.getValue),
-          DateTimeConstants.day        -> Bson.Int32(ldt.getDayOfMonth),
-          DateTimeConstants.hour       -> Bson.Int32(ldt.getHour),
-          DateTimeConstants.minute     -> Bson.Int32(ldt.getMinute),
-          DateTimeConstants.second     -> Bson.Int32(ldt.getSecond),
-          DateTimeConstants.nanosecond -> Bson.Int32(ldt.getNano))),
-        EJsonType(TypeTag.LocalDateTime.value))).right
+          DateTimeConstants.year       -> Bson.Int32(dt.getYear),
+          DateTimeConstants.month      -> Bson.Int32(dt.getMonth.getValue),
+          DateTimeConstants.day        -> Bson.Int32(dt.getDayOfMonth),
+          DateTimeConstants.hour       -> Bson.Int32(dt.getHour),
+          DateTimeConstants.minute     -> Bson.Int32(dt.getMinute),
+          DateTimeConstants.second     -> Bson.Int32(dt.getSecond),
+          DateTimeConstants.nanosecond -> Bson.Int32(dt.getNano),
+          DateTimeConstants.offset     -> Bson.Int32(0))),
+        EJsonType(TypeTag.OffsetDateTime.value))).right
     case Bson.Binary(value)    =>
       E.inj(ejson.Meta(
         Bson.Text(ejson.z85.encode(ByteVector.view(value.toArray))),
