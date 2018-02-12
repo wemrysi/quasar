@@ -391,6 +391,144 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
             }
           }
 
+        case Range(lower, upper) =>
+          import java.util.Arrays
+          import scala.collection.mutable
+          import scala.annotation.tailrec
+          composeSliceTransform2(upper).zip(composeSliceTransform2(lower)) { (upperS, lowerS) =>
+            val upperColumns = upperS.materialized.columns
+            val lowerColumns = lowerS.materialized.columns
+            val lowerC = lowerColumns.getOrElse(ColumnRef(CPath.Identity, CLong), {
+              val numCol = lowerColumns(ColumnRef(CPath.Identity, CNum)).asInstanceOf[ArrayNumColumn]
+              new ArrayLongColumn(numCol.defined, numCol.values.map(_.toLong))
+            }).asInstanceOf[ArrayLongColumn]
+            val upperC = upperColumns.getOrElse(ColumnRef(CPath.Identity, CLong), {
+              val numCol = upperColumns(ColumnRef(CPath.Identity, CNum)).asInstanceOf[ArrayNumColumn]
+              new ArrayLongColumn(numCol.defined, numCol.values.map(_.toLong))
+            }).asInstanceOf[ArrayLongColumn]
+            // lower == Column(1, 2, 3)
+            // upper == Column(3, 4, 5)
+            // output == Map(
+            //   ColumnRef(Index(0)) -> Column(1, 2, 3), 
+            //   ColumnRef(Index(1)) -> Column(2, 3, 4), 
+            //   ColumnRef(Index(2)) -> Column(3, 4, 5)
+            // )
+            // 
+            val lowerA = lowerC.values
+            val upperA = upperC.values
+            val minNumRows = 
+              if (lowerA.length > upperA.length) upperA.length 
+              else lowerA.length
+            val maxNumRows =
+              if (lowerA.length < upperA.length) upperA.length 
+              else lowerA.length
+            println(s"""
+            |minNumRows: $minNumRows
+            |maxNumRows: $maxNumRows
+            |lowerA: ${lowerA.mkString("[", ",", "]")}
+            |upperA: ${upperA.mkString("[", ",", "]")}
+            """.stripMargin)
+            val arraysBuildr = new mutable.ListBuffer[Array[Long]]()
+            val bitsetsBuildr = new mutable.ListBuffer[BitSet]()
+            val stateArray: Array[Long] = Arrays.copyOf(lowerA, maxNumRows)
+            val stateBitset: BitSet = new BitSet(maxNumRows)
+            stateBitset.set(0, maxNumRows)
+            println(
+              "stateBitset: " + stateBitset.getBits().map(java.lang.Long.toBinaryString).mkString("[", "\n", "]")
+            )
+            println(
+              "stateArray: " + stateArray.map(_.toString).mkString("[", "\n", "]")
+            )
+            var done = 0
+            var r = 0
+            while (r < stateArray.length && done != stateArray.length) {
+              if (stateArray(r) > upperA(r)) {
+                done += 1
+                stateBitset.clear(r)
+              }
+              r += 1
+            }
+            if (done != stateArray.length) {
+              arraysBuildr += Arrays.copyOf(stateArray, maxNumRows)
+              bitsetsBuildr += stateBitset.copy()
+            }
+            var columns = 0
+            var doneLooping = done == stateArray.length
+            while (!doneLooping) {
+              if (done < stateArray.length) {
+                arraysBuildr += Arrays.copyOf(stateArray, maxNumRows)
+                bitsetsBuildr += stateBitset.copy()
+              } else {
+                doneLooping = true
+              }
+              var row = 0
+              done = 0
+              while (row < minNumRows) {
+                if (stateArray(row) > upperA(row)) {
+                  stateBitset.clear(row)
+                  done += 1
+                } else {
+                  stateArray(row) = stateArray(row) + 1
+                  columns += 1
+                }
+                row += 1
+              }
+              println(
+                "stateBitset: \n" + stateBitset.getBits().map(java.lang.Long.toBinaryString(_)).mkString("[", "\n", "]")
+              )
+              println(
+                "stateArray: \n" + stateArray.map(_.toString).mkString("[", "\n", "]")
+              )
+              println(s"done: $done")
+            }
+            def allColumns(arrs: List[Array[Long]], defineds: List[BitSet]): Map[ColumnRef, Column] = {
+              @tailrec
+              def rec(i: Int, 
+                      arrs: List[Array[Long]], defineds: List[BitSet], 
+                      accum: Map[ColumnRef, Column]): Map[ColumnRef, Column] =
+                (arrs, defineds) match {
+                  case (a :: as, d :: ds) => 
+                    val ref = ColumnRef(CPath(CPathIndex(i) :: Nil), CLong)
+                    val column = new ArrayLongColumn(d, a)
+                    val newAccum = accum + (ref -> column)
+                    rec(i + 1, as, ds, newAccum)
+                  case _ => accum
+                }
+              (arrs, defineds) match {
+                case (Nil, Nil) => 
+                  println("we got two nils")
+                  lowerC.defined.or(upperC.defined)
+                  Map(ColumnRef(CPath.Identity, CEmptyArray) -> EmptyArrayColumn(lowerC.defined))
+                case _ => 
+                  rec(0, arrs, defineds, Map.empty)
+              }
+            }
+            val arrays = arraysBuildr.result()
+            val bitsets = bitsetsBuildr.result()
+            println(
+              "final bitsets: " + 
+                bitsets
+                  .map(
+                    _.getBits().map(java.lang.Long.toBinaryString)
+                                .mkString("[", "\n", "]"))
+                  .mkString("(", "\n\n\n", ")")
+            )
+            println(
+              "final arrays: " + 
+                arrays
+                  .map(
+                    _.map(_.toString)
+                    .mkString("[", "\n", "]"))
+                  .mkString("(", "\n\n\n", ")")
+            )
+            new Slice {
+              val size = 
+                bitsets.length * maxNumRows
+              val columns = 
+                allColumns(arrays, bitsets)
+            }
+          }
+
         case ConstLiteral(value, target) =>
           composeSliceTransform2(target) map { _.definedConst(value) }
 

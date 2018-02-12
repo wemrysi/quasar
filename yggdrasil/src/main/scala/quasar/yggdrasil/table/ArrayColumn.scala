@@ -100,7 +100,7 @@ object ArrayLongColumn {
     new ArrayLongColumn(new BitSet, new Array[Long](size))
 }
 
-class ArrayDoubleColumn(val defined: BitSet, values: Array[Double]) extends ArrayColumn[Double] with DoubleColumn {
+class ArrayDoubleColumn(val defined: BitSet, val values: Array[Double]) extends ArrayColumn[Double] with DoubleColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: Double) = {
@@ -118,7 +118,7 @@ object ArrayDoubleColumn {
     new ArrayDoubleColumn(new BitSet, new Array[Double](size))
 }
 
-class ArrayNumColumn(val defined: BitSet, values: Array[BigDecimal]) extends ArrayColumn[BigDecimal] with NumColumn {
+class ArrayNumColumn(val defined: BitSet, val values: Array[BigDecimal]) extends ArrayColumn[BigDecimal] with NumColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: BigDecimal) = {

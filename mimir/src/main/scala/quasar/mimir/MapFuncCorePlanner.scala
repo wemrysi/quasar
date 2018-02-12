@@ -240,7 +240,7 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.Meta(a1) => ???
 
       case MapFuncsCore.Range(from, to) =>
-        (Map2[A](from, to, cake.Library.range): TransSpec[A]).point[F]
+        (Range(from, to): TransSpec[A]).point[F]
 
       case MapFuncsCore.Guard(src, tpe, a2, a3) =>
         (Cond(IsType(src, JType.fromType(tpe)), a2, a3): TransSpec[A]).point[F]

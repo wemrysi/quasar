@@ -22,8 +22,6 @@ import quasar.precog.common._
 import quasar.yggdrasil._
 import quasar.yggdrasil.table._
 
-import scala.collection.immutable.NumericRange
-
 trait ArrayLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait ArrayLib extends ColumnarTableLib {
     import StdLib.dateToStrCol
@@ -218,20 +216,6 @@ trait ArrayLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
       case List(target: DateColumn, lower: DateColumn, upper: DateColumn) =>
         between(List(dateToStrCol(target), dateToStrCol(lower), dateToStrCol(upper))).get
-    }
-
-    lazy val range: CF2 = CF2P("std::array::range") {
-      case (lower: LongColumn, upper: LongColumn) =>
-        new HomogeneousArrayColumn[Long] {
-          val tpe = CArrayType(CLong)
-          def apply(row: Int) = {
-            val l = lower(row)
-            val u = upper(row)
-            NumericRange.inclusive[Long](l, u, 1).toArray
-          }
-          def isDefinedAt(row: Int) =
-            lower.isDefinedAt(row) && upper.isDefinedAt(row)
-        }
     }
 
     object Flatten extends Morphism1(Vector(), "flatten") {
