@@ -448,10 +448,6 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
               }
               r += 1
             }
-            if (done != stateArray.length) {
-              arraysBuildr += Arrays.copyOf(stateArray, maxNumRows)
-              bitsetsBuildr += stateBitset.copy()
-            }
             var columns = 0
             var doneLooping = done == stateArray.length
             while (!doneLooping) {
@@ -464,7 +460,7 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
               var row = 0
               done = 0
               while (row < minNumRows) {
-                if (stateArray(row) > upperA(row)) {
+                if (stateArray(row) >= upperA(row)) {
                   stateBitset.clear(row)
                   done += 1
                 } else {
@@ -494,14 +490,7 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
                     rec(i + 1, as, ds, newAccum)
                   case _ => accum
                 }
-              (arrs, defineds) match {
-                case (Nil, Nil) => 
-                  println("we got two nils")
-                  lowerC.defined.or(upperC.defined)
-                  Map(ColumnRef(CPath.Identity, CEmptyArray) -> EmptyArrayColumn(lowerC.defined))
-                case _ => 
-                  rec(0, arrs, defineds, Map.empty)
-              }
+              rec(0, arrs, defineds, Map.empty)
             }
             val arrays = arraysBuildr.result()
             val bitsets = bitsetsBuildr.result()

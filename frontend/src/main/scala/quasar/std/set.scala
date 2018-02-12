@@ -22,7 +22,7 @@ import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.sql.JoinDir
 
-// import scala.collection.immutable.NumericRange
+import scala.collection.immutable.NumericRange
 
 import matryoshka._
 import matryoshka.implicits._
@@ -113,9 +113,9 @@ trait SetLib extends Library {
     Func.Input2(Type.Int, Type.Int),
     noSimplification,
     partialTyper[nat._2] {
-      // case Sized(Type.Const(Data.Int(a)), Type.Const(Data.Int(b))) =>
-      //   Type.Const(
-      //     Data.Arr(NumericRange.inclusive[BigInt](a, b, 1).toList ∘ (Data.Int(_))))
+      case Sized(Type.Const(Data.Int(a)), Type.Const(Data.Int(b))) if a <= b =>
+        Type.Const(
+          Data.Arr(NumericRange.inclusive[BigInt](a, b, 1).toList ∘ (Data.Int(_))))
       case Sized(_, _) => Type.Int
     },
     basicUntyper)

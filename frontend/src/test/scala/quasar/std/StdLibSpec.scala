@@ -1915,8 +1915,8 @@ abstract class StdLibSpec extends Qspec {
         "Range(1, 1) is [1]" >> {
           binary(Range(_, _).embed, Data.Int(1), Data.Int(1), Data.Arr(List(Data.Int(1))))
         }
-        "Range(2, 1) is []" >> {
-          binary(Range(_, _).embed, Data.Int(2), Data.Int(1), Data.Arr(Nil))
+        "Range(2, 1) is undefined" >> {
+          binary(Range(_, _).embed, Data.Int(2), Data.Int(1), Data.NA)
         }
       }
     }
