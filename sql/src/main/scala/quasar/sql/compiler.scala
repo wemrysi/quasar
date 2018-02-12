@@ -271,18 +271,12 @@ final class Compiler[M[_], T: Equal]
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def flattenJoins(term: T, relations: SqlRelation[CoExpr]):
         T = relations match {
-        case _: NamedRelation[_]             => term
-        case JoinRelation(left, right, _, _) =>
-          structural.MapConcat(
-            flattenJoins(Left.projectFrom(term), left),
-            flattenJoins(Right.projectFrom(term), right)).embed
+      case _: NamedRelation[_]             => term
+      case JoinRelation(left, right, _, _) =>
+        structural.MapConcat(
+          flattenJoins(Left.projectFrom(term), left),
+          flattenJoins(Right.projectFrom(term), right)).embed
     }
-
-    // TODO: Customer Orders starting point
-    // TODO: flight recorder attch a profiler yourkit
-    // TODO: a node is probably beind compared too many times
-    // TODO: matryoska that compares eq to eq
-    // TODO: equals in logical plan is broken
 
     def buildJoinDirectionMap(relations: SqlRelation[CoExpr]):
         Map[String, List[JoinDir]] = {
@@ -291,7 +285,7 @@ final class Compiler[M[_], T: Equal]
           Map[String, List[JoinDir]] = rel match {
         case t: NamedRelation[_] => Map(t.aliasName -> acc)
         case JoinRelation(left, right, tpe, clause) =>
-            loop(left, Left :: acc) ++ loop(right, Right :: acc)
+          loop(left, Left :: acc) ++ loop(right, Right :: acc)
       }
 
       loop(relations, Nil)
@@ -380,7 +374,7 @@ final class Compiler[M[_], T: Equal]
         case ExprRelationAST(expr, _) => compile0(expr)
 
         case JoinRelation(left, right, tpe, clause) =>
-          (CompilerState.freshName("left") ⊛ CompilerState.freshName("right")) ((leftName, rightName) => {
+          (CompilerState.freshName("left") ⊛ CompilerState.freshName("right"))((leftName, rightName) => {
             val leftFree: T = lpr.joinSideName(leftName)
             val rightFree: T = lpr.joinSideName(rightName)
 
@@ -390,7 +384,7 @@ final class Compiler[M[_], T: Equal]
                 BindingContext(Map()),
                 tableContext(leftFree, left) ++ tableContext(rightFree, right))
               (compile0(clause)))((left0, right0, clause0) =>
-              lpr.join(left0, right0, tpe, JoinCondition(leftName, rightName, clause0)))
+                lpr.join(left0, right0, tpe, JoinCondition(leftName, rightName, clause0)))
           }).join
       }
 
@@ -733,10 +727,11 @@ final class Compiler[M[_], T: Equal]
   def compile
     (tree: Cofree[Sql, SA.Annotations])
     (implicit
-     MErr: MonadError_[M, SemanticError],
+      MErr: MonadError_[M, SemanticError],
       MState: MonadState[M, CompilerState[T]],
-     S: Show[T],
-     R: RenderTree[T]): M[T] =
+      S: Show[T],
+      R: RenderTree[T])
+      : M[T] =
     compile0(tree).map(Compiler.reduceGroupKeys[T])
 }
 
@@ -754,7 +749,8 @@ object Compiler {
     (implicit
      TR: Recursive.Aux[T, LP],
      TC: Corecursive.Aux[T, LP],
-     S: Show[T]): SemanticError \/ T =
+     S: Show[T])
+     : SemanticError \/ T =
     trampoline[T].compile(tree).eval(CompilerState(Nil, Context(Nil, Nil), 0)).run.run
 
   /** Emulate SQL semantics by reducing any projection which trivially
