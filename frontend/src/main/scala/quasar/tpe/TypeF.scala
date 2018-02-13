@@ -150,14 +150,14 @@ object TypeF extends TypeFInstances {
     JR: Recursive.Aux[J, EJson]
   ): GCoalgebra[T \/ ?, TypeF[J, ?], (T, T)] = {
     type LR  = (T, T)
-    val T    = top[J, T]().embed
+    val ⊤    = top[J, T]().embed
     val ⊥    = bottom[J, T]().embed
 
     val arrayGlb: ((IList[T] \/ T, IList[T] \/ T)) => IList[LR] \/ LR = {
       case (\/-( x), \/-( y)) => (x, y).right
       case (\/-( x), -\/(ys)) => ys.map((x, _)).left
       case (-\/(xs), \/-( y)) => xs.map((_, y)).left
-      case (-\/(xs), -\/(ys)) => xs.alignWith(ys)(_.fold((_, T), (T, _), (_, _))).left
+      case (-\/(xs), -\/(ys)) => xs.alignWith(ys)(_.fold((_, ⊤), (⊤, _), (_, _))).left
     }
 
     // NB: We could do a bit better in the scenario where X includes known keys
@@ -169,13 +169,13 @@ object TypeF extends TypeFInstances {
     def mapGlb(xs: IMap[J, T], ux: Option[(T, T)], ys: IMap[J, T], uy: Option[(T, T)]): TypeF[J, LR] =
       map[J, LR](
         xs.alignWith(ys)(_.fold(
-          x      => (x, uy ? ⊥ | T),
-          y      => (ux ? ⊥ | T, y),
+          x      => (x, uy ? ⊥ | ⊤),
+          y      => (ux ? ⊥ | ⊤, y),
           (x, y) => (x, y)
         )),
         ux.alignWith(uy)(_.fold(
-          _.umap((_, T)),
-          _.umap((T, _)),
+          _.umap((_, ⊤)),
+          _.umap((⊤, _)),
           untupled({ case ((xk, xv), (yk, yv)) => ((xk, yk), (xv, yv)) })
         )))
 
