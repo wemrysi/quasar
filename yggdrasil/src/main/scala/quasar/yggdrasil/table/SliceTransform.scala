@@ -406,14 +406,6 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
               val numCol = upperColumns(ColumnRef(CPath.Identity, CNum)).asInstanceOf[ArrayNumColumn]
               new ArrayLongColumn(numCol.defined, numCol.values.map(_.toLong))
             }).asInstanceOf[ArrayLongColumn]
-            // lower == Column(1, 2, 3)
-            // upper == Column(3, 4, 5)
-            // output == Map(
-            //   ColumnRef(Index(0)) -> Column(1, 2, 3), 
-            //   ColumnRef(Index(1)) -> Column(2, 3, 4), 
-            //   ColumnRef(Index(2)) -> Column(3, 4, 5)
-            // )
-            // 
             val lowerA = lowerC.values
             val upperA = upperC.values
             val minNumRows = 
@@ -422,23 +414,11 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
             val maxNumRows =
               if (lowerA.length < upperA.length) upperA.length 
               else lowerA.length
-            println(s"""
-            |minNumRows: $minNumRows
-            |maxNumRows: $maxNumRows
-            |lowerA: ${lowerA.mkString("[", ",", "]")}
-            |upperA: ${upperA.mkString("[", ",", "]")}
-            """.stripMargin)
             val arraysBuildr = new mutable.ListBuffer[Array[Long]]()
             val bitsetsBuildr = new mutable.ListBuffer[BitSet]()
             val stateArray: Array[Long] = Arrays.copyOf(lowerA, maxNumRows)
             val stateBitset: BitSet = new BitSet(maxNumRows)
             stateBitset.set(0, maxNumRows)
-            println(
-              "stateBitset: " + stateBitset.getBits().map(java.lang.Long.toBinaryString).mkString("[", "\n", "]")
-            )
-            println(
-              "stateArray: " + stateArray.map(_.toString).mkString("[", "\n", "]")
-            )
             var done = 0
             var r = 0
             while (r < stateArray.length && done != stateArray.length) {
@@ -469,18 +449,11 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
                 }
                 row += 1
               }
-              println(
-                "stateBitset: \n" + stateBitset.getBits().map(java.lang.Long.toBinaryString(_)).mkString("[", "\n", "]")
-              )
-              println(
-                "stateArray: \n" + stateArray.map(_.toString).mkString("[", "\n", "]")
-              )
-              println(s"done: $done")
             }
             def allColumns(arrs: List[Array[Long]], defineds: List[BitSet]): Map[ColumnRef, Column] = {
               @tailrec
-              def rec(i: Int, 
-                      arrs: List[Array[Long]], defineds: List[BitSet], 
+              def rec(i: Int,
+                      arrs: List[Array[Long]], defineds: List[BitSet],
                       accum: Map[ColumnRef, Column]): Map[ColumnRef, Column] =
                 (arrs, defineds) match {
                   case (a :: as, d :: ds) => 
@@ -494,22 +467,6 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
             }
             val arrays = arraysBuildr.result()
             val bitsets = bitsetsBuildr.result()
-            println(
-              "final bitsets: " + 
-                bitsets
-                  .map(
-                    _.getBits().map(java.lang.Long.toBinaryString)
-                                .mkString("[", "\n", "]"))
-                  .mkString("(", "\n\n\n", ")")
-            )
-            println(
-              "final arrays: " + 
-                arrays
-                  .map(
-                    _.map(_.toString)
-                    .mkString("[", "\n", "]"))
-                  .mkString("(", "\n\n\n", ")")
-            )
             new Slice {
               val size = 
                 bitsets.length * maxNumRows
