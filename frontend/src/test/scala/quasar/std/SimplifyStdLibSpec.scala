@@ -70,9 +70,10 @@ class SimplifyStdLibSpec extends StdLibSpec {
 
       case (structural.MapProject, List(Data.Obj(fields), Data.Str(field))) if !fields.contains(field) => notHandled
 
-      // case (set.Range, List(Data.Int(a), Data.Int(b))) if a > b => notHandled
+      case (StdLib.set.Range, List(Data.Int(a), Data.Int(b))) if a > b =>
+        notHandled
 
-      case _ => ().right
+      case _ =>  ().right
     }
 
   /** Identify constructs that are expected not to be implemented. */
