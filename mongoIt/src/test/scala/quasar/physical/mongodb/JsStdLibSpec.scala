@@ -39,6 +39,7 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case (string.Lower, _)              => Pending("TODO").left
     case (string.Upper, _)              => Pending("TODO").left
     case (quasar.std.SetLib.Within, _)  => Pending("TODO").left
+    case (quasar.std.SetLib.Range, _)   => Pending("TODO").left
 
     case (string.ToString, Data.Dec(_) :: Nil) =>
       Pending("Dec printing doesn't match precisely").left
