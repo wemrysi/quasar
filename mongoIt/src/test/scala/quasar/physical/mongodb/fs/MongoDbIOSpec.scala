@@ -63,6 +63,33 @@ class MongoDbIOSpec extends Qspec {
           idxs must_=== Set(Index("_id_", NonEmptyList(BsonField.Name("_id") -> IndexType.Ascending), false))
         }).unsafePerformSync
       }
+
+      "rename collection" in {
+        (for {
+          src  <- tempColl(prefix)
+          _    <- insert(
+                    src,
+                    List(Bson.Doc(ListMap("a" -> Bson.Int32(0)))).map(_.repr)).run(setupClient)
+          statsSrcBefore <- collectionStatistics(src).run(setupClient)
+
+          dst  <- tempColl(prefix)
+          _    <- insert(
+                    dst,
+                    List(Bson.Doc(ListMap("b" -> Bson.Int32(1))), Bson.Doc(ListMap("c" -> Bson.Int32(2)))).map(_.repr)).run(setupClient)
+          statsDstBefore <- collectionStatistics(dst).run(setupClient)
+
+          _     <- rename(src, dst, RenameSemantics.Overwrite).run(testClient)
+
+          srcAfterExists <- collectionExists(src).run(setupClient)
+          statsDstAfter <- collectionStatistics(dst).run(setupClient)
+          _     <- dropCollection(dst).run(setupClient)
+        } yield {
+          statsSrcBefore.count must_=== 1
+          statsDstBefore.count must_=== 2
+          srcAfterExists must_=== false
+          statsDstAfter.count must_=== 1
+        }).unsafePerformSync
+      }
     }
   }
 }
