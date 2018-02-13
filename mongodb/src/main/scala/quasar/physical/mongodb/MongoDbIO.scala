@@ -251,7 +251,7 @@ object MongoDbIO {
       collection(src)
         .flatMap(c => async[java.lang.Void](c.renameCollection(
           dst.asNamespace,
-          (new RenameCollectionOptions) dropTarget dropDst,
+          (new RenameCollectionOptions).dropTarget(dropDst),
           _)))
         .void
   }
