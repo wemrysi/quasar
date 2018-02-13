@@ -2,10 +2,10 @@
     "name": "range",
     "backends": {},
     "data": "nested.data",
-    "query": "select topArr[1].botArr[*] .. 8 from nested",
+    "query": "select (topArr[1].botArr[*] .. 9) from nested",
     "predicate": "exactly",
     "ignoreResultOrder": false,
     "expected": [
-        [7, 8], [8], undefined
+        [7, 8, 9], [8, 9], [9]
     ]
 }
