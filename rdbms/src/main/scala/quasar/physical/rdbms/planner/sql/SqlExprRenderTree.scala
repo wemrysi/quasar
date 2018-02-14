@@ -74,6 +74,8 @@ trait SqlExprRenderTree {
             nonTerminal("Min", a1)
           case Sum(a1) =>
             nonTerminal("Sum", a1)
+          case ArrayAgg(a1) =>
+            nonTerminal("ArrayAgg", a1)
           case DeleteKey(expr1, expr2) =>
             NonTerminal(s"Delete Key" :: Nil, none, List(expr1, expr2) ∘ r.render)
           case Distinct(a1) =>

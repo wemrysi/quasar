@@ -7,7 +7,8 @@
         "mimir":           "skip",
         "spark_hdfs":      "skip",
         "spark_local":     "skip",
-        "spark_cassandra": "skip"
+        "spark_cassandra": "skip",
+        "postgres":        "skip"
     },
     "data": "../cities.data",
     "query": "select distinct * from `../cities` where city = \"BOSTON\"",

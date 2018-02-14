@@ -39,7 +39,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends QS
       K(ReadLP[T, F])                        >==>
       debug("ReadLP: ")                      >==>
       RewriteGroupByArrays[T, F]             >==>
-      debug("RewriteGBArrays: ")             >-
+      debug("RewriteGroupByArrays: ")        >-
       EliminateUnary[T]                      >==>
       debug("EliminateUnary: ")              >-
       RecognizeDistinct[T]                   >==>
@@ -51,7 +51,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends QS
       ReifyBuckets[T, F]                     >==>
       debug("ReifyBuckets: ")                >==>
       MinimizeAutoJoins[T, F]                >==>
-      debug("MinimizeAJ: ")                  >==>
+      debug("MinimizeAutoJoins: ")           >==>
       ReifyAutoJoins[T, F]                   >==>
       debug("ReifyAutoJoins: ")              >==>
       ExpandShifts[T, F]                     >==>

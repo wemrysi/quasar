@@ -51,6 +51,8 @@ script:
   - docker/scripts/assembleTestingConf -i quasar_$CONNECTOR
   - cat it/testing.conf
 
+  - ./sbt preBuild
+
   - |-
     SPECIFIC_DELEGATE=
 
@@ -92,17 +94,22 @@ jobs:
   include:
     - stage: clean
       env:
-      script: ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
+      script:
+        - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
 
     - stage: compile
       env:
       script:
         - set -e
 
+        - ./sbt preBuild
+
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
             checkHeaders \
             test:compile
+
+        - ./sbt postBuild
 
         - set +e
 
@@ -110,6 +117,7 @@ jobs:
     - stage: unit test
       env:
       script:
+        - ./sbt preBuild
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
             it/sideEffectTestFSConfig \
@@ -120,6 +128,8 @@ jobs:
       env:
       script:
         - set -e
+
+        - ./sbt preBuild
 
         # workaround for the fact that travis caching isn't working. when it starts working again, remove this
         - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION foundation/test:compile
@@ -166,6 +176,7 @@ cache:
     - $HOME/.sbt
     - target
     - .targets
+    - '.hoarder-cache'
     - project/project/target
     - project/target
 

@@ -48,7 +48,7 @@ final class ReduceFuncPlanner[T[_[_]]: BirecursiveT, F[_]: Applicative] extends 
     case RF.Max(a1)            => Max(a1)
     case RF.Min(a1)            => Min(a1)
     case RF.Sum(a1)            => Sum(a1)
-    case RF.UnshiftArray(a1)   => ???
+    case RF.UnshiftArray(a1)   => ArrayAgg(a1)
     case RF.UnshiftMap(a1, a2) => ???
   }
 }

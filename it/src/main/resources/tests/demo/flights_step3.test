@@ -8,7 +8,7 @@
        "postgres":          "pending"
     },
     "NB": "should be skipped on couchbase, since it doesn't have general join",
-    "NB2": "Pending for Postgres until UnshiftArray reduce function is supported",
+    "NB2": "Pending for Postgres because of missing support for first/last aggregation",
     "query": "SELECT DISTINCT row.source AS Source, [row.destination...] AS Destination, [row.fuel...] AS Cost FROM flights AS row GROUP BY row.source ORDER BY row.source ASC",
     "predicate": "exactly",
     "expected": [

@@ -45,7 +45,6 @@ import scalaz.std.anyVal._
 import scalaz.syntax.either._
 import scalaz.syntax.tag._
 import scalaz.syntax.std.boolean._
-// import scalaz.syntax.show._
 
 object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
