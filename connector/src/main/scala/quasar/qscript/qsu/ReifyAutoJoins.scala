@@ -98,10 +98,10 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
             qsu.qsAutoJoin(l, c, lcKeys, lcCombiner)
 
           def projLeft[A](hole: FreeMapA[A]): FreeMapA[A] =
-            func.ProjectKey(StrLit(lName), hole)
+            func.ProjectKey(hole, StrLit(lName))
 
           def projCenter[A](hole: FreeMapA[A]): FreeMapA[A] =
-            func.ProjectKey(StrLit(cName), hole)
+            func.ProjectKey(hole, StrLit(cName))
 
           val combiner: JoinFunc = combiner3 flatMap {
             case LeftSide3 => projLeft[JoinSide](LeftSideF)
