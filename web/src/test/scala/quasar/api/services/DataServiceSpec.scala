@@ -52,7 +52,6 @@ import org.http4s._
 import org.http4s.argonaut._
 import org.http4s.headers._
 import org.http4s.server.middleware.GZip
-import org.http4s.util.Renderer
 import org.specs2.specification.core.Fragment
 import org.specs2.execute.AsResult
 import org.specs2.matcher.MatchResult
@@ -398,8 +397,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
 
             respA.status must_= Status.Ok
             respB.status must_= Status.Ok
-            respA.headers.get(Expires.name) ∘ (_.value) must_=
-              Renderer.renderString(lastUpdate.plus(Duration.ofSeconds(maxAgeSecs.toLong))).some
+            respA.headers.get(Expires.name) ∘ (_.value) must_= None
             respA.as[String].unsafePerformSync must_= respB.as[String].unsafePerformSync
             vc ∘ (_.cacheReads) must_= (viewCache.cacheReads ⊹ 1).some
           }
@@ -428,9 +426,8 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
 
             respA.status must_= Status.Ok
             respB.status must_= Status.Ok
-            respA.headers.get(Warning) ∘ (_.value) must_= StaleHeader.value.some
-            respA.headers.get(Expires) ∘ (_.value) must_=
-              Renderer.renderString(lastUpdate.plus(Duration.ofSeconds(maxAgeSecs.toLong))).some
+            respA.headers.get(Warning) ∘ (_.value) must_= None
+            respA.headers.get(Expires) ∘ (_.value) must_= None
             respA.as[String].unsafePerformSync must_= respB.as[String].unsafePerformSync
             vc ∘ (_.cacheReads) must_= (viewCache.cacheReads ⊹ 1).some
            }

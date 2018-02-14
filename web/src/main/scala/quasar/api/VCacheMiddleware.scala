@@ -16,15 +16,10 @@
 
 package quasar.api
 
-import slamdata.Predef._
 import quasar.effect.Timing
 import quasar.fs.mount.cache.VCache, VCache.VCacheExpR
 
-import org.http4s.Header
-import org.http4s.headers.Expires
-import org.http4s.util.Renderer
-import scalaz._, Scalaz._
-import scalaz.syntax.tag._
+import scalaz._
 
 object VCacheMiddleware {
   def apply[S[_]](
@@ -34,13 +29,8 @@ object VCacheMiddleware {
     T: Timing.Ops[S],
     C: Catchable[Free[S, ?]]
   ): QHttpService[S] =
-    QHttpService { case req =>
-      (service(req) ⊛ R.ask ⊛ T.timestamp) { case (resp, ex, ts) =>
-        val cacheHeaders = ex.unwrap.foldMap(e =>
-          Header(Expires.name.value, Renderer.renderString(e.v)) ::
-          ts.isAfter(e.v).fold(List(StaleHeader), Nil))
-
-        resp.modifyHeaders(_ ++ cacheHeaders)
-      }
-    }
+    //Due to qz-3657 cache specific response headers have been removed for the moment.
+    //However, since the plan is to reintroduce them in the form of ETags,
+    //we are keeping the infrastructure
+    QHttpService { case req => service(req) }
 }
