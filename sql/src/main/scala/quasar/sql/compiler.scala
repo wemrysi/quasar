@@ -29,7 +29,6 @@ import quasar.std.StdLib, StdLib._
 import quasar.std.TemporalPart
 import quasar.sql.{SemanticAnalysis => SA}, SA._
 import quasar.RenderTree
-// import quasar.RenderTree.ops._
 
 import matryoshka._
 import matryoshka.data._
@@ -763,26 +762,27 @@ object Compiler {
      TC: Corecursive.Aux[T, LP],
      S: Show[T],
      R: RenderTree[T]): T = {
+    type K = (T, ZFree[LP, Unit])
     // Step 0: identify key expressions, and rewrite them by replacing the
     // group source with the source at the point where they might appear.
-    def keysƒ(t: LP[(T, List[(T, ZFree[LP, Unit])])]): (T, List[(T, ZFree[LP, Unit])]) = {
-      def groupedKeys(t: LP[T], newSrc: T): Option[List[(T, ZFree[LP, Unit])]] = {
+    def keysƒ(t: LP[(T, List[K])]): (T, List[K]) = {
+      def groupedKeys(t: LP[T]): Option[List[K]] = {
         Some(t) collect {
           case InvokeUnapply(set.GroupBy, Sized(src, structural.MakeArrayN(keys))) =>
             keys.map(_.transAna[ZFree[LP, Unit]]{ lp =>
               if (lp.embed ≟ src) CoEnv[Unit, LP, T](-\/(()))
               else CoEnv[Unit, LP, T](\/-(lp))
-            }) strengthL newSrc
+            }) strengthL t.embed
         }
       }
 
       val tf = t.map(_._1)
-      (tf.embed, groupedKeys(tf, tf.embed).getOrElse(t.foldMap(_._2)))
+      (tf.embed, groupedKeys(tf).getOrElse(t.foldMap(_._2)))
     }
 
-    val sources: List[(T, ZFree[LP, Unit])] = tree.cata(keysƒ)._2
+    val sources: List[K] = tree.cata(keysƒ)._2
 
-    type KeyState = (List[(T, ZFree[LP, Unit])], List[T])
+    type KeyState = (List[K], List[T])
 
     val KS = MonadState_[State[KeyState, ?], KeyState]
 
@@ -791,7 +791,7 @@ object Compiler {
 
     // Step 1: annotate nodes containing the keys.
     val ann: State[KeyState, Cofree[LP, Boolean]] = tree.transAnaM {
-      case let @ LPLet(name, expr, body) =>
+      case let @ LPLet(name, expr, _) =>
         for {
           ks <- KS.get
           (srcs, keys) = ks
