@@ -20,27 +20,21 @@ import scala.Predef.$conforms
 import slamdata.Predef._
 import quasar.{Data, RepresentableData}
 import quasar.DataArbitrary._
-import quasar.DateArbitrary._
 import quasar.RepresentableDataArbitrary._
 import quasar.api._,
   ApiErrorEntityDecoder._, PathUtils._, MessageFormat.JsonContentType, MessageFormatGen._
 import quasar.api.matchers._
 import quasar.api.MessageFormatGen._
 import quasar.contrib.pathy._, PathArbitrary._
-import quasar.contrib.scalaz.catchable._
 import quasar.csv.CsvParser
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount._, MountConfigArbitrary._
-import MountConfig.{ModuleConfig, ViewConfig, viewConfig0}
-import quasar.fs.mount.cache.ViewCache
+import MountConfig.{ModuleConfig, ViewConfig}
 import quasar.main.CoreEffIO
 import quasar.sql._
-import quasar.Variables
-
-import java.time.{Duration, Instant}
 
 import argonaut.{Json, EncodeJson}
 import argonaut.Argonaut._
@@ -69,7 +63,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import Fixture._, InMemory._, JsonPrecision._, JsonFormat._
   import FileSystemFixture.{ReadWriteT, ReadWrites, amendWrites}
   import PathError.pathNotFound
-  import VCacheFixture._
 
   def service(mem: InMemState, mounts: MountingsConfig = MountingsConfig.empty): Service[Request, Response] =
     serviceRef(mem, mounts)._1
@@ -370,67 +363,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
               "detail" := Json(
                 "path" := "/foo")))) and
           (response.status must_=== Status.NotFound)
-        }
-      }
-
-      "respond with view cache data" >> {
-        "fresh" >> prop {
-            (f: AFile, g: AFile, now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
-            val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
-            lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isBefore(lastUpdate.plus(maxAge)) && f ≠ g
-          } ==> {
-            val expr = sqlB"""select { "α": 7 }"""
-            val viewCache = ViewCache(
-              MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
-              maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
-            val mounts = Map[APath, MountConfig](f -> viewConfig0(expr))
-            val memState = InMemState.fromFiles(Map(g -> Vector(Data.Obj("α" -> Data._int(7)))))
-
-            val (respA, respB, vc) = evalViewTest(now, mounts, memState) { (it, ir) =>
-              (for {
-                _ <- vcache.put(f, viewCache)
-                a <- VCacheMiddleware(data.service[ViewEff]).apply(Request(uri = pathUri(f)))
-                b <- data.service[ViewEff].apply(Request(uri = pathUri(g)))
-                c <- vcache.get(f).run
-              } yield (a.toHttpResponse(ir), b.toHttpResponse(ir), c)).foldMap(it)
-            }.unsafePerformSync
-
-            respA.status must_= Status.Ok
-            respB.status must_= Status.Ok
-            respA.headers.get(Expires.name) ∘ (_.value) must_= None
-            respA.as[String].unsafePerformSync must_= respB.as[String].unsafePerformSync
-            vc ∘ (_.cacheReads) must_= (viewCache.cacheReads ⊹ 1).some
-          }
-        }
-
-        "stale" >> prop {
-            (f: AFile, g: AFile, now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
-            val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
-              lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isAfter(lastUpdate.plus(maxAge)) && f ≠ g
-          } ==> {
-            val expr = sqlB"""select { "α": 7 }"""
-            val viewCache = ViewCache(
-              MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
-              maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
-            val mounts = Map[APath, MountConfig](f -> viewConfig0(expr))
-            val memState = InMemState.fromFiles(Map(g -> Vector(Data.Obj("α" -> Data._int(7)))))
-
-            val (respA, respB, vc) = evalViewTest(now, mounts, memState) { (it, ir) =>
-              (for {
-                _ <- vcache.put(f, viewCache)
-                a <- VCacheMiddleware(data.service[ViewEff]).apply(Request(uri = pathUri(f)))
-                b <- data.service[ViewEff].apply(Request(uri = pathUri(g)))
-                c <- vcache.get(f).run
-              } yield (a.toHttpResponse(ir), b.toHttpResponse(ir), c)).foldMap(it)
-            }.unsafePerformSync
-
-            respA.status must_= Status.Ok
-            respB.status must_= Status.Ok
-            respA.headers.get(Warning) ∘ (_.value) must_= None
-            respA.headers.get(Expires) ∘ (_.value) must_= None
-            respA.as[String].unsafePerformSync must_= respB.as[String].unsafePerformSync
-            vc ∘ (_.cacheReads) must_= (viewCache.cacheReads ⊹ 1).some
-           }
         }
       }
 
