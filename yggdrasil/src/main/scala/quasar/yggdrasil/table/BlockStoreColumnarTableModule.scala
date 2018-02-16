@@ -46,7 +46,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
 
   protected lazy val blockModuleLogger = LoggerFactory.getLogger("quasar.yggdrasil.table.BlockStoreColumnarTableModule")
 
-  import trans._
+  import trans.{Range => _, _}
   import TransSpec.deepMap
 
   type TableCompanion <: BlockStoreColumnarTableCompanion
@@ -489,7 +489,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
             }
           }
 
-          // This function exists so that we can correctly nandle the situation where the right side is out of data
+          // This function exists so that we can correctly handle the situation where the right side is out of data
           // and we need to continue in a span on the left.
           def continue(nextStep: NextStep,
                        comparator: RowComparator,
@@ -1097,7 +1097,6 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
   class ExternalTable(slices: StreamT[M, Slice], size: TableSize) extends Table(slices, size) {
     import Table._
     import SliceTransform._
-    import trans._
 
     def load(tpe: JType) = Table.load(this, tpe)
 

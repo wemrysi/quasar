@@ -53,7 +53,8 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
       Skipped("only printable ascii supported on MongoDB < 3.4").left
     case (string.ToString, List(Data.Timestamp(_) | Data.Date(_))) => Skipped("Implemented, but formatted incorrectly").left
 
-    case (quasar.std.SetLib.Within, _)      => notHandled.left
+    case (quasar.std.SetLib.Within, _) => notHandled.left
+    case (quasar.std.SetLib.Range, _)  => notHandled.left
 
     case (date.ExtractIsoYear, _) => notHandled.left
     case (date.ExtractWeek, _)    => Skipped("Implemented, but not ISO compliant").left
