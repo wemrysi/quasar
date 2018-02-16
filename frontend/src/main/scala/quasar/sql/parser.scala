@@ -460,8 +460,9 @@ private[sql] class SQLParser[T[_[_]]: BirecursiveT]
   def filter: Parser[T[Sql]] = keyword("where") ~> defined_expr
 
   def group_by: Parser[GroupBy[T[Sql]]] =
-    keyword("group") ~> keyword("by") ~> rep1sep(defined_expr, op(",")) ~ opt(keyword("having") ~> defined_expr) ^^ {
-      case k ~ h => GroupBy(k, h)
+    keyword("group") ~> keyword("by") ~> rep1sep(defined_expr, op(",")) ~ opt(keyword("having") ~> defined_expr) >> {
+      case k ~ None => success(GroupBy(k, None))
+      case _ ~ Some(_) => failure("Keyword `having` not supported.") // TODO remove failure when qz-3686 is fixed
     }
 
   def order_by: Parser[OrderBy[T[Sql]]] = {

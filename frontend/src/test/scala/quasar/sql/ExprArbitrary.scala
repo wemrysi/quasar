@@ -85,8 +85,10 @@ trait ExprArbitrary {
   }
 
   private def groupByGen(depth: Int): Gen[GroupBy[Fix[Sql]]] =
-    (smallNonEmptyListOf(exprGen(depth)) ⊛ Gen.option(exprGen(depth)))(
-      GroupBy(_, _))
+    // TODO re-enable when qz-3686 is fixed
+    //(smallNonEmptyListOf(exprGen(depth)) ⊛ Gen.option(exprGen(depth)))(
+    //  GroupBy(_, _))
+    smallNonEmptyListOf(exprGen(depth)) map { GroupBy(_, None) }
 
   private def orderByGen(depth: Int): Gen[OrderBy[Fix[Sql]]] = {
     val order = Gen.oneOf(ASC, DESC) tuple exprGen(depth)
