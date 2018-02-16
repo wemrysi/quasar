@@ -52,7 +52,7 @@ package object quasar {
   // TODO: Move this into the SQL package, provide a type class for it in core.
   def precompile[T: Equal: RenderTree]
     (query: Fix[Sql], vars: Variables, basePath: ADir)
-    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
+    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP], S: Show[T])
       : CompileM[T] = {
     import SemanticAnalysis._
     for {

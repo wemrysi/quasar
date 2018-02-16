@@ -215,8 +215,14 @@ object construction {
       Free.pure(ShiftTarget.RightTarget[T]())
     def AccessLeftTarget(f: Hole => QAccess[T, Hole]): FreeMapA[T, ShiftTarget[T]] =
       Free.pure(ShiftTarget.AccessLeftTarget(f(SrcHole)))
+
     def LeftSide: JoinFunc[T] = Free.pure(qscript.LeftSide)
     def RightSide: JoinFunc[T] = Free.pure(qscript.RightSide)
+
+    def LeftSide3: FreeMapA[T, JoinSide3] = Free.pure(qscript.LeftSide3)
+    def Center: FreeMapA[T, JoinSide3] = Free.pure(qscript.Center)
+    def RightSide3: FreeMapA[T, JoinSide3] = Free.pure(qscript.RightSide3)
+
     def ReduceIndex(i: Int \/ Int): FreeMapA[T, ReduceIndex] = Free.pure(qscript.ReduceIndex(i))
 
     def Abs[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =

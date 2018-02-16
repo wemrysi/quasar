@@ -51,6 +51,8 @@ script:
   - docker/scripts/assembleTestingConf -i quasar_$CONNECTOR
   - cat it/testing.conf
 
+  - ./sbt preBuild
+
   - |-
     SPECIFIC_DELEGATE=
 

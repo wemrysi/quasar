@@ -1368,7 +1368,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                       (lpf.invoke2(MapProject, lpf.free('__tmp3), lpf.constant(Data.Str("cm"))), SortDir.asc).wrapNel),
                     lpf.constant(Data.Int(10))), // offset 10
                   lpf.constant(Data.Int(5))))))))    // limit 5
-    }
+    }.pendingUntilFixed("reported in issue qz-3686")
 
     "compile simple sum" in {
       testLogicalPlanCompile(
@@ -1774,7 +1774,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
                 lpf.constant(Data.Str("city"))))))
 
       reduceGroupKeys(lp) must equalToPlan(exp)
-    }
+    }.pendingUntilFixed("reported in issue qz-3686")
 
     "not insert redundant Reduction" in {
       val lp =
