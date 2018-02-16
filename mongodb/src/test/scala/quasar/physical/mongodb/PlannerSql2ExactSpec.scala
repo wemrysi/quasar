@@ -302,9 +302,13 @@ class PlannerSql2ExactSpec extends
          $project(
            reshape(sigil.Quasar ->
              $cond(
-               $and(
-                 $lt($literal(Bson.Null), $field("val2")),
-                 $lt($field("val2"), $literal(Bson.Text("")))),
+               $or(
+                 $and(
+                   $lt($literal(Bson.Null), $field("val2")),
+                   $lt($field("val2"), $literal(Bson.Text("")))),
+                 $and(
+                   $lte($literal(Check.minDate), $field("val2")),
+                   $lt($field("val2"), $literal(Check.minTimestamp)))),
                $cond(
                  $or(
                    $and(
@@ -317,7 +321,7 @@ class PlannerSql2ExactSpec extends
                  $literal(Bson.Undefined)),
                $literal(Bson.Undefined))),
            ExcludeId)))
-    }.pendingUntilFixed("FIXME: regression on next-major")
+    }
 
     "plan concat (3.2+)" in {
       plan3_2(sqlE"select concat(city, state) from extraSmallZips") must
@@ -710,18 +714,22 @@ class PlannerSql2ExactSpec extends
              sigil.Quasar ->
                $cond(
                  $or(
-                   $and(
-                     $lt($literal(Bson.Null), $field("pop")),
-                     $lt($field("pop"), $literal(Bson.Doc()))),
+                   $or(
+                     $and(
+                       $lt($literal(Bson.Null), $field("pop")),
+                       $lt($field("pop"), $literal(Bson.Doc()))),
+                     $and(
+                       $lte($literal(Check.minDate), $field("pop")),
+                       $lt($field("pop"), $literal(Check.minTimestamp)))),
                    $and(
                      $lte($literal(Bson.Bool(false)), $field("pop")),
-                     $lt($field("pop"), $literal(Bson.Regex("", ""))))),
+                     $lte($field("pop"), $literal(Bson.Bool(true))))),
                  $cond($lt($field("pop"), $literal(Bson.Int32(10000))),
                    $field("city"),
                    $field("loc")),
                  $literal(Bson.Undefined))),
            ExcludeId)))
-    }.pendingUntilFixed("FIXME: regression on next-major")
+    }
 
     "plan negate" in {
       plan(sqlE"select -val1 from divide") must
@@ -769,9 +777,13 @@ class PlannerSql2ExactSpec extends
          $project(
            reshape(sigil.Quasar ->
              $cond(
-               $and(
-                 $lt($literal(Bson.Null), $field("val3")),
-                 $lt($field("val3"), $literal(Bson.Text("")))),
+               $or(
+                 $and(
+                   $lt($literal(Bson.Null), $field("val3")),
+                   $lt($field("val3"), $literal(Bson.Text("")))),
+                 $and(
+                   $lte($literal(Check.minDate), $field("val3")),
+                   $lt($field("val3"), $literal(Check.minTimestamp)))),
                $cond(
                  $or(
                    $and(
@@ -784,7 +796,7 @@ class PlannerSql2ExactSpec extends
                  $literal(Bson.Undefined)),
                $literal(Bson.Undefined))),
            ExcludeId)))
-    }.pendingUntilFixed("FIXME: regression on next-major")
+    }
 
     "plan simple js filter 3.2" in {
       plan3_2(sqlE"select * from zips where length(city) < 4") must
@@ -1687,8 +1699,7 @@ class PlannerSql2ExactSpec extends
       plan(sqlE"SELECT (DISTINCT foo.bar) + (DISTINCT foo.baz) FROM foo") must
         beWorkflow0(
           $read(collection("db", "zips")))
-    //}.pendingWithActual(notOnPar, testFile("plan combination of two distinct sets"))
-    }.pendingUntilFixed("FIXME: regression on next-major")
+    }.pendingWithActual(notOnPar, testFile("plan combination of two distinct sets"))
 
     "plan simple union" in {
       plan(sqlE"select name, year from cars union select year, name from cars") must
