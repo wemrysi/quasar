@@ -25,7 +25,7 @@ import quasar.qscript.{construction, JoinSide, LeftSide, RightSide}
 import quasar.sql.JoinDir
 
 import matryoshka.BirecursiveT
-import scalaz.{Monad, NonEmptyList, Scalaz, StateT}, Scalaz._
+import scalaz.{Monad, NonEmptyList, Scalaz, StateT, \/}, Scalaz._
 
 /** Extracts `MapFunc` expressions from operations by requiring an argument
   * to be a function of one or more sibling arguments and creating an
@@ -60,11 +60,18 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
         case (sym, fms) => QSFilter(sym, fms.head)
       }
 
-    case graph @ Extractors.LPJoin(left, right, cond, jtype, lref, rref) =>
+    case graph @ Extractors.LPJoin(left, right, cond, jtype, lref, rref) => {
       val combiner: JoinFunc =
         func.StaticMapS(
           JoinDir.Left.name -> func.LeftSide,
           JoinDir.Right.name -> func.RightSide)
+
+
+      def refReplace(g: QSUGraph, l: Symbol, r: Symbol): Symbol => JoinSide \/ QSUGraph =
+        replaceRefs(g, l, r) >>> (_.toLeft(g).disjunction)
+
+      val max: FreeMapA[JoinSide \/ QSUGraph] =
+        MappableRegion.maximal(graph refocus cond.root).map(qg => refReplace(qg, lref, rref)(qg.root))
 
       MappableRegion.funcOf(replaceRefs(graph, lref, rref), graph refocus cond.root)
         .map(jf => ThetaJoin(left.root, right.root, jf, jtype, combiner)) match {
@@ -74,6 +81,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
             PlannerErrorME[F].raiseError[QSUGraph](
               InternalError(s"Invalid join condition, $cond, must be a mappable function of $left and $right.", None))
         }
+    }
 
     case graph @ Extractors.LPSort(src, keys) =>
       unifyShapePreserving[F](graph, src.root, keys map (_._1.root))("sort_source", "sort_key") {
