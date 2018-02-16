@@ -386,8 +386,6 @@ A cached view is created by adding the `Cache-Control: max-age=<seconds>`  heade
 
 Like ordinary views, cached views appear as a file in the filesystem.
 
-When serving requests involving cached views an `Expires: <http-date>` header informed by the `max-age` of involved views is included. A reasonably provisioned server will keep cached views fresh. If it does fall behind the response will include the `Warning: 110 - "Response is Stale"` header. The `Expires` header is absent from responses that do not involve cached views.
-
 ### Module mounts
 
 If the mount's key is "module" then the mount represents a "virtual" directory which contains a collection of SQL Statements. The Quasar Filesystem surfaces each SQL function definition as a file despite the fact that it is not possible to read from that file. Instead one needs to use the `invoke` endpoint in order to pass arguments to a particular function and get the result.

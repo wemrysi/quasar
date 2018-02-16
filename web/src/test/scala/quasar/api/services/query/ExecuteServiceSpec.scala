@@ -25,7 +25,6 @@ import quasar.api.services.VCacheFixture
 import quasar.api.services.Fixture._
 import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._, PathArbitrary._
-import quasar.contrib.scalaz.catchable._
 import quasar.DateArbitrary._
 import quasar.effect.ScopeExecution
 import quasar.fp._
@@ -51,7 +50,6 @@ import org.http4s
 import org.http4s._
 import org.http4s.argonaut._
 import org.http4s.headers._
-import org.http4s.util.Renderer
 import org.specs2.matcher.MatchResult
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
@@ -175,7 +173,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
           val (resp, vc) = evalViewTest(now, mounts, InMemState.empty) { (it, ir) =>
             (for {
               _ <- vcache.put(f, viewCache)
-              a <- VCacheMiddleware(execute.service[ViewEff, Nothing](executionIdRef)).apply(
+              a <- execute.service[ViewEff, Nothing](executionIdRef).apply(
                      Request(uri = (pathUri(f) / "").copy(query =
                        http4s.Query.fromPairs(
                          "q" -> s"select * from `../${fileName(f).value}`"))))
@@ -184,8 +182,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
           }.unsafePerformSync
 
           resp.status must_= Status.Ok
-          resp.headers.get(Expires.name) ∘ (_.value) must_=
-            Renderer.renderString(lastUpdate.plus(Duration.ofSeconds(maxAgeSecs.toLong))).some
+          resp.headers.get(Expires.name) ∘ (_.value) must_= None
           vc ∘ (_.cacheReads) must_= (viewCache.cacheReads ⊹ 1).some
         }
       }
@@ -206,7 +203,7 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
           val (resp, vc) = evalViewTest(now, mounts, InMemState.empty) { (it, ir) =>
             (for {
               _ <- vcache.put(f, viewCache)
-              a <- VCacheMiddleware(execute.service[ViewEff, Nothing](executionIdRef)).apply(
+              a <- execute.service[ViewEff, Nothing](executionIdRef).apply(
                 Request(uri = (pathUri(f) / "").copy(query =
                   http4s.Query.fromPairs(
                     "q" -> s"select * from `../${fileName(f).value}`"))))
@@ -215,11 +212,10 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
           }.unsafePerformSync
 
           resp.status must_= Status.Ok
-          resp.headers.get(Warning) ∘ (_.value) must_= StaleHeader.value.some
-          resp.headers.get(Expires) ∘ (_.value) must_=
-            Renderer.renderString(lastUpdate.plus(Duration.ofSeconds(maxAgeSecs.toLong))).some
+          resp.headers.get(Warning) ∘ (_.value) must_= None
+          resp.headers.get(Expires) ∘ (_.value) must_= None
           vc ∘ (_.cacheReads) must_= (viewCache.cacheReads ⊹ 1).some
-         }
+        }
       }
     }
     "execute a query with offset and limit and a variable" >> {
