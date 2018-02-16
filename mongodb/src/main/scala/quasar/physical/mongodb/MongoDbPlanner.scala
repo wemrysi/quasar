@@ -730,24 +730,6 @@ object MongoDbPlanner {
           case (_, _) => -\/(InternalError fromMsg node.map(_._1).shows)
         }
 
-//      def relDateOp1(f: Bson.Date => Selector.Condition, date: Data.LocalDate, g: Data.LocalDate => Data.Timestamp, index: Int): Output =
-//        Bson.Date.fromInstant(g(date).value).fold[Output](
-//          -\/(NonRepresentableData(g(date))))(
-//          d => \/-((
-//            { case x :: Nil => Selector.Doc(x -> f(d)) },
-//            List(There(index, Here[T]())))))
-//
-//      def relDateOp2(conj: (Selector, Selector) => Selector, f1: Bson.Date => Selector.Condition, f2: Bson.Date => Selector.Condition, date: Data.LocalDate, g1: Data.LocalDate => Data.Timestamp, g2: Data.LocalDate => Data.Timestamp, index: Int): Output =
-//        ((Bson.Date.fromInstant(g1(date).value) \/> NonRepresentableData(g1(date))) ⊛
-//          (Bson.Date.fromInstant(g2(date).value) \/> NonRepresentableData(g2(date))))((d1, d2) =>
-//          (
-//            { case x :: Nil =>
-//              conj(
-//                Selector.Doc(x -> f1(d1)),
-//                Selector.Doc(x -> f2(d2)))
-//            },
-//            List(There(index, Here[T]()))))
-
       val flipCore: MapFuncCore[T, _] => Option[MapFuncCore[T, _]] = {
         case Eq(a, b)  => Some(Eq(a, b))
         case Neq(a, b) => Some(Neq(a, b))
@@ -772,24 +754,6 @@ object MongoDbPlanner {
         case MFC(Constant(_)) => \/-(default)
         case MFC(And(a, b))   => invoke2Nel(a._2, b._2)(Selector.And.apply _)
         case MFC(Or(a, b))    => invoke2Nel(a._2, b._2)(Selector.Or.apply _)
-
-//        case MFC(Gt(_, IsDate(d2)))  => relDateOp1(Selector.Gte, d2, date.startOfNextDay, 0)
-//        case MFC(Lt(IsDate(d1), _))  => relDateOp1(Selector.Gte, d1, date.startOfNextDay, 1)
-
-//        case MFC(Lt(_, IsDate(d2)))  => relDateOp1(Selector.Lt,  d2, date.startOfDay, 0)
-//        case MFC(Gt(IsDate(d1), _))  => relDateOp1(Selector.Lt,  d1, date.startOfDay, 1)
-
-//        case MFC(Gte(_, IsDate(d2))) => relDateOp1(Selector.Gte, d2, date.startOfDay, 0)
-//        case MFC(Lte(IsDate(d1), _)) => relDateOp1(Selector.Gte, d1, date.startOfDay, 1)
-
-//        case MFC(Lte(_, IsDate(d2))) => relDateOp1(Selector.Lt,  d2, date.startOfNextDay, 0)
-//        case MFC(Gte(IsDate(d1), _)) => relDateOp1(Selector.Lt,  d1, date.startOfNextDay, 1)
-
-//        case MFC(Eq(_, IsDate(d2))) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d2, date.startOfDay, date.startOfNextDay, 0)
-//        case MFC(Eq(IsDate(d1), _)) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d1, date.startOfDay, date.startOfNextDay, 1)
-
-//        case MFC(Neq(_, IsDate(d2))) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d2, date.startOfDay, date.startOfNextDay, 0)
-//        case MFC(Neq(IsDate(d1), _)) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d1, date.startOfDay, date.startOfNextDay, 1)
 
         case MFC(Eq(a, b))  => reversibleRelop(a, b)(func)
         case MFC(Neq(a, b)) => reversibleRelop(a, b)(func)
