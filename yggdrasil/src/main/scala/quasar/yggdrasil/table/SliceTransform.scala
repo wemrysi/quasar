@@ -23,6 +23,10 @@ import quasar.precog.common._
 import quasar.precog.util._
 import quasar.yggdrasil.bytecode.{ JBooleanT, JObjectUnfixedT, JArrayUnfixedT }
 
+import java.util.Arrays
+import scala.collection.mutable
+import scala.annotation.tailrec
+
 import scalaz._
 import scalaz.std.tuple._
 import scalaz.syntax.monad._
@@ -392,9 +396,6 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
           }
 
         case Range(lower, upper) =>
-          import java.util.Arrays
-          import scala.collection.mutable
-          import scala.annotation.tailrec
           composeSliceTransform2(upper).zip(composeSliceTransform2(lower)) { (upperS, lowerS) =>
             val upperColumns = upperS.materialized.columns
             val lowerColumns = lowerS.materialized.columns
@@ -408,12 +409,22 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
             }).asInstanceOf[ArrayLongColumn]
             val lowerA = lowerC.values
             val upperA = upperC.values
-            val minNumRows = 
-              if (lowerA.length > upperA.length) upperA.length 
+            val minNumRows =
+              if (lowerA.length > upperA.length) upperA.length
               else lowerA.length
             val maxNumRows =
-              if (lowerA.length < upperA.length) upperA.length 
+              if (lowerA.length < upperA.length) upperA.length
               else lowerA.length
+            var biggestRange = 0L
+            var i = 0
+            while (i < minNumRows) {
+              biggestRange = java.lang.Math.max(upperA(i) - lowerA(i), biggestRange)
+              i += 1
+            }
+            if (biggestRange > Int.MaxValue) {
+              val message = s"Biggest range would have $biggestRange elements, the maximum range size is ${Int.MaxValue}"
+              throw new Exception(message)
+            }
             val arraysBuildr = new mutable.ListBuffer[Array[Long]]()
             val bitsetsBuildr = new mutable.ListBuffer[BitSet]()
             val stateArray: Array[Long] = Arrays.copyOf(lowerA, maxNumRows)
@@ -456,7 +467,7 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
                       arrs: List[Array[Long]], defineds: List[BitSet],
                       accum: Map[ColumnRef, Column]): Map[ColumnRef, Column] =
                 (arrs, defineds) match {
-                  case (a :: as, d :: ds) => 
+                  case (a :: as, d :: ds) =>
                     val ref = ColumnRef(CPath(CPathIndex(i) :: Nil), CLong)
                     val column = new ArrayLongColumn(d, a)
                     val newAccum = accum + (ref -> column)
@@ -468,9 +479,9 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
             val arrays = arraysBuildr.result()
             val bitsets = bitsetsBuildr.result()
             new Slice {
-              val size = 
+              val size =
                 bitsets.length * maxNumRows
-              val columns = 
+              val columns =
                 allColumns(arrays, bitsets)
             }
           }
