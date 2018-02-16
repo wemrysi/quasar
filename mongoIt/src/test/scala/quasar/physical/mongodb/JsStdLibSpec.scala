@@ -46,7 +46,7 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case (date.ExtractSecond, _) => Pending("TODO").left
     case (date.ExtractWeek, _) => Pending("TODO").left
 
-    case (date.Now, _) => Pending("TODO").left
+    case (date.Now, _) => Pending("Returns correct result, but wrapped into Data.Dec instead of Data.Interval").left
     case (date.NowDate, _) => Pending("TODO").left
     case (date.NowTime, _) => Pending("TODO").left
     case (date.CurrentTimeZone, _) => noTimeZoneSupport.left

@@ -54,7 +54,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
     case (date.StartOfDay, Data.LocalLike(_) :: Nil) => notHandled.left
 
-    case (date.Now, _) => Pending("TODO").left
+    case (date.Now, _) => Pending("Returns correct result, but wrapped into Data.Dec instead of Data.Interval").left
     case (date.NowDate, _) => Pending("TODO").left
     case (date.NowTime, _) => Pending("TODO").left
     case (date.CurrentTimeZone, _) => noTimeZoneSupport.left
