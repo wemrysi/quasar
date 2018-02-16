@@ -286,7 +286,6 @@ object MongoDbPlanner {
             // NB: Some explicit coproducts for adjacent types.
             case Type.Int ⨿ Type.Dec ⨿ Type.Str => check.isNumberOrString
             case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str => check.isNumberOrString
-//            TODO: Come back to this
             case Type.LocalDate ⨿ Type.Bool => check.isDateTimestampOrBoolean
             case Type.Syntaxed => check.isSyntaxed
           }
