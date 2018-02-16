@@ -261,7 +261,7 @@ object MongoDbPlanner {
             case Type.Int
                | Type.Dec
                | Type.Int ⨿ Type.Dec
-               | Type.Int ⨿ Type.Dec ⨿ Type.Interval => check.isNumber
+               | Type.Int ⨿ Type.Dec ⨿ Type.Interval => check.isNumber // for now intervals check as numbers
             case Type.Str => check.isString
             case Type.Obj(map, _) =>
               ((expr: Fix[ExprOp]) => {
@@ -285,7 +285,7 @@ object MongoDbPlanner {
                 Type.LocalDateTime | Type.LocalDate | Type.LocalTime => check.isDate
             // NB: Some explicit coproducts for adjacent types.
             case Type.Int ⨿ Type.Dec ⨿ Type.Str => check.isNumberOrString
-            case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str => check.isNumberOrString
+            case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str => check.isNumberOrString // for now intervals check as numbers
             case Type.LocalDate ⨿ Type.Bool => check.isDateTimestampOrBoolean
             case Type.Syntaxed => check.isSyntaxed
           }
@@ -344,9 +344,12 @@ object MongoDbPlanner {
 
     val handleSpecialCore: MapFuncCore[T, JsCore] => M[JsCore] = {
       case Constant(v1) => ejsonToJs[M, T[EJson]](v1)
+
       case JoinSideName(n) =>
         raiseErr[M, JsCore](qscriptPlanningFailed(UnexpectedJoinSide(n)))
+
       case Now() => execTime map (ts => New(Name("ISODate"), List(ts)))
+
       case Interval(a1) => unimplemented[M, JsCore]("Interval JS")
 
       // TODO: De-duplicate and move these to JsFuncHandler
@@ -356,15 +359,19 @@ object MongoDbPlanner {
             BinOp(jscore.Div,
               Call(Select(date, "getUTCFullYear"), Nil),
               Literal(Js.Num(100, false))))))).point[M]
+
       case ExtractDayOfMonth(date) => Call(Select(date, "getUTCDate"), Nil).point[M]
+
       case ExtractDecade(date) =>
         Call(ident("NumberLong"), List(
           trunc(
             BinOp(jscore.Div,
               Call(Select(date, "getUTCFullYear"), Nil),
               Literal(Js.Num(10, false)))))).point[M]
+
       case ExtractDayOfWeek(date) =>
         Call(Select(date, "getUTCDay"), Nil).point[M]
+
       case ExtractDayOfYear(date) =>
         Call(ident("NumberInt"), List(
           Call(Select(ident("Math"), "floor"), List(
@@ -378,20 +385,25 @@ object MongoDbPlanner {
                     Literal(Js.Num(0, false))))),
                 Literal(Js.Num(86400000, false))),
               Literal(Js.Num(1, false))))))).point[M]
+
       case ExtractEpoch(date) =>
         Call(ident("NumberLong"), List(
           BinOp(jscore.Div,
             Call(Select(date, "valueOf"), Nil),
             Literal(Js.Num(1000, false))))).point[M]
+
       case ExtractHour(date) => Call(Select(date, "getUTCHours"), Nil).point[M]
+
       case ExtractIsoDayOfWeek(date) =>
         Let(Name("x"), Call(Select(date, "getUTCDay"), Nil),
           If(
             BinOp(jscore.Eq, ident("x"), Literal(Js.Num(0, false))),
             Literal(Js.Num(7, false)),
             ident("x"))).point[M]
+
       case ExtractIsoYear(date) =>
         Call(Select(date, "getUTCFullYear"), Nil).point[M]
+
       case ExtractMicrosecond(date) =>
         BinOp(jscore.Mult,
           BinOp(jscore.Add,
@@ -400,24 +412,29 @@ object MongoDbPlanner {
               Call(Select(date, "getUTCSeconds"), Nil),
               Literal(Js.Num(1000, false)))),
           Literal(Js.Num(1000, false))).point[M]
+
       case ExtractMillennium(date) =>
         Call(ident("NumberLong"), List(
           Call(Select(ident("Math"), "ceil"), List(
             BinOp(jscore.Div,
               Call(Select(date, "getUTCFullYear"), Nil),
               Literal(Js.Num(1000, false))))))).point[M]
+
       case ExtractMillisecond(date) =>
         BinOp(jscore.Add,
           Call(Select(date, "getUTCMilliseconds"), Nil),
           BinOp(jscore.Mult,
             Call(Select(date, "getUTCSeconds"), Nil),
             Literal(Js.Num(1000, false)))).point[M]
+
       case ExtractMinute(date) =>
         Call(Select(date, "getUTCMinutes"), Nil).point[M]
+
       case ExtractMonth(date) =>
         BinOp(jscore.Add,
           Call(Select(date, "getUTCMonth"), Nil),
           Literal(Js.Num(1, false))).point[M]
+
       case ExtractQuarter(date) =>
         Call(ident("NumberInt"), List(
           BinOp(jscore.Add,
@@ -427,12 +444,14 @@ object MongoDbPlanner {
                 Literal(Js.Num(3, false))),
               Literal(Js.Num(0, false))),
             Literal(Js.Num(1, false))))).point[M]
+
       case ExtractSecond(date) =>
         BinOp(jscore.Add,
           Call(Select(date, "getUTCSeconds"), Nil),
           BinOp(jscore.Div,
             Call(Select(date, "getUTCMilliseconds"), Nil),
             Literal(Js.Num(1000, false)))).point[M]
+
       case ExtractWeek(date) =>
         Call(ident("NumberInt"), List(
           Call(Select(ident("Math"), "floor"), List(
@@ -454,17 +473,22 @@ object MongoDbPlanner {
               Literal(Js.Num(1, false))))))).point[M]
 
       case MakeMap(Embed(LiteralF(Js.Str(str))), a2) => Obj(ListMap(Name(str) -> a2)).point[M]
+
       // TODO: pull out the literal, and handle this case in other situations
       case MakeMap(a1, a2) => Obj(ListMap(Name("__Quasar_non_string_map") ->
        Arr(List(Arr(List(a1, a2)))))).point[M]
+
       case ConcatArrays(Embed(ArrF(a1)), Embed(ArrF(a2))) =>
         Arr(a1 |+| a2).point[M]
+
       case ConcatArrays(a1, a2) =>
         If(BinOp(jscore.Or, isArray(a1), isArray(a2)),
           Call(Select(a1, "concat"), List(a2)),
           BinOp(jscore.Add, a1, a2)).point[M]
+
       case ConcatMaps(Embed(ObjF(o1)), Embed(ObjF(o2))) =>
         Obj(o1 ++ o2).point[M]
+
       case ConcatMaps(a1, a2) => SpliceObjects(List(a1, a2)).point[M]
 
       case Guard(expr, typ, cont, fallback) =>

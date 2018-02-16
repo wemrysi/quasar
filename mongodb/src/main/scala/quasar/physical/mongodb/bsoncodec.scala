@@ -191,15 +191,16 @@ object BsonCodec {
           }.join \/> NonRepresentableEJson(value.shows + " is not a valid LocalDate")
 
       case (EJsonType(TypeTag.Interval.value), Bson.Doc(map)) =>
-        (extract(map.get(DateTimeConstants.year), Bson._int32) ⊛
-          extract(map.get(DateTimeConstants.month), Bson._int32) ⊛
-          extract(map.get(DateTimeConstants.day), Bson._int32) ⊛
-          extract(map.get(DateTimeConstants.second), Bson._int32) ⊛
-          extract(map.get(DateTimeConstants.nanosecond), Bson._int32)) {
-            (y, m, d, s, n) =>
-              Bson.Text(
-                s"${y.toString}:${m.toString}:${d.toString}:${s.toString}:${n.toString}")
-          } \/> NonRepresentableEJson(value.shows + " is not a valid Interval")
+        (for {
+          y <- extract[Int](map.get(DateTimeConstants.year), Bson._int32)
+          m <- extract[Int](map.get(DateTimeConstants.month), Bson._int32)
+          d <- extract[Int](map.get(DateTimeConstants.day), Bson._int32)
+          s <- extract[Int](map.get(DateTimeConstants.second), Bson._int32)
+          n <- extract[Int](map.get(DateTimeConstants.nanosecond), Bson._int32)
+          if y === 0 || m === 0 || d === 0 // TODO support intervals with dates in them
+        } yield {
+          Bson.Dec(s*1000 + n*1e-6)
+        }) \/> NonRepresentableEJson(value.shows + " is not a valid Interval (only time-like intervals are supported)")
 
       case (_, _) => value.right
     }

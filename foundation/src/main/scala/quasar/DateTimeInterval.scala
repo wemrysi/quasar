@@ -169,10 +169,12 @@ final class DateTimeInterval private(
 
 @SuppressWarnings(Array("org.wartremover.warts.Equals"))
 object DateTimeInterval {
+
   val PATTERN: Pattern =
     Pattern.compile("([-+]?)P(?:([-+]?[0-9]+)Y)?(?:([-+]?[0-9]+)M)?(?:([-+]?[0-9]+)W)?(?:([-+]?[0-9]+)D)?" +
       "(T(?:([-+]?[0-9]+)H)?(?:([-+]?[0-9]+)M)?(?:([-+]?[0-9]+)(?:[.,]([0-9]{0,9}))?S)?)?",
       Pattern.CASE_INSENSITIVE)
+
   val zero: DateTimeInterval = new DateTimeInterval(0, 0, 0, 0L, 0)
 
   object TimeLike {
@@ -204,8 +206,7 @@ object DateTimeInterval {
       f1.months + f2.months,
       f1.days + f2.days,
       f1.seconds + f2.seconds,
-      f1.nanos.toLong + f2.nanos
-    )
+      f1.nanos.toLong + f2.nanos)
   }
 
   def apply(years: Int, months: Int, days: Int, seconds: Long, nanos: Long): DateTimeInterval = {

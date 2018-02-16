@@ -199,7 +199,11 @@ object Data {
 
   final case class Interval(value: DateTimeInterval) extends Data {
     def dataType = Type.Interval
-    def toJs = ??? // TODO
+    def toJs = if (value.isTimeLike) {
+      jscore.Literal(Js.Num(value.seconds*1000 + value.nanos*1e-6, true)).some
+    } else {
+      None // TODO support intervals with dates in them
+    }
   }
 
   val _interval =

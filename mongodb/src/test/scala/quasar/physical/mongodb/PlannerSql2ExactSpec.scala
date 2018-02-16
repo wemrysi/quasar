@@ -1775,7 +1775,7 @@ class PlannerSql2ExactSpec extends
           $project(
             reshape(sigil.Quasar -> $field("src")),
             ExcludeId)))
-    }.pendingUntilFixed("FIXME: regression on next-major")
+    }
 
     "plan time_of_day (pipeline)" in {
       import FormatSpecifier._
