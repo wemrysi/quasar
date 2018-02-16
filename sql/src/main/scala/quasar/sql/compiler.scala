@@ -17,24 +17,25 @@
 package quasar.sql
 
 import slamdata.Predef._
-import quasar.{Data, Func, GenericFunc, HomomorphicFunction, Reduction, SemanticError, Sifting, UnaryFunc, VarName},
-  SemanticError._
+import quasar.{Data, Func, GenericFunc, HomomorphicFunction, Reduction, SemanticError, UnaryFunc, VarName}
+import SemanticError._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.contrib.shapeless._
 import quasar.common.SortDir
 import quasar.fp._
-import quasar.fp.binder._
-import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
+import quasar.frontend.logicalplan.{LogicalPlan => LP, Let => LPLet, _}
 import quasar.std.StdLib, StdLib._
 import quasar.std.TemporalPart
 import quasar.sql.{SemanticAnalysis => SA}, SA._
+import quasar.RenderTree
 
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
+import matryoshka.patterns._
 import pathy.Path._
-import scalaz.{Tree => _, _}, Scalaz._
+import scalaz.{Tree => _, Free => ZFree, _}, Scalaz._
 import shapeless.{Annotations => _, Data => _, :: => _, _}
 
 final case class TableContext[T]
@@ -314,7 +315,7 @@ final class Compiler[M[_], T: Equal]
           stepName <- CompilerState.freshName("tmp")
           current  <- current
           bc        = relations match {
-            case ExprRelationAST(_, Some(name))        => BindingContext(Map(name -> lpr.free(stepName)))
+            case ExprRelationAST(_, Some(name))  => BindingContext(Map(name -> lpr.free(stepName)))
             case TableRelationAST(_, Some(name)) => BindingContext(Map(name -> lpr.free(stepName)))
             case id @ IdentRelationAST(_, _)     => BindingContext(Map(id.aliasName -> lpr.free(stepName)))
             case r                               => BindingContext[T](Map())
@@ -726,7 +727,9 @@ final class Compiler[M[_], T: Equal]
     (tree: Cofree[Sql, SA.Annotations])
     (implicit
       MErr: MonadError_[M, SemanticError],
-      MState: MonadState[M, CompilerState[T]])
+      MState: MonadState[M, CompilerState[T]],
+      S: Show[T],
+      R: RenderTree[T])
       : M[T] =
     compile0(tree).map(Compiler.reduceGroupKeys[T])
 }
@@ -740,10 +743,13 @@ object Compiler {
     (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
     apply[StateT[EitherT[scalaz.Free.Trampoline, SemanticError, ?], CompilerState[T], ?], T]
 
-  def compile[T: Equal]
+  def compile[T: Equal: RenderTree]
     (tree: Cofree[Sql, SA.Annotations])
-    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
-      : SemanticError \/ T =
+    (implicit
+     TR: Recursive.Aux[T, LP],
+     TC: Corecursive.Aux[T, LP],
+     S: Show[T])
+     : SemanticError \/ T =
     trampoline[T].compile(tree).eval(CompilerState(Nil, Context(Nil, Nil), 0)).run.run
 
   /** Emulate SQL semantics by reducing any projection which trivially
@@ -751,33 +757,57 @@ object Compiler {
     */
   def reduceGroupKeys[T: Equal]
     (tree: T)
-    (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
-      : T = {
+    (implicit
+     TR: Recursive.Aux[T, LP],
+     TC: Corecursive.Aux[T, LP],
+     S: Show[T],
+     R: RenderTree[T]): T = {
+    type K = (T, ZFree[LP, Unit])
     // Step 0: identify key expressions, and rewrite them by replacing the
     // group source with the source at the point where they might appear.
-    def keysƒ(t: LP[(T, List[T])]):
-        (T, List[T]) =
-    {
-      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-      def groupedKeys(t: LP[T], newSrc: T): Option[List[T]] = {
-        t match {
+    def keysƒ(t: LP[(T, List[K])]): (T, List[K]) = {
+      def groupedKeys(t: LP[T]): Option[List[K]] = {
+        Some(t) collect {
           case InvokeUnapply(set.GroupBy, Sized(src, structural.MakeArrayN(keys))) =>
-            Some(keys.map(_.transCataT(t => if (t ≟ src) newSrc else t)))
-          case InvokeUnapply(func, Sized(src, _)) if func.effect ≟ Sifting =>
-            groupedKeys(src.project, newSrc)
-          case _ => None
+            keys.map(_.transAna[ZFree[LP, Unit]]{ lp =>
+              if (lp.embed ≟ src) CoEnv[Unit, LP, T](-\/(()))
+              else CoEnv[Unit, LP, T](\/-(lp))
+            }) strengthL t.embed
         }
       }
 
-      (t.map(_._1).embed,
-        groupedKeys(t.map(_._1), t.map(_._1).embed).getOrElse(t.foldMap(_._2)))
+      val tf = t.map(_._1)
+      (tf.embed, groupedKeys(tf).getOrElse(t.foldMap(_._2)))
     }
 
-    // use `scalaz.IList` so we can use `scalaz.Equal[LP]`
-    val keys: IList[T] = IList.fromList(boundCata(tree)(keysƒ)._2)
+    val sources: List[K] = tree.cata(keysƒ)._2
+
+    type KeyState = (List[K], List[T])
+
+    val KS = MonadState_[State[KeyState, ?], KeyState]
+
+    def makeKey(tree: T, flp: ZFree[LP, Unit]): T =
+      flp.cata(interpret[LP, Unit, T](_ => tree, _.embed))
 
     // Step 1: annotate nodes containing the keys.
-    val ann: Cofree[LP, Boolean] = boundAttribute(tree)(keys.element)
+    val ann: State[KeyState, Cofree[LP, Boolean]] = tree.transAnaM {
+      case let @ LPLet(name, expr, _) =>
+        for {
+          ks <- KS.get
+          (srcs, keys) = ks
+          srcs2 = srcs.map { case (t, flp) =>
+            val l = if (t ≟ expr) Free[T](name).embed else t
+            (l, flp)
+          }
+          keys2 = srcs2.map { case (t, flp) => makeKey(t,flp) }
+          _ <- KS.put((srcs2, keys2))
+        } yield EnvT((keys.element(let.embed), let: LP[T]))
+
+      case other =>
+        KS.gets { case (_, k) =>
+          EnvT((k.element(other.embed), other))
+        }
+    }
 
     // Step 2: transform from the top, inserting Arbitrary where a key is not
     // otherwise reduced.
@@ -793,6 +823,9 @@ object Compiler {
           else t.tail
       }
     }
-    ann.ana[T](rewriteƒ)
+
+    ann.eval((sources, sources.map { case (t, flp) => makeKey(t,flp) })).ana[T](rewriteƒ)
+
   }
+
 }
