@@ -18,7 +18,7 @@ package quasar.api.services
 
 import slamdata.Predef._
 import quasar.api._, ToApiError.ops._, ToQResponse.ops._
-import quasar.api.{Destination, HeaderParam, VCacheMiddleware}
+import quasar.api.{Destination, HeaderParam}
 import quasar.contrib.scalaz.catchable._
 import quasar.effect.{ScopeExecution, Timing, TimingRepository}
 import quasar.fp.{TaskRef, liftMT}
@@ -73,7 +73,7 @@ object RestApi {
       "/schema/fs"    -> analyze.schema.service[S],
       "/metastore"    -> metastore.service[S],
       "/timings"      -> timings.service[S](timingRepo)
-    ).mapValues(VCacheMiddleware[S](_))
+    )
 
   val additionalServices: Map[String, HttpService] =
     ListMap(

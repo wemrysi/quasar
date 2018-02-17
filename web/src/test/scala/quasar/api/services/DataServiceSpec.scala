@@ -27,7 +27,6 @@ import quasar.api._,
 import quasar.api.matchers._
 import quasar.api.MessageFormatGen._
 import quasar.contrib.pathy._, PathArbitrary._
-import quasar.contrib.scalaz.catchable._
 import quasar.csv.CsvParser
 import quasar.fp._
 import quasar.fp.free._
@@ -54,7 +53,6 @@ import org.http4s._
 import org.http4s.argonaut._
 import org.http4s.headers._
 import org.http4s.server.middleware.GZip
-import org.http4s.util.Renderer
 import org.specs2.specification.core.Fragment
 import org.specs2.execute.AsResult
 import org.specs2.matcher.MatchResult
@@ -396,19 +394,15 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             val (respA, respB, vc) = evalViewTest(now, mounts, memState) { (it, ir) =>
               (for {
                 _ <- vcache.put(f, viewCache)
-                a <- VCacheMiddleware(data.service[ViewEff]).apply(Request(uri = pathUri(f)))
+                a <- data.service[ViewEff].apply(Request(uri = pathUri(f)))
                 b <- data.service[ViewEff].apply(Request(uri = pathUri(g)))
                 c <- vcache.get(f).run
               } yield (a.toHttpResponse(ir), b.toHttpResponse(ir), c)).foldMap(it)
             }.unsafePerformSync
 
-            val expiration = VCacheMiddleware.validDate(
-              lastUpdate.toInstant.plus(Duration.ofSeconds(maxAgeSecs.toLong)))
-
             respA.status must_= Status.Ok
             respB.status must_= Status.Ok
-            respA.headers.get(Expires.name) ∘ (_.value) must_=
-              Renderer.renderString(expiration).some
+            respA.headers.get(Expires.name) ∘ (_.value) must_= None
             respA.as[String].unsafePerformSync must_= respB.as[String].unsafePerformSync
             vc ∘ (_.cacheReads) must_= (viewCache.cacheReads ⊹ 1).some
           }
@@ -432,19 +426,16 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             val (respA, respB, vc) = evalViewTest(now, mounts, memState) { (it, ir) =>
               (for {
                 _ <- vcache.put(f, viewCache)
-                a <- VCacheMiddleware(data.service[ViewEff]).apply(Request(uri = pathUri(f)))
+                a <- data.service[ViewEff].apply(Request(uri = pathUri(f)))
                 b <- data.service[ViewEff].apply(Request(uri = pathUri(g)))
                 c <- vcache.get(f).run
               } yield (a.toHttpResponse(ir), b.toHttpResponse(ir), c)).foldMap(it)
             }.unsafePerformSync
 
-            val expiration = VCacheMiddleware.validDate(
-              lastUpdate.toInstant.plus(Duration.ofSeconds(maxAgeSecs.toLong)))
-
             respA.status must_= Status.Ok
             respB.status must_= Status.Ok
-            respA.headers.get(Warning) ∘ (_.value) must_= StaleHeader.value.some
-            respA.headers.get(Expires) ∘ (_.value) must_= Renderer.renderString(expiration).some
+            respA.headers.get(Warning) ∘ (_.value) must_= None
+            respA.headers.get(Expires) ∘ (_.value) must_= None
             respA.as[String].unsafePerformSync must_= respB.as[String].unsafePerformSync
             vc ∘ (_.cacheReads) must_= (viewCache.cacheReads ⊹ 1).some
            }
