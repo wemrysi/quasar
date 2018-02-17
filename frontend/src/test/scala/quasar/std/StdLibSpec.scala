@@ -308,6 +308,15 @@ abstract class StdLibSpec extends Qspec {
         //   unary(ToString(_).embed, Data.Dec(x), Data.Str(x.toString))
         // }
 
+        "OffsetDate" >> {
+          def test(x: QOffsetDate) = unary(
+            ToString(_).embed,
+            Data.OffsetDate(x),
+            Data.Str(x.toString))
+
+          "any" >> prop (test(_: QOffsetDate))
+        }
+
         "OffsetDateTime" >> {
           def test(x: JOffsetDateTime) = unary(
             ToString(_).embed,
@@ -319,11 +328,33 @@ abstract class StdLibSpec extends Qspec {
           "any" >> prop (test(_: JOffsetDateTime))
         }
 
+        "OffsetTime" >> {
+          def test(x: JOffsetTime) = unary(
+            ToString(_).embed,
+            Data.OffsetTime(x),
+            Data.Str(x.format(DateTimeFormatter.ofPattern("HH:mm:ss.nnnnnnnnnXXX"))))
+
+          "zero fractional seconds" >> test(JOffsetTime.ofInstant(Instant.EPOCH, ZoneOffset.UTC))
+
+          "any" >> prop (test(_: JOffsetTime))
+        }
+
         "LocalDate" >> prop { (x: JLocalDate) =>
           unary(
             ToString(_).embed,
             Data.LocalDate(x),
             Data.Str(x.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))))
+        }
+
+        "LocalDateTime" >> {
+          def test(x: JLocalDateTime) = unary(
+            ToString(_).embed,
+            Data.LocalDateTime(x),
+            Data.Str(x.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.nnnnnnnnn"))))
+
+          "zero fractional seconds" >> test(JLocalDateTime.ofInstant(Instant.EPOCH, ZoneOffset.UTC))
+
+          "any" >> prop (test(_: JLocalDateTime))
         }
 
         "LocalTime" >> {

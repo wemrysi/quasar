@@ -23,6 +23,7 @@ import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import scala.util.matching.Regex
+import java.time.format.DateTimeFormatter
 
 import matryoshka._
 import matryoshka.implicits._
@@ -334,20 +335,28 @@ trait StringLib extends Library {
     Func.Input1(Type.Syntaxed),
     noSimplification,
     partialTyperV[nat._1] {
-      case Sized(Type.Const(data))  => (data match {
-        case Data.Str(str)          => success(str)
-        case Data.Null              => success("null")
-        case Data.Bool(b)           => success(b.shows)
-        case Data.Int(i)            => success(i.shows)
-        case Data.Dec(d)            => success(d.shows)
-        case Data.OffsetDateTime(t) => success(t.toString)
-        case Data.OffsetTime(t)     => success(t.toString)
-        case Data.OffsetDate(d)     => success(d.toString)
-        case Data.LocalDateTime(t)  => success(t.toString)
-        case Data.LocalTime(t)      => success(t.toString)
-        case Data.LocalDate(d)      => success(d.toString)
-        case Data.Interval(i)       => success(i.toString)
-        case Data.Id(i)        => success(i.toString)
+      case Sized(Type.Const(data)) => (data match {
+        case Data.Str(str) => success(str)
+        case Data.Null => success("null")
+        case Data.Bool(b) => success(b.shows)
+        case Data.Int(i) => success(i.shows)
+        case Data.Dec(d) => success(d.shows)
+
+        case Data.OffsetDate(t) =>
+          success(t.toString)
+        case Data.OffsetDateTime(t) =>
+          success(t.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.nnnnnnnnnXXX")))
+        case Data.OffsetTime(t) =>
+          success(t.format(DateTimeFormatter.ofPattern("HH:mm:ss.nnnnnnnnnXXX")))
+        case Data.LocalDate(t) =>
+          success(t.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")))
+        case Data.LocalDateTime(t) =>
+          success(t.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.nnnnnnnnn")))
+        case Data.LocalTime(t) =>
+          success(t.format(DateTimeFormatter.ofPattern("HH:mm:ss.nnnnnnnnn")))
+
+        case Data.Interval(i) => success(i.toString)
+        case Data.Id(i) => success(i.toString)
         // NB: Should not be able to hit this case, because of the domain.
         case other                  =>
           failureNel(
