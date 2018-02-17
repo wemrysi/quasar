@@ -323,7 +323,7 @@ trait ColumnarTableModule[M[+ _]]
     with IndicesModule[M] {
 
   import TableModule._
-  import trans._
+  import trans.{Range => _, _}
 
   type Table <: ColumnarTable
   type TableCompanion <: ColumnarTableCompanion

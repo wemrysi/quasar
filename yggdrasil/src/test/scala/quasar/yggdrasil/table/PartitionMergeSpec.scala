@@ -25,7 +25,7 @@ import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
 trait PartitionMergeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
-  import trans._
+  import trans.{Range => _, _}
 
   def testPartitionMerge = {
     val JArray(elements) = JParser.parseUnsafe("""[

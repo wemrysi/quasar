@@ -71,6 +71,7 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
       case (ExtractFunc(MapFuncsCore.ProjectKey(_,_)), _, _) => pending
       case (ExtractFunc(MapFuncsCore.And(_,_)), _, _) => pending
       case (ExtractFunc(MapFuncsCore.Or(_,_)), _, _) => pending
+      case (ExtractFunc(MapFuncsCore.Range(_,_)), _, _) => pending
       case (_, _, _) => run
     }
 

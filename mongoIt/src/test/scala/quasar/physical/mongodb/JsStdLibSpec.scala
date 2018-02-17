@@ -90,6 +90,7 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case (relations.Or, List(_, Data.NA)) => Pending("TODO handle and/or with outer semantics").left
 
     /* SET */
+    case (quasar.std.SetLib.Range, _) => Pending("TODO").left
     case (quasar.std.SetLib.Within, _) => Pending("TODO").left
 
     /* STRING */

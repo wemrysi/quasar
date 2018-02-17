@@ -97,6 +97,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
       Pending("TODO").left
 
     /* SET */
+    case (quasar.std.SetLib.Range, _) => notHandled.left
     case (quasar.std.SetLib.Within, _) => notHandled.left
 
     /* STRING */
