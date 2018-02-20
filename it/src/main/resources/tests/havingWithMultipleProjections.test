@@ -1,10 +1,10 @@
 {
     "name": "having with multiple projections",
     "backends": {
-        "couchbase":         "pending",
-        "marklogic_json":    "pending",
+        "couchbase":         "pendingIgnoreFieldOrder",
+        "marklogic_json":    "pendingIgnoreFieldOrder",
         "marklogic_xml":     "pending",
-        "mimir":             "pending",
+        "mimir":             "pendingIgnoreFieldOrder",
         "mongodb_3_2":       "pending",
         "mongodb_3_4":       "pending",
         "mongodb_read_only": "pending",
