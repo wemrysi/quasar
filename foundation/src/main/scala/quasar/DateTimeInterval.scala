@@ -201,13 +201,7 @@ object DateTimeInterval {
 
   implicit val dateTimeIntervalMonoid: Monoid[DateTimeInterval] = new Monoid[DateTimeInterval] {
     val zero = DateTimeInterval.zero
-
-    def append(f1: DateTimeInterval, f2: => DateTimeInterval) = DateTimeInterval(
-      f1.years + f2.years,
-      f1.months + f2.months,
-      f1.days + f2.days,
-      f1.seconds + f2.seconds,
-      f1.nanos.toLong + f2.nanos)
+    def append(f1: DateTimeInterval, f2: => DateTimeInterval) = f1.plus(f2)
   }
 
   def apply(years: Int, months: Int, days: Int, seconds: Long, nanos: Long): DateTimeInterval = {
