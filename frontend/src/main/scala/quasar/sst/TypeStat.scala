@@ -224,13 +224,22 @@ sealed abstract class TypeStatInstances {
 
     def minmax[B: EncodeEJson](kind: String, c: A, mn: B, mx: B): J =
       kmap(
-        kind,
-        "count" -> c.asEJson[J],
-        "min"   -> mn.asEJson[J],
-        "max"   -> mx.asEJson[J])
+        kind
+      , "count" -> c.asEJson[J]
+      , "min"   -> mn.asEJson[J]
+      , "max"   -> mx.asEJson[J])
 
-    def sstats(ss: SampleStats[A]): J =
+    def sstats(ss: SampleStats[A]): J = {
+			val state =
+				emap(
+					"size"           -> ss.size.asEJson[J]
+				, "centralMoment1" -> ss.m1.asEJson[J]
+				, "centralMoment2" -> ss.m2.asEJson[J]
+				, "centralMoment3" -> ss.m3.asEJson[J]
+				, "centralMoment4" -> ss.m4.asEJson[J])
+
       emap(
+				("state", state)                                         ::
         ("mean", ss.mean.asEJson[J])                             ::
         optEntry("variance",
           isPopulation.fold(ss.variance, ss.populationVariance)) :::
@@ -238,43 +247,53 @@ sealed abstract class TypeStatInstances {
           isPopulation.fold(ss.skewness, ss.populationSkewness)) :::
         optEntry("kurtosis",
           isPopulation.fold(ss.kurtosis, ss.populationKurtosis)) : _*)
+    }
 
     def dist[B: EncodeEJson](kind: String, ss: SampleStats[A], mn: B, mx: B): J =
       kmap(
-        kind,
-        "count"        -> ss.size.asEJson[J],
-        "distribution" -> sstats(ss),
-        "min"          -> mn.asEJson[J],
-        "max"          -> mx.asEJson[J])
+        kind
+      , "count"        -> ss.size.asEJson[J]
+      , "distribution" -> sstats(ss)
+      , "min"          -> mn.asEJson[J]
+      , "max"          -> mx.asEJson[J])
 
     ts match {
-      case Bool(t, f)               =>
+      case Bool(t, f) =>
         kmap(
-          "boolean",
-          "true"  -> t.asEJson[J],
-          "false" -> f.asEJson[J])
-      case Byte(c, mn, mx)          => minmax("byte", c, mn, mx)
-      case Char(c, mn, mx)          => minmax("char", c, mn, mx)
-      case Int(s, mn, mx)           => dist("integer", s, mn, mx)
-      case Dec(s, mn, mx)           => dist("decimal", s, mn, mx)
-      case Count(c)                 => kmap("count", "count" -> c.asEJson[J])
+          "boolean"
+        , "true"  -> t.asEJson[J]
+        , "false" -> f.asEJson[J])
 
-      case Coll(c, mnl, mxl)        =>
+      case Byte(c, mn, mx) =>
+        minmax("byte", c, mn, mx)
+
+      case Char(c, mn, mx) =>
+        minmax("char", c, mn, mx)
+
+      case Int(s, mn, mx) =>
+        dist("integer", s, mn, mx)
+
+      case Dec(s, mn, mx) =>
+        dist("decimal", s, mn, mx)
+
+      case Count(c) =>
+        kmap("count", "count" -> c.asEJson[J])
+
+      case Coll(c, mnl, mxl) =>
         kmap(
           "collection",
           ("count" -> c.asEJson[J])  ::
           optEntry("minLength", mnl) :::
           optEntry("maxLength", mxl) : _*)
 
-
       case Str(c, mnl, mxl, mn, mx) =>
         kmap(
-          "string",
-          "count"     -> c.asEJson[J],
-          "minLength" -> mnl.asEJson[J],
-          "maxLength" -> mxl.asEJson[J],
-          "min"       -> mn.asEJson[J],
-          "max"       -> mx.asEJson[J])
+          "string"
+        , "count"     -> c.asEJson[J]
+        , "minLength" -> mnl.asEJson[J]
+        , "maxLength" -> mxl.asEJson[J]
+        , "min"       -> mn.asEJson[J]
+        , "max"       -> mx.asEJson[J])
     }
   }
 }
