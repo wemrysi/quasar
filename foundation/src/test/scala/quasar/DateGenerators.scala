@@ -90,8 +90,8 @@ trait DateGenerators {
       years <- genYears
       months <- genMonths
       days <- genDays
-      seconds <- arbitrary[Int]
-      nanos <- Gen.choose(0L, 999999999L)
+      seconds <- genSeconds
+      nanos <- genNanos
     } yield DateTimeInterval(years, months, days, seconds.toLong, nanos)
 
   def genDateInterval: Gen[DateTimeInterval] =
@@ -103,8 +103,8 @@ trait DateGenerators {
 
   def genTimeInterval: Gen[DateTimeInterval] =
     for {
-      seconds <- arbitrary[Int]
-      nanos <- Gen.choose(0L, 999999999L)
+      seconds <- genSeconds
+      nanos <- genNanos
     } yield DateTimeInterval(0, 0, 0, seconds.toLong, nanos)
 
   def genLocalDateTime: Gen[JLocalDateTime] =
