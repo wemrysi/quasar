@@ -89,6 +89,10 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
     List(
       func.Constant(EJson.nul[Fix[EJson]]),
       func.Now,
+      func.NowDate,
+      func.NowTime,
+      func.CurrentTimeZone,
+      func.ToLocal(h),
       func.Undefined,
       func.Length(h),
       func.SetTimeZone(h, h),

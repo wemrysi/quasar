@@ -42,6 +42,14 @@ object construction {
       rollCore(MapFuncsCore.Undefined())
     def Now[A]: FreeMapA[T, A] =
       rollCore(MapFuncsCore.Now())
+    def NowDate[A]: FreeMapA[T, A] =
+      rollCore(MapFuncsCore.NowDate())
+    def NowTime[A]: FreeMapA[T, A] =
+      rollCore(MapFuncsCore.NowTime())
+    def CurrentTimeZone[A]: FreeMapA[T, A] =
+      rollCore(MapFuncsCore.CurrentTimeZone())
+    def ToLocal[A](a: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.ToLocal(a))
     def JoinSideName[A](sym: Symbol): FreeMapA[T, A] =
       rollCore(MapFuncsCore.JoinSideName(sym))
     def SetTimeZone[A](a1: FreeMapA[T, A], a2: FreeMapA[T, A]): FreeMapA[T, A] =
