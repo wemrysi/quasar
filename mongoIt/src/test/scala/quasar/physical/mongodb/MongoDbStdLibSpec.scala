@@ -32,7 +32,8 @@ import quasar.std._
 
 import scala.sys
 
-import java.time.{Instant, ZoneOffset}
+import java.time.{Instant, OffsetDateTime => JOffsetDateTime, ZoneOffset}
+
 import matryoshka.{Hole => _, _}
 import matryoshka.data.Fix
 import matryoshka.implicits._
@@ -73,13 +74,14 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
       * produced by the MongoDB backend, in cases where MongoDB cannot represent
       * the type natively. */
     def massageExpected(expected: Data): Data = expected match {
-      case Data.LocalDate(time) => Data.LocalDateTime(time.atStartOfDay)
-      case Data.LocalTime(time) => Data.Str(time.toString)
+      case Data.LocalDate(time) =>
+        Data.OffsetDateTime(JOffsetDateTime.of(time.atStartOfDay, ZoneOffset.UTC))
+      case Data.LocalTime(time) =>
+        Data.Str(time.toString)
       case Data.LocalDateTime(time) =>
-        Data.LocalDateTime(
-          time.withNano(scala.math.round(time.getNano.toDouble / 1000000).toInt * 1000000)) // round to millis
-      case Data.OffsetDateTime(time) if time.getOffset == ZoneOffset.UTC =>
-        Data.LocalDateTime(time.toLocalDateTime)
+        Data.OffsetDateTime(JOffsetDateTime.of(
+          time.withNano(scala.math.round(time.getNano.toDouble / 1000000).toInt * 1000000), // round to millis
+          ZoneOffset.UTC))
       case _ => expected
     }
 
