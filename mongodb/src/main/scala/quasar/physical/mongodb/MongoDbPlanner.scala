@@ -686,14 +686,6 @@ object MongoDbPlanner {
         }
     }
 
-    object IsDate {
-      def unapply(v: (T[MapFunc[T, ?]], Output)): Option[Data.LocalDate] =
-        v._1.project match {
-          case MFC(Constant(d @ Data.LocalDate(_))) => Some(d)
-          case _                               => None
-        }
-    }
-
     val relFunc: MapFunc[T, _] => Option[Bson => Selector.Condition] = {
       case MFC(Eq(_, _))  => Some(Selector.Eq)
       case MFC(Neq(_, _)) => Some(Selector.Neq)
