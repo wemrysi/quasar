@@ -88,7 +88,7 @@ class DateTimeIntervalSpec extends quasar.Qspec {
     "one second" in {
       DateTimeInterval(0, 0, 0, 1L, 0).toString shouldEqual "PT1S"
     }
-    "half a second" in {
+    "one tenth second" in {
       DateTimeInterval(0, 0, 0, 0L, 100000000).toString shouldEqual "PT0.1S"
     }
     "all components" in {
