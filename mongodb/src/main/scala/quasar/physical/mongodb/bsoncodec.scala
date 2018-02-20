@@ -30,7 +30,6 @@ import java.time.{
   LocalTime => JLocalTime,
   OffsetDateTime => JOffsetDateTime,
   OffsetTime => JOffsetTime,
-  ZoneId,
   ZoneOffset
 }
 import java.time.format.DateTimeFormatter
@@ -227,7 +226,7 @@ object BsonCodec {
     case Bson.Int64(value)     => E.inj(ejson.Int(value)).right
     case Bson.Date(value)      =>
       // Bson dates are stored in UTC
-      val dt = JLocalDateTime.ofInstant(Instant.ofEpochMilli(value), ZoneId.of("Z"))
+      val dt = JLocalDateTime.ofInstant(Instant.ofEpochMilli(value), ZoneOffset.UTC)
       E.inj(ejson.Meta(
         Bson.Doc(ListMap(
           DateTimeConstants.year       -> Bson.Int32(dt.getYear),
