@@ -108,7 +108,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (string.ToString, List(Data.DateTimeLike(_))) =>
       Pending("Works but isn't formatted as expected.").left
 
-    case (string.Search, _) => Skipped("compiles to a map/reduce, so can't be run in tests").left
+    case (string.Search, _) => notHandled.left
     case (string.Split, _) if (!is3_4(backend)) => Skipped("not implemented in aggregation on MongoDB < 3.4").left
     case (string.Substring, List(Data.Str(s), _, _)) if (!is3_4(backend) && !isPrintableAscii(s)) =>
       Skipped("only printable ascii supported on MongoDB < 3.4").left
