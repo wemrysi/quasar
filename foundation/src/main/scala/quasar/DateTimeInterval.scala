@@ -33,9 +33,10 @@ import scalaz.std.anyVal._
 // note that parse->toString is not an isomorphism, because the first minus sign
 // is absorbed into the rest of the units in the interval,
 // and nanos in excess of a second are added into seconds
+//
 // Let it be known: adding months does not behave as a monoid action on +.
-// LocalDate.of(1, 1, 31).plusMonths(2) == LocalDate.of(1, 2, 31)
-// LocalDate.of(1, 1, 31).plusMonths(1).plusMonths(1) == LocalDate.of(1, 2, 28)
+// LocalDate.of(1, 1, 31).plusMonths(2) == LocalDate.of(1, 3, 31)
+// LocalDate.of(1, 1, 31).plusMonths(1).plusMonths(1) == LocalDate.of(1, 3, 28)
 
 @SuppressWarnings(Array("org.wartremover.warts.FinalCaseClass"))
 final class DateTimeInterval private(
