@@ -23,6 +23,10 @@ import quasar.precog.common._
 import quasar.precog.util._
 import quasar.yggdrasil.bytecode.{ JBooleanT, JObjectUnfixedT, JArrayUnfixedT }
 
+import java.util.Arrays
+import scala.collection.mutable
+import scala.annotation.tailrec
+
 import scalaz._
 import scalaz.std.tuple._
 import scalaz.syntax.monad._
@@ -388,6 +392,97 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
             new Slice {
               val size = materializedItem.size
               val columns = Map(ColumnRef(CPath.Identity, CBoolean) -> results)
+            }
+          }
+
+        case Range(lower, upper) =>
+          composeSliceTransform2(upper).zip(composeSliceTransform2(lower)) { (upperS, lowerS) =>
+            val upperColumns = upperS.materialized.columns
+            val lowerColumns = lowerS.materialized.columns
+            val lowerC = lowerColumns.getOrElse(ColumnRef(CPath.Identity, CLong), {
+              val numCol = lowerColumns(ColumnRef(CPath.Identity, CNum)).asInstanceOf[ArrayNumColumn]
+              new ArrayLongColumn(numCol.defined, numCol.values.map(_.toLong))
+            }).asInstanceOf[ArrayLongColumn]
+            val upperC = upperColumns.getOrElse(ColumnRef(CPath.Identity, CLong), {
+              val numCol = upperColumns(ColumnRef(CPath.Identity, CNum)).asInstanceOf[ArrayNumColumn]
+              new ArrayLongColumn(numCol.defined, numCol.values.map(_.toLong))
+            }).asInstanceOf[ArrayLongColumn]
+            val lowerA = lowerC.values
+            val upperA = upperC.values
+            val minNumRows =
+              if (lowerA.length > upperA.length) upperA.length
+              else lowerA.length
+            val maxNumRows =
+              if (lowerA.length < upperA.length) upperA.length
+              else lowerA.length
+            var biggestRange = 0L
+            var i = 0
+            while (i < minNumRows) {
+              biggestRange = java.lang.Math.max(upperA(i) - lowerA(i), biggestRange)
+              i += 1
+            }
+            if (biggestRange > Int.MaxValue) {
+              val message = s"Biggest range would have $biggestRange elements, the maximum range size is ${Int.MaxValue}"
+              throw new Exception(message)
+            }
+            val arraysBuildr = new mutable.ListBuffer[Array[Long]]()
+            val bitsetsBuildr = new mutable.ListBuffer[BitSet]()
+            val stateArray: Array[Long] = Arrays.copyOf(lowerA, maxNumRows)
+            val stateBitset: BitSet = new BitSet(maxNumRows)
+            stateBitset.set(0, maxNumRows)
+            var done = 0
+            var r = 0
+            while (r < stateArray.length && done != stateArray.length) {
+              if (stateArray(r) > upperA(r)) {
+                done += 1
+                stateBitset.clear(r)
+              }
+              r += 1
+            }
+            var columns = 0
+            var doneLooping = done == stateArray.length
+            while (!doneLooping) {
+              if (done < stateArray.length) {
+                arraysBuildr += Arrays.copyOf(stateArray, maxNumRows)
+                bitsetsBuildr += stateBitset.copy()
+              } else {
+                doneLooping = true
+              }
+              var row = 0
+              done = 0
+              while (row < minNumRows) {
+                if (stateArray(row) >= upperA(row)) {
+                  stateBitset.clear(row)
+                  done += 1
+                } else {
+                  stateArray(row) = stateArray(row) + 1
+                  columns += 1
+                }
+                row += 1
+              }
+            }
+            def allColumns(arrs: List[Array[Long]], defineds: List[BitSet]): Map[ColumnRef, Column] = {
+              @tailrec
+              def rec(i: Int,
+                      arrs: List[Array[Long]], defineds: List[BitSet],
+                      accum: Map[ColumnRef, Column]): Map[ColumnRef, Column] =
+                (arrs, defineds) match {
+                  case (a :: as, d :: ds) =>
+                    val ref = ColumnRef(CPath(CPathIndex(i) :: Nil), CLong)
+                    val column = new ArrayLongColumn(d, a)
+                    val newAccum = accum + (ref -> column)
+                    rec(i + 1, as, ds, newAccum)
+                  case _ => accum
+                }
+              rec(0, arrs, defineds, Map.empty)
+            }
+            val arrays = arraysBuildr.result()
+            val bitsets = bitsetsBuildr.result()
+            new Slice {
+              val size =
+                bitsets.length * maxNumRows
+              val columns =
+                allColumns(arrays, bitsets)
             }
           }
 

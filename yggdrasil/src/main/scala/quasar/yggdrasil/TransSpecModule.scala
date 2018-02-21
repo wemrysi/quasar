@@ -122,6 +122,9 @@ trait TransSpecModule extends FNModule {
     // this has to be primitive because of how nutso equality is
     case class Within[+A <: SourceType](item: TransSpec[A], in: TransSpec[A]) extends TransSpec[A]
 
+    // this has to be primitive because it produces an array
+    case class Range[+A <: SourceType](lower: TransSpec[A], upper: TransSpec[A]) extends TransSpec[A]
+
     // target is the transspec that provides defineedness information. The resulting table will be defined
     // and have the constant value wherever a row provided by the target transspec has at least one member
     // that is not undefined
@@ -209,6 +212,7 @@ trait TransSpecModule extends FNModule {
           case trans.EqualLiteral(source, value, invert) => trans.EqualLiteral(mapSources(source)(f), value, invert)
 
           case trans.Within(item, in) => trans.Within(mapSources(item)(f), mapSources(in)(f))
+          case trans.Range(upper, lower) => trans.Range(mapSources(upper)(f), mapSources(lower)(f))
 
           case trans.Cond(pred, left, right) => trans.Cond(mapSources(pred)(f), mapSources(left)(f), mapSources(right)(f))
         }
@@ -259,6 +263,7 @@ trait TransSpecModule extends FNModule {
         case trans.EqualLiteral(source, value, invert) => trans.EqualLiteral(deepMap(source)(f), value, invert)
 
         case trans.Within(item, in)                    => trans.Within(deepMap(item)(f), deepMap(in)(f))
+        case trans.Range(upper, lower)                 => trans.Range(deepMap(upper)(f), deepMap(lower)(f))
 
         case trans.Cond(pred, left, right) => trans.Cond(deepMap(pred)(f), deepMap(left)(f), deepMap(right)(f))
       }
@@ -368,6 +373,7 @@ trait TransSpecModule extends FNModule {
             case Equal(f, s)             => Equal(normalize(f, undef), normalize(s, undef))
             case EqualLiteral(f, v, i)   => EqualLiteral(normalize(f, undef), v, i)
             case Within(item, in)        => Within(normalize(item, undef), normalize(in, undef))
+            case Range(upper, lower)     => Range(normalize(upper, undef), normalize(lower, undef))
             case Cond(p, l, r)           => Cond(normalize(p, undef), normalize(l, undef), normalize(r, undef))
             case Filter(s, t)            => Filter(normalize(s, undef), normalize(t, undef))
             case FilterDefined(s, df, t) => FilterDefined(normalize(s, undef), normalize(df, undef), t)
@@ -440,6 +446,7 @@ trait TransSpecModule extends FNModule {
           case Equal(f, s)               => paths(f) ++ paths(s) + r
           case EqualLiteral(s, _, _)     => paths(s) + r
           case Within(item, in)          => paths(item) ++ paths(in) + r
+          case Range(upper, lower)       => paths(upper) ++ paths(lower) + r
           case Filter(f, p)              => paths(f) ++ paths(p) + r
           case FilterDefined(s, p, _)    => paths(s) ++ paths(p) + r
           case IsType(s, _)              => paths(s) + r
