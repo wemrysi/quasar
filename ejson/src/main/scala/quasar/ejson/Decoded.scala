@@ -16,14 +16,16 @@
 
 package quasar.ejson
 
-import slamdata.Predef.String
+import slamdata.Predef.{Option, String}
 import quasar.{RenderTree, RenderedTree}
 import quasar.fp.ski.κ
 
 import matryoshka.Recursive
-import scalaz.{\/, -\/, \/-, Applicative, Monad, Plus, Traverse}
+import scalaz.{\/, -\/, \/-, Applicative, Cord, Equal, Monad, Plus, Show, Traverse}
+import scalaz.std.string._
 import scalaz.std.tuple._
 import scalaz.syntax.functor._
+import scalaz.syntax.show._
 
 /** The result of attempting to decode a `A` from EJson. */
 final case class Decoded[A](toDisjunction: (RenderedTree, String) \/ A) {
@@ -42,12 +44,15 @@ final case class Decoded[A](toDisjunction: (RenderedTree, String) \/ A) {
   def setMessage(msg: String): Decoded[A] =
     withMessage(κ(msg))
 
+  def toOption: Option[A] =
+    toDisjunction.toOption
+
   def withMessage(f: String => String): Decoded[A] =
     Decoded(toDisjunction.leftMap(_.map(f)))
 }
 
 object Decoded extends DecodedInstances {
-  def attempt[J, A](j: J, r: String \/ A)(implicit J: Recursive.Aux[J, EJson]): Decoded[A] =
+  def attempt[J, A](j: => J, r: String \/ A)(implicit J: Recursive.Aux[J, EJson]): Decoded[A] =
     r.fold(Decoded.failureFor[A](j, _), Decoded.success)
 
   def failure[A](input: RenderedTree, msg: String): Decoded[A] =
