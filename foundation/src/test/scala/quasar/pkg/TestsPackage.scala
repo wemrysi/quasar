@@ -96,8 +96,7 @@ trait ScalacheckSupport {
   def genAlphaNumString: Gen[String] = alphaNumChar.list ^^ (_.mkString)
   def genBigDecimal: Gen[BigDecimal] = Arbitrary.arbBigDecimal.arbitrary
 
-  // mostly copied from scalacheck, but the scale range is tweaked from (-300, 300) to (-100, 100).
-  // this is a hack to avoid underflow and overflow exceptions during tests. It's still a problem.
+  // This is a hack to avoid underflow and overflow exceptions during tests. It's still a problem.
   def genSmallScaleBigDecimal: Gen[BigDecimal] =
     for {
       dec <- genBigDecimal
