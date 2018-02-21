@@ -102,7 +102,7 @@ trait ScalacheckSupport {
     for {
       dec <- genBigDecimal
       scale <- Gen.choose(-100, 100)
-    } yield dec.setScale(scale)
+    } yield dec.setScale(scale, BigDecimal.RoundingMode.DOWN)
 
   def genBigInt: Gen[BigInt]           = Arbitrary.arbBigInt.arbitrary
   def genBool: Gen[Boolean]            = oneOf(true, false)
