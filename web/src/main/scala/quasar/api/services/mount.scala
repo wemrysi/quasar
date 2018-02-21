@@ -148,13 +148,13 @@ object mount {
       maxAge =  req.headers.get(`Cache-Control`).flatMap(_.values.list.collectFirst {
                   case `max-age`(s) => s
                 })
-      _      <- (refineType(path).toOption ⊛ MountConfig.viewConfig.getOption(bConf).map(MountConfig.ViewConfig.tupled) ⊛ maxAge)(createNewViewCache[S])
+      _      <- (refineType(path).toOption ⊛ MountConfig.viewConfig.getOption(bConf).map(MountConfig.ViewConfig.tupled) ⊛ maxAge)(createOrUpdateViewCache[S])
                   .getOrElse(().point[EitherT[Free[S, ?], ApiError, ?]])
     } yield exists
 
-  private def createNewViewCache[S[_]](
-    viewPath: AFile, 
-    viewConfig: MountConfig.ViewConfig, 
+  private def createOrUpdateViewCache[S[_]](
+    viewPath: AFile,
+    viewConfig: MountConfig.ViewConfig,
     maxAge: scala.concurrent.duration.Duration
   )(implicit
     MF: ManageFile.Ops[S],
@@ -167,14 +167,19 @@ object mount {
       timeStamp     <- T.timestamp.liftM[ApiErrT]
 
       refreshAfter  <- free.lift(Task.fromDisjunction(ViewCache.expireAt(timeStamp, maxAge))).into.liftM[ApiErrT]
-      newViewCache  = ViewCache.mk(viewConfig, maxAge.toSeconds, refreshAfter, dataFile)
+      newViewCache  =  ViewCache.mk(viewConfig, maxAge.toSeconds, refreshAfter, dataFile)
       _             <- vcache.get(viewPath).fold(
-                          κ(vcache.modify(viewPath, _.copy(
-                            viewConfig = newViewCache.viewConfig,
-                            maxAgeSeconds = newViewCache.maxAgeSeconds,
-                            refreshAfter = newViewCache.refreshAfter,
-                            status = newViewCache.status,
-                            dataFile = newViewCache.dataFile))),
+                          κ(vcache.modify(viewPath, modifyViewCache(newViewCache))),
                           vcache.put(viewPath, newViewCache)).join.liftM[ApiErrT]
     } yield ()
+
+  private def modifyViewCache(nw: ViewCache)(old: ViewCache): ViewCache = {
+    if (MountConfig.equal.equal(nw.viewConfig, old.viewConfig))
+      // only update maxAgeSeconds and refreshAfter (relative to maxAgeSeconds)
+      old.copy(
+        maxAgeSeconds = nw.maxAgeSeconds,
+        refreshAfter = old.refreshAfter.plusSeconds(nw.maxAgeSeconds - old.maxAgeSeconds))
+    else
+      nw
+  }
 }
