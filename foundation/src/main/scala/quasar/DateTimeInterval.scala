@@ -16,12 +16,21 @@
 
 package quasar
 
+import slamdata.Predef._
+
+import java.lang.Math
+import java.time.{
+  Duration,
+  LocalDate,
+  LocalDateTime,
+  LocalTime,
+  OffsetDateTime,
+  OffsetTime,
+  Period
+}
 import java.util.regex.Pattern
 
 import scala.util.Try
-import slamdata.Predef._
-import java.lang.Math
-import java.time.{Duration, LocalDateTime, OffsetDateTime, Period}
 
 import scalaz.Monoid
 import scalaz.syntax.equal._
@@ -132,35 +141,44 @@ final class DateTimeInterval private(
       buf.toString
     }
 
-  def compareTo(other: DateTimeInterval): Int = {
+  def compareTo(other: DateTimeInterval): Int =
     toString.compareTo(other.toString)
-  }
 
-  def subtractFrom(dt: LocalDateTime): LocalDateTime = {
-    dt
-      .minusNanos(nanos.toLong)
-      .minusSeconds(seconds)
-      .minusDays(days.toLong)
-      .minusMonths(months.toLong)
-      .minusYears(years.toLong)
-  }
+  def subtractFromLocalDateTime(dt: LocalDateTime): LocalDateTime =
+    dt.minus(this.toPeriod).plus(this.toDuration)
 
-  def subtractFromOffset(odt: OffsetDateTime): OffsetDateTime = {
-    OffsetDateTime.of(subtractFrom(odt.toLocalDateTime), odt.getOffset)
-  }
+  def subtractFromLocalDate(dt: LocalDate): LocalDate =
+    dt.minus(this.toPeriod)
 
-  def addTo(dt: LocalDateTime): LocalDateTime = {
-    dt
-      .plusYears(years.toLong)
-      .plusMonths(months.toLong)
-      .plusDays(days.toLong)
-      .plusSeconds(seconds)
-      .plusNanos(nanos.toLong)
-  }
+  def subtractFromLocalTime(dt: LocalTime): LocalTime =
+    dt.minus(this.toDuration)
 
-  def addToOffset(odt: OffsetDateTime): OffsetDateTime = {
-    OffsetDateTime.of(addTo(odt.toLocalDateTime), odt.getOffset)
-  }
+  def subtractFromOffsetDateTime(odt: OffsetDateTime): OffsetDateTime =
+    OffsetDateTime.of(subtractFromLocalDateTime(odt.toLocalDateTime), odt.getOffset)
+
+  def subtractFromOffsetDate(odt: OffsetDate): OffsetDate =
+    OffsetDate(subtractFromLocalDate(odt.date), odt.offset)
+
+  def subtractFromOffsetTime(odt: OffsetTime): OffsetTime =
+    OffsetTime.of(subtractFromLocalTime(odt.toLocalTime), odt.getOffset)
+
+  def addToLocalDateTime(dt: LocalDateTime): LocalDateTime =
+    dt.plus(this.toPeriod).plus(this.toDuration)
+
+  def addToLocalDate(dt: LocalDate): LocalDate =
+    dt.plus(this.toPeriod)
+
+  def addToLocalTime(dt: LocalTime): LocalTime =
+    dt.plus(this.toDuration)
+
+  def addToOffsetDateTime(odt: OffsetDateTime): OffsetDateTime =
+    OffsetDateTime.of(addToLocalDateTime(odt.toLocalDateTime), odt.getOffset)
+
+  def addToOffsetDate(odt: OffsetDate): OffsetDate =
+    OffsetDate(addToLocalDate(odt.date), odt.offset)
+
+  def addToOffsetTime(odt: OffsetTime): OffsetTime =
+    OffsetTime.of(addToLocalTime(odt.toLocalTime), odt.getOffset)
 
   def isDateLike: Boolean = seconds ≟ 0 && nanos ≟ 0
   def isTimeLike: Boolean = years ≟ 0 && months ≟ 0 && days ≟ 0

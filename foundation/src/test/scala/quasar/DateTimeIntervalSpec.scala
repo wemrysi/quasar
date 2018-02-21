@@ -154,7 +154,8 @@ class DateTimeIntervalSpec extends quasar.Qspec {
   "addTo" should {
     "be a group if normalized" in {
       prop { (d: LocalDateTime, i: DateTimeInterval) =>
-        (i.days.abs < 14 && i.months.abs < 12) ==> (i.subtractFrom(i.addTo(d)) must_=== d)
+        (i.days.abs < 14 && i.months.abs < 12) ==>
+          (i.subtractFromLocalDateTime(i.addToLocalDateTime(d)) must_=== d)
       }
     }
   }

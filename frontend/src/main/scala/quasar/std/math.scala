@@ -103,41 +103,58 @@ trait MathLib extends Library {
         }
     },
     partialTyperV[nat._2] {
-      case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))             => success(Type.Const(Data.Int(v1 + v2)))
-      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2)))       => success(Type.Const(Data.Dec(v1 + v2)))
+      case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2))) =>
+        success(Type.Const(Data.Int(v1 + v2)))
+
+      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) =>
+        success(Type.Const(Data.Dec(v1 + v2)))
+
       case Sized(Type.Const(Data.Interval(i1)), Type.Const(Data.Interval(i2))) =>
         success(Type.Const(Data.Interval(i1 plus i2)))
+
       case Sized(Type.Const(CanLensDateTime(dt)), Type.Const(Data.Interval(i))) =>
-        success(Type.Const(dt.peeks(i.addTo)))
+        success(Type.Const(dt.peeks(i.addToLocalDateTime)))
+
       case Sized(Type.Const(CanLensTime(t)), Type.Const(Data.Interval(DateTimeInterval.TimeLike(i)))) =>
         success(Type.Const(t.peeks(_.plus(i))))
+
       case Sized(Type.Const(CanLensDate(d)), Type.Const(Data.Interval(DateTimeInterval.DateLike(i)))) =>
         success(Type.Const(d.peeks(_.plus(i))))
+
       case Sized(Type.Const(Data.Interval(i)), Type.Const(CanLensDateTime(dt))) =>
-        success(Type.Const(dt.peeks(i.addTo)))
+        success(Type.Const(dt.peeks(i.addToLocalDateTime)))
+
       case Sized(Type.Const(Data.Interval(DateTimeInterval.TimeLike(i))), Type.Const(CanLensTime(t))) =>
         success(Type.Const(t.peeks(_.plus(i))))
+
       case Sized(Type.Const(Data.Interval(DateTimeInterval.DateLike(i))), Type.Const(CanLensDate(d))) =>
         success(Type.Const(d.peeks(_.plus(i))))
+
       case Sized(Type.Const(CanLensDate(_)), Type.Const(Data.Interval(_))) =>
         failure(NonEmptyList(SemanticError.GenericError("Intervals containing time information can't be added to dates")))
+
       case Sized(Type.Const(CanLensTime(_)), Type.Const(Data.Interval(_))) =>
         failure(NonEmptyList(SemanticError.GenericError("Intervals containing date information can't be added to times")))
+
       case Sized(Type.Const(Data.Interval(_)), Type.Const(CanLensDate(_))) =>
         failure(NonEmptyList(SemanticError.GenericError("Intervals containing time information can't be added to dates")))
+
       case Sized(Type.Const(Data.Interval(_)), Type.Const(CanLensTime(_))) =>
         failure(NonEmptyList(SemanticError.GenericError("Intervals containing date information can't be added to times")))
+
       case Sized(t1, t2)
         if (Type.OffsetDateTime ⨿ Type.OffsetTime ⨿ Type.OffsetDate ⨿
                     Type.LocalDateTime ⨿ Type.LocalDate ⨿ Type.LocalTime ⨿ Type.Interval).contains(t1) &&
             Type.Interval.contains(t2) =>
         success(t1.widenConst)
+
       case Sized(t1, t2)
         if (Type.OffsetDateTime ⨿ Type.OffsetTime ⨿ Type.OffsetDate ⨿
                     Type.LocalDateTime ⨿ Type.LocalDate ⨿ Type.LocalTime ⨿ Type.Interval).contains(t2) &&
             Type.Interval.contains(t1) =>
         success(t2.widenConst)
     } ||| numericWidening,
+
     partialUntyperOV[nat._2](t => 
       Type.typecheck(Type.Interval, t).fold(κ(t match {
         case Type.Int                      => Some(success(Func.Input2(Type.Int, Type.Int)))
@@ -237,14 +254,19 @@ trait MathLib extends Library {
 
       case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))       =>
         Type.Const(Data.Int(v1 - v2))
+
       case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) =>
         Type.Const(Data.Dec(v1 - v2))
+
       case Sized(Type.Const(CanLensDateTime(v1)), Type.Const(Data.Interval(v2))) =>
-        Type.Const(v1.peeks(v2.subtractFrom))
+        Type.Const(v1.peeks(v2.subtractFromLocalDateTime))
+
       case Sized(Type.Const(CanLensDate(v1)), Type.Const(Data.Interval(DateTimeInterval.DateLike(v2)))) =>
         Type.Const(v1.peeks(_.minus(v2)))
+
       case Sized(Type.Const(CanLensTime(v1)), Type.Const(Data.Interval(DateTimeInterval.TimeLike(v2)))) =>
         Type.Const(v1.peeks(_.minus(v2)))
+
       case Sized(Type.Const(Data.LocalDateTime(v1)), Type.Const(Data.LocalDateTime(v2))) =>
         val y = v1.getYear - v2.getYear
         val mo = v1.getMonth.getValue - v2.getMonth.getValue
@@ -255,18 +277,21 @@ trait MathLib extends Library {
         val s = v1.getSecond - v2.getSecond
         val n = v1.getNano - v2.getNano
         Type.Const(Data.Interval(DateTimeInterval(y, mo, d, h * 3600L + mi * 60L + s, n.toLong)))
+
       case Sized(Type.Const(Data.LocalDate(v1)), Type.Const(Data.LocalDate(v2))) =>
         val y = v1.getYear - v2.getYear
         val m = v1.getMonth.getValue - v2.getMonth.getValue
         val nv2 = v2.minusMonths(m.toLong)
         val d = v1.getDayOfMonth - nv2.getDayOfMonth
         Type.Const(Data.Interval(DateTimeInterval(y, m, d, 0L, 0L)))
+
       case Sized(Type.Const(Data.LocalTime(v1)), Type.Const(Data.LocalTime(v2))) =>
         val h = v1.getHour - v2.getHour
         val m = v1.getMinute - v2.getMinute
         val s = v1.getSecond - v2.getSecond
         val n = v1.getNano - v2.getNano
         Type.Const(Data.Interval(DateTimeInterval(0, 0, 0, h * 3600L + m * 60L + s, n.toLong)))
+
       case Sized(Type.LocalDateTime.superOf(_), Type.LocalDateTime.superOf(_)) => Type.Interval
       case Sized(Type.OffsetDateTime.superOf(_), Type.Interval.superOf(_)) => Type.OffsetDateTime
       case Sized(Type.OffsetDate.superOf(_), Type.Interval.superOf(_)) => Type.OffsetDate

@@ -1685,39 +1685,52 @@ abstract class StdLibSpec extends Qspec {
           commute(Add(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x + y))
         }
 
-        "OffsetDate/Interval" >> prop { (x: QOffsetDate, i0: DateTimeInterval) =>
-          val i = DateTimeInterval.makeUnsafe(i0.years, i0.months, i0.days, 0, 0)
-          val result = x.date.plusYears(i.years.toLong).plusMonths(i.months.toLong).plusDays(i.days.toLong)
-          commute(Add(_, _).embed, Data.OffsetDate(x), Data.Interval(i), Data.OffsetDate(quasar.OffsetDate(result, x.offset)))
+        "OffsetDate/Interval" >> prop { (x: QOffsetDate, i: DateTimeInterval) =>
+          val result = i.addToOffsetDate(x)
+          commute(Add(_, _).embed, Data.OffsetDate(x), Data.Interval(i), Data.OffsetDate(result))
         }.setGens(DateGenerators.genOffsetDate, DateGenerators.genDateInterval)
 
         "OffsetTime/Interval" >> prop { (x: JOffsetTime, i: DateTimeInterval) =>
-          val result = x.plusSeconds(i.seconds).plusNanos(i.nanos.toLong)
+          val result = i.addToOffsetTime(x)
           commute(Add(_, _).embed, Data.OffsetTime(x), Data.Interval(i), Data.OffsetTime(result))
         }.setGens(DateGenerators.genOffsetTime, DateGenerators.genTimeInterval)
 
         "OffsetDateTime/Interval" >> prop { (x: JOffsetDateTime, i: DateTimeInterval) =>
-          val result = x
-            .plusYears(i.years.toLong).plusMonths(i.months.toLong).plusDays(i.days.toLong)
-            .plusSeconds(i.seconds).plusNanos(i.nanos.toLong)
+          val result = i.addToOffsetDateTime(x)
           commute(Add(_, _).embed, Data.OffsetDateTime(x), Data.Interval(i), Data.OffsetDateTime(result))
         }
 
-        "LocalDate/Interval" >> prop { (x: JLocalDate, i: DateTimeInterval) =>
-          val result = x.plusYears(i.years.toLong).plusMonths(i.months.toLong).plusDays(i.days.toLong)
-          commute(Add(_, _).embed, Data.LocalDate(x), Data.Interval(i), Data.LocalDate(result))
-        }.setGens(DateGenerators.genLocalDate, DateGenerators.genDateInterval)
+        "LocalDate/Interval" >> {
+          "Feb 29" >> {
+            val x: JLocalDate = JLocalDate.of(2016, 2, 29)
+            val i: DateTimeInterval = DateTimeInterval(-101, -57, -4, 0, 0)
+            val result: JLocalDate = i.addToLocalDate(x)
+            commute(Add(_, _).embed, Data.LocalDate(x), Data.Interval(i), Data.LocalDate(result))
+          }
+
+          "any" >> prop { (x: JLocalDate, i: DateTimeInterval) =>
+            val result: JLocalDate = i.addToLocalDate(x)
+            commute(Add(_, _).embed, Data.LocalDate(x), Data.Interval(i), Data.LocalDate(result))
+          }.setGens(DateGenerators.genLocalDate, DateGenerators.genDateInterval)
+        }
 
         "LocalTime/Interval" >> prop { (x: JLocalTime, i: DateTimeInterval) =>
-          val result = x.plusSeconds(i.seconds).plusNanos(i.nanos.toLong)
+          val result: JLocalTime = i.addToLocalTime(x)
           commute(Add(_, _).embed, Data.LocalTime(x), Data.Interval(i), Data.LocalTime(result))
         }.setGens(DateGenerators.genLocalTime, DateGenerators.genTimeInterval)
 
-        "LocalDateTime/Interval" >> prop { (x: JLocalDateTime, i: DateTimeInterval) =>
-          val result = x
-            .plusYears(i.years.toLong).plusMonths(i.months.toLong).plusDays(i.days.toLong)
-            .plusSeconds(i.seconds).plusNanos(i.nanos.toLong)
-          commute(Add(_, _).embed, Data.LocalDateTime(x), Data.Interval(i), Data.LocalDateTime(result))
+        "LocalDateTime/Interval" >> {
+          "Feb 29" >> {
+            val x: JLocalDateTime = JLocalDateTime.of(2016, 2, 29, 3, 7, 11)
+            val i: DateTimeInterval = DateTimeInterval(-101, -57, -4, 5, 7)
+            val result: JLocalDateTime = i.addToLocalDateTime(x)
+            commute(Add(_, _).embed, Data.LocalDateTime(x), Data.Interval(i), Data.LocalDateTime(result))
+          }
+
+          "any" >> prop { (x: JLocalDateTime, i: DateTimeInterval) =>
+            val result: JLocalDateTime = i.addToLocalDateTime(x)
+            commute(Add(_, _).embed, Data.LocalDateTime(x), Data.Interval(i), Data.LocalDateTime(result))
+          }
         }
       }
 
@@ -1788,27 +1801,33 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "LocalDateTime/Interval" >> prop { (x: JLocalDateTime, y: DateTimeInterval) =>
-           binary(Subtract(_, _).embed, Data.LocalDateTime(x), Data.Interval(y), Data.LocalDateTime(y.subtractFrom(x)))
+          val expected = y.subtractFromLocalDateTime(x)
+          binary(Subtract(_, _).embed, Data.LocalDateTime(x), Data.Interval(y), Data.LocalDateTime(expected))
         }
 
         "LocalDate/Interval" >> prop { (x: JLocalDate, y: DateTimeInterval) =>
-          binary(Subtract(_, _).embed, Data.LocalDate(x), Data.Interval(y), Data.LocalDate(x.minus(y.toPeriod)))
+          val expected = y.subtractFromLocalDate(x)
+          binary(Subtract(_, _).embed, Data.LocalDate(x), Data.Interval(y), Data.LocalDate(expected))
         }.setGens(DateGenerators.genLocalDate, DateGenerators.genDateInterval)
 
         "LocalTime/Interval" >> prop { (x: JLocalTime, y: DateTimeInterval) =>
-          binary(Subtract(_, _).embed, Data.LocalTime(x), Data.Interval(y), Data.LocalTime(x.minus(y.toDuration)))
+          val expected = y.subtractFromLocalTime(x)
+          binary(Subtract(_, _).embed, Data.LocalTime(x), Data.Interval(y), Data.LocalTime(expected))
         }.setGens(DateGenerators.genLocalTime, DateGenerators.genTimeInterval)
 
         "OffsetDateTime/Interval" >> prop { (x: JOffsetDateTime, y: DateTimeInterval) =>
-          binary(Subtract(_, _).embed, Data.OffsetDateTime(x), Data.Interval(y), Data.OffsetDateTime(y.subtractFromOffset(x)))
+          val expected = y.subtractFromOffsetDateTime(x)
+          binary(Subtract(_, _).embed, Data.OffsetDateTime(x), Data.Interval(y), Data.OffsetDateTime(expected))
         }
 
         "OffsetDate/Interval" >> prop { (x: QOffsetDate, y: DateTimeInterval) =>
-          binary(Subtract(_, _).embed, Data.OffsetDate(x), Data.Interval(y), Data.OffsetDate(x.minus(y.toPeriod)))
+          val expected = y.subtractFromOffsetDate(x)
+          binary(Subtract(_, _).embed, Data.OffsetDate(x), Data.Interval(y), Data.OffsetDate(expected))
         }.setGens(DateGenerators.genOffsetDate, DateGenerators.genDateInterval)
 
         "OffsetTime/Interval" >> prop { (x: JOffsetTime, y: DateTimeInterval) =>
-          binary(Subtract(_, _).embed, Data.OffsetTime(x), Data.Interval(y), Data.OffsetTime(x.minus(y.toDuration)))
+          val expected = y.subtractFromOffsetTime(x)
+          binary(Subtract(_, _).embed, Data.OffsetTime(x), Data.Interval(y), Data.OffsetTime(expected))
         }.setGens(DateGenerators.genOffsetTime, DateGenerators.genTimeInterval)
 
         // TODO: LocalDateTime/LocalDateTime, LocalDate, LocalTime/LocalTime
