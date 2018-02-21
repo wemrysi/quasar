@@ -18,20 +18,21 @@ package quasar.qscript.qsu
 
 import slamdata.Predef._
 
-import quasar.NameGenerator
+import quasar.{NameGenerator, RenderTreeT}
 import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.fp.symbolOrder
 import quasar.qscript.{construction, JoinSide, LeftSide, RightSide}
 import quasar.sql.JoinDir
 
-import matryoshka.BirecursiveT
-import scalaz.{Monad, NonEmptyList, Scalaz, StateT, \/}, Scalaz._
+import matryoshka.{BirecursiveT, ShowT}
+import scalaz.Tags.Disjunction
+import scalaz.{Monad, NonEmptyList, ICons, INil, Scalaz, StateT, Tag}, Scalaz._
 
 /** Extracts `MapFunc` expressions from operations by requiring an argument
   * to be a function of one or more sibling arguments and creating an
   * autojoin if not.
   */
-final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
+final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private () extends QSUTTypes[T] {
   import QScriptUniform._
   import QSUGraph.Extractors
 
@@ -66,21 +67,42 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
           JoinDir.Left.name -> func.LeftSide,
           JoinDir.Right.name -> func.RightSide)
 
+      MappableRegion.funcOf(replaceRefs(graph, lref, rref), graph refocus cond.root).cata(jf =>
+        graph.overwriteAtRoot(ThetaJoin(left.root, right.root, jf, jtype, combiner)).point[F], {
+          val max = MappableRegion.maximal(graph refocus cond.root)
+          val targets =
+            max.toIList.partition(hasJoinRef(_, lref)).bimap(_.map(_.root), _.map(_.root))
 
-      def refReplace(g: QSUGraph, l: Symbol, r: Symbol): Symbol => JoinSide \/ QSUGraph =
-        replaceRefs(g, l, r) >>> (_.toLeft(g).disjunction)
+          targets match {
+            case (ICons(leftTarget, INil()), ICons(rightTarget, INil())) => {
+              val leftUnify = UnifyTargets[T, F](withName[F](_))(graph, left.root, NonEmptyList(leftTarget))("left_source", "left_target")
+              val rightUnify = UnifyTargets[T, F](withName[F](_))(graph, right.root, NonEmptyList(rightTarget))("right_source", "right_target")
+              val err = InternalError(s"Unable to unify targets", None)
 
-      val max: FreeMapA[JoinSide \/ QSUGraph] =
-        MappableRegion.maximal(graph refocus cond.root).map(qg => refReplace(qg, lref, rref)(qg.root))
+              (leftUnify |@| rightUnify) {
+                case ((leftGraph, leftOrig, leftSide), (rightGraph, rightOrig, rightSide)) => {
+                  val on0: F[JoinFunc] = max.traverseM(qg => qg.root match {
+                    case `leftTarget` => leftSide.head.as[JoinSide](LeftSide).some
+                    case `rightTarget` => rightSide.head.as[JoinSide](RightSide).some
+                    case _ => none
+                  }).cata(_.point[F], PlannerErrorME[F].raiseError[JoinFunc](err))
 
-      MappableRegion.funcOf(replaceRefs(graph, lref, rref), graph refocus cond.root)
-        .map(jf => ThetaJoin(left.root, right.root, jf, jtype, combiner)) match {
-          case Some(qs) =>
-            graph.overwriteAtRoot(qs).point[F]
-          case None =>
-            PlannerErrorME[F].raiseError[QSUGraph](
-              InternalError(s"Invalid join condition, $cond, must be a mappable function of $left and $right.", None))
-        }
+                  val repair: JoinFunc = combiner.map({
+                    case LeftSide => leftOrig.as[JoinSide](LeftSide)
+                    case RightSide => rightOrig.as[JoinSide](RightSide)
+                  }).join
+
+                  val tj = on0 map (ThetaJoin(leftGraph.root, rightGraph.root, _, jtype, repair))
+
+                  tj map (tj0 => graph.overwriteAtRoot(tj0) :++ leftGraph :++ rightGraph)
+                }
+              }.join
+            }
+            case _ =>
+              PlannerErrorME[F].raiseError[QSUGraph](
+                  InternalError(s"Invalid join condition, $cond, must be a mappable function of $left and $right.", None))
+          }
+        })
     }
 
     case graph @ Extractors.LPSort(src, keys) =>
@@ -88,6 +110,14 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
         case (sym, fms) => QSSort(sym, Nil, fms fzip keys.seconds)
       }
   }
+
+  private def hasJoinRef(g: QSUGraph, refId: Symbol): Boolean =
+    Tag.unwrap[Boolean, Disjunction](g.foldMapUp(g => g.unfold.map(_.root) match {
+      case JoinSideRef(rid) if refId === rid =>
+        Tag[Boolean, Disjunction](true)
+      case _ =>
+        Tag[Boolean, Disjunction](false)
+    }))
 
   private def replaceRefs(g: QSUGraph, l: Symbol, r: Symbol)
       : Symbol => Option[JoinSide] =
@@ -121,7 +151,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T
 
 object ExtractFreeMap {
   def apply[
-      T[_[_]]: BirecursiveT,
+      T[_[_]]: BirecursiveT: RenderTreeT: ShowT,
       F[_]: Monad: NameGenerator: PlannerErrorME]
       (graph: QSUGraph[T])
       : F[QSUGraph[T]] =
