@@ -23,7 +23,11 @@ import quasar.std.StdLib._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 
-import java.time.{Instant, LocalDate => JLocalDate, LocalDateTime => JLocalDateTime}
+import java.time.{
+  Instant,
+  LocalDate => JLocalDate,
+  LocalDateTime => JLocalDateTime
+}
 import matryoshka._
 import matryoshka.data.Fix
 import org.specs2.execute.{Pending, Result, Success}

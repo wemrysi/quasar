@@ -65,7 +65,8 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name)
 
   def is3_2(backend: BackendName): Boolean = backend ≟ TestConfig.MONGO_3_2.name
-  def is3_4(backend: BackendName): Boolean = backend ≟ TestConfig.MONGO_3_4.name
+  def is3_4(backend: BackendName): Boolean =
+    (backend ≟ TestConfig.MONGO_3_4.name) || (backend ≟ TestConfig.MONGO_READ_ONLY.name)
 
   MongoDbSpec.clientShould(MongoDb.Type) { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._
