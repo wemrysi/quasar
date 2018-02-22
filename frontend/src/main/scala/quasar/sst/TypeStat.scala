@@ -191,32 +191,32 @@ sealed abstract class TypeStatInstances {
           kind <- j.decodedKeyS[String](KindKey)
 
           ts <- kind match {
-            case "boolean" =>
+            case Kind.Boolean =>
               (j.decodedKeyS[A](TrueKey) |@| j.decodedKeyS[A](FalseKey))(TypeStat.bool(_, _))
 
-            case "byte" =>
+            case Kind.Byte =>
               minmax[SByte](j) map (TypeStat.byte(_))
 
-            case "char" =>
+            case Kind.Char =>
               minmax[SChar](j) map (TypeStat.char(_))
 
-            case "integer" =>
+            case Kind.Int =>
               dist[BigInt](j) map (TypeStat.int(_))
 
-            case "decimal" =>
+            case Kind.Dec =>
               dist[BigDecimal](j) map (TypeStat.dec(_))
 
-            case "count" =>
+            case Kind.Count =>
               j.decodedKeyS[A](CountKey) map (TypeStat.count(_))
 
-            case "collection" =>
+            case Kind.Coll =>
               (
                 j.decodedKeyS[A](CountKey)                |@|
                 j.keyS(MinLenKey).traverse(_.decodeAs[A]) |@|
                 j.keyS(MaxLenKey).traverse(_.decodeAs[A])
               )(TypeStat.coll(_, _, _))
 
-            case "string" =>
+            case Kind.Str =>
               (
                 j.decodedKeyS[A](CountKey)    |@|
                 j.decodedKeyS[A](MinLenKey)   |@|
@@ -291,6 +291,17 @@ sealed abstract class TypeStatInstances {
   private val TrueKey = "true"
   private val VarianceKey = "variance"
 
+  private object Kind {
+    val Boolean = "boolean"
+    val Byte = "byte"
+    val Char = "char"
+    val Coll = "collection"
+    val Count = "count"
+    val Dec = "decimal"
+    val Int = "integer"
+    val Str = "string"
+  }
+
   private[sst] def encodeEJson0[A: EncodeEJson: Equal: Field: NRoot, J](
     ts: TypeStat[A],
     isPopulation: Boolean
@@ -345,35 +356,35 @@ sealed abstract class TypeStatInstances {
     ts match {
       case Bool(t, f) =>
         kmap(
-          "boolean"
+          Kind.Boolean
         , TrueKey  -> t.asEJson[J]
         , FalseKey -> f.asEJson[J])
 
       case Byte(c, mn, mx) =>
-        minmax("byte", c, mn, mx)
+        minmax(Kind.Byte, c, mn, mx)
 
       case Char(c, mn, mx) =>
-        minmax("char", c, mn, mx)
+        minmax(Kind.Char, c, mn, mx)
 
       case Int(s, mn, mx) =>
-        dist("integer", s, mn, mx)
+        dist(Kind.Int, s, mn, mx)
 
       case Dec(s, mn, mx) =>
-        dist("decimal", s, mn, mx)
+        dist(Kind.Dec, s, mn, mx)
 
       case Count(c) =>
-        kmap("count", CountKey -> c.asEJson[J])
+        kmap(Kind.Count, CountKey -> c.asEJson[J])
 
       case Coll(c, mnl, mxl) =>
         kmap(
-          "collection",
+          Kind.Coll,
           (CountKey -> c.asEJson[J]) ::
           optEntry(MinLenKey, mnl)   :::
           optEntry(MaxLenKey, mxl) : _*)
 
       case Str(c, mnl, mxl, mn, mx) =>
         kmap(
-          "string"
+          Kind.Str
         , CountKey  -> c.asEJson[J]
         , MinLenKey -> mnl.asEJson[J]
         , MaxLenKey -> mxl.asEJson[J]
