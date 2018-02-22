@@ -361,28 +361,28 @@ private[quasar] sealed abstract class TypeFInstances {
     new DecodeEJsonK[TypeF[A, ?]] {
       def decodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): CoalgebraM[Decoded, TypeF[A, ?], J] =
         j => j.decodedKeyS[String](TypeKey) flatMap {
-          case "bottom" =>
+          case Type.Bottom =>
             TypeF.bottom[A, J]().point[Decoded]
 
-          case "top" =>
+          case Type.Top =>
             TypeF.top[A, J]().point[Decoded]
 
-          case "const" =>
+          case Type.Const =>
             j.decodedKeyS[A](OfKey) map (TypeF.const[A, J](_))
 
-          case "sum" =>
+          case Type.Union =>
             j.decodeKeyS(OfKey) flatMap { u =>
               Decoded.attempt(u, u.array.collect {
                 case x :: y :: zs => TypeF.union[A, J](x, y, zs.toIList)
               } \/> "Union")
             }
 
-          case "array" =>
+          case Type.Arr =>
             j.decodeKeyS(OfKey) map { a =>
               TypeF.arr[A, J](a.array.map(_.toIList) <\/ a)
             }
 
-          case "map" =>
+          case Type.Map =>
             val known = for {
               m <- j.decodeKeyS(OfKey)
               assocs <- Decoded.attempt(m, m.assoc \/> "Map")
@@ -405,14 +405,14 @@ private[quasar] sealed abstract class TypeFInstances {
   implicit def encodeEJsonK[A](implicit A: EncodeEJson[A]): EncodeEJsonK[TypeF[A, ?]] =
     new EncodeEJsonK[TypeF[A, ?]] {
       def encodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Algebra[TypeF[A, ?], J] = {
-        case Bottom()        => tlabel("bottom")
-        case Top()           => tlabel("top")
+        case Bottom()        => tlabel(Type.Bottom)
+        case Top()           => tlabel(Type.Top)
         case Simple(s)       => tlabel(SimpleType.name(s))
-        case Const(a)        => tof("const", A.encode[J](a))
-        case Union(x, y, zs) => tof("sum", EJson.arr((x :: y :: zs).toList : _*))
+        case Const(a)        => tof(Type.Const, A.encode[J](a))
+        case Union(x, y, zs) => tof(Type.Union, EJson.arr((x :: y :: zs).toList : _*))
 
         case Arr(a) =>
-          tof("array", a.leftMap(js => EJson.arr(js.toList : _*)).merge)
+          tof(Type.Arr, a.leftMap(js => EJson.arr(js.toList : _*)).merge)
 
         case Map(kvs, unk) =>
           val jjs   = kvs.toList.map(_.leftMap(A.encode[J](_)))
@@ -420,7 +420,7 @@ private[quasar] sealed abstract class TypeFInstances {
             EJson.str(OtherKey),
             map1(EJson.str(KeysKey) -> k, EJson.str(ValuesKey) -> v)
           )}
-          tof("map", EJson.map(jjs : _*), other.toList: _*)
+          tof(Type.Map, EJson.map(jjs : _*), other.toList: _*)
       }
 
       private def map1[J](assoc: (J, J), assocs: (J, J)*)(
@@ -496,4 +496,13 @@ private[quasar] sealed abstract class TypeFInstances {
   private val OtherKey = "other"
   private val TypeKey = "type"
   private val ValuesKey = "values"
+
+  private object Type {
+    val Bottom = "bottom"
+    val Top = "top"
+    val Const = "const"
+    val Union = "sum"
+    val Arr = "array"
+    val Map = "map"
+  }
 }
