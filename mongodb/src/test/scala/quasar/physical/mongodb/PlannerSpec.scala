@@ -102,6 +102,7 @@ class PlannerSpec extends
         beRight.which(cwf => notBrokenWithOps(cwf.op, IList(ReadOp, MatchOp, ProjectOp, MatchOp, GroupOp, ProjectOp)))
     }
 
+    // TODO qz-3686
     /*trackPending(
       "having with multiple projections",
       plan(sqlE"select city, sum(pop) from extraSmallZips group by city having sum(pop) > 40000"),
