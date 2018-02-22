@@ -16,10 +16,9 @@
 
 package quasar
 
-import java.time._
-
 import slamdata.Predef._
-import DateGenerators._
+
+import java.time._
 
 class DateTimeIntervalSpec extends quasar.Qspec {
 
@@ -148,15 +147,6 @@ class DateTimeIntervalSpec extends quasar.Qspec {
     }
     "compare nanos" in {
       DateTimeInterval.ofSecondsNanos(1, 5).compareTo(DateTimeInterval.ofSeconds(1)) should be_<(0)
-    }
-  }
-
-  "addTo" should {
-    "be a group if normalized" in {
-      prop { (d: LocalDateTime, i: DateTimeInterval) =>
-        (i.days.abs < 14 && i.months.abs < 12) ==>
-          (i.subtractFromLocalDateTime(i.addToLocalDateTime(d)) must_=== d)
-      }
     }
   }
 }
