@@ -117,57 +117,42 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
               }.join
             }
             case (ICons(leftTarget, INil()), INil()) => {
-              val leftUnify =
-                UnifyTargets[T, F](withName[F](_))(graph, left.root, NonEmptyList(leftTarget.root))("left_source", "left_target")
+              unifyShapePreservingM[F](graph, left.root, NonEmptyList(leftTarget.root))("left_source", "left_target") {
+                case (sym, fms) => {
+                  val leftSym = leftTarget.root
 
-              leftUnify >>= { case (leftGraph, leftOrig, leftSide) =>
-                val leftSym = leftTarget.root
-                val on: Option[JoinFunc] = joinFunc.traverseM({
-                  case -\/(side) => side.point[FreeMapA].some
-                  case \/-(g) => g.root match {
-                    case `leftSym` => leftSide.head.as[JoinSide](LeftSide).some
-                    case _ => none
-                  }
-                })
+                  val on: Option[JoinFunc] = joinFunc.traverseM({
+                    case -\/(side) => side.point[FreeMapA].some
+                    case \/-(g) => g.root match {
+                      case `leftSym` => fms.head.as[JoinSide](LeftSide).some
+                      case _ => none
+                    }
+                  })
 
-                val repair: JoinFunc = combiner.map({
-                  case LeftSide => leftOrig.as[JoinSide](LeftSide)
-                  case RightSide => (RightSide: JoinSide).point[FreeMapA]
-                }).join
-
-                on.cata(on0 => {
-                  val node = ThetaJoin(leftGraph.root, right.root, on0, jtype, repair)
-
-                  (graph.overwriteAtRoot(node) :++ leftGraph).point[F]
-                }, PlannerErrorME[F].raiseError[QSUGraph](err))
+                  on.cata(
+                    on0 => (ThetaJoin(sym, right.root, on0, jtype, combiner): QScriptUniform[Symbol]).point[F],
+                    PlannerErrorME[F].raiseError[QScriptUniform[Symbol]](err))
+                }
               }
             }
-            case (INil(), ICons(rightTarget, INil())) => {
-              val rightUnify =
-                UnifyTargets[T, F](withName[F](_))(graph, right.root, NonEmptyList(rightTarget.root))("right_source", "right_target")
+            case (INil(), ICons(rightTarget, INil())) =>
+              unifyShapePreservingM[F](graph, right.root, NonEmptyList(rightTarget.root))("right_source", "right_target") {
+                case (sym, fms) => {
+                  val rightSym = rightTarget.root
 
-              rightUnify >>= { case (rightGraph, rightOrig, rightSide) =>
-                val rightSym = rightTarget.root
-                val on: Option[JoinFunc] = joinFunc.traverseM({
-                  case -\/(side) => side.point[FreeMapA].some
-                  case \/-(g) => g.root match {
-                    case `rightSym` => rightSide.head.as[JoinSide](LeftSide).some
-                    case _ => none
-                  }
-                })
+                  val on: Option[JoinFunc] = joinFunc.traverseM({
+                    case -\/(side) => side.point[FreeMapA].some
+                    case \/-(g) => g.root match {
+                      case `rightSym` => fms.head.as[JoinSide](RightSide).some
+                      case _ => none
+                    }
+                  })
 
-                val repair: JoinFunc = combiner.map({
-                  case LeftSide => (LeftSide: JoinSide).point[FreeMapA]
-                  case RightSide => rightOrig.as[JoinSide](RightSide)
-                }).join
-
-                on.cata(on0 => {
-                  val node = ThetaJoin(left.root, rightGraph.root, on0, jtype, repair)
-
-                  (graph.overwriteAtRoot(node) :++ rightGraph).point[F]
-                }, PlannerErrorME[F].raiseError[QSUGraph](err))
+                  on.cata(
+                    on0 => (ThetaJoin(left.root, sym, on0, jtype, combiner): QScriptUniform[Symbol]).point[F],
+                    PlannerErrorME[F].raiseError[QScriptUniform[Symbol]](err))
+                }
               }
-            }
             case _ =>
               PlannerErrorME[F].raiseError[QSUGraph](
                 InternalError(s"Invalid join condition, $cond, must be a mappable function of $left and $right.", None))
@@ -203,14 +188,23 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
       sourceName: String,
       targetPrefix: String)(
       buildNode: (Symbol, NonEmptyList[FreeMap]) => QScriptUniform[Symbol]): F[QSUGraph] =
+    unifyShapePreservingM[F](graph, source, targets)(sourceName, targetPrefix)(buildNode map (_.point[F]))
+
+  private def unifyShapePreservingM[F[_]: Monad: NameGenerator: RevIdxM](
+      graph: QSUGraph,
+      source: Symbol,
+      targets: NonEmptyList[Symbol])(
+      sourceName: String,
+      targetPrefix: String)(
+      buildNode: (Symbol, NonEmptyList[FreeMap]) => F[QScriptUniform[Symbol]]): F[QSUGraph] =
     UnifyTargets[T, F](withName[F](_))(graph, source, targets)(sourceName, targetPrefix) flatMap {
       case (newSrc, original, targetExprs) =>
-        val node = buildNode(newSrc.root, targetExprs)
+        val node: F[QScriptUniform[Symbol]] = buildNode(newSrc.root, targetExprs)
 
         if (newSrc.root === source)
-          graph.overwriteAtRoot(node).point[F]
+          node map (graph.overwriteAtRoot(_))
         else
-          withName[F](node) map { inter =>
+          (node >>= (withName[F](_))) map { inter =>
             graph.overwriteAtRoot(Map(inter.root, original)) :++ inter :++ newSrc
           }
     }
