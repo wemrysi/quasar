@@ -307,18 +307,14 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
       "succeed with a cached view mount" >> prop { (src: AFile, dst: AFile) =>
         val expr = sqlB"α"
         val vars = Variables.empty
-        val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
+        val cfg = MountConfig.ViewConfig(expr, vars)
+        val cfgStr = EncodeJson.of[MountConfig].encode(cfg)
         val maxAge = 7.seconds
-        val viewCache =
-          lift(Task.fromDisjunction(ViewCache.expireAt(nineteenEighty, maxAge)) ∘ (ra =>
-            ViewCache(
-              MountConfig.ViewConfig(expr, vars), None, None, 0, None, None,
-              maxAge.toSeconds, ra, ViewCache.Status.Pending, None, src, None))).into[Eff]
+        val vc = ViewCache.mk(cfg, maxAge.toSeconds, nineteenEighty, src)
 
         (src ≠ dst) ==> {
           runTest { service =>
             for {
-              vc       <- viewCache
               put      <- lift(Request(
                               method = PUT,
                               uri = pathUri(src),
@@ -645,17 +641,13 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
           runTest { service =>
             val expr = sqlB"α"
             val vars = Variables.empty
-            val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
+            val cfg = MountConfig.ViewConfig(expr, vars)
+            val cfgStr = EncodeJson.of[MountConfig].encode(cfg)
             val df = d </> f
             val maxAge = 7.seconds
-            val viewCache =
-              lift(Task.fromDisjunction(ViewCache.expireAt(nineteenEighty, maxAge)) ∘ (ra =>
-                ViewCache(
-                  MountConfig.ViewConfig(expr, vars), None, None, 0, None, None,
-                  maxAge.toSeconds, ra, ViewCache.Status.Pending, None, df, None))).into[Eff]
+            val vc = ViewCache.mk(cfg, maxAge.toSeconds, nineteenEighty, df)
 
             for {
-              vc    <- viewCache
               req   <- reqBuilder(d, f, cfgStr, `Cache-Control`(CacheDirective.`max-age`(7.seconds)))
               r     <- service(req)
               (res, mntd) = r
@@ -843,18 +835,15 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
           val expr1 = sqlB"α"
           val expr2 = sqlB"β"
           val vars = Variables.empty
-          val cfgStr1 = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr1, vars))
-          val cfgStr2 = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr2, vars))
+          val cfg1 = MountConfig.ViewConfig(expr1, vars)
+          val cfg2 = MountConfig.ViewConfig(expr2, vars)
+          val cfgStr1 = EncodeJson.of[MountConfig].encode(cfg1)
+          val cfgStr2 = EncodeJson.of[MountConfig].encode(cfg2)
           val df = d </> f
           val maxAge = 7.seconds
-          val viewCache =
-            lift(Task.fromDisjunction(ViewCache.expireAt(nineteenEighty, maxAge)) ∘ (ra =>
-              ViewCache(
-                MountConfig.ViewConfig(expr1, vars), None, None, 0, None, None,
-                maxAge.toSeconds, ra, ViewCache.Status.Pending, None, df, None))).into[Eff]
+          val vc = ViewCache.mk(cfg1, maxAge.toSeconds, nineteenEighty, df)
 
           for {
-            vc    <- viewCache
             _     <- lift(Request(
                        method = Method.PUT,
                        uri = pathUri(df))
@@ -942,18 +931,15 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             def mkCache(ex: ScopedExpr[Fix[Sql]]) = {
               val cfg = MountConfig.ViewConfig(ex, vars)
               val cfgStr = EncodeJson.of[MountConfig].encode(cfg)
-              val viewCache =
-                lift(Task.fromDisjunction(ViewCache.expireAt(nineteenEighty, maxAge)) ∘ (ra =>
-                  ViewCache.mk(cfg, maxAge.toSeconds, ra, df))).into[Eff]
+              val viewCache = ViewCache.mk(cfg, maxAge.toSeconds, nineteenEighty, df)
               (cfgStr, viewCache)
             }
             def modifyViewCache: ViewCache => ViewCache = _.copy(cacheReads = 42)
 
-            val (cfgStr1, viewCache1) = mkCache(expr1)
-            val (cfgStr2, viewCache2) = mkCache(expr2)
+            val (cfgStr1, vc1) = mkCache(expr1)
+            val (cfgStr2, vc2) = mkCache(expr2)
 
             for {
-              vc    <- viewCache2
               _     <- lift(setupRequest(maxAge, df).withBody(cfgStr1)).into[Eff] >>= (service)
               _     <- vcache.modify(df, modifyViewCache)
               put   <- lift(Request(
@@ -969,7 +955,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
             } yield {
               (body must_= s"updated ${printPath(df)}")         and
               (res.status must_= Ok)                            and
-              (vcg ∘ (_.copy(dataFile = df)) must beSome(if (expectFreshCache) vc else modifyViewCache(vc)))   and
+              (vcg ∘ (_.copy(dataFile = df)) must beSome(if (expectFreshCache) vc2 else modifyViewCache(vc2)))   and
               (mntd must_=== Set(MR.mountView(df, expr2, vars))) and
               (after must beSome(MountConfig.viewConfig(expr2, vars).right[MountingError]))
             }

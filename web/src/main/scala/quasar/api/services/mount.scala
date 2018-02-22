@@ -164,22 +164,32 @@ object mount {
   ): EitherT[Free[S, ?], ApiError, Unit] =
     for {
       dataFile      <- MF.tempFile(viewPath).leftMap(_.toApiError)
-      timeStamp     <- T.timestamp.liftM[ApiErrT]
-
-      refreshAfter  <- free.lift(Task.fromDisjunction(ViewCache.expireAt(timeStamp, maxAge))).into.liftM[ApiErrT]
+      refreshAfter  <- T.timestamp.liftM[ApiErrT]
       newViewCache  =  ViewCache.mk(viewConfig, maxAge.toSeconds, refreshAfter, dataFile)
       _             <- vcache.get(viewPath).fold(
                           κ(vcache.modify(viewPath, modifyViewCache(newViewCache))),
                           vcache.put(viewPath, newViewCache)).join.liftM[ApiErrT]
     } yield ()
 
-  private def modifyViewCache(nw: ViewCache)(old: ViewCache): ViewCache = {
+  private def modifyViewCache(nw: ViewCache)(old: ViewCache): ViewCache =
+    // TODO we should not recreate the cache if the ViewConfig hasn't changed
+    // However `if (MountConfig.equal.equal(nw.viewConfig, old.viewConfig))`
+    // only tests whether the toplevel definition has changed.
+    // At the moment we cannot detect any changes in underlying definitions.
+    // As soon as we support this, code can be changed to something like this:
+    // if (cacheDefinitionChanged)
+    //   <existing code>
+    // else
+    //   // only update maxAgeSeconds and refreshAfter (relative to maxAgeSeconds)
+    //   old.copy(
+    //     maxAgeSeconds = nw.maxAgeSeconds,
+    //     refreshAfter = old.refreshAfter.plusSeconds(nw.maxAgeSeconds - old.maxAgeSeconds))
     if (MountConfig.equal.equal(nw.viewConfig, old.viewConfig))
-      // only update maxAgeSeconds and refreshAfter (relative to maxAgeSeconds)
-      old.copy(
-        maxAgeSeconds = nw.maxAgeSeconds,
-        refreshAfter = old.refreshAfter.plusSeconds(nw.maxAgeSeconds - old.maxAgeSeconds))
+      // Let's keep the old cacheReads & lastUpdate if toplevel definition
+      // is unchanged
+      nw.copy(
+        cacheReads = old.cacheReads,
+        lastUpdate = old.lastUpdate)
     else
       nw
-  }
 }
