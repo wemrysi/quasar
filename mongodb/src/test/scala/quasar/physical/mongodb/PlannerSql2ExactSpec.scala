@@ -1379,7 +1379,9 @@ class PlannerSql2ExactSpec extends
     }
 
     "plan simple having filter" in {
-      val actual = plan(sqlE"select city from zips group by city having count(*) > 10")
+      // TODO qz-3686 (it's not mongo's job to catch parse failures)
+      // val actual = plan(sqlE"select city from zips group by city having count(*) > 10")
+      val actual = FileSystemError.UnsupportedOperation("`having` not implemented").left[Crystallized[WorkflowF]]
       val expected = (chain[Workflow](
         $read(collection("db", "zips")),
         $group(
@@ -1392,7 +1394,7 @@ class PlannerSql2ExactSpec extends
           reshape(sigil.Quasar -> $field("_id", "0")),
           ExcludeId)))
 
-      skipped("#3021")
+      skipped("qz-3686")
     }
 
     "prefer projection+filter over JS filter" in {
