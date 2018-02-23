@@ -166,8 +166,7 @@ object mount {
       tempFile      <- MF.tempFile(viewPath).leftMap(_.toApiError)
       timeStamp     <- T.timestamp.liftM[ApiErrT]
      
-      refreshAfter  <- free.lift(
-        Task.fromDisjunction(ViewCache.expireAt(timeStamp, maxAge))).into.liftM[ApiErrT]
+      refreshAfter  <- free.lift(Task.fromDisjunction(ViewCache.expireAt(timeStamp, maxAge))).into.liftM[ApiErrT]
       newViewCache  = ViewCache(
                        viewConfig = viewConfig,
                        lastUpdate = none,

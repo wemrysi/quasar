@@ -25,8 +25,7 @@ import quasar.fs.FileSystemError.PathErr
 import quasar.fs.PathError.PathNotFound
 import quasar.metastore._, KeyValueStore._, MetaStoreAccess._
 
-import java.sql.Timestamp
-import java.time.Duration
+import java.time.{Duration, Instant}
 
 import doobie.imports.ConnectionIO
 import scalaz._, Scalaz._
@@ -53,7 +52,7 @@ object VCache {
 
   type ExpirationsT[F[_], A] = WriterT[F, List[Expiration], A]
 
-  final case class Expiration(v: Timestamp)
+  final case class Expiration(v: Instant)
 
   object Expiration {
     implicit val order: Order[Expiration] =
@@ -102,9 +101,9 @@ object VCache {
           Tags.Min(
             vc >>= (c => c.lastUpdate ∘ (lu =>
               Expiration(
-                \/.fromTryCatchNonFatal (
-                  Timestamp.from(lu.toInstant.plus(Duration.ofSeconds(c.maxAgeSeconds)))
-                ) | maxTimestamp))))
+                \/.fromTryCatchNonFatal(
+                  lu.plus(Duration.ofSeconds(c.maxAgeSeconds))
+                ) | Instant.MAX))))
 
         W.tell(expirations).as(vc)
       }

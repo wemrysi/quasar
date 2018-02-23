@@ -30,7 +30,7 @@ import quasar.metastore.MetaStore.ShouldInitialize
 import quasar.sql._
 import quasar.Variables
 
-import java.sql.Timestamp
+import java.time.Instant
 
 import argonaut._, Argonaut._
 import doobie.imports._
@@ -101,7 +101,7 @@ class MetastoreServiceSpec extends quasar.Qspec {
       val (svc, srcMeta) = serviceWithMetaStore()
       val viewCache = ViewCache(
         MountConfig.ViewConfig(sqlB"α", Variables.empty), None, None, 0, None, None,
-        0, new Timestamp(0), ViewCache.Status.Pending, None, f, None)
+        0, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, f, None)
       val pvc = PathedViewCache(f, viewCache)
 
       (for {

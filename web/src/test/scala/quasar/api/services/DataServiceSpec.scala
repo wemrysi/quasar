@@ -34,13 +34,11 @@ import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount._, MountConfigArbitrary._
 import MountConfig.{ModuleConfig, ViewConfig, viewConfig0}
-import quasar.fs.mount.cache.{ViewCache, ViewCacheArbitrary}
+import quasar.fs.mount.cache.ViewCache
 import quasar.main.CoreEffIO
-import quasar.metastore.maxTimestamp
 import quasar.sql._
 import quasar.Variables
 
-import java.sql.Timestamp
 import java.time.{Duration, Instant}
 
 import argonaut.{Json, EncodeJson}
@@ -71,7 +69,6 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import FileSystemFixture.{ReadWriteT, ReadWrites, amendWrites}
   import PathError.pathNotFound
   import VCacheFixture._
-  import ViewCacheArbitrary._
 
   def service(mem: InMemState, mounts: MountingsConfig = MountingsConfig.empty): Service[Request, Response] =
     serviceRef(mem, mounts)._1
@@ -377,19 +374,16 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
 
       "respond with view cache data" >> {
         "fresh" >> prop {
-            (f: AFile, g: AFile, now: Instant, lastUpdate: Timestamp, maxAgeSecs: Int @@ RPositive) => {
+            (f: AFile, g: AFile, now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
             val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
-            val last = lastUpdate.toInstant
-            last.isBefore(Instant.MAX.minus(maxAge)) && now.isBefore(last.plus(maxAge)) && f ≠ g
+            lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isBefore(lastUpdate.plus(maxAge)) && f ≠ g
           } ==> {
             val expr = sqlB"""select { "α": 7 }"""
-
-            val mounts = Map[APath, MountConfig](f -> viewConfig0(expr))
-            val memState = InMemState.fromFiles(Map(g -> Vector(Data.Obj("α" -> Data._int(7)))))
-
             val viewCache = ViewCache(
               MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
-              maxAgeSecs.toLong, new Timestamp(0), ViewCache.Status.Pending, None, g, None)
+              maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
+            val mounts = Map[APath, MountConfig](f -> viewConfig0(expr))
+            val memState = InMemState.fromFiles(Map(g -> Vector(Data.Obj("α" -> Data._int(7)))))
 
             val (respA, respB, vc) = evalViewTest(now, mounts, memState) { (it, ir) =>
               (for {
@@ -409,19 +403,16 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
         }
 
         "stale" >> prop {
-            (f: AFile, g: AFile, now: Instant, lastUpdate: Timestamp, maxAgeSecs: Int @@ RPositive) => {
+            (f: AFile, g: AFile, now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
             val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
-            val last = lastUpdate.toInstant
-            last.isBefore(maxTimestamp.toInstant.minus(maxAge)) && now.isAfter(last.plus(maxAge)) && f ≠ g
+              lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isAfter(lastUpdate.plus(maxAge)) && f ≠ g
           } ==> {
             val expr = sqlB"""select { "α": 7 }"""
-
-            val mounts = Map[APath, MountConfig](f -> viewConfig0(expr))
-            val memState = InMemState.fromFiles(Map(g -> Vector(Data.Obj("α" -> Data._int(7)))))
-
             val viewCache = ViewCache(
               MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
-              maxAgeSecs.toLong, new Timestamp(0), ViewCache.Status.Pending, None, g, None)
+              maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
+            val mounts = Map[APath, MountConfig](f -> viewConfig0(expr))
+            val memState = InMemState.fromFiles(Map(g -> Vector(Data.Obj("α" -> Data._int(7)))))
 
             val (respA, respB, vc) = evalViewTest(now, mounts, memState) { (it, ir) =>
               (for {

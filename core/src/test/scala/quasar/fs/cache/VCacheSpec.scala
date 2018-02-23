@@ -29,7 +29,7 @@ import quasar.fs.mount.cache.ViewCacheArbitrary._
 import quasar.metastore._
 import quasar.sql._
 
-import java.sql.Timestamp
+import java.time.Instant
 
 import doobie.imports._
 import pathy.Path._
@@ -72,7 +72,7 @@ abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaS
     val expr = sqlB"α"
     val viewCache = ViewCache(
       MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
-      600L, new Timestamp(0), ViewCache.Status.Pending, None, dataFile, tmpDataFile.some)
+      600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, dataFile, tmpDataFile.some)
 
     evalWithFiles(
       vcache.put(f, viewCache) >> vcache.put(f, viewCache),
@@ -87,7 +87,7 @@ abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaS
     val expr = sqlB"α"
     val viewCache = ViewCache(
       MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
-      600L, new Timestamp(0), ViewCache.Status.Pending, None, dataFile, tmpDataFile.some)
+      600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, dataFile, tmpDataFile.some)
 
     evalWithFiles(
       vcache.put(f, viewCache) >>
@@ -107,7 +107,7 @@ abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaS
     val expr = sqlB"α"
     val viewCache = ViewCache(
       MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
-      600L, new Timestamp(0), ViewCache.Status.Pending, None, dataFile, tmpDataFile.some)
+      600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, dataFile, tmpDataFile.some)
 
     evalWithFiles(
       vcache.put(f, viewCache) >>
@@ -123,7 +123,7 @@ abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaS
     val expr = sqlB"α"
     val viewCache = ViewCache(
       MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
-      600L, new Timestamp(0), ViewCache.Status.Pending, None, dataFile, tmpDataFile.some)
+      600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, dataFile, tmpDataFile.some)
 
     evalWithFiles(
       vcache.compareAndPut(f, viewCache.some, viewCache),
@@ -138,7 +138,7 @@ abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaS
     val expr = sqlB"α"
     val viewCache = ViewCache(
       MountConfig.ViewConfig(expr, Variables.empty), None, None, 0, None, None,
-      600L, new Timestamp(0), ViewCache.Status.Pending, None, dataFile, tmpDataFile.some)
+      600L, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, dataFile, tmpDataFile.some)
 
     evalWithFiles(
       vcache.put(f, viewCache) >> vcache.delete(f),

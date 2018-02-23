@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar.contrib.pathy.AFile
 import quasar.fs.mount.MountConfig
 
-import java.sql.Timestamp
 import java.time.{Duration => JDuration, Instant}
 import scala.concurrent.duration._
 
@@ -28,13 +27,13 @@ import scalaz._, Scalaz._
 
 final case class ViewCache(
   viewConfig: MountConfig.ViewConfig,
-  lastUpdate: Option[Timestamp],
+  lastUpdate: Option[Instant],
   executionMillis: Option[Long],
   cacheReads: Int,
   assignee: Option[String],
-  assigneeStart: Option[Timestamp],
+  assigneeStart: Option[Instant],
   maxAgeSeconds: Long,
-  refreshAfter: Timestamp,
+  refreshAfter: Instant,
   status: ViewCache.Status,
   errorMsg: Option[String],
   dataFile: AFile,
@@ -51,12 +50,11 @@ object ViewCache {
   }
 
   // Hard coded to 80% of maxAge for now
-  def expireAt(ts: Instant, maxAge: Duration): Throwable \/ Timestamp =
-    \/.fromTryCatchNonFatal(Timestamp.from(
-      ts.plus(JDuration.ofMillis((maxAge.toMillis.toDouble * 0.8).toLong))))
+  def expireAt(ts: Instant, maxAge: Duration): Throwable \/ Instant =
+    \/.fromTryCatchNonFatal(ts.plus(JDuration.ofMillis((maxAge.toMillis.toDouble * 0.8).toLong)))
 
   implicit val equal: Equal[ViewCache] = {
-    implicit val equalTimestamp: Equal[Timestamp] = Equal.equalA
+    implicit val equalInstant: Equal[Instant] = Equal.equalA
 
     Equal.equal {
       case (ViewCache(l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12),

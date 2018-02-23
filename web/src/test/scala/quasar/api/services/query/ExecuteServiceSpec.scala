@@ -32,13 +32,12 @@ import quasar.fp.free.{foldMapNT, injectNT, liftFT}
 import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.fs._, InMemory._, mount._
-import quasar.fs.mount.cache.{ViewCache, ViewCacheArbitrary}
+import quasar.fs.mount.cache.ViewCache
 import quasar.fs.mount.MountConfig.viewConfig0
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.main.CoreEffIO
 import quasar.sql.{Positive => _, _}
 
-import java.sql.Timestamp
 import java.time.{Instant, Duration}
 
 import argonaut.{Json => AJson, _}, Argonaut._
@@ -68,7 +67,6 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
   import posixCodec.printPath
   import FileSystemError.executionFailed_
   import VCacheFixture.{Eff => _, _}
-  import ViewCacheArbitrary._
 
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
@@ -160,17 +158,16 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
     }
     "response with view cache headers" >> {
       "fresh" >> prop {
-          (now: Instant, lastUpdate: Timestamp, maxAgeSecs: Int @@ RPositive) => {
+          (now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
           val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
-          val last = lastUpdate.toInstant
-          last.isBefore(Instant.MAX.minus(maxAge)) && now.isBefore(last.plus(maxAge))
+          lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isBefore(lastUpdate.plus(maxAge))
         } ==> {
           val f = rootDir </> file("f")
           val g = rootDir </> file("g")
           val expr = sqlB"""select { "α": 7 }"""
           val viewCache = ViewCache(
             MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
-            maxAgeSecs.toLong, new Timestamp(0), ViewCache.Status.Pending, None, g, None)
+            maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
           val mounts = Map[APath, MountConfig](f -> viewConfig0(expr))
 
           val (resp, vc) = evalViewTest(now, mounts, InMemState.empty) { (it, ir) =>
@@ -191,17 +188,16 @@ class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s
       }
 
       "stale" >> prop {
-          (now: Instant, lastUpdate: Timestamp, maxAgeSecs: Int @@ RPositive) => {
+          (now: Instant, lastUpdate: Instant, maxAgeSecs: Int @@ RPositive) => {
           val maxAge = Duration.ofSeconds(maxAgeSecs.toLong)
-          val last = lastUpdate.toInstant
-          last.isBefore(Instant.MAX.minus(maxAge)) && now.isAfter(last.plus(maxAge))
+            lastUpdate.isBefore(Instant.MAX.minus(maxAge)) && now.isAfter(lastUpdate.plus(maxAge))
         } ==> {
           val f = rootDir </> file("f")
           val g = rootDir </> file("g")
           val expr = sqlB"""select { "α": 7 }"""
           val viewCache = ViewCache(
             MountConfig.ViewConfig(expr, Variables.empty), lastUpdate.some, None, 0, None, None,
-            maxAgeSecs.toLong, new Timestamp(0), ViewCache.Status.Pending, None, g, None)
+            maxAgeSecs.toLong, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, g, None)
           val mounts = Map[APath, MountConfig](f -> viewConfig0(expr))
 
           val (resp, vc) = evalViewTest(now, mounts, InMemState.empty) { (it, ir) =>

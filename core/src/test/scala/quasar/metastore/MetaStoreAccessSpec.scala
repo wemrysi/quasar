@@ -23,7 +23,7 @@ import quasar.fs.mount.{ConnectionUri, MountConfig, MountType}
 import quasar.fs.mount.cache.ViewCache
 import quasar.sql._
 
-import java.sql.Timestamp
+import java.time.Instant
 
 import doobie.util.transactor.Transactor
 import eu.timepit.refined.numeric.NonNegative
@@ -45,11 +45,10 @@ abstract class MetaStoreAccessSpec extends Specification with TaskChecker with M
   "static query checks" >> {
 
     val f = rootDir </> file("α")
-    val timestamp = new Timestamp(0)
-
+    val instant = Instant.ofEpochSecond(0)
     val viewCache = ViewCache(
       MountConfig.ViewConfig(sqlB"α", Variables.empty), None, None, 0, None, None,
-      0, timestamp, ViewCache.Status.Pending, None, f, None)
+      0, instant, ViewCache.Status.Pending, None, f, None)
 
     val pathedMountConfig = PathedMountConfig(
       rootDir </> file("mimir"),
@@ -73,9 +72,9 @@ abstract class MetaStoreAccessSpec extends Specification with TaskChecker with M
     check(Queries.updateViewCache(f, viewCache))
     check(Queries.updateViewCacheErrorMsg(f, "err"))
     check(Queries.deleteViewCache(f))
-    check(Queries.staleCachedViews(timestamp))
-    check(Queries.cacheRefreshAssigneStart(f, "α", timestamp, f))
-    check(Queries.updatePerSuccesfulCacheRefresh(f, timestamp, 0, timestamp))
+    check(Queries.staleCachedViews(instant))
+    check(Queries.cacheRefreshAssigneStart(f, "α", instant, f))
+    check(Queries.updatePerSuccesfulCacheRefresh(f, instant, 0, instant))
   }
 
   "fsMounts" should {
