@@ -139,27 +139,39 @@ trait RelationsLib extends Library {
       // TODO: partial evaluation for Int and Dec and possibly other constants
       case Sized(Type.Const(Data.Dec(mid)), Type.Const(Data.Dec(lo)), Type.Const(Data.Dec(hi))) =>
         Type.Const(Data.Bool(lo <= mid && mid <= hi))
+
       case Sized(Type.Const(Data.Int(mid)), Type.Const(Data.Int(lo)), Type.Const(Data.Int(hi))) =>
         Type.Const(Data.Bool(lo <= mid && mid <= hi))
+
       case Sized(Type.Const(Data.Str(mid)), Type.Const(Data.Str(lo)), Type.Const(Data.Str(hi))) =>
         Type.Const(Data.Bool(lo <= mid && mid <= hi))
+
       case Sized(Type.Const(Data.OffsetDateTime(mid)), Type.Const(Data.OffsetDateTime(lo)), Type.Const(Data.OffsetDateTime(hi))) =>
         Type.Const(Data.Bool(lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0))
+
       case Sized(Type.Const(Data.OffsetTime(mid)), Type.Const(Data.OffsetTime(lo)), Type.Const(Data.OffsetTime(hi))) =>
         Type.Const(Data.Bool(lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0))
+
       case Sized(Type.Const(Data.OffsetDate(mid)), Type.Const(Data.OffsetDate(lo)), Type.Const(Data.OffsetDate(hi))) =>
         Type.Const(Data.Bool(lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0))
+
       case Sized(Type.Const(Data.LocalDateTime(mid)), Type.Const(Data.LocalDateTime(lo)), Type.Const(Data.LocalDateTime(hi))) =>
         Type.Const(Data.Bool(lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0))
+
       case Sized(Type.Const(Data.LocalTime(mid)), Type.Const(Data.LocalTime(lo)), Type.Const(Data.LocalTime(hi))) =>
         Type.Const(Data.Bool(lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0))
+
       case Sized(Type.Const(Data.LocalDate(mid)), Type.Const(Data.LocalDate(lo)), Type.Const(Data.LocalDate(hi))) =>
         Type.Const(Data.Bool(lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0))
+
       case Sized(Type.Const(Data.Interval(mid)), Type.Const(Data.Interval(lo)), Type.Const(Data.Interval(hi))) =>
         Type.Const(Data.Bool(lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0))
+
       case Sized(Type.Const(Data.Bool(mid)), Type.Const(Data.Bool(lo)), Type.Const(Data.Bool(hi))) =>
         Type.Const(Data.Bool(((lo == mid) && (mid == hi)) || (!lo && ((!mid && hi) || (mid && hi)))))
+
       case Sized(_, _, _) => Type.Bool
+
       case _ => Type.Bool
     },
     basicUntyper)
