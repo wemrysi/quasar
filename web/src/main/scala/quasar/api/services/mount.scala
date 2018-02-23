@@ -173,17 +173,16 @@ object mount {
 
   private def modifyViewCache(nw: ViewCache)(old: ViewCache): ViewCache =
     // TODO we should not recreate the cache if the ViewConfig hasn't changed
-    // However `if (MountConfig.equal.equal(nw.viewConfig, old.viewConfig))`
-    // only tests whether the toplevel definition has changed.
-    // At the moment we cannot detect any changes in underlying definitions.
-    // As soon as we support this, code can be changed to something like this:
-    // if (cacheDefinitionChanged)
-    //   <existing code>
-    // else
+    // However, we first need to invalidate caches when an underlying view or
+    // module changes, otherwise caches don't get invalidated when they should.
+    // When this is implemented we can use something like this:
+    // if (MountConfig.equal.equal(nw.viewConfig, old.viewConfig))
     //   // only update maxAgeSeconds and refreshAfter (relative to maxAgeSeconds)
     //   old.copy(
     //     maxAgeSeconds = nw.maxAgeSeconds,
     //     refreshAfter = old.refreshAfter.plusSeconds(nw.maxAgeSeconds - old.maxAgeSeconds))
+    // else
+    //   nw
     if (MountConfig.equal.equal(nw.viewConfig, old.viewConfig))
       // Let's keep the old cacheReads & lastUpdate if toplevel definition
       // is unchanged
