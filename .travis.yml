@@ -26,8 +26,7 @@ env:
     - CONNECTOR=mimir
     - CONNECTOR=mongodb_3_2
     - CONNECTOR=mongodb_3_4
-    - CONNECTOR=mongodb_3_4_3
-    - CONNECTOR=mongodb_3_4_4
+    - CONNECTOR=mongodb_3_4_13
     - CONNECTOR=mongodb_3_6
     - CONNECTOR=mongodb_read_only
     # - CONNECTOR=spark_local_test # no spark for 2.12
