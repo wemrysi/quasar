@@ -247,13 +247,13 @@ object SValue extends SValueInstances {
     case CLong(n)                      => SDecimal(BigDecimal(n))
     case CDouble(n)                    => SDecimal(BigDecimal(n))
     case CNum(n)                       => SDecimal(n)
-    case COffsetDateTime(d)            => sys.error("todo") // Should this be SString(d.toString)?
-    case COffsetTime(d)                => sys.error("todo") // Should this be SString(d.toString)?
-    case COffsetDate(d)                => sys.error("todo") // Should this be SString(d.toString)?
-    case CLocalDateTime(d)             => sys.error("todo") // Should this be SString(d.toString)?
-    case CLocalTime(d)                 => sys.error("todo") // Should this be SString(d.toString)?
-    case CLocalDate(d)                 => sys.error("todo") // Should this be SString(d.toString)?
-    case CDuration(p)                  => sys.error("todo") // Should this be SString(d.toString)?
+    case COffsetDateTime(d)            => sys.error("unsupported")
+    case COffsetTime(d)                => sys.error("unsupported")
+    case COffsetDate(d)                => sys.error("unsupported")
+    case CLocalDateTime(d)             => sys.error("unsupported")
+    case CLocalTime(d)                 => sys.error("unsupported")
+    case CLocalDate(d)                 => sys.error("unsupported")
+    case CDuration(p)                  => sys.error("unsupported")
     case CArray(as, CArrayType(aType)) => SArray(as.map(a => fromCValue(aType(a)))(breakOut))
     case CNull                         => SNull
     case CEmptyArray                   => SArray(Vector())
