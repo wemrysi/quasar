@@ -1732,6 +1732,28 @@ abstract class StdLibSpec extends Qspec {
             commute(Add(_, _).embed, Data.LocalDateTime(x), Data.Interval(i), Data.LocalDateTime(result))
           }
         }
+
+        "add and subtract 1 month from Jan 31" >> {
+          val x: JLocalDate = JLocalDate.of(2016, 1, 31)
+          val i: DateTimeInterval = DateTimeInterval.ofMonths(1)
+
+          binary(
+            (date, interval) => Subtract(Add(date, interval).embed, interval).embed,
+            Data.LocalDate(x),
+            Data.Interval(i),
+            Data.LocalDate(JLocalDate.of(2016, 1, 29)))
+        }
+
+        "add and subtract 1 year from Feb 29" >> {
+          val x: JLocalDate = JLocalDate.of(2016, 2, 29)
+          val i: DateTimeInterval = DateTimeInterval.ofYears(1)
+
+          binary(
+            (date, interval) => Subtract(Add(date, interval).embed, interval).embed,
+            Data.LocalDate(x),
+            Data.Interval(i),
+            Data.LocalDate(JLocalDate.of(2016, 2, 28)))
+        }
       }
 
       "Multiply" >> {
