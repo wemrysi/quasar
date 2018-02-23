@@ -16,14 +16,23 @@
 
 package quasar.main
 
-import quasar._
 import slamdata.Predef._
+
+import quasar._
 import quasar.RepresentableDataGenerators._
 
-//import java.time._
-import scalaz._, Scalaz._
-import org.scalacheck.Arbitrary
+import java.time.{
+  LocalDate => JLocalDate,
+  LocalDateTime => JLocalDateTime,
+  LocalTime => JLocalTime,
+  OffsetDateTime => JOffsetDateTime,
+  OffsetTime => JOffsetTime,
+  ZoneOffset
+}
+
 import eu.timepit.refined.auto._
+import org.scalacheck.Arbitrary
+import scalaz._, Scalaz._
 
 class PrettifySpecs extends quasar.Qspec {
   import Prettify._
@@ -196,11 +205,42 @@ class PrettifySpecs extends quasar.Qspec {
       render(Data.Dec(1.0)) must_== Aligned.Right("1.0")
     }
 
-//    TODO: Come back to this
-//    "render Timestamp" in {
-//      val now = Instant.now
-//      render(Data.Timestamp(now)) must_== Aligned.Right(now.toString)
-//    }
+    val localDate = JLocalDate.of(2016, 2, 29)
+    val localTime = JLocalTime.of(6, 7, 8, 9)
+    val offset = ZoneOffset.UTC
+
+    "render OffsetDateTime" in {
+      val dt = JOffsetDateTime.of(localDate, localTime, offset)
+      render(Data.OffsetDateTime(dt)) must_== Aligned.Right("2016-02-29T06:07:08.000000009Z")
+    }
+
+    "render OffsetDate" in {
+      val dt = OffsetDate(localDate, offset)
+      render(Data.OffsetDate(dt)) must_== Aligned.Right("2016-02-29Z")
+    }
+
+    "render OffsetTime" in {
+      val dt = JOffsetTime.of(localTime, offset)
+      render(Data.OffsetTime(dt)) must_== Aligned.Right("06:07:08.000000009Z")
+    }
+
+    "render LocalDateTime" in {
+      val dt = JLocalDateTime.of(localDate, localTime)
+      render(Data.LocalDateTime(dt)) must_== Aligned.Right("2016-02-29T06:07:08.000000009")
+    }
+
+    "render LocalDate" in {
+      render(Data.LocalDate(localDate)) must_== Aligned.Right("2016-02-29")
+    }
+
+    "render LocalTime" in {
+      render(Data.LocalTime(localTime)) must_== Aligned.Right("06:07:08.000000009")
+    }
+
+    "render DateTimeInterval" in {
+      val i = DateTimeInterval(2, 3, 4, 5, 678)
+      render(Data.Interval(i)) must_== Aligned.Right("P2Y3M4DT5.000000678S")
+    }
   }
 
   "parse" should {
