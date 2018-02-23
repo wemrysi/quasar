@@ -35,7 +35,7 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
   import trans._
   import SliceTransform._
 
-  case class TableIndex(private[table] val indices: List[SliceIndex]) {
+  class TableIndex(private[table] val indices: List[SliceIndex]) {
 
     /**
       * Return the set of values we've seen for this group key.
@@ -170,7 +170,7 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
     * are valid for particular key combinations. For best results
     * valueSlice should already be materialized.
     */
-  case class SliceIndex(
+  class SliceIndex(
       private[table] val vals: mutable.Map[Int, mutable.Set[RValue]],
       private[table] val dict: mutable.Map[(Int, RValue), ArrayIntList],
       private[table] val keyset: mutable.Set[Seq[RValue]],
