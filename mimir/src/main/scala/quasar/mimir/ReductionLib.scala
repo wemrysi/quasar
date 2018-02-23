@@ -17,15 +17,13 @@
 package quasar.mimir
 
 import quasar.precog.common._
-import quasar.precog.util.NumericComparisons
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
 
+import scala.collection.mutable
+
 import scalaz._
 import Scalaz._
-import java.time._
-
-import scala.collection.mutable
 
 class LongAdder {
   var t = 0L
@@ -59,7 +57,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     val ReductionNamespace = Vector()
 
     override def _libReduction =
-      super._libReduction ++ Set(Count, Max, Min, MaxTime, MinTime, Sum, Mean, GeometricMean, SumSq, Variance, StdDev, Forall, Exists)
+      super._libReduction ++ Set(Count, Max, Min, Sum, Mean, GeometricMean, SumSq, Variance, StdDev, Forall, Exists)
 
     val CountMonoid = implicitly[Monoid[Count.Result]]
     object Count extends Reduction(ReductionNamespace, "count") {
@@ -84,188 +82,6 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       def extract(res: Result): Table = Table.constLong(Set(res))
 
       def extractValue(res: Result) = Some(CNum(res))
-    }
-
-    // TODO: figure out DateTime, Offset variants
-
-    object MaxTime extends Reduction(ReductionNamespace, "maxTime") {
-      type Result = Option[LocalTime]
-
-      implicit val monoid = new Monoid[Result] {
-        def zero = None
-        def append(left: Result, right: => Result): Result = {
-          (for {
-            l <- left
-            r <- right
-          } yield {
-            val res = NumericComparisons.compare(l, r)
-            if (res > 0) l
-            else r
-          }) orElse left orElse right
-        }
-      }
-
-      val tpe = UnaryOperationType(JLocalTimeT, JLocalTimeT)
-
-      def reducer: Reducer[Result] = new CReducer[Result] {
-        def reduce(schema: CSchema, range: Range): Result = {
-          val maxs = schema.columns(JLocalTimeT) map {
-            case col: LocalTimeColumn =>
-              var zmin: LocalTime = LocalTime.MIN
-              val seen = RangeUtil.loopDefined(range, col) { i =>
-                val z = col(i)
-                if (NumericComparisons.compare(z, zmin) > 0) zmin = z
-              }
-              if (seen) Some(zmin) else None
-
-            case _ => None
-          }
-
-          if (maxs.isEmpty) None else maxs.suml(monoid)
-        }
-      }
-
-      def extract(res: Result): Table =
-        res map { dt =>
-          Table.constLocalTime(Set(dt))
-        } getOrElse Table.empty
-
-      def extractValue(res: Result) = res map { CLocalTime(_) }
-    }
-
-    object MinTime extends Reduction(ReductionNamespace, "minTime") {
-      type Result = Option[LocalTime]
-
-      implicit val monoid = new Monoid[Result] {
-        def zero = None
-        def append(left: Result, right: => Result): Result = {
-          (for {
-            l <- left
-            r <- right
-          } yield {
-            val res = NumericComparisons.compare(l, r)
-            if (res < 0) l
-            else r
-          }) orElse left orElse right
-        }
-      }
-
-      val tpe = UnaryOperationType(JLocalTimeT, JLocalTimeT)
-
-      def reducer: Reducer[Result] = new CReducer[Result] {
-        def reduce(schema: CSchema, range: Range): Result = {
-          val maxs = schema.columns(JLocalTimeT) map {
-            case col: LocalTimeColumn =>
-              var zmax: LocalTime = LocalTime.MAX
-              val seen = RangeUtil.loopDefined(range, col) { i =>
-                val z = col(i)
-                if (NumericComparisons.compare(z, zmax) < 0) zmax = z
-              }
-              if (seen) Some(zmax) else None
-
-            case _ => None
-          }
-
-          if (maxs.isEmpty) None else maxs.suml(monoid)
-        }
-      }
-
-      def extract(res: Result): Table =
-        res map { dt =>
-          Table.constLocalTime(Set(dt))
-        } getOrElse Table.empty
-
-      def extractValue(res: Result) = res map { CLocalTime(_) }
-    }
-
-    object MaxDate extends Reduction(ReductionNamespace, "maxDate") {
-      type Result = Option[LocalDate]
-
-      implicit val monoid = new Monoid[Result] {
-        def zero = None
-        def append(left: Result, right: => Result): Result = {
-          (for {
-            l <- left
-            r <- right
-          } yield {
-            val res = NumericComparisons.compare(l, r)
-            if (res > 0) l
-            else r
-          }) orElse left orElse right
-        }
-      }
-
-      val tpe = UnaryOperationType(JLocalDateT, JLocalDateT)
-
-      def reducer: Reducer[Result] = new CReducer[Result] {
-        def reduce(schema: CSchema, range: Range): Result = {
-          val maxs = schema.columns(JLocalDateT) map {
-            case col: LocalDateColumn =>
-              var zmin: LocalDate = LocalDate.MIN
-              val seen = RangeUtil.loopDefined(range, col) { i =>
-                val z = col(i)
-                if (NumericComparisons.compare(z, zmin) > 0) zmin = z
-              }
-              if (seen) Some(zmin) else None
-
-            case _ => None
-          }
-
-          if (maxs.isEmpty) None else maxs.suml(monoid)
-        }
-      }
-
-      def extract(res: Result): Table =
-        res map { dt =>
-          Table.constLocalDate(Set(dt))
-        } getOrElse Table.empty
-
-      def extractValue(res: Result) = res map { CLocalDate(_) }
-    }
-
-    object MinDate extends Reduction(ReductionNamespace, "minDate") {
-      type Result = Option[LocalDate]
-
-      implicit val monoid = new Monoid[Result] {
-        def zero = None
-        def append(left: Result, right: => Result): Result = {
-          (for {
-            l <- left
-            r <- right
-          } yield {
-            val res = NumericComparisons.compare(l, r)
-            if (res < 0) l
-            else r
-          }) orElse left orElse right
-        }
-      }
-
-      val tpe = UnaryOperationType(JLocalDateT, JLocalDateT)
-
-      def reducer: Reducer[Result] = new CReducer[Result] {
-        def reduce(schema: CSchema, range: Range): Result = {
-          val maxs = schema.columns(JLocalDateT) map {
-            case col: LocalDateColumn =>
-              var zmax: LocalDate = LocalDate.MAX
-              val seen = RangeUtil.loopDefined(range, col) { i =>
-                val z = col(i)
-                if (NumericComparisons.compare(z, zmax) < 0) zmax = z
-              }
-              if (seen) Some(zmax) else None
-
-            case _ => None
-          }
-
-          if (maxs.isEmpty) None else maxs.suml(monoid)
-        }
-      }
-
-      def extract(res: Result): Table =
-        res map { dt =>
-          Table.constLocalDate(Set(dt))
-        } getOrElse Table.empty
-
-      def extractValue(res: Result) = res map { CLocalDate(_) }
     }
 
     object Max extends Reduction(ReductionNamespace, "max") {

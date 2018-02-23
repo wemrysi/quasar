@@ -33,8 +33,6 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
     val TimeNamespace = Vector("std", "time")
 
     override def _lib1 = super._lib1 ++ Set(
-//      GetMillis,
-
       OffsetDate,
       OffsetDateTime,
       OffsetTime,
@@ -42,11 +40,6 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       LocalDateTime,
       LocalTime,
       Duration,
-//      MillisToISO
-//      Date,
-//      Time,
-//      TimeZone,
-//      Season,
 
       ExtractCentury,
       ExtractDayOfMonth,
@@ -83,156 +76,9 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       TruncQuarter,
       TruncSecond,
       TruncWeek,
-      TruncYear
-//      StartOfDay
-    )
+      TruncYear)
 
-    override def _lib2 = super._lib2 ++ Set(
-//      YearsPlus,
-//      MonthsPlus,
-//      WeeksPlus,
-//      DaysPlus,
-//      HoursPlus,
-//      MinutesPlus,
-//      SecondsPlus,
-//      NanosPlus,
-//
-//      YearsBetween,
-//      MonthsBetween,
-//      WeeksBetween,
-//      DaysBetween,
-//      HoursBetween,
-//      MinutesBetween,
-//      SecondsBetween
-
-//      MinTimeOf,
-//      MaxTimeOf
-    )
-
-
-    trait ExtremeTime extends Op2F2
-
-//    object MinTimeOf extends Op2F2(TimeNamespace, "minTimeOf") with ExtremeTime {
-//      def computeExtreme(t1: ZonedDateTime, t2: ZonedDateTime): ZonedDateTime = {
-//        val res: Int = NumericComparisons.compare(t1, t2)
-//        if (res < 0) t1
-//        else t2
-//      }
-//    }
-//
-//    object MaxTimeOf extends Op2F2(TimeNamespace, "maxTimeOf") with ExtremeTime {
-//      def computeExtreme(t1: ZonedDateTime, t2: ZonedDateTime): ZonedDateTime = {
-//        val res: Int = NumericComparisons.compare(t1, t2)
-//        if (res > 0) t1
-//        else t2
-//      }
-//    }
-
-    // TODO: replace
-//    trait TimestampPlus extends Op2F2 {
-//      val tpe = BinaryOperationType(JTimestampT, JNumberT, JTimestampT)
-//      def f2: F2 = CF2P("builtin::time::timePlus") {
-//        case (AsInstantCol(c1), c2: LongColumn) =>
-//          new Map2Column(c1, c2) with InstantColumn {
-//            def apply(row: Int) = plus(c1(row), c2(row).toInt)
-//          }
-//
-//        case (AsInstantCol(c1), c2: NumColumn) =>
-//          new Map2Column(c1, c2) with InstantColumn {
-//            def apply(row: Int) = plus(c1(row), c2(row).toInt)
-//          }
-//
-//        case (AsInstantCol(c1), c2: DoubleColumn) =>
-//          new Map2Column(c1, c2) with InstantColumn {
-//            def apply(row: Int) = plus(c1(row), c2(row).toInt)
-//          }
-//      }
-//
-//      def plus(d: Instant, i: Int): Instant
-//    }
-
-    // TODO: remove
-//    object SecondsPlus extends Op2F2(TimeNamespace, "secondsPlus") with TimestampPlus {
-//      def plus(d: Instant, i: Int) = d.plusSeconds(i)
-//    }
-//
-//    object NanosPlus extends Op2F2(TimeNamespace, "nanosPlus") with TimestampPlus {
-//      def plus(d: Instant, i: Int) = d.plusNanos(i)
-//    }
-
-//    trait TimeBetween extends Op2F2 {
-//      val tpe = BinaryOperationType(InstantLikeT, InstantLikeT, JNumberT)
-//      def f2: F2 = CF2P("builtin::time::timeBetween") {
-//        case (AsInstantCol(c1), AsInstantCol(c2)) =>
-//
-//        new Map2Column(c1, c2) with LongColumn {
-//          def apply(row: Int) = between(c1(row), c2(row))
-//        }
-//      }
-//
-//      def between(d1: Instant, d2: Instant): Long
-//    }
-
-//    object YearsBetween extends Op2F2(TimeNamespace, "yearsBetween") with TimeBetween {
-//      def between(d1: Instant, d2: Instant) = ChronoUnit.YEARS.between(d1, d2)
-//    }
-//
-//    object MonthsBetween extends Op2F2(TimeNamespace, "monthsBetween") with TimeBetween {
-//      def between(d1: Instant, d2: Instant) = ChronoUnit.MONTHS.between(d1, d2)
-//    }
-//
-//    object WeeksBetween extends Op2F2(TimeNamespace, "weeksBetween") with TimeBetween {
-//      def between(d1: Instant, d2: Instant) = ChronoUnit.WEEKS.between(d1, d2)
-//     }
-//
-//    object DaysBetween extends Op2F2(TimeNamespace, "daysBetween") with TimeBetween {
-//      def between(d1: Instant, d2: Instant) = ChronoUnit.DAYS.between(d1, d2)
-//    }
-//
-//    object HoursBetween extends Op2F2(TimeNamespace, "hoursBetween") with TimeBetween {
-//      def between(d1: Instant, d2: Instant) = ChronoUnit.HOURS.between(d1, d2)
-//    }
-//
-//    object MinutesBetween extends Op2F2(TimeNamespace, "minutesBetween") with TimeBetween {
-//      def between(d1: Instant, d2: Instant) = ChronoUnit.MINUTES.between(d1, d2)
-//    }
-//
-//    object SecondsBetween extends Op2F2(TimeNamespace, "secondsBetween") with TimeBetween {
-//      def between(d1: Instant, d2: Instant) = ChronoUnit.SECONDS.between(d1, d2)
-//    }
-
-    // TODO: rename to "toTimestamp"
-//    object MillisToISO extends Op1F1(TimeNamespace, "millisToISO") {
-//      val tpe = UnaryOperationType(JNumberT, JTimestampT)
-//      def f1: F1 = CF1P("builtin::time::millisToIso") {
-//        case c1: LongColumn => new InstantColumn {
-//          def isDefinedAt(row: Int) = c1.isDefinedAt(row)
-//
-//          def apply(row: Int) = {
-//            val time = c1(row)
-//            Instant.ofEpochMilli(time)
-//          }
-//        }
-//
-//        case c1: NumColumn => new InstantColumn {
-//          def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c1(row) >= Long.MinValue && c1(row) <= Long.MaxValue
-//
-//          def apply(row: Int) = {
-//            val time = c1(row)
-//            Instant.ofEpochMilli(time.toLong)
-//          }
-//        }
-//
-//        case c1: DoubleColumn => new InstantColumn {
-//          def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c1(row) >= Long.MinValue && c1(row) <= Long.MaxValue
-//
-//          def apply(row: Int) = {
-//            val time = c1(row)
-//            Instant.ofEpochMilli(time.toLong)
-//          }
-//        }
-//      }
-//    }
+    override def _lib2 = super._lib2
 
     val ExtractEpoch = new Op1F1(TimeNamespace, "extractEpoch") {
       val tpe = UnaryOperationType(JOffsetDateTimeT, JNumberT)
