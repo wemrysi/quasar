@@ -124,7 +124,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
                       val node = ThetaJoin(leftGraph.root, rightGraph.root, on0, jtype, repair)
                       val newGraph = leftGraph :++ rightGraph
 
-                      (graph.overwriteAtRoot(node) :++ leftGraph :++ rightGraph).point[F]
+                      (graph0.overwriteAtRoot(node) :++ newGraph).point[F]
                     }, PlannerErrorME[F].raiseError[QSUGraph](err))
                 }
               }.join
@@ -161,24 +161,38 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
                 }
               }
             }
-            case (INil(), ICons(rightTarget, INil())) =>
-              unifyShapePreservingM[F](graph0, right.root, NonEmptyList(rightTarget.root))("right_source", "right_target") {
-                case (sym, _, fms) => {
+            case (INil(), ICons(rightTarget, INil())) => {
+              val unify =
+                UnifyTargets[T, F](withName[F](_))(graph0, right.root, NonEmptyList(rightTarget.root))("right_source", "right_target")
+
+              unify >>= {
+                case (newSrc, original, fms) => {
                   val rightSym = rightTarget.root
 
-                  val on: Option[JoinFunc] = joinFunc.traverseM({
+                  val on: F[JoinFunc] = joinFunc.traverseM({
                     case -\/(side) => side.point[FreeMapA].some
                     case \/-(g) => g.root match {
-                      case `rightSym` => fms.head.as[JoinSide](RightSide).some
+                      case `rightSym` => fms.head.as[JoinSide](LeftSide).some
                       case _ => none
                     }
-                  })
+                  }).cata(_.point[F], PlannerErrorME[F].raiseError[JoinFunc](err))
 
-                  on.cata(
-                    on0 => (ThetaJoin(left.root, sym, on0, jtype, combiner): QScriptUniform[Symbol]).point[F],
-                    PlannerErrorME[F].raiseError[QScriptUniform[Symbol]](err))
+                  val repair: JoinFunc = combiner.map({
+                    case LeftSide => (LeftSide: JoinSide).point[FreeMapA]
+                    case RightSide => original.as[JoinSide](RightSide)
+                  }).join
+
+                  val node = on map (ThetaJoin(left.root, newSrc.root, _, jtype, repair))
+
+                  if (newSrc.root === right.root)
+                    node map (graph0.overwriteAtRoot(_))
+                  else
+                    (node >>= (withName[F](_))) >>= { inter =>
+                      node map (n => graph0.overwriteAtRoot(n) :++ inter :++ newSrc)
+                    }
                 }
               }
+            }
             case _ =>
               PlannerErrorME[F].raiseError[QSUGraph](
                 InternalError(s"Invalid join condition, $cond, must be a mappable function of $left and $right.", None))
