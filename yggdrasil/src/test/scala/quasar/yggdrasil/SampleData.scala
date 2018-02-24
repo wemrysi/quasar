@@ -55,8 +55,7 @@ object SampleData extends SJValueGenerators with RCValueGenerators {
       depth   <- choose(0, 1)
       jschema <- schema(depth)
       (idCount, data) <- genEventColumns(jschema)
-    }
-    yield {
+    } yield {
       SampleData(
         data.sorted flatMap {
           // Sometimes the assembly process will generate overlapping values which will
@@ -64,10 +63,8 @@ object SampleData extends SJValueGenerators with RCValueGenerators {
           // out here than prevent it from happening in the first place.
           case (ids, jv) => try { Some(RValue.fromJValueRaw(toRecord(ids, assemble(jv)))) } catch { case _ : RuntimeException => None }
         },
-        Some((idCount, jschema))
-      )
-    }
-  )
+        Some((idCount, jschema)))
+    })
 
   def distinctBy[T, C[X] <: Seq[X], S](c: C[T])(key: T => S)(implicit cbf: CanBuildFrom[C[T], T, C[T]]): C[T] = {
     val builder = cbf()
@@ -99,8 +96,7 @@ object SampleData extends SJValueGenerators with RCValueGenerators {
         sampleData <- arbitrary(sample)
       } yield {
         SampleData(sampleData.data.sortBy(_.toJValue), sampleData.schema)
-      }
-    )
+      })
   }
 
   def shuffle(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = {
@@ -120,8 +116,7 @@ object SampleData extends SJValueGenerators with RCValueGenerators {
         sampleData <- arbitrary(sample)
       } yield {
         SampleData(sampleData.data.distinct, sampleData.schema)
-      }
-    )
+      })
   }
 
   def distinctKeys(sample: Arbitrary[SampleData]) : Arbitrary[SampleData] = {
@@ -130,8 +125,7 @@ object SampleData extends SJValueGenerators with RCValueGenerators {
         sampleData <- arbitrary(sample)
       } yield {
         SampleData(distinctBy(sampleData.data)(_ \ "keys"), sampleData.schema)
-      }
-    )
+      })
   }
 
   def distinctValues(sample: Arbitrary[SampleData]) : Arbitrary[SampleData] = {
@@ -140,8 +134,7 @@ object SampleData extends SJValueGenerators with RCValueGenerators {
         sampleData <- arbitrary(sample)
       } yield {
         SampleData(distinctBy(sampleData.data)(_ \ "value"), sampleData.schema)
-      }
-    )
+      })
   }
 
   def duplicateRows(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = {
@@ -189,6 +182,3 @@ object SampleData extends SJValueGenerators with RCValueGenerators {
     Arbitrary(gen)
   }
 }
-
-
-

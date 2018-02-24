@@ -36,6 +36,16 @@ object EJson {
   def fromExt[T](e: Extension[T])(implicit T: Corecursive.Aux[T, EJson]): T =
     ExtEJson(e).embed
 
+  def toJson[A](f: A => Option[String]): EJson[A] => Option[Json[A]] = {
+    def handleExt(ext: Extension[A]): Option[Obj[A]] =
+      Extension.Optics.map[A]
+        .getOption(ext)
+        .flatMap(_ traverse { case (k, v) => f(k) strengthR v })
+        .map(kvs => Obj(ListMap(kvs : _*)))
+
+    _.run.bitraverse(handleExt, some) map (Coproduct(_))
+  }
+
   def arr[T](xs: T*)(implicit T: Corecursive.Aux[T, EJson]): T =
     fromCommon(Arr(xs.toList))
 
