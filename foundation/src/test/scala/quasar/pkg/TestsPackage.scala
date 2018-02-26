@@ -98,10 +98,7 @@ trait ScalacheckSupport {
 
   // This is a hack to avoid underflow and overflow exceptions during tests. It's still a problem.
   def genSmallScaleBigDecimal: Gen[BigDecimal] =
-    for {
-      dec <- genBigDecimal
-      scale <- Gen.choose(-100, 100)
-    } yield dec.setScale(scale, BigDecimal.RoundingMode.DOWN)
+    genBigDecimal.map(_.setScale(100, BigDecimal.RoundingMode.DOWN))
 
   def genBigInt: Gen[BigInt]           = Arbitrary.arbBigInt.arbitrary
   def genBool: Gen[Boolean]            = oneOf(true, false)
