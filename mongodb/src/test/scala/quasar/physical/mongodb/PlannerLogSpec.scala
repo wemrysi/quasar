@@ -31,7 +31,7 @@ class PlannerLogSpec extends PlannerHelpers {
         Vector(
           "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
           "Sort Keys Projected", "Annotated Tree",
-          "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
+          "Logical Plan", "Optimized", "Inferred Types", "Typechecked", "Rewritten Joins",
           "QScript (Educated)", "QScript (ShiftRead)", "QScript (Optimized)",
           "QScript Mongo", "QScript Mongo (Subset Before Map)", "QScript Mongo (Prefer Projection)",
           "Workflow Builder", "Workflow (raw)", "Workflow (crystallized)")
@@ -42,7 +42,7 @@ class PlannerLogSpec extends PlannerHelpers {
         Vector(
           "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
           "Sort Keys Projected", "Annotated Tree",
-          "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
+          "Logical Plan", "Optimized", "Inferred Types", "Typechecked", "Rewritten Joins",
           "QScript (Educated)", "QScript (ShiftRead)", "QScript (Optimized)",
           "QScript Mongo", "QScript Mongo (Subset Before Map)",
           "QScript Mongo (Prefer Projection)", "QScript Mongo (Map Before Sort)",
@@ -60,7 +60,7 @@ class PlannerLogSpec extends PlannerHelpers {
         Vector(
           "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
           "Sort Keys Projected", "Annotated Tree",
-          "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
+          "Logical Plan", "Optimized", "Inferred Types", "Typechecked", "Rewritten Joins",
           "QScript (Educated)", "QScript (ShiftRead)", "QScript (Optimized)",
           "QScript Mongo", "QScript Mongo (Subset Before Map)", "QScript Mongo (Prefer Projection)")
     }
