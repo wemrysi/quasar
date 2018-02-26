@@ -16,14 +16,14 @@
 
 package quasar.yggdrasil.table
 
+import quasar.RCValueGenerators
 import quasar.blueeyes._
 import quasar.blueeyes.json._
-import quasar.RCValueGenerators
-import quasar.DateGenerators
 import quasar.precog.BitSet
 import quasar.precog.TestSupport._
 import quasar.precog.common._
 import quasar.precog.util._
+import quasar.time.DateGenerators
 import quasar.yggdrasil.TableModule.SortDescending
 
 import scala.util.Random

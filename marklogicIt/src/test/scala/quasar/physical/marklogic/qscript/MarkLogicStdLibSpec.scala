@@ -28,7 +28,7 @@ import quasar.physical.marklogic.testing
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 import quasar.std._
-import quasar.{DateGenerators, DateTimeInterval}
+import quasar.time.{DateGenerators, DateTimeInterval}
 
 import java.time._
 import scala.math.{abs, round}

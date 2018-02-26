@@ -20,6 +20,7 @@ import slamdata.Predef._
 
 import quasar._
 import quasar.RepresentableDataGenerators._
+import quasar.time.{DateTimeInterval, OffsetDate}
 
 import java.time.{
   LocalDate => JLocalDate,

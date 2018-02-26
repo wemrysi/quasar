@@ -16,36 +16,16 @@
 
 package quasar
 
+import slamdata.Predef._
+
 import java.time._
 import java.time.temporal.{ChronoField, ChronoUnit}
 
-import slamdata.Predef._
 import scalaz._
 import Scalaz._
 
-sealed abstract class TemporalPart extends Serializable
+package object time {
 
-object TemporalPart {
-  final case object Century     extends TemporalPart
-  final case object Day         extends TemporalPart
-  final case object Decade      extends TemporalPart
-  final case object Hour        extends TemporalPart
-  final case object Microsecond extends TemporalPart
-  final case object Millennium  extends TemporalPart
-  final case object Millisecond extends TemporalPart
-  final case object Minute      extends TemporalPart
-  final case object Month       extends TemporalPart
-  final case object Quarter     extends TemporalPart
-  final case object Second      extends TemporalPart
-  final case object Week        extends TemporalPart
-  final case object Year        extends TemporalPart
-
-  implicit val equal: Equal[TemporalPart] = Equal.equalRef
-  implicit val show: Show[TemporalPart] = Show.showFromToString
-}
-
-object datetime {
-  import TemporalPart._
   type LensDate[I] = Lens[I, LocalDate]
   type SetDate[I, O] = (I, LocalDate) => O
   type LensTime[I] = Lens[I, LocalTime]
@@ -141,62 +121,91 @@ object datetime {
 
   def truncTime(part: TemporalPart, i: LocalTime): LocalTime =
       part match {
-        case Hour        => truncHour(i)
-        case Microsecond => truncMicrosecond(i)
-        case Millisecond => truncMillisecond(i)
-        case Minute      => truncMinute(i)
-        case Second      => truncSecond(i)
-        case _           => i
+        case TemporalPart.Hour        => truncHour(i)
+        case TemporalPart.Microsecond => truncMicrosecond(i)
+        case TemporalPart.Millisecond => truncMillisecond(i)
+        case TemporalPart.Minute      => truncMinute(i)
+        case TemporalPart.Second      => truncSecond(i)
+        case _                        => i
       }
 
   def truncDateTime(part: TemporalPart, i: LocalDateTime): LocalDateTime =
-    if (part === Day) LocalDateTime.of(i.toLocalDate, LocalTime.MIN)
-    else LocalDateTime.of(truncDate(part, i.toLocalDate), truncTime(part, i.toLocalTime))
+    if (part === TemporalPart.Day) {
+      LocalDateTime.of(i.toLocalDate, LocalTime.MIN)
+    } else {
+      LocalDateTime.of(truncDate(part, i.toLocalDate), truncTime(part, i.toLocalTime))
+    }
 
   def truncDate(part: TemporalPart, date: LocalDate): LocalDate =
     part match {
-      case Century    => truncCentury(date)
-      case Decade     => truncDecade(date)
-      case Millennium => truncMillennium(date)
-      case Month      => truncMonth(date)
-      case Quarter    => truncQuarter(date)
-      case Week       => truncWeek(date)
-      case Year       => truncYear(date)
-      case _          => date
+      case TemporalPart.Century    => truncCentury(date)
+      case TemporalPart.Decade     => truncDecade(date)
+      case TemporalPart.Millennium => truncMillennium(date)
+      case TemporalPart.Month      => truncMonth(date)
+      case TemporalPart.Quarter    => truncQuarter(date)
+      case TemporalPart.Week       => truncWeek(date)
+      case TemporalPart.Year       => truncYear(date)
+      case _                       => date
     }
 
-  def extractCentury(ld: LocalDate): Long = (ld.getLong(ChronoField.YEAR_OF_ERA) - 1) / 100 + 1
-  def extractDayOfMonth(ld: LocalDate): Long = ld.getLong(ChronoField.DAY_OF_MONTH)
-  def extractDecade(ld: LocalDate): Long = ld.getLong(ChronoField.YEAR_OF_ERA) / 10
-  def extractDayOfYear(ld: LocalDate): Long = ld.getLong(ChronoField.DAY_OF_YEAR)
-  def extractEpoch(odt: OffsetDateTime): Double = odt.toEpochSecond + odt.getNano / 1000000000.0
-  def extractMillennium(ld: LocalDate): Long = (ld.getLong(ChronoField.YEAR) - 1) / 1000 + 1
+  def extractCentury(ld: LocalDate): Long =
+    (ld.getLong(ChronoField.YEAR_OF_ERA) - 1) / 100 + 1
+
+  def extractDayOfMonth(ld: LocalDate): Long =
+    ld.getLong(ChronoField.DAY_OF_MONTH)
+
+  def extractDecade(ld: LocalDate): Long =
+    ld.getLong(ChronoField.YEAR_OF_ERA) / 10
+
+  def extractDayOfYear(ld: LocalDate): Long =
+    ld.getLong(ChronoField.DAY_OF_YEAR)
+
+  def extractEpoch(odt: OffsetDateTime): Double =
+    odt.toEpochSecond + odt.getNano / 1000000000.0
+
+  def extractMillennium(ld: LocalDate): Long =
+    (ld.getLong(ChronoField.YEAR) - 1) / 1000 + 1
+
   def extractMonth(ld: LocalDate): Int = ld.getMonthValue
-  def extractQuarter(ld: LocalDate): Long = java.lang.Math.ceil(ld.getMonthValue / 3.0).toLong
-  def extractWeek(ld: LocalDate): Long = if (ld.getDayOfYear === 1) 53 else ld.getLong(ChronoField.ALIGNED_WEEK_OF_YEAR)
+
+  def extractQuarter(ld: LocalDate): Long =
+    java.lang.Math.ceil(ld.getMonthValue / 3.0).toLong
+
+  def extractWeek(ld: LocalDate): Long =
+    if (ld.getDayOfYear === 1) 53 else ld.getLong(ChronoField.ALIGNED_WEEK_OF_YEAR)
+
   def extractYear(ld: LocalDate): Int = ld.getYear
+
   def extractIsoYear(ld: LocalDate): Long =
     // TODO: Come back to this, add tests for BC era
     if (ld.getDayOfYear === 1) ld.getLong(ChronoField.YEAR_OF_ERA) - 1
     else ld.getLong(ChronoField.YEAR_OF_ERA)
+
   def extractIsoDayOfWeek(ld: LocalDate): Int =
     ld.getDayOfWeek.getValue
+
   def extractDayOfWeek(ld: LocalDate): Int =
     ld.getDayOfWeek.getValue % 7
-  def extractHour(lt: LocalTime): Int =
-    lt.getHour
+
+  def extractHour(lt: LocalTime): Int = lt.getHour
+
   def extractMicrosecond(lt: LocalTime): Long =
     lt.getLong(ChronoField.MICRO_OF_SECOND) + lt.getSecond * 1000000
+
   def extractMillisecond(lt: LocalTime): Long =
     lt.getLong(ChronoField.MILLI_OF_SECOND) + lt.getSecond * 1000
+
   def extractMinute(lt: LocalTime): Long =
     lt.getLong(ChronoField.MINUTE_OF_HOUR)
+
   def extractSecond(lt: LocalTime): BigDecimal =
     BigDecimal(lt.getNano) / 1000000000.0 + lt.getSecond
-  def extractTimeZone(zo: ZoneOffset): Int =
-    zo.getTotalSeconds
+
+  def extractTimeZone(zo: ZoneOffset): Int = zo.getTotalSeconds
+
   def extractTimeZoneHour(zo: ZoneOffset): Int =
     zo.getTotalSeconds / 3600
+
   def extractTimeZoneMinute(zo: ZoneOffset): Int =
     (zo.getTotalSeconds / 60) % 60
 }

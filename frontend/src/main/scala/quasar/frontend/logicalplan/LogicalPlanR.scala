@@ -46,7 +46,7 @@ final case class ConstrainedPlan[T](
 // TODO: Move constraints to methods and/or pull the constructors into own class.
 final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) {
   import quasar.std.StdLib, StdLib._, structural._
-  import quasar.TemporalPart
+  import quasar.time.TemporalPart
 
   def read(path: FPath) = lp.read[T](path).embed
 
@@ -445,9 +445,9 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
         case TemporalTrunc(part, src) =>
           import DataDateTimeExtractors._
           val typer: Func.Domain[nat._1] => Func.VCodomain = {
-            case Sized(Type.Const(CanLensDateTime(s))) => Type.Const(s.peeks(datetime.truncDateTime(part, _))).success
-            case Sized(Type.Const(CanLensTime(s))) => Type.Const(s.peeks(datetime.truncTime(part, _))).success
-            case Sized(Type.Const(CanLensDate(s))) => Type.Const(s.peeks(datetime.truncDate(part, _))).success
+            case Sized(Type.Const(CanLensDateTime(s))) => Type.Const(s.peeks(time.truncDateTime(part, _))).success
+            case Sized(Type.Const(CanLensTime(s))) => Type.Const(s.peeks(time.truncTime(part, _))).success
+            case Sized(Type.Const(CanLensDate(s))) => Type.Const(s.peeks(time.truncDate(part, _))).success
             case Sized(t) => t.success
           }
 

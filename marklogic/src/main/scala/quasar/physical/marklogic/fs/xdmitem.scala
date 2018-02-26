@@ -17,15 +17,17 @@
 package quasar.physical.marklogic.fs
 
 import slamdata.Predef._
-import quasar.{Data, DateTimeInterval}
+import quasar.Data
 import quasar.fs.FileSystemError
 import quasar.physical.marklogic.{ErrorMessages, MonadErrMsgs}
 import quasar.physical.marklogic.optics._
 import quasar.physical.marklogic.xml
 import quasar.physical.marklogic.xml.SecureXML
+import quasar.time.DateTimeInterval
 
 import scala.collection.JavaConverters._
 import scala.xml.Elem
+
 import argonaut._
 import com.marklogic.xcc.types.{Duration => _, _}
 import java.time._

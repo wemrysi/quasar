@@ -19,9 +19,9 @@ package jdbm3
 
 import java.time._
 
-import quasar.{DateTimeInterval, OffsetDate}
 import quasar.precog._
 import quasar.precog.common._
+import quasar.time.{DateTimeInterval, OffsetDate}
 
 import scala.reflect.ClassTag
 

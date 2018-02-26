@@ -19,19 +19,18 @@ package quasar.precog.common
 import quasar.blueeyes._
 import quasar.precog._
 import quasar.precog.util.{BitSetUtil, ByteBufferMonad, ByteBufferPool, RawBitSet}
-
-import scalaz._
+import quasar.time.{DateTimeInterval, OffsetDate}
 
 import java.nio.{ByteBuffer, CharBuffer}
 import java.nio.charset.{CharsetEncoder, CoderResult}
 import java.math.{BigDecimal => BigDec}
 import java.time._
 
-import quasar.{DateTimeInterval, OffsetDate}
-
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
 import scala.specialized
+
+import scalaz._
 
 /**
   * Codecs allow a writer to deal with the case where we have a buffer overflow

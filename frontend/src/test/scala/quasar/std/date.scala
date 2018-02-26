@@ -17,9 +17,10 @@
 package quasar.std
 
 import slamdata.Predef._
+import quasar._
+import quasar.time.DateTimeInterval
 
 import scalaz._
-import quasar._
 
 class DateSpecs extends quasar.Qspec {
   import DateLib._

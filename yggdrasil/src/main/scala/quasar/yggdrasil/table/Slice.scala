@@ -16,17 +16,16 @@
 
 package quasar.yggdrasil.table
 
-import quasar.yggdrasil._
-import quasar.precog.util._
-import quasar.precog._
-import quasar.yggdrasil.util.CPathUtils
-import quasar.precog.common._
-import quasar.yggdrasil.bytecode._
-import quasar.precog.util.RingDeque
-import quasar.{DateTimeInterval, OffsetDate}
-
-import TransSpecModule._
 import quasar.blueeyes._, json._
+import quasar.precog._
+import quasar.precog.common._
+import quasar.precog.util._
+import quasar.precog.util.RingDeque
+import quasar.time.{DateTimeInterval, OffsetDate}
+import quasar.yggdrasil._
+import quasar.yggdrasil.TransSpecModule._
+import quasar.yggdrasil.bytecode._
+import quasar.yggdrasil.util.CPathUtils
 
 import scalaz._, Scalaz._, Ordering._
 

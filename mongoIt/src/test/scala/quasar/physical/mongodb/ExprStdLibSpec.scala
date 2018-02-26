@@ -27,6 +27,7 @@ import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.qscript._
 import quasar.qscript.rewrites.{Coalesce => _}
 import quasar.std.StdLib._
+import quasar.time.TemporalPart
 
 import java.time.Instant
 import matryoshka._

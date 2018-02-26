@@ -16,12 +16,12 @@
 
 package quasar.precog.util
 
-import quasar.OffsetDate
 import quasar.blueeyes._
 import quasar.blueeyes.json.JValue
 import quasar.blueeyes.json.serialization.{Decomposer, Extractor}
 import quasar.blueeyes.json.serialization.DefaultSerialization._
 import quasar.blueeyes.json.serialization.Extractor._
+import quasar.time.OffsetDate
 
 import org.slf4s.Logging
 

@@ -18,7 +18,7 @@ package quasar.physical.mongodb
 
 import slamdata.Predef._
 import quasar.contrib.scalacheck.gen
-import quasar.{DateGenerators, DateTimeInterval}
+import quasar.time.{DateGenerators, DateTimeInterval}
 
 import java.time._
 

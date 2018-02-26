@@ -29,6 +29,7 @@ import quasar.physical.mongodb.fs._, bsoncursor._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 import quasar.std._
+import quasar.time.TemporalPart
 
 import scala.sys
 

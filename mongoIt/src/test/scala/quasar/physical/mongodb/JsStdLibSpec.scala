@@ -22,6 +22,7 @@ import quasar.fs.FileSystemError
 import quasar.std.StdLib._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
+import quasar.time.TemporalPart
 
 import java.time.{
   Instant,

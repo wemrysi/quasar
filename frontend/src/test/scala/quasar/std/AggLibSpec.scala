@@ -16,15 +16,18 @@
 
 package quasar.std
 
-import scala.Predef.$conforms
 import slamdata.Predef._
+
 import quasar._
-import DataGenerators._
+import quasar.DataGenerators._
+import quasar.time.DateTimeInterval
 
 import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.NonEmptyList
 import scalaz.std.anyVal._
 import scalaz.syntax.foldable1._
+
+import scala.Predef.$conforms
 
 class AggLibSpec extends quasar.Qspec {
   import AggLib._

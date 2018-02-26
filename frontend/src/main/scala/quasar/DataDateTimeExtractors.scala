@@ -17,6 +17,16 @@
 package quasar
 
 import slamdata.Predef._
+
+import quasar.Data.{
+  LocalDate => DLocalDate,
+  LocalDateTime => DLocalDateTime,
+  LocalTime => DLocalTime,
+  OffsetDate => DOffsetDate,
+  OffsetDateTime => DOffsetDateTime,
+  OffsetTime => DOffsetTime
+}
+
 import java.time.{
   LocalDate => JLocalDate,
   LocalDateTime => JLocalDateTime,
@@ -25,15 +35,8 @@ import java.time.{
   OffsetTime => JOffsetTime,
   ZoneOffset
 }
+
 import scalaz._
-import Data.{
-  LocalDate => DLocalDate,
-  LocalDateTime => DLocalDateTime,
-  LocalTime => DLocalTime,
-  OffsetDate => DOffsetDate,
-  OffsetDateTime => DOffsetDateTime,
-  OffsetTime => DOffsetTime
-}
 
 object DataDateTimeExtractors {
 
@@ -53,9 +56,9 @@ object DataDateTimeExtractors {
 
   object CanLensTime {
     def unapply(data: Data): Option[Store[JLocalTime, Data]] = data match {
-      case d@DOffsetDateTime(_) => Some(datetime.lensTimeOffsetDateTime(d.value).map(DOffsetDateTime))
-      case d@DOffsetTime(_) => Some(datetime.lensTimeOffsetTime(d.value).map(DOffsetTime))
-      case d@DLocalDateTime(_) => Some(datetime.lensTimeLocalDateTime(d.value).map(DLocalDateTime))
+      case d@DOffsetDateTime(_) => Some(time.lensTimeOffsetDateTime(d.value).map(DOffsetDateTime))
+      case d@DOffsetTime(_) => Some(time.lensTimeOffsetTime(d.value).map(DOffsetTime))
+      case d@DLocalDateTime(_) => Some(time.lensTimeLocalDateTime(d.value).map(DLocalDateTime))
       case d@DLocalTime(_) => Some(Store(DLocalTime, d.value))
       case _ => None
     }
@@ -63,9 +66,9 @@ object DataDateTimeExtractors {
 
   object CanLensDate {
     def unapply(data: Data): Option[Store[JLocalDate, Data]] = data match {
-      case d@DOffsetDateTime(_) => Some(datetime.lensDateOffsetDateTime(d.value).map(DOffsetDateTime))
-      case d@DOffsetDate(_) => Some(datetime.lensDateOffsetDate(d.value).map(DOffsetDate))
-      case d@DLocalDateTime(_) => Some(datetime.lensDateLocalDateTime(d.value).map(DLocalDateTime))
+      case d@DOffsetDateTime(_) => Some(time.lensDateOffsetDateTime(d.value).map(DOffsetDateTime))
+      case d@DOffsetDate(_) => Some(time.lensDateOffsetDate(d.value).map(DOffsetDate))
+      case d@DLocalDateTime(_) => Some(time.lensDateLocalDateTime(d.value).map(DLocalDateTime))
       case d@DLocalDate(_) => Some(Store(DLocalDate, d.value))
       case _ => None
     }
@@ -73,17 +76,17 @@ object DataDateTimeExtractors {
 
   object CanLensDateTime {
     def unapply(data: Data): Option[Store[JLocalDateTime, Data]] = data match {
-      case d@DOffsetDateTime(_) => Some(datetime.lensDateTimeOffsetDateTime(d.value).map(DOffsetDateTime))
-      case d@DLocalDateTime(_) => Some(datetime.lensDateTimeLocalDateTime(d.value).map(DLocalDateTime))
+      case d@DOffsetDateTime(_) => Some(time.lensDateTimeOffsetDateTime(d.value).map(DOffsetDateTime))
+      case d@DLocalDateTime(_) => Some(time.lensDateTimeLocalDateTime(d.value).map(DLocalDateTime))
       case _ => None
     }
   }
 
   object CanLensTimeZone {
     def unapply(data: Data): Option[Store[ZoneOffset, Data]] = data match {
-      case d@DOffsetDateTime(_) => Some(datetime.lensTimeZoneOffsetDateTime(d.value).map(DOffsetDateTime))
-      case d@DOffsetDate(_) => Some(datetime.lensTimeZoneOffsetDate(d.value).map(DOffsetDate))
-      case d@DOffsetTime(_) => Some(datetime.lensTimeZoneOffsetTime(d.value).map(DOffsetTime))
+      case d@DOffsetDateTime(_) => Some(time.lensTimeZoneOffsetDateTime(d.value).map(DOffsetDateTime))
+      case d@DOffsetDate(_) => Some(time.lensTimeZoneOffsetDate(d.value).map(DOffsetDate))
+      case d@DOffsetTime(_) => Some(time.lensTimeZoneOffsetTime(d.value).map(DOffsetTime))
       case _ => None
     }
   }
@@ -91,10 +94,10 @@ object DataDateTimeExtractors {
   object CanSetTimeZone {
     def unapply(data: Data): Option[ZoneOffset => Data] = data match {
       case d@DOffsetDateTime(_) => Some(zo => DOffsetDateTime(JOffsetDateTime.of(d.value.toLocalDateTime, zo)))
-      case d@DOffsetDate(_) => Some(zo => DOffsetDate(quasar.OffsetDate(d.value.date, zo)))
+      case d@DOffsetDate(_) => Some(zo => DOffsetDate(time.OffsetDate(d.value.date, zo)))
       case d@DOffsetTime(_) => Some(zo => DOffsetTime(JOffsetTime.of(d.value.toLocalTime, zo)))
       case d@DLocalDateTime(_) => Some(zo => DOffsetDateTime(JOffsetDateTime.of(d.value, zo)))
-      case d@DLocalDate(_) => Some(zo => DOffsetDate(quasar.OffsetDate(d.value, zo)))
+      case d@DLocalDate(_) => Some(zo => DOffsetDate(time.OffsetDate(d.value, zo)))
       case d@DLocalTime(_) => Some(zo => DOffsetTime(JOffsetTime.of(d.value, zo)))
       case _ => None
     }
@@ -103,7 +106,7 @@ object DataDateTimeExtractors {
   object CanRemoveTime {
     def unapply(data: Data): Option[Data] = data match {
       case DLocalDateTime(v) => Some(DLocalDate(v.toLocalDate))
-      case DOffsetDateTime(v) => Some(DOffsetDate(quasar.OffsetDate(v.toLocalDate, v.getOffset)))
+      case DOffsetDateTime(v) => Some(DOffsetDate(time.OffsetDate(v.toLocalDate, v.getOffset)))
       case _ => None
     }
   }

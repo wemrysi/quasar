@@ -22,7 +22,7 @@ import quasar.javascript.Js
 import quasar.jscore, jscore.{Name, JsCoreF}
 import quasar.std.StdLib._
 import quasar.qscript._, MapFuncsCore._
-import quasar.TemporalPart._
+import quasar.time.TemporalPart._
 
 import scala.Predef.implicitly
 

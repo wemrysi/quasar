@@ -25,7 +25,7 @@ import quasar.fp.tree.{BinaryArg, TernaryArg, UnaryArg}
 import quasar.precog.common.RValue
 import quasar.qscript._
 import quasar.std.StdLibSpec
-import quasar.{DateGenerators, DateTimeInterval}
+import quasar.time.{DateGenerators, DateTimeInterval}
 
 import org.scalacheck.{Arbitrary, Gen}
 

@@ -24,7 +24,7 @@ import quasar.fp.tree._
 import quasar.qscript._, MapFuncsCore._, MapFuncsDerived._
 import quasar.physical.sparkcore.fs.CoreMap
 import quasar.std._
-import quasar.DateGenerators
+import quasar.time.DateGenerators
 
 import matryoshka._
 import matryoshka.data.Fix

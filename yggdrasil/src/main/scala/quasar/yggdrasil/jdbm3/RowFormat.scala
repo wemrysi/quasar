@@ -20,16 +20,15 @@ package jdbm3
 import table._
 import quasar.blueeyes._
 import quasar.precog.common._
-import quasar.precog.util.RawBitSet
-import quasar.DateTimeInterval
+import quasar.precog.util.{ByteBufferMonad, ByteBufferPool, NumericComparisons, RawBitSet}
+import ByteBufferPool._
+import quasar.time.{DateTimeInterval, OffsetDate}
 
 import scalaz._
 import Scalaz._
-import quasar.precog.util.{ByteBufferMonad, ByteBufferPool, NumericComparisons}
-import ByteBufferPool._
+
 import java.nio.ByteBuffer
 import java.time.{LocalDateTime, LocalTime, LocalDate, OffsetDateTime, OffsetTime}
-import quasar.OffsetDate
 
 import scala.annotation.tailrec
 import scala.collection.mutable

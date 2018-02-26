@@ -22,7 +22,7 @@ import quasar.{ejson, qscript}
 import quasar.ejson.EJson
 import quasar.qscript.qsu.{Access, QAccess}
 import quasar.qscript.qsu.QScriptUniform.ShiftTarget
-import quasar.TemporalPart
+import quasar.time.TemporalPart
 
 import matryoshka._
 import matryoshka.data.Fix

@@ -16,7 +16,9 @@
 
 package quasar.qscript.qsu
 
-import quasar.{Data, DataGenerators, TemporalPart, Type, Qspec}
+import slamdata.Predef._
+
+import quasar.{Data, DataGenerators, Type, Qspec}
 import quasar.Planner.PlannerError
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.scalaz.{NonEmptyListE => NELE}
@@ -45,7 +47,7 @@ import quasar.std.{
   StringLib,
   StructuralLib
 }
-import slamdata.Predef._
+import quasar.time.TemporalPart
 
 import matryoshka.data.Fix
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}

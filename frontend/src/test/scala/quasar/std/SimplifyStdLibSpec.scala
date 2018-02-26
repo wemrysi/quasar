@@ -17,11 +17,13 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar.{Data, DateGenerators, GenericFunc}
+import quasar.{Data, GenericFunc}
 import quasar.RenderTree.ops._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib._
+import quasar.time.DateGenerators
+
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._

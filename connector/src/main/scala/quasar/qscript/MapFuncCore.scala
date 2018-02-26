@@ -20,13 +20,13 @@ import slamdata.Predef._
 
 import quasar._
 import quasar.RenderTree.ops._
-import quasar.TemporalPart
 import quasar.contrib.matryoshka._
 import quasar.ejson._
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.qscript.rewrites.{DedupeGuards, ExtractFiltering}
+import quasar.time.TemporalPart
 
 import matryoshka._
 import matryoshka.data._

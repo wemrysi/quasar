@@ -17,8 +17,9 @@
 package quasar.yggdrasil
 package table
 
+import quasar.time.{DateTimeInterval, OffsetDate}
+
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
-import quasar.{DateTimeInterval, OffsetDate}
 
 class MemoBoolColumn(c: BoolColumn) extends BoolColumn {
   private[this] var row0          = -1

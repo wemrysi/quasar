@@ -17,10 +17,10 @@
 package quasar.mimir
 
 import quasar.precog.common._
+import quasar.time.OffsetDate
 import quasar.yggdrasil._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
-import quasar.OffsetDate
 
 import scalaz._
 import Scalaz._

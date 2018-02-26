@@ -19,8 +19,8 @@ package quasar.yggdrasil
 import quasar.precog.common._
 import quasar.precog._, TestSupport._
 import quasar.precog.util._
+import quasar.time.OffsetDate
 import quasar.yggdrasil.table._
-import quasar.OffsetDate
 
 import java.time._
 

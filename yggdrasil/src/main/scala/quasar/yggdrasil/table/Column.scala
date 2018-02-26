@@ -20,12 +20,11 @@ import quasar.blueeyes._, json._
 import quasar.precog._
 import quasar.precog.common._
 import quasar.precog.util._
-import quasar.DateTimeInterval
+import quasar.time.{DateTimeInterval, OffsetDate}
 
 import scalaz.Semigroup
 
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
-import quasar.OffsetDate
 
 import scala.annotation.tailrec
 import scala.collection.mutable

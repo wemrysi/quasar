@@ -25,7 +25,7 @@ import quasar.precog.util.RawBitSet
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util._
 import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
-import quasar.{DateTimeInterval, OffsetDate}
+import quasar.time.{DateTimeInterval, OffsetDate}
 
 import TransSpecModule._
 import org.slf4j.Logger

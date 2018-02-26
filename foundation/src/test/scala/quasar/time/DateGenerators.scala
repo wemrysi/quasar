@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.time
 
 import slamdata.Predef._
 import quasar.pkg.tests._
@@ -31,6 +31,7 @@ import java.time.{
 import java.time.temporal.ChronoField
 
 trait DateGenerators {
+
   implicit val arbDateTimeInterval: Arbitrary[DateTimeInterval] = genInterval
   implicit val arbInstant: Arbitrary[Instant] =
     Arbitrary((genEpochSeconds, genNanos) >> Instant.ofEpochSecond _)

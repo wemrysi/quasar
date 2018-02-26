@@ -19,8 +19,8 @@ package table
 
 import quasar.precog.BitSet
 import quasar.precog.common._
+import quasar.time.{DateTimeInterval, OffsetDate}
 import quasar.yggdrasil.bytecode.JType
-import quasar.{DateTimeInterval, OffsetDate}
 
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 

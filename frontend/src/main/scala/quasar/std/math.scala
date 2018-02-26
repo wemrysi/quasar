@@ -17,11 +17,12 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar.{Data, DateTimeInterval, Func, UnaryFunc, BinaryFunc, Type, Mapping, SemanticError}
+import quasar.{Data, Func, UnaryFunc, BinaryFunc, Type, Mapping, SemanticError}
+import quasar.DataDateTimeExtractors._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
-import quasar.DataDateTimeExtractors._
+import quasar.time.DateTimeInterval
 
 import scala.math.BigDecimal.RoundingMode
 

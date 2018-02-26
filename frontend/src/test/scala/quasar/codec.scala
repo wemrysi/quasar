@@ -16,11 +16,13 @@
 
 package quasar
 
-import argonaut._, Argonaut._
-import quasar.DataEncodingError.{UnrepresentableDataError, UnescapedKeyError}
 import slamdata.Predef._
+import quasar.DataEncodingError.{UnrepresentableDataError, UnescapedKeyError}
+import quasar.time.{DateTimeInterval, OffsetDate}
 
 import java.time._
+
+import argonaut._, Argonaut._
 import scalaz._, Scalaz._
 
 class DataCodecSpecs extends quasar.Qspec {

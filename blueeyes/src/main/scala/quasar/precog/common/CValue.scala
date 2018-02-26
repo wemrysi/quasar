@@ -17,9 +17,9 @@
 package quasar.precog
 package common
 
-import quasar.{DateTimeInterval, OffsetDate}
 import quasar.blueeyes._, json._, serialization._
-import DefaultSerialization._
+import quasar.blueeyes.json.serialization.DefaultSerialization._
+import quasar.time.{DateTimeInterval, OffsetDate}
 
 import scalaz._, Scalaz._, Ordering._
 

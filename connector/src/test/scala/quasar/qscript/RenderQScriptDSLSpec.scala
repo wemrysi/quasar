@@ -23,7 +23,7 @@ import matryoshka.Delay
 import matryoshka.data.Fix
 import org.specs2.execute.Result
 import quasar.ejson.{EJson, Extension}
-import quasar.TemporalPart
+import quasar.time.TemporalPart
 import quasar.qscript.RenderQScriptDSL.RenderQScriptDSL
 import quasar.common.{JoinType, SortDir}
 import pathy.Path._
@@ -47,7 +47,7 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
     """
       |import quasar.{Data, Type}
       |import quasar.common.{JoinType, SortDir}
-      |import quasar.TemporalPart
+      |import quasar.time.TemporalPart
       |import quasar.qscript._
       |import quasar.ejson.{EJson, Fixed}
       |import quasar.fp._

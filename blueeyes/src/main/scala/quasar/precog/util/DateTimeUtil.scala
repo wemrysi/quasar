@@ -16,11 +16,11 @@
 
 package quasar.precog.util
 
+import quasar.time.OffsetDate
+
 import java.time._
 import java.time.format._
 import java.util.regex.Pattern
-
-import quasar.OffsetDate
 
 object DateTimeUtil {
 

@@ -18,6 +18,7 @@ package quasar
 
 import slamdata.Predef._
 import quasar.pkg.tests._
+import quasar.time.{DateGenerators, OffsetDate}
 
 import java.time.{
   LocalDate => JLocalDate,

@@ -18,6 +18,7 @@ package quasar.std
 
 import slamdata.Predef._
 import quasar._
+import quasar.time.DateTimeInterval
 
 import scalaz._, Validation.{success, failureNel}
 import scalaz.std.list._

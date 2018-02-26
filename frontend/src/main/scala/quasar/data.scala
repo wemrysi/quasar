@@ -27,6 +27,7 @@ import quasar.ejson.{
 }
 import quasar.fp._
 import quasar.javascript.Js
+import quasar.time.{DateTimeInterval, OffsetDate => QOffsetDate}
 
 import java.time.{
   LocalDate => JLocalDate,
@@ -155,7 +156,7 @@ object Data {
   val _offsetTime =
     Prism.partial[Data, JOffsetTime] { case Data.OffsetTime(ts) => ts } (Data.OffsetTime)
 
-  final case class OffsetDate(value: quasar.OffsetDate) extends Data {
+  final case class OffsetDate(value: QOffsetDate) extends Data {
     def dataType = Type.OffsetDate
     def toJs = jscore.Call(
       jscore.ident("ISODate"),
@@ -163,7 +164,7 @@ object Data {
   }
 
   val _offsetDate =
-    Prism.partial[Data, quasar.OffsetDate] { case Data.OffsetDate(ts) => ts } (Data.OffsetDate)
+    Prism.partial[Data, QOffsetDate] { case Data.OffsetDate(ts) => ts } (Data.OffsetDate)
 
   final case class LocalDateTime(value: JLocalDateTime) extends Data {
     def dataType = Type.LocalDateTime
@@ -442,7 +443,7 @@ object Data {
           extract(map.get(DateTimeConstants.day), _int)(_.toInt) ⊛
           extract(map.get(DateTimeConstants.offset), _int)(_.toInt)) {
             (y, m, d, o) =>
-              OffsetDate(quasar.OffsetDate(JLocalDate.of(y, m, d), ZoneOffset.ofTotalSeconds(o)))
+              OffsetDate(QOffsetDate(JLocalDate.of(y, m, d), ZoneOffset.ofTotalSeconds(o)))
           }.getOrElse(NA)
       case (EJsonType(TypeTag.LocalDateTime), Obj(map)) =>
         (extract(map.get(DateTimeConstants.year), _int)(_.toInt) ⊛

@@ -18,6 +18,7 @@ package quasar
 
 import quasar.Data._
 import quasar.pkg.tests._
+import quasar.time.DateGenerators
 
 case class RepresentableData(data: Data)
 

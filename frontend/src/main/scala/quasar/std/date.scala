@@ -18,48 +18,55 @@ package quasar.std
 
 import slamdata.Predef._
 import quasar._
-import SemanticError._
-import quasar.fp.ski._
-import java.time.{Instant, ZoneOffset, LocalDate => JLocalDate, LocalTime => JLocalTime}
-import java.time.{OffsetDateTime => JOffsetDateTime}
-
 import quasar.DataDateTimeExtractors._
-import quasar.datetime._
+import quasar.SemanticError._
+import quasar.fp.ski._
+import quasar.time.{OffsetDate => QOffsetDate, _}
+
+import java.time.{
+  Instant,
+  LocalDate => JLocalDate,
+  LocalDateTime => JLocalDateTime,
+  LocalTime => JLocalTime,
+  OffsetDateTime => JOffsetDateTime,
+  OffsetTime => JOffsetTime,
+  ZoneOffset
+}
 
 import scalaz._
-import Validation.success
+import scalaz.Validation.success
 import scalaz.syntax.either._
 import scalaz.syntax.std.option._
 import shapeless.{Data => _, _}
 
 trait DateLib extends Library with Serializable {
   def parseOffsetDateTime(str: String): SemanticError \/ Data.OffsetDateTime =
-    \/.fromTryCatchNonFatal(java.time.OffsetDateTime.parse(str)).bimap(
+    \/.fromTryCatchNonFatal(JOffsetDateTime.parse(str)).bimap(
       κ(DateFormatError(OffsetDateTime, str, None)),
       Data.OffsetDateTime.apply)
 
   def parseOffsetTime(str: String): SemanticError \/ Data.OffsetTime =
-    \/.fromTryCatchNonFatal(java.time.OffsetTime.parse(str)).bimap(
+    \/.fromTryCatchNonFatal(JOffsetTime.parse(str)).bimap(
       κ(DateFormatError(OffsetTime, str, None)),
       Data.OffsetTime.apply)
 
   def parseOffsetDate(str: String): SemanticError \/ Data.OffsetDate =
-    \/.fromTryCatchNonFatal(quasar.OffsetDate.parse(str)).bimap(
+    \/.fromTryCatchNonFatal(QOffsetDate.parse(str)).bimap(
       κ(DateFormatError(OffsetDate, str, None)),
       Data.OffsetDate.apply)
 
   def parseLocalDateTime(str: String): SemanticError \/ Data.LocalDateTime =
-    \/.fromTryCatchNonFatal(java.time.LocalDateTime.parse(str)).bimap(
+    \/.fromTryCatchNonFatal(JLocalDateTime.parse(str)).bimap(
       κ(DateFormatError(OffsetDate, str, None)),
       Data.LocalDateTime.apply)
 
   def parseLocalTime(str: String): SemanticError \/ Data.LocalTime =
-    \/.fromTryCatchNonFatal(java.time.LocalTime.parse(str)).bimap(
+    \/.fromTryCatchNonFatal(JLocalTime.parse(str)).bimap(
       κ(DateFormatError(LocalTime, str, None)),
       Data.LocalTime.apply)
 
   def parseLocalDate(str: String): SemanticError \/ Data.LocalDate =
-    \/.fromTryCatchNonFatal(java.time.LocalDate.parse(str)).bimap(
+    \/.fromTryCatchNonFatal(JLocalDate.parse(str)).bimap(
       κ(DateFormatError(LocalDate, str, None)),
       Data.LocalDate.apply)
 
@@ -155,7 +162,7 @@ trait DateLib extends Library with Serializable {
     Func.Input1(Type.OffsetDateTime),
     noSimplification,
     partialTyper[nat._1] {
-      case Sized(Type.Const(Data.OffsetDateTime(k))) => Type.Const(Data.Dec(datetime.extractEpoch(k)))
+      case Sized(Type.Const(Data.OffsetDateTime(k))) => Type.Const(Data.Dec(time.extractEpoch(k)))
       case Sized(Type.OffsetDateTime) => Type.Dec
     },
     basicUntyper)

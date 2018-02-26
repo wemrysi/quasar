@@ -16,15 +16,22 @@
 
 package quasar.mimir
 
-import java.time.format.DateTimeParseException
-
+import quasar.time
+import quasar.time.{DateTimeInterval, OffsetDate => QOffsetDate, TemporalPart}
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
-import java.time.{LocalDate => JLocalDate, LocalDateTime => JLocalDateTime, LocalTime => JLocalTime}
-import java.time.{ZoneOffset, OffsetDateTime => JOffsetDateTime, OffsetTime => JOffsetTime}
-
-import quasar.{DateTimeInterval, TemporalPart, datetime}
 import quasar.yggdrasil.util.ColumnDateTimeExtractors._
+
+import java.time.{
+  LocalDate => JLocalDate,
+  LocalDateTime => JLocalDateTime,
+  LocalTime => JLocalTime,
+  OffsetDateTime => JOffsetDateTime,
+  OffsetTime => JOffsetTime,
+  ZoneOffset
+}
+import java.time.format.DateTimeParseException
+
 import scalaz.syntax.show._
 
 trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
@@ -85,7 +92,7 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       def f1: F1 = CF1P("builtin::time::extractEpoch") {
         case c: OffsetDateTimeColumn =>
           new Map1Column(c) with DoubleColumn {
-            def apply(row: Int) = datetime.extractEpoch(c(row))
+            def apply(row: Int) = time.extractEpoch(c(row))
           }
       }
     }
@@ -158,7 +165,7 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
           }
         case (n: LongColumn, c: LocalDateColumn) =>
           new Map1Column(c) with OffsetDateColumn {
-            def apply(row: Int) = quasar.OffsetDate(c(row), create(n(row).toInt))
+            def apply(row: Int) = QOffsetDate(c(row), create(n(row).toInt))
           }
         case (n: LongColumn, c: LocalTimeColumn) =>
           new Map1Column(c) with OffsetTimeColumn {
@@ -167,36 +174,36 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       }
     }
 
-    val ExtractCentury = new DateLongExtractor("Century", datetime.extractCentury)
-    val ExtractDayOfMonth = new DateLongExtractor("DayOfMonth", datetime.extractDayOfMonth)
-    val ExtractDecade = new DateLongExtractor("Decade", datetime.extractDecade)
-    val ExtractDayOfWeek = new DateLongExtractor("DayOfWeek", datetime.extractDayOfWeek)
-    val ExtractDayOfYear = new DateLongExtractor("DayOfYear", datetime.extractDayOfYear)
-    val ExtractIsoDayOfWeek = new DateLongExtractor("IsoDayOfWeek", datetime.extractIsoDayOfWeek)
-    val ExtractIsoYear = new DateLongExtractor("IsoYear", datetime.extractIsoYear)
-    val ExtractMillennium = new DateLongExtractor("Millennium", datetime.extractMillennium)
-    val ExtractMonth = new DateLongExtractor("Month", datetime.extractMonth)
-    val ExtractQuarter = new DateLongExtractor("Quarter", datetime.extractQuarter)
-    val ExtractWeek = new DateLongExtractor("Week", datetime.extractWeek)
-    val ExtractYear = new DateLongExtractor("Year", datetime.extractYear)
+    val ExtractCentury = new DateLongExtractor("Century", time.extractCentury)
+    val ExtractDayOfMonth = new DateLongExtractor("DayOfMonth", time.extractDayOfMonth)
+    val ExtractDecade = new DateLongExtractor("Decade", time.extractDecade)
+    val ExtractDayOfWeek = new DateLongExtractor("DayOfWeek", time.extractDayOfWeek)
+    val ExtractDayOfYear = new DateLongExtractor("DayOfYear", time.extractDayOfYear)
+    val ExtractIsoDayOfWeek = new DateLongExtractor("IsoDayOfWeek", time.extractIsoDayOfWeek)
+    val ExtractIsoYear = new DateLongExtractor("IsoYear", time.extractIsoYear)
+    val ExtractMillennium = new DateLongExtractor("Millennium", time.extractMillennium)
+    val ExtractMonth = new DateLongExtractor("Month", time.extractMonth)
+    val ExtractQuarter = new DateLongExtractor("Quarter", time.extractQuarter)
+    val ExtractWeek = new DateLongExtractor("Week", time.extractWeek)
+    val ExtractYear = new DateLongExtractor("Year", time.extractYear)
 
-    val ExtractHour = new TimeLongExtractor("Hour", datetime.extractHour)
-    val ExtractMicrosecond = new TimeLongExtractor("Microsecond", datetime.extractMicrosecond)
-    val ExtractMillisecond = new TimeLongExtractor("Millisecond", datetime.extractMillisecond)
-    val ExtractMinute = new TimeLongExtractor("Minute", datetime.extractMinute)
+    val ExtractHour = new TimeLongExtractor("Hour", time.extractHour)
+    val ExtractMicrosecond = new TimeLongExtractor("Microsecond", time.extractMicrosecond)
+    val ExtractMillisecond = new TimeLongExtractor("Millisecond", time.extractMillisecond)
+    val ExtractMinute = new TimeLongExtractor("Minute", time.extractMinute)
     val ExtractSecond = new Op1F1(TimeNamespace, "extractSecond") {
       val tpe = UnaryOperationType(JType.JOffsetT, JNumberT)
       def f1: F1 = CF1P("builtin::time::extractSecond") {
         case AsTimeColumn(c) =>
           new Map1Column(c) with NumColumn {
-            def apply(row: Int) = datetime.extractSecond(c(row))
+            def apply(row: Int) = time.extractSecond(c(row))
           }
       }
     }
 
-    val ExtractTimeZone = new OffsetIntExtractor("TimeZone", datetime.extractTimeZone)
-    val ExtractTimeZoneMinute = new OffsetIntExtractor("TimeZoneMinute", datetime.extractTimeZoneMinute)
-    val ExtractTimeZoneHour = new OffsetIntExtractor("TimeZoneHour", datetime.extractTimeZoneHour)
+    val ExtractTimeZone = new OffsetIntExtractor("TimeZone", time.extractTimeZone)
+    val ExtractTimeZoneMinute = new OffsetIntExtractor("TimeZoneMinute", time.extractTimeZoneMinute)
+    val ExtractTimeZoneHour = new OffsetIntExtractor("TimeZoneHour", time.extractTimeZoneHour)
 
     val SetTimeZone = new OffsetIntSetter("TimeZone",
       ZoneOffset.ofTotalSeconds,
@@ -269,10 +276,10 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       def f1: F1 = CF1P("builtin::time::offsetdate") {
         case c: StrColumn =>
           new OffsetDateColumn {
-            def apply(row: Int) = quasar.OffsetDate.parse(c(row))
+            def apply(row: Int) = QOffsetDate.parse(c(row))
             def isDefinedAt(row: Int) = {
               try {
-                quasar.OffsetDate.parse(c(row))
+                QOffsetDate.parse(c(row))
                 true
               } catch { case (_: DateTimeParseException) =>
                 false
@@ -332,29 +339,29 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
         case c: OffsetDateTimeColumn => new Map1Column(c) with OffsetDateTimeColumn {
           def apply(row: Int) = {
             val r = c(row)
-            JOffsetDateTime.of(datetime.truncDateTime(truncPart, r.toLocalDateTime), r.getOffset)
+            JOffsetDateTime.of(time.truncDateTime(truncPart, r.toLocalDateTime), r.getOffset)
           }
         }
         case c: OffsetDateColumn => new Map1Column(c) with OffsetDateColumn {
           def apply(row: Int) = {
             val r = c(row)
-            quasar.OffsetDate(datetime.truncDate(truncPart, r.date), r.offset)
+            QOffsetDate(time.truncDate(truncPart, r.date), r.offset)
           }
         }
         case c: OffsetTimeColumn => new Map1Column(c) with OffsetTimeColumn {
           def apply(row: Int) = {
             val r = c(row)
-            JOffsetTime.of(datetime.truncTime(truncPart, r.toLocalTime), r.getOffset)
+            JOffsetTime.of(time.truncTime(truncPart, r.toLocalTime), r.getOffset)
           }
         }
         case c: LocalDateTimeColumn => new Map1Column(c) with LocalDateTimeColumn {
-          def apply(row: Int) = datetime.truncDateTime(truncPart, c(row))
+          def apply(row: Int) = time.truncDateTime(truncPart, c(row))
         }
         case c: LocalDateColumn => new Map1Column(c) with LocalDateColumn {
-          def apply(row: Int) = datetime.truncDate(truncPart, c(row))
+          def apply(row: Int) = time.truncDate(truncPart, c(row))
         }
         case c: LocalTimeColumn => new Map1Column(c) with LocalTimeColumn {
-          def apply(row: Int) = datetime.truncTime(truncPart, c(row))
+          def apply(row: Int) = time.truncTime(truncPart, c(row))
         }
       }
       val tpe = UnaryOperationType(JType.JTemporalAbsoluteT, JType.JTemporalAbsoluteT)
@@ -408,13 +415,13 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       def f1: F1 = CF1P("builtin::time::startofday") {
         case c: LocalDateTimeColumn =>
           new Map1Column(c) with LocalDateTimeColumn {
-            def apply(row: Int) = datetime.truncDateTime(TemporalPart.Day, c(row))
+            def apply(row: Int) = time.truncDateTime(TemporalPart.Day, c(row))
           }
         case c: OffsetDateTimeColumn =>
           new Map1Column(c) with OffsetDateTimeColumn {
             def apply(row: Int) = {
               val r = c(row)
-              JOffsetDateTime.of(datetime.truncDateTime(TemporalPart.Day, r.toLocalDateTime), r.getOffset)
+              JOffsetDateTime.of(time.truncDateTime(TemporalPart.Day, r.toLocalDateTime), r.getOffset)
             }
           }
         case c: LocalDateColumn =>

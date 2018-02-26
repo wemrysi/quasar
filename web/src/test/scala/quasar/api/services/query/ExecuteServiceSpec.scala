@@ -18,7 +18,6 @@ package quasar.api.services.query
 
 import slamdata.Predef._
 import quasar._
-import quasar.DateGenerators._
 import quasar.Fixture.unsafeToLP
 import quasar.api._, ApiErrorEntityDecoder._, ToApiError.ops._
 import quasar.api.matchers._
@@ -37,6 +36,7 @@ import quasar.fs.mount.MountConfig.viewConfig0
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.main.CoreEffIO
 import quasar.sql.{Positive => _, _}
+import quasar.time.DateGenerators._
 
 import java.time.{Instant, Duration}
 

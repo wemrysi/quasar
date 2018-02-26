@@ -18,8 +18,7 @@ package quasar.api.services
 
 import scala.Predef.$conforms
 import slamdata.Predef._
-import quasar.{Data, RepresentableData}
-import quasar.DateGenerators._
+import quasar.{Data, RepresentableData, Variables}
 import quasar.DataGenerators._
 import quasar.RepresentableDataGenerators._
 import quasar.api._,
@@ -37,7 +36,7 @@ import MountConfig.{ModuleConfig, ViewConfig, viewConfig0}
 import quasar.fs.mount.cache.ViewCache
 import quasar.main.CoreEffIO
 import quasar.sql._
-import quasar.Variables
+import quasar.time.DateGenerators._
 
 import java.time.{Duration, Instant}
 

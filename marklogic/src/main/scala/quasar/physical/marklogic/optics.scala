@@ -24,7 +24,7 @@ import java.time._
 import java.time.format._
 import java.time.temporal.{TemporalAccessor, TemporalQuery}
 
-import quasar.{DateTimeInterval, OffsetDate}
+import quasar.time.{DateTimeInterval, OffsetDate}
 
 import scalaz._
 

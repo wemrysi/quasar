@@ -29,7 +29,7 @@ import quasar.physical.couchbase.planner.Planner.mapFuncPlanner
 import quasar.Planner.PlannerError
 import quasar.qscript._
 import quasar.std.StdLibSpec
-import quasar.{DateGenerators, DateTimeInterval}
+import quasar.time.{DateGenerators, DateTimeInterval}
 
 import java.time._
 

@@ -16,10 +16,13 @@
 
 package quasar
 
-import java.time._
-
 import slamdata.Predef.{Set => _, _}
-import quasar.DateGenerators._
+import quasar.time.{DateTimeInterval, OffsetDate}
+import quasar.time.DateGenerators._
+
+import java.time._
+import scala.Predef.implicitly
+
 import org.scalacheck._
 import org.scalacheck.Gen._
 
@@ -28,7 +31,6 @@ import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.syntax.traverse._
 import scalaz.std.list._
 import scalaz.std.option._
-import scala.Predef.implicitly
 
 trait TypeGenerators {
   implicit def arbitraryType: Arbitrary[Type] = Arbitrary { Gen.sized(depth => typeGen(depth/25)) }

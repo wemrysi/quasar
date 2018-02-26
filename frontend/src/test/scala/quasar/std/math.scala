@@ -17,13 +17,15 @@
 package quasar.std
 
 import slamdata.Predef._
+
 import quasar.{Func, SemanticError, Type, TypeGenerators}, Type.Const
 import quasar.frontend.logicalplan._
+import quasar.time.DateTimeInterval
+
+import java.time.{OffsetDateTime => JOffsetDateTime}
 
 import matryoshka.data.Fix
 import org.scalacheck.Arbitrary
-import java.time.{OffsetDateTime => JOffsetDateTime}
-import quasar.DateTimeInterval
 import scalaz.ValidationNel
 import scalaz.Validation.FlatMap._
 import shapeless._

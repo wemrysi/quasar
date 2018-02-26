@@ -17,17 +17,20 @@
 package quasar.std
 
 import slamdata.Predef._, BigDecimal.RoundingMode
+
 import quasar.{Data, Qspec, Type}
 import quasar.DataGenerators.{dataArbitrary => _, _}
-import quasar.DateGenerators
 import quasar.frontend.logicalplan._
-import quasar.{
+import quasar.pkg.tests._
+import quasar.time.{
+  truncDateTime,
+  truncDate,
+  truncTime,
+  DateGenerators,
   DateTimeInterval,
   OffsetDate => QOffsetDate,
   TemporalPart
 }
-import quasar.DateGenerators.arbZoneOffset
-import quasar.datetime.{truncDateTime, truncDate, truncTime}
 
 import java.time.{
   Instant,
@@ -39,7 +42,6 @@ import java.time.{
   ZoneOffset
 }
 import java.time.format.DateTimeFormatter
-import quasar.pkg.tests._
 import scala.collection.Traversable
 import scala.math.abs
 import scala.util.matching.Regex
@@ -91,6 +93,8 @@ abstract class StdLibSpec extends Qspec {
         runner.decDomain.map(Data.Dec(_)),
         runner.stringDomain.map(Data.Str(_)))
     }
+
+    implicit val arbZoneOffset: Arbitrary[ZoneOffset] = Arbitrary[ZoneOffset](runner.timezoneDomain)
 
     implicit val arbLocalDate: Arbitrary[JLocalDate] = Arbitrary[JLocalDate](runner.dateDomain)
     implicit val arbDataLocalDate: Arbitrary[Data.LocalDate] = arbLocalDate ^^ Data.LocalDate
@@ -398,7 +402,7 @@ abstract class StdLibSpec extends Qspec {
             SetTimeZone(_, _).embed,
             Data.Int(offset),
             Data.LocalDate(dt),
-            Data.OffsetDate(quasar.OffsetDate(dt, ZoneOffset.ofTotalSeconds(offset))))
+            Data.OffsetDate(QOffsetDate(dt, ZoneOffset.ofTotalSeconds(offset))))
         }.setGens(genOffset, arbLocalDate.gen)
 
         "LocalTime" >> prop { (offset: Int, dt: JLocalTime) =>
@@ -417,7 +421,7 @@ abstract class StdLibSpec extends Qspec {
             Data.OffsetDateTime(dt.withOffsetSameLocal(ZoneOffset.ofTotalSeconds(offset))))
         }.setGens(genOffset, arbOffsetDateTime.gen)
 
-        "OffsetDate" >> prop { (offset: Int, dt: quasar.OffsetDate) =>
+        "OffsetDate" >> prop { (offset: Int, dt: QOffsetDate) =>
           binary(
             SetTimeZone(_, _).embed,
             Data.Int(offset),
@@ -448,7 +452,7 @@ abstract class StdLibSpec extends Qspec {
             SetTimeZoneMinute(_, _).embed,
             Data.Int(offset),
             Data.LocalDate(dt),
-            Data.OffsetDate(quasar.OffsetDate(dt, ZoneOffset.ofHoursMinutes(0, offset))))
+            Data.OffsetDate(QOffsetDate(dt, ZoneOffset.ofHoursMinutes(0, offset))))
         }.setGens(genOffsetMinute, arbLocalDate.gen)
 
         "LocalTime" >> prop { (offset: Int, dt: JLocalTime) =>
@@ -471,8 +475,8 @@ abstract class StdLibSpec extends Qspec {
           binary(
             SetTimeZoneMinute(_, _).embed,
             Data.Int(offset),
-            Data.OffsetDate(quasar.OffsetDate(dt, ZoneOffset.ofHoursMinutesSeconds(5, 17, 23))),
-            Data.OffsetDate(quasar.OffsetDate(dt, ZoneOffset.ofHoursMinutesSeconds(5, offset, 23))))
+            Data.OffsetDate(QOffsetDate(dt, ZoneOffset.ofHoursMinutesSeconds(5, 17, 23))),
+            Data.OffsetDate(QOffsetDate(dt, ZoneOffset.ofHoursMinutesSeconds(5, offset, 23))))
         }.setGens(genOffsetPositiveMinute, arbLocalDate.gen)
 
         "OffsetTime" >> prop { (offset: Int, dt: JLocalTime) =>
@@ -498,7 +502,7 @@ abstract class StdLibSpec extends Qspec {
             SetTimeZoneHour(_, _).embed,
             Data.Int(offset),
             Data.LocalDate(dt),
-            Data.OffsetDate(quasar.OffsetDate(dt, ZoneOffset.ofHoursMinutes(offset, 0))))
+            Data.OffsetDate(QOffsetDate(dt, ZoneOffset.ofHoursMinutes(offset, 0))))
         }.setGens(genOffsetHour, arbLocalDate.gen)
 
         "LocalTime" >> prop { (offset: Int, dt: JLocalTime) =>
@@ -521,8 +525,8 @@ abstract class StdLibSpec extends Qspec {
           binary(
             SetTimeZoneHour(_, _).embed,
             Data.Int(offset),
-            Data.OffsetDate(quasar.OffsetDate(dt, ZoneOffset.ofHoursMinutesSeconds(5, 17, 23))),
-            Data.OffsetDate(quasar.OffsetDate(dt, ZoneOffset.ofHoursMinutesSeconds(offset, 17, 23))))
+            Data.OffsetDate(QOffsetDate(dt, ZoneOffset.ofHoursMinutesSeconds(5, 17, 23))),
+            Data.OffsetDate(QOffsetDate(dt, ZoneOffset.ofHoursMinutesSeconds(offset, 17, 23))))
         }.setGens(genOffsetPositiveHour, arbLocalDate.gen)
 
         "OffsetTime" >> prop { (offset: Int, dt: JLocalTime) =>
@@ -1362,7 +1366,7 @@ abstract class StdLibSpec extends Qspec {
         unary(
           Interval(_).embed,
           Data.Str("P7Y2M4W3DT5H6M9.1409S"),
-          Data.Interval(quasar.DateTimeInterval(7, 2, (4*7)+3, (5*60*60)+(6*60)+9, 140900000)))
+          Data.Interval(DateTimeInterval(7, 2, (4*7)+3, (5*60*60)+(6*60)+9, 140900000)))
       }
 
       "StartOfDay" >> {
@@ -1429,7 +1433,7 @@ abstract class StdLibSpec extends Qspec {
         "OffsetDate" >> {
           unary(
             ToLocal(_).embed,
-            Data.OffsetDate(quasar.OffsetDate.parse("2009-02-13+12:15:18")),
+            Data.OffsetDate(QOffsetDate.parse("2009-02-13+12:15:18")),
             Data.LocalDate(JLocalDate.parse("2009-02-13")))
         }
 

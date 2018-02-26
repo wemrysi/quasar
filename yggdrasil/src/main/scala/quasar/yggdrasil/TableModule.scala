@@ -16,11 +16,10 @@
 
 package quasar.yggdrasil
 
+import quasar.precog.common._
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
-import quasar.precog.common._
-
-import quasar.{DateTimeInterval, OffsetDate}
+import quasar.time.{DateTimeInterval, OffsetDate}
 
 import scala.collection.Set
 

@@ -25,7 +25,7 @@ import quasar.physical.couchbase._, N1QL.{Eq, Split, _}, Case._, Select.{Value, 
 import quasar.Planner.PlannerErrorME
 import quasar.qscript, qscript.{MapFuncCore, MapFuncsCore => MF}
 import quasar.std.StdLib.string.{dateRegex, timeRegex}
-import quasar.TemporalPart, TemporalPart._
+import quasar.time.TemporalPart, TemporalPart._
 
 import matryoshka._
 import matryoshka.implicits._

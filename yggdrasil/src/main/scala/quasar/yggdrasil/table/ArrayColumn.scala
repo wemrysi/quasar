@@ -16,11 +16,11 @@
 
 package quasar.yggdrasil.table
 
-import quasar.DateTimeInterval
 import quasar.precog._
 import quasar.precog.common._
 import quasar.precog.util._
-import quasar.OffsetDate
+import quasar.time.{DateTimeInterval, OffsetDate}
+
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 
 import scala.reflect.ClassTag

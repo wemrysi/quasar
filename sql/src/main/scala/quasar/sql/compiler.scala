@@ -17,8 +17,18 @@
 package quasar.sql
 
 import slamdata.Predef._
-import quasar.{Data, Func, GenericFunc, HomomorphicFunction, Reduction, SemanticError, UnaryFunc, VarName}
-import SemanticError._
+import quasar.{
+  Data,
+  Func,
+  GenericFunc,
+  HomomorphicFunction,
+  Reduction,
+  RenderTree,
+  SemanticError,
+  UnaryFunc,
+  VarName
+}
+import quasar.SemanticError._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.contrib.shapeless._
@@ -26,9 +36,8 @@ import quasar.common.SortDir
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, Let => LPLet, _}
 import quasar.std.StdLib, StdLib._
-import quasar.TemporalPart
 import quasar.sql.{SemanticAnalysis => SA}, SA._
-import quasar.RenderTree
+import quasar.time.TemporalPart
 
 import matryoshka._
 import matryoshka.data._
