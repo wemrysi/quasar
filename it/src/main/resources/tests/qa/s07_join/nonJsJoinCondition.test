@@ -6,7 +6,6 @@
         "marklogic_json":    "timeout",
         "marklogic_xml":     "timeout",
         "mimir":             "ignoreFieldOrder",
-        "mongodb_read_only": "pending",
         "spark_hdfs":        "pending",
         "spark_local":       "pending",
         "spark_cassandra":   "pending",
@@ -14,7 +13,6 @@
     },
 
     "data": "../zips.data",
-    "NB": "mongodb_read_only works if an index on zips.pop exists. The test harness does not currently support creating indexes",
 
     "query": "select z1.city as city1, z1.loc, z2.city as city2, z2.pop from `../zips` as z1 join `../zips` as z2 on z1.loc[*] = z2.pop",
 
