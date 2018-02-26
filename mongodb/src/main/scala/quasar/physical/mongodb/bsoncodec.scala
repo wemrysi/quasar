@@ -199,7 +199,7 @@ object BsonCodec {
           if y === 0 && m === 0 && d === 0 // TODO support intervals with dates in them
         } yield {
           Bson.Dec(s*1000 + n*1e-6)
-        }) \/> NonRepresentableEJson(value.shows + " is not a valid Interval (only time-like intervals are supported)")
+        }) \/> NonRepresentableEJson(value.shows + " is either not a valid Interval or contains a nonzero year, month, or day (currently only time-like intervals are supported)")
 
       case (_, _) => value.right
     }
