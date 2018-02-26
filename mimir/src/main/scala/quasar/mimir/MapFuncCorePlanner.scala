@@ -124,11 +124,11 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.NowDate() => ???
       case MapFuncsCore.CurrentTimeZone() => ???
 
-      case MapFuncsCore.SetTimeZone(a1, v) =>
+      case MapFuncsCore.SetTimeZone(v, a1) =>
         (Map2[A](a1, v, cake.Library.SetTimeZone.f2): TransSpec[A]).point[F]
-      case MapFuncsCore.SetTimeZoneHour(a1, v) =>
+      case MapFuncsCore.SetTimeZoneHour(v, a1) =>
         (Map2[A](a1, v, cake.Library.SetTimeZoneHour.f2): TransSpec[A]).point[F]
-      case MapFuncsCore.SetTimeZoneMinute(a1, v) =>
+      case MapFuncsCore.SetTimeZoneMinute(v, a1) =>
         (Map2[A](a1, v, cake.Library.SetTimeZoneMinute.f2): TransSpec[A]).point[F]
 
       case MapFuncsCore.TypeOf(a1) => ???

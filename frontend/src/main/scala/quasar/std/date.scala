@@ -240,13 +240,13 @@ trait DateLib extends Library with Serializable {
     BinaryFunc(
       Mapping, help,
       Type.Temporal,
-      Func.Input2(Type.Int, Type.Temporal),
+      Func.Input2(Type.Temporal, Type.Int),
       noSimplification,
       partialTyper[nat._2] {
-        case Sized(Type.Numeric, Type.OffsetDate | Type.OffsetDateTime | Type.OffsetTime) => Type.Numeric
-        case Sized(Type.Const(Data.Int(input)), Type.Const(DataDateTimeExtractors.CanLensTimeZone(i))) =>
+        case Sized(Type.OffsetDate | Type.OffsetDateTime | Type.OffsetTime, Type.Numeric) => Type.Numeric
+        case Sized(Type.Const(DataDateTimeExtractors.CanLensTimeZone(i)), Type.Const(Data.Int(input))) =>
           Type.Const(i.peeks(outTimeZone(input.toInt, _)))
-        case Sized(Type.Const(Data.Int(input)), Type.Const(DataDateTimeExtractors.CanSetTimeZone(k))) =>
+        case Sized(Type.Const(DataDateTimeExtractors.CanSetTimeZone(k)), Type.Const(Data.Int(input))) =>
           Type.Const(k(out(input.toInt)))
       },
       basicUntyper)
