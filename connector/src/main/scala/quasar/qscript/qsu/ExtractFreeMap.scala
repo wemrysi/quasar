@@ -208,10 +208,8 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
 
   private def hasJoinRef(g: QSUGraph, refId: Symbol): Boolean =
     Tag.unwrap[Boolean, Disjunction](g.foldMapUp(g => g.unfold.map(_.root) match {
-      case JoinSideRef(rid) if refId === rid =>
-        Tag[Boolean, Disjunction](true)
-      case _ =>
-        Tag[Boolean, Disjunction](false)
+      case JoinSideRef(rid) if refId === rid => Tag(true)
+      case _ => Tag(false)
     }))
 
   private def replaceRefs(g: QSUGraph, l: Symbol, r: Symbol)
