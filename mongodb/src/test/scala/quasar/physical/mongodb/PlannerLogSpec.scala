@@ -29,7 +29,7 @@ class PlannerLogSpec extends PlannerHelpers {
     "include all phases when successful" in {
       planLog(sqlE"select city from zips").map(_.name) must_===
         Vector(
-          "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
+          "SQL AST", "Variables Substituted", "Absolutized",
           "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "QScript (Educated)", "QScript (ShiftRead)", "QScript (Optimized)",
@@ -40,7 +40,7 @@ class PlannerLogSpec extends PlannerHelpers {
     "log mapBeforeSort when it is applied" in {
       planLog(sqlE"select length(city) from zips order by city").map(_.name) must_===
         Vector(
-          "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
+          "SQL AST", "Variables Substituted", "Absolutized",
           "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "QScript (Educated)", "QScript (ShiftRead)", "QScript (Optimized)",
@@ -58,7 +58,7 @@ class PlannerLogSpec extends PlannerHelpers {
     "include correct phases with planner error" in {
       planLog(sqlE"""select interval(bar) from zips""").map(_.name) must_===
         Vector(
-          "SQL AST", "Variables Substituted", "Absolutized", "Normalized Projections",
+          "SQL AST", "Variables Substituted", "Absolutized",
           "Sort Keys Projected", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked", "Rewritten Joins",
           "QScript (Educated)", "QScript (ShiftRead)", "QScript (Optimized)",
