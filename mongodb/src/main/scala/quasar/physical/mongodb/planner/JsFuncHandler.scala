@@ -17,11 +17,16 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.Data
+import quasar.{Data, Planner, Type}, Planner._, Type.{Coproduct => _, _}
+import quasar.ejson.EJson
+import quasar.fp._
+import quasar.fp.ski._
+import quasar.fs.MonadFsErr
 import quasar.javascript.Js
-import quasar.jscore, jscore.{Name, JsCoreF}
+import quasar.jscore, jscore.{JsCore, JsCoreF, Name}
+import quasar.physical.mongodb.planner.common._
+import quasar.qscript._
 import quasar.std.StdLib._
-import quasar.qscript._, MapFuncsCore._
 import quasar.std.TemporalPart._
 
 import scala.Predef.implicitly
@@ -33,15 +38,201 @@ import matryoshka.patterns._
 import scalaz.{Divide => _, _}, Scalaz._
 
 trait JsFuncHandler[IN[_]] {
-  def handle: IN ~> OptionFree[JsCoreF, ?]
+  def handle[M[_]: Monad: MonadFsErr: ExecTimeR]: AlgebraM[M, IN, JsCore]
 }
 
 object JsFuncHandler {
 
-  implicit def mapFuncCore[T[_[_]]: BirecursiveT, J, E]
+  // TODO: Use `JsonCodec.encode` and avoid failing.
+  private def ejsonToJs[M[_]: Applicative: MonadFsErr, EJ: Show]
+    (ej: EJ)(implicit EJ: Recursive.Aux[EJ, EJson])
+      : M[JsCore] =
+    ej.cata(Data.fromEJson).toJs.fold(
+      raisePlannerError[M, JsCore](NonRepresentableEJson(ej.shows)))(
+      _.point[M])
+
+  implicit def mapFuncCore[T[_[_]]: BirecursiveT: ShowT, J, E]
       : JsFuncHandler[MapFuncCore[T, ?]] =
     new JsFuncHandler[MapFuncCore[T, ?]] {
-      def handle: MapFuncCore[T, ?] ~> OptionFree[JsCoreF, ?] =
+      import jscore.{
+        Add => _, In => _,
+        Lt => _, Lte => _, Gt => _, Gte => _, Eq => _, Neq => _,
+        And => _, Or => _, Not => _, TypeOf => _,
+        _}
+
+      val mjs = quasar.physical.mongodb.javascript[JsCore](_.embed)
+      import mjs._
+
+      import MapFuncsCore._
+
+      // NB: Math.trunc is not present in MongoDB.
+      private def trunc(expr: JsCore): JsCore =
+        Let(Name("x"), expr,
+          BinOp(jscore.Sub,
+            ident("x"),
+            BinOp(jscore.Mod, ident("x"), Literal(Js.Num(1, false)))))
+
+      private def execTime[M[_]: Applicative](implicit ev: ExecTimeR[M]): M[JsCore] =
+          ev.ask map (ts => Literal(Js.Str(ts.toString)))
+
+      def handle[M[_]: Monad: MonadFsErr: ExecTimeR]: AlgebraM[M, MapFuncCore[T, ?], JsCore] =
+        mf => handleCommon(mf).cata(_.point[M], handleSpecial[M].apply(mf))
+
+      def handleCommon(mf: MapFuncCore[T, JsCore]): Option[JsCore] =
+        handle0.apply(mf).map(unpack[Fix, JsCoreF])
+
+      def handleSpecial[M[_]: Monad: MonadFsErr: ExecTimeR]: AlgebraM[M, MapFuncCore[T, ?], JsCore] = {
+        case Constant(v1) => ejsonToJs[M, T[EJson]](v1)
+        case JoinSideName(n) => raisePlannerError[M, JsCore](UnexpectedJoinSide(n))
+        case Now() => execTime[M] map (ts => New(Name("ISODate"), List(ts)))
+        case Interval(a1) => unimplemented[M, JsCore]("Interval JS")
+
+        // TODO: De-duplicate and move these to JsFuncHandler
+        case ExtractCentury(date) =>
+          Call(ident("NumberLong"), List(
+            Call(Select(ident("Math"), "ceil"), List(
+              BinOp(jscore.Div,
+                Call(Select(date, "getUTCFullYear"), Nil),
+                Literal(Js.Num(100, false))))))).point[M]
+        case ExtractDayOfMonth(date) => Call(Select(date, "getUTCDate"), Nil).point[M]
+        case ExtractDecade(date) =>
+          Call(ident("NumberLong"), List(
+            trunc(
+              BinOp(jscore.Div,
+                Call(Select(date, "getUTCFullYear"), Nil),
+                Literal(Js.Num(10, false)))))).point[M]
+        case ExtractDayOfWeek(date) =>
+          Call(Select(date, "getUTCDay"), Nil).point[M]
+        case ExtractDayOfYear(date) =>
+          Call(ident("NumberInt"), List(
+            Call(Select(ident("Math"), "floor"), List(
+              BinOp(jscore.Add,
+                BinOp(jscore.Div,
+                  BinOp(Sub,
+                    date,
+                    New(Name("Date"), List(
+                      Call(Select(date, "getFullYear"), Nil),
+                      Literal(Js.Num(0, false)),
+                      Literal(Js.Num(0, false))))),
+                  Literal(Js.Num(86400000, false))),
+                Literal(Js.Num(1, false))))))).point[M]
+        case ExtractEpoch(date) =>
+          Call(ident("NumberLong"), List(
+            BinOp(jscore.Div,
+              Call(Select(date, "valueOf"), Nil),
+              Literal(Js.Num(1000, false))))).point[M]
+        case ExtractHour(date) => Call(Select(date, "getUTCHours"), Nil).point[M]
+        case ExtractIsoDayOfWeek(date) =>
+          Let(Name("x"), Call(Select(date, "getUTCDay"), Nil),
+            If(
+              BinOp(jscore.Eq, ident("x"), Literal(Js.Num(0, false))),
+              Literal(Js.Num(7, false)),
+              ident("x"))).point[M]
+        case ExtractIsoYear(date) =>
+          Call(Select(date, "getUTCFullYear"), Nil).point[M]
+        case ExtractMicroseconds(date) =>
+          BinOp(jscore.Mult,
+            BinOp(jscore.Add,
+              Call(Select(date, "getUTCMilliseconds"), Nil),
+              BinOp(jscore.Mult,
+                Call(Select(date, "getUTCSeconds"), Nil),
+                Literal(Js.Num(1000, false)))),
+            Literal(Js.Num(1000, false))).point[M]
+        case ExtractMillennium(date) =>
+          Call(ident("NumberLong"), List(
+            Call(Select(ident("Math"), "ceil"), List(
+              BinOp(jscore.Div,
+                Call(Select(date, "getUTCFullYear"), Nil),
+                Literal(Js.Num(1000, false))))))).point[M]
+        case ExtractMilliseconds(date) =>
+          BinOp(jscore.Add,
+            Call(Select(date, "getUTCMilliseconds"), Nil),
+            BinOp(jscore.Mult,
+              Call(Select(date, "getUTCSeconds"), Nil),
+              Literal(Js.Num(1000, false)))).point[M]
+        case ExtractMinute(date) =>
+          Call(Select(date, "getUTCMinutes"), Nil).point[M]
+        case ExtractMonth(date) =>
+          BinOp(jscore.Add,
+            Call(Select(date, "getUTCMonth"), Nil),
+            Literal(Js.Num(1, false))).point[M]
+        case ExtractQuarter(date) =>
+          Call(ident("NumberInt"), List(
+            BinOp(jscore.Add,
+              BinOp(jscore.BitOr,
+                BinOp(jscore.Div,
+                  Call(Select(date, "getUTCMonth"), Nil),
+                  Literal(Js.Num(3, false))),
+                Literal(Js.Num(0, false))),
+              Literal(Js.Num(1, false))))).point[M]
+        case ExtractSecond(date) =>
+          BinOp(jscore.Add,
+            Call(Select(date, "getUTCSeconds"), Nil),
+            BinOp(jscore.Div,
+              Call(Select(date, "getUTCMilliseconds"), Nil),
+              Literal(Js.Num(1000, false)))).point[M]
+        case ExtractWeek(date) =>
+          Call(ident("NumberInt"), List(
+            Call(Select(ident("Math"), "floor"), List(
+              BinOp(jscore.Add,
+                BinOp(jscore.Div,
+                  Let(Name("startOfYear"),
+                    New(Name("Date"), List(
+                      Call(Select(date, "getFullYear"), Nil),
+                      Literal(Js.Num(0, false)),
+                      Literal(Js.Num(1, false)))),
+                    BinOp(jscore.Add,
+                      BinOp(Div,
+                        BinOp(Sub, date, ident("startOfYear")),
+                        Literal(Js.Num(86400000, false))),
+                      BinOp(jscore.Add,
+                        Call(Select(ident("startOfYear"), "getDay"), Nil),
+                        Literal(Js.Num(1, false))))),
+                  Literal(Js.Num(7, false))),
+                Literal(Js.Num(1, false))))))).point[M]
+
+        case MakeMap(Embed(LiteralF(Js.Str(str))), a2) => Obj(ListMap(Name(str) -> a2)).point[M]
+        // TODO: pull out the literal, and handle this case in other situations
+        case MakeMap(a1, a2) => Obj(ListMap(Name("__Quasar_non_string_map") ->
+         Arr(List(Arr(List(a1, a2)))))).point[M]
+        case ConcatArrays(Embed(ArrF(a1)), Embed(ArrF(a2))) =>
+          Arr(a1 |+| a2).point[M]
+        case ConcatArrays(a1, a2) =>
+          If(BinOp(jscore.Or, isArray(a1), isArray(a2)),
+            Call(Select(a1, "concat"), List(a2)),
+            BinOp(jscore.Add, a1, a2)).point[M]
+        case ConcatMaps(Embed(ObjF(o1)), Embed(ObjF(o2))) =>
+          Obj(o1 ++ o2).point[M]
+        case ConcatMaps(a1, a2) => SpliceObjects(List(a1, a2)).point[M]
+
+        case Guard(expr, typ, cont, fallback) =>
+          val jsCheck: Type => Option[JsCore => JsCore] =
+            generateTypeCheck[JsCore, JsCore](BinOp(jscore.Or, _, _)) {
+              case Type.Null             => isNull
+              case Type.Dec              => isDec
+              case Type.Int
+                 | Type.Int ⨿ Type.Dec
+                 | Type.Int ⨿ Type.Dec ⨿ Type.Interval
+                  => isAnyNumber
+              case Type.Str              => isString
+              case Type.Obj(_, _) ⨿ Type.FlexArr(_, _, _)
+                  => isObjectOrArray
+              case Type.Obj(_, _)        => isObject
+              case Type.FlexArr(_, _, _) => isArray
+              case Type.Binary           => isBinary
+              case Type.Id               => isObjectId
+              case Type.Bool             => isBoolean
+              case Type.Date             => isDate
+              case Type.Syntaxed         => isSyntaxed
+            }
+          jsCheck(typ).fold[M[JsCore]](
+            raiseInternalError("uncheckable type"))(
+            f => If(f(expr), cont, fallback).point[M])
+        // TODO: Specify the function name for pattern match failures
+        case _ => unimplemented[M, JsCore]("JS function")
+      }
+
+      def handle0: MapFuncCore[T, ?] ~> OptionFree[JsCoreF, ?] =
         new (MapFuncCore[T, ?] ~> OptionFree[JsCoreF, ?]) {
 
           def apply[A](mfc: MapFuncCore[T, A]): OptionFree[JsCoreF, A] = {
@@ -406,49 +597,22 @@ object JsFuncHandler {
         }
     }
 
-    def mapFuncDerived[T[_[_]]]
-        : JsFuncHandler[MapFuncDerived[T, ?]] =
-      new JsFuncHandler[MapFuncDerived[T, ?]] {
-
-        def handle: MapFuncDerived[T, ?] ~> OptionFree[JsCoreF, ?] =
-          new (MapFuncDerived[T, ?] ~> OptionFree[JsCoreF, ?]) {
-
-            def apply[A](mfc: MapFuncDerived[T, A]): OptionFree[JsCoreF, A] = None
-          }
-      }
-
-  implicit def mapFuncDerivedUnhandled[T[_[_]]: CorecursiveT]
+  implicit def mapFuncDerived[T[_[_]]: CorecursiveT]
     (implicit core: JsFuncHandler[MapFuncCore[T, ?]])
       : JsFuncHandler[MapFuncDerived[T, ?]] =
     new JsFuncHandler[MapFuncDerived[T, ?]] {
-      val derived: JsFuncHandler[MapFuncDerived[T, ?]] = mapFuncDerived
-
-      private def handleUnhandled[F[_]]
-        (derived: MapFuncDerived[T, ?] ~> OptionFree[F, ?], core: MapFuncCore[T, ?] ~> OptionFree[F, ?])
-          : MapFuncDerived[T, ?] ~> OptionFree[F, ?] =
-        new (MapFuncDerived[T, ?] ~> OptionFree[F, ?]) {
-          def apply[A](f: MapFuncDerived[T, A]): OptionFree[F, A] = {
-            val alg: AlgebraM[Option, CoEnv[A, MapFuncCore[T,?], ?], Free[F,A]] =
-              _.run.fold[OptionFree[F, A]](x => Free.point(x).some, core(_).map(_.join))
-            derived(f)
-              .orElse(Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(alg))
-          }
-        }
-
-      def handle: MapFuncDerived[T, ?] ~> OptionFree[JsCoreF, ?] =
-        handleUnhandled(derived.handle, core.handle)
+      def handle[M[_]: Monad: MonadFsErr: ExecTimeR]: AlgebraM[M, MapFuncDerived[T, ?], JsCore] =
+        ExpandMapFunc.expand(core.handle[M], κ[MapFuncDerived[T, JsCore], Option[M[JsCore]]](None))
     }
 
   implicit def mapFuncCoproduct[F[_], G[_]]
       (implicit F: JsFuncHandler[F], G: JsFuncHandler[G])
       : JsFuncHandler[Coproduct[F, G, ?]] =
     new JsFuncHandler[Coproduct[F, G, ?]] {
-      def handle: Coproduct[F, G, ?] ~> OptionFree[JsCoreF, ?] =
-        λ[Coproduct[F, G, ?] ~> OptionFree[JsCoreF, ?]](_.run.fold(
-          F.handle.apply, G.handle.apply
-        ))
+      def handle[M[_]: Monad: MonadFsErr: ExecTimeR]: AlgebraM[M, Coproduct[F, G, ?], JsCore] =
+        _.run.fold(F.handle[M], G.handle[M])
     }
 
-  def handle[F[_]: JsFuncHandler]: F ~> OptionFree[JsCoreF, ?] =
-    implicitly[JsFuncHandler[F]].handle
+  def handle[F[_]: JsFuncHandler, M[_]: Monad: MonadFsErr: ExecTimeR]: AlgebraM[M, F, JsCore] =
+    implicitly[JsFuncHandler[F]].handle[M]
 }
