@@ -116,11 +116,6 @@ object Data {
   val _arr =
     Prism.partial[Data, List[Data]] { case Data.Arr(l) => l } (Data.Arr(_))
 
-  final case class Set(value: List[Data]) extends Data {
-    def dataType = value.foldLeft[Type](Type.Bottom)((acc, d) => Type.lub(acc, d.dataType))
-    def toJs = None
-  }
-
   final case class Timestamp(value: Instant) extends Data {
     def dataType = Type.Timestamp
     def toJs = jscore.Call(jscore.ident("ISODate"), List(jscore.Literal(Js.Str(value.toString)))).some
