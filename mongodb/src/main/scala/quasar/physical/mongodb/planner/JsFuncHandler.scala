@@ -34,7 +34,6 @@ import scala.Predef.implicitly
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
-import matryoshka.patterns._
 import scalaz.{Divide => _, _}, Scalaz._
 
 trait JsFuncHandler[IN[_]] {
@@ -81,6 +80,55 @@ object JsFuncHandler {
       def handleCommon(mf: MapFuncCore[T, JsCore]): Option[JsCore] =
         handle0.apply(mf).map(unpack[Fix, JsCoreF])
 
+      def year(date: JsCore): JsCore =
+        Call(Select(date, "getUTCFullYear"), Nil)
+
+      def month(date: JsCore): JsCore =
+        BinOp(jscore.Add,
+          Call(Select(date, "getUTCMonth"), Nil),
+          litNum(1))
+
+      def day(date: JsCore): JsCore =
+        Call(Select(date, "getUTCDate"), Nil)
+
+      def hour(date: JsCore): JsCore =
+        Call(Select(date, "getUTCHours"), Nil)
+
+      def minute(date: JsCore): JsCore =
+        Call(Select(date, "getUTCMinutes"), Nil)
+
+      def second(date: JsCore): JsCore =
+        Call(Select(date, "getUTCSeconds"), Nil)
+
+      def millisecond(date: JsCore): JsCore =
+        Call(Select(date, "getUTCMilliseconds"), Nil)
+
+      def dayOfWeek(date: JsCore): JsCore =
+        Call(Select(date, "getUTCDay"), Nil)
+
+      def quarter(date: JsCore): JsCore =
+        BinOp(jscore.Add,
+          Call(Select(ident("Math"), "floor"), List(
+            BinOp(jscore.Div, Call(Select(date, "getUTCMonth"), Nil), litNum(3)))),
+          litNum(1))
+
+      def decade(date: JsCore): JsCore =
+        trunc(BinOp(jscore.Div, year(date), litNum(10)))
+
+      def century(date: JsCore): JsCore =
+        Call(Select(ident("Math"), "ceil"), List(
+          BinOp(jscore.Div, year(date), litNum(100))))
+
+      def millennium(date: JsCore): JsCore =
+        Call(Select(ident("Math"), "ceil"), List(
+          BinOp(jscore.Div, year(date), litNum(1000))))
+
+      def litStr(s: String): JsCore =
+        Literal(Js.Str(s))
+
+      def litNum(i: Int): JsCore =
+        Literal(Js.Num(i.toDouble, false))
+
       def handleSpecial[M[_]: Monad: MonadFsErr: ExecTimeR]: AlgebraM[M, MapFuncCore[T, ?], JsCore] = {
         case Constant(v1) => ejsonToJs[M, T[EJson]](v1)
         case JoinSideName(n) => raisePlannerError[M, JsCore](UnexpectedJoinSide(n))
@@ -90,19 +138,13 @@ object JsFuncHandler {
         // TODO: De-duplicate and move these to JsFuncHandler
         case ExtractCentury(date) =>
           Call(ident("NumberLong"), List(
-            Call(Select(ident("Math"), "ceil"), List(
-              BinOp(jscore.Div,
-                Call(Select(date, "getUTCFullYear"), Nil),
-                Literal(Js.Num(100, false))))))).point[M]
-        case ExtractDayOfMonth(date) => Call(Select(date, "getUTCDate"), Nil).point[M]
+            century(date))).point[M]
+        case ExtractDayOfMonth(date) =>
+          day(date).point[M]
         case ExtractDecade(date) =>
-          Call(ident("NumberLong"), List(
-            trunc(
-              BinOp(jscore.Div,
-                Call(Select(date, "getUTCFullYear"), Nil),
-                Literal(Js.Num(10, false)))))).point[M]
+          Call(ident("NumberLong"), List(decade(date))).point[M]
         case ExtractDayOfWeek(date) =>
-          Call(Select(date, "getUTCDay"), Nil).point[M]
+          dayOfWeek(date).point[M]
         case ExtractDayOfYear(date) =>
           Call(ident("NumberInt"), List(
             Call(Select(ident("Math"), "floor"), List(
@@ -120,57 +162,43 @@ object JsFuncHandler {
           Call(ident("NumberLong"), List(
             BinOp(jscore.Div,
               Call(Select(date, "valueOf"), Nil),
-              Literal(Js.Num(1000, false))))).point[M]
-        case ExtractHour(date) => Call(Select(date, "getUTCHours"), Nil).point[M]
+              litNum(1000)))).point[M]
+        case ExtractHour(date) =>
+          hour(date).point[M]
         case ExtractIsoDayOfWeek(date) =>
-          Let(Name("x"), Call(Select(date, "getUTCDay"), Nil),
+          Let(Name("x"), dayOfWeek(date),
             If(
-              BinOp(jscore.Eq, ident("x"), Literal(Js.Num(0, false))),
-              Literal(Js.Num(7, false)),
+              BinOp(jscore.Eq, ident("x"), litNum(0)),
+              litNum(7),
               ident("x"))).point[M]
         case ExtractIsoYear(date) =>
-          Call(Select(date, "getUTCFullYear"), Nil).point[M]
+          year(date).point[M]
         case ExtractMicroseconds(date) =>
           BinOp(jscore.Mult,
             BinOp(jscore.Add,
-              Call(Select(date, "getUTCMilliseconds"), Nil),
+              millisecond(date),
               BinOp(jscore.Mult,
-                Call(Select(date, "getUTCSeconds"), Nil),
-                Literal(Js.Num(1000, false)))),
-            Literal(Js.Num(1000, false))).point[M]
+                second(date),
+                litNum(1000))),
+            litNum(1000)).point[M]
         case ExtractMillennium(date) =>
-          Call(ident("NumberLong"), List(
-            Call(Select(ident("Math"), "ceil"), List(
-              BinOp(jscore.Div,
-                Call(Select(date, "getUTCFullYear"), Nil),
-                Literal(Js.Num(1000, false))))))).point[M]
+          Call(ident("NumberLong"), List(millennium(date))).point[M]
         case ExtractMilliseconds(date) =>
           BinOp(jscore.Add,
-            Call(Select(date, "getUTCMilliseconds"), Nil),
+            millisecond(date),
             BinOp(jscore.Mult,
-              Call(Select(date, "getUTCSeconds"), Nil),
-              Literal(Js.Num(1000, false)))).point[M]
+              second(date),
+              litNum(1000))).point[M]
         case ExtractMinute(date) =>
-          Call(Select(date, "getUTCMinutes"), Nil).point[M]
+          minute(date).point[M]
         case ExtractMonth(date) =>
-          BinOp(jscore.Add,
-            Call(Select(date, "getUTCMonth"), Nil),
-            Literal(Js.Num(1, false))).point[M]
+          month(date).point[M]
         case ExtractQuarter(date) =>
-          Call(ident("NumberInt"), List(
-            BinOp(jscore.Add,
-              BinOp(jscore.BitOr,
-                BinOp(jscore.Div,
-                  Call(Select(date, "getUTCMonth"), Nil),
-                  Literal(Js.Num(3, false))),
-                Literal(Js.Num(0, false))),
-              Literal(Js.Num(1, false))))).point[M]
+          Call(ident("NumberInt"), List(quarter(date))).point[M]
         case ExtractSecond(date) =>
           BinOp(jscore.Add,
-            Call(Select(date, "getUTCSeconds"), Nil),
-            BinOp(jscore.Div,
-              Call(Select(date, "getUTCMilliseconds"), Nil),
-              Literal(Js.Num(1000, false)))).point[M]
+            second(date),
+            BinOp(jscore.Div, millisecond(date), litNum(1000))).point[M]
         case ExtractWeek(date) =>
           Call(ident("NumberInt"), List(
             Call(Select(ident("Math"), "floor"), List(
@@ -228,6 +256,7 @@ object JsFuncHandler {
           jsCheck(typ).fold[M[JsCore]](
             raiseInternalError("uncheckable type"))(
             f => If(f(expr), cont, fallback).point[M])
+
         // TODO: Specify the function name for pattern match failures
         case _ => unimplemented[M, JsCore]("JS function")
       }
@@ -449,46 +478,6 @@ object JsFuncHandler {
                     litStr("."),
                     pad3(millisecond(ident("t")))))
 
-              case ExtractCentury(date) => century(date)
-              case ExtractDayOfMonth(date) => day(date)
-              case ExtractDecade(date) => decade(date)
-              case ExtractDayOfWeek(date) => dayOfWeek(date)
-              // TODO: case ExtractDayOfYear(date) =>
-              case ExtractEpoch(date) =>
-                BinOp(jscore.Div,
-                  Call(select(date, "valueOf"), Nil),
-                  litNum(1000))
-              case ExtractHour(date) => hour(date)
-              case ExtractIsoDayOfWeek(date) =>
-                Let(Name("x"), dayOfWeek(date),
-                  If(
-                    BinOp(jscore.Eq, ident("x"), litNum(0)),
-                    litNum(7),
-                    ident("x")))
-              // TODO: case ExtractIsoYear(date) =>
-              case ExtractMicroseconds(date) =>
-                BinOp(jscore.Mult,
-                  BinOp(jscore.Add,
-                    millisecond(date),
-                    BinOp(jscore.Mult,
-                      second(date),
-                      litNum(1000))),
-                  litNum(1000))
-              case ExtractMillennium(date) => millennium(date)
-              case ExtractMilliseconds(date) =>
-                BinOp(jscore.Add,
-                  millisecond(date),
-                  BinOp(jscore.Mult,
-                    second(date),
-                    litNum(1000)))
-              case ExtractMinute(date) => minute(date)
-              case ExtractMonth(date) => month(date)
-              case ExtractQuarter(date) => quarter(date)
-              case ExtractSecond(date) =>
-                BinOp(jscore.Add,
-                  second(date),
-                  BinOp(jscore.Div, millisecond(date), litNum(1000)))
-              // TODO: case ExtractWeek(date) =>
               case ExtractYear(date) => year(date)
 
               case StartOfDay(date) =>
@@ -589,8 +578,6 @@ object JsFuncHandler {
             }
 
             partial(mfc) orElse (mfc match {
-              case Constant(v1)     =>
-                v1.cata(Data.fromEJson).toJs.map(_.transCata[Free[JsCoreF, A]](js => CoEnv(js.right[A])))
               case _                => None
             })
           }
