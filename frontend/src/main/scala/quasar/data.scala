@@ -511,6 +511,7 @@ object Data {
       case Str(value)       => C.inj(ejson.Str(value)).right
       case Dec(value)       => C.inj(ejson.Dec(value)).right
       case Int(value)       => E.inj(ejson.Int(value)).right
+
       case OffsetDateTime(value) => E.inj(ejson.Meta(
         Obj(ListMap(
           DateTimeConstants.year       -> Int(value.getYear),
@@ -522,6 +523,7 @@ object Data {
           DateTimeConstants.nanosecond -> Int(value.getNano),
           DateTimeConstants.offset     -> Int(value.getOffset.getTotalSeconds))),
         EJsonType(TypeTag.OffsetDateTime))).right
+
       case OffsetTime(value) => E.inj(ejson.Meta(
         Obj(ListMap(
           DateTimeConstants.hour       -> Int(value.getHour),
@@ -530,6 +532,7 @@ object Data {
           DateTimeConstants.nanosecond -> Int(value.getNano),
           DateTimeConstants.offset     -> Int(value.getOffset.getTotalSeconds))),
         EJsonType(TypeTag.OffsetTime))).right
+
       case OffsetDate(value) => E.inj(ejson.Meta(
         Obj(ListMap(
           DateTimeConstants.year   -> Int(value.date.getYear),
@@ -537,6 +540,7 @@ object Data {
           DateTimeConstants.day    -> Int(value.date.getDayOfMonth),
           DateTimeConstants.offset -> Int(value.offset.getTotalSeconds))),
         EJsonType(TypeTag.OffsetDate))).right
+
       case LocalDateTime(value) => E.inj(ejson.Meta(
         Obj(ListMap(
           DateTimeConstants.year       -> Int(value.getYear),
@@ -547,6 +551,7 @@ object Data {
           DateTimeConstants.second     -> Int(value.getSecond),
           DateTimeConstants.nanosecond -> Int(value.getNano))),
         EJsonType(TypeTag.LocalDateTime))).right
+
       case LocalTime(value)      => E.inj(ejson.Meta(
         Obj(ListMap(
           DateTimeConstants.hour       -> Int(value.getHour),
@@ -554,12 +559,14 @@ object Data {
           DateTimeConstants.second     -> Int(value.getSecond),
           DateTimeConstants.nanosecond -> Int(value.getNano))),
         EJsonType(TypeTag.LocalTime))).right
+
       case LocalDate(value) => E.inj(ejson.Meta(
         Obj(ListMap(
           DateTimeConstants.year  -> Int(value.getYear),
           DateTimeConstants.month -> Int(value.getMonth.getValue),
           DateTimeConstants.day   -> Int(value.getDayOfMonth))),
         EJsonType(TypeTag.LocalDate))).right
+
       case Interval(value)  =>
         E.inj(ejson.Meta(
           Obj(ListMap(
@@ -569,13 +576,16 @@ object Data {
             DateTimeConstants.second     -> Int(value.seconds),
             DateTimeConstants.nanosecond -> Int(value.nanos))),
           EJsonType(TypeTag.Interval))).right
+
       case Binary(value)    =>
         E.inj(ejson.Meta(
           Str(ejson.z85.encode(ByteVector.view(value.toArray))),
           EJsonTypeSize(TypeTag.Binary, value.size))).right
+
       case Id(value)        =>
         // FIXME: This evilly guesses the backend-specific OID formats
         E.inj(ejson.Meta(Str(value), EJsonType(TypeTag("_bson.oid")))).right
+
       case data             => data.left
     })
 }
