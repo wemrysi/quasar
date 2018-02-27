@@ -403,7 +403,7 @@ object Data {
         EJsonType(TypeTag.Time))).right
       case Interval(value)  =>
         E.inj(ejson.Meta(
-          Obj(ListMap("seconds" -> Dec(value.toNanos / nanosPerSec))),
+          Obj(ListMap("seconds" -> Dec(BigDecimal(value.toNanos) / BigDecimal(nanosPerSec)))),
           EJsonType(TypeTag.Interval))).right
       case Binary(value)    =>
         E.inj(ejson.Meta(
