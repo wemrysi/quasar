@@ -26,6 +26,7 @@ import quasar.Data.{
   OffsetDateTime => DOffsetDateTime,
   OffsetTime => DOffsetTime
 }
+import quasar.fp._
 
 import java.time.{
   LocalDate => JLocalDate,
@@ -56,49 +57,49 @@ object DataDateTimeExtractors {
 
   object CanLensTime {
     def unapply(data: Data): Option[Store[JLocalTime, Data]] = data match {
-      case d@DOffsetDateTime(_) => Some(time.lensTimeOffsetDateTime(d.value).map(DOffsetDateTime))
-      case d@DOffsetTime(_) => Some(time.lensTimeOffsetTime(d.value).map(DOffsetTime))
-      case d@DLocalDateTime(_) => Some(time.lensTimeLocalDateTime(d.value).map(DLocalDateTime))
-      case d@DLocalTime(_) => Some(Store(DLocalTime, d.value))
+      case d @ DOffsetDateTime(_) => Some(time.lensTimeOffsetDateTime.store(d.value).map(DOffsetDateTime))
+      case d @ DOffsetTime(_) => Some(time.lensTimeOffsetTime.store(d.value).map(DOffsetTime))
+      case d @ DLocalDateTime(_) => Some(time.lensTimeLocalDateTime.store(d.value).map(DLocalDateTime))
+      case d @ DLocalTime(_) => Some(Store(DLocalTime, d.value))
       case _ => None
     }
   }
 
   object CanLensDate {
     def unapply(data: Data): Option[Store[JLocalDate, Data]] = data match {
-      case d@DOffsetDateTime(_) => Some(time.lensDateOffsetDateTime(d.value).map(DOffsetDateTime))
-      case d@DOffsetDate(_) => Some(time.lensDateOffsetDate(d.value).map(DOffsetDate))
-      case d@DLocalDateTime(_) => Some(time.lensDateLocalDateTime(d.value).map(DLocalDateTime))
-      case d@DLocalDate(_) => Some(Store(DLocalDate, d.value))
+      case d @ DOffsetDateTime(_) => Some(time.lensDateOffsetDateTime.store(d.value).map(DOffsetDateTime))
+      case d @ DOffsetDate(_) => Some(time.lensDateOffsetDate.store(d.value).map(DOffsetDate))
+      case d @ DLocalDateTime(_) => Some(time.lensDateLocalDateTime.store(d.value).map(DLocalDateTime))
+      case d @ DLocalDate(_) => Some(Store(DLocalDate, d.value))
       case _ => None
     }
   }
 
   object CanLensDateTime {
     def unapply(data: Data): Option[Store[JLocalDateTime, Data]] = data match {
-      case d@DOffsetDateTime(_) => Some(time.lensDateTimeOffsetDateTime(d.value).map(DOffsetDateTime))
-      case d@DLocalDateTime(_) => Some(time.lensDateTimeLocalDateTime(d.value).map(DLocalDateTime))
+      case d @ DOffsetDateTime(_) => Some(time.lensDateTimeOffsetDateTime.store(d.value).map(DOffsetDateTime))
+      case d @ DLocalDateTime(_) => Some(time.lensDateTimeLocalDateTime.store(d.value).map(DLocalDateTime))
       case _ => None
     }
   }
 
   object CanLensTimeZone {
     def unapply(data: Data): Option[Store[ZoneOffset, Data]] = data match {
-      case d@DOffsetDateTime(_) => Some(time.lensTimeZoneOffsetDateTime(d.value).map(DOffsetDateTime))
-      case d@DOffsetDate(_) => Some(time.lensTimeZoneOffsetDate(d.value).map(DOffsetDate))
-      case d@DOffsetTime(_) => Some(time.lensTimeZoneOffsetTime(d.value).map(DOffsetTime))
+      case d @ DOffsetDateTime(_) => Some(time.lensTimeZoneOffsetDateTime.store(d.value).map(DOffsetDateTime))
+      case d @ DOffsetDate(_) => Some(time.lensTimeZoneOffsetDate.store(d.value).map(DOffsetDate))
+      case d @ DOffsetTime(_) => Some(time.lensTimeZoneOffsetTime.store(d.value).map(DOffsetTime))
       case _ => None
     }
   }
 
   object CanSetTimeZone {
     def unapply(data: Data): Option[ZoneOffset => Data] = data match {
-      case d@DOffsetDateTime(_) => Some(zo => DOffsetDateTime(JOffsetDateTime.of(d.value.toLocalDateTime, zo)))
-      case d@DOffsetDate(_) => Some(zo => DOffsetDate(time.OffsetDate(d.value.date, zo)))
-      case d@DOffsetTime(_) => Some(zo => DOffsetTime(JOffsetTime.of(d.value.toLocalTime, zo)))
-      case d@DLocalDateTime(_) => Some(zo => DOffsetDateTime(JOffsetDateTime.of(d.value, zo)))
-      case d@DLocalDate(_) => Some(zo => DOffsetDate(time.OffsetDate(d.value, zo)))
-      case d@DLocalTime(_) => Some(zo => DOffsetTime(JOffsetTime.of(d.value, zo)))
+      case d @ DOffsetDateTime(_) => Some(zo => DOffsetDateTime(JOffsetDateTime.of(d.value.toLocalDateTime, zo)))
+      case d @ DOffsetDate(_) => Some(zo => DOffsetDate(time.OffsetDate(d.value.date, zo)))
+      case d @ DOffsetTime(_) => Some(zo => DOffsetTime(JOffsetTime.of(d.value.toLocalTime, zo)))
+      case d @ DLocalDateTime(_) => Some(zo => DOffsetDateTime(JOffsetDateTime.of(d.value, zo)))
+      case d @ DLocalDate(_) => Some(zo => DOffsetDate(time.OffsetDate(d.value, zo)))
+      case d @ DLocalTime(_) => Some(zo => DOffsetTime(JOffsetTime.of(d.value, zo)))
       case _ => None
     }
   }

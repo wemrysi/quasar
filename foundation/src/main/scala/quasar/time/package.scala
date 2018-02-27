@@ -21,7 +21,9 @@ import slamdata.Predef._
 import java.time._
 import java.time.temporal.{ChronoField, ChronoUnit}
 
-import scalaz._
+import monocle.Lens
+
+import scalaz.{Lens => _, _}
 import Scalaz._
 
 package object time {
@@ -35,54 +37,95 @@ package object time {
   type LensDateTime[I] = Lens[I, LocalDateTime]
   type SetDateTime[I, O] = (I, LocalDateTime) => O
 
-  def toLensDateTime[I](ld: LensDate[I], lt: LensTime[I]): LensDateTime[I] = Lens.lensu[I, LocalDateTime](
-    (i, ldt) => ld.set(lt.set(i, ldt.toLocalTime), ldt.toLocalDate),
-    i => LocalDateTime.of(ld.get(i), lt.get(i))
-  )
 
-  def toLensDate[I](ldt: LensDateTime[I]): LensDate[I] = ldt andThen lensDateLocalDateTime
+  // Lens
 
-  def toLensTime[I](ldt: LensDateTime[I]): LensTime[I] = ldt andThen lensTimeLocalDateTime
+  def toLensDateTime[I](ld: LensDate[I], lt: LensTime[I]): LensDateTime[I] =
+    Lens[I, LocalDateTime](
+      i => LocalDateTime.of(ld.get(i), lt.get(i)))(
+      ldt => (i => ld.set(ldt.toLocalDate)(lt.set(ldt.toLocalTime)(i))))
 
-  val lensDateLocalDate: LensDate[LocalDate] = Lens.lensId
+  def toLensDate[I](ldt: LensDateTime[I]): LensDate[I] =
+    ldt composeLens lensDateLocalDateTime
+
+  def toLensTime[I](ldt: LensDateTime[I]): LensTime[I] =
+    ldt composeLens lensTimeLocalDateTime
+
+  val lensDateLocalDate: LensDate[LocalDate] = Lens.id[LocalDate]
+
   val lensDateLocalDateTime: LensDate[LocalDateTime] =
-    Lens.lensu[LocalDateTime, LocalDate]((ldt, ld) => LocalDateTime.of(ld, ldt.toLocalTime), _.toLocalDate)
+    Lens[LocalDateTime, LocalDate](
+      _.toLocalDate)(
+      ld => (ldt => LocalDateTime.of(ld, ldt.toLocalTime)))
+
   val lensDateOffsetDate: LensDate[OffsetDate] =
-    Lens.lensu[OffsetDate, LocalDate]((od, ld) => OffsetDate(ld, od.offset), _.date)
+    Lens[OffsetDate, LocalDate](
+      _.date)(
+      ld => (od => OffsetDate(ld, od.offset)))
+
   val lensDateOffsetDateTime: LensDate[OffsetDateTime] =
-    Lens.lensu[OffsetDateTime, LocalDate]((odt, ld) => OffsetDateTime.of(ld, odt.toLocalTime, odt.getOffset), _.toLocalDate)
+    Lens[OffsetDateTime, LocalDate](
+      _.toLocalDate)(
+      ld => (odt => OffsetDateTime.of(ld, odt.toLocalTime, odt.getOffset)))
 
   val lensTimeLocalDateTime: LensTime[LocalDateTime] =
-    Lens.lensu[LocalDateTime, LocalTime]((ldt, lt) => LocalDateTime.of(ldt.toLocalDate, lt), _.toLocalTime)
-  val lensTimeLocalTime: LensTime[LocalTime] = Lens.lensId
-  val lensTimeOffsetDateTime: LensTime[OffsetDateTime] =
-    Lens.lensu[OffsetDateTime, LocalTime]((odt, lt) => OffsetDateTime.of(odt.toLocalDate, lt, odt.getOffset), _.toLocalTime)
-  val lensTimeOffsetTime: LensTime[OffsetTime] =
-    Lens.lensu[OffsetTime, LocalTime]((ot, lt) => OffsetTime.of(lt, ot.getOffset), _.toLocalTime)
+    Lens[LocalDateTime, LocalTime](
+      _.toLocalTime)(
+      lt => (ldt => LocalDateTime.of(ldt.toLocalDate, lt)))
 
-  val lensDateTimeLocalDateTime = Lens.lensId[LocalDateTime]
-  val lensDateTimeOffsetDateTime = toLensDateTime(lensDateOffsetDateTime, lensTimeOffsetDateTime)
+  val lensTimeLocalTime: LensTime[LocalTime] = Lens.id[LocalTime]
+
+  val lensTimeOffsetDateTime: LensTime[OffsetDateTime] =
+    Lens[OffsetDateTime, LocalTime](
+      _.toLocalTime)(
+      lt => (odt => OffsetDateTime.of(odt.toLocalDate, lt, odt.getOffset)))
+
+  val lensTimeOffsetTime: LensTime[OffsetTime] =
+    Lens[OffsetTime, LocalTime](
+      _.toLocalTime)(
+      lt => (ot => OffsetTime.of(lt, ot.getOffset)))
+
+  val lensDateTimeLocalDateTime = Lens.id[LocalDateTime]
+
+  val lensDateTimeOffsetDateTime =
+    toLensDateTime(lensDateOffsetDateTime, lensTimeOffsetDateTime)
+
+  val lensTimeZoneOffsetDateTime: LensTimeZone[OffsetDateTime] =
+    Lens[OffsetDateTime, ZoneOffset](
+      _.getOffset)(
+      o => (odt => OffsetDateTime.of(odt.toLocalDateTime, o)))
+
+  val lensTimeZoneOffsetTime: LensTimeZone[OffsetTime] =
+    Lens[OffsetTime, ZoneOffset](
+      _.getOffset)(
+      o => (ot => OffsetTime.of(ot.toLocalTime, o)))
+
+  val lensTimeZoneOffsetDate: LensTimeZone[OffsetDate] =
+    Lens[OffsetDate, ZoneOffset](
+      _.offset)(
+      o => (od => OffsetDate(od.date, o)))
+
+
+  // Set
+
+  val setTimeZoneLocalTime: SetTimeZone[LocalTime, OffsetTime] = OffsetTime.of
+  val setTimeZoneLocalDate: SetTimeZone[LocalDate, OffsetDate] = OffsetDate(_, _)
+  val setTimeZoneLocalDateTime: SetTimeZone[LocalDateTime, OffsetDateTime] = OffsetDateTime.of
 
   val setDateLocalTime: SetDate[LocalTime, LocalDateTime] =
     (lt, ld) => LocalDateTime.of(ld, lt)
+
   val setTimeLocalDate: SetTime[LocalDate, LocalDateTime] =
     (ld, lt) => LocalDateTime.of(ld, lt)
 
   val setDateOffsetTime: SetDate[OffsetTime, OffsetDateTime] =
     (ot, ld) => OffsetDateTime.of(ld, ot.toLocalTime, ot.getOffset)
+
   val setTimeOffsetDate: SetTime[OffsetDate, OffsetDateTime] =
     (od, lt) => OffsetDateTime.of(od.date, lt, od.offset)
 
-  val lensTimeZoneOffsetDateTime: LensTimeZone[OffsetDateTime] =
-    Lens.lensu[OffsetDateTime, ZoneOffset]((odt, o) => OffsetDateTime.of(odt.toLocalDateTime, o), _.getOffset)
-  val lensTimeZoneOffsetTime: LensTimeZone[OffsetTime] =
-    Lens.lensu[OffsetTime, ZoneOffset]((ot, o) => OffsetTime.of(ot.toLocalTime, o), _.getOffset)
-  val lensTimeZoneOffsetDate: LensTimeZone[OffsetDate] =
-    Lens.lensu[OffsetDate, ZoneOffset]((od, o) => OffsetDate(od.date, o), _.offset)
 
-  val setTimeZoneLocalTime: SetTimeZone[LocalTime, OffsetTime] = OffsetTime.of
-  val setTimeZoneLocalDate: SetTimeZone[LocalDate, OffsetDate] = OffsetDate(_, _)
-  val setTimeZoneLocalDateTime: SetTimeZone[LocalDateTime, OffsetDateTime] = OffsetDateTime.of
+  // Trunc
 
   def truncHour(i: LocalTime): LocalTime = i.truncatedTo(ChronoUnit.HOURS)
   def truncMicrosecond(i: LocalTime): LocalTime = i.truncatedTo(ChronoUnit.MICROS)
@@ -147,6 +190,9 @@ package object time {
       case TemporalPart.Year       => truncYear(date)
       case _                       => date
     }
+
+
+  // Extract
 
   def extractCentury(ld: LocalDate): Long =
     (ld.getLong(ChronoField.YEAR_OF_ERA) - 1) / 100 + 1

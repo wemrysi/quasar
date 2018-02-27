@@ -84,7 +84,7 @@ trait DateLib extends Library with Serializable {
     setter(in, JLocalTime.MIN)
 
   def startOfNextDay[I, O](in: I)(dateLens: LensDate[I], setTime: SetTime[I, O]): O = {
-    val updateDate = dateLens.mod(_.plusDays(1), in)
+    val updateDate = dateLens.modify(_.plusDays(1))(in)
     val updateTime = startOfDay[I, O](updateDate)(setTime)
     updateTime
   }
