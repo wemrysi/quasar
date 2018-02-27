@@ -2321,8 +2321,6 @@ abstract class StdLibSpec extends Qspec {
     "RelationsLib" >> {
       import RelationsLib._
 
-      // TODO: comparisons for date/time/interval types
-
       "Eq" >> {
         "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
           binary(Eq(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x == y))
@@ -2346,10 +2344,6 @@ abstract class StdLibSpec extends Qspec {
             !((Type.Numeric contains x.dataType) &&
               (Type.Numeric contains y.dataType))) ==>
             binary(Eq(_, _).embed, x, y, Data.Bool(false))
-        }
-
-        "any value with self" >> prop { (x: Data) =>
-          binary(Eq(_, _).embed, x, x, Data.Bool(true))
         }
       }
 
@@ -2378,9 +2372,7 @@ abstract class StdLibSpec extends Qspec {
             binary(Neq(_, _).embed, x, y, Data.Bool(true))
         }
 
-        "any value with self" >> prop { (x: Data) =>
-          binary(Neq(_, _).embed, x, x, Data.Bool(false))
-        }
+        // TODO: the rest of the types
       }
 
       "Lt" >> {
