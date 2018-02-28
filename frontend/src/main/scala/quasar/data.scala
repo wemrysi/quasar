@@ -131,11 +131,6 @@ object Data {
   val _arr =
     Prism.partial[Data, List[Data]] { case Data.Arr(l) => l } (Data.Arr(_))
 
-  final case class Set(value: List[Data]) extends Data {
-    def dataType = value.foldLeft[Type](Type.Bottom)((acc, d) => Type.lub(acc, d.dataType))
-    def toJs = None
-  }
-
   final case class OffsetDateTime(value: JOffsetDateTime) extends Data {
     def dataType = Type.OffsetDateTime
     def toJs = jscore.Call(

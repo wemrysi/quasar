@@ -55,9 +55,6 @@ private[qscript] object DataPlanner {
           apply[M, FMT](value) >>= (SP.mkObjectEntry(key.xs, _))
         } >>= (ents => SP.mkObject(mkSeq(ents)))
 
-      case Data.Set(elements) =>
-        elements.traverse(apply[M, FMT]) map (mkSeq(_))
-
       case _ => apply[M, FMT](data)
     }
 }

@@ -16,21 +16,14 @@
 
 package quasar.std
 
-import slamdata.Predef._
 import quasar._
-import quasar.time.DateTimeInterval
 
-import scalaz._, Validation.{success, failureNel}
-import scalaz.std.list._
-import scalaz.std.option._
-import scalaz.syntax.bifunctor._
-import scalaz.syntax.traverse._
-import scalaz.syntax.std.list._
-import scalaz.syntax.monoid._
-import scalaz.syntax.std.option._
+import scalaz._, Validation.success
 import shapeless.{Data => _, :: => _, _}
 
 trait AggLib extends Library {
+  private val MathRel = Type.Numeric ⨿ Type.Interval
+
   private val reflexiveUntyper: Func.Untyper[nat._1] =
     untyper[nat._1](t => success(Func.Input1(t)))
 
@@ -40,12 +33,8 @@ trait AggLib extends Library {
     Type.Int,
     Func.Input1(Type.Top),
     noSimplification,
-    partialTyper[nat._1] {
-      case Sized(Type.Const(Data.Set(xs))) => Type.Const(Data.Int(xs.length))
-      case Sized(Type.Const(_))            => Type.Const(Data.Int(1))
-      case Sized(_)                        => Type.Int
-    },
-    basicUntyper)
+    basicTyper[nat._1],
+    basicUntyper[nat._1])
 
   val Sum = UnaryFunc(
     Reduction,
@@ -53,28 +42,7 @@ trait AggLib extends Library {
     Type.Numeric ⨿ Type.Interval,
     Func.Input1(Type.Numeric ⨿ Type.Interval),
     noSimplification,
-    partialTyperV[nat._1] {
-      case Sized(Type.Const(Data.Set(Nil))) =>
-        success(Type.Const(Data.Int(0)))
-
-      case Sized(Type.Const(s @ Data.Set(xs))) if s.dataType == Type.Int =>
-        intSet(xs)
-          .map(ys => Type.Const(Data.Int(ys.sum)))
-          .validationNel
-
-      case Sized(Type.Const(s @ Data.Set(xs))) if s.dataType == Type.Dec =>
-        decSet(xs)
-          .map(ys => Type.Const(Data.Dec(ys.sum)))
-          .validationNel
-
-      case Sized(Type.Const(s @ Data.Set(xs))) if s.dataType == Type.Interval =>
-        ivlSet(xs)
-          .map(ys => Type.Const(Data.Interval(ys.foldLeft(DateTimeInterval.zero)(_ |+| _))))
-          .validationNel
-
-      case Sized(t) =>
-        success(t)
-    },
+    widenConstTyper(_(0)),
     reflexiveUntyper)
 
   val Min = UnaryFunc(
@@ -83,14 +51,7 @@ trait AggLib extends Library {
     Type.Comparable,
     Func.Input1(Type.Comparable),
     noSimplification,
-    partialTyperV[nat._1] {
-      case Sized(Type.Const(Data.Set(xs))) =>
-        reduceComparableSet(Data.Comparable.min)(xs)
-          .map(c => Type.Const(c.value))
-
-      case Sized(t) =>
-        success(t)
-    },
+    widenConstTyper(_(0)),
     reflexiveUntyper)
 
   val Max = UnaryFunc(
@@ -99,14 +60,7 @@ trait AggLib extends Library {
     Type.Comparable,
     Func.Input1(Type.Comparable),
     noSimplification,
-    partialTyperV[nat._1] {
-      case Sized(Type.Const(Data.Set(xs))) =>
-        reduceComparableSet(Data.Comparable.max)(xs)
-          .map(c => Type.Const(c.value))
-
-      case Sized(t) =>
-        success(t)
-    },
+    widenConstTyper(_(0)),
     reflexiveUntyper)
 
   val First = UnaryFunc(
@@ -115,9 +69,7 @@ trait AggLib extends Library {
     Type.Top,
     Func.Input1(Type.Top),
     noSimplification,
-    partialTyperV[nat._1] {
-      case Sized(t) => success(t)
-    },
+    widenConstTyper(_(0)),
     reflexiveUntyper)
 
   val Last = UnaryFunc(
@@ -126,9 +78,7 @@ trait AggLib extends Library {
     Type.Top,
     Func.Input1(Type.Top),
     noSimplification,
-    partialTyperV[nat._1] {
-      case Sized(t) => success(t)
-    },
+    widenConstTyper(_(0)),
     reflexiveUntyper)
 
   val Avg = UnaryFunc(
@@ -138,16 +88,8 @@ trait AggLib extends Library {
     Func.Input1(Type.Numeric),
     noSimplification,
     partialTyperV[nat._1] {
-      case Sized(Type.Const(Data.Set(Nil))) =>
-        expectedNonEmptySet
-
-      case Sized(Type.Const(Data.Set(xs))) =>
-        numSet(xs)
-          .map(ns => Type.Const(Data.Dec(ns.sum / ns.length)))
-          .validationNel
-
-      case Sized(t) =>
-        success(t)
+      case Sized(t) if MathRel.contains(t) =>
+        success(t.widenConst)
     },
     reflexiveUntyper)
 
@@ -157,55 +99,8 @@ trait AggLib extends Library {
     Type.Top,
     Func.Input1(Type.Top),
     noSimplification,
-    partialTyperV[nat._1] {
-      case Sized(Type.Const(Data.Set(Nil))) =>
-        expectedNonEmptySet
-
-      case Sized(Type.Const(Data.Set(x :: xs))) =>
-        success(Type.Const(x))
-
-      case Sized(t) =>
-        success(t)
-    },
+    widenConstTyper(_(0)),
     reflexiveUntyper)
-
-  ////
-
-  private val errSetF = Functor[SemanticError \/ ?].compose[List]
-
-  private def expectedNonEmptySet[A]: ValidationNel[SemanticError, A] =
-    failureNel(SemanticError.DomainError(Data.Set(Nil), some("Expected non-empty Set")))
-
-  private def reduceComparableSet(
-    f: (Data.Comparable, Data.Comparable) => Option[Data.Comparable]
-  ): List[Data] => ValidationNel[SemanticError, Data.Comparable] =
-    _.toNel.fold(expectedNonEmptySet[Data.Comparable])(xs =>
-      xs.traverse(Data.Comparable(_))
-        .flatMap(ys => ys.tail.foldLeftM(ys.head)(f))
-        .toSuccessNel(SemanticError.DomainError(
-          Data.Set(xs.list.toList),
-          some("Expected Set of comparable values"))))
-
-  private val numSet: List[Data] => SemanticError \/ List[BigDecimal] =
-    set =>
-        errSetF.map(intSet(set))(BigDecimal(_))
-        .orElse(decSet(set))
-        .leftAs(SemanticError.DomainError(Data.Set(set), some("Expected Set of numeric values")))
-
-  private val ivlSet: List[Data] => SemanticError \/ List[DateTimeInterval] =
-    homogenizedPF({ case Data.Interval(d) => d }, "Expected Set(Interval)")
-
-  private val decSet: List[Data] => SemanticError \/ List[BigDecimal] =
-    homogenizedPF({ case Data.Dec(n) => n }, "Expected Set(Dec)")
-
-  private val intSet: List[Data] => SemanticError \/ List[BigInt] =
-    homogenizedPF({ case Data.Int(n) => n }, "Expected Set(Int)")
-
-  private def homogenizedPF[A](f: PartialFunction[Data, A], err: String): List[Data] => SemanticError \/ List[A] =
-    homogenized(f.lift, err)
-
-  private def homogenized[A](f: Data => Option[A], err: String): List[Data] => SemanticError \/ List[A] =
-    set => set.traverse(f) \/> SemanticError.DomainError(Data.Set(set), some(err))
 }
 
 object AggLib extends AggLib

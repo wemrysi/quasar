@@ -278,7 +278,6 @@ object MapFuncCorePlanner {
   import scalaz.syntax.functor._
   import scalaz.std.option._
   def dataToRValue(data: Data): Option[RValue] = data match {
-    case Data.Set(d) => RArray(d.flatMap(dataToRValue)).some
     case Data.Arr(d) => RArray(d.flatMap(dataToRValue)).some
     case Data.Obj(o) => RObject(o.flatMap { case (k, v) => dataToRValue(v).strengthL(k) }).some
     case Data.Null => CNull.some
