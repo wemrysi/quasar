@@ -50,8 +50,7 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
     fixParser.parseScopedExpr(query).valueOr(err => scala.sys.error(
     s"False assumption in test, could not parse due to parse error: $err"))
   val parseAndAnnotate: Fix[Sql] => NonEmptyList[SemanticError] \/ Cofree[Sql, SemanticAnalysis.Annotations] = query => {
-    val normed = normalizeProjections(query)
-    val sorted   = projectSortKeys(normed)
+    val sorted   = projectSortKeys(query)
     annotate(sorted)
   }
 
