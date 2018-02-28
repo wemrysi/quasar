@@ -24,7 +24,6 @@ import matryoshka._
 import scalaz._, Scalaz._
 import shapeless._
 
-// TODO: Cleanup duplication in case statements!
 trait RelationsLib extends Library {
   val Eq = BinaryFunc(
     Mapping,
@@ -69,11 +68,36 @@ trait RelationsLib extends Library {
     Func.Input2(Type.Comparable, Type.Comparable),
     noSimplification,
     partialTyper[nat._2] {
-      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) => Type.Const(Data.Bool(v1 < v2))
-      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => Type.Const(Data.Bool(v1 < v2))
-      case Sized(Type.Const(Data.Str(v1)), Type.Const(Data.Str(v2))) => Type.Const(Data.Bool(v1 < v2))
-        // TODO: fill in
-//      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) => Type.Const(Data.Bool(v1.compareTo(v2) < 0))
+      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) =>
+        Type.Const(Data.Bool(v1 < v2))
+
+      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) =>
+        Type.Const(Data.Bool(v1 < v2))
+
+      case Sized(Type.Const(Data.Str(v1)), Type.Const(Data.Str(v2))) =>
+        Type.Const(Data.Bool(v1 < v2))
+
+      case Sized(Type.Const(Data.LocalDate(v1)), Type.Const(Data.LocalDate(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) < 0))
+
+      case Sized(Type.Const(Data.LocalDateTime(v1)), Type.Const(Data.LocalDateTime(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) < 0))
+
+      case Sized(Type.Const(Data.LocalTime(v1)), Type.Const(Data.LocalTime(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) < 0))
+
+      case Sized(Type.Const(Data.OffsetDate(v1)), Type.Const(Data.OffsetDate(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) < 0))
+
+      case Sized(Type.Const(Data.OffsetDateTime(v1)), Type.Const(Data.OffsetDateTime(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) < 0))
+
+      case Sized(Type.Const(Data.OffsetTime(v1)), Type.Const(Data.OffsetTime(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) < 0))
+
+      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) < 0))
+
       case _ => Type.Bool
     },
     basicUntyper)
@@ -85,12 +109,36 @@ trait RelationsLib extends Library {
     Func.Input2(Type.Comparable, Type.Comparable),
     noSimplification,
     partialTyper[nat._2] {
-      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) => Type.Const(Data.Bool(v1 <= v2))
-      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => Type.Const(Data.Bool(v1 <= v2))
-      case Sized(Type.Const(Data.Str(v1)), Type.Const(Data.Str(v2))) => Type.Const(Data.Bool(v1 <= v2))
-      // TODO: fill in
-//      case Sized(Type.Const(Data.Timestamp(v1)), Type.Const(Data.Timestamp(v2))) => Type.Const(Data.Bool(v1.compareTo(v2) <= 0))
-//      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) => Type.Const(Data.Bool(v1.compareTo(v2) <= 0))
+      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) =>
+        Type.Const(Data.Bool(v1 <= v2))
+
+      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) =>
+        Type.Const(Data.Bool(v1 <= v2))
+
+      case Sized(Type.Const(Data.Str(v1)), Type.Const(Data.Str(v2))) =>
+        Type.Const(Data.Bool(v1 <= v2))
+
+      case Sized(Type.Const(Data.LocalDate(v1)), Type.Const(Data.LocalDate(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) <= 0))
+
+      case Sized(Type.Const(Data.LocalDateTime(v1)), Type.Const(Data.LocalDateTime(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) <= 0))
+
+      case Sized(Type.Const(Data.LocalTime(v1)), Type.Const(Data.LocalTime(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) <= 0))
+
+      case Sized(Type.Const(Data.OffsetDate(v1)), Type.Const(Data.OffsetDate(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) <= 0))
+
+      case Sized(Type.Const(Data.OffsetDateTime(v1)), Type.Const(Data.OffsetDateTime(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) <= 0))
+
+      case Sized(Type.Const(Data.OffsetTime(v1)), Type.Const(Data.OffsetTime(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) <= 0))
+
+      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) <= 0))
+
       case _ => Type.Bool
     },
     basicUntyper)
@@ -102,12 +150,36 @@ trait RelationsLib extends Library {
     Func.Input2(Type.Comparable, Type.Comparable),
     noSimplification,
     partialTyper[nat._2] {
-      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) => Type.Const(Data.Bool(v1 > v2))
-      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => Type.Const(Data.Bool(v1 > v2))
-      case Sized(Type.Const(Data.Str(v1)), Type.Const(Data.Str(v2))) => Type.Const(Data.Bool(v1 > v2))
-        // TODO: fill in
-//      case Sized(Type.Const(Data.Timestamp(v1)), Type.Const(Data.Timestamp(v2))) => Type.Const(Data.Bool(v1.compareTo(v2) > 0))
-//      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) => Type.Const(Data.Bool(v1.compareTo(v2) > 0))
+      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) =>
+        Type.Const(Data.Bool(v1 > v2))
+
+      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) =>
+        Type.Const(Data.Bool(v1 > v2))
+
+      case Sized(Type.Const(Data.Str(v1)), Type.Const(Data.Str(v2))) =>
+        Type.Const(Data.Bool(v1 > v2))
+
+      case Sized(Type.Const(Data.LocalDate(v1)), Type.Const(Data.LocalDate(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) > 0))
+
+      case Sized(Type.Const(Data.LocalDateTime(v1)), Type.Const(Data.LocalDateTime(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) > 0))
+
+      case Sized(Type.Const(Data.LocalTime(v1)), Type.Const(Data.LocalTime(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) > 0))
+
+      case Sized(Type.Const(Data.OffsetDate(v1)), Type.Const(Data.OffsetDate(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) > 0))
+
+      case Sized(Type.Const(Data.OffsetDateTime(v1)), Type.Const(Data.OffsetDateTime(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) > 0))
+
+      case Sized(Type.Const(Data.OffsetTime(v1)), Type.Const(Data.OffsetTime(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) > 0))
+
+      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) > 0))
+
       case _ => Type.Bool
     },
     basicUntyper)
@@ -119,12 +191,36 @@ trait RelationsLib extends Library {
     Func.Input2(Type.Comparable, Type.Comparable),
     noSimplification,
     partialTyper[nat._2] {
-      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) => Type.Const(Data.Bool(v1 >= v2))
-      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => Type.Const(Data.Bool(v1 >= v2))
-      case Sized(Type.Const(Data.Str(v1)), Type.Const(Data.Str(v2))) => Type.Const(Data.Bool(v1 >= v2))
-      // TODO: fill in
-//      case Sized(Type.Const(Data.Timestamp(v1)), Type.Const(Data.Timestamp(v2))) => Type.Const(Data.Bool(v1.compareTo(v2) >= 0))
-//      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) => Type.Const(Data.Bool(v1.compareTo(v2) >= 0))
+      case Sized(Type.Const(Data.Bool(v1)), Type.Const(Data.Bool(v2))) =>
+        Type.Const(Data.Bool(v1 >= v2))
+
+      case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) =>
+        Type.Const(Data.Bool(v1 >= v2))
+
+      case Sized(Type.Const(Data.Str(v1)), Type.Const(Data.Str(v2))) =>
+        Type.Const(Data.Bool(v1 >= v2))
+
+      case Sized(Type.Const(Data.LocalDate(v1)), Type.Const(Data.LocalDate(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) >= 0))
+
+      case Sized(Type.Const(Data.LocalDateTime(v1)), Type.Const(Data.LocalDateTime(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) >= 0))
+
+      case Sized(Type.Const(Data.LocalTime(v1)), Type.Const(Data.LocalTime(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) >= 0))
+
+      case Sized(Type.Const(Data.OffsetDate(v1)), Type.Const(Data.OffsetDate(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) >= 0))
+
+      case Sized(Type.Const(Data.OffsetDateTime(v1)), Type.Const(Data.OffsetDateTime(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) >= 0))
+
+      case Sized(Type.Const(Data.OffsetTime(v1)), Type.Const(Data.OffsetTime(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) >= 0))
+
+      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) =>
+        Type.Const(Data.Bool(v1.compareTo(v2) >= 0))
+
       case _ => Type.Bool
     },
     basicUntyper)
