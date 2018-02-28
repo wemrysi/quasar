@@ -183,7 +183,7 @@ object Server {
 
   def safeMain(args: Vector[String]): Task[Unit] = {
     logErrors(for {
-      _ <- Task.delay(println(s"Quasar v${quasar.build.BuildInfo.version}")).liftM[MainErrT]
+      _ <- stdout(s"Quasar v${quasar.build.BuildInfo.version}").liftM[MainErrT]
       webCmdLineCfg <- WebCmdLineConfig.fromArgs(args)
       _ <- initMetaStoreOrStart[WebConfig](
              webCmdLineCfg.toCmdLineConfig,
