@@ -167,11 +167,11 @@ object JsFuncHandler {
         case Interval(a1) => unimplemented[M, JsCore]("Interval JS")
 
         case ExtractCentury(date) =>
-          Call(ident("NumberLong"), List(century(date))).point[M]
+          century(date).point[M]
         case ExtractDayOfMonth(date) =>
           day(date).point[M]
         case ExtractDecade(date) =>
-          Call(ident("NumberLong"), List(decade(date))).point[M]
+          decade(date).point[M]
         case ExtractDayOfWeek(date) =>
           dayOfWeek(date).point[M]
         case ExtractDayOfYear(date) =>
@@ -188,10 +188,9 @@ object JsFuncHandler {
                   litNum(86400000)),
                 litNum(1)))))).point[M]
         case ExtractEpoch(date) =>
-          Call(ident("NumberLong"), List(
-            BinOp(jscore.Div,
-              Call(Select(date, "valueOf"), Nil),
-              litNum(1000)))).point[M]
+          BinOp(jscore.Div,
+            Call(Select(date, "valueOf"), Nil),
+            litNum(1000)).point[M]
         case ExtractHour(date) =>
           hour(date).point[M]
         case ExtractIsoDayOfWeek(date) =>
@@ -211,7 +210,7 @@ object JsFuncHandler {
                 litNum(1000))),
             litNum(1000)).point[M]
         case ExtractMillennium(date) =>
-          Call(ident("NumberLong"), List(millennium(date))).point[M]
+          millennium(date).point[M]
         case ExtractMilliseconds(date) =>
           BinOp(jscore.Add,
             millisecond(date),
