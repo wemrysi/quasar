@@ -19,7 +19,7 @@ package quasar.qscript.qsu
 import slamdata.Predef._
 import quasar.{Qspec, TreeMatchers}
 import quasar.Planner.PlannerError
-import quasar.common.SortDir
+import quasar.common.{SortDir, JoinType}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
@@ -54,6 +54,7 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       right -> func.RightSide)
 
   val orders: AFile = Path.rootDir </> Path.dir("client") </> Path.file("orders")
+  val customers: AFile = Path.rootDir </> Path.dir("client") </> Path.file("customers")
 
   def extractFM(graph: QSUGraph) = ExtractFreeMap[Fix, F](graph)
 
@@ -313,6 +314,36 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           outerAutojoinCondition must beTreeEqual(func.ConcatMaps(
             func.LeftSide,
             func.MakeMap(func.Constant(ejs.str("sort_key_1")), func.RightSide)))
+        }
+      }
+    }
+
+    "convert a non-mappable join condition" >> {
+      val leftKey = projectStrKey("leftKey")
+      val rightKey = projectStrKey("rightKey")
+      val lref = Symbol("leftJoin")
+      val rref = Symbol("rightJoin")
+
+      val graph: QSUGraph = QSUGraph.fromTree[Fix](
+        qsu.lpJoin(qsu.tread(orders), qsu.tread(customers),
+          qsu._autojoin2(
+            qsu.transpose(qsu.map(qsu.read(orders), projectStrKey("leftKey")), Retain.Values, Rotation.ShiftArray),
+            qsu.map(qsu.read(customers), projectStrKey("rightKey")),
+            func.Eq(func.LeftSide, func.RightSide)),
+          JoinType.Inner, lref, rref))
+
+      evaluate(extractFM(graph)) must beLike {
+        case \/-(ThetaJoin(
+          Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap),
+          AutoJoin2(
+            AutoJoin2(
+              Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap),
+              Transpose(Map(Read(`orders`), accessLeft), Retain.Values, Rotation.ShiftArray),
+              innerAutojoinCondition),
+            Read(`customers`), outerAutojoinCondition),
+          condition, JoinType.Inner, combiner)) => {
+
+          accessLeft must beTreeEqual(leftKey)
         }
       }
     }
