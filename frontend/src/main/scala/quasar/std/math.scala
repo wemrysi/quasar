@@ -85,8 +85,8 @@ trait MathLib extends Library {
     }
   }
 
-  /** Adds two numeric values, promoting to decimal if either operand is
-    * decimal.
+  /** Adds two numeric or temporal values, promoting to decimal when appropriate
+    * if either operand is decimal.
     */
   val Add = BinaryFunc(
     Mapping,
@@ -165,7 +165,8 @@ trait MathLib extends Library {
       κ(Some(success(Func.Input2(t, Type.Interval)))))))
 
   /**
-   * Multiplies two numeric values, promoting to decimal if either operand is decimal.
+   * Multiplies two numeric or temporal values, promoting to decimal when appropriate
+   * if either operand is decimal.
    */
   val Multiply = BinaryFunc(
     Mapping,
@@ -231,10 +232,9 @@ trait MathLib extends Library {
       case Type.Dec => Func.Input2(Type.Numeric, Type.Numeric)
     })
 
-  /** Subtracts one value from another, promoting to decimal if either operand
-    * is decimal.
+  /** Subtracts one numeric or temporal value from another,
+    * promoting to decimal when appropriate if either operand is decimal.
     */
-    // TODO: document change
   val Subtract = BinaryFunc(
     Mapping,
     "Subtracts two numeric or temporal values",
@@ -317,13 +317,13 @@ trait MathLib extends Library {
       κ(Some(success(Func.Input2(t, Type.Interval)))))})
 
   /**
-   * Divides one value by another, promoting to decimal if either operand is decimal.
+   * Divides one numeric value by another, promoting to decimal if either operand is decimal.
    */
   val Divide = BinaryFunc(
     Mapping,
-    "Divides one numeric or interval value by another (non-zero) numeric value",
-    Type.Dec ⨿ Type.Interval,
-    Func.Input2(MathRel, Type.Numeric),
+    "Divides one numeric value by another (non-zero) numeric value",
+    Type.Dec,
+    Func.Input2(Type.Numeric, Type.Numeric),
     new Func.Simplifier {
       def apply[T]
         (orig: LP[T])
