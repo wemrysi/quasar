@@ -167,8 +167,7 @@ object JsFuncHandler {
         case Interval(a1) => unimplemented[M, JsCore]("Interval JS")
 
         case ExtractCentury(date) =>
-          Call(ident("NumberLong"), List(
-            century(date))).point[M]
+          Call(ident("NumberLong"), List(century(date))).point[M]
         case ExtractDayOfMonth(date) =>
           day(date).point[M]
         case ExtractDecade(date) =>
@@ -184,10 +183,10 @@ object JsFuncHandler {
                     date,
                     New(Name("Date"), List(
                       Call(Select(date, "getFullYear"), Nil),
-                      Literal(Js.Num(0, false)),
-                      Literal(Js.Num(0, false))))),
-                  Literal(Js.Num(86400000, false))),
-                Literal(Js.Num(1, false))))))).point[M]
+                      litNum(0),
+                      litNum(0)))),
+                  litNum(86400000)),
+                litNum(1)))))).point[M]
         case ExtractEpoch(date) =>
           Call(ident("NumberLong"), List(
             BinOp(jscore.Div,
@@ -237,17 +236,17 @@ object JsFuncHandler {
                   Let(Name("startOfYear"),
                     New(Name("Date"), List(
                       Call(Select(date, "getFullYear"), Nil),
-                      Literal(Js.Num(0, false)),
-                      Literal(Js.Num(1, false)))),
+                      litNum(0),
+                      litNum(1))),
                     BinOp(jscore.Add,
                       BinOp(Div,
                         BinOp(Sub, date, ident("startOfYear")),
-                        Literal(Js.Num(86400000, false))),
+                        litNum(86400000)),
                       BinOp(jscore.Add,
                         Call(Select(ident("startOfYear"), "getDay"), Nil),
-                        Literal(Js.Num(1, false))))),
-                  Literal(Js.Num(7, false))),
-                Literal(Js.Num(1, false))))))).point[M]
+                        litNum(1)))),
+                  litNum(7)),
+                litNum(1)))))).point[M]
 
         case MakeMap(Embed(LiteralF(Js.Str(str))), a2) => Obj(ListMap(Name(str) -> a2)).point[M]
         // TODO: pull out the literal, and handle this case in other situations
@@ -334,7 +333,7 @@ object JsFuncHandler {
               List(field)).point[M]
         case Within(a1, a2) =>
           BinOp(jscore.Neq,
-            Literal(Js.Num(-1, false)),
+            litNum(-1),
             Call(Select(a2, "indexOf"), List(a1))).point[M]
         case Null(str) =>
           If(
