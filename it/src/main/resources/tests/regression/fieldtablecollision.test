@@ -1,10 +1,11 @@
 {
   "name": "[reg] field/table name collision",
-  "data": "bug2958.data",
+  "data": "fieldtablecollision.data",
   "backends": {
   },
-  "query": "SELECT bug2958.bug2958 FROM bug2958",
+  "query": "SELECT fieldtablecollision.fieldtablecollision FROM fieldtablecollision",
   "predicate": "exactly",
   "expected": [
+    1
   ]
 }
