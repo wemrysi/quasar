@@ -372,10 +372,9 @@ abstract class StdLibSpec extends Qspec {
           "any" >> prop (test(_: JLocalTime))
         }
 
-        // TODO: Enable
-        // "interval" >> prop { (x: Duration) =>
-        //   unary(ToString(_).embed, Data.Interval(x), Data.Str(x.toString))
-        // }
+        "Interval" >> prop { (x: DateTimeInterval) =>
+          unary(ToString(_).embed, Data.Interval(x), Data.Str(x.toString))
+        }
       }
     }
 
@@ -1813,8 +1812,6 @@ abstract class StdLibSpec extends Qspec {
         "Int squared" >> prop { (x: Int) =>
           binary(Power(_, _).embed, Data.Int(x), Data.Int(2), Data.Int(x.toLong * x.toLong))
         }
-
-        // TODO: test as much of the domain as much sense
       }
 
       "Subtract" >> {
