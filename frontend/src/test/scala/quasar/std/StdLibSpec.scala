@@ -1774,6 +1774,8 @@ abstract class StdLibSpec extends Qspec {
         // "mixed int/double" >> prop { (x: Int, y: Double) =>
         //   commute(Multiply(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x * y))
         // }
+
+        // TODO: Interval * Int
       }
 
       "Power" >> {
@@ -1856,7 +1858,7 @@ abstract class StdLibSpec extends Qspec {
           binary(Subtract(_, _).embed, Data.OffsetTime(x), Data.Interval(y), Data.OffsetTime(expected))
         }.setGens(DateGenerators.genOffsetTime, DateGenerators.genTimeInterval)
 
-        // TODO: LocalDateTime/LocalDateTime, LocalDate, LocalTime/LocalTime
+        // TODO: LocalDateTime/LocalDateTime, LocalDate, LocalTime/LocalTime, Interval/Interval
       }
 
       "Divide" >> {
@@ -1874,8 +1876,6 @@ abstract class StdLibSpec extends Qspec {
         // "mixed int/double" >> prop { (x: Int, y: Double) =>
         //   commute(Divide(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x / y))
         // }
-
-        // TODO: Interval * Int
       }
 
       "Negate" >> {
