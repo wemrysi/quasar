@@ -122,13 +122,13 @@ object xdmitem {
     val rsecs = BigDecimal(xdd.getSeconds)
     val secs  = rsecs.toLong
     val nanos = (rsecs - secs) / 1000000000
-    val dur = DateTimeInterval(
-      years = xdd.getYears,
-      months = xdd.getMonths,
-      days = xdd.getDays,
-      seconds = xdd.getWholeSeconds,
-      nanos = (xdd.getSeconds.setScale(0, RoundingMode.DOWN).intValue - xdd.getWholeSeconds) * 100000000
-    )
+    val dur = DateTimeInterval.make(
+      xdd.getYears,
+      xdd.getMonths,
+      xdd.getDays,
+      xdd.getWholeSeconds,
+      (xdd.getSeconds.setScale(0, RoundingMode.DOWN).intValue - xdd.getWholeSeconds) * 100000000)
+
     if (xdd.isPositive) dur else dur.multiply(-1)
   }
 

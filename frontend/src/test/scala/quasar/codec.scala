@@ -178,7 +178,7 @@ class DataCodecSpecs extends quasar.Qspec {
       }
 
       "re-parse Str as Interval" in {
-        val interval = Data.Interval(DateTimeInterval(0, 0, 0, 1, 0))
+        val interval = Data.Interval(DateTimeInterval.make(0, 0, 0, 1, 0))
         val str = Data.Str(interval.value.toString)
         roundTrip(str) must beSome(interval.right[DataEncodingError])
       }

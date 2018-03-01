@@ -24,6 +24,7 @@ import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.time.DateTimeInterval
 
+import java.time.{Duration, Period}
 import scala.math.BigDecimal.RoundingMode
 
 import matryoshka._
@@ -253,7 +254,7 @@ trait MathLib extends Library {
     partialTyper[nat._2] {
       case Sized(v1, TZero()) if Type.Numeric.contains(v1) => v1
 
-      case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))       =>
+      case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2))) =>
         Type.Const(Data.Int(v1 - v2))
 
       case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) =>
@@ -269,29 +270,15 @@ trait MathLib extends Library {
         Type.Const(v1.peeks(_.minus(v2)))
 
       case Sized(Type.Const(Data.LocalDateTime(v1)), Type.Const(Data.LocalDateTime(v2))) =>
-        val y = v1.getYear - v2.getYear
-        val mo = v1.getMonth.getValue - v2.getMonth.getValue
-        val nv2 = v2.minusMonths(mo.toLong)
-        val d = v1.getDayOfMonth - nv2.getDayOfMonth
-        val h = v1.getHour - v2.getHour
-        val mi = v1.getMinute - v2.getMinute
-        val s = v1.getSecond - v2.getSecond
-        val n = v1.getNano - v2.getNano
-        Type.Const(Data.Interval(DateTimeInterval(y, mo, d, h * 3600L + mi * 60L + s, n.toLong)))
+        Type.Const(Data.Interval(DateTimeInterval(
+          Period.between(v1.toLocalDate, v2.toLocalDate),
+          Duration.between(v1.toLocalTime, v2.toLocalTime))))
 
       case Sized(Type.Const(Data.LocalDate(v1)), Type.Const(Data.LocalDate(v2))) =>
-        val y = v1.getYear - v2.getYear
-        val m = v1.getMonth.getValue - v2.getMonth.getValue
-        val nv2 = v2.minusMonths(m.toLong)
-        val d = v1.getDayOfMonth - nv2.getDayOfMonth
-        Type.Const(Data.Interval(DateTimeInterval(y, m, d, 0L, 0L)))
+        Type.Const(Data.Interval(DateTimeInterval(Period.between(v1, v2), Duration.ZERO)))
 
       case Sized(Type.Const(Data.LocalTime(v1)), Type.Const(Data.LocalTime(v2))) =>
-        val h = v1.getHour - v2.getHour
-        val m = v1.getMinute - v2.getMinute
-        val s = v1.getSecond - v2.getSecond
-        val n = v1.getNano - v2.getNano
-        Type.Const(Data.Interval(DateTimeInterval(0, 0, 0, h * 3600L + m * 60L + s, n.toLong)))
+        Type.Const(Data.Interval(DateTimeInterval(Period.ZERO, Duration.between(v1, v2))))
 
       case Sized(Type.LocalDateTime.superOf(_), Type.LocalDateTime.superOf(_)) => Type.Interval
       case Sized(Type.OffsetDateTime.superOf(_), Type.Interval.superOf(_)) => Type.OffsetDateTime
@@ -309,9 +296,12 @@ trait MathLib extends Library {
     partialUntyperOV[nat._2] { t => Type.typecheck(Type.Temporal, t).fold(
       κ(Type.typecheck(Type.Interval, t).fold(
         κ(t match {
-          case Type.Int                      => Some(success(Func.Input2(Type.Int    , Type.Int    )))
-          case t if Type.Numeric.contains(t) => Some(success(Func.Input2(Type.Numeric, Type.Numeric)))
-          case _                             => None
+          case Type.Int =>
+            Some(success(Func.Input2(Type.Int, Type.Int    )))
+          case t if Type.Numeric.contains(t) =>
+            Some(success(Func.Input2(Type.Numeric, Type.Numeric)))
+          case _ =>
+            None
         }),
         κ(Some(success(Func.Input2(Type.Temporal ⨿ Type.Interval, Type.Temporal ⨿ Type.Interval)))))),
       κ(Some(success(Func.Input2(t, Type.Interval)))))})
@@ -337,19 +327,14 @@ trait MathLib extends Library {
       case Sized(v1, TOne())  => success(v1)
 
       case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))
-        if v2 != BigInt(0)                                                => success(Type.Const(Data.Dec(BigDecimal(v1) / BigDecimal(v2))))
+        if v2 != BigInt(0) => success(Type.Const(Data.Dec(BigDecimal(v1) / BigDecimal(v2))))
+
       case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2)))
-        if v2 != BigDecimal(0)                                            => success(Type.Const(Data.Dec(v1 / v2)))
+        if v2 != BigDecimal(0) => success(Type.Const(Data.Dec(v1 / v2)))
 
-      // TODO: handle interval divided by Dec (not provided by threeten). See SD-582.
-      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Int(v2))) => success(Type.Const(Data.Interval(DateTimeInterval.divideBy(v1, v2.intValue))))
-
-      case Sized(Type.Interval.superOf(_), Type.Int.superOf(_))           => success(Type.Interval)
-      case Sized(Type.Numeric.superOf(_), Type.Numeric.superOf(_))        => success(Type.Dec)
+      case Sized(Type.Numeric.superOf(_), Type.Numeric.superOf(_)) => success(Type.Dec)
     },
-    untyper[nat._2](t => Type.typecheck(Type.Interval, t).fold(
-      κ(success(Func.Input2(Type.Numeric, Type.Numeric))),
-      κ(success(Func.Input2(Type.Interval, Type.Int))))))
+    basicUntyper)
 
   /**
    * Aka "unary minus".

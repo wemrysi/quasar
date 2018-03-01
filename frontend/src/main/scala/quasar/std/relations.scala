@@ -95,9 +95,6 @@ trait RelationsLib extends Library {
       case Sized(Type.Const(Data.OffsetTime(v1)), Type.Const(Data.OffsetTime(v2))) =>
         Type.Const(Data.Bool(v1.compareTo(v2) < 0))
 
-      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) =>
-        Type.Const(Data.Bool(v1.compareTo(v2) < 0))
-
       case _ => Type.Bool
     },
     basicUntyper)
@@ -134,9 +131,6 @@ trait RelationsLib extends Library {
         Type.Const(Data.Bool(v1.compareTo(v2) <= 0))
 
       case Sized(Type.Const(Data.OffsetTime(v1)), Type.Const(Data.OffsetTime(v2))) =>
-        Type.Const(Data.Bool(v1.compareTo(v2) <= 0))
-
-      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) =>
         Type.Const(Data.Bool(v1.compareTo(v2) <= 0))
 
       case _ => Type.Bool
@@ -177,9 +171,6 @@ trait RelationsLib extends Library {
       case Sized(Type.Const(Data.OffsetTime(v1)), Type.Const(Data.OffsetTime(v2))) =>
         Type.Const(Data.Bool(v1.compareTo(v2) > 0))
 
-      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) =>
-        Type.Const(Data.Bool(v1.compareTo(v2) > 0))
-
       case _ => Type.Bool
     },
     basicUntyper)
@@ -216,9 +207,6 @@ trait RelationsLib extends Library {
         Type.Const(Data.Bool(v1.compareTo(v2) >= 0))
 
       case Sized(Type.Const(Data.OffsetTime(v1)), Type.Const(Data.OffsetTime(v2))) =>
-        Type.Const(Data.Bool(v1.compareTo(v2) >= 0))
-
-      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) =>
         Type.Const(Data.Bool(v1.compareTo(v2) >= 0))
 
       case _ => Type.Bool
@@ -258,9 +246,6 @@ trait RelationsLib extends Library {
         Type.Const(Data.Bool(lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0))
 
       case Sized(Type.Const(Data.LocalDate(mid)), Type.Const(Data.LocalDate(lo)), Type.Const(Data.LocalDate(hi))) =>
-        Type.Const(Data.Bool(lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0))
-
-      case Sized(Type.Const(Data.Interval(mid)), Type.Const(Data.Interval(lo)), Type.Const(Data.Interval(hi))) =>
         Type.Const(Data.Bool(lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0))
 
       case Sized(Type.Const(Data.Bool(mid)), Type.Const(Data.Bool(lo)), Type.Const(Data.Bool(hi))) =>

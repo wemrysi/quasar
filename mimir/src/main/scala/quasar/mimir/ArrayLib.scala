@@ -324,15 +324,6 @@ trait ArrayLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
           def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
         }
 
-      case List(target: DurationColumn, lower: DurationColumn, upper: DurationColumn) =>
-        new BoolColumn {
-          def apply(row: Int) = {
-            val t = target(row)
-            lower(row).compareTo(t) <= 0 && t.compareTo(upper(row)) <= 0
-          }
-          def isDefinedAt(row: Int) = target.isDefinedAt(row) && lower.isDefinedAt(row) && upper.isDefinedAt(row)
-        }
-
       case List(target: BoolColumn, lower: BoolColumn, upper: BoolColumn) =>
         new BoolColumn {
           def apply(row: Int) = {

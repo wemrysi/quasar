@@ -561,7 +561,7 @@ object Type extends TypeInstances {
   val AnyObject = Obj(Map(), Some(Top))
   val Numeric = Int ⨿ Dec
   val Temporal = OffsetDateTime ⨿ OffsetDate ⨿ OffsetTime ⨿ LocalDateTime ⨿ LocalDate ⨿ LocalTime
-  val Comparable = Numeric ⨿ Interval ⨿ Str ⨿ Temporal ⨿ Bool
+  val Comparable = Numeric ⨿ Str ⨿ Temporal ⨿ Bool
   val Syntaxed = Type.Null ⨿ Type.Comparable ⨿ Type.Id
   val HasDate = OffsetDateTime ⨿ OffsetDate ⨿ LocalDateTime ⨿ LocalDate
   val HasTime = OffsetDateTime ⨿ OffsetTime ⨿ LocalDateTime ⨿ LocalTime
