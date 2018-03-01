@@ -190,9 +190,6 @@ trait MathLib extends Library {
       case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2)))       => Type.Const(Data.Int(v1 * v2))
       case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => Type.Const(Data.Dec(v1 * v2))
 
-      // TODO: handle interval multiplied by Dec (not provided by threeten). See SD-582.
-      // Is that actually sensical? It doesn't sound like it to me; you can't "carry"
-      // fractional units down to smaller units most of the time.
       case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Int(v2))) => Type.Const(Data.Interval(v1.multiply(v2.intValue)))
       case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Interval(v2))) => Type.Const(Data.Interval(v2.multiply(v1.intValue)))
       case Sized(t1, t2) if (Type.Int contains t2) && (Type.Interval contains t1) => Type.Interval
