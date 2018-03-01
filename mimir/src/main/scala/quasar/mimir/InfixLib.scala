@@ -16,9 +16,10 @@
 
 package quasar.mimir
 
+import quasar.precog.util.NumericComparisons
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
-import quasar.precog.util.NumericComparisons
+import quasar.time.DateTimeInterval
 
 trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait InfixLib extends ColumnarTableLib {
@@ -242,6 +243,48 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
             new LocalTimeColumn {
               def apply(row: Int) = c2(row).subtractFromLocalTime(c1(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isTimeLike
+            }
+
+          case (c1: LocalDateTimeColumn, c2: LocalDateTimeColumn) =>
+            new DurationColumn {
+              def apply(row: Int) = DateTimeInterval.betweenLocalDateTime(c1(row), c2(row))
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
+            }
+
+          case (c1: LocalDateColumn, c2: LocalDateColumn) =>
+            new DurationColumn {
+              def apply(row: Int) = DateTimeInterval.betweenLocalDate(c1(row), c2(row))
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
+            }
+
+          case (c1: LocalTimeColumn, c2: LocalTimeColumn) =>
+            new DurationColumn {
+              def apply(row: Int) = DateTimeInterval.betweenLocalTime(c1(row), c2(row))
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
+            }
+
+          case (c1: OffsetDateTimeColumn, c2: OffsetDateTimeColumn) =>
+            new DurationColumn {
+              def apply(row: Int) = DateTimeInterval.betweenOffsetDateTime(c1(row), c2(row))
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
+            }
+
+          case (c1: OffsetDateColumn, c2: OffsetDateColumn) =>
+            new DurationColumn {
+              def apply(row: Int) = DateTimeInterval.betweenOffsetDate(c1(row), c2(row))
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
+            }
+
+          case (c1: OffsetTimeColumn, c2: OffsetTimeColumn) =>
+            new DurationColumn {
+              def apply(row: Int) = DateTimeInterval.betweenOffsetTime(c1(row), c2(row))
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
+            }
+
+          case (c1: DurationColumn, c2: DurationColumn) =>
+            new DurationColumn {
+              def apply(row: Int) = c1(row).minus(c2(row))
+              def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
         }
       }
