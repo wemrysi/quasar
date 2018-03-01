@@ -2361,19 +2361,19 @@ abstract class StdLibSpec extends Qspec {
 
       "Eq" >> {
         "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
-          binary(Eq(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x == y))
+          commute(Eq(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x == y))
         }
 
         "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
-          binary(Eq(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x == y))
+          commute(Eq(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x == y))
         }
 
         "any two Strs" >> prop { (x: String, y: String) =>
-          binary(Eq(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x == y))
+          commute(Eq(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x == y))
         }
 
         "any value with self" >> prop { (x: Data) =>
-          binary(Eq(_, _).embed, x, x, Data.Bool(true))
+          commute(Eq(_, _).embed, x, x, Data.Bool(true))
         }
 
         "any values with different types" >> prop { (x: Data, y: Data) =>
@@ -2381,25 +2381,25 @@ abstract class StdLibSpec extends Qspec {
           (x.dataType != y.dataType &&
             !((Type.Numeric contains x.dataType) &&
               (Type.Numeric contains y.dataType))) ==>
-            binary(Eq(_, _).embed, x, y, Data.Bool(false))
+            commute(Eq(_, _).embed, x, y, Data.Bool(false))
         }
       }
 
       "Neq" >> {
         "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
-          binary(Neq(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x != y))
+          commute(Neq(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x != y))
         }
 
         "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
-          binary(Neq(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x != y))
+          commute(Neq(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x != y))
         }
 
         "any two Strs" >> prop { (x: String, y: String) =>
-          binary(Neq(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x != y))
+          commute(Neq(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x != y))
         }
 
         "any value with self" >> prop { (x: Data) =>
-          binary(Neq(_, _).embed, x, x, Data.Bool(false))
+          commute(Neq(_, _).embed, x, x, Data.Bool(false))
         }
 
         "any values with different types" >> prop { (x: Data, y: Data) =>
@@ -2407,7 +2407,7 @@ abstract class StdLibSpec extends Qspec {
           (x.dataType != y.dataType &&
             !((Type.Numeric contains x.dataType) &&
               (Type.Numeric contains y.dataType))) ==>
-            binary(Neq(_, _).embed, x, y, Data.Bool(true))
+            commute(Neq(_, _).embed, x, y, Data.Bool(true))
         }
       }
 
