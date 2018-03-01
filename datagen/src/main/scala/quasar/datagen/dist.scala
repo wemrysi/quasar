@@ -167,8 +167,8 @@ object dist {
 
   private def collBounds[A: AdditiveMonoid](ts: TypeStat[A], maxLen: A): (A, A) =
     (
-      collMin[A] getOption ts getOrElse AdditiveMonoid[A].zero
-    , collMax[A] getOption ts getOrElse maxLen
+      collMin[A] getOption ts getOrElse AdditiveMonoid[A].zero,
+      collMax[A] getOption ts getOrElse maxLen
     )
 
   private def collMin[A] = TypeStat.coll[A] composeLens _2 composePrism someP
@@ -185,13 +185,13 @@ object dist {
 
   private def leafDist[J](implicit J: Corecursive.Aux[J, EJson]): Dist[J] =
     Dist.mix(
-      Dist[Boolean] map (EJson.bool(_))
-    , Dist[Byte] map (EJson.byte(_))
-    , Dist[Char] map (EJson.char(_))
-    , Dist.bigdecimal(BigIntMaxBytes, BigDecimalMaxScale) map (EJson.dec(_))
-    , Dist.bigint(BigIntMaxBytes) map (EJson.int(_))
-    , Dist.constant(EJson.nul[J])
-    , Dist.list[Char](0, StringMaxLength) map (cs => EJson.str(cs.mkString)))
+      Dist[Boolean] map (EJson.bool(_)),
+      Dist[Byte] map (EJson.byte(_)),
+      Dist[Char] map (EJson.char(_)),
+      Dist.bigdecimal(BigIntMaxBytes, BigDecimalMaxScale) map (EJson.dec(_)),
+      Dist.bigint(BigIntMaxBytes) map (EJson.int(_)),
+      Dist.constant(EJson.nul[J]),
+      Dist.list[Char](0, StringMaxLength) map (cs => EJson.str(cs.mkString)))
 
   /** Returns a list of spans having the same `B`. Preserves order of the
     * original list such that `spansBy(xs)(f).flatMap(_.toList) === xs`.

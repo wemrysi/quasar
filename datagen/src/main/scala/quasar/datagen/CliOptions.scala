@@ -123,11 +123,11 @@ object CliOptions extends CliOptionsInstances {
 sealed abstract class CliOptionsInstances {
   implicit val equal: Equal[CliOptions] =
     Equal.equalBy(o => (
-      o.sstFile.getPath
-    , o.outSize
-    , o.outFile.getPath
-    , o.writeMode
-    , o.sstSource))
+      o.sstFile.getPath,
+      o.outSize,
+      o.outFile.getPath,
+      o.writeMode,
+      o.sstSource))
 
   implicit val show: Show[CliOptions] =
     Show.showFromToString

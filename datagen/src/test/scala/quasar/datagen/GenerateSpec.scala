@@ -165,9 +165,9 @@ final class GenerateSpec extends quasar.Qspec {
             TypeStat.coll(10.0, Some(1.0), Some(3.0)),
             TypeF.map(
               IMap(
-                foo -> sst(TypeStat.count(10.0), TypeF.top())
-              , bar -> sst(TypeStat.count(5.0), TypeF.top())
-              , baz -> sst(TypeStat.count(3.0), TypeF.top())),
+                foo -> sst(TypeStat.count(10.0), TypeF.top()),
+                bar -> sst(TypeStat.count(5.0), TypeF.top()),
+                baz -> sst(TypeStat.count(3.0), TypeF.top())),
               None))
 
         val validKeys =
