@@ -1858,7 +1858,40 @@ abstract class StdLibSpec extends Qspec {
           binary(Subtract(_, _).embed, Data.OffsetTime(x), Data.Interval(y), Data.OffsetTime(expected))
         }.setGens(DateGenerators.genOffsetTime, DateGenerators.genTimeInterval)
 
-        // TODO: LocalDateTime/LocalDateTime, LocalDate, LocalTime/LocalTime, Interval/Interval
+        "LocalDateTime/LocalDateTime" >> prop { (x: JLocalDateTime, y: JLocalDateTime) =>
+          val expected = DateTimeInterval.betweenLocalDateTime(x, y)
+          binary(Subtract(_, _).embed, Data.LocalDateTime(x), Data.LocalDateTime(y), Data.Interval(expected))
+        }
+
+        "LocalDate/LocalDate" >> prop { (x: JLocalDate, y: JLocalDate) =>
+          val expected = DateTimeInterval.betweenLocalDate(x, y)
+          binary(Subtract(_, _).embed, Data.LocalDate(x), Data.LocalDate(y), Data.Interval(expected))
+        }
+
+        "LocalTime/LocalTime" >> prop { (x: JLocalTime, y: JLocalTime) =>
+          val expected = DateTimeInterval.betweenLocalTime(x, y)
+          binary(Subtract(_, _).embed, Data.LocalTime(x), Data.LocalTime(y), Data.Interval(expected))
+        }
+
+        "OffsetDateTime/OffsetDateTime" >> prop { (x: JOffsetDateTime, y: JOffsetDateTime) =>
+          val expected = DateTimeInterval.betweenOffsetDateTime(x, y)
+          binary(Subtract(_, _).embed, Data.OffsetDateTime(x), Data.OffsetDateTime(y), Data.Interval(expected))
+        }
+
+        "OffsetDate/OffsetDate" >> prop { (x: QOffsetDate, y: QOffsetDate) =>
+          val expected = DateTimeInterval.betweenOffsetDate(x, y)
+          binary(Subtract(_, _).embed, Data.OffsetDate(x), Data.OffsetDate(y), Data.Interval(expected))
+        }
+
+        "OffsetTime/OffsetTime" >> prop { (x: JOffsetTime, y: JOffsetTime) =>
+          val expected = DateTimeInterval.betweenOffsetTime(x, y)
+          binary(Subtract(_, _).embed, Data.OffsetTime(x), Data.OffsetTime(y), Data.Interval(expected))
+        }
+
+        "Interval/Interval" >> prop { (x: DateTimeInterval, y: DateTimeInterval) =>
+          val expected = x.minus(y)
+          binary(Subtract(_, _).embed, Data.Interval(x), Data.Interval(y), Data.Interval(expected))
+        }
       }
 
       "Divide" >> {
