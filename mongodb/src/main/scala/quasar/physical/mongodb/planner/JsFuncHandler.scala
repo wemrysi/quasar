@@ -551,7 +551,6 @@ object JsFuncHandler {
               Fun(List(Name("element"), Name("index")),
                 BinOp(jscore.Add, ident("index"), start)))).point[M]
 
-
         // TODO: Specify the function name for pattern match failures
         case _ => unimplemented[M, JsCore]("JS function")
       }
