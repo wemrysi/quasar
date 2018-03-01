@@ -1762,8 +1762,13 @@ abstract class StdLibSpec extends Qspec {
 
       "Multiply" >> {
         "any ints" >> prop { (x: Int, y: Int) =>
-          binary(Multiply(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(x.toLong * y.toLong))
+          commute(Multiply(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(x.toLong * y.toLong))
         }
+
+        "Interval/Int" >> prop { (x: DateTimeInterval, y: Int) =>
+          val expected = x.multiply(y)
+          commute(Multiply(_, _).embed, Data.Interval(x), Data.Int(y), Data.Interval(expected))
+        }.setGens(DateGenerators.genInterval, Gen.choose(-10, 10)) // avoid integer overflow
 
         // TODO: figure out what domain can be tested here (tends to overflow)
         // "any doubles" >> prop { (x: Double, y: Double) =>
@@ -1774,8 +1779,6 @@ abstract class StdLibSpec extends Qspec {
         // "mixed int/double" >> prop { (x: Int, y: Double) =>
         //   commute(Multiply(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x * y))
         // }
-
-        // TODO: Interval * Int
       }
 
       "Power" >> {
