@@ -50,7 +50,7 @@ class DateSpecs extends quasar.Qspec {
     }
 
     "parse ymd" in {
-      parseInterval("P1Y1M1D") must_=== \/-(Data.Interval(DateTimeInterval(1, 1, 1, 0, 0)))
+      parseInterval("P1Y1M1D") must_=== \/-(Data.Interval(DateTimeInterval.make(1, 1, 1, 0, 0)))
     }
   }
 }

@@ -1754,19 +1754,11 @@ class PlannerSql2ExactSpec extends
       plan(sqlE"""select * from days where date < timestamp("2014-11-17T22:00:00Z") and date - interval("PT12H") > timestamp("2014-11-17T00:00:00Z")""") must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "days")),
-          $match(Selector.And(
-            Selector.Or(
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int32)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int64)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Dec)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Date))),
-            Selector.Or(
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int32)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int64)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Dec)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Text)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Date)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Bool))))),
+          $match(Selector.Or(
+            Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int32)),
+            Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int64)),
+            Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Dec)),
+            Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Date)))),
           $project(
             reshape(
               "0" -> $field("date"),

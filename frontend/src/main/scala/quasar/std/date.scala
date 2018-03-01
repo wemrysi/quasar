@@ -36,7 +36,6 @@ import java.time.{
 import scalaz._
 import scalaz.Validation.success
 import scalaz.syntax.either._
-import scalaz.syntax.std.option._
 import shapeless.{Data => _, _}
 
 trait DateLib extends Library with Serializable {
@@ -70,12 +69,11 @@ trait DateLib extends Library with Serializable {
       κ(DateFormatError(LocalDate, str, None)),
       Data.LocalDate.apply)
 
-  def parseInterval(str: String): SemanticError \/ Data.Interval = {
-    val err = DateFormatError(Interval, str, Some("expected, e.g. P3DT12H30M15.0S"))
-    \/.fromTryCatchNonFatal(DateTimeInterval.parse(str)).fold(
-      κ(-\/(err)),
-      _.cata(Data.Interval(_).right, err.left))
-  }
+  def parseInterval(str: String): SemanticError \/ Data.Interval =
+    DateTimeInterval.parse(str) match {
+      case Some(i) => Data.Interval(i).right
+      case None => DateFormatError(Interval, str, Some("expected, e.g. P3DT12H30M15.0S")).left
+    }
 
   def startOfDayInstant(date: JLocalDate): Instant =
     date.atStartOfDay.atZone(ZoneOffset.UTC).toInstant

@@ -223,7 +223,6 @@ object CValue {
     case (COffsetDateTime(ad), COffsetDateTime(bd))                                   => fromInt(ad compareTo bd)
     case (COffsetDate(ad), COffsetDate(bd))                                           => fromInt(ad compareTo bd)
     case (COffsetTime(ad), COffsetTime(bd))                                           => fromInt(ad compareTo bd)
-    case (CDuration(ad), CDuration(bd))                                               => fromInt(ad compareTo bd)
     case (CArray(as, CArrayType(atpe)), CArray(bs, CArrayType(btpe))) if atpe == btpe => as.toStream.map(x => atpe(x): CValue) ?|? bs.toStream.map(x => btpe(x))
     case (a: CNumericValue[_], b: CNumericValue[_])                                   => (a.toCNum: CValue) ?|? b.toCNum
     case (a, b)                                                                       => a.cType ?|? b.cType
@@ -373,6 +372,9 @@ object CType {
 
     case JArray(_) =>
       sys.error("TODO: Allow for homogeneous JArrays -> CArray.")
+
+    case JObject(_) =>
+      sys.error("TODO: Not implemented.")
 
     case JUndefined => None
   }

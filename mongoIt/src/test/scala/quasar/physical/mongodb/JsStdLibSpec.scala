@@ -67,9 +67,14 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     // https://jira.mongodb.org/browse/SERVER-8164
     // mongo 3.5.13 fixes this issue
     // we Success these so the property tests don't abort early
-    case (date.LocalDate, Data.Str(date) :: Nil) if JLocalDate.parse(date).getYear < 100 && (is3_2(backend) || is3_4(backend)) =>
+    case (date.LocalDate, Data.Str(date) :: Nil)
+        if JLocalDate.parse(date).getYear < 100 &&
+          (is3_2(backend) || is3_4(backend)) || is3_4_13(backend) =>
       Success().updateExpected("Actually skipped due to mongo bug SERVER-8164 (Fixed in 3.5.13).").left
-    case (date.LocalDateTime, Data.Str(date) :: Nil) if JLocalDateTime.parse(date).getYear < 100 && (is3_2(backend) || is3_4(backend)) =>
+
+    case (date.LocalDateTime, Data.Str(date) :: Nil)
+        if JLocalDateTime.parse(date).getYear < 100 &&
+          (is3_2(backend) || is3_4(backend)) || is3_4_13(backend) =>
       Success().updateExpected("Actually skipped due to mongo bug SERVER-8164 (Fixed in 3.5.13).").left
 
     case (date.Interval, _) => Pending("TODO").left

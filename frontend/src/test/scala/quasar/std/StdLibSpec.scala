@@ -1366,7 +1366,7 @@ abstract class StdLibSpec extends Qspec {
         unary(
           Interval(_).embed,
           Data.Str("P7Y2M4W3DT5H6M9.1409S"),
-          Data.Interval(DateTimeInterval(7, 2, (4*7)+3, (5*60*60)+(6*60)+9, 140900000)))
+          Data.Interval(DateTimeInterval.make(7, 2, (4*7)+3, (5*60*60)+(6*60)+9, 140900000)))
       }
 
       "StartOfDay" >> {
@@ -1707,7 +1707,7 @@ abstract class StdLibSpec extends Qspec {
         "LocalDate/Interval" >> {
           "Feb 29" >> {
             val x: JLocalDate = JLocalDate.of(2016, 2, 29)
-            val i: DateTimeInterval = DateTimeInterval(-101, -57, -4, 0, 0)
+            val i: DateTimeInterval = DateTimeInterval.make(-101, -57, -4, 0, 0)
             val result: JLocalDate = i.addToLocalDate(x)
             commute(Add(_, _).embed, Data.LocalDate(x), Data.Interval(i), Data.LocalDate(result))
           }
@@ -1726,7 +1726,7 @@ abstract class StdLibSpec extends Qspec {
         "LocalDateTime/Interval" >> {
           "Feb 29" >> {
             val x: JLocalDateTime = JLocalDateTime.of(2016, 2, 29, 3, 7, 11)
-            val i: DateTimeInterval = DateTimeInterval(-101, -57, -4, 5, 7)
+            val i: DateTimeInterval = DateTimeInterval.make(-101, -57, -4, 5, 7)
             val result: JLocalDateTime = i.addToLocalDateTime(x)
             commute(Add(_, _).embed, Data.LocalDateTime(x), Data.Interval(i), Data.LocalDateTime(result))
           }
@@ -2503,11 +2503,6 @@ abstract class StdLibSpec extends Qspec {
         "any three LocalTimes" >> prop { (lo: JLocalTime, mid: JLocalTime, hi: JLocalTime) =>
           val result = lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0
           ternary(Between(_, _, _).embed, Data.LocalTime(mid), Data.LocalTime(lo), Data.LocalTime(hi), Data.Bool(result))
-        }
-
-        "any three Intervals" >> prop { (lo: DateTimeInterval, mid: DateTimeInterval, hi: DateTimeInterval) =>
-          val result = lo.compareTo(mid) <= 0 && mid.compareTo(hi) <= 0
-          ternary(Between(_, _, _).embed, Data.Interval(mid), Data.Interval(lo), Data.Interval(hi), Data.Bool(result))
         }
 
         // TODO: Cross-type comparison

@@ -239,7 +239,7 @@ class PrettifySpecs extends quasar.Qspec {
     }
 
     "render DateTimeInterval" in {
-      val i = DateTimeInterval(2, 3, 4, 5, 678)
+      val i = DateTimeInterval.make(2, 3, 4, 5, 678)
       render(Data.Interval(i)) must_== Aligned.Right("P2Y3M4DT5.000000678S")
     }
   }
@@ -263,10 +263,6 @@ class PrettifySpecs extends quasar.Qspec {
       case Data.Binary(_)   => false
       case Data.Id(_)       => false
       case Data.NA          => false
-      // Unfortunately currently there is a bug where intervals do not serialize/deserialize properly
-      // and although it would appear to work for a human observer,
-      // the runtime instances are not found to be "equal" which is breaking tests
-      case Data.Interval(_) => true
       case _                => true
     }
 

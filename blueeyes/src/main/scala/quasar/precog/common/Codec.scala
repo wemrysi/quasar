@@ -442,20 +442,22 @@ object Codec {
 
   implicit case object IntervalCodec extends FixedWidthCodec[DateTimeInterval]  {
     def size: Int = 24
+
     def writeUnsafe(a: DateTimeInterval, buffer: ByteBuffer): Unit = {
-      buffer.putInt(a.years)
-      buffer.putInt(a.months)
-      buffer.putInt(a.days)
-      buffer.putLong(a.seconds)
-      buffer.putInt(a.nanos)
+      buffer.putInt(a.period.getYears)
+      buffer.putInt(a.period.getMonths)
+      buffer.putInt(a.period.getDays)
+      buffer.putLong(a.duration.getSeconds)
+      buffer.putInt(a.duration.getNano)
     }
+
     def read(buffer: ByteBuffer): DateTimeInterval = {
       val years = buffer.getInt()
       val months = buffer.getInt()
       val days = buffer.getInt()
       val seconds = buffer.getLong()
       val nanos = buffer.getInt()
-      DateTimeInterval.makeUnsafe(years, months, days, seconds, nanos)
+      DateTimeInterval.make(years, months, days, seconds, nanos)
     }
   }
 

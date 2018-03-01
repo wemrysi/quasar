@@ -49,7 +49,7 @@ class DataSpec extends Qspec with DataGenerators {
   }
 
   "round trip an interval" >> {
-    val data: Data = Data.Interval(DateTimeInterval(1982, 4, 12, 18, 123456789))
+    val data: Data = Data.Interval(DateTimeInterval.make(1982, 4, 12, 18, 123456789))
     roundtrip(data) must_=== data.some
   }
 
