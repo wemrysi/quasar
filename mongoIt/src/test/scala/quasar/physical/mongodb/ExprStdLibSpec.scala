@@ -78,6 +78,8 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     /* MATH */
     case (math.Add, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Pending("TODO").left
     case (math.Subtract, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Pending("TODO").left
+    case (math.Multiply, List(Data.Interval(_), _)) => Pending("TODO").left
+    case (math.Multiply, List(_, Data.Interval(_))) => Pending("TODO").left
 
     //FIXME modulo and trunc (which is defined in terms of modulo) cause the
     //mongo docker container to crash (with quite high frequency but not always).

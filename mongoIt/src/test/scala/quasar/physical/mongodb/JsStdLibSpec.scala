@@ -87,6 +87,8 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
 
     case (math.Add, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Pending("TODO").left
     case (math.Subtract, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Pending("TODO").left
+    case (math.Multiply, List(Data.Interval(_), _)) => Pending("TODO").left
+    case (math.Multiply, List(_, Data.Interval(_))) => Pending("TODO").left
 
     /* RELATIONS */
     case (relations.IfUndefined, _) => Pending("TODO").left
