@@ -24,7 +24,6 @@ import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.time.DateTimeInterval
 
-import java.time.{Duration, Period}
 import scala.math.BigDecimal.RoundingMode
 
 import matryoshka._
@@ -270,26 +269,43 @@ trait MathLib extends Library {
         Type.Const(v1.peeks(_.minus(v2)))
 
       case Sized(Type.Const(Data.LocalDateTime(v1)), Type.Const(Data.LocalDateTime(v2))) =>
-        Type.Const(Data.Interval(DateTimeInterval(
-          Period.between(v1.toLocalDate, v2.toLocalDate),
-          Duration.between(v1.toLocalTime, v2.toLocalTime))))
+        Type.Const(Data.Interval(DateTimeInterval.betweenLocalDateTime(v1, v2)))
 
       case Sized(Type.Const(Data.LocalDate(v1)), Type.Const(Data.LocalDate(v2))) =>
-        Type.Const(Data.Interval(DateTimeInterval(Period.between(v1, v2), Duration.ZERO)))
+        Type.Const(Data.Interval(DateTimeInterval.betweenLocalDate(v1, v2)))
 
       case Sized(Type.Const(Data.LocalTime(v1)), Type.Const(Data.LocalTime(v2))) =>
-        Type.Const(Data.Interval(DateTimeInterval(Period.ZERO, Duration.between(v1, v2))))
+        Type.Const(Data.Interval(DateTimeInterval.betweenLocalTime(v2, v2)))
+
+      case Sized(Type.Const(Data.OffsetDateTime(v1)), Type.Const(Data.OffsetDateTime(v2))) =>
+        Type.Const(Data.Interval(DateTimeInterval.betweenOffsetDateTime(v1, v2)))
+
+      case Sized(Type.Const(Data.OffsetDate(v1)), Type.Const(Data.OffsetDate(v2))) =>
+        Type.Const(Data.Interval(DateTimeInterval.betweenOffsetDate(v1, v2)))
+
+      case Sized(Type.Const(Data.OffsetTime(v1)), Type.Const(Data.OffsetTime(v2))) =>
+        Type.Const(Data.Interval(DateTimeInterval.betweenOffsetTime(v2, v2)))
 
       case Sized(Type.LocalDateTime.superOf(_), Type.LocalDateTime.superOf(_)) => Type.Interval
+      case Sized(Type.LocalDate.superOf(_), Type.LocalDate.superOf(_)) => Type.Interval
+      case Sized(Type.LocalTime.superOf(_), Type.LocalTime.superOf(_)) => Type.Interval
+
+      case Sized(Type.OffsetDateTime.superOf(_), Type.OffsetDateTime.superOf(_)) => Type.Interval
+      case Sized(Type.OffsetDate.superOf(_), Type.OffsetDate.superOf(_)) => Type.Interval
+      case Sized(Type.OffsetTime.superOf(_), Type.OffsetTime.superOf(_)) => Type.Interval
+
       case Sized(Type.OffsetDateTime.superOf(_), Type.Interval.superOf(_)) => Type.OffsetDateTime
       case Sized(Type.OffsetDate.superOf(_), Type.Interval.superOf(_)) => Type.OffsetDate
       case Sized(Type.OffsetTime.superOf(_), Type.Interval.superOf(_)) => Type.OffsetTime
-      case Sized(Type.LocalDate.superOf(_), Type.LocalDate.superOf(_)) => Type.Interval
-      case Sized(Type.LocalDate.superOf(_), Type.Interval.superOf(_))  => Type.LocalDate
-      case Sized(Type.LocalTime.superOf(_), Type.Interval.superOf(_))  => Type.LocalTime
-      case Sized(Type.LocalTime.superOf(_), Type.LocalTime.superOf(_)) => Type.Interval
-      case Sized(Type.Interval.superOf(_), Type.Interval.superOf(_))   => Type.Interval
-      case Sized(Type.Temporal.superOf(ty), Type.Interval.superOf(_))  => ty.widenConst
+
+      case Sized(Type.LocalDateTime.superOf(_), Type.Interval.superOf(_)) => Type.LocalDate
+      case Sized(Type.LocalDate.superOf(_), Type.Interval.superOf(_)) => Type.LocalDate
+      case Sized(Type.LocalTime.superOf(_), Type.Interval.superOf(_)) => Type.LocalTime
+
+      case Sized(Type.Temporal.superOf(ty), Type.Interval.superOf(_)) => ty.widenConst
+
+      case Sized(Type.Interval.superOf(_), Type.Interval.superOf(_))=> Type.Interval
+
       case Sized(Type.Temporal.superOf(t1), Type.Temporal.superOf(t2))
         if (t1.contains(t2) || t2.contains(t1)) => Type.Interval
     } ||| numericWidening,
