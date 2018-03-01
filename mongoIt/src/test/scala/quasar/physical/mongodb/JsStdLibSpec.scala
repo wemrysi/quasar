@@ -93,6 +93,9 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     /* RELATIONS */
     case (relations.IfUndefined, _) => Pending("TODO").left
 
+    case (relations.Eq, List(Data.Interval(_), Data.Interval(_))) => Pending("TODO").left
+    case (relations.Neq, List(Data.Interval(_), Data.Interval(_))) => Pending("TODO").left
+
     case (relations.Between, List(Data.Interval(_), Data.Interval(_), Data.Interval(_))) =>
       Pending("TODO").left
 

@@ -96,6 +96,9 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
     case (relations.IfUndefined, _) => notHandled.left
 
+    case (relations.Eq, List(Data.Interval(_), Data.Interval(_))) => Pending("TODO").left
+    case (relations.Neq, List(Data.Interval(_), Data.Interval(_))) => Pending("TODO").left
+
     case (relations.Between, List(Data.Interval(_), Data.Interval(_), Data.Interval(_))) =>
       Pending("TODO").left
 
