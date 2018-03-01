@@ -16,25 +16,34 @@
 
 package quasar.datagen
 
+import slamdata.Predef.{Option, String}
 import quasar.{Data, DataArbitrary, DataCodec}
 import quasar.ejson._
 
 import fs2.{Pure, Stream}
 import matryoshka.data.Fix
 import scalaz.std.list._
-import scalaz.std.string._
 
 final class PreciseDataCodecSpec extends quasar.Qspec with DataArbitrary {
   type J = Fix[EJson]
 
+  def parsePrecise(s: String): Option[Data] =
+    DataCodec.parse(s)(DataCodec.Precise).toOption
+
+  def renderPrecise(d: Data): Option[String] =
+    DataCodec.render(d)(DataCodec.Precise)
+
   "precise data codec roundtrips" >> prop { d: Data =>
-    val encoded =
-      DataCodec.Precise.encode(d).map(_.nospaces)
+    val encoded = renderPrecise(d)
+    // NB: Because we may have elided any `NA` values from `d` when rendering.
+    val decoded = encoded flatMap parsePrecise
 
     Stream.pure(encoded)
       .unNone
       .through(codec.ejsonDecodePreciseData[Pure, J])
       .through(codec.ejsonEncodePreciseData[Pure, J])
-      .toList must equal(encoded.toList)
+      .map(parsePrecise)
+      .unNone
+      .toList must equal(decoded.toList)
   }
 }
