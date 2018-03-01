@@ -124,6 +124,15 @@ package object time {
   val setTimeOffsetDate: SetTime[OffsetDate, OffsetDateTime] =
     (od, lt) => OffsetDateTime.of(od.date, lt, od.offset)
 
+  def setTimeZoneMinute(offset: ZoneOffset, minutes: Int): ZoneOffset = {
+    val totalSeconds: Int = offset.getTotalSeconds
+    val minuteField: Int = (totalSeconds % 3600) / 60
+    ZoneOffset.ofTotalSeconds(totalSeconds - (minuteField * 60) + (minutes * 60))
+  }
+
+  def setTimeZoneHour(offset: ZoneOffset, hours: Int): ZoneOffset =
+    ZoneOffset.ofTotalSeconds(hours * 3600 + offset.getTotalSeconds % 3600)
+
 
   // Trunc
 

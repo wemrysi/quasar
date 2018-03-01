@@ -251,8 +251,6 @@ trait DateLib extends Library with Serializable {
 
   // FIXME `ZoneOffset.ofTotalSeconds` throws an exception if the integer
   // input is not in the range [-64800, 64800]
-  //
-  // TODO deduplicate the set time zone impls from mimir's TimeLib
   val SetTimeZone = setTimeZone(
     "Sets the timezone subfield in a date/time value (in seconds east of UTC).",
     ZoneOffset.ofTotalSeconds,
@@ -261,16 +259,12 @@ trait DateLib extends Library with Serializable {
   val SetTimeZoneMinute = setTimeZone(
     "Sets the minute component of the timezone subfield in a date/time value.",
     ZoneOffset.ofHoursMinutes(0, _),
-    { (i, zo) =>
-      val totalSeconds: Int = zo.getTotalSeconds
-      val minuteField: Int = (totalSeconds % 3600) / 60
-      ZoneOffset.ofTotalSeconds(totalSeconds - (minuteField * 60) + (i * 60))
-    })
+    (i, zo) => setTimeZoneMinute(zo, i))
 
   val SetTimeZoneHour = setTimeZone(
     "Sets the hour component of the timezone subfield in a date/time value.",
     ZoneOffset.ofHours,
-    (i, zo) => ZoneOffset.ofTotalSeconds(i * 3600 + zo.getTotalSeconds % 3600))
+    (i, zo) => setTimeZoneHour(zo, i))
 
   val Now = NullaryFunc(
     Mapping,

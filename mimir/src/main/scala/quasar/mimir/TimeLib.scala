@@ -211,15 +211,11 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
 
     val SetTimeZoneMinute = new OffsetIntSetter("TimeZoneMinute",
       ZoneOffset.ofHoursMinutes(0, _),
-      { (i, zo) =>
-        val totalSeconds: Int = zo.getTotalSeconds
-        val minuteField: Int = (totalSeconds % 3600) / 60
-        ZoneOffset.ofTotalSeconds(totalSeconds - (minuteField * 60) + (i * 60))
-      })
+      (i, zo) => time.setTimeZoneMinute(zo, i))
 
     val SetTimeZoneHour = new OffsetIntSetter("TimeZoneHour",
       ZoneOffset.ofHours,
-      (i, zo) => ZoneOffset.ofTotalSeconds(i * 3600 + zo.getTotalSeconds % 3600))
+      (i, zo) => time.setTimeZoneHour(zo, i))
 
     val LocalDate = new Op1F1(TimeNamespace, "localdate") {
       def f1: F1 = CF1P("builtin::time::localdate") {
