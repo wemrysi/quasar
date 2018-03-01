@@ -2357,8 +2357,6 @@ abstract class StdLibSpec extends Qspec {
     "RelationsLib" >> {
       import RelationsLib._
 
-      // TODO: comparisons for date/time/interval types
-
       "Eq" >> {
         "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
           commute(Eq(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x == y))
@@ -2370,6 +2368,34 @@ abstract class StdLibSpec extends Qspec {
 
         "any two Strs" >> prop { (x: String, y: String) =>
           commute(Eq(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x == y))
+        }
+
+        "LocalDateTime" >> prop { (x: JLocalDateTime, y: JLocalDateTime) =>
+          commute(Eq(_, _).embed, Data.LocalDateTime(x), Data.LocalDateTime(y), Data.Bool(x == y))
+        }
+
+        "LocalDate" >> prop { (x: JLocalDate, y: JLocalDate) =>
+          commute(Eq(_, _).embed, Data.LocalDate(x), Data.LocalDate(y), Data.Bool(x == y))
+        }
+
+        "LocalTime" >> prop { (x: JLocalTime, y: JLocalTime) =>
+          commute(Eq(_, _).embed, Data.LocalTime(x), Data.LocalTime(y), Data.Bool(x == y))
+        }
+
+        "OffsetDateTime" >> prop { (x: JOffsetDateTime, y: JOffsetDateTime) =>
+          commute(Eq(_, _).embed, Data.OffsetDateTime(x), Data.OffsetDateTime(y), Data.Bool(x == y))
+        }
+
+        "OffsetDate" >> prop { (x: QOffsetDate, y: QOffsetDate) =>
+          commute(Eq(_, _).embed, Data.OffsetDate(x), Data.OffsetDate(y), Data.Bool(x == y))
+        }
+
+        "OffsetTime" >> prop { (x: JOffsetTime, y: JOffsetTime) =>
+          commute(Eq(_, _).embed, Data.OffsetTime(x), Data.OffsetTime(y), Data.Bool(x == y))
+        }
+
+        "Interval" >> prop { (x: DateTimeInterval, y: DateTimeInterval) =>
+          commute(Eq(_, _).embed, Data.Interval(x), Data.Interval(y), Data.Bool(x == y))
         }
 
         "any value with self" >> prop { (x: Data) =>
@@ -2398,6 +2424,34 @@ abstract class StdLibSpec extends Qspec {
           commute(Neq(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x != y))
         }
 
+        "LocalDateTime" >> prop { (x: JLocalDateTime, y: JLocalDateTime) =>
+          commute(Neq(_, _).embed, Data.LocalDateTime(x), Data.LocalDateTime(y), Data.Bool(x != y))
+        }
+
+        "LocalDate" >> prop { (x: JLocalDate, y: JLocalDate) =>
+          commute(Neq(_, _).embed, Data.LocalDate(x), Data.LocalDate(y), Data.Bool(x != y))
+        }
+
+        "LocalTime" >> prop { (x: JLocalTime, y: JLocalTime) =>
+          commute(Neq(_, _).embed, Data.LocalTime(x), Data.LocalTime(y), Data.Bool(x != y))
+        }
+
+        "OffsetDateTime" >> prop { (x: JOffsetDateTime, y: JOffsetDateTime) =>
+          commute(Neq(_, _).embed, Data.OffsetDateTime(x), Data.OffsetDateTime(y), Data.Bool(x != y))
+        }
+
+        "OffsetDate" >> prop { (x: QOffsetDate, y: QOffsetDate) =>
+          commute(Neq(_, _).embed, Data.OffsetDate(x), Data.OffsetDate(y), Data.Bool(x != y))
+        }
+
+        "OffsetTime" >> prop { (x: JOffsetTime, y: JOffsetTime) =>
+          commute(Neq(_, _).embed, Data.OffsetTime(x), Data.OffsetTime(y), Data.Bool(x != y))
+        }
+
+        "Interval" >> prop { (x: DateTimeInterval, y: DateTimeInterval) =>
+          commute(Neq(_, _).embed, Data.Interval(x), Data.Interval(y), Data.Bool(x != y))
+        }
+
         "any value with self" >> prop { (x: Data) =>
           commute(Neq(_, _).embed, x, x, Data.Bool(false))
         }
@@ -2424,6 +2478,30 @@ abstract class StdLibSpec extends Qspec {
           binary(Lt(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x < y))
         }
 
+        "LocalDateTime" >> prop { (x: JLocalDateTime, y: JLocalDateTime) =>
+          binary(Lt(_, _).embed, Data.LocalDateTime(x), Data.LocalDateTime(y), Data.Bool(x.compareTo(y) < 0))
+        }
+
+        "LocalDate" >> prop { (x: JLocalDate, y: JLocalDate) =>
+          binary(Lt(_, _).embed, Data.LocalDate(x), Data.LocalDate(y), Data.Bool(x.compareTo(y) < 0))
+        }
+
+        "LocalTime" >> prop { (x: JLocalTime, y: JLocalTime) =>
+          binary(Lt(_, _).embed, Data.LocalTime(x), Data.LocalTime(y), Data.Bool(x.compareTo(y) < 0))
+        }
+
+        "OffsetDateTime" >> prop { (x: JOffsetDateTime, y: JOffsetDateTime) =>
+          binary(Lt(_, _).embed, Data.OffsetDateTime(x), Data.OffsetDateTime(y), Data.Bool(x.compareTo(y) < 0))
+        }
+
+        "OffsetDate" >> prop { (x: QOffsetDate, y: QOffsetDate) =>
+          binary(Lt(_, _).embed, Data.OffsetDate(x), Data.OffsetDate(y), Data.Bool(x.compareTo(y) < 0))
+        }
+
+        "OffsetTime" >> prop { (x: JOffsetTime, y: JOffsetTime) =>
+          binary(Lt(_, _).embed, Data.OffsetTime(x), Data.OffsetTime(y), Data.Bool(x.compareTo(y) < 0))
+        }
+
         "any value with self" >> prop { (x: Data) =>
           binary(Lt(_, _).embed, x, x, Data.Bool(false))
         }
@@ -2440,6 +2518,30 @@ abstract class StdLibSpec extends Qspec {
 
         "any two Strs" >> prop { (x: String, y: String) =>
           binary(Lte(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x <= y))
+        }
+
+        "LocalDateTime" >> prop { (x: JLocalDateTime, y: JLocalDateTime) =>
+          binary(Lte(_, _).embed, Data.LocalDateTime(x), Data.LocalDateTime(y), Data.Bool(x.compareTo(y) <= 0))
+        }
+
+        "LocalDate" >> prop { (x: JLocalDate, y: JLocalDate) =>
+          binary(Lte(_, _).embed, Data.LocalDate(x), Data.LocalDate(y), Data.Bool(x.compareTo(y) <= 0))
+        }
+
+        "LocalTime" >> prop { (x: JLocalTime, y: JLocalTime) =>
+          binary(Lte(_, _).embed, Data.LocalTime(x), Data.LocalTime(y), Data.Bool(x.compareTo(y) <= 0))
+        }
+
+        "OffsetDateTime" >> prop { (x: JOffsetDateTime, y: JOffsetDateTime) =>
+          binary(Lte(_, _).embed, Data.OffsetDateTime(x), Data.OffsetDateTime(y), Data.Bool(x.compareTo(y) <= 0))
+        }
+
+        "OffsetDate" >> prop { (x: QOffsetDate, y: QOffsetDate) =>
+          binary(Lte(_, _).embed, Data.OffsetDate(x), Data.OffsetDate(y), Data.Bool(x.compareTo(y) <= 0))
+        }
+
+        "OffsetTime" >> prop { (x: JOffsetTime, y: JOffsetTime) =>
+          binary(Lte(_, _).embed, Data.OffsetTime(x), Data.OffsetTime(y), Data.Bool(x.compareTo(y) <= 0))
         }
 
         "any value with self" >> prop { (x: Data) =>
@@ -2460,6 +2562,30 @@ abstract class StdLibSpec extends Qspec {
           binary(Gt(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x > y))
         }
 
+        "LocalDateTime" >> prop { (x: JLocalDateTime, y: JLocalDateTime) =>
+          binary(Gt(_, _).embed, Data.LocalDateTime(x), Data.LocalDateTime(y), Data.Bool(x.compareTo(y) > 0))
+        }
+
+        "LocalDate" >> prop { (x: JLocalDate, y: JLocalDate) =>
+          binary(Gt(_, _).embed, Data.LocalDate(x), Data.LocalDate(y), Data.Bool(x.compareTo(y) > 0))
+        }
+
+        "LocalTime" >> prop { (x: JLocalTime, y: JLocalTime) =>
+          binary(Gt(_, _).embed, Data.LocalTime(x), Data.LocalTime(y), Data.Bool(x.compareTo(y) > 0))
+        }
+
+        "OffsetDateTime" >> prop { (x: JOffsetDateTime, y: JOffsetDateTime) =>
+          binary(Gt(_, _).embed, Data.OffsetDateTime(x), Data.OffsetDateTime(y), Data.Bool(x.compareTo(y) > 0))
+        }
+
+        "OffsetDate" >> prop { (x: QOffsetDate, y: QOffsetDate) =>
+          binary(Gt(_, _).embed, Data.OffsetDate(x), Data.OffsetDate(y), Data.Bool(x.compareTo(y) > 0))
+        }
+
+        "OffsetTime" >> prop { (x: JOffsetTime, y: JOffsetTime) =>
+          binary(Gt(_, _).embed, Data.OffsetTime(x), Data.OffsetTime(y), Data.Bool(x.compareTo(y) > 0))
+        }
+
         "any value with self" >> prop { (x: Data) =>
           binary(Gt(_, _).embed, x, x, Data.Bool(false))
         }
@@ -2478,10 +2604,33 @@ abstract class StdLibSpec extends Qspec {
           binary(Gte(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x >= y))
         }
 
+        "LocalDateTime" >> prop { (x: JLocalDateTime, y: JLocalDateTime) =>
+          binary(Gte(_, _).embed, Data.LocalDateTime(x), Data.LocalDateTime(y), Data.Bool(x.compareTo(y) >= 0))
+        }
+
+        "LocalDate" >> prop { (x: JLocalDate, y: JLocalDate) =>
+          binary(Gte(_, _).embed, Data.LocalDate(x), Data.LocalDate(y), Data.Bool(x.compareTo(y) >= 0))
+        }
+
+        "LocalTime" >> prop { (x: JLocalTime, y: JLocalTime) =>
+          binary(Gte(_, _).embed, Data.LocalTime(x), Data.LocalTime(y), Data.Bool(x.compareTo(y) >= 0))
+        }
+
+        "OffsetDateTime" >> prop { (x: JOffsetDateTime, y: JOffsetDateTime) =>
+          binary(Gte(_, _).embed, Data.OffsetDateTime(x), Data.OffsetDateTime(y), Data.Bool(x.compareTo(y) >= 0))
+        }
+
+        "OffsetDate" >> prop { (x: QOffsetDate, y: QOffsetDate) =>
+          binary(Gte(_, _).embed, Data.OffsetDate(x), Data.OffsetDate(y), Data.Bool(x.compareTo(y) >= 0))
+        }
+
+        "OffsetTime" >> prop { (x: JOffsetTime, y: JOffsetTime) =>
+          binary(Gte(_, _).embed, Data.OffsetTime(x), Data.OffsetTime(y), Data.Bool(x.compareTo(y) >= 0))
+        }
+
         "any value with self" >> prop { (x: Data) =>
           binary(Gte(_, _).embed, x, x, Data.Bool(true))
         }
-
       }
 
       "Between" >> {

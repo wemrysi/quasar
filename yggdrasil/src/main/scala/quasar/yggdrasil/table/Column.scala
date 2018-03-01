@@ -471,6 +471,7 @@ object Column {
     case CLocalDateTime(v)                   => const(v)
     case CLocalDate(v)                       => const(v)
     case CLocalTime(v)                       => const(v)
+    case CDuration(v)                        => const(v)
     case CArray(v, t @ CArrayType(elemType)) => const(v)(elemType)
     case CEmptyObject                        => new InfiniteColumn with EmptyObjectColumn
     case CEmptyArray                         => new InfiniteColumn with EmptyArrayColumn
