@@ -28,7 +28,7 @@ import scala.Console, Console.{RED, RESET}
 import fs2.Stream
 import fs2.{io, text}
 import fs2.interop.scalaz._
-import fs2.util.{Async, Suspendable}
+import fs2.util.Suspendable
 import matryoshka.data.Mu
 import scalaz.{\/, ImmutableArray}
 import scalaz.concurrent._
@@ -61,7 +61,7 @@ object Main extends TaskApp {
   val MaxCollLength: Double = 10.0
 
   /** A stream of JSON-encoded records generated from the input `SSTS`. */
-  def generatedJson[F[_]: Async: Suspendable](ssts: SSTS): Stream[F, String] =
+  def generatedJson[F[_]: Suspendable](ssts: SSTS): Stream[F, String] =
     generate.ejson[F](MaxCollLength, ssts)
       .getOrElse(failedStream("Unable to generate data from the provided SST."))
       .through(codec.ejsonEncodePreciseData[F, EJ])
