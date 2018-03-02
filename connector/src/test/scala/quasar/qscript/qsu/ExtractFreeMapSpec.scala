@@ -16,7 +16,7 @@
 
 package quasar.qscript.qsu
 
-import slamdata.Predef._
+import slamdata.Predef.{Map => SMap, _}
 import quasar.{Qspec, TreeMatchers}
 import quasar.Planner.PlannerError
 import quasar.common.{SortDir, JoinType}
@@ -26,13 +26,13 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.qscript.construction
-import quasar.qscript.MapFuncsCore
+import quasar.qscript.{MapFuncsCore, JoinSide, LeftSide, RightSide}
 
 import matryoshka._
 import matryoshka.data._
 import matryoshka.data.free._
 import pathy.Path
-import scalaz.{\/, \/-, EitherT, ICons, INil, Need, NonEmptyList => NEL, StateT}
+import scalaz.{\/, \/-, EitherT, ICons, INil, Need, NonEmptyList => NEL, StateT, Free}
 import scalaz.Scalaz._
 
 object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
@@ -44,6 +44,7 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
   val ejs = Fixed[Fix[EJson]]
   val qsu = QScriptUniform.DslT[Fix]
+  val qsu0 = QScriptUniform.AnnotatedDsl[Fix, Symbol]
   val func = construction.Func[Fix]
 
   def projectStrKey(key: String): FreeMap = func.ProjectKeyS(func.Hole, key)
@@ -319,31 +320,55 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
     }
 
     "convert a non-mappable join condition" >> {
-      val leftKey = projectStrKey("leftKey")
-      val rightKey = projectStrKey("rightKey")
-      val lref = Symbol("leftJoin")
-      val rref = Symbol("rightJoin")
+      val projectOrdersKey = projectStrKey("orders_key")
+      val projectCustomersKey = projectStrKey("customers_key")
+      val leftRead = qsu0.transpose('left, (qsu0.read('lr, orders), Retain.Values, Rotation.ShiftMap))
+      val rightRead = qsu0.transpose('right, (qsu0.read('rr, customers), Retain.Values, Rotation.ShiftMap))
 
-      val graph: QSUGraph = QSUGraph.fromTree[Fix](
-        qsu.lpJoin(qsu.tread(orders), qsu.tread(customers),
-          qsu._autojoin2(
-            qsu.transpose(qsu.map(qsu.read(orders), projectStrKey("leftKey")), Retain.Values, Rotation.ShiftArray),
-            qsu.map(qsu.read(customers), projectStrKey("rightKey")),
-            func.Eq(func.LeftSide, func.RightSide)),
-          JoinType.Inner, lref, rref))
+      val (renames, graph0) = QSUGraph.fromAnnotatedTree[Fix](
+        qsu0.lpJoin('j, (leftRead, rightRead,
+          qsu0._autojoin2('aj, (
+            qsu0.transpose('ts, (qsu0.map('map0, (leftRead, projectOrdersKey)), Retain.Values, Rotation.ShiftArray)),
+            qsu0.map('map1, (rightRead, projectCustomersKey)),
+            func.Eq(func.LeftSide, func.RightSide))),
+          JoinType.Inner, 'leftJoin, 'rightJoin)) map (_.some))
+
+      val joinSideLeft  = QSUGraph[Fix]('side0, SMap('side0 -> QScriptUniform.JoinSideRef('leftJoin)))
+      val joinSideRight = QSUGraph[Fix]('side1, SMap('side1 -> QScriptUniform.JoinSideRef('rightJoin)))
+
+      val graph = (graph0 :++ joinSideLeft :++ joinSideRight)
+        .replaceIf(renames('left), 'side0, {
+          case QScriptUniform.LPJoin(_, _, _, _, _, _) => false
+          case _ => true
+        })
+        .replaceIf(renames('right), 'side1, {
+          case QScriptUniform.LPJoin(_, _, _, _, _, _) => false
+          case _ => true
+        })
 
       evaluate(extractFM(graph)) must beLike {
         case \/-(ThetaJoin(
           Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap),
           AutoJoin2(
-            AutoJoin2(
-              Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap),
-              Transpose(Map(Read(`orders`), accessLeft), Retain.Values, Rotation.ShiftArray),
-              innerAutojoinCondition),
-            Read(`customers`), outerAutojoinCondition),
-          condition, JoinType.Inner, combiner)) => {
+            Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap),
+            Transpose(Map(Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap), struct), Retain.Values, Rotation.ShiftArray),
+            autojoinCondition),
+          on, JoinType.Inner, repair)) => {
 
-          accessLeft must beTreeEqual(leftKey)
+          autojoinCondition must beTreeEqual(makeMap("right_source", "right_target_0"))
+
+          struct must beTreeEqual(projectOrdersKey)
+
+          on must beTreeEqual(
+            func.Eq(
+              projectCustomersKey.as[JoinSide](LeftSide),
+              func.ProjectKeyS(func.RightSide, "right_target_0")))
+
+          repair must beTreeEqual(
+            makeMap("left", "right") >>= {
+              case RightSide => func.ProjectKeyS(func.RightSide, "right_source")
+              case side => Free.pure(side)
+            })
         }
       }
     }

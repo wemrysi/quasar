@@ -94,6 +94,25 @@ final case class QSUGraph[T[_[_]]](
       this
   }
 
+  /** Removes the `src` vertex, replacing any references to it with `target` if f succeeds. */
+  def replaceIf(src: Symbol, target: Symbol, f: QScriptUniform[T, Symbol] => Boolean): QSUGraph[T] = {
+    import QScriptUniform._
+
+    def replaceIfSrc(sym: Symbol): Symbol =
+      (sym === src) ? target | sym
+
+    if (vertices.isDefinedAt(src) && vertices.isDefinedAt(target))
+      QSUGraph(
+        replaceIfSrc(root),
+        vertices mapValues {
+          case JoinSideRef(s) => JoinSideRef(replaceIfSrc(s))
+          case node if f(node) => node map replaceIfSrc
+          case other => other
+        })
+    else
+      this
+  }
+
   // the same as replace, but whenever a node is modified, it changes the name
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def replaceWithRename[

@@ -27,9 +27,9 @@ import scalaz.{ICons, IList, INil, Monad, NonEmptyList, Scalaz, WriterT}, Scalaz
 /** Given a graph, source and targets vertices, unifies access to the target
   * values via `FreeMap`s over a common source.
   *
-  * Returns the new source graph, a unary function to access the original source
-  * value and a list of unary functions to access the values of each of the
-  * provided targets.
+  * Returns the new source graph, a unary function to access the
+  * original source value and a list of symbols tupled with unary
+  * functions to access the values of each of the provided targets.
   */
 final class UnifyTargets[T[_[_]]: BirecursiveT, F[_]: Monad] private (
     sourceName: String,
@@ -79,7 +79,7 @@ final class UnifyTargets[T[_[_]]: BirecursiveT, F[_]: Monad] private (
             }
           }
 
-        val targetMap0 = targetMap map { case (sym, fm) => (sym, fm.map(_.root) >>= accessIndex) }
+        val targetMap0 = targetMap map { case (sym, fm) => (sym, fm map (_.root) >>= accessIndex) }
 
         autojoinedM map (g => (g :++ graph, sourceAccess, targetMap0))
     }
