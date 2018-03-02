@@ -272,7 +272,7 @@ trait MathLib extends Library {
         Type.Const(Data.Interval(DateTimeInterval.betweenLocalDate(v1, v2)))
 
       case Sized(Type.Const(Data.LocalTime(v1)), Type.Const(Data.LocalTime(v2))) =>
-        Type.Const(Data.Interval(DateTimeInterval.betweenLocalTime(v2, v2)))
+        Type.Const(Data.Interval(DateTimeInterval.betweenLocalTime(v1, v2)))
 
       case Sized(Type.Const(Data.OffsetDateTime(v1)), Type.Const(Data.OffsetDateTime(v2))) =>
         Type.Const(Data.Interval(DateTimeInterval.betweenOffsetDateTime(v1, v2)))
@@ -281,7 +281,10 @@ trait MathLib extends Library {
         Type.Const(Data.Interval(DateTimeInterval.betweenOffsetDate(v1, v2)))
 
       case Sized(Type.Const(Data.OffsetTime(v1)), Type.Const(Data.OffsetTime(v2))) =>
-        Type.Const(Data.Interval(DateTimeInterval.betweenOffsetTime(v2, v2)))
+        Type.Const(Data.Interval(DateTimeInterval.betweenOffsetTime(v1, v2)))
+
+      case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) =>
+        Type.Const(Data.Interval(v1.minus(v2)))
 
       case Sized(Type.LocalDateTime.superOf(_), Type.LocalDateTime.superOf(_)) => Type.Interval
       case Sized(Type.LocalDate.superOf(_), Type.LocalDate.superOf(_)) => Type.Interval
