@@ -422,7 +422,7 @@ trait ColumnarTableModule[M[+ _]]
     }
 
     def constDuration(v: collection.Set[DateTimeInterval]): Table = {
-      val column = ArrayDurationColumn(v.toArray)
+      val column = ArrayIntervalColumn(v.toArray)
       Table(Slice(Map(ColumnRef(CPath.Identity, CDuration) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 

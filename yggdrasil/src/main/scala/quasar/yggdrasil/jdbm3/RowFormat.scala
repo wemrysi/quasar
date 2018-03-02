@@ -254,7 +254,7 @@ trait RowFormatSupport { self: StdCodecs =>
         }
       }
 
-    case (CDuration, col: DurationColumn) =>
+    case (CDuration, col: IntervalColumn) =>
       new SimpleColumnValueEncoder[DateTimeInterval] {
         val codec = Codec[DateTimeInterval]
 
@@ -333,7 +333,7 @@ trait RowFormatSupport { self: StdCodecs =>
       new ColumnValueDecoder {
         def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[LocalDate].read(buf))
       }
-    case (CDuration, col: ArrayDurationColumn) =>
+    case (CDuration, col: ArrayIntervalColumn) =>
       new ColumnValueDecoder {
         def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[DateTimeInterval].read(buf))
       }

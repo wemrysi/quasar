@@ -79,7 +79,7 @@ case class SegmentsWrapper(segments: Seq[Segment], projectionId: Int, blockId: L
         case CLocalDateTime     => new ArrayLocalDateTimeColumn(defined, values)
         case CLocalTime         => new ArrayLocalTimeColumn(defined, values)
         case CLocalDate         => new ArrayLocalDateColumn(defined, values)
-        case CDuration          => new ArrayDurationColumn(defined, values)
+        case CDuration          => new ArrayIntervalColumn(defined, values)
         case CNum               => new ArrayNumColumn(defined, values)
         case CDouble            => new ArrayDoubleColumn(defined, values)
         case CLong              => new ArrayLongColumn(defined, values)

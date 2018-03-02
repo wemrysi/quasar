@@ -238,11 +238,11 @@ class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extend
           }
 
         case CDuration =>
-          new DurationColumn {
+          new IntervalColumn {
             private var row0: Int             = -1
-            private var refCol0: DurationColumn = _
-            @inline private def refCol(row: Int): DurationColumn =
-              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[DurationColumn]
+            private var refCol0: IntervalColumn = _
+            @inline private def refCol(row: Int): IntervalColumn =
+              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[IntervalColumn]
 
             def apply(row: Int) = refCol0(row)
 

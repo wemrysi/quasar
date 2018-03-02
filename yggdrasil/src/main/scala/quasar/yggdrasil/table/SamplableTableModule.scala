@@ -149,7 +149,7 @@ trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { sel
         case CLocalDateTime       => ArrayLocalDateTimeColumn.empty(size)
         case CLocalTime           => ArrayLocalTimeColumn.empty(size)
         case CLocalDate           => ArrayLocalDateColumn.empty(size)
-        case CDuration            => ArrayDurationColumn.empty(size)
+        case CDuration            => ArrayIntervalColumn.empty(size)
         case CArrayType(elemType) => ArrayHomogeneousArrayColumn.empty(size)(elemType)
         case CNull                => MutableNullColumn.empty()
         case CEmptyObject         => MutableEmptyObjectColumn.empty()

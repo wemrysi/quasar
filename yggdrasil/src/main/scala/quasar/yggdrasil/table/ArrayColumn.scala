@@ -262,7 +262,7 @@ object ArrayLocalDateColumn {
     new ArrayLocalDateColumn(new BitSet, new Array[LocalDate](size))
 }
 
-class ArrayDurationColumn(val defined: BitSet, values: Array[DateTimeInterval]) extends ArrayColumn[DateTimeInterval] with DurationColumn {
+class ArrayIntervalColumn(val defined: BitSet, values: Array[DateTimeInterval]) extends ArrayColumn[DateTimeInterval] with IntervalColumn {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: DateTimeInterval) = {
@@ -271,13 +271,13 @@ class ArrayDurationColumn(val defined: BitSet, values: Array[DateTimeInterval]) 
   }
 }
 
-object ArrayDurationColumn {
+object ArrayIntervalColumn {
   def apply(values: Array[DateTimeInterval]) =
-    new ArrayDurationColumn(BitSetUtil.range(0, values.length), values)
+    new ArrayIntervalColumn(BitSetUtil.range(0, values.length), values)
   def apply(defined: BitSet, values: Array[DateTimeInterval]) =
-    new ArrayDurationColumn(defined.copy, values)
-  def empty(size: Int): ArrayDurationColumn =
-    new ArrayDurationColumn(new BitSet, new Array[DateTimeInterval](size))
+    new ArrayIntervalColumn(defined.copy, values)
+  def empty(size: Int): ArrayIntervalColumn =
+    new ArrayIntervalColumn(new BitSet, new Array[DateTimeInterval](size))
 }
 
 class MutableEmptyArrayColumn(val defined: BitSet) extends ArrayColumn[Boolean] with EmptyArrayColumn {

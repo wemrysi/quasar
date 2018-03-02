@@ -79,7 +79,7 @@ class RowFormatSpec extends Specification with ScalaCheck with SJValueGenerators
         case (CLocalDateTime(x), col: LocalDateTimeColumn)   => col(row) must_== x
         case (CLocalTime(x), col: LocalTimeColumn)           => col(row) must_== x
         case (CLocalDate(x), col: LocalDateColumn)           => col(row) must_== x
-        case (CDuration(x), col: DurationColumn)             => col(row) must_== x
+        case (CDuration(x), col: IntervalColumn)             => col(row) must_== x
         case (CNull, col: NullColumn)                        => ok
         case (CEmptyObject, col: EmptyObjectColumn)          => ok
         case (CEmptyArray, col: EmptyArrayColumn)            => ok

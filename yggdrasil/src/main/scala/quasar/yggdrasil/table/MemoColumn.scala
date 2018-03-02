@@ -71,7 +71,7 @@ class MemoStrColumn(c: StrColumn) extends StrColumn {
   }
 }
 
-class MemoDurationColumn(c: DurationColumn) extends DurationColumn {
+class MemoIntervalColumn(c: IntervalColumn) extends IntervalColumn {
   private[this] var row0                   = -1
   private[this] var memo: DateTimeInterval = _
   def isDefinedAt(row: Int) = c.isDefinedAt(row)

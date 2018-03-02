@@ -142,7 +142,7 @@ private final case class LocalDateColumnHasher(columnRef: ColumnRef, column: Loc
   protected final def hashImpl(row: Int): Int = ???
 }
 
-private final case class PeriodColumnHasher(columnRef: ColumnRef, column: DurationColumn) extends ColumnHasher {
+private final case class PeriodColumnHasher(columnRef: ColumnRef, column: IntervalColumn) extends ColumnHasher {
   private val pathHash = columnRef.selector.hashCode
   protected final def hashImpl(row: Int): Int = 11 * pathHash + 503 * column(row).hashCode
 }
@@ -203,7 +203,7 @@ private object ColumnHasher {
     case (col: LocalDateTimeColumn)  => new LocalDateTimeColumnHasher(ref, col)
     case (col: LocalTimeColumn)      => new LocalTimeColumnHasher(ref, col)
     case (col: LocalDateColumn)      => new LocalDateColumnHasher(ref, col)
-    case (col: DurationColumn)       => new PeriodColumnHasher(ref, col)
+    case (col: IntervalColumn)       => new PeriodColumnHasher(ref, col)
     case _                           => new CValueColumnHasher(ref, col0)
   }
 }

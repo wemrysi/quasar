@@ -99,80 +99,80 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
           case (c1: NumColumn, c2: NumColumn) =>
             new NumFrom.NN(c1, c2, numOk, _ + _)
 
-          case (c1: OffsetDateTimeColumn, c2: DurationColumn) =>
+          case (c1: OffsetDateTimeColumn, c2: IntervalColumn) =>
             new OffsetDateTimeColumn {
               def apply(row: Int) = c2(row).addToOffsetDateTime(c1(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
-          case (c1: OffsetDateColumn, c2: DurationColumn) =>
+          case (c1: OffsetDateColumn, c2: IntervalColumn) =>
             new OffsetDateColumn {
               def apply(row: Int) = c2(row).addToOffsetDate(c1(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isDateLike
             }
 
-          case (c1: OffsetTimeColumn, c2: DurationColumn) =>
+          case (c1: OffsetTimeColumn, c2: IntervalColumn) =>
             new OffsetTimeColumn {
               def apply(row: Int) = c2(row).addToOffsetTime(c1(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isTimeLike
             }
 
-          case (c1: LocalDateTimeColumn, c2: DurationColumn) =>
+          case (c1: LocalDateTimeColumn, c2: IntervalColumn) =>
             new LocalDateTimeColumn {
               def apply(row: Int) = c2(row).addToLocalDateTime(c1(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
-          case (c1: LocalDateColumn, c2: DurationColumn) =>
+          case (c1: LocalDateColumn, c2: IntervalColumn) =>
             new LocalDateColumn {
               def apply(row: Int) = c2(row).addToLocalDate(c1(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isDateLike
             }
 
-          case (c1: LocalTimeColumn, c2: DurationColumn) =>
+          case (c1: LocalTimeColumn, c2: IntervalColumn) =>
             new LocalTimeColumn {
               def apply(row: Int) = c2(row).addToLocalTime(c1(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isTimeLike
             }
 
-          case (c1: DurationColumn, c2: OffsetDateTimeColumn) =>
+          case (c1: IntervalColumn, c2: OffsetDateTimeColumn) =>
             new OffsetDateTimeColumn {
               def apply(row: Int) = c1(row).addToOffsetDateTime(c2(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
-          case (c1: DurationColumn, c2: OffsetDateColumn) =>
+          case (c1: IntervalColumn, c2: OffsetDateColumn) =>
             new OffsetDateColumn {
               def apply(row: Int) = c1(row).addToOffsetDate(c2(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c1(row).isDateLike
             }
 
-          case (c1: DurationColumn, c2: OffsetTimeColumn) =>
+          case (c1: IntervalColumn, c2: OffsetTimeColumn) =>
             new OffsetTimeColumn {
               def apply(row: Int) = c1(row).addToOffsetTime(c2(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c1(row).isTimeLike
             }
 
-          case (c1: DurationColumn, c2: LocalDateTimeColumn) =>
+          case (c1: IntervalColumn, c2: LocalDateTimeColumn) =>
             new LocalDateTimeColumn {
               def apply(row: Int) = c1(row).addToLocalDateTime(c2(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
-          case (c1: DurationColumn, c2: LocalDateColumn) =>
+          case (c1: IntervalColumn, c2: LocalDateColumn) =>
             new LocalDateColumn {
               def apply(row: Int) = c1(row).addToLocalDate(c2(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c1(row).isDateLike
             }
 
-          case (c1: DurationColumn, c2: LocalTimeColumn) =>
+          case (c1: IntervalColumn, c2: LocalTimeColumn) =>
             new LocalTimeColumn {
               def apply(row: Int) = c1(row).addToLocalTime(c2(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c1(row).isTimeLike
             }
 
-          case (c1: DurationColumn, c2: DurationColumn) =>
-            new DurationColumn {
+          case (c1: IntervalColumn, c2: IntervalColumn) =>
+            new IntervalColumn {
               def apply(row: Int) = c1(row).plus(c2(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
@@ -209,80 +209,80 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
           case (c1: NumColumn, c2: NumColumn) =>
             new NumFrom.NN(c1, c2, numOk, _ - _)
 
-          case (c1: OffsetDateTimeColumn, c2: DurationColumn) =>
+          case (c1: OffsetDateTimeColumn, c2: IntervalColumn) =>
             new OffsetDateTimeColumn {
               def apply(row: Int) = c2(row).subtractFromOffsetDateTime(c1(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
-          case (c1: OffsetDateColumn, c2: DurationColumn) =>
+          case (c1: OffsetDateColumn, c2: IntervalColumn) =>
             new OffsetDateColumn {
               def apply(row: Int) = c2(row).subtractFromOffsetDate(c1(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isDateLike
             }
 
-          case (c1: OffsetTimeColumn, c2: DurationColumn) =>
+          case (c1: OffsetTimeColumn, c2: IntervalColumn) =>
             new OffsetTimeColumn {
               def apply(row: Int) = c2(row).subtractFromOffsetTime(c1(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isTimeLike
             }
 
-          case (c1: LocalDateTimeColumn, c2: DurationColumn) =>
+          case (c1: LocalDateTimeColumn, c2: IntervalColumn) =>
             new LocalDateTimeColumn {
               def apply(row: Int) = c2(row).subtractFromLocalDateTime(c1(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
-          case (c1: LocalDateColumn, c2: DurationColumn) =>
+          case (c1: LocalDateColumn, c2: IntervalColumn) =>
             new LocalDateColumn {
               def apply(row: Int) = c2(row).subtractFromLocalDate(c1(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isDateLike
             }
 
-          case (c1: LocalTimeColumn, c2: DurationColumn) =>
+          case (c1: LocalTimeColumn, c2: IntervalColumn) =>
             new LocalTimeColumn {
               def apply(row: Int) = c2(row).subtractFromLocalTime(c1(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isTimeLike
             }
 
           case (c1: LocalDateTimeColumn, c2: LocalDateTimeColumn) =>
-            new DurationColumn {
+            new IntervalColumn {
               def apply(row: Int) = DateTimeInterval.betweenLocalDateTime(c1(row), c2(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
           case (c1: LocalDateColumn, c2: LocalDateColumn) =>
-            new DurationColumn {
+            new IntervalColumn {
               def apply(row: Int) = DateTimeInterval.betweenLocalDate(c1(row), c2(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
           case (c1: LocalTimeColumn, c2: LocalTimeColumn) =>
-            new DurationColumn {
+            new IntervalColumn {
               def apply(row: Int) = DateTimeInterval.betweenLocalTime(c1(row), c2(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
           case (c1: OffsetDateTimeColumn, c2: OffsetDateTimeColumn) =>
-            new DurationColumn {
+            new IntervalColumn {
               def apply(row: Int) = DateTimeInterval.betweenOffsetDateTime(c1(row), c2(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
           case (c1: OffsetDateColumn, c2: OffsetDateColumn) =>
-            new DurationColumn {
+            new IntervalColumn {
               def apply(row: Int) = DateTimeInterval.betweenOffsetDate(c1(row), c2(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
           case (c1: OffsetTimeColumn, c2: OffsetTimeColumn) =>
-            new DurationColumn {
+            new IntervalColumn {
               def apply(row: Int) = DateTimeInterval.betweenOffsetTime(c1(row), c2(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
-          case (c1: DurationColumn, c2: DurationColumn) =>
-            new DurationColumn {
+          case (c1: IntervalColumn, c2: IntervalColumn) =>
+            new IntervalColumn {
               def apply(row: Int) = c1(row).minus(c2(row))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
@@ -319,14 +319,14 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
           case (c1: NumColumn, c2: NumColumn) =>
             new NumFrom.NN(c1, c2, numOk, _ * _)
 
-          case (c1: LongColumn, c2: DurationColumn) =>
-            new DurationColumn {
+          case (c1: LongColumn, c2: IntervalColumn) =>
+            new IntervalColumn {
               def apply(row: Int) = c2(row).multiply(c1(row).toInt)
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
-          case (c1: DurationColumn, c2: LongColumn) =>
-            new DurationColumn {
+          case (c1: IntervalColumn, c2: LongColumn) =>
+            new IntervalColumn {
               def apply(row: Int) = c1(row).multiply(c2(row).toInt)
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }

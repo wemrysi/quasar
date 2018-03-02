@@ -249,7 +249,7 @@ trait Slice { source =>
               def apply(row: Int)       = d
             })
           case CDuration(p) =>
-            (ColumnRef(CPath.Identity, CDuration), new DurationColumn {
+            (ColumnRef(CPath.Identity, CDuration), new IntervalColumn {
               def isDefinedAt(row: Int) = source.isDefinedAt(row)
               def apply(row: Int)       = p
             })
@@ -951,13 +951,13 @@ trait Slice { source =>
           }
           ArrayLocalDateColumn(defined, values)
 
-        case col: DurationColumn =>
+        case col: IntervalColumn =>
           val defined = col.definedAt(0, source.size)
           val values  = new Array[DateTimeInterval](source.size)
           Loop.range(0, source.size) { row =>
             if (defined(row)) values(row) = col(row)
           }
-          ArrayDurationColumn(defined, values)
+          ArrayIntervalColumn(defined, values)
 
         case col: EmptyArrayColumn =>
           val ncol = MutableEmptyArrayColumn.empty()
@@ -1654,7 +1654,7 @@ trait Slice { source =>
               }
 
               case CDuration => {
-                val specCol = col.asInstanceOf[DurationColumn]
+                val specCol = col.asInstanceOf[IntervalColumn]
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
@@ -1850,7 +1850,7 @@ object Slice {
             }
 
           case CDuration(p) =>
-            acc.getOrElse(ref, ArrayDurationColumn.empty(sliceSize)).asInstanceOf[ArrayDurationColumn].unsafeTap { c =>
+            acc.getOrElse(ref, ArrayIntervalColumn.empty(sliceSize)).asInstanceOf[ArrayIntervalColumn].unsafeTap { c =>
               c.update(sliceIndex, p)
             }
 

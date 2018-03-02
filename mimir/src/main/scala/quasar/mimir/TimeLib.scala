@@ -322,7 +322,7 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
 
     val Duration = new Op1F1(TimeNamespace, "duration") {
       def f1: F1 = CF1P("builtin::time::duration") {
-        case c: StrColumn => new DurationColumn {
+        case c: StrColumn => new IntervalColumn {
           def apply(row: Int) = DateTimeInterval.parse(c(row)).get
           def isDefinedAt(row: Int) = DateTimeInterval.parse(c(row)).isDefined
         }

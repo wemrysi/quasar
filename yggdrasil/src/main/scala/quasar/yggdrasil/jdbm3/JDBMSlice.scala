@@ -89,7 +89,7 @@ object JDBMSlice {
       case CLocalDateTime       => ArrayLocalDateTimeColumn.empty(sliceSize)
       case CLocalTime           => ArrayLocalTimeColumn.empty(sliceSize)
       case CLocalDate           => ArrayLocalDateColumn.empty(sliceSize)
-      case CDuration            => ArrayDurationColumn.empty(sliceSize)
+      case CDuration            => ArrayIntervalColumn.empty(sliceSize)
       case CNull                => MutableNullColumn.empty()
       case CEmptyObject         => MutableEmptyObjectColumn.empty()
       case CEmptyArray          => MutableEmptyArrayColumn.empty()

@@ -177,7 +177,7 @@ object HomogeneousArrayColumn {
         def apply(row: Int): LocalDate = col(row)(i)
       }
     case col @ HomogeneousArrayColumn(CDuration) =>
-      new DurationColumn {
+      new IntervalColumn {
         def isDefinedAt(row: Int): Boolean =
           i >= 0 && col.isDefinedAt(row) && i < col(row).length
         def apply(row: Int): DateTimeInterval = col(row)(i)
@@ -355,7 +355,7 @@ trait LocalDateColumn extends Column with (Int => LocalDate) {
   override def toString                   = "LocalDateColumn"
 }
 
-trait DurationColumn extends Column with (Int => DateTimeInterval) {
+trait IntervalColumn extends Column with (Int => DateTimeInterval) {
   def apply(row: Int): DateTimeInterval
   def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
   // TODO: fix this
@@ -365,7 +365,7 @@ trait DurationColumn extends Column with (Int => DateTimeInterval) {
   override def jValue(row: Int)           = JString(this(row).toString)
   override def cValue(row: Int)           = CDuration(this(row))
   override def strValue(row: Int): String = this(row).toString
-  override def toString                   = "DurationColumn"
+  override def toString                   = "IntervalColumn"
 }
 
 trait EmptyArrayColumn extends Column {
@@ -550,7 +550,7 @@ object Column {
     def apply(row: Int) = v
   }
 
-  @inline def const(v: DateTimeInterval) = new InfiniteColumn with DurationColumn {
+  @inline def const(v: DateTimeInterval) = new InfiniteColumn with IntervalColumn {
     def apply(row: Int) = v
   }
 
@@ -571,7 +571,7 @@ object Column {
     case col: LocalDateTimeColumn       => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
     case col: LocalTimeColumn           => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
     case col: LocalDateColumn           => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
-    case col: DurationColumn            => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
+    case col: IntervalColumn            => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
     case col: HomogeneousArrayColumn[a] =>
       new HomogeneousArrayColumn[Array[a]] {
         val tpe = CArrayType(col.tpe)

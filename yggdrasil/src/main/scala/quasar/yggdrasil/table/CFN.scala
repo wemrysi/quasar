@@ -387,7 +387,7 @@ trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
         val cols = cols0.asInstanceOf[Array[Array[DateTimeInterval]]]
 
         val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
-          ColumnRef(CPath(CPathIndex(i)), tpe) -> new DurationColumn {
+          ColumnRef(CPath(CPathIndex(i)), tpe) -> new IntervalColumn {
             def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
             def apply(row: Int)       = cols(row)(i)
           }

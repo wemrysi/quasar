@@ -290,8 +290,8 @@ object ArraySetColumn {
         }
 
       case CDuration =>
-        new ArraySetColumn[DurationColumn](ctype, columnSet.map(_.asInstanceOf[DurationColumn])) with DurationColumn {
-          def apply(row: Int): DateTimeInterval = backing(firstDefinedIndexAt(row)).asInstanceOf[DurationColumn].apply(row)
+        new ArraySetColumn[IntervalColumn](ctype, columnSet.map(_.asInstanceOf[IntervalColumn])) with IntervalColumn {
+          def apply(row: Int): DateTimeInterval = backing(firstDefinedIndexAt(row)).asInstanceOf[IntervalColumn].apply(row)
         }
 
       case ctype: CArrayType[a] =>

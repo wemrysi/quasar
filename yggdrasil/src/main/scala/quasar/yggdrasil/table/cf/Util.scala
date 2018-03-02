@@ -107,8 +107,8 @@ object util {
         }
       }
 
-    case (c1: DurationColumn, c2: DurationColumn) =>
-      new UnionColumn(c1, c2) with DurationColumn {
+    case (c1: IntervalColumn, c2: IntervalColumn) =>
+      new UnionColumn(c1, c2) with IntervalColumn {
         def apply(row: Int) = {
           if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
         }
@@ -242,9 +242,9 @@ object util {
             }
           })
 
-        case (_, _: DurationColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[DurationColumn]) =>
-          val periodColumns = copyCastArray[DurationColumn](columns)
-          Some(new NConcatColumn(offsets, periodColumns) with DurationColumn {
+        case (_, _: IntervalColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[IntervalColumn]) =>
+          val periodColumns = copyCastArray[IntervalColumn](columns)
+          Some(new NConcatColumn(offsets, periodColumns) with IntervalColumn {
             def apply(row: Int) = {
               val i = indexOf(row)
               periodColumns(i)(row - offsets(i))
@@ -393,8 +393,8 @@ object util {
         def apply(row: Int) = c(row - by)
       }
 
-    case c: DurationColumn =>
-      new ShiftColumn(by, c) with DurationColumn {
+    case c: IntervalColumn =>
+      new ShiftColumn(by, c) with IntervalColumn {
         def apply(row: Int) = c(row - by)
       }
 
@@ -421,7 +421,7 @@ object util {
     case c: LocalDateTimeColumn  => new SparsenColumn(c, idx, toSize) with LocalDateTimeColumn { def apply(row: Int) =  c(remap(row)) }
     case c: LocalTimeColumn      => new SparsenColumn(c, idx, toSize) with LocalTimeColumn { def apply(row: Int) =      c(remap(row)) }
     case c: LocalDateColumn      => new SparsenColumn(c, idx, toSize) with LocalDateColumn { def apply(row: Int) =      c(remap(row)) }
-    case c: DurationColumn       => new SparsenColumn(c, idx, toSize) with DurationColumn { def apply(row: Int) =       c(remap(row)) }
+    case c: IntervalColumn       => new SparsenColumn(c, idx, toSize) with IntervalColumn { def apply(row: Int) =       c(remap(row)) }
     case c: HomogeneousArrayColumn[a] =>
       new SparsenColumn(c, idx, toSize) with HomogeneousArrayColumn[a] {
         val tpe = c.tpe
@@ -442,7 +442,7 @@ object util {
     case c: LocalDateTimeColumn => new EmptyColumn[LocalDateTimeColumn] with LocalDateTimeColumn
     case c: LocalTimeColumn     => new EmptyColumn[LocalTimeColumn] with LocalTimeColumn
     case c: LocalDateColumn     => new EmptyColumn[LocalDateColumn] with LocalDateColumn
-    case c: DurationColumn      => new EmptyColumn[DurationColumn] with DurationColumn
+    case c: IntervalColumn      => new EmptyColumn[IntervalColumn] with IntervalColumn
     case c: HomogeneousArrayColumn[a] =>
       new EmptyColumn[HomogeneousArrayColumn[a]] with HomogeneousArrayColumn[a] {
         val tpe = c.tpe
@@ -464,7 +464,7 @@ object util {
     case c: LocalDateTimeColumn  => UndefinedColumn.raw
     case c: LocalTimeColumn      => UndefinedColumn.raw
     case c: LocalDateColumn      => UndefinedColumn.raw
-    case c: DurationColumn       => UndefinedColumn.raw
+    case c: IntervalColumn       => UndefinedColumn.raw
     case c: HomogeneousArrayColumn[_] => UndefinedColumn.raw
     case c: EmptyArrayColumn  => UndefinedColumn.raw
     case c: EmptyObjectColumn => UndefinedColumn.raw
@@ -483,7 +483,7 @@ object util {
     case c: LocalDateTimeColumn  => new RemapColumn(c, f) with LocalDateTimeColumn { def apply(row: Int)  = c(f(row)) }
     case c: LocalTimeColumn      => new RemapColumn(c, f) with LocalTimeColumn { def apply(row: Int)      = c(f(row)) }
     case c: LocalDateColumn      => new RemapColumn(c, f) with LocalDateColumn { def apply(row: Int)      = c(f(row)) }
-    case c: DurationColumn => new RemapColumn(c, f) with DurationColumn { def apply(row: Int)             = c(f(row)) }
+    case c: IntervalColumn => new RemapColumn(c, f) with IntervalColumn { def apply(row: Int)             = c(f(row)) }
     case c: HomogeneousArrayColumn[a] =>
       new RemapColumn(c, f) with HomogeneousArrayColumn[a] {
         val tpe = c.tpe
@@ -506,7 +506,7 @@ object util {
     case c: LocalDateTimeColumn => new RemapFilterColumn(c, filter, offset) with LocalDateTimeColumn { def apply(row: Int)   = c(row + offset) }
     case c: LocalTimeColumn     => new RemapFilterColumn(c, filter, offset) with LocalTimeColumn { def apply(row: Int)       = c(row + offset) }
     case c: LocalDateColumn     => new RemapFilterColumn(c, filter, offset) with LocalDateColumn { def apply(row: Int)       = c(row + offset) }
-    case c: DurationColumn => new RemapFilterColumn(c, filter, offset) with DurationColumn { def apply(row: Int)             = c(row + offset) }
+    case c: IntervalColumn => new RemapFilterColumn(c, filter, offset) with IntervalColumn { def apply(row: Int)             = c(row + offset) }
     case c: HomogeneousArrayColumn[a] =>
       new RemapFilterColumn(c, filter, offset) with HomogeneousArrayColumn[a] {
         val tpe = c.tpe
@@ -529,7 +529,7 @@ object util {
     case c: LocalDateTimeColumn  => new RemapIndicesColumn(c, indices) with LocalDateTimeColumn { def apply(row: Int)  = c(indices.get(row)) }
     case c: LocalTimeColumn      => new RemapIndicesColumn(c, indices) with LocalTimeColumn { def apply(row: Int)      = c(indices.get(row)) }
     case c: LocalDateColumn      => new RemapIndicesColumn(c, indices) with LocalDateColumn { def apply(row: Int)      = c(indices.get(row)) }
-    case c: DurationColumn       => new RemapIndicesColumn(c, indices) with DurationColumn { def apply(row: Int)       = c(indices.get(row)) }
+    case c: IntervalColumn       => new RemapIndicesColumn(c, indices) with IntervalColumn { def apply(row: Int)       = c(indices.get(row)) }
     case c: HomogeneousArrayColumn[a] =>
       new RemapIndicesColumn(c, indices) with HomogeneousArrayColumn[a] {
         val tpe = c.tpe
@@ -552,7 +552,7 @@ object util {
     case c: LocalDateTimeColumn  => new BitsetColumn(definedAt & c.definedAt(from, to)) with LocalDateTimeColumn { def apply(row: Int)  = c(row) }
     case c: LocalTimeColumn      => new BitsetColumn(definedAt & c.definedAt(from, to)) with LocalTimeColumn { def apply(row: Int)      = c(row) }
     case c: LocalDateColumn      => new BitsetColumn(definedAt & c.definedAt(from, to)) with LocalDateColumn { def apply(row: Int)      = c(row) }
-    case c: DurationColumn => new BitsetColumn(definedAt & c.definedAt(from, to)) with DurationColumn { def apply(row: Int)             = c(row) }
+    case c: IntervalColumn => new BitsetColumn(definedAt & c.definedAt(from, to)) with IntervalColumn { def apply(row: Int)             = c(row) }
     case c: HomogeneousArrayColumn[a] =>
       new BitsetColumn(definedAt & c.definedAt(from, to)) with HomogeneousArrayColumn[a] {
         val tpe = c.tpe
@@ -575,7 +575,7 @@ object util {
     case c: LocalDateTimeColumn  => new LocalDateTimeColumn { def apply(row: Int)   = c(row); def isDefinedAt(row: Int) = c.isDefinedAt(row) && p(row) }
     case c: LocalTimeColumn      => new LocalTimeColumn { def apply(row: Int)           = c(row); def isDefinedAt(row: Int) = c.isDefinedAt(row) && p(row) }
     case c: LocalDateColumn      => new LocalDateColumn { def apply(row: Int)           = c(row); def isDefinedAt(row: Int) = c.isDefinedAt(row) && p(row) }
-    case c: DurationColumn       => new DurationColumn { def apply(row: Int)             = c(row); def isDefinedAt(row: Int) = c.isDefinedAt(row) && p(row) }
+    case c: IntervalColumn       => new IntervalColumn { def apply(row: Int)             = c(row); def isDefinedAt(row: Int) = c.isDefinedAt(row) && p(row) }
     case c: HomogeneousArrayColumn[a] =>
       new HomogeneousArrayColumn[a] {
         val tpe = c.tpe
@@ -651,8 +651,8 @@ object util {
         def apply(row: Int) = if (leftMask.get(row)) left(row) else right(row)
       }
 
-    case (left: DurationColumn, right: DurationColumn) =>
-      new UnionColumn(left, right) with DurationColumn {
+    case (left: IntervalColumn, right: IntervalColumn) =>
+      new UnionColumn(left, right) with IntervalColumn {
         def apply(row: Int) = if (leftMask.get(row)) left(row) else right(row)
       }
 
