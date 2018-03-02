@@ -69,7 +69,7 @@ object CTypeFlags {
           case CArrayType(tpe) =>
             buffer += FArray
             flagForCValueType(tpe)
-          case CDuration => buffer += FDuration
+          case CInterval => buffer += FDuration
         }
       }
 
@@ -109,7 +109,7 @@ object CTypeFlags {
       case FLocalDateTime => Success(CLocalDateTime)
       case FLocalTime => Success(CLocalTime)
       case FLocalDate => Success(CLocalDate)
-      case FDuration => Success(CDuration)
+      case FDuration => Success(CInterval)
       case FArray => readCValueType(buffer.get()) map (CArrayType(_))
       case _ => Failure(new IOException("Unexpected segment type flag: %x" format flag))
     }

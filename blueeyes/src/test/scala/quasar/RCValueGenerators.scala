@@ -28,7 +28,7 @@ trait RCValueGenerators {
   private def genNonArrayCValueType: Gen[CValueType[_]] =
     Gen.oneOf[CValueType[_]](CString, CBoolean, CLong, CDouble, CNum,
       COffsetDateTime, COffsetTime, COffsetDate,
-      CLocalDateTime, CLocalTime, CLocalDate, CDuration)
+      CLocalDateTime, CLocalTime, CLocalDate, CInterval)
 
   def genCValueType(maxDepth: Int = maxArrayDepth): Gen[CValueType[_]] = {
     if (maxDepth > 0) {
@@ -52,7 +52,7 @@ trait RCValueGenerators {
     case COffsetDateTime => genOffsetDateTime.map(COffsetDateTime(_))
     case COffsetTime => genOffsetTime.map(COffsetTime(_))
     case COffsetDate => genOffsetDate.map(COffsetDate(_))
-    case CDuration => genInterval.map(CDuration(_))
+    case CInterval => genInterval.map(CInterval(_))
     case CArrayType(elemType) =>
       vectorOf(genValueForCValueType(elemType) map (_.value)) map { xs =>
         CArray(xs.toArray(elemType.classTag), CArrayType(elemType))

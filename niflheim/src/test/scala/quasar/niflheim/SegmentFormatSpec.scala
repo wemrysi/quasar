@@ -78,7 +78,7 @@ trait SegmentFormatSpec extends Specification with ScalaCheck with SegmentFormat
       surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CLocalDateTime, EmptyBitSet, new Array[LocalDateTime](0)))
       surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CLocalTime, EmptyBitSet, new Array[LocalTime](0)))
       surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CLocalDate, EmptyBitSet, new Array[LocalDate](0)))
-      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CDuration, EmptyBitSet, new Array[DateTimeInterval](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CInterval, EmptyBitSet, new Array[DateTimeInterval](0)))
     }
     "roundtrip simple boolean segment" in {
       val segment = BooleanSegment(1234L, CPath("a.b.c"),

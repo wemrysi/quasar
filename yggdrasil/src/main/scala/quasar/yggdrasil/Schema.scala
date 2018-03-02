@@ -48,7 +48,7 @@ object Schema {
     case JLocalDateTimeT  => Set(CLocalDateTime)
     case JLocalTimeT      => Set(CLocalTime)
     case JLocalDateT      => Set(CLocalDate)
-    case JDurationT       => Set(CDuration)
+    case JIntervalT       => Set(CInterval)
     case _                => Set.empty
   }
 
@@ -153,8 +153,8 @@ object Schema {
       case JLocalDateT =>
         ColumnRef(CPath(nodes.reverse), CLocalDate) :: Nil
 
-      case JDurationT =>
-        ColumnRef(CPath(nodes.reverse), CDuration) :: Nil
+      case JIntervalT =>
+        ColumnRef(CPath(nodes.reverse), CInterval) :: Nil
 
       case JNullT =>
         ColumnRef(CPath(nodes.reverse), CNull) :: Nil
@@ -174,7 +174,7 @@ object Schema {
     case CLocalDateTime         => Some(JLocalDateTimeT)
     case CLocalTime             => Some(JLocalTimeT)
     case CLocalDate             => Some(JLocalDateT)
-    case CDuration              => Some(JDurationT)
+    case CInterval              => Some(JIntervalT)
     case _                      => None
   }
 
@@ -186,7 +186,7 @@ object Schema {
       case JNumberT | JTextT | JBooleanT | JNullT |
            JLocalDateTimeT | JLocalTimeT | JLocalDateT |
            JOffsetDateTimeT | JOffsetTimeT | JOffsetDateT |
-           JDurationT => leaf
+           JIntervalT => leaf
       case JArrayFixedT(elements)                                     => JArrayFixedT(elements.mapValues(inner))
       case JObjectFixedT(fields)                                      => JObjectFixedT(fields.mapValues(inner))
       case JUnionT(left, right)                                       => JUnionT(inner(left), inner(right))
@@ -270,7 +270,7 @@ object Schema {
       case JLocalDateTimeT  => handleRoot(Seq(CLocalDateTime), cols)
       case JLocalTimeT      => handleRoot(Seq(CLocalTime), cols)
       case JLocalDateT      => handleRoot(Seq(CLocalDate), cols)
-      case JDurationT       => handleRoot(Seq(CDuration), cols)
+      case JIntervalT       => handleRoot(Seq(CInterval), cols)
 
       case JObjectUnfixedT => handleUnfixed(CEmptyObject, _.isInstanceOf[CPathField], cols)
       case JArrayUnfixedT  => handleUnfixed(CEmptyArray, _.isInstanceOf[CPathIndex], cols)
@@ -385,7 +385,7 @@ object Schema {
     case (JLocalDateTimeT, (CPath.Identity, CLocalDateTime))   => true
     case (JLocalTimeT, (CPath.Identity, CLocalTime))           => true
     case (JLocalDateT, (CPath.Identity, CLocalDate))           => true
-    case (JDurationT,  (CPath.Identity, CDuration))            => true
+    case (JIntervalT,  (CPath.Identity, CInterval))            => true
 
     case (JObjectUnfixedT, (CPath.Identity, CEmptyObject))                         => true
     case (JObjectUnfixedT, (CPath(CPathField(_), _ *), _))                         => true
@@ -439,7 +439,7 @@ object Schema {
     case JLocalDateTimeT  => ctpes.contains(CPath.Identity, CLocalDateTime)
     case JLocalTimeT      => ctpes.contains(CPath.Identity, CLocalTime)
     case JLocalDateT      => ctpes.contains(CPath.Identity, CLocalDate)
-    case JDurationT       => ctpes.contains(CPath.Identity, CDuration)
+    case JIntervalT       => ctpes.contains(CPath.Identity, CInterval)
 
     case JObjectUnfixedT if ctpes.contains(CPath.Identity, CEmptyObject) => true
     case JObjectUnfixedT =>

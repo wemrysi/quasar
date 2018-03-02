@@ -144,7 +144,7 @@ trait TableModule[M[+ _]] extends TransSpecModule {
     def constLocalDateTime(v: Set[LocalDateTime]): Table
     def constLocalTime(v: Set[LocalTime]): Table
     def constLocalDate(v: Set[LocalDate]): Table
-    def constDuration(v: Set[DateTimeInterval]): Table
+    def constInterval(v: Set[DateTimeInterval]): Table
     def constBoolean(v: Set[Boolean]): Table
     def constNull: Table
 

@@ -248,8 +248,8 @@ trait Slice { source =>
               def isDefinedAt(row: Int) = source.isDefinedAt(row)
               def apply(row: Int)       = d
             })
-          case CDuration(p) =>
-            (ColumnRef(CPath.Identity, CDuration), new IntervalColumn {
+          case CInterval(p) =>
+            (ColumnRef(CPath.Identity, CInterval), new IntervalColumn {
               def isDefinedAt(row: Int) = source.isDefinedAt(row)
               def apply(row: Int)       = p
             })
@@ -1376,7 +1376,7 @@ trait Slice { source =>
         }
 
         @inline
-        def renderDuration(duration: DateTimeInterval) {
+        def renderInterval(duration: DateTimeInterval) {
           renderString(duration.toString)
         }
 
@@ -1653,12 +1653,12 @@ trait Slice { source =>
                 }
               }
 
-              case CDuration => {
+              case CInterval => {
                 val specCol = col.asInstanceOf[IntervalColumn]
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderDuration(specCol(row))
+                  renderInterval(specCol(row))
                   true
                 } else {
                   false
@@ -1849,7 +1849,7 @@ object Slice {
               c.update(sliceIndex, d)
             }
 
-          case CDuration(p) =>
+          case CInterval(p) =>
             acc.getOrElse(ref, ArrayIntervalColumn.empty(sliceSize)).asInstanceOf[ArrayIntervalColumn].unsafeTap { c =>
               c.update(sliceIndex, p)
             }

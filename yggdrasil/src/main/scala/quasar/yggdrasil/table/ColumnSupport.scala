@@ -289,7 +289,7 @@ object ArraySetColumn {
           def apply(row: Int): LocalDate = backing(firstDefinedIndexAt(row)).asInstanceOf[LocalDateColumn].apply(row)
         }
 
-      case CDuration =>
+      case CInterval =>
         new ArraySetColumn[IntervalColumn](ctype, columnSet.map(_.asInstanceOf[IntervalColumn])) with IntervalColumn {
           def apply(row: Int): DateTimeInterval = backing(firstDefinedIndexAt(row)).asInstanceOf[IntervalColumn].apply(row)
         }

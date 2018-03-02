@@ -35,7 +35,7 @@ case object JOffsetDateT     extends JPrimitiveType
 case object JLocalDateTimeT  extends JPrimitiveType
 case object JLocalDateT      extends JPrimitiveType
 case object JLocalTimeT      extends JPrimitiveType
-case object JDurationT       extends JPrimitiveType
+case object JIntervalT       extends JPrimitiveType
 
 sealed trait JArrayT extends JType
 case class JArrayHomogeneousT(jType: JType)        extends JArrayT
@@ -57,19 +57,19 @@ case class JUnionT(left: JType, right: JType) extends JType {
 
 object JType {
   val JPrimitiveUnfixedT =
-    JNumberT | JTextT | JBooleanT | JNullT | JDurationT |
+    JNumberT | JTextT | JBooleanT | JNullT | JIntervalT |
       JLocalDateTimeT | JLocalTimeT | JLocalDateT |
       JOffsetDateTimeT | JOffsetTimeT | JOffsetDateT
   val JUniverseT = JPrimitiveUnfixedT | JObjectUnfixedT | JArrayUnfixedT
   val JTemporalT =
-    JDurationT |
+    JIntervalT |
       JLocalDateTimeT | JLocalTimeT | JLocalDateT |
       JOffsetDateTimeT | JOffsetTimeT | JOffsetDateT
   val JTemporalAbsoluteT =
     JLocalDateTimeT | JLocalTimeT | JLocalDateT |
       JOffsetDateTimeT | JOffsetTimeT | JOffsetDateT
   val JAbsoluteT = JTemporalAbsoluteT | JNumberT
-  val JRelativeT = JAbsoluteT | JDurationT
+  val JRelativeT = JAbsoluteT | JIntervalT
   val JDateTimeT =
     JLocalDateTimeT | JOffsetDateTimeT
   val JTimeT =
@@ -94,7 +94,7 @@ object JType {
       case Type.LocalDateTime => JLocalDateTimeT | JTextT
       case Type.LocalTime => JLocalTimeT | JTextT
       case Type.LocalDate => JLocalDateT | JTextT
-      case Type.Interval => JDurationT | JTextT
+      case Type.Interval => JIntervalT | JTextT
       case Type.Id => JTextT
       case Type.Arr(tpes) =>
         val mapped: Map[Int, JType] =

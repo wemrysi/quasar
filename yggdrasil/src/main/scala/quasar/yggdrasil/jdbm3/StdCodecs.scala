@@ -58,7 +58,7 @@ trait StdCodecs {
     case CLocalDateTime       => LocalDateTimeCodec
     case CLocalTime           => LocalTimeCodec
     case CLocalDate           => LocalDateCodec
-    case CDuration            => IntervalCodec
+    case CInterval            => IntervalCodec
     case CArrayType(elemType) => ArrayCodec(codecForCValueType(elemType), elemType.classTag)
   }
 }

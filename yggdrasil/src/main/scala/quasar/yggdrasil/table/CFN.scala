@@ -382,7 +382,7 @@ trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
         columns
       }
 
-      case (tpe @ CDuration, (cols0, defined)) => {
+      case (tpe @ CInterval, (cols0, defined)) => {
         val max  = maxIds(cols0, defined)
         val cols = cols0.asInstanceOf[Array[Array[DateTimeInterval]]]
 

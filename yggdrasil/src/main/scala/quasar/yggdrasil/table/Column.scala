@@ -176,7 +176,7 @@ object HomogeneousArrayColumn {
           i >= 0 && col.isDefinedAt(row) && i < col(row).length
         def apply(row: Int): LocalDate = col(row)(i)
       }
-    case col @ HomogeneousArrayColumn(CDuration) =>
+    case col @ HomogeneousArrayColumn(CInterval) =>
       new IntervalColumn {
         def isDefinedAt(row: Int): Boolean =
           i >= 0 && col.isDefinedAt(row) && i < col(row).length
@@ -361,9 +361,9 @@ trait IntervalColumn extends Column with (Int => DateTimeInterval) {
   // TODO: fix this
   def rowCompare(row1: Int, row2: Int): Int = sys.error("Cannot compare periods.")
 
-  override val tpe                        = CDuration
+  override val tpe                        = CInterval
   override def jValue(row: Int)           = JString(this(row).toString)
-  override def cValue(row: Int)           = CDuration(this(row))
+  override def cValue(row: Int)           = CInterval(this(row))
   override def strValue(row: Int): String = this(row).toString
   override def toString                   = "IntervalColumn"
 }
@@ -471,7 +471,7 @@ object Column {
     case CLocalDateTime(v)                   => const(v)
     case CLocalDate(v)                       => const(v)
     case CLocalTime(v)                       => const(v)
-    case CDuration(v)                        => const(v)
+    case CInterval(v)                        => const(v)
     case CArray(v, t @ CArrayType(elemType)) => const(v)(elemType)
     case CEmptyObject                        => new InfiniteColumn with EmptyObjectColumn
     case CEmptyArray                         => new InfiniteColumn with EmptyArrayColumn

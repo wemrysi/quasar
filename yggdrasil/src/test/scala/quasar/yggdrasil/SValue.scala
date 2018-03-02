@@ -253,7 +253,7 @@ object SValue extends SValueInstances {
     case CLocalDateTime(d)             => sys.error("unsupported")
     case CLocalTime(d)                 => sys.error("unsupported")
     case CLocalDate(d)                 => sys.error("unsupported")
-    case CDuration(p)                  => sys.error("unsupported")
+    case CInterval(p)                  => sys.error("unsupported")
     case CArray(as, CArrayType(aType)) => SArray(as.map(a => fromCValue(aType(a)))(breakOut))
     case CNull                         => SNull
     case CEmptyArray                   => SArray(Vector())

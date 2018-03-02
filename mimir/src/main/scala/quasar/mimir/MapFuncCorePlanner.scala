@@ -110,7 +110,7 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
       case MapFuncsCore.OffsetDate(a1) =>
         (Map1[A](a1, cake.Library.OffsetDate.f1): TransSpec[A]).point[F]
       case MapFuncsCore.Interval(a1) =>
-        (Map1[A](a1, cake.Library.Duration.f1): TransSpec[A]).point[F]
+        (Map1[A](a1, cake.Library.Interval.f1): TransSpec[A]).point[F]
       case MapFuncsCore.StartOfDay(a1) =>
         (Map1[A](a1, cake.Library.StartOfDay.f1): TransSpec[A]).point[F]
       case MapFuncsCore.TemporalTrunc(part, a1) =>
@@ -292,7 +292,7 @@ object MapFuncCorePlanner {
     case Data.LocalDateTime(v) => CLocalDateTime(v).some
     case Data.LocalDate(v) => CLocalDate(v).some
     case Data.LocalTime(v) => CLocalTime(v).some
-    case Data.Interval(k) => CDuration(k).some
+    case Data.Interval(k) => CInterval(k).some
     case Data.Binary(k) => CArray[Long](k.map(l => l.toLong).toArray).some
     case Data.Id(s) => CString(s).some
     case Data.NA => None
@@ -315,7 +315,7 @@ object MapFuncCorePlanner {
     case COffsetDateTime(ad) => Data.OffsetDateTime(ad)
     case COffsetDate(ad)     => Data.OffsetDate(ad)
     case COffsetTime(ad)     => Data.OffsetTime(ad)
-    case CDuration(ad)       => Data.Interval(ad)
+    case CInterval(ad)       => Data.Interval(ad)
     case CUndefined          => Data.NA
     case CNull               => Data.Null
   }

@@ -256,7 +256,7 @@ object ArbitrarySlice extends RCValueGenerators with DateGenerators {
       case CLocalDateTime  => arrayOfN(size, genLocalDateTime) ^^ (ArrayLocalDateTimeColumn(bs, _))
       case CLocalTime      => arrayOfN(size, genLocalTime) ^^ (ArrayLocalTimeColumn(bs, _))
       case CLocalDate      => arrayOfN(size, genLocalDate) ^^ (ArrayLocalDateColumn(bs, _))
-      case CDuration       => arrayOfN(size, genInterval) ^^ (ArrayIntervalColumn(bs, _))
+      case CInterval       => arrayOfN(size, genInterval) ^^ (ArrayIntervalColumn(bs, _))
       case CNum            => arrayOfN(size, genDouble) ^^ (ns => ArrayNumColumn(bs, ns map (v => BigDecimal(v))))
       case CNull           => genBitSet(size) ^^ (s => new BitsetColumn(s) with NullColumn)
       case CEmptyObject    => genBitSet(size) ^^ (s => new BitsetColumn(s) with EmptyObjectColumn)

@@ -421,9 +421,9 @@ trait ColumnarTableModule[M[+ _]]
       Table(Slice(Map(ColumnRef(CPath.Identity, CLocalDate) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
-    def constDuration(v: collection.Set[DateTimeInterval]): Table = {
+    def constInterval(v: collection.Set[DateTimeInterval]): Table = {
       val column = ArrayIntervalColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CDuration) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
+      Table(Slice(Map(ColumnRef(CPath.Identity, CInterval) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
 
@@ -1904,7 +1904,7 @@ trait ColumnarTableModule[M[+ _]]
           case CLocalDateTime         => JLocalDateTimeT
           case CLocalTime             => JLocalTimeT
           case CLocalDate             => JLocalDateT
-          case CDuration              => JDurationT
+          case CInterval              => JIntervalT
           case CArrayType(elemType)   => leafType(elemType)
           case CEmptyObject           => JObjectFixedT(Map.empty)
           case CEmptyArray            => JArrayFixedT(Map.empty)

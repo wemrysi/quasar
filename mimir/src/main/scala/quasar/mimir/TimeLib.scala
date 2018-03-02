@@ -46,7 +46,7 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       LocalDate,
       LocalDateTime,
       LocalTime,
-      Duration,
+      Interval,
 
       ExtractCentury,
       ExtractDayOfMonth,
@@ -320,14 +320,14 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       val tpe = UnaryOperationType(JTextT, JOffsetTimeT)
     }
 
-    val Duration = new Op1F1(TimeNamespace, "duration") {
+    val Interval = new Op1F1(TimeNamespace, "duration") {
       def f1: F1 = CF1P("builtin::time::duration") {
         case c: StrColumn => new IntervalColumn {
           def apply(row: Int) = DateTimeInterval.parse(c(row)).get
           def isDefinedAt(row: Int) = DateTimeInterval.parse(c(row)).isDefined
         }
       }
-      val tpe = UnaryOperationType(JTextT, JDurationT)
+      val tpe = UnaryOperationType(JTextT, JIntervalT)
     }
 
     final case class Trunc(truncPart: TemporalPart) extends Op1F1(TimeNamespace, "trunc" + truncPart.shows) {

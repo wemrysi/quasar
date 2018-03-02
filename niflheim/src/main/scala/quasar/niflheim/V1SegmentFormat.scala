@@ -216,7 +216,7 @@ object V1SegmentFormat extends SegmentFormat {
     case CLocalDateTime => Codec.LocalDateTimeCodec
     case CLocalTime => Codec.LocalTimeCodec
     case CLocalDate => Codec.LocalDateCodec
-    case CDuration => Codec.IntervalCodec
+    case CInterval => Codec.IntervalCodec
     case CArrayType(elemType) =>
       Codec.ArrayCodec(getCodecFor(elemType))(elemType.classTag)
   }

@@ -237,7 +237,7 @@ class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extend
             }
           }
 
-        case CDuration =>
+        case CInterval =>
           new IntervalColumn {
             private var row0: Int             = -1
             private var refCol0: IntervalColumn = _

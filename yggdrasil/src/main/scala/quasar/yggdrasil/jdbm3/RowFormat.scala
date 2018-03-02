@@ -254,7 +254,7 @@ trait RowFormatSupport { self: StdCodecs =>
         }
       }
 
-    case (CDuration, col: IntervalColumn) =>
+    case (CInterval, col: IntervalColumn) =>
       new SimpleColumnValueEncoder[DateTimeInterval] {
         val codec = Codec[DateTimeInterval]
 
@@ -333,7 +333,7 @@ trait RowFormatSupport { self: StdCodecs =>
       new ColumnValueDecoder {
         def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[LocalDate].read(buf))
       }
-    case (CDuration, col: ArrayIntervalColumn) =>
+    case (CInterval, col: ArrayIntervalColumn) =>
       new ColumnValueDecoder {
         def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[DateTimeInterval].read(buf))
       }
@@ -520,7 +520,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
           case CLocalDateTime(x)  => wrappedWriteInit[LocalDateTime](x, sink)
           case CLocalTime(x)      => wrappedWriteInit[LocalTime](x, sink)
           case CLocalDate(x)      => wrappedWriteInit[LocalDate](x, sink)
-          case CDuration(x)       => wrappedWriteInit[DateTimeInterval](x, sink)
+          case CInterval(x)       => wrappedWriteInit[DateTimeInterval](x, sink)
           case CLong(x)           => wrappedWriteInit[Long](x, sink)
           case CDouble(x)         => wrappedWriteInit[Double](x, sink)
           case CNum(x)            => wrappedWriteInit[BigDecimal](x, sink)
@@ -846,7 +846,7 @@ object SortingRowFormat {
     case CLocalDateTime  => FLocalDateTime
     case CLocalTime      => FLocalTime
     case CLocalDate      => FLocalDate
-    case CDuration       => FPeriod
+    case CInterval       => FPeriod
     case CEmptyObject    => FEmptyObject
     case CEmptyArray     => FEmptyArray
     case CNull           => FNull
@@ -866,7 +866,7 @@ object SortingRowFormat {
     case FOffsetDateTime => COffsetDateTime
     case FOffsetTime     => COffsetTime
     case FOffsetDate     => COffsetDate
-    case FPeriod         => CDuration
+    case FPeriod         => CInterval
     case FEmptyObject    => CEmptyObject
     case FEmptyArray     => CEmptyArray
     case FNull           => CNull

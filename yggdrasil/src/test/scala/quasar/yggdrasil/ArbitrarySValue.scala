@@ -92,7 +92,7 @@ trait SJValueGenerators extends ArbitraryBigDecimal with RCValueGenerators {
     CNull,
     CEmptyObject,
     CEmptyArray,
-    CDuration,
+    CInterval,
     COffsetDateTime,
     COffsetTime,
     COffsetDate,

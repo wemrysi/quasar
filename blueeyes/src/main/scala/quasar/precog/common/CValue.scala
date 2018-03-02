@@ -250,7 +250,7 @@ sealed trait CType extends Serializable {
     case CLocalDateTime  => 12
     case CLocalTime      => 13
     case CLocalDate      => 14
-    case CDuration       => 15
+    case CInterval       => 15
     case CArrayType(t)   => 100 + t.typeIndex
   }
 }
@@ -288,7 +288,7 @@ object CType {
     case CLocalDateTime       => "LocalDateTime"
     case CLocalTime           => "LocalTime"
     case CLocalDate           => "LocalDate"
-    case CDuration            => "Duration"
+    case CInterval            => "Interval"
     case CUndefined           => sys.error("CUndefined cannot be serialized")
   }
 
@@ -309,7 +309,7 @@ object CType {
     case "LocalDateTime"  => Some(CLocalDateTime)
     case "LocalDate"      => Some(CLocalDate)
     case "LocalTime"      => Some(CLocalTime)
-    case "Duration"       => Some(CDuration)
+    case "Interval"       => Some(CInterval)
     case ArrayName(elem)  => fromName(elem) collect { case tp: CValueType[_] => CArrayType(tp) }
     case _                => None
   }
@@ -475,7 +475,7 @@ object CValueType {
   implicit def localDateTime: CValueType[LocalDateTime]   = CLocalDateTime
   implicit def localTime: CValueType[LocalTime]           = CLocalTime
   implicit def localDate: CValueType[LocalDate]           = CLocalDate
-  implicit def duration: CValueType[DateTimeInterval]     = CDuration
+  implicit def duration: CValueType[DateTimeInterval]     = CInterval
   implicit def array[A](implicit elemType: CValueType[A]) = CArrayType(elemType)
 }
 
@@ -697,13 +697,13 @@ case object CLocalDate extends CValueType[LocalDate] {
   def jValueFor(v: LocalDate)             = JString(v.toString)
 }
 
-case class CDuration(value: DateTimeInterval) extends CWrappedValue[DateTimeInterval] {
-  val cType = CDuration
+case class CInterval(value: DateTimeInterval) extends CWrappedValue[DateTimeInterval] {
+  val cType = CInterval
 }
 
-case object CDuration extends CValueType[DateTimeInterval] {
+case object CInterval extends CValueType[DateTimeInterval] {
   val classTag: ClassTag[DateTimeInterval]              = implicitly[ClassTag[DateTimeInterval]]
-  def readResolve()                                     = CDuration
+  def readResolve()                                     = CInterval
   def order(v1: DateTimeInterval, v2: DateTimeInterval) = sys.error("todo")
   def jValueFor(v: DateTimeInterval)                    = JString(v.toString)
 }
