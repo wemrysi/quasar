@@ -328,6 +328,12 @@ object Data {
 
   implicit val dataEqual: Equal[Data] = Equal.equalA
 
+  implicit val dataCorecursive: Corecursive.Aux[Data, EJson] =
+    new Corecursive[Data] {
+      type Base[T] = EJson[T]
+      def embed(t: EJson[Data])(implicit BF: Functor[Base]) = fromEJson(t)
+    }
+
   /** NB: For parsing arbitrary JSON into `Data`, _not_ for deserializing `Data`
     *     previously serialized as JSON. For that, see `DataCodec`.
     */

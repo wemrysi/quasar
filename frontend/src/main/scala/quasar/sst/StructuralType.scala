@@ -276,7 +276,10 @@ sealed abstract class StructuralTypeInstances extends StructuralTypeInstances0 {
 
         def decodeK[J](implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]) =
           j => {
-            val tags = j.keyS(TagKey).cata(_.decodeAs[List[TypeTag]], List().point[Decoded])
+            val tags = j.keyS(TagKey).cata(
+              tj => tj.decodeAs[TypeTag].map(List(_)) orElse tj.decodeAs[List[TypeTag]],
+              List().point[Decoded])
+
             (tags |@| decType.decodeK[J].apply(j))(TTags(_, _))
           }
       }
