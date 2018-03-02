@@ -16,7 +16,7 @@
 
 package quasar.qscript.qsu
 
-import slamdata.Predef.{Map => SMap, _}
+import slamdata.Predef._
 import quasar.{Qspec, TreeMatchers}
 import quasar.Planner.PlannerError
 import quasar.common.{SortDir, JoinType}
@@ -44,7 +44,6 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
   val ejs = Fixed[Fix[EJson]]
   val qsu = QScriptUniform.DslT[Fix]
-  val qsu0 = QScriptUniform.AnnotatedDsl[Fix, Symbol]
   val func = construction.Func[Fix]
 
   def projectStrKey(key: String): FreeMap = func.ProjectKeyS(func.Hole, key)
@@ -322,29 +321,16 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
     "convert a non-mappable join condition" >> {
       val projectOrdersKey = projectStrKey("orders_key")
       val projectCustomersKey = projectStrKey("customers_key")
-      val leftRead = qsu0.transpose('left, (qsu0.read('lr, orders), Retain.Values, Rotation.ShiftMap))
-      val rightRead = qsu0.transpose('right, (qsu0.read('rr, customers), Retain.Values, Rotation.ShiftMap))
+      val leftRead = qsu.transpose(qsu.read(orders), Retain.Values, Rotation.ShiftMap)
+      val rightRead = qsu.transpose(qsu.read(customers), Retain.Values, Rotation.ShiftMap)
 
-      val (renames, graph0) = QSUGraph.fromAnnotatedTree[Fix](
-        qsu0.lpJoin('j, (leftRead, rightRead,
-          qsu0._autojoin2('aj, (
-            qsu0.transpose('ts, (qsu0.map('map0, (leftRead, projectOrdersKey)), Retain.Values, Rotation.ShiftArray)),
-            qsu0.map('map1, (rightRead, projectCustomersKey)),
-            func.Eq(func.LeftSide, func.RightSide))),
-          JoinType.Inner, 'leftJoin, 'rightJoin)) map (_.some))
-
-      val joinSideLeft  = QSUGraph[Fix]('side0, SMap('side0 -> QScriptUniform.JoinSideRef('leftJoin)))
-      val joinSideRight = QSUGraph[Fix]('side1, SMap('side1 -> QScriptUniform.JoinSideRef('rightJoin)))
-
-      val graph = (graph0 :++ joinSideLeft :++ joinSideRight)
-        .replaceIf(renames('left), 'side0, {
-          case QScriptUniform.LPJoin(_, _, _, _, _, _) => false
-          case _ => true
-        })
-        .replaceIf(renames('right), 'side1, {
-          case QScriptUniform.LPJoin(_, _, _, _, _, _) => false
-          case _ => true
-        })
+      val graph = QSUGraph.fromTree[Fix](
+        qsu.lpJoin(leftRead, rightRead,
+          qsu._autojoin2(
+            qsu.transpose(qsu.map(qsu.joinSideRef('leftJoin), projectOrdersKey), Retain.Values, Rotation.ShiftArray),
+            qsu.map(qsu.joinSideRef('rightJoin), projectCustomersKey),
+            func.Eq(func.LeftSide, func.RightSide)),
+          JoinType.Inner, 'leftJoin, 'rightJoin))
 
       evaluate(extractFM(graph)) must beLike {
         case \/-(ThetaJoin(
