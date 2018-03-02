@@ -562,7 +562,7 @@ object Type extends TypeInstances {
   val Numeric = Int ⨿ Dec
   val Temporal = OffsetDateTime ⨿ OffsetDate ⨿ OffsetTime ⨿ LocalDateTime ⨿ LocalDate ⨿ LocalTime
   val Comparable = Numeric ⨿ Str ⨿ Temporal ⨿ Bool
-  val Syntaxed = Type.Null ⨿ Type.Comparable ⨿ Type.Id
+  val Syntaxed = Type.Null ⨿ Type.Comparable ⨿ Type.Interval ⨿ Type.Id
   val HasDate = OffsetDateTime ⨿ OffsetDate ⨿ LocalDateTime ⨿ LocalDate
   val HasTime = OffsetDateTime ⨿ OffsetTime ⨿ LocalDateTime ⨿ LocalTime
   val HasOffset = OffsetDateTime ⨿ OffsetDate ⨿ OffsetTime
