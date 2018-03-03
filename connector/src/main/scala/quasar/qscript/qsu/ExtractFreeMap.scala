@@ -62,71 +62,65 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
       }
 
     case graph @ Extractors.LPJoin(left, right, cond, jtype, lref, rref) => {
-      val graph0 = graph.foldMapUp[IList[(Symbol, Symbol)]](g =>
-        g.unfold match {
-          case JoinSideRef(`lref`) => IList((g.root, left.root))
-          case JoinSideRef(`rref`) => IList((g.root, right.root))
+      val graph0 = graph.foldMapUp[IList[(Symbol, Symbol)]] {
+          case g @ Extractors.JoinSideRef(`lref`) => IList((g.root, left.root))
+          case g @ Extractors.JoinSideRef(`rref`) => IList((g.root, right.root))
           case _ => IList()
-        }).foldLeft(graph) {
+        }.foldLeft(graph) {
           case (g, (src, target)) => g.replace(src, target)
         }
 
-      MappableRegion.funcOf(replaceRefs(graph, lref, rref), graph refocus cond.root).cata(jf =>
-        graph.overwriteAtRoot(ThetaJoin(left.root, right.root, jf, jtype, combiner)).point[F], {
-          val msg = (desc: String) => InternalError(desc, None)
-          val max = MappableRegion.maximal(graph refocus cond.root)
-          val nonMappable: IList[QSUGraph] => Option[NonEmptyList[Symbol]] =
-            _.filterNot(mappableOf(_, lref, rref)).map(_.root).toNel
+      MappableRegion.funcOf(replaceRefs(graph, lref, rref), graph refocus cond.root).
+        cata(jf => graph.overwriteAtRoot(ThetaJoin(left.root, right.root, jf, jtype, combiner)).point[F],
+          {
+            val msg = (desc: String) => InternalError(desc, None)
+            val max = MappableRegion.maximal(graph refocus cond.root)
+            val nonMappable: IList[QSUGraph] => Option[NonEmptyList[Symbol]] =
+              _.filterNot(mappableOf(_, lref, rref)).map(_.root).toNel
 
-          max.toIList.partition(hasJoinRef(_, lref)).bimap(nonMappable(_), nonMappable(_)) match {
-            case (Some(lefts), None) =>
-              unifyJoin[F](graph0, left.root, lefts, LeftSide, JoinSideRef(lref), JoinSideRef(rref), max)("left_source", "left_target") {
-                case (newSrc, on, repair) => ThetaJoin(newSrc, right.root, on, jtype, repair)
-              }.getOrElseF(
-                PlannerErrorME[F].raiseError[QSUGraph](msg(s"Unable to unify targets: $lefts")))
+            max.toIList.partition(hasJoinRef(_, lref)).bimap(nonMappable(_), nonMappable(_)) match {
+              case (Some(lefts), None) =>
+                unifyJoin[F](graph0, left.root, lefts, LeftSide, JoinSideRef(lref), JoinSideRef(rref), max)("left_source", "left_target") {
+                  case (newSrc, on, repair) => ThetaJoin(newSrc, right.root, on, jtype, repair)
+                }.getOrElseF(
+                  PlannerErrorME[F].raiseError[QSUGraph](msg(s"Unable to unify targets: $lefts")))
 
-            case (None, Some(rights)) =>
-              unifyJoin[F](graph0, right.root, rights, RightSide, JoinSideRef(lref), JoinSideRef(rref), max)("right_source", "right_target") {
-                case (newSrc, on, repair) => ThetaJoin(left.root, newSrc, on, jtype, repair)
-              }.getOrElseF(
-                PlannerErrorME[F].raiseError[QSUGraph](msg(s"Unable to unify targets: $rights")))
+              case (None, Some(rights)) =>
+                unifyJoin[F](graph0, right.root, rights, RightSide, JoinSideRef(lref), JoinSideRef(rref), max)("right_source", "right_target") {
+                  case (newSrc, on, repair) => ThetaJoin(left.root, newSrc, on, jtype, repair)
+                }.getOrElseF(
+                  PlannerErrorME[F].raiseError[QSUGraph](msg(s"Unable to unify targets: $rights")))
 
-            case (Some(lefts), Some(rights)) => {
-              val leftUnify =
-                UnifyTargets[T, F](withName[F](_))(graph, left.root, lefts)("left_source", "left_target")
-              val rightUnify =
-                UnifyTargets[T, F](withName[F](_))(graph, right.root, rights)("right_source", "right_target")
+              case (Some(lefts), Some(rights)) => {
+                val leftUnify =
+                  UnifyTargets[T, F](withName[F](_))(graph, left.root, lefts)("left_source", "left_target")
+                val rightUnify =
+                  UnifyTargets[T, F](withName[F](_))(graph, right.root, rights)("right_source", "right_target")
 
-              (leftUnify |@| rightUnify) {
-                case ((leftGraph, leftOrig, leftMap0), (rightGraph, rightOrig, rightMap0)) => {
-                  val leftMap = SMap(leftMap0.toList: _*)
-                  val rightMap = SMap(rightMap0.toList: _*)
+                (leftUnify |@| rightUnify) {
+                  case ((leftGraph, leftOrig, leftMap0), (rightGraph, rightOrig, rightMap0)) => {
+                    val leftMap = SMap(leftMap0.toList: _*)
+                    val rightMap = SMap(rightMap0.toList: _*)
 
-                  val on: Option[JoinFunc] = max.traverseM[Option, JoinSide](qg => qg.root match {
-                    case sym if leftMap.isDefinedAt(sym) => leftMap.get(sym).map(_.as(LeftSide))
-                    case sym if rightMap.isDefinedAt(sym) => rightMap.get(sym).map(_.as(RightSide))
-                    case _ => none
-                  })
+                    val repair: JoinFunc = combiner >>= {
+                      case LeftSide => leftOrig.as(LeftSide)
+                      case RightSide => rightOrig.as(RightSide)
+                    }
 
-                  val repair: JoinFunc = combiner >>= {
-                    case LeftSide => leftOrig.as(LeftSide)
-                    case RightSide => rightOrig.as(RightSide)
+                    max.traverseM[Option, JoinSide](qg => leftMap.get(qg.root).map(_.as[JoinSide](LeftSide)) orElse rightMap.get(qg.root).map(_.as[JoinSide](RightSide)))
+                      .cata(on => {
+                        val node = ThetaJoin(leftGraph.root, rightGraph.root, on, jtype, repair)
+
+                        (graph0.overwriteAtRoot(node) :++ leftGraph :++ rightGraph).point[F]
+                      }, PlannerErrorME[F].raiseError[QSUGraph](msg(s"Unable to unify targets. Left: $lefts, Right: $rights")))
                   }
-
-                  on.cata(
-                    on0 => {
-                      val node = ThetaJoin(leftGraph.root, rightGraph.root, on0, jtype, repair)
-
-                      (graph0.overwriteAtRoot(node) :++ leftGraph :++ rightGraph).point[F]
-                    }, PlannerErrorME[F].raiseError[QSUGraph](msg(s"Unable to unify targets. Left: $lefts, Right: $rights")))
-                }
-              }.join
+                }.join
+              }
+              case _ =>
+                PlannerErrorME[F].raiseError[QSUGraph](
+                  InternalError(s"Invalid join condition, $cond, must be a mappable function of $left and $right.", None))
             }
-            case _ =>
-              PlannerErrorME[F].raiseError[QSUGraph](
-                InternalError(s"Invalid join condition, $cond, must be a mappable function of $left and $right.", None))
-          }
-        })
+          })
     }
 
     case graph @ Extractors.LPSort(src, keys) =>
@@ -141,8 +135,8 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
       JoinDir.Right.name -> func.RightSide)
 
   private def hasJoinRef(g: QSUGraph, refId: Symbol): Boolean =
-    Tag.unwrap[Boolean, Disjunction](g.foldMapUp(g => g.unfold.map(_.root) match {
-      case JoinSideRef(rid) if refId === rid => Tag(true)
+    Tag.unwrap[Boolean, Disjunction](g.foldMapUp({
+      case Extractors.JoinSideRef(rid) if refId === rid => Tag(true)
       case _ => Tag(false)
     }))
 
@@ -190,28 +184,19 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
       targetPrefix: String)(
       buildNode: (Symbol, JoinFunc, JoinFunc) => QScriptUniform[Symbol]): OptionT[F, QSUGraph] =
     UnifyTargets[T, F](withName[F](_))(graph, source, targets)(sourceName, targetPrefix).liftM[OptionT] >>= {
-      case (newSrc, original, targetMap) => {
+      case (newSrc, original, targets) => {
         val repair: JoinFunc = combiner >>= {
           case side if side === reshapeSide => original.as(side)
           case other => Free.pure(other)
         }
 
-        val map = SMap(targetMap.toList: _*)
+        val targetMap = SMap(targets.toList: _*)
 
         OptionT(max.map(qg => partialRefReplace(qg, lref.id, rref.id)(qg.root))
           .traverseM[Option, JoinSide] {
             case -\/(side) => Free.pure(side).some
-            case \/-(g) => g.root match {
-              case sym if map.isDefinedAt(sym) => map.get(sym).map(_.as(reshapeSide))
-              case _ => none
-            }
-          }.point[F]) >>= { on =>
-          val node = buildNode(newSrc.root, on, repair)
-
-          withName[F](node)
-            .map(inter => graph.overwriteAtRoot(node) :++ inter :++ newSrc)
-            .liftM[OptionT]
-        }
+            case \/-(g) => targetMap.get(g.root) map (_.as(reshapeSide))
+          }.point[F]) map (on => graph.overwriteAtRoot(buildNode(newSrc.root, on, repair)) :++ newSrc)
       }
     }
 
