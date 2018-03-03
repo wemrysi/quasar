@@ -96,14 +96,14 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
         reflNT[Task] :+: KeyValueStore.impl.fromTaskRef(configsRef)
 
       (vcacheInterp ⊛ InMemory.runFs(InMemory.InMemState.empty)) { (vci, fsi) =>
-        val effR: Eff ~> ResponseOr =
-          liftMT[Task, ResponseT]                                                        :+:
-          (liftMT[Task, ResponseT] compose timingInterp)                                 :+:
-          (liftMT[Task, ResponseT] compose vci)                                          :+:
-          (liftMT[Task, ResponseT] compose fsi compose injectNT[ManageFile, FileSystem]) :+:
-          (liftMT[Task, ResponseT] compose (foldMapNT(meff) compose mounter))            :+:
-          failureResponseOr[MountingError]                                               :+:
-          failureResponseOr[PathTypeMismatch]
+        val effR: Eff ~> FailedResponseOr =
+          liftMT[Task, FailedResponseT]                                                        :+:
+          (liftMT[Task, FailedResponseT] compose timingInterp)                                 :+:
+          (liftMT[Task, FailedResponseT] compose vci)                                          :+:
+          (liftMT[Task, FailedResponseT] compose fsi compose injectNT[ManageFile, FileSystem]) :+:
+          (liftMT[Task, FailedResponseT] compose (foldMapNT(meff) compose mounter))            :+:
+          FailedResponse.fromFailureMessage[Task, MountingError]                               :+:
+          FailedResponse.fromFailureMessage[Task, PathTypeMismatch]
 
         val effT: Eff ~> Task =
           reflNT[Task]                                   :+:
