@@ -102,13 +102,16 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
                     val leftMap = SMap(leftMap0.toList: _*)
                     val rightMap = SMap(rightMap0.toList: _*)
 
-                    val repair: JoinFunc = combiner >>= {
-                      case LeftSide => leftOrig.as(LeftSide)
-                      case RightSide => rightOrig.as(RightSide)
-                    }
+                    val repair = combiner >>= (_.fold(leftOrig.as[JoinSide](LeftSide), rightOrig.as[JoinSide](RightSide)))
 
-                    max.traverseM[Option, JoinSide](qg => leftMap.get(qg.root).map(_.as[JoinSide](LeftSide)) orElse rightMap.get(qg.root).map(_.as[JoinSide](RightSide)))
-                      .cata(on => {
+                    max.map(partialRefReplace(_, lref, rref))
+                      .traverseM[Option, JoinSide] {
+                        case -\/(side) =>
+                          Free.pure[MapFunc, JoinSide](side).some
+                        case \/-(g) =>
+                          leftMap.get(g.root).map(_.as[JoinSide](LeftSide))
+                            .orElse(rightMap.get(g.root).map(_.as[JoinSide](RightSide)))
+                      }.cata(on => {
                         val node = ThetaJoin(leftGraph.root, rightGraph.root, on, jtype, repair)
 
                         (graph0.overwriteAtRoot(node) :++ leftGraph :++ rightGraph).point[F]
@@ -147,11 +150,11 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
       case JoinSideRef(`r`) => RightSide
     }
 
-  private def partialRefReplace(g: QSUGraph, l: Symbol, r: Symbol): Symbol => JoinSide \/ QSUGraph =
-      replaceRefs(g, l, r) >>> (_.toLeft(g).disjunction)
+  private def partialRefReplace(g: QSUGraph, l: Symbol, r: Symbol): JoinSide \/ QSUGraph =
+    replaceRefs(g, l, r)(g.root).cata(_.left[QSUGraph], g.right[JoinSide])
 
   private def mappableOf(g: QSUGraph, l: Symbol, r: Symbol): Boolean =
-      replaceRefs(g, l, r)(g.root).isDefined
+    replaceRefs(g, l, r)(g.root).isDefined
 
   private def unifyShapePreserving[F[_]: Monad: NameGenerator: RevIdxM](
       graph: QSUGraph,
@@ -192,7 +195,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
 
         val targetMap = SMap(targets.toList: _*)
 
-        OptionT(max.map(qg => partialRefReplace(qg, lref.id, rref.id)(qg.root))
+        OptionT(max.map(partialRefReplace(_, lref.id, rref.id))
           .traverseM[Option, JoinSide] {
             case -\/(side) => Free.pure(side).some
             case \/-(g) => targetMap.get(g.root) map (_.as(reshapeSide))
