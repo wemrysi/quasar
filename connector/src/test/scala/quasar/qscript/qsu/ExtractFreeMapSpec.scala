@@ -365,7 +365,7 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
                 func.ProjectKeyS(func.LeftSide, "left_target_0"), "foo"),
               func.Add(
                 func.ProjectKeyS(func.RightSide, "right_target_0"),
-                func.ProjectKeyS(func.RightSide, "customer_key_2"))))
+                func.ProjectKeyS(func.RightSide, "customers_key_2"))))
 
           structCustomers must beTreeEqual(projectCustomersKey)
         }
