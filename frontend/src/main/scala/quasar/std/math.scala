@@ -113,23 +113,41 @@ trait MathLib extends Library {
       case Sized(Type.Const(Data.Interval(i1)), Type.Const(Data.Interval(i2))) =>
         success(Type.Const(Data.Interval(i1 plus i2)))
 
-      case Sized(Type.Const(CanLensDateTime(dt)), Type.Const(Data.Interval(i))) =>
-        success(Type.Const(dt.peeks(i.addToLocalDateTime)))
+      case Sized(Type.Const(Data.LocalDateTime(v1)), Type.Const(Data.Interval(v2))) =>
+        success(Type.Const(Data.LocalDateTime(v2.addToLocalDateTime(v1))))
 
-      case Sized(Type.Const(CanLensTime(t)), Type.Const(Data.Interval(DateTimeInterval.TimeLike(i)))) =>
-        success(Type.Const(t.peeks(_.plus(i))))
+      case Sized(Type.Const(Data.LocalDate(v1)), Type.Const(Data.Interval(DateTimeInterval.DateLike(v2)))) =>
+        success(Type.Const(Data.LocalDate(DateTimeInterval.addToLocalDate(v1, v2))))
 
-      case Sized(Type.Const(CanLensDate(d)), Type.Const(Data.Interval(DateTimeInterval.DateLike(i)))) =>
-        success(Type.Const(d.peeks(_.plus(i))))
+      case Sized(Type.Const(Data.LocalTime(v1)), Type.Const(Data.Interval(DateTimeInterval.TimeLike(v2)))) =>
+        success(Type.Const(Data.LocalTime(DateTimeInterval.addToLocalTime(v1, v2))))
 
-      case Sized(Type.Const(Data.Interval(i)), Type.Const(CanLensDateTime(dt))) =>
-        success(Type.Const(dt.peeks(i.addToLocalDateTime)))
+      case Sized(Type.Const(Data.OffsetDateTime(v1)), Type.Const(Data.Interval(v2))) =>
+        success(Type.Const(Data.OffsetDateTime(v2.addToOffsetDateTime(v1))))
 
-      case Sized(Type.Const(Data.Interval(DateTimeInterval.TimeLike(i))), Type.Const(CanLensTime(t))) =>
-        success(Type.Const(t.peeks(_.plus(i))))
+      case Sized(Type.Const(Data.OffsetDate(v1)), Type.Const(Data.Interval(DateTimeInterval.DateLike(v2)))) =>
+        success(Type.Const(Data.OffsetDate(DateTimeInterval.addToOffsetDate(v1, v2))))
 
-      case Sized(Type.Const(Data.Interval(DateTimeInterval.DateLike(i))), Type.Const(CanLensDate(d))) =>
-        success(Type.Const(d.peeks(_.plus(i))))
+      case Sized(Type.Const(Data.OffsetTime(v1)), Type.Const(Data.Interval(DateTimeInterval.TimeLike(v2)))) =>
+        success(Type.Const(Data.OffsetTime(DateTimeInterval.addToOffsetTime(v1, v2))))
+
+      case Sized(Type.Const(Data.Interval(v2)), Type.Const(Data.LocalDateTime(v1))) =>
+        success(Type.Const(Data.LocalDateTime(v2.addToLocalDateTime(v1))))
+
+      case Sized(Type.Const(Data.Interval(DateTimeInterval.DateLike(v2))), Type.Const(Data.LocalDate(v1))) =>
+        success(Type.Const(Data.LocalDate(DateTimeInterval.addToLocalDate(v1, v2))))
+
+      case Sized(Type.Const(Data.Interval(DateTimeInterval.TimeLike(v2))), Type.Const(Data.LocalTime(v1))) =>
+        success(Type.Const(Data.LocalTime(DateTimeInterval.addToLocalTime(v1, v2))))
+
+      case Sized(Type.Const(Data.Interval(v2)), Type.Const(Data.OffsetDateTime(v1))) =>
+        success(Type.Const(Data.OffsetDateTime(v2.addToOffsetDateTime(v1))))
+
+      case Sized(Type.Const(Data.Interval(DateTimeInterval.DateLike(v2))), Type.Const(Data.OffsetDate(v1))) =>
+        success(Type.Const(Data.OffsetDate(DateTimeInterval.addToOffsetDate(v1, v2))))
+
+      case Sized(Type.Const(Data.Interval(DateTimeInterval.TimeLike(v2))), Type.Const(Data.OffsetTime(v1))) =>
+        success(Type.Const(Data.OffsetTime(DateTimeInterval.addToOffsetTime(v1, v2))))
 
       case Sized(Type.Const(CanLensDate(_)), Type.Const(Data.Interval(_))) =>
         failure(NonEmptyList(SemanticError.GenericError("Intervals containing time information can't be added to dates")))
@@ -145,22 +163,22 @@ trait MathLib extends Library {
 
       case Sized(t1, t2)
         if (Type.OffsetDateTime ⨿ Type.OffsetTime ⨿ Type.OffsetDate ⨿
-                    Type.LocalDateTime ⨿ Type.LocalDate ⨿ Type.LocalTime ⨿ Type.Interval).contains(t1) &&
+          Type.LocalDateTime ⨿ Type.LocalDate ⨿ Type.LocalTime ⨿ Type.Interval).contains(t1) &&
             Type.Interval.contains(t2) =>
         success(t1.widenConst)
 
       case Sized(t1, t2)
         if (Type.OffsetDateTime ⨿ Type.OffsetTime ⨿ Type.OffsetDate ⨿
-                    Type.LocalDateTime ⨿ Type.LocalDate ⨿ Type.LocalTime ⨿ Type.Interval).contains(t2) &&
+          Type.LocalDateTime ⨿ Type.LocalDate ⨿ Type.LocalTime ⨿ Type.Interval).contains(t2) &&
             Type.Interval.contains(t1) =>
         success(t2.widenConst)
     } ||| numericWidening,
 
     partialUntyperOV[nat._2](t => 
       Type.typecheck(Type.Interval, t).fold(κ(t match {
-        case Type.Int                      => Some(success(Func.Input2(Type.Int, Type.Int)))
+        case Type.Int => Some(success(Func.Input2(Type.Int, Type.Int)))
         case t if Type.Numeric.contains(t) => Some(success(Func.Input2(Type.Numeric, Type.Numeric)))
-        case _                             => None
+        case _ => None
         }),
       κ(Some(success(Func.Input2(t, Type.Interval)))))))
 
@@ -244,76 +262,91 @@ trait MathLib extends Library {
         orig match {
           case Invoke(_, Sized(Embed(x), Embed(ZeroF()))) => x.some
           case Invoke(_, Sized(Embed(ZeroF()), x))        => Negate(x).some
-          case _                                           => None
+          case _                                          => None
         }
     },
-    partialTyper[nat._2] {
-      case Sized(v1, TZero()) if Type.Numeric.contains(v1) => v1
+    partialTyperV[nat._2] {
+      case Sized(v1, TZero()) if Type.Numeric.contains(v1) => success(v1)
 
       case Sized(Type.Const(Data.Int(v1)), Type.Const(Data.Int(v2))) =>
-        Type.Const(Data.Int(v1 - v2))
+        success(Type.Const(Data.Int(v1 - v2)))
 
       case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) =>
-        Type.Const(Data.Dec(v1 - v2))
-
-      case Sized(Type.Const(CanLensDateTime(v1)), Type.Const(Data.Interval(v2))) =>
-        Type.Const(v1.peeks(v2.subtractFromLocalDateTime))
-
-      case Sized(Type.Const(CanLensDate(v1)), Type.Const(Data.Interval(DateTimeInterval.DateLike(v2)))) =>
-        Type.Const(v1.peeks(_.minus(v2)))
-
-      case Sized(Type.Const(CanLensTime(v1)), Type.Const(Data.Interval(DateTimeInterval.TimeLike(v2)))) =>
-        Type.Const(v1.peeks(_.minus(v2)))
-
-      case Sized(Type.Const(Data.LocalDateTime(v1)), Type.Const(Data.LocalDateTime(v2))) =>
-        Type.Const(Data.Interval(DateTimeInterval.betweenLocalDateTime(v1, v2)))
-
-      case Sized(Type.Const(Data.LocalDate(v1)), Type.Const(Data.LocalDate(v2))) =>
-        Type.Const(Data.Interval(DateTimeInterval.betweenLocalDate(v1, v2)))
-
-      case Sized(Type.Const(Data.LocalTime(v1)), Type.Const(Data.LocalTime(v2))) =>
-        Type.Const(Data.Interval(DateTimeInterval.betweenLocalTime(v1, v2)))
-
-      case Sized(Type.Const(Data.OffsetDateTime(v1)), Type.Const(Data.OffsetDateTime(v2))) =>
-        Type.Const(Data.Interval(DateTimeInterval.betweenOffsetDateTime(v1, v2)))
-
-      case Sized(Type.Const(Data.OffsetDate(v1)), Type.Const(Data.OffsetDate(v2))) =>
-        Type.Const(Data.Interval(DateTimeInterval.betweenOffsetDate(v1, v2)))
-
-      case Sized(Type.Const(Data.OffsetTime(v1)), Type.Const(Data.OffsetTime(v2))) =>
-        Type.Const(Data.Interval(DateTimeInterval.betweenOffsetTime(v1, v2)))
+        success(Type.Const(Data.Dec(v1 - v2)))
 
       case Sized(Type.Const(Data.Interval(v1)), Type.Const(Data.Interval(v2))) =>
-        Type.Const(Data.Interval(v1.minus(v2)))
+        success(Type.Const(Data.Interval(v1.minus(v2))))
 
-      case Sized(Type.LocalDateTime.superOf(_), Type.LocalDateTime.superOf(_)) => Type.Interval
-      case Sized(Type.LocalDate.superOf(_), Type.LocalDate.superOf(_)) => Type.Interval
-      case Sized(Type.LocalTime.superOf(_), Type.LocalTime.superOf(_)) => Type.Interval
+      case Sized(Type.Const(Data.LocalDateTime(v1)), Type.Const(Data.Interval(v2))) =>
+        success(Type.Const(Data.LocalDateTime(v2.subtractFromLocalDateTime(v1))))
 
-      case Sized(Type.OffsetDateTime.superOf(_), Type.OffsetDateTime.superOf(_)) => Type.Interval
-      case Sized(Type.OffsetDate.superOf(_), Type.OffsetDate.superOf(_)) => Type.Interval
-      case Sized(Type.OffsetTime.superOf(_), Type.OffsetTime.superOf(_)) => Type.Interval
+      case Sized(Type.Const(Data.LocalDate(v1)), Type.Const(Data.Interval(DateTimeInterval.DateLike(v2)))) =>
+        success(Type.Const(Data.LocalDate(DateTimeInterval.subtractFromLocalDate(v1, v2))))
 
-      case Sized(Type.OffsetDateTime.superOf(_), Type.Interval.superOf(_)) => Type.OffsetDateTime
-      case Sized(Type.OffsetDate.superOf(_), Type.Interval.superOf(_)) => Type.OffsetDate
-      case Sized(Type.OffsetTime.superOf(_), Type.Interval.superOf(_)) => Type.OffsetTime
+      case Sized(Type.Const(Data.LocalTime(v1)), Type.Const(Data.Interval(DateTimeInterval.TimeLike(v2)))) =>
+        success(Type.Const(Data.LocalTime(DateTimeInterval.subtractFromLocalTime(v1, v2))))
 
-      case Sized(Type.LocalDateTime.superOf(_), Type.Interval.superOf(_)) => Type.LocalDate
-      case Sized(Type.LocalDate.superOf(_), Type.Interval.superOf(_)) => Type.LocalDate
-      case Sized(Type.LocalTime.superOf(_), Type.Interval.superOf(_)) => Type.LocalTime
+      case Sized(Type.Const(Data.OffsetDateTime(v1)), Type.Const(Data.Interval(v2))) =>
+        success(Type.Const(Data.OffsetDateTime(v2.subtractFromOffsetDateTime(v1))))
 
-      case Sized(Type.Temporal.superOf(ty), Type.Interval.superOf(_)) => ty.widenConst
+      case Sized(Type.Const(Data.OffsetDate(v1)), Type.Const(Data.Interval(DateTimeInterval.DateLike(v2)))) =>
+        success(Type.Const(Data.OffsetDate(DateTimeInterval.subtractFromOffsetDate(v1, v2))))
 
-      case Sized(Type.Interval.superOf(_), Type.Interval.superOf(_))=> Type.Interval
+      case Sized(Type.Const(Data.OffsetTime(v1)), Type.Const(Data.Interval(DateTimeInterval.TimeLike(v2)))) =>
+        success(Type.Const(Data.OffsetTime(DateTimeInterval.subtractFromOffsetTime(v1, v2))))
+
+      case Sized(Type.Const(CanLensDate(_)), Type.Const(Data.Interval(_))) =>
+        failure(NonEmptyList(SemanticError.GenericError("Intervals containing time information can't be added to dates")))
+
+      case Sized(Type.Const(CanLensTime(_)), Type.Const(Data.Interval(_))) =>
+        failure(NonEmptyList(SemanticError.GenericError("Intervals containing date information can't be added to times")))
+
+      case Sized(Type.Const(Data.LocalDateTime(v1)), Type.Const(Data.LocalDateTime(v2))) =>
+        success(Type.Const(Data.Interval(DateTimeInterval.betweenLocalDateTime(v1, v2))))
+
+      case Sized(Type.Const(Data.LocalDate(v1)), Type.Const(Data.LocalDate(v2))) =>
+        success(Type.Const(Data.Interval(DateTimeInterval.ofPeriod(DateTimeInterval.betweenLocalDate(v1, v2)))))
+
+      case Sized(Type.Const(Data.LocalTime(v1)), Type.Const(Data.LocalTime(v2))) =>
+        success(Type.Const(Data.Interval(DateTimeInterval.ofDuration(DateTimeInterval.betweenLocalTime(v1, v2)))))
+
+      case Sized(Type.Const(Data.OffsetDateTime(v1)), Type.Const(Data.OffsetDateTime(v2))) =>
+        success(Type.Const(Data.Interval(DateTimeInterval.betweenOffsetDateTime(v1, v2))))
+
+      case Sized(Type.Const(Data.OffsetDate(v1)), Type.Const(Data.OffsetDate(v2))) =>
+        success(Type.Const(Data.Interval(DateTimeInterval.ofPeriod(DateTimeInterval.betweenOffsetDate(v1, v2)))))
+
+      case Sized(Type.Const(Data.OffsetTime(v1)), Type.Const(Data.OffsetTime(v2))) =>
+        success(Type.Const(Data.Interval(DateTimeInterval.ofDuration(DateTimeInterval.betweenOffsetTime(v1, v2)))))
+
+      case Sized(Type.LocalDateTime.superOf(_), Type.LocalDateTime.superOf(_)) => success(Type.Interval)
+      case Sized(Type.LocalDate.superOf(_), Type.LocalDate.superOf(_)) => success(Type.Interval)
+      case Sized(Type.LocalTime.superOf(_), Type.LocalTime.superOf(_)) => success(Type.Interval)
+
+      case Sized(Type.OffsetDateTime.superOf(_), Type.OffsetDateTime.superOf(_)) => success(Type.Interval)
+      case Sized(Type.OffsetDate.superOf(_), Type.OffsetDate.superOf(_)) => success(Type.Interval)
+      case Sized(Type.OffsetTime.superOf(_), Type.OffsetTime.superOf(_)) => success(Type.Interval)
+
+      case Sized(Type.OffsetDateTime.superOf(_), Type.Interval.superOf(_)) => success(Type.OffsetDateTime)
+      case Sized(Type.OffsetDate.superOf(_), Type.Interval.superOf(_)) => success(Type.OffsetDate)
+      case Sized(Type.OffsetTime.superOf(_), Type.Interval.superOf(_)) => success(Type.OffsetTime)
+
+      case Sized(Type.LocalDateTime.superOf(_), Type.Interval.superOf(_)) => success(Type.LocalDate)
+      case Sized(Type.LocalDate.superOf(_), Type.Interval.superOf(_)) => success(Type.LocalDate)
+      case Sized(Type.LocalTime.superOf(_), Type.Interval.superOf(_)) => success(Type.LocalTime)
+
+      case Sized(Type.Temporal.superOf(ty), Type.Interval.superOf(_)) => success(ty.widenConst)
+
+      case Sized(Type.Interval.superOf(_), Type.Interval.superOf(_))=> success(Type.Interval)
 
       case Sized(Type.Temporal.superOf(t1), Type.Temporal.superOf(t2))
-        if (t1.contains(t2) || t2.contains(t1)) => Type.Interval
+        if (t1.contains(t2) || t2.contains(t1)) => success(Type.Interval)
     } ||| numericWidening,
     partialUntyperOV[nat._2] { t => Type.typecheck(Type.Temporal, t).fold(
       κ(Type.typecheck(Type.Interval, t).fold(
         κ(t match {
           case Type.Int =>
-            Some(success(Func.Input2(Type.Int, Type.Int    )))
+            Some(success(Func.Input2(Type.Int, Type.Int)))
           case t if Type.Numeric.contains(t) =>
             Some(success(Func.Input2(Type.Numeric, Type.Numeric)))
           case _ =>

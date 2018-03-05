@@ -77,23 +77,30 @@ class StdLibTypeCoherenceSpec extends quasar.Qspec with quasar.TypeGenerators {
     }.right.getOrElse(success)
   }
 
-  def testCoherence[N <: Nat](name: String, func: GenericFunc[N]): Fragment =
+  def testCoherence[N <: Nat](name: String, func: GenericFunc[N]): Fragment = {
     s"$name coherence" >> {
       locally {
         implicit val arbitraryTypes: Arbitrary[Func.Domain[N]] =
-          Arbitrary(func.domain.unsized.traverse(k => Gen.sized(s => genSubtypesWithConst(k, s/25))).map(Sized.wrap[List[Type], N]))
+          Arbitrary(
+            func.domain.unsized
+              .traverse(k => Gen.sized(s => genSubtypesWithConst(k, s/25)))
+              .map(Sized.wrap[List[Type], N]))
+
         "input coherence" in Prop.forAll { (is: Func.Domain[N]) =>
           testInputCoherence[N](func)(is)
         }
       }
+
       locally {
         implicit val arbitraryType: Arbitrary[Type] =
           Arbitrary(Gen.sized(s => genSubtypes(func.codomain, s/25)))
+
         "output coherence" in Prop.forAll { (t: Type) =>
           testOutputCoherence[N](func)(t)
         }
       }
     }
+  }
 
   "AggLib" >> {
     testCoherence("Count", AggLib.Count)

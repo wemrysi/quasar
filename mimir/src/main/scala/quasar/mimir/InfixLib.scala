@@ -107,13 +107,13 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
           case (c1: OffsetDateColumn, c2: IntervalColumn) =>
             new OffsetDateColumn {
-              def apply(row: Int) = c2(row).addToOffsetDate(c1(row))
+              def apply(row: Int) = DateTimeInterval.addToOffsetDate(c1(row), c2(row).period)
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isDateLike
             }
 
           case (c1: OffsetTimeColumn, c2: IntervalColumn) =>
             new OffsetTimeColumn {
-              def apply(row: Int) = c2(row).addToOffsetTime(c1(row))
+              def apply(row: Int) = DateTimeInterval.addToOffsetTime(c1(row), c2(row).duration)
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isTimeLike
             }
 
@@ -125,13 +125,13 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
           case (c1: LocalDateColumn, c2: IntervalColumn) =>
             new LocalDateColumn {
-              def apply(row: Int) = c2(row).addToLocalDate(c1(row))
+              def apply(row: Int) = DateTimeInterval.addToLocalDate(c1(row), c2(row).period)
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isDateLike
             }
 
           case (c1: LocalTimeColumn, c2: IntervalColumn) =>
             new LocalTimeColumn {
-              def apply(row: Int) = c2(row).addToLocalTime(c1(row))
+              def apply(row: Int) = DateTimeInterval.addToLocalTime(c1(row), c2(row).duration)
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isTimeLike
             }
 
@@ -143,13 +143,13 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
           case (c1: IntervalColumn, c2: OffsetDateColumn) =>
             new OffsetDateColumn {
-              def apply(row: Int) = c1(row).addToOffsetDate(c2(row))
+              def apply(row: Int) = DateTimeInterval.addToOffsetDate(c2(row), c1(row).period)
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c1(row).isDateLike
             }
 
           case (c1: IntervalColumn, c2: OffsetTimeColumn) =>
             new OffsetTimeColumn {
-              def apply(row: Int) = c1(row).addToOffsetTime(c2(row))
+              def apply(row: Int) = DateTimeInterval.addToOffsetTime(c2(row), c1(row).duration)
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c1(row).isTimeLike
             }
 
@@ -161,13 +161,13 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
           case (c1: IntervalColumn, c2: LocalDateColumn) =>
             new LocalDateColumn {
-              def apply(row: Int) = c1(row).addToLocalDate(c2(row))
+              def apply(row: Int) = DateTimeInterval.addToLocalDate(c2(row), c1(row).period)
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c1(row).isDateLike
             }
 
           case (c1: IntervalColumn, c2: LocalTimeColumn) =>
             new LocalTimeColumn {
-              def apply(row: Int) = c1(row).addToLocalTime(c2(row))
+              def apply(row: Int) = DateTimeInterval.addToLocalTime(c2(row), c1(row).duration)
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c1(row).isTimeLike
             }
 
@@ -217,13 +217,13 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
           case (c1: OffsetDateColumn, c2: IntervalColumn) =>
             new OffsetDateColumn {
-              def apply(row: Int) = c2(row).subtractFromOffsetDate(c1(row))
+              def apply(row: Int) = DateTimeInterval.subtractFromOffsetDate(c1(row), c2(row).period)
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isDateLike
             }
 
           case (c1: OffsetTimeColumn, c2: IntervalColumn) =>
             new OffsetTimeColumn {
-              def apply(row: Int) = c2(row).subtractFromOffsetTime(c1(row))
+              def apply(row: Int) = DateTimeInterval.subtractFromOffsetTime(c1(row), c2(row).duration)
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isTimeLike
             }
 
@@ -235,13 +235,13 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
           case (c1: LocalDateColumn, c2: IntervalColumn) =>
             new LocalDateColumn {
-              def apply(row: Int) = c2(row).subtractFromLocalDate(c1(row))
+              def apply(row: Int) = DateTimeInterval.subtractFromLocalDate(c1(row), c2(row).period)
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isDateLike
             }
 
           case (c1: LocalTimeColumn, c2: IntervalColumn) =>
             new LocalTimeColumn {
-              def apply(row: Int) = c2(row).subtractFromLocalTime(c1(row))
+              def apply(row: Int) = DateTimeInterval.subtractFromLocalTime(c1(row), c2(row).duration)
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row) && c2(row).isTimeLike
             }
 
@@ -253,13 +253,15 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
           case (c1: LocalDateColumn, c2: LocalDateColumn) =>
             new IntervalColumn {
-              def apply(row: Int) = DateTimeInterval.betweenLocalDate(c1(row), c2(row))
+              def apply(row: Int) =
+                DateTimeInterval.ofPeriod(DateTimeInterval.betweenLocalDate(c1(row), c2(row)))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
           case (c1: LocalTimeColumn, c2: LocalTimeColumn) =>
             new IntervalColumn {
-              def apply(row: Int) = DateTimeInterval.betweenLocalTime(c1(row), c2(row))
+              def apply(row: Int) =
+                DateTimeInterval.ofDuration(DateTimeInterval.betweenLocalTime(c1(row), c2(row)))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
@@ -271,13 +273,15 @@ trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
           case (c1: OffsetDateColumn, c2: OffsetDateColumn) =>
             new IntervalColumn {
-              def apply(row: Int) = DateTimeInterval.betweenOffsetDate(c1(row), c2(row))
+              def apply(row: Int) =
+                DateTimeInterval.ofPeriod(DateTimeInterval.betweenOffsetDate(c1(row), c2(row)))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
           case (c1: OffsetTimeColumn, c2: OffsetTimeColumn) =>
             new IntervalColumn {
-              def apply(row: Int) = DateTimeInterval.betweenOffsetTime(c1(row), c2(row))
+              def apply(row: Int) =
+                DateTimeInterval.ofDuration(DateTimeInterval.betweenOffsetTime(c1(row), c2(row)))
               def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
             }
 
