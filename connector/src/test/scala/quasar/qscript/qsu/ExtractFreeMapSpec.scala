@@ -318,6 +318,60 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       }
     }
 
+    "convert a partially mappable join condition on both sides" >> {
+      val projectCustomersKey = projectStrKey("customers_key")
+      val projectCustomersKey2 = projectStrKey("customers_key_2")
+      val projectFoo = projectStrKey("foo")
+
+      val graph = QSUGraph.fromTree[Fix](
+        qsu.lpJoin(
+          qsu.transpose(qsu.read(orders), Retain.Values, Rotation.ShiftMap),
+          qsu.transpose(qsu.read(customers), Retain.Values, Rotation.ShiftMap),
+          qsu._autojoin2(
+            qsu.map(qsu.union(qsu.joinSideRef('leftJoin), qsu.joinSideRef('rightJoin)), projectFoo),
+            qsu._autojoin2(
+              qsu.transpose(qsu.map(qsu.joinSideRef('rightJoin), projectCustomersKey), Retain.Values, Rotation.ShiftArray),
+              qsu.map(qsu.joinSideRef('rightJoin), projectCustomersKey2),
+              func.Add(func.LeftSide, func.RightSide)),
+            func.Eq(func.LeftSide, func.RightSide)),
+          JoinType.Inner, 'leftJoin, 'rightJoin))
+
+      evaluate(extractFM(graph)) must beLike {
+        case \/-(ThetaJoin(
+          AutoJoin2(
+            Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap),
+            Union(
+              Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap),
+              Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap)),
+            autojoinConditionOrders),
+          AutoJoin2(
+            Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap),
+            Transpose(Map(Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap), structCustomers), Retain.Values, Rotation.ShiftArray),
+            autojoinConditionCustomers),
+          on, JoinType.Inner, repair)) => {
+
+          autojoinConditionOrders must beTreeEqual(makeMap("left_source", "left_target_0"))
+          autojoinConditionCustomers must beTreeEqual(makeMap("right_source", "right_target_0"))
+
+          repair must beTreeEqual(
+            makeMap("left", "right") >>= {
+              case LeftSide => func.ProjectKeyS(func.LeftSide, "left_source")
+              case RightSide => func.ProjectKeyS(func.RightSide, "right_source")
+            })
+
+          on must beTreeEqual(
+            func.Eq(
+              func.ProjectKeyS(
+                func.ProjectKeyS(func.LeftSide, "left_target_0"), "foo"),
+              func.Add(
+                func.ProjectKeyS(func.RightSide, "right_target_0"),
+                func.ProjectKeyS(func.RightSide, "customer_key_2"))))
+
+          structCustomers must beTreeEqual(projectCustomersKey)
+        }
+      }
+    }
+
     "convert a non-mappable join condition on both sides" >> {
       val projectOrdersKey = projectStrKey("orders_key")
       val projectCustomersKey = projectStrKey("customers_key")
