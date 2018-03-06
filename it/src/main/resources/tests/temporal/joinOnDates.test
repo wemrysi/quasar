@@ -3,7 +3,6 @@
 
     "backends": {
         "marklogic_json": "pending",
-        "marklogic_xml": "pending",
         "mimir": "pending"
     },
 
