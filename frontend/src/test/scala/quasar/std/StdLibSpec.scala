@@ -544,7 +544,7 @@ abstract class StdLibSpec extends Qspec {
 
       "ExtractCentury" >> {
         "LocalDate -1" >> prop { (x: JLocalDate) =>
-          unary(ExtractCentury(_).embed, Data.LocalDate(x.withYear(-1)), Data.Int(0))
+          unary(ExtractCentury(_).embed, Data.LocalDate(x.withYear(-1)), Data.Int(1))
         }
 
         "LocalDate 1" >> prop { (x: JLocalDate) =>
@@ -660,7 +660,7 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "LocalDate 1" >> prop { (x: JLocalDate) =>
-          unary(ExtractDecade(_).embed, Data.LocalDate(x.withYear(1)), Data.Int(1))
+          unary(ExtractDecade(_).embed, Data.LocalDate(x.withYear(1)), Data.Int(0))
         }
 
         "LocalDate" >> prop { (x: JLocalDate) =>
@@ -878,12 +878,12 @@ abstract class StdLibSpec extends Qspec {
 
         "LocalDate 0000-2-3" >> {
           val year: JLocalDate = JLocalDate.of(0, 2, 3)
-          unary(ExtractIsoYear(_).embed, Data.LocalDate(year), Data.Int(0))
+          unary(ExtractIsoYear(_).embed, Data.LocalDate(year), Data.Int(1))
         }
 
         "LocalDate -0001-2-3" >> {
           val year: JLocalDate = JLocalDate.of(-1, 2, 3)
-          unary(ExtractIsoYear(_).embed, Data.LocalDate(year), Data.Int(-1))
+          unary(ExtractIsoYear(_).embed, Data.LocalDate(year), Data.Int(2))
         }
 
         "LocalDate year 2016" >> {
@@ -997,7 +997,7 @@ abstract class StdLibSpec extends Qspec {
 
       "ExtractMillennium" >> {
         "LocalDate -1" >> prop { (x: JLocalDate) =>
-          unary(ExtractMillennium(_).embed, Data.LocalDate(x.withYear(-1)), Data.Int(0))
+          unary(ExtractMillennium(_).embed, Data.LocalDate(x.withYear(-1)), Data.Int(1))
         }
 
         "LocalDate 1" >> prop { (x: JLocalDate) =>
