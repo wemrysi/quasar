@@ -227,12 +227,12 @@ package object time {
     java.lang.Math.ceil(ld.getMonthValue / 3.0).toLong
 
   def extractWeek(ld: LocalDate): Long =
-    if (ld.getDayOfYear === 1) 53 else ld.getLong(ChronoField.ALIGNED_WEEK_OF_YEAR)
+    if (ld.getDayOfYear === 1) 53
+    else ld.getLong(ChronoField.ALIGNED_WEEK_OF_YEAR)
 
   def extractYear(ld: LocalDate): Int = ld.getYear
 
   def extractIsoYear(ld: LocalDate): Long =
-    // TODO: Come back to this, add tests for BC era
     if (ld.getDayOfYear === 1) ld.getLong(ChronoField.YEAR_OF_ERA) - 1
     else ld.getLong(ChronoField.YEAR_OF_ERA)
 

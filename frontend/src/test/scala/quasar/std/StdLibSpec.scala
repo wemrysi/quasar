@@ -543,6 +543,10 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ExtractCentury" >> {
+        "LocalDate -1" >> prop { (x: JLocalDate) =>
+          unary(ExtractCentury(_).embed, Data.LocalDate(x.withYear(-1)), Data.Int(0))
+        }
+
         "LocalDate 1" >> prop { (x: JLocalDate) =>
           unary(ExtractCentury(_).embed, Data.LocalDate(x.withYear(1)), Data.Int(1))
         }
@@ -651,6 +655,14 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ExtractDecade" >> {
+        "LocalDate -1" >> prop { (x: JLocalDate) =>
+          unary(ExtractDecade(_).embed, Data.LocalDate(x.withYear(-1)), Data.Int(0))
+        }
+
+        "LocalDate 1" >> prop { (x: JLocalDate) =>
+          unary(ExtractDecade(_).embed, Data.LocalDate(x.withYear(1)), Data.Int(1))
+        }
+
         "LocalDate" >> prop { (x: JLocalDate) =>
           unary(ExtractDecade(_).embed, Data.LocalDate(x.withYear(1999)), Data.Int(199))
         }
@@ -861,8 +873,18 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ExtractIsoYear" >> {
-        val year2016: JLocalDate = JLocalDate.parse("2017-01-01")
+        val year2016: JLocalDate = JLocalDate.parse("2017-01-01") // day of year = 1
         val year2017: JLocalDate = JLocalDate.parse("2017-01-02") // first week containing Jan. 4
+
+        "LocalDate 0000-2-3" >> {
+          val year: JLocalDate = JLocalDate.of(0, 2, 3)
+          unary(ExtractIsoYear(_).embed, Data.LocalDate(year), Data.Int(0))
+        }
+
+        "LocalDate -0001-2-3" >> {
+          val year: JLocalDate = JLocalDate.of(-1, 2, 3)
+          unary(ExtractIsoYear(_).embed, Data.LocalDate(year), Data.Int(-1))
+        }
 
         "LocalDate year 2016" >> {
           unary(ExtractIsoYear(_).embed, Data.LocalDate(year2016), Data.Int(2016))
@@ -974,6 +996,10 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ExtractMillennium" >> {
+        "LocalDate -1" >> prop { (x: JLocalDate) =>
+          unary(ExtractMillennium(_).embed, Data.LocalDate(x.withYear(-1)), Data.Int(0))
+        }
+
         "LocalDate 1" >> prop { (x: JLocalDate) =>
           unary(ExtractMillennium(_).embed, Data.LocalDate(x.withYear(1)), Data.Int(1))
         }
@@ -1292,7 +1318,7 @@ abstract class StdLibSpec extends Qspec {
 
       "ExtractWeek" >> {
         val week7: JLocalDate = JLocalDate.parse("2001-02-16")
-        val week53: JLocalDate = JLocalDate.parse("2016-01-01")
+        val week53: JLocalDate = JLocalDate.parse("2016-01-01") // day of year = 1
 
         "LocalDate week 7" >> {
           unary(ExtractWeek(_).embed, Data.LocalDate(week7), Data.Int(7))
