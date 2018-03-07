@@ -39,8 +39,8 @@ trait MemoryDatasetConsumer[M[+ _]] extends EvaluatorModule[M] {
       implicit val nt = NaturalTransformation.refl[M]
       val evaluator   = Evaluator(M)
       val result      = evaluator.eval(graph, ctx, optimize)
-      val json = result.flatMap(_.toJson).copoint filterNot { jvalue =>
-        (jvalue \ "value") == JUndefined
+      val json = result.flatMap(_.toJson).copoint filterNot { rvalue =>
+        (rvalue.toJValue \ "value") == JUndefined
       }
 
       var extractIdTime: Long      = 0L
