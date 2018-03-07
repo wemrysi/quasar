@@ -53,6 +53,11 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (date.ExtractSecond, _) => Pending("TODO").left
     case (date.ExtractWeek, _) => Pending("TODO").left
 
+    // Not working for any date-like types, but we just have tests for LocalDate
+    case (date.ExtractCentury, List(Data.LocalDate(d))) if d.getYear < 1 => Pending("TODO").left
+    case (date.ExtractDecade, List(Data.LocalDate(d))) if d.getYear < 1 => Pending("TODO").left
+    case (date.ExtractMillennium, List(Data.LocalDate(d))) if d.getYear < 1 => Pending("TODO").left
+
     case (date.StartOfDay, Data.LocalLike(_) :: Nil) => notHandled.left
 
     case (date.Now, _) => Pending("Returns correct result, but wrapped into Data.Dec instead of Data.Interval").left
