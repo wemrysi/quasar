@@ -2,7 +2,6 @@
     "name": "join on dates",
 
     "backends": {
-        "marklogic_json": "pending",
         "mimir": "pending"
     },
 
