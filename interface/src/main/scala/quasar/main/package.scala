@@ -138,35 +138,43 @@ package object main extends Logging {
     }
 
     val isolatedFS: Task[BackendDef[Task]] = config match {
-      case JarDirectory(file) =>
+      case JarDirectory(directory) =>
         import java.util.jar.JarFile
+        import java.nio.file.Files
+        import argonaut._, Argonaut._
+
+        final case class Plugin(mainJar: jPath, classPath: List[jPath]) {
+          private def absolute(relative: jPath): jPath = directory.toPath.toAbsolutePath.resolve(relative)
+          def withAbsolutePaths = Plugin(absolute(mainJar), classPath.map(absolute))
+        }
+
+        implicit val pathDecodeJson:   DecodeJson[jPath]  = optionDecoder(json => json.string.map(jPath), "Path")
+        implicit val pluginDecodeJson: DecodeJson[Plugin] = jdecode2L(Plugin.apply)("main_jar", "classpath")
+
+        def load(pluginFile: jFile): Task[Option[BackendDef[Task]]] = {
+          val backend: OptionT[Task, BackendDef[Task]] = for {
+            contents <- Task.delay(new String(Files.readAllBytes(pluginFile.toPath))).liftM[OptionT]
+            plugin <- OptionT(Task.delay(contents.decodeOption[Plugin].map(_.withAbsolutePaths)))
+            classLoader <- Task.delay(new URLClassLoader(plugin.classPath.map(_.toUri.toURL).toArray, ParentCL)).liftM[OptionT]
+            mainJar <- Task.delay(new JarFile(plugin.mainJar.toFile)).liftM[OptionT]
+            backendModuleAttr <- OptionT(Task.delay(Option(mainJar.getManifest.getMainAttributes.getValue("Backend-Module"))))
+            backendModules = backendModuleAttr.split(" ").toList.toIList
+            defs <- backendModules.traverse(loadBackend(_, classLoader))
+          } yield defs.fold
+
+          for {
+            result <- backend.run
+            _ <- if (result.isEmpty) {
+              Task.delay(log.warn(s"unable to load any backends from $pluginFile; perhaps the file is invalid or the 'Backend-Module' attribute is not defined"))
+            } else Task.now(())
+          } yield result
+        }
 
         for {
-          children <- Task.delay(file.listFiles().toList)
-          jars = IList.fromList(children.filter(_.getName.endsWith(".jar")).toList)
-
-          loaded <- jars traverse { jar =>
-            val back = for {
-              cl <- Task.delay(new URLClassLoader(Array(jar.toURI.toURL), ParentCL)).liftM[OptionT]
-              manifest <- Task.delay(new JarFile(jar).getManifest()).liftM[OptionT]
-              attrs <- Task.delay(manifest.getMainAttributes()).liftM[OptionT]
-
-              moduleAttrValue <- OptionT(Task.delay(Option(attrs.getValue("Backend-Module"))))
-              modules = IList.fromList(moduleAttrValue.split(" ").toList)
-
-              defs <- modules.traverse(loadBackend(_, cl))
-            } yield defs.fold
-
-            for {
-              result <- back.run
-
-              _ <- if (result.isEmpty)
-                Task.delay(log.warn(s"unable to load any backends from $jar; perhaps the 'Backend-Module' attribute is not defined"))
-              else
-                Task.now(())
-            } yield result
-          }
-        } yield loaded.flatMap(r => IList.fromList(r.toList)).fold
+          children <- Task.delay(directory.listFiles().toList.toIList)
+          pluginFiles = children.filter(_.getName.endsWith(".plugin"))
+          loaded <- pluginFiles.traverse(pluginFile => load(pluginFile))
+        } yield loaded.flatMap(_.toIList).fold
 
       case ExplodedDirs(backends) =>
         val maybeDefinitionsM: Task[IList[Option[BackendDef[Task]]]] = backends traverse {
