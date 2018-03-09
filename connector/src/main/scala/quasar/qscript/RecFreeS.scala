@@ -17,11 +17,14 @@
 package quasar.qscript
 
 import slamdata.Predef._
-import scalaz._, Scalaz._
+
+import quasar.RenderTree
+
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
-import matryoshka.patterns._
+import matryoshka.patterns.interpretM
+import scalaz._, Scalaz._
 
 sealed trait RecFreeS[F[_], A] extends Product with Serializable {
   import RecFreeS._
@@ -30,7 +33,6 @@ sealed trait RecFreeS[F[_], A] extends Product with Serializable {
   def linearize: Free[F, A] = this match {
     case Suspend(fa) =>
       Free.liftF(fa)
-
     case Fix(form, rec) =>
       rec.flatMapSuspension(λ[RecFreeS[F, ?] ~> Free[F, ?]](_.linearize)) >> form.linearize
   }
@@ -43,21 +45,24 @@ object RecFreeS {
   final case class Fix[F[_], A](form: RecFreeS[F, A], rec: Free[RecFreeS[F, ?], Unit]) extends RecFreeS[F, A]
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def interpret[M[_]: Monad, F[_]: Traverse, A](fm: RecFreeS[F, A])(susint: F[A] => M[A], fixint: A => M[(A, A => M[A])]): M[A] =
+  def recInterpretM[M[_]: Monad, F[_]: Traverse, A](fm: RecFreeS[F, A])(susint: AlgebraM[M, F, A], fixint: A => M[(A, A => M[A])]): M[A] =
     fm match {
       case Suspend(fa) => susint(fa)
       case Fix(form, rec) =>
-        for {
-          formA <- RecFreeS.interpret(form)(susint, fixint)
-          pair <- fixint(formA)
-          (hole, cont) = pair
-
-          applied <- rec.cataM[M, A](
-            interpretM(_ => hole.point[M], RecFreeS.interpret(_)(susint, fixint)))
-
-          back <- cont(applied)
-        } yield back
+        recInterpretM(form)(susint, fixint) >>= (fixint(_)) >>= {
+          case (hole, cont) =>
+            rec.cataM[M, A](interpretM(_ => hole.point[M], recInterpretM(_)(susint, fixint))) >>= (cont(_))
+        }
     }
+
+  def recInterpret[F[_]: Traverse, A](fm: RecFreeS[F, A])(susint: Algebra[F, A], fixint: A => (A, A => A)): A =
+    recInterpretM[Id, F, A](fm)(susint, fixint)
+
+  def fromFree[F[_], A](f: Free[F, A]): Free[RecFreeS[F, ?], A] =
+    f.mapSuspension(λ[F ~> RecFreeS[F, ?]](Suspend(_)))
+
+  def letIn[F[_], A](form: Free[F, A])(rec: Free[F, Unit]): Free[RecFreeS[F, ?], A] =
+    form.mapSuspension(λ[F ~> RecFreeS[F, ?]](f => Fix(Suspend(f), fromFree(rec))))
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def traverse[F[_]: Traverse]: Traverse[RecFreeS[F, ?]] = new Traverse[RecFreeS[F, ?]] {
@@ -66,4 +71,8 @@ object RecFreeS {
       case Fix(form, rec) => traverseImpl[G, A, B](form)(f) map (Fix(_, rec))
     }
   }
+
+  // FIXME: Display the bound form and body separately
+  implicit def renderTree[F[_]: Functor, A](implicit F: RenderTree[F[A]], FR: RenderTree[Free[F, A]])
+      : RenderTree[RecFreeS[F, A]] = RenderTree.make(rf => FR.render(rf.linearize))
 }
