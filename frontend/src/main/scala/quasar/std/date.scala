@@ -39,6 +39,13 @@ import scalaz.syntax.either._
 import shapeless.{Data => _, _}
 
 trait DateLib extends Library with Serializable {
+
+  // legacy function for parsing Instants
+  def parseTimestamp(str: String): SemanticError \/ Data.OffsetDateTime =
+    \/.fromTryCatchNonFatal(Instant.parse(str).atOffset(ZoneOffset.UTC)).bimap(
+      κ(DateFormatError(OffsetDateTime, str, None)),
+      Data.OffsetDateTime.apply)
+
   def parseOffsetDateTime(str: String): SemanticError \/ Data.OffsetDateTime =
     \/.fromTryCatchNonFatal(JOffsetDateTime.parse(str)).bimap(
       κ(DateFormatError(OffsetDateTime, str, None)),
