@@ -92,6 +92,40 @@ class DataCodecSpecs extends quasar.Qspec {
         roundTrip(Data.Int(LargeInt)) must beSome(Data.Dec(new java.math.BigDecimal(LargeInt.underlying)).right[DataEncodingError])
       }
 
+      "decode timestamp" in { DataCodec.parse("""{ "$timestamp": "2015-01-31T10:30:00.000Z" }""").toOption must beSome(Data.OffsetDateTime(OffsetDateTime.parse("2015-01-31T10:30:00Z"))) }
+      "decode date"      in { DataCodec.parse("""{ "$date": "2015-01-31" }""").toOption must beSome(Data.LocalDate(LocalDate.parse("2015-01-31"))) }
+      "decode time"      in { DataCodec.parse("""{ "$time": "10:30:00.000" }""").toOption must beSome(Data.LocalTime(LocalTime.parse("10:30:00.000"))) }
+
+      "decode localdatetime" in { DataCodec.parse("""{ "$localdatetime": "2015-01-31T10:30" }""").toOption must beSome(Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30:00"))) }
+      "decode localdate" in { DataCodec.parse("""{ "$localdate": "2015-01-31" }""").toOption must beSome(Data.LocalDate(LocalDate.parse("2015-01-31"))) }
+      "decode localtime" in { DataCodec.parse("""{ "$localtime": "10:30" }""").toOption must beSome(Data.LocalTime(LocalTime.parse("10:30:00.000"))) }
+      "decode offsetdatetime" in { DataCodec.parse("""{ "$offsetdatetime": "2015-01-31T10:30Z" }""").toOption must beSome(Data.OffsetDateTime(OffsetDateTime.parse("2015-01-31T10:30:00Z"))) }
+      "decode offsetdate" in { DataCodec.parse("""{ "$offsetdate": "2015-01-31Z" }""").toOption must beSome(Data.OffsetDate(OffsetDate.parse("2015-01-31Z"))) }
+      "decode offsettime" in { DataCodec.parse("""{ "$offsettime": "10:30Z" }""").toOption must beSome(Data.OffsetTime(OffsetTime.parse("10:30:00.000Z"))) }
+
+      "decode timestamp within array" in {
+        val input = """[{ "$timestamp": "2015-01-31T10:30:00.000Z" }]"""
+
+        val results = DataCodec.parse(input).toOption
+        val expected = Data.Arr(List(Data.OffsetDateTime(OffsetDateTime.parse("2015-01-31T10:30:00Z"))))
+
+        results must beSome(expected)
+      }
+
+      "decode timestamp AND localdatetime within array" in {
+        val input = """[{ "$timestamp": "2015-01-31T10:30:00.000Z" }, { "$localdatetime": "2015-01-31T10:30" }]"""
+
+        val results = DataCodec.parse(input).toOption
+
+        val expected = Data.Arr(
+          List(
+            Data.OffsetDateTime(OffsetDateTime.parse("2015-01-31T10:30:00Z")),
+            Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30:00"))))
+
+        results must beSome(expected)
+      }
+
+
       // Some invalid inputs:
 
       "fail with unescaped leading '$'" in {
