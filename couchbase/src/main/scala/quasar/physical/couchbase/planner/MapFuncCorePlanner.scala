@@ -17,8 +17,15 @@
 package quasar.physical.couchbase.planner
 
 import slamdata.Predef._
-import quasar.DataCodec, DataCodec.Precise.{LocalDateKey, LocalDateTimeKey, LocalTimeKey, IntervalKey,
-                                            OffsetDateKey, OffsetDateTimeKey, OffsetTimeKey}
+import quasar.DataCodec, DataCodec.PreciseKeys.{
+  LocalDateKey,
+  LocalDateTimeKey,
+  LocalTimeKey,
+  IntervalKey,
+  OffsetDateKey,
+  OffsetDateTimeKey,
+  OffsetTimeKey
+}
 import quasar.{Data => QData, Type => QType, NameGenerator}
 import quasar.fp._
 import quasar.physical.couchbase._, N1QL.{Eq, Split, _}, Case._, Select.{Value, _}

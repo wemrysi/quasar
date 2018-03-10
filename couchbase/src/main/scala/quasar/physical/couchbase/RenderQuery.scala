@@ -21,7 +21,7 @@ import quasar.{Data => QData, DataCodec}
 import quasar.fp.ski.κ
 import quasar.Planner.{NonRepresentableData, PlannerError}
 import quasar.common.SortDir, SortDir.{Ascending, Descending}
-import quasar.DataCodec.Precise.{LocalDateKey, LocalTimeKey}
+import quasar.DataCodec.PreciseKeys.{LocalDateKey, LocalTimeKey}
 
 import matryoshka._
 import matryoshka.implicits._

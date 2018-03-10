@@ -112,6 +112,19 @@ object DataCodec {
         })
   }
 
+  object PreciseKeys {
+    val LocalDateTimeKey = "$localdatetime"
+    val LocalDateKey = "$localdate"
+    val LocalTimeKey = "$localtime"
+    val OffsetDateTimeKey = "$offsetdatetime"
+    val OffsetDateKey = "$offsetdate"
+    val OffsetTimeKey = "$offsettime"
+    val IntervalKey = "$interval"
+    val BinaryKey = "$binary"
+    val ObjKey = "$obj"
+    val IdKey = "$oid"
+  }
+
   /*
    * The purpose behind the explicit fixed-point here is to allow interleaved
    * composition at depth.  Specifically, we want to be able to write the `orElse`
@@ -129,16 +142,7 @@ object DataCodec {
    * then you can add it using a very similar trick.
    */
   def NewPrecise(recDecode: Json => DataEncodingError \/ Data) = new DataCodec {
-    val LocalDateTimeKey = "$localdatetime"
-    val LocalDateKey = "$localdate"
-    val LocalTimeKey = "$localtime"
-    val OffsetDateTimeKey = "$offsetdatetime"
-    val OffsetDateKey = "$offsetdate"
-    val OffsetTimeKey = "$offsettime"
-    val IntervalKey = "$interval"
-    val BinaryKey = "$binary"
-    val ObjKey = "$obj"
-    val IdKey = "$oid"
+    import PreciseKeys._
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def encode(data: Data): Option[Json] = {

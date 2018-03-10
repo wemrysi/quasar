@@ -23,9 +23,9 @@ import quasar.{Data, DataCodec}
 import quasar.physical.rdbms.model._
 
 package object postgres {
-  
+
   implicit val codec: DataCodec = DataCodec.Precise
-  import DataCodec.Precise._
+  import DataCodec.PreciseKeys._
 
   implicit val typeMapper: TypeMapper = TypeMapper(
     {
