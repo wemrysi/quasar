@@ -1,6 +1,7 @@
 {
     "name": "simple filter using timestamp literals",
     "backends": {
+        "mimir": "pending"
     },
     "data":  "../days.data",
     "query": "select ts from `../days` where ts > timestamp(\"1970-10-14T08:22:06Z\")",
