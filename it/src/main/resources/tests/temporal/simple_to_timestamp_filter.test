@@ -1,6 +1,7 @@
 {
     "name": "simple filter using to_timestamp",
     "backends": {
+        "mimir": "pending"
     },
     "data":  "../days.data",
     "query": "select ts from `../days`
