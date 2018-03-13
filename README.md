@@ -1114,7 +1114,7 @@ localtime      | `"10:30:00.000"`    | `{ "$localtime": "10:30" }` |
 offsetdatetime | `"2015-01-31T10:30:00Z"`    | `{ "$offsetdatetime": "2015-01-31T10:30Z" }` |
 offsetdate | `"2015-01-31Z"`    | `{ "$offsetdate": "2015-01-31Z" }` |
 offsettime | `"10:30:00.000Z"`    | `{ "$offsettime": "10:30Z" }` |
-interval  | `"PT12H34M"`    | `{ "$interval": "P7DT12H34M" }` | year/month not currently supported.
+interval  | `"PT12H34M"`    | `{ "$interval": "P7DT12H34M" }` | 
 binary    | `"TE1OTw=="`    | `{ "$binary": "TE1OTw==" }` | BASE64-encoded.
 object id | `"abc"`         | `{ "$oid": "abc" }` |
 
