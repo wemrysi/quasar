@@ -1,6 +1,7 @@
 {
     "name": "simple filter using timestamp literals",
     "backends": {
+        "marklogic_json": "pending",
         "mimir": "pending"
     },
     "data":  "../days.data",
