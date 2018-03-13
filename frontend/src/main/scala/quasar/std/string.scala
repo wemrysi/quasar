@@ -199,13 +199,14 @@ trait StringLib extends Library {
         orig match {
           case InvokeUnapply(f @ TernaryFunc(_, _, _, _, _, _, _), Sized(
             Embed(Constant(Data.Str(str))),
-            Embed(Constant(Data.Int(from))),
-            for0))
-              if 0 < from =>
-            Invoke(f, Func.Input3(
-              Constant[T](Data.Str(str.substring(from.intValue))).embed,
-              Constant[T](Data.Int(0)).embed,
-              for0)).some
+            fromLP @ Embed(Constant(Data.Int(from))),
+            for0)) =>
+              if (from < 0 || from > str.length) Constant[T](Data.Str("")).some
+              else
+                Invoke(f, Func.Input3(
+                  Constant[T](Data.Str(str.substring(from.intValue))).embed,
+                  Constant[T](Data.Int(0)).embed,
+                  Invoke(MathLib.Subtract, Func.Input2(for0, fromLP)).embed)).some
           case _ => None
         }
     },
