@@ -198,7 +198,7 @@ object BsonCodec {
           n <- extract[Int](map.get(DateTimeConstants.nanosecond), Bson._int32)
           if y === 0 && m === 0 // TODO support intervals with dates in them
         } yield {
-          Bson.Dec((d*24+h)*3600000 + s*1000 + n*1e-6)
+          Bson.Dec(d*86400000 + s*1000 + n*1e-6)
         }) \/> NonRepresentableEJson(value.shows + " is either not a valid Interval or contains a nonzero year or month (currently only time-like intervals and days are supported)")
 
       case (_, _) => value.right
