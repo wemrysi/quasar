@@ -180,8 +180,8 @@ abstract class StdLibSpec extends Qspec {
 
         "any string and offsets" >> prop { (str: String, start0: Int, length0: Int) =>
           // restrict the range to something that will actually exercise the behavior
-          val start = (start0 % 1000) - 500
-          val length = (length0 % 1000) - 500
+          val start = (start0 % 1000)
+          val length = (length0 % 1000)
 
           // NB: this is the MongoDB behavior, for lack of a better idea
           val expected = StringLib.safeSubstring(str, start, length)
