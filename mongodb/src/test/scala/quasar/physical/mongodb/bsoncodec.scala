@@ -64,7 +64,7 @@ abstract class BsonCodecSpecs(v: BsonVersion) extends quasar.Qspec {
 
       def preserved(d: Data): Boolean = d match {
         case Int(x)            => x.isValidLong
-        case Interval(i)       => i.years == 0 && i.months == 0
+        case Interval(i)       => i.period.getYears == 0 && i.period.getMonths == 0
         case OffsetDateTime(_) => false
         case OffsetDate(_)     => false
         case OffsetTime(_)     => false
