@@ -174,7 +174,7 @@ trait MathLib extends Library {
         success(t2.widenConst)
     } ||| numericWidening,
 
-    partialUntyperOV[nat._2](t => 
+    partialUntyperOV[nat._2](t =>
       Type.typecheck(Type.Interval, t).fold(κ(t match {
         case Type.Int => Some(success(Func.Input2(Type.Int, Type.Int)))
         case t if Type.Numeric.contains(t) => Some(success(Func.Input2(Type.Numeric, Type.Numeric)))
@@ -331,7 +331,7 @@ trait MathLib extends Library {
       case Sized(Type.OffsetDate.superOf(_), Type.Interval.superOf(_)) => success(Type.OffsetDate)
       case Sized(Type.OffsetTime.superOf(_), Type.Interval.superOf(_)) => success(Type.OffsetTime)
 
-      case Sized(Type.LocalDateTime.superOf(_), Type.Interval.superOf(_)) => success(Type.LocalDate)
+      case Sized(Type.LocalDateTime.superOf(_), Type.Interval.superOf(_)) => success(Type.LocalDateTime)
       case Sized(Type.LocalDate.superOf(_), Type.Interval.superOf(_)) => success(Type.LocalDate)
       case Sized(Type.LocalTime.superOf(_), Type.Interval.superOf(_)) => success(Type.LocalTime)
 
