@@ -199,7 +199,7 @@ trait StringLib extends Library {
         orig match {
           case InvokeUnapply(f @ TernaryFunc(_, _, _, _, _, _, _), Sized(
             Embed(Constant(Data.Str(str))),
-            fromLP @ Embed(Constant(Data.Int(from))),
+            Embed(Constant(Data.Int(from))),
             for0)) if from != 0 =>
               if (from < 0 || from > str.length) Constant[T](Data.Str("")).some
               else
