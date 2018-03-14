@@ -31,10 +31,10 @@ import org.scalacheck.Arbitrary, Arbitrary._
 import scalaz.{Failure => _, _}, Scalaz._
 import shapeless.Nat
 
-/** Test the typers and simplifiers defined in the std lib functions themselves.
+/** Test the typers defined in the std lib functions themselves.
   */
-class SimplifyStdLibSpec extends StdLibSpec {
-  val lpf = new LogicalPlanR[Fix[LP]]
+class ConstantPlanStdLibSpec extends StdLibSpec {
+  private val lpf = new LogicalPlanR[Fix[LP]]
 
   val notHandled: Result \/ Unit = Skipped("not simplified").left
 
