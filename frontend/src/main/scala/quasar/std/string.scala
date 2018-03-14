@@ -200,12 +200,13 @@ trait StringLib extends Library {
           case InvokeUnapply(f @ TernaryFunc(_, _, _, _, _, _, _), Sized(
             Embed(Constant(Data.Str(str))),
             Embed(Constant(Data.Int(from))),
-            for0))
-              if 0 < from =>
-            Invoke(f, Func.Input3(
-              Constant[T](Data.Str(str.substring(from.intValue))).embed,
-              Constant[T](Data.Int(0)).embed,
-              for0)).some
+            for0)) if from != 0 =>
+              if (from < 0 || from > str.length) Constant[T](Data.Str("")).some
+              else
+                Invoke(f, Func.Input3(
+                  Constant[T](Data.Str(str.substring(from.intValue))).embed,
+                  Constant[T](Data.Int(0)).embed,
+                  for0)).some
           case _ => None
         }
     },

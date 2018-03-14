@@ -167,10 +167,21 @@ abstract class StdLibSpec extends Qspec {
           ternary(Substring(_, _, _).embed, Data.Str(str), Data.Int(start), Data.Int(0), Data.Str(""))
         }
 
+        "any string with start > str.length" >> prop { (str: String) =>
+          // restrict the range to something that will actually exercise the behavior
+          val start = str.length + 1
+          ternary(Substring(_, _, _).embed, Data.Str(str), Data.Int(start), Data.Int(str.length), Data.Str(""))
+        }
+
+        "any string with start < 0" >> prop { (str: String) =>
+          // restrict the range to something that will actually exercise the behavior
+          ternary(Substring(_, _, _).embed, Data.Str(str), Data.Int(-1), Data.Int(str.length), Data.Str(""))
+        }
+
         "any string and offsets" >> prop { (str: String, start0: Int, length0: Int) =>
           // restrict the range to something that will actually exercise the behavior
-          val start = start0 % 1000
-          val length = length0 % 1000
+          val start = (start0 % 1000)
+          val length = (length0 % 1000)
 
           // NB: this is the MongoDB behavior, for lack of a better idea
           val expected = StringLib.safeSubstring(str, start, length)
