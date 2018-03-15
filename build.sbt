@@ -129,6 +129,7 @@ concurrentRestrictions in Global := {
 concurrentRestrictions in Global += Tags.exclusive(ExclusiveTest)
 
 lazy val publishSettings = commonPublishSettings ++ Seq(
+  performSonatypeSync := false,   // basically just ignores all the sonatype sync parts of things
   organizationName := "SlamData Inc.",
   organizationHomepage := Some(url("http://quasar-analytics.org")),
   homepage := Some(url("https://github.com/quasar-analytics/quasar")),
@@ -180,7 +181,7 @@ lazy val assemblySettings = Seq(
 lazy val commonSettings = buildSettings ++ publishSettings ++ assemblySettings
 
 // not doing this causes NoSuchMethodErrors when using coursier
-lazy val excludeTypelevelScalaLibrary = 
+lazy val excludeTypelevelScalaLibrary =
   Seq(excludeDependencies += "org.typelevel" % "scala-library")
 
 // Include to also publish a project's tests
