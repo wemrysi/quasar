@@ -86,8 +86,4 @@ object RecFreeS {
   implicit final class LinearizeOps[F[_], A](val self: Free[RecFreeS[F, ?], A]) extends AnyVal {
     def linearize: Free[F, A] = RecFreeS.linearize(self)
   }
-
-  implicit final class ToRecOps[F[_], A](val self: Free[F, A]) extends AnyVal {
-    def toRec: Free[RecFreeS[F, ?], A] = RecFreeS.fromFree(self)
-  }
 }
