@@ -33,7 +33,8 @@ import quasar.qscript.{
   IdStatus,
   IncludeId,
   MFC,
-  ReduceFunc}
+  ReduceFunc,
+  RecFreeS}
 import quasar.qscript.MapFuncCore.{EmptyMap, StaticMap}
 import quasar.qscript.provenance.JoinKey
 import quasar.qscript.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
@@ -284,7 +285,8 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
                   )
               }
 
-              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), newStatus, onUndefined, newRepair, rot))
+              g.overwriteAtRoot(
+                O.leftShift(source.root, RecFreeS.fromFree(rebaseV(struct.linearize)), newStatus, onUndefined, newRepair, rot))
             }
 
           case (true, false) =>
@@ -292,7 +294,8 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
               val newRepair =
                 makeIV(lookupIdentities >> func.LeftTarget, repair)
 
-              g.overwriteAtRoot(O.leftShift(source.root, rebaseV(struct), idStatus, onUndefined, newRepair, rot))
+              g.overwriteAtRoot(
+                O.leftShift(source.root, RecFreeS.fromFree(rebaseV(struct.linearize)), idStatus, onUndefined, newRepair, rot))
             }
 
           case (false, true) =>

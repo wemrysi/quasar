@@ -25,7 +25,7 @@ import quasar.javascript._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript.{OnUndefined, ShiftType}
+import quasar.qscript.{OnUndefined, ShiftType, RecFreeS, RecFreeMap}
 import quasar.sql.JoinDir
 import slamdata.Predef._
 
@@ -48,6 +48,14 @@ class PlannerQScriptSpec extends
     quasar.qscript.construction.mkDefaults[Fix, fs.MongoQScript[Fix, ?]]
 
   import dsl._
+
+  val guardedProjectR: String => RecFreeMap[Fix] =
+    (s => RecFreeS.fromFree(
+      func.Guard(
+        func.ProjectKeyS(func.Hole, s),
+        Type.FlexArr(0, None, Type.Top),
+        func.ProjectKeyS(func.Hole, s),
+        func.Undefined)))
 
   val json = Fixed[Fix[EJson]]
 
@@ -264,11 +272,7 @@ class PlannerQScriptSpec extends
           fix.Filter(
             fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("patients"), qscript.ExcludeId),
             func.Eq(func.ProjectKeyS(func.Hole, "state"), func.Constant(json.str("CO")))),
-          func.Guard(
-            func.ProjectKeyS(func.Hole, "codes"),
-            Type.FlexArr(0, None, Type.Top),
-            func.ProjectKeyS(func.Hole, "codes"),
-            func.Undefined),
+          guardedProjectR("codes"),
           qscript.ExcludeId,
           ShiftType.Array,
           OnUndefined.Omit,
@@ -304,11 +308,7 @@ class PlannerQScriptSpec extends
         fix.Filter(
           fix.LeftShift(
             fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-            func.Guard(
-              func.ProjectKeyS(func.Hole, "loc"),
-              Type.FlexArr(0, None, Type.Top),
-              func.ProjectKeyS(func.Hole, "loc"),
-              func.Undefined),
+            guardedProjectR("loc"),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
             OnUndefined.Omit,
@@ -340,11 +340,7 @@ class PlannerQScriptSpec extends
         fix.Filter(
           fix.LeftShift(
             fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-            func.Guard(
-              func.ProjectKeyS(func.Hole, "loc"),
-              Type.FlexArr(0, None, Type.Top),
-              func.ProjectKeyS(func.Hole, "loc"),
-              func.Undefined),
+            guardedProjectR("loc"),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
             OnUndefined.Omit,
@@ -371,11 +367,7 @@ class PlannerQScriptSpec extends
         fix.LeftShift(
           fix.LeftShift(
             fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-            func.Guard(
-              func.ProjectKeyS(func.Hole, "loc"),
-              Type.FlexArr(0, None, Type.FlexArr(0, None, Type.Top)),
-              func.ProjectKeyS(func.Hole, "loc"),
-              func.Undefined),
+            guardedProjectR("loc"),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
             OnUndefined.Omit,
@@ -388,7 +380,7 @@ class PlannerQScriptSpec extends
                   func.Undefined),
               "original" ->
                 func.LeftSide)),
-          func.ProjectKeyS(func.Hole, "results"),
+          RecFreeS.fromFree(func.ProjectKeyS(func.Hole, "results")),
           qscript.ExcludeId,
           qscript.ShiftType.Array,
           OnUndefined.Omit,
@@ -429,15 +421,13 @@ class PlannerQScriptSpec extends
     }
 
     "plan double flatten without reference to LeftSide" in {
+      val holeR = RecFreeS.fromFree(func.Hole)
+
       qplan(
         fix.LeftShift(
           fix.LeftShift(
             fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-            func.Guard(
-              func.ProjectKeyS(func.Hole, "loc"),
-              Type.FlexArr(0, None, Type.FlexArr(0, None, Type.Top)),
-              func.ProjectKeyS(func.Hole, "loc"),
-              func.Undefined),
+            guardedProjectR("loc"),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
             OnUndefined.Omit,
@@ -445,7 +435,7 @@ class PlannerQScriptSpec extends
               Type.FlexArr(0, None, Type.Top),
               func.RightSide,
               func.Undefined)),
-          func.Hole,
+          holeR,
           qscript.ExcludeId,
           qscript.ShiftType.Array,
           OnUndefined.Omit,
@@ -478,11 +468,7 @@ class PlannerQScriptSpec extends
       qplan(
         fix.LeftShift(
           fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-          func.Guard(
-            func.ProjectKeyS(func.Hole, "loc"),
-            Type.FlexArr(0, None, Type.Top),
-            func.ProjectKeyS(func.Hole, "loc"),
-            func.Undefined),
+          guardedProjectR("loc"),
           qscript.ExcludeId,
           qscript.ShiftType.Array,
           OnUndefined.Omit,
@@ -509,8 +495,8 @@ class PlannerQScriptSpec extends
     }
 
     "plan flatten with Cond in struct and repair" in {
-      qplan(
-        fix.LeftShift(fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("patients"), qscript.ExcludeId),
+      val struct =
+        RecFreeS.fromFree(
           func.Guard(
             func.ProjectKeyS(
               func.Cond(
@@ -535,7 +521,12 @@ class PlannerQScriptSpec extends
                     func.ProjectKeyS(func.Hole, "city"),
                     func.Constant(json.arr(List(json.str("BOULDER"), json.str("AURORA")))))),
                 func.Hole, func.Undefined), "codes"),
-            func.Undefined),
+            func.Undefined))
+
+      qplan(
+        fix.LeftShift(
+          fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("patients"), qscript.ExcludeId),
+          struct,
           qscript.ExcludeId,
           ShiftType.Array,
           OnUndefined.Omit,

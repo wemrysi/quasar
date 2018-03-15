@@ -30,6 +30,7 @@ import quasar.qscript.{
   IncludeId,
   JoinSide,
   OnUndefined,
+  RecFreeS,
   ReduceFunc,
   ReduceFuncs,
   ReduceIndex,
@@ -70,6 +71,8 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
 
   val root = Path.rootDir[Sandboxed]
   val afile: AFile = root </> file("foobar")
+  val toRec: FreeMap => RecFreeMap = RecFreeS.fromFree(_)
+  val holeR: RecFreeMap = toRec(func.Hole)
 
   "graduating QSU to QScript" should {
 
@@ -112,7 +115,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
       }
 
       "convert LeftShift" in {
-        val struct: FreeMap = func.Add(HoleF, IntLit(17))
+        val struct: RecFreeMap = toRec(func.Add(HoleF, IntLit(17)))
         val arepair: FreeMapA[QScriptUniform.ShiftTarget[Fix]] = func.ConcatArrays(
           func.MakeArray(func.AccessLeftTarget(Access.valueHole(_))),
           func.ConcatArrays(
@@ -187,7 +190,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
           qsu.thetaJoin(
             qsu.leftShift(
               qsu.read(root </> file("zips")),
-              HoleF[Fix],
+              holeR,
               IncludeId,
               OnUndefined.Omit,
               aconcatArr,
@@ -202,7 +205,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
       val lhs: Free[QSE, Hole] =
         fqse.LeftShift(
           fqse.Read(root </> file("zips")),
-          HoleF[Fix],
+          holeR,
           IncludeId,
           ShiftType.Array,
           OnUndefined.Omit,

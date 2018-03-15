@@ -24,7 +24,7 @@ import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp.coproductEqual
 import quasar.fp.ski.κ
-import quasar.qscript.{construction, ExcludeId, Hole, IdOnly, IncludeId, OnUndefined, SrcHole}
+import quasar.qscript.{construction, ExcludeId, Hole, IdOnly, IncludeId, OnUndefined, RecFreeS, SrcHole}
 
 import matryoshka.data.Fix
 import matryoshka.data.free._
@@ -41,6 +41,8 @@ object ResolveOwnIdentitiesSpec extends Qspec with QSUTTypes[Fix] with TreeMatch
   val func = construction.Func[Fix]
 
   val foo: AFile = rootDir </> file("foo")
+  val projectKeyS: String => RecFreeMap =
+    (s => RecFreeS.fromFree(func.ProjectKeyS(func.Hole, s)))
 
   val resolveIds = ResolveOwnIdentities[Fix]_
 
@@ -78,10 +80,12 @@ object ResolveOwnIdentitiesSpec extends Qspec with QSUTTypes[Fix] with TreeMatch
           func.MakeArray(func.ProjectIndexI(func.RightTarget, 0)),
           func.MakeArray(func.ProjectIndexI(func.RightTarget, 1)))
 
+      val struct = RecFreeS.fromFree(func.ProjectKeyS(func.Hole, "bar"))
+
       val (remap, lshift) = QSUGraph.fromAnnotatedTree[Fix](
         qsu.leftShift('ls, (
           qsu.read('r, foo),
-          func.ProjectKeyS(func.Hole, "bar"),
+          projectKeyS("bar"),
           ExcludeId,
           OnUndefined.Omit,
           initialRepair,
@@ -102,7 +106,7 @@ object ResolveOwnIdentitiesSpec extends Qspec with QSUTTypes[Fix] with TreeMatch
       val (remap, lshift) = QSUGraph.fromAnnotatedTree[Fix](
         qsu.leftShift('ls, (
           qsu.read('r, foo),
-          func.ProjectKeyS(func.Hole, "bar"),
+          projectKeyS("bar"),
           IdOnly,
           OnUndefined.Omit,
           initialRepair,

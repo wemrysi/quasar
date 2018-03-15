@@ -252,7 +252,7 @@ object construction {
     def Map(r: R, func: FreeMap[T]): R =
       core(qscript.Map[T, R](r, func))
     def LeftShift(src: R,
-                  struct: FreeMap[T],
+                  struct: RecFreeMap[T],
                   idStatus: IdStatus,
                   shiftType: ShiftType,
                   onUndefined: OnUndefined,

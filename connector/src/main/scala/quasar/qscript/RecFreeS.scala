@@ -39,8 +39,6 @@ sealed trait RecFreeS[F[_], A] extends Product with Serializable {
 }
 
 object RecFreeS {
-  type RecFreeMapA[T[_[_]], A] = Free[RecFreeS[MapFunc[T, ?], ?], A]
-
   final case class Suspend[F[_], A](fa: F[A]) extends RecFreeS[F, A]
   final case class Fix[F[_], A](form: RecFreeS[F, A], rec: Free[RecFreeS[F, ?], Unit]) extends RecFreeS[F, A]
 
@@ -64,6 +62,9 @@ object RecFreeS {
   def letIn[F[_], A](form: Free[F, A])(rec: Free[F, Unit]): Free[RecFreeS[F, ?], A] =
     form.mapSuspension(λ[F ~> RecFreeS[F, ?]](f => Fix(Suspend(f), fromFree(rec))))
 
+  def linearize[F[_], A](f: Free[RecFreeS[F, ?], A]): Free[F, A] =
+    f.flatMapSuspension(λ[RecFreeS[F, ?] ~> Free[F, ?]](_.linearize))
+
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def traverse[F[_]: Traverse]: Traverse[RecFreeS[F, ?]] = new Traverse[RecFreeS[F, ?]] {
     def traverseImpl[G[_]: Applicative, A, B](fa: RecFreeS[F, A])(f: A => G[B]): G[RecFreeS[F, B]] = fa match {
@@ -73,6 +74,20 @@ object RecFreeS {
   }
 
   // FIXME: Display the bound form and body separately
-  implicit def renderTree[F[_]: Functor, A](implicit F: RenderTree[F[A]], FR: RenderTree[Free[F, A]])
-      : RenderTree[RecFreeS[F, A]] = RenderTree.make(rf => FR.render(rf.linearize))
+  implicit def renderTree[F[_], A](implicit F: RenderTree[F[A]], FR: RenderTree[Free[F, A]]): RenderTree[RecFreeS[F, A]] =
+    RenderTree.make(rf => FR.render(rf.linearize))
+
+  implicit def show[F[_], A](implicit SF: Show[Free[F, A]]): Show[RecFreeS[F, A]] =
+    Show.show(_.linearize.show)
+
+  implicit def equal[F[_], A](implicit SF: Equal[Free[F, A]]): Equal[RecFreeS[F, A]] =
+    Equal.equalBy(_.linearize)
+
+  implicit final class LinearizeOps[F[_], A](val self: Free[RecFreeS[F, ?], A]) extends AnyVal {
+    def linearize: Free[F, A] = RecFreeS.linearize(self)
+  }
+
+  implicit final class ToRecOps[F[_], A](val self: Free[F, A]) extends AnyVal {
+    def toRec: Free[RecFreeS[F, ?], A] = RecFreeS.fromFree(self)
+  }
 }

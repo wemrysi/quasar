@@ -313,7 +313,7 @@ object RenderQScriptDSL {
           case LeftShift(src, struct, idStatus, shiftType, undef, repair) =>
             DSLTree(base, "LeftShift",
               (A(base, src).right ::
-                freeMap(base, struct).right ::
+                freeMap(base, struct.linearize).right ::
                 idStatus.shows.left ::
                 ("ShiftType." + shiftType.shows).left ::
                 ("OnUndefined." + undef.shows).left ::

@@ -677,7 +677,7 @@ object MongoDbPlanner {
                 getJsMerge[T, M](
                   _, jscore.Select(jscore.Ident(JsFn.defaultName), rootKey.value), jscore.Select(jscore.Ident(JsFn.defaultName), structKey.value))
 
-              val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
+              val struct0 = struct.linearize.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
               val repair0 = repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide]))
 
               val src0: M[WorkflowBuilder[WF]] =
@@ -697,7 +697,7 @@ object MongoDbPlanner {
             }
 
             else {
-              val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
+              val struct0 = struct.linearize.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
               val repair0 = repair.as[Hole](SrcHole).transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
 
               getBuilder[T, M, WF, EX, Hole](

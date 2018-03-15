@@ -100,10 +100,12 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
   }
 
   "preferProjection" >> {
+    val holeR = RecFreeS.fromFree(func.Hole)
+
     val base: Fix[QS] =
       fix.LeftShift(
         fix.Read[AFile](rootDir </> dir("foo") </> file("bar")),
-        func.Hole,
+        holeR,
         ExcludeId,
         ShiftType.Array,
         OnUndefined.Omit,
@@ -132,10 +134,12 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
     }
 
     "LeftShift" >> {
+      val struct = RecFreeS.fromFree(func.DeleteKeyS(func.Hole, "c"))
+
       val q =
         fix.LeftShift(
           base,
-          func.DeleteKeyS(func.Hole, "c"),
+          struct,
           IncludeId,
           ShiftType.Array,
           OnUndefined.Omit,
@@ -143,10 +147,12 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
             func.DeleteKeyS(func.DeleteKeyS(func.LeftSide, "a"), "b"),
             func.RightSide)))
 
+      val complementStruct = RecFreeS.fromFree(prjFrom(func.Hole, "a", "b"))
+
       val e =
         fix.LeftShift(
           base,
-          prjFrom(func.Hole, "a", "b"),
+          complementStruct,
           IncludeId,
           ShiftType.Array,
           OnUndefined.Omit,
