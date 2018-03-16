@@ -123,13 +123,13 @@ object compression {
     implicit
     A : Ring[A],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = typeTransform[J] {
-    case EnvT((ts, TypeF.Const(Embed(C(Str(s)))))) if s.length > maxLength.value =>
+  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
+    case EnvT((ts, TypeST(TypeF.Const(Embed(C(Str(s))))))) if s.length > maxLength.value =>
       val newStats = TypeStat.str[A].modify {
         case (c, n, m, _, _) => (c, n, m, "", "")
       } (ts)
 
-      envT(newStats, charArr(newStats.size))
+      strings.lubString[SST[J, A], J, A](newStats)
   }
 
   /** Compress a union larger than `maxSize` by reducing the largest group of
@@ -174,9 +174,6 @@ object compression {
   private def byteArr[J, A](cnt: A): TypeF[J, SST[J, A]] =
     simpleArr(cnt, SimpleType.Byte)
 
-  private def charArr[J, A](cnt: A): TypeF[J, SST[J, A]] =
-    simpleArr(cnt, SimpleType.Char)
-
   private def simpleArr[J, A](cnt: A, st: SimpleType): TypeF[J, SST[J, A]] =
     TypeF.arr[J, SST[J, A]](envT(
       TypeStat.count(cnt),
@@ -203,7 +200,7 @@ object compression {
       envT(TypeStat.fromEJson(cnt, j), TypeST(TypeF.simple[J, SST[J, A]](s))).embed
 
     case Embed(C(Str(_))) =>
-      envT(TypeStat.fromEJson(cnt, j), TypeST(charArr[J, A](cnt))).embed
+      strings.lubString[SST[J, A], J, A](TypeStat.fromEJson(cnt, j)).embed
 
     case _ => SST.fromEJson(cnt, j)
   }
