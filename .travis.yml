@@ -168,6 +168,7 @@ notifications:
 branches:
   only:
     - master
+    - next-major
     - /^backport.*$/
 
 cache:
