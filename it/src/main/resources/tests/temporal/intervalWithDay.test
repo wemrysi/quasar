@@ -19,14 +19,14 @@
     "ignoreResultOrder": true,
 
     "expected": [
-        { "day": "Sunday", "diff": { "$offsetdatetime": "2014-08-14T17:54:58.800Z" } },
-        { "day": "Monday", "diff": { "$offsetdatetime": "2014-08-15T18:54:58.800Z" } },
-        { "day": "Tuesday", "diff": { "$offsetdatetime": "2014-08-16T19:54:58.800Z" } },
-        { "day": "Wednesday", "diff": { "$offsetdatetime": "2014-08-17T20:54:58.800Z" } },
-        { "day": "Thursday", "diff": { "$offsetdatetime": "2014-08-18T21:54:58.800Z" } },
-        { "day": "Friday", "diff": { "$offsetdatetime": "2014-08-19T22:54:58.800Z" } },
-        { "day": "Saturday", "diff": { "$offsetdatetime": "2014-08-20T23:54:58.800Z" } },
-        { "day": "Wednesday", "diff": { "$offsetdatetime": "1969-12-29T11:54:57.800Z" } },
-        { "day": "Monday", "diff": { "$offsetdatetime": "1653-02-07T13:08:18.800Z" } }
+        { "day": "Sunday",    "diff": { "$offsetdatetime": "2014-08-14T17:54:58.800000000Z" } },
+        { "day": "Monday",    "diff": { "$offsetdatetime": "2014-08-15T18:54:58.800000000Z" } },
+        { "day": "Tuesday",   "diff": { "$offsetdatetime": "2014-08-16T19:54:58.800000000Z" } },
+        { "day": "Wednesday", "diff": { "$offsetdatetime": "2014-08-17T20:54:58.800000000Z" } },
+        { "day": "Thursday",  "diff": { "$offsetdatetime": "2014-08-18T21:54:58.800000000Z" } },
+        { "day": "Friday",    "diff": { "$offsetdatetime": "2014-08-19T22:54:58.800000000Z" } },
+        { "day": "Saturday",  "diff": { "$offsetdatetime": "2014-08-20T23:54:58.800000000Z" } },
+        { "day": "Wednesday", "diff": { "$offsetdatetime": "1969-12-29T11:54:57.800000000Z" } },
+        { "day": "Monday",    "diff": { "$offsetdatetime": "1653-02-07T13:08:18.800000000Z" } }
     ]
 }
