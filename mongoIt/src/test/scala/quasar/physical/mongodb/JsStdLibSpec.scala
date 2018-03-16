@@ -43,15 +43,16 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     /* DATE */
     case (date.ExtractDayOfYear, _) => Pending("TODO").left
-    case (date.ExtractHour, _) => Pending("TODO").left
     case (date.ExtractIsoYear, _) => Pending("TODO").left
-    case (date.ExtractMicrosecond, _) => Pending("TODO").left
-    case (date.ExtractMillisecond, _) => Pending("TODO").left
-    case (date.ExtractMinute, _) => Pending("TODO").left
-    case (date.ExtractSecond, _) => Pending("TODO").left
     case (date.ExtractWeek, _) => Pending("TODO").left
 
-    // Not working for any date-like types, but we just have tests for LocalDate
+    case (date.ExtractHour, Data.LocalTime(_) :: Nil) => Pending("TODO").left
+    case (date.ExtractMicrosecond, Data.LocalTime(_) :: Nil) => Pending("TODO").left
+    case (date.ExtractMillisecond, Data.LocalTime(_) :: Nil) => Pending("TODO").left
+    case (date.ExtractMinute, Data.LocalTime(_) :: Nil) => Pending("TODO").left
+    case (date.ExtractSecond, Data.LocalTime(_) :: Nil) => Pending("TODO").left
+
+    // Not working for year < 1 for any date-like types, but we just have tests for LocalDate
     case (date.ExtractCentury, List(Data.LocalDate(d))) if d.getYear < 1 => Pending("TODO").left
     case (date.ExtractDecade, List(Data.LocalDate(d))) if d.getYear < 1 => Pending("TODO").left
     case (date.ExtractMillennium, List(Data.LocalDate(d))) if d.getYear < 1 => Pending("TODO").left
