@@ -1699,10 +1699,16 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "TimeOfDay" >> {
-        "datetime" >> {
+        "OffsetDateTime" >> {
           val now = JOffsetDateTime.now
           val expected = now.toOffsetTime
           unary(TimeOfDay(_).embed, Data.OffsetDateTime(now), Data.OffsetTime(expected))
+        }
+
+        "LocalDateTime" >> {
+          val now = JLocalDateTime.now
+          val expected = now.toLocalTime
+          unary(TimeOfDay(_).embed, Data.LocalDateTime(now), Data.LocalTime(expected))
         }
       }
     }

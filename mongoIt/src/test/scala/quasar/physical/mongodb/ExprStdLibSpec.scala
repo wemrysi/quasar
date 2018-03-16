@@ -78,7 +78,6 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (date.LocalTime, _) => notHandled.left
 
     case (date.Interval, _) => notHandled.left
-    case (date.TimeOfDay, _) => notHandled.left
 
     /* MATH */
     case (math.Add, List(Data.DateTimeLike(_), Data.DateTimeLike(_))) => Pending("TODO").left

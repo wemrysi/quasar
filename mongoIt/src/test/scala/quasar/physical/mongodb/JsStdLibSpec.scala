@@ -83,7 +83,6 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
       Success().updateExpected("Actually skipped due to mongo bug SERVER-8164 (Fixed in 3.5.13).").left
 
     case (date.Interval, _) => Pending("TODO").left
-    case (date.TimeOfDay, _) => Pending("TODO").left
 
     /* MATH */
     case (math.Power, Data.Number(x) :: Data.Number(y) :: Nil)
