@@ -209,8 +209,8 @@ def isolatedBackendSettings(classnames: String*) = Seq(
   isolatedBackends in Global ++=
     classnames.map(_ -> (fullClasspath in Compile).value.files),
 
-  packageOptions in assembly +=
-    Package.ManifestAttributes(new java.util.jar.Attributes.Name("Backend-Module") -> classnames.mkString(" ")))
+  packageOptions in (Compile, packageBin) +=
+    Package.ManifestAttributes("Backend-Module" -> classnames.mkString(" ")))
 
 lazy val isCIBuild               = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
 lazy val isIsolatedEnv           = settingKey[Boolean]("True if running in an isolated environment")
