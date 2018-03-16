@@ -144,7 +144,7 @@ object BsonCodec {
           extract(map.get(DateTimeConstants.offset), Bson._int32)) {
             (h, m, s, n, o) =>
               Bson.Text(
-                JOffsetTime.of(h, m, s, n,ZoneOffset.ofTotalSeconds(o)).format(DateTimeFormatter.ISO_OFFSET_TIME))
+                JOffsetTime.of(h, m, s, n,ZoneOffset.ofTotalSeconds(o)).toString)
           } \/> NonRepresentableEJson(value.shows + " is not a valid OffsetTime")
 
       case (EJsonType(TypeTag.OffsetDate.value), Bson.Doc(map)) =>

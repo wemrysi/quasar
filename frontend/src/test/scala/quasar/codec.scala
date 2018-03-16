@@ -47,12 +47,12 @@ class DataCodecSpecs extends quasar.Qspec {
       "encode int"       in { DataCodec.render(Data.Int(0))   must beSome("0") }
       "encode dec"       in { DataCodec.render(Data.Dec(1.1)) must beSome("1.1") }
       "encode dec with no fractional part" in { DataCodec.render(Data.Dec(2.0)) must beSome("2.0") }
-      "encode localdatetime" in { DataCodec.render(Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30:00"))) must beSome("""{ "$localdatetime": "2015-01-31T10:30" }""") }
+      "encode localdatetime" in { DataCodec.render(Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30:00"))) must beSome("""{ "$localdatetime": "2015-01-31T10:30:00.000000000" }""") }
       "encode localdate" in { DataCodec.render(Data.LocalDate(LocalDate.parse("2015-01-31")))              must beSome("""{ "$localdate": "2015-01-31" }""") }
-      "encode localtime" in { DataCodec.render(Data.LocalTime(LocalTime.parse("10:30:00.000")))            must beSome("""{ "$localtime": "10:30" }""") }
-      "encode offsetdatetime" in { DataCodec.render(Data.OffsetDateTime(OffsetDateTime.parse("2015-01-31T10:30:00Z"))) must beSome("""{ "$offsetdatetime": "2015-01-31T10:30Z" }""") }
+      "encode localtime" in { DataCodec.render(Data.LocalTime(LocalTime.parse("10:30:00")))            must beSome("""{ "$localtime": "10:30:00.000000000" }""") }
+      "encode offsetdatetime" in { DataCodec.render(Data.OffsetDateTime(OffsetDateTime.parse("2015-01-31T10:30:00Z"))) must beSome("""{ "$offsetdatetime": "2015-01-31T10:30:00.000000000Z" }""") }
       "encode offsetdate" in { DataCodec.render(Data.OffsetDate(OffsetDate.parse("2015-01-31Z")))              must beSome("""{ "$offsetdate": "2015-01-31Z" }""") }
-      "encode offsettime" in { DataCodec.render(Data.OffsetTime(OffsetTime.parse("10:30:00.000Z")))            must beSome("""{ "$offsettime": "10:30Z" }""") }
+      "encode offsettime" in { DataCodec.render(Data.OffsetTime(OffsetTime.parse("10:30:00.000Z")))            must beSome("""{ "$offsettime": "10:30:00.000000000Z" }""") }
       "encode interval"  in {
         (for {
           interval <- DateTimeInterval.parse("PT12H34M")
@@ -66,7 +66,7 @@ class DataCodecSpecs extends quasar.Qspec {
       }
       "encode obj with leading '$'s" in {
         DataCodec.render(Data.Obj(ListMap("$a" -> Data.Int(1), "$date" -> Data.LocalDateTime(LocalDateTime.parse("2015-01-31T10:30"))))) must
-          beSome("""{ "$obj": { "$a": 1, "$date": { "$localdatetime": "2015-01-31T10:30" } } }""")
+          beSome("""{ "$obj": { "$a": 1, "$date": { "$localdatetime": "2015-01-31T10:30:00.000000000" } } }""")
       }
       "encode obj with $obj" in {
         DataCodec.render(Data.Obj(ListMap("$obj" -> Data.Obj(ListMap("$obj" -> Data.Int(1)))))) must

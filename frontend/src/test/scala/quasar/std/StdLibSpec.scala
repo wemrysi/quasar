@@ -43,7 +43,6 @@ import java.time.{
   Period,
   ZoneOffset
 }
-import java.time.format.DateTimeFormatter
 import scala.collection.Traversable
 import scala.math.abs
 import scala.util.matching.Regex
@@ -341,7 +340,7 @@ abstract class StdLibSpec extends Qspec {
           def test(x: JOffsetDateTime) = unary(
             ToString(_).embed,
             Data.OffsetDateTime(x),
-            Data.Str(x.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.nnnnnnnnnXXX"))))
+            Data.Str(x.toString))
 
           "zero fractional seconds" >> test(Instant.EPOCH.atOffset(ZoneOffset.UTC))
 
@@ -352,7 +351,7 @@ abstract class StdLibSpec extends Qspec {
           def test(x: JOffsetTime) = unary(
             ToString(_).embed,
             Data.OffsetTime(x),
-            Data.Str(x.format(DateTimeFormatter.ofPattern("HH:mm:ss.nnnnnnnnnXXX"))))
+            Data.Str(x.toString))
 
           "zero fractional seconds" >> test(JOffsetTime.ofInstant(Instant.EPOCH, ZoneOffset.UTC))
 
@@ -363,14 +362,14 @@ abstract class StdLibSpec extends Qspec {
           unary(
             ToString(_).embed,
             Data.LocalDate(x),
-            Data.Str(x.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))))
+            Data.Str(x.toString))
         }
 
         "LocalDateTime" >> {
           def test(x: JLocalDateTime) = unary(
             ToString(_).embed,
             Data.LocalDateTime(x),
-            Data.Str(x.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.nnnnnnnnn"))))
+            Data.Str(x.toString))
 
           "zero fractional seconds" >> test(JLocalDateTime.ofInstant(Instant.EPOCH, ZoneOffset.UTC))
 
@@ -381,7 +380,7 @@ abstract class StdLibSpec extends Qspec {
           def test(x: JLocalTime) = unary(
             ToString(_).embed,
             Data.LocalTime(x),
-            Data.Str(x.format(DateTimeFormatter.ofPattern("HH:mm:ss.nnnnnnnnn"))))
+            Data.Str(x.toString))
 
           "zero fractional seconds" >> test(JLocalTime.NOON)
 

@@ -23,7 +23,6 @@ import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import scala.util.matching.Regex
-import java.time.format.DateTimeFormatter
 
 import matryoshka._
 import matryoshka.implicits._
@@ -346,15 +345,15 @@ trait StringLib extends Library {
         case Data.OffsetDate(t) =>
           success(t.toString)
         case Data.OffsetDateTime(t) =>
-          success(t.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.nnnnnnnnnXXX")))
+          success(t.toString)
         case Data.OffsetTime(t) =>
-          success(t.format(DateTimeFormatter.ofPattern("HH:mm:ss.nnnnnnnnnXXX")))
+          success(t.toString)
         case Data.LocalDate(t) =>
-          success(t.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")))
+          success(t.toString)
         case Data.LocalDateTime(t) =>
-          success(t.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.nnnnnnnnn")))
+          success(t.toString)
         case Data.LocalTime(t) =>
-          success(t.format(DateTimeFormatter.ofPattern("HH:mm:ss.nnnnnnnnn")))
+          success(t.toString)
 
         case Data.Interval(i) => success(i.toString)
         case Data.Id(i) => success(i.toString)

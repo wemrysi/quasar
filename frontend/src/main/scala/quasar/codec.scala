@@ -125,6 +125,39 @@ object DataCodec {
     val IdKey = "$oid"
   }
 
+  object VerboseDateTimeFormatters {
+    import java.time.format._
+    import java.time.temporal.ChronoField
+
+    val LocalTimeFormatter = new DateTimeFormatterBuilder()
+      .appendValue(ChronoField.HOUR_OF_DAY, 2)
+      .appendLiteral(':')
+      .appendValue(ChronoField.MINUTE_OF_HOUR, 2)
+      .appendLiteral(':')
+      .appendValue(ChronoField.SECOND_OF_MINUTE, 2)
+      .appendFraction(ChronoField.NANO_OF_SECOND, 9, 9, true)
+      .toFormatter()
+
+    val OffsetTimeFormatter = new DateTimeFormatterBuilder()
+      .parseCaseInsensitive()
+      .append(LocalTimeFormatter)
+      .appendOffsetId()
+      .toFormatter()
+
+    val LocalDateTimeFormatter = new DateTimeFormatterBuilder()
+      .parseCaseInsensitive()
+      .append(DateTimeFormatter.ISO_LOCAL_DATE)
+      .appendLiteral('T')
+      .append(LocalTimeFormatter)
+      .toFormatter()
+
+    val OffsetDateTimeFormatter = new DateTimeFormatterBuilder()
+      .parseCaseInsensitive()
+      .append(LocalDateTimeFormatter)
+      .appendOffsetId()
+      .toFormatter()
+  }
+
   /*
    * The purpose behind the explicit fixed-point here is to allow interleaved
    * composition at depth.  Specifically, we want to be able to write the `orElse`
@@ -147,6 +180,7 @@ object DataCodec {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def encode(data: Data): Option[Json] = {
       import Data._
+      import VerboseDateTimeFormatters._
       data match {
         case d@(Null | Bool(_) | Int(_) | Dec(_) | Str(_)) => Readable.encode(d)
         // For Object, if we find one of the above keys, which means we serialized something particular
@@ -157,13 +191,20 @@ object DataCodec {
 
         case Arr(value) => Json.array(value.map(encode).unite: _*).some
 
-        case OffsetDateTime(value)  => Json.obj(OffsetDateTimeKey -> jString(value.toString)).some
-        case Data.OffsetDate(value) => Json.obj(OffsetDateKey     -> jString(value.toString)).some
-        case OffsetTime(value)      => Json.obj(OffsetTimeKey     -> jString(value.toString)).some
-        case LocalDateTime(value)   => Json.obj(LocalDateTimeKey  -> jString(value.toString)).some
-        case LocalDate(value)       => Json.obj(LocalDateKey      -> jString(value.toString)).some
-        case LocalTime(value)       => Json.obj(LocalTimeKey      -> jString(value.toString)).some
-        case Interval(value)        => Json.obj(IntervalKey       -> jString(value.toString)).some
+        case OffsetDateTime(value)  =>
+          Json.obj(OffsetDateTimeKey -> jString(OffsetDateTimeFormatter.format(value))).some
+        case Data.OffsetDate(value) =>
+          Json.obj(OffsetDateKey     -> jString(value.toString)).some
+        case OffsetTime(value)      =>
+          Json.obj(OffsetTimeKey     -> jString(OffsetTimeFormatter.format(value))).some
+        case LocalDateTime(value)   =>
+          Json.obj(LocalDateTimeKey  -> jString(LocalDateTimeFormatter.format(value))).some
+        case LocalDate(value)       =>
+          Json.obj(LocalDateKey      -> jString(value.toString)).some
+        case LocalTime(value)       =>
+          Json.obj(LocalTimeKey      -> jString(LocalTimeFormatter.format(value))).some
+        case Interval(value)        =>
+          Json.obj(IntervalKey       -> jString(value.toString)).some
 
         case bin @ Binary(_)        => Json.obj(BinaryKey         -> jString(bin.base64)).some
 
