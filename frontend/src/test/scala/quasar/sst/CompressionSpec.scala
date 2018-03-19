@@ -27,6 +27,7 @@ import quasar.fp.numeric.Positive
 import quasar.tpe._
 
 import scala.Predef.$conforms
+import scala.Byte
 
 import eu.timepit.refined.auto._
 import matryoshka.{project => _, _}
@@ -56,7 +57,7 @@ final class CompressionSpec extends quasar.Qspec
   val J = ejson.Fixed[J]
 
   case class LeafEjs(ejs: J) {
-    def toSST: S = SST.fromEJson(Real(1), ejs)
+    def toSst: S = SST.fromEJson(Real(1), ejs)
   }
 
   implicit val arbitraryLeafEjs: Arbitrary[LeafEjs] =
@@ -89,7 +90,7 @@ final class CompressionSpec extends quasar.Qspec
         val byte = J.byte(b)
         val nul = SST.fromEJson(Real(1), J.nul())
         val m0 = IMap.fromFoldable((int :: byte :: chars) strengthR nul)
-        val unk  = unk0.map(_.umap(_.toSST))
+        val unk  = unk0.map(_.umap(_.toSst))
         val msst = envT(cnt1, TypeST(TypeF.map[J, S](m0, unk))).embed
 
         val uval = SST.fromEJson(Real(cs.size), J.nul())
@@ -98,7 +99,7 @@ final class CompressionSpec extends quasar.Qspec
         val unk1 = ukey.strengthR(uval) |+| unk
         val exp  = envT(cnt1, TypeST(TypeF.map[J, S](m1, unk1))).embed
 
-        msst.transCata[S](compression.coalesceKeys(2L)) must_= exp
+        msst.transAna[S](compression.coalesceKeys(2L)) must_= exp
       }}
 
     test("type", J.char(_))
@@ -108,32 +109,40 @@ final class CompressionSpec extends quasar.Qspec
     "ignores map where size of keys does not exceed maxSize" >> prop {
       (xs: IList[(LeafEjs, LeafEjs)], unk0: Option[(LeafEjs, LeafEjs)]) =>
 
-      val m   = IMap.fromFoldable(xs.map(_.bimap(_.ejs, _.toSST)))
-      val unk = unk0.map(_.umap(_.toSST))
+      val m   = IMap.fromFoldable(xs.map(_.bimap(_.ejs, _.toSst)))
+      val unk = unk0.map(_.umap(_.toSst))
       val sst = envT(cnt1, TypeST(TypeF.map[J, S](m, unk))).embed
 
       Positive(m.size.toLong).cata(
-        l => sst.transCata[S](compression.coalesceKeys(l)),
+        l => sst.transAna[S](compression.coalesceKeys(l)),
         sst
       ) must_= sst
     }
   }
 
   "coalescePrimary" >> {
-    "combines consts with their primary type in unions" >> prop { (st0: SimpleType, sjs: ISet[LeafEjs]) =>
-      val st = sjs.findMax.flatMap(x => simpleTypeOf(x.ejs)) | st0
-      val simpleSst = envT(cnt1, TypeST(TypeF.simple[J, S](st))).embed
-      val ssts = sjs.toIList.map(_.toSST)
-      val (matching, nonmatching) = ssts.partition(s => sstConst(s).exists(j => simpleTypeOf(j) exists (_ ≟ st)))
-      val simplified = matching.map(x => envTType.set(TypeST(TypeF.simple(st)))(x.project).embed)
-      val coalesced = NonEmptyList.nel(simpleSst, simplified).suml1
+    "combines consts with their primary SST in unions" >> prop { (sj: LeafEjs, sjs: ISet[LeafEjs]) =>
+      val pt = primaryTagOf(sj.ejs)
+      val primarySst = compression.primarySst(Real(1), sj.ejs)
 
-      val compressed = NonEmptyList.nel(simpleSst, ssts).suml1.transCata[S](compression.coalescePrimary)
+      val leafs = sjs.insert(sj).toIList
+      val ssts = leafs.map(_.toSst)
 
-      compressed must_= NonEmptyList.nel(coalesced, nonmatching).suml1
+      val (matching, nonmatching) =
+        leafs.partition(l => primaryTagOf(l.ejs) ≟ pt)
+
+      val simplified = matching.map(l => compression.primarySst(Real(1), l.ejs))
+      val coalesced = NonEmptyList.nel(primarySst, simplified).suml1
+
+      val compressed =
+        NonEmptyList.nel(primarySst, ssts)
+          .suml1
+          .transAna[S](compression.coalescePrimary)
+
+      compressed must_= NonEmptyList.nel(coalesced, nonmatching map (_.toSst)).suml1
     }
 
-    "combines multiple instances of a primary type in unions" >> prop {
+    "combines multiple instances of a primary SST in unions" >> prop {
       (sts: NonEmptyList[SimpleType], a1: NonEmptyList[J], a2: NonEmptyList[J]) =>
       val as1 = SST.fromEJson(Real(1), J.arr(a1.toList))
       val as2 = SST.fromEJson(Real(1), J.arr(a2.toList))
@@ -143,12 +152,12 @@ final class CompressionSpec extends quasar.Qspec
       val union = envT(cnt, TypeST(TypeF.union[J, S](as1, as2, xs))).embed
       val sum   = NonEmptyList.nel(as1, as2 :: xs).suml1
 
-      union.transCata[S](compression.coalescePrimary) must_= sum
+      union.transAna[S](compression.coalescePrimary) must_= sum
     }
 
-    "no effect when a const's primary type not in the union" >> prop { ljs: NonEmptyList[LeafEjs] =>
-      val sum = ljs.foldMap1(_.toSST)
-      sum.transCata[S](compression.coalescePrimary) must_= sum
+    "no effect when a const's primary tag not in the union" >> prop { ljs: NonEmptyList[LeafEjs] =>
+      val sum = ljs.foldMap1(_.toSst)
+      sum.transAna[S](compression.coalescePrimary) must_= sum
     }
   }
 
@@ -159,12 +168,12 @@ final class CompressionSpec extends quasar.Qspec
 
         val xs: IMap[Char, LeafEjs] = IMap.fromFoldable(xs0) + head
 
-        val u1 = head.bimap(_ => SST.fromEJson(Real(1), f('x')), _.toSST)
+        val u1 = head.bimap(_ => SST.fromEJson(Real(1), f('x')), _.toSst)
         val u2 = head.bimap(
           c => g(TypeStat.fromEJson(Real(1), J.char(c)), SimpleType.Char).embed,
-          _.toSST)
-        val kv1 = kv.bimap(J.int(_), _.toSST)
-        val cs = xs.toList.map(_.bimap(f, _.toSST))
+          _.toSst)
+        val kv1 = kv.bimap(J.int(_), _.toSst)
+        val cs = xs.toList.map(_.bimap(f, _.toSst))
         val m = IMap.fromFoldable(kv1 :: cs)
         val sst1 = envT(cnt1, TypeST(TypeF.map(m, u1.some))).embed
         val sst2 = envT(cnt1, TypeST(TypeF.map(m, u2.some))).embed
@@ -174,8 +183,8 @@ final class CompressionSpec extends quasar.Qspec
         val exp1 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u1)))).embed
         val exp2 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u2)))).embed
 
-        (sst1.transCata[S](compression.coalesceWithUnknown) must_= exp1) and
-        (sst2.transCata[S](compression.coalesceWithUnknown) must_= exp2)
+        (sst1.transAna[S](compression.coalesceWithUnknown) must_= exp1) and
+        (sst2.transAna[S](compression.coalesceWithUnknown) must_= exp2)
       }
 
     def testUnkUnion(kind: String, f: Char => J, g: (TypeStat[Real], SimpleType) => SSTF[J, Real, S]) =
@@ -184,16 +193,16 @@ final class CompressionSpec extends quasar.Qspec
 
         val xs: IMap[Char, LeafEjs] = IMap.fromFoldable(xs0) + head
 
-        val u1 = head.bimap(_ => SST.fromEJson(Real(1), f('x')), _.toSST)
+        val u1 = head.bimap(_ => SST.fromEJson(Real(1), f('x')), _.toSst)
         val u2 = head.bimap(
           c => g(TypeStat.fromEJson(Real(1), J.char(c)), SimpleType.Char).embed,
-          _.toSST)
+          _.toSst)
         val st = envT(cnt1, TypeST(TypeF.simple[J, S](SimpleType.Dec))).embed
         val tp = envT(cnt1, TypeST(TypeF.top[J, S]())).embed
         val u1u = u1.leftMap(s => envT(cnt1, TypeST(TypeF.union[J, S](tp, s, IList(st)))).embed)
         val u2u = u2.leftMap(s => envT(cnt1, TypeST(TypeF.union[J, S](s, st, IList(tp)))).embed)
-        val kv1 = kv.bimap(J.int(_), _.toSST)
-        val cs = xs.toList.map(_.bimap(f, _.toSST))
+        val kv1 = kv.bimap(J.int(_), _.toSst)
+        val cs = xs.toList.map(_.bimap(f, _.toSst))
         val m = IMap.fromFoldable(kv1 :: cs)
         val sst1 = envT(cnt1, TypeST(TypeF.map(m, u1u.some))).embed
         val sst2 = envT(cnt1, TypeST(TypeF.map(m, u2u.some))).embed
@@ -203,8 +212,8 @@ final class CompressionSpec extends quasar.Qspec
         val exp1 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u1u)))).embed
         val exp2 = envT(cnt1, TypeST(TypeF.map(b, a map (_ |+| u2u)))).embed
 
-        (sst1.transCata[S](compression.coalesceWithUnknown) must_= exp1) and
-        (sst2.transCata[S](compression.coalesceWithUnknown) must_= exp2)
+        (sst1.transAna[S](compression.coalesceWithUnknown) must_= exp1) and
+        (sst2.transAna[S](compression.coalesceWithUnknown) must_= exp2)
       }
 
     def test(kind: String, f: Char => J, g: (TypeStat[Real], SimpleType) => SSTF[J, Real, S]) = {
@@ -223,28 +232,28 @@ final class CompressionSpec extends quasar.Qspec
         envT(ts, TypeST(TypeF.simple[J, S](st))).embed))))
 
     "has no effect on maps when all keys are known" >> prop { xs: IList[(LeafEjs, LeafEjs)] =>
-      val m   = IMap.fromFoldable(xs.map(_.bimap(_.ejs, _.toSST)))
+      val m   = IMap.fromFoldable(xs.map(_.bimap(_.ejs, _.toSst)))
       val sst = envT(cnt1, TypeST(TypeF.map[J, S](m, None))).embed
 
-      sst.transCata[S](compression.coalesceWithUnknown) must_= sst
+      sst.transAna[S](compression.coalesceWithUnknown) must_= sst
     }
 
     "has no effect on maps when primary type not in unknown" >> prop { xs: IList[(LeafEjs, LeafEjs)] =>
-      val m   = IMap.fromFoldable(xs.map(_.bimap(_.ejs, _.toSST)))
+      val m   = IMap.fromFoldable(xs.map(_.bimap(_.ejs, _.toSst)))
       val T   = envT(cnt1, TypeST(TypeF.top[J, S]())).embed
       val sst = envT(cnt1, TypeST(TypeF.map[J, S](m, Some((T, T))))).embed
 
-      sst.transCata[S](compression.coalesceWithUnknown) must_= sst
+      sst.transAna[S](compression.coalesceWithUnknown) must_= sst
     }
 
     "has no effect on maps when primary tag not in unknown" >> prop { xs: IList[(LeafEjs, LeafEjs)] =>
       val foo = TypeTag("foo")
       val bar = TypeTag("bar")
-      val m = IMap.fromFoldable(xs.map(_.bimap(l => J.meta(l.ejs, J.tpe(foo)), _.toSST)))
+      val m = IMap.fromFoldable(xs.map(_.bimap(l => J.meta(l.ejs, J.tpe(foo)), _.toSst)))
       val T = envT(cnt1, TagST[J](Tagged(bar, envT(cnt1, TypeST(TypeF.top[J, S]())).embed))).embed
       val sst = envT(cnt1, TypeST(TypeF.map[J, S](m, Some((T, T))))).embed
 
-      sst.transCata[S](compression.coalesceWithUnknown) must_= sst
+      sst.transAna[S](compression.coalesceWithUnknown) must_= sst
     }
   }
 
@@ -262,10 +271,19 @@ final class CompressionSpec extends quasar.Qspec
       val coll = TypeStat.coll(Real(1), rlen, rlen)
       val lubarr = envT(coll, TypeST(TypeF.arr[J, S](sum.right))).embed
 
-      val req = xsst.transCata[S](compression.limitArrays(alen))
-      val rlt = xsst.transCata[S](compression.limitArrays(lt))
+      val req = xsst.elgotApo[S](compression.limitArrays(alen))
+      val rlt = xsst.elgotApo[S](compression.limitArrays(lt))
 
       (req must_= xsst) and (rlt must_= lubarr)
+    }}
+
+    "does not limit structural string arrays" >> prop {
+      s: String => (s.length > 1) ==> {
+
+      val lim: Positive = Positive((s.length - 1).toLong) getOrElse 1L
+      val stringSst = strings.widenString[J, Real](Real(1), s).embed
+
+      stringSst.elgotApo[S](compression.limitArrays(lim)) must_= stringSst
     }}
   }
 
@@ -279,8 +297,8 @@ final class CompressionSpec extends quasar.Qspec
       val ts  = TypeStat.coll(Real(1), rlen, rlen)
       val arr = strings.lubString[S, J, Real](ts).embed
 
-      val req = str.transCata[S](compression.limitStrings(plen))
-      val rlt = str.transCata[S](compression.limitStrings(lt))
+      val req = str.transAna[S](compression.limitStrings(plen))
+      val rlt = str.transAna[S](compression.limitStrings(lt))
 
       (req must_= str) and (rlt must_= arr)
     }}
@@ -303,16 +321,16 @@ final class CompressionSpec extends quasar.Qspec
       val union0 = NonEmptyList.nel(dec, chars ::: bytes).suml1
       val union1 = envT(union0.copoint, TypeST(TypeF.union[J, S](compByte, dec, chars))).embed
 
-      union0.transCata[S](compression.narrowUnion(3L)) must_= union1
+      union0.transAna[S](compression.narrowUnion(3L)) must_= union1
     }}
 
     "no effect on unions smaller or equal to maxSize" >> prop {
       (x: LeafEjs, y: LeafEjs, xs: IList[LeafEjs]) =>
 
-      val union = envT(cnt1, TypeST(TypeF.union[J, S](x.toSST, y.toSST, xs map (_.toSST)))).embed
+      val union = envT(cnt1, TypeST(TypeF.union[J, S](x.toSst, y.toSst, xs map (_.toSst)))).embed
 
       Positive((xs.length + 2).toLong).cata(
-        l => union.transCata[S](compression.narrowUnion(l)),
+        l => union.transAna[S](compression.narrowUnion(l)),
         union
       ) must_= union
     }
@@ -325,12 +343,13 @@ final class CompressionSpec extends quasar.Qspec
       val ejs     = J.meta(J.str(encoded), J.sizedTpe(TypeTag.Binary, BigInt(bytes.size)))
       val sst     = SST.fromEJson(Real(1), ejs)
 
-      val byte    = envT(cnt1, TypeST(TypeF.simple[J, S](SimpleType.Byte))).embed
+      val bstat   = TypeStat.byte(Real(1), Byte.MinValue, Byte.MaxValue)
+      val byte    = envT(bstat, TypeST(TypeF.simple[J, S](SimpleType.Byte))).embed
       val rsize   = Real(bytes.size).some
       val coll    = TypeStat.coll(Real(1), rsize, rsize)
       val barr    = envT(coll, TypeST(TypeF.arr[J, S](byte.right))).embed
 
-      sst.transCata[S](compression.z85EncodedBinary) must_= barr
+      sst.transAna[S](compression.z85EncodedBinary) must_= barr
     }
   }
 }

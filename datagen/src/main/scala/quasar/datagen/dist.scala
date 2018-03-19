@@ -18,10 +18,10 @@ package quasar.datagen
 
 import slamdata.Predef._
 import quasar.contrib.spire.random.dist._
-import quasar.ejson.{EJson, Type => EType}
+import quasar.ejson.{DecodeEJson, EJson, Type => EType}
 import quasar.fp.numeric.SampleStats
 import quasar.fp.ski.ι
-import quasar.sst.{Population, PopulationSST, SST, StructuralType, Tagged, TypeStat}
+import quasar.sst.{strings, Population, PopulationSST, SST, StructuralType, Tagged, TypeStat}
 import quasar.tpe.TypeF
 
 import scala.Char
@@ -33,7 +33,6 @@ import monocle.syntax.fields.{_2, _3}
 import monocle.std.option.{some => someP}
 import scalaz.{-\/, \/-, ==>>, Bifunctor, Equal, INil, NonEmptyList, Order, Tags}
 import scalaz.Scalaz._
-import scalaz.syntax.tag._
 import spire.algebra.{AdditiveMonoid, Field, NRoot}
 import spire.math.ConvertableFrom
 import spire.random.{Dist, Gaussian}
@@ -51,7 +50,8 @@ object dist {
       maxCollLen: A,
       src: PopulationSST[J, A])(
       implicit
-      J: Corecursive.Aux[J, EJson])
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
       : Option[Dist[J]] =
     sst(maxCollLen, Population.unsubst(src)) { ss =>
       ss.populationStddev strengthL ss.mean
@@ -61,7 +61,8 @@ object dist {
       maxCollLen: A,
       src: SST[J, A])(
       implicit
-      J: Corecursive.Aux[J, EJson])
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
       : Option[Dist[J]] =
     sst(maxCollLen, src) { ss =>
       ss.stddev strengthL ss.mean
@@ -72,7 +73,8 @@ object dist {
       src: SST[J, A])(
       gaussian: SampleStats[A] => Option[(A, A)])(
       implicit
-      J: Corecursive.Aux[J, EJson])
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
       : Option[Dist[J]] =
     hylo((SST.size(src), src))(typeDistƒ[J, A](maxCollLen, gaussian), relativeProbƒ[J, A]) map (_._2)
 
@@ -92,7 +94,8 @@ object dist {
       maxCollLen: A,
       gaussian: SampleStats[A] => Option[(A, A)])(
       implicit
-      J: Corecursive.Aux[J, EJson])
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
       : Algebra[STF[J, (A, TypeStat[A]), ?], Option[(A, Dist[J])]] =
     _.run.traverse(_.run.swap) map {
       case (_, TypeF.Bottom()) =>
@@ -121,7 +124,7 @@ object dist {
 
         some((p, Dist.weightedMix(arrDists._2 : _*) map (EJson.arr(_ : _*))))
 
-      case ((p, s), TypeF.Arr(\/-(x))) if TypeStat.str[A].isEmpty(s) =>
+      case ((p, s), TypeF.Arr(\/-(x))) =>
         val (minl, maxl) = collBounds(s, maxCollLen).umap(_.toInt)
         x map { case (_, d) => (p, Dist.list(minl, maxl)(d) map (EJson.arr(_ : _*))) }
 
@@ -150,6 +153,13 @@ object dist {
         typeStatDist(gaussian, s) strengthL p
 
     } valueOr {
+      case Tagged(strings.StructuralString, dist) =>
+        dist.map(_.map(_.map { j =>
+          DecodeEJson[List[Char]].decode(j)
+            .map(_.mkString)
+            .fold((_, _) => j, EJson.str(_))
+        }))
+
       /** TODO: Inspect Tagged values for known types (esp. temporal) for
         *       more declarative generation.
         */
@@ -233,19 +243,6 @@ object dist {
 
       case TypeStat.Char(_, cn, cx) =>
         charRange(cn, cx) map (EJson.char(_))
-
-      /** TODO: Improve this, possibly by recognizing known patterns in strings
-        *       and/or retaining more information about character distribution
-        *       when turning strings into SSTs.
-        */
-      case TypeStat.Str(_, ln, lx, sn, sx) =>
-        val minmax =
-          (sn + sx).toList.foldMap(c => some((Tags.MinVal(c), Tags.MaxVal(c))))
-
-        val (minc, maxc) =
-          minmax.fold((Char.MinValue, Char.MaxValue))(_.bimap(_.unwrap, _.unwrap))
-
-        Dist.list(ln.toInt, lx.toInt)(charRange(minc, maxc)) map (cs => EJson.str(cs.mkString))
 
       case TypeStat.Int(ss, mn, mx) =>
         gaussian(ss)

@@ -22,7 +22,7 @@ import quasar.sst.{PopulationSST, SST}
 
 import fs2.Stream
 import fs2.util.Suspendable
-import matryoshka.Corecursive
+import matryoshka.{Corecursive, Recursive}
 import scalaz.{\/, Equal, Order}
 import scalaz.Scalaz._
 import spire.algebra.{Field, NRoot}
@@ -38,7 +38,8 @@ object generate {
           sst: PopulationSST[J, A] \/ SST[J, A])(
           implicit
           F: Suspendable[F],
-          J: Corecursive.Aux[J, EJson])
+          JC: Corecursive.Aux[J, EJson],
+          JR: Recursive.Aux[J, EJson])
           : Option[Stream[F, J]] =
         sst
           .fold(

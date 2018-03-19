@@ -23,7 +23,7 @@ import quasar.contrib.spire.random.dist._
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.sst.{SST, StructuralType, TypeStat}
+import quasar.sst.{strings, SST, StructuralType, TypeStat}
 import quasar.tpe.{SimpleType, TypeF}
 
 import matryoshka.data.Fix
@@ -48,9 +48,7 @@ final class GenerateSpec extends quasar.Qspec {
     sst(ts, TypeF.simple(st))
 
   def sstS(n: Int, s: String): S =
-    sst(
-      tsJ(n, J.str(s)),
-      TypeF.arr(sstL(TypeStat.count(n.toDouble), SimpleType.Char).right))
+    strings.widenString[J, Double](n.toDouble, s).embed
 
   def tsJ(n: Int, j: J): TypeStat[Double] =
     TypeStat.fromEJson(n.toDouble, j)
@@ -233,12 +231,19 @@ final class GenerateSpec extends quasar.Qspec {
       valuesShould(csst)(J.char.exist(c => (c >= 'e') && (c <= 'l')))
     }
 
-    "str within length range and char range of min/max values" >> {
-      def strSst(s: String): S =
-        sst(
-          tsJ1(J.str(s)),
-          TypeF.arr(sstL(TypeStat.count(1.0), SimpleType.Char).right))
+    "str within length range and arbitrary chars" >> {
+      val ssst =
+        NonEmptyList("foo", "quux", "xex", "orp") foldMap1 { s =>
+          val n = s.length.toDouble.some
+          strings.lubString[S, J, Double](TypeStat.coll(1.0, n, n)).embed
+        }
 
+      valuesShould(ssst)(J.str.exist { s =>
+        (s.length ≟ 4 || s.length ≟ 3)
+      })
+    }
+
+    "str within length range and char range of min/max values" >> {
       val ssst =
         NonEmptyList("foo", "quux", "xex", "orp") foldMap1 (sstS(1, _))
 

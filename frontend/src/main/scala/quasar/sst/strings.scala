@@ -16,32 +16,54 @@
 
 package quasar.sst
 
+import slamdata.Predef._
 import quasar.contrib.matryoshka.envT
-import quasar.ejson.TypeTag
+import quasar.ejson.{EJson, TypeTag}
 import quasar.tpe.{SimpleType, TypeF}
 
-import matryoshka.Corecursive
-import scalaz.{\/, IList}
+import scala.Char
+
+import matryoshka.{Corecursive, Recursive}
+import scalaz.Order
 import scalaz.syntax.either._
-import spire.algebra.AdditiveSemigroup
+import spire.algebra.{AdditiveSemigroup, Field}
+import spire.math.ConvertableTo
+
 
 object strings {
   import StructuralType.{TagST, TypeST, STF}
 
-  val StringTag = TypeTag("_ejson.string")
+  val StructuralString = TypeTag("_structural.string")
 
   /** An sst annotated with the given stats for a string of unknown characters. */
   def lubString[T, J, A: AdditiveSemigroup](ts: TypeStat[A])(
     implicit C: Corecursive.Aux[T, SSTF[J, A, ?]]
   ): SSTF[J, A, T] = {
     val charSst =
-      C.embed(envT(TypeStat.count(ts.size), TypeST(TypeF.simple(SimpleType.Char))))
+      C.embed(envT(
+        TypeStat.char(ts.size, Char.MinValue, Char.MaxValue),
+        TypeST(TypeF.simple(SimpleType.Char))))
 
-    stringArr(ts, charSst.right)
+    stringTagged(ts, C.embed(envT(ts, TypeST(TypeF.arr(charSst.right)))))
   }
 
-  def stringArr[T, L, V](v: V, t: IList[T] \/ T)(
-    implicit C: Corecursive.Aux[T, STF[L, V, ?]]
-  ): STF[L, V, T] =
-    envT(v, TagST[L](Tagged(StringTag, C.embed(envT(v, TypeST(TypeF.arr(t)))))))
+  /** Widens a string into an array of characters.
+    *
+    * FIXME: Overly specific, define in terms of [Co]Recursive.
+    */
+  def widenString[J: Order, A: ConvertableTo: Field: Order](count: A, s: String)(
+    implicit
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
+  ): SSTF[J, A, SST[J, A]] = {
+    val charArr =
+      SST.fromEJson(count, EJson.arr(s.map(EJson.char[J](_)) : _*))
+
+    stringTagged(charArr.copoint, charArr)
+  }
+
+  ////
+
+  private def stringTagged[T, L, V](v: V, t: T): STF[L, V, T] =
+    envT(v, TagST[L](Tagged(StructuralString, t)))
 }

@@ -26,6 +26,8 @@ import quasar.fp.numeric.SampleStats
 import quasar.sst._
 import quasar.tpe._
 
+import scala.{Byte, Char}
+
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix
 import matryoshka.implicits._
@@ -34,7 +36,7 @@ import scalaz.stream.Process
 import spire.std.double._
 
 final class ExtractSchemaSpec extends quasar.Qspec {
-  import Data._, StructuralType.TypeST
+  import Data._, StructuralType.{TagST, TypeST}
 
   type J = Fix[EJson]
   type S = SST[J, Double]
@@ -84,14 +86,19 @@ final class ExtractSchemaSpec extends quasar.Qspec {
       TypeStat.coll(2.0, 1.0.some, 1.0.some),
       TypeST(TypeF.map[J, S](IMap(
         J.str("foo") -> envT(
-          TypeStat.str(1.0, 6.0, 6.0, "", ""),
-          TypeST(TypeF.arr[J, S](envT(
-            TypeStat.count(1.0),
-            TypeST(TypeF.simple[J, S](SimpleType.Char))
-          ).embed.right))).embed,
+          TypeStat.coll(1.0, 6.0.some, 6.0.some),
+          TagST[J](Tagged(
+            strings.StructuralString,
+            envT(
+              TypeStat.coll(1.0, 6.0.some, 6.0.some),
+              TypeST(TypeF.arr[J, S](envT(
+                TypeStat.char(1.0, Char.MinValue, Char.MaxValue),
+                TypeST(TypeF.simple[J, S](SimpleType.Char))).embed.right))
+            ).embed))
+          ).embed,
 
         J.str("bar") -> envT(
-          TypeStat.str(1.0, 5.0, 5.0, "abcde", "abcde"),
+          TypeStat.coll(1.0, 5.0.some, 5.0.some),
           TypeST(TypeF.const[J, S](J.str("abcde")))
         ).embed
       ), None))).embed
@@ -116,14 +123,14 @@ final class ExtractSchemaSpec extends quasar.Qspec {
         J.str("foo") -> envT(
           TypeStat.coll(1.0, l1.some, l1.some),
           TypeST(TypeF.arr[J, S](envT(
-            TypeStat.count(1.0),
+            TypeStat.byte(1.0, Byte.MinValue, Byte.MaxValue),
             TypeST(TypeF.simple[J, S](SimpleType.Byte))
           ).embed.right))).embed,
 
         J.str("bar") -> envT(
           TypeStat.coll(1.0, l2.some, l2.some),
           TypeST(TypeF.arr[J, S](envT(
-            TypeStat.count(1.0),
+            TypeStat.byte(1.0, Byte.MinValue, Byte.MaxValue),
             TypeST(TypeF.simple[J, S](SimpleType.Byte))
           ).embed.right))).embed
       ), None))).embed
@@ -143,11 +150,25 @@ final class ExtractSchemaSpec extends quasar.Qspec {
       TypeStat.coll(4.0, 1.0.some, 1.0.some),
       TypeST(TypeF.map[J, S](IMap.empty[J, S], Some((
         envT(
-          TypeStat.str(4.0, 3.0, 4.0, "bar", "quux"),
-          TypeST(TypeF.arr[J, S](envT(
-            TypeStat.count(4.0),
-            TypeST(TypeF.simple[J, S](SimpleType.Char))
-          ).embed.right))).embed,
+          TypeStat.coll(4.0, 3.0.some, 4.0.some),
+          TagST[J](Tagged(
+            strings.StructuralString,
+            envT(
+              TypeStat.coll(4.0, 3.0.some, 4.0.some),
+              TypeST(TypeF.arr[J, S](IList(
+                envT(
+                  TypeStat.char(4.0, 'b', 'q'),
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
+                envT(
+                  TypeStat.char(4.0, 'a', 'u'),
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
+                envT(
+                  TypeStat.char(4.0, 'o', 'z'),
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
+                envT(
+                  TypeStat.char(1.0, 'x', 'x'),
+                  TypeST(TypeF.const[J, S](J.char('x')))).embed
+              ).left))).embed))).embed,
         envT(
           TypeStat.int(SampleStats.freq(4.0, 1.0), BigInt(1), BigInt(1)),
           TypeST(TypeF.const[J, S](J.int(1)))
@@ -169,11 +190,25 @@ final class ExtractSchemaSpec extends quasar.Qspec {
       TypeStat.coll(4.0, 1.0.some, 1.0.some),
       TypeST(TypeF.map[J, S](IMap.empty[J, S], Some((
         envT(
-          TypeStat.str(4.0, 3.0, 4.0, "bar", "quux"),
-          TypeST(TypeF.arr[J, S](envT(
-            TypeStat.count(4.0),
-            TypeST(TypeF.simple[J, S](SimpleType.Char))
-          ).embed.right))).embed,
+          TypeStat.coll(4.0, 3.0.some, 4.0.some),
+          TagST[J](Tagged(
+            strings.StructuralString,
+            envT(
+              TypeStat.coll(4.0, 3.0.some, 4.0.some),
+              TypeST(TypeF.arr[J, S](IList(
+                envT(
+                  TypeStat.char(4.0, 'b', 'q'),
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
+                envT(
+                  TypeStat.char(4.0, 'a', 'u'),
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
+                envT(
+                  TypeStat.char(4.0, 'o', 'z'),
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
+                envT(
+                  TypeStat.char(1.0, 'x', 'x'),
+                  TypeST(TypeF.const[J, S](J.char('x')))).embed
+              ).left))).embed))).embed,
         envT(
           TypeStat.int(SampleStats.freq(4.0, 1.0), BigInt(1), BigInt(1)),
           TypeST(TypeF.const[J, S](J.int(1)))

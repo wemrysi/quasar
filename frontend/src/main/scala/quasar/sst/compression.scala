@@ -22,6 +22,8 @@ import quasar.ejson.{EJson, CommonEJson => C, Str}
 import quasar.fp.numeric._
 import quasar.tpe._
 
+import scala.Byte
+
 import matryoshka.{project => _, _}
 import matryoshka.patterns.EnvT
 import matryoshka.implicits._
@@ -105,18 +107,25 @@ object compression {
       envT(ts, TypeF.map(unchanged, compressMap(toCompress) |+| some((k, v))))
   }
 
-  /** Replace statically known arrays longer than the given limit with an array
-    * of unknown size.
-    */
+  /** Replace statically known arrays longer than the given limit with a lub array. */
   def limitArrays[J: Order, A: Order](maxLength: Positive)(
     implicit
     A : Field[A],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = typeTransform[J] {
-    case EnvT((ts, TypeF.Arr(-\/(elts @ ICons(h, t))))) if elts.length > maxLength.value =>
-      val (cnt, len) = (ts.size, A fromInt elts.length)
-      envT(TypeStat.coll(cnt, some(len), some(len)), TypeF.arr(\/-(NonEmptyList.nel(h, t).suml1)))
-  }
+  ): ElgotCoalgebra[SST[J, A] \/ ?, SSTF[J, A, ?], SST[J, A]] =
+    sst => sst.project match {
+      case EnvT((_, TagST(Tagged(strings.StructuralString, _)))) =>
+        sst.left
+
+      case EnvT((ts, TypeST(TypeF.Arr(-\/(elts @ ICons(h, t)))))) if elts.length > maxLength.value =>
+        val (cnt, len) = (ts.size, A fromInt elts.length)
+        envT(
+          TypeStat.coll(cnt, some(len), some(len)),
+          TypeST(TypeF.arr[J, SST[J, A]](\/-(NonEmptyList.nel(h, t).suml1)))).right
+
+      case other =>
+        other.right
+    }
 
   /** Replace literal string types longer than the given limit with `char[]`. */
   def limitStrings[J, A](maxLength: Positive)(
@@ -151,6 +160,44 @@ object compression {
       }
   }
 
+  /** Returns the SST of the primary tag of the given EJson value. */
+  def primarySst[J: Order, A: ConvertableTo: Field: Order](cnt: A, j: J)(
+    implicit
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
+  ): SST[J, A] = j match {
+    case Embed(C(Str(s))) =>
+      strings.widenString[J, A](cnt, s).embed
+
+    case SimpleEJson(s) =>
+      envT(TypeStat.fromEJson(cnt, j), TypeST(TypeF.simple[J, SST[J, A]](s))).embed
+
+    case _ => SST.fromEJson(cnt, j)
+  }
+
+  /** Returns the primary SST if the argument is a constant, otherwise returns
+    * the argument itself.
+    */
+  def widenConst[J: Order, A: ConvertableTo: Field: Order](
+    sst: SST[J, A]
+  )(implicit
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
+  ): SST[J, A] = {
+    def psst(ts: TypeStat[A], j: J): SST[J, A] =
+      StructuralType.measure[J, TypeStat[A]].set(ts)(primarySst(ts.size, j))
+
+    sst.project match {
+      case ConstST(None, ts, j) =>
+        psst(ts, j)
+
+      case ConstST(Some((ts0, t)), ts, j) =>
+        envT(ts0, TagST[J](Tagged(t, psst(ts, j)))).embed
+
+      case _ => sst
+    }
+  }
+
   /** Replace encoded binary strings with `byte[]`. */
   def z85EncodedBinary[J, A](
     implicit
@@ -168,12 +215,9 @@ object compression {
   private implicit val foldableNelOpt: Foldable[NelOpt] = Foldable[NonEmptyList].compose[Option]
 
   private def byteArr[J, A](cnt: A): TypeF[J, SST[J, A]] =
-    simpleArr(cnt, SimpleType.Byte)
-
-  private def simpleArr[J, A](cnt: A, st: SimpleType): TypeF[J, SST[J, A]] =
     TypeF.arr[J, SST[J, A]](envT(
-      TypeStat.count(cnt),
-      TypeST(TypeF.simple[J, SST[J, A]](st))
+      TypeStat.byte(cnt, Byte.MinValue, Byte.MaxValue),
+      TypeST(TypeF.simple[J, SST[J, A]](SimpleType.Byte))
     ).embed.right)
 
   private def compressMap[J: Order, A: Order: Field: ConvertableTo](
@@ -185,42 +229,4 @@ object compression {
     m.foldlWithKey(none[(SST[J, A], SST[J, A])]) { (r, j, sst) =>
       r |+| some((SST.fromEJson(SST.size(sst), j), sst))
     }
-
-  /** Returns the SST of the primary type of the given EJson value. */
-  private def primarySST[J: Order, A: ConvertableTo: Field: Order](cnt: A, j: J)(
-    implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): SST[J, A] = j match {
-    case Embed(C(Str(_))) =>
-      strings.lubString[SST[J, A], J, A](TypeStat.fromEJson(cnt, j)).embed
-
-    case SimpleEJson(s) =>
-      envT(TypeStat.fromEJson(cnt, j), TypeST(TypeF.simple[J, SST[J, A]](s))).embed
-
-    case _ => SST.fromEJson(cnt, j)
-  }
-
-  /** Returns the primary SST if the argument is a constant, otherwise returns
-    * the argument itself.
-    */
-  private def widenConst[J: Order, A: ConvertableTo: Field: Order](
-    sst: SST[J, A]
-  )(implicit
-    JC: Corecursive.Aux[J, EJson],
-    JR: Recursive.Aux[J, EJson]
-  ): SST[J, A] = {
-    def psst(ts: TypeStat[A], j: J): SST[J, A] =
-      StructuralType.measure[J, TypeStat[A]].set(ts)(primarySST(ts.size, j))
-
-    sst.project match {
-      case ConstST(None, ts, j) =>
-        psst(ts, j)
-
-      case ConstST(Some((ts0, t)), ts, j) =>
-        envT(ts0, TagST[J](Tagged(t, psst(ts, j)))).embed
-
-      case _ => sst
-    }
-  }
 }
