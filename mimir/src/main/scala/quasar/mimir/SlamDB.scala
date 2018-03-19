@@ -61,7 +61,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
-object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
+trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
   import FileSystemError._
   import PathError._
   import Precog.startTask
@@ -486,3 +486,5 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
     }
   }
 }
+
+object Mimir extends SlamDB
