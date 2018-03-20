@@ -129,6 +129,7 @@ concurrentRestrictions in Global := {
 concurrentRestrictions in Global += Tags.exclusive(ExclusiveTest)
 
 lazy val publishSettings = commonPublishSettings ++ Seq(
+  performSonatypeSync := false,   // basically just ignores all the sonatype sync parts of things
   organizationName := "SlamData Inc.",
   organizationHomepage := Some(url("http://quasar-analytics.org")),
   homepage := Some(url("https://github.com/quasar-analytics/quasar")),
@@ -180,7 +181,7 @@ lazy val assemblySettings = Seq(
 lazy val commonSettings = buildSettings ++ publishSettings ++ assemblySettings
 
 // not doing this causes NoSuchMethodErrors when using coursier
-lazy val excludeTypelevelScalaLibrary = 
+lazy val excludeTypelevelScalaLibrary =
   Seq(excludeDependencies += "org.typelevel" % "scala-library")
 
 // Include to also publish a project's tests
@@ -208,8 +209,8 @@ def isolatedBackendSettings(classnames: String*) = Seq(
   isolatedBackends in Global ++=
     classnames.map(_ -> (fullClasspath in Compile).value.files),
 
-  packageOptions in assembly +=
-    Package.ManifestAttributes(new java.util.jar.Attributes.Name("Backend-Module") -> classnames.mkString(" ")))
+  packageOptions in (Compile, packageBin) +=
+    Package.ManifestAttributes("Backend-Module" -> classnames.mkString(" ")))
 
 lazy val isCIBuild               = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
 lazy val isIsolatedEnv           = settingKey[Boolean]("True if running in an isolated environment")
