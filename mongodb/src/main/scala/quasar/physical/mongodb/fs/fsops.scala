@@ -44,12 +44,6 @@ object fsops {
                 else ().point[MongoFsM]
     } yield cs
 
-  /** The user (non-system) collections having a prefix equivalent to the given
-    * directory path.
-    */
-  def userCollectionsInDir(dir: ADir): MongoFsM[Vector[Collection]] =
-    collectionsInDir(dir) map (_.filterNot(_.collection isDescendantOf CollectionName("system")))
-
   /** A filesystem `PathSegment` representing the first segment of a collection name
     * relative to the given parent directory.
     */
