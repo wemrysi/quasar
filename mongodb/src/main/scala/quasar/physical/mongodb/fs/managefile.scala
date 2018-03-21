@@ -23,7 +23,7 @@ import quasar.fp.TaskRef
 import quasar.fs._
 import quasar.physical.mongodb._
 
-import com.mongodb.{MongoException, MongoCommandException, MongoServerException}
+import com.mongodb.{MongoCommandException, MongoServerException}
 import com.mongodb.async.client.MongoClient
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -56,32 +56,8 @@ object managefile {
     case MoveSemantics.FailIfMissing => RenameSemantics.Overwrite
   }
 
-  def moveDir(src: ADir, dst: ADir, sem: MoveSemantics): MongoFsM[Unit] = {
-    // TODO: Need our own error type instead of reusing the one from the driver.
-    def filesMismatchError(srcs: Vector[AFile], dsts: Vector[AFile]): MongoException = {
-      val pp = posixCodec.printPath _
-      new MongoException(
-        s"Mismatched files when moving '${pp(src)}' to '${pp(dst)}': srcFiles = ${srcs map pp}, dstFiles = ${dsts map pp}")
-    }
-
-    def moveAllUserCollections = for {
-      colls    <- userCollectionsInDir(src)
-      srcFiles =  colls map (_.asFile)
-      dstFiles =  srcFiles.map(_ relativeTo (src) map (dst </> _)).unite
-      _        <- srcFiles.alignBoth(dstFiles).sequence.cata(
-                    _.traverse { case (s, d) => moveFile(s, d, sem) },
-                    MongoDbIO.fail(filesMismatchError(srcFiles, dstFiles)).liftM[FileSystemErrT])
-    } yield ()
-
-    if (src === dst)
-      ().point[MongoFsM]
-    else if (depth(src) == 1)
-      dbNameFromPathM(src) flatMap { dbName =>
-        moveAllUserCollections *> dropDatabase(dbName).liftM[FileSystemErrT]
-      }
-    else
-      moveAllUserCollections
-  }
+  def moveDir(src: ADir, dst: ADir, sem: MoveSemantics): MongoFsM[Unit] =
+    unsupportedOperation("MongoDb connector does not support moving directories").raiseError[MongoFsM, Unit]
 
   def moveFile(src: AFile, dst: AFile, sem: MoveSemantics): MongoFsM[Unit] = {
 
@@ -142,23 +118,8 @@ object managefile {
       } yield ()
   }
 
-  // TODO: Really need a Path#fold[A] method, which will be much more reliable
-  //       than this process of deduction.
   def deleteDir(dir: ADir): MongoFsM[Unit] =
-    Collection.dbNameFromPath(dir).toOption match {
-      case Some(n) if depth(dir) == 1 =>
-        dropDatabase(n).liftM[FileSystemErrT]
-
-      case Some(_) =>
-        collectionsInDir(dir)
-          .flatMap(_.traverse_(dropCollection(_).liftM[FileSystemErrT]))
-
-      case None if depth(dir) == 0 =>
-        dropAllDatabases.liftM[FileSystemErrT]
-
-      case None =>
-        nonExistentParent(dir)
-    }
+    unsupportedOperation("MongoDb connector does not support deleting directories").raiseError[MongoFsM, Unit]
 
   def deleteFile(file: AFile): MongoFsM[Unit] =
     collFromFileM(file) flatMap (c =>

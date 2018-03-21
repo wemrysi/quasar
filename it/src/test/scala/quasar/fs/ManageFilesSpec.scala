@@ -22,6 +22,7 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.foldable._
 import quasar.fs.FileSystemTest.allFsUT
 
+import org.specs2.matcher.{Matcher, MatchersImplicits}, MatchersImplicits._
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
@@ -39,6 +40,11 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
 
   def deleteForManage(run: Run): FsTask[Unit] =
     runT(run)(manage.delete(managePrefix))
+
+  def unsupported: Matcher[FileSystemError] = { err: FileSystemError =>
+    (FileSystemError.unsupportedOperation.getOption(err).isDefined,
+    err.shows + " is not UnsupportedOperation")
+  }
 
   fileSystemShould { (fs, _) =>
     implicit val run = fs.testInterpM
@@ -146,9 +152,12 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
                 write.save(f2, anotherDoc.toProcess).drain ++
                 manage.moveDir(d1, d2, MoveSemantics.FailIfExists).liftM[Process]
 
-        (execT(run, p).runOption must beNone) and
+        val res = execT(run, p).runOption
+
+        (res must beSome(unsupported)) or
+        ((res must beNone) and
         (runT(run)(query.ls(d2)).runEither must beRight(containTheSameElementsAs(expectedFiles))) and
-        (runT(run)(query.ls(d1)).runEither must beLeft(pathErr(pathNotFound(d1))))
+        (runT(run)(query.ls(d1)).runEither must beLeft(pathErr(pathNotFound(d1)))))
       }
 
       // fixes #2973
@@ -167,11 +176,14 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
         val p = write.save(f, oneDoc.toProcess).drain ++
                 manage.moveDir(d2, trash_d2, MoveSemantics.FailIfExists).liftM[Process]
 
-        (execT(run, p).runOption must beNone) and
+        val res = execT(run, p).runOption
+
+        (res must beSome(unsupported)) or
+        ((res must beNone) and
         (runT(run)(query.ls(root)).runEither must beRight(containTheSameElementsAs(expectedRoot))) and
         (runT(run)(query.ls(trash)).runEither must beRight(containTheSameElementsAs(expectedTrash))) and
         (runT(run)(query.ls(trash_d2)).runEither must beRight(containTheSameElementsAs(expectedFiles))) and
-        (runT(run)(query.ls(d2)).runEither must beLeft(pathErr(pathNotFound(d2))))
+        (runT(run)(query.ls(d2)).runEither must beLeft(pathErr(pathNotFound(d2)))))
       }
 
       "files and directories with spaces/dots in names should be supported" >> {
@@ -203,7 +215,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
         val d2 = managePrefix </> dir("dirdnetodirdne") </> dir("d2")
 
         runT(run)(manage.moveDir(d1, d2, MoveSemantics.FailIfExists))
-          .runOption must beSome(pathErr(pathNotFound(d1)))
+          .runOption must (beSome(pathErr(pathNotFound(d1))) or beSome(unsupported))
       }
 
       "[SD-1846] moving a directory with a name that is a prefix of another directory" >> {
@@ -225,9 +237,12 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
           write.saveThese(uf3, thirdDoc)   *>
           manage.moveDir(src, dst, MoveSemantics.FailIfExists)
 
-        (runT(run)(setupAndMove).runOption must beNone)                                                     and
+        val res = runT(run)(setupAndMove).runOption
+
+        ((res must beSome(unsupported)) or
+        ((res must beNone)                                                                                  and
         (runLogT(run, read.scanAll(dst </> file("one"))).runEither must beRight(completelySubsume(oneDoc))) and
-        (run(query.fileExists(src </> file("one"))).unsafePerformSync must beFalse)
+        (run(query.fileExists(src </> file("one"))).unsafePerformSync must beFalse)))
       }
 
       "copying" >> {
@@ -283,15 +298,19 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
                 write.save(f2, anotherDoc.toProcess).drain ++
                 manage.delete(d).liftM[Process]
 
-        (execT(run, p).runOption must beNone)                                       and
+        val res = execT(run, p).runOption
+
+        (res must beSome(unsupported)) or
+        ((res must beNone)                                                          and
         (runLogT(run, read.scanAll(f1)).runEither must beRight(Vector.empty[Data])) and
         (runLogT(run, read.scanAll(f2)).runEither must beRight(Vector.empty[Data])) and
-        (runT(run)(query.ls(d)).runEither must beLeft(pathErr(pathNotFound(d))))
+        (runT(run)(query.ls(d)).runEither must beLeft(pathErr(pathNotFound(d)))))
       }
 
       "deleting a nonexistent directory returns PathNotFound" >> {
         val d = managePrefix </> dir("deldirnotfound")
-        runT(run)(manage.delete(d)).runEither must beLeft(pathErr(pathNotFound(d)))
+        runT(run)(manage.delete(d)).runEither must
+           (beLeft(pathErr(pathNotFound(d))) or beLeft(unsupported))
       }
 
       "write/read from temp dir near existing" >> {
