@@ -58,7 +58,7 @@ object analysis {
   object CompressionSettings {
     val DefaultArrayMaxLength:  Positive = 64L
     val DefaultMapMaxSize:      Positive = 64L
-    val DefaultStringMaxLength: Positive = 64L
+    val DefaultStringMaxLength: Positive = 32L
     val DefaultUnionMaxSize:    Positive =  1L
 
     val Default: CompressionSettings =

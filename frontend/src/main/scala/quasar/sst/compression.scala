@@ -28,7 +28,7 @@ import matryoshka.{project => _, _}
 import matryoshka.patterns.EnvT
 import matryoshka.implicits._
 import scalaz._, Scalaz._
-import spire.algebra.{Field, Ring}
+import spire.algebra.Field
 import spire.math.ConvertableTo
 
 object compression {
@@ -128,13 +128,13 @@ object compression {
     }
 
   /** Replace literal string types longer than the given limit with `char[]`. */
-  def limitStrings[J, A](maxLength: Positive)(
+  def limitStrings[J, A: ConvertableTo: Field: Order](maxLength: Positive)(
     implicit
-    A : Ring[A],
+    JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
   ): SSTF[J, A, SST[J, A]] => SSTF[J, A, SST[J, A]] = totally {
     case EnvT((ts, TypeST(TypeF.Const(Embed(C(Str(s))))))) if s.length > maxLength.value =>
-      strings.lubString[SST[J, A], J, A](ts)
+      strings.compress[SST[J, A], J, A](ts, s)
   }
 
   /** Compress a union larger than `maxSize` by reducing the largest group of
@@ -167,7 +167,7 @@ object compression {
     JR: Recursive.Aux[J, EJson]
   ): SST[J, A] = j match {
     case Embed(C(Str(s))) =>
-      strings.widenString[J, A](cnt, s).embed
+      strings.widen[J, A](cnt, s).embed
 
     case SimpleEJson(s) =>
       envT(TypeStat.fromEJson(cnt, j), TypeST(TypeF.simple[J, SST[J, A]](s))).embed

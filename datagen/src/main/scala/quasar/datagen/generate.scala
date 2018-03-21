@@ -25,7 +25,7 @@ import fs2.util.Suspendable
 import matryoshka.{Corecursive, Recursive}
 import scalaz.{\/, Equal, Order}
 import scalaz.Scalaz._
-import spire.algebra.{Field, NRoot}
+import spire.algebra.{Field, IsReal, NRoot}
 import spire.math.ConvertableFrom
 import spire.random.{Gaussian, Generator}
 
@@ -33,7 +33,7 @@ object generate {
   object ejson {
     def apply[F[_]] = new PartiallyApplied[F]
     final class PartiallyApplied[F[_]] {
-      def apply[J: Order, A: ConvertableFrom: Equal: Field: Gaussian: NRoot](
+      def apply[J: Order, A: ConvertableFrom: Equal: Field: Gaussian: IsReal: NRoot](
           maxCollLen: A,
           sst: PopulationSST[J, A] \/ SST[J, A])(
           implicit

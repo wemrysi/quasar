@@ -281,7 +281,7 @@ final class CompressionSpec extends quasar.Qspec
       s: String => (s.length > 1) ==> {
 
       val lim: Positive = Positive((s.length - 1).toLong) getOrElse 1L
-      val stringSst = strings.widenString[J, Real](Real(1), s).embed
+      val stringSst = strings.widen[J, Real](Real(1), s).embed
 
       stringSst.elgotApo[S](compression.limitArrays(lim)) must_= stringSst
     }}
@@ -291,11 +291,9 @@ final class CompressionSpec extends quasar.Qspec
     "compresses strings longer than maxLen" >> prop { s: String => (s.length > 1) ==> {
       val plen: Positive = Positive(s.length.toLong) getOrElse 1L
       val lt: Positive = Positive((s.length - 1).toLong) getOrElse 1L
-      val rlen = Real(s.length).some
-      val str  = SST.fromEJson(Real(1), J.str(s))
 
-      val ts  = TypeStat.coll(Real(1), rlen, rlen)
-      val arr = strings.lubString[S, J, Real](ts).embed
+      val str = SST.fromEJson(Real(1), J.str(s))
+      val arr = strings.compress[S, J, Real](str.copoint, s).embed
 
       val req = str.transAna[S](compression.limitStrings(plen))
       val rlt = str.transAna[S](compression.limitStrings(lt))

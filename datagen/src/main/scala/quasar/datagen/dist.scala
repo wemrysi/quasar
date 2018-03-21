@@ -33,11 +33,12 @@ import monocle.syntax.fields.{_2, _3}
 import monocle.std.option.{some => someP}
 import scalaz.{-\/, \/-, ==>>, Bifunctor, Equal, INil, NonEmptyList, Order, Tags}
 import scalaz.Scalaz._
-import spire.algebra.{AdditiveMonoid, Field, NRoot}
+import spire.algebra.{AdditiveMonoid, Field, IsReal, NRoot}
 import spire.math.ConvertableFrom
 import spire.random.{Dist, Gaussian}
 import spire.syntax.convertableFrom._
 import spire.syntax.field._
+import spire.syntax.isReal._
 
 object dist {
   import StructuralType.{ST, STF}
@@ -46,7 +47,7 @@ object dist {
   val BigDecimalMaxScale = 34
   val StringMaxLength    = 128
 
-  def population[J: Order, A: ConvertableFrom: Equal: Field: Gaussian: NRoot](
+  def population[J: Order, A: ConvertableFrom: Equal: Field: Gaussian: IsReal: NRoot](
       maxCollLen: A,
       src: PopulationSST[J, A])(
       implicit
@@ -57,7 +58,7 @@ object dist {
       ss.populationStddev strengthL ss.mean
     }
 
-  def sample[J: Order, A: ConvertableFrom: Equal: Field: Gaussian: NRoot](
+  def sample[J: Order, A: ConvertableFrom: Equal: Field: Gaussian: IsReal: NRoot](
       maxCollLen: A,
       src: SST[J, A])(
       implicit
@@ -68,7 +69,7 @@ object dist {
       ss.stddev strengthL ss.mean
     }
 
-  def sst[J: Order, A: ConvertableFrom: Equal: Field: Gaussian](
+  def sst[J: Order, A: ConvertableFrom: Equal: Field: Gaussian: IsReal](
       maxCollLen: A,
       src: SST[J, A])(
       gaussian: SampleStats[A] => Option[(A, A)])(
@@ -90,7 +91,7 @@ object dist {
   /** Returns an EJson distribution based on an SST node and the probability it
     * exists in its parent.
     */
-  def typeDistƒ[J: Order, A: ConvertableFrom: Equal: Field: Gaussian](
+  def typeDistƒ[J: Order, A: ConvertableFrom: Equal: Field: Gaussian: IsReal](
       maxCollLen: A,
       gaussian: SampleStats[A] => Option[(A, A)])(
       implicit
@@ -169,9 +170,6 @@ object dist {
 
   ////
 
-  private def charRange(min: Char, max: Char): Dist[Char] =
-    Dist.intrange(min.toInt, max.toInt) map (_.toChar)
-
   private def clamp[A: Order](min: A, max: A): A => A =
     _.min(max).max(min)
 
@@ -224,7 +222,7 @@ object dist {
   /** Attempt to build a `Dist` from a `TypeStat`, given a function to
     * extract the mean and stddev from `SampleStats`.
     */
-  private def typeStatDist[J, A: ConvertableFrom: Field: Gaussian](
+  private def typeStatDist[J, A: ConvertableFrom: Field: Gaussian: IsReal](
       gaussian: SampleStats[A] => Option[(A, A)],
       stat: TypeStat[A])(
       implicit
@@ -241,8 +239,10 @@ object dist {
       case TypeStat.Byte(_, bn, bx) =>
         Dist.intrange(bn.toInt, bx.toInt) map (i => EJson.byte(i.toByte))
 
-      case TypeStat.Char(_, cn, cx) =>
-        charRange(cn, cx) map (EJson.char(_))
+      case TypeStat.Char(ss, cn, cx) =>
+        gaussian(ss)
+          .cata((Dist.gaussian[A] _).tupled, Dist.constant(ss.mean))
+          .map((EJson.char[J](_)) <<< ((_: Int).toChar) <<< clamp(cn.toInt, cx.toInt) <<< ((_: A).round.toInt))
 
       case TypeStat.Int(ss, mn, mx) =>
         gaussian(ss)

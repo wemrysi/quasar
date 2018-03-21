@@ -43,7 +43,7 @@ trait TypeStatArbitrary {
       genColl[A],
       arbitrary[A] map (count[A](_)),
       (arbitrary[A] |@| genRange[SByte])((a, r) => byte(a, r._1, r._2)),
-      (arbitrary[A] |@| genRange[SChar])((a, r) => char(a, r._1, r._2)),
+      (arbitrary[SampleStats[A]] |@| genRange[SChar])((s, r) => char(s, r._1, r._2)),
       (arbitrary[SampleStats[A]] |@| genRange[BigInt])((s, r) => int[A](s, r._1, r._2)),
       (arbitrary[SampleStats[A]] |@| genRange[BigDecimal])((s, r) => dec[A](s, r._1, r._2)))
 

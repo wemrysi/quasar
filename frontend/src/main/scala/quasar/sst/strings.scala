@@ -21,12 +21,12 @@ import quasar.contrib.matryoshka.envT
 import quasar.ejson.{EJson, TypeTag}
 import quasar.tpe.{SimpleType, TypeF}
 
-import scala.Char
-
 import matryoshka.{Corecursive, Recursive}
-import scalaz.Order
+import scalaz.{IList, Order}
+import scalaz.std.option._
 import scalaz.syntax.either._
-import spire.algebra.{AdditiveSemigroup, Field}
+import scalaz.syntax.foldable._
+import spire.algebra.Field
 import spire.math.ConvertableTo
 
 
@@ -35,23 +35,34 @@ object strings {
 
   val StructuralString = TypeTag("_structural.string")
 
-  /** An sst annotated with the given stats for a string of unknown characters. */
-  def lubString[T, J, A: AdditiveSemigroup](ts: TypeStat[A])(
-    implicit C: Corecursive.Aux[T, SSTF[J, A, ?]]
+  /** Compresses a string into a generic char[]. */
+  def compress[T, J, A: ConvertableTo: Order](strStat: TypeStat[A], s: String)(
+    implicit
+    A: Field[A],
+    C: Corecursive.Aux[T, SSTF[J, A, ?]],
+    JC: Corecursive.Aux[J, EJson],
+    JR: Recursive.Aux[J, EJson]
   ): SSTF[J, A, T] = {
-    val charSst =
-      C.embed(envT(
-        TypeStat.char(ts.size, Char.MinValue, Char.MaxValue),
-        TypeST(TypeF.simple(SimpleType.Char))))
+    // NB: Imported here so as not to pollute outer scope given Iterable's
+    //     pervasiveness.
+    import scalaz.std.iterable._
 
-    stringTagged(ts, C.embed(envT(ts, TypeST(TypeF.arr(charSst.right)))))
+    val charStat =
+      s.toIterable.foldMap(c => some(TypeStat.fromEJson(A.one, EJson.char(c))))
+
+    val charArr =
+      charStat.fold(IList.empty[T].left[T]) { ts =>
+        C.embed(envT(ts, TypeST(TypeF.simple(SimpleType.Char)))).right
+      }
+
+    stringTagged(strStat, C.embed(envT(strStat, TypeST(TypeF.arr(charArr)))))
   }
 
-  /** Widens a string into an array of characters.
+  /** Widens a string into an array of its characters.
     *
     * FIXME: Overly specific, define in terms of [Co]Recursive.
     */
-  def widenString[J: Order, A: ConvertableTo: Field: Order](count: A, s: String)(
+  def widen[J: Order, A: ConvertableTo: Field: Order](count: A, s: String)(
     implicit
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
