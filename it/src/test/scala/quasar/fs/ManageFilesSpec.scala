@@ -254,12 +254,8 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
           read.scanAll(f2) ++
           read.scanAll(f1)
 
-        val result = runLogT(run, p).map(_.toVector).runEither
-        result match {
-          case Left(UnsupportedOperation(_)) => skipped("This connector does not seem to support copy which is fine")
-          case Left(error)                   => org.specs2.execute.Failure("Received filesystem error: " + error.shows)
-          case Right(res)                    => (res must_=== (oneDoc ++ oneDoc)).toResult
-        }
+        runLogT(run, p).map(_.toVector).runEither must
+          (beLeft(unsupported) or beRight(oneDoc ++ oneDoc))
       }
 
       "deleting a nonexistent file returns PathNotFound" >> {
