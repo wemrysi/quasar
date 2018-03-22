@@ -39,26 +39,29 @@ object compression {
     * and their values to the unknown value field.
     */
   def coalesceKeys[J: Order, A: Order: Field: ConvertableTo](
-    maxSize: Positive
+    maxSize: Natural
   )(implicit
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
-  ): SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] =
-    _.some collect {
-      case EnvT((ts, TypeST(TypeF.Map(kn, unk)))) if kn.size > maxSize.value =>
-        val grouped =
-          kn.foldlWithKey(IMap.empty[PrimaryTag, J ==>> Unit])((m, j, _) =>
-            m.alter(
-              primaryTagOf(j),
-              _ map (_ insert (j, ())) orElse some(IMap.singleton(j, ()))))
+  ): SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] = {
+    case EnvT((ts, TypeST(TypeF.Map(kn, unk)))) if kn.size > maxSize.value =>
+      val grouped =
+        kn.foldlWithKey(IMap.empty[PrimaryTag, J ==>> Unit])((m, j, _) =>
+          m.alter(
+            primaryTagOf(j),
+            _ map (_ insert (j, ())) orElse some(IMap.singleton(j, ()))))
 
-        val (kn1, unk1) = grouped.maximumBy(_.size).fold((kn, unk)) { m =>
-          val toCompress = kn intersection m
-          (kn \\ toCompress, compressMap(toCompress) |+| unk)
-        }
+      val compressed = grouped.maximumBy(_.size) map { m =>
+        val toCompress = kn intersection m
+        (kn \\ toCompress, compressMap(toCompress) |+| unk)
+      }
 
-        envT(ts, TypeST(TypeF.map[J, SST[J, A]](kn1, unk1)))
-    }
+      compressed map {
+        case (kn1, unk1) => envT(ts, TypeST(TypeF.map[J, SST[J, A]](kn1, unk1)))
+      }
+
+    case _ => none
+  }
 
   /** Compress unions by combining any constants with their primary type if it
     * also appears in the union.
@@ -115,7 +118,7 @@ object compression {
   }
 
   /** Replace statically known arrays longer than the given limit with a lub array. */
-  def limitArrays[J: Order, A: Order](maxLength: Positive)(
+  def limitArrays[J: Order, A: Order](maxLength: Natural)(
     implicit
     A : Field[A],
     JR: Recursive.Aux[J, EJson]
@@ -135,7 +138,7 @@ object compression {
     }
 
   /** Replace literal string types longer than the given limit with `char[]`. */
-  def limitStrings[J, A: ConvertableTo: Field: Order](maxLength: Positive)(
+  def limitStrings[J, A: ConvertableTo: Field: Order](maxLength: Natural)(
     implicit
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
@@ -157,13 +160,16 @@ object compression {
     case EnvT((ts, TypeST(TypeF.Unioned(xs)))) if xs.length > maxSize.value =>
       val grouped = xs.list groupBy (_.project.primaryTag)
 
-      val compressed = (grouped - none).toList.maximumBy(_._2.length).fold(grouped) {
+      val compressed = (grouped - none).toList.maximumBy(_._2.length) map {
         case (pt, ssts) => grouped.insert(pt, ssts.foldMap1(widenConst[J, A]).wrapNel)
       }
 
-      compressed.foldMap(_.list).toNel map {
-        case NonEmptyList(x, ICons(y, zs)) => envT(ts, TypeST(TypeF.union[J, SST[J, A]](x, y, zs)))
-        case NonEmptyList(x, INil())       => envT(ts, x.project.lower)
+      compressed flatMap (_.foldMap(_.list).toNel) collect {
+        case NonEmptyList(x, ICons(y, zs)) if (zs.length + 2) < xs.length =>
+          envT(ts, TypeST(TypeF.union[J, SST[J, A]](x, y, zs)))
+
+        case NonEmptyList(x, INil()) =>
+          envT(ts, x.project.lower)
       }
 
     case _ => none

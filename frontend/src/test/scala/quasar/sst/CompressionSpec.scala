@@ -23,7 +23,7 @@ import quasar.contrib.matryoshka.arbitrary._
 import quasar.ejson, ejson.{EJsonArbitrary, TypeTag, z85}
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.fp.numeric.Positive
+import quasar.fp.numeric.{Natural, Positive}
 import quasar.tpe._
 
 import scala.Predef.$conforms
@@ -116,7 +116,7 @@ final class CompressionSpec extends quasar.Qspec
       val unk = unk0.map(_.umap(_.toSst))
       val sst = envT(cnt1, TypeST(TypeF.map[J, S](m, unk))).embed
 
-      Positive(m.size.toLong).cata(
+      Natural(m.size.toLong).cata(
         l => attemptCompression(sst, compression.coalesceKeys(l)),
         sst
       ) must_= sst
@@ -264,8 +264,8 @@ final class CompressionSpec extends quasar.Qspec
     "compresses arrays longer than maxLen to the union of the members" >> prop {
       xs: NonEmptyList[BigInt] => (xs.length > 1) ==> {
 
-      val alen: Positive = Positive(xs.length.toLong) getOrElse 1L
-      val lt: Positive = Positive((xs.length - 1).toLong) getOrElse 1L
+      val alen: Natural = Natural(xs.length.toLong) getOrElse 0L
+      val lt: Natural = Natural((xs.length - 1).toLong) getOrElse 0L
       val rlen = Real(xs.length).some
       val ints = xs.map(J.int(_))
       val xsst = SST.fromEJson(Real(1), J.arr(ints.toList))
@@ -283,7 +283,7 @@ final class CompressionSpec extends quasar.Qspec
     "does not limit structural string arrays" >> prop {
       s: String => (s.length > 1) ==> {
 
-      val lim: Positive = Positive((s.length - 1).toLong) getOrElse 1L
+      val lim: Natural = Natural((s.length - 1).toLong) getOrElse 0L
       val stringSst = strings.widen[J, Real](Real(1), s).embed
 
       stringSst.elgotApo[S](compression.limitArrays(lim)) must_= stringSst
@@ -292,8 +292,8 @@ final class CompressionSpec extends quasar.Qspec
 
   "limitStrings" >> {
     "compresses strings longer than maxLen" >> prop { s: String => (s.length > 1) ==> {
-      val plen: Positive = Positive(s.length.toLong) getOrElse 1L
-      val lt: Positive = Positive((s.length - 1).toLong) getOrElse 1L
+      val plen: Natural = Natural(s.length.toLong) getOrElse 0L
+      val lt: Natural = Natural((s.length - 1).toLong) getOrElse 0L
 
       val str = SST.fromEJson(Real(1), J.str(s))
       val arr = strings.compress[S, J, Real](str.copoint, s).embed

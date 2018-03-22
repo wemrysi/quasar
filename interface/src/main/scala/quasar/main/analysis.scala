@@ -22,7 +22,7 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.ejson.{EJson, EncodeEJson}
 import quasar.ejson.implicits._
-import quasar.fp.numeric.Positive
+import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._
 import quasar.fs.mount.Mounting
 import quasar.frontend.SemanticErrors
@@ -50,16 +50,16 @@ object analysis {
     * @param unionMaxSize    unions larger than this will be compressed
     */
   final case class CompressionSettings(
-    arrayMaxLength:  Positive,
-    mapMaxSize:      Positive,
-    stringMaxLength: Positive,
+    arrayMaxLength:  Natural,
+    mapMaxSize:      Natural,
+    stringMaxLength: Natural,
     unionMaxSize:    Positive
   )
 
   object CompressionSettings {
-    val DefaultArrayMaxLength:  Positive = 10L
-    val DefaultMapMaxSize:      Positive = 32L
-    val DefaultStringMaxLength: Positive =  1L
+    val DefaultArrayMaxLength:  Natural  = 10L
+    val DefaultMapMaxSize:      Natural  = 32L
+    val DefaultStringMaxLength: Natural  =  0L
     val DefaultUnionMaxSize:    Positive =  1L
 
     val Default: CompressionSettings =
