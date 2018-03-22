@@ -23,7 +23,7 @@ import quasar.fp.TaskRef
 import quasar.fs._
 import quasar.physical.mongodb._
 
-import com.mongodb.{MongoCommandException, MongoServerException}
+import com.mongodb.{MongoException, MongoCommandException, MongoServerException}
 import com.mongodb.async.client.MongoClient
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -56,8 +56,30 @@ object managefile {
     case MoveSemantics.FailIfMissing => RenameSemantics.Overwrite
   }
 
-  def moveDir(src: ADir, dst: ADir, sem: MoveSemantics): MongoFsM[Unit] =
-    unsupportedOperation("MongoDb connector does not support moving directories").raiseError[MongoFsM, Unit]
+  def moveDir(src: ADir, dst: ADir, sem: MoveSemantics): MongoFsM[Unit] = {
+    // TODO: Need our own error type instead of reusing the one from the driver.
+    def filesMismatchError(srcs: Vector[AFile], dsts: Vector[AFile]): MongoException = {
+      val pp = posixCodec.printPath _
+      new MongoException(
+        s"Mismatched files when moving '${pp(src)}' to '${pp(dst)}': srcFiles = ${srcs map pp}, dstFiles = ${dsts map pp}")
+    }
+
+    def moveAllUserCollections = for {
+      colls    <- userCollectionsInDir(src)
+      srcFiles =  colls map (_.asFile)
+      dstFiles =  srcFiles.map(_ relativeTo (src) map (dst </> _)).unite
+      _        <- srcFiles.alignBoth(dstFiles).sequence.cata(
+                    _.traverse { case (s, d) => moveFile(s, d, sem) },
+                    MongoDbIO.fail(filesMismatchError(srcFiles, dstFiles)).liftM[FileSystemErrT])
+    } yield ()
+
+    if (src === dst)
+      ().point[MongoFsM]
+    else if (depth(src) == 1)
+      unsupportedOperation("MongoDb connector does not support moving directories involving databases").raiseError[MongoFsM, Unit]
+    else
+      moveAllUserCollections
+  }
 
   def moveFile(src: AFile, dst: AFile, sem: MoveSemantics): MongoFsM[Unit] = {
 
