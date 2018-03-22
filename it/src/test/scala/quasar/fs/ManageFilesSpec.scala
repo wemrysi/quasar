@@ -38,9 +38,6 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
 
   val managePrefix: ADir = rootDir </> dir("m")
 
-  def deleteForManage(run: Run): FsTask[Unit] =
-    runT(run)(manage.delete(managePrefix))
-
   def unsupported: Matcher[FileSystemError] = { err: FileSystemError =>
     (FileSystemError.unsupportedOperation.getOption(err).isDefined,
     err.shows + " is not UnsupportedOperation")
@@ -50,7 +47,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
     implicit val run = fs.testInterpM
 
     "Managing Files" should {
-      step(deleteForManage(fs.setupInterpM).runVoid)
+      step(doDelete(fs.setupInterpM, managePrefix).runVoid)
 
       "moving a file should make it available at the new path and not found at the old" >> {
         val f1 = managePrefix </> dir("d1") </> file("f1")
@@ -152,12 +149,9 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
                 write.save(f2, anotherDoc.toProcess).drain ++
                 manage.moveDir(d1, d2, MoveSemantics.FailIfExists).liftM[Process]
 
-        val res = execT(run, p).runOption
-
-        (res must beSome(unsupported)) or
-        ((res must beNone) and
+        (execT(run, p).runOption must beNone) and
         (runT(run)(query.ls(d2)).runEither must beRight(containTheSameElementsAs(expectedFiles))) and
-        (runT(run)(query.ls(d1)).runEither must beLeft(pathErr(pathNotFound(d1)))))
+        (runT(run)(query.ls(d1)).runEither must beLeft(pathErr(pathNotFound(d1))))
       }
 
       // fixes #2973
@@ -176,14 +170,11 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
         val p = write.save(f, oneDoc.toProcess).drain ++
                 manage.moveDir(d2, trash_d2, MoveSemantics.FailIfExists).liftM[Process]
 
-        val res = execT(run, p).runOption
-
-        (res must beSome(unsupported)) or
-        ((res must beNone) and
+        (execT(run, p).runOption must beNone) and
         (runT(run)(query.ls(root)).runEither must beRight(containTheSameElementsAs(expectedRoot))) and
         (runT(run)(query.ls(trash)).runEither must beRight(containTheSameElementsAs(expectedTrash))) and
         (runT(run)(query.ls(trash_d2)).runEither must beRight(containTheSameElementsAs(expectedFiles))) and
-        (runT(run)(query.ls(d2)).runEither must beLeft(pathErr(pathNotFound(d2)))))
+        (runT(run)(query.ls(d2)).runEither must beLeft(pathErr(pathNotFound(d2))))
       }
 
       "files and directories with spaces/dots in names should be supported" >> {
@@ -215,7 +206,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
         val d2 = managePrefix </> dir("dirdnetodirdne") </> dir("d2")
 
         runT(run)(manage.moveDir(d1, d2, MoveSemantics.FailIfExists))
-          .runOption must (beSome(pathErr(pathNotFound(d1))) or beSome(unsupported))
+          .runOption must beSome(pathErr(pathNotFound(d1)))
       }
 
       "[SD-1846] moving a directory with a name that is a prefix of another directory" >> {
@@ -237,12 +228,9 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
           write.saveThese(uf3, thirdDoc)   *>
           manage.moveDir(src, dst, MoveSemantics.FailIfExists)
 
-        val res = runT(run)(setupAndMove).runOption
-
-        ((res must beSome(unsupported)) or
-        ((res must beNone)                                                                                  and
+        (runT(run)(setupAndMove).runOption must beNone)                                                                                  and
         (runLogT(run, read.scanAll(dst </> file("one"))).runEither must beRight(completelySubsume(oneDoc))) and
-        (run(query.fileExists(src </> file("one"))).unsafePerformSync must beFalse)))
+        (run(query.fileExists(src </> file("one"))).unsafePerformSync must beFalse)
       }
 
       "copying" >> {
@@ -352,7 +340,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
           .runEither must beRight(beSome[RFile])
       }
 
-      step(deleteForManage(fs.setupInterpM).runVoid)
+      step(doDelete(fs.setupInterpM, managePrefix).runVoid)
     }
   }
 }

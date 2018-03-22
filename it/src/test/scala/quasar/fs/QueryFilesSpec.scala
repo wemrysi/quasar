@@ -40,7 +40,7 @@ class QueryFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsU
   val queryPrefix: ADir = rootDir </> dir("q")
 
   def deleteForQuery(run: Run): FsTask[Unit] =
-    runT(run)(manage.delete(queryPrefix))
+    doDelete(run, queryPrefix)
 
   val lpr = new LogicalPlanR[Fix[LP]]
 
