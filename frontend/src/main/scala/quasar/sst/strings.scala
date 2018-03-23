@@ -29,7 +29,6 @@ import scalaz.syntax.foldable._
 import spire.algebra.Field
 import spire.math.ConvertableTo
 
-
 object strings {
   import StructuralType.{TagST, TypeST, STF}
 
