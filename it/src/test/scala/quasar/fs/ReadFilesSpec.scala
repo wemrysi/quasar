@@ -62,7 +62,7 @@ class ReadFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsUT
   }
 
   def deleteForReading(run: Run): FsTask[Unit] =
-    runT(run)(manage.delete(readsPrefix))
+    doDelete(run, readsPrefix)
 
   fileSystemShould { (fs, _) =>
     implicit val run = fs.testInterpM

@@ -22,6 +22,7 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.foldable._
 import quasar.fs.FileSystemTest.allFsUT
 
+import org.specs2.matcher.{Matcher, MatchersImplicits}, MatchersImplicits._
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
@@ -37,14 +38,16 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
 
   val managePrefix: ADir = rootDir </> dir("m")
 
-  def deleteForManage(run: Run): FsTask[Unit] =
-    runT(run)(manage.delete(managePrefix))
+  def unsupported: Matcher[FileSystemError] = { err: FileSystemError =>
+    (FileSystemError.unsupportedOperation.getOption(err).isDefined,
+    err.shows + " is not UnsupportedOperation")
+  }
 
   fileSystemShould { (fs, _) =>
     implicit val run = fs.testInterpM
 
     "Managing Files" should {
-      step(deleteForManage(fs.setupInterpM).runVoid)
+      step(doDelete(fs.setupInterpM, managePrefix).runVoid)
 
       "moving a file should make it available at the new path and not found at the old" >> {
         val f1 = managePrefix </> dir("d1") </> file("f1")
@@ -225,7 +228,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
           write.saveThese(uf3, thirdDoc)   *>
           manage.moveDir(src, dst, MoveSemantics.FailIfExists)
 
-        (runT(run)(setupAndMove).runOption must beNone)                                                     and
+        (runT(run)(setupAndMove).runOption must beNone)                                                                                  and
         (runLogT(run, read.scanAll(dst </> file("one"))).runEither must beRight(completelySubsume(oneDoc))) and
         (run(query.fileExists(src </> file("one"))).unsafePerformSync must beFalse)
       }
@@ -239,12 +242,8 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
           read.scanAll(f2) ++
           read.scanAll(f1)
 
-        val result = runLogT(run, p).map(_.toVector).runEither
-        result match {
-          case Left(UnsupportedOperation(_)) => skipped("This connector does not seem to support copy which is fine")
-          case Left(error)                   => org.specs2.execute.Failure("Received filesystem error: " + error.shows)
-          case Right(res)                    => (res must_=== (oneDoc ++ oneDoc)).toResult
-        }
+        runLogT(run, p).map(_.toVector).runEither must
+          (beLeft(unsupported) or beRight(oneDoc ++ oneDoc))
       }
 
       "deleting a nonexistent file returns PathNotFound" >> {
@@ -283,15 +282,19 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
                 write.save(f2, anotherDoc.toProcess).drain ++
                 manage.delete(d).liftM[Process]
 
-        (execT(run, p).runOption must beNone)                                       and
+        val res = execT(run, p).runOption
+
+        (res must beSome(unsupported)) or
+        ((res must beNone)                                                          and
         (runLogT(run, read.scanAll(f1)).runEither must beRight(Vector.empty[Data])) and
         (runLogT(run, read.scanAll(f2)).runEither must beRight(Vector.empty[Data])) and
-        (runT(run)(query.ls(d)).runEither must beLeft(pathErr(pathNotFound(d))))
+        (runT(run)(query.ls(d)).runEither must beLeft(pathErr(pathNotFound(d)))))
       }
 
       "deleting a nonexistent directory returns PathNotFound" >> {
         val d = managePrefix </> dir("deldirnotfound")
-        runT(run)(manage.delete(d)).runEither must beLeft(pathErr(pathNotFound(d)))
+        runT(run)(manage.delete(d)).runEither must
+           (beLeft(pathErr(pathNotFound(d))) or beLeft(unsupported))
       }
 
       "write/read from temp dir near existing" >> {
@@ -337,7 +340,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
           .runEither must beRight(beSome[RFile])
       }
 
-      step(deleteForManage(fs.setupInterpM).runVoid)
+      step(doDelete(fs.setupInterpM, managePrefix).runVoid)
     }
   }
 }

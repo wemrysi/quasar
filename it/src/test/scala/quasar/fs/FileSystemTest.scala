@@ -22,6 +22,8 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.fp._
 import quasar.fp.free._
+import quasar.fp.ski._
+import quasar.fs.FileSystemError._
 import quasar.fs.mount._, BackendDef.DefinitionResult, Fixture._
 import quasar.fs.mount.cache.VCache, VCache.VCacheKVS
 import quasar.effect._
@@ -52,9 +54,12 @@ import scalaz.stream.Process
   */
 abstract class FileSystemTest[S[_]](
   val fileSystems: Task[IList[SupportedFs[S]]]
-) extends quasar.Qspec {
+)(implicit Q: QueryFile :<: S, M: ManageFile :<: S) extends quasar.Qspec {
 
   sequential
+
+  val query_  = QueryFile.Ops[S]
+  val manage_ = ManageFile.Ops[S]
 
   type F[A]      = Free[S, A]
   type FsTask[A] = FileSystemErrT[Task, A]
@@ -133,6 +138,29 @@ abstract class FileSystemTest[S[_]](
 
   def execT[A](run: Run, p: Process[FileSystemErrT[F, ?], A]): FsTask[Unit] =
     p.translate[FsTask](runT(run)).run
+
+  def doDelete(run: Run, dir: ADir): FsTask[Unit] = {
+
+    def filesUnder(dir: ADir): EitherT[F, FileSystemError, List[AFile]] =
+      query_.descendantFiles(dir).map(_.map(y => dir </> y._1).toList)
+
+    def deletePerFile(dir: ADir)
+        : Free[S, FileSystemError \/ Unit] =
+      (for {
+        files <- filesUnder(dir)
+        ds <- files.traverse(manage_.delete)
+      } yield ds).run.map(_.map((κ(()))))
+
+    def delete(dir: ADir): Free[S, FileSystemError \/ Unit] = for {
+      d <- manage_.delete(dir).run
+      r <- d match {
+             case -\/(UnsupportedOperation(_)) => deletePerFile(dir)
+             case x => Free.point[S, FileSystemError \/ Unit](x)
+           }
+    } yield r
+
+    runT(run)(EitherT(delete(dir)))
+  }
 
   ////
 

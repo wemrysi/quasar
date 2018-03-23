@@ -76,9 +76,7 @@ object managefile {
     if (src === dst)
       ().point[MongoFsM]
     else if (depth(src) == 1)
-      dbNameFromPathM(src) flatMap { dbName =>
-        moveAllUserCollections *> dropDatabase(dbName).liftM[FileSystemErrT]
-      }
+      unsupportedOperation("MongoDb connector does not support moving directories involving databases").raiseError[MongoFsM, Unit]
     else
       moveAllUserCollections
   }
@@ -142,23 +140,8 @@ object managefile {
       } yield ()
   }
 
-  // TODO: Really need a Path#fold[A] method, which will be much more reliable
-  //       than this process of deduction.
   def deleteDir(dir: ADir): MongoFsM[Unit] =
-    Collection.dbNameFromPath(dir).toOption match {
-      case Some(n) if depth(dir) == 1 =>
-        dropDatabase(n).liftM[FileSystemErrT]
-
-      case Some(_) =>
-        collectionsInDir(dir)
-          .flatMap(_.traverse_(dropCollection(_).liftM[FileSystemErrT]))
-
-      case None if depth(dir) == 0 =>
-        dropAllDatabases.liftM[FileSystemErrT]
-
-      case None =>
-        nonExistentParent(dir)
-    }
+    unsupportedOperation("MongoDb connector does not support deleting directories").raiseError[MongoFsM, Unit]
 
   def deleteFile(file: AFile): MongoFsM[Unit] =
     collFromFileM(file) flatMap (c =>
