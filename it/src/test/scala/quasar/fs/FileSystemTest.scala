@@ -82,6 +82,12 @@ abstract class FileSystemTest[S[_]](
       .as(AsResult(a))
       .valueOr(cs => skipped(s"Doesn't support: ${cs.map(_.shows).intercalate(", ")}"))
 
+  def ifSupported[A, B: AsResult](fa: FsTask[A])(f: FileSystemError \/ A => Task[B]): Result =
+    (fa.run flatMap {
+      case -\/(FileSystemError.UnsupportedOperation(reason)) => skipped(reason).point[Task]
+      case other => f(other) map (AsResult(_))
+    }).unsafePerformSync
+
   def pendingFor[A: AsResult](fs: FileSystemUT[S])(toPend: Set[String])(a: => A): Result = {
     val name: String = fs.ref.name.name
     toPend.contains(name).fold(pending(s"PENDING: Not supported for $name."), AsResult(a))
