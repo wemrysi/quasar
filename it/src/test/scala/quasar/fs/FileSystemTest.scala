@@ -54,12 +54,9 @@ import scalaz.stream.Process
   */
 abstract class FileSystemTest[S[_]](
   val fileSystems: Task[IList[SupportedFs[S]]]
-)(implicit Q: QueryFile :<: S, M: ManageFile :<: S) extends quasar.Qspec {
+) extends quasar.Qspec {
 
   sequential
-
-  val query_  = QueryFile.Ops[S]
-  val manage_ = ManageFile.Ops[S]
 
   type F[A]      = Free[S, A]
   type FsTask[A] = FileSystemErrT[Task, A]
@@ -84,6 +81,12 @@ abstract class FileSystemTest[S[_]](
       .traverse_(c => fs.supports(c).fold(().successNel[BackendCapability], c.failureNel))
       .as(AsResult(a))
       .valueOr(cs => skipped(s"Doesn't support: ${cs.map(_.shows).intercalate(", ")}"))
+
+  def ifSupported[A, B: AsResult](fa: FsTask[A])(f: FileSystemError \/ A => Task[B]): Result =
+    (fa.run flatMap {
+      case -\/(FileSystemError.UnsupportedOperation(reason)) => skipped(reason).point[Task]
+      case other => f(other) map (AsResult(_))
+    }).unsafePerformSync
 
   def pendingFor[A: AsResult](fs: FileSystemUT[S])(toPend: Set[String])(a: => A): Result = {
     val name: String = fs.ref.name.name
@@ -139,20 +142,20 @@ abstract class FileSystemTest[S[_]](
   def execT[A](run: Run, p: Process[FileSystemErrT[F, ?], A]): FsTask[Unit] =
     p.translate[FsTask](runT(run)).run
 
-  def doDelete(run: Run, dir: ADir): FsTask[Unit] = {
+  def doDelete(run: Run, dir: ADir)(implicit Q: QueryFile.Ops[S], M: ManageFile.Ops[S]): FsTask[Unit] = {
 
     def filesUnder(dir: ADir): EitherT[F, FileSystemError, List[AFile]] =
-      query_.descendantFiles(dir).map(_.map(y => dir </> y._1).toList)
+      Q.descendantFiles(dir).map(_.map(y => dir </> y._1).toList)
 
     def deletePerFile(dir: ADir)
         : Free[S, FileSystemError \/ Unit] =
       (for {
         files <- filesUnder(dir)
-        ds <- files.traverse(manage_.delete)
+        ds <- files.traverse(M.delete(_))
       } yield ds).run.map(_.map((κ(()))))
 
     def delete(dir: ADir): Free[S, FileSystemError \/ Unit] = for {
-      d <- manage_.delete(dir).run
+      d <- M.delete(dir).run
       r <- d match {
              case -\/(UnsupportedOperation(_)) => deletePerFile(dir)
              case x => Free.point[S, FileSystemError \/ Unit](x)

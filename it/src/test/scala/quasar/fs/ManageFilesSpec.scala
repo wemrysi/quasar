@@ -22,10 +22,10 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.foldable._
 import quasar.fs.FileSystemTest.allFsUT
 
-import org.specs2.matcher.{Matcher, MatchersImplicits}, MatchersImplicits._
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 import scalaz.stream._
 
 class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
@@ -37,11 +37,6 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
   val manage = ManageFile.Ops[BackendEffect]
 
   val managePrefix: ADir = rootDir </> dir("m")
-
-  def unsupported: Matcher[FileSystemError] = { err: FileSystemError =>
-    (FileSystemError.unsupportedOperation.getOption(err).isDefined,
-    err.shows + " is not UnsupportedOperation")
-  }
 
   fileSystemShould { (fs, _) =>
     implicit val run = fs.testInterpM
@@ -242,8 +237,9 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
           read.scanAll(f2) ++
           read.scanAll(f1)
 
-        runLogT(run, p).map(_.toVector).runEither must
-          (beLeft(unsupported) or beRight(oneDoc ++ oneDoc))
+        ifSupported(runLogT(run, p)) { r =>
+          Task.delay(r.toEither must beRight(oneDoc ++ oneDoc))
+        }
       }
 
       "deleting a nonexistent file returns PathNotFound" >> {
@@ -282,19 +278,27 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
                 write.save(f2, anotherDoc.toProcess).drain ++
                 manage.delete(d).liftM[Process]
 
-        val res = execT(run, p).runOption
-
-        (res must beSome(unsupported)) or
-        ((res must beNone)                                                          and
-        (runLogT(run, read.scanAll(f1)).runEither must beRight(Vector.empty[Data])) and
-        (runLogT(run, read.scanAll(f2)).runEither must beRight(Vector.empty[Data])) and
-        (runT(run)(query.ls(d)).runEither must beLeft(pathErr(pathNotFound(d)))))
+        ifSupported(execT(run, p)) { res =>
+          for {
+            r1 <- Task.delay(res.swap.toOption must beNone)
+            f1data <- runLogT(run, read.scanAll(f1)).run
+            f2data <- runLogT(run, read.scanAll(f2)).run
+            lsd <- runT(run)(query.ls(d)).run
+          } yield {
+            r1 and
+            (f1data.toEither must beRight(Vector.empty[Data])) and
+            (f2data.toEither must beRight(Vector.empty[Data])) and
+            (lsd.toEither must beLeft(pathErr(pathNotFound(d))))
+          }
+        }
       }
 
       "deleting a nonexistent directory returns PathNotFound" >> {
         val d = managePrefix </> dir("deldirnotfound")
-        runT(run)(manage.delete(d)).runEither must
-           (beLeft(pathErr(pathNotFound(d))) or beLeft(unsupported))
+
+        ifSupported(runT(run)(manage.delete(d))) { r =>
+          Task.delay(r.toEither must beLeft(pathErr(pathNotFound(d))))
+        }
       }
 
       "write/read from temp dir near existing" >> {
