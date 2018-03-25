@@ -48,6 +48,8 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends QS
       debug("ExtractFreeMap: ")              >==>
       ApplyProvenance[T, F]                  >==>
       debug("ApplyProv: ")                   >==>
+      FoldConstantReductions[T, F]           >==>
+      debug("FoldConstantReductions: ")      >==>
       ReifyBuckets[T, F]                     >==>
       debug("ReifyBuckets: ")                >==>
       MinimizeAutoJoins[T, F]                >==>
