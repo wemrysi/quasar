@@ -35,22 +35,19 @@ final class FoldConstantReductions[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
   private val func = qscript.construction.Func[T]
   private val json = ejson.Fixed[T[EJson]]
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def apply(aqsu: AuthenticatedQSU[T])
       : AuthenticatedQSU[T] = {
-    type G[A] = State[QAuth, A]
-    val (auth, graph) = aqsu.graph.rewriteM[G](Function.unlift(extract)).run(aqsu.auth)
-    ApplyProvenance.AuthenticatedQSU(graph, auth)
+    val graph = aqsu.graph.rewrite(Function.unlift(extract))
+    ApplyProvenance.AuthenticatedQSU(graph, aqsu.auth)
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   private def extract
-      : QSUGraph => Option[State[QAuth, QSUGraph]] = {
+      : QSUGraph => Option[QSUGraph] = {
     case qsr@Extractors.LPReduce(m@Extractors.Map(_, fm), Arbitrary(_) | First(_) | Last(_)) =>
       val normalizedFM = fm.transCata[FreeMap](MapFuncCore.normalize[T, Hole])
       normalizedFM.project.run match {
         case \/-(MFC(MapFuncsCore.Constant(_))) =>
-          Some(qsr.overwriteAtRoot(m.unfold.map(_.root)).pure[State[QAuth, ?]])
+          Some(qsr.overwriteAtRoot(m.unfold.map(_.root)))
         case _ =>
           None
       }
