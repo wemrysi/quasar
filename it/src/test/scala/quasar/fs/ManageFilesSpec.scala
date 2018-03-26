@@ -28,7 +28,9 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream._
 
-class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
+class ManageFilesSpec extends FileSystemTest[BackendEffect](
+    allFsUT.map(_ filter (_.ref supports BackendCapability.write()))) {
+
   import FileSystemTest._, FileSystemError._, PathError._
 
   val query  = QueryFile.Ops[BackendEffect]
@@ -273,6 +275,30 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
         val d = managePrefix </> dir("deldir")
         val f1 = d </> file("f1")
         val f2 = d </> file("f2")
+
+        val p = write.save(f1, oneDoc.toProcess).drain ++
+                write.save(f2, anotherDoc.toProcess).drain ++
+                manage.delete(d).liftM[Process]
+
+        ifSupported(execT(run, p)) { res =>
+          for {
+            r1 <- Task.delay(res.swap.toOption must beNone)
+            f1data <- runLogT(run, read.scanAll(f1)).run
+            f2data <- runLogT(run, read.scanAll(f2)).run
+            lsd <- runT(run)(query.ls(d)).run
+          } yield {
+            r1 and
+            (f1data.toEither must beRight(Vector.empty[Data])) and
+            (f2data.toEither must beRight(Vector.empty[Data])) and
+            (lsd.toEither must beLeft(pathErr(pathNotFound(d))))
+          }
+        }
+      }
+
+      "deleting a directory deletes all directories therein" >> {
+        val d = managePrefix </> dir("deldir2")
+        val f1 = d </> dir("d1") </> file("f1")
+        val f2 = d </> dir("d2") </> file("f2")
 
         val p = write.save(f1, oneDoc.toProcess).drain ++
                 write.save(f2, anotherDoc.toProcess).drain ++

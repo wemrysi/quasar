@@ -157,9 +157,9 @@ abstract class FileSystemTest[S[_]](
     def delete(dir: ADir): Free[S, FileSystemError \/ Unit] = for {
       d <- M.delete(dir).run
       r <- d match {
-             case -\/(UnsupportedOperation(_)) => deletePerFile(dir)
-             case x => Free.point[S, FileSystemError \/ Unit](x)
-           }
+        case -\/(UnsupportedOperation(_)) => deletePerFile(dir)
+        case x => Free.point[S, FileSystemError \/ Unit](x)
+      }
     } yield r
 
     runT(run)(EitherT(delete(dir)))
@@ -230,12 +230,12 @@ object FileSystemTest {
   }
 
   def localFsUT(mounts: BackendDef[PhysFsEffM]): Task[IList[SupportedFs[BackendEffect]]] =
-    (inMemUT |@| hierarchicalUT |@| nullViewUT(mounts)) { (mem, hier, nullUT) =>
+    (inMemUT |@| localUT |@| hierarchicalUT |@| nullViewUT(mounts)) { (mem, local, hier, nullUT) =>
       IList(
         SupportedFs(mem.ref, mem.some),
+        SupportedFs(local.ref, local.some),
         SupportedFs(hier.ref, hier.some),
-        SupportedFs(nullUT.ref, nullUT.some)
-      )
+        SupportedFs(nullUT.ref, nullUT.some))
     }
 
   def nullViewUT(mounts: BackendDef[PhysFsEffM]): Task[FileSystemUT[BackendEffect]] =
@@ -300,9 +300,18 @@ object FileSystemTest {
   def inMemUT: Task[FileSystemUT[BackendEffect]] = {
     val ref = BackendRef(BackendName("in-memory"), ISet singleton BackendCapability.write())
 
-    InMemory.runStatefully(InMemory.InMemState.empty)
-      .map(_ compose InMemory.fileSystem)
+    InMemory.runFs(InMemory.InMemState.empty)
       .map(f => Empty.analyze[Task] :+: f)
       .map(f => FileSystemUT(ref, f, f, rootDir, ().point[Task]))
+  }
+
+  def localUT: Task[FileSystemUT[BackendEffect]] = {
+    val ref = BackendRef(BackendName("local"), ISet singleton BackendCapability.write())
+
+    val mntDir: ADir = rootDir </> dir("tmp") </> dir("local")
+
+    Local(new java.io.File("/tmp/local/")).runFs
+      .map(f => Empty.analyze[Task] :+: f)
+      .map(f => FileSystemUT(ref, f, f, mntDir, ().point[Task]))
   }
 }

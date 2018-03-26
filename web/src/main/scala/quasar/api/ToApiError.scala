@@ -96,6 +96,10 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
         e.toApiError :+ ("logicalplan" := lp.render)
       case QScriptPlanningFailed(e) =>
         e.toApiError
+      case ue @ UnexpectedError(err, reason) =>
+        fromMsg(
+          BadRequest withReason "Unexpected Error",
+          (ue: FileSystemError).shows)
       case UnsupportedOperation(reason) =>
         fromMsg(
           BadRequest withReason "Unsupported Operation",
