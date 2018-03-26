@@ -23,7 +23,6 @@ import quasar._
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript._
-import quasar.Planner._
 import ReduceFuncs.{Arbitrary, First, Last}
 
 import matryoshka.{Hole => _, _}
@@ -37,34 +36,34 @@ final class FoldConstantReductions[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
   private val json = ejson.Fixed[T[EJson]]
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  def apply[F[_]: Monad: PlannerErrorME](aqsu: AuthenticatedQSU[T])
-      : F[AuthenticatedQSU[T]] = {
-    type G[A] = StateT[StateT[F, RevIdx, ?], QAuth, A]
-    aqsu.graph.rewriteM[G](Function.unlift(extract[G])).run(aqsu.auth).eval(aqsu.graph.generateRevIndex) map {
-      case (auth, graph) => ApplyProvenance.AuthenticatedQSU(graph, auth)
-    }
+  def apply(aqsu: AuthenticatedQSU[T])
+      : AuthenticatedQSU[T] = {
+    type G[A] = State[QAuth, A]
+    val (auth, graph) = aqsu.graph.rewriteM[G](Function.unlift(extract)).run(aqsu.auth)
+    ApplyProvenance.AuthenticatedQSU(graph, auth)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Throw"))
-  private def extract[F[_]: Monad: PlannerErrorME: RevIdxM]
-      : QSUGraph => Option[F[QSUGraph]] = {
+  private def extract
+      : QSUGraph => Option[State[QAuth, QSUGraph]] = {
     case qsr@Extractors.LPReduce(m@Extractors.Map(_, fm), Arbitrary(_) | First(_) | Last(_)) =>
       val normalizedFM = fm.transCata[FreeMap](MapFuncCore.normalize[T, Hole])
       normalizedFM.project.run match {
         case \/-(MFC(MapFuncsCore.Constant(_))) =>
-          Some(qsr.overwriteAtRoot(m.unfold.map(_.root)).pure[F])
-        case _ => None
+          Some(qsr.overwriteAtRoot(m.unfold.map(_.root)).pure[State[QAuth, ?]])
+        case _ =>
+          None
       }
-    case _ => None
+    case _ =>
+      None
   }
 
 }
 
 object FoldConstantReductions {
   def apply[
-      T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
-      F[_]: Monad: NameGenerator: PlannerErrorME]
+      T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT]
       (aqsu: AuthenticatedQSU[T])
-      : F[AuthenticatedQSU[T]] =
-    taggedInternalError("FoldConstantReductions", new FoldConstantReductions[T].apply[F](aqsu))
+      : AuthenticatedQSU[T] =
+    new FoldConstantReductions[T].apply(aqsu)
 }
