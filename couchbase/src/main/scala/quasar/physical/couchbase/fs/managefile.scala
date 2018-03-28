@@ -65,9 +65,10 @@ abstract class managefile {
       _         <- ME.unattempt(lift(deleteHavingPrefix(ctx, col.v)).into[Eff].liftB)
     } yield ()
 
-  def tempFile(near: APath): Backend[AFile] =
+  def tempFile(near: APath, prefix: Option[TempFilePrefix]): Backend[AFile] =
     MonotonicSeq.Ops[Eff].next.map { i =>
-      val tmpFilename = file(s"__quasar_tmp_$i")
+      val tmpFilename = file(
+        prefix.map(_.prefix).getOrElse("__quasar_tmp_") + i.toString)
       refineType(near).fold(
         d => d </> tmpFilename,
         f => fileParent(f) </> tmpFilename)

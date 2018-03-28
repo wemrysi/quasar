@@ -158,12 +158,13 @@ trait RdbmsManageFile
         .getOrElse(().point[Backend])
     }
 
-    override def tempFile(near: APath): Backend[AFile] = {
+    override def tempFile(near: APath, prefix: Option[TempFilePrefix]): Backend[AFile] = {
       MonotonicSeq
         .Ops[Eff]
         .next
         .map { i =>
-          val tmpFilename = file(s"__quasar_tmp_table_$i")
+          val tmpFilename = file(
+            prefix.map(_.prefix).getOrElse("__quasar_tmp_table_") + i.toString)
           refineType(near).fold(d => {
             d </> tmpFilename
           }, f => fileParent(f) </> tmpFilename)

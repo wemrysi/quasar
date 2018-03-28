@@ -32,7 +32,7 @@ import scalaz.concurrent.Task
 object managefile {
   import FileSystemError._, PathError._, MongoDbIO._, fsops._
 
-  type ManageIn           = (TmpPrefix, TaskRef[Long])
+  type ManageIn           = (Salt, TaskRef[Long])
   type ManageInT[F[_], A] = ReaderT[F, ManageIn, A]
   type MongoManage[A]     = ManageInT[MongoDbIO, A]
 
@@ -43,10 +43,10 @@ object managefile {
     S0: Task :<: S,
     S1: PhysErr :<: S
   ): Task[MongoManage ~> Free[S, ?]] =
-    (tmpPrefix |@| TaskRef(0L)) { (prefix, ref) =>
+    (salt |@| TaskRef(0L)) { (s, ref) =>
       new (MongoManage ~> Free[S, ?]) {
         def apply[A](fs: MongoManage[A]) =
-          fs.run((prefix, ref)).runF(client)
+          fs.run((s, ref)).runF(client)
       }
     }
 
@@ -149,13 +149,13 @@ object managefile {
         dropCollection(c).liftM[FileSystemErrT],
         pathErr(pathNotFound(file)).raiseError[MongoFsM, Unit]))
 
-  def freshName: MongoManage[String] =
+  def freshName(tempFilePrefix: Option[TempFilePrefix]): MongoManage[String] =
     for {
       in <- MonadReader[MongoManage, ManageIn].ask
-      (prefix, ref) = in
+      (salt, ref) = in
       n  <- liftTask(ref.modifyS(i => (i + 1, i))).liftM[ManageInT]
-    } yield prefix.run + n.toString
+    } yield tempFilePrefix.map(_.prefix).getOrElse("__quasar.tmp_") + salt.s + "_" + n.toString
 
-  def tmpPrefix: Task[TmpPrefix] =
-    NameGenerator.salt map (s => TmpPrefix(s"__quasar.tmp_${s}_"))
+  def salt: Task[Salt] =
+    NameGenerator.salt map (Salt(_))
 }

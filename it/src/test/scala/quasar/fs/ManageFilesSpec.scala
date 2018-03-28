@@ -306,7 +306,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
         val f = d </> file("somefile")
 
         val p = write.save(f, oneDoc.toProcess).drain ++
-                manage.tempFile(f).liftM[Process] flatMap { tf =>
+                manage.tempFile(f, None).liftM[Process] flatMap { tf =>
                   write.save(tf, anotherDoc.toProcess).drain ++
                   read.scanAll(tf) ++
                   manage.delete(tf).liftM[Process].drain
@@ -318,7 +318,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
       "write/read from temp dir near non existing" >> {
         val d = managePrefix </> dir("tmpnear2")
         val f = d </> file("somefile")
-        val p = manage.tempFile(f).liftM[Process] flatMap { tf =>
+        val p = manage.tempFile(f, None).liftM[Process] flatMap { tf =>
                   write.save(tf, anotherDoc.toProcess).drain ++
                   read.scanAll(tf) ++
                   manage.delete(tf).liftM[Process].drain
@@ -330,7 +330,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
       "temp file should be generated in hint directory" >> prop { rdir: RDir =>
         val hintDir = managePrefix </> rdir
 
-        runT(run)(manage.tempFile(hintDir))
+        runT(run)(manage.tempFile(hintDir, None))
           .map(_ relativeTo hintDir)
           .runEither must beRight(beSome[RFile])
       }
@@ -339,7 +339,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
         val hintFile = managePrefix </> rfile
         val hintDir  = fileParent(hintFile)
 
-        runT(run)(manage.tempFile(hintFile))
+        runT(run)(manage.tempFile(hintFile, None))
           .map(_ relativeTo hintDir)
           .runEither must beRight(beSome[RFile])
       }

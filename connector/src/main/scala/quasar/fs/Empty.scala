@@ -55,7 +55,7 @@ object Empty {
     case ManageFile.Move(scn, _) => fsPathNotFound(scn.src)
     case ManageFile.Copy(pair)   => fsPathNotFound(pair.src)
     case ManageFile.Delete(p)    => fsPathNotFound(p)
-    case ManageFile.TempFile(p)  => (refineType(p).swap.valueOr(fileParent) </> file("tmp")).right.point[F]
+    case ManageFile.TempFile(p, prefix)  => (refineType(p).swap.valueOr(fileParent) </> file(s"${prefix}_tmp")).right.point[F]
   }
 
   def queryFile[F[_]: Applicative]: QueryFile ~> F =

@@ -479,10 +479,10 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
       } yield ()
     }
 
-    def tempFile(near: APath): Backend[AFile] = {
+    def tempFile(near: APath, prefix: Option[TempFilePrefix]): Backend[AFile] = {
       for {
         seed <- Task.delay(UUID.randomUUID().toString).liftM[MT].liftB
-      } yield refineType(near).fold(p => p, fileParent) </> file(seed)
+      } yield refineType(near).fold(p => p, fileParent) </> file(prefix.map(_.prefix).getOrElse("") + seed)
     }
   }
 }
