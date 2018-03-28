@@ -66,6 +66,16 @@ object RecFreeS {
     f.flatMapSuspension(λ[RecFreeS[F, ?] ~> Free[F, ?]](_.linearize))
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def mapS[F[_], S[_], A](rc: RecFreeS[F, A])(t: F ~> S): RecFreeS[S, A] = rc match {
+    case Suspend(fa) =>
+      Suspend(t(fa))
+    case Fix(form, rec) =>
+      Fix(
+        RecFreeS.mapS(form)(t),
+        rec.mapSuspension(λ[RecFreeS[F, ?] ~> RecFreeS[S, ?]](RecFreeS.mapS(_)(t))))
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def traverse[F[_]: Traverse]: Traverse[RecFreeS[F, ?]] = new Traverse[RecFreeS[F, ?]] {
     def traverseImpl[G[_]: Applicative, A, B](fa: RecFreeS[F, A])(f: A => G[B]): G[RecFreeS[F, B]] = fa match {
       case Suspend(fa0) => Traverse[F].traverseImpl[G, A, B](fa0)(f) map (Suspend(_))
@@ -85,5 +95,9 @@ object RecFreeS {
 
   implicit final class LinearizeOps[F[_], A](val self: Free[RecFreeS[F, ?], A]) extends AnyVal {
     def linearize: Free[F, A] = RecFreeS.linearize(self)
+  }
+
+  implicit final class RecOps[F[_], A](val self: Free[F, A]) extends AnyVal {
+    def asRec: Free[RecFreeS[F, ?], A] = RecFreeS.fromFree(self)
   }
 }

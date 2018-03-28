@@ -32,10 +32,19 @@ import scalaz.std.tuple._
 import scalaz.syntax.bifunctor._
 
 object construction {
+  final case class RecFunc[T[_[_]]: BirecursiveT]() {
+    private val json = ejson.Fixed[T[EJson]]
+    private def rollCore[A](in: RecFreeS[MapFuncCore[T, ?], RecFreeMapA[T, A]]): RecFreeMapA[T, A] =
+      Free.roll(RecFreeS.mapS(in)(λ[MapFuncCore[T, ?] ~> MapFunc[T, ?]](MFC(_))))
+    private def rollDerived[A](in: RecFreeS[MapFuncDerived[T, ?], RecFreeMapA[T, A]]): RecFreeMapA[T, A] =
+      Free.roll(RecFreeS.mapS(in)(λ[MapFuncDerived[T, ?] ~> MapFunc[T, ?]](MFD(_))))
+  }
+
   final case class Func[T[_[_]]]()(implicit birec: BirecursiveT[T]) {
     private val json = ejson.Fixed[T[EJson]]
     private def rollCore[A](in: MapFuncCore[T, FreeMapA[T, A]]): FreeMapA[T, A] = Free.roll(MFC(in))
     private def rollDerived[A](in: MapFuncDerived[T, FreeMapA[T, A]]): FreeMapA[T, A] = Free.roll(MFD(in))
+
     def Constant[A](in: T[EJson]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.Constant(in))
     def Undefined[A]: FreeMapA[T, A] =
