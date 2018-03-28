@@ -149,12 +149,18 @@ object managefile {
         dropCollection(c).liftM[FileSystemErrT],
         pathErr(pathNotFound(file)).raiseError[MongoFsM, Unit]))
 
-  def freshName(tempFilePrefix: Option[TempFilePrefix]): MongoManage[String] =
+  val defaultPrefix = TempFilePrefix("__quasar.tmp_")
+
+  def saltedPrefix(salt: Salt, prefix: Option[TempFilePrefix]): TempFilePrefix =
+    prefix.getOrElse(defaultPrefix) |+| TempFilePrefix(salt.s)
+
+  def freshFile(near: APath, prefix: Option[TempFilePrefix]): MongoManage[AFile] = {
     for {
       in <- MonadReader[MongoManage, ManageIn].ask
       (salt, ref) = in
       n  <- liftTask(ref.modifyS(i => (i + 1, i))).liftM[ManageInT]
-    } yield tempFilePrefix.map(_.prefix).getOrElse("__quasar.tmp_") + salt.s + "_" + n.toString
+    } yield TmpFile.tmpFile0(near, saltedPrefix(salt, prefix), n)
+  }
 
   def salt: Task[Salt] =
     NameGenerator.salt map (Salt(_))

@@ -16,28 +16,19 @@
 
 package quasar.fs
 
-import slamdata.Predef._
-import quasar._
-import quasar.fp._
+import quasar.contrib.pathy._
 
-import scalaz._
+import pathy.Path._
+import scalaz._, Scalaz._
 
-final case class TempFilePrefix(s: String) extends AnyVal
+object TmpFile {
 
-object TempFilePrefix {
+  def tmpFilename[A: Show](prefix: TempFilePrefix, a: A): FileName =
+    FileName(prefix.s + a.shows)
 
-  implicit val showTempFilePrefix: Show[TempFilePrefix] =
-    Show.shows(_.s)
+  def tmpFile[A: Show](dir: ADir, prefix: TempFilePrefix, a: A): AFile =
+    dir </> file1(tmpFilename(prefix, a))
 
-  implicit val renderTreeTempFilePrefix: RenderTree[TempFilePrefix] =
-    RenderTree.fromShow("TempFilePrefix")
-
-  implicit val monoidTempFilePrefix: Monoid[TempFilePrefix] =
-    new Monoid[TempFilePrefix] {
-      val zero = TempFilePrefix("")
-
-      def append(p1: TempFilePrefix, p2: => TempFilePrefix) =
-        TempFilePrefix(p1.s + p2.s)
-    }
-
+  def tmpFile0[A: Show](near: APath, prefix: TempFilePrefix, a: A): AFile =
+    tmpFile(nearDir(near), prefix, a)
 }

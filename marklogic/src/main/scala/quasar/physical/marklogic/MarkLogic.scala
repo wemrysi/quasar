@@ -306,13 +306,12 @@ sealed class MarkLogic protected (readChunkSize: Positive, writeChunkSize: Posit
         ).void
       }
 
+    val defaultPrefix = TempFilePrefix("temp-")
+
     def tempFile(path: APath, prefix: Option[TempFilePrefix]): Backend[AFile] =
       // Take my hand, scalac
       UuidReader[FileSystemErrT[PhaseResultT[Configured, ?], ?]] asks { uuid =>
-        val fname = prefix.map(_.prefix).getOrElse("temp-") + uuid.toString
-        refineType(path).fold(
-          d => d </> file(fname),
-          f => fileParent(f) </> file(fname))
+        TmpFile.tmpFile0(path, prefix.getOrElse(defaultPrefix), uuid.toString)
       }
 
     ////

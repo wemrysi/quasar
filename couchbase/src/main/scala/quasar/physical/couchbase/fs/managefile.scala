@@ -24,7 +24,6 @@ import quasar.fp.free._
 import quasar.fs._, ManageFile._
 import quasar.physical.couchbase._, common._, Couchbase._
 
-import pathy.Path._
 import scalaz._, Scalaz._
 
 abstract class managefile {
@@ -65,12 +64,9 @@ abstract class managefile {
       _         <- ME.unattempt(lift(deleteHavingPrefix(ctx, col.v)).into[Eff].liftB)
     } yield ()
 
+  val defaultPrefix = TempFilePrefix("__quasar_tmp_")
+
   def tempFile(near: APath, prefix: Option[TempFilePrefix]): Backend[AFile] =
-    MonotonicSeq.Ops[Eff].next.map { i =>
-      val tmpFilename = file(
-        prefix.map(_.prefix).getOrElse("__quasar_tmp_") + i.toString)
-      refineType(near).fold(
-        d => d </> tmpFilename,
-        f => fileParent(f) </> tmpFilename)
-    }.liftB
+    MonotonicSeq.Ops[Eff].next.map(
+      TmpFile.tmpFile0(near, prefix.getOrElse(defaultPrefix), _)).liftB
 }

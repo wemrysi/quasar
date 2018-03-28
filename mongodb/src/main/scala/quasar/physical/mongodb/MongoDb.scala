@@ -294,14 +294,9 @@ object MongoDb
         EitherT.fromDisjunction[MongoManage](Collection.dbNameFromPath(near))
           .bimap(FileSystemError.pathErr(_), κ(()))
 
-      val mkTemp =
-        freshName(prefix).liftM[FileSystemErrT] map { n =>
-          pathy.Path.refineType(near).fold(
-            _ </> pathy.Path.file(n),
-            f => pathy.Path.fileParent(f) </> pathy.Path.file(n))
-        }
+      val mm: MongoManage[FileSystemError \/ AFile] =
+        checkPath.flatMap(κ(freshFile(near, prefix).liftM[FileSystemErrT])).run
 
-      val mm: MongoManage[FileSystemError \/ AFile] = checkPath.flatMap(κ(mkTemp)).run
       toBackend(mm)
     }
   }
