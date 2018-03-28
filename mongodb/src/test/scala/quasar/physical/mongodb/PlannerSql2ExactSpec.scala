@@ -29,7 +29,7 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript.{OnUndefined, ShiftType, RecFreeS}
+import quasar.qscript.{OnUndefined, ShiftType}
 import quasar.sql._
 
 import java.time.Instant
@@ -153,44 +153,38 @@ class PlannerSql2ExactSpec extends
       "$match before $unwind",
       sqlToWf = Ok,
       sqlE"SELECT measureEnrollments[*].measureKey FROM zips WHERE year=2017 and memberNumber=123456",
-      {
-        val struct =
-          RecFreeS.fromFree(func.Guard(
+      QsSpec(
+        sqlToQs = Ok,
+        qsToWf = Ok,
+        fix.LeftShift(
+          fix.Filter(fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
             func.Guard(
               func.Hole,
               Type.Obj(Map(), Some(Type.Top)),
-              func.ProjectKey(
-                func.Hole,
-                func.Constant(json.str("measureEnrollments"))),
-              func.Undefined),
+              func.And(
+                func.Eq(
+                  func.ProjectKey(func.Hole, func.Constant(json.str("year"))),
+                  func.Constant(json.int(2017))),
+                func.Eq(
+                  func.ProjectKey(func.Hole, func.Constant(json.str("memberNumber"))),
+                  func.Constant(json.int(123456)))),
+              func.Undefined)),
+          recFunc.Guard(
+            recFunc.Guard(
+              recFunc.Hole,
+              Type.Obj(Map(), Some(Type.Top)),
+              recFunc.ProjectKey(
+                recFunc.Hole,
+                recFunc.Constant(json.str("measureEnrollments"))),
+              recFunc.Undefined),
             Type.FlexArr(0, None, Type.Obj(Map(), Some(Type.Top))),
-            func.ProjectKey(func.Hole, func.Constant(json.str("measureEnrollments"))),
-            func.Undefined))
-
-        QsSpec(
-          sqlToQs = Ok,
-          qsToWf = Ok,
-          fix.LeftShift(
-            fix.Filter(fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-              func.Guard(
-                func.Hole,
-                Type.Obj(Map(), Some(Type.Top)),
-                func.And(
-                  func.Eq(
-                    func.ProjectKey(func.Hole, func.Constant(json.str("year"))),
-                    func.Constant(json.int(2017))),
-                  func.Eq(
-                    func.ProjectKey(func.Hole, func.Constant(json.str("memberNumber"))),
-                    func.Constant(json.int(123456)))),
-                func.Undefined)),
-            struct,
-            qscript.ExcludeId,
-            ShiftType.Array,
-            OnUndefined.Omit,
-            func.ProjectKey(
-              func.RightSide, func.Constant(json.str("measureKey"))))
-        ).some
-      },
+            recFunc.ProjectKey(recFunc.Hole, recFunc.Constant(json.str("measureEnrollments"))),
+            recFunc.Undefined),
+          qscript.ExcludeId,
+          ShiftType.Array,
+          OnUndefined.Omit,
+          func.ProjectKey(
+            func.RightSide, func.Constant(json.str("measureKey"))))).some,
       chain[Workflow](
         $read(collection("db", "zips")),
         $match(Selector.And(

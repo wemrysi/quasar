@@ -31,7 +31,6 @@ import scalaz._, Scalaz._
 
 class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
   val rewrite = new Rewrite[Fix]
-  val holeR = RecFreeS.fromFree(qsdsl.func.Hole)
 
   "shiftRead" should {
     "eliminate Read nodes from a simple query" in {
@@ -40,7 +39,7 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
       val qScript: Fix[QS] =
         chainQS(
           qsdsl.fix.Read[AFile](sampleFile),
-          qsdsl.fix.LeftShift(_, holeR, ExcludeId, ShiftType.Array, OnUndefined.Omit, qsdsl.func.RightSide))
+          qsdsl.fix.LeftShift(_, qsdsl.recFunc.Hole, ExcludeId, ShiftType.Array, OnUndefined.Omit, qsdsl.func.RightSide))
 
       val newQScript: Fix[QST] =
         qScript.codyna(
@@ -58,7 +57,7 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
       val qScript: Fix[QS] = qsdsl.fix.Reduce(
         qsdsl.fix.LeftShift(
           qsdsl.fix.Read[AFile](rootDir </> dir("foo") </> file("bar")),
-          holeR,
+          qsdsl.recFunc.Hole,
           ExcludeId,
           ShiftType.Array,
           OnUndefined.Omit,
