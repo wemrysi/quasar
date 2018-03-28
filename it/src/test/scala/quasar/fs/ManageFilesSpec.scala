@@ -306,7 +306,7 @@ class ManageFilesSpec extends FileSystemTest[BackendEffect](allFsUT.map(_ filter
         val f = d </> file("somefile")
 
         val p = write.save(f, oneDoc.toProcess).drain ++
-                manage.tempFile(f, None).liftM[Process] flatMap { tf =>
+                manage.tempFile(f, TempFilePrefix("some_prefix_").some).liftM[Process] flatMap { tf =>
                   write.save(tf, anotherDoc.toProcess).drain ++
                   read.scanAll(tf) ++
                   manage.delete(tf).liftM[Process].drain
