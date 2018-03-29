@@ -29,7 +29,6 @@ import quasar.qscript.{
   LeftSide,
   MapFuncsCore,
   OnUndefined,
-  RecFreeS,
   ReduceFuncs,
   ReduceIndex,
   RightSide,
@@ -56,6 +55,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
+  val recFunc = construction.RecFunc[Fix]
   val qprov = QProv[Fix]
 
   type J = Fix[EJson]
@@ -63,12 +63,9 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
   val afile = Path.rootDir[Sandboxed] </> Path.file("afile")
   val afile2 = Path.rootDir[Sandboxed] </> Path.file("afile2")
-  val holeR = RecFreeS.fromFree(func.Hole)
-  val projectKeyS: String => RecFreeMap =
-    (s => RecFreeS.fromFree(func.ProjectKeyS(func.Hole, s)))
 
   val shiftedRead =
-    qsu.leftShift(qsu.read(afile), holeR, ExcludeId, OnUndefined.Omit, func.RightTarget, Rotation.ShiftMap)
+    qsu.leftShift(qsu.read(afile), recFunc.Hole, ExcludeId, OnUndefined.Omit, func.RightTarget, Rotation.ShiftMap)
 
   implicit val eqP: Equal[qprov.P] =
     qprov.prov.provenanceEqual(Equal[qprov.D], Equal[QIdAccess])
@@ -537,7 +534,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         qsu.autojoin2((
           qsu.leftShift(
             shiftedRead,
-            holeR,
+            recFunc.Hole,
             ExcludeId,
             OnUndefined.Omit,
             func.RightTarget,
@@ -577,7 +574,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           shiftedRead,
           qsu.leftShift(
             shiftedRead,
-            holeR,
+            recFunc.Hole,
             ExcludeId,
             OnUndefined.Omit,
             func.RightTarget,
@@ -617,7 +614,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           qsu.qsReduce(
             qsu.leftShift(
               shiftedRead,
-              holeR,
+              recFunc.Hole,
               ExcludeId,
               OnUndefined.Omit,
               func.RightTarget,
@@ -676,7 +673,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           qsu.qsReduce(
             qsu.leftShift(
               shiftedRead,
-              holeR,
+              recFunc.Hole,
               ExcludeId,
               OnUndefined.Omit,
               func.RightTarget,
@@ -735,12 +732,12 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           qsu.leftShift(
             qsu.leftShift(
               shiftedRead,
-              holeR,
+              recFunc.Hole,
               IncludeId,
               OnUndefined.Omit,
               func.RightTarget,
               Rotation.ShiftArray),
-            holeR,
+            recFunc.Hole,
             ExcludeId,
             OnUndefined.Omit,
             func.RightTarget,
@@ -800,17 +797,17 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             qsu.leftShift(
               qsu.leftShift(
                 shiftedRead,
-                holeR,
+                recFunc.Hole,
                 IncludeId,
                 OnUndefined.Omit,
                 func.RightTarget,
                 Rotation.ShiftArray),
-              holeR,
+              recFunc.Hole,
               ExcludeId,
               OnUndefined.Omit,
               func.RightTarget,
               Rotation.ShiftMap),
-            holeR,
+            recFunc.Hole,
             ExcludeId,
             OnUndefined.Omit,
             func.RightTarget,
@@ -882,7 +879,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         qsu.autojoin2((
           qsu.leftShift(
             shiftedRead,
-            projectKeyS("c"),
+            recFunc.ProjectKeyS(recFunc.Hole, "c"),
             ExcludeId,
             OnUndefined.Omit,
             func.RightTarget,
@@ -890,12 +887,12 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           qsu.leftShift(
             qsu.leftShift(
               shiftedRead,
-              projectKeyS("d"),
+              recFunc.ProjectKeyS(recFunc.Hole, "d"),
               ExcludeId,
               OnUndefined.Omit,
               func.RightTarget,
               Rotation.ShiftArray),
-            holeR,
+            recFunc.Hole,
             ExcludeId,
             OnUndefined.Omit,
             func.RightTarget,
@@ -970,17 +967,17 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             qsu.leftShift(
               qsu.leftShift(
                 shiftedRead,
-                projectKeyS("a"),
+                recFunc.ProjectKeyS(recFunc.Hole, "a"),
                 ExcludeId,
                 OnUndefined.Omit,
                 func.RightTarget,
                 Rotation.ShiftArray),
-              holeR,
+              recFunc.Hole,
               ExcludeId,
               OnUndefined.Omit,
               func.RightTarget,
               Rotation.ShiftArray),
-            holeR,
+            recFunc.Hole,
             ExcludeId,
             OnUndefined.Omit,
             func.RightTarget,
@@ -993,7 +990,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         qsu.autojoin2((
           qsu.leftShift(
             shiftedRead,
-            projectKeyS("c"),
+            recFunc.ProjectKeyS(recFunc.Hole, "c"),
             ExcludeId,
             OnUndefined.Omit,
             func.RightTarget,
@@ -1001,12 +998,12 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           qsu.leftShift(
             qsu.leftShift(
               shiftedRead,
-              projectKeyS("d"),
+              recFunc.ProjectKeyS(recFunc.Hole, "d"),
               ExcludeId,
               OnUndefined.Omit,
               func.RightTarget,
               Rotation.ShiftArray),
-            holeR,
+            recFunc.Hole,
             ExcludeId,
             OnUndefined.Omit,
             func.RightTarget,
@@ -1185,12 +1182,12 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                       Type.AnyObject,
                       func.ProjectKeyS(func.Hole, "b"),
                       func.Undefined)),
-                  holeR,
+                  recFunc.Hole,
                   ExcludeId,
                   OnUndefined.Omit,
                   func.RightTarget,
                   Rotation.ShiftArray),
-                holeR,
+                recFunc.Hole,
                 ExcludeId,
                 OnUndefined.Omit,
                 func.RightTarget,
@@ -1265,7 +1262,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       val qsu1 =
         qsu.leftShift(
           qsu0,
-          holeR,
+          recFunc.Hole,
           ExcludeId,
           OnUndefined.Omit,
           func.RightTarget,
@@ -1277,7 +1274,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       val qsu11 =
         qsu.leftShift(
           qsu9,
-          holeR,
+          recFunc.Hole,
           ExcludeId,
           OnUndefined.Omit,
           func.RightTarget,
@@ -1300,7 +1297,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       val qsu13 =
         qsu.leftShift(
           qsu12,
-          holeR,
+          recFunc.Hole,
           ExcludeId,
           OnUndefined.Omit,
           func.RightTarget,
@@ -1350,13 +1347,13 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               qsu.map(
                 qsu.leftShift(
                   qsu.map(shiftedRead, func.ProjectKeyS(func.Hole, "b")),
-                  holeR,
+                  recFunc.Hole,
                   ExcludeId,
                   OnUndefined.Omit,
                   func.RightTarget,
                   Rotation.FlattenArray),
                 func.ProjectKeyS(func.Hole, "c")),
-              holeR,
+              recFunc.Hole,
               ExcludeId,
               OnUndefined.Omit,
               func.RightTarget,
@@ -1416,7 +1413,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           qsu.autojoin2((
             qsu.leftShift(
               qsu.map(shiftedRead, func.ProjectKeyS(func.Hole, "a")),
-              holeR,
+              recFunc.Hole,
               ExcludeId,
               OnUndefined.Omit,
               func.RightTarget,
@@ -1425,13 +1422,13 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               qsu.map(
                 qsu.leftShift(
                   qsu.map(shiftedRead, func.ProjectKeyS(func.Hole, "b")),
-                  holeR,
+                  recFunc.Hole,
                   ExcludeId,
                   OnUndefined.Omit,
                   func.RightTarget,
                   Rotation.FlattenArray),
                 func.ProjectKeyS(func.Hole, "c")),
-              holeR,
+              recFunc.Hole,
               ExcludeId,
               OnUndefined.Omit,
               func.RightTarget,

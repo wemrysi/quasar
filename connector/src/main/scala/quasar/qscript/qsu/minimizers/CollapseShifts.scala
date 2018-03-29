@@ -58,6 +58,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
   private type ShiftGraph = QSU.LeftShift[T, QSUGraph] \/ QSU.MultiLeftShift[T, QSUGraph]
 
   private val func = construction.Func[T]
+  private val recFunc = construction.RecFunc[T]
   private val N = new NormalizableT[T]
 
   private val ResultsField = "results"
@@ -244,7 +245,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
         reconstructed <- reversed.tail.foldLeftM[G, QSUGraph](init2) {
           case (src, -\/(QSU.LeftShift(_, struct, idStatus, _, repair, rot))) =>
-            val struct2 = struct >> RecFreeS.fromFree(func.ProjectKeyS(func.Hole, ResultsField))
+            val struct2 = struct >> recFunc.ProjectKeyS(recFunc.Hole, ResultsField)
 
             val repair2 = repair flatMap {
               case ShiftTarget.AccessLeftTarget(Access.Value(_)) =>

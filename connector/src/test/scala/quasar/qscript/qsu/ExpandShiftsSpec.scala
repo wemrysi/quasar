@@ -20,7 +20,7 @@ import quasar.Planner.PlannerError
 import quasar.{Qspec, TreeMatchers}
 import quasar.ejson.EJson
 import quasar.fp._
-import quasar.qscript.{construction, Hole, ExcludeId, OnUndefined, SrcHole, RecFreeS}
+import quasar.qscript.{construction, Hole, ExcludeId, OnUndefined, SrcHole}
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import slamdata.Predef.{Map => _, _}
 
@@ -42,11 +42,11 @@ object eshSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
+  val recFunc = construction.RecFunc[Fix]
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
   val hole: Hole = SrcHole
-  val holeR = RecFreeS.fromFree(func.Hole)
 
   def index(i: Int): FreeMapA[QAccess[Hole] \/ Int] =
     i.right[QAccess[Hole]].pure[FreeMapA]
@@ -54,7 +54,7 @@ object eshSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   "convert singly nested LeftShift/ThetaJoin" in {
     val dataset = qsu.leftShift(
       qsu.read(rootDir </> file("dataset")),
-      holeR,
+      recFunc.Hole,
       ExcludeId,
       OnUndefined.Omit,
       func.RightTarget,
@@ -142,7 +142,7 @@ object eshSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   "convert singly nested LeftShift/ThetaJoin with onUndefined = OnUndefined.Emit" in {
     val dataset = qsu.leftShift(
       qsu.read(rootDir </> file("dataset")),
-      holeR,
+      recFunc.Hole,
       ExcludeId,
       OnUndefined.Omit,
       func.RightTarget,
@@ -192,7 +192,7 @@ object eshSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   "convert doubly nested LeftShift/ThetaJoin" in {
     val dataset = qsu.leftShift(
       qsu.read(rootDir </> file("dataset")),
-      holeR,
+      recFunc.Hole,
       ExcludeId,
       OnUndefined.Omit,
       func.RightTarget,

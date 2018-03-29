@@ -24,7 +24,7 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.qscript.construction
-import quasar.qscript.{ExcludeId, HoleF, OnUndefined, ReduceFuncs, ReduceIndex, RightSideF, ShiftType, RecFreeS}
+import quasar.qscript.{ExcludeId, HoleF, OnUndefined, ReduceFuncs, ReduceIndex, RightSideF, ShiftType}
 import quasar.sql.CompilerHelpers
 import quasar.std.{AggLib, IdentityLib}
 import slamdata.Predef._
@@ -47,9 +47,8 @@ object LPtoQSSpec extends Qspec with CompilerHelpers with QSUTTypes[Fix] {
 
   val func = defaults.func
   val qs = defaults.fix
+  val recFunc = defaults.recFunc
   val json = Fixed[Fix[EJson]]
-  val toRec: FreeMap => RecFreeMap = RecFreeS.fromFree(_)
-  val holeR = toRec(func.Hole)
 
   val root = Path.rootDir[Sandboxed]
   val afoo = root </> file("foo")
@@ -70,7 +69,7 @@ object LPtoQSSpec extends Qspec with CompilerHelpers with QSUTTypes[Fix] {
 
       val expected = qs.LeftShift(
         qs.Read(afoo),
-        holeR,
+        recFunc.Hole,
         ExcludeId,
         ShiftType.Map,
         OnUndefined.Omit,
@@ -89,7 +88,7 @@ object LPtoQSSpec extends Qspec with CompilerHelpers with QSUTTypes[Fix] {
       val expected = qs.Reduce(
         qs.LeftShift(
           qs.Read(afoo),
-          holeR,
+          recFunc.Hole,
           ExcludeId,
           ShiftType.Map,
           OnUndefined.Omit,
