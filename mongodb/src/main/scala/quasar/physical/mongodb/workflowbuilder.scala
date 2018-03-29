@@ -514,7 +514,7 @@ object WorkflowBuilder {
       case quasar.qscript.IdOnly => oKey
       case quasar.qscript.IncludeId => $arrayLit(List(oKey, oValue))
     }
-    val fldName: Option[BsonField.Name] = (base.toDocVar \\ field).deref.map(f => f.flatten.head)
+    val fldName: Option[BsonField.Name] = (base.toDocVar \\ field).deref.map(f => f.flatten.last)
 
     chain(wf,
       $project[WF](Reshape(rst ++ ListMap(
