@@ -40,7 +40,7 @@ sealed trait RecFreeS[F[_], A] extends Product with Serializable {
 
 object RecFreeS {
   final case class Suspend[F[_], A](fa: F[A]) extends RecFreeS[F, A]
-  final case class Fix[F[_], A](form: RecFreeS[F, A], rec: Free[RecFreeS[F, ?], Unit]) extends RecFreeS[F, A]
+  final case class Fix[F[_], A](form: RecFreeS[F, A], rec: Free[RecFreeS[F, ?], Hole]) extends RecFreeS[F, A]
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def recInterpretM[M[_]: Monad, F[_]: Traverse, A](fm: RecFreeS[F, A])(susint: AlgebraM[M, F, A], fixint: A => M[(A, A => M[A])]): M[A] =
@@ -59,7 +59,7 @@ object RecFreeS {
   def fromFree[F[_], A](f: Free[F, A]): Free[RecFreeS[F, ?], A] =
     f.mapSuspension(λ[F ~> RecFreeS[F, ?]](Suspend(_)))
 
-  def letIn[F[_], A](form: Free[F, A])(rec: Free[F, Unit]): Free[RecFreeS[F, ?], A] =
+  def letIn[F[_], A](form: Free[F, A])(rec: Free[F, Hole]): Free[RecFreeS[F, ?], A] =
     form.mapSuspension(λ[F ~> RecFreeS[F, ?]](f => Fix(Suspend(f), fromFree(rec))))
 
   def linearize[F[_], A](f: Free[RecFreeS[F, ?], A]): Free[F, A] =

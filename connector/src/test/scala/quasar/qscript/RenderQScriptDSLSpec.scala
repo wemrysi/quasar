@@ -204,7 +204,7 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
     val h = free.Hole
     List[Fix[QST]](
       fix.Map(u, func.Undefined),
-      fix.LeftShift(u, RecFreeS.fromFree(func.Undefined), ExcludeId, ShiftType.Array, OnUndefined.Omit, func.LeftSide),
+      fix.LeftShift(u, recFunc.Undefined, ExcludeId, ShiftType.Array, OnUndefined.Omit, func.LeftSide),
       fix.Reduce(u, Nil, Nil, func.ReduceIndex(1.right)),
       fix.Sort(u, Nil, NonEmptyList((func.Hole, SortDir.Ascending), (func.Hole, SortDir.Descending))),
       fix.Union(u, free.Hole, free.Hole),
@@ -257,8 +257,9 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
   "rendered dsl should represent the tree rendered" >> {
     import RenderQScriptDSL._
     "QScript" >> {
-      // "Fix" >> testDSL(fixQScripts, fixQSRender[Fix])
-      // "Free" >> testDSL(freeQScripts, freeQSRender[Fix])
+      "Fix" >> testDSL(fixQScripts, fixQSRender[Fix])
+      "Free" >> testDSL(freeQScripts, freeQSRender[Fix])
+
       "FreeMap" >> testDSL(freeMaps, freeMapRender[Fix])
       "ReduceFunc" >> testDSL(reduceFuncs, reduceFuncRender[Fix])
       "JoinFunc" >> testDSL(joinSides, joinFuncRender[Fix])
