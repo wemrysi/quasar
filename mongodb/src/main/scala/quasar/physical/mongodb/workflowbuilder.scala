@@ -522,7 +522,7 @@ object WorkflowBuilder {
         ExcludeId),
       $unwind[WF](DocVar.ROOT(BsonField.Name("o")), None, None),
       $project[WF](Reshape(rst ++
-        ListMap(fldName.getOrElse(BsonField.Name("value")) -> \/-(prj))),
+        ListMap(fldName.getOrElse(QuasarSigilName) -> \/-(prj))),
         ExcludeId))
   }
 

@@ -53,7 +53,6 @@ object sigil {
   val Id = "_id"
 
 
-  @simulacrum.typeclass
   trait Sigil[A] {
     /** Returns the value of the named field or `None` if the input isn't
       * a document or the field doesn't exist.
@@ -82,12 +81,15 @@ object sigil {
     def quasarSigilExists: A => Boolean =
       quasarValue(_).isDefined
 
-    /** The value under the Quasar sigil, if found. */
-    def quasarValue: A => Option[A] =
-      fieldValue(Quasar)
+    /** The value under the Quasar sigil (possibly nested), if found. */
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def quasarValue: A => Option[A]  =
+      a => (fieldValue(Quasar)(a)).map(n => quasarValue(n).getOrElse(n))
   }
 
   object Sigil {
+    def apply[A](implicit instance: Sigil[A]): Sigil[A] = instance
+
     implicit val sigilBson: Sigil[Bson] = new Sigil[Bson] {
       def fieldValue(name: String): Bson => Option[Bson] =
         b => Bson._doc.getOption(b).flatMap(m => m.get(name))
