@@ -152,7 +152,7 @@ object managefile {
   val defaultPrefix = TempFilePrefix("__quasar.tmp_")
 
   def saltedPrefix(salt: Salt, prefix: Option[TempFilePrefix]): TempFilePrefix =
-    prefix.getOrElse(defaultPrefix) |+| TempFilePrefix(salt.s)
+    prefix.getOrElse(defaultPrefix) |+| TempFilePrefix(salt.s + "_")
 
   def freshFile(near: APath, prefix: Option[TempFilePrefix]): MongoManage[AFile] = {
     for {
