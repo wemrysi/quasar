@@ -1,0 +1,14 @@
+{
+    "name":  "shift map keys - wildcard",
+    "backends": {
+    },
+    "data": "zips.data",
+    "query": "select *{_:} from zips",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+    "expected": ["_id",
+                 "city",
+                 "loc",
+                 "pop",
+                 "state"]
+}
