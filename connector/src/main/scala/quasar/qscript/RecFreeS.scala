@@ -87,10 +87,10 @@ object RecFreeS {
   implicit def renderTree[F[_], A](implicit F: RenderTree[F[A]], FR: RenderTree[Free[F, A]]): RenderTree[RecFreeS[F, A]] =
     RenderTree.make(rf => FR.render(rf.linearize))
 
-  implicit def show[F[_], A](implicit SF: Show[Free[F, A]]): Show[RecFreeS[F, A]] =
+  implicit def show[F[_], A](implicit SF: Show[Free[F, A]]): Show[Free[RecFreeS[F, ?], A]] =
     Show.show(_.linearize.show)
 
-  implicit def equal[F[_], A](implicit SF: Equal[Free[F, A]]): Equal[RecFreeS[F, A]] =
+  implicit def equal[F[_], A](implicit SF: Equal[Free[F, A]]): Equal[Free[RecFreeS[F, ?], A]] =
     Equal.equalBy(_.linearize)
 
   implicit final class LinearizeOps[F[_], A](val self: Free[RecFreeS[F, ?], A]) extends AnyVal {

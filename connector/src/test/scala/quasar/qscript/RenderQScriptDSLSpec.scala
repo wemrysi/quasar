@@ -84,8 +84,98 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
 
   import qstdsl._
 
+  def recFreeMaps: List[RecFreeMap] = {
+    val h = recFunc.Hole
+
+    List(
+      recFunc.Constant(EJson.nul[Fix[EJson]]),
+      recFunc.Now,
+      recFunc.Undefined,
+      recFunc.Length(h),
+      recFunc.ExtractCentury(h),
+      recFunc.ExtractDayOfMonth(h),
+      recFunc.ExtractDecade(h),
+      recFunc.ExtractDayOfWeek(h),
+      recFunc.ExtractDayOfYear(h),
+      recFunc.ExtractEpoch(h),
+      recFunc.ExtractHour(h),
+      recFunc.ExtractIsoDayOfWeek(h),
+      recFunc.ExtractIsoYear(h),
+      recFunc.ExtractMicroseconds(h),
+      recFunc.ExtractMillennium(h),
+      recFunc.ExtractMilliseconds(h),
+      recFunc.ExtractMinute(h),
+      recFunc.ExtractMonth(h),
+      recFunc.ExtractQuarter(h),
+      recFunc.ExtractSecond(h),
+      recFunc.ExtractTimezone(h),
+      recFunc.ExtractTimezoneHour(h),
+      recFunc.ExtractTimezoneMinute(h),
+      recFunc.ExtractWeek(h),
+      recFunc.ExtractYear(h),
+      recFunc.Date(h),
+      recFunc.Time(h),
+      recFunc.Timestamp(h),
+      recFunc.Interval(h),
+      recFunc.StartOfDay(h),
+      recFunc.TemporalTrunc(TemporalPart.Day, h),
+      recFunc.TimeOfDay(h),
+      recFunc.ToTimestamp(h),
+      recFunc.TypeOf(h),
+      recFunc.ToId(h),
+      recFunc.Negate(h),
+      recFunc.MakeArray(h),
+      recFunc.Lower(h),
+      recFunc.Upper(h),
+      recFunc.Bool(h),
+      recFunc.Integer(h),
+      recFunc.Decimal(h),
+      recFunc.Null(h),
+      recFunc.ToString(h),
+      recFunc.Not(h),
+      recFunc.Meta(h),
+      recFunc.Add(h, h),
+      recFunc.Multiply(h, h),
+      recFunc.Subtract(h, h),
+      recFunc.Divide(h, h),
+      recFunc.Modulo(h, h),
+      recFunc.Power(h, h),
+      recFunc.Eq(h, h),
+      recFunc.Neq(h, h),
+      recFunc.Lt(h, h),
+      recFunc.Lte(h, h),
+      recFunc.Gt(h, h),
+      recFunc.Gte(h, h),
+      recFunc.IfUndefined(h, h),
+      recFunc.And(h, h),
+      recFunc.Or(h, h),
+      recFunc.Within(h, h),
+      recFunc.Split(h, h),
+      recFunc.MakeMap(h, h),
+      recFunc.ConcatArrays(h, h),
+      recFunc.ConcatMaps(h, h),
+      recFunc.ProjectIndex(h, h),
+      recFunc.ProjectKey(h, h),
+      recFunc.DeleteKey(h, h),
+      recFunc.Range(h, h),
+      recFunc.Between(h, h, h),
+      recFunc.Guard(h, Type.Top, h, h),
+      recFunc.Cond(h, h, h),
+      recFunc.Search(h, h, h),
+      recFunc.Substring(h, h, h),
+      recFunc.Abs(h),
+      recFunc.Ceil(h),
+      recFunc.Floor(h),
+      recFunc.Trunc(h),
+      recFunc.Round(h),
+      recFunc.FloorScale(h, h),
+      recFunc.CeilScale(h, h),
+      recFunc.RoundScale(h, h))
+  }
+
   def freeMaps: List[FreeMap] = {
     val h = func.Hole
+
     List(
       func.Constant(EJson.nul[Fix[EJson]]),
       func.Now,
@@ -169,8 +259,7 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
       func.Round(h),
       func.FloorScale(h, h),
       func.CeilScale(h, h),
-      func.RoundScale(h, h)
-    )
+      func.RoundScale(h, h))
   }
 
   def freeQScripts = {
@@ -178,7 +267,7 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
     List[FreeQS](
       free.Hole,
       free.Map(h, func.Undefined),
-      free.LeftShift(h, RecFreeS.fromFree(func.Undefined), ExcludeId, ShiftType.Array, OnUndefined.Omit, func.LeftSide),
+      free.LeftShift(h, recFunc.Undefined, ExcludeId, ShiftType.Array, OnUndefined.Omit, func.LeftSide),
       free.Reduce(h, Nil, Nil, func.ReduceIndex(1.right)),
       free.Sort(h, Nil, NonEmptyList((func.Hole, SortDir.Ascending))),
       free.Union(h, h, h),
@@ -195,8 +284,7 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
       free.ShiftedRead[ADir](rootDir </> dir("db"), ExcludeId),
       free.Read[AFile](rootDir </> dir("db") </> file("zips")),
       free.Read[ADir](rootDir </> dir("db")),
-      free.Root
-    )
+      free.Root)
   }
 
   def fixQScripts = {
@@ -219,8 +307,7 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
       fix.ShiftedRead[ADir](rootDir </> dir("db"), ExcludeId),
       fix.Read[AFile](rootDir </> dir("db") </> file("zips")),
       fix.Read[ADir](rootDir </> dir("db")),
-      fix.Root
-    )
+      fix.Root)
   }
 
   def reduceFuncs = {
@@ -231,8 +318,7 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
       Min(h), Max(h),
       Avg(h), Arbitrary(h),
       First(h), Last(h),
-      UnshiftArray(h), UnshiftMap(h, h)
-    )
+      UnshiftArray(h), UnshiftMap(h, h))
   }
 
   def joinSides = {
@@ -250,17 +336,18 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
       json.int(1),
       json.meta(json.nul(), json.nul()),
       json.nul(),
-      json.str("test")
-    )
+      json.str("test"))
   }
 
   "rendered dsl should represent the tree rendered" >> {
     import RenderQScriptDSL._
+
     "QScript" >> {
       "Fix" >> testDSL(fixQScripts, fixQSRender[Fix])
       "Free" >> testDSL(freeQScripts, freeQSRender[Fix])
 
       "FreeMap" >> testDSL(freeMaps, freeMapRender[Fix])
+      "RecFreeMap" >> testDSL(recFreeMaps, recFreeMapRender[Fix])
       "ReduceFunc" >> testDSL(reduceFuncs, reduceFuncRender[Fix])
       "JoinFunc" >> testDSL(joinSides, joinFuncRender[Fix])
     }
