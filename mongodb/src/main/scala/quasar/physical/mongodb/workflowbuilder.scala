@@ -492,18 +492,18 @@ object WorkflowBuilder {
         case (StructureType.Array(field, quasar.qscript.ExcludeId), _, _) =>
           $unwind[WF](base.toDocVar \\ field, None, None).apply(acc)
         case (StructureType.Array(field, idStatus), Some(r), _) =>
-          flattenFieldArrayUnwindProject(base, field, idStatus, r, acc)
+          flattenFieldArrayUnwindProject(base.toDocVar \\ field, idStatus, r, acc)
         case (StructureType.Array(field, idStatus), _, _) =>
-          flattenFieldMapReduce(base, field, idStatus).apply(acc)
+          flattenFieldMapReduce(base.toDocVar \\ field, idStatus).apply(acc)
         case (StructureType.Object(field, idStatus), Some(r), MongoQueryModel.`3.4.4`) =>
-          flattenFieldObject344(base, field, idStatus, r, acc)
+          flattenFieldObject344(base.toDocVar \\ field, idStatus, r, acc)
         case (StructureType.Object(field, idStatus), _, _) =>
-          flattenFieldMapReduce(base, field, idStatus).apply(acc)
+          flattenFieldMapReduce(base.toDocVar \\ field, idStatus).apply(acc)
       }
     }
 
   private def flattenFieldObject344[WF[_]: Coalesce]
-    (base: Base, field: DocVar, idStatus: IdStatus, rest: List[BsonField.Name], wf: Fix[WF])
+    (docVar: DocVar, idStatus: IdStatus, rest: List[BsonField.Name], wf: Fix[WF])
     (implicit ev0: WorkflowOpCoreF :<: WF)
       : Fix[WF] = {
     val rst = ListMap(rest.map(f => f -> \/-($var(DocVar.ROOT(f)))) : _*)
@@ -514,11 +514,11 @@ object WorkflowBuilder {
       case quasar.qscript.IdOnly => oKey
       case quasar.qscript.IncludeId => $arrayLit(List(oKey, oValue))
     }
-    val fldName: Option[BsonField.Name] = (base.toDocVar \\ field).deref.map(f => f.flatten.last)
+    val fldName: Option[BsonField.Name] = docVar.deref.map(f => f.flatten.last)
 
     chain(wf,
       $project[WF](Reshape(rst ++ ListMap(
-        BsonField.Name("o") -> \/-(fixExprOp344.$objectToArray($var(base.toDocVar \\ field))))),
+        BsonField.Name("o") -> \/-(fixExprOp344.$objectToArray($var(docVar))))),
         ExcludeId),
       $unwind[WF](DocVar.ROOT(BsonField.Name("o")), None, None),
       $project[WF](Reshape(rst ++
@@ -527,45 +527,45 @@ object WorkflowBuilder {
   }
 
   private def flattenFieldArrayUnwindProject[WF[_]: Coalesce]
-    (base: Base, field: DocVar, idStatus: IdStatus, rest: List[BsonField.Name], wf: Fix[WF])
+    (docVar: DocVar, idStatus: IdStatus, rest: List[BsonField.Name], wf: Fix[WF])
     (implicit ev0: WorkflowOpCoreF :<: WF)
       : Fix[WF] = {
     val rst = ListMap(rest.map(f => f -> \/-($var(DocVar.ROOT(f)))) : _*)
     val prj = idStatus match {
-      case quasar.qscript.ExcludeId => $var(base.toDocVar \\ field)
+      case quasar.qscript.ExcludeId => $var(docVar)
       case quasar.qscript.IdOnly => $var(DocField(BsonField.Name("ix")))
       case quasar.qscript.IncludeId => $arrayLit(List(
         $var(DocField(BsonField.Name("ix"))),
-        $var(base.toDocVar \\ field)))
+        $var(docVar)))
     }
     chain(wf,
-      $unwind[WF](base.toDocVar \\ field, Some(BsonField.Name("ix")), None),
+      $unwind[WF](docVar, Some(BsonField.Name("ix")), None),
       $project[WF](Reshape(rst ++
         // TODO: mongo >= 3.4 has $addFields - should be able to plan without `rest` being known
         // { $unwind: {path: "$f", includeArrayIndex: "ix"} } ,
         // { $addFields: { "f": ["$ix", "$f"] } },
         // { $project: { "ix": false } },
-        (base.toDocVar \\ field).deref.map(f => ListMap(f.flatten.head ->
+        docVar.deref.map(f => ListMap(f.flatten.head ->
           \/-(prj))).getOrElse(ListMap())),
         ExcludeId))
   }
 
   private def flattenFieldMapReduce[WF[_]: Coalesce]
-    (base: Base, field: DocVar, idStatus: IdStatus)
+    (docVar: DocVar, idStatus: IdStatus)
     (implicit ev0: WorkflowOpCoreF :<: WF)
       : FixOp[WF] =
     $simpleMap[WF](
       idStatus match {
         case quasar.qscript.ExcludeId =>
-          NonEmptyList(FlatExpr((base.toDocVar \\ field).toJs))
+          NonEmptyList(FlatExpr(docVar.toJs))
         case quasar.qscript.IncludeId =>
           NonEmptyList(
             SubExpr(
-              (base.toDocVar \\ field).toJs,
+              docVar.toJs,
               JsFn(jsBase,
                 jscore.Let(
                   jscore.Name("m"),
-                  (base.toDocVar \\ field).toJs(jscore.Ident(jsBase)),
+                  docVar.toJs(jscore.Ident(jsBase)),
                   jscore.Call(
                     jscore.Select(
                       jscore.Call(
@@ -575,16 +575,16 @@ object WorkflowBuilder {
                     List(jscore.Fun(List(jscore.Name("k")), jscore.Arr(List(
                       jscore.ident("k"),
                       jscore.Access(jscore.ident("m"), jscore.ident("k")))))))))),
-            FlatExpr((base.toDocVar \\ field).toJs))
+            FlatExpr(docVar.toJs))
         case quasar.qscript.IdOnly =>
           NonEmptyList(
             SubExpr(
-              (base.toDocVar \\ field).toJs,
+              docVar.toJs,
               JsFn(jsBase,
                 jscore.Call(
                   jscore.Select(jscore.ident("Object"), "keys"),
-                  List((base.toDocVar \\ field).toJs(jscore.Ident(jsBase)))))),
-            FlatExpr((base.toDocVar \\ field).toJs))
+                  List(docVar.toJs(jscore.Ident(jsBase)))))),
+            FlatExpr(docVar.toJs))
       },
       ListMap())
 
