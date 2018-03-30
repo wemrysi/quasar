@@ -227,6 +227,9 @@ object construction {
       rollDerived(MapFuncsDerived.CeilScale(a1, a2))
     def RoundScale[A](a1: RecFreeMapA[T, A], a2: RecFreeMapA[T, A]): RecFreeMapA[T, A] =
       rollDerived(MapFuncsDerived.RoundScale(a1, a2))
+
+    def Let[A](form: RecFreeMapA[T, A], body: RecFreeMapA[T, Hole]): RecFreeMapA[T, A] =
+      RecFreeS.letIn(form, body)
   }
 
   final case class Func[T[_[_]]]()(implicit birec: BirecursiveT[T]) {

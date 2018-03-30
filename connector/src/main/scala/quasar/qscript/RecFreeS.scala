@@ -59,8 +59,8 @@ object RecFreeS {
   def fromFree[F[_], A](f: Free[F, A]): Free[RecFreeS[F, ?], A] =
     f.mapSuspension(λ[F ~> RecFreeS[F, ?]](Suspend(_)))
 
-  def letIn[F[_], A](form: Free[F, A])(rec: Free[F, Hole]): Free[RecFreeS[F, ?], A] =
-    form.mapSuspension(λ[F ~> RecFreeS[F, ?]](f => Fix(Suspend(f), fromFree(rec))))
+  def letIn[F[_], A](form: Free[RecFreeS[F, ?], A], body: Free[RecFreeS[F, ?], Hole]): Free[RecFreeS[F, ?], A] =
+    form.mapSuspension(λ[RecFreeS[F, ?] ~> RecFreeS[F, ?]](f => Fix(f, body)))
 
   def linearize[F[_], A](f: Free[RecFreeS[F, ?], A]): Free[F, A] =
     f.flatMapSuspension(λ[RecFreeS[F, ?] ~> Free[F, ?]](_.linearize))

@@ -170,7 +170,8 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
       recFunc.Round(h),
       recFunc.FloorScale(h, h),
       recFunc.CeilScale(h, h),
-      recFunc.RoundScale(h, h))
+      recFunc.RoundScale(h, h),
+      recFunc.Let(h, h))
   }
 
   def freeMaps: List[FreeMap] = {
