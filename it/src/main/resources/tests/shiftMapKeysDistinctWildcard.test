@@ -1,6 +1,10 @@
 {
     "name":  "shift map keys - distinct wildcard",
     "backends": {
+        "marklogic_xml": "pending",
+        "mongodb_3_4_13": "pending",
+        "mongodb_3_6": "pending",
+        "mongodb_read_only": "pending"
     },
     "data": "zips.data",
     "query": "select distinct *{_:} from zips",
