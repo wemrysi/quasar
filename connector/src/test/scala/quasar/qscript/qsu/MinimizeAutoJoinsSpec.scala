@@ -771,7 +771,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               "results" -> func.RightTarget))
 
           structOuter.linearize must beTreeEqual(
-              func.ProjectKeyS(func.Hole, "results"))
+            func.ProjectKeyS(func.Hole, "results"))
 
           repairOuter must beTreeEqual(
             func.StaticMapS(
