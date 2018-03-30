@@ -1,5 +1,5 @@
 {
-    "name": "flatten an object inside a field projection",
+    "name": "flatten a map inside a field projection",
     "data": "slamengine_commits.data",
     "backends": {
     },
