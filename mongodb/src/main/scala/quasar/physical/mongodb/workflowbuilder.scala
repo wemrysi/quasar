@@ -28,7 +28,7 @@ import quasar.jscore, jscore.JsFn
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript.IdStatus
+import quasar.qscript.{IdStatus, ShiftType}
 import quasar.std.StdLib._
 
 import matryoshka._
@@ -298,6 +298,13 @@ object WorkflowBuilder {
         extends StructureType[A]
     final case class Object[A](field: A, includeKey: IdStatus)
         extends StructureType[A]
+
+    def mk[A](shiftType: ShiftType, field: A, idStatus: IdStatus)
+        : StructureType[A] =
+      shiftType match {
+        case ShiftType.Array => Array(field, idStatus)
+        case ShiftType.Map => Object(field, idStatus)
+      }
 
     implicit val StructureTypeTraverse: Traverse[StructureType] =
       new Traverse[StructureType] {

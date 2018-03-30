@@ -690,10 +690,9 @@ object MongoDbPlanner {
                   exprOrJs(_)(exprMerge, jsMerge), cfg.bsonVersion)(
                   FlatteningBuilder(
                     src1,
-                    shiftType match {
-                      case ShiftType.Array => Set(StructureType.Array(DocField(structKey), id))
-                      case ShiftType.Map   => Set(StructureType.Object(DocField(structKey), id))
-                    }, List(rootKey).some), repair0))
+                    Set(StructureType.mk(shiftType, DocField(structKey), id)),
+                    List(rootKey).some),
+                  repair0))
             }
 
             else {
@@ -709,11 +708,9 @@ object MongoDbPlanner {
                   cfg.bsonVersion)(
                   FlatteningBuilder(
                     builder,
-                    shiftType match {
-                      case ShiftType.Array => Set(StructureType.Array(DocVar.ROOT(), id))
-                      case ShiftType.Map => Set(StructureType.Object(DocVar.ROOT(), id))
-                    }, List().some),
-                    repair0))
+                    Set(StructureType.mk(shiftType, DocVar.ROOT(), id)),
+                    List().some),
+                  repair0))
             }
 
           }
