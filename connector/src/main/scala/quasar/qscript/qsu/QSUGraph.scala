@@ -70,6 +70,28 @@ final case class QSUGraph[T[_[_]]](
     inner(this).eval(Set())
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.MutableDataStructures"))
+  def cata[A](alg: QScriptUniform[T, A] => A): A = {
+    val map = scala.collection.mutable.Map.empty[Symbol, A]
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def loop(sf: QSUGraph[T]): A = {
+      alg(sf.vertices(sf.root).map { s =>
+        map.getOrElse(s, {
+          val res = loop(QSUGraph(s, sf.vertices))
+          val _ = map += (s -> res)
+          res
+        })
+      })
+    }
+    loop(this)
+  }
+
+  def linearizeAsTree[A](
+    implicit CR: Corecursive.Aux[A, QScriptUniform[T, ?]]
+  ): A = {
+    cata[A](CR.embed(_))
+  }
+
   def foldMapUp[A: Monoid](f: QSUGraph[T] => A): A =
     foldMapUpM[Id, A](f)
 

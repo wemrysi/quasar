@@ -55,6 +55,9 @@ final class RewriteGroupByArrays[T[_[_]]: BirecursiveT: ShowT] private () extend
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def unapplySeq(qgraph: QSUGraph): Option[Vector[QSUGraph]] = qgraph match {
+      // TODO: the commuted cases should be just as important,
+      //       we're just ignoring them for now because this is
+      //       how LP always associates flattened group keys
       case AutoJoin2C(
         NAryArray(elems @ _*),
         Unary(last, MFC(MapFuncsCore.MakeArray(SrcHole))),
