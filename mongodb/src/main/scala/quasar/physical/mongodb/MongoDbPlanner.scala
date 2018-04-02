@@ -690,7 +690,7 @@ object MongoDbPlanner {
                   exprOrJs(_)(exprMerge, jsMerge), cfg.bsonVersion)(
                   FlatteningBuilder(
                     src1,
-                    Set(StructureType.mk(shiftType, DocField(structKey), id)),
+                    Set(StructureType.mk(shiftType, structKey, id)),
                     List(rootKey).some),
                   repair0))
 
@@ -712,7 +712,7 @@ object MongoDbPlanner {
                   cfg.bsonVersion)(
                   FlatteningBuilder(
                     DocBuilder(builder, ListMap(wrapKey -> docVarToExpr(DocVar.ROOT()))),
-                    Set(StructureType.mk(shiftType, DocField(wrapKey), id)),
+                    Set(StructureType.mk(shiftType, wrapKey, id)),
                     List().some),
                   repair0))
             }
