@@ -693,11 +693,15 @@ object MongoDbPlanner {
                     Set(StructureType.mk(shiftType, DocField(structKey), id)),
                     List(rootKey).some),
                   repair0))
-            }
 
-            else {
+            } else {
+
               val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
-              val repair0 = repair.as[Hole](SrcHole).transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
+              val repair0 =
+                repair.as[Hole](SrcHole).transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole])) >>=
+                  κ(Free.roll(MFC(MapFuncsCore.ProjectKey[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("wrap")))))
+
+              val wrapKey = BsonField.Name("wrap")
 
               getBuilder[T, M, WF, EX, Hole](
                 handleFreeMap[T, M, EX](
@@ -707,8 +711,8 @@ object MongoDbPlanner {
                     cfg.funcHandler, cfg.staticHandler, _),
                   cfg.bsonVersion)(
                   FlatteningBuilder(
-                    builder,
-                    Set(StructureType.mk(shiftType, DocVar.ROOT(), id)),
+                    DocBuilder(builder, ListMap(wrapKey -> docVarToExpr(DocVar.ROOT()))),
+                    Set(StructureType.mk(shiftType, DocField(wrapKey), id)),
                     List().some),
                   repair0))
             }
