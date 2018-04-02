@@ -23,7 +23,6 @@ import slamdata.Predef._
 import matryoshka.data.Fix
 import pathy.Path, Path.Sandboxed
 import scalaz.{Need, StateT}
-import scalaz.Scalaz._
 
 object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
