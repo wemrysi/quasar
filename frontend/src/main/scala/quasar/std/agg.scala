@@ -105,7 +105,6 @@ trait AggLib extends Library {
     Type.Numeric,
     Func.Input1(Type.Numeric),
     simplifiesOnConstants(Constant(_)),
-    noSimplification,
     partialTyperV[nat._1] {
       case Sized(t) if MathRel.contains(t) =>
         success(t.widenConst)
