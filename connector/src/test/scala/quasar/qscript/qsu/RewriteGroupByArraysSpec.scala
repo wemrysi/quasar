@@ -193,34 +193,22 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
           GroupBy(    // s2
             GroupBy(   // s1
               Read(`afile`),
-              AutoJoin2C(
-                Read(`afile`),
-                DataConstantMapped(Data.Str("foo")),
-                MapFuncsCore.ProjectKey(LeftSide, RightSide))),
+              DataConstant(Data.Arr(List(Data.Null)))),
             AutoJoin2C(
               GroupBy(  // s1
                 Read(`afile`),
-                AutoJoin2C(
-                  Read(`afile`),
-                  DataConstantMapped(Data.Str("foo")),
-                  MapFuncsCore.ProjectKey(LeftSide, RightSide))),
+                DataConstant(Data.Arr(List(Data.Null)))),
               DataConstantMapped(Data.Str("bar")),
               MapFuncsCore.ProjectKey(LeftSide, RightSide))),
           AutoJoin2C(
             GroupBy(    // s2
               GroupBy(
                 Read(`afile`),
-                AutoJoin2C(
-                  Read(`afile`),
-                  DataConstantMapped(Data.Str("foo")),
-                  MapFuncsCore.ProjectKey(LeftSide, RightSide))),
+                DataConstant(Data.Arr(List(Data.Null)))),
               AutoJoin2C(
                 GroupBy(    // s1
                   Read(`afile`),
-                  AutoJoin2C(
-                    Read(`afile`),
-                    DataConstantMapped(Data.Str("foo")),
-                    MapFuncsCore.ProjectKey(LeftSide, RightSide))),
+                  DataConstant(Data.Arr(List(Data.Null)))),
                 DataConstantMapped(Data.Str("bar")),
                 MapFuncsCore.ProjectKey(LeftSide, RightSide))),
             DataConstantMapped(Data.Str("baz")),
@@ -252,8 +240,6 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
               MFC(MapFuncsCore.Constant[Fix, Hole](json.arr(List(json.nul()))))),
             _(MapFuncsCore.ConcatArrays(_, _))))))
 
-      println(eval(rw(qgraph)).shows)
-
       eval(rw(qgraph)) must beLike {
         case GroupBy(
           GroupBy(    // s2
@@ -272,25 +258,7 @@ object RewriteGroupByArraysSpec extends Qspec with QSUTTypes[Fix] {
                   MapFuncsCore.ProjectKey(LeftSide, RightSide))),
               DataConstantMapped(Data.Str("bar")),
               MapFuncsCore.ProjectKey(LeftSide, RightSide))),
-          AutoJoin2C(
-            GroupBy(    // s2
-              GroupBy(
-                Read(`afile`),
-                AutoJoin2C(
-                  Read(`afile`),
-                  DataConstantMapped(Data.Str("foo")),
-                  MapFuncsCore.ProjectKey(LeftSide, RightSide))),
-              AutoJoin2C(
-                GroupBy(    // s1
-                  Read(`afile`),
-                  AutoJoin2C(
-                    Read(`afile`),
-                    DataConstantMapped(Data.Str("foo")),
-                    MapFuncsCore.ProjectKey(LeftSide, RightSide))),
-                DataConstantMapped(Data.Str("bar")),
-                MapFuncsCore.ProjectKey(LeftSide, RightSide))),
-            DataConstantMapped(Data.Str("baz")),
-            MapFuncsCore.ProjectKey(LeftSide, RightSide))) => ok
+          DataConstant(Data.Arr(List(Data.Null)))) => ok
       }
     }
   }
