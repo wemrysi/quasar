@@ -169,23 +169,22 @@ class PlannerSql2ExactSpec extends
                   func.ProjectKey(func.Hole, func.Constant(json.str("memberNumber"))),
                   func.Constant(json.int(123456)))),
               func.Undefined)),
-          func.Guard(
-            func.Guard(
-              func.Hole,
+          recFunc.Guard(
+            recFunc.Guard(
+              recFunc.Hole,
               Type.Obj(Map(), Some(Type.Top)),
-              func.ProjectKey(
-                func.Hole,
-                func.Constant(json.str("measureEnrollments"))),
-              func.Undefined),
+              recFunc.ProjectKey(
+                recFunc.Hole,
+                recFunc.Constant(json.str("measureEnrollments"))),
+              recFunc.Undefined),
             Type.FlexArr(0, None, Type.Obj(Map(), Some(Type.Top))),
-            func.ProjectKey(func.Hole, func.Constant(json.str("measureEnrollments"))),
-            func.Undefined),
+            recFunc.ProjectKey(recFunc.Hole, recFunc.Constant(json.str("measureEnrollments"))),
+            recFunc.Undefined),
           qscript.ExcludeId,
           ShiftType.Array,
           OnUndefined.Omit,
           func.ProjectKey(
-            func.RightSide, func.Constant(json.str("measureKey"))))
-      ).some,
+            func.RightSide, func.Constant(json.str("measureKey"))))).some,
       chain[Workflow](
         $read(collection("db", "zips")),
         $match(Selector.And(
