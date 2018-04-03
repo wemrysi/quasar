@@ -1074,6 +1074,11 @@ object MapFuncsCore {
       mf.resume.fold(IntLitMapFunc.unapply(_), _ => None)
   }
 
+  object RecIntLit {
+    def unapply[T[_[_]]: RecursiveT, A](mf: RecFreeMapA[T, A]): Option[BigInt] =
+      mf.linearize.resume.fold(IntLitMapFunc.unapply(_), _ => None)
+  }
+
   object IntLitMapFunc {
     def unapply[T[_[_]]: RecursiveT, A](mf: MapFunc[T, A]): Option[BigInt] =
       mf match {
