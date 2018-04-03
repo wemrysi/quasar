@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.{Data, DataCodec}
 import quasar.contrib.pathy.{prettyPrint, AFile, APath, PathSegment}
-import quasar.contrib.scalaz.MonadState_
+import quasar.contrib.scalaz.stateT.StateTask
 import quasar.fp.TaskRef
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fp.ski.κ
@@ -43,7 +43,7 @@ import java.util.stream.Collectors
 import scala.collection.JavaConverters._
 
 import pathy.Path.{refineType, DirName, FileName}
-import scalaz.{~>, \/, -\/, \/-, EitherT, Monad, State}
+import scalaz.{~>, \/, -\/, \/-, EitherT, StateT}
 import scalaz.Scalaz._
 import scalaz.concurrent.Task
 
@@ -61,114 +61,137 @@ class Local private (baseDir: JFile) {
     current: Long,
     handles: Set[Long])
 
-  def readFile[F[_]: Monad](implicit F: MonadState_[F, ReadState]) = λ[ReadFile ~> F] {
-    case ReadFile.Open(file, offset, limit) => F.get flatMap {
-      case ReadState(current, handles) =>
-        F.put { ReadState(
-          current + 1,
-          handles + ((current, (new AtomicBoolean(false), offset, limit))))
-        } >> ReadFile.ReadHandle(file, current).right.point[F]
-    }
+  type Result[A] = EitherT[Task, LocalFileSystemError, A]
+  type WriteResult[A] = StateT[Result, WriteState, A]
+  type ReadResult[A] = StateT[Result, ReadState, A]
 
-    case ReadFile.Read(h @ ReadFile.ReadHandle(file, id)) => F.gets { state =>
+  type FSError[A] = FileSystemError \/ A
+  type LocalFSError[A] = LocalFileSystemError \/ A
 
-      val check: FileSystemError \/ (AtomicBoolean, Natural, Option[Positive]) =
-        toRight(state.handles.get(id))(
-          FileSystemError.unknownReadHandle(h))
+  def readFile = λ[ReadFile ~> ReadResult] {
+    case ReadFile.Open(file, offset, limit) =>
+      StateTask.modifyAndGets[ReadState, FSError[ReadFile.ReadHandle]] {
+        case ReadState(current, handles) =>
+          val state = ReadState(
+            current + 1,
+            handles + ((current, (new AtomicBoolean(false), offset, limit))))
 
-      check flatMap {
-        case (bool, offset, limit) =>
-          val jpath: JPath = toJPath(file)
+          val handle = ReadFile.ReadHandle(file, current)
 
-          if (bool.getAndSet(true)) { // we've already read from this handle
-            Vector[Data]().right
-          } else {
-            if (jpath.toFile.exists) {
-              tryCatch[Vector[String], Vector[Data]](
-                Files.readAllLines(jpath, StandardCharsets.UTF_8).asScala.toVector)(
-                s"Reading failed for $file.",
-                _.drop(offset.value.toInt)
-                  .take(limit.map(_.value.toInt).getOrElse(Int.MaxValue)) // FIXME horrible performance
-                  .traverse(str =>
-                    \/.fromEither(Data.jsonParser.parseFromString(str).toEither))
-                  .leftMap(err =>
-                    FileSystemError.readFailed(err.toString, s"Read for $file failed.")))
+          (state, handle.right[FileSystemError])
+      }.mapT(EitherT.rightT(_))
+
+    case ReadFile.Read(h @ ReadFile.ReadHandle(file, id)) => StateT {
+      case state @ ReadState(_, handles) => delayEither[FSError[Vector[Data]]] {
+
+        val check: FSError[(AtomicBoolean, Natural, Option[Positive])] =
+          toRight(handles.get(id))(
+            FileSystemError.unknownReadHandle(h))
+
+        check match {
+          case -\/(err) =>
+            err.left.right
+
+          case \/-((bool, offset, limit)) =>
+            val jpath: JPath = toJPath(file)
+
+            if (bool.getAndSet(true)) { // we've already read from this handle
+              Vector[Data]().right.right
             } else {
-              Vector[Data]().right
+              if (jpath.toFile.exists) {
+                \/.fromTryCatchNonFatal[Vector[String]](
+                  Files.readAllLines(jpath, StandardCharsets.UTF_8).asScala.toVector).fold(
+                  err => LocalFileSystemError.readFailed(jpath, err).left,
+                  _.drop(offset.value.toInt)
+                    .take(limit.map(_.value.toInt).getOrElse(Int.MaxValue)) // FIXME horrible performance
+                    .traverse(str =>
+                      \/.fromEither(Data.jsonParser.parseFromString(str).toEither))
+                    .leftMap(err =>
+                      FileSystemError.readFailed(err.toString, s"Read for $file failed."))
+                    .right)
+              } else {
+                // apparently read on a non-existent file is equivalent to reading the empty file??!!
+                Vector[Data]().right.right
+              }
             }
-          }
-      }
+        }
+      }.map(state -> _)
     }
 
-    case ReadFile.Close(ReadFile.ReadHandle(_, id)) => F.modify {
-      case ReadState(current, handles) =>
-        ReadState(current, handles - id)
-    }
+    case ReadFile.Close(ReadFile.ReadHandle(_, id)) =>
+      StateTask.modify[ReadState] {
+        case ReadState(current, handles) => ReadState(current, handles - id)
+      }.mapT(EitherT.rightT(_))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  def writeFile[F[_]: Monad](implicit F: MonadState_[F, WriteState]) = λ[WriteFile ~> F] {
-    case WriteFile.Open(file) => F.get flatMap {
-      case WriteState(current, handles) =>
-        F.put { WriteState(
-          current + 1,
-          handles + current)
-        } >> WriteFile.WriteHandle(file, current).right.point[F]
-    }
+  def writeFile = λ[WriteFile ~> WriteResult] {
+    case WriteFile.Open(file) =>
+      StateTask.modifyAndGets[WriteState, FSError[WriteFile.WriteHandle]] {
+        case WriteState(current, handles) =>
+          val state = WriteState(
+            current + 1,
+            handles + current)
 
-    case WriteFile.Write(h @ WriteFile.WriteHandle(path, id), data) => F.gets { state =>
-      implicit val codec: DataCodec = DataCodec.Precise
+          val handle = WriteFile.WriteHandle(file, current)
 
-      val check: Option[FileSystemError] =
-        state.handles.contains(id).fold(
-          None,
-          FileSystemError.unknownWriteHandle(h).some)
+          (state, handle.right[FileSystemError])
+      }.mapT(EitherT.rightT(_))
 
-      check match {
-        case Some(err) => Vector(err)
-        case None =>
-          data.traverse(DataCodec.render).map { strs =>
-            \/.fromTryCatchNonFatal[JPath] {
-              Files.createDirectories(toJPath(path).getParent)
-              Files.write(toJPath(path),
-                strs.asJava,
-                StandardCharsets.UTF_8,
-                StandardOpenOption.APPEND,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.WRITE)
-            }
-          } match {
-            case Some(\/-(_)) =>
-              Vector[FileSystemError]()
-            case Some(-\/(err)) =>
-              Vector(FileSystemError.unexpectedError(
-                err.some,
-                s"Error during writing to path $path."))
-            case None =>
-              Vector(FileSystemError.unexpectedError(
-                None,
-                s"Data failed to render while writing to path $path."))
+    case WriteFile.Write(h @ WriteFile.WriteHandle(path, id), data) => StateT {
+      case state @ WriteState(_, handles) => delayEither {
+        if (!handles.contains(id)) {
+          Vector(FileSystemError.unknownWriteHandle(h)).right
+        } else {
+          implicit val codec: DataCodec = DataCodec.Precise
+
+          val (errs, strs): (Vector[Data], Vector[String]) = data.foldMap { d =>
+            DataCodec.render(d).fold(
+              (Vector(d), Vector[String]()))(
+              (s: String) => (Vector[Data](), Vector(s)))
           }
-      }
+
+          val jpath: JPath = toJPath(path)
+
+          \/.fromTryCatchNonFatal[JPath] {
+            Files.createDirectories(jpath.getParent)
+            Files.write(jpath,
+              strs.asJava,
+              StandardCharsets.UTF_8,
+              StandardOpenOption.APPEND,
+              StandardOpenOption.CREATE,
+              StandardOpenOption.WRITE)
+          }.fold(
+            err => LocalFileSystemError.writeFailed(toJPath(path), err).left,
+            _ => {
+              val partial = if (errs.isEmpty)
+                Vector()
+              else
+                Vector(FileSystemError.partialWrite(errs.size))
+
+              (errs.map(FileSystemError.writeFailed(_, s"Write failed for path $path")) ++ partial).right
+            })
+        }
+      }.map(state -> _)
     }
 
-    case WriteFile.Close(WriteFile.WriteHandle(_, id)) => F.modify {
-      case WriteState(current, handles) =>
-        WriteState(current, handles - id)
-    }
+    case WriteFile.Close(WriteFile.WriteHandle(_, id)) =>
+      StateTask.modify[WriteState] {
+        case WriteState(current, handles) => WriteState(current, handles - id)
+      }.mapT(EitherT.rightT(_))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  def manageFile = λ[ManageFile ~> Task] {
-    case ManageFile.Move(pair, MoveSemantics.FailIfExists) => pair match {
-      case ManageFile.PathPair.DirToDir(src, dst) => Task delay {
+  def manageFile = λ[ManageFile ~> Result] {
+    case ManageFile.Move(pair, sem @ MoveSemantics.FailIfExists) => pair match {
+      case ManageFile.PathPair.DirToDir(src, dst) => delayEither[FSError[Unit]] {
         val jsrc: JPath = toJPath(src)
         val jdst: JPath = toJPath(dst)
 
         failIfTargetExists(src, dst) match {
-          case Some(err) =>err.left
+          case Some(err) => err.left.right
           case None =>
-            tryCatch[Unit, Unit]({
+            \/.fromTryCatchNonFatal[Unit]({
               val contents: List[JFile] = Files.list(jsrc)
                 .collect(Collectors.toList()).asScala.toList
                 .map(_.toFile)
@@ -177,111 +200,123 @@ class Local private (baseDir: JFile) {
               Files.createDirectories(jdst)
               contents.foreach(f =>
                 Files.move(f.toPath, jdst.resolve(f.toPath.getFileName)))
-            })(s"Error moving $src to $dst with semantic FailIfExists.", κ(().right))
+            }).fold(
+              err => LocalFileSystemError.MoveFailed(pair, sem, err).left,
+              κ(().right.right))
         }
-      } flatMap {
-        case err @ -\/(_) => err.point[Task]
+      } flatMapF {
+        case err @ -\/(_) => Task.point(err.right)
         case \/-(_) => delete(src)
       }
 
-      case ManageFile.PathPair.FileToFile(src, dst) => Task delay {
+      case ManageFile.PathPair.FileToFile(src, dst) => delayEither[FSError[Unit]] {
         val jsrc: JPath = toJPath(src)
         val jdst: JPath = toJPath(dst)
 
         failIfTargetExists(src, dst) match {
-          case Some(err) => err.left
+          case Some(err) => err.left.right
           case None =>
-            tryCatch[JPath, Unit]({
+            \/.fromTryCatchNonFatal[JPath]({
               Files.createDirectories(jdst.getParent)
               Files.move(jsrc, jdst)
-            })(s"Error moving $src to $dst with semantic FailIfExists.", κ(().right))
+            }).fold(
+              err => LocalFileSystemError.MoveFailed(pair, sem, err).left,
+              κ(().right.right))
         }
       }
     }
 
-    case ManageFile.Move(pair, MoveSemantics.FailIfMissing) => pair match {
-      case ManageFile.PathPair.DirToDir(src, dst) => Task delay {
+    case ManageFile.Move(pair, sem @ MoveSemantics.FailIfMissing) => pair match {
+      case ManageFile.PathPair.DirToDir(src, dst) => delayEither[FSError[Unit]] {
         val jsrc: JPath = toJPath(src)
         val jdst: JPath = toJPath(dst)
 
         failIfTargetMissing(src, dst) match {
-          case Some(err) => err.left
+          case Some(err) => err.left.right
           case None =>
-            tryCatch[Unit, Unit]({
+            \/.fromTryCatchNonFatal[Unit]({
               val contents: List[JFile] = Files.list(jsrc)
                 .collect(Collectors.toList()).asScala.toList
                 .map(_.toFile)
                 .filter(_.isFile)
               Files.createDirectories(jdst.getParent)
               contents.foreach(f => Files.move(f.toPath, jdst, StandardCopyOption.REPLACE_EXISTING))
-            })(s"Error moving $src to $dst with semantic FailIfMissing.", κ(().right))
+            }).fold(
+              err => LocalFileSystemError.MoveFailed(pair, sem, err).left,
+              κ(().right.right))
         }
-      } flatMap {
-        case err @ -\/(_) => err.point[Task]
+      } flatMapF {
+        case err @ -\/(_) => Task.point(err.right)
         case \/-(_) => delete(src)
       }
 
-      case ManageFile.PathPair.FileToFile(src, dst) => Task delay {
+      case ManageFile.PathPair.FileToFile(src, dst) => delayEither[FSError[Unit]] {
         val jsrc: JPath = toJPath(src)
         val jdst: JPath = toJPath(dst)
 
         failIfTargetMissing(src, dst) match {
-          case Some(err) => err.left
+          case Some(err) => err.left.right
           case None =>
-            tryCatch[JPath, Unit]({
+            \/.fromTryCatchNonFatal[JPath]({
               Files.createDirectories(jdst.getParent)
               Files.move(jsrc, jdst, StandardCopyOption.REPLACE_EXISTING)
-            })(s"Error moving $src to $dst with semantic FailIfMissing.", κ(().right)),
+            }).fold(
+              err => LocalFileSystemError.MoveFailed(pair, sem, err).left,
+              κ(().right.right))
         }
       }
     }
 
-    case ManageFile.Move(pair, MoveSemantics.Overwrite) => pair match {
-      case ManageFile.PathPair.DirToDir(src, dst) => Task delay {
+    case ManageFile.Move(pair, sem @ MoveSemantics.Overwrite) => pair match {
+      case ManageFile.PathPair.DirToDir(src, dst) => delayEither[FSError[Unit]] {
         val jsrc: JPath = toJPath(src)
         val jdst: JPath = toJPath(dst)
 
         failIfSourceMissing(src) match {
-          case Some(err) => err.left
+          case Some(err) => err.left.right
           case None =>
-            tryCatch[Unit, Unit]({
+            \/.fromTryCatchNonFatal[Unit]({
               val contents: List[JFile] = Files.list(jsrc)
                 .collect(Collectors.toList()).asScala.toList
                 .map(_.toFile)
                 .filter(_.isFile)
               Files.createDirectories(jdst.getParent)
               contents.foreach(f => Files.move(f.toPath, jdst, StandardCopyOption.REPLACE_EXISTING))
-            })(s"Error moving $src to $dst with semantic Overwrite.", κ(().right)),
+            }).fold(
+              err => LocalFileSystemError.MoveFailed(pair, sem, err).left,
+              κ(().right.right))
         }
-      } flatMap {
-        case err @ -\/(_) => err.point[Task]
+      } flatMapF {
+        case err @ -\/(_) => Task.point(err.right)
         case \/-(_) => delete(src)
       }
 
-      case ManageFile.PathPair.FileToFile(src, dst) => Task delay {
+      case ManageFile.PathPair.FileToFile(src, dst) => delayEither[FSError[Unit]] {
         val jsrc: JPath = toJPath(src)
         val jdst: JPath = toJPath(dst)
 
         failIfSourceMissing(src) match {
-          case Some(err) => err.left
+          case Some(err) => err.left.right
           case None =>
-            tryCatch[JPath, Unit]({
+            \/.fromTryCatchNonFatal[JPath]({
               Files.createDirectories(jdst.getParent)
               Files.move(jsrc, jdst, StandardCopyOption.REPLACE_EXISTING)
-            })(s"Error moving $src to $dst with semantic Overwrite.", κ(().right)),
+            }).fold(
+              err => LocalFileSystemError.MoveFailed(pair, sem, err).left,
+              κ(().right.right))
         }
       }
     }
 
     case ManageFile.Copy(pair) => pair match {
-      case ManageFile.PathPair.DirToDir(src, dst) => Task delay {
+      case ManageFile.PathPair.DirToDir(src, dst) => delayEither[FSError[Unit]] {
         val jsrc: JPath = toJPath(src)
         val jdst: JPath = toJPath(dst)
 
         failIfSourceMissing(src) match {
-          case Some(err) => err.left
+          case Some(err) => err.left.right
           case None =>
-            tryCatch[Unit, Unit]({
+            \/.fromTryCatchNonFatal[Unit]({
               val contents: List[JFile] = Files.list(jsrc)
                 .collect(Collectors.toList()).asScala.toList
                 .map(_.toFile)
@@ -289,23 +324,25 @@ class Local private (baseDir: JFile) {
 
               Files.createDirectories(jdst.getParent)
               contents.foreach(f => Files.copy(f.toPath, jdst, StandardCopyOption.REPLACE_EXISTING))
-            })(s"Error copying directory $src to directory $dst.", κ(().right)),
+            }).fold(
+              err => LocalFileSystemError.CopyFailed(pair, err).left,
+              κ(().right.right))
         }
       }
 
-      case ManageFile.PathPair.FileToFile(src, dst) => Task delay {
+      case ManageFile.PathPair.FileToFile(src, dst) => delayEither[FSError[Unit]] {
         failIfSourceMissing(src) match {
-          case Some(err) => err.left
+          case Some(err) => err.left.right
           case None =>
-            tryCatch[JPath, Unit](
-              Files.copy(toJPath(src), toJPath(dst), StandardCopyOption.REPLACE_EXISTING))(
-              s"Error copying file $src to file $dst.",
-              κ(().right))
+            \/.fromTryCatchNonFatal[JPath](
+              Files.copy(toJPath(src), toJPath(dst), StandardCopyOption.REPLACE_EXISTING)).fold(
+              err => LocalFileSystemError.CopyFailed(pair, err).left,
+              κ(().right.right))
         }
       }
     }
 
-    case ManageFile.Delete(path) => delete(path)
+    case ManageFile.Delete(path) => EitherT.eitherT(delete(path))
 
     case ManageFile.TempFile(path, tempFilePrefix) =>
       val tmp: Task[Throwable \/ JFile] = Task delay {
@@ -314,7 +351,7 @@ class Local private (baseDir: JFile) {
 
         \/.fromTryCatchNonFatal[JFile] {
           refineType(path).fold(
-            _ => { // dir
+            _ => { // directory
               Files.createDirectories(jpath)
               Files.createTempFile(jpath, prefix, "").toFile
             },
@@ -327,30 +364,28 @@ class Local private (baseDir: JFile) {
 
       EitherT.eitherT(tmp)
         .leftMap(err =>
-          FileSystemError.unexpectedError(
-            err.some,
-            s"Error creating a temp file near $path."))
+          LocalFileSystemError.tempFileCreationFailed(toJPath(path), err))
         .flatMap(file =>
           AFile.fromFile(file).toRight(
-            FileSystemError.unexpectedError(
-              None,
-              s"Error constructing an AFile from the created temp file $file.")))
-        .run
+            LocalFileSystemError.tempFileCreationFailed(
+              toJPath(path),
+              new RuntimeException(s"AFile creation failed for file $file."))))
+        .map(_.right[FileSystemError])
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  def queryFile = λ[QueryFile ~> Task] {
+  def queryFile = λ[QueryFile ~> Result] {
     case QueryFile.ExecutePlan(lp, _) => ??? // not supported
     case QueryFile.EvaluatePlan(lp) => ??? // not supported
     case QueryFile.More(h) => ??? // not supported
     case QueryFile.Close(_) => ??? // not supported
     case QueryFile.Explain(lp) => ??? // not supported
 
-    case QueryFile.ListContents(dir) => Task delay {
+    case QueryFile.ListContents(dir) => delayEither {
       failIfSourceMissing(dir) match {
-        case Some(err) => err.left
+        case Some(err) => err.left.right
         case None =>
-          tryCatch[Set[Node], Set[Node]]({
+          \/.fromTryCatchNonFatal[FSError[Set[Node]]] {
             val contents: List[JFile] = Files.list(toJPath(dir))
               .collect(Collectors.toList()).asScala.toList
               .map(_.toFile)
@@ -360,58 +395,58 @@ class Local private (baseDir: JFile) {
               case f if f.isFile => FileName(f.getName).right
             }
 
-            files.map(quasar.fs.Node.fromSegment).toSet
-          })(s"Error listing contents of $dir.", _.right)
+            files.map(quasar.fs.Node.fromSegment).toSet.right
+          }.leftMap(e => LocalFileSystemError.listContentsFailed(toJPath(dir), e))
       }
     }
 
-    case QueryFile.FileExists(file) => Task delay {
-      Files.exists(toJPath(file))
-    }
+    case QueryFile.FileExists(file) =>
+      delayRight(Files.exists(toJPath(file)))
   }
 
   ////////
 
   private def toJPath(path: APath): JPath = Paths.get(prettyPrint(path))
 
-  private def delete(path: APath): Task[FileSystemError \/ Unit] = Task delay {
-    val jpath: JPath = toJPath(path)
+  private def delayEither[A](a: LocalFSError[A]): Result[A] =
+    EitherT.eitherT(Task.delay(a))
 
-    failIfSourceMissing(path) match {
-      case Some(err) => err.left
-      case None => refineType(path) match {
-        case -\/(_) => // directory
-          val visitor = new SimpleFileVisitor[JPath] {
-            override def visitFile(file: JPath, attrs: BasicFileAttributes): FileVisitResult = {
-              Files.delete(file)
-              FileVisitResult.CONTINUE
+  private def delayRight[A](a: A): Result[A] =
+    EitherT.rightT(Task.delay(a))
+
+  private def delete(path: APath): Task[LocalFSError[FSError[Unit]]] =
+    Task delay {
+      val jpath: JPath = toJPath(path)
+
+      failIfSourceMissing(path) match {
+        case Some(err) => err.left.right
+        case None => refineType(path) match {
+          case -\/(_) => // directory
+            val visitor = new SimpleFileVisitor[JPath] {
+              override def visitFile(file: JPath, attrs: BasicFileAttributes): FileVisitResult = {
+                Files.delete(file)
+                FileVisitResult.CONTINUE
+              }
+
+              override def postVisitDirectory(dir: JPath, exc: IOException): FileVisitResult = {
+                Files.delete(dir)
+                FileVisitResult.CONTINUE
+              }
             }
 
-            override def postVisitDirectory(dir: JPath, exc: IOException): FileVisitResult = {
-              Files.delete(dir)
-              FileVisitResult.CONTINUE
-            }
-          }
+            \/.fromTryCatchNonFatal[JPath](Files.walkFileTree(jpath, visitor)).fold(
+              err => LocalFileSystemError.deleteDirFailed(jpath, err).left,
+              κ(().right.right))
 
-          tryCatch[JPath, Unit](Files.walkFileTree(jpath, visitor))(
-            s"Error deleting directory $path.",
-            κ(().right))
-
-        case \/-(_) => // file
-          tryCatch[Boolean, Unit](Files.deleteIfExists(jpath))(
-            s"Error deleting file $path.",
-            bool =>
-              if (bool) ().right
-              else FileSystemError.pathErr(PathError.pathNotFound(path)).left)
+          case \/-(_) => // file
+            \/.fromTryCatchNonFatal[Boolean](Files.deleteIfExists(jpath)).fold(
+              err => LocalFileSystemError.deleteFileFailed(jpath, err).left,
+              bool =>
+                if (bool) ().right.right
+                else FileSystemError.pathErr(PathError.pathNotFound(path)).left.right)
+        }
       }
     }
-  }
-
-  private def tryCatch[A, B](effect: A)(errMsg: String, cont: A => FileSystemError \/ B)
-      : FileSystemError \/ B =
-    \/.fromTryCatchNonFatal[A](effect).fold(
-      err => FileSystemError.unexpectedError(err.some, errMsg).left,
-      cont)
 
   private def failIfSourceMissing(src: APath): Option[FileSystemError] =
     if (!Files.exists(toJPath(src)))
@@ -439,19 +474,30 @@ class Local private (baseDir: JFile) {
           None
     }
 
-  private def readToTask: Task[State[ReadState, ?] ~> Task] =
-    TaskRef(ReadState(0, Map())) map { ref =>
-      new (State[ReadState, ?] ~> Task) {
-        def apply[A](state: State[ReadState, A]) =
-          ref.modifyS(state.run)
-      }
-    }
+  private def errorTask[A](either: LocalFSError[A]): Task[A] =
+    either.fold(err => Task.fail(err.throwable), Task.point(_))
 
-  private def writeToTask: Task[State[WriteState, ?] ~> Task] =
+  private def resultToTask = λ[Result ~> Task] {
+    _.run.flatMap(errorTask)
+  }
+
+  private def readToTask: Task[ReadResult ~> Task] =
+    TaskRef(ReadState(0, Map())) map { ref =>
+      new (ReadResult ~> Task) {
+        def apply[A](state: ReadResult[A]) =
+          ref.modifyT {
+            state.run(_).run.flatMap(errorTask)
+          }
+      }
+   }
+
+  private def writeToTask: Task[WriteResult ~> Task] =
     TaskRef(WriteState(0, Set())) map { ref =>
-      new (State[WriteState, ?] ~> Task) {
-        def apply[A](state: State[WriteState, A]) =
-          ref.modifyS(state.run)
+      new (WriteResult ~> Task) {
+        def apply[A](state: WriteResult[A]) =
+          ref.modifyT {
+            state.run(_).run.flatMap(errorTask)
+          }
       }
     }
 
@@ -461,10 +507,10 @@ class Local private (baseDir: JFile) {
     read <- readToTask
     write <- writeToTask
   } yield { interpretFileSystem(
-    queryFile,
-    read compose readFile[State[ReadState, ?]],
-    write compose writeFile[State[WriteState, ?]],
-    manageFile)
+    resultToTask compose queryFile,
+    read compose readFile,
+    write compose writeFile,
+    resultToTask compose manageFile)
   }
 }
 

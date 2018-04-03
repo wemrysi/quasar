@@ -73,9 +73,6 @@ object FileSystemError {
   final case class WriteFailed private (data: Data, reason: String)
     extends FileSystemError
 
-  final case class UnexpectedError(ex: Option[Throwable], reason: String)
-    extends FileSystemError
-
   final case class UnsupportedOperation(reason: String)
     extends FileSystemError
 
@@ -122,10 +119,6 @@ object FileSystemError {
     case WriteFailed(d, r) => (d, r)
   } (WriteFailed.tupled)
 
-  val unexpectedError = Prism.partial[FileSystemError, (Option[Throwable], String)] {
-    case UnexpectedError(ex, r) => (ex, r)
-  } (UnexpectedError.tupled)
-
   val unsupportedOperation = Prism.partial[FileSystemError, String] {
     case UnsupportedOperation(reason) => reason
   } (UnsupportedOperation)
@@ -154,8 +147,6 @@ object FileSystemError {
         s"Failed to write $n data."
       case WriteFailed(d, r) =>
         s"Failed to write datum: reason='$r', datum=${d.shows}"
-      case UnexpectedError(ex, r) =>
-        s"Unexpected error: reason='$r', throwable=${ex.fold("None")(_.getMessage)}"
       case UnsupportedOperation(reason) =>
         s"Operation is unsupported because $reason"
     }
