@@ -699,9 +699,9 @@ object MongoDbPlanner {
               val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
               val repair0 =
                 repair.as[Hole](SrcHole).transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole])) >>=
-                  κ(Free.roll(MFC(MapFuncsCore.ProjectKey[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("wrap")))))
+                  κ(Free.roll(MFC(MapFuncsCore.ProjectKey[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit(Keys.wrap)))))
 
-              val wrapKey = BsonField.Name("wrap")
+              val wrapKey = BsonField.Name(Keys.wrap)
 
               getBuilder[T, M, WF, EX, Hole](
                 handleFreeMap[T, M, EX](

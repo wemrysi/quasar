@@ -78,5 +78,7 @@ object common {
           })(
           Some(_))
 
-
+  object Keys {
+    val wrap = "wrap"
+  }
 }

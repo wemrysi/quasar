@@ -28,6 +28,7 @@ import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
+import quasar.physical.mongodb.planner.common._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.{OnUndefined, ShiftType}
 import quasar.sql._
@@ -192,7 +193,7 @@ class PlannerSql2ExactSpec extends
           Selector.Doc(BsonField.Name("year") -> Selector.Eq(Bson.Int32(2017))),
           Selector.Doc(BsonField.Name("memberNumber") -> Selector.Eq(Bson.Int32(123456))))),
         $project(reshape(
-          "wrap" ->
+          Keys.wrap ->
             $cond(
               $and(
                 $lte($literal(Bson.Arr()), $field("measureEnrollments")),
@@ -200,9 +201,9 @@ class PlannerSql2ExactSpec extends
               $field("measureEnrollments"),
               $literal(Bson.Undefined))),
           ExcludeId),
-        $unwind(DocField(BsonField.Name("wrap")), None, None),
+        $unwind(DocField(BsonField.Name(Keys.wrap)), None, None),
         $project(reshape(
-          sigil.Quasar -> $field("wrap", "measureKey")),
+          sigil.Quasar -> $field(Keys.wrap, "measureKey")),
           ExcludeId))))
 
   for (s <- specs) {
@@ -645,7 +646,7 @@ class PlannerSql2ExactSpec extends
             $read(collection("db", "zips")),
             $project(
               reshape(
-                "wrap" ->
+                Keys.wrap ->
                   $cond(
                     $and(
                       $lte($literal(Bson.Arr(List())), $field("loc")),
@@ -653,9 +654,9 @@ class PlannerSql2ExactSpec extends
                     $field("loc"),
                     $literal(Bson.Undefined))),
               ExcludeId),
-            $unwind(DocField(BsonField.Name("wrap")), None, None),
+            $unwind(DocField(BsonField.Name(Keys.wrap)), None, None),
             $project(
-              reshape(sigil.Quasar -> $field("wrap")),
+              reshape(sigil.Quasar -> $field(Keys.wrap)),
               ExcludeId))
         }
     }
