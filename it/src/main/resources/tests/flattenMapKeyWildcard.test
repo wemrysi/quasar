@@ -1,0 +1,15 @@
+{
+    "name": "flatten map key - distinct wildcard",
+    "backends": {
+        "marklogic_xml": "pending"
+    },
+    "data": "zips.data",
+    "query": "select distinct *{*:} from zips",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": ["_id",
+                 "city",
+                 "loc",
+                 "pop",
+                 "state"]
+}

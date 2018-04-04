@@ -28,6 +28,7 @@ import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
+import quasar.physical.mongodb.planner.common._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.{OnUndefined, ShiftType}
 import quasar.sql._
@@ -169,30 +170,29 @@ class PlannerSql2ExactSpec extends
                   func.ProjectKey(func.Hole, func.Constant(json.str("memberNumber"))),
                   func.Constant(json.int(123456)))),
               func.Undefined)),
-          func.Guard(
-            func.Guard(
-              func.Hole,
+          recFunc.Guard(
+            recFunc.Guard(
+              recFunc.Hole,
               Type.Obj(Map(), Some(Type.Top)),
-              func.ProjectKey(
-                func.Hole,
-                func.Constant(json.str("measureEnrollments"))),
-              func.Undefined),
+              recFunc.ProjectKey(
+                recFunc.Hole,
+                recFunc.Constant(json.str("measureEnrollments"))),
+              recFunc.Undefined),
             Type.FlexArr(0, None, Type.Obj(Map(), Some(Type.Top))),
-            func.ProjectKey(func.Hole, func.Constant(json.str("measureEnrollments"))),
-            func.Undefined),
+            recFunc.ProjectKey(recFunc.Hole, recFunc.Constant(json.str("measureEnrollments"))),
+            recFunc.Undefined),
           qscript.ExcludeId,
           ShiftType.Array,
           OnUndefined.Omit,
           func.ProjectKey(
-            func.RightSide, func.Constant(json.str("measureKey"))))
-      ).some,
+            func.RightSide, func.Constant(json.str("measureKey"))))).some,
       chain[Workflow](
         $read(collection("db", "zips")),
         $match(Selector.And(
           Selector.Doc(BsonField.Name("year") -> Selector.Eq(Bson.Int32(2017))),
           Selector.Doc(BsonField.Name("memberNumber") -> Selector.Eq(Bson.Int32(123456))))),
         $project(reshape(
-          "0" ->
+          Keys.wrap ->
             $cond(
               $and(
                 $lte($literal(Bson.Arr()), $field("measureEnrollments")),
@@ -200,9 +200,9 @@ class PlannerSql2ExactSpec extends
               $field("measureEnrollments"),
               $literal(Bson.Undefined))),
           ExcludeId),
-        $unwind(DocField(BsonField.Name("0")), None, None),
+        $unwind(DocField(BsonField.Name(Keys.wrap)), None, None),
         $project(reshape(
-          sigil.Quasar -> $field("0", "measureKey")),
+          sigil.Quasar -> $field(Keys.wrap, "measureKey")),
           ExcludeId))))
 
   for (s <- specs) {
@@ -304,9 +304,13 @@ class PlannerSql2ExactSpec extends
          $project(
            reshape(sigil.Quasar ->
              $cond(
-               $and(
-                 $lt($literal(Bson.Null), $field("val2")),
-                 $lt($field("val2"), $literal(Bson.Text("")))),
+               $or(
+                 $and(
+                   $lt($literal(Bson.Null), $field("val2")),
+                   $lt($field("val2"), $literal(Bson.Text("")))),
+                 $and(
+                   $lte($literal(Check.minDate), $field("val2")),
+                   $lt($field("val2"), $literal(Check.minTimestamp)))),
                $cond(
                  $or(
                    $and(
@@ -320,7 +324,6 @@ class PlannerSql2ExactSpec extends
                $literal(Bson.Undefined))),
            ExcludeId)))
     }
-
 
     "plan concat (3.2+)" in {
       plan3_2(sqlE"select concat(city, state) from extraSmallZips") must
@@ -645,7 +648,7 @@ class PlannerSql2ExactSpec extends
             $read(collection("db", "zips")),
             $project(
               reshape(
-                "0" ->
+                Keys.wrap ->
                   $cond(
                     $and(
                       $lte($literal(Bson.Arr(List())), $field("loc")),
@@ -653,9 +656,9 @@ class PlannerSql2ExactSpec extends
                     $field("loc"),
                     $literal(Bson.Undefined))),
               ExcludeId),
-            $unwind(DocField(BsonField.Name("0")), None, None),
+            $unwind(DocField(BsonField.Name(Keys.wrap)), None, None),
             $project(
-              reshape(sigil.Quasar -> $field("0")),
+              reshape(sigil.Quasar -> $field(Keys.wrap)),
               ExcludeId))
         }
     }
@@ -713,12 +716,16 @@ class PlannerSql2ExactSpec extends
              sigil.Quasar ->
                $cond(
                  $or(
-                   $and(
-                     $lt($literal(Bson.Null), $field("pop")),
-                     $lt($field("pop"), $literal(Bson.Doc()))),
+                   $or(
+                     $and(
+                       $lt($literal(Bson.Null), $field("pop")),
+                       $lt($field("pop"), $literal(Bson.Doc()))),
+                     $and(
+                       $lte($literal(Check.minDate), $field("pop")),
+                       $lt($field("pop"), $literal(Check.minTimestamp)))),
                    $and(
                      $lte($literal(Bson.Bool(false)), $field("pop")),
-                     $lt($field("pop"), $literal(Bson.Regex("", ""))))),
+                     $lte($field("pop"), $literal(Bson.Bool(true))))),
                  $cond($lt($field("pop"), $literal(Bson.Int32(10000))),
                    $field("city"),
                    $field("loc")),
@@ -772,9 +779,13 @@ class PlannerSql2ExactSpec extends
          $project(
            reshape(sigil.Quasar ->
              $cond(
-               $and(
-                 $lt($literal(Bson.Null), $field("val3")),
-                 $lt($field("val3"), $literal(Bson.Text("")))),
+               $or(
+                 $and(
+                   $lt($literal(Bson.Null), $field("val3")),
+                   $lt($field("val3"), $literal(Bson.Text("")))),
+                 $and(
+                   $lte($literal(Check.minDate), $field("val3")),
+                   $lt($field("val3"), $literal(Check.minTimestamp)))),
                $cond(
                  $or(
                    $and(
@@ -1743,19 +1754,11 @@ class PlannerSql2ExactSpec extends
       plan(sqlE"""select * from days where date < timestamp("2014-11-17T22:00:00Z") and date - interval("PT12H") > timestamp("2014-11-17T00:00:00Z")""") must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "days")),
-          $match(Selector.And(
-            Selector.Or(
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int32)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int64)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Dec)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Date))),
-            Selector.Or(
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int32)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int64)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Dec)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Text)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Date)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Bool))))),
+          $match(Selector.Or(
+            Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int32)),
+            Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int64)),
+            Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Dec)),
+            Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Date)))),
           $project(
             reshape(
               "0" -> $field("date"),
