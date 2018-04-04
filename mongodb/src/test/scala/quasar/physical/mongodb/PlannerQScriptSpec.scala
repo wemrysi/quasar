@@ -24,6 +24,7 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.javascript._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
+import quasar.physical.mongodb.planner.common._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.{OnUndefined, ShiftType}
 import quasar.sql.JoinDir
@@ -353,17 +354,17 @@ class PlannerQScriptSpec extends
         chain[Workflow](
           $read(collection("db", "zips")),
           $project(reshape(
-            "0" ->
+            Keys.wrap ->
               $cond(
                 $and(
                   $lte($literal(Bson.Arr()), $field("loc")),
                   $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("loc"),
                 $literal(Bson.Undefined)))),
-          $unwind(DocField("0"), None, None),
+          $unwind(DocField(Keys.wrap), None, None),
           $match(Selector.Doc(
-            BsonField.Name("0") -> Selector.Lt(Bson.Int32(-165)))),
-          $project(reshape(sigil.Quasar -> $field("0")))))
+            BsonField.Name(Keys.wrap) -> Selector.Lt(Bson.Int32(-165)))),
+          $project(reshape(sigil.Quasar -> $field(Keys.wrap)))))
     }
 
     "plan double flatten with reference to LeftSide" in {
@@ -453,25 +454,25 @@ class PlannerQScriptSpec extends
         chain[Workflow](
           $read(collection("db", "zips")),
           $project(reshape(
-            "0" ->
+            Keys.wrap ->
               $cond(
                 $and(
                   $lte($literal(Bson.Arr()), $field("loc")),
                   $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("loc"),
                 $literal(Bson.Undefined)))),
-          $unwind(DocField("0"), None, None),
+          $unwind(DocField(Keys.wrap), None, None),
           $project(reshape(
-            "0" ->
+            Keys.wrap ->
               $cond(
                 $and(
-                  $lte($literal(Bson.Arr()), $field("0")),
-                  $lt($field("0"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
-                $field("0"),
+                  $lte($literal(Bson.Arr()), $field(Keys.wrap)),
+                  $lt($field(Keys.wrap), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $field(Keys.wrap),
                 $literal(Bson.Undefined)))),
-          $unwind(DocField("0"), None, None),
+          $unwind(DocField(Keys.wrap), None, None),
           $project(reshape(
-            sigil.Quasar -> $field("0")))))
+            sigil.Quasar -> $field(Keys.wrap)))))
     }
 
     "plan flatten with reference to LeftSide" in {
