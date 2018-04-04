@@ -19,6 +19,7 @@ package quasar.fs
 import slamdata.Predef._
 
 import quasar.{Data, DataCodec}
+import quasar.common.PhaseResult
 import quasar.contrib.pathy.{prettyPrint, AFile, APath, PathSegment}
 import quasar.contrib.scalaz.stateT.StateTask
 import quasar.fp.TaskRef
@@ -110,7 +111,7 @@ class Local private (baseDir: JFile) {
                       FileSystemError.readFailed(err.toString, s"Read for $file failed."))
                     .right)
               } else {
-                // apparently read on a non-existent file is equivalent to reading the empty file??!!
+                // FIXME apparently read on a non-existent file is equivalent to reading the empty file??!!
                 Vector[Data]().right.right
               }
             }
@@ -375,13 +376,29 @@ class Local private (baseDir: JFile) {
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def queryFile = λ[QueryFile ~> Result] {
-    case QueryFile.ExecutePlan(lp, _) => ??? // not supported
-    case QueryFile.EvaluatePlan(lp) => ??? // not supported
-    case QueryFile.More(h) => ??? // not supported
-    case QueryFile.Close(_) => ??? // not supported
-    case QueryFile.Explain(lp) => ??? // not supported
+    case QueryFile.ExecutePlan(_, _) => delayRight {
+      (Vector[PhaseResult](), FileSystemError.unsupportedOperation(
+        "QueryFile.ExecutePlan not supported by the local file system.").left)
+    }
 
-    case QueryFile.ListContents(dir) => delayEither {
+    case QueryFile.EvaluatePlan(_) => delayRight {
+      (Vector[PhaseResult](), FileSystemError.unsupportedOperation(
+        "QueryFile.EvaluatePlan not supported by the local file system.").left)
+    }
+
+    case QueryFile.More(h) => delayRight {
+      FileSystemError.unsupportedOperation(
+        "QueryFile.More not supported by the local file system.").left
+    }
+
+    case QueryFile.Close(_) => delayRight(())
+
+    case QueryFile.Explain(lp) => delayRight {
+      (Vector[PhaseResult](), FileSystemError.unsupportedOperation(
+        "QueryFile.Explain not supported by the local file system.").left)
+    }
+
+    case QueryFile.ListContents(dir) => delayEither[FSError[Set[Node]]] {
       failIfSourceMissing(dir) match {
         case Some(err) => err.left.right
         case None =>
@@ -401,7 +418,7 @@ class Local private (baseDir: JFile) {
     }
 
     case QueryFile.FileExists(file) =>
-      delayRight(Files.exists(toJPath(file)))
+      delayRight[Boolean](Files.exists(toJPath(file)))
   }
 
   ////////
