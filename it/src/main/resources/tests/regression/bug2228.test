@@ -4,8 +4,8 @@
   "backends": {
     "couchbase":         "skip",
     "marklogic_json":    "ignoreFieldOrder",
-    "mimir":             "pendingIgnoreFieldOrder",
-    "postgres":          "pending"
+    "postgres":          "pending",
+    "mimir":             "ignoreFieldOrder"
   },
   "NB": "Pending for postgres connector due to PSQLException errors qz-3737",
   "query": "SELECT o.order_key AS OrderKey, o.purchase_date AS PurchaseDate, c.last_name, c.city AS City, c.state AS State, oi.qty AS Quantity, i.price AS UnitPrice

@@ -4,7 +4,7 @@
   "backends": {
       "couchbase":         "skip",
       "marklogic_json":    "ignoreFieldOrder",
-      "mimir":             "pendingIgnoreFieldOrder",
+      "mimir":             "ignoreFieldOrder",
       "postgres":          "pending"
   },
   "NB": "this query works in mimir but fails because it appends UTC to dates",
