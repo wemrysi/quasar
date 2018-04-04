@@ -34,6 +34,8 @@ env:
   global:
     - COURSIER_PROGRESS=0
     - SBT=./sbt
+    # DISCORD_WEBHOOK_TOKENS
+    - secure: "copZbrzCXeRfTx2ZRM6nsM07A4rfQAZ0mqk4R+z6USJhjLHv+KXAN30QN2nIAi9FmLoEX8BZRRpbX36nkc81jverhbS6POaci5UcQLpo8HOX4yR3b/pWqIBlno55K5hC6UCEXAneI/ZThFKwotpME9dw7ww+S+gIyaoDvZc4OUI="
 
 # this is also the test stage :eyeroll:
 script:
@@ -165,6 +167,16 @@ notifications:
         %{build_url}"
   slack:
     secure: k7tat0w0CSokOD1K0nfPhFY9Z3xkYHXboNlW1WgNAjqtq56hQsfQWhN8z6cXRAs/CgT8ME0K//wDN/HgdG91/aVh1smv/hxMa6P/o70GclhvUkB4iTis3kv9la3Kf2w3K5pbWJ6fFLdAZqc5i9XpQ8q+d7UTgwAxj1ZcYwaCSVo=
+
+after_success:
+  - wget https://raw.githubusercontent.com/k3rn31p4nic/travis-ci-discord-webhook/master/send.sh
+  - chmod +x send.sh
+  - ./send.sh success https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
+
+after_failure:
+  - wget https://raw.githubusercontent.com/k3rn31p4nic/travis-ci-discord-webhook/master/send.sh
+  - chmod +x send.sh
+  - ./send.sh failure https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
 
 branches:
   only:
