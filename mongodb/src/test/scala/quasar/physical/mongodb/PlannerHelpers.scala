@@ -187,6 +187,10 @@ object PlannerHelpers {
     EitherT.monadListen[WriterT[Id, Vector[PhaseResult], ?], PhaseResults, FileSystemError](
       WriterT.writerTMonadListen[Id, Vector[PhaseResult]])
 
+  implicit val monadListen: MonadListen[EitherT[PhaseResultT[Id, ?], FileSystemError, ?], PhaseResults] =
+    EitherT.monadListen[WriterT[Id, Vector[PhaseResult], ?], PhaseResults, FileSystemError](
+      WriterT.writerTMonadListen[Id, Vector[PhaseResult]])
+
   def compileSqlToLP[M[_]: Monad: MonadFsErr: PhaseResultTell]
       (sql: Fix[Sql], basePath: ADir): M[Fix[LP]] = {
     val (log, s) = queryPlan(sql, Variables.empty, basePath, 0L, None).run.run
@@ -209,7 +213,7 @@ object PlannerHelpers {
   def planSqlToQScript(query: Fix[Sql]): Either[FileSystemError, Fix[fs.MongoQScript[Fix, ?]]] =
     sqlToQscript(query, basePathDb, listContents).run.value.toEither
 
-  def queryPlanner[M[_]: Monad: MonadFsErr: PhaseResultTell]
+  def queryPlanner[M[_]: Monad: MonadFsErr: PhaseResultTell: PhaseResultListen]
       (sql: Fix[Sql],
         basePath: ADir,
         model: MongoQueryModel,
