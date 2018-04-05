@@ -436,11 +436,13 @@ class Local private (baseDir: JFile) {
           case -\/(_) => // directory
             val visitor = new SimpleFileVisitor[JPath] {
               override def visitFile(file: JPath, attrs: BasicFileAttributes): FileVisitResult = {
+                println(s"visiting file: $file")
                 Files.delete(file)
                 FileVisitResult.CONTINUE
               }
 
               override def postVisitDirectory(dir: JPath, exc: IOException): FileVisitResult = {
+                println(s"visiting post dir: $dir")
                 Files.delete(dir)
                 FileVisitResult.CONTINUE
               }
