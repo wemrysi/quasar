@@ -38,12 +38,13 @@ import java.nio.file.{
   StandardOpenOption
 }
 import java.nio.file.attribute.BasicFileAttributes
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.stream.Collectors
 
 import scala.collection.JavaConverters._
 
-import pathy.Path.{refineType, DirName, FileName}
+import pathy.Path.{file1, refineType, DirName, FileName}
 import scalaz.{~>, \/, -\/, \/-, EitherT, StateT}
 import scalaz.Scalaz._
 import scalaz.concurrent.Task
@@ -345,33 +346,28 @@ class Local private (baseDir: JFile) {
 
     case ManageFile.Delete(path) => EitherT.eitherT(delete(path))
 
-    case ManageFile.TempFile(path, tempFilePrefix) =>
-      val tmp: Task[Throwable \/ JFile] = Task delay {
-        val jpath: JPath = toJPath(path)
-        val prefix: String = tempFilePrefix.fold("")( _.s)
+    case ManageFile.TempFile(path, prefix) => delayEither[FSError[AFile]] {
+      val uuid: String = UUID.randomUUID().toString
 
-        \/.fromTryCatchNonFatal[JFile] {
-          refineType(path).fold(
-            _ => { // directory
-              Files.createDirectories(jpath)
-              Files.createTempFile(jpath, prefix, "").toFile
-            },
-            _ => { // file
-              Files.createDirectories(jpath.getParent)
-              Files.createTempFile(jpath.getParent, prefix, "").toFile
-            })
-        }
+      val fileName: FileName =
+        TmpFile.tmpFileName[String](prefix.getOrElse(TempFilePrefix("")), uuid)
+
+      val jpath: JPath = toJPath(path)
+
+      \/.fromTryCatchNonFatal[JPath] {
+        refineType(path).fold(
+          _ => { // directory
+            Files.createDirectories(jpath)
+            Files.createFile(Paths.get(jpath.toFile.getPath, fileName.value))
+          },
+          _ => { // file
+            Files.createDirectories(jpath.getParent)
+            Files.createFile(Paths.get(jpath.toFile.getParent, fileName.value))
+          })
+        }.fold(
+          err => LocalFileSystemError.tempFileCreationFailed(toJPath(path), err).left,
+          κ((nearDir(path) </> file1(fileName)).right.right))
       }
-
-      EitherT.eitherT(tmp)
-        .leftMap(err =>
-          LocalFileSystemError.tempFileCreationFailed(toJPath(path), err))
-        .flatMap(file =>
-          AFile.fromFile(file).toRight(
-            LocalFileSystemError.tempFileCreationFailed(
-              toJPath(path),
-              new RuntimeException(s"AFile creation failed for file $file"))))
-        .map(_.right[FileSystemError])
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
@@ -412,7 +408,7 @@ class Local private (baseDir: JFile) {
               case f if f.isFile => FileName(f.getName).right
             }
 
-            files.map(quasar.fs.Node.fromSegment).toSet.right
+            files.map(Node.fromSegment).toSet.right
           }.leftMap(e => LocalFileSystemError.listContentsFailed(toJPath(dir), e))
       }
     }
