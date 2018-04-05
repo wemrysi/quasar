@@ -108,7 +108,7 @@ class Local private (baseDir: JFile) {
                     .traverse(str =>
                       \/.fromEither(Data.jsonParser.parseFromString(str).toEither))
                     .leftMap(err =>
-                      FileSystemError.readFailed(err.toString, s"Read for $file failed."))
+                      FileSystemError.readFailed(err.toString, s"Read for $file failed"))
                     .right)
               } else {
                 // FIXME apparently read on a non-existent file is equivalent to reading the empty file??!!
@@ -370,7 +370,7 @@ class Local private (baseDir: JFile) {
           AFile.fromFile(file).toRight(
             LocalFileSystemError.tempFileCreationFailed(
               toJPath(path),
-              new RuntimeException(s"AFile creation failed for file $file."))))
+              new RuntimeException(s"AFile creation failed for file $file"))))
         .map(_.right[FileSystemError])
   }
 
