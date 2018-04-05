@@ -349,8 +349,7 @@ class Local private (baseDir: JFile) {
     case ManageFile.TempFile(path, prefix) => delayEither[FSError[AFile]] {
       val uuid: String = UUID.randomUUID().toString
 
-      val fileName: FileName =
-        TmpFile.tmpFileName[String](prefix.getOrElse(TempFilePrefix("")), uuid)
+      val fileName: FileName = FileName(prefix.fold("")(_.s) + uuid)
 
       val jpath: JPath = toJPath(path)
 
