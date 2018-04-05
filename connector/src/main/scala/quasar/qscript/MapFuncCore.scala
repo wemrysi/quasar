@@ -1087,6 +1087,13 @@ object MapFuncsCore {
   }
 
   object RecIntLit {
+    def apply[T[_[_]]: BirecursiveT, A](i: BigInt): RecFreeMapA[T, A] = {
+      val recFunc = construction.RecFunc[T]
+      val json = ejson.Fixed[T[EJson]]
+
+      recFunc.Constant(json.int(i))
+    }
+
     def unapply[T[_[_]]: RecursiveT, A](mf: RecFreeMapA[T, A]): Option[BigInt] =
       mf.linearize.resume.fold(IntLitMapFunc.unapply(_), _ => None)
   }

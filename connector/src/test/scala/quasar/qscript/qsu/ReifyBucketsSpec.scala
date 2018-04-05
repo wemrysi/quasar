@@ -38,6 +38,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   val J = Fixed[Fix[EJson]]
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
+  val recFunc = construction.RecFunc[Fix]
 
   def reifyBuckets(qsu: Fix[QScriptUniform]): PlannerError \/ QSUGraph =
     ApplyProvenance[Fix, EitherT[State[Long, ?], PlannerError, ?]](QSUGraph.fromTree(qsu))
@@ -55,7 +56,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               qsu.tread1("zips"),
               DTrans.Group(
                 func.ProjectKeyS(func.Hole, "state"))),
-            func.ProjectKeyS(func.Hole, "pop")),
+            recFunc.ProjectKeyS(recFunc.Hole, "pop")),
           ReduceFuncs.Sum(()))
 
       val expBucket =
@@ -84,7 +85,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
             qsu.dimEdit(
               qsu.tread1("zips"),
               DTrans.Group(func.Constant(J.int(7)))),
-            func.ProjectKeyS(func.Hole, "pop")),
+            recFunc.ProjectKeyS(recFunc.Hole, "pop")),
           ReduceFuncs.Sum(()))
 
       val expB =
@@ -112,7 +113,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         qsu.lpReduce(
           qsu.map(
             qsu.tread1("zips"),
-            func.ProjectKeyS(func.Hole, "pop")),
+            recFunc.ProjectKeyS(recFunc.Hole, "pop")),
           ReduceFuncs.Sum(()))
 
       val expFm =
@@ -126,7 +127,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
             List(ReduceFuncs.Sum(r)),
             _)) =>
 
-          (fm must beTreeEqual(expFm)) and
+          (fm.linearize must beTreeEqual(expFm)) and
           (r must beTreeEqual(func.Hole))
       }
     }
@@ -262,7 +263,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
                     _(MapFuncsCore.ProjectKey(_, _)))),
                   Retain.Values,
                   Rotation.FlattenArray),
-                func.ProjectKeyS(func.Hole, "quux")),
+                recFunc.ProjectKeyS(recFunc.Hole, "quux")),
               ReduceFuncs.Sum(())),
             _(MapFuncsCore.MakeMap(_, _)))),
           _(MapFuncsCore.ConcatMaps(_, _))))

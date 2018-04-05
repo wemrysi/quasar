@@ -87,7 +87,7 @@ object RecFreeS {
   }
 
   // FIXME: Display the bound form and body separately
-  implicit def renderTree[F[_], A](FR: RenderTree[Free[F, A]]): RenderTree[RecFreeS[F, A]] =
+  implicit def renderTree[F[_], A](FR: RenderTree[Free[F, A]]): RenderTree[Free[RecFreeS[F, ?], A]] =
     RenderTree.make(rf => FR.render(rf.linearize))
 
   implicit def show[F[_], A](implicit SF: Show[Free[F, A]]): Show[Free[RecFreeS[F, ?], A]] =

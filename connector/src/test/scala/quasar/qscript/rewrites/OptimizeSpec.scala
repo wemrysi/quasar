@@ -35,10 +35,10 @@ class OptimizeSpec extends quasar.Qspec with QScriptHelpers {
       val from =
         free.Map(
           free.Filter(free.Hole, func.Constant(json.bool(true))),
-          func.ProjectKeyS(func.Hole, "foo"))
+          recFunc.ProjectKeyS(recFunc.Hole, "foo"))
 
       val count =
-        free.Map(free.Hole, func.ProjectIndexI(func.Hole, 2))
+        free.Map(free.Hole, recFunc.ProjectIndexI(recFunc.Hole, 2))
 
       val input =
         fix.Subset(
@@ -54,17 +54,17 @@ class OptimizeSpec extends quasar.Qspec with QScriptHelpers {
             free.Filter(free.Hole, func.Constant(json.bool(true))),
             Take,
             count),
-          func.ProjectKeyS(func.Hole, "foo"))
+          recFunc.ProjectKeyS(recFunc.Hole, "foo"))
 
       optimizeExpr(input) must equal(output)
     }
 
     "move filter before union" in {
       val lBranch =
-        free.Map(free.Hole, func.ProjectKeyS(func.Hole, "foo"))
+        free.Map(free.Hole, recFunc.ProjectKeyS(recFunc.Hole, "foo"))
 
       val rBranch =
-        free.Map(free.Hole, func.ProjectIndexI(func.Hole, 2))
+        free.Map(free.Hole, recFunc.ProjectIndexI(recFunc.Hole, 2))
 
       val input =
         fix.Filter(

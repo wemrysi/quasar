@@ -18,6 +18,7 @@ package quasar.qscript.qsu
 
 import quasar.Planner.PlannerError
 import quasar.{Qspec, TreeMatchers}
+import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript.{construction, Hole, ExcludeId, OnUndefined, SrcHole}
@@ -26,6 +27,7 @@ import slamdata.Predef.{Map => _, _}
 
 import matryoshka._
 import matryoshka.data._
+import matryoshka.data.free._
 import org.specs2.matcher.{Expectable, MatchResult, Matcher}
 import pathy.Path._
 import scalaz.{\/, EitherT, Need, StateT}
@@ -96,10 +98,11 @@ object eshSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         ),
         fm
       ) =>
-        fm must beTreeEqual(
+        fm.linearize must beTreeEqual(
           func.Add(
             func.ProjectKeyS(func.Hole, "0"),
             func.ProjectKeyS(func.Hole, "1")))
+
         projectBar.linearize must beTreeEqual(
           func.ProjectKeyS(func.ProjectKeyS(func.Hole, "original"), "bar")
         )
@@ -242,7 +245,7 @@ object eshSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         ),
         fm
       ) =>
-        fm must beTreeEqual(
+        fm.linearize must beTreeEqual(
           func.Subtract(
             func.Add(
               func.ProjectKeyS(func.Hole, "0"),

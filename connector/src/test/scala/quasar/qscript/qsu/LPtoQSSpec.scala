@@ -59,7 +59,7 @@ object LPtoQSSpec extends Qspec with CompilerHelpers with QSUTTypes[Fix] {
 
       val expected = qs.Map(
         qs.Unreferenced,
-        func.Constant(json.bool(true)))
+        recFunc.Constant(json.bool(true)))
 
       lp must compileTo(expected)
     }

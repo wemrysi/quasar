@@ -25,8 +25,8 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.qscript.construction
-import quasar.qscript.{HoleF, ReduceFuncs}
-import quasar.qscript.MapFuncsCore.IntLit
+import quasar.qscript.ReduceFuncs
+import quasar.qscript.MapFuncsCore.RecIntLit
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -50,6 +50,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
   val qsu = QScriptUniform.AnnotatedDsl[Fix, Symbol]
   val func = construction.Func[Fix]
+  val recFunc = construction.RecFunc[Fix]
 
   val app = ApplyProvenance[Fix, F] _
   val qprov = QProv[Fix]
@@ -65,7 +66,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
     "produce provenance for map" in {
 
-      val fm: FreeMap = func.Add(HoleF, IntLit(17))
+      val fm: RecFreeMap = recFunc.Add(recFunc.Hole, RecIntLit(17))
 
       val tree: Cofree[QSU, Symbol] =
         qsu.map('name0,
@@ -87,7 +88,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
                 qsu.read('n0, afile),
                 DTrans.Group(func.ProjectKeyS(func.Hole, "x")))),
               DTrans.Group(func.ProjectKeyS(func.Hole, "y")))),
-            func.ProjectKeyS(func.Hole, "pop"))),
+            recFunc.ProjectKeyS(recFunc.Hole, "pop"))),
           ReduceFuncs.Sum(())))
 
       tree must haveDimensions(SMap(
@@ -113,9 +114,9 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
               qsu.read('n3, afile),
               Retain.Values,
               Rotation.ShiftMap)),
-            func.Add(
-              func.Constant(J.int(7)),
-              func.ProjectKeyS(func.Hole, "bar")))),
+            recFunc.Add(
+              recFunc.Constant(J.int(7)),
+              recFunc.ProjectKeyS(recFunc.Hole, "bar")))),
           DTrans.Squash[Fix]()))
 
       tree must haveDimensions(SMap(

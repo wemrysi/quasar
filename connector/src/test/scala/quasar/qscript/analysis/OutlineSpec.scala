@@ -312,7 +312,7 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
   def lShape(srcShape: Shape): Shape =
     rollS(CommonEJson(ejson.Arr(List(srcShape, rollS(ExtEJson(ejson.Int(53)))))))
 
-  val rfn: FreeMap = MapFuncCore.StaticArray(List(func.Constant(json.int(78)), func.Hole))
+  val rfn: RecFreeMap = MapFuncCore.RecStaticArray(List(recFunc.Constant(json.int(78)), recFunc.Hole))
   val r: FreeQS = free.Map(free.Hole, rfn)
   def rShape(srcShape: Shape): Shape =
     rollS(CommonEJson(ejson.Arr(List(rollS(ExtEJson(ejson.Int(78))), srcShape))))
