@@ -49,22 +49,28 @@ import simulacrum.typeclass
     (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
       : AlgebraM[(Option ∘ M)#λ, IN, Fix[EX]]
 
-  def handle3_2[M[_]: Monad: MonadFsErr: ExecTimeR](v: BsonVersion)
-      : AlgebraM[M, IN, Fix[Expr3_2]] =
-    handleOpsCore[Expr3_2, M](v)
+  def handle3_2[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
+    (implicit e32: ExprOpCoreF :<: EX)
+      : AlgebraM[M, IN, Fix[EX]] =
+    handleOpsCore[EX, M](v)
 
-  def handle3_4[M[_]: Monad: MonadFsErr: ExecTimeR](v: BsonVersion)
-      : AlgebraM[M, IN, Fix[Expr3_4]] = f => {
-    val h34 = handleOps3_4[Expr3_4, M](v)
-    val h = handleOpsCore[Expr3_4, M](v)
+  def handle3_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
+    (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX)
+      : AlgebraM[M, IN, Fix[EX]] = f => {
+    val h34 = handleOps3_4[EX, M](v)
+    val h = handleOpsCore[EX, M](v)
     h34(f) getOrElse h(f)
   }
 
-  def handle3_4_4[M[_]: Monad: MonadFsErr: ExecTimeR](v: BsonVersion)
-     : AlgebraM[M, IN, Fix[Expr3_4_4]] = f => {
-    val h344 = handleOps3_4_4[Expr3_4_4, M](v)
-    val h34 = handleOps3_4[Expr3_4_4, M](v)
-    val h = handleOpsCore[Expr3_4_4, M](v)
+  def handle3_4_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
+    (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
+     : AlgebraM[M, IN, Fix[EX]] = f => {
+    val h344 = handleOps3_4_4[EX, M](v)
+    val h34 = handleOps3_4[EX, M](v)
+    val h = handleOpsCore[EX, M](v)
     h344(f) getOrElse (h34(f) getOrElse h(f))
   }
 }
@@ -367,31 +373,14 @@ object FuncHandler {
       def handleOps3_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
         (v: BsonVersion)
         (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX)
-          : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] = {
-
-        val handle3_4Core: AlgebraM[M, MapFuncCore[T, ?], Fix[EX]] = f => {
-          val h34 = core.handleOps3_4[EX, M](v)
-          val h = core.handleOpsCore[EX, M](v)
-          h34(f) getOrElse h(f)
-        }
-        val derived: AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] = κ(None)
-        ExpandMapFunc.expand[T, M, Fix[EX]](handle3_4Core, derived) andThen (_.some)
-      }
+          : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] =
+        ExpandMapFunc.expand[T, M, Fix[EX]](core.handle3_4(v), κ(None)) andThen (_.some)
 
       def handleOps3_4_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
         (v: BsonVersion)
         (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
-          : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] = {
-
-        val handle3_4_4Core: AlgebraM[M, MapFuncCore[T, ?], Fix[EX]] = f => {
-          val h344 = core.handleOps3_4_4[EX, M](v)
-          val h34 = core.handleOps3_4[EX, M](v)
-          val h = core.handleOpsCore[EX, M](v)
-          h344(f) getOrElse (h34(f) getOrElse h(f))
-        }
-
-        ExpandMapFunc.expand[T, M, Fix[EX]](handle3_4_4Core, κ(None)) andThen (_.some)
-      }
+          : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] =
+        ExpandMapFunc.expand[T, M, Fix[EX]](core.handle3_4_4(v), κ(None)) andThen (_.some)
     }
 
   implicit def mapFuncCoproduct[F[_], G[_]]
@@ -427,15 +416,15 @@ object FuncHandler {
   def handle3_2[F[_]: FuncHandler, M[_]: Monad: MonadFsErr: ExecTimeR]
     (v: BsonVersion)
       : AlgebraM[M, F, Fix[Expr3_2]] =
-    FuncHandler[F].handle3_2[M](v)
+    FuncHandler[F].handle3_2[Expr3_2, M](v)
 
   def handle3_4[F[_]: FuncHandler, M[_]: Monad: MonadFsErr: ExecTimeR]
     (v: BsonVersion)
       : AlgebraM[M, F, Fix[Expr3_4]] =
-    FuncHandler[F].handle3_4[M](v)
+    FuncHandler[F].handle3_4[Expr3_4, M](v)
 
   def handle3_4_4[F[_]: FuncHandler, M[_]: Monad: MonadFsErr: ExecTimeR]
     (v: BsonVersion)
       : AlgebraM[M, F, Fix[Expr3_4_4]] =
-    FuncHandler[F].handle3_4_4[M](v)
+    FuncHandler[F].handle3_4_4[Expr3_4_4, M](v)
 }
