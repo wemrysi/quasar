@@ -66,11 +66,11 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
 
   def plan: AlgebraM[F, QScriptCore[T, ?], T[SqlExpr]] = {
     case qscript.Map(`unref`, f) =>
-      processFreeMap(f, SqlExpr.Null[T[SqlExpr]])
+      processFreeMap(f.linearize, SqlExpr.Null[T[SqlExpr]])
     case qscript.Map(src, f) =>
       for {
         fromAlias <- genId[T[SqlExpr], F](deriveIndirection(src))
-        selection <- processFreeMap(f, fromAlias)
+        selection <- processFreeMap(f.linearize, fromAlias)
           .map(idToWildcard[T])
       } yield {
         Select(
