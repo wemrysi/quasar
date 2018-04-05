@@ -46,10 +46,10 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         implicitly[DeepShape[Fix, QScriptCore]].deepShapeƒ
 
       "Map" >> {
-        val fun: FreeMap = func.ProjectIndexI(func.Hole, 3)
+        val fun: RecFreeMap = recFunc.ProjectIndexI(recFunc.Hole, 3)
         val qs = Map(shape, fun)
 
-        deepShapeQS(qs) must equal(fun >> shape)
+        deepShapeQS(qs) must equal(fun.linearize >> shape)
       }
 
       "LeftShift" >> {
@@ -92,12 +92,12 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         val from: FreeQS =
           free.Map(
             free.Hole,
-            func.ProjectKeyS(func.Hole, "foo"))
+            recFunc.ProjectKeyS(recFunc.Hole, "foo"))
 
         val count: FreeQS =
           free.Map(
             free.Hole,
-            func.ProjectKeyS(func.Hole, "bar"))
+            recFunc.ProjectKeyS(recFunc.Hole, "bar"))
 
         val qs = Subset(shape, from, Take, count)
 
@@ -108,12 +108,12 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         val lBranch: FreeQS =
           free.Map(
             free.Hole,
-            func.ProjectKeyS(func.Hole, "foo"))
+            recFunc.ProjectKeyS(recFunc.Hole, "foo"))
 
         val rBranch: FreeQS =
           free.Map(
             free.Hole,
-            func.ProjectKeyS(func.Hole, "bar"))
+            recFunc.ProjectKeyS(recFunc.Hole, "bar"))
 
         val qs = Union(shape, lBranch, rBranch)
 
@@ -201,7 +201,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         free.LeftShift(
           free.Map(
             free.Hole,
-            func.ProjectKeyS(func.Hole, "foo")),
+            recFunc.ProjectKeyS(recFunc.Hole, "foo")),
           recFunc.Hole,
           IncludeId,
           ShiftType.Array,
@@ -212,7 +212,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         free.LeftShift(
           free.Map(
             free.Hole,
-            func.ProjectKeyS(func.Hole, "bar")),
+            recFunc.ProjectKeyS(recFunc.Hole, "bar")),
           recFunc.Hole,
           IncludeId,
           ShiftType.Array,

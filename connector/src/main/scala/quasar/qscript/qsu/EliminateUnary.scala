@@ -16,11 +16,11 @@
 
 package quasar.qscript.qsu
 
-import quasar.qscript.FreeMapA
+import quasar.qscript.RecFreeMapA
+import quasar.qscript.RecFreeS
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 
 import matryoshka.BirecursiveT
-import scalaz.Free
 import scalaz.syntax.applicative._
 
 object EliminateUnary {
@@ -29,6 +29,6 @@ object EliminateUnary {
   def apply[T[_[_]]: BirecursiveT](qgraph: QSUGraph[T]): QSUGraph[T] =
     qgraph rewrite {
       case qgraph @ Unary(source, mf) =>
-        qgraph.overwriteAtRoot(QSU.Map(source.root, Free.roll(mf.map(_.point[FreeMapA[T, ?]]))))
+        qgraph.overwriteAtRoot(QSU.Map(source.root, RecFreeS.roll(mf.map(_.point[RecFreeMapA[T, ?]]))))
     }
 }

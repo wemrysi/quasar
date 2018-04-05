@@ -24,7 +24,6 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.qscript._
-import quasar.qscript.MapFuncsCore._
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
@@ -142,6 +141,8 @@ abstract class ExpandDirsInstances {
 private[qscript] final class ExpandDirsPath[T[_[_]]: BirecursiveT, O[_]: Functor](
   implicit FI: Injectable.Aux[O, QScriptTotal[T, ?]], QC: QScriptCore[T, ?] :<: O
 ) extends TTypes[T] {
+  val recFunc = construction.RecFunc[T]
+
   def union(elems: NonEmptyList[O[T[O]]]): O[T[O]] =
     elems.foldRight1(
       (elem, acc) => QC.inj(Union(QC.inj(Unreferenced[T, T[O]]()).embed,
@@ -149,7 +150,7 @@ private[qscript] final class ExpandDirsPath[T[_[_]]: BirecursiveT, O[_]: Functor
         acc.embed.cata[Free[QScriptTotal, Hole]](g => Free.roll(FI.inject(g))))))
 
   def wrapDir(name: String, d: O[T[O]]): O[T[O]] =
-    QC.inj(Map(d.embed, Free.roll(MFC(MakeMap(StrLit(name), HoleF)))))
+    QC.inj(Map(d.embed, recFunc.MakeMapS(name, recFunc.Hole)))
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def allDescendents[M[_]: Monad: MonadFsErr]

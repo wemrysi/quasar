@@ -75,6 +75,9 @@ object RecFreeS {
         rec.mapSuspension(λ[RecFreeS[F, ?] ~> RecFreeS[S, ?]](RecFreeS.mapS(_)(t))))
   }
 
+  def roll[F[_], A](rc: F[Free[RecFreeS[F, ?], A]]): Free[RecFreeS[F, ?], A] =
+    Free.roll(RecFreeS.Suspend(rc))
+
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def traverse[F[_]: Traverse]: Traverse[RecFreeS[F, ?]] = new Traverse[RecFreeS[F, ?]] {
     def traverseImpl[G[_]: Applicative, A, B](fa: RecFreeS[F, A])(f: A => G[B]): G[RecFreeS[F, B]] = fa match {
@@ -84,7 +87,7 @@ object RecFreeS {
   }
 
   // FIXME: Display the bound form and body separately
-  implicit def renderTree[F[_], A](implicit F: RenderTree[F[A]], FR: RenderTree[Free[F, A]]): RenderTree[RecFreeS[F, A]] =
+  implicit def renderTree[F[_], A](FR: RenderTree[Free[F, A]]): RenderTree[RecFreeS[F, A]] =
     RenderTree.make(rf => FR.render(rf.linearize))
 
   implicit def show[F[_], A](implicit SF: Show[Free[F, A]]): Show[Free[RecFreeS[F, ?], A]] =

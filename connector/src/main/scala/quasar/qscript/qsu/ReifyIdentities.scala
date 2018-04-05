@@ -198,7 +198,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
         nestedVerts = origVerts.updated(nestedRoot, origVerts(origRoot))
 
-        newVert = O.map(nestedRoot, func)
+        newVert = O.map(nestedRoot, func.asRec)
 
         newBranch = QSUGraph(origRoot, nestedVerts.updated(origRoot, newVert))
 
@@ -320,8 +320,8 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       case g @ E.Map(source, fm) =>
         preserveIV(source, g) map { emitsIV =>
           if (emitsIV) {
-            val newFunc = makeIV(lookupIdentities, rebaseV(fm))
-            g.overwriteAtRoot(O.map(source.root, newFunc))
+            val newFunc = makeIV(lookupIdentities, rebaseV(fm.linearize))
+            g.overwriteAtRoot(O.map(source.root, newFunc.asRec))
           } else g
         }
 
@@ -565,7 +565,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
           // The root of the graph emits IV, so we need to project out the value.
           freshName map { newRoot =>
             val QSUGraph(oldRoot, oldVerts) = reifiedGraph
-            val updVerts = oldVerts.updated(newRoot, O.map(oldRoot, lookupValue))
+            val updVerts = oldVerts.updated(newRoot, O.map(oldRoot, lookupValue.asRec))
             QSUGraph(newRoot, updVerts)
           }
         else

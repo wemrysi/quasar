@@ -26,6 +26,7 @@ import quasar.contrib.matryoshka._
 import quasar.fp.ski.{ι, κ}
 import quasar.fp._
 import quasar.qscript._
+import quasar.qscript.RecFreeS._
 import quasar.qscript.provenance.JoinKeys
 
 import matryoshka.{Hole => _, birecursiveIso => _, _} // {delayEqual, equalTEqual, delayShow, showTShow, BirecursiveT, Delay, Embed, EqualT, ShowT}
@@ -284,7 +285,7 @@ object QScriptUniform {
 
   final case class Map[T[_[_]], A](
       source: A,
-      fm: FreeMap[T]) extends QScriptUniform[T, A]
+      fm: RecFreeMap[T]) extends QScriptUniform[T, A]
 
   final case class Read[T[_[_]], A](path: AFile) extends QScriptUniform[T, A]
 
@@ -538,8 +539,8 @@ object QScriptUniform {
         case Unary(a, mf) => (a, mf)
       } { case (a, mf) => Unary(a, mf) }
 
-    def map[A]: Prism[QScriptUniform[A], (A, FreeMap)] =
-      Prism.partial[QScriptUniform[A], (A, FreeMap)] {
+    def map[A]: Prism[QScriptUniform[A], (A, RecFreeMap)] =
+      Prism.partial[QScriptUniform[A], (A, RecFreeMap)] {
         case Map(a, fm) => (a, fm)
       } { case (a, fm) => Map(a, fm) }
 
@@ -606,6 +607,7 @@ object QScriptUniform {
 
     val iso: Iso[A, F[QScriptUniform[A]]]
     def lifting[S, A]: Prism[S, A] => Prism[F[S], F[A]]
+    val recFunc = construction.RecFunc[T]
 
     type Bin[A] = (A, A) => Binary[T, A]
     type Tri[A] = (A, A, A) => Ternary[T, A]
@@ -686,12 +688,12 @@ object QScriptUniform {
     def unary: Prism[A, F[(A, MapFunc[Hole])]] =
       composeLifting[(?, MapFunc[Hole])](O.unary[A])
 
-    def map: Prism[A, F[(A, FreeMap)]] =
-      composeLifting[(?, FreeMap)](O.map[A])
+    def map: Prism[A, F[(A, RecFreeMap)]] =
+      composeLifting[(?, RecFreeMap)](O.map[A])
 
     def map1(pair: F[(A, MapFuncCore[Hole])]): A =
       map(pair.map {
-        case(src, f) => (src, Free.roll(mfc(f as HoleF[T])))
+        case(src, f) => (src, RecFreeS.roll(mfc(f.as(recFunc.Hole))))
       })
 
     def qsAutoJoin: Prism[A, F[(A, A, JoinKeys[QIdAccess], JoinFunc)]] = {
@@ -753,14 +755,14 @@ object QScriptUniform {
     // undefined
     val undefined: Prism[T[QSU], Unit] =
       Prism[T[QSU], Unit](map.getOption(_) collect {
-        case (Unreferenced(), Embed(CoEnv(\/-(MFC(MapFuncsCore.Undefined()))))) => ()
-      })(_ => map(unreferenced(), Free.roll(mfc[FreeMap](MapFuncsCore.Undefined()))))
+        case (Unreferenced(), Embed(CoEnv(\/-(Suspend(MFC(MapFuncsCore.Undefined())))))) => ()
+      })(_ => map(unreferenced(), recFunc.Undefined[Hole]))
 
     // constants
     val constant: Prism[T[QSU], T[EJson]] =
       Prism[T[QSU], T[EJson]](map.getOption(_) collect {
-        case (Unreferenced(), Embed(CoEnv(\/-(MFC(MapFuncsCore.Constant(ejs)))))) => ejs
-      })(ejs => map(unreferenced(), Free.roll(mfc[FreeMap](MapFuncsCore.Constant(ejs)))))
+        case (Unreferenced(), Embed(CoEnv(\/-(Suspend(MFC(MapFuncsCore.Constant(ejs))))))) => ejs
+      })(ejs => map(unreferenced(), recFunc.Constant[Hole](ejs)))
 
     val carr: Prism[T[QSU], List[T[EJson]]] =
       constant composePrism J.arr

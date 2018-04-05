@@ -21,6 +21,7 @@ import slamdata.Predef.{Map => SMap, _}
 import quasar.{NameGenerator, RenderTreeT}
 import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.fp.symbolOrder
+import quasar.qscript.RecFreeS._
 import quasar.qscript.{construction, JoinSide, LeftSide, RightSide}
 import quasar.sql.JoinDir
 
@@ -171,7 +172,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
           graph.overwriteAtRoot(node).point[F]
         else
           withName[F](node) map { inter =>
-            graph.overwriteAtRoot(Map(inter.root, original)) :++ inter :++ newSrc
+            graph.overwriteAtRoot(Map(inter.root, original.asRec)) :++ inter :++ newSrc
           }
     }
 

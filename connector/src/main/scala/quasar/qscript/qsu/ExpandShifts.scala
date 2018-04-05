@@ -20,19 +20,20 @@ import slamdata.Predef._
 
 import quasar.NameGenerator
 import quasar.Planner.PlannerErrorME
-import quasar.qscript.qsu.QSUGraph.Extractors._
-import quasar.qscript.{
-  construction,
-  Hole,
-  OnUndefined,
-  SrcHole,
-  RecFreeS
-}
-import quasar.qscript.qsu.{QScriptUniform => QSU}
-import QSU.Rotation
-import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 import quasar.contrib.scalaz._
 import quasar.ejson.EJson
+import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
+import quasar.qscript.qsu.QSUGraph.Extractors._
+import quasar.qscript.RecFreeS._
+import quasar.qscript.qsu.{QScriptUniform => QSU}
+import QSU.Rotation
+import quasar.qscript.{
+  Hole,
+  OnUndefined,
+  RecFreeS,
+  SrcHole,
+  construction
+}
 
 import matryoshka.{Hole => _, _}
 import scalaz._
@@ -124,7 +125,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
       }
       for {
         shifted <- shiftedG
-        map = QSU.Map[T, Symbol](shifted.root, mapper)
+        map = QSU.Map[T, Symbol](shifted.root, mapper.asRec)
       } yield mls.overwriteAtRoot(map) :++ shifted
   }
 }

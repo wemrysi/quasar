@@ -25,9 +25,9 @@ import quasar.fp.ski.κ
 import quasar.qscript.{
   construction,
   Hole,
-  HoleF,
   ReduceIndex
 }
+import quasar.qscript.RecFreeS._
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import slamdata.Predef._
 
@@ -40,6 +40,7 @@ final class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
   import QSUGraph.Extractors._
 
   private val func = construction.Func[T]
+  private val recFunc = construction.RecFunc[T]
 
   def couldApplyTo(candidates: List[QSUGraph]): Boolean = {
     candidates forall {
@@ -123,9 +124,9 @@ final class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
         }
 
       // 107.7, All chiropractors, all the time
-      val adjustedFM = fm flatMap { i =>
+      val adjustedFM = fm.asRec flatMap { i =>
         // get the value back OUT of the map
-        func.ProjectKeyS(HoleF[T], i.toString)
+        recFunc.ProjectKeyS(recFunc.Hole, i.toString)
       }
 
       val redPat = QSU.QSReduce[T, Symbol](source.root, buckets, reducers, repair)

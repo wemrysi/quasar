@@ -35,6 +35,7 @@ import quasar.qscript.{
   SrcHole,
   RecFreeS
 }
+import quasar.qscript.RecFreeS._
 import quasar.qscript.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
 import quasar.qscript.rewrites.NormalizableT
 import slamdata.Predef._
@@ -143,7 +144,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           src.point[G]
         } else {
           // this case should never happen
-          updateGraph[T, G](QSU.Map(src.root, fm)) map { rewritten =>
+          updateGraph[T, G](QSU.Map(src.root, fm.asRec)) map { rewritten =>
             rewritten :++ src
           }
         }
@@ -211,7 +212,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         func.ConcatMaps(left, right)
       } getOrElse rightHole
 
-      updateGraph[T, G](QSU.Map(parent.root, func.ConcatMaps(leftFM, rightFM))) map { rewritten =>
+      updateGraph[T, G](QSU.Map(parent.root, recFunc.ConcatMaps(leftFM.asRec, rightFM.asRec))) map { rewritten =>
         rewritten :++ parent
       }
     }
@@ -219,7 +220,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
     def coalesceUneven(shifts: NEL[ShiftGraph], qgraph: QSUGraph): G[QSUGraph] = {
       val origFM = qgraph match {
         case Map(_, fm) => fm
-        case _ => func.Hole
+        case _ => recFunc.Hole
       }
 
       val reversed = shifts.reverse
@@ -294,15 +295,15 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
         rewritten = reconstructed match {
           case reconstructed @ LeftShift(src, struct, idStatus, onUndefined, repair, rot) =>
-            val origLifted = origFM >> func.ProjectKeyS(repair, OriginalField)
-            val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted)
+            val origLifted = origFM >> recFunc.ProjectKeyS(repair.asRec, OriginalField)
+            val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted.linearize)
 
             reconstructed.overwriteAtRoot(
               QSU.LeftShift(src.root, struct, idStatus, onUndefined, N.freeMF(repair2), rot))
 
           case reconstructed @ MultiLeftShift(src, shifts, onUndefined, repair) =>
-            val origLifted = origFM >> func.ProjectKeyS(repair, OriginalField)
-            val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted)
+            val origLifted = origFM >> recFunc.ProjectKeyS(repair.asRec, OriginalField)
+            val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted.linearize)
 
             reconstructed.overwriteAtRoot(
               QSU.MultiLeftShift(src.root, shifts, onUndefined, repair2 /*N.freeMF(repair2)*/))
@@ -661,11 +662,11 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           back.map(g => (g, Set(i)))
 
         case (qgraph @ Map(parent, fm), i) =>
-          val back = qgraph.overwriteAtRoot(QSU.Map(parent.root, func.MakeMapS(i.toString, fm))).point[G]
+          val back = qgraph.overwriteAtRoot(QSU.Map(parent.root, recFunc.MakeMapS(i.toString, fm))).point[G]
           back.map(g => (g, Set(i)))
 
         case (qgraph, i) =>
-          val back = updateGraph[T, G](QSU.Map(qgraph.root, func.MakeMapS(i.toString, func.Hole))) map { rewritten =>
+          val back = updateGraph[T, G](QSU.Map(qgraph.root, recFunc.MakeMapS(i.toString, recFunc.Hole))) map { rewritten =>
             rewritten :++ qgraph
           }
 
@@ -692,9 +693,9 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
           val back = mergeIndexMaps(
             parent1,
-            left,
+            left.linearize,
             leftIndices,
-            right,
+            right.linearize,
             rightIndices)
 
           back.map(g => (g, leftIndices ++ rightIndices))
@@ -706,7 +707,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       back = qgraph.overwriteAtRoot(
         QSU.Map(
           coalesced.root,
-          fm.flatMap(i => func.ProjectKeyS(func.Hole, i.toString)))) :++ coalesced
+          fm.flatMap(i => func.ProjectKeyS(func.Hole, i.toString)).asRec)) :++ coalesced
     } yield Some((coalesced, back))
   }
 

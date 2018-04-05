@@ -44,7 +44,8 @@ final class FoldConstantReductions[T[_[_]]: BirecursiveT: EqualT: RenderTreeT: S
   private def extract
       : QSUGraph => Option[QSUGraph] = {
     case qsr@Extractors.LPReduce(m@Extractors.Map(_, fm), Arbitrary(_) | First(_) | Last(_)) =>
-      val normalizedFM = fm.transCata[FreeMap](MapFuncCore.normalize[T, Hole])
+      val normalizedFM = fm.linearize.transCata[FreeMap](MapFuncCore.normalize[T, Hole])
+
       normalizedFM.project.run match {
         case \/-(MFC(MapFuncsCore.Constant(_))) =>
           Some(qsr.overwriteAtRoot(m.unfold.map(_.root)))

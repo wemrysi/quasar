@@ -75,7 +75,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
       "Map" should {
         "returns cardinality of already processed part of qscript" in {
           val cardinality = 40
-          val map = quasar.qscript.Map(cardinality, func.ProjectKeyS(func.Hole, "key"))
+          val map = quasar.qscript.Map(cardinality, recFunc.ProjectKeyS(recFunc.Hole, "key"))
           compile(map) must_== cardinality
         }
       }
@@ -186,7 +186,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
           val cardinality = 100
           def fun(country: String): FreeMap =
             func.Eq(func.ProjectKeyS(func.Hole, "country"), func.Constant(json.str(country)))
-          def left: FreeQS = free.Map(free.Hole, func.ProjectKeyS(func.Hole, "key"))
+          def left: FreeQS = free.Map(free.Hole, recFunc.ProjectKeyS(recFunc.Hole, "key"))
           def right: FreeQS = free.Filter(free.Hole, fun("US"))
           val union = quasar.qscript.Union(cardinality, left, right)
           compile(union) must_== cardinality + (cardinality / 2)
@@ -215,7 +215,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         val cardinality = 100
         val fun: FreeMap =
           func.Eq(func.ProjectKeyS(func.Hole, "key"), func.Constant(json.str("val")))
-        def left: FreeQS = free.Map(free.Hole, func.ProjectKeyS(func.Hole, "key"))
+        def left: FreeQS = free.Map(free.Hole, recFunc.ProjectKeyS(recFunc.Hole, "key"))
         def right: FreeQS = free.Filter(free.Hole, fun)
         val joinFunc: JoinFunc = func.LeftSide
         val join = quasar.qscript.EquiJoin(cardinality, left, right, List((fun, fun)), JoinType.Inner, joinFunc)
@@ -229,7 +229,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
         val cardinality = 100
         val fun: FreeMap =
           func.Eq(func.ProjectKeyS(func.Hole, "key"), func.Constant(json.str("val")))
-        def left: FreeQS = free.Map(free.Hole, func.ProjectKeyS(func.Hole, "key"))
+        def left: FreeQS = free.Map(free.Hole, recFunc.ProjectKeyS(recFunc.Hole, "key"))
         def right: FreeQS = free.Filter(free.Hole, fun)
         val joinFunc: JoinFunc = func.LeftSide
         val join = quasar.qscript.ThetaJoin(cardinality, left, right, joinFunc, JoinType.Inner, joinFunc)
@@ -246,5 +246,5 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
   }
 
   private def constFreeQS(v: Int): FreeQS =
-    free.Map(free.Unreferenced, func.Constant(json.int(v)))
+    free.Map(free.Unreferenced, recFunc.Constant(json.int(v)))
 }
