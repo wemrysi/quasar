@@ -17,9 +17,9 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.{Planner, Type}, Planner.InternalError
+import quasar.Type
 import quasar.fp.ski._
-import quasar.fs.{FileSystemError, MonadFsErr}, FileSystemError._
+import quasar.fs.MonadFsErr
 import quasar.physical.mongodb.{Bson, BsonCodec, BsonField, BsonVersion}
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.common._
@@ -82,8 +82,7 @@ object FuncHandler {
 
       def execTime[M[_]: Monad: MonadFsErr](implicit MR: ExecTimeR[M]): M[Bson.Date] =
         OptionT[M, Bson.Date](MR.ask.map(Bson.Date.fromInstant(_)))
-          .getOrElseF(raiseErr(
-            qscriptPlanningFailed(InternalError.fromMsg("Could not get the current timestamp"))))
+          .getOrElseF(raiseInternalError("Could not get the current timestamp"))
 
       def handleOpsCore[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
         (v: BsonVersion)
@@ -206,7 +205,7 @@ object FuncHandler {
 
           case Constant(v1)  =>
             v1.cataM(BsonCodec.fromEJson(v)).fold(
-              e => raiseErr(qscriptPlanningFailed(e)),
+              raisePlannerError(_),
               $literal(_).point[M])
           case Now() => execTime[M] map ($literal(_))
           // NB: The aggregation implementation of `ToString` does not handle ObjectId
