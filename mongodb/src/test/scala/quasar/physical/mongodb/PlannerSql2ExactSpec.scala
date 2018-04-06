@@ -1900,6 +1900,31 @@ class PlannerSql2ExactSpec extends
       }
     }
 
+    val selectTrunc = chain[Workflow](
+      $read(collection("db", "divide")),
+      $project(
+        reshape(sigil.Quasar ->
+           $cond(
+             $and(
+               $lt($literal(Bson.Null), $field("val3")),
+               $lt($field("val3"), $literal(Bson.Text("")))),
+             $trunc($field("val3")),
+             $literal(Bson.Undefined))),
+        ExcludeId))
+
+    "plan simple derived mapfunc" in {
+      plan3_2(sqlE"select trunc(val3) from divide") must beWorkflow(selectTrunc)
+    }
+
+    "plan simple derived mapfunc - fallback" in {
+      plan(sqlE"select trunc(val3) from divide") must beWorkflow(selectTrunc)
+    }
+
+    "plan derived mapfunc" in {
+      plan3_2(sqlE"select ceil_scale(val3,1) from divide") must_===(
+        plan(sqlE"select ceil_scale(val3,1) from divide"))
+    }
+
     def simpleJoinMapReduce(coll1: Collection, coll2: Collection) =
       joinStructure(
         $read(coll1), "0", $$ROOT,

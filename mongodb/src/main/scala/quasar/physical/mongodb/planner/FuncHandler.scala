@@ -366,20 +366,18 @@ object FuncHandler {
           }
         }
 
-        ExpandMapFunc.expand(core.handleOpsCore(v), derived)
+        ExpandMapFunc.expand(core.handle3_2(v), derived)
       }
 
       def handleOps3_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
         (v: BsonVersion)
         (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX)
-          : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] =
-        ExpandMapFunc.expand[T, M, Fix[EX]](core.handle3_4(v), κ(None)) andThen (_.some)
+          : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] = κ(None)
 
       def handleOps3_4_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
         (v: BsonVersion)
         (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
-          : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] =
-        ExpandMapFunc.expand[T, M, Fix[EX]](core.handle3_4_4(v), κ(None)) andThen (_.some)
+          : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] = κ(None)
     }
 
   implicit def mapFuncCoproduct[F[_], G[_]]
