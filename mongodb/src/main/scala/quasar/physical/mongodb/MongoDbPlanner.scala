@@ -18,7 +18,7 @@ package quasar.physical.mongodb
 
 import slamdata.Predef.{Map => _, _}
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
-import quasar.common.{PhaseResult, PhaseResults, PhaseResultListen, PhaseResultTell, SortDir}
+import quasar.common.{PhaseResult, PhaseResults, PhaseResultListen, PhaseResultT, PhaseResultTell, SortDir}
 import quasar.connector.BackendModule
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
@@ -27,7 +27,7 @@ import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.{FileSystemError, MonadFsErr}, FileSystemError.qscriptPlanningFailed
+import quasar.fs.{FileSystemError, FileSystemErrT, MonadFsErr}, FileSystemError.qscriptPlanningFailed
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.accumulator._
@@ -1049,11 +1049,22 @@ object MongoDbPlanner {
       ME:  MonadFsErr[M],
       ML:  PhaseResultListen[M],
       MT:  PhaseResultTell[M])
-      : M[Crystallized[WF]] =
+      : M[Crystallized[WF]] = {
+
+    def doBuildWorkflow[F[_]: Monad: ExecTimeR]
+      (cfg0: PlannerConfig[T, EX, WF, F])
+      (qs0: T[fs.MongoQScript[T, ?]])
+        : F[(PhaseResults, FileSystemError \/ Fix[WF])] = {
+      type FT[A] = FileSystemErrT[PhaseResultT[F, ?], A]
+      val fh: AlgebraM[FT, MapFunc[T, ?], Fix[EX]] =
+        cfg0.funcHandler andThen (_.liftM[PhaseResultT].liftM[FileSystemErrT])
+      buildWorkflow[T, FT, WF, EX](cfg0.copy(funcHandler = fh))(qs0).run.run
+    }
+
     for {
       qs0 <- toMongoQScript[T, M](anyDoc, qs)
-      resLog0 <- ML.listen(ME.attempt(buildWorkflow[T, M, WF, EX](cfg)(qs0)))
-      (res0, log0) = resLog0
+      logRes0 <- doBuildWorkflow[M](cfg)(qs0)
+      (log0, res0) = logRes0
       wf0 <- res0 match {
                case \/-(wf) if (needsMapBeforeSort(wf)) =>
                  // TODO look into adding mapBeforeSort to WorkflowBuilder or Workflow stage
@@ -1070,6 +1081,7 @@ object MongoDbPlanner {
         "Workflow (crystallized)",
         Crystallize[WF].crystallize(wf0).point[M])
     } yield wf1
+  }
 
   def planExecTime[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
