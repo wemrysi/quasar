@@ -27,7 +27,7 @@ import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.{FileSystemError, FileSystemErrT, MonadFsErr}, FileSystemError.qscriptPlanningFailed
+import quasar.fs.{FileSystemError, MonadFsErr}, FileSystemError.qscriptPlanningFailed
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.accumulator._
@@ -1054,28 +1054,27 @@ object MongoDbPlanner {
     def doBuildWorkflow[F[_]: Monad: ExecTimeR]
       (cfg0: PlannerConfig[T, EX, WF, F])
       (qs0: T[fs.MongoQScript[T, ?]])
-        : F[(PhaseResults, FileSystemError \/ Fix[WF])] = {
-      type FT[A] = FileSystemErrT[PhaseResultT[F, ?], A]
-      val fh: AlgebraM[FT, MapFunc[T, ?], Fix[EX]] =
-        cfg0.funcHandler andThen (_.liftM[PhaseResultT].liftM[FileSystemErrT])
-      buildWorkflow[T, FT, WF, EX](cfg0.copy(funcHandler = fh))(qs0).run.run
+      (implicit ME: MonadFsErr[F])
+        : F[FileSystemError \/ (PhaseResults, Fix[WF])] = {
+      val fh = cfg0.funcHandler andThen (_.liftM[PhaseResultT])
+      ME.attempt(buildWorkflow[T, PhaseResultT[F, ?], WF, EX](
+        cfg0.copy(funcHandler = fh))(qs0).run)
     }
 
     for {
       qs0 <- toMongoQScript[T, M](anyDoc, qs)
-      logRes0 <- doBuildWorkflow[M](cfg)(qs0)
-      (log0, res0) = logRes0
+      res0 <- doBuildWorkflow[M](cfg)(qs0)
       wf0 <- res0 match {
-               case \/-(wf) if (needsMapBeforeSort(wf)) =>
+               case \/-((_, wf)) if (needsMapBeforeSort(wf)) =>
                  // TODO look into adding mapBeforeSort to WorkflowBuilder or Workflow stage
                  // instead, so that we can avoid having to rerun some transformations.
                  // See #3063
                  log("QScript Mongo (Map Before Sort)",
                    Trans(mapBeforeSort[T, M], qs0)) >>= buildWorkflow[T, M, WF, EX](cfg)
-               case \/-(wf) =>
-                 MT.tell(log0) *> wf.point[M]
+               case \/-((log, wf)) =>
+                 MT.tell(log) *> wf.point[M]
                case -\/(err) =>
-                 MT.tell(log0) *> raiseErr[M, Fix[WF]](err)
+                 raiseErr[M, Fix[WF]](err)
              }
       wf1 <- log(
         "Workflow (crystallized)",
