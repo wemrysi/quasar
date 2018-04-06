@@ -431,18 +431,22 @@ class Local private (baseDir: JFile) {
         case Some(err) => err.left.right
         case None => refineType(path) match {
           case -\/(_) => // directory
+
+            // ported from quasar.precog.util.IOUtils
+            // this works but using a `java.nio.file.SimpleFileVisitor` does not
+            // (recursive delete fails when file gets into an inexplicable permission state)
             @SuppressWarnings(Array("org.wartremover.warts.Null"))
             def listFiles(f: JFile): Task[Vector[JFile]] = Task delay {
               f.listFiles match {
                 case null => Vector()
-                case xs   => xs.toVector
+                case xs => xs.toVector
               }
             }
 
             @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
             def recursiveDeleteSeq(files: Seq[JFile]): Task[Unit] = {
               files.toList match {
-                case Nil      => Task.now(())
+                case Nil => Task.now(())
                 case hd :: tl => recursiveDelete(hd).flatMap(_ => recursiveDeleteSeq(tl))
               }
             }
@@ -454,7 +458,7 @@ class Local private (baseDir: JFile) {
               if (!file.isDirectory) Task.delay(del())
               else listFiles(file) flatMap {
                 case Vector() => Task.delay(del())
-                case xs      => recursiveDeleteSeq(xs).flatMap(_ => Task.delay(del()))
+                case xs => recursiveDeleteSeq(xs).flatMap(_ => Task.delay(del()))
               }
             }
 
