@@ -35,6 +35,7 @@ env:
   global:
     - COURSIER_PROGRESS=0
     - SBT=./sbt
+    - BUILD_HACK_TIMEOUT=60
     # DISCORD_WEBHOOK_TOKENS
     - secure: "copZbrzCXeRfTx2ZRM6nsM07A4rfQAZ0mqk4R+z6USJhjLHv+KXAN30QN2nIAi9FmLoEX8BZRRpbX36nkc81jverhbS6POaci5UcQLpo8HOX4yR3b/pWqIBlno55K5hC6UCEXAneI/ZThFKwotpME9dw7ww+S+gIyaoDvZc4OUI="
 
@@ -85,7 +86,7 @@ script:
 
   # workaround for the fact that travis caching isn't working. when it starts working again, remove this
   - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION foundation/test:compile
-  - travis_wait 40 ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
+  - travis_wait $BUILD_HACK_TIMEOUT ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
 
   # then run the tests (note that this re-runs some tests; we can get rid of that once we have polyrepo)
   - |-
@@ -139,7 +140,7 @@ jobs:
 
         # workaround for the fact that travis caching isn't working. when it starts working again, remove this
         - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION foundation/test:compile
-        - travis_wait 40 ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
+        - travis_wait $BUILD_HACK_TIMEOUT ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
 
         - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc web/assembly'
 
