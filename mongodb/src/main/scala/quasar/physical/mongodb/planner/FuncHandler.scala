@@ -18,6 +18,7 @@ package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
 import quasar.Type
+import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.MonadFsErr
 import quasar.physical.mongodb.{Bson, BsonCodec, BsonField, BsonVersion}
@@ -77,7 +78,7 @@ import simulacrum.typeclass
 
 object FuncHandler {
 
-  implicit def mapFuncCore[T[_[_]]: BirecursiveT]: FuncHandler[MapFuncCore[T, ?]] =
+  implicit def mapFuncCore[T[_[_]]: BirecursiveT: ShowT]: FuncHandler[MapFuncCore[T, ?]] =
     new FuncHandler[MapFuncCore[T, ?]] {
 
       def execTime[M[_]: Monad: MonadFsErr](implicit MR: ExecTimeR[M]): M[Bson.Date] =
@@ -271,29 +272,13 @@ object FuncHandler {
               }
             exprCheck(typ).fold(cont)(f => $cond(f(expr), cont, fallback)).point[M]
 
-          case ToId(a1) => unimplemented[M, Fix[EX]]("ToId expression")
-          case OffsetDate(a1) => unimplemented[M, Fix[EX]]("OffsetDate expression")
-          case OffsetTime(a1) => unimplemented[M, Fix[EX]]("OffsetTime expression")
-          case OffsetDateTime(a1) => unimplemented[M, Fix[EX]]("OffsetDateTime expression")
-          case LocalDate(a1) => unimplemented[M, Fix[EX]]("LocalDate expression")
-          case LocalTime(a1) => unimplemented[M, Fix[EX]]("LocalTime expression")
-          case LocalDateTime(a1) => unimplemented[M, Fix[EX]]("LocalDateTime expression")
-          case Interval(a1) => unimplemented[M, Fix[EX]]("Interval expression")
-          case StartOfDay(a1) => unimplemented[M, Fix[EX]]("StartOfDay expression")
-          case TemporalTrunc(a1, a2) => unimplemented[M, Fix[EX]]("TemporalTrunc expression")
-          case IfUndefined(a1, a2) => unimplemented[M, Fix[EX]]("IfUndefined expression")
-          case Within(a1, a2) => unimplemented[M, Fix[EX]]("Within expression")
-          case ExtractIsoYear(a1) => unimplemented[M, Fix[EX]]("ExtractIsoYear expression")
-          case Integer(a1) => unimplemented[M, Fix[EX]]("Integer expression")
-          case Decimal(a1) => unimplemented[M, Fix[EX]]("Decimal expression")
-          case MakeMap(a1, a2) => unimplemented[M, Fix[EX]]("MakeMap expression")
-          case ConcatMaps(a1, a2) => unimplemented[M, Fix[EX]]("ConcatMap expression")
-          case ProjectKey(a1, a2) => unimplemented[M, Fix[EX]](s"ProjectKey expression")
-          case DeleteKey(a1, a2)  => unimplemented[M, Fix[EX]]("DeleteKey expression")
-          case Length(a1) => unimplemented[M, Fix[EX]]("Length expression")
-          case Range(_, _)     => unimplemented[M, Fix[EX]]("Range expression")
-          case Search(_, _, _) => unimplemented[M, Fix[EX]]("Search expression")
-          case Split(_, _)     => unimplemented[M, Fix[EX]]("Split expression")
+          // NB: catch all added because scala cannot check exhaustiveness here.
+          // It's also not trivial to manually make sure that all cases are covered,
+          // so without getting triggered by the compiler when this needs to be
+          // updated, this will be hard to keep in sync.
+          case x =>
+            val mf: MapFuncCore[T,quasar.qscript.Hole] = x.as(SrcHole)
+            unimplemented[M, Fix[EX]](s"expression ${mf.shows}")
         }
       }
 
