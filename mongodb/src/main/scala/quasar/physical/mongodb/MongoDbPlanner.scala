@@ -1058,7 +1058,7 @@ object MongoDbPlanner {
       val fh = cfg0.funcHandler andThen (_.liftM[PhaseResultT])
       // NB: buildWorkflow[T, FileSystemErrT[PhaseResultT[F, ?], ?], WF, EX]
       // gives the right return type F[(PhaseResults, FileSystemError \/ Fix[WF])]
-      // but adding a second FileSystemErrT screws up error handling: 
+      // but adding a second FileSystemErrT screws up error handling:
       // unimplemented MapFunc's in FuncHandler don't fall back to JsFuncHandler
       // anymore
       ME.attempt(buildWorkflow[T, PhaseResultT[F, ?], WF, EX](
