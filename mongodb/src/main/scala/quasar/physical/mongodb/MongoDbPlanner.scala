@@ -18,7 +18,7 @@ package quasar.physical.mongodb
 
 import slamdata.Predef.{Map => _, _}
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
-import quasar.common.{PhaseResult, PhaseResults, PhaseResultListen, PhaseResultT, PhaseResultTell, SortDir}
+import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultTell, SortDir}
 import quasar.connector.BackendModule
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
@@ -1047,7 +1047,6 @@ object MongoDbPlanner {
       ev3: EX :<: ExprOp,
       ev4: RenderTree[Fix[WF]],
       ME:  MonadFsErr[M],
-      ML:  PhaseResultListen[M],
       MT:  PhaseResultTell[M])
       : M[Crystallized[WF]] = {
 
@@ -1057,6 +1056,11 @@ object MongoDbPlanner {
       (implicit ME: MonadFsErr[F])
         : F[FileSystemError \/ (PhaseResults, Fix[WF])] = {
       val fh = cfg0.funcHandler andThen (_.liftM[PhaseResultT])
+      // NB: buildWorkflow[T, FileSystemErrT[PhaseResultT[F, ?], ?], WF, EX]
+      // gives the right return type F[(PhaseResults, FileSystemError \/ Fix[WF])]
+      // but adding a second FileSystemErrT screws up error handling: 
+      // unimplemented MapFunc's in FuncHandler don't fall back to JsFuncHandler
+      // anymore
       ME.attempt(buildWorkflow[T, PhaseResultT[F, ?], WF, EX](
         cfg0.copy(funcHandler = fh))(qs0).run)
     }
@@ -1084,7 +1088,7 @@ object MongoDbPlanner {
 
   def planExecTime[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      M[_]: Monad: PhaseResultTell: PhaseResultListen: MonadFsErr](
+      M[_]: Monad: PhaseResultTell: MonadFsErr](
       qs: T[fs.MongoQScript[T, ?]],
       queryContext: fs.QueryContext,
       queryModel: MongoQueryModel,
@@ -1107,7 +1111,7 @@ object MongoDbPlanner {
     */
   def plan[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      M[_]: Monad: PhaseResultTell: PhaseResultListen: MonadFsErr: ExecTimeR](
+      M[_]: Monad: PhaseResultTell: MonadFsErr: ExecTimeR](
       qs: T[fs.MongoQScript[T, ?]],
       queryContext: fs.QueryContext,
       queryModel: MongoQueryModel,

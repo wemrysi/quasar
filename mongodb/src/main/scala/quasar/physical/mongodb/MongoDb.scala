@@ -113,7 +113,7 @@ object MongoDb
 
   def doPlan[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      N[_]: Monad: MonadFsErr: PhaseResultTell: PhaseResultListen]
+      N[_]: Monad: MonadFsErr: PhaseResultTell]
       (qs: T[QSM[T, ?]],
         ctx: fs.QueryContext,
         queryModel: MongoQueryModel,
