@@ -84,10 +84,10 @@ class PlannerSql2ExactSpec extends
           free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
           free.ShiftedRead[AFile](rootDir </> dir("db") </> file("smallZips"), qscript.ExcludeId),
           List((
-            func.Guard(func.Hole, Type.AnyObject, func.ProjectKeyS(func.Hole, "_id"), func.Undefined),
-            func.Guard(func.Hole, Type.AnyObject, func.ProjectKeyS(func.Hole, "_id"), func.Undefined))),
+            func.ProjectKeyS(func.Typecheck(func.Hole, Type.AnyObject), "_id"),
+            func.ProjectKeyS(func.Typecheck(func.Hole, Type.AnyObject), "_id"))),
           JoinType.Inner,
-          func.Guard(func.RightSide, Type.AnyObject, func.ProjectKeyS(func.RightSide, "city"), func.Undefined))).some,
+          func.ProjectKeyS(func.Typecheck(func.RightSide, Type.AnyObject), "city"))).some,
       chain[Workflow](
         $read(collection("db", "zips")),
         $match(Selector.Doc(
@@ -115,23 +115,23 @@ class PlannerSql2ExactSpec extends
           free.ShiftedRead[AFile](rootDir </> dir("db") </> file("cars"), qscript.ExcludeId),
           free.ShiftedRead[AFile](rootDir </> dir("db") </> file("cars2"), qscript.ExcludeId),
           List((
-            func.Guard(func.Hole, Type.AnyObject, func.ProjectKeyS(func.Hole, "_id"), func.Undefined),
-            func.Guard(func.Hole, Type.AnyObject, func.ProjectKeyS(func.Hole, "_id"), func.Undefined))),
+            func.ProjectKeyS(func.Typecheck(func.Hole, Type.AnyObject), "_id"),
+            func.ProjectKeyS(func.Typecheck(func.Hole, Type.AnyObject), "_id"))),
           JoinType.Inner,
           func.ConcatMaps(
             func.MakeMap(
               func.Constant(json.str("name")),
               func.Guard(
-                func.Guard(func.LeftSide, Type.AnyObject, func.LeftSide, func.Undefined),
+                func.Typecheck(func.LeftSide, Type.AnyObject),
                 Type.AnyObject,
-                func.ProjectKeyS(func.LeftSide, "name"),
+                func.ProjectKeyS(func.Typecheck(func.LeftSide, Type.AnyObject), "name"),
                 func.Undefined)),
             func.MakeMap(
               func.Constant(json.str("year")),
               func.Guard(
-                func.Guard(func.RightSide, Type.AnyObject, func.RightSide, func.Undefined),
+                func.Typecheck(func.RightSide, Type.AnyObject),
                 Type.AnyObject,
-                func.ProjectKeyS(func.RightSide, "year"),
+                func.ProjectKeyS(func.Typecheck(func.RightSide, Type.AnyObject), "year"),
                 func.Undefined))))).some,
       chain[Workflow](
         $read(collection("db", "cars")),
@@ -158,33 +158,26 @@ class PlannerSql2ExactSpec extends
         qsToWf = Ok,
         fix.LeftShift(
           fix.Filter(fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-            func.Guard(
-              func.Hole,
-              Type.Obj(Map(), Some(Type.Top)),
-              func.And(
-                func.Eq(
-                  func.ProjectKey(func.Hole, func.Constant(json.str("year"))),
-                  func.Constant(json.int(2017))),
-                func.Eq(
-                  func.ProjectKey(func.Hole, func.Constant(json.str("memberNumber"))),
-                  func.Constant(json.int(123456)))),
-              func.Undefined)),
-          func.Guard(
-            func.Guard(
-              func.Hole,
-              Type.Obj(Map(), Some(Type.Top)),
-              func.ProjectKey(
-                func.Hole,
-                func.Constant(json.str("measureEnrollments"))),
-              func.Undefined),
-            Type.FlexArr(0, None, Type.Obj(Map(), Some(Type.Top))),
-            func.ProjectKey(func.Hole, func.Constant(json.str("measureEnrollments"))),
-            func.Undefined),
+            func.And(
+              func.Eq(
+                func.ProjectKeyS(
+                  func.Typecheck(func.Hole, Type.AnyObject),
+                  "year"),
+                func.Constant(json.int(2017))),
+              func.Eq(
+                func.ProjectKeyS(
+                  func.Typecheck(func.Hole, Type.AnyObject),
+                  "memberNumber"),
+                func.Constant(json.int(123456))))),
+          func.Typecheck(
+            func.ProjectKeyS(
+              func.Typecheck(func.Hole, Type.AnyObject),
+              "measureEnrollments"),
+            Type.FlexArr(0, None, Type.AnyObject)),
           qscript.ExcludeId,
           ShiftType.Array,
           OnUndefined.Omit,
-          func.ProjectKey(
-            func.RightSide, func.Constant(json.str("measureKey"))))
+          func.ProjectKeyS(func.RightSide, "measureKey"))
       ).some,
       chain[Workflow](
         $read(collection("db", "zips")),
@@ -1664,7 +1657,7 @@ class PlannerSql2ExactSpec extends
           ListMap())))
     }
 
-    "plan select length() and simple field" in {
+    "@plan select length() and simple field" in {
       plan(sqlE"select city, length(city) from zips") must
       beWorkflow(chain[Workflow](
         $read(collection("db", "zips")),

@@ -262,6 +262,10 @@ object construction {
       rollDerived(MapFuncsDerived.CeilScale(a1, a2))
     def RoundScale[A](a1: FreeMapA[T, A], a2: FreeMapA[T, A]): FreeMapA[T, A] =
       rollDerived(MapFuncsDerived.RoundScale(a1, a2))
+
+
+    def Typecheck[A](a1: FreeMapA[T, A], tpe: quasar.Type): FreeMapA[T, A] =
+      rollDerived(MapFuncsDerived.Typecheck(a1, tpe))
   }
 
   final case class Dsl[T[_[_]], F[_], R](embed: F[R] => R)
