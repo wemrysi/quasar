@@ -31,6 +31,7 @@ import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 import simulacrum.typeclass
+import iotaz.{CopK, TListK}
 
 @typeclass trait Normalizable[F[_]] {
   def normalizeF: NTComp[F, Option]
@@ -61,6 +62,10 @@ trait NormalizableInstances {
   implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       : Normalizable[EquiJoin[T, ?]] =
     normalizable[T].EquiJoin
+
+  // TODO provide actual instance
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
+  implicit def normalizableCopK[X <: TListK]: Normalizable[CopK[X, ?]] = null
 
   implicit def coproduct[F[_], G[_]]
     (implicit F: Normalizable[F], G: Normalizable[G])
