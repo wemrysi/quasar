@@ -2,7 +2,6 @@
     "name": "flatten a map inside a field projection",
     "data": "slamengine_commits.data",
     "backends": {
-        "mimir":    "pending",
         "postgres": "pending"
     },
     "NB": "this actually works on mimir, but the time mismatch makes it look like a failure",
