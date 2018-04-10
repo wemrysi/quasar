@@ -2,7 +2,8 @@
     "name": "sort, project, and limit",
 
     "backends": {
-        "mimir": "ignoreFieldOrder"
+        "mimir": "ignoreFieldOrder",
+        "postgres": "pending"
     },
     "NB": "Pending for postgres connector due to boxed result errors qz-3739",
     "data": "zips.data",
