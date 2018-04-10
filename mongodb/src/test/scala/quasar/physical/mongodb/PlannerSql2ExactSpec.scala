@@ -1658,7 +1658,7 @@ class PlannerSql2ExactSpec extends
           ListMap())))
     }
 
-    "@plan select length() and simple field" in {
+    "plan select length() and simple field" in {
       plan(sqlE"select city, length(city) from zips") must
       beWorkflow(chain[Workflow](
         $read(collection("db", "zips")),
