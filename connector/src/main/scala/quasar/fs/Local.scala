@@ -191,13 +191,9 @@ class Local private (baseDir: JFile) {
           case Some(err) => err.left.right
           case None =>
             \/.fromTryCatchNonFatal[Unit]({
-              val contents: List[JFile] = Files.list(jsrc)
-                .collect(Collectors.toList()).asScala.toList
-                .map(_.toFile)
-                .filter(_.isFile)
-
               Files.createDirectories(jdst)
-              contents.foreach(f =>
+
+              listFiles(jsrc).foreach(f =>
                 Files.move(f.toPath, jdst.resolve(f.toPath.getFileName)))
             }).fold(
               err => LocalFileSystemError.MoveFailed(pair, sem, err).left,
@@ -234,12 +230,10 @@ class Local private (baseDir: JFile) {
           case Some(err) => err.left.right
           case None =>
             \/.fromTryCatchNonFatal[Unit]({
-              val contents: List[JFile] = Files.list(jsrc)
-                .collect(Collectors.toList()).asScala.toList
-                .map(_.toFile)
-                .filter(_.isFile)
               Files.createDirectories(jdst.getParent)
-              contents.foreach(f => Files.move(f.toPath, jdst, StandardCopyOption.REPLACE_EXISTING))
+
+              listFiles(jsrc).foreach(f =>
+                Files.move(f.toPath, jdst, StandardCopyOption.REPLACE_EXISTING))
             }).fold(
               err => LocalFileSystemError.MoveFailed(pair, sem, err).left,
               κ(().right.right))
@@ -275,12 +269,10 @@ class Local private (baseDir: JFile) {
           case Some(err) => err.left.right
           case None =>
             \/.fromTryCatchNonFatal[Unit]({
-              val contents: List[JFile] = Files.list(jsrc)
-                .collect(Collectors.toList()).asScala.toList
-                .map(_.toFile)
-                .filter(_.isFile)
               Files.createDirectories(jdst.getParent)
-              contents.foreach(f => Files.move(f.toPath, jdst, StandardCopyOption.REPLACE_EXISTING))
+
+              listFiles(jsrc).foreach(f =>
+                Files.move(f.toPath, jdst, StandardCopyOption.REPLACE_EXISTING))
             }).fold(
               err => LocalFileSystemError.MoveFailed(pair, sem, err).left,
               κ(().right.right))
@@ -316,13 +308,10 @@ class Local private (baseDir: JFile) {
           case Some(err) => err.left.right
           case None =>
             \/.fromTryCatchNonFatal[Unit]({
-              val contents: List[JFile] = Files.list(jsrc)
-                .collect(Collectors.toList()).asScala.toList
-                .map(_.toFile)
-                .filter(_.isFile)
-
               Files.createDirectories(jdst.getParent)
-              contents.foreach(f => Files.copy(f.toPath, jdst, StandardCopyOption.REPLACE_EXISTING))
+
+              listFiles(jsrc).foreach(f =>
+                Files.copy(f.toPath, jdst, StandardCopyOption.REPLACE_EXISTING))
             }).fold(
               err => LocalFileSystemError.CopyFailed(pair, err).left,
               κ(().right.right))
@@ -395,14 +384,11 @@ class Local private (baseDir: JFile) {
         case Some(err) => err.left.right
         case None =>
           \/.fromTryCatchNonFatal[FSError[Set[Node]]] {
-            val contents: List[JFile] = Files.list(toJPath(dir))
-              .collect(Collectors.toList()).asScala.toList
-              .map(_.toFile)
-
-            val files: List[PathSegment] = contents.collect {
-              case f if f.isDirectory => DirName(f.getName).left
-              case f if f.isFile => FileName(f.getName).right
-            }
+            val files: List[PathSegment] =
+              listFilesAndDirs(toJPath(dir)).collect {
+                case f if f.isDirectory => DirName(f.getName).left
+                case f if f.isFile => FileName(f.getName).right
+              }
 
             files.map(Node.fromSegment).toSet.right
           }.leftMap(e => LocalFileSystemError.listContentsFailed(toJPath(dir), e))
@@ -422,6 +408,14 @@ class Local private (baseDir: JFile) {
 
   private def delayRight[A](a: A): Result[A] =
     EitherT.rightT(Task.delay(a))
+
+  private def listFilesAndDirs(src: JPath): List[JFile] =
+    Files.list(src)
+      .collect(Collectors.toList()).asScala.toList
+      .map(_.toFile)
+
+  private def listFiles(src: JPath): List[JFile] =
+    listFilesAndDirs(src).filter(_.isFile)
 
   private def delete(path: APath): Task[LocalFSError[FSError[Unit]]] =
     Task delay {
