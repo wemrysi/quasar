@@ -51,8 +51,8 @@ final class EquiJoinPlanner[
   }
 
   object MetaGuard {
-    def unapply[A](mf: FreeMapA[T, A]): Boolean = (
-      mf.resume.swap.toOption >>= { case MFC(mfs.Guard(Meta(), _, _, _)) => ().some; case _ => none }
+    def unapply[A](mf: RecFreeMapA[T, A]): Boolean = (
+      mf.linearize.resume.swap.toOption >>= { case MFC(mfs.Guard(Meta(), _, _, _)) => ().some; case _ => none }
     ).isDefined
 
     object Meta {

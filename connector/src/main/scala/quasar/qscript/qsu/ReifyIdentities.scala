@@ -366,7 +366,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       case g @ E.QSFilter(source, p) =>
         preserveIV(source, g) map { emitsIV =>
           if (emitsIV)
-            g.overwriteAtRoot(O.qsFilter(source.root, rebaseV(p)))
+            g.overwriteAtRoot(O.qsFilter(source.root, rebaseV(p.linearize).asRec))
           else
             g
         }

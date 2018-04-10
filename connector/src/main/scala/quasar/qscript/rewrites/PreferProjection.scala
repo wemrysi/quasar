@@ -24,6 +24,7 @@ import quasar.fp.PrismNT
 import quasar.fp.ski.κ
 import quasar.qscript._
 import quasar.qscript.analysis.Outline
+import quasar.qscript.RecFreeS._
 
 import matryoshka._
 import matryoshka.data.free._
@@ -185,7 +186,7 @@ sealed abstract class PreferProjectionInstances {
           BtoF(Sort(u, prjBuckets, prjOrder))
 
         case Filter((srcShape, u), pred) =>
-          BtoF(Filter(u, prjFreeMap(srcShape, pred)))
+          BtoF(Filter(u, prjFreeMap(srcShape, pred.linearize).asRec))
 
         case Subset((srcShape, u), from, op, count) =>
           BtoF(Subset(u, prjFreeQS(srcShape, from), op, prjFreeQS(srcShape, count)))

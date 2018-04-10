@@ -119,8 +119,9 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
           */
         "returns half of cardinality of already processed part of qscript" in {
           val cardinality = 50
-          def fun: FreeMap = func.Lt(func.ProjectKeyS(func.Hole, "age"), func.Constant(json.int(24)))
+          def fun: RecFreeMap = recFunc.Lt(recFunc.ProjectKeyS(recFunc.Hole, "age"), recFunc.Constant(json.int(24)))
           val filter = quasar.qscript.Filter(cardinality, fun)
+
           compile(filter) must_== cardinality / 2
         }
       }
@@ -184,8 +185,8 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
       "Union" should {
         "returns cardinality of sum lBranch + rBranch" in {
           val cardinality = 100
-          def fun(country: String): FreeMap =
-            func.Eq(func.ProjectKeyS(func.Hole, "country"), func.Constant(json.str(country)))
+          def fun(country: String): RecFreeMap =
+            recFunc.Eq(recFunc.ProjectKeyS(recFunc.Hole, "country"), recFunc.Constant(json.str(country)))
           def left: FreeQS = free.Map(free.Hole, recFunc.ProjectKeyS(recFunc.Hole, "key"))
           def right: FreeQS = free.Filter(free.Hole, fun("US"))
           val union = quasar.qscript.Union(cardinality, left, right)
@@ -213,12 +214,12 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
       "returns cardinality of multiplication lBranch * rBranch" in {
         val compile = Cardinality.equiJoin[Fix].calculate(empty)
         val cardinality = 100
-        val fun: FreeMap =
-          func.Eq(func.ProjectKeyS(func.Hole, "key"), func.Constant(json.str("val")))
+        val fun: RecFreeMap =
+          recFunc.Eq(recFunc.ProjectKeyS(recFunc.Hole, "key"), recFunc.Constant(json.str("val")))
         def left: FreeQS = free.Map(free.Hole, recFunc.ProjectKeyS(recFunc.Hole, "key"))
         def right: FreeQS = free.Filter(free.Hole, fun)
         val joinFunc: JoinFunc = func.LeftSide
-        val join = quasar.qscript.EquiJoin(cardinality, left, right, List((fun, fun)), JoinType.Inner, joinFunc)
+        val join = quasar.qscript.EquiJoin(cardinality, left, right, List((fun.linearize, fun.linearize)), JoinType.Inner, joinFunc)
         compile(join) must_== cardinality * (cardinality / 2)
       }
     }
@@ -227,8 +228,8 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
       "return cardinality of multiplication lBranch * rBranch" in {
         val compile = Cardinality.thetaJoin[Fix].calculate(empty)
         val cardinality = 100
-        val fun: FreeMap =
-          func.Eq(func.ProjectKeyS(func.Hole, "key"), func.Constant(json.str("val")))
+        val fun: RecFreeMap =
+          recFunc.Eq(recFunc.ProjectKeyS(recFunc.Hole, "key"), recFunc.Constant(json.str("val")))
         def left: FreeQS = free.Map(free.Hole, recFunc.ProjectKeyS(recFunc.Hole, "key"))
         def right: FreeQS = free.Filter(free.Hole, fun)
         val joinFunc: JoinFunc = func.LeftSide

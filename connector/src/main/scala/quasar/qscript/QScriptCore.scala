@@ -137,7 +137,7 @@ object ReduceIndex {
   */
 @Lenses final case class Filter[T[_[_]], A](
   src: A,
-  f: FreeMap[T])
+  f: RecFreeMap[T])
     extends QScriptCore[T, A]
 
 /** Chooses a subset of values from a dataset, given a count. */
@@ -281,7 +281,7 @@ object QScriptCore {
               case Filter(src, func) =>
                 NonTerminal("Filter" :: nt, None, List(
                   RA.render(src),
-                  func.render))
+                  func.linearize.render))
               case Subset(src, from, sel, count) =>
                 NonTerminal("Subset" :: nt, sel.shows.some, List(
                   RA.render(src),

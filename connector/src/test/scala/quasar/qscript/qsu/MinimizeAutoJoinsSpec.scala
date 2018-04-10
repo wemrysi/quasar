@@ -266,7 +266,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           qsu.read(afile),
           qsu.qsFilter(
             qsu.read(afile),
-            func.Eq(func.Hole, func.Constant(J.str("foo")))),
+            recFunc.Eq(recFunc.Hole, recFunc.Constant(J.str("foo")))),
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
@@ -286,7 +286,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         qsu.autojoin2((
           qsu.qsFilter(
             qsu.read(afile),
-            func.Eq(func.Hole, func.Constant(J.str("foo")))),
+            recFunc.Eq(recFunc.Hole, recFunc.Constant(J.str("foo")))),
           qsu.cint(42),
           _(MapFuncsCore.Add(_, _)))))
 
@@ -308,9 +308,9 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             tread,
             qsu.undefined(),
             _(MapFuncsCore.Guard(_, Type.AnyObject, _, _)))),
-          func.Eq(
-            func.ProjectKeyS(func.Hole, "city"),
-            func.ProjectKeyS(func.Hole, "state")))
+          recFunc.Eq(
+            recFunc.ProjectKeyS(recFunc.Hole, "city"),
+            recFunc.ProjectKeyS(recFunc.Hole, "state")))
 
       val projLoc =
         qsu.autojoin2((
@@ -1546,7 +1546,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                 func.StaticMapS(
                   "filter_source" -> func.LeftSide,
                   "filter_predicate" -> func.RightSide))),
-              func.ProjectKeyS(func.Hole, "filter_predicate")),
+              recFunc.ProjectKeyS(recFunc.Hole, "filter_predicate")),
             recFunc.ProjectKeyS(recFunc.Hole, "filter_source")))
 
       val leftShiftCount =

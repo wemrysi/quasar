@@ -120,7 +120,7 @@ object SimplifyJoin {
               func.StaticMapS(
                 LeftK -> func.LeftSide,
                 RightK -> func.RightSide)))).embed)(
-            (ej, filt) => GtoH(QC.inj(Filter(ej, mergeSides(filt)))).embed),
+            (ej, filt) => GtoH(QC.inj(Filter(ej, mergeSides(filt).asRec))).embed),
             mergeSides(tj.combine).asRec)))
         }
     }

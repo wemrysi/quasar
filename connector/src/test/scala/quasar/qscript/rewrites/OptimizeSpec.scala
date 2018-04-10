@@ -34,7 +34,7 @@ class OptimizeSpec extends quasar.Qspec with QScriptHelpers {
     "move subset before map" in {
       val from =
         free.Map(
-          free.Filter(free.Hole, func.Constant(json.bool(true))),
+          free.Filter(free.Hole, recFunc.Constant(json.bool(true))),
           recFunc.ProjectKeyS(recFunc.Hole, "foo"))
 
       val count =
@@ -51,7 +51,7 @@ class OptimizeSpec extends quasar.Qspec with QScriptHelpers {
         fix.Map(
           fix.Subset(
             fix.Root,
-            free.Filter(free.Hole, func.Constant(json.bool(true))),
+            free.Filter(free.Hole, recFunc.Constant(json.bool(true))),
             Take,
             count),
           recFunc.ProjectKeyS(recFunc.Hole, "foo"))
@@ -72,17 +72,17 @@ class OptimizeSpec extends quasar.Qspec with QScriptHelpers {
             fix.Root,
             lBranch,
             rBranch),
-          func.Eq(func.Add(func.Hole, func.Constant(json.int(1))), func.Constant(json.int(5))))
+          recFunc.Eq(recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(1))), recFunc.Constant(json.int(5))))
 
       val output =
         fix.Union(
           fix.Root,
           free.Filter(
             lBranch,
-            func.Eq(func.Add(func.Hole, func.Constant(json.int(1))), func.Constant(json.int(5)))),
+            recFunc.Eq(recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(1))), recFunc.Constant(json.int(5)))),
           free.Filter(
             rBranch,
-            func.Eq(func.Add(func.Hole, func.Constant(json.int(1))), func.Constant(json.int(5)))))
+            recFunc.Eq(recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(1))), recFunc.Constant(json.int(5)))))
 
       optimizeExpr(input) must equal(output)
     }

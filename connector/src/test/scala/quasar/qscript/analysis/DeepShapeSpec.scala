@@ -81,7 +81,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
       }
 
       "Filter" >> {
-        val fun: FreeMap = func.ProjectIndexI(func.Hole, 3)
+        val fun: RecFreeMap = recFunc.ProjectIndexI(recFunc.Hole, 3)
         val qs = Filter(shape, fun)
 
         deepShapeQS(qs) must equal(freeShape[Fix](UnknownShape()))

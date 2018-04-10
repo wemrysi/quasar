@@ -72,7 +72,7 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           qsu.map(qsu.read(orders), predicate)))
 
       evaluate(extractFM(graph)) must beLike {
-        case \/-(QSFilter(Read(`orders`), fm)) => fm must_= predicate.linearize
+        case \/-(QSFilter(Read(`orders`), fm)) => fm must_= predicate
       }
     }
 
@@ -96,7 +96,7 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
           fm.linearize must beTreeEqual(predicate.linearize)
 
-          filterPredicate must beTreeEqual(projectStrKey("filter_predicate_0"))
+          filterPredicate.linearize must beTreeEqual(projectStrKey("filter_predicate_0"))
 
           valueAccess.linearize must beTreeEqual(projectStrKey("filter_source"))
 
@@ -130,7 +130,7 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
           fm.linearize must beTreeEqual(field.linearize)
 
-          filterPredicate must beTreeEqual(predicate >> projectStrKey("filter_predicate_0"))
+          filterPredicate.linearize must beTreeEqual(predicate >> projectStrKey("filter_predicate_0"))
 
           valueAccess.linearize must beTreeEqual(projectStrKey("filter_source"))
 
