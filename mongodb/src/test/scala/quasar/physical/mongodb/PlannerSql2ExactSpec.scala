@@ -28,6 +28,7 @@ import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
+import quasar.physical.mongodb.planner.common._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.{OnUndefined, ShiftType}
 import quasar.sql._
@@ -169,9 +170,9 @@ class PlannerSql2ExactSpec extends
                   func.Typecheck(func.Hole, Type.AnyObject),
                   "memberNumber"),
                 func.Constant(json.int(123456))))),
-          func.Typecheck(
-            func.ProjectKeyS(
-              func.Typecheck(func.Hole, Type.AnyObject),
+          recFunc.Typecheck(
+            recFunc.ProjectKeyS(
+              recFunc.Typecheck(recFunc.Hole, Type.AnyObject),
               "measureEnrollments"),
             Type.FlexArr(0, None, Type.AnyObject)),
           qscript.ExcludeId,
@@ -185,7 +186,7 @@ class PlannerSql2ExactSpec extends
           Selector.Doc(BsonField.Name("year") -> Selector.Eq(Bson.Int32(2017))),
           Selector.Doc(BsonField.Name("memberNumber") -> Selector.Eq(Bson.Int32(123456))))),
         $project(reshape(
-          "0" ->
+          Keys.wrap ->
             $cond(
               $and(
                 $lte($literal(Bson.Arr()), $field("measureEnrollments")),
@@ -193,9 +194,9 @@ class PlannerSql2ExactSpec extends
               $field("measureEnrollments"),
               $literal(Bson.Undefined))),
           ExcludeId),
-        $unwind(DocField(BsonField.Name("0")), None, None),
+        $unwind(DocField(BsonField.Name(Keys.wrap)), None, None),
         $project(reshape(
-          sigil.Quasar -> $field("0", "measureKey")),
+          sigil.Quasar -> $field(Keys.wrap, "measureKey")),
           ExcludeId))))
 
   for (s <- specs) {
@@ -641,7 +642,7 @@ class PlannerSql2ExactSpec extends
             $read(collection("db", "zips")),
             $project(
               reshape(
-                "0" ->
+                Keys.wrap ->
                   $cond(
                     $and(
                       $lte($literal(Bson.Arr(List())), $field("loc")),
@@ -649,9 +650,9 @@ class PlannerSql2ExactSpec extends
                     $field("loc"),
                     $literal(Bson.Undefined))),
               ExcludeId),
-            $unwind(DocField(BsonField.Name("0")), None, None),
+            $unwind(DocField(BsonField.Name(Keys.wrap)), None, None),
             $project(
-              reshape(sigil.Quasar -> $field("0")),
+              reshape(sigil.Quasar -> $field(Keys.wrap)),
               ExcludeId))
         }
     }
