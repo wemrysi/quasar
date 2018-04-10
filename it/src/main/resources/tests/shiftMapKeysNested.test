@@ -1,7 +1,8 @@
 {
     "name":  "shift map keys - nested",
     "backends": {
-        "marklogic_xml": "pending"
+        "marklogic_xml": "pending",
+        "postgres": "pending"
     },
     "data": "nested.data",
     "query": "select topObj.midObj{_:} from nested",

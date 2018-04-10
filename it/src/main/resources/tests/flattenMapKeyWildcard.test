@@ -1,7 +1,8 @@
 {
     "name": "flatten map key - distinct wildcard",
     "backends": {
-        "marklogic_xml": "pending"
+        "marklogic_xml": "pending",
+        "postgres": "pending"
     },
     "data": "zips.data",
     "query": "select distinct *{*:} from zips",

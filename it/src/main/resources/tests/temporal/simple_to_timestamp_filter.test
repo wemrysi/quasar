@@ -2,7 +2,8 @@
     "name": "simple filter using to_timestamp",
     "backends": {
         "marklogic_json": "pending",
-        "mimir": "pending"
+        "mimir": "pending",
+        "postgres": "pending"
     },
     "data":  "../days.data",
     "query": "select ts from `../days`
