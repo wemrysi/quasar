@@ -23,7 +23,6 @@ import quasar.connector.BackendModule
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz._, eitherT._
-import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
@@ -69,7 +68,7 @@ object MongoDbPlanner {
   type OutputM[A]      = PlannerError \/ A
 
   def processMapFuncExpr
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, EX[_]: Traverse, A]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse, A]
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX])
     (fm: FreeMapA[T, A])
     (recovery: A => Fix[EX])
@@ -82,7 +81,7 @@ object MongoDbPlanner {
         funcHandler)
 
     def convert(e: EX[FreeMapA[T, A]]): M[Fix[EX]] =
-      e.map(_.cataM(alg)).sequence.map(_.embed)
+      e.traverse(_.cataM(alg)).map(_.embed)
 
     val expr: M[Fix[EX]] = staticHandler.handle(fm).map(convert) getOrElse fm.cataM(alg)
 
@@ -90,7 +89,7 @@ object MongoDbPlanner {
   }
 
   def getSelector
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, EX[_]: Traverse, A]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse, A]
     (fm: FreeMapA[T, A], default: OutputM[PartialSelector[T]], galg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]])
     (implicit inj: EX :<: ExprOp)
       : OutputM[PartialSelector[T]] =
@@ -123,11 +122,6 @@ object MongoDbPlanner {
       case UnshiftMap(k, v) => ???
     }
   }
-
-  def ejsonToExpression[M[_]: Applicative: MonadFsErr, EJ]
-    (v: BsonVersion)(ej: EJ)(implicit EJ: Recursive.Aux[EJ, EJson])
-      : M[Fix[ExprOp]] =
-    ej.cataM(BsonCodec.fromEJson(v)).fold(pe => raiseErr(qscriptPlanningFailed(pe)), $literal(_).point[M])
 
   def javascript[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
       : AlgebraM[M, MapFunc[T, ?], JsCore] =
@@ -698,7 +692,7 @@ object MongoDbPlanner {
 
   def getExpr[
     T[_[_]]: BirecursiveT: ShowT,
-    M[_]: Monad: ExecTimeR: MonadFsErr, EX[_]: Traverse: Inject[?[_], ExprOp]]
+    M[_]: Monad, EX[_]: Traverse: Inject[?[_], ExprOp]]
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX])
     (fm: FreeMap[T])
     (implicit EX: ExprOpCoreF :<: EX)
@@ -719,7 +713,7 @@ object MongoDbPlanner {
    *  of the FreeMapA[T, A]
    */
   def getFilterBuilder
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_], EX[_]: Traverse, A]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse, A]
     (handler: FreeMapA[T, A] => M[Expr], v: BsonVersion)
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, A])
     (implicit ev: EX :<: ExprOp, WB: WorkflowBuilder.Ops[WF])
@@ -805,7 +799,7 @@ object MongoDbPlanner {
   }
 
   def getStructBuilder
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_]: WorkflowBuilder.Ops[?[_]], EX[_]: Traverse]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_]: WorkflowBuilder.Ops[?[_]], EX[_]: Traverse]
     (handler: FreeMap[T] => M[Expr], v: BsonVersion)
     (src: WorkflowBuilder[WF], struct: FreeMap[T], rootKey: BsonField.Name, structKey: BsonField.Name)
     (implicit ev: EX :<: ExprOp): M[WorkflowBuilder[WF]] =
@@ -855,7 +849,7 @@ object MongoDbPlanner {
       case RightSide => a2
     } ∘ (JsFn(JsFn.defaultName, _))
 
-  def getExprMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR, EX[_]: Traverse]
+  def getExprMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX])
     (jf: JoinFunc[T], a1: DocVar, a2: DocVar)
     (implicit EX: ExprOpCoreF :<: EX, inj: EX :<: ExprOp)
@@ -890,7 +884,7 @@ object MongoDbPlanner {
       : M[Expr] =
     exprOrJs(jr)(getExprRed[T, M, EX](funcHandler, staticHandler)(_), getJsRed[T, M])
 
-  def getExprRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, EX[_]: Traverse]
+  def getExprRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX])
     (jr: FreeMapA[T, ReduceIndex])
     (implicit EX: ExprOpCoreF :<: EX, ev: EX :<: ExprOp)
