@@ -81,7 +81,7 @@ object MongoDbPlanner {
         funcHandler)
 
     def convert(e: EX[FreeMapA[T, A]]): M[Fix[EX]] =
-      e.map(_.cataM(alg)).sequence.map(_.embed)
+      e.traverse(_.cataM(alg)).map(_.embed)
 
     val expr: M[Fix[EX]] = staticHandler.handle(fm).map(convert) getOrElse fm.cataM(alg)
 
