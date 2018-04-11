@@ -68,7 +68,7 @@ object MongoDbPlanner {
   type OutputM[A]      = PlannerError \/ A
 
   def processMapFuncExpr
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, EX[_]: Traverse, A]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse, A]
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX])
     (fm: FreeMapA[T, A])
     (recovery: A => Fix[EX])
@@ -89,7 +89,7 @@ object MongoDbPlanner {
   }
 
   def getSelector
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, EX[_]: Traverse, A]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse, A]
     (fm: FreeMapA[T, A], default: OutputM[PartialSelector[T]], galg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]])
     (implicit inj: EX :<: ExprOp)
       : OutputM[PartialSelector[T]] =
@@ -692,7 +692,7 @@ object MongoDbPlanner {
 
   def getExpr[
     T[_[_]]: BirecursiveT: ShowT,
-    M[_]: Monad: ExecTimeR: MonadFsErr, EX[_]: Traverse: Inject[?[_], ExprOp]]
+    M[_]: Monad, EX[_]: Traverse: Inject[?[_], ExprOp]]
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX])
     (fm: FreeMap[T])
     (implicit EX: ExprOpCoreF :<: EX)
@@ -713,7 +713,7 @@ object MongoDbPlanner {
    *  of the FreeMapA[T, A]
    */
   def getFilterBuilder
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_], EX[_]: Traverse, A]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse, A]
     (handler: FreeMapA[T, A] => M[Expr], v: BsonVersion)
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, A])
     (implicit ev: EX :<: ExprOp, WB: WorkflowBuilder.Ops[WF])
@@ -799,7 +799,7 @@ object MongoDbPlanner {
   }
 
   def getStructBuilder
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_]: WorkflowBuilder.Ops[?[_]], EX[_]: Traverse]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_]: WorkflowBuilder.Ops[?[_]], EX[_]: Traverse]
     (handler: FreeMap[T] => M[Expr], v: BsonVersion)
     (src: WorkflowBuilder[WF], struct: FreeMap[T], rootKey: BsonField.Name, structKey: BsonField.Name)
     (implicit ev: EX :<: ExprOp): M[WorkflowBuilder[WF]] =
@@ -849,7 +849,7 @@ object MongoDbPlanner {
       case RightSide => a2
     } ∘ (JsFn(JsFn.defaultName, _))
 
-  def getExprMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR, EX[_]: Traverse]
+  def getExprMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX])
     (jf: JoinFunc[T], a1: DocVar, a2: DocVar)
     (implicit EX: ExprOpCoreF :<: EX, inj: EX :<: ExprOp)
@@ -884,7 +884,7 @@ object MongoDbPlanner {
       : M[Expr] =
     exprOrJs(jr)(getExprRed[T, M, EX](funcHandler, staticHandler)(_), getJsRed[T, M])
 
-  def getExprRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, EX[_]: Traverse]
+  def getExprRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX])
     (jr: FreeMapA[T, ReduceIndex])
     (implicit EX: ExprOpCoreF :<: EX, ev: EX :<: ExprOp)
@@ -1053,7 +1053,7 @@ object MongoDbPlanner {
       val fh = cfg0.funcHandler andThen (_.liftM[PhaseResultT])
       // NB: buildWorkflow[T, FileSystemErrT[PhaseResultT[F, ?], ?], WF, EX]
       // gives the right return type F[(PhaseResults, FileSystemError \/ Fix[WF])]
-      // but adding a second FileSystemErrT screws up error handling: 
+      // but adding a second FileSystemErrT screws up error handling:
       // unimplemented MapFunc's in FuncHandler don't fall back to JsFuncHandler
       // anymore
       ME.attempt(buildWorkflow[T, PhaseResultT[F, ?], WF, EX](
