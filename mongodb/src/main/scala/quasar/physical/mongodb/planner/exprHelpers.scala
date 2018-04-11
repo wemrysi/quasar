@@ -21,6 +21,7 @@ import quasar.fp.ski._
 import quasar.physical.mongodb.Bson
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.planner.common._
 import quasar.qscript._
 
 import matryoshka.{Hole => _, _}
@@ -98,6 +99,4 @@ object exprHelpers {
     processMapFuncExpr[T, M, EX, ReduceIndex](funcHandler, staticHandler)(jr)(_.idx.fold(
       i => fixExprOpCore[EX].$field("_id", i.toString),
       i => fixExprOpCore[EX].$field(createFieldName("f", i))))
-
-  def createFieldName(prefix: String, i: Int): String = prefix + i.toString
 }

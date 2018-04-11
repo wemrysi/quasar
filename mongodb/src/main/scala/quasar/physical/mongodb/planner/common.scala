@@ -72,6 +72,8 @@ object common {
         case _ => None
       })(Some(_))
 
+  def createFieldName(prefix: String, i: Int): String = prefix + i.toString
+
   object Keys {
     val wrap = "wrap"
   }

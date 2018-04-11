@@ -27,12 +27,13 @@ import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.{FileSystemError, MonadFsErr}, FileSystemError.qscriptPlanningFailed
-import quasar.jscore, jscore.{JsCore, JsFn}
+import quasar.jscore.JsFn
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.{selector => _, _}
 import quasar.physical.mongodb.planner.common._
 import quasar.physical.mongodb.planner.exprHelpers._
+import quasar.physical.mongodb.planner.jsHelpers._
 import quasar.physical.mongodb.planner.selector._
 import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
 import quasar.qscript._, RenderQScriptDSL._
@@ -59,15 +60,6 @@ object MongoDbPlanner {
         _.embed),
       ginterpret[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], A, OutputM[PartialSelector[T]]](
         κ(default), galg))
-
-  def processMapFunc[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR, A]
-    (fm: FreeMapA[T, A])(recovery: A => JsCore)
-      : M[JsCore] =
-    fm.cataM(interpretM[M, MapFunc[T, ?], A, JsCore](recovery(_).point[M], javascript))
-
-  def javascript[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
-      : AlgebraM[M, MapFunc[T, ?], JsCore] =
-    JsFuncHandler.handle[MapFunc[T, ?], M]
 
   /** Brings a [[WBM]] into our `M`. */
   def liftM[M[_]: Monad: MonadFsErr, A](meh: WBM[A]): M[A] =
@@ -428,15 +420,6 @@ object MongoDbPlanner {
       : M[WorkflowBuilder[WF]] =
     getBuilder[T, M, WF, EX, ReduceIndex](handleRedRepair[T, M, EX](funcHandler, staticHandler, _), v)(src, fm)
 
-  def getJsMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
-    (jf: JoinFunc[T], a1: JsCore, a2: JsCore)
-      : M[JsFn] =
-    processMapFunc[T, M, JoinSide](
-      jf) {
-      case LeftSide => a1
-      case RightSide => a2
-    } ∘ (JsFn(JsFn.defaultName, _))
-
   def exprOrJs[M[_]: Applicative: MonadFsErr, A]
     (a: A)
     (exf: A => M[Fix[ExprOp]], jsf: A => M[JsFn])
@@ -460,14 +443,6 @@ object MongoDbPlanner {
     (implicit EX: ExprOpCoreF :<: EX, ev: EX :<: ExprOp)
       : M[Expr] =
     exprOrJs(jr)(getExprRed[T, M, EX](funcHandler, staticHandler)(_), getJsRed[T, M])
-
-  def getJsRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
-    (jr: Free[MapFunc[T, ?], ReduceIndex])
-      : M[JsFn] =
-    processMapFunc[T, M, ReduceIndex](jr)(_.idx.fold(
-      i => jscore.Select(jscore.Select(jscore.Ident(JsFn.defaultName), "_id"), i.toString),
-      i => jscore.Select(jscore.Ident(JsFn.defaultName), createFieldName("f", i)))) ∘
-      (JsFn(JsFn.defaultName, _))
 
   def rebaseWB
     [T[_[_]]: EqualT, M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush, EX[_]: Traverse]
