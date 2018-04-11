@@ -49,18 +49,6 @@ import scalaz._, Scalaz._
 
 object MongoDbPlanner {
 
-  def getSelector
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse, A]
-    (fm: FreeMapA[T, A], default: OutputM[PartialSelector[T]], galg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]])
-    (implicit inj: EX :<: ExprOp)
-      : OutputM[PartialSelector[T]] =
-    fm.zygo(
-      interpret[MapFunc[T, ?], A, T[MapFunc[T, ?]]](
-        κ(MFC(MapFuncsCore.Undefined[T, T[MapFunc[T, ?]]]()).embed),
-        _.embed),
-      ginterpret[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], A, OutputM[PartialSelector[T]]](
-        κ(default), galg))
-
   /** Brings a [[WBM]] into our `M`. */
   def liftM[M[_]: Monad: MonadFsErr, A](meh: WBM[A]): M[A] =
     meh.fold(

@@ -16,17 +16,21 @@
 
 package quasar.physical.mongodb.planner
 
-import slamdata.Predef.{Map => _, _}
-import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
+import slamdata.Predef._
+import quasar._, Planner._, Type._
+import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.physical.mongodb._
+import quasar.physical.mongodb.expression.ExprOp
 import quasar.physical.mongodb.planner.common._
 import quasar.qscript._
 
-import matryoshka.{Hole => _, _}
+import matryoshka._
+import matryoshka.data._
 import matryoshka.implicits._
-import scalaz._, Scalaz.{ToIdOps => _, _}
+import matryoshka.patterns._
+import scalaz._, Scalaz._
 
 object selector {
   // TODO: This is generalizable to an arbitrary `Recursive` type, I think.
@@ -298,4 +302,16 @@ object selector {
 
     invoke(node)
   }
+
+  def getSelector
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse, A]
+    (fm: FreeMapA[T, A], default: OutputM[PartialSelector[T]], galg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector[T]]])
+    (implicit inj: EX :<: ExprOp)
+      : OutputM[PartialSelector[T]] =
+    fm.zygo(
+      interpret[MapFunc[T, ?], A, T[MapFunc[T, ?]]](
+        κ(MFC(MapFuncsCore.Undefined[T, T[MapFunc[T, ?]]]()).embed),
+        _.embed),
+      ginterpret[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], A, OutputM[PartialSelector[T]]](
+        κ(default), galg))
 }
