@@ -29,10 +29,10 @@ import quasar.fp.ski._
 import quasar.fs.{FileSystemError, MonadFsErr}, FileSystemError.qscriptPlanningFailed
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
-import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.{selector => _, _}
 import quasar.physical.mongodb.planner.common._
+import quasar.physical.mongodb.planner.exprHelpers._
 import quasar.physical.mongodb.planner.selector._
 import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
 import quasar.qscript._, RenderQScriptDSL._
@@ -44,31 +44,9 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import org.bson.BsonDocument
-import scalaz._, Scalaz.{ToIdOps => _, _}
+import scalaz._, Scalaz._
 
 object MongoDbPlanner {
-  import fixExprOp._
-
-  def processMapFuncExpr
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse, A]
-    (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX])
-    (fm: FreeMapA[T, A])
-    (recovery: A => Fix[EX])
-    (implicit inj: EX :<: ExprOp)
-      : M[Fix[ExprOp]] = {
-
-    val alg: AlgebraM[M, CoEnvMapA[T, A, ?], Fix[EX]] =
-      interpretM[M, MapFunc[T, ?], A, Fix[EX]](
-        recovery(_).point[M],
-        funcHandler)
-
-    def convert(e: EX[FreeMapA[T, A]]): M[Fix[EX]] =
-      e.traverse(_.cataM(alg)).map(_.embed)
-
-    val expr: M[Fix[EX]] = staticHandler.handle(fm).map(convert) getOrElse fm.cataM(alg)
-
-    expr.map(_.transCata[Fix[ExprOp]](inj))
-  }
 
   def getSelector
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse, A]
@@ -87,24 +65,6 @@ object MongoDbPlanner {
       : M[JsCore] =
     fm.cataM(interpretM[M, MapFunc[T, ?], A, JsCore](recovery(_).point[M], javascript))
 
-  // TODO: Should have a JsFn version of this for $reduce nodes.
-  val accumulator: ReduceFunc[Fix[ExprOp]] => AccumOp[Fix[ExprOp]] = {
-    import quasar.qscript.ReduceFuncs._
-
-    {
-      case Arbitrary(a)     => $first(a)
-      case First(a)         => $first(a)
-      case Last(a)          => $last(a)
-      case Avg(a)           => $avg(a)
-      case Count(_)         => $sum($literal(Bson.Int32(1)))
-      case Max(a)           => $max(a)
-      case Min(a)           => $min(a)
-      case Sum(a)           => $sum(a)
-      case UnshiftArray(a)  => $push(a)
-      case UnshiftMap(k, v) => ???
-    }
-  }
-
   def javascript[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
       : AlgebraM[M, MapFunc[T, ?], JsCore] =
     JsFuncHandler.handle[MapFunc[T, ?], M]
@@ -114,8 +74,6 @@ object MongoDbPlanner {
     meh.fold(
       e => raiseErr(qscriptPlanningFailed(e)),
       _.point[M])
-
-  def createFieldName(prefix: String, i: Int): String = prefix + i.toString
 
   trait Planner[F[_]] {
     type IT[G[_]]
@@ -179,6 +137,7 @@ object MongoDbPlanner {
       new Planner[QScriptCore[T, ?]] {
         import MapFuncsCore._
         import MapFuncCore._
+        import fixExprOp._
 
         type IT[G[_]] = T[G]
 
@@ -272,12 +231,12 @@ object MongoDbPlanner {
                       b.zipWithIndex.map(p => docVarToExpr(DocField(BsonField.Name(createFieldName("b", p._2))))),
                       red.zipWithIndex.map(ai =>
                         (BsonField.Name(createFieldName("f", ai._2)),
-                          accumulator(ai._1.as($field(createFieldName("f", ai._2)))))).toListMap))(
+                          exprHelpers.accumulator(ai._1.as($field(createFieldName("f", ai._2)))))).toListMap))(
                     exprs => WB.groupBy(src,
                       b,
                       exprs.zipWithIndex.map(ai =>
                         (BsonField.Name(createFieldName("f", ai._2)),
-                          accumulator(ai._1))).toListMap)),
+                          exprHelpers.accumulator(ai._1))).toListMap)),
                     repair)
               }).join
           case Sort(src, bucket, order) =>
@@ -421,15 +380,6 @@ object MongoDbPlanner {
       default("ProjectBucket")
   }
 
-  def getExpr[
-    T[_[_]]: BirecursiveT: ShowT,
-    M[_]: Monad, EX[_]: Traverse: Inject[?[_], ExprOp]]
-    (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX])
-    (fm: FreeMap[T])
-    (implicit EX: ExprOpCoreF :<: EX)
-      : M[Fix[ExprOp]] =
-    processMapFuncExpr[T, M, EX, Hole](funcHandler, staticHandler)(fm)(κ(fixExprOpCore[EX].$$ROOT))
-
   def getJsFn[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
     (fm: FreeMap[T])
       : M[JsFn] =
@@ -487,17 +437,6 @@ object MongoDbPlanner {
       case RightSide => a2
     } ∘ (JsFn(JsFn.defaultName, _))
 
-  def getExprMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
-    (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX])
-    (jf: JoinFunc[T], a1: DocVar, a2: DocVar)
-    (implicit EX: ExprOpCoreF :<: EX, inj: EX :<: ExprOp)
-      : M[Fix[ExprOp]] =
-    processMapFuncExpr[T, M, EX, JoinSide](funcHandler, staticHandler)(
-      jf) {
-      case LeftSide => fixExprOpCore[EX].$var(a1)
-      case RightSide => fixExprOpCore[EX].$var(a2)
-    }
-
   def exprOrJs[M[_]: Applicative: MonadFsErr, A]
     (a: A)
     (exf: A => M[Fix[ExprOp]], jsf: A => M[JsFn])
@@ -521,15 +460,6 @@ object MongoDbPlanner {
     (implicit EX: ExprOpCoreF :<: EX, ev: EX :<: ExprOp)
       : M[Expr] =
     exprOrJs(jr)(getExprRed[T, M, EX](funcHandler, staticHandler)(_), getJsRed[T, M])
-
-  def getExprRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
-    (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX])
-    (jr: FreeMapA[T, ReduceIndex])
-    (implicit EX: ExprOpCoreF :<: EX, ev: EX :<: ExprOp)
-      : M[Fix[ExprOp]] =
-    processMapFuncExpr[T, M, EX, ReduceIndex](funcHandler, staticHandler)(jr)(_.idx.fold(
-      i => fixExprOpCore[EX].$field("_id", i.toString),
-      i => fixExprOpCore[EX].$field(createFieldName("f", i))))
 
   def getJsRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
     (jr: Free[MapFunc[T, ?], ReduceIndex])
