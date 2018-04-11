@@ -143,7 +143,7 @@ useGpg in Global := {
 }
 
 lazy val publishSettings = commonPublishSettings ++ Seq(
-  performSonatypeSync := false,   // basically just ignores all the sonatype sync parts of things
+  performMavenCentralSync := false,   // publishes quasar to bintray only, skipping sonatype and maven central
   organizationName := "SlamData Inc.",
   organizationHomepage := Some(url("http://quasar-analytics.org")),
   homepage := Some(url("https://github.com/quasar-analytics/quasar")),
