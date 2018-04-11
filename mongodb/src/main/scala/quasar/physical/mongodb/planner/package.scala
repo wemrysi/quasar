@@ -16,14 +16,11 @@
 
 package quasar.physical.mongodb
 
-import slamdata.Predef._
 import quasar.Planner.PlannerError
 
 import scalaz._
 
 package object planner {
-  type OptionFree[F[_], A] = Option[Free[F, A]]
-
   // TODO: Remove this type.
   type WBM[X] = PlannerError \/ X
 }
