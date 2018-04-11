@@ -8,7 +8,8 @@
         "marklogic_xml": "pending",
         "spark_hdfs": "pending",
         "spark_local": "pending",
-	"spark_cassandra": "pending"	
+	"spark_cassandra": "pending",
+        "postgres": "pending"
     },
 
     "data": "../days.data",

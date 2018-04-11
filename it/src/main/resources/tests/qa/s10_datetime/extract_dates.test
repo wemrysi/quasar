@@ -2,9 +2,9 @@
   "name": "[qa_s10] extract date parts",
 
   "backends": {
-    "marklogic_json":       "ignoreFieldOrder",
-    "postgres":             "ignoreResultOrder",
-    "mimir":                "skip"
+    "marklogic_json": "ignoreFieldOrder",
+    "postgres": "pending",
+    "mimir": "skip"
   },
   "data": "../dates.data",
 
