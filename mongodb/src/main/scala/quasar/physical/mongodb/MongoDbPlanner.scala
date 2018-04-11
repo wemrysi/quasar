@@ -32,7 +32,7 @@ import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
-import quasar.physical.mongodb.planner.{selector => _, There => _, _}
+import quasar.physical.mongodb.planner.{selector => _, _}
 import quasar.physical.mongodb.planner.common._
 import quasar.physical.mongodb.planner.selector._
 import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
@@ -440,99 +440,6 @@ object MongoDbPlanner {
       : M[JsFn] =
     processMapFunc[T, M, Hole](fm)(κ(jscore.Ident(JsFn.defaultName))) ∘
       (JsFn(JsFn.defaultName, _))
-
-
-  /* Given a handler of type FreeMapA[T, A] => Expr, a FreeMapA[T, A]
-   *  and a source WorkflowBuilder, return a new WorkflowBuilder
-   *  filtered according to the `Cond`s found in the FreeMapA[T, A].
-   *  The result is tupled with whatever remains to be planned out
-   *  of the FreeMapA[T, A]
-   */
-  def getFilterBuilder
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_], EX[_]: Traverse, A]
-    (handler: FreeMapA[T, A] => M[Expr], v: BsonVersion)
-    (src: WorkflowBuilder[WF], fm: FreeMapA[T, A])
-    (implicit ev: EX :<: ExprOp, WB: WorkflowBuilder.Ops[WF])
-     : M[(WorkflowBuilder[WF], FreeMapA[T, A])] = {
-
-    import MapFuncCore._
-    import MapFuncsCore._
-
-    def filterBuilder(src0: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
-        M[WorkflowBuilder[WF]] = {
-      val (sel, inputs) = partialSel
-
-      inputs.traverse(f => handler(f(fm))) ∘ (WB.filter(src0, _, sel))
-    }
-
-    def elideCond: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
-      case CoEnv(\/-(MFC(Cond(if_, then_, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
-        CoEnv(then_.resume.swap).some
-      case _ => none
-    }
-
-    def toCofree[B](ann: B): Algebra[CoEnv[A, MapFunc[T, ?], ?], Cofree[MapFunc[T, ?], B]] =
-      interpret(κ(Cofree(ann, MFC(Undefined()))), attributeAlgebra[MapFunc[T, ?], B](κ(ann)))
-
-    val undefinedF: MapFunc[T, Cofree[MapFunc[T, ?], Boolean] \/ FreeMapA[T, A]] = MFC(Undefined())
-    val gcoalg: GCoalgebra[Cofree[MapFunc[T, ?], Boolean] \/ ?, EnvT[Boolean, MapFunc[T, ?], ?], FreeMapA[T, A]] =
-      _.fold(κ(envT(false, undefinedF)), {
-        case MFC(Cond(if_, then_, undef @ Embed(CoEnv(\/-(MFC(Undefined())))))) =>
-          envT(false, MFC(Cond(if_.cata(toCofree(true)).left, then_.cata(toCofree(false)).left, undef.cata(toCofree(false)).left)))
-
-        case otherwise => envT(false, otherwise ∘ (_.right))
-      })
-
-    val galg: GAlgebra[(Cofree[MapFunc[T, ?], Boolean], ?), EnvT[Boolean, MapFunc[T, ?], ?], OutputM[PartialSelector[T]]] = { node =>
-      def forgetAnn: Cofree[MapFunc[T, ?], Boolean] => T[MapFunc[T, ?]] = _.transCata[T[MapFunc[T, ?]]](_.lower)
-
-      node.runEnvT match {
-        case (true, wa) =>
-          /* The `selector` algebra requires one side of a comparison
-           * to be a Constant. The comparisons present inside Cond do
-           * not necessarily have this shape, hence the decorator
-           */
-          selector[T](v).apply(wa.map { case (tree, sl) => (forgetAnn(tree), sl) }) <+> (wa match {
-            case MFC(Eq(_, _))
-               | MFC(Neq(_, _))
-               | MFC(Lt(_, _))
-               | MFC(Lte(_, _))
-               | MFC(Gt(_, _))
-               | MFC(Gte(_, _))
-               | MFC(Undefined()) => defaultSelector[T].right
-            /** The cases here don't readily imply selectors, but
-              *  still need to be handled in case a `Cond` is nested
-              *  inside one of these.  For instance, if ConcatMaps
-              *  includes `Cond`s in BOTH maps, these are extracted
-              *  and `Or`ed using Selector.Or. In the case of unary
-              *  `MapFunc`s, we simply need to fix the InputFinder to
-              *  look in the right place.
-              */
-            case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
-            case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
-            case MFC(Guard((_, if_), _, _, _)) => if_.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-            case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
-          })
-
-        case (false, wa) => wa match {
-          case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
-          case MFC(ProjectKey((_, v), _)) => v.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-          case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
-          case MFC(Guard((_, if_), _, _, _)) => if_.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-          case MFC(Cond((_, pred), _, _)) => pred.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-          case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
-        }
-      }
-    }
-
-    val sels: Option[PartialSelector[T]] =
-      fm.ghylo[(Cofree[MapFunc[T, ?], Boolean], ?), Cofree[MapFunc[T, ?], Boolean] \/ ?]
-        [EnvT[Boolean, MapFunc[T, ?], ?], OutputM[PartialSelector[T]]](distPara, distApo, galg, gcoalg).toOption
-
-    (sels ∘ (filterBuilder(src, _))).cata(
-      _ strengthR fm.transCata[FreeMapA[T, A]](orOriginal(elideCond)),
-      (src, fm).point[M])
-  }
 
   def getStructBuilder
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_]: WorkflowBuilder.Ops[?[_]], EX[_]: Traverse]
