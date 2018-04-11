@@ -33,6 +33,15 @@ import scalaz._, Scalaz._
 object common {
   type ExecTimeR[F[_]] = MonadReader_[F, Instant]
 
+  // TODO: Remove this type.
+  type WBM[X] = PlannerError \/ X
+
+  /** Brings a [[WBM]] into our `M`. */
+  def liftM[M[_]: Monad: MonadFsErr, A](meh: WBM[A]): M[A] =
+    meh.fold(
+      e => raiseErr(qscriptPlanningFailed(e)),
+      _.point[M])
+
   def raiseErr[M[_], A](err: FileSystemError)(
     implicit ev: MonadFsErr[M]
   ): M[A] = ev.raiseError(err)

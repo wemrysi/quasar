@@ -50,12 +50,6 @@ import scalaz._, Scalaz._
 
 object MongoDbPlanner {
 
-  /** Brings a [[WBM]] into our `M`. */
-  def liftM[M[_]: Monad: MonadFsErr, A](meh: WBM[A]): M[A] =
-    meh.fold(
-      e => raiseErr(qscriptPlanningFailed(e)),
-      _.point[M])
-
   trait Planner[F[_]] {
     type IT[G[_]]
 
