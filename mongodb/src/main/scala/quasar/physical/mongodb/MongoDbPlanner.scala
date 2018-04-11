@@ -23,7 +23,6 @@ import quasar.connector.BackendModule
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz._, eitherT._
-import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
@@ -123,11 +122,6 @@ object MongoDbPlanner {
       case UnshiftMap(k, v) => ???
     }
   }
-
-  def ejsonToExpression[M[_]: Applicative: MonadFsErr, EJ]
-    (v: BsonVersion)(ej: EJ)(implicit EJ: Recursive.Aux[EJ, EJson])
-      : M[Fix[ExprOp]] =
-    ej.cataM(BsonCodec.fromEJson(v)).fold(pe => raiseErr(qscriptPlanningFailed(pe)), $literal(_).point[M])
 
   def javascript[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
       : AlgebraM[M, MapFunc[T, ?], JsCore] =
