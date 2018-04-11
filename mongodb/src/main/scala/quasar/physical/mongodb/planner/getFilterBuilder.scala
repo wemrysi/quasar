@@ -21,7 +21,6 @@ import quasar._, Planner._
 import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.MonadFsErr
 import quasar.physical.mongodb.{BsonVersion, Selector, WorkflowBuilder}, WorkflowBuilder._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.{selector => sel}
@@ -43,7 +42,7 @@ object getFilterBuilder {
    *  of the FreeMapA[T, A]
    */
   def apply
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_], EX[_]: Traverse, A]
+    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse, A]
     (handler: FreeMapA[T, A] => M[Expr], v: BsonVersion)
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, A])
     (implicit ev: EX :<: ExprOp, WB: WorkflowBuilder.Ops[WF])

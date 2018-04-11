@@ -5,7 +5,7 @@
         "marklogic_json": "pendingIgnoreFieldOrder",
         "marklogic_xml": "pending",
         "mimir":"pendingIgnoreFieldOrder",
-        "postgres": "ignoreFieldOrder"
+        "postgres": "pending"
     },
     "data": "smalltimeseries.data",
     "query": "

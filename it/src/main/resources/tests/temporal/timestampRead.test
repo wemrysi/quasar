@@ -1,8 +1,9 @@
 {
     "name": "reads timestamps with flatten",
     "backends": {
-        "mimir":          "pending",
-        "couchbase":      "pending"
+        "mimir":     "pending",
+        "couchbase": "pending",
+        "postgres": "pending"
     },
     "data": "../daysWithArray.data",
 
