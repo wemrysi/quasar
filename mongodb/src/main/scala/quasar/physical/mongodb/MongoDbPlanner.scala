@@ -481,12 +481,6 @@ object MongoDbPlanner {
       case x => raiseErr(qscriptPlanningFailed(NonRepresentableEJson(x.toString)))
     }
 
-  // This is maybe worth putting in Matryoshka?
-  def findFirst[T[_[_]]: RecursiveT, F[_]: Functor: Foldable, A](
-    f: PartialFunction[T[F], A]):
-      CoalgebraM[A \/ ?, F, T[F]] =
-    tf => (f.lift(tf) \/> tf.project).swap
-
   // TODO: This should perhaps be _in_ PhaseResults or something
   def log[M[_]: Monad, A: RenderTree]
     (label: String, ma: M[A])
