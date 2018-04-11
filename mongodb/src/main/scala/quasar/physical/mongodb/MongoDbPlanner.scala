@@ -372,12 +372,6 @@ object MongoDbPlanner {
       default("ProjectBucket")
   }
 
-  def getJsFn[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
-    (fm: FreeMap[T])
-      : M[JsFn] =
-    processMapFunc[T, M, Hole](fm)(κ(jscore.Ident(JsFn.defaultName))) ∘
-      (JsFn(JsFn.defaultName, _))
-
   def getStructBuilder
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_]: WorkflowBuilder.Ops[?[_]], EX[_]: Traverse]
     (handler: FreeMap[T] => M[Expr], v: BsonVersion)

@@ -17,12 +17,13 @@
 package quasar.physical.mongodb.planner
 
 import quasar._
+import quasar.fp.ski._
 import quasar.fs.MonadFsErr
 import quasar.jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.planner.common._
 import quasar.qscript._
 
-import matryoshka._
+import matryoshka.{Hole => _, _}
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
@@ -53,6 +54,12 @@ object jsHelpers {
     processMapFunc[T, M, ReduceIndex](jr)(_.idx.fold(
       i => jscore.Select(jscore.Select(jscore.Ident(JsFn.defaultName), "_id"), i.toString),
       i => jscore.Select(jscore.Ident(JsFn.defaultName), createFieldName("f", i)))) ∘
+      (JsFn(JsFn.defaultName, _))
+
+  def getJsFn[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (fm: FreeMap[T])
+      : M[JsFn] =
+    processMapFunc[T, M, Hole](fm)(κ(jscore.Ident(JsFn.defaultName))) ∘
       (JsFn(JsFn.defaultName, _))
 
 }
