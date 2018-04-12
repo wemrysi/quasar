@@ -17,11 +17,11 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar._, Planner._
+import quasar._
 import quasar.contrib.scalaz._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.{FileSystemError, MonadFsErr}, FileSystemError.qscriptPlanningFailed
+import quasar.fs.MonadFsErr
 import quasar.jscore.JsFn
 import quasar.physical.mongodb.{BsonField, BsonVersion}
 import quasar.physical.mongodb.MongoDbPlanner.Planner
@@ -60,7 +60,7 @@ object helpers {
         case MapFuncCore.StaticMap(elems) =>
           elems.traverse(_.bitraverse({
             case Embed(MapFuncCore.EC(ejson.Str(key))) => BsonField.Name(key).point[M]
-            case key => raiseErr[M, BsonField.Name](qscriptPlanningFailed(InternalError.fromMsg(s"Unsupported object key: ${key.shows}")))
+            case key => raiseInternalError[M, BsonField.Name](s"Unsupported object key: ${key.shows}")
           }, handler)) ∘ (es => DocBuilder(src0, es.toListMap))
         case _ => handler(fm0) ∘ (ExprBuilder(src0, _))
       }

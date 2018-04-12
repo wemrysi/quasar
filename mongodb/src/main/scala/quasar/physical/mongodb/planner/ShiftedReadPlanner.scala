@@ -19,7 +19,7 @@ package quasar.physical.mongodb.planner
 import slamdata.Predef._
 import quasar._, Planner._
 import quasar.contrib.pathy.AFile
-import quasar.fs.{FileSystemError, MonadFsErr}, FileSystemError.qscriptPlanningFailed
+import quasar.fs.MonadFsErr
 import quasar.physical.mongodb._, MongoDbPlanner.Planner
 import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.expression._
@@ -47,7 +47,7 @@ class ShiftedReadPlanner[T[_[_]]: BirecursiveT: ShowT] extends Planner[Const[Shi
     qs => Collection
       .fromFile(qs.getConst.path)
       .fold(
-        e => raiseErr(qscriptPlanningFailed(PlanPathError(e))),
+        e => raisePlannerError(PlanPathError(e)),
         coll => {
           val dataset = WB.read(coll)
           // TODO: exclude `_id` from the value here?

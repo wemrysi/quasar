@@ -17,14 +17,14 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar._, Planner._
+import quasar._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultTell}
 import quasar.connector.BackendModule
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.{FileSystemError, MonadFsErr}, FileSystemError.qscriptPlanningFailed
+import quasar.fs.{FileSystemError, MonadFsErr}
 import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.{selector => _, _}
@@ -109,7 +109,7 @@ object MongoDbPlanner {
             ev2: WorkflowBuilder.Ops[WF],
             ev3: ExprOpCoreF :<: EX,
             ev4: EX :<: ExprOp) =
-          κ(raiseErr(qscriptPlanningFailed(InternalError.fromMsg(s"should not be reached: $label"))))
+          κ(raiseInternalError(s"should not be reached: $label"))
       }
 
     implicit def deadEnd[T[_[_]]]: Planner.Aux[T, Const[DeadEnd, ?]] =

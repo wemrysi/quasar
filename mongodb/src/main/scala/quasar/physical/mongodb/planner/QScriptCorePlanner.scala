@@ -24,7 +24,7 @@ import quasar.contrib.scalaz._
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.{FileSystemError, MonadFsErr}, FileSystemError.qscriptPlanningFailed
+import quasar.fs.MonadFsErr
 import quasar.jscore.JsFn
 import quasar.physical.mongodb._, MongoDbPlanner.Planner
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
@@ -212,7 +212,7 @@ object QScriptCorePlanner {
     (implicit ev0: WorkflowOpCoreF :<: WF)
       : M[Bson] =
     asLiteral(wb).fold(
-      raiseErr[M, Bson](qscriptPlanningFailed(NonRepresentableEJson(wb.toString))))(
+      raisePlannerError[M, Bson](NonRepresentableEJson(wb.toString)))(
       _.point[M])
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
@@ -223,6 +223,6 @@ object QScriptCorePlanner {
     HasLiteral[M, WF](wb) >>= {
       case Bson.Int32(v) => v.toLong.point[M]
       case Bson.Int64(v) => v.point[M]
-      case x => raiseErr(qscriptPlanningFailed(NonRepresentableEJson(x.toString)))
+      case x => raisePlannerError(NonRepresentableEJson(x.toString))
     }
 }
