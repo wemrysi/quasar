@@ -50,15 +50,6 @@ init_marklogic() {
   $SCRIPTS_DIR/initMarklogic $1 $2 $3 $4
 }
 
-init_spark_local() {
-  if [[ ${TRAVIS:-} ]]
-  then
-    mkdir ${HOME}/spark_local_test
-  else
-    mkdir /tmp/spark_local_test
-  fi
-}
-
 ##########################################
 # parse arguments and run various
 # database configuration scripts
@@ -72,7 +63,6 @@ apply_configuration() {
   if [[ $CONTAINER == "quasar_marklogic_json"      ]]; then init_marklogic $DOCKERIP 9001 9002 disabled; fi
   if [[ $CONTAINER == "quasar_postgres"            ]]; then init_postgres;                               fi
   if [[ $CONTAINER == "quasar_metastore"           ]]; then init_metastore;                              fi
-  if [[ $CONTAINER == "quasar_spark_local_test"    ]]; then init_spark_local;                            fi
 }
 
 
@@ -129,38 +119,13 @@ function upContainer() {
 
 create_database() {
   local LOCAL_CONTAINER=$1
-  if [[ $LOCAL_CONTAINER == "quasar_spark_local_test" ]]
-  then
-    echo "$LOCAL_CONTAINER: not starting a container for spark_local_test..."
-  elif [[ $LOCAL_CONTAINER == "quasar_mimir" ]]
+  if [[ $LOCAL_CONTAINER == "quasar_mimir" ]]
   then
     echo "$LOCAL_CONTAINER: not starting a container for mimir..."
   elif [[ $LOCAL_CONTAINER =~ "marklogic" ]]
   then
     $SCRIPTS_DIR/../Dockerfiles/Marklogic/getMLRpm
     upContainer $LOCAL_CONTAINER
-  elif [[ $LOCAL_CONTAINER == "quasar_spark_cluster" ]]
-  then
-    upContainer $LOCAL_CONTAINER
-  elif [[ $LOCAL_CONTAINER == "quasar_spark_hdfs" ]]
-  then
-    upContainer $LOCAL_CONTAINER
-    create_database quasar_spark_cluster
-  elif [[ $LOCAL_CONTAINER == "quasar_spark_ftp" ]]
-  then
-    upContainer $LOCAL_CONTAINER
-    create_database quasar_spark_cluster
-  elif [[ $LOCAL_CONTAINER == "quasar_spark_elasticsearch" ]]
-  then
-    upContainer $LOCAL_CONTAINER
-    create_database quasar_spark_cluster
-  elif [[ $LOCAL_CONTAINER == "quasar_spark_cassandra" ]]
-  then
-    upContainer $LOCAL_CONTAINER
-    create_database quasar_spark_cluster
-  elif [[ $LOCAL_CONTAINER == "quasar_spark_s3" ]]
-  then
-    create_database quasar_spark_cluster
   elif [[ $LOCAL_CONTAINER == "quasar_metastore" ]]
   then
     upContainer $LOCAL_CONTAINER
