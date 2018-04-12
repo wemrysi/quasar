@@ -70,42 +70,9 @@ object MongoDbPlanner {
 
     def apply[T[_[_]], F[_]](implicit ev: Planner.Aux[T, F]) = ev
 
-    implicit def shiftedReadFile[T[_[_]]: BirecursiveT: ShowT]: Planner.Aux[T, Const[ShiftedRead[AFile], ?]] =
-      new Planner[Const[ShiftedRead[AFile], ?]] {
-        type IT[G[_]] = T[G]
-        def plan
-          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush, EX[_]: Traverse]
-          (cfg: PlannerConfig[T, EX, WF, M])
-          (implicit
-            ev0: WorkflowOpCoreF :<: WF,
-            ev1: RenderTree[WorkflowBuilder[WF]],
-            WB: WorkflowBuilder.Ops[WF],
-            ev3: ExprOpCoreF :<: EX,
-            ev4: EX :<: ExprOp) =
-          qs => Collection
-            .fromFile(qs.getConst.path)
-            .fold(
-              e => raiseErr(qscriptPlanningFailed(PlanPathError(e))),
-              coll => {
-                val dataset = WB.read(coll)
-                // TODO: exclude `_id` from the value here?
-                qs.getConst.idStatus match {
-                  case IdOnly    =>
-                    getExprBuilder[T, M, WF, EX](
-                      cfg.funcHandler, cfg.staticHandler, cfg.bsonVersion)(
-                      dataset,
-                        Free.roll(MFC(MapFuncsCore.ProjectKey[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))))
-                  case IncludeId =>
-                    getExprBuilder[T, M, WF, EX](
-                      cfg.funcHandler, cfg.staticHandler, cfg.bsonVersion)(
-                      dataset,
-                        MapFuncCore.StaticArray(List(
-                          Free.roll(MFC(MapFuncsCore.ProjectKey[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit("_id")))),
-                          HoleF)))
-                  case ExcludeId => dataset.point[M]
-                }
-              })
-      }
+    implicit def shiftedReadFile[T[_[_]]: BirecursiveT: ShowT]
+        : Planner.Aux[T, Const[ShiftedRead[AFile], ?]] =
+      new ShiftedReadPlanner[T]
 
     implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT: ShowT]:
         Planner.Aux[T, QScriptCore[T, ?]] =
