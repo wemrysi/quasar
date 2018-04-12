@@ -43,14 +43,6 @@ configure_metastore() {
 }
 
 ##########################################
-# injects postgres url into
-# it/testing.conf
-#
-configure_postgres() {
-  echo 'postgres'=\"jdbc:postgresql://${DOCKERIP}:35432/postgres?user=postgres\" >> $CONFIGFILE
-}
-
-##########################################
 # injects various mongodb urls into
 # it/testing.conf depending on argument
 #
@@ -72,7 +64,6 @@ container_lookup() {
   if [[ $CONTAINER == "couchbase"        ]]; then configure_couchbase      $CONTAINER;      fi
   if [[ $CONTAINER == "metastore"        ]]; then configure_metastore;                      fi
   if [[ $CONTAINER == "mimir"            ]]; then configure_mimir;                          fi
-  if [[ $CONTAINER == "postgres"         ]]; then configure_postgres;                       fi
 }
 
 
