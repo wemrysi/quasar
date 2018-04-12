@@ -30,8 +30,6 @@ env:
     - CONNECTOR=mongodb_3_6
     - CONNECTOR=mongodb_read_only
     - CONNECTOR=postgres
-    # - CONNECTOR=spark_local_test # no spark for 2.12
-    # - CONNECTOR=spark_hdfs # no spark for 2.12
   global:
     - COURSIER_PROGRESS=0
     - SBT=./sbt
@@ -74,21 +72,6 @@ script:
       couchbase) SPECIFIC_DELEGATE="couchbaseIt/testOnly -- xonly failtrace" ;;
       marklogic_*) SPECIFIC_DELEGATE="marklogicIt/testOnly -- xonly failtrace" ;;
       mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly failtrace" ;;
-
-      spark_hdfs)
-
-        ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-          'set every assemblyJarName in assembly := "sparkcore.jar"' \
-          'set every sparkDependencyProvided := true' \
-          sparkcore/assembly
-
-        cp ./.targets/sparkcore/scala-2.11/sparkcore.jar $TRAVIS_BUILD_DIR
-
-        export SPARKCORE_JAR_PATH="$TRAVIS_BUILD_DIR/sparkcore.jar"
-
-        ;;
-
-      *) ;;
     esac
 
   # workaround for the fact that travis caching isn't working. when it starts working again, remove this
@@ -155,14 +138,6 @@ jobs:
 
         # release to sonatype
         - scripts/quasarPublishAndTag
-
-        # recreate sparkcore.jar, which is just going to hang out
-        # sparkcore currently disabled
-        # - |-
-        #   ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-        #     'set every assemblyJarName in assembly := "sparkcore.jar"' \
-        #     'set every sparkDependencyProvided := true' \
-        #     sparkcore/assembly
 
         # release to github
         - scripts/publishJar
