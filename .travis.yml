@@ -29,7 +29,6 @@ env:
     - CONNECTOR=mongodb_3_4_13
     - CONNECTOR=mongodb_3_6
     - CONNECTOR=mongodb_read_only
-    - CONNECTOR=postgres
   global:
     - COURSIER_PROGRESS=0
     - SBT=./sbt
@@ -49,7 +48,7 @@ script:
   - set -e
 
   # travis installs postgres by default this will stop and free up the psql port
-  # needed by the  postgreql container
+  # needed by the postgresql container
   - sudo /etc/init.d/postgresql stop
   - sudo /etc/init.d/mysql stop
   - sudo service memcached stop
