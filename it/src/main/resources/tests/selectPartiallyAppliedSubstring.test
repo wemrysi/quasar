@@ -1,9 +1,7 @@
 {
     "name": "select partially-applied substring",
     "backends": {
-        "postgres":          "pending"
     },
-    "NB": "Pending for postgres connector due to boxed result errors qz-3739",
     "data": "extraSmallZips.data",
     "query": "select substring(\"abcdefghijklmnop\", 5, trunc(pop / 10000)) from extraSmallZips",
     "predicate": "exactly",

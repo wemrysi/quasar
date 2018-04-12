@@ -115,17 +115,6 @@ object Dependencies {
     )
   }
 
-  def rdbmscore = {
-    Seq(
-      "org.tpolecat" %% "doobie-core"       % doobieVersion,
-      "org.tpolecat" %% "doobie-postgres"   % doobieVersion,
-      "org.tpolecat" %% "doobie-hikari"     % doobieVersion,
-      "org.tpolecat" %% "doobie-h2"         % doobieVersion,
-      "com.github.alexarchambault" %% "scalacheck-shapeless_1.13" % "1.1.6" % Test,
-      "org.tpolecat" %% "doobie-specs2"     % doobieVersion % Test
-    )
-  }
-
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"         % jacksonVersion,
     "com.fasterxml.jackson.core" %  "jackson-databind"     % jacksonVersion,

@@ -4,8 +4,7 @@
         "couchbase":       "skip",
         "marklogic_json":  "skip",
         "marklogic_xml":   "skip",
-        "mimir":           "skip",
-        "postgres":        "skip"
+        "mimir":           "skip"
     },
     "data": "../cities.data",
     "query": "select distinct * from `../cities` where city = \"BOSTON\"",

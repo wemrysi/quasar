@@ -269,22 +269,22 @@ lazy val root = project.in(file("."))
                       niflheim,
 //   |         |         |
     sql, connector,   yggdrasil,
-//   |   /  | | \ \______|__________________________________
-//   |  /   | |  \      /     \         \         \         \
-    core, skeleton, mimir, marklogic, mongodb, couchbase,  rdbms,
-//      \     |     /         |          |         |         |
-          interface,   //     |          |         |         |
-//          /  \              |          |         |         |
-         repl, web,   //      |          |         |         |
-//              |             |          |         |         |
-                it,   //      |          |         |         |
-//   ___________|_____________/          |         |         |
-//  /           |      __________________/         |         |
-//  |          /|\    /          __________________/         |
-//  |         / | \  /          /             _______________/
-//  |        /  |  \/__________/______       /
-//  |       /   |  /    \     /        \    /
-  marklogicIt, mongoIt, couchbaseIt, rdbmsIt
+//   |   /  | | \ \______|________________________
+//   |  /   | |  \      /     \         \         \
+    core, skeleton, mimir, marklogic, mongodb, couchbase,
+//      \     |     /         |          |         |
+          interface,   //     |          |         |
+//          /  \              |          |         |
+         repl, web,   //      |          |         |
+//              |             |          |         |
+                it,   //      |          |         |
+//   ___________|_____________/          |         |
+//  /           |      __________________/         |
+//  |          /|\    /          __________________/
+//  |         / | \  /          /
+//  |        /  |  \/__________/
+//  |       /   |  /    \     /
+  marklogicIt, mongoIt, couchbaseIt
 //
 // NB: the *It projects are temporary until we polyrepo
   ).enablePlugins(AutomateHeaderPlugin)
@@ -488,18 +488,6 @@ lazy val skeleton = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val rdbms = project
-  .settings(name := "quasar-rdbms-internal")
-  .dependsOn(connector % BothScopes,
-             core      % "test->compile")
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(githubReleaseSettings)
-  .settings(libraryDependencies ++= Dependencies.rdbmscore)
-  .settings(isolatedBackendSettings("quasar.physical.rdbms.fs.postgres.Postgres$"))
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
 // interfaces
 
 /** Types and operations needed by applications that embed Quasar.
@@ -621,19 +609,6 @@ lazy val mongoIt = project
 lazy val couchbaseIt = project
   .configs(ExclusiveTests)
   .dependsOn(it % BothScopes, couchbase)
-  .settings(commonSettings)
-  .settings(noPublishSettings)
-  .settings(targetSettings)
-  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
-  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
-  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
-  .settings(parallelExecution in Test := false)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val rdbmsIt = project
-  .configs(ExclusiveTests)
-  .dependsOn(it % BothScopes, rdbms)
   .settings(commonSettings)
   .settings(noPublishSettings)
   .settings(targetSettings)

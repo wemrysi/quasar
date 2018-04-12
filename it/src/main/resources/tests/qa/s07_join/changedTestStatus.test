@@ -10,8 +10,7 @@
         "mongodb_3_4":       "pendingIgnoreFieldOrder",
         "mongodb_3_4_13":    "pendingIgnoreFieldOrder",
         "mongodb_3_6":       "pendingIgnoreFieldOrder",
-        "mongodb_read_only": "pendingIgnoreFieldOrder",
-        "postgres":          "pending"
+        "mongodb_read_only": "pendingIgnoreFieldOrder"
     },
     "NB": "Mimir runs of out memory and the JVM dies when this test runs",
     "data": ["../../oldTests.data", "../../newTests.data"],

@@ -5,8 +5,7 @@
         "couchbase":         "pending",
         "marklogic_json":    "timeout",
         "marklogic_xml":     "timeout",
-        "mimir":             "pending",
-        "postgres":          "pending"
+        "mimir":             "pending"
     },
 
     "data": ["../../zips.data", "../largeZips.data"],
