@@ -21,6 +21,7 @@ import quasar._
 import quasar.fs.FileSystemError
 import quasar.std.StdLib._
 import quasar.physical.mongodb.workflow._
+import quasar.physical.mongodb.planner.jsHelpers
 import quasar.qscript._
 import quasar.time.TemporalPart
 
@@ -142,7 +143,7 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
 
   def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix])
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
-    MongoDbPlanner.getJsFn[Fix, ReaderT[FileSystemError \/ ?, Instant, ?]](mf).run(runAt) ∘
+    jsHelpers.getJsFn[Fix, ReaderT[FileSystemError \/ ?, Instant, ?]](mf).run(runAt) ∘
       (js =>
         (Crystallize[WorkflowF].crystallize(
           chain[Fix[WorkflowF]](
