@@ -16,10 +16,8 @@
 
 package quasar.physical.mongodb
 
-import slamdata.Predef._
 import quasar.{Planner => _, _}
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultTell}
-import quasar.connector.BackendModule
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
 import quasar.fs.{FileSystemError, MonadFsErr}
@@ -39,13 +37,6 @@ import org.bson.BsonDocument
 import scalaz._, Scalaz._
 
 object MongoDbPlanner {
-
-  // TODO: This should perhaps be _in_ PhaseResults or something
-  def log[M[_]: Monad, A: RenderTree]
-    (label: String, ma: M[A])
-    (implicit mtell: MonadTell_[M, PhaseResults])
-      : M[A] =
-    ma.mproduct(a => mtell.tell(Vector(PhaseResult.tree(label, a)))) ∘ (_._1)
 
   def toMongoQScript[
       T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
@@ -85,19 +76,22 @@ object MongoDbPlanner {
       mongoQS1 <- Trans(assumeReadType[T, MQS, M](Type.AnyObject), qs)
       mongoQS2 <- mongoQS1.transCataM(elideQuasarSigil[T, MQS, M](anyDoc))
       mongoQS3 <- normalize(mongoQS2)
-      _ <- BackendModule.logPhase[M](PhaseResult.treeAndCode("QScript Mongo", mongoQS3))
+      _ <- PhaseResults.logPhase[M](
+             PhaseResult.treeAndCode("QScript Mongo", mongoQS3))
 
       mongoQS4 =  mongoQS3.transCata[T[MQS]](
                     liftFF[QScriptCore[T, ?], MQS, T[MQS]](
                       repeatedly(O.subsetBeforeMap[MQS, MQS](
                         reflNT[MQS]))))
-      _ <- BackendModule.logPhase[M](
+      _ <- PhaseResults.logPhase[M](
              PhaseResult.treeAndCode("QScript Mongo (Subset Before Map)",
              mongoQS4))
 
       // TODO: Once field deletion is implemented for 3.4, this could be selectively applied, if necessary.
       mongoQS5 =  PreferProjection.preferProjection[MQS](mongoQS4)
-      _ <- BackendModule.logPhase[M](PhaseResult.treeAndCode("QScript Mongo (Prefer Projection)", mongoQS5))
+      _ <- PhaseResults.logPhase[M](
+             PhaseResult.treeAndCode("QScript Mongo (Prefer Projection)",
+             mongoQS5))
     } yield mongoQS5
   }
 
@@ -115,12 +109,17 @@ object MongoDbPlanner {
       ev3: RenderTree[Fix[WF]])
       : M[Fix[WF]] =
     for {
-      wb <- log(
-        "Workflow Builder",
-        qs.cataM[M, WorkflowBuilder[WF]](
-          Planner[T, fs.MongoQScript[T, ?]].plan[M, WF, EX](cfg).apply(_) ∘
-            (_.transCata[Fix[WorkflowBuilderF[WF, ?]]](repeatedly(WorkflowBuilder.normalize[WF, Fix[WorkflowBuilderF[WF, ?]]])))))
-      wf <- log("Workflow (raw)", liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb, cfg.queryModel)))
+      wb <- qs.cataM[M, WorkflowBuilder[WF]](
+              Planner[T, fs.MongoQScript[T, ?]].plan[M, WF, EX](cfg).apply(_) ∘
+                (_.transCata[Fix[WorkflowBuilderF[WF, ?]]](
+                  repeatedly(WorkflowBuilder.normalize[WF, Fix[WorkflowBuilderF[WF, ?]]]))))
+      _ <- PhaseResults.logPhase[M](
+             PhaseResult.tree("Workflow Builder", wb))
+
+      wf <- liftM[M, Fix[WF]](WorkflowBuilder.build[WBM, WF](wb, cfg.queryModel))
+      _ <- PhaseResults.logPhase[M](
+             PhaseResult.tree("Workflow (raw)", wf))
+
     } yield wf
 
   def plan0
@@ -156,6 +155,13 @@ object MongoDbPlanner {
         cfg0.copy(funcHandler = fh))(qs0).run)
     }
 
+    def doMapBeforeSort(qs0: T[fs.MongoQScript[T, ?]]) =
+      for {
+        t <- Trans(mapBeforeSort[T, M], qs0)
+        _ <- PhaseResults.logPhase[M](
+                PhaseResult.tree("QScript Mongo (Map Before Sort)", t))
+      } yield t
+
     for {
       qs0 <- toMongoQScript[T, M](anyDoc, qs)
       res0 <- doBuildWorkflow[M](cfg)(qs0)
@@ -164,16 +170,15 @@ object MongoDbPlanner {
                  // TODO look into adding mapBeforeSort to WorkflowBuilder or Workflow stage
                  // instead, so that we can avoid having to rerun some transformations.
                  // See #3063
-                 log("QScript Mongo (Map Before Sort)",
-                   Trans(mapBeforeSort[T, M], qs0)) >>= buildWorkflow[T, M, WF, EX](cfg)
+                 doMapBeforeSort(qs0) >>= buildWorkflow[T, M, WF, EX](cfg)
                case \/-((log, wf)) =>
                  MT.tell(log) *> wf.point[M]
                case -\/(err) =>
                  raiseErr[M, Fix[WF]](err)
              }
-      wf1 <- log(
-        "Workflow (crystallized)",
-        Crystallize[WF].crystallize(wf0).point[M])
+      wf1 = Crystallize[WF].crystallize(wf0)
+      _ <- PhaseResults.logPhase[M](
+             PhaseResult.tree("Workflow (crystallized)", wf1))
     } yield wf1
   }
 
