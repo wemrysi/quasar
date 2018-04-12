@@ -24,7 +24,6 @@ import quasar.fp.ski._
 import quasar.fs.MonadFsErr
 import quasar.jscore.JsFn
 import quasar.physical.mongodb.{BsonField, BsonVersion}
-import quasar.physical.mongodb.MongoDbPlanner.Planner
 import quasar.physical.mongodb.WorkflowBuilder, WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.common._

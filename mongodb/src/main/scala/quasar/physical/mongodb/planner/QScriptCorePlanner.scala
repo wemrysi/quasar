@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar._, Planner._
+import quasar.{Planner => QPlanner, _}, QPlanner._
 import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._
@@ -26,7 +26,7 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.MonadFsErr
 import quasar.jscore.JsFn
-import quasar.physical.mongodb._, MongoDbPlanner.Planner
+import quasar.physical.mongodb._
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.{selector => sel}

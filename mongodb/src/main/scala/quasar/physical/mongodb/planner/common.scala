@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.{Planner, Type}, Planner._, Type._
+import quasar.{Planner => QPlanner, Type}, QPlanner._, Type._
 import quasar.contrib.scalaz._
 import quasar.fp.ski._
 import quasar.fs._, FileSystemError._

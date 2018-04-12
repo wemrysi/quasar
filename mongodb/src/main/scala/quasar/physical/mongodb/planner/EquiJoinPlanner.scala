@@ -19,7 +19,7 @@ package quasar.physical.mongodb.planner
 import slamdata.Predef._
 import quasar._
 import quasar.fs.MonadFsErr
-import quasar.physical.mongodb._, MongoDbPlanner.Planner
+import quasar.physical.mongodb._
 import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.common._

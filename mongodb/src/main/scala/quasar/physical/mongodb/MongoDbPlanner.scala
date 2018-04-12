@@ -17,13 +17,11 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar._
+import quasar.{Planner => _, _}
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultTell}
 import quasar.connector.BackendModule
-import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
-import quasar.fp.ski._
 import quasar.fs.{FileSystemError, MonadFsErr}
 import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.expression._
@@ -41,92 +39,6 @@ import org.bson.BsonDocument
 import scalaz._, Scalaz._
 
 object MongoDbPlanner {
-
-  trait Planner[F[_]] {
-    type IT[G[_]]
-
-    def plan
-      [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush, EX[_]: Traverse]
-      (cfg: PlannerConfig[IT, EX, WF, M])
-      (implicit
-        ev0: WorkflowOpCoreF :<: WF,
-        ev1: RenderTree[WorkflowBuilder[WF]],
-        ev2: WorkflowBuilder.Ops[WF],
-        ev3: ExprOpCoreF :<: EX,
-        ev4: EX :<: ExprOp):
-        AlgebraM[M, F, WorkflowBuilder[WF]]
-  }
-
-  object Planner {
-    type Aux[T[_[_]], F[_]] = Planner[F] { type IT[G[_]] = T[G] }
-
-    def apply[T[_[_]], F[_]](implicit ev: Planner.Aux[T, F]) = ev
-
-    implicit def shiftedReadFile[T[_[_]]: BirecursiveT: ShowT]
-        : Planner.Aux[T, Const[ShiftedRead[AFile], ?]] =
-      new ShiftedReadPlanner[T]
-
-    implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT: ShowT]:
-        Planner.Aux[T, QScriptCore[T, ?]] =
-      new QScriptCorePlanner[T]
-
-    implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT]:
-        Planner.Aux[T, EquiJoin[T, ?]] =
-      new EquiJoinPlanner[T]
-
-    implicit def coproduct[T[_[_]], F[_], G[_]](
-      implicit F: Planner.Aux[T, F], G: Planner.Aux[T, G]):
-        Planner.Aux[T, Coproduct[F, G, ?]] =
-      new Planner[Coproduct[F, G, ?]] {
-        type IT[G[_]] = T[G]
-        def plan
-          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush, EX[_]: Traverse]
-          (cfg: PlannerConfig[T, EX, WF, M])
-          (implicit
-            ev0: WorkflowOpCoreF :<: WF,
-            ev1: RenderTree[WorkflowBuilder[WF]],
-            ev2: WorkflowBuilder.Ops[WF],
-            ev3: ExprOpCoreF :<: EX,
-            ev4: EX :<: ExprOp) =
-          _.run.fold(
-            F.plan[M, WF, EX](cfg),
-            G.plan[M, WF, EX](cfg))
-      }
-
-    // TODO: All instances below here only need to exist because of `FreeQS`,
-    //       but can’t actually be called.
-
-    def default[T[_[_]], F[_]](label: String): Planner.Aux[T, F] =
-      new Planner[F] {
-        type IT[G[_]] = T[G]
-
-        def plan
-          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush, EX[_]: Traverse]
-          (cfg: PlannerConfig[T, EX, WF, M])
-          (implicit
-            ev0: WorkflowOpCoreF :<: WF,
-            ev1: RenderTree[WorkflowBuilder[WF]],
-            ev2: WorkflowBuilder.Ops[WF],
-            ev3: ExprOpCoreF :<: EX,
-            ev4: EX :<: ExprOp) =
-          κ(raiseInternalError(s"should not be reached: $label"))
-      }
-
-    implicit def deadEnd[T[_[_]]]: Planner.Aux[T, Const[DeadEnd, ?]] =
-      default("DeadEnd")
-
-    implicit def read[T[_[_]], A]: Planner.Aux[T, Const[Read[A], ?]] =
-      default("Read")
-
-    implicit def shiftedReadDir[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead[ADir], ?]] =
-      default("ShiftedRead[ADir]")
-
-    implicit def thetaJoin[T[_[_]]]: Planner.Aux[T, ThetaJoin[T, ?]] =
-      default("ThetaJoin")
-
-    implicit def projectBucket[T[_[_]]]: Planner.Aux[T, ProjectBucket[T, ?]] =
-      default("ProjectBucket")
-  }
 
   // TODO: This should perhaps be _in_ PhaseResults or something
   def log[M[_]: Monad, A: RenderTree]
