@@ -234,39 +234,9 @@ object MongoDbPlanner {
         }
       }
 
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT]:
         Planner.Aux[T, EquiJoin[T, ?]] =
-      new Planner[EquiJoin[T, ?]] {
-        type IT[G[_]] = T[G]
-        def plan
-          [M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush, EX[_]: Traverse]
-          (cfg: PlannerConfig[T, EX, WF, M])
-          (implicit
-            ev0: WorkflowOpCoreF :<: WF,
-            ev1: RenderTree[WorkflowBuilder[WF]],
-            ev2: WorkflowBuilder.Ops[WF],
-            ev3: ExprOpCoreF :<: EX,
-            ev4: EX :<: ExprOp) =
-          qs =>
-        (rebaseWB[T, M, WF, EX](cfg, qs.lBranch, qs.src) ⊛
-          rebaseWB[T, M, WF, EX](cfg, qs.rBranch, qs.src))(
-          (lb, rb) => {
-            val (lKey, rKey) = Unzip[List].unzip(qs.key)
-
-            (lKey.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _)) ⊛
-              rKey.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _)))(
-              (lk, rk) =>
-              liftM[M, WorkflowBuilder[WF]](cfg.joinHandler.run(
-                qs.f,
-                JoinSource(lb, lk),
-                JoinSource(rb, rk))) >>=
-                (getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler, cfg.bsonVersion)(_, qs.combine >>= {
-                  case LeftSide => Free.roll(MFC(MapFuncsCore.ProjectKey(HoleF, MapFuncsCore.StrLit("left"))))
-                  case RightSide => Free.roll(MFC(MapFuncsCore.ProjectKey(HoleF, MapFuncsCore.StrLit("right"))))
-                }))).join
-          }).join
-      }
+      new EquiJoinPlanner[T]
 
     implicit def coproduct[T[_[_]], F[_], G[_]](
       implicit F: Planner.Aux[T, F], G: Planner.Aux[T, G]):
