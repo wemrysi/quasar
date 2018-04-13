@@ -29,6 +29,7 @@ import quasar.qscript._
 import quasar.qscript.RecFreeS._
 import quasar.qscript.analysis.Outline
 
+import matryoshka.{delayEqual, delayShow}
 import matryoshka.data.Fix
 import matryoshka.data.free._
 import org.specs2.scalacheck._
