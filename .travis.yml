@@ -38,6 +38,13 @@ env:
     - BUILD_HACK_TIMEOUT=60
     # DISCORD_WEBHOOK_TOKENS
     - secure: "copZbrzCXeRfTx2ZRM6nsM07A4rfQAZ0mqk4R+z6USJhjLHv+KXAN30QN2nIAi9FmLoEX8BZRRpbX36nkc81jverhbS6POaci5UcQLpo8HOX4yR3b/pWqIBlno55K5hC6UCEXAneI/ZThFKwotpME9dw7ww+S+gIyaoDvZc4OUI="
+    # ENCRYPTION_PASSWORD
+    - secure: "YIfY4y2fR4jMOim40r7m4zIHDXI6sXIk+J8qaPJyfPx/cmDRKs5DfbHddb0Rp7Ny0tnRiwRZDt+pEZvfSiuxCIeQQ6/2vi76Jg1iK2ZMO7ZP2wFg5m2t3T+vRIx9WVBr3JVmI4lPuP9FCNTUmxHIzYgozgZM+KdhticW5k3BABY="
+    # GITHUB_ACCESS_TOKEN
+    - secure: "Cuba400Wq7DxPe/1fXWlgI/aS3oXTj64jQJY588dQZ84wLDnTNbdP4SgZMcGJgzVs4f14PTIGTkK5xJ6WjNLIrUVxBhsB5sRRlX/oMkTVo3ALl/+/q6XXzG6JFuzc2lOHAiryuqQ4ndVNbwSmm5u9u/Krgl2lUlrDqKhhq6LdJI="
+    # GITHUB_TOKEN
+    - secure: "lH3uaFqFM+4fXAQiF+cQ6eo89HI4Vc7QuIaVUuA7xcVTkPy52cWg6ivrX1ZIG1HQXo5UOFEJDxPmGyeobF/8BrcgacigvEbiHkVhiXzRnWtpZYEPFac3cUmnKd8VRgYA68gXX3pBuF29v+v91MmznDiuBkfKn8r7z/sTykUdHV4="
+
 
 # this is also the test stage :eyeroll:
 script:
