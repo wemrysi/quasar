@@ -128,7 +128,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
 
   def elideNopQC[F[_]: Functor]: QScriptCore[T[F]] => Option[F[T[F]]] = {
     case Filter(Embed(src), BoolLit(true)) => some(src)
-    case Map(Embed(src), mf) if mf.linearize ≟ HoleF => some(src)
+    case Map(Embed(src), mf) if mf ≟ HoleR => some(src)
     case _                                 => none
   }
 
@@ -160,18 +160,18 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       shiftType: ShiftType,
       onUndefined: OnUndefined,
       repair: JoinFunc,
-      shiftSrc: FreeMap,
+      shiftSrc: RecFreeMap,
       mapFn: FreeMap
     ): BranchUnification[F, JoinSide, A] =
       BranchUnification { jf =>
         (jf >>= {
           case LeftSide => mapFn >> LeftSideF  // references `src`
           case RightSide  => repair >>= {
-            case LeftSide  => shiftSrc >> LeftSideF
+            case LeftSide  => shiftSrc.linearize >> LeftSideF
             case RightSide => RightSideF
           }
         }).some
-      } (func => QC.inj(LeftShift(src, struct >> shiftSrc.asRec, status, shiftType, onUndefined, func)).some)
+      } (func => QC.inj(LeftShift(src, struct >> shiftSrc, status, shiftType, onUndefined, func)).some)
 
     // Unify (LeftShift, Map)
     def unifyMapLeftSideShift(
@@ -180,18 +180,18 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       shiftType: ShiftType,
       onUndefined: OnUndefined,
       repair: JoinFunc,
-      shiftSrc: FreeMap,
+      shiftSrc: RecFreeMap,
       mapFn: FreeMap
     ): BranchUnification[F, JoinSide, A] =
       BranchUnification { jf =>
         (jf >>= {
           case LeftSide  => repair >>= {
-            case LeftSide  => shiftSrc >> LeftSideF
+            case LeftSide  => shiftSrc.linearize >> LeftSideF
             case RightSide => RightSideF
           }
           case RightSide => mapFn >> LeftSideF  // references `src`
         }).some
-      } (func => QC.inj(LeftShift(src, struct >> shiftSrc.asRec, status, shiftType, onUndefined, func)).some)
+      } (func => QC.inj(LeftShift(src, struct >> shiftSrc, status, shiftType, onUndefined, func)).some)
 
     (left.resumeTwice, right.resumeTwice) match {
       // left side is the data while the right side shifts the same data
@@ -199,11 +199,11 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
         case Some(LeftShift(lshiftSrc, struct, status, shiftType, undef, repair)) =>
           lshiftSrc match {
             case \/-(SrcHole) =>
-              unifyMapRightSideShift(struct, status, shiftType, undef, repair, HoleF, HoleF)
+              unifyMapRightSideShift(struct, status, shiftType, undef, repair, HoleR, HoleF)
 
             case -\/(values) => FI.project(values) >>= QC.prj match {
               case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
-                unifyMapRightSideShift(struct, status, shiftType, undef, repair, srcFn.linearize, HoleF)
+                unifyMapRightSideShift(struct, status, shiftType, undef, repair, srcFn, HoleF)
 
               case _ => NoneBranch[F, JoinSide, A]
             }
@@ -216,11 +216,11 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
         case Some(LeftShift(lshiftSrc, struct, status, shiftType, undef, repair)) =>
           lshiftSrc match {
             case \/-(SrcHole) =>
-              unifyMapLeftSideShift(struct, status, shiftType, undef, repair, HoleF, HoleF)
+              unifyMapLeftSideShift(struct, status, shiftType, undef, repair, HoleR, HoleF)
 
             case -\/(values) => FI.project(values) >>= QC.prj match {
               case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
-                unifyMapLeftSideShift(struct, status, shiftType, undef, repair, srcFn.linearize, HoleF)
+                unifyMapLeftSideShift(struct, status, shiftType, undef, repair, srcFn, HoleF)
 
               case _ => NoneBranch[F, JoinSide, A]
             }
@@ -233,11 +233,11 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
         case (Map(\/-(SrcHole), mapFn), LeftShift(lshiftSrc, struct, status, stpe, undef, repair)) =>
           lshiftSrc match {
             case \/-(SrcHole) =>
-              unifyMapRightSideShift(struct, status, stpe, undef, repair, HoleF, mapFn.linearize)
+              unifyMapRightSideShift(struct, status, stpe, undef, repair, HoleR, mapFn.linearize)
 
             case -\/(values) => FI.project(values) >>= QC.prj match {
               case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
-                unifyMapRightSideShift(struct, status, stpe, undef, repair, srcFn.linearize, mapFn.linearize)
+                unifyMapRightSideShift(struct, status, stpe, undef, repair, srcFn, mapFn.linearize)
 
               case _ => NoneBranch[F, JoinSide, A]
             }
@@ -247,11 +247,11 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
         case (LeftShift(lshiftSrc, struct, status, shiftType, undef, repair), Map(\/-(SrcHole), mapFn)) =>
           lshiftSrc match {
             case \/-(SrcHole) =>
-              unifyMapLeftSideShift(struct, status, shiftType, undef, repair, HoleF, mapFn.linearize)
+              unifyMapLeftSideShift(struct, status, shiftType, undef, repair, HoleR, mapFn.linearize)
 
             case -\/(values) => FI.project(values) >>= QC.prj match {
               case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
-                unifyMapLeftSideShift(struct, status, shiftType, undef, repair, srcFn.linearize, mapFn.linearize)
+                unifyMapLeftSideShift(struct, status, shiftType, undef, repair, srcFn, mapFn.linearize)
 
               case _ => NoneBranch[F, JoinSide, A]
             }
@@ -385,15 +385,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       branchSide.remap(func).flatMap(branchSide.combine)
   }
 
-  def unifySimpleBranchesCoEnv[F[_], A]
-    (src: A, l: FreeQS, r: FreeQS, combine: JoinFunc)
-    (rebase: FreeQS => A => Option[A])
-    (implicit
-      QC: QScriptCore :<: F,
-      FI: Injectable.Aux[F, QScriptTotal])
-      : Option[CoEnv[Hole, F, A]] =
-    unifySimpleBranches(src, l, r, combine)(rebase)(QC, FI).map(fa => CoEnv(\/-(fa)))
-
   // FIXME: This really needs to ensure that the condition is that of an
   //        autojoin, otherwise it’ll elide things that are truly meaningful.
   def elideNopJoin[F[_], A]
@@ -408,23 +399,23 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       (QCToF: PrismNT[F, QScriptCore])
       : QScriptCore[T[F]] => Option[F[T[F]]] = {
     case qs @ LeftShift(Embed(src), struct, ExcludeId, shiftType, OnUndefined.Emit, joinFunc) =>
-      (QCToF.get(src), struct.linearize.resume) match {
+      (QCToF.get(src), struct.resume) match {
         // LeftShift(Map(_, MakeArray(_)), Hole, ExcludeId, _)
         case (Some(Map(innerSrc, fm)), \/-(SrcHole)) =>
-          fm.linearize.resume match {
-            case -\/(MFC(MakeArray(value))) =>
-              QCToF(Map(innerSrc, (joinFunc >>= {
-                case LeftSide => fm.linearize
+          fm.resume match {
+            case -\/(Suspend(MFC(MakeArray(value)))) =>
+              QCToF(Map(innerSrc, (joinFunc.asRec >>= {
+                case LeftSide => fm
                 case RightSide => value
-              }).asRec)).some
+              }))).some
             case _ => None
           }
         // LeftShift(_, MakeArray(_), ExcludeId, _)
-        case (_, -\/(MFC(MakeArray(value)))) =>
-          QCToF(Map(src.embed, (joinFunc >>= {
-            case LeftSide => HoleF
+        case (_, -\/(Suspend(MFC(MakeArray(value))))) =>
+          QCToF(Map(src.embed, (joinFunc.asRec >>= {
+            case LeftSide => HoleR
             case RightSide => value
-          }).asRec)).some
+          }))).some
         case (_, _) => None
       }
     case qs => None

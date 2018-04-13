@@ -22,7 +22,6 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.physical.mongodb._
 import quasar.qscript._
-import quasar.qscript.RecFreeS.RecOps
 import quasar.{Qspec, TreeMatchers, Type}
 import slamdata.Predef._
 
@@ -80,15 +79,16 @@ class assumeReadTypeSpec extends Qspec with TTypes[Fix] with TreeMatchers {
   def genNoRewriteSrcFix(maxDepth: Int = MAX_DEPTH): Gen[Fix[fs.MongoQScript[Fix, ?]]] =
     Gen.const(noRewriteSrcFix0)
 
-  def guard(mf: FreeMap) = func.Guard(func.Hole, Type.AnyObject, mf, func.Undefined)
-  val fun = func.ProjectKeyS(func.Hole, "_id")
+  def guard(mf: RecFreeMap) = recFunc.Guard(recFunc.Hole, Type.AnyObject, mf, recFunc.Undefined)
 
-  def assertElide(qs: FreeMap => Fix[fs.MongoQScript[Fix, ?]]) =
+  val fun = recFunc.ProjectKeyS(recFunc.Hole, "_id")
+
+  def assertElide(qs: RecFreeMap => Fix[fs.MongoQScript[Fix, ?]]) =
     assumeReadTp(qs(guard(fun))) must beRight(beTreeEqual(qs(fun)))
-  def assertNoElide(qs: FreeMap => Fix[fs.MongoQScript[Fix, ?]]) =
+  def assertNoElide(qs: RecFreeMap => Fix[fs.MongoQScript[Fix, ?]]) =
     assumeReadTp(qs(guard(fun))) must beRight(beTreeEqual(qs(guard(fun))))
 
-  def elideProps(qs: Fix[fs.MongoQScript[Fix, ?]] => FreeMap => Fix[fs.MongoQScript[Fix, ?]]) = {
+  def elideProps(qs: Fix[fs.MongoQScript[Fix, ?]] => RecFreeMap => Fix[fs.MongoQScript[Fix, ?]]) = {
     "elide" >> Prop.forAll(genRewriteSrcFix()) { src =>
       assertElide(qs(src))
     }
@@ -98,13 +98,13 @@ class assumeReadTypeSpec extends Qspec with TTypes[Fix] with TreeMatchers {
   }
 
   "assumeReadType" >> {
-    "Filter condition" >> elideProps(src => fm => fix.Filter(src, fm))
-    "Leftshift struct" >> elideProps(src => fm => fix.LeftShift(src, fm.asRec, IncludeId, ShiftType.Array, OnUndefined.Omit, func.LeftSide))
-    "Subset from" >> elideProps(src => fm => fix.Subset(src, free.Map(free.Hole, fm.asRec), Take, free.Hole))
-    "Subset count" >> elideProps(src => fm => fix.Subset(src, free.Hole, Take, free.Map(free.Hole, fm.asRec)))
-    "Subset both" >> elideProps(src => fm => fix.Subset(src, free.Map(free.Hole, fm.asRec), Take, free.Map(free.Hole, fm.asRec)))
-    "Union left" >> elideProps(src => fm => fix.Union(src, free.Map(free.Hole, fm.asRec), free.Hole))
-    "Union right" >> elideProps(src => fm => fix.Union(src, free.Hole, free.Map(free.Hole, fm.asRec)))
-    "Union both" >> elideProps(src => fm => fix.Union(src, free.Map(free.Hole, fm.asRec), free.Map(free.Hole, fm.asRec)))
+    "Filter condition" >> elideProps(src => fm => fix.Filter(src, fm.linearize))
+    "Leftshift struct" >> elideProps(src => fm => fix.LeftShift(src, fm, IncludeId, ShiftType.Array, OnUndefined.Omit, func.LeftSide))
+    "Subset from" >> elideProps(src => fm => fix.Subset(src, free.Map(free.Hole, fm), Take, free.Hole))
+    "Subset count" >> elideProps(src => fm => fix.Subset(src, free.Hole, Take, free.Map(free.Hole, fm)))
+    "Subset both" >> elideProps(src => fm => fix.Subset(src, free.Map(free.Hole, fm), Take, free.Map(free.Hole, fm)))
+    "Union left" >> elideProps(src => fm => fix.Union(src, free.Map(free.Hole, fm), free.Hole))
+    "Union right" >> elideProps(src => fm => fix.Union(src, free.Hole, free.Map(free.Hole, fm)))
+    "Union both" >> elideProps(src => fm => fix.Union(src, free.Map(free.Hole, fm), free.Map(free.Hole, fm)))
   }
 }
