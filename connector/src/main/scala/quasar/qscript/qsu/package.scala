@@ -17,7 +17,7 @@
 package quasar.qscript
 
 import slamdata.Predef.{Map => SMap, _}
-import quasar.NameGenerator
+import quasar.effect.NameGenerator
 import quasar.Planner.{InternalError, PlannerErrorME}
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson

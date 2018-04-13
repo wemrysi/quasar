@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.effect
 
 import slamdata.Predef._
 import quasar.fp.ski.κ
-import quasar.effect.MonotonicSeq
 
 import simulacrum.typeclass
 import scalaz._

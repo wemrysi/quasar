@@ -17,7 +17,8 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef.{Map => SMap, _}
-import quasar.{NameGenerator, Planner, RenderTreeT}, Planner.PlannerErrorME
+import quasar.effect.NameGenerator
+import quasar.{Planner, RenderTreeT}, Planner.PlannerErrorME
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.{EJson, Fixed}

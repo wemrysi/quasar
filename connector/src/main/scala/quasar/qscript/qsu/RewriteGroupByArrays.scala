@@ -17,7 +17,7 @@
 package quasar.qscript.qsu
 
 import quasar.ejson
-import quasar.NameGenerator
+import quasar.effect.NameGenerator
 import quasar.qscript.{SrcHole, LeftSide, MapFuncsCore, MFC, RightSide}
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import slamdata.Predef._

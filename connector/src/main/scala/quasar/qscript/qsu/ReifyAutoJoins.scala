@@ -18,7 +18,8 @@ package quasar.qscript.qsu
 
 import slamdata.Predef._
 
-import quasar.{NameGenerator, Planner}, Planner.PlannerErrorME
+import quasar.Planner, Planner.PlannerErrorME
+import quasar.effect.NameGenerator
 import quasar.ejson.implicits._
 import quasar.fp.coproductEqual
 import quasar.qscript.{

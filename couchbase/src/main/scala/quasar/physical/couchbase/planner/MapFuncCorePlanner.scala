@@ -26,7 +26,8 @@ import quasar.DataCodec, DataCodec.PreciseKeys.{
   OffsetDateTimeKey,
   OffsetTimeKey
 }
-import quasar.{Data => QData, Type => QType, NameGenerator}
+import quasar.{Data => QData, Type => QType}
+import quasar.effect.NameGenerator
 import quasar.fp._
 import quasar.physical.couchbase._, N1QL.{Eq, Split, _}, Case._, Select.{Value, _}
 import quasar.Planner.PlannerErrorME

@@ -21,7 +21,6 @@ import quasar.{
   BinaryFunc,
   Data,
   Mapping,
-  NameGenerator,
   NullaryFunc,
   Reduction,
   TernaryFunc,
@@ -30,6 +29,7 @@ import quasar.{
 import quasar.Planner.{NonRepresentableData, PlannerError, PlannerErrorME}
 import quasar.contrib.pathy.mkAbsolute
 import quasar.contrib.scalaz.MonadState_
+import quasar.effect.NameGenerator
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.frontend.{logicalplan => lp}

@@ -17,7 +17,7 @@
 package quasar.physical.couchbase.planner
 
 import slamdata.Predef._
-import quasar.NameGenerator
+import quasar.effect.NameGenerator
 import quasar.Planner.{PlannerErrorME}
 import quasar.common.JoinType
 import quasar.contrib.pathy.AFile

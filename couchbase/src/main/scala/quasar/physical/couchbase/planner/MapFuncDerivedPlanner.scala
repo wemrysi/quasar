@@ -17,7 +17,7 @@
 package quasar.physical.couchbase.planner
 
 import slamdata.Predef._
-import quasar.NameGenerator
+import quasar.effect.NameGenerator
 import quasar.fp.ski._
 import quasar.physical.couchbase._
 import quasar.Planner.PlannerErrorME

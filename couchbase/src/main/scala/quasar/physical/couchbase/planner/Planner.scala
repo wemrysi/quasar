@@ -16,7 +16,7 @@
 
 package quasar.physical.couchbase.planner
 
-import quasar.NameGenerator
+import quasar.effect.NameGenerator
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.physical.couchbase._, common._
 import quasar.Planner.PlannerErrorME

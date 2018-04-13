@@ -17,7 +17,7 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef.{Map => SMap, _}
-import quasar.NameGenerator
+import quasar.effect.NameGenerator
 import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.MonadState_
 import quasar.fp._

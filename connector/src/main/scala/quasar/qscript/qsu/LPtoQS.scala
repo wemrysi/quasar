@@ -17,8 +17,9 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef._
-import quasar.{NameGenerator, RenderTreeT}
+import quasar.RenderTreeT
 import quasar.Planner.PlannerErrorME
+import quasar.effect.NameGenerator
 import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka.{delayShow, showTShow, BirecursiveT, EqualT, ShowT}

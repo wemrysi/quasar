@@ -17,8 +17,9 @@
 package quasar.qscript.qsu
 package minimizers
 
-import quasar.{NameGenerator, Planner}, Planner.PlannerErrorME
+import quasar.Planner, Planner.PlannerErrorME
 import quasar.contrib.matryoshka._
+import quasar.effect.NameGenerator
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski.κ
