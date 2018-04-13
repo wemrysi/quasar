@@ -19,6 +19,7 @@ package quasar.qscript
 import slamdata.Predef._
 
 import quasar.RenderTree
+import quasar.fp.ski.κ
 
 import matryoshka._
 import matryoshka.data._
@@ -43,18 +44,21 @@ object RecFreeS {
   final case class Fix[F[_], A](form: RecFreeS[F, A], rec: Free[RecFreeS[F, ?], Hole]) extends RecFreeS[F, A]
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def recInterpretM[M[_]: Monad, F[_]: Traverse, A](fm: RecFreeS[F, A])(susint: AlgebraM[M, F, A], fixint: A => M[(A, A => M[A])]): M[A] =
-    fm match {
+  def recInterpretM[M[_]: Monad, F[_]: Traverse, A](susint: AlgebraM[M, F, A], fixint: A => M[(A, A => M[A])]): AlgebraM[M, RecFreeS[F, ?], A] =
+    fm => fm match {
       case Suspend(fa) => susint(fa)
       case Fix(form, rec) =>
-        recInterpretM(form)(susint, fixint) >>= (fixint(_)) >>= {
+        recInterpretM(susint, fixint).apply(form) >>= (fixint(_)) >>= {
           case (hole, cont) =>
-            rec.cataM[M, A](interpretM(_ => hole.point[M], recInterpretM(_)(susint, fixint))) >>= (cont(_))
+            rec.cataM[M, A](
+              interpretM(
+                κ(hole.point[M]),
+                recInterpretM(susint, fixint).apply(_))) >>= (cont(_))
         }
     }
 
-  def recInterpret[F[_]: Traverse, A](fm: RecFreeS[F, A])(susint: Algebra[F, A], fixint: A => (A, A => A)): A =
-    recInterpretM[Id, F, A](fm)(susint, fixint)
+  def recInterpret[F[_]: Traverse, A](susint: Algebra[F, A], fixint: A => (A, A => A)): Algebra[RecFreeS[F, ?], A] =
+    fm => recInterpretM[Id, F, A](susint, fixint).apply(fm)
 
   def fromFree[F[_], A](f: Free[F, A]): Free[RecFreeS[F, ?], A] =
     f.mapSuspension(λ[F ~> RecFreeS[F, ?]](Suspend(_)))
@@ -87,7 +91,7 @@ object RecFreeS {
   }
 
   // FIXME: Display the bound form and body separately
-  implicit def renderTree[F[_], A](FR: RenderTree[Free[F, A]]): RenderTree[Free[RecFreeS[F, ?], A]] =
+  implicit def renderTree[F[_], A](implicit FR: RenderTree[Free[F, A]]): RenderTree[Free[RecFreeS[F, ?], A]] =
     RenderTree.make(rf => FR.render(rf.linearize))
 
   implicit def show[F[_], A](implicit SF: Show[Free[F, A]]): Show[Free[RecFreeS[F, ?], A]] =
