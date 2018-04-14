@@ -18,7 +18,7 @@ package quasar.qscript
 
 import slamdata.Predef._
 
-import quasar.RenderTree
+import quasar.{RenderTree, NonTerminal}
 import quasar.fp.ski.κ
 
 import matryoshka._
@@ -90,9 +90,19 @@ object RecFreeS {
     }
   }
 
-  // FIXME: Display the bound form and body separately
-  implicit def renderTree[F[_], A](implicit FR: RenderTree[Free[F, A]]): RenderTree[Free[RecFreeS[F, ?], A]] =
-    RenderTree.make(rf => FR.render(rf.linearize))
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  implicit def recRenderTree[F[_]: Traverse](implicit FR: Delay[RenderTree, F]): Delay[RenderTree, RecFreeS[F, ?]] =
+    Delay.fromNT(λ[RenderTree ~> (RenderTree ∘ RecFreeS[F, ?])#λ](rt =>
+      RenderTree.make {
+        case Suspend(fa) => FR.apply(rt).render(fa)
+        case Fix(form, body) =>
+          NonTerminal(
+            List("Let"),
+            none,
+            List(
+              recRenderTree[F].apply(rt).render(form),
+              RenderTree.free[RecFreeS[F, ?]].apply(RenderTree[Hole]).render(body)))
+      }))
 
   implicit def show[F[_], A](implicit SF: Show[Free[F, A]]): Show[Free[RecFreeS[F, ?], A]] =
     Show.show(_.linearize.show)
