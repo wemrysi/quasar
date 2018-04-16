@@ -27,8 +27,8 @@ import quasar.physical.mongodb.{BsonField, BsonVersion}
 import quasar.physical.mongodb.WorkflowBuilder, WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.common._
-import quasar.physical.mongodb.planner.exprHelpers._
-import quasar.physical.mongodb.planner.jsHelpers._
+import quasar.physical.mongodb.planner.exprOp._
+import quasar.physical.mongodb.planner.javascript._
 import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
 import quasar.qscript._
 
@@ -38,7 +38,7 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 
-object helpers {
+object workflow {
   def getStructBuilder
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_]: WorkflowBuilder.Ops[?[_]], EX[_]: Traverse]
     (handler: FreeMap[T] => M[Expr], v: BsonVersion)

@@ -31,9 +31,9 @@ import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.{selector => sel}
 import quasar.physical.mongodb.planner.common._
-import quasar.physical.mongodb.planner.exprHelpers._
-import quasar.physical.mongodb.planner.helpers._
-import quasar.physical.mongodb.planner.jsHelpers._
+import quasar.physical.mongodb.planner.exprOp._
+import quasar.physical.mongodb.planner.workflow._
+import quasar.physical.mongodb.planner.javascript._
 import quasar.physical.mongodb.planner.selector._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
@@ -143,12 +143,12 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT] extends
                 b.zipWithIndex.map(p => docVarToExpr(DocField(BsonField.Name(createFieldName("b", p._2))))),
                 red.zipWithIndex.map(ai =>
                   (BsonField.Name(createFieldName("f", ai._2)),
-                    exprHelpers.accumulator(ai._1.as($field(createFieldName("f", ai._2)))))).toListMap))(
+                    exprOp.accumulator(ai._1.as($field(createFieldName("f", ai._2)))))).toListMap))(
               exprs => WB.groupBy(src,
                 b,
                 exprs.zipWithIndex.map(ai =>
                   (BsonField.Name(createFieldName("f", ai._2)),
-                    exprHelpers.accumulator(ai._1))).toListMap)),
+                    exprOp.accumulator(ai._1))).toListMap)),
               repair)
         }).join
     case Sort(src, bucket, order) =>

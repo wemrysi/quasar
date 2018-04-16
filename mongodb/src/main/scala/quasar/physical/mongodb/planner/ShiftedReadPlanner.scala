@@ -24,7 +24,7 @@ import quasar.physical.mongodb._
 import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.common._
-import quasar.physical.mongodb.planner.helpers._
+import quasar.physical.mongodb.planner.workflow._
 import quasar.physical.mongodb.workflow.{ExcludeId => _, IncludeId => _, _}
 import quasar.qscript._
 
