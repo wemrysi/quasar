@@ -17,13 +17,13 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef.{Map => _, _}
-import quasar._, Planner._, Type.{Const => _, _}
+import quasar._, Type.{Const => _, _}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.{FileSystemError, MonadFsErr}, FileSystemError.qscriptPlanningFailed
+import quasar.fs.MonadFsErr
 import quasar.physical.mongodb.planner.common._
 import quasar.qscript._
 import quasar.qscript.analysis.ShapePreserving
@@ -79,7 +79,7 @@ object assumeReadType {
       else {
         val union = subType ⨯ typ
         if (union ≟ Type.Bottom)
-          raiseErr(qscriptPlanningFailed(InternalError.fromMsg(s"can only contain ${subType.shows}, but ${typ.shows} is expected")))
+          raiseInternalError(s"can only contain ${subType.shows}, but ${typ.shows} is expected")
         else
           CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]](u(union).right).point[M]
       }
