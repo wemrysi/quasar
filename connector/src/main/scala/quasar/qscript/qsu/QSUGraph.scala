@@ -530,7 +530,7 @@ object QSUGraph extends QSUGraphInstances {
     }
 
     object QSFilter {
-      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
+      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], RecFreeMap[T])] = g.unfold match {
         case g: QSU.QSFilter[T, QSUGraph[T]] => QSU.QSFilter.unapply(g)
         case _ => None
       }

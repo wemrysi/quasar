@@ -254,7 +254,7 @@ object QScriptCore {
               case LeftShift(src, struct, id, stpe, undef, repair) =>
                 NonTerminal("LeftShift" :: nt, None,
                   RA.render(src) ::
-                    nested("Struct", struct.linearize) ::
+                    nested("Struct", struct) ::
                     nested("IdStatus", id) ::
                     nested("ShiftType", stpe) ::
                     nested("OnUndefined", undef) ::
@@ -281,7 +281,7 @@ object QScriptCore {
               case Filter(src, func) =>
                 NonTerminal("Filter" :: nt, None, List(
                   RA.render(src),
-                  func.linearize.render))
+                  func.render))
               case Subset(src, from, sel, count) =>
                 NonTerminal("Subset" :: nt, sel.shows.some, List(
                   RA.render(src),
