@@ -17,6 +17,7 @@
 package quasar
 
 import quasar.effect.Failure
+import quasar.fs.EnvironmentError
 
 import scalaz._
 

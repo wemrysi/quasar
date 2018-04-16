@@ -17,7 +17,7 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar.connector.{EnvironmentError, EnvErrT}
+import quasar.connector.EnvErrT
 import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.kleisli._
 import quasar.effect.{NameGenerator => QNameGenerator}

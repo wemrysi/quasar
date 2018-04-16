@@ -18,7 +18,6 @@ package quasar.fs.mount
 
 import slamdata.Predef._
 import quasar.QuasarSpecification
-import quasar.connector.EnvironmentError
 import quasar.fp.ski.κ
 import quasar.fs._
 

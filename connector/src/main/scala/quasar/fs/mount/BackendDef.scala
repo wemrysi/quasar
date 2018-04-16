@@ -17,9 +17,8 @@
 package quasar.fs.mount
 
 import slamdata.Predef._
-import quasar.connector.EnvironmentError
 import quasar.fp.ski.κ
-import quasar.fs.{BackendEffect, FileSystemType}
+import quasar.fs.{BackendEffect, EnvironmentError, FileSystemType}
 
 import scala.StringContext
 

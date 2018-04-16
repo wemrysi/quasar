@@ -18,7 +18,6 @@ package quasar.physical.marklogic
 
 import slamdata.Predef.{uuid => _, _}
 import quasar.{Data, Planner => QPlanner}
-import quasar.connector.EnvironmentError
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._

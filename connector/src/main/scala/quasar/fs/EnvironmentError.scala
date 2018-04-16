@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.fs
 
 import slamdata.Predef._
 

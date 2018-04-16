@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.fs
 
 import org.specs2.scalaz.Spec
 import scalaz.scalacheck.ScalazProperties
