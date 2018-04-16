@@ -101,7 +101,7 @@ abstract class FileSystemTest[S[_]](
     * superset of the key -> value associations.
     *
     * This exists to allow data stores having synthetic primary keys
-    * (MongoDB, RDBMS, etc.) to still pass the tests even though
+    * (MongoDB, etc.) to still pass the tests even though
     * their results may contain extra identity keys.
     */
   def subsume(superType: Data): Matcher[Data] =
