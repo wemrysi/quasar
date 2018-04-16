@@ -85,6 +85,8 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
         Data.Str(time.toString)
       case Data.LocalDateTime(time) =>
         Data.OffsetDateTime(JOffsetDateTime.of(
+          // NB withNano(scala.math.round(...)) fails for a corner case:
+          // Invalid value for NanoOfSecond (valid values 0 - 999999999): 1000000000
           time.truncatedTo(ChronoUnit.SECONDS)
             .plusNanos(scala.math.round(time.getNano.toDouble / 1000000).toLong * 1000000), // round to millis
           ZoneOffset.UTC))
