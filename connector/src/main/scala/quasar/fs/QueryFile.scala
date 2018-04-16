@@ -19,7 +19,6 @@ package quasar.fs
 import slamdata.Predef._
 import quasar._, RenderTree.ops._, RenderTreeT.ops._
 import quasar.common.{PhaseResults, PhaseResultT, PhaseResultW}
-import quasar.connector.CompileM
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._

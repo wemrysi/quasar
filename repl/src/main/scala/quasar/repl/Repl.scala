@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.{Data, DataCodec, Variables, resolveImports, queryPlan}
 import quasar.Planner.PlannerError
 import quasar.common.{PhaseResult, PhaseResults}
-import quasar.connector.CompileM
+import quasar.fs.CompileM
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.csv.CsvWriter
