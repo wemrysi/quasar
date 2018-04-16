@@ -351,7 +351,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
         case LeftShift(Embed(src), struct, id, stpe, undef, shiftRepair) =>
           FToOut.get(src) >>= QC.prj >>= {
             case LeftShift(innerSrc, innerStruct, innerId, innerStpe, innerUndef, innerRepair)
-                if !shiftRepair.element(LeftSide) && !fmIsCondUndef(shiftRepair) && struct.linearize ≠ HoleF =>
+                if !shiftRepair.element(LeftSide) && !fmIsCondUndef(shiftRepair) && struct ≠ HoleR =>
               LeftShift(
                 FToOut.reverseGet(QC.inj(LeftShift(
                   innerSrc,
@@ -360,7 +360,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
                   innerStpe,
                   innerUndef,
                   struct.linearize >> innerRepair))).embed,
-                RecFreeS.fromFree[MapFunc, Hole](HoleF),
+                HoleR,
                 id,
                 stpe,
                 OnUndefined.omit,
@@ -442,9 +442,10 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
               (FToOut.get(innerSrc) >>= SR.prj) match {
                 case Some(sr) =>
                   Map(
-                    FToOut.reverseGet(QC.inj(Filter(
-                      FToOut.reverseGet(SR.inj(sr)).embed,
-                      mf >> innermf))).embed,
+                    FToOut.reverseGet(QC.inj(
+                      Filter(
+                        FToOut.reverseGet(SR.inj(sr)).embed,
+                        mf >> innermf))).embed,
                     innermf).some
                 case _ => None
               }

@@ -174,18 +174,15 @@ class PlannerSql2ExactSpec extends
             recFunc.Guard(
               recFunc.Hole,
               Type.Obj(Map(), Some(Type.Top)),
-              recFunc.ProjectKey(
-                recFunc.Hole,
-                recFunc.Constant(json.str("measureEnrollments"))),
+              recFunc.ProjectKeyS(recFunc.Hole, "measureEnrollments"),
               recFunc.Undefined),
             Type.FlexArr(0, None, Type.Obj(Map(), Some(Type.Top))),
-            recFunc.ProjectKey(recFunc.Hole, recFunc.Constant(json.str("measureEnrollments"))),
+            recFunc.ProjectKeyS(recFunc.Hole, "measureEnrollments"),
             recFunc.Undefined),
           qscript.ExcludeId,
           ShiftType.Array,
           OnUndefined.Omit,
-          func.ProjectKey(
-            func.RightSide, func.Constant(json.str("measureKey"))))).some,
+          func.ProjectKeyS(func.RightSide, "measureKey"))).some,
       chain[Workflow](
         $read(collection("db", "zips")),
         $match(Selector.And(
@@ -1898,6 +1895,31 @@ class PlannerSql2ExactSpec extends
               "1" -> $include()),
             ExcludeId))
       }
+    }
+
+    val selectTrunc = chain[Workflow](
+      $read(collection("db", "divide")),
+      $project(
+        reshape(sigil.Quasar ->
+           $cond(
+             $and(
+               $lt($literal(Bson.Null), $field("val3")),
+               $lt($field("val3"), $literal(Bson.Text("")))),
+             $trunc($field("val3")),
+             $literal(Bson.Undefined))),
+        ExcludeId))
+
+    "plan simple derived mapfunc" in {
+      plan3_2(sqlE"select trunc(val3) from divide") must beWorkflow(selectTrunc)
+    }
+
+    "plan simple derived mapfunc - fallback" in {
+      plan(sqlE"select trunc(val3) from divide") must beWorkflow(selectTrunc)
+    }
+
+    "plan derived mapfunc" in {
+      plan3_2(sqlE"select ceil_scale(val3,1) from divide") must_===(
+        plan(sqlE"select ceil_scale(val3,1) from divide"))
     }
 
     def simpleJoinMapReduce(coll1: Collection, coll2: Collection) =
