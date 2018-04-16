@@ -3,7 +3,6 @@
 
   "backends": {
     "marklogic_json": "ignoreFieldOrder",
-    "postgres": "pending",
     "mimir": "skip"
   },
   "data": "../dates.data",

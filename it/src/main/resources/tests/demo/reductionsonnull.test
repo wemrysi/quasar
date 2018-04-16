@@ -9,8 +9,7 @@
     "mongodb_3_4":       "pending",
     "mongodb_3_4_13":    "pending",
     "mongodb_3_6":       "pending",
-    "mongodb_read_only": "pending",
-    "postgres":          "pending"
+    "mongodb_read_only": "pending"
   },
   "query": "SELECT age AS dimension, SUM(height) AS measure1, null AS size, null AS measure2, null AS series FROM patients WHERE true GROUP BY null, age ORDER BY null ASC, age ASC",
   "predicate": "exactly",

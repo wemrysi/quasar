@@ -1,8 +1,7 @@
 {
     "name":  "shift map keys - wildcard",
     "backends": {
-        "marklogic_xml": "pending",
-        "postgres":      "pending"
+        "marklogic_xml": "pending"
     },
     "data": "zips.data",
     "query": "select *{_:} from zips",
