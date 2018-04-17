@@ -43,6 +43,7 @@ import java.time.{
   Period,
   ZoneOffset
 }
+import java.time.temporal.ChronoUnit
 import scala.collection.Traversable
 import scala.math.abs
 import scala.util.matching.Regex
@@ -1531,8 +1532,21 @@ abstract class StdLibSpec extends Qspec {
         }
       }
 
-      "LocalDateTime" >> prop { (v: JLocalDateTime) =>
-        unary(LocalDateTime(_).embed, Data.Str(v.toString), Data.LocalDateTime(v))
+      "LocalDateTime" >> {
+        def test(x: JLocalDateTime) = unary(
+          LocalDateTime(_).embed,
+          Data.Str(x.toString),
+          Data.LocalDateTime(x))
+
+        "precision minutes" >> prop { (v: JLocalDateTime) => test(v.truncatedTo(ChronoUnit.MINUTES)) }
+
+        "precision seconds" >> prop { (v: JLocalDateTime) => test(v.truncatedTo(ChronoUnit.SECONDS)) }
+
+        "precision millis" >> prop { (v: JLocalDateTime) => test(v.truncatedTo(ChronoUnit.MILLIS)) }
+
+        "precision micros" >> prop { (v: JLocalDateTime) => test(v.truncatedTo(ChronoUnit.MICROS)) }
+
+        "full precision" >> prop (test(_: JLocalDateTime))
       }
 
       "LocalTime" >> {

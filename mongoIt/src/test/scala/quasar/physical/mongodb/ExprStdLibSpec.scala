@@ -29,7 +29,9 @@ import quasar.qscript.rewrites.{Coalesce => _}
 import quasar.std.StdLib._
 import quasar.time.TemporalPart
 
-import java.time.Instant
+import java.time.{Instant, LocalDateTime => JLocalDateTime}
+import java.time.temporal.ChronoUnit
+
 import matryoshka._
 import matryoshka.data.Fix
 import org.specs2.execute._
@@ -87,7 +89,11 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
     case (date.LocalDate, _) if advertisedVersion(backend) lt `3.6`.some =>
       notImplBefore(`3.6`).left
-    case (date.LocalDateTime, _) => notHandled.left
+    case (date.LocalDateTime, _) if advertisedVersion(backend) lt `3.6`.some =>
+      notImplBefore(`3.6`).left
+    case (date.LocalDateTime, List(Data.Str(s)))
+      if JLocalDateTime.parse(s) != JLocalDateTime.parse(s).truncatedTo(ChronoUnit.MILLIS) =>
+        Pending("LocalDateTime(s) does not support precision beyond millis in MongoDb 3.6").left
     case (date.LocalTime, _) => notHandled.left
 
     case (date.Interval, _) => notHandled.left

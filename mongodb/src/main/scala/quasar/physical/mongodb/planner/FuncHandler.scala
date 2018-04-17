@@ -364,6 +364,7 @@ object FuncHandler {
           case ExtractWeek(a1) =>
             extractDateFieldIso(a1, BsonField.Name("isoWeek")).point[M]
           case LocalDate(a1) => $dateFromString(a1, None).point[M]
+          case LocalDateTime(a1) => $dateFromString(a1, None).point[M]
         }
       }
     }
