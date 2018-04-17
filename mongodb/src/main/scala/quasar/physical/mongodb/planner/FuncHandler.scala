@@ -353,15 +353,19 @@ object FuncHandler {
 
         val check = new Check[Fix[EX], EX]
 
+        def extractDateFieldIso(date: Fix[EX], fieldName: BsonField.Name): Fix[EX] =
+          $let(
+            ListMap(DocVar.Name("parts") -> $dateToParts(date, $literal(Bson.Text("+00:00")), true)),
+            $var(DocVar.ROOT(BsonField.Name("$parts")) \ fieldName))
+
+
         mfc.some collect {
+          case ExtractIsoDayOfWeek(a1) =>
+            extractDateFieldIso(a1, BsonField.Name("isoDayOfWeek")).point[M]
           case ExtractIsoYear(a1) =>
-            $let(
-              ListMap(DocVar.Name("parts") -> $dateToParts(a1, $literal(Bson.Text("+00:00")), true)),
-              $var(DocVar.ROOT(BsonField.Name("$parts")) \ BsonField.Name("isoWeekYear"))).point[M]
+            extractDateFieldIso(a1, BsonField.Name("isoWeekYear")).point[M]
           case ExtractWeek(a1) =>
-            $let(
-              ListMap(DocVar.Name("parts") -> $dateToParts(a1, $literal(Bson.Text("+00:00")), true)),
-              $var(DocVar.ROOT(BsonField.Name("$parts")) \ BsonField.Name("isoWeek"))).point[M]
+            extractDateFieldIso(a1, BsonField.Name("isoWeek")).point[M]
         }
       }
 
