@@ -266,7 +266,7 @@ lazy val root = project.in(file("."))
 //   |     /   |    \    |
         datagen,      blueeyes,
 //   |         |         |
-                      niflheim,
+              fs,     niflheim,
 //   |         |         |
     sql, connector,   yggdrasil,
 //   |   /  | | \ \______|________________________
@@ -360,7 +360,11 @@ lazy val common = project
   */
 lazy val core = project
   .settings(name := "quasar-core-internal")
-  .dependsOn(frontend % BothScopes, connector % BothScopes, sql)
+  .dependsOn(
+    frontend  % BothScopes,
+    fs        % "test->test",
+    connector % BothScopes,
+    sql)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -413,12 +417,24 @@ lazy val sql = project
 
 /** Types and operations needed by connector implementations.
   */
+lazy val fs = project
+  .settings(name := "quasar-fs-internal")
+  .dependsOn(
+    common,
+    effect,
+    frontend % BothScopes)
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
     common   % BothScopes,
     effect   % BothScopes,
     frontend % BothScopes,
+    fs,
     sql      % "test->test")
   .settings(commonSettings)
   .settings(publishTestsSettings)
@@ -461,6 +477,7 @@ lazy val marklogic = project
 lazy val mongodb = project
   .settings(name := "quasar-mongodb-internal")
   .dependsOn(
+    fs        % "test->test",
     connector % BothScopes,
     js        % BothScopes,
     core      % "test->compile")
