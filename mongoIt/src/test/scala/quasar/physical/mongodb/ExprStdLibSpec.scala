@@ -40,6 +40,8 @@ import shapeless.Nat
   * pipeline (aka ExprOp).
   */
 class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
+  import MongoQueryModel._
+
   val notHandled = Skipped("Not implemented in aggregation.")
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
@@ -112,7 +114,8 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (quasar.std.SetLib.Within, _) => notHandled.left
 
     /* STRING */
-    case (string.Length, _) if !is3_4(backend) => Skipped("not implemented in aggregation on MongoDB < 3.4").left
+    case (string.Length, _) if advertisedVersion(backend) === `3.2`.some =>
+      Skipped("not implemented in aggregation on MongoDB < 3.4").left
     case (string.Integer, _) => notHandled.left
     case (string.Decimal, _) => notHandled.left
 
@@ -120,9 +123,11 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
       Pending("Works but isn't formatted as expected.").left
 
     case (string.Search, _) => notHandled.left
-    case (string.Split, _) if (!is3_4(backend)) => Skipped("not implemented in aggregation on MongoDB < 3.4").left
-    case (string.Substring, List(Data.Str(s), _, _)) if (!is3_4(backend) && !isPrintableAscii(s)) =>
-      Skipped("only printable ascii supported on MongoDB < 3.4").left
+    case (string.Split, _) if advertisedVersion(backend) === `3.2`.some =>
+      Skipped("not implemented in aggregation on MongoDB < 3.4").left
+    case (string.Substring, List(Data.Str(s), _, _)) if
+      ((advertisedVersion(backend) === `3.2`.some) && !isPrintableAscii(s)) =>
+        Skipped("only printable ascii supported on MongoDB < 3.4").left
 
     /* STRUCTURAL */
     case (structural.ConcatOp, _) => notHandled.left

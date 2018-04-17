@@ -66,11 +66,13 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
   def compile(queryModel: MongoQueryModel, coll: Collection, lp: FreeMap[Fix])
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name)
 
-  def is3_2(backend: BackendName): Boolean = backend ≟ TestConfig.MONGO_3_2.name
-  def is3_4(backend: BackendName): Boolean =
-    (backend ≟ TestConfig.MONGO_3_4.name) || (backend ≟ TestConfig.MONGO_READ_ONLY.name)
-  def is3_4_13(backend: BackendName): Boolean = backend ≟ TestConfig.MONGO_3_4_13.name
-  def is3_6(backend: BackendName): Boolean = backend ≟ TestConfig.MONGO_3_6.name
+  def advertisedVersion(backend: BackendName): Option[MongoQueryModel] =
+    if (backend ≟ TestConfig.MONGO_3_2.name) MongoQueryModel.`3.2`.some
+    else if ((backend ≟ TestConfig.MONGO_3_4.name) || (backend ≟ TestConfig.MONGO_READ_ONLY.name))
+      MongoQueryModel.`3.4`.some
+    else if (backend ≟ TestConfig.MONGO_3_4_13.name) MongoQueryModel.`3.4.4`.some
+    else if (backend ≟ TestConfig.MONGO_3_6.name) MongoQueryModel.`3.6`.some
+    else None
 
   MongoDbSpec.clientShould(MongoDb.Type) { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._
@@ -207,5 +209,12 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
     }
 
     backend.name should tests(runner)
+
+    s"advertised version of ${backend.name}" should {
+      "match with real version" in {
+        advertisedVersion(BackendName(backend.name)) must_===
+          MongoDbIO.serverVersion.run(testClient).map(MongoQueryModel(_).some).unsafePerformSync
+      }
+    }
   }
 }
