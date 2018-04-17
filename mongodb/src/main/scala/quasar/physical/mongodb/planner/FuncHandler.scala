@@ -353,9 +353,8 @@ object FuncHandler {
 
         def extractDateFieldIso(date: Fix[EX], fieldName: BsonField.Name): Fix[EX] =
           $let(
-            ListMap(DocVar.Name("parts") -> $dateToParts(date, $literal(Bson.Text("+00:00")), true)),
+            ListMap(DocVar.Name("parts") -> $dateToParts(date, None, true.some)),
             $var(DocVar.ROOT(BsonField.Name("$parts")) \ fieldName))
-
 
         mfc.some collect {
           case ExtractIsoDayOfWeek(a1) =>
@@ -364,7 +363,7 @@ object FuncHandler {
             extractDateFieldIso(a1, BsonField.Name("isoWeekYear")).point[M]
           case ExtractWeek(a1) =>
             extractDateFieldIso(a1, BsonField.Name("isoWeek")).point[M]
-          case LocalDate(a1) => $dateFromString(a1, $literal(Bson.Text("+00:00"))).point[M]
+          case LocalDate(a1) => $dateFromString(a1, None).point[M]
         }
       }
     }

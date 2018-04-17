@@ -31,18 +31,28 @@ trait ExprOp3_6F[A]
 object ExprOp3_6F {
 
   final case class $mergeObjectsF[A](docs: List[A]) extends ExprOp3_6F[A]
-  final case class $dateFromStringF[A](string: A, timezone: A) extends ExprOp3_6F[A]
+  final case class $dateFromStringF[A](string: A, timezone: Option[A]) extends ExprOp3_6F[A]
   final case class $dateFromPartsF[A](
     year: A,
-    month: A,
-    day: A,
-    hour: A,
-    minute: A,
-    second: A,
-    milliseconds: A,
-    timezone: A
+    month: Option[A],
+    day: Option[A],
+    hour: Option[A],
+    minute: Option[A],
+    second: Option[A],
+    millisecond: Option[A],
+    timezone: Option[A]
   ) extends ExprOp3_6F[A]
-  final case class $dateToPartsF[A](date: A, timezone: A, iso8601: Boolean) extends ExprOp3_6F[A]
+  final case class $dateFromPartsIsoF[A](
+    isoWeekYear: A,
+    isoWeek: Option[A],
+    isoDayOfWeek: Option[A],
+    hour: Option[A],
+    minute: Option[A],
+    second: Option[A],
+    millisecond: Option[A],
+    timezone: Option[A]
+  ) extends ExprOp3_6F[A]
+  final case class $dateToPartsF[A](date: A, timezone: Option[A], iso8601: Option[Boolean]) extends ExprOp3_6F[A]
 
   implicit val equal: Delay[Equal, ExprOp3_6F] =
     new Delay[Equal, ExprOp3_6F] {
@@ -53,6 +63,8 @@ object ExprOp3_6F {
           case ($dateFromStringF(s1, t1), $dateFromStringF(s2, t2)) => s1 ≟ s2 && t1 ≟ t2
           case ($dateFromPartsF(y1, m1, d1, h1, mi1, s1, ms1, t1), $dateFromPartsF(y2, m2, d2, h2, mi2, s2, ms2, t2)) =>
             y1 ≟ y2 && m1 ≟ m2 && d1 ≟ d2 && h1 ≟ h2 && mi1 ≟ mi2 && s1 ≟ s2 && ms1 ≟ ms2 && t1 ≟ t2
+          case ($dateFromPartsIsoF(y1, w1, d1, h1, mi1, s1, ms1, t1), $dateFromPartsIsoF(y2, w2, d2, h2, mi2, s2, ms2, t2)) =>
+            y1 ≟ y2 && w1 ≟ w2 && d1 ≟ d2 && h1 ≟ h2 && mi1 ≟ mi2 && s1 ≟ s2 && ms1 ≟ ms2 && t1 ≟ t2
           case ($dateToPartsF(d1, t1, i1), $dateToPartsF(d2, t2, i2)) =>
             d1 ≟ d2 && t1 ≟ t2 && i1 ≟ i2
           case _ => false
@@ -65,10 +77,18 @@ object ExprOp3_6F {
         G[ExprOp3_6F[B]] =
       fa match {
         case $mergeObjectsF(d) => G.map(d.traverse(f))($mergeObjectsF(_))
-        case $dateFromStringF(s, t) => (f(s) |@| f(t))($dateFromStringF(_, _))
+        case $dateFromStringF(s, t) => (f(s) |@| Traverse[Option].traverse(t)(f))($dateFromStringF(_, _))
         case $dateFromPartsF(y, m, d, h, mi, s, ms, t) =>
-          (f(y) |@| f(m) |@| f(d) |@| f(h) |@| f(mi) |@| f(s) |@| f(ms) |@| f(t))($dateFromPartsF(_, _, _, _, _, _, _, _))
-        case $dateToPartsF(d, t, i) => (f(d) |@| f(t))($dateToPartsF(_, _, i))
+          (f(y) |@| Traverse[Option].traverse(m)(f) |@| Traverse[Option].traverse(d)(f) |@|
+           Traverse[Option].traverse(h)(f) |@| Traverse[Option].traverse(mi)(f) |@|
+           Traverse[Option].traverse(s)(f) |@| Traverse[Option].traverse(ms)(f) |@|
+           Traverse[Option].traverse(t)(f))($dateFromPartsF(_, _, _, _, _, _, _, _))
+        case $dateFromPartsIsoF(y, w, d, h, mi, s, ms, t) =>
+          (f(y) |@| Traverse[Option].traverse(w)(f) |@| Traverse[Option].traverse(d)(f) |@|
+           Traverse[Option].traverse(h)(f) |@| Traverse[Option].traverse(mi)(f) |@|
+           Traverse[Option].traverse(s)(f) |@| Traverse[Option].traverse(ms)(f) |@|
+           Traverse[Option].traverse(t)(f))($dateFromPartsIsoF(_, _, _, _, _, _, _, _))
+        case $dateToPartsF(d, t, i) => (f(d) |@| Traverse[Option].traverse(t)(f))($dateToPartsF(_, _, i))
       }
   }
 
@@ -83,23 +103,33 @@ object ExprOp3_6F {
         case $mergeObjectsF(d) => Bson.Doc("$mergeObjects" -> Bson.Arr(d: _*))
         case $dateFromStringF(s, t) =>
           Bson.Doc("$dateFromString" -> Bson.Doc(
-            "dateString" -> s,
-            "timezone" -> t))
+            ListMap("dateString" -> s) ++
+              (t.map(tz => ListMap("timezone" -> tz)).getOrElse(ListMap()))))
         case $dateFromPartsF(y, m, d, h, mi, s, ms, t) =>
-          Bson.Doc("$dateFromPartsF" -> Bson.Doc(
-            "year" -> y,
+          Bson.Doc("$dateFromParts" -> Bson.Doc.opt(ListMap(
+            "year" -> y.some,
             "month" -> m,
             "day" -> d,
             "hour" -> h,
             "minute" -> mi,
             "second" -> s,
-            "milliseconds" -> ms,
-            "timezone" -> t))
+            "millisecond" -> ms,
+            "timezone" -> t)))
+        case $dateFromPartsIsoF(y, w, d, h, mi, s, ms, t) =>
+          Bson.Doc("$dateFromParts" -> Bson.Doc.opt(ListMap(
+            "isoWeekYear" -> y.some,
+            "isoWeek" -> w,
+            "isoDayOfWeek" -> d,
+            "hour" -> h,
+            "minute" -> mi,
+            "second" -> s,
+            "millisecond" -> ms,
+            "timezone" -> t)))
         case $dateToPartsF(d, t, i) =>
-          Bson.Doc("$dateToParts" -> Bson.Doc(
-            "date" -> d,
+          Bson.Doc("$dateToParts" -> Bson.Doc.opt(ListMap(
+            "date" -> d.some,
             "timezone" -> t,
-            "iso8601" -> Bson.Bool(i)))
+            "iso8601" -> i.map(b => Bson.Bool(b)))))
       }
 
       def rebase[T](base: T)(implicit T: Recursive.Aux[T, OUT]) = I(_).some
@@ -113,10 +143,15 @@ object ExprOp3_6F {
     @inline private def convert(expr: ExprOp3_6F[T]): T = embed(I.inj(expr))
 
     def $mergeObjects(docs: List[T]): T = convert($mergeObjectsF(docs))
-    def $dateFromString(s: T, tz: T): T = convert($dateFromStringF(s, tz))
-    def $dateFromParts(y: T, m: T, d: T, h: T, mi: T, s: T, ms: T, tz: T): T =
+    def $dateFromString(s: T, tz: Option[T]): T = convert($dateFromStringF(s, tz))
+    def $dateFromParts(y: T, m: Option[T], d: Option[T], h: Option[T], mi: Option[T],
+          s: Option[T], ms: Option[T], tz: Option[T])
+        : T =
       convert($dateFromPartsF(y, m, d, h, mi, s, ms, tz))
-    def $dateToParts(date: T, tz: T, iso8601: Boolean): T =
+    def $dateFromPartsIso(y: T, w: Option[T], d: Option[T], h: Option[T], mi: Option[T],
+          s: Option[T], ms: Option[T], tz: Option[T]): T =
+      convert($dateFromPartsIsoF(y, w, d, h, mi, s, ms, tz))
+    def $dateToParts(date: T, tz: Option[T], iso8601: Option[Boolean]): T =
       convert($dateToPartsF(date, tz, iso8601))
   }
 }
