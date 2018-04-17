@@ -13,7 +13,6 @@ import sbt._, Keys._
 import sbt.std.Transform.DummyTaskMap
 import sbt.TestFrameworks.Specs2
 import sbtrelease._, ReleaseStateTransformations._, Utilities._
-import scoverage._
 import slamdata.SbtSlamData.transferPublishAndTagResources
 
 val BothScopes = "test->test;compile->compile"
@@ -42,8 +41,6 @@ lazy val buildSettings = commonBuildSettings ++ Seq(
       Integer.parseInt(version.split("\\.")(1)) >= 8,
       "Java 8 or above required, found " + version)
   },
-
-  ScoverageKeys.coverageHighlighting := true,
 
   scalacOptions += "-target:jvm-1.8",
 
@@ -303,7 +300,7 @@ lazy val foundation = project
   .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(
-    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild, isIsolatedEnv, exclusiveTestTag),
+    buildInfoKeys := Seq[BuildInfoKey](version, isCIBuild, isIsolatedEnv, exclusiveTestTag),
     buildInfoPackage := "quasar.build",
     exclusiveTestTag := "exclusive",
     isCIBuild := isTravisBuild.value,
@@ -374,9 +371,7 @@ lazy val core = project
   .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(
-    libraryDependencies ++= Dependencies.core,
-    ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true)
+    libraryDependencies ++= Dependencies.core)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -391,9 +386,7 @@ lazy val frontend = project
   .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(
-    libraryDependencies ++= Dependencies.frontend,
-    ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true)
+    libraryDependencies ++= Dependencies.frontend)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -458,9 +451,6 @@ lazy val connector = project
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
-  .settings(
-    ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
