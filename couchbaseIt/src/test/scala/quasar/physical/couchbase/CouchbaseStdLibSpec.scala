@@ -105,7 +105,7 @@ class CouchbaseStdLibSpec extends StdLibSpec {
     val r: FileSystemError \/ (String, Vector[QData]) = (
       for {
         q  <- ME.unattempt(
-                fm.cataM(interpretM(a =>
+                fm.cataM[M, Fix[N1QL]](interpretM(a =>
                     argN1ql(args(a)), mapFuncPlanner[Fix, EitherT[F, PlannerError, ?]].plan))
                   .leftMap(FileSystemError.qscriptPlanningFailed(_)).run.liftB)
         s  =  Select(

@@ -58,12 +58,12 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
 
       val zeroRef: JoinFunc = makeRef(0)
       val oneRef: JoinFunc = makeRef(1)
-      val rightCount: Int = repair.elgotPara(count(RightSideF))
+      val rightCount: Int = repair.elgotPara[Int](count(RightSideF))
 
-      if (repair.elgotPara(count(oneRef)) ≟ rightCount)
+      if (repair.elgotPara[Int](count(oneRef)) ≟ rightCount)
         // all `RightSide` access is through `oneRef`
         (ExcludeId, repair.transApoT(substitute[JoinFunc](oneRef, RightSideF))).some
-      else if (repair.elgotPara(count(zeroRef)) ≟ rightCount)
+      else if (repair.elgotPara[Int](count(zeroRef)) ≟ rightCount)
         // all `RightSide` access is through `zeroRef`
         (IdOnly, repair.transApoT(substitute[JoinFunc](zeroRef, RightSideF))).some
       else
@@ -81,12 +81,12 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
               C: Coalesce.Aux[T, G, G],
               N: Normalizable[G])
       : T[F] => T[G] = {
-    _.codyna(
+    _.codyna[G, T[G]](
       normalizeTJ[G] >>>
-      liftFG(injectRepeatedly(C.coalesceSRNormalize[G, ADir](idPrism))) >>>
-      liftFG(injectRepeatedly(C.coalesceSRNormalize[G, AFile](idPrism))) >>>
+      injectRepeatedly[G, G, T[G]](C.coalesceSRNormalize[G, ADir](idPrism)) >>>
+      injectRepeatedly[G, G, T[G]](C.coalesceSRNormalize[G, AFile](idPrism)) >>>
       (_.embed),
-      ((_: T[F]).project) >>> (S.shiftRead(idPrism.reverseGet)(_)))
+      ((_: T[F]).project) >>> (S.shiftRead[G](idPrism.reverseGet)(_)))
   }
 
   def shiftReadDir[F[_]: Functor, G[_]: Traverse](
@@ -99,11 +99,11 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     C: Coalesce.Aux[T, G, G],
     N: Normalizable[G]
   ): T[F] => T[G] =
-    _.codyna(
+    _.codyna[G, T[G]](
       normalizeTJ[G] >>>
-      liftFG(injectRepeatedly(C.coalesceSRNormalize[G, ADir](idPrism))) >>>
+      injectRepeatedly[G, G, T[G]](C.coalesceSRNormalize[G, ADir](idPrism)) >>>
       (_.embed),
-      ((_: T[F]).project) >>> (S.shiftReadDir(idPrism.reverseGet)(_)))
+      ((_: T[F]).project) >>> (S.shiftReadDir[G](idPrism.reverseGet)(_)))
 
   def simplifyJoinOnShiftRead[F[_]: Functor, G[_]: Traverse, H[_]: Functor]
     (implicit QC: QScriptCore :<: G,
@@ -116,7 +116,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
               C: Coalesce.Aux[T, G, G],
               N: Normalizable[G])
       : T[F] => T[H] =
-    shiftRead[F, G].apply(_).transCata[T[H]](J.simplifyJoin(idPrism.reverseGet))
+    shiftRead[F, G].apply(_).transCata[T[H]](J.simplifyJoin[J.G](idPrism.reverseGet))
 
 
   // TODO: These optimizations should give rise to various property tests:
@@ -497,15 +497,15 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
 
     val qcPrism = PrismNT.inject[QScriptCore, F] compose prism
 
-    ftf => repeatedly(applyTransforms(
-      liftFFTrans(prism)(Normalizable[F].normalizeF(_: F[T[G]])),
-      liftFFTrans(qcPrism)(compactQC(_: QScriptCore[T[G]])),
-      liftFGTrans(qcPrism)(compactLeftShift[G](qcPrism)),
-      liftFFTrans(qcPrism)(uniqueBuckets(_: QScriptCore[T[G]])),
-      liftFFTrans(qcPrism)(compactReductions(_: QScriptCore[T[G]])),
-      liftFFTrans(prism)(C.coalesceQC[G](prism)),
-      liftFGTrans(prism)(normalizeJoins),
-      liftFGTrans(qcPrism)(elideNopQC[G])
+    ftf => repeatedly[G[T[G]]](applyTransforms[G[T[G]]](
+      liftFFTrans[F, G, T[G]](prism)(Normalizable[F].normalizeF(_: F[T[G]])),
+      liftFFTrans[QScriptCore, G, T[G]](qcPrism)(compactQC(_: QScriptCore[T[G]])),
+      liftFGTrans[QScriptCore, G, T[G]](qcPrism)(compactLeftShift[G](qcPrism)),
+      liftFFTrans[QScriptCore, G, T[G]](qcPrism)(uniqueBuckets(_: QScriptCore[T[G]])),
+      liftFFTrans[QScriptCore, G, T[G]](qcPrism)(compactReductions(_: QScriptCore[T[G]])),
+      liftFFTrans[F, G, T[G]](prism)(C.coalesceQC[G](prism)),
+      liftFGTrans[F, G, T[G]](prism)(normalizeJoins),
+      liftFGTrans[QScriptCore, G, T[G]](qcPrism)(elideNopQC[G])
     ))(prism(ftf))
   }
 
@@ -529,8 +529,8 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
              FI: Injectable.Aux[F, QScriptTotal]):
       F[A] => G[A] = {
 
-    val normEJ =
-      liftFFTrans(prism)(C.coalesceEJ[G](prism.get))
+    val normEJ: G[T[G]] => Option[G[T[G]]] =
+      liftFFTrans[F, G, T[G]](prism)(C.coalesceEJ[G](prism.get))
 
     normalizeWithBijection[F, G, A](bij)(prism, normEJ compose (prism apply _))
   }
@@ -562,8 +562,9 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       F[A] => G[A] = {
 
     val normTJ = applyTransforms(
-      liftFFTrans(prism)(C.coalesceTJ[G](prism.get)),
-      liftFFTrans(prism)((fa: F[T[G]]) => TJ.prj(fa).flatMap(elideNopJoin[F, T[G]](rebase))))
+      liftFFTrans[F, G, T[G]](prism)(C.coalesceTJ[G](prism.get)),
+      liftFFTrans[F, G, T[G]](prism)((fa: F[T[G]]) =>
+        TJ.prj(fa).flatMap(elideNopJoin[F, T[G]](rebase))))
 
     normalizeWithBijection[F, G, A](bij)(prism, normTJ compose (prism apply _))
   }
@@ -601,5 +602,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       QC:           QScriptCore :<: OUT,
       FI: Injectable.Aux[OUT, QScriptTotal])
       : T[IN] => M[T[OUT]] =
-    _.cataM(FS.discoverPath[M](g)) >>= DiscoverPath.unionAll[T, M, OUT](g)
+    _.cataM[M, List[ADir] \&/ FS.IT[FS.OUT]](FS.discoverPath[M](g)) >>=
+      DiscoverPath.unionAll[T, M, OUT](g)
 }

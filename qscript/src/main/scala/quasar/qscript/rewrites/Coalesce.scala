@@ -227,10 +227,10 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
   private def eliminateRightSideProj[A: Equal](func: FreeMapA[A], a: A): Option[FreeMapA[A]] = {
     val target = Free.point[MapFunc, A](a)
     val oneRef = Free.roll[MapFunc, A](MFC(ProjectIndex(target, IntLit(1))))
-    val rightCount: Int = func.elgotPara(count(target))
+    val rightCount: Int = func.elgotPara[Int](count(target))
 
     // all `RightSide` access is through `oneRef`
-    (func.elgotPara(count(oneRef)) ≟ rightCount).option(
+    (func.elgotPara[Int](count(oneRef)) ≟ rightCount).option(
       func.transApoT(substitute(oneRef, target)))
   }
 

@@ -124,7 +124,7 @@ object PreferProjection extends PreferProjectionInstances {
     def apply[T[_[_]]] = new PartiallyApplied[T]
     final class PartiallyApplied[T[_[_]]] {
       def apply[A](fa: Free[EJson, A])(implicit T: CorecursiveT[T]): Option[T[EJson]] =
-        fa.transCataM(_.run.toOption)
+        fa.transCataM[Option, T[EJson], EJson](_.run.toOption)
     }
   }
 }

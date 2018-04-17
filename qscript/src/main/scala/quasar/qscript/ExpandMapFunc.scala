@@ -44,8 +44,8 @@ object ExpandMapFunc extends ExpandMapFuncInstances {
       derived: AlgebraM[(Option ∘ F)#λ, MapFuncDerived[T, ?], A])
       : AlgebraM[F, MapFuncDerived[T, ?], A] = { f =>
     derived(f).getOrElse(
-      Free.roll(mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(
-        interpretM(scala.Predef.implicitly[Monad[F]].point[A](_), core)))
+      Free.roll(mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM[F, A](
+        interpretM[F, MapFuncCore[T, ?], A, A](scala.Predef.implicitly[Monad[F]].point[A](_), core)))
   }
 }
 

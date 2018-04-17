@@ -46,13 +46,14 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     expr.transCata[Fix[QST]](SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet))
 
   def compactLeftShiftExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[Fix[QS]](liftFG(injectRepeatedly(
-      rewrite.compactLeftShift[QS](PrismNT.inject).apply(_: QScriptCore[Fix[QS]]))))
+    expr.transCata[Fix[QS]](liftFG[QScriptCore, QS, Fix[QS]](
+      injectRepeatedly[QScriptCore, QS, Fix[QS]](
+        rewrite.compactLeftShift[QS](PrismNT.inject).apply(_: QScriptCore[Fix[QS]]))))
 
   def includeToExcludeExpr(expr: Fix[QST]): Fix[QST] =
     expr.transCata[Fix[QST]](
-      liftFG(repeatedly(Coalesce[Fix, QST, QST].coalesceSR[QST, ADir](idPrism))) >>>
-      liftFG(repeatedly(Coalesce[Fix, QST, QST].coalesceSR[QST, AFile](idPrism))))
+      (qst => repeatedly[QST[Fix[QST]]](Coalesce[Fix, QST, QST].coalesceSR[QST, ADir](idPrism))(qst)) >>>
+      (qst => repeatedly[QST[Fix[QST]]](Coalesce[Fix, QST, QST].coalesceSR[QST, AFile](idPrism))(qst)))
 
   type QSI[A] =
     (QScriptCore :\: ProjectBucket :\: ThetaJoin :/: Const[DeadEnd, ?])#M[A]

@@ -48,12 +48,12 @@ object RecFreeS {
     fm => fm match {
       case Suspend(fa) => susint(fa)
       case Fix(form, rec) =>
-        recInterpretM(susint, fixint).apply(form) >>= (fixint(_)) >>= {
+        recInterpretM[M, F, A](susint, fixint).apply(form) >>= (fixint(_)) >>= {
           case (hole, cont) =>
             rec.cataM[M, A](
-              interpretM(
+              interpretM[M, RecFreeS[F, ?], Hole, A](
                 κ(hole.point[M]),
-                recInterpretM(susint, fixint).apply(_))) >>= (cont(_))
+                recInterpretM[M, F, A](susint, fixint).apply(_))) >>= (cont(_))
         }
     }
 

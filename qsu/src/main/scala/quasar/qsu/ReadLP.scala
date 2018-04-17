@@ -80,7 +80,8 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
   def apply[
       F[_]: Monad: PlannerErrorME: NameGenerator](
       plan: T[lp.LogicalPlan]): F[QSUGraph] =
-    plan.cataM(readLPƒ[StateT[F, RevIdx, ?]]).eval(SMap())
+    plan.cataM[StateT[F, RevIdx, ?], QSUGraph](
+      readLPƒ[StateT[F, RevIdx, ?]]).eval(SMap())
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def readLPƒ[

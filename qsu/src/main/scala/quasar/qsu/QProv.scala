@@ -49,7 +49,7 @@ final class QProv[T[_[_]]: BirecursiveT: EqualT]
     * appropriate bucket references.
     */
   def bucketedIds[M[_]: Monad: BucketsM](src: Symbol, p: P): M[P] =
-    p.cataM(bucketedIdsƒ[M](src))
+    p.cataM[M, P](bucketedIdsƒ[M](src))
 
   def bucketedIdsƒ[M[_]: Monad](src: Symbol)(implicit M: BucketsM[M]): AlgebraM[M, PF, P] = {
     case ProvF.Value(i) =>

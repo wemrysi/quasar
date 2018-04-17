@@ -168,7 +168,7 @@ trait Prov[D, I, P] {
     * of `Both`.
     */
   private def flattenBoth(p: P): IList[IList[P]] =
-    p.elgotPara(flattenBothƒ)
+    p.elgotPara[IList[IList[P]]](flattenBothƒ)
 
   private val flattenBothƒ: ElgotAlgebra[(P, ?), PF, IList[IList[P]]] = {
     case (_, Both(l, r))  => (l |@| r)(_ ++ _)
@@ -178,7 +178,7 @@ trait Prov[D, I, P] {
 
   /** The disjunction described by a tree of `OneOf`. */
   private def flattenOneOf(p: P): IList[P] =
-    p.elgotPara(flattenOneOfƒ)
+    p.elgotPara[IList[P]](flattenOneOfƒ)
 
   private val flattenOneOfƒ: ElgotAlgebra[(P, ?), PF, IList[P]] = {
     case (_, Both(l, r))  => l ++ r
@@ -191,7 +191,7 @@ trait Prov[D, I, P] {
     * of `Then`.
     */
   private def flattenThen(p: P): IList[IList[P]] =
-    p.elgotPara(flattenThenƒ)
+    p.elgotPara[IList[IList[P]]](flattenThenƒ)
 
   private val flattenThenƒ: ElgotAlgebra[(P, ?), PF, IList[IList[P]]] = {
     case (_, Then(l, r))  => (l |@| r)(_ ++ _)

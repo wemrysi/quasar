@@ -217,7 +217,7 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[_]: Functor]
     (f: ListContents[M])
       : M[FreeQS] =
     branch.cataM[M, List[ADir] \&/ T[QScriptTotal]](
-      interpretM(
+      interpretM[M, QScriptTotal, Hole, List[ADir] \&/ T[QScriptTotal]](
         κ((src ∘ (_.transCata[T[QScriptTotal]](FI.inject))).point[M]),
         DiscoverPathTotal.discoverPath(f))) >>=
       (DiscoverPathTTotal.unionAll[M](f).apply(_) ∘ (_.cata(Free.roll[QScriptTotal, Hole])))
@@ -226,7 +226,7 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[_]: Functor]
     (src: List[ADir] \&/ T[O], lb: FreeQS, rb: FreeQS, f: ListContents[M])
     (op: (T[O], FreeQS, FreeQS) => O[T[O]])
       : M[List[ADir] \&/ T[O]] =
-    (convertBranch(src, lb)(f) ⊛ convertBranch(src, rb)(f))((l, r) =>
+    (convertBranch[M](src, lb)(f) ⊛ convertBranch[M](src, rb)(f))((l, r) =>
       \&/-(op(QC.inj(Unreferenced[T, T[O]]()).embed, l, r).embed))
 
   def fileType[M[_]: Monad: MonadFsErr](listContents: ListContents[M]):
@@ -279,7 +279,7 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[_]: Functor]
               case That(files)       => That(union(NonEmptyList(files, rebucket(out, value, key))))
               case Both(dirs, files) => Both(dirs, union(NonEmptyList(files, rebucket(out, value, key))))
             })
-        case x => x.traverse(unionAll(g)) ∘ (in => \&/-(PB.inj(in).embed))
+        case x => x.traverse(unionAll[M](g)) ∘ (in => \&/-(PB.inj(in).embed))
       }
     }
 
@@ -296,7 +296,7 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[_]: Functor]
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
             QC.inj(Subset(s, l, sel, r)))
 
-        case x => x.traverse(unionAll(g)) ∘ (in => \&/-(QC.inj(in).embed))
+        case x => x.traverse(unionAll[M](g)) ∘ (in => \&/-(QC.inj(in).embed))
       }
     }
 
@@ -311,7 +311,7 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[_]: Functor]
         case ThetaJoin(src, lb, rb, on, jType, combine) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
             TJ.inj(ThetaJoin(s, l, r, on, jType, combine)))
-        case x => x.traverse(unionAll(g)) ∘ (in => \&/-(TJ.inj(in).embed))
+        case x => x.traverse(unionAll[M](g)) ∘ (in => \&/-(TJ.inj(in).embed))
       }
     }
 
@@ -324,7 +324,7 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[_]: Functor]
         case EquiJoin(src, lb, rb, k, jType, combine) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
             EJ.inj(EquiJoin(s, l, r, k, jType, combine)))
-        case x => x.traverse(unionAll(g)) ∘ (in => \&/-(EJ.inj(in).embed))
+        case x => x.traverse(unionAll[M](g)) ∘ (in => \&/-(EJ.inj(in).embed))
       }
     }
 
@@ -334,6 +334,6 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[_]: Functor]
       type OUT[A] = O[A]
 
       def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) =
-        _.traverse(unionAll(g)) ∘ (in => \&/-(IN.inj(in).embed))
+        _.traverse(unionAll[M](g)) ∘ (in => \&/-(IN.inj(in).embed))
     }
 }

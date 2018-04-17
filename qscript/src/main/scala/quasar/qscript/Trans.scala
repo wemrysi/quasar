@@ -38,7 +38,7 @@ object Trans {
       (trans: Trans[F, M], t: T[G])
       (implicit FG: F :<: G, FT: Injectable.Aux[G, QScriptTotal[T, ?]], B: Branches[T, G])
       : M[T[G]] =
-    applyTrans(trans, PrismNT.inject)(t)
+    applyTrans[T, F, G, M](trans, PrismNT.inject)(t)
 
   def applyTrans[T[_[_]]: BirecursiveT, F[_], G[_]: Traverse, M[_]: Monad]
       (trans: Trans[F, M], GtoF: PrismNT[G, F])
@@ -55,7 +55,8 @@ object Trans {
         G.inject compose GtoF.reverseGet)
 
     def tb[A]: G[A] => M[G[A]] = BR.branches.modifyF[M](transBranches[T, F, M](trans, prismT))
-    transHyloM(t)(tb[T[G]], transG)
+
+    transHyloM[T[G], G, G, T[G], G, M](t)(tb[T[G]], transG)
   }
 
   ////
@@ -74,6 +75,7 @@ object Trans {
       co => p.get(co).fold(co.point[M])(trans.trans[FreeQS[T], G](p))
 
     def tb[A]: G[A] => M[G[A]] = Branches.coEnv[T, Hole, QScriptTotal[T, ?]].branches.modifyF(transBranches[T, F, M](trans, QTtoF))
-    transHyloM(fqs)(tb[FreeQS[T]], transT)
+
+    transHyloM[FreeQS[T], G, G, FreeQS[T], G, M](fqs)(tb[FreeQS[T]], transT)
   }
 }

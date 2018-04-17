@@ -42,10 +42,11 @@ private[qscript] trait UnirewriteLowPriorityImplicits {
       N: Normalizable[QScriptShiftRead[T, ?]],
       E: ExpandDirs.Aux[T, C0[C, ?], C#M]): Unirewrite[T, C] = new Unirewrite[T, C] {
 
-    def apply[F[_]: Monad: MonadFsErr](r: Rewrite[T], lc: DiscoverPath.ListContents[F]): T[QScriptRead[T, ?]] => F[T[C#M]] = { qs =>
+    def apply[F[_]: Monad: MonadFsErr](r: Rewrite[T], lc: DiscoverPath.ListContents[F])
+        : T[QScriptRead[T, ?]] => F[T[C#M]] = { qs =>
       r.simplifyJoinOnShiftRead[QScriptRead[T, ?], QScriptShiftRead[T, ?], C0[C, ?]]
         .apply(qs)
-        .transCataM(E.expandDirs(reflNT[C#M], lc))
+        .transCataM[F, T[C#M], C#M](E.expandDirs(reflNT[C#M], lc))
     }
   }
 }
