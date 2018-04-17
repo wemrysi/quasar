@@ -409,4 +409,9 @@ object FuncHandler {
     (v: BsonVersion)
       : AlgebraM[M, F, Fix[Expr3_4_4]] =
     FuncHandler[F].handle3_4_4[Expr3_4_4, M](v)
+
+  def handle3_6[F[_]: FuncHandler, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
+      : AlgebraM[M, F, Fix[Expr3_6]] =
+    FuncHandler[F].handle3_4_4[Expr3_6, M](v)
 }
