@@ -358,6 +358,10 @@ object FuncHandler {
             $let(
               ListMap(DocVar.Name("parts") -> $dateToParts(a1, $literal(Bson.Text("+00:00")), true)),
               $var(DocVar.ROOT(BsonField.Name("$parts")) \ BsonField.Name("isoWeekYear"))).point[M]
+          case ExtractWeek(a1) =>
+            $let(
+              ListMap(DocVar.Name("parts") -> $dateToParts(a1, $literal(Bson.Text("+00:00")), true)),
+              $var(DocVar.ROOT(BsonField.Name("$parts")) \ BsonField.Name("isoWeek"))).point[M]
         }
       }
 

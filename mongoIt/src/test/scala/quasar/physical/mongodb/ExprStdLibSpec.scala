@@ -43,17 +43,21 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
   import MongoQueryModel._
 
   val notHandled = Skipped("Not implemented in aggregation.")
+  def notImplBefore(v: MongoQueryModel) = Pending(s"not implemented in aggregation on MongoDB < ${v.shows}")
+  def notImplBeforeSkipped(v: MongoQueryModel) = Skipped(s"not implemented in aggregation on MongoDB < ${v.shows}")
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     /* DATE */
     case (date.ExtractIsoYear, _) if advertisedVersion(backend) lt `3.6`.some =>
-      Pending("not implemented in aggregation on MongoDB < 3.6").left
+      notImplBefore(`3.6`).left
     // Not working for year < 1 for any date-like types, but we just have tests for LocalDate
-    case (date.ExtractIsoYear, List(Data.LocalDate(d))) 
+    case (date.ExtractIsoYear, List(Data.LocalDate(d)))
       if d.getYear < 1 && advertisedVersion(backend) === `3.6`.some =>
         Pending("TODO").left
-    case (date.ExtractWeek, _) => Pending("TODO").left
+
+    case (date.ExtractWeek, _) if advertisedVersion(backend) lt `3.6`.some  =>
+      notImplBefore(`3.6`).left
 
     case (date.ExtractHour, Data.LocalTime(_) :: Nil) => Pending("TODO").left
     case (date.ExtractMicrosecond, Data.LocalTime(_) :: Nil) => Pending("TODO").left
@@ -119,19 +123,19 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (quasar.std.SetLib.Within, _) => notHandled.left
 
     /* STRING */
-    case (string.Length, _) if advertisedVersion(backend) === `3.2`.some =>
-      Skipped("not implemented in aggregation on MongoDB < 3.4").left
+    case (string.Length, _) if advertisedVersion(backend) lt `3.4`.some =>
+      notImplBeforeSkipped(`3.4`).left
     case (string.Integer, _) => notHandled.left
     case (string.Decimal, _) => notHandled.left
 
     case (string.ToString, List(Data.DateTimeLike(_))) =>
-      Pending("Works but isn't formatted as expected.").left
+      Pending("implemented but isn't formatted as specified").left
 
     case (string.Search, _) => notHandled.left
-    case (string.Split, _) if advertisedVersion(backend) === `3.2`.some =>
-      Skipped("not implemented in aggregation on MongoDB < 3.4").left
+    case (string.Split, _) if advertisedVersion(backend) lt `3.4`.some =>
+      notImplBeforeSkipped(`3.4`).left
     case (string.Substring, List(Data.Str(s), _, _)) if
-      ((advertisedVersion(backend) === `3.2`.some) && !isPrintableAscii(s)) =>
+      ((advertisedVersion(backend) lt `3.4`.some) && !isPrintableAscii(s)) =>
         Skipped("only printable ascii supported on MongoDB < 3.4").left
 
     /* STRUCTURAL */
