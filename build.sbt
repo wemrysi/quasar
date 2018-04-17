@@ -246,32 +246,26 @@ lazy val root = project.in(file("."))
   .settings(aggregate in assembly := false)
   .settings(excludeTypelevelScalaLibrary)
   .aggregate(
-// NB: need to get dependencies to look like:
-//         ┌ common ┐
-//  ┌ frontend ┬ connector ┬─────────┬──────┐
-// sql       core      marklogic  mongodb  ...
-//  └──────────┼───────────┴─────────┴──────┘
-//         interface
 
        foundation,
-//       /   \
-      ejson, js,
-//       \  /
-        common,   // <--
-//     /       \        \
-    effect, frontend,  precog,
-//   |     /   |    \    |
-        datagen,      blueeyes,
-//   |         |         |
-              fs,     niflheim,
-//   |         |         |
-            qscript,
-//   |         |         |
-    sql, connector,   yggdrasil,
-//   |   /  | | \ \______|________________________
-//   |  /   | |  \      /     \         \         \
+//     /     \    \
+    effect, ejson, js,
+//    |        \   /
+              common,
+//    |       /      \
+        frontend,    precog,
+//    |/    /    \       |
+     fs, sql, datagen, blueeyes,
+//    |   |              |
+// ___|___|              |
+// |  |                  |
+     qscript,         niflheim,
+// |     \               |
+         connector,   yggdrasil,
+// |     /   |   \______|________________________
+//  \   /    |         /     \         \         \
     core, skeleton, mimir, marklogic, mongodb, couchbase,
-//      \     |     /         |          |         |
+//      \     |    /          |          |         |
           interface,   //     |          |         |
 //          /  \              |          |         |
          repl, web,   //      |          |         |
@@ -287,8 +281,6 @@ lazy val root = project.in(file("."))
 //
 // NB: the *It projects are temporary until we polyrepo
   ).enablePlugins(AutomateHeaderPlugin)
-
-// common components
 
 /** Very general utilities, ostensibly not Quasar-specific, but they just aren’t
   * in other places yet. This also contains `contrib` packages for things we’d
@@ -348,7 +340,6 @@ lazy val common = project
   // TODO: The dependency on `js` is because `Data` encapsulates its `toJs`,
   //       which should be extracted.
   .dependsOn(
-    foundation % BothScopes,
     ejson % BothScopes,
     js % BothScopes)
   .settings(commonSettings)
@@ -356,26 +347,6 @@ lazy val common = project
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
-
-/** The compiler from `LogicalPlan` to `QScript` – this is the bulk of
-  * transformation, type checking, optimization, etc.
-  */
-lazy val core = project
-  .settings(name := "quasar-core-internal")
-  .dependsOn(
-    frontend  % BothScopes,
-    fs        % "test->test",
-    connector % BothScopes,
-    sql)
-  .settings(commonSettings)
-  .settings(publishTestsSettings)
-  .settings(targetSettings)
-  .settings(
-    libraryDependencies ++= Dependencies.core)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
-// frontends
 
 /** Types and operations needed by query language implementations.
   */
@@ -411,14 +382,9 @@ lazy val sql = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-// connectors
-
-/** Types and operations needed by connector implementations.
-  */
 lazy val fs = project
   .settings(name := "quasar-fs-internal")
   .dependsOn(
-    common,
     effect,
     frontend % BothScopes)
   .settings(commonSettings)
@@ -429,10 +395,7 @@ lazy val fs = project
 lazy val qscript = project
   .settings(name := "quasar-qscript-internal")
   .dependsOn(
-    foundation % "test->test",
-    effect,
-    frontend   % BothScopes,
-    sql        % "test->test",
+    sql % "test->test",
     fs)
   .settings(commonSettings)
   .settings(targetSettings)
@@ -442,15 +405,26 @@ lazy val qscript = project
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
-    common   % BothScopes,
-    effect   % BothScopes,
-    frontend % BothScopes,
-    fs,
-    qscript,
-    sql      % "test->test")
+    sql % "test->test",
+    qscript)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val core = project
+  .settings(name := "quasar-core-internal")
+  .dependsOn(
+    connector % BothScopes,
+    sql,
+    effect    % "test->test",
+    fs        % "test->test")
+  .settings(commonSettings)
+  .settings(publishTestsSettings)
+  .settings(targetSettings)
+  .settings(
+    libraryDependencies ++= Dependencies.core)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -459,8 +433,8 @@ lazy val connector = project
 lazy val couchbase = project
   .settings(name := "quasar-couchbase-internal")
   .dependsOn(
-    qscript   % "test->test",
-    connector % BothScopes)
+    connector % BothScopes,
+    qscript   % "test->test")
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.couchbase)
@@ -516,8 +490,6 @@ lazy val skeleton = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-// interfaces
-
 /** Types and operations needed by applications that embed Quasar.
   */
 lazy val interface = project
@@ -537,7 +509,7 @@ lazy val interface = project
   */
 lazy val repl = project
   .settings(name := "quasar-repl")
-  .dependsOn(interface, foundation % BothScopes)
+  .dependsOn(interface)
   .settings(commonSettings)
   .settings(githubReleaseSettings)
   .settings(targetSettings)
@@ -553,7 +525,7 @@ lazy val repl = project
   */
 lazy val web = project
   .settings(name := "quasar-web")
-  .dependsOn(interface % BothScopes, core % BothScopes)
+  .dependsOn(interface % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(githubReleaseSettings)
@@ -571,9 +543,8 @@ lazy val it = project
   .settings(name := "quasar-it-internal")
   .configs(ExclusiveTests)
   .dependsOn(
-    core % BothScopes,
-    qscript % "test->test",
-    web % BothScopes)
+    web     % BothScopes,
+    qscript % "test->test")
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -678,26 +649,9 @@ lazy val blueeyes = project.setup
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val mimir = project.setup
-  .settings(name := "quasar-mimir-internal")
-  .dependsOn(
-    yggdrasil % BothScopes,
-    blueeyes,
-    precog % BothScopes,
-    connector)
-  .scalacArgs("-Ypartial-unification")
-  .withWarnings
-  .settings(libraryDependencies ++= Dependencies.mimir)
-  .settings(headerLicenseSettings)
-  .settings(publishSettings)
-  .settings(assemblySettings)
-  .settings(targetSettings)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
 lazy val niflheim = project.setup
   .settings(name := "quasar-niflheim-internal")
-  .dependsOn(blueeyes % BothScopes, precog % BothScopes)
+  .dependsOn(blueeyes % BothScopes)
   .scalacArgs("-Ypartial-unification")
   .withWarnings
   .settings(libraryDependencies ++= Dependencies.niflheim)
@@ -710,7 +664,7 @@ lazy val niflheim = project.setup
 
 lazy val yggdrasil = project.setup
   .settings(name := "quasar-yggdrasil-internal")
-  .dependsOn(blueeyes % BothScopes, precog % BothScopes, niflheim % BothScopes)
+  .dependsOn(niflheim % BothScopes)
   .withWarnings
   .settings(
     resolvers += "bintray-djspiewak-maven" at "https://dl.bintray.com/djspiewak/maven",
@@ -722,3 +676,17 @@ lazy val yggdrasil = project.setup
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val mimir = project.setup
+  .settings(name := "quasar-mimir-internal")
+  .dependsOn(
+    yggdrasil % BothScopes,
+    connector)
+  .scalacArgs("-Ypartial-unification")
+  .withWarnings
+  .settings(libraryDependencies ++= Dependencies.mimir)
+  .settings(headerLicenseSettings)
+  .settings(publishSettings)
+  .settings(assemblySettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
