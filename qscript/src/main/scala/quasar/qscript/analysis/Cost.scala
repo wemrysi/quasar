@@ -66,13 +66,10 @@ object Cost {
         case Filter((card, cost), f) => (card + cost).point[M]
         case Subset((card, cost), from, sel, count) => (card + cost).point[M]
         case LeftShift((card, cost), _, _, _, _, _) => (card + cost).point[M]
-        case Union((card, cost), lBranch, rBranch) => {
-          val compileCardinality = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
-          val compileCost = Cost[QScriptTotal[T, ?]].evaluate(pathCard)
-          val left = lBranch.zygoM(interpretM(κ(card.point[M]), compileCardinality), ginterpretM(κ(cost.point[M]), compileCost))
-          val right = lBranch.zygoM(interpretM(κ(card.point[M]), compileCardinality), ginterpretM(κ(cost.point[M]), compileCost))
-          (left |@| right)( (l, r) => (l + r) / 2)
-        }
+        case Union((card, cost), lBranch, rBranch) =>
+          interpretBranches[T, M](card, cost, pathCard)(lBranch, rBranch) {
+            (l, r) => (l + r) / 2
+          }
         case Unreferenced() => 0.point[M]
       }
     }
@@ -89,23 +86,17 @@ object Cost {
     new Cost[EquiJoin[T, ?]] {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def evaluate[M[_] : Monad](pathCard: APath => M[Int]): GAlgebraM[(Int, ?), M, EquiJoin[T, ?], Int] = {
-        case EquiJoin((card, cost), lBranch, rBranch, key, jt, combine) =>
-          val compileCardinality = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
-          val compileCost = Cost[QScriptTotal[T, ?]].evaluate(pathCard)
-          (lBranch.zygoM(interpretM(κ(card.point[M]), compileCardinality), ginterpretM(κ(cost.point[M]), compileCost)) |@|
-          rBranch.zygoM(interpretM(κ(card.point[M]), compileCardinality), ginterpretM(κ(cost.point[M]), compileCost))) { _ + _ }
+        case EquiJoin((card, cost), lBranch, rBranch, _, _, _) =>
+          interpretBranches[T, M](card, cost, pathCard)(lBranch, rBranch)(_ + _)
       }
     }
+
   implicit def thetaJoin[T[_[_]] : RecursiveT : ShowT]: Cost[ThetaJoin[T, ?]] =
     new Cost[ThetaJoin[T, ?]] {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def evaluate[M[_] : Monad](pathCard: APath => M[Int]): GAlgebraM[(Int, ?), M, ThetaJoin[T, ?], Int] = {
-        case ThetaJoin((card, cost), lBranch, rBranch, _, _, _) => {
-          val compileCardinality = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
-          val compileCost = Cost[QScriptTotal[T, ?]].evaluate(pathCard)
-          (lBranch.zygoM(interpretM(κ(card.point[M]), compileCardinality), ginterpretM(κ(cost.point[M]), compileCost)) |@|
-          rBranch.zygoM(interpretM(κ(card.point[M]), compileCardinality), ginterpretM(κ(cost.point[M]), compileCost))) { _ + _ }
-        }
+        case ThetaJoin((card, cost), lBranch, rBranch, _, _, _) =>
+          interpretBranches[T, M](card, cost, pathCard)(lBranch, rBranch)(_ + _)
       }
     }
 
@@ -116,4 +107,21 @@ object Cost {
         _.run.fold(F.evaluate(pathCard), G.evaluate(pathCard))
     }
 
+  ////////
+
+  private def interpretBranches[T[_[_]]: RecursiveT: ShowT, M[_]: Monad](
+    card: Int, cost: Int, pathCard: APath => M[Int])(
+    left: FreeQS[T], right: FreeQS[T])(
+    ap: (Int, Int) => Int)
+      : M[Int] = {
+    val compileCardinality = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
+    val compileCost = Cost[QScriptTotal[T, ?]].evaluate(pathCard)
+
+    def interpretBranch(qs: FreeQS[T]): M[Int] =
+      qs.zygoM[Int, Int, M](
+        interpretM[M, QScriptTotal[T, ?], Hole, Int](κ(card.point[M]), compileCardinality),
+        ginterpretM[(Int, ?), M, QScriptTotal[T, ?], Hole, Int](κ(cost.point[M]), compileCost))
+
+    (interpretBranch(left) |@| interpretBranch(right))(ap)
+  }
 }

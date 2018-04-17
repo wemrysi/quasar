@@ -73,14 +73,16 @@ object Cardinality {
             case _ => c
           }
         }.point[M]
+
         case LeftShift(card, _, _, _, _, _) => (card * 10).point[M]
-        case Union(card, lBranch, rBranch) => {
-          val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
-          (lBranch.cataM(interpretM(κ(card.point[M]), compile)) |@| rBranch.cataM(interpretM(κ(card.point[M]), compile))) { _ + _}
-        }
+
+        case Union(card, lBranch, rBranch) =>
+          interpretBranches(card, pathCard)(lBranch, rBranch)(_ + _)
+
         case Unreferenced() => 1.point[M]
       }
     }
+
   implicit def projectBucket[T[_[_]] : RecursiveT: ShowT]: Cardinality[ProjectBucket[T, ?]] =
     new Cardinality[ProjectBucket[T, ?]] {
       def calculate[M[_] : Monad](pathCard: APath => M[Int]): AlgebraM[M, ProjectBucket[T, ?], Int] = {
@@ -94,8 +96,7 @@ object Cardinality {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def calculate[M[_] : Monad](pathCard: APath => M[Int]): AlgebraM[M, EquiJoin[T, ?], Int] = {
         case EquiJoin(card, lBranch, rBranch, _, _, _) =>
-          val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
-          (lBranch.cataM(interpretM(κ(card.point[M]), compile)) |@| rBranch.cataM(interpretM(κ(card.point[M]), compile))) { _ * _}
+          interpretBranches(card, pathCard)(lBranch, rBranch)(_ * _)
       }
     }
 
@@ -104,8 +105,7 @@ object Cardinality {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def calculate[M[_] : Monad](pathCard: APath => M[Int]): AlgebraM[M, ThetaJoin[T, ?], Int] = {
         case ThetaJoin(card, lBranch, rBranch, _, _, _) =>
-          val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
-          (lBranch.cataM(interpretM(κ(card.point[M]), compile)) |@| rBranch.cataM(interpretM(κ(card.point[M]), compile))) { _ * _}
+          interpretBranches(card, pathCard)(lBranch, rBranch)(_ * _)
       }
     }
 
@@ -121,4 +121,20 @@ object Cardinality {
       def calculate[M[_] : Monad](pathCard: APath => M[Int]): AlgebraM[M, Coproduct[F, G, ?], Int] =
         _.run.fold(F.calculate(pathCard), G.calculate(pathCard))
     }
+
+  ////////
+
+  private def interpretBranches[T[_[_]]: RecursiveT: ShowT, M[_]: Monad](
+    card: Int, pathCard: APath => M[Int])(
+    left: FreeQS[T], right: FreeQS[T])(
+    ap: (Int, Int) => Int)
+      : M[Int] = {
+    val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
+
+    def interpretBranch(qs: FreeQS[T]): M[Int] =
+      qs.cataM[M, Int](
+        interpretM[M, QScriptTotal[T, ?], Hole, Int](κ(card.point[M]), compile))
+
+    (interpretBranch(left) |@| interpretBranch(right))(ap)
+  }
 }
