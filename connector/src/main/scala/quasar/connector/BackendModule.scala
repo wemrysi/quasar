@@ -35,9 +35,9 @@ import quasar.fs._
 import quasar.fs.FileSystemError.qscriptPlanningFailed
 import quasar.fs.mount._
 import quasar.qscript._
-import quasar.qscript.qsu.LPtoQS
 import quasar.qscript.rewrites.{Rewrite, Unicoalesce, Unirewrite}
 import quasar.qscript.RenderQScriptDSL._
+import quasar.qsu.LPtoQS
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._

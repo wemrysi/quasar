@@ -249,28 +249,30 @@ lazy val root = project.in(file("."))
 
        foundation,
 //     /     \    \
-    effect, ejson, js,
-//    |        \   /
+    effect, ejson, js, // <- _______
+//    |        \   /                \
               common,
-//    |       /      \
+//    |       /      \                \
         frontend,    precog,
-//    |/    /    \       |
+//    |/    /    \       |             |
      fs, sql, datagen, blueeyes,
-//    |   |              |
-// ___|___|              |
-// |  |                  |
+//    |   |              |             |
+// ___|___|              |             |
+// |  |                  |             |
      qscript,         niflheim,
-// |     \               |
+// |  |                  |             |
+     qsu,
+// |     \               |             |
          connector,   yggdrasil,
-// |     /   |   \______|________________________
+// |     /   |   \______|______________|_________
 //  \   /    |         /     \         \         \
     core, skeleton, mimir, marklogic, mongodb, couchbase,
 //      \     |    /          |          |         |
-          interface,   //     |          |         |
+          interface,
 //          /  \              |          |         |
-         repl, web,   //      |          |         |
+         repl, web,
 //              |             |          |         |
-                it,   //      |          |         |
+                it,
 //   ___________|_____________/          |         |
 //  /           |      __________________/         |
 //  |          /|\    /          __________________/
@@ -402,11 +404,19 @@ lazy val qscript = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val qsu = project
+  .settings(name := "quasar-qsu-internal")
+  .dependsOn(qscript % BothScopes)
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
     sql % "test->test",
-    qscript)
+    qsu)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
