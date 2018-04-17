@@ -329,22 +329,16 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
 
     case qscript.Union(src, lBranch, rBranch) =>
       for {
-       leftRepr <- lBranch.cataM[F, MimirRepr](
-         interpretM[F, QScriptTotal[T, ?], Hole, MimirRepr](κ(src.point[F]), planQST))
-
-       rightRepr <- rBranch.cataM[F, MimirRepr](
-         interpretM[F, QScriptTotal[T, ?], Hole, MimirRepr](κ(src.point[F]), planQST))
+       leftRepr <- interpretBranch(planQST)(src, lBranch)
+       rightRepr <- interpretBranch(planQST)(src, rBranch)
 
        rightCoerced = leftRepr.unsafeMerge(rightRepr)
       } yield MimirRepr(leftRepr.P)(leftRepr.table.concat(rightCoerced.table))
 
     case qscript.Subset(src, from, op, count) =>
       for {
-        fromRepr <- from.cataM[F, MimirRepr](
-          interpretM[F, QScriptTotal[T, ?], Hole, MimirRepr](κ(src.point[F]), planQST))
-
-        countRepr <- count.cataM[F, MimirRepr](
-          interpretM[F, QScriptTotal[T, ?], Hole, MimirRepr](κ(src.point[F]), planQST))
+        fromRepr <- interpretBranch(planQST)(src, from)
+        countRepr <- interpretBranch(planQST)(src, count)
 
         back <- {
           def result = for {
@@ -380,4 +374,13 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
           P.Table.constLong(Set(0)).point[CakeM]
       }))
   }
+
+  ////////
+
+  private def interpretBranch(
+    planQST: AlgebraM[F, QScriptTotal[T, ?], MimirRepr])(
+    src: MimirRepr, qs: FreeQS[T])
+      : F[MimirRepr] =
+    qs.cataM[F, MimirRepr](
+      interpretM[F, QScriptTotal[T, ?], Hole, MimirRepr](κ(src.point[F]), planQST))
 }
