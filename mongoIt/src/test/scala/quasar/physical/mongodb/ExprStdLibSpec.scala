@@ -85,7 +85,8 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (date.OffsetDateTime, _) => noTimeZoneSupport.left
     case (date.OffsetTime, _) => noTimeZoneSupport.left
 
-    case (date.LocalDate, _) => notHandled.left
+    case (date.LocalDate, _) if advertisedVersion(backend) lt `3.6`.some =>
+      notImplBefore(`3.6`).left
     case (date.LocalDateTime, _) => notHandled.left
     case (date.LocalTime, _) => notHandled.left
 

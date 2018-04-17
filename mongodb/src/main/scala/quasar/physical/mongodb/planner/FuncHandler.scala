@@ -351,8 +351,6 @@ object FuncHandler {
 
         import fp32._, fp36._
 
-        val check = new Check[Fix[EX], EX]
-
         def extractDateFieldIso(date: Fix[EX], fieldName: BsonField.Name): Fix[EX] =
           $let(
             ListMap(DocVar.Name("parts") -> $dateToParts(date, $literal(Bson.Text("+00:00")), true)),
@@ -366,9 +364,9 @@ object FuncHandler {
             extractDateFieldIso(a1, BsonField.Name("isoWeekYear")).point[M]
           case ExtractWeek(a1) =>
             extractDateFieldIso(a1, BsonField.Name("isoWeek")).point[M]
+          case LocalDate(a1) => $dateFromString(a1, $literal(Bson.Text("+00:00"))).point[M]
         }
       }
-
     }
 
   implicit def mapFuncDerived[T[_[_]]: CorecursiveT]
