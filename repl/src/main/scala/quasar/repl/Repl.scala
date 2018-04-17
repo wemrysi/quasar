@@ -19,7 +19,7 @@ package quasar.repl
 import slamdata.Predef._
 
 import quasar.{Data, DataCodec, Variables, resolveImports, queryPlan}
-import quasar.Planner.PlannerError
+import quasar.fs.Planner.PlannerError
 import quasar.common.{PhaseResult, PhaseResults}
 import quasar.fs.CompileM
 import quasar.contrib.matryoshka._

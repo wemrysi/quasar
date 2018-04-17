@@ -17,13 +17,15 @@
 package quasar.qscript.qsu
 package minimizers
 
-import quasar.{Planner, RenderTreeT}, Planner.PlannerErrorME
+import slamdata.Predef._
+import quasar.RenderTreeT
 import quasar.contrib.matryoshka._
 import quasar.effect.NameGenerator
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski.κ
+import quasar.fs.Planner, Planner.PlannerErrorME
 import quasar.qscript.{
   construction,
   Hole,
@@ -39,7 +41,6 @@ import quasar.qscript.{
 import quasar.qscript.RecFreeS._
 import quasar.qscript.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
 import quasar.qscript.rewrites.NormalizableT
-import slamdata.Predef._
 
 import matryoshka.{delayEqual, BirecursiveT, EqualT, ShowT}
 import matryoshka.data.free._

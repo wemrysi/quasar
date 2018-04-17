@@ -19,7 +19,7 @@ package quasar.qscript.qsu
 import slamdata.Predef.{Map => SMap, _}
 
 import quasar.Qspec
-import quasar.Planner.PlannerError
+import quasar.fs.Planner.PlannerError
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._

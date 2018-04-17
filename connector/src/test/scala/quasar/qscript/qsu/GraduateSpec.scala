@@ -18,7 +18,7 @@ package quasar.qscript.qsu
 
 import slamdata.Predef._
 import quasar.Qspec
-import quasar.Planner.{InternalError, PlannerError}
+import quasar.fs.Planner.{InternalError, PlannerError}
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}

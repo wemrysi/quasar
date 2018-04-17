@@ -18,7 +18,7 @@ package quasar.main
 
 import slamdata.Predef.{PartialFunction, Some, Unit}
 
-import quasar.Planner, Planner.PlannerError
+import quasar.fs.Planner, Planner.PlannerError
 import quasar.effect.{Capture, Failure}
 import quasar.fp.free
 import quasar.fs.{EnvironmentError, FileSystemError, PhysicalError, UnhandledFSError}

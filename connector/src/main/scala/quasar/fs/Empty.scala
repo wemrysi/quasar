@@ -17,7 +17,7 @@
 package quasar.fs
 
 import slamdata.Predef._
-import quasar.Planner.UnsupportedPlan
+import quasar.fs.Planner.UnsupportedPlan
 import quasar.common.PhaseResults
 import quasar.contrib.pathy._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}

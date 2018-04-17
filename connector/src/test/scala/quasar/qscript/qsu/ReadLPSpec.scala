@@ -19,7 +19,7 @@ package quasar.qscript.qsu
 import slamdata.Predef._
 
 import quasar.{Data, DataGenerators, Type, Qspec}
-import quasar.Planner.PlannerError
+import quasar.fs.Planner.PlannerError
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.scalaz.{NonEmptyListE => NELE}
 import quasar.frontend.logicalplan.{JoinCondition, LogicalPlan}

@@ -26,7 +26,7 @@ import quasar.{
   TernaryFunc,
   UnaryFunc
 }
-import quasar.Planner.{NonRepresentableData, PlannerError, PlannerErrorME}
+import quasar.fs.Planner.{NonRepresentableData, PlannerError, PlannerErrorME}
 import quasar.contrib.pathy.mkAbsolute
 import quasar.contrib.scalaz.MonadState_
 import quasar.effect.NameGenerator

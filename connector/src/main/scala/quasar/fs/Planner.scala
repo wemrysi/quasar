@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.fs
 
 import slamdata.Predef._
+import quasar._
 import quasar.contrib.scalaz.MonadError_
 import quasar.contrib.pathy.ADir
 import quasar.fp._
-import quasar.fs.PathError
 import quasar.frontend.logicalplan.LogicalPlan
 
 import matryoshka._
@@ -44,26 +44,33 @@ object Planner {
   final case class NonRepresentableData(data: Data) extends PlannerError {
     def message = "The back-end has no representation for the constant: " + data.shows
   }
+
   final case class NonRepresentableEJson(data: String)
       extends PlannerError {
     def message = "The back-end has no representation for the constant: " + data
   }
+
   final case class UnsupportedFunction[N <: Nat](func: GenericFunc[N], hint: Option[String]) extends PlannerError {
     def message = "The function '" + func.shows + "' is recognized but not supported by this back-end." + hint.map(" (" + _ + ")").getOrElse("")
   }
+
   final case class PlanPathError(error: PathError) extends PlannerError {
     def message = error.shows
   }
+
   final case class UnsupportedJoinCondition(cond: Fix[LogicalPlan]) extends PlannerError {
     def message = s"Joining with ${cond.shows} is not currently supported"
   }
+
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   final case class UnsupportedPlan(plan: LogicalPlan[_], hint: Option[String]) extends PlannerError {
     def message = "The back-end has no or no efficient means of implementing the plan" + hint.map(" (" + _ + ")").getOrElse("")+ ": " + plan.toString
   }
+
   final case class FuncApply[N <: Nat](func: GenericFunc[N], expected: String, actual: String) extends PlannerError {
     def message = "A parameter passed to function " + func.shows + " is invalid: Expected " + expected + " but found: " + actual
   }
+
   final case class ObjectIdFormatError(str: String) extends PlannerError {
     def message = "Invalid ObjectId string: " + str
   }
@@ -71,6 +78,7 @@ object Planner {
   final case class NonRepresentableInJS(value: String) extends PlannerError {
     def message = "Operation/value could not be compiled to JavaScript: " + value
   }
+
   final case class UnsupportedJS(value: String) extends PlannerError {
     def message = "Conversion of operation/value to JavaScript not implemented: " + value
   }
@@ -113,19 +121,23 @@ object Planner {
   sealed abstract class CompilationError {
     def message: String
   }
+
   object CompilationError {
     final case class CompilePathError(error: PathError)
         extends CompilationError {
       def message = error.shows
     }
+
     final case class CSemanticError(error: SemanticError)
         extends CompilationError {
       def message = error.message
     }
+
     final case class CPlannerError(error: PlannerError)
         extends CompilationError {
       def message = error.message
     }
+
     final case class ManyErrors(errors: NonEmptyList[SemanticError])
         extends CompilationError {
       def message = errors.map(_.message).list.toList.mkString("[", "\n", "]")

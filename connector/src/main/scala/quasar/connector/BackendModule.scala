@@ -19,7 +19,7 @@ package quasar.connector
 import slamdata.Predef._
 
 import quasar.{RenderTree, RenderTreeT}
-import quasar.Planner.PlannerError
+import quasar.fs.Planner.PlannerError
 import quasar.Data
 import quasar.common._
 import quasar.concurrent.Pools._

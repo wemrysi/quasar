@@ -17,7 +17,7 @@
 package quasar.api
 
 import slamdata.Predef._
-import quasar.{Data, DataCodec, Planner, SemanticError}
+import quasar.{Data, DataCodec, SemanticError}
 import quasar.RenderTree.ops._
 import quasar.fp._
 import quasar.fp.ski._

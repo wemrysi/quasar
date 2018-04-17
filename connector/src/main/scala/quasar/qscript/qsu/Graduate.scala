@@ -19,7 +19,7 @@ package quasar.qscript.qsu
 import slamdata.Predef._
 
 import quasar.effect.NameGenerator
-import quasar.Planner.{InternalError, PlannerErrorME}
+import quasar.fs.Planner.{InternalError, PlannerErrorME}
 import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.MonadReader_

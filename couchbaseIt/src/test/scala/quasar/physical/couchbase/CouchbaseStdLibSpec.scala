@@ -26,7 +26,7 @@ import quasar.physical.couchbase.common.CBDataCodec
 import quasar.physical.couchbase.fs.{parseConfig, FsType}
 import quasar.physical.couchbase.Couchbase._, QueryFileModule.n1qlResults
 import quasar.physical.couchbase.planner.Planner.mapFuncPlanner
-import quasar.Planner.PlannerError
+import quasar.fs.Planner.PlannerError
 import quasar.qscript._
 import quasar.std.StdLibSpec
 import quasar.time.{DateGenerators, DateTimeInterval}

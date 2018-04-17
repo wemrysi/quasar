@@ -18,7 +18,7 @@ package quasar.fs
 
 import slamdata.Predef._
 import quasar.{Data, QuasarError}
-import quasar.Planner.PlannerError
+import quasar.fs.Planner.PlannerError
 import quasar.fp._
 import quasar.frontend.logicalplan.LogicalPlan
 

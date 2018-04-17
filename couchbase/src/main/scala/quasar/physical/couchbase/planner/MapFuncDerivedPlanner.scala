@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.effect.NameGenerator
 import quasar.fp.ski._
 import quasar.physical.couchbase._
-import quasar.Planner.PlannerErrorME
+import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript._
 
 import matryoshka._

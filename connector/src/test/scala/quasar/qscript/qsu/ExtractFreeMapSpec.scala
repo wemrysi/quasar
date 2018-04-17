@@ -17,14 +17,14 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef._
-
-import quasar.Planner.PlannerError
+import quasar.{Qspec, TreeMatchers}
 import quasar.common.{SortDir, JoinType}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
 import quasar.ejson.implicits._
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
+import quasar.fs.Planner.PlannerError
 import quasar.qscript.construction
 import quasar.qscript.{MapFuncsCore, JoinSide, LeftSide, RightSide}
 import quasar.{Qspec, TreeMatchers}

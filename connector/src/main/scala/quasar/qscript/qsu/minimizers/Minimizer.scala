@@ -18,7 +18,7 @@ package quasar.qscript.qsu
 package minimizers
 
 import slamdata.Predef._
-import quasar.Planner, Planner.PlannerErrorME
+import quasar.fs.Planner, Planner.PlannerErrorME
 import quasar.effect.NameGenerator
 
 import scalaz.Monad

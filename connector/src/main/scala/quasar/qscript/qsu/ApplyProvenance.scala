@@ -18,7 +18,7 @@ package quasar.qscript.qsu
 
 import slamdata.Predef._
 
-import quasar.Planner.{PlannerErrorME, InternalError}
+import quasar.fs.Planner.{PlannerErrorME, InternalError}
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson
 import quasar.ejson.EJson

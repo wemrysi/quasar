@@ -18,7 +18,7 @@ package quasar.qscript.qsu
 
 import quasar.{Data, Qspec, RenderTree}
 import RenderTree.ops._
-import quasar.Planner.PlannerError
+import quasar.fs.Planner.PlannerError
 import quasar.contrib.matryoshka._
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._

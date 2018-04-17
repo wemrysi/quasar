@@ -19,7 +19,7 @@ package quasar.qscript.qsu
 import slamdata.Predef.{List, Long, Nil}
 
 import quasar.{Qspec, TreeMatchers}
-import quasar.Planner.PlannerError
+import quasar.fs.Planner.PlannerError
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp.{coproductEqual, coproductShow}

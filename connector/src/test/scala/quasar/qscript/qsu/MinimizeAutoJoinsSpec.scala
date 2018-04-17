@@ -17,10 +17,11 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef._
-import quasar.{Planner, Qspec, TreeMatchers, Type}, Planner.PlannerError
+import quasar.{Qspec, TreeMatchers, Type}
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
+import quasar.fs.Planner, Planner.PlannerError
 import quasar.qscript.{
   construction,
   ExcludeId,

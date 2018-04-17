@@ -18,7 +18,7 @@ package quasar.qscript.qsu
 
 import slamdata.Predef._
 import quasar.RenderTreeT
-import quasar.Planner.PlannerErrorME
+import quasar.fs.Planner.PlannerErrorME
 import quasar.effect.NameGenerator
 import quasar.frontend.logicalplan.LogicalPlan
 

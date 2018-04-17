@@ -23,7 +23,7 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.qscript.{construction, MapFuncsCore}
 import quasar.qscript.provenance.JoinKeys
-import quasar.Planner.PlannerError
+import quasar.fs.Planner.PlannerError
 
 import matryoshka.data.Fix
 import pathy.Path

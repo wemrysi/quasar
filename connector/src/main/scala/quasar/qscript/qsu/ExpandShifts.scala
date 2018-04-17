@@ -19,9 +19,9 @@ package quasar.qscript.qsu
 import slamdata.Predef._
 
 import quasar.effect.NameGenerator
-import quasar.Planner.PlannerErrorME
 import quasar.contrib.scalaz._
 import quasar.ejson.EJson
+import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 import quasar.qscript.qsu.QSUGraph.Extractors._
 import quasar.qscript.RecFreeS._

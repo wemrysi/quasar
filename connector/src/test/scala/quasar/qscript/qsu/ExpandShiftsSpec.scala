@@ -16,7 +16,7 @@
 
 package quasar.qscript.qsu
 
-import quasar.Planner.PlannerError
+import quasar.fs.Planner.PlannerError
 import quasar.{Qspec, TreeMatchers}
 import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
