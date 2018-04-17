@@ -100,7 +100,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         fix.LeftShift(
           fix.Map(
             fix.Unreferenced,
-            func.Constant(json.bool(true))),
+            recFunc.Constant(json.bool(true))),
           recFunc.Hole,
           ExcludeId,
           ShiftType.Array,
@@ -183,12 +183,12 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       val exp: Fix[QS] =
         fix.Map(
           fix.Root,
-          func.MakeArray(func.Constant(json.int(7))))
+          recFunc.MakeArray(recFunc.Constant(json.int(7))))
 
       val expected: Fix[QS] =
         fix.Map(
           fix.Root,
-          func.Constant(json.arr(List(value))))
+          recFunc.Constant(json.arr(List(value))))
 
       normalizeFExpr(exp) must equal(expected)
     }
@@ -201,7 +201,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           free.LeftShift(
             free.Map(
               free.Root,
-              func.ProjectKey(func.Hole, func.Constant(json.str("city")))),
+              recFunc.ProjectKey(recFunc.Hole, recFunc.Constant(json.str("city")))),
             recFunc.Hole,
             IncludeId,
             ShiftType.Array,
@@ -211,7 +211,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               func.MakeArray(func.RightSide))),
           free.Map(
             free.Unreferenced,
-            func.Constant(json.str("name"))),
+            recFunc.Constant(json.str("name"))),
           func.Constant(json.bool(true)),
           JoinType.Inner,
           func.ProjectKey(
@@ -240,12 +240,12 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       val exp: Fix[QS] =
         fix.Map(
           fix.Root,
-          func.MakeArray(func.MakeArray(func.Constant(json.int(7)))))
+          recFunc.MakeArray(recFunc.MakeArray(recFunc.Constant(json.int(7)))))
 
       val expected: Fix[QS] =
         fix.Map(
           fix.Root,
-          func.Constant(json.arr(List(json.arr(List(value))))))
+          recFunc.Constant(json.arr(List(json.arr(List(value))))))
 
       normalizeFExpr(exp) must equal(expected)
     }
@@ -257,7 +257,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           fix.Root,
           free.Map(
             free.Unreferenced,
-            func.Constant(json.str("name"))),
+            recFunc.Constant(json.str("name"))),
           free.ThetaJoin(
             free.Root,
             free.LeftShift(
@@ -271,7 +271,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                 func.MakeArray(func.RightSide))),
             free.Map(
               free.Unreferenced,
-              func.Constant(json.str("name"))),
+              recFunc.Constant(json.str("name"))),
             func.Constant(json.bool(true)),
             JoinType.Inner,
             func.ConcatArrays(
@@ -308,18 +308,18 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       val exp: Fix[QS] =
         fix.Map(
           fix.Root,
-          func.MakeArray(
+          recFunc.MakeArray(
             // !false && (false || !true)
-            func.And(
-              func.Not(func.Constant(json.bool(false))),
-              func.Or(
-                func.Constant(json.bool(false)),
-                func.Not(func.Constant(json.bool(true)))))))
+            recFunc.And(
+              recFunc.Not(recFunc.Constant(json.bool(false))),
+              recFunc.Or(
+                recFunc.Constant(json.bool(false)),
+                recFunc.Not(recFunc.Constant(json.bool(true)))))))
 
       val expected: Fix[QS] =
         fix.Map(
           fix.Root,
-          func.Constant(json.arr(List(json.bool(false)))))
+          recFunc.Constant(json.arr(List(json.bool(false)))))
 
       normalizeFExpr(exp) must equal(expected)
     }
@@ -380,9 +380,9 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               func.ProjectKeyS(
                 func.ProjectKeyS(func.Hole, SimplifyJoin.RightK),
                 "r_lat"))),
-          func.ConcatMaps(
-            func.ProjectKeyS(func.Hole, SimplifyJoin.LeftK),
-            func.ProjectKeyS(func.Hole, SimplifyJoin.RightK)))
+          recFunc.ConcatMaps(
+            recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.LeftK),
+            recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.RightK)))
       }
     }
 
@@ -393,14 +393,14 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       val originalQScript =
         fix.Map(
           fix.ShiftedRead[AFile](sampleFile, IncludeId),
-          func.Add(
-            func.ProjectIndexI(func.Hole, 1),
-            func.ProjectIndexI(func.Hole, 1)))
+          recFunc.Add(
+            recFunc.ProjectIndexI(recFunc.Hole, 1),
+            recFunc.ProjectIndexI(recFunc.Hole, 1)))
 
       val expectedQScript =
         fix.Map(
           fix.ShiftedRead[AFile](sampleFile, ExcludeId),
-          func.Add(func.Hole, func.Hole))
+          recFunc.Add(recFunc.Hole, recFunc.Hole))
 
       includeToExcludeExpr(originalQScript) must_= expectedQScript
     }
@@ -440,7 +440,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         fix.LeftShift(
           fix.Map(
             fix.Root,
-            func.MakeArray(func.Add(func.Hole, func.Constant(json.int(3))))),
+            recFunc.MakeArray(recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3))))),
           recFunc.Hole,
           ExcludeId,
           ShiftType.Array,
@@ -452,9 +452,9 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       val expected: Fix[QS] =
         fix.Map(
           fix.Root,
-          func.StaticMapS(
-            "right" -> func.Add(func.Hole, func.Constant(json.int(3))),
-            "left" -> func.MakeArray(func.Add(func.Hole, func.Constant(json.int(3))))))
+          recFunc.StaticMapS(
+            "right" -> recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3))),
+            "left" -> recFunc.MakeArray(recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3))))))
 
       compactLeftShiftExpr(original) must equal(expected)
     }
@@ -465,7 +465,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         fix.LeftShift(
           fix.Map(
             fix.Root,
-            func.Add(func.Hole, func.Constant(json.int(3)))),
+            recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3)))),
           recFunc.MakeArray(recFunc.Subtract(recFunc.Hole, recFunc.Constant(json.int(5)))),
           ExcludeId,
           ShiftType.Array,
@@ -478,10 +478,10 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         fix.Map(
           fix.Map(
             fix.Root,
-            func.Add(func.Hole, func.Constant(json.int(3)))),
-          func.StaticMapS(
-            "right" -> func.Subtract(func.Hole, func.Constant(json.int(5))),
-            "left" -> func.Hole))
+            recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3)))),
+          recFunc.StaticMapS(
+            "right" -> recFunc.Subtract(recFunc.Hole, recFunc.Constant(json.int(5))),
+            "left" -> recFunc.Hole))
 
       compactLeftShiftExpr(original) must equal(expected)
     }

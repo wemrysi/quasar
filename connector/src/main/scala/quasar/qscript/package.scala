@@ -168,7 +168,9 @@ package object qscript {
   }
 
   def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFunc[T, ?], Hole](SrcHole)
+  def HoleR[T[_[_]]]: RecFreeMap[T] = Free.point[RecFreeS[MapFunc[T, ?], ?], Hole](SrcHole)
   def HoleQS[T[_[_]]]: FreeQS[T] = Free.point[QScriptTotal[T, ?], Hole](SrcHole)
+
   def LeftSideF[T[_[_]]]: JoinFunc[T] =
     Free.point[MapFunc[T, ?], JoinSide](LeftSide)
   def RightSideF[T[_[_]]]: JoinFunc[T] =

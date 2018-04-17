@@ -16,9 +16,10 @@
 
 package quasar.qscript.rewrites
 
-import slamdata.Predef.{Map => _, _}
 import quasar.fp._
+import quasar.qscript.RecFreeS._
 import quasar.qscript._
+import slamdata.Predef.{Map => _, _}
 
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
@@ -120,7 +121,7 @@ object SimplifyJoin {
                 LeftK -> func.LeftSide,
                 RightK -> func.RightSide)))).embed)(
             (ej, filt) => GtoH(QC.inj(Filter(ej, mergeSides(filt)))).embed),
-            mergeSides(tj.combine))))
+            mergeSides(tj.combine).asRec)))
         }
     }
 

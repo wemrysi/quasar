@@ -61,7 +61,7 @@ object UnaryFunctions {
           def modifyF[F[_]: Applicative](f: FreeMap[T] => F[FreeMap[T]])(s: QScriptCore[T, A]): F[QScriptCore[T, A]] =
             s match {
               case Map(src, fm) =>
-                (f(fm)).map(Map(src, _))
+                (f(fm.linearize)).map(RecFreeS.fromFree(_)).map(Map(src, _))
               case LeftShift(src, struct, id, stpe, undef, repair) =>
                 (f(struct.linearize).map(RecFreeS.fromFree(_))).map(LeftShift(src, _, id, stpe, undef, repair))
               case Reduce(src, bucket, red, repair) =>

@@ -33,6 +33,7 @@ import quasar.qscript.{
   RightSide3,
   SrcHole
 }
+import quasar.qscript.RecFreeS._
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 import quasar.qscript.rewrites.NormalizableT
@@ -53,6 +54,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
     minimizers.CollapseShifts[T])
 
   private val func = construction.Func[T]
+  private val recFunc = construction.RecFunc[T]
   private val srcHole: Hole = SrcHole   // wtb smart constructor
 
   private val J = Fixed[T[EJson]]
@@ -157,14 +159,14 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
     case Nil =>
       updateGraph[T, G](QSU.Unreferenced[T, Symbol]()) map { unref =>
-        some(qgraph.overwriteAtRoot(QSU.Map[T, Symbol](unref.root, fm as srcHole)) :++ unref)
+        some(qgraph.overwriteAtRoot(QSU.Map[T, Symbol](unref.root, fm.as(srcHole).asRec)) :++ unref)
       }
 
     case single :: Nil =>
       // if this is false, it's an assertion error
       // lazy val sanityCheck = fm.toList.forall(0 ==)
 
-      some(qgraph.overwriteAtRoot(QSU.Map[T, Symbol](single.root, fm as srcHole))).point[G]
+      some(qgraph.overwriteAtRoot(QSU.Map[T, Symbol](single.root, fm.as(srcHole).asRec))).point[G]
 
     case multiple if Minimizers.all(m => !m.couldApplyTo(multiple)) =>
       expandSecondOrder(fm, multiple) match {
@@ -215,13 +217,13 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
                 (simplifiedSource, simplifiedFM) = singleSource match {
                   case Map(src, fm) => (src, fm)
-                  case _ => (singleSource, func.Hole)
+                  case _            => (singleSource, recFunc.Hole)
                 }
 
                 candidates2 <- exRebuilds.zipWithIndex traverse {
                   case (rebuild, i) =>
-                    val rebuiltFM = func.ProjectKeyS(simplifiedFM, i.toString)
-                    val normalized = N.freeMF(rebuiltFM)
+                    val rebuiltFM = recFunc.ProjectKeyS(simplifiedFM, i.toString)
+                    val normalized = N.freeMF(rebuiltFM.linearize)
 
                     rebuild(
                       simplifiedSource,

@@ -155,7 +155,7 @@ sealed abstract class PreferProjectionInstances {
     new PreferProjection[QScriptCore[T, ?], U, B] {
       def preferProjectionƒ(BtoF: PrismNT[B, QScriptCore[T, ?]]) = {
         case Map((srcShape, u), f) =>
-          BtoF(Map(u, prjFreeMap(srcShape, f)))
+          BtoF(Map(u, RecFreeS.fromFree(prjFreeMap(srcShape, f.linearize))))
 
         case LeftShift((srcShape, u), struct, idStatus, shiftType, undef, repair) =>
           // NB: This is necessary as srcShape gives us the input shape to the

@@ -227,7 +227,7 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
 
         makeNorm(bucket, order)(rebucket, _ => orderNormOpt)(Sort(src, _, _))
 
-      case Map(src, f)                   => freeMFEq(f).map(Map(src, _))
+      case Map(src, f)                   => freeMFEq(f.linearize).map(RecFreeS.fromFree(_)).map(Map(src, _))
       case LeftShift(src, s, i, t, u, r) => makeNorm(s.linearize, r)(freeMFEq(_), freeMFEq(_))((str, repair) => LeftShift(src, RecFreeS.fromFree(str), i, t, u, repair))
       case Union(src, l, r)              => makeNorm(l, r)(freeTCEq(_), freeTCEq(_))(Union(src, _, _))
       case Filter(src, f)                => freeMFEq(f).map(Filter(src, _))

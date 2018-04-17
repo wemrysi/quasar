@@ -38,6 +38,7 @@ object MappableRegionSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   val QSU = QScriptUniform.Optics[Fix]
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
+  val recFunc = construction.RecFunc[Fix]
   val hole = (SrcHole: Hole)
 
   val orders: AFile = Path.rootDir </> Path.dir("client") </> Path.file("orders")
@@ -51,12 +52,15 @@ object MappableRegionSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   def projectStrKey(key: String): FreeMap =
     func.ProjectKeyS(func.Hole, key)
 
+  def recProjectStrKey(key: String): RecFreeMap =
+    recFunc.ProjectKeyS(recFunc.Hole, key)
+
   "finding mappable region" should {
     "convert autojoin2" >> {
       val tree =
         qsu.autojoin2((
-          qsu.map(qsu.read(orders), projectStrKey("foo")),
-          qsu.map(qsu.read(orders), projectStrKey("bar")),
+          qsu.map(qsu.read(orders), recProjectStrKey("foo")),
+          qsu.map(qsu.read(orders), recProjectStrKey("bar")),
           _(ConcatMaps(_, _))))
 
       val exp =
@@ -69,10 +73,10 @@ object MappableRegionSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
       val tree =
         qsu.autojoin3((
           qsu.autojoin2((
-            qsu.map(qsu.read(orders), projectStrKey("baz")),
+            qsu.map(qsu.read(orders), recProjectStrKey("baz")),
             qsu.cint(42),
             _(Gt(_, _)))),
-          qsu.map(qsu.read(orders), projectStrKey("quux")),
+          qsu.map(qsu.read(orders), recProjectStrKey("quux")),
           qsu.cdec(32.56),
           _(Cond(_, _, _))))
 
@@ -92,7 +96,7 @@ object MappableRegionSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
             qsu.read(orders),
             qsu.cstr("foo"),
             _(ProjectKey(_, _)))),
-          func.MakeArray(func.Hole))
+          recFunc.MakeArray(recFunc.Hole))
 
       val exp =
         func.MakeArray(projectStrKey("foo"))
@@ -105,8 +109,8 @@ object MappableRegionSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
         qsu.autojoin2((
           qsu.lpFilter(
             qsu.read(orders),
-            qsu.map(qsu.read(orders), projectStrKey("isOpen"))),
-          qsu.map(qsu.read(orders), projectStrKey("clientName")),
+            qsu.map(qsu.read(orders), recProjectStrKey("isOpen"))),
+          qsu.map(qsu.read(orders), recProjectStrKey("clientName")),
           _(MakeMap(_, _))))
 
       val exp =
@@ -117,14 +121,14 @@ object MappableRegionSpec extends Qspec with TreeMatchers with QSUTTypes[Fix] {
 
     "halt when predicate returns true" >> {
       val prjIdx =
-        func.ProjectIndex(func.Hole, func.Constant(ejs.int(3)))
+        recFunc.ProjectIndex(recFunc.Hole, recFunc.Constant(ejs.int(3)))
 
       val tree =
         qsu.autojoin2((
           qsu.map(
             qsu.lpFilter(
               qsu.read(orders),
-              qsu.map(qsu.read(orders), projectStrKey("isClosed"))),
+              qsu.map(qsu.read(orders), recProjectStrKey("isClosed"))),
             prjIdx),
           qsu.cstr("closed"),
           _(MakeMap(_, _))))

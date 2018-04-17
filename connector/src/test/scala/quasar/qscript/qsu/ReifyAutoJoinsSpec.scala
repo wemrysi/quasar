@@ -38,6 +38,7 @@ object ReifyAutoJoinSpecs extends Qspec with TreeMatchers with QSUTTypes[Fix] {
 
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
+  val recFunc = construction.RecFunc[Fix]
 
   val J = Fixed[Fix[EJson]]
 
@@ -51,10 +52,10 @@ object ReifyAutoJoinSpecs extends Qspec with TreeMatchers with QSUTTypes[Fix] {
         qsu.autojoin2((
           qsu.map(
             qsu.read(afile1),
-            func.ProjectKeyS(func.Hole, "foo")),
+            recFunc.ProjectKeyS(recFunc.Hole, "foo")),
           qsu.map(
             qsu.read(afile2),
-            func.ProjectKeyS(func.Hole, "bar")),
+            recFunc.ProjectKeyS(recFunc.Hole, "bar")),
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
@@ -64,10 +65,10 @@ object ReifyAutoJoinSpecs extends Qspec with TreeMatchers with QSUTTypes[Fix] {
           JoinKeys(INil()),
           fmCombiner) =>
 
-          fmL must beTreeEqual(
+          fmL.linearize must beTreeEqual(
             func.ProjectKeyS(func.Hole, "foo"))
 
-          fmR must beTreeEqual(
+          fmR.linearize must beTreeEqual(
             func.ProjectKeyS(func.Hole, "bar"))
 
           fmCombiner must beTreeEqual(
@@ -80,13 +81,13 @@ object ReifyAutoJoinSpecs extends Qspec with TreeMatchers with QSUTTypes[Fix] {
         qsu._autojoin3((
           qsu.map(
             qsu.read(afile1),
-            func.ProjectKeyS(func.Hole, "foo")),
+            recFunc.ProjectKeyS(recFunc.Hole, "foo")),
           qsu.map(
             qsu.read(afile2),
-            func.ProjectKeyS(func.Hole, "bar")),
+            recFunc.ProjectKeyS(recFunc.Hole, "bar")),
           qsu.map(
             qsu.read(afile3),
-            func.ProjectKeyS(func.Hole, "baz")),
+            recFunc.ProjectKeyS(recFunc.Hole, "baz")),
           func.Subtract(func.Add(func.LeftSide3, func.RightSide3), func.Center))))
 
       runOn(qgraph) must beLike {
@@ -100,13 +101,13 @@ object ReifyAutoJoinSpecs extends Qspec with TreeMatchers with QSUTTypes[Fix] {
           JoinKeys(INil()),
           fmOuter) =>
 
-          fmL must beTreeEqual(
+          fmL.linearize must beTreeEqual(
            func.ProjectKeyS(func.Hole, "foo"))
 
-          fmC must beTreeEqual(
+          fmC.linearize must beTreeEqual(
            func.ProjectKeyS(func.Hole, "bar"))
 
-          fmR must beTreeEqual(
+          fmR.linearize must beTreeEqual(
            func.ProjectKeyS(func.Hole, "baz"))
 
           fmInner must beTreeEqual(

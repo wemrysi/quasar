@@ -17,16 +17,17 @@
 package quasar.qscript.qsu
 
 import slamdata.Predef._
-import quasar.{Qspec, TreeMatchers}
+
 import quasar.Planner.PlannerError
 import quasar.common.{SortDir, JoinType}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
-import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
+import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.qscript.construction
 import quasar.qscript.{MapFuncsCore, JoinSide, LeftSide, RightSide}
+import quasar.{Qspec, TreeMatchers}
 
 import matryoshka._
 import matryoshka.data._
@@ -45,8 +46,10 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   val ejs = Fixed[Fix[EJson]]
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
+  val recFunc = construction.RecFunc[Fix]
 
   def projectStrKey(key: String): FreeMap = func.ProjectKeyS(func.Hole, key)
+  def recProjectStrKey(key: String): RecFreeMap = recFunc.ProjectKeyS(recFunc.Hole, key)
 
   def makeMap(left: String, right: String): JoinFunc =
     func.StaticMapS(
@@ -61,7 +64,7 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   "extracting mappable region" should {
 
     "convert mappable filter predicate" >> {
-      val predicate = projectStrKey("foo")
+      val predicate = recProjectStrKey("foo")
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.lpFilter(
@@ -69,12 +72,12 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           qsu.map(qsu.read(orders), predicate)))
 
       evaluate(extractFM(graph)) must beLike {
-        case \/-(QSFilter(Read(`orders`), fm)) => fm must_= predicate
+        case \/-(QSFilter(Read(`orders`), fm)) => fm must_= predicate.linearize
       }
     }
 
     "convert transposed filter predicate" >> {
-      val predicate = projectStrKey("foo")
+      val predicate = recProjectStrKey("foo")
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.lpFilter(
@@ -91,18 +94,18 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               filterPredicate),
             valueAccess)) =>
 
-          fm must beTreeEqual(predicate)
+          fm.linearize must beTreeEqual(predicate.linearize)
 
           filterPredicate must beTreeEqual(projectStrKey("filter_predicate_0"))
 
-          valueAccess must beTreeEqual(projectStrKey("filter_source"))
+          valueAccess.linearize must beTreeEqual(projectStrKey("filter_source"))
 
           autojoinCondition must beTreeEqual(makeMap("filter_source", "filter_predicate_0"))
       }
     }
 
     "greedily convert mappable function applied to transposed filter predicate" >> {
-      val field = projectStrKey("foo")
+      val field = recProjectStrKey("foo")
 
       val predicate =
         func.Gt(func.Hole, func.Constant(ejs.int(42)))
@@ -125,18 +128,18 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               filterPredicate),
             valueAccess)) =>
 
-          fm must beTreeEqual(field)
+          fm.linearize must beTreeEqual(field.linearize)
 
           filterPredicate must beTreeEqual(predicate >> projectStrKey("filter_predicate_0"))
 
-          valueAccess must beTreeEqual(projectStrKey("filter_source"))
+          valueAccess.linearize must beTreeEqual(projectStrKey("filter_source"))
 
           autojoinCondition must beTreeEqual(makeMap("filter_source", "filter_predicate_0"))
       }
     }
 
     "convert mappable group key" >> {
-      val key = projectStrKey("foo")
+      val key = recProjectStrKey("foo")
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.groupBy(
@@ -144,12 +147,12 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           qsu.map(qsu.read(orders), key)))
 
       evaluate(extractFM(graph)) must beLike {
-        case \/-(DimEdit(Read(`orders`), DTrans.Group(fm))) => fm must_= key
+        case \/-(DimEdit(Read(`orders`), DTrans.Group(fm))) => fm must_= key.linearize
       }
     }
 
     "convert transposed group key" >> {
-      val key = projectStrKey("foo")
+      val key = recProjectStrKey("foo")
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.groupBy(
@@ -166,21 +169,21 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               DTrans.Group(groupKey)),
             valueAccess)) =>
 
-          fm must beTreeEqual(key)
+          fm.linearize must beTreeEqual(key.linearize)
 
           groupKey must beTreeEqual(projectStrKey("group_key_0"))
 
-          valueAccess must beTreeEqual(projectStrKey("group_source"))
+          valueAccess.linearize must beTreeEqual(projectStrKey("group_source"))
 
           autojoinCondition must beTreeEqual(makeMap("group_source", "group_key_0"))
       }
     }
 
     "greedily convert mappable function applied to transposed group key" >> {
-      val key = projectStrKey("foo")
+      val key = recProjectStrKey("foo")
 
       val f =
-        func.Add(func.Modulo(func.Hole, func.Constant(ejs.int(13))), func.Constant(ejs.int(1)))
+        recFunc.Add(recFunc.Modulo(recFunc.Hole, recFunc.Constant(ejs.int(13))), recFunc.Constant(ejs.int(1)))
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.groupBy(
@@ -199,19 +202,19 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               DTrans.Group(groupKey)),
             valueAccess)) =>
 
-          fm must beTreeEqual(key)
+          fm.linearize must beTreeEqual(key.linearize)
 
-          groupKey must beTreeEqual(f >> projectStrKey("group_key_0"))
+          groupKey must beTreeEqual(f.linearize >> projectStrKey("group_key_0"))
 
-          valueAccess must beTreeEqual(projectStrKey("group_source"))
+          valueAccess.linearize must beTreeEqual(projectStrKey("group_source"))
 
           autojoinCondition must beTreeEqual(makeMap("group_source", "group_key_0"))
       }
     }
 
     "convert mappable sort keys" >> {
-      val key1 = projectStrKey("foo")
-      val key2 = projectStrKey("foo")
+      val key1 = recProjectStrKey("foo")
+      val key2 = recProjectStrKey("foo")
 
       val graph: QSUGraph = QSUGraph.fromTree[Fix](
         qsu.lpSort(
@@ -225,14 +228,14 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
             Read(`orders`),
             Nil,
             NEL((fm1, SortDir.Ascending), ICons((fm2, SortDir.Descending), INil())))) =>
-          fm1 must_= key1
-          fm2 must_= key2
+          fm1 must_= key1.linearize
+          fm2 must_= key2.linearize
       }
     }
 
     "convert transposed sort key and mappable sort key" >> {
-      val key1 = projectStrKey("foo")
-      val key2 = projectStrKey("bar")
+      val key1 = recProjectStrKey("foo")
+      val key2 = recProjectStrKey("bar")
 
       val graph: QSUGraph = QSUGraph.fromTree[Fix](
         qsu.lpSort(
@@ -252,13 +255,13 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               NEL((fm1, SortDir.Ascending), ICons((fm2, SortDir.Descending), INil()))),
             valueAccess)) => {
 
-          fm must beTreeEqual(key2)
+          fm.linearize must beTreeEqual(key2.linearize)
 
-          fm1 must beTreeEqual(key1 >> projectStrKey("sort_source"))
+          fm1 must beTreeEqual(key1.linearize >> projectStrKey("sort_source"))
 
           fm2 must beTreeEqual(projectStrKey("sort_key_0"))
 
-          valueAccess must beTreeEqual(projectStrKey("sort_source"))
+          valueAccess.linearize must beTreeEqual(projectStrKey("sort_source"))
 
           autojoinCondition must beTreeEqual(makeMap("sort_source", "sort_key_0"))
         }
@@ -266,10 +269,10 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
     }
 
     "convert two transposed sort keys and two mappable sort keys" >> {
-      val key1 = projectStrKey("key1")
-      val key2 = projectStrKey("key2")
-      val key3 = projectStrKey("key3")
-      val key4 = projectStrKey("key4")
+      val key1 = recProjectStrKey("key1")
+      val key2 = recProjectStrKey("key2")
+      val key3 = recProjectStrKey("key3")
+      val key4 = recProjectStrKey("key4")
 
       val graph: QSUGraph = QSUGraph.fromTree[Fix](
         qsu.lpSort(
@@ -295,19 +298,19 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
                 (fm1, SortDir.Ascending), ICons((fm2, SortDir.Descending), ICons((fm3, SortDir.Descending), ICons((fm4, SortDir.Ascending), INil()))))),
             valueAccess)) => {
 
-          innerFM must beTreeEqual(key2)
+          innerFM.linearize must beTreeEqual(key2.linearize)
 
-          outerFM must beTreeEqual(key4)
+          outerFM.linearize must beTreeEqual(key4.linearize)
 
-          fm1 must beTreeEqual(key1 >> projectStrKey("sort_source"))
+          fm1 must beTreeEqual(key1.linearize >> projectStrKey("sort_source"))
 
           fm2 must beTreeEqual(projectStrKey("sort_key_0"))
 
-          fm3 must beTreeEqual(key3 >> projectStrKey("sort_source"))
+          fm3 must beTreeEqual(key3.linearize >> projectStrKey("sort_source"))
 
           fm4 must beTreeEqual(projectStrKey("sort_key_1"))
 
-          valueAccess must beTreeEqual(projectStrKey("sort_source"))
+          valueAccess.linearize must beTreeEqual(projectStrKey("sort_source"))
 
           innerAutojoinCondition must beTreeEqual(makeMap("sort_source", "sort_key_0"))
 
@@ -319,9 +322,9 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
     }
 
     "convert a partially mappable join condition on both sides" >> {
-      val projectCustomersKey = projectStrKey("customers_key")
-      val projectCustomersKey2 = projectStrKey("customers_key_2")
-      val projectFoo = projectStrKey("foo")
+      val projectCustomersKey = recProjectStrKey("customers_key")
+      val projectCustomersKey2 = recProjectStrKey("customers_key_2")
+      val projectFoo = recProjectStrKey("foo")
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.lpJoin(
@@ -367,14 +370,14 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
                 func.ProjectKeyS(func.RightSide, "right_target_0"),
                 func.ProjectKeyS(func.RightSide, "customers_key_2"))))
 
-          structCustomers must beTreeEqual(projectCustomersKey)
+          structCustomers.linearize must beTreeEqual(projectCustomersKey.linearize)
         }
       }
     }
 
     "convert a non-mappable join condition on both sides" >> {
-      val projectOrdersKey = projectStrKey("orders_key")
-      val projectCustomersKey = projectStrKey("customers_key")
+      val projectOrdersKey = recProjectStrKey("orders_key")
+      val projectCustomersKey = recProjectStrKey("customers_key")
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.lpJoin(
@@ -401,8 +404,8 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           autojoinConditionOrders must beTreeEqual(makeMap("left_source", "left_target_0"))
           autojoinConditionCustomers must beTreeEqual(makeMap("right_source", "right_target_0"))
 
-          structOrders must beTreeEqual(projectOrdersKey)
-          structCustomers must beTreeEqual(projectCustomersKey)
+          structOrders.linearize must beTreeEqual(projectOrdersKey.linearize)
+          structCustomers.linearize must beTreeEqual(projectCustomersKey.linearize)
 
           on must beTreeEqual(
             func.Eq(
@@ -419,8 +422,8 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
     }
 
     "convert a non-mappable join condition on the left" >> {
-      val projectOrdersKey = projectStrKey("orders_key")
-      val projectCustomersKey = projectStrKey("customers_key")
+      val projectOrdersKey = recProjectStrKey("orders_key")
+      val projectCustomersKey = recProjectStrKey("customers_key")
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.lpJoin(
@@ -443,12 +446,12 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
           autojoinCondition must beTreeEqual(makeMap("left_source", "left_target_0"))
 
-          struct must beTreeEqual(projectOrdersKey)
+          struct.linearize must beTreeEqual(projectOrdersKey.linearize)
 
           on must beTreeEqual(
             func.Eq(
               func.ProjectKeyS(func.LeftSide, "left_target_0"),
-              projectCustomersKey.as[JoinSide](RightSide)))
+              projectCustomersKey.linearize.as[JoinSide](RightSide)))
 
           repair must beTreeEqual(
             makeMap("left", "right") >>= {

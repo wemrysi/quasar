@@ -38,7 +38,7 @@ import quasar.qscript.{
   SrcHole,
   Take
 }
-import quasar.qscript.MapFuncsCore.IntLit
+import quasar.qscript.MapFuncsCore.{IntLit, RecIntLit}
 import quasar.qscript.qsu.ApplyProvenance.AuthenticatedQSU
 import matryoshka.EqualT
 import matryoshka.data.Fix
@@ -83,7 +83,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
       }
 
       "convert Map" in {
-        val fm: FreeMap = func.Add(HoleF, IntLit(17))
+        val fm: RecFreeMap = recFunc.Add(recFunc.Hole, RecIntLit(17))
 
         val qgraph: Fix[QSU] = qsu.map(qsu.read(afile), fm)
         val qscript: Fix[QSE] = qse.Map(qse.Read[AFile](afile), fm)
@@ -211,7 +211,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
           concatArr)
 
       val rhs: Free[QSE, Hole] =
-        fqse.Map(fqse.Unreferenced, func.Constant(Fixed[Fix[EJson]].int(1)))
+        fqse.Map(fqse.Unreferenced, recFunc.Constant(Fixed[Fix[EJson]].int(1)))
 
       val qscript =
         qse.Subset(
@@ -226,7 +226,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
           Take,
           fqse.Map(
             Free.pure[QSE, Hole](SrcHole),
-            func.Constant(Fixed[Fix[EJson]].int(11))))
+            recFunc.Constant(Fixed[Fix[EJson]].int(11))))
 
       qgraph must graduateAs(qscript)
     }

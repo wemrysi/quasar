@@ -227,7 +227,7 @@ sealed abstract class OutlineInstances {
     new Outline[QScriptCore[T, ?]] {
       val outlineƒ: Algebra[QScriptCore[T, ?], Shape] = {
         case Map(inShape, fm) =>
-          outlineF(fm)(κ(inShape))
+          outlineF(fm.linearize)(κ(inShape))
 
         case LeftShift(inShape, _, idStatus, _, _, repair) =>
           outlineF(repair) {

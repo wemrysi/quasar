@@ -67,7 +67,7 @@ final class QScriptCorePlanner[
     case qscript.Map(src, f) =>
       for {
         id1 <- genId[T[N1QL], F]
-        ff  <- processFreeMap(f, id1)
+        ff  <- processFreeMap(f.linearize, id1)
       } yield Select(
         Value(true),
         ResultExpr(ff, none).wrapNel,

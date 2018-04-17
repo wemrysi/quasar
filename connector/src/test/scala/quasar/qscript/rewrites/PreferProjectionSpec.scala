@@ -126,12 +126,12 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
       val q =
         fix.Map(
           base,
-          func.DeleteKeyS(func.Hole, "b"))
+          recFunc.DeleteKeyS(recFunc.Hole, "b"))
 
       val e =
         fix.Map(
           base,
-          prjFrom(func.Hole, "a", "c"))
+          recPrjFrom(recFunc.Hole, "a", "c"))
 
       preferProjection[QS](q) must_= e
     }
@@ -224,7 +224,7 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
           base,
           free.Map(
             free.Hole,
-            func.DeleteKeyS(func.Hole, "c")),
+            recFunc.DeleteKeyS(recFunc.Hole, "c")),
           Take,
           free.Reduce(
             free.Hole,
@@ -237,7 +237,7 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
           base,
           free.Map(
             free.Hole,
-            prjFrom(func.Hole, "a", "b")),
+            recPrjFrom(recFunc.Hole, "a", "b")),
           Take,
           free.Reduce(
             free.Hole,
@@ -254,10 +254,10 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
           base,
           free.Map(
             free.Hole,
-            func.DeleteKeyS(func.Hole, "a")),
+            recFunc.DeleteKeyS(recFunc.Hole, "a")),
           free.Map(
             free.Hole,
-            func.DeleteKeyS(func.Hole, "b")),
+            recFunc.DeleteKeyS(recFunc.Hole, "b")),
           func.Eq(
             func.DeleteKeyS(func.LeftSide, "b"),
             func.DeleteKeyS(func.RightSide, "a")),
@@ -271,10 +271,10 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
           base,
           free.Map(
             free.Hole,
-            prjFrom(func.Hole, "b", "c")),
+            recPrjFrom(recFunc.Hole, "b", "c")),
           free.Map(
             free.Hole,
-            prjFrom(func.Hole, "a", "c")),
+            recPrjFrom(recFunc.Hole, "a", "c")),
           func.Eq(
             prjFrom(func.LeftSide, "c"),
             prjFrom(func.RightSide, "c")),

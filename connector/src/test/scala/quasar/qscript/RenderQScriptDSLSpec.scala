@@ -286,7 +286,7 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
     val h = free.Hole
     List[FreeQS](
       free.Hole,
-      free.Map(h, func.Undefined),
+      free.Map(h, recFunc.Undefined),
       free.LeftShift(h, recFunc.Undefined, ExcludeId, ShiftType.Array, OnUndefined.Omit, func.LeftSide),
       free.Reduce(h, Nil, Nil, func.ReduceIndex(1.right)),
       free.Sort(h, Nil, NonEmptyList((func.Hole, SortDir.Ascending))),
@@ -311,7 +311,7 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
     val u = fix.Unreferenced
     val h = free.Hole
     List[Fix[QST]](
-      fix.Map(u, func.Undefined),
+      fix.Map(u, recFunc.Undefined),
       fix.LeftShift(u, recFunc.Undefined, ExcludeId, ShiftType.Array, OnUndefined.Omit, func.LeftSide),
       fix.Reduce(u, Nil, Nil, func.ReduceIndex(1.right)),
       fix.Sort(u, Nil, NonEmptyList((func.Hole, SortDir.Ascending), (func.Hole, SortDir.Descending))),

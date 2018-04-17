@@ -68,7 +68,7 @@ object MappableRegion {
         CoEnv(g.left[FreeMapA[T, QSUGraph[T]]])
 
       case QSUPattern(_, Map(srcG, fm)) =>
-        CoEnv(fm.map(_ => srcG).right[QSUGraph[T]])
+        CoEnv(fm.linearize.map(_ => srcG).right[QSUGraph[T]])
 
       case QSUPattern(_, AutoJoin2(left, right, combine)) =>
         CoEnv(combine.map {

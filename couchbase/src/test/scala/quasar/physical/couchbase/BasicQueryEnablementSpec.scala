@@ -142,9 +142,9 @@ class BasicQueryEnablementSpec
       val qs =
         fix.Map(
           fix.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
-          func.Add(
-            func.ProjectKeyS(func.Hole, "a"),
-            func.ProjectKeyS(func.Hole, "b")))
+          recFunc.Add(
+            recFunc.ProjectKeyS(recFunc.Hole, "a"),
+            recFunc.ProjectKeyS(recFunc.Hole, "b")))
 
       val n1ql = n1qlFromQS(qs)
 

@@ -334,7 +334,7 @@ object RenderQScriptDSL {
 
         (base: String, qsc: QScriptCore[T, A]) => qsc match {
           case Map(src, f) =>
-            DSLTree(base, "Map", (A(base, src).right :: freeMap(base, f).right :: Nil).some)
+            DSLTree(base, "Map", (A(base, src).right :: recFreeMap(base, f).right :: Nil).some)
 
           case LeftShift(src, struct, idStatus, shiftType, undef, repair) =>
             DSLTree(base, "LeftShift",

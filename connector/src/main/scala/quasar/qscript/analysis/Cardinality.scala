@@ -65,7 +65,7 @@ object Cardinality {
         case Subset(card, from, sel, count) => {
           val compile = Cardinality[QScriptTotal[T, ?]].calculate(pathCard)
           def c = count.fold(κ(card / 2), {
-            case I(Map(_, MapFuncsCore.IntLit(v))) => v.toInt
+            case I(Map(_, MapFuncsCore.RecIntLit(v))) => v.toInt
             case _ => card / 2
           })
           sel match {

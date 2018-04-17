@@ -54,7 +54,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
     case qscript.Map(src, f) =>
       import src.P.trans._
       for {
-        trans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(f)
+        trans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(f.linearize)
         newSort = for {
           lastSort <- src.lastSort
           newBucket = lastSort.bucket.flatMap(TransSpec.rephrase(_, Source, trans))

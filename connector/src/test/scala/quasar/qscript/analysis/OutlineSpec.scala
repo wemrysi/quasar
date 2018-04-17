@@ -219,11 +219,16 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
         func.MakeArray(func.Hole),
         func.MakeArray(func.Constant(Fix(ExtEJson(ejson.Int(75))))))
 
+    val recFun =
+      recFunc.ConcatArrays(
+        recFunc.MakeArray(recFunc.Hole),
+        recFunc.MakeArray(recFunc.Constant(Fix(ExtEJson(ejson.Int(75))))))
+
     val modSrc: Shape => Shape =
       s => rollS(CommonEJson(ejson.Arr(List(s, rollS(ExtEJson(ejson.Int(75)))))))
 
     "Map is shape of function applied to source" >> prop { srcShape: Shape =>
-      outlineQC(Map(srcShape, fun)) must_= modSrc(srcShape)
+      outlineQC(Map(srcShape, recFun)) must_= modSrc(srcShape)
     }
 
     "LeftShift(IncludeId) results in shape of repair applied to static array" >> prop { srcShape: Shape =>
@@ -279,12 +284,12 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
     "Subset is the shape of `from` applied to the source shape" >> prop { srcShape: Shape =>
       val from: FreeQS =
         free.Sort(
-          free.Map(free.Hole, fun),
+          free.Map(free.Hole, recFun),
           Nil,
           NonEmptyList((func.Hole, SortDir.Ascending)))
 
       val count: FreeQS =
-        free.Map(free.Hole, func.Constant(json.int(2)))
+        free.Map(free.Hole, recFunc.Constant(json.int(2)))
 
       outlineQC(Subset(srcShape, from, Take, count)) must_= modSrc(srcShape)
     }
@@ -302,12 +307,12 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
     }
   }
 
-  val lfn: FreeMap = MapFuncCore.StaticArray(List(func.Hole, func.Constant(json.int(53))))
+  val lfn: RecFreeMap = MapFuncCore.RecStaticArray(List(recFunc.Hole, recFunc.Constant(json.int(53))))
   val l: FreeQS = free.Map(free.Hole, lfn)
   def lShape(srcShape: Shape): Shape =
     rollS(CommonEJson(ejson.Arr(List(srcShape, rollS(ExtEJson(ejson.Int(53)))))))
 
-  val rfn: FreeMap = MapFuncCore.StaticArray(List(func.Constant(json.int(78)), func.Hole))
+  val rfn: RecFreeMap = MapFuncCore.RecStaticArray(List(recFunc.Constant(json.int(78)), recFunc.Hole))
   val r: FreeQS = free.Map(free.Hole, rfn)
   def rShape(srcShape: Shape): Shape =
     rollS(CommonEJson(ejson.Arr(List(rollS(ExtEJson(ejson.Int(78))), srcShape))))

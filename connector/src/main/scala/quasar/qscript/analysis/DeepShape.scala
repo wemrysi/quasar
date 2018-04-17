@@ -146,7 +146,7 @@ sealed abstract class DeepShapeInstances {
     new DeepShape[T, QScriptCore[T, ?]] {
       def deepShapeƒ: Algebra[QScriptCore[T, ?], FreeShape[T]] = {
 
-        case Map(shape, fm) => fm >> shape
+        case Map(shape, fm) => fm.linearize >> shape
 
         case LeftShift(shape, struct, id, _, _, repair) =>
           repair >>= {

@@ -91,6 +91,18 @@ object MapFuncCore {
       }
   }
 
+  object RecStaticArray {
+    def apply[T[_[_]]: BirecursiveT, A](elems: List[RecFreeMapA[T, A]]): RecFreeMapA[T, A] = {
+      val recFunc = construction.RecFunc[T]
+      val json = ejson.Fixed[T[EJson]]
+
+      elems.map(recFunc.MakeArray(_)) match {
+        case x :: xs => xs.foldLeft(x)(recFunc.ConcatArrays(_, _))
+        case _  => recFunc.Constant(json.arr(List()))
+      }
+    }
+  }
+
   /** Like `StaticArray`, but returns as much of the array as can be statically
     * determined. Useful if you just want to statically lookup into an array if
     * possible, and punt otherwise.
@@ -1072,6 +1084,18 @@ object MapFuncsCore {
 
     def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]): Option[BigInt] =
       mf.resume.fold(IntLitMapFunc.unapply(_), _ => None)
+  }
+
+  object RecIntLit {
+    def apply[T[_[_]]: BirecursiveT, A](i: BigInt): RecFreeMapA[T, A] = {
+      val recFunc = construction.RecFunc[T]
+      val json = ejson.Fixed[T[EJson]]
+
+      recFunc.Constant(json.int(i))
+    }
+
+    def unapply[T[_[_]]: RecursiveT, A](mf: RecFreeMapA[T, A]): Option[BigInt] =
+      mf.linearize.resume.fold(IntLitMapFunc.unapply(_), _ => None)
   }
 
   object IntLitMapFunc {

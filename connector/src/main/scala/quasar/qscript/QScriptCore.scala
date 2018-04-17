@@ -31,7 +31,7 @@ sealed abstract class QScriptCore[T[_[_]], A] extends Product with Serializable
 
 /** A data-level transformation.
   */
-@Lenses final case class Map[T[_[_]], A](src: A, f: FreeMap[T])
+@Lenses final case class Map[T[_[_]], A](src: A, f: RecFreeMap[T])
     extends QScriptCore[T, A]
 
 /** Flattens nested structure, converting each value into a data set, which are
@@ -250,7 +250,7 @@ object QScriptCore {
             v match {
               case Map(src, f) =>
                 NonTerminal("Map" :: nt, None,
-                  RA.render(src) :: f.render :: Nil)
+                  RA.render(src) :: f.linearize.render :: Nil)
               case LeftShift(src, struct, id, stpe, undef, repair) =>
                 NonTerminal("LeftShift" :: nt, None,
                   RA.render(src) ::

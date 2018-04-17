@@ -33,7 +33,7 @@ final class ShapePreservingSpec extends quasar.Qspec with QScriptHelpers {
   "ShapePreserving QScriptCore" >> {
 
     def sr(id: IdStatus) = free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), id)
-    val count = free.Map(free.Unreferenced, func.Constant(json.int(1)))
+    val count = free.Map(free.Unreferenced, recFunc.Constant(json.int(1)))
     def mkSubset(src: Option[IdStatus], from: FreeQS) = Subset(src, from, Take, count)
     def sp(qs: QScriptCore[Option[IdStatus]]): Option[IdStatus] =
       ShapePreserving[QScriptCore].shapePreservingƒ(qs)

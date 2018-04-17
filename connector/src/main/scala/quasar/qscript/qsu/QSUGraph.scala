@@ -606,10 +606,10 @@ object QSUGraph extends QSUGraphInstances {
 
     // TODO doesn't guarantee only one function; could be more!
     object FMFC1 {
-      def unapply[T[_[_]]](fm: FreeMap[T])(
+      def unapply[T[_[_]]](fm: RecFreeMap[T])(
           implicit IC: MapFuncCore[T, ?] :<: MapFunc[T, ?]): Option[MapFuncCore[T, Hole]] = {
 
-        fm.resume.swap.toOption collect {
+        fm.linearize.resume.swap.toOption collect {
           case IC(mfc) => mfc.map(_ => SrcHole: Hole)
         }
       }

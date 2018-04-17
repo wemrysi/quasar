@@ -178,6 +178,7 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[_]: Functor]
 ) extends TTypes[T] {
   import DiscoverPath.ListContents
 
+  private val recFunc = construction.RecFunc[T]
   private def DiscoverPathTotal = DiscoverPath[T, QScriptTotal, QScriptTotal]
   private def DiscoverPathTTotal = new DiscoverPathT[T, QScriptTotal]
 
@@ -195,7 +196,7 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[_]: Functor]
     (name: String, d: F[T[F]])
     (implicit QC: QScriptCore :<: F)
       : F[T[F]] =
-    QC.inj(Map(d.embed, Free.roll(MFC(MakeMap(StrLit(name), HoleF)))))
+    QC.inj(Map(d.embed, recFunc.MakeMapS(name, recFunc.Hole)))
 
   private val unionDirs: List[ADir] => Option[NonEmptyList[T[O]]] =
     _ ∘ (makeRead[O](_).embed) match {

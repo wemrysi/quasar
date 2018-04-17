@@ -35,9 +35,9 @@ object construction {
   final case class RecFunc[T[_[_]]: BirecursiveT]() {
     private val json = ejson.Fixed[T[EJson]]
     private def rollCore[A](in: MapFuncCore[T, RecFreeMapA[T, A]]): RecFreeMapA[T, A] =
-      Free.roll(RecFreeS.Suspend(MFC(in)))
+      RecFreeS.roll(MFC(in))
     private def rollDerived[A](in: MapFuncDerived[T, RecFreeMapA[T, A]]): RecFreeMapA[T, A] =
-      Free.roll(RecFreeS.Suspend(MFD(in)))
+      RecFreeS.roll(MFD(in))
 
     def Constant[A](in: T[EJson]): RecFreeMapA[T, A] =
       rollCore(MapFuncsCore.Constant(in))
@@ -254,7 +254,7 @@ object construction {
       RecFreeS.letIn(form, body)
   }
 
-  final case class Func[T[_[_]]]()(implicit birec: BirecursiveT[T]) {
+  final case class Func[T[_[_]]: BirecursiveT]() {
     private val json = ejson.Fixed[T[EJson]]
     private def rollCore[A](in: MapFuncCore[T, FreeMapA[T, A]]): FreeMapA[T, A] = Free.roll(MFC(in))
     private def rollDerived[A](in: MapFuncDerived[T, FreeMapA[T, A]]): FreeMapA[T, A] = Free.roll(MFD(in))
@@ -495,8 +495,10 @@ object construction {
                                          injCore: Injectable.Aux[QScriptCore[T, ?], F],
                                          injTotal: Injectable.Aux[F, QScriptTotal[T, ?]]) {
     private def core(fr: QScriptCore[T, R]): R = embed(injCore.inject(fr))
-    def Map(r: R, func: FreeMap[T]): R =
+
+    def Map(r: R, func: RecFreeMap[T]): R =
       core(qscript.Map[T, R](r, func))
+
     def LeftShift(src: R,
                   struct: RecFreeMap[T],
                   idStatus: IdStatus,
@@ -504,33 +506,42 @@ object construction {
                   onUndefined: OnUndefined,
                   repair: JoinFunc[T]): R =
       core(qscript.LeftShift(src, struct, idStatus, shiftType, onUndefined, repair))
+
     def Reduce(src: R,
                bucket: List[FreeMap[T]],
                reducers: List[ReduceFunc[FreeMap[T]]],
                repair: FreeMapA[T, ReduceIndex]): R =
       core(qscript.Reduce(src, bucket, reducers, repair))
+
     def Sort(src: R,
              bucket: List[FreeMap[T]],
              order: NonEmptyList[(FreeMap[T], SortDir)]): R =
       core(qscript.Sort(src, bucket, order))
+
     def Union(src: R,
               lBranch: Free[F, Hole],
               rBranch: Free[F, Hole]): R =
       core(qscript.Union(src, lBranch.mapSuspension(injTotal.inject), rBranch.mapSuspension(injTotal.inject)))
+
     def Filter(src: R,
                f: FreeMap[T]): R =
       core(qscript.Filter(src, f))
+
     def Subset(src: R,
                from: Free[F, Hole],
                op: SelectionOp,
                count: Free[F, Hole]): R =
       core(qscript.Subset(src, from.mapSuspension(injTotal.inject), op, count.mapSuspension(injTotal.inject)))
+
     def Unreferenced: R =
       core(qscript.Unreferenced())
+
     def BucketKey(src: R, value: FreeMap[T], name: FreeMap[T])(implicit F: Injectable.Aux[ProjectBucket[T, ?], F]): R =
       embed(F.inject(qscript.BucketKey(src, value, name)))
+
     def BucketIndex(src: R, value: FreeMap[T], index: FreeMap[T])(implicit F: Injectable.Aux[ProjectBucket[T, ?], F]): R =
       embed(F.inject(qscript.BucketIndex(src, value, index)))
+
     def ThetaJoin(src: R,
                   lBranch: Free[F, Hole],
                   rBranch: Free[F, Hole],
@@ -539,6 +550,7 @@ object construction {
                   combine: JoinFunc[T])
                  (implicit F: Injectable.Aux[ThetaJoin[T, ?], F]): R =
       embed(F.inject(qscript.ThetaJoin(src, lBranch.mapSuspension(injTotal.inject), rBranch.mapSuspension(injTotal.inject), on, f, combine)))
+
     def EquiJoin(src: R,
                  lBranch: Free[F, Hole],
                  rBranch: Free[F, Hole],
@@ -547,15 +559,19 @@ object construction {
                  combine: JoinFunc[T])
                 (implicit F: Injectable.Aux[EquiJoin[T, ?], F]): R =
       embed(F.inject(qscript.EquiJoin(src, lBranch.mapSuspension(injTotal.inject), rBranch.mapSuspension(injTotal.inject), key, f, combine)))
+
     def ShiftedRead[A](path: A,
                        idStatus: IdStatus)
                       (implicit F: Injectable.Aux[Const[ShiftedRead[A], ?], F]): R =
       embed(F.inject(Const(qscript.ShiftedRead(path, idStatus))))
+
     def Read[A](path: A)
                (implicit F: Injectable.Aux[Const[Read[A], ?], F]): R =
       embed(F.inject(Const(qscript.Read(path))))
+
     def Root(implicit F: Injectable.Aux[Const[DeadEnd, ?], F]): R =
       embed(F.inject(Const(qscript.Root)))
+
     def Hole(implicit ev: Free[F, Hole] === R): R =
       ev(Free.pure(SrcHole))
   }
