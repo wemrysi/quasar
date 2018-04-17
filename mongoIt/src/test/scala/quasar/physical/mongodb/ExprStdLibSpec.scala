@@ -47,7 +47,12 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
   /** Identify constructs that are expected not to be implemented in the pipeline. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     /* DATE */
-    case (date.ExtractIsoYear, _) => Pending("TODO").left
+    case (date.ExtractIsoYear, _) if advertisedVersion(backend) lt `3.6`.some =>
+      Pending("not implemented in aggregation on MongoDB < 3.6").left
+    // Not working for year < 1 for any date-like types, but we just have tests for LocalDate
+    case (date.ExtractIsoYear, List(Data.LocalDate(d))) 
+      if d.getYear < 1 && advertisedVersion(backend) === `3.6`.some =>
+        Pending("TODO").left
     case (date.ExtractWeek, _) => Pending("TODO").left
 
     case (date.ExtractHour, Data.LocalTime(_) :: Nil) => Pending("TODO").left

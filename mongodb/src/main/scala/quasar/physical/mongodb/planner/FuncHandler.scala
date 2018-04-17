@@ -50,6 +50,11 @@ import simulacrum.typeclass
     (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
       : AlgebraM[(Option ∘ M)#λ, IN, Fix[EX]]
 
+  def handleOps3_6[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
+    (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX, e36: ExprOp3_6F :<: EX)
+      : AlgebraM[(Option ∘ M)#λ, IN, Fix[EX]]
+
   def handle3_2[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
     (v: BsonVersion)
     (implicit e32: ExprOpCoreF :<: EX)
@@ -61,7 +66,7 @@ import simulacrum.typeclass
     (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX)
       : AlgebraM[M, IN, Fix[EX]] = f => {
     val h34 = handleOps3_4[EX, M](v)
-    val h = handleOpsCore[EX, M](v)
+    val h = handle3_2[EX, M](v)
     h34(f) getOrElse h(f)
   }
 
@@ -70,9 +75,17 @@ import simulacrum.typeclass
     (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
      : AlgebraM[M, IN, Fix[EX]] = f => {
     val h344 = handleOps3_4_4[EX, M](v)
-    val h34 = handleOps3_4[EX, M](v)
-    val h = handleOpsCore[EX, M](v)
-    h344(f) getOrElse (h34(f) getOrElse h(f))
+    val h34 = handle3_4[EX, M](v)
+    h344(f) getOrElse h34(f)
+  }
+
+  def handle3_6[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
+    (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX, e36: ExprOp3_6F :<: EX)
+     : AlgebraM[M, IN, Fix[EX]] = f => {
+    val h36 = handleOps3_6[EX, M](v)
+    val h344 = handle3_4_4[EX, M](v)
+    h36(f) getOrElse h344(f)
   }
 }
 
@@ -328,6 +341,26 @@ object FuncHandler {
         (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
           : AlgebraM[(Option ∘ M)#λ, MapFuncCore[T, ?], Fix[EX]] = κ(None)
 
+      def handleOps3_6[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+        (v: BsonVersion)
+        (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX, e36: ExprOp3_6F :<: EX)
+          : AlgebraM[(Option ∘ M)#λ, MapFuncCore[T, ?], Fix[EX]] = { mfc =>
+
+        val fp32  = new ExprOpCoreF.fixpoint[Fix[EX], EX](_.embed)
+        val fp36  = new ExprOp3_6F.fixpoint[Fix[EX], EX](_.embed)
+
+        import fp32._, fp36._
+
+        val check = new Check[Fix[EX], EX]
+
+        mfc.some collect {
+          case ExtractIsoYear(a1) =>
+            $let(
+              ListMap(DocVar.Name("parts") -> $dateToParts(a1, $literal(Bson.Text("+00:00")), true)),
+              $var(DocVar.ROOT(BsonField.Name("$parts")) \ BsonField.Name("isoWeekYear"))).point[M]
+        }
+      }
+
     }
 
   implicit def mapFuncDerived[T[_[_]]: CorecursiveT]
@@ -363,6 +396,11 @@ object FuncHandler {
         (v: BsonVersion)
         (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
           : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] = κ(None)
+
+      def handleOps3_6[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+        (v: BsonVersion)
+        (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX, e36: ExprOp3_6F :<: EX)
+          : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] = κ(None)
     }
 
   implicit def mapFuncCoproduct[F[_], G[_]]
@@ -393,6 +431,14 @@ object FuncHandler {
           F.handleOps3_4_4[EX, M](v).apply _,
           G.handleOps3_4_4[EX, M](v).apply _)
 
+      def handleOps3_6[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+        (v: BsonVersion)
+        (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX, e36: ExprOp3_6F :<: EX)
+          : AlgebraM[(Option ∘ M)#λ, Coproduct[F, G, ?], Fix[EX]] =
+        _.run.fold(
+          F.handleOps3_6[EX, M](v).apply _,
+          G.handleOps3_6[EX, M](v).apply _)
+
     }
 
   def handle3_2[F[_]: FuncHandler, M[_]: Monad: MonadFsErr: ExecTimeR]
@@ -413,5 +459,5 @@ object FuncHandler {
   def handle3_6[F[_]: FuncHandler, M[_]: Monad: MonadFsErr: ExecTimeR]
     (v: BsonVersion)
       : AlgebraM[M, F, Fix[Expr3_6]] =
-    FuncHandler[F].handle3_4_4[Expr3_6, M](v)
+    FuncHandler[F].handle3_6[Expr3_6, M](v)
 }
