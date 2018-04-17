@@ -268,6 +268,8 @@ lazy val root = project.in(file("."))
 //   |         |         |
               fs,     niflheim,
 //   |         |         |
+            qscript,
+//   |         |         |
     sql, connector,   yggdrasil,
 //   |   /  | | \ \______|________________________
 //   |  /   | |  \      /     \         \         \
@@ -348,7 +350,10 @@ lazy val common = project
   .settings(name := "quasar-common-internal")
   // TODO: The dependency on `js` is because `Data` encapsulates its `toJs`,
   //       which should be extracted.
-  .dependsOn(foundation % BothScopes, ejson % BothScopes, js % BothScopes)
+  .dependsOn(
+    foundation % BothScopes,
+    ejson % BothScopes,
+    js % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -428,6 +433,19 @@ lazy val fs = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val qscript = project
+  .settings(name := "quasar-qscript-internal")
+  .dependsOn(
+    foundation % "test->test",
+    effect,
+    frontend   % BothScopes,
+    sql        % "test->test",
+    fs)
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
@@ -435,6 +453,7 @@ lazy val connector = project
     effect   % BothScopes,
     frontend % BothScopes,
     fs,
+    qscript,
     sql      % "test->test")
   .settings(commonSettings)
   .settings(publishTestsSettings)
@@ -449,7 +468,9 @@ lazy val connector = project
   */
 lazy val couchbase = project
   .settings(name := "quasar-couchbase-internal")
-  .dependsOn(connector % BothScopes)
+  .dependsOn(
+    qscript   % "test->test",
+    connector % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(libraryDependencies ++= Dependencies.couchbase)
@@ -559,7 +580,10 @@ lazy val web = project
 lazy val it = project
   .settings(name := "quasar-it-internal")
   .configs(ExclusiveTests)
-  .dependsOn(web % BothScopes, core % BothScopes)
+  .dependsOn(
+    core % BothScopes,
+    qscript % "test->test",
+    web % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -666,7 +690,11 @@ lazy val blueeyes = project.setup
 
 lazy val mimir = project.setup
   .settings(name := "quasar-mimir-internal")
-  .dependsOn(yggdrasil % BothScopes, blueeyes, precog % BothScopes, connector)
+  .dependsOn(
+    yggdrasil % BothScopes,
+    blueeyes,
+    precog % BothScopes,
+    connector)
   .scalacArgs("-Ypartial-unification")
   .withWarnings
   .settings(libraryDependencies ++= Dependencies.mimir)
