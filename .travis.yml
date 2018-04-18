@@ -29,9 +29,6 @@ env:
     - CONNECTOR=mongodb_3_4_13
     - CONNECTOR=mongodb_3_6
     - CONNECTOR=mongodb_read_only
-    - CONNECTOR=postgres
-    # - CONNECTOR=spark_local_test # no spark for 2.12
-    # - CONNECTOR=spark_hdfs # no spark for 2.12
   global:
     - COURSIER_PROGRESS=0
     - SBT=./sbt
@@ -51,7 +48,7 @@ script:
   - set -e
 
   # travis installs postgres by default this will stop and free up the psql port
-  # needed by the  postgreql container
+  # needed by the postgresql container
   - sudo /etc/init.d/postgresql stop
   - sudo /etc/init.d/mysql stop
   - sudo service memcached stop
@@ -74,26 +71,7 @@ script:
       couchbase) SPECIFIC_DELEGATE="couchbaseIt/testOnly -- xonly failtrace" ;;
       marklogic_*) SPECIFIC_DELEGATE="marklogicIt/testOnly -- xonly failtrace" ;;
       mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly failtrace" ;;
-
-      spark_hdfs)
-
-        ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-          'set every assemblyJarName in assembly := "sparkcore.jar"' \
-          'set every sparkDependencyProvided := true' \
-          sparkcore/assembly
-
-        cp ./.targets/sparkcore/scala-2.11/sparkcore.jar $TRAVIS_BUILD_DIR
-
-        export SPARKCORE_JAR_PATH="$TRAVIS_BUILD_DIR/sparkcore.jar"
-
-        ;;
-
-      *) ;;
     esac
-
-  # workaround for the fact that travis caching isn't working. when it starts working again, remove this
-  - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION foundation/test:compile
-  - travis_wait $BUILD_HACK_TIMEOUT ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
 
   # then run the tests (note that this re-runs some tests; we can get rid of that once we have polyrepo)
   - |-
@@ -145,24 +123,12 @@ jobs:
 
         - ./sbt preBuild
 
-        # workaround for the fact that travis caching isn't working. when it starts working again, remove this
-        - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION foundation/test:compile
-        - travis_wait $BUILD_HACK_TIMEOUT ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
-
         - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc web/assembly'
 
         - scripts/testJar
 
         # release to sonatype
         - scripts/quasarPublishAndTag
-
-        # recreate sparkcore.jar, which is just going to hang out
-        # sparkcore currently disabled
-        # - |-
-        #   ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-        #     'set every assemblyJarName in assembly := "sparkcore.jar"' \
-        #     'set every sparkDependencyProvided := true' \
-        #     sparkcore/assembly
 
         # release to github
         - scripts/publishJar

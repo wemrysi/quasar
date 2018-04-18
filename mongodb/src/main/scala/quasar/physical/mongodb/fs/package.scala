@@ -17,7 +17,7 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar.connector.{EnvironmentError, EnvErrT, EnvErr}
+import quasar.connector.{EnvErrT, EnvErr}
 import quasar.common.PhaseResultT
 import quasar.config._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
