@@ -324,7 +324,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
       import src.P.trans._
 
       for {
-        trans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(f)
+        trans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(f.linearize)
       } yield MimirRepr.withSort(src.P)(src.table.transform(Filter(TransSpec1.Id, trans)))(src.lastSort)
 
     case qscript.Union(src, lBranch, rBranch) =>
