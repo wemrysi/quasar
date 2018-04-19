@@ -87,17 +87,6 @@ object ExprOp3_6F {
     if (i === -1) none else i.some
   }
 
-  val dateFromPartsArgNames: List[(TemporalPart, String)] =
-    List[(TemporalPart, String)](
-      Year -> DateParts.year,
-      Month -> DateParts.month,
-      Day -> DateParts.day,
-      Hour -> DateParts.hour,
-      Minute -> DateParts.minute,
-      Second -> DateParts.second,
-      Millisecond -> DateParts.millisecond
-    )
-
   implicit val equal: Delay[Equal, ExprOp3_6F] =
     new Delay[Equal, ExprOp3_6F] {
       def apply[A](eq: Equal[A]) = {
