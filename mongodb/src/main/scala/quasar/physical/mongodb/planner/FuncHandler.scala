@@ -160,10 +160,9 @@ object FuncHandler {
                 $literal(Bson.Bool(false)),
                 $literal(Bson.Undefined))).point[M]
 
-          case ExtractCentury(a1) =>
-            $trunc($divide($add($year(a1), $literal(Bson.Int32(99))), $literal(Bson.Int32(100)))).point[M]
+          case ExtractCentury(a1) => mkYearToCentury($year(a1)).point[M]
           case ExtractDayOfMonth(a1) => $dayOfMonth(a1).point[M]
-          case ExtractDecade(a1) => $trunc($divide($year(a1), $literal(Bson.Int32(10)))).point[M]
+          case ExtractDecade(a1) => mkYearToDecade($year(a1)).point[M]
           case ExtractDayOfWeek(a1) => $subtract($dayOfWeek(a1), $literal(Bson.Int32(1))).point[M]
           case ExtractDayOfYear(a1) => $dayOfYear(a1).point[M]
           case ExtractEpoch(a1) =>
@@ -181,8 +180,7 @@ object FuncHandler {
                 $multiply($second(a1), $literal(Bson.Int32(1000))),
                 $millisecond(a1)),
               $literal(Bson.Int32(1000))).point[M]
-          case ExtractMillennium(a1) =>
-            $trunc($divide($add($year(a1), $literal(Bson.Int32(999))), $literal(Bson.Int32(1000)))).point[M]
+          case ExtractMillennium(a1) => mkYearToMillenium($year(a1)).point[M]
           case ExtractMillisecond(a1) =>
             $add(
               $multiply($second(a1), $literal(Bson.Int32(1000))),
