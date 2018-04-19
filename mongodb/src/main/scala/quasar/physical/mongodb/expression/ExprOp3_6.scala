@@ -30,6 +30,20 @@ trait ExprOp3_6F[A]
 
 object ExprOp3_6F {
 
+  object DateParts {
+    val isoWeekYear = "isoWeekYear"
+    val isoWeek = "isoWeek"
+    val isoDayOfWeek = "isoDayOfWeek"
+    val year = "year"
+    val month = "month"
+    val day = "day"
+    val hour = "hour"
+    val minute = "minute"
+    val second = "second"
+    val millisecond = "millisecond"
+    val timezone = "timezone"
+  }
+
   final case class $mergeObjectsF[A](docs: List[A]) extends ExprOp3_6F[A]
   final case class $dateFromStringF[A](string: A, timezone: Option[A]) extends ExprOp3_6F[A]
   final case class $dateFromPartsF[A](
@@ -107,24 +121,24 @@ object ExprOp3_6F {
               (t.map(tz => ListMap("timezone" -> tz)).getOrElse(ListMap()))))
         case $dateFromPartsF(y, m, d, h, mi, s, ms, t) =>
           Bson.Doc("$dateFromParts" -> Bson.Doc.opt(ListMap(
-            "year" -> y.some,
-            "month" -> m,
-            "day" -> d,
-            "hour" -> h,
-            "minute" -> mi,
-            "second" -> s,
-            "millisecond" -> ms,
-            "timezone" -> t)))
+            DateParts.year -> y.some,
+            DateParts.month -> m,
+            DateParts.day -> d,
+            DateParts.hour -> h,
+            DateParts.minute -> mi,
+            DateParts.second -> s,
+            DateParts.millisecond -> ms,
+            DateParts.timezone -> t)))
         case $dateFromPartsIsoF(y, w, d, h, mi, s, ms, t) =>
           Bson.Doc("$dateFromParts" -> Bson.Doc.opt(ListMap(
-            "isoWeekYear" -> y.some,
-            "isoWeek" -> w,
-            "isoDayOfWeek" -> d,
-            "hour" -> h,
-            "minute" -> mi,
-            "second" -> s,
-            "millisecond" -> ms,
-            "timezone" -> t)))
+            DateParts.isoWeekYear -> y.some,
+            DateParts.isoWeek -> w,
+            DateParts.isoDayOfWeek -> d,
+            DateParts.hour -> h,
+            DateParts.minute -> mi,
+            DateParts.second -> s,
+            DateParts.millisecond -> ms,
+            DateParts.timezone -> t)))
         case $dateToPartsF(d, t, i) =>
           Bson.Doc("$dateToParts" -> Bson.Doc.opt(ListMap(
             "date" -> d.some,

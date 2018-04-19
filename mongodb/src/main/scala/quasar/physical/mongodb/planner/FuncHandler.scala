@@ -351,6 +351,7 @@ object FuncHandler {
         val fp36  = new ExprOp3_6F.fixpoint[Fix[EX], EX](_.embed)
 
         import fp32._, fp36._
+        import ExprOp3_6F.DateParts
 
         def extractDateFieldIso(date: Fix[EX], fieldName: BsonField.Name): Fix[EX] =
           $let(
@@ -359,13 +360,13 @@ object FuncHandler {
 
         val pairs: List[(TemporalPart, BsonField.Name)] =
           List[(TemporalPart, String)](
-            Year -> "year",
-            Month -> "month",
-            Day -> "day",
-            Hour -> "hour",
-            Minute -> "minute",
-            Second -> "second",
-            Millisecond -> "millisecond"
+            Year -> DateParts.year,
+            Month -> DateParts.month,
+            Day -> DateParts.day,
+            Hour -> DateParts.hour,
+            Minute -> DateParts.minute,
+            Second -> DateParts.second,
+            Millisecond -> DateParts.millisecond
           ).map(p => (p._1, BsonField.Name(p._2)))
 
         def truncFields(part: TemporalPart): Option[NonEmptyList[BsonField.Name]] = {
@@ -378,11 +379,11 @@ object FuncHandler {
 
         mfc.some collect {
           case ExtractIsoDayOfWeek(a1) =>
-            extractDateFieldIso(a1, BsonField.Name("isoDayOfWeek")).point[M]
+            extractDateFieldIso(a1, BsonField.Name(DateParts.isoDayOfWeek)).point[M]
           case ExtractIsoYear(a1) =>
-            extractDateFieldIso(a1, BsonField.Name("isoWeekYear")).point[M]
+            extractDateFieldIso(a1, BsonField.Name(DateParts.isoWeekYear)).point[M]
           case ExtractWeek(a1) =>
-            extractDateFieldIso(a1, BsonField.Name("isoWeek")).point[M]
+            extractDateFieldIso(a1, BsonField.Name(DateParts.isoWeek)).point[M]
           case LocalDate(a1) => $dateFromString(a1, None).point[M]
           case LocalDateTime(a1) => $dateFromString(a1, None).point[M]
           case tt @ TemporalTrunc(part, a1) =>
