@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.connector.{EnvErrT, EnvErr}
 import quasar.common.PhaseResultT
 import quasar.config._
-import quasar.effect.{Failure, KeyValueStore, MonotonicSeq, NameGenerator => NG}
+import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
 import quasar.contrib.pathy._
 import quasar.fp._, free._
 import quasar.fs._, mount._
@@ -57,15 +57,7 @@ package object fs {
   final case class MongoConfig(
     client: MongoClient,
     serverVersion: ServerVersion,
-    defaultDb: Option[fs.DefaultDb],
     wfExec: WorkflowExecutor[MongoDbIO, BsonCursor])
-
-  final case class DefaultDb(run: DatabaseName)
-
-  object DefaultDb {
-    def fromPath(path: APath): Option[DefaultDb] =
-      Collection.dbNameFromPath(path).map(DefaultDb(_)).toOption
-  }
 
   final case class Salt(s: String) extends scala.AnyVal
 
@@ -76,9 +68,8 @@ package object fs {
     (for {
       client <- asyncClientDef[Task](uri)
       version <- free.lift(MongoDbIO.serverVersion.run(client)).into[Task].liftM[DefErrT]
-      defDb <- free.lift(findDefaultDb.run(client)).into[Task].liftM[DefErrT]
       wfExec <- wfExec(client)
-    } yield MongoConfig(client, version, defDb, wfExec)).mapT(freeTaskToTask.apply)
+    } yield MongoConfig(client, version, wfExec)).mapT(freeTaskToTask.apply)
 
   def compile(cfg: MongoConfig): BackendDef.DefErrT[Task, (MongoM ~> Task, Task[Unit])] =
     (effToTask(cfg) map (i => (
@@ -121,7 +112,7 @@ package object fs {
     (
       MonotonicSeq.from(0L) |@|
       Task.delay(MongoDbIO.runNT(cfg.client)) |@|
-      queryfile.run[BsonCursor, PhysFsEff](cfg.client, cfg.defaultDb) |@|
+      queryfile.run[BsonCursor, PhysFsEff](cfg.client) |@|
       managefile.run[PhysFsEff](cfg.client) |@|
       KeyValueStore.impl.default[ReadFile.ReadHandle, BsonCursor] |@|
       KeyValueStore.impl.default[WriteFile.WriteHandle, Collection]
@@ -140,15 +131,6 @@ package object fs {
     NaturalTransformation.refl[Task],
     Failure.toRuntimeError[Task, PhysicalError]
   ))
-
-  private def findDefaultDb: MongoDbIO[Option[DefaultDb]] =
-    (for {
-      coll0  <- MongoDbIO.liftTask(NG.salt).liftM[OptionT]
-      coll   =  CollectionName(s"__${coll0}__")
-      dbName <- MongoDbIO.firstWritableDb(coll)
-      _      <- MongoDbIO.dropCollection(Collection(dbName, coll))
-                  .attempt.void.liftM[OptionT]
-    } yield DefaultDb(dbName)).run
 
   private[fs] def asyncClientDef[S[_]](
     uri: ConnectionUri
