@@ -17,9 +17,10 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar._, Planner.PlannerError
+import quasar._
 import quasar.contrib.scalaz._
 import quasar.fs.FileSystemError, FileSystemError.qscriptPlanningFailed
+import quasar.fs.Planner.PlannerError
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._

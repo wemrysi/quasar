@@ -17,11 +17,10 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar.{NameGenerator => NG}
-import quasar.connector.{EnvironmentError, EnvErrT, EnvErr}
+import quasar.connector.{EnvErrT, EnvErr}
 import quasar.common.PhaseResultT
 import quasar.config._
-import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
+import quasar.effect.{Failure, KeyValueStore, MonotonicSeq, NameGenerator => NG}
 import quasar.contrib.pathy._
 import quasar.fp._, free._
 import quasar.fs._, mount._

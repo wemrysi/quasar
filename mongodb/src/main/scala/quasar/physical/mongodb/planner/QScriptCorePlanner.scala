@@ -17,14 +17,15 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.{Planner => QPlanner, _}, QPlanner._
+import quasar.{RenderTree, Type}
 import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.MonadFsErr
+import quasar.fs.{Planner => QPlanner, _}, QPlanner._
+import quasar.jscore
 import quasar.jscore.JsFn
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
@@ -65,8 +66,8 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT] extends
       WB: WorkflowBuilder.Ops[WF],
       ev3: ExprOpCoreF :<: EX,
       ev4: EX :<: ExprOp) = {
-    case qscript.Map(src, f) =>
-      getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler, cfg.bsonVersion)(src, f)
+    case quasar.qscript.Map(src, f) =>
+      getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler, cfg.bsonVersion)(src, f.linearize)
     case LeftShift(src, struct, id, shiftType, onUndef, repair) => {
       def rewriteUndefined[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
         case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined()))))))))

@@ -16,11 +16,11 @@
 
 package quasar.physical.mongodb
 
-import quasar.{Planner => _, _}
+import quasar._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultTell}
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
-import quasar.fs.{FileSystemError, MonadFsErr}
+import quasar.fs.{FileSystemError, MonadFsErr, Planner => _}
 import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.{selector => _, _}
@@ -37,7 +37,6 @@ import org.bson.BsonDocument
 import scalaz._, Scalaz._
 
 object MongoDbPlanner {
-
   def toMongoQScript[
       T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
       M[_]: Monad: MonadFsErr: PhaseResultTell]
