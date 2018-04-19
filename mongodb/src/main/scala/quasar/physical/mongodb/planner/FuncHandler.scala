@@ -26,6 +26,7 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.common._
 import quasar.qscript.{MapFuncsDerived => D, _}, MapFuncsCore._
 import quasar.qscript.rewrites.{Coalesce => _}
+import quasar.time.TemporalPart
 
 import matryoshka._
 import matryoshka.data._
@@ -362,6 +363,23 @@ object FuncHandler {
           cond => f =>
             if (cond) selectPartsField(f).some else none
 
+        def dateWith(
+          date: Fix[EX],
+          year: Option[Fix[EX]],
+          month: Option[Option[Fix[EX]]]): Fix[EX] =
+          $let(
+            ListMap(
+              DocVar.Name("parts") -> $dateToParts(date, None, false.some)),
+            $dateFromParts(
+              y  = year.getOrElse(selectPartsField(DateParts.year)),
+              m  = month.getOrElse(selectPartsField(DateParts.month).some),
+              d  = none,
+              h  = none,
+              mi = none,
+              s  = none,
+              ms = none,
+              tz = none))
+
         mfc.some collect {
           case ExtractIsoDayOfWeek(a1) =>
             extractDateFieldIso(a1, BsonField.Name(DateParts.isoDayOfWeek)).point[M]
@@ -373,10 +391,6 @@ object FuncHandler {
           case LocalDateTime(a1) => $dateFromString(a1, None).point[M]
           case tt @ TemporalTrunc(part, a1) =>
             ExprOp3_6F.dateFromPartsArgIndex(part) match {
-              case None =>
-                val mf: MapFuncCore[T,quasar.qscript.Hole] =
-                  (tt : MapFuncCore[T, Fix[EX]]).as(SrcHole)
-                unimplemented[M, Fix[EX]](s"expression ${mf.shows}")
               case Some(i) =>
                 $let(
                   ListMap(
@@ -390,8 +404,39 @@ object FuncHandler {
                     s  = selectPartsFieldIf(i >= 5)(DateParts.second),
                     ms = selectPartsFieldIf(i >= 6)(DateParts.millisecond),
                     tz = none)).point[M]
+              case None =>
+                part match {
+                  case TemporalPart.Millennium =>
+                    dateWith(
+                      date = a1,
+                      year = mkTruncBy(1000, selectPartsField(DateParts.year)).some,
+                      month = Some(None)).point[M]
+                  case TemporalPart.Century =>
+                    dateWith(
+                      date = a1,
+                      year = mkTruncBy(100, selectPartsField(DateParts.year)).some,
+                      month = Some(None)).point[M]
+                  case TemporalPart.Decade =>
+                    dateWith(
+                      date = a1,
+                      year = mkTruncBy(10, selectPartsField(DateParts.year)).some,
+                      month = Some(None)).point[M]
+                  case TemporalPart.Quarter =>
+                    dateWith(
+                      date = a1,
+                      year = none,
+                      month = Some(Some(
+                        $add(
+                          $literal(Bson.Int32(1)),
+                          mkTruncBy(3, $subtract(
+                            selectPartsField(DateParts.month),
+                            $literal(Bson.Int32(1)))))))).point[M]
+                  case _ =>
+                    val mf: MapFuncCore[T,quasar.qscript.Hole] =
+                      (tt : MapFuncCore[T, Fix[EX]]).as(SrcHole)
+                    unimplemented[M, Fix[EX]](s"expression ${mf.shows}")
                 }
-
+            }
         }
       }
     }

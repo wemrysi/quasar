@@ -513,6 +513,9 @@ object ExprOpCoreF {
     def mkYearToMillenium(year: T): T =
       $trunc($divide($add(year, $literal(Bson.Int32(999))), $literal(Bson.Int32(1000))))
 
+    def mkTruncBy(i: Int, t: T): T =
+      $multiply($trunc($divide(t, $literal(Bson.Int32(i)))), $literal(Bson.Int32(i)))
+
     // FIXME: used only by tests and should live in src/test somewhere
     def $field(field: String, others: String*): T =
       $var(DocField(others.map(BsonField.Name(_)).foldLeft[BsonField](BsonField.Name(field))(_ \ _)))

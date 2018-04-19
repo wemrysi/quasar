@@ -154,10 +154,6 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
   }
 
   def skipTemporalTrunc(part: TemporalPart): Boolean = part match {
-    case TemporalPart.Millennium => true
-    case TemporalPart.Century => true
-    case TemporalPart.Decade => true
-    case TemporalPart.Quarter => true
     case TemporalPart.Week => true
     case TemporalPart.Microsecond => true
     case _ => false
