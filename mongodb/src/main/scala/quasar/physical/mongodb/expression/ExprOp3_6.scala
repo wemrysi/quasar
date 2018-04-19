@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.physical.mongodb.{Bson}
+import quasar.time.TemporalPart, TemporalPart._
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -42,6 +43,7 @@ object ExprOp3_6F {
     val second = "second"
     val millisecond = "millisecond"
     val timezone = "timezone"
+
   }
 
   final case class $mergeObjectsF[A](docs: List[A]) extends ExprOp3_6F[A]
@@ -67,6 +69,34 @@ object ExprOp3_6F {
     timezone: Option[A]
   ) extends ExprOp3_6F[A]
   final case class $dateToPartsF[A](date: A, timezone: Option[A], iso8601: Option[Boolean]) extends ExprOp3_6F[A]
+
+  // the order of $dateFromPartsF's TemporalPart arguments
+  private val dateFromPartsArgs =
+    List[TemporalPart](
+      Year,
+      Month,
+      Day,
+      Hour,
+      Minute,
+      Second,
+      Millisecond
+    )
+
+  def dateFromPartsArgIndex(part: TemporalPart): Option[Int] = {
+    val i = dateFromPartsArgs.indexWhere(_ === part)
+    if (i === -1) none else i.some
+  }
+
+  val dateFromPartsArgNames: List[(TemporalPart, String)] =
+    List[(TemporalPart, String)](
+      Year -> DateParts.year,
+      Month -> DateParts.month,
+      Day -> DateParts.day,
+      Hour -> DateParts.hour,
+      Minute -> DateParts.minute,
+      Second -> DateParts.second,
+      Millisecond -> DateParts.millisecond
+    )
 
   implicit val equal: Delay[Equal, ExprOp3_6F] =
     new Delay[Equal, ExprOp3_6F] {

@@ -26,7 +26,6 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.common._
 import quasar.qscript.{MapFuncsDerived => D, _}, MapFuncsCore._
 import quasar.qscript.rewrites.{Coalesce => _}
-import quasar.time.TemporalPart, TemporalPart._
 
 import matryoshka._
 import matryoshka.data._
@@ -358,24 +357,12 @@ object FuncHandler {
             ListMap(DocVar.Name("parts") -> $dateToParts(date, None, true.some)),
             $var(DocVar.ROOT(BsonField.Name("$parts")) \ fieldName))
 
-        val pairs: List[(TemporalPart, BsonField.Name)] =
-          List[(TemporalPart, String)](
-            Year -> DateParts.year,
-            Month -> DateParts.month,
-            Day -> DateParts.day,
-            Hour -> DateParts.hour,
-            Minute -> DateParts.minute,
-            Second -> DateParts.second,
-            Millisecond -> DateParts.millisecond
-          ).map(p => (p._1, BsonField.Name(p._2)))
+        val selectPartsField: String => Fix[EX] =
+          f => $var(DocVar.ROOT(BsonField.Name("$parts")) \ BsonField.Name(f))
 
-        def truncFields(part: TemporalPart): Option[NonEmptyList[BsonField.Name]] = {
-          val i = pairs.indexWhere(_._1 === part)
-          pairs.take(i + 1).map(_._2).toNel
-        }
-
-        val selectPartsField: BsonField.Name => Fix[EX] =
-          f => $var(DocVar.ROOT(BsonField.Name("$parts")) \ f)
+        val selectPartsFieldIf: Boolean => String => Option[Fix[EX]] =
+          cond => f =>
+            if (cond) selectPartsField(f).some else none
 
         mfc.some collect {
           case ExtractIsoDayOfWeek(a1) =>
@@ -387,25 +374,24 @@ object FuncHandler {
           case LocalDate(a1) => $dateFromString(a1, None).point[M]
           case LocalDateTime(a1) => $dateFromString(a1, None).point[M]
           case tt @ TemporalTrunc(part, a1) =>
-            truncFields(part) match {
+            ExprOp3_6F.dateFromPartsArgIndex(part) match {
               case None =>
                 val mf: MapFuncCore[T,quasar.qscript.Hole] =
                   (tt : MapFuncCore[T, Fix[EX]]).as(SrcHole)
                 unimplemented[M, Fix[EX]](s"expression ${mf.shows}")
-              case Some(l) =>
-                val t = l.tail.toList
+              case Some(i) =>
                 $let(
                   ListMap(
                     DocVar.Name("parts") -> $dateToParts(a1, None, false.some)),
                   $dateFromParts(
-                    selectPartsField(l.head),
-                    t.lift(0).map(selectPartsField),
-                    t.lift(1).map(selectPartsField),
-                    t.lift(2).map(selectPartsField),
-                    t.lift(3).map(selectPartsField),
-                    t.lift(4).map(selectPartsField),
-                    t.lift(5).map(selectPartsField),
-                    none)).point[M]
+                    y  = selectPartsField(DateParts.year),
+                    m  = selectPartsFieldIf(i >= 1)(DateParts.month),
+                    d  = selectPartsFieldIf(i >= 2)(DateParts.day),
+                    h  = selectPartsFieldIf(i >= 3)(DateParts.hour),
+                    mi = selectPartsFieldIf(i >= 4)(DateParts.minute),
+                    s  = selectPartsFieldIf(i >= 5)(DateParts.second),
+                    ms = selectPartsFieldIf(i >= 6)(DateParts.millisecond),
+                    tz = none)).point[M]
                 }
 
         }
