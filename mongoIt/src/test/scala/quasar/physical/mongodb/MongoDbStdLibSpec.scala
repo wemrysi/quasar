@@ -55,7 +55,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
   val runAt = Instant.parse("2015-01-26T00:00:00Z")
 
-  val noTimeZoneSupport = Skipped("Mongo does not support time zones.")
+  val noTimeZoneSupport = Pending("Mongo does not support time zones.")
 
   args.report(showtimes = ArgProperty(true))
 
@@ -105,9 +105,9 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
     def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LP, Unit] = {
       case lp.Invoke(_, _) if containsOffset(args) => noTimeZoneSupport.left
       case lp.Invoke(func, _) => shortCircuit(backend, func, args)
+      case lp.TemporalTrunc(_, _) if containsOffset(args) => noTimeZoneSupport.left
       case lp.TemporalTrunc(part, _) if skipTemporalTrunc(part) =>
         Pending(s"TemporalTrunc for $part not implemented.").left
-      case lp.TemporalTrunc(_, _) if containsOffset(args) => noTimeZoneSupport.left
       case _ => ().right
     }
 
