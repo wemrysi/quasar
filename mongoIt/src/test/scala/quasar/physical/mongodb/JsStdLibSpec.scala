@@ -131,15 +131,11 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case _ => ().right
   }
 
-  // These error when mongo tries to extract date components from a time.
-  def skipTemporalTrunc(part: TemporalPart): Boolean = part match {
-    case TemporalPart.Hour => true
-    case TemporalPart.Microsecond => true
-    case TemporalPart.Millisecond => true
-    case TemporalPart.Minute => true
-    case TemporalPart.Second => true
-    case _ => false
-  }
+  def temporalTruncSupported(backend: BackendName, part: TemporalPart): Boolean =
+    part match {
+      case TemporalPart.Microsecond => false
+      case _ => true
+    }
 
   def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix])
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {
