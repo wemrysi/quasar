@@ -14,19 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.sql
+package quasar
 
-import slamdata.Predef._
-
-import scala.Predef.implicitly
+import slamdata.Predef.String
 
 import org.scalacheck.Arbitrary
-import scalaz.scalacheck.ScalaCheckBinding._
-import scalaz.Scalaz._
 
-trait CINameArbitrary {
-  implicit val ciNameArbitrary: Arbitrary[CIName] =
-    implicitly[Arbitrary[String]].map(CIName(_))
+trait CIStringArbitrary {
+  implicit val ciStringArbitrary: Arbitrary[CIString] =
+    Arbitrary(Arbitrary.arbitrary[String] map (CIString(_)))
 }
 
-object CINameArbitrary extends CINameArbitrary
+object CIStringArbitrary extends CIStringArbitrary
