@@ -436,6 +436,19 @@ object FuncHandler {
                           mkTruncBy(3, $subtract(
                             selectPartsField(DateParts.month),
                             $literal(Bson.Int32(1)))))))).point[M]
+                  case TemporalPart.Week =>
+                    $let(
+                      ListMap(
+                        DocVar.Name("parts") -> $dateToParts(a1, None, true.some)),
+                      $dateFromPartsIso(
+                        y  = selectPartsField(DateParts.isoWeekYear),
+                        w  = selectPartsField(DateParts.isoWeek).some,
+                        d  = none,
+                        h  = none,
+                        mi = none,
+                        s  = none,
+                        ms = none,
+                        tz = none)).point[M]
                   case _ =>
                     val mf: MapFuncCore[T,quasar.qscript.Hole] =
                       (tt : MapFuncCore[T, Fix[EX]]).as(SrcHole)

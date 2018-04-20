@@ -43,7 +43,6 @@ object ExprOp3_6F {
     val second = "second"
     val millisecond = "millisecond"
     val timezone = "timezone"
-
   }
 
   final case class $mergeObjectsF[A](docs: List[A]) extends ExprOp3_6F[A]

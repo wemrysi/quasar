@@ -159,7 +159,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     if (advertisedVersion(backend) lt MongoQueryModel.`3.6`.some) false
     else
       part match {
-        case TemporalPart.Week | TemporalPart.Microsecond => false
+        case TemporalPart.Microsecond => false
         case _ => true
       }
 
