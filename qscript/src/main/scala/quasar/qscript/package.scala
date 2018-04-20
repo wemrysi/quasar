@@ -162,11 +162,6 @@ package object qscript {
   type FreeMap[T[_[_]]]     = FreeMapA[T, Hole]
   type JoinFunc[T[_[_]]]    = FreeMapA[T, JoinSide]
 
-  type FreeQS[T[_[_]]]      = Free[QScriptTotal[T, ?], Hole]
-  type FreeMapA[T[_[_]], A] = Free[MapFunc[T, ?], A]
-  type FreeMap[T[_[_]]]     = FreeMapA[T, Hole]
-  type JoinFunc[T[_[_]]]    = FreeMapA[T, JoinSide]
-
   type CoEnvQS[T[_[_]], A]      = CoEnv[Hole, QScriptTotal[T, ?], A]
   type CoEnvMapA[T[_[_]], A, B] = CoEnv[A, MapFunc[T, ?], B]
   type CoEnvMap[T[_[_]], A]     = CoEnvMapA[T, Hole, A]

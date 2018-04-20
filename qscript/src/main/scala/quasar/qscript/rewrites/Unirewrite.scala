@@ -48,7 +48,7 @@ private[qscript] trait UnirewriteLowPriorityImplicits {
         : T[QScriptRead[T, ?]] => F[T[CopK[L, ?]]] = { qs =>
       r.simplifyJoinOnShiftRead[QScriptRead[T, ?], QScriptShiftRead[T, ?], C0[L, ?]]
         .apply(qs)
-        .transCataM[F, T[C#M], C#M](E.expandDirs(reflNT[CopK[L, ?]], lc))
+        .transCataM[F, T[CopK[L, ?]], CopK[L, ?]](E.expandDirs(reflNT[CopK[L, ?]], lc))
     }
   }
 }
