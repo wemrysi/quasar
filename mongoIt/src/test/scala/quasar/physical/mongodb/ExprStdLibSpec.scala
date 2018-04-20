@@ -73,7 +73,8 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (date.ExtractDecade, List(Data.LocalDate(d))) if d.getYear < 1 => Pending("TODO").left
     case (date.ExtractMillennium, List(Data.LocalDate(d))) if d.getYear < 1 => Pending("TODO").left
 
-    case (date.StartOfDay, Data.LocalLike(_) :: Nil) => notHandled.left
+    case (date.StartOfDay, _) if advertisedVersion(backend) lt `3.6`.some =>
+      notImplBefore(`3.6`).left
 
     case (date.Now, _) => Pending("Returns correct result, but wrapped into Data.Dec instead of Data.Interval").left
     case (date.NowDate, _) => Pending("TODO").left

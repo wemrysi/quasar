@@ -389,6 +389,19 @@ object FuncHandler {
             extractDateFieldIso(a1, BsonField.Name(DateParts.isoWeek)).point[M]
           case LocalDate(a1) => $dateFromString(a1, None).point[M]
           case LocalDateTime(a1) => $dateFromString(a1, None).point[M]
+          case StartOfDay(a1) =>
+            $let(
+              ListMap(
+                DocVar.Name("parts") -> $dateToParts(a1, None, false.some)),
+              $dateFromParts(
+                y  = selectPartsField(DateParts.year),
+                m  = selectPartsField(DateParts.month).some,
+                d  = selectPartsField(DateParts.day).some,
+                h  = none,
+                mi = none,
+                s  = none,
+                ms = none,
+                tz = none)).point[M]
           case tt @ TemporalTrunc(part, a1) =>
             ExprOp3_6F.dateFromPartsArgIndex(part) match {
               case Some(i) =>
