@@ -363,6 +363,22 @@ object FuncHandler {
           cond => f =>
             if (cond) selectPartsField(f).some else none
 
+        // i is number of $dateFromParts args to keep apart from year
+        // (which is always kept) and timezone (which is never kept)
+        def tempTrunc(date: Fix[EX], i: Int): Fix[EX] =
+          $let(
+            ListMap(
+              DocVar.Name("parts") -> $dateToParts(date, None, false.some)),
+            $dateFromParts(
+              y  = selectPartsField(DateParts.year),
+              m  = selectPartsFieldIf(i >= 1)(DateParts.month),
+              d  = selectPartsFieldIf(i >= 2)(DateParts.day),
+              h  = selectPartsFieldIf(i >= 3)(DateParts.hour),
+              mi = selectPartsFieldIf(i >= 4)(DateParts.minute),
+              s  = selectPartsFieldIf(i >= 5)(DateParts.second),
+              ms = selectPartsFieldIf(i >= 6)(DateParts.millisecond),
+              tz = none))
+
         def dateWith(
           date: Fix[EX],
           year: Option[Fix[EX]],
@@ -389,34 +405,10 @@ object FuncHandler {
             extractDateFieldIso(a1, BsonField.Name(DateParts.isoWeek)).point[M]
           case LocalDate(a1) => $dateFromString(a1, None).point[M]
           case LocalDateTime(a1) => $dateFromString(a1, None).point[M]
-          case StartOfDay(a1) =>
-            $let(
-              ListMap(
-                DocVar.Name("parts") -> $dateToParts(a1, None, false.some)),
-              $dateFromParts(
-                y  = selectPartsField(DateParts.year),
-                m  = selectPartsField(DateParts.month).some,
-                d  = selectPartsField(DateParts.day).some,
-                h  = none,
-                mi = none,
-                s  = none,
-                ms = none,
-                tz = none)).point[M]
+          case StartOfDay(a1) => tempTrunc(a1, 2).point[M]
           case tt @ TemporalTrunc(part, a1) =>
             ExprOp3_6F.dateFromPartsArgIndex(part) match {
-              case Some(i) =>
-                $let(
-                  ListMap(
-                    DocVar.Name("parts") -> $dateToParts(a1, None, false.some)),
-                  $dateFromParts(
-                    y  = selectPartsField(DateParts.year),
-                    m  = selectPartsFieldIf(i >= 1)(DateParts.month),
-                    d  = selectPartsFieldIf(i >= 2)(DateParts.day),
-                    h  = selectPartsFieldIf(i >= 3)(DateParts.hour),
-                    mi = selectPartsFieldIf(i >= 4)(DateParts.minute),
-                    s  = selectPartsFieldIf(i >= 5)(DateParts.second),
-                    ms = selectPartsFieldIf(i >= 6)(DateParts.millisecond),
-                    tz = none)).point[M]
+              case Some(i) => tempTrunc(a1, i).point[M]
               case None =>
                 part match {
                   case TemporalPart.Millennium =>
