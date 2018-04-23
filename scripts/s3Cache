@@ -20,7 +20,7 @@ if [[ "$1" = "upload" ]]; then
   aws s3 --only-show-errors cp $HOARDER s3://quasar-build-cache/$PRNUM/$HOARDER --recursive
   echo "done uploading!"
 elif [[ "$1" = "download" ]]; then
-  echo "downloading $TARGETS and $HOARDER to s3://quasar-build-cache/$PRNUM ..."
+  echo "downloading $TARGETS and $HOARDER from s3://quasar-build-cache/$PRNUM ..."
   aws s3 --only-show-errors cp s3://quasar-build-cache/$PRNUM/$TARGETS $TARGETS --recursive
   aws s3 --only-show-errors cp s3://quasar-build-cache/$PRNUM/$HOARDER $HOARDER --recursive
   echo "done downloading!"
