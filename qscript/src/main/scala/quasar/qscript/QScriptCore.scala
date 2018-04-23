@@ -137,7 +137,7 @@ object ReduceIndex {
   */
 @Lenses final case class Filter[T[_[_]], A](
   src: A,
-  f: FreeMap[T])
+  f: RecFreeMap[T])
     extends QScriptCore[T, A]
 
 /** Chooses a subset of values from a dataset, given a count. */
@@ -254,7 +254,7 @@ object QScriptCore {
               case LeftShift(src, struct, id, stpe, undef, repair) =>
                 NonTerminal("LeftShift" :: nt, None,
                   RA.render(src) ::
-                    nested("Struct", struct.linearize) ::
+                    nested("Struct", struct) ::
                     nested("IdStatus", id) ::
                     nested("ShiftType", stpe) ::
                     nested("OnUndefined", undef) ::

@@ -147,7 +147,7 @@ private[qscript] final class QScriptCorePlanner[
         r   <- elimSearch[Q](r0)
       } yield (mkSeq_(l) union mkSeq_(r)).right
 
-    case Filter(src, f) => FilterPlanner.plan[T, F, FMT, Q](src, f)
+    case Filter(src, f) => FilterPlanner.plan[T, F, FMT, Q](src, f.linearize)
 
     // TODO: detect when from and count don't reference `src` and avoid the let.
     // NB: XQuery sequences use 1-based indexing.

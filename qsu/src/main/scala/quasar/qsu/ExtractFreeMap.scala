@@ -60,7 +60,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
 
     case graph @ Extractors.LPFilter(src, predicate) =>
       unifyShapePreserving[F](graph, src.root, NonEmptyList(predicate.root))("filter_source", "filter_predicate") {
-        case (sym, fms) => QSFilter(sym, fms.head)
+        case (sym, fms) => QSFilter(sym, fms.head.asRec)
       }
 
     case graph @ Extractors.LPJoin(left, right, cond, jtype, lref, rref) => {

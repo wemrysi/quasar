@@ -514,7 +514,7 @@ object construction {
       core(qscript.Union(src, lBranch.mapSuspension(injTotal.inject), rBranch.mapSuspension(injTotal.inject)))
 
     def Filter(src: R,
-               f: FreeMap[T]): R =
+               f: RecFreeMap[T]): R =
       core(qscript.Filter(src, f))
 
     def Subset(src: R,

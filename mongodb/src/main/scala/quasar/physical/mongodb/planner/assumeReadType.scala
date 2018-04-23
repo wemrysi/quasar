@@ -139,7 +139,7 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
         : F[A] => M[G[A]] = {
         case QC(Filter(src, cond))
           if (isRewrite[T, F, G, A](GtoF, src.project)) =>
-            ((MapFuncCore.flattenAnd(cond))
+            ((MapFuncCore.flattenAnd(cond.linearize))
               .traverse(elide))
               .map(_.toList.filter {
                 case MapFuncsCore.BoolLit(true) => false
@@ -147,7 +147,7 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
               } match {
                 case Nil => src.project
                 case h :: t => GtoF.reverseGet(
-                  QC(Filter(src, t.foldLeft[FreeMap[T]](h)((acc, e) => Free.roll(MFC(MapFuncsCore.And(acc, e)))))))
+                  QC(Filter(src, t.foldLeft[FreeMap[T]](h)((acc, e) => Free.roll(MFC(MapFuncsCore.And(acc, e)))).asRec)))
               })
         case QC(LeftShift(src, struct, id, stpe, onUndef, repair))
           if (isRewrite[T, F, G, A](GtoF, src.project)) =>

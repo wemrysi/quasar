@@ -1064,13 +1064,12 @@ object MapFuncsCore {
       Free.roll(MFC(Constant[T, FreeMapA[T, A]](EJson.fromCommon(ejson.Bool[T[EJson]](b)))))
 
     def unapply[T[_[_]]: RecursiveT, A](mf: FreeMapA[T, A]): Option[Boolean] =
-      mf.resume.fold ({
-        case MFC(Constant(ej)) => CommonEJson.prj(ej.project).flatMap {
-          case ejson.Bool(b) => b.some
-          case _ => None
-        }
-        case _ => None
-      }, _ => None)
+      mf.resume.fold(BoolLitMapFunc.unapply(_), _ => None)
+  }
+
+  object RecBoolLit {
+    def unapply[T[_[_]]: RecursiveT, A](mf: RecFreeMapA[T, A]): Option[Boolean] =
+      mf.linearize.resume.fold(BoolLitMapFunc.unapply(_), _ => None)
   }
 
   object DecLit {
@@ -1103,6 +1102,17 @@ object MapFuncsCore {
       mf match {
         case MFC(Constant(ej)) => ExtEJson.prj(ej.project).flatMap {
           case ejson.Int(i) => i.some
+          case _ => None
+        }
+        case _ => None
+      }
+  }
+
+  object BoolLitMapFunc {
+    def unapply[T[_[_]]: RecursiveT, A](mf: MapFunc[T, A]): Option[Boolean] =
+      mf match {
+        case MFC(Constant(ej)) => CommonEJson.prj(ej.project).flatMap {
+          case ejson.Bool(i) => i.some
           case _ => None
         }
         case _ => None

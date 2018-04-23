@@ -92,7 +92,7 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
       }
 
       "convert QSFilter" in {
-        val fm: FreeMap = func.Add(HoleF, IntLit(17))
+        val fm: RecFreeMap = recFunc.Add(recFunc.Hole, RecIntLit(17))
 
         val qgraph: Fix[QSU] = qsu.qsFilter(qsu.read(afile), fm)
         val qscript: Fix[QSE] = qse.Filter(qse.Read[AFile](afile), fm)

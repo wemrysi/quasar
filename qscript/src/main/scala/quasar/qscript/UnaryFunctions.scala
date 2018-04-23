@@ -18,6 +18,7 @@ package quasar.qscript
 
 import matryoshka._
 import matryoshka.patterns._
+import quasar.qscript.RecFreeS.RecOps
 
 import monocle._
 import scalaz._, Scalaz._
@@ -61,9 +62,9 @@ object UnaryFunctions {
           def modifyF[F[_]: Applicative](f: FreeMap[T] => F[FreeMap[T]])(s: QScriptCore[T, A]): F[QScriptCore[T, A]] =
             s match {
               case Map(src, fm) =>
-                (f(fm.linearize)).map(RecFreeS.fromFree(_)).map(Map(src, _))
+                (f(fm.linearize)).map(_.asRec).map(Map(src, _))
               case LeftShift(src, struct, id, stpe, undef, repair) =>
-                (f(struct.linearize).map(RecFreeS.fromFree(_))).map(LeftShift(src, _, id, stpe, undef, repair))
+                (f(struct.linearize).map(_.asRec)).map(LeftShift(src, _, id, stpe, undef, repair))
               case Reduce(src, bucket, red, repair) =>
                 (bucket.traverse(f) |@| red.traverse(_.traverse(f)))(Reduce(src, _, _, repair))
               case Sort(src, bucket, order) =>
@@ -71,7 +72,7 @@ object UnaryFunctions {
               case Union(src, lBranch, rBranch) =>
                 Applicative[F].pure(s)
               case Filter(src, fm) =>
-                (f(fm)).map(Filter(src, _))
+                (f(fm.linearize)).map(_.asRec).map(Filter(src, _))
               case Subset(src, from, sel, count) =>
                 Applicative[F].pure(s)
               case Unreferenced() =>

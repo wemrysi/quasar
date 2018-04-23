@@ -25,6 +25,7 @@ import quasar.fp.ski.κ
 import quasar.ejson
 import quasar.ejson.{CommonEJson, EJson, EJsonArbitrary, ExtEJson}
 import quasar.ejson.implicits._
+import quasar.qscript.RecFreeS._
 import quasar.qscript._
 
 import matryoshka.{Hole => _, _}
@@ -299,7 +300,7 @@ final class OutlineSpec extends quasar.Qspec with QScriptHelpers {
     }
 
     "Filter does not affect shape" >> prop { srcShape: Shape =>
-      outlineQC(Filter(srcShape, fun)) must_= srcShape
+      outlineQC(Filter(srcShape, fun.asRec)) must_= srcShape
     }
 
     "Unreferenced has undefined shape" >> {

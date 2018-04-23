@@ -37,6 +37,7 @@ import org.bson.BsonDocument
 import scalaz._, Scalaz._
 
 object MongoDbPlanner {
+
   def toMongoQScript[
       T[_[_]]: BirecursiveT: EqualT: RenderTreeT: ShowT,
       M[_]: Monad: MonadFsErr: PhaseResultTell]

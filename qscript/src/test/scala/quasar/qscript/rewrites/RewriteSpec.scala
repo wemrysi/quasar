@@ -142,12 +142,12 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             func.StaticMapS(
               "l" -> func.LeftSide,
               "r" -> func.RightSide)),
-          func.Lt(
-            func.ProjectKeyS(
-              func.ProjectKeyS(func.Hole, "l"),
+          recFunc.Lt(
+            recFunc.ProjectKeyS(
+              recFunc.ProjectKeyS(recFunc.Hole, "l"),
               "lat"),
-            func.ProjectKeyS(
-              func.ProjectKeyS(func.Hole, "l"),
+            recFunc.ProjectKeyS(
+              recFunc.ProjectKeyS(recFunc.Hole, "l"),
               "lon"))).unFix
 
       Coalesce[Fix, QST, QST].coalesceTJ(idPrism[QST].get).apply(exp).map(rewrite.normalizeTJ[QST]) must
@@ -374,12 +374,12 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               func.StaticMapS(
                 SimplifyJoin.LeftK -> func.LeftSide,
                 SimplifyJoin.RightK -> func.RightSide)),
-            func.Lt(
-              func.ProjectKeyS(
-                func.ProjectKeyS(func.Hole, SimplifyJoin.LeftK),
+            recFunc.Lt(
+              recFunc.ProjectKeyS(
+                recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.LeftK),
                 "l_lat"),
-              func.ProjectKeyS(
-                func.ProjectKeyS(func.Hole, SimplifyJoin.RightK),
+              recFunc.ProjectKeyS(
+                recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.RightK),
                 "r_lat"))),
           recFunc.ConcatMaps(
             recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.LeftK),
@@ -516,11 +516,11 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             fix.Unreferenced,
             free.Filter(
               free.Read[AFile](rootDir </> file("foo")),
-              func.Guard(
-                func.Hole,
+              recFunc.Guard(
+                recFunc.Hole,
                 Type.AnyObject,
-                func.Constant(json.bool(false)),
-                func.Constant(json.bool(true)))),
+                recFunc.Constant(json.bool(false)),
+                recFunc.Constant(json.bool(true)))),
             free.Read[AFile](rootDir </> file("bar")),
             func.Eq(
               func.ProjectKeyS(func.RightSide, "r_id"),
@@ -559,11 +559,11 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             fix.Unreferenced,
             free.Filter(
               free.Read[AFile](rootDir </> file("foo")),
-              func.Guard(
-                func.Hole,
+              recFunc.Guard(
+                recFunc.Hole,
                 Type.AnyObject,
-                func.Constant(json.bool(true)),
-                func.Constant(json.bool(false)))),
+                recFunc.Constant(json.bool(true)),
+                recFunc.Constant(json.bool(false)))),
             free.Read[AFile](rootDir </> file("bar")),
             func.Eq(
               func.ProjectKeyS(func.RightSide, "r_id"),
@@ -600,7 +600,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             fix.Unreferenced,
             free.Filter(
               free.Read[AFile](rootDir </> file("foo")),
-              func.Not(func.Lt(func.ProjectKeyS(func.Hole, "x"), func.Constant(json.int(7))))),
+              recFunc.Not(recFunc.Lt(recFunc.ProjectKeyS(recFunc.Hole, "x"), recFunc.Constant(json.int(7))))),
             free.Read[AFile](rootDir </> file("bar")),
             func.Eq(
               func.ProjectKeyS(func.RightSide, "r_id"),
@@ -637,7 +637,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             fix.Unreferenced,
             free.Filter(
               free.Read[AFile](rootDir </> file("foo")),
-              func.Lt(func.ProjectKeyS(func.Hole, "x"), func.Constant(json.int(7)))),
+              recFunc.Lt(recFunc.ProjectKeyS(recFunc.Hole, "x"), recFunc.Constant(json.int(7)))),
             free.Read[AFile](rootDir </> file("bar")),
             func.Eq(
               func.ProjectKeyS(func.RightSide, "r_id"),

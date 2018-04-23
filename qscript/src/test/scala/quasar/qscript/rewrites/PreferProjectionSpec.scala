@@ -26,6 +26,7 @@ import quasar.fp.ski.κ
 import quasar.ejson.{EJson, EJsonArbitrary}
 import quasar.ejson.implicits._
 import quasar.qscript._
+import quasar.qscript.RecFreeS._
 import quasar.qscript.analysis.Outline
 
 import matryoshka.data.Fix
@@ -208,12 +209,12 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
       val q =
         fix.Filter(
           base,
-          func.Eq(func.DeleteKeyS(func.Hole, "a"), func.Hole))
+          recFunc.Eq(recFunc.DeleteKeyS(recFunc.Hole, "a"), recFunc.Hole))
 
       val e =
         fix.Filter(
           base,
-          func.Eq(prjFrom(func.Hole, "b", "c"), func.Hole))
+          recFunc.Eq(prjFrom(func.Hole, "b", "c").asRec, recFunc.Hole))
 
       preferProjection[QS](q) must_= e
     }

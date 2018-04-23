@@ -368,7 +368,7 @@ object RenderQScriptDSL {
             DSLTree(base, "Union", args.some)
 
           case Filter(src, f) =>
-            val args = A(base, src).right :: freeMap(base, f).right :: Nil
+            val args = A(base, src).right :: recFreeMap(base, f).right :: Nil
             DSLTree(base, "Filter", args.some)
 
           case Subset(src, from, op, count) =>
