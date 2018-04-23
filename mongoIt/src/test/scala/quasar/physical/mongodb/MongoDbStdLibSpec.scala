@@ -106,6 +106,9 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
       case lp.Invoke(_, _) if containsOffset(args) => noTimeZoneSupport.left
       case lp.Invoke(func, _) => shortCircuit(backend, func, args)
       case lp.TemporalTrunc(_, _) if containsOffset(args) => noTimeZoneSupport.left
+      case lp.TemporalTrunc(_, _)
+        if args.exists(Data._localTime.getOption(_).isDefined) =>
+          Pending(s"TemporalTrunc for LocalTime not implemented.").left
       case lp.TemporalTrunc(part, _) if !temporalTruncSupported(backend, part) =>
         Pending(s"TemporalTrunc for $part not implemented.").left
       case _ => ().right
