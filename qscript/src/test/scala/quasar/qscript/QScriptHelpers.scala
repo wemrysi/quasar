@@ -24,7 +24,6 @@ import iotaz.{TNilK,CopK}
 import iotaz.TListK.:::
 
 import scala.Predef.implicitly
-import slamdata.Predef._
 
 import matryoshka._
 import matryoshka.data.Fix
