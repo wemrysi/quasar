@@ -140,9 +140,6 @@ jobs:
         # release to sonatype
         - scripts/quasarPublishAndTag
 
-        # release to github
-        - scripts/publishJar
-
         - set +e
 
     - stage: cache cleanup
