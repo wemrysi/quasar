@@ -110,7 +110,7 @@ package iotaz.internal {
              $fa.index match {
                case ..$injectCases
                case other => throw new _root_.java.lang.Exception(
-                 s"subinject internal error: index " + other.toString + " out of bounds for " + $fa.toString)
+                 "subinject internal error: index " + other.toString + " out of bounds for " + $fa.toString)
              }
            }
          },
@@ -120,7 +120,7 @@ package iotaz.internal {
              $fa.index match {
                case ..$projectCases
                case other => throw new _root_.java.lang.Exception(
-                 s"subinject internal error: index " + other.toString + " out of bounds for " + $fa.toString)
+                 "subinject internal error: index " + other.toString + " out of bounds for " + $fa.toString)
              }
            }
          }
