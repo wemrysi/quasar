@@ -32,6 +32,11 @@ abstract class Planner[T[_[_]], F[_], QS[_]] {
 object Planner {
   def apply[T[_[_]], F[_], QS[_]](implicit ev: Planner[T, F, QS]): Planner[T, F, QS] = ev
 
+  import iotaz.{CopK, TListK}
+  // TODO provide actual instance
+  @slamdata.Predef.SuppressWarnings(slamdata.Predef.Array("org.wartremover.warts.Null"))
+  implicit def copKMapFuncPlanner[T[_[_]], N[_], X <: TListK]: Planner[T, N, CopK[X, ?]] = null
+
   implicit def coproduct[T[_[_]], N[_], F[_], G[_]](
     implicit F: Planner[T, N, F], G: Planner[T, N, G]
   ): Planner[T, N, Coproduct[F, G, ?]] =
@@ -66,8 +71,9 @@ object Planner {
 
   def mapFuncPlanner[T[_[_]]: BirecursiveT: ShowT, F[_]: Applicative: Monad: NameGenerator: PlannerErrorME]
     : Planner[T, F, MapFunc[T, ?]] = {
-    val core = new MapFuncCorePlanner[T, F]
-    coproduct(core, new MapFuncDerivedPlanner(core))
+//    val core = new MapFuncCorePlanner[T, F]
+//    coproduct(core, new MapFuncDerivedPlanner(core))
+    copKMapFuncPlanner
   }
 
   implicit def projectBucketPlanner[T[_[_]]: RecursiveT: ShowT, F[_]: PlannerErrorME]
