@@ -36,6 +36,7 @@ import quasar.physical.mongodb.planner.exprOp._
 import quasar.physical.mongodb.planner.workflow._
 import quasar.physical.mongodb.planner.javascript._
 import quasar.physical.mongodb.planner.selector._
+import quasar.physical.mongodb.selector.Selector
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 

@@ -21,10 +21,11 @@ import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.{Planner => QPlanner}, QPlanner._
-import quasar.physical.mongodb.{BsonVersion, Selector, WorkflowBuilder}, WorkflowBuilder._
+import quasar.physical.mongodb.{BsonVersion, WorkflowBuilder}, WorkflowBuilder._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.{selector => sel}
 import quasar.physical.mongodb.planner.selector._
+import quasar.physical.mongodb.selector.Selector
 import quasar.qscript._
 
 import matryoshka._

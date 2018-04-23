@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.physical.mongodb
+package quasar.physical.mongodb.selector
 
 import slamdata.Predef._
 import quasar.{RenderTree, Terminal, NonTerminal}
 import quasar.fp._
 import quasar.javascript._
+import quasar.physical.mongodb.{Bson, BsonField, BsonType}
 
 import scala.Any
 

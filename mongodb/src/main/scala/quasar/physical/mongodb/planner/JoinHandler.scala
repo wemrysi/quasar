@@ -28,6 +28,7 @@ import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb._, WorkflowBuilder._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.selector.Selector
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.ExcludeId
 import quasar.sql.JoinDir

@@ -24,6 +24,7 @@ import quasar.fp.ski._
 import quasar.fs.{Planner => QPlanner}, QPlanner._
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.expression.ExprOp
+import quasar.physical.mongodb.selector.Selector
 import quasar.physical.mongodb.planner.common._
 import quasar.qscript._
 
