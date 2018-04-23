@@ -503,8 +503,9 @@ object WorkflowBuilder {
           flattenFieldArrayUnwindProject(base.toDocVar, field, idStatus, r, acc)
         case (StructureType.Array(field, idStatus), _, _) =>
           flattenFieldMapReduce(base.toDocVar \ field, idStatus).apply(acc)
-        case (StructureType.Object(field, idStatus), Some(r), MongoQueryModel.`3.4.4`) =>
-          flattenFieldObject344(base.toDocVar, field, idStatus, r, acc)
+        case (StructureType.Object(field, idStatus), Some(r), m)
+          if m gte MongoQueryModel.`3.4.4` =>
+            flattenFieldObject344(base.toDocVar, field, idStatus, r, acc)
         case (StructureType.Object(field, idStatus), _, _) =>
           flattenFieldMapReduce(base.toDocVar \ field, idStatus).apply(acc)
       }
