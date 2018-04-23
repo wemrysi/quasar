@@ -52,9 +52,6 @@ import spire.std.double._
 object Repl {
   import Command.{XDir, XFile}
 
-  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-  import EitherT.eitherTMonad
-
   val HelpMessage =
     """Quasar REPL, Copyright © 2014–2017 SlamData Inc.
       |
