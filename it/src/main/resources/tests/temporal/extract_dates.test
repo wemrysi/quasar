@@ -1,5 +1,5 @@
 {
-  "name": "[qa_s10] extract date parts",
+  "name": "extract date parts",
 
   "backends": {
     "marklogic_json": "ignoreFieldOrder",
