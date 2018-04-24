@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.physical.mongodb
+package quasar.physical.mongodb.selector
 
 import slamdata.Predef._
+
+import quasar.physical.mongodb.{Bson, BsonField}
 
 class SelectorSpec extends quasar.Qspec  {
 

@@ -29,6 +29,7 @@ import quasar.javascript._
 import quasar.{jscore => js}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.selector.Selector
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.DiscoverPath
 import quasar.sql._
