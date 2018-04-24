@@ -565,6 +565,11 @@ object JsFuncHandler {
         ExpandMapFunc.expand(core.handle[M], κ[MapFuncDerived[T, JsCore], Option[M[JsCore]]](None))
     }
 
+  import iotaz.{CopK, TListK}
+  // TODO provide actual instance
+  @slamdata.Predef.SuppressWarnings(slamdata.Predef.Array("org.wartremover.warts.Null"))
+  implicit def copKJsFuncHandler[X <: TListK]: JsFuncHandler[CopK[X, ?]] = null
+
   implicit def mapFuncCoproduct[F[_], G[_]]
       (implicit F: JsFuncHandler[F], G: JsFuncHandler[G])
       : JsFuncHandler[Coproduct[F, G, ?]] =

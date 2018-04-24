@@ -34,12 +34,13 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz.{ToIdOps => _, _}
+import iotaz.CopK
 
 object assumeReadType {
 
   object SRT {
     def unapply[T[_[_]], A](qt: QScriptTotal[T, A]): Option[ShiftedRead[AFile]] =
-      Inject[Const[ShiftedRead[AFile], ?], QScriptTotal[T, ?]].prj(qt).map(_.getConst)
+      CopK.Inject[Const[ShiftedRead[AFile], ?], QScriptTotal[T, ?]].prj(qt).map(_.getConst)
   }
 
   object FreeQS {
@@ -52,8 +53,8 @@ object assumeReadType {
   def isRewriteIdStatus(idStatus: IdStatus): Boolean = idStatus === ExcludeId
 
   def isRewrite[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, G[_]: Functor, A](GtoF: PrismNT[G, F], qs: G[A])(implicit
-    QC: QScriptCore[T, ?] :<: F,
-    SR: Const[ShiftedRead[AFile], ?] :<: F,
+    QC: QScriptCore[T, ?] :<<: F,
+    SR: Const[ShiftedRead[AFile], ?] :<<: F,
     FT: Injectable.Aux[F, QScriptTotal[T, ?]],
     SP: ShapePreserving[F],
     RA: Recursive.Aux[A, G],
@@ -99,9 +100,9 @@ object assumeReadType {
 def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
   (typ: Type)
   (implicit
-    QC: QScriptCore[T, ?] :<: F,
-    EJ: EquiJoin[T, ?] :<: F,
-    SR: Const[ShiftedRead[AFile], ?] :<: F,
+    QC: QScriptCore[T, ?] :<<: F,
+    EJ: EquiJoin[T, ?] :<<: F,
+    SR: Const[ShiftedRead[AFile], ?] :<<: F,
     FT: Injectable.Aux[F, QScriptTotal[T, ?]],
     SP: ShapePreserving[F])
     : Trans[F, M] =

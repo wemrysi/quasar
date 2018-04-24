@@ -22,6 +22,7 @@ import quasar.common.PhaseResultT
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.kleisli._
 import quasar.fs._
+import quasar.fp.copkTraverse
 import quasar.physical.mongodb._
 
 import matryoshka._

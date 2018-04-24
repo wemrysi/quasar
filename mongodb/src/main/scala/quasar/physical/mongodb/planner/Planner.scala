@@ -62,6 +62,11 @@ object Planner {
       Planner.Aux[T, EquiJoin[T, ?]] =
     new EquiJoinPlanner[T]
 
+  import iotaz.{CopK, TListK}
+  // TODO provide actual instance
+  @slamdata.Predef.SuppressWarnings(slamdata.Predef.Array("org.wartremover.warts.Null"))
+  implicit def copKPlanner[T[_[_]], X <: TListK]: Planner.Aux[T, CopK[X, ?]] = null
+
   implicit def coproduct[T[_[_]], F[_], G[_]](
     implicit F: Planner.Aux[T, F], G: Planner.Aux[T, G]):
       Planner.Aux[T, Coproduct[F, G, ?]] =

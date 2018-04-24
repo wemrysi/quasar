@@ -36,9 +36,9 @@ object Trans {
 
   def apply[T[_[_]]: BirecursiveT, F[_], G[_]: Traverse, M[_]: Monad]
       (trans: Trans[F, M], t: T[G])
-      (implicit FG: F :<: G, FT: Injectable.Aux[G, QScriptTotal[T, ?]], B: Branches[T, G])
+      (implicit FG: F :<<: G, FT: Injectable.Aux[G, QScriptTotal[T, ?]], B: Branches[T, G])
       : M[T[G]] =
-    applyTrans[T, F, G, M](trans, PrismNT.inject)(t)
+    applyTrans[T, F, G, M](trans, PrismNT.injectCopK)(t)
 
   def applyTrans[T[_[_]]: BirecursiveT, F[_], G[_]: Traverse, M[_]: Monad]
       (trans: Trans[F, M], GtoF: PrismNT[G, F])

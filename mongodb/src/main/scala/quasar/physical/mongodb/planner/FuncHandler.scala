@@ -499,6 +499,11 @@ object FuncHandler {
           : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] = κ(None)
     }
 
+  import iotaz.{CopK, TListK}
+  // TODO provide actual instance
+  @slamdata.Predef.SuppressWarnings(slamdata.Predef.Array("org.wartremover.warts.Null"))
+  implicit def copKFuncHandler[X <: TListK]: FuncHandler[CopK[X, ?]] = null
+
   implicit def mapFuncCoproduct[F[_], G[_]]
       (implicit F: FuncHandler[F], G: FuncHandler[G])
       : FuncHandler[Coproduct[F, G, ?]] =

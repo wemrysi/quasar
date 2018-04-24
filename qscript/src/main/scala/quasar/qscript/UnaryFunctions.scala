@@ -40,6 +40,11 @@ object UnaryFunctions {
         }
     }
 
+  import iotaz.{CopK, TListK}
+  // TODO provide actual instance
+  @slamdata.Predef.SuppressWarnings(slamdata.Predef.Array("org.wartremover.warts.Null"))
+  implicit def copKUnaryFunctions[T[_[_]], X <: TListK]: UnaryFunctions[T, CopK[X, ?]] = null
+
   implicit def coproduct[T[_[_]], G[_], H[_]]
     (implicit G: UnaryFunctions[T, G], H: UnaryFunctions[T, H])
       : UnaryFunctions[T, Coproduct[G, H, ?]] =
