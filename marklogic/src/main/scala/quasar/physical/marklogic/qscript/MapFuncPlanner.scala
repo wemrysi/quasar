@@ -30,6 +30,11 @@ object MapFuncPlanner {
 
   def apply[F[_], FMT, MF[_]](implicit ev: MapFuncPlanner[F, FMT, MF]): MapFuncPlanner[F, FMT, MF] = ev
 
+  import iotaz.{CopK, TListK}
+  // TODO provide actual instance
+  @slamdata.Predef.SuppressWarnings(slamdata.Predef.Array("org.wartremover.warts.Null"))
+  implicit def copKMapFuncPlanner[F[_], FMT, X <: TListK, T[_[_]]]: MapFuncPlanner[F, FMT, CopK[X, ?]] = null
+
   implicit def coproduct[F[_], FMT, G[_], H[_], T[_[_]]: RecursiveT](
     implicit G: MapFuncPlanner[F, FMT, G], H: MapFuncPlanner[F, FMT, H]
   ): MapFuncPlanner[F, FMT, Coproduct[G, H, ?]] =

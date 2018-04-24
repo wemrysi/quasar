@@ -63,6 +63,12 @@ object Planner extends PlannerInstances {
 }
 
 sealed abstract class PlannerInstances extends PlannerInstances0 {
+
+  import iotaz.{CopK, TListK}
+  // TODO provide actual instance
+  @slamdata.Predef.SuppressWarnings(slamdata.Predef.Array("org.wartremover.warts.Null"))
+  implicit def copKPlanner[M[_], FMT, X <: TListK, J]: Planner[M, FMT, CopK[X, ?], J] = null
+
   implicit def coproduct[M[_], FMT, F[_], G[_], J](
     implicit F: Lazy[Planner[M, FMT, F, J]], G: Lazy[Planner[M, FMT, G, J]]
   ): Planner[M, FMT, Coproduct[F, G, ?], J] =

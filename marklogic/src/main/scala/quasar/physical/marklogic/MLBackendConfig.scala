@@ -18,9 +18,7 @@ package quasar
 package physical.marklogic
 
 import quasar.contrib.matryoshka._
-import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
-import quasar.contrib.scalaz.writerT._
 import quasar.ejson.EJson
 import quasar.fp.numeric._
 import quasar.physical.marklogic.fs._
@@ -28,6 +26,7 @@ import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._
 
 import matryoshka._
+import iotaz.CopK
 
 /** Internal configuration used in the MarkLogic BackendModule.
   *
@@ -35,7 +34,7 @@ import matryoshka._
   */
 private[marklogic] sealed abstract class MLBackendConfig {
   type M[A] = MLFSQ[A]
-  type QSM[T[_[_]], A] = MLQScriptCP[T]#M[A]
+  type QSM[T[_[_]], A] = CopK[MLQScriptCP[T], A]
 
   type FMT
 
