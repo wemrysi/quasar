@@ -4,8 +4,8 @@
         "mimir":"ignoreFieldOrder",
         "couchbase": "pendingIgnoreFieldOrder"
     },
-    "data": "../../zips.data",
-    "query": "select `_id` as zip from `../../zips` union select city, state from `../../zips`",
+    "data": "../zips.data",
+    "query": "select `_id` as zip from `../zips` union select city, state from `../zips`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [
