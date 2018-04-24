@@ -77,7 +77,7 @@ object getFilterBuilder {
         case otherwise => envT(false, otherwise ∘ (_.right))
       })
 
-    val galg: GAlgebra[(Cofree[MapFunc[T, ?], Boolean], ?), EnvT[Boolean, MapFunc[T, ?], ?], OutputM[PartialSelector[T]]] = { node =>
+    val galg: GAlgebra[(Cofree[MapFunc[T, ?], Boolean], ?), EnvT[Boolean, MapFunc[T, ?], ?], PlannerError \/ PartialSelector[T]] = { node =>
       def forgetAnn: Cofree[MapFunc[T, ?], Boolean] => T[MapFunc[T, ?]] = _.transCata[T[MapFunc[T, ?]]](_.lower)
 
       node.runEnvT match {
@@ -121,7 +121,7 @@ object getFilterBuilder {
 
     val sels: Option[PartialSelector[T]] =
       fm.ghylo[(Cofree[MapFunc[T, ?], Boolean], ?), Cofree[MapFunc[T, ?], Boolean] \/ ?]
-        [EnvT[Boolean, MapFunc[T, ?], ?], OutputM[PartialSelector[T]]](distPara, distApo, galg, gcoalg).toOption
+        [EnvT[Boolean, MapFunc[T, ?], ?], PlannerError \/ PartialSelector[T]](distPara, distApo, galg, gcoalg).toOption
 
     (sels ∘ (filterBuilder(src, _))).cata(
       _ strengthR fm.transCata[FreeMapA[T, A]](orOriginal(elideCond)),
