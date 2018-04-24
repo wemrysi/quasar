@@ -90,7 +90,7 @@ jobs:
     - stage: clean
       env:
       script:
-        - ./scripts/s3Cache cleanup
+        - ./scripts/s3Cache cacheCleanUp
         - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
 
     - stage: compile
