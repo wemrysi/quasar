@@ -1,19 +1,19 @@
 {
-    "name": "[qa_s07] join with reversed condition and complex condition expression",
+    "name": "[qa_s07] join with multiple conditions",
 
     "backends": {
-        "couchbase": "pending",
+        "couchbase": "skip",
         "marklogic_json": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
 
     "NB": "#1587: Disabled in couchbase due to lack of general join.",
 
-    "data": ["../../slamengine_commits.data", "../../slamengine_commits_dup.data"],
+    "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
 
     "query": "select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth
-              from `../../slamengine_commits` as l join `../../slamengine_commits_dup` as r
-              on r.sha = l.parents[0].sha",
+              from `../slamengine_commits` as l join `../slamengine_commits_dup` as r
+                on r.sha = l.parents[0].sha and l.author.login = r.author.login",
 
     "predicate": "atLeast",
     "ignoreResultOrder": true,
@@ -33,10 +33,10 @@
           "parent": "3de46760d45c4fd0db9a03ad978361df3e8f0998", "p_auth": "mossprescott" },
         { "child": "3de46760d45c4fd0db9a03ad978361df3e8f0998", "c_auth": "mossprescott",
           "parent": "43b4018ae5d1e40bbbc2babb8929ed247b5d2dcb", "p_auth": "mossprescott" },
-        { "child": "0999da94bddcbc5bf536e3874aaba50582e96959", "c_auth": "mossprescott",
-          "parent": "472dd80e8bdffae0c1bded28a91139941433550d", "p_auth": "jdegoes" },
         { "child": "56d1caf5d082d1a6840090986e277d36d03f1859", "c_auth": "jdegoes",
           "parent": "472dd80e8bdffae0c1bded28a91139941433550d", "p_auth": "jdegoes" },
-        { "child": "3d44ce48fc0670aaf39ba1acd0e1c161f14cc2d6", "c_auth": "sellout",
-          "parent": "53d2e5684d9403194dff1cc63423c2590038d1c0", "p_auth": "mossprescott" }]
+        { "child": "82e67fef1aae1d283bff90d1d27efd4266d26d49", "c_auth": "jdegoes",
+          "parent": "5b54522e340244d618645ace4bd0cbb7edf8bd5b", "p_auth": "jdegoes" },
+        { "child": "f1b375cf28abebb32f296119dbb347e5121c3a7a", "c_auth": "sellout",
+          "parent": "696c6ff2556bb1ea6a6de86a03736058e8f6c52a", "p_auth": "sellout" }]
 }
