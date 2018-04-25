@@ -57,6 +57,8 @@ object selector {
   //       (naturally `BsonField`), and `B` is the recursive parameter.
   type PartialSelector[T[_[_]]] = Partial[T, BsonField, Selector]
 
+  type Output[T[_[_]]] = PlannerError \/ PartialSelector[T]
+
   def defaultSelector[T[_[_]]]: PartialSelector[T] = (
     { case List(field) =>
       Selector.Doc(ListMap(
@@ -65,9 +67,9 @@ object selector {
     List(Here[T]()))
 
   def invoke2Nel[T[_[_]]]
-    (x: PlannerError \/ PartialSelector[T], y: PlannerError \/ PartialSelector[T])
+    (x: Output[T], y: Output[T])
     (f: (Selector, Selector) => Selector)
-      : PlannerError \/ PartialSelector[T] =
+      : Output[T] =
     (x ⊛ y) { case ((f1, p1), (f2, p2)) =>
       ({ case list =>
         f(f1(list.take(p1.size)), f2(list.drop(p1.size)))
@@ -76,9 +78,9 @@ object selector {
     }
 
   def invoke2Rel[T[_[_]]]
-    (x: PlannerError \/ PartialSelector[T], y: PlannerError \/ PartialSelector[T])
+    (x: Output[T], y: Output[T])
     (f: (Selector, Selector) => Selector)
-      : PlannerError \/ PartialSelector[T] =
+      : Output[T] =
     (x.toOption, y.toOption) match {
       case (Some((f1, p1)), Some((f2, p2)))=>
         invoke2Nel(x, y)(f)
@@ -90,7 +92,7 @@ object selector {
     }
 
   def typeSelector[T[_[_]]: RecursiveT: ShowT]:
-      GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], PlannerError \/ PartialSelector[T]] = { node =>
+      GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], Output[T]] = { node =>
 
     import MapFuncsCore._
 
@@ -146,7 +148,7 @@ object selector {
                 Type.LocalDateTime | Type.LocalDate | Type.LocalTime =>
               ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Date)))
           }
-        selCheck(typ).fold[PlannerError \/ PartialSelector[T]](
+        selCheck(typ).fold[Output[T]](
           -\/(InternalError.fromMsg(node.map(_._1).shows)))(
           f =>
           \/-(cont._2.fold[PartialSelector[T]](
@@ -174,13 +176,11 @@ object selector {
     * leftovers for conversion using \$where.
     */
   def selector[T[_[_]]: RecursiveT: ShowT](v: BsonVersion):
-      GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], PlannerError \/ PartialSelector[T]] = { node =>
+      GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], Output[T]] = { node =>
     import MapFuncsCore._
 
-    type Output = PlannerError \/ PartialSelector[T]
-
     object IsBson {
-      def unapply(x: (T[MapFunc[T, ?]], Output)): Option[Bson] =
+      def unapply(x: (T[MapFunc[T, ?]], Output[T])): Option[Bson] =
         x._1.project match {
           case MFC(Constant(b)) => b.cataM(BsonCodec.fromEJson(v)).toOption
           case _ => None
@@ -188,7 +188,7 @@ object selector {
     }
 
     object IsBool {
-      def unapply(v: (T[MapFunc[T, ?]], Output)): Option[Boolean] =
+      def unapply(v: (T[MapFunc[T, ?]], Output[T])): Option[Boolean] =
         v match {
           case IsBson(Bson.Bool(b)) => b.some
           case _                    => None
@@ -196,7 +196,7 @@ object selector {
     }
 
     object IsText {
-      def unapply(v: (T[MapFunc[T, ?]], Output)): Option[String] =
+      def unapply(v: (T[MapFunc[T, ?]], Output[T])): Option[String] =
         v match {
           case IsBson(Bson.Text(str)) => Some(str)
           case _                      => None
@@ -215,7 +215,7 @@ object selector {
 
     val default: PartialSelector[T] = defaultSelector[T]
 
-    def invoke(func: MapFunc[T, (T[MapFunc[T, ?]], Output)]): Output = {
+    def invoke(func: MapFunc[T, (T[MapFunc[T, ?]], Output[T])]): Output[T] = {
       /**
         * All the relational operators require a field as one parameter, and
         * BSON literal value as the other parameter. So we have to try to
@@ -227,9 +227,9 @@ object selector {
         * Javascript using the "$where" operator.
         */
       def relop
-        (x: (T[MapFunc[T, ?]], Output), y: (T[MapFunc[T, ?]], Output))
+        (x: (T[MapFunc[T, ?]], Output[T]), y: (T[MapFunc[T, ?]], Output[T]))
         (f: Bson => Selector.Condition, r: Bson => Selector.Condition):
-          Output =
+          Output[T] =
         (x, y) match {
           case (_, IsBson(v2)) =>
             \/-(({ case List(f1) => Selector.Doc(ListMap(f1 -> Selector.Expr(f(v2)))) }, List(There(0, Here[T]()))))
@@ -256,7 +256,7 @@ object selector {
         case _ => None
       }
 
-      def reversibleRelop(x: (T[MapFunc[T, ?]], Output), y: (T[MapFunc[T, ?]], Output))(f: MapFunc[T, _]): Output =
+      def reversibleRelop(x: (T[MapFunc[T, ?]], Output[T]), y: (T[MapFunc[T, ?]], Output[T]))(f: MapFunc[T, _]): Output[T] =
         (relFunc(f) ⊛ flip(f).flatMap(relFunc))(relop(x, y)(_, _)).getOrElse(-\/(InternalError fromMsg "couldn’t decipher operation"))
 
       func match {
@@ -309,13 +309,13 @@ object selector {
 
   def getSelector
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse, A]
-    (fm: FreeMapA[T, A], default: PlannerError \/ PartialSelector[T], galg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], PlannerError \/ PartialSelector[T]])
+    (fm: FreeMapA[T, A], default: Output[T], galg: GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], Output[T]])
     (implicit inj: EX :<: ExprOp)
-      : PlannerError \/ PartialSelector[T] =
+      : Output[T] =
     fm.zygo(
       interpret[MapFunc[T, ?], A, T[MapFunc[T, ?]]](
         κ(MFC(MapFuncsCore.Undefined[T, T[MapFunc[T, ?]]]()).embed),
         _.embed),
-      ginterpret[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], A, PlannerError \/ PartialSelector[T]](
+      ginterpret[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], A, Output[T]](
         κ(default), galg))
 }
