@@ -17,6 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
+import quasar.RenderTreeT
 import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
@@ -43,7 +44,7 @@ object getFilterBuilder {
    *  of the FreeMapA[T, A]
    */
   def apply
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse, A]
+    [T[_[_]]: BirecursiveT: ShowT: RenderTreeT, M[_]: Monad, WF[_], EX[_]: Traverse, A]
     (handler: FreeMapA[T, A] => M[Expr], v: BsonVersion)
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, A])
     (implicit ev: EX :<: ExprOp, WB: WorkflowBuilder.Ops[WF])
@@ -69,6 +70,7 @@ object getFilterBuilder {
       interpret(κ(Cofree(ann, MFC(Undefined()))), attributeAlgebra[MapFunc[T, ?], B](κ(ann)))
 
     val undefinedF: MapFunc[T, Cofree[MapFunc[T, ?], Boolean] \/ FreeMapA[T, A]] = MFC(Undefined())
+
     val gcoalg: GCoalgebra[Cofree[MapFunc[T, ?], Boolean] \/ ?, EnvT[Boolean, MapFunc[T, ?], ?], FreeMapA[T, A]] =
       _.fold(κ(envT(false, undefinedF)), {
         case MFC(Cond(if_, then_, undef @ Embed(CoEnv(\/-(MFC(Undefined())))))) =>

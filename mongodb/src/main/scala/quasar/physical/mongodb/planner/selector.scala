@@ -175,8 +175,8 @@ object selector {
     * expressions which can be turned into selectors, factoring out the
     * leftovers for conversion using \$where.
     */
-  def selector[T[_[_]]: RecursiveT: ShowT](v: BsonVersion):
-      GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], Output[T]] = { node =>
+  def selector[T[_[_]]: BirecursiveT: ShowT: RenderTreeT](v: BsonVersion)
+      : GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], Output[T]] = { node =>
     import MapFuncsCore._
 
     object IsBson {

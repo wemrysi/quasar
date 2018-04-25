@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.{RenderTree, Type}
+import quasar.{RenderTree, RenderTreeT, Type}
 import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._
@@ -46,7 +46,7 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 
-class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT] extends
+class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends
     Planner[QScriptCore[T, ?]] {
 
   import MapFuncsCore._
