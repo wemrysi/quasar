@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.Data
 import quasar.contrib.scalacheck.gen
 import quasar.fp.ski.κ
+import quasar.fp.{copkTraverse, TwoElemCopKToEitherOps}
 import quasar.fp.tree.{BinaryArg, TernaryArg, UnaryArg}
 import quasar.precog.common.RValue
 import quasar.qscript._
@@ -35,7 +36,7 @@ import org.specs2.specification.{AfterAll, Scope}
 import java.time.{Duration => _, _}
 
 import matryoshka.AlgebraM
-import matryoshka.data.Fix
+import matryoshka.data.{Fix, freeRecursive}
 import matryoshka.implicits._
 import matryoshka.patterns._
 
@@ -101,7 +102,7 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
   private def check[A](fm: FreeMapA[Fix, A]): Option[Result] =
     fm.cataM(interpretM[Result \/ ?, MapFunc[Fix, ?], A, Unit](
       κ(().right),
-      _.run.fold(shortCircuitCore, shortCircuitDerived))).swap.toOption
+      _.toDisjunction.fold(shortCircuitCore, shortCircuitDerived))).swap.toOption
 
   private def run[A](
     freeMap: FreeMapA[Fix, A],

@@ -186,8 +186,12 @@ package object fp
     ga => prism.get(ga).flatMap(f)
 
 
-  def liftFF[F[_], G[_], A](orig: F[A] => F[A])(implicit F: F :<<: G):
+  def liftFF[F[_], G[_], A](orig: F[A] => F[A])(implicit F: F :<: G):
       G[A] => G[A] =
+    ftf => F.prj(ftf).fold(ftf)(orig.andThen(F.inj))
+
+  def liftFFCopK[F[_], G[_], A](orig: F[A] => F[A])(implicit F: F :<<: G):
+  G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig.andThen(F.inj))
 
   def liftFFTrans[F[_], G[_], A](prism: PrismNT[G, F])(f: F[A] => Option[F[A]])

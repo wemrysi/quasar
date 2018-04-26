@@ -85,7 +85,7 @@ object MongoDb
   def optimize[T[_[_]]: BirecursiveT: EqualT: ShowT]
       : QSM[T, T[QSM[T, ?]]] => QSM[T, T[QSM[T, ?]]] = {
     val O = new Optimize[T]
-    liftFF[QScriptCore[T, ?], QSM[T, ?], T[QSM[T, ?]]](
+    liftFFCopK[QScriptCore[T, ?], QSM[T, ?], T[QSM[T, ?]]](
       repeatedly(O.filterBeforeUnion[QSM[T, ?]]))
   }
 

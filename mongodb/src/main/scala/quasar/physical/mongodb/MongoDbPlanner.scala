@@ -80,7 +80,7 @@ object MongoDbPlanner {
              PhaseResult.treeAndCode("QScript Mongo", mongoQS3))
 
       mongoQS4 =  mongoQS3.transCata[T[MQS]](
-                    liftFF[QScriptCore[T, ?], MQS, T[MQS]](
+                    liftFFCopK[QScriptCore[T, ?], MQS, T[MQS]](
                       repeatedly(O.subsetBeforeMap[MQS, MQS](
                         reflNT[MQS]))))
       _ <- PhaseResults.logPhase[M](
