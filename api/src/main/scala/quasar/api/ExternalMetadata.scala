@@ -16,6 +16,8 @@
 
 package quasar.api
 
+import slamdata.Predef.Exception
+
 import monocle.macros.Lenses
 import scalaz.{Cord, Show}
 import scalaz.syntax.show._
@@ -23,14 +25,18 @@ import scalaz.syntax.show._
 @Lenses
 final case class ExternalMetadata(
     kind: MediaType,
-    status: ExternalStatus)
+    condition: Condition[Exception])
 
 object ExternalMetadata extends ExternalMetadataInstances
 
 sealed abstract class ExternalMetadataInstances {
-  implicit val show: Show[ExternalMetadata] =
+  implicit val show: Show[ExternalMetadata] = {
+    implicit val exShow: Show[Exception] =
+      Show.shows(_.getMessage)
+
     Show.show {
       case ExternalMetadata(k, s) =>
         Cord("ExternalMetadata(") ++ k.show ++ Cord(", ") ++ s.show ++ Cord(")")
     }
+  }
 }

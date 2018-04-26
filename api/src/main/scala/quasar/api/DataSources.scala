@@ -16,8 +16,6 @@
 
 package quasar.api
 
-import slamdata.Predef.Unit
-
 import scalaz.{\/, IMap, ISet}
 
 trait DataSources[F[_], C, S] {
@@ -36,7 +34,7 @@ trait DataSources[F[_], C, S] {
       kind: MediaType,
       config: C,
       onConflict: ConflictResolution)
-      : F[ExternalError[C] \/ Unit]
+      : F[Condition[ExternalError[C]]]
 
   /** Returns the result of attempting to create a static datasource containing the
     * given content, `Unit` indicates the operation was successful.
@@ -49,7 +47,7 @@ trait DataSources[F[_], C, S] {
       name: ResourceName,
       content: S,
       onConflict: ConflictResolution)
-      : F[StaticError[C] \/ Unit]
+      : F[Condition[StaticError[C]]]
 
   /** Returns the metadata and configuration for the specified datasource,
     * or an error if it doesn't exist.
@@ -61,7 +59,7 @@ trait DataSources[F[_], C, S] {
     *
     * An error is returned if no datasource exists having the specified name.
     */
-  def remove(name: ResourceName): F[CommonError[C] \/ Unit]
+  def remove(name: ResourceName): F[Condition[CommonError[C]]]
 
   /** Rename `src` to `dst`, handling conflicts at `dst` according to
     * `onConflict`. An error is returned if `src` does not exist.
@@ -70,7 +68,7 @@ trait DataSources[F[_], C, S] {
       src: ResourceName,
       dst: ResourceName,
       onConflict: ConflictResolution)
-      : F[CreateError[C] \/ Unit]
+      : F[Condition[CreateError[C]]]
 
   /** A map of all datasources to their current status. */
   def status: F[IMap[ResourceName, StaticDataSource \/ ExternalMetadata]]
