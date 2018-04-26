@@ -20,7 +20,7 @@ import slamdata.Predef.{Product, None, Serializable, Some, Unit}
 import quasar.fp.ski.κ
 
 import monocle.Prism
-import scalaz.{Cord, ISet, OneAnd, Order, Show}
+import scalaz.{Cord, Order, Show}
 import scalaz.std.option._
 import scalaz.syntax.show._
 
@@ -29,15 +29,15 @@ trait ResourcePathType extends Product with Serializable
 
 object ResourcePathType extends ResourcePathTypeInstances {
   case object ResourcePrefix extends ResourcePathType
-  final case class Resource(formats: OneAnd[ISet, MediaType]) extends ResourcePathType
+  final case class Resource(formats: MediaTypes) extends ResourcePathType
 
   val resourcePrefix: Prism[ResourcePathType, Unit] =
     Prism.partial[ResourcePathType, Unit] {
       case ResourcePrefix => ()
     } (κ(ResourcePrefix))
 
-  val resource: Prism[ResourcePathType, OneAnd[ISet, MediaType]] =
-    Prism.partial[ResourcePathType, OneAnd[ISet, MediaType]] {
+  val resource: Prism[ResourcePathType, MediaTypes] =
+    Prism.partial[ResourcePathType, MediaTypes] {
       case Resource(mts) => mts
     } (Resource)
 }
