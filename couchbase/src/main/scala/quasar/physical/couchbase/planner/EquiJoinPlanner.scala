@@ -22,7 +22,7 @@ import quasar.fs.Planner.{PlannerErrorME}
 import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
 import quasar.fp.ski.κ
-import quasar.fp.{copkTraverse, :<<:}
+import quasar.fp.{copkTraverse, :<<:, ACopK}
 import quasar.physical.couchbase._,
   common.{ContextReader, DocTypeValue},
   N1QL.{Eq, Unreferenced, _},
@@ -44,7 +44,7 @@ final class EquiJoinPlanner[
   extends Planner[T, F, EquiJoin[T, ?]] {
 
   object CShiftedRead {
-    def unapply[F[_], A](
+    def unapply[F[a] <: ACopK[a], A](
       fa: F[A]
     )(implicit
       C: Const[ShiftedRead[AFile], ?] :<<: F

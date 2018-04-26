@@ -19,7 +19,7 @@ package quasar.qscript
 
 import slamdata.Predef._
 import scalaz._, Scalaz._
-import quasar.fp.:<<:
+import quasar.fp.{:<<:, ACopK}
 
 /** This is like [[scalaz.Inject]], but for injecting an arbitrary coproduct
   * where all of the components are in the `OUT` coproduct in any order.
@@ -58,7 +58,7 @@ sealed trait InjectableInstances extends InjectableInstances0 {
     )
   )
 
-  implicit def injectCopK[F[_], G[_]](implicit IN: F :<<: G): Aux[F, G] =
+  implicit def injectCopK[F[_], G[a] <: ACopK[a]](implicit IN: F :<<: G): Aux[F, G] =
     make[F, G](IN.inj, IN.prj)
 
 }

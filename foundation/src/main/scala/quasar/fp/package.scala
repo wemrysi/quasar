@@ -173,7 +173,7 @@ package object fp
       G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig)
 
-  def liftFGCopK[F[_], G[_], A](orig: F[A] => G[A])(implicit F: F :<<: G):
+  def liftFGCopK[F[_], G[a] <: ACopK[a], A](orig: F[A] => G[A])(implicit F: F :<<: G):
       G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig)
 
@@ -190,7 +190,7 @@ package object fp
       G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig.andThen(F.inj))
 
-  def liftFFCopK[F[_], G[_], A](orig: F[A] => F[A])(implicit F: F :<<: G):
+  def liftFFCopK[F[_], G[a] <: ACopK[a], A](orig: F[A] => F[A])(implicit F: F :<<: G):
   G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig.andThen(F.inj))
 
@@ -230,7 +230,8 @@ package object fp
           case (_,       _)       => false
         })))
 
-  type :<<:[F[_], G[_]] = CopKInject[F, G]
+  type ACopK[a] = CopK[_, a]
+  type :<<:[F[_], G[a] <: ACopK[a]] = CopK.Inject[F, G]
 
   implicit class TwoElemCopKToEitherOps[F[_], G[_], A](val copK: CopK[F ::: G ::: TNilK, A])(
     implicit
@@ -331,33 +332,6 @@ package object fp
 }
 
 package fp {
-
-  /** This is like [[iotaz.CopK.Inject]], but doesn't hava a type bound on G
-    * that requires G to be [[iotaz.CopK]]. This allows to avoid repeating
-    * this bound on every type that needs inject instance. This also allows
-    * to create reflexive inject instance like in [[scalaz.Inject]] which is
-    * used in some places.
-    */
-  trait CopKInject[F[_], G[_]] extends (F ~> G) {
-    def inj : F ~> G
-    def prj : G ~> λ[A => Option[F[A]]]
-    final def apply[A](fa : F[A]) : G[A] = inj(fa)
-    final def unapply[A](ga : G[A]) : Option[F[A]] = prj(ga)
-  }
-
-  object CopKInject extends CopKInjectInstances
-
-  sealed trait CopKInjectInstances extends CopKInjectFunctions {
-    implicit def injectCopK[F[_], G[a] <: CopK[_, a]](implicit IN: CopK.Inject[F, G]): CopKInject[F, G] =
-      make[F, G](IN.inj, IN.prj)
-  }
-
-  sealed trait CopKInjectFunctions {
-    def make[F[_], G[_]](inject: F ~> G, project: G ~> λ[A => Option[F[A]]]): CopKInject[F, G] = new CopKInject[F, G] {
-      val inj = inject
-      val prj = project
-    }
-  }
 
   /** Lift a `State` computation to operate over a "larger" state given a `Lens`.
     *

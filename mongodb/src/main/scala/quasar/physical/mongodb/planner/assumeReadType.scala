@@ -52,7 +52,7 @@ object assumeReadType {
 
   def isRewriteIdStatus(idStatus: IdStatus): Boolean = idStatus === ExcludeId
 
-  def isRewrite[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, G[_]: Functor, A](GtoF: PrismNT[G, F], qs: G[A])(implicit
+  def isRewrite[T[_[_]]: BirecursiveT: EqualT, F[a] <: ACopK[a]: Functor, G[_]: Functor, A](GtoF: PrismNT[G, F], qs: G[A])(implicit
     QC: QScriptCore[T, ?] :<<: F,
     SR: Const[ShiftedRead[AFile], ?] :<<: F,
     FT: Injectable.Aux[F, QScriptTotal[T, ?]],
@@ -97,7 +97,7 @@ object assumeReadType {
     }
   }
 
-def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
+def apply[T[_[_]]: BirecursiveT: EqualT, F[a] <: ACopK[a]: Functor, M[_]: Monad: MonadFsErr]
   (typ: Type)
   (implicit
     QC: QScriptCore[T, ?] :<<: F,
