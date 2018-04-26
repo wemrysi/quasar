@@ -57,7 +57,7 @@ object MongoDbPlanner {
       val mqs2 = BR.branches.modify(
           _.transCata[FreeQS[T]](liftCo(R.normalizeEJCoEnv[QScriptTotal[T, ?]]))
         )(mqs1.project).embed
-      Trans(assumeReadType[T, MQS, M](Type.AnyObject), mqs2)
+      Trans.applyTrans(assumeReadType[T, MQS, M](Type.AnyObject), PrismNT.id[MQS])(mqs2)
     }
 
     // TODO: All of these need to be applied through branches. We may also be able to compose
@@ -73,7 +73,7 @@ object MongoDbPlanner {
     //         not recognize any Map as shape preserving, but it may recognize
     //         x being shape preserving (e.g. when x = ShiftedRead(y, ExcludeId))
     for {
-      mongoQS1 <- Trans(assumeReadType[T, MQS, M](Type.AnyObject), qs)
+      mongoQS1 <- Trans.applyTrans(assumeReadType[T, MQS, M](Type.AnyObject), PrismNT.id[MQS])(qs)
       mongoQS2 <- mongoQS1.transCataM(elideQuasarSigil[T, MQS, M](anyDoc))
       mongoQS3 <- normalize(mongoQS2)
       _ <- PhaseResults.logPhase[M](

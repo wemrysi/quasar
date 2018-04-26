@@ -343,12 +343,7 @@ package fp {
 
   object CopKInject extends CopKInjectInstances
 
-  sealed trait CopKInjectInstances extends CopKInjectInstances0 {
-    implicit def reflexiveCopKInject[F[_]]: CopKInject[F, F] =
-      make[F, F](λ[F ~> F](x => x), λ[F ~> λ[A => Option[F[A]]]](some(_)))
-  }
-
-  sealed trait CopKInjectInstances0 extends CopKInjectFunctions {
+  sealed trait CopKInjectInstances extends CopKInjectFunctions {
     implicit def injectCopK[F[_], G[a] <: CopK[_, a]](implicit IN: CopK.Inject[F, G]): CopKInject[F, G] =
       make[F, G](IN.inj, IN.prj)
   }
