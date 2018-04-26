@@ -83,8 +83,8 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       : T[F] => T[G] = {
     _.codyna[G, T[G]](
       normalizeTJ[G] >>>
-      injectRepeatedly[G, G, T[G]](C.coalesceSRNormalize[G, ADir](idPrism)) >>>
-      injectRepeatedly[G, G, T[G]](C.coalesceSRNormalize[G, AFile](idPrism)) >>>
+      repeatedly(C.coalesceSRNormalize[G, ADir](idPrism)) >>>
+      repeatedly(C.coalesceSRNormalize[G, AFile](idPrism)) >>>
       (_.embed),
       ((_: T[F]).project) >>> (S.shiftRead[G](idPrism.reverseGet)(_)))
   }
@@ -101,7 +101,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
   ): T[F] => T[G] =
     _.codyna[G, T[G]](
       normalizeTJ[G] >>>
-      injectRepeatedly[G, G, T[G]](C.coalesceSRNormalize[G, ADir](idPrism)) >>>
+      repeatedly(C.coalesceSRNormalize[G, ADir](idPrism)) >>>
       (_.embed),
       ((_: T[F]).project) >>> (S.shiftReadDir[G](idPrism.reverseGet)(_)))
 
