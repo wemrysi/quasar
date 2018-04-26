@@ -16,19 +16,13 @@
 
 package quasar.api
 
-import slamdata.Predef.{Int, Some}
+import slamdata.Predef.{Int, Product, Serializable, Some}
 
 import scalaz.{Enum, Show}
 import scalaz.std.anyVal._
 import scalaz.syntax.order._
 
-sealed trait ConflictResolution {
-  def fold[A](preserve: => A, replace: => A): A =
-    this match {
-      case ConflictResolution.Preserve => preserve
-      case ConflictResolution.Replace => replace
-    }
-}
+sealed trait ConflictResolution extends Product with Serializable
 
 object ConflictResolution extends ConflictResolutionInstances {
   case object Preserve extends ConflictResolution
@@ -48,17 +42,26 @@ sealed abstract class ConflictResolutionInstances {
         toInt(x) ?|? toInt(y)
 
       def pred(cr: ConflictResolution) =
-        cr.fold(ConflictResolution.replace, ConflictResolution.preserve)
+        cr match {
+          case ConflictResolution.Preserve => ConflictResolution.Replace
+          case ConflictResolution.Replace  => ConflictResolution.Preserve
+        }
 
       def succ(cr: ConflictResolution) =
-        cr.fold(ConflictResolution.replace, ConflictResolution.preserve)
+        cr match {
+          case ConflictResolution.Preserve => ConflictResolution.Replace
+          case ConflictResolution.Replace  => ConflictResolution.Preserve
+        }
 
-      override val min = Some(ConflictResolution.preserve)
+      override val min = Some(ConflictResolution.Preserve)
 
-      override val max = Some(ConflictResolution.replace)
+      override val max = Some(ConflictResolution.Replace)
 
       private def toInt(cr: ConflictResolution): Int =
-        cr.fold(0, 1)
+        cr match {
+          case ConflictResolution.Preserve => 0
+          case ConflictResolution.Replace  => 1
+        }
     }
 
   implicit val show: Show[ConflictResolution] =
