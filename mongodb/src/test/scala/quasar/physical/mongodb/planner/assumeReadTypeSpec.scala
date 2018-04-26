@@ -43,7 +43,10 @@ class assumeReadTypeSpec extends Qspec with TTypes[Fix] with TreeMatchers {
   val json = Fixed[Fix[EJson]]
 
   def assumeReadTp(qs: Fix[fs.MongoQScript[Fix, ?]]): Either[quasar.fs.FileSystemError, Fix[fs.MongoQScript[Fix, ?]]] =
-    Trans(assumeReadType[Fix, fs.MongoQScript[Fix, ?], quasar.fs.FileSystemError \/ ?](Type.AnyObject), qs).toEither
+    Trans.applyTrans(
+      assumeReadType[Fix, fs.MongoQScript[Fix, ?], quasar.fs.FileSystemError \/ ?](Type.AnyObject),
+      PrismNT.id[fs.MongoQScript[Fix, ?]]
+    )(qs).toEither
 
   val rewriteSrcFree0 = free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), ExcludeId)
   val rewriteSrcFix0 = fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), ExcludeId)
