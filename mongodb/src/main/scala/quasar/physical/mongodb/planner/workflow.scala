@@ -97,13 +97,13 @@ object workflow {
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX], fm: FreeMap[T])
     (implicit EX: ExprOpCoreF :<: EX, ev: EX :<: ExprOp)
       : M[Expr] =
-    exprOrJs(fm)(getExpr[T, M, EX](funcHandler, staticHandler)(_), getJsFn[T, M])
+    exprOrJs(fm)(getExpr[T, M, EX](funcHandler, staticHandler), getJsFn[T, M])
 
   def handleRedRepair[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, EX[_]: Traverse]
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX], jr: FreeMapA[T, ReduceIndex])
     (implicit EX: ExprOpCoreF :<: EX, ev: EX :<: ExprOp)
       : M[Expr] =
-    exprOrJs(jr)(getExprRed[T, M, EX](funcHandler, staticHandler)(_), getJsRed[T, M])
+    exprOrJs(jr)(getExprRed[T, M, EX](funcHandler, staticHandler), getJsRed[T, M])
 
   def rebaseWB
     [T[_[_]]: EqualT, M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush, EX[_]: Traverse]
