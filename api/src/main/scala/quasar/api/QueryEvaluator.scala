@@ -16,11 +16,11 @@
 
 package quasar.api
 
-import quasar.api.ResourceError.CommonError
+import quasar.api.ResourceError.ReadError
 
 import scalaz.\/
 
 trait QueryEvaluator[F[_], Q, R] extends ResourceDiscovery[F] {
   /** Returns the results of evaluating the given query. */
-  def evaluate(query: Q): F[CommonError \/ R]
+  def evaluate(query: Q): F[ReadError \/ R]
 }

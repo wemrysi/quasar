@@ -16,45 +16,55 @@
 
 package quasar.api
 
-import slamdata.Predef.{Product, None, Serializable, Some, Unit}
-import quasar.fp.ski.κ
+import slamdata.Predef.{Int, Product, Serializable, Some}
 
-import monocle.Prism
-import scalaz.{Cord, Order, Show}
-import scalaz.std.option._
-import scalaz.syntax.show._
+import scalaz.{Enum, Show}
+import scalaz.std.anyVal._
+import scalaz.syntax.order._
 
 /** Describes what a `ResourcePath` refers to. */
 trait ResourcePathType extends Product with Serializable
 
 object ResourcePathType extends ResourcePathTypeInstances {
+  case object Resource extends ResourcePathType
   case object ResourcePrefix extends ResourcePathType
-  final case class Resource(formats: MediaTypes) extends ResourcePathType
 
-  val resourcePrefix: Prism[ResourcePathType, Unit] =
-    Prism.partial[ResourcePathType, Unit] {
-      case ResourcePrefix => ()
-    } (κ(ResourcePrefix))
+  val resource: ResourcePathType =
+    Resource
 
-  val resource: Prism[ResourcePathType, MediaTypes] =
-    Prism.partial[ResourcePathType, MediaTypes] {
-      case Resource(mts) => mts
-    } (Resource)
+  val resourcePrefix: ResourcePathType =
+    ResourcePrefix
 }
 
 sealed abstract class ResourcePathTypeInstances {
-  implicit val order: Order[ResourcePathType] =
-    Order.orderBy {
-      case ResourcePathType.ResourcePrefix => None
-      case ResourcePathType.Resource(mts) => Some(mts)
+  implicit val enum: Enum[ResourcePathType] =
+    new Enum[ResourcePathType] {
+      def order(x: ResourcePathType, y: ResourcePathType) =
+        toInt(x) ?|? toInt(y)
+
+      def pred(t: ResourcePathType) =
+        t match {
+          case ResourcePathType.Resource => ResourcePathType.ResourcePrefix
+          case ResourcePathType.ResourcePrefix  => ResourcePathType.Resource
+        }
+
+      def succ(t: ResourcePathType) =
+        t match {
+          case ResourcePathType.Resource => ResourcePathType.ResourcePrefix
+          case ResourcePathType.ResourcePrefix  => ResourcePathType.Resource
+        }
+
+      override val min = Some(ResourcePathType.ResourcePrefix)
+
+      override val max = Some(ResourcePathType.Resource)
+
+      private def toInt(t: ResourcePathType): Int =
+        t match {
+          case ResourcePathType.ResourcePrefix => 0
+          case ResourcePathType.Resource => 1
+        }
     }
 
   implicit val show: Show[ResourcePathType] =
-    Show.show {
-      case ResourcePathType.ResourcePrefix =>
-        Cord("ResourcePrefix")
-
-      case ResourcePathType.Resource(mts) =>
-        Cord("Resource(") ++ mts.show ++ Cord(")")
-    }
+    Show.showFromToString
 }

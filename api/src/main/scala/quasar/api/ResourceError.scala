@@ -18,7 +18,7 @@ package quasar.api
 
 import slamdata.Predef.{Product, Serializable}
 
-import scalaz.{Cord, ISet, Show}
+import scalaz.{Cord, Show}
 import scalaz.syntax.show._
 
 sealed trait ResourceError extends QuasarErrorNG
@@ -27,9 +27,6 @@ sealed trait ResourceError extends QuasarErrorNG
 
 object ResourceError extends ResourceErrorInstances {
   sealed trait ReadError extends ResourceError
-
-  final case class MediaTypeUnsupported(unsupported: MediaType, supported: ISet[MediaType])
-      extends ReadError
 
   final case class NotAResource(path: ResourcePath) extends ReadError
 
@@ -43,9 +40,6 @@ sealed abstract class ResourceErrorInstances {
 
   implicit val show: Show[ResourceError] =
     Show.show {
-      case MediaTypeUnsupported(u, s) =>
-        Cord("MediaTypeUnsupported(") ++ u.show ++ Cord(", ") ++ s.show ++ Cord(")")
-
       case NotAResource(p) =>
         Cord("NotAResource(") ++ p.show ++ Cord(")")
 

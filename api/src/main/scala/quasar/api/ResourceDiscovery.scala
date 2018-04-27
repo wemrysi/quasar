@@ -16,12 +16,12 @@
 
 package quasar.api
 
-import slamdata.Predef.Option
+import slamdata.Predef.Boolean
 import quasar.api.ResourceError.CommonError
 
 import scalaz.{\/, IMap, Tree}
 
-/** Provides for discovering the existence and types of resources in a datasource. */
+/** Provides for discovering the resources in a datasource. */
 trait ResourceDiscovery[F[_]] {
 
   /** Returns the children of the specified resource path or an error if it
@@ -34,8 +34,6 @@ trait ResourceDiscovery[F[_]] {
     */
   def descendants(path: ResourcePath): F[CommonError \/ Tree[(ResourceName, ResourcePathType)]]
 
-  /** Returns the `MediaTypes` for the specified resource if it exists and
-    * `None` if it doesn't.
-    */
-  def exists(path: ResourcePath): F[Option[MediaTypes]]
+  /** Returns whether the specified resource path refers to a resource. */
+  def isResource(path: ResourcePath): F[Boolean]
 }
