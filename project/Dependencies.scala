@@ -64,7 +64,6 @@ object Dependencies {
   )
 
   def api = Seq(
-    "co.fs2"                     %% "fs2-core"      % fs2Version,
     "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion
   )
 
