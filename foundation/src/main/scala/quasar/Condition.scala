@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar
 
 import slamdata.Predef.{None, Option, Product, Serializable, Some, Unit}
 import quasar.fp.ski.κ

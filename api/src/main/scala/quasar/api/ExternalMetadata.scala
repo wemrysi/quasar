@@ -17,6 +17,7 @@
 package quasar.api
 
 import slamdata.Predef.Exception
+import quasar.Condition
 
 import monocle.macros.Lenses
 import scalaz.{Cord, Show}

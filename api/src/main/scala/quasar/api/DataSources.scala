@@ -16,6 +16,8 @@
 
 package quasar.api
 
+import quasar.Condition
+
 import scalaz.{\/, IMap, ISet}
 
 trait DataSources[F[_], C, S] {
