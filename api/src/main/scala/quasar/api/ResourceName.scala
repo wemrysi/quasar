@@ -21,7 +21,7 @@ import slamdata.Predef.String
 import scalaz.{Order, Show}
 import scalaz.std.string._
 
-final case class ResourceName(value: String) extends scala.AnyVal
+final case class ResourceName(value: String)
 
 object ResourceName extends ResourceNameInstances
 
