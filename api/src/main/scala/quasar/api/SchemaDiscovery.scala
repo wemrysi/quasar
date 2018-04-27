@@ -23,5 +23,5 @@ trait SchemaDiscovery[F[_], Q, C, S] {
   /** Returns a description of the structure of the dataset represented
     * by the given query.
     */
-  def schema(query: Q, compressionSettings: C): F[Option[S]]
+  def schema(query: Q, settings: C): F[Option[S]]
 }
