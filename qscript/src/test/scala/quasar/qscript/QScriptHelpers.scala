@@ -38,7 +38,7 @@ trait QScriptHelpers extends TTypes[Fix] {
     Const[DeadEnd, ?]     :::
     TNilK, A]
 
-  val DE = CopK.Inject[Const[DeadEnd, ?], QS]
+  val DE = implicitly[Const[DeadEnd, ?]     :<<: QS]
   val RD = implicitly[Const[Read[ADir], ?]  :<<: QS]
   val RF = implicitly[Const[Read[AFile], ?] :<<: QS]
   val QC = implicitly[QScriptCore           :<<: QS]

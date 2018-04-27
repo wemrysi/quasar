@@ -25,8 +25,8 @@ import iotaz.{TNilK, CopK}
 
 package object couchbase {
   type CouchbaseQScriptCP[T[_[_]]] =
-    QScriptCore[T, ?] :::
-    EquiJoin[T, ?] :::
+    QScriptCore[T, ?]            :::
+    EquiJoin[T, ?]               :::
     Const[ShiftedRead[AFile], ?] :::
     TNilK
 

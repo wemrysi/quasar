@@ -31,7 +31,7 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import pathy.Path.{dir1, file1, rootDir}
 import scalaz._, Scalaz._, \&/._
-import iotaz.{ CopK, TListK }
+import iotaz.{CopK, TListK}
 
 /** This extracts statically-known paths from QScript queries to make it easier
   * for connectors to map queries to their own filesystems.

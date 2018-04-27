@@ -44,7 +44,7 @@ import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import iotaz.{CopK,TListK}
+import iotaz.{CopK, TListK}
 
 
 trait BackendModule {

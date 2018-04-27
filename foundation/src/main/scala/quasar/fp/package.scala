@@ -18,7 +18,7 @@ package quasar
 
 import slamdata.Predef._
 
-import iotaz.{ CopK, TListK, TNilK }
+import iotaz.{CopK, TListK, TNilK}
 import iotaz.TListK.:::
 import matryoshka._
 import matryoshka.data._
@@ -191,7 +191,7 @@ package object fp
     ftf => F.prj(ftf).fold(ftf)(orig.andThen(F.inj))
 
   def liftFFCopK[F[_], G[a] <: ACopK[a], A](orig: F[A] => F[A])(implicit F: F :<<: G):
-  G[A] => G[A] =
+      G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig.andThen(F.inj))
 
   def liftFFTrans[F[_], G[_], A](prism: PrismNT[G, F])(f: F[A] => Option[F[A]])
@@ -233,7 +233,7 @@ package object fp
   type ACopK[a] = CopK[_, a]
   type :<<:[F[_], G[a] <: ACopK[a]] = CopK.Inject[F, G]
 
-  implicit class TwoElemCopKToEitherOps[F[_], G[_], A](val copK: CopK[F ::: G ::: TNilK, A])(
+  implicit class TwoElemCopKOps[F[_], G[_], A](val copK: CopK[F ::: G ::: TNilK, A])(
     implicit
     IF: CopK.Inject[F, CopK[F ::: G ::: TNilK, ?]],
     IG: CopK.Inject[G, CopK[F ::: G ::: TNilK, ?]]
@@ -332,7 +332,6 @@ package object fp
 }
 
 package fp {
-
   /** Lift a `State` computation to operate over a "larger" state given a `Lens`.
     *
     * NB: Uses partial application of `F[_]` for better type inference, usage:

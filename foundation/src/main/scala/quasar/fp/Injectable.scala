@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// TODO adjust package, or find a better place for this. For now it will stay here, to be decided later
+// TODO adjust package, or find a better place for this
 package quasar.qscript
 
 import slamdata.Predef._

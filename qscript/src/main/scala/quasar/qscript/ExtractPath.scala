@@ -16,18 +16,17 @@
 
 package quasar.qscript
 
-import iotaz.{ CopK, TListK }
 import slamdata.Predef._
 import quasar.fp.ski.κ
 import quasar.fp.copkTraverse
+
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-
-import scalaz._
-import Scalaz._
+import scalaz._, Scalaz._
 import shapeless.Lazy
+import iotaz.{CopK, TListK}
 
 /** Extracts paths of particular type from QScript, collecting them in the
   * provided `ApplicativePlus`.

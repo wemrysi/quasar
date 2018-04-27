@@ -16,21 +16,17 @@
 
 package quasar
 
-import matryoshka.Delay
 import slamdata.Predef._
-import quasar.contrib.pathy.{ ADir, AFile }
-import quasar.fp.DelayedFG
-import quasar.fp._ // TODO remember to remove coproduct.scala file once it is not needed
-//import quasar.qscript.MapFuncCore._
+import quasar.contrib.pathy.{ADir, AFile}
+import quasar.fp._
 
-import matryoshka.{Hole => _, _}
+import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
-
-import iotaz._
-import TListK.:::
+import iotaz.{CopK, TNilK}
+import iotaz.TListK.:::
 
 /** The various representations of an arbitrary query, as seen by the filesystem
   * connectors, along with the operations for dealing with them.
@@ -75,16 +71,6 @@ package object qscript {
      ::: Const[DeadEnd, ?]
      ::: TNilK, A]
 
-  private def coproductEqual[F[_], G[_]](implicit F: Delay[Equal, F], G: Delay[Equal, G]): Delay[Equal, Coproduct[F, G, ?]] =
-    Delay.fromNT(λ[Equal ~> DelayedFG[F, G]#Equal](eq =>
-      Equal equal ((cp1, cp2) =>
-        (cp1.run, cp2.run) match {
-          case (-\/(f1), -\/(f2)) => F(eq).equal(f1, f2)
-          case (\/-(g1), \/-(g2)) => G(eq).equal(g1, g2)
-          case (_,       _)       => false
-        })))
-
-
   object QCT {
     def apply[T[_[_]], A](qc: QScriptCore[T, A]): QScriptTotal[T, A] =
       CopK.Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(qc)
@@ -98,8 +84,8 @@ package object qscript {
   type QScriptEducated[T[_[_]], A] =
     CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[Read[ADir], ?] ::: Const[Read[AFile], ?] ::: TNilK, A]
 
-  def educatedToTotal[T[_[_]]]
-      : Injectable.Aux[QScriptEducated[T, ?], QScriptTotal[T, ?]] = SubInject[QScriptEducated[T, ?], QScriptTotal[T, ?]]
+  def educatedToTotal[T[_[_]]]: Injectable.Aux[QScriptEducated[T, ?], QScriptTotal[T, ?]] =
+    SubInject[QScriptEducated[T, ?], QScriptTotal[T, ?]]
 
   object QCE {
     def apply[T[_[_]], A](qc: QScriptCore[T, A]): QScriptEducated[T, A] =
@@ -123,8 +109,8 @@ package object qscript {
   type QScriptRead[T[_[_]], A] =
     CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[Read[ADir], ?] ::: Const[Read[AFile], ?] ::: TNilK, A]
 
-  implicit def qScriptReadToQscriptTotal[T[_[_]]]
-      : Injectable.Aux[QScriptRead[T, ?], QScriptTotal[T, ?]] = SubInject[QScriptRead[T, ?], QScriptTotal[T, ?]]
+  implicit def qScriptReadToQscriptTotal[T[_[_]]]: Injectable.Aux[QScriptRead[T, ?], QScriptTotal[T, ?]] =
+    SubInject[QScriptRead[T, ?], QScriptTotal[T, ?]]
 
   /** QScript that has gone through Read conversion and shifted conversion.
     *
@@ -133,8 +119,8 @@ package object qscript {
   type QScriptShiftRead[T[_[_]], A] =
     CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[ShiftedRead[ADir], ?] ::: Const[ShiftedRead[AFile], ?] ::: TNilK, A]
 
-  implicit def qScriptShiftReadToQScriptTotal[T[_[_]]]
-      : Injectable.Aux[QScriptShiftRead[T, ?], QScriptTotal[T, ?]] = SubInject[QScriptShiftRead[T, ?], QScriptTotal[T, ?]]
+  implicit def qScriptShiftReadToQScriptTotal[T[_[_]]]: Injectable.Aux[QScriptShiftRead[T, ?], QScriptTotal[T, ?]] =
+    SubInject[QScriptShiftRead[T, ?], QScriptTotal[T, ?]]
 
   type MapFunc[T[_[_]], A] = CopK[MapFuncCore[T, ?] ::: MapFuncDerived[T, ?] ::: TNilK, A]
 
@@ -212,25 +198,4 @@ package object qscript {
   def injectRepeatedly[F [_], G[a] <: ACopK[a], A](op: F[A] => Option[G[A]])(implicit F: F :<<: G): F[A] => G[A] =
     fa => op(fa).fold(F.inj(fa))(ga => F.prj(ga).fold(ga)(injectRepeatedly(op)))
 
-/*
-  // Helpers for creating `Injectable` instances
-
-  object ::\:: {
-    def apply[F[_]] = new Aux[F]
-
-    final class Aux[F[_]] {
-      def apply[T[_[_]], G[_]]
-        (i: Injectable.Aux[G, QScriptTotal[T, ?]])
-        (implicit F: F :<: QScriptTotal[T, ?])
-          : Injectable.Aux[Coproduct[F, G, ?], QScriptTotal[T, ?]] =
-        Injectable.coproduct(Injectable.inject[F, QScriptTotal[T, ?]], i)
-    }
-  }
-
-  def ::/::[T[_[_]], F[_], G[_]]
-    (implicit F: F :<: QScriptTotal[T, ?], G: G :<: QScriptTotal[T, ?])
-      : Injectable.Aux[Coproduct[F, G, ?], QScriptTotal[T, ?]] =
-    Injectable.coproduct(
-      Injectable.inject[F, QScriptTotal[T, ?]],
-      Injectable.inject[G, QScriptTotal[T, ?]])*/
 }

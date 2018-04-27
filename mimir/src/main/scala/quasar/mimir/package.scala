@@ -26,8 +26,8 @@ import iotaz.{TNilK, CopK}
 package object mimir {
   // pessimistically equal to couchbase's
   type MimirQScriptCP[T[_[_]]] =
-    QScriptCore[T, ?] :::
-    EquiJoin[T, ?] :::
+    QScriptCore[T, ?]            :::
+    EquiJoin[T, ?]               :::
     Const[ShiftedRead[AFile], ?] :::
     TNilK
 

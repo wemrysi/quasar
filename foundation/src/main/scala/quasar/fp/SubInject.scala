@@ -29,6 +29,9 @@ package quasar.fp {
 
 }
 
+// iotaz package was used to get access to packed private code, mostly for extracting
+// type list from CopK. Also most of the code here that is not specific to SubInject
+// was copied from iotaz (because it was private).
 package iotaz.internal {
 
   import quasar.qscript.Injectable
@@ -50,7 +53,7 @@ package iotaz.internal {
       val Inner = evInner.tpe
       val Outer = evOuter.tpe
 
-      val res = tb.foldAbort(for {
+      tb.foldAbort(for {
         _ <- guardAssumptions("Inner", Inner)
         _ <- guardAssumptions("Outer", Outer)
         innerTypes <- extractCoproductTypes(Inner)
@@ -61,7 +64,6 @@ package iotaz.internal {
       } yield {
         makeInjectable(Inner, Outer, innerTypes, outerTypes, innerTypeToOuterIndex)
       })
-      res
     }
 
     private def makeInjectable(
