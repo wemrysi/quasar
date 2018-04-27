@@ -109,6 +109,11 @@ sealed abstract class ConditionInstances extends ConditionInstances0 {
           .bimap(optionIso.reverseGet, optionIso.reverseGet)
     }
 
+  implicit def monoid[E: Semigroup]: Monoid[Condition[E]] =
+    Monoid.instance[Condition[E]](
+      (x, y) => optionIso.reverseGet(Monoid[Option[E]].append(optionIso.get(x), optionIso.get(y))),
+      Condition.normal())
+
   implicit val unzip: Unzip[Condition] =
     new Unzip[Condition] {
       def unzip[A, B](x: Condition[(A, B)]) =
