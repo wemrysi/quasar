@@ -63,6 +63,10 @@ object Dependencies {
     "org.typelevel"              %% "scalaz-specs2"             % "0.5.2"                              % Test
   )
 
+  def api = Seq(
+    "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion
+  )
+
   def frontend = Seq(
     "com.github.julien-truffaut" %% "monocle-macro"            % monocleVersion,
     "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.0.6",
