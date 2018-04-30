@@ -109,7 +109,7 @@ jobs:
 
         - ./sbt postBuild
 
-        - scripts/s3Cache upload
+        - travis_wait 30 scripts/s3Cache upload
 
         - set +e
 
