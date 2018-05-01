@@ -44,7 +44,7 @@ sealed trait ResourcePath extends Product with Serializable {
         ResourcePath.leaf(rootDir </> file(name.value))
     }
 
-  def toAPath: APath =
+  def toPath: APath =
     fold(ι, rootDir)
 }
 
@@ -61,14 +61,20 @@ object ResourcePath extends ResourcePathInstances {
     Prism.partial[ResourcePath, Unit] {
       case Root => ()
     } (κ(Root))
+
+  def fromPath(path: APath): ResourcePath =
+    peel(path).fold(root()) {
+      case (parent, name) =>
+        leaf(parent </> file1(name.valueOr(d => FileName(d.value))))
+    }
 }
 
 sealed abstract class ResourcePathInstances {
   implicit val order: Order[ResourcePath] =
-    Order.orderBy(_.toAPath)
+    Order.orderBy(_.toPath)
 
   implicit val show: Show[ResourcePath] =
     Show.show { rp =>
-      Cord("ResourcePath(") ++ rp.toAPath.show ++ Cord(")")
+      Cord("ResourcePath(") ++ rp.toPath.show ++ Cord(")")
     }
 }

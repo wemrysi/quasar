@@ -407,6 +407,7 @@ lazy val qsu = project
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
+    api,
     sql % "test->test",
     qsu)
   .settings(commonSettings)
