@@ -145,7 +145,7 @@ jobs:
     - stage: cache cleanup
       env:
       script:
-        - scripts/s3Cache cleanup
+        - travis_wait 30 scripts/s3Cache cleanup
 
 notifications:
   irc:
