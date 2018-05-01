@@ -30,13 +30,13 @@ sealed trait DataSourceError[C] extends QuasarErrorNG
 object DataSourceError {
   sealed trait ExternalError[C] extends DataSourceError[C]
 
-  final case class DataSourceUnsupported[C](kind: MediaType, supported: ISet[MediaType])
+  final case class DataSourceUnsupported[C](kind: DataSourceType, supported: ISet[DataSourceType])
       extends ExternalError[C]
 
-  final case class MalformedConfiguration[C](kind: MediaType, config: C, reason: String)
+  final case class MalformedConfiguration[C](kind: DataSourceType, config: C, reason: String)
       extends ExternalError[C]
 
-  final case class InvalidConfiguration[C](kind: MediaType, config: C, reasons: NonEmptyList[String])
+  final case class InvalidConfiguration[C](kind: DataSourceType, config: C, reasons: NonEmptyList[String])
       extends ExternalError[C]
 
   final case class ConnectionFailed[C](message: String, cause: Option[Throwable])

@@ -25,7 +25,7 @@ import scalaz.syntax.show._
 
 @Lenses
 final case class ExternalMetadata(
-    kind: MediaType,
+    kind: DataSourceType,
     condition: Condition[Exception])
 
 object ExternalMetadata extends ExternalMetadataInstances
