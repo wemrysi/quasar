@@ -90,7 +90,7 @@ jobs:
     - stage: clean
       env:
       script:
-        - ./scripts/s3Cache cacheCleanUp
+        - travis_wait 30 ./scripts/s3Cache cacheCleanUp
         - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
 
     - stage: compile
@@ -98,7 +98,7 @@ jobs:
       script:
         - set -e
 
-        - scripts/s3Cache cleanup
+        - travis_wait 30 scripts/s3Cache cleanup
 
         - ./sbt preBuild
 
