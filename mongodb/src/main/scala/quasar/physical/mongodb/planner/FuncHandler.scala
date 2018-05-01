@@ -115,19 +115,16 @@ object FuncHandler {
           case Add(a1, a2)           => $add(a1, a2).point[M]
           case Multiply(a1, a2)      => $multiply(a1, a2).point[M]
           case Subtract(a1, a2)      => $subtract(a1, a2).point[M]
-          case Divide(a1, a2)        =>
+          case Divide(a1, $literal(x)) if Bson.isInt(x, 0) =>
+            mkDivideBy0(a1).point[M]
+          case Divide(a1, a2@$literal(_)) =>
+            $divide(a1, a2).point[M]
+          case Divide(a1, a2) =>
             // NB: It’s apparently intentional that division by zero crashes
             //     the query in MongoDB. See
             //     https://jira.mongodb.org/browse/SERVER-29410
-            // TODO: It would be nice if we would be able to generate simply
-            //       $divide(a1, a2) for $literal denominators, but the type
-            //       of a2 is generic so we can't check it here.
             $cond($eq(a2, $literal(Bson.Int32(0))),
-              $cond($eq(a1, $literal(Bson.Int32(0))),
-                $literal(Bson.Dec(Double.NaN)),
-                $cond($gt(a1, $literal(Bson.Int32(0))),
-                  $literal(Bson.Dec(Double.PositiveInfinity)),
-                  $literal(Bson.Dec(Double.NegativeInfinity)))),
+              mkDivideBy0(a1),
               $divide(a1, a2)).point[M]
           case Modulo(a1, a2)        => $mod(a1, a2).point[M]
           case Negate(a1)            => $multiply($literal(Bson.Int32(-1)), a1).point[M]

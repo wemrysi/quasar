@@ -503,7 +503,13 @@ object ExprOpCoreF {
                         $cond($lt(a1, $literal(Check.minRegex)),   $literal(Bson.Text("_bson.timestamp")),
                           $literal(Bson.Text("_bson.regularexpression"))))))))))))
 
-
+    def mkDivideBy0(a1: T): T =
+      $cond($eq(a1, $literal(Bson.Int32(0))),
+        $literal(Bson.Dec(Double.NaN)),
+        $cond($gt(a1, $literal(Bson.Int32(0))),
+          $literal(Bson.Dec(Double.PositiveInfinity)),
+          $literal(Bson.Dec(Double.NegativeInfinity))))
+      
     def mkYearToCentury(year: T): T =
       $trunc($divide($add(year, $literal(Bson.Int32(99))), $literal(Bson.Int32(100))))
 
