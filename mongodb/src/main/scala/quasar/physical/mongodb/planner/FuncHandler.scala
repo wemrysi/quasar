@@ -218,14 +218,11 @@ object FuncHandler {
               raisePlannerError(_),
               $literal(_).point[M])
           case Now() => execTime[M] map ($literal(_))
+
           // NB: The aggregation implementation of `ToString` does not handle ObjectId
           //     Here we force this case to be planned using JS
           case ToString($var(DocVar(_, Some(BsonField.Name("_id"))))) =>
             unimplemented[M, Fix[EX]]("ToString _id expression")
-          // FIXME: $substr is deprecated in Mongo 3.4. This implementation should be
-          //        versioned along with the other functions in FuncHandler, taking into
-          //        account the special case for ObjectId above. Mongo 3.4 should
-          //        use $substrBytes instead of $substr
           case ToString(a1) => mkToString(a1, $substr).point[M]
 
           case ProjectKey($var(dv), $literal(Bson.Text(key))) =>
@@ -314,6 +311,12 @@ object FuncHandler {
                 $lt(a3, $literal(Bson.Int32(0))),
                 $substrCP(a1, a2, $strLenCP(a1)),
                 $substrCP(a1, a2, a3))).point[M]
+
+          // NB: The aggregation implementation of `ToString` does not handle ObjectId
+          //     Here we force this case to be planned using JS
+          case ToString($var(DocVar(_, Some(BsonField.Name("_id"))))) =>
+            unimplemented[M, Fix[EX]]("ToString _id expression")
+          case ToString(a1) => mkToString(a1, $substrBytes).point[M]
 
           // NB: Quasar strings are arrays of characters. However, MongoDB
           //     represent strings and arrays as distinct types. Moreoever, SQL^2
