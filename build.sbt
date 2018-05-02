@@ -383,6 +383,7 @@ lazy val fs = project
     frontend % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
+  .settings(publishTestsSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
