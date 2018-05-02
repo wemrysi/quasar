@@ -33,14 +33,16 @@ object DataSourceError {
   final case class DataSourceUnsupported[C](kind: DataSourceType, supported: ISet[DataSourceType])
       extends ExternalError[C]
 
+  sealed trait InitializationError[C] extends ExternalError[C]
+
   final case class MalformedConfiguration[C](kind: DataSourceType, config: C, reason: String)
-      extends ExternalError[C]
+      extends InitializationError[C]
 
   final case class InvalidConfiguration[C](kind: DataSourceType, config: C, reasons: NonEmptyList[String])
-      extends ExternalError[C]
+      extends InitializationError[C]
 
   final case class ConnectionFailed[C](message: String, cause: Option[Throwable])
-      extends ExternalError[C]
+      extends InitializationError[C]
 
   sealed trait StaticError[C] extends DataSourceError[C]
 

@@ -90,6 +90,10 @@ object Dependencies {
     "eu.timepit"       %% "refined-scalaz" % refinedVersion
   )
 
+  def connector = Seq(
+    "co.fs2" %% "fs2-core" % fs2Version
+  )
+
   def core = Seq(
     "org.tpolecat"               %% "doobie-core"               % doobieVersion,
     "org.tpolecat"               %% "doobie-hikari"             % doobieVersion,
