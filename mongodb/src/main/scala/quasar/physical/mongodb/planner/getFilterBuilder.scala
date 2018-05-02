@@ -37,6 +37,18 @@ import scalaz._, Scalaz._
 
 object getFilterBuilder {
 
+  def filterBuilder[T[_[_]], M[_]: Applicative, WF[_], A](
+    handler: FreeMapA[T, A] => M[Expr],
+    src: WorkflowBuilder[WF],
+    partialSel: PartialSelector[T],
+    fm: FreeMapA[T, A])
+    (implicit WB: WorkflowBuilder.Ops[WF])
+      : M[WorkflowBuilder[WF]] = {
+    val (sel, inputs) = partialSel
+
+    inputs.traverse(f => handler(f(fm))) ∘ (WB.filter(src, _, sel))
+  }
+
   /* Given a handler of type FreeMapA[T, A] => Expr, a FreeMapA[T, A]
    *  and a source WorkflowBuilder, return a new WorkflowBuilder
    *  filtered according to the `Cond`s found in the FreeMapA[T, A].
@@ -52,13 +64,6 @@ object getFilterBuilder {
 
     import MapFuncCore._
     import MapFuncsCore._
-
-    def filterBuilder(src0: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
-        M[WorkflowBuilder[WF]] = {
-      val (sel, inputs) = partialSel
-
-      inputs.traverse(f => handler(f(fm))) ∘ (WB.filter(src0, _, sel))
-    }
 
     def elideCond: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
       case CoEnv(\/-(MFC(Cond(if_, then_, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
@@ -125,7 +130,7 @@ object getFilterBuilder {
       fm.ghylo[(Cofree[MapFunc[T, ?], Boolean], ?), Cofree[MapFunc[T, ?], Boolean] \/ ?]
         [EnvT[Boolean, MapFunc[T, ?], ?], Output[T]](distPara, distApo, galg, gcoalg).toOption
 
-    (sels ∘ (filterBuilder(src, _))).cata(
+    (sels ∘ (filterBuilder(handler, src, _, fm))).cata(
       _ strengthR fm.transCata[FreeMapA[T, A]](orOriginal(elideCond)),
       (src, fm).point[M])
   }
