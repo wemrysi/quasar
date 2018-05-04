@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar._
 import quasar.common.JoinType
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
-import quasar.sql.JoinDir
 
 import scala.collection.immutable.NumericRange
 

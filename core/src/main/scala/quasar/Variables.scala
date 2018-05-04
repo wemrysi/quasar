@@ -19,7 +19,6 @@ package quasar
 import slamdata.Predef._
 import quasar.SemanticError._
 import quasar.frontend.SemanticErrors
-import quasar.sql.{Sql, Select, Vari, VariRelationAST}
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -30,7 +29,7 @@ final case class Variables(value: Map[VarName, VarValue]) {
   def lookup(name: VarName): SemanticError \/ Fix[Sql] =
     value.get(name).fold[SemanticError \/ Fix[Sql]](
       UnboundVariable(name).left)(
-      varValue => sql.fixParser.parseExpr(varValue.value)
+      varValue => fixParser.parseExpr(varValue.value)
         .leftMap(VariableParseError(name, varValue, _)))
 }
 final case class VarName(value: String) {

@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.frontend.logicalplan
 
 import slamdata.Predef._
+import quasar.{Data, Func, TreeMatchers}
 import quasar.common.SortDir
-import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
-import quasar.sql.CompilerHelpers
 import quasar.std._, StdLib.structural._
 
 import matryoshka._
@@ -30,7 +29,9 @@ import scalaz.{Free => _, _}, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazProperties._
 
-class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers {
+class OptimizerSpec extends quasar.Qspec with LogicalPlanHelpers with TreeMatchers {
+  type LP[A] = LogicalPlan[A]
+
   "simplify" should {
 
     "inline trivial binding" in {

@@ -242,20 +242,20 @@ lazy val root = project.in(file("."))
                common,
 //     /      /      \                \
         frontend,    precog,
-//    |/    /    \       |             |
+//    |/   /    \        |             |
      fs, sql, datagen, blueeyes,
-//    |   |              |             |
-// ___|___|              |             |
-// |  |                  |             |
-     qscript,         niflheim,
-// |  |                  |             |
+//    | \ |              |             |
+//    |  \|_____         |             |
+//    |         \        |             |
+     qscript,  core,  niflheim,
+//    |          |       |             |
      qsu,
-// |     \               |             |
+//     __\_______/       |             |
          connector,   yggdrasil,
-// |     /   |   \______|______________|_________
-//  \   /    |         /     \         \         \
-    core, skeleton, mimir, marklogic, mongodb, couchbase,
-//      \     |    /          |          |         |
+//     |     |   \______|______________|_________
+//     |     |         /     \         \         \
+          skeleton, mimir, marklogic, mongodb, couchbase,
+//     \      |    /          |          |         |
           interface,
 //          /  \              |          |         |
          repl, web,
@@ -376,10 +376,12 @@ lazy val datagen = project
   */
 lazy val sql = project
   .settings(name := "quasar-sql-internal")
-  .dependsOn(frontend % BothScopes)
+  .dependsOn(common % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
+  .settings(
+    libraryDependencies ++= Dependencies.sql)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val fs = project
@@ -396,7 +398,7 @@ lazy val fs = project
 lazy val qscript = project
   .settings(name := "quasar-qscript-internal")
   .dependsOn(
-    sql % "test->test",
+    frontend % "test->test",
     fs)
   .settings(commonSettings)
   .settings(targetSettings)
@@ -415,7 +417,6 @@ lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
     api,
-    sql % "test->test",
     qsu)
   .settings(commonSettings)
   .settings(publishTestsSettings)
@@ -428,7 +429,7 @@ lazy val connector = project
 lazy val core = project
   .settings(name := "quasar-core-internal")
   .dependsOn(
-    connector % BothScopes,
+    frontend,
     sql,
     api       % "test->test",
     effect    % "test->test",
@@ -459,7 +460,9 @@ lazy val couchbase = project
   */
 lazy val marklogic = project
   .settings(name := "quasar-marklogic-internal")
-  .dependsOn(connector % BothScopes)
+  .dependsOn(
+    connector % BothScopes,
+    qscript   % "test->test")
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
@@ -476,7 +479,7 @@ lazy val mongodb = project
     fs        % "test->test",
     connector % BothScopes,
     js        % BothScopes,
-    core      % "test->compile")
+    core      % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(

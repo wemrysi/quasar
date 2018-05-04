@@ -25,7 +25,6 @@ import quasar.fp.binder._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
 import quasar.namegen._
-import quasar.sql.JoinDir
 
 import scala.Predef.$conforms
 

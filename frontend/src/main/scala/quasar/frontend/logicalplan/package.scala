@@ -18,16 +18,21 @@ package quasar.frontend
 
 import slamdata.Predef._
 import quasar._
-import quasar.common.{JoinType, SortDir}
+import quasar.common.{JoinType, PhaseResult, SortDir}
 import quasar.contrib.pathy.FPath
 import quasar.namegen.NameGen
 import quasar.time.TemporalPart
 
 import scala.Symbol
 
+import matryoshka.data.Fix
 import monocle.Prism
 import shapeless.Nat
 import scalaz._
+import scalaz.std.vector._
+import scalaz.syntax.either._
+import scalaz.syntax.monad._
+import scalaz.syntax.writer._
 
 package object logicalplan {
   def read[A] =
@@ -76,4 +81,17 @@ package object logicalplan {
 
   def freshName(prefix: String): State[NameGen, Symbol] =
     quasar.namegen.freshName(prefix).map(Symbol(_))
+
+  /** Optimizes and typechecks a `LogicalPlan` returning the improved plan. */
+  def preparePlan(lp: Fix[LogicalPlan]): CompileM[Fix[LogicalPlan]] =
+    for {
+      optimized   <- compilePhase("Optimized", optimizer.optimize(lp).right)
+      typechecked <- lpr.ensureCorrectTypes(optimized) flatMap { a =>
+        (a.set(Vector(PhaseResult.tree("Typechecked", a)))).liftM[SemanticErrsT]
+      }
+      rewritten   <- compilePhase("Rewritten Joins", optimizer.rewriteJoins(typechecked).right)
+    } yield rewritten
+
+  private val optimizer = new Optimizer[Fix[LogicalPlan]]
+  private val lpr = optimizer.lpr
 }

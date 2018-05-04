@@ -17,24 +17,18 @@
 package quasar.sql
 
 import slamdata.Predef._
-import quasar.{Data, TermLogicalPlanMatchers, SemanticError}
-import quasar.contrib.pathy.sandboxCurrent
+import quasar.SemanticError
 import quasar.fp._
-import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.sql.SemanticAnalysis._
-import quasar.std._, StdLib._, structural._
 
 import matryoshka.Algebra
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import org.specs2.matcher.MustThrownMatchers._
-import pathy.Path._
 import scalaz._, Scalaz._
 
-trait CompilerHelpers extends TermLogicalPlanMatchers {
-  val lpf = new LogicalPlanR[Fix[LP]]
-
+trait CompilerHelpers extends LogicalPlanHelpers {
   // TODO use `quasar.precompile`
   val compile: Fix[Sql] => NonEmptyList[SemanticError] \/ Fix[LP] = query => {
     for {
@@ -46,9 +40,11 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
   def unsafeParse(query: String) =
     fixParser.parseExpr(query).valueOr(err => scala.sys.error(
       s"False assumption in test, could not parse due to parse error: $err"))
+
   def unsafeParseScopedExpr(query: String) =
     fixParser.parseScopedExpr(query).valueOr(err => scala.sys.error(
     s"False assumption in test, could not parse due to parse error: $err"))
+
   val parseAndAnnotate: Fix[Sql] => NonEmptyList[SemanticError] \/ Cofree[Sql, SemanticAnalysis.Annotations] = query => {
     val sorted   = projectSortKeys(query)
     annotate(sorted)
@@ -57,9 +53,6 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
   val parseAndAnnotateUnsafe: Fix[Sql] => Cofree[Sql, SemanticAnalysis.Annotations] = query => {
     parseAndAnnotate(query).valueOr(err => throw new RuntimeException(s"False assumption in test, could not annotate due to underlying issue: $err"))
   }
-
-  val optimizer = new Optimizer[Fix[LP]]
-  val lpr = optimizer.lpr
 
   // Compile -> Optimize -> Typecheck -> Rewrite Joins
   val fullCompile: Fix[Sql] => NonEmptyList[SemanticError] \/ Fix[LP] =
@@ -113,10 +106,4 @@ trait CompilerHelpers extends TermLogicalPlanMatchers {
     }
     result.cata[Fix[LP]](rename)
   }
-
-  def read(file: String): Fix[LP] =
-    lpf.read(sandboxCurrent(posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(file).get).get)
-
-  def makeObj(ts: (String, Fix[LP])*): Fix[LP] =
-    MakeMapN(ts.map(t => lpf.constant(Data.Str(t._1)) -> t._2): _*).embed
 }

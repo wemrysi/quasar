@@ -18,7 +18,7 @@ package quasar
 
 import slamdata.Predef._
 import quasar.contrib.pathy.ADir
-import quasar.sql._
+import quasar.frontend.CIName
 
 import matryoshka._
 import matryoshka.data._

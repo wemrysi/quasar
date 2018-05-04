@@ -23,9 +23,8 @@ import quasar.contrib.pathy._
 import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.frontend.{SemanticErrsT, logicalplan => lp}, lp.{LogicalPlan => LP}
+import quasar.frontend.{CIName, CompileM, logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.namegen._
-import quasar.sql.CIName
 
 import scala.Predef.$conforms
 import scala.Symbol
@@ -499,8 +498,7 @@ final class LogicalPlanR[T](implicit TR: Recursive.Aux[T, LP], TC: Corecursive.A
 
   type SemNames[A] = NameT[SemDisj, A]
 
-  def ensureCorrectTypes(term: T):
-      SemanticErrsT[PhaseResultW, T] = {
+  def ensureCorrectTypes(term: T): CompileM[T] = {
     // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
     import StateT.stateTMonadState
 

@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.sql
+package quasar.frontend.logicalplan
 
 import slamdata.Predef._
 import quasar.Data
-import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib._
 
 import matryoshka._
@@ -28,8 +27,11 @@ sealed abstract class JoinDir(val name: String) {
   import structural.MapProject
 
   val data: Data = Data.Str(name)
-  def const[T](implicit T: Corecursive.Aux[T, LP]): T = constant[T](data).embed
-  def projectFrom[T](lp: T)(implicit T: Corecursive.Aux[T, LP]): T =
+
+  def const[T](implicit T: Corecursive.Aux[T, LogicalPlan]): T =
+    constant[T](data).embed
+
+  def projectFrom[T](lp: T)(implicit T: Corecursive.Aux[T, LogicalPlan]): T =
     MapProject(lp, const).embed
 }
 

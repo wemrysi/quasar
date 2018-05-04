@@ -19,7 +19,7 @@ package quasar.sql
 import slamdata.Predef._
 import quasar.{Data, Type, SemanticError}
 import quasar.common.{JoinType, SortDir}
-import quasar.frontend.logicalplan.{JoinCondition, LogicalPlan => LP}
+import quasar.frontend.logicalplan.{JoinCondition, JoinDir, LogicalPlan => LP}
 import quasar.std._, StdLib._, agg._, array._, date._, identity._, math._
 
 import pathy.Path._

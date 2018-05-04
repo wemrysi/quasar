@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar._, RenderTree.ops._
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.frontend.CIName
 
 import matryoshka._
 import matryoshka.implicits._

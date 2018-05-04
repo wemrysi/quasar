@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.common.JoinType
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.frontend.CIName
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 
@@ -33,16 +34,6 @@ import scalaz._, Scalaz._
 import scalaz.Liskov._
 
 package object sql {
-
-  type CIName = quasar.CIString
-
-  object CIName {
-    def apply(value: String): CIName =
-      CIString(value)
-
-    def unapply(name: CIName): Option[String] =
-      CIString.unapply(name)
-  }
 
   def select[A] = Prism.partial[Sql[A], (IsDistinct, List[Proj[A]], Option[SqlRelation[A]], Option[A], Option[GroupBy[A]], Option[OrderBy[A]])] {
     case Select(d, p, r, f, g, o) => (d, p, r, f, g, o)
@@ -146,7 +137,7 @@ package object sql {
       }
     }
 
-  implicit class ExprOps[T[_[_]]: BirecursiveT](q: T[Sql]) {
+  implicit class SqlOps[T[_[_]]: BirecursiveT](q: T[Sql]) {
     def mkPathsAbsolute(basePath: ADir): T[Sql] =
       q.transCata[T[Sql]](mapPathsMƒ[Id](refineTypeAbs(_).fold(ι, pathy.Path.unsandbox(basePath) </> _)))
 
