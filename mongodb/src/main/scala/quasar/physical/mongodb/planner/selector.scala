@@ -50,12 +50,11 @@ object selector {
       a.resume.fold(fa => next(fa.toList.apply(index)), κ(a))
   }
 
-  type Partial[T[_[_]], In, Out] = (PartialFunction[List[In], Out], List[InputFinder[T]])
-
   // TODO: Need this until the old connector goes away and we can redefine
   //       `Selector` as `Selector[A, B]`, where `A` is the field type
   //       (naturally `BsonField`), and `B` is the recursive parameter.
-  type PartialSelector[T[_[_]]] = Partial[T, BsonField, Selector]
+  type PartialSelector[T[_[_]]] =
+    (PartialFunction[List[BsonField], Selector], List[InputFinder[T]])
 
   type Output[T[_[_]]] = PlannerError \/ PartialSelector[T]
 
