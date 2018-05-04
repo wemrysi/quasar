@@ -27,7 +27,7 @@ sealed trait DataSourceError[C] extends QuasarErrorNG
     with Product
     with Serializable
 
-object DataSourceError {
+object DataSourceError extends DataSourceErrorInstances {
   sealed trait ExternalError[C] extends DataSourceError[C]
 
   final case class DataSourceUnsupported[C](kind: DataSourceType, supported: ISet[DataSourceType])
