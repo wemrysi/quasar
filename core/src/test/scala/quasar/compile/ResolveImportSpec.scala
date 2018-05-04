@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.sql
+package quasar.compile
 
 import slamdata.Predef._
 import quasar.contrib.pathy.ADir
@@ -145,6 +145,18 @@ class ResolveImportSpec extends quasar.Qspec {
       val scopedExpr = ScopedExpr(sqlE"FOO(1,2)", List(func))
       resolveImportsImpl[Id, Fix](scopedExpr, rootDir, κ(Nil)).run must_===
         InvalidFunctionDefinition(func, "parameter :a is defined multiple times").left
+    }
+  }
+
+  "apply arguments to a function declaration" >> {
+    "in the general case" in {
+      val funcDef = FunctionDecl(CIName("foo"), args = List(CIName("bar")), body = sqlE"SELECT * from `/person` where :bar")
+      funcDef.applyArgs(List(sqlE"age > 10")) must_=== sqlE"SELECT * from `/person` where age > 10".right
+    }
+
+    "if the variable is inside of a `from`" in {
+      val funcDef = FunctionDecl(CIName("foo"), args = List(CIName("bar")), body = sqlE"SELECT * from :bar")
+      funcDef.applyArgs(List(sqlE"`/person`")) must_=== sqlE"SELECT * from `/person`".right
     }
   }
 }

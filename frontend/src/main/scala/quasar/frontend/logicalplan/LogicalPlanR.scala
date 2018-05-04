@@ -18,12 +18,12 @@ package quasar.frontend.logicalplan
 
 import slamdata.Predef._
 import quasar._, SemanticError.TypeError
-import quasar.common.{JoinType, PhaseResult, PhaseResultW, SortDir}
+import quasar.common.{CIName, JoinType, PhaseResult, PhaseResultW, SortDir}
 import quasar.contrib.pathy._
 import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.frontend.{CIName, CompileM, logicalplan => lp}, lp.{LogicalPlan => LP}
+import quasar.frontend.{CompileM, logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.namegen._
 
 import scala.Predef.$conforms

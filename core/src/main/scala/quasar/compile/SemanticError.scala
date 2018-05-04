@@ -14,11 +14,13 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.compile
 
 import slamdata.Predef._
+import quasar.TypeError
 import quasar.contrib.pathy.ADir
-import quasar.frontend.CIName
+import quasar.common.CIName
+import quasar.sql._
 
 import matryoshka._
 import matryoshka.data._
@@ -54,8 +56,8 @@ object SemanticError {
   final case class InvalidFunctionDefinition(funcDef: FunctionDecl[Fix[Sql]], reason: String) extends SemanticError {
     def message = s"The function '${funcDef.name.shows}' is invalid because: $reason"
   }
-  final case class TypeError(expected: Type, actual: Type, hint: Option[String]) extends SemanticError {
-    def message = s"Expected type ${expected.shows} but found ${actual.shows}" + hint.map(": " + _).getOrElse("")
+  final case class TypeErr(typeError: TypeError) extends SemanticError {
+    def message = typeError.message
   }
   final case class VariableParseError(vari: VarName, value: VarValue, cause: quasar.sql.ParsingError) extends SemanticError {
     def message = s"The variable ${vari.toString} should contain a SQL expression but was `${value.value}` (${cause.message})"

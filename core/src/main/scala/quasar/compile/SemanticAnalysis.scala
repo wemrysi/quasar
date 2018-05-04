@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.sql
+package quasar.compile
 
 import slamdata.Predef._
 import quasar.{NonTerminal, RenderTree, RenderedTree, SemanticError, Terminal, VarName},
   RenderTree.ops._,
   SemanticError._
 import quasar.contrib.pathy.prettyPrint
+import quasar.sql._
 
 import scala.AnyRef
 

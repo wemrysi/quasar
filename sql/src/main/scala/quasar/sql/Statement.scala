@@ -18,12 +18,11 @@ package quasar.sql
 
 import slamdata.Predef._
 import quasar._, RenderTree.ops._
-import quasar.contrib.std._
+import quasar.common.CIName
 
 import pathy.Path
 import pathy.Path._
 import matryoshka._
-import matryoshka.implicits._
 import matryoshka.data.Fix
 import monocle.macros.Lenses
 import monocle.Prism
@@ -70,24 +69,6 @@ object Statement {
   override def pprint(implicit ev: BODY <~< String) = {
     val argList = args.map(name => ":" + escape("`", name.shows)).mkString(", ")
     s"CREATE FUNCTION ${name.shows}($argList)\n  BEGIN\n    ${ev(body)}\n  END"
-  }
-  def applyArgs[T[_[_]]: BirecursiveT](argsProvided: List[T[Sql]])(implicit ev: BODY <~< T[Sql]): SemanticError \/ T[Sql] = {
-    val expected = args.size
-    val actual   = argsProvided.size
-    args.duplicates.headOption.cata(
-      duplicates => SemanticError.InvalidFunctionDefinition(this.map(ev(_).convertTo[Fix[Sql]]), s"parameter :${duplicates.head.value} is defined multiple times").left, {
-        if (expected ≠ actual) SemanticError.WrongArgumentCount(name, expected, actual).left
-        else {
-          val argMap = args.zip(argsProvided).toMap
-          ev(body).cataM[SemanticError \/ ?, T[Sql]] {
-            case v: Vari[T[Sql]] =>
-              argMap.getOrElse(CIName(v.symbol), v.embed).right // Leave the variable there in case it will be substituted by an external variable
-            case s: Select[T[Sql]] =>
-              s.substituteRelationVariable[Id, T[Sql]](v => argMap.getOrElse(CIName(v.symbol), v.embed)).map(_.embed)
-            case other => other.embed.right
-          }
-        }
-      })
   }
 }
 

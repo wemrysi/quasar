@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.sql
+package quasar.compile
 
 import slamdata.Predef._
 import quasar.{
@@ -28,15 +28,16 @@ import quasar.{
   UnaryFunc,
   VarName
 }
-import quasar.SemanticError._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.contrib.shapeless._
 import quasar.common.SortDir
+import quasar.compile.{SemanticAnalysis => SA}, SA._
+import quasar.compile.SemanticError._
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, Let => LPLet, _}
+import quasar.sql._
 import quasar.std.StdLib, StdLib._
-import quasar.sql.{SemanticAnalysis => SA}, SA._
 import quasar.time.TemporalPart
 
 import matryoshka._

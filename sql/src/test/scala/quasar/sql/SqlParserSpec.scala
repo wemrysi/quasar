@@ -17,10 +17,10 @@
 package quasar.sql
 
 import slamdata.Predef._
-import quasar.common.JoinType
+import quasar.common.{CIName, JoinType}
 import quasar.fp._
+import quasar.QuasarMatchers._
 import quasar.RenderTree.ops._
-import quasar.specs2.QuasarMatchers._
 import quasar.sql.StatementArbitrary._
 import quasar.sql.fixpoint._
 

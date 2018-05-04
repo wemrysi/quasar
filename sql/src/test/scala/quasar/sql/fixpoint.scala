@@ -17,6 +17,7 @@
 package quasar.sql
 
 import slamdata.Predef._
+import quasar.common.CIName
 
 import matryoshka._
 import matryoshka.data.Fix

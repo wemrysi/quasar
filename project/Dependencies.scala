@@ -94,6 +94,7 @@ object Dependencies {
   )
 
   def sql = Seq(
+    "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
     "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.0.6"
   )
 

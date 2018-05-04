@@ -20,9 +20,8 @@ import slamdata.Predef._
 import quasar.common.JoinType
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.frontend.CIName
+import quasar.common.CIName
 import quasar.contrib.pathy._
-import quasar.contrib.scalaz.eitherT._
 
 import contextual._
 import matryoshka._
@@ -83,51 +82,6 @@ package object sql {
     (implicit T: Corecursive.Aux[T, Sql])=
     JoinRelation(left, right, JoinType.Inner, boolLiteral[T](true).embed)
 
-  /** Returns the name of the expression when viewed as a projection
-    * (of the optional relation), if available.
-    */
-  def projectionName[T](
-    expr: T,
-    relationName: Option[String]
-  )(implicit
-    T: Recursive.Aux[T, Sql]
-  ): Option[String] = {
-    val loop: T => (Option[String] \/ (Option[String] \/ T)) =
-      _.project match {
-        case Ident(name) if !relationName.element(name)  => some(name).left
-        case Binop(_, Embed(StringLiteral(v)), KeyDeref) => some(v).left
-        case Unop(arg, FlattenMapValues)                 => arg.right.right
-        case Unop(arg, FlattenArrayValues)               => arg.right.right
-        case _                                           => None.left
-      }
-
-    \/.loopRight(expr.right, ι[Option[String]], loop)
-  }
-
-  def projectionNames[T]
-    (projections: List[Proj[T]], relName: Option[String])
-    (implicit T: Recursive.Aux[T, Sql])
-      : SemanticError \/ List[(String, T)] = {
-    val aliases = projections.flatMap(_.alias.toList)
-
-    (aliases diff aliases.distinct).headOption.cata[SemanticError \/ List[(String, T)]](
-      duplicateAlias => SemanticError.DuplicateAlias(duplicateAlias).left,
-      projections.zipWithIndex.mapAccumLeftM(aliases.toSet) { case (used, (Proj(expr, alias), index)) =>
-        alias.cata(
-          a => (used, a -> expr).right,
-          {
-            val tentativeName = projectionName(expr, relName) getOrElse index.toString
-            val alternatives = Stream.from(0).map(suffix => tentativeName + suffix.toString)
-            (tentativeName #:: alternatives).dropWhile(used.contains).headOption.map { name =>
-              // WartRemover seems to be confused by the `+` method on `Set`
-              @SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
-              val newUsed = used + name
-              (newUsed, name -> expr)
-            } \/> SemanticError.GenericError("Could not generate alias for a relation") // unlikely since we know it's an quasi-infinite stream
-          })
-      }.map(_._2))
-  }
-
   def mapPathsMƒ[F[_]: Monad](f: FUPath => F[FUPath]): Sql ~> (F ∘ Sql)#λ =
     new (Sql ~> (F ∘ Sql)#λ) {
       def apply[A](e: Sql[A]) = e match {
@@ -172,61 +126,6 @@ package object sql {
 
       case other => other.map(_.makeTables(bindings)).embed
     }
-
-    /**
-      * Inlines all function invocations with the bodies of functions in scope.
-      * Leaves invocations to functions outside of scope untouched (as opposed to erroring out)
-      * @param scope Returns the list of function definitions that match a given name and function arity along with a
-      *              path specifying whether this function was found
-      */
-    def inlineInvokes[M[_]: Monad](scope: (CIName, Int) => M[List[(FunctionDecl[T[Sql]], ADir)]]): EitherT[M, SemanticError, T[Sql]] = {
-      q.cataM[EitherT[M, SemanticError, ?], T[Sql]] {
-        case invoke @ InvokeFunction(name, args) =>
-          EitherT(scope(name, args.size).flatMap {
-            case Nil                => invoke.embed.right.point[M]
-            case List((funcDef, _)) => funcDef.applyArgs(args).point[M]
-            case ambiguous          =>
-              SemanticError.ambiguousFunctionInvoke(name, ambiguous.map { case(func, from) => (func.name, from)}).left.point[M]
-          })
-        case other => EitherT.rightT(other.embed.point[M])
-      }
-    }
-  }
-
-  def resolveImportsImpl[M[_]: Monad, T[_[_]]: BirecursiveT](scopedExpr: ScopedExpr[T[Sql]], baseDir: ADir, retrieve: ADir => M[List[Statement[T[Sql]]]])
-  : EitherT[M, SemanticError, T[Sql]] = {
-
-    def absImport(i: Import[T[Sql]], from: ADir): SemanticError \/ ADir =
-      refineTypeAbs(i.path).fold(sandboxCurrent(_), r => sandboxCurrent(unsandbox(from) </> r))
-        .toRightDisjunction {
-          val invalidPathString = posixCodec.unsafePrintPath(i.path)
-          val fromString = posixCodec.printPath(from)
-          SemanticError.GenericError(s"$invalidPathString is invalid because it is located at $fromString")
-        }
-
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def scopeFromHere(imports: List[Import[T[Sql]]], funcsHere: List[FunctionDecl[T[Sql]]], here: ADir): (CIName, Int) => EitherT[M, SemanticError, List[(FunctionDecl[T[Sql]], ADir)]] = {
-      case (name, arity) =>
-        imports.traverse(absImport(_, here)).fold(
-          err => EitherT(err.left.point[M]),
-          absImportPaths => {
-            // All functions coming from `imports` along with their respective import statements and where they are defined
-            val funcsFromImports = absImportPaths.traverse(d => retrieve(d).map(stats => (stats.decls, stats.imports, d)))
-            // All functions in "this" scope along with their own imports
-            val allFuncs = funcsFromImports.map((funcsHere, imports, here) :: _)
-            EitherT.rightT(allFuncs).flatMap(_.traverse { case (funcs, imports, from) =>
-              def matchesSignature(func: FunctionDecl[T[Sql]]) = func.name === name && arity === func.args.size
-              funcs.filter(matchesSignature).traverse { decl =>
-                val others = funcs.filterNot(matchesSignature) // No recursice calls in SQL^2 so we don't include ourselves
-                val currentScope = scopeFromHere(imports, others, from)
-                decl.traverse(_.mkPathsAbsolute(from).inlineInvokes(currentScope)).flattenLeft.strengthR(from)
-              }
-            }).map(_.join)
-          }
-        )
-    }
-
-    scopedExpr.expr.inlineInvokes(scopeFromHere(scopedExpr.imports, scopedExpr.defs, baseDir)).flattenLeft
   }
 
   implicit class StatementsOps[A](a: List[Statement[A]]) {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.sql
+package quasar.compile
 
 import slamdata.Predef._
 import quasar.TreeMatchers

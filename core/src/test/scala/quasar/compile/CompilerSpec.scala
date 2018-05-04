@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.sql
+package quasar.compile
 
 import slamdata.Predef._
 import quasar.{Data, Type, SemanticError}
@@ -1800,6 +1800,25 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
   List("avg", "sum") foreach { fn =>
     s"passing a literal set of the wrong type to '${fn.toUpperCase}' fails" >> {
       fullCompile(unsafeParse(s"""select $fn(("one", "two", "three"))""")) must beLeftDisjunction
+    }
+  }
+
+  "namedProjections" should {
+    "create unique names" >> {
+      "when two fields have the same name" in {
+        val query = sqlE"SELECT owner.name, car.name from owners as owner join cars as car on car.`_id` = owner.carId"
+        val projections = query.project.asInstanceOf[Select[Fix[Sql]]].projections
+        projectionNames(projections, None) must beLike { case \/-(list) =>
+          list.map(_._1) must contain(allOf("name", "name0"))
+        }
+      }
+      "when a field and an alias have the same name" in {
+        val query = sqlE"SELECT owner.name, car.model as name from owners as owner join cars as car on car.`_id` = owner.carId"
+        val projections = query.project.asInstanceOf[Select[Fix[Sql]]].projections
+        projectionNames(projections, None) must beLike { case \/-(list) =>
+          list.map(_._1) must contain(allOf("name0", "name"))
+        }
+      }
     }
   }
 }

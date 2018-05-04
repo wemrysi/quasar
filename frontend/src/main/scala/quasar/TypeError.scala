@@ -14,23 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.sql
+package quasar
 
-import slamdata.Predef._
-import quasar.common.CIName
+import slamdata.Predef.{Option, Product, Serializable, String}
 
-import scalaz.Scalaz._
+import scalaz.syntax.show._
 
-class StatementSpec extends quasar.Qspec {
-  "Statement" >> {
-    "pretty print" >> {
-      "escape param names that need to escaped" >> {
-        val funcDef = FunctionDecl(
-          name = CIName("FOO"),
-          args = List(CIName("what!?(")),
-          body = sqlE"select * from :`what!?(`")
-        funcDef.pprintF must_= "CREATE FUNCTION FOO(:`what!?(`)\n  BEGIN\n    (select * from :`what!?(`)\n  END"
-      }
-    }
+sealed trait TypeError extends Product with Serializable
+
+object TypeError {
+  final case class UnificationError(expected: Type, actual: Type, hint: Option[String]) extends TypeError {
+    def message = s"Expected type ${expected.shows} but found ${actual.shows}" + hint.map(": " + _).getOrElse("")
   }
 }

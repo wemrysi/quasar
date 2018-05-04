@@ -20,27 +20,9 @@ import slamdata.Predef.{Option, String, Vector}
 import quasar.common.{PhaseResult, PhaseResultW}
 
 import scalaz._
-import scalaz.std.vector._
-import scalaz.syntax.monad._
-import scalaz.syntax.writer._
 
 package object frontend {
   type CompileM[A] = SemanticErrsT[PhaseResultW, A]
   type SemanticErrors = NonEmptyList[SemanticError]
   type SemanticErrsT[F[_], A] = EitherT[F, SemanticErrors, A]
-
-  type CIName = CIString
-
-  object CIName {
-    def apply(value: String): CIName =
-      CIString(value)
-
-    def unapply(name: CIName): Option[String] =
-      CIString.unapply(name)
-  }
-
-  def compilePhase[A: RenderTree](label: String, r: SemanticErrors \/ A): CompileM[A] =
-    EitherT(r.point[PhaseResultW]) flatMap { a =>
-      (a.set(Vector(PhaseResult.tree(label, a)))).liftM[SemanticErrsT]
-    }
 }

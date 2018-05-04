@@ -22,6 +22,16 @@ import quasar.contrib.scalaz.{MonadListen_, MonadTell_}
 import scalaz._
 
 package object common {
+  type CIName = CIString
+
+  object CIName {
+    def apply(value: String): CIName =
+      CIString(value)
+
+    def unapply(name: CIName): Option[String] =
+      CIString.unapply(name)
+  }
+
   type PhaseResults = Vector[PhaseResult]
 
   object PhaseResults {
@@ -45,5 +55,13 @@ package object common {
 
   object PhaseResultListen {
     def apply[F[_]](implicit F: PhaseResultListen[F]) = F
+  }
+
+  object phase {
+    def apply[F[_]] = new PartiallyApplied[F]
+    final class PartiallyApplied[F[_]] {
+      def apply[A: RenderTree](label: String, a: A)(implicit F: PhaseResultTell[F]): F[A] =
+        F.writer(Vector(PhaseResult.tree(label, a)), a)
+    }
   }
 }

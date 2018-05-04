@@ -16,6 +16,7 @@
 
 package quasar.sql
 
+import quasar.common.CIName
 import quasar.sql.ExprArbitrary._
 
 import scala.Predef._
