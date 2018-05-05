@@ -40,6 +40,9 @@ package object quasar {
 
   type QuasarErrT[M[_], A] = EitherT[M, QuasarError, A]
 
+  type QScriptFederated[T[_[_]], F[_], S, R, A] =
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[(ResourcePath, Source[F, S, R])], ?])#M[A]
+
   private def phase[A: RenderTree](label: String, r: SemanticErrors \/ A):
       CompileM[A] =
     EitherT(r.point[PhaseResultW]) flatMap { a =>
