@@ -16,14 +16,14 @@
 
 package quasar.api
 
-import slamdata.Predef.{Option, Product, Serializable, String, Throwable}
+import slamdata.Predef.{Nothing, Option, Product, Serializable, String, Throwable}
 
 import scalaz.{Cord, ISet, NonEmptyList, Show}
 import scalaz.std.string._
 import scalaz.std.option._
 import scalaz.syntax.show._
 
-sealed trait DataSourceError[C] extends QuasarErrorNG
+sealed trait DataSourceError[+C] extends QuasarErrorNG
     with Product
     with Serializable
 
@@ -44,12 +44,12 @@ object DataSourceError extends DataSourceErrorInstances {
   final case class ConnectionFailed[C](message: String, cause: Option[Throwable])
       extends InitializationError[C]
 
-  sealed trait StaticError[C] extends DataSourceError[C]
+  sealed trait StaticError extends DataSourceError[Nothing]
 
-  final case class MalformedContent[C](reason: String)
-      extends StaticError[C]
+  final case class MalformedContent(reason: String)
+      extends StaticError
 
-  sealed trait CreateError[C] extends ExternalError[C] with StaticError[C]
+  sealed trait CreateError[C] extends ExternalError[C] with StaticError
 
   final case class DataSourceExists[C](name: ResourceName)
       extends CreateError[C]

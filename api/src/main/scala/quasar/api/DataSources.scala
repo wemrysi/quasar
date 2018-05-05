@@ -49,7 +49,7 @@ trait DataSources[F[_], C, S] {
       name: ResourceName,
       content: S,
       onConflict: ConflictResolution)
-      : F[Condition[StaticError[C]]]
+      : F[Condition[StaticError]]
 
   /** Returns the metadata and configuration for the specified datasource,
     * or an error if it doesn't exist.
