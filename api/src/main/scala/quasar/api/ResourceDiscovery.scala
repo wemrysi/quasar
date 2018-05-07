@@ -16,7 +16,7 @@
 
 package quasar.api
 
-import slamdata.Predef.Boolean
+import slamdata.Predef.{Boolean, Stream}
 import quasar.api.ResourceError.CommonError
 
 import scalaz.{\/, IMap, Tree}
@@ -32,7 +32,7 @@ trait ResourceDiscovery[F[_]] {
   /** Returns the descendants of the specified resource path or an error if it
     * does not exist.
     */
-  def descendants(path: ResourcePath): F[CommonError \/ Tree[(ResourceName, ResourcePathType)]]
+  def descendants(path: ResourcePath): F[CommonError \/ Stream[Tree[ResourceName]]]
 
   /** Returns whether the specified resource path refers to a resource. */
   def isResource(path: ResourcePath): F[Boolean]
