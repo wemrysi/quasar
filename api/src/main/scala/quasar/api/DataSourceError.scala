@@ -16,38 +16,40 @@
 
 package quasar.api
 
-import slamdata.Predef.{Option, Product, Serializable, String, Throwable}
+import slamdata.Predef.{Nothing, Option, Product, Serializable, String, Throwable}
 
 import scalaz.{Cord, ISet, NonEmptyList, Show}
 import scalaz.std.string._
 import scalaz.std.option._
 import scalaz.syntax.show._
 
-sealed trait DataSourceError[C] extends QuasarErrorNG
+sealed trait DataSourceError[+C] extends QuasarErrorNG
     with Product
     with Serializable
 
-object DataSourceError {
+object DataSourceError extends DataSourceErrorInstances {
   sealed trait ExternalError[C] extends DataSourceError[C]
 
-  final case class DataSourceUnsupported[C](kind: MediaType, supported: ISet[MediaType])
+  final case class DataSourceUnsupported[C](kind: DataSourceType, supported: ISet[DataSourceType])
       extends ExternalError[C]
 
-  final case class MalformedConfiguration[C](kind: MediaType, config: C, reason: String)
-      extends ExternalError[C]
+  sealed trait InitializationError[C] extends ExternalError[C]
 
-  final case class InvalidConfiguration[C](kind: MediaType, config: C, reasons: NonEmptyList[String])
-      extends ExternalError[C]
+  final case class MalformedConfiguration[C](kind: DataSourceType, config: C, reason: String)
+      extends InitializationError[C]
+
+  final case class InvalidConfiguration[C](kind: DataSourceType, config: C, reasons: NonEmptyList[String])
+      extends InitializationError[C]
 
   final case class ConnectionFailed[C](message: String, cause: Option[Throwable])
-      extends ExternalError[C]
+      extends InitializationError[C]
 
-  sealed trait StaticError[C] extends DataSourceError[C]
+  sealed trait StaticError extends DataSourceError[Nothing]
 
-  final case class MalformedContent[C](reason: String)
-      extends StaticError[C]
+  final case class MalformedContent(reason: String)
+      extends StaticError
 
-  sealed trait CreateError[C] extends ExternalError[C] with StaticError[C]
+  sealed trait CreateError[C] extends ExternalError[C] with StaticError
 
   final case class DataSourceExists[C](name: ResourceName)
       extends CreateError[C]

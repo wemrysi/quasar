@@ -64,7 +64,8 @@ object Dependencies {
   )
 
   def api = Seq(
-    "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion
+    "com.github.julien-truffaut" %% "monocle-macro"  % monocleVersion,
+    "eu.timepit"                 %% "refined-scalaz" % refinedVersion
   )
 
   def frontend = Seq(
@@ -82,10 +83,15 @@ object Dependencies {
   )
 
   def datagen = Seq(
-    "co.fs2" %% "fs2-core"        % fs2Version,
-    "co.fs2" %% "fs2-io"          % fs2Version,
-    "co.fs2" %% "fs2-scalaz"      % fs2ScalazVersion,
-    "com.github.scopt" %% "scopt" % scoptVersion
+    "co.fs2"           %% "fs2-core"       % fs2Version,
+    "co.fs2"           %% "fs2-io"         % fs2Version,
+    "co.fs2"           %% "fs2-scalaz"     % fs2ScalazVersion,
+    "com.github.scopt" %% "scopt"          % scoptVersion,
+    "eu.timepit"       %% "refined-scalaz" % refinedVersion
+  )
+
+  def connector = Seq(
+    "co.fs2" %% "fs2-core" % fs2Version
   )
 
   def core = Seq(
@@ -136,6 +142,7 @@ object Dependencies {
     "log4j"                %  "log4j"       % "1.2.17" % Test
   )
   def web = Seq(
+    "eu.timepit"     %% "refined-scalaz"      % refinedVersion,
     "org.http4s"     %% "http4s-dsl"          % http4sVersion,
     "org.http4s"     %% "http4s-argonaut"     % http4sVersion,
     "org.http4s"     %% "http4s-client"       % http4sVersion,

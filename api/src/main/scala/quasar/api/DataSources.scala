@@ -27,13 +27,13 @@ trait DataSources[F[_], C, S] {
     * datasource, `Unit` indicates the operation was successful.
     *
     * @name an identifier to assign to the datasource, must not exist unless `onConflict` is `Replace`
-    * @kind the media type uniquely identifying the type of datasource
+    * @kind uniquely identifies the type of datasource
     * @config configuration information, the specifics of which are determined by `kind`
     * @onConflict an enumeration describing how to resolve name conflicts
     */
   def createExternal(
       name: ResourceName,
-      kind: MediaType,
+      kind: DataSourceType,
       config: C,
       onConflict: ConflictResolution)
       : F[Condition[ExternalError[C]]]
@@ -49,7 +49,7 @@ trait DataSources[F[_], C, S] {
       name: ResourceName,
       content: S,
       onConflict: ConflictResolution)
-      : F[Condition[StaticError[C]]]
+      : F[Condition[StaticError]]
 
   /** Returns the metadata and configuration for the specified datasource,
     * or an error if it doesn't exist.
@@ -75,6 +75,6 @@ trait DataSources[F[_], C, S] {
   /** A map of all datasources to their current status. */
   def status: F[IMap[ResourceName, StaticDataSource \/ ExternalMetadata]]
 
-  /** The set of media types describing currently supported external datasources. */
-  def supportedExternal: F[ISet[MediaType]]
+  /** The set of currently supported external datasources. */
+  def supportedExternal: F[ISet[DataSourceType]]
 }

@@ -408,12 +408,15 @@ lazy val qsu = project
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
+    api,
     sql % "test->test",
     qsu)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
+  .settings(
+    libraryDependencies ++= Dependencies.connector)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project
