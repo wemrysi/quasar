@@ -15,8 +15,8 @@
  */
 
 import slamdata.Predef._
+import quasar.api._
 import quasar.common.{PhaseResult, PhaseResultW}
-import quasar.fs.CompileM
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.Failure
@@ -24,10 +24,11 @@ import quasar.fp._
 import quasar.fp.numeric._
 import quasar.frontend.{SemanticErrors, SemanticErrsT}
 import quasar.frontend.logicalplan.{LogicalPlan => LP, Free => _, _}
-import quasar.fs.{FileSystemError, FileSystemErrT}
+import quasar.fs.{CompileM, FileSystemError, FileSystemErrT}
 import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
 import quasar.fs.mount.Mounting
+import quasar.qscript.{QScriptCore, Read => QRead, ThetaJoin}
 import quasar.sql._
 import quasar.std.StdLib.set._
 
@@ -40,8 +41,36 @@ package object quasar {
 
   type QuasarErrT[M[_], A] = EitherT[M, QuasarError, A]
 
-  type QScriptFederated[T[_[_]], F[_], S, R, A] =
-    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[(ResourcePath, Source[F, S, R])], ?])#M[A]
+  type QScriptFederated[T[_[_]], S, A] =
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[QRead[(ResourcePath, Source[S])], ?])#M[A]
+
+  object QScriptFederated {
+    object QC {
+      def apply[T[_[_]], S, A](qc: QScriptCore[T, A]): QScriptFederated[T, S, A] =
+        Inject[QScriptCore[T, ?], QScriptFederated[T, S, ?]].inj(qc)
+
+      def unapply[T[_[_]], S, A](qf: QScriptFederated[T, S, A]): Option[QScriptCore[T, A]] =
+        Inject[QScriptCore[T, ?], QScriptFederated[T, S, ?]].prj(qf)
+    }
+
+    object TJ {
+      def apply[T[_[_]], S, A](tj: ThetaJoin[T, A]): QScriptFederated[T, S, A] =
+        Inject[ThetaJoin[T, ?], QScriptFederated[T, S, ?]].inj(tj)
+
+      def unapply[T[_[_]], S, A](qf: QScriptFederated[T, S, A]): Option[ThetaJoin[T, A]] =
+        Inject[ThetaJoin[T, ?], QScriptFederated[T, S, ?]].prj(qf)
+    }
+
+    object RD {
+      def apply[T[_[_]], S, A](p: ResourcePath, s: Source[S]): QScriptFederated[T, S, A] =
+        Inject[Const[QRead[(ResourcePath, Source[S])], ?], QScriptFederated[T, S, ?]]
+          .inj(Const(QRead((p, s))))
+
+      def unapply[T[_[_]], S, A](qf: QScriptFederated[T, S, A]): Option[(ResourcePath, Source[S])] =
+        Inject[Const[QRead[(ResourcePath, Source[S])], ?], QScriptFederated[T, S, ?]]
+          .prj(qf).map(_.getConst.path)
+    }
+  }
 
   private def phase[A: RenderTree](label: String, r: SemanticErrors \/ A):
       CompileM[A] =

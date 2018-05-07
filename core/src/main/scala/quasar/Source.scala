@@ -18,4 +18,4 @@ package quasar
 
 import quasar.api.ResourceName
 
-final case class Source[F[_], A, B](name: ResourceName, f: A => F[B])
+final case class Source[A](name: ResourceName, src: A)

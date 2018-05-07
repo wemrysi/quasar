@@ -424,6 +424,7 @@ lazy val core = project
   .dependsOn(
     connector % BothScopes,
     sql,
+    api       % "test->test",
     effect    % "test->test",
     fs        % "test->test")
   .settings(commonSettings)

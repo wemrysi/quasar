@@ -16,7 +16,7 @@
 
 package quasar.api
 
-import slamdata.Predef.{tailrec, Boolean, None, Option, Some, Unit}
+import slamdata.Predef.{tailrec, Boolean, None, Option, Some, Stream, Unit}
 import quasar.api.ResourceError._
 import quasar.fp.ski.κ
 
@@ -28,13 +28,13 @@ import scalaz.syntax.equal._
 import scalaz.syntax.std.option._
 
 final class MockQueryEvaluator[F[_]: Applicative, Q, R] private (
-    resources: Tree[ResourceName],
+    resources: Stream[Tree[ResourceName]],
     eval: Q => F[ReadError \/ R])
   extends QueryEvaluator[F, Q, R] {
 
   def children(path: ResourcePath): F[CommonError \/ IMap[ResourceName, ResourcePathType]] = {
-    val progeny = subtreeAt(path) map { t =>
-      IMap.fromFoldable(t.subForest map { k =>
+    val progeny = forestAt(path) map { f =>
+      IMap.fromFoldable(f map { k =>
         val typ =
           if (k.subForest.isEmpty) ResourcePathType.resource
           else ResourcePathType.resourcePrefix
@@ -43,31 +43,31 @@ final class MockQueryEvaluator[F[_]: Applicative, Q, R] private (
       })
     }
 
-    (progeny \/> (PathNotFound(path) : CommonError)).point[F]
+    (progeny \/> pathNotFound[CommonError](path)).point[F]
   }
 
-  def descendants(path: ResourcePath): F[CommonError \/ Tree[ResourceName]] =
-    (subtreeAt(path) \/> (PathNotFound(path) : CommonError)).point[F]
+  def descendants(path: ResourcePath): F[CommonError \/ Stream[Tree[ResourceName]]] =
+    (forestAt(path) \/> pathNotFound[CommonError](path)).point[F]
 
   def isResource(path: ResourcePath): F[Boolean] =
-    subtreeAt(path).exists(_.subForest.isEmpty).point[F]
+    forestAt(path).exists(_.isEmpty).point[F]
 
   def evaluate(query: Q): F[ReadError \/ R] =
     eval(query)
 
   ////
 
-  private def subtreeAt(path: ResourcePath): Option[Tree[ResourceName]] = {
+  private def forestAt(path: ResourcePath): Option[Stream[Tree[ResourceName]]] = {
     @tailrec
-    def go(p: ResourcePath, t: Tree[ResourceName]): Option[Tree[ResourceName]] =
-      path.uncons match {
+    def go(p: ResourcePath, f: Stream[Tree[ResourceName]]): Option[Stream[Tree[ResourceName]]] =
+      p.uncons match {
         case Some((n, p1)) =>
-          t.subForest.find(_.rootLabel === n) match {
-            case Some(t0) => go(p1, t0)
+          f.find(_.rootLabel === n) match {
+            case Some(t0) => go(p1, t0.subForest)
             case None => None
           }
 
-        case None => Some(t)
+        case None => Some(f)
       }
 
     go(path, resources)
@@ -76,19 +76,19 @@ final class MockQueryEvaluator[F[_]: Applicative, Q, R] private (
 
 object MockQueryEvaluator {
   def apply[F[_]: Applicative, Q, R](
-      resources: Tree[ResourceName],
+      resources: Stream[Tree[ResourceName]],
       eval: Q => F[ReadError \/ R])
       : QueryEvaluator[F, Q, R] =
     new MockQueryEvaluator(resources, eval)
 
   def fromResponseIMap[F[_]: Applicative, Q: Order, R](
-      resources: Tree[ResourceName],
+      resources: Stream[Tree[ResourceName]],
       responses: IMap[Q, R])
       : QueryEvaluator[F, Q, R] =
     apply(resources, q => (responses.lookup(q) \/> rootNotFound).point[F])
 
   def resourceDiscovery[F[_]: Applicative](
-      resources: Tree[ResourceName])
+      resources: Stream[Tree[ResourceName]])
       : ResourceDiscovery[F] =
     apply(resources, κ(rootNotFound.left[Unit].point[F]))
 

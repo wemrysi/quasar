@@ -16,7 +16,11 @@
 
 package quasar
 
+import quasar.api.ResourceError.ReadError
+
+import scalaz.\/
+
 /** Represents the ability to evaluate QScript over potentially many sources. */
 trait QueryFederation[T[_[_]], F[_], S, R] {
-  def evaluateFederated(q: T[QScriptFederated[T, F, S, R, ?]]): F[R]
+  def evaluateFederated(q: T[QScriptFederated[T, S, ?]]): F[ReadError \/ R]
 }
