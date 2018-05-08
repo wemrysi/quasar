@@ -23,7 +23,7 @@ import scalaz.std.anyVal._
 import scalaz.syntax.order._
 
 /** Describes what a `ResourcePath` refers to. */
-trait ResourcePathType extends Product with Serializable
+sealed trait ResourcePathType extends Product with Serializable
 
 object ResourcePathType extends ResourcePathTypeInstances {
   case object Resource extends ResourcePathType
