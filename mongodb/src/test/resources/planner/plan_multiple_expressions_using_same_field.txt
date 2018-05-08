@@ -3,10 +3,8 @@ Chain
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("identities" -> {
-│  │  │  │       "rlp1": { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("0") }] }
-│  │  │  │     })
-│  │  │  ├─ Name("value" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
+│  │  │  ├─ Name("identities" -> { "rlp1": "$_id" })
+│  │  │  ├─ Name("value" -> "$$ROOT")
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped

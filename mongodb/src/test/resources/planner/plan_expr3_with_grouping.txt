@@ -402,22 +402,10 @@ Chain
 │     │  │       "$cond": [
 │     │  │         {
 │     │  │           "$and": [
-│     │  │             {
-│     │  │               "$lte": [
-│     │  │                 { "$literal": {  } },
-│     │  │                 {
-│     │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
-│     │  │                 }]
-│     │  │             },
-│     │  │             {
-│     │  │               "$lt": [
-│     │  │                 {
-│     │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
-│     │  │                 },
-│     │  │                 { "$literal": [] }]
-│     │  │             }]
+│     │  │             { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│     │  │             { "$lt": ["$$ROOT", { "$literal": [] }] }]
 │     │  │         },
-│     │  │         { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] },
+│     │  │         "$$ROOT",
 │     │  │         { "$literal": undefined }]
 │     │  │     })
 │     │  ╰─ ExcludeId

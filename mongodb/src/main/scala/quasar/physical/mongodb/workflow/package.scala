@@ -654,7 +654,7 @@ package object workflow {
       def crystallize(op: Fix[F]) = {
 
         val finished =
-          deleteUnusedFields(reorderOps(simplifyGroup[F](op)))
+          deleteUnusedFields(reorderOps(simplifyGroup[F](simplifyAllExprOps[F](op))))
 
         def fixShape(wf: Fix[F]) =
           simpleShape(wf).fold(finished) { n =>
