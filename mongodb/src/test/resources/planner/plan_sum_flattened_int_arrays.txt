@@ -60,16 +60,7 @@ Chain
 │  │                 { "$literal": BinData(0, "") }]
 │  │             }]
 │  │         },
-│  │         {
-│  │           "$cond": [
-│  │             {
-│  │               "$and": [
-│  │                 { "$lte": [{ "$literal": {  } }, "$value.original"] },
-│  │                 { "$lt": ["$value.original", { "$literal": [] }] }]
-│  │             },
-│  │             "$value.original.c",
-│  │             { "$literal": undefined }]
-│  │         },
+│  │         "$value.original.c",
 │  │         [{ "$literal": undefined }]]
 │  │     })
 │  ╰─ ExcludeId
