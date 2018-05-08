@@ -16,6 +16,43 @@
 
 package quasar
 
-import quasar.api.ResourceName
+import quasar.api.ResourcePath
 
-final case class Source[A](name: ResourceName, src: A)
+import monocle.macros.Lenses
+import scalaz.{Cord, Equal, Functor, Order, Show}
+import scalaz.std.tuple._
+import scalaz.syntax.show._
+
+@Lenses
+final case class Source[A](path: ResourcePath, src: A) {
+  def map[B](f: A => B): Source[B] =
+    Source(path, f(src))
+}
+
+object Source extends SourceInstances
+
+sealed abstract class SourceInstances extends SourceInstances0 {
+  implicit val functor: Functor[Source] =
+    new Functor[Source] {
+      def map[A, B](sa: Source[A])(f: A => B) =
+        sa map f
+    }
+
+  implicit def order[A: Order]: Order[Source[A]] =
+    Order.orderBy {
+      case Source(p, a) => (p, a)
+    }
+
+  implicit def show[A: Show]: Show[Source[A]] =
+    Show.show {
+      case Source(p, a) =>
+        Cord("Source(") ++ p.show ++ Cord(", ") ++ a.show ++ Cord(")")
+    }
+}
+
+sealed abstract class SourceInstances0 {
+  def equal[A: Equal]: Equal[Source[A]] =
+    Equal.equalBy {
+      case Source(p, a) => (p, a)
+    }
+}

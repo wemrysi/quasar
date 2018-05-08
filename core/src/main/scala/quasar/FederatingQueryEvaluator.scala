@@ -19,18 +19,22 @@ package quasar
 import slamdata.Predef.{List, Option}
 import quasar.api._, ResourceError._
 import quasar.contrib.pathy._
-import quasar.qscript._
+import quasar.contrib.scalaz.MonadTell_
+import quasar.fp.PrismNT
+import quasar.qscript.{Read => QRead, _}
 
 import matryoshka._
-import matryoshka.implicits._
-import scalaz.{Const, EitherT, IMap, Inject, Monad, OptionT, Tree}
-import scalaz.Scalaz._
+import pathy.Path.refineType
+import scalaz._, Scalaz._
 
 /** A `QueryEvaluator` capable of executing queries against multiple sources. */
 final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, S, R] private (
     queryFederation: QueryFederation[T, F, S, R],
     sources: F[IMap[ResourceName, (ResourceDiscovery[F], S)]])
     extends QueryEvaluator[F, T[QScriptRead[T, ?]], R] {
+
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import WriterT.writerTMonadListen
 
   def children(path: ResourcePath) =
     path match {
@@ -49,9 +53,9 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, S, R] p
         (for {
           x <- lookupLeaf[CommonError](f)
 
-          (p, d, s) = x
+          (n, d, s) = x
 
-          r <- EitherT(d.children(p)) leftMap prefixCommonError(s.name)
+          r <- EitherT(d.children(s.path)) leftMap prefixCommonError(n)
         } yield r).run
     }
 
@@ -71,9 +75,9 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, S, R] p
         for {
           x <- lookupLeaf[CommonError](f)
 
-          (p, d, s) = x
+          (n, d, s) = x
 
-          r <- EitherT(d.descendants(p)) leftMap prefixCommonError(s.name)
+          r <- EitherT(d.descendants(s.path)) leftMap prefixCommonError(n)
         } yield r
     }).run
 
@@ -84,68 +88,79 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, S, R] p
 
       case ResourcePath.Leaf(f) =>
         lookupLeaf[CommonError](f) flatMap {
-          case (p, d, _) => EitherT.rightT(d.isResource(p))
+          case (_, d, s) => EitherT.rightT(d.isResource(s.path))
         } getOrElse false
     }
 
-  def evaluate(q: T[QScriptRead[T, ?]]) = {
-    type G[A] = EitherT[F, ReadError, A]
+  def evaluate(q: T[QScriptRead[T, ?]]) =
+    (for {
+      wa <- Trans.applyTrans(federate, ReadPath)(q).run
 
-    val qsFederated = q.transCataM[G, T[QScriptFederated[T, S, ?]], QScriptFederated[T, S, ?]] {
-      case ReadPath(p) =>
-        val rp = ResourcePath.fromPath(p)
+      (srcs, qr) = wa
 
-        for {
-          f <- EitherT.fromDisjunction[F] {
-            ResourcePath.leaf.getOption(rp) \/> notAResource[ReadError](ResourcePath.root())
-          }
+      srcMap = IMap.fromFoldable(srcs)
 
-          l <- lookupLeaf[ReadError](f)
+      fq = FederatedQuery(qr, srcMap.lookup)
 
-          (rp, _, s) = l
-
-        } yield QScriptFederated.RD(rp, s)
-
-      case RQC(qc) =>
-        QScriptFederated.QC(qc).point[G]
-
-      case RTJ(tj) =>
-        QScriptFederated.TJ(tj).point[G]
-    }
-
-    qsFederated.flatMapF(queryFederation.evaluateFederated).run
-  }
+      r <- EitherT(queryFederation.evaluateFederated(fq))
+    } yield r).run
 
   ////
 
-  private object ReadPath {
-    val RD = Inject[Const[Read[ADir], ?], QScriptRead[T, ?]]
-    val RF = Inject[Const[Read[AFile], ?], QScriptRead[T, ?]]
+  private type SrcsT[X[_], A] = WriterT[X, DList[(AFile, Source[S])], A]
+  private type M[A] = SrcsT[EitherT[F, ReadError, ?], A]
 
-    def unapply[A](qr: QScriptRead[T, A]): Option[APath] =
-      RD.prj(qr).map(_.getConst.path) orElse RF.prj(qr).map(_.getConst.path)
-  }
+  private val IRD = Inject[Const[QRead[ADir], ?], QScriptRead[T, ?]]
+  private val IRF = Inject[Const[QRead[AFile], ?], QScriptRead[T, ?]]
 
-  private object RQC {
-    def unapply[A](qr: QScriptRead[T, A]): Option[QScriptCore[T, A]] =
-      Inject[QScriptCore[T, ?], QScriptRead[T, ?]].prj(qr)
-  }
+  private val ReadPath: PrismNT[QScriptRead[T, ?], Const[QRead[APath], ?]] =
+    PrismNT[QScriptRead[T, ?], Const[QRead[APath], ?]](
+      λ[QScriptRead[T, ?] ~> (Option ∘ Const[QRead[APath], ?])#λ](qr =>
+        IRD.prj(qr).map(_.getConst.path)
+          .orElse(IRF.prj(qr).map(_.getConst.path))
+          .map(p => Const(QRead(p)))),
 
-  private object RTJ {
-    def unapply[A](qr: QScriptRead[T, A]): Option[ThetaJoin[T, A]] =
-      Inject[ThetaJoin[T, ?], QScriptRead[T, ?]].prj(qr)
-  }
+      λ[Const[QRead[APath], ?] ~> QScriptRead[T, ?]](rp =>
+        refineType(rp.getConst.path).fold(
+          d => IRD.inj(Const(QRead(d))),
+          f => IRF.inj(Const(QRead(f))))))
+
+  // Record all sources in the query, erroring unless all are known.
+  private val federate: Trans[Const[QRead[APath], ?], M] =
+    new Trans[Const[QRead[APath], ?], M] {
+      def trans[U, G[_]: Functor]
+          (GtoF: PrismNT[G, Const[QRead[APath], ?]])
+          (implicit UC: Corecursive.Aux[U, G], UR: Recursive.Aux[U, G])
+          : Const[QRead[APath], U] => M[G[U]] = {
+
+        case Const(QRead(p)) =>
+          val file =
+            EitherT.fromDisjunction[F](
+              ResourcePath.leaf
+                .getOption(ResourcePath.fromPath(p))
+                .toRightDisjunction(notAResource[ReadError](ResourcePath.root())))
+              .liftM[SrcsT]
+
+          for {
+            f <- file
+
+            l <- lookupLeaf[ReadError](f).liftM[SrcsT]
+
+            _ <- MonadTell_[M, DList[(AFile, Source[S])]].tell(DList((f, l._3)))
+          } yield GtoF(Const(QRead(f)))
+      }
+    }
 
   private def discoveries: F[List[(ResourceName, ResourceDiscovery[F])]] =
     sources.map(_.map(_._1).toAscList)
 
   private def lookupLeaf[E >: CommonError](file: AFile)
-      : EitherT[F, E, (ResourcePath, ResourceDiscovery[F], Source[S])] = {
+      : EitherT[F, E, (ResourceName, ResourceDiscovery[F], Source[S])] = {
 
     val (n, p) = ResourcePath.unconsLeaf(file)
 
     OptionT(sources map (_ lookup n))
-      .map({ case (rd, s) => (p, rd, Source(n, s)) })
+      .map({ case (rd, s) => (n, rd, Source(p, s)) })
       .toRight(pathNotFound[E](ResourcePath.leaf(file)))
   }
 

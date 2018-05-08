@@ -18,14 +18,21 @@ package quasar
 
 import slamdata.Predef._
 import quasar.api._, ResourceError._
+import quasar.contrib.pathy.{ADir, AFile}
+import quasar.fp.{constEqual, coproductEqual}
+import quasar.qscript._
 
+import matryoshka._
 import matryoshka.data.Fix
+import pathy.Path._
 import scalaz.{Id, IMap, Show, Tree}, Id.Id
+import scalaz.std.anyVal._
+import scalaz.std.option._
 import scalaz.std.stream._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 
-final class FederatingQueryEvaluatorSpec extends quasar.Qspec {
+final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
 
   implicit val showTree: Show[Tree[ResourceName]] =
     Show.shows(_.drawTree)
@@ -47,8 +54,8 @@ final class FederatingQueryEvaluatorSpec extends quasar.Qspec {
 
   val xys = MockQueryEvaluator.resourceDiscovery[Id](xyForest)
 
-  val qfed = new QueryFederation[Fix, Id, Int, Fix[QScriptFederated[Fix, Int, ?]]] {
-    def evaluateFederated(q: Fix[QScriptFederated[Fix, Int, ?]]) = q.right[ReadError]
+  val qfed = new QueryFederation[Fix, Id, Int, FederatedQuery[Fix, Int]] {
+    def evaluateFederated(q: FederatedQuery[Fix, Int]) = q.right[ReadError]
   }
 
   val fqe =
@@ -138,10 +145,100 @@ final class FederatingQueryEvaluatorSpec extends quasar.Qspec {
   }
 
   "evaluate" >> {
-    "returns PNF when no source" >> todo
+    val qs = construction.mkDefaults[Fix, QScriptRead[Fix, ?]]
 
-    "returns PNF when no source in branch" >> todo
+    "returns NAR for root" >> {
+      val query =
+        qs.fix.Map(
+          qs.fix.Read[ADir](rootDir),
+          qs.recFunc.MakeMapS("value", qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "value")))
 
-    "builds federated qscript when all sources found" >> todo
+      fqe.evaluate(query).swap.toOption must_= Some(notAResource(ResourcePath.root()))
+    }
+
+    "returns PNF when no source" >> {
+      val query =
+        qs.fix.Map(
+          qs.fix.Read[AFile](rootDir </> dir("foo") </> file("bar")),
+          qs.recFunc.MakeMapS("value", qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "value")))
+
+      val rp =
+        ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
+
+      fqe.evaluate(query).swap.toOption must_= Some(pathNotFound(rp))
+    }
+
+    "returns PNF when no source in branch" >> {
+      val query =
+        qs.fix.Union(
+          qs.fix.Unreferenced,
+          qs.free.Read[AFile](rootDir </> dir("abs") </> file("a")),
+          qs.free.Read[AFile](rootDir </> dir("foo") </> file("bar")))
+
+      val rp =
+        ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
+
+      fqe.evaluate(query).swap.toOption must_= Some(pathNotFound(rp))
+    }
+
+    "builds federated query when all sources found" >> {
+      val absa: AFile =
+        rootDir </> dir("abs") </> file("a")
+
+      val xysy: AFile =
+        rootDir </> dir("xys") </> file("y")
+
+      val query =
+        qs.fix.Filter(
+          qs.fix.Union(
+            qs.fix.Unreferenced,
+            qs.free.Read[AFile](absa),
+            qs.free.Read[AFile](xysy)),
+          qs.recFunc.Gt(
+            qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "ts"),
+            qs.recFunc.Now))
+
+      fqe.evaluate(query) map { fq =>
+        fq.query must beTreeEqual(query)
+        fq.sources(absa) must_= Some(Source(ResourcePath.root() / ResourceName("a"), 1))
+        fq.sources(xysy) must_= Some(Source(ResourcePath.root() / ResourceName("y"), 2))
+      } getOrElse ko("Unexpected evaluate failure.")
+    }
+
+    "converts any directory paths to files" >> {
+      val absabD: ADir =
+        rootDir </> dir("abs") </> dir("a") </> dir("b")
+
+      val absabF: AFile =
+        rootDir </> dir("abs") </> dir("a") </> file("b")
+
+      val xysy: AFile =
+        rootDir </> dir("xys") </> file("y")
+
+      val query =
+        qs.fix.Filter(
+          qs.fix.Union(
+            qs.fix.Unreferenced,
+            qs.free.Read[ADir](absabD),
+            qs.free.Read[AFile](xysy)),
+          qs.recFunc.Gt(
+            qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "ts"),
+            qs.recFunc.Now))
+
+      val expected =
+        qs.fix.Filter(
+          qs.fix.Union(
+            qs.fix.Unreferenced,
+            qs.free.Read[AFile](absabF),
+            qs.free.Read[AFile](xysy)),
+          qs.recFunc.Gt(
+            qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "ts"),
+            qs.recFunc.Now))
+
+      fqe.evaluate(query) map { fq =>
+        fq.query must beTreeEqual(expected)
+        fq.sources(absabF) must_= Some(Source(ResourcePath.root() / ResourceName("a") / ResourceName("b"), 1))
+      } getOrElse ko("Unexpected evaluate failure.")
+    }
   }
 }

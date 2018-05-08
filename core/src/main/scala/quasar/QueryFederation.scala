@@ -22,5 +22,5 @@ import scalaz.\/
 
 /** Represents the ability to evaluate QScript over potentially many sources. */
 trait QueryFederation[T[_[_]], F[_], S, R] {
-  def evaluateFederated(q: T[QScriptFederated[T, S, ?]]): F[ReadError \/ R]
+  def evaluateFederated(q: FederatedQuery[T, S]): F[ReadError \/ R]
 }
