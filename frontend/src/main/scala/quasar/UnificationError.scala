@@ -16,14 +16,14 @@
 
 package quasar
 
-import slamdata.Predef.{Option, Product, Serializable, String}
+import slamdata.Predef._
 
+import monocle.macros.Lenses
+import scalaz.std.string._
 import scalaz.syntax.show._
+import scalaz.syntax.std.option._
 
-sealed trait TypeError extends Product with Serializable
-
-object TypeError {
-  final case class UnificationError(expected: Type, actual: Type, hint: Option[String]) extends TypeError {
-    def message = s"Expected type ${expected.shows} but found ${actual.shows}" + hint.map(": " + _).getOrElse("")
-  }
+@Lenses
+final case class UnificationError(expected: Type, actual: Type, hint: Option[String]) {
+  def message = s"Expected type ${expected.shows} but found ${actual.shows}" + ~hint.map(": " + _)
 }

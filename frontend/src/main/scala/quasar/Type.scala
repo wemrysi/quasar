@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar.common.PrimaryType
 import quasar.fp._
 import quasar.fp.ski._
-import SemanticError.TypeError
 
 import scala.Any
 
@@ -131,8 +130,8 @@ sealed abstract class Type extends Product with Serializable { self =>
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  final def mapKey(key: Type): SemanticResult[Type] = {
-    if (Type.lub(key, Str) ≠ Str) failureNel(TypeError(Str, key, None))
+  final def mapKey(key: Type): UnificationResult[Type] = {
+    if (Type.lub(key, Str) ≠ Str) failureNel(UnificationError(Str, key, None))
     else (key, this) match {
       case (_, x @ Coproduct (_, _)) => {
         implicit val or: Monoid[Type] = Type.TypeOrMonoid
@@ -144,8 +143,8 @@ sealed abstract class Type extends Product with Serializable { self =>
       }
 
       case (Str, t) =>
-        t.objectType.fold[SemanticResult[Type]](
-          failureNel(TypeError(AnyObject, this, None)))(
+        t.objectType.fold[UnificationResult[Type]](
+          failureNel(UnificationError(AnyObject, this, None)))(
           success)
 
       case (Const(Data.Str(key)), Const(Data.Obj(map))) =>
@@ -153,18 +152,18 @@ sealed abstract class Type extends Product with Serializable { self =>
 
       case (Const(Data.Str(key)), Obj(map, uk)) =>
         map.get(key).fold(
-          uk.fold[SemanticResult[Type]](
+          uk.fold[UnificationResult[Type]](
             success(Type.Const(Data.NA)))(
             success))(
           success)
 
-      case _ => failureNel(TypeError(AnyObject, this, None))
+      case _ => failureNel(UnificationError(AnyObject, this, None))
     }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  final def arrayElem(index: Type): SemanticResult[Type] = {
-    if (Type.lub(index, Int) ≠ Int) failureNel(TypeError(Int, index, None))
+  final def arrayElem(index: Type): UnificationResult[Type] = {
+    if (Type.lub(index, Int) ≠ Int) failureNel(UnificationError(Int, index, None))
     else (index, this) match {
       case (Const(Data.Int(index)), Const(Data.Arr(arr))) =>
         success(Const(arr.lift(index.toInt).getOrElse(Data.NA)))
@@ -174,8 +173,8 @@ sealed abstract class Type extends Product with Serializable { self =>
         x.flatten.toList.foldMap(_.arrayElem(index))
 
       case (Int, _) =>
-        this.arrayType.fold[SemanticResult[Type]](
-          failureNel(TypeError(AnyArray, this, None)))(
+        this.arrayType.fold[UnificationResult[Type]](
+          failureNel(UnificationError(AnyArray, this, None)))(
           success)
 
       case (_, FlexArr(_, _, value)) =>
@@ -184,7 +183,7 @@ sealed abstract class Type extends Product with Serializable { self =>
       case (Const(Data.Int(index)), Arr(value)) =>
         success(value.lift(index.toInt).getOrElse(Const(Data.NA)))
 
-      case (_, _) => failureNel(TypeError(AnyArray, this, None))
+      case (_, _) => failureNel(UnificationError(AnyArray, this, None))
     }
   }
 
@@ -300,7 +299,7 @@ trait TypeInstances {
 }
 
 object Type extends TypeInstances {
-  type SemanticResult[A] = ValidationNel[SemanticError, A]
+  type UnificationResult[A] = ValidationNel[UnificationError, A]
 
   val fromPrimaryType: PrimaryType => Type = {
     case common.Null => Null
@@ -314,17 +313,17 @@ object Type extends TypeInstances {
   }
 
   private def fail0[A](expected: Type, actual: Type, message: Option[String])
-      : SemanticResult[A] =
-    Validation.failure(NonEmptyList(TypeError(expected, actual, message)))
+      : UnificationResult[A] =
+    Validation.failure(NonEmptyList(UnificationError(expected, actual, message)))
 
-  private def fail[A](expected: Type, actual: Type): SemanticResult[A] =
+  private def fail[A](expected: Type, actual: Type): UnificationResult[A] =
     fail0(expected, actual, None)
 
   private def failMsg[A](expected: Type, actual: Type, msg: String)
-      : SemanticResult[A] =
+      : UnificationResult[A] =
     fail0(expected, actual, Some(msg))
 
-  private def succeed[A](v: A): SemanticResult[A] = Validation.success(v)
+  private def succeed[A](v: A): UnificationResult[A] = Validation.success(v)
 
   def simplify(tpe: Type): Type = mapUp(tpe) {
     case x @ Coproduct(_, _) => {
@@ -362,7 +361,7 @@ object Type extends TypeInstances {
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def typecheck(superType: Type, subType: Type):
-      SemanticResult[Unit] =
+      UnificationResult[Unit] =
     (superType, subType) match {
       case (superType, subType) if (superType ≟ subType) => succeed(())
 
@@ -382,25 +381,25 @@ object Type extends TypeInstances {
         typecheck(superType, elem2.concatenate(TypeOrMonoid))
       case (FlexArr(supMin, supMax, superType), FlexArr(subMin, subMax, subType)) =>
         lazy val tc = typecheck(superType, subType)
-        def checkOpt[A](sup: Option[A], comp: (A, A) => Boolean, sub: Option[A], next: => SemanticResult[Unit]) =
+        def checkOpt[A](sup: Option[A], comp: (A, A) => Boolean, sub: Option[A], next: => UnificationResult[Unit]) =
           sup.fold(
             next)(
-            p => sub.fold[SemanticResult[Unit]](
+            p => sub.fold[UnificationResult[Unit]](
               fail(superType, subType))(
               b => if (comp(p, b)) next else fail(superType, subType)))
         lazy val max = checkOpt(supMax, Order[Int].greaterThanOrEqual, subMax, tc)
         checkOpt(Some(supMin), Order[Int].lessThanOrEqual, Some(subMin), max)
       case (Obj(supMap, supUk), Obj(subMap, subUk)) =>
         supMap.toList.foldMap { case (k, v) =>
-          subMap.get(k).fold[SemanticResult[Unit]](
+          subMap.get(k).fold[UnificationResult[Unit]](
             fail(superType, subType))(
             typecheck(v, _))
         } +++
           supUk.fold(
-            subUk.fold[SemanticResult[Unit]](
+            subUk.fold[UnificationResult[Unit]](
               if ((subMap -- supMap.keySet).isEmpty) succeed(()) else fail(superType, subType))(
               κ(fail(superType, subType))))(
-            p => subUk.fold[SemanticResult[Unit]](
+            p => subUk.fold[UnificationResult[Unit]](
               // if (subMap -- supMap.keySet) is empty, fail(superType, subType)
               (subMap -- supMap.keySet).foldMap(typecheck(p, _)))(
               typecheck(p, _)))
@@ -550,7 +549,7 @@ object Type extends TypeInstances {
     actuals.foldMap(typecheck(expected, _))
 
   private def typecheckCP(expecteds: Vector[Type], actual: Type) =
-    expecteds.foldLeft[SemanticResult[Unit]](
+    expecteds.foldLeft[UnificationResult[Unit]](
       fail(Bottom, actual))(
       (acc, expected) => acc ||| typecheck(expected, actual))
 
