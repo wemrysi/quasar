@@ -262,7 +262,7 @@ trait StringLib extends Library {
 
   val Boolean = UnaryFunc(
     Mapping,
-    "Converts the strings “true” and “false” into boolean values. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    "Converts the strings “true” and “false” into boolean values. This is a partial function – arguments that don’t satisfy the constraint have undefined results.",
     Type.Bool,
     Func.Input1(Type.Str),
     noSimplification,
@@ -285,7 +285,7 @@ trait StringLib extends Library {
 
   val Integer = UnaryFunc(
     Mapping,
-    "Converts strings containing integers into integer values. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    "Converts strings containing integers into integer values. This is a partial function – arguments that don’t satisfy the constraint have undefined results.",
     Type.Int,
     Func.Input1(Type.Str),
     noSimplification,
@@ -301,7 +301,7 @@ trait StringLib extends Library {
 
   val Decimal = UnaryFunc(
     Mapping,
-    "Converts strings containing decimals into decimal values. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    "Converts strings containing decimals into decimal values. This is a partial function – arguments that don’t satisfy the constraint have undefined results.",
     Type.Dec,
     Func.Input1(Type.Str),
     noSimplification,
@@ -316,7 +316,7 @@ trait StringLib extends Library {
 
   val Null = UnaryFunc(
     Mapping,
-    "Converts strings containing “null” into the null value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    "Converts strings containing “null” into the null value. This is a partial function – arguments that don’t satisfy the constraint have undefined results.",
     Type.Null,
     Func.Input1(Type.Str),
     noSimplification,
