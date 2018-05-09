@@ -119,9 +119,9 @@ object Local {
                         _.drop(offset.value.toInt)
                           .take(limit.map(_.value.toInt).getOrElse(Int.MaxValue)) // FIXME horrible performance
                           .traverse(str =>
-                            \/.fromEither(Data.jsonParser.parseFromString(str).toEither))
+                            \/.fromEither(DataCodec.parse(str)(DataCodec.Precise).toEither))
                           .leftMap(err =>
-                            FileSystemError.readFailed(err.toString, s"Read for $file failed"))
+                            FileSystemError.readFailed(err.shows, s"Read for $file failed"))
                           .right)
                     } else {
                       // FIXME apparently read on a non-existent file is equivalent to reading the empty file??!!
