@@ -2,6 +2,7 @@
   "name": "subselect distinct in where",
   "backends": {
     "couchbase":         "skip",
+    "lwc_local":         "ignoreFieldOrder",
     "marklogic_json":    "skip",
     "marklogic_xml":     "skip",
     "mimir":             "ignoreFieldOrder",

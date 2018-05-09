@@ -34,17 +34,12 @@ trait IdSourceScannerModule {
         Column.isDefinedAt(rawCols, i)
       }
 
-      val idCol = new LongColumn {
-        def isDefinedAt(row: Int) = defined(row)
-        def apply(row: Int)       = id
-      }
-
       val seqCol = new LongColumn {
         def isDefinedAt(row: Int) = defined(row)
         def apply(row: Int): Long = pos + row
       }
 
-      (pos + range.end, Map(ColumnRef(CPath(CPathIndex(0)), CLong) -> seqCol, ColumnRef(CPath(CPathIndex(1)), CLong) -> idCol))
+      (pos + range.end, Map(ColumnRef(CPath(CPathIndex(0)), CLong) -> seqCol))
     }
   }
 }

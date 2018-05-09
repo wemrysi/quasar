@@ -81,13 +81,19 @@ lazy val backendRewrittenRunSettings = Seq(
     delegate.info("Computing classpaths of dependent backends...")
 
     val parentCp = (fullClasspath in connector in Compile).value.files
-    val backends = isolatedBackends.value map {
+    val productionBackends = isolatedBackends.value map {
       case (name, childCp) =>
         val classpathStr =
           createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(",")
 
         "--backend:" + name + "=" + classpathStr
     }
+
+    val lwcCp = (fullClasspath in mimir in Test).value.files
+    val lwcClasspath = createBackendEntry(lwcCp, parentCp).map(_.getAbsolutePath).mkString(",")
+    val testBackends = List("--backend:quasar.mimir.LightweightTester$=" + lwcClasspath)
+
+    val backends = productionBackends ++ testBackends
 
     val main = (mainClass in Compile).value.getOrElse(sys.error("unspecified main class; huzzah huzzah huzzah"))
     val r = runner.value
@@ -559,13 +565,19 @@ lazy val it = project
       val LoadCfgProp = "slamdata.internal.fs-load-cfg"
 
       val parentCp = (fullClasspath in connector in Compile).value.files
-      val backends = isolatedBackends.value map {
+      val productionBackends = isolatedBackends.value map {
         case (name, childCp) =>
           val classpathStr =
             createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(":")
 
           name + "=" + classpathStr
       }
+
+      val lwcCp = (fullClasspath in mimir in Test).value.files
+      val lwcClasspath = createBackendEntry(lwcCp, parentCp).map(_.getAbsolutePath).mkString(":")
+      val testBackends = List("quasar.mimir.LightweightTester$=" + lwcClasspath)
+
+      val backends = productionBackends ++ testBackends
 
       if (java.lang.System.getProperty(LoadCfgProp, "").isEmpty) {
         // we aren't forking tests, so we just set the property in the current JVM

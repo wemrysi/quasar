@@ -1,9 +1,10 @@
 {
     "name": "order by desc and asc",
     "backends": {
-        "mimir": "ignoreFieldOrder",
         "couchbase": "ignoreFieldOrder",
-        "marklogic_json": "ignoreFieldOrder"
+        "lwc_local": "ignoreFieldOrder",
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "zips.data",
     "query": "select city, state from zips order by state desc, city asc",

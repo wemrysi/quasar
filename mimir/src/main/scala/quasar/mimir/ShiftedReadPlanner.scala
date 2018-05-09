@@ -18,44 +18,93 @@ package quasar.mimir
 
 import slamdata.Predef._
 
+import quasar.blueeyes.json.JValue
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fs._
 import quasar.mimir.MimirCake._
+import quasar.precog.common.RValue
 import quasar.qscript._
+import quasar.yggdrasil.TransSpecModule.paths.{Key, Value}
 import quasar.yggdrasil.bytecode.JType
 
 import delorean._
+import fs2.interop.scalaz._
 import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
-    lift: FileSystemErrT[CakeM, ?] ~> F) {
+final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad, FS <: LightweightFileSystem](
+    lift: FileSystemErrT[CakeM[FS, ?], ?] ~> F) {
 
   def plan: AlgebraM[F, Const[ShiftedRead[AFile], ?], MimirRepr] = {
     case Const(ShiftedRead(path, status)) => {
+      type X[A] = EitherT[CakeM[FS, ?], FileSystemError, A]
+
       val pathStr: String = pathy.Path.posixCodec.printPath(path)
 
-      val loaded: EitherT[CakeM, FileSystemError, MimirRepr] =
+      val loaded: X[MimirRepr] =
         for {
-          precog <- cake[EitherT[CakeM, FileSystemError, ?]]
+          connectors <- cake[X, FS]
+          (_, lwfs) = connectors
 
-          repr <-
-            MimirRepr.meld[EitherT[CakeM, FileSystemError, ?]](
-              new DepFn1[Cake, λ[`P <: Cake` => EitherT[CakeM, FileSystemError, P#Table]]] {
-                def apply(P: Cake): EitherT[CakeM, FileSystemError, P.Table] = {
-                  val et =
-                    P.Table.constString(Set(pathStr)).load(JType.JUniverseT).mapT(_.toTask)
+          repr <- MimirRepr.meld[X, FS](
+            new DepFn1[Cake, λ[`P <: Cake` => X[P#Table]]] {
+              def apply(P: Cake): X[P.Table] = {
 
-                  et.mapT(_.liftM[MT]) leftMap { err =>
-                    val msg = err.messages.toList.reduce(_ + ";" + _)
-                    FileSystemError.readFailed(posixCodec.printPath(path), msg)
+                val read: EitherT[Task, FileSystemError, P.Table] =
+                  P.Table.constString(Set(pathStr))
+                    .load(JType.JUniverseT)
+                    .mapT(_.toTask)
+                    .leftMap { err =>
+                      val msg = err.messages.toList.reduce(_ + ";" + _)
+                      FileSystemError.readFailed(posixCodec.printPath(path), msg)
+                    }
+
+                val et: Task[FileSystemError \/ P.Table] = for {
+                  precogRead <- read.run
+
+                  et <- precogRead match {
+                    // read from mimir
+                    case right @ \/-(_) =>
+                      Task.now(right: FileSystemError \/ P.Table)
+
+                    // read from the lwc
+                    case -\/(_) =>
+                      lwfs.read(path) flatMap {
+                        case Some(stream) => for {
+                          // FIXME this pages the entire fs2.Stream into memory
+                          values <- stream
+                            .map(data => RValue.fromJValueRaw(JValue.fromData(data)))
+                            .runLog
+                          } yield {
+                            import P.trans._
+
+                            // TODO depending on the id status we may not need to wrap the table
+                            P.Table.fromRValues(values.toStream)
+                              .transform(OuterObjectConcat(
+                                WrapObject(
+                                  Scan(Leaf(Source), P.freshIdScanner),
+                                  Key.name),
+                                WrapObject(
+                                  Leaf(Source),
+                                  Value.name))).right[FileSystemError]
+                          }
+
+                        case None =>
+                          Task.now(FileSystemError.readFailed(
+                            posixCodec.printPath(path),
+                            "read from lightweight connector failed").left[P.Table])
+                      }
                   }
-                }
-              })
+                } yield et
+
+                EitherT.eitherT(et.liftM[CakeMT[?[_], FS, ?]])
+              }
+            })
         } yield {
           import repr.P.trans._
 

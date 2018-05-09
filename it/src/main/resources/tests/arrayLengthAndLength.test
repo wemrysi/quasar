@@ -2,8 +2,9 @@
     "name": "Retrieve array length and string length",
 
     "backends": {
-        "mimir": "pendingIgnoreFieldOrder",
-        "couchbase": "ignoreFieldOrder"
+        "couchbase": "ignoreFieldOrder",
+        "lwc_local": "pendingIgnoreFieldOrder",
+        "mimir": "pendingIgnoreFieldOrder"
     },
 
     "data": "smallZips.data",

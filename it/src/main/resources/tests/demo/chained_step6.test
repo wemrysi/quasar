@@ -3,6 +3,7 @@
     "data": "patients.data",
     "backends": {
        "couchbase":         "ignoreFieldOrder",
+       "lwc_local":         "pending",
        "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "pending"
     },

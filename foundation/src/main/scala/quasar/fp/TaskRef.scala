@@ -86,7 +86,7 @@ object TaskRef {
         for {
           a0 <- read
           (a1T, bT) = modify(a0)
-	  a1 <- a1T
+          a1 <- a1T
           bool <- compareAndSet(a0, a1)
           back <- if (bool) bT else twoPhaseModifyT[B](modify)
         } yield back

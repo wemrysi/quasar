@@ -22,6 +22,7 @@ stages:
 env:
   matrix:
     # - CONNECTOR=couchbase
+    - CONNECTOR=lwc_local
     - CONNECTOR=marklogic_json
     - CONNECTOR=marklogic_xml
     - CONNECTOR=mimir

@@ -2,6 +2,7 @@
     "name": "filter by JS expression, with only reducing projections",
 
     "backends": {
+        "lwc_local":"pendingIgnoreFieldOrder",
         "mimir":"pendingIgnoreFieldOrder"
     },
 

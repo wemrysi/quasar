@@ -164,6 +164,7 @@ abstract class FileSystemTest[S[_]](
     } yield r
 
     runT(run)(EitherT(delete(dir)))
+    //EitherT.rightT(Task.now(()))
   }
 
   ////
