@@ -17,7 +17,8 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar.{Data, Func, UnaryFunc, BinaryFunc, Type, Mapping, SemanticError}
+import quasar.{Data, Func, UnaryFunc, BinaryFunc, Type, Mapping}
+import quasar.ArgumentError._
 import quasar.DataDateTimeExtractors._
 import quasar.fp._
 import quasar.fp.ski._
@@ -27,7 +28,7 @@ import quasar.time.DateTimeInterval
 import scala.math.BigDecimal.RoundingMode
 
 import matryoshka._
-import scalaz._, Scalaz._, Validation.{failure, success}
+import scalaz._, Scalaz._, Validation.{failureNel, success}
 import shapeless._
 
 trait MathLib extends Library {
@@ -150,16 +151,16 @@ trait MathLib extends Library {
         success(Type.Const(Data.OffsetTime(DateTimeInterval.addToOffsetTime(v1, v2))))
 
       case Sized(Type.Const(CanLensDate(_)), Type.Const(Data.Interval(_))) =>
-        failure(NonEmptyList(SemanticError.GenericError("Intervals containing time information can't be added to dates")))
+        failureNel(invalidArgumentError("Intervals containing time information can't be added to dates"))
 
       case Sized(Type.Const(CanLensTime(_)), Type.Const(Data.Interval(_))) =>
-        failure(NonEmptyList(SemanticError.GenericError("Intervals containing date information can't be added to times")))
+        failureNel(invalidArgumentError("Intervals containing date information can't be added to times"))
 
       case Sized(Type.Const(Data.Interval(_)), Type.Const(CanLensDate(_))) =>
-        failure(NonEmptyList(SemanticError.GenericError("Intervals containing time information can't be added to dates")))
+        failureNel(invalidArgumentError("Intervals containing time information can't be added to dates"))
 
       case Sized(Type.Const(Data.Interval(_)), Type.Const(CanLensTime(_))) =>
-        failure(NonEmptyList(SemanticError.GenericError("Intervals containing date information can't be added to times")))
+        failureNel(invalidArgumentError("Intervals containing date information can't be added to times"))
 
       case Sized(t1, t2)
         if (Type.OffsetDateTime ⨿ Type.OffsetTime ⨿ Type.OffsetDate ⨿
@@ -296,10 +297,10 @@ trait MathLib extends Library {
         success(Type.Const(Data.OffsetTime(DateTimeInterval.subtractFromOffsetTime(v1, v2))))
 
       case Sized(Type.Const(CanLensDate(_)), Type.Const(Data.Interval(_))) =>
-        failure(NonEmptyList(SemanticError.GenericError("Intervals containing time information can't be added to dates")))
+        failureNel(invalidArgumentError("Intervals containing time information can't be added to dates"))
 
       case Sized(Type.Const(CanLensTime(_)), Type.Const(Data.Interval(_))) =>
-        failure(NonEmptyList(SemanticError.GenericError("Intervals containing date information can't be added to times")))
+        failureNel(invalidArgumentError("Intervals containing date information can't be added to times"))
 
       case Sized(Type.Const(Data.LocalDateTime(v1)), Type.Const(Data.LocalDateTime(v2))) =>
         success(Type.Const(Data.Interval(DateTimeInterval.betweenLocalDateTime(v1, v2))))
