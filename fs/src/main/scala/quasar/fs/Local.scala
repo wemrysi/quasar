@@ -50,13 +50,13 @@ import scalaz.concurrent.Task
   *
   * The implementations are not guaranteed to be atomic.
   */
-class Local private (baseDir: JFile) {
+object Local {
 
-  case class ReadState(
+  final case class ReadState(
     current: Long,
     handles: Map[Long, (AtomicBoolean, Natural, Option[Positive])])
 
-  case class WriteState(
+  final case class WriteState(
     current: Long,
     handles: Set[Long])
 
@@ -534,8 +534,4 @@ class Local private (baseDir: JFile) {
     write compose writeFile,
     resultToTask compose manageFile)
   }
-}
-
-object Local {
-  def apply(baseDir: JFile): Local = new Local(baseDir)
 }

@@ -320,7 +320,7 @@ object FileSystemTest {
         posixCodec.parseAbsDir(local.getAbsolutePath + "/").map(unsafeSandboxAbs)
           .getOrElse(scala.sys.error("Failed to generate a temp path on a non-windows fs (assumed posix compliance)."))
 
-    Local(local).runFs
+    Local.runFs
       .map(f => Empty.analyze[Task] :+: f)
       .map(f => FileSystemUT(ref, f, f, testDir, ().point[Task]))
   }
