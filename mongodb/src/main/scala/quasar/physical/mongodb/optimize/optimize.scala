@@ -87,7 +87,7 @@ package object optimize {
       * without those fields followed by a \$project that projects those fields
       * from the key.
       */
-    private def simplifyGroupƒ[F[_]: Coalesce: Functor](implicit ev: WorkflowOpCoreF :<: F):
+    def simplifyGroupƒ[F[_]: Coalesce: Functor](implicit ev: WorkflowOpCoreF :<: F):
         F[Fix[F]] => Option[F[Fix[F]]] = {
       case ev($GroupF(src, Grouped(cont), id)) =>
         val (newCont, proj) =
@@ -126,13 +126,7 @@ package object optimize {
     def simplifyGroup[F[_]: Coalesce: Functor](op: Fix[F])(implicit ev: WorkflowOpCoreF :<: F): Fix[F] =
       op.transCata[Fix[F]](orOriginal(simplifyGroupƒ[F]))
 
-    def simplifyAllExprOps[F[_]: Traverse: ExprOpTraversal]
-      (op: Fix[F])
-      (implicit TR: Recursive.Aux[Fix[F], F])
-        : Fix[F] = 
-      TR.transHylo[F, Fix[F], F](op)(Traverse[F].sequence[Id, Fix[F]], simplifyExprOps)
-
-    def simplifyExprOps[F[_]: ExprOpTraversal]: F[Fix[F]] => F[Fix[F]] =
+    def simplifyExprOpsƒ[F[_]: ExprOpTraversal]: F[Fix[F]] => F[Fix[F]] =
       ExprOpTraversal[F].exprOps.modify(
         _.cata[Fix[ExprOp]](ExprOpOps.simplifyAlg[ExprOp]))
 
