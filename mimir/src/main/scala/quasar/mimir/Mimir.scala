@@ -42,7 +42,7 @@ object MimirLightweight extends LightweightConnector {
     EitherT.rightT((MimirFileSystem, ().point[Task]).point[Task])
 }
 
-object Mimir extends SlamDB {
+object Mimir extends SlamEngine {
   val Type: FileSystemType = FileSystemType("mimir")
   val lwc: LightweightConnector = MimirLightweight
 }

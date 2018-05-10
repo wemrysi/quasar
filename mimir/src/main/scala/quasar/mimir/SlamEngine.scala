@@ -62,7 +62,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
-trait SlamDB extends BackendModule with Logging with DefaultAnalyzeModule {
+trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
   import FileSystemError._
   import PathError._
   import Precog.startTask
