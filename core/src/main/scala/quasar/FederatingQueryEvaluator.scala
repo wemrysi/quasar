@@ -16,7 +16,7 @@
 
 package quasar
 
-import slamdata.Predef.{List, Option}
+import slamdata.Predef.{Boolean, List, Option, Stream}
 import quasar.api._, ResourceError._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadTell_
@@ -36,7 +36,7 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, S, R] p
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import WriterT.writerTMonadListen
 
-  def children(path: ResourcePath) =
+  def children(path: ResourcePath): F[CommonError \/ IMap[ResourceName, ResourcePathType]] =
     path match {
       case ResourcePath.Root =>
         for {
@@ -59,7 +59,7 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, S, R] p
         } yield r).run
     }
 
-  def descendants(path: ResourcePath) =
+  def descendants(path: ResourcePath): F[CommonError \/ Stream[Tree[ResourceName]]] =
     (path match {
       case ResourcePath.Root =>
         for {
@@ -81,7 +81,7 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, S, R] p
         } yield r
     }).run
 
-  def isResource(path: ResourcePath) =
+  def isResource(path: ResourcePath): F[Boolean] =
     path match {
       case ResourcePath.Root =>
         false.point[F]
@@ -92,7 +92,7 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, S, R] p
         } getOrElse false
     }
 
-  def evaluate(q: T[QScriptRead[T, ?]]) =
+  def evaluate(q: T[QScriptRead[T, ?]]): F[ReadError \/ R] =
     (for {
       wa <- Trans.applyTrans(federate, ReadPath)(q).run
 
