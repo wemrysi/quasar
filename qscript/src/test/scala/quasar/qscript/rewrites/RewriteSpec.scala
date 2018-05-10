@@ -66,7 +66,6 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
   implicit val de: Injectable.Aux[Const[DeadEnd, ?], QSI] = Injectable.injectCopK[Const[DeadEnd, ?], QSI]
 
   val qsidsl = construction.mkDefaults[Fix, QSI]
-  val qscdsl = construction.mkDefaults[Fix, QScriptCore]
 
   val DEI = implicitly[Const[DeadEnd, ?] :<<: QSI]
   val QCI = implicitly[QScriptCore :<<: QSI]
@@ -99,10 +98,9 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     // TODO instance for Coalesce is not found. It was provided by
     // def qscriptCore[G[_]](implicit QC: QScriptCore :<<: G): Coalesce.Aux[T, QScriptCore, G]
     // but there is no reflexive instance for CopK.Inject
-/*
     "coalesce a Map into a subsequent LeftShift" in {
-      import qscdsl._
-      val exp: QScriptCore[Fix[QScriptCore]] =
+      import qsidsl._
+      val exp: QSI[Fix[QSI]] =
         fix.LeftShift(
           fix.Map(
             fix.Unreferenced,
@@ -113,7 +111,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           OnUndefined.Omit,
           func.RightSide).unFix
 
-      Coalesce[Fix, QScriptCore, QScriptCore].coalesceQC(idPrism).apply(exp) must
+      Coalesce[Fix, QSI, QSI].coalesceQC(idPrism).apply(exp) must
       equal(
         fix.LeftShift(
           fix.Unreferenced,
@@ -123,7 +121,6 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           OnUndefined.Omit,
           func.RightSide).unFix.some)
     }
-*/
 
     "coalesce a Filter into a preceding ThetaJoin" in {
       import qstdsl._
