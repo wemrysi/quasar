@@ -32,7 +32,7 @@ sealed trait ResourcePath extends Product with Serializable {
       case ResourcePath.Root    => root
     }
 
-  def / (name: ResourceName): ResourcePath =
+  def /(name: ResourceName): ResourcePath =
     this match {
       case ResourcePath.Leaf(f) =>
         val d = fileParent(f)
@@ -43,7 +43,7 @@ sealed trait ResourcePath extends Product with Serializable {
         ResourcePath.leaf(rootDir </> file(name.value))
     }
 
-  def /: (name: ResourceName): ResourcePath =
+  def /:(name: ResourceName): ResourcePath =
     this match {
       case ResourcePath.Leaf(f) =>
         ResourcePath.leaf(rebaseA(rootDir </> dir(name.value))(f))
@@ -56,7 +56,7 @@ sealed trait ResourcePath extends Product with Serializable {
     fold(ι, rootDir)
 
   def uncons: Option[(ResourceName, ResourcePath)] =
-    ResourcePath.leaf.getOption(this) map (ResourcePath.unconsLeaf)
+    ResourcePath.leaf.getOption(this).map(ResourcePath.unconsLeaf)
 }
 
 object ResourcePath extends ResourcePathInstances {
