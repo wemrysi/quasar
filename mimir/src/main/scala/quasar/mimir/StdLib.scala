@@ -26,7 +26,7 @@ import scalaz._
 import Scalaz._
 import java.time._
 
-trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
+trait TableLibModule[M[_]] extends TableModule[M] with TransSpecModule {
   type Lib <: TableLib
   implicit def M: Monad[M]
 
@@ -167,7 +167,7 @@ trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
   }
 }
 
-trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTableModule[M] {
+trait ColumnarTableLibModule[M[_]] extends TableLibModule[M] with ColumnarTableModule[M] {
   trait ColumnarTableLib extends TableLib {
     class WrapArrayTableReduction(val r: Reduction, val jtypef: Option[(JType => JType, ColumnRef => Option[ColumnRef])]) extends Reduction(r.namespace, r.name) {
       type Result = r.Result
@@ -259,7 +259,7 @@ trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTabl
   }
 }
 
-trait StdLibModule[M[+ _]]
+trait StdLibModule[M[_]]
     extends InfixLibModule[M]
     with UnaryLibModule[M]
     with ArrayLibModule[M]

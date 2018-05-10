@@ -18,7 +18,7 @@ package quasar.mimir
 
 import quasar.yggdrasil.table._
 
-trait ArrayLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
+trait ArrayLibModule[M[_]] extends ColumnarTableLibModule[M] {
   trait ArrayLib extends ColumnarTableLib {
 
     override def _libMorphism1 = super._libMorphism1

@@ -23,7 +23,7 @@ import org.specs2._
 
 import _root_.scalaz._, Scalaz._
 
-trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike {
+trait LeftShiftSpec[M[_]] extends TableModuleTestSupport[M] with SpecificationLike {
 
   def testTrivialArrayLeftShift = {
     val rec = toRecord(Array(0), JArray(JNum(12) :: JNum(13) :: Nil))

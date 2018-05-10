@@ -22,7 +22,7 @@ import quasar.yggdrasil.table._
 
 import BigDecimal.RoundingMode
 
-trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
+trait UnaryLibModule[M[_]] extends ColumnarTableLibModule[M] {
   trait UnaryLib extends ColumnarTableLib {
     import trans.{Range => _, _}
     import StdLib.{ BoolFrom, DoubleFrom, LongFrom, NumFrom, doubleIsDefined }

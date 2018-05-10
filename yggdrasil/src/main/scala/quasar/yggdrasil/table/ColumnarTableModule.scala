@@ -40,7 +40,7 @@ import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTim
 import scala.annotation.tailrec
 import scala.collection.mutable
 
-trait ColumnarTableTypes[M[+ _]] {
+trait ColumnarTableTypes[M[_]] {
   type F1         = CF1
   type F2         = CF2
   type FN         = CFN
@@ -64,7 +64,7 @@ trait ColumnarTableModuleConfig {
 }
 
 object ColumnarTableModule extends Logging {
-  def renderJson[M[+ _]](slices: StreamT[M, Slice], prefix: String, delimiter: String, suffix: String)(implicit M: Monad[M]): StreamT[M, CharBuffer] = {
+  def renderJson[M[_]](slices: StreamT[M, Slice], prefix: String, delimiter: String, suffix: String)(implicit M: Monad[M]): StreamT[M, CharBuffer] = {
     def wrap(stream: StreamT[M, CharBuffer]) = {
       if (prefix == "" && suffix == "") stream
       else if (suffix == "") CharBuffer.wrap(prefix) :: stream
@@ -117,7 +117,7 @@ object ColumnarTableModule extends Logging {
     *
     * "the fox said: ""hello, my name is fred."""
     */
-  def renderCsv[M[+ _]](slices: StreamT[M, Slice])(implicit M: Monad[M]): StreamT[M, CharBuffer] = {
+  def renderCsv[M[_]](slices: StreamT[M, Slice])(implicit M: Monad[M]): StreamT[M, CharBuffer] = {
     import scala.collection.{ Map => GenMap }
 
     /**
@@ -314,7 +314,7 @@ object ColumnarTableModule extends Logging {
   }
 }
 
-trait ColumnarTableModule[M[+ _]]
+trait ColumnarTableModule[M[_]]
     extends TableModule[M]
     with ColumnarTableTypes[M]
     with IdSourceScannerModule
@@ -328,8 +328,6 @@ trait ColumnarTableModule[M[+ _]]
   type Table <: ColumnarTable
   type TableCompanion <: ColumnarTableCompanion
   case class TableMetrics(startCount: Int, sliceTraversedCount: Int)
-
-  implicit def M: Monad[M]
 
   def newScratchDir(): File    = IOUtils.createTmpDir("ctmscratch").unsafePerformIO
   def jdbmCommitInterval: Long = 200000l

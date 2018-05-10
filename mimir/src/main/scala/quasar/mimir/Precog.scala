@@ -34,6 +34,7 @@ import akka.routing.{
 
 import delorean._
 
+import cats.effect.IO
 import fs2.async
 import fs2.interop.scalaz._
 
@@ -41,13 +42,11 @@ import org.slf4s.Logging
 
 import scalaz.Monad
 import scalaz.concurrent.Task
-import scalaz.std.scalaFuture.futureInstance
 
 import java.io.File
 import java.util.concurrent.CountDownLatch
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.collection.immutable.IndexedSeq
 
@@ -55,7 +54,7 @@ import scala.collection.immutable.IndexedSeq
 final class Precog private (dataDir0: File)
     extends VFSColumnarTableModule
     with TablePagerModule
-    with StdLibModule[Future] {
+    with StdLibModule[IO] {
 
   object Library extends StdLib
 
@@ -113,18 +112,15 @@ final class Precog private (dataDir0: File)
   val masterChef: ActorRef =
     actorSystem.actorOf(props.withRouter(routerConfig))
 
-  private val clock: Clock = Clock.System
-
-  // Members declared in quasar.yggdrasil.table.ColumnarTableModule
-  implicit def M: Monad[Future] = futureInstance
+  private val clock: Clock[IO] = Clock.System
 
   // Members declared in quasar.yggdrasil.TableModule
   sealed trait TableCompanion extends VFSColumnarTableCompanion
   object Table extends TableCompanion
 
-  def shutdown: Future[Unit] = {
+  def shutdown: IO[Unit] = {
     for {
-      _ <- vfsShutdownSignal.set(None).unsafeToFuture
+      _ <- IO(()) // vfsShutdownSignal.set(None).to[IO]
       _ <- actorSystem.terminate.map(_ => ())
     } yield ()
   }

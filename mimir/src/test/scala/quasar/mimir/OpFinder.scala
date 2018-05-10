@@ -19,7 +19,7 @@ package quasar.mimir
 import quasar.yggdrasil._
 import quasar.yggdrasil.bytecode._
 
-trait OpFinderModule[M[+ _]] extends Instructions with TableModule[M] with TableLibModule[M] {
+trait OpFinderModule[M[_]] extends Instructions with TableModule[M] with TableLibModule[M] {
   import instructions._
 
   trait OpFinder {
@@ -28,7 +28,7 @@ trait OpFinderModule[M[+ _]] extends Instructions with TableModule[M] with Table
   }
 }
 
-trait StdLibOpFinderModule[M[+ _]] extends Instructions with StdLibModule[M] with OpFinderModule[M] {
+trait StdLibOpFinderModule[M[_]] extends Instructions with StdLibModule[M] with OpFinderModule[M] {
   import instructions._
   import library._
 

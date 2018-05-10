@@ -24,7 +24,7 @@ import scalaz._, Scalaz._
 
 import scala.annotation.tailrec
 
-trait BlockStoreTestModule[M[+_]] extends BaseBlockStoreTestModule[M] {
+trait BlockStoreTestModule[M[_]] extends BaseBlockStoreTestModule[M] {
   implicit def M: Monad[M] with Comonad[M]
 
   type GroupId = String
@@ -36,7 +36,7 @@ trait BlockStoreTestModule[M[+_]] extends BaseBlockStoreTestModule[M] {
   object Table extends TableCompanion
 }
 
-trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
+trait BaseBlockStoreTestModule[M[_]] extends ColumnarTableModuleTestSupport[M]
     with SliceColumnarTableModule[M]
     with StubProjectionModule[M, Slice] {
 
@@ -115,7 +115,7 @@ trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
 }
 
 object BlockStoreTestModule {
-  def empty[M[+_]](implicit M0: Monad[M] with Comonad[M]) = new BlockStoreTestModule[M] {
+  def empty[M[_]](implicit M0: Monad[M] with Comonad[M]) = new BlockStoreTestModule[M] {
     val M = M0
     val projections = Map.empty[Path, Projection]
   }

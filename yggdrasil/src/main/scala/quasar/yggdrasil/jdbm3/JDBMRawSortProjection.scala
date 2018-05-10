@@ -36,7 +36,7 @@ import scala.collection.JavaConverters._
   * A Projection wrapping a raw JDBM TreeMap index used for sorting. It's assumed that
   * the index has been created and filled prior to creating this wrapper.
   */
-class JDBMRawSortProjection[M[+ _]] private[yggdrasil] (dbFile: File,
+class JDBMRawSortProjection[M[_]] private[yggdrasil] (dbFile: File,
                                                         indexName: String,
                                                         sortKeyRefs: Seq[ColumnRef],
                                                         valRefs: Seq[ColumnRef],

@@ -40,6 +40,11 @@ object Dependencies {
     "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
     "org.scalaz"                 %% "scalaz-concurrent"         % scalazVersion,
     "org.scalaz.stream"          %% "scalaz-stream"             % scalazStreamVersion,
+    "com.codecommit"             %% "shims"                     % "1.2.1",
+    "org.typelevel"              %% "cats-effect"               % "1.0.0-RC",
+    "co.fs2"                     %% "fs2-core"                  % fs2Version,
+    "co.fs2"                     %% "fs2-io"                    % fs2Version,
+    "co.fs2"                     %% "fs2-scalaz"                % fs2ScalazVersion,
     "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,
     "org.typelevel"              %% "algebra"                   % algebraVersion,
     "org.typelevel"              %% "spire"                     % spireVersion,
@@ -167,9 +172,11 @@ object Dependencies {
       .exclude("com.zaxxer", "HikariCP-java6"), // conflict with Doobie
     "commons-io"           %  "commons-io"      % "2.5"
   )
+
   def blueeyes = Seq(
     "com.google.guava" %  "guava" % "13.0"
   )
+
   def mimir = Seq(
     "io.verizon.delorean" %% "core" % deloreanVersion,
     "co.fs2" %% "fs2-core"   % fs2Version,

@@ -21,13 +21,13 @@ import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 import quasar.precog.common.RValue
 
-trait TestLib[M[+_]] extends TableModule[M] {
+trait TestLib[M[_]] extends TableModule[M] {
   def lookupF1(namespace: List[String], name: String): F1
   def lookupF2(namespace: List[String], name: String): F2
   def lookupScanner(namespace: List[String], name: String): Scanner
 }
 
-trait TableModuleTestSupport[M[+_]] extends TableModule[M] with TestLib[M] {
+trait TableModuleTestSupport[M[_]] extends TableModule[M] with TestLib[M] {
   implicit def M: Monad[M] with Comonad[M]
 
   def fromJson(data: Stream[JValue], maxBlockSize: Option[Int] = None): Table
@@ -36,7 +36,7 @@ trait TableModuleTestSupport[M[+_]] extends TableModule[M] with TestLib[M] {
   def fromSample(sampleData: SampleData, maxBlockSize: Option[Int] = None): Table = fromJson(sampleData.data.map(_.toJValueRaw), maxBlockSize)
 }
 
-trait TableModuleSpec[M[+_]] extends SpecificationLike with ScalaCheck {
+trait TableModuleSpec[M[_]] extends SpecificationLike with ScalaCheck {
   import SampleData._
 
   implicit def M: Monad[M] with Comonad[M]

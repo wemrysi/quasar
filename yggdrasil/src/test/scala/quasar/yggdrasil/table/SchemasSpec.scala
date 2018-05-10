@@ -22,7 +22,7 @@ import quasar.blueeyes._, json._
 import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
 
-trait SchemasSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait SchemasSpec[M[_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   def testSingleSchema = {
     val expected = Set(JObjectFixedT(Map("a" -> JNumberT, "b" -> JTextT, "c" -> JNullT)))
     val trivialData = Stream.fill(100)(JParser.parseUnsafe("""{ "a": 1, "b": "x", "c": null }"""))

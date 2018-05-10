@@ -35,7 +35,7 @@ object JobManager {
   }
 }
 
-trait JobManager[M[+_]] { self =>
+trait JobManager[M[_]] { self =>
   /**
    * Create a new Job with the given API key, name, type and possibly an
    * initial status message and expiration. If a started time is provided, then
@@ -175,7 +175,7 @@ trait JobManager[M[+_]] { self =>
  * Given a method that can transition a Job between states, this provides
  * default implementations of the explicit state transition methods.
  */
-trait JobStateManager[M[+_]] { self: JobManager[M] =>
+trait JobStateManager[M[_]] { self: JobManager[M] =>
   import JobState._
 
   protected def transition(job: JobId)(t: JobState => Either[String, JobState]): M[Either[String, Job]]
@@ -212,23 +212,25 @@ trait JobStateManager[M[+_]] { self: JobManager[M] =>
   }
 }
 
-trait JobResultManager[M[+_]] { self: JobManager[M] =>
+trait JobResultManager[M[_]] { self: JobManager[M] =>
+  import scalaz.syntax.either._
   import scalaz.syntax.monad._
 
-  implicit def M: Monad[M]
   protected def fs: FileStorage[M]
 
-  def setResult(id: JobId, mimeType: Option[MimeType], data: StreamT[M, Array[Byte]]): M[Either[String, Unit]] = {
+  def setResult(id: JobId, mimeType: Option[MimeType], data: StreamT[M, Array[Byte]])
+    (implicit M: Monad[M]): M[String \/ Unit] = {
     findJob(id) flatMap (_ map { job =>
-      fs.save(job.id, FileData(mimeType, data)) map (Right(_))
-    } getOrElse M.point(Left("Invalid job id: " + id)))
+      fs.save(job.id, FileData(mimeType, data)) map (_.right[String])
+    } getOrElse M.point(("Invalid job id: " + id).left[Unit]))
   }
 
-  def getResult(job: JobId): M[Either[String, (Option[MimeType], StreamT[M, Array[Byte]])]] = {
+  def getResult(job: JobId)
+    (implicit M: Monad[M]): M[String \/ (Option[MimeType], StreamT[M, Array[Byte]])] = {
     fs.load(job) map (_ map { case FileData(mimeType, data) =>
-      Right((mimeType, data))
+      ((mimeType, data)).right
     } getOrElse {
-      Left("No results exist for job " + job)
+      ("No results exist for job " + job).left
     })
   }
 }

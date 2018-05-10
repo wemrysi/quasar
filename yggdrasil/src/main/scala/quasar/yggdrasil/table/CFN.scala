@@ -138,7 +138,7 @@ object CFNP {
 }
 
 object CF2Array {
-  def apply[A, M[+ _]](name: String)(pf: PartialFunction[(Column, Column, Range), (CType, Array[Array[A]], BitSet)]): CMapper[M] = new ArrayMapperS[M] {
+  def apply[A, M[_]](name: String)(pf: PartialFunction[(Column, Column, Range), (CType, Array[Array[A]], BitSet)]): CMapper[M] = new ArrayMapperS[M] {
     def apply(columns0: Map[ColumnRef, Column], range: Range) = {
       for {
         (ColumnRef(CPath(CPathIndex(0)), _), col1) <- columns0
@@ -158,17 +158,17 @@ trait CScanner {
   def scan(a: A, cols: Map[ColumnRef, Column], range: Range): (A, Map[ColumnRef, Column])
 }
 
-sealed trait CMapper[M[+ _]] {
+sealed trait CMapper[M[_]] {
   def fold[A](f: CMapperS[M] => A, g: CMapperM[M] => A): A
 }
 
-trait CMapperS[M[+ _]] extends CMapper[M] {
+trait CMapperS[M[_]] extends CMapper[M] {
   final def fold[A](f: CMapperS[M] => A, g: CMapperM[M] => A): A = f(this)
 
   def map(cols: Map[ColumnRef, Column], range: Range): Map[ColumnRef, Column]
 }
 
-trait CMapperM[M[+ _]] extends CMapper[M] {
+trait CMapperM[M[_]] extends CMapper[M] {
   final def fold[A](f: CMapperS[M] => A, g: CMapperM[M] => A): A = g(this)
 
   def map(cols: Map[ColumnRef, Column], range: Range): M[Map[ColumnRef, Column]]
@@ -184,7 +184,7 @@ trait CReducer[A] {
   def reduce(schema: CSchema, range: Range): A
 }
 
-trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
+trait ArrayMapperS[M[_]] extends CMapperS[M] {
   def map(columns0: Map[ColumnRef, Column], range: Range): Map[ColumnRef, Column] = {
     val results = this(columns0, range)
 

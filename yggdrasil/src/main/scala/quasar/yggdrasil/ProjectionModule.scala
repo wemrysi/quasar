@@ -19,7 +19,7 @@ package quasar.yggdrasil
 import quasar.precog.common._
 import scalaz._, Scalaz._
 
-trait ProjectionModule[M[+ _], Block] {
+trait ProjectionModule[M[_], Block] {
   type Projection <: ProjectionLike[M, Block]
   type ProjectionCompanion <: ProjectionCompanionLike[M]
 
@@ -36,7 +36,7 @@ trait ProjectionModule[M[+ _], Block] {
 
 case class BlockProjectionData[Key, Block](minKey: Key, maxKey: Key, data: Block)
 
-trait ProjectionLike[M[+ _], Block] {
+trait ProjectionLike[M[_], Block] {
   type Key
 
   def structure(implicit M: Monad[M]): M[Set[ColumnRef]]

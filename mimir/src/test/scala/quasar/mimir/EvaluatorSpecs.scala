@@ -33,11 +33,11 @@ import java.io.File
 
 import scala.collection.mutable
 
-trait EvaluatorSpecification[M[+_]] extends Specification with EvaluatorTestSupport[M] {
+trait EvaluatorSpecification[M[_]] extends Specification with EvaluatorTestSupport[M] {
   def M = Need.need.asInstanceOf[scalaz.Monad[M] with scalaz.Comonad[M]]
 }
 
-trait EvaluatorTestSupport[M[+_]] extends StdLibEvaluatorStack[M]
+trait EvaluatorTestSupport[M[_]] extends StdLibEvaluatorStack[M]
     with BaseBlockStoreTestModule[M]
     with IdSourceScannerModule
     with SpecificationHelp { outer =>

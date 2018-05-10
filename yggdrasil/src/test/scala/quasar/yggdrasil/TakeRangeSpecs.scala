@@ -21,7 +21,7 @@ import quasar.blueeyes.json._
 import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
 
-trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait TakeRangeSpec[M[_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
 
   def checkTakeRange = {

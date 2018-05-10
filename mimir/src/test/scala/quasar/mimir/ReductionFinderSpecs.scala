@@ -22,7 +22,7 @@ import quasar.yggdrasil._
 
 import scalaz._
 
-trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
+trait ReductionFinderSpecs[M[_]] extends EvaluatorSpecification[M] {
 
   import instructions._
   import dag._

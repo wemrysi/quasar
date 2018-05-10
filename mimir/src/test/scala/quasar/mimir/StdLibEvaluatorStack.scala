@@ -19,7 +19,7 @@ package quasar.mimir
 import quasar.yggdrasil.table.cf
 import scalaz._
 
-trait StdLibEvaluatorStack[M[+ _]]
+trait StdLibEvaluatorStack[M[_]]
     extends EvaluatorModule[M]
     with StdLibModule[M]
     with StdLibOpFinderModule[M]

@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 
-trait QueryLogger[M[+ _], -P] { self =>
+trait QueryLogger[M[_], -P] { self =>
   def contramap[P0](f: P0 => P): QueryLogger[M, P0] = new QueryLogger[M, P0] {
     def die(): M[Unit]                        = self.die()
     def error(pos: P0, msg: String): M[Unit]  = self.error(f(pos), msg)
@@ -83,7 +83,7 @@ trait QueryLogger[M[+ _], -P] { self =>
   def done: M[Unit]
 }
 
-trait LoggingQueryLogger[M[+ _], P] extends QueryLogger[M, P] {
+trait LoggingQueryLogger[M[_], P] extends QueryLogger[M, P] {
   implicit def M: Applicative[M]
 
   protected val logger = LoggerFactory.getLogger("quasar.mimir.QueryLogger")
@@ -110,14 +110,14 @@ trait LoggingQueryLogger[M[+ _], P] extends QueryLogger[M, P] {
 }
 
 object LoggingQueryLogger {
-  def apply[M[+ _]](implicit M0: Monad[M]): QueryLogger[M, Any] = {
+  def apply[M[_]](implicit M0: Monad[M]): QueryLogger[M, Any] = {
     new LoggingQueryLogger[M, Any] with TimingQueryLogger[M, Any] {
       val M = M0
     }
   }
 }
 
-trait TimingQueryLogger[M[+ _], P] extends QueryLogger[M, P] {
+trait TimingQueryLogger[M[_], P] extends QueryLogger[M, P] {
   implicit def M: Monad[M]
 
   private val table = new ConcurrentHashMap[P, Stats]
@@ -161,7 +161,7 @@ trait TimingQueryLogger[M[+ _], P] extends QueryLogger[M, P] {
   }
 }
 
-trait ExceptionQueryLogger[M[+ _], -P] extends QueryLogger[M, P] {
+trait ExceptionQueryLogger[M[_], -P] extends QueryLogger[M, P] {
   implicit def M: Applicative[M]
 
   abstract override def die(): M[Unit] =

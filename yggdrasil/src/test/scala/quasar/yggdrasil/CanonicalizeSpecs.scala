@@ -25,7 +25,7 @@ import scalaz.syntax.comonad._
 import org.specs2.ScalaCheck
 import org.scalacheck.Gen
 import quasar.precog.TestSupport._
-trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait CanonicalizeSpec[M[_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
 
   val table = {

@@ -21,7 +21,7 @@ import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
 import quasar.precog.common._
 
-trait CrossSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait CrossSpec[M[_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
   import trans._
 

@@ -36,7 +36,7 @@ import java.util.regex.{ Pattern, PatternSyntaxException }
  * revert this and only accept JTextT (StrColumn).
  */
 
-trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
+trait StringLibModule[M[_]] extends ColumnarTableLibModule[M] {
   trait StringLib extends ColumnarTableLib {
     import StdLib._
 

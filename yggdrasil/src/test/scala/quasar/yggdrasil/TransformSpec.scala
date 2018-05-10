@@ -24,7 +24,7 @@ import quasar.yggdrasil.bytecode._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
-trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait TransformSpec[M[_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SJValueGenerators._
   import SampleData._
   import trans._

@@ -18,42 +18,34 @@ package quasar.blueeyes.util
 
 import quasar.blueeyes._
 
-import scala.concurrent.Future
 import java.time.{Instant, LocalDateTime, Period}
 
-trait Clock {
+import cats.effect.IO
+import scalaz.Monad
+import scalaz.syntax.monad._
+
+trait Clock[F[_]] {
 
   /** Returns the current time.
     */
-  def now(): LocalDateTime
+  def now: F[LocalDateTime]
 
-  def instant(): Instant
+  def instant: F[Instant]
 
-  def nanoTime(): Long
+  def nanoTime: F[Long]
 
   /** Times how long the specified future takes to be delivered.
     */
-  def time[T](f: => Future[T]): Future[(Period, T)] = {
-    val start = now()
+  def time[T](f: () => F[T])(implicit F: Monad[F]): F[(Period, T)] = for {
+    start <- now
+    t <- f()
+    end <- now
+  } yield (start until end, t)
 
-    f.map { result =>
-      val end = now()
-
-      (start until end, result)
-    }
-  }
-
-  /** Times a block of code.
+  /** Times a pure function.
     */
-  def timeBlock[T](f: => T): (Period, T) = {
-    val start = now()
-
-    val result = f
-
-    val end = now()
-
-    (start until end, result)
-  }
+  def timePure[T](f: () => T)(implicit F: Monad[F]): F[(Period, T)] =
+    time[T](() => f().pure[F])
 }
 
 object Clock {
@@ -61,10 +53,11 @@ object Clock {
 }
 
 trait ClockSystem {
-  implicit val realtimeClock = new Clock {
-    def now(): LocalDateTime = dateTime.now()
-    def instant(): Instant = quasar.blueeyes.instant.now()
-    def nanoTime(): Long = System.nanoTime()
+  implicit val realtimeClock: Clock[IO] = new Clock[IO] {
+    def now: IO[LocalDateTime] = IO(dateTime.now())
+    def instant: IO[Instant] = IO(quasar.blueeyes.instant.now())
+    def nanoTime: IO[Long] = IO(System.nanoTime())
   }
 }
+
 object ClockSystem extends ClockSystem

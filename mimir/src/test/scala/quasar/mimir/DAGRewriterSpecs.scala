@@ -22,7 +22,7 @@ import scalaz._
 import scalaz.std.anyVal.booleanInstance.disjunction
 import scalaz.std.option.optionFirst
 
-trait DAGRewriterSpecs[M[+_]] extends EvaluatorSpecification[M] {
+trait DAGRewriterSpecs[M[_]] extends EvaluatorSpecification[M] {
 
   import dag._
   import instructions._

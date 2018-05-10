@@ -25,7 +25,7 @@ import scalaz._, Scalaz._
 import scala.annotation.tailrec
 import scala.collection.mutable
 
-trait SamplableTableModule[M[+ _]] extends TableModule[M] {
+trait SamplableTableModule[M[_]] extends TableModule[M] {
   type Table <: SamplableTable
 
   trait SamplableTable extends TableLike { self: Table =>
@@ -33,7 +33,7 @@ trait SamplableTableModule[M[+ _]] extends TableModule[M] {
   }
 }
 
-trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { self: ColumnarTableModule[M] with SliceTransforms[M] =>
+trait SamplableColumnarTableModule[M[_]] extends SamplableTableModule[M] { self: ColumnarTableModule[M] with SliceTransforms[M] =>
 
   import trans._
 

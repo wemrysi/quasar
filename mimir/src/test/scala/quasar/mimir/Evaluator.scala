@@ -32,7 +32,7 @@ import scalaz._, Scalaz._, StateT._
 import scala.annotation.tailrec
 import scala.collection.immutable.Queue
 
-trait EvaluatorModule[M[+ _]]
+trait EvaluatorModule[M[_]]
     extends OpFinderModule[M]
     with ReductionFinderModule[M]
     with TransSpecableModule[M]

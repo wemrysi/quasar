@@ -31,7 +31,7 @@ import SampleData._
 
 import java.nio.CharBuffer
 
-trait TestColumnarTableModule[M[+_]] extends ColumnarTableModuleTestSupport[M] {
+trait TestColumnarTableModule[M[_]] extends ColumnarTableModuleTestSupport[M] {
   type GroupId = Int
   import trans._
 
@@ -67,7 +67,7 @@ trait TestColumnarTableModule[M[+_]] extends ColumnarTableModuleTestSupport[M] {
   object Table extends TableCompanion
 }
 
-trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
+trait ColumnarTableModuleSpec[M[_]] extends TestColumnarTableModule[M]
     with TableModuleSpec[M]
     with CogroupSpec[M]
     with CrossSpec[M]

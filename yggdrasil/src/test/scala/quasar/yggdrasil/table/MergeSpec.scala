@@ -23,7 +23,7 @@ import quasar.yggdrasil.bytecode.JType
 
 import scalaz._, Scalaz._
 
-trait MergeSpec[M[+_]] extends
+trait MergeSpec[M[_]] extends
   ColumnarTableModuleTestSupport[M] with
   TableModuleSpec[M] with
   IndicesModule[M] {

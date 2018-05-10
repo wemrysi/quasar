@@ -22,7 +22,7 @@ import quasar.precog.common._
 import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
 
-trait SampleSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait SampleSpec[M[_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import trans._
 
   val simpleData: Stream[JValue] = Stream.tabulate(100) { i =>

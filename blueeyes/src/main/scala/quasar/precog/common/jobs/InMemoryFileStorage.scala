@@ -22,7 +22,7 @@ import quasar.precog.MimeType
 
 import scalaz._
 
-final class InMemoryFileStorage[M[+_]](implicit M: Monad[M]) extends FileStorage[M] {
+final class InMemoryFileStorage[M[_]](implicit M: Monad[M]) extends FileStorage[M] {
   import scalaz.syntax.monad._
 
   private val files = new mutable.HashMap[String, (Option[MimeType], Array[Byte])]

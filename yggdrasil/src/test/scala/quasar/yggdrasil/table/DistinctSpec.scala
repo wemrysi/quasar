@@ -21,7 +21,7 @@ import quasar.blueeyes._, json._
 import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
 
-trait DistinctSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait DistinctSpec[M[_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
   import trans._
 

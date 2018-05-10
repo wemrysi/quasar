@@ -27,7 +27,7 @@ import scalaz.syntax.std.boolean._
 
 import scala.annotation.tailrec
 
-trait ColumnarTableModuleTestSupport[M[+_]] extends ColumnarTableModule[M] with TableModuleTestSupport[M] {
+trait ColumnarTableModuleTestSupport[M[_]] extends ColumnarTableModule[M] with TableModuleTestSupport[M] {
   def newGroupId: GroupId
 
   def defaultSliceSize = 10

@@ -764,7 +764,7 @@ trait Slice { source =>
     val order: Array[Int] = Array.range(0, source.size) filter { row =>
       keySlice.isDefinedAt(row) && source.isDefinedAt(row)
     }
-    val rowOrder = if (sortOrder == SortAscending) keySlice.order else keySlice.order.reverse
+    val rowOrder = if (sortOrder == SortAscending) keySlice.order else ??? // keySlice.order.reversed
     spire.math.MergeSort.sort(order)(rowOrder, implicitly)
 
     val remapOrder = new ArrayIntList(order.size)
@@ -986,7 +986,7 @@ trait Slice { source =>
     }
   }
 
-  def renderJson[M[+ _]](delimiter: String)(implicit M: Monad[M]): (StreamT[M, CharBuffer], Boolean) = {
+  def renderJson[M[_]](delimiter: String)(implicit M: Monad[M]): (StreamT[M, CharBuffer], Boolean) = {
     if (columns.isEmpty) {
       (StreamT.empty[M, CharBuffer], false)
     } else {

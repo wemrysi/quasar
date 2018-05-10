@@ -22,7 +22,7 @@ import quasar.yggdrasil.execution.EvaluationContext
 
 import scalaz._, Scalaz._
 
-trait MemoryDatasetConsumer[M[+ _]] extends EvaluatorModule[M] {
+trait MemoryDatasetConsumer[M[_]] extends EvaluatorModule[M] {
   type IdType
 
   type X      = Throwable
@@ -67,7 +67,7 @@ trait MemoryDatasetConsumer[M[+ _]] extends EvaluatorModule[M] {
   }
 }
 
-trait LongIdMemoryDatasetConsumer[M[+ _]] extends MemoryDatasetConsumer[M] {
+trait LongIdMemoryDatasetConsumer[M[_]] extends MemoryDatasetConsumer[M] {
   type IdType = SValue
   def extractIds(jv: JValue): Seq[SValue] = (jv --> classOf[JArray]).elements map jvalueToSValue
 }

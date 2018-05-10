@@ -30,6 +30,7 @@ import quasar.qscript._
 import quasar.yggdrasil.TableModule
 import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
+import cats.effect.IO
 import delorean._
 import fs2.interop.scalaz._
 import matryoshka.{Hole => _, _}
@@ -38,10 +39,10 @@ import matryoshka.data._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
+import shims._
 
 import scala.collection.immutable.{Map => ScalaMap}
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 
 final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
     liftF: Task ~> F, liftFCake: CakeM ~> F) {
@@ -162,17 +163,17 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
         }
 
         table <- {
-          def reduceAll(bucketed: Boolean)(table: src.P.Table): Future[src.P.Table] = {
+          def reduceAll(bucketed: Boolean)(table: src.P.Table): IO[src.P.Table] = {
             for {
               // ok this isn't working right now because we throw away the key when we reduce; need to fold in a First reducer to carry along the key
               red <- megaReduction(bucketed)(table.transform(megaSpec(bucketed)))
 
-              trans <- repair.cataM[Future, TransSpec1](
+              trans <- repair.cataM[IO, TransSpec1](
                 // note that .0 is the partition key
                 // and .1 is the value (if bucketed)
                 // if we aren't bucketed, everything is unwrapped
                 // these are effectively implementation details of partitionMerge
-                interpretM[Future, MapFunc[T, ?], ReduceIndex, TransSpec1](
+                interpretM[IO, MapFunc[T, ?], ReduceIndex, TransSpec1](
                   {
                     case ReduceIndex(\/-(idx)) =>
                       // we don't add First if we aren't bucketed
@@ -180,21 +181,21 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
                         case Some(i) =>
                           (DerefArrayStatic(
                             Leaf(Source),
-                            CPathIndex(i)): TransSpec1).point[Future]
+                            CPathIndex(i)): TransSpec1).point[IO]
 
                         case None => ???
                       }
 
                     case ReduceIndex(-\/(idx)) =>
                       // note that an undefined bucket will still retain indexing as long as we don't compact the slice
-                      Future(scala.Predef.assert(bucketed, s"bucketed was false in a ReduceIndex(-\\/($idx))")) >>
+                      IO(scala.Predef.assert(bucketed, s"bucketed was false in a ReduceIndex(-\\/($idx))")) >>
                         (DerefArrayStatic(
                           DerefArrayStatic(
                             Leaf(Source),
                             CPathIndex(remapIndex(bucketed)(0))),
-                          CPathIndex(idx)): TransSpec1).point[Future]
+                          CPathIndex(idx)): TransSpec1).point[IO]
                   },
-                  mapFuncPlanner[Future].plan(src.P)[Source1](TransSpec1.Id)))
+                  mapFuncPlanner[IO].plan(src.P)[Source1](TransSpec1.Id)))
             } yield red.transform(trans)
           }
 
@@ -281,7 +282,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
               SortOrdering[TransSpec1](Set(sortKey), sortOrder, unique = false) :: a
           }
 
-          def sortAll(table: src.P.Table): Future[src.P.Table] = {
+          def sortAll(table: src.P.Table): IO[src.P.Table] = {
             sortOrderings.foldRightM(table) {
               case (ordering, table) =>
                 ordering.sort(src.P)(table)
@@ -349,10 +350,10 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
             retainsOrder = op != Sample
             back <- op match {
               case Take =>
-                Future.successful(compacted.take(number))
+                IO.now(compacted.take(number))
 
               case Drop =>
-                Future.successful(compacted.drop(number))
+                IO.now(compacted.drop(number))
 
               case Sample =>
                 compacted.sample(number, List(fromRepr.P.trans.TransSpec1.Id)).map(_.head) // the number of Reprs returned equals the number of transspecs

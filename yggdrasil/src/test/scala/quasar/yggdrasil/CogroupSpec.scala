@@ -31,7 +31,7 @@ import org.scalacheck._, Gen._
 
 import scala.annotation.tailrec
 
-trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait CogroupSpec[M[_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
   import trans._
   import trans.constants._

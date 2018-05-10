@@ -32,7 +32,7 @@ import scalaz.std.tuple._
 import scalaz.syntax.monad._
 import scalaz.syntax.bifunctor._
 
-trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] with ObjectConcatHelpers with ArrayConcatHelpers with MapUtils {
+trait SliceTransforms[M[_]] extends TableModule[M] with ColumnarTableTypes[M] with ObjectConcatHelpers with ArrayConcatHelpers with MapUtils {
 
   import trans._
 
