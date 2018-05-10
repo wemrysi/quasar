@@ -20,13 +20,12 @@ import scala.Predef.$conforms
 import slamdata.Predef._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.specs2._, QuasarMatchers._
 
 import argonaut._, Argonaut._
 import argonaut.JsonScalaz._
 import scalaz.Scalaz._
 
-class TypesSpec extends quasar.Qspec {
+class TypesSpec extends Qspec with ValidationMatchers {
   import Type._
   import TypeGenerators._, DataGenerators._
 

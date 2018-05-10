@@ -84,7 +84,7 @@ package object logicalplan {
   def MonadArgumentErrs[F[_]](implicit ev: MonadArgumentErrs[F]): MonadArgumentErrs[F] = ev
 
   def freshSym[F[_]: Functor: NameGenerator](prefix: String): F[Symbol] =
-    NameGenerator[F].prefixedName(prefix).map(Symbol(_))
+    NameGenerator[F].prefixedName("__" + prefix).map(Symbol(_))
 
   /** Optimizes and typechecks a `LogicalPlan` returning the improved plan. */
   def preparePlan[

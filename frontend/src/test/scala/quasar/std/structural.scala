@@ -16,14 +16,14 @@
 
 package quasar.std
 
-import scala.Predef.$conforms
 import slamdata.Predef._
 import quasar._
 
-import org.specs2.scalaz._
+import scala.Predef.$conforms
+
 import scalaz._, Scalaz._
 
-class StructuralSpecs extends quasar.Qspec with ValidationMatchers {
+class StructuralSpecs extends Qspec with ValidationMatchers {
   import quasar.Type._
 
   import StructuralLib._

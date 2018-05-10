@@ -18,6 +18,7 @@ package quasar.frontend.logicalplan
 
 import slamdata.Predef._
 import quasar.{Data, Type}
+import quasar.common.PhaseResultT
 import quasar.contrib.pathy._
 import quasar.fp.ski.κ
 import quasar.std._, StdLib._, set._, structural._, relations._
@@ -25,6 +26,7 @@ import quasar.std._, StdLib._, set._, structural._, relations._
 import matryoshka.data.Fix
 import org.specs2.execute._
 import pathy.Path.{file, rootDir}
+import scalaz.\/
 
 class EnsureCorrectTypesSpec extends quasar.Qspec with quasar.TreeMatchers {
 
@@ -182,7 +184,8 @@ class EnsureCorrectTypesSpec extends quasar.Qspec with quasar.TreeMatchers {
   }
 
   private def ensure(lp: Fix[LogicalPlan])(eval: Fix[LogicalPlan] => ResultLike): Result =
-    lpf.ensureCorrectTypes(lp).run.run._2.fold(κ(failure), eval(_).toResult)
+    lpf.ensureCorrectTypes[PhaseResultT[ArgumentErrors \/ ?, ?]](lp)
+      .value.fold(κ(failure), eval(_).toResult)
 
   implicit def strToFile(str: String): AFile =
     rootDir </> file(str)
