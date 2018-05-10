@@ -307,10 +307,17 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
     }
 
     def fileExists(file: AFile): Configured[Boolean] =
-      cake[M].flatMap {
-        case (precog, lwfs) =>
-          ((precog.fs.exists(file) |@| lwfs.exists(file))(_ || _)).liftM[MT]
-      }.liftM[ConfiguredT]
+      for {
+        connectors <- cake[Configured]
+        (precog, lwfs) = connectors
+
+        precogExists <- precog.fs.exists(file).liftM[MT].liftM[ConfiguredT]
+
+        back <- if (precogExists)
+          true.point[Configured]
+        else
+          lwfs.exists(file).liftM[MT].liftM[ConfiguredT]
+      } yield back
   }
 
   object ReadFileModule extends ReadFileModule {
