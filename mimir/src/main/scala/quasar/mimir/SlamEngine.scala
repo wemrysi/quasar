@@ -309,8 +309,10 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
   object ReadFileModule extends ReadFileModule {
     import ReadFile._
 
+    private type LWCData = (AtomicBoolean, Option[Stream[Task, Data]])
+
     private val readMap =
-      new ConcurrentHashMap[ReadHandle, Precog#TablePager \/ (AtomicBoolean, Option[Stream[Task, Data]])]
+      new ConcurrentHashMap[ReadHandle, Precog#TablePager \/ LWCData]
 
     private val cur = new AtomicLong(0L)
 
@@ -364,6 +366,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
           _.more,
           {
             case (bool, data) if !bool.getAndSet(true) =>
+              // FIXME this pages the entire lwc dataset into memory, crashing the server
               data.fold(Vector[Data]().point[Task])(_.runLog)
             case (_, _) => // enqueue the empty vector so ReadFile.scan knows when to stop scanning
               Vector[Data]().point[Task]
