@@ -84,8 +84,8 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
     Injectable.inject[Const[ShiftedRead[AFile], ?], QSM[T, ?]]
 
   type Repr = MimirRepr
-  type MT[F[_], A] = CakeMT[F, LightweightFileSystem, A]
-  type M[A] = CakeM[LightweightFileSystem, A]
+  type MT[F[_], A] = CakeMT[F, A]
+  type M[A] = CakeM[A]
 
   import Cost._
   import Cardinality._
@@ -166,7 +166,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
 
     def mapFuncPlanner[F[_]: Monad] = MapFuncPlanner[T, F, MapFunc[T, ?]]
 
-    def qScriptCorePlanner = new QScriptCorePlanner[T, Backend, LightweightFileSystem](
+    def qScriptCorePlanner = new QScriptCorePlanner[T, Backend](
       λ[Task ~> Backend](_.liftM[MT].liftB),
       λ[M ~> Backend](_.liftB))
 
@@ -178,7 +178,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
         λ[Configured ~> PhaseResultT[Configured, ?]](_.liftM[PhaseResultT])
           compose λ[M ~> Configured](_.liftM[ConfiguredT]))
 
-    def shiftedReadPlanner = new ShiftedReadPlanner[T, Backend, LightweightFileSystem](liftErr)
+    def shiftedReadPlanner = new ShiftedReadPlanner[T, Backend](liftErr)
 
     lazy val planQST: AlgebraM[Backend, QScriptTotal[T, ?], Repr] =
       _.run.fold(
@@ -278,7 +278,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
 
     def listContents(dir: ADir): Backend[Set[PathSegment]] = {
       for {
-        connectors <- cake[Backend, LightweightFileSystem]
+        connectors <- cake[Backend]
         (precog, lwfs) = connectors
 
         existsPrecog <- precog.fs.exists(dir).liftM[MT].liftB
@@ -300,7 +300,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
     }
 
     def fileExists(file: AFile): Configured[Boolean] =
-      cake[M, LightweightFileSystem].flatMap {
+      cake[M].flatMap {
         case (precog, lwfs) =>
           ((precog.fs.exists(file) |@| lwfs.exists(file))(_ || _)).liftM[MT]
       }.liftM[ConfiguredT]
@@ -316,7 +316,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
 
     def open(file: AFile, offset: Natural, limit: Option[Positive]): Backend[ReadHandle] = {
       for {
-        connectors <- cake[Backend, LightweightFileSystem]
+        connectors <- cake[Backend]
         (precog, lwfs) = connectors
 
         handle <- Task.delay(ReadHandle(file, cur.getAndIncrement())).liftM[MT].liftB
@@ -408,7 +408,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
           path = fileToPath(file)
           jvs = queue.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits).map(JValue.fromData)
 
-          connectors <- cake[M, LightweightFileSystem]
+          connectors <- cake[M]
           (precog, _) = connectors
 
           ingestion = for {
@@ -476,7 +476,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
       scenario.fold(
         d2d = { (from, to) =>
           for {
-            connectors <- cake[Backend, LightweightFileSystem]
+            connectors <- cake[Backend]
             (precog, _) = connectors
 
             exists <- precog.fs.exists(from).liftM[MT].liftB
@@ -502,7 +502,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
         },
         f2f = { (from, to) =>
           for {
-            connectors <- cake[Backend, LightweightFileSystem]
+            connectors <- cake[Backend]
             (precog, _) = connectors
 
             exists <- precog.fs.exists(from).liftM[MT].liftB
@@ -533,7 +533,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
 
     def delete(path: APath): Backend[Unit] = {
       for {
-        connectors <- cake[Backend, LightweightFileSystem]
+        connectors <- cake[Backend]
         (precog, _) = connectors
 
         exists <- precog.fs.exists(path).liftM[MT].liftB

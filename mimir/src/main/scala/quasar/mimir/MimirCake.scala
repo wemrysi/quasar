@@ -37,11 +37,11 @@ object MimirCake {
 
   type Cake = Precog with Singleton
 
-  type CakeMT[F[_], A <: LightweightFileSystem, B] = Kleisli[F, (Cake, A), B]
-  type CakeM[A <: LightweightFileSystem, B] = CakeMT[Task, A, B]
+  type CakeMT[F[_], A] = Kleisli[F, (Cake, LightweightFileSystem), A]
+  type CakeM[A] = CakeMT[Task, A]
 
-  def cake[F[_], A <: LightweightFileSystem](implicit F: MonadReader_[F, (Cake, A)])
-      : F[(Cake, A)] =
+  def cake[F[_]](implicit F: MonadReader_[F, (Cake, LightweightFileSystem)])
+      : F[(Cake, LightweightFileSystem)] =
     F.ask
 
   // EquiJoin results are sorted by both keys at the same time, so we need to keep track of both

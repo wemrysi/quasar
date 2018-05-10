@@ -37,21 +37,21 @@ import scalaz.concurrent.Task
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad, FS <: LightweightFileSystem](
-    lift: FileSystemErrT[CakeM[FS, ?], ?] ~> F) {
+final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
+    lift: FileSystemErrT[CakeM, ?] ~> F) {
 
   def plan: AlgebraM[F, Const[ShiftedRead[AFile], ?], MimirRepr] = {
     case Const(ShiftedRead(path, status)) => {
-      type X[A] = EitherT[CakeM[FS, ?], FileSystemError, A]
+      type X[A] = EitherT[CakeM, FileSystemError, A]
 
       val pathStr: String = pathy.Path.posixCodec.printPath(path)
 
       val loaded: X[MimirRepr] =
         for {
-          connectors <- cake[X, FS]
+          connectors <- cake[X]
           (_, lwfs) = connectors
 
-          repr <- MimirRepr.meld[X, FS](
+          repr <- MimirRepr.meld[X, LightweightFileSystem](
             new DepFn1[Cake, λ[`P <: Cake` => X[P#Table]]] {
               def apply(P: Cake): X[P.Table] = {
 
@@ -102,7 +102,7 @@ final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
                   }
                 } yield et
 
-                EitherT.eitherT(et.liftM[CakeMT[?[_], FS, ?]])
+                EitherT.eitherT(et.liftM[CakeMT[?[_], ?]])
               }
             })
         } yield {
