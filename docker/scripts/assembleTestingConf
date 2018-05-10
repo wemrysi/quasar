@@ -18,7 +18,7 @@ configure_lwc_local() {
 # it/testing.conf
 #
 configure_mimir() {
-  echo "mimir=\"{\\\"dataDir\\\": \\\"/tmp/precog/\\\", \\\"uri\\\": \\\"\\\"}\"" >> $CONFIGFILE
+  echo "mimir=\"/tmp/precog/\"" >> $CONFIGFILE
 }
 
 ##########################################

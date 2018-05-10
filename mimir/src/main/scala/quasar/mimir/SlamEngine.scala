@@ -110,7 +110,11 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
     O.optimize(reflNT[QSM[T, ?]])
   }
 
+  // for lightweight connectors that require a connection uri
   // { "dataDir": "/path/to/data/", "uri": "<uri_to_lwc>" }
+  //
+  // for lightweight connectors that don't require a connection uri (defaults to "")
+  // "/path/to/data/"
   def parseConfig(uri: ConnectionUri): BackendDef.DefErrT[Task, Config] = {
 
     case class Config0(dataDir: String, uri: String)
@@ -120,7 +124,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
       Task.delay {
         uri.value.parse.map(_.as[Config0]) match {
           case Left(err) =>
-            NonEmptyList(err).left[EnvironmentError].left[Config0]
+            Config0(uri.value, "").right[BackendDef.DefinitionError]
           case Right(DecodeResult(Left((err, _)))) =>
             NonEmptyList(err).left[EnvironmentError].left[Config0]
           case Right(DecodeResult(Right(config))) =>
