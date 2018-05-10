@@ -17,10 +17,10 @@
 package quasar.compile
 
 import slamdata.Predef._
-import quasar.{NonTerminal, RenderTree, RenderedTree, SemanticError, Terminal, VarName},
-  RenderTree.ops._,
-  SemanticError._
+import quasar.{NonTerminal, RenderTree, RenderedTree, Terminal, VarName},
+  RenderTree.ops._
 import quasar.contrib.pathy.prettyPrint
+import quasar.compile.SemanticError._
 import quasar.sql._
 
 import scala.AnyRef

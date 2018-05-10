@@ -31,7 +31,7 @@ import quasar.{
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.contrib.shapeless._
-import quasar.common.SortDir
+import quasar.common.{CIName, SortDir}
 import quasar.compile.{SemanticAnalysis => SA}, SA._
 import quasar.compile.SemanticError._
 import quasar.fp._

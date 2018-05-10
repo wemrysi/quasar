@@ -104,7 +104,7 @@ object ResolveImports {
 
           case ambiguous =>
             MonadSemanticErrs[M].raiseError(NonEmptyList(
-              SemanticError.ambiguousFunctionInvoke(name, ambiguous.leftMap(_.name)))
+              SemanticError.ambiguousFunctionInvoke(name, ambiguous.leftMap(_.name))))
         }
 
       case other =>

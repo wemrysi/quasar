@@ -17,7 +17,7 @@
 package quasar.compile
 
 import slamdata.Predef._
-import quasar.TypeError
+import quasar.{ArgumentError, UnificationError, VarName, VarValue}
 import quasar.contrib.pathy.ADir
 import quasar.common.CIName
 import quasar.sql._
@@ -37,6 +37,8 @@ object SemanticError {
   implicit val SemanticErrorShow: Show[SemanticError] = Show.shows(_.message)
 
   final case class GenericError(message: String) extends SemanticError
+
+  final case class ArgError(argumentError: ArgumentError) extends SemanticError
 
   // Modules
   final case class AmbiguousFunctionInvoke(name: CIName, from: List[(CIName,ADir)]) extends SemanticError {
@@ -84,13 +86,6 @@ object SemanticError {
     def message = s"Wrong number of arguments for function '${funcName.shows}': expected $expected but found $actual"
   }
 
-  final case class InvalidStringCoercion(str: String, expected: String \/ List[String]) extends SemanticError {
-    def message = {
-      val expectedString = expected.fold("“" + _ + "”", "one of " + _.mkString("“", ", ", "”"))
-      s"Expected $expectedString but found “$str”"
-    }
-  }
-
   final case class AmbiguousReference(node: Fix[Sql], relations: List[SqlRelation[Unit]])
       extends SemanticError {
     def message = "The expression '" + pprint(node) + "' is ambiguous and might refer to any of the tables " + relations.mkString(", ")
@@ -102,10 +97,6 @@ object SemanticError {
 
   final case class CompiledSubtableMissing(name: String) extends SemanticError {
     def message = s"""Expected to find a compiled subtable with name "$name""""
-  }
-
-  final case class DateFormatError[N <: Nat](func: GenericFunc[N], str: String, hint: Option[String]) extends SemanticError {
-    def message = s"Date/time string could not be parsed as ${func.shows}: $str" + hint.map(" (" + _ + ")").getOrElse("")
   }
 
   final case class InvalidPathError(path: Path[_, File, _], hint: Option[String]) extends SemanticError {

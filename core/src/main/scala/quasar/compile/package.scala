@@ -16,12 +16,12 @@
 
 package quasar
 
-import slamdata.Predef.{Option, String, Vector}
+import slamdata.Predef.{List, Option, String, Vector}
 import quasar.common.{phase, PhaseResult, PhaseResultW}
 import quasar.contrib.scalaz.MonadError_
 import quasar.sql._
 
-import scalaz.{EitherT, Monad, NonEmptyList}
+import scalaz.{\/, EitherT, Monad, NonEmptyList}
 
 package object compile {
   type SemanticErrors = NonEmptyList[SemanticError]
@@ -30,7 +30,33 @@ package object compile {
 
   type SemanticErrsT[F[_], A] = EitherT[F, SemanticErrors, A]
 
-  type CompileM[A] = SemanticErrsT[PhaseResultW, A]
+  def addOffsetLimit[T]
+      (lp: T, off: Natural, lim: Option[Positive])
+      (implicit T: Corecursive.Aux[T, LP])
+      : T = {
+    val skipped = Drop(lp, constant[T](Data.Int(off.value)).embed).embed
+    lim.fold(
+      skipped)(
+      l => Take(skipped, constant[T](Data.Int(l.value)).embed).embed)
+  }
+
+  /** Compiles a query into raw LogicalPlan, which has not yet been optimized or
+    * typechecked.
+    */
+  def precompile[F[_], T: Equal: RenderTree: Show]
+      (query: Fix[Sql], vars: Variables, basePath: ADir)
+      (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
+      : F[T] = {
+    import SemanticAnalysis._
+    for {
+      ast      <- phase[F]("SQL AST", query.right)
+      substAst <- phase("Variables Substituted", Variables.substVars(ast, vars))
+      absAst   <- phase("Absolutized", substAst.mkPathsAbsolute(basePath).right)
+      sortProj <- phase("Sort Keys Projected", projectSortKeys[Fix[Sql]](absAst).right)
+      annAst   <- phase("Annotated Tree", annotate[Fix[Sql]](sortProj))
+      logical  <- phase("Logical Plan", Compiler.compile[T](annAst) leftMap (_.wrapNel))
+    } yield logical
+  }
 
   /** Returns the name of the expression when viewed as a projection
     * (of the optional relation), if available.
@@ -76,4 +102,29 @@ package object compile {
           })
       }.map(_._2))
   }
+
+  /** Returns the `LogicalPlan` for the given SQL^2 query */
+  def queryPlan(
+    expr: Fix[Sql], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive]):
+      CompileM[Fix[LP]] =
+    precompile[Fix[LP]](expr, vars, basePath)
+      .flatMap(lp => preparePlan(addOffsetLimit(lp, off, lim)))
+
+  def resolveImports[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(implicit
+    mount: Mounting.Ops[S],
+    fsFail: Failure.Ops[FileSystemError, S]
+  ): EitherT[Free[S, ?], SemanticError, Fix[Sql]] =
+    EitherT(fsFail.unattemptT(resolveImports_(scopedExpr, baseDir).run))
+
+  def resolveImports_[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(implicit
+    mount: Mounting.Ops[S]
+  ): EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, Fix[Sql]] =
+    resolveImportsImpl[EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, ?], Fix](
+      scopedExpr,
+      baseDir,
+      d => EitherT(EitherT(mount
+             .lookupModuleConfig(d)
+             .bimap(e => SemanticError.genericError(e.shows), _.statements)
+             .run.run ∘ (_ \/> (pathErr(pathNotFound(d))))))
+    ).run >>= (i => EitherT(EitherT.rightT(i.η[Free[S, ?]])))
 }
