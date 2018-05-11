@@ -64,4 +64,12 @@ package object common {
         F.writer(Vector(PhaseResult.tree(label, a)), a)
     }
   }
+
+  object phaseM {
+    def apply[F[_]] = new PartiallyApplied[F]
+    final class PartiallyApplied[F[_]] {
+      def apply[A: RenderTree](label: String, fa: F[A])(implicit F0: PhaseResultTell[F], F1: Monad[F]): F[A] =
+        F1.bind(fa)(phase[F](label, _))
+    }
+  }
 }

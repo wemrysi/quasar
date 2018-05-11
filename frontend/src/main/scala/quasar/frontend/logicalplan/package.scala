@@ -18,7 +18,7 @@ package quasar.frontend
 
 import slamdata.Predef._
 import quasar._
-import quasar.common.{phase, JoinType, PhaseResult, PhaseResults, PhaseResultTell, SortDir}
+import quasar.common.{phase, phaseM, JoinType, PhaseResultTell, SortDir}
 import quasar.contrib.pathy.FPath
 import quasar.contrib.scalaz.MonadError_
 import quasar.effect.NameGenerator
@@ -88,7 +88,7 @@ package object logicalplan {
 
   /** Optimizes and typechecks a `LogicalPlan` returning the improved plan. */
   def preparePlan[
-      F[_]: Monad: MonadArgumentErrs: NameGenerator: PhaseResultTell,
+      F[_]: Monad: MonadArgumentErrs: PhaseResultTell,
       T: Equal: RenderTree](
       t: T)(
       implicit
@@ -101,10 +101,8 @@ package object logicalplan {
 
     for {
       optimized   <- phase[F]("Optimized", optimizer.optimize(t))
-      typechecked <- lpr.ensureCorrectTypes[F](optimized)
-      _           <- PhaseResults.logPhase[F](PhaseResult.tree("Typechecked", typechecked))
+      typechecked <- phaseM[F]("Typechecked", lpr.ensureCorrectTypes[F](optimized))
       rewritten   <- phase[F]("Rewritten Joins", optimizer.rewriteJoins(typechecked))
     } yield rewritten
   }
-
 }
