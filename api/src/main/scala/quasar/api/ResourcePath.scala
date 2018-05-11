@@ -16,14 +16,13 @@
 
 package quasar.api
 
-import slamdata.Predef.{Product, Serializable, Unit}
-import quasar.contrib.pathy.{AFile, APath}
+import slamdata.Predef._
+import quasar.contrib.pathy.{firstSegmentName, rebaseA, stripPrefixA, AFile, APath}
 import quasar.fp.ski.{ι, κ}
 
 import monocle.Prism
 import pathy.Path._
-import scalaz.{Cord, Order, Show}
-import scalaz.syntax.show._
+import scalaz.{Order, Show}
 
 /** Identifies a resource in a datasource. */
 sealed trait ResourcePath extends Product with Serializable {
@@ -33,7 +32,7 @@ sealed trait ResourcePath extends Product with Serializable {
       case ResourcePath.Root    => root
     }
 
-  def / (name: ResourceName): ResourcePath =
+  def /(name: ResourceName): ResourcePath =
     this match {
       case ResourcePath.Leaf(f) =>
         val d = fileParent(f)
@@ -44,8 +43,20 @@ sealed trait ResourcePath extends Product with Serializable {
         ResourcePath.leaf(rootDir </> file(name.value))
     }
 
+  def /:(name: ResourceName): ResourcePath =
+    this match {
+      case ResourcePath.Leaf(f) =>
+        ResourcePath.leaf(rebaseA(rootDir </> dir(name.value))(f))
+
+      case ResourcePath.Root =>
+        ResourcePath.leaf(rootDir </> file(name.value))
+    }
+
   def toPath: APath =
     fold(ι, rootDir)
+
+  def uncons: Option[(ResourceName, ResourcePath)] =
+    ResourcePath.leaf.getOption(this).map(ResourcePath.unconsLeaf)
 }
 
 object ResourcePath extends ResourcePathInstances {
@@ -67,6 +78,20 @@ object ResourcePath extends ResourcePathInstances {
       case (parent, name) =>
         leaf(parent </> file1(name.valueOr(d => FileName(d.value))))
     }
+
+  def unconsLeaf(file: AFile): (ResourceName, ResourcePath) = {
+    val (n, p) = firstSegmentName(fileParent(file)) match {
+      case None =>
+        (fileName(file).value, ResourcePath.root())
+
+      case Some(seg) =>
+        val str = seg.fold(_.value, _.value)
+        val fileAsDir = fileParent(file) </> dir(fileName(file).value)
+        (str, ResourcePath.fromPath(stripPrefixA(rootDir </> dir(str))(fileAsDir)))
+    }
+
+    (ResourceName(n), p)
+  }
 }
 
 sealed abstract class ResourcePathInstances {
@@ -74,7 +99,7 @@ sealed abstract class ResourcePathInstances {
     Order.orderBy(_.toPath)
 
   implicit val show: Show[ResourcePath] =
-    Show.show { rp =>
-      Cord("ResourcePath(") ++ rp.toPath.show ++ Cord(")")
+    Show.shows { rp =>
+      s"ResourcePath(${posixCodec.printPath(rp.toPath)})"
     }
 }

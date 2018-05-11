@@ -16,7 +16,6 @@
 
 import slamdata.Predef._
 import quasar.common.{PhaseResult, PhaseResultW}
-import quasar.fs.CompileM
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.Failure
@@ -24,7 +23,7 @@ import quasar.fp._
 import quasar.fp.numeric._
 import quasar.frontend.{SemanticErrors, SemanticErrsT}
 import quasar.frontend.logicalplan.{LogicalPlan => LP, Free => _, _}
-import quasar.fs.{FileSystemError, FileSystemErrT}
+import quasar.fs.{CompileM, FileSystemError, FileSystemErrT}
 import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
 import quasar.fs.mount.Mounting

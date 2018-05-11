@@ -16,9 +16,11 @@
 
 package quasar.api
 
-import slamdata.Predef.{Product, Serializable}
+import slamdata.Predef.{None, Product, Serializable, Some}
 
-import scalaz.{Cord, Show}
+import scalaz.{Equal, Cord, Show}
+import scalaz.std.option._
+import scalaz.std.tuple._
 import scalaz.syntax.show._
 
 sealed trait ResourceError extends QuasarErrorNG
@@ -33,12 +35,24 @@ object ResourceError extends ResourceErrorInstances {
   sealed trait CommonError extends ReadError
 
   final case class PathNotFound(path: ResourcePath) extends CommonError
+
+  def notAResource[E >: ReadError](path: ResourcePath): E =
+    NotAResource(path)
+
+  def pathNotFound[E >: CommonError](path: ResourcePath): E =
+    PathNotFound(path)
 }
 
 sealed abstract class ResourceErrorInstances {
   import ResourceError._
 
-  implicit val show: Show[ResourceError] =
+  implicit def equal[E <: ResourceError]: Equal[E] =
+    Equal.equalBy {
+      case NotAResource(p) => (Some(p), None)
+      case PathNotFound(p) => (None, Some(p))
+    }
+
+  implicit def show[E <: ResourceError]: Show[E] =
     Show.show {
       case NotAResource(p) =>
         Cord("NotAResource(") ++ p.show ++ Cord(")")
