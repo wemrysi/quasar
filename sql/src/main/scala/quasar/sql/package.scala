@@ -59,10 +59,10 @@ package object sql {
   // NB: we need to support relative paths, including `../foo`
   type FUPath = pathy.Path[_, pathy.Path.File, pathy.Path.Unsandboxed]
 
-  def parser[T[_[_]]: BirecursiveT] = new SQLParser[T]()
+  def parser[T[_[_]]: BirecursiveT]: SQLParser[T] = new SQLParser[T]()
 
   // TODO: Get rid of this one once we’ve parameterized everything on `T`.
-  val fixParser = parser[Fix]
+  val fixParser: SQLParser[Fix] = parser[Fix]
 
   // Note: This is hardcoded to `Fix` but cannot be made generic with version `1.0.1` of contextual,
   //       it results in a `ClassNotFound` exception being thrown at compile time

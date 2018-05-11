@@ -38,7 +38,7 @@ final case class MapDeref[T[_[_]]](expr: T[Sql])         extends DerefType[T]
 final case class ArrayDeref[T[_[_]]](expr: T[Sql])       extends DerefType[T]
 final case class DimChange[T[_[_]]](unop: UnaryOperator) extends DerefType[T]
 
-private[sql] class SQLParser[T[_[_]]: BirecursiveT]
+class SQLParser[T[_[_]]: BirecursiveT]
     extends StandardTokenParsers {
   class SqlLexical extends StdLexical with RegexParsers {
     override type Elem = super.Elem
