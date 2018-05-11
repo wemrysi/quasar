@@ -30,7 +30,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 object ResolveImports {
-  def apply[T[_[_]]: BirecursiveT, M[_]: Monad: MonadSemanticErr](
+  def apply[M[_]: Monad: MonadSemanticErr, T[_[_]]: BirecursiveT](
       scopedExpr: ScopedExpr[T[Sql]],
       baseDir: ADir,
       retrieve: ADir => M[List[Statement[T[Sql]]]])
@@ -98,7 +98,7 @@ object ResolveImports {
 
             case s: Select[T[Sql]] =>
               substituteRelationVariable(s) { v =>
-                argMap.getOrElse(CIName(v.symbol), v.embed)
+                argMap.getOrElse(CIName(v.symbol), v.embed).right[SemanticError]
               } map (_.embed)
 
             case other => other.embed.right
@@ -113,7 +113,7 @@ object ResolveImports {
     * @param scope Returns the list of function definitions that match a given name and function arity along with a
     *              path specifying whether this function was found
     */
-  def inlineInvokes[T[_[_]]: BirecursiveT, M[_]: Monad: MonadSemanticErr](
+  def inlineInvokes[M[_]: Monad: MonadSemanticErr, T[_[_]]: BirecursiveT](
       q: T[Sql],
       scope: (CIName, Int) => M[List[(FunctionDecl[T[Sql]], ADir)]])
       : M[T[Sql]] = {
@@ -136,33 +136,35 @@ object ResolveImports {
     }
   }
 
-  def substituteRelationVariable[T](
+  def substituteRelationVariable[F[_]: Monad: MonadSemanticErr, T](
       select: Select[T])(
-      mapping: Vari[T] => T)(
+      mapping: Vari[T] => F[T])(
       implicit
       T0: Recursive.Aux[T, Sql],
       T1: Corecursive.Aux[T, Sql])
-      : SemanticError \/ Select[T] = {
+      : F[Select[T]] = {
 
-    val newRelation = select.relation.traverse(_.transformM[SemanticError \/ ?, T]({
+    val newRelation = select.relation.traverse(_.transformM[F, T]({
       case VariRelationAST(vari, alias) =>
-        mapping(vari).project match {
+        mapping(vari).flatMap(_.project match {
           case Ident(name) =>
             posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(name)
-              .map(TableRelationAST(_, alias): SqlRelation[T])
-              .toRightDisjunction(SemanticError.genericError(
-                s"bad path: $name (note: absolute file path required)")) // FIXME
+              .cata(
+                p => (TableRelationAST(p, alias): SqlRelation[T]).point[F],
+                MonadSemanticErr[F].raiseError(SemanticError.genericError(
+                  s"bad path: $name (note: absolute file path required)"))) // FIXME
 
           // If the variable points to another variable, substitute the old one for the new one
           case Vari(symbol) =>
-            VariRelationAST(Vari(symbol), alias).right
+            (VariRelationAST(Vari(symbol), alias): SqlRelation[T]).point[F]
 
           case x =>
-            SemanticError.genericError(s"not a valid table name: ${pprint(x.embed)}").left // FIXME
-        }
+            MonadSemanticErr[F].raiseError(
+              SemanticError.genericError(s"not a valid table name: ${pprint(x.embed)}")) // FIXME
+        })
 
-      case otherRelation => otherRelation.right[SemanticError]
-    }, _.right[SemanticError]))
+      case otherRelation => otherRelation.point[F]
+    }, _.point[F]))
 
     newRelation.map(r => select.copy(relation = r))
   }

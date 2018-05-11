@@ -135,6 +135,11 @@ object SemanticError {
     case DuplicateAlias(name) => name
   }(DuplicateAlias(_))
 
+  val duplicateRelationName: Prism[SemanticError, String] =
+    Prism.partial[SemanticError, String] {
+      case DuplicateRelationName(name) => name
+    } (DuplicateRelationName(_))
+
   val wrongArgumentCount: Prism[SemanticError, (CIName, Int, Int)] = Prism.partial[SemanticError, (CIName, Int, Int)] {
     case WrongArgumentCount(name, expected, found) => (name, expected, found)
   }(WrongArgumentCount.tupled)
@@ -142,4 +147,14 @@ object SemanticError {
   val compiledSubtableMissing: Prism[SemanticError, String] = Prism.partial[SemanticError, String] {
     case CompiledSubtableMissing(name) => name
   }(CompiledSubtableMissing(_))
+
+  val noTableDefined: Prism[SemanticError, Fix[Sql]] =
+    Prism.partial[SemanticError, Fix[Sql]] {
+      case NoTableDefined(expr) => expr
+    } (NoTableDefined(_))
+
+  val argError: Prism[SemanticError, ArgumentError] =
+    Prism.partial[SemanticError, ArgumentError] {
+      case ArgError(e) => e
+    } (ArgError(_))
 }

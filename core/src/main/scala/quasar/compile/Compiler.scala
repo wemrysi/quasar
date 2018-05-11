@@ -16,7 +16,7 @@
 
 package quasar.compile
 
-import slamdata.Predef._
+import slamdata.Predef.{Eq => _, _}
 import quasar.{
   Data,
   Func,
@@ -24,7 +24,6 @@ import quasar.{
   HomomorphicFunction,
   Reduction,
   RenderTree,
-  SemanticError,
   UnaryFunc,
   VarName
 }
@@ -45,7 +44,7 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import pathy.Path._
-import scalaz.{Tree => _, Free => ZFree, _}, Scalaz._
+import scalaz.{Plus => _, Tree => _, Free => ZFree, _}, Scalaz._
 import shapeless.{Annotations => _, Data => _, :: => _, _}
 
 final case class TableContext[T]

@@ -17,20 +17,24 @@
 package quasar
 
 import slamdata.Predef._
-import quasar.common.{phase, PhaseResult, PhaseResultW, PhaseResultTell}
+import quasar.common.{phase, phaseM, PhaseResultTell}
 import quasar.contrib.pathy.ADir
 import quasar.contrib.scalaz.MonadError_
+import quasar.effect.Failure
+import quasar.fp._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fp.ski._
+import quasar.fs.{FileSystemError, FileSystemErrT}, FileSystemError._
+import quasar.fs.PathError.pathNotFound
 import quasar.fs.mount.Mounting
-import quasar.frontend.logicalplan.{constant, LogicalPlan => LP}
+import quasar.frontend.logicalplan.{constant, preparePlan, ArgumentErrors, LogicalPlan => LP}
 import quasar.sql._
 import quasar.std.SetLib.{Drop, Take}
 
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import scalaz._, Scalaz._
+import scalaz.{Failure => _, _}, Scalaz._
 
 package object compile {
   type SemanticErrors = NonEmptyList[SemanticError]
@@ -69,18 +73,25 @@ package object compile {
   /** Compiles a query into raw LogicalPlan, which has not yet been optimized or
     * typechecked.
     */
-  def precompile[F[_]: Monad: PhaseResultTell, T: Equal: RenderTree: Show]
-      (query: Fix[Sql], vars: Variables, basePath: ADir)
+  def precompile[
+      F[_]: Monad: PhaseResultTell: MonadSemanticErrs,
+      U[_[_]]: BirecursiveT: EqualT: RenderTreeT,
+      T: Equal: RenderTree: Show]
+      (query: U[Sql], vars: Variables, basePath: ADir)
       (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
       : F[T] = {
+
     import SemanticAnalysis._
+    val sqlParser = parser[U]
+
     for {
       ast      <- phase[F]("SQL AST", query)
-      substAst <- phase[F]("Variables Substituted", Variables.substVars(ast, vars))
-      absAst   <- phase[F]("Absolutized", substAst.mkPathsAbsolute(basePath).right)
-      sortProj <- phase[F]("Sort Keys Projected", projectSortKeys[Fix[Sql]](absAst).right)
-      annAst   <- phase[F]("Annotated Tree", annotate[Fix[Sql]](sortProj))
-      logical  <- phase[F]("Logical Plan", Compiler.compile[T](annAst) leftMap (_.wrapNel))
+      substAst <- phaseM[F]("Variables Substituted", substVars[F, U](sqlParser, ast, vars))
+      absAst   <- phase[F]("Absolutized", substAst.mkPathsAbsolute(basePath))
+      sortProj <- phase[F]("Sort Keys Projected", projectSortKeys[U[Sql]](absAst))
+      annAst   <- phaseM[F]("Annotated Tree", annotate[F, U[Sql]](sortProj))
+      compRes  =  Compiler.compile[T](annAst).leftMap(_.wrapNel)
+      logical  <- phaseM[F]("Logical Plan", MonadSemanticErrs[F].unattempt(compRes.point[F]))
     } yield logical
   }
 
@@ -130,53 +141,78 @@ package object compile {
   }
 
   /** Returns the `LogicalPlan` for the given SQL^2 query */
-  def queryPlan(
-    expr: Fix[Sql], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive]):
-      CompileM[Fix[LP]] =
-    precompile[Fix[LP]](expr, vars, basePath)
-      .flatMap(lp => preparePlan(addOffsetLimit(lp, off, lim)))
+  def queryPlan[
+      F[_]: Monad: PhaseResultTell: MonadSemanticErrs,
+      U[_[_]]: BirecursiveT: EqualT: RenderTreeT,
+      T: Equal: RenderTree: Show](
+      expr: U[Sql], vars: Variables, basePath: ADir, off: Natural, lim: Option[Positive])(
+      implicit TC: Corecursive.Aux[T, LP], TR: Recursive.Aux[T, LP])
+      : F[T] =
+    precompile[F, U, T](expr, vars, basePath) flatMap { lp =>
+      MonadSemanticErrs[F].unattempt(
+        preparePlan[EitherT[F, ArgumentErrors, ?], T](addOffsetLimit(lp, off, lim))
+          .leftMap(_.map(SemanticError.argError(_)))
+          .run)
+    }
 
-  def resolveImports[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(implicit
-    mount: Mounting.Ops[S],
-    fsFail: Failure.Ops[FileSystemError, S]
-  ): EitherT[Free[S, ?], SemanticError, Fix[Sql]] =
+  def resolveImports[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(
+      implicit
+      mount: Mounting.Ops[S],
+      fsFail: Failure.Ops[FileSystemError, S])
+      : EitherT[Free[S, ?], SemanticError, Fix[Sql]] =
     EitherT(fsFail.unattemptT(resolveImports_(scopedExpr, baseDir).run))
 
-  def resolveImports_[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(implicit
-    mount: Mounting.Ops[S]
-  ): EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, Fix[Sql]] =
-    ResolveImports[Fix, EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, ?]](
-      scopedExpr,
-      baseDir,
-      d => EitherT(EitherT(mount
-             .lookupModuleConfig(d)
-             .bimap(e => SemanticError.genericError(e.shows), _.statements)
-             .run.run ∘ (_ \/> (pathErr(pathNotFound(d))))))
-    ).run >>= (i => EitherT(EitherT.rightT(i.η[Free[S, ?]])))
+  def resolveImports_[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(
+      implicit
+      mount: Mounting.Ops[S])
+      : EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, Fix[Sql]] = {
+    def moduleStatements(d: ADir) =
+      EitherT(
+        mount
+          .lookupModuleConfig(d)
+          .bimap(e => SemanticError.genericError(e.shows), _.statements)
+          .run.toRight(pathErr(pathNotFound(d))))
 
-  def substVarsƒ(vars: Variables): AlgebraM[SemanticError \/ ?, Sql, Fix[Sql]] = {
+    ResolveImports[EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, ?], Fix](
+      scopedExpr, baseDir, moduleStatements)
+  }
+
+  // FIXME: This traverses `expr` twice and parses all the bound expression twice, once to
+  //        check for errors and another time to actual substitute them.
+  def substVars[F[_]: Monad: MonadSemanticErrs, T[_[_]]: BirecursiveT](
+      parser: SQLParser[T], expr: T[Sql], variables: Variables)
+      : F[T[Sql]] = {
+
+    val allVars =
+      expr.cata(allVariables)
+
+    val errors =
+      allVars.map(binding(parser, variables, _))
+        .collect { case -\/(semErr) => semErr }.toNel
+
+    errors.cata(
+      MonadSemanticErrs[F].raiseError(_),
+      MonadSemanticErrs[F].unattempt(
+        expr.cataM[SemanticError \/ ?, T[Sql]](substVarsƒ(parser, variables))
+          .leftMap(_.wrapNel).point[F]))
+  }
+
+  def substVarsƒ[T[_[_]]: BirecursiveT](parser: SQLParser[T], vars: Variables)
+      : AlgebraM[SemanticError \/ ?, Sql, T[Sql]] = {
     case Vari(name) =>
-      vars.lookup(VarName(name))
+      binding(parser, vars, VarName(name))
 
-    case sel: Select[Fix[Sql]] =>
-      sel.substituteRelationVariable[SemanticError \/ ?, Fix[Sql]](v =>
-        vars.lookup(VarName(v.symbol))).join.map(_.embed)
+    case sel: Select[T[Sql]] =>
+      ResolveImports.substituteRelationVariable(sel)(v =>
+        binding(parser, vars, VarName(v.symbol))).map(_.embed)
 
     case x => x.embed.right
   }
 
-  def substVars(expr: Fix[Sql], variables: Variables): SemanticErrors \/ Fix[Sql] = {
-    val allVars = expr.cata(allVariables)
-    val errors = allVars.map(variables.lookup(_)).collect { case -\/(semErr) => semErr }.toNel
-    errors.fold(
-      expr.cataM[SemanticError \/ ?, Fix[Sql]](substVarsƒ(variables)).leftMap(_.wrapNel))(
-      errors => errors.left)
-  }
+  ////
 
-  /*
-  value.get(name).fold[SemanticError \/ Fix[Sql]](
-    UnboundVariable(name).left)(
-    varValue => fixParser.parseExpr(varValue.value)
-      .leftMap(VariableParseError(name, varValue, _)))
-  */
+  private def binding[T[_[_]]](parser: SQLParser[T], vs: Variables, n: VarName): SemanticError \/ T[Sql] =
+    vs.lookup(n)
+      .toRightDisjunction(SemanticError.unboundVariable(n))
+      .flatMap(v => parser.parseExpr(v.value).leftMap(SemanticError.VariableParseError(n, v, _)))
 }

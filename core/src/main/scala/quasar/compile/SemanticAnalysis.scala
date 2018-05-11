@@ -28,13 +28,9 @@ import scala.AnyRef
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import scalaz._, Scalaz._, Validation.{success, failure}
+import scalaz._, Scalaz._, Validation.{success, failure, failureNel}
 
 object SemanticAnalysis {
-  type Failure = NonEmptyList[SemanticError]
-
-  private def fail[A](e: SemanticError) = Validation.failure[Failure, A](NonEmptyList(e))
-
   sealed abstract class Synthetic
   object Synthetic {
     final case object SortKey extends Synthetic
@@ -134,7 +130,7 @@ object SemanticAnalysis {
               success(Map(aliasOpt.getOrElse(name) ->
                 IdentRelationAST(name, aliasOpt)))
             case VariRelationAST(vari, aliasOpt) =>
-              failure((UnboundVariable(VarName(vari.symbol)): SemanticError).wrapNel)
+              failureNel(unboundVariable(VarName(vari.symbol)))
             case TableRelationAST(file, aliasOpt) =>
               success(Map(aliasOpt.getOrElse(prettyPrint(file)) -> TableRelationAST(file, aliasOpt)))
             case ExprRelationAST(expr, aliasOpt) =>
@@ -143,7 +139,7 @@ object SemanticAnalysis {
               rels <- findRelations(l) tuple findRelations(r)
               (left, right) = rels
               rez <- (left.keySet intersect right.keySet).toList.toNel.cata(
-                nel => failure(nel.map(DuplicateRelationName(_):SemanticError)),
+                nel => failure(nel.map(duplicateRelationName(_))),
                 success(left ++ right))
             } yield rez
           }
@@ -320,7 +316,7 @@ object SemanticAnalysis {
           // `mystate := "CO"; select * from zips where state = mystate`
           val localScope = if (ts.scope.isEmpty) bs.scope else ts.scope
           Provenance.anyOf[Map[String, ?]]((localScope) ∘ (Provenance.Relation(_))) match {
-            case Provenance.Empty => fail(NoTableDefined(Ident[Fix[Sql]](name).embed))
+            case Provenance.Empty => failureNel(noTableDefined(Ident[Fix[Sql]](name).embed))
             case x                => success(x)
           }})(
           (Provenance.Relation(_)) ⋙ success)
@@ -347,7 +343,7 @@ object SemanticAnalysis {
   def addAnnotations[T](implicit T: Corecursive.Aux[T, Sql]):
       ElgotAlgebraM[
         ((Scope, T), ?),
-        NonEmptyList[SemanticError] \/ ?,
+        SemanticErrors \/ ?,
         Sql,
         Cofree[Sql, Annotations]] =
     e => attributeElgotM[(Scope, ?), ValidSem][Sql, Annotations](
@@ -359,11 +355,14 @@ object SemanticAnalysis {
     expr.transCata[T](orOriginal(projectSortKeysƒ[T]))
 
   // NB: identifySynthetics &&& (scopeTables >>> inferProvenance)
-  def annotate[T](expr: T)(implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql])
-      : NonEmptyList[SemanticError] \/ Cofree[Sql, Annotations] = {
+  def annotate[F[_]: Applicative: MonadSemanticErrs, T](expr: T)(
+      implicit TR: Recursive.Aux[T, Sql], TC: Corecursive.Aux[T, Sql])
+      : F[Cofree[Sql, Annotations]] = {
+
     val emptyScope: Scope = Scope(TableScope(Map()), BindingScope(Map()))
-    (emptyScope, expr).coelgotM[NonEmptyList[SemanticError] \/ ?](
-      addAnnotations,
-      scopeTablesƒ.apply(_).disjunction)
+
+    (emptyScope, expr)
+      .coelgotM[SemanticErrors \/ ?](addAnnotations, scopeTablesƒ.apply(_).disjunction)
+      .fold(MonadSemanticErrs[F].raiseError(_), _.point[F])
   }
 }
