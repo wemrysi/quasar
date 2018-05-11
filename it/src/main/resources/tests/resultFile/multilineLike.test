@@ -1,6 +1,7 @@
 {
     "name": "match LIKE with multiple lines",
     "backends": {
+        "lwc_local": "pending",
         "mimir": "pending"
     },
     "data": "../slamengine_commits.data",

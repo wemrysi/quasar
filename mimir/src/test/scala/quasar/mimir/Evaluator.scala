@@ -61,8 +61,6 @@ trait EvaluatorModule[M[+ _]]
 
     def report: QueryLogger[N, Unit]
 
-    def freshIdScanner: Scanner
-
     def Forall: Reduction { type Result = Option[Boolean] }
     def Exists: Reduction { type Result = Option[Boolean] }
     def concatString: F2

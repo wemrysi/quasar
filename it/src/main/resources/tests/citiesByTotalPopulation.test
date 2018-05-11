@@ -3,6 +3,7 @@
 
     "backends": {
         "couchbase":         "ignoreFieldOrder",
+        "lwc_local":         "ignoreFieldOrder",
         "mimir":             "ignoreFieldOrder"
     },
     "data": "zips.data",

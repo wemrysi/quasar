@@ -628,8 +628,7 @@ trait ColumnarTableModule[M[+ _]]
             }
           }
         },
-        ExactSize(values.length)
-      )
+        ExactSize(values.length))
     }
 
     def join(left: Table, right: Table, orderHint: Option[JoinOrder] = None)(leftKeySpec: TransSpec1,

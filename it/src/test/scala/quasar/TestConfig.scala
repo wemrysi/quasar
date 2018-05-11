@@ -17,6 +17,7 @@
 package quasar
 
 import slamdata.Predef._
+import quasar.config.FsPath
 import quasar.contrib.scalaz._
 import quasar.contrib.pathy._
 import quasar.effect.NameGenerator
@@ -50,6 +51,7 @@ object TestConfig {
    * should get rid of this abomination as soon as possible.
    */
   val COUCHBASE       = ExternalBackendRef(BackendRef(BackendName("couchbase")        , BackendCapability.All), FileSystemType("couchbase"))
+  val LWC_LOCAL       = ExternalBackendRef(BackendRef(BackendName("lwc_local")        , BackendCapability.All), FileSystemType("lwc_local"))
   val MARKLOGIC_JSON  = ExternalBackendRef(BackendRef(BackendName("marklogic_json")   , BackendCapability.All), FileSystemType("marklogic"))
   val MARKLOGIC_XML   = ExternalBackendRef(BackendRef(BackendName("marklogic_xml")    , BackendCapability.All), FileSystemType("marklogic"))
   val MIMIR           = ExternalBackendRef(BackendRef(BackendName("mimir")            , BackendCapability.All), mimir.Mimir.Type)
@@ -61,6 +63,7 @@ object TestConfig {
 
   lazy val backendRefs: List[ExternalBackendRef] = List(
     COUCHBASE,
+    LWC_LOCAL,
     MARKLOGIC_JSON, MARKLOGIC_XML,
     MIMIR,
     MONGO_3_2, MONGO_3_4, MONGO_3_4_13, MONGO_3_6, MONGO_READ_ONLY)
@@ -123,9 +126,25 @@ object TestConfig {
           testRef.release *> setupRef.release)
     }
 
+    val local: java.io.File = java.nio.file.Files.createTempDirectory("localfs").toFile
+
+    // this is literally only going to work if the tempdir is at C:\
+    val testDir: ADir =
+      if (java.lang.System.getProperty("os.name").contains("Windows"))
+        windowsCodec.parseAbsDir(FsPath.winVolAndPath(local.getAbsolutePath)._2 + "\\").map(unsafeSandboxAbs)
+          .getOrElse(scala.sys.error("Failed to generate a temp path on windows."))
+      else
+        posixCodec.parseAbsDir(local.getAbsolutePath + "/").map(unsafeSandboxAbs)
+          .getOrElse(scala.sys.error("Failed to generate a temp path on a non-windows fs (assumed posix compliance)."))
+
     TestConfig.testDataPrefix flatMap { prefix =>
       TestConfig.backendRefs.toIList
-        .traverse(r => lookupFileSystem(r, prefix).run.map(fsUT => SupportedFs(r.ref,fsUT, fsUT.map(_.copy(testDir = rootDir)))))
+        .traverse {
+          case r @ ExternalBackendRef(LWC_LOCAL.ref, _) =>
+            lookupFileSystem(r, testDir).run.map(fsUT => SupportedFs(r.ref,fsUT, fsUT.map(_.copy(testDir = rootDir))))
+          case r =>
+            lookupFileSystem(r, prefix).run.map(fsUT => SupportedFs(r.ref,fsUT, fsUT.map(_.copy(testDir = rootDir))))
+        }
     }
   }
 

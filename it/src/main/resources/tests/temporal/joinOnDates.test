@@ -2,6 +2,7 @@
     "name": "join on dates",
 
     "backends": {
+        "lwc_local": "pending",
         "mimir": "pending"
     },
     "data":  ["../slamengine_commits.data", "../slamengine_commits_dup.data"],

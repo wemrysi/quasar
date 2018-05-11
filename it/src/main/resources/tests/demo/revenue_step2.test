@@ -3,6 +3,7 @@
     "data": "revenue.data",
     "backends": {
        "couchbase":         "pending",
+       "lwc_local":         "pending",
        "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "pending"
     },

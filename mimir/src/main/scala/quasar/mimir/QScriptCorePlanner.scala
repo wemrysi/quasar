@@ -369,10 +369,11 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
 
     // FIXME look for Map(Unreferenced, Constant) and return constant table
     case qscript.Unreferenced() =>
-      liftFCake(MimirRepr.meld[CakeM](new DepFn1[Cake, λ[`P <: Cake` => CakeM[P#Table]]] {
-        def apply(P: Cake): CakeM[P.Table] =
-          P.Table.constLong(Set(0)).point[CakeM]
-      }))
+      liftFCake(MimirRepr.meld[CakeM, LightweightFileSystem](
+        new DepFn1[Cake, λ[`P <: Cake` => CakeM[P#Table]]] {
+          def apply(P: Cake): CakeM[P.Table] =
+            P.Table.constLong(Set(0)).point[CakeM]
+        }))
   }
 
   ////////

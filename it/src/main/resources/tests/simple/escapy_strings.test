@@ -2,6 +2,7 @@
   "name": "[qa_s01] select with string escapes",
 
   "backends": {
+    "lwc_local": "ignoreFieldOrder",
     "mimir": "ignoreFieldOrder"
   },
 

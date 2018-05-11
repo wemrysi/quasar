@@ -3,6 +3,7 @@
 
     "backends": {
         "couchbase":         "timeout",
+        "lwc_local":         "ignoreFieldOrder",
         "marklogic_json":    "timeout",
         "marklogic_xml":     "timeout",
         "mongodb_3_2":       "ignoreFieldOrder",
