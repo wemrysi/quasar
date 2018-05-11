@@ -16,12 +16,21 @@
 
 package quasar.compile
 
+import slamdata.Predef._
+import quasar.common.CIName
+import quasar.contrib.pathy._
+import quasar.contrib.std._
+import quasar.fp.ski._
 import quasar.sql._
 
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
+import pathy.Path._
 import scalaz._, Scalaz._
 
 object ResolveImports {
-  def apply[T[_[_]]: BirecursiveT, M[_]: Monad: MonadSemanticErrs](
+  def apply[T[_[_]]: BirecursiveT, M[_]: Monad: MonadSemanticErr](
       scopedExpr: ScopedExpr[T[Sql]],
       baseDir: ADir,
       retrieve: ADir => M[List[Statement[T[Sql]]]])
@@ -32,7 +41,7 @@ object ResolveImports {
         .toRightDisjunction {
           val invalidPathString = posixCodec.unsafePrintPath(i.path)
           val fromString = posixCodec.printPath(from)
-          SemanticError.GenericError(s"$invalidPathString is invalid because it is located at $fromString")
+          SemanticError.genericError(s"$invalidPathString is invalid because it is located at $fromString")
         }
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -43,7 +52,7 @@ object ResolveImports {
         : (CIName, Int) => M[List[(FunctionDecl[T[Sql]], ADir)]] = {
       case (name, arity) =>
         imports.traverse(absImport(_, here)).fold(
-          err => MonadSemanticErrs[M].raiseError(err.wrapNel),
+          MonadSemanticErr[M].raiseError(_),
           absImportPaths => {
             // All functions coming from `imports` along with their respective import statements and where they are defined
             val funcsFromImports = absImportPaths.traverse(d => retrieve(d).map(stats => (stats.decls, stats.imports, d)))
@@ -54,32 +63,48 @@ object ResolveImports {
               funcs.filter(matchesSignature).traverse { decl =>
                 val others = funcs.filterNot(matchesSignature) // No recursice calls in SQL^2 so we don't include ourselves
                 val currentScope = scopeFromHere(imports, others, from)
-                decl.traverse(q => inlineInvokes(q.mkPathsAbsolute(from), currentScope)).flattenLeft.strengthR(from)
+                decl.traverse(q => inlineInvokes(q.mkPathsAbsolute(from), currentScope)).strengthR(from)
               }
             }).map(_.join)
           })
     }
 
-    inlineInvokes(scopedExpr.expr, scopeFromHere(scopedExpr.imports, scopedExpr.defs, baseDir)).flattenLeft
+    inlineInvokes(scopedExpr.expr, scopeFromHere(scopedExpr.imports, scopedExpr.defs, baseDir))
   }
 
-  def applyFunction[T[_[_]]: BirecursiveT](func: FunctionDecl[T[Sql]], args: List[T[Sql]]): SemanticError \/ T[Sql] = {
+  def applyFunction[T[_[_]]: BirecursiveT](
+      func: FunctionDecl[T[Sql]],
+      args: List[T[Sql]])
+      : SemanticError \/ T[Sql] = {
+
     val expected = func.args.size
     val actual   = args.size
-    func.args.duplicates.headOption.cata(
-      duplicates => SemanticError.InvalidFunctionDefinition(this.map(ev(_).convertTo[Fix[Sql]]), s"parameter :${duplicates.head.value} is defined multiple times").left, {
-        if (expected ≠ actual) SemanticError.WrongArgumentCount(name, expected, actual).left
-        else {
+
+    func.args.duplicates.headOption match {
+      case Some(dupes) =>
+        SemanticError.InvalidFunctionDefinition(
+          func.map(_.convertTo[Fix[Sql]]),
+          s"parameter :${dupes.head.value} is defined multiple times").left
+
+      case None =>
+        if (expected ≠ actual) {
+          SemanticError.WrongArgumentCount(func.name, expected, actual).left
+        } else {
           val argMap = func.args.zip(args).toMap
           func.body.cataM[SemanticError \/ ?, T[Sql]] {
             case v: Vari[T[Sql]] =>
-              argMap.getOrElse(CIName(v.symbol), v.embed).right // Leave the variable there in case it will be substituted by an external variable
+              // Leave the variable there in case it will be substituted by an external variable
+              argMap.getOrElse(CIName(v.symbol), v.embed).right
+
             case s: Select[T[Sql]] =>
-              substituteRelationVariable[Id, T[Sql]](v => argMap.getOrElse(CIName(v.symbol), v.embed)).map(_.embed)
+              substituteRelationVariable(s) { v =>
+                argMap.getOrElse(CIName(v.symbol), v.embed)
+              } map (_.embed)
+
             case other => other.embed.right
           }
         }
-      })
+      }
   }
 
   /**
@@ -88,7 +113,7 @@ object ResolveImports {
     * @param scope Returns the list of function definitions that match a given name and function arity along with a
     *              path specifying whether this function was found
     */
-  def inlineInvokes[T[_[_]]: BirecursiveT, M[_]: Monad: MonadSemanticErrs](
+  def inlineInvokes[T[_[_]]: BirecursiveT, M[_]: Monad: MonadSemanticErr](
       q: T[Sql],
       scope: (CIName, Int) => M[List[(FunctionDecl[T[Sql]], ADir)]])
       : M[T[Sql]] = {
@@ -99,12 +124,11 @@ object ResolveImports {
             invoke.embed.point[M]
 
           case List((funcDef, _)) =>
-            MonadSemanticErrs[M].unattempt(
-              funcDef.applyArgs(args).leftMap(_.wrapNel).point[M])
+            MonadSemanticErr[M].unattempt(applyFunction(funcDef, args).point[M])
 
           case ambiguous =>
-            MonadSemanticErrs[M].raiseError(NonEmptyList(
-              SemanticError.ambiguousFunctionInvoke(name, ambiguous.leftMap(_.name))))
+            MonadSemanticErr[M].raiseError(
+              SemanticError.ambiguousFunctionInvoke(name, ambiguous.map(_.leftMap(_.name))))
         }
 
       case other =>
@@ -112,25 +136,34 @@ object ResolveImports {
     }
   }
 
-  def substituteRelationVariable[M[_]: Monad, T](select: Select[T], mapping: Vari[A] => M[A])(implicit
-    T0: Recursive.Aux[T, Sql],
-    T1: Corecursive.Aux[T, Sql],
-    ev: A <~< T
-  ): M[SemanticError \/ Select[A]] = {
-      val newRelation = select.relation.traverse(_.transformM[EitherT[M, SemanticError, ?], A]({
-        case VariRelationAST(vari, alias) =>
-          EitherT(mapping(vari).map(ev(_).project match {
-            case Ident(name) =>
-              posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(name).cata(
-                TableRelationAST(_, alias).right,
-                SemanticError.GenericError(s"bad path: $name (note: absolute file path required)").left) // FIXME
-            // If the variable points to another variable, substitute the old one for the new one
-            case Vari(symbol) => VariRelationAST(Vari(symbol), alias).right
-            case x =>
-              SemanticError.GenericError(s"not a valid table name: ${pprint(x.embed)}").left // FIXME
-          }))
-        case otherRelation => otherRelation.point[EitherT[M, SemanticError, ?]]
-      }, _.point[EitherT[M, SemanticError, ?]]))
-      newRelation.map(r => this.copy(relation = r)).run
+  def substituteRelationVariable[T](
+      select: Select[T])(
+      mapping: Vari[T] => T)(
+      implicit
+      T0: Recursive.Aux[T, Sql],
+      T1: Corecursive.Aux[T, Sql])
+      : SemanticError \/ Select[T] = {
+
+    val newRelation = select.relation.traverse(_.transformM[SemanticError \/ ?, T]({
+      case VariRelationAST(vari, alias) =>
+        mapping(vari).project match {
+          case Ident(name) =>
+            posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(name)
+              .map(TableRelationAST(_, alias): SqlRelation[T])
+              .toRightDisjunction(SemanticError.genericError(
+                s"bad path: $name (note: absolute file path required)")) // FIXME
+
+          // If the variable points to another variable, substitute the old one for the new one
+          case Vari(symbol) =>
+            VariRelationAST(Vari(symbol), alias).right
+
+          case x =>
+            SemanticError.genericError(s"not a valid table name: ${pprint(x.embed)}").left // FIXME
+        }
+
+      case otherRelation => otherRelation.right[SemanticError]
+    }, _.right[SemanticError]))
+
+    newRelation.map(r => select.copy(relation = r))
   }
 }
