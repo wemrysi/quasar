@@ -16,7 +16,6 @@
 
 package quasar
 
-import quasar.common.PhaseResultW
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadError_
 import quasar.effect.Failure

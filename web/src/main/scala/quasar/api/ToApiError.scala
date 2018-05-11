@@ -244,12 +244,6 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           BadRequest withReason "Invalid ObjectId.",
           err.message,
           "objectId" := oid)
-      case CompilationFailed(semErrs) =>
-        fromMsg(
-          BadRequest withReason "Compilation failed",
-          err.message,
-          "compilation errors" := semErrs.map(_.toApiError)
-        )
       case NonRepresentableInJS(value) =>
         fromMsg(
           InternalServerError withReason "Unable to compile to JavaScript.",

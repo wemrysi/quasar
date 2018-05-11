@@ -295,6 +295,6 @@ object view {
         case (e, i) => lift(e, i)
       } flatMap (resolved => EitherT(preparePlan(resolved).run.value.point[FileSystemErrT[Free[S, ?], ?]]))
 
-    newLP.leftMap(e => planningFailed(plan, Planner.CompilationFailed(e))).flattenLeft
+    newLP.leftMap(e => planningFailed(plan, Planner.InternalError(e.toList.mkString(", ")))).flattenLeft
   }
 }
