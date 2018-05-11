@@ -16,59 +16,28 @@
 
 package quasar
 
-import slamdata.Predef._
-import quasar.SemanticError._
-import quasar.frontend.SemanticErrors
+import slamdata.Predef.{Map, Option, String}
 
-import matryoshka._
-import matryoshka.data.Fix
-import matryoshka.implicits._
-import scalaz._, Scalaz._
+import scalaz.Equal
+import scalaz.std.tuple._
+import scalaz.syntax.bifunctor._
 
 final case class Variables(value: Map[VarName, VarValue]) {
-  def lookup(name: VarName): SemanticError \/ Fix[Sql] =
-    value.get(name).fold[SemanticError \/ Fix[Sql]](
-      UnboundVariable(name).left)(
-      varValue => fixParser.parseExpr(varValue.value)
-        .leftMap(VariableParseError(name, varValue, _)))
+  def lookup(name: VarName): Option[VarValue] =
+    value.get(name)
 }
+
 final case class VarName(value: String) {
   override def toString = ":" + value
 }
+
 final case class VarValue(value: String)
 
 object Variables {
   val empty: Variables = Variables(Map())
 
   def fromMap(value: Map[String, String]): Variables =
-    Variables(value.map(t => VarName(t._1) -> VarValue(t._2)))
-
-  def substVarsƒ(vars: Variables):
-      AlgebraM[SemanticError \/ ?, Sql, Fix[Sql]] = {
-    case Vari(name) =>
-      vars.lookup(VarName(name))
-    case sel: Select[Fix[Sql]] =>
-      sel.substituteRelationVariable[SemanticError \/ ?, Fix[Sql]](v => vars.lookup(VarName(v.symbol))).join.map(_.embed)
-    case x => x.embed.right
-  }
-
-  def allVariables: Algebra[Sql, List[VarName]] = {
-    case Vari(name)                                      => List(VarName(name))
-    case sel @ Select(_, _, rel, _, _, _) =>
-      rel.toList.collect { case VariRelationAST(vari, _) => VarName(vari.symbol) } ++
-      (sel: Sql[List[VarName]]).fold
-    case other                                           => other.fold
-  }
-
-  // FIXME: Get rid of this
-  def substVars(expr: Fix[Sql], variables: Variables)
-      : SemanticErrors \/ Fix[Sql] = {
-    val allVars = expr.cata(allVariables)
-    val errors = allVars.map(variables.lookup(_)).collect { case -\/(semErr) => semErr }.toNel
-    errors.fold(
-      expr.cataM[SemanticError \/ ?, Fix[Sql]](substVarsƒ(variables)).leftMap(_.wrapNel))(
-      errors => errors.left)
-  }
+    Variables(value.map(_.bimap(VarName(_), VarValue(_))))
 
   implicit val equal: Equal[Variables] = Equal.equalA
 }

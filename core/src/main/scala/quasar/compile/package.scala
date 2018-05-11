@@ -16,17 +16,32 @@
 
 package quasar
 
-import slamdata.Predef.{List, Option, String, Vector}
-import quasar.common.{phase, PhaseResult, PhaseResultW}
+import slamdata.Predef._
+import quasar.common.{phase, PhaseResult, PhaseResultW, PhaseResultTell}
+import quasar.contrib.pathy.ADir
 import quasar.contrib.scalaz.MonadError_
+import quasar.fp.numeric.{Natural, Positive}
+import quasar.fp.ski._
+import quasar.fs.mount.Mounting
+import quasar.frontend.logicalplan.{constant, LogicalPlan => LP}
 import quasar.sql._
+import quasar.std.SetLib.{Drop, Take}
 
-import scalaz.{\/, EitherT, Monad, NonEmptyList}
+import matryoshka._
+import matryoshka.data.Fix
+import matryoshka.implicits._
+import scalaz._, Scalaz._
 
 package object compile {
   type SemanticErrors = NonEmptyList[SemanticError]
 
+  type MonadSemanticErr[F[_]] = MonadError_[F, SemanticError]
+
+  def MonadSemanticErr[F[_]](implicit ev: MonadSemanticErr[F]): MonadSemanticErr[F] = ev
+
   type MonadSemanticErrs[F[_]] = MonadError_[F, SemanticErrors]
+
+  def MonadSemanticErrs[F[_]](implicit ev: MonadSemanticErrs[F]): MonadSemanticErrs[F] = ev
 
   type SemanticErrsT[F[_], A] = EitherT[F, SemanticErrors, A]
 
@@ -40,21 +55,32 @@ package object compile {
       l => Take(skipped, constant[T](Data.Int(l.value)).embed).embed)
   }
 
+  def allVariables: Algebra[Sql, List[VarName]] = {
+    case Vari(name) => List(VarName(name))
+
+    case sel @ Select(_, _, rel, _, _, _) =>
+      rel.toList.collect {
+        case VariRelationAST(vari, _) => VarName(vari.symbol)
+      } ++ (sel: Sql[List[VarName]]).fold
+
+    case other => other.fold
+  }
+
   /** Compiles a query into raw LogicalPlan, which has not yet been optimized or
     * typechecked.
     */
-  def precompile[F[_], T: Equal: RenderTree: Show]
+  def precompile[F[_]: Monad: PhaseResultTell, T: Equal: RenderTree: Show]
       (query: Fix[Sql], vars: Variables, basePath: ADir)
       (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP])
       : F[T] = {
     import SemanticAnalysis._
     for {
-      ast      <- phase[F]("SQL AST", query.right)
-      substAst <- phase("Variables Substituted", Variables.substVars(ast, vars))
-      absAst   <- phase("Absolutized", substAst.mkPathsAbsolute(basePath).right)
-      sortProj <- phase("Sort Keys Projected", projectSortKeys[Fix[Sql]](absAst).right)
-      annAst   <- phase("Annotated Tree", annotate[Fix[Sql]](sortProj))
-      logical  <- phase("Logical Plan", Compiler.compile[T](annAst) leftMap (_.wrapNel))
+      ast      <- phase[F]("SQL AST", query)
+      substAst <- phase[F]("Variables Substituted", Variables.substVars(ast, vars))
+      absAst   <- phase[F]("Absolutized", substAst.mkPathsAbsolute(basePath).right)
+      sortProj <- phase[F]("Sort Keys Projected", projectSortKeys[Fix[Sql]](absAst).right)
+      annAst   <- phase[F]("Annotated Tree", annotate[Fix[Sql]](sortProj))
+      logical  <- phase[F]("Logical Plan", Compiler.compile[T](annAst) leftMap (_.wrapNel))
     } yield logical
   }
 
@@ -119,7 +145,7 @@ package object compile {
   def resolveImports_[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(implicit
     mount: Mounting.Ops[S]
   ): EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, Fix[Sql]] =
-    resolveImportsImpl[EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, ?], Fix](
+    ResolveImports[Fix, EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, ?]](
       scopedExpr,
       baseDir,
       d => EitherT(EitherT(mount
@@ -127,4 +153,30 @@ package object compile {
              .bimap(e => SemanticError.genericError(e.shows), _.statements)
              .run.run ∘ (_ \/> (pathErr(pathNotFound(d))))))
     ).run >>= (i => EitherT(EitherT.rightT(i.η[Free[S, ?]])))
+
+  def substVarsƒ(vars: Variables): AlgebraM[SemanticError \/ ?, Sql, Fix[Sql]] = {
+    case Vari(name) =>
+      vars.lookup(VarName(name))
+
+    case sel: Select[Fix[Sql]] =>
+      sel.substituteRelationVariable[SemanticError \/ ?, Fix[Sql]](v =>
+        vars.lookup(VarName(v.symbol))).join.map(_.embed)
+
+    case x => x.embed.right
+  }
+
+  def substVars(expr: Fix[Sql], variables: Variables): SemanticErrors \/ Fix[Sql] = {
+    val allVars = expr.cata(allVariables)
+    val errors = allVars.map(variables.lookup(_)).collect { case -\/(semErr) => semErr }.toNel
+    errors.fold(
+      expr.cataM[SemanticError \/ ?, Fix[Sql]](substVarsƒ(variables)).leftMap(_.wrapNel))(
+      errors => errors.left)
+  }
+
+  /*
+  value.get(name).fold[SemanticError \/ Fix[Sql]](
+    UnboundVariable(name).left)(
+    varValue => fixParser.parseExpr(varValue.value)
+      .leftMap(VariableParseError(name, varValue, _)))
+  */
 }
