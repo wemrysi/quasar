@@ -38,7 +38,9 @@ object SemanticError {
 
   final case class GenericError(message: String) extends SemanticError
 
-  final case class ArgError(argumentError: ArgumentError) extends SemanticError
+  final case class ArgError(argumentError: ArgumentError) extends SemanticError {
+    def message = argumentError.message
+  }
 
   // Modules
   final case class AmbiguousFunctionInvoke(name: CIName, from: List[(CIName,ADir)]) extends SemanticError {

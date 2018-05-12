@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.compile
+package quasar.fs.mount.module
 
 import slamdata.Predef._
 import quasar.contrib.pathy.ADir

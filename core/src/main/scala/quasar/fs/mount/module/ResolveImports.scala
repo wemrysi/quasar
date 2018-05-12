@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.compile
+package quasar.fs.mount.module
 
 import slamdata.Predef._
 import quasar.common.CIName
+import quasar.compile.{substituteRelationVariable, MonadSemanticErr, SemanticError}
 import quasar.contrib.pathy._
 import quasar.contrib.std._
-import quasar.fp.ski._
 import quasar.sql._
 
 import matryoshka._
@@ -134,38 +134,5 @@ object ResolveImports {
       case other =>
        other.embed.point[M]
     }
-  }
-
-  def substituteRelationVariable[F[_]: Monad: MonadSemanticErr, T](
-      select: Select[T])(
-      mapping: Vari[T] => F[T])(
-      implicit
-      T0: Recursive.Aux[T, Sql],
-      T1: Corecursive.Aux[T, Sql])
-      : F[Select[T]] = {
-
-    val newRelation = select.relation.traverse(_.transformM[F, T]({
-      case VariRelationAST(vari, alias) =>
-        mapping(vari).flatMap(_.project match {
-          case Ident(name) =>
-            posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(name)
-              .cata(
-                p => (TableRelationAST(p, alias): SqlRelation[T]).point[F],
-                MonadSemanticErr[F].raiseError(SemanticError.genericError(
-                  s"bad path: $name (note: absolute file path required)"))) // FIXME
-
-          // If the variable points to another variable, substitute the old one for the new one
-          case Vari(symbol) =>
-            (VariRelationAST(Vari(symbol), alias): SqlRelation[T]).point[F]
-
-          case x =>
-            MonadSemanticErr[F].raiseError(
-              SemanticError.genericError(s"not a valid table name: ${pprint(x.embed)}")) // FIXME
-        })
-
-      case otherRelation => otherRelation.point[F]
-    }, _.point[F]))
-
-    newRelation.map(r => select.copy(relation = r))
   }
 }

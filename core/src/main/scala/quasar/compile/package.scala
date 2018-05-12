@@ -20,20 +20,16 @@ import slamdata.Predef._
 import quasar.common.{phase, phaseM, PhaseResultTell}
 import quasar.contrib.pathy.ADir
 import quasar.contrib.scalaz.MonadError_
-import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fp.ski._
-import quasar.fs.{FileSystemError, FileSystemErrT}, FileSystemError._
-import quasar.fs.PathError.pathNotFound
-import quasar.fs.mount.Mounting
 import quasar.frontend.logicalplan.{constant, preparePlan, ArgumentErrors, LogicalPlan => LP}
 import quasar.sql._
 import quasar.std.SetLib.{Drop, Take}
 
 import matryoshka._
-import matryoshka.data.Fix
 import matryoshka.implicits._
+import pathy.Path.posixCodec
 import scalaz.{Failure => _, _}, Scalaz._
 
 package object compile {
@@ -155,26 +151,37 @@ package object compile {
           .run)
     }
 
-  def resolveImports[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(
+  def substituteRelationVariable[F[_]: Monad: MonadSemanticErr, T](
+      select: Select[T])(
+      mapping: Vari[T] => F[T])(
       implicit
-      mount: Mounting.Ops[S],
-      fsFail: Failure.Ops[FileSystemError, S])
-      : EitherT[Free[S, ?], SemanticError, Fix[Sql]] =
-    EitherT(fsFail.unattemptT(resolveImports_(scopedExpr, baseDir).run))
+      T0: Recursive.Aux[T, Sql],
+      T1: Corecursive.Aux[T, Sql])
+      : F[Select[T]] = {
 
-  def resolveImports_[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(
-      implicit
-      mount: Mounting.Ops[S])
-      : EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, Fix[Sql]] = {
-    def moduleStatements(d: ADir) =
-      EitherT(
-        mount
-          .lookupModuleConfig(d)
-          .bimap(e => SemanticError.genericError(e.shows), _.statements)
-          .run.toRight(pathErr(pathNotFound(d))))
+    val newRelation = select.relation.traverse(_.transformM[F, T]({
+      case VariRelationAST(vari, alias) =>
+        mapping(vari).flatMap(_.project match {
+          case Ident(name) =>
+            posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(name)
+              .cata(
+                p => (TableRelationAST(p, alias): SqlRelation[T]).point[F],
+                MonadSemanticErr[F].raiseError(SemanticError.genericError(
+                  s"bad path: $name (note: absolute file path required)"))) // FIXME
 
-    ResolveImports[EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, ?], Fix](
-      scopedExpr, baseDir, moduleStatements)
+          // If the variable points to another variable, substitute the old one for the new one
+          case Vari(symbol) =>
+            (VariRelationAST(Vari(symbol), alias): SqlRelation[T]).point[F]
+
+          case x =>
+            MonadSemanticErr[F].raiseError(
+              SemanticError.genericError(s"not a valid table name: ${pprint(x.embed)}")) // FIXME
+        })
+
+      case otherRelation => otherRelation.point[F]
+    }, _.point[F]))
+
+    newRelation.map(r => select.copy(relation = r))
   }
 
   // FIXME: This traverses `expr` twice and parses all the bound expression twice, once to
@@ -203,7 +210,7 @@ package object compile {
       binding(parser, vars, VarName(name))
 
     case sel: Select[T[Sql]] =>
-      ResolveImports.substituteRelationVariable(sel)(v =>
+      substituteRelationVariable(sel)(v =>
         binding(parser, vars, VarName(v.symbol))).map(_.embed)
 
     case x => x.embed.right
