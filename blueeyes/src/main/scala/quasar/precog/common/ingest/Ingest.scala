@@ -154,3 +154,9 @@ object StreamRef {
     }
   }
 }
+
+object EventMessage {
+  // an instant that's close enough to the start of timestamping for our purposes
+  val defaultTimestamp = instant fromMillis 1362465101979L
+}
+

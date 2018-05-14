@@ -21,11 +21,6 @@ import Iso8601Serialization._, Versioned._
 
 import shapeless.HNil
 
-object EventMessage {
-  // an instant that's close enough to the start of timestamping for our purposes
-  val defaultTimestamp = instant fromMillis 1362465101979L
-}
-
 case class EventId(producerId: Int, sequenceId: Int) {
   val uid = (producerId.toLong << 32) | (sequenceId.toLong & 0xFFFFFFFFL)
 }
