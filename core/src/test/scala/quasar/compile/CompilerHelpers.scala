@@ -17,10 +17,10 @@
 package quasar.compile
 
 import slamdata.Predef._
-import quasar.SemanticError
+import quasar.common.PhaseResultT
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
-import quasar.sql.SemanticAnalysis._
+import quasar.sql._
 
 import matryoshka.Algebra
 import matryoshka.data.Fix
@@ -29,8 +29,15 @@ import org.specs2.matcher.MustThrownMatchers._
 import scalaz._, Scalaz._
 
 trait CompilerHelpers extends LogicalPlanHelpers {
+  import SemanticAnalysis._
+
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import WriterT.writerTMonad
+
+  private type ECT[A] = PhaseResultT[ArgumentErrors \/ ?, A]
+
   // TODO use `quasar.precompile`
-  val compile: Fix[Sql] => NonEmptyList[SemanticError] \/ Fix[LP] = query => {
+  val compile: Fix[Sql] => SemanticErrors \/ Fix[LP] = query => {
     for {
       attr   <- parseAndAnnotate(query)
       cld    <- Compiler.compile[Fix[LP]](attr).leftMap(NonEmptyList(_))
@@ -45,9 +52,9 @@ trait CompilerHelpers extends LogicalPlanHelpers {
     fixParser.parseScopedExpr(query).valueOr(err => scala.sys.error(
     s"False assumption in test, could not parse due to parse error: $err"))
 
-  val parseAndAnnotate: Fix[Sql] => NonEmptyList[SemanticError] \/ Cofree[Sql, SemanticAnalysis.Annotations] = query => {
-    val sorted   = projectSortKeys(query)
-    annotate(sorted)
+  val parseAndAnnotate: Fix[Sql] => SemanticErrors \/ Cofree[Sql, SemanticAnalysis.Annotations] = query => {
+    val sorted = projectSortKeys(query)
+    annotate[SemanticErrors \/ ?, Fix[Sql]](sorted)
   }
 
   val parseAndAnnotateUnsafe: Fix[Sql] => Cofree[Sql, SemanticAnalysis.Annotations] = query => {
@@ -55,15 +62,18 @@ trait CompilerHelpers extends LogicalPlanHelpers {
   }
 
   // Compile -> Optimize -> Typecheck -> Rewrite Joins
-  val fullCompile: Fix[Sql] => NonEmptyList[SemanticError] \/ Fix[LP] =
+  val fullCompile: Fix[Sql] => SemanticErrors \/ Fix[LP] =
     q => compile(q).flatMap { lp =>
       // TODO we should just call `quasar.preparePlan` here
       // but we need to remove core's dependency on sql first
       val optimized = optimizer.optimize(lp)
-      for {
-        typechecked <- lpr.ensureCorrectTypes(optimized).run.run._2
+
+      val planned = for {
+        typechecked <- lpr.ensureCorrectTypes[ECT](optimized).value
         rewritten <- optimizer.rewriteJoins(typechecked).right
       } yield rewritten
+
+      planned.leftMap(_.map(SemanticError.argError(_)))
     }
 
   // NB: this plan is simplified and normalized, but not optimized. That allows
@@ -84,7 +94,7 @@ trait CompilerHelpers extends LogicalPlanHelpers {
     compile(query).map(optimizer.optimize).toEither must beRight(equalToPlan(expected))
 
   def testLogicalPlanDoesNotTypeCheck(query: Fix[Sql]) =
-    compile(query).map(lpr.ensureCorrectTypes(_).run.run._2.toEither must beLeft).toEither must beRight
+    compile(query).map(lpr.ensureCorrectTypes[ECT](_).value.toEither must beLeft).toEither must beRight
 
   def testTypedLogicalPlanCompile(query: Fix[Sql], expected: Fix[LP]) =
     fullCompile(query).toEither must beRight(equalToPlan(expected))

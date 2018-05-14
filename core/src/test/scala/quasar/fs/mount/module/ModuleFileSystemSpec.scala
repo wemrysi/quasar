@@ -18,6 +18,7 @@ package quasar.fs.mount.module
 
 import slamdata.Predef._
 import quasar.Data
+import quasar.common.CIName
 import quasar.contrib.pathy.{AFile, APath}
 import quasar.effect.KeyValueStore
 import quasar.fp.evalNT

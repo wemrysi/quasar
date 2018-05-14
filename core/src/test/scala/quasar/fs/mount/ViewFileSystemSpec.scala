@@ -18,7 +18,8 @@ package quasar.fs.mount
 
 import slamdata.Predef._
 import quasar._
-import quasar.common.JoinType
+import quasar.common.{JoinType, PhaseResultT}
+import quasar.compile.{precompile, queryPlan, SemanticErrors}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
@@ -70,6 +71,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import StateT.stateTMonadState
+  import WriterT.writerTMonad
 
   type Errs = MountingError \/ PathTypeMismatch
 
@@ -80,6 +82,8 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
   type VSS[A]         = State[VS, A]
   type VFS[A]         = ErrsT[VSS, A]
+
+  type QP[A] = PhaseResultT[SemanticErrors \/ ?, A]
 
   def runMounting[F[_]](implicit F: MonadState[F, VS]): Mounting ~> F =
     free.foldMapNT(KeyValueStore.impl.toState[F](VS.mountConfigs)) compose Mounter.trivial[MountConfigs]
@@ -166,7 +170,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
     "translate simple read to query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = sqlE"select * from `/zips`"
-      val lp = queryPlan(expr, Variables.empty, rootDir, 0L, None).run.run._2
+      val lp = queryPlan[QP, Fix, Fix[LogicalPlan]](expr, Variables.empty, rootDir, 0L, None).value
                  .valueOr(e => scala.sys.error("Unexpected semantic errors during compilation: " + e.shows))
 
       val views = Map(p -> expr)
@@ -660,15 +664,16 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           lpf.constant(Data.Int(10))).embed
 
       val innerLP =
-        quasar.precompile[Fix[LogicalPlan]](inner, Variables.empty, fileParent(p)).run.value.toOption.get
+        precompile[QP, Fix, Fix[LogicalPlan]](inner, Variables.empty, fileParent(p))
+          .value.toOption.get
 
       val vs = Map[AFile, Fix[Sql]](p -> inner)
 
-      val exp = quasar.preparePlan(Take(
+      val exp = preparePlan[PhaseResultT[ArgumentErrors \/ ?, ?], Fix[LogicalPlan]](Take(
           Drop(
             innerLP,
             lpf.constant(Data.Int(5))).embed,
-          lpf.constant(Data.Int(10))).embed).run.value.toOption.get
+          lpf.constant(Data.Int(10))).embed).value.toOption.get
 
       resolvedRefs(vs, outer) must beRightDisjunction.like {
         case r => r must beTreeEqual(exp)
@@ -742,8 +747,8 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val q = unsafeParse(s"select * from `${posixCodec.printPath(p)}` limit 10")
 
       val qlp =
-        quasar.queryPlan(q, Variables.empty, rootDir, 0L, None)
-          .run.value.valueOr(e => scala.sys.error("Unexpected error compiling sql query: " + e.shows))
+        queryPlan[QP, Fix, Fix[LogicalPlan]](q, Variables.empty, rootDir, 0L, None)
+          .value.valueOr(e => scala.sys.error("Unexpected error compiling sql query: " + e.shows))
 
       val vs = Map[AFile, Fix[Sql]](p -> q)
 

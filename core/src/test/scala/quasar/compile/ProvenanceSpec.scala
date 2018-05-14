@@ -17,11 +17,13 @@
 package quasar.compile
 
 import slamdata.Predef._
-import quasar.sql.SemanticAnalysis._, Provenance._
+import quasar.sql._
 
 import pathy.Path._
 
 class ProvenanceSpec extends quasar.Qspec {
+  import SemanticAnalysis._, Provenance._
+
   val Rel1 = Relation(TableRelationAST(file("foo"), None))
   val Rel2 = Relation(TableRelationAST(file("bar"), None))
 

@@ -17,7 +17,9 @@
 package quasar.fs.mount
 
 import slamdata.Predef._
-import quasar.{Data, Func}
+import quasar.{Data, Func, Variables}
+import quasar.common.PhaseResultT
+import quasar.compile.SemanticErrors
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._, free._
@@ -119,14 +121,19 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
 
   def failsForDifferentFs[A](f: (Fix[LogicalPlan], AFile) => ExecM[A]) =
     "should fail if any plan paths refer to different filesystems" >> {
-      import quasar.{queryPlan, Variables}
+      import quasar.compile.queryPlan
       import quasar.sql._
+
+      // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+      import WriterT.writerTMonad
+
+      type F[A] = PhaseResultT[SemanticErrors \/ ?, A]
 
       val joinQry =
         "select f.x, q.y from `/bar/mntA/foo` as f inner join `/foo/mntC/quux` as q on f.id = q.id"
 
       val lp = fixParser.parseExpr(joinQry).toOption
-        .flatMap(expr => queryPlan(expr, Variables(Map()), rootDir, 0L, None).run.value.toOption)
+        .flatMap(expr => queryPlan[F, Fix, Fix[LogicalPlan]](expr, Variables(Map()), rootDir, 0L, None).value.toOption)
         .get
 
       runMntd(f(lp, mntA </> file("out0")).run.value)

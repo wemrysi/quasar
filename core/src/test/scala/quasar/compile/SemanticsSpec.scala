@@ -18,6 +18,7 @@ package quasar.compile
 
 import slamdata.Predef._
 import quasar.TreeMatchers
+import quasar.sql._
 import quasar.sql.fixpoint._
 
 import matryoshka._

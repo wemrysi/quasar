@@ -431,10 +431,10 @@ lazy val connector = project
 lazy val core = project
   .settings(name := "quasar-core-internal")
   .dependsOn(
-    fs        % BothScopes,
-    sql,
-    api       % "test->test",
-    effect    % "test->test")
+    fs     % BothScopes,
+    sql    % BothScopes,
+    api    % "test->test",
+    effect % "test->test")
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
