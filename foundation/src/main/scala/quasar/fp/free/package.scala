@@ -34,6 +34,8 @@ package object free {
   /** `Inject#inj` as a natural transformation. */
   def injectNT[F[_], G[_]](implicit I: F :<: G) = λ[F ~> G](I inj _)
 
+  def injectNTCopK[F[_], G[a] <: ACopK[a]](implicit I: F :<<: G) = λ[F ~> G](I inj _)
+
   /** `Inject#prj` as a natural transformation. */
   def projectNT[F[_], G[_]](implicit I: F :<: G) = λ[G ~> λ[a => Option[F[a]]]](I prj _)
 
