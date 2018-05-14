@@ -26,6 +26,7 @@ import quasar.api.ApiErrorEntityDecoder._
 import quasar.api.matchers._
 import quasar.api.PathUtils._
 import quasar.api.services.Fixture._
+import quasar.common.CIName
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fp._
 import quasar.fp.numeric._

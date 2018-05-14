@@ -18,18 +18,19 @@ package quasar.fs.cache
 
 import slamdata.Predef._
 import quasar.common.PhaseResultT
+import quasar.compile.SemanticErrsT
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.Timing
-import quasar.frontend.SemanticErrsT
 import quasar.fp.free
 import quasar.fs.FileSystemError, FileSystemError._
 import quasar.fs.mount.{MountConfig, Mounting}
 import quasar.fs.mount.cache.{ViewCache, VCache}
+import quasar.fs.mount.module.resolveImports_
 import quasar.fs.MoveSemantics.Overwrite
 import quasar.fs.PathError._
 import quasar.fs.{ManageFile, QueryFile, WriteFile}
-import quasar.main.FilesystemQueries
+import quasar.main.{CompExec, FilesystemQueries}
 import quasar.metastore.{MetaStoreAccess, PathedViewCache, Queries}
 
 import java.time.{Duration => JDuration, Instant}
@@ -55,10 +56,10 @@ object ViewCacheRefresh {
     S2: Mounting :<: S,
     S3: ConnectionIO :<: S,
     S4: Task :<: S
-  ): Q.transforms.CompExecM[Unit] = {
-    import Q.transforms._
-
+  ): CompExec[Free[S, ?]]#CompExecM[Unit] = {
+    val CE = CompExec[Free[S, ?]]
     val M = ManageFile.Ops[S]
+    import CE._
 
     val getCachedView: CompExecM[ViewCache] =
       lift(MetaStoreAccess.lookupViewCache(viewPath) ∘ (_ \/> pathErr(pathNotFound(viewPath))))
@@ -90,7 +91,7 @@ object ViewCacheRefresh {
     Q: QueryFile.Ops[S],
     T: Timing.Ops[S],
     S0: ConnectionIO :<: S
-  ): Q.transforms.CompExecM[Option[PathedViewCache]] =
+  ): CompExec[Free[S, ?]]#CompExecM[Option[PathedViewCache]] =
     lift(T.timestamp ∘ (_.right[FileSystemError])) >>= (ts =>
       lift(MetaStoreAccess.staleCachedViews(ts) ∘ (_.right[FileSystemError])) ∘ (_.headOption))
 
@@ -105,12 +106,12 @@ object ViewCacheRefresh {
     S1: ManageFile :<: S,
     S2: Mounting :<: S,
     S3: Task :<: S
-  ): Q.transforms.CompExecM[Unit] = {
+  ): CompExec[Free[S, ?]]#CompExecM[Unit] = {
     val fsQ = new FilesystemQueries[S]
 
     for {
       q       <- EitherT(EitherT(
-                   (quasar.resolveImports_[S](view.query, basePath).leftMap(nels(_)).run.run ∘ (_.sequence))
+                   (resolveImports_[S](view.query, basePath).leftMap(nels(_)).run.run ∘ (_.sequence))
                      .liftM[PhaseResultT]))
       _       <- fsQ.executeQuery(q, view.vars, basePath, tmpDataPath)
     } yield ()
@@ -120,14 +121,14 @@ object ViewCacheRefresh {
     v: FileSystemError \/ A
   )(implicit
     Q: QueryFile.Ops[S]
-  ): Q.transforms.CompExecM[A] =
+  ): CompExec[Free[S, ?]]#CompExecM[A] =
     lift(v.η[Free[S, ?]])
 
   def lift[S[_], A](
     v: Free[S, FileSystemError \/ A]
   )(implicit
     Q: QueryFile.Ops[S]
-  ): Q.transforms.CompExecM[A] =
+  ): CompExec[Free[S, ?]]#CompExecM[A] =
     EitherT(v.liftM[PhaseResultT].liftM[SemanticErrsT])
 
   def lift[S[_], A](
@@ -135,6 +136,6 @@ object ViewCacheRefresh {
   )(implicit
     S0: ConnectionIO :<: S,
     Q: QueryFile.Ops[S]
-  ): Q.transforms.CompExecM[A] =
+  ): CompExec[Free[S, ?]]#CompExecM[A] =
     lift(Free.liftF(S0(cio)))
 }
