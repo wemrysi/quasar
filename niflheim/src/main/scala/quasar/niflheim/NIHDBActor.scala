@@ -17,7 +17,6 @@
 package quasar.niflheim
 
 import quasar.precog.common._
-import quasar.precog.common.ingest.EventId
 import quasar.precog.util._
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
@@ -352,12 +351,6 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
   private def computeBlockMap(current: BlockState) = {
     val allBlocks: List[StorageReader] = (current.cooked ++ current.pending.values :+ current.rawLog)
     SortedMap(allBlocks.map { r => r.id -> r }.toSeq: _*)
-  }
-
-  def updatedThresholds(current: Map[Int, Int], ids: Seq[Long]): Map[Int, Int] = {
-    (current.toSeq ++ ids.map {
-      i => val EventId(p, s) = EventId.fromLong(i); (p -> s)
-    }).groupBy(_._1).map { case (p, ids) => (p -> ids.map(_._2).max) }
   }
 
   override def receive = {
