@@ -19,8 +19,9 @@ package quasar
 import quasar.api.ResourcePath
 
 import monocle.macros.Lenses
-import scalaz.{Cord, Equal, Functor, Order, Show}
+import scalaz.{Applicative, Cord, Equal, Order, Show, Traverse}
 import scalaz.std.tuple._
+import scalaz.syntax.functor._
 import scalaz.syntax.show._
 
 @Lenses
@@ -32,12 +33,6 @@ final case class Source[A](path: ResourcePath, src: A) {
 object Source extends SourceInstances
 
 sealed abstract class SourceInstances extends SourceInstances0 {
-  implicit val functor: Functor[Source] =
-    new Functor[Source] {
-      def map[A, B](sa: Source[A])(f: A => B) =
-        sa map f
-    }
-
   implicit def order[A: Order]: Order[Source[A]] =
     Order.orderBy {
       case Source(p, a) => (p, a)
@@ -48,10 +43,19 @@ sealed abstract class SourceInstances extends SourceInstances0 {
       case Source(p, a) =>
         Cord("Source(") ++ p.show ++ Cord(", ") ++ a.show ++ Cord(")")
     }
+
+  implicit val traverse: Traverse[Source] =
+    new Traverse[Source] {
+      override def map[A, B](sa: Source[A])(f: A => B) =
+        sa map f
+
+      def traverseImpl[F[_]: Applicative, A, B](fa: Source[A])(f: A => F[B]) =
+        f(fa.src) map (Source(fa.path, _))
+    }
 }
 
 sealed abstract class SourceInstances0 {
-  def equal[A: Equal]: Equal[Source[A]] =
+  implicit def equal[A: Equal]: Equal[Source[A]] =
     Equal.equalBy {
       case Source(p, a) => (p, a)
     }

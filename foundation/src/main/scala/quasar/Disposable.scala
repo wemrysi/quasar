@@ -20,7 +20,7 @@ import slamdata.Predef.{Throwable, Unit}
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.κ
 
-import scalaz.{Applicative, Functor, Monad, Monoid, Semigroup, Zip}
+import scalaz.{Functor, Monad, Monoid, Semigroup, Zip}
 import scalaz.syntax.monad._
 import scalaz.syntax.monoid._
 
@@ -38,14 +38,12 @@ final class Disposable[F[_], A](
   def apply[B](f: A => F[B])(implicit F0: Monad[F], F1: MonadError_[F, Throwable]): F[B] =
     F1.ensuring(f(value))(κ(dispose))
 
-  def ap[B](other: => Disposable[F, A => B])(
+  def flatMap[B](f: A => Disposable[F, B])(
       implicit
       F0: Monad[F],
       F1: MonadError_[F, Throwable])
       : Disposable[F, B] =
-    other.zip(this) map {
-      case (f, a) => f(a)
-    }
+    zip(f(value)).map(_._2)
 
   def map[B](f: A => B): Disposable[F, B] =
     Disposable(f(value), dispose)
@@ -74,10 +72,13 @@ object Disposable extends DisposableInstances {
 }
 
 sealed abstract class DisposableInstances extends DisposableInstances0 {
-  implicit def applicative[F[_]: Monad: MonadError_[?[_], Throwable]]: Applicative[Disposable[F, ?]] =
-    new Applicative[Disposable[F, ?]] {
-      def ap[A, B](fa: => Disposable[F, A])(ff: => Disposable[F, A => B]) =
-        fa ap ff
+  implicit def monad[F[_]: Monad: MonadError_[?[_], Throwable]]: Monad[Disposable[F, ?]] =
+    new Monad[Disposable[F, ?]] {
+      def bind[A, B](fa: Disposable[F, A])(f: A => Disposable[F, B]) =
+        fa flatMap f
+
+      override def map[A, B](fa: Disposable[F, A])(f: A => B) =
+        fa map f
 
       def point[A](a: => A) =
         Disposable(a, ().point[F])
