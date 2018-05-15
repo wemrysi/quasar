@@ -18,7 +18,7 @@ package quasar.precog.common
 package ingest
 
 import quasar.blueeyes._, json._, serialization._
-import IsoSerialization._, Iso8601Serialization._, Versioned._
+import Iso8601Serialization._, Versioned._
 import Extractor._
 import scalaz._, Scalaz._, Validation._
 
@@ -29,7 +29,7 @@ import java.util.UUID
 import java.time.Instant
 
 sealed trait Event {
-  def fold[A](ingest: Ingest => A, archive: Archive => A): A
+  def fold[A](ingest: Ingest => A): A
   def split(n: Int): List[Event]
   def length: Int
 }
@@ -37,14 +37,14 @@ sealed trait Event {
 object Event {
   implicit val decomposer: Decomposer[Event] = new Decomposer[Event] {
     override def decompose(event: Event): JValue = {
-      event.fold(_.serialize, _.serialize)
+      event.fold(_.serialize)
     }
   }
 }
 
 case class Ingest(path: Path, data: Seq[JValue], jobId: Option[JobId], timestamp: Instant, streamRef: StreamRef)
     extends Event {
-  def fold[A](ingest: Ingest => A, archive: Archive => A): A = ingest(this)
+  def fold[A](ingest: Ingest => A): A = ingest(this)
 
   def split(n: Int): List[Event] = {
     val splitSize = (data.length / n) max 1
@@ -89,22 +89,6 @@ object Ingest {
 
   implicit val decomposer: Decomposer[Ingest] = decomposerV1
   implicit val extractor: Extractor[Ingest] = extractorV1
-}
-
-case class Archive(path: Path, jobId: Option[JobId], timestamp: Instant) extends Event {
-  def fold[A](ingest: Ingest => A, archive: Archive => A): A = archive(this)
-  def split(n: Int) = List(this) // can't split an archive
-  def length = 1
-}
-
-object Archive {
-  val schemaV1 = "path" :: "jobId" :: ("timestamp" ||| EventMessage.defaultTimestamp) :: HNil
-
-  val extractorV1: Extractor[Archive] = extractorV[Archive](schemaV1, None)
-  val decomposerV1: Decomposer[Archive] = decomposerV[Archive](schemaV1, Some("1.0".v))
-
-  implicit val decomposer: Decomposer[Archive] = decomposerV1
-  implicit val extractor: Extractor[Archive] = extractorV1
 }
 
 sealed trait StreamRef {
