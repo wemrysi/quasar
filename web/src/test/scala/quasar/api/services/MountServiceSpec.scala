@@ -21,6 +21,7 @@ import quasar._
 import quasar.api._, ApiErrorEntityDecoder._
 import quasar.api.PathUtils._
 import quasar.api.matchers._
+import quasar.common.CIName
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.effect.{Failure, KeyValueStore, Timing}
 import quasar.fp._

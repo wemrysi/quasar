@@ -18,10 +18,13 @@ package quasar.fs.mount.module
 
 import slamdata.Predef._
 import quasar._
-import quasar.fp.numeric._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
+import quasar.common._
+import quasar.compile.{queryPlan, SemanticError, SemanticErrors}
 import quasar.effect.{Failure, LiftedOps}
+import quasar.fp.numeric._
+import quasar.frontend.logicalplan.{LogicalPlan => LP}
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.sql._
@@ -185,8 +188,9 @@ object Module {
             allArgs      <- EitherT(maybeAllArgs.toRightDisjunction(argumentsMissing(missingArgs)).point[Free[S, ?]])
             scopedExpr   =  ScopedExpr(invokeFunction[Fix[Sql]](CIName(name), allArgs).embed, moduleConfig.statements)
             sql          <- EitherT(resolveImports_(scopedExpr, currentDir).leftMap(e => semErrors(e.wrapNel)).run.leftMap(fsError(_))).flattenLeft
-            lp           <- EitherT(quasar.queryPlan(sql, Variables.empty, basePath = currentDir, offset, limit)
-                              .run.value.leftMap(semErrors(_)).point[Free[S, ?]])
+            lp           <- queryPlan[PhaseResultT[EitherT[Free[S, ?], SemanticErrors, ?], ?], Fix, Fix[LP]](
+                              sql, Variables.empty, currentDir, offset, limit)
+                              .value.leftMap(semErrors(_))
             handle       <- EitherT(query.eval(lp).run.value).leftMap(fsError(_))
           } yield ResultHandle(handle.run)).run
         case More(handle)  => query.more(QueryFile.ResultHandle(handle.run)).run

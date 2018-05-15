@@ -45,7 +45,7 @@ class ResultFileQueryRegressionSpec
   val suiteName = "ResultFile Queries"
 
   def queryResults(expr: Fix[Sql], vars: Variables, basePath: ADir) = {
-    import qfTransforms._
+    import CE._
 
     type M[A] = FileSystemErrT[F, A]
 

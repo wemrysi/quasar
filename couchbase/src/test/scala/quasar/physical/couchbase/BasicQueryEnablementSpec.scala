@@ -18,6 +18,7 @@ package quasar.physical.couchbase
 
 import slamdata.Predef._
 import quasar._
+import quasar.compile.CompilerHelpers
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.MonotonicSeq

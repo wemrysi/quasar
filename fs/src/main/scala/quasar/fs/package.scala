@@ -16,21 +16,17 @@
 
 package quasar
 
-import quasar.common.PhaseResultW
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadError_
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.ski._
-import quasar.frontend.SemanticErrsT
 
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 
 package object fs extends PhysicalErrorPrisms {
-  type CompileM[A] = SemanticErrsT[PhaseResultW, A]
-
   type FileSystem[A] = (QueryFile :\: ReadFile :\: WriteFile :/: ManageFile)#M[A]
 
   type BackendEffect[A] = Coproduct[Analyze, FileSystem, A]

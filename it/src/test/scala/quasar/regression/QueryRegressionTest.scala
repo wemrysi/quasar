@@ -20,18 +20,18 @@ import slamdata.Predef._
 import quasar._
 import quasar.build.BuildInfo
 import quasar.common._
+import quasar.compile.{SemanticError, SemanticErrsT}
 import quasar.contrib.argonaut._
 import quasar.contrib.pathy.Helpers._
 import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.writerT._
 import quasar.ejson
 import quasar.ejson.Common.{Optics => CO}
-import quasar.frontend._
 import quasar.contrib.pathy._
 import quasar.fp._, free._
 import quasar.fp.ski._
 import quasar.fs._
-import quasar.main.{physicalFileSystems, FilesystemQueries}
+import quasar.main.{physicalFileSystems, CompExec, FilesystemQueries}
 import quasar.fs.mount.{Mounts, hierarchical}
 import quasar.sql, sql.Sql
 
@@ -63,8 +63,8 @@ abstract class QueryRegressionTest[S[_]](
 
   type FsErr[A] = FileSystemErrT[F, A]
 
-  val qfTransforms = QueryFile.Transforms[F]
-  import qfTransforms._
+  val CE = CompExec[F]
+  import CE._
 
   val injectTask: Task ~> F =
     liftFT[S].compose(injectNT[Task, S])

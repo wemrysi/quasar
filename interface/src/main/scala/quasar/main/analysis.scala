@@ -17,7 +17,9 @@
 package quasar.main
 
 import slamdata.Predef._
-import quasar.{Data, queryPlan, resolveImports_, Variables}
+import quasar.{Data, Variables}
+import quasar.common.PhaseResultT
+import quasar.compile.{queryPlan, SemanticErrors}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.ejson.{EJson, EncodeEJson}
@@ -25,7 +27,7 @@ import quasar.ejson.implicits._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._
 import quasar.fs.mount.Mounting
-import quasar.frontend.SemanticErrors
+import quasar.fs.mount.module.resolveImports_
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.sql.{ScopedExpr, Sql}
 import quasar.sst._
@@ -167,8 +169,8 @@ object analysis {
     resolveImports_[S](expr, baseDir)
       .leftMap(_.wrapNel)
       .flatMapF(query =>
-        queryPlan(query, vars, baseDir, 0L, none).run.value
-          .traverse(sampleOfPlan[S](_, size)))
+        queryPlan[PhaseResultT[SemanticErrors \/ ?, ?], Fix, Fix[LogicalPlan]](query, vars, baseDir, 0L, none)
+          .value.traverse(sampleOfPlan[S](_, size)))
       .run
 
   def schemaToData[T[_[_]]: BirecursiveT, A: EncodeEJson: Equal: Field: NRoot](

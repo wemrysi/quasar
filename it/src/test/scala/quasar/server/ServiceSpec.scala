@@ -293,7 +293,7 @@ class ServiceSpec extends quasar.Qspec {
         )(Task.now)
       }
 
-      r.map(_.status) must beRightDisjunction(BadRequest withReason "Compilation failed")
+      r.map(_.status) must beRightDisjunction(InternalServerError withReason "Failed to plan query.")
     }
   }
 

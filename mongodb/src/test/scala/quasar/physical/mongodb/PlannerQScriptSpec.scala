@@ -16,19 +16,19 @@
 
 package quasar.physical.mongodb
 
+import slamdata.Predef._
 import quasar._
 import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._
 import quasar.contrib.specs2.PendingWithActualTracking
 import quasar.ejson.{EJson, Fixed}
+import quasar.frontend.logicalplan.JoinDir
 import quasar.javascript._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.planner.common._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.{OnUndefined, ShiftType}
-import quasar.sql.JoinDir
-import slamdata.Predef._
 
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix

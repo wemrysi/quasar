@@ -17,20 +17,46 @@
 package quasar.fs.mount
 
 import slamdata.Predef._
+import quasar.compile.SemanticError
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
+import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.ski.ι
 import quasar.fp.numeric._
 import quasar.fp.free._
 import quasar.fs._, FileSystemError._, PathError._
 import quasar.fs.mount.cache.VCache.VCacheKVS
+import quasar.sql._
 
+import matryoshka.data.Fix
 import pathy.Path._
 import scalaz.{Failure => _, Node => _, _}, Scalaz._
 
 package object module {
   import MountConfig.{ModuleConfig, moduleConfig}
+
+  def resolveImports[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(
+      implicit
+      mount: Mounting.Ops[S],
+      fsFail: Failure.Ops[FileSystemError, S])
+      : EitherT[Free[S, ?], SemanticError, Fix[Sql]] =
+    EitherT(fsFail.unattemptT(resolveImports_(scopedExpr, baseDir).run))
+
+  def resolveImports_[S[_]](scopedExpr: ScopedExpr[Fix[Sql]], baseDir: ADir)(
+      implicit
+      mount: Mounting.Ops[S])
+      : EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, Fix[Sql]] = {
+    def moduleStatements(d: ADir) =
+      EitherT(
+        mount
+          .lookupModuleConfig(d)
+          .bimap(e => SemanticError.genericError(e.shows), _.statements)
+          .run.toRight(pathErr(pathNotFound(d))))
+
+    ResolveImports[EitherT[FileSystemErrT[Free[S, ?], ?], SemanticError, ?], Fix](
+      scopedExpr, baseDir, moduleStatements)
+  }
 
   private def moduleAncestor[S[_]](f: AFile)(implicit S: Mounting :<: S): Free[S, Option[ModuleConfig]] = {
     val mount = Mounting.Ops[S]

@@ -21,7 +21,6 @@ import quasar.fp.free.foldMapNT
 import quasar.fp.ski.κ
 import quasar.fs._
 import quasar.physical.marklogic.testing
-import quasar.sql.CompilerHelpers
 
 import eu.timepit.refined.auto._
 import org.specs2.specification.core.{Fragment, Fragments}
@@ -29,7 +28,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-abstract class MultiFormatFileSystemTest extends quasar.Qspec with CompilerHelpers {
+abstract class MultiFormatFileSystemTest extends quasar.Qspec {
   def multiFormatFileSystemShould(
     js:  BackendEffect ~> Task,
     xml: BackendEffect ~> Task
