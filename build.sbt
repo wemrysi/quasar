@@ -440,9 +440,9 @@ lazy val core = project
   .settings(name := "quasar-core-internal")
   .dependsOn(
     api     % BothScopes,
-    fs      % BothScopes,
     qscript % BothScopes,
     sql     % BothScopes,
+    fs      % "test->test",
     effect  % "test->test")
   .settings(commonSettings)
   .settings(publishTestsSettings)
