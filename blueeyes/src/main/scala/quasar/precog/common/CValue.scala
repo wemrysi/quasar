@@ -17,8 +17,7 @@
 package quasar.precog
 package common
 
-import quasar.blueeyes._, json._, serialization._
-import quasar.blueeyes.json.serialization.DefaultSerialization._
+import quasar.blueeyes._, json._
 import quasar.time.{DateTimeInterval, OffsetDate}
 
 import scalaz._, Scalaz._, Ordering._
@@ -312,19 +311,6 @@ object CType {
     case "Interval"       => Some(CInterval)
     case ArrayName(elem)  => fromName(elem) collect { case tp: CValueType[_] => CArrayType(tp) }
     case _                => None
-  }
-
-  implicit val decomposer: Decomposer[CType] = new Decomposer[CType] {
-    def decompose(ctype: CType): JValue = JString(nameOf(ctype))
-  }
-
-  implicit val extractor: Extractor[CType] = new Extractor[CType] {
-    def validated(obj: JValue): Validation[Extractor.Error, CType] =
-      obj.validated[String].map(fromName _) match {
-        case Success(Some(t)) => Success(t)
-        case Success(None)    => Failure(Extractor.Invalid("Unknown type."))
-        case Failure(f)       => Failure(f)
-      }
   }
 
   def readResolve() = CType

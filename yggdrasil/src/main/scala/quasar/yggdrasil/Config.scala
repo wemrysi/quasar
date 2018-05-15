@@ -14,20 +14,18 @@
  * limitations under the License.
  */
 
-package quasar.precog.common.ingest
+package quasar.yggdrasil
 
-import org.scalacheck.Gen
-import quasar.precog.TestSupport._
+object Config {
+  val idSource = new FreshAtomicIdSource
 
-object EventIdSpecs extends Specification with ScalaCheck {
-  implicit val idRange = Gen.chooseNum[Int](0, Int.MaxValue)
+  def hashJoins         = true
+  def maxSliceSize: Int = 20000
 
-  "EventId" should {
-    "support round-trip encap/decap of producer/sequence ids" in prop { (prod: Int, seq: Int) =>
-      val uid = EventId(prod, seq).uid
+  // This is a slice size that we'd like our slices to be at least as large as.
+  def minIdealSliceSize: Int = maxSliceSize / 4
 
-      EventId.producerId(uid) mustEqual prod
-      EventId.sequenceId(uid) mustEqual seq
-    }
-  }
+  // This is what we consider a "small" slice. This may affect points where
+  // we take proactive measures to prevent problems caused by small slices.
+  def smallSliceSize: Int = 50
 }
