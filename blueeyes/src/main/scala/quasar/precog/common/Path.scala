@@ -16,8 +16,6 @@
 
 package quasar.precog.common
 
-import quasar.blueeyes._, json._, serialization._, DefaultSerialization._
-
 class Path private (val elements: String*) {
   val path: String = elements.mkString("/", "/", "/").replaceAll("/+", "/")
 
@@ -31,9 +29,6 @@ class Path private (val elements: String*) {
 }
 
 object Path {
-  implicit val PathDecomposer: Decomposer[Path] = StringDecomposer contramap { (_: Path).toString }
-  implicit val PathExtractor: Extractor[Path]   = StringExtractor map { Path(_) }
-
   val Root = new Path()
 
   private def cleanPath(string: String): String = string.replaceAll("^/|/$", "").replaceAll("/+", "/")
