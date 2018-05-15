@@ -24,7 +24,7 @@ import scalaz._
 import Scalaz._
 import ExtractorDecomposer.by
 import java.util.UUID
-import java.time.{Duration, Instant, LocalDateTime}
+import java.time.{Duration, Instant}
 
 /** Decomposes the value into a JSON object.
   */
@@ -117,17 +117,4 @@ object SerializationImplicits extends SerializationImplicits
 /** Bundles default extractors, default decomposers, and serialization
   * implicits for natural serialization of core supported types.
   */
-object DefaultSerialization extends DefaultExtractors with DefaultDecomposers with SerializationImplicits {
-  implicit val DateTimeExtractorDecomposer =
-    by[LocalDateTime].opt(x => JNum(x.getMillis): JValue)(_.validated[Long] map (dateTime fromMillis _))
-}
-
-// when we want to serialize dates as ISO8601 not as numbers
-object Iso8601Serialization extends DefaultExtractors with DefaultDecomposers with SerializationImplicits {
-  import Extractor._
-  implicit val TZDateTimeExtractorDecomposer =
-    by[LocalDateTime].opt(d => JString(dateTime showIso d): JValue) {
-      case JString(dt) => (Thrown.apply _) <-: Validation.fromTryCatchNonFatal(dateTime fromIso dt)
-      case _           => Failure(Invalid("Date time must be represented as JSON string"))
-    }
-}
+object DefaultSerialization extends DefaultExtractors with DefaultDecomposers with SerializationImplicits
