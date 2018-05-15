@@ -19,7 +19,7 @@ package quasar
 import slamdata.Predef._
 import quasar.api._, ResourceError._
 import quasar.contrib.pathy.{ADir, AFile}
-import quasar.fp.{constEqual, coproductEqual}
+import quasar.fp.{copkTraverse, copkEqual, copKRenderTree}
 import quasar.qscript._
 
 import matryoshka._
