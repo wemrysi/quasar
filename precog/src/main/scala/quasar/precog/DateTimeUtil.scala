@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.precog.util
+package quasar.precog
 
 import quasar.time.OffsetDate
 
