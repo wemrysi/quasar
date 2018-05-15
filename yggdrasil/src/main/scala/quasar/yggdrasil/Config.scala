@@ -16,7 +16,7 @@
 
 package quasar.yggdrasil
 
-object yggConfig {
+object Config {
   val idSource = new FreshAtomicIdSource
 
   def hashJoins         = true

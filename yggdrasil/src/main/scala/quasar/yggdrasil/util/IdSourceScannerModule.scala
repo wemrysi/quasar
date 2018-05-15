@@ -19,14 +19,14 @@ package quasar.yggdrasil.util
 import quasar.precog.util._
 import quasar.precog.common._
 import quasar.yggdrasil.table._
-import quasar.yggdrasil.{yggConfig, FreshAtomicIdSource}
+import quasar.yggdrasil.{Config, FreshAtomicIdSource}
 
 trait IdSourceScannerModule {
   val idSource = new FreshAtomicIdSource
   def freshIdScanner = new CScanner {
     type A = Long
     def init = 0
-    private val id = yggConfig.idSource.nextId()
+    private val id = Config.idSource.nextId()
 
     def scan(pos: Long, cols: Map[ColumnRef, Column], range: Range): (A, Map[ColumnRef, Column]) = {
       val rawCols = cols.values.toArray

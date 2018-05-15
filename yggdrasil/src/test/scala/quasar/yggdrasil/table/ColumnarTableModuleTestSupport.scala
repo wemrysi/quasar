@@ -54,7 +54,7 @@ trait ColumnarTableModuleTestSupport[M[+_]] extends ColumnarTableModule[M] with 
   // production-path code uses fromRValues, but all the tests use fromJson
   // this will need to be changed when our tests support non-json such as CDate and CPeriod
   def fromJson0(values: Stream[JValue], maxSliceSize: Option[Int] = None): Table = {
-    val sliceSize = maxSliceSize.getOrElse(yggConfig.maxSliceSize)
+    val sliceSize = maxSliceSize.getOrElse(Config.maxSliceSize)
 
     Table(
       StreamT.unfoldM(values) { events =>
