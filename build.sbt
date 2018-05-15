@@ -238,24 +238,24 @@ lazy val root = project.in(file("."))
        foundation, //___
 //    /    \      \     \
     api, effect, ejson, js, //______
-//       /     \   /                \
-               common,
-//     /      /      \                \
-        frontend,    precog,
-//    |/   /    \        |             |
-     fs, sql, datagen, blueeyes,
-//    | \ |              |             |
-//    |  \|_____         |             |
-//    |         \        |             |
-     qscript,  core,  niflheim,
-//    |          |       |             |
-     qsu,
-//     __\_______/       |             |
+//  /      |        \   /           \
+                  common,
+// /       |     /  |   \             \
+        frontend,  sql, precog,
+// |   /    |       |    |             |
+     fs,  datagen,    blueeyes,
+// |  |             |    |             |
+// |  |_________   /     |             |
+// |__|_________\ /      |             |
+     qscript,         niflheim,
+// |  |       \  |       |_____________|__
+     qsu,      core,
+// \____\            \   |             | |
          connector,   yggdrasil,
-//     |     |   \______|______________|_________
-//     |     |         /     \         \         \
+//     /     |   \______|______________|_|_______
+//     |     |         /     \         \ |       \
           skeleton, mimir, marklogic, mongodb, couchbase,
-//     \      |    /          |          |         |
+//     \     |     /          |          |         |
           interface,
 //          /  \              |          |         |
          repl, web,
@@ -388,9 +388,7 @@ lazy val sql = project
 
 lazy val fs = project
   .settings(name := "quasar-fs-internal")
-  .dependsOn(
-    effect,
-    frontend % BothScopes)
+  .dependsOn(frontend % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(publishTestsSettings)
@@ -400,8 +398,8 @@ lazy val fs = project
 lazy val qscript = project
   .settings(name := "quasar-qscript-internal")
   .dependsOn(
-    frontend % "test->test",
-    fs)
+    fs,
+    frontend % "test->test")
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
@@ -431,10 +429,11 @@ lazy val connector = project
 lazy val core = project
   .settings(name := "quasar-core-internal")
   .dependsOn(
-    fs     % BothScopes,
-    sql    % BothScopes,
-    api    % "test->test",
-    effect % "test->test")
+    api     % BothScopes,
+    fs      % BothScopes,
+    qscript % BothScopes,
+    sql     % BothScopes,
+    effect  % "test->test")
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
