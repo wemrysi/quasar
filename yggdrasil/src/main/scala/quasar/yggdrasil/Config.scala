@@ -16,19 +16,17 @@
 
 package quasar.yggdrasil
 
-trait IdSource {
-  def nextIdBlock(n: Int): Long
-  def nextId(): Long
-}
+object yggConfig {
+  val idSource = new FreshAtomicIdSource
 
-final class FreshAtomicIdSource extends IdSource {
-  private val source = new java.util.concurrent.atomic.AtomicLong
-  def nextId() = source.getAndIncrement
-  def nextIdBlock(n: Int): Long = {
-    var nextId = source.get()
-    while (!source.compareAndSet(nextId, nextId + n)) {
-      nextId = source.get()
-    }
-    nextId
-  }
+  def hashJoins         = true
+  def sortBufferSize    = 1000
+  def maxSliceSize: Int = 20000
+
+  // This is a slice size that we'd like our slices to be at least as large as.
+  def minIdealSliceSize: Int = maxSliceSize / 4
+
+  // This is what we consider a "small" slice. This may affect points where
+  // we take proactive measures to prevent problems caused by small slices.
+  def smallSliceSize: Int = 50
 }

@@ -16,10 +16,10 @@
 
 package quasar.yggdrasil.util
 
-import quasar.blueeyes._
 import quasar.precog.util._
 import quasar.precog.common._
 import quasar.yggdrasil.table._
+import quasar.yggdrasil.{yggConfig, FreshAtomicIdSource}
 
 trait IdSourceScannerModule {
   val idSource = new FreshAtomicIdSource
