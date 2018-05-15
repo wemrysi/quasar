@@ -23,6 +23,7 @@ import quasar.contrib.pathy._
 import quasar.contrib.specs2._
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp.ski._
+import quasar.frontend.logicalplan.JoinDir
 import quasar.fs._
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._

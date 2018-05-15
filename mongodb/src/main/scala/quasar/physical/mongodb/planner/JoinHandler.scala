@@ -23,6 +23,7 @@ import quasar.common.JoinType
 import quasar.contrib.scalaz._
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.frontend.logicalplan.JoinDir
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb._, WorkflowBuilder._
@@ -30,7 +31,6 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.ExcludeId
-import quasar.sql.JoinDir
 
 import matryoshka._
 import matryoshka.data.Fix
