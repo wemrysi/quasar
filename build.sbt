@@ -242,13 +242,15 @@ lazy val root = project.in(file("."))
                   common,
 // /       |     /  |   \             \
         frontend,  sql, precog,
-// |   /    |       |    |             |
-     fs,  datagen,    blueeyes,
-// |  |             |    |             |
-// |  |_________   /     |             |
-// |__|_________\ /      |             |
+// |   /    |  \    |    |             |
+     fs,  sst,            blueeyes,
+// |  |     |   |   |    |             |
+// |  |     |   \   /    |             |
+        datagen,
+// |  |__________||      |             |
+// |__|__________||      |             |
      qscript,         niflheim,
-// |  |       \  |       |_____________|__
+// |  |          ||      |_____________|__
      qsu,      core,
 // \____\            \   |             | |
          connector,   yggdrasil,
@@ -363,9 +365,17 @@ lazy val frontend = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val sst = project
+  .settings(name := "quasar-sst-internal")
+  .dependsOn(frontend % BothScopes)
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val datagen = project
   .settings(name := "quasar-datagen")
-  .dependsOn(frontend % BothScopes)
+  .dependsOn(sst % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
@@ -511,8 +521,9 @@ lazy val interface = project
   .settings(name := "quasar-interface-internal")
   .dependsOn(
     core % BothScopes,
+    mimir,
     skeleton,
-    mimir)
+    sst)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
