@@ -2,6 +2,7 @@
     "name": "convert dates to/from strings",
     "backends": {
         "couchbase": "ignoreFieldOrder",
+        "lwc_local":"pendingIgnoreFieldOrder",
         "marklogic_json": "pendingIgnoreFieldOrder",
         "marklogic_xml": "pending",
         "mimir":"pendingIgnoreFieldOrder",

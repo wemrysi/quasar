@@ -2,6 +2,7 @@
     "name": "basic analytic query",
     "backends": {
         "couchbase":         "pendingIgnoreFieldOrder",
+        "lwc_local":         "ignoreFieldOrder",
         "marklogic_json":    "ignoreFieldOrder",
         "mimir":             "ignoreFieldOrder",
         "mongodb_3_2":       "skip",

@@ -22,6 +22,7 @@ stages:
 env:
   matrix:
     # - CONNECTOR=couchbase
+    - CONNECTOR=lwc_local
     - CONNECTOR=marklogic_json
     - CONNECTOR=marklogic_xml
     - CONNECTOR=mimir
@@ -47,8 +48,8 @@ env:
 # this is also the test stage :eyeroll:
 script:
   - set -e
-  
-  - scripts/s3Cache download
+
+  - travis_wait 30 scripts/s3Cache download
 
   # travis installs postgres by default this will stop and free up the psql port
   # needed by the postgresql container
@@ -90,7 +91,7 @@ jobs:
     - stage: clean
       env:
       script:
-        - ./scripts/s3Cache cacheCleanUp
+        - travis_wait 30 ./scripts/s3Cache cacheCleanUp
         - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
 
     - stage: compile
@@ -98,7 +99,7 @@ jobs:
       script:
         - set -e
 
-        - scripts/s3Cache cleanup
+        - travis_wait 30 scripts/s3Cache cleanup
 
         - ./sbt preBuild
 
@@ -109,7 +110,7 @@ jobs:
 
         - ./sbt postBuild
 
-        - scripts/s3Cache upload
+        - travis_wait 30 scripts/s3Cache upload
 
         - set +e
 
@@ -117,7 +118,7 @@ jobs:
     - stage: unit test
       env:
       script:
-        - scripts/s3Cache download
+        - travis_wait 30 scripts/s3Cache download
         - ./sbt preBuild
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
@@ -130,7 +131,7 @@ jobs:
       script:
         - set -e
 
-        - scripts/s3Cache download
+        - travis_wait 30 scripts/s3Cache download
         - ./sbt preBuild
 
         - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc web/assembly'
@@ -145,7 +146,7 @@ jobs:
     - stage: cache cleanup
       env:
       script:
-        - scripts/s3Cache cleanup
+        - travis_wait 30 scripts/s3Cache cleanup
 
 notifications:
   irc:

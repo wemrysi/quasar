@@ -1,6 +1,7 @@
 {
     "name": "simple filter using timestamp literals",
     "backends": {
+        "lwc_local": "pending",
         "marklogic_json": "pending",
         "mimir": "pending"
     },

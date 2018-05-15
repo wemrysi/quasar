@@ -112,6 +112,9 @@ create_database() {
   if [[ $LOCAL_CONTAINER == "quasar_mimir" ]]
   then
     echo "$LOCAL_CONTAINER: not starting a container for mimir..."
+  elif [[ $LOCAL_CONTAINER == "quasar_lwc_local" ]]
+  then
+    echo "$LOCAL_CONTAINER: not starting a container for local lwc..."
   elif [[ $LOCAL_CONTAINER =~ "marklogic" ]]
   then
     $SCRIPTS_DIR/../Dockerfiles/Marklogic/getMLRpm

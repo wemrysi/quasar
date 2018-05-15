@@ -3,6 +3,7 @@
     "data": "timeseries.data",
     "backends": {
        "couchbase":         "ignoreFieldOrder",
+       "lwc_local":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
        "mimir":             "ignoreFieldOrder"
 

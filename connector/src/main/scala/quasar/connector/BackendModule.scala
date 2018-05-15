@@ -167,7 +167,11 @@ trait BackendModule {
         PhaseResult.tree("QScript (Educated)", qs)
       }
 
-      shifted <- Unirewrite[T, QS[T], M](R, lc).apply(qs)
+      shifted <- MonadFsErr[M].unattempt(
+        Unirewrite[T, QS[T], PlannerErrT[M, ?]](R, d => lc(d).liftM[PlannerErrT])
+          .apply(qs)
+          .leftMap(qscriptPlanningFailed(_))
+          .run)
       _ <- logPhase[M](PhaseResult.treeAndCode("QScript (ShiftRead)", shifted))
 
       optimized =

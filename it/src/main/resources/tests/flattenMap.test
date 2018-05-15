@@ -1,8 +1,7 @@
 {
     "name": "flatten map",
     "backends": {
-        "couchbase":  "ignoreFieldOrder",
-        "mimir": "ignoreFieldOrder",
+        "lwc_local": "ignoreFieldOrder",
         "couchbase": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },

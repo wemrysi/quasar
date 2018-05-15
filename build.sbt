@@ -81,13 +81,19 @@ lazy val backendRewrittenRunSettings = Seq(
     delegate.info("Computing classpaths of dependent backends...")
 
     val parentCp = (fullClasspath in connector in Compile).value.files
-    val backends = isolatedBackends.value map {
+    val productionBackends = isolatedBackends.value map {
       case (name, childCp) =>
         val classpathStr =
           createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(",")
 
         "--backend:" + name + "=" + classpathStr
     }
+
+    val lwcCp = (fullClasspath in mimir in Test).value.files
+    val lwcClasspath = createBackendEntry(lwcCp, parentCp).map(_.getAbsolutePath).mkString(",")
+    val testBackends = List("--backend:quasar.mimir.LightweightTester$=" + lwcClasspath)
+
+    val backends = productionBackends ++ testBackends
 
     val main = (mainClass in Compile).value.getOrElse(sys.error("unspecified main class; huzzah huzzah huzzah"))
     val r = runner.value
@@ -229,12 +235,12 @@ lazy val root = project.in(file("."))
   .settings(excludeTypelevelScalaLibrary)
   .aggregate(
 
-       foundation,
-//     /     \    \
-    effect, ejson, js, // <- _______
-//    |        \   /                \
-              common,
-//    |       /      \                \
+       foundation, //___
+//    /    \      \     \
+    api, effect, ejson, js, //______
+//       /     \   /                \
+               common,
+//     /      /      \                \
         frontend,    precog,
 //    |/    /    \       |             |
      fs, sql, datagen, blueeyes,
@@ -284,6 +290,16 @@ lazy val foundation = project
     libraryDependencies ++= Dependencies.foundation)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
+
+/** Types and interfaces describing Quasar's functionality. */
+lazy val api = project
+  .settings(name := "quasar-api-internal")
+  .dependsOn(foundation % BothScopes)
+  .settings(libraryDependencies ++= Dependencies.api)
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
 
 /** A fixed-point implementation of the EJson spec. This should probably become
   * a standalone library.
@@ -373,6 +389,7 @@ lazy val fs = project
     frontend % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
+  .settings(publishTestsSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -397,12 +414,15 @@ lazy val qsu = project
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
+    api,
     sql % "test->test",
     qsu)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
+  .settings(
+    libraryDependencies ++= Dependencies.connector)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project
@@ -410,6 +430,7 @@ lazy val core = project
   .dependsOn(
     connector % BothScopes,
     sql,
+    api       % "test->test",
     effect    % "test->test",
     fs        % "test->test")
   .settings(commonSettings)
@@ -545,13 +566,19 @@ lazy val it = project
       val LoadCfgProp = "slamdata.internal.fs-load-cfg"
 
       val parentCp = (fullClasspath in connector in Compile).value.files
-      val backends = isolatedBackends.value map {
+      val productionBackends = isolatedBackends.value map {
         case (name, childCp) =>
           val classpathStr =
             createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(":")
 
           name + "=" + classpathStr
       }
+
+      val lwcCp = (fullClasspath in mimir in Test).value.files
+      val lwcClasspath = createBackendEntry(lwcCp, parentCp).map(_.getAbsolutePath).mkString(":")
+      val testBackends = List("quasar.mimir.LightweightTester$=" + lwcClasspath)
+
+      val backends = productionBackends ++ testBackends
 
       if (java.lang.System.getProperty(LoadCfgProp, "").isEmpty) {
         // we aren't forking tests, so we just set the property in the current JVM

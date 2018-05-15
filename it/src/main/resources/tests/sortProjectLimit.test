@@ -2,6 +2,7 @@
     "name": "sort, project, and limit",
 
     "backends": {
+        "lwc_local": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
     "data": "zips.data",

@@ -3,6 +3,7 @@
     "NB": "This is currently disabled on all connectors due to #2110.",
     "backends": {
         "couchbase":         "pending",
+        "lwc_local":         "skip",
         "marklogic_json":    "pending",
         "marklogic_xml":     "pending",
         "mimir":             "skip",
