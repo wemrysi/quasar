@@ -26,11 +26,6 @@ class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck
   val sampleSize = 100
 
   "simple metadata" should {
-    "surivive round trip serialization" in prop { in: Metadata =>
-      in.serialize.validated[Metadata] must beLike {
-        case Success(out) => in mustEqual out
-      }
-    }
 
     "merge with like metadata" in prop { (sample1: List[Metadata], sample2: List[Metadata]) =>
       val prepared = sample1 zip sample2 map {
@@ -68,11 +63,6 @@ class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck
   }
 
   "metadata maps" should {
-    "survive round trip serialization" in prop { in: Map[MetadataType, Metadata] =>
-      in.map(_._2).toList.serialize.validated[List[Metadata]] must beLike {
-        case Success(out) => in must_== Map[MetadataType, Metadata](out.map{ m => (m.metadataType, m) }: _*)
-      }
-    }
 
     "merge as expected" in prop { (sample1: List[Map[MetadataType, Metadata]], sample2: List[Map[MetadataType, Metadata]]) =>
       val prepared = sample1 zip sample2 map {

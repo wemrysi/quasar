@@ -57,29 +57,6 @@ sealed trait Metadata {
 }
 
 object Metadata {
-  implicit val MetadataDecomposer: Decomposer[Metadata] = new Decomposer[Metadata] {
-    override def decompose(metadata: Metadata): JValue = {
-      JObject(List(JField(MetadataType.toName(metadata.metadataType), metadata.fold(_.jv, _.jv, _.jv, _.jv, _.jv))))
-    }
-  }
-
-  implicit val MetadataExtractor: Extractor[Metadata] = new Extractor[Metadata] {
-    override def validated(obj: JValue): Validation[Error, Metadata] = obj match {
-      case metadata @ JObject(entries) if entries.size == 1 => {
-        val (key, value) = entries.head
-        MetadataType.fromName(key).map {
-          case BooleanValueStats    => value.validated[BooleanValueStats]
-          case LongValueStats       => value.validated[LongValueStats]
-          case DoubleValueStats     => value.validated[DoubleValueStats]
-          case BigDecimalValueStats => value.validated[BigDecimalValueStats]
-          case StringValueStats     => value.validated[StringValueStats]
-        } getOrElse { Failure(Invalid("Unknown metadata type: " + key)) }
-      }
-
-      case _ => Failure(Invalid("Invalid metadata entry: " + obj))
-    }
-  }
-
   implicit val MetadataSemigroup = new Semigroup[Map[MetadataType, Metadata]] {
     def append(m1: Map[MetadataType, Metadata], m2: => Map[MetadataType, Metadata]) =
       m1.foldLeft(m2) { (acc, t) =>
