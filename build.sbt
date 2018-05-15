@@ -449,6 +449,7 @@ lazy val couchbase = project
   .settings(name := "quasar-couchbase-internal")
   .dependsOn(
     connector % BothScopes,
+    core      % "test->test",
     qscript   % "test->test")
   .settings(commonSettings)
   .settings(targetSettings)
@@ -463,6 +464,7 @@ lazy val marklogic = project
   .settings(name := "quasar-marklogic-internal")
   .dependsOn(
     connector % BothScopes,
+    core      % "test->test",
     qscript   % "test->test")
   .settings(commonSettings)
   .settings(targetSettings)

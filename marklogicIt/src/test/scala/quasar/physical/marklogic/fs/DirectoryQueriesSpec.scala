@@ -18,6 +18,7 @@ package quasar.physical.marklogic.fs
 
 import slamdata.Predef._
 import quasar.Data
+import quasar.compile.CompilerHelpers
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.fs._
@@ -28,7 +29,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 
-final class DirectoryQueriesSpec extends MultiFormatFileSystemTest {
+final class DirectoryQueriesSpec extends MultiFormatFileSystemTest with CompilerHelpers {
 
   def multiFormatFileSystemShould(js: BackendEffect ~> Task, xml: BackendEffect ~> Task) = {
     "Querying directory paths" >> {
