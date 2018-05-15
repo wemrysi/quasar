@@ -19,7 +19,7 @@ package quasar.mimir
 import quasar.Data
 import quasar.contrib.pathy.{ADir, AFile, PathSegment}
 import quasar.fp.PrismNT
-import quasar.fs.{FileSystem, Local, QueryFile, ReadFile}
+import quasar.fs.{FileSystem, FileSystemType, Local, QueryFile, ReadFile}
 import quasar.fs.mount.ConnectionUri
 
 import eu.timepit.refined.auto._
@@ -79,4 +79,9 @@ object LocalLightweight extends LightweightConnector {
     EitherT.rightT(Task.delay {
       (LocalLightweightFileSystem, Task.now(()))
     })
+}
+
+object LocalLWC extends SlamEngine {
+  val Type: FileSystemType = FileSystemType("local_file_system")
+  val lwc: LightweightConnector = LocalLightweight
 }
