@@ -28,7 +28,7 @@ import scalaz.{:<:, EitherT, OptionT}
 import scalaz.Scalaz._
 import scalaz.concurrent.Task
 
-object LightweightLocalFileSystem extends LightweightFileSystem {
+object LocalLightweightFileSystem extends LightweightFileSystem {
 
   def children(dir: ADir): Task[Option[Set[PathSegment]]] =
     for {
@@ -74,9 +74,9 @@ object LightweightLocalFileSystem extends LightweightFileSystem {
     PrismNT.inject[FS, FileSystem].apply(fs)
 }
 
-object LightweightLocal extends LightweightConnector {
+object LocalLightweight extends LightweightConnector {
   def init(uri: ConnectionUri): EitherT[Task, String, (LightweightFileSystem, Task[Unit])] =
     EitherT.rightT(Task.delay {
-      (LightweightLocalFileSystem, Task.now(()))
+      (LocalLightweightFileSystem, Task.now(()))
     })
 }
